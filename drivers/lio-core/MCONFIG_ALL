@@ -1,0 +1,39 @@
+##################################################################################
+# Filename:  <filename>
+#
+# $HeadURL: svn://subversion.sbei.com/pyx/target/branches/2.9-linux-iscsi.org/pyx-target/MCONFIG_ALL $
+#   $LastChangedRevision: 7131 $
+#   $LastChangedBy: nab $
+#   $LastChangedDate: 2007-08-25 17:03:55 -0700 (Sat, 25 Aug 2007) $
+#
+# Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+# For further information, contact via email: support@sbei.com
+# SBE, Inc.  San Ramon, California  U.S.A.
+##################################################################################
+
+MODVER ?= 1
+
+EZLK ?= 0
+USEGDB ?= 1
+
+ERLONE ?= 1
+ERLTWO ?= 1
+
+DEBUG_ISCSI ?= 0
+DEBUG_OPCODES ?= 0
+
+DEBUG_AUTHD ?= 0
+DEBUG_CHAP ?= 0
+DEBUG_ERL ?= 0
+DEBUG_DEV ?= 0
+
+DEBUG_SUSE ?= 0
+
+SNMP_FEATURE ?= 1
+SNAP_FEATURE ?= 1

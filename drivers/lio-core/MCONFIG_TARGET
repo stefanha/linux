@@ -1,0 +1,24 @@
+##################################################################################
+# Filename:  MCONFIG_TARGET
+#
+##################################################################################
+
+
+PYX_ISCSI_VENDOR ?="Linux-iSCSI.org"
+
+# Transport Plugins and Devices.
+#
+LINUX_PARALLEL_SCSI ?= 1
+LINUX_SCSI_MEDIA_ROM ?= 1
+LINUX_PARALLEL_ATA ?= 0
+LINUX_IBLOCK ?= 1
+LINUX_RAMDISK ?= 1
+LINUX_FILEIO ?= 1
+LINUX_VROM ?= 0
+LINUX_VTAPE ?= 1
+LINUX_MEDIA_CHANGER ?= 1
+
+#
+# Workarounds for stupidity
+#
+LINUX_EVPD_PAGE_CHECK?=1

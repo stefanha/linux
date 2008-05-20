@@ -1,0 +1,5 @@
+menuconfig LIO_CORE
+	tristate "Linux-iSCSI.org Storage Engine"
+	default m
+	---help---
+	Say Y here to enable the Linux-iSCSI.org Storage Engine and Subsystem Plugins.
