@@ -4476,7 +4476,6 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	memset(&ti, 0, sizeof(iscsi_transform_info_t));
 	ti.ti_data_length = cmd->data_length;
 	ti.ti_dev = ISCSI_LUN(cmd)->iscsi_dev;
-	ti.ti_vol = ISCSI_LUN(cmd)->iscsi_vol;
 	ti.ti_cmd = cmd;
 	ti.se_obj_ptr = type_ptr;
 	ti.se_obj_api = ISCSI_LUN(cmd)->lun_obj_api;

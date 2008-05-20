@@ -1222,7 +1222,6 @@ typedef struct iscsi_lun_s {
 	iscsi_lun_acl_t		*lun_acl_tail;
 	struct iscsi_node_acl_s *lun_reserved_node_acl;
 	iscsi_device_t		*iscsi_dev;
-	struct vol_s		*iscsi_vol;
 	void			*lun_type_ptr;
 	struct se_obj_lun_type_s *lun_obj_api;
 	struct se_port_s	*lun_sep;

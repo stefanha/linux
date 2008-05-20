@@ -259,7 +259,6 @@ typedef struct iscsi_transform_info_s {
         struct iscsi_cmd_s *ti_cmd;
         struct iscsi_device_s *ti_dev;
 	struct raid_engine_s *ti_raid;
-	struct vol_s	*ti_vol;
 	void *se_obj_ptr;
 	void *ti_obj_ptr;
 	struct se_obj_lun_type_s *se_obj_api;
