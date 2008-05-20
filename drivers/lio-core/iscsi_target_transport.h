@@ -126,7 +126,6 @@ extern int transport_generic_re_vol_cdb_count (struct iscsi_cmd_s *, struct iscs
 extern int transport_generic_re_vol_allocate_DMA (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
 extern int transport_process_mirror_write (u32 *, struct iscsi_transform_info_s *);
 extern int transport_mirror_vol_write_allocate_DMA (struct iscsi_cmd_s *, struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *);
-extern int transport_rebuild_cmd (struct iscsi_cmd_s *, int);
 extern void transport_device_setup_cmd (iscsi_cmd_t *);
 extern int transport_generic_allocate_tasks (iscsi_cmd_t *, unsigned char *);
 extern int transport_generic_check_device_location (iscsi_device_t *dev, struct iscsi_dev_transport_info_s *);

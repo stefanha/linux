@@ -714,14 +714,7 @@ static void transport_all_task_dev_remove_state (iscsi_cmd_t *cmd)
 		atomic_set(&task->task_state_active, 0);
 		atomic_dec(&T_TASK(cmd)->t_task_cdbs_ex_left);
 	}
-#ifdef REPLICATION_FEATURE
-	if (!cmd->iscsi_raid)
-		return;
 
-	spin_unlock_irq(&T_TASK(cmd)->t_state_lock);
-	raid_clear_rebuild_events(cmd);	
-	spin_lock_irq(&T_TASK(cmd)->t_state_lock);
-#endif
 	return;
 }
 
@@ -2182,64 +2175,6 @@ static int transport_process_non_data_transform (iscsi_cmd_t *cmd, iscsi_transfo
 }
 
 extern int transport_execute_tasks (iscsi_cmd_t *);
-
-/*
- * Memory already exists for the iscsi_cmd_t in question, this call will release
- * the previously allocate tasks and dev state.  At that point it will perform the
- * following operations:
- *
- * 1) Release the existing iscsi_task_t which have not timed out.
- * 2) Create new iscsi_task_ts and add to T_TASK(cmd)->t_task_list.
- * 3) Add tasks to device state list for WRITEs
- * 4) Add tasks to execute queue for READs
- */
-extern int transport_rebuild_cmd (iscsi_cmd_t *cmd, int post_execute)
-{
-	int ret;
-	iscsi_transform_info_t ti;
-	unsigned long flags;
-
-	/*
-	 * Note that tasks that have not been returned from the transport
-	 * plugin will not be released here.
-	 */
-	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-	transport_all_task_dev_remove_state(cmd);
-	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-	transport_release_tasks(cmd);
-
-	T_TASK(cmd)->t_tasks_failed = 0;
-
-	memset((void *)&ti, 0, sizeof(iscsi_transform_info_t));
-	ti.ti_cmd = cmd;
-	ti.ti_raid = ISCSI_LUN(cmd)->iscsi_raid;
-	ti.ti_vol = ISCSI_LUN(cmd)->iscsi_vol;
-	ti.ti_data_length = cmd->data_length;
-	ti.ti_lba = T_TASK(cmd)->t_task_lba;
-	ti.se_obj_ptr = ISCSI_LUN(cmd)->lun_type_ptr;
-	ti.se_obj_api = ISCSI_LUN(cmd)->lun_obj_api;
-
-	if ((ret = transport_new_cmd_obj(cmd, &ti, ISCSI_LUN(cmd)->lun_obj_api,
-			ISCSI_LUN(cmd)->lun_type_ptr, post_execute)) < 0)
-		goto failure;
-	
-	if (cmd->transport_cdb_transform(cmd, &ti) < 0) {
-		ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-		goto failure;
-	}
-	
-	if ((ret = cmd->transport_map_buffers_to_tasks(cmd)) < 0)
-		goto failure;
-	
-	if (cmd->data_direction == ISCSI_WRITE)
-		transport_add_tasks_to_state_queue(cmd);
-
-	return(0);
-
-failure:
-	return(ret);
-}
-
 static int transport_generic_cmd_sequencer (iscsi_cmd_t *, unsigned char *);
 
 extern void transport_device_setup_cmd (iscsi_cmd_t *cmd)
@@ -4516,21 +4451,7 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	cmd->se_orig_obj_api = obj_api;
 	cmd->se_orig_obj_ptr = type_ptr;
 	cmd->cmd_flags = cmd_flags;
-
-//#warning FIXME v2.8: This needs to go away once we get rid of ISCSI_LUN(cmd)->iscsi_XXXX usage
-	switch (obj_api->se_obj_type) {
-	case ISCSI_LUN_TYPE_DEVICE:
-		ISCSI_LUN(cmd)->iscsi_dev = (iscsi_device_t *) type_ptr;
-		break;
-#ifdef REPLICATION_FEATURE
-	case ISCSI_LUN_TYPE_RAID:
-		ISCSI_LUN(cmd)->iscsi_raid = (raid_engine_t *) type_ptr;
-		break;
-#endif
-	default:
-		TRACE_ERROR("Unsupported type: %d for transport passthrough\n", obj_api->se_obj_type);
-		goto fail;
-	}
+	ISCSI_LUN(cmd)->iscsi_dev = (iscsi_device_t *) type_ptr;
 
 	/*
 	 * Double check that the passed object is currently accepting CDBs
@@ -4555,7 +4476,6 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	memset(&ti, 0, sizeof(iscsi_transform_info_t));
 	ti.ti_data_length = cmd->data_length;
 	ti.ti_dev = ISCSI_LUN(cmd)->iscsi_dev;
-	ti.ti_raid = ISCSI_LUN(cmd)->iscsi_raid;
 	ti.ti_vol = ISCSI_LUN(cmd)->iscsi_vol;
 	ti.ti_cmd = cmd;
 	ti.se_obj_ptr = type_ptr;

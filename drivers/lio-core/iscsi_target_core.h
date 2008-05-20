@@ -704,7 +704,6 @@ typedef struct iscsi_cmd_s {
 	struct iscsi_cmd_s	*l_next;
 	struct iscsi_cmd_s	*l_prev;
 	struct iscsi_device_s	*iscsi_dev;
-	struct raid_engine_s	*iscsi_raid;
 	struct se_obj_lun_type_s *se_obj_api;
 	void			*se_obj_ptr;
 	struct se_obj_lun_type_s *se_orig_obj_api;
@@ -1223,7 +1222,6 @@ typedef struct iscsi_lun_s {
 	iscsi_lun_acl_t		*lun_acl_tail;
 	struct iscsi_node_acl_s *lun_reserved_node_acl;
 	iscsi_device_t		*iscsi_dev;
-	struct raid_engine_s	*iscsi_raid;
 	struct vol_s		*iscsi_vol;
 	void			*lun_type_ptr;
 	struct se_obj_lun_type_s *lun_obj_api;
