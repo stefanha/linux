@@ -389,11 +389,6 @@ extern void transport_init_queue_obj (se_queue_obj_t *qobj)
 	return;
 }
 
-static int ISNUMBER(char x)
-{
-	return ((x>='0') && (x<='9'));
-}
-
 extern void transport_load_plugins (void)
 {
 	int ret = 0;

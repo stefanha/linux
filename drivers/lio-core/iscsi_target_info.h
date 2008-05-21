@@ -31,9 +31,6 @@
 
 #define MAX_SCSI_DEV_TYPE       14
 
-extern char *iscsi_decode_dev_sts_string (u32);
-extern char *iscsi_decode_raid_sts_string (u32);
-extern char *iscsi_decode_raid_type_string (u32);
 extern int iscsi_get_hba_info_count_for_global (int *);
 extern int iscsi_get_hba_info (char *, int, int, int, int);
 extern int iscsi_get_dev_info_count_for_hba (u32, int *);

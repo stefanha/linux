@@ -907,7 +907,6 @@ static int init_iscsi_global (iscsi_global_t *global)
 	spin_lock_init(&global->login_thread_lock);
 	spin_lock_init(&global->np_lock);
 	spin_lock_init(&global->plugin_class_lock);
-	spin_lock_init(&global->raid_lock);
 	spin_lock_init(&global->shutdown_lock);
 	spin_lock_init(&global->tiqn_lock);
 	INIT_LIST_HEAD(&global->g_tiqn_list);

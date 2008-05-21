@@ -1121,7 +1121,6 @@ typedef struct iscsi_dev_transport_info_s {
 	u32			rd_device_id;
 	u32			vt_device_id;
 	u32			mc_device_id;
-	u32			raid_dev;
 	int			scsi_channel_id;
 	int			scsi_lun_id;
 	int			scsi_target_id;
@@ -1377,7 +1376,6 @@ typedef struct iscsi_global_s {
 	u32			thread_id;	/* Thread ID counter */
 	int (*ti_forcechanoffline)(void *);
 	struct se_plugin_class_s *plugin_class_list;
-	struct raid_engine_s	*raid_list;
 	struct vol_s		*vol_list;
 	iscsi_hba_t		*hba_list;
 	struct list_head	g_tiqn_list;
@@ -1389,7 +1387,6 @@ typedef struct iscsi_global_s {
 	spinlock_t		inactive_ts_lock;
 	spinlock_t		login_thread_lock; /* Spinlock for adding/removing login threads */
 	spinlock_t		plugin_class_lock;
-	spinlock_t		raid_lock;
 	spinlock_t		shutdown_lock;
 	spinlock_t		thread_set_lock; /* Spinlock for adding/removing thread sets */
 	spinlock_t		tiqn_lock;	/* Spinlock for iscsi_tiqn_t */

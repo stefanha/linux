@@ -138,7 +138,6 @@ extern void transport_direct_request_timeout (iscsi_cmd_t *);
 extern void transport_generic_request_timeout (iscsi_cmd_t *);
 extern int transport_generic_allocate_buf (iscsi_cmd_t *, u32, u32);
 extern int __transport_execute_tasks (struct iscsi_device_s *);
-extern int __transport_raid_execute_tasks (struct raid_engine_s *);
 extern void transport_new_cmd_failure (struct iscsi_cmd_s *);
 extern void transport_start_task_timer (struct iscsi_task_s *);
 extern void __transport_stop_task_timer (struct iscsi_task_s *, unsigned long *);
@@ -232,7 +231,6 @@ typedef struct iscsi_task_s {
 	u32		task_sg_offset;
 	iscsi_cmd_t	*iscsi_cmd;
 	iscsi_device_t	*iscsi_dev;
-	struct raid_engine_s *iscsi_raid;
 	struct semaphore	task_stop_sem;
 	atomic_t	task_active;
 	atomic_t	task_execute_queue;
@@ -257,7 +255,6 @@ typedef struct iscsi_transform_info_s {
 	unsigned long long	ti_lba;
         struct iscsi_cmd_s *ti_cmd;
         struct iscsi_device_s *ti_dev;
-	struct raid_engine_s *ti_raid;
 	void *se_obj_ptr;
 	void *ti_obj_ptr;
 	struct se_obj_lun_type_s *se_obj_api;
