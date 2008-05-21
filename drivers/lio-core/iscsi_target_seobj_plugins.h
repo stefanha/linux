@@ -27,9 +27,5 @@
 #define ISCSI_TARGET_SEOBJ_PLUGINS_H
 
 extern se_obj_lun_type_t dev_obj_template;
-extern se_obj_lun_type_t devvol_obj_template;
-extern se_obj_lun_type_t raidvol_obj_template;
-extern se_obj_lun_type_t raid_obj_template;
-extern se_obj_lun_type_t snapvol_obj_template;
 
 #endif /* ISCSI_TARGET_SEOBJ_PLUGINS_H */
