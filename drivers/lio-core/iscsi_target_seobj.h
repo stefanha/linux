@@ -29,8 +29,7 @@
 extern struct se_obj_lun_type_s *se_obj_get_api (u32);
 extern int se_obj_load_plugins (void);
 
-#define DEV_OBJ_VERSION		"v2.9"
-#define RAID_OBJ_VERSION	"v2.9"
+#define DEV_OBJ_VERSION		"v3.0"
 
 typedef int (*map_func_t)(struct iscsi_task_s *, u32);
 

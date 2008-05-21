@@ -30,7 +30,7 @@
 #ifndef ISCSI_TARGET_PSCSI_H
 #define ISCSI_TARGET_PSCSI_H
 
-#define PSCSI_VERSION		"v2.9"
+#define PSCSI_VERSION		"v3.0"
 
 /* used in pscsi_find_alloc_len() */
 #ifndef INQUIRY_DATA_SIZE

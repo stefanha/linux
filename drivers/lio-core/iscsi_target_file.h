@@ -29,7 +29,7 @@
 #ifndef ISCSI_TARGET_FILE_H
 #define ISCSI_TARGET_FILE_H
 
-#define FD_VERSION		"v2.9"
+#define FD_VERSION		"v3.0"
 
 #define FD_MAX_DEV_NAME		256
 #define FD_HBA_QUEUE_DEPTH	256		/* Maximum queuedepth for the FILEIO HBA */

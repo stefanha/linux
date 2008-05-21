@@ -26,7 +26,7 @@
 #ifndef _ISCSI_TARGET_FEATURE_OBJ_H_
 #define _ISCSI_TARGET_FEATURE_OBJ_H_
 
-#define PYX_SE_VERSION		"v2.9"
+#define PYX_SE_VERSION		"v3.0"
 
 #define FP_SO_NONE		0
 #define FP_SO_VOL_OBJS_ONLY	1

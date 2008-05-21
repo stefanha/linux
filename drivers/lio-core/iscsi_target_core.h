@@ -76,8 +76,8 @@
 #define ISCSI_IWARP_SCTP			4
 #define ISCSI_INFINIBAND			5
 
-#define ISCSI_TCP_VERSION		"v2.9"
-#define ISCSI_SCTP_VERSION		"v2.9"
+#define ISCSI_TCP_VERSION		"v3.0"
+#define ISCSI_SCTP_VERSION		"v3.0"
 
 /* iscsi_node_attrib_t sanity values */
 #define NA_DATAOUT_TIMEOUT		3

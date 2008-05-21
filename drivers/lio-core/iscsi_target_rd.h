@@ -29,9 +29,9 @@
 #ifndef ISCSI_TARGET_RD_H
 #define ISCSI_TARGET_RD_H
 
-#define RD_HBA_VERSION		"v2.0"
-#define RD_DR_VERSION		"v2.9"
-#define RD_MCP_VERSION		"v2.9"
+#define RD_HBA_VERSION		"v3.0"
+#define RD_DR_VERSION		"v3.0"
+#define RD_MCP_VERSION		"v3.0"
 
 #define RD_MAX_ALLOCATION_SIZE	65536		/* Largest piece of memory kmalloc can allocate */
 #define RD_HBA_QUEUE_DEPTH	256		/* Maximum queuedepth for the Ramdisk HBA */
