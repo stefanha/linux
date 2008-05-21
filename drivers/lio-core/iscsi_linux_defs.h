@@ -94,21 +94,4 @@
 	timer.data	= (unsigned long) d; \
 	timer.function	= func;
 
-/*
- * Other misc stuff.
- */
-
-#ifndef SCSI_DATA_UNKNOWN
-#define SCSI_DATA_UNKNOWN       (DMA_BIDIRECTIONAL)
-#endif
-#ifndef SCSI_DATA_WRITE
-#define SCSI_DATA_WRITE         (DMA_TO_DEVICE)
-#endif
-#ifndef SCSI_DATA_READ
-#define SCSI_DATA_READ          (DMA_FROM_DEVICE)
-#endif
-#ifndef SCSI_DATA_NONE
-#define SCSI_DATA_NONE          (DMA_NONE)
-#endif
-
 #endif    /*** ISCSI_LINUX_DEFS_H ***/

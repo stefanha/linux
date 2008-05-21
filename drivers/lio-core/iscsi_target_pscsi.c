@@ -52,10 +52,6 @@
 typedef struct scsi_cmnd Scsi_Cmnd;
 typedef struct scsi_request Scsi_Request;
 typedef struct scsi_pointer Scsi_Pointer;
-#define SCSI_DATA_UNKNOWN	(DMA_BIDIRECTIONAL)
-#define SCSI_DATA_WRITE		(DMA_TO_DEVICE)
-#define SCSI_DATA_READ		(DMA_FROM_DEVICE)
-#define SCSI_DATA_NONE		(DMA_NONE)
 #endif /* _SCSI_H */
 #include <scsi/scsi_host.h>
 
@@ -1026,7 +1022,7 @@ extern int pscsi_CDB_inquiry (iscsi_task_t *task, u32 size)
 #else
 	Scsi_Request *req = (Scsi_Request *) task->transport_req;
 
-	req->sr_data_direction	= SCSI_DATA_READ;
+	req->sr_data_direction	= DMA_FROM_DEVICE;
 #endif 
 
 	pscsi_map_task_non_SG(task);
@@ -1042,7 +1038,7 @@ extern int pscsi_CDB_none (iscsi_task_t *task, u32 size)
 #else
 	Scsi_Request *req = (Scsi_Request *) task->transport_req;
 
-	req->sr_data_direction	= SCSI_DATA_NONE;
+	req->sr_data_direction	= DMA_NONE;
 	req->sr_bufflen		= 0;
 	req->sr_sglist_len	= 0;
 	req->sr_use_sg		= 0;
@@ -1064,7 +1060,7 @@ extern int pscsi_CDB_read_non_SG (iscsi_task_t *task, u32 size)
 #else
 	Scsi_Request *req = (Scsi_Request *) task->transport_req;
 
-	req->sr_data_direction  = SCSI_DATA_READ;
+	req->sr_data_direction  = DMA_FROM_DEVICE;
 #endif 
 
 	pscsi_map_task_non_SG(task);
@@ -1088,7 +1084,7 @@ extern int pscsi_CDB_read_SG (iscsi_task_t *task, u32 size)
 #else
 	Scsi_Request *req = (Scsi_Request *) task->transport_req;
 
-	req->sr_data_direction  = SCSI_DATA_READ;
+	req->sr_data_direction  = DMA_FROM_DEVICE;
 	pscsi_map_task_SG(task);
 
 	return(req->sr_use_sg);
@@ -1108,7 +1104,7 @@ extern int pscsi_CDB_write_non_SG (iscsi_task_t *task, u32 size)
 #else
 	Scsi_Request *req = (Scsi_Request *) task->transport_req;
 
-	req->sr_data_direction  = SCSI_DATA_WRITE;
+	req->sr_data_direction  = DMA_TO_DEVICE;
 #endif 
 
 	pscsi_map_task_non_SG(task);
@@ -1131,7 +1127,7 @@ extern int pscsi_CDB_write_SG (iscsi_task_t *task, u32 size)
 #else
 	Scsi_Request *req = (Scsi_Request *) task->transport_req;
 
-	req->sr_data_direction  = SCSI_DATA_WRITE;
+	req->sr_data_direction  = DMA_TO_DEVICE;
 	pscsi_map_task_SG(task);
 
 	return(req->sr_use_sg);
