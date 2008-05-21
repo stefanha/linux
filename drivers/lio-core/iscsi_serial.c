@@ -34,10 +34,6 @@
 #include <iscsi_linux_os.h>
 #endif /* LINUX */
 
-#ifdef FREEBSD
-#include <iscsi_freebsd_os.h>
-#endif /* FREEBSD */
-
 #include <iscsi_serial.h>
 
 #define SERIAL_BITS	31

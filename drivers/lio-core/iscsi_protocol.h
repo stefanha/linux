@@ -28,11 +28,6 @@
 #include <iscsi_linux_defs.h>
 #endif /* LINUX */
 
-#ifdef FREEBSD
-#include <iscsi_freebsd_os.h>
-#include <iscsi_freebsd_defs.h>
-#endif /* FREEBSD */
-
 #include <iscsi_debug.h>
 
 #define ISCSI_PORT			3260

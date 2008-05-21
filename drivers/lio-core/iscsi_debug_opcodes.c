@@ -34,10 +34,6 @@
 #include <iscsi_linux_os.h>
 #endif /* LINUX */
 
-#ifdef FREEBSD
-#include <iscsi_freebsd_os.h>
-#endif /* FREEBSD */
-
 #define __ISCSI_DEBUG_OPCODES_C
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>

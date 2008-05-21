@@ -21,11 +21,6 @@
 #include <iscsi_linux_defs.h>
 #endif /* LINUX */
 
-#ifdef FREEBSD
-#include <iscsi_freebsd_os.h>
-#include <iscsi_freebsd_defs.h>
-#endif /* FREEBSD */
-
 /*	calculate a 32-bit crc	*/
 /*	if restart has 0x01 set, initialize the accumulator */
 /*	if restart has 0x02 set, save result in network byte order */
