@@ -101,9 +101,7 @@ typedef struct fd_request_s {
 	u32		fd_sg_count;		/* Scatterlist count */
 	unsigned long long	fd_lba;			/* Logical Block Address */
 	u64		fd_size;
-#ifdef LINUX_KERNEL_26
 	struct kiocb	fd_iocb;
-#endif
 	struct iovec	*fd_iovs;
 	void		*fd_buf;		/* Data buffer containing scatterlists(s) or contingous memory segments. */
 	struct fd_dev_s	*fd_dev;		/* FILEIO device */

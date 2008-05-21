@@ -353,9 +353,8 @@ extern int se_delhbafromtarget (void *p)
 	core_put_hba(hba);
 	return(ret);
 }
-#ifdef LINUX_KERNEL_26
+
 EXPORT_SYMBOL(se_delhbafromtarget);
-#endif
 
 /*      iscsi_target_ioctl():
  *
@@ -926,9 +925,8 @@ extern int iscsi_ioctl (
 }
 
 extern int iscsi_targetname (void) { return (iscsi_global->targetname_set); }
-#ifdef LINUX_KERNEL_26
+
 EXPORT_SYMBOL(iscsi_targetname);
-#endif
 
 extern void se_set_forcechanoffline (void *p)
 {
@@ -941,9 +939,8 @@ extern void se_set_forcechanoffline (void *p)
 	
 	return;
 }
-#ifdef LINUX_KERNEL_26
+
 EXPORT_SYMBOL(se_set_forcechanoffline);
-#endif
 
 #ifdef USE_COMPAT_IOCTL
 
