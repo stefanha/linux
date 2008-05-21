@@ -95,7 +95,6 @@ extern int iscsi_debug_dev (iscsi_device_t *);
 #endif
 extern unsigned char *transport_get_iqn_sn (void);
 extern void transport_init_queue_obj (struct se_queue_obj_s *);
-extern void transport_check_uuid (u32 *, void *);
 extern void transport_load_plugins (void);
 extern iscsi_device_t *transport_core_locate_dev (struct iscsi_target *, iscsi_dev_transport_info_t *, int *);
 extern void transport_task_dev_remove_state (struct iscsi_task_s *, struct iscsi_device_s *);

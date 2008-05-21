@@ -394,49 +394,6 @@ static int ISNUMBER(char x)
 	return ((x>='0') && (x<='9'));
 }
 
-
-/*
- * When the userspace program 'uuid' is not available, we must generate a UUID internally.
- */
-extern void transport_check_uuid (u32 *uu_id, void *p)
-{
-	static u32 sigc = 0;    /* dummy "anything" starting value */
-
-	union {
-		u32 j32[2];
-		u64 j64;
-	} jif;
-
-	/* create a seed number based upon current version/release */
-	if (sigc == 0) {
-		unsigned char vsn[40];
-		int len;
-
-		len = strlen (PYX_ISCSI_VERSION);
-		sprintf (vsn, PYX_ISCSI_VERSION);
-
-		if ((len>=5) && ISNUMBER(vsn[len-5])) sigc = vsn[len-5] & 0xf;
-		if ((len>=4) && ISNUMBER(vsn[len-4])) sigc = (sigc << 4) + (vsn[len-4] & 0xf);
-		if ((len>=3) && ISNUMBER(vsn[len-3])) sigc = (sigc << 4) + (vsn[len-3] & 0xf);
-		if ((len>=2) && ISNUMBER(vsn[len-2])) sigc = (sigc << 4) + (vsn[len-2] & 0xf);
-		if ((len>=1) && ISNUMBER(vsn[len-1])) sigc = (sigc << 4) + (vsn[len-1] & 0xf);
-		sigc = sigc << 12;
-	}
-
-	jif.j64 = get_jiffies_64();
-
-	sigc += 1;     /* assures uniquess w/in same jiffie */
-	uu_id[0] = (u32) p; /* different kernels & builds probably unique */
-	uu_id[1] = sigc;
-	uu_id[2] = jif.j32[0];  /* timestamp uniqueness */
-	uu_id[3] = jif.j32[1];  /* timestamp uniqueness */
-
-	TRACE_OPS("Generated in-kernel UUID: %08x%08x%08x%08x\n",
-		uu_id[0], uu_id[1], uu_id[2], uu_id[3]);
-
-	return;
-}
-
 extern void transport_load_plugins (void)
 {
 	int ret = 0;
