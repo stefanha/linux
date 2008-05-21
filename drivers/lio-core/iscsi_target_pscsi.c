@@ -28,7 +28,6 @@
 
 #define ISCSI_TARGET_PSCSI_C
 
-#ifdef LINUX
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -49,8 +48,6 @@ typedef struct scsi_pointer Scsi_Pointer;
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-
-#endif /* LINUX */
 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>

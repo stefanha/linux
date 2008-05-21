@@ -4135,7 +4135,6 @@ extern int iscsi_target_tx_thread (void *arg)
 
 	TRACE_ENTER
 
-#ifdef LINUX
         {
 	    static int x = 0;  /* unique number added to thread name */
             char name[20];
@@ -4145,7 +4144,6 @@ extern int iscsi_target_tx_thread (void *arg)
 	    sprintf (name, "%s/%d", ISCSI_TX_THREAD_NAME, x++);
 	    iscsi_daemon(ts->tx_thread, name, SHUTDOWN_SIGS);
         }
-#endif /* LINUX */      
 	
 restart:
 	if (!(conn = iscsi_tx_thread_pre_handler(ts, TARGET)))
@@ -4462,7 +4460,6 @@ extern int iscsi_target_rx_thread (void *arg)
 	iscsi_thread_set_t *ts = (iscsi_thread_set_t *) arg;
 	struct iovec iov;
 
-#ifdef LINUX
         {
 	    static int x = 0;  /* unique number added to thread name */
             char name[20];
@@ -4472,7 +4469,6 @@ extern int iscsi_target_rx_thread (void *arg)
 	    sprintf (name, "%s/%d", ISCSI_RX_THREAD_NAME, x++);
 	    iscsi_daemon(ts->rx_thread, name, SHUTDOWN_SIGS);
         }
-#endif /* LINUX */
 	
 restart:
 	if (!(conn = iscsi_rx_thread_pre_handler(ts, TARGET)))

@@ -30,9 +30,7 @@
 #ifndef ISCSI_SERIAL_C
 #define ISCSI_SERIAL_C
 
-#ifdef LINUX
 #include <iscsi_linux_os.h>
-#endif /* LINUX */
 
 #include <iscsi_serial.h>
 

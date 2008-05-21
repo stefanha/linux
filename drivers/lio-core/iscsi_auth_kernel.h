@@ -22,10 +22,8 @@
 #ifndef ISCSI_AUTH_KERNEL_H
 #define ISCSI_AUTH_KERNEL_H
 
-#ifdef LINUX
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_auth.h>
 

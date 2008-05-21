@@ -2669,10 +2669,8 @@ static inline int iscsi_do_rx_data (
 	int data = count->data_length, rx_loop = 0, total_rx = 0;
 	__u32 rx_marker_val[count->ss_marker_count], rx_marker_iov = 0;
 	struct iovec iov[count->ss_iov_count];
-#ifdef LINUX
 	mm_segment_t oldfs;
 	struct msghdr msg;
-#endif /* LINUX */
 
 	if (!conn || !conn->sock || !CONN_OPS(conn))
 		return(-1);
@@ -2808,10 +2806,8 @@ static inline int iscsi_do_tx_data (
 	int data = count->data_length, total_tx = 0, tx_loop = 0;
 	__u32 tx_marker_val[count->ss_marker_count], tx_marker_iov = 0;
 	struct iovec iov[count->ss_iov_count];
-#ifdef LINUX
 	mm_segment_t oldfs;
 	struct msghdr msg;
-#endif /* LINUX */
 
 	if (!conn || !conn->sock || !CONN_OPS(conn))
 		return(-1);

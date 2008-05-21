@@ -25,7 +25,6 @@
 
 #define ISCSI_TARGET_SEOBJ_C
 
-#ifdef LINUX
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -37,7 +36,6 @@
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_lists.h>
 #include <iscsi_debug.h>

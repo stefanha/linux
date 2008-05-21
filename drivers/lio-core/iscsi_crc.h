@@ -16,10 +16,8 @@
 #ifndef _ISCSI_CRC_H_
 #define _ISCSI_CRC_H_
 
-#ifdef LINUX
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 /*	calculate a 32-bit crc	*/
 /*	if restart has 0x01 set, initialize the accumulator */

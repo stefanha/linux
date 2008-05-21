@@ -29,7 +29,6 @@
 
 #define ISCSI_TARGET_INFO_C
 
-#ifdef LINUX
 #include <linux/string.h>
 #include <linux/version.h>
 #include <linux/utsrelease.h>
@@ -48,7 +47,6 @@
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_lists.h>
 #include <iscsi_debug.h>

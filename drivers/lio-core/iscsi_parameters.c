@@ -26,10 +26,8 @@
  *********************************************************************************/
 
 
-#ifdef LINUX
 #include <linux/slab.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_protocol.h>
 #include <iscsi_debug.h>

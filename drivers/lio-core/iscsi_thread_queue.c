@@ -28,7 +28,6 @@
 
 #define ISCSI_THREAD_QUEUE_C
 
-#ifdef LINUX
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -36,7 +35,6 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
         
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>

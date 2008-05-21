@@ -26,13 +26,11 @@
  *********************************************************************************/
 
 
-#ifdef LINUX
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
 
 #include <iscsi_linux_os.h>
-#endif /* LINUX */
 
 #define __ISCSI_DEBUG_OPCODES_C
 #include <iscsi_debug.h>

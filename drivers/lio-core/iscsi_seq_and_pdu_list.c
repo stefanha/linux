@@ -29,11 +29,9 @@
 
 #define ISCSI_SEQ_AND_PDU_LIST_C
 
-#ifdef LINUX
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_protocol.h>
 #include <iscsi_debug.h>

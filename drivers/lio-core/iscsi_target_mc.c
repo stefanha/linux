@@ -25,7 +25,6 @@
 
 #define ISCSI_TARGET_MC_C
 
-#ifdef LINUX
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -38,7 +37,6 @@
 
 #include <iscsi_linux_os.h> 
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */      
                                 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>

@@ -74,7 +74,6 @@ extern int iscsi_send_async_msg (iscsi_conn_t *, __u16, __u8, __u8);
 extern int iscsi_target_release_phase1(int);
 extern void iscsi_target_release_phase2(void);
 
-#ifdef LINUX
 extern int linux24_blockdevice_nop (void)
 {
 	return(0);
@@ -174,7 +173,6 @@ extern int linux_blockdevice_check (int major, int minor)
 	 
 	return(0);
 }
-#endif /* LINUX */
 
 static int get_out_count (int cmd, struct iscsi_target *t)
 {

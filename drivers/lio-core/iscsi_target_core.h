@@ -29,7 +29,6 @@
 #ifndef ISCSI_TARGET_CORE_H
 #define ISCSI_TARGET_CORE_H
 
-#ifdef LINUX
 #include <linux/in.h>
 #include <net/sock.h>
 #include <net/tcp.h>
@@ -37,7 +36,6 @@
 #ifdef SNMP_SUPPORT
 #include <iscsi_target_mib.h>
 #endif /* SNMP_SUPPORT */
-#endif
 
 #include <iscsi_target_version.h>	    /* get version definition */
 

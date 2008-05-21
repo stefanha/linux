@@ -23,10 +23,8 @@
 #ifndef ISCSI_PROTOCOL_H
 #define ISCSI_PROTOCOL_H
 
-#ifdef LINUX
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_debug.h>
 

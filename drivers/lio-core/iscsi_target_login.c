@@ -28,7 +28,6 @@
 
 #define ISCSI_TARGET_LOGIN_C
 
-#ifdef LINUX
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -42,7 +41,6 @@
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
@@ -869,14 +867,12 @@ extern int iscsi_target_login_thread (void *arg)
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 	
-#ifdef LINUX
 	{
 	char name[16];
 	memset(name, 0, 16);
 	sprintf(name, "iscsi_np");
 	iscsi_daemon(np->np_thread, name, SHUTDOWN_SIGS);
 	}
-#endif /* LINUX */
 
 	if (!(sock = iscsi_target_setup_login_socket(np))) {
 		up(&np->np_start_sem);

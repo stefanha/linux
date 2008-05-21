@@ -28,7 +28,6 @@
 
 #define ISCSI_TARGET_LINUX_PROC_C
 
-#ifdef LINUX
 #include <linux/string.h>
 #include <linux/version.h>
 #include <linux/timer.h>
@@ -45,7 +44,6 @@
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_lists.h>
 #include <iscsi_debug.h>

@@ -22,15 +22,8 @@
 #ifndef ISCSI_OPCODES_DEBUG_H
 #define ISCSI_OPCODES_DEBUG_H
 
-#ifdef LINUX
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
-
-#ifdef FREEBSD
-#include <iscsi_freebsd_os.h>
-#include <iscsi_freebsd_defs.h>
-#endif /* FREEBSD */
 
 void print_status_class_and_detail (u8, u8);
 void print_reject_reason(u8);

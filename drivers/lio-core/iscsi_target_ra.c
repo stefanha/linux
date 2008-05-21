@@ -28,7 +28,6 @@
 
 #define ISCSI_TARGET_RA_C
 
-#ifdef LINUX
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -41,7 +40,6 @@
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
 
 #include <iscsi_lists.h>
 #include <iscsi_protocol.h>

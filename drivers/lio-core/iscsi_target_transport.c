@@ -28,7 +28,6 @@
 
 #define ISCSI_TARGET_TRANSPORT_C
 
-#ifdef LINUX    
 #include <linux/version.h>
 #include <linux/net.h>
 #include <linux/delay.h>
@@ -47,7 +46,6 @@
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-#endif /* LINUX */
         
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
@@ -6533,13 +6531,11 @@ static int transport_status_thread (void *p)
 	void *se_obj_ptr;
 	int ret, state;
 
-#ifdef LINUX
 	{
 	char name[16];
 	sprintf(name, "LIO_st_%s", TRANSPORT(dev)->name);
 	iscsi_daemon(dev->dev_mgmt_thread, name, SHUTDOWN_SIGS);
         }
-#endif /* LINUX */
 	
 	up(&dev->dev_status_queue_obj->thread_create_sem);
 	
@@ -6799,13 +6795,11 @@ static int transport_processing_thread (void *param)
 	iscsi_device_t *dev = (iscsi_device_t *) param;
 	iscsi_queue_req_t *qr;
 
-#ifdef LINUX
 	{
 	char name[16];
 	sprintf(name, "LIO_%s", TRANSPORT(dev)->name);
 	iscsi_daemon(dev->process_thread, name, SHUTDOWN_SIGS);
 	}
-#endif /* LINUX */
 
 	up(&dev->dev_queue_obj->thread_create_sem);
 	
