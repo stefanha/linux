@@ -27,9 +27,7 @@
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/version.h>
-#ifdef HAS_UTS_RELEASE
 #include <linux/utsrelease.h>
-#endif
 #include <linux/utsname.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>

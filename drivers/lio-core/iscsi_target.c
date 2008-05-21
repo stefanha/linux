@@ -31,9 +31,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/version.h>
-#ifdef HAS_UTS_RELEASE
 #include <linux/utsrelease.h>
-#endif
 #include <linux/init.h>
 #include <linux/kmod.h>
 #include <linux/net.h>
