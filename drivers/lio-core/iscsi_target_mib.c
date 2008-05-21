@@ -167,7 +167,9 @@ static int inst_attr_seq_show(struct seq_file *seq, void *v)
 	/* Display strings one per line */
 	seq_printf(seq, "description: %s\n", ISCSI_INST_DESCR);
 	seq_printf(seq, "vendor: %s\n", ISCSI_VENDOR);
-	seq_printf(seq, "version: %s on %s/%s\n", PYX_ISCSI_VERSION, ISCSI_UTS_SYSNAME, ISCSI_UTS_MACHINE);
+	seq_printf(seq, "version: %s on %s/%s\n", PYX_ISCSI_VERSION,
+		utsname()->sysname, utsname()->machine);
+
 	return(0);
 }
 

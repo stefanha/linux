@@ -1150,7 +1150,7 @@ extern int iscsi_get_plugin_info (
                 memset(b, 0, TMP_BUF_LEN);
                 bl = sprintf(b, "--------------------[Storage Engine Info]----------------------------\n");
 	        bl += sprintf(b+bl, "%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on %s/%s on "UTS_RELEASE"\n",
-                        PYX_ISCSI_VENDOR, ISCSI_UTS_SYSNAME, ISCSI_UTS_MACHINE);
+                        PYX_ISCSI_VENDOR, utsname()->sysname, utsname()->machine);
 		bl += sprintf(b+bl, "--------------------[SE Registered Plugins]--------------------------\n");
 
 		if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0)

@@ -144,7 +144,7 @@ extern void rd_release_device_space (rd_dev_t *rd_dev)
 		sg_per_table = sg_table[i].rd_sg_count;
 
 		for (j = 0; j < sg_per_table; j++) {
-			if ((pg = GET_PAGE_SG(&sg[j]))) {
+			if ((pg = sg_page(&sg[j]))) {
 				__free_page(pg);
 				page_count++;
 			}
@@ -209,7 +209,7 @@ static int rd_build_device_space (rd_dev_t *rd_dev)
 		}
 		memset(sg, 0, sg_per_table * sizeof(struct scatterlist));
 
-		SET_SG_TABLE(sg, sg_per_table);
+		sg_init_table((struct scatterlist *)&sg[0], sg_per_table);
 
 		sg_table[i].sg_table = sg;
 		sg_table[i].rd_sg_count = sg_per_table;
@@ -223,7 +223,7 @@ static int rd_build_device_space (rd_dev_t *rd_dev)
 					" pages for rd_dev_sg_table_t\n");
 				return(-1);
 			}
-			SET_PAGE_SG(&sg[j], pg);
+			sg_assign_page(&sg[j], pg);
 			sg[j].length = PAGE_SIZE;
 		}
 
@@ -627,11 +627,11 @@ static int rd_MEMCPY_read (rd_request_t *req)
 			if (length > req->rd_size)
 				length = req->rd_size;
 
-			dst = GET_ADDR_SG(&sg_d[i++]) + dst_offset;
+			dst = sg_virt(&sg_d[i++]) + dst_offset;
 			if (!dst)
 				BUG();
 
-			src = GET_ADDR_SG(&sg_s[j]) + src_offset;
+			src = sg_virt(&sg_s[j]) + src_offset;
 			if (!src)
 				BUG();
 
@@ -649,7 +649,7 @@ static int rd_MEMCPY_read (rd_request_t *req)
 			if (length > req->rd_size)
 				length = req->rd_size;
 
-			dst = GET_ADDR_SG(&sg_d[i]) + dst_offset;
+			dst = sg_virt(&sg_d[i]) + dst_offset;
 			if (!dst)
 				BUG();
 
@@ -659,7 +659,7 @@ static int rd_MEMCPY_read (rd_request_t *req)
 			} else
 				dst_offset = length;
 
-			src = GET_ADDR_SG(&sg_s[j++]) + src_offset;
+			src = sg_virt(&sg_s[j++]) + src_offset;
 			if (!src)
 				BUG();
 
@@ -737,11 +737,11 @@ static int rd_MEMCPY_write (rd_request_t *req)
 			if (length > req->rd_size)
 				length = req->rd_size;
 
-			src = GET_ADDR_SG(&sg_s[i++]) + src_offset;
+			src = sg_virt(&sg_s[i++]) + src_offset;
 			if (!src)
 				BUG();
 
-			dst = GET_ADDR_SG(&sg_d[j]) + dst_offset;
+			dst = sg_virt(&sg_d[j]) + dst_offset;
 			if (!dst)
 				BUG();
 
@@ -759,7 +759,7 @@ static int rd_MEMCPY_write (rd_request_t *req)
 			if (length > req->rd_size)
 				length = req->rd_size;
 
-			src = GET_ADDR_SG(&sg_s[i]) + src_offset;
+			src = sg_virt(&sg_s[i]) + src_offset;
 			if (!src)
 				BUG();
 
@@ -769,7 +769,7 @@ static int rd_MEMCPY_write (rd_request_t *req)
 			} else
 				src_offset = length;
 
-			dst = GET_ADDR_SG(&sg_d[j++]) + dst_offset;
+			dst = sg_virt(&sg_d[j++]) + dst_offset;
 			if (!dst)
 				BUG();
 
@@ -878,7 +878,7 @@ static int rd_DIRECT_with_offset (iscsi_task_t *task, struct list_head *se_mem_l
 			if (offset_length > req->rd_size)
 				offset_length = req->rd_size;
 
-			se_mem->se_page = GET_PAGE_SG(&sg_s[j++]);
+			se_mem->se_page = sg_page(&sg_s[j++]);
 			se_mem->se_off = req->rd_offset;
 			se_mem->se_len = offset_length;
 
@@ -890,7 +890,7 @@ static int rd_DIRECT_with_offset (iscsi_task_t *task, struct list_head *se_mem_l
 		offset_length = (req->rd_size < req->rd_offset) ?
 			req->rd_size : req->rd_offset;
 
-		se_mem->se_page = GET_PAGE_SG(&sg_s[j]);
+		se_mem->se_page = sg_page(&sg_s[j]);
 		se_mem->se_len = offset_length;
 
 		set_offset = 1;
@@ -970,7 +970,7 @@ static int rd_DIRECT_without_offset (iscsi_task_t *task, struct list_head *se_me
 		length = (req->rd_size < sg_s[j].length) ?
 			req->rd_size : sg_s[j].length;
 		
-		se_mem->se_page = GET_PAGE_SG(&sg_s[j++]);
+		se_mem->se_page = sg_page(&sg_s[j++]);
 		se_mem->se_len = length;
 
 #ifdef DEBUG_RAMDISK_DR

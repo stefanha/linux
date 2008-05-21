@@ -647,7 +647,7 @@ static int fd_do_readv (fd_request_t *req, iscsi_task_t *task)
 
 	for (i = 0; i < req->fd_sg_count; i++) {
 		iov[i].iov_len = sg[i].length;
-		iov[i].iov_base = GET_ADDR_SG(&sg[i]);
+		iov[i].iov_base = sg_virt(&sg[i]); 
 	}
 
 	old_fs = get_fs();
@@ -722,7 +722,7 @@ static int fd_do_aio_read (fd_request_t *req, iscsi_task_t *task)
 		TRACE_ERROR("sg->length: %d sg->page: %p\n", sg[i].length, sg[i].page);
 		length += sg[i].length;
 		iov->iov_len = sg[i].length;
-		iov->iov_base = GET_ADDR_SG(&sg[i]);
+		iov->iov_base = sg_virt(&sg[i]);
 		TRACE_ERROR("iov_iov_len: %d iov_iov_base: %p\n", iov->iov_len, iov->iov_base);
 	}
 	
@@ -829,7 +829,7 @@ static int fd_do_writev (fd_request_t *req, iscsi_task_t *task)
 	
 	for (i = 0; i < req->fd_sg_count; i++) {
 		iov[i].iov_len = sg[i].length;
-		iov[i].iov_base = GET_ADDR_SG(&sg[i]);
+		iov[i].iov_base = sg_virt(&sg[i]);
 	}
 
 	old_fs = get_fs();
@@ -885,7 +885,7 @@ static int fd_do_aio_write (fd_request_t *req, iscsi_task_t *task)
 
 		length += sg[i].length;
 		iov->iov_len = sg[i].length;
-		iov->iov_base = GET_ADDR_SG(&sg[i]);
+		iov->iov_base = sg_virt(&sg[i]);
 		TRACE_ERROR("iov_iov_len: %d iov_iov_base: %p\n", iov->iov_len, iov->iov_base);
 	}
 

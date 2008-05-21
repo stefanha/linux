@@ -4229,7 +4229,7 @@ extern void transport_memcpy_read_contig (
 		if (length > total_length)
 			length = total_length;
 
-		src = GET_ADDR_SG(&sg_s[i]);
+		src = sg_virt(&sg_s[i]);
 
 		memcpy(dst, src, length);
 
@@ -4259,12 +4259,12 @@ extern void transport_memcpy_read_sg (
 			if (length > total_length)
 				length = total_length;
 
-			dst = GET_ADDR_SG(&sg_d[i]) + dst_offset;
+			dst = sg_virt(&sg_d[i]) + dst_offset;
 			if (!dst)
 				BUG();
 			i++;
 			
-			src = GET_ADDR_SG(&sg_s[j]) + src_offset;
+			src = sg_virt(&sg_s[j]) + src_offset;
 			if (!src)
 				BUG();
 
@@ -4276,7 +4276,7 @@ extern void transport_memcpy_read_sg (
 			if (length > total_length)
 				length = total_length;
 
-			dst = GET_ADDR_SG(&sg_d[i]) + dst_offset;
+			dst = sg_virt(&sg_d[i]) + dst_offset;
 			if (!dst)
 				BUG();
 
@@ -4286,7 +4286,7 @@ extern void transport_memcpy_read_sg (
 			} else
 				dst_offset = length;
 
-			src = GET_ADDR_SG(&sg_s[j]) + src_offset;
+			src = sg_virt(&sg_s[j]) + src_offset;
 			if (!src)
 				BUG();
 			j++;
@@ -4317,7 +4317,7 @@ extern void transport_memcpy_write_contig (
 		if (length > total_length)
 			length = total_length;
 
-		dst = GET_ADDR_SG(&sg_d[i]);
+		dst = sg_virt(&sg_d[i]);
 
 		memcpy(dst, src, length);
 
@@ -4347,12 +4347,12 @@ extern void transport_memcpy_write_sg (
 			if (length > total_length)
 				length = total_length;
 
-			src = GET_ADDR_SG(&sg_s[i]) + src_offset;
+			src = sg_virt(&sg_s[i]) + src_offset;
 			if (!src)
 				BUG();
 			i++;
 
-			dst = GET_ADDR_SG(&sg_d[j]) + dst_offset;
+			dst = sg_virt(&sg_d[j]) + dst_offset;
 			if (!dst)
 				BUG();
 
@@ -4364,7 +4364,7 @@ extern void transport_memcpy_write_sg (
 			if (length > total_length)
 				length = total_length;
 
-			src = GET_ADDR_SG(&sg_s[i]) + src_offset;
+			src = sg_virt(&sg_s[i]) + src_offset;
 			if (!src)
 				BUG();
 
@@ -4374,7 +4374,7 @@ extern void transport_memcpy_write_sg (
 			} else
 				src_offset = length;
 
-			dst = GET_ADDR_SG(&sg_d[j]) + dst_offset;
+			dst = sg_virt(&sg_d[j]) + dst_offset;
 			if (!dst)
 				BUG();
 			j++;
@@ -5143,7 +5143,7 @@ extern u32 transport_calc_sg_num (
 	}
 	memset(task->task_buf, 0, task->task_sg_num * sizeof(struct scatterlist));
 
-	SET_SG_TABLE(task->task_buf, task->task_sg_num);
+	sg_init_table((struct scatterlist *)&task->task_buf[0], task->task_sg_num);
 
 	DEBUG_SC("Successfully allocated task->task_sg_num: %u\n", task->task_sg_num);
 	
@@ -5240,7 +5240,7 @@ extern int transport_map_sg_to_mem (
 		INIT_LIST_HEAD(&se_mem->se_list);
 
 		if (*task_offset == 0) {
-			se_mem->se_page = GET_PAGE_SG(&sg_s[j]);
+			se_mem->se_page = sg_page(&sg_s[j]);
 			se_mem->se_off = sg_s[j].offset;
 
 			if (task_size >= sg_s[j].length)
@@ -5257,7 +5257,7 @@ extern int transport_map_sg_to_mem (
 			if (saved_task_offset)
 				*task_offset = saved_task_offset;
 		} else {
-			se_mem->se_page = GET_PAGE_SG(&sg_s[j]);
+			se_mem->se_page = sg_page(&sg_s[j]);
 			se_mem->se_off = (*task_offset + sg_s[j].offset);
 
 			if ((sg_s[j].length - *task_offset) > task_size) {
@@ -5397,7 +5397,7 @@ extern int transport_map_mem_to_sg (
 
 	while (task_size) {
 		if (*task_offset == 0) {
-			SET_PAGE_SG(&sg[sg_no], se_mem->se_page);
+			sg_assign_page(&sg[sg_no], se_mem->se_page);
 			sg[sg_no].offset = se_mem->se_off;
 
 			if (task_size >= se_mem->se_len) {
@@ -5424,7 +5424,7 @@ extern int transport_map_mem_to_sg (
 			if (saved_task_offset)
 				*task_offset = saved_task_offset;
 		} else {
-			SET_PAGE_SG(&sg[sg_no], se_mem->se_page);
+			sg_assign_page(&sg[sg_no], se_mem->se_page);
 			sg[sg_no].offset = (*task_offset + se_mem->se_off);
 
 			if ((se_mem->se_len - *task_offset) > task_size) {
@@ -5455,7 +5455,7 @@ extern int transport_map_mem_to_sg (
 next:
 		DEBUG_MEM("task[%u] - sg[%u] %p %u %u - Reducing task_size"
 			" to %u\n", task->task_no, sg_no,
-			GET_PAGE_SG(&sg[sg_no]), sg[sg_no].length,
+			sg_page(&sg[sg_no]), sg[sg_no].length,
 			sg[sg_no].offset, task_size);
 
 		sg_no++;

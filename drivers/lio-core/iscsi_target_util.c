@@ -2133,7 +2133,7 @@ extern void iscsi_get_network_interface_from_conn (iscsi_conn_t *conn)
 {
 	struct net_device *net_dev;
 
-	if (!(net_dev = DEV_GET_BY_NAME(conn->net_dev))) {
+	if (!(net_dev = dev_get_by_name(&init_net, conn->net_dev))) {
 		TRACE_ERROR("Unable to locate active network interface:"
 			" %s\n", strlen(conn->net_dev) ? conn->net_dev : "None");
 		conn->net_if = NULL;

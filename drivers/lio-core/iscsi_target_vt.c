@@ -1259,7 +1259,7 @@ static int vt_do_read (vt_request_t *req)
 
 	for (i = 0; i < req->vt_sg_count; i++) {
 
-		if (!(buf = GET_ADDR_SG(&sg[i])))
+		if (!(buf = sg_virt(&sg[i])))
 			return(-1);
 
 		if (req->vt_dev->vt_read_count + sg[i].length > req->vt_dev->vt_read_limit)
@@ -1354,7 +1354,7 @@ static int vt_do_write (vt_request_t *req)
 
 	for (i = 0; i < req->vt_sg_count; i++) {
 
-		if (!(buf = GET_ADDR_SG(&sg[i])))
+		if (!(buf = sg_virt(&sg[i])))
 			return(-1);
 
 		old_fs = get_fs();

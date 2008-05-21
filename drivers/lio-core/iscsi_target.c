@@ -959,7 +959,7 @@ static int default_targetname_seq_show (struct seq_file *m, void *p)
 static int version_info_seq_show (struct seq_file *m, void *p)
 {
 	seq_printf(m, "%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on %s/%s on "UTS_RELEASE"\n",
-			PYX_ISCSI_VENDOR, ISCSI_UTS_SYSNAME, ISCSI_UTS_MACHINE);
+			PYX_ISCSI_VENDOR, utsname()->sysname, utsname()->machine);
 
 	return(0);
 }
@@ -1025,7 +1025,7 @@ static int iscsi_target_detect(void)
 	struct proc_dir_entry *dir_entry, *name_entry, *ver_entry;
 
 	printk("%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on %s/%s on "UTS_RELEASE"\n",
-		PYX_ISCSI_VENDOR, ISCSI_UTS_SYSNAME, ISCSI_UTS_MACHINE);
+		PYX_ISCSI_VENDOR, utsname()->sysname, utsname()->machine);
 
 	if (!(iscsi_global = (iscsi_global_t *)kmalloc(
 			sizeof(iscsi_global_t), GFP_KERNEL))) {

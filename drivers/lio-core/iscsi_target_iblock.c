@@ -234,11 +234,7 @@ extern int iblock_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di
 	ib_dev->ibd_major = di->iblock_major;
 	ib_dev->ibd_minor = di->iblock_minor;
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,21)
 	if (!(ib_dev->ibd_bio_set = bioset_create(32, 64))) {
-#else
-	if (!(ib_dev->ibd_bio_set = bioset_create(32, 64, 8))) {
-#endif
 		TRACE_ERROR("Unable to create bioset for IBLOCK\n");
 		dump_stack();
 		goto failed;
@@ -685,10 +681,10 @@ extern int iblock_map_task_SG (iscsi_task_t *task)
 	 */
 	for (i = 0; i < task->task_sg_num; i++) {
 		DEBUG_IBLOCK("task: %p bio: %p Calling bio_add_page(): page: %p len:"
-			" %u offset: %u\n", task, bio, GET_PAGE_SG(&sg[i]),
+			" %u offset: %u\n", task, bio, sg_page(&sg[i]),
 				sg[i].length, sg[i].offset);
 again:
-		if ((ret = bio_add_page(bio, GET_PAGE_SG(&sg[i]), sg[i].length,
+		if ((ret = bio_add_page(bio, sg_page(&sg[i]), sg[i].length,
 				sg[i].offset)) != sg[i].length) {
 
 			DEBUG_IBLOCK("*** Set bio->bi_sector: %llu\n", bio->bi_sector);
@@ -834,27 +830,12 @@ extern int iblock_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
 	return(0);
 }
 
-//#warning FIXME v2.8: Finish up exception handling in iblock_bio_done() with bytes_done
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 extern void iblock_bio_done (struct bio *bio, int err)
-#else
-extern int iblock_bio_done (struct bio *bio, unsigned int bytes_done, int err)
-#endif
 {
 	iscsi_task_t *task = (iscsi_task_t *)bio->bi_private;
 	iblock_req_t *ibr = (iblock_req_t *)task->transport_req;
 	int ret = 0;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	if (bio->bi_size) {
-		TRACE_ERROR("bio: %p task_lba: %llu bio_lba: %llu err=%d,"
-			" returned with bio->bi_size: %u\n", bio, task->task_lba,
-				(unsigned long long)bio->bi_sector, err, bio->bi_size);
-		transport_complete_task(task, 0);
-		ret = 1;
-		goto out;
-	}
-#endif
 	if ((err = test_bit(BIO_UPTODATE, &bio->bi_flags) ? err : -EIO) != 0) {
 		TRACE_ERROR("test_bit(BIO_UPTODATE) failed for bio: %p\n", bio);
 		transport_complete_task(task, 0);
@@ -878,9 +859,5 @@ extern int iblock_bio_done (struct bio *bio, unsigned int bytes_done, int err)
 	ibr->ib_bio = NULL;
 	transport_complete_task(task, (!err));
 out:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 	return;
-#else
-	return(ret);
-#endif
 }

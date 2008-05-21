@@ -40,36 +40,6 @@
  */
 #define CALL_USERMODEHELPER(a, b, c)   call_usermodehelper(a, b, c, 1)
 
-#ifdef MEMORY_DEBUG
-#define inline
-#endif
-
-/*
- * 2.6.24 provides an updated struct scatterlist API.  Use macros for the new
- * code, and use inline functions for legacy operation. 
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
-# define SET_SG_TABLE(sg, cnt)		sg_init_table((struct scatterlist *)&sg[0], cnt);
-# define GET_ADDR_SG(sg)		sg_virt(sg)
-# define GET_PAGE_SG(sg)		sg_page(sg)
-# define SET_PAGE_SG(sg, page)		sg_assign_page(sg, page)
-#else
-#include <linux/scatterlist.h>
-#define SET_SG_TABLE(sg, cnt)	
-static inline void *GET_ADDR_SG(struct scatterlist *sg)
-{
-	return(page_address(sg->page) + sg->offset);
-}
-static inline struct page *GET_PAGE_SG(struct scatterlist *sg)
-{
-	return(sg->page);
-}
-static inline void SET_PAGE_SG(struct scatterlist *sg, struct page *page)
-{
-	sg->page = page;
-	return;
-}
-#endif
 
 /*
  * kernel -- userspace copy commands
@@ -102,12 +72,6 @@ static inline void SET_PAGE_SG(struct scatterlist *sg, struct page *page)
 	sock->ops->setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, dev, strlen(dev)); \
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
-# define DEV_GET_BY_NAME(name)	dev_get_by_name(&init_net, name)
-#else
-# define DEV_GET_BY_NAME(name)	dev_get_by_name(name)
-#endif
-
 /*
  * Threads.
  */
@@ -133,14 +97,6 @@ static inline void SET_PAGE_SG(struct scatterlist *sg, struct page *page)
 /*
  * Other misc stuff.
  */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
-# define ISCSI_UTS_SYSNAME      utsname()->sysname
-# define ISCSI_UTS_MACHINE      utsname()->machine
-#else
-# define ISCSI_UTS_SYSNAME      system_utsname.sysname  
-# define ISCSI_UTS_MACHINE      system_utsname.machine
-#endif
 
 #ifndef SCSI_DATA_UNKNOWN
 #define SCSI_DATA_UNKNOWN       (DMA_BIDIRECTIONAL)

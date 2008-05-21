@@ -718,7 +718,7 @@ after_mode_sense:
 		u16 bdl;
 		u32 blocksize;
 		
-		if (!(buf = GET_ADDR_SG(&sg[0]))) {
+		if (!(buf = sg_virt(&sg[0]))) {
 			TRACE_ERROR("Unable to get buf for scatterlist\n");
 			goto after_mode_select;
 		}
