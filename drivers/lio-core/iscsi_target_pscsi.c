@@ -38,10 +38,6 @@
 #include <linux/smp_lock.h>
 #include <linux/genhd.h>
 
-#ifdef USE_SCSI_H
-#include <scsi.h>
-#endif /* USE_SCSI_H */
-#ifndef _SCSI_H
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
@@ -49,7 +45,6 @@
 typedef struct scsi_cmnd Scsi_Cmnd;
 typedef struct scsi_request Scsi_Request;
 typedef struct scsi_pointer Scsi_Pointer;
-#endif /* _SCSI_H */
 #include <scsi/scsi_host.h>
 
 #include <iscsi_linux_os.h>

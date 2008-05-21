@@ -44,13 +44,8 @@
 #include <linux/utsname.h>
 #include <net/sock.h>
 #include <net/tcp.h>
-#ifdef USE_SCSI_H
-#include <scsi.h>
-#endif /* USE_SCSI_H */
-#ifndef _SCSI_H
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
-#endif /* _SCSI_H */
 #include <scsi/scsi_host.h>
 
 #include <iscsi_linux_os.h>

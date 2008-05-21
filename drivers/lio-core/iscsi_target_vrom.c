@@ -36,18 +36,8 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
-#ifdef LINUX_KERNEL_26
-#ifdef USE_SCSI_H
-#include <scsi.h>
-#endif /* USE_SCSI_H */
-#ifndef _SCSI_H
 #include <scsi/scsi.h>
-#endif /* SCSI_H */
 #include <scsi/scsi_host.h>
-#else
-#include <scsi.h>
-#include <hosts.h>
-#endif
 #include <linux/cdrom.h>
 #include <linux/random.h>
 

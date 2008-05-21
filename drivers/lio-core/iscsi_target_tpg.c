@@ -38,14 +38,8 @@
 #include <linux/in.h>
 #include <net/sock.h>
 #include <net/tcp.h>
-
-#ifdef USE_SCSI_H
-#include <scsi.h>
-#endif /* USE_SCSI_H */
-#ifndef _SCSI_H
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
-#endif /* SCSI_H */
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>

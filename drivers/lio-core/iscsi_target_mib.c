@@ -34,14 +34,10 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/blkdev.h>
-#ifdef USE_SCSI_H
-#include <scsi.h>
-#endif /* USE_SCSI_H */
-#ifndef _SCSI_H
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
-#endif /* _SCSI_H */
 #include <scsi/scsi_host.h>
+
 #include "iscsi_protocol.h"
 #include <iscsi_debug_opcodes.h>
 #include "iscsi_target_core.h"
