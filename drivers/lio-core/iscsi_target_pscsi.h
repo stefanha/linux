@@ -89,11 +89,7 @@ extern struct scatterlist *pscsi_get_SG (iscsi_task_t *);
 extern u32 pscsi_get_SG_count (iscsi_task_t *);
 extern int pscsi_set_non_SG_buf (unsigned char *, iscsi_task_t *);
 extern void pscsi_shutdown_hba (struct iscsi_hba_s *);
-# ifdef scsi_execute_async_address
 extern void pscsi_req_done (void *, char *, int, int);
-# else
-extern inline void pscsi_req_done (Scsi_Cmnd *);
-#endif
 #endif
 
 #include <linux/device.h>
@@ -102,7 +98,6 @@ extern inline void pscsi_req_done (Scsi_Cmnd *);
 #include <linux/kref.h>
 #include <linux/kobject.h>
 
-#ifdef scsi_execute_async_address
 typedef struct pscsi_plugin_task_s {
 	unsigned char pscsi_cdb[SCSI_CDB_SIZE];
 	unsigned char pscsi_sense[SCSI_SENSE_BUFFERSIZE];
@@ -111,7 +106,6 @@ typedef struct pscsi_plugin_task_s {
 	u32	pscsi_data_len;
 	void	*pscsi_buf;
 } pscsi_plugin_task_t;
-#endif /* scsi_execute_async_address */
 
 /*
  * We use the generic command sequencer, so we must setup

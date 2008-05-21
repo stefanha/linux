@@ -44,9 +44,6 @@
 #ifndef _SCSI_H
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
-# ifndef scsi_execute_async_address
-# include <scsi/scsi_request.h>
-# endif
 #include <scsi/scsi_cmnd.h>
 #include <scsi/sd.h>
 typedef struct scsi_cmnd Scsi_Cmnd;
@@ -584,19 +581,11 @@ extern int pscsi_transport_complete (iscsi_task_t *task)
 	struct scsi_device *sd = (struct scsi_device *) task->iscsi_dev->dev_ptr;
 	void *pscsi_buf;
 	int result;
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	unsigned char *cdb = &pt->pscsi_cdb[0];
 
 	result = pt->pscsi_result;
 	pscsi_buf = pt->pscsi_buf;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-	unsigned char *cdb = &req->sr_cmnd[0];
-	
-	result = req->sr_result;
-	pscsi_buf = req->sr_buffer;
-#endif
 
 # ifdef LINUX_EVPD_PAGE_CHECK
 	if ((cdb[0] == INQUIRY) && host_byte(result) == DID_OK) {
@@ -750,7 +739,6 @@ extern void *pscsi_allocate_request (
 	iscsi_task_t *task,
 	iscsi_device_t *dev)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt;
 	if (!(pt = kmalloc(sizeof(pscsi_plugin_task_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate pscsi_plugin_task_t\n");
@@ -759,19 +747,6 @@ extern void *pscsi_allocate_request (
 	memset(pt, 0, sizeof(pscsi_plugin_task_t));
 
 	return(pt);
-
-#else
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
-	Scsi_Request *sr;
-
-	if (!(sr = (Scsi_Request *) scsi_allocate_request(sd, GFP_KERNEL))) {
-		TRACE_ERROR("scsi_allocate_request() failed\n");
-		return(NULL);
-	}
-	sr->upper_private_data = (void *) task;
-
-	return(sr);
-#endif
 }
 
 extern void pscsi_get_evpd_prod (unsigned char *buf, u32 size, iscsi_device_t *dev)
@@ -795,7 +770,6 @@ extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev
  */
 extern int pscsi_do_task (iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	int ret;
 	
@@ -809,13 +783,6 @@ extern int pscsi_do_task (iscsi_task_t *task)
 		return(PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE);
 	}	
 
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	scsi_do_req(req, req->sr_cmnd, req->sr_buffer, req->sr_bufflen, pscsi_req_done,
-			(task->se_obj_api->get_device_type(task->se_obj_ptr) == 0) ?
-			PS_TIMEOUT_DISK : PS_TIMEOUT_OTHER, PS_RETRY);
-#endif 
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
@@ -825,16 +792,7 @@ extern int pscsi_do_task (iscsi_task_t *task)
  */
 extern void pscsi_free_task (iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
 	kfree(task->transport_req);
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-	if (!req) {
-		TRACE_ERROR("REQ is NULL!\n");
-		BUG();
-	}
-	scsi_release_request(req);
-#endif 
 	return;
 }
 
@@ -972,16 +930,8 @@ extern void pscsi_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
  */
 extern void pscsi_map_task_SG (iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
         pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pt->pscsi_buf = (void *)task->task_buf;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-	req->sr_bufflen = task->task_size;
-	req->sr_buffer = (void *)task->task_buf;
-	req->sr_sglist_len = (task->task_sg_num * sizeof(struct scatterlist));
-	req->sr_use_sg = task->task_sg_num;
-#endif
 
 	return;
 }
@@ -995,16 +945,8 @@ extern void pscsi_map_task_non_SG (iscsi_task_t *task)
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pt->pscsi_buf = (void *)buf;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-	req->sr_bufflen = task->task_size;
-	req->sr_buffer = (void *)buf;
-	req->sr_sglist_len = 0;
-	req->sr_use_sg = 0;
-#endif 
 
 	return;
 }
@@ -1015,34 +957,19 @@ extern void pscsi_map_task_non_SG (iscsi_task_t *task)
  */
 extern int pscsi_CDB_inquiry (iscsi_task_t *task, u32 size)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	req->sr_data_direction	= DMA_FROM_DEVICE;
-#endif 
-
 	pscsi_map_task_non_SG(task);
+
 	return(0);
 }
 
 extern int pscsi_CDB_none (iscsi_task_t *task, u32 size)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_NONE;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	req->sr_data_direction	= DMA_NONE;
-	req->sr_bufflen		= 0;
-	req->sr_sglist_len	= 0;
-	req->sr_use_sg		= 0;
-#endif 
 
 	return(0);
 }
@@ -1053,16 +980,9 @@ extern int pscsi_CDB_none (iscsi_task_t *task, u32 size)
  */
 extern int pscsi_CDB_read_non_SG (iscsi_task_t *task, u32 size)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	req->sr_data_direction  = DMA_FROM_DEVICE;
-#endif 
-
 	pscsi_map_task_non_SG(task);
 
 	return(0);
@@ -1074,21 +994,12 @@ extern int pscsi_CDB_read_non_SG (iscsi_task_t *task, u32 size)
  */
 extern int pscsi_CDB_read_SG (iscsi_task_t *task, u32 size)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
 	pscsi_map_task_SG(task);
 
 	return(task->task_sg_num);
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	req->sr_data_direction  = DMA_FROM_DEVICE;
-	pscsi_map_task_SG(task);
-
-	return(req->sr_use_sg);
-#endif
 }
 
 /*	pscsi_CDB_write_non_SG():
@@ -1097,17 +1008,11 @@ extern int pscsi_CDB_read_SG (iscsi_task_t *task, u32 size)
  */
 extern int pscsi_CDB_write_non_SG (iscsi_task_t *task, u32 size)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_TO_DEVICE;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	req->sr_data_direction  = DMA_TO_DEVICE;
-#endif 
-
 	pscsi_map_task_non_SG(task);
+
 	return(0);
 }
 
@@ -1117,21 +1022,12 @@ extern int pscsi_CDB_write_non_SG (iscsi_task_t *task, u32 size)
  */
 extern int pscsi_CDB_write_SG (iscsi_task_t *task, u32 size)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_TO_DEVICE;
 	pscsi_map_task_SG(task);
 	
 	return(task->task_sg_num);
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	req->sr_data_direction  = DMA_TO_DEVICE;
-	pscsi_map_task_SG(task);
-
-	return(req->sr_use_sg);
-#endif
 }
 
 /*	pscsi_check_lba():
@@ -1158,15 +1054,9 @@ extern int pscsi_check_for_SG (iscsi_task_t *task)
  */
 extern unsigned char *pscsi_get_cdb (iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	return(pt->pscsi_cdb);
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	return(req->sr_cmnd);
-#endif 
 }
 
 /*	pscsi_get_sense_buffer():
@@ -1175,15 +1065,9 @@ extern unsigned char *pscsi_get_cdb (iscsi_task_t *task)
  */
 extern unsigned char *pscsi_get_sense_buffer (iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	return((unsigned char *)&pt->pscsi_sense[0]);
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-	
-	return((unsigned char *)&req->sr_sense_buffer[0]);
-#endif
 }
 
 /*	pscsi_get_blocksize():
@@ -1256,15 +1140,9 @@ extern u32 pscsi_get_queue_depth (iscsi_device_t *dev)
  */
 extern unsigned char *pscsi_get_non_SG (iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	
 	return((unsigned char *)pt->pscsi_buf);
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	return((unsigned char *)req->sr_buffer);
-#endif
 }
 
 /*	pscsi_get_SG():
@@ -1273,15 +1151,9 @@ extern unsigned char *pscsi_get_non_SG (iscsi_task_t *task)
  */
 extern struct scatterlist *pscsi_get_SG (iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	return((struct scatterlist *)pt->pscsi_buf);
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;
-
-	return((struct scatterlist *)req->sr_buffer);
-#endif
 }
 
 /*	pscsi_get_SG_count():
@@ -1299,18 +1171,9 @@ extern u32 pscsi_get_SG_count (iscsi_task_t *task)
  */
 extern int pscsi_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
 {
-#ifdef scsi_execute_async_address
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_buf = (void *) buf;
-#else
-	Scsi_Request *req = (Scsi_Request *) task->transport_req;	
-
-	req->sr_buffer = (void *) buf;
-	req->sr_bufflen = task->task_size;
-	req->sr_sglist_len = 0;
-	req->sr_use_sg = 0;
-#endif
 
 	return(0);
 }
@@ -1368,7 +1231,6 @@ extern inline void pscsi_process_SAM_status (iscsi_task_t *task, unsigned char *
 	return;
 }
 
-#ifdef scsi_execute_async_address
 extern void pscsi_req_done (void *data, char *sense, int result, int data_len)
 {
 	iscsi_task_t *task = (iscsi_task_t *)data;
@@ -1387,24 +1249,3 @@ extern void pscsi_req_done (void *data, char *sense, int result, int data_len)
 	return;
 }
 
-#else
-
-/*	pscsi_req_done():
- *
- *	This function is passed to scsi_do_req() in pscsi_do_task() and is
- *	called once scsi_do_req() completes.
- */
-extern void pscsi_req_done (Scsi_Cmnd *sc_cmd)
-{
-	iscsi_task_t *task = NULL;
-	Scsi_Request *req = sc_cmd->sc_request;
-
-	task = (iscsi_task_t *)req->upper_private_data;
-
-	scsi_put_command(sc_cmd);
-	req->sr_command = NULL;
-
-	pscsi_process_SAM_status(task, &req->sr_cmnd[0], req->sr_result);
-	return;
-}
-#endif /* scsi_execute_async_address */
