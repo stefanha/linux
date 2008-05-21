@@ -30,9 +30,7 @@
 /*
  * Used for utsname()-> access
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 #include <linux/syscalls.h>
-#endif
 #include <linux/highmem.h>
 
 /*

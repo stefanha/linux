@@ -79,11 +79,7 @@ extern unsigned char *iblock_get_non_SG (iscsi_task_t *);
 extern struct scatterlist *iblock_get_SG (iscsi_task_t *);
 extern u32 iblock_get_SG_count (iscsi_task_t *);
 extern int iblock_set_non_SG_buf (unsigned char *, iscsi_task_t *);
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 extern void iblock_bio_done (struct bio *, int);
-# else
-extern int iblock_bio_done (struct bio *, unsigned int, int);
-# endif
 #endif /* ! IBLOCK_INCLUDE_STRUCTS */
 
 typedef struct iblock_req_s {
