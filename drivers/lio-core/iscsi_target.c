@@ -4947,8 +4947,8 @@ extern int iscsi_close_session (
 	 * nodes iscsi_node_acl_t if it had been previously dynamically
 	 * generated.
 	 */
+	spin_lock_bh(&tpg->acl_node_lock);
 	if ((acl = sess->node_acl)) {
-		spin_lock_bh(&tpg->acl_node_lock);
 		if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 			if (!(ISCSI_TPG_ATTRIB(tpg)->cache_dynamic_acls)) {
 				REMOVE_ENTRY_FROM_LIST(acl, tpg->acl_node_head,
@@ -4960,9 +4960,9 @@ extern int iscsi_close_session (
 				spin_lock_bh(&tpg->acl_node_lock);
 			}
 		}
-		spin_unlock_bh(&tpg->acl_node_lock);
 		sess->node_acl = NULL;
 	}
+	spin_unlock_bh(&tpg->acl_node_lock);
 
 	iscsi_free_all_ooo_cmdsns(sess);
 	iscsi_release_all_cmds_in_pool(sess);

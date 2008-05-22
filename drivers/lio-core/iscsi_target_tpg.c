@@ -570,6 +570,16 @@ static void iscsi_tpg_free_portal_group_node_acls (iscsi_portal_group_t *tpg)
 	acl = tpg->acl_node_head;
 	while (acl) {
 		acl_next = acl->next;
+
+		/*
+		 * The kfree() for dynamically allocated Node ACLS is done in
+		 * iscsi_close_session().
+		 */
+		if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
+			acl = acl_next;
+			continue;
+		}
+
 		kfree(acl);
 		tpg->num_node_acls--;
 		acl = acl_next;
