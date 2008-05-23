@@ -193,7 +193,7 @@ extern void transport_start_status_thread (iscsi_device_t *);
 extern void transport_stop_status_thread (iscsi_device_t *);
 
 /*
- * Each iscsi_transport_task_t can have N number of possible se_task_t's
+ * Each se_transport_task_t can have N number of possible se_task_t's
  * for the storage transport(s) to possibly execute.
  * Used primarily for splitting up CDBs that exceed the physical storage
  * HBA's maximum sector count per task.

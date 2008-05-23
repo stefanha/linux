@@ -361,12 +361,12 @@ inline iscsi_cmd_t *iscsi_allocate_cmd (iscsi_conn_t *conn)
 		memset(cmd, 0, sizeof(iscsi_cmd_t));
 	}
 
-	if (!(cmd->t_task = (iscsi_transport_task_t *) kmalloc(
-			sizeof(iscsi_transport_task_t), GFP_ATOMIC))) {
+	if (!(cmd->t_task = (se_transport_task_t *) kmalloc(
+			sizeof(se_transport_task_t), GFP_ATOMIC))) {
 		TRACE_ERROR("Unable to allocate cmd->t_task\n");
 		return(NULL);
 	}
-	memset(cmd->t_task, 0, sizeof(iscsi_transport_task_t));
+	memset(cmd->t_task, 0, sizeof(se_transport_task_t));
 	
 	cmd->conn	= conn;	
 	init_MUTEX_LOCKED(&cmd->reject_sem);

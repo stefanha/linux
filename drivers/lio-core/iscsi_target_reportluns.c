@@ -181,12 +181,12 @@ extern int iscsi_allocate_rl_cmd (
 	if (!(rl_cmd = rl_allocate_cmd(cmd, cmd->data_length)))
 		goto failure;
 
-	if (!(cmd->t_task = (iscsi_transport_task_t *) kmalloc(
-			sizeof(iscsi_transport_task_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate iscsi_transport_task_t\n");
+	if (!(cmd->t_task = (se_transport_task_t *) kmalloc(
+			sizeof(se_transport_task_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate se_transport_task_t\n");
 		goto failure;
 	}
-	memset(cmd->t_task, 0, sizeof(iscsi_transport_task_t));
+	memset(cmd->t_task, 0, sizeof(se_transport_task_t));
 	
 	init_MUTEX_LOCKED(&T_TASK(cmd)->t_transport_stop_sem);
 	spin_lock_init(&T_TASK(cmd)->t_state_lock);

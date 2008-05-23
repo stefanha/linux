@@ -3285,7 +3285,7 @@ extern int __transport_execute_tasks (iscsi_device_t *dev)
 	
 	/*
 	 * Check if there is enough room in the device and HBA queue to send
-	 * iscsi_transport_task_t's to the selected transport.
+	 * se_transport_task_t's to the selected transport.
 	 */
 check_depth:
 	spin_lock_irqsave(&ISCSI_HBA(dev)->hba_queue_lock, flags);
@@ -4353,13 +4353,13 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	}
 	memset(cmd, 0, sizeof(iscsi_cmd_t));
 
-	if (!(cmd->t_task = (iscsi_transport_task_t *) kmalloc(
-			sizeof(iscsi_transport_task_t), GFP_KERNEL))) {
+	if (!(cmd->t_task = (se_transport_task_t *) kmalloc(
+			sizeof(se_transport_task_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate cmd->t_task\n");
 		kfree(cmd);
 		return(NULL);
 	}
-	memset(cmd->t_task, 0, sizeof(iscsi_transport_task_t));
+	memset(cmd->t_task, 0, sizeof(se_transport_task_t));
 
 	init_MUTEX_LOCKED(&cmd->reject_sem);
 	init_MUTEX_LOCKED(&cmd->unsolicited_data_sem);

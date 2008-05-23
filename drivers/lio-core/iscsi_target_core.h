@@ -556,9 +556,9 @@ typedef union
 	time_t	time;
 } iscsi_rsig_time_t;
 
-typedef struct iscsi_transport_task_s {
+typedef struct se_transport_task_s {
 	unsigned char		t_task_cdb[SCSI_CDB_SIZE];
-	unsigned long long		t_task_lba;
+	unsigned long long	t_task_lba;
 	int			t_tasks_failed;
 	u32			t_task_cdbs;
 	u32			t_task_check;
@@ -581,18 +581,18 @@ typedef struct iscsi_transport_task_s {
 	atomic_t		transport_lun_fe_stop;
 	atomic_t		transport_lun_stop;
 	spinlock_t		t_state_lock;
-	struct semaphore		t_transport_stop_sem;   
-	struct semaphore		t_transport_passthrough_sem;
-	struct semaphore		t_transport_passthrough_wsem;
-	struct semaphore		transport_lun_fe_stop_sem;
-	struct semaphore		transport_lun_stop_sem;
+	struct semaphore	t_transport_stop_sem;   
+	struct semaphore	t_transport_passthrough_sem;
+	struct semaphore	t_transport_passthrough_wsem;
+	struct semaphore	transport_lun_fe_stop_sem;
+	struct semaphore	transport_lun_stop_sem;
 	void			*t_task_buf;
 	void			*t_task_pt_buf;
 	struct iscsi_cmd_s	*t_task_pt_cmd;
 	struct list_head	t_task_list;
 	struct list_head	*t_mem_list;
 	struct se_fp_obj_s	*t_fp;
-} ____cacheline_aligned iscsi_transport_task_t;
+} ____cacheline_aligned se_transport_task_t;
 
 struct iscsi_device_s;
 struct iscsi_map_sg_s;
@@ -706,7 +706,7 @@ typedef struct iscsi_cmd_s {
 	void			*se_obj_ptr;
 	struct se_obj_lun_type_s *se_orig_obj_api;
 	void			*se_orig_obj_ptr;
-	iscsi_transport_task_t	*t_task;
+	se_transport_task_t	*t_task;
 	int (*transport_add_cmd_to_queue)(struct iscsi_cmd_s *, u8);
 	int (*transport_allocate_iovecs)(struct iscsi_cmd_s *);
 	int (*transport_allocate_resources)(struct iscsi_cmd_s *, u32, u32);
@@ -729,7 +729,7 @@ typedef struct iscsi_cmd_s {
   
 }  ____cacheline_aligned iscsi_cmd_t;
 
-#define T_TASK(cmd)	((iscsi_transport_task_t *)(cmd->t_task))
+#define T_TASK(cmd)	((se_transport_task_t *)(cmd->t_task))
 #define CMD_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_obj_api))
 #define CMD_ORIG_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_orig_obj_api))
 
