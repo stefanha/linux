@@ -1098,7 +1098,7 @@ typedef struct se_device_s {
 	struct se_task_s	*state_task_head;
 	struct se_task_s	*state_task_tail;
 	struct se_hba_s		*iscsi_hba;	/* Pointer to associated iSCSI HBA */
-	struct iscsi_transport_s *transport;	/* Pointer to template of function pointers for transport */ 
+	struct se_subsystem_api_s *transport;	/* Pointer to template of function pointers for transport */ 
 	struct se_device_s	*next;		/* Pointer to next device in TPG list */
 	struct se_device_s	*prev;
 }  ____cacheline_aligned se_device_t;
@@ -1151,7 +1151,7 @@ typedef struct se_hba_s {
 	spinlock_t		device_lock;	/* Spinlock for adding/removing devices */
 	spinlock_t		hba_queue_lock;
 	struct semaphore		hba_access_sem;
-	struct iscsi_transport_s *transport;
+	struct se_subsystem_api_s *transport;
 	struct se_hba_s		*next;
 	struct se_hba_s		*prev;
 }  ____cacheline_aligned se_hba_t;

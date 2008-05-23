@@ -107,7 +107,7 @@ extern struct se_task_s *transport_get_task_from_execute_queue (struct se_device
 extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
 extern int transport_check_device_tcq (se_device_t *, u32, u32);
 extern se_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
-extern se_device_t *transport_add_device_to_iscsi_hba (se_hba_t *, struct iscsi_transport_s *, u32, void *);
+extern se_device_t *transport_add_device_to_iscsi_hba (se_hba_t *, struct se_subsystem_api_s *, u32, void *);
 extern void transport_generic_activate_device (se_device_t *);
 extern void transport_generic_deactivate_device (se_device_t *);
 extern int transport_generic_claim_phydevice (se_device_t *);
@@ -278,7 +278,7 @@ typedef struct iscsi_transport_spc_s {
  * 	Each type of disk transport supported MUST have a template defined
  *	within its .h file.
  */
-typedef struct iscsi_transport_s {
+typedef struct se_subsystem_api_s {
 	/*
 	 * The Name. :-)
 	 */
@@ -339,7 +339,7 @@ typedef struct iscsi_transport_s {
 	 * cmd_sequencer():
 	 *
 	 * Use transport_generic_cmd_sequencer() for majority of DAS transport drivers
-	 * with a iscsi_transport_spc_t struct as mentioned below.
+	 * with a scsi_transport_spc_t struct as mentioned below.
 	 * Provided out of convenience.
 	 */
 	int (*cmd_sequencer)(iscsi_cmd_t *cmd);
