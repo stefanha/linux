@@ -124,7 +124,7 @@ extern int iblock_detach_hba (iscsi_hba_t *hba)
 	return(0);
 }
 
-extern int iblock_claim_phydevice (iscsi_hba_t *hba, iscsi_device_t *dev)
+extern int iblock_claim_phydevice (iscsi_hba_t *hba, se_device_t *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *)dev->dev_ptr;
 	struct block_device *bd;
@@ -147,7 +147,7 @@ extern int iblock_claim_phydevice (iscsi_hba_t *hba, iscsi_device_t *dev)
 	return(0);
 }
 
-extern int iblock_release_phydevice (iscsi_device_t *dev)
+extern int iblock_release_phydevice (se_device_t *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *)dev->dev_ptr;
 	
@@ -174,7 +174,7 @@ extern int iblock_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di
 {
 	iblock_dev_t *ib_dev = NULL;
 	iblock_hba_t *ib_host = (iblock_hba_t *) iscsi_hba->hba_ptr;
-	iscsi_device_t *iscsi_dev;
+	se_device_t *iscsi_dev;
 	struct block_device *bd = NULL;
 	u32 dev_flags = 0;
 	int ret = 0;
@@ -257,7 +257,7 @@ failed:
  *
  *
  */
-extern int iblock_activate_device (iscsi_device_t *dev)
+extern int iblock_activate_device (se_device_t *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 	iblock_hba_t *ib_hba = ib_dev->ibd_host;
@@ -273,7 +273,7 @@ extern int iblock_activate_device (iscsi_device_t *dev)
  *
  *
  */
-extern void iblock_deactivate_device (iscsi_device_t *dev)
+extern void iblock_deactivate_device (se_device_t *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 	iblock_hba_t *ib_hba = ib_dev->ibd_host;
@@ -285,7 +285,7 @@ extern void iblock_deactivate_device (iscsi_device_t *dev)
 	return;
 }
 
-extern int iblock_check_device_location (iscsi_device_t *dev, iscsi_dev_transport_info_t *dti)
+extern int iblock_check_device_location (se_device_t *dev, iscsi_dev_transport_info_t *dti)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 
@@ -325,7 +325,7 @@ extern int iblock_check_ghost_id (iscsi_hbainfo_t *hi)
 	return(0);
 }
 
-extern void iblock_free_device (iscsi_device_t *dev)
+extern void iblock_free_device (se_device_t *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 
@@ -352,7 +352,7 @@ extern int iblock_transport_complete (se_task_t *task)
  */
 extern void *iblock_allocate_request (
 	se_task_t *task,
-        iscsi_device_t *dev)
+        se_device_t *dev)
 {
 	iblock_req_t *ib_req;
 
@@ -366,13 +366,13 @@ extern void *iblock_allocate_request (
 	return((void *)ib_req);
 }
 
-extern void iblock_get_evpd_prod (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void iblock_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	snprintf(buf, size, "IBLOCK");
 	return;
 }
 
-extern void iblock_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void iblock_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
 	
@@ -583,7 +583,7 @@ extern void iblock_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
 	return;
 }
 
-extern void iblock_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
+extern void iblock_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
 	char buf[BDEVNAME_SIZE];
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
@@ -752,7 +752,7 @@ extern int iblock_CDB_write_SG (se_task_t *task, u32 size)
 	return(iblock_map_task_SG(task));
 }
 
-extern int iblock_check_lba (unsigned long long lba, iscsi_device_t *dev)
+extern int iblock_check_lba (unsigned long long lba, se_device_t *dev)
 {
 	return(0);
 }
@@ -769,27 +769,27 @@ extern unsigned char *iblock_get_cdb (se_task_t *task)
 	return(req->ib_scsi_cdb);
 }
 
-extern u32 iblock_get_blocksize (iscsi_device_t *dev)
+extern u32 iblock_get_blocksize (se_device_t *dev)
 {
 	return(IBLOCK_BLOCKSIZE);
 }
 
-extern u32 iblock_get_device_rev (iscsi_device_t *dev)
+extern u32 iblock_get_device_rev (se_device_t *dev)
 {
 	return(02);
 }
 
-extern u32 iblock_get_device_type (iscsi_device_t *dev)
+extern u32 iblock_get_device_type (se_device_t *dev)
 {
 	return(0); /* TYPE_DISK */
 }
 
-extern u32 iblock_get_dma_length (u32 task_size, iscsi_device_t *dev)
+extern u32 iblock_get_dma_length (u32 task_size, se_device_t *dev)
 {
 	return(PAGE_SIZE);
 }
 
-extern u32 iblock_get_max_sectors (iscsi_device_t *dev)
+extern u32 iblock_get_max_sectors (se_device_t *dev)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
 	request_queue_t *q = bdev_get_queue(ibd->ibd_bd);
@@ -798,7 +798,7 @@ extern u32 iblock_get_max_sectors (iscsi_device_t *dev)
 		q->max_sectors : IBLOCK_MAX_SECTORS);
 }
 
-extern u32 iblock_get_queue_depth (iscsi_device_t *dev)
+extern u32 iblock_get_queue_depth (se_device_t *dev)
 {
 	return(IBLOCK_DEVICE_QUEUE_DEPTH);
 }

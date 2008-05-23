@@ -173,7 +173,7 @@ static int getauxinfo(vr_dev_t *vd, char *path)
 int vr_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	char *dev_p;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	vr_dev_t *vr_dev;
 	vr_host_t *vr_host = (vr_host_t *) iscsi_hba->hba_ptr;
 	mm_segment_t old_fs;
@@ -278,9 +278,9 @@ fail:
  *
  *
  */
-iscsi_device_t *vr_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vr_dev_p)
+se_device_t *vr_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vr_dev_p)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	vr_dev_t *vr_dev = (vr_dev_t *) vr_dev_p;
 	
 	if (!(dev = transport_add_device_to_iscsi_hba(iscsi_hba, &vrom_template,
@@ -294,7 +294,7 @@ iscsi_device_t *vr_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vr_dev_p)
  *
  *
  */
-int vr_activate_device (iscsi_device_t *dev)
+int vr_activate_device (se_device_t *dev)
 {
 	vr_dev_t *vr_dev = (vr_dev_t *) dev->dev_ptr;
 	vr_host_t *vr_host = vr_dev->vr_host;
@@ -310,7 +310,7 @@ int vr_activate_device (iscsi_device_t *dev)
  *
  *
  */
-void vr_deactivate_device (iscsi_device_t *dev)
+void vr_deactivate_device (se_device_t *dev)
 {
 	vr_dev_t *vr_dev = (vr_dev_t *) dev->dev_ptr;
 	vr_host_t *vr_host = vr_dev->vr_host;
@@ -326,7 +326,7 @@ void vr_deactivate_device (iscsi_device_t *dev)
  *
  *
  */
-void vr_free_device (iscsi_device_t *dev)
+void vr_free_device (se_device_t *dev)
 {
 	vr_dev_t *vr_dev = (vr_dev_t *) dev->dev_ptr;
 
@@ -356,7 +356,7 @@ int vr_transport_complete (se_task_t *task)
  */
 void *vr_allocate_request (
 	se_task_t *task,
-	iscsi_device_t *dev)
+	se_device_t *dev)
 {
 	vr_request_t *vr_req;
 	
@@ -1207,7 +1207,7 @@ int vr_CDB_write_SG (se_task_t *task, u32 size)
  *
  *
  */
-int vr_check_lba (iscsi_lba_t lba, iscsi_device_t *dev)
+int vr_check_lba (iscsi_lba_t lba, se_device_t *dev)
 {
 	return(0);
 }
@@ -1238,7 +1238,7 @@ unsigned char *vr_get_cdb (se_task_t *task)
  *
  *
  */
-u32 vr_get_blocksize (iscsi_device_t *dev)
+u32 vr_get_blocksize (se_device_t *dev)
 {
 	vr_dev_t *vr_dev = (vr_dev_t *) dev->dev_ptr;
 
@@ -1249,7 +1249,7 @@ u32 vr_get_blocksize (iscsi_device_t *dev)
  *
  *
  */
-u32 vr_get_max_sectors (iscsi_device_t *dev)
+u32 vr_get_max_sectors (se_device_t *dev)
 {
 	return(VR_MAX_SECTORS);
 }
@@ -1258,7 +1258,7 @@ u32 vr_get_max_sectors (iscsi_device_t *dev)
  *
  *
  */
-u32 vr_get_queue_depth (iscsi_device_t *dev)
+u32 vr_get_queue_depth (se_device_t *dev)
 {
 	return(VR_DEVICE_QUEUE_DEPTH);
 }

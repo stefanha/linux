@@ -235,7 +235,7 @@ static void vt_write_filemark_maybe (se_task_t *task)
  */
 extern int vt_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	vt_dev_t *vt_dev;
 	vt_host_t *vt_host = (vt_host_t *) iscsi_hba->hba_ptr;
 
@@ -283,9 +283,9 @@ fail:
  *
  *
  */
-extern iscsi_device_t *vt_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vt_dev_p)
+extern se_device_t *vt_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vt_dev_p)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	vt_dev_t *vt_dev = (vt_dev_t *) vt_dev_p;
 	
 	if (!(dev = transport_add_device_to_iscsi_hba(iscsi_hba, &vtape_template, 
@@ -299,7 +299,7 @@ extern iscsi_device_t *vt_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vt_d
  *
  *
  */
-extern int vt_activate_device (iscsi_device_t *dev)
+extern int vt_activate_device (se_device_t *dev)
 {
 	vt_dev_t *vt_dev = (vt_dev_t *) dev->dev_ptr;
 	vt_host_t *vt_host = vt_dev->vt_host;
@@ -315,7 +315,7 @@ extern int vt_activate_device (iscsi_device_t *dev)
  *
  *
  */
-extern void vt_deactivate_device (iscsi_device_t *dev)
+extern void vt_deactivate_device (se_device_t *dev)
 {
 	vt_dev_t *vt_dev = (vt_dev_t *) dev->dev_ptr;
 	vt_host_t *vt_host = vt_dev->vt_host;
@@ -331,7 +331,7 @@ extern void vt_deactivate_device (iscsi_device_t *dev)
  *
  *
  */
-extern int vt_check_device_location (iscsi_device_t *dev, iscsi_dev_transport_info_t *dti)
+extern int vt_check_device_location (se_device_t *dev, iscsi_dev_transport_info_t *dti)
 {
 	vt_dev_t *vt_dev = (vt_dev_t *) dev->dev_ptr;
 
@@ -374,7 +374,7 @@ extern int vt_check_ghost_id (iscsi_hbainfo_t *hi)
  *
  *
  */
-extern void vt_free_device (iscsi_device_t *dev)
+extern void vt_free_device (se_device_t *dev)
 {
 	vt_dev_t *vt_dev = (vt_dev_t *) dev->dev_ptr;
 	if (vt_dev == NULL)
@@ -404,7 +404,7 @@ extern int vt_transport_complete (se_task_t *task)
  */
 extern void *vt_allocate_request (
 	se_task_t *task,
-	iscsi_device_t *dev)
+	se_device_t *dev)
 {
 	vt_request_t *vt_req;
 	
@@ -419,13 +419,13 @@ extern void *vt_allocate_request (
 	return((void *)vt_req);
 }
 
-extern void vt_get_evpd_prod (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void vt_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	snprintf(buf, size, "VTAPE");
 	return;
 }
 
-extern void vt_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void vt_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	vt_dev_t *fdev = (vt_dev_t *) dev->dev_ptr;
 	iscsi_hba_t *hba = dev->iscsi_hba;
@@ -1488,7 +1488,7 @@ extern void vt_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
 	return;
 }
 
-extern void vt_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
+extern void vt_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
 	struct vt_dev_s *fd = (struct vt_dev_s *) dev->dev_ptr;
 
@@ -1630,7 +1630,7 @@ extern int vt_CDB_write_SG (se_task_t *task, u32 size)
  *
  *
  */
-extern int vt_check_lba (unsigned long long lba, iscsi_device_t *dev)
+extern int vt_check_lba (unsigned long long lba, se_device_t *dev)
 {
 	return(0);
 }
@@ -1661,7 +1661,7 @@ extern unsigned char *vt_get_cdb (se_task_t *task)
  *
  *
  */
-extern u32 vt_get_blocksize (iscsi_device_t *dev)
+extern u32 vt_get_blocksize (se_device_t *dev)
 {
 	return(VT_BLOCKSIZE);
 }
@@ -1670,7 +1670,7 @@ extern u32 vt_get_blocksize (iscsi_device_t *dev)
  *
  *
  */
-extern u32 vt_get_device_rev (iscsi_device_t *dev)
+extern u32 vt_get_device_rev (se_device_t *dev)
 {
 	return(02); 
 }
@@ -1679,7 +1679,7 @@ extern u32 vt_get_device_rev (iscsi_device_t *dev)
  *
  *
  */
-extern u32 vt_get_device_type (iscsi_device_t *dev)
+extern u32 vt_get_device_type (se_device_t *dev)
 {
 	return(TYPE_TAPE);
 }
@@ -1688,7 +1688,7 @@ extern u32 vt_get_device_type (iscsi_device_t *dev)
  *
  *
  */
-extern u32 vt_get_dma_length (u32 task_size, iscsi_device_t *dev)
+extern u32 vt_get_dma_length (u32 task_size, se_device_t *dev)
 {
 	return(PAGE_SIZE);
 }
@@ -1697,7 +1697,7 @@ extern u32 vt_get_dma_length (u32 task_size, iscsi_device_t *dev)
  *
  *
  */
-extern u32 vt_get_max_sectors (iscsi_device_t *dev)
+extern u32 vt_get_max_sectors (se_device_t *dev)
 {
 	return(VT_MAX_SECTORS);
 }
@@ -1706,7 +1706,7 @@ extern u32 vt_get_max_sectors (iscsi_device_t *dev)
  *
  *
  */
-extern u32 vt_get_queue_depth (iscsi_device_t *dev)
+extern u32 vt_get_queue_depth (se_device_t *dev)
 {
 	return(VT_DEVICE_QUEUE_DEPTH);
 }
@@ -1776,7 +1776,7 @@ static vt_dev_t *vt_find_dev (int mc_host_id, int vt_dev_id)
 {
 	int i;
 	iscsi_hba_t *hba;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	vt_dev_t *vt_dev;
 
 	spin_lock(&iscsi_global->hba_lock);

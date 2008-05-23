@@ -116,7 +116,7 @@ extern int fd_detach_hba (iscsi_hba_t *hba)
 	return(0);
 }
 
-extern int fd_claim_phydevice (iscsi_hba_t *hba, iscsi_device_t *dev)
+extern int fd_claim_phydevice (iscsi_hba_t *hba, se_device_t *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
 	struct block_device *bd;
@@ -142,7 +142,7 @@ extern int fd_claim_phydevice (iscsi_hba_t *hba, iscsi_device_t *dev)
 	return(0);
 }
 
-extern int fd_release_phydevice (iscsi_device_t *dev)
+extern int fd_release_phydevice (se_device_t *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
 
@@ -175,7 +175,7 @@ extern int fd_release_phydevice (iscsi_device_t *dev)
 extern int fd_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	char *dev_p = NULL;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	fd_dev_t *fd_dev;
 	fd_host_t *fd_host = (fd_host_t *) iscsi_hba->hba_ptr;
 	mm_segment_t old_fs;
@@ -319,9 +319,9 @@ fail:
  *
  *
  */
-extern iscsi_device_t *fd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *fd_dev_p, iscsi_devinfo_t *di)
+extern se_device_t *fd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *fd_dev_p, iscsi_devinfo_t *di)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	fd_dev_t *fd_dev = (fd_dev_t *) fd_dev_p;
 	
 	if (!(dev = transport_add_device_to_iscsi_hba(iscsi_hba, &fileio_template,
@@ -335,7 +335,7 @@ extern iscsi_device_t *fd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *fd_d
  *
  *
  */
-extern int fd_activate_device (iscsi_device_t *dev)
+extern int fd_activate_device (se_device_t *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 	fd_host_t *fd_host = fd_dev->fd_host;
@@ -351,7 +351,7 @@ extern int fd_activate_device (iscsi_device_t *dev)
  *
  *
  */
-extern void fd_deactivate_device (iscsi_device_t *dev)
+extern void fd_deactivate_device (se_device_t *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 	fd_host_t *fd_host = fd_dev->fd_host;
@@ -367,7 +367,7 @@ extern void fd_deactivate_device (iscsi_device_t *dev)
  *
  *
  */
-extern int fd_check_device_location (iscsi_device_t *dev, iscsi_dev_transport_info_t *dti)
+extern int fd_check_device_location (se_device_t *dev, iscsi_dev_transport_info_t *dti)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 
@@ -410,7 +410,7 @@ extern int fd_check_ghost_id (iscsi_hbainfo_t *hi)
  *
  *
  */
-extern void fd_free_device (iscsi_device_t *dev)
+extern void fd_free_device (se_device_t *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 
@@ -440,7 +440,7 @@ extern int fd_transport_complete (se_task_t *task)
  */
 extern void *fd_allocate_request (
 	se_task_t *task,
-	iscsi_device_t *dev)
+	se_device_t *dev)
 {
 	fd_request_t *fd_req;
 	
@@ -455,13 +455,13 @@ extern void *fd_allocate_request (
 	return((void *)fd_req);
 }
 
-extern void fd_get_evpd_prod (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void fd_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	snprintf(buf, size, "FILEIO");
 	return;
 }
 
-extern void fd_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void fd_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	fd_dev_t *fdev = (fd_dev_t *) dev->dev_ptr;
 	iscsi_hba_t *hba = dev->iscsi_hba;
@@ -1044,7 +1044,7 @@ extern void fd_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
 	return;
 }
 
-extern void fd_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
+extern void fd_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
 	fd_dev_t *fd = (fd_dev_t *) dev->dev_ptr;
 
@@ -1201,7 +1201,7 @@ extern int fd_CDB_write_SG (se_task_t *task, u32 size)
  *
  *
  */
-extern int fd_check_lba (unsigned long long lba, iscsi_device_t *dev)
+extern int fd_check_lba (unsigned long long lba, se_device_t *dev)
 {
 	return(0);
 }
@@ -1232,7 +1232,7 @@ extern unsigned char *fd_get_cdb (se_task_t *task)
  *
  *
  */
-extern u32 fd_get_blocksize (iscsi_device_t *dev)
+extern u32 fd_get_blocksize (se_device_t *dev)
 {
 	return(FD_BLOCKSIZE);
 }
@@ -1241,7 +1241,7 @@ extern u32 fd_get_blocksize (iscsi_device_t *dev)
  *
  *
  */
-extern u32 fd_get_device_rev (iscsi_device_t *dev)
+extern u32 fd_get_device_rev (se_device_t *dev)
 {
 	return(02); 
 }
@@ -1250,7 +1250,7 @@ extern u32 fd_get_device_rev (iscsi_device_t *dev)
  *
  *
  */
-extern u32 fd_get_device_type (iscsi_device_t *dev)
+extern u32 fd_get_device_type (se_device_t *dev)
 {
 	return(0); /* TYPE_DISK */
 }
@@ -1259,7 +1259,7 @@ extern u32 fd_get_device_type (iscsi_device_t *dev)
  *
  *
  */
-extern u32 fd_get_dma_length (u32 task_size, iscsi_device_t *dev)
+extern u32 fd_get_dma_length (u32 task_size, se_device_t *dev)
 {
 	return(PAGE_SIZE);
 }
@@ -1268,7 +1268,7 @@ extern u32 fd_get_dma_length (u32 task_size, iscsi_device_t *dev)
  *
  *
  */
-extern u32 fd_get_max_sectors (iscsi_device_t *dev)
+extern u32 fd_get_max_sectors (se_device_t *dev)
 {
 	return(FD_MAX_SECTORS);
 }
@@ -1277,7 +1277,7 @@ extern u32 fd_get_max_sectors (iscsi_device_t *dev)
  *
  *
  */
-extern u32 fd_get_queue_depth (iscsi_device_t *dev)
+extern u32 fd_get_queue_depth (se_device_t *dev)
 {
 	return(FD_DEVICE_QUEUE_DEPTH);
 }

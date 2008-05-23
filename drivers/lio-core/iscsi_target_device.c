@@ -68,7 +68,7 @@ extern __u32 iscsi_unpack_lun (unsigned char *);
 extern int iscsi_check_devices_access (iscsi_hba_t *hba)
 {
 	int ret = 0;
-	iscsi_device_t *dev = NULL, *dev_next = NULL;
+	se_device_t *dev = NULL, *dev_next = NULL;
 
 	spin_lock(&hba->device_lock);
 	dev = hba->device_head;
@@ -94,7 +94,7 @@ extern int iscsi_check_devices_access (iscsi_hba_t *hba)
  */
 extern void iscsi_disable_devices_for_hba (iscsi_hba_t *hba)
 {
-	iscsi_device_t *dev, *dev_next;
+	se_device_t *dev, *dev_next;
 
 	spin_lock(&hba->device_lock);
 	dev = hba->device_head;
@@ -127,7 +127,7 @@ extern void iscsi_disable_devices_for_hba (iscsi_hba_t *hba)
  *
  *
  */
-extern void se_release_device_for_hba (iscsi_device_t *dev)
+extern void se_release_device_for_hba (se_device_t *dev)
 {
 	iscsi_hba_t *hba = dev->iscsi_hba;
 
@@ -278,7 +278,7 @@ out:
 //#warning FIXME v2.8: Add SNMP bits to se_obj_api 
 #ifdef SNMP_SUPPORT
 	if (iscsi_lun->lun_type == ISCSI_LUN_TYPE_DEVICE) {
-		iscsi_device_t *dev = iscsi_lun->iscsi_dev;
+		se_device_t *dev = iscsi_lun->iscsi_dev;
 
 		spin_lock(&dev->stats_lock);
 		dev->num_cmds++;
@@ -663,9 +663,9 @@ extern void iscsi_clear_lun_from_tpg (iscsi_lun_t *lun, iscsi_portal_group_t *tp
  *
  *
  */
-extern iscsi_device_t *core_get_device_from_transport (iscsi_hba_t *hba, iscsi_dev_transport_info_t *dti)
+extern se_device_t *core_get_device_from_transport (iscsi_hba_t *hba, iscsi_dev_transport_info_t *dti)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	
 	spin_lock(&hba->device_lock);
 	for (dev = hba->device_head; dev; dev = dev->next) {
@@ -727,10 +727,10 @@ extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_de
  */
 static int iscsi_check_create_virtual_device (iscsi_hba_t *hba, iscsi_dev_transport_info_t *dti)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 
 	if ((dev = core_get_device_from_transport(hba, dti))) {
-		TRACE_ERROR("iscsi_device_t already exists on iSCSI HBA:"
+		TRACE_ERROR("se_device_t already exists on iSCSI HBA:"
 			" %u\n", hba->hba_id);
 		return(1);
 	}
@@ -780,7 +780,7 @@ extern int iscsi_create_virtual_device (iscsi_hba_t *hba, iscsi_devinfo_t *di, s
 /*
  * Called with iscsi_hba_t->device_lock held.
  */
-extern void se_clear_dev_ports (iscsi_device_t *dev)
+extern void se_clear_dev_ports (se_device_t *dev)
 {
 	iscsi_hba_t *hba = dev->iscsi_hba;	
 	iscsi_lun_t *lun;
@@ -815,7 +815,7 @@ extern void se_clear_dev_ports (iscsi_device_t *dev)
  *
  *	Used for IBLOCK, RAMDISK, and FILEIO Transport Drivers.
  */
-extern int se_free_virtual_device (iscsi_device_t *dev, iscsi_hba_t *hba)
+extern int se_free_virtual_device (se_device_t *dev, iscsi_hba_t *hba)
 {
 	spin_lock(&hba->device_lock);
 	se_clear_dev_ports(dev);
@@ -866,7 +866,7 @@ extern iscsi_hba_t *core_get_hba_from_hbaid (
 	return(hba);
 }
 
-extern void se_dev_start (iscsi_device_t *dev)
+extern void se_dev_start (se_device_t *dev)
 {
 	iscsi_hba_t *hba = dev->iscsi_hba;
 	
@@ -886,7 +886,7 @@ extern void se_dev_start (iscsi_device_t *dev)
 	return;
 }
 
-extern void se_dev_stop (iscsi_device_t *dev)
+extern void se_dev_stop (se_device_t *dev)
 {
 	iscsi_hba_t *hba = dev->iscsi_hba;
 
@@ -916,7 +916,7 @@ extern void se_dev_stop (iscsi_device_t *dev)
 extern int iscsi_dev_add_lun (
 	iscsi_portal_group_t *tpg,
 	iscsi_hba_t *hba,
-	iscsi_device_t *dev,
+	se_device_t *dev,
 	iscsi_dev_transport_info_t *dti)
 {
 	iscsi_lun_t *lun;
@@ -925,7 +925,7 @@ extern int iscsi_dev_add_lun (
 	int ret;
 	
 	if (DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj) != 0) {
-		TRACE_ERROR("Unable to export iscsi_device_t while dev_access_obj: %d\n",
+		TRACE_ERROR("Unable to export se_device_t while dev_access_obj: %d\n",
 			DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj));
 		return(ERR_OBJ_ACCESS_COUNT);
 	}
@@ -933,7 +933,7 @@ extern int iscsi_dev_add_lun (
 	if ((fp = DEV_OBJ_API(dev)->get_feature_obj(dev))) {
 		if (fp->fp_mode != FP_MODE_SINGLE) {
 			if (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)) {
-				TRACE_ERROR("Unable to export iscsi_device_t while"
+				TRACE_ERROR("Unable to export se_device_t while"
 					" dev_feature_obj: %d\n",
 					DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj));
 				return(ERR_OBJ_FEATURE_COUNT);

@@ -55,7 +55,7 @@
  */
 extern int iscsi_ra_check (iscsi_cmd_t *cmd)
 {
-	iscsi_device_t *dev = ISCSI_DEV(cmd);
+	se_device_t *dev = ISCSI_DEV(cmd);
 	
 	return(0);
 }

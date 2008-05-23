@@ -218,7 +218,7 @@ static int transport_processing_thread (void *);
 #ifdef DEBUG_DEV
 
 //#warning FIXME: PLUGIN API TODO
-extern int __iscsi_debug_dev (iscsi_device_t *dev)
+extern int __iscsi_debug_dev (se_device_t *dev)
 {
 	int fail_task = 0;
 	fd_dev_t *fd_dev;
@@ -284,7 +284,7 @@ extern int __iscsi_debug_dev (iscsi_device_t *dev)
 }
 
 //#warning FIXME: PLUGIN API TODO
-extern int iscsi_debug_dev (iscsi_device_t *dev)
+extern int iscsi_debug_dev (se_device_t *dev)
 {
 	int fail_task = 0;
 	fd_dev_t *fd_dev;
@@ -426,12 +426,12 @@ extern void transport_load_plugins (void)
 	return;
 }
 
-static iscsi_device_t *transport_scan_hbas_for_evpd_sn (
+static se_device_t *transport_scan_hbas_for_evpd_sn (
 	unsigned char *buf,
 	u32 len)
 {
 	u32 i;
-	iscsi_device_t *dev = NULL;
+	se_device_t *dev = NULL;
 	iscsi_hba_t *hba;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -464,12 +464,12 @@ static iscsi_device_t *transport_scan_hbas_for_evpd_sn (
 	return(NULL);
 }
 
-static iscsi_device_t *transport_scan_hbas_for_evpd_di (
+static se_device_t *transport_scan_hbas_for_evpd_di (
 	unsigned char *buf,
 	u32 len)
 {
 	u32 i;
-	iscsi_device_t *dev = NULL;
+	se_device_t *dev = NULL;
 	iscsi_hba_t *hba;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -504,12 +504,12 @@ static iscsi_device_t *transport_scan_hbas_for_evpd_di (
 
 #ifdef PYX_IBLOCK
 
-static iscsi_device_t *transport_scan_hbas_for_major_minor (
+static se_device_t *transport_scan_hbas_for_major_minor (
 	int major,
 	int minor)
 {
 	iblock_dev_t *ib_dev = NULL;
-	iscsi_device_t *dev = NULL;
+	se_device_t *dev = NULL;
 	iscsi_hba_t *hba;
 	int i;
 
@@ -553,12 +553,12 @@ static iscsi_device_t *transport_scan_hbas_for_major_minor (
 
 #endif /* PYX_IBLOCK */
 
-extern iscsi_device_t *transport_core_locate_dev (
+extern se_device_t *transport_core_locate_dev (
 	struct iscsi_target *tg,
 	iscsi_dev_transport_info_t *dti,
 	int *ret)
 {
-	iscsi_device_t *dev = NULL;
+	se_device_t *dev = NULL;
 	iscsi_hba_t *hba;
 
 	dti->iscsi_lun = tg->iscsi_lun;
@@ -572,7 +572,7 @@ extern iscsi_device_t *transport_core_locate_dev (
 	if (tg->params_set & PARAM_EVPD_UNIT_SERIAL) {
 		if (!(dev = transport_scan_hbas_for_evpd_sn(tg->value,
 				strlen(tg->value)))) {
-			TRACE_ERROR("Unable to locate iscsi_device_t from EVPD SN:"
+			TRACE_ERROR("Unable to locate se_device_t from EVPD SN:"
 					" %s\n", tg->value);
 			*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
 			return(NULL);
@@ -581,7 +581,7 @@ extern iscsi_device_t *transport_core_locate_dev (
 	} else if (tg->params_set & PARAM_EVPD_DEVICE_IDENT) {
 		if (!(dev = transport_scan_hbas_for_evpd_di(tg->value,
 				strlen(tg->value)))) {
-			TRACE_ERROR("Unable to locate iscsi_device_t from EVPD DI:"
+			TRACE_ERROR("Unable to locate se_device_t from EVPD DI:"
 					" %s\n", tg->value);
 			*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
 			return(NULL);
@@ -596,7 +596,7 @@ extern iscsi_device_t *transport_core_locate_dev (
 		   !(tg->params_set & PARAM_HBA_ID)) {
 			if (!(dev = transport_scan_hbas_for_major_minor(tg->iblock_major,
 						tg->iblock_minor))) {
-				TRACE_ERROR("Unable to locate iscsi_device_t from %d:%d",
+				TRACE_ERROR("Unable to locate se_device_t from %d:%d",
 						tg->iblock_major, tg->iblock_minor);
 				*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
 				return(NULL);
@@ -614,7 +614,7 @@ extern iscsi_device_t *transport_core_locate_dev (
 		}
 
 		if (!(dev = core_get_device_from_transport(hba, dti))) {
-			TRACE_ERROR("Unable to locate iscsi_device_t on iSCSI HBA:"
+			TRACE_ERROR("Unable to locate se_device_t on iSCSI HBA:"
 				" %u\n", hba->hba_id);
 			core_put_hba(hba);
 			*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
@@ -632,7 +632,7 @@ extern iscsi_device_t *transport_core_locate_dev (
  */
 static void transport_all_task_dev_remove_state (iscsi_cmd_t *cmd)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	se_task_t *task;
 	unsigned long flags;
 
@@ -665,7 +665,7 @@ static void transport_all_task_dev_remove_state (iscsi_cmd_t *cmd)
 /*
  * Called with T_TASK(cmd)->t_state_lock held.
  */
-extern void transport_task_dev_remove_state (se_task_t *task, iscsi_device_t *dev)
+extern void transport_task_dev_remove_state (se_task_t *task, se_device_t *dev)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	unsigned long flags;
@@ -863,7 +863,7 @@ extern int transport_add_cmd_to_queue (iscsi_cmd_t *cmd, se_queue_obj_t *qobj, u
 
 static int transport_add_cmd_to_dev_queue (iscsi_cmd_t *cmd, u8 t_state)
 {
-	iscsi_device_t *dev = cmd->iscsi_dev;
+	se_device_t *dev = cmd->iscsi_dev;
 	
 	return(transport_add_cmd_to_queue(cmd, dev->dev_queue_obj, t_state));
 }
@@ -993,7 +993,7 @@ extern void transport_complete_cmd (iscsi_cmd_t *cmd, int success)
 extern void transport_complete_task (se_task_t *task, int success)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
-	iscsi_device_t *dev = task->iscsi_dev;
+	se_device_t *dev = task->iscsi_dev;
 	int t_state;
 	unsigned long flags;
 #if 0
@@ -1104,7 +1104,7 @@ check_task_stop:
  *
  *	Called with iscsi_dev_t->execute_task_lock called.
  */
-static void __transport_add_task_to_execute_queue (se_task_t *task, iscsi_device_t *dev)
+static void __transport_add_task_to_execute_queue (se_task_t *task, se_device_t *dev)
 {
 	if (!dev->execute_task_head && !dev->execute_task_tail) {
 		dev->execute_task_head = dev->execute_task_tail = task;
@@ -1132,7 +1132,7 @@ static void __transport_add_task_to_execute_queue (se_task_t *task, iscsi_device
  *
  *
  */
-extern void transport_add_task_to_execute_queue (se_task_t *task, iscsi_device_t *dev)
+extern void transport_add_task_to_execute_queue (se_task_t *task, se_device_t *dev)
 {
 	unsigned long flags;
 
@@ -1165,7 +1165,7 @@ extern void transport_add_task_to_execute_queue (se_task_t *task, iscsi_device_t
 
 static void transport_add_tasks_to_state_queue (iscsi_cmd_t *cmd)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	se_task_t *task;
 	unsigned long flags;
 
@@ -1196,7 +1196,7 @@ static void transport_add_tasks_to_state_queue (iscsi_cmd_t *cmd)
  */
 extern void transport_add_tasks_from_cmd (iscsi_cmd_t *cmd)
 {
-	iscsi_device_t *dev = ISCSI_DEV(cmd);
+	se_device_t *dev = ISCSI_DEV(cmd);
 	se_task_t *task;
 	unsigned long flags;
 
@@ -1217,7 +1217,7 @@ extern void transport_add_tasks_from_cmd (iscsi_cmd_t *cmd)
  *
  *	Called with dev->execute_task_lock held.
  */
-extern se_task_t *transport_get_task_from_execute_queue (iscsi_device_t *dev)
+extern se_task_t *transport_get_task_from_execute_queue (se_device_t *dev)
 {
 	se_task_t *task;
 
@@ -1242,7 +1242,7 @@ extern se_task_t *transport_get_task_from_execute_queue (iscsi_device_t *dev)
  *
  *
  */
-static void transport_remove_task_from_execute_queue (se_task_t *task, iscsi_device_t *dev)
+static void transport_remove_task_from_execute_queue (se_task_t *task, se_device_t *dev)
 {
 	unsigned long flags;
 
@@ -1275,7 +1275,7 @@ static void transport_remove_task_from_execute_queue (se_task_t *task, iscsi_dev
  *
  *
  */
-extern int transport_check_device_tcq (iscsi_device_t *dev, __u32 iscsi_lun, __u32 device_tcq)
+extern int transport_check_device_tcq (se_device_t *dev, __u32 iscsi_lun, __u32 device_tcq)
 {
 	if (device_tcq > dev->queue_depth) {
 		TRACE_ERROR("Attempting to set storage device queue depth to"
@@ -1300,7 +1300,7 @@ extern int transport_check_device_tcq (iscsi_device_t *dev, __u32 iscsi_lun, __u
  *
  *
  */
-static void transport_release_all_cmds (iscsi_device_t *dev)
+static void transport_release_all_cmds (se_device_t *dev)
 {
 	iscsi_cmd_t *cmd = NULL;
 	iscsi_queue_req_t *qr, *qr_next;
@@ -1529,7 +1529,7 @@ static int transport_get_inquiry_evpd_device_ident (se_obj_lun_type_t *obj_api, 
 	return(0);
 }
 
-static int transport_get_read_capacity (iscsi_device_t *dev)
+static int transport_get_read_capacity (se_device_t *dev)
 {
 	unsigned char cdb[SCSI_CDB_SIZE], *buf;
 	u32 blocks, v1, v2;
@@ -1597,20 +1597,20 @@ static int transport_get_read_capacity (iscsi_device_t *dev)
  *	signifying OS that a dependent block_device has been claimed.  In exception cases we
  *	will release said block_device ourselves.
  */
-extern iscsi_device_t *transport_add_device_to_iscsi_hba (
+extern se_device_t *transport_add_device_to_iscsi_hba (
 	iscsi_hba_t *hba,
 	iscsi_transport_t *transport,
 	u32 device_flags,
 	void *transport_dev)
 {
 	int ret = 0;
-	iscsi_device_t  *dev;
+	se_device_t  *dev;
 
-	if (!(dev = (iscsi_device_t *) kmalloc(sizeof(iscsi_device_t), GFP_KERNEL))) {
+	if (!(dev = (se_device_t *) kmalloc(sizeof(se_device_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_dev_t\n");
 		return(NULL);
 	}
-	memset(dev, 0, sizeof (iscsi_device_t));
+	memset(dev, 0, sizeof (se_device_t));
 
 	if (!(dev->dev_queue_obj = (se_queue_obj_t *) kmalloc(sizeof(se_queue_obj_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for dev->dev_queue_obj\n");
@@ -1668,7 +1668,7 @@ extern iscsi_device_t *transport_add_device_to_iscsi_hba (
 	spin_unlock(&hba->device_lock);
 
 	/*
-	 * Get this iscsi_device_t's API from the device object plugin.
+	 * Get this se_device_t's API from the device object plugin.
 	 */
 	if (!(dev->dev_obj_api = se_obj_get_api(ISCSI_LUN_TYPE_DEVICE)))
 		goto out;
@@ -1707,7 +1707,7 @@ extern iscsi_device_t *transport_add_device_to_iscsi_hba (
 		goto out;
 	
 	/*
-	 * Determine if any feature plugin metadata exists on the iscsi_device_t object.
+	 * Determine if any feature plugin metadata exists on the se_device_t object.
 	 */
 	ret = feature_plugin_activate(dev->dev_obj_api, (void *)dev, 0);
 	if (ret < 0)
@@ -1728,7 +1728,7 @@ out:
 	transport_generic_release_phydevice(dev, 0);
 	
 	/*
-	 * Release newly allocated state for iscsi_device_t
+	 * Release newly allocated state for se_device_t
 	 */
 	transport_generic_deactivate_device(dev);
 
@@ -1748,7 +1748,7 @@ out:
  *
  *
  */
-extern void transport_generic_activate_device (iscsi_device_t *dev)
+extern void transport_generic_activate_device (se_device_t *dev)
 {
 	if (TRANSPORT(dev)->activate_device)
 		TRANSPORT(dev)->activate_device(dev);
@@ -1767,7 +1767,7 @@ extern void transport_generic_activate_device (iscsi_device_t *dev)
  *
  *
  */
-extern void transport_generic_deactivate_device (iscsi_device_t *dev)
+extern void transport_generic_deactivate_device (se_device_t *dev)
 {
 	if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD))
 		DEV_OBJ_API(dev)->stop_status_thread((void *)dev);
@@ -1795,7 +1795,7 @@ extern void transport_generic_deactivate_device (iscsi_device_t *dev)
  *	Returns 1 - Successfuly claimed
  *	Returns < 0 - Error
  */
-extern int transport_generic_claim_phydevice (iscsi_device_t *dev)
+extern int transport_generic_claim_phydevice (se_device_t *dev)
 {
 	int ret;
 	iscsi_hba_t *hba;
@@ -1814,7 +1814,7 @@ extern int transport_generic_claim_phydevice (iscsi_device_t *dev)
 		return(0);
 		
 	if (!(hba = dev->iscsi_hba)) {
-		TRACE_ERROR("iscsi_device_t->iscsi_hba is NULL!\n");
+		TRACE_ERROR("se_device_t->iscsi_hba is NULL!\n");
 		return(-1);
 	}
 		
@@ -1835,7 +1835,7 @@ extern int transport_generic_claim_phydevice (iscsi_device_t *dev)
  *	see iscsi_target_pscsi.c and iscsi_target_iblock.c functions for
  *	iscsi_transport_t->[claim,release]_phydevice()
  */
-extern void transport_generic_release_phydevice (iscsi_device_t *dev, int check_pscsi)
+extern void transport_generic_release_phydevice (se_device_t *dev, int check_pscsi)
 {
 	if (!TRANSPORT(dev)->release_phydevice)
 		return;
@@ -1853,7 +1853,7 @@ extern void transport_generic_release_phydevice (iscsi_device_t *dev, int check_
 		return;
 		
 	if (!dev->dev_ptr) {
-		TRACE_ERROR("iscsi_device_t->dev_ptr is NULL!\n");
+		TRACE_ERROR("se_device_t->dev_ptr is NULL!\n");
 		BUG();
 	}
 
@@ -1875,7 +1875,7 @@ extern void transport_generic_release_phydevice (iscsi_device_t *dev, int check_
  *
  *
  */
-extern void transport_generic_free_device (iscsi_device_t *dev)
+extern void transport_generic_free_device (se_device_t *dev)
 {
 	transport_generic_deactivate_device(dev);
 	
@@ -2227,7 +2227,7 @@ extern int transport_generic_allocate_tasks (
  *
  */
 extern int transport_generic_check_device_location (
-	iscsi_device_t *dev,
+	se_device_t *dev,
 	iscsi_dev_transport_info_t *dti)
 {
 	int ret = 0;
@@ -2235,7 +2235,7 @@ extern int transport_generic_check_device_location (
 	iscsi_transport_t *t;
 	
 	if (!dev->iscsi_hba) {
-		TRACE_ERROR("iscsi_device_t->iscsi_hba is NULL!\n");
+		TRACE_ERROR("se_device_t->iscsi_hba is NULL!\n");
 		return(-1);
 	}
 	hba = dev->iscsi_hba;
@@ -2254,7 +2254,7 @@ extern int transport_generic_handle_cdb (
 	iscsi_cmd_t *cmd)
 {
 #if 0
-	iscsi_device_t *dev;
+	se_device_t *dev;
 #endif
 	if (!ISCSI_LUN(cmd)) {
 		TRACE_ERROR("ISCSI_LUN(cmd) is NULL\n");
@@ -2365,7 +2365,7 @@ extern void transport_stop_tasks_for_cmd (iscsi_cmd_t *cmd)
 	return;
 }
 
-static void transport_failure_reset_queue_depth (iscsi_device_t *dev)
+static void transport_failure_reset_queue_depth (se_device_t *dev)
 {
 	unsigned long flags;
 
@@ -2378,7 +2378,7 @@ static void transport_failure_reset_queue_depth (iscsi_device_t *dev)
 }
 
 /*
- * Used for iscsi_device_t, JBOD and RAID0.
+ * Used for se_device_t, JBOD and RAID0.
  */
 extern int transport_failure_tasks_generic (iscsi_cmd_t *cmd)
 {
@@ -2413,7 +2413,7 @@ done:
  *
  *	Handle SAM-esque emulation for generic transport request failures.
  */
-extern void transport_generic_request_failure (iscsi_cmd_t *cmd, iscsi_device_t *dev, int complete, int sc)
+extern void transport_generic_request_failure (iscsi_cmd_t *cmd, se_device_t *dev, int complete, int sc)
 {
 	DEBUG_GRF("-----[ Storage Engine Exception for cmd: %p ITT: 0x%08x CDB: 0x%02x\n", cmd,
 		cmd->init_task_tag, T_TASK(cmd)->t_task_cdb[0]);
@@ -3232,7 +3232,7 @@ extern void transport_stop_all_task_timers (iscsi_cmd_t *cmd)
 	return;
 }
 
-static inline int transport_tcq_window_closed (iscsi_device_t *dev)
+static inline int transport_tcq_window_closed (se_device_t *dev)
 {
 	if (dev->dev_tcq_window_closed++ < PYX_TRANSPORT_WINDOW_CLOSED_THRESHOLD) {
 		msleep(PYX_TRANSPORT_WINDOW_CLOSED_WAIT_SHORT);
@@ -3266,7 +3266,7 @@ extern int transport_execute_tasks (iscsi_cmd_t *cmd)
 
 	/*
 	 * Add the task(s) built for the passed iscsi_cmd_t to the
-	 * execution queue for this iscsi_device_t.
+	 * execution queue for this se_device_t.
 	 */
 	if (!transport_cmd_check_stop(cmd, 0, TRANSPORT_PROCESSING))
 		CMD_ORIG_OBJ_API(cmd)->add_tasks(cmd->se_orig_obj_ptr, cmd);
@@ -3276,7 +3276,7 @@ extern int transport_execute_tasks (iscsi_cmd_t *cmd)
 	return(0);
 }
 
-extern int __transport_execute_tasks (iscsi_device_t *dev)
+extern int __transport_execute_tasks (se_device_t *dev)
 {
 	int error;
 	iscsi_cmd_t *cmd = NULL;
@@ -3361,10 +3361,10 @@ static void transport_nop_wait_for_tasks (iscsi_cmd_t *, int, int);
 
 static inline u32 transport_get_sectors_6 (unsigned char *cdb, iscsi_cmd_t *cmd, int *ret)
 {
-	iscsi_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
+	se_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
 	
 	/*
-	 * Assume TYPE_DISK for non iscsi_device_t objects.
+	 * Assume TYPE_DISK for non se_device_t objects.
 	 * Use 8-bit sector value.
 	 */
 	if (!dev)
@@ -3386,10 +3386,10 @@ type_disk:
 
 static inline u32 transport_get_sectors_10 (unsigned char *cdb, iscsi_cmd_t *cmd, int *ret)
 {
-	iscsi_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
+	se_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
 
 	/*
-	 * Assume TYPE_DISK for non iscsi_device_t objects.
+	 * Assume TYPE_DISK for non se_device_t objects.
 	 * Use 16-bit sector value.
 	 */
 	if (!dev)
@@ -3413,10 +3413,10 @@ type_disk:
 
 static inline u32 transport_get_sectors_12 (unsigned char *cdb, iscsi_cmd_t *cmd, int *ret)
 {
-	iscsi_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
+	se_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
 
 	/*
-	 * Assume TYPE_DISK for non iscsi_device_t objects.
+	 * Assume TYPE_DISK for non se_device_t objects.
 	 * Use 32-bit sector value.
 	 */
 	if (!dev)
@@ -3440,10 +3440,10 @@ type_disk:
 
 static inline u32 transport_get_sectors_16 (unsigned char *cdb, iscsi_cmd_t *cmd, int *ret)
 {
-	iscsi_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
+	se_device_t *dev = ISCSI_LUN(cmd)->iscsi_dev;
 	
 	/*
-	 * Assume TYPE_DISK for non iscsi_device_t objects.
+	 * Assume TYPE_DISK for non se_device_t objects.
 	 * Use 32-bit sector value.
 	 */
 	if (!dev)
@@ -3737,7 +3737,7 @@ extern int transport_generic_emulate_modesense (
 extern int transport_get_sense_data (iscsi_cmd_t *cmd)
 {
 	unsigned char *buffer = NULL, *sense_buffer = NULL;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	se_task_t *task = NULL, *task_tmp;
 	unsigned long flags;
 
@@ -4395,7 +4395,7 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	cmd->se_orig_obj_api = obj_api;
 	cmd->se_orig_obj_ptr = type_ptr;
 	cmd->cmd_flags = cmd_flags;
-	ISCSI_LUN(cmd)->iscsi_dev = (iscsi_device_t *) type_ptr;
+	ISCSI_LUN(cmd)->iscsi_dev = (se_device_t *) type_ptr;
 
 	/*
 	 * Double check that the passed object is currently accepting CDBs
@@ -5676,7 +5676,7 @@ extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 	/*
 	 * For WRITEs, let the iSCSI Target RX Thread know its buffer is ready..
 	 * This WRITE iscsi_cmd_t (and all of its associated se_task_t's)
-	 * will be added to the iscsi_device_t execution queue after its WRITE
+	 * will be added to the se_device_t execution queue after its WRITE
 	 * data has arrived. (ie: It gets handled by the transport processing
 	 * thread a second time)
 	 */
@@ -5972,7 +5972,7 @@ remove:
  *
  *
  */
-static void transport_generic_lun_reset (iscsi_device_t *dev)
+static void transport_generic_lun_reset (se_device_t *dev)
 {
 	return;
 }
@@ -6046,7 +6046,7 @@ static void transport_generic_cold_reset (iscsi_hba_t *hba)
 extern int transport_generic_do_tmr (iscsi_cmd_t *cmd)
 {
 	iscsi_cmd_t *ref_cmd;
-	iscsi_device_t *dev = ISCSI_DEV(cmd);
+	se_device_t *dev = ISCSI_DEV(cmd);
 	iscsi_tmr_req_t *req = cmd->tmr_req;
 
 	if (TRANSPORT(dev)->do_tmr)
@@ -6114,11 +6114,11 @@ static int transport_add_qr_to_queue (se_queue_obj_t *qobj, void *se_obj_ptr, in
 	return(0);
 }
 
-extern void transport_start_status_timer (iscsi_device_t *dev);
+extern void transport_start_status_timer (se_device_t *dev);
 
 static void transport_handle_status_timeout (unsigned long data)
 {
-	iscsi_device_t *dev = (iscsi_device_t *) data;
+	se_device_t *dev = (se_device_t *) data;
 
 	spin_lock_bh(&dev->dev_status_thr_lock);
 	if (dev->dev_status_timer_flags & TF_STOP) {
@@ -6134,7 +6134,7 @@ static void transport_handle_status_timeout (unsigned long data)
 	return;
 }
 
-extern void transport_start_status_timer (iscsi_device_t *dev)
+extern void transport_start_status_timer (se_device_t *dev)
 {
 	spin_lock_bh(&dev->dev_status_thr_lock);
 	if (dev->dev_status_timer_flags & TF_RUNNING) {
@@ -6154,7 +6154,7 @@ extern void transport_start_status_timer (iscsi_device_t *dev)
 	return;
 }
 
-extern void transport_stop_status_timer (iscsi_device_t *dev)
+extern void transport_stop_status_timer (se_device_t *dev)
 {
 	spin_lock_bh(&dev->dev_status_thr_lock);
 	if (!(dev->dev_status_timer_flags & TF_RUNNING)) {
@@ -6176,7 +6176,7 @@ extern void transport_stop_status_timer (iscsi_device_t *dev)
 
 static void transport_status_thr_complete (iscsi_cmd_t *cmd)
 {
-	iscsi_device_t *dev = ISCSI_DEV(cmd);
+	se_device_t *dev = ISCSI_DEV(cmd);
 	int ret;
 
 	ret = transport_passthrough_complete(cmd);	
@@ -6269,7 +6269,7 @@ static int transport_status_thread_tur (se_obj_lun_type_t *obj_api, void *obj_pt
  *	Called with spin_lock_irq(&dev->execute_task_lock); held
  *
  */
-static se_task_t *transport_get_task_from_state_list (iscsi_device_t *dev)
+static se_task_t *transport_get_task_from_state_list (se_device_t *dev)
 {
 	se_task_t *task;
 
@@ -6289,7 +6289,7 @@ static se_task_t *transport_get_task_from_state_list (iscsi_device_t *dev)
 }
 
 extern void transport_status_thr_force_offline (
-	iscsi_device_t *dev,
+	se_device_t *dev,
 	se_obj_lun_type_t *se_obj_api,
 	void *se_obj_ptr)
 {
@@ -6305,7 +6305,7 @@ extern void transport_status_thr_force_offline (
 	return;
 }
 
-extern int transport_status_thr_dev_online (iscsi_device_t *dev)
+extern int transport_status_thr_dev_online (se_device_t *dev)
 {
 	spin_lock(&dev->dev_status_lock);
 	if (dev->dev_status & ISCSI_DEVICE_OFFLINE_ACTIVATED) {
@@ -6320,7 +6320,7 @@ extern int transport_status_thr_dev_online (iscsi_device_t *dev)
 	return(0);
 }
 
-extern int transport_status_thr_dev_offline (iscsi_device_t *dev)
+extern int transport_status_thr_dev_offline (se_device_t *dev)
 {
 	spin_lock(&dev->dev_status_lock);
 	if (dev->dev_status & ISCSI_DEVICE_ACTIVATED) {
@@ -6335,7 +6335,7 @@ extern int transport_status_thr_dev_offline (iscsi_device_t *dev)
 	return(0);
 }
 
-extern int transport_status_thr_dev_offline_tasks (iscsi_device_t *dev, void *se_obj_ptr)
+extern int transport_status_thr_dev_offline_tasks (se_device_t *dev, void *se_obj_ptr)
 {
 	iscsi_cmd_t *cmd;
 	se_task_t *task, *task_next;
@@ -6487,7 +6487,7 @@ static void transport_status_empty_queue (se_queue_obj_t *qobj)
 	return;
 }
 
-static int transport_status_dev_offline (iscsi_device_t *dev)
+static int transport_status_dev_offline (se_device_t *dev)
 {
 	se_fp_obj_t *fp;	
 
@@ -6506,7 +6506,7 @@ static int transport_status_dev_offline (iscsi_device_t *dev)
 	return(0);
 }
 
-static int transport_status_dev_online (iscsi_device_t *dev)
+static int transport_status_dev_online (se_device_t *dev)
 {
 	se_fp_obj_t *fp;
 
@@ -6526,7 +6526,7 @@ static int transport_status_dev_online (iscsi_device_t *dev)
 static int transport_status_thread (void *p)
 {
 	se_obj_lun_type_t *se_obj_api;
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 	iscsi_queue_req_t *qr;
 	void *se_obj_ptr;
 	int ret, state;
@@ -6594,7 +6594,7 @@ out:
 	return(0);
 }
 
-extern void transport_start_status_thread (iscsi_device_t *dev)
+extern void transport_start_status_thread (se_device_t *dev)
 {
 	spin_lock_bh(&dev->dev_status_thr_lock);
 	atomic_inc(&dev->dev_status_thr_count);
@@ -6610,7 +6610,7 @@ extern void transport_start_status_thread (iscsi_device_t *dev)
 	return;
 }
 
-extern void transport_stop_status_thread (iscsi_device_t *dev)
+extern void transport_stop_status_thread (se_device_t *dev)
 {
 	spin_lock_bh(&dev->dev_status_thr_lock);
 	if (!(atomic_dec_and_test(&dev->dev_status_thr_count))) {
@@ -6626,7 +6626,7 @@ extern void transport_stop_status_thread (iscsi_device_t *dev)
 	return;
 }
 
-static void transport_processing_shutdown (iscsi_device_t *dev)
+static void transport_processing_shutdown (se_device_t *dev)
 {
 	iscsi_cmd_t *cmd;
 	iscsi_queue_req_t *qr;
@@ -6636,7 +6636,7 @@ static void transport_processing_shutdown (iscsi_device_t *dev)
 
 
 	/*
-	 * Empty the iscsi_device_t's se_task_t state list.
+	 * Empty the se_device_t's se_task_t state list.
 	 */
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
 	while ((task = transport_get_task_from_state_list(dev))) {
@@ -6752,7 +6752,7 @@ static void transport_processing_shutdown (iscsi_device_t *dev)
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 
 	/*
-	 * Empty the iscsi_device_t's iscsi_cmd_t list.
+	 * Empty the se_device_t's iscsi_cmd_t list.
 	 */
 	spin_lock_irqsave(&dev->dev_queue_obj->cmd_queue_lock, flags);
 	while ((qr = __transport_get_qr_from_queue(dev->dev_queue_obj))) {
@@ -6792,7 +6792,7 @@ static int transport_processing_thread (void *param)
 {
 	int ret, t_state;
 	iscsi_cmd_t *cmd;
-	iscsi_device_t *dev = (iscsi_device_t *) param;
+	se_device_t *dev = (se_device_t *) param;
 	iscsi_queue_req_t *qr;
 
 	{

@@ -139,14 +139,14 @@ static int rl_allocate_fake_lun (iscsi_cmd_t *cmd, u32 lun)
 	ISCSI_LUN(cmd)->iscsi_lun = lun;
 	lun_p = ISCSI_LUN(cmd);
 	
-	if (!(lun_p->iscsi_dev = (iscsi_device_t *)
-			kmalloc(sizeof(iscsi_device_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate iscsi_device_t\n");
+	if (!(lun_p->iscsi_dev = (se_device_t *)
+			kmalloc(sizeof(se_device_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate se_device_t\n");
 		kfree(ISCSI_LUN(cmd));
 		return(-1);
 	}
 
-	memset(ISCSI_DEV(cmd), 0, sizeof(iscsi_device_t));
+	memset(ISCSI_DEV(cmd), 0, sizeof(se_device_t));
 	ISCSI_DEV(cmd)->transport = &rl_template;
 
 	return(0);
@@ -170,7 +170,7 @@ extern int iscsi_allocate_rl_cmd (
 	cmd->data_length = (cdb[6] << 24) + (cdb[7] << 16) + (cdb[8] << 8) + cdb[9];
 
 	/*
-	 * We are going to be accessing a pseudo iscsi_device_t and iscsi_lun_t,
+	 * We are going to be accessing a pseudo se_device_t and iscsi_lun_t,
 	 * Still call iscsi_get_lun_for_cmd() for accounting purposes.
 	 */ 
 	 iscsi_get_lun_for_cmd(cmd, iscsi_lun);

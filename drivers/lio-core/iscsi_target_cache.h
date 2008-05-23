@@ -35,7 +35,7 @@
 
 extern iscsi_cache_entry_t *iscsi_cache_check_for_entry (iscsi_cache_check_entry_t *, iscsi_cmd_t *);
 extern void iscsi_cache_add_entry (iscsi_cache_check_entry_t *, iscsi_cmd_t *);
-extern int iscsi_cache_init_dev (iscsi_device_t *);
-extern void iscsi_cache_free_dev (iscsi_device_t *);
+extern int iscsi_cache_init_dev (se_device_t *);
+extern void iscsi_cache_free_dev (se_device_t *);
 
 #endif /* ISCSI_TARGET_CACHE_H */

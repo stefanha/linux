@@ -208,7 +208,7 @@ done:
 
 extern int iscsi_get_dev_info_count_for_hba (u32 hba_id, int *count)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	iscsi_hba_t *hba;
 
 	if (!(hba = core_get_hba_from_id(hba_id, 0)))
@@ -277,7 +277,7 @@ const char *transport_device_types[MAX_SCSI_DEV_TYPE] = {
 };
 
 extern void iscsi_dump_dev_state (
-	iscsi_device_t *dev,
+	se_device_t *dev,
 	char *b,
 	int *bl)
 {
@@ -312,7 +312,7 @@ extern void iscsi_dump_dev_state (
 }
 
 extern void iscsi_dump_dev_info (
-	iscsi_device_t *dev,
+	se_device_t *dev,
 	iscsi_lun_t *lun,
 	unsigned long long total_bytes,
 	char *b,        /* Pointer to info buffer */
@@ -400,7 +400,7 @@ extern int iscsi_get_hba_dev_info (
 {
 	unsigned char *b;
 	int bl = 0, cl = 0, oob = 1, start = 0;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	iscsi_hba_t *hba;
 
 	if (!(hba = core_get_hba_from_id(hba_id, 0))) {

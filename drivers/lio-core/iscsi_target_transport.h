@@ -90,13 +90,13 @@
 struct se_mem_s;
 
 #ifdef DEBUG_DEV
-extern int __iscsi_debug_dev (iscsi_device_t *);
-extern int iscsi_debug_dev (iscsi_device_t *);
+extern int __iscsi_debug_dev (se_device_t *);
+extern int iscsi_debug_dev (se_device_t *);
 #endif
 extern unsigned char *transport_get_iqn_sn (void);
 extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
-extern iscsi_device_t *transport_core_locate_dev (struct iscsi_target *, iscsi_dev_transport_info_t *, int *);
+extern se_device_t *transport_core_locate_dev (struct iscsi_target *, iscsi_dev_transport_info_t *, int *);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct iscsi_device_s *);
 extern int transport_add_cmd_to_queue (struct iscsi_cmd_s *, struct se_queue_obj_s *, u8);
 extern void transport_complete_cmd (iscsi_cmd_t *, int);
@@ -105,14 +105,14 @@ extern void transport_add_task_to_execute_queue (struct se_task_s *, struct iscs
 extern void transport_add_tasks_from_cmd (struct iscsi_cmd_s *);
 extern struct se_task_s *transport_get_task_from_execute_queue (struct iscsi_device_s *);
 extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
-extern int transport_check_device_tcq (iscsi_device_t *, u32, u32);
+extern int transport_check_device_tcq (se_device_t *, u32, u32);
 extern iscsi_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
-extern iscsi_device_t *transport_add_device_to_iscsi_hba (iscsi_hba_t *, struct iscsi_transport_s *, u32, void *);
-extern void transport_generic_activate_device (iscsi_device_t *);
-extern void transport_generic_deactivate_device (iscsi_device_t *);
-extern int transport_generic_claim_phydevice (iscsi_device_t *);
-extern void transport_generic_release_phydevice (iscsi_device_t *, int);
-extern void transport_generic_free_device (iscsi_device_t *);
+extern se_device_t *transport_add_device_to_iscsi_hba (iscsi_hba_t *, struct iscsi_transport_s *, u32, void *);
+extern void transport_generic_activate_device (se_device_t *);
+extern void transport_generic_deactivate_device (se_device_t *);
+extern int transport_generic_claim_phydevice (se_device_t *);
+extern void transport_generic_release_phydevice (se_device_t *, int);
+extern void transport_generic_free_device (se_device_t *);
 extern int transport_generic_obj_start (struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long);
 extern int transport_process_vol_transform (u32 *, struct iscsi_transform_info_s *);
 extern int transport_jbod_cdb_count (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
@@ -127,13 +127,13 @@ extern int transport_process_mirror_write (u32 *, struct iscsi_transform_info_s 
 extern int transport_mirror_vol_write_allocate_DMA (struct iscsi_cmd_s *, struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *);
 extern void transport_device_setup_cmd (iscsi_cmd_t *);
 extern int transport_generic_allocate_tasks (iscsi_cmd_t *, unsigned char *);
-extern int transport_generic_check_device_location (iscsi_device_t *dev, struct iscsi_dev_transport_info_s *);
+extern int transport_generic_check_device_location (se_device_t *dev, struct iscsi_dev_transport_info_s *);
 extern int transport_generic_handle_cdb (iscsi_cmd_t *);
 extern int transport_generic_handle_data (iscsi_cmd_t *);
 extern int transport_generic_handle_tmr (iscsi_cmd_t *, iscsi_tmr_req_t *);
 extern void transport_stop_tasks_for_cmd (struct iscsi_cmd_s *);
 extern int transport_failure_tasks_generic (iscsi_cmd_t *);
-extern void transport_generic_request_failure (iscsi_cmd_t *, iscsi_device_t *, int, int); 
+extern void transport_generic_request_failure (iscsi_cmd_t *, se_device_t *, int, int); 
 extern void transport_direct_request_timeout (iscsi_cmd_t *);
 extern void transport_generic_request_timeout (iscsi_cmd_t *);
 extern int transport_generic_allocate_buf (iscsi_cmd_t *, u32, u32);
@@ -183,14 +183,14 @@ extern u32 transport_generic_get_cdb_count (struct iscsi_cmd_s *, struct iscsi_t
 extern int transport_generic_new_cmd (iscsi_cmd_t *);
 extern void transport_generic_process_write (iscsi_cmd_t *);
 extern int transport_generic_do_tmr (iscsi_cmd_t *);
-extern void transport_start_status_timer (iscsi_device_t *);
-extern void transport_stop_status_timer (iscsi_device_t *);
-extern void transport_status_thr_force_offline (iscsi_device_t *, struct se_obj_lun_type_s *, void *);
-extern int transport_status_thr_dev_offline (iscsi_device_t *);
-extern int transport_status_thr_dev_offline_tasks (iscsi_device_t *, void *);
-extern int transport_status_thr_rdev_offline (iscsi_device_t *);
-extern void transport_start_status_thread (iscsi_device_t *);
-extern void transport_stop_status_thread (iscsi_device_t *);
+extern void transport_start_status_timer (se_device_t *);
+extern void transport_stop_status_timer (se_device_t *);
+extern void transport_status_thr_force_offline (se_device_t *, struct se_obj_lun_type_s *, void *);
+extern int transport_status_thr_dev_offline (se_device_t *);
+extern int transport_status_thr_dev_offline_tasks (se_device_t *, void *);
+extern int transport_status_thr_rdev_offline (se_device_t *);
+extern void transport_start_status_thread (se_device_t *);
+extern void transport_stop_status_thread (se_device_t *);
 
 /*
  * Each se_transport_task_t can have N number of possible se_task_t's
@@ -230,7 +230,7 @@ typedef struct se_task_s {
 	u32		task_sg_num;
 	u32		task_sg_offset;
 	iscsi_cmd_t	*iscsi_cmd;
-	iscsi_device_t	*iscsi_dev;
+	se_device_t	*iscsi_dev;
 	struct semaphore	task_stop_sem;
 	atomic_t	task_active;
 	atomic_t	task_execute_queue;
@@ -330,7 +330,7 @@ typedef struct iscsi_transport_s {
 	/*
 	 * check_device_location():
 	 */
-	int (*check_device_location)(iscsi_device_t *, iscsi_dev_transport_info_t *);
+	int (*check_device_location)(se_device_t *, iscsi_dev_transport_info_t *);
 	/*
 	 * check_ghost_id():
 	 */
@@ -360,7 +360,7 @@ typedef struct iscsi_transport_s {
 	/*
 	 * allocate_request():
 	 */
-	void *(*allocate_request)(se_task_t *, iscsi_device_t *);
+	void *(*allocate_request)(se_task_t *, se_device_t *);
 	/*
 	 * allocate_buf():
 	 */
@@ -408,11 +408,11 @@ typedef struct iscsi_transport_s {
 	/*
 	 * get_dev_info():
 	 */
-	void (*get_dev_info)(iscsi_device_t *, char *, int *);
+	void (*get_dev_info)(se_device_t *, char *, int *);
 	/*
 	 * check_lba():
 	 */
-	int (*check_lba)(unsigned long long lba, iscsi_device_t *);
+	int (*check_lba)(unsigned long long lba, se_device_t *);
 	/*
 	 * check_for_SG():
 	 */
@@ -424,44 +424,44 @@ typedef struct iscsi_transport_s {
 	/*
 	 * get_blocksize():
 	 */
-	__u32 (*get_blocksize)(iscsi_device_t *);
+	__u32 (*get_blocksize)(se_device_t *);
 	/*
 	 * get_device_rev():
 	 */
-	__u32 (*get_device_rev)(iscsi_device_t *);
+	__u32 (*get_device_rev)(se_device_t *);
 	/*
 	 * get_device_type():
 	 */
-	__u32 (*get_device_type)(iscsi_device_t *);
+	__u32 (*get_device_type)(se_device_t *);
 	/*
 	 * get_dma_length():
 	 */
-	__u32 (*get_dma_length)(u32, iscsi_device_t *);
+	__u32 (*get_dma_length)(u32, se_device_t *);
 	/*
 	 * get_evpd_prod():
 	 */
-	void (*get_evpd_prod)(unsigned char *, u32, iscsi_device_t *);
+	void (*get_evpd_prod)(unsigned char *, u32, se_device_t *);
 	/*
 	 * get_evpd_sn():
 	 */
-	void (*get_evpd_sn)(unsigned char *, u32, iscsi_device_t *);
+	void (*get_evpd_sn)(unsigned char *, u32, se_device_t *);
 	/*
 	 * get_max_cdbs():
 	 */
-	__u32 (*get_max_cdbs)(iscsi_device_t *);
+	__u32 (*get_max_cdbs)(se_device_t *);
 	/*
 	 * get_max_sectors():
 	 */
-	 __u32 (*get_max_sectors)(iscsi_device_t *);
+	 __u32 (*get_max_sectors)(se_device_t *);
 	/*
 	 * get_queue_depth():
 	 *
 	 */
-	__u32 (*get_queue_depth)(iscsi_device_t *);
+	__u32 (*get_queue_depth)(se_device_t *);
 	/*
 	 * transport_timeout_start():
 	 */
-	int (*transport_timeout_start)(iscsi_device_t *, se_task_t *);
+	int (*transport_timeout_start)(se_device_t *, se_task_t *);
 	/*
 	 * do_se_mem_map():
 	 */

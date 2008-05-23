@@ -361,7 +361,7 @@ extern int iscsi_ioctl (
 {
 	int network_transport = 0, ret = 0;
 	u32 lun_access = 0;
-	iscsi_device_t *dev = NULL;
+	se_device_t *dev = NULL;
 	iscsi_devinfo_t dev_info;
 	iscsi_dev_transport_info_t devt_info;
 	iscsi_hba_t *hba = NULL;

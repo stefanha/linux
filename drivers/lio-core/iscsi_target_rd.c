@@ -237,7 +237,7 @@ static int rd_build_device_space (rd_dev_t *rd_dev)
  */
 static int rd_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di, int rd_direct)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	rd_dev_t *rd_dev;
 	rd_host_t *rd_host = (rd_host_t *) iscsi_hba->hba_ptr;
 
@@ -292,9 +292,9 @@ extern int rd_MEMCPY_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t 
  *
  *
  */
-extern iscsi_device_t *rd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *rd_dev_p, iscsi_devinfo_t *di)
+extern se_device_t *rd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *rd_dev_p, iscsi_devinfo_t *di)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	rd_dev_t *rd_dev = (rd_dev_t *) rd_dev_p;
 	
 	if (!(dev = transport_add_device_to_iscsi_hba(iscsi_hba,
@@ -309,7 +309,7 @@ extern iscsi_device_t *rd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *rd_d
  *
  *
  */
-extern int rd_activate_device (iscsi_device_t *dev)
+extern int rd_activate_device (se_device_t *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 	rd_host_t *rd_host = rd_dev->rd_host;
@@ -325,7 +325,7 @@ extern int rd_activate_device (iscsi_device_t *dev)
  *
  *
  */
-extern void rd_deactivate_device (iscsi_device_t *dev)
+extern void rd_deactivate_device (se_device_t *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 	rd_host_t *rd_host = rd_dev->rd_host;
@@ -341,7 +341,7 @@ extern void rd_deactivate_device (iscsi_device_t *dev)
  *
  *
  */
-extern int rd_check_device_location (iscsi_device_t *dev, iscsi_dev_transport_info_t *dti)
+extern int rd_check_device_location (se_device_t *dev, iscsi_dev_transport_info_t *dti)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 
@@ -394,7 +394,7 @@ extern int rd_dr_check_ghost_id (iscsi_hbainfo_t *hi)
  *
  *
  */
-extern void rd_free_device (iscsi_device_t *dev)
+extern void rd_free_device (se_device_t *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 
@@ -419,7 +419,7 @@ extern int rd_transport_complete (se_task_t *task)
  */
 extern void *rd_allocate_request (
 	se_task_t *task,
-	iscsi_device_t *dev)
+	se_device_t *dev)
 {
 	rd_request_t *rd_req;
 	
@@ -434,7 +434,7 @@ extern void *rd_allocate_request (
 	return((void *)rd_req);
 }
 
-extern void rd_get_evpd_prod (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void rd_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 
@@ -442,7 +442,7 @@ extern void rd_get_evpd_prod (unsigned char *buf, u32 size, iscsi_device_t *dev)
 	return;
 }
 
-extern void rd_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void rd_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 	iscsi_hba_t *hba = dev->iscsi_hba;
@@ -1168,7 +1168,7 @@ extern void rd_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
 	return;
 }
 
-extern void rd_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
+extern void rd_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
 	struct rd_dev_s *rd = (struct rd_dev_s *) dev->dev_ptr;
 
@@ -1310,7 +1310,7 @@ extern int rd_CDB_write_SG (se_task_t *task, u32 size)
  *
  *
  */
-extern int rd_DIRECT_check_lba (unsigned long long lba, iscsi_device_t *dev)
+extern int rd_DIRECT_check_lba (unsigned long long lba, se_device_t *dev)
 {
 	return(((lba % (PAGE_SIZE / RD_BLOCKSIZE)) * RD_BLOCKSIZE) ? 1 : 0);
 }
@@ -1319,7 +1319,7 @@ extern int rd_DIRECT_check_lba (unsigned long long lba, iscsi_device_t *dev)
  *
  *
  */
-extern int rd_MEMCPY_check_lba (unsigned long long lba, iscsi_device_t *dev)
+extern int rd_MEMCPY_check_lba (unsigned long long lba, se_device_t *dev)
 {
 	return(0);
 }
@@ -1350,17 +1350,17 @@ extern unsigned char *rd_get_cdb (se_task_t *task)
  *
  *
  */
-extern u32 rd_get_blocksize (iscsi_device_t *dev)
+extern u32 rd_get_blocksize (se_device_t *dev)
 {
 	return(RD_BLOCKSIZE);
 }
 
-extern u32 rd_get_device_rev (iscsi_device_t *dev)
+extern u32 rd_get_device_rev (se_device_t *dev)
 {
 	return(02);
 }
 
-extern u32 rd_get_device_type (iscsi_device_t *dev)
+extern u32 rd_get_device_type (se_device_t *dev)
 {
 	return(0); /* TYPE_DISK */
 }
@@ -1369,7 +1369,7 @@ extern u32 rd_get_device_type (iscsi_device_t *dev)
  *
  *
  */
-extern u32 rd_get_dma_length (u32 task_size, iscsi_device_t *dev)
+extern u32 rd_get_dma_length (u32 task_size, se_device_t *dev)
 {
 	return(PAGE_SIZE);
 }
@@ -1378,7 +1378,7 @@ extern u32 rd_get_dma_length (u32 task_size, iscsi_device_t *dev)
  *
  *
  */
-extern u32 rd_get_max_sectors (iscsi_device_t *dev)
+extern u32 rd_get_max_sectors (se_device_t *dev)
 {
 	return(RD_MAX_SECTORS);
 }
@@ -1387,7 +1387,7 @@ extern u32 rd_get_max_sectors (iscsi_device_t *dev)
  *
  *
  */
-extern u32 rd_get_queue_depth (iscsi_device_t *dev)
+extern u32 rd_get_queue_depth (se_device_t *dev)
 {
 	return(RD_DEVICE_QUEUE_DEPTH);
 }

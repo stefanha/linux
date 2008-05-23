@@ -1560,7 +1560,7 @@ done:
 	}
 
 	/*
-	 * The CDB is going to an iscsi_device_t.
+	 * The CDB is going to an se_device_t.
 	 */
 	if ((ret = iscsi_get_lun_for_cmd(cmd, hdr->lun)) < 0) {
 		if (ret == -2)
@@ -2238,7 +2238,7 @@ static inline int iscsi_handle_task_mgt_cmd (
 	__u8 response;
 	int call_transport = 0, cmdsn_ret, out_of_order_cmdsn = 0;
 	iscsi_cmd_t *cmd;
-	iscsi_device_t *dev = NULL;
+	se_device_t *dev = NULL;
 	iscsi_lun_t *lun = NULL;
 	iscsi_tmr_req_t *tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr;

@@ -78,11 +78,11 @@ MAKE_OBJ_TYPE_RET(dev);
 
 extern void dev_obj_get_obj_info (void *p, iscsi_lun_t *lun, unsigned long long bytes, int state, char *b, int *bl)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 	
 	if (state)
 		iscsi_dump_dev_state(dev, b, bl);
-	iscsi_dump_dev_info((iscsi_device_t *)p, lun, bytes, b, bl);
+	iscsi_dump_dev_info((se_device_t *)p, lun, bytes, b, bl);
 	return;
 }
 
@@ -99,65 +99,65 @@ extern void *dev_obj_get_obj (void *p)
 
 extern se_queue_obj_t *dev_obj_get_queue_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(dev->dev_queue_obj);
 }
 
 extern void dev_obj_start_status_thread (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_start_status_thread((iscsi_device_t *)p);
+		transport_start_status_thread((se_device_t *)p);
 
 	return;
 }
 
 extern void dev_obj_stop_status_thread (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_stop_status_thread((iscsi_device_t *)p);
+		transport_stop_status_thread((se_device_t *)p);
 
 	return;
 }
 
 extern int dev_obj_start_status_timer (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_start_status_timer((iscsi_device_t *)p);
+		transport_start_status_timer((se_device_t *)p);
 
 	return(0);
 }
 
 extern void dev_obj_stop_status_timer (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_stop_status_timer((iscsi_device_t *)p);
+		transport_stop_status_timer((se_device_t *)p);
 
 	return;
 }
 
 extern int dev_obj_claim_obj (void *p)
 {
-	return(transport_generic_claim_phydevice((iscsi_device_t *)p));
+	return(transport_generic_claim_phydevice((se_device_t *)p));
 }
 
 extern void dev_obj_release_obj (void *p)
 {
-	transport_generic_release_phydevice((iscsi_device_t *)p, 1);
+	transport_generic_release_phydevice((se_device_t *)p, 1);
 	return;
 }
 
 extern void dev_obj_set_feature_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	DEV_OBJ_API(dev)->inc_count(&dev->dev_feature_obj);
 	return;
@@ -165,7 +165,7 @@ extern void dev_obj_set_feature_obj (void *p)
 
 extern void dev_obj_clear_feature_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	DEV_OBJ_API(dev)->dec_count(&dev->dev_feature_obj);
 	return;
@@ -173,7 +173,7 @@ extern void dev_obj_clear_feature_obj (void *p)
 
 extern int dev_obj_enable_feature (void *p, int f, int fm, void *fp)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	if (!(dev->dev_fp = feature_plugin_alloc(f, fm, fp, DEV_OBJ_API(dev), p)))
 		return(-1);
@@ -192,7 +192,7 @@ extern int dev_obj_enable_feature (void *p, int f, int fm, void *fp)
 
 extern void dev_obj_disable_feature (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	if (!(feature_plugin_free(dev->dev_fp))) {
 		dev->dev_fp = NULL;
@@ -206,14 +206,14 @@ extern void dev_obj_disable_feature (void *p)
 
 extern se_fp_obj_t *dev_obj_get_feature_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(dev->dev_fp);
 }
 
 extern void dev_access_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	DEV_OBJ_API(dev)->inc_count(&dev->dev_access_obj);
 	return;
@@ -221,7 +221,7 @@ extern void dev_access_obj (void *p)
 
 extern void dev_deaccess_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	DEV_OBJ_API(dev)->dec_count(&dev->dev_access_obj);
 	return;
@@ -229,7 +229,7 @@ extern void dev_deaccess_obj (void *p)
 
 extern void dev_put_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	core_put_hba(dev->iscsi_hba);
 	return;
@@ -237,7 +237,7 @@ extern void dev_put_obj (void *p)
 
 extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	se_port_t *sep;
 
 	if (!(sep = kmalloc(sizeof(se_port_t), GFP_KERNEL))) {
@@ -275,7 +275,7 @@ extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
 
 extern void dev_obj_unexport (void *p, iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	se_port_t *sep = lun->lun_sep;
 
 	spin_lock(&dev->se_port_lock);
@@ -310,7 +310,7 @@ extern int dev_obj_transport_setup_cmd (void *p, iscsi_cmd_t *cmd)
 
 extern int dev_obj_active_tasks (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(atomic_read(&dev->execute_tasks));
 }
@@ -323,7 +323,7 @@ extern int dev_obj_add_tasks (void *p, iscsi_cmd_t *cmd)
 
 extern int dev_obj_execute_tasks (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	__transport_execute_tasks(dev);
 	return(0);
@@ -331,35 +331,35 @@ extern int dev_obj_execute_tasks (void *p)
 
 extern int dev_obj_depth_left (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(atomic_read(&dev->depth_left));
 }
 
 extern int dev_obj_queue_depth (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(dev->queue_depth);
 }
 
 extern int dev_obj_blocksize (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(TRANSPORT(dev)->get_blocksize(dev));
 }
 
 extern int dev_obj_max_sectors (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(TRANSPORT(dev)->get_max_sectors(dev));
 }
 
 extern unsigned long long dev_obj_end_lba (void *p, int zero_lba, se_fp_obj_t *fp)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	
 	if (!fp)
 		 return((dev->dev_sectors_total + ((zero_lba) ? 1 : 0)));
@@ -375,7 +375,7 @@ extern unsigned long long dev_obj_get_next_lba (void *p, unsigned long long lba)
 
 extern unsigned long long dev_obj_total_sectors (void *p, int zero_lba, int ignore_fp)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	se_fp_obj_t *fp;
 
 	if (!ignore_fp && (fp = DEV_OBJ_API(dev)->get_feature_obj(p)))
@@ -395,7 +395,7 @@ extern int dev_obj_do_se_mem_map (
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	u32 tmp_task_offset = *task_offset;
 	int ret = 0;
 
@@ -426,7 +426,7 @@ extern int dev_obj_do_se_mem_map (
 
 extern int dev_obj_get_mem_buf (void *p, iscsi_cmd_t *cmd)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_buf) ?
 		TRANSPORT(dev)->allocate_buf : &transport_generic_allocate_buf;
@@ -438,7 +438,7 @@ extern int dev_obj_get_mem_buf (void *p, iscsi_cmd_t *cmd)
 
 extern int dev_obj_get_mem_SG (void *p, iscsi_cmd_t *cmd)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_DMA) ?
 		TRANSPORT(dev)->allocate_DMA : &transport_generic_get_mem;
@@ -450,7 +450,7 @@ extern int dev_obj_get_mem_SG (void *p, iscsi_cmd_t *cmd)
 
 extern map_func_t dev_obj_get_map_SG (void *p, int rw)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	
 	return((rw == ISCSI_WRITE) ? dev->transport->spc->write_SG :
 		dev->transport->spc->read_SG);
@@ -458,7 +458,7 @@ extern map_func_t dev_obj_get_map_SG (void *p, int rw)
 
 extern map_func_t dev_obj_get_map_non_SG (void *p, int rw)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return((rw == ISCSI_WRITE) ? dev->transport->spc->write_non_SG :
 		dev->transport->spc->read_non_SG);
@@ -466,14 +466,14 @@ extern map_func_t dev_obj_get_map_non_SG (void *p, int rw)
 
 extern map_func_t dev_obj_get_map_none (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(dev->transport->spc->none);
 }
 
 extern void *dev_obj_get_transport_req (void *p, se_task_t *task)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	task->iscsi_dev = dev;
 	
@@ -488,7 +488,7 @@ extern void dev_obj_free_tasks (void *p, iscsi_cmd_t *cmd)
 
 extern int dev_obj_activate (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	
 	se_dev_start(dev);
 	return(0);
@@ -496,7 +496,7 @@ extern int dev_obj_activate (void *p)
 
 extern void dev_obj_deactivate (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	se_dev_stop(dev);
 	return;
@@ -504,7 +504,7 @@ extern void dev_obj_deactivate (void *p)
 
 extern void dev_obj_notify_obj (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	up(&dev->dev_queue_obj->thread_sem);
 	return;
@@ -512,7 +512,7 @@ extern void dev_obj_notify_obj (void *p)
 
 extern int dev_obj_check_online (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	int ret;
 
 	spin_lock(&dev->dev_status_lock);
@@ -525,7 +525,7 @@ extern int dev_obj_check_online (void *p)
 
 extern int dev_obj_check_shutdown (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	int ret;
 
 	spin_lock(&dev->dev_status_lock);
@@ -537,22 +537,22 @@ extern int dev_obj_check_shutdown (void *p)
 
 extern void dev_obj_fail_operations (void *p)
 {
-	transport_status_thr_dev_offline((iscsi_device_t *)p);
-	transport_status_thr_dev_offline_tasks((iscsi_device_t *)p, p);
+	transport_status_thr_dev_offline((se_device_t *)p);
+	transport_status_thr_dev_offline_tasks((se_device_t *)p, p);
 	return;
 }
 
 extern void dev_obj_signal_offline (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	
-	transport_status_thr_force_offline((iscsi_device_t *)p, DEV_OBJ_API(dev), p);
+	transport_status_thr_force_offline((se_device_t *)p, DEV_OBJ_API(dev), p);
 	return;
 }
 
 extern void dev_obj_signal_shutdown (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	spin_lock(&dev->dev_status_lock);
 	if ((dev->dev_status & ISCSI_DEVICE_ACTIVATED) ||
@@ -574,7 +574,7 @@ extern void dev_obj_signal_shutdown (void *p)
 
 extern void dev_obj_clear_shutdown (void *p)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	spin_lock(&dev->dev_status_lock);
 	if (dev->dev_status & ISCSI_DEVICE_SHUTDOWN) {
@@ -590,14 +590,14 @@ extern unsigned char *dev_obj_get_cdb (
 	void *p,
 	se_task_t *task)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	return(dev->transport->get_cdb(task));
 }
 
 extern int dev_obj_start (void *p, iscsi_transform_info_t *ti, unsigned long long starting_lba)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 	
 	return(transport_generic_obj_start(ti, DEV_OBJ_API(dev), p, starting_lba));
 }
@@ -611,7 +611,7 @@ extern u32 dev_obj_get_cdb_count (
 	se_mem_t **se_mem_out,
 	u32 *task_offset_in)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	ti->ti_dev = dev;
 	return(transport_generic_get_cdb_count(ti->ti_cmd, ti, DEV_OBJ_API(dev), p,
@@ -623,7 +623,7 @@ extern u32 dev_obj_get_cdb_size (
 	u32 sectors,
 	unsigned char *cdb)
 {
-	iscsi_device_t *dev  = (iscsi_device_t *)p;
+	se_device_t *dev  = (se_device_t *)p;
 
 	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE) {
 		if (cdb[1] & 1) { /* sectors */
@@ -638,7 +638,7 @@ extern u32 dev_obj_get_cdb_size (
 
 extern void dev_obj_generate_cdb (void *p, unsigned long long lba, u32 *sectors, unsigned char *cdb, int rw)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	dev->dev_generate_cdb(lba, sectors, cdb, rw);
 	return;
@@ -646,24 +646,24 @@ extern void dev_obj_generate_cdb (void *p, unsigned long long lba, u32 *sectors,
 
 extern int dev_obj_get_device_access (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	return((dev->dev_flags & DF_READ_ONLY) ? 0 : 1);
 }
 
 extern int dev_obj_get_device_type (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	return(TRANSPORT(dev)->get_device_type(dev));
 }
 
 extern int dev_obj_check_DMA_handler (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	if (!dev->transport) {
-		TRACE_ERROR("iscsi_device_t->transport is NULL!\n");
+		TRACE_ERROR("se_device_t->transport is NULL!\n");
 		BUG();
 	}
 	
@@ -672,21 +672,21 @@ extern int dev_obj_check_DMA_handler (void *p)
 
 extern t10_wwn_t *dev_obj_get_t10_wwn (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	return(&dev->t10_wwn);
 }
 
 extern int dev_obj_check_tur_bit (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	return(atomic_read(&dev->dev_tur_active));
 }
 
 extern void dev_obj_clear_tur_bit (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	atomic_set(&dev->dev_tur_active, 0);
 	return;
@@ -694,7 +694,7 @@ extern void dev_obj_clear_tur_bit (void *p)
 
 extern void dev_obj_set_tur_bit (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	atomic_set(&dev->dev_tur_active, 1);
 	return;
@@ -702,7 +702,7 @@ extern void dev_obj_set_tur_bit (void *p)
 
 extern void dev_obj_get_evpd_prod (void *p, unsigned char *buf, u32 size)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	TRANSPORT(dev)->get_evpd_prod(buf, size, dev);
 	return;
@@ -710,7 +710,7 @@ extern void dev_obj_get_evpd_prod (void *p, unsigned char *buf, u32 size)
 
 extern void dev_obj_get_evpd_sn (void *p, unsigned char *buf, u32 size)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	TRANSPORT(dev)->get_evpd_sn(buf, size, dev);
 	return;
@@ -718,7 +718,7 @@ extern void dev_obj_get_evpd_sn (void *p, unsigned char *buf, u32 size)
 
 extern int dev_obj_get_task_timeout (void *p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 	
 	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK)
 		return(TRANSPORT_TIMEOUT_TYPE_DISK); 
@@ -734,7 +734,7 @@ extern int dev_obj_get_task_timeout (void *p)
 
 extern int dev_obj_set_task_timeout_handler (void *p, se_task_t *task)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	if (TRANSPORT(dev)->transport_timeout_start)
 		return(TRANSPORT(dev)->transport_timeout_start(dev, task));
@@ -759,7 +759,7 @@ extern int dev_del_obj_from_lun (iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
 
 extern se_obj_lun_type_t *dev_get_next_obj_api (void *p, void **next_p)
 {
-	iscsi_device_t *dev = (iscsi_device_t *)p;
+	se_device_t *dev = (se_device_t *)p;
 
 	*next_p = dev;
 	

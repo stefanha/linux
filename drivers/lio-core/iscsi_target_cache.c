@@ -57,7 +57,7 @@ extern iscsi_cache_entry_t *iscsi_cache_check_for_entry (iscsi_cache_check_entry
 {
 	u32 i;
 	iscsi_cache_entry_t *ce;
-	iscsi_device_t *dev = ISCSI_DEV(cmd);
+	se_device_t *dev = ISCSI_DEV(cmd);
 
 	spin_lock(&DEV_CACHE(dev)->dev_cache_lock);
 	for (i = 0; i < DEV_CACHE(dev)->cache_entries; i++) {
@@ -98,7 +98,7 @@ extern void iscsi_cache_add_entry (iscsi_cache_check_entry_t *cce, iscsi_cmd_t *
 {
 	u32 i;
 	iscsi_cache_entry_t *ce = NULL;
-	iscsi_device_t *dev = ISCSI_DEV(cmd);
+	se_device_t *dev = ISCSI_DEV(cmd);
 	
 	/*
 	 * Evict any matching LBA/SECTOR combination for WRITEs.
@@ -173,7 +173,7 @@ set_entry_active:
  *
  *
  */
-extern int iscsi_cache_init_dev (iscsi_device_t *dev)
+extern int iscsi_cache_init_dev (se_device_t *dev)
 {
 	u32 def_entires = ISCSI_CACHE_DEFAULT_ENTIRES;
 	
@@ -203,7 +203,7 @@ extern int iscsi_cache_init_dev (iscsi_device_t *dev)
  *
  *
  */
-extern void iscsi_cache_free_dev (iscsi_device_t *dev)
+extern void iscsi_cache_free_dev (se_device_t *dev)
 {
 	u32 i;
 	iscsi_cache_entry_t *ce;

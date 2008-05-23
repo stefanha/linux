@@ -252,7 +252,7 @@
 #define ISCSI_WRITE				2
 #define ISCSI_NONE				3
 
-/* iscsi_device_t->type */
+/* se_device_t->type */
 #define PSCSI					1
 #define SSCSI					2
 #define PATA					3
@@ -270,7 +270,7 @@
 #define ISCSI_LUNFLAGS_READ_ONLY		0x00000002
 #define ISCSI_LUNFLAGS_READ_WRITE		0x00000004
 
-/* iscsi_device_t->dev_status */
+/* se_device_t->dev_status */
 #define ISCSI_DEVICE_ACTIVATED			0x01
 #define	ISCSI_DEVICE_DEACTIVATED		0x02
 #define ISCSI_DEVICE_QUEUE_FULL			0x04
@@ -1101,9 +1101,9 @@ typedef struct iscsi_device_s {
 	struct iscsi_transport_s *transport;	/* Pointer to template of function pointers for transport */ 
 	struct iscsi_device_s	*next;		/* Pointer to next device in TPG list */
 	struct iscsi_device_s	*prev;
-}  ____cacheline_aligned iscsi_device_t;
+}  ____cacheline_aligned se_device_t;
 
-#define ISCSI_DEV(cmd)		((iscsi_device_t *)(cmd)->iscsi_lun->iscsi_dev)
+#define ISCSI_DEV(cmd)		((se_device_t *)(cmd)->iscsi_lun->iscsi_dev)
 #define DEV_OBJ_API(dev)	((struct se_obj_lun_type_s *)(dev)->dev_obj_api)
 
 typedef struct iscsi_dev_transport_info_s {
@@ -1145,8 +1145,8 @@ typedef struct iscsi_hba_s {
 	atomic_t		left_queue_depth;
 	atomic_t		max_queue_depth; /* Maximum queue depth the HBA can handle. */
 	void			*hba_ptr;	/* Pointer to transport specific host structure. */
-	iscsi_device_t		*device_head;	/* Pointer to start of devices for this HBA */
-	iscsi_device_t		*device_tail;	/* Pointer to end of devices of this HBA */
+	se_device_t		*device_head;	/* Pointer to start of devices for this HBA */
+	se_device_t		*device_tail;	/* Pointer to end of devices of this HBA */
 	iscsi_hbainfo_t		hba_info;
 	spinlock_t		device_lock;	/* Spinlock for adding/removing devices */
 	spinlock_t		hba_queue_lock;
@@ -1218,7 +1218,7 @@ typedef struct iscsi_lun_s {
 	iscsi_lun_acl_t		*lun_acl_head;
 	iscsi_lun_acl_t		*lun_acl_tail;
 	struct iscsi_node_acl_s *lun_reserved_node_acl;
-	iscsi_device_t		*iscsi_dev;
+	se_device_t		*iscsi_dev;
 	void			*lun_type_ptr;
 	struct se_obj_lun_type_s *lun_obj_api;
 	struct se_port_s	*lun_sep;

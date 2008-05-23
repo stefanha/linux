@@ -1301,7 +1301,7 @@ static void *locate_hba_start(
 	loff_t *pos,
 	int (*do_check)(void *))
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	iscsi_hba_t *hba;
 	table_iter_t *tpg_iter;
 	loff_t n = *pos;
@@ -1354,7 +1354,7 @@ static void *locate_hba_next(
 	int (*do_check)(void *))
 {
 	table_iter_t *iterp = (table_iter_t *)v;
-	iscsi_device_t *dev = (iscsi_device_t *)iterp->ti_ptr, *dev_next = NULL;
+	se_device_t *dev = (se_device_t *)iterp->ti_ptr, *dev_next = NULL;
 	iscsi_hba_t *hba;
 	int i;
 
@@ -1411,13 +1411,13 @@ next_hba:
 static void locate_hba_stop(struct seq_file *seq, void *v)
 {
 	table_iter_t *iterp = (table_iter_t *)v;
-	iscsi_device_t *dev = NULL;
+	se_device_t *dev = NULL;
 	iscsi_hba_t *hba;
 
 	if (!(v))
 		return;
 
-	if (iterp && (dev = (iscsi_device_t *)iterp->ti_ptr)) {
+	if (iterp && (dev = (se_device_t *)iterp->ti_ptr)) {
 		hba = dev->iscsi_hba;
 		atomic_dec(&hba->dev_mib_access_count);
 	}
@@ -1457,7 +1457,7 @@ static void scsi_dev_seq_stop(struct seq_file *seq, void *v)
 static int scsi_dev_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_hba_t *hba;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	int k;
 
@@ -1472,7 +1472,7 @@ static int scsi_dev_seq_show(struct seq_file *seq, void *v)
 	}
 
 	spin_lock(&hba->device_lock);
-	if ((dev = (iscsi_device_t *)iterp->ti_ptr)) {
+	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		char str[28];
 
 		seq_printf(seq, "%u %u %s %u\n", hba->hba_index,
@@ -1543,7 +1543,7 @@ static void scsi_port_seq_stop(struct seq_file *seq, void *v)
 static int scsi_port_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_hba_t *hba;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	se_port_t *sep;
 	table_iter_t *iterp = (table_iter_t *)v;
 
@@ -1559,7 +1559,7 @@ static int scsi_port_seq_show(struct seq_file *seq, void *v)
 
 	/* FIXME: scsiPortBusyStatuses count */
 	spin_lock(&hba->device_lock);
-	if ((dev = (iscsi_device_t *)iterp->ti_ptr)) {
+	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		spin_lock(&dev->se_port_lock);
 		list_for_each_entry(sep, &dev->dev_sep_list, sep_list) {
 			seq_printf(seq, "%u %u %u %s%u %u\n", hba->hba_index,
@@ -1617,7 +1617,7 @@ static void scsi_transport_seq_stop(struct seq_file *seq, void *v)
 static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_hba_t *hba;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	se_port_t *se;
 	t10_wwn_t *wwn;
@@ -1633,7 +1633,7 @@ static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 	}
 
 	spin_lock(&hba->device_lock);
-	if ((dev = (iscsi_device_t *)iterp->ti_ptr)) {
+	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		wwn = &dev->t10_wwn;
 
 		spin_lock(&dev->se_port_lock);
@@ -1699,7 +1699,7 @@ static void scsi_tgt_dev_seq_stop(struct seq_file *seq, void *v)
 static int scsi_tgt_dev_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_hba_t *hba;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	int non_accessible_lus = 0;
 	char status[16];
@@ -1715,7 +1715,7 @@ static int scsi_tgt_dev_seq_show(struct seq_file *seq, void *v)
 	}
 
 	spin_lock(&hba->device_lock);
-	if ((dev = (iscsi_device_t *)iterp->ti_ptr)) {
+	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		switch (dev->dev_status) {
 		case ISCSI_DEVICE_ACTIVATED:
 			strcpy(status, "activated");
@@ -1791,7 +1791,7 @@ static void scsi_tgt_port_seq_stop(struct seq_file *seq, void *v)
 static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_hba_t *hba;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	se_port_t *sep;
 	table_iter_t *iterp = (table_iter_t *)v;
 	u32 rx_mbytes, tx_mbytes;
@@ -1809,7 +1809,7 @@ static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 	}
 
 	spin_lock(&hba->device_lock);
-	if ((dev = (iscsi_device_t *)iterp->ti_ptr)) {
+	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		spin_lock(&dev->se_port_lock);
 		list_for_each_entry(sep, &dev->dev_sep_list, sep_list) {
 			seq_printf(seq, "%u %u %u %s%d %s%s%d ", 
@@ -2088,7 +2088,7 @@ static void scsi_lu_seq_stop(struct seq_file *seq, void *v)
 static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_hba_t *hba;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	int j;
 	char str[28];
@@ -2106,7 +2106,7 @@ static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 	}
 	
 	spin_lock(&hba->device_lock);
-	if ((dev = (iscsi_device_t *)iterp->ti_ptr)) {
+	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		/* Fix LU state, if we can read it from the device */
 #warning FIXME: Get scsiLuDefaultLun from transport plugins
 		seq_printf(seq, "%u %u %u %llu %s", hba->hba_index,

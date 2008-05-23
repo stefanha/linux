@@ -246,7 +246,7 @@ static int iscsi_shutdown_hba (
 extern int iscsi_hba_del_hba (
 	iscsi_hba_t *hba)
 {
-	iscsi_device_t *dev, *dev_next;
+	se_device_t *dev, *dev_next;
 	
 	if (!(hba->hba_status & HBA_STATUS_ACTIVE)) {
 		TRACE_ERROR("HBA ID: %d Status: INACTIVE, ignoring delhbafromtarget"
@@ -256,7 +256,7 @@ extern int iscsi_hba_del_hba (
 
 	/*
 	 * Do not allow the iscsi_hba_t to be released if references exist to
-	 * from iscsi_device_t->iscsi_lun_t or iscsi_device_t->raid_engine_t.
+	 * from se_device_t->iscsi_lun_t.
 	 */
 	if (iscsi_check_devices_access(hba) < 0) {
 		TRACE_ERROR("iSCSI_HBA[%u] - **ERROR** - Unable to release HBA"

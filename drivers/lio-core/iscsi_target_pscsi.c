@@ -287,7 +287,7 @@ extern int pscsi_scan_devices (iscsi_hba_t *iscsi_hba, iscsi_hbainfo_t *hi)
 {
 	int pscsi_dev_count = 0;
 	int dev_flags = 0;
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	struct scsi_device *sd;
 	struct Scsi_Host *sh = (struct Scsi_Host *) iscsi_hba->hba_ptr;
 
@@ -368,9 +368,9 @@ extern int pscsi_scan_devices (iscsi_hba_t *iscsi_hba, iscsi_hbainfo_t *hi)
  *	FIXME: We are going to want to increment struct scsi_device->access_count
  *	       either here or in pscsi_activate_device().
  */
-extern iscsi_device_t *pscsi_add_device_to_list (iscsi_hba_t *iscsi_hba, struct scsi_device *sd, int dev_flags)
+extern se_device_t *pscsi_add_device_to_list (iscsi_hba_t *iscsi_hba, struct scsi_device *sd, int dev_flags)
 {
-	iscsi_device_t *dev;
+	se_device_t *dev;
 	
 	/*
 	 * Some pseudo Parallel SCSI HBAs do not fill in sector_size
@@ -452,14 +452,14 @@ out:
 	return(dev);
 }
 
-extern int pscsi_claim_phydevice (iscsi_hba_t *hba, iscsi_device_t *dev)
+extern int pscsi_claim_phydevice (iscsi_hba_t *hba, se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *)dev->dev_ptr;
 	
 	return(pscsi_claim_sd(sd));
 }
 
-extern int pscsi_release_phydevice (iscsi_device_t *dev)
+extern int pscsi_release_phydevice (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *)dev->dev_ptr;
 	
@@ -470,7 +470,7 @@ extern int pscsi_release_phydevice (iscsi_device_t *dev)
  *
  *
  */
-extern int pscsi_activate_device (iscsi_device_t *dev)
+extern int pscsi_activate_device (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 	struct Scsi_Host *sh = sd->host;
@@ -486,7 +486,7 @@ extern int pscsi_activate_device (iscsi_device_t *dev)
  *
  *
  */
-extern void pscsi_deactivate_device (iscsi_device_t *dev)
+extern void pscsi_deactivate_device (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 	struct Scsi_Host *sh = sd->host;
@@ -502,7 +502,7 @@ extern void pscsi_deactivate_device (iscsi_device_t *dev)
  *
  *
  */
-extern int pscsi_check_device_location (iscsi_device_t *dev, iscsi_dev_transport_info_t *dti)
+extern int pscsi_check_device_location (se_device_t *dev, iscsi_dev_transport_info_t *dti)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 
@@ -550,7 +550,7 @@ extern int pscsi_check_ghost_id (iscsi_hbainfo_t *hi)
  *
  *
  */
-extern void pscsi_free_device (iscsi_device_t *dev)
+extern void pscsi_free_device (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 
@@ -729,7 +729,7 @@ after_mode_select:
  */
 extern void *pscsi_allocate_request (
 	se_task_t *task,
-	iscsi_device_t *dev)
+	se_device_t *dev)
 {
 	pscsi_plugin_task_t *pt;
 	if (!(pt = kmalloc(sizeof(pscsi_plugin_task_t), GFP_KERNEL))) {
@@ -741,13 +741,13 @@ extern void *pscsi_allocate_request (
 	return(pt);
 }
 
-extern void pscsi_get_evpd_prod (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void pscsi_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	snprintf(buf, size, "PSCSI");
 	return;
 }
 
-extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
+extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 	iscsi_hba_t *hba = dev->iscsi_hba;
@@ -866,7 +866,7 @@ extern void pscsi_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
 	return;	
 }
 
-extern void pscsi_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
+extern void pscsi_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
 	int i;
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
@@ -1026,7 +1026,7 @@ extern int pscsi_CDB_write_SG (se_task_t *task, u32 size)
  *
  *
  */
-extern int pscsi_check_lba (unsigned long long lba, iscsi_device_t *dev)
+extern int pscsi_check_lba (unsigned long long lba, se_device_t *dev)
 {
 	return(0);
 }
@@ -1066,7 +1066,7 @@ extern unsigned char *pscsi_get_sense_buffer (se_task_t *task)
  *
  *
  */
-extern u32 pscsi_get_blocksize (iscsi_device_t *dev)
+extern u32 pscsi_get_blocksize (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 
@@ -1077,7 +1077,7 @@ extern u32 pscsi_get_blocksize (iscsi_device_t *dev)
  *
  *
  */
-extern u32 pscsi_get_device_rev (iscsi_device_t *dev)
+extern u32 pscsi_get_device_rev (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 	
@@ -1088,7 +1088,7 @@ extern u32 pscsi_get_device_rev (iscsi_device_t *dev)
  *
  *
  */
-extern u32 pscsi_get_device_type (iscsi_device_t *dev)
+extern u32 pscsi_get_device_type (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 
@@ -1099,7 +1099,7 @@ extern u32 pscsi_get_device_type (iscsi_device_t *dev)
  *
  *
  */
-extern u32 pscsi_get_dma_length (u32 task_size, iscsi_device_t *dev)
+extern u32 pscsi_get_dma_length (u32 task_size, se_device_t *dev)
 {
 	return(PAGE_SIZE);
 }
@@ -1108,7 +1108,7 @@ extern u32 pscsi_get_dma_length (u32 task_size, iscsi_device_t *dev)
  *
  *
  */
-extern u32 pscsi_get_max_sectors (iscsi_device_t *dev)
+extern u32 pscsi_get_max_sectors (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 	return((sd->host->max_sectors > sd->request_queue->max_sectors) ?
@@ -1119,7 +1119,7 @@ extern u32 pscsi_get_max_sectors (iscsi_device_t *dev)
  *
  *
  */
-extern u32 pscsi_get_queue_depth (iscsi_device_t *dev)
+extern u32 pscsi_get_queue_depth (se_device_t *dev)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 
