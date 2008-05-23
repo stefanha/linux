@@ -449,7 +449,7 @@ iscsi_transport_spc_t vrom_template_spc = ISCSI_VROM_SPC;
 	spc:			&vrom_template_spc,		\
 };
 	
-iscsi_transport_t vrom_template = ISCSI_VROM;
+se_subsystem_api_t vrom_template = ISCSI_VROM;
 #endif /* ! VR_INCLUDE_STRUCTS */
 
 #endif /* ISCSI_TARGET_VROM_H */

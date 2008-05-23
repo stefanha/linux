@@ -130,9 +130,9 @@ static void iscsi_dump_hba_info (
 	int *bl)
 {
 	int ret = 0;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 	
-	t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		return;
 
@@ -319,9 +319,9 @@ extern void iscsi_dump_dev_info (
 	int *bl)
 {
 	int ret = 0;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 
-	t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, dev->type, &ret);
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, dev->type, &ret);
 	if (!t || (ret != 0))
 		return;
 	

@@ -65,7 +65,7 @@ extern int linux_blockdevice_release(int, int, struct block_device *);
 #define DEBUG_IBLOCK(x...)
 #endif
 
-/*	iblock_attach_hba(): (Part of iscsi_transport_t template)
+/*	iblock_attach_hba(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -101,7 +101,7 @@ extern int iblock_attach_hba (
 	return(0);
 }
 
-/*	iblock_detach_hba(): (Part of iscsi_transport_t template)
+/*	iblock_detach_hba(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -253,7 +253,7 @@ failed:
 	return(0);
 }
 
-/*	iblock_activate_device(): (Part of iscsi_transport_t template)
+/*	iblock_activate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -269,7 +269,7 @@ extern int iblock_activate_device (se_device_t *dev)
 	return(0);
 }
 
-/*	iblock_deactivate_device(): (Part of iscsi_transport_t template)
+/*	iblock_deactivate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -346,7 +346,7 @@ extern int iblock_transport_complete (se_task_t *task)
 	return(0);
 }
 
-/*	iblock_allocate_request(): (Part of iscsi_transport_t template)
+/*	iblock_allocate_request(): (Part of se_subsystem_api_t template)
  *
  *
  */

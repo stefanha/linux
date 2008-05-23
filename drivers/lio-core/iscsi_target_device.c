@@ -686,7 +686,7 @@ extern se_device_t *core_get_device_from_transport (se_hba_t *hba, iscsi_dev_tra
 extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_devinfo_t *di, se_hba_t *hba)
 {
 	int ret = 0;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 	
 	if (!(tg->params_set & PARAM_HBA_ID)) {
 		TRACE_ERROR("HBA_ID Not passed to createvirtdev, assuming hba_id=0."
@@ -705,7 +705,7 @@ extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_de
 		return(ERR_HBA_CANNOT_LOCATE);
 	}
 	
-	t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		return(ret);
 	
@@ -746,11 +746,11 @@ extern int iscsi_create_virtual_device (se_hba_t *hba, iscsi_devinfo_t *di, stru
 {
 	int ret = 0;
 	iscsi_dev_transport_info_t dti;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 
 	memset(&dti, 0, sizeof(iscsi_dev_transport_info_t));
 
-	t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		return(ret);
 	
@@ -833,7 +833,7 @@ extern se_hba_t *core_get_hba_from_hbaid (
 {
 	int ret = 0;
 	se_hba_t *hba;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 	
 	if (!(tg->params_set & PARAM_HBA_ID)) {
 		TRACE_ERROR("PARAM_HBA_ID not passed!\n");
@@ -856,7 +856,7 @@ extern se_hba_t *core_get_hba_from_hbaid (
 	if (!add)
 		return(hba);
 	
-        t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
+        t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
                 return(NULL);
 

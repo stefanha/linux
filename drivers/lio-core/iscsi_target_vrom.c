@@ -166,7 +166,7 @@ static int getauxinfo(vr_dev_t *vd, char *path)
 }
 
 
-/*	vr_create_virtdevice(): (Part of iscsi_transport_t template)
+/*	vr_create_virtdevice(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -290,7 +290,7 @@ se_device_t *vr_add_device_to_list (se_hba_t *iscsi_hba, void *vr_dev_p)
 	return(dev);
 }
 
-/*	vr_activate_device(): (Part of iscsi_transport_t template)
+/*	vr_activate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -306,7 +306,7 @@ int vr_activate_device (se_device_t *dev)
 	return(0);
 }
 
-/*	vr_deactivate_device(): (Part of iscsi_transport_t template)
+/*	vr_deactivate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -322,7 +322,7 @@ void vr_deactivate_device (se_device_t *dev)
 	return;
 }
 
-/*	vr_free_device(): (Part of iscsi_transport_t template)
+/*	vr_free_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -341,7 +341,7 @@ void vr_free_device (se_device_t *dev)
 	return;
 }
 
-/*	vr_transport_complete(): (Part of iscsi_transport_t template)
+/*	vr_transport_complete(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -350,7 +350,7 @@ int vr_transport_complete (se_task_t *task)
 	return(0);
 }
 
-/*	vr_allocate_request(): (Part of iscsi_transport_t template)
+/*	vr_allocate_request(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1054,7 +1054,7 @@ int vr_do_task (se_task_t *task)
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
-/*	vr_free_task(): (Part of iscsi_transport_t template)
+/*	vr_free_task(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1212,7 +1212,7 @@ int vr_check_lba (iscsi_lba_t lba, se_device_t *dev)
 	return(0);
 }
 
-/*	vr_check_for_SG(): (Part of iscsi_transport_t template)
+/*	vr_check_for_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1223,7 +1223,7 @@ int vr_check_for_SG (se_task_t *task)
 	return(req->vr_sg_count);
 }
 
-/*	vr_get_cdb(): (Part of iscsi_transport_t template)
+/*	vr_get_cdb(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1234,7 +1234,7 @@ unsigned char *vr_get_cdb (se_task_t *task)
 	return(req->vr_scsi_cdb);
 }
 
-/*	vr_get_blocksize(): (Part of iscsi_transport_t template)
+/*	vr_get_blocksize(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1245,7 +1245,7 @@ u32 vr_get_blocksize (se_device_t *dev)
 	return(vr_dev->vr_blocksize);
 }
 
-/*	vr_get_max_sectors(): (Part of iscsi_transport_t template)
+/*	vr_get_max_sectors(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1254,7 +1254,7 @@ u32 vr_get_max_sectors (se_device_t *dev)
 	return(VR_MAX_SECTORS);
 }
 
-/*	vr_get_queue_depth(): (Part of iscsi_transport_t template)
+/*	vr_get_queue_depth(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1263,7 +1263,7 @@ u32 vr_get_queue_depth (se_device_t *dev)
 	return(VR_DEVICE_QUEUE_DEPTH);
 }
 
-/*	vr_get_non_SG(): (Part of iscsi_transport_t template)
+/*	vr_get_non_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1274,7 +1274,7 @@ unsigned char *vr_get_non_SG (se_task_t *task)
 	return((unsigned char *)req->vr_buf);
 }
 
-/*	vr_get_SG(): (Part of iscsi_transport_t template)
+/*	vr_get_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1285,7 +1285,7 @@ struct scatterlist *vr_get_SG (se_task_t *task)
 	return((struct scatterlist *)req->vr_buf);
 }
 
-/*	vr_get_SG_count(): (Part of iscsi_transport_t template)
+/*	vr_get_SG_count(): (Part of se_subsystem_api_t template)
  *
  *
  */

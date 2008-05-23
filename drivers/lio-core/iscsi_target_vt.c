@@ -74,7 +74,7 @@ static u64 swap(u64 n)
 	return n;
 }
 
-/*	vt_attach_hba(): (Part of iscsi_transport_t template)
+/*	vt_attach_hba(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -109,7 +109,7 @@ extern int vt_attach_hba (
 	return(0);
 }
 
-/*	vt_detach_hba(): (Part of iscsi_transport_t template)
+/*	vt_detach_hba(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -229,7 +229,7 @@ static void vt_write_filemark_maybe (se_task_t *task)
 		vt_write_filemark(task, 0);
 }
 
-/*	vt_create_virtdevice(): (Part of iscsi_transport_t template)
+/*	vt_create_virtdevice(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -295,7 +295,7 @@ extern se_device_t *vt_add_device_to_list (se_hba_t *iscsi_hba, void *vt_dev_p)
 	return(dev);
 }
 
-/*	vt_activate_device(): (Part of iscsi_transport_t template)
+/*	vt_activate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -311,7 +311,7 @@ extern int vt_activate_device (se_device_t *dev)
 	return(0);
 }
 
-/*	vt_deactivate_device(): (Part of iscsi_transport_t template)
+/*	vt_deactivate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -327,7 +327,7 @@ extern void vt_deactivate_device (se_device_t *dev)
 	return;
 }
 
-/*	vt_check_device_location(): (Part of iscsi_transport_t template)
+/*	vt_check_device_location(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -370,7 +370,7 @@ extern int vt_check_ghost_id (iscsi_hbainfo_t *hi)
 	return(0);
 }
 
-/*	vt_free_device(): (Part of iscsi_transport_t template)
+/*	vt_free_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -385,7 +385,7 @@ extern void vt_free_device (se_device_t *dev)
 	return;
 }
 
-/*	vt_transport_complete(): (Part of iscsi_transport_t template)
+/*	vt_transport_complete(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -398,7 +398,7 @@ extern int vt_transport_complete (se_task_t *task)
 	return(t);
 }
 
-/*	vt_allocate_request(): (Part of iscsi_transport_t template)
+/*	vt_allocate_request(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1414,7 +1414,7 @@ extern int vt_do_task (se_task_t *task)
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
-/*	vt_free_task(): (Part of iscsi_transport_t template)
+/*	vt_free_task(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1635,7 +1635,7 @@ extern int vt_check_lba (unsigned long long lba, se_device_t *dev)
 	return(0);
 }
 
-/*	vt_check_for_SG(): (Part of iscsi_transport_t template)
+/*	vt_check_for_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1646,7 +1646,7 @@ extern int vt_check_for_SG (se_task_t *task)
 	return(req->vt_sg_count);
 }
 
-/*	vt_get_cdb(): (Part of iscsi_transport_t template)
+/*	vt_get_cdb(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1657,7 +1657,7 @@ extern unsigned char *vt_get_cdb (se_task_t *task)
 	return(req->vt_scsi_cdb);
 }
 
-/*	vt_get_blocksize(): (Part of iscsi_transport_t template)
+/*	vt_get_blocksize(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1666,7 +1666,7 @@ extern u32 vt_get_blocksize (se_device_t *dev)
 	return(VT_BLOCKSIZE);
 }
 
-/*	vt_get_device_rev(): (Part of iscsi_transport_t template)
+/*	vt_get_device_rev(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1675,7 +1675,7 @@ extern u32 vt_get_device_rev (se_device_t *dev)
 	return(02); 
 }
 
-/*	vt_get_device_type(): (Part of iscsi_transport_t template)
+/*	vt_get_device_type(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1684,7 +1684,7 @@ extern u32 vt_get_device_type (se_device_t *dev)
 	return(TYPE_TAPE);
 }
 
-/*	vt_get_dma_length(): (Part of iscsi_transport_t template)
+/*	vt_get_dma_length(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1693,7 +1693,7 @@ extern u32 vt_get_dma_length (u32 task_size, se_device_t *dev)
 	return(PAGE_SIZE);
 }
 
-/*	vt_get_max_sectors(): (Part of iscsi_transport_t template)
+/*	vt_get_max_sectors(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1702,7 +1702,7 @@ extern u32 vt_get_max_sectors (se_device_t *dev)
 	return(VT_MAX_SECTORS);
 }
 
-/*	vt_get_queue_depth(): (Part of iscsi_transport_t template)
+/*	vt_get_queue_depth(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1711,7 +1711,7 @@ extern u32 vt_get_queue_depth (se_device_t *dev)
 	return(VT_DEVICE_QUEUE_DEPTH);
 }
 
-/*	vt_get_non_SG(): (Part of iscsi_transport_t template)
+/*	vt_get_non_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1722,7 +1722,7 @@ extern unsigned char *vt_get_non_SG (se_task_t *task)
 	return((unsigned char *)req->vt_buf);
 }
 
-/*	vt_get_SG(): (Part of iscsi_transport_t template)
+/*	vt_get_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1733,7 +1733,7 @@ extern struct scatterlist *vt_get_SG (se_task_t *task)
 	return((struct scatterlist *)req->vt_buf);
 }
 
-/*	vt_get_SG_count(): (Part of iscsi_transport_t template)
+/*	vt_get_SG_count(): (Part of se_subsystem_api_t template)
  *
  *
  */

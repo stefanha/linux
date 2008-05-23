@@ -167,7 +167,7 @@ iscsi_transport_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 	spc:			&pscsi_template_spc,		\
 };
 
-iscsi_transport_t pscsi_template = ISCSI_PSCSI;
+se_subsystem_api_t pscsi_template = ISCSI_PSCSI;
 #endif
 
 #endif   /*** ISCSI_TARGET_PSCSI_H ***/

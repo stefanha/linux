@@ -1599,7 +1599,7 @@ static int transport_get_read_capacity (se_device_t *dev)
  */
 extern se_device_t *transport_add_device_to_iscsi_hba (
 	se_hba_t *hba,
-	iscsi_transport_t *transport,
+	se_subsystem_api_t *transport,
 	u32 device_flags,
 	void *transport_dev)
 {
@@ -1833,7 +1833,7 @@ extern int transport_generic_claim_phydevice (se_device_t *dev)
  *
  *	In Linux v2.6 this means calling fs/block_dev.c:bd_release()
  *	see iscsi_target_pscsi.c and iscsi_target_iblock.c functions for
- *	iscsi_transport_t->[claim,release]_phydevice()
+ *	se_subsystem_api_t->[claim,release]_phydevice()
  */
 extern void transport_generic_release_phydevice (se_device_t *dev, int check_pscsi)
 {
@@ -2232,7 +2232,7 @@ extern int transport_generic_check_device_location (
 {
 	int ret = 0;
 	se_hba_t *hba;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 	
 	if (!dev->iscsi_hba) {
 		TRACE_ERROR("se_device_t->iscsi_hba is NULL!\n");
@@ -2240,7 +2240,7 @@ extern int transport_generic_check_device_location (
 	}
 	hba = dev->iscsi_hba;
 	
-	if (!(t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
+	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
 		return(ret);
 
 	return(t->check_device_location(dev, dti));

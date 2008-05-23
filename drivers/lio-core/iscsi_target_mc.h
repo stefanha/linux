@@ -200,7 +200,7 @@ iscsi_transport_spc_t mc_template_spc = ISCSI_MC_SPC;
 	spc:			&mc_template_spc,		\
 };
 	
-iscsi_transport_t mc_template = ISCSI_MC;
+se_subsystem_api_t mc_template = ISCSI_MC;
 #endif /* ! MC_INCLUDE_STRUCTS */
 
 #endif /* ISCSI_TARGET_MC_H */

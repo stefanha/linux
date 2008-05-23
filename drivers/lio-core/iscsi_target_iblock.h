@@ -169,7 +169,7 @@ iscsi_transport_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	spc:			&iblock_template_spc,		\
 };
 
-iscsi_transport_t iblock_template = ISCSI_IBLOCK;
+se_subsystem_api_t iblock_template = ISCSI_IBLOCK;
 #endif /* IBLOCK_INCLUDE_STRUCTS */
 
 #endif /* ISCSI_TARGET_IBLOCK_H */

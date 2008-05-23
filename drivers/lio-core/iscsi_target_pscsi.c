@@ -261,7 +261,7 @@ fail:
 	return(-1);
 }
 
-/*	pscsi_detach_hba(): (Part of iscsi_transport_t template)
+/*	pscsi_detach_hba(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -279,7 +279,7 @@ extern int pscsi_detach_hba (se_hba_t *hba)
 	return(0);
 }
 
-/*	pscsi_scan_devices(): (Part of iscsi_transport_t template)
+/*	pscsi_scan_devices(): (Part of se_subsystem_api_t template)
  *
  * 	FIXME: For <= v2.4, check what locking the midlayer does for accessing Scsi_Host->host_queue (if any?)
  */
@@ -466,7 +466,7 @@ extern int pscsi_release_phydevice (se_device_t *dev)
 	return(pscsi_release_sd(sd));
 }
 
-/*	pscsi_activate_device(): (Part of iscsi_transport_t template)
+/*	pscsi_activate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -482,7 +482,7 @@ extern int pscsi_activate_device (se_device_t *dev)
 	return(0);
 }
 
-/*	pscsi_deactivate_device(): (Part of iscsi_transport_t template)
+/*	pscsi_deactivate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -498,7 +498,7 @@ extern void pscsi_deactivate_device (se_device_t *dev)
 	return;
 }
 
-/*	pscsi_check_device_location(): (Part of iscsi_transport_t template)
+/*	pscsi_check_device_location(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -514,7 +514,7 @@ extern int pscsi_check_device_location (se_device_t *dev, iscsi_dev_transport_in
 	return(-1);	
 }
 
-/*	pscsi_check_ghost_id(): (Part of iscsi_transport_t template)
+/*	pscsi_check_ghost_id(): (Part of se_subsystem_api_t template)
  *
  *	
  */
@@ -546,7 +546,7 @@ extern int pscsi_check_ghost_id (iscsi_hbainfo_t *hi)
 	return(0);
 }
 
-/*	pscsi_free_device(): (Part of iscsi_transport_t template)
+/*	pscsi_free_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -723,7 +723,7 @@ after_mode_select:
 	return(0);
 }
 
-/*	pscsi_allocate_request(): (Part of iscsi_transport_t template)
+/*	pscsi_allocate_request(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -756,7 +756,7 @@ extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 	return;
 }
 
-/*	pscsi_do_task(): (Part of iscsi_transport_t template)
+/*	pscsi_do_task(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -778,7 +778,7 @@ extern int pscsi_do_task (se_task_t *task)
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
-/*	pscsi_free_task(): (Part of iscsi_transport_t template)
+/*	pscsi_free_task(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1157,7 +1157,7 @@ extern u32 pscsi_get_SG_count (se_task_t *task)
 	return(task->task_sg_num);
 }
 
-/*	pscsi_set_non_SG_buf(): (Part of iscsi_transport_t template)
+/*	pscsi_set_non_SG_buf(): (Part of se_subsystem_api_t template)
  *
  *
  */

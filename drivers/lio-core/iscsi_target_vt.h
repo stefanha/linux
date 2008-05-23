@@ -190,7 +190,7 @@ iscsi_transport_spc_t vtape_template_spc = ISCSI_VTAPE_SPC;
 	spc:			&vtape_template_spc,		\
 };
 	
-iscsi_transport_t vtape_template = ISCSI_VTAPE;
+se_subsystem_api_t vtape_template = ISCSI_VTAPE;
 #endif /* ! VT_INCLUDE_STRUCTS */
 
 #endif /* ISCSI_TARGET_VTAPE_H */

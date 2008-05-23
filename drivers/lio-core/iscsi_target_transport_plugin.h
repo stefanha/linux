@@ -31,50 +31,50 @@
 #define PSCSI_INCLUDE_STRUCTS
 #include <iscsi_target_pscsi.h>
 #undef PSCSI_INCLUDE_STRUCTS
-extern iscsi_transport_t pscsi_template;
+extern se_subsystem_api_t pscsi_template;
 #endif /* PARALLEL_SCSI */
 
 #ifdef PYX_IBLOCK
 #define IBLOCK_INCLUDE_STRUCTS
 #include <iscsi_target_iblock.h>
 #undef IBLOCK_INCLUDE_STRUCTS
-extern iscsi_transport_t iblock_template;
+extern se_subsystem_api_t iblock_template;
 #endif /* PYX_IBLOCK */
 
 #ifdef PYX_RAMDISK
 #define RD_INCLUDE_STRUCTS
 #include <iscsi_target_rd.h>
 #undef RD_INCLUDE_STRUCTS
-extern iscsi_transport_t rd_dr_template;
-extern iscsi_transport_t rd_mcp_template;
+extern se_subsystem_api_t rd_dr_template;
+extern se_subsystem_api_t rd_mcp_template;
 #endif /* PYX_RAMDISK */
 
 #ifdef PYX_FILEIO
 #define FD_INCLUDE_STRUCTS
 #include <iscsi_target_file.h>
 #undef FD_INCLUDE_STRUCTS
-extern iscsi_transport_t fileio_template;
+extern se_subsystem_api_t fileio_template;
 #endif /* PYX_FILEIO */
 
 #ifdef PYX_VROM
 #define VR_INCLUDE_STRUCTS
 #include <iscsi_target_vrom.h>
 #undef VR_INCLUDE_STRUCTS
-extern iscsi_transport_t vrom_template;
+extern se_subsystem_api_t vrom_template;
 #endif /* PYX_VROM */
 
 #ifdef PYX_VTAPE
 #define VT_INCLUDE_STRUCTS
 #include <iscsi_target_vt.h>
 #undef VT_INCLUDE_STRUCTS
-extern iscsi_transport_t vtape_template;
+extern se_subsystem_api_t vtape_template;
 #endif /* PYX_VTAPE */
 
 #ifdef PYX_MEDIA_CHANGER
 #define MC_INCLUDE_STRUCTS
 #include <iscsi_target_mc.h>
 #undef MC_INCLUDE_STRUCTS
-extern iscsi_transport_t mc_template;
+extern se_subsystem_api_t mc_template;
 #endif /* PYX_MEDIA_CHANGER */
 
 #endif    /*** _ISCSI_TARGET_TRANSPORT_PLUGIN_H_ ***/

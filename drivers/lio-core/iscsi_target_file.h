@@ -200,7 +200,7 @@ iscsi_transport_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	spc:			&fileio_template_spc,		\
 };
 	
-iscsi_transport_t fileio_template = ISCSI_FILEIO;
+se_subsystem_api_t fileio_template = ISCSI_FILEIO;
 #endif /* ! FD_INCLUDE_STRUCTS */
 
 #endif /* ISCSI_TARGET_FILE_H */

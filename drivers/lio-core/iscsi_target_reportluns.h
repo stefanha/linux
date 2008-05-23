@@ -48,7 +48,7 @@ static unsigned char *rl_get_non_SG (se_task_t *);
 	get_non_SG:		rl_get_non_SG,		\
 };
 
-iscsi_transport_t rl_template = ISCSI_RL;
+se_subsystem_api_t rl_template = ISCSI_RL;
 
 #endif   /*** ISCSI_TARGET_REPORTLUNS_H ***/
 

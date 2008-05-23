@@ -57,7 +57,7 @@ extern iscsi_global_t *iscsi_global;
 //#define DEBUG_RAMDISK_MCP
 //#define DEBUG_RAMDISK_DR
 
-/*	rd_attach_hba(): (Part of iscsi_transport_t template)
+/*	rd_attach_hba(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -92,7 +92,7 @@ extern int rd_attach_hba (
 	return(0);
 }
 
-/*	rd_detach_hba(): (Part of iscsi_transport_t template)
+/*	rd_detach_hba(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -305,7 +305,7 @@ extern se_device_t *rd_add_device_to_list (se_hba_t *iscsi_hba, void *rd_dev_p, 
 	return(dev);
 }
 
-/*	rd_activate_device(): (Part of iscsi_transport_t template)
+/*	rd_activate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -321,7 +321,7 @@ extern int rd_activate_device (se_device_t *dev)
 	return(0);
 }
 
-/*	rd_deactivate_device(): (Part of iscsi_transport_t template)
+/*	rd_deactivate_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -337,7 +337,7 @@ extern void rd_deactivate_device (se_device_t *dev)
 	return;
 }
 
-/*	rd_check_device_location(): (Part of iscsi_transport_t template)
+/*	rd_check_device_location(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -390,7 +390,7 @@ extern int rd_dr_check_ghost_id (iscsi_hbainfo_t *hi)
 	return(rd_check_ghost_id(hi, RAMDISK_DR));
 }
 
-/*	rd_free_device(): (Part of iscsi_transport_t template)
+/*	rd_free_device(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -404,7 +404,7 @@ extern void rd_free_device (se_device_t *dev)
 	return;
 }
 
-/*	rd_transport_complete(): (Part of iscsi_transport_t template)
+/*	rd_transport_complete(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -413,7 +413,7 @@ extern int rd_transport_complete (se_task_t *task)
 	return(0);
 }
 
-/*	rd_allocate_request(): (Part of iscsi_transport_t template)
+/*	rd_allocate_request(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -802,7 +802,7 @@ static int rd_MEMCPY_write (rd_request_t *req)
 	return(0);
 }
 
-/*	rd_MEMCPY_do_task(): (Part of iscsi_transport_t template)
+/*	rd_MEMCPY_do_task(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1073,7 +1073,7 @@ extern int rd_DIRECT_allocate_DMA (iscsi_cmd_t *cmd, u32 length, u32 dma_size)
 	return(0);
 }
 
-/*	rd_DIRECT_do_task(): (Part of iscsi_transport_t template)
+/*	rd_DIRECT_do_task(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1092,7 +1092,7 @@ extern int rd_DIRECT_do_task (se_task_t *task)
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);				
 }
 
-/*	rd_free_task(): (Part of iscsi_transport_t template)
+/*	rd_free_task(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1324,7 +1324,7 @@ extern int rd_MEMCPY_check_lba (unsigned long long lba, se_device_t *dev)
 	return(0);
 }
 
-/*	rd_check_for_SG(): (Part of iscsi_transport_t template)
+/*	rd_check_for_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1335,7 +1335,7 @@ extern int rd_check_for_SG (se_task_t *task)
 	return(req->rd_sg_count);
 }
 
-/*	rd_get_cdb(): (Part of iscsi_transport_t template)
+/*	rd_get_cdb(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1346,7 +1346,7 @@ extern unsigned char *rd_get_cdb (se_task_t *task)
 	return(req->rd_scsi_cdb);
 }
 
-/*	rd_get_blocksize(): (Part of iscsi_transport_t template)
+/*	rd_get_blocksize(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1365,7 +1365,7 @@ extern u32 rd_get_device_type (se_device_t *dev)
 	return(0); /* TYPE_DISK */
 }
 
-/*	rd_get_dma_length(): (Part of iscsi_transport_t template)
+/*	rd_get_dma_length(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1374,7 +1374,7 @@ extern u32 rd_get_dma_length (u32 task_size, se_device_t *dev)
 	return(PAGE_SIZE);
 }
 
-/*	rd_get_max_sectors(): (Part of iscsi_transport_t template)
+/*	rd_get_max_sectors(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1383,7 +1383,7 @@ extern u32 rd_get_max_sectors (se_device_t *dev)
 	return(RD_MAX_SECTORS);
 }
 
-/*	rd_get_queue_depth(): (Part of iscsi_transport_t template)
+/*	rd_get_queue_depth(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1392,7 +1392,7 @@ extern u32 rd_get_queue_depth (se_device_t *dev)
 	return(RD_DEVICE_QUEUE_DEPTH);
 }
 
-/*	rd_get_non_SG(): (Part of iscsi_transport_t template)
+/*	rd_get_non_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1403,7 +1403,7 @@ extern unsigned char *rd_get_non_SG (se_task_t *task)
 	return((unsigned char *)req->rd_buf);
 }
 
-/*	rd_get_SG(): (Part of iscsi_transport_t template)
+/*	rd_get_SG(): (Part of se_subsystem_api_t template)
  *
  *
  */
@@ -1414,7 +1414,7 @@ extern struct scatterlist *rd_get_SG (se_task_t *task)
 	return((struct scatterlist *)req->rd_buf);
 }
 
-/*	rd_get_SG_count(): (Part of iscsi_transport_t template)
+/*	rd_get_SG_count(): (Part of se_subsystem_api_t template)
  *
  *
  */

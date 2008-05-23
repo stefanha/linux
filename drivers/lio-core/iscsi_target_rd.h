@@ -195,7 +195,7 @@ iscsi_transport_spc_t rd_template_spc = ISCSI_RD_SPC;
 	spc:			&rd_template_spc,		\
 };
 
-iscsi_transport_t rd_dr_template = ISCSI_RD_DR;
+se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 
 #define ISCSI_RD_MCP {						\
 	name:			"rd_mcp",			\
@@ -238,7 +238,7 @@ iscsi_transport_t rd_dr_template = ISCSI_RD_DR;
 	spc:			&rd_template_spc,		\
 };
 	
-iscsi_transport_t rd_mcp_template = ISCSI_RD_MCP;
+se_subsystem_api_t rd_mcp_template = ISCSI_RD_MCP;
 #endif /* ! RD_INCLUDE_STRUCTS */
 
 #endif /* ISCSI_TARGET_RD_H */

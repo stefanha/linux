@@ -400,7 +400,7 @@ extern int dev_obj_do_se_mem_map (
 	int ret = 0;
 
 	/*
-	 * iscsi_transport_t->do_se_mem_map is used when internal allocation has
+	 * se_subsystem_api_t->do_se_mem_map is used when internal allocation has
 	 * been done by the transport plugin.
 	 */
 	if (TRANSPORT(dev)->do_se_mem_map) {

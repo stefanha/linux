@@ -71,7 +71,7 @@ extern int iscsi_hba_check_online (
 	int found_hba = 0, ret = 0;
 	se_hba_t *hba;
 	iscsi_hbainfo_t hi;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 
 	if (dti->hba_id < (ISCSI_MAX_GLOBAL_HBAS-1)) {
 		TRACE_ERROR("Passed HBA ID: %d exceeds ISCSI_MAX_GLOBAL_HBAS-1: %d\n", 
@@ -86,7 +86,7 @@ extern int iscsi_hba_check_online (
 
 	memset(&hi, 0, sizeof(iscsi_hbainfo_t));
 	
-	if (!(t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
+	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
 		return(ret);
 
 	if (t->check_ghost_id(&hi))
@@ -165,7 +165,7 @@ extern int iscsi_hba_check_addhba_params (
 	iscsi_hbainfo_t *hi)
 {
 	int ret = 0;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 
 	if (!(tg->params_set & PARAM_HBA_ID)) {
 		TRACE_ERROR("hba_id must be set for addhbatotarget\n");
@@ -173,7 +173,7 @@ extern int iscsi_hba_check_addhba_params (
 	}
 	hi->hba_type = tg->hba_type;
 	
-	if (!(t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, tg->hba_type, &ret)))
+	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, tg->hba_type, &ret)))
 		return(ret);
 
 	if ((ret = t->check_hba_params(hi, tg, 0)) < 0)
@@ -192,7 +192,7 @@ extern int iscsi_hba_add_hba (
 	struct iscsi_target *tg)
 {
 	int ret = 0;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 	
 	if (hba->hba_status & HBA_STATUS_ACTIVE)
                 return(ERR_ADDTHBA_ALREADY_ACTIVE);
@@ -202,7 +202,7 @@ extern int iscsi_hba_add_hba (
 	hba->hba_info.hba_type = hi->hba_type;
 	hba->hba_info.hba_id = hi->hba_id;
 	
-	if (!(t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hi->hba_type, &ret)))
+	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hi->hba_type, &ret)))
 		return(ret);
 	
 	if ((ret = t->check_hba_params(&hba->hba_info, tg, 0)) < 0)
@@ -228,9 +228,9 @@ static int iscsi_shutdown_hba (
 	se_hba_t *hba)
 {
 	int ret = 0;
-	iscsi_transport_t *t;
+	se_subsystem_api_t *t;
 
-	if (!(t = (iscsi_transport_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
+	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
 		return(ret);
 
 	if (t->detach_hba(hba) < 0)

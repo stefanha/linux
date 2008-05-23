@@ -510,7 +510,7 @@ typedef struct iscsi_transport_s {
 	 * sequencer is used. (ie: cmd_sequencer() is NULL)
 	 */
 	iscsi_transport_spc_t *spc;
-} ____cacheline_aligned iscsi_transport_t;
+} ____cacheline_aligned se_subsystem_api_t;
 
 #define TRANSPORT(dev)		(dev)->transport
 #define TRANSPORT_SPC(dev)	(dev)->transport->spc
