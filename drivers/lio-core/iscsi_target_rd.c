@@ -408,7 +408,7 @@ extern void rd_free_device (iscsi_device_t *dev)
  *
  *
  */
-extern int rd_transport_complete (iscsi_task_t *task)
+extern int rd_transport_complete (se_task_t *task)
 {
 	return(0);
 }
@@ -418,7 +418,7 @@ extern int rd_transport_complete (iscsi_task_t *task)
  *
  */
 extern void *rd_allocate_request (
-	iscsi_task_t *task,
+	se_task_t *task,
 	iscsi_device_t *dev)
 {
 	rd_request_t *rd_req;
@@ -455,7 +455,7 @@ extern void rd_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
  *
  *
  */
-static int rd_emulate_inquiry (iscsi_task_t *task)
+static int rd_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
 	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
@@ -477,7 +477,7 @@ static int rd_emulate_inquiry (iscsi_task_t *task)
  *
  *
  */
-static int rd_emulate_read_cap (iscsi_task_t *task)
+static int rd_emulate_read_cap (se_task_t *task)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
 	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1;
@@ -488,7 +488,7 @@ static int rd_emulate_read_cap (iscsi_task_t *task)
 	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, RD_BLOCKSIZE));
 }
 
-static int rd_emulate_read_cap16 (iscsi_task_t *task)
+static int rd_emulate_read_cap16 (se_task_t *task)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
 	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1;	
@@ -500,7 +500,7 @@ static int rd_emulate_read_cap16 (iscsi_task_t *task)
  *
  *
  */
-static int rd_emulate_scsi_cdb (iscsi_task_t *task)
+static int rd_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret;
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
@@ -806,7 +806,7 @@ static int rd_MEMCPY_write (rd_request_t *req)
  *
  *
  */
-extern int rd_MEMCPY_do_task (iscsi_task_t *task)
+extern int rd_MEMCPY_do_task (se_task_t *task)
 {
 	int ret = 0;
 	rd_request_t *req = (rd_request_t *) task->transport_req;
@@ -837,7 +837,7 @@ extern int rd_MEMCPY_do_task (iscsi_task_t *task)
  *
  *
  */
-static int rd_DIRECT_with_offset (iscsi_task_t *task, struct list_head *se_mem_list, u32 *se_mem_cnt, u32 *task_offset)
+static int rd_DIRECT_with_offset (se_task_t *task, struct list_head *se_mem_list, u32 *se_mem_cnt, u32 *task_offset)
 {
 	rd_request_t *req = (rd_request_t *)task->transport_req;
 	rd_dev_t *dev = req->rd_dev;
@@ -933,7 +933,7 @@ out:
  *
  *
  */
-static int rd_DIRECT_without_offset (iscsi_task_t *task, struct list_head *se_mem_list, u32 *se_mem_cnt, u32 *task_offset)
+static int rd_DIRECT_without_offset (se_task_t *task, struct list_head *se_mem_list, u32 *se_mem_cnt, u32 *task_offset)
 {
 	rd_request_t *req = (rd_request_t *)task->transport_req;
 	rd_dev_t *dev = req->rd_dev;
@@ -1007,7 +1007,7 @@ out:
  *
  */
 extern int rd_DIRECT_do_se_mem_map (
-	iscsi_task_t *task,
+	se_task_t *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
 	se_mem_t *in_se_mem,
@@ -1077,7 +1077,7 @@ extern int rd_DIRECT_allocate_DMA (iscsi_cmd_t *cmd, u32 length, u32 dma_size)
  *
  *
  */
-extern int rd_DIRECT_do_task (iscsi_task_t *task)
+extern int rd_DIRECT_do_task (se_task_t *task)
 {
 	if (!(task->iscsi_cmd->cmd_flags & ICF_SCSI_DATA_SG_IO_CDB))
 		return(rd_emulate_scsi_cdb(task));
@@ -1096,7 +1096,7 @@ extern int rd_DIRECT_do_task (iscsi_task_t *task)
  *
  *
  */
-extern void rd_free_task (iscsi_task_t *task)
+extern void rd_free_task (se_task_t *task)
 {
 	rd_request_t *req;
 	req = (rd_request_t *) task->transport_req;
@@ -1184,7 +1184,7 @@ extern void rd_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
  *
  *
  */
-extern void rd_map_task_non_SG (iscsi_task_t *task)
+extern void rd_map_task_non_SG (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	rd_request_t *req = (rd_request_t *) task->transport_req;
@@ -1200,7 +1200,7 @@ extern void rd_map_task_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern void rd_map_task_SG (iscsi_task_t *task)
+extern void rd_map_task_SG (se_task_t *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1215,7 +1215,7 @@ extern void rd_map_task_SG (iscsi_task_t *task)
  *
  *
  */
-extern int rd_CDB_inquiry (iscsi_task_t *task, u32 size)
+extern int rd_CDB_inquiry (se_task_t *task, u32 size)
 {      
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 		        
@@ -1238,7 +1238,7 @@ extern int rd_CDB_inquiry (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int rd_CDB_none (iscsi_task_t *task, u32 size)
+extern int rd_CDB_none (se_task_t *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1254,7 +1254,7 @@ extern int rd_CDB_none (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int rd_CDB_read_non_SG (iscsi_task_t *task, u32 size)
+extern int rd_CDB_read_non_SG (se_task_t *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1268,7 +1268,7 @@ extern int rd_CDB_read_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int rd_CDB_read_SG (iscsi_task_t *task, u32 size)
+extern int rd_CDB_read_SG (se_task_t *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1282,7 +1282,7 @@ extern int rd_CDB_read_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int rd_CDB_write_non_SG (iscsi_task_t *task, u32 size)
+extern int rd_CDB_write_non_SG (se_task_t *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 	
@@ -1296,7 +1296,7 @@ extern int rd_CDB_write_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int rd_CDB_write_SG (iscsi_task_t *task, u32 size)
+extern int rd_CDB_write_SG (se_task_t *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1328,7 +1328,7 @@ extern int rd_MEMCPY_check_lba (unsigned long long lba, iscsi_device_t *dev)
  *
  *
  */
-extern int rd_check_for_SG (iscsi_task_t *task)
+extern int rd_check_for_SG (se_task_t *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 	
@@ -1339,7 +1339,7 @@ extern int rd_check_for_SG (iscsi_task_t *task)
  *
  *
  */
-extern unsigned char *rd_get_cdb (iscsi_task_t *task)
+extern unsigned char *rd_get_cdb (se_task_t *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1396,7 +1396,7 @@ extern u32 rd_get_queue_depth (iscsi_device_t *dev)
  *
  *
  */
-extern unsigned char *rd_get_non_SG (iscsi_task_t *task)
+extern unsigned char *rd_get_non_SG (se_task_t *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1407,7 +1407,7 @@ extern unsigned char *rd_get_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern struct scatterlist *rd_get_SG (iscsi_task_t *task)
+extern struct scatterlist *rd_get_SG (se_task_t *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1418,7 +1418,7 @@ extern struct scatterlist *rd_get_SG (iscsi_task_t *task)
  *
  *
  */
-extern u32 rd_get_SG_count (iscsi_task_t *task)
+extern u32 rd_get_SG_count (se_task_t *task)
 {
 	return(0);
 }
@@ -1427,7 +1427,7 @@ extern u32 rd_get_SG_count (iscsi_task_t *task)
  *
  *
  */
-extern int rd_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
+extern int rd_set_non_SG_buf (unsigned char *buf, se_task_t *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 	

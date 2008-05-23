@@ -633,7 +633,7 @@ extern iscsi_device_t *transport_core_locate_dev (
 static void transport_all_task_dev_remove_state (iscsi_cmd_t *cmd)
 {
 	iscsi_device_t *dev;
-	iscsi_task_t *task;
+	se_task_t *task;
 	unsigned long flags;
 
 	if (!T_TASK(cmd))
@@ -665,7 +665,7 @@ static void transport_all_task_dev_remove_state (iscsi_cmd_t *cmd)
 /*
  * Called with T_TASK(cmd)->t_state_lock held.
  */
-extern void transport_task_dev_remove_state (iscsi_task_t *task, iscsi_device_t *dev)
+extern void transport_task_dev_remove_state (se_task_t *task, iscsi_device_t *dev)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	unsigned long flags;
@@ -990,7 +990,7 @@ extern void transport_complete_cmd (iscsi_cmd_t *cmd, int success)
  *	Called from interrupt and non interrupt context depending
  *	on the transport plugin.
  */
-extern void transport_complete_task (iscsi_task_t *task, int success)
+extern void transport_complete_task (se_task_t *task, int success)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	iscsi_device_t *dev = task->iscsi_dev;
@@ -1024,7 +1024,7 @@ extern void transport_complete_task (iscsi_task_t *task, int success)
 	}
 	
 	/*
-	 * See if we are waiting for outstanding iscsi_task_t
+	 * See if we are waiting for outstanding se_task_t
 	 * to complete for an exception condition
 	 */
 check_task_stop:
@@ -1072,7 +1072,7 @@ check_task_stop:
 
 	/*
 	 * Decrement the outstanding t_task_cdbs_left count.  The last
-	 * iscsi_task_t from iscsi_cmd_t will complete itself into the
+	 * se_task_t from iscsi_cmd_t will complete itself into the
 	 * device queue depending upon int success.
 	 */
 	if (!(atomic_dec_and_test(&T_TASK(cmd)->t_task_cdbs_left))) {
@@ -1104,7 +1104,7 @@ check_task_stop:
  *
  *	Called with iscsi_dev_t->execute_task_lock called.
  */
-static void __transport_add_task_to_execute_queue (iscsi_task_t *task, iscsi_device_t *dev)
+static void __transport_add_task_to_execute_queue (se_task_t *task, iscsi_device_t *dev)
 {
 	if (!dev->execute_task_head && !dev->execute_task_tail) {
 		dev->execute_task_head = dev->execute_task_tail = task;
@@ -1132,7 +1132,7 @@ static void __transport_add_task_to_execute_queue (iscsi_task_t *task, iscsi_dev
  *
  *
  */
-extern void transport_add_task_to_execute_queue (iscsi_task_t *task, iscsi_device_t *dev)
+extern void transport_add_task_to_execute_queue (se_task_t *task, iscsi_device_t *dev)
 {
 	unsigned long flags;
 
@@ -1166,7 +1166,7 @@ extern void transport_add_task_to_execute_queue (iscsi_task_t *task, iscsi_devic
 static void transport_add_tasks_to_state_queue (iscsi_cmd_t *cmd)
 {
 	iscsi_device_t *dev;
-	iscsi_task_t *task;
+	se_task_t *task;
 	unsigned long flags;
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
@@ -1197,7 +1197,7 @@ static void transport_add_tasks_to_state_queue (iscsi_cmd_t *cmd)
 extern void transport_add_tasks_from_cmd (iscsi_cmd_t *cmd)
 {
 	iscsi_device_t *dev = ISCSI_DEV(cmd);
-	iscsi_task_t *task;
+	se_task_t *task;
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
@@ -1217,9 +1217,9 @@ extern void transport_add_tasks_from_cmd (iscsi_cmd_t *cmd)
  *
  *	Called with dev->execute_task_lock held.
  */
-extern iscsi_task_t *transport_get_task_from_execute_queue (iscsi_device_t *dev)
+extern se_task_t *transport_get_task_from_execute_queue (iscsi_device_t *dev)
 {
-	iscsi_task_t *task;
+	se_task_t *task;
 
 	if (!dev->execute_task_head)
 		return(NULL);
@@ -1242,7 +1242,7 @@ extern iscsi_task_t *transport_get_task_from_execute_queue (iscsi_device_t *dev)
  *
  *
  */
-static void transport_remove_task_from_execute_queue (iscsi_task_t *task, iscsi_device_t *dev)
+static void transport_remove_task_from_execute_queue (se_task_t *task, iscsi_device_t *dev)
 {
 	unsigned long flags;
 
@@ -1339,7 +1339,7 @@ static void transport_release_all_cmds (iscsi_device_t *dev)
  *
  *
  */
-static int transport_dev_write_pending_nop (iscsi_task_t *task)
+static int transport_dev_write_pending_nop (se_task_t *task)
 {
 	return(0);
 }
@@ -1965,20 +1965,20 @@ static inline int transport_check_device_cdb_sector_count (se_obj_lun_type_t *se
  *
  *
  */
-static iscsi_task_t *transport_generic_get_task (
+static se_task_t *transport_generic_get_task (
 	iscsi_transform_info_t *ti,
 	iscsi_cmd_t *cmd,
 	void *se_obj_ptr,
 	se_obj_lun_type_t *se_obj_api)
 {
-	iscsi_task_t *task;
+	se_task_t *task;
 	unsigned long flags;
 
-	if (!(task = kmalloc(sizeof(iscsi_task_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate iscsi_task_t\n");
+	if (!(task = kmalloc(sizeof(se_task_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate se_task_t\n");
 		return(NULL);
 	}
-	memset(task, 0, sizeof(iscsi_task_t));
+	memset(task, 0, sizeof(se_task_t));
 	
 	INIT_LIST_HEAD(&task->t_list);
 	init_MUTEX_LOCKED(&task->task_stop_sem);
@@ -2026,7 +2026,7 @@ static int transport_process_data_sg_transform (iscsi_cmd_t *cmd, iscsi_transfor
 static int transport_process_control_sg_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
 {
 	unsigned char *cdb;
-	iscsi_task_t *task;
+	se_task_t *task;
 	se_mem_t *se_mem, *se_mem_lout = NULL;
 	int ret;
 	u32 se_mem_cnt = 0, task_offset = 0;
@@ -2069,7 +2069,7 @@ static int transport_process_control_sg_transform (iscsi_cmd_t *cmd, iscsi_trans
 static int transport_process_control_nonsg_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
 {
 	unsigned char *cdb;
-	iscsi_task_t *task;
+	se_task_t *task;
 
 	if (!(task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr, ti->se_obj_api)))
 		return(-1);
@@ -2097,7 +2097,7 @@ static int transport_process_control_nonsg_transform (iscsi_cmd_t *cmd, iscsi_tr
 static int transport_process_non_data_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
 {
 	unsigned char *cdb;
-	iscsi_task_t *task;
+	se_task_t *task;
 
 	if (!(task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr, ti->se_obj_api)))
 		return(-1);
@@ -2312,7 +2312,7 @@ extern int transport_generic_handle_tmr (
  */
 extern void transport_stop_tasks_for_cmd (iscsi_cmd_t *cmd)
 {
-	iscsi_task_t *task, *task_tmp;
+	se_task_t *task, *task_tmp;
 	unsigned long flags;
 
 	DEBUG_TS("ITT[0x%08x] - Stopping tasks\n", cmd->init_task_tag);
@@ -2324,8 +2324,8 @@ extern void transport_stop_tasks_for_cmd (iscsi_cmd_t *cmd)
 	list_for_each_entry_safe(task, task_tmp, &T_TASK(cmd)->t_task_list, t_list) {
 		DEBUG_TS("task_no[%d] - Processing task %p\n", task->task_no, task);
 		/*
-		 * If the iscsi_task_t has not been sent and is not active,
-		 * remove the iscsi_task_t from the execution queue.
+		 * If the se_task_t has not been sent and is not active,
+		 * remove the se_task_t from the execution queue.
 		 */
 		if (!atomic_read(&task->task_sent) &&
 		    !atomic_read(&task->task_active)) {
@@ -2338,7 +2338,7 @@ extern void transport_stop_tasks_for_cmd (iscsi_cmd_t *cmd)
 		}
 
 		/*
-		 * If the iscsi_task_t is active, sleep until it is returned
+		 * If the se_task_t is active, sleep until it is returned
 		 * from the plugin.
 		 */
 		if (atomic_read(&task->task_active)) {
@@ -2387,7 +2387,7 @@ extern int transport_failure_tasks_generic (iscsi_cmd_t *cmd)
 	 * This causes problems when EVPD INQUIRY fails, disable this functionality
 	 * for now.
 	 */
-	iscsi_task_t *task;
+	se_task_t *task;
 
 	if (!(cmd->cmd_flags & ICF_SE_DISABLE_ONLINE_CHECK))
 		goto done;
@@ -2527,7 +2527,7 @@ extern void transport_direct_request_timeout (iscsi_cmd_t *cmd)
 extern void transport_generic_request_timeout (iscsi_cmd_t *cmd)
 {
 	unsigned char *cdb;
-	iscsi_task_t *task;
+	se_task_t *task;
 	unsigned long flags;
 	
 	/*
@@ -3083,7 +3083,7 @@ static inline void transport_set_supported_SAM_opcode (iscsi_cmd_t *cmd)
  */
 extern void transport_task_timeout_handler (unsigned long data)
 {
-	iscsi_task_t *task = (iscsi_task_t *)data;
+	se_task_t *task = (se_task_t *)data;
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	unsigned long flags;
 
@@ -3138,7 +3138,7 @@ extern void transport_task_timeout_handler (unsigned long data)
 /*
  * Called with T_TASK(cmd)->t_state_lock held.
  */
-extern void transport_start_task_timer (iscsi_task_t *task)
+extern void transport_start_task_timer (se_task_t *task)
 {
 	unsigned char *cdb;
 	int timeout;
@@ -3175,7 +3175,7 @@ extern void transport_start_task_timer (iscsi_task_t *task)
 /*
  * Called with spin_lock_irq(&T_TASK(cmd)->t_state_lock) held.
  */
-extern void __transport_stop_task_timer (iscsi_task_t *task, unsigned long *flags)
+extern void __transport_stop_task_timer (se_task_t *task, unsigned long *flags)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 
@@ -3194,7 +3194,7 @@ extern void __transport_stop_task_timer (iscsi_task_t *task, unsigned long *flag
 	return;
 }
 
-extern void transport_stop_task_timer (iscsi_task_t *task)
+extern void transport_stop_task_timer (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	unsigned long flags;
@@ -3221,7 +3221,7 @@ extern void transport_stop_task_timer (iscsi_task_t *task)
 
 extern void transport_stop_all_task_timers (iscsi_cmd_t *cmd)
 {
-	iscsi_task_t *task = NULL, *task_tmp;
+	se_task_t *task = NULL, *task_tmp;
 	unsigned long flags;
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
@@ -3280,7 +3280,7 @@ extern int __transport_execute_tasks (iscsi_device_t *dev)
 {
 	int error;
 	iscsi_cmd_t *cmd = NULL;
-	iscsi_task_t *task;
+	se_task_t *task;
         unsigned long flags;
 	
 	/*
@@ -3738,7 +3738,7 @@ extern int transport_get_sense_data (iscsi_cmd_t *cmd)
 {
 	unsigned char *buffer = NULL, *sense_buffer = NULL;
 	iscsi_device_t *dev;
-	iscsi_task_t *task = NULL, *task_tmp;
+	se_task_t *task = NULL, *task_tmp;
 	unsigned long flags;
 
 	if (!ISCSI_LUN(cmd)) {
@@ -4587,7 +4587,7 @@ extern void transport_generic_complete_ok (iscsi_cmd_t *cmd)
 			reason = NON_EXISTENT_LUN;
 
 		/*
-		 * Only set when an iscsi_task_t->task_scsi_status returned
+		 * Only set when an se_task_t->task_scsi_status returned
 		 * a non GOOD status.
 		 */
 		if (cmd->scsi_status) {
@@ -4632,7 +4632,7 @@ extern void transport_generic_complete_ok (iscsi_cmd_t *cmd)
 
 extern void transport_free_dev_tasks (iscsi_cmd_t *cmd)
 {
-	iscsi_task_t *task, *task_tmp;
+	se_task_t *task, *task_tmp;
 	unsigned long flags;
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
@@ -4798,7 +4798,7 @@ release_cmd:
  */
 static int transport_generic_map_buffers_to_tasks (iscsi_cmd_t *cmd)
 {
-	iscsi_task_t *task = NULL;
+	se_task_t *task = NULL;
 	int ret;
 
 	/*
@@ -4821,7 +4821,7 @@ static int transport_generic_map_buffers_to_tasks (iscsi_cmd_t *cmd)
 	}
 	
 	/*
-	 * Determine the scatterlist offset for each iscsi_task_t,
+	 * Determine the scatterlist offset for each se_task_t,
 	 * and segment and set pointers to storage transport buffers
 	 * via task->transport_map_task().
 	 */
@@ -5031,7 +5031,7 @@ out:
 }
 
 extern u32 transport_calc_sg_num (
-	iscsi_task_t *task,
+	se_task_t *task,
 	se_mem_t *in_se_mem,
 	u32 task_offset)
 {
@@ -5095,7 +5095,7 @@ extern u32 transport_calc_sg_num (
 }
 
 static inline int transport_set_task_sectors_disk (
-	iscsi_task_t *task,
+	se_task_t *task,
 	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	se_fp_obj_t *fp,
@@ -5122,7 +5122,7 @@ static inline int transport_set_task_sectors_disk (
 }
 
 static inline int transport_set_task_sectors_non_disk (
-	iscsi_task_t *task,
+	se_task_t *task,
 	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	se_fp_obj_t *fp,
@@ -5140,7 +5140,7 @@ static inline int transport_set_task_sectors_non_disk (
 }
 
 static inline int transport_set_task_sectors (
-	iscsi_task_t *task,
+	se_task_t *task,
 	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	se_fp_obj_t *fp,
@@ -5156,7 +5156,7 @@ static inline int transport_set_task_sectors (
 }
 
 extern int transport_map_sg_to_mem (
-	iscsi_task_t *task,
+	se_task_t *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
 	se_mem_t *in_se_mem,
@@ -5230,7 +5230,7 @@ next:
 }
 
 extern int transport_map_mem_to_mem (
-	iscsi_task_t *task,
+	se_task_t *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
 	se_mem_t *in_se_mem, 
@@ -5321,7 +5321,7 @@ next:
  *
  */
 extern int transport_map_mem_to_sg (
-	iscsi_task_t *task,
+	se_task_t *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
 	se_mem_t *in_se_mem,
@@ -5427,7 +5427,7 @@ extern u32 transport_generic_get_cdb_count (
 {
 	unsigned char *cdb = NULL;
 	void *obj_ptr, *next_obj_ptr = NULL;
-	iscsi_task_t *task;
+	se_task_t *task;
 	se_fp_obj_t *fp = NULL;
 	se_mem_t *se_mem, *se_mem_lout = NULL;
 	se_obj_lun_type_t *obj_api;
@@ -5617,7 +5617,7 @@ extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 		iscsi_ra_check(cmd);
 #endif	
 	/*
-	 * Generate iscsi_task_t(s) and/or their payloads for this CDB.
+	 * Generate se_task_t(s) and/or their payloads for this CDB.
 	 */
 	memset((void *)&ti, 0, sizeof(iscsi_transform_info_t));
 	ti.ti_cmd = cmd;
@@ -5675,7 +5675,7 @@ extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 
 	/*
 	 * For WRITEs, let the iSCSI Target RX Thread know its buffer is ready..
-	 * This WRITE iscsi_cmd_t (and all of its associated iscsi_task_t's)
+	 * This WRITE iscsi_cmd_t (and all of its associated se_task_t's)
 	 * will be added to the iscsi_device_t execution queue after its WRITE
 	 * data has arrived. (ie: It gets handled by the transport processing
 	 * thread a second time)
@@ -5687,7 +5687,7 @@ process:
 	}
 
 	/*
-	 * Everything else but a WRITE, add the iscsi_cmd_t's iscsi_task_t's
+	 * Everything else but a WRITE, add the iscsi_cmd_t's se_task_t's
 	 * to the execution queue.
 	 */
 	transport_execute_tasks(cmd);
@@ -5737,7 +5737,7 @@ extern void transport_generic_process_write (iscsi_cmd_t *cmd)
 			cmd->data_length = cmd->cmd_spdtl;
 			
 			/*
-			 * FIXME, clear out original iscsi_task_t and state information.
+			 * FIXME, clear out original se_task_t and state information.
 			 */
 			
 			
@@ -6269,9 +6269,9 @@ static int transport_status_thread_tur (se_obj_lun_type_t *obj_api, void *obj_pt
  *	Called with spin_lock_irq(&dev->execute_task_lock); held
  *
  */
-static iscsi_task_t *transport_get_task_from_state_list (iscsi_device_t *dev)
+static se_task_t *transport_get_task_from_state_list (iscsi_device_t *dev)
 {
-	iscsi_task_t *task;
+	se_task_t *task;
 
 	if (!dev->state_task_head)
 		return(NULL);
@@ -6338,7 +6338,7 @@ extern int transport_status_thr_dev_offline (iscsi_device_t *dev)
 extern int transport_status_thr_dev_offline_tasks (iscsi_device_t *dev, void *se_obj_ptr)
 {
 	iscsi_cmd_t *cmd;
-	iscsi_task_t *task, *task_next;
+	se_task_t *task, *task_next;
 	int complete = 0, remove = 0;
 	unsigned long flags;
 
@@ -6630,13 +6630,13 @@ static void transport_processing_shutdown (iscsi_device_t *dev)
 {
 	iscsi_cmd_t *cmd;
 	iscsi_queue_req_t *qr;
-	iscsi_task_t *task;
+	se_task_t *task;
 	u8 state;
 	unsigned long flags;
 
 
 	/*
-	 * Empty the iscsi_device_t's iscsi_task_t state list.
+	 * Empty the iscsi_device_t's se_task_t state list.
 	 */
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
 	while ((task = transport_get_task_from_state_list(dev))) {

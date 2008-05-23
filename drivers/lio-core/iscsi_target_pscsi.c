@@ -568,7 +568,7 @@ extern void pscsi_free_device (iscsi_device_t *dev)
  *
  *
  */
-extern int pscsi_transport_complete (iscsi_task_t *task)
+extern int pscsi_transport_complete (se_task_t *task)
 {
 	struct scsi_device *sd = (struct scsi_device *) task->iscsi_dev->dev_ptr;
 	void *pscsi_buf;
@@ -728,7 +728,7 @@ after_mode_select:
  *
  */
 extern void *pscsi_allocate_request (
-	iscsi_task_t *task,
+	se_task_t *task,
 	iscsi_device_t *dev)
 {
 	pscsi_plugin_task_t *pt;
@@ -760,7 +760,7 @@ extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev
  *
  *
  */
-extern int pscsi_do_task (iscsi_task_t *task)
+extern int pscsi_do_task (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	int ret;
@@ -782,7 +782,7 @@ extern int pscsi_do_task (iscsi_task_t *task)
  *
  *
  */
-extern void pscsi_free_task (iscsi_task_t *task)
+extern void pscsi_free_task (se_task_t *task)
 {
 	kfree(task->transport_req);
 	return;
@@ -920,7 +920,7 @@ extern void pscsi_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
  *
  *
  */
-extern void pscsi_map_task_SG (iscsi_task_t *task)
+extern void pscsi_map_task_SG (se_task_t *task)
 {
         pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pt->pscsi_buf = (void *)task->task_buf;
@@ -932,7 +932,7 @@ extern void pscsi_map_task_SG (iscsi_task_t *task)
  *
  *
  */
-extern void pscsi_map_task_non_SG (iscsi_task_t *task)
+extern void pscsi_map_task_non_SG (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
@@ -947,7 +947,7 @@ extern void pscsi_map_task_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern int pscsi_CDB_inquiry (iscsi_task_t *task, u32 size)
+extern int pscsi_CDB_inquiry (se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -957,7 +957,7 @@ extern int pscsi_CDB_inquiry (iscsi_task_t *task, u32 size)
 	return(0);
 }
 
-extern int pscsi_CDB_none (iscsi_task_t *task, u32 size)
+extern int pscsi_CDB_none (se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -970,7 +970,7 @@ extern int pscsi_CDB_none (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int pscsi_CDB_read_non_SG (iscsi_task_t *task, u32 size)
+extern int pscsi_CDB_read_non_SG (se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -984,7 +984,7 @@ extern int pscsi_CDB_read_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int pscsi_CDB_read_SG (iscsi_task_t *task, u32 size)
+extern int pscsi_CDB_read_SG (se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -998,7 +998,7 @@ extern int pscsi_CDB_read_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int pscsi_CDB_write_non_SG (iscsi_task_t *task, u32 size)
+extern int pscsi_CDB_write_non_SG (se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1012,7 +1012,7 @@ extern int pscsi_CDB_write_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int pscsi_CDB_write_SG (iscsi_task_t *task, u32 size)
+extern int pscsi_CDB_write_SG (se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1035,7 +1035,7 @@ extern int pscsi_check_lba (unsigned long long lba, iscsi_device_t *dev)
  *
  *
  */
-extern int pscsi_check_for_SG (iscsi_task_t *task)
+extern int pscsi_check_for_SG (se_task_t *task)
 {
 	return(task->task_sg_num);
 }
@@ -1044,7 +1044,7 @@ extern int pscsi_check_for_SG (iscsi_task_t *task)
  *
  *
  */
-extern unsigned char *pscsi_get_cdb (iscsi_task_t *task)
+extern unsigned char *pscsi_get_cdb (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1055,7 +1055,7 @@ extern unsigned char *pscsi_get_cdb (iscsi_task_t *task)
  *
  *
  */
-extern unsigned char *pscsi_get_sense_buffer (iscsi_task_t *task)
+extern unsigned char *pscsi_get_sense_buffer (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1130,7 +1130,7 @@ extern u32 pscsi_get_queue_depth (iscsi_device_t *dev)
  *
  *
  */
-extern unsigned char *pscsi_get_non_SG (iscsi_task_t *task)
+extern unsigned char *pscsi_get_non_SG (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	
@@ -1141,7 +1141,7 @@ extern unsigned char *pscsi_get_non_SG (iscsi_task_t *task)
  *
  * 
  */
-extern struct scatterlist *pscsi_get_SG (iscsi_task_t *task)
+extern struct scatterlist *pscsi_get_SG (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1152,7 +1152,7 @@ extern struct scatterlist *pscsi_get_SG (iscsi_task_t *task)
  *
  *
  */
-extern u32 pscsi_get_SG_count (iscsi_task_t *task)
+extern u32 pscsi_get_SG_count (se_task_t *task)
 {
 	return(task->task_sg_num);
 }
@@ -1161,7 +1161,7 @@ extern u32 pscsi_get_SG_count (iscsi_task_t *task)
  *
  *
  */
-extern int pscsi_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
+extern int pscsi_set_non_SG_buf (unsigned char *buf, se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1198,7 +1198,7 @@ extern void pscsi_shutdown_hba (iscsi_hba_t *hba)
  *
  */
 //#warning FIXME: We can do some custom handling of HBA fuckups here.
-extern inline void pscsi_process_SAM_status (iscsi_task_t *task, unsigned char *cdb, int result)
+extern inline void pscsi_process_SAM_status (se_task_t *task, unsigned char *cdb, int result)
 {
 	if ((task->task_scsi_status = status_byte(result))) {
 		task->task_scsi_status <<= 1;
@@ -1225,7 +1225,7 @@ extern inline void pscsi_process_SAM_status (iscsi_task_t *task, unsigned char *
 
 extern void pscsi_req_done (void *data, char *sense, int result, int data_len)
 {
-	iscsi_task_t *task = (iscsi_task_t *)data;
+	se_task_t *task = (se_task_t *)data;
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *)task->transport_req;
 #if 0
 	printk("pscsi_req_done(): result: %08x, sense: %p data_len: %d\n",

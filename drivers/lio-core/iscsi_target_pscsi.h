@@ -44,12 +44,12 @@
 #define PS_TIMEOUT_DISK		15*HZ
 #define PS_TIMEOUT_OTHER	500*HZ
 
-extern int pscsi_CDB_inquiry (iscsi_task_t *, u32);
-extern int pscsi_CDB_none (iscsi_task_t *, u32);
-extern int pscsi_CDB_read_non_SG (iscsi_task_t *, u32);
-extern int pscsi_CDB_read_SG (iscsi_task_t *, u32);
-extern int pscsi_CDB_write_non_SG (iscsi_task_t *, u32);
-extern int pscsi_CDB_write_SG (iscsi_task_t *, u32);
+extern int pscsi_CDB_inquiry (se_task_t *, u32);
+extern int pscsi_CDB_none (se_task_t *, u32);
+extern int pscsi_CDB_read_non_SG (se_task_t *, u32);
+extern int pscsi_CDB_read_SG (se_task_t *, u32);
+extern int pscsi_CDB_write_non_SG (se_task_t *, u32);
+extern int pscsi_CDB_write_SG (se_task_t *, u32);
 
 #ifndef PSCSI_INCLUDE_STRUCTS
 extern int pscsi_attach_hba (iscsi_portal_group_t *, iscsi_hba_t *, iscsi_hbainfo_t *);
@@ -63,31 +63,31 @@ extern iscsi_device_t *pscsi_add_device_to_list (iscsi_hba_t *, struct scsi_devi
 extern int pscsi_check_device_location (iscsi_device_t *, iscsi_dev_transport_info_t *);
 extern int pscsi_check_ghost_id (iscsi_hbainfo_t *);
 extern void pscsi_free_device (iscsi_device_t *);
-extern int pscsi_transport_complete (iscsi_task_t *);
-extern void *pscsi_allocate_request (iscsi_task_t *, iscsi_device_t *);
+extern int pscsi_transport_complete (se_task_t *);
+extern void *pscsi_allocate_request (se_task_t *, iscsi_device_t *);
 extern void pscsi_get_evpd_prod (unsigned char *, u32, iscsi_device_t *);
 extern void pscsi_get_evpd_sn (unsigned char *, u32, iscsi_device_t *);
-extern int pscsi_do_task (iscsi_task_t *);
-extern void pscsi_free_task (iscsi_task_t *);
+extern int pscsi_do_task (se_task_t *);
+extern void pscsi_free_task (se_task_t *);
 extern int pscsi_check_hba_params (iscsi_hbainfo_t *, struct iscsi_target *, int);
 extern int pscsi_check_dev_params (iscsi_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
 extern void pscsi_get_plugin_info (void *, char *, int *);
 extern void pscsi_get_hba_info (iscsi_hba_t *, char *, int *);
 extern void pscsi_get_dev_info (iscsi_device_t *, char *, int *);
 extern int pscsi_check_lba (unsigned long long, iscsi_device_t *);
-extern int pscsi_check_for_SG (iscsi_task_t *);
-extern unsigned char *pscsi_get_cdb (iscsi_task_t *);
-extern unsigned char *pscsi_get_sense_buffer (iscsi_task_t *);
+extern int pscsi_check_for_SG (se_task_t *);
+extern unsigned char *pscsi_get_cdb (se_task_t *);
+extern unsigned char *pscsi_get_sense_buffer (se_task_t *);
 extern u32 pscsi_get_blocksize (iscsi_device_t *);
 extern u32 pscsi_get_device_rev (iscsi_device_t *);
 extern u32 pscsi_get_device_type (iscsi_device_t *);
 extern u32 pscsi_get_dma_length (u32, iscsi_device_t *);
 extern u32 pscsi_get_max_sectors (iscsi_device_t *);
 extern u32 pscsi_get_queue_depth (iscsi_device_t *);
-extern unsigned char *pscsi_get_non_SG (iscsi_task_t *);
-extern struct scatterlist *pscsi_get_SG (iscsi_task_t *);
-extern u32 pscsi_get_SG_count (iscsi_task_t *);
-extern int pscsi_set_non_SG_buf (unsigned char *, iscsi_task_t *);
+extern unsigned char *pscsi_get_non_SG (se_task_t *);
+extern struct scatterlist *pscsi_get_SG (se_task_t *);
+extern u32 pscsi_get_SG_count (se_task_t *);
+extern int pscsi_set_non_SG_buf (unsigned char *, se_task_t *);
 extern void pscsi_shutdown_hba (struct iscsi_hba_s *);
 extern void pscsi_req_done (void *, char *, int, int);
 #endif

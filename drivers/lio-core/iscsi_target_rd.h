@@ -44,12 +44,12 @@
 #define RD_DATA_NONE		3
 
 #ifndef RD_INCLUDE_STRUCTS
-extern int rd_CDB_inquiry (iscsi_task_t *, u32);
-extern int rd_CDB_none (iscsi_task_t *, u32);
-extern int rd_CDB_read_non_SG (iscsi_task_t *, u32);
-extern int rd_CDB_read_SG (iscsi_task_t *, u32);
-extern int rd_CDB_write_non_SG (iscsi_task_t *, u32);
-extern int rd_CDB_write_SG (iscsi_task_t *, u32);
+extern int rd_CDB_inquiry (se_task_t *, u32);
+extern int rd_CDB_none (se_task_t *, u32);
+extern int rd_CDB_read_non_SG (se_task_t *, u32);
+extern int rd_CDB_read_SG (se_task_t *, u32);
+extern int rd_CDB_write_non_SG (se_task_t *, u32);
+extern int rd_CDB_write_SG (se_task_t *, u32);
 
 extern int rd_attach_hba (iscsi_portal_group_t *, iscsi_hba_t *, iscsi_hbainfo_t *);
 extern int rd_detach_hba (iscsi_hba_t *);
@@ -62,16 +62,16 @@ extern int rd_mcp_check_ghost_id (iscsi_hbainfo_t *);
 extern int rd_dr_check_ghost_id (iscsi_hbainfo_t *);
 extern void rd_free_device (iscsi_device_t *);
 extern iscsi_device_t *rd_add_device_to_list (iscsi_hba_t *, void *, iscsi_devinfo_t *);
-extern int rd_transport_complete (iscsi_task_t *);
-extern void *rd_allocate_request (iscsi_task_t *, iscsi_device_t *);
+extern int rd_transport_complete (se_task_t *);
+extern void *rd_allocate_request (se_task_t *, iscsi_device_t *);
 extern void rd_get_evpd_prod (unsigned char *, u32, iscsi_device_t *);
 extern void rd_get_evpd_sn (unsigned char *, u32, iscsi_device_t *);
-extern int rd_DIRECT_do_task (iscsi_task_t *);
-extern int rd_MEMCPY_do_task (iscsi_task_t *);
+extern int rd_DIRECT_do_task (se_task_t *);
+extern int rd_MEMCPY_do_task (se_task_t *);
 extern int rd_DIRECT_allocate_DMA (iscsi_cmd_t *, u32, u32);
-extern int rd_DIRECT_do_se_mem_map (struct iscsi_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
+extern int rd_DIRECT_do_se_mem_map (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 extern void rd_DIRECT_free_DMA (iscsi_cmd_t *);
-extern void rd_free_task (iscsi_task_t *);
+extern void rd_free_task (se_task_t *);
 extern int rd_check_hba_params (iscsi_hbainfo_t *, struct iscsi_target *, int);
 extern int rd_check_dev_params (iscsi_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
 extern int rd_check_virtdev_params (iscsi_devinfo_t *, struct iscsi_target *);
@@ -81,18 +81,18 @@ extern void rd_get_hba_info (iscsi_hba_t *, char *, int *);
 extern void rd_get_dev_info (iscsi_device_t *, char *, int *);
 extern int rd_DIRECT_check_lba (unsigned long long, iscsi_device_t *);
 extern int rd_MEMCPY_check_lba (unsigned long long, iscsi_device_t *);
-extern int rd_check_for_SG (iscsi_task_t *);
-extern unsigned char *rd_get_cdb (iscsi_task_t *);
+extern int rd_check_for_SG (se_task_t *);
+extern unsigned char *rd_get_cdb (se_task_t *);
 extern u32 rd_get_blocksize (iscsi_device_t *);
 extern u32 rd_get_device_rev (iscsi_device_t *);
 extern u32 rd_get_device_type (iscsi_device_t *);
 extern u32 rd_get_dma_length (u32, iscsi_device_t *);
 extern u32 rd_get_max_sectors (iscsi_device_t *);
 extern u32 rd_get_queue_depth (iscsi_device_t *);
-extern unsigned char *rd_get_non_SG (iscsi_task_t *);
-extern struct scatterlist *rd_get_SG (iscsi_task_t *);
-extern u32 rd_get_SG_count (iscsi_task_t *);
-extern int rd_set_non_SG_buf (unsigned char *, iscsi_task_t *);
+extern unsigned char *rd_get_non_SG (se_task_t *);
+extern struct scatterlist *rd_get_SG (se_task_t *);
+extern u32 rd_get_SG_count (se_task_t *);
+extern int rd_set_non_SG_buf (unsigned char *, se_task_t *);
 #endif /* ! RD_INCLUDE_STRUCTS */
 
 #define RRF_EMULATE_CDB		0x01

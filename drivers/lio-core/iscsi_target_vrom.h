@@ -43,38 +43,38 @@
 #define VR_DATA_NONE		3
 
 #ifndef VR_INCLUDE_STRUCTS
-int vr_CDB_inquiry (iscsi_task_t *, u32);
-int vr_CDB_none (iscsi_task_t *, u32);
-int vr_CDB_read_non_SG (iscsi_task_t *, u32);
-int vr_CDB_read_SG (iscsi_task_t *, u32);
-int vr_CDB_write_non_SG (iscsi_task_t *, u32);
-int vr_CDB_write_SG (iscsi_task_t *, u32);
+int vr_CDB_inquiry (se_task_t *, u32);
+int vr_CDB_none (se_task_t *, u32);
+int vr_CDB_read_non_SG (se_task_t *, u32);
+int vr_CDB_read_SG (se_task_t *, u32);
+int vr_CDB_write_non_SG (se_task_t *, u32);
+int vr_CDB_write_SG (se_task_t *, u32);
 
 int vr_create_virtdevice (iscsi_hba_t *, iscsi_devinfo_t *);
 int vr_activate_device (iscsi_device_t *);
 void vr_deactivate_device (iscsi_device_t *);
 void vr_free_device (iscsi_device_t *);
 iscsi_device_t *vr_add_device_to_list (iscsi_hba_t *, void *);
-int vr_transport_complete (iscsi_task_t *);
-void *vr_allocate_request (iscsi_task_t *, iscsi_device_t *);
-int vr_do_task (iscsi_task_t *);
-void vr_free_task (iscsi_task_t *);
+int vr_transport_complete (se_task_t *);
+void *vr_allocate_request (se_task_t *, iscsi_device_t *);
+int vr_do_task (se_task_t *);
+void vr_free_task (se_task_t *);
 extern int vr_check_dev_params (iscsi_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
 extern int vr_check_virtdev_params (iscsi_devinfo_t *, struct iscsi_target *);
 extern void vr_get_plugin_info (void *, char *, int *);
 extern void vr_get_dev_info (iscsi_device_t *, char *, int *);
 int vr_check_lba (unsigned long long, iscsi_device_t *);
-int vr_check_for_SG (iscsi_task_t *);
-unsigned char *vr_get_cdb (iscsi_task_t *);
+int vr_check_for_SG (se_task_t *);
+unsigned char *vr_get_cdb (se_task_t *);
 u32 vr_get_blocksize (iscsi_device_t *);
-u32 vr_get_dma_length (iscsi_task_t *);
+u32 vr_get_dma_length (se_task_t *);
 u32 vr_get_max_cdbs (iscsi_device_t *);
 u32 vr_get_max_sectors (iscsi_device_t *);
 u32 vr_get_queue_depth (iscsi_device_t *);
-unsigned char *vr_get_non_SG (iscsi_task_t *);
-struct scatterlist *vr_get_SG (iscsi_task_t *);
-u32 vr_get_SG_count (iscsi_task_t *);
-int vr_set_non_SG_buf (unsigned char *, iscsi_task_t *);
+unsigned char *vr_get_non_SG (se_task_t *);
+struct scatterlist *vr_get_SG (se_task_t *);
+u32 vr_get_SG_count (se_task_t *);
+int vr_set_non_SG_buf (unsigned char *, se_task_t *);
 #endif /* ! VR_INCLUDE_STRUCTS */
 
 #include "../css-auth/css-auth.h"

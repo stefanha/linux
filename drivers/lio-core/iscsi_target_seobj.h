@@ -31,7 +31,7 @@ extern int se_obj_load_plugins (void);
 
 #define DEV_OBJ_VERSION		"v3.0"
 
-typedef int (*map_func_t)(struct iscsi_task_s *, u32);
+typedef int (*map_func_t)(struct se_task_s *, u32);
 
 typedef struct se_obj_lun_type_s {
 	int	se_obj_type;
@@ -71,13 +71,13 @@ typedef struct se_obj_lun_type_s {
 	unsigned long long (*free_sectors)(void *);
 	unsigned long long (*get_next_lba)(void *, unsigned long long);
 	unsigned long long (*total_sectors)(void *, int, int);
-	int (*do_se_mem_map)(void *, struct iscsi_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
+	int (*do_se_mem_map)(void *, struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 	int (*get_mem_buf)(void *, struct iscsi_cmd_s *);
 	int (*get_mem_SG)(void *, struct iscsi_cmd_s *);
 	map_func_t (*get_map_SG)(void *, int);
 	map_func_t (*get_map_non_SG)(void *, int);
 	map_func_t (*get_map_none)(void *);
-	void *(*get_transport_req)(void *, struct iscsi_task_s *);
+	void *(*get_transport_req)(void *, struct se_task_s *);
 	void (*free_tasks)(void *, struct iscsi_cmd_s *);
 	int (*activate)(void *);
 	void (*deactivate)(void *);
@@ -90,7 +90,7 @@ typedef struct se_obj_lun_type_s {
 	void (*signal_shutdown)(void *);
 	void (*clear_shutdown)(void *);
 	int (*obj_start)(void *, struct iscsi_transform_info_s *, unsigned long long);
-	unsigned char *(*get_cdb)(void *, struct iscsi_task_s *);
+	unsigned char *(*get_cdb)(void *, struct se_task_s *);
 	u32 (*get_cdb_count)(void *, struct iscsi_transform_info_s *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
 	u32 (*get_cdb_size)(void *, u32, unsigned char *);
 	void (*generate_cdb)(void *, unsigned long long, u32 *, unsigned char *, int);
@@ -105,7 +105,7 @@ typedef struct se_obj_lun_type_s {
 	void (*get_evpd_prod)(void *, unsigned char *, u32);
 	void (*get_evpd_sn)(void *, unsigned char *, u32);
 	int (*get_task_timeout)(void *);
-	int (*set_task_timeout_handler)(void *, struct iscsi_task_s *);
+	int (*set_task_timeout_handler)(void *, struct se_task_s *);
 	int (*task_failure_complete)(void *, struct iscsi_cmd_s *);
 	int (*add_obj_to_lun)(struct iscsi_portal_group_s *, struct iscsi_lun_s *);
 	int (*del_obj_from_lun)(struct iscsi_portal_group_s *, struct iscsi_lun_s *);

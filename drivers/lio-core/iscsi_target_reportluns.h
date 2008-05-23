@@ -37,9 +37,9 @@ typedef struct rl_cmd_s {
 extern int iscsi_allocate_rl_cmd (iscsi_cmd_t *, unsigned char *, u64);
 extern int iscsi_build_report_luns_response (iscsi_cmd_t *);
 
-static int rl_check_for_SG (iscsi_task_t *);
-static void rl_free_task (iscsi_task_t *);
-static unsigned char *rl_get_non_SG (iscsi_task_t *);
+static int rl_check_for_SG (se_task_t *);
+static void rl_free_task (se_task_t *);
+static unsigned char *rl_get_non_SG (se_task_t *);
 
 #define ISCSI_RL { 					\
 	name:			"RL",			\

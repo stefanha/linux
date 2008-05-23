@@ -715,7 +715,7 @@ typedef struct iscsi_cmd_s {
 	void (*transport_free_resources)(struct iscsi_cmd_s *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	struct iscsi_task_s *(*transport_get_task)(struct iscsi_transform_info_s *, struct iscsi_cmd_s *, void *, struct se_obj_lun_type_s *);
+	struct se_task_s *(*transport_get_task)(struct iscsi_transform_info_s *, struct iscsi_cmd_s *, void *, struct se_obj_lun_type_s *);
 	int (*transport_map_buffers_to_tasks)(struct iscsi_cmd_s *);
 	void (*transport_map_SG_segments)(struct iscsi_unmap_sg_s *);
 	void (*transport_passthrough_done)(struct iscsi_cmd_s *);
@@ -1089,14 +1089,14 @@ typedef struct iscsi_device_s {
         pid_t                   process_thread_pid;
 	struct task_struct		*dev_mgmt_thread;
 	t10_wwn_t		t10_wwn;	/* T10 Inquiry and EVPD WWN Information */
-	int (*write_pending)(struct iscsi_task_s *);
+	int (*write_pending)(struct se_task_s *);
 	void (*dev_generate_cdb)(unsigned long long, u32 *, unsigned char *, int);
 	struct se_fp_obj_s	*dev_fp;
 	struct se_obj_lun_type_s *dev_obj_api;
-	struct iscsi_task_s	*execute_task_head;
-	struct iscsi_task_s	*execute_task_tail;
-	struct iscsi_task_s	*state_task_head;
-	struct iscsi_task_s	*state_task_tail;
+	struct se_task_s	*execute_task_head;
+	struct se_task_s	*execute_task_tail;
+	struct se_task_s	*state_task_head;
+	struct se_task_s	*state_task_tail;
 	struct iscsi_hba_s	*iscsi_hba;	/* Pointer to associated iSCSI HBA */
 	struct iscsi_transport_s *transport;	/* Pointer to template of function pointers for transport */ 
 	struct iscsi_device_s	*next;		/* Pointer to next device in TPG list */

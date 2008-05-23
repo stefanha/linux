@@ -341,7 +341,7 @@ extern void iblock_free_device (iscsi_device_t *dev)
 	return;
 }
 
-extern int iblock_transport_complete (iscsi_task_t *task)
+extern int iblock_transport_complete (se_task_t *task)
 {
 	return(0);
 }
@@ -351,7 +351,7 @@ extern int iblock_transport_complete (iscsi_task_t *task)
  *
  */
 extern void *iblock_allocate_request (
-	iscsi_task_t *task,
+	se_task_t *task,
         iscsi_device_t *dev)
 {
 	iblock_req_t *ib_req;
@@ -380,7 +380,7 @@ extern void iblock_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *de
 	return;
 }
 
-static int iblock_emulate_inquiry (iscsi_task_t *task)
+static int iblock_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
@@ -407,7 +407,7 @@ static int iblock_emulate_inquiry (iscsi_task_t *task)
 	       se_location, sub_sn));
 }
 
-static int iblock_emulate_read_cap (iscsi_task_t *task)
+static int iblock_emulate_read_cap (se_task_t *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
@@ -419,7 +419,7 @@ static int iblock_emulate_read_cap (iscsi_task_t *task)
 	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, IBLOCK_BLOCKSIZE));
 }
 
-static int iblock_emulate_read_cap16 (iscsi_task_t *task)
+static int iblock_emulate_read_cap16 (se_task_t *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
@@ -428,7 +428,7 @@ static int iblock_emulate_read_cap16 (iscsi_task_t *task)
 	return(transport_generic_emulate_readcapacity_16(task->iscsi_cmd, blocks_long, IBLOCK_BLOCKSIZE));;
 }
 
-static int iblock_emulate_scsi_cdb (iscsi_task_t *task)
+static int iblock_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret;
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
@@ -488,7 +488,7 @@ static int iblock_emulate_scsi_cdb (iscsi_task_t *task)
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
-extern int iblock_do_task (iscsi_task_t *task)
+extern int iblock_do_task (se_task_t *task)
 {
 	iblock_req_t *req = (iblock_req_t *)task->transport_req;
 	iblock_dev_t *ibd = (iblock_dev_t *)req->ib_dev;
@@ -513,7 +513,7 @@ extern int iblock_do_task (iscsi_task_t *task)
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
-extern void iblock_free_task (iscsi_task_t *task)
+extern void iblock_free_task (se_task_t *task)
 {
 	iblock_req_t *req = (iblock_req_t *) task->transport_req;
 
@@ -607,20 +607,20 @@ extern void iblock_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
 	return;
 }
 
-extern void iblock_map_task_non_SG (iscsi_task_t *task)
+extern void iblock_map_task_non_SG (se_task_t *task)
 {
 	return;
 }
 
 static void iblock_bio_destructor (struct bio *bio)
 {
-	iscsi_task_t *task = (iscsi_task_t *)bio->bi_private;
+	se_task_t *task = (se_task_t *)bio->bi_private;
 	iblock_dev_t *ib_dev = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 
 	bio_free(bio, ib_dev->ibd_bio_set);
 }
 
-static struct bio *iblock_get_bio (iscsi_task_t *task,
+static struct bio *iblock_get_bio (se_task_t *task,
 	iblock_req_t *ib_req,
 	iblock_dev_t *ib_dev,
 	int *ret,
@@ -652,7 +652,7 @@ static struct bio *iblock_get_bio (iscsi_task_t *task,
 	return(bio);
 }
 
-extern int iblock_map_task_SG (iscsi_task_t *task)
+extern int iblock_map_task_SG (se_task_t *task)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 	iblock_req_t *ib_req = (iblock_req_t *) task->transport_req;
@@ -716,38 +716,38 @@ fail:
 	return(ret);
 }
 
-extern int iblock_CDB_inquiry (iscsi_task_t *task, __u32 size)
+extern int iblock_CDB_inquiry (se_task_t *task, __u32 size)
 {
 	iblock_map_task_non_SG(task);
 
 	return(0);
 }
 
-extern int iblock_CDB_none (iscsi_task_t *task, u32 size)
+extern int iblock_CDB_none (se_task_t *task, u32 size)
 {
 	return(0);
 }
 
-extern int iblock_CDB_read_non_SG (iscsi_task_t *task, u32 size)
+extern int iblock_CDB_read_non_SG (se_task_t *task, u32 size)
 {
 	iblock_map_task_non_SG(task);
 
 	return(0);
 }
 
-extern int iblock_CDB_read_SG (iscsi_task_t *task, u32 size)
+extern int iblock_CDB_read_SG (se_task_t *task, u32 size)
 {
 	return(iblock_map_task_SG(task));
 }
 
-extern int iblock_CDB_write_non_SG (iscsi_task_t *task, u32 size)
+extern int iblock_CDB_write_non_SG (se_task_t *task, u32 size)
 {
 	iblock_map_task_non_SG(task);
 
 	return(0);
 }
 
-extern int iblock_CDB_write_SG (iscsi_task_t *task, u32 size)
+extern int iblock_CDB_write_SG (se_task_t *task, u32 size)
 {
 	return(iblock_map_task_SG(task));
 }
@@ -757,12 +757,12 @@ extern int iblock_check_lba (unsigned long long lba, iscsi_device_t *dev)
 	return(0);
 }
 
-extern int iblock_check_for_SG (iscsi_task_t *task)
+extern int iblock_check_for_SG (se_task_t *task)
 {
 	return(task->task_sg_num);
 }
 
-extern unsigned char *iblock_get_cdb (iscsi_task_t *task)
+extern unsigned char *iblock_get_cdb (se_task_t *task)
 {
 	iblock_req_t *req = (iblock_req_t *) task->transport_req;
 	
@@ -803,30 +803,30 @@ extern u32 iblock_get_queue_depth (iscsi_device_t *dev)
 	return(IBLOCK_DEVICE_QUEUE_DEPTH);
 }
 
-extern unsigned char *iblock_get_non_SG (iscsi_task_t *task)
+extern unsigned char *iblock_get_non_SG (se_task_t *task)
 {
 	return((unsigned char *)task->iscsi_cmd->t_task->t_task_buf);
 }
 
-extern struct scatterlist *iblock_get_SG (iscsi_task_t *task)
+extern struct scatterlist *iblock_get_SG (se_task_t *task)
 {
 	return((struct scatterlist *)task->task_buf);
 }
 
-extern u32 iblock_get_SG_count (iscsi_task_t *task)
+extern u32 iblock_get_SG_count (se_task_t *task)
 {
 	return(task->task_sg_num);
 }
 
 //#warning FIXME v2.8: Breakage in iblock_set_non_SG_buf()
-extern int iblock_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
+extern int iblock_set_non_SG_buf (unsigned char *buf, se_task_t *task)
 {
 	return(0);
 }
 
 extern void iblock_bio_done (struct bio *bio, int err)
 {
-	iscsi_task_t *task = (iscsi_task_t *)bio->bi_private;
+	se_task_t *task = (se_task_t *)bio->bi_private;
 	iblock_req_t *ibr = (iblock_req_t *)task->transport_req;
 	int ret = 0;
 

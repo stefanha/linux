@@ -61,7 +61,7 @@ static int rl_set_iovec_ptrs (
 	iscsi_unmap_sg_t *unmap_sg)
 {
 	iscsi_cmd_t *cmd = (iscsi_cmd_t *) map_sg->cmd;
-	iscsi_task_t *task = NULL;
+	se_task_t *task = NULL;
 	rl_cmd_t *rl_cmd = NULL;
 	struct iovec *iov = map_sg->iov;
 
@@ -164,7 +164,7 @@ extern int iscsi_allocate_rl_cmd (
 	u32 unpacked_lun;
 	unsigned long flags;
 	rl_cmd_t *rl_cmd = NULL;
-	iscsi_task_t *task = NULL;
+	se_task_t *task = NULL;
 	
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&iscsi_lun);
 	cmd->data_length = (cdb[6] << 24) + (cdb[7] << 16) + (cdb[8] << 8) + cdb[9];
@@ -194,11 +194,11 @@ extern int iscsi_allocate_rl_cmd (
 
 	memcpy(T_TASK(cmd)->t_task_cdb, cdb, SCSI_CDB_SIZE);
 	
-        if (!(task = kmalloc(sizeof(iscsi_task_t), GFP_KERNEL))) {
-                TRACE_ERROR("Unable to allocate iscsi_task_t\n");
+        if (!(task = kmalloc(sizeof(se_task_t), GFP_KERNEL))) {
+                TRACE_ERROR("Unable to allocate se_task_t\n");
 		goto failure;
 	}
-        memset(task, 0, sizeof(iscsi_task_t));
+        memset(task, 0, sizeof(se_task_t));
 
 	INIT_LIST_HEAD(&task->t_list);
 	init_MUTEX_LOCKED(&task->task_stop_sem);
@@ -258,7 +258,7 @@ extern int iscsi_build_report_luns_response (
 	iscsi_dev_entry_t *deve;
 	iscsi_lun_t *iscsi_lun;
 	iscsi_session_t *sess = SESS(conn);
-	iscsi_task_t *task;
+	se_task_t *task;
 	rl_cmd_t *rl_cmd;
 	
 	list_for_each_entry(task, &T_TASK(cmd)->t_task_list, t_list) {
@@ -314,7 +314,7 @@ extern int iscsi_build_report_luns_response (
  *
  *
  */
-static int rl_check_for_SG (iscsi_task_t *task)
+static int rl_check_for_SG (se_task_t *task)
 {
 	return(0);
 }
@@ -323,7 +323,7 @@ static int rl_check_for_SG (iscsi_task_t *task)
  *
  *
  */
-static void rl_free_task (iscsi_task_t *task)
+static void rl_free_task (se_task_t *task)
 {
 	rl_cmd_t *rl_cmd = (rl_cmd_t *) task->transport_req;
 	
@@ -354,7 +354,7 @@ static void rl_free_task (iscsi_task_t *task)
  *
  *
  */
-static unsigned char *rl_get_non_SG (iscsi_task_t *task)
+static unsigned char *rl_get_non_SG (se_task_t *task)
 {
 	rl_cmd_t *rl_cmd = (rl_cmd_t *) task->transport_req;
 	

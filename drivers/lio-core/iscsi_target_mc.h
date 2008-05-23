@@ -40,12 +40,12 @@
 #define MC_DATA_NONE		3
 
 #ifndef MC_INCLUDE_STRUCTS
-extern int mc_CDB_inquiry (iscsi_task_t *, u32);
-extern int mc_CDB_none (iscsi_task_t *, u32);
-extern int mc_CDB_read_non_SG (iscsi_task_t *, u32);
-extern int mc_CDB_read_SG (iscsi_task_t *, u32);
-extern int mc_CDB_write_non_SG (iscsi_task_t *, u32);
-extern int mc_CDB_write_SG (iscsi_task_t *, u32);
+extern int mc_CDB_inquiry (se_task_t *, u32);
+extern int mc_CDB_none (se_task_t *, u32);
+extern int mc_CDB_read_non_SG (se_task_t *, u32);
+extern int mc_CDB_read_SG (se_task_t *, u32);
+extern int mc_CDB_write_non_SG (se_task_t *, u32);
+extern int mc_CDB_write_SG (se_task_t *, u32);
 
 extern int mc_attach_hba (iscsi_portal_group_t *, iscsi_hba_t *, iscsi_hbainfo_t *);
 extern int mc_detach_hba (iscsi_hba_t *);
@@ -56,12 +56,12 @@ extern int mc_check_device_location (iscsi_device_t *, iscsi_dev_transport_info_
 extern int mc_check_ghost_id (iscsi_hbainfo_t *);
 extern void mc_free_device (iscsi_device_t *);
 extern iscsi_device_t *mc_add_device_to_list (iscsi_hba_t *, void *);
-extern int mc_transport_complete (iscsi_task_t *);
-extern void *mc_allocate_request (iscsi_task_t *, iscsi_device_t *);
+extern int mc_transport_complete (se_task_t *);
+extern void *mc_allocate_request (se_task_t *, iscsi_device_t *);
 extern void mc_get_evpd_prod (unsigned char *, u32, iscsi_device_t *);
 extern void mc_get_evpd_sn (unsigned char *, u32, iscsi_device_t *);
-extern int mc_do_task (iscsi_task_t *);
-extern void mc_free_task (iscsi_task_t *);
+extern int mc_do_task (se_task_t *);
+extern void mc_free_task (se_task_t *);
 extern int mc_check_hba_params (iscsi_hbainfo_t *, struct iscsi_target *, int);
 extern int mc_check_dev_params (iscsi_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
 extern int mc_check_virtdev_params (iscsi_devinfo_t *, struct iscsi_target *);
@@ -69,19 +69,19 @@ extern void mc_get_plugin_info (void *, char *, int *);
 extern void mc_get_hba_info (iscsi_hba_t *, char *, int *);
 extern void mc_get_dev_info (iscsi_device_t *, char *, int *);
 extern int mc_check_lba (unsigned long long, iscsi_device_t *);
-extern int mc_check_for_SG (iscsi_task_t *);
-extern unsigned char *mc_get_cdb (iscsi_task_t *);
+extern int mc_check_for_SG (se_task_t *);
+extern unsigned char *mc_get_cdb (se_task_t *);
 extern u32 mc_get_blocksize (iscsi_device_t *);
 extern u32 mc_get_device_rev (iscsi_device_t *);
 extern u32 mc_get_device_type (iscsi_device_t *);
 extern u32 mc_get_dma_length (u32, iscsi_device_t *);
 extern u32 mc_get_max_sectors (iscsi_device_t *);
 extern u32 mc_get_queue_depth (iscsi_device_t *);
-extern unsigned char *mc_get_non_SG (iscsi_task_t *);
-extern struct scatterlist *mc_get_SG (iscsi_task_t *);
-extern u32 mc_get_SG_count (iscsi_task_t *);
-extern int mc_set_non_SG_buf (unsigned char *, iscsi_task_t *);
-extern unsigned char *mc_get_sense_buffer (iscsi_task_t *);
+extern unsigned char *mc_get_non_SG (se_task_t *);
+extern struct scatterlist *mc_get_SG (se_task_t *);
+extern u32 mc_get_SG_count (se_task_t *);
+extern int mc_set_non_SG_buf (unsigned char *, se_task_t *);
+extern unsigned char *mc_get_sense_buffer (se_task_t *);
 #endif /* ! MC_INCLUDE_STRUCTS */
 
 #define RRF_EMULATE_CDB		0x01

@@ -387,7 +387,7 @@ extern unsigned long long dev_obj_total_sectors (void *p, int zero_lba, int igno
 
 extern int dev_obj_do_se_mem_map (
 	void *p, 
-	iscsi_task_t *task,
+	se_task_t *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
 	se_mem_t *in_se_mem,
@@ -418,7 +418,7 @@ extern int dev_obj_do_se_mem_map (
 		return(-1);
 	
 	/*
-	 * iscsi_task_t->task_buf now contains the struct scatterlist array.
+	 * se_task_t->task_buf now contains the struct scatterlist array.
 	 */
 	return(transport_map_mem_to_sg(task, se_mem_list, task->task_buf, in_se_mem, out_se_mem,
 			se_mem_cnt, task_offset));
@@ -471,7 +471,7 @@ extern map_func_t dev_obj_get_map_none (void *p)
 	return(dev->transport->spc->none);
 }
 
-extern void *dev_obj_get_transport_req (void *p, iscsi_task_t *task)
+extern void *dev_obj_get_transport_req (void *p, se_task_t *task)
 {
 	iscsi_device_t *dev  = (iscsi_device_t *)p;
 
@@ -588,7 +588,7 @@ extern void dev_obj_clear_shutdown (void *p)
 
 extern unsigned char *dev_obj_get_cdb (
 	void *p,
-	iscsi_task_t *task)
+	se_task_t *task)
 {
 	iscsi_device_t *dev  = (iscsi_device_t *)p;
 
@@ -732,7 +732,7 @@ extern int dev_obj_get_task_timeout (void *p)
 	return(TRANSPORT_TIMEOUT_TYPE_OTHER);
 }
 
-extern int dev_obj_set_task_timeout_handler (void *p, iscsi_task_t *task)
+extern int dev_obj_set_task_timeout_handler (void *p, se_task_t *task)
 {
 	iscsi_device_t *dev = (iscsi_device_t *)p;
 

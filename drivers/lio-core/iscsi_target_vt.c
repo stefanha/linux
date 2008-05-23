@@ -54,11 +54,11 @@
 extern iscsi_global_t *iscsi_global;
 
 static int vt_dev_write_filemark(vt_dev_t *, int);
-static int vt_write_filemark(iscsi_task_t *, int);
-static int vt_mode_sense(iscsi_task_t *);
-static int vt_request_sense(iscsi_task_t *);
-static int vt_log_sense(iscsi_task_t *);
-static int vt_read_position(iscsi_task_t *);
+static int vt_write_filemark(se_task_t *, int);
+static int vt_mode_sense(se_task_t *);
+static int vt_request_sense(se_task_t *);
+static int vt_log_sense(se_task_t *);
+static int vt_read_position(se_task_t *);
 
 /* make it big endian */
 
@@ -139,7 +139,7 @@ extern char *mc_get_filename(int, int);
  *	If the tape drive is associated with a media changer then get the file
  *	name from the media changer plug-in.
  */
-static int vt_open_file (iscsi_task_t *task, int trunc)
+static int vt_open_file (se_task_t *task, int trunc)
 {
 	char *dev_p;
 	char *filename;
@@ -212,14 +212,14 @@ static void vt_dev_close_file (vt_dev_t *vt_dev)
 		atomic_inc(&vt_dev->vt_lock);
 }
 
-static void vt_close_file (iscsi_task_t *task)
+static void vt_close_file (se_task_t *task)
 {
 	vt_request_t *req;
 	req = (vt_request_t *) task->transport_req;
 	vt_dev_close_file(req->vt_dev);
 }
 
-static void vt_write_filemark_maybe (iscsi_task_t *task)
+static void vt_write_filemark_maybe (se_task_t *task)
 {
 	vt_request_t *req;
 	vt_dev_t *vt_dev;
@@ -389,7 +389,7 @@ extern void vt_free_device (iscsi_device_t *dev)
  *
  *
  */
-extern int vt_transport_complete (iscsi_task_t *task)
+extern int vt_transport_complete (se_task_t *task)
 {
 	int t;
 	vt_request_t *req = (vt_request_t *) task->transport_req;
@@ -403,7 +403,7 @@ extern int vt_transport_complete (iscsi_task_t *task)
  *
  */
 extern void *vt_allocate_request (
-	iscsi_task_t *task,
+	se_task_t *task,
 	iscsi_device_t *dev)
 {
 	vt_request_t *vt_req;
@@ -531,7 +531,7 @@ static char *hw[] = {
  *
  *
  */
-static int vt_inquiry (iscsi_task_t *task)
+static int vt_inquiry (se_task_t *task)
 {
 	int page_code, len;
 
@@ -609,7 +609,7 @@ static int vt_inquiry (iscsi_task_t *task)
  *
  *
  */
-static int vt_write_filemark(iscsi_task_t *task, int setmark)
+static int vt_write_filemark(se_task_t *task, int setmark)
 {
 	vt_request_t *req;
 	req = (vt_request_t *) task->transport_req;
@@ -702,7 +702,7 @@ static int vt_dev_write_filemark(vt_dev_t *vt_dev, int setmark)
 	return(0);
 }
 
-static int vt_emulate_flush(iscsi_task_t *task)
+static int vt_emulate_flush(se_task_t *task)
 {
 	vt_request_t *req;
 	struct file *f;
@@ -755,7 +755,7 @@ static int vt_emulate_flush(iscsi_task_t *task)
  *
  *	-1	error
  */
-static int vt_goto_next_filemark(iscsi_task_t *task, int op)
+static int vt_goto_next_filemark(se_task_t *task, int op)
 {
 	int ret, setmark;
 	vt_request_t *req;
@@ -841,7 +841,7 @@ static int vt_goto_next_filemark(iscsi_task_t *task, int op)
  *
  *	-1	error
  */
-static int vt_goto_previous_filemark(iscsi_task_t *task, int op)
+static int vt_goto_previous_filemark(se_task_t *task, int op)
 {
 	int ret, setmark;
 	vt_request_t *req;
@@ -914,7 +914,7 @@ static int vt_goto_previous_filemark(iscsi_task_t *task, int op)
  *
  *	-1	error
  */
-static int vt_goto_next_setmark(iscsi_task_t *task)
+static int vt_goto_next_setmark(se_task_t *task)
 {
 	int ret;
 	vt_request_t *req;
@@ -943,7 +943,7 @@ static int vt_goto_next_setmark(iscsi_task_t *task)
  *
  *	-1	error
  */
-static int vt_goto_previous_setmark(iscsi_task_t *task)
+static int vt_goto_previous_setmark(se_task_t *task)
 {
 	int ret;
 	vt_request_t *req;
@@ -972,7 +972,7 @@ static int vt_goto_previous_setmark(iscsi_task_t *task)
  *
  *
  */
-static int vt_emulate_space(iscsi_task_t *task, int code, int count)
+static int vt_emulate_space(se_task_t *task, int code, int count)
 {
 	int i, ret;
 	vt_request_t *req;
@@ -1098,7 +1098,7 @@ static int vt_emulate_read_block_limits (
  *
  *
  */
-static int vt_emulate_read_cap (iscsi_task_t *task)
+static int vt_emulate_read_cap (se_task_t *task)
 {
 	u32 blocks = (1000000000 / VT_BLOCKSIZE) - 1;
 	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, VT_BLOCKSIZE));
@@ -1108,7 +1108,7 @@ static int vt_emulate_read_cap (iscsi_task_t *task)
  *
  *
  */
-static int vt_emulate_scsi_cdb (iscsi_task_t *task)
+static int vt_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret, i, n, code, count, setmark;
 	vt_request_t *vt_req = (vt_request_t *) task->transport_req;
@@ -1365,7 +1365,7 @@ static int vt_do_write (vt_request_t *req)
 	return(0);
 }
 
-extern int vt_do_task (iscsi_task_t *task)
+extern int vt_do_task (se_task_t *task)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1418,7 +1418,7 @@ extern int vt_do_task (iscsi_task_t *task)
  *
  *
  */
-extern void vt_free_task (iscsi_task_t *task)
+extern void vt_free_task (se_task_t *task)
 {
 	vt_request_t *req;
 
@@ -1504,7 +1504,7 @@ extern void vt_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
  *
  *
  */
-extern void vt_map_task_non_SG (iscsi_task_t *task)
+extern void vt_map_task_non_SG (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	vt_request_t *req = (vt_request_t *) task->transport_req;
@@ -1520,7 +1520,7 @@ extern void vt_map_task_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern void vt_map_task_SG (iscsi_task_t *task)
+extern void vt_map_task_SG (se_task_t *task)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1535,7 +1535,7 @@ extern void vt_map_task_SG (iscsi_task_t *task)
  *
  *
  */
-extern int vt_CDB_inquiry (iscsi_task_t *task, u32 size)
+extern int vt_CDB_inquiry (se_task_t *task, u32 size)
 {      
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 		        
@@ -1558,7 +1558,7 @@ extern int vt_CDB_inquiry (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int vt_CDB_none (iscsi_task_t *task, u32 size)
+extern int vt_CDB_none (se_task_t *task, u32 size)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1574,7 +1574,7 @@ extern int vt_CDB_none (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int vt_CDB_read_non_SG (iscsi_task_t *task, u32 size)
+extern int vt_CDB_read_non_SG (se_task_t *task, u32 size)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1588,7 +1588,7 @@ extern int vt_CDB_read_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int vt_CDB_read_SG (iscsi_task_t *task, u32 size)
+extern int vt_CDB_read_SG (se_task_t *task, u32 size)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1602,7 +1602,7 @@ extern int vt_CDB_read_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int vt_CDB_write_non_SG (iscsi_task_t *task, u32 size)
+extern int vt_CDB_write_non_SG (se_task_t *task, u32 size)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 	
@@ -1616,7 +1616,7 @@ extern int vt_CDB_write_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int vt_CDB_write_SG (iscsi_task_t *task, u32 size)
+extern int vt_CDB_write_SG (se_task_t *task, u32 size)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1639,7 +1639,7 @@ extern int vt_check_lba (unsigned long long lba, iscsi_device_t *dev)
  *
  *
  */
-extern int vt_check_for_SG (iscsi_task_t *task)
+extern int vt_check_for_SG (se_task_t *task)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 	
@@ -1650,7 +1650,7 @@ extern int vt_check_for_SG (iscsi_task_t *task)
  *
  *
  */
-extern unsigned char *vt_get_cdb (iscsi_task_t *task)
+extern unsigned char *vt_get_cdb (se_task_t *task)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1715,7 +1715,7 @@ extern u32 vt_get_queue_depth (iscsi_device_t *dev)
  *
  *
  */
-extern unsigned char *vt_get_non_SG (iscsi_task_t *task)
+extern unsigned char *vt_get_non_SG (se_task_t *task)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1726,7 +1726,7 @@ extern unsigned char *vt_get_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern struct scatterlist *vt_get_SG (iscsi_task_t *task)
+extern struct scatterlist *vt_get_SG (se_task_t *task)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 
@@ -1737,7 +1737,7 @@ extern struct scatterlist *vt_get_SG (iscsi_task_t *task)
  *
  *
  */
-extern u32 vt_get_SG_count (iscsi_task_t *task)
+extern u32 vt_get_SG_count (se_task_t *task)
 {
 	return(0);
 }
@@ -1746,7 +1746,7 @@ extern u32 vt_get_SG_count (iscsi_task_t *task)
  *
  *
  */
-extern int vt_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
+extern int vt_set_non_SG_buf (unsigned char *buf, se_task_t *task)
 {
 	vt_request_t *req = (vt_request_t *) task->transport_req;
 	
@@ -1761,7 +1761,7 @@ extern int vt_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
  *
  *
  */
-extern unsigned char *vt_get_sense_buffer (iscsi_task_t *task)
+extern unsigned char *vt_get_sense_buffer (se_task_t *task)
 {
 	vt_request_t *req;
 	req = (vt_request_t *) task->transport_req;
@@ -1890,7 +1890,7 @@ static int modesense_0x10 (unsigned char *buf)
  *
  *	Respond to a MODE SENSE command.
  */
-static int vt_mode_sense (iscsi_task_t *task)
+static int vt_mode_sense (se_task_t *task)
 {
 	int len, dbd, page_code;
 	unsigned char buf[SE_MODE_PAGE_BUF];
@@ -1998,7 +1998,7 @@ static int vt_mode_sense (iscsi_task_t *task)
  *
  *	Respond to a REQUEST SENSE command.
  */
-static int vt_request_sense (iscsi_task_t *task)
+static int vt_request_sense (se_task_t *task)
 {
 	int len;
 	unsigned char buf[8];
@@ -2039,7 +2039,7 @@ unsigned char foo[36] = {
  *
  *	Respond to a LOG SENSE command.
  */
-static int vt_log_sense (iscsi_task_t *task)
+static int vt_log_sense (se_task_t *task)
 {
 	int len;
 	unsigned char *dst, *cdb;
@@ -2061,7 +2061,7 @@ static int vt_log_sense (iscsi_task_t *task)
 	return(0);
 }
 
-static int vt_read_position (iscsi_task_t *task)
+static int vt_read_position (se_task_t *task)
 {
 	unsigned char *dst, *cdb;
 	iscsi_cmd_t *cmd;

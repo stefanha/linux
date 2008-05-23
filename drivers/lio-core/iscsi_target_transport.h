@@ -97,13 +97,13 @@ extern unsigned char *transport_get_iqn_sn (void);
 extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
 extern iscsi_device_t *transport_core_locate_dev (struct iscsi_target *, iscsi_dev_transport_info_t *, int *);
-extern void transport_task_dev_remove_state (struct iscsi_task_s *, struct iscsi_device_s *);
+extern void transport_task_dev_remove_state (struct se_task_s *, struct iscsi_device_s *);
 extern int transport_add_cmd_to_queue (struct iscsi_cmd_s *, struct se_queue_obj_s *, u8);
 extern void transport_complete_cmd (iscsi_cmd_t *, int);
-extern void transport_complete_task (struct iscsi_task_s *, int);
-extern void transport_add_task_to_execute_queue (struct iscsi_task_s *, struct iscsi_device_s *);
+extern void transport_complete_task (struct se_task_s *, int);
+extern void transport_add_task_to_execute_queue (struct se_task_s *, struct iscsi_device_s *);
 extern void transport_add_tasks_from_cmd (struct iscsi_cmd_s *);
-extern struct iscsi_task_s *transport_get_task_from_execute_queue (struct iscsi_device_s *);
+extern struct se_task_s *transport_get_task_from_execute_queue (struct iscsi_device_s *);
 extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
 extern int transport_check_device_tcq (iscsi_device_t *, u32, u32);
 extern iscsi_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
@@ -139,9 +139,9 @@ extern void transport_generic_request_timeout (iscsi_cmd_t *);
 extern int transport_generic_allocate_buf (iscsi_cmd_t *, u32, u32);
 extern int __transport_execute_tasks (struct iscsi_device_s *);
 extern void transport_new_cmd_failure (struct iscsi_cmd_s *);
-extern void transport_start_task_timer (struct iscsi_task_s *);
-extern void __transport_stop_task_timer (struct iscsi_task_s *, unsigned long *);
-extern void transport_stop_task_timer (struct iscsi_task_s *);
+extern void transport_start_task_timer (struct se_task_s *);
+extern void __transport_stop_task_timer (struct se_task_s *, unsigned long *);
+extern void transport_stop_task_timer (struct se_task_s *);
 extern void transport_stop_all_task_timers (struct iscsi_cmd_s *);
 extern int transport_execute_tasks (struct iscsi_cmd_s *);
 extern int transport_generic_emulate_inquiry (struct iscsi_cmd_s *, unsigned char, unsigned char *, unsigned char *, unsigned char *, unsigned char *);
@@ -175,10 +175,10 @@ extern unsigned char *transport_get_vaddr (struct se_mem_s *);
 extern struct list_head *transport_init_se_mem_list (void);
 extern void transport_free_se_mem_list (struct list_head *);
 extern int transport_generic_get_mem (struct iscsi_cmd_s *, u32, u32);
-extern u32 transport_calc_sg_num (struct iscsi_task_s *, struct se_mem_s *, u32);
-extern int transport_map_sg_to_mem (struct iscsi_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
-extern int transport_map_mem_to_mem (struct iscsi_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
-extern int transport_map_mem_to_sg (struct iscsi_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
+extern u32 transport_calc_sg_num (struct se_task_s *, struct se_mem_s *, u32);
+extern int transport_map_sg_to_mem (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
+extern int transport_map_mem_to_mem (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
+extern int transport_map_mem_to_sg (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 extern u32 transport_generic_get_cdb_count (struct iscsi_cmd_s *, struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
 extern int transport_generic_new_cmd (iscsi_cmd_t *);
 extern void transport_generic_process_write (iscsi_cmd_t *);
@@ -193,7 +193,7 @@ extern void transport_start_status_thread (iscsi_device_t *);
 extern void transport_stop_status_thread (iscsi_device_t *);
 
 /*
- * Each iscsi_transport_task_t can have N number of possible iscsi_task_t's
+ * Each iscsi_transport_task_t can have N number of possible se_task_t's
  * for the storage transport(s) to possibly execute.
  * Used primarily for splitting up CDBs that exceed the physical storage
  * HBA's maximum sector count per task.
@@ -215,7 +215,7 @@ typedef struct se_port_s {
 	struct list_head sep_list;
 } se_port_t;
 
-typedef struct iscsi_task_s {
+typedef struct se_task_s {
 	unsigned char	task_sense;
 	unsigned char	*task_buf;
 	void		*transport_req;
@@ -239,15 +239,15 @@ typedef struct iscsi_task_s {
 	atomic_t	task_stop;
 	atomic_t	task_state_active;
 	struct timer_list	task_timer;
-	int (*transport_map_task)(struct iscsi_task_s *, u32);
+	int (*transport_map_task)(struct se_task_s *, u32);
 	void *se_obj_ptr;
 	struct se_obj_lun_type_s *se_obj_api;
-	struct iscsi_task_s *t_next;
-	struct iscsi_task_s *t_prev;
-	struct iscsi_task_s *ts_next;
-	struct iscsi_task_s *ts_prev;
+	struct se_task_s *t_next;
+	struct se_task_s *t_prev;
+	struct se_task_s *ts_next;
+	struct se_task_s *ts_prev;
 	struct list_head t_list;
-} ____cacheline_aligned iscsi_task_t;
+} ____cacheline_aligned se_task_t;
 
 typedef struct iscsi_transform_info_s {
 	int		ti_set_counts;
@@ -266,12 +266,12 @@ typedef struct iscsi_transform_info_s {
  * each of the following function pointers set. 
  */
 typedef struct iscsi_transport_spc_s {
-	int (*inquiry)(iscsi_task_t *, u32);
-	int (*none)(iscsi_task_t *, u32);
-	int (*read_non_SG)(iscsi_task_t *, u32);
-	int (*read_SG)(iscsi_task_t *, u32);
-	int (*write_non_SG)(iscsi_task_t *, u32);
-	int (*write_SG)(iscsi_task_t *, u32);
+	int (*inquiry)(se_task_t *, u32);
+	int (*none)(se_task_t *, u32);
+	int (*read_non_SG)(se_task_t *, u32);
+	int (*read_SG)(se_task_t *, u32);
+	int (*write_non_SG)(se_task_t *, u32);
+	int (*write_SG)(se_task_t *, u32);
 } iscsi_transport_spc_t;
 
 /*
@@ -356,11 +356,11 @@ typedef struct iscsi_transport_s {
 	 * Use transport_generic_complete() for majority of DAS transport drivers.
 	 * Provided out of convenience.
 	 */
-	int (*transport_complete)(iscsi_task_t *task);
+	int (*transport_complete)(se_task_t *task);
 	/*
 	 * allocate_request():
 	 */
-	void *(*allocate_request)(iscsi_task_t *, iscsi_device_t *);
+	void *(*allocate_request)(se_task_t *, iscsi_device_t *);
 	/*
 	 * allocate_buf():
 	 */
@@ -380,11 +380,11 @@ typedef struct iscsi_transport_s {
 	/*
 	 * do_task():
 	 */
-	int (*do_task)(iscsi_task_t *);
+	int (*do_task)(se_task_t *);
 	/*
 	 * free_task():
 	 */
-	void (*free_task)(iscsi_task_t *);
+	void (*free_task)(se_task_t *);
 	/*
 	 * check_hba_params():
 	 */
@@ -416,11 +416,11 @@ typedef struct iscsi_transport_s {
 	/*
 	 * check_for_SG():
 	 */
-	int (*check_for_SG)(iscsi_task_t *);
+	int (*check_for_SG)(se_task_t *);
 	/*
 	 * get_cdb():
 	 */
-	unsigned char *(*get_cdb)(iscsi_task_t *);
+	unsigned char *(*get_cdb)(se_task_t *);
 	/*
 	 * get_blocksize():
 	 */
@@ -461,35 +461,35 @@ typedef struct iscsi_transport_s {
 	/*
 	 * transport_timeout_start():
 	 */
-	int (*transport_timeout_start)(iscsi_device_t *, iscsi_task_t *);
+	int (*transport_timeout_start)(iscsi_device_t *, se_task_t *);
 	/*
 	 * do_se_mem_map():
 	 */
-	int (*do_se_mem_map)(iscsi_task_t *, struct list_head *, void *, se_mem_t *, se_mem_t **, u32 *, u32 *);
+	int (*do_se_mem_map)(se_task_t *, struct list_head *, void *, se_mem_t *, se_mem_t **, u32 *, u32 *);
 	/*
 	 * get_sense_buffer():
 	 */
-	unsigned char *(*get_sense_buffer)(iscsi_task_t *);
+	unsigned char *(*get_sense_buffer)(se_task_t *);
 	/*
 	 * get_non_SG():
 	 */
-	unsigned char *(*get_non_SG)(iscsi_task_t *);
+	unsigned char *(*get_non_SG)(se_task_t *);
 	/*
 	 * get_SG():
 	 */
-	struct scatterlist *(*get_SG)(iscsi_task_t *);
+	struct scatterlist *(*get_SG)(se_task_t *);
 	/*
 	 * get_SG_count():
 	 */
-	__u32 (*get_SG_count)(iscsi_task_t *);
+	__u32 (*get_SG_count)(se_task_t *);
 	/*
 	 * set_non_SG_buf():
 	 */
-	int (*set_non_SG_buf)(unsigned char *, iscsi_task_t *);
+	int (*set_non_SG_buf)(unsigned char *, se_task_t *);
 	/*
 	 * map_task_to_SG():
 	 */
-	void (*map_task_to_SG)(iscsi_task_t *);
+	void (*map_task_to_SG)(se_task_t *);
 	/*
 	 * set_iovec_ptrs():
 	 */
@@ -501,7 +501,7 @@ typedef struct iscsi_transport_s {
 	/*
 	 * write_pending():
 	 */
-	int (*write_pending)(iscsi_task_t *);
+	int (*write_pending)(se_task_t *);
 	/*
 	 * iscsi_transport_spc_t structure:
 	 * 

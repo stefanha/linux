@@ -52,7 +52,7 @@
 #define MC_BUF_LEN 60000
  
 extern iscsi_global_t *iscsi_global;
-static void mc_read_element_status(iscsi_task_t *);
+static void mc_read_element_status(se_task_t *);
 
 static struct hw_s {
 	char *name;
@@ -628,7 +628,7 @@ extern void mc_free_device (iscsi_device_t *dev)
  *
  *
  */
-extern int mc_transport_complete (iscsi_task_t *task)
+extern int mc_transport_complete (se_task_t *task)
 {
 	int t;
 	mc_request_t *req = (mc_request_t *) task->transport_req;
@@ -642,7 +642,7 @@ extern int mc_transport_complete (iscsi_task_t *task)
  *
  */
 extern void *mc_allocate_request (
-	iscsi_task_t *task,
+	se_task_t *task,
 	iscsi_device_t *dev)
 {
 	mc_request_t *mc_req;
@@ -677,7 +677,7 @@ extern void mc_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
  *
  *
  */
-extern int mc_emulate_inquiry (iscsi_task_t *task)
+extern int mc_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
@@ -730,7 +730,7 @@ extern int mc_emulate_inquiry (iscsi_task_t *task)
  *
  *
  */
-static int mc_emulate_read_cap (iscsi_task_t *task)
+static int mc_emulate_read_cap (se_task_t *task)
 {
 	u32 blocks = 1000000000 / MC_BLOCKSIZE - 1;
 	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, MC_BLOCKSIZE));
@@ -741,7 +741,7 @@ static int mc_emulate_read_cap (iscsi_task_t *task)
  *
  */
 static int mc_emulate_modesense (
-	iscsi_task_t *task,
+	se_task_t *task,
 	unsigned char *cdb,
 	unsigned char *rbuf,
 	int ten,
@@ -829,7 +829,7 @@ extern void vt_unlock(int, int);
  *	from a source element to a destination element. Support for the MOVE
  *	MEDIUM command is mandatory.
  */
-static int mc_move_medium (iscsi_task_t *task)
+static int mc_move_medium (se_task_t *task)
 {
 	int mta, sa, da;
 	mc_request_t *req;
@@ -1028,7 +1028,7 @@ medium_removal_prevented:
  *
  *
  */
-static int mc_emulate_scsi_cdb (iscsi_task_t *task)
+static int mc_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret;
 	mc_request_t *mc_req = (mc_request_t *) task->transport_req;
@@ -1084,7 +1084,7 @@ static int mc_emulate_scsi_cdb (iscsi_task_t *task)
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
-extern int mc_do_task (iscsi_task_t *task)
+extern int mc_do_task (se_task_t *task)
 {
 	int ret = 0;
 	mc_request_t *req = (mc_request_t *) task->transport_req;
@@ -1121,7 +1121,7 @@ extern int mc_do_task (iscsi_task_t *task)
  *
  *
  */
-extern void mc_free_task (iscsi_task_t *task)
+extern void mc_free_task (se_task_t *task)
 {
 	mc_request_t *req;
 
@@ -1211,7 +1211,7 @@ extern void mc_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
  *
  *
  */
-extern void mc_map_task_non_SG (iscsi_task_t *task)
+extern void mc_map_task_non_SG (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	mc_request_t *req = (mc_request_t *) task->transport_req;
@@ -1227,7 +1227,7 @@ extern void mc_map_task_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern void mc_map_task_SG (iscsi_task_t *task)
+extern void mc_map_task_SG (se_task_t *task)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1242,7 +1242,7 @@ extern void mc_map_task_SG (iscsi_task_t *task)
  *
  *
  */
-extern int mc_CDB_inquiry (iscsi_task_t *task, u32 size)
+extern int mc_CDB_inquiry (se_task_t *task, u32 size)
 {      
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 		        
@@ -1265,7 +1265,7 @@ extern int mc_CDB_inquiry (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int mc_CDB_none (iscsi_task_t *task, u32 size)
+extern int mc_CDB_none (se_task_t *task, u32 size)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1281,7 +1281,7 @@ extern int mc_CDB_none (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int mc_CDB_read_non_SG (iscsi_task_t *task, u32 size)
+extern int mc_CDB_read_non_SG (se_task_t *task, u32 size)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1295,7 +1295,7 @@ extern int mc_CDB_read_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int mc_CDB_read_SG (iscsi_task_t *task, u32 size)
+extern int mc_CDB_read_SG (se_task_t *task, u32 size)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1309,7 +1309,7 @@ extern int mc_CDB_read_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int mc_CDB_write_non_SG (iscsi_task_t *task, u32 size)
+extern int mc_CDB_write_non_SG (se_task_t *task, u32 size)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 	
@@ -1323,7 +1323,7 @@ extern int mc_CDB_write_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int mc_CDB_write_SG (iscsi_task_t *task, u32 size)
+extern int mc_CDB_write_SG (se_task_t *task, u32 size)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1346,7 +1346,7 @@ extern int mc_check_lba (unsigned long long lba, iscsi_device_t *dev)
  *
  *
  */
-extern int mc_check_for_SG (iscsi_task_t *task)
+extern int mc_check_for_SG (se_task_t *task)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 	
@@ -1357,7 +1357,7 @@ extern int mc_check_for_SG (iscsi_task_t *task)
  *
  *
  */
-extern unsigned char *mc_get_cdb (iscsi_task_t *task)
+extern unsigned char *mc_get_cdb (se_task_t *task)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1422,7 +1422,7 @@ extern u32 mc_get_queue_depth (iscsi_device_t *dev)
  *
  *
  */
-extern unsigned char *mc_get_non_SG (iscsi_task_t *task)
+extern unsigned char *mc_get_non_SG (se_task_t *task)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1433,7 +1433,7 @@ extern unsigned char *mc_get_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern struct scatterlist *mc_get_SG (iscsi_task_t *task)
+extern struct scatterlist *mc_get_SG (se_task_t *task)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 
@@ -1444,7 +1444,7 @@ extern struct scatterlist *mc_get_SG (iscsi_task_t *task)
  *
  *
  */
-extern u32 mc_get_SG_count (iscsi_task_t *task)
+extern u32 mc_get_SG_count (se_task_t *task)
 {
 	return(0);
 }
@@ -1453,7 +1453,7 @@ extern u32 mc_get_SG_count (iscsi_task_t *task)
  *
  *
  */
-extern int mc_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
+extern int mc_set_non_SG_buf (unsigned char *buf, se_task_t *task)
 {
 	mc_request_t *req = (mc_request_t *) task->transport_req;
 	
@@ -1469,7 +1469,7 @@ extern int mc_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
  *	The iSCSI transport module calls this function to get a pointer to the
  *	media changer's sense buffer.
  */
-extern unsigned char *mc_get_sense_buffer (iscsi_task_t *task)
+extern unsigned char *mc_get_sense_buffer (se_task_t *task)
 {
 	mc_request_t *req;
 	req = (mc_request_t *) task->transport_req;
@@ -2233,7 +2233,7 @@ static int mc_write_d (
  *
  *
  */
-static void mc_read_element_status (iscsi_task_t *task)
+static void mc_read_element_status (se_task_t *task)
 {
 	mc_request_t *req;
 	int fe;

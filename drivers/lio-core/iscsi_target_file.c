@@ -429,7 +429,7 @@ extern void fd_free_device (iscsi_device_t *dev)
  *
  *
  */
-extern int fd_transport_complete (iscsi_task_t *task)
+extern int fd_transport_complete (se_task_t *task)
 {
 	return(0);
 }
@@ -439,7 +439,7 @@ extern int fd_transport_complete (iscsi_task_t *task)
  *
  */
 extern void *fd_allocate_request (
-	iscsi_task_t *task,
+	se_task_t *task,
 	iscsi_device_t *dev)
 {
 	fd_request_t *fd_req;
@@ -474,7 +474,7 @@ extern void fd_get_evpd_sn (unsigned char *buf, u32 size, iscsi_device_t *dev)
  *
  *
  */
-extern int fd_emulate_inquiry (iscsi_task_t *task)
+extern int fd_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
 	unsigned char *sub_sn = NULL;
@@ -505,7 +505,7 @@ extern int fd_emulate_inquiry (iscsi_task_t *task)
  *
  *
  */
-static int fd_emulate_read_cap (iscsi_task_t *task)
+static int fd_emulate_read_cap (se_task_t *task)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) task->iscsi_dev->dev_ptr;
 	u32 blocks = (fd_dev->fd_dev_size / FD_BLOCKSIZE);
@@ -516,7 +516,7 @@ static int fd_emulate_read_cap (iscsi_task_t *task)
 	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, FD_BLOCKSIZE));
 }
 
-static int fd_emulate_read_cap16 (iscsi_task_t *task)
+static int fd_emulate_read_cap16 (se_task_t *task)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) task->iscsi_dev->dev_ptr;
 	unsigned long long blocks_long = (fd_dev->fd_dev_size / FD_BLOCKSIZE);
@@ -528,7 +528,7 @@ static int fd_emulate_read_cap16 (iscsi_task_t *task)
  *
  *
  */
-static int fd_emulate_scsi_cdb (iscsi_task_t *task)
+static int fd_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret;
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
@@ -626,7 +626,7 @@ static inline int fd_seek (struct file *fd, unsigned long long lba)
 	return(0);
 }
 
-static int fd_do_readv (fd_request_t *req, iscsi_task_t *task)
+static int fd_do_readv (fd_request_t *req, se_task_t *task)
 {
 	int ret = 0;
 	u32 i;
@@ -662,7 +662,7 @@ static int fd_do_readv (fd_request_t *req, iscsi_task_t *task)
 
 static void fd_aio_intr (struct kiocb *kcb)
 {
-	iscsi_task_t *task = (iscsi_task_t *)kcb->private;
+	se_task_t *task = (se_task_t *)kcb->private;
 
 	printk("Got AIO_READ Response: task: %p\n", task);
 
@@ -677,7 +677,7 @@ static ssize_t fd_aio_retry (struct kiocb *kcb)
 	return(0);
 }
 
-static int fd_do_aio_read (fd_request_t *req, iscsi_task_t *task)
+static int fd_do_aio_read (fd_request_t *req, se_task_t *task)
 {
 	int ret = 0;
 	u32 i, length = 0;
@@ -760,7 +760,7 @@ extern void fd_sendfile_free_DMA (iscsi_cmd_t *cmd)
 static int fd_sendactor (read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
 	unsigned long count = desc->count;
-	iscsi_task_t *task = desc->arg.data;
+	se_task_t *task = desc->arg.data;
 	fd_request_t *req = (fd_request_t *) task->transport_req;	
 	struct scatterlist *sg = (struct scatterlist *) req->fd_buf;
 
@@ -786,7 +786,7 @@ static int fd_sendactor (read_descriptor_t * desc, struct page *page, unsigned l
 	return(size);
 }
 
-static int fd_do_sendfile (fd_request_t *req, iscsi_task_t *task)
+static int fd_do_sendfile (fd_request_t *req, se_task_t *task)
 {
 	int ret = 0;
 	struct file *fd = req->fd_dev->fd_file;
@@ -808,7 +808,7 @@ static int fd_do_sendfile (fd_request_t *req, iscsi_task_t *task)
 
 #endif
 
-static int fd_do_writev (fd_request_t *req, iscsi_task_t *task)
+static int fd_do_writev (fd_request_t *req, se_task_t *task)
 {
 	int ret = 0;
 	u32 i;
@@ -842,7 +842,7 @@ static int fd_do_writev (fd_request_t *req, iscsi_task_t *task)
 
 #if 0
 
-static int fd_do_aio_write (fd_request_t *req, iscsi_task_t *task)
+static int fd_do_aio_write (fd_request_t *req, se_task_t *task)
 {
 	int ret = 0;
 	u32 i, length = 0;
@@ -916,7 +916,7 @@ static int fd_do_aio_write (fd_request_t *req, iscsi_task_t *task)
 
 #endif
 
-extern int fd_do_task (iscsi_task_t *task)
+extern int fd_do_task (se_task_t *task)
 {
 	int ret = 0;
 	fd_request_t *req = (fd_request_t *) task->transport_req;
@@ -951,7 +951,7 @@ extern int fd_do_task (iscsi_task_t *task)
  *
  *
  */
-extern void fd_free_task (iscsi_task_t *task)
+extern void fd_free_task (se_task_t *task)
 {
 	fd_request_t *req;
 
@@ -1075,7 +1075,7 @@ extern void fd_get_dev_info (iscsi_device_t *dev, char *b, int *bl)
  *
  *
  */
-extern void fd_map_task_non_SG (iscsi_task_t *task)
+extern void fd_map_task_non_SG (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	fd_request_t *req = (fd_request_t *) task->transport_req;
@@ -1091,7 +1091,7 @@ extern void fd_map_task_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern void fd_map_task_SG (iscsi_task_t *task)
+extern void fd_map_task_SG (se_task_t *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1106,7 +1106,7 @@ extern void fd_map_task_SG (iscsi_task_t *task)
  *
  *
  */
-extern int fd_CDB_inquiry (iscsi_task_t *task, u32 size)
+extern int fd_CDB_inquiry (se_task_t *task, u32 size)
 {      
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 		        
@@ -1129,7 +1129,7 @@ extern int fd_CDB_inquiry (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int fd_CDB_none (iscsi_task_t *task, u32 size)
+extern int fd_CDB_none (se_task_t *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1145,7 +1145,7 @@ extern int fd_CDB_none (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int fd_CDB_read_non_SG (iscsi_task_t *task, u32 size)
+extern int fd_CDB_read_non_SG (se_task_t *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1159,7 +1159,7 @@ extern int fd_CDB_read_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int fd_CDB_read_SG (iscsi_task_t *task, u32 size)
+extern int fd_CDB_read_SG (se_task_t *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1173,7 +1173,7 @@ extern int fd_CDB_read_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int fd_CDB_write_non_SG (iscsi_task_t *task, u32 size)
+extern int fd_CDB_write_non_SG (se_task_t *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 	
@@ -1187,7 +1187,7 @@ extern int fd_CDB_write_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-extern int fd_CDB_write_SG (iscsi_task_t *task, u32 size)
+extern int fd_CDB_write_SG (se_task_t *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1210,7 +1210,7 @@ extern int fd_check_lba (unsigned long long lba, iscsi_device_t *dev)
  *
  *
  */
-extern int fd_check_for_SG (iscsi_task_t *task)
+extern int fd_check_for_SG (se_task_t *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 	
@@ -1221,7 +1221,7 @@ extern int fd_check_for_SG (iscsi_task_t *task)
  *
  *
  */
-extern unsigned char *fd_get_cdb (iscsi_task_t *task)
+extern unsigned char *fd_get_cdb (se_task_t *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1286,7 +1286,7 @@ extern u32 fd_get_queue_depth (iscsi_device_t *dev)
  *
  *
  */
-extern unsigned char *fd_get_non_SG (iscsi_task_t *task)
+extern unsigned char *fd_get_non_SG (se_task_t *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1297,7 +1297,7 @@ extern unsigned char *fd_get_non_SG (iscsi_task_t *task)
  *
  *
  */
-extern struct scatterlist *fd_get_SG (iscsi_task_t *task)
+extern struct scatterlist *fd_get_SG (se_task_t *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1308,7 +1308,7 @@ extern struct scatterlist *fd_get_SG (iscsi_task_t *task)
  *
  *
  */
-extern u32 fd_get_SG_count (iscsi_task_t *task)
+extern u32 fd_get_SG_count (se_task_t *task)
 {
 	return(0);
 }
@@ -1317,7 +1317,7 @@ extern u32 fd_get_SG_count (iscsi_task_t *task)
  *
  *
  */
-extern int fd_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
+extern int fd_set_non_SG_buf (unsigned char *buf, se_task_t *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 	

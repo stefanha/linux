@@ -345,7 +345,7 @@ void vr_free_device (iscsi_device_t *dev)
  *
  *
  */
-int vr_transport_complete (iscsi_task_t *task)
+int vr_transport_complete (se_task_t *task)
 {
 	return(0);
 }
@@ -355,7 +355,7 @@ int vr_transport_complete (iscsi_task_t *task)
  *
  */
 void *vr_allocate_request (
-	iscsi_task_t *task,
+	se_task_t *task,
 	iscsi_device_t *dev)
 {
 	vr_request_t *vr_req;
@@ -405,7 +405,7 @@ static inline struct rmmc_aux_tk *findtk(struct rmmc_conn *mconn,
  *
  *
  */
-void vr_emulate_inquiry (iscsi_task_t *task)
+void vr_emulate_inquiry (se_task_t *task)
 {
 	unsigned char *buf;
 	vr_request_t *vr_req = (vr_request_t *) task->transport_req;
@@ -427,7 +427,7 @@ void vr_emulate_inquiry (iscsi_task_t *task)
  *
  *
  */
-void vr_emulate_read_cap (iscsi_task_t *task)
+void vr_emulate_read_cap (se_task_t *task)
 {
 	unsigned char *buf;
 	unsigned long long blocks;
@@ -456,7 +456,7 @@ void vr_emulate_read_cap (iscsi_task_t *task)
  *
  *
  */
-int vr_emulate_mode_sense_10 (iscsi_task_t *task)
+int vr_emulate_mode_sense_10 (se_task_t *task)
 {
 	unsigned char *cdb;
 	unsigned char *buf;
@@ -498,7 +498,7 @@ int vr_emulate_mode_sense_10 (iscsi_task_t *task)
  *
  * 
  */
-int vr_emulate_read_dvd_structure (iscsi_task_t *task)
+int vr_emulate_read_dvd_structure (se_task_t *task)
 {
 	u8 num, *manuf;
 	u32 len;
@@ -591,7 +591,7 @@ int vr_emulate_read_dvd_structure (iscsi_task_t *task)
  *
  *
  */
-int vr_emulate_read_disc_info (iscsi_task_t *task)
+int vr_emulate_read_disc_info (se_task_t *task)
 {
 	u32 len;
 	unsigned char *buf;
@@ -624,7 +624,7 @@ int vr_emulate_read_disc_info (iscsi_task_t *task)
  *
  *
  */
-int vr_emulate_read_toc (iscsi_task_t *task)
+int vr_emulate_read_toc (se_task_t *task)
 {
 	u32 len = 0;
 	unsigned char *cdb;
@@ -693,7 +693,7 @@ int vr_emulate_read_toc (iscsi_task_t *task)
  *
  *
  */
-int vr_emulate_report_key (iscsi_task_t *task)
+int vr_emulate_report_key (se_task_t *task)
 {
 	u32 len, lba;
 	unsigned char *cdb;
@@ -808,7 +808,7 @@ int vr_emulate_report_key (iscsi_task_t *task)
  *
  *
  */
-int vr_emulate_send_key (iscsi_task_t *task)
+int vr_emulate_send_key (se_task_t *task)
 {
 	u32 len = task->task_size;
 	unsigned char *cdb;
@@ -878,7 +878,7 @@ int vr_emulate_send_key (iscsi_task_t *task)
  *
  *
  */
-int vr_emulate_scsi_cdb (iscsi_task_t *task)
+int vr_emulate_scsi_cdb (se_task_t *task)
 {
 	vr_request_t *vr_req = (vr_request_t *) task->transport_req;
 
@@ -1026,7 +1026,7 @@ tatic int fd_do_write (fd_request_t *req)
 	return(0);
 }
 #endif
-int vr_do_task (iscsi_task_t *task)
+int vr_do_task (se_task_t *task)
 {
 	int ret;
 	vr_request_t *req = (vr_request_t *) task->transport_req;
@@ -1058,7 +1058,7 @@ int vr_do_task (iscsi_task_t *task)
  *
  *
  */
-void vr_free_task (iscsi_task_t *task)
+void vr_free_task (se_task_t *task)
 {
 	vr_request_t *req;
 
@@ -1080,7 +1080,7 @@ extern void vr_get_plugin_info (void *p, char *b, int *bl)
  *
  *
  */
-void vr_map_task_non_SG (iscsi_task_t *task)
+void vr_map_task_non_SG (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	vr_request_t *req = (vr_request_t *) task->transport_req;
@@ -1096,7 +1096,7 @@ void vr_map_task_non_SG (iscsi_task_t *task)
  *
  *
  */
-void vr_map_task_SG (iscsi_task_t *task)
+void vr_map_task_SG (se_task_t *task)
 {
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	vr_request_t *req = (vr_request_t *) task->transport_req;
@@ -1112,7 +1112,7 @@ void vr_map_task_SG (iscsi_task_t *task)
  *
  *
  */
-int vr_CDB_inquiry (iscsi_task_t *task, u32 size)
+int vr_CDB_inquiry (se_task_t *task, u32 size)
 {      
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 		        
@@ -1135,7 +1135,7 @@ int vr_CDB_inquiry (iscsi_task_t *task, u32 size)
  *
  *
  */
-int vr_CDB_none (iscsi_task_t *task, u32 size)
+int vr_CDB_none (se_task_t *task, u32 size)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 
@@ -1151,7 +1151,7 @@ int vr_CDB_none (iscsi_task_t *task, u32 size)
  *
  *
  */
-int vr_CDB_read_non_SG (iscsi_task_t *task, u32 size)
+int vr_CDB_read_non_SG (se_task_t *task, u32 size)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 
@@ -1165,7 +1165,7 @@ int vr_CDB_read_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-int vr_CDB_read_SG (iscsi_task_t *task, u32 size)
+int vr_CDB_read_SG (se_task_t *task, u32 size)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 
@@ -1179,7 +1179,7 @@ int vr_CDB_read_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-int vr_CDB_write_non_SG (iscsi_task_t *task, u32 size)
+int vr_CDB_write_non_SG (se_task_t *task, u32 size)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 	
@@ -1193,7 +1193,7 @@ int vr_CDB_write_non_SG (iscsi_task_t *task, u32 size)
  *
  *
  */
-int vr_CDB_write_SG (iscsi_task_t *task, u32 size)
+int vr_CDB_write_SG (se_task_t *task, u32 size)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 
@@ -1216,7 +1216,7 @@ int vr_check_lba (iscsi_lba_t lba, iscsi_device_t *dev)
  *
  *
  */
-int vr_check_for_SG (iscsi_task_t *task)
+int vr_check_for_SG (se_task_t *task)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 	
@@ -1227,7 +1227,7 @@ int vr_check_for_SG (iscsi_task_t *task)
  *
  *
  */
-unsigned char *vr_get_cdb (iscsi_task_t *task)
+unsigned char *vr_get_cdb (se_task_t *task)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 
@@ -1267,7 +1267,7 @@ u32 vr_get_queue_depth (iscsi_device_t *dev)
  *
  *
  */
-unsigned char *vr_get_non_SG (iscsi_task_t *task)
+unsigned char *vr_get_non_SG (se_task_t *task)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 
@@ -1278,7 +1278,7 @@ unsigned char *vr_get_non_SG (iscsi_task_t *task)
  *
  *
  */
-struct scatterlist *vr_get_SG (iscsi_task_t *task)
+struct scatterlist *vr_get_SG (se_task_t *task)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 
@@ -1289,7 +1289,7 @@ struct scatterlist *vr_get_SG (iscsi_task_t *task)
  *
  *
  */
-u32 vr_get_SG_count (iscsi_task_t *task)
+u32 vr_get_SG_count (se_task_t *task)
 {
 	return(0);
 }
@@ -1298,7 +1298,7 @@ u32 vr_get_SG_count (iscsi_task_t *task)
  *
  *
  */
-int vr_set_non_SG_buf (unsigned char *buf, iscsi_task_t *task)
+int vr_set_non_SG_buf (unsigned char *buf, se_task_t *task)
 {
 	vr_request_t *req = (vr_request_t *) task->transport_req;
 	
