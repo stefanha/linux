@@ -80,7 +80,7 @@ static u64 swap(u64 n)
  */
 extern int vt_attach_hba (
 	iscsi_portal_group_t *tpg,
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	iscsi_hbainfo_t *hi)
 {
 	vt_host_t *vt_host;
@@ -113,7 +113,7 @@ extern int vt_attach_hba (
  *
  *
  */
-extern int vt_detach_hba (iscsi_hba_t *hba)
+extern int vt_detach_hba (se_hba_t *hba)
 {
 	vt_host_t *vt_host;
 	
@@ -233,7 +233,7 @@ static void vt_write_filemark_maybe (se_task_t *task)
  *
  *
  */
-extern int vt_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int vt_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	se_device_t *dev;
 	vt_dev_t *vt_dev;
@@ -283,7 +283,7 @@ fail:
  *
  *
  */
-extern se_device_t *vt_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vt_dev_p)
+extern se_device_t *vt_add_device_to_list (se_hba_t *iscsi_hba, void *vt_dev_p)
 {
 	se_device_t *dev;
 	vt_dev_t *vt_dev = (vt_dev_t *) vt_dev_p;
@@ -344,7 +344,7 @@ extern int vt_check_device_location (se_device_t *dev, iscsi_dev_transport_info_
 extern int vt_check_ghost_id (iscsi_hbainfo_t *hi)
 {
 	int i;          
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	vt_host_t *fh;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -428,7 +428,7 @@ extern void vt_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 extern void vt_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	vt_dev_t *fdev = (vt_dev_t *) dev->dev_ptr;
-	iscsi_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->iscsi_hba;
 
 	snprintf(buf, size, "%u_%u", hba->hba_id, fdev->vt_dev_id);	
 	return;
@@ -1442,7 +1442,7 @@ extern int vt_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int
 	return(0);
 }
 
-extern int vt_check_dev_params (iscsi_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
+extern int vt_check_dev_params (se_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_VT_DEVICE_ID)) {
 		TRACE_ERROR("Missing VTAPE createvirtdev parameters\n");
@@ -1479,7 +1479,7 @@ extern void vt_get_plugin_info (void *p, char *b, int *bl)
 	return;
 }
 
-extern void vt_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
+extern void vt_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  VT Host ID: %u\n",
 		 hba->hba_id, hba->hba_info.vt_host_id);
@@ -1775,7 +1775,7 @@ extern unsigned char *vt_get_sense_buffer (se_task_t *task)
 static vt_dev_t *vt_find_dev (int mc_host_id, int vt_dev_id)
 {
 	int i;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	se_device_t *dev;
 	vt_dev_t *vt_dev;
 

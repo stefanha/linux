@@ -106,7 +106,7 @@ static unsigned char *alloc_buf (void)
 extern int iscsi_get_hba_info_count_for_global (int *count)
 {
 	u32 i;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	*count = 1;
 	
@@ -125,7 +125,7 @@ extern int iscsi_get_hba_info_count_for_global (int *count)
 }
 
 static void iscsi_dump_hba_info (
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	char *b,	/* Pointer to info buffer */
 	int *bl)
 {
@@ -156,7 +156,7 @@ extern int iscsi_get_hba_info (
 	unsigned char *b;
 	int bl = 0, cl = 0, oob = 1, start = 0;
         u32 i;
-        iscsi_hba_t *hba;
+        se_hba_t *hba;
 
 	if (!(b = alloc_buf()))
 		goto done;
@@ -209,7 +209,7 @@ done:
 extern int iscsi_get_dev_info_count_for_hba (u32 hba_id, int *count)
 {
 	se_device_t *dev;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	if (!(hba = core_get_hba_from_id(hba_id, 0)))
 		return(-1);
@@ -401,7 +401,7 @@ extern int iscsi_get_hba_dev_info (
 	unsigned char *b;
 	int bl = 0, cl = 0, oob = 1, start = 0;
 	se_device_t *dev;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	if (!(hba = core_get_hba_from_id(hba_id, 0))) {
 		oob = 0;

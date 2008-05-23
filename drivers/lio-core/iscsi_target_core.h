@@ -195,10 +195,10 @@
 #define DATAIN_WITHIN_COMMAND_RECOVERY		1
 #define DATAIN_CONNECTION_RECOVERY		2
 
-/* iscsi_hba_t->hba_flags */
+/* se_hba_t->hba_flags */
 #define HBA_FLAGS_INTERNAL_USE			0x00000001
 
-/* iscsi_hba_t->hba_status and iscsi_tpg_hba->thba_status */
+/* se_hba_t->hba_status and iscsi_tpg_hba->thba_status */
 #define HBA_STATUS_FREE				0x00000001
 #define HBA_STATUS_ACTIVE			0x00000002
 #define HBA_STATUS_INACTIVE			0x00000004
@@ -1097,7 +1097,7 @@ typedef struct iscsi_device_s {
 	struct se_task_s	*execute_task_tail;
 	struct se_task_s	*state_task_head;
 	struct se_task_s	*state_task_tail;
-	struct iscsi_hba_s	*iscsi_hba;	/* Pointer to associated iSCSI HBA */
+	struct se_hba_s		*iscsi_hba;	/* Pointer to associated iSCSI HBA */
 	struct iscsi_transport_s *transport;	/* Pointer to template of function pointers for transport */ 
 	struct iscsi_device_s	*next;		/* Pointer to next device in TPG list */
 	struct iscsi_device_s	*prev;
@@ -1130,7 +1130,7 @@ typedef struct iscsi_dev_transport_info_s {
 	u32			vol_id;
 } ____cacheline_aligned iscsi_dev_transport_info_t;
 
-typedef struct iscsi_hba_s {
+typedef struct se_hba_s {
 	u8			type;		/* Type of disk transport used for HBA. */
 	u16			hba_tpgt;
 	u32			hba_status;
@@ -1152,13 +1152,13 @@ typedef struct iscsi_hba_s {
 	spinlock_t		hba_queue_lock;
 	struct semaphore		hba_access_sem;
 	struct iscsi_transport_s *transport;
-	struct iscsi_hba_s	*next;
-	struct iscsi_hba_s	*prev;
-}  ____cacheline_aligned iscsi_hba_t;
+	struct se_hba_s		*next;
+	struct se_hba_s		*prev;
+}  ____cacheline_aligned se_hba_t;
 
-#define ISCSI_HBA(d)		((iscsi_hba_t *)(d)->iscsi_hba)
+#define ISCSI_HBA(d)		((se_hba_t *)(d)->iscsi_hba)
 // Using SE_HBA() for new code
-#define SE_HBA(d)		((iscsi_hba_t *)(d)->iscsi_hba)
+#define SE_HBA(d)		((se_hba_t *)(d)->iscsi_hba)
 
 typedef struct iscsi_node_attrib_s {
 	__u32			dataout_timeout;
@@ -1375,7 +1375,7 @@ typedef struct iscsi_global_s {
 	int (*ti_forcechanoffline)(void *);
 	struct se_plugin_class_s *plugin_class_list;
 	struct vol_s		*vol_list;
-	iscsi_hba_t		*hba_list;
+	se_hba_t		*hba_list;
 	struct list_head	g_tiqn_list;
 	struct list_head	g_np_list;
 	spinlock_t		active_ts_lock;

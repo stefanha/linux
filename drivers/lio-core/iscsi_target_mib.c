@@ -1259,7 +1259,7 @@ static struct file_operations conn_attr_seq_fops = {
  */
 static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	int i;
 
 	seq_puts(seq, "inst sw_indx\n");
@@ -1302,7 +1302,7 @@ static void *locate_hba_start(
 	int (*do_check)(void *))
 {
 	se_device_t *dev;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	table_iter_t *tpg_iter;
 	loff_t n = *pos;
 	int i, header = (n) ? 0 : 1;
@@ -1355,7 +1355,7 @@ static void *locate_hba_next(
 {
 	table_iter_t *iterp = (table_iter_t *)v;
 	se_device_t *dev = (se_device_t *)iterp->ti_ptr, *dev_next = NULL;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	int i;
 
 	(*pos)++;
@@ -1412,7 +1412,7 @@ static void locate_hba_stop(struct seq_file *seq, void *v)
 {
 	table_iter_t *iterp = (table_iter_t *)v;
 	se_device_t *dev = NULL;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	if (!(v))
 		return;
@@ -1433,7 +1433,7 @@ static void locate_hba_stop(struct seq_file *seq, void *v)
  */
 int do_hba_check(void *p)
 {
-	iscsi_hba_t *hba = (iscsi_hba_t *)p;
+	se_hba_t *hba = (se_hba_t *)p;
 
 	return(hba->dev_count);
 }
@@ -1456,7 +1456,7 @@ static void scsi_dev_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_dev_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	int k;
@@ -1542,7 +1542,7 @@ static void scsi_port_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_port_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	se_device_t *dev;
 	se_port_t *sep;
 	table_iter_t *iterp = (table_iter_t *)v;
@@ -1616,7 +1616,7 @@ static void scsi_transport_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	se_port_t *se;
@@ -1698,7 +1698,7 @@ static void scsi_tgt_dev_seq_stop(struct seq_file *seq, void *v)
 #define LU_COUNT	1  /* for now */
 static int scsi_tgt_dev_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	int non_accessible_lus = 0;
@@ -1790,7 +1790,7 @@ static void scsi_tgt_port_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	se_device_t *dev;
 	se_port_t *sep;
 	table_iter_t *iterp = (table_iter_t *)v;
@@ -2087,7 +2087,7 @@ static void scsi_lu_seq_stop(struct seq_file *seq, void *v)
 #define SCSI_LU_INDEX		1
 static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
 	int j;

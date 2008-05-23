@@ -71,7 +71,7 @@ extern int linux_blockdevice_release(int, int, struct block_device *);
  */
 extern int iblock_attach_hba (
 	iscsi_portal_group_t *tpg,
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	iscsi_hbainfo_t *hi)
 {
 	iblock_hba_t *ib_host;
@@ -105,7 +105,7 @@ extern int iblock_attach_hba (
  *
  *
  */
-extern int iblock_detach_hba (iscsi_hba_t *hba)
+extern int iblock_detach_hba (se_hba_t *hba)
 {
 	iblock_hba_t *ib_host;
 
@@ -124,7 +124,7 @@ extern int iblock_detach_hba (iscsi_hba_t *hba)
 	return(0);
 }
 
-extern int iblock_claim_phydevice (iscsi_hba_t *hba, se_device_t *dev)
+extern int iblock_claim_phydevice (se_hba_t *hba, se_device_t *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *)dev->dev_ptr;
 	struct block_device *bd;
@@ -170,7 +170,7 @@ extern int iblock_release_phydevice (se_device_t *dev)
 	return(0);
 }
 
-extern int iblock_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int iblock_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	iblock_dev_t *ib_dev = NULL;
 	iblock_hba_t *ib_host = (iblock_hba_t *) iscsi_hba->hba_ptr;
@@ -299,7 +299,7 @@ extern int iblock_check_device_location (se_device_t *dev, iscsi_dev_transport_i
 extern int iblock_check_ghost_id (iscsi_hbainfo_t *hi)
 {
 	int i;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	iblock_hba_t *ib_hba;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -385,7 +385,7 @@ static int iblock_emulate_inquiry (se_task_t *task)
 	unsigned char prod[64], se_location[128];
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
-	iscsi_hba_t *hba = task->iscsi_dev->iscsi_hba;
+	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
 	unsigned char *sub_sn = NULL;
 
 	memset(prod, 0, 64);
@@ -540,7 +540,7 @@ extern int iblock_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t,
 	return(0);
 }
 
-extern int iblock_check_dev_params (iscsi_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
+extern int iblock_check_dev_params (se_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) ||
 	    !(t->hba_params_set & PARAM_HBA_IBLOCK_MINOR)) {
@@ -574,7 +574,7 @@ extern void iblock_get_plugin_info (void *p, char *b, int *bl)
 	return;
 }
 
-extern void iblock_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
+extern void iblock_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  iBlock Host ID: %u\n",
 		hba->hba_id, hba->hba_info.iblock_host_id);

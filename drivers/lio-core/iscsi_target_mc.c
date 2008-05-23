@@ -368,7 +368,7 @@ static void mc_fixup (mc_host_t *p)
  */
 extern int mc_attach_hba (
 	iscsi_portal_group_t *tpg,
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	iscsi_hbainfo_t *hi)
 {
 	mc_host_t *mc_host;
@@ -401,7 +401,7 @@ extern int mc_attach_hba (
  *
  *
  */
-extern int mc_detach_hba (iscsi_hba_t *hba)
+extern int mc_detach_hba (se_hba_t *hba)
 {
 	int i;
 	mc_host_t *mc_host;
@@ -428,13 +428,13 @@ extern int mc_detach_hba (iscsi_hba_t *hba)
 	return(0);
 }
 
-extern int vt_create_virtdevice(iscsi_hba_t *, iscsi_devinfo_t *);
+extern int vt_create_virtdevice(se_hba_t *, iscsi_devinfo_t *);
 
 /*	mc_create_virtdevice(): (Part of iscsi_transport_t template)
  *
  *
  */
-extern int mc_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int mc_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	int n;
 	se_device_t *dev;
@@ -524,7 +524,7 @@ fail:
  *
  *
  */
-extern se_device_t *mc_add_device_to_list (iscsi_hba_t *iscsi_hba, void *mc_dev_p)
+extern se_device_t *mc_add_device_to_list (se_hba_t *iscsi_hba, void *mc_dev_p)
 {
 	se_device_t *dev;
 	mc_dev_t *mc_dev = (mc_dev_t *) mc_dev_p;
@@ -585,7 +585,7 @@ extern int mc_check_device_location (se_device_t *dev, iscsi_dev_transport_info_
 extern int mc_check_ghost_id (iscsi_hbainfo_t *hi)
 {
 	int i;          
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	mc_host_t *fh;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -667,7 +667,7 @@ extern void mc_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 extern void mc_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	mc_dev_t *fdev = (mc_dev_t *) dev->dev_ptr;
-	iscsi_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->iscsi_hba;
 
 	snprintf(buf, size, "%u_%u", hba->hba_id, fdev->mc_dev_id);	
 	return;
@@ -682,7 +682,7 @@ extern int mc_emulate_inquiry (se_task_t *task)
 	unsigned char prod[64], se_location[128];
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	mc_dev_t *fdev = (mc_dev_t *) task->iscsi_dev->dev_ptr;
-	iscsi_hba_t *hba = task->iscsi_dev->iscsi_hba;
+	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
 	unsigned char *dst = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	unsigned char buf[EVPD_BUF_LEN];
@@ -1144,7 +1144,7 @@ extern int mc_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int
 	return(0);
 }
 
-extern int mc_check_dev_params (iscsi_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
+extern int mc_check_dev_params (se_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_MC_DEVICE_ID)) {
 		TRACE_ERROR("Missing MEDIA CHANGER createvirtdev parameters\n");
@@ -1186,7 +1186,7 @@ extern void mc_get_plugin_info (void *p, char *b, int *bl)
 	return;
 }
 
-extern void mc_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
+extern void mc_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  media changer Host ID: %u\n",
 		 hba->hba_id, hba->hba_info.mc_host_id);
@@ -1492,7 +1492,7 @@ extern char *mc_get_filename (int mc_host_id, int vt_device_id)
 {
 	int i, k;
 	unsigned char *filename;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	mc_host_t *p;
 
 	filename = NULL;

@@ -30,13 +30,13 @@
 #define ISCSI_TARGET_HBA_H
  
 extern int iscsi_hba_check_online (iscsi_dev_transport_info_t *);
-extern iscsi_hba_t *__core_get_hba_from_id (iscsi_hba_t *);
-extern iscsi_hba_t *core_get_hba_from_id (u32, int);
-extern iscsi_hba_t *iscsi_get_hba_from_ptr (void *);
-extern void core_put_hba (iscsi_hba_t *);
+extern se_hba_t *__core_get_hba_from_id (se_hba_t *);
+extern se_hba_t *core_get_hba_from_id (u32, int);
+extern se_hba_t *iscsi_get_hba_from_ptr (void *);
+extern void core_put_hba (se_hba_t *);
 extern int iscsi_hba_check_addhba_params (struct iscsi_target *, iscsi_hbainfo_t *);
-extern int iscsi_hba_add_hba (iscsi_hba_t *, iscsi_hbainfo_t *, struct iscsi_target *);
-extern int iscsi_hba_del_hba (iscsi_hba_t *);
+extern int iscsi_hba_add_hba (se_hba_t *, iscsi_hbainfo_t *, struct iscsi_target *);
+extern int iscsi_hba_del_hba (se_hba_t *);
 extern void iscsi_disable_all_hbas (void);
 extern void iscsi_hba_del_all_hbas (void);
 

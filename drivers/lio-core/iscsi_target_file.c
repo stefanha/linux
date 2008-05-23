@@ -64,7 +64,7 @@ extern int linux_blockdevice_check(int, int);
  */
 extern int fd_attach_hba (
 	iscsi_portal_group_t *tpg,
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	iscsi_hbainfo_t *hi)
 {
 	fd_host_t *fd_host;
@@ -97,7 +97,7 @@ extern int fd_attach_hba (
  *
  *
  */
-extern int fd_detach_hba (iscsi_hba_t *hba)
+extern int fd_detach_hba (se_hba_t *hba)
 {
 	fd_host_t *fd_host;
 	
@@ -116,7 +116,7 @@ extern int fd_detach_hba (iscsi_hba_t *hba)
 	return(0);
 }
 
-extern int fd_claim_phydevice (iscsi_hba_t *hba, se_device_t *dev)
+extern int fd_claim_phydevice (se_hba_t *hba, se_device_t *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
 	struct block_device *bd;
@@ -172,7 +172,7 @@ extern int fd_release_phydevice (se_device_t *dev)
  *
  *
  */
-extern int fd_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int fd_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	char *dev_p = NULL;
 	se_device_t *dev;
@@ -319,7 +319,7 @@ fail:
  *
  *
  */
-extern se_device_t *fd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *fd_dev_p, iscsi_devinfo_t *di)
+extern se_device_t *fd_add_device_to_list (se_hba_t *iscsi_hba, void *fd_dev_p, iscsi_devinfo_t *di)
 {
 	se_device_t *dev;
 	fd_dev_t *fd_dev = (fd_dev_t *) fd_dev_p;
@@ -380,7 +380,7 @@ extern int fd_check_device_location (se_device_t *dev, iscsi_dev_transport_info_
 extern int fd_check_ghost_id (iscsi_hbainfo_t *hi)
 {
 	int i;          
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	fd_host_t *fh;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -464,7 +464,7 @@ extern void fd_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 extern void fd_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	fd_dev_t *fdev = (fd_dev_t *) dev->dev_ptr;
-	iscsi_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->iscsi_hba;
 
 	snprintf(buf, size, "%u_%u", hba->hba_id, fdev->fd_dev_id);	
 	return;
@@ -480,7 +480,7 @@ extern int fd_emulate_inquiry (se_task_t *task)
 	unsigned char *sub_sn = NULL;
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
 	fd_dev_t *fdev = (fd_dev_t *) task->iscsi_dev->dev_ptr;
-	iscsi_hba_t *hba = task->iscsi_dev->iscsi_hba;
+	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
 	
 	memset(prod, 0, 64);
 	memset(se_location, 0, 128);
@@ -976,7 +976,7 @@ extern int fd_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int
 	return(0);
 }
 
-extern int fd_check_dev_params (iscsi_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
+extern int fd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_FD_DEVICE_ID)) {
 		TRACE_ERROR("Missing FILEIO createvirtdev parameters\n");
@@ -1035,7 +1035,7 @@ extern void fd_get_plugin_info (void *p, char *b, int *bl)
 	return;
 }
 
-extern void fd_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
+extern void fd_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  FD Host ID: %u\n",
 		 hba->hba_id, hba->hba_info.fd_host_id);

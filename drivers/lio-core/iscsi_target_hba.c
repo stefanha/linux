@@ -69,7 +69,7 @@ extern int iscsi_hba_check_online (
 	iscsi_dev_transport_info_t *dti)
 {
 	int found_hba = 0, ret = 0;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	iscsi_hbainfo_t hi;
 	iscsi_transport_t *t;
 
@@ -96,9 +96,9 @@ out:
 	return(found_hba);
 }
 
-extern iscsi_hba_t *iscsi_get_hba_from_ptr (void *p)
+extern se_hba_t *iscsi_get_hba_from_ptr (void *p)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	u32 i;
 	
 	spin_lock(&iscsi_global->hba_lock);	
@@ -123,15 +123,15 @@ extern iscsi_hba_t *iscsi_get_hba_from_ptr (void *p)
 	return(NULL);
 }
 	
-extern iscsi_hba_t *__core_get_hba_from_id (iscsi_hba_t *hba)
+extern se_hba_t *__core_get_hba_from_id (se_hba_t *hba)
 {
 	down_interruptible(&hba->hba_access_sem);
 	return((signal_pending(current)) ? NULL : hba);
 }
 
-extern iscsi_hba_t *core_get_hba_from_id (u32 hba_id, int addhba)
+extern se_hba_t *core_get_hba_from_id (u32 hba_id, int addhba)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	
 	if (hba_id > (ISCSI_MAX_GLOBAL_HBAS-1)) {
 		TRACE_ERROR("iSCSI HBA_ID: %u exceeds ISCSI_MAX_GLOBAL_HBAS-1: %u\n",
@@ -150,7 +150,7 @@ extern iscsi_hba_t *core_get_hba_from_id (u32 hba_id, int addhba)
 	return(__core_get_hba_from_id(hba));
 }
 
-extern void core_put_hba (iscsi_hba_t *hba)
+extern void core_put_hba (se_hba_t *hba)
 {
 	up(&hba->hba_access_sem);
 	return;
@@ -187,7 +187,7 @@ extern int iscsi_hba_check_addhba_params (
  *
  */
 extern int iscsi_hba_add_hba (
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	iscsi_hbainfo_t *hi,
 	struct iscsi_target *tg)
 {
@@ -225,7 +225,7 @@ extern int iscsi_hba_add_hba (
 }
 
 static int iscsi_shutdown_hba (
-	iscsi_hba_t *hba)
+	se_hba_t *hba)
 {
 	int ret = 0;
 	iscsi_transport_t *t;
@@ -244,7 +244,7 @@ static int iscsi_shutdown_hba (
  *
  */
 extern int iscsi_hba_del_hba (
-	iscsi_hba_t *hba)
+	se_hba_t *hba)
 {
 	se_device_t *dev, *dev_next;
 	
@@ -255,7 +255,7 @@ extern int iscsi_hba_del_hba (
 	}
 
 	/*
-	 * Do not allow the iscsi_hba_t to be released if references exist to
+	 * Do not allow the se_hba_t to be released if references exist to
 	 * from se_device_t->iscsi_lun_t.
 	 */
 	if (iscsi_check_devices_access(hba) < 0) {
@@ -289,7 +289,7 @@ extern int iscsi_hba_del_hba (
 	return(0);
 }
 
-static void iscsi_hba_transport_shutdown (iscsi_hba_t *hba)
+static void se_hba_transport_shutdown (se_hba_t *hba)
 {
 	if (!(HBA_TRANSPORT(hba)->shutdown_hba))
 		return;
@@ -301,7 +301,7 @@ static void iscsi_hba_transport_shutdown (iscsi_hba_t *hba)
 extern void iscsi_disable_all_hbas (void)
 {
 	int i;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	spin_lock(&iscsi_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
@@ -326,7 +326,7 @@ extern void iscsi_disable_all_hbas (void)
 extern void iscsi_hba_del_all_hbas (void)
 {
 	int i;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	spin_lock(&iscsi_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
@@ -339,7 +339,7 @@ extern void iscsi_hba_del_all_hbas (void)
 			hba->hba_id, hba->type, hba->hba_status);
 #endif		
 		spin_unlock(&iscsi_global->hba_lock);
-		iscsi_hba_transport_shutdown(hba);
+		se_hba_transport_shutdown(hba);
 		iscsi_hba_del_hba(hba);
 		spin_lock(&iscsi_global->hba_lock);
 	}

@@ -170,7 +170,7 @@ static int getauxinfo(vr_dev_t *vd, char *path)
  *
  *
  */
-int vr_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+int vr_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	char *dev_p;
 	se_device_t *dev;
@@ -278,7 +278,7 @@ fail:
  *
  *
  */
-se_device_t *vr_add_device_to_list (iscsi_hba_t *iscsi_hba, void *vr_dev_p)
+se_device_t *vr_add_device_to_list (se_hba_t *iscsi_hba, void *vr_dev_p)
 {
 	se_device_t *dev;
 	vr_dev_t *vr_dev = (vr_dev_t *) vr_dev_p;

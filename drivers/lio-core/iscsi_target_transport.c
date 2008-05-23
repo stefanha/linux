@@ -432,7 +432,7 @@ static se_device_t *transport_scan_hbas_for_evpd_sn (
 {
 	u32 i;
 	se_device_t *dev = NULL;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	spin_lock(&iscsi_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
@@ -470,7 +470,7 @@ static se_device_t *transport_scan_hbas_for_evpd_di (
 {
 	u32 i;
 	se_device_t *dev = NULL;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	spin_lock(&iscsi_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
@@ -510,7 +510,7 @@ static se_device_t *transport_scan_hbas_for_major_minor (
 {
 	iblock_dev_t *ib_dev = NULL;
 	se_device_t *dev = NULL;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	int i;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -559,7 +559,7 @@ extern se_device_t *transport_core_locate_dev (
 	int *ret)
 {
 	se_device_t *dev = NULL;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 
 	dti->iscsi_lun = tg->iscsi_lun;
 	dti->force = tg->force;
@@ -1598,7 +1598,7 @@ static int transport_get_read_capacity (se_device_t *dev)
  *	will release said block_device ourselves.
  */
 extern se_device_t *transport_add_device_to_iscsi_hba (
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	iscsi_transport_t *transport,
 	u32 device_flags,
 	void *transport_dev)
@@ -1798,7 +1798,7 @@ extern void transport_generic_deactivate_device (se_device_t *dev)
 extern int transport_generic_claim_phydevice (se_device_t *dev)
 {
 	int ret;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	
 	/*
 	 * This function pointer is present when handling access
@@ -2231,7 +2231,7 @@ extern int transport_generic_check_device_location (
 	iscsi_dev_transport_info_t *dti)
 {
 	int ret = 0;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	iscsi_transport_t *t;
 	
 	if (!dev->iscsi_hba) {
@@ -5981,7 +5981,7 @@ static void transport_generic_lun_reset (se_device_t *dev)
  *
  *
  */
-static void transport_generic_host_reset (iscsi_hba_t *hba)
+static void transport_generic_host_reset (se_hba_t *hba)
 {
 	return;
 }
@@ -5991,7 +5991,7 @@ static void transport_generic_host_reset (iscsi_hba_t *hba)
  *
  */
 //#warning FIXME: COLD_RESET
-static void transport_generic_cold_reset (iscsi_hba_t *hba)
+static void transport_generic_cold_reset (se_hba_t *hba)
 {
 #if 0
 	int i, reset_hba = 0;

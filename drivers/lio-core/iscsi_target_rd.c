@@ -63,7 +63,7 @@ extern iscsi_global_t *iscsi_global;
  */
 extern int rd_attach_hba (
 	iscsi_portal_group_t *tpg,
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	iscsi_hbainfo_t *hi)
 {
 	rd_host_t *rd_host;
@@ -96,7 +96,7 @@ extern int rd_attach_hba (
  *
  *
  */
-extern int rd_detach_hba (iscsi_hba_t *hba)
+extern int rd_detach_hba (se_hba_t *hba)
 {
 	rd_host_t *rd_host;
 
@@ -235,7 +235,7 @@ static int rd_build_device_space (rd_dev_t *rd_dev)
  *
  *
  */
-static int rd_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di, int rd_direct)
+static int rd_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di, int rd_direct)
 {
 	se_device_t *dev;
 	rd_dev_t *rd_dev;
@@ -278,12 +278,12 @@ fail:
 	return(0);
 }
 
-extern int rd_DIRECT_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int rd_DIRECT_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	return(rd_create_virtdevice(iscsi_hba, di, 1));	
 }
 
-extern int rd_MEMCPY_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int rd_MEMCPY_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
 {
 	return(rd_create_virtdevice(iscsi_hba, di, 0));
 }
@@ -292,7 +292,7 @@ extern int rd_MEMCPY_create_virtdevice (iscsi_hba_t *iscsi_hba, iscsi_devinfo_t 
  *
  *
  */
-extern se_device_t *rd_add_device_to_list (iscsi_hba_t *iscsi_hba, void *rd_dev_p, iscsi_devinfo_t *di)
+extern se_device_t *rd_add_device_to_list (se_hba_t *iscsi_hba, void *rd_dev_p, iscsi_devinfo_t *di)
 {
 	se_device_t *dev;
 	rd_dev_t *rd_dev = (rd_dev_t *) rd_dev_p;
@@ -354,7 +354,7 @@ extern int rd_check_device_location (se_device_t *dev, iscsi_dev_transport_info_
 extern int rd_check_ghost_id (iscsi_hbainfo_t *hi, int type)
 {
 	int i;          
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	rd_host_t *rh;
 
 	spin_lock(&iscsi_global->hba_lock);
@@ -445,7 +445,7 @@ extern void rd_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 extern void rd_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
-	iscsi_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->iscsi_hba;
 
 	snprintf(buf, size, "%u_%u", hba->hba_id, rd_dev->rd_dev_id);
 	return;
@@ -460,7 +460,7 @@ static int rd_emulate_inquiry (se_task_t *task)
 	unsigned char prod[64], se_location[128];
 	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
 	iscsi_cmd_t *cmd = task->iscsi_cmd;
-	iscsi_hba_t *hba = task->iscsi_dev->iscsi_hba;
+	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
 	
 	memset(prod, 0, 64);
 	memset(se_location, 0, 128);
@@ -1119,7 +1119,7 @@ extern int rd_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int
 	return(0);
 }
 
-extern int rd_check_dev_params (iscsi_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
+extern int rd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_RD_DEVICE_ID)) {
 		TRACE_ERROR("Missing Ramdisk createvirtdev parameters\n");
@@ -1159,7 +1159,7 @@ extern void rd_mcp_get_plugin_info (void *p, char *b, int *bl)
 	return;
 }
 
-extern void rd_get_hba_info (iscsi_hba_t *hba, char *b, int *bl)
+extern void rd_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  RD Host ID: %u\n",
 		hba->hba_id, hba->hba_info.rd_host_id);

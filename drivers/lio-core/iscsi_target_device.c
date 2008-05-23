@@ -65,7 +65,7 @@
 extern iscsi_global_t *iscsi_global;
 extern __u32 iscsi_unpack_lun (unsigned char *);
 
-extern int iscsi_check_devices_access (iscsi_hba_t *hba)
+extern int iscsi_check_devices_access (se_hba_t *hba)
 {
 	int ret = 0;
 	se_device_t *dev = NULL, *dev_next = NULL;
@@ -92,7 +92,7 @@ extern int iscsi_check_devices_access (iscsi_hba_t *hba)
  *
  *
  */
-extern void iscsi_disable_devices_for_hba (iscsi_hba_t *hba)
+extern void iscsi_disable_devices_for_hba (se_hba_t *hba)
 {
 	se_device_t *dev, *dev_next;
 
@@ -129,7 +129,7 @@ extern void iscsi_disable_devices_for_hba (iscsi_hba_t *hba)
  */
 extern void se_release_device_for_hba (se_device_t *dev)
 {
-	iscsi_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->iscsi_hba;
 
 	if ((dev->dev_status & ISCSI_DEVICE_ACTIVATED) ||
 	    (dev->dev_status & ISCSI_DEVICE_DEACTIVATED) ||
@@ -663,7 +663,7 @@ extern void iscsi_clear_lun_from_tpg (iscsi_lun_t *lun, iscsi_portal_group_t *tp
  *
  *
  */
-extern se_device_t *core_get_device_from_transport (iscsi_hba_t *hba, iscsi_dev_transport_info_t *dti)
+extern se_device_t *core_get_device_from_transport (se_hba_t *hba, iscsi_dev_transport_info_t *dti)
 {
 	se_device_t *dev;
 	
@@ -683,7 +683,7 @@ extern se_device_t *core_get_device_from_transport (iscsi_hba_t *hba, iscsi_dev_
  *
  *
  */
-extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_devinfo_t *di, iscsi_hba_t *hba)
+extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_devinfo_t *di, se_hba_t *hba)
 {
 	int ret = 0;
 	iscsi_transport_t *t;
@@ -700,7 +700,7 @@ extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_de
 	}
 
 	if (!hba->hba_ptr) {
-		TRACE_ERROR("Unable to locate active iscsi_hba_t at HBA ID: %u\n",
+		TRACE_ERROR("Unable to locate active se_hba_t at HBA ID: %u\n",
 				hba->hba_id);
 		return(ERR_HBA_CANNOT_LOCATE);
 	}
@@ -725,7 +725,7 @@ extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_de
  *
  *
  */
-static int iscsi_check_create_virtual_device (iscsi_hba_t *hba, iscsi_dev_transport_info_t *dti)
+static int iscsi_check_create_virtual_device (se_hba_t *hba, iscsi_dev_transport_info_t *dti)
 {
 	se_device_t *dev;
 
@@ -742,7 +742,7 @@ static int iscsi_check_create_virtual_device (iscsi_hba_t *hba, iscsi_dev_transp
  *
  *	Used for Virtual Transport Plugins.
  */
-extern int iscsi_create_virtual_device (iscsi_hba_t *hba, iscsi_devinfo_t *di, struct iscsi_target *tg)
+extern int iscsi_create_virtual_device (se_hba_t *hba, iscsi_devinfo_t *di, struct iscsi_target *tg)
 {
 	int ret = 0;
 	iscsi_dev_transport_info_t dti;
@@ -778,11 +778,11 @@ extern int iscsi_create_virtual_device (iscsi_hba_t *hba, iscsi_devinfo_t *di, s
 }
 
 /*
- * Called with iscsi_hba_t->device_lock held.
+ * Called with se_hba_t->device_lock held.
  */
 extern void se_clear_dev_ports (se_device_t *dev)
 {
-	iscsi_hba_t *hba = dev->iscsi_hba;	
+	se_hba_t *hba = dev->iscsi_hba;	
 	iscsi_lun_t *lun;
 	iscsi_portal_group_t *tpg;
 	se_port_t *sep, *sep_tmp;
@@ -815,7 +815,7 @@ extern void se_clear_dev_ports (se_device_t *dev)
  *
  *	Used for IBLOCK, RAMDISK, and FILEIO Transport Drivers.
  */
-extern int se_free_virtual_device (se_device_t *dev, iscsi_hba_t *hba)
+extern int se_free_virtual_device (se_device_t *dev, se_hba_t *hba)
 {
 	spin_lock(&hba->device_lock);
 	se_clear_dev_ports(dev);
@@ -826,13 +826,13 @@ extern int se_free_virtual_device (se_device_t *dev, iscsi_hba_t *hba)
 	return(0);
 }
 
-extern iscsi_hba_t *core_get_hba_from_hbaid (
+extern se_hba_t *core_get_hba_from_hbaid (
 	struct iscsi_target *tg,
 	iscsi_dev_transport_info_t *dti,
 	int add)
 {
 	int ret = 0;
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	iscsi_transport_t *t;
 	
 	if (!(tg->params_set & PARAM_HBA_ID)) {
@@ -868,7 +868,7 @@ extern iscsi_hba_t *core_get_hba_from_hbaid (
 
 extern void se_dev_start (se_device_t *dev)
 {
-	iscsi_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->iscsi_hba;
 	
         spin_lock(&hba->device_lock);
 	DEV_OBJ_API(dev)->inc_count(&dev->dev_obj);
@@ -888,7 +888,7 @@ extern void se_dev_start (se_device_t *dev)
 
 extern void se_dev_stop (se_device_t *dev)
 {
-	iscsi_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->iscsi_hba;
 
 	spin_lock(&hba->device_lock);
 	DEV_OBJ_API(dev)->dec_count(&dev->dev_obj);
@@ -915,7 +915,7 @@ extern void se_dev_stop (se_device_t *dev)
  */
 extern int iscsi_dev_add_lun (
 	iscsi_portal_group_t *tpg,
-	iscsi_hba_t *hba,
+	se_hba_t *hba,
 	se_device_t *dev,
 	iscsi_dev_transport_info_t *dti)
 {

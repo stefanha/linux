@@ -330,12 +330,12 @@ extern int iscsi_close(struct inode *inode, struct file *filp)
 }
 
 /*
- * In T/I mode, used by initiator to release iscsi_hba_t from storage engine
+ * In T/I mode, used by initiator to release se_hba_t from storage engine
  * before LUN shutdown.
  */
 extern int se_delhbafromtarget (void *p)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	int ret;
 
 	if (!(hba = iscsi_get_hba_from_ptr(p)))
@@ -364,7 +364,7 @@ extern int iscsi_ioctl (
 	se_device_t *dev = NULL;
 	iscsi_devinfo_t dev_info;
 	iscsi_dev_transport_info_t devt_info;
-	iscsi_hba_t *hba = NULL;
+	se_hba_t *hba = NULL;
 	iscsi_hbainfo_t hba_info;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_session_t	*sess = NULL;

@@ -891,7 +891,7 @@ extern void core_release_nps (void)
 //#warning FIXME v2.8: Need to move these pieces into feature plugin allocation routines
 static int init_iscsi_global (iscsi_global_t *global)
 {
-	iscsi_hba_t *hba;
+	se_hba_t *hba;
 	int i;
 	
 	memset(global, 0, sizeof(iscsi_global_t));
@@ -910,11 +910,11 @@ static int init_iscsi_global (iscsi_global_t *global)
 	INIT_LIST_HEAD(&global->g_tiqn_list);
 	INIT_LIST_HEAD(&global->g_np_list);
 	
-	if (!(global->hba_list = kmalloc((sizeof(iscsi_hba_t) * ISCSI_MAX_GLOBAL_HBAS), GFP_KERNEL))) {
+	if (!(global->hba_list = kmalloc((sizeof(se_hba_t) * ISCSI_MAX_GLOBAL_HBAS), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate global->hba_list\n");
 		goto out;
 	}
-	memset(global->hba_list, 0, (sizeof(iscsi_hba_t) * ISCSI_MAX_GLOBAL_HBAS));
+	memset(global->hba_list, 0, (sizeof(se_hba_t) * ISCSI_MAX_GLOBAL_HBAS));
 
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
 		hba = &global->hba_list[i];

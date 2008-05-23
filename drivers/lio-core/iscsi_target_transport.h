@@ -106,8 +106,8 @@ extern void transport_add_tasks_from_cmd (struct iscsi_cmd_s *);
 extern struct se_task_s *transport_get_task_from_execute_queue (struct iscsi_device_s *);
 extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
 extern int transport_check_device_tcq (se_device_t *, u32, u32);
-extern iscsi_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
-extern se_device_t *transport_add_device_to_iscsi_hba (iscsi_hba_t *, struct iscsi_transport_s *, u32, void *);
+extern se_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
+extern se_device_t *transport_add_device_to_iscsi_hba (se_hba_t *, struct iscsi_transport_s *, u32, void *);
 extern void transport_generic_activate_device (se_device_t *);
 extern void transport_generic_deactivate_device (se_device_t *);
 extern int transport_generic_claim_phydevice (se_device_t *);
@@ -294,23 +294,23 @@ typedef struct iscsi_transport_s {
 	/*
 	 * attach_hba():
 	 */
-	int (*attach_hba)(iscsi_portal_group_t *, iscsi_hba_t *, iscsi_hbainfo_t *);
+	int (*attach_hba)(iscsi_portal_group_t *, se_hba_t *, iscsi_hbainfo_t *);
 	/*
 	 * detach_hba():
 	 */
-	int (*detach_hba)(struct iscsi_hba_s *);
+	int (*detach_hba)(struct se_hba_s *);
 	/*
 	 * claim_phydevice(): Only for Physical HBAs
 	 */
-	int (*claim_phydevice)(struct iscsi_hba_s *, struct iscsi_device_s *);
+	int (*claim_phydevice)(struct se_hba_s *, struct iscsi_device_s *);
 	/*
 	 * create_virtdevice(): Only for Virtual HBAs
 	 */
-	int (*create_virtdevice)(struct iscsi_hba_s *, struct iscsi_devinfo_s *);
+	int (*create_virtdevice)(struct se_hba_s *, struct iscsi_devinfo_s *);
 	/*
 	 * scan_devices(): Only for Physical HBAs
 	 */
-	int (*scan_devices)(struct iscsi_hba_s *, struct iscsi_hbainfo_s *);
+	int (*scan_devices)(struct se_hba_s *, struct iscsi_hbainfo_s *);
 	/*
 	 * activate_device():
 	 */
@@ -392,7 +392,7 @@ typedef struct iscsi_transport_s {
 	/*
 	 * check_dev_params():
 	 */
-	int (*check_dev_params)(iscsi_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
+	int (*check_dev_params)(se_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
 	/*
 	 * check_virtdev_params():
 	 */
@@ -404,7 +404,7 @@ typedef struct iscsi_transport_s {
 	/*
 	 * get_hba_info():
 	 */
-	void (*get_hba_info)(iscsi_hba_t *, char *, int *);
+	void (*get_hba_info)(se_hba_t *, char *, int *);
 	/*
 	 * get_dev_info():
 	 */
@@ -497,7 +497,7 @@ typedef struct iscsi_transport_s {
 	/*
 	 * shutdown_hba():
 	 */
-	void (*shutdown_hba)(iscsi_hba_t *);
+	void (*shutdown_hba)(se_hba_t *);
 	/*
 	 * write_pending():
 	 */
