@@ -113,7 +113,7 @@ typedef struct iblock_hba_s {
 #ifndef IBLOCK_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * iscsi_transport_spc_t.
+ * se_subsystem_spc_t.
  */
 #define ISCSI_IBLOCK_SPC { \
 	inquiry:		iblock_CDB_inquiry,		\
@@ -124,7 +124,7 @@ typedef struct iblock_hba_s {
 	write_SG:		iblock_CDB_write_SG,		\
 };
 
-iscsi_transport_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
+se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 
 #define ISCSI_IBLOCK { \
 	name:			"iblock",			\

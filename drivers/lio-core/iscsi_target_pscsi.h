@@ -109,7 +109,7 @@ typedef struct pscsi_plugin_task_s {
 
 /*
  * We use the generic command sequencer, so we must setup
- * iscsi_transport_spc_t.
+ * se_subsystem_spc_t.
  */
 #ifndef PSCSI_INCLUDE_STRUCTS
 #define ISCSI_PSCSI_SPC { \
@@ -121,7 +121,7 @@ typedef struct pscsi_plugin_task_s {
 	write_SG:		pscsi_CDB_write_SG,		\
 };
 
-iscsi_transport_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
+se_subsystem_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 
 #define ISCSI_PSCSI { \
 	name:			"pscsi",			\

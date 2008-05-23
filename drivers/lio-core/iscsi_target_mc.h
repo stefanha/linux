@@ -146,7 +146,7 @@ typedef struct mc_host_s {
 #ifndef MC_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * iscsi_transport_spc_t.
+ * se_subsystem_spc_t.
  */
 #define ISCSI_MC_SPC {					\
 	inquiry:		mc_CDB_inquiry,			\
@@ -157,7 +157,7 @@ typedef struct mc_host_s {
 	write_SG:		mc_CDB_write_SG,		\
 };
 
-iscsi_transport_spc_t mc_template_spc = ISCSI_MC_SPC;
+se_subsystem_spc_t mc_template_spc = ISCSI_MC_SPC;
 
 #define ISCSI_MC {						\
 	name:			"media changer",		\

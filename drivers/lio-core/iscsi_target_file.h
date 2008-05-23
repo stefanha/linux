@@ -142,7 +142,7 @@ typedef struct fd_host_s {
 #ifndef FD_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * iscsi_transport_spc_t.
+ * se_subsystem_spc_t.
  */
 #define ISCSI_FILEIO_SPC {					\
 	inquiry:		fd_CDB_inquiry,			\
@@ -153,7 +153,7 @@ typedef struct fd_host_s {
 	write_SG:		fd_CDB_write_SG,		\
 };
 
-iscsi_transport_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
+se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 
 //#warning FIXME v2.8: transport_type for FILEIO will need to change with DIRECT_IO to blockdevs
 

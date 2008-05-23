@@ -136,7 +136,7 @@ typedef struct vt_host_s {
 #ifndef VT_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * iscsi_transport_spc_t.
+ * se_subsystem_spc_t.
  */
 #define ISCSI_VTAPE_SPC {					\
 	inquiry:		vt_CDB_inquiry,			\
@@ -147,7 +147,7 @@ typedef struct vt_host_s {
 	write_SG:		vt_CDB_write_SG,		\
 };
 
-iscsi_transport_spc_t vtape_template_spc = ISCSI_VTAPE_SPC;
+se_subsystem_spc_t vtape_template_spc = ISCSI_VTAPE_SPC;
 
 #define ISCSI_VTAPE {						\
 	name:			"vtape",			\

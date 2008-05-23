@@ -265,14 +265,14 @@ typedef struct iscsi_transform_info_s {
  * Each type of DAS transport that uses the generic command sequencer needs
  * each of the following function pointers set. 
  */
-typedef struct iscsi_transport_spc_s {
+typedef struct se_subsystem_spc_s {
 	int (*inquiry)(se_task_t *, u32);
 	int (*none)(se_task_t *, u32);
 	int (*read_non_SG)(se_task_t *, u32);
 	int (*read_SG)(se_task_t *, u32);
 	int (*write_non_SG)(se_task_t *, u32);
 	int (*write_SG)(se_task_t *, u32);
-} iscsi_transport_spc_t;
+} se_subsystem_spc_t;
 
 /*
  * 	Each type of disk transport supported MUST have a template defined
@@ -503,13 +503,13 @@ typedef struct se_subsystem_api_s {
 	 */
 	int (*write_pending)(se_task_t *);
 	/*
-	 * iscsi_transport_spc_t structure:
+	 * se_subsystem_spc_t structure:
 	 * 
 	 * Contains function pointers of SPC opcodes to call from the generic
 	 * command sequencer into a transport driver if the generic command
 	 * sequencer is used. (ie: cmd_sequencer() is NULL)
 	 */
-	iscsi_transport_spc_t *spc;
+	se_subsystem_spc_t *spc;
 } ____cacheline_aligned se_subsystem_api_t;
 
 #define TRANSPORT(dev)		(dev)->transport

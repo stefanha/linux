@@ -138,7 +138,7 @@ typedef struct rd_host_s {
 #ifndef RD_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * iscsi_transport_spc_t.
+ * se_subsystem_spc_t.
  */
 #define ISCSI_RD_SPC {						\
 	inquiry:		rd_CDB_inquiry,			\
@@ -149,7 +149,7 @@ typedef struct rd_host_s {
 	write_SG:		rd_CDB_write_SG,		\
 };
 
-iscsi_transport_spc_t rd_template_spc = ISCSI_RD_SPC;
+se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 
 #define ISCSI_RD_DR {						\
 	name:			"rd_dr",			\

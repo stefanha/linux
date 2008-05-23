@@ -404,7 +404,7 @@ typedef struct vr_host_s {
 #ifndef VR_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * iscsi_transport_spc_t.
+ * se_subsystem_spc_t.
  */
 #define ISCSI_VROM_SPC {					\
 	inquiry:		vr_CDB_inquiry,			\
@@ -415,7 +415,7 @@ typedef struct vr_host_s {
 	write_SG:		vr_CDB_write_SG,		\
 };
 
-iscsi_transport_spc_t vrom_template_spc = ISCSI_VROM_SPC;
+se_subsystem_spc_t vrom_template_spc = ISCSI_VROM_SPC;
 
 #define ISCSI_VROM {						\
 	name:			"vrom",				\
