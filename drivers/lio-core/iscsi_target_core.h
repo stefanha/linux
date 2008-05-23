@@ -594,7 +594,7 @@ typedef struct se_transport_task_s {
 	struct se_fp_obj_s	*t_fp;
 } ____cacheline_aligned se_transport_task_t;
 
-struct iscsi_device_s;
+struct se_device_s;
 struct iscsi_map_sg_s;
 struct iscsi_unmap_sg_s;
 struct iscsi_transform_info_s;
@@ -701,7 +701,7 @@ typedef struct iscsi_cmd_s {
 	struct iscsi_cmd_s	*t_prev;	/* Previous command in DAS transport list */
 	struct iscsi_cmd_s	*l_next;
 	struct iscsi_cmd_s	*l_prev;
-	struct iscsi_device_s	*iscsi_dev;
+	struct se_device_s	*iscsi_dev;
 	struct se_obj_lun_type_s *se_obj_api;
 	void			*se_obj_ptr;
 	struct se_obj_lun_type_s *se_orig_obj_api;
@@ -1046,7 +1046,7 @@ typedef struct iscsi_dev_entry_s {
  *	Each Real PAS/SAS/SATA/PATA/iBLOCK device that we find upon module init we add 
  *	a iscsi_target_device_t structure to the iSCSI Device List.
  */
-typedef struct iscsi_device_s {
+typedef struct se_device_s {
 	__u8			type;		/* Type of disk transport used for device */
 	__u8			thread_active;	/* Set to 1 if thread is NOT sleeping on thread_sem */
 	__u8			dev_status_timer_flags;
@@ -1099,8 +1099,8 @@ typedef struct iscsi_device_s {
 	struct se_task_s	*state_task_tail;
 	struct se_hba_s		*iscsi_hba;	/* Pointer to associated iSCSI HBA */
 	struct iscsi_transport_s *transport;	/* Pointer to template of function pointers for transport */ 
-	struct iscsi_device_s	*next;		/* Pointer to next device in TPG list */
-	struct iscsi_device_s	*prev;
+	struct se_device_s	*next;		/* Pointer to next device in TPG list */
+	struct se_device_s	*prev;
 }  ____cacheline_aligned se_device_t;
 
 #define ISCSI_DEV(cmd)		((se_device_t *)(cmd)->iscsi_lun->iscsi_dev)

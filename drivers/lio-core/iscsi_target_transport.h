@@ -97,13 +97,13 @@ extern unsigned char *transport_get_iqn_sn (void);
 extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
 extern se_device_t *transport_core_locate_dev (struct iscsi_target *, iscsi_dev_transport_info_t *, int *);
-extern void transport_task_dev_remove_state (struct se_task_s *, struct iscsi_device_s *);
+extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);
 extern int transport_add_cmd_to_queue (struct iscsi_cmd_s *, struct se_queue_obj_s *, u8);
 extern void transport_complete_cmd (iscsi_cmd_t *, int);
 extern void transport_complete_task (struct se_task_s *, int);
-extern void transport_add_task_to_execute_queue (struct se_task_s *, struct iscsi_device_s *);
+extern void transport_add_task_to_execute_queue (struct se_task_s *, struct se_device_s *);
 extern void transport_add_tasks_from_cmd (struct iscsi_cmd_s *);
-extern struct se_task_s *transport_get_task_from_execute_queue (struct iscsi_device_s *);
+extern struct se_task_s *transport_get_task_from_execute_queue (struct se_device_s *);
 extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
 extern int transport_check_device_tcq (se_device_t *, u32, u32);
 extern se_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
@@ -137,7 +137,7 @@ extern void transport_generic_request_failure (iscsi_cmd_t *, se_device_t *, int
 extern void transport_direct_request_timeout (iscsi_cmd_t *);
 extern void transport_generic_request_timeout (iscsi_cmd_t *);
 extern int transport_generic_allocate_buf (iscsi_cmd_t *, u32, u32);
-extern int __transport_execute_tasks (struct iscsi_device_s *);
+extern int __transport_execute_tasks (struct se_device_s *);
 extern void transport_new_cmd_failure (struct iscsi_cmd_s *);
 extern void transport_start_task_timer (struct se_task_s *);
 extern void __transport_stop_task_timer (struct se_task_s *, unsigned long *);
@@ -254,7 +254,7 @@ typedef struct iscsi_transform_info_s {
 	u32		ti_data_length;
 	unsigned long long	ti_lba;
         struct iscsi_cmd_s *ti_cmd;
-        struct iscsi_device_s *ti_dev;
+        struct se_device_s *ti_dev;
 	void *se_obj_ptr;
 	void *ti_obj_ptr;
 	struct se_obj_lun_type_s *se_obj_api;
@@ -302,7 +302,7 @@ typedef struct iscsi_transport_s {
 	/*
 	 * claim_phydevice(): Only for Physical HBAs
 	 */
-	int (*claim_phydevice)(struct se_hba_s *, struct iscsi_device_s *);
+	int (*claim_phydevice)(struct se_hba_s *, struct se_device_s *);
 	/*
 	 * create_virtdevice(): Only for Virtual HBAs
 	 */
@@ -314,19 +314,19 @@ typedef struct iscsi_transport_s {
 	/*
 	 * activate_device():
 	 */
-	int (*activate_device)(struct iscsi_device_s *);
+	int (*activate_device)(struct se_device_s *);
 	/*
 	 * deactivate_device():
 	 */
-	void (*deactivate_device)(struct iscsi_device_s *);
+	void (*deactivate_device)(struct se_device_s *);
 	/*
 	 * release_phydevice():
 	 */
-	int (*release_phydevice)(struct iscsi_device_s *);
+	int (*release_phydevice)(struct se_device_s *);
 	/*
 	 * free_device():
 	 */
-	void (*free_device)(struct iscsi_device_s *);
+	void (*free_device)(struct se_device_s *);
 	/*
 	 * check_device_location():
 	 */
