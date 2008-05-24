@@ -5577,45 +5577,7 @@ extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 {
 	int ret = 0;
 	se_transform_info_t ti;
-#if 0 /* Cache stuff */
-	int cache_hit = 0;
-	iscsi_cache_entry_t *ce;
-	iscsi_cache_check_entry_t cce;
 
-	/*
-	 * Non-DATA CDBs never make it into the cache.
-	 */
-	if (cmd->data_direction == ISCSI_NONE)
-		goto allocate_resources;
-	
-	/*
-	 * See if the LBA/SECTORS combination from the received CDB is
-	 * already in the cache.
-	 */
-	memset(&cce, 0, sizeof(iscsi_cache_check_entry_t));
-	cce.lba = 0;
-	cce.sectors = 0;
-	
-	if ((ce = iscsi_cache_check_for_entry(&cce, cmd))) {
-		/*
-		 * Got a hit!  Set the required T_TASK(cmd)-> values
-		 * that cmd->transport_allocate_resources() would normally
-		 * set during a cache miss from the returned iscsi_cache_entry_t.
-		 */
-		cache_hit = 1;
-		T_TASK(cmd)->t_task_buf = ce->ce_task_buf;
-		T_TASK(cmd)->t_task_se_num = ce->ce_task_sg_num;
-		goto allocate_iovecs;
-	}
-#endif
-#if 0 /* Readahead stuff */
-	/*
-	 * Check if we want to do Readahead here.
-	 */
-	if ((cmd->data_direction == ISCSI_READ) &&
-	    (ISCSI_DEV(cmd)->dev_flags & DF_READAHEAD_ACTIVE))
-		iscsi_ra_check(cmd);
-#endif	
 	/*
 	 * Generate se_task_t(s) and/or their payloads for this CDB.
 	 */
