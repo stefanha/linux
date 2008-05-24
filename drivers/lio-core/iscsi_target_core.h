@@ -820,7 +820,7 @@ typedef struct iscsi_conn_s {
 	struct iscsi_login_thread_s *login_thread;
 	struct iscsi_portal_group_s *tpg;
 	struct iscsi_session_s	*sess;		/* Pointer to parent session */
-	struct iscsi_thread_set_s *thread_set;	/* Pointer to thread_set in use for this conn's threads */
+	struct se_thread_set_s	*thread_set;	/* Pointer to thread_set in use for this conn's threads */
 	struct iscsi_conn_s 	*next;		/* Pointer to next connection in session */
 	struct iscsi_conn_s	*prev;
 } ____cacheline_aligned iscsi_conn_t;
@@ -1399,10 +1399,10 @@ typedef struct se_global_s {
 #ifdef DEBUG_DEV
 	spinlock_t		debug_dev_lock;
 #endif
-	iscsi_thread_set_t	*active_ts_head;
-	iscsi_thread_set_t	*active_ts_tail;
-	iscsi_thread_set_t	*inactive_ts_head;
-	iscsi_thread_set_t	*inactive_ts_tail;
+	se_thread_set_t		*active_ts_head;
+	se_thread_set_t		*active_ts_tail;
+	se_thread_set_t		*inactive_ts_head;
+	se_thread_set_t		*inactive_ts_tail;
 	iscsi_tiqn_t		*global_tiqn;
 } ____cacheline_aligned se_global_t;
 

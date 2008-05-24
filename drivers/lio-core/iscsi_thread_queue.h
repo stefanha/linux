@@ -28,16 +28,16 @@
  * Defines for thread sets.
  */
 extern int iscsi_thread_set_force_reinstatement (iscsi_conn_t *);
-extern void iscsi_add_ts_to_inactive_list (struct iscsi_thread_set_s *);
+extern void iscsi_add_ts_to_inactive_list (struct se_thread_set_s *);
 extern int iscsi_allocate_thread_sets (u32, int);
 extern void iscsi_deallocate_thread_sets (int);
-extern void iscsi_activate_thread_set (iscsi_conn_t *, struct iscsi_thread_set_s *);
-extern struct iscsi_thread_set_s *iscsi_get_thread_set (int);
+extern void iscsi_activate_thread_set (iscsi_conn_t *, struct se_thread_set_s *);
+extern struct se_thread_set_s *iscsi_get_thread_set (int);
 extern void iscsi_set_thread_clear (iscsi_conn_t *, u8);
 extern void iscsi_set_thread_set_signal (iscsi_conn_t *, u8);
 extern int iscsi_release_thread_set (iscsi_conn_t *, int);
-extern iscsi_conn_t *iscsi_rx_thread_pre_handler (struct iscsi_thread_set_s *, int);
-extern iscsi_conn_t *iscsi_tx_thread_pre_handler (struct iscsi_thread_set_s *, int);
+extern iscsi_conn_t *iscsi_rx_thread_pre_handler (struct se_thread_set_s *, int);
+extern iscsi_conn_t *iscsi_tx_thread_pre_handler (struct se_thread_set_s *, int);
 
 #define INITIATOR_THREAD_SET_COUNT		4
 #define TARGET_THREAD_SET_COUNT			4
@@ -53,14 +53,14 @@ extern iscsi_conn_t *iscsi_tx_thread_pre_handler (struct iscsi_thread_set_s *, i
 #define ISCSI_SIGNAL_RX_THREAD			0x1
 #define ISCSI_SIGNAL_TX_THREAD			0x2
 
-/* iscsi_thread_set_t->status */
+/* se_thread_set_t->status */
 #define ISCSI_THREAD_SET_FREE			1
 #define ISCSI_THREAD_SET_ACTIVE			2
 #define ISCSI_THREAD_SET_DIE			3
 #define ISCSI_THREAD_SET_RESET			4
 #define ISCSI_THREAD_SET_DEALLOCATE_THREADS	5
 
-typedef struct iscsi_thread_set_s {
+typedef struct se_thread_set_s {
 	u8			blocked_threads; /* flags used for blocking and restarting sets */
 	u8			create_threads;	/* flag for creating threads */
 	u8			delay_inactive; /* flag for delaying readding to inactive list */
@@ -85,9 +85,9 @@ typedef struct iscsi_thread_set_s {
 	struct semaphore		tx_start_sem;	/* used for normal unused blocking */
 	struct task_struct		*rx_thread;	/* OS descriptor for rx thread */
 	struct task_struct		*tx_thread;	/* OS descriptor for tx thread */
-	struct iscsi_thread_set_s *next;	/* next iscsi_thread_set_t in list */
-	struct iscsi_thread_set_s *prev;	/* previous iscsi_thread_set_t in list */
-} iscsi_thread_set_t;
+	struct se_thread_set_s *next;	/* next se_thread_set_t in list */
+	struct se_thread_set_s *prev;	/* previous se_thread_set_t in list */
+} se_thread_set_t;
 
 #endif   /*** ISCSI_THREAD_QUEUE_H ***/
 

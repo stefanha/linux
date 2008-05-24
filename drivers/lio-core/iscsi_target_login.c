@@ -540,7 +540,7 @@ static int iscsi_post_login_handler (iscsi_np_t *np, iscsi_conn_t *conn, __u8 ze
 	unsigned char *ip, *ip_np;
 	iscsi_session_t *sess = SESS(conn);
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	iscsi_thread_set_t *ts;
+	se_thread_set_t *ts;
 
 	iscsi_inc_conn_usage_count(conn);
 

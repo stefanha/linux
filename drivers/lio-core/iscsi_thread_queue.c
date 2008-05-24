@@ -51,7 +51,7 @@ extern se_global_t *iscsi_global;
  *
  *
  */
-static void iscsi_add_ts_to_active_list (iscsi_thread_set_t *ts)
+static void iscsi_add_ts_to_active_list (se_thread_set_t *ts)
 {
 	TRACE_ENTER
 #if 0
@@ -70,7 +70,7 @@ static void iscsi_add_ts_to_active_list (iscsi_thread_set_t *ts)
  *
  *
  */
-extern void iscsi_add_ts_to_inactive_list (iscsi_thread_set_t *ts)
+extern void iscsi_add_ts_to_inactive_list (se_thread_set_t *ts)
 {
 	TRACE_ENTER
 #if 0
@@ -89,7 +89,7 @@ extern void iscsi_add_ts_to_inactive_list (iscsi_thread_set_t *ts)
  *
  *
  */
-static void iscsi_del_ts_from_active_list (iscsi_thread_set_t *ts)
+static void iscsi_del_ts_from_active_list (se_thread_set_t *ts)
 {
 	TRACE_ENTER
 #if 0
@@ -112,9 +112,9 @@ static void iscsi_del_ts_from_active_list (iscsi_thread_set_t *ts)
  *
  *
  */
-static iscsi_thread_set_t *iscsi_get_ts_from_inactive_list (void)
+static se_thread_set_t *iscsi_get_ts_from_inactive_list (void)
 {
-	iscsi_thread_set_t *ts;
+	se_thread_set_t *ts;
 
 	TRACE_ENTER
 
@@ -147,18 +147,18 @@ static iscsi_thread_set_t *iscsi_get_ts_from_inactive_list (void)
 extern int iscsi_allocate_thread_sets (u32 thread_pair_count, int role)
 {
 	int allocated_thread_pair_count = 0, i;
-	iscsi_thread_set_t *ts = NULL;
+	se_thread_set_t *ts = NULL;
 
 	TRACE_ENTER
 
 	for (i = 0; i < thread_pair_count; i++) {
-		if (!(ts = (iscsi_thread_set_t *) kmalloc(
-				sizeof(iscsi_thread_set_t), GFP_KERNEL))) {
+		if (!(ts = (se_thread_set_t *) kmalloc(
+				sizeof(se_thread_set_t), GFP_KERNEL))) {
 			TRACE_ERROR("Unable to allocate memory for thread set.\n");
 			return(allocated_thread_pair_count);
 		}
 
-		memset(ts, 0, sizeof(iscsi_thread_set_t));
+		memset(ts, 0, sizeof(se_thread_set_t));
 		ts->status = ISCSI_THREAD_SET_FREE;
 		spin_lock_init(&ts->ts_state_lock);
 		init_MUTEX_LOCKED(&ts->stop_active_sem);
@@ -203,7 +203,7 @@ extern int iscsi_allocate_thread_sets (u32 thread_pair_count, int role)
 extern void iscsi_deallocate_thread_sets (int role)
 {
 	u32 released_count = 0;
-	iscsi_thread_set_t *ts = NULL;
+	se_thread_set_t *ts = NULL;
 	
 	TRACE_ENTER
 
@@ -246,7 +246,7 @@ extern void iscsi_deallocate_thread_sets (int role)
 static void iscsi_deallocate_extra_thread_sets (int role)
 {
 	u32 orig_count, released_count = 0;
-	iscsi_thread_set_t *ts = NULL;
+	se_thread_set_t *ts = NULL;
 
 	TRACE_ENTER
 
@@ -291,7 +291,7 @@ static void iscsi_deallocate_extra_thread_sets (int role)
  *
  *
  */
-extern void iscsi_activate_thread_set (iscsi_conn_t *conn, iscsi_thread_set_t *ts)
+extern void iscsi_activate_thread_set (iscsi_conn_t *conn, se_thread_set_t *ts)
 {
 	TRACE_ENTER
 
@@ -330,12 +330,12 @@ static void iscsi_get_thread_set_timeout (unsigned long data)
  *	Parameters:	iSCSI Connection Pointer.
  *	Returns:	iSCSI Thread Set Pointer
  */
-extern iscsi_thread_set_t *iscsi_get_thread_set (int role)
+extern se_thread_set_t *iscsi_get_thread_set (int role)
 {
 	int allocate_ts = 0;
 	struct semaphore sem;
 	struct timer_list timer;
-	iscsi_thread_set_t *ts = NULL;
+	se_thread_set_t *ts = NULL;
 
 	TRACE_ENTER
 
@@ -377,7 +377,7 @@ get_set:
  */
 extern void iscsi_set_thread_clear (iscsi_conn_t *conn, u8 thread_clear)
 {
-	iscsi_thread_set_t *ts = NULL;
+	se_thread_set_t *ts = NULL;
 
 	TRACE_ENTER
 
@@ -408,7 +408,7 @@ extern void iscsi_set_thread_clear (iscsi_conn_t *conn, u8 thread_clear)
  */
 extern void iscsi_set_thread_set_signal (iscsi_conn_t *conn, u8 signal_sent)
 {
-	iscsi_thread_set_t *ts = NULL;
+	se_thread_set_t *ts = NULL;
 
 	TRACE_ENTER
 
@@ -434,7 +434,7 @@ extern void iscsi_set_thread_set_signal (iscsi_conn_t *conn, u8 signal_sent)
 extern int iscsi_release_thread_set (iscsi_conn_t *conn, int role)
 {
 	int thread_called = 0;
-	iscsi_thread_set_t *ts = NULL;
+	se_thread_set_t *ts = NULL;
 
 	TRACE_ENTER
 
@@ -509,7 +509,7 @@ extern int iscsi_release_thread_set (iscsi_conn_t *conn, int role)
  */
 extern int iscsi_thread_set_force_reinstatement (iscsi_conn_t *conn)
 {
-	iscsi_thread_set_t *ts;
+	se_thread_set_t *ts;
 	
 	TRACE_ENTER
 
@@ -569,7 +569,7 @@ static void iscsi_check_to_add_additional_sets (int role)
  *
  *
  */
-static int iscsi_signal_thread_pre_handler (iscsi_thread_set_t *ts)
+static int iscsi_signal_thread_pre_handler (se_thread_set_t *ts)
 {
 #if 0
 	printk("ts->thread_id: %d ts->status = %d%s\n", ts->thread_id,
@@ -589,7 +589,7 @@ static int iscsi_signal_thread_pre_handler (iscsi_thread_set_t *ts)
  *
  *
  */
-extern iscsi_conn_t *iscsi_rx_thread_pre_handler (iscsi_thread_set_t *ts, int role)
+extern iscsi_conn_t *iscsi_rx_thread_pre_handler (se_thread_set_t *ts, int role)
 {
 	TRACE_ENTER
 
@@ -630,7 +630,7 @@ sleep:
 		return(NULL);
 		
 	if (!ts->conn) {
-		TRACE_ERROR("iscsi_thread_set_t->conn is NULL for thread_id: %d"
+		TRACE_ERROR("se_thread_set_t->conn is NULL for thread_id: %d"
 			", going back to sleep\n", ts->thread_id);
 		goto sleep;
 	}
@@ -651,7 +651,7 @@ sleep:
  *
  *
  */
-extern iscsi_conn_t *iscsi_tx_thread_pre_handler (iscsi_thread_set_t *ts, int role)
+extern iscsi_conn_t *iscsi_tx_thread_pre_handler (se_thread_set_t *ts, int role)
 {
 	TRACE_ENTER
 
@@ -692,7 +692,7 @@ sleep:
 		return(NULL);
 
 	if (!ts->conn) {
-		TRACE_ERROR("iscsi_thread_set_t->conn is NULL for thread_id: %d"
+		TRACE_ERROR("se_thread_set_t->conn is NULL for thread_id: %d"
 			", going back to sleep\n", ts->thread_id);
 		goto sleep;
 	}

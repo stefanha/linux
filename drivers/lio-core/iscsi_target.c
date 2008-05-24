@@ -4130,7 +4130,7 @@ extern int iscsi_target_tx_thread (void *arg)
 	iscsi_cmd_t *cmd = NULL;
 	iscsi_conn_t *conn;
 	iscsi_queue_req_t *qr = NULL;
-	iscsi_thread_set_t *ts = (iscsi_thread_set_t *) arg;
+	se_thread_set_t *ts = (se_thread_set_t *) arg;
 	iscsi_unmap_sg_t unmap_sg;
 
 	TRACE_ENTER
@@ -4457,7 +4457,7 @@ extern int iscsi_target_rx_thread (void *arg)
 	__u8 buffer[ISCSI_HDR_LEN], opcode;
 	__u32 checksum = 0, digest = 0;
 	iscsi_conn_t *conn = NULL;
-	iscsi_thread_set_t *ts = (iscsi_thread_set_t *) arg;
+	se_thread_set_t *ts = (se_thread_set_t *) arg;
 	struct iovec iov;
 
         {
