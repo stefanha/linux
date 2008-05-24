@@ -264,7 +264,7 @@
 #define VTAPE					9
 #define MEDIA_CHANGER				10
 
-/* iscsi_dev_entry_t->lun_flags and iscsi_lun_t->lun_access */
+/* se_dev_entry_t->lun_flags and iscsi_lun_t->lun_access */
 #define ISCSI_LUNFLAGS_NO_ACCESS		0x00000000
 #define ISCSI_LUNFLAGS_INITIATOR_ACCESS		0x00000001
 #define ISCSI_LUNFLAGS_READ_ONLY		0x00000002
@@ -692,7 +692,7 @@ typedef struct iscsi_cmd_s {
 	struct iscsi_conn_s 	*conn;		/* Connection this command is alligient to */
 	struct iscsi_conn_recovery_s *cr;	/* Pointer to connection recovery entry */
 	struct iscsi_session_s	*sess;		/* Session the command is part of,  used for connection recovery */
-	struct iscsi_dev_entry_s *iscsi_deve;
+	struct se_dev_entry_s	*iscsi_deve;
 	struct iscsi_lun_s	*iscsi_lun;	/* iSCSI device/LUN this commands belongs to */
 	struct iscsi_cmd_s	*next;		/* Next command in the session pool */
 	struct iscsi_cmd_s	*i_next;	/* Next command in connection list */
@@ -1025,7 +1025,7 @@ typedef struct iscsi_cache_check_entry_s {
 	u32		sectors;
 }  ____cacheline_aligned iscsi_cache_check_entry_t;
 
-typedef struct iscsi_dev_entry_s {
+typedef struct se_dev_entry_s {
 	__u32			lun_flags;
 	__u32			deve_cmds;
 	__u32			mapped_lun;
@@ -1040,7 +1040,7 @@ typedef struct iscsi_dev_entry_s {
 	__u64			write_bytes;
 #endif /* SNMP_SUPPORT */
 	struct iscsi_lun_s	*iscsi_lun;
-}  ____cacheline_aligned iscsi_dev_entry_t;
+}  ____cacheline_aligned se_dev_entry_t;
 
 /*
  *	Each Real PAS/SAS/SATA/PATA/iBLOCK device that we find upon module init we add 
@@ -1184,7 +1184,7 @@ typedef struct iscsi_node_acl_s {
 	u64			write_bytes;
 	spinlock_t		stats_lock;
 #endif /* SNMP_SUPPORT */
-	iscsi_dev_entry_t	*device_list;
+	se_dev_entry_t		*device_list;
 	spinlock_t		device_list_lock;
 	iscsi_node_attrib_t	node_attrib;
 	struct iscsi_portal_group_s *tpg;

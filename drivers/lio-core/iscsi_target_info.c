@@ -924,7 +924,7 @@ extern int iscsi_tpg_get_tpg_info (
 	unsigned char *ip, *ip_ex;
 	int j, start = 0;
 	int bl = 0, cl = 0, oob = 1;
-	iscsi_dev_entry_t *deve = NULL;
+	se_dev_entry_t *deve = NULL;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_node_acl_t *acl = NULL;
 	iscsi_np_ex_t *np_ex;

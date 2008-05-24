@@ -255,7 +255,7 @@ extern int iscsi_build_report_luns_response (
 	u32 cdb_offset = 0, lun_count = 0, offset = 8;
 	u64 i, lun;
 	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 	iscsi_lun_t *iscsi_lun;
 	iscsi_session_t *sess = SESS(conn);
 	se_task_t *task;

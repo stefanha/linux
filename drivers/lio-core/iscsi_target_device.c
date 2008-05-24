@@ -162,7 +162,7 @@ extern iscsi_lun_t *iscsi_get_lun (
 	u64 lun)
 {
 	u32 unpacked_lun;
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 	iscsi_lun_t *iscsi_lun = NULL;
 	iscsi_portal_group_t *tpg = conn->tpg;
 	iscsi_session_t *sess = SESS(conn);
@@ -206,7 +206,7 @@ extern int iscsi_get_lun_for_cmd (
 	int ret = -1;
 	u32 unpacked_lun;
 	iscsi_conn_t *conn= CONN(cmd);
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 	iscsi_lun_t *iscsi_lun = NULL;
 	iscsi_portal_group_t *tpg = conn->tpg;
 	iscsi_session_t *sess = SESS(conn);
@@ -381,13 +381,13 @@ extern int iscsi_set_queue_depth_for_node (
  */
 extern int iscsi_create_device_list_for_node (iscsi_node_acl_t *nacl, iscsi_portal_group_t *tpg)
 {
-	if (!(nacl->device_list = (iscsi_dev_entry_t *) kmalloc(
-			sizeof(iscsi_dev_entry_t) * ISCSI_MAX_LUNS_PER_TPG, GFP_KERNEL))) {
+	if (!(nacl->device_list = (se_dev_entry_t *) kmalloc(
+			sizeof(se_dev_entry_t) * ISCSI_MAX_LUNS_PER_TPG, GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for session"
 				" device list.\n");
 		return(-1);
 	}
-	memset(nacl->device_list, 0, sizeof(iscsi_dev_entry_t) *
+	memset(nacl->device_list, 0, sizeof(se_dev_entry_t) *
 			ISCSI_MAX_LUNS_PER_TPG);
 
 	return(0);
@@ -400,7 +400,7 @@ extern int iscsi_create_device_list_for_node (iscsi_node_acl_t *nacl, iscsi_port
 extern int iscsi_free_device_list_for_node (iscsi_node_acl_t *nacl, iscsi_portal_group_t *tpg)
 {
 	__u32 i;
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 	iscsi_lun_t *iscsi_lun;
 
 	if (!nacl->device_list)
@@ -439,7 +439,7 @@ static int iscsi_check_device_list_access (
 	iscsi_node_acl_t *nacl)
 {
 	int ret = 0;
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 	
 	spin_lock_bh(&nacl->device_list_lock);
 	deve = &nacl->device_list[mapped_lun];
@@ -455,7 +455,7 @@ extern int iscsi_update_device_list_access (
 	u32 lun_access,
 	iscsi_node_acl_t *nacl)
 {
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	deve = &nacl->device_list[mapped_lun];
@@ -491,7 +491,7 @@ extern void iscsi_update_device_list_for_node (
 	int enable)
 {
 	int status = 0;
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	deve = &nacl->device_list[mapped_lun];
@@ -629,7 +629,7 @@ extern void iscsi_clear_lun_from_tpg (iscsi_lun_t *lun, iscsi_portal_group_t *tp
 {
 	u32 i;
         iscsi_node_acl_t *nacl, *nacl_next;
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 
         spin_lock_bh(&tpg->acl_node_lock);
         nacl = tpg->acl_node_head;

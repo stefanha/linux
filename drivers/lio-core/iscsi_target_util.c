@@ -1141,7 +1141,7 @@ extern void iscsi_release_cmd_direct (iscsi_cmd_t *cmd)
 
 extern void iscsi_dec_nacl_count (iscsi_node_acl_t *nacl, iscsi_cmd_t *cmd)
 {
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 
 	if (!cmd)
 		return;
@@ -2040,7 +2040,7 @@ static void iscsi_update_counters (iscsi_conn_t *conn, u32 timeout)
 {
 	u32 i;
 	u64 this_count, last_count;
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 	iscsi_node_acl_t *node_acl = SESS(conn)->node_acl;
 
 	spin_lock_bh(&node_acl->device_list_lock);

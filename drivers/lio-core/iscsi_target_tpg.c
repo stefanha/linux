@@ -298,7 +298,7 @@ static void iscsi_clear_initiator_node_from_tpg (
 	iscsi_portal_group_t *tpg)
 {
 	int i;
-	iscsi_dev_entry_t *deve;
+	se_dev_entry_t *deve;
 	iscsi_lun_t *lun;
 	iscsi_lun_acl_t *acl;
 
