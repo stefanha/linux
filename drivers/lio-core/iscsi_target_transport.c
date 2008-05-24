@@ -207,7 +207,7 @@
 #define DEBUG_GRF(x...)
 #endif
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
 extern int iscsi_release_sessions_for_tpg (iscsi_portal_group_t *, int);
 extern int iscsi_stop_session (iscsi_session_t *, int, int);

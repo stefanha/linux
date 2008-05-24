@@ -44,7 +44,7 @@
 
 #undef ISCSI_TARGET_DISCOVERY_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern void iscsi_ntoa2 (unsigned char *, __u32);
 
 /*	iscsi_build_sendtargets_response():

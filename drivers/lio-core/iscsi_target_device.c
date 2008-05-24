@@ -62,7 +62,7 @@
 
 #undef ISCSI_TARGET_DEVICE_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern __u32 iscsi_unpack_lun (unsigned char *);
 
 extern int iscsi_check_devices_access (se_hba_t *hba)

@@ -45,7 +45,7 @@ extern int iscsi_target_rx_thread (void *);
 
 #undef ISCSI_THREAD_QUEUE_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 /*	iscsi_add_ts_to_active_list():
  *

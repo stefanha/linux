@@ -49,7 +49,7 @@
 
 #undef ISCSI_TARGET_DATAIN_VALUES_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 extern iscsi_datain_req_t *iscsi_allocate_datain_req (void)
 {

@@ -58,7 +58,7 @@
 
 #undef ISCSI_TARGET_ERL1_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern int iscsi_add_reject_from_cmd (u8, int, int, unsigned char *, iscsi_cmd_t *);
 extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
 extern int iscsi_build_report_luns_response (iscsi_cmd_t *);

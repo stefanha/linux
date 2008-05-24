@@ -72,7 +72,7 @@ typedef struct scsi_pointer Scsi_Pointer;
 #warning FIXME: Obtain via IOCTL for Initiator Drivers
 #define INIT_CORE_NAME          "SBE, Inc. iSCSI Initiator Core"
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern struct block_device *linux_blockdevice_claim(int, int, void *);
 extern int linux_blockdevice_release(int, int, struct block_device *);
 extern int linux_blockdevice_check(int, int);

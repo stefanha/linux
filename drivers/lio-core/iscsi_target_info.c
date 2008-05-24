@@ -69,7 +69,7 @@
 
 #undef ISCSI_TARGET_INFO_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 static int check_and_copy_buf (
 	unsigned char *b,

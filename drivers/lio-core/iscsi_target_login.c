@@ -58,7 +58,7 @@
 
 #undef ISCSI_TARGET_LOGIN_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern int iscsi_close_session (iscsi_session_t *);
 extern int iscsi_stop_session (iscsi_session_t *, int, int);
 

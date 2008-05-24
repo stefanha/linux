@@ -57,7 +57,7 @@
 
 #define MAX_LOGIN_PDUS	7
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 /*	iscsi_target_check_login_request():
  *

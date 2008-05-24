@@ -58,7 +58,7 @@
 
 #undef ISCSI_TARGET_ERL2_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern int iscsi_send_async_msg (iscsi_conn_t *, __u16, __u8, __u8);
 extern int iscsi_close_connection (iscsi_conn_t *);
 

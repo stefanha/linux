@@ -48,7 +48,7 @@
 
 #undef ISCSI_TARGET_DEBUGERL_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 /*	iscsi_target_check_debug_erl():
  *

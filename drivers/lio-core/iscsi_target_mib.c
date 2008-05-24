@@ -55,7 +55,7 @@
 #include <iscsi_target_seobj.h>
 #include <iscsi_target_feature_obj.h>
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 /* iSCSI mib table index */
 iscsi_index_table_t iscsi_index_table;

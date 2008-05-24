@@ -62,7 +62,7 @@
 
 #undef ISCSI_TARGET_LINUX_PROC_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 #define ISCSI_MAX_PROC_LENGTH   PAGE_SIZE
 

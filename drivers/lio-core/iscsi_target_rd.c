@@ -52,7 +52,7 @@
 #include <iscsi_target_rd.h>
 #include <iscsi_target_error.h>
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 //#define DEBUG_RAMDISK_MCP
 //#define DEBUG_RAMDISK_DR

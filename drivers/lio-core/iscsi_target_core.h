@@ -1361,7 +1361,7 @@ typedef struct iscsi_tiqn_s {
 #endif /* SNMP_SUPPORT */
 } ____cacheline_aligned iscsi_tiqn_t;
 
-typedef struct iscsi_global_s {
+typedef struct se_global_s {
 	char			targetname[ISCSI_IQN_LEN]; /* iSCSI Node Name */
 	u32			in_rmmod;	/* In module removal */
 	u32			in_shutdown;	/* In core shutdown */
@@ -1404,7 +1404,7 @@ typedef struct iscsi_global_s {
 	iscsi_thread_set_t	*inactive_ts_head;
 	iscsi_thread_set_t	*inactive_ts_tail;
 	iscsi_tiqn_t		*global_tiqn;
-} ____cacheline_aligned iscsi_global_t;
+} ____cacheline_aligned se_global_t;
 
 #define ISCSI_DEBUG_ERL(g)	((iscsi_debug_erl_t *)(g)->debug_erl)
 

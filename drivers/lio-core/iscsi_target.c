@@ -93,7 +93,7 @@
 
 #undef ISCSI_TARGET_C
 
-iscsi_global_t *iscsi_global = NULL;
+se_global_t *iscsi_global = NULL;
 
 extern struct miscdevice iscsi_dev;
 
@@ -886,15 +886,15 @@ extern void core_release_nps (void)
 
 /* init_iscsi_target():
  *
- * This function is called during module initialization to setup iscsi_global_t.
+ * This function is called during module initialization to setup se_global_t.
  */
 //#warning FIXME v2.8: Need to move these pieces into feature plugin allocation routines
-static int init_iscsi_global (iscsi_global_t *global)
+static int init_iscsi_global (se_global_t *global)
 {
 	se_hba_t *hba;
 	int i;
 	
-	memset(global, 0, sizeof(iscsi_global_t));
+	memset(global, 0, sizeof(se_global_t));
 	init_MUTEX(&global->auth_sem);
 	init_MUTEX(&global->auth_id_sem);
 	spin_lock_init(&global->active_ts_lock);
@@ -1000,7 +1000,7 @@ static const struct file_operations version_info = {
  *	This function is called upon module_init and does the following
  *	actions in said order:
  *
- *	0) Allocates and initializes the iscsi_global_t structure.
+ *	0) Allocates and initializes the se_global_t structure.
  *	1) Registers the character device for the IOCTL.
  *	2) Registers /proc filesystem entries.
  *	3) Creates a lookaside cache entry for the iscsi_cmd_t and 
@@ -1024,8 +1024,8 @@ static int iscsi_target_detect(void)
 	printk("%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on %s/%s on "UTS_RELEASE"\n",
 		PYX_ISCSI_VENDOR, utsname()->sysname, utsname()->machine);
 
-	if (!(iscsi_global = (iscsi_global_t *)kmalloc(
-			sizeof(iscsi_global_t), GFP_KERNEL))) {
+	if (!(iscsi_global = (se_global_t *)kmalloc(
+			sizeof(se_global_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_global\n");
 		return(-1);
 	}

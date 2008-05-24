@@ -55,7 +55,7 @@
 
 #undef ISCSI_TARGET_PLUGIN_C
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 extern void plugin_load_all_classes (void)
 {

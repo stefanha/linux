@@ -51,7 +51,7 @@
 
 #define MC_BUF_LEN 60000
  
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 static void mc_read_element_status(se_task_t *);
 
 static struct hw_s {

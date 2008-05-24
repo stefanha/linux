@@ -51,7 +51,7 @@
 #include <iscsi_target_vt.h>
 #include <iscsi_target_error.h>
  
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 
 static int vt_dev_write_filemark(vt_dev_t *, int);
 static int vt_write_filemark(se_task_t *, int);

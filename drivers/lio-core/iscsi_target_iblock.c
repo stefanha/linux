@@ -53,7 +53,7 @@
 #include <iscsi_target_iblock.h>
 #include <iscsi_target_error.h>
 
-extern iscsi_global_t *iscsi_global;
+extern se_global_t *iscsi_global;
 extern struct block_device *__linux_blockdevice_claim (int, int, void *, int *); 
 extern struct block_device *linux_blockdevice_claim(int, int, void *);
 
