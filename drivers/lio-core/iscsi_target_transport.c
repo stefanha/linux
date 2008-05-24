@@ -54,12 +54,10 @@
 #include <iscsi_target_error.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
-#include <iscsi_target_cache.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_hba.h>
-#include <iscsi_target_ra.h>
 #include <iscsi_target_scdb.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
