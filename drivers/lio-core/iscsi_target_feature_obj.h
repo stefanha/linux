@@ -36,7 +36,7 @@ typedef struct se_feature_plugin_s {
 	int fp_supported_obj;
         void (*get_plugin_info)(void *, char *, int *);
 	void (*get_feature_info)(void *, char *, int *);
-	void (*get_export_info)(void *, struct iscsi_lun_s *, char *, int *);
+	void (*get_export_info)(void *, struct se_lun_s *, char *, int *);
 	int (*feature_activate)(struct se_obj_lun_type_s *, void *);
 	int (*feature_destroy)(struct se_fp_obj_s *);
 	int (*feature_release)(struct se_fp_obj_s *);

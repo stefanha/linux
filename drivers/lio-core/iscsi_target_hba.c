@@ -256,7 +256,7 @@ extern int iscsi_hba_del_hba (
 
 	/*
 	 * Do not allow the se_hba_t to be released if references exist to
-	 * from se_device_t->iscsi_lun_t.
+	 * from se_device_t->se_lun_t.
 	 */
 	if (iscsi_check_devices_access(hba) < 0) {
 		TRACE_ERROR("iSCSI_HBA[%u] - **ERROR** - Unable to release HBA"

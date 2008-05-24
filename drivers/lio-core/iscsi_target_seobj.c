@@ -76,7 +76,7 @@ MAKE_OBJ_TYPE(dev, inc, inc);
 MAKE_OBJ_TYPE(dev, dec, inc);
 MAKE_OBJ_TYPE_RET(dev);
 
-extern void dev_obj_get_obj_info (void *p, iscsi_lun_t *lun, unsigned long long bytes, int state, char *b, int *bl)
+extern void dev_obj_get_obj_info (void *p, se_lun_t *lun, unsigned long long bytes, int state, char *b, int *bl)
 {
 	se_device_t *dev = (se_device_t *)p;
 	
@@ -235,7 +235,7 @@ extern void dev_put_obj (void *p)
 	return;
 }
 
-extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
+extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 {
 	se_device_t *dev  = (se_device_t *)p;
 	se_port_t *sep;
@@ -273,7 +273,7 @@ extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
 	return(0);
 }
 
-extern void dev_obj_unexport (void *p, iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
+extern void dev_obj_unexport (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 {
 	se_device_t *dev  = (se_device_t *)p;
 	se_port_t *sep = lun->lun_sep;
@@ -747,12 +747,12 @@ extern int dev_obj_task_failure_complete (void *p, iscsi_cmd_t *cmd)
 	return(transport_failure_tasks_generic(cmd));
 }
 
-extern int dev_add_obj_to_lun (iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
+extern int dev_add_obj_to_lun (iscsi_portal_group_t *tpg, se_lun_t *lun)
 {
 	return(0);
 }
 
-extern int dev_del_obj_from_lun (iscsi_portal_group_t *tpg, iscsi_lun_t *lun)
+extern int dev_del_obj_from_lun (iscsi_portal_group_t *tpg, se_lun_t *lun)
 {
 	return(iscsi_dev_del_lun(tpg, lun->iscsi_lun));
 }

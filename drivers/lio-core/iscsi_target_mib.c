@@ -1885,7 +1885,7 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 	table_iter_t *iterp = (table_iter_t *)v;
 	iscsi_node_acl_t *acl;
 	se_dev_entry_t *deve;
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	iscsi_tiqn_t *tiqn;
 	int j; 
 
@@ -1991,7 +1991,7 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 	iscsi_sess_ops_t *sops;
 	table_iter_t *iterp = (table_iter_t *)v;
 	se_dev_entry_t *deve;
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	iscsi_tiqn_t *tiqn = (iscsi_tiqn_t *)iterp->ti_ptr;
 	int j;
 

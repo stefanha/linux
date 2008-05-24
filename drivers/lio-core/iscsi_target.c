@@ -2239,7 +2239,7 @@ static inline int iscsi_handle_task_mgt_cmd (
 	int call_transport = 0, cmdsn_ret, out_of_order_cmdsn = 0;
 	iscsi_cmd_t *cmd;
 	se_device_t *dev = NULL;
-	iscsi_lun_t *lun = NULL;
+	se_lun_t *lun = NULL;
 	iscsi_tmr_req_t *tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr;
 

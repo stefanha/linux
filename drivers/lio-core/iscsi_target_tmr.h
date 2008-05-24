@@ -29,11 +29,11 @@
 #ifndef ISCSI_TARGET_TMR_H
 #define ISCSI_TARGET_TMR_H
 
-extern __u8 iscsi_tmr_abort_task (iscsi_conn_t *, iscsi_tmr_req_t *, iscsi_lun_t **, unsigned char *);
-extern __u8 iscsi_tmr_abort_task_set (iscsi_conn_t *, iscsi_tmr_req_t *, iscsi_lun_t **, unsigned char *);
-extern __u8 iscsi_tmr_clear_aca (iscsi_conn_t *, iscsi_tmr_req_t *, iscsi_lun_t **, unsigned char *);
-extern __u8 iscsi_tmr_clear_task_set (iscsi_conn_t *, iscsi_tmr_req_t *, iscsi_lun_t **, unsigned char *);
-extern __u8 iscsi_tmr_lun_reset (iscsi_conn_t *, iscsi_tmr_req_t *, iscsi_lun_t **, unsigned char *);
+extern __u8 iscsi_tmr_abort_task (iscsi_conn_t *, iscsi_tmr_req_t *, se_lun_t **, unsigned char *);
+extern __u8 iscsi_tmr_abort_task_set (iscsi_conn_t *, iscsi_tmr_req_t *, se_lun_t **, unsigned char *);
+extern __u8 iscsi_tmr_clear_aca (iscsi_conn_t *, iscsi_tmr_req_t *, se_lun_t **, unsigned char *);
+extern __u8 iscsi_tmr_clear_task_set (iscsi_conn_t *, iscsi_tmr_req_t *, se_lun_t **, unsigned char *);
+extern __u8 iscsi_tmr_lun_reset (iscsi_conn_t *, iscsi_tmr_req_t *, se_lun_t **, unsigned char *);
 extern __u8 iscsi_tmr_task_warm_reset (iscsi_conn_t *, iscsi_tmr_req_t *, unsigned char *);
 extern __u8 iscsi_tmr_task_cold_reset (iscsi_conn_t *, iscsi_tmr_req_t *, unsigned char *);
 extern __u8 iscsi_tmr_task_reassign (iscsi_conn_t *, iscsi_tmr_req_t *, unsigned char *);

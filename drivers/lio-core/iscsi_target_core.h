@@ -203,11 +203,11 @@
 #define HBA_STATUS_ACTIVE			0x00000002
 #define HBA_STATUS_INACTIVE			0x00000004
 
-/* iscsi_lun_t->lun_status */
+/* se_lun_t->lun_status */
 #define ISCSI_LUN_STATUS_FREE			0
 #define ISCSI_LUN_STATUS_ACTIVE			1
 
-/* iscsi_lun_t->lun_type */
+/* se_lun_t->lun_type */
 #define ISCSI_LUN_TYPE_NONE			0
 #define ISCSI_LUN_TYPE_DEVICE			1
 #define ISCSI_LUN_TYPE_DEVICE_VOLUME		2
@@ -264,7 +264,7 @@
 #define VTAPE					9
 #define MEDIA_CHANGER				10
 
-/* se_dev_entry_t->lun_flags and iscsi_lun_t->lun_access */
+/* se_dev_entry_t->lun_flags and se_lun_t->lun_access */
 #define ISCSI_LUNFLAGS_NO_ACCESS		0x00000000
 #define ISCSI_LUNFLAGS_INITIATOR_ACCESS		0x00000001
 #define ISCSI_LUNFLAGS_READ_ONLY		0x00000002
@@ -693,7 +693,7 @@ typedef struct iscsi_cmd_s {
 	struct iscsi_conn_recovery_s *cr;	/* Pointer to connection recovery entry */
 	struct iscsi_session_s	*sess;		/* Session the command is part of,  used for connection recovery */
 	struct se_dev_entry_s	*iscsi_deve;
-	struct iscsi_lun_s	*iscsi_lun;	/* iSCSI device/LUN this commands belongs to */
+	struct se_lun_s		*iscsi_lun;	/* iSCSI device/LUN this commands belongs to */
 	struct iscsi_cmd_s	*next;		/* Next command in the session pool */
 	struct iscsi_cmd_s	*i_next;	/* Next command in connection list */
 	struct iscsi_cmd_s	*i_prev;	/* Previous command in connection list */
@@ -989,7 +989,7 @@ typedef struct se_hbainfo_s {
 typedef struct iscsi_lun_acl_s {
 	char			initiatorname[ISCSI_IQN_LEN];
 	u32			mapped_lun;
-	struct iscsi_lun_s	*iscsi_lun;
+	struct se_lun_s		*iscsi_lun;
 	struct iscsi_lun_acl_s	*next;
 	struct iscsi_lun_acl_s	*prev;
 }  ____cacheline_aligned iscsi_lun_acl_t;
@@ -1039,7 +1039,7 @@ typedef struct se_dev_entry_s {
 	__u64			read_bytes;
 	__u64			write_bytes;
 #endif /* SNMP_SUPPORT */
-	struct iscsi_lun_s	*iscsi_lun;
+	struct se_lun_s		*iscsi_lun;
 }  ____cacheline_aligned se_dev_entry_t;
 
 /*
@@ -1204,7 +1204,7 @@ typedef struct iscsi_tpg_attrib_s {
 	u32			demo_mode_lun_access;
 }  ____cacheline_aligned iscsi_tpg_attrib_t;
 
-typedef struct iscsi_lun_s {
+typedef struct se_lun_s {
 	int			lun_type;
 	int			lun_status;
 	u32			lun_access;
@@ -1225,9 +1225,9 @@ typedef struct iscsi_lun_s {
 	int (*persistent_reservation_check)(iscsi_cmd_t *);
 	int (*persistent_reservation_release)(iscsi_cmd_t *);
 	int (*persistent_reservation_reserve)(iscsi_cmd_t *);
-} ____cacheline_aligned iscsi_lun_t;
+} ____cacheline_aligned se_lun_t;
 
-#define ISCSI_LUN(c)            ((iscsi_lun_t *)(c)->iscsi_lun)
+#define ISCSI_LUN(c)            ((se_lun_t *)(c)->iscsi_lun)
 #define LUN_OBJ_API(lun)	((struct se_obj_lun_type_s *)(lun)->lun_obj_api)
 
 typedef struct iscsi_np_ex_s {
@@ -1291,7 +1291,7 @@ typedef struct iscsi_portal_group_s {
 	spinlock_t		tpg_lun_lock;
 	spinlock_t		tpg_np_lock;	/* Spinlock for adding/removing Network Portals */
 	spinlock_t		tpg_state_lock;
-	iscsi_lun_t		*tpg_lun_list;
+	se_lun_t		*tpg_lun_list;
 	iscsi_node_acl_t	*acl_node_head;	/* Pointer to start of Initiator ACL list */
 	iscsi_node_acl_t	*acl_node_tail;	/* Pointer to end of Initiator ACL list */
 	struct semaphore		tpg_access_sem;

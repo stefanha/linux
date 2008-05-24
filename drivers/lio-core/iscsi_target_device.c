@@ -157,13 +157,13 @@ extern void se_release_device_for_hba (se_device_t *dev)
  *
  */
 //#warning FIXME v2.8: Breakage in iscsi_get_lun() for TMRs
-extern iscsi_lun_t *iscsi_get_lun (
+extern se_lun_t *iscsi_get_lun (
 	iscsi_conn_t *conn,
 	u64 lun)
 {
 	u32 unpacked_lun;
 	se_dev_entry_t *deve;
-	iscsi_lun_t *iscsi_lun = NULL;
+	se_lun_t *iscsi_lun = NULL;
 	iscsi_portal_group_t *tpg = conn->tpg;
 	iscsi_session_t *sess = SESS(conn);
 
@@ -207,7 +207,7 @@ extern int iscsi_get_lun_for_cmd (
 	u32 unpacked_lun;
 	iscsi_conn_t *conn= CONN(cmd);
 	se_dev_entry_t *deve;
-	iscsi_lun_t *iscsi_lun = NULL;
+	se_lun_t *iscsi_lun = NULL;
 	iscsi_portal_group_t *tpg = conn->tpg;
 	iscsi_session_t *sess = SESS(conn);
 	unsigned long flags;
@@ -270,7 +270,7 @@ out:
 	}
 
 	/*
-	 * Determine if the iscsi_lun_t is online.
+	 * Determine if the se_lun_t is online.
 	 */
 	if (LUN_OBJ_API(iscsi_lun)->check_online(iscsi_lun->lun_type_ptr) != 0)
 		return(-1);
@@ -298,7 +298,7 @@ out:
 		return(0);
 	
 	/*
-	 * Add the iscsi_cmd_t to the iscsi_lun_t's cmd list.  This list is used
+	 * Add the iscsi_cmd_t to the se_lun_t's cmd list.  This list is used
 	 * for tracking state of iscsi_cmd_ts during LUN shutdown events.
 	 */
 	spin_lock_irqsave(&iscsi_lun->lun_cmd_lock, flags);
@@ -401,7 +401,7 @@ extern int iscsi_free_device_list_for_node (iscsi_node_acl_t *nacl, iscsi_portal
 {
 	__u32 i;
 	se_dev_entry_t *deve;
-	iscsi_lun_t *iscsi_lun;
+	se_lun_t *iscsi_lun;
 
 	if (!nacl->device_list)
 		return(0);
@@ -483,7 +483,7 @@ extern int iscsi_update_device_list_access (
  *
  */
 extern void iscsi_update_device_list_for_node (
-	iscsi_lun_t *lun,
+	se_lun_t *lun,
 	u32 mapped_lun,
 	u32 lun_access,
 	iscsi_node_acl_t *nacl,
@@ -533,7 +533,7 @@ extern void iscsi_update_device_list_for_node (
  *
  *
  */
-extern void iscsi_clear_lun_from_sessions (iscsi_lun_t *lun, iscsi_portal_group_t *tpg)
+extern void iscsi_clear_lun_from_sessions (se_lun_t *lun, iscsi_portal_group_t *tpg)
 {
 	iscsi_cmd_t *cmd;
 	unsigned long flags;
@@ -625,7 +625,7 @@ extern void iscsi_clear_lun_from_sessions (iscsi_lun_t *lun, iscsi_portal_group_
  *
  *
  */
-extern void iscsi_clear_lun_from_tpg (iscsi_lun_t *lun, iscsi_portal_group_t *tpg)
+extern void iscsi_clear_lun_from_tpg (se_lun_t *lun, iscsi_portal_group_t *tpg)
 {
 	u32 i;
         iscsi_node_acl_t *nacl, *nacl_next;
@@ -783,7 +783,7 @@ extern int iscsi_create_virtual_device (se_hba_t *hba, se_devinfo_t *di, struct 
 extern void se_clear_dev_ports (se_device_t *dev)
 {
 	se_hba_t *hba = dev->iscsi_hba;	
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	iscsi_portal_group_t *tpg;
 	se_port_t *sep, *sep_tmp;
 
@@ -919,7 +919,7 @@ extern int iscsi_dev_add_lun (
 	se_device_t *dev,
 	se_dev_transport_info_t *dti)
 {
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	se_fp_obj_t *fp;
 	u32 lun_access = 0;
 	int ret;
@@ -1000,7 +1000,7 @@ extern int iscsi_dev_del_lun (
 	iscsi_portal_group_t *tpg,
 	__u32 iscsi_lun)
 {
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	int ret = 0;
 
 	if (!(lun = iscsi_tpg_pre_dellun(tpg, iscsi_lun, ISCSI_LUN_TYPE_DEVICE, &ret)))
@@ -1018,9 +1018,9 @@ extern int iscsi_dev_del_lun (
  *
  *
  */
-static iscsi_lun_t *iscsi_dev_get_lun (iscsi_portal_group_t *tpg, u32 lun)
+static se_lun_t *iscsi_dev_get_lun (iscsi_portal_group_t *tpg, u32 lun)
 {
-	iscsi_lun_t *iscsi_lun;
+	se_lun_t *iscsi_lun;
 
 	spin_lock(&tpg->tpg_lun_lock);
 	if (lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
@@ -1055,7 +1055,7 @@ extern int iscsi_dev_add_initiator_node_lun_acl (
 	u32 lun_access,
 	char *initiatorname)
 {
-	iscsi_lun_t *iscsi_lun;
+	se_lun_t *iscsi_lun;
 	iscsi_lun_acl_t *acl;
 	iscsi_node_acl_t *nacl;
 
@@ -1137,7 +1137,7 @@ extern int iscsi_dev_del_initiator_node_lun_acl (
 	u32 mapped_lun,
 	char *initiatorname)
 {
-	iscsi_lun_t *iscsi_lun;
+	se_lun_t *iscsi_lun;
 	iscsi_lun_acl_t *acl;
 	iscsi_node_acl_t *nacl;
 

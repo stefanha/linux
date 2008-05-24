@@ -56,10 +56,10 @@ extern iscsi_tpg_np_t *iscsi_tpg_del_np_phase0 (iscsi_portal_group_t *, iscsi_np
 extern int iscsi_tpg_del_np_phase1 (iscsi_tpg_np_t *, iscsi_portal_group_t *, iscsi_np_t *);
 extern int iscsi_tpg_del_network_portal (iscsi_portal_group_t *, struct iscsi_target *, int);
 extern int iscsi_tpg_set_initiator_node_queue_depth (iscsi_portal_group_t *, unsigned char *, __u32, int);
-extern iscsi_lun_t *iscsi_tpg_pre_addlun (iscsi_portal_group_t *, u32, int *);
-extern int iscsi_tpg_post_addlun (iscsi_portal_group_t *, iscsi_lun_t *, int, u32, void *, struct se_obj_lun_type_s *);
-extern iscsi_lun_t *iscsi_tpg_pre_dellun (iscsi_portal_group_t *, u32, int, int *);
-extern int iscsi_tpg_post_dellun (iscsi_portal_group_t *, iscsi_lun_t *);
+extern se_lun_t *iscsi_tpg_pre_addlun (iscsi_portal_group_t *, u32, int *);
+extern int iscsi_tpg_post_addlun (iscsi_portal_group_t *, se_lun_t *, int, u32, void *, struct se_obj_lun_type_s *);
+extern se_lun_t *iscsi_tpg_pre_dellun (iscsi_portal_group_t *, u32, int, int *);
+extern int iscsi_tpg_post_dellun (iscsi_portal_group_t *, se_lun_t *);
 extern int iscsi_tpg_set_attributes (iscsi_portal_group_t *, __u32, __u32);
 extern void iscsi_disable_tpgs (struct iscsi_tiqn_s *);
 extern void iscsi_disable_all_tpgs (void);

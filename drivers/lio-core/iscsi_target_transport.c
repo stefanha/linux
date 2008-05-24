@@ -797,7 +797,7 @@ static int transport_cmd_check_stop (iscsi_cmd_t *cmd, int transport_off, u8 t_s
 
 static void transport_lun_remove_cmd (iscsi_cmd_t *cmd)
 {
-	iscsi_lun_t *lun = ISCSI_LUN(cmd);
+	se_lun_t *lun = ISCSI_LUN(cmd);
 	unsigned long flags;
 
 	if (!lun) 
@@ -4381,11 +4381,11 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	 * Simulate an iSCSI LUN entry need for passing SCSI CDBs into
 	 * iscsi_cmd_t.
 	 */
-	if (!(cmd->iscsi_lun = kmalloc(sizeof(iscsi_lun_t), GFP_KERNEL))) {
+	if (!(cmd->iscsi_lun = kmalloc(sizeof(se_lun_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate cmd->iscsi_lun\n");
 		goto fail;
 	}
-	memset(cmd->iscsi_lun, 0, sizeof(iscsi_lun_t));
+	memset(cmd->iscsi_lun, 0, sizeof(se_lun_t));
 
 	spin_lock_init(&cmd->iscsi_lun->lun_sep_lock);
 	ISCSI_LUN(cmd)->lun_type = obj_api->se_obj_type;
@@ -5857,9 +5857,9 @@ static void transport_nop_wait_for_tasks (iscsi_cmd_t *cmd, int remove_cmd, int 
 /*	transport_lun_wait_for_tasks():
  *
  *	Called from IOCTL context to stop the passed iscsi_cmd_t to allow
- *	an iscsi_lun_t to be successfully shutdown.
+ *	an se_lun_t to be successfully shutdown.
  */
-extern int transport_lun_wait_for_tasks (iscsi_cmd_t *cmd, iscsi_lun_t *lun)
+extern int transport_lun_wait_for_tasks (iscsi_cmd_t *cmd, se_lun_t *lun)
 {
 	unsigned long flags;
 	

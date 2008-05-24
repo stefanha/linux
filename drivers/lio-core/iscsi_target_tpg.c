@@ -299,7 +299,7 @@ static void iscsi_clear_initiator_node_from_tpg (
 {
 	int i;
 	se_dev_entry_t *deve;
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	iscsi_lun_acl_t *acl;
 
 	spin_lock_bh(&nacl->device_list_lock);
@@ -398,7 +398,7 @@ extern void iscsi_tpg_add_node_to_devs (
 {
 	int i = 0;
 	u32 lun_access = 0;
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 
 	spin_lock(&tpg->tpg_lun_lock);
 	for (i = 0; i < ISCSI_MAX_LUNS_PER_TPG; i++) {
@@ -613,7 +613,7 @@ extern int iscsi_tpg_persistent_reservation_check (iscsi_cmd_t *cmd)
 {
 	int ret;
 	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_lun_t *lun = ISCSI_LUN(cmd);
+	se_lun_t *lun = ISCSI_LUN(cmd);
 
 	if (!CONN(cmd))
 		return(0);
@@ -632,7 +632,7 @@ extern int iscsi_tpg_persistent_reservation_check (iscsi_cmd_t *cmd)
 extern int iscsi_tpg_persistent_reservation_release (iscsi_cmd_t *cmd)
 {
 	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_lun_t *lun = ISCSI_LUN(cmd);
+	se_lun_t *lun = ISCSI_LUN(cmd);
 
 	if (!CONN(cmd)) {
 		TRACE_ERROR("iscsi_conn_t is NULL!\n");
@@ -660,7 +660,7 @@ extern int iscsi_tpg_persistent_reservation_release (iscsi_cmd_t *cmd)
 extern int iscsi_tpg_persistent_reservation_reserve (iscsi_cmd_t *cmd)
 {
 	iscsi_conn_t *conn = CONN(cmd);
-        iscsi_lun_t *lun = ISCSI_LUN(cmd);
+        se_lun_t *lun = ISCSI_LUN(cmd);
 
 	if (!CONN(cmd)) {
 		TRACE_ERROR("iscsi_conn_t is NULL!\n");
@@ -699,7 +699,7 @@ extern int iscsi_tpg_persistent_reservation_reserve (iscsi_cmd_t *cmd)
 extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t *tpg)
 {
 	int i;
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	
 	if (tpg->tpg_state != TPG_STATE_FREE) {
 		TRACE_ERROR("Unable to add iSCSI Target Portal Group: %d while"
@@ -709,11 +709,11 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 
 	iscsi_set_default_tpg_attribs(tpg);
 
-	if (!(tpg->tpg_lun_list = kmalloc((sizeof(iscsi_lun_t) * ISCSI_MAX_LUNS_PER_TPG), GFP_KERNEL))) {
+	if (!(tpg->tpg_lun_list = kmalloc((sizeof(se_lun_t) * ISCSI_MAX_LUNS_PER_TPG), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for tpg->tpg_lun_list\n");
 		goto err_out;
 	}
-	memset(tpg->tpg_lun_list, 0, (sizeof(iscsi_lun_t) * ISCSI_MAX_LUNS_PER_TPG));
+	memset(tpg->tpg_lun_list, 0, (sizeof(se_lun_t) * ISCSI_MAX_LUNS_PER_TPG));
 
 	if (iscsi_create_default_params(&tpg->param_list) < 0)
 		goto err_out;
@@ -769,7 +769,7 @@ err_out:
 static void iscsi_tpg_clear_object_luns (iscsi_portal_group_t *tpg)
 {
 	int i, ret;
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 
 	spin_lock(&tpg->tpg_lun_lock);
 	for (i = 0; i < ISCSI_MAX_LUNS_PER_TPG; i++) {
@@ -1366,12 +1366,12 @@ extern int iscsi_tpg_set_initiator_node_queue_depth (
 	return(0);
 }
 
-extern iscsi_lun_t *iscsi_tpg_pre_addlun (
+extern se_lun_t *iscsi_tpg_pre_addlun (
 	iscsi_portal_group_t *tpg,
 	u32 iscsi_lun,
 	int *ret)
 {
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	
 	if (iscsi_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
 		TRACE_ERROR("iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
@@ -1398,7 +1398,7 @@ extern iscsi_lun_t *iscsi_tpg_pre_addlun (
 	
 extern int iscsi_tpg_post_addlun (
 	iscsi_portal_group_t *tpg,
-	iscsi_lun_t *lun,
+	se_lun_t *lun,
 	int lun_type,
 	u32 lun_access,
 	void *lun_ptr,
@@ -1426,13 +1426,13 @@ extern int iscsi_tpg_post_addlun (
 	return(0);
 }
 
-extern iscsi_lun_t *iscsi_tpg_pre_dellun (
+extern se_lun_t *iscsi_tpg_pre_dellun (
 	iscsi_portal_group_t *tpg,
 	u32 iscsi_lun,
 	int lun_type,
 	int *ret)
 {
-	iscsi_lun_t *lun;
+	se_lun_t *lun;
 	
 	if (iscsi_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
 		TRACE_ERROR("iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
@@ -1470,7 +1470,7 @@ extern iscsi_lun_t *iscsi_tpg_pre_dellun (
 
 extern int iscsi_tpg_post_dellun (
 	iscsi_portal_group_t *tpg,
-	iscsi_lun_t *lun)
+	se_lun_t *lun)
 {
 	iscsi_lun_acl_t *acl, *acl_next;
 	

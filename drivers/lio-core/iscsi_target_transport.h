@@ -165,7 +165,7 @@ extern void transport_free_dev_tasks (iscsi_cmd_t *);
 extern void transport_release_tasks (iscsi_cmd_t *);
 extern void transport_release_fe_cmd (iscsi_cmd_t *);
 extern int transport_generic_remove (iscsi_cmd_t *, int, int);
-extern int transport_lun_wait_for_tasks (iscsi_cmd_t *, iscsi_lun_t *);
+extern int transport_lun_wait_for_tasks (iscsi_cmd_t *, se_lun_t *);
 extern void transport_generic_free_cmd (iscsi_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds (iscsi_cmd_t *, int);
 extern int transport_generic_do_transform (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
@@ -210,7 +210,7 @@ typedef struct se_port_s {
 	u32		sep_index;
 	scsi_port_stats_t sep_stats;
 #endif
-	struct iscsi_lun_s *sep_lun;	
+	struct se_lun_s *sep_lun;	
 	struct iscsi_portal_group_s *sep_tpg;
 	struct list_head sep_list;
 } se_port_t;

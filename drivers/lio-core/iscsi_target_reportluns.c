@@ -127,15 +127,15 @@ static rl_cmd_t *rl_allocate_cmd (iscsi_cmd_t *cmd, u32 size)
  */
 static int rl_allocate_fake_lun (iscsi_cmd_t *cmd, u32 lun)
 {
-	iscsi_lun_t *lun_p;
+	se_lun_t *lun_p;
 	
-	if (!(cmd->iscsi_lun = (iscsi_lun_t *)
-			kmalloc(sizeof(iscsi_lun_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate iscsi_lun_t\n");
+	if (!(cmd->iscsi_lun = (se_lun_t *)
+			kmalloc(sizeof(se_lun_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate se_lun_t\n");
 		return(-1);
 	}
 
-	memset(ISCSI_LUN(cmd), 0, sizeof(iscsi_lun_t));
+	memset(ISCSI_LUN(cmd), 0, sizeof(se_lun_t));
 	ISCSI_LUN(cmd)->iscsi_lun = lun;
 	lun_p = ISCSI_LUN(cmd);
 	
@@ -170,7 +170,7 @@ extern int iscsi_allocate_rl_cmd (
 	cmd->data_length = (cdb[6] << 24) + (cdb[7] << 16) + (cdb[8] << 8) + cdb[9];
 
 	/*
-	 * We are going to be accessing a pseudo se_device_t and iscsi_lun_t,
+	 * We are going to be accessing a pseudo se_device_t and se_lun_t,
 	 * Still call iscsi_get_lun_for_cmd() for accounting purposes.
 	 */ 
 	 iscsi_get_lun_for_cmd(cmd, iscsi_lun);
@@ -256,7 +256,7 @@ extern int iscsi_build_report_luns_response (
 	u64 i, lun;
 	iscsi_conn_t *conn = CONN(cmd);
 	se_dev_entry_t *deve;
-	iscsi_lun_t *iscsi_lun;
+	se_lun_t *iscsi_lun;
 	iscsi_session_t *sess = SESS(conn);
 	se_task_t *task;
 	rl_cmd_t *rl_cmd;

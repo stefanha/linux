@@ -64,7 +64,7 @@ extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
 extern __u8 iscsi_tmr_abort_task (
 	iscsi_conn_t *conn,
 	iscsi_tmr_req_t *tmr_req,
-	iscsi_lun_t **lun,
+	se_lun_t **lun,
 	unsigned char *buf)
 {
 	iscsi_cmd_t *ref_cmd;
@@ -113,7 +113,7 @@ extern __u8 iscsi_tmr_abort_task (
 extern __u8 iscsi_tmr_abort_task_set (
 	iscsi_conn_t *conn,
 	iscsi_tmr_req_t *tmr_req,
-	iscsi_lun_t **lun,
+	se_lun_t **lun,
 	unsigned char *buf)
 {
 	struct iscsi_init_task_mgt_cmnd *hdr =
@@ -137,7 +137,7 @@ extern __u8 iscsi_tmr_abort_task_set (
 extern __u8 iscsi_tmr_clear_aca (
 	iscsi_conn_t *conn,
 	iscsi_tmr_req_t *tmr_req,
-	iscsi_lun_t **lun,
+	se_lun_t **lun,
 	unsigned char *buf)
 {
 	struct iscsi_init_task_mgt_cmnd *hdr =
@@ -161,7 +161,7 @@ extern __u8 iscsi_tmr_clear_aca (
 extern __u8 iscsi_tmr_clear_task_set (
 	iscsi_conn_t *conn,
 	iscsi_tmr_req_t *tmr_req,
-	iscsi_lun_t **lun,
+	se_lun_t **lun,
 	unsigned char *buf)
 {
 	struct iscsi_init_task_mgt_cmnd *hdr =
@@ -185,7 +185,7 @@ extern __u8 iscsi_tmr_clear_task_set (
 #if 0
 static int iscsi_tmr_check_LUN_RESET_acl (
 	iscsi_tmr_req_t *tmr_req,
-	iscsi_lun_t *lun,
+	se_lun_t *lun,
 	iscsi_session_t *sess)
 {
 	TRACE_ERROR("TMR Opcode: LUN_RESET authorization failed for Initiator"
@@ -202,7 +202,7 @@ static int iscsi_tmr_check_LUN_RESET_acl (
 extern __u8 iscsi_tmr_lun_reset (
 	iscsi_conn_t *conn,
 	iscsi_tmr_req_t *tmr_req,
-	iscsi_lun_t **lun,
+	se_lun_t **lun,
 	unsigned char *buf)
 {
 #if 0

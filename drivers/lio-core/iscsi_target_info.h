@@ -38,7 +38,7 @@ extern int iscsi_get_lun_info_count_for_tpg (unsigned char *, u16, int *);
 extern int iscsi_get_hba_dev_info (u32, char *, int, int, int, int);
 extern int iscsi_tpg_get_lun_info (unsigned char *, u16, char *, int, int, int, int);
 extern void iscsi_dump_dev_state (struct se_device_s *, char *, int *);
-extern void iscsi_dump_dev_info (struct se_device_s *, struct iscsi_lun_s *, unsigned long long, char *, int *);
+extern void iscsi_dump_dev_info (struct se_device_s *, struct se_lun_s *, unsigned long long, char *, int *);
 extern int iscsi_get_sess_info_count_for_tpg (unsigned char *, u16, int *);
 extern int iscsi_tpg_get_sess_info (unsigned char *, u16, char *, int, int, int, int);
 extern int iscsi_get_tpg_info_count_for_global (unsigned char *, int *);

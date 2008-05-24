@@ -231,7 +231,7 @@ extern int iscsi_get_lun_info_count_for_tpg (
 	u16 tpgt,
 	int *count)
 {
-	iscsi_lun_t *lun = NULL;
+	se_lun_t *lun = NULL;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_tiqn_t *tiqn;
 	int i;
@@ -313,7 +313,7 @@ extern void iscsi_dump_dev_state (
 
 extern void iscsi_dump_dev_info (
 	se_device_t *dev,
-	iscsi_lun_t *lun,
+	se_lun_t *lun,
 	unsigned long long total_bytes,
 	char *b,        /* Pointer to info buffer */
 	int *bl)
@@ -474,7 +474,7 @@ extern int iscsi_tpg_get_lun_info (
 {
 	unsigned char *b;
 	int bl = 0, cl = 0, oob = 1, i, start = 0;
-	iscsi_lun_t *lun = NULL;
+	se_lun_t *lun = NULL;
 	iscsi_lun_acl_t *acl = NULL;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_tiqn_t *tiqn;
