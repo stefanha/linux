@@ -944,7 +944,7 @@ typedef struct iscsi_login_s {
 #define FD_MAX_DEV_NAME	256
 #endif
 
-typedef struct iscsi_devinfo_s {
+typedef struct se_devinfo_s {
 	unsigned char	fd_dev_name[FD_MAX_DEV_NAME];
 	unsigned char	lvm_uuid[48];
 	u8		hba_type;
@@ -967,7 +967,7 @@ typedef struct iscsi_devinfo_s {
 	u32		mc_device_id;
 	u32		mc_hw_id;
 	u32		uu_id[4];
-} ____cacheline_aligned iscsi_devinfo_t;
+} ____cacheline_aligned se_devinfo_t;
 
 typedef struct se_hbainfo_s {
 	__u8		hba_type;

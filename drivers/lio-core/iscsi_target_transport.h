@@ -306,7 +306,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * create_virtdevice(): Only for Virtual HBAs
 	 */
-	int (*create_virtdevice)(struct se_hba_s *, struct iscsi_devinfo_s *);
+	int (*create_virtdevice)(struct se_hba_s *, struct se_devinfo_s *);
 	/*
 	 * scan_devices(): Only for Physical HBAs
 	 */
@@ -396,7 +396,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * check_virtdev_params():
 	 */
-	int (*check_virtdev_params)(iscsi_devinfo_t *, struct iscsi_target *);
+	int (*check_virtdev_params)(se_devinfo_t *, struct iscsi_target *);
 	/*
 	 * get_plugin_info():
 	 */

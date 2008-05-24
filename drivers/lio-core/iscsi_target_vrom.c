@@ -170,7 +170,7 @@ static int getauxinfo(vr_dev_t *vd, char *path)
  *
  *
  */
-int vr_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+int vr_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 {
 	char *dev_p;
 	se_device_t *dev;

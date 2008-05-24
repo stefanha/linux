@@ -48,7 +48,7 @@ extern int iblock_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *
 extern int iblock_detach_hba (se_hba_t *);
 extern int iblock_claim_phydevice (se_hba_t *, se_device_t *);
 extern int iblock_release_phydevice (se_device_t *);
-extern int iblock_create_virtdevice (se_hba_t *, iscsi_devinfo_t *);
+extern int iblock_create_virtdevice (se_hba_t *, se_devinfo_t *);
 extern int iblock_activate_device (se_device_t *);
 extern void iblock_deactivate_device (se_device_t *);
 extern int iblock_check_device_location (se_device_t *, se_dev_transport_info_t *);
@@ -62,7 +62,7 @@ extern int iblock_do_task (se_task_t *);
 extern void iblock_free_task (se_task_t *);
 extern int iblock_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern int iblock_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
-extern int iblock_check_virtdev_params (iscsi_devinfo_t *di, struct iscsi_target *);
+extern int iblock_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *);
 extern void iblock_get_plugin_info (void *, char *, int *);
 extern void iblock_get_hba_info (se_hba_t *, char *, int *);
 extern void iblock_get_dev_info (se_device_t *, char *, int *);

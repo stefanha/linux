@@ -172,7 +172,7 @@ extern int fd_release_phydevice (se_device_t *dev)
  *
  *
  */
-extern int fd_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int fd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 {
 	char *dev_p = NULL;
 	se_device_t *dev;
@@ -319,7 +319,7 @@ fail:
  *
  *
  */
-extern se_device_t *fd_add_device_to_list (se_hba_t *iscsi_hba, void *fd_dev_p, iscsi_devinfo_t *di)
+extern se_device_t *fd_add_device_to_list (se_hba_t *iscsi_hba, void *fd_dev_p, se_devinfo_t *di)
 {
 	se_device_t *dev;
 	fd_dev_t *fd_dev = (fd_dev_t *) fd_dev_p;
@@ -987,7 +987,7 @@ extern int fd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_tr
 	return(0);
 }
 
-extern int fd_check_virtdev_params (iscsi_devinfo_t *di, struct iscsi_target *t)
+extern int fd_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
 {
 	/*
 	 * Special case when we are using FILEIO with a block device that

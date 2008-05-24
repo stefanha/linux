@@ -170,7 +170,7 @@ extern int iblock_release_phydevice (se_device_t *dev)
 	return(0);
 }
 
-extern int iblock_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int iblock_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 {
 	iblock_dev_t *ib_dev = NULL;
 	iblock_hba_t *ib_host = (iblock_hba_t *) iscsi_hba->hba_ptr;
@@ -553,7 +553,7 @@ extern int iblock_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_de
 	return(0);
 }
 
-extern int iblock_check_virtdev_params (iscsi_devinfo_t *di, struct iscsi_target *t)
+extern int iblock_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
 {
 	if (!(t->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) ||
 	    !(t->hba_params_set & PARAM_HBA_IBLOCK_MINOR)) {

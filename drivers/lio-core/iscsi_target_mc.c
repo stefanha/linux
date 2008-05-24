@@ -428,13 +428,13 @@ extern int mc_detach_hba (se_hba_t *hba)
 	return(0);
 }
 
-extern int vt_create_virtdevice(se_hba_t *, iscsi_devinfo_t *);
+extern int vt_create_virtdevice(se_hba_t *, se_devinfo_t *);
 
 /*	mc_create_virtdevice(): (Part of se_subsystem_api_t template)
  *
  *
  */
-extern int mc_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int mc_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 {
 	int n;
 	se_device_t *dev;
@@ -1156,7 +1156,7 @@ extern int mc_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_tr
 	return(0);
 }
 
-extern int mc_check_virtdev_params (iscsi_devinfo_t *di, struct iscsi_target *t)
+extern int mc_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
 {
 	if ((t->hba_params_set & PARAM_HBA_MC_DEVICE_ID) == 0) {
 		TRACE_ERROR("Missing MEDIA CHANGER createvirtdev parameters\n");

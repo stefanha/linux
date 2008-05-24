@@ -683,7 +683,7 @@ extern se_device_t *core_get_device_from_transport (se_hba_t *hba, se_dev_transp
  *
  *
  */
-extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_devinfo_t *di, se_hba_t *hba)
+extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, se_devinfo_t *di, se_hba_t *hba)
 {
 	int ret = 0;
 	se_subsystem_api_t *t;
@@ -742,7 +742,7 @@ static int iscsi_check_create_virtual_device (se_hba_t *hba, se_dev_transport_in
  *
  *	Used for Virtual Transport Plugins.
  */
-extern int iscsi_create_virtual_device (se_hba_t *hba, iscsi_devinfo_t *di, struct iscsi_target *tg)
+extern int iscsi_create_virtual_device (se_hba_t *hba, se_devinfo_t *di, struct iscsi_target *tg)
 {
 	int ret = 0;
 	se_dev_transport_info_t dti;

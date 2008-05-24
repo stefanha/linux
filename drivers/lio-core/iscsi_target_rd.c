@@ -235,7 +235,7 @@ static int rd_build_device_space (rd_dev_t *rd_dev)
  *
  *
  */
-static int rd_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di, int rd_direct)
+static int rd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di, int rd_direct)
 {
 	se_device_t *dev;
 	rd_dev_t *rd_dev;
@@ -278,12 +278,12 @@ fail:
 	return(0);
 }
 
-extern int rd_DIRECT_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int rd_DIRECT_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 {
 	return(rd_create_virtdevice(iscsi_hba, di, 1));	
 }
 
-extern int rd_MEMCPY_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int rd_MEMCPY_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 {
 	return(rd_create_virtdevice(iscsi_hba, di, 0));
 }
@@ -292,7 +292,7 @@ extern int rd_MEMCPY_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di
  *
  *
  */
-extern se_device_t *rd_add_device_to_list (se_hba_t *iscsi_hba, void *rd_dev_p, iscsi_devinfo_t *di)
+extern se_device_t *rd_add_device_to_list (se_hba_t *iscsi_hba, void *rd_dev_p, se_devinfo_t *di)
 {
 	se_device_t *dev;
 	rd_dev_t *rd_dev = (rd_dev_t *) rd_dev_p;
@@ -1130,7 +1130,7 @@ extern int rd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_tr
 	return(0);
 }
 
-extern int rd_check_virtdev_params (iscsi_devinfo_t *di, struct iscsi_target *t)
+extern int rd_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
 {
 	if (!(t->hba_params_set & PARAM_HBA_RD_DEVICE_ID) ||
 	    !(t->hba_params_set & PARAM_HBA_RD_PAGES)) {

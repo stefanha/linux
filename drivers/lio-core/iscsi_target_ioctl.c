@@ -362,7 +362,7 @@ extern int iscsi_ioctl (
 	int network_transport = 0, ret = 0;
 	u32 lun_access = 0;
 	se_device_t *dev = NULL;
-	iscsi_devinfo_t dev_info;
+	se_devinfo_t dev_info;
 	se_dev_transport_info_t devt_info;
 	se_hba_t *hba = NULL;
 	se_hbainfo_t hba_info;
@@ -653,7 +653,7 @@ extern int iscsi_ioctl (
 	  iscsi_put_tpg(tpg);
 	  break;
 	case ISCSI_TARGET_CREATEVIRTDEV:
-	  memset(&dev_info, 0, sizeof(iscsi_devinfo_t));
+	  memset(&dev_info, 0, sizeof(se_devinfo_t));
 	  dev_info.hba_type = t->hba_type;
 	  if (!(hba = core_get_hba_from_id(t->hba_id, 0))) {
 		  ret = ERR_HBA_CANNOT_LOCATE;

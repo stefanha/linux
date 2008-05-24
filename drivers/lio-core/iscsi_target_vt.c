@@ -233,7 +233,7 @@ static void vt_write_filemark_maybe (se_task_t *task)
  *
  *
  */
-extern int vt_create_virtdevice (se_hba_t *iscsi_hba, iscsi_devinfo_t *di)
+extern int vt_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 {
 	se_device_t *dev;
 	vt_dev_t *vt_dev;
@@ -1453,7 +1453,7 @@ extern int vt_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_tr
 	return(0);
 }
 
-extern int vt_check_virtdev_params (iscsi_devinfo_t *di, struct iscsi_target *t)
+extern int vt_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
 {
 	if ((t->hba_params_set & PARAM_HBA_VT_DEVICE_ID) == 0) {
 		TRACE_ERROR("Missing VTAPE createvirtdev parameters\n");

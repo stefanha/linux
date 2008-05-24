@@ -49,7 +49,7 @@ extern int mc_CDB_write_SG (se_task_t *, u32);
 
 extern int mc_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
 extern int mc_detach_hba (se_hba_t *);
-extern int mc_create_virtdevice (se_hba_t *, iscsi_devinfo_t *);
+extern int mc_create_virtdevice (se_hba_t *, se_devinfo_t *);
 extern int mc_activate_device (se_device_t *);
 extern void mc_deactivate_device (se_device_t *);
 extern int mc_check_device_location (se_device_t *, se_dev_transport_info_t *);
@@ -64,7 +64,7 @@ extern int mc_do_task (se_task_t *);
 extern void mc_free_task (se_task_t *);
 extern int mc_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern int mc_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
-extern int mc_check_virtdev_params (iscsi_devinfo_t *, struct iscsi_target *);
+extern int mc_check_virtdev_params (se_devinfo_t *, struct iscsi_target *);
 extern void mc_get_plugin_info (void *, char *, int *);
 extern void mc_get_hba_info (se_hba_t *, char *, int *);
 extern void mc_get_dev_info (se_device_t *, char *, int *);
