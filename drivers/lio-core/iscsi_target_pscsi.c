@@ -502,7 +502,7 @@ extern void pscsi_deactivate_device (se_device_t *dev)
  *
  *
  */
-extern int pscsi_check_device_location (se_device_t *dev, iscsi_dev_transport_info_t *dti)
+extern int pscsi_check_device_location (se_device_t *dev, se_dev_transport_info_t *dti)
 {
 	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
 
@@ -811,7 +811,7 @@ extern int pscsi_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int
 	return(0);
 }
 
-extern int pscsi_check_dev_params (se_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
+extern int pscsi_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_SCSI_CHANNEL_ID)) {
 		TRACE_ERROR("scsi_channel_id must be set for"

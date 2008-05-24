@@ -663,7 +663,7 @@ extern void iscsi_clear_lun_from_tpg (iscsi_lun_t *lun, iscsi_portal_group_t *tp
  *
  *
  */
-extern se_device_t *core_get_device_from_transport (se_hba_t *hba, iscsi_dev_transport_info_t *dti)
+extern se_device_t *core_get_device_from_transport (se_hba_t *hba, se_dev_transport_info_t *dti)
 {
 	se_device_t *dev;
 	
@@ -725,7 +725,7 @@ extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *tg, iscsi_de
  *
  *
  */
-static int iscsi_check_create_virtual_device (se_hba_t *hba, iscsi_dev_transport_info_t *dti)
+static int iscsi_check_create_virtual_device (se_hba_t *hba, se_dev_transport_info_t *dti)
 {
 	se_device_t *dev;
 
@@ -745,10 +745,10 @@ static int iscsi_check_create_virtual_device (se_hba_t *hba, iscsi_dev_transport
 extern int iscsi_create_virtual_device (se_hba_t *hba, iscsi_devinfo_t *di, struct iscsi_target *tg)
 {
 	int ret = 0;
-	iscsi_dev_transport_info_t dti;
+	se_dev_transport_info_t dti;
 	se_subsystem_api_t *t;
 
-	memset(&dti, 0, sizeof(iscsi_dev_transport_info_t));
+	memset(&dti, 0, sizeof(se_dev_transport_info_t));
 
 	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
@@ -828,7 +828,7 @@ extern int se_free_virtual_device (se_device_t *dev, se_hba_t *hba)
 
 extern se_hba_t *core_get_hba_from_hbaid (
 	struct iscsi_target *tg,
-	iscsi_dev_transport_info_t *dti,
+	se_dev_transport_info_t *dti,
 	int add)
 {
 	int ret = 0;
@@ -917,7 +917,7 @@ extern int iscsi_dev_add_lun (
 	iscsi_portal_group_t *tpg,
 	se_hba_t *hba,
 	se_device_t *dev,
-	iscsi_dev_transport_info_t *dti)
+	se_dev_transport_info_t *dti)
 {
 	iscsi_lun_t *lun;
 	se_fp_obj_t *fp;

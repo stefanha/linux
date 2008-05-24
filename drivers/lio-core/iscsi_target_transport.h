@@ -96,7 +96,7 @@ extern int iscsi_debug_dev (se_device_t *);
 extern unsigned char *transport_get_iqn_sn (void);
 extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
-extern se_device_t *transport_core_locate_dev (struct iscsi_target *, iscsi_dev_transport_info_t *, int *);
+extern se_device_t *transport_core_locate_dev (struct iscsi_target *, se_dev_transport_info_t *, int *);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);
 extern int transport_add_cmd_to_queue (struct iscsi_cmd_s *, struct se_queue_obj_s *, u8);
 extern void transport_complete_cmd (iscsi_cmd_t *, int);
@@ -127,7 +127,7 @@ extern int transport_process_mirror_write (u32 *, struct iscsi_transform_info_s 
 extern int transport_mirror_vol_write_allocate_DMA (struct iscsi_cmd_s *, struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *);
 extern void transport_device_setup_cmd (iscsi_cmd_t *);
 extern int transport_generic_allocate_tasks (iscsi_cmd_t *, unsigned char *);
-extern int transport_generic_check_device_location (se_device_t *dev, struct iscsi_dev_transport_info_s *);
+extern int transport_generic_check_device_location (se_device_t *dev, struct se_dev_transport_info_s *);
 extern int transport_generic_handle_cdb (iscsi_cmd_t *);
 extern int transport_generic_handle_data (iscsi_cmd_t *);
 extern int transport_generic_handle_tmr (iscsi_cmd_t *, iscsi_tmr_req_t *);
@@ -330,7 +330,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * check_device_location():
 	 */
-	int (*check_device_location)(se_device_t *, iscsi_dev_transport_info_t *);
+	int (*check_device_location)(se_device_t *, se_dev_transport_info_t *);
 	/*
 	 * check_ghost_id():
 	 */
@@ -392,7 +392,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * check_dev_params():
 	 */
-	int (*check_dev_params)(se_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
+	int (*check_dev_params)(se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 	/*
 	 * check_virtdev_params():
 	 */

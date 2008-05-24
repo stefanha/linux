@@ -57,7 +57,7 @@ extern int rd_DIRECT_create_virtdevice (se_hba_t *, iscsi_devinfo_t *);
 extern int rd_MEMCPY_create_virtdevice (se_hba_t *, iscsi_devinfo_t *);
 extern int rd_activate_device (se_device_t *);
 extern void rd_deactivate_device (se_device_t *);
-extern int rd_check_device_location (se_device_t *, iscsi_dev_transport_info_t *);
+extern int rd_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int rd_mcp_check_ghost_id (se_hbainfo_t *);
 extern int rd_dr_check_ghost_id (se_hbainfo_t *);
 extern void rd_free_device (se_device_t *);
@@ -73,7 +73,7 @@ extern int rd_DIRECT_do_se_mem_map (struct se_task_s *, struct list_head *, void
 extern void rd_DIRECT_free_DMA (iscsi_cmd_t *);
 extern void rd_free_task (se_task_t *);
 extern int rd_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
-extern int rd_check_dev_params (se_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
+extern int rd_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern int rd_check_virtdev_params (iscsi_devinfo_t *, struct iscsi_target *);
 extern void rd_dr_get_plugin_info (void *, char *, int *);
 extern void rd_mcp_get_plugin_info (void *, char *, int *);

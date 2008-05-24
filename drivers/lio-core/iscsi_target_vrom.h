@@ -59,7 +59,7 @@ int vr_transport_complete (se_task_t *);
 void *vr_allocate_request (se_task_t *, se_device_t *);
 int vr_do_task (se_task_t *);
 void vr_free_task (se_task_t *);
-extern int vr_check_dev_params (se_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
+extern int vr_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern int vr_check_virtdev_params (iscsi_devinfo_t *, struct iscsi_target *);
 extern void vr_get_plugin_info (void *, char *, int *);
 extern void vr_get_dev_info (se_device_t *, char *, int *);

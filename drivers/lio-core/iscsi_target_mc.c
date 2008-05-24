@@ -572,7 +572,7 @@ extern void mc_deactivate_device (se_device_t *dev)
  *
  *
  */
-extern int mc_check_device_location (se_device_t *dev, iscsi_dev_transport_info_t *dti)
+extern int mc_check_device_location (se_device_t *dev, se_dev_transport_info_t *dti)
 {
 	mc_dev_t *mc_dev = (mc_dev_t *) dev->dev_ptr;
 
@@ -1144,7 +1144,7 @@ extern int mc_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int vi
 	return(0);
 }
 
-extern int mc_check_dev_params (se_hba_t *hba, struct iscsi_target *t, iscsi_dev_transport_info_t *dti)
+extern int mc_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_MC_DEVICE_ID)) {
 		TRACE_ERROR("Missing MEDIA CHANGER createvirtdev parameters\n");

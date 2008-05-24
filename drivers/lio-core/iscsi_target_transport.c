@@ -555,7 +555,7 @@ static se_device_t *transport_scan_hbas_for_major_minor (
 
 extern se_device_t *transport_core_locate_dev (
 	struct iscsi_target *tg,
-	iscsi_dev_transport_info_t *dti,
+	se_dev_transport_info_t *dti,
 	int *ret)
 {
 	se_device_t *dev = NULL;
@@ -2228,7 +2228,7 @@ extern int transport_generic_allocate_tasks (
  */
 extern int transport_generic_check_device_location (
 	se_device_t *dev,
-	iscsi_dev_transport_info_t *dti)
+	se_dev_transport_info_t *dti)
 {
 	int ret = 0;
 	se_hba_t *hba;

@@ -39,7 +39,7 @@ extern int iscsi_create_device_list_for_node (iscsi_node_acl_t *, iscsi_portal_g
 extern int iscsi_free_device_list_for_node (iscsi_node_acl_t *, iscsi_portal_group_t *);
 extern void iscsi_update_device_list_for_node (iscsi_lun_t *, u32, u32, iscsi_node_acl_t *, iscsi_portal_group_t *, int);     
 extern void iscsi_clear_lun_from_sessions (iscsi_lun_t *, iscsi_portal_group_t *);
-extern se_device_t *core_get_device_from_transport (se_hba_t *, iscsi_dev_transport_info_t *);
+extern se_device_t *core_get_device_from_transport (se_hba_t *, se_dev_transport_info_t *);
 extern int se_claim_physical_device (se_hba_t *, iscsi_devinfo_t *, struct iscsi_target *);
 extern int se_release_physical_device (struct iscsi_target *, iscsi_devinfo_t *, se_hba_t *);
 extern void iscsi_clear_lun_from_tpg (iscsi_lun_t *, iscsi_portal_group_t *);
@@ -49,13 +49,13 @@ extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *, iscsi_devi
 extern int iscsi_create_virtual_device (se_hba_t *, iscsi_devinfo_t *, struct iscsi_target *);
 extern void se_dev_start (se_device_t *);
 extern void se_dev_stop (se_device_t *);
-extern int iscsi_dev_add_lun (iscsi_portal_group_t *, se_hba_t *, se_device_t *, iscsi_dev_transport_info_t *);
+extern int iscsi_dev_add_lun (iscsi_portal_group_t *, se_hba_t *, se_device_t *, se_dev_transport_info_t *);
 extern int iscsi_dev_del_lun (iscsi_portal_group_t *, u32);
 extern int iscsi_dev_add_initiator_node_lun_acl (iscsi_portal_group_t *, u32, u32, u32, char *);
 extern int iscsi_dev_del_initiator_node_lun_acl (iscsi_portal_group_t *, u32, u32, char *);
 extern int iscsi_dev_set_initiator_node_lun_access (iscsi_portal_group_t *, u32, u32, char *);
 extern se_hba_t *core_get_hba_from_hbaid (struct iscsi_target *tg,
-					      iscsi_dev_transport_info_t *dti,
+					      se_dev_transport_info_t *dti,
 					      int add);
 
 #endif /* ISCSI_TARGET_DEVICE_H */

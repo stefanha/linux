@@ -66,7 +66,7 @@ extern iscsi_global_t *iscsi_global;
  *
  */
 extern int iscsi_hba_check_online (
-	iscsi_dev_transport_info_t *dti)
+	se_dev_transport_info_t *dti)
 {
 	int found_hba = 0, ret = 0;
 	se_hba_t *hba;

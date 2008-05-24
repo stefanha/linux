@@ -363,7 +363,7 @@ extern int iscsi_ioctl (
 	u32 lun_access = 0;
 	se_device_t *dev = NULL;
 	iscsi_devinfo_t dev_info;
-	iscsi_dev_transport_info_t devt_info;
+	se_dev_transport_info_t devt_info;
 	se_hba_t *hba = NULL;
 	se_hbainfo_t hba_info;
 	iscsi_portal_group_t *tpg = NULL;
@@ -670,7 +670,7 @@ extern int iscsi_ioctl (
 	  core_put_hba(hba);
 	  break;
 	case ISCSI_TARGET_FREEVIRTDEV:
-	  memset(&devt_info, 0, sizeof(iscsi_dev_transport_info_t));
+	  memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
 	  devt_info.hba_id = t->hba_id;
  	
 	  if (!(dev = transport_core_locate_dev(t, &devt_info, &ret))) 
@@ -692,7 +692,7 @@ extern int iscsi_ioctl (
 		  goto dumpout;
 	  }
 
-	  memset(&devt_info, 0, sizeof(iscsi_dev_transport_info_t));
+	  memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
 	  devt_info.hba_id = t->hba_id;
 
 	  if (!(dev = transport_core_locate_dev(t, &devt_info, &ret))) {
@@ -795,7 +795,7 @@ extern int iscsi_ioctl (
 	  
 	case ISCSI_TARGET_DEBUG_DEV:
 #ifdef DEBUG_DEV
-	  memset(&devt_info, 0, sizeof(iscsi_dev_transport_info_t));
+	  memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
 	  devt_info.hba_id = t->hba_id;
 
 	  if (!(dev = transport_core_locate_dev(t, &devt_info, &ret)))

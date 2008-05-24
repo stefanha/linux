@@ -1106,7 +1106,7 @@ typedef struct se_device_s {
 #define ISCSI_DEV(cmd)		((se_device_t *)(cmd)->iscsi_lun->iscsi_dev)
 #define DEV_OBJ_API(dev)	((struct se_obj_lun_type_s *)(dev)->dev_obj_api)
 
-typedef struct iscsi_dev_transport_info_s {
+typedef struct se_dev_transport_info_s {
 	unsigned char		fd_dev_name[FD_MAX_DEV_NAME];
 	int			check_tcq;
 	int			force;
@@ -1128,7 +1128,7 @@ typedef struct iscsi_dev_transport_info_s {
 	u32			iscsi_lun;
 	u32			queue_depth;
 	u32			vol_id;
-} ____cacheline_aligned iscsi_dev_transport_info_t;
+} ____cacheline_aligned se_dev_transport_info_t;
 
 typedef struct se_hba_s {
 	u8			type;		/* Type of disk transport used for HBA. */
