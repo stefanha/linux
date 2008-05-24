@@ -1056,7 +1056,7 @@ extern int iscsi_dev_add_initiator_node_lun_acl (
 	char *initiatorname)
 {
 	se_lun_t *iscsi_lun;
-	iscsi_lun_acl_t *acl;
+	se_lun_acl_t *acl;
 	iscsi_node_acl_t *nacl;
 
 	if (strlen(initiatorname) > 255) {
@@ -1099,11 +1099,11 @@ extern int iscsi_dev_add_initiator_node_lun_acl (
 	}
 	spin_unlock(&iscsi_lun->lun_acl_lock);
 
-	if (!(acl = (iscsi_lun_acl_t *) kmalloc(sizeof(iscsi_lun_acl_t), GFP_KERNEL))) {	
-		TRACE_ERROR("Unable to allocate memory for iscsi_lun_acl_t.\n");
+	if (!(acl = (se_lun_acl_t *) kmalloc(sizeof(se_lun_acl_t), GFP_KERNEL))) {	
+		TRACE_ERROR("Unable to allocate memory for se_lun_acl_t.\n");
 		return(ERR_NO_MEMORY);
 	}
-	memset(acl, 0, sizeof(iscsi_lun_acl_t));
+	memset(acl, 0, sizeof(se_lun_acl_t));
 
 	acl->iscsi_lun = iscsi_lun;
 	acl->mapped_lun = mapped_lun;
@@ -1138,7 +1138,7 @@ extern int iscsi_dev_del_initiator_node_lun_acl (
 	char *initiatorname)
 {
 	se_lun_t *iscsi_lun;
-	iscsi_lun_acl_t *acl;
+	se_lun_acl_t *acl;
 	iscsi_node_acl_t *nacl;
 
 	if (strlen(initiatorname) > 255) {

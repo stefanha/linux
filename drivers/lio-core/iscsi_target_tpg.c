@@ -300,7 +300,7 @@ static void iscsi_clear_initiator_node_from_tpg (
 	int i;
 	se_dev_entry_t *deve;
 	se_lun_t *lun;
-	iscsi_lun_acl_t *acl;
+	se_lun_acl_t *acl;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	for (i = 0; i < ISCSI_MAX_LUNS_PER_TPG; i++) {
@@ -328,7 +328,7 @@ static void iscsi_clear_initiator_node_from_tpg (
 		}
 
 		if (!acl) {
-			TRACE_ERROR("Unable to locate iscsi_lun_acl_t for %s, mapped_lun: %u\n",
+			TRACE_ERROR("Unable to locate se_lun_acl_t for %s, mapped_lun: %u\n",
 				nacl->initiatorname, deve->mapped_lun);
 			spin_unlock(&lun->lun_acl_lock);
 			spin_lock_bh(&nacl->device_list_lock);
@@ -1472,7 +1472,7 @@ extern int iscsi_tpg_post_dellun (
 	iscsi_portal_group_t *tpg,
 	se_lun_t *lun)
 {
-	iscsi_lun_acl_t *acl, *acl_next;
+	se_lun_acl_t *acl, *acl_next;
 	
 	iscsi_clear_lun_from_sessions(lun, tpg);
 

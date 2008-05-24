@@ -475,7 +475,7 @@ extern int iscsi_tpg_get_lun_info (
 	unsigned char *b;
 	int bl = 0, cl = 0, oob = 1, i, start = 0;
 	se_lun_t *lun = NULL;
-	iscsi_lun_acl_t *acl = NULL;
+	se_lun_acl_t *acl = NULL;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_tiqn_t *tiqn;
 

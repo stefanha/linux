@@ -986,13 +986,13 @@ typedef struct se_hbainfo_s {
 	int		os_claim_devices;
 } ____cacheline_aligned se_hbainfo_t;
 
-typedef struct iscsi_lun_acl_s {
+typedef struct se_lun_acl_s {
 	char			initiatorname[ISCSI_IQN_LEN];
 	u32			mapped_lun;
 	struct se_lun_s		*iscsi_lun;
-	struct iscsi_lun_acl_s	*next;
-	struct iscsi_lun_acl_s	*prev;
-}  ____cacheline_aligned iscsi_lun_acl_t;
+	struct se_lun_acl_s	*next;
+	struct se_lun_acl_s	*prev;
+}  ____cacheline_aligned se_lun_acl_t;
 
 #ifdef DEBUG_ERL
 typedef struct iscsi_debug_erl_s {
@@ -1215,8 +1215,8 @@ typedef struct se_lun_s {
 	spinlock_t		lun_sep_lock;
 	iscsi_cmd_t		*lun_cmd_head;
 	iscsi_cmd_t		*lun_cmd_tail;
-	iscsi_lun_acl_t		*lun_acl_head;
-	iscsi_lun_acl_t		*lun_acl_tail;
+	se_lun_acl_t		*lun_acl_head;
+	se_lun_acl_t		*lun_acl_tail;
 	struct iscsi_node_acl_s *lun_reserved_node_acl;
 	se_device_t		*iscsi_dev;
 	void			*lun_type_ptr;
