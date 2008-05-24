@@ -365,7 +365,7 @@ extern int iscsi_ioctl (
 	iscsi_devinfo_t dev_info;
 	iscsi_dev_transport_info_t devt_info;
 	se_hba_t *hba = NULL;
-	iscsi_hbainfo_t hba_info;
+	se_hbainfo_t hba_info;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_session_t	*sess = NULL;
 	iscsi_tiqn_t *tiqn = NULL;
@@ -587,7 +587,7 @@ extern int iscsi_ioctl (
 	  iscsi_put_tpg(tpg);
 	  break;
 	case ISCSI_TARGET_ADDHBATOTARGET:
-	  memset(&hba_info, 0, sizeof(iscsi_hbainfo_t));
+	  memset(&hba_info, 0, sizeof(se_hbainfo_t));
 	  hba_info.hba_id = t->hba_id;
 	  hba_info.hba_type = t->hba_type;
 	  hba_info.internal_dma_alloc = t->internal_dma_alloc;

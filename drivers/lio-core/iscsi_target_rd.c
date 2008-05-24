@@ -64,7 +64,7 @@ extern iscsi_global_t *iscsi_global;
 extern int rd_attach_hba (
 	iscsi_portal_group_t *tpg,
 	se_hba_t *hba,
-	iscsi_hbainfo_t *hi)
+	se_hbainfo_t *hi)
 {
 	rd_host_t *rd_host;
 
@@ -351,7 +351,7 @@ extern int rd_check_device_location (se_device_t *dev, iscsi_dev_transport_info_
 	return(-1);
 }
 
-extern int rd_check_ghost_id (iscsi_hbainfo_t *hi, int type)
+extern int rd_check_ghost_id (se_hbainfo_t *hi, int type)
 {
 	int i;          
 	se_hba_t *hba;
@@ -380,12 +380,12 @@ extern int rd_check_ghost_id (iscsi_hbainfo_t *hi, int type)
 	return(0);
 }
 
-extern int rd_mcp_check_ghost_id (iscsi_hbainfo_t *hi)
+extern int rd_mcp_check_ghost_id (se_hbainfo_t *hi)
 {
 	return(rd_check_ghost_id(hi, RAMDISK_MCP));
 }
 
-extern int rd_dr_check_ghost_id (iscsi_hbainfo_t *hi)
+extern int rd_dr_check_ghost_id (se_hbainfo_t *hi)
 {
 	return(rd_check_ghost_id(hi, RAMDISK_DR));
 }
@@ -1106,7 +1106,7 @@ extern void rd_free_task (se_task_t *task)
 	return;
 }
 
-extern int rd_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int virt)
+extern int rd_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
 {
 	if (!(t->hba_params_set & PARAM_HBA_RD_HOST_ID)) {
 		TRACE_ERROR("rd_host_id must be set for"

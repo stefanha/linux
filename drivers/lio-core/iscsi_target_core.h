@@ -969,7 +969,7 @@ typedef struct iscsi_devinfo_s {
 	u32		uu_id[4];
 } ____cacheline_aligned iscsi_devinfo_t;
 
-typedef struct iscsi_hbainfo_s {
+typedef struct se_hbainfo_s {
 	__u8		hba_type;
 	__u8		_pad[3];
 	u32		hba_id;
@@ -984,7 +984,7 @@ typedef struct iscsi_hbainfo_s {
 	int		scsi_host_id;
 	int		iscsi_channel_id;
 	int		os_claim_devices;
-} ____cacheline_aligned iscsi_hbainfo_t;
+} ____cacheline_aligned se_hbainfo_t;
 
 typedef struct iscsi_lun_acl_s {
 	char			initiatorname[ISCSI_IQN_LEN];
@@ -1147,7 +1147,7 @@ typedef struct se_hba_s {
 	void			*hba_ptr;	/* Pointer to transport specific host structure. */
 	se_device_t		*device_head;	/* Pointer to start of devices for this HBA */
 	se_device_t		*device_tail;	/* Pointer to end of devices of this HBA */
-	iscsi_hbainfo_t		hba_info;
+	se_hbainfo_t		hba_info;
 	spinlock_t		device_lock;	/* Spinlock for adding/removing devices */
 	spinlock_t		hba_queue_lock;
 	struct semaphore		hba_access_sem;

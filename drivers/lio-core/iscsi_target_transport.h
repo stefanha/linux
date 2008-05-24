@@ -294,7 +294,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * attach_hba():
 	 */
-	int (*attach_hba)(iscsi_portal_group_t *, se_hba_t *, iscsi_hbainfo_t *);
+	int (*attach_hba)(iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
 	/*
 	 * detach_hba():
 	 */
@@ -310,7 +310,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * scan_devices(): Only for Physical HBAs
 	 */
-	int (*scan_devices)(struct se_hba_s *, struct iscsi_hbainfo_s *);
+	int (*scan_devices)(struct se_hba_s *, struct se_hbainfo_s *);
 	/*
 	 * activate_device():
 	 */
@@ -334,7 +334,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * check_ghost_id():
 	 */
-	int (*check_ghost_id)(iscsi_hbainfo_t *);
+	int (*check_ghost_id)(se_hbainfo_t *);
 	/*
 	 * cmd_sequencer():
 	 *
@@ -388,7 +388,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * check_hba_params():
 	 */
-	int (*check_hba_params)(iscsi_hbainfo_t *, struct iscsi_target *, int);
+	int (*check_hba_params)(se_hbainfo_t *, struct iscsi_target *, int);
 	/*
 	 * check_dev_params():
 	 */

@@ -52,16 +52,16 @@ extern int pscsi_CDB_write_non_SG (se_task_t *, u32);
 extern int pscsi_CDB_write_SG (se_task_t *, u32);
 
 #ifndef PSCSI_INCLUDE_STRUCTS
-extern int pscsi_attach_hba (iscsi_portal_group_t *, se_hba_t *, iscsi_hbainfo_t *);
+extern int pscsi_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
 extern int pscsi_detach_hba (se_hba_t *);
-extern int pscsi_scan_devices (se_hba_t *, iscsi_hbainfo_t *);
+extern int pscsi_scan_devices (se_hba_t *, se_hbainfo_t *);
 extern int pscsi_claim_phydevice (se_hba_t *, se_device_t *);
 extern int pscsi_release_phydevice (se_device_t *);
 extern int pscsi_activate_device (se_device_t *);
 extern void pscsi_deactivate_device (se_device_t *);
 extern se_device_t *pscsi_add_device_to_list (se_hba_t *, struct scsi_device *, int);
 extern int pscsi_check_device_location (se_device_t *, iscsi_dev_transport_info_t *);
-extern int pscsi_check_ghost_id (iscsi_hbainfo_t *);
+extern int pscsi_check_ghost_id (se_hbainfo_t *);
 extern void pscsi_free_device (se_device_t *);
 extern int pscsi_transport_complete (se_task_t *);
 extern void *pscsi_allocate_request (se_task_t *, se_device_t *);
@@ -69,7 +69,7 @@ extern void pscsi_get_evpd_prod (unsigned char *, u32, se_device_t *);
 extern void pscsi_get_evpd_sn (unsigned char *, u32, se_device_t *);
 extern int pscsi_do_task (se_task_t *);
 extern void pscsi_free_task (se_task_t *);
-extern int pscsi_check_hba_params (iscsi_hbainfo_t *, struct iscsi_target *, int);
+extern int pscsi_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern int pscsi_check_dev_params (se_hba_t *, struct iscsi_target *, iscsi_dev_transport_info_t *);
 extern void pscsi_get_plugin_info (void *, char *, int *);
 extern void pscsi_get_hba_info (se_hba_t *, char *, int *);

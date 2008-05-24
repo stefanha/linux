@@ -369,7 +369,7 @@ static void mc_fixup (mc_host_t *p)
 extern int mc_attach_hba (
 	iscsi_portal_group_t *tpg,
 	se_hba_t *hba,
-	iscsi_hbainfo_t *hi)
+	se_hbainfo_t *hi)
 {
 	mc_host_t *mc_host;
 
@@ -582,7 +582,7 @@ extern int mc_check_device_location (se_device_t *dev, iscsi_dev_transport_info_
 	return(-1);
 }
 
-extern int mc_check_ghost_id (iscsi_hbainfo_t *hi)
+extern int mc_check_ghost_id (se_hbainfo_t *hi)
 {
 	int i;          
 	se_hba_t *hba;
@@ -1131,7 +1131,7 @@ extern void mc_free_task (se_task_t *task)
 	return;
 }
 
-extern int mc_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int virt)
+extern int mc_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
 {
 	if (!(t->hba_params_set & PARAM_HBA_MC_HOST_ID)) {
 		TRACE_ERROR("mc_host_id must be set for"

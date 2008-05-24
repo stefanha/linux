@@ -81,7 +81,7 @@ static u64 swap(u64 n)
 extern int vt_attach_hba (
 	iscsi_portal_group_t *tpg,
 	se_hba_t *hba,
-	iscsi_hbainfo_t *hi)
+	se_hbainfo_t *hi)
 {
 	vt_host_t *vt_host;
 
@@ -341,7 +341,7 @@ extern int vt_check_device_location (se_device_t *dev, iscsi_dev_transport_info_
 	return(-1);
 }
 
-extern int vt_check_ghost_id (iscsi_hbainfo_t *hi)
+extern int vt_check_ghost_id (se_hbainfo_t *hi)
 {
 	int i;          
 	se_hba_t *hba;
@@ -1428,7 +1428,7 @@ extern void vt_free_task (se_task_t *task)
 	return;
 }
 
-extern int vt_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int virt)
+extern int vt_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
 {
 	if (!(t->hba_params_set & PARAM_HBA_VT_HOST_ID)) {
 		TRACE_ERROR("vt_host_id must be set for"

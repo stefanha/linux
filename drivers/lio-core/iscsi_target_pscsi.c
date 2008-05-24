@@ -212,7 +212,7 @@ extern int pscsi_release_sd (struct scsi_device *sd)
  *
  *	FIXME: Check was locking the midlayer does for accessing scsi_hostlist.	
  */
-extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, iscsi_hbainfo_t *hi)
+extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, se_hbainfo_t *hi)
 {
 	int hba_depth, max_sectors, pscsi_dev_count;
 	struct Scsi_Host *sh;
@@ -235,7 +235,7 @@ extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, iscsi_hba
 	hba->hba_ptr = (void *) sh;
 	hba->hba_id = hi->hba_id;
 	hba->transport = &pscsi_template;
-	memcpy((void *)&hba->hba_info, (void *)hi, sizeof(iscsi_hbainfo_t));
+	memcpy((void *)&hba->hba_info, (void *)hi, sizeof(se_hbainfo_t));
 	
 	PYXPRINT("iSCSI_HBA[%d] - %s Parallel SCSI HBA Driver %s on iSCSI"
 		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR, PSCSI_VERSION, PYX_ISCSI_VERSION);
@@ -283,7 +283,7 @@ extern int pscsi_detach_hba (se_hba_t *hba)
  *
  * 	FIXME: For <= v2.4, check what locking the midlayer does for accessing Scsi_Host->host_queue (if any?)
  */
-extern int pscsi_scan_devices (se_hba_t *iscsi_hba, iscsi_hbainfo_t *hi)
+extern int pscsi_scan_devices (se_hba_t *iscsi_hba, se_hbainfo_t *hi)
 {
 	int pscsi_dev_count = 0;
 	int dev_flags = 0;
@@ -518,7 +518,7 @@ extern int pscsi_check_device_location (se_device_t *dev, iscsi_dev_transport_in
  *
  *	
  */
-extern int pscsi_check_ghost_id (iscsi_hbainfo_t *hi)
+extern int pscsi_check_ghost_id (se_hbainfo_t *hi)
 {
 	int i;
 	se_hba_t *hba;
@@ -788,7 +788,7 @@ extern void pscsi_free_task (se_task_t *task)
 	return;
 }
 
-extern int pscsi_check_hba_params (iscsi_hbainfo_t *hi, struct iscsi_target *t, int virt)
+extern int pscsi_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
 {
 	if (virt) {
 		TRACE_ERROR("createvirtdev is not required for Physical"

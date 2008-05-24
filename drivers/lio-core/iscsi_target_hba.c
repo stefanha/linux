@@ -70,7 +70,7 @@ extern int iscsi_hba_check_online (
 {
 	int found_hba = 0, ret = 0;
 	se_hba_t *hba;
-	iscsi_hbainfo_t hi;
+	se_hbainfo_t hi;
 	se_subsystem_api_t *t;
 
 	if (dti->hba_id < (ISCSI_MAX_GLOBAL_HBAS-1)) {
@@ -84,7 +84,7 @@ extern int iscsi_hba_check_online (
 	if (hba->hba_status != HBA_STATUS_ACTIVE)
 		goto out;
 
-	memset(&hi, 0, sizeof(iscsi_hbainfo_t));
+	memset(&hi, 0, sizeof(se_hbainfo_t));
 	
 	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
 		return(ret);
@@ -162,7 +162,7 @@ extern void core_put_hba (se_hba_t *hba)
  */
 extern int iscsi_hba_check_addhba_params (
 	struct iscsi_target *tg,
-	iscsi_hbainfo_t *hi)
+	se_hbainfo_t *hi)
 {
 	int ret = 0;
 	se_subsystem_api_t *t;
@@ -188,7 +188,7 @@ extern int iscsi_hba_check_addhba_params (
  */
 extern int iscsi_hba_add_hba (
 	se_hba_t *hba,
-	iscsi_hbainfo_t *hi,
+	se_hbainfo_t *hi,
 	struct iscsi_target *tg)
 {
 	int ret = 0;
