@@ -595,7 +595,7 @@ extern unsigned char *dev_obj_get_cdb (
 	return(dev->transport->get_cdb(task));
 }
 
-extern int dev_obj_start (void *p, iscsi_transform_info_t *ti, unsigned long long starting_lba)
+extern int dev_obj_start (void *p, se_transform_info_t *ti, unsigned long long starting_lba)
 {
 	se_device_t *dev  = (se_device_t *)p;
 	
@@ -604,7 +604,7 @@ extern int dev_obj_start (void *p, iscsi_transform_info_t *ti, unsigned long lon
 
 extern u32 dev_obj_get_cdb_count (
 	void *p,
-	iscsi_transform_info_t *ti,
+	se_transform_info_t *ti,
 	unsigned long long lba,
 	u32 sectors,
 	se_mem_t *se_mem_in,

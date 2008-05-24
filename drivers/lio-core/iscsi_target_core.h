@@ -597,7 +597,7 @@ typedef struct se_transport_task_s {
 struct se_device_s;
 struct iscsi_map_sg_s;
 struct iscsi_unmap_sg_s;
-struct iscsi_transform_info_s;
+struct se_transform_info_s;
 struct se_obj_lun_type_s;
 struct se_fp_obj_s;
 struct scatterlist;
@@ -710,12 +710,12 @@ typedef struct iscsi_cmd_s {
 	int (*transport_add_cmd_to_queue)(struct iscsi_cmd_s *, u8);
 	int (*transport_allocate_iovecs)(struct iscsi_cmd_s *);
 	int (*transport_allocate_resources)(struct iscsi_cmd_s *, u32, u32);
-	int (*transport_cdb_transform)(struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
-	int (*transport_do_transform)(struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
+	int (*transport_cdb_transform)(struct iscsi_cmd_s *, struct se_transform_info_s *);
+	int (*transport_do_transform)(struct iscsi_cmd_s *, struct se_transform_info_s *);
 	void (*transport_free_resources)(struct iscsi_cmd_s *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	struct se_task_s *(*transport_get_task)(struct iscsi_transform_info_s *, struct iscsi_cmd_s *, void *, struct se_obj_lun_type_s *);
+	struct se_task_s *(*transport_get_task)(struct se_transform_info_s *, struct iscsi_cmd_s *, void *, struct se_obj_lun_type_s *);
 	int (*transport_map_buffers_to_tasks)(struct iscsi_cmd_s *);
 	void (*transport_map_SG_segments)(struct iscsi_unmap_sg_s *);
 	void (*transport_passthrough_done)(struct iscsi_cmd_s *);

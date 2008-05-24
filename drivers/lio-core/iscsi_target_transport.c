@@ -1966,7 +1966,7 @@ static inline int transport_check_device_cdb_sector_count (se_obj_lun_type_t *se
  *
  */
 static se_task_t *transport_generic_get_task (
-	iscsi_transform_info_t *ti,
+	se_transform_info_t *ti,
 	iscsi_cmd_t *cmd,
 	void *se_obj_ptr,
 	se_obj_lun_type_t *se_obj_api)
@@ -2002,7 +2002,7 @@ static se_task_t *transport_generic_get_task (
 	return(task);
 }
 
-extern int transport_generic_obj_start (iscsi_transform_info_t *ti, se_obj_lun_type_t *obj_api, void *p, unsigned long long starting_lba)
+extern int transport_generic_obj_start (se_transform_info_t *ti, se_obj_lun_type_t *obj_api, void *p, unsigned long long starting_lba)
 {
 	ti->ti_lba = starting_lba;
 	ti->ti_obj_api = obj_api;
@@ -2011,7 +2011,7 @@ extern int transport_generic_obj_start (iscsi_transform_info_t *ti, se_obj_lun_t
 	return(0);
 }
 
-static int transport_process_data_sg_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
+static int transport_process_data_sg_transform (iscsi_cmd_t *cmd, se_transform_info_t *ti)
 {
 	/*
 	 * Already handled in transport_generic_get_cdb_count()
@@ -2023,7 +2023,7 @@ static int transport_process_data_sg_transform (iscsi_cmd_t *cmd, iscsi_transfor
  *
  *
  */
-static int transport_process_control_sg_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
+static int transport_process_control_sg_transform (iscsi_cmd_t *cmd, se_transform_info_t *ti)
 {
 	unsigned char *cdb;
 	se_task_t *task;
@@ -2066,7 +2066,7 @@ static int transport_process_control_sg_transform (iscsi_cmd_t *cmd, iscsi_trans
  *
  *
  */
-static int transport_process_control_nonsg_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
+static int transport_process_control_nonsg_transform (iscsi_cmd_t *cmd, se_transform_info_t *ti)
 {
 	unsigned char *cdb;
 	se_task_t *task;
@@ -2094,7 +2094,7 @@ static int transport_process_control_nonsg_transform (iscsi_cmd_t *cmd, iscsi_tr
  *
  *
  */
-static int transport_process_non_data_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
+static int transport_process_non_data_transform (iscsi_cmd_t *cmd, se_transform_info_t *ti)
 {
 	unsigned char *cdb;
 	se_task_t *task;
@@ -4345,7 +4345,7 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	void *type_ptr)
 {
 	iscsi_cmd_t *cmd;
-	iscsi_transform_info_t ti;
+	se_transform_info_t ti;
 	
 	if (!(cmd = (iscsi_cmd_t *) kmalloc(sizeof(iscsi_cmd_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate iscsi_cmd_t\n");
@@ -4417,7 +4417,7 @@ extern iscsi_cmd_t *transport_allocate_passthrough (
 	if (transport_generic_allocate_tasks(cmd, cdb) < 0)
 		goto fail;
 
-	memset(&ti, 0, sizeof(iscsi_transform_info_t));
+	memset(&ti, 0, sizeof(se_transform_info_t));
 	ti.ti_data_length = cmd->data_length;
 	ti.ti_dev = ISCSI_LUN(cmd)->iscsi_dev;
 	ti.ti_cmd = cmd;
@@ -4862,7 +4862,7 @@ non_scsi_data:
  *
  *
  */
-extern int transport_generic_do_transform (iscsi_cmd_t *cmd, iscsi_transform_info_t *ti)
+extern int transport_generic_do_transform (iscsi_cmd_t *cmd, se_transform_info_t *ti)
 {
 	if (cmd->transport_cdb_transform(cmd, ti) < 0)
 		return(-1);
@@ -4901,7 +4901,7 @@ extern int transport_get_sectors (
 
 extern int transport_new_cmd_obj (
 	iscsi_cmd_t *cmd,
-	iscsi_transform_info_t *ti,
+	se_transform_info_t *ti,
 	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	int post_execute)
@@ -5416,7 +5416,7 @@ next:
 
 extern u32 transport_generic_get_cdb_count (
 	iscsi_cmd_t *cmd,
-	iscsi_transform_info_t *ti,
+	se_transform_info_t *ti,
 	se_obj_lun_type_t *head_obj_api,
 	void *head_obj_ptr,
 	unsigned long long starting_lba,
@@ -5576,7 +5576,7 @@ static int transport_process_feature (iscsi_cmd_t *cmd)
 extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 {
 	int ret = 0;
-	iscsi_transform_info_t ti;
+	se_transform_info_t ti;
 #if 0 /* Cache stuff */
 	int cache_hit = 0;
 	iscsi_cache_entry_t *ce;
@@ -5619,7 +5619,7 @@ extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 	/*
 	 * Generate se_task_t(s) and/or their payloads for this CDB.
 	 */
-	memset((void *)&ti, 0, sizeof(iscsi_transform_info_t));
+	memset((void *)&ti, 0, sizeof(se_transform_info_t));
 	ti.ti_cmd = cmd;
         ti.se_obj_ptr = ISCSI_LUN(cmd)->lun_type_ptr;
         ti.se_obj_api = ISCSI_LUN(cmd)->lun_obj_api;

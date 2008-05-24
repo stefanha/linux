@@ -113,18 +113,18 @@ extern void transport_generic_deactivate_device (se_device_t *);
 extern int transport_generic_claim_phydevice (se_device_t *);
 extern void transport_generic_release_phydevice (se_device_t *, int);
 extern void transport_generic_free_device (se_device_t *);
-extern int transport_generic_obj_start (struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long);
-extern int transport_process_vol_transform (u32 *, struct iscsi_transform_info_s *);
-extern int transport_jbod_cdb_count (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
-extern int transport_jbod_allocate_DMA (struct iscsi_cmd_s *cmd, struct iscsi_transform_info_s *);
-extern int transport_process_jbod_rw (u32 *, struct iscsi_transform_info_s *);
-extern int transport_stripe_cdb_count (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
-extern int transport_stripe_allocate_DMA (struct iscsi_cmd_s *cmd, struct iscsi_transform_info_s *);
-extern int transport_process_stripe_rw (u32 *, struct iscsi_transform_info_s *);
-extern int transport_generic_re_vol_cdb_count (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
-extern int transport_generic_re_vol_allocate_DMA (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
-extern int transport_process_mirror_write (u32 *, struct iscsi_transform_info_s *);
-extern int transport_mirror_vol_write_allocate_DMA (struct iscsi_cmd_s *, struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *);
+extern int transport_generic_obj_start (struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long);
+extern int transport_process_vol_transform (u32 *, struct se_transform_info_s *);
+extern int transport_jbod_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *);
+extern int transport_jbod_allocate_DMA (struct iscsi_cmd_s *cmd, struct se_transform_info_s *);
+extern int transport_process_jbod_rw (u32 *, struct se_transform_info_s *);
+extern int transport_stripe_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *);
+extern int transport_stripe_allocate_DMA (struct iscsi_cmd_s *cmd, struct se_transform_info_s *);
+extern int transport_process_stripe_rw (u32 *, struct se_transform_info_s *);
+extern int transport_generic_re_vol_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *);
+extern int transport_generic_re_vol_allocate_DMA (struct iscsi_cmd_s *, struct se_transform_info_s *);
+extern int transport_process_mirror_write (u32 *, struct se_transform_info_s *);
+extern int transport_mirror_vol_write_allocate_DMA (struct iscsi_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *);
 extern void transport_device_setup_cmd (iscsi_cmd_t *);
 extern int transport_generic_allocate_tasks (iscsi_cmd_t *, unsigned char *);
 extern int transport_generic_check_device_location (se_device_t *dev, struct se_dev_transport_info_s *);
@@ -168,9 +168,9 @@ extern int transport_generic_remove (iscsi_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks (iscsi_cmd_t *, se_lun_t *);
 extern void transport_generic_free_cmd (iscsi_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds (iscsi_cmd_t *, int);
-extern int transport_generic_do_transform (struct iscsi_cmd_s *, struct iscsi_transform_info_s *);
+extern int transport_generic_do_transform (struct iscsi_cmd_s *, struct se_transform_info_s *);
 extern int transport_get_sectors (struct iscsi_cmd_s *, struct se_obj_lun_type_s *, void *);
-extern int transport_new_cmd_obj (struct iscsi_cmd_s *, struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *, int);
+extern int transport_new_cmd_obj (struct iscsi_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, int);
 extern unsigned char *transport_get_vaddr (struct se_mem_s *);
 extern struct list_head *transport_init_se_mem_list (void);
 extern void transport_free_se_mem_list (struct list_head *);
@@ -179,7 +179,7 @@ extern u32 transport_calc_sg_num (struct se_task_s *, struct se_mem_s *, u32);
 extern int transport_map_sg_to_mem (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 extern int transport_map_mem_to_mem (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 extern int transport_map_mem_to_sg (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
-extern u32 transport_generic_get_cdb_count (struct iscsi_cmd_s *, struct iscsi_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
+extern u32 transport_generic_get_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
 extern int transport_generic_new_cmd (iscsi_cmd_t *);
 extern void transport_generic_process_write (iscsi_cmd_t *);
 extern int transport_generic_do_tmr (iscsi_cmd_t *);
@@ -249,7 +249,7 @@ typedef struct se_task_s {
 	struct list_head t_list;
 } ____cacheline_aligned se_task_t;
 
-typedef struct iscsi_transform_info_s {
+typedef struct se_transform_info_s {
 	int		ti_set_counts;
 	u32		ti_data_length;
 	unsigned long long	ti_lba;
@@ -259,7 +259,7 @@ typedef struct iscsi_transform_info_s {
 	void *ti_obj_ptr;
 	struct se_obj_lun_type_s *se_obj_api;
 	struct se_obj_lun_type_s *ti_obj_api;
-} ____cacheline_aligned iscsi_transform_info_t;
+} ____cacheline_aligned se_transform_info_t;
 
 /*
  * Each type of DAS transport that uses the generic command sequencer needs

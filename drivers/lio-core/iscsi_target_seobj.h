@@ -89,9 +89,9 @@ typedef struct se_obj_lun_type_s {
 	void (*signal_offline)(void *);
 	void (*signal_shutdown)(void *);
 	void (*clear_shutdown)(void *);
-	int (*obj_start)(void *, struct iscsi_transform_info_s *, unsigned long long);
+	int (*obj_start)(void *, struct se_transform_info_s *, unsigned long long);
 	unsigned char *(*get_cdb)(void *, struct se_task_s *);
-	u32 (*get_cdb_count)(void *, struct iscsi_transform_info_s *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
+	u32 (*get_cdb_count)(void *, struct se_transform_info_s *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
 	u32 (*get_cdb_size)(void *, u32, unsigned char *);
 	void (*generate_cdb)(void *, unsigned long long, u32 *, unsigned char *, int);
 	int (*get_device_access)(void *);
