@@ -224,14 +224,14 @@ extern int iscsi_OS_register_info_handlers (u16 tpgt)
 	}
 
 	sprintf(dev_buf, "iscsi_target/tpg_%d/dev_info", tpgt);
-	if (!(dev_info = proc_create_data(dev_buf, 0, iscsi_tpg, &dev_proc_ops, (void *)&tpgt))) {
+	if (!(dev_info = proc_create_data(dev_buf, S_IFREG, iscsi_tpg, &dev_proc_ops, (void *)&tpgt))) {
 		remove_proc_entry(dir_buf, 0);
 		TRACE_ERROR("create_proc_data() failed.\n");
 		return(-1);
 	}
 
 	sprintf(sess_buf, "iscsi_target/tpg_%d/sess_info", tpgt);
-	if (!(sess_info = proc_create_data(sess_buf, 0, iscsi_tpg, &sess_proc_ops, (void *)&tpgt))) {
+	if (!(sess_info = proc_create_data(sess_buf, S_IFREG, iscsi_tpg, &sess_proc_ops, (void *)&tpgt))) {
 		remove_proc_entry(dev_buf, 0);
 		remove_proc_entry(dir_buf, 0);
 		TRACE_ERROR("create_proc_data() failed.\n");
@@ -239,7 +239,7 @@ extern int iscsi_OS_register_info_handlers (u16 tpgt)
 	}
 
 	sprintf(tpg_buf, "iscsi_target/tpg_%d/tpg_info", tpgt);
-	if (!(tpg_info = proc_create_data(tpg_buf, 0, iscsi_tpg, &tpg_proc_ops, (void *)&tpgt))) {
+	if (!(tpg_info = proc_create_data(tpg_buf, S_IFREG, iscsi_tpg, &tpg_proc_ops, (void *)&tpgt))) {
 		remove_proc_entry(sess_buf, 0);
 		remove_proc_entry(dev_buf, 0);
 		remove_proc_entry(dir_buf, 0);

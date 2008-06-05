@@ -1071,14 +1071,14 @@ static int iscsi_target_detect(void)
 		goto out;
         }
 	if (!(name_entry = proc_create_data("iscsi_target/target_nodename",
-			0, dir_entry, &default_targetname, NULL))) {
+			S_IFREG, dir_entry, &default_targetname, NULL))) {
 		TRACE_ERROR("create_proc_info_entry() failed.\n");
 		remove_proc_entry("iscsi_target", 0);
 		ret = -1;
 		goto out;
 	}
 	if (!(ver_entry = proc_create_data("iscsi_target/version_info",
-			0, dir_entry, &version_info, NULL))) {
+			S_IFREG, dir_entry, &version_info, NULL))) {
 		TRACE_ERROR("create_proc_info_entry() failed.\n");
 		remove_proc_entry("iscsi_target/target_node_name", 0);
 		remove_proc_entry("iscsi_target", 0);
