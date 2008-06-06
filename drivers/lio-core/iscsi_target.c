@@ -977,7 +977,6 @@ static int default_targetname_seq_open (struct inode *inode, struct file *file)
 }
 
 static const struct file_operations default_targetname = {
-	.owner		= THIS_MODULE,
 	.open		= default_targetname_seq_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -990,7 +989,6 @@ static int version_info_seq_open (struct inode *inode, struct file *file)
 }
 
 static const struct file_operations version_info = {
-	.owner		= THIS_MODULE,
 	.open		= version_info_seq_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -1072,16 +1070,16 @@ static int iscsi_target_detect(void)
 		ret = -1;
 		goto out;
         }
-	if (!(name_entry = proc_create("target_nodename", 0,
-			dir_entry, &default_targetname))) {
-		TRACE_ERROR("proc_create() failed.\n");
+	if (!(name_entry = proc_create_data("iscsi_target/target_nodename",
+			S_IFREG, dir_entry, &default_targetname, NULL))) {
+		TRACE_ERROR("create_proc_info_entry() failed.\n");
 		remove_proc_entry("iscsi_target", 0);
 		ret = -1;
 		goto out;
 	}
-	if (!(ver_entry = proc_create("version_info", 0,
-			dir_entry, &version_info))) {
-		TRACE_ERROR("proc_create() failed.\n");
+	if (!(ver_entry = proc_create_data("iscsi_target/version_info",
+			S_IFREG, dir_entry, &version_info, NULL))) {
+		TRACE_ERROR("create_proc_info_entry() failed.\n");
 		remove_proc_entry("iscsi_target/target_node_name", 0);
 		remove_proc_entry("iscsi_target", 0);
 		ret = -1;
