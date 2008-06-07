@@ -239,6 +239,7 @@ static void *locate_tpg_start(
 		if (!tiqn->tiqn_active_tpgs)
 			continue;
 
+		spin_lock(&tiqn->tiqn_state_lock);
 		spin_lock(&tiqn->tiqn_tpg_lock);
 		for (i = 0; i < ISCSI_MAX_TPGS; i++) {
 			tpg = &tiqn->tiqn_tpg_list[i];
@@ -264,12 +265,14 @@ static void *locate_tpg_start(
 				atomic_inc(&tiqn->tiqn_access_count);
 				spin_unlock(&tpg->tpg_state_lock);
 				spin_unlock(&tiqn->tiqn_tpg_lock);
+				spin_unlock(&tiqn->tiqn_state_lock);
 				spin_unlock(&iscsi_global->tiqn_lock);
 				return((void *)tpg_iter);
 			}
 			spin_unlock(&tpg->tpg_state_lock);
 		}
 		spin_unlock(&tiqn->tiqn_tpg_lock);
+		spin_unlock(&tiqn->tiqn_state_lock);
 	}
 	spin_unlock(&iscsi_global->tiqn_lock);
 
@@ -315,6 +318,7 @@ static void *locate_tpg_next(
 		return(NULL);
 	} else {
 		spin_lock(&iscsi_global->tiqn_lock);
+		spin_lock(&tiqn->tiqn_state_lock);
 		atomic_dec(&tiqn->tiqn_access_count);
 
 		list_for_each_entry_continue(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
@@ -337,10 +341,11 @@ static void *locate_tpg_next(
 					iterp->count_cur = 0; 
 					iterp->ti_offset = tpg->tpgt;
 					iterp->ti_skip_body = 0;
-
+					
 					atomic_inc(&tiqn->tiqn_access_count);
 					spin_unlock(&tpg->tpg_state_lock);
 					spin_unlock(&tiqn->tiqn_tpg_lock);
+					spin_unlock(&tiqn->tiqn_state_lock);
 					spin_unlock(&iscsi_global->tiqn_lock);
 
 					return(v);
@@ -349,6 +354,7 @@ static void *locate_tpg_next(
 			}
 			spin_unlock(&tiqn->tiqn_tpg_lock);
 		}
+		spin_unlock(&tiqn->tiqn_state_lock);
 		spin_unlock(&iscsi_global->tiqn_lock);
 	}
 
@@ -364,7 +370,9 @@ static void locate_tpg_stop(struct seq_file *seq, void *v)
 		return;
 
 	if (iterp && (tiqn = (iscsi_tiqn_t *)iterp->ti_ptr)) {
+		spin_lock(&tiqn->tiqn_state_lock);
 		atomic_dec(&tiqn->tiqn_access_count);
+		spin_unlock(&tiqn->tiqn_state_lock);
 	}
 
 //	printk("%s[%d] - Releasing iterp: %p\n", current->comm, current->pid, iterp);

@@ -133,41 +133,100 @@ extern iscsi_tiqn_t *__core_get_default_tiqn (void)
 	return(tiqn);
 }
 
+/*
+ * Called with iscsi_global->tiqn_lock held.
+ */
 extern iscsi_tiqn_t *core_get_default_tiqn (void)
 {
 	iscsi_tiqn_t *tiqn = NULL;
 
-	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
 		break;
 	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-
 	if (!tiqn) {
 		TRACE_ERROR("Unable to locate Default Target IQN\n");
 		return(NULL);
 	}
+	spin_lock(&tiqn->tiqn_state_lock);
+	if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
+		spin_unlock(&tiqn->tiqn_state_lock);
+		down_interruptible(&tiqn->tiqn_access_sem);
+		return((signal_pending(current)) ? NULL : tiqn);
+	}
+	spin_unlock(&tiqn->tiqn_state_lock);
 
-	return(tiqn);
+	return(NULL);
 }
 
-extern iscsi_tiqn_t *core_get_tiqn (unsigned char *buf)
+extern iscsi_tiqn_t *core_get_tiqn_for_login(unsigned char *buf)
 {
 	iscsi_tiqn_t *tiqn = NULL;
 
-	if (!(strlen(buf)))
-		return(core_get_default_tiqn());
-
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (!(strncmp(tiqn->tiqn, buf, strlen(tiqn->tiqn)))) {
-			spin_unlock(&iscsi_global->tiqn_lock);
-			return(tiqn);
+		if (!(strncmp(tiqn->tiqn, buf, strlen(buf)))) {
+			
+			spin_lock(&tiqn->tiqn_state_lock);
+			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
+				atomic_inc(&tiqn->tiqn_access_count);
+				spin_unlock(&tiqn->tiqn_state_lock);
+				spin_unlock(&iscsi_global->tiqn_lock);
+				return(tiqn);
+			}
+			spin_unlock(&tiqn->tiqn_state_lock);
 		}
 	}
 	spin_unlock(&iscsi_global->tiqn_lock);
 
 	return(NULL);
+}
+
+extern iscsi_tiqn_t *core_get_tiqn (unsigned char *buf, int delete)
+{
+	iscsi_tiqn_t *tiqn = NULL;
+
+	spin_lock(&iscsi_global->tiqn_lock);
+	if (!(strlen(buf))) {
+		tiqn = core_get_default_tiqn();
+		spin_unlock(&iscsi_global->tiqn_lock);
+		return(tiqn);
+	}
+
+	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (!(strncmp(tiqn->tiqn, buf, strlen(buf)))) {
+
+			spin_lock(&tiqn->tiqn_state_lock);
+			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
+				if (delete) 
+					tiqn->tiqn_state = TIQN_STATE_SHUTDOWN;
+
+				spin_unlock(&tiqn->tiqn_state_lock);
+				spin_unlock(&iscsi_global->tiqn_lock);
+				down_interruptible(&tiqn->tiqn_access_sem);
+				return((signal_pending(current)) ? NULL : tiqn);
+			}
+			spin_unlock(&tiqn->tiqn_state_lock);
+		}
+	}
+	spin_unlock(&iscsi_global->tiqn_lock);
+
+	return(NULL);
+}
+
+extern void core_put_tiqn (iscsi_tiqn_t *tiqn)
+{
+	if (tiqn) {
+		up(&tiqn->tiqn_access_sem);
+	}
+	return;
+}
+
+extern void core_put_tiqn_for_login (iscsi_tiqn_t *tiqn)
+{
+	spin_lock(&tiqn->tiqn_state_lock);
+	atomic_dec(&tiqn->tiqn_access_count);
+	spin_unlock(&tiqn->tiqn_state_lock);
+	return;
 }
 
 #warning FIXME: Add IQN format checks to core_add_tiqn()
@@ -183,7 +242,7 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (!(strncmp(tiqn->tiqn, buf, ISCSI_TIQN_LEN))) {
+		if (!(strncmp(tiqn->tiqn, buf, strlen(buf)))) {
 			TRACE_ERROR("Target IQN: %s already exists in Core\n",
 				tiqn->tiqn);
 			spin_unlock(&iscsi_global->tiqn_lock);
@@ -202,6 +261,8 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 
 	sprintf(tiqn->tiqn, "%s", buf);
 	INIT_LIST_HEAD(&tiqn->tiqn_list);
+	init_MUTEX(&tiqn->tiqn_access_sem);
+	spin_lock_init(&tiqn->tiqn_state_lock);
 	spin_lock_init(&tiqn->tiqn_tpg_lock);
 #ifdef SNMP_SUPPORT
 	spin_lock_init(&tiqn->sess_err_stats.lock);
@@ -221,6 +282,8 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 			ISCSI_MAX_TPGS));
 
 	init_iscsi_portal_groups(tiqn);
+
+	tiqn->tiqn_state = TIQN_STATE_ACTIVE;
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_add_tail(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list);
@@ -248,20 +311,43 @@ extern int __core_del_tiqn (iscsi_tiqn_t *tiqn)
 	return(0);
 }
 
+static void core_wait_for_tiqn (iscsi_tiqn_t *tiqn)
+{
+	/*
+	 * Wait for accesses to said iscsi_tiqn_t to end.
+	 */
+	spin_lock(&tiqn->tiqn_state_lock);
+        while (atomic_read(&tiqn->tiqn_access_count)) {
+		spin_unlock(&tiqn->tiqn_state_lock);
+		msleep(10);
+		spin_lock(&tiqn->tiqn_state_lock);
+	}
+	spin_unlock(&tiqn->tiqn_state_lock);
+
+	return;
+}
+
 extern int core_del_tiqn (unsigned char *buf)
 {
 	iscsi_tiqn_t *tiqn;
 
-	if (!(tiqn = core_get_tiqn(buf))) {
+	/*
+	 * core_get_tiqn(iqn_buf, 1) sets tiqn->tiqn_state = TIQN_STATE_SHUTDOWN while
+	 * holding tiqn->tiqn_state_lock.  This means that all subsequent attempts to
+	 * access this iscsi_tiqn_t will fail from both transport fabric and control code paths.
+	 */
+	if (!(tiqn = core_get_tiqn(buf, 1))) {
 		TRACE_ERROR("Unable to locate iscsi_tiqn_t: %s\n", buf);
 		return(-1);
 	}
 
 	if (tiqn == iscsi_global->global_tiqn) {
 		TRACE_ERROR("Unable to delete original IQN: %s\n", tiqn->tiqn);
+		core_put_tiqn(tiqn);
 		return(-1);
 	}
 
+	core_wait_for_tiqn(tiqn);
 	return(__core_del_tiqn(tiqn));
 }
 
@@ -271,9 +357,20 @@ extern int core_release_tiqns (void)
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry_safe(tiqn, t_tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		spin_unlock(&iscsi_global->tiqn_lock);
+		
+		spin_lock(&tiqn->tiqn_state_lock);
+		if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
+			tiqn->tiqn_state = TIQN_STATE_SHUTDOWN;
+			spin_unlock(&tiqn->tiqn_state_lock);
+			spin_unlock(&iscsi_global->tiqn_lock);
 
-		__core_del_tiqn(tiqn);
+			core_wait_for_tiqn(tiqn);
+			__core_del_tiqn(tiqn);
+
+			spin_lock(&iscsi_global->tiqn_lock);
+			continue;
+		}
+		spin_unlock(&tiqn->tiqn_state_lock);
 
 		spin_lock(&iscsi_global->tiqn_lock);
 	}
@@ -289,16 +386,22 @@ extern iscsi_portal_group_t *core_get_tpg_from_iqn (
 	int addtpg)
 {
 	iscsi_tiqn_t *tiqn;
+	iscsi_portal_group_t *tpg;
 
 	/*
 	 * Legacy Mode, locate the first valid Target IQN.
 	 */
-	if (!iqn || !(tiqn = core_get_tiqn(iqn)))
+	if (!iqn || !(tiqn = core_get_tiqn(iqn, 0)))
 		return(NULL);
 
 	*tiqn_out = tiqn;
 
-	return(iscsi_get_tpg_from_tpgt(tiqn, tpgt, addtpg));
+	if (!(tpg = iscsi_get_tpg_from_tpgt(tiqn, tpgt, addtpg))) {
+		core_put_tiqn(tiqn);
+		return(NULL);
+	}
+
+	return(tpg);
 }
 
 extern int core_access_np (iscsi_np_t *np, iscsi_portal_group_t *tpg)
@@ -352,12 +455,17 @@ extern int core_access_np (iscsi_np_t *np, iscsi_portal_group_t *tpg)
 
 extern int core_deaccess_np (iscsi_np_t *np, iscsi_portal_group_t *tpg)
 {
+	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_login_tpg = NULL;	
 	printk("Cleared np->np_login_tpg\n");
 	spin_unlock_bh(&np->np_thread_lock);
 
 	up(&tpg->np_login_sem);
+
+	if (tiqn)
+		core_put_tiqn_for_login(tiqn);
 
 	return(0);
 }
@@ -1177,6 +1285,8 @@ extern void iscsi_target_release_phase2 (void)
 	remove_proc_entry("iscsi_target/target_nodename", 0);
 	remove_proc_entry("iscsi_target", 0);
 #endif
+	TRACE_ERROR("Done! :-)\n");
+
 	return;
 }
 
@@ -5294,9 +5404,18 @@ extern int iscsi_release_sessions_for_tpg (iscsi_portal_group_t *tpg, int force)
 	while (sess) {
 		sess_next = sess->next;
 		
+                spin_lock(&sess->conn_lock);
+                if (atomic_read(&sess->session_fall_back_to_erl0) ||
+                    atomic_read(&sess->session_logout) ||
+                    (sess->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+			spin_unlock(&sess->conn_lock);
+			sess = sess_next;
+			continue;
+		}
 		atomic_set(&sess->session_reinstatement, 1);
-
+		spin_unlock(&sess->conn_lock);
 		spin_unlock_bh(&tpg->session_lock);
+
 		iscsi_free_session(sess);
 		spin_lock_bh(&tpg->session_lock);
 		

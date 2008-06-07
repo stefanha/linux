@@ -31,7 +31,9 @@
 
 extern iscsi_tiqn_t *__core_get_default_tiqn (void);
 extern iscsi_tiqn_t *core_get_default_tiqn (void);
-extern struct iscsi_tiqn_s *core_get_tiqn (unsigned char *);
+extern struct iscsi_tiqn_s *core_get_tiqn_for_login (unsigned char *);
+extern struct iscsi_tiqn_s *core_get_tiqn (unsigned char *, int);
+extern void core_put_tiqn (iscsi_tiqn_t *);
 extern iscsi_tiqn_t *core_add_tiqn (unsigned char *, int *);
 extern int core_del_tiqn (unsigned char *);
 extern struct iscsi_portal_group_s *core_get_tpg_from_iqn (unsigned char *, struct iscsi_tiqn_s **, u16, int);

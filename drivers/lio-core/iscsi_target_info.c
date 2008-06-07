@@ -226,6 +226,32 @@ extern int iscsi_get_dev_info_count_for_hba (u32 hba_id, int *count)
 	return(0);
 }
 
+extern int iscsi_get_global_dev_info_count (int *count)
+{
+	se_device_t *dev;
+	se_hba_t *hba;
+	int i;
+
+	*count = 1;
+
+	spin_lock(&iscsi_global->hba_lock);
+	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
+		hba = &iscsi_global->hba_list[i];
+
+		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
+			continue;
+
+		spin_lock(&hba->device_lock);
+		for (dev = hba->device_head; dev; dev = dev->next) {
+			*count += 1;
+		}
+		spin_unlock(&hba->device_lock);
+	}
+	spin_unlock(&iscsi_global->hba_lock);
+
+	return(0);
+}
+
 extern int iscsi_get_lun_info_count_for_tpg (
 	unsigned char *targetname,
 	u16 tpgt,
@@ -453,6 +479,82 @@ extern int iscsi_get_hba_dev_info (
 done:                   
 	core_put_hba(hba);
 	if (oob) { 
+		TRACE_ERROR("Ran out of buffer..\n");
+	}
+	if (b) kfree(b);
+	return(cl);
+}
+
+extern int iscsi_get_global_dev_info (
+	char *pb,       /* Pointer to info buffer */
+	int ml,         /* Max Length in bytes of buffer space */
+	int header,
+	int counter_offset,
+	int single_out)
+{
+	unsigned char *b;
+	int bl = 0, cl = 0, oob = 1, start = 0, i;
+	se_device_t *dev;
+	se_hba_t *hba;
+
+	if (!(b = alloc_buf()))
+		goto done;
+
+	if (header) {
+		memset(b, 0, TMP_BUF_LEN);
+		bl = sprintf(b, "-----------------------------[Global Storage Device Info]"
+				"-----------------------------\n");
+		if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0)
+			goto done;
+	}	
+
+	spin_lock(&iscsi_global->hba_lock);
+	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
+		hba = &iscsi_global->hba_list[i];
+		
+		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
+			continue;
+
+		spin_lock(&hba->device_lock);
+		for (dev = hba->device_head; dev; dev = dev->next) {
+			if (single_out && (start < counter_offset)) {
+				start++;
+				continue;
+			}
+			
+			memset(b, 0, TMP_BUF_LEN);
+			bl = 0;
+			
+			spin_unlock(&hba->device_lock);
+
+			DEV_OBJ_API(dev)->get_obj_info((void *)dev, NULL,
+				(DEV_OBJ_API(dev)->total_sectors(dev, 1, 0) *
+				 DEV_OBJ_API(dev)->blocksize(dev)), 1, b, &bl);
+
+			spin_lock(&hba->device_lock);
+			
+			bl += sprintf(b+bl, "\n");
+			
+			if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0) {
+				spin_unlock(&hba->device_lock);
+				spin_unlock(&iscsi_global->hba_lock);
+				goto done;
+			}
+
+			if (single_out) {
+				spin_unlock(&hba->device_lock);
+				spin_unlock(&iscsi_global->hba_lock);
+				goto single;
+			}
+		}
+		spin_unlock(&hba->device_lock);
+	}
+	spin_unlock(&iscsi_global->hba_lock);
+
+single:
+	oob = 0;
+done:
+	if (oob) {
 		TRACE_ERROR("Ran out of buffer..\n");
 	}
 	if (b) kfree(b);
@@ -778,7 +880,7 @@ extern int iscsi_get_tpg_info_count_for_global (unsigned char *targetname, int *
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
 	
-	if (!(tiqn = core_get_tiqn(targetname))) {
+	if (!(tiqn = core_get_tiqn(targetname, 0))) {
 		TRACE_ERROR("Unable to locate targetname\n");
 		return(-1);
 	}
@@ -795,6 +897,8 @@ extern int iscsi_get_tpg_info_count_for_global (unsigned char *targetname, int *
 		*count += 1;
 	}
 	spin_unlock(&tiqn->tiqn_tpg_lock);
+
+	core_put_tiqn(tiqn);
 	
 	return(0);
 }
@@ -836,7 +940,7 @@ extern int iscsi_tpg_get_global_tpg_info (
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_tiqn_t *tiqn;
 
-	if (!(tiqn = core_get_tiqn(targetname))) {
+	if (!(tiqn = core_get_tiqn(targetname, 0))) {
 		TRACE_ERROR("Unable to locate targetname\n");
 		oob = 0;
 		goto done;
@@ -900,6 +1004,7 @@ extern int iscsi_tpg_get_global_tpg_info (
 	
 	oob = 0;
 done:
+	core_put_tiqn(tiqn);
 	if (oob) {
 		TRACE_ERROR("Ran out of buffer..\n");
 	}

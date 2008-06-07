@@ -212,6 +212,9 @@ static int get_out_count (int cmd, struct iscsi_target *t)
 	case ISCSI_TARGET_LISTGNPINFO:
 	  core_get_np_count(&t->out_count);
 	  break;
+	case ISCSI_TARGET_LISTGHBADEVINFO:
+	  iscsi_get_global_dev_info_count(&t->out_count);
+	  break;
 	default:
 	  return(-1);
 	}
@@ -290,6 +293,11 @@ static int check_info_out (int cmd, struct iscsi_target *t)
 	case ISCSI_TARGET_LISTGNPINFO:
 		t->out_size = core_list_gnpinfo (
 				t->out_buf, t->out_buf_size,
+				(t->out_state == INFO_GOT_OUT_COUNT),
+				t->out_count_cur, 1);
+		break;
+	case ISCSI_TARGET_LISTGHBADEVINFO:
+		t->out_size = iscsi_get_global_dev_info (t->out_buf, t->out_buf_size,
 				(t->out_state == INFO_GOT_OUT_COUNT),
 				t->out_count_cur, 1);
 		break;
