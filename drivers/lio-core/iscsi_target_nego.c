@@ -219,8 +219,7 @@ static int iscsi_target_check_first_request(
 					return(-1);
 				}
 
-				if (strncmp(param->value, acl->initiatorname,
-				    strlen(acl->initiatorname))) {
+				if (strcmp(param->value, acl->initiatorname)) {
 					TRACE_ERROR("Incorrect InitiatorName: %s for"
 						" this iSCSI Initiator Node.\n",
 						param->value);

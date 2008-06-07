@@ -164,7 +164,7 @@ extern iscsi_tiqn_t *core_get_tiqn_for_login(unsigned char *buf)
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (!(strncmp(tiqn->tiqn, buf, strlen(buf)))) {
+		if (!(strcmp(tiqn->tiqn, buf))) {
 			
 			spin_lock(&tiqn->tiqn_state_lock);
 			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
@@ -193,7 +193,7 @@ extern iscsi_tiqn_t *core_get_tiqn (unsigned char *buf, int delete)
 	}
 
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (!(strncmp(tiqn->tiqn, buf, strlen(buf)))) {
+		if (!(strcmp(tiqn->tiqn, buf))) {
 
 			spin_lock(&tiqn->tiqn_state_lock);
 			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
@@ -242,7 +242,7 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (!(strncmp(tiqn->tiqn, buf, strlen(buf)))) {
+		if (!(strcmp(tiqn->tiqn, buf))) {
 			TRACE_ERROR("Target IQN: %s already exists in Core\n",
 				tiqn->tiqn);
 			spin_unlock(&iscsi_global->tiqn_lock);
