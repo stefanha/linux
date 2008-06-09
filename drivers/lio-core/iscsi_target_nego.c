@@ -776,7 +776,7 @@ get_target:
 	/*
 	 * Locate Target IQN from Storage Node.
 	 */
-	if (!(tiqn = core_get_tiqn(t_buf))) {
+	if (!(tiqn = core_get_tiqn_for_login(t_buf))) {
 		TRACE_ERROR("Unable to locate Target IQN: %s in"
 			" Storage Node\n", t_buf);
 		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,

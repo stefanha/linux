@@ -2159,7 +2159,7 @@ extern void iscsi_start_netif_timer (iscsi_conn_t *conn)
 	init_timer(&conn->transport_timer);
 	SETUP_TIMER(conn->transport_timer, ISCSI_TPG_ATTRIB(tpg)->netif_timeout,
 		conn, iscsi_handle_netif_timeout);
-				                
+	conn->netif_timer_flags &= ~NETIF_TF_STOP;
 	conn->netif_timer_flags |= NETIF_TF_RUNNING;
 	add_timer(&conn->transport_timer);
 	
@@ -2187,7 +2187,6 @@ extern void iscsi_stop_netif_timer (iscsi_conn_t *conn)
 
 	spin_lock_bh(&conn->netif_lock);
 	conn->netif_timer_flags &= ~NETIF_TF_RUNNING;
-	conn->netif_timer_flags &= ~NETIF_TF_STOP;
 	spin_unlock_bh(&conn->netif_lock);
 	
 	TRACE_LEAVE
@@ -2292,7 +2291,7 @@ extern void iscsi_start_nopin_response_timer (
 	SETUP_TIMER(conn->nopin_response_timer,
 		ISCSI_NODE_ATTRIB(acl)->nopin_response_timeout,
 		conn, iscsi_handle_nopin_response_timeout);
-
+	conn->nopin_response_timer_flags &= ~NOPIN_RESPONSE_TF_STOP;
 	conn->nopin_response_timer_flags |= NOPIN_RESPONSE_TF_RUNNING;
 	add_timer(&conn->nopin_response_timer);
 
@@ -2324,7 +2323,6 @@ extern void iscsi_stop_nopin_response_timer (
 
 	spin_lock_bh(&conn->nopin_timer_lock);
 	conn->nopin_response_timer_flags &= ~NOPIN_RESPONSE_TF_RUNNING;
-	conn->nopin_response_timer_flags &= ~NOPIN_RESPONSE_TF_STOP;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 		
 	return;
@@ -2383,6 +2381,7 @@ extern void iscsi_start_nopin_timer (
 	init_timer(&conn->nopin_timer);
 	SETUP_TIMER(conn->nopin_timer, ISCSI_NODE_ATTRIB(acl)->nopin_timeout,
 			conn, iscsi_handle_nopin_timeout);
+	conn->nopin_timer_flags &= ~NOPIN_TF_STOP;
 	conn->nopin_timer_flags |= NOPIN_TF_RUNNING;
 	add_timer(&conn->nopin_timer);
 
@@ -2416,7 +2415,6 @@ extern void iscsi_stop_nopin_timer (
 	
 	spin_lock_bh(&conn->nopin_timer_lock);
 	conn->nopin_timer_flags &= ~NOPIN_TF_RUNNING;
-	conn->nopin_timer_flags &= ~NOPIN_TF_STOP;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 	
 	TRACE_LEAVE
@@ -3074,12 +3072,12 @@ extern iscsi_tiqn_t *iscsi_snmp_get_tiqn (iscsi_conn_t *conn)
 	iscsi_portal_group_t *tpg;
 	
 	if (!conn || !conn->sess || !conn->sess->tpg)
-		return(core_get_default_tiqn());
+		return(__core_get_default_tiqn());
 
 	if (!(tpg = conn->sess->tpg))
-		return(core_get_default_tiqn());
+		return(__core_get_default_tiqn());
 
 	return((tpg->tpg_tiqn) ? tpg->tpg_tiqn :
-		core_get_default_tiqn());
+		__core_get_default_tiqn());
 }
 #endif /* SNMP_SUPPORT */

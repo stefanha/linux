@@ -235,7 +235,10 @@ extern iscsi_portal_group_t *iscsi_get_tpg_from_tpgt (
  */
 extern void iscsi_put_tpg (iscsi_portal_group_t *tpg)
 {
+	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+
 	up(&tpg->tpg_access_sem);
+	core_put_tiqn(tiqn);
 	return;
 }
 

@@ -688,6 +688,7 @@ static void iscsi_start_login_thread_timer (iscsi_np_t *np)
 	init_timer(&np->np_login_timer);
 	SETUP_TIMER(np->np_login_timer, /* ISCSI_TPG_ATTRIB(tpg)->login_timeout */ 15,
 		np, iscsi_handle_login_thread_timeout);
+	np->np_login_timer_flags &= ~TPG_NP_TF_STOP;
 	np->np_login_timer_flags |= TPG_NP_TF_RUNNING;
 	add_timer(&np->np_login_timer);
 
@@ -716,7 +717,6 @@ static void iscsi_stop_login_thread_timer (iscsi_np_t *np)
 
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_login_timer_flags &= ~TPG_NP_TF_RUNNING;
-	np->np_login_timer_flags &= ~TPG_NP_TF_STOP;
 	spin_unlock_bh(&np->np_thread_lock);
 		
 	return;

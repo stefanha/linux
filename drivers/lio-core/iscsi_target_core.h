@@ -283,6 +283,10 @@
 #define DEV_STATUS_THR_TAKE_OFFLINE		3
 #define DEV_STATUS_THR_SHUTDOWN			4
 
+/* iscsi_tiqn_t->tiqn_state */
+#define TIQN_STATE_ACTIVE			1
+#define TIQN_STATE_SHUTDOWN			2
+
 /* iscsi_cmd_t->cmd_flags */
 #define ICF_GOT_LAST_DATAOUT			0x00000001
 #define ICF_GOT_DATACK_SNACK			0x00000002
@@ -1347,11 +1351,14 @@ typedef struct iscsi_unmap_sg_s {
 
 typedef struct iscsi_tiqn_s {
 	unsigned char		tiqn[ISCSI_TIQN_LEN];
+	int			tiqn_state;
 	u32			tiqn_active_tpgs;
 	u32			tiqn_ntpgs;
 	struct list_head	tiqn_list;		
+	struct semaphore	tiqn_access_sem;
 	iscsi_portal_group_t	*tiqn_tpg_list;	
 	atomic_t		tiqn_access_count;
+	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
 #ifdef SNMP_SUPPORT
 	u32			tiqn_index;

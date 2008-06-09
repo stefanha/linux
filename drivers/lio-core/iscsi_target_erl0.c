@@ -838,6 +838,11 @@ static void iscsi_handle_time2retain_timeout (unsigned long data)
 		spin_unlock_bh(&tpg->session_lock);
 		return;
 	}
+	if (atomic_read(&sess->session_reinstatement)) {
+		TRACE_ERROR("Exiting Time2Retain handler because session_reinstatement=1\n");
+		spin_unlock_bh(&tpg->session_lock);
+		return;
+	}
 	sess->time2retain_timer_flags |= T2R_TF_EXPIRED;
 
 	TRACE_ERROR("Time2Retain timer expired for SID: %u, cleaning up"
@@ -870,6 +875,19 @@ static void iscsi_handle_time2retain_timeout (unsigned long data)
  */
 extern void iscsi_start_time2retain_handler (iscsi_session_t *sess)
 {
+	int tpg_active;
+
+	/*
+	 * Only start Time2Retain timer when the assoicated TPG is still in
+	 * an ACTIVE (eg: not disabled or shutdown) state.
+	 */
+	spin_lock(&ISCSI_TPG_S(sess)->tpg_state_lock);
+	tpg_active = (ISCSI_TPG_S(sess)->tpg_state == TPG_STATE_ACTIVE);
+	spin_unlock(&ISCSI_TPG_S(sess)->tpg_state_lock);
+
+	if (!(tpg_active))
+		return;
+
 	if (sess->time2retain_timer_flags & T2R_TF_RUNNING)
 		return;
 
@@ -879,6 +897,7 @@ extern void iscsi_start_time2retain_handler (iscsi_session_t *sess)
 	init_timer(&sess->time2retain_timer);
 	SETUP_TIMER(sess->time2retain_timer, SESS_OPS(sess)->DefaultTime2Retain,
 			sess, iscsi_handle_time2retain_timeout);
+	sess->time2retain_timer_flags &= ~T2R_TF_STOP;
 	sess->time2retain_timer_flags |= T2R_TF_RUNNING;
 	add_timer(&sess->time2retain_timer);
 
@@ -889,15 +908,15 @@ extern void iscsi_start_time2retain_handler (iscsi_session_t *sess)
  *
  *	Called with spin_lock_bh(&iscsi_portal_group_t->session_lock) held
  */
-extern void iscsi_stop_time2retain_timer (iscsi_session_t *sess)
+extern int iscsi_stop_time2retain_timer (iscsi_session_t *sess)
 {
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
 	
 	if (sess->time2retain_timer_flags & T2R_TF_EXPIRED)
-		return;
+		return(-1);
 	
 	if (!(sess->time2retain_timer_flags & T2R_TF_RUNNING))
-		return;
+		return(0);
 	
 	sess->time2retain_timer_flags |= T2R_TF_STOP;
 	spin_unlock_bh(&tpg->session_lock);
@@ -906,10 +925,9 @@ extern void iscsi_stop_time2retain_timer (iscsi_session_t *sess)
 
 	spin_lock_bh(&tpg->session_lock);
 	sess->time2retain_timer_flags &= ~T2R_TF_RUNNING;
-	sess->time2retain_timer_flags &= ~T2R_TF_STOP;
 	TRACE(TRACE_TIMER, "Stopped Time2Retain Timer for SID: %u\n", sess->sid);
 
-	return;
+	return(0);
 }
 
 /*	iscsi_connection_reinstatement_rcfr():
