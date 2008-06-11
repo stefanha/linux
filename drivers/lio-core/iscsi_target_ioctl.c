@@ -943,7 +943,7 @@ extern void se_set_forcechanoffline (void *p)
 
 EXPORT_SYMBOL(se_set_forcechanoffline);
 
-#ifdef USE_COMPAT_IOCTL
+#ifdef CONFIG_COMPAT
 
 extern long iscsi_compat_ioctl (struct file *filp,
 				unsigned int cmd,
@@ -953,44 +953,3 @@ extern long iscsi_compat_ioctl (struct file *filp,
 }
 
 #endif
-
-#if defined(USE_REGISTER_IOCTL32_CONVERSION) && defined(CONFIG_COMPAT)
- 
-extern int compat_iscsi_ioctl(
-			      unsigned int fd,
-			      unsigned int cmd,
-			      unsigned long arg,
-			      struct file *filp)
-{
-	return iscsi_ioctl(filp->f_dentry->d_inode, filp, cmd, (unsigned int) arg);
-}
-
-extern void register_iscsi_target_ioctl32(void)
-{
-	int cmd;
-	
-	for (cmd = ISCSI_TARGET_FIRST_IOCTL; cmd < ISCSI_TARGET_LAST_IOCTL; cmd++)
-		if (register_ioctl32_conversion(cmd, compat_iscsi_ioctl)!=0)
-		{
-			TRACE_ERROR("iscsi_target: failed to register 32 bit compatible ioctl 0x%08x\n", cmd);
-		}
-}
-
-extern void unregister_iscsi_target_ioctl32(void)
-{
-	int cmd;
-	
-	for (cmd = ISCSI_TARGET_FIRST_IOCTL; cmd < ISCSI_TARGET_LAST_IOCTL; cmd++)
-		if (unregister_ioctl32_conversion(cmd)!=0)
-		{
-			TRACE_ERROR("iscsi_target: failed to unregister 32 bit compatible ioctl 0x%08x\n", cmd);
-		}
-}
-
-#else
-
-void register_iscsi_target_ioctl32(void) { }
-void unregister_iscsi_target_ioctl32(void) { }
-
-#endif
-

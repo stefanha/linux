@@ -147,14 +147,12 @@ typedef struct iscsi_target  iscsi_target_t;
 #include <linux/miscdevice.h>
 #include <linux/major.h>
 
-extern void register_iscsi_target_ioctl32(void);
-extern void unregister_iscsi_target_ioctl32(void);
 extern int iscsi_open (struct inode *, struct file *);
 extern int iscsi_close(struct inode *, struct file *);
 extern int iscsi_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
-#ifdef USE_COMPAT_IOCTL
+#ifdef CONFIG_COMPAT
 extern long iscsi_compat_ioctl(struct file *, unsigned int, unsigned long);
-#endif /* USE_COMPAT_IOCTL */
+#endif /* CONFIG_COMPAT */
 
 extern se_global_t *iscsi_global;
 
@@ -163,9 +161,9 @@ extern se_global_t *iscsi_global;
 static struct file_operations iscsi_fops = {
         owner:          THIS_MODULE,
         ioctl:          iscsi_ioctl,
-#ifdef USE_COMPAT_IOCTL
+#ifdef CONFIG_COMPAT
 	compat_ioctl:	iscsi_compat_ioctl,
-#endif /* USE_COMPAT_IOCTL */
+#endif /* CONFIG_COMPAT */
         open:           iscsi_open,
         release:        iscsi_close,
 };
