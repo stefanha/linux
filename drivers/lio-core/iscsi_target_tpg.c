@@ -325,7 +325,7 @@ static void iscsi_clear_initiator_node_from_tpg (
 
 		spin_lock(&lun->lun_acl_lock);
 		for (acl = lun->lun_acl_head; acl; acl = acl->next) {
-			if (!(strncmp(acl->initiatorname, nacl->initiatorname, strlen(nacl->initiatorname))) &&
+			if (!(strcmp(acl->initiatorname, nacl->initiatorname)) &&
 			     (acl->mapped_lun == deve->mapped_lun))
 				break;
 		}
@@ -360,8 +360,7 @@ extern iscsi_node_acl_t *__iscsi_tpg_get_initiator_node_acl (
 	iscsi_node_acl_t *acl;
 	
 	for (acl = tpg->acl_node_head; acl; acl = acl->next) {
-		if (!strncmp(acl->initiatorname, initiatorname,
-				strlen(initiatorname)))
+		if (!(strcmp(acl->initiatorname, initiatorname)))
 			return(acl);
 	}
 
@@ -380,7 +379,7 @@ extern iscsi_node_acl_t *iscsi_tpg_get_initiator_node_acl (
 		                
 	spin_lock_bh(&tpg->acl_node_lock);
 	for (acl = tpg->acl_node_head; acl; acl = acl->next) {
-		if (!strncmp(acl->initiatorname, initiatorname, strlen(initiatorname)) &&
+		if (!(strcmp(acl->initiatorname, initiatorname)) &&
 		   (!(acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL))) {
 			spin_unlock_bh(&tpg->acl_node_lock);
 			return(acl);

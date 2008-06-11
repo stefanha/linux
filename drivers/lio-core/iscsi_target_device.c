@@ -1084,7 +1084,7 @@ extern int iscsi_dev_add_initiator_node_lun_acl (
 	
 	spin_lock(&iscsi_lun->lun_acl_lock);
 	for (acl = iscsi_lun->lun_acl_head; acl; acl = acl->next) {
-		if (!(strncmp(acl->initiatorname, initiatorname, strlen(initiatorname))) &&
+		if (!(strcmp(acl->initiatorname, initiatorname)) &&
 		     (acl->mapped_lun == mapped_lun))
 		break;
 	}
@@ -1158,7 +1158,7 @@ extern int iscsi_dev_del_initiator_node_lun_acl (
 
 	spin_lock(&iscsi_lun->lun_acl_lock);
 	for (acl = iscsi_lun->lun_acl_head; acl; acl = acl->next) {
-		if (!(strncmp(acl->initiatorname, initiatorname, strlen(initiatorname))) &&
+		if (!(strcmp(acl->initiatorname, initiatorname)) &&
 		      (acl->mapped_lun == mapped_lun))
 			break;
 	}

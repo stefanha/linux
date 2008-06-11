@@ -449,7 +449,7 @@ static se_device_t *transport_scan_hbas_for_evpd_sn (
 				dev->t10_wwn.unit_serial);
 			DEBUG_SO("buf: %s\n", buf);
 
-			if (!(strncmp(dev->t10_wwn.unit_serial, buf, len))) {
+			if (!(strcmp(dev->t10_wwn.unit_serial, buf))) {
 				spin_unlock(&hba->device_lock);
 				spin_unlock(&iscsi_global->hba_lock);
 				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
@@ -487,7 +487,7 @@ static se_device_t *transport_scan_hbas_for_evpd_di (
 				dev->t10_wwn.device_identifier);
 			DEBUG_SO("buf: %s\n", buf);
 
-			if (!(strncmp(dev->t10_wwn.device_identifier, buf, len))) {
+			if (!(strcmp(dev->t10_wwn.device_identifier, buf))) {
 				spin_unlock(&hba->device_lock);
 				spin_unlock(&iscsi_global->hba_lock);
 				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
