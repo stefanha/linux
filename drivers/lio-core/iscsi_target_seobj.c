@@ -73,7 +73,7 @@ extern int type##_obj_check_count (struct se_obj_s *obj)		\
 }
 
 MAKE_OBJ_TYPE(dev, inc, inc);
-MAKE_OBJ_TYPE(dev, dec, inc);
+MAKE_OBJ_TYPE(dev, dec, dec);
 MAKE_OBJ_TYPE_RET(dev);
 
 extern void dev_obj_get_obj_info (void *p, se_lun_t *lun, unsigned long long bytes, int state, char *b, int *bl)

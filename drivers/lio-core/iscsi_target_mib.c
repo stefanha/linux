@@ -126,17 +126,31 @@ static int get_num_sessions(iscsi_tiqn_t *tiqn)
 	return(num_sessions);
 }
 
+static int check_tiqn_status (iscsi_tiqn_t *tiqn)
+{
+	int ret;
+
+	spin_lock(&tiqn->tiqn_state_lock);
+	ret = (tiqn->tiqn_state == TIQN_STATE_ACTIVE);
+	spin_unlock(&tiqn->tiqn_state_lock);
+
+	return(ret);
+}
+
 static int inst_attr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_sess_err_stats_t *sess_err;
-	iscsi_tiqn_t *tiqn;
+	iscsi_tiqn_t *tiqn, *tiqn_tmp;
 	u32 sess_err_count;
 
 	seq_puts(seq, "inst min_ver max_ver portals nodes sessions fail_sess"
 		" fail_type fail_rem_name disc_time\n");
 
 	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (check_tiqn_status(tiqn) == 0)
+			continue;
+
 		seq_printf(seq, "%u %u %u %u %u %u ",
  			   tiqn->tiqn_index, ISCSI_MIN_VERSION, ISCSI_MAX_VERSION,
 			   get_num_portals(tiqn), ISCSI_INST_NUM_NODES,
@@ -186,12 +200,14 @@ static struct file_operations inst_attr_seq_fops = {
 static int sess_err_stats_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_sess_err_stats_t *sess_err;
-	iscsi_tiqn_t *tiqn;
+	iscsi_tiqn_t *tiqn, *tiqn_tmp;
 
 	seq_puts(seq, "inst digest_errors cxn_errors format_errors\n");
 
 	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (check_tiqn_status(tiqn) == 0)
+			continue;
 
 		sess_err = &tiqn->sess_err_stats;
 
@@ -223,7 +239,7 @@ static void *locate_tpg_start(
 	int (*do_check)(void *))
 {
 	iscsi_portal_group_t *tpg;
-	iscsi_tiqn_t *tiqn;
+	iscsi_tiqn_t *tiqn, *tiqn_tmp;
 	table_iter_t *tpg_iter;
 	loff_t n = *pos;
 	int i, header = (n) ? 0 : 1;
@@ -234,7 +250,9 @@ static void *locate_tpg_start(
 //	printk("%s[%d] - Allocated TPG itr: %p\n", current->comm, current->pid, tpg_iter);
 
 	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (check_tiqn_status(tiqn) == 0)
+			continue;
 
 		if (!tiqn->tiqn_active_tpgs)
 			continue;
@@ -287,7 +305,7 @@ static void *locate_tpg_next(
 {
 	table_iter_t *iterp = (table_iter_t *)v;
 	iscsi_portal_group_t *tpg;
-	iscsi_tiqn_t *tiqn = (iscsi_tiqn_t *)iterp->ti_ptr;
+	iscsi_tiqn_t *tiqn = (iscsi_tiqn_t *)iterp->ti_ptr, *tiqn_tmp;
 	int i;
 
 	(*pos)++;
@@ -321,7 +339,10 @@ static void *locate_tpg_next(
 		spin_lock(&tiqn->tiqn_state_lock);
 		atomic_dec(&tiqn->tiqn_access_count);
 
-		list_for_each_entry_continue(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+		list_for_each_entry_safe_continue(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+			if (check_tiqn_status(tiqn) == 0)
+				continue;
+
 			if (!tiqn->tiqn_active_tpgs)
 				continue;
 
@@ -410,7 +431,7 @@ static void portal_attr_seq_stop(struct seq_file *seq, void *v)
 static int portal_attr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_portal_group_t *tpg;
-	iscsi_tpg_np_t *tpg_np;
+	iscsi_tpg_np_t *tpg_np, *tpg_np_tmp;
 	table_iter_t *iterp = (table_iter_t *)v;
 	iscsi_param_t *maxrcvdseg, *hdrdigest, *datadigest, *ofmark;
 	iscsi_tiqn_t *tiqn;
@@ -441,7 +462,7 @@ static int portal_attr_seq_show(struct seq_file *seq, void *v)
 		return(0);
 
 	spin_lock(&tpg->tpg_np_lock);
-	list_for_each_entry(tpg_np, &tpg->tpg_gnp_list, tpg_np_list) {
+	list_for_each_entry_safe(tpg_np, tpg_np_tmp, &tpg->tpg_gnp_list, tpg_np_list) {
 #warning FIXME: T/I Mode
 #warning FIXME: DNS 
 		seq_printf(seq, "%u %u %s %s ", 
@@ -518,14 +539,16 @@ static struct file_operations portal_attr_seq_fops = {
 static int tgt_portal_attr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_portal_group_t *tpg;
-	iscsi_tpg_np_t *tpg_np;
-	iscsi_tiqn_t *tiqn;
+	iscsi_tpg_np_t *tpg_np, *tpg_np_tmp;
+	iscsi_tiqn_t *tiqn, *tiqn_tmp;
 	int i;
 
 	seq_puts(seq, "inst indx node_indx port tag\n");
 
 	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (check_tiqn_status(tiqn) == 0)
+			continue;
 
 		spin_lock(&tiqn->tiqn_tpg_lock);
 		for (i = 0; i < ISCSI_MAX_TPGS; i++) {
@@ -535,7 +558,7 @@ static int tgt_portal_attr_seq_show(struct seq_file *seq, void *v)
 			if (tpg->tpg_state == TPG_STATE_ACTIVE) {
 	
 				spin_lock(&tpg->tpg_np_lock);
-				list_for_each_entry(tpg_np, &tpg->tpg_gnp_list, tpg_np_list) {
+				list_for_each_entry_safe(tpg_np, tpg_np_tmp, &tpg->tpg_gnp_list, tpg_np_list) {
 					seq_printf(seq, "%u %u %u %u %u\n", 
 						   tiqn->tiqn_index, tpg_np->tpg_np_index,
 						   ISCSI_NODE_INDEX, tpg_np->tpg_np->np_port,
@@ -688,14 +711,16 @@ static struct file_operations node_attr_seq_fops = {
 static int tgt_attr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_login_stats_t *lstat;
-	iscsi_tiqn_t *tiqn;
+	iscsi_tiqn_t *tiqn, *tiqn_tmp;
 	u32 fail_count;
 
 	seq_puts(seq, "inst indx login_fails last_fail_time last_fail_type "
 		 "fail_intr_name fail_intr_addr_type fail_intr_addr\n");
 
 	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (check_tiqn_status(tiqn) == 0)
+			continue;
 
 		lstat = &tiqn->login_stats;
 
@@ -737,13 +762,15 @@ static struct file_operations tgt_attr_seq_fops = {
 static int login_stats_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_login_stats_t *lstat;
-	iscsi_tiqn_t *tiqn;
+	iscsi_tiqn_t *tiqn, *tiqn_tmp;
 
 	seq_puts(seq, "inst indx accepts other_fails redirects authorize_fails "
 		 "authenticate_fails negotiate_fails\n");
 
 	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (check_tiqn_status(tiqn) == 0)
+			continue;
 		
 		lstat = &tiqn->login_stats;
 		seq_printf(seq, "%u %u %u %u %u %u %u %u\n", tiqn->tiqn_index,
@@ -774,12 +801,15 @@ static struct file_operations login_stats_seq_fops = {
  */
 static int logout_stats_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_tiqn_t *tiqn;
+	iscsi_tiqn_t *tiqn, *tiqn_tmp;
 
 	seq_puts(seq, "inst indx normal_logouts abnormal_logouts\n");
 	
 	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
+		if (check_tiqn_status(tiqn) == 0)
+			continue;
+
 		seq_printf(seq, "%u %u %u %u\n", tiqn->tiqn_index, ISCSI_NODE_INDEX,
 			tiqn->logout_stats.normal_logouts,
 			tiqn->logout_stats.abnormal_logouts);
@@ -1552,7 +1582,7 @@ static int scsi_port_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
 	se_device_t *dev;
-	se_port_t *sep;
+	se_port_t *sep, *sep_tmp;
 	table_iter_t *iterp = (table_iter_t *)v;
 
 	if (iterp->ti_header) {
@@ -1569,7 +1599,7 @@ static int scsi_port_seq_show(struct seq_file *seq, void *v)
 	spin_lock(&hba->device_lock);
 	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		spin_lock(&dev->se_port_lock);
-		list_for_each_entry(sep, &dev->dev_sep_list, sep_list) {
+		list_for_each_entry_safe(sep, sep_tmp, &dev->dev_sep_list, sep_list) {
 			seq_printf(seq, "%u %u %u %s%u %u\n", hba->hba_index,
 				dev->dev_index, sep->sep_index, "Device",
 				dev->dev_index, 0);
@@ -1627,7 +1657,7 @@ static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 	se_hba_t *hba;
 	se_device_t *dev;
 	table_iter_t *iterp = (table_iter_t *)v;
-	se_port_t *se;
+	se_port_t *se, *se_tmp;
 	t10_wwn_t *wwn;
 
 	if (iterp->ti_header) {
@@ -1645,7 +1675,7 @@ static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 		wwn = &dev->t10_wwn;
 
 		spin_lock(&dev->se_port_lock);
-		list_for_each_entry(se, &dev->dev_sep_list, sep_list) {
+		list_for_each_entry_safe(se, se_tmp, &dev->dev_sep_list, sep_list) {
 			seq_printf(seq, "%u %s %u %s+%s\n",
 				hba->hba_index, /* scsiTransportIndex */
 				"scsiTransportISCSI",  /* scsiTransportType */
@@ -1800,7 +1830,7 @@ static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
 	se_device_t *dev;
-	se_port_t *sep;
+	se_port_t *sep, *sep_tmp;
 	table_iter_t *iterp = (table_iter_t *)v;
 	u32 rx_mbytes, tx_mbytes;
 	unsigned long long num_cmds;
@@ -1819,7 +1849,7 @@ static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 	spin_lock(&hba->device_lock);
 	if ((dev = (se_device_t *)iterp->ti_ptr)) {
 		spin_lock(&dev->se_port_lock);
-		list_for_each_entry(sep, &dev->dev_sep_list, sep_list) {
+		list_for_each_entry_safe(sep, sep_tmp, &dev->dev_sep_list, sep_list) {
 			seq_printf(seq, "%u %u %u %s%d %s%s%d ", 
 			     hba->hba_index,
 			     dev->dev_index,
