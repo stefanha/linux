@@ -2720,12 +2720,12 @@ extern int iscsi_logout_closeconnection (iscsi_cmd_t *cmd, iscsi_conn_t *conn)
 	 * can arrive on a connection with a differing CID.
 	 */
 	if (conn->cid == cmd->logout_cid) {
-		spin_lock(&conn->state_lock);
+		spin_lock_bh(&conn->state_lock);
 		TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_IN_LOGOUT.\n");
 		conn->conn_state = TARG_CONN_STATE_IN_LOGOUT;
 		atomic_set(&conn->conn_logout_remove, 1);
 		conn->conn_logout_reason = CLOSECONNECTION;
-		spin_unlock(&conn->state_lock);
+		spin_unlock_bh(&conn->state_lock);
 	} else {
 		/*
 		 * Handle all different cid CLOSECONNECTION requests in
@@ -5169,10 +5169,10 @@ static void iscsi_logout_post_handler_diffcid (
 	if (l_conn->sock)
 		l_conn->sock->ops->shutdown(l_conn->sock, RCV_SHUTDOWN);
 
-	spin_lock(&l_conn->state_lock);
+	spin_lock_bh(&l_conn->state_lock);
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_IN_LOGOUT.\n");
 	l_conn->conn_state = TARG_CONN_STATE_IN_LOGOUT;
-	spin_unlock(&l_conn->state_lock);
+	spin_unlock_bh(&l_conn->state_lock);
 	
 	iscsi_cause_connection_reinstatement(l_conn, 1);
 	iscsi_dec_conn_usage_count(l_conn);
