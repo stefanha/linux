@@ -791,6 +791,7 @@ get_target:
 	if (!(conn->tpg = core_get_tpg_from_np(tiqn, np))) {
 		TRACE_ERROR("Unable to locate Target Portal Group"
 				" on %s\n", tiqn->tiqn);
+		core_put_tiqn_for_login(tiqn);
 		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,
 			STAT_DETAIL_SERVICE_UNAVAILABLE);
 		ret = -1;
@@ -803,9 +804,11 @@ get_target:
 	 * process login attempt.
 	 */
 	if (core_access_np(np, conn->tpg) < 0) {
+		core_put_tiqn_for_login(tiqn);
 		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,
 			STAT_DETAIL_SERVICE_UNAVAILABLE);
 		ret = -1;
+		conn->tpg = NULL;
 		goto out;
 	}
 
