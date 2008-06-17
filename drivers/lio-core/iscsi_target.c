@@ -4890,6 +4890,7 @@ extern int iscsi_close_connection (
 		down(&conn->conn_post_wait_sem);
 		spin_lock_bh(&conn->state_lock);
 	}
+	atomic_set(&conn->connection_reinstatement, 1);
 	spin_unlock_bh(&conn->state_lock);
 
 	/*
