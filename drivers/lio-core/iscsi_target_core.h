@@ -440,6 +440,7 @@
 #define ISCSI_NP_THREAD_INACTIVE		2
 #define ISCSI_NP_THREAD_RESET			3
 #define ISCSI_NP_THREAD_SHUTDOWN		4
+#define ISCSI_NP_THREAD_EXIT			5
 
 /* Used for debugging various ERL situations. */
 #define TARGET_ERL_MISSING_CMD_SN			1
@@ -1256,11 +1257,13 @@ typedef struct iscsi_np_s {
 	u32			np_index;
 #endif
 	u16			np_port;
+	atomic_t		np_shutdown;
 	spinlock_t		np_ex_lock;
 	spinlock_t		np_state_lock;
 	spinlock_t		np_thread_lock;
 	struct semaphore		np_done_sem;
 	struct semaphore		np_restart_sem;
+	struct semaphore		np_shutdown_sem;
 	struct semaphore		np_start_sem;
 	struct socket		*np_socket;
 	struct task_struct		*np_thread;

@@ -44,9 +44,8 @@ extern void *core_get_np_ip (iscsi_np_t *np);
 extern struct iscsi_np_s *core_get_np (void *, u16, int);
 extern int __core_del_np_ex (iscsi_np_t *, iscsi_np_ex_t *);
 extern struct iscsi_np_s *core_add_np (struct iscsi_target *, int, int *);
-extern int core_reset_np_thread (iscsi_np_t *);
+extern int core_reset_np_thread (struct iscsi_np_s *, struct iscsi_tpg_np_s *, struct iscsi_portal_group_s *, int);
 extern int core_del_np (struct iscsi_target *, int);
-
 extern int iscsi_send_async_msg (iscsi_conn_t *, __u16, __u8, __u8);
 extern int iscsi_send_r2t (iscsi_cmd_t *, iscsi_conn_t *);
 extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);

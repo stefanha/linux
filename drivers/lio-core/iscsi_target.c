@@ -746,11 +746,13 @@ extern iscsi_np_t *core_add_np (
 #ifdef SNMP_SUPPORT
 	np->np_index		= get_new_index(ISCSI_PORTAL_INDEX);
 #endif
+	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
 	spin_lock_init(&np->np_ex_lock);
 	init_MUTEX_LOCKED(&np->np_done_sem);
 	init_MUTEX_LOCKED(&np->np_restart_sem);
+	init_MUTEX_LOCKED(&np->np_shutdown_sem);
 	init_MUTEX_LOCKED(&np->np_start_sem);
 	INIT_LIST_HEAD(&np->np_list);
 	INIT_LIST_HEAD(&np->np_nex_list);
@@ -793,14 +795,33 @@ extern iscsi_np_t *core_add_np (
 	return(np);
 }
 
-extern int core_reset_np_thread (iscsi_np_t *np)
+extern int core_reset_np_thread (
+	iscsi_np_t *np,
+	iscsi_tpg_np_t *tpg_np,
+	iscsi_portal_group_t *tpg,
+	int shutdown)
 {
 	spin_lock_bh(&np->np_thread_lock);
+	if (tpg && tpg_np) {
+		/*
+		 * The reset operation need only be performed when the
+		 * passed iscsi_portal_group_t has a login in progress
+		 * to one of the network portals.
+		 */
+		if (tpg_np->tpg_np->np_login_tpg != tpg) {
+			spin_unlock_bh(&np->np_thread_lock);
+			return(0);
+		}
+	}
 	if (np->np_thread_state == ISCSI_NP_THREAD_INACTIVE) {
 		spin_unlock_bh(&np->np_thread_lock);
 		return(0);
 	}
+
 	np->np_thread_state = ISCSI_NP_THREAD_RESET;
+	if (shutdown)
+		atomic_set(&np->np_shutdown, 1);
+
 	if (np->np_thread) {
 		spin_unlock_bh(&np->np_thread_lock);
 		send_sig(SIGKILL, np->np_thread, 1);
@@ -816,11 +837,13 @@ extern int core_del_np_thread (iscsi_np_t *np)
 {
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
+	atomic_set(&np->np_shutdown, 1);
 	if (np->np_thread) {
 		send_sig(SIGKILL, np->np_thread, 1);
 		spin_unlock_bh(&np->np_thread_lock);
+		up(&np->np_shutdown_sem);
 		down(&np->np_done_sem);
-		spin_lock_bh(&np->np_thread_lock);
+		return(0);
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
@@ -967,7 +990,7 @@ extern void core_reset_nps (void)
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
 		spin_unlock(&iscsi_global->np_lock);
-		core_reset_np_thread(np);
+		core_reset_np_thread(np, NULL, NULL, 1);
 		spin_lock(&iscsi_global->np_lock);
 	}
 	spin_unlock(&iscsi_global->np_lock);

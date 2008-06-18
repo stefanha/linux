@@ -244,27 +244,15 @@ extern void iscsi_put_tpg (iscsi_portal_group_t *tpg)
 
 static void iscsi_clear_tpg_np_login_thread (
 	iscsi_tpg_np_t *tpg_np,
-	iscsi_portal_group_t *tpg)
+	iscsi_portal_group_t *tpg,
+	int shutdown)
 {
 	if (!tpg_np->tpg_np) {
 		TRACE_ERROR("iscsi_tpg_np_t->tpg_np is NULL!\n");
 		return;
 	}
 
-	/*
-	 * The reset operation need only be performed when the
-	 * passed iscsi_portal_group_t has a login in progress
-	 * to one of the network portals.
-	 */
-	spin_lock_bh(&tpg_np->tpg_np->np_thread_lock);
-	if (tpg_np->tpg_np->np_login_tpg != tpg) {
-		spin_unlock_bh(&tpg_np->tpg_np->np_thread_lock);
-		return;
-	} 
-	spin_unlock_bh(&tpg_np->tpg_np->np_thread_lock);
-
-	core_reset_np_thread(tpg_np->tpg_np);
-
+	core_reset_np_thread(tpg_np->tpg_np, tpg_np, tpg, shutdown);
 	return;
 }
 
@@ -273,7 +261,8 @@ static void iscsi_clear_tpg_np_login_thread (
  *
  */
 extern void iscsi_clear_tpg_np_login_threads (
-	iscsi_portal_group_t *tpg)
+	iscsi_portal_group_t *tpg,
+	int shutdown)
 {
 	iscsi_tpg_np_t *tpg_np;
 
@@ -284,7 +273,7 @@ extern void iscsi_clear_tpg_np_login_threads (
 			continue;
 		}
 		spin_unlock(&tpg->tpg_np_lock);
-		iscsi_clear_tpg_np_login_thread(tpg_np, tpg);
+		iscsi_clear_tpg_np_login_thread(tpg_np, tpg, shutdown);
 		spin_lock(&tpg->tpg_np_lock);
 	}
 	spin_unlock(&tpg->tpg_np_lock);
@@ -801,7 +790,7 @@ extern int iscsi_tpg_del_portal_group (
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 
-	iscsi_clear_tpg_np_login_threads(tpg);
+	iscsi_clear_tpg_np_login_threads(tpg, 1);
 	
 	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
 		TRACE_ERROR("Unable to delete iSCSI Target Portal Group: %hu"
@@ -912,7 +901,7 @@ extern int iscsi_tpg_disable_portal_group (iscsi_portal_group_t *tpg, int force)
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 	
-	iscsi_clear_tpg_np_login_threads(tpg);
+	iscsi_clear_tpg_np_login_threads(tpg, 0);
 	
 	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
 		spin_lock(&tpg->tpg_state_lock);
@@ -1204,7 +1193,7 @@ extern int iscsi_tpg_del_np_phase1 (
 		ip = &buf_ipv4[0];
 	}
 	
-	iscsi_clear_tpg_np_login_thread(tpg_np, tpg);
+	iscsi_clear_tpg_np_login_thread(tpg_np, tpg, 1);
 
 	PYXPRINT("CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s on network"
 		" device: %s\n", tpg->tpg_tiqn->tiqn, ip,
