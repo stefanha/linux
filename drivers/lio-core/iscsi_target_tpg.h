@@ -35,7 +35,7 @@ extern void core_release_discovery_tpg (void);
 extern iscsi_portal_group_t *core_get_tpg_from_np (struct iscsi_tiqn_s *, struct iscsi_np_s *);
 extern iscsi_portal_group_t *iscsi_get_tpg_from_tpgt (struct iscsi_tiqn_s *, __u16, int);
 extern void iscsi_put_tpg (iscsi_portal_group_t *);
-extern void iscsi_clear_tpg_np_login_threads (iscsi_portal_group_t *);
+extern void iscsi_clear_tpg_np_login_threads (iscsi_portal_group_t *, int);
 extern iscsi_node_acl_t *__iscsi_tpg_get_initiator_node_acl (iscsi_portal_group_t *, unsigned char *);
 extern void iscsi_tpg_add_node_to_devs (iscsi_node_acl_t *, iscsi_portal_group_t *);
 extern iscsi_node_acl_t *iscsi_tpg_get_initiator_node_acl (iscsi_portal_group_t *, unsigned char *);

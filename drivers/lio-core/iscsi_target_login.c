@@ -883,11 +883,6 @@ get_new_sock:
 	flush_signals(current);
 	ip_proto = sock_type = set_sctp_conn_flag = 0;
 
-	spin_lock_bh(&np->np_thread_lock);
-	if (np->np_thread_state == ISCSI_NP_THREAD_RESET)
-		up(&np->np_restart_sem);
-	spin_unlock_bh(&np->np_thread_lock);
-
 	switch (np->np_network_transport) {
 	case ISCSI_TCP:
 		ip_proto = IPPROTO_TCP;
@@ -909,7 +904,6 @@ get_new_sock:
 			np->np_network_transport);
 		if (start)
 			up(&np->np_start_sem);
-
 		return(-1);
 	}
 	
@@ -946,10 +940,24 @@ get_new_sock:
 	}
 	
 	spin_lock_bh(&np->np_thread_lock);
-	np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
-	if (start) {
-		start = 0;
-		up(&np->np_start_sem);
+	if (np->np_thread_state == ISCSI_NP_THREAD_SHUTDOWN)
+		goto out;
+	else if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
+		if (atomic_read(&np->np_shutdown)) {
+			spin_unlock_bh(&np->np_thread_lock);
+			up(&np->np_restart_sem);
+			down(&np->np_shutdown_sem);
+			goto out;
+		}
+		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
+                up(&np->np_restart_sem);
+	} else {
+		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
+	
+		if (start) {
+			start = 0;
+			up(&np->np_start_sem);
+		}
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 	
@@ -964,6 +972,12 @@ get_new_sock:
 		if (signal_pending(current)) {
 			spin_lock_bh(&np->np_thread_lock);
 			if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
+				if (atomic_read(&np->np_shutdown)) {
+					spin_unlock_bh(&np->np_thread_lock);
+					up(&np->np_restart_sem);
+					down(&np->np_shutdown_sem);
+					goto out;
+				}
 				spin_unlock_bh(&np->np_thread_lock);
 				goto get_new_sock;
 			}
@@ -1030,7 +1044,8 @@ get_new_sock:
 	}
 	
 	spin_lock(&np->np_thread_lock);
-	if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {
+	if ((atomic_read(&np->np_shutdown)) ||
+	    (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE)) {
 		spin_unlock(&np->np_thread_lock);
 		TRACE_ERROR("iSCSI Network Portal on %s:%hu currently not"
 			" active.\n", ip, np->np_port);
@@ -1256,11 +1271,24 @@ old_sess_out:
 	if (!(signal_pending(current)))
 		goto get_new_sock;
 	
-	if (np->np_thread_state != ISCSI_NP_THREAD_SHUTDOWN)
+	spin_lock_bh(&np->np_thread_lock);
+	if (atomic_read(&np->np_shutdown)) {
+		spin_unlock_bh(&np->np_thread_lock);	
+		up(&np->np_restart_sem);
+		down(&np->np_shutdown_sem);
+		goto out;
+	}
+	if (np->np_thread_state != ISCSI_NP_THREAD_SHUTDOWN) {
+		spin_unlock_bh(&np->np_thread_lock);
 		goto get_new_sock;	
+	}
+	spin_unlock_bh(&np->np_thread_lock);
 out:
 	iscsi_stop_login_thread_timer(np);
+	spin_lock_bh(&np->np_thread_lock);
+	np->np_thread_state = ISCSI_NP_THREAD_EXIT;
 	np->np_thread = NULL;
+	spin_unlock_bh(&np->np_thread_lock);
 	up(&np->np_done_sem);
 	return(0);
 }
