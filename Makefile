@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 26
-EXTRAVERSION = -rc9
+EXTRAVERSION =
 NAME = Rotary Wombat
 
 # *DOCUMENTATION*
@@ -526,6 +526,10 @@ endif
 ifdef CONFIG_DEBUG_INFO
 KBUILD_CFLAGS	+= -g
 KBUILD_AFLAGS	+= -gdwarf-2
+endif
+
+ifdef CONFIG_FTRACE
+KBUILD_CFLAGS	+= -pg
 endif
 
 # We trigger additional mismatches with less inlining
