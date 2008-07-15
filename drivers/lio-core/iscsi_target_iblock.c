@@ -492,7 +492,7 @@ extern int iblock_do_task (se_task_t *task)
 {
 	iblock_req_t *req = (iblock_req_t *)task->transport_req;
 	iblock_dev_t *ibd = (iblock_dev_t *)req->ib_dev;
-	request_queue_t *q = bdev_get_queue(ibd->ibd_bd);
+	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
 	struct bio *bio = req->ib_bio, *nbio = NULL;
 
 	if (!(task->iscsi_cmd->cmd_flags & ICF_SCSI_DATA_SG_IO_CDB))
@@ -792,7 +792,7 @@ extern u32 iblock_get_dma_length (u32 task_size, se_device_t *dev)
 extern u32 iblock_get_max_sectors (se_device_t *dev)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
-	request_queue_t *q = bdev_get_queue(ibd->ibd_bd);
+	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
 
 	return((q->max_sectors < IBLOCK_MAX_SECTORS) ?
 		q->max_sectors : IBLOCK_MAX_SECTORS);
