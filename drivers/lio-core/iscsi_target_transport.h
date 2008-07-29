@@ -83,7 +83,8 @@
 
 
 #define SE_MODE_PAGE_BUF			512
-#define SE_LVM_UUID_LEN				48
+#define SE_LVM_UUID_LEN				48 /* Must match PARAM_LVM_UUID_LEN */
+#define SE_UDEV_PATH_LEN			256 /* Must match PARAM_UDEV_PATH_LEN */
 
 #define MOD_MAX_SECTORS(ms, bs)			(ms % (PAGE_SIZE / bs))
 

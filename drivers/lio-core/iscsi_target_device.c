@@ -767,6 +767,8 @@ extern int iscsi_create_virtual_device (se_hba_t *hba, se_devinfo_t *di, struct 
 		di->uu_id[3] = tg->uu_id[3];
 	} else if (tg->params_set & PARAM_LVM_UUID)
 		snprintf(di->lvm_uuid, PARAM_LVM_UUID_LEN, "%s", tg->value);
+	else if (tg->params_set & PARAM_UDEV_PATH)
+		snprintf(di->udev_path, PARAM_UDEV_PATH_LEN, "%s", tg->value);
 
 	if (tg->params_set & PARAM_FORCE)
 		di->force = 1;
