@@ -40,11 +40,8 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
-#include <scsi/sd.h>
-typedef struct scsi_cmnd Scsi_Cmnd;
-typedef struct scsi_request Scsi_Request;
-typedef struct scsi_pointer Scsi_Pointer;
 #include <scsi/scsi_host.h>
+#include <sd.h>
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
