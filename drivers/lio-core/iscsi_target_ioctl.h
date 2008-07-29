@@ -35,6 +35,7 @@
 #define PARAM_EVPD_UNIT_SERIAL_LEN	36
 #define PARAM_EVDP_DEVICE_IDENT_LEN	68
 #define PARAM_LVM_UUID_LEN		48 /* Must be smaller than IOCTL_PARAM_BUF_LEN */
+#define PARAM_UDEV_PATH_LEN		256 /* Must be smaller or equal to than IOCTL_PARAM_BUF_LEN */
       
 typedef  enum {SNAPSHOT_POLICY_INVALID,
 	       SNAPSHOT_POLICY_KILL_OLDEST,

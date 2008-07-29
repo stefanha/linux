@@ -93,9 +93,11 @@ typedef struct iblock_req_s {
 
 #define IBDF_HAS_MD_UUID		0x01
 #define IBDF_HAS_LVM_UUID		0x02
+#define IBDF_HAS_UDEV_PATH		0x04
 
 typedef struct iblock_dev_s {
 	unsigned char ibd_lvm_uuid[SE_LVM_UUID_LEN];
+	unsigned char ibd_udev_path[SE_UDEV_PATH_LEN];
 	int	ibd_major;
 	int	ibd_minor;
 	u32	ibd_depth;

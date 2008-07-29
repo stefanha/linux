@@ -200,6 +200,10 @@ extern int iblock_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 		PYXPRINT("IBLOCK: Referencing LVM Universal Unit Identifier "
 			"<%s>\n", ib_dev->ibd_lvm_uuid);
 		ib_dev->ibd_flags |= IBDF_HAS_LVM_UUID;
+	} else if (strlen(di->udev_path)) {
+		snprintf(ib_dev->ibd_udev_path, SE_UDEV_PATH_LEN, "%s", di->udev_path);
+		PYXPRINT("IBLOCK: Referencing UDEV path: %s\n", ib_dev->ibd_udev_path);
+		ib_dev->ibd_flags |= IBDF_HAS_UDEV_PATH;
 	}
 	
 	PYXPRINT("IBLOCK: Claiming %p Major:Minor - %d:%d\n", ib_dev,
@@ -596,6 +600,8 @@ extern void iblock_get_dev_info (se_device_t *dev, char *b, int *bl)
 			ibd->ibd_uu_id[2], ibd->ibd_uu_id[3]);
 	} else if (ibd->ibd_flags & IBDF_HAS_LVM_UUID)
 		*bl += sprintf(b+*bl, "  LVM UUID: %s\n", ibd->ibd_lvm_uuid);
+	else if (ibd->ibd_flags & IBDF_HAS_UDEV_PATH)
+		*bl += sprintf(b+*bl, "  UDEV PATH: %s\n", ibd->ibd_udev_path);
 	else 
 		*bl += sprintf(b+*bl, "\n");
 

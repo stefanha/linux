@@ -951,7 +951,8 @@ typedef struct iscsi_login_s {
 
 typedef struct se_devinfo_s {
 	unsigned char	fd_dev_name[FD_MAX_DEV_NAME];
-	unsigned char	lvm_uuid[48];
+	unsigned char	lvm_uuid[48]; /* PARAM_LVM_UUID_LEN */
+	unsigned char	udev_path[256]; /* PARAM_UDEV_PATH_LEN */
 	u8		hba_type;
 	u8		_pad[3];
 	int		no_create_file;
