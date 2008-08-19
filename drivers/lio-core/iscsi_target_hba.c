@@ -141,11 +141,8 @@ extern se_hba_t *core_get_hba_from_id (u32 hba_id, int addhba)
 
 	hba = &iscsi_global->hba_list[hba_id];
 
-	if (!addhba && !(hba->hba_status & HBA_STATUS_ACTIVE)) {
-		TRACE_ERROR("iSCSI HBA ID: %d Status: !HBA_STATUS_ACTIVE,"
-			" ignoring request\n", hba_id);
+	if (!addhba && !(hba->hba_status & HBA_STATUS_ACTIVE))
 		return(NULL);
-	}
 
 	return(__core_get_hba_from_id(hba));
 }
