@@ -91,10 +91,7 @@ typedef struct iscsi_index_table_s {
 /* Structure for table row iteration with seq_file */
 typedef struct table_iter_s {
 	int	ti_skip_body;
-	u32	count_max;
-	u32	count_cur;
 	u32	ti_offset;
-	u32	ti_header;
 	void	*ti_ptr;
 } table_iter_t;
 
