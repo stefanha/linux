@@ -105,7 +105,6 @@ typedef struct se_obj_lun_type_s {
 	void (*get_evpd_prod)(void *, unsigned char *, u32);
 	void (*get_evpd_sn)(void *, unsigned char *, u32);
 	int (*get_task_timeout)(void *);
-	int (*set_task_timeout_handler)(void *, struct se_task_s *);
 	int (*task_failure_complete)(void *, struct iscsi_cmd_s *);
 	int (*add_obj_to_lun)(struct iscsi_portal_group_s *, struct se_lun_s *);
 	int (*del_obj_from_lun)(struct iscsi_portal_group_s *, struct se_lun_s *);

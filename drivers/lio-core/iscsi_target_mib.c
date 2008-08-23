@@ -1414,6 +1414,7 @@ static void *locate_hba_next(
 		spin_unlock(&SE_HBA(dev)->device_lock);
 		return((void *)iterp);
 	}
+	spin_unlock(&SE_HBA(dev)->device_lock);
 
 	spin_lock(&iscsi_global->hba_lock);
 	hba = &iscsi_global->hba_list[iterp->ti_offset];

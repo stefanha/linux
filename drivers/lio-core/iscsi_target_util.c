@@ -1213,7 +1213,7 @@ extern void iscsi_release_all_cmds_in_pool (iscsi_session_t *sess)
 	__u32 release_cmd_count = 0;
 	iscsi_cmd_t *cmd, *cmd_next;
 
-	spin_lock(&sess->pool_lock);
+	spin_lock_bh(&sess->pool_lock);
 	cmd = sess->pool_head;
 	while (cmd) {
 		cmd_next = cmd->next;
@@ -1232,7 +1232,7 @@ extern void iscsi_release_all_cmds_in_pool (iscsi_session_t *sess)
 		cmd = cmd_next;
 		release_cmd_count++;
 	}
-	spin_unlock(&sess->pool_lock);
+	spin_unlock_bh(&sess->pool_lock);
 
 	if (release_cmd_count != atomic_read(&sess->pool_count)) {
 		TRACE_ERROR("Released cmd pool count %d does not equal"
