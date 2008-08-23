@@ -5743,8 +5743,10 @@ static int transport_generic_write_pending (iscsi_cmd_t *cmd)
 	if (cmd->immediate_data || cmd->unsolicited_data)
 		up(&cmd->unsolicited_data_sem);
 	else {
-		if (iscsi_build_r2ts_for_cmd(cmd, CONN(cmd), 1) < 0)
+		if (iscsi_build_r2ts_for_cmd(cmd, CONN(cmd), 1) < 0) {
+			transport_cmd_check_stop(cmd, 1, 0);
 			return(PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES);
+		}
 	}
 
 	transport_cmd_check_stop(cmd, 1, 0);
