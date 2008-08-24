@@ -732,16 +732,6 @@ extern int dev_obj_get_task_timeout (void *p)
 	return(TRANSPORT_TIMEOUT_TYPE_OTHER);
 }
 
-extern int dev_obj_set_task_timeout_handler (void *p, se_task_t *task)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	if (TRANSPORT(dev)->transport_timeout_start)
-		return(TRANSPORT(dev)->transport_timeout_start(dev, task));
-
-	return(0);
-}
-
 extern int dev_obj_task_failure_complete (void *p, iscsi_cmd_t *cmd)
 {
 	return(transport_failure_tasks_generic(cmd));
@@ -845,7 +835,6 @@ extern int dev_release_obj_lock (void *p)
 	get_evpd_prod:		dev_obj_get_evpd_prod,			\
 	get_evpd_sn:		dev_obj_get_evpd_sn,			\
 	get_task_timeout:	dev_obj_get_task_timeout,		\
-	set_task_timeout_handler: dev_obj_set_task_timeout_handler,	\
 	task_failure_complete:	dev_obj_task_failure_complete,		\
 	add_obj_to_lun:		dev_add_obj_to_lun,			\
 	del_obj_from_lun:	dev_del_obj_from_lun,			\

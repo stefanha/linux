@@ -460,10 +460,6 @@ typedef struct se_subsystem_api_s {
 	 */
 	__u32 (*get_queue_depth)(se_device_t *);
 	/*
-	 * transport_timeout_start():
-	 */
-	int (*transport_timeout_start)(se_device_t *, se_task_t *);
-	/*
 	 * do_se_mem_map():
 	 */
 	int (*do_se_mem_map)(se_task_t *, struct list_head *, void *, se_mem_t *, se_mem_t **, u32 *, u32 *);

@@ -3144,11 +3144,6 @@ extern void transport_start_task_timer (se_task_t *task)
 	if (task->task_flags & TF_RUNNING)
 		return;
 
-	if (task->se_obj_api->set_task_timeout_handler) {
-		if (task->se_obj_api->set_task_timeout_handler(task->se_obj_ptr, task) == 1)
-			return;
-	}
-	
 	if (!(cdb = task->se_obj_api->get_cdb(task->se_obj_ptr, task)))
 		timeout = task->se_obj_api->get_task_timeout(task->se_obj_ptr);
 	else {
