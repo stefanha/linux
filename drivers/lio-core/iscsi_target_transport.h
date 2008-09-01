@@ -61,7 +61,7 @@
 
 /* For SE OBJ Plugins, in seconds */
 #define TRANSPORT_TIMEOUT_TUR			10
-#define TRANSPORT_TIMEOUT_TYPE_DISK		10
+#define TRANSPORT_TIMEOUT_TYPE_DISK		60
 #define TRANSPORT_TIMEOUT_TYPE_ROM		120
 #define TRANSPORT_TIMEOUT_TYPE_TAPE		600
 #define TRANSPORT_TIMEOUT_TYPE_OTHER		300
@@ -140,6 +140,7 @@ extern void transport_generic_request_timeout (iscsi_cmd_t *);
 extern int transport_generic_allocate_buf (iscsi_cmd_t *, u32, u32);
 extern int __transport_execute_tasks (struct se_device_s *);
 extern void transport_new_cmd_failure (struct iscsi_cmd_s *);
+extern u32 transport_get_default_task_timeout (struct se_device_s *);
 extern void transport_start_task_timer (struct se_task_s *);
 extern void __transport_stop_task_timer (struct se_task_s *, unsigned long *);
 extern void transport_stop_task_timer (struct se_task_s *);

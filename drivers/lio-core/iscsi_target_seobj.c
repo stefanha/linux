@@ -104,9 +104,12 @@ extern se_queue_obj_t *dev_obj_get_queue_obj (void *p)
 	return(dev->dev_queue_obj);
 }
 
-extern void dev_obj_start_status_thread (void *p)
+extern void dev_obj_start_status_thread (void *p, int force)
 {
 	se_device_t *dev = (se_device_t *)p;
+
+	if (!(force) && !(DEV_ATTRIB(dev)->da_status_thread))
+		return;
 
 	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
 		transport_start_status_thread((se_device_t *)p);
@@ -354,7 +357,11 @@ extern int dev_obj_max_sectors (void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	return(TRANSPORT(dev)->get_max_sectors(dev));
+	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV)
+		return((DEV_ATTRIB(dev)->da_max_sectors > TRANSPORT(dev)->get_max_sectors(dev) ?
+		       TRANSPORT(dev)->get_max_sectors(dev) : DEV_ATTRIB(dev)->da_max_sectors));
+	else
+		return(DEV_ATTRIB(dev)->da_max_sectors);
 }
 
 extern unsigned long long dev_obj_end_lba (void *p, int zero_lba, se_fp_obj_t *fp)
@@ -720,16 +727,7 @@ extern int dev_obj_get_task_timeout (void *p)
 {
 	se_device_t *dev = (se_device_t *)p;
 	
-	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK)
-		return(TRANSPORT_TIMEOUT_TYPE_DISK); 
-
-	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_ROM)
-		return(TRANSPORT_TIMEOUT_TYPE_ROM);
-
-	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE)
-		return(TRANSPORT_TIMEOUT_TYPE_TAPE); 
-
-	return(TRANSPORT_TIMEOUT_TYPE_OTHER);
+	return(DEV_ATTRIB(dev)->da_task_timeout);
 }
 
 extern int dev_obj_task_failure_complete (void *p, iscsi_cmd_t *cmd)

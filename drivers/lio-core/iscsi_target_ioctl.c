@@ -215,6 +215,9 @@ static int get_out_count (int cmd, struct iscsi_target *t)
 	case ISCSI_TARGET_LISTGHBADEVINFO:
 	  iscsi_get_global_dev_info_count(&t->out_count);
 	  break;
+	case ISCSI_TARGET_LISTDEVATTRIB:
+          t->out_count = 1;
+	  break;
 	default:
 	  return(-1);
 	}
@@ -300,6 +303,9 @@ static int check_info_out (int cmd, struct iscsi_target *t)
 		t->out_size = iscsi_get_global_dev_info (t->out_buf, t->out_buf_size,
 				(t->out_state == INFO_GOT_OUT_COUNT),
 				t->out_count_cur, 1);
+		break;
+	case ISCSI_TARGET_LISTDEVATTRIB:
+		t->out_size = se_dev_get_attrib_info(t);
 		break;
 	default:
 	  return(-1);
@@ -432,6 +438,7 @@ extern int iscsi_ioctl (
 	case ISCSI_TARGET_LISTTPGATTRIB:
 	case ISCSI_TARGET_LISTGNINFO:
 	case ISCSI_TARGET_LISTGNPINFO:
+	case ISCSI_TARGET_LISTDEVATTRIB:
 	  switch (t->out_state) {
 	  case INFO_GET_OUT_COUNT:
 	    if ((ret = get_out_count(cmd, t)) < 0) {
@@ -906,6 +913,19 @@ extern int iscsi_ioctl (
 
 		if ((ret = core_del_np(t, network_transport)) < 0)
 			goto dumpout;
+		break;
+	case ISCSI_TARGET_SETDEVATTRIB:
+		memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
+		devt_info.hba_id = t->hba_id;
+
+		if (!(dev = transport_core_locate_dev(t, &devt_info, &ret)))
+			goto dumpout;
+		if ((ret = se_dev_set_attrib(dev, t->da_attrib, t->da_value,
+				t->force)) < 0) {
+			core_put_hba(dev->iscsi_hba);
+			goto dumpout;
+		}
+		core_put_hba(dev->iscsi_hba);
 		break;
 	default:
 	  	TRACE_ERROR("Unknown IOCTL cmd: 0x%08x\n", cmd);

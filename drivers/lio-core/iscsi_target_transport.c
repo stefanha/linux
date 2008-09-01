@@ -1650,6 +1650,8 @@ extern se_device_t *transport_add_device_to_iscsi_hba (
 	dev->queue_depth	= TRANSPORT(dev)->get_queue_depth(dev);
 	atomic_set(&dev->depth_left, dev->queue_depth);
 
+	se_dev_set_default_attribs(dev);
+
 //#warning FIXME v2.8: Put into SE OBJ API
 	dev->write_pending = (transport->write_pending) ? transport->write_pending :
 		&transport_dev_write_pending_nop;
@@ -1756,7 +1758,7 @@ extern void transport_generic_activate_device (se_device_t *dev)
 	down(&dev->dev_queue_obj->thread_create_sem);
 
 	if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD))
-		DEV_OBJ_API(dev)->start_status_thread((void *)dev);
+		DEV_OBJ_API(dev)->start_status_thread((void *)dev, 0);
 
 	return;
 }
@@ -3133,6 +3135,20 @@ extern void transport_task_timeout_handler (unsigned long data)
 	return;
 }
 
+extern u32 transport_get_default_task_timeout (se_device_t *dev)
+{
+	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK)
+		return(TRANSPORT_TIMEOUT_TYPE_DISK); 
+
+	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_ROM)
+		return(TRANSPORT_TIMEOUT_TYPE_ROM);
+
+	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE)
+		return(TRANSPORT_TIMEOUT_TYPE_TAPE); 
+
+	return(TRANSPORT_TIMEOUT_TYPE_OTHER);
+}
+
 /*
  * Called with T_TASK(cmd)->t_state_lock held.
  */
@@ -3143,15 +3159,16 @@ extern void transport_start_task_timer (se_task_t *task)
 
 	if (task->task_flags & TF_RUNNING)
 		return;
+	/*
+	 * If the task_timeout is disabled, exit now.
+	 */
+	if (!(timeout = task->se_obj_api->get_task_timeout(task->se_obj_ptr)))
+		return;
 
-	if (!(cdb = task->se_obj_api->get_cdb(task->se_obj_ptr, task)))
-		timeout = task->se_obj_api->get_task_timeout(task->se_obj_ptr);
-	else {
+	if ((cdb = task->se_obj_api->get_cdb(task->se_obj_ptr, task))) {
 		if ((cdb[0] == TEST_UNIT_READY) &&
 	            (task->iscsi_cmd->cmd_flags & ICF_SE_DISABLE_ONLINE_CHECK))
 			timeout = TRANSPORT_TIMEOUT_TUR;
-		else
-			timeout = task->se_obj_api->get_task_timeout(task->se_obj_ptr);
 	}
 
 	init_timer(&task->task_timer);
@@ -6113,6 +6130,9 @@ extern void transport_start_status_timer (se_device_t *dev)
 
 extern void transport_stop_status_timer (se_device_t *dev)
 {
+	if (!(DEV_ATTRIB(dev)->da_status_thread_tur))
+		return;
+
 	spin_lock_bh(&dev->dev_status_thr_lock);
 	if (!(dev->dev_status_timer_flags & TF_RUNNING)) {
 		spin_unlock_bh(&dev->dev_status_thr_lock);
@@ -6554,11 +6574,11 @@ out:
 extern void transport_start_status_thread (se_device_t *dev)
 {
 	spin_lock_bh(&dev->dev_status_thr_lock);
-	atomic_inc(&dev->dev_status_thr_count);
-	if (atomic_read(&dev->dev_status_thr_count) != 1) {
+	if (atomic_read(&dev->dev_status_thr_count) == 1) {
 		spin_unlock_bh(&dev->dev_status_thr_lock);
 		return;
 	}
+	atomic_set(&dev->dev_status_thr_count, 1);
 	spin_unlock_bh(&dev->dev_status_thr_lock);
 	
 	kernel_thread(transport_status_thread, (void *)dev, 0);
@@ -6570,15 +6590,22 @@ extern void transport_start_status_thread (se_device_t *dev)
 extern void transport_stop_status_thread (se_device_t *dev)
 {
 	spin_lock_bh(&dev->dev_status_thr_lock);
-	if (!(atomic_dec_and_test(&dev->dev_status_thr_count))) {
+	if (!(atomic_read(&dev->dev_status_thr_count))) {
 		spin_unlock_bh(&dev->dev_status_thr_lock);
 		return;
 	}
 
+	if (!dev->dev_mgmt_thread) {
+		TRACE_ERROR("dev[%p]: Status/Management struct task_struct"
+			" is NULL!\n", dev);
+		spin_unlock_bh(&dev->dev_status_thr_lock);
+		return;
+	}
 	send_sig(SIGKILL, dev->dev_mgmt_thread, 1);
 	spin_unlock_bh(&dev->dev_status_thr_lock);
 	
 	down(&dev->dev_status_queue_obj->thread_done_sem);
+	atomic_set(&dev->dev_status_thr_count, 0);
 	
 	return;
 }

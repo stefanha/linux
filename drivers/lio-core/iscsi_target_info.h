@@ -49,6 +49,7 @@ extern int iscsi_tpg_get_global_tpg_info (unsigned char *, char *, int, int, int
 extern int iscsi_tpg_get_tpg_info (unsigned char *, u16, char *, int, int, int, int);
 extern int iscsi_get_plugin_count (int *);
 extern int iscsi_get_plugin_info (char *, int, int, int, int);
+extern int se_dev_get_attrib_info (struct iscsi_target *);
 extern int iscsi_get_node_attrib_info (unsigned char *, u16, char *, char *, int, int, int, int);
 extern int iscsi_get_tpg_attrib_info (unsigned char *, u16, char *, char *, int, int, int, int);
 extern int core_get_tiqn_count (int *);

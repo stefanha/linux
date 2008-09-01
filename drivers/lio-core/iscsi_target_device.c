@@ -1215,3 +1215,192 @@ extern int iscsi_dev_set_initiator_node_lun_access (
 
 	return(ret);
 }
+
+extern void se_dev_set_default_attribs (se_device_t *dev)
+{
+	DEV_ATTRIB(dev)->da_status_thread = DA_STATUS_THREAD;
+	DEV_ATTRIB(dev)->da_status_thread_tur = DA_STATUS_THREAD_TUR;
+	/*
+	 * max_sectors is based on subsystem plugin dependent requirements.
+	 */
+	DEV_ATTRIB(dev)->da_max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
+	/*
+	 * queue_depth is based on subsystem plugin dependent requirements.
+	 */
+	DEV_ATTRIB(dev)->da_queue_depth = TRANSPORT(dev)->get_queue_depth(dev);
+	/*
+	 * task_timeout is based on device type.
+	 */
+	DEV_ATTRIB(dev)->da_task_timeout = transport_get_default_task_timeout(dev);
+
+	return;
+}
+
+static int se_dev_set_task_timeout (se_device_t *dev, u32 task_timeout)
+{
+	if (task_timeout > DA_TASK_TIMEOUT_MAX) {
+		TRACE_ERROR("dev[%p]: Passed task_timeout: %u larger then"
+			" DA_TASK_TIMEOUT_MAX\n", dev, task_timeout);
+		return(-1);
+	} else {
+		DEV_ATTRIB(dev)->da_task_timeout = task_timeout;
+		PYXPRINT("dev[%p]: Set SE Device task_timeout: %u\n", dev, task_timeout);
+	}
+
+	return(0);
+}
+
+static int se_dev_set_status_thread (se_device_t *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+	 	TRACE_ERROR("Illegal value %d\n", flag);
+		return(-1);		
+	}
+
+	if (!flag) {
+		if (DEV_ATTRIB(dev)->da_status_thread) {
+			if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+				TRACE_ERROR("dev[%p]: Unable to stop SE Device Status"
+					" Thread while dev_export_obj: %d count exists\n",
+					dev, DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj));
+				return(-1);
+			}
+			if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD))
+	        	        DEV_OBJ_API(dev)->stop_status_thread((void *)dev);
+		}
+	} else {
+		if (!(DEV_ATTRIB(dev)->da_status_thread))
+			DEV_OBJ_API(dev)->start_status_thread((void *)dev, 1);
+	}
+
+	DEV_ATTRIB(dev)->da_status_thread = flag;
+	PYXPRINT("dev[%p]: SE Device Status Thread: %s\n", dev, (flag) ?
+			"Enabled" : "Disabled");
+	return(0);
+}
+
+static int se_dev_set_status_thread_tur (se_device_t *dev, int flag)
+{
+	int start = 0;
+
+	if ((flag != 0) && (flag != 1)) {
+		TRACE_ERROR("Illegal value %d\n", flag);
+		return(-1);
+	}
+
+	if (flag && !(DEV_ATTRIB(dev)->da_status_thread_tur))
+		start = 1;
+
+	DEV_ATTRIB(dev)->da_status_thread_tur = flag;
+	if (start)
+		transport_start_status_timer(dev);
+	PYXPRINT("dev[%p]: SE Device Status Thread TUR: %s\n", dev, (flag) ?
+			"Enabled" : "Disabled");
+	return(0);
+}
+
+/*
+ * Note, this can only be called on unexported SE Device Object.
+ */
+static int se_dev_set_queue_depth (se_device_t *dev, u32 queue_depth)
+{
+	u32 orig_queue_depth = dev->queue_depth;
+
+	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+		TRACE_ERROR("dev[%p]: Unable to change SE Device TCQ while"
+			" dev_export_obj: %d count exists\n", dev,
+			DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj));
+		return(-1);
+	}
+	if (!(queue_depth)) {
+		TRACE_ERROR("dev[%p]: Illegal ZERO value for queue_depth\n", dev);
+		return(-1);
+	}
+	if (queue_depth > TRANSPORT(dev)->get_queue_depth(dev)) {
+		TRACE_ERROR("dev[%p]: Passed queue_depth: %u exceeds"
+			" LIO-Core/SE_Device TCQ: %u\n", dev, queue_depth,
+			TRANSPORT(dev)->get_queue_depth(dev));
+		return(-1);
+	}
+		
+	DEV_ATTRIB(dev)->da_queue_depth = dev->queue_depth = queue_depth;
+	if (queue_depth > orig_queue_depth)
+		atomic_add(queue_depth - orig_queue_depth, &dev->depth_left);	
+	else if (queue_depth < orig_queue_depth)
+		atomic_sub(orig_queue_depth - queue_depth, &dev->depth_left);
+
+	PYXPRINT("dev[%p]: SE Device TCQ Depth changed to: %u\n", dev, queue_depth);
+	return(0);
+}
+
+static int se_dev_set_max_sectors (se_device_t *dev, u32 max_sectors, int force)
+{
+	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+		TRACE_ERROR("dev[%p]: Unable to change SE Device max_sectors"
+			" while dev_export_obj: %d count exists\n", dev,
+			DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj));
+		return(-1);
+	}
+	if (!(max_sectors)) {
+		TRACE_ERROR("dev[%p]: Illegal ZERO value for max_sectors\n", dev);
+		return(-1);
+	}
+	if (max_sectors < DA_STATUS_MAX_SECTORS_MIN) {
+		TRACE_ERROR("dev[%p]: Passed max_sectors: %u less than"
+			" DA_STATUS_MAX_SECTORS_MIN: %u\n", dev, max_sectors,
+				DA_STATUS_MAX_SECTORS_MIN);
+		return(-1);
+	}
+	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
+		if (max_sectors > TRANSPORT(dev)->get_max_sectors(dev)) {
+			 TRACE_ERROR("dev[%p]: Passed max_sectors: %u greater than"
+				" LIO-Core/SE_Device max_sectors: %u\n", dev,
+				max_sectors, TRANSPORT(dev)->get_max_sectors(dev));
+			 return(-1);
+		}
+	} else {
+		if (!(force) && (max_sectors > TRANSPORT(dev)->get_max_sectors(dev))) {
+			TRACE_ERROR("dev[%p]: Passed max_sectors: %u greater than"
+				" LIO-Core/SE_Device max_sectors: %u, use force=1 to override.\n",
+				dev, max_sectors, TRANSPORT(dev)->get_max_sectors(dev));
+			return(-1);
+		}
+		if (max_sectors > DA_STATUS_MAX_SECTORS_MAX) {
+			TRACE_ERROR("dev[%p]: Passed max_sectors: %u greater than"
+				" DA_STATUS_MAX_SECTORS_MAX: %u\n", dev,
+				max_sectors, DA_STATUS_MAX_SECTORS_MAX);
+			return(-1);
+		}
+	}
+
+	DEV_ATTRIB(dev)->da_max_sectors = max_sectors;
+	PYXPRINT("dev[%p]: SE Device max_sectors changed to %u\n",
+			dev, max_sectors);
+	return(0);
+}
+
+extern int se_dev_set_attrib (
+	se_device_t *dev,
+	u32 da_attrib,
+	u32 da_attrib_value,
+	int force)
+{
+	switch (da_attrib) {
+	case DA_SET_TASK_TIMEOUT:
+		return(se_dev_set_task_timeout(dev, da_attrib_value));
+	case DA_SET_STATUS_THREAD:
+		return(se_dev_set_status_thread(dev, da_attrib_value));
+	case DA_SET_STATUS_THREAD_TUR:
+		return(se_dev_set_status_thread_tur(dev, da_attrib_value));
+	case DA_SET_QUEUE_DEPTH:
+		return(se_dev_set_queue_depth(dev, da_attrib_value));
+	case DA_SET_MAX_SECTORS:
+		return(se_dev_set_max_sectors(dev, da_attrib_value, force));
+	default:
+		TRACE_ERROR("Unknown SE Device Attribute: %u, ignoring"
+			" request\n", da_attrib);
+		return(-1);
+	}
+
+	return(0);
+}
