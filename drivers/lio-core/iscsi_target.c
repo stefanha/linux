@@ -1302,8 +1302,6 @@ extern void iscsi_target_release_phase2 (void)
 	remove_proc_entry("iscsi_target/target_nodename", 0);
 	remove_proc_entry("iscsi_target", 0);
 #endif
-	TRACE_ERROR("Done! :-)\n");
-
 	return;
 }
 

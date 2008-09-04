@@ -53,6 +53,7 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_ioctl.h>
+#include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_hba.h>
 #include <iscsi_target_seobj.h>
 #include <iscsi_target_transport.h>
@@ -331,7 +332,7 @@ extern void iscsi_dump_dev_state (
 		atomic_read(&dev->execute_tasks), atomic_read(&dev->depth_left),
 		dev->queue_depth);
 	*bl += sprintf(b+*bl, "  SectorSize: %u  MaxSectors: %u\n",
-			TRANSPORT(dev)->get_blocksize(dev), TRANSPORT(dev)->get_max_sectors(dev));
+			TRANSPORT(dev)->get_blocksize(dev), DEV_ATTRIB(dev)->da_max_sectors);
 	*bl += sprintf(b+*bl, "        ");
 
 	return;
@@ -1291,6 +1292,55 @@ extern int iscsi_get_plugin_info (
 
 	oob = 0;
 done:
+	if (oob) {
+		TRACE_ERROR("Ran out of buffer..\n");
+	}
+	if (b) kfree(b);
+	return(cl);
+}
+
+extern int se_dev_get_attrib_info (
+	struct iscsi_target *t)
+{
+	char *pb = t->out_buf;
+	unsigned char *b;
+	se_device_t *dev;
+	int bl = 0, cl = 0, oob = 1;
+	int ml = t->out_buf_size;
+	int header = (t->out_state == INFO_GOT_OUT_COUNT);
+	int ret = 0;
+	se_dev_transport_info_t devt_info;
+
+	memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
+	devt_info.hba_id = t->hba_id;
+
+	if (!(dev = transport_core_locate_dev(t, &devt_info, &ret)))
+		return(-1);
+
+	if (!(b = alloc_buf()))
+		goto done;
+
+	if (header) {
+		memset(b, 0, TMP_BUF_LEN);
+		bl = sprintf(b, "--------[SE Device Attributes: %p]--------\n", dev);
+		if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0)
+			goto done;
+	}
+
+	memset(b, 0, TMP_BUF_LEN);
+	bl = sprintf(b, "        hw_max_sectors: %u\n", TRANSPORT(dev)->get_max_sectors(dev));
+	bl += sprintf(b+bl, "        hw_queue_depth: %u\n", TRANSPORT(dev)->get_queue_depth(dev));
+	bl += sprintf(b+bl, "        max_sectors: %u\n", DEV_ATTRIB(dev)->da_max_sectors);
+	bl += sprintf(b+bl, "        queue_depth: %u\n", DEV_ATTRIB(dev)->da_queue_depth);
+	bl += sprintf(b+bl, "        status_thread: %u\n", DEV_ATTRIB(dev)->da_status_thread);
+	bl += sprintf(b+bl, "        status_thread_tur: %u\n", DEV_ATTRIB(dev)->da_status_thread_tur);
+	bl += sprintf(b+bl, "        task_timeout: %u\n", DEV_ATTRIB(dev)->da_task_timeout);
+
+	if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0)
+	 	goto done;
+	oob = 0;
+done:
+        core_put_hba(dev->iscsi_hba);
 	if (oob) {
 		TRACE_ERROR("Ran out of buffer..\n");
 	}

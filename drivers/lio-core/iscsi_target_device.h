@@ -57,5 +57,7 @@ extern int iscsi_dev_set_initiator_node_lun_access (iscsi_portal_group_t *, u32,
 extern se_hba_t *core_get_hba_from_hbaid (struct iscsi_target *tg,
 					      se_dev_transport_info_t *dti,
 					      int add);
+extern void se_dev_set_default_attribs (se_device_t *);
+extern int se_dev_set_attrib (se_device_t *, u32, u32, int);
 
 #endif /* ISCSI_TARGET_DEVICE_H */

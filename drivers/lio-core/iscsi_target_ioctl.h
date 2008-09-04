@@ -59,6 +59,7 @@ struct iscsi_target {
   short int port_ex;
   short int tpgt;
   int count;
+  int da_params_set_count;
   int hba_type;
   int na_params_set_count;
   int internal_dma_alloc;
@@ -79,6 +80,9 @@ struct iscsi_target {
   int ta_params_set_count;
   unsigned short int isid;
   unsigned short int tsih;
+  unsigned int da_attrib;
+  unsigned int da_params_set;
+  unsigned int da_value;
   unsigned int hba_id;
   unsigned int fd_device_id;
   unsigned int fd_host_id;

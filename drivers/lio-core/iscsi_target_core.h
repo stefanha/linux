@@ -77,6 +77,13 @@
 #define ISCSI_TCP_VERSION		"v3.0"
 #define ISCSI_SCTP_VERSION		"v3.0"
 
+/* iscsi_dev_attrib_t sanity values */
+#define DA_TASK_TIMEOUT_MAX		600 /* 10 Minutes, see transport_get_default_task_timeout()  */
+#define DA_STATUS_THREAD		1 /* Enabled by default */
+#define DA_STATUS_THREAD_TUR		1 /* Enabled by default */
+#define DA_STATUS_MAX_SECTORS_MIN	16
+#define DA_STATUS_MAX_SECTORS_MAX	8192
+
 /* iscsi_node_attrib_t sanity values */
 #define NA_DATAOUT_TIMEOUT		3
 #define NA_DATAOUT_TIMEOUT_MAX		60
@@ -1048,6 +1055,14 @@ typedef struct se_dev_entry_s {
 	struct se_lun_s		*iscsi_lun;
 }  ____cacheline_aligned se_dev_entry_t;
 
+typedef struct iscsi_dev_attrib_s {
+	int			da_status_thread;
+	int			da_status_thread_tur;
+	u32			da_max_sectors;
+	u32			da_queue_depth;
+	u32			da_task_timeout;
+} iscsi_dev_attrib_t;
+
 /*
  *	Each Real PAS/SAS/SATA/PATA/iBLOCK device that we find upon module init we add 
  *	a iscsi_target_device_t structure to the iSCSI Device List.
@@ -1077,6 +1092,7 @@ typedef struct se_device_s {
 	atomic_t		dev_tur_active;
 	atomic_t		execute_tasks;
 	atomic_t		dev_status_thr_count;
+	iscsi_dev_attrib_t	dev_attrib;
 	struct se_obj_s		dev_obj;
 	struct se_obj_s		dev_access_obj;
 	struct se_obj_s		dev_export_obj;
@@ -1110,6 +1126,7 @@ typedef struct se_device_s {
 }  ____cacheline_aligned se_device_t;
 
 #define ISCSI_DEV(cmd)		((se_device_t *)(cmd)->iscsi_lun->iscsi_dev)
+#define DEV_ATTRIB(dev)		(&(dev)->dev_attrib)
 #define DEV_OBJ_API(dev)	((struct se_obj_lun_type_s *)(dev)->dev_obj_api)
 
 typedef struct se_dev_transport_info_s {

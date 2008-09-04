@@ -40,7 +40,7 @@ typedef struct se_obj_lun_type_s {
 	void (*get_plugin_info)(void *, char *, int *);
 	void *(*get_obj)(void *);
 	struct se_queue_obj_s *(*get_queue_obj)(void *);
-	void (*start_status_thread)(void *);
+	void (*start_status_thread)(void *, int);
 	void (*stop_status_thread)(void *);
 	int (*start_status_timer)(void *);
 	void (*stop_status_timer)(void *);
