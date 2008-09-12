@@ -91,6 +91,10 @@
 #include <iscsi_target_mib.h>
 #endif /* SNMP_SUPPORT */
 
+#ifdef LIO_TARGET_CONFIGFS
+#include <iscsi_target_configfs.h>
+#endif
+
 #undef ISCSI_TARGET_C
 
 se_global_t *iscsi_global = NULL;
@@ -1220,6 +1224,9 @@ static int iscsi_target_detect(void)
 #endif
 #endif /* CONFIG_PROC_FS */
 
+#if 1
+	iscsi_target_register_configfs();
+#endif
 	if (iscsi_allocate_thread_sets(TARGET_THREAD_SET_COUNT, TARGET) !=
 			TARGET_THREAD_SET_COUNT) {
 		TRACE_ERROR("iscsi_allocate_thread_sets() returned"
@@ -1240,10 +1247,17 @@ out:
 	plugin_unload_all_classes();
 	core_release_discovery_tpg();
 	iscsi_deallocate_thread_sets(TARGET);
-
+#if 1
+	iscsi_target_deregister_configfs();
+#endif
+#ifdef CONFIG_PROC_FS
+# ifdef SNMP_SUPPORT
+        remove_iscsi_target_mib();
+# endif
 	remove_proc_entry("iscsi_target/version_info", 0);
 	remove_proc_entry("iscsi_target/target_nodename", 0);
 	remove_proc_entry("iscsi_target", 0);
+#endif
 	
 	misc_deregister(&iscsi_dev);
 #ifdef DEBUG_ERL
@@ -1293,6 +1307,9 @@ extern void iscsi_target_release_phase2 (void)
 	plugin_unload_all_classes();
 
 	iscsi_global->ti_forcechanoffline = NULL;
+#if 1
+	iscsi_target_deregister_configfs();
+#endif
 	
 #ifdef CONFIG_PROC_FS
 # ifdef SNMP_SUPPORT
