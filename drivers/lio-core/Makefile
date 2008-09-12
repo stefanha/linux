@@ -29,6 +29,8 @@ CWD=$(shell pwd)
 include $(CWD)/drivers/lio-core/MCONFIG_TARGET
 include $(CWD)/drivers/lio-core/MCONFIG_ALL
 
+obj-$(CONFIG_TARGET_CORE_CONFIGFS) 	+=	target_core_configfs.o
+
 obj-m				+=	iscsi_target_mod.o
 iscsi_target_mod-objs		+=	iscsi_crc.o \
 					iscsi_debug_opcodes.o \
@@ -101,6 +103,10 @@ endif
 ifeq ($(SNMP_FEATURE), 1)
 iscsi_target_mod-objs           +=      iscsi_target_mib.o
 EXTRA_CFLAGS                    +=      -DSNMP_SUPPORT
+endif
+ifeq ($(LIO_TARGET_CONFIGFS), 1)
+iscsi_target_mod-objs		+=	iscsi_target_configfs.o
+EXTRA_CFLAGS			+=	-DLIO_TARGET_CONFIGFS
 endif
 ifeq ($(ERLTWO), 1)
 EXTRA_CFLAGS += -DERLONE -DERLTWO

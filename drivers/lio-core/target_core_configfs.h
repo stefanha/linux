@@ -1,0 +1,38 @@
+/*********************************************************************************
+ * Filename:  target_core_configfs.h
+ *
+ * This file contains the configfs defines and prototypes for the
+ * Generic Target Engine project.
+ *
+ * Copyright (c) 2008 Linux-iSCSI.org
+ *
+ * Nicholas A. Bellinger <nab@kernel.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ ****************************************************************************/
+
+#define TARGET_CORE_CONFIGFS_VERSION "v1.0.0"
+
+#define TARGET_CORE_CONFIG_ROOT	"/sys/kernel/config"
+
+#define TARGET_FABRIC_NAME_SIZE	32
+
+extern struct target_fabric_configfs *target_fabric_configfs_init (struct config_item_type *, const char *name);
+extern void target_fabric_configfs_free (struct target_fabric_configfs *);
+extern struct config_item *target_fabric_configfs_register (struct target_fabric_configfs *);
+extern void target_fabric_configfs_deregister (struct target_fabric_configfs *);
+extern int target_core_init_configfs (void);
+extern void target_core_exit_configfs (void);

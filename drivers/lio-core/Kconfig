@@ -3,3 +3,14 @@ menuconfig LIO_CORE
 	default m
 	---help---
 	Say Y here to enable the Linux-iSCSI.org Storage Engine and Subsystem Plugins.
+
+if LIO_CORE
+
+config TARGET_CORE_CONFIGFS
+        tristate "Generic Target Core ConfigFS Infrastructure"
+	select CONFIGFS_FS
+        default m
+        ---help---
+        Say Y here to enabled the ConfigFS enabled control path for the Generic Target Engine.
+
+endif # LIO_CORE

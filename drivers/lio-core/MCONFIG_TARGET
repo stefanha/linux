@@ -22,3 +22,5 @@ LINUX_MEDIA_CHANGER ?= 1
 # Workarounds for stupidity
 #
 LINUX_EVPD_PAGE_CHECK?=1
+
+LIO_TARGET_CONFIGFS?=1
