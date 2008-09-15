@@ -1300,6 +1300,8 @@ typedef struct iscsi_tpg_np_s {
 	struct list_head	tpg_np_list;
 } ____cacheline_aligned iscsi_tpg_np_t;
   
+#include <linux/configfs.h>
+
 typedef struct iscsi_portal_group_s {
 	__u8			tpg_state;	/* TPG State */
 	__u16			tpgt;		/* Target Portal Group Tag */
@@ -1319,6 +1321,8 @@ typedef struct iscsi_portal_group_s {
 	se_lun_t		*tpg_lun_list;
 	iscsi_node_acl_t	*acl_node_head;	/* Pointer to start of Initiator ACL list */
 	iscsi_node_acl_t	*acl_node_tail;	/* Pointer to end of Initiator ACL list */
+	struct config_group	tpg_np_group;
+	struct config_group	tpg_lun_group;
 	struct semaphore		tpg_access_sem;
 	struct semaphore		np_login_sem;
 	iscsi_tpg_attrib_t	tpg_attrib;
