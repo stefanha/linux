@@ -33,6 +33,7 @@ extern int iscsi_hba_check_online (se_dev_transport_info_t *);
 extern se_hba_t *__core_get_hba_from_id (se_hba_t *);
 extern se_hba_t *core_get_hba_from_id (u32, int);
 extern se_hba_t *iscsi_get_hba_from_ptr (void *);
+extern se_hba_t *core_get_next_free_hba (void);
 extern void core_put_hba (se_hba_t *);
 extern int iscsi_hba_check_addhba_params (struct iscsi_target *, se_hbainfo_t *);
 extern int iscsi_hba_add_hba (se_hba_t *, se_hbainfo_t *, struct iscsi_target *);

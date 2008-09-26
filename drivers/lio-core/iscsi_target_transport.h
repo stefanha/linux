@@ -90,6 +90,8 @@
 
 struct se_mem_s;
 
+extern int init_se_global (void);
+extern void release_se_global (void);
 #ifdef DEBUG_DEV
 extern int __iscsi_debug_dev (se_device_t *);
 extern int iscsi_debug_dev (se_device_t *);
@@ -98,6 +100,7 @@ extern unsigned char *transport_get_iqn_sn (void);
 extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
 extern se_device_t *transport_core_locate_dev (struct iscsi_target *, se_dev_transport_info_t *, int *);
+extern struct se_plugin_s *transport_core_get_plugin_by_name (const char *name);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);
 extern int transport_add_cmd_to_queue (struct iscsi_cmd_s *, struct se_queue_obj_s *, u8);
 extern void transport_complete_cmd (iscsi_cmd_t *, int);
@@ -114,6 +117,7 @@ extern void transport_generic_deactivate_device (se_device_t *);
 extern int transport_generic_claim_phydevice (se_device_t *);
 extern void transport_generic_release_phydevice (se_device_t *, int);
 extern void transport_generic_free_device (se_device_t *);
+extern int transport_allocate_iovecs_for_cmd (struct iscsi_cmd_s *, __u32);
 extern int transport_generic_obj_start (struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long);
 extern int transport_process_vol_transform (u32 *, struct se_transform_info_s *);
 extern int transport_jbod_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *);
@@ -168,6 +172,10 @@ extern void transport_release_tasks (iscsi_cmd_t *);
 extern void transport_release_fe_cmd (iscsi_cmd_t *);
 extern int transport_generic_remove (iscsi_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks (iscsi_cmd_t *, se_lun_t *);
+extern int iscsi_send_check_condition_and_sense (iscsi_cmd_t *, __u8, int);
+extern int iscsi_tpg_persistent_reservation_check (iscsi_cmd_t *);
+extern int iscsi_tpg_persistent_reservation_release (iscsi_cmd_t *);
+extern int iscsi_tpg_persistent_reservation_reserve (iscsi_cmd_t *);
 extern void transport_generic_free_cmd (iscsi_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds (iscsi_cmd_t *, int);
 extern int transport_generic_do_transform (struct iscsi_cmd_s *, struct se_transform_info_s *);
@@ -263,6 +271,13 @@ typedef struct se_transform_info_s {
 	struct se_obj_lun_type_s *ti_obj_api;
 } ____cacheline_aligned se_transform_info_t;
 
+typedef struct se_subsystem_dev_s {
+	se_hba_t	*se_dev_hba;
+	se_device_t	*se_dev_ptr;
+	void		*se_dev_su_ptr;
+	struct config_group se_dev_group;
+} ____cacheline_aligned se_subsystem_dev_t;
+
 /*
  * Each type of DAS transport that uses the generic command sequencer needs
  * each of the following function pointers set. 
@@ -306,9 +321,13 @@ typedef struct se_subsystem_api_s {
 	 */
 	int (*claim_phydevice)(struct se_hba_s *, struct se_device_s *);
 	/*
+	 * allocate_virtdevice():
+	 */
+	void *(*allocate_virtdevice)(struct se_hba_s *, const char *);
+	/*
 	 * create_virtdevice(): Only for Virtual HBAs
 	 */
-	int (*create_virtdevice)(struct se_hba_s *, struct se_devinfo_s *);
+	se_device_t *(*create_virtdevice)(struct se_hba_s *, void *);
 	/*
 	 * scan_devices(): Only for Physical HBAs
 	 */
@@ -328,7 +347,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * free_device():
 	 */
-	void (*free_device)(struct se_device_s *);
+	void (*free_device)(void *);
 	/*
 	 * check_device_location():
 	 */
@@ -391,6 +410,18 @@ typedef struct se_subsystem_api_s {
 	 * check_hba_params():
 	 */
 	int (*check_hba_params)(se_hbainfo_t *, struct iscsi_target *, int);
+	/*
+	 * check_configfs_dev_params():
+	 */
+	ssize_t (*check_configfs_dev_params)(se_hba_t *, se_subsystem_dev_t *);
+	/*
+	 * set_configfs_dev_params():
+	 */
+	ssize_t (*set_configfs_dev_params)(se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
+	/*
+	 * show_configfs_dev_params():
+	 */	
+	ssize_t (*show_configfs_dev_params)(se_hba_t *, se_subsystem_dev_t *, char *);
 	/*
 	 * check_dev_params():
 	 */

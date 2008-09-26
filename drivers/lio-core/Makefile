@@ -25,14 +25,50 @@
 
 CWD=$(shell pwd)
 
-
 include $(CWD)/drivers/lio-core/MCONFIG_TARGET
 include $(CWD)/drivers/lio-core/MCONFIG_ALL
 
-obj-$(CONFIG_TARGET_CORE_CONFIGFS) 	+=	target_core_configfs.o
+obj-$(CONFIG_TARGET_CORE)		+=	target_core_mod.o
+target_core_mod-objs			:=	target_core_configfs.o \
+						target_core_device.o \
+						iscsi_target_feature_obj.o \
+						iscsi_target_hba.o \
+						iscsi_target_plugin.o \
+						iscsi_target_scdb.o \
+						iscsi_target_seobj.o \
+						iscsi_target_transport.o \
 
-obj-m				+=	iscsi_target_mod.o
-iscsi_target_mod-objs		+=	iscsi_crc.o \
+ifeq ($(LINUX_IBLOCK), 1)
+target_core_mod-objs			+=	iscsi_target_iblock.o
+EXTRA_CFLAGS				+=	-DPYX_IBLOCK
+endif
+ifeq ($(LINUX_PARALLEL_SCSI), 1)
+target_core_mod-objs			+=	iscsi_target_pscsi.o
+EXTRA_CFLAGS				+=	-DPARALLEL_SCSI
+endif
+ifeq ($(LINUX_RAMDISK), 1)
+target_core_mod-objs			+=	iscsi_target_rd.o
+EXTRA_CFLAGS				+=	-DPYX_RAMDISK
+endif
+ifeq ($(LINUX_FILEIO), 1)
+target_core_mod-objs			+=	iscsi_target_file.o
+EXTRA_CFLAGS				+=	-DPYX_FILEIO
+endif
+ifeq ($(LINUX_VROM), 1)
+target_core_mod-objs			+=	iscsi_target_vrom.o
+EXTRA_CFLAGS				+=	-DPYX_VROM
+endif
+ifeq ($(LINUX_VTAPE), 1)
+target_core_mod-objs			+=	iscsi_target_vt.o
+EXTRA_CFLAGS				+=	-DPYX_VTAPE
+endif
+ifeq ($(LINUX_MEDIA_CHANGER), 1)
+target_core_mod-objs			+=	iscsi_target_mc.o
+EXTRA_CFLAGS				+=	-DPYX_MEDIA_CHANGER
+endif
+
+obj-$(CONFIG_LIO_TARGET)	+=	iscsi_target_mod.o
+iscsi_target_mod-objs		:=	iscsi_crc.o \
 					iscsi_debug_opcodes.o \
 					iscsi_parameters.o \
 					iscsi_seq_and_pdu_list.o \
@@ -45,60 +81,22 @@ iscsi_target_mod-objs		+=	iscsi_crc.o \
 					iscsi_target_erl0.o \
 					iscsi_target_erl1.o \
 					iscsi_target_erl2.o \
-					iscsi_target_feature_obj.o \
-					$(ISCSI_TARGET_FILE) \
-					iscsi_target_hba.o \
 					iscsi_target_info.o \
 					iscsi_target_ioctl.o \
 					iscsi_target_linux_proc.o \
 					iscsi_target_login.o \
 					iscsi_target_nego.o \
 					iscsi_target_nodeattrib.o \
-					iscsi_target_plugin.o \
-					$(ISCSI_TARGET_PSCSI) \
-					$(ISCSI_TARGET_RD) \
 					iscsi_target_reportluns.o \
-					iscsi_target_scdb.o \
-					iscsi_target_seobj.o \
 					iscsi_target_tmr.o \
 					iscsi_target_tpg.o \
-					iscsi_target_transport.o \
 					iscsi_target_util.o \
-					$(ISCSI_TARGET_VROM) \
 					iscsi_target.o \
                                         div64.o
 
-ifeq ($(LINUX_IBLOCK), 1)
-iscsi_target_mod-objs           +=      iscsi_target_iblock.o
-EXTRA_CFLAGS                    +=      -DPYX_IBLOCK
-endif
 ifeq ($(DEBUG_ERL), 1)
 iscsi_target_mod-objs           +=      iscsi_target_debugerl.o
 EXTRA_CFLAGS                    +=      -DDEBUG_ERL
-endif
-ifeq ($(LINUX_PARALLEL_SCSI), 1)
-iscsi_target_mod-objs           +=      iscsi_target_pscsi.o
-EXTRA_CFLAGS                    +=      -DPARALLEL_SCSI
-endif
-ifeq ($(LINUX_RAMDISK), 1)
-iscsi_target_mod-objs           +=      iscsi_target_rd.o
-EXTRA_CFLAGS                    +=      -DPYX_RAMDISK
-endif
-ifeq ($(LINUX_FILEIO), 1)
-iscsi_target_mod-objs           +=      iscsi_target_file.o
-EXTRA_CFLAGS                    +=      -DPYX_FILEIO
-endif
-ifeq ($(LINUX_VROM), 1)
-iscsi_target_mod-objs           +=      iscsi_target_vrom.o
-EXTRA_CFLAGS                    +=      -DPYX_VROM
-endif
-ifeq ($(LINUX_VTAPE), 1)
-iscsi_target_mod-objs           +=      iscsi_target_vt.o
-EXTRA_CFLAGS                    +=      -DPYX_VTAPE
-endif
-ifeq ($(LINUX_MEDIA_CHANGER), 1)
-iscsi_target_mod-objs           +=      iscsi_target_mc.o
-EXTRA_CFLAGS                    +=      -DPYX_MEDIA_CHANGER
 endif
 ifeq ($(SNMP_FEATURE), 1)
 iscsi_target_mod-objs           +=      iscsi_target_mib.o
@@ -143,13 +141,16 @@ install ins:
 	rm -f /lib/modules/`uname -r`/kernel/drivers/iscsi/iscsi_target_mod.ko
 	mkdir -p /lib/modules/`uname -r`/kernel/drivers/iscsi
 	cp -f iscsi_target_mod.ko /lib/modules/`uname -r`/kernel/drivers/iscsi
+	cp -f target_core_mod.ko /lib/modules/`uname -r`/kernel/drivers/iscsi
 	depmod -ae
 
 
 
 clean:
 	rm -f $(foreach prog,$(iscsi_target_mod-objs) $(obj-m),$(CWD)/$(prog)) $(CWD)/iscsi_target_mod.mod.o
+	rm -f $(foreach prog,$(target_core_mod-objs) $(obj-m),$(CWD)/$(prog)) $(CWD)/target_core_mod.mod.o
 	rm -f iscsi_target_mod.ko iscsi_target_mod.mod.c 
+	rm -f target_core_mod.ko target_core_mod.mod.c
 	rm -f .*.cmd ../common/.*.cmd .make_autoconfig *~
 	rm -fr .tmp_versions
 

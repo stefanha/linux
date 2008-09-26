@@ -51,7 +51,7 @@
 
 #define MC_BUF_LEN 60000
  
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
 static void mc_read_element_status(se_task_t *);
 
 static struct hw_s {
@@ -588,9 +588,9 @@ extern int mc_check_ghost_id (se_hbainfo_t *hi)
 	se_hba_t *hba;
 	mc_host_t *fh;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -602,11 +602,11 @@ extern int mc_check_ghost_id (se_hbainfo_t *hi)
 			TRACE_ERROR("MEDIA CHANGER HBA with MC_HOST_ID: %u already"
 				" assigned to iSCSI HBA: %hu, ignoring request\n",
 				hi->mc_host_id, hba->hba_id);
-			spin_unlock(&iscsi_global->hba_lock);
+			spin_unlock(&se_global->hba_lock);
 			return(-1);
 		}
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 		
 	return(0);
 }
@@ -1499,10 +1499,10 @@ extern char *mc_get_filename (int mc_host_id, int vt_device_id)
 
 	/* find the media changer */
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 		if (hba == NULL)
 			continue;
 		if (hba->type != MEDIA_CHANGER)
@@ -1519,7 +1519,7 @@ extern char *mc_get_filename (int mc_host_id, int vt_device_id)
 		}
 	}
 
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(filename);
 }

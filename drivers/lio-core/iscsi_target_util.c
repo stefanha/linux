@@ -64,7 +64,7 @@
 
 #undef ISCSI_TARGET_UTIL_C
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 extern int iscsi_check_acl_for_lun (se_device_t *, iscsi_conn_t *);
 extern int iscsi_add_nopin (iscsi_conn_t *, int);
 
@@ -310,37 +310,6 @@ extern void iscsi_free_r2ts_from_list (
 
 	TRACE_LEAVE
 	return;
-}
-
-/*	iscsi_allocate_iovecs_for_cmd():
- *
- *
- */
-extern int iscsi_allocate_iovecs_for_cmd (
-	iscsi_cmd_t *cmd,
-	__u32 iov_count)
-{
-	/*
-	 * See if we already have enough iovecs from a previous iscsi_cmd_t
-	 * to fulfill the request.
-	 */
-	if (cmd->orig_iov_data_count >= iov_count)
-		return(0);
-
-	if (cmd->iov_data)
-		kfree(cmd->iov_data);
-
-	if (!(cmd->iov_data = (struct iovec *) kmalloc(
-			iov_count * sizeof(struct iovec), GFP_ATOMIC))) {
-		TRACE_ERROR("Unable to allocate memory for"
-			" iscsi_cmd_t->iov_data.\n");
-		return(-1);
-	}
-	memset(cmd->iov_data, 0, iov_count * sizeof(struct iovec));
-
-	cmd->orig_iov_data_count = iov_count;
-
-	return(0);
 }
 
 /*	iscsi_allocate_cmd():
@@ -1318,117 +1287,6 @@ inline __u32 iscsi_unpack_lun (unsigned char *lun_ptr)
 	}
 
 	return(result);
-}
-
-/*	iscsi_send_check_condition_and_sense();
- *
- *
- */
-extern int iscsi_send_check_condition_and_sense (iscsi_cmd_t *cmd, u8 reason, int from_transport)
-{
-	u16 size;
-	unsigned char *buffer = NULL;
-	iscsi_conn_t *conn = CONN(cmd);
-
-	spin_lock_bh(&cmd->istate_lock);
-	if (cmd->cmd_flags & ICF_SENT_CHECK_CONDITION) {
-		spin_unlock_bh(&cmd->istate_lock);
-		return(0);
-	}
-	cmd->cmd_flags |= ICF_SENT_CHECK_CONDITION;
-	spin_unlock_bh(&cmd->istate_lock);
-
-	if (!reason && from_transport)
-		goto after_reason;
-
-	if (!from_transport)
-		cmd->cmd_flags |= ICF_EMULATED_TASK_SENSE;
-
-	if (!(buffer = (char *) kmalloc(ISCSI_SENSE_SEGMENT_TOTAL, GFP_ATOMIC))) {
-		TRACE_ERROR("Unable to allocate memory for SENSE buffer\n");
-		return(-1);
-	}
-	memset(buffer, 0, ISCSI_SENSE_SEGMENT_TOTAL);
-	cmd->buf_ptr	= buffer;
-
-	/* 
-	 * Data Segment of iSCSI Response PDU.
-	 */
-	size = ISCSI_SENSE_BUFFER;
-	buffer[0]	= ((ISCSI_SENSE_BUFFER >> 8) & 0xff);	/* SenseLength */
-	buffer[1]	= (ISCSI_SENSE_BUFFER & 0xff);		/* SenseLength */
-
-	/*
-	 * Actual SENSE DATA, see SPC-3 7.23.2
-	 */
-	switch (reason) {
-	case NON_EXISTENT_LUN:
-	case UNSUPPORTED_SCSI_OPCODE:
-	case SECTOR_COUNT_TOO_MANY:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x05; /* ILLEGAL REQUEST */
-		buffer[14] = 0x20; /* INVALID COMMAND OPERATION CODE */
-		break;
-	case UNKNOWN_MODE_PAGE:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x05; /* ILLEGAL REQUEST */
-		buffer[14] = 0x24; /* INVALID FIELD IN CDB */
-		break;
-	case INCORRECT_AMOUNT_OF_DATA:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x0c; /* WRITE ERROR */
-		buffer[15] = 0x0d; /* NOT ENOUGH UNSOLICITED DATA */			
-		break;
-	case INVALID_CDB_FIELD:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x24; /* INVALID FIELD IN CDB */
-		break;
-	case UNEXPECTED_UNSOLICITED_DATA:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x0c; /* WRITE ERROR */
-		buffer[15] = 0x0c; /* UNEXPECTED_UNSOLICITED_DATA */
-		break;
-	case SERVICE_CRC_ERROR:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x47; /* PROTOCOL SERVICE CRC ERROR */
-		buffer[15] = 0x05; /* N/A */
-		break;
-	case SNACK_REJECTED:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x11; /* READ ERROR */
-		buffer[15] = 0x13; /* FAILED RETRANSMISSION REQUEST */
-		break;
-	case WRITE_PROTECTED:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x07; /* DATA PROTECT */
-		buffer[14] = 0x27; /* WRITE PROTECTED */
-		break;
-	case LOGICAL_UNIT_COMMUNICATION_FAILURE:
-	default:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x05; /* ILLEGAL REQUEST */
-		buffer[14] = 0x80; /* LOGICAL UNIT COMMUNICATION FAILURE */
-		break;
-	}
-
-	/*
-	 * LINUX defines CHECK_CONDITION as 0x01, but follow SPC-3 anyways.
-	 */
-	cmd->scsi_status	= 0x02; /* CHECK CONDITION */
-	cmd->scsi_sense_length	= ISCSI_SENSE_SEGMENT_LENGTH;	/* Automatically padded */
-
-after_reason:
-	if (!(cmd->cmd_flags & ICF_CMD_PASSTHROUGH)) {
-		cmd->i_state = ISTATE_SEND_STATUS;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
-	}
-	
-	return(0);
 }
 
 /*	iscsi_get_tpg_session_from_sid():

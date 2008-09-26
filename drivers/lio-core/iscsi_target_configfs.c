@@ -30,8 +30,6 @@
 #include <linux/configfs.h>
 #include <linux/inet.h>
 
-#include <target_core_configfs.h>
-
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
 
@@ -44,10 +42,20 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
+#include <iscsi_target_erl0.h>
 #include <iscsi_target_tpg.h>
+#include <iscsi_target_util.h>
 #include <iscsi_target.h>
+#ifdef SNMP_SUPPORT
+#include <iscsi_target_mib.h>
+#endif /* SNMP_SUPPORT */
 
+#include <target_core_fabric_ops.h>
+#include <target_core_configfs.h>
 #include <iscsi_target_configfs.h>
+
+extern void iscsi_dump_dev_info (struct se_device_s *, struct se_lun_s *, unsigned long long, char *, int *);
+extern void iscsi_dump_dev_state (struct se_device_s *, char *, int *);
 
 static struct target_fabric_configfs *lio_target_fabric_configfs = NULL;
 
@@ -619,6 +627,22 @@ extern int iscsi_target_register_configfs (void)
 		return(-1);
 	}
 
+	/*
+	 * Temporary OPs function pointers used by target_core_mod..
+	 */
+	fabric->tf_ops.release_cmd_to_pool = &iscsi_release_cmd_to_pool;
+	fabric->tf_ops.release_cmd_direct = &iscsi_release_cmd_direct;
+	fabric->tf_ops.dev_del_lun = &iscsi_dev_del_lun;
+	fabric->tf_ops.stop_session = &iscsi_stop_session;
+	fabric->tf_ops.fall_back_to_erl0 = &iscsi_fall_back_to_erl0;
+	fabric->tf_ops.add_cmd_to_response_queue = &iscsi_add_cmd_to_response_queue;
+	fabric->tf_ops.build_r2ts_for_cmd = &iscsi_build_r2ts_for_cmd;
+	fabric->tf_ops.dec_nacl_count = &iscsi_dec_nacl_count;
+	fabric->tf_ops.dump_dev_info = &iscsi_dump_dev_info;
+	fabric->tf_ops.dump_dev_state = &iscsi_dump_dev_state;
+#ifdef SNMP_SUPPORT
+	fabric->tf_ops.get_new_index = &get_new_index;
+#endif
 	if (!(iscsi_ci = target_fabric_configfs_register(fabric))) {
 		printk(KERN_ERR "target_fabric_configfs_register() for LIO-Target failed!\n");
 		target_fabric_configfs_free(fabric);		

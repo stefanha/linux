@@ -70,7 +70,8 @@
 
 #undef ISCSI_TARGET_INFO_C
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
+extern se_global_t *se_global;
 
 static int check_and_copy_buf (
 	unsigned char *b,
@@ -111,16 +112,16 @@ extern int iscsi_get_hba_info_count_for_global (int *count)
 
 	*count = 1;
 	
-        spin_lock(&iscsi_global->hba_lock);
+        spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-                hba = &iscsi_global->hba_list[i];
+                hba = &se_global->hba_list[i];
 
                 if (!(hba->hba_status & HBA_STATUS_ACTIVE))
                         continue;
 
 		*count += 1;
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(0);
 }
@@ -170,9 +171,9 @@ extern int iscsi_get_hba_info (
                         goto done;
         }
 
-        spin_lock(&iscsi_global->hba_lock);
+        spin_lock(&se_global->hba_lock);
         for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-                hba = &iscsi_global->hba_list[i];
+                hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -181,22 +182,22 @@ extern int iscsi_get_hba_info (
 			start++;
 			continue;
 		}
-		spin_unlock(&iscsi_global->hba_lock);
+		spin_unlock(&se_global->hba_lock);
 
 		memset(b, 0, TMP_BUF_LEN);
 		bl = 0;
 		iscsi_dump_hba_info(hba, b, &bl);
 
-		spin_lock(&iscsi_global->hba_lock);
+		spin_lock(&se_global->hba_lock);
 		if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0) {
-			spin_unlock(&iscsi_global->hba_lock);
+			spin_unlock(&se_global->hba_lock);
 			goto done;
 		}
 				                
 		if (single_out)
 			break;
         }
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
         oob = 0;
 done:
@@ -235,9 +236,9 @@ extern int iscsi_get_global_dev_info_count (int *count)
 
 	*count = 1;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -248,7 +249,7 @@ extern int iscsi_get_global_dev_info_count (int *count)
 		}
 		spin_unlock(&hba->device_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(0);
 }
@@ -509,9 +510,9 @@ extern int iscsi_get_global_dev_info (
 			goto done;
 	}	
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 		
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -538,19 +539,19 @@ extern int iscsi_get_global_dev_info (
 			
 			if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0) {
 				spin_unlock(&hba->device_lock);
-				spin_unlock(&iscsi_global->hba_lock);
+				spin_unlock(&se_global->hba_lock);
 				goto done;
 			}
 
 			if (single_out) {
 				spin_unlock(&hba->device_lock);
-				spin_unlock(&iscsi_global->hba_lock);
+				spin_unlock(&se_global->hba_lock);
 				goto single;
 			}
 		}
 		spin_unlock(&hba->device_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 single:
 	oob = 0;
@@ -1199,9 +1200,9 @@ extern int iscsi_get_plugin_count (int *count)
 
 	*count = 1;
 
-	spin_lock(&iscsi_global->plugin_class_lock);
+	spin_lock(&se_global->plugin_class_lock);
 	for (i = 0; i < MAX_PLUGIN_CLASSES; i++) {
-		pc = &iscsi_global->plugin_class_list[i];
+		pc = &se_global->plugin_class_list[i];
 
 		if (!pc->plugin_array)
 			continue;
@@ -1217,7 +1218,7 @@ extern int iscsi_get_plugin_count (int *count)
 		}
 		spin_unlock(&pc->plugin_lock);
 	}
-	spin_unlock(&iscsi_global->plugin_class_lock);
+	spin_unlock(&se_global->plugin_class_lock);
 
 	return(0);
 }
@@ -1249,9 +1250,9 @@ extern int iscsi_get_plugin_info (
 			goto done;
 	}
 
-	spin_lock(&iscsi_global->plugin_class_lock);
+	spin_lock(&se_global->plugin_class_lock);
 	for (i = 0; i < MAX_PLUGIN_CLASSES; i++) {
-		pc = &iscsi_global->plugin_class_list[i];
+		pc = &se_global->plugin_class_list[i];
 
 		if (!pc->plugin_array)
 			continue;
@@ -1279,7 +1280,7 @@ extern int iscsi_get_plugin_info (
 
 			if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0) {
 				spin_unlock(&pc->plugin_lock);
-				spin_unlock(&iscsi_global->plugin_class_lock);
+				spin_unlock(&se_global->plugin_class_lock);
 				goto done;
 			}
 		}
@@ -1288,7 +1289,7 @@ extern int iscsi_get_plugin_info (
 		if (single_out)
 			break;
 	}
-        spin_unlock(&iscsi_global->plugin_class_lock);
+        spin_unlock(&se_global->plugin_class_lock);
 
 	oob = 0;
 done:

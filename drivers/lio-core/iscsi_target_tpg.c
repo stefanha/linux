@@ -67,7 +67,7 @@
 
 #undef ISCSI_TARGET_TPG_C
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 
 extern int iscsi_close_session (iscsi_session_t *); 
 extern int iscsi_free_session (iscsi_session_t *);
@@ -598,89 +598,6 @@ static void iscsi_set_default_tpg_attribs (iscsi_portal_group_t *tpg)
 	a->demo_mode_lun_access = TA_DEMO_MODE_LUN_ACCESS;
 		
 	return;
-}
-
-extern int iscsi_tpg_persistent_reservation_check (iscsi_cmd_t *cmd)
-{
-	int ret;
-	iscsi_conn_t *conn = CONN(cmd);
-	se_lun_t *lun = ISCSI_LUN(cmd);
-
-	if (!CONN(cmd))
-		return(0);
-
-	spin_lock(&lun->lun_reservation_lock);
-	if (!lun->lun_reserved_node_acl) {
-		spin_unlock(&lun->lun_reservation_lock);
-		return(0);
-	}
-	ret = (lun->lun_reserved_node_acl != SESS(conn)->node_acl) ? -1 : 0;
-	spin_unlock(&lun->lun_reservation_lock);
-
-	return(ret);
-}
-
-extern int iscsi_tpg_persistent_reservation_release (iscsi_cmd_t *cmd)
-{
-	iscsi_conn_t *conn = CONN(cmd);
-	se_lun_t *lun = ISCSI_LUN(cmd);
-
-	if (!CONN(cmd)) {
-		TRACE_ERROR("iscsi_conn_t is NULL!\n");
-		return(5);
-	}
-	
-	spin_lock(&lun->lun_reservation_lock);
-	if (!lun->lun_reserved_node_acl) {
-		spin_unlock(&lun->lun_reservation_lock);
-		return(0);
-	}
-
-	if (lun->lun_reserved_node_acl != SESS(conn)->node_acl) {
-		spin_unlock(&lun->lun_reservation_lock);
-		return(0);
-	}
-	lun->lun_reserved_node_acl = NULL;
-	PYXPRINT("Released TPG LUN: %u -> MAPPED LUN: %u for %s\n", ISCSI_LUN(cmd)->iscsi_lun,
-		cmd->iscsi_deve->mapped_lun, SESS(conn)->node_acl->initiatorname);
-	spin_unlock(&lun->lun_reservation_lock);
-
-	return(0);
-}
-
-extern int iscsi_tpg_persistent_reservation_reserve (iscsi_cmd_t *cmd)
-{
-	iscsi_conn_t *conn = CONN(cmd);
-        se_lun_t *lun = ISCSI_LUN(cmd);
-
-	if (!CONN(cmd)) {
-		TRACE_ERROR("iscsi_conn_t is NULL!\n");
-		return(5);
-	}
-	
-	if ((T_TASK(cmd)->t_task_cdb[1] & 0x01) && (T_TASK(cmd)->t_task_cdb[1] & 0x02)) {
-		TRACE_ERROR("LongIO and Obselete Bits set, returning ILLEGAL_REQUEST\n");
-		return(7);
-	}
-	
-	spin_lock(&lun->lun_reservation_lock);
-	if (lun->lun_reserved_node_acl && (lun->lun_reserved_node_acl != SESS(conn)->node_acl)) {
-		TRACE_ERROR("RESERVATION CONFLIFT\n");
-		TRACE_ERROR("Original reserver TPG LUN: %u %s\n", lun->iscsi_lun,
-				lun->lun_reserved_node_acl->initiatorname);
-		TRACE_ERROR("Current attempt - TPG LUN: %u -> MAPPED LUN: %u from %s \n",
-				lun->iscsi_lun, cmd->iscsi_deve->mapped_lun,
-				SESS(conn)->node_acl->initiatorname);
-		spin_unlock(&lun->lun_reservation_lock);
-		return(5);
-	}
-		
-	lun->lun_reserved_node_acl = SESS(conn)->node_acl;
-	PYXPRINT("Reserved TPG LUN: %u -> MAPPED LUN: %u for %s\n", ISCSI_LUN(cmd)->iscsi_lun,
-		cmd->iscsi_deve->mapped_lun, SESS(conn)->node_acl->initiatorname);
-	spin_unlock(&lun->lun_reservation_lock);
-	
-        return(0);
 }
 
 /*	iscsi_tpg_add_portal_group():

@@ -48,6 +48,7 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_error.h>
+#include <target_core_device.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_hba.h>
 #include <iscsi_target_tpg.h>
@@ -59,7 +60,7 @@
 
 #undef ISCSI_TARGET_HBA_C
 
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
 
 /*	iscsi_hba_check_online():
  *
@@ -79,7 +80,7 @@ extern int iscsi_hba_check_online (
 		return(-1);
 	}
 	
-	hba = &iscsi_global->hba_list[dti->hba_id];
+	hba = &se_global->hba_list[dti->hba_id];
 		
 	if (hba->hba_status != HBA_STATUS_ACTIVE)
 		goto out;
@@ -101,9 +102,9 @@ extern se_hba_t *iscsi_get_hba_from_ptr (void *p)
 	se_hba_t *hba;
 	u32 i;
 	
-	spin_lock(&iscsi_global->hba_lock);	
+	spin_lock(&se_global->hba_lock);	
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 		
 		if (hba->hba_status != HBA_STATUS_ACTIVE)	
 			continue;
@@ -112,16 +113,18 @@ extern se_hba_t *iscsi_get_hba_from_ptr (void *p)
 			continue;
 
 		if (hba->hba_ptr == p) {
-			spin_unlock(&iscsi_global->hba_lock);
+			spin_unlock(&se_global->hba_lock);
 
 			down_interruptible(&hba->hba_access_sem);
 			return((signal_pending(current)) ? NULL : hba);
 		}
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(NULL);
 }
+
+EXPORT_SYMBOL(iscsi_get_hba_from_ptr);
 	
 extern se_hba_t *__core_get_hba_from_id (se_hba_t *hba)
 {
@@ -139,7 +142,7 @@ extern se_hba_t *core_get_hba_from_id (u32 hba_id, int addhba)
 		return(NULL);
 	}
 
-	hba = &iscsi_global->hba_list[hba_id];
+	hba = &se_global->hba_list[hba_id];
 
 	if (!addhba && !(hba->hba_status & HBA_STATUS_ACTIVE))
 		return(NULL);
@@ -147,11 +150,35 @@ extern se_hba_t *core_get_hba_from_id (u32 hba_id, int addhba)
 	return(__core_get_hba_from_id(hba));
 }
 
+EXPORT_SYMBOL(core_get_hba_from_id);
+
+extern se_hba_t *core_get_next_free_hba (void)
+{
+	se_hba_t *hba;
+	u32 i;
+
+	spin_lock(&se_global->hba_lock);     
+	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
+		hba = &se_global->hba_list[i];
+		if (hba->hba_status != HBA_STATUS_FREE)
+			continue;
+
+		spin_unlock(&se_global->hba_lock);
+		return(__core_get_hba_from_id(hba));
+	}
+	spin_unlock(&se_global->hba_lock);
+
+	TRACE_ERROR("Unable to locate next free HBA\n");
+	return(NULL);
+}
+
 extern void core_put_hba (se_hba_t *hba)
 {
 	up(&hba->hba_access_sem);
 	return;
 }
+
+EXPORT_SYMBOL(core_put_hba);
 
 /*	iscsi_hba_check_addhba_params();
  *
@@ -178,6 +205,8 @@ extern int iscsi_hba_check_addhba_params (
 	
 	return(0);
 }
+
+EXPORT_SYMBOL(iscsi_hba_check_addhba_params);
 
 /*	iscsi_hba_add_hba():
  *
@@ -220,6 +249,8 @@ extern int iscsi_hba_add_hba (
 
 	return(0);
 }
+
+EXPORT_SYMBOL(iscsi_hba_add_hba);
 
 static int iscsi_shutdown_hba (
 	se_hba_t *hba)
@@ -286,6 +317,8 @@ extern int iscsi_hba_del_hba (
 	return(0);
 }
 
+EXPORT_SYMBOL(iscsi_hba_del_hba);
+
 static void se_hba_transport_shutdown (se_hba_t *hba)
 {
 	if (!(HBA_TRANSPORT(hba)->shutdown_hba))
@@ -300,21 +333,23 @@ extern void iscsi_disable_all_hbas (void)
 	int i;
 	se_hba_t *hba;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
 
-		spin_unlock(&iscsi_global->hba_lock);
+		spin_unlock(&se_global->hba_lock);
 		iscsi_disable_devices_for_hba(hba);
-		spin_lock(&iscsi_global->hba_lock);
+		spin_lock(&se_global->hba_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return;
 }
+
+EXPORT_SYMBOL(iscsi_disable_all_hbas);
 
 /*	iscsi_hba_del_all_hbas():
  *
@@ -325,9 +360,9 @@ extern void iscsi_hba_del_all_hbas (void)
 	int i;
 	se_hba_t *hba;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 	
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -335,12 +370,14 @@ extern void iscsi_hba_del_all_hbas (void)
 		PYXPRINT("Shutting down HBA ID: %d, HBA_TYPE: %d, STATUS: 0x%08x\n",
 			hba->hba_id, hba->type, hba->hba_status);
 #endif		
-		spin_unlock(&iscsi_global->hba_lock);
+		spin_unlock(&se_global->hba_lock);
 		se_hba_transport_shutdown(hba);
 		iscsi_hba_del_hba(hba);
-		spin_lock(&iscsi_global->hba_lock);
+		spin_lock(&se_global->hba_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return;
 }
+
+EXPORT_SYMBOL(iscsi_hba_del_all_hbas);

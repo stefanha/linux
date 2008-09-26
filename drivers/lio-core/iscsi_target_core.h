@@ -1153,6 +1153,8 @@ typedef struct se_dev_transport_info_s {
 	u32			vol_id;
 } ____cacheline_aligned se_dev_transport_info_t;
 
+#include <linux/configfs.h>
+
 typedef struct se_hba_s {
 	u8			type;		/* Type of disk transport used for HBA. */
 	u16			hba_tpgt;
@@ -1173,7 +1175,8 @@ typedef struct se_hba_s {
 	se_hbainfo_t		hba_info;
 	spinlock_t		device_lock;	/* Spinlock for adding/removing devices */
 	spinlock_t		hba_queue_lock;
-	struct semaphore		hba_access_sem;
+	struct config_group	hba_group;
+	struct semaphore	hba_access_sem;
 	struct se_subsystem_api_s *transport;
 	struct se_hba_s		*next;
 	struct se_hba_s		*prev;
@@ -1300,8 +1303,6 @@ typedef struct iscsi_tpg_np_s {
 	struct list_head	tpg_np_list;
 } ____cacheline_aligned iscsi_tpg_np_t;
   
-#include <linux/configfs.h>
-
 typedef struct iscsi_portal_group_s {
 	__u8			tpg_state;	/* TPG State */
 	__u16			tpgt;		/* Target Portal Group Tag */
@@ -1394,6 +1395,17 @@ typedef struct iscsi_tiqn_s {
 } ____cacheline_aligned iscsi_tiqn_t;
 
 typedef struct se_global_s {
+	u32			in_shutdown;
+        struct se_plugin_class_s *plugin_class_list;
+        se_hba_t                *hba_list;
+	spinlock_t		hba_lock;
+	spinlock_t		plugin_class_lock;
+#ifdef DEBUG_DEV
+        spinlock_t              debug_dev_lock;
+#endif
+} se_global_t;
+
+typedef struct iscsi_global_s {
 	char			targetname[ISCSI_IQN_LEN]; /* iSCSI Node Name */
 	u32			in_rmmod;	/* In module removal */
 	u32			in_shutdown;	/* In core shutdown */
@@ -1405,18 +1417,13 @@ typedef struct se_global_s {
 	u32			nluns;		/* Number of active iSCSI LUNs */
 	u32			thread_id;	/* Thread ID counter */
 	int (*ti_forcechanoffline)(void *);
-	struct se_plugin_class_s *plugin_class_list;
-	struct vol_s		*vol_list;
-	se_hba_t		*hba_list;
 	struct list_head	g_tiqn_list;
 	struct list_head	g_np_list;
 	spinlock_t		active_ts_lock;
 	spinlock_t		check_thread_lock;
 	spinlock_t		discovery_lock; /* Spinlock for adding/removing discovery entries */
-	spinlock_t		hba_lock;
 	spinlock_t		inactive_ts_lock;
 	spinlock_t		login_thread_lock; /* Spinlock for adding/removing login threads */
-	spinlock_t		plugin_class_lock;
 	spinlock_t		shutdown_lock;
 	spinlock_t		thread_set_lock; /* Spinlock for adding/removing thread sets */
 	spinlock_t		tiqn_lock;	/* Spinlock for iscsi_tiqn_t */
@@ -1428,15 +1435,12 @@ typedef struct se_global_s {
 	iscsi_debug_erl_t	*debug_erl;
 	spinlock_t		debug_erl_lock;
 #endif /* DEBUG_ERL */
-#ifdef DEBUG_DEV
-	spinlock_t		debug_dev_lock;
-#endif
 	se_thread_set_t		*active_ts_head;
 	se_thread_set_t		*active_ts_tail;
 	se_thread_set_t		*inactive_ts_head;
 	se_thread_set_t		*inactive_ts_tail;
 	iscsi_tiqn_t		*global_tiqn;
-} ____cacheline_aligned se_global_t;
+} ____cacheline_aligned iscsi_global_t;
 
 #define ISCSI_DEBUG_ERL(g)	((iscsi_debug_erl_t *)(g)->debug_erl)
 

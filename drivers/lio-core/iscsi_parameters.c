@@ -45,7 +45,7 @@
 
 #define ISCSI_PARAMETER_C
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 
 /*	iscsi_login_rx_data():
  *

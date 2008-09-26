@@ -58,7 +58,7 @@
 
 #undef ISCSI_TARGET_LOGIN_C
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 extern int iscsi_close_session (iscsi_session_t *);
 extern int iscsi_stop_session (iscsi_session_t *, int, int);
 
@@ -728,8 +728,9 @@ static void iscsi_stop_login_thread_timer (iscsi_np_t *np)
  */
 static struct socket *iscsi_target_setup_login_socket (iscsi_np_t *np)
 {
-	int backlog = 5, ip_proto, sock_type, ret;
+	const char *end;
 	struct socket *sock;
+	int backlog = 5, ip_proto, sock_type, ret;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 	
@@ -784,10 +785,9 @@ static struct socket *iscsi_target_setup_login_socket (iscsi_np_t *np)
 		sock_in6.sin6_family = AF_INET6;
 		sock_in6.sin6_port = htons(np->np_port);
 //		sock_in6.sin6_scope_id = if_nametoindex("eth0");
-#if 0
-		if ((ret = in6_pton(&np->np_ipv6[0], -1 /* len */,
-				(void *)&sock_in6.sin6_addr.in6_u,
-				'\\', NULL)) <= 0) {
+#if 1
+		if ((ret = in6_pton(&np->np_ipv6[0], IPV6_ADDRESS_SPACE,
+				(void *)&sock_in6.sin6_addr.in6_u, -1, &end)) <= 0) {
 			TRACE_ERROR("in6_pton returned: %d\n", ret);
 			goto fail;
 		}

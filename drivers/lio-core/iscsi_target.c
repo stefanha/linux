@@ -91,13 +91,11 @@
 #include <iscsi_target_mib.h>
 #endif /* SNMP_SUPPORT */
 
-#ifdef LIO_TARGET_CONFIGFS
 #include <iscsi_target_configfs.h>
-#endif
 
 #undef ISCSI_TARGET_C
 
-se_global_t *iscsi_global = NULL;
+iscsi_global_t *iscsi_global = NULL;
 
 extern struct miscdevice iscsi_dev;
 
@@ -116,6 +114,9 @@ static int iscsi_send_task_mgt_rsp (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_send_text_rsp (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_send_reject (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_logout_post_handler (iscsi_cmd_t *, iscsi_conn_t *);
+
+/* From target_core_mod */
+extern void feature_plugin_single_release (void);
 
 /*
  * Legacy Mode, locate the first valid Target IQN.
@@ -1019,63 +1020,26 @@ extern void core_release_nps (void)
 
 /* init_iscsi_target():
  *
- * This function is called during module initialization to setup se_global_t.
+ * This function is called during module initialization to setup iscsi_global_t.
  */
 //#warning FIXME v2.8: Need to move these pieces into feature plugin allocation routines
-static int init_iscsi_global (se_global_t *global)
+static int init_iscsi_global (iscsi_global_t *global)
 {
-	se_hba_t *hba;
-	int i;
-	
-	memset(global, 0, sizeof(se_global_t));
+	memset(global, 0, sizeof(iscsi_global_t));
 	init_MUTEX(&global->auth_sem);
 	init_MUTEX(&global->auth_id_sem);
 	spin_lock_init(&global->active_ts_lock);
 	spin_lock_init(&global->check_thread_lock);
 	spin_lock_init(&global->discovery_lock);
-	spin_lock_init(&global->hba_lock);
 	spin_lock_init(&global->inactive_ts_lock);
 	spin_lock_init(&global->login_thread_lock);
 	spin_lock_init(&global->np_lock);
-	spin_lock_init(&global->plugin_class_lock);
 	spin_lock_init(&global->shutdown_lock);
 	spin_lock_init(&global->tiqn_lock);
 	INIT_LIST_HEAD(&global->g_tiqn_list);
 	INIT_LIST_HEAD(&global->g_np_list);
 	
-	if (!(global->hba_list = kmalloc((sizeof(se_hba_t) * ISCSI_MAX_GLOBAL_HBAS), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate global->hba_list\n");
-		goto out;
-	}
-	memset(global->hba_list, 0, (sizeof(se_hba_t) * ISCSI_MAX_GLOBAL_HBAS));
-
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &global->hba_list[i];
-
-		hba->hba_status |= HBA_STATUS_FREE;
-		hba->hba_id = i;
-		spin_lock_init(&hba->device_lock);
-		spin_lock_init(&hba->hba_queue_lock);
-		init_MUTEX(&hba->hba_access_sem);
-#ifdef SNMP_SUPPORT
-		hba->hba_index = get_new_index(SCSI_INST_INDEX);
-#endif
-	}
-
-	if (!(global->plugin_class_list = kmalloc((sizeof(se_plugin_class_t) * MAX_PLUGIN_CLASSES), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate global->plugin_class_list\n");
-		goto out;
-	}
-	memset(global->plugin_class_list, 0, (sizeof(se_plugin_class_t) * MAX_PLUGIN_CLASSES));
-
 	return(0);
-out:
-	if (global->hba_list)
-		kfree(global->hba_list);
-	if (global->plugin_class_list)
-		kfree(global->plugin_class_list);
-
-	return(-1);
 }
 
 static int default_targetname_seq_show (struct seq_file *m, void *p)
@@ -1133,7 +1097,7 @@ static const struct file_operations version_info = {
  *	This function is called upon module_init and does the following
  *	actions in said order:
  *
- *	0) Allocates and initializes the se_global_t structure.
+ *	0) Allocates and initializes the iscsi_global_t structure.
  *	1) Registers the character device for the IOCTL.
  *	2) Registers /proc filesystem entries.
  *	3) Creates a lookaside cache entry for the iscsi_cmd_t and 
@@ -1157,8 +1121,8 @@ static int iscsi_target_detect(void)
 	printk("%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on %s/%s on "UTS_RELEASE"\n",
 		PYX_ISCSI_VENDOR, utsname()->sysname, utsname()->machine);
 
-	if (!(iscsi_global = (se_global_t *)kmalloc(
-			sizeof(se_global_t), GFP_KERNEL))) {
+	if (!(iscsi_global = (iscsi_global_t *)kmalloc(
+			sizeof(iscsi_global_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_global\n");
 		return(-1);
 	}
@@ -1235,7 +1199,12 @@ static int iscsi_target_detect(void)
 		goto out;
 	}
 
-	plugin_load_all_classes();
+	/*
+	 * Setup Frontend Plugins
+	 */
+	plugin_register_class(PLUGIN_TYPE_FRONTEND, "FRONTEND", MAX_PLUGINS);
+	frontend_load_plugins();
+
 	if (core_load_discovery_tpg() < 0)
 		goto out;
 
@@ -1243,8 +1212,7 @@ static int iscsi_target_detect(void)
 
 	return(ret);
 out:
-
-	plugin_unload_all_classes();
+	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 	core_release_discovery_tpg();
 	iscsi_deallocate_thread_sets(TARGET);
 #if 1
@@ -1263,7 +1231,6 @@ out:
 #ifdef DEBUG_ERL
 	kfree(iscsi_global->debug_erl);
 #endif /* DEBUG_ERL */
-	kfree(iscsi_global->hba_list);
 	kfree(iscsi_global);
 	
 	return(ret);
@@ -1294,6 +1261,8 @@ extern int iscsi_target_release_phase1 (int rmmod)
 
 extern void iscsi_target_release_phase2 (void)
 {
+	se_plugin_class_t *pc;
+
 	core_reset_nps();
 	iscsi_disable_all_tpgs();
 	iscsi_deallocate_thread_sets(TARGET);
@@ -1304,7 +1273,7 @@ extern void iscsi_target_release_phase2 (void)
 	iscsi_hba_del_all_hbas();
 	core_release_discovery_tpg();
 	core_release_tiqns();
-	plugin_unload_all_classes();
+	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 
 	iscsi_global->ti_forcechanoffline = NULL;
 #if 1
@@ -1346,7 +1315,6 @@ static int iscsi_target_release (void)
 #ifdef DEBUG_ERL
 	kfree(iscsi_global->debug_erl);
 #endif /* DEBUG_ERL */
-	kfree(iscsi_global->hba_list);
 	kfree(iscsi_global);
 	
 	printk("Unloading Complete.\n");

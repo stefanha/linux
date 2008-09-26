@@ -27,7 +27,7 @@
 
 #include <iscsi_auth.h>
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 
 /*	iscsi_handle_authetication():
  *
