@@ -1,11 +1,12 @@
 /*********************************************************************************
  * Filename:  iscsi_target_iblock.c
  *
- * This file contains the iSCSI <-> Linux BlockIO transport specific functions.
+ * This file contains the Storage Engine  <-> Linux BlockIO transport specific functions.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -53,7 +54,7 @@
 #include <iscsi_target_iblock.h>
 #include <iscsi_target_error.h>
 
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
 extern struct block_device *__linux_blockdevice_claim (int, int, void *, int *); 
 extern struct block_device *linux_blockdevice_claim(int, int, void *);
 
@@ -90,11 +91,11 @@ extern int iblock_attach_hba (
 	hba->hba_id = hi->hba_id;
 	hba->transport = &iblock_template;
 
-	PYXPRINT("iSCSI_HBA[%d] - %s iBlock HBA Driver %s for iSCSI"
+	PYXPRINT("CORE_HBA[%d] - %s iBlock HBA Driver %s for iSCSI"
 		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR,
 			IBLOCK_VERSION, PYX_ISCSI_VERSION);
 
-	PYXPRINT("iSCSI_HBA[%d] - Attached iBlock HBA: %u to iSCSI Transport with"
+	PYXPRINT("CORE_HBA[%d] - Attached iBlock HBA: %u to iSCSI Transport with"
 		" TCQ Depth: %d\n", hba->hba_id, ib_host->iblock_host_id,
 		atomic_read(&hba->max_queue_depth));
 
@@ -115,7 +116,7 @@ extern int iblock_detach_hba (se_hba_t *hba)
 	}
 	ib_host = (iblock_hba_t *) hba->hba_ptr;
 
-	PYXPRINT("iSCSI_HBA[%d] - Detached iBlock HBA: %u from iSCSI Transport\n",
+	PYXPRINT("CORE_HBA[%d] - Detached iBlock HBA: %u from iSCSI Transport\n",
 			hba->hba_id, ib_host->iblock_host_id);
 
 	kfree(ib_host);
@@ -170,52 +171,47 @@ extern int iblock_release_phydevice (se_device_t *dev)
 	return(0);
 }
 
-extern int iblock_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
+extern void *iblock_allocate_virtdevice (se_hba_t *hba, const char *name)
 {
 	iblock_dev_t *ib_dev = NULL;
-	iblock_hba_t *ib_host = (iblock_hba_t *) iscsi_hba->hba_ptr;
-	se_device_t *iscsi_dev;
+	iblock_hba_t *ib_host = (iblock_hba_t *) hba->hba_ptr;
+
+	if (!(ib_dev = kmalloc(sizeof(iblock_dev_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate iblock_dev_t\n");
+		return(NULL);
+	}
+	memset(ib_dev, 0, sizeof(iblock_dev_t));
+
+	ib_dev->ibd_host = ib_host;
+
+	printk("IBLOCK: Allocated ib_dev for %s\n", name);
+
+	return(ib_dev);
+}
+
+extern se_device_t *iblock_create_virtdevice (se_hba_t *hba, void *p)
+{
+	iblock_dev_t *ib_dev = (iblock_dev_t *) p;
+	se_device_t *dev;
 	struct block_device *bd = NULL;
 	u32 dev_flags = 0;
 	int ret = 0;
 
-	if (!(ib_dev = kmalloc(sizeof(iblock_dev_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate iblock_dev_t\n");
+	if (!(ib_dev)) {
+		TRACE_ERROR("Unable to locate iblock_dev_t parameter\n");
 		return(0);
 	}
-	memset(ib_dev, 0, sizeof(iblock_dev_t));
 
-	if ((di->uu_id[0] != 0) && (di->uu_id[1] != 0) && (di->uu_id[2] != 0) &&
-	    (di->uu_id[3] != 0)) {
-		PYXPRINT("IBLOCK: Referencing MD Universal Unit Identifier "
-			"<%x %x %x %x>\n", di->uu_id[0], di->uu_id[1], di->uu_id[2],
-                               di->uu_id[3]);
-		ib_dev->ibd_uu_id[0] = di->uu_id[0];
-		ib_dev->ibd_uu_id[1] = di->uu_id[1];
-		ib_dev->ibd_uu_id[2] = di->uu_id[2];
-		ib_dev->ibd_uu_id[3] = di->uu_id[3];
-		ib_dev->ibd_flags |= IBDF_HAS_MD_UUID;
-	} else if (strlen(di->lvm_uuid)) {
-		snprintf(ib_dev->ibd_lvm_uuid, SE_LVM_UUID_LEN, "%s", di->lvm_uuid);
-		PYXPRINT("IBLOCK: Referencing LVM Universal Unit Identifier "
-			"<%s>\n", ib_dev->ibd_lvm_uuid);
-		ib_dev->ibd_flags |= IBDF_HAS_LVM_UUID;
-	} else if (strlen(di->udev_path)) {
-		snprintf(ib_dev->ibd_udev_path, SE_UDEV_PATH_LEN, "%s", di->udev_path);
-		PYXPRINT("IBLOCK: Referencing UDEV path: %s\n", ib_dev->ibd_udev_path);
-		ib_dev->ibd_flags |= IBDF_HAS_UDEV_PATH;
-	}
-	
 	PYXPRINT("IBLOCK: Claiming %p Major:Minor - %d:%d\n", ib_dev,
-                di->iblock_major, di->iblock_minor);
+                ib_dev->ibd_major, ib_dev->ibd_minor);
 
-	if ((bd = __linux_blockdevice_claim(di->iblock_major, di->iblock_minor, ib_dev, &ret)))
+	if ((bd = __linux_blockdevice_claim(ib_dev->ibd_major, ib_dev->ibd_minor, ib_dev, &ret)))
 		if (ret == 1)
 			dev_flags = DF_CLAIMED_BLOCKDEV;
-		else if (di->force) {
+		else if (ib_dev->ibd_force) {
 			dev_flags = DF_READ_ONLY;
 			PYXPRINT("IBLOCK: DF_READ_ONLY for Major:Minor - %d:%d\n",
-				di->iblock_major, di->iblock_minor);
+				ib_dev->ibd_major, ib_dev->ibd_minor);
 		} else {
 			TRACE_ERROR("WARNING: Unable to claim block device. Only use"
 				" force=1 for READ-ONLY access.\n");
@@ -224,13 +220,9 @@ extern int iblock_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 	else
 		goto failed;	
 	
-	ib_dev->ibd_host = ib_host;
 	ib_dev->ibd_bd = bd;
 	if (dev_flags & DF_CLAIMED_BLOCKDEV)
 		ib_dev->ibd_bd->bd_contains = bd;
-
-	ib_dev->ibd_major = di->iblock_major;
-	ib_dev->ibd_minor = di->iblock_minor;
 
 	if (!(ib_dev->ibd_bio_set = bioset_create(32, 64))) {
 		TRACE_ERROR("Unable to create bioset for IBLOCK\n");
@@ -242,19 +234,19 @@ extern int iblock_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim() above..
 	 */
-	if (!(iscsi_dev = transport_add_device_to_iscsi_hba(iscsi_hba,
+	if (!(dev = transport_add_device_to_iscsi_hba(hba,
 			&iblock_template, dev_flags, (void *)ib_dev)))
 		goto failed;
 
-	ib_dev->ibd_depth = iscsi_dev->queue_depth;
+	ib_dev->ibd_depth = dev->queue_depth;
 
-	return(1);
+	return(dev);
 
 failed:
 	if (ib_dev->ibd_bio_set)
 		bioset_free(ib_dev->ibd_bio_set);
 	kfree(ib_dev);
-	return(0);
+	return(NULL);
 }
 
 /*	iblock_activate_device(): (Part of se_subsystem_api_t template)
@@ -306,9 +298,9 @@ extern int iblock_check_ghost_id (se_hbainfo_t *hi)
 	se_hba_t *hba;
 	iblock_hba_t *ib_hba;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		 hba = &iscsi_global->hba_list[i];
+		 hba = &se_global->hba_list[i];
 
 		 if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			 continue;
@@ -320,18 +312,18 @@ extern int iblock_check_ghost_id (se_hbainfo_t *hi)
 			 TRACE_ERROR("iBlock HBA with iblock_hba_id: %u already"
 				" assigned to iSCSI HBA: %hu, ignoring request\n",
 				hi->iblock_host_id, hba->hba_id);
-			 spin_unlock(&iscsi_global->hba_lock);
+			 spin_unlock(&se_global->hba_lock);
 			 return(-1);
 		}
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(0);
 }
 
-extern void iblock_free_device (se_device_t *dev)
+extern void iblock_free_device (void *p)
 {
-	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
+	iblock_dev_t *ib_dev = (iblock_dev_t *) p;
 
 	if (ib_dev->ibd_bio_set) {
 		DEBUG_IBLOCK("Calling bioset_free ib_dev->ibd_bio_set: %p\n",
@@ -339,7 +331,10 @@ extern void iblock_free_device (se_device_t *dev)
 		bioset_free(ib_dev->ibd_bio_set);
 	}
 
+#warning FIXME: See if transport_generic_release_phydevice() can be removed from iblock_free_device()
+#if 0
 	transport_generic_release_phydevice(dev, 0);
+#endif
 	kfree(ib_dev);
 
 	return;
@@ -544,6 +539,125 @@ extern int iblock_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, in
 	return(0);
 }
 
+static void iblock_check_dev_params_delim (char *ptr, char **cur)
+{
+	char *ptr2;	
+
+	if (ptr) {
+		if ((ptr2 = strstr(ptr, ","))) {
+			**cur = '\0';
+			*cur = (ptr2 + 1); /* Skip over comma */
+		} else
+			*cur = NULL;
+	}
+
+	return;
+}
+
+extern ssize_t iblock_set_configfs_dev_params (se_hba_t *hba,
+					       se_subsystem_dev_t *se_dev,
+					       const char *page, ssize_t count)
+{
+	iblock_dev_t *ib_dev = (iblock_dev_t *) se_dev->se_dev_su_ptr;
+	char *buf, *cur, *ptr, *endptr;
+	int ret = 0;
+
+	if (!(buf = kzalloc(count, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
+		return(0);
+	}
+	memcpy(buf, page, count);
+	cur = buf;
+	
+	while (cur) {
+#warning FIXME: md_uuid= parameter 
+		if ((ptr = strstr(cur, "md_uuid="))) {
+			ptr += 7; /* Skip to = */
+			*ptr = '\0';
+			ptr += 1;
+			iblock_check_dev_params_delim(ptr, &cur);
+			ib_dev->ibd_uu_id[0] = 0;
+			ib_dev->ibd_uu_id[1] = 0;
+			ib_dev->ibd_uu_id[2] = 0;
+			ib_dev->ibd_uu_id[3] = 0;
+			PYXPRINT("IBLOCK: Referencing MD Universal Unit Identifier "
+				"<%x %x %x %x>\n", ib_dev->ibd_uu_id[0],
+				ib_dev->ibd_uu_id[1], ib_dev->ibd_uu_id[2], 
+				ib_dev->ibd_uu_id[3]);
+			ib_dev->ibd_flags |= IBDF_HAS_MD_UUID;
+		} else if ((ptr = strstr(cur, "lvm_uuid="))) {
+			ptr += 8; /* Skip to = */
+			*ptr = '\0';
+			ptr += 1;
+			iblock_check_dev_params_delim(ptr, &cur);
+			ptr = strstrip(ptr);
+			ret = snprintf(ib_dev->ibd_lvm_uuid, SE_LVM_UUID_LEN, "%s", ptr);
+			PYXPRINT("IBLOCK: Referencing LVM Universal Unit Identifier "
+				"<%s>\n", ib_dev->ibd_lvm_uuid);
+			ib_dev->ibd_flags |= IBDF_HAS_LVM_UUID;
+		} else if ((ptr = strstr(cur, "udev_path="))) {
+			ptr += 9; /* Skip to = */
+			*ptr = '\0';
+			ptr += 1;
+			iblock_check_dev_params_delim(ptr, &cur);
+			ptr = strstrip(ptr);
+			ret = snprintf(ib_dev->ibd_udev_path, SE_UDEV_PATH_LEN, "%s", ptr);
+			PYXPRINT("IBLOCK: Referencing UDEV path: %s\n", ib_dev->ibd_udev_path);
+			ib_dev->ibd_flags |= IBDF_HAS_UDEV_PATH;
+		} else if ((ptr = strstr(cur, "major="))) {
+			ptr += 5; /* Skip to = */
+			*ptr = '\0';
+			ptr += 1;
+			iblock_check_dev_params_delim(ptr, &cur);
+			ib_dev->ibd_major = simple_strtoul(ptr, &endptr, 0);
+			PYXPRINT("IBLOCK: Referencing Major: %d\n", ib_dev->ibd_major);
+			ib_dev->ibd_flags |= IBDF_HAS_MAJOR;
+		} else if ((ptr = strstr(cur, "minor="))) {
+			ptr += 5; /* Skip to = */
+			*ptr = '\0';
+			ptr += 1;
+			iblock_check_dev_params_delim(ptr, &cur);
+			ib_dev->ibd_minor = simple_strtoul(ptr, &endptr, 0);
+			PYXPRINT("IBLOCK: Referencing Minor: %d\n", ib_dev->ibd_minor);
+			ib_dev->ibd_flags |= IBDF_HAS_MINOR;	
+		} else if ((ptr = strstr(cur, "force="))) {
+			ptr += 5; /* Skip to = */
+			*ptr = '\0';
+			ptr += 1;
+			iblock_check_dev_params_delim(ptr, &cur);
+			ib_dev->ibd_force = simple_strtoul(ptr, &endptr, 0);
+			PYXPRINT("IBLOCK: Set force=%d\n", ib_dev->ibd_force);
+		}
+	}
+
+	kfree(buf);
+	return(count);
+}
+
+extern ssize_t iblock_check_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev)
+{
+	iblock_dev_t *ibd = (iblock_dev_t *) se_dev->se_dev_su_ptr;
+
+	if (!(ibd->ibd_flags & IBDF_HAS_MAJOR) ||
+	    !(ibd->ibd_flags & IBDF_HAS_MINOR)) {
+		TRACE_ERROR("Missing iblock_major= and iblock_minor= parameters\n");
+		return(-1);
+	}
+
+	return(0);
+}
+		
+extern void __iblock_get_dev_info (iblock_dev_t *, char *, int *);
+
+extern ssize_t iblock_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev, char *page)
+{
+	iblock_dev_t *ibd = (iblock_dev_t *) se_dev->se_dev_su_ptr;
+	int bl = 0;
+
+	__iblock_get_dev_info(ibd, page, &bl);
+	return((ssize_t)bl);
+}
+
 extern int iblock_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) ||
@@ -589,11 +703,19 @@ extern void iblock_get_hba_info (se_hba_t *hba, char *b, int *bl)
 
 extern void iblock_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
-	char buf[BDEVNAME_SIZE];
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
-	struct block_device *bd = ibd->ibd_bd;
 
-	*bl += sprintf(b+*bl, "iBlock device: %s", bdevname(bd, buf));
+	__iblock_get_dev_info(ibd, b, bl);
+	return;
+}
+
+extern void __iblock_get_dev_info (iblock_dev_t *ibd, char *b, int *bl)
+{
+	char buf[BDEVNAME_SIZE];
+	struct block_device *bd = ibd->ibd_bd;	
+
+	if (bd)
+		*bl += sprintf(b+*bl, "iBlock device: %s", bdevname(bd, buf));
 	if (ibd->ibd_flags & IBDF_HAS_MD_UUID) {
 		*bl += sprintf(b+*bl, "  MD UUID: %x:%x:%x:%x\n",
 			ibd->ibd_uu_id[0], ibd->ibd_uu_id[1],
@@ -606,10 +728,16 @@ extern void iblock_get_dev_info (se_device_t *dev, char *b, int *bl)
 		*bl += sprintf(b+*bl, "\n");
 
 	*bl += sprintf(b+*bl, "        ");
-	*bl += sprintf(b+*bl, "Major: %d Minor: %d  %s\n",
-		ibd->ibd_major, ibd->ibd_minor, (!bd->bd_contains) ? "" :
-		(bd->bd_holder == (iblock_dev_t *)ibd) ?
+	if (bd) {
+		*bl += sprintf(b+*bl, "Major: %d Minor: %d  %s\n",
+			ibd->ibd_major, ibd->ibd_minor, (!bd->bd_contains) ? "" :
+			(bd->bd_holder == (iblock_dev_t *)ibd) ?
 			"CLAIMED: IBLOCK" : "CLAIMED: OS");
+	} else {
+		*bl += sprintf(b+*bl, "Major: %d Minor: %d\n",
+			ibd->ibd_major, ibd->ibd_minor);
+	}
+
 	return;
 }
 

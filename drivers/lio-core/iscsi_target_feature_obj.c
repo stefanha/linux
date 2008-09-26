@@ -113,6 +113,8 @@ extern void feature_plugin_single_release (void)
 	return;
 }
 
+EXPORT_SYMBOL(feature_plugin_single_release);
+
 static se_feature_plugin_t *feature_plugin_locate_api (int plugin_loc)
 {
         se_plugin_class_t *pc;

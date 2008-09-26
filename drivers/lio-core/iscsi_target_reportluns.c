@@ -211,7 +211,7 @@ extern int iscsi_allocate_rl_cmd (
         list_add(&task->t_list, &T_TASK(cmd)->t_task_list);
         spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 	
-	if (iscsi_allocate_iovecs_for_cmd(cmd, ISCSI_IOV_DATA_BUFFER + 1) < 0)
+	if (transport_allocate_iovecs_for_cmd(cmd, ISCSI_IOV_DATA_BUFFER + 1) < 0)
 		goto failure;
 
 	spin_lock_bh(&cmd->istate_lock);

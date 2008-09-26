@@ -69,7 +69,7 @@
 #warning FIXME: Obtain via IOCTL for Initiator Drivers
 #define INIT_CORE_NAME          "SBE, Inc. iSCSI Initiator Core"
 
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
 extern struct block_device *linux_blockdevice_claim(int, int, void *);
 extern int linux_blockdevice_release(int, int, struct block_device *);
 extern int linux_blockdevice_check(int, int);
@@ -521,9 +521,9 @@ extern int pscsi_check_ghost_id (se_hbainfo_t *hi)
 	se_hba_t *hba;
 	struct Scsi_Host *sh;
 	
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -534,11 +534,11 @@ extern int pscsi_check_ghost_id (se_hbainfo_t *hi)
 			TRACE_ERROR("Parallel SCSI HBA with SCSI Host ID: %d"
 				" already assigned to iSCSI HBA: %hu, ignoring"
 				" request.\n", hi->scsi_host_id, i);
-			spin_unlock(&iscsi_global->hba_lock);
+			spin_unlock(&se_global->hba_lock);
 			return(1);
 		}
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(0);
 }
@@ -1178,7 +1178,8 @@ extern void pscsi_shutdown_hba (se_hba_t *hba)
 		 */
 		return;
 	}
-	
+#warning FIXME: iscsi_global breakage in iscsi_target_pscsi.c
+#if 0	
 	if (!iscsi_global->ti_forcechanoffline)
 		return;
 	
@@ -1186,7 +1187,7 @@ extern void pscsi_shutdown_hba (se_hba_t *hba)
 	 * Notify the iSCSI Initiator to perform pause/forcechanoffline operations
 	 */
 	iscsi_global->ti_forcechanoffline(hba->hba_ptr);
-
+#endif
 	return;
 }
 

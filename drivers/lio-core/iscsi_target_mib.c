@@ -55,7 +55,8 @@
 #include <iscsi_target_seobj.h>
 #include <iscsi_target_feature_obj.h>
 
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
+extern iscsi_global_t *iscsi_global;
 
 /* iSCSI mib table index */
 iscsi_index_table_t iscsi_index_table;
@@ -1310,9 +1311,9 @@ static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 
 	seq_puts(seq, "inst sw_indx\n");
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -1324,7 +1325,7 @@ static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "plugin: %s version: %s\n", hba->transport->name,
 				PYX_ISCSI_VERSION);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(0);
 }
@@ -1363,9 +1364,9 @@ static void *locate_hba_start(
 #endif
 	seq->private = (void *)tpg_iter;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -1382,12 +1383,12 @@ static void *locate_hba_start(
 				hba->hba_id, atomic_read(&hba->dev_mib_access_count));
 #endif
 			spin_unlock(&hba->device_lock);
-			spin_unlock(&iscsi_global->hba_lock);
+			spin_unlock(&se_global->hba_lock);
 			return(SEQ_START_TOKEN);
 		}
 		spin_unlock(&hba->device_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(SEQ_START_TOKEN);
 }
@@ -1416,13 +1417,13 @@ static void *locate_hba_next(
 	}
 	spin_unlock(&SE_HBA(dev)->device_lock);
 
-	spin_lock(&iscsi_global->hba_lock);
-	hba = &iscsi_global->hba_list[iterp->ti_offset];
+	spin_lock(&se_global->hba_lock);
+	hba = &se_global->hba_list[iterp->ti_offset];
 	atomic_dec(&hba->dev_mib_access_count);
 	iterp->ti_ptr = NULL;
 
 	for (i = (iterp->ti_offset + 1); i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -1437,12 +1438,12 @@ static void *locate_hba_next(
 			atomic_inc(&hba->dev_mib_access_count);
 
 			spin_unlock(&hba->device_lock);
-			spin_unlock(&iscsi_global->hba_lock);
+			spin_unlock(&se_global->hba_lock);
 			return((void *)iterp);
 		}
 		spin_unlock(&hba->device_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(NULL);
 }

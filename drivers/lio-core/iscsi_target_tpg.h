@@ -41,9 +41,6 @@ extern void iscsi_tpg_add_node_to_devs (iscsi_node_acl_t *, iscsi_portal_group_t
 extern iscsi_node_acl_t *iscsi_tpg_get_initiator_node_acl (iscsi_portal_group_t *, unsigned char *);
 extern iscsi_node_acl_t *iscsi_tpg_check_initiator_node_acl (iscsi_portal_group_t *, unsigned char *);
 extern void iscsi_tpg_dump_params (iscsi_portal_group_t *);
-extern int iscsi_tpg_persistent_reservation_check (iscsi_cmd_t *);
-extern int iscsi_tpg_persistent_reservation_release (iscsi_cmd_t *);
-extern int iscsi_tpg_persistent_reservation_reserve (iscsi_cmd_t *);
 extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *, iscsi_portal_group_t *);
 extern int iscsi_tpg_del_portal_group (iscsi_tiqn_t *, iscsi_portal_group_t *, int);
 extern int iscsi_tpg_enable_portal_group (iscsi_portal_group_t *);

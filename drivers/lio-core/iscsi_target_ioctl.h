@@ -159,7 +159,7 @@ extern int iscsi_ioctl(struct inode *, struct file *, unsigned int, unsigned lon
 extern long iscsi_compat_ioctl(struct file *, unsigned int, unsigned long);
 #endif /* CONFIG_COMPAT */
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 
 #define ISCSI_MINOR	203
 

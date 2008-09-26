@@ -54,6 +54,7 @@
 #include <iscsi_target_error.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
+#include <target_core_device.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
@@ -69,6 +70,9 @@
 #include <iscsi_target_transport_plugin.h>
 #include <iscsi_target_feature_obj.h>
 #include <iscsi_target_feature_plugins.h>
+
+#include <target_core_fabric_ops.h>
+#include <target_core_configfs.h>
 
 #undef ISCSI_TARGET_TRANSPORT_C
 
@@ -205,13 +209,88 @@
 #define DEBUG_GRF(x...)
 #endif
 
-extern se_global_t *iscsi_global;
-extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
+se_global_t *se_global;
+
+EXPORT_SYMBOL(se_global);
 extern int iscsi_release_sessions_for_tpg (iscsi_portal_group_t *, int);
-extern int iscsi_stop_session (iscsi_session_t *, int, int);
 static void transport_release_cmd_to_pool (iscsi_cmd_t *);
 static int transport_generic_write_pending (iscsi_cmd_t *);
 static int transport_processing_thread (void *);
+
+extern int init_se_global (void)
+{
+	se_global_t *global;
+	se_hba_t *hba;
+	int i;
+
+	if (!(global = kzalloc(sizeof(se_global_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate memory for se_global_t\n");
+		return(-1);
+	};
+
+	spin_lock_init(&global->hba_lock);
+	spin_lock_init(&global->plugin_class_lock);
+
+        if (!(global->hba_list = kmalloc((sizeof(se_hba_t) * ISCSI_MAX_GLOBAL_HBAS), GFP_KERNEL))) {
+                TRACE_ERROR("Unable to allocate global->hba_list\n");
+                goto out;
+        }
+        memset(global->hba_list, 0, (sizeof(se_hba_t) * ISCSI_MAX_GLOBAL_HBAS));
+
+        for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
+                hba = &global->hba_list[i];
+
+                hba->hba_status |= HBA_STATUS_FREE;
+                hba->hba_id = i; 
+                spin_lock_init(&hba->device_lock);
+                spin_lock_init(&hba->hba_queue_lock);
+                init_MUTEX(&hba->hba_access_sem);
+#warning FIXME: Need to seperate out SNMP for target_core_mod and iscsi_target_mod..
+#if 0
+#ifdef SNMP_SUPPORT
+		{
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+		
+		if (!(iscsi_tf))
+			BUG();
+
+                hba->hba_index = iscsi_tf->get_new_index(SCSI_INST_INDEX);
+		}
+#endif
+#endif
+        }
+	
+        if (!(global->plugin_class_list = kmalloc((sizeof(se_plugin_class_t) * MAX_PLUGIN_CLASSES),
+			GFP_KERNEL))) {
+                TRACE_ERROR("Unable to allocate global->plugin_class_list\n");
+                goto out;
+        }
+        memset(global->plugin_class_list, 0, (sizeof(se_plugin_class_t) * MAX_PLUGIN_CLASSES));
+
+	se_global = global;
+
+	return(0);
+out:
+	kfree(global->hba_list);
+	kfree(global->plugin_class_list);
+	kfree(global);
+        return(-1);
+}
+
+extern void release_se_global (void)
+{
+	se_global_t *global;
+
+	if (!(global = se_global))
+		return;
+
+	kfree(global->plugin_class_list);
+	kfree(global->hba_list);
+	kfree(global);
+
+	se_global = NULL;
+	return;
+}
 
 #ifdef DEBUG_DEV
 
@@ -225,7 +304,7 @@ extern int __iscsi_debug_dev (se_device_t *dev)
 	rd_dev_t *rd_dev;
 	struct scsi_device *sd;
 
-	spin_lock(&iscsi_global->debug_dev_lock);
+	spin_lock(&se_global->debug_dev_lock);
 	switch (dev->iscsi_hba->type) {
 	case PSCSI:
 		sd = (struct scsi_device *) dev->dev_ptr;
@@ -276,7 +355,7 @@ extern int __iscsi_debug_dev (se_device_t *dev)
 		}
 		break;
 	}
-	spin_unlock(&iscsi_global->debug_dev_lock);
+	spin_unlock(&se_global->debug_dev_lock);
 
 	return(fail_task);
 }
@@ -291,7 +370,7 @@ extern int iscsi_debug_dev (se_device_t *dev)
 	rd_dev_t *rd_dev;
 	struct scsi_device *sd;
 
-	spin_lock_irq(&iscsi_global->debug_dev_lock);
+	spin_lock_irq(&se_global->debug_dev_lock);
 	switch (dev->iscsi_hba->type) {
 	case PSCSI:
 		sd = (struct scsi_device *) dev->dev_ptr;
@@ -342,16 +421,17 @@ extern int iscsi_debug_dev (se_device_t *dev)
 		}
 		break;
 	}
-	spin_unlock_irq(&iscsi_global->debug_dev_lock);
+	spin_unlock_irq(&seglobal->debug_dev_lock);
 	
 	return(fail_task);
 }
 #endif /* DEBUG_DEV */
 
+#warning FIXME: transport_get_iqn_sn() for se_global_t
 extern unsigned char *transport_get_iqn_sn (void)
 {
 	unsigned char *iqn = NULL;
-
+#if 0
 	if ((iqn = strstr(iscsi_global->targetname, ":sn.")))
 		iqn += 1; /* Skip over : */
 	else {
@@ -365,7 +445,9 @@ extern unsigned char *transport_get_iqn_sn (void)
 		else
 			iqn = &iscsi_global->targetname[0];
 	}
-
+#else
+	return("1234567890");
+#endif
 	return(iqn);
 }
 
@@ -432,9 +514,9 @@ static se_device_t *transport_scan_hbas_for_evpd_sn (
 	se_device_t *dev = NULL;
 	se_hba_t *hba;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (hba->hba_status != HBA_STATUS_ACTIVE)
 			continue;
@@ -451,13 +533,13 @@ static se_device_t *transport_scan_hbas_for_evpd_sn (
 
 			if (!(strcmp(dev->t10_wwn.unit_serial, buf))) {
 				spin_unlock(&hba->device_lock);
-				spin_unlock(&iscsi_global->hba_lock);
+				spin_unlock(&se_global->hba_lock);
 				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
 			}
 		}
 		spin_unlock(&hba->device_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(NULL);
 }
@@ -470,9 +552,9 @@ static se_device_t *transport_scan_hbas_for_evpd_di (
 	se_device_t *dev = NULL;
 	se_hba_t *hba;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (hba->hba_status != HBA_STATUS_ACTIVE)
 			continue;
@@ -489,13 +571,13 @@ static se_device_t *transport_scan_hbas_for_evpd_di (
 
 			if (!(strcmp(dev->t10_wwn.device_identifier, buf))) {
 				spin_unlock(&hba->device_lock);
-				spin_unlock(&iscsi_global->hba_lock);
+				spin_unlock(&se_global->hba_lock);
 				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
 			}
 		}
 		spin_unlock(&hba->device_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(NULL);
 }
@@ -511,9 +593,9 @@ static se_device_t *transport_scan_hbas_for_major_minor (
 	se_hba_t *hba;
 	int i;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (hba->hba_status != HBA_STATUS_ACTIVE)
 			continue;
@@ -538,13 +620,13 @@ static se_device_t *transport_scan_hbas_for_major_minor (
 			if ((ib_dev->ibd_major == major) &&
 			    (ib_dev->ibd_minor == minor)) {
 				spin_unlock(&hba->device_lock);
-				spin_unlock(&iscsi_global->hba_lock);
+				spin_unlock(&se_global->hba_lock);
 				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
 			}
 		}
 		spin_unlock(&hba->device_lock);
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return(NULL);
 }
@@ -623,6 +705,30 @@ extern se_device_t *transport_core_locate_dev (
 	}
 
 	return(dev);
+}
+
+EXPORT_SYMBOL(transport_core_locate_dev);
+
+extern se_plugin_t *transport_core_get_plugin_by_name (const char *name)
+{
+	se_plugin_class_t *pc;
+	se_plugin_t *p;
+	int i;
+
+	if (!(pc = plugin_get_class(PLUGIN_TYPE_TRANSPORT)))
+		return(NULL);
+
+	for (i = 0; i < MAX_PLUGINS; i++) {
+		p = &pc->plugin_array[i];
+
+		if (!p->plugin_obj)
+			continue;
+		
+		if (!(strncmp(name, p->plugin_name, strlen(p->plugin_name))))
+			return(p);
+	}
+
+	return(NULL);
 }
 
 /*
@@ -1294,6 +1400,8 @@ extern int transport_check_device_tcq (se_device_t *dev, __u32 iscsi_lun, __u32 
 	return(0);
 }	
 
+EXPORT_SYMBOL(transport_check_device_tcq);
+
 /*	transport_release_all_cmds():
  *
  *
@@ -1657,7 +1765,13 @@ extern se_device_t *transport_add_device_to_iscsi_hba (
 		&transport_dev_write_pending_nop;
 
 #ifdef SNMP_SUPPORT
-	dev->dev_index = get_new_index(SCSI_DEVICE_INDEX);
+	{
+	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+	if (!(iscsi_tf))
+
+	dev->dev_index = iscsi_tf->get_new_index(SCSI_DEVICE_INDEX);
+	}
 	dev->creation_time = get_jiffies_64();
 	spin_lock_init(&dev->stats_lock);
 #endif /* SNMP_SUPPORT */
@@ -1826,6 +1940,8 @@ extern int transport_generic_claim_phydevice (se_device_t *dev)
 	return(1);
 }
 
+EXPORT_SYMBOL(transport_generic_claim_phydevice);
+
 /*	transport_generic_release_phydevice():
  *
  *	Release exclusive access from OS dependant block-device via
@@ -1882,10 +1998,41 @@ extern void transport_generic_free_device (se_device_t *dev)
 	transport_generic_release_phydevice(dev, 0);
 	
 	if (TRANSPORT(dev)->free_device)
-		TRANSPORT(dev)->free_device(dev);
+		TRANSPORT(dev)->free_device(dev->dev_ptr);
 
 	return;
 }
+
+EXPORT_SYMBOL(transport_generic_free_device);
+
+extern int transport_allocate_iovecs_for_cmd (
+	iscsi_cmd_t *cmd,
+	__u32 iov_count)
+{
+	/*
+	 * See if we already have enough iovecs from a previous iscsi_cmd_t
+	 * to fulfill the request.
+	 */
+	if (cmd->orig_iov_data_count >= iov_count)
+		return(0);
+
+	if (cmd->iov_data)
+		kfree(cmd->iov_data);
+
+	if (!(cmd->iov_data = (struct iovec *) kmalloc(
+			iov_count * sizeof(struct iovec), GFP_ATOMIC))) {
+		TRACE_ERROR("Unable to allocate memory for"
+			" iscsi_cmd_t->iov_data.\n");
+		return(-1);
+	}
+	memset(cmd->iov_data, 0, iov_count * sizeof(struct iovec));
+
+	cmd->orig_iov_data_count = iov_count;
+	
+	return(0);
+}
+
+EXPORT_SYMBOL(transport_allocate_iovecs_for_cmd);
 
 /*	transport_generic_allocate_iovecs():
  *
@@ -1904,7 +2051,7 @@ static int transport_generic_allocate_iovecs (
 #endif
 	iov_count += ISCSI_IOV_DATA_BUFFER;
 
-	if (iscsi_allocate_iovecs_for_cmd(cmd, iov_count))
+	if (transport_allocate_iovecs_for_cmd(cmd, iov_count))
 		return(-1);
 
 	return(0);
@@ -2222,6 +2369,8 @@ extern int transport_generic_allocate_tasks (
 	return(0);
 }
 
+EXPORT_SYMBOL(transport_generic_allocate_tasks);
+
 /*	transport_generic_check_device_location():
  *
  *
@@ -2245,6 +2394,8 @@ extern int transport_generic_check_device_location (
 
 	return(t->check_device_location(dev, dti));
 }
+
+EXPORT_SYMBOL(transport_generic_check_device_location);
 
 /*	transport_generic_handle_cdb():
  *
@@ -2270,6 +2421,8 @@ extern int transport_generic_handle_cdb (
 	return(0);
 }
 
+EXPORT_SYMBOL(transport_generic_handle_cdb);
+
 /*	transport_generic_handle_data():
  *
  *
@@ -2293,6 +2446,8 @@ extern int transport_generic_handle_data (
 	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_WRITE);
 	return(0);
 }
+
+EXPORT_SYMBOL(transport_generic_handle_data);
 
 /*	transport_generic_handle_tmr():
  *
@@ -2462,8 +2617,15 @@ extern void transport_generic_request_failure (iscsi_cmd_t *cmd, se_device_t *de
 				transport_new_cmd_failure(cmd);
 			
 			if (CONN(cmd) && SESS(CONN(cmd))) {
-				iscsi_fall_back_to_erl0(CONN(cmd));
-				iscsi_stop_session(SESS(CONN(cmd)), 0, 0);
+				{
+				struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+				
+				if (!(iscsi_tf))
+					BUG();
+
+				iscsi_tf->fall_back_to_erl0(CONN(cmd));
+				iscsi_tf->stop_session(SESS(CONN(cmd)), 0, 0);
+				}
 			} else {
 				TRACE_ERROR("Huh, conn and sess are NULL for ITT: 0x%08x"
 					" t_state: %u\n", cmd->init_task_tag, cmd->t_state);
@@ -3148,6 +3310,8 @@ extern u32 transport_get_default_task_timeout (se_device_t *dev)
 
 	return(TRANSPORT_TIMEOUT_TYPE_OTHER);
 }
+
+EXPORT_SYMBOL(transport_get_default_task_timeout);
 
 /*
  * Called with T_TASK(cmd)->t_state_lock held.
@@ -4617,7 +4781,14 @@ extern void transport_generic_complete_ok (iscsi_cmd_t *cmd)
 		spin_unlock(&cmd->iscsi_lun->lun_sep_lock);
 #endif
 		cmd->i_state = ISTATE_SEND_DATAIN;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		{
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+			
+		if (!(iscsi_tf))
+			BUG();
+
+		iscsi_tf->add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		}
 		break;
 	case ISCSI_WRITE:
 #ifdef SNMP_SUPPORT
@@ -4628,7 +4799,14 @@ extern void transport_generic_complete_ok (iscsi_cmd_t *cmd)
 #endif
 	case ISCSI_NONE:
 		cmd->i_state = ISTATE_SEND_STATUS;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		{
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+		if (!(iscsi_tf))
+			BUG();
+
+		iscsi_tf->add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		}
 		break;
 	default:
 		break;
@@ -4761,7 +4939,14 @@ extern void transport_release_fe_cmd (iscsi_cmd_t *cmd)
 	transport_release_tasks(cmd);
 	transport_free_pages(cmd);
 
-	iscsi_release_cmd_direct(cmd);
+	{
+	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+	if (!(iscsi_tf))
+		BUG();
+
+	iscsi_tf->release_cmd_direct(cmd);
+	}
 
         return;
 }       
@@ -4796,8 +4981,14 @@ extern int transport_generic_remove (iscsi_cmd_t *cmd, int release_to_pool, int 
 release_cmd:
 	if (release_to_pool && !(cmd->cmd_flags & ICF_CMD_PASSTHROUGH))
 		transport_release_cmd_to_pool(cmd);
-	else
-		iscsi_release_cmd_direct(cmd);
+	else {
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+		if (!(iscsi_tf))
+			BUG();
+
+		iscsi_tf->release_cmd_direct(cmd);
+	}
 
 	return(0);
 }
@@ -5755,7 +5946,12 @@ static int transport_generic_write_pending (iscsi_cmd_t *cmd)
 	if (cmd->immediate_data || cmd->unsolicited_data)
 		up(&cmd->unsolicited_data_sem);
 	else {
-		if (iscsi_build_r2ts_for_cmd(cmd, CONN(cmd), 1) < 0) {
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+		if (!(iscsi_tf))
+			BUG();
+
+		if (iscsi_tf->build_r2ts_for_cmd(cmd, CONN(cmd), 1) < 0) {
 			transport_cmd_check_stop(cmd, 1, 0);
 			return(PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES);
 		}
@@ -5776,10 +5972,24 @@ static void transport_release_cmd_to_pool (iscsi_cmd_t *cmd)
 		TRACE_ERROR("Releasing cmd: %p ITT: 0x%08x i_state: 0x%02x, deferred_i_state: 0x%02x directly\n",
 				cmd, cmd->init_task_tag, cmd->i_state, cmd->deferred_i_state);
 #endif
-		iscsi_release_cmd_direct(cmd);
+		{
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+		if (!(iscsi_tf))
+			BUG();
+
+		iscsi_tf->release_cmd_direct(cmd);
+		}
 	} else {
 		iscsi_session_t *sess = (CONN(cmd)) ? CONN(cmd)->sess : cmd->sess;
-		iscsi_release_cmd_to_pool(cmd, sess);
+		{
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+		
+		if (!(iscsi_tf))
+			BUG();
+
+		iscsi_tf->release_cmd_to_pool(cmd, sess);
+		}
 	}
 
 	return;
@@ -5804,7 +6014,14 @@ extern void transport_generic_free_cmd (
 			TRACE_ERROR("Unable to locate iscsi_session_t\n");
 			BUG();
 		}
-		iscsi_dec_nacl_count(SESS_NODE_ACL(sess), cmd);
+		{
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+		if (!(iscsi_tf))
+			BUG();
+
+		iscsi_tf->dec_nacl_count(SESS_NODE_ACL(sess), cmd);
+		}
 
 		if (ISCSI_LUN(cmd)) {
 #if 0
@@ -5822,6 +6039,8 @@ extern void transport_generic_free_cmd (
 		
 	return;
 }
+
+EXPORT_SYMBOL(transport_generic_free_cmd);
 
 static void transport_nop_wait_for_tasks (iscsi_cmd_t *cmd, int remove_cmd, int session_reinstatement)
 {
@@ -5863,6 +6082,8 @@ extern int transport_lun_wait_for_tasks (iscsi_cmd_t *cmd, se_lun_t *lun)
 
 	return(0);
 }
+
+EXPORT_SYMBOL(transport_lun_wait_for_tasks);
 
 /*	transport_generic_wait_for_tasks():
  *
@@ -5941,6 +6162,211 @@ remove:
 	transport_generic_free_cmd(cmd, 0, 0, session_reinstatement);
 	return;
 }
+
+extern int iscsi_send_check_condition_and_sense (iscsi_cmd_t *cmd, u8 reason, int from_transport)
+{
+	u16 size;
+	unsigned char *buffer = NULL;
+	iscsi_conn_t *conn = CONN(cmd);
+
+	spin_lock_bh(&cmd->istate_lock);
+	if (cmd->cmd_flags & ICF_SENT_CHECK_CONDITION) {
+		spin_unlock_bh(&cmd->istate_lock);
+		return(0);
+	}
+	cmd->cmd_flags |= ICF_SENT_CHECK_CONDITION;
+	spin_unlock_bh(&cmd->istate_lock);
+
+	if (!reason && from_transport)
+		goto after_reason;
+
+	if (!from_transport)
+		cmd->cmd_flags |= ICF_EMULATED_TASK_SENSE;
+
+	if (!(buffer = (char *) kmalloc(ISCSI_SENSE_SEGMENT_TOTAL, GFP_ATOMIC))) {
+		TRACE_ERROR("Unable to allocate memory for SENSE buffer\n");
+		return(-1);
+	}
+	memset(buffer, 0, ISCSI_SENSE_SEGMENT_TOTAL);
+	cmd->buf_ptr    = buffer;
+
+	/*
+	 * Data Segment of iSCSI Response PDU.
+	 */
+	size = ISCSI_SENSE_BUFFER;
+	buffer[0]       = ((ISCSI_SENSE_BUFFER >> 8) & 0xff);   /* SenseLength */
+	buffer[1]       = (ISCSI_SENSE_BUFFER & 0xff);          /* SenseLength */
+
+	/*
+	 * Actual SENSE DATA, see SPC-3 7.23.2
+	 */
+	switch (reason) {
+	case NON_EXISTENT_LUN:
+	case UNSUPPORTED_SCSI_OPCODE:
+	case SECTOR_COUNT_TOO_MANY:
+		buffer[2] = 0x70; /* CURRENT ERROR */
+		buffer[4] = 0x05; /* ILLEGAL REQUEST */
+		buffer[14] = 0x20; /* INVALID COMMAND OPERATION CODE */
+		break;
+	case UNKNOWN_MODE_PAGE:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x05; /* ILLEGAL REQUEST */
+                buffer[14] = 0x24; /* INVALID FIELD IN CDB */
+                break;
+        case INCORRECT_AMOUNT_OF_DATA:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x0b; /* ABORTED COMMAND */
+                buffer[14] = 0x0c; /* WRITE ERROR */
+                buffer[15] = 0x0d; /* NOT ENOUGH UNSOLICITED DATA */
+                break;
+        case INVALID_CDB_FIELD:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x0b; /* ABORTED COMMAND */
+                buffer[14] = 0x24; /* INVALID FIELD IN CDB */
+                break;
+        case UNEXPECTED_UNSOLICITED_DATA:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x0b; /* ABORTED COMMAND */
+                buffer[14] = 0x0c; /* WRITE ERROR */
+                buffer[15] = 0x0c; /* UNEXPECTED_UNSOLICITED_DATA */
+                break;
+        case SERVICE_CRC_ERROR:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x0b; /* ABORTED COMMAND */
+                buffer[14] = 0x47; /* PROTOCOL SERVICE CRC ERROR */
+                buffer[15] = 0x05; /* N/A */
+                break;
+        case SNACK_REJECTED:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x0b; /* ABORTED COMMAND */
+                buffer[14] = 0x11; /* READ ERROR */
+                buffer[15] = 0x13; /* FAILED RETRANSMISSION REQUEST */
+                break;
+        case WRITE_PROTECTED:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x07; /* DATA PROTECT */
+                buffer[14] = 0x27; /* WRITE PROTECTED */
+                break;
+        case LOGICAL_UNIT_COMMUNICATION_FAILURE:
+        default:
+                buffer[2] = 0x70; /* CURRENT ERROR */
+                buffer[4] = 0x05; /* ILLEGAL REQUEST */
+                buffer[14] = 0x80; /* LOGICAL UNIT COMMUNICATION FAILURE */
+                break;
+        }
+
+	/*
+	 * LINUX defines CHECK_CONDITION as 0x01, but follow SPC-3 anyways.
+	 */
+        cmd->scsi_status        = 0x02; /* CHECK CONDITION */
+        cmd->scsi_sense_length  = ISCSI_SENSE_SEGMENT_LENGTH;   /* Automatically padded */
+
+after_reason:
+        if (!(cmd->cmd_flags & ICF_CMD_PASSTHROUGH)) {
+                cmd->i_state = ISTATE_SEND_STATUS;
+		{
+		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+		
+		if (!(iscsi_tf))
+			BUG();
+
+                iscsi_tf->add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		}
+        }
+
+	return(0);
+}
+
+EXPORT_SYMBOL(iscsi_send_check_condition_and_sense);
+
+extern int iscsi_tpg_persistent_reservation_check (iscsi_cmd_t *cmd)
+{
+        int ret;
+        iscsi_conn_t *conn = CONN(cmd);
+        se_lun_t *lun = ISCSI_LUN(cmd);
+
+        if (!CONN(cmd))
+                return(0);
+
+        spin_lock(&lun->lun_reservation_lock);
+        if (!lun->lun_reserved_node_acl) {
+                spin_unlock(&lun->lun_reservation_lock);
+                return(0);
+        }
+        ret = (lun->lun_reserved_node_acl != SESS(conn)->node_acl) ? -1 : 0;
+        spin_unlock(&lun->lun_reservation_lock);
+
+        return(ret);
+}
+
+EXPORT_SYMBOL(iscsi_tpg_persistent_reservation_check);
+
+extern int iscsi_tpg_persistent_reservation_release (iscsi_cmd_t *cmd)
+{
+        iscsi_conn_t *conn = CONN(cmd);
+        se_lun_t *lun = ISCSI_LUN(cmd);
+
+        if (!CONN(cmd)) {
+                TRACE_ERROR("iscsi_conn_t is NULL!\n");
+                return(5);
+        }
+
+        spin_lock(&lun->lun_reservation_lock);
+        if (!lun->lun_reserved_node_acl) {
+                spin_unlock(&lun->lun_reservation_lock);
+                return(0);
+        }
+
+        if (lun->lun_reserved_node_acl != SESS(conn)->node_acl) {
+                spin_unlock(&lun->lun_reservation_lock);
+                return(0);
+        }
+        lun->lun_reserved_node_acl = NULL;
+        PYXPRINT("Released TPG LUN: %u -> MAPPED LUN: %u for %s\n", ISCSI_LUN(cmd)->iscsi_lun,
+                cmd->iscsi_deve->mapped_lun, SESS(conn)->node_acl->initiatorname);
+        spin_unlock(&lun->lun_reservation_lock);
+
+        return(0);
+}
+
+EXPORT_SYMBOL(iscsi_tpg_persistent_reservation_release);
+
+extern int iscsi_tpg_persistent_reservation_reserve (iscsi_cmd_t *cmd)
+{
+        iscsi_conn_t *conn = CONN(cmd);
+        se_lun_t *lun = ISCSI_LUN(cmd);
+
+        if (!CONN(cmd)) {
+                TRACE_ERROR("iscsi_conn_t is NULL!\n");
+                return(5);
+        }
+
+        if ((T_TASK(cmd)->t_task_cdb[1] & 0x01) && (T_TASK(cmd)->t_task_cdb[1] & 0x02)) {
+                TRACE_ERROR("LongIO and Obselete Bits set, returning ILLEGAL_REQUEST\n");
+                return(7);
+        }
+
+        spin_lock(&lun->lun_reservation_lock);
+        if (lun->lun_reserved_node_acl && (lun->lun_reserved_node_acl != SESS(conn)->node_acl)) {
+                TRACE_ERROR("RESERVATION CONFLIFT\n");
+                TRACE_ERROR("Original reserver TPG LUN: %u %s\n", lun->iscsi_lun,
+                                lun->lun_reserved_node_acl->initiatorname);
+                TRACE_ERROR("Current attempt - TPG LUN: %u -> MAPPED LUN: %u from %s \n",
+                                lun->iscsi_lun, cmd->iscsi_deve->mapped_lun,
+                                SESS(conn)->node_acl->initiatorname);
+                spin_unlock(&lun->lun_reservation_lock);
+                return(5);
+        }
+
+        lun->lun_reserved_node_acl = SESS(conn)->node_acl;
+        PYXPRINT("Reserved TPG LUN: %u -> MAPPED LUN: %u for %s\n", ISCSI_LUN(cmd)->iscsi_lun,
+                cmd->iscsi_deve->mapped_lun, SESS(conn)->node_acl->initiatorname);
+        spin_unlock(&lun->lun_reservation_lock);
+
+        return(0);
+}
+
+EXPORT_SYMBOL(iscsi_tpg_persistent_reservation_reserve);
 
 /*	transport_generic_lun_reset():
  *
@@ -6058,8 +6484,14 @@ extern int transport_generic_do_tmr (iscsi_cmd_t *cmd)
 
 	cmd->i_state = ISTATE_SEND_TASKMGTRSP;
 	cmd->t_state = TRANSPORT_ISTATE_PROCESSING;
-	iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
-	
+	{
+	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+	if (!(iscsi_tf))
+		BUG();
+
+	iscsi_tf->add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
+	}
 	return(0);
 }
 
@@ -6128,6 +6560,8 @@ extern void transport_start_status_timer (se_device_t *dev)
 	return;
 }
 
+EXPORT_SYMBOL(transport_start_status_timer);
+
 extern void transport_stop_status_timer (se_device_t *dev)
 {
 	if (!(DEV_ATTRIB(dev)->da_status_thread_tur))
@@ -6161,7 +6595,7 @@ static void transport_status_thr_complete (iscsi_cmd_t *cmd)
 	/*
 	 * Return if the module is being removed.
 	 */
-	if (iscsi_global->in_shutdown) {
+	if (se_global->in_shutdown) {
 		transport_passthrough_release(cmd);
 		return;
 	}

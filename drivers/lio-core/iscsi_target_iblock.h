@@ -4,6 +4,7 @@
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -48,12 +49,13 @@ extern int iblock_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *
 extern int iblock_detach_hba (se_hba_t *);
 extern int iblock_claim_phydevice (se_hba_t *, se_device_t *);
 extern int iblock_release_phydevice (se_device_t *);
-extern int iblock_create_virtdevice (se_hba_t *, se_devinfo_t *);
+extern void *iblock_allocate_virtdevice (se_hba_t *, const char *);
+extern se_device_t *iblock_create_virtdevice (se_hba_t *, void *);
 extern int iblock_activate_device (se_device_t *);
 extern void iblock_deactivate_device (se_device_t *);
 extern int iblock_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int iblock_check_ghost_id (se_hbainfo_t *);
-extern void iblock_free_device (se_device_t *);
+extern void iblock_free_device (void *);
 extern int iblock_transport_complete (se_task_t *);
 extern void *iblock_allocate_request (se_task_t *, se_device_t *);
 extern void iblock_get_evpd_prod (unsigned char *, u32, se_device_t *);
@@ -61,6 +63,9 @@ extern void iblock_get_evpd_sn (unsigned char *, u32, se_device_t *);
 extern int iblock_do_task (se_task_t *);
 extern void iblock_free_task (se_task_t *);
 extern int iblock_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
+extern ssize_t iblock_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
+extern ssize_t iblock_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
+extern ssize_t iblock_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
 extern int iblock_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern int iblock_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *);
 extern void iblock_get_plugin_info (void *, char *, int *);
@@ -94,10 +99,14 @@ typedef struct iblock_req_s {
 #define IBDF_HAS_MD_UUID		0x01
 #define IBDF_HAS_LVM_UUID		0x02
 #define IBDF_HAS_UDEV_PATH		0x04
+#define IBDF_HAS_MAJOR			0x08
+#define IBDF_HAS_MINOR			0x10
+#define IBDF_HAS_FORCE			0x20
 
 typedef struct iblock_dev_s {
 	unsigned char ibd_lvm_uuid[SE_LVM_UUID_LEN];
 	unsigned char ibd_udev_path[SE_UDEV_PATH_LEN];
+	int	ibd_force;
 	int	ibd_major;
 	int	ibd_minor;
 	u32	ibd_depth;
@@ -135,6 +144,7 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	attach_hba:		iblock_attach_hba,		\
 	detach_hba:		iblock_detach_hba,		\
 	claim_phydevice:	iblock_claim_phydevice,		\
+	allocate_virtdevice:	iblock_allocate_virtdevice,	\
 	create_virtdevice:	iblock_create_virtdevice,	\
 	activate_device:	iblock_activate_device,		\
 	deactivate_device:	iblock_deactivate_device,	\
@@ -147,8 +157,11 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	do_task:		iblock_do_task,			\
 	free_task:		iblock_free_task,		\
 	check_hba_params:	iblock_check_hba_params,	\
-	check_dev_params:	iblock_check_dev_params,	\
+	check_configfs_dev_params: iblock_check_configfs_dev_params, \
+	set_configfs_dev_params: iblock_set_configfs_dev_params, \
+	show_configfs_dev_params: iblock_show_configfs_dev_params, \
 	check_virtdev_params:	iblock_check_virtdev_params,	\
+	check_dev_params:	iblock_check_dev_params,	\
 	get_plugin_info:	iblock_get_plugin_info,		\
 	get_hba_info:		iblock_get_hba_info,		\
 	get_dev_info:		iblock_get_dev_info,		\

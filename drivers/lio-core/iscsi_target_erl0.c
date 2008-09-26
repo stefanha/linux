@@ -57,10 +57,14 @@
 
 #undef ISCSI_TARGET_ERL0_C
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 extern int iscsi_add_reject_from_cmd (u8, int, int, unsigned char *, iscsi_cmd_t *);
 extern int iscsi_close_session (iscsi_session_t *);
 extern int iscsi_close_connection (iscsi_conn_t *);
+
+/* From target_core_mod */
+extern int iscsi_send_check_condition_and_sense (iscsi_cmd_t *, __u8, int);
+
 
 /*	iscsi_set_dataout_sequence_values():
  *

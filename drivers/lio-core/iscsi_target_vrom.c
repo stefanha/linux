@@ -57,7 +57,7 @@
 
 #include <iscsi_target_file.c>
  
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
 
 struct rmmc_conn global_conn;
 

@@ -44,6 +44,7 @@
 #include <iscsi_target_error.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
+#include <target_core_device.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_hba.h>
 #include <iscsi_target_tpg.h>
@@ -57,6 +58,9 @@
 #include <iscsi_target_feature_plugins.h>
 
 #include <iscsi_target_info.h>
+
+#include <target_core_fabric_ops.h>
+#include <target_core_configfs.h>
 
 #undef ISCSI_TARGET_SEOBJ_C
 
@@ -79,10 +83,14 @@ MAKE_OBJ_TYPE_RET(dev);
 extern void dev_obj_get_obj_info (void *p, se_lun_t *lun, unsigned long long bytes, int state, char *b, int *bl)
 {
 	se_device_t *dev = (se_device_t *)p;
+	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+	if (!(iscsi_tf))
+		BUG();
 	
 	if (state)
-		iscsi_dump_dev_state(dev, b, bl);
-	iscsi_dump_dev_info((se_device_t *)p, lun, bytes, b, bl);
+		iscsi_tf->dump_dev_state(dev, b, bl);
+	iscsi_tf->dump_dev_info((se_device_t *)p, lun, bytes, b, bl);
 	return;
 }
 
@@ -270,7 +278,14 @@ extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 	spin_unlock(&dev->se_port_lock);
 #ifdef SNMP_SUPPORT
 	dev->dev_port_count++;
-	sep->sep_index = get_new_index(SCSI_PORT_INDEX);
+	{
+	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+
+	if (!(iscsi_tf))
+		BUG();
+
+	sep->sep_index = iscsi_tf->get_new_index(SCSI_PORT_INDEX);
+	}
 #endif
 
 	return(0);
@@ -742,7 +757,12 @@ extern int dev_add_obj_to_lun (iscsi_portal_group_t *tpg, se_lun_t *lun)
 
 extern int dev_del_obj_from_lun (iscsi_portal_group_t *tpg, se_lun_t *lun)
 {
-	return(iscsi_dev_del_lun(tpg, lun->iscsi_lun));
+	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+	
+	if (!(iscsi_tf))
+		BUG();
+
+	return(iscsi_tf->dev_del_lun(tpg, lun->iscsi_lun));
 }
 
 extern se_obj_lun_type_t *dev_get_next_obj_api (void *p, void **next_p)

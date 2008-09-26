@@ -27,9 +27,6 @@
 #ifndef ISCSI_TARGET_DEVICE_H
 #define ISCSI_TARGET_DEVICE_H
  
-extern int iscsi_check_devices_access (se_hba_t *);
-extern void iscsi_disable_devices_for_hba (se_hba_t *);
-extern void se_release_device_for_hba (se_device_t *);
 extern se_lun_t *iscsi_get_lun (iscsi_conn_t *, u64);
 extern int iscsi_get_lun_for_cmd (iscsi_cmd_t *, u64);
 extern void iscsi_determine_maxcmdsn (iscsi_session_t *, iscsi_node_acl_t *);
@@ -39,25 +36,11 @@ extern int iscsi_create_device_list_for_node (iscsi_node_acl_t *, iscsi_portal_g
 extern int iscsi_free_device_list_for_node (iscsi_node_acl_t *, iscsi_portal_group_t *);
 extern void iscsi_update_device_list_for_node (se_lun_t *, u32, u32, iscsi_node_acl_t *, iscsi_portal_group_t *, int);     
 extern void iscsi_clear_lun_from_sessions (se_lun_t *, iscsi_portal_group_t *);
-extern se_device_t *core_get_device_from_transport (se_hba_t *, se_dev_transport_info_t *);
-extern int se_claim_physical_device (se_hba_t *, se_devinfo_t *, struct iscsi_target *);
-extern int se_release_physical_device (struct iscsi_target *, se_devinfo_t *, se_hba_t *);
 extern void iscsi_clear_lun_from_tpg (se_lun_t *, iscsi_portal_group_t *);
-extern void se_clear_dev_ports (se_device_t *);
-extern int se_free_virtual_device (se_device_t *, se_hba_t *);
-extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *, se_devinfo_t *, se_hba_t *);
-extern int iscsi_create_virtual_device (se_hba_t *, se_devinfo_t *, struct iscsi_target *);
-extern void se_dev_start (se_device_t *);
-extern void se_dev_stop (se_device_t *);
 extern int iscsi_dev_add_lun (iscsi_portal_group_t *, se_hba_t *, se_device_t *, se_dev_transport_info_t *);
 extern int iscsi_dev_del_lun (iscsi_portal_group_t *, u32);
 extern int iscsi_dev_add_initiator_node_lun_acl (iscsi_portal_group_t *, u32, u32, u32, char *);
 extern int iscsi_dev_del_initiator_node_lun_acl (iscsi_portal_group_t *, u32, u32, char *);
 extern int iscsi_dev_set_initiator_node_lun_access (iscsi_portal_group_t *, u32, u32, char *);
-extern se_hba_t *core_get_hba_from_hbaid (struct iscsi_target *tg,
-					      se_dev_transport_info_t *dti,
-					      int add);
-extern void se_dev_set_default_attribs (se_device_t *);
-extern int se_dev_set_attrib (se_device_t *, u32, u32, int);
 
 #endif /* ISCSI_TARGET_DEVICE_H */

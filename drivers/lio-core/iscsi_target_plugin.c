@@ -55,16 +55,10 @@
 
 #undef ISCSI_TARGET_PLUGIN_C
 
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
 
 extern void plugin_load_all_classes (void)
 {
-	/*
-	 * Setup Frontend Plugins
-	 */
-	plugin_register_class(PLUGIN_TYPE_FRONTEND, "FRONTEND", MAX_PLUGINS);
-	frontend_load_plugins();
-
 	/*
 	 * Setup Transport Plugins
 	 */
@@ -86,6 +80,8 @@ extern void plugin_load_all_classes (void)
 	return;
 }
 
+EXPORT_SYMBOL(plugin_load_all_classes);
+
 extern se_plugin_class_t *plugin_get_class (
 	u32 plugin_class_type)
 {
@@ -97,11 +93,9 @@ extern se_plugin_class_t *plugin_get_class (
 		return(NULL);
 	}
 
-	pc = &iscsi_global->plugin_class_list[plugin_class_type];
-	if (!pc->plugin_array) {
-		TRACE_ERROR("Plugin Class Type: %u does not exist!\n", plugin_class_type);
+	pc = &se_global->plugin_class_list[plugin_class_type];
+	if (!pc->plugin_array)
 		return(NULL);
-	}
 
 	return(pc);
 }
@@ -120,19 +114,19 @@ extern int plugin_register_class (
 				MAX_PLUGIN_CLASS_NAME);
 		return(-1);
 	}
-	spin_lock(&iscsi_global->plugin_class_lock);
+	spin_lock(&se_global->plugin_class_lock);
 	if (plugin_class_type > MAX_PLUGIN_CLASSES) {
 		TRACE_ERROR("Passed plugin class type: %u exceeds MAX_PLUGIN_CLASSES: %d\n",
 				plugin_class_type, MAX_PLUGIN_CLASSES);
 		return(-1);
 	}
 
-	pc = &iscsi_global->plugin_class_list[plugin_class_type];
+	pc = &se_global->plugin_class_list[plugin_class_type];
 	if (pc->plugin_array) {
 		TRACE_ERROR("Plugin Class Type: %u already exists\n", plugin_class_type);
 		return(-1);
 	}
-	spin_unlock(&iscsi_global->plugin_class_lock);
+	spin_unlock(&se_global->plugin_class_lock);
 		
 	if (!(pc->plugin_array = kmalloc(sizeof(se_plugin_t) * max_plugins, GFP_KERNEL))) {
 		TRACE_ERROR("Unable to locate pc->plugin_array\n");
@@ -156,6 +150,8 @@ extern int plugin_register_class (
 	
 	return(0);
 }
+
+EXPORT_SYMBOL(plugin_register_class);
 
 extern int plugin_deregister_class (u32 plugin_class_type)
 {
@@ -181,13 +177,15 @@ extern int plugin_deregister_class (u32 plugin_class_type)
 	return(0);
 }
 
+EXPORT_SYMBOL(plugin_deregister_class);
+
 extern void plugin_unload_all_classes (void)
 {
 	u32 i;
 	se_plugin_class_t *pc;
 
 	for (i = 0; i < MAX_PLUGIN_CLASSES; i++) {
-		pc = &iscsi_global->plugin_class_list[i];
+		pc = &se_global->plugin_class_list[i];
 
 		if (!pc->plugin_array)
 			continue;
@@ -197,6 +195,8 @@ extern void plugin_unload_all_classes (void)
 
 	return;
 }
+
+EXPORT_SYMBOL(plugin_unload_all_classes);
 
 extern void *plugin_get_obj (
 	u32 plugin_class,
@@ -223,12 +223,15 @@ extern void *plugin_get_obj (
 	}
 	spin_unlock(&pc->plugin_lock);
 
+	*ret = 0;
 	return(p->plugin_obj);
 out:
 	*ret = -1;
 	spin_unlock(&pc->plugin_lock);
 	return(NULL);
 }
+
+EXPORT_SYMBOL(plugin_get_obj);
 
 extern struct se_plugin_s *plugin_register (
 	void *obj,
@@ -286,6 +289,8 @@ out:
 	spin_unlock(&pc->plugin_lock);
 	return(NULL);
 }
+
+EXPORT_SYMBOL(plugin_register);
 
 extern int plugin_deregister (
 	u32 plugin_loc,

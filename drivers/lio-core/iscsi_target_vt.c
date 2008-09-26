@@ -51,7 +51,7 @@
 #include <iscsi_target_vt.h>
 #include <iscsi_target_error.h>
  
-extern se_global_t *iscsi_global;
+extern se_global_t *se_global;
 
 static int vt_dev_write_filemark(vt_dev_t *, int);
 static int vt_write_filemark(se_task_t *, int);
@@ -347,9 +347,9 @@ extern int vt_check_ghost_id (se_hbainfo_t *hi)
 	se_hba_t *hba;
 	vt_host_t *fh;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
@@ -361,11 +361,11 @@ extern int vt_check_ghost_id (se_hbainfo_t *hi)
 			TRACE_ERROR("VTAPE HBA with VT_HOST_ID: %u already"
 				" assigned to iSCSI HBA: %hu, ignoring request\n",
 				hi->vt_host_id, hba->hba_id);
-			spin_unlock(&iscsi_global->hba_lock);
+			spin_unlock(&se_global->hba_lock);
 			return(-1);
 		}
 	}
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 		
 	return(0);
 }
@@ -1779,10 +1779,10 @@ static vt_dev_t *vt_find_dev (int mc_host_id, int vt_dev_id)
 	se_device_t *dev;
 	vt_dev_t *vt_dev;
 
-	spin_lock(&iscsi_global->hba_lock);
+	spin_lock(&se_global->hba_lock);
 
 	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &iscsi_global->hba_list[i];
+		hba = &se_global->hba_list[i];
 		if (hba == NULL)
 			continue;
 		spin_lock(&hba->device_lock);
@@ -1796,14 +1796,14 @@ static vt_dev_t *vt_find_dev (int mc_host_id, int vt_dev_id)
 				continue;
 			if (vt_dev->vt_dev_id == vt_dev_id) {
 				spin_unlock(&hba->device_lock);
-				spin_unlock(&iscsi_global->hba_lock);
+				spin_unlock(&se_global->hba_lock);
 				return vt_dev;
 			}
 		}
 		spin_unlock(&hba->device_lock);
 	}
 
-	spin_unlock(&iscsi_global->hba_lock);
+	spin_unlock(&se_global->hba_lock);
 
 	return NULL;
 }

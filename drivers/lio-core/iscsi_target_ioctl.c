@@ -69,105 +69,17 @@
 
 #undef ISCSI_TARGET_IOCTL_C
 
-extern se_global_t *iscsi_global;
+extern iscsi_global_t *iscsi_global;
 extern int iscsi_send_async_msg (iscsi_conn_t *, __u16, __u8, __u8);
 extern int iscsi_target_release_phase1(int);
 extern void iscsi_target_release_phase2(void);
 
-extern struct block_device *__linux_blockdevice_claim (int major, int minor, void *claim_ptr, int *ret)
-{
-	dev_t dev;
-	struct block_device *bd;
-
-	dev = MKDEV(major, minor);
-
-	if (!(bd = bdget(dev))) {
-		*ret = -1;
-		return(NULL);
-	}
-
-	if (blkdev_get(bd, FMODE_WRITE, O_RDWR) < 0) {
-		*ret = -1;
-		return(NULL);
-	}
-        /*
-         * If no claim pointer was passed from claimee, use struct block_device.
-         */
-        if (!claim_ptr)
-                claim_ptr = (void *)bd;
-
-        if (bd_claim(bd, claim_ptr) < 0) {
-#if 0
-		PYXPRINT("Using previously claimed Major:Minor - %d:%d\n",
-				major, minor);
-#endif
-		*ret = 0;
-                return(bd);
-        }
-
-	*ret = 1;
-        return(bd);
-}
-
-extern struct block_device *linux_blockdevice_claim (int major, int minor, void *claim_ptr)
-{
-	dev_t dev;
-	struct block_device *bd;
-
-	dev = MKDEV(major, minor);
-
-	if (!(bd = bdget(dev)))
-		return(NULL);
-
-	if (blkdev_get(bd, FMODE_WRITE, O_RDWR) < 0)
-		return(NULL);
-
-	/*
-	 * If no claim pointer was passed from claimee, use struct block_device.
-	 */
-	if (!claim_ptr)
-		claim_ptr = (void *)bd;
-
-	if (bd_claim(bd, claim_ptr) < 0) {
-		blkdev_put(bd);
-		return(NULL);
-	}
-
-	return(bd);
-}
-
-extern int linux_blockdevice_release (int major, int minor, struct block_device *bd_p)
-{
-	dev_t dev;
-	struct block_device *bd;
-	
-	if (!bd_p) {
-		dev = MKDEV(major, minor);
-	
-		if (!(bd = bdget(dev)))
-			return(-1);
-	} else
-		bd = bd_p;
-	
-	bd_release(bd);
-	blkdev_put(bd);
-
-	return(0);
-}
-
-extern int linux_blockdevice_check (int major, int minor)
-{
-	struct block_device *bd;
-	
-	if (!(bd = linux_blockdevice_claim(major, minor, NULL)))
-		return(-1);
-	/*
-	 * Blockdevice was able to be claimed, now unclaim it and return success.
-	 */
-	linux_blockdevice_release(major, minor, NULL);
-	 
-	return(0);
-}
+/* Symbols from target_core_mod */
+extern int se_free_virtual_device (struct se_device_s *, struct se_hba_s *);
+extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *, struct se_devinfo_s *, struct se_hba_s *);
+extern int iscsi_create_virtual_device (struct se_hba_s *, struct se_devinfo_s *, struct iscsi_target *);
+extern int linux_blockdevice_check (int, int);
+extern int se_dev_set_attrib (struct se_device_s *, u32, u32, int);
 
 static int get_out_count (int cmd, struct iscsi_target *t)
 {
