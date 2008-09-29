@@ -101,6 +101,7 @@ extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
 extern se_device_t *transport_core_locate_dev (struct iscsi_target *, se_dev_transport_info_t *, int *);
 extern struct se_plugin_s *transport_core_get_plugin_by_name (const char *name);
+extern void transport_check_dev_params_delim (char *, char **);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);
 extern int transport_add_cmd_to_queue (struct iscsi_cmd_s *, struct se_queue_obj_s *, u8);
 extern void transport_complete_cmd (iscsi_cmd_t *, int);
@@ -328,10 +329,6 @@ typedef struct se_subsystem_api_s {
 	 * create_virtdevice(): Only for Virtual HBAs
 	 */
 	se_device_t *(*create_virtdevice)(struct se_hba_s *, void *);
-	/*
-	 * scan_devices(): Only for Physical HBAs
-	 */
-	int (*scan_devices)(struct se_hba_s *, struct se_hbainfo_s *);
 	/*
 	 * activate_device():
 	 */
