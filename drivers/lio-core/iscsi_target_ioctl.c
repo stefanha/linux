@@ -614,6 +614,7 @@ extern int iscsi_ioctl (
 	  core_put_hba(hba);
 	  break;
 	case ISCSI_TARGET_ADDLUNTODEV:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -634,6 +635,9 @@ extern int iscsi_ioctl (
 	  core_put_hba(dev->iscsi_hba);
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_DELLUNFROMDEV:
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
