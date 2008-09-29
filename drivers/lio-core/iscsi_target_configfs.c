@@ -45,6 +45,7 @@
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
+#include <iscsi_target_transport.h>
 #include <iscsi_target.h>
 #ifdef SNMP_SUPPORT
 #include <iscsi_target_mib.h>
@@ -58,6 +59,12 @@ extern void iscsi_dump_dev_info (struct se_device_s *, struct se_lun_s *, unsign
 extern void iscsi_dump_dev_state (struct se_device_s *, char *, int *);
 
 static struct target_fabric_configfs *lio_target_fabric_configfs = NULL;
+
+struct lio_target_configfs_attribute {
+	struct configfs_attribute attr;
+	ssize_t (*show)(void *, char *);
+	ssize_t (*store)(void *, const char *, size_t);
+};
 
 static u16 get_tpgt_from_tpg_ci (char *str, int *ret)
 {
@@ -306,27 +313,291 @@ static struct config_item_type lio_target_np_cit = {
 
 // End items for lio_target_np_cit
 
+// Start items for lio_target_port_cit
+
+static ssize_t lio_target_show_port_info (void *p, char *page)
+{
+	se_lun_t *lun = (se_lun_t *)p;
+	int read_bytes = 0;
+
+	read_bytes += sprintf(page, "lio_target_show_port_info()\n");
+	return(read_bytes);
+}
+
+static struct lio_target_configfs_attribute lio_target_attr_port_info = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "port_info",
+		    .ca_mode = S_IRUGO },
+	.show	= lio_target_show_port_info,
+	.store	= NULL,
+};
+
+static ssize_t lio_target_store_port_control (void *p, const char *page, size_t count)
+{
+	se_lun_t *lun = (se_lun_t *)p;
+	char *buf, *cur;
+
+	if (!(buf = kzalloc(count, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
+		return(-ENOMEM);
+	}
+	memcpy(buf, page, count);
+
+	printk("lio_target_store_port_control(): %s\n", buf);
+
+	kfree(buf);
+	return(count);
+}
+
+static struct lio_target_configfs_attribute lio_target_attr_port_control = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "port_control",
+		    .ca_mode = S_IWUSR },
+	.show	= NULL,
+	.store	= lio_target_store_port_control,
+};
+
+static struct configfs_attribute *lio_target_port_attrs[] = {
+	&lio_target_attr_port_info.attr,
+	&lio_target_attr_port_control.attr,
+	NULL,
+};
+
+static ssize_t lio_target_port_show (struct config_item *item,
+				     struct configfs_attribute *attr,
+				     char *page)
+{
+	se_lun_t *lun = container_of(to_config_group(item), se_lun_t, lun_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->show))
+		return(-EINVAL);
+
+	return(lt_attr->show((void *)lun, page));
+}
+
+static ssize_t lio_target_port_store (struct config_item *item,
+				      struct configfs_attribute *attr,
+				      const char *page, size_t count)
+{
+	se_lun_t *lun = container_of(to_config_group(item), se_lun_t, lun_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->store))
+		return(-EINVAL);
+
+	return(lt_attr->store((void *)lun, page, count));
+}
+
+static int lio_target_port_link (struct config_item *lun_ci, struct config_item *se_dev_ci)
+{
+	iscsi_portal_group_t *tpg;
+	iscsi_tiqn_t *tiqn;
+	se_device_t *dev;
+	se_lun_t *lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group);
+	se_lun_t *lun_p;
+	se_subsystem_dev_t *se_dev = container_of(
+		to_config_group(se_dev_ci), se_subsystem_dev_t, se_dev_group);
+	struct config_item *tpg_ci, *tiqn_ci;
+	int ret = 0;
+	unsigned short int tpgt;
+
+	if (lun->lun_type_ptr != NULL) {
+		printk(KERN_ERR "Port Symlink already exists\n");
+		return(-EEXIST);
+	}
+
+	if (!(tpg_ci = &lun_ci->ci_parent->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tpg_ci\n");
+		return(-EINVAL);
+	}
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return(-EINVAL);
+	}
+
+	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
+	if (ret != 0)
+		return(-EINVAL);
+
+	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
+				&tiqn, tpgt, 0)))
+		return(-EINVAL);
+
+	if (!(dev = se_dev->se_dev_ptr)) {	
+		printk(KERN_ERR "Unable to locate se_device_t pointer from %s\n",
+			config_item_name(se_dev_ci));
+		return(-ENODEV);
+	}
+
+	if (!(lun_p = iscsi_dev_add_lun(tpg, dev->iscsi_hba, dev, lun->iscsi_lun, &ret))) {
+		printk(KERN_ERR "iscsi_dev_add_lun() failed: %d\n", ret);
+		goto out;
+	}
+	iscsi_put_tpg(tpg);
+
+	printk("LIO_Target_ConfigFS: Created Port Symlink %s -> %s\n",
+		config_item_name(se_dev_ci), config_item_name(lun_ci));
+	return(0);
+out:
+	iscsi_put_tpg(tpg);
+	return(-EINVAL);
+}
+
+static int lio_target_port_unlink (struct config_item *lun_ci, struct config_item *se_dev_ci)
+{
+	iscsi_portal_group_t *tpg;
+	iscsi_tiqn_t *tiqn;
+	se_lun_t *lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group);
+	se_subsystem_dev_t *se_dev = container_of(
+		to_config_group(se_dev_ci), se_subsystem_dev_t, se_dev_group);
+	struct config_item *tpg_ci, *tiqn_ci;
+	int ret = 0;
+	unsigned short int tpgt;
+
+	printk("se_dev_ci: %s, lun_ci: %s\n", config_item_name(se_dev_ci),
+			config_item_name(lun_ci));
+
+	if (!(tpg_ci = &lun_ci->ci_parent->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tpg_ci\n");
+		return(-EINVAL);
+	}
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return(-EINVAL);
+	}
+
+	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
+	if (ret != 0)
+		return(-EINVAL);
+
+	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
+				&tiqn, tpgt, 0)))
+		return(-EINVAL);
+
+	ret = iscsi_dev_del_lun(tpg, lun->iscsi_lun);
+	iscsi_put_tpg(tpg);
+
+	printk("LIO_Target_ConfigFS: Removed Port Symlink %s -> %s\n",
+		config_item_name(se_dev_ci), config_item_name(lun_ci));
+
+	return(0);
+}
+
+static struct configfs_item_operations lio_target_port_item_ops = {
+	.release		= NULL,
+	.show_attribute		= lio_target_port_show,
+	.store_attribute	= lio_target_port_store,
+	.allow_link		= lio_target_port_link,
+	.drop_link		= lio_target_port_unlink,
+};
+
+static struct config_item_type lio_target_port_cit = {
+	.ct_item_ops		= &lio_target_port_item_ops,
+	.ct_attrs		= lio_target_port_attrs,
+	.ct_owner		= THIS_MODULE,
+};
+
+// End items for lio_target_port_cit
+
 // Start items for lio_target_lun_cit
 
-static struct config_group *lio_target_call_addluntodev (
+static struct config_group *lio_target_lun_make_group (
         struct config_group *group,
         const char *name)
 {
-	printk("lio_target_call_addluntodev()\n");
+	iscsi_portal_group_t *tpg;
+	iscsi_tiqn_t *tiqn;
+	se_lun_t *lun_p;
+	struct config_item *lun_ci, *tpg_ci, *tiqn_ci;
+	char *str, *endptr;
+	u32 lun;
+	int ret = 0;
+	unsigned short int tpgt;
+
+	if (!(str = strstr(name, "_"))) { 
+		printk(KERN_ERR "Unable to locate \'_\" in \"lun_$LUN_NUMBER\"\n");
+		return(NULL);
+	}
+	str++; /* Advance over _ delim.. */
+	lun = simple_strtoul(str, &endptr, 0);
+
+	if (!(lun_ci = &group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item np_ci\n");
+		return(NULL);
+	}
+	if (!(tpg_ci = &lun_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tpg_ci\n");
+		return(NULL);
+	}
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return(NULL);
+	}
+	/*
+	 * Get the u16 tpgt from tpg_ci..
+	 */
+	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
+	if (ret != 0) 
+		return(NULL);
+
+	printk("LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu LUN: %u\n",
+			config_item_name(tiqn_ci), tpgt, lun);
+
+	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
+                                &tiqn, tpgt, 0)))
+		return(NULL);
+
+	if (!(lun_p = iscsi_get_lun_from_tpg(tpg, lun)))
+		goto out;
+
+	config_group_init_type_name(&lun_p->lun_group, name, &lio_target_port_cit);
+
+	iscsi_put_tpg(tpg);
+	return(&lun_p->lun_group);
+out:
+	iscsi_put_tpg(tpg);
 	return(NULL);
 }
 
-static void lio_target_call_dellunfromdev (
+static void lio_target_lun_drop_item (
         struct config_group *group,
         struct config_item *item)
 {
-	printk("lio_target_call_dellunfromdev()\n");
+	se_lun_t *lun = container_of(to_config_group(item), se_lun_t, lun_group);
+	struct config_item *lun_ci, *tpg_ci, *tiqn_ci;
+	int ret = 0;
+	unsigned short int tpgt;
+
+	if (!(lun_ci = &group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item np_ci\n");
+		return;
+	}
+	if (!(tpg_ci = &lun_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tpg_ci\n");
+		return;
+	}
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return;
+	}
+
+	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
+	if (ret != 0)
+		return;
+
+	printk("LIO_Target_ConfigFS: DEREGISTER -> %s TPGT: %hu LUN: %u\n",
+			config_item_name(tiqn_ci), tpgt, lun->iscsi_lun);
+
+	config_item_put(item);
 	return;
 }
 
 static struct configfs_group_operations lio_target_lun_group_ops = {
-	.make_group	= lio_target_call_addluntodev,
-	.drop_item	= lio_target_call_dellunfromdev,
+	.make_group	= lio_target_lun_make_group,
+	.drop_item	= lio_target_lun_drop_item,
 };
 
 static struct config_item_type lio_target_lun_cit = {
@@ -340,49 +611,123 @@ static struct config_item_type lio_target_lun_cit = {
 
 // Start items for lio_target_tpg_cit
 
-static ssize_t lio_target_tpg_attr_show (struct config_item *item,
-                                      struct configfs_attribute *attr,
-                                      char *page)
+static ssize_t lio_target_store_tpg_control (void *p, const char *page, size_t count)
 {
-        return(sprintf(page, "Linux-iSCSI.org Target "PYX_ISCSI_VERSION""
-                " on %s/%s on "UTS_RELEASE"\n", utsname()->sysname,
-                utsname()->machine));
+	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
+
+	printk("lio_target_store_tpg_control(): %s\n", page);
+	return(count);
+}
+
+static struct lio_target_configfs_attribute lio_target_attr_tpg_control = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "tpg_control",
+		    .ca_mode = S_IWUSR },
+	.show	= NULL,
+	.store	= lio_target_store_tpg_control,
+};
+
+static ssize_t lio_target_store_tpg_enable (void *p, const char *page, size_t count)
+{
+	iscsi_portal_group_t *tpg_p = (iscsi_portal_group_t *)p, *tpg;
+	iscsi_tiqn_t *tiqn;
+	struct config_item *tpg_ci, *tiqn_ci;
+	char *endptr;
+	u32 op;
+	int ret = 0;;
+
+	op = simple_strtoul(page, &endptr, 0);	
+	if ((op != 1) && (op != 0)) {
+		printk(KERN_ERR "Illegal value for tpg_enable: %u\n", op);
+		return(-EINVAL);
+	}
+
+	if (!(tpg_ci = &tpg_p->tpg_group.cg_item)) {
+		printk(KERN_ERR "Unable to locate tpg_ci\n");
+		return(-EINVAL);
+	}
+
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return(-EINVAL);
+	}
+
+	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
+			&tiqn, tpg_p->tpgt, 0)))
+		return(-EINVAL);
+
+	if (op) {
+#warning WARNING: tpg_enable uses #warning Currently uses generate_node_acls=1,cache_dynamic_acls=1,demo_mode_lun_access=1
+		ISCSI_TPG_ATTRIB(tpg)->generate_node_acls = 1;
+		ISCSI_TPG_ATTRIB(tpg)->cache_dynamic_acls = 1;
+		ISCSI_TPG_ATTRIB(tpg)->demo_mode_lun_access = 1;
+
+		if ((ret = iscsi_tpg_enable_portal_group(tpg)) < 0)
+			goto out;
+	} else {
+#warning FIXME: For disabletpg, sssumes force=1 for now..
+		if ((ret = iscsi_tpg_disable_portal_group(tpg, 1)) < 0)
+			goto out;
+	}
+
+	iscsi_put_tpg(tpg);
+	return(count);
+out:
+	iscsi_put_tpg(tpg);
+	return(-EINVAL);
+}
+
+static struct lio_target_configfs_attribute lio_target_attr_tpg_enable = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "tpg_enable",
+		    .ca_mode = S_IWUSR },
+	.show	= NULL,
+	.store	= lio_target_store_tpg_enable,
+};
+
+static struct configfs_attribute *lio_target_tpg_attrs[] = {
+	&lio_target_attr_tpg_control.attr,
+	&lio_target_attr_tpg_enable.attr,
+};
+
+static ssize_t lio_target_tpg_show (struct config_item *item,
+                                    struct configfs_attribute *attr,
+                                    char *page)
+{
+	iscsi_portal_group_t *tpg = container_of(
+			to_config_group(item), iscsi_portal_group_t, tpg_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of( 
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->show))
+		 return(-EINVAL);
+
+	return(lt_attr->show((void *)tpg, page));
+}
+
+static ssize_t lio_target_tpg_store (struct config_item *item,
+				     struct configfs_attribute *attr,
+				     const char *page, size_t count)
+{
+	iscsi_portal_group_t *tpg = container_of(
+			to_config_group(item), iscsi_portal_group_t, tpg_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of( 
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->store))
+		return(-EINVAL);
+
+	return(lt_attr->store((void *)tpg, page, count));
 }
 
 static struct configfs_item_operations lio_target_tpg_item_ops = {
-        .show_attribute = lio_target_tpg_attr_show,
+        .show_attribute		= lio_target_tpg_show,
+	.store_attribute	= lio_target_tpg_store,
 };
 
-static struct config_group *lio_target_tpg_make_group (
-        struct config_group *group,
-        const char *name)
-{
-	printk("lio_target_tpg_make_group() called\n");
-	return(NULL);
-}
-
-static void lio_target_tpg_drop_item (
-        struct config_group *group,
-        struct config_item *item)
-{
-        printk("lio_target_tpg_drop_item() called\n");
-        return;
-}
-
-static struct configfs_group_operations lio_target_tpg_group_ops = {
-        .make_group     = &lio_target_tpg_make_group,
-        .drop_item      = &lio_target_tpg_drop_item,
-};
-#if 0
-static struct configfs_attribute *lio_target_tpg_item_attrs[] = {
-        &lio_target_tpg_attr_show,
-        NULL,
-};
-#endif
 static struct config_item_type lio_target_tpg_cit = {
         .ct_item_ops    = &lio_target_tpg_item_ops,
-        .ct_group_ops   = &lio_target_tpg_group_ops,
-//      .ct_attrs       = lio_target_tpg_item_attrs,
+	.ct_attrs       = lio_target_tpg_attrs,
         .ct_owner       = THIS_MODULE,
 };
 
@@ -442,10 +787,8 @@ static struct config_group *lio_target_tiqn_addtpg (
 	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci), &tiqn, tpgt, 1)))
 		return(NULL);
 
-	if (!(tpg_cg = kzalloc(sizeof(struct config_group), GFP_KERNEL))) {
-		iscsi_put_tpg(tpg);
-		return(ERR_PTR(-ENOMEM));
-	}
+	tpg_cg = &tpg->tpg_group;
+
 	/*
 	 * Create default configfs groups for iscsi_portal_group_t..
 	 */
@@ -471,7 +814,6 @@ static struct config_group *lio_target_tiqn_addtpg (
 	return(tpg_cg);
 out:	
 	kfree(tpg_cg->default_groups);
-	kfree(tpg_cg);
 	iscsi_put_tpg(tpg);
 	return(NULL);
 }
@@ -663,7 +1005,7 @@ extern void iscsi_target_deregister_configfs (void)
 	
 	target_fabric_configfs_deregister(lio_target_fabric_configfs);	
 	lio_target_fabric_configfs = NULL;
-	printk("LIO_TARGET[0] - Cleared lio_target_fabric_configfs..\n");
+	printk("LIO_TARGET[0] - Cleared lio_target_fabric_configfs\n");
 
 	return;
 }
