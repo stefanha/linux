@@ -1,11 +1,12 @@
 /*********************************************************************************
  * Filename:  iscsi_target_file.c
  *
- * This file contains the iSCSI <-> FILEIO transport specific functions.
+ * This file contains the Storage Engine <-> FILEIO transport specific functions.
  *
  * Copyright (c) 2005 PyX Technologies, Inc.
  * Copyright (c) 2005-2006 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -83,10 +84,10 @@ extern int fd_attach_hba (
 	hba->hba_id = hi->hba_id;
 	hba->transport = &fileio_template;
 
-	PYXPRINT("iSCSI_HBA[%d] - %s FILEIO HBA Driver %s for iSCSI"
-		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR, FD_VERSION, PYX_ISCSI_VERSION);
-	
-	PYXPRINT("iSCSI_HBA[%d] - Attached FILEIO HBA: %u to iSCSI Transport with"
+	PYXPRINT("CORE_HBA[%d] - %s FILEIO HBA Driver %s on"
+		" Generic Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR,
+		FD_VERSION, PYX_ISCSI_VERSION);
+	PYXPRINT("CORE_HBA[%d] - Attached FILEIO HBA: %u to Generic Target Core with"
 		" TCQ Depth: %d MaxSectors: %u\n", hba->hba_id, fd_host->fd_host_id,
 		atomic_read(&hba->max_queue_depth), FD_MAX_SECTORS);
 
@@ -107,7 +108,7 @@ extern int fd_detach_hba (se_hba_t *hba)
 	}
 	fd_host = (fd_host_t *) hba->hba_ptr;
 
-	PYXPRINT("iSCSI_HBA[%d] - Detached FILEIO HBA: %u from iSCSI Transport\n",
+	PYXPRINT("CORE_HBA[%d] - Detached FILEIO HBA: %u from Generic Target Core\n",
 			hba->hba_id, fd_host->fd_host_id);
 
 	kfree(fd_host);
@@ -168,38 +169,52 @@ extern int fd_release_phydevice (se_device_t *dev)
 	return(0);
 }
 
+extern void *fd_allocate_virtdevice (se_hba_t *hba, const char *name)
+{
+	fd_dev_t *fd_dev;
+	fd_host_t *fd_host = (fd_host_t *) hba->hba_ptr;
+
+	if (!(fd_dev = (fd_dev_t *) kzalloc(sizeof(fd_dev_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate memory for fd_dev_t\n");
+		return(NULL);
+	}
+
+	fd_dev->fd_host = fd_host;
+	
+	printk("FILEIO: Allocated fd_dev for %p\n", name);
+
+	return(fd_dev);
+}
+
+extern se_device_t *fd_add_device_to_list (se_hba_t *, fd_dev_t *, int);
+
 /*	fd_create_virtdevice(): (Part of se_subsystem_api_t template)
  *
  *
  */
-extern int fd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
+extern se_device_t *fd_create_virtdevice (se_hba_t *hba, void *p)
 {
 	char *dev_p = NULL;
 	se_device_t *dev;
-	fd_dev_t *fd_dev;
-	fd_host_t *fd_host = (fd_host_t *) iscsi_hba->hba_ptr;
+	fd_dev_t *fd_dev = (fd_dev_t *) p;
+	fd_host_t *fd_host = (fd_host_t *) hba->hba_ptr;
 	mm_segment_t old_fs;
 	struct block_device *bd = NULL;
 	struct file *file;
-	int flags, ret = 0;
-
+	int dev_flags = 0, flags, ret = 0;
+#if 0
 	if (strlen(di->fd_dev_name) > FD_MAX_DEV_NAME) {
 		TRACE_ERROR("di->fd_dev_name exceeds FD_MAX_DEV_NAME: %d\n",
 				FD_MAX_DEV_NAME);
 		return(0);
 	}
 
-	if (!(fd_dev = (fd_dev_t *) kmalloc(sizeof(fd_dev_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate memory for fd_dev_t\n");
-		return(0);
-	}
-	memset(fd_dev, 0, sizeof(fd_dev_t));
-
 	fd_dev->fd_dev_id = di->fd_device_id;
 	fd_dev->fd_host = fd_host;
 	fd_dev->fd_dev_size = di->fd_device_size;
 	fd_dev->fd_claim_bd = di->fd_claim_bd;
 	sprintf(fd_dev->fd_dev_name, "%s", di->fd_dev_name);
+#endif
 	
 	old_fs = get_fs();
 	set_fs(get_ds());
@@ -211,12 +226,14 @@ extern int fd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 				IS_ERR(dev_p));
 		goto fail;
 	}
-	
+#if 0	
 	if (di->no_create_file)
 		flags = O_RDWR | O_LARGEFILE;
 	else
 		flags = O_RDWR | O_CREAT | O_LARGEFILE;
-
+#else
+	flags = O_RDWR | O_CREAT | O_LARGEFILE;
+#endif
 //	flags |= O_DIRECT;
 	
 	file = filp_open(dev_p, flags, 0600);
@@ -234,6 +251,8 @@ extern int fd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 	 *
 	 * Otherwise, we use the passed fd_size= from target-ctl.
 	 */
+#warning FIXME: Complete fd_dev->fd_claim_bd = 1 support
+#if 0
 	if (fd_dev->fd_claim_bd) {
 		fd_dev->fd_major = di->iblock_major;
 		fd_dev->fd_minor = di->iblock_minor;
@@ -261,9 +280,9 @@ extern int fd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 		if ((bd = __linux_blockdevice_claim(fd_dev->fd_major, fd_dev->fd_minor,
 				(void *)fd_dev, &ret)))
 			if (ret == 1)
-				di->dev_flags |= DF_CLAIMED_BLOCKDEV;
+				dev_flags |= DF_CLAIMED_BLOCKDEV;
 			else if (di->force) {
-				di->dev_flags |= DF_READ_ONLY;	
+				dev_flags |= DF_READ_ONLY;	
 				PYXPRINT("FILEIO: DF_READ_ONLY for Major:Minor - %d:%d\n",
 					di->iblock_major, di->iblock_minor);
 			} else {	
@@ -275,7 +294,7 @@ extern int fd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 			goto fail;
 
 		fd_dev->fd_bd = bd;
-		if (di->dev_flags & DF_CLAIMED_BLOCKDEV)
+		if (dev_flags & DF_CLAIMED_BLOCKDEV)
 			fd_dev->fd_bd->bd_contains = bd;
 
 		/*
@@ -287,48 +306,40 @@ extern int fd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
 				fd_dev->fd_dev_size);
 #endif
 	}
-
-	di->dev_flags |= DF_DISABLE_STATUS_THREAD;
+#endif
+	dev_flags |= DF_DISABLE_STATUS_THREAD;
 	
-	if (!(dev = fd_add_device_to_list(iscsi_hba, fd_dev, di)))
+	if (!(dev = fd_add_device_to_list(hba, fd_dev, dev_flags)))
 		goto fail;
 
+	fd_dev->fd_dev_id = fd_host->fd_host_dev_id_count++;
 	fd_dev->fd_queue_depth = dev->queue_depth;
 	
-	PYXPRINT("iSCSI_FILE[%u] - Added LIO FILEIO Device ID: %u at %s,"
+	PYXPRINT("CORE_FILE[%u] - Added LIO FILEIO Device ID: %u at %s,"
 		" %llu total bytes\n", fd_host->fd_host_id, fd_dev->fd_dev_id,
 			fd_dev->fd_dev_name, fd_dev->fd_dev_size);
 	
 	putname(dev_p);
 	
-	return(1);
-
+	return(dev);
 fail:
 	if (fd_dev->fd_file) {
 		filp_close(fd_dev->fd_file, NULL);
 		fd_dev->fd_file = NULL;
 	}
-	
 	putname(dev_p);
 	kfree(fd_dev);
-	
-	return(0);
+	return(NULL);
 }
 
 /*	fd_add_device_to_list():
  *
  *
  */
-extern se_device_t *fd_add_device_to_list (se_hba_t *iscsi_hba, void *fd_dev_p, se_devinfo_t *di)
+extern se_device_t *fd_add_device_to_list (se_hba_t *hba, fd_dev_t *fd_dev, int dev_flags)
 {
-	se_device_t *dev;
-	fd_dev_t *fd_dev = (fd_dev_t *) fd_dev_p;
-	
-	if (!(dev = transport_add_device_to_iscsi_hba(iscsi_hba, &fileio_template,
-				di->dev_flags, (void *)fd_dev)))
-		return(NULL);
-
-	return(dev);
+	return(transport_add_device_to_iscsi_hba(hba, &fileio_template,
+				dev_flags, (void *)fd_dev));
 }
 
 /*	fd_activate_device(): (Part of se_subsystem_api_t template)
@@ -340,7 +351,7 @@ extern int fd_activate_device (se_device_t *dev)
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 	fd_host_t *fd_host = fd_dev->fd_host;
 	
-	PYXPRINT("iSCSI_FILE[%u] - Activating Device with TCQ: %d at FILEIO"
+	PYXPRINT("CORE_FILE[%u] - Activating Device with TCQ: %d at FILEIO"
 		" Device ID: %d\n", fd_host->fd_host_id, fd_dev->fd_queue_depth,
 		fd_dev->fd_dev_id);
 
@@ -356,7 +367,7 @@ extern void fd_deactivate_device (se_device_t *dev)
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 	fd_host_t *fd_host = fd_dev->fd_host;
 
-	PYXPRINT("iSCSI_FILE[%u] - Deactivating Device with TCQ: %d at FILEIO"
+	PYXPRINT("CORE_FILE[%u] - Deactivating Device with TCQ: %d at FILEIO"
 		" Device ID: %d\n", fd_host->fd_host_id, fd_dev->fd_queue_depth,
 		fd_dev->fd_dev_id);
 
@@ -410,18 +421,16 @@ extern int fd_check_ghost_id (se_hbainfo_t *hi)
  *
  *
  */
-extern void fd_free_device (se_device_t *dev)
+extern void fd_free_device (void *p)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
+	fd_dev_t *fd_dev = (fd_dev_t *) p;
 
 	if (fd_dev->fd_file) {
 		filp_close(fd_dev->fd_file, NULL);
 		fd_dev->fd_file = NULL;
 	}
 
-	transport_generic_release_phydevice(dev, 0);
 	kfree(fd_dev);
-
 	return;
 }
 
@@ -976,6 +985,77 @@ extern int fd_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int vi
 	return(0);
 }
 
+extern ssize_t fd_set_configfs_dev_params (se_hba_t *hba,
+					       se_subsystem_dev_t *se_dev,
+					       const char *page, ssize_t count)
+{
+	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
+	char *buf, *cur, *ptr, *ptr2, *endptr;
+	int params = 0;
+
+	if (!(buf = kzalloc(count, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
+		return(0);
+	}
+	memcpy(buf, page, count);
+	cur = buf;
+
+#warning FIXME: Finish UUID for FILEIO
+#warning FIXME: Finish major/minor for real backend blockdevice
+	while (cur) {
+		if (!(ptr = strstr(cur, "=")))
+			goto out;
+
+		*ptr = '\0';
+		ptr++;
+
+		if ((ptr2 = strstr(cur, "fd_dev_name"))) {
+			transport_check_dev_params_delim(ptr, &cur);
+			ptr = strstrip(ptr);
+			snprintf(fd_dev->fd_dev_name, FD_MAX_DEV_NAME, "%s", ptr);
+			PYXPRINT("FILEIO: Referencing Path: %s\n", fd_dev->fd_dev_name);
+			fd_dev->fbd_flags |= FBDF_HAS_PATH;
+			params++;
+		} else if ((ptr2 = strstr(cur, "fd_dev_size"))) {
+			transport_check_dev_params_delim(ptr, &cur);
+			fd_dev->fd_dev_size = simple_strtoull(ptr, &endptr, 0);
+			PYXPRINT("FILEIO: Referencing Size: %llu\n", fd_dev->fd_dev_size);
+			fd_dev->fbd_flags |= FBDF_HAS_SIZE;
+			params++;
+		} else
+			cur = NULL;
+	}
+
+out:
+	kfree(buf);
+	return((params) ? count : -EINVAL);
+}
+
+#warning FIXME: Finish major/minor for real backend blockdevice
+extern ssize_t fd_check_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev)
+{
+	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
+
+	if (!(fd_dev->fbd_flags & FBDF_HAS_PATH) ||
+	    !(fd_dev->fbd_flags & FBDF_HAS_SIZE)) {
+		TRACE_ERROR("Missing fd_dev_name= and fd_dev_size=\n");
+		return(-1);
+	}
+	
+	return(0);
+}
+
+extern void __fd_get_dev_info (fd_dev_t *, char *, int *);
+
+extern ssize_t fd_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev, char *page)
+{
+	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
+	int bl = 0;
+
+	__fd_get_dev_info(fd_dev, page, &bl);
+	return((ssize_t)bl);
+}
+
 extern int fd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_FD_DEVICE_ID)) {
@@ -1046,27 +1126,34 @@ extern void fd_get_hba_info (se_hba_t *hba, char *b, int *bl)
 
 extern void fd_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
-	fd_dev_t *fd = (fd_dev_t *) dev->dev_ptr;
+	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 
-	*bl += sprintf(b+*bl, "LIO FILEIO ID: %u", fd->fd_dev_id);
-	if (fd->fbd_flags & FBDF_HAS_MD_UUID) {
+	__fd_get_dev_info(fd_dev, b, bl);
+	return;
+}
+
+extern void __fd_get_dev_info (fd_dev_t *fd_dev, char *b, int *bl)
+{
+	*bl += sprintf(b+*bl, "LIO FILEIO ID: %u", fd_dev->fd_dev_id);
+	if (fd_dev->fbd_flags & FBDF_HAS_MD_UUID) {
 		*bl += sprintf(b+*bl, "  MD UUID: %x:%x:%x:%x\n",
-			fd->fbd_uu_id[0], fd->fbd_uu_id[1],
-			fd->fbd_uu_id[2], fd->fbd_uu_id[3]);
-	} else if (fd->fbd_flags & FBDF_HAS_LVM_UUID)
-		*bl += sprintf(b+*bl, "  LVM UUID: %s\n", fd->fbd_lvm_uuid);
-	else
-		*bl += sprintf(b+*bl, "  FILEIO Makeup: %s\n", TRANSPORT(dev)->name);
+			fd_dev->fbd_uu_id[0], fd_dev->fbd_uu_id[1],
+			fd_dev->fbd_uu_id[2], fd_dev->fbd_uu_id[3]);
+	} else if (fd_dev->fbd_flags & FBDF_HAS_LVM_UUID)
+		*bl += sprintf(b+*bl, "  LVM UUID: %s\n", fd_dev->fbd_lvm_uuid);
 
-	if (fd->fd_bd) {
-		struct block_device *bd = fd->fd_bd;
+	*bl += sprintf(b+*bl, "        File: %s  Size: %llu  ",
+		fd_dev->fd_dev_name, fd_dev->fd_dev_size);	
+
+	if (fd_dev->fd_bd) {
+		struct block_device *bd = fd_dev->fd_bd;
 		
-		*bl += sprintf(b+*bl, "        File: %s  Size: %llu  %s\n",
-				fd->fd_dev_name, fd->fd_dev_size,
+		*bl += sprintf(b+*bl, "%s\n",
 				(!bd->bd_contains) ? "" :
-				(bd->bd_holder == (fd_dev_t *)fd) ?
+				(bd->bd_holder == (fd_dev_t *)fd_dev) ?
 					"CLAIMED: FILEIO" : "CLAIMED: OS");
-	}
+	} else
+		*bl += sprintf(b+*bl, "\n");
 
 	return;
 }

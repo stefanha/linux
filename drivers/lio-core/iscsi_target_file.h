@@ -1,11 +1,12 @@
 /*********************************************************************************
  * Filename:  iscsi_target_file.h
  *
- * This file contains the iSCSI <-> FILEIO transport specific definitions and prototypes.
+ * This file contains the Storage Engine <-> FILEIO transport specific definitions and prototypes.
  *
  * Copyright (c) 2005 PyX Technologies, Inc.
  * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -53,13 +54,13 @@ extern int fd_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
 extern int fd_detach_hba (se_hba_t *);
 extern int fd_claim_phydevice (se_hba_t *, se_device_t *);
 extern int fd_release_phydevice (se_device_t *);
-extern int fd_create_virtdevice (se_hba_t *, se_devinfo_t *);
+extern void *fd_allocate_virtdevice (se_hba_t *, const char *);
+extern se_device_t *fd_create_virtdevice (se_hba_t *, void *);
 extern int fd_activate_device (se_device_t *);
 extern void fd_deactivate_device (se_device_t *);
 extern int fd_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int fd_check_ghost_id (se_hbainfo_t *);
-extern void fd_free_device (se_device_t *);
-extern se_device_t *fd_add_device_to_list (se_hba_t *, void *, se_devinfo_t *);
+extern void fd_free_device (void *);
 extern int fd_transport_complete (se_task_t *);
 extern void *fd_allocate_request (se_task_t *, se_device_t *);
 extern void fd_get_evpd_prod (unsigned char *, u32, se_device_t *);
@@ -67,6 +68,9 @@ extern void fd_get_evpd_sn (unsigned char *, u32, se_device_t *);
 extern int fd_do_task (se_task_t *);
 extern void fd_free_task (se_task_t *);
 extern int fd_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
+extern ssize_t fd_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
+extern ssize_t fd_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
+extern ssize_t fd_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
 extern int fd_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern int fd_check_virtdev_params (se_devinfo_t *, struct iscsi_target *);
 extern void fd_get_plugin_info (void *, char *, int *);
@@ -116,6 +120,8 @@ typedef struct fd_dev_sg_table_s {
 
 #define FBDF_HAS_MD_UUID	0x01
 #define FBDF_HAS_LVM_UUID	0x02
+#define FBDF_HAS_PATH		0x04
+#define FBDF_HAS_SIZE		0x08
 
 typedef struct fd_dev_s {
 	unsigned char	fbd_lvm_uuid[SE_LVM_UUID_LEN];
@@ -136,6 +142,7 @@ typedef struct fd_dev_s {
 } ____cacheline_aligned fd_dev_t;
 
 typedef struct fd_host_s {
+	u32		fd_host_dev_id_count;
 	u32		fd_host_id;		/* Unique FILEIO Host ID */
 } ____cacheline_aligned fd_host_t;
 
@@ -165,6 +172,7 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	detach_hba:		fd_detach_hba,			\
 	claim_phydevice:	fd_claim_phydevice,		\
 	release_phydevice:	fd_release_phydevice,		\
+	allocate_virtdevice:	fd_allocate_virtdevice,		\
 	create_virtdevice:	fd_create_virtdevice,		\
 	activate_device:	fd_activate_device,		\
 	deactivate_device:	fd_deactivate_device,		\
@@ -176,6 +184,9 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	do_task:		fd_do_task,			\
 	free_task:		fd_free_task,			\
 	check_hba_params:	fd_check_hba_params,		\
+	check_configfs_dev_params: fd_check_configfs_dev_params, \
+	set_configfs_dev_params: fd_set_configfs_dev_params,	\
+	show_configfs_dev_params: fd_show_configfs_dev_params,	\
 	check_dev_params:	fd_check_dev_params,		\
 	check_virtdev_params:	fd_check_virtdev_params,	\
 	get_plugin_info:	fd_get_plugin_info,		\
