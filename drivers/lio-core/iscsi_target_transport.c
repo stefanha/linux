@@ -731,6 +731,21 @@ extern se_plugin_t *transport_core_get_plugin_by_name (const char *name)
 	return(NULL);
 }
 
+extern void transport_check_dev_params_delim (char *ptr, char **cur)
+{
+	char *ptr2;
+
+	if (ptr) {
+		if ((ptr2 = strstr(ptr, ","))) {
+			*ptr2 = '\0';
+			*cur = (ptr2 + 1); /* Skip over comma */
+		} else
+			*cur = NULL;
+	}
+
+	return;
+}
+
 /*
  * Called with T_TASK(cmd)->t_state_lock held.
  */
@@ -1993,6 +2008,9 @@ extern void transport_generic_release_phydevice (se_device_t *dev, int check_psc
  */
 extern void transport_generic_free_device (se_device_t *dev)
 {
+	if (!(dev->dev_ptr))
+		return;
+
 	transport_generic_deactivate_device(dev);
 	
 	transport_generic_release_phydevice(dev, 0);

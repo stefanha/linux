@@ -1246,6 +1246,7 @@ typedef struct se_lun_s {
 	struct iscsi_node_acl_s *lun_reserved_node_acl;
 	se_device_t		*iscsi_dev;
 	void			*lun_type_ptr;
+	struct config_group	lun_group;
 	struct se_obj_lun_type_s *lun_obj_api;
 	struct se_port_s	*lun_sep;
 	int (*persistent_reservation_check)(iscsi_cmd_t *);
@@ -1324,6 +1325,7 @@ typedef struct iscsi_portal_group_s {
 	iscsi_node_acl_t	*acl_node_tail;	/* Pointer to end of Initiator ACL list */
 	struct config_group	tpg_np_group;
 	struct config_group	tpg_lun_group;
+	struct config_group	tpg_group;
 	struct semaphore		tpg_access_sem;
 	struct semaphore		np_login_sem;
 	iscsi_tpg_attrib_t	tpg_attrib;

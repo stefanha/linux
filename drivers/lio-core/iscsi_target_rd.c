@@ -1,11 +1,12 @@
 /*********************************************************************************
  * Filename:  iscsi_target_rd.c
  *
- * This file contains the iSCSI <-> Ramdisk transport specific functions.
+ * This file contains the Storage Engine <-> Ramdisk transport specific functions.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -82,10 +83,10 @@ extern int rd_attach_hba (
 	hba->hba_id = hi->hba_id;
 	hba->transport = (hi->hba_type == RAMDISK_DR) ? &rd_dr_template : &rd_mcp_template;
 
-	PYXPRINT("iSCSI_HBA[%d] - %s Ramdisk HBA Driver %s for iSCSI"
-		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR, RD_HBA_VERSION, PYX_ISCSI_VERSION);
-	
-	PYXPRINT("iSCSI_HBA[%d] - Attached Ramdisk HBA: %u to iSCSI Transport with"
+	PYXPRINT("CORE_HBA[%d] - %s Ramdisk HBA Driver %s on"
+		" Generic Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR,
+		RD_HBA_VERSION, PYX_ISCSI_VERSION);
+	PYXPRINT("CORE_HBA[%d] - Attached Ramdisk HBA: %u to Generic Target Core"
 		" TCQ Depth: %d MaxSectors: %u\n", hba->hba_id, rd_host->rd_host_id,
 		atomic_read(&hba->max_queue_depth), RD_MAX_SECTORS);
 
@@ -107,7 +108,7 @@ extern int rd_detach_hba (se_hba_t *hba)
 
 	rd_host = (rd_host_t *) hba->hba_ptr;
 
-        PYXPRINT("iSCSI_HBA[%d] - Detached Ramdisk HBA: %u from iSCSI Transport\n",
+        PYXPRINT("CORE_HBA[%d] - Detached Ramdisk HBA: %u from Generic Target Core\n",
 			hba->hba_id, rd_host->rd_host_id);
 	
 	kfree(rd_host);
@@ -146,7 +147,7 @@ extern void rd_release_device_space (rd_dev_t *rd_dev)
 		kfree(sg);
 	}
 
-	PYXPRINT("iSCSI_RD[%u] - Released device space for Ramdisk Device ID: %u,"
+	PYXPRINT("CORE_RD[%u] - Released device space for Ramdisk Device ID: %u,"
 		" pages %u in %u tables total bytes %lu\n", rd_dev->rd_host->rd_host_id,
 			rd_dev->rd_dev_id, page_count, rd_dev->sg_table_count,
 			(unsigned long)page_count * PAGE_SIZE);
@@ -224,85 +225,103 @@ static int rd_build_device_space (rd_dev_t *rd_dev)
 		total_sg_needed -= sg_per_table;
 	}
 
-	PYXPRINT("iSCSI_RD[%u] - Built Ramdisk Device ID: %u space of %u pages"
+	PYXPRINT("CORE_RD[%u] - Built Ramdisk Device ID: %u space of %u pages"
 		" in %u tables\n", rd_dev->rd_host->rd_host_id, rd_dev->rd_dev_id,
 			rd_dev->rd_page_count, rd_dev->sg_table_count);
 	
 	return(0);
 }
 
+static void *rd_allocate_virtdevice (se_hba_t *hba, const char *name, int rd_direct)
+{
+	rd_dev_t *rd_dev;
+	rd_host_t *rd_host = (rd_host_t *) hba->hba_ptr;
+
+	if (!(rd_dev = (rd_dev_t *) kzalloc(sizeof(rd_dev_t), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate memory for rd_dev_t\n");
+		return(NULL);
+	}
+
+	rd_dev->rd_host = rd_host;
+	rd_dev->rd_direct = rd_direct;
+
+	return(rd_dev);
+}
+
+extern void *rd_DIRECT_allocate_virtdevice (se_hba_t *hba, const char *name)
+{
+	return(rd_allocate_virtdevice(hba, name, 1));
+}
+
+extern void *rd_MEMCPY_allocate_virtdevice (se_hba_t *hba, const char *name)
+{
+	return(rd_allocate_virtdevice(hba, name, 0));
+}
+
+extern se_device_t *rd_add_device_to_list (se_hba_t *, rd_dev_t *, int);
+
 /*	rd_create_virtdevice():
  *
  *
  */
-static int rd_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di, int rd_direct)
+static se_device_t *rd_create_virtdevice (se_hba_t *hba, void *p, int rd_direct)
 {
 	se_device_t *dev;
-	rd_dev_t *rd_dev;
-	rd_host_t *rd_host = (rd_host_t *) iscsi_hba->hba_ptr;
+	rd_dev_t *rd_dev = (rd_dev_t *) p;
+	rd_host_t *rd_host = (rd_host_t *) hba->hba_ptr;
+	int dev_flags = 0;
 
-	if (!(rd_dev = (rd_dev_t *) kmalloc(sizeof(rd_dev_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate memory for rd_dev_t\n");
-		return(0);
-	}
-	memset(rd_dev, 0, sizeof(rd_dev_t));
-
+#if 0
 	rd_dev->rd_dev_id = di->rd_device_id;
 	rd_dev->rd_page_count = di->rd_pages;
 	rd_dev->rd_host = rd_host;
 	rd_dev->rd_direct = rd_direct;
-
-	di->dev_flags |= DF_DISABLE_STATUS_THREAD;
+#endif
+	dev_flags |= DF_DISABLE_STATUS_THREAD;
 	if (rd_dev->rd_direct)
-		di->dev_flags |= DF_TRANSPORT_DMA_ALLOC;
-	
+		dev_flags |= DF_TRANSPORT_DMA_ALLOC;
+
 	if (rd_build_device_space(rd_dev) < 0)
 		goto fail;
 	
-	if (!(dev = rd_add_device_to_list(iscsi_hba, rd_dev, di)))
+	if (!(dev = rd_add_device_to_list(hba, rd_dev, dev_flags)))
 		goto fail;
 
+	rd_dev->rd_dev_id = rd_host->rd_host_dev_id_count++;
 	rd_dev->rd_queue_depth = dev->queue_depth;
 	
-	PYXPRINT("iSCSI_RD[%u] - Added iSBE %s Ramdisk Device ID: %u of %u pages in"
+	PYXPRINT("CORE_RD[%u] - Added LIO %s Ramdisk Device ID: %u of %u pages in"
 		" %u tables, %lu total bytes\n", rd_host->rd_host_id, (!rd_dev->rd_direct) ?
 		"MEMCPY" : "DIRECT", rd_dev->rd_dev_id, rd_dev->rd_page_count,
 		rd_dev->sg_table_count, (unsigned long)(rd_dev->rd_page_count * PAGE_SIZE));
 
-	return(1);
+	return(dev);
 
 fail:
 	rd_release_device_space(rd_dev);
 	kfree(rd_dev);
-
-	return(0);
+	return(NULL);
 }
 
-extern int rd_DIRECT_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
+extern se_device_t *rd_DIRECT_create_virtdevice (se_hba_t *hba, void *p)
 {
-	return(rd_create_virtdevice(iscsi_hba, di, 1));	
+	return(rd_create_virtdevice(hba, p, 1));	
 }
 
-extern int rd_MEMCPY_create_virtdevice (se_hba_t *iscsi_hba, se_devinfo_t *di)
+extern se_device_t *rd_MEMCPY_create_virtdevice (se_hba_t *hba, void *p)
 {
-	return(rd_create_virtdevice(iscsi_hba, di, 0));
+	return(rd_create_virtdevice(hba, p, 0));
 }
 
 /*	rd_add_device_to_list():
  *
  *
  */
-extern se_device_t *rd_add_device_to_list (se_hba_t *iscsi_hba, void *rd_dev_p, se_devinfo_t *di)
+extern se_device_t *rd_add_device_to_list (se_hba_t *hba, rd_dev_t *rd_dev, int dev_flags)
 {
-	se_device_t *dev;
-	rd_dev_t *rd_dev = (rd_dev_t *) rd_dev_p;
-	
-	if (!(dev = transport_add_device_to_iscsi_hba(iscsi_hba,
+	return(transport_add_device_to_iscsi_hba(hba,
 			(rd_dev->rd_direct) ? &rd_dr_template : &rd_mcp_template,
-			di->dev_flags, (void *)rd_dev)))
-		return(NULL);
-
-	return(dev);
+			dev_flags, (void *)rd_dev));
 }
 
 /*	rd_activate_device(): (Part of se_subsystem_api_t template)
@@ -314,7 +333,7 @@ extern int rd_activate_device (se_device_t *dev)
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 	rd_host_t *rd_host = rd_dev->rd_host;
 	
-	PYXPRINT("iSCSI_RD[%u] - Activating Device with TCQ: %d at Ramdisk"
+	PYXPRINT("CORE_RD[%u] - Activating Device with TCQ: %d at Ramdisk"
 		" Device ID: %d\n", rd_host->rd_host_id, rd_dev->rd_queue_depth,
 		rd_dev->rd_dev_id);
 
@@ -330,7 +349,7 @@ extern void rd_deactivate_device (se_device_t *dev)
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 	rd_host_t *rd_host = rd_dev->rd_host;
 
-	PYXPRINT("iSCSI_RD[%u] - Deactivating Device with TCQ: %d at Ramdisk"
+	PYXPRINT("CORE_RD[%u] - Deactivating Device with TCQ: %d at Ramdisk"
 		" Device ID: %d\n", rd_host->rd_host_id, rd_dev->rd_queue_depth,
 		rd_dev->rd_dev_id);
 
@@ -394,13 +413,12 @@ extern int rd_dr_check_ghost_id (se_hbainfo_t *hi)
  *
  *
  */
-extern void rd_free_device (se_device_t *dev)
+extern void rd_free_device (void *p)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
+	rd_dev_t *rd_dev = (rd_dev_t *) p;
 
 	rd_release_device_space(rd_dev);
 	kfree(rd_dev);
-
 	return;
 }
 
@@ -1119,6 +1137,67 @@ extern int rd_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int vi
 	return(0);
 }
 
+extern ssize_t rd_set_configfs_dev_params (se_hba_t *hba,
+						se_subsystem_dev_t *se_dev,
+						const char *page, ssize_t count)
+{
+	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
+	char *buf, *cur, *ptr, *ptr2, *endptr;
+	int params = 0;
+
+	if (!(buf = kzalloc(count, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
+		return(0);
+	}
+	memcpy(buf, page, count);
+	cur = buf;
+
+	while (cur) {
+		if (!(ptr = strstr(cur, "=")))
+			goto out;
+
+		*ptr = '\0';
+		ptr++;
+
+		if ((ptr2 = strstr(cur, "rd_pages"))) {
+			transport_check_dev_params_delim(ptr, &cur);
+			rd_dev->rd_page_count =  simple_strtoul(ptr, &endptr, 0);
+			PYXPRINT("RAMDISK: Referencing Page Count: %u\n",
+				rd_dev->rd_page_count);
+			rd_dev->rd_flags |= RDF_HAS_PAGE_COUNT;
+			params++;
+		} else
+			cur = NULL;
+	}
+
+out:
+	kfree(buf);
+	return((params) ? count : -EINVAL);
+}
+
+extern ssize_t rd_check_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev)
+{
+	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
+
+	if (!(rd_dev->rd_flags & RDF_HAS_PAGE_COUNT)) {
+		TRACE_ERROR("Missing rd_pages= parameter\n");
+		return(-1);
+	}
+
+	return(0);
+}
+
+extern void __rd_get_dev_info (rd_dev_t *, char *, int *);
+
+extern ssize_t rd_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev, char *page)
+{
+	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
+	int bl = 0;
+	
+	 __rd_get_dev_info(rd_dev, page, &bl);
+	return((ssize_t)bl);
+}
+
 extern int rd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_RD_DEVICE_ID)) {
@@ -1170,12 +1249,18 @@ extern void rd_get_hba_info (se_hba_t *hba, char *b, int *bl)
 
 extern void rd_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
-	struct rd_dev_s *rd = (struct rd_dev_s *) dev->dev_ptr;
+	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 
-	*bl += sprintf(b+*bl, "iSBE RamDisk ID: %u  RamDisk Makeup: %s\n",
-			rd->rd_dev_id, TRANSPORT(dev)->name);
+	__rd_get_dev_info(rd_dev, b, bl);
+	return;
+}
+
+extern void __rd_get_dev_info (rd_dev_t *rd_dev, char *b, int *bl)
+{
+	*bl += sprintf(b+*bl, "LIO RamDisk ID: %u  RamDisk Makeup: %s\n",
+			rd_dev->rd_dev_id, (rd_dev->rd_direct) ? "rd_direct" : "rd_mcp");
 	*bl += sprintf(b+*bl, "        PAGES/PAGE_SIZE: %u*%lu  SG_table_count: %u\n",
-			rd->rd_page_count, PAGE_SIZE, rd->sg_table_count);
+			rd_dev->rd_page_count, PAGE_SIZE, rd_dev->sg_table_count);
 
 	return;
 }

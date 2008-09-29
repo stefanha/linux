@@ -91,11 +91,11 @@ extern int iblock_attach_hba (
 	hba->hba_id = hi->hba_id;
 	hba->transport = &iblock_template;
 
-	PYXPRINT("CORE_HBA[%d] - %s iBlock HBA Driver %s for iSCSI"
-		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR,
-			IBLOCK_VERSION, PYX_ISCSI_VERSION);
+	PYXPRINT("CORE_HBA[%d] - %s iBlock HBA Driver %s on"
+		" Generic Target Core Stack %s\n", hba->hba_id,
+		PYX_ISCSI_VENDOR, IBLOCK_VERSION, PYX_ISCSI_VERSION);
 
-	PYXPRINT("CORE_HBA[%d] - Attached iBlock HBA: %u to iSCSI Transport with"
+	PYXPRINT("CORE_HBA[%d] - Attached iBlock HBA: %u to Generic Target Core"
 		" TCQ Depth: %d\n", hba->hba_id, ib_host->iblock_host_id,
 		atomic_read(&hba->max_queue_depth));
 
@@ -116,7 +116,7 @@ extern int iblock_detach_hba (se_hba_t *hba)
 	}
 	ib_host = (iblock_hba_t *) hba->hba_ptr;
 
-	PYXPRINT("CORE_HBA[%d] - Detached iBlock HBA: %u from iSCSI Transport\n",
+	PYXPRINT("CORE_HBA[%d] - Detached iBlock HBA: %u Generic Target Core\n",
 			hba->hba_id, ib_host->iblock_host_id);
 
 	kfree(ib_host);
@@ -258,7 +258,7 @@ extern int iblock_activate_device (se_device_t *dev)
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 	iblock_hba_t *ib_hba = ib_dev->ibd_host;
 
-	PYXPRINT("iSCSI_iBLOCK[%u] - Activating Device with TCQ: %d at Major:"
+	PYXPRINT("CORE_iBLOCK[%u] - Activating Device with TCQ: %d at Major:"
 		" %d Minor %d\n", ib_hba->iblock_host_id, ib_dev->ibd_depth,
 			ib_dev->ibd_major, ib_dev->ibd_minor);
 
@@ -274,7 +274,7 @@ extern void iblock_deactivate_device (se_device_t *dev)
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 	iblock_hba_t *ib_hba = ib_dev->ibd_host;
 
-	PYXPRINT("iSCSI_iBLOCK[%u] - Deactivating Device with TCQ: %d at Major:"
+	PYXPRINT("CORE_iBLOCK[%u] - Deactivating Device with TCQ: %d at Major:"
 		" %d Minor %d\n", ib_hba->iblock_host_id, ib_dev->ibd_depth,
 			ib_dev->ibd_major, ib_dev->ibd_minor);
 
@@ -331,12 +331,7 @@ extern void iblock_free_device (void *p)
 		bioset_free(ib_dev->ibd_bio_set);
 	}
 
-#warning FIXME: See if transport_generic_release_phydevice() can be removed from iblock_free_device()
-#if 0
-	transport_generic_release_phydevice(dev, 0);
-#endif
 	kfree(ib_dev);
-
 	return;
 }
 
@@ -539,28 +534,13 @@ extern int iblock_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, in
 	return(0);
 }
 
-static void iblock_check_dev_params_delim (char *ptr, char **cur)
-{
-	char *ptr2;	
-
-	if (ptr) {
-		if ((ptr2 = strstr(ptr, ","))) {
-			**cur = '\0';
-			*cur = (ptr2 + 1); /* Skip over comma */
-		} else
-			*cur = NULL;
-	}
-
-	return;
-}
-
 extern ssize_t iblock_set_configfs_dev_params (se_hba_t *hba,
 					       se_subsystem_dev_t *se_dev,
 					       const char *page, ssize_t count)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) se_dev->se_dev_su_ptr;
-	char *buf, *cur, *ptr, *endptr;
-	int ret = 0;
+	char *buf, *cur, *ptr, *ptr2, *endptr;
+	int params = 0, ret = 0;
 
 	if (!(buf = kzalloc(count, GFP_KERNEL))) {
 		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
@@ -570,12 +550,15 @@ extern ssize_t iblock_set_configfs_dev_params (se_hba_t *hba,
 	cur = buf;
 	
 	while (cur) {
+		if (!(ptr = strstr(cur, "=")))
+			goto out;
+
+		*ptr = '\0';
+		ptr++;
+
 #warning FIXME: md_uuid= parameter 
-		if ((ptr = strstr(cur, "md_uuid="))) {
-			ptr += 7; /* Skip to = */
-			*ptr = '\0';
-			ptr += 1;
-			iblock_check_dev_params_delim(ptr, &cur);
+		if ((ptr2 = strstr(cur, "md_uuid"))) {
+			transport_check_dev_params_delim(ptr, &cur);
 			ib_dev->ibd_uu_id[0] = 0;
 			ib_dev->ibd_uu_id[1] = 0;
 			ib_dev->ibd_uu_id[2] = 0;
@@ -585,53 +568,46 @@ extern ssize_t iblock_set_configfs_dev_params (se_hba_t *hba,
 				ib_dev->ibd_uu_id[1], ib_dev->ibd_uu_id[2], 
 				ib_dev->ibd_uu_id[3]);
 			ib_dev->ibd_flags |= IBDF_HAS_MD_UUID;
-		} else if ((ptr = strstr(cur, "lvm_uuid="))) {
-			ptr += 8; /* Skip to = */
-			*ptr = '\0';
-			ptr += 1;
-			iblock_check_dev_params_delim(ptr, &cur);
+			params++;
+		} else if ((ptr2 = strstr(cur, "lvm_uuid"))) {
+			transport_check_dev_params_delim(ptr, &cur);
 			ptr = strstrip(ptr);
 			ret = snprintf(ib_dev->ibd_lvm_uuid, SE_LVM_UUID_LEN, "%s", ptr);
 			PYXPRINT("IBLOCK: Referencing LVM Universal Unit Identifier "
 				"<%s>\n", ib_dev->ibd_lvm_uuid);
 			ib_dev->ibd_flags |= IBDF_HAS_LVM_UUID;
-		} else if ((ptr = strstr(cur, "udev_path="))) {
-			ptr += 9; /* Skip to = */
-			*ptr = '\0';
-			ptr += 1;
-			iblock_check_dev_params_delim(ptr, &cur);
+			params++;
+		} else if ((ptr2 = strstr(cur, "udev_path"))) {
+			transport_check_dev_params_delim(ptr, &cur);
 			ptr = strstrip(ptr);
 			ret = snprintf(ib_dev->ibd_udev_path, SE_UDEV_PATH_LEN, "%s", ptr);
 			PYXPRINT("IBLOCK: Referencing UDEV path: %s\n", ib_dev->ibd_udev_path);
 			ib_dev->ibd_flags |= IBDF_HAS_UDEV_PATH;
-		} else if ((ptr = strstr(cur, "major="))) {
-			ptr += 5; /* Skip to = */
-			*ptr = '\0';
-			ptr += 1;
-			iblock_check_dev_params_delim(ptr, &cur);
+			params++;
+		} else if ((ptr2 = strstr(cur, "major"))) {
+			transport_check_dev_params_delim(ptr, &cur);
 			ib_dev->ibd_major = simple_strtoul(ptr, &endptr, 0);
 			PYXPRINT("IBLOCK: Referencing Major: %d\n", ib_dev->ibd_major);
 			ib_dev->ibd_flags |= IBDF_HAS_MAJOR;
-		} else if ((ptr = strstr(cur, "minor="))) {
-			ptr += 5; /* Skip to = */
-			*ptr = '\0';
-			ptr += 1;
-			iblock_check_dev_params_delim(ptr, &cur);
+			params++;
+		} else if ((ptr2 = strstr(cur, "minor"))) {
+			transport_check_dev_params_delim(ptr, &cur);
 			ib_dev->ibd_minor = simple_strtoul(ptr, &endptr, 0);
 			PYXPRINT("IBLOCK: Referencing Minor: %d\n", ib_dev->ibd_minor);
 			ib_dev->ibd_flags |= IBDF_HAS_MINOR;	
-		} else if ((ptr = strstr(cur, "force="))) {
-			ptr += 5; /* Skip to = */
-			*ptr = '\0';
-			ptr += 1;
-			iblock_check_dev_params_delim(ptr, &cur);
+			params++;
+		} else if ((ptr2 = strstr(cur, "force"))) {
+			transport_check_dev_params_delim(ptr, &cur);
 			ib_dev->ibd_force = simple_strtoul(ptr, &endptr, 0);
 			PYXPRINT("IBLOCK: Set force=%d\n", ib_dev->ibd_force);
-		}
+			params++;
+		} else
+			cur = NULL;
 	}
 
+out:
 	kfree(buf);
-	return(count);
+	return((params) ? count : -EINVAL);
 }
 
 extern ssize_t iblock_check_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev)

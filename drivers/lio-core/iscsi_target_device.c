@@ -577,21 +577,22 @@ extern void iscsi_clear_lun_from_tpg (se_lun_t *lun, iscsi_portal_group_t *tpg)
  *
  *
  */
-extern int iscsi_dev_add_lun (
+extern se_lun_t *iscsi_dev_add_lun (
 	iscsi_portal_group_t *tpg,
 	se_hba_t *hba,
 	se_device_t *dev,
-	se_dev_transport_info_t *dti)
+	u32 lun,
+	int *ret)
 {
-	se_lun_t *lun;
+	se_lun_t *lun_p;
 	se_fp_obj_t *fp;
 	u32 lun_access = 0;
-	int ret;
 	
 	if (DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj) != 0) {
 		TRACE_ERROR("Unable to export se_device_t while dev_access_obj: %d\n",
 			DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj));
-		return(ERR_OBJ_ACCESS_COUNT);
+		*ret = ERR_OBJ_ACCESS_COUNT;
+		return(NULL);
 	}
 				
 	if ((fp = DEV_OBJ_API(dev)->get_feature_obj(dev))) {
@@ -600,11 +601,14 @@ extern int iscsi_dev_add_lun (
 				TRACE_ERROR("Unable to export se_device_t while"
 					" dev_feature_obj: %d\n",
 					DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj));
-				return(ERR_OBJ_FEATURE_COUNT);
+				*ret = ERR_OBJ_FEATURE_COUNT;
+				return(NULL);
 			}
 		}
 	}
 	
+#warning FIXME: Make check_tcq the default..?
+#if 0
 	spin_lock(&hba->device_lock);
 	if (dti->check_tcq) {
 		if (transport_check_device_tcq(dev, dti->iscsi_lun,
@@ -614,27 +618,30 @@ extern int iscsi_dev_add_lun (
 		}
 	}
 	spin_unlock(&hba->device_lock);
-
+#endif
+#if 0
 	/*
 	 * Now we claim exclusive access to the OS dependant block device.
 	 */
 	if (transport_generic_claim_phydevice(dev) < 0)
 		return(ERR_BLOCKDEV_CLAIMED);
-	
-	if (!(lun = iscsi_tpg_pre_addlun(tpg, dti->iscsi_lun, &ret)))
-		return(ret);
+#endif	
+	if (!(lun_p = iscsi_tpg_pre_addlun(tpg, lun, ret)))
+		return(NULL);
 
 	if (DEV_OBJ_API(dev)->get_device_access((void *)dev) == 0)
 		lun_access = ISCSI_LUNFLAGS_READ_ONLY;
 	else
 		lun_access = ISCSI_LUNFLAGS_READ_WRITE;
 	
-	if (iscsi_tpg_post_addlun(tpg, lun, ISCSI_LUN_TYPE_DEVICE, lun_access,
-			      dev, dev->dev_obj_api) < 0)
-		return(ERR_EXPORT_FAILED);
+	if (iscsi_tpg_post_addlun(tpg, lun_p, ISCSI_LUN_TYPE_DEVICE, lun_access,
+			      dev, dev->dev_obj_api) < 0) {
+		*ret = ERR_EXPORT_FAILED;
+		return(NULL);
+	}
 
 	PYXPRINT("iSCSI_TPG[%hu]_LUN[%u] - Activated iSCSI Logical Unit from"
-		" iSCSI HBA: %u\n", tpg->tpgt, lun->iscsi_lun, hba->hba_id);
+		" CORE HBA: %u\n", tpg->tpgt, lun_p->iscsi_lun, hba->hba_id);
 	
 	/*
 	 * Update LUN maps for dynamically added initiators when generate_node_acl
@@ -653,7 +660,8 @@ extern int iscsi_dev_add_lun (
 		spin_unlock_bh(&tpg->acl_node_lock);
 	}
 
-	return(0);
+	*ret = 0;
+	return(lun_p);
 }
 
 /*	iscsi_dev_del_lun():
@@ -676,6 +684,32 @@ extern int iscsi_dev_del_lun (
 		" device object\n", tpg->tpgt, iscsi_lun);
 	
 	return(0);
+}
+
+extern se_lun_t *iscsi_get_lun_from_tpg (iscsi_portal_group_t *tpg, u32 lun)
+{
+	se_lun_t *iscsi_lun;
+
+	spin_lock(&tpg->tpg_lun_lock);
+	if (lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
+		TRACE_ERROR("iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
+			" %u for Target Portal Group: %hu\n", lun,
+			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
+			spin_unlock(&tpg->tpg_lun_lock);
+		return(NULL);
+	}
+	iscsi_lun = &tpg->tpg_lun_list[lun];
+
+	if (iscsi_lun->lun_status != ISCSI_LUN_STATUS_FREE) {
+		TRACE_ERROR("iSCSI Logical Unit Number: %u is not free on"
+			" iSCSI Target Portal Group: %hu, ignoring request.\n",
+			lun, tpg->tpgt);
+		spin_unlock(&tpg->tpg_lun_lock);
+		return(NULL);
+	}
+	spin_unlock(&tpg->tpg_lun_lock);
+
+	return(iscsi_lun);
 }
 
 /*	iscsi_dev_get_lun():

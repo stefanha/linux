@@ -211,7 +211,7 @@ extern int pscsi_release_sd (struct scsi_device *sd)
  */
 extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, se_hbainfo_t *hi)
 {
-	int hba_depth, max_sectors, pscsi_dev_count;
+	int hba_depth, max_sectors;
 	struct Scsi_Host *sh;
 
 	if (!(sh = pscsi_get_sh(hi->scsi_host_id)))
@@ -234,14 +234,15 @@ extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, se_hbainf
 	hba->transport = &pscsi_template;
 	memcpy((void *)&hba->hba_info, (void *)hi, sizeof(se_hbainfo_t));
 	
-	PYXPRINT("iSCSI_HBA[%d] - %s Parallel SCSI HBA Driver %s on iSCSI"
-		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR, PSCSI_VERSION, PYX_ISCSI_VERSION);
-	PYXPRINT("iSCSI_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
+	PYXPRINT("CORE_HBA[%d] - %s Parallel SCSI HBA Driver %s on Generic"
+		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR,
+		PSCSI_VERSION, PYX_ISCSI_VERSION);
+	PYXPRINT("CORE_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
 			(sh->hostt->name) : "Unknown");
-	PYXPRINT("iSCSI_HBA[%d] - Attached Parallel SCSI HBA to iSCSI Transport"
+	PYXPRINT("CORE_HBA[%d] - Attached Parallel SCSI HBA to Generic Target Core"
 		" with TCQ Depth: %d MaxSectors: %hu\n", hba->hba_id,
 		atomic_read(&hba->max_queue_depth), max_sectors);
-
+#if 0
 	/*
 	 * For Parallel SCSI we assume the devices are already attached to the
 	 * HBA, so go ahead and scan the bus for devices to export as iSCSI LUNs.
@@ -251,11 +252,13 @@ extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, se_hbainf
 			" Parallel SCSI HBA %d.\n", sh->host_no);
 		goto fail;
 	}
-		
+#endif		
 	return(0);
+#if 0
 fail:
 	scsi_host_put(sh);
 	return(-1);
+#endif
 }
 
 /*	pscsi_detach_hba(): (Part of se_subsystem_api_t template)
@@ -268,7 +271,7 @@ extern int pscsi_detach_hba (se_hba_t *hba)
 	
 	scsi_host_put(scsi_host);
 	
-	PYXPRINT("iSCSI_HBA[%d] - Detached Parallel SCSI HBA: %s from iSCSI Transport\n",
+	PYXPRINT("CORE_HBA[%d] - Detached Parallel SCSI HBA: %s from Generic Target Core\n",
 		hba->hba_id, (scsi_host->hostt->name) ? (scsi_host->hostt->name) : "Unknown");	
 
 	hba->hba_ptr = NULL;
@@ -280,6 +283,7 @@ extern int pscsi_detach_hba (se_hba_t *hba)
  *
  * 	FIXME: For <= v2.4, check what locking the midlayer does for accessing Scsi_Host->host_queue (if any?)
  */
+#if 0
 extern int pscsi_scan_devices (se_hba_t *iscsi_hba, se_hbainfo_t *hi)
 {
 	int pscsi_dev_count = 0;
@@ -359,13 +363,18 @@ extern int pscsi_scan_devices (se_hba_t *iscsi_hba, se_hbainfo_t *hi)
 
 	return(pscsi_dev_count);
 }
+#endif
 
 /*	pscsi_add_device_to_list():
  *
  *	FIXME: We are going to want to increment struct scsi_device->access_count
  *	       either here or in pscsi_activate_device().
  */
-extern se_device_t *pscsi_add_device_to_list (se_hba_t *iscsi_hba, struct scsi_device *sd, int dev_flags)
+extern se_device_t *pscsi_add_device_to_list (
+	se_hba_t *hba,
+	pscsi_dev_virt_t *pdv,
+	struct scsi_device *sd,
+	int dev_flags)
 {
 	se_device_t *dev;
 	
@@ -406,10 +415,25 @@ extern se_device_t *pscsi_add_device_to_list (se_hba_t *iscsi_hba, struct scsi_d
 			" queue_depth to %d\n", sd->channel, sd->id,
 				sd->lun, sd->queue_depth);
 	}
-	
-	if (!(dev = transport_add_device_to_iscsi_hba(iscsi_hba, &pscsi_template,
-			 	dev_flags, (void *)sd)))
+	/*
+	 * Set the pointer pdv->pdv_sd to from passed struct scsi_device,
+	 * which has already been referenced with Linux SCSI code with
+	 * scsi_device_get() in this file's pscsi_create_virtdevice().
+	 *
+	 * The passthrough operations called by the transport_add_device_* function
+	 * below will require this pointer to be set for passthrough ops.
+	 *
+	 * For the shutdown case in pscsi_free_device(), this struct scsi_device 
+	 * reference is released with Linux SCSI code scsi_device_put() and the
+	 * pdv->pdv_sd cleared.
+	 */
+	pdv->pdv_sd = sd;
+
+	if (!(dev = transport_add_device_to_iscsi_hba(hba, &pscsi_template,
+				dev_flags, (void *)pdv))) {
+		pdv->pdv_sd = NULL;
 		return(NULL);
+	}
 	
 	/*
 	 * For TYPE_TAPE, attempt to determine blocksize with MODE_SENSE.
@@ -451,16 +475,108 @@ out:
 
 extern int pscsi_claim_phydevice (se_hba_t *hba, se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *)dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *)pdv->pdv_sd;
 	
 	return(pscsi_claim_sd(sd));
 }
 
 extern int pscsi_release_phydevice (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *)dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *)pdv->pdv_sd;
 	
 	return(pscsi_release_sd(sd));
+}
+
+extern void *pscsi_allocate_virtdevice (se_hba_t *hba, const char *name)
+{
+	pscsi_dev_virt_t *pdv;	
+
+	if (!(pdv = kzalloc(sizeof(pscsi_dev_virt_t), GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for pscsi_dev_virt_t\n");
+		return(NULL);
+	}
+	pdv->pdv_se_hba = hba;
+
+	printk("PSCSI: Allocated pdv: %p for %s\n", pdv, name);
+	return((void *)pdv);
+}
+
+extern se_device_t *pscsi_create_virtdevice (se_hba_t *hba, void *p)
+{
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *)p;
+	se_device_t *dev;
+	struct scsi_device *sd;
+	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
+	u32 dev_flags = 0;
+
+	if (!(pdv)) {
+		printk(KERN_ERR "Unable to locate pscsi_dev_virt_t parameter\n");
+		return(NULL);
+	}
+
+	spin_lock_irq(sh->host_lock);
+	list_for_each_entry(sd, &sh->__devices, siblings) {
+		if (!(pdv->pdv_channel_id == sd->channel) ||
+		    !(pdv->pdv_target_id == sd->id) ||
+		    !(pdv->pdv_lun_id == sd->lun))
+			continue;
+
+		if (sd->type == TYPE_DISK) {
+			if (scsi_device_get(sd)) {
+				spin_unlock_irq(sh->host_lock);
+				printk(KERN_ERR "scsi_device_get() failed for %d:%d:%d:%d\n",
+					sh->host_no, sd->channel, sd->id, sd->lun);
+				return(NULL);
+			}
+			spin_unlock_irq(sh->host_lock);
+
+			if (pscsi_check_sd(sd) < 0) {
+				scsi_device_put(sd);
+				printk(KERN_ERR "pscsi_check_sd() failed for %d:%d:%d:%d\n",
+					sh->host_no, sd->channel, sd->id, sd->lun);
+				return(NULL);
+			}
+#warning FIXME: Is this already being done inside target_core_mod..?
+			if (!(pscsi_claim_sd(sd))) {
+				dev_flags |= DF_CLAIMED_BLOCKDEV;
+				dev_flags |= DF_PERSISTENT_CLAIMED_BLOCKDEV;
+			}
+
+			if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags))) {
+				scsi_device_put(sd);
+				return(NULL);
+			}	
+			PYXPRINT("CORE_PSCSI[%d] - Added TYPE_DISK for %d:%d:%d\n",
+				sh->host_no, sd->channel, sd->id, sd->lun);	
+
+			return(dev);
+		}
+#warning FIXME: Can all NON TYPE_DISK be handled this way..?
+		if ((sd->type == TYPE_ROM) ||
+		    (sd->type == TYPE_TAPE) ||
+		    (sd->type == TYPE_MEDIUM_CHANGER)) {	
+			spin_unlock_irq(sh->host_lock);
+
+			if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags)))
+				return(NULL);	
+
+			PYXPRINT("CORE_PSCSI[%d] - Added TYPE_DISK for %d:%d:%d\n",
+				sh->host_no, sd->channel, sd->id, sd->lun);   	
+
+			return(dev);
+		}
+
+		printk(KERN_ERR "Unable to process SCSI device type: %d\n", sd->type);
+		return(NULL);
+	}
+	spin_unlock_irq(sh->host_lock);
+
+	printk(KERN_ERR "Unable to locate %d:%d:%d:%d\n", sh->host_no,
+		pdv->pdv_channel_id,  pdv->pdv_target_id, pdv->pdv_lun_id);
+
+	return(NULL);
 }
 
 /*	pscsi_activate_device(): (Part of se_subsystem_api_t template)
@@ -469,10 +585,11 @@ extern int pscsi_release_phydevice (se_device_t *dev)
  */
 extern int pscsi_activate_device (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	struct Scsi_Host *sh = sd->host;
 	
-	PYXPRINT("iSCSI_PSCSI[%d] - Activating Device with TCQ: %d at Parallel"
+	PYXPRINT("CORE_PSCSI[%d] - Activating Device with TCQ: %d at Parallel"
 		" SCSI Location (Channel/Target/LUN) %d/%d/%d\n", sh->host_no,
 		 sd->queue_depth, sd->channel, sd->id, sd->lun);
 
@@ -485,10 +602,11 @@ extern int pscsi_activate_device (se_device_t *dev)
  */
 extern void pscsi_deactivate_device (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	struct Scsi_Host *sh = sd->host;
 	
-	PYXPRINT("iSCSI_PSCSI[%d] - Deactivating Device with TCQ: %d at Parallel"
+	PYXPRINT("CORE_PSCSI[%d] - Deactivating Device with TCQ: %d at Parallel"
 		" SCSI Location (Channel/Target/LUN) %d/%d/%d\n", sh->host_no,
 		sd->queue_depth, sd->channel, sd->id, sd->lun);
 	
@@ -501,7 +619,8 @@ extern void pscsi_deactivate_device (se_device_t *dev)
  */
 extern int pscsi_check_device_location (se_device_t *dev, se_dev_transport_info_t *dti)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
 	if ((dti->scsi_channel_id == sd->channel) &&
 	    (dti->scsi_lun_id == sd->lun) &&
@@ -547,17 +666,17 @@ extern int pscsi_check_ghost_id (se_hbainfo_t *hi)
  *
  *
  */
-extern void pscsi_free_device (se_device_t *dev)
+extern void pscsi_free_device (void *p)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) p;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
-	if (sd->type == TYPE_DISK) {
-		transport_generic_release_phydevice(dev, 0);
+	if (sd && (sd->type == TYPE_DISK)) {
 		scsi_device_put(sd);
+		pdv->pdv_sd = NULL;
 	}
 	
-	dev->dev_ptr = NULL;
-
+	kfree(pdv);
 	return;
 }
 
@@ -567,7 +686,8 @@ extern void pscsi_free_device (se_device_t *dev)
  */
 extern int pscsi_transport_complete (se_task_t *task)
 {
-	struct scsi_device *sd = (struct scsi_device *) task->iscsi_dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->iscsi_dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	void *pscsi_buf;
 	int result;
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
@@ -746,7 +866,8 @@ extern void pscsi_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 
 extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	se_hba_t *hba = dev->iscsi_hba;
 
 	snprintf(buf, size, "%u_%u_%u_%u", hba->hba_id, sd->channel, sd->id, sd->lun);
@@ -760,9 +881,10 @@ extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 extern int pscsi_do_task (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->iscsi_dev->dev_ptr;
 	int ret;
 	
-	if ((ret = scsi_execute_async((struct scsi_device *)task->iscsi_dev->dev_ptr,
+	if ((ret = scsi_execute_async((struct scsi_device *)pdv->pdv_sd,
 			   pt->pscsi_cdb, COMMAND_SIZE(pt->pscsi_cdb[0]), pt->pscsi_direction,
 			   pt->pscsi_buf, task->task_size, task->task_sg_num,
 			   (task->se_obj_api->get_device_type(task->se_obj_ptr) == 0) ?
@@ -806,6 +928,86 @@ extern int pscsi_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int
 		hi->iscsi_channel_id = t->iscsi_channel_id;
 
 	return(0);
+}
+
+extern ssize_t pscsi_set_configfs_dev_params (se_hba_t *hba,
+					      se_subsystem_dev_t *se_dev,
+					      const char *page, ssize_t count)
+{
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
+	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
+	char *buf, *cur, *ptr, *ptr2, *endptr;
+	int params = 0;
+
+	if (!(buf = kzalloc(count, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
+		return(-ENOMEM);
+	}
+	memcpy(buf, page, count);
+	cur = buf;
+
+	while (cur) {
+		if (!(ptr = strstr(cur, "=")))
+			goto out;
+
+		*ptr = '\0';
+		ptr++;
+
+		if ((ptr2 = strstr(cur, "scsi_channel_id"))) {
+			transport_check_dev_params_delim(ptr, &cur);
+			pdv->pdv_channel_id = simple_strtoul(ptr, &endptr, 0);
+			PYXPRINT("PSCSI[%d]: Referencing SCSI Channel ID: %d\n", 
+				sh->host_no, pdv->pdv_channel_id);
+			pdv->pdv_flags |= PDF_HAS_CHANNEL_ID;
+			params++;
+		} else if ((ptr2 = strstr(cur, "scsi_target_id"))) {
+			transport_check_dev_params_delim(ptr, &cur);
+			pdv->pdv_target_id = simple_strtoul(ptr, &endptr, 0);
+			PYXPRINT("PSCSI[%d]: Referencing SCSI Target ID: %d\n",
+				sh->host_no, pdv->pdv_target_id);
+			pdv->pdv_flags |= PDF_HAS_TARGET_ID;
+			params++;
+		} else if ((ptr2 = strstr(cur, "scsi_lun_id"))) {
+			transport_check_dev_params_delim(ptr, &cur);
+			pdv->pdv_lun_id = simple_strtoul(ptr, &endptr, 0);
+			PYXPRINT("PSCSI[%d]: Referencing SCSI LUN ID: %d\n",
+				sh->host_no, pdv->pdv_lun_id);
+			pdv->pdv_flags |= PDF_HAS_LUN_ID;
+			params++;
+		} else
+			cur = NULL;
+#warning FIXME: Add evpd_unit_serial= and evpd_dev_ident= parameter support for ConfigFS
+	}
+
+out:
+	kfree(buf);
+	return((params) ? count : -EINVAL);
+}
+
+extern ssize_t pscsi_check_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev)
+{
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
+
+	if (!(pdv->pdv_flags & PDF_HAS_CHANNEL_ID) ||
+	    !(pdv->pdv_flags & PDF_HAS_TARGET_ID) ||
+	    !(pdv->pdv_flags & PDF_HAS_TARGET_ID)) {
+		TRACE_ERROR("Missing scsi_channel_id=, scsi_target_id= and"
+			" scsi_lun_id= parameters\n");
+		return(-1);
+	}
+	
+	return(0);
+}
+
+extern void __pscsi_get_dev_info (pscsi_dev_virt_t *, char *, int *);
+
+extern ssize_t pscsi_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *se_dev, char *page)
+{
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
+	int bl = 0;
+
+	__pscsi_get_dev_info(pdv, page, &bl);
+	return((ssize_t)bl);
 }
 
 extern int pscsi_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
@@ -865,50 +1067,57 @@ extern void pscsi_get_hba_info (se_hba_t *hba, char *b, int *bl)
 
 extern void pscsi_get_dev_info (se_device_t *dev, char *b, int *bl)
 {
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+
+	__pscsi_get_dev_info(pdv, b, bl);
+	return;
+}
+
+extern void __pscsi_get_dev_info (pscsi_dev_virt_t *pdv, char *b, int *bl)
+{
 	int i;
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
-	*bl += sprintf(b+*bl, "Parallel SCSI Device Bus Location:"
-		" Target ID: %d Channel ID: %d LUN: %d\n",
-		sd->id, sd->channel, sd->lun);
+	*bl += sprintf(b+*bl, "SCSI Device Bus Location:"
+		" Channel ID: %d Target ID: %d LUN: %d\n",
+		pdv->pdv_channel_id, pdv->pdv_target_id, pdv->pdv_lun_id);
 
-	*bl += sprintf(b+*bl, "        ");
+	if (sd) {
+		*bl += sprintf(b+*bl, "        ");
+		*bl += sprintf(b+*bl, "Vendor: ");
+		for (i = 0; i < 8; i++) {
+			if (ISPRINT(sd->vendor[i]))   /* printable character ? */
+				*bl += sprintf(b+*bl, "%c", sd->vendor[i]);
+			else
+				*bl += sprintf(b+*bl, " ");
+		}
+		*bl += sprintf(b+*bl, " Model: ");
+		for (i = 0; i < 16; i++) {
+			if (ISPRINT(sd->model[i]))   /* printable character ? */
+				*bl += sprintf(b+*bl, "%c", sd->model[i]);
+			else
+				*bl += sprintf(b+*bl, " ");
+		}
+		*bl += sprintf(b+*bl, " Rev: ");
+		for (i = 0; i < 4; i++) {
+			if (ISPRINT(sd->rev[i]))   /* printable character ? */
+				*bl += sprintf(b+*bl, "%c", sd->rev[i]);
+			else
+				*bl += sprintf(b+*bl, " ");
+		}
 
-	*bl += sprintf(b+*bl, "Vendor: ");
-	for (i = 0; i < 8; i++) {
-		if (ISPRINT(sd->vendor[i]))   /* printable character ? */
-			*bl += sprintf(b+*bl, "%c", sd->vendor[i]);
-		else
-			*bl += sprintf(b+*bl, " ");
+		if (sd->type == TYPE_DISK) {
+			struct scsi_disk *sdisk = dev_get_drvdata(&sd->sdev_gendev);
+			struct gendisk *disk = (struct gendisk *) sdisk->disk;
+			struct block_device *bdev = bdget(MKDEV(disk->major, disk->first_minor));
+	
+			bdev->bd_disk = disk;
+			*bl += sprintf(b+*bl, "   %s\n", (!bdev->bd_holder) ? "" :
+					(bdev->bd_holder == (struct scsi_device *)sd) ?
+					"CLAIMED: PSCSI" : "CLAIMED: OS");
+		} else
+			*bl += sprintf(b+*bl, "\n");
 	}
-
-	*bl += sprintf(b+*bl, " Model: ");
-	for (i = 0; i < 16; i++) {
-		if (ISPRINT(sd->model[i]))   /* printable character ? */
-			*bl += sprintf(b+*bl, "%c", sd->model[i]);
-		else
-			*bl += sprintf(b+*bl, " ");
-	}
-
-	*bl += sprintf(b+*bl, " Rev: ");
-	for (i = 0; i < 4; i++) {
-		if (ISPRINT(sd->rev[i]))   /* printable character ? */
-			*bl += sprintf(b+*bl, "%c", sd->rev[i]);
-		else
-			*bl += sprintf(b+*bl, " ");
-	}
-
-	if (sd->type == TYPE_DISK) {
-		struct scsi_disk *sdisk = dev_get_drvdata(&sd->sdev_gendev);
-		struct gendisk *disk = (struct gendisk *) sdisk->disk;
-		struct block_device *bdev = bdget(MKDEV(disk->major, disk->first_minor));
-
-		bdev->bd_disk = disk;
-		*bl += sprintf(b+*bl, "   %s\n", (!bdev->bd_holder) ? "" :
-				(bdev->bd_holder == (struct scsi_device *)sd) ?
-				"CLAIMED: PSCSI" : "CLAIMED: OS");
-	} else
-		*bl += sprintf(b+*bl, "\n");
 
 	return;
 }
@@ -1065,7 +1274,8 @@ extern unsigned char *pscsi_get_sense_buffer (se_task_t *task)
  */
 extern u32 pscsi_get_blocksize (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
 	return(sd->sector_size);
 }
@@ -1076,7 +1286,8 @@ extern u32 pscsi_get_blocksize (se_device_t *dev)
  */
 extern u32 pscsi_get_device_rev (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	
 	return((sd->scsi_level - 1) ? sd->scsi_level - 1 : 1);
 }
@@ -1087,7 +1298,8 @@ extern u32 pscsi_get_device_rev (se_device_t *dev)
  */
 extern u32 pscsi_get_device_type (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
 	return(sd->type);
 }
@@ -1107,7 +1319,8 @@ extern u32 pscsi_get_dma_length (u32 task_size, se_device_t *dev)
  */
 extern u32 pscsi_get_max_sectors (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	return((sd->host->max_sectors > sd->request_queue->max_sectors) ?
 		sd->request_queue->max_sectors : sd->host->max_sectors);
 }
@@ -1118,7 +1331,8 @@ extern u32 pscsi_get_max_sectors (se_device_t *dev)
  */
 extern u32 pscsi_get_queue_depth (se_device_t *dev)
 {
-	struct scsi_device *sd = (struct scsi_device *) dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
+	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
 	return(sd->queue_depth);
 }
