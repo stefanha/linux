@@ -57,12 +57,13 @@ extern int pscsi_detach_hba (se_hba_t *);
 extern int pscsi_scan_devices (se_hba_t *, se_hbainfo_t *);
 extern int pscsi_claim_phydevice (se_hba_t *, se_device_t *);
 extern int pscsi_release_phydevice (se_device_t *);
+extern void *pscsi_allocate_virtdevice (se_hba_t *, const char *);
+extern se_device_t *pscsi_create_virtdevice (se_hba_t *, void *);
 extern int pscsi_activate_device (se_device_t *);
 extern void pscsi_deactivate_device (se_device_t *);
-extern se_device_t *pscsi_add_device_to_list (se_hba_t *, struct scsi_device *, int);
 extern int pscsi_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int pscsi_check_ghost_id (se_hbainfo_t *);
-extern void pscsi_free_device (se_device_t *);
+extern void pscsi_free_device (void *);
 extern int pscsi_transport_complete (se_task_t *);
 extern void *pscsi_allocate_request (se_task_t *, se_device_t *);
 extern void pscsi_get_evpd_prod (unsigned char *, u32, se_device_t *);
@@ -70,6 +71,9 @@ extern void pscsi_get_evpd_sn (unsigned char *, u32, se_device_t *);
 extern int pscsi_do_task (se_task_t *);
 extern void pscsi_free_task (se_task_t *);
 extern int pscsi_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
+extern ssize_t pscsi_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
+extern ssize_t pscsi_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
+extern ssize_t pscsi_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
 extern int pscsi_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern void pscsi_get_plugin_info (void *, char *, int *);
 extern void pscsi_get_hba_info (se_hba_t *, char *, int *);
@@ -107,6 +111,21 @@ typedef struct pscsi_plugin_task_s {
 	void	*pscsi_buf;
 } pscsi_plugin_task_t;
 
+#define PDF_HAS_CHANNEL_ID	0x01
+#define PDF_HAS_TARGET_ID	0x02
+#define PDF_HAS_LUN_ID		0x04
+#define PDF_HAS_EVPD_UNIT_SERIAL 0x08
+#define PDF_HAS_EVPD_DEV_IDENT	0x10
+
+typedef struct pscsi_dev_virt_s {
+	int	pdv_flags;
+	int	pdv_channel_id;
+	int	pdv_target_id;
+	int	pdv_lun_id;
+	struct scsi_device *pdv_sd;
+	struct se_hba_s *pdv_se_hba;
+} pscsi_dev_virt_t;
+
 /*
  * We use the generic command sequencer, so we must setup
  * se_subsystem_spc_t.
@@ -129,10 +148,11 @@ se_subsystem_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 	transport_type:		TRANSPORT_PLUGIN_PHBA_PDEV,	\
 	attach_hba:		pscsi_attach_hba,		\
 	detach_hba:		pscsi_detach_hba,		\
-	scan_devices:		pscsi_scan_devices,		\
 	activate_device:	pscsi_activate_device,		\
 	deactivate_device:	pscsi_deactivate_device,	\
 	claim_phydevice:	pscsi_claim_phydevice,		\
+	allocate_virtdevice:	pscsi_allocate_virtdevice,	\
+	create_virtdevice:	pscsi_create_virtdevice,	\
 	free_device:		pscsi_free_device,		\
 	release_phydevice:	pscsi_release_phydevice,	\
 	check_device_location:	pscsi_check_device_location,	\
@@ -142,6 +162,9 @@ se_subsystem_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 	do_task:		pscsi_do_task,			\
 	free_task:		pscsi_free_task,		\
 	check_hba_params:	pscsi_check_hba_params,		\
+	check_configfs_dev_params: pscsi_check_configfs_dev_params, \
+	set_configfs_dev_params: pscsi_set_configfs_dev_params, \
+	show_configfs_dev_params: pscsi_show_configfs_dev_params, \
 	check_dev_params:	pscsi_check_dev_params,		\
 	get_plugin_info:	pscsi_get_plugin_info,		\
 	get_hba_info:		pscsi_get_hba_info,		\
