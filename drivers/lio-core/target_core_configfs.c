@@ -890,7 +890,7 @@ static struct config_group *target_core_call_addhbatotarget (
 	struct config_group *group,
 	const char *name)
 {
-	char *se_plugin_str, *str, *endptr;
+	char *se_plugin_str, *str, *str2, *endptr;
 	se_hba_t *hba;
 	se_hbainfo_t hba_info;
 	se_plugin_t *se_plugin;
@@ -909,12 +909,23 @@ static struct config_group *target_core_call_addhbatotarget (
 	snprintf(buf, TARGET_CORE_NAME_MAX_LEN, "%s", name);
 
 	if (!(str = strstr(buf, "_"))) {
-		printk(KERN_ERR "Unable to locate \"_\" for $PLUGIN_$PLUGIN_ID\n");
+		printk(KERN_ERR "Unable to locate \"_\" for $SUBSYSTEM_PLUGIN_$HOST_ID\n");
 		return(NULL);
 	}
 	se_plugin_str = buf;
-	*str = '\0'; /* Terminate for *se_plugin_str */
-	str += 1; /* Skip to start of plugin dependent ID */
+
+	/*
+	 * Special case for subsystem plugins that have "_" in their names.
+	 * Namely rd_direct and rd_mcp..
+	 */
+	if ((str2 = strstr(str+1, "_"))) {
+		*str2 = '\0'; /* Terminate for *se_plugin_str */
+		str2++; /* Skip to start of plugin dependent ID */
+	} else {
+		*str = '\0'; /* Terminate for *se_plugin_str */
+		str++; /* Skip to start of plugin dependent ID */
+	}
+
 	if (!(se_plugin = transport_core_get_plugin_by_name(se_plugin_str)))
 		return(NULL);
 
@@ -1064,8 +1075,9 @@ extern int target_core_init_configfs (void)
 		return(-1);
 	}
 
-	printk("TARGET_CORE[0]: Initialized ConfigFS Fabric Infrastructure: %s\n",
-                	TARGET_CORE_CONFIGFS_VERSION);
+	printk("TARGET_CORE[0]: Initialized ConfigFS Fabric Infrastructure: "
+		""TARGET_CORE_CONFIGFS_VERSION" on %s/%s on "UTS_RELEASE"\n",
+			utsname()->sysname, utsname()->machine);
 
 #warning FIXME: Handle failure of init_se_global()
 	init_se_global();
