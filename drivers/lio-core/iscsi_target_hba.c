@@ -245,7 +245,7 @@ extern int iscsi_hba_add_hba (
 	hba->hba_status &= ~HBA_STATUS_FREE;
 	hba->hba_status |= HBA_STATUS_ACTIVE;
 
-	PYXPRINT("iSCSI_HBA[%d] - Attached HBA to iSCSI Target Node\n", hba->hba_id);
+	PYXPRINT("CORE_HBA[%d] - Attached HBA to Generic Target Core\n", hba->hba_id);
 
 	return(0);
 }
@@ -287,7 +287,7 @@ extern int iscsi_hba_del_hba (
 	 * from se_device_t->se_lun_t.
 	 */
 	if (iscsi_check_devices_access(hba) < 0) {
-		TRACE_ERROR("iSCSI_HBA[%u] - **ERROR** - Unable to release HBA"
+		TRACE_ERROR("CORE_HBA[%u] - **ERROR** - Unable to release HBA"
 			" with active LUNs\n", hba->hba_id);
 		return(ERR_DELHBA_SHUTDOWN_FAILED);
 	}
@@ -312,7 +312,7 @@ extern int iscsi_hba_del_hba (
 	hba->hba_status &= ~HBA_STATUS_ACTIVE;
 	hba->hba_status |= HBA_STATUS_FREE;
 
-	PYXPRINT("iSCSI_HBA[%d] - Detached HBA from iSCSI Target Node\n", hba->hba_id);
+	PYXPRINT("CORE_HBA[%d] - Detached HBA from Generic Target Core\n", hba->hba_id);
 
 	return(0);
 }
