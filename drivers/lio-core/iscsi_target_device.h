@@ -37,8 +37,9 @@ extern int iscsi_free_device_list_for_node (iscsi_node_acl_t *, iscsi_portal_gro
 extern void iscsi_update_device_list_for_node (se_lun_t *, u32, u32, iscsi_node_acl_t *, iscsi_portal_group_t *, int);     
 extern void iscsi_clear_lun_from_sessions (se_lun_t *, iscsi_portal_group_t *);
 extern void iscsi_clear_lun_from_tpg (se_lun_t *, iscsi_portal_group_t *);
-extern int iscsi_dev_add_lun (iscsi_portal_group_t *, se_hba_t *, se_device_t *, se_dev_transport_info_t *);
+extern se_lun_t *iscsi_dev_add_lun (iscsi_portal_group_t *, se_hba_t *, se_device_t *, u32, int *);
 extern int iscsi_dev_del_lun (iscsi_portal_group_t *, u32);
+extern se_lun_t *iscsi_get_lun_from_tpg (iscsi_portal_group_t *, u32);
 extern int iscsi_dev_add_initiator_node_lun_acl (iscsi_portal_group_t *, u32, u32, u32, char *);
 extern int iscsi_dev_del_initiator_node_lun_acl (iscsi_portal_group_t *, u32, u32, char *);
 extern int iscsi_dev_set_initiator_node_lun_access (iscsi_portal_group_t *, u32, u32, char *);
