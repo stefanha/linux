@@ -1,11 +1,12 @@
 /*********************************************************************************
  * Filename:  iscsi_target_rd.h
  *
- * This file contains the iSCSI <-> Ramdisk transport specific definitions and prototypes.
+ * This file contains the Storage Engine <-> Ramdisk transport specific definitions and prototypes.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -53,15 +54,16 @@ extern int rd_CDB_write_SG (se_task_t *, u32);
 
 extern int rd_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
 extern int rd_detach_hba (se_hba_t *);
-extern int rd_DIRECT_create_virtdevice (se_hba_t *, se_devinfo_t *);
-extern int rd_MEMCPY_create_virtdevice (se_hba_t *, se_devinfo_t *);
+extern void *rd_DIRECT_allocate_virtdevice (se_hba_t *, const char *);
+extern void *rd_MEMCPY_allocate_virtdevice (se_hba_t *, const char *);
+extern se_device_t *rd_DIRECT_create_virtdevice (se_hba_t *, void *);
+extern se_device_t *rd_MEMCPY_create_virtdevice (se_hba_t *, void *);
 extern int rd_activate_device (se_device_t *);
 extern void rd_deactivate_device (se_device_t *);
 extern int rd_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int rd_mcp_check_ghost_id (se_hbainfo_t *);
 extern int rd_dr_check_ghost_id (se_hbainfo_t *);
-extern void rd_free_device (se_device_t *);
-extern se_device_t *rd_add_device_to_list (se_hba_t *, void *, se_devinfo_t *);
+extern void rd_free_device (void *);
 extern int rd_transport_complete (se_task_t *);
 extern void *rd_allocate_request (se_task_t *, se_device_t *);
 extern void rd_get_evpd_prod (unsigned char *, u32, se_device_t *);
@@ -73,6 +75,9 @@ extern int rd_DIRECT_do_se_mem_map (struct se_task_s *, struct list_head *, void
 extern void rd_DIRECT_free_DMA (iscsi_cmd_t *);
 extern void rd_free_task (se_task_t *);
 extern int rd_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
+extern ssize_t rd_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
+extern ssize_t rd_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
+extern ssize_t rd_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
 extern int rd_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern int rd_check_virtdev_params (se_devinfo_t *, struct iscsi_target *);
 extern void rd_dr_get_plugin_info (void *, char *, int *);
@@ -120,8 +125,11 @@ typedef struct rd_dev_sg_table_s {
 	struct scatterlist *sg_table;
 } ____cacheline_aligned rd_dev_sg_table_t;
 
+#define RDF_HAS_PAGE_COUNT	0x01
+
 typedef struct rd_dev_s {
 	int		rd_direct;
+	u32		rd_flags;
 	u32		rd_dev_id;		/* Unique Ramdisk Device ID in Ramdisk HBA */
 	u32		rd_page_count;		/* Total page count for ramdisk device */
 	u32		sg_table_count;		/* Number of SG tables in sg_table_array */
@@ -132,6 +140,7 @@ typedef struct rd_dev_s {
 } ____cacheline_aligned rd_dev_t;
 
 typedef struct rd_host_s {
+	u32		rd_host_dev_id_count;
 	u32		rd_host_id;		/* Unique Ramdisk Host ID */
 } ____cacheline_aligned rd_host_t;
 
@@ -157,6 +166,7 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	transport_type:		TRANSPORT_PLUGIN_VHBA_VDEV,	\
 	attach_hba:		rd_attach_hba,			\
 	detach_hba:		rd_detach_hba,			\
+	allocate_virtdevice:	rd_DIRECT_allocate_virtdevice,	\
 	create_virtdevice:	rd_DIRECT_create_virtdevice,	\
 	activate_device:	rd_activate_device,		\
 	deactivate_device:	rd_deactivate_device,		\
@@ -170,6 +180,9 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	do_task:		rd_DIRECT_do_task,		\
 	free_task:		rd_free_task,			\
 	check_hba_params:	rd_check_hba_params,		\
+	check_configfs_dev_params: rd_check_configfs_dev_params, \
+	set_configfs_dev_params: rd_set_configfs_dev_params,	\
+	show_configfs_dev_params: rd_show_configfs_dev_params,	\
 	check_dev_params:	rd_check_dev_params,		\
 	check_virtdev_params:	rd_check_virtdev_params,	\
 	get_plugin_info:	rd_dr_get_plugin_info,		\
@@ -203,6 +216,7 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 	transport_type:		TRANSPORT_PLUGIN_VHBA_VDEV,	\
 	attach_hba:		rd_attach_hba,			\
 	detach_hba:		rd_detach_hba,			\
+	allocate_virtdevice:	rd_MEMCPY_allocate_virtdevice,	\
 	create_virtdevice:	rd_MEMCPY_create_virtdevice,	\
 	activate_device:	rd_activate_device,		\
 	deactivate_device:	rd_deactivate_device,		\
@@ -214,6 +228,9 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 	do_task:		rd_MEMCPY_do_task,		\
 	free_task:		rd_free_task,			\
 	check_hba_params:	rd_check_hba_params,		\
+	check_configfs_dev_params: rd_check_configfs_dev_params, \
+	set_configfs_dev_params: rd_set_configfs_dev_params,	\
+	show_configfs_dev_params: rd_show_configfs_dev_params,	\
 	check_dev_params:	rd_check_dev_params,		\
 	check_virtdev_params:	rd_check_virtdev_params,	\
 	get_plugin_info:	rd_mcp_get_plugin_info,		\
