@@ -230,7 +230,7 @@ static int iscsi_login_zero_tsih_s1 (
 	spin_lock_init(&sess->session_usage_lock);
 	spin_lock_init(&sess->ttt_lock);
 #ifdef SNMP_SUPPORT
-	sess->session_index = get_new_index(ISCSI_SESSION_INDEX);
+	sess->session_index = iscsi_get_new_index(ISCSI_SESSION_INDEX);
 	sess->creation_time = get_jiffies_64();
 	spin_lock_init(&sess->session_stats_lock);
 #endif /* SNMP_SUPPORT */
@@ -1026,14 +1026,6 @@ get_new_sock:
 		goto new_sess_out;
 	}	
 	memset(conn->conn_ops, 0, sizeof(iscsi_conn_ops_t));
-					
-	if (!iscsi_global->targetname_set) {
-		TRACE_ERROR("No iSCSI TargetName is for this Node,"
-			" rejecting login request.\n");
-		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,
-				STAT_DETAIL_SERVICE_UNAVAILABLE);
-		goto new_sess_out;
-	}
 
 	if (np->np_net_size == IPV6_ADDRESS_SPACE) 
 		ip = &np->np_ipv6[0];
@@ -1097,7 +1089,7 @@ get_new_sock:
 	snprintf(conn->net_dev, ISCSI_NETDEV_NAME_SIZE, "%s", np->np_net_dev);
 
 #ifdef SNMP_SUPPORT
-	conn->conn_index = get_new_index(ISCSI_CONNECTION_INDEX);
+	conn->conn_index = iscsi_get_new_index(ISCSI_CONNECTION_INDEX);
 	conn->local_ip = np->np_ipv4;
 	conn->local_port = np->np_port;
 #endif
