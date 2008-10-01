@@ -83,14 +83,10 @@ MAKE_OBJ_TYPE_RET(dev);
 extern void dev_obj_get_obj_info (void *p, se_lun_t *lun, unsigned long long bytes, int state, char *b, int *bl)
 {
 	se_device_t *dev = (se_device_t *)p;
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
 
-	if (!(iscsi_tf))
-		BUG();
-	
 	if (state)
-		iscsi_tf->dump_dev_state(dev, b, bl);
-	iscsi_tf->dump_dev_info((se_device_t *)p, lun, bytes, b, bl);
+		transport_dump_dev_state(dev, b, bl);
+	transport_dump_dev_info((se_device_t *)p, lun, bytes, b, bl);
 	return;
 }
 
@@ -278,14 +274,7 @@ extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 	spin_unlock(&dev->se_port_lock);
 #ifdef SNMP_SUPPORT
 	dev->dev_port_count++;
-	{
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-	if (!(iscsi_tf))
-		BUG();
-
-	sep->sep_index = iscsi_tf->get_new_index(SCSI_PORT_INDEX);
-	}
+	sep->sep_index = scsi_get_new_index(SCSI_PORT_INDEX);
 #endif
 
 	return(0);
