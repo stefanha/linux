@@ -76,10 +76,6 @@ typedef enum {
 	ISCSI_TARGET_AUTH_INDEX,
 	ISCSI_SESSION_INDEX,
 	ISCSI_CONNECTION_INDEX,
-	SCSI_INST_INDEX,
-	SCSI_DEVICE_INDEX,
-	SCSI_PORT_INDEX,
-	SCSI_AUTH_INTR_INDEX,
 	INDEX_TYPE_MAX
 } iscsi_index_t;
 
@@ -88,30 +84,18 @@ typedef struct iscsi_index_table_s {
 	u32 		iscsi_mib_index[INDEX_TYPE_MAX];
 } iscsi_index_table_t;
 
-/* Structure for table row iteration with seq_file */
-typedef struct table_iter_s {
-	int	ti_skip_body;
-	u32	ti_offset;
-	void	*ti_ptr;
-} table_iter_t;
-
-/* Portal data */
-typedef struct portal_data_s {
-	u32	index;
-	u32	ipaddr;
-} portal_data_t;
-
-/* SCSI Port stats */
-typedef struct scsi_port_stats_s {
-	u64	cmd_pdus;
-	u64	tx_data_octets;
-	u64	rx_data_octets;
-} scsi_port_stats_t;
-
+extern void *lio_scsi_auth_intr_seq_start(struct seq_file *, loff_t *);
+extern void *lio_scsi_auth_intr_seq_next(struct seq_file *, void *, loff_t *);
+extern int lio_scsi_auth_intr_seq_show(struct seq_file *, void *);
+extern void lio_scsi_auth_intr_seq_stop(struct seq_file *, void *);
+extern void *lio_scsi_att_intr_port_seq_start(struct seq_file *, loff_t *);
+extern void *lio_scsi_att_intr_port_seq_next(struct seq_file *, void *, loff_t *);
+extern int lio_scsi_att_intr_port_seq_show(struct seq_file *, void *);
+extern void lio_scsi_att_intr_port_seq_stop(struct seq_file *, void *);
 extern int init_iscsi_target_mib(void);
 extern void remove_iscsi_target_mib(void);
 extern void init_iscsi_index_table(void);
-extern u32 get_new_index(iscsi_index_t);
+extern u32 iscsi_get_new_index(iscsi_index_t);
 
 #endif   /*** ISCSI_TARGET_MIB_H ***/
 
