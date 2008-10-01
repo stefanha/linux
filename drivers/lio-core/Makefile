@@ -66,6 +66,10 @@ ifeq ($(LINUX_MEDIA_CHANGER), 1)
 target_core_mod-objs			+=	iscsi_target_mc.o
 EXTRA_CFLAGS				+=	-DPYX_MEDIA_CHANGER
 endif
+ifeq ($(SNMP_FEATURE), 1)
+target_core_mod-objs			+=	target_core_mib.o
+EXTRA_CFLAGS				+=	-DSNMP_SUPPORT
+endif
 
 obj-$(CONFIG_LIO_TARGET)	+=	iscsi_target_mod.o
 iscsi_target_mod-objs		:=	iscsi_crc.o \

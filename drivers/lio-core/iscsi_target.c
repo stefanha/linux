@@ -271,7 +271,7 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 	spin_lock_init(&tiqn->sess_err_stats.lock);
 	spin_lock_init(&tiqn->login_stats.lock);
 	spin_lock_init(&tiqn->logout_stats.lock);
-	tiqn->tiqn_index = get_new_index(ISCSI_INST_INDEX);
+	tiqn->tiqn_index = iscsi_get_new_index(ISCSI_INST_INDEX);
 #endif
 	if (!(tiqn->tiqn_tpg_list = kmalloc(
 			(sizeof(iscsi_portal_group_t) * ISCSI_MAX_TPGS),
@@ -749,7 +749,7 @@ extern iscsi_np_t *core_add_np (
 	np->np_network_transport = network_transport;
 	np->np_net_size		= net_size;
 #ifdef SNMP_SUPPORT
-	np->np_index		= get_new_index(ISCSI_PORTAL_INDEX);
+	np->np_index		= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
 #endif
 	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);

@@ -462,7 +462,7 @@ extern iscsi_node_acl_t *iscsi_tpg_check_initiator_node_acl (
 	snprintf(acl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
 	acl->tpg = tpg;
 #ifdef SNMP_SUPPORT
-        acl->acl_index = get_new_index(SCSI_AUTH_INTR_INDEX);
+        acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
         spin_lock_init(&acl->stats_lock);
 #endif /* SNMP_SUPPORT */
 	acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
@@ -878,7 +878,7 @@ extern int iscsi_tpg_add_initiator_node_acl (
 	snprintf(acl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
 	acl->tpg = tpg;
 #ifdef SNMP_SUPPORT
-	acl->acl_index = get_new_index(SCSI_AUTH_INTR_INDEX);
+	acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
 	spin_lock_init(&acl->stats_lock);
 #endif /* SNMP_SUPPORT */
 
@@ -1048,7 +1048,7 @@ extern int iscsi_tpg_add_network_portal (
 	}
 	memset((void *)tpg_np, 0, sizeof(iscsi_tpg_np_t));
 #ifdef SNMP_SUPPORT
-	tpg_np->tpg_np_index	= get_new_index(ISCSI_PORTAL_INDEX);
+	tpg_np->tpg_np_index	= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
 #endif /* SNMP_SUPPORT */
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
 	tpg_np->tpg_np		=  np;
