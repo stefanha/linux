@@ -55,9 +55,6 @@
 #include <target_core_configfs.h>
 #include <iscsi_target_configfs.h>
 
-extern void iscsi_dump_dev_info (struct se_device_s *, struct se_lun_s *, unsigned long long, char *, int *);
-extern void iscsi_dump_dev_state (struct se_device_s *, char *, int *);
-
 static struct target_fabric_configfs *lio_target_fabric_configfs = NULL;
 
 struct lio_target_configfs_attribute {
@@ -429,11 +426,13 @@ static int lio_target_port_link (struct config_item *lun_ci, struct config_item 
 	if (!(dev = se_dev->se_dev_ptr)) {	
 		printk(KERN_ERR "Unable to locate se_device_t pointer from %s\n",
 			config_item_name(se_dev_ci));
-		return(-ENODEV);
+		ret = -ENODEV;
+		goto out;
 	}
 
 	if (!(lun_p = iscsi_dev_add_lun(tpg, dev->iscsi_hba, dev, lun->iscsi_lun, &ret))) {
 		printk(KERN_ERR "iscsi_dev_add_lun() failed: %d\n", ret);
+		ret = -EINVAL;
 		goto out;
 	}
 	iscsi_put_tpg(tpg);
@@ -443,7 +442,7 @@ static int lio_target_port_link (struct config_item *lun_ci, struct config_item 
 	return(0);
 out:
 	iscsi_put_tpg(tpg);
-	return(-EINVAL);
+	return(ret);
 }
 
 static int lio_target_port_unlink (struct config_item *lun_ci, struct config_item *se_dev_ci)
@@ -962,7 +961,7 @@ static struct config_item_type lio_target_cit = {
 extern int iscsi_target_register_configfs (void)
 {
 	struct target_fabric_configfs *fabric;
-	struct config_item *iscsi_ci;
+	int ret;
 
 	if (!(fabric = target_fabric_configfs_init(&lio_target_cit, "iscsi"))) {
 		printk(KERN_ERR "target_fabric_configfs_init() for LIO-Target failed!\n");
@@ -980,12 +979,16 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.add_cmd_to_response_queue = &iscsi_add_cmd_to_response_queue;
 	fabric->tf_ops.build_r2ts_for_cmd = &iscsi_build_r2ts_for_cmd;
 	fabric->tf_ops.dec_nacl_count = &iscsi_dec_nacl_count;
-	fabric->tf_ops.dump_dev_info = &iscsi_dump_dev_info;
-	fabric->tf_ops.dump_dev_state = &iscsi_dump_dev_state;
-#ifdef SNMP_SUPPORT
-	fabric->tf_ops.get_new_index = &get_new_index;
-#endif
-	if (!(iscsi_ci = target_fabric_configfs_register(fabric))) {
+	fabric->tf_ops.scsi_auth_intr_seq_start = &lio_scsi_auth_intr_seq_start;
+	fabric->tf_ops.scsi_auth_intr_seq_next = &lio_scsi_auth_intr_seq_next;
+	fabric->tf_ops.scsi_auth_intr_seq_show = &lio_scsi_auth_intr_seq_show;
+	fabric->tf_ops.scsi_auth_intr_seq_stop = &lio_scsi_auth_intr_seq_stop;
+	fabric->tf_ops.scsi_att_intr_port_seq_start = &lio_scsi_att_intr_port_seq_start;
+	fabric->tf_ops.scsi_att_intr_port_seq_next = &lio_scsi_att_intr_port_seq_next;
+	fabric->tf_ops.scsi_att_intr_port_seq_show = &lio_scsi_att_intr_port_seq_show;
+	fabric->tf_ops.scsi_att_intr_port_seq_stop = &lio_scsi_att_intr_port_seq_stop;
+
+	if ((ret = target_fabric_configfs_register(fabric)) < 0) {
 		printk(KERN_ERR "target_fabric_configfs_register() for LIO-Target failed!\n");
 		target_fabric_configfs_free(fabric);		
 		return(-1);
