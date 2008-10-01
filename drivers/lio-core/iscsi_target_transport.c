@@ -245,18 +245,8 @@ extern int init_se_global (void)
                 spin_lock_init(&hba->device_lock);
                 spin_lock_init(&hba->hba_queue_lock);
                 init_MUTEX(&hba->hba_access_sem);
-#warning FIXME: Need to seperate out SNMP for target_core_mod and iscsi_target_mod..
-#if 0
 #ifdef SNMP_SUPPORT
-		{
-		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-		
-		if (!(iscsi_tf))
-			BUG();
-
-                hba->hba_index = iscsi_tf->get_new_index(SCSI_INST_INDEX);
-		}
-#endif
+                hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
 #endif
         }
 	
@@ -1417,6 +1407,118 @@ extern int transport_check_device_tcq (se_device_t *dev, __u32 iscsi_lun, __u32 
 
 EXPORT_SYMBOL(transport_check_device_tcq);
 
+extern void transport_dump_dev_state (
+	se_device_t *dev,
+	char *b,
+	int *bl)
+{
+	*bl += sprintf(b+*bl, "Status: ");
+	switch (dev->dev_status) {
+	case ISCSI_DEVICE_ACTIVATED:
+		*bl += sprintf(b+*bl, "ACTIVATED");
+		break;
+	case ISCSI_DEVICE_DEACTIVATED:
+		*bl += sprintf(b+*bl, "DEACTIVATED");
+                break;
+	case ISCSI_DEVICE_SHUTDOWN:
+		*bl += sprintf(b+*bl, "SHUTDOWN");
+		break;
+	case ISCSI_DEVICE_OFFLINE_ACTIVATED:
+	case ISCSI_DEVICE_OFFLINE_DEACTIVATED:
+		*bl += sprintf(b+*bl, "OFFLINE");
+		break;
+	default:
+		*bl += sprintf(b+*bl, "UNKNOWN=%d", dev->dev_status);
+		break;
+	}
+
+	*bl += sprintf(b+*bl, "  Execute/Left/Max Queue Depth: %d/%d/%d",
+		atomic_read(&dev->execute_tasks), atomic_read(&dev->depth_left),
+		dev->queue_depth);
+	*bl += sprintf(b+*bl, "  SectorSize: %u  MaxSectors: %u\n",
+		TRANSPORT(dev)->get_blocksize(dev), DEV_ATTRIB(dev)->da_max_sectors);
+	*bl += sprintf(b+*bl, "        ");
+
+	return;	
+}
+
+extern void transport_dump_dev_info ( 
+	se_device_t *dev,
+	se_lun_t *lun,
+	unsigned long long total_bytes,
+	char *b,        /* Pointer to info buffer */
+	int *bl)
+{
+	se_subsystem_api_t *t;
+	int ret = 0;
+
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, dev->type, &ret);
+	if (!t || (ret != 0))
+		return;
+
+	t->get_dev_info(dev, b, bl);
+	*bl += sprintf(b+*bl, "        ");
+	*bl += sprintf(b+*bl, "Type: %s ", scsi_device_type(TRANSPORT(dev)->get_device_type(dev)));
+	*bl += sprintf(b+*bl, "ANSI SCSI revision: %02x  ", TRANSPORT(dev)->get_device_rev(dev));
+
+	if (DEV_OBJ_API(dev)->get_t10_wwn) {
+		t10_wwn_t *wwn = DEV_OBJ_API(dev)->get_t10_wwn((void *)dev);
+
+		*bl += sprintf(b+*bl, "Unit Serial: %s  ",
+			((strlen(wwn->unit_serial) != 0) ?
+			(char *)wwn->unit_serial : "None"));
+	}
+
+	if (dev->dev_fp) {
+		unsigned char tbuf[128];
+		int len = 0;
+
+		memset(tbuf, 0, 128);
+		dev->dev_fp->fp_api->get_feature_info(dev->dev_fp->fp_ptr, &tbuf[0], &len);
+
+		*bl += sprintf(b+*bl, "%s", tbuf);
+
+		if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
+		    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
+			*bl += sprintf(b+*bl, "  ACCESSED\n");
+		else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
+			*bl += sprintf(b+*bl, "  EXPORTED\n");
+		else
+			*bl += sprintf(b+*bl, "  FREE\n");
+	} else {
+		*bl += sprintf(b+*bl, "%s", "DIRECT");
+
+		if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
+		    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
+			*bl += sprintf(b+*bl, "  ACCESSED\n");
+		else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
+			*bl += sprintf(b+*bl, "  EXPORTED\n");
+		else
+			*bl += sprintf(b+*bl, "  FREE\n");
+	}
+
+	if (lun) {
+		*bl += sprintf(b+*bl, "        iSCSI Host ID: %u iSCSI LUN: %u",
+			dev->iscsi_hba->hba_id, lun->iscsi_lun);
+		if (!(TRANSPORT(dev)->get_device_type(dev))) {
+			*bl += sprintf(b+*bl, "  Active Cmds: %d  Total Bytes: %llu\n",
+				atomic_read(&dev->active_cmds), total_bytes);
+		} else {
+			*bl += sprintf(b+*bl, "  Active Cmds: %d\n", atomic_read(&dev->active_cmds));
+		}
+	} else {
+		if (!(TRANSPORT(dev)->get_device_type(dev))) {
+			*bl += sprintf(b+*bl, "        iSCSI Host ID: %u  Active Cmds: %d  Total Bytes: %llu\n",
+				dev->iscsi_hba->hba_id, atomic_read(&dev->active_cmds), total_bytes);
+		} else {
+			*bl += sprintf(b+*bl, "        iSCSI Host ID: %u  Active Cmds: %d\n",
+				dev->iscsi_hba->hba_id, atomic_read(&dev->active_cmds));
+		}
+	}
+
+	return;
+}
+
 /*	transport_release_all_cmds():
  *
  *
@@ -1780,13 +1882,7 @@ extern se_device_t *transport_add_device_to_iscsi_hba (
 		&transport_dev_write_pending_nop;
 
 #ifdef SNMP_SUPPORT
-	{
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-	if (!(iscsi_tf))
-
-	dev->dev_index = iscsi_tf->get_new_index(SCSI_DEVICE_INDEX);
-	}
+	dev->dev_index = scsi_get_new_index(SCSI_DEVICE_INDEX);
 	dev->creation_time = get_jiffies_64();
 	spin_lock_init(&dev->stats_lock);
 #endif /* SNMP_SUPPORT */
@@ -5001,11 +5097,15 @@ release_cmd:
 		transport_release_cmd_to_pool(cmd);
 	else {
 		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+		
+		if ((iscsi_tf)) {
+			iscsi_tf->release_cmd_direct(cmd);
+			return(0);
+		}
 
-		if (!(iscsi_tf))
-			BUG();
-
-		iscsi_tf->release_cmd_direct(cmd);
+		if (T_TASK(cmd))
+			kfree(T_TASK(cmd));
+		kfree(cmd);
 	}
 
 	return(0);

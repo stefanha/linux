@@ -111,6 +111,8 @@ extern void transport_add_tasks_from_cmd (struct iscsi_cmd_s *);
 extern struct se_task_s *transport_get_task_from_execute_queue (struct se_device_s *);
 extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
 extern int transport_check_device_tcq (se_device_t *, u32, u32);
+extern void transport_dump_dev_state (struct se_device_s *, char *, int *);
+extern void transport_dump_dev_info (struct se_device_s *, struct se_lun_s *, unsigned long long, char *, int *);
 extern se_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
 extern se_device_t *transport_add_device_to_iscsi_hba (se_hba_t *, struct se_subsystem_api_s *, u32, void *);
 extern void transport_generic_activate_device (se_device_t *);
@@ -215,6 +217,10 @@ typedef struct se_mem_s {
 	u32		se_off;
 	struct list_head se_list;
 } ____cacheline_aligned se_mem_t;
+
+#ifdef SNMP_SUPPORT
+#include <target_core_mib.h>
+#endif
 
 typedef struct se_port_s {
 #ifdef SNMP_SUPPORT
