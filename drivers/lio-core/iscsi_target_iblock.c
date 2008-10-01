@@ -116,7 +116,7 @@ extern int iblock_detach_hba (se_hba_t *hba)
 	}
 	ib_host = (iblock_hba_t *) hba->hba_ptr;
 
-	PYXPRINT("CORE_HBA[%d] - Detached iBlock HBA: %u Generic Target Core\n",
+	PYXPRINT("CORE_HBA[%d] - Detached iBlock HBA: %u from Generic Target Core\n",
 			hba->hba_id, ib_host->iblock_host_id);
 
 	kfree(ib_host);
