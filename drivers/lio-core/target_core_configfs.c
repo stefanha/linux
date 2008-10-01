@@ -49,7 +49,9 @@
 #include <iscsi_target_plugin.h>
 #include <iscsi_target_transport.h>
 #include <iscsi_target.h>
+
 #ifdef SNMP_SUPPORT
+#include <linux/proc_fs.h>
 #include <iscsi_target_mib.h>
 #endif /* SNMP_SUPPORT */
 
@@ -126,33 +128,6 @@ static struct target_fabric_configfs *target_core_get_fabric (
 }
 
 /*
- * Called with g_tf_lock mutex held, and struct target_fabric_congifs->tf_access_cnt
- * is not incremented..
- */
-static struct target_fabric_configfs *__target_core_get_fabric (
-	const char *name)
-{
-	struct target_fabric_configfs *tf;
-
-	if (!(name))
-		return(NULL);
-	
-	list_for_each_entry(tf, &g_tf_list, tf_list) {
-		if (!(strcmp(tf->tf_name, name)))
-			return(tf);
-	}
-
-	return(NULL);
-}
-
-static void target_core_put_fabric (
-	struct target_fabric_configfs *tf)
-{
-	atomic_dec(&tf->tf_access_cnt);
-	return;
-}
-
-/*
  * Called from struct target_core_group_ops->make_group()
  */
 static struct config_group *target_core_register_fabric (
@@ -161,70 +136,70 @@ static struct config_group *target_core_register_fabric (
 {
 	struct config_group *fabric_cg;
 	struct target_fabric_configfs *tf;
+	char *ptr;
+	int ret;
 
 	printk("Target_Core_ConfigFS: REGISTER -> group: %p name: %s\n", group, name);
+
+        if (!(fabric_cg = kzalloc(sizeof(struct config_group), GFP_KERNEL)))
+                return(ERR_PTR(-ENOMEM));
+	/*
+	 * Load LIO Target for $CONFIGFS/target/iscsi :-)
+	 */
+	if ((ptr = strstr(name, "iscsi"))) {
+		if ((ret = request_module("iscsi_target_mod")) < 0) {
+			printk(KERN_ERR "request_module() failed for"
+				" iscsi_target_mod.ko: %d\n", ret);
+			kfree(fabric_cg);
+			return(ERR_PTR(-EINVAL));
+		}
+	} else {
+		printk(KERN_ERR "Unsupported configfs target fabric %s\n", name);
+		kfree(fabric_cg);
+		return(ERR_PTR(-EINVAL));
+	}
+
+	if (!(tf = target_core_get_fabric(name))) {
+		printk(KERN_ERR "target_core_get_fabric() failed for %s\n", name);
+		kfree(fabric_cg);
+		return(ERR_PTR(-EINVAL));
+	}
+	printk("Target_Core_ConfigFS: REGISTER -> Located fabric: %s\n", tf->tf_name);
 
 	/*
 	 * On a successful target_core_get_fabric() look, the returned 
 	 * struct target_fabric_configfs *tf will contain a usage reference.
 	 */
-	if (!(tf = target_core_get_fabric(name)))
-		return(NULL);
-
-	printk("Target_Core_ConfigFS: REGISTER -> Located fabric: %s\n", tf->tf_name);
-
-        if (!(fabric_cg = kzalloc(sizeof(struct config_group), GFP_KERNEL))) {
-		target_core_put_fabric(tf);
-                return(ERR_PTR(-ENOMEM));
-        }
-
 	printk("Target_Core_ConfigFS: REGISTER -> %p\n", tf->tf_fabric_cit);
-        config_group_init_type_name(fabric_cg, name, tf->tf_fabric_cit);
+        config_group_init_type_name(&tf->tf_group, name, tf->tf_fabric_cit);
         printk("Target_Core_ConfigFS: REGISTER -> Allocated Fabric: %s\n",
-			fabric_cg->cg_item.ci_name);
+			tf->tf_group.cg_item.ci_name);
 
-	return(fabric_cg);
+	tf->tf_fabric = &tf->tf_group.cg_item;
+	printk("Target_Core_ConfigFS: REGISTER -> Set tf->tf_fabric for %s\n", name);
+		
+	return(&tf->tf_group);
 }
 
 /*
  * Called from struct target_core_group_ops->drop_item()
+mkdir 
  */
 static void target_core_deregister_fabric (
 	struct config_group *group,
 	struct config_item *item)
 {
-	struct target_fabric_configfs *tf;
+	struct target_fabric_configfs *tf = container_of(
+		to_config_group(item), struct target_fabric_configfs, tf_group);
 
-	if (!(group) || !(item)) {
-		printk(KERN_ERR "Missing group or item parameters\n");
-		return;
-	}
 	printk("Target_Core_ConfigFS: DEREGISTER -> Looking up %s in tf list\n",
 			config_item_name(item));
 
-	mutex_lock(&g_tf_lock);
-	if (!(tf = __target_core_get_fabric(config_item_name(item)))) {
-		mutex_unlock(&g_tf_lock);
-		printk(KERN_ERR "Unable to locate tf from item: %s\n",
-			config_item_name(item));
-		BUG();
-	}
 	printk("Target_Core_ConfigFS: DEREGISTER -> located fabric: %s\n", tf->tf_name);
+	atomic_dec(&tf->tf_access_cnt);
 
-	if (!(atomic_dec_and_test(&tf->tf_access_cnt))) {
-		mutex_unlock(&g_tf_lock);
-		printk(KERN_ERR "Non zero tf->tf_access_cnt for fabric %s\n",
-			tf->tf_name);
-		BUG();
-	}
-	list_del(&tf->tf_list);
-	mutex_unlock(&g_tf_lock);
-
-	printk("Target_Core_ConfigFS: DEREGISTER -> Releasing tf: %s\n", tf->tf_name);
-	tf->tf_fabric_cit = NULL;
-	tf->tf_subsys = NULL;
+	printk("Target_Core_ConfigFS: DEREGISTER -> Releasing tf->tf_fabric for %s\n", tf->tf_name);
 	tf->tf_fabric = NULL;
-	kfree(tf);
 
 	printk("Target_Core_ConfigFS: DEREGISTER -> Releasing ci %s\n",
 			config_item_name(item));
@@ -468,65 +443,39 @@ unlock:
  * Upon a successful registration, the new fabric's struct config_item is return.
  * Also, a pointer to this struct is set in the passted struct target_fabric_configfs.
  */
-extern struct config_item *target_fabric_configfs_register (
+extern int target_fabric_configfs_register (
 	struct target_fabric_configfs *tf)
 {
-	struct config_item *fabric;
 	struct config_group *su_group;
-	char buf[256];
 
 	if (!(tf)) {
 		printk(KERN_ERR "Unable to locate target_fabric_configfs pointer\n");
-		return(NULL);
+		return(-EINVAL);
 	}
 	if (!(tf->tf_subsys)) {
 		printk(KERN_ERR "Unable to target struct config_subsystem pointer\n");
-		return(NULL);
+		return(-EINVAL);
 	}
 	if (!(su_group = &tf->tf_subsys->su_group)) {
 		printk(KERN_ERR "Unable to locate target struct config_group pointer\n");
-		return(NULL);
+		return(-EINVAL);
 	}
-
-	memset(buf, 0, 256);
-	snprintf(buf, 256, "%s/target/%s", TARGET_CORE_CONFIG_ROOT, tf->tf_name);
-	printk("target_fabric_configfs_register(): Using do_configfs_mkdir(%s)\n", buf);
-
-	do_configfs_mkdir(&su_group->cg_item, buf, 600);
-
-	/*
-	 * Grab reference to returned config_item *fabric..
-	 */
-	if (!(fabric = target_fabric_configfs_find_by_name(tf->tf_subsys,
-			tf->tf_name))) {
-		printk(KERN_ERR "target_fabric_configfs_find_by_name() returned"
-				" NULL for %s\n", tf->tf_name);
-		return(NULL);
-	}
-	tf->tf_fabric = fabric;
-	printk("target_fabric_configfs_register(): Allocated Fabric: %s\n",
-			config_item_name(fabric));
 	printk("<<<<<<<<<<<<<<<<<<<<<< END FABRIC API >>>>>>>>>>>>>>>>>>>>>>\n");
 
+#warning FIXME: Remove temporary pointer to iscsi_fabric_ops..
 	iscsi_fabric_ops = &tf->tf_ops;
 
-	return(fabric);
+	return(0);
 }
 
 extern void target_fabric_configfs_deregister (
 	struct target_fabric_configfs *tf)
 {
-	struct config_item *fabric;
 	struct config_group *su_group;
 	struct configfs_subsystem *su;
-	char buf[256], name[256];
 
 	if (!(tf)) {
 		printk(KERN_ERR "Unable to locate passed target_fabric_configfs\n");
-		return;
-	}
-	if (!(fabric = tf->tf_fabric)) {
-		printk(KERN_ERR "Unable to locate passed fabric struct config_item\n");
 		return;
 	}
 	if (!(su = tf->tf_subsys)) {
@@ -538,32 +487,22 @@ extern void target_fabric_configfs_deregister (
 		return;
 	}
 
-	memset(name, 0, 256);
-	snprintf(name, 256, "%s", tf->tf_name);
-
-	memset(buf, 0, 256);
-	snprintf(buf, 256, "%s/target/%s", TARGET_CORE_CONFIG_ROOT,
-			config_item_name(fabric));
-	/*
-	 * Release the fabric's config_item reference that was obtained in
-	 * target_fabric_configfs_find_by_name() -> config_group_find_item()
-	 */
-	config_item_put(fabric);
-
 	printk("<<<<<<<<<<<<<<<<<<<<<< BEGIN FABRIC API >>>>>>>>>>>>>>>>>>>>>>\n");
-	printk("target_fabric_configfs_unregister(): Using do_configfs_rmdir(%s)\n", buf);
-	do_configfs_rmdir(&su_group->cg_item, buf);
+	mutex_lock(&g_tf_lock);
+	if (atomic_read(&tf->tf_access_cnt)) {
+		mutex_unlock(&g_tf_lock);
+		printk(KERN_ERR "Non zero tf->tf_access_cnt for fabric %s\n",
+			tf->tf_name);
+		BUG();
+        }
+	list_del(&tf->tf_list);
+	mutex_unlock(&g_tf_lock);
 
-	/*
-	 * Make sure the struct config_item *fabric was released..
-	 */
-	if ((fabric = target_fabric_configfs_find_by_name(su, name))) {
-		printk(KERN_ERR "Huh..? struct config_item: %s for fabric %s"
-			" still exists\n", config_item_name(fabric), name);
-		return;
-	}
+	printk("Target_Core_ConfigFS: DEREGISTER -> Releasing tf: %s\n", tf->tf_name);
+	tf->tf_fabric_cit = NULL;
+	tf->tf_subsys = NULL;
+	kfree(tf);
 
-	printk("target_fabric_configfs_unregister(): Released Fabric: %s\n", name);
 	printk("<<<<<<<<<<<<<<<<<<<<<< END FABRIC API >>>>>>>>>>>>>>>>>>>>>>\n");
 	return;
 }
@@ -584,22 +523,15 @@ static ssize_t target_core_show_dev_info (void *p, char *page)
 	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;
 	se_hba_t *hba = se_dev->se_dev_hba;
 	se_subsystem_api_t *t;
-	int ret = 0;
+	int ret = 0, bl = 0;
 	ssize_t read_bytes = 0;
 
 	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0)) 
 		return(0);
 	
-	{
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-	int bl = 0;
-
-	if (!(iscsi_tf))
-		BUG();
-	
-	if (se_dev->se_dev_ptr)
-		iscsi_tf->dump_dev_state(se_dev->se_dev_ptr, page, &bl);
+	if (se_dev->se_dev_ptr) {
+		transport_dump_dev_state(se_dev->se_dev_ptr, page, &bl);
 		read_bytes += bl;
 	}
 
@@ -902,7 +834,7 @@ static struct config_group *target_core_call_addhbatotarget (
 	memset(buf, 0, TARGET_CORE_NAME_MAX_LEN);
 	if (strlen(name) > TARGET_CORE_NAME_MAX_LEN) {
 		printk(KERN_ERR "Passed *name strlen(): %d exceeds"
-			" TARGET_CORE_NAME_MAX_LEN: %d\n", strlen(name),
+			" TARGET_CORE_NAME_MAX_LEN: %d\n", (int)strlen(name),
 			TARGET_CORE_NAME_MAX_LEN);
 		return(NULL);
 	}
@@ -1041,6 +973,9 @@ extern int target_core_init_configfs (void)
 {
 	struct config_group *target_cg;
 	struct configfs_subsystem *subsys;
+#ifdef SNMP_SUPPORT
+	struct proc_dir_entry *scsi_target_proc;
+#endif
 	int ret;
 
 	subsys = target_core_subsystem[0];	
@@ -1074,16 +1009,32 @@ extern int target_core_init_configfs (void)
 			ret, subsys->su_group.cg_item.ci_namebuf);
 		return(-1);
 	}
-
 	printk("TARGET_CORE[0]: Initialized ConfigFS Fabric Infrastructure: "
 		""TARGET_CORE_CONFIGFS_VERSION" on %s/%s on "UTS_RELEASE"\n",
 			utsname()->sysname, utsname()->machine);
 
-#warning FIXME: Handle failure of init_se_global()
-	init_se_global();
-	plugin_load_all_classes();
+	if ((ret = init_se_global()) < 0)
+		goto out;
 
+	plugin_load_all_classes();
+#ifdef SNMP_SUPPORT
+	if (!(scsi_target_proc = proc_mkdir("scsi_target", 0))) {
+		printk(KERN_ERR "proc_mkdir(scsi_target, 0) failed\n");
+		goto out;
+	}
+	if ((ret = init_scsi_target_mib()) < 0)
+		goto out;
+#endif
 	return(0);
+
+out:
+	configfs_unregister_subsystem(subsys);
+#ifdef SNMP_SUPPORT
+	remove_proc_entry("scsi_target", 0);
+#endif
+	plugin_unload_all_classes();
+	release_se_global();
+	return(-1);
 }
 
 extern void target_core_exit_configfs (void)
@@ -1103,9 +1054,12 @@ extern void target_core_exit_configfs (void)
 	}
 
 	configfs_unregister_subsystem(subsys);
-
 	printk("TARGET_CORE[0]: Released ConfigFS Fabric Infrastructure\n");
 
+#ifdef SNMP_SUPPORT
+	remove_scsi_target_mib();
+	remove_proc_entry("scsi_target", 0);
+#endif
 	plugin_unload_all_classes();
 	release_se_global();
 
