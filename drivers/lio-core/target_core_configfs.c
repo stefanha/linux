@@ -541,7 +541,7 @@ static ssize_t target_core_show_dev_info (void *p, char *page)
 
 static struct target_core_configfs_attribute target_core_attr_dev_info = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "dev_info",
+		    .ca_name = "info",
 		    .ca_mode = S_IRUGO },
 	.show	= target_core_show_dev_info,
 	.store	= NULL,
@@ -568,7 +568,7 @@ static ssize_t target_core_store_dev_control (void *p, const char *page, size_t 
 
 static struct target_core_configfs_attribute target_core_attr_dev_control = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "dev_control",
+		    .ca_name = "control",
 		    .ca_mode = S_IWUSR },
 	.show	= NULL,
 	.store	= target_core_store_dev_control,
@@ -603,7 +603,7 @@ static ssize_t target_core_store_dev_enable (void *p, const char *page, size_t c
 
 static struct target_core_configfs_attribute target_core_attr_dev_enable = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "dev_enable",
+		    .ca_name = "enable",
 		    .ca_mode = S_IWUSR },
 	.show	= NULL,
 	.store	= target_core_store_dev_enable,

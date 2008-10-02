@@ -323,7 +323,7 @@ static ssize_t lio_target_show_port_info (void *p, char *page)
 
 static struct lio_target_configfs_attribute lio_target_attr_port_info = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "port_info",
+		    .ca_name = "info",
 		    .ca_mode = S_IRUGO },
 	.show	= lio_target_show_port_info,
 	.store	= NULL,
@@ -348,7 +348,7 @@ static ssize_t lio_target_store_port_control (void *p, const char *page, size_t 
 
 static struct lio_target_configfs_attribute lio_target_attr_port_control = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "port_control",
+		    .ca_name = "control",
 		    .ca_mode = S_IWUSR },
 	.show	= NULL,
 	.store	= lio_target_store_port_control,
@@ -620,7 +620,7 @@ static ssize_t lio_target_store_tpg_control (void *p, const char *page, size_t c
 
 static struct lio_target_configfs_attribute lio_target_attr_tpg_control = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "tpg_control",
+		    .ca_name = "control",
 		    .ca_mode = S_IWUSR },
 	.show	= NULL,
 	.store	= lio_target_store_tpg_control,
@@ -678,7 +678,7 @@ out:
 
 static struct lio_target_configfs_attribute lio_target_attr_tpg_enable = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "tpg_enable",
+		    .ca_name = "enable",
 		    .ca_mode = S_IWUSR },
 	.show	= NULL,
 	.store	= lio_target_store_tpg_enable,
