@@ -1,11 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_hba.c
+ * Filename:  target_core_hba.c
  *
  * This file copntains the iSCSI HBA Transport related functions.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,7 +27,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_HBA_C
+#define TARGET_CORE_HBA_C
 
 #include <linux/net.h>
 #include <linux/string.h>
@@ -50,15 +51,15 @@
 #include <iscsi_target_error.h>
 #include <target_core_device.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_hba.h>
+#include <target_core_hba.h>
 #include <iscsi_target_tpg.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
 
-#undef ISCSI_TARGET_HBA_C
+#undef TARGET_CORE_HBA_C
 
 extern se_global_t *se_global;
 

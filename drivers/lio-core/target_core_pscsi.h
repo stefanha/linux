@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  iscsi_target_pscsi.h
+ * Filename:  target_core_pscsi.h
  *
  * This file contains the iSCSI <-> Parallel SCSI transport
  * specific definitions and prototypes.
@@ -7,6 +7,7 @@
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -27,8 +28,8 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_PSCSI_H
-#define ISCSI_TARGET_PSCSI_H
+#ifndef TARGET_CORE_PSCSI_H
+#define TARGET_CORE_PSCSI_H
 
 #define PSCSI_VERSION		"v3.0"
 
@@ -193,4 +194,4 @@ se_subsystem_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 se_subsystem_api_t pscsi_template = ISCSI_PSCSI;
 #endif
 
-#endif   /*** ISCSI_TARGET_PSCSI_H ***/
+#endif   /*** TARGET_CORE_PSCSI_H ***/

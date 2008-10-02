@@ -31,39 +31,39 @@ include $(CWD)/drivers/lio-core/MCONFIG_ALL
 obj-$(CONFIG_TARGET_CORE)		+=	target_core_mod.o
 target_core_mod-objs			:=	target_core_configfs.o \
 						target_core_device.o \
-						iscsi_target_feature_obj.o \
-						iscsi_target_hba.o \
-						iscsi_target_plugin.o \
-						iscsi_target_scdb.o \
-						iscsi_target_seobj.o \
-						iscsi_target_transport.o \
+						target_core_feature_obj.o \
+						target_core_hba.o \
+						target_core_plugin.o \
+						target_core_scdb.o \
+						target_core_seobj.o \
+						target_core_transport.o \
 
 ifeq ($(LINUX_IBLOCK), 1)
-target_core_mod-objs			+=	iscsi_target_iblock.o
+target_core_mod-objs			+=	target_core_iblock.o
 EXTRA_CFLAGS				+=	-DPYX_IBLOCK
 endif
 ifeq ($(LINUX_PARALLEL_SCSI), 1)
-target_core_mod-objs			+=	iscsi_target_pscsi.o
+target_core_mod-objs			+=	target_core_pscsi.o
 EXTRA_CFLAGS				+=	-DPARALLEL_SCSI
 endif
 ifeq ($(LINUX_RAMDISK), 1)
-target_core_mod-objs			+=	iscsi_target_rd.o
+target_core_mod-objs			+=	target_core_rd.o
 EXTRA_CFLAGS				+=	-DPYX_RAMDISK
 endif
 ifeq ($(LINUX_FILEIO), 1)
-target_core_mod-objs			+=	iscsi_target_file.o
+target_core_mod-objs			+=	target_core_file.o
 EXTRA_CFLAGS				+=	-DPYX_FILEIO
 endif
 ifeq ($(LINUX_VROM), 1)
-target_core_mod-objs			+=	iscsi_target_vrom.o
+target_core_mod-objs			+=	target_core_vrom.o
 EXTRA_CFLAGS				+=	-DPYX_VROM
 endif
 ifeq ($(LINUX_VTAPE), 1)
-target_core_mod-objs			+=	iscsi_target_vt.o
+target_core_mod-objs			+=	target_core_vt.o
 EXTRA_CFLAGS				+=	-DPYX_VTAPE
 endif
 ifeq ($(LINUX_MEDIA_CHANGER), 1)
-target_core_mod-objs			+=	iscsi_target_mc.o
+target_core_mod-objs			+=	target_core_mc.o
 EXTRA_CFLAGS				+=	-DPYX_MEDIA_CHANGER
 endif
 ifeq ($(SNMP_FEATURE), 1)

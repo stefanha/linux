@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  iscsi_target_iblock.c
+ * Filename:  target_core_iblock.c
  *
  * This file contains the Storage Engine  <-> Linux BlockIO transport specific functions.
  *
@@ -26,7 +26,7 @@
  *
  *********************************************************************************/
 
-
+#define TARGET_CORE_IBLOCK_C
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/timer.h> 
@@ -49,10 +49,12 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_iblock.h>
+#include <target_core_iblock.h>
 #include <iscsi_target_error.h>
+
+#undef TARGET_CORE_IBLOCK_C
 
 extern se_global_t *se_global;
 extern struct block_device *__linux_blockdevice_claim (int, int, void *, int *); 

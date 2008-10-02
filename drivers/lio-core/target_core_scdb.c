@@ -1,11 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_scdb.c
+ * Filename:  target_core_scdb.c
  *
  * This file contains the iSCSI Transport Split CDB related functions.
  *
  * Copyright (c) 2004-2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,7 +27,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_SCDB_C
+#define TARGET_CORE_SCDB_C
 
 #include <linux/net.h>
 #include <linux/string.h>
@@ -45,12 +46,12 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_ioctl.h>
-#include <iscsi_target_hba.h>
-#include <iscsi_target_transport.h>
+#include <target_core_hba.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_scdb.h>
+#include <target_core_scdb.h>
 
-#undef ISCSI_TARGET_SCDB_C
+#undef TARGET_CORE_SCDB_C
 
 /*	split_cdb_XX_6():
  *

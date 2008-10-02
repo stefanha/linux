@@ -45,16 +45,16 @@
 #include <iscsi_target_error.h>
 #include "iscsi_target_device.h"
 #include "iscsi_target_ioctl.h"
-#include "iscsi_target_hba.h"
+#include "target_core_hba.h"
 #include "iscsi_target_info.h"
-#include "iscsi_target_transport.h"
+#include "target_core_transport.h"
 #include "iscsi_target_util.h"
 
 #include "target_core_mib.h"
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_feature_obj.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
+#include <target_core_feature_obj.h>
 
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>

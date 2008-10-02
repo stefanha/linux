@@ -45,7 +45,7 @@
 #include <iscsi_target_device.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_tpg.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target_nodeattrib.h>
 

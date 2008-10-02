@@ -1,10 +1,11 @@
 /*********************************************************************************
- * Filename:  iscsi_target_vt.c
+ * Filename:  target_core_vt.c
  *
  * This file contains the iSCSI <-> VTAPE transport specific functions.
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -25,7 +26,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_VTAPE_C
+#define TARGET_CORE_VTAPE_C
 
 #include <linux/version.h>
 #include <linux/string.h>
@@ -46,10 +47,12 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_vt.h>
+#include <target_core_vt.h>
 #include <iscsi_target_error.h>
+
+#undef TARGET_CORE_VTAPE_C
  
 extern se_global_t *se_global;
 

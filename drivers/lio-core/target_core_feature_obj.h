@@ -1,8 +1,9 @@
 /*********************************************************************************
- * Filename:  iscsi_target_feature_obj.h
+ * Filename:  target_core_feature_obj.h
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *

@@ -1,11 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_mc.h
+ * Filename:  target_core_mc.h
  *
  * This file contains the iSCSI <-> media changer transport specific definitions
  * and prototypes.
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,8 +25,8 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_MC_H
-#define ISCSI_TARGET_MC_H
+#ifndef TARGET_CORE_MC_H
+#define TARGET_CORE_MC_H
 
 #define MC_VERSION		"v0.1"
 
@@ -203,4 +204,4 @@ se_subsystem_spc_t mc_template_spc = ISCSI_MC_SPC;
 se_subsystem_api_t mc_template = ISCSI_MC;
 #endif /* ! MC_INCLUDE_STRUCTS */
 
-#endif /* ISCSI_TARGET_MC_H */
+#endif /* TARGET_CORE_MC_H */

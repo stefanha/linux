@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  iscsi_target_file.h
+ * Filename:  target_core_file.h
  *
  * This file contains the Storage Engine <-> FILEIO transport specific definitions and prototypes.
  *

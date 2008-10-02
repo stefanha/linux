@@ -64,17 +64,17 @@
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>
-#include <iscsi_target_hba.h>
+#include <target_core_hba.h>
 #include <iscsi_target_login.h>
 #include <iscsi_target_tmr.h>
 #include <iscsi_target_tpg.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_feature_obj.h>
-#include <iscsi_target_feature_plugins.h>
-#include <iscsi_target_frontend_plugin.h>
+#include <target_core_plugin.h>
+#include <target_core_feature_obj.h>
+#include <target_core_feature_plugins.h>
+#include <target_core_frontend_plugin.h>
 
 #include <iscsi_target.h>
 #include <iscsi_target_device.h>

@@ -1,11 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_vrom.h
+ * Filename:  target_core_vrom.h
  *
  * This file contains the iSCSI <-> Virtual ROM transport specific definitions
  * and prototypes.
  *
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *

@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  iscsi_target_rd.c
+ * Filename:  target_core_rd.c
  *
  * This file contains the Storage Engine <-> Ramdisk transport specific functions.
  *
@@ -27,7 +27,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_RD_C
+#define TARGET_CORE_RD_C
 
 #include <linux/version.h>
 #include <linux/string.h>
@@ -48,10 +48,12 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_rd.h>
+#include <target_core_rd.h>
 #include <iscsi_target_error.h>
+
+#undef TARGET_CORE_RD_C
 
 extern se_global_t *se_global;
 

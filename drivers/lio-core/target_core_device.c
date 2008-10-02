@@ -28,7 +28,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_DEVICE_C
+#define TARGET_CORE_DEVICE_C
 
 #include <linux/net.h>
 #include <linux/string.h>
@@ -53,16 +53,16 @@
 #include <iscsi_target_ioctl_defs.h>
 #include <target_core_device.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_hba.h>
+#include <target_core_hba.h>
 #include <iscsi_target_tpg.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_feature_obj.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
+#include <target_core_feature_obj.h>
 
-#undef ISCSI_TARGET_DEVICE_C
+#undef TARGET_CORE_DEVICE_C
 
 extern se_global_t *se_global;
 extern __u32 iscsi_unpack_lun (unsigned char *);

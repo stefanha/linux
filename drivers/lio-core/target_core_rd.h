@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  iscsi_target_rd.h
+ * Filename:  target_core_rd.h
  *
  * This file contains the Storage Engine <-> Ramdisk transport specific definitions and prototypes.
  *
@@ -27,8 +27,8 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_RD_H
-#define ISCSI_TARGET_RD_H
+#ifndef TARGET_CORE_RD_H
+#define TARGET_CORE_RD_H
 
 #define RD_HBA_VERSION		"v3.0"
 #define RD_DR_VERSION		"v3.0"
@@ -258,4 +258,4 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 se_subsystem_api_t rd_mcp_template = ISCSI_RD_MCP;
 #endif /* ! RD_INCLUDE_STRUCTS */
 
-#endif /* ISCSI_TARGET_RD_H */
+#endif /* TARGET_CORE_RD_H */

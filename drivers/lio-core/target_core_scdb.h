@@ -1,8 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_seobj_plugins.h
+ * Filename:  target_core_scdb.h
  *
- * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
+ * This file contains the iSCSI Transport Split CDB related definitions.
+ *
+ * Copyright (c) 2004-2005 PyX Technologies, Inc.
+ * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -23,9 +27,16 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_SEOBJ_PLUGINS_H
-#define ISCSI_TARGET_SEOBJ_PLUGINS_H
+#ifndef TARGET_CORE_SCDB_H
+#define TARGET_CORE_SCDB_H
 
-extern se_obj_lun_type_t dev_obj_template;
-
-#endif /* ISCSI_TARGET_SEOBJ_PLUGINS_H */
+extern void split_cdb_XX_6 (unsigned long long, u32 *, unsigned char *);
+extern void split_cdb_RW_6 (unsigned long long, u32 *, unsigned char *, int);
+extern void split_cdb_XX_10 (unsigned long long, u32 *, unsigned char *);
+extern void split_cdb_RW_10 (unsigned long long, u32 *, unsigned char *, int);
+extern void split_cdb_XX_12 (unsigned long long, u32 *, unsigned char *);
+extern void split_cdb_RW_12 (unsigned long long, u32 *, unsigned char *, int);
+extern void split_cdb_XX_16 (unsigned long long, u32 *, unsigned char *);
+extern void split_cdb_RW_16 (unsigned long long, u32 *, unsigned char *, int);
+ 
+#endif /* TARGET_CORE_SCDB_H */

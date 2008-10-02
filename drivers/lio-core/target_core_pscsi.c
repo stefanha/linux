@@ -1,11 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_pscsi.c
+ * Filename:  target_core_pscsi.c
  *
  * This file contains the iSCSI <-> Parallel SCSI transport specific functions.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,7 +27,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_PSCSI_C
+#define TARGET_CORE_PSCSI_C
 
 #include <linux/version.h>
 #include <linux/string.h>
@@ -52,17 +53,17 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_pscsi.h>
+#include <target_core_pscsi.h>
 #include <iscsi_target_error.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_seobj_plugins.h>
-#include <iscsi_target_transport_plugin.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
+#include <target_core_seobj_plugins.h>
+#include <target_core_transport_plugin.h>
 				
-#undef ISCSI_TARGET_PSCSI_C
+#undef TARGET_CORE_PSCSI_C
 
 #define ISPRINT(a)  ((a >=' ')&&(a <= '~'))
 

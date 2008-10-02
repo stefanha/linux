@@ -1,8 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_frontend_plugin.h
+ * Filename:  target_core_hba.h
  *
- * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
+ * This file contains the iSCSI HBA Transport related definitions.
+ *
+ * Copyright (c) 2003-2004 PyX Technologies, Inc.
+ * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -23,12 +27,19 @@
  *********************************************************************************/
 
 
-#ifndef _ISCSI_TARGET_FRONTEND_PLUGIN_H_
-#define _ISCSI_TARGET_FRONTEND_PLUGIN_H_
+#ifndef TARGET_CORE_HBA_H
+#define TARGET_CORE_HBA_H
+ 
+extern int iscsi_hba_check_online (se_dev_transport_info_t *);
+extern se_hba_t *__core_get_hba_from_id (se_hba_t *);
+extern se_hba_t *core_get_hba_from_id (u32, int);
+extern se_hba_t *iscsi_get_hba_from_ptr (void *);
+extern se_hba_t *core_get_next_free_hba (void);
+extern void core_put_hba (se_hba_t *);
+extern int iscsi_hba_check_addhba_params (struct iscsi_target *, se_hbainfo_t *);
+extern int iscsi_hba_add_hba (se_hba_t *, se_hbainfo_t *, struct iscsi_target *);
+extern int iscsi_hba_del_hba (se_hba_t *);
+extern void iscsi_disable_all_hbas (void);
+extern void iscsi_hba_del_all_hbas (void);
 
-typedef struct scsi_target_frontend_s {
-	void (*get_plugin_info)(void *, char *, int *);
-} scsi_target_frontend_t;
-
-#endif    /*** _ISCSI_TARGET_FRONTEND_PLUGIN_H_ ***/
-
+#endif /* TARGET_CORE_HBA_H */

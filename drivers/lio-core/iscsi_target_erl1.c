@@ -50,7 +50,7 @@
 #include <iscsi_target_datain_values.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
