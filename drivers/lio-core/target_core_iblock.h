@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  iscsi_target_iblock.h
+ * Filename:  target_core_iblock.h
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 

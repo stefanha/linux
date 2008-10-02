@@ -48,15 +48,15 @@
 #include "iscsi_target_device.h"
 #include "iscsi_target_ioctl.h"
 #include "iscsi_target_tpg.h"
-#include "iscsi_target_hba.h"
+#include "target_core_hba.h"
 #include "iscsi_target_info.h"
-#include "iscsi_target_transport.h"
+#include "target_core_transport.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target_mib.h"
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_feature_obj.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
+#include <target_core_feature_obj.h>
 
 extern se_global_t *se_global;
 extern iscsi_global_t *iscsi_global;

@@ -1,10 +1,11 @@
 /*********************************************************************************
- * Filename:  iscsi_target_mc.c
+ * Filename:  target_core_mc.c
  *
  * This file contains the iSCSI <-> media changer transport specific functions.
  *
  * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,7 +24,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_MC_C
+#define TARGET_CORE_MC_C
 
 #include <linux/version.h>
 #include <linux/string.h>
@@ -44,10 +45,12 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_mc.h>
+#include <target_core_mc.h>
 #include <iscsi_target_error.h>
+
+#undef TARGET_CORE_MC_C
 
 #define MC_BUF_LEN 60000
  

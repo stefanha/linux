@@ -1,8 +1,9 @@
 /*********************************************************************************
- * Filename:  iscsi_target_seobj.c
+ * Filename:  target_core_seobj.c
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -46,16 +47,16 @@
 #include <iscsi_target_ioctl_defs.h>
 #include <target_core_device.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_hba.h>
+#include <target_core_hba.h>
 #include <iscsi_target_tpg.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_seobj_plugins.h>
-#include <iscsi_target_feature_obj.h>
-#include <iscsi_target_feature_plugins.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
+#include <target_core_seobj_plugins.h>
+#include <target_core_feature_obj.h>
+#include <target_core_feature_plugins.h>
 
 #include <iscsi_target_info.h>
 

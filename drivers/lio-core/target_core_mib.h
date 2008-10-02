@@ -24,8 +24,8 @@
  *********************************************************************************/
 
 
-#ifndef SCSI_TARGET_MIB_H
-#define SCSI_TARGET_MIB_H
+#ifndef TARGET_CORE_MIB_H
+#define TARGET_CORE_MIB_H
 
 typedef enum {
 	SCSI_INST_INDEX,
@@ -52,5 +52,5 @@ extern void remove_scsi_target_mib(void);
 extern void init_scsi_index_table(void);
 extern u32 scsi_get_new_index(scsi_index_t);
 
-#endif   /*** SCSI_TARGET_MIB_H ***/
+#endif   /*** TARGET_CORE_MIB_H ***/
 

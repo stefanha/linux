@@ -50,13 +50,13 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_ioctl.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_feature_obj.h>
-#include <iscsi_target_feature_plugins.h>
+#include <target_core_plugin.h>
+#include <target_core_feature_obj.h>
+#include <target_core_feature_plugins.h>
 
 #include <iscsi_target_info.h>
 

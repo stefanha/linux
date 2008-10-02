@@ -50,7 +50,7 @@
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>
 #include <iscsi_target_tmr.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
 
 #undef ISCSI_TARGET_TMR_C

@@ -1,8 +1,9 @@
 /*********************************************************************************
- * Filename:  iscsi_target_plugin.c
+ * Filename:  target_core_plugin.c
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -22,7 +23,7 @@
  *
  *********************************************************************************/
 
-#define ISCSI_TARGET_PLUGIN_C
+#define TARGET_CORE_PLUGIN_C
 
 #include <linux/net.h>
 #include <linux/string.h>
@@ -45,15 +46,15 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_hba.h>
-#include <iscsi_target_seobj.h>
+#include <target_core_hba.h>
+#include <target_core_seobj.h>
 #include <iscsi_target_tpg.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_feature_obj.h>
+#include <target_core_plugin.h>
+#include <target_core_feature_obj.h>
 
-#undef ISCSI_TARGET_PLUGIN_C
+#undef TARGET_CORE_PLUGIN_C
 
 extern se_global_t *se_global;
 

@@ -1,10 +1,11 @@
 /*********************************************************************************
- * Filename:  iscsi_target_vt.h
+ * Filename:  target_core_vt.h
  *
  * This file contains the iSCSI <-> VTAPE transport specific definitions and prototypes.
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -25,8 +26,8 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_VT_H
-#define ISCSI_TARGET_VT_H
+#ifndef TARGET_CORE_VT_H
+#define TARGET_CORE_VT_H
 
 #define VT_VERSION		"v0.1"
 
@@ -193,4 +194,4 @@ se_subsystem_spc_t vtape_template_spc = ISCSI_VTAPE_SPC;
 se_subsystem_api_t vtape_template = ISCSI_VTAPE;
 #endif /* ! VT_INCLUDE_STRUCTS */
 
-#endif /* ISCSI_TARGET_VTAPE_H */
+#endif /* TARGET_CORE_VTAPE_H */

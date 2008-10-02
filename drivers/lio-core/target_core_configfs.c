@@ -44,10 +44,10 @@
 #include <iscsi_target_ioctl_defs.h>
 #include <target_core_device.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_hba.h>
+#include <target_core_hba.h>
 #include <iscsi_target_info.h>
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_transport.h>
+#include <target_core_plugin.h>
+#include <target_core_transport.h>
 #include <iscsi_target.h>
 
 #ifdef SNMP_SUPPORT

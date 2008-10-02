@@ -54,17 +54,17 @@
 #include <iscsi_target_core.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
-#include <iscsi_target_hba.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_transport.h>
+#include <target_core_hba.h>
+#include <target_core_seobj.h>
+#include <target_core_transport.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_feature_obj.h>
-#include <iscsi_target_feature_plugins.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
+#include <target_core_feature_obj.h>
+#include <target_core_feature_plugins.h>
 
 #include <iscsi_target_info.h>
 

@@ -45,7 +45,7 @@
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target.h>
 #ifdef SNMP_SUPPORT
 #include <iscsi_target_mib.h>

@@ -1,8 +1,9 @@
 /*********************************************************************************
- * Filename:  iscsi_target_feature_plugins.H
+ * Filename:  target_core_frontend_plugin.h
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -23,7 +24,12 @@
  *********************************************************************************/
 
 
-#ifndef _ISCSI_TARGET_FEATYRE_PLUGINS_H_
-#define _ISCSI_TARGET_FEATYRE_PLUGINS_H_
+#ifndef _TARGET_CORE_FRONTEND_PLUGIN_H_
+#define _TARGET_CORE_FRONTEND_PLUGIN_H_
 
-#endif   /*** _ISCSI_TARGET_FEATYRE_PLUGINS_H_ ***/
+typedef struct scsi_target_frontend_s {
+	void (*get_plugin_info)(void *, char *, int *);
+} scsi_target_frontend_t;
+
+#endif    /*** _TARGET_CORE_FRONTEND_PLUGIN_H_ ***/
+

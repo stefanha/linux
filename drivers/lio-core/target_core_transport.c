@@ -1,11 +1,12 @@
 /*********************************************************************************
- * Filename:  iscsi_target_transport.c
+ * Filename:  target_core_transport.c
  *
  * This file contains the iSCSI Target Generic DAS Transport Layer Core.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,7 +27,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_TRANSPORT_C
+#define TARGET_CORE_TRANSPORT_C
 
 #include <linux/version.h>
 #include <linux/net.h>
@@ -58,23 +59,23 @@
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
-#include <iscsi_target_hba.h>
-#include <iscsi_target_scdb.h>
+#include <target_core_hba.h>
+#include <target_core_scdb.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 
-#include <iscsi_target_plugin.h>
-#include <iscsi_target_seobj.h>
-#include <iscsi_target_seobj_plugins.h>
-#include <iscsi_target_transport_plugin.h>
-#include <iscsi_target_feature_obj.h>
-#include <iscsi_target_feature_plugins.h>
+#include <target_core_plugin.h>
+#include <target_core_seobj.h>
+#include <target_core_seobj_plugins.h>
+#include <target_core_transport_plugin.h>
+#include <target_core_feature_obj.h>
+#include <target_core_feature_plugins.h>
 
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>
 
-#undef ISCSI_TARGET_TRANSPORT_C
+#undef TARGET_CORE_TRANSPORT_C
 
 //#define DEBUG_CDB_HANDLER
 #ifdef DEBUG_CDB_HANDLER

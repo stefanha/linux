@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  iscsi_target_file.c
+ * Filename:  target_core_file.c
  *
  * This file contains the Storage Engine <-> FILEIO transport specific functions.
  *
@@ -27,7 +27,7 @@
  *********************************************************************************/
 
 
-#define ISCSI_TARGET_FILE_C
+#define TARGET_CORE_FILE_C
 
 #include <linux/version.h>
 #include <linux/string.h>
@@ -48,10 +48,12 @@
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
-#include <iscsi_target_transport.h>
+#include <target_core_transport.h>
 #include <iscsi_target_util.h>
-#include <iscsi_target_file.h>
+#include <target_core_file.h>
 #include <iscsi_target_error.h>
+
+#undef TARGET_CORE_FILE_C
  
 extern se_global_t *se_global;
 extern struct block_device *__linux_blockdevice_claim (int, int, void *, int *);

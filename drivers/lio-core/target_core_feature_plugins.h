@@ -1,11 +1,9 @@
 /*********************************************************************************
- * Filename:  iscsi_target_hba.h
+ * Filename:  target_core_feature_plugins.H
  *
- * This file contains the iSCSI HBA Transport related definitions.
- *
- * Copyright (c) 2003-2004 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
+ * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,19 +24,7 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_HBA_H
-#define ISCSI_TARGET_HBA_H
- 
-extern int iscsi_hba_check_online (se_dev_transport_info_t *);
-extern se_hba_t *__core_get_hba_from_id (se_hba_t *);
-extern se_hba_t *core_get_hba_from_id (u32, int);
-extern se_hba_t *iscsi_get_hba_from_ptr (void *);
-extern se_hba_t *core_get_next_free_hba (void);
-extern void core_put_hba (se_hba_t *);
-extern int iscsi_hba_check_addhba_params (struct iscsi_target *, se_hbainfo_t *);
-extern int iscsi_hba_add_hba (se_hba_t *, se_hbainfo_t *, struct iscsi_target *);
-extern int iscsi_hba_del_hba (se_hba_t *);
-extern void iscsi_disable_all_hbas (void);
-extern void iscsi_hba_del_all_hbas (void);
+#ifndef _TARGET_CORE_FEATYRE_PLUGINS_H_
+#define _TARGET_CORE_FEATYRE_PLUGINS_H_
 
-#endif /* ISCSI_TARGET_HBA_H */
+#endif   /*** _TARGET_CORE_FEATYRE_PLUGINS_H_ ***/

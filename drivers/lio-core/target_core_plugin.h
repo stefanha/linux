@@ -1,8 +1,9 @@
 /*********************************************************************************
- * Filename:  iscsi_target_plugin.h
+ * Filename:  target_core_plugin.h
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * Copyright (c) 2007 Rising Tide Software, Inc.
+ * Copyright (c) 2008 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -23,8 +24,8 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_PLUGIN_H
-#define ISCSI_TARGET_PLUGIN_H
+#ifndef TARGET_CORE_PLUGIN_H
+#define TARGET_CORE_PLUGIN_H
 
 #define PLUGIN_TYPE_FRONTEND	0
 #define PLUGIN_TYPE_TRANSPORT	1
@@ -78,4 +79,4 @@ typedef struct se_plugin_s	{
 	void (*get_plugin_info)(void *, char *, int *);
 } se_plugin_t;
 
-#endif /* ISCSI_TARGET_PLUGIN_H */
+#endif /* TARGET_CORE_PLUGIN_H */
