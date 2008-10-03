@@ -345,7 +345,7 @@ static void iscsi_clear_initiator_node_from_tpg (
  */
 extern iscsi_node_acl_t *__iscsi_tpg_get_initiator_node_acl (
 	iscsi_portal_group_t *tpg,
-	unsigned char *initiatorname)
+	const char *initiatorname)
 {
 	iscsi_node_acl_t *acl;
 	
@@ -842,10 +842,11 @@ extern int iscsi_tpg_disable_portal_group (iscsi_portal_group_t *tpg, int force)
  *
  *
  */
-extern int iscsi_tpg_add_initiator_node_acl (
+extern iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl (
 	iscsi_portal_group_t *tpg,
-	unsigned char *initiatorname,
-	__u32 queue_depth)
+	const char *initiatorname,
+	__u32 queue_depth,
+	int *ret)
 {
 	iscsi_node_acl_t *acl = NULL;
 
@@ -863,14 +864,16 @@ extern int iscsi_tpg_add_initiator_node_acl (
 			" Node %s already exists for TPG %hu, ignoring"
 			" request.\n", initiatorname, tpg->tpgt);
 		spin_unlock_bh(&tpg->acl_node_lock);
-		return(ERR_ADDINITACL_ACL_EXISTS);
+		*ret = ERR_ADDINITACL_ACL_EXISTS;
+		return(NULL);
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);
 
 	if (!(acl = (iscsi_node_acl_t *) kmalloc(
 			sizeof(iscsi_node_acl_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_node_acl_t.\n");
-		return(ERR_NO_MEMORY);
+		*ret = ERR_NO_MEMORY;
+		return(NULL);
 	}
 	memset((void *)acl, 0, sizeof(iscsi_node_acl_t));
 
@@ -887,13 +890,15 @@ extern int iscsi_tpg_add_initiator_node_acl (
       
 	if (iscsi_create_device_list_for_node(acl, tpg)  < 0) {
 		kfree(acl);
-		return(ERR_NO_MEMORY);
+		*ret = ERR_NO_MEMORY;
+		return(NULL);
 	}
 	
 	if (iscsi_set_queue_depth_for_node(tpg, acl) < 0) {
 		iscsi_free_device_list_for_node(acl, tpg);
 		kfree(acl);
-		return(ERR_ADDINITACL_QUEUE_SET_FAILED);
+		*ret = ERR_ADDINITACL_QUEUE_SET_FAILED;
+		return(NULL);
 	}
 	
 	spin_lock_bh(&tpg->acl_node_lock);
@@ -905,8 +910,7 @@ done:
 	PYXPRINT("iSCSI_TPG[%hu] - Added ACL with TCQ Depth: %d for iSCSI"
 		" Initiator Node: %s\n", tpg->tpgt, acl->queue_depth,
 			initiatorname);
-
-	return(0);
+	return(acl);
 }
 
 /*	iscsi_tpg_del_initiator_node_acl():

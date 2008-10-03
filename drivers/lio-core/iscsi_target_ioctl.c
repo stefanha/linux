@@ -543,18 +543,23 @@ extern int iscsi_ioctl (
 	  core_put_hba(hba);
 	  break;
 	case ISCSI_TARGET_ADDNODETOTPG:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
 	  }
-	  if ((ret = iscsi_tpg_add_initiator_node_acl(tpg, t->keytext,
+	  if ((ret = iscsi_tpg_add_initiator_node_acl(tpg, (const char *)t->keytext,
 						      t->queue_depth)) < 0) {
 		  iscsi_put_tpg(tpg);
 		  goto dumpout;
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_DELNODEFROMTPG:
+#if 0
 	  if (!(tpg =  core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -566,6 +571,9 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_SETNODEQUEUEDEPTH:
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;

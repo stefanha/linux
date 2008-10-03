@@ -1213,6 +1213,7 @@ typedef struct iscsi_node_acl_s {
 	se_dev_entry_t		*device_list;
 	spinlock_t		device_list_lock;
 	iscsi_node_attrib_t	node_attrib;
+	struct config_group	acl_group;
 	struct iscsi_portal_group_s *tpg;
 	struct iscsi_node_acl_s	*next;
 	struct iscsi_node_acl_s	*prev;
@@ -1325,6 +1326,7 @@ typedef struct iscsi_portal_group_s {
 	iscsi_node_acl_t	*acl_node_tail;	/* Pointer to end of Initiator ACL list */
 	struct config_group	tpg_np_group;
 	struct config_group	tpg_lun_group;
+	struct config_group	tpg_acl_group;
 	struct config_group	tpg_group;
 	struct semaphore		tpg_access_sem;
 	struct semaphore		np_login_sem;
