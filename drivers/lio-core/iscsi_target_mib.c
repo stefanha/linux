@@ -170,7 +170,7 @@ static int inst_attr_seq_show(struct seq_file *seq, void *v)
 
 		sess_err = &tiqn->sess_err_stats;
 
-		spin_lock(&sess_err->lock);
+		spin_lock_bh(&sess_err->lock);
 		sess_err_count = (sess_err->digest_errors +
 				sess_err->cxn_timeout_errors +
 		 		sess_err->pdu_format_errors);
@@ -180,7 +180,7 @@ static int inst_attr_seq_show(struct seq_file *seq, void *v)
 			  sess_err->last_sess_fail_rem_name[0] ?
 			  	sess_err->last_sess_fail_rem_name : NONE,
 			  ISCSI_DISCONTINUITY_TIME);
-		spin_unlock(&sess_err->lock);
+		spin_unlock_bh(&sess_err->lock);
 	}
 	spin_unlock(&iscsi_global->tiqn_lock);
 
