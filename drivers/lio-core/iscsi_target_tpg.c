@@ -459,6 +459,7 @@ extern iscsi_node_acl_t *iscsi_tpg_check_initiator_node_acl (
 	memset((void *)acl, 0, sizeof(iscsi_node_acl_t));
 
 	spin_lock_init(&acl->device_list_lock);
+	spin_lock_init(&acl->nacl_sess_lock);
 	acl->queue_depth = ISCSI_TPG_ATTRIB(tpg)->default_queue_depth;
 	snprintf(acl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
 	acl->tpg = tpg;

@@ -5068,6 +5068,9 @@ extern int iscsi_close_session (
 				spin_lock_bh(&tpg->acl_node_lock);
 			}
 		}
+		spin_lock(&acl->nacl_sess_lock);
+		acl->nacl_sess = NULL;
+		spin_unlock(&acl->nacl_sess_lock);
 		sess->node_acl = NULL;
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);

@@ -102,7 +102,7 @@ static struct configfs_attribute *lio_target_portal_attrs[] = {
 
 static struct config_item_type lio_target_portal_cit = {
 	.ct_item_ops	= &lio_target_portal_item_ops,
-	.ct_attrs	= &lio_target_portal_attrs,
+	.ct_attrs	= lio_target_portal_attrs,
 	.ct_owner	= THIS_MODULE,
 };
 
@@ -608,28 +608,24 @@ static struct config_item_type lio_target_lun_cit = {
 
 // End items for lio_target_lun_cit
 
-// Start items for lio_target_acl_cit
+// Start items for lio_target_initiator_cit
 
-static int lio_target_initiator_link (struct config_item *lun_acl_ci, struct config_item *lun_ci)
+static int lio_target_initiator_lacl_link (struct config_item *lun_acl_ci, struct config_item *lun_ci)
 {
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
 	se_lun_t *lun;
-	struct config_item *tpg_ci, *tpg_ci_s, *tiqn_ci, *tiqn_ci_s;
-	char *ptr;
-	u32 mapped_lun;
+	se_lun_acl_t *lacl;
+	struct config_item *nacl_ci, *tpg_ci, *tpg_ci_s, *tiqn_ci, *tiqn_ci_s;
+	char *ro_ptr = NULL;
 	int ret = 0, lun_access;
 	unsigned short int tpgt;
 
-	/*
-	 * Make sure user is symlinking to iscsi/$IQN/$TPGT/lun/lun_$ID.
-	 */
-	if (!(ptr = strstr(config_item_name(lun_ci), "lun_"))) {
-		printk(KERN_ERR "Unable to locate \"lun_\" from Symlink Source:"
-			" %s\n", config_item_name(lun_ci));
+	if (!(nacl_ci = &lun_acl_ci->ci_parent->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item nacl_ci\n");
 		return(-EINVAL);
 	}
-	if (!(tpg_ci = &lun_acl_ci->ci_parent->ci_group->cg_item)) {
+	if (!(tpg_ci = &nacl_ci->ci_group->cg_item)) {
 		printk(KERN_ERR "Unable to locate config_item tpg_ci\n");
 		return(-EINVAL);
 	}
@@ -645,6 +641,7 @@ static int lio_target_initiator_link (struct config_item *lun_acl_ci, struct con
 		printk(KERN_ERR "Unable to locate config_item tiqn_ci_s\n");
 		return(-EINVAL);
 	}	
+
 	/*
 	 * Make sure the SymLink is going to the same iscsi/$IQN/$TPGT
 	 */
@@ -661,6 +658,10 @@ static int lio_target_initiator_link (struct config_item *lun_acl_ci, struct con
 	/*
 	 * Now that we have validated the iscsi/$IQN/$TPGT patch, grab the se_lun_t
 	 */
+	if (!(lacl = container_of(to_config_group(lun_acl_ci), se_lun_acl_t, se_lun_group))) {
+		printk(KERN_ERR "Unable to locate se_lun_acl_t\n");
+		return(-EINVAL);
+	}
 	if (!(lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group))) {
 		printk(KERN_ERR "Unable to locate se_lun_t\n");
 		return(-EINVAL);
@@ -673,20 +674,28 @@ static int lio_target_initiator_link (struct config_item *lun_acl_ci, struct con
 	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
 				&tiqn, tpgt, 0)))
 		return(-EINVAL);
+#if 0
+	if ((ro_ptr = strstr(buf, ":RO"))) {
+		*ro_ptr = '\0'; // Terminate : for simple_strtoul() below..
+		lun_access = ISCSI_LUNFLAGS_READ_ONLY;
+	} else
+#endif
+		lun_access = ISCSI_LUNFLAGS_READ_WRITE;
 
-#warning FIXME: addnodetolun mapped_lun= assumes se_lun->iscsi_lun for now..
-	mapped_lun = lun->iscsi_lun;
-#warning FIXME: addnodetolun assumes ISCSI_LUNFLAGS_READ_WRITE lun_access=
-	lun_access = ISCSI_LUNFLAGS_READ_WRITE;
-
-	if ((ret = iscsi_dev_add_initiator_node_lun_acl(tpg, lun->iscsi_lun,
-			mapped_lun, lun_access, config_item_name(lun_acl_ci))) < 0) {
+	/*
+	 * Determine the actual mapped LUN value user wants..
+	 *
+	 * This value is what the iSCSI Initiator actually sees the
+	 * iscsi/$IQN/$TPGT/lun/lun_* as on their iSCSI Initiator Ports.
+	 */
+	if ((ret = iscsi_dev_add_initiator_node_lun_acl(tpg, lacl,
+				lun->iscsi_lun, lun_access)) < 0) {
 		ret = -EEXIST;
 		goto out;
 	}
-
-	printk("LIO_Target_ConfigFS: Created Initiator ACL Symlink %s -> %s\n",
-		config_item_name(lun_acl_ci), config_item_name(lun_ci));
+	printk("LIO_Target_ConfigFS: Created Initiator LUN ACL Symlink: %s TPG LUN: %s"
+		" Mapped LUN: %s %s\n", lacl->initiatorname, config_item_name(lun_ci),
+		config_item_name(lun_acl_ci), (ro_ptr) ? "READ-ONLY" : "READ-WRITE");
 
 	iscsi_put_tpg(tpg);
 	return(0);
@@ -695,22 +704,34 @@ out:
 	return(ret);
 }
 
-static int lio_target_initiator_unlink (struct config_item *lun_acl_ci, struct config_item *lun_ci)
+static int lio_target_initiator_lacl_unlink (struct config_item *lun_acl_ci, struct config_item *lun_ci)
 {
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
-	se_lun_t *lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group);
-	struct config_item *tpg_ci, *tiqn_ci;
-	u32 mapped_lun;
+	se_lun_t *lun;
+	se_lun_acl_t *lacl;
+	struct config_item *nacl_ci, *tpg_ci, *tiqn_ci;
 	int ret = 0;
 	unsigned short int tpgt;
 
-	if (!(tpg_ci = &lun_acl_ci->ci_parent->ci_group->cg_item)) {
+	if (!(nacl_ci = &lun_acl_ci->ci_parent->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item nacl_ci\n");
+		return(-EINVAL);
+	}
+	if (!(tpg_ci = &nacl_ci->ci_group->cg_item)) {
 		printk(KERN_ERR "Unable to locate config_item tpg_ci\n");
 		return(-EINVAL);
 	}
 	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
 		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return(-EINVAL);
+	}
+	if (!(lacl = container_of(to_config_group(lun_acl_ci), se_lun_acl_t, se_lun_group))) {
+		printk(KERN_ERR "Unable to locate se_lun_acl_t\n");
+		return(-EINVAL);
+	}
+	if (!(lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group))) {
+		printk(KERN_ERR "Unable to locate se_lun_t\n");
 		return(-EINVAL);
 	}
 
@@ -722,18 +743,12 @@ static int lio_target_initiator_unlink (struct config_item *lun_acl_ci, struct c
 				&tiqn, tpgt, 0)))
 		return(-EINVAL);
 
-#warning FIXME: delnodefromlun mapped_lun= assumes se_lun->iscsi_lun for now..
-	mapped_lun = lun->iscsi_lun;
-
-	if ((ret = iscsi_dev_del_initiator_node_lun_acl(tpg, lun->iscsi_lun,
-			mapped_lun, config_item_name(lun_acl_ci))) < 0) {
-		ret = -EINVAL;
+	if ((ret = iscsi_dev_del_initiator_node_lun_acl(tpg, lun, lacl)) < 0)
 		goto out;
-	}
-	
-	printk("LIO_Target_ConfigFS: Removed Port Symlink %s -> %s\n",
-		config_item_name(lun_ci), config_item_name(lun_acl_ci));
 
+	printk("LIO_Target_ConfigFS: Removed Initiator LUN ACL Symlink: %s TPG LUN: %s"
+		" Mapped LUN: %s\n", lacl->initiatorname, config_item_name(lun_acl_ci),
+				config_item_name(lun_ci));
 	iscsi_put_tpg(tpg);
 	return(0);
 out:
@@ -741,19 +756,329 @@ out:
 	return(ret);
 }
 
-static struct configfs_item_operations lio_target_initiator_item_ops = {
-	.release		= NULL,
+static struct configfs_item_operations lio_target_initiator_lacl_item_ops = {
 	.show_attribute		= NULL,
 	.store_attribute	= NULL,
-	.allow_link		= lio_target_initiator_link,
-	.drop_link		= lio_target_initiator_unlink,
+	.allow_link		= lio_target_initiator_lacl_link,
+	.drop_link		= lio_target_initiator_lacl_unlink,
+};
+
+static struct config_item_type lio_target_initiator_lacl_cit = {
+	.ct_item_ops		= &lio_target_initiator_lacl_item_ops,
+//	.ct_attrs		= lio_target_initiator_lacl_attrs,
+	.ct_owner		= THIS_MODULE,
+};
+
+static struct config_group *lio_target_initiator_lacl_make_group (
+	struct config_group *group,
+	const char *name)
+{
+	iscsi_portal_group_t *tpg;
+	iscsi_tiqn_t *tiqn;
+	se_lun_acl_t *lacl;
+	struct config_item *acl_ci, *tpg_ci, *tiqn_ci;
+	char *buf, *endptr, *ptr;
+	u32 mapped_lun;
+	int ret = 0;
+	unsigned short int tpgt;
+
+	if (!(acl_ci = &group->cg_item)) {
+		printk(KERN_ERR "Unable to locatel acl_ci\n");
+		return(NULL);
+	}
+	if (!(tpg_ci = &acl_ci->ci_parent->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate tpg_ci\n");
+		return(NULL);
+	}
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return(NULL);
+	}
+
+	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
+	if (ret != 0)
+		return(NULL);
+
+	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
+				&tiqn, tpgt, 0)))
+		return(NULL);
+
+	if (!(buf = kzalloc(strlen(name) + 1, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for name buf\n");
+		goto out;
+	}
+	snprintf(buf, strlen(name) + 1, "%s", name);
+	/*
+	 * Make sure user is creating iscsi/$IQN/$TPGT/acls/$INITIATOR/lun_$ID.
+	 */
+	if (!(ptr = strstr(buf, "lun_"))) {
+		printk(KERN_ERR "Unable to locate \"lun_\" from buf: %s"
+			" name: %s\n", buf, name);
+		goto out;
+	}
+	ptr += 3; /* Skip to "_" */
+	*ptr = '\0'; /* Terminate the string */
+	ptr++; /* Advance pointer to next characater */
+	
+	/*
+	 * Determine the Mapped LUN value.  This is what the iSCSI Initiator will
+	 * actually see.
+	 */
+	mapped_lun = simple_strtoul(ptr, &endptr, 0);
+
+	if (!(lacl = iscsi_dev_init_initiator_node_lun_acl(tpg, mapped_lun,
+				config_item_name(acl_ci), &ret)))
+		goto out;
+
+	config_group_init_type_name(&lacl->se_lun_group, name,
+			&lio_target_initiator_lacl_cit);
+
+	printk("LIO_Target_ConfigFS: Initialized Initiator LUN ACL: %s Mapped LUN: %s\n",
+			config_item_name(acl_ci), name);
+	kfree(buf);
+	iscsi_put_tpg(tpg);
+	return(&lacl->se_lun_group);
+out:
+	kfree(buf);
+	iscsi_put_tpg(tpg);
+	return(NULL);
+}
+
+static void lio_target_initiator_lacl_drop_item (
+	struct config_group *group,
+	struct config_item *item)
+{
+	iscsi_portal_group_t *tpg;
+	iscsi_tiqn_t *tiqn;
+	se_lun_acl_t *lacl;
+	struct config_item *acl_ci, *tpg_ci, *tiqn_ci;
+	int ret = 0;
+	unsigned short int tpgt;
+
+	if (!(acl_ci = &group->cg_item)) {
+		printk(KERN_ERR "Unable to locatel acl_ci\n");
+		return;
+	}
+	if (!(tpg_ci = &acl_ci->ci_parent->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate tpg_ci\n");
+		return;
+	}
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return;
+	}
+
+	if (!(lacl = container_of(to_config_group(item), se_lun_acl_t,
+				se_lun_group))) {
+		printk(KERN_ERR "Unable to locate se_lun_acl_t\n");
+		return;
+	}
+
+	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
+	if (ret != 0)
+		return;
+
+	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
+			&tiqn, tpgt, 0)))
+		return;
+
+	printk("LIO_Target_ConfigFS: Freeing Initiator LUN ACL: %s Mapped LUN:"
+			" %s\n", lacl->initiatorname, config_item_name(item));
+
+	iscsi_dev_free_initiator_node_lun_acl(tpg, lacl);
+
+	config_item_put(item);
+	iscsi_put_tpg(tpg);
+	return;
+}
+
+static ssize_t lio_target_initiator_nacl_info (void *p, char *page)
+{
+	iscsi_node_acl_t *nacl = (iscsi_node_acl_t *)p;
+	iscsi_session_t *sess;
+	iscsi_conn_t *conn;
+	unsigned char *ip, buf_ipv4[IPV4_BUF_SIZE];
+	ssize_t rb = 0;
+
+	spin_lock_bh(&nacl->nacl_sess_lock);
+	if (!(sess = nacl->nacl_sess))
+		rb += sprintf(page+rb, "No active iSCSI Session for Endpoint\n");
+	else {
+		if (SESS_OPS(sess)->InitiatorName)
+			rb += sprintf(page+rb, "InitiatorName: %s\n",
+				SESS_OPS(sess)->InitiatorName);
+		if (SESS_OPS(sess)->InitiatorAlias)
+			rb += sprintf(page+rb, "InitiatorAlias: %s\n",
+				SESS_OPS(sess)->InitiatorAlias);
+		
+		rb += sprintf(page+rb, "LIO Session ID: %u   "
+			"ISID: 0x%02x %02x %02x %02x %02x %02x  "
+			"TSIH: %hu  ", sess->sid,
+			sess->isid[0], sess->isid[1], sess->isid[2],
+			sess->isid[3], sess->isid[4], sess->isid[5],
+			sess->tsih);
+		rb += sprintf(page+rb, "SessionType: %s\n",
+				(SESS_OPS(sess)->SessionType) ?
+				"Discovery" : "Normal");
+		rb += sprintf(page+rb, "Cmds in Session Pool: %d  ",
+				atomic_read(&sess->pool_count));
+		rb += sprintf(page+rb, "Session State: ");
+		switch (sess->session_state) {
+		case TARG_SESS_STATE_FREE:
+			rb += sprintf(page+rb, "TARG_SESS_FREE\n");
+			break;
+		case TARG_SESS_STATE_ACTIVE:
+			rb += sprintf(page+rb, "TARG_SESS_STATE_ACTIVE\n");
+			break;
+		case TARG_SESS_STATE_LOGGED_IN:
+			rb += sprintf(page+rb, "TARG_SESS_STATE_LOGGED_IN\n");
+			break;
+		case TARG_SESS_STATE_FAILED:
+			rb += sprintf(page+rb, "TARG_SESS_STATE_FAILED\n");
+			break;
+		case TARG_SESS_STATE_IN_CONTINUE:
+			rb += sprintf(page+rb, "TARG_SESS_STATE_IN_CONTINUE\n");
+			break;
+		default:
+			rb += sprintf(page+rb, "ERROR: Unknown Session State!\n");
+			break;
+		}
+			
+		rb += sprintf(page+rb, "---------------------[iSCSI Session Values]-----------------------\n");
+		rb += sprintf(page+rb, "  CmdSN/WR  :  CmdSN/WC  :  ExpCmdSN  :  MaxCmdSN  :     ITT    :     TTT\n");
+		rb += sprintf(page+rb, " 0x%08x   0x%08x   0x%08x   0x%08x   0x%08x   0x%08x\n",
+			sess->cmdsn_window, (sess->max_cmd_sn - sess->exp_cmd_sn) + 1,
+			sess->exp_cmd_sn, sess->max_cmd_sn,
+			sess->init_task_tag, sess->targ_xfer_tag);
+		rb += sprintf(page+rb, "----------------------[iSCSI Connections]-------------------------\n");
+
+		spin_lock(&sess->conn_lock);
+		for (conn = sess->conn_head; conn; conn = conn->next) {
+			rb += sprintf(page+rb, "CID: %hu  Connection State: ", conn->cid);
+			switch (conn->conn_state) {
+			case TARG_CONN_STATE_FREE:
+				rb += sprintf(page+rb, "TARG_CONN_STATE_FREE\n");
+				break;
+			case TARG_CONN_STATE_XPT_UP:
+				rb += sprintf(page+rb, "TARG_CONN_STATE_XPT_UP\n");
+				break;
+			case TARG_CONN_STATE_IN_LOGIN:
+				rb += sprintf(page+rb, "TARG_CONN_STATE_IN_LOGIN\n");
+				break;
+			case TARG_CONN_STATE_LOGGED_IN:
+				rb += sprintf(page+rb, "TARG_CONN_STATE_LOGGED_IN\n");
+				break;
+			case TARG_CONN_STATE_IN_LOGOUT:
+				rb += sprintf(page+rb, "TARG_CONN_STATE_IN_LOGOUT\n");
+				break;
+			case TARG_CONN_STATE_LOGOUT_REQUESTED:
+				rb += sprintf(page+rb, "TARG_CONN_STATE_LOGOUT_REQUESTED\n");
+				break;
+			case TARG_CONN_STATE_CLEANUP_WAIT:
+				rb += sprintf(page+rb, "TARG_CONN_STATE_CLEANUP_WAIT\n");
+				break;
+			default:
+				rb += sprintf(page+rb, "ERROR: Unknown Connection State!\n");
+				break;
+			}
+
+			if (conn->net_size == IPV6_ADDRESS_SPACE)
+				ip = &conn->ipv6_login_ip[0];
+			else {
+				iscsi_ntoa2(buf_ipv4, conn->login_ip);
+				ip = &buf_ipv4[0];
+			}
+			rb += sprintf(page+rb, "   Address %s %s", ip,
+				(conn->network_transport == ISCSI_TCP) ? "TCP" : "SCTP");
+			rb += sprintf(page+rb, "  StatSN: 0x%08x\n", conn->stat_sn);
+		}
+		spin_unlock(&sess->conn_lock);
+	}
+	spin_unlock_bh(&nacl->nacl_sess_lock);
+
+	return(rb);
+}
+
+static struct lio_target_configfs_attribute lio_target_attr_initiator_info = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "info",
+		    .ca_mode = S_IRUGO },
+	.show	= lio_target_initiator_nacl_info,
+	.store	= NULL,
+};
+
+static ssize_t lio_target_initiator_nacl_control (void *p, const char *page, size_t count)
+{
+	iscsi_node_acl_t *nacl = (iscsi_node_acl_t *)p;
+
+	printk("lio_target_initiator_nacl_control: page: %s, count: %d\n", page, count);
+	return(count);
+}
+
+static struct lio_target_configfs_attribute lio_target_attr_initiator_control = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "control",
+		    .ca_mode = S_IWUSR },
+	.show	= NULL,
+	.store	= lio_target_initiator_nacl_control,
+};
+
+static ssize_t lio_target_initiator_nacl_show (struct config_item *item,
+				    struct configfs_attribute *attr,
+				    char *page)
+{
+	iscsi_node_acl_t *nacl = container_of(
+			to_config_group(item), iscsi_node_acl_t, acl_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->show))
+		return(-EINVAL);
+
+	return(lt_attr->show((void *)nacl, page));
+}
+
+static ssize_t lio_target_initiator_nacl_store (struct config_item *item,
+				     struct configfs_attribute *attr,
+				     const char *page, size_t count)
+{
+	iscsi_node_acl_t *nacl = container_of(
+			to_config_group(item), iscsi_node_acl_t, acl_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->store))
+		return(-EINVAL);
+
+	return(lt_attr->store((void *)nacl, page, count));
+}
+
+static struct configfs_attribute *lio_target_initiator_attrs[] = {
+	&lio_target_attr_initiator_info.attr,
+	&lio_target_attr_initiator_control.attr,
+	NULL,
+};
+
+static struct configfs_item_operations lio_target_initiator_item_ops = {
+	.show_attribute		= lio_target_initiator_nacl_show,
+	.store_attribute	= lio_target_initiator_nacl_store,
+};
+
+static struct configfs_group_operations lio_target_initiator_group_ops = {
+	.make_group		= lio_target_initiator_lacl_make_group,
+	.drop_item		= lio_target_initiator_lacl_drop_item,
 };
 
 static struct config_item_type lio_target_initiator_cit = {
 	.ct_item_ops		= &lio_target_initiator_item_ops,
-//	.ct_attrs		= lio_target_initiator_attrs,
+	.ct_group_ops		= &lio_target_initiator_group_ops,
+	.ct_attrs		= lio_target_initiator_attrs,
 	.ct_owner		= THIS_MODULE,
 };
+
+// End items for lio_target_initiator_cit
+
+// Start items for lio_target_acl_cit
 
 static struct config_group *lio_target_call_addnodetotpg (
 	struct config_group *group,
@@ -763,6 +1088,7 @@ static struct config_group *lio_target_call_addnodetotpg (
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
 	struct config_item *acl_ci, *tpg_ci, *tiqn_ci;
+	u32 cmdsn_depth;
 	int ret = 0;
 	unsigned short int tpgt;
 
@@ -787,8 +1113,11 @@ static struct config_group *lio_target_call_addnodetotpg (
 				&tiqn, tpgt, 0)))
                 return(NULL);
 	
-#warning FIXME: Passing hardcoded queue_depth=1 for addnodetotpg
-	if (!(acl = iscsi_tpg_add_initiator_node_acl(tpg, name, 1, &ret)))
+#warning FIXME: cmdsn_depth set to ISCSI_TPG_ATTRIB(tpg)->default_queue_depth
+	cmdsn_depth = ISCSI_TPG_ATTRIB(tpg)->default_queue_depth;
+
+	if (!(acl = iscsi_tpg_add_initiator_node_acl(tpg, name,
+				cmdsn_depth, &ret)))
 		goto out;
 
 	config_group_init_type_name(&acl->acl_group, name, &lio_target_initiator_cit);
@@ -867,7 +1196,7 @@ static ssize_t lio_target_store_tpg_control (void *p, const char *page, size_t c
 {
 	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
 
-	printk("lio_target_store_tpg_control(): %s\n", page);
+	printk("lio_target_store_tpg_control(): tpg: %p %s\n", tpg, page);
 	return(count);
 }
 
@@ -909,11 +1238,12 @@ static ssize_t lio_target_store_tpg_enable (void *p, const char *page, size_t co
 		return(-EINVAL);
 
 	if (op) {
-#warning WARNING: tpg_enable uses #warning Currently uses generate_node_acls=1,cache_dynamic_acls=1,demo_mode_lun_access=1
+//#warning WARNING: enabletpg uses #warning Currently uses generate_node_acls=1,cache_dynamic_acls=1,demo_mode_lun_access=1
+#if 0
 		ISCSI_TPG_ATTRIB(tpg)->generate_node_acls = 1;
 		ISCSI_TPG_ATTRIB(tpg)->cache_dynamic_acls = 1;
 		ISCSI_TPG_ATTRIB(tpg)->demo_mode_lun_access = 1;
-
+#endif
 		if ((ret = iscsi_tpg_enable_portal_group(tpg)) < 0)
 			goto out;
 	} else {
@@ -940,6 +1270,7 @@ static struct lio_target_configfs_attribute lio_target_attr_tpg_enable = {
 static struct configfs_attribute *lio_target_tpg_attrs[] = {
 	&lio_target_attr_tpg_control.attr,
 	&lio_target_attr_tpg_enable.attr,
+	NULL,
 };
 
 static ssize_t lio_target_tpg_show (struct config_item *item,
@@ -988,6 +1319,7 @@ static struct config_item_type lio_target_tpg_cit = {
 
 // Start items for lio_target_tiqn_cit
 
+#if 0
 static ssize_t lio_target_tiqn_attr_show_nodename (struct config_item *item,
                                       struct configfs_attribute *attr,
                                       char *page)
@@ -1004,6 +1336,7 @@ static struct configfs_attribute lio_target_tiqn_attr_nodename = {
         .ca_name        = "nodename",
         .ca_mode        = S_IRUGO | S_IWUSR,
 };
+#endif
 
 static struct config_group *lio_target_tiqn_addtpg (
         struct config_group *group,
@@ -1130,7 +1463,7 @@ static struct configfs_attribute *lio_target_tiqn_item_attrs[] = {
 #endif
 
 static struct config_item_type lio_target_tiqn_cit = {
-	.ct_item_ops	= &lio_target_tiqn_item_ops,
+//	.ct_item_ops	= &lio_target_tiqn_item_ops,
 	.ct_group_ops	= &lio_target_tiqn_group_ops,
 //	.ct_attrs	= lio_target_tiqn_item_attrs,
 	.ct_owner	= THIS_MODULE,
