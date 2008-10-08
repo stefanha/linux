@@ -52,7 +52,6 @@
 #include <target_core_transport.h>
 #include <iscsi_target_util.h>
 #include <target_core_plugin.h>
-#include <target_core_feature_obj.h>
 
 #undef TARGET_CORE_PLUGIN_C
 
@@ -72,12 +71,6 @@ extern void plugin_load_all_classes (void)
 	plugin_register_class(PLUGIN_TYPE_OBJ, "OBJ", MAX_PLUGINS);
 	se_obj_load_plugins();
 		
-	/*
-	 * Setup Feature Plugins 
-	 */
-	plugin_register_class(PLUGIN_TYPE_FEATURE, "FEATURE", MAX_PLUGINS);
-	core_feature_load_plugins();
-	
 	return;
 }
 

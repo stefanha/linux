@@ -62,8 +62,6 @@
 
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#include <target_core_feature_obj.h>
-#include <target_core_feature_plugins.h>
 
 #include <iscsi_target_info.h>
 

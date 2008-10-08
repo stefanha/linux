@@ -72,8 +72,6 @@
 #include <iscsi_target_util.h>
 
 #include <target_core_plugin.h>
-#include <target_core_feature_obj.h>
-#include <target_core_feature_plugins.h>
 #include <target_core_frontend_plugin.h>
 
 #include <iscsi_target.h>
@@ -114,9 +112,6 @@ static int iscsi_send_task_mgt_rsp (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_send_text_rsp (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_send_reject (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_logout_post_handler (iscsi_cmd_t *, iscsi_conn_t *);
-
-/* From target_core_mod */
-extern void feature_plugin_single_release (void);
 
 /*
  * Legacy Mode, locate the first valid Target IQN.
@@ -1269,7 +1264,6 @@ extern void iscsi_target_release_phase2 (void)
 	iscsi_disable_all_hbas();
 	iscsi_remove_all_tpgs();
 	core_release_nps();
-	feature_plugin_single_release();
 	iscsi_hba_del_all_hbas();
 	core_release_discovery_tpg();
 	core_release_tiqns();

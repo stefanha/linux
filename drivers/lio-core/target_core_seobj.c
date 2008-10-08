@@ -55,8 +55,6 @@
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
 #include <target_core_seobj_plugins.h>
-#include <target_core_feature_obj.h>
-#include <target_core_feature_plugins.h>
 
 #include <iscsi_target_info.h>
 
@@ -161,62 +159,6 @@ extern void dev_obj_release_obj (void *p)
 {
 	transport_generic_release_phydevice((se_device_t *)p, 1);
 	return;
-}
-
-extern void dev_obj_set_feature_obj (void *p)
-{
-	se_device_t *dev  = (se_device_t *)p;
-
-	DEV_OBJ_API(dev)->inc_count(&dev->dev_feature_obj);
-	return;
-}
-
-extern void dev_obj_clear_feature_obj (void *p)
-{
-	se_device_t *dev  = (se_device_t *)p;
-
-	DEV_OBJ_API(dev)->dec_count(&dev->dev_feature_obj);
-	return;
-}
-
-extern int dev_obj_enable_feature (void *p, int f, int fm, void *fp)
-{
-	se_device_t *dev  = (se_device_t *)p;
-
-	if (!(dev->dev_fp = feature_plugin_alloc(f, fm, fp, DEV_OBJ_API(dev), p)))
-		return(-1);
-
-	DEV_OBJ_API(dev)->set_feature_obj(dev);
-
-	if (DEV_OBJ_API(dev)->claim_obj(dev) < 0) {
-		feature_plugin_free(dev->dev_fp);
-		dev->dev_fp = NULL;
-		DEV_OBJ_API(dev)->clear_feature_obj(dev);
-		return(-1);
-	}
-
-	return(0);
-}
-
-extern void dev_obj_disable_feature (void *p)
-{
-	se_device_t *dev  = (se_device_t *)p;
-
-	if (!(feature_plugin_free(dev->dev_fp))) {
-		dev->dev_fp = NULL;
-	
-		DEV_OBJ_API(dev)->clear_feature_obj(dev);
-		DEV_OBJ_API(dev)->release_obj(dev);
-	}
-	
-	return;
-}
-
-extern se_fp_obj_t *dev_obj_get_feature_obj (void *p)
-{
-	se_device_t *dev  = (se_device_t *)p;
-
-	return(dev->dev_fp);
 }
 
 extern void dev_access_obj (void *p)
@@ -369,15 +311,11 @@ extern int dev_obj_max_sectors (void *p)
 		return(DEV_ATTRIB(dev)->da_max_sectors);
 }
 
-extern unsigned long long dev_obj_end_lba (void *p, int zero_lba, se_fp_obj_t *fp)
+extern unsigned long long dev_obj_end_lba (void *p, int zero_lba)
 {
 	se_device_t *dev  = (se_device_t *)p;
 	
-	if (!fp)
-		 return((dev->dev_sectors_total + ((zero_lba) ? 1 : 0)));
-	
-	return(((dev->dev_sectors_total + ((zero_lba) ? 1 : 0)) -
-		 fp->fp_api->feature_metadata_size(fp)));
+	 return((dev->dev_sectors_total + ((zero_lba) ? 1 : 0)));
 }
 
 extern unsigned long long dev_obj_get_next_lba (void *p, unsigned long long lba)
@@ -385,15 +323,10 @@ extern unsigned long long dev_obj_get_next_lba (void *p, unsigned long long lba)
 	return(lba);
 }
 
-extern unsigned long long dev_obj_total_sectors (void *p, int zero_lba, int ignore_fp)
+extern unsigned long long dev_obj_total_sectors (void *p, int zero_lba)
 {
 	se_device_t *dev  = (se_device_t *)p;
-	se_fp_obj_t *fp;
 
-	if (!ignore_fp && (fp = DEV_OBJ_API(dev)->get_feature_obj(p)))
-		return(((dev->dev_sectors_total + ((zero_lba) ? 1 : 0)) -
-			 fp->fp_api->feature_metadata_size(fp)));
-	
 	return((dev->dev_sectors_total + ((zero_lba) ? 1 : 0)));
 }
 
@@ -789,11 +722,6 @@ extern int dev_release_obj_lock (void *p)
 	inc_count:		dev_obj_inc_count,			\
 	dec_count:		dev_obj_dec_count,			\
 	check_count:		dev_obj_check_count,			\
-	set_feature_obj:	dev_obj_set_feature_obj,		\
-	clear_feature_obj:	dev_obj_clear_feature_obj,		\
-	enable_feature:		dev_obj_enable_feature,			\
-	disable_feature:	dev_obj_disable_feature,		\
-	get_feature_obj:	dev_obj_get_feature_obj,		\
 	access_obj:		dev_access_obj,				\
 	deaccess_obj:		dev_deaccess_obj,			\
 	put_obj:		dev_put_obj,				\

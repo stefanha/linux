@@ -59,7 +59,6 @@
 
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#include <target_core_feature_obj.h>
 
 #undef ISCSI_TARGET_DEVICE_C
 
@@ -585,7 +584,6 @@ extern se_lun_t *iscsi_dev_add_lun (
 	int *ret)
 {
 	se_lun_t *lun_p;
-	se_fp_obj_t *fp;
 	u32 lun_access = 0;
 	
 	if (DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj) != 0) {
@@ -595,18 +593,6 @@ extern se_lun_t *iscsi_dev_add_lun (
 		return(NULL);
 	}
 				
-	if ((fp = DEV_OBJ_API(dev)->get_feature_obj(dev))) {
-		if (fp->fp_mode != FP_MODE_SINGLE) {
-			if (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)) {
-				TRACE_ERROR("Unable to export se_device_t while"
-					" dev_feature_obj: %d\n",
-					DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj));
-				*ret = ERR_OBJ_FEATURE_COUNT;
-				return(NULL);
-			}
-		}
-	}
-	
 #warning FIXME: Make check_tcq the default..?
 #if 0
 	spin_lock(&hba->device_lock);

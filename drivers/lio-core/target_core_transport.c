@@ -69,8 +69,6 @@
 #include <target_core_seobj.h>
 #include <target_core_seobj_plugins.h>
 #include <target_core_transport_plugin.h>
-#include <target_core_feature_obj.h>
-#include <target_core_feature_plugins.h>
 
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>
@@ -1470,33 +1468,15 @@ extern void transport_dump_dev_info (
 			(char *)wwn->unit_serial : "None"));
 	}
 
-	if (dev->dev_fp) {
-		unsigned char tbuf[128];
-		int len = 0;
+	*bl += sprintf(b+*bl, "%s", "DIRECT");
 
-		memset(tbuf, 0, 128);
-		dev->dev_fp->fp_api->get_feature_info(dev->dev_fp->fp_ptr, &tbuf[0], &len);
-
-		*bl += sprintf(b+*bl, "%s", tbuf);
-
-		if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
-		    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
-			*bl += sprintf(b+*bl, "  ACCESSED\n");
-		else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
-			*bl += sprintf(b+*bl, "  EXPORTED\n");
-		else
-			*bl += sprintf(b+*bl, "  FREE\n");
-	} else {
-		*bl += sprintf(b+*bl, "%s", "DIRECT");
-
-		if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
-		    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
-			*bl += sprintf(b+*bl, "  ACCESSED\n");
-		else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
-			*bl += sprintf(b+*bl, "  EXPORTED\n");
-		else
-			*bl += sprintf(b+*bl, "  FREE\n");
-	}
+	if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
+	    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
+		*bl += sprintf(b+*bl, "  ACCESSED\n");
+	else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
+		*bl += sprintf(b+*bl, "  EXPORTED\n");
+	else
+		*bl += sprintf(b+*bl, "  FREE\n");
 
 	if (lun) {
 		*bl += sprintf(b+*bl, "        iSCSI Host ID: %u iSCSI LUN: %u",
@@ -1931,18 +1911,6 @@ extern se_device_t *transport_add_device_to_iscsi_hba (
 	 */
 	if ((ret = transport_get_read_capacity(dev)) < 0)
 		goto out;
-	
-	/*
-	 * Determine if any feature plugin metadata exists on the se_device_t object.
-	 */
-	ret = feature_plugin_activate(dev->dev_obj_api, (void *)dev, 0);
-	if (ret < 0)
-		goto out;
-	if (ret > 0) {
-		ret = 0;
-		goto out;
-	}
-	
 out:
 	if (!ret)
 		return(dev);
@@ -3543,16 +3511,6 @@ extern int transport_execute_tasks (iscsi_cmd_t *cmd)
 		}
 	}
 	
-	/*
-	 * transport_process_feature() will determine if this frontend
-	 * T_TASK(cmd) is handed off to a feature plugin.
-	 */
-	if (cmd->transport_feature_io) {
-		if (!transport_cmd_check_stop(cmd, 0, TRANSPORT_PROCESSING))
-			cmd->transport_feature_io(T_TASK(cmd)->t_fp, cmd);
-		return(0);
-	}
-
 	/*
 	 * Add the task(s) built for the passed iscsi_cmd_t to the
 	 * execution queue for this se_device_t.
@@ -5206,11 +5164,10 @@ extern int transport_get_sectors (
 		return(0);
 
 	if ((T_TASK(cmd)->t_task_lba + T_TASK(cmd)->t_task_sectors) >
-	     obj_api->total_sectors(obj_ptr, 1, (cmd->cmd_flags & ICF_SE_ALLOW_EOO))) {
+	     obj_api->total_sectors(obj_ptr, 1)) {
 		TRACE_ERROR("LBA: %llu Sectors: %u exceeds"
 			" obj_api->total_sectors(): %llu\n", T_TASK(cmd)->t_task_lba,
-			T_TASK(cmd)->t_task_sectors, obj_api->total_sectors(obj_ptr, 1,
-				(cmd->cmd_flags & ICF_SE_ALLOW_EOO)));
+			T_TASK(cmd)->t_task_sectors, obj_api->total_sectors(obj_ptr, 1));
 		cmd->cmd_flags |= ICF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = SECTOR_COUNT_TOO_MANY;
 		return(PYX_TRANSPORT_REQ_TOO_MANY_SECTORS);
@@ -5418,13 +5375,12 @@ static inline int transport_set_task_sectors_disk (
 	se_task_t *task,
 	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
-	se_fp_obj_t *fp,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if ((lba + sectors) > obj_api->end_lba(obj_ptr, 1, fp)) {
-		task->task_sectors = ((obj_api->end_lba(obj_ptr, 1, fp) - lba) + 1);
+	if ((lba + sectors) > obj_api->end_lba(obj_ptr, 1)) {
+		task->task_sectors = ((obj_api->end_lba(obj_ptr, 1) - lba) + 1);
 		
 		if (task->task_sectors > obj_api->max_sectors(obj_ptr)) {
 			task->task_sectors = obj_api->max_sectors(obj_ptr);
@@ -5445,7 +5401,6 @@ static inline int transport_set_task_sectors_non_disk (
 	se_task_t *task,
 	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
-	se_fp_obj_t *fp,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
@@ -5463,16 +5418,15 @@ static inline int transport_set_task_sectors (
 	se_task_t *task,
 	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
-	se_fp_obj_t *fp,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
 	return((obj_api->get_device_type(obj_ptr) == TYPE_DISK)	?
 		transport_set_task_sectors_disk(task, obj_api, obj_ptr,
-				fp, lba, sectors, max_sectors_set) :
+				lba, sectors, max_sectors_set) :
 		transport_set_task_sectors_non_disk(task, obj_api, obj_ptr,
-				fp, lba, sectors, max_sectors_set));
+				lba, sectors, max_sectors_set));
 }
 
 extern int transport_map_sg_to_mem (
@@ -5748,7 +5702,6 @@ extern u32 transport_generic_get_cdb_count (
 	unsigned char *cdb = NULL;
 	void *obj_ptr, *next_obj_ptr = NULL;
 	se_task_t *task;
-	se_fp_obj_t *fp = NULL;
 	se_mem_t *se_mem, *se_mem_lout = NULL;
 	se_obj_lun_type_t *obj_api;
 	int max_sectors_set = 0, ret;
@@ -5777,13 +5730,6 @@ extern u32 transport_generic_get_cdb_count (
 	}
 	
 	/*
-	 * Only pass a valid *fp into obj_api->end_lba() when the iscsi_cmd_t is not
-	 * accessing the reserved feature metadata area at the end of the object.
-	 */
-	if (!(cmd->cmd_flags & ICF_SE_ALLOW_EOO))
-		fp = head_obj_api->get_feature_obj(head_obj_ptr);
-	
-	/*
 	 * Locate starting object from original starting_lba.
 	 */
 	lba = ti->ti_lba;
@@ -5799,14 +5745,14 @@ extern u32 transport_generic_get_cdb_count (
 		}
 
 		DEBUG_VOL("ITT[0x%08x]: LBA: %llu SectorsLeft: %u EOBJ: %llu\n",
-			cmd->init_task_tag, lba, sectors, obj_api->end_lba(obj_ptr, 1, fp));
+			cmd->init_task_tag, lba, sectors, obj_api->end_lba(obj_ptr, 1));
 
 		head_obj_api->release_obj_lock(head_obj_ptr);
 
 		if (!(task = cmd->transport_get_task(ti, cmd, obj_ptr, obj_api)))
 			goto out;
 
-		transport_set_task_sectors(task, obj_api, obj_ptr, fp, lba,
+		transport_set_task_sectors(task, obj_api, obj_ptr, lba,
 				sectors, &max_sectors_set);
 
 		task->task_lba = lba;
@@ -5864,28 +5810,6 @@ out:
 	return(0);
 }
 
-static int transport_process_feature (iscsi_cmd_t *cmd)
-{
-	se_obj_lun_type_t *obj_api = ISCSI_LUN(cmd)->lun_obj_api;
-	
-	if (!((T_TASK(cmd)->t_fp = obj_api->get_feature_obj(ISCSI_LUN(cmd)->lun_type_ptr))))
-		return(0);
-	
-	if (cmd->cmd_flags & ICF_SCSI_DATA_SG_IO_CDB) {
-		cmd->transport_feature_io = T_TASK(cmd)->t_fp->fp_api->feature_io;
-
-		/*
-		 * Determine if additional values need to be set in T_TASK(cmd).
-		 */
-		if (T_TASK(cmd)->t_fp->fp_api->feature_io_check_lun)
-			T_TASK(cmd)->t_fp->fp_api->feature_io_check_lun(T_TASK(cmd)->t_fp, cmd);
-
-		return(1);
-	}
-
-	return(0);
-}
-	
 /*	 transport_generic_new_cmd(): Called from transport_processing_thread()
  *
  *	 Allocate storage transport resources from a set of values predefined
@@ -5914,14 +5838,6 @@ extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 		if ((ret = transport_get_sectors(cmd, ISCSI_LUN(cmd)->lun_obj_api,
 					ISCSI_LUN(cmd)->lun_type_ptr)) < 0)
 			goto failure;
-
-		if (transport_process_feature(cmd) > 0) {
-			if ((ret = cmd->transport_allocate_iovecs(cmd)) < 0) {
-				ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-				goto failure;
-			}
-			goto process;
-		}
 
 		if ((ret = transport_new_cmd_obj(cmd, &ti, ISCSI_LUN(cmd)->lun_obj_api,
 					ISCSI_LUN(cmd)->lun_type_ptr, 0)) < 0)
@@ -5962,7 +5878,6 @@ extern int transport_generic_new_cmd (iscsi_cmd_t *cmd)
 	 * data has arrived. (ie: It gets handled by the transport processing
 	 * thread a second time)
 	 */
-process:
 	if (cmd->data_direction == ISCSI_WRITE) {
 		transport_add_tasks_to_state_queue(cmd);
 		return(transport_generic_write_pending(cmd));
@@ -7019,37 +6934,24 @@ static void transport_status_empty_queue (se_queue_obj_t *qobj)
 
 static int transport_status_dev_offline (se_device_t *dev)
 {
-	se_fp_obj_t *fp;	
-
 	if (DEV_OBJ_API(dev)->check_online((void *)dev) != 0) {
 		DEBUG_ST("Ignoring DEV_STATUS_THR_TAKE_OFFLINE: while OFFLINE\n");
 		return(0);
 	}
 	transport_status_thr_dev_offline(dev);
-
-	fp = DEV_OBJ_API(dev)->get_feature_obj((void *)dev);
-	if (fp && fp->fp_api->feature_element_offline)
-		fp->fp_api->feature_element_offline(fp);
-	else
-		transport_status_thr_dev_offline_tasks(dev, (void *)dev);
+	transport_status_thr_dev_offline_tasks(dev, (void *)dev);
 
 	return(0);
 }
 
 static int transport_status_dev_online (se_device_t *dev)
 {
-	se_fp_obj_t *fp;
-
 	if (!(DEV_OBJ_API(dev)->check_online((void *)dev))) {
 		DEBUG_ST("Ignoring DEV_STATUS_THR_TAKE_ONLINE: while ONLINE\n");
 		return(0);
 	}
 	transport_status_thr_dev_online(dev);
 
-	fp = DEV_OBJ_API(dev)->get_feature_obj((void *)dev);
-	if (fp && fp->fp_api->feature_element_online)
-		fp->fp_api->feature_element_online(fp);
-				
 	return(0);
 }
 

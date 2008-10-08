@@ -56,7 +56,6 @@
 
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#include <target_core_feature_obj.h>
 
 extern se_global_t *se_global;
 extern iscsi_global_t *iscsi_global;

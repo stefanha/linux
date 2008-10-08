@@ -63,8 +63,6 @@
 
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#include <target_core_feature_obj.h>
-#include <target_core_feature_plugins.h>
 
 #include <iscsi_target_info.h>
 
@@ -368,33 +366,15 @@ extern void iscsi_dump_dev_info (
 			 	(char *)wwn->unit_serial : "None"));
 	}
 	
-	if (dev->dev_fp) {
-		unsigned char tbuf[128];
-		int len = 0;
+	*bl += sprintf(b+*bl, "%s", "DIRECT");
 
-		memset(tbuf, 0, 128);
-		dev->dev_fp->fp_api->get_feature_info(dev->dev_fp->fp_ptr, &tbuf[0], &len);
-
-		*bl += sprintf(b+*bl, "%s", tbuf);
-	
-		if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
-		    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
-			*bl += sprintf(b+*bl, "  ACCESSED\n");	
-		else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
-			*bl += sprintf(b+*bl, "  EXPORTED\n");
-		else
-			*bl += sprintf(b+*bl, "  FREE\n");
-	} else {
-		*bl += sprintf(b+*bl, "%s", "DIRECT");
-
-		if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
-		    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
-			*bl += sprintf(b+*bl, "  ACCESSED\n");
-		else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
-			*bl += sprintf(b+*bl, "  EXPORTED\n");
-		else
-			*bl += sprintf(b+*bl, "  FREE\n");
-	}
+	if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
+	    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
+		*bl += sprintf(b+*bl, "  ACCESSED\n");
+	else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
+		*bl += sprintf(b+*bl, "  EXPORTED\n");
+	else
+		*bl += sprintf(b+*bl, "  FREE\n");
 	
 	if (lun) {
 		*bl += sprintf(b+*bl, "        iSCSI Host ID: %u iSCSI LUN: %u",
@@ -460,7 +440,7 @@ extern int iscsi_get_hba_dev_info (
 		spin_unlock(&hba->device_lock);
 
 		DEV_OBJ_API(dev)->get_obj_info((void *)dev, NULL,
-			(DEV_OBJ_API(dev)->total_sectors(dev, 1, 0) *
+			(DEV_OBJ_API(dev)->total_sectors(dev, 1) *
 			 DEV_OBJ_API(dev)->blocksize(dev)), 1, b, &bl);
 
 		spin_lock(&hba->device_lock);
@@ -530,7 +510,7 @@ extern int iscsi_get_global_dev_info (
 			spin_unlock(&hba->device_lock);
 
 			DEV_OBJ_API(dev)->get_obj_info((void *)dev, NULL,
-				(DEV_OBJ_API(dev)->total_sectors(dev, 1, 0) *
+				(DEV_OBJ_API(dev)->total_sectors(dev, 1) *
 				 DEV_OBJ_API(dev)->blocksize(dev)), 1, b, &bl);
 
 			spin_lock(&hba->device_lock);
@@ -616,7 +596,7 @@ extern int iscsi_tpg_get_lun_info (
 
 		spin_unlock(&tpg->tpg_lun_lock);
 		LUN_OBJ_API(lun)->get_obj_info(lun->lun_type_ptr, lun,
-			(LUN_OBJ_API(lun)->total_sectors(lun->lun_type_ptr, 1, 0) *
+			(LUN_OBJ_API(lun)->total_sectors(lun->lun_type_ptr, 1) *
 			 LUN_OBJ_API(lun)->blocksize(lun->lun_type_ptr)), 1, b, &bl);
 
 		if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0)

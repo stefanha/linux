@@ -50,11 +50,6 @@ typedef struct se_obj_lun_type_s {
 	void (*inc_count)(struct se_obj_s *);
 	void (*dec_count)(struct se_obj_s *);
 	int (*check_count)(struct se_obj_s *);
-	void (*set_feature_obj)(void *);
-	void (*clear_feature_obj)(void *);
-	int (*enable_feature)(void *, int, int, void *);
-	void (*disable_feature)(void *);
-	struct se_fp_obj_s *(*get_feature_obj)(void *);
 	void (*access_obj)(void *);
 	void (*deaccess_obj)(void *);
 	void (*put_obj)(void *);
@@ -68,10 +63,10 @@ typedef struct se_obj_lun_type_s {
 	int (*queue_depth)(void *);
 	int (*blocksize)(void *);
 	int (*max_sectors)(void *);
-	unsigned long long (*end_lba)(void *, int, struct se_fp_obj_s *);
+	unsigned long long (*end_lba)(void *, int);
 	unsigned long long (*free_sectors)(void *);
 	unsigned long long (*get_next_lba)(void *, unsigned long long);
-	unsigned long long (*total_sectors)(void *, int, int);
+	unsigned long long (*total_sectors)(void *, int);
 	int (*do_se_mem_map)(void *, struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 	int (*get_mem_buf)(void *, struct iscsi_cmd_s *);
 	int (*get_mem_SG)(void *, struct iscsi_cmd_s *);

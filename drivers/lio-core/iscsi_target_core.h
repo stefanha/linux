@@ -218,12 +218,6 @@
 /* se_lun_t->lun_type */
 #define ISCSI_LUN_TYPE_NONE			0
 #define ISCSI_LUN_TYPE_DEVICE			1
-#define ISCSI_LUN_TYPE_DEVICE_VOLUME		2
-#define ISCSI_LUN_TYPE_RAID			3
-#define ISCSI_LUN_TYPE_RAID_VOLUME		4
-#define ISCSI_LUN_TYPE_SNAP_VOLUME		5
-#define ISCSI_LUN_TYPE_REPL			6
-#define ISCSI_LUN_TYPE_REPL_VOLUME		7
 
 /* iscsi_portal_group_t->state */
 #define TPG_STATE_FREE				0
@@ -604,7 +598,6 @@ typedef struct se_transport_task_s {
 	struct iscsi_cmd_s	*t_task_pt_cmd;
 	struct list_head	t_task_list;
 	struct list_head	*t_mem_list;
-	struct se_fp_obj_s	*t_fp;
 } ____cacheline_aligned se_transport_task_t;
 
 struct se_device_s;
@@ -612,7 +605,6 @@ struct iscsi_map_sg_s;
 struct iscsi_unmap_sg_s;
 struct se_transform_info_s;
 struct se_obj_lun_type_s;
-struct se_fp_obj_s;
 struct scatterlist;
 
 typedef struct iscsi_fe_cmd_s {
@@ -732,7 +724,6 @@ typedef struct iscsi_cmd_s {
 	int (*transport_map_buffers_to_tasks)(struct iscsi_cmd_s *);
 	void (*transport_map_SG_segments)(struct iscsi_unmap_sg_s *);
 	void (*transport_passthrough_done)(struct iscsi_cmd_s *);
-	int (*transport_feature_io)(struct se_fp_obj_s *, struct iscsi_cmd_s *);
 	void (*transport_unmap_SG_segments)(struct iscsi_unmap_sg_s *);
 	int (*transport_set_iovec_ptrs)(struct iscsi_map_sg_s *, struct iscsi_unmap_sg_s *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
@@ -1115,7 +1106,6 @@ typedef struct se_device_s {
 	t10_wwn_t		t10_wwn;	/* T10 Inquiry and EVPD WWN Information */
 	int (*write_pending)(struct se_task_s *);
 	void (*dev_generate_cdb)(unsigned long long, u32 *, unsigned char *, int);
-	struct se_fp_obj_s	*dev_fp;
 	struct se_obj_lun_type_s *dev_obj_api;
 	struct se_task_s	*execute_task_head;
 	struct se_task_s	*execute_task_tail;

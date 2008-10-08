@@ -54,7 +54,6 @@
 
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#include <target_core_feature_obj.h>
 
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>
