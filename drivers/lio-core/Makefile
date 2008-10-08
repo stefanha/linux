@@ -31,7 +31,6 @@ include $(CWD)/drivers/lio-core/MCONFIG_ALL
 obj-$(CONFIG_TARGET_CORE)		+=	target_core_mod.o
 target_core_mod-objs			:=	target_core_configfs.o \
 						target_core_device.o \
-						target_core_feature_obj.o \
 						target_core_hba.o \
 						target_core_plugin.o \
 						target_core_scdb.o \
