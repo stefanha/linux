@@ -30,6 +30,7 @@
 #define ISCSI_TARGET_CORE_H
 
 #include <linux/in.h>
+#include <linux/configfs.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <iscsi_linux_defs.h>
@@ -1005,6 +1006,7 @@ typedef struct se_lun_acl_s {
 	struct se_lun_s		*iscsi_lun;
 	struct se_lun_acl_s	*next;
 	struct se_lun_acl_s	*prev;
+	struct config_group	se_lun_group;
 }  ____cacheline_aligned se_lun_acl_t;
 
 #ifdef DEBUG_ERL
@@ -1153,8 +1155,6 @@ typedef struct se_dev_transport_info_s {
 	u32			vol_id;
 } ____cacheline_aligned se_dev_transport_info_t;
 
-#include <linux/configfs.h>
-
 typedef struct se_hba_s {
 	u8			type;		/* Type of disk transport used for HBA. */
 	u16			hba_tpgt;
@@ -1212,7 +1212,9 @@ typedef struct iscsi_node_acl_s {
 #endif /* SNMP_SUPPORT */
 	se_dev_entry_t		*device_list;
 	spinlock_t		device_list_lock;
+	spinlock_t		nacl_sess_lock;
 	iscsi_node_attrib_t	node_attrib;
+	iscsi_session_t		*nacl_sess;
 	struct config_group	acl_group;
 	struct iscsi_portal_group_s *tpg;
 	struct iscsi_node_acl_s	*next;

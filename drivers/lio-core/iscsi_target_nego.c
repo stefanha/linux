@@ -831,7 +831,7 @@ get_target:
 	/*
 	 * Locate incoming Initiator IQN reference from Storage Node.
 	 */
-	if (!(SESS(conn)->node_acl = iscsi_tpg_check_initiator_node_acl(
+	if (!(sess->node_acl = iscsi_tpg_check_initiator_node_acl(
 			conn->tpg, i_buf))) {
 		TRACE_ERROR("iSCSI Initiator Node: %s is not authorized to"
 			" access iSCSI target portal group: %hu.\n",
@@ -841,8 +841,11 @@ get_target:
 		ret = -1;
 		goto out;
 	}
-	ret = 0;
+	spin_lock_bh(&sess->node_acl->nacl_sess_lock);
+	sess->node_acl->nacl_sess = sess;
+	spin_unlock_bh(&sess->node_acl->nacl_sess_lock);
 
+	ret = 0;
 out:
 	TRACE_LEAVE
 	kfree(tmpbuf);

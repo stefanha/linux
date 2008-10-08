@@ -742,86 +742,83 @@ static se_lun_t *iscsi_dev_get_lun (iscsi_portal_group_t *tpg, u32 lun)
 	return(iscsi_lun);
 }
 
-/*	iscsi_dev_add_initiator_node_lun_acl():
- *
- *
- */
-extern int iscsi_dev_add_initiator_node_lun_acl (
+extern se_lun_acl_t *iscsi_dev_init_initiator_node_lun_acl (
 	iscsi_portal_group_t *tpg,
-	u32 lun,
 	u32 mapped_lun,
-	u32 lun_access,
-	char *initiatorname)
+	char *initiatorname,
+	int *ret)
 {
-	se_lun_t *iscsi_lun;
-	se_lun_acl_t *acl;
+	se_lun_acl_t *lacl;
 	iscsi_node_acl_t *nacl;
 
 	if (strlen(initiatorname) > ISCSI_IQN_LEN) {
 		TRACE_ERROR("iSCSI InitiatorName exceeds maximum size.\n"); 
-		return(ERR_INITIATORNAME_TOO_LARGE);
+		*ret = -EOVERFLOW;
+		return(NULL);
+	}
+	if (!(nacl = iscsi_tpg_get_initiator_node_acl(tpg, initiatorname))) {
+		*ret = -EINVAL;
+		return(NULL);
+	}
+#warning iscsi_check_device_list_access() fails for IQN with active session when generate_node_acls=1,cache_dynmaic_acls=1
+	if (iscsi_check_device_list_access(mapped_lun, nacl) < 0) {
+		TRACE_ERROR("ACL Entry already exists for iSCSI"
+			" Initiator Node: %s for Mapped iSCSI Logout Unit Number: %u"
+			" on iSCSI Target Portal Group: %hu, ignoring request\n",
+				initiatorname, mapped_lun, tpg->tpgt);
+		*ret = -EEXIST;
+		return(NULL);
 	}
 	
+	if (!(lacl = (se_lun_acl_t *) kmalloc(sizeof(se_lun_acl_t), GFP_KERNEL))) {	
+		TRACE_ERROR("Unable to allocate memory for se_lun_acl_t.\n");
+		*ret = -ENOMEM;
+		return(NULL);
+	}
+	memset(lacl, 0, sizeof(se_lun_acl_t));
+
+	lacl->mapped_lun = mapped_lun;
+	snprintf(lacl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
+
+	return(lacl);
+}
+
+extern int iscsi_dev_add_initiator_node_lun_acl (
+        iscsi_portal_group_t *tpg,
+	se_lun_acl_t *lacl,
+        u32 lun,
+        u32 lun_access)
+{
+	se_lun_t *iscsi_lun;
+	iscsi_node_acl_t *nacl;
+
 	if (!(iscsi_lun = iscsi_dev_get_lun(tpg, lun))) {
 		TRACE_ERROR("iSCSI Logical Unit Number: %u is not active on"
 			" iSCSI Target Portal Group: %hu, ignoring request.\n",
-				lun, tpg->tpgt);
-		return(ERR_LUN_NOT_ACTIVE);
-	}
+                                lun, tpg->tpgt);
+                return(-EINVAL);
+        }
 
-	if (!(nacl = iscsi_tpg_get_initiator_node_acl(tpg, initiatorname)))
-		return(ERR_ADDLUNACL_NODE_ACL_MISSING);
-
-	if (iscsi_check_device_list_access(mapped_lun, nacl) < 0) {
-		TRACE_ERROR("ACL Entry already exists for iSCSI"
-			" Initiator Node: %s for iSCSI Logout Unit Number: %u->%u"
-			" on iSCSI Target Portal Group: %hu, ignoring request\n",
-				initiatorname, lun, mapped_lun, tpg->tpgt);
-		return(ERR_ADDLUNACL_ALREADY_EXISTS);
-	}
-	
-	spin_lock(&iscsi_lun->lun_acl_lock);
-	for (acl = iscsi_lun->lun_acl_head; acl; acl = acl->next) {
-		if (!(strcmp(acl->initiatorname, initiatorname)) &&
-		     (acl->mapped_lun == mapped_lun))
-		break;
-	}
-
-	if (acl) {
-		TRACE_ERROR("ACL Entry already exists for iSCSI"
-			" Initiator Node: %s for iSCSI Logout Unit Number: %u->%u"
-			" on iSCSI Target Portal Group: %hu, ignoring request\n",
-				initiatorname, lun, mapped_lun, tpg->tpgt);
-		spin_unlock(&iscsi_lun->lun_acl_lock);
-		return(ERR_ADDLUNACL_ALREADY_EXISTS);
-	}
-	spin_unlock(&iscsi_lun->lun_acl_lock);
-
-	if (!(acl = (se_lun_acl_t *) kmalloc(sizeof(se_lun_acl_t), GFP_KERNEL))) {	
-		TRACE_ERROR("Unable to allocate memory for se_lun_acl_t.\n");
-		return(ERR_NO_MEMORY);
-	}
-	memset(acl, 0, sizeof(se_lun_acl_t));
-
-	acl->iscsi_lun = iscsi_lun;
-	acl->mapped_lun = mapped_lun;
-	snprintf(acl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
+	if (!(nacl = iscsi_tpg_get_initiator_node_acl(tpg, lacl->initiatorname)))
+		return(-EINVAL);
 
 	spin_lock(&iscsi_lun->lun_acl_lock);
-	ADD_ENTRY_TO_LIST(acl, iscsi_lun->lun_acl_head, iscsi_lun->lun_acl_tail);
+	ADD_ENTRY_TO_LIST(lacl, iscsi_lun->lun_acl_head, iscsi_lun->lun_acl_tail);
 	spin_unlock(&iscsi_lun->lun_acl_lock);
 
 	if ((iscsi_lun->lun_access & ISCSI_LUNFLAGS_READ_ONLY) &&
 	    (lun_access & ISCSI_LUNFLAGS_READ_WRITE))
 		lun_access = ISCSI_LUNFLAGS_READ_ONLY;
+
+	lacl->iscsi_lun = iscsi_lun;
 	
-	iscsi_update_device_list_for_node(iscsi_lun, mapped_lun, lun_access, nacl, tpg, 1);
+	iscsi_update_device_list_for_node(iscsi_lun, lacl->mapped_lun,
+			lun_access, nacl, tpg, 1);
 
 	PYXPRINT("iSCSI_TPG[%hu]_LUN[%u->%u] - Added %s ACL for iSCSI"
-		" InitiatorNode: %s\n", tpg->tpgt, lun, mapped_lun,
+		" InitiatorNode: %s\n", tpg->tpgt, lun, lacl->mapped_lun,
 		(lun_access & ISCSI_LUNFLAGS_READ_WRITE) ? "RW" : "RO",
-			initiatorname);
-	
+			lacl->initiatorname);
 	return(0);
 }
 
@@ -831,56 +828,38 @@ extern int iscsi_dev_add_initiator_node_lun_acl (
  */
 extern int iscsi_dev_del_initiator_node_lun_acl (
 	iscsi_portal_group_t *tpg,
-	u32 lun,
-	u32 mapped_lun,
-	char *initiatorname)
+	se_lun_t *iscsi_lun,
+	se_lun_acl_t *lacl)
 {
-	se_lun_t *iscsi_lun;
-	se_lun_acl_t *acl;
 	iscsi_node_acl_t *nacl;
 
-	if (strlen(initiatorname) > ISCSI_IQN_LEN) {
-		TRACE_ERROR("iSCSI InitiatorName exceeds maximum size.\n"); 
-		return(ERR_INITIATORNAME_TOO_LARGE);
-	}
-	
-	if (!(iscsi_lun = iscsi_dev_get_lun(tpg, lun))) {
-		TRACE_ERROR("iSCSI Logical Unit Number: %u is not active on"
-			" iSCSI Target Portal Group: %hu, ignoring request.\n",
-				lun, tpg->tpgt);
-		return(ERR_LUN_NOT_ACTIVE);
-	}
-
-	if (!(nacl = iscsi_tpg_get_initiator_node_acl(tpg, initiatorname)))
+	if (!(nacl = iscsi_tpg_get_initiator_node_acl(tpg, lacl->initiatorname)))
 		return(ERR_DELLUNACL_NODE_ACL_MISSING);
 
 	spin_lock(&iscsi_lun->lun_acl_lock);
-	for (acl = iscsi_lun->lun_acl_head; acl; acl = acl->next) {
-		if (!(strcmp(acl->initiatorname, initiatorname)) &&
-		      (acl->mapped_lun == mapped_lun))
-			break;
-	}
-
-	if (!acl) {
-		TRACE_ERROR("Unable to locate LUN ACL for InitiatorName: %s on"
-			" iSCSI LUN: %u on iSCSI TPG: %hu.\n", initiatorname,
-				lun, tpg->tpgt);
-		spin_unlock(&iscsi_lun->lun_acl_lock);
-		return(ERR_DELLUNACL_DOES_NOT_EXIST);
-	}
-
-	REMOVE_ENTRY_FROM_LIST(acl, iscsi_lun->lun_acl_head, iscsi_lun->lun_acl_tail);
+	REMOVE_ENTRY_FROM_LIST(lacl, iscsi_lun->lun_acl_head, iscsi_lun->lun_acl_tail);
 	spin_unlock(&iscsi_lun->lun_acl_lock);
 	
-	iscsi_update_device_list_for_node(iscsi_lun, mapped_lun,
+	iscsi_update_device_list_for_node(iscsi_lun, lacl->mapped_lun,
 		ISCSI_LUNFLAGS_NO_ACCESS, nacl, tpg, 0);
 	
-	kfree(acl);
-	
-	PYXPRINT("iSCSI_TPG[%hu]_LUN[%u] - Removed ACL for iSCSI"
-		" InitiatorNode: %s\n", tpg->tpgt, lun, initiatorname);
-	
+	lacl->iscsi_lun = NULL;
+
+	PYXPRINT("iSCSI_TPG[%hu]_LUN[%u] - Removed ACL for iSCSI InitiatorNode:"
+		" %s Mapped LUN: %u\n", tpg->tpgt, iscsi_lun->iscsi_lun,
+			lacl->initiatorname, lacl->mapped_lun);
 	return(0);
+}
+
+extern void iscsi_dev_free_initiator_node_lun_acl (
+	iscsi_portal_group_t *tpg,
+	se_lun_acl_t *lacl)
+{
+	PYXPRINT("iSCSI_TPG[%hu] - Freeing ACL for iSCSI InitiatorNode: %s"
+		" Mapped LUN: %u\n", tpg->tpgt, lacl->initiatorname, lacl->mapped_lun);
+
+	kfree(lacl);
+	return;
 }
 
 extern int iscsi_dev_set_initiator_node_lun_access (
