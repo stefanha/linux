@@ -575,6 +575,7 @@ extern int iscsi_ioctl (
 	goto dumpout;
 #endif
 	case ISCSI_TARGET_SETNODEQUEUEDEPTH:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -587,6 +588,9 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_CREATEVIRTDEV:
 	  memset(&dev_info, 0, sizeof(se_devinfo_t));
 	  dev_info.hba_type = t->hba_type;

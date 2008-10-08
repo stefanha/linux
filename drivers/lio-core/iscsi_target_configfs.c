@@ -1007,20 +1007,70 @@ static struct lio_target_configfs_attribute lio_target_attr_initiator_info = {
 	.store	= NULL,
 };
 
-static ssize_t lio_target_initiator_nacl_control (void *p, const char *page, size_t count)
+static ssize_t lio_target_initiator_nacl_cmdsn_window_show (void *p, char *page)
 {
 	iscsi_node_acl_t *nacl = (iscsi_node_acl_t *)p;
 
-	printk("lio_target_initiator_nacl_control: page: %s, count: %d\n", page, count);
-	return(count);
+	return(sprintf(page, "%u\n", nacl->queue_depth));
+}
+
+static ssize_t lio_target_initiator_nacl_cmdsn_window_store (void *p, const char *page, size_t count)
+{
+	iscsi_portal_group_t *tpg;
+	iscsi_tiqn_t *tiqn;
+	iscsi_node_acl_t *nacl = (iscsi_node_acl_t *)p;
+	struct config_item *acl_ci, *tpg_ci, *tiqn_ci;
+	char *endptr;
+	u32 cmdsn_depth = 0;
+	int ret = 0;
+	unsigned short int tpgt;
+
+	cmdsn_depth = simple_strtoul(page, &endptr, 0);
+	if (cmdsn_depth > TA_DEFAULT_QUEUE_DEPTH_MAX) {
+		printk(KERN_ERR "Passed cmdsn_depth: %u exceeds"
+			" TA_DEFAULT_QUEUE_DEPTH_MAX: %u\n", cmdsn_depth,
+			TA_DEFAULT_QUEUE_DEPTH_MAX);
+		return(-EINVAL);
+	}
+	if (!(acl_ci = &nacl->acl_group.cg_item)) {
+		printk(KERN_ERR "Unable to locatel acl_ci\n");
+		return(-EINVAL);
+	}
+	if (!(tpg_ci = &acl_ci->ci_parent->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate tpg_ci\n");
+		return(-EINVAL);
+	}
+	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
+		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
+		return(-EINVAL);
+	}
+
+	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
+	if (ret != 0)
+		return(-EINVAL);
+
+	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
+				&tiqn, tpgt, 0)))
+		return(-EINVAL);
+
+#warning setnodequeuedepth assumes force=1
+	ret = iscsi_tpg_set_initiator_node_queue_depth(tpg,
+				config_item_name(acl_ci), cmdsn_depth, 1);
+
+	printk("LIO_Target_ConfigFS: %s/%s Set CmdSN Window: %u for"
+		"InitiatorName: %s\n", config_item_name(tiqn_ci),
+		config_item_name(tpg_ci), cmdsn_depth, config_item_name(acl_ci));
+
+	iscsi_put_tpg(tpg);
+	return((!ret) ? count : (ssize_t)ret);
 }
 
 static struct lio_target_configfs_attribute lio_target_attr_initiator_control = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "control",
-		    .ca_mode = S_IWUSR },
-	.show	= NULL,
-	.store	= lio_target_initiator_nacl_control,
+		    .ca_name = "cmdsn_depth",
+		    .ca_mode = S_IRUGO | S_IWUSR },
+	.show	= lio_target_initiator_nacl_cmdsn_window_show,
+	.store	= lio_target_initiator_nacl_cmdsn_window_store,
 };
 
 static ssize_t lio_target_initiator_nacl_show (struct config_item *item,

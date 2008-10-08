@@ -1200,7 +1200,7 @@ extern int iscsi_tpg_set_initiator_node_queue_depth (
 			" Node %s does not exists for TPG %hu, ignoring"
 			" request.\n", initiatorname, tpg->tpgt);
 		spin_unlock_bh(&tpg->acl_node_lock);
-		return(ERR_INITIATORACL_DOES_NOT_EXIST);
+		return(-ENODEV);
 	}
 	if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 		acl->nodeacl_flags &= ~NAF_DYNAMIC_NODE_ACL;
@@ -1223,7 +1223,7 @@ extern int iscsi_tpg_set_initiator_node_queue_depth (
 			if (dynamic_acl)
 				acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
 			spin_unlock_bh(&tpg->acl_node_lock);
-			return(ERR_INITIATORACL_SESSION_EXISTS);
+			return(-EEXIST);
 		}
 		spin_lock(&sess->conn_lock);
 		if (atomic_read(&sess->session_fall_back_to_erl0) ||
@@ -1258,7 +1258,7 @@ extern int iscsi_tpg_set_initiator_node_queue_depth (
 		if (dynamic_acl)
 			acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
 		spin_unlock_bh(&tpg->acl_node_lock);
-		return(ERR_SETINITCQ_SET_FAILED);
+		return(-EINVAL);
 	}
 	spin_unlock_bh(&tpg->session_lock);
 
