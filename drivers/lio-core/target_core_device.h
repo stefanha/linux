@@ -39,8 +39,6 @@ extern int se_claim_physical_device (se_hba_t *, se_devinfo_t *, struct iscsi_ta
 extern int se_release_physical_device (struct iscsi_target *, se_devinfo_t *, se_hba_t *);
 extern void se_clear_dev_ports (se_device_t *);
 extern int se_free_virtual_device (se_device_t *, se_hba_t *);
-extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *, se_devinfo_t *, se_hba_t *);
-extern int iscsi_create_virtual_device (se_hba_t *, se_devinfo_t *, struct iscsi_target *);
 extern void se_dev_start (se_device_t *);
 extern void se_dev_stop (se_device_t *);
 extern se_hba_t *core_get_hba_from_hbaid (struct iscsi_target *tg,

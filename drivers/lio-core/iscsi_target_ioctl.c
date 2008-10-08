@@ -76,8 +76,6 @@ extern void iscsi_target_release_phase2(void);
 
 /* Symbols from target_core_mod */
 extern int se_free_virtual_device (struct se_device_s *, struct se_hba_s *);
-extern int iscsi_check_hba_for_virtual_device (struct iscsi_target *, struct se_devinfo_s *, struct se_hba_s *);
-extern int iscsi_create_virtual_device (struct se_hba_s *, struct se_devinfo_s *, struct iscsi_target *);
 extern int linux_blockdevice_check (int, int);
 extern int se_dev_set_attrib (struct se_device_s *, u32, u32, int);
 
@@ -288,7 +286,6 @@ extern int iscsi_ioctl (
 	int network_transport = 0, ret = 0;
 	u32 lun_access = 0;
 	se_device_t *dev = NULL;
-	se_devinfo_t dev_info;
 	se_dev_transport_info_t devt_info;
 	se_hba_t *hba = NULL;
 	se_hbainfo_t hba_info;
@@ -592,6 +589,7 @@ extern int iscsi_ioctl (
 	goto dumpout;
 #endif
 	case ISCSI_TARGET_CREATEVIRTDEV:
+#if 0
 	  memset(&dev_info, 0, sizeof(se_devinfo_t));
 	  dev_info.hba_type = t->hba_type;
 	  if (!(hba = core_get_hba_from_id(t->hba_id, 0))) {
@@ -608,7 +606,11 @@ extern int iscsi_ioctl (
 	  }
 	  core_put_hba(hba);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_FREEVIRTDEV:
+#if 0
 	  memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
 	  devt_info.hba_id = t->hba_id;
  	
@@ -625,6 +627,9 @@ extern int iscsi_ioctl (
 	  }
 	  core_put_hba(hba);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_ADDLUNTODEV:
 #if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
