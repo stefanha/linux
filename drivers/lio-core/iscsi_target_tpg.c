@@ -598,6 +598,7 @@ static void iscsi_set_default_tpg_attribs (iscsi_portal_group_t *tpg)
 	a->generate_node_acls = TA_GENERATE_NODE_ACLS;
 	a->cache_dynamic_acls = TA_CACHE_DYNAMIC_ACLS;
 	a->demo_mode_lun_access = TA_DEMO_MODE_LUN_ACCESS;
+	a->cache_core_nps = TA_CACHE_CORE_NPS;
 		
 	return;
 }
@@ -1000,76 +1001,93 @@ extern int iscsi_tpg_del_initiator_node_acl (
 	return(0);
 }
 
+extern iscsi_tpg_np_t *iscsi_tpg_locate_child_np (
+	iscsi_tpg_np_t *tpg_np,
+	int network_transport)
+{
+	iscsi_tpg_np_t *tpg_np_child, *tpg_np_child_tmp;
+
+	spin_lock(&tpg_np->tpg_np_parent_lock);
+	list_for_each_entry_safe(tpg_np_child, tpg_np_child_tmp,
+			&tpg_np->tpg_np_parent_list, tpg_np_child_list) {
+		if (tpg_np_child->tpg_np->np_network_transport ==
+				network_transport) {
+			spin_unlock(&tpg_np->tpg_np_parent_lock);
+			return(tpg_np_child);
+		}
+	}	
+	spin_unlock(&tpg_np->tpg_np_parent_lock);
+
+	return(NULL);
+}
+
 /*	iscsi_tpg_add_network_portal():
  *
  *
  */
-extern int iscsi_tpg_add_network_portal (
+extern iscsi_tpg_np_t *iscsi_tpg_add_network_portal (
 	iscsi_portal_group_t *tpg,
-	struct iscsi_target *tg,
+	iscsi_np_addr_t *np_addr,
+	iscsi_tpg_np_t *tpg_np_parent,
 	int network_transport)
 {
 	iscsi_np_t *np;
 	iscsi_tpg_np_t *tpg_np;
-	unsigned char *ip, *ip_buf;
+	char *ip_buf;
+	void *ip;
 	int ret = 0;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
-	if (tg->net_params_set & PARAM_NET_IPV6_ADDRESS) {
-		ip = ip_buf = &tg->ip6[0];
+	if (np_addr->np_flags & NPF_NET_IPV6) {
+		ip_buf = (char *)&np_addr->np_ipv6[0];
+		ip = (void *)&np_addr->np_ipv6[0];
 	} else {
-		ip = (void *)&tg->ip;
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, tg->ip);
+		iscsi_ntoa2(buf_ipv4, np_addr->np_ipv4);
 		ip_buf = &buf_ipv4[0];
+		ip = (void *)&np_addr->np_ipv4;
 	}
-
 	/*
 	 * If the Network Portal does not currently exist, start it up now.
 	 */
-	if (!(np = core_get_np((void *)ip, tg->port, network_transport))) {
-		if (!(np = core_add_np(tg, network_transport, &ret)))
-			return(ret);
+	if (!(np = core_get_np(ip, np_addr->np_port, network_transport))) {
+		if (!(np = core_add_np(np_addr, network_transport, &ret)))
+			return(ERR_PTR(-EINVAL));
 	}
 
-	spin_lock(&tpg->tpg_np_lock);
-	list_for_each_entry(tpg_np, &tpg->tpg_gnp_list, tpg_np_list) {
-		if (!(memcmp(core_get_np_ip(tpg_np->tpg_np), ip, tpg_np->tpg_np->np_net_size)) &&
-		    (tpg_np->tpg_np->np_port == tg->port) &&
-		    (tpg_np->tpg_np->np_network_transport == network_transport)) {
-			TRACE_ERROR("Network Portal %s:%hu on %s already exists"
-				" on TPG %hu, ignoring request.\n", ip_buf,
-				tg->port, (network_transport == ISCSI_TCP) ?
-				"TCP" : "SCTP", tpg->tpgt);
-			spin_unlock(&tpg->tpg_np_lock);
-			return(ERR_ADDNPTOTPG_ALREADY_EXISTS);
-		}
-	}
-	spin_unlock(&tpg->tpg_np_lock);
-                 
-	if (!(tpg_np = (iscsi_tpg_np_t *) kmalloc(
+	if (!(tpg_np = (iscsi_tpg_np_t *) kzalloc(
 			sizeof(iscsi_tpg_np_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_tpg_np_t.\n");
-		return(ERR_NO_MEMORY);
+		return(ERR_PTR(-ENOMEM));
 	}
-	memset((void *)tpg_np, 0, sizeof(iscsi_tpg_np_t));
 #ifdef SNMP_SUPPORT
 	tpg_np->tpg_np_index	= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
 #endif /* SNMP_SUPPORT */
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
-	tpg_np->tpg_np		=  np;
+	INIT_LIST_HEAD(&tpg_np->tpg_np_child_list);
+	INIT_LIST_HEAD(&tpg_np->tpg_np_parent_list);
+	spin_lock_init(&tpg_np->tpg_np_parent_lock);
+	tpg_np->tpg_np		= np;
+	tpg_np->tpg		= tpg;
 
 	spin_lock(&tpg->tpg_np_lock);
 	list_add_tail(&tpg_np->tpg_np_list, &tpg->tpg_gnp_list);
 	tpg->num_tpg_nps++;
 	spin_unlock(&tpg->tpg_np_lock);
 
+	if (tpg_np_parent) {
+		tpg_np->tpg_np_parent = tpg_np_parent;
+		spin_lock(&tpg_np_parent->tpg_np_parent_lock);
+		list_add_tail(&tpg_np->tpg_np_child_list,
+			&tpg_np_parent->tpg_np_parent_list);
+		spin_unlock(&tpg_np_parent->tpg_np_parent_lock);
+	}
+
 	PYXPRINT("CORE[%s] - Added Network Portal: %s:%hu,%hu on %s on network"
-		" device: %s\n", tpg->tpg_tiqn->tiqn, ip_buf,
-		tpg_np->tpg_np->np_port, tpg->tpgt,
-		(tpg_np->tpg_np->np_network_transport == ISCSI_TCP) ?
-		"TCP" : "SCTP", (strlen(tpg_np->tpg_np->np_net_dev)) ?
-		(char *)tpg_np->tpg_np->np_net_dev : "None");
+		" device: %s\n", tpg->tpg_tiqn->tiqn, ip_buf, np->np_port,
+		tpg->tpgt, (np->np_network_transport == ISCSI_TCP) ?
+		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
+		(char *)np->np_net_dev : "None");
 
 	spin_lock(&np->np_state_lock);
 	np->np_exports++;
@@ -1077,36 +1095,17 @@ extern int iscsi_tpg_add_network_portal (
 		tpg->tpg_tiqn->tiqn, tpg->tpgt, np->np_exports);
 	spin_unlock(&np->np_state_lock);
 
-	return(0);
+	return(tpg_np);
 }
 
-extern iscsi_tpg_np_t *iscsi_tpg_del_np_phase0 (
-	iscsi_portal_group_t *tpg,
-	iscsi_np_t *np)
-{
-	iscsi_tpg_np_t *tpg_np, *tpg_np_t;
-
-	spin_lock(&tpg->tpg_np_lock);
-	list_for_each_entry_safe(tpg_np, tpg_np_t, &tpg->tpg_gnp_list, tpg_np_list) {
-		if (tpg_np->tpg_np == np) {
-			list_del(&tpg_np->tpg_np_list);
-			tpg->num_tpg_nps--;
-			spin_unlock(&tpg->tpg_np_lock);
-			return(tpg_np);
-		}
-	}
-	spin_unlock(&tpg->tpg_np_lock);
-
-	return(NULL);
-}
-
-extern int iscsi_tpg_del_np_phase1 (
+static int iscsi_tpg_release_np (
 	iscsi_tpg_np_t *tpg_np,
 	iscsi_portal_group_t *tpg,
 	iscsi_np_t *np)
 {
-	unsigned char *ip;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
+	char *ip;
+	char buf_ipv4[IPV4_BUF_SIZE];
+	int drop_np = 0;
 	
 	if (np->np_net_size == IPV6_ADDRESS_SPACE)
 		ip = &np->np_ipv6[0];
@@ -1120,22 +1119,26 @@ extern int iscsi_tpg_del_np_phase1 (
 
 	PYXPRINT("CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s on network"
 		" device: %s\n", tpg->tpg_tiqn->tiqn, ip,
-		tpg_np->tpg_np->np_port, tpg->tpgt,
-		(tpg_np->tpg_np->np_network_transport == ISCSI_TCP) ? 
-		"TCP" : "SCTP",  (strlen(tpg_np->tpg_np->np_net_dev)) ?
-			(char *)tpg_np->tpg_np->np_net_dev : "None");
+		np->np_port, tpg->tpgt, (np->np_network_transport == ISCSI_TCP) ? 
+		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
+		(char *)np->np_net_dev : "None");
 
 	tpg_np->tpg_np = NULL;
+	tpg_np->tpg = NULL;
 	kfree(tpg_np);
 
 	/*
 	 * Shutdown Network Portal when last TPG reference is released.
 	 */
 	spin_lock(&np->np_state_lock);
-	np->np_exports--;
+	if ((--np->np_exports == 0) && !(ISCSI_TPG_ATTRIB(tpg)->cache_core_nps))
+		atomic_set(&np->np_shutdown, 1);
 	PYXPRINT("CORE[%s]_TPG[%hu] - Decremented np_exports to %u\n",
 		tpg->tpg_tiqn->tiqn, tpg->tpgt, np->np_exports);
 	spin_unlock(&np->np_state_lock);
+
+	if (atomic_read(&np->np_shutdown))
+		core_del_np(np);
 
 	return(0);
 }
@@ -1146,38 +1149,45 @@ extern int iscsi_tpg_del_np_phase1 (
  */
 extern int iscsi_tpg_del_network_portal (
 	iscsi_portal_group_t *tpg,
-	struct iscsi_target *tg,
-	int network_transport)
+	iscsi_tpg_np_t *tpg_np)
 {
 	iscsi_np_t *np;
-	iscsi_tpg_np_t *tpg_np;
-	unsigned char *ip, *ip_buf;
+	iscsi_tpg_np_t *tpg_np_child, *tpg_np_child_tmp;
 	int ret = 0;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
+
+	if (!(np = tpg_np->tpg_np)) {
+		printk(KERN_ERR "Unable to locate iscsi_np_t from iscsi_tpg_np_t\n");
+		return(-EINVAL);
+	}
 	
-	if (tg->net_params_set & PARAM_NET_IPV6_ADDRESS) {
-		ip = ip_buf = &tg->ip6[0];
+	if (!tpg_np->tpg_np_parent) {
+		/*
+		 * We are the parent tpg network portal.  Release all of the
+		 * child tpg_np's (eg: the non ISCSI_TCP ones) on our parent list
+		 * first.
+		 */
+		list_for_each_entry_safe(tpg_np_child, tpg_np_child_tmp,
+				&tpg_np->tpg_np_parent_list, tpg_np_child_list) {
+			if ((ret = iscsi_tpg_del_network_portal(tpg, tpg_np_child)) < 0)
+				printk(KERN_ERR "iscsi_tpg_del_network_portal()"
+					" failed: %d\n", ret);
+		}
 	} else {
-		ip = (void *)&tg->ip;
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, tg->ip);
-		ip_buf = &buf_ipv4[0];
+		/*
+		 * We are not the parent ISCSI_TCP tpg network portal.  Release
+		 * our own network portals from the child list.
+		 */
+		spin_lock(&tpg_np->tpg_np_parent->tpg_np_parent_lock);
+		list_del(&tpg_np->tpg_np_child_list);
+		spin_unlock(&tpg_np->tpg_np_parent->tpg_np_parent_lock);
 	}
 
-	if (!(np = core_get_np((void *)ip, tg->port, network_transport)))
-		return(-1);
+	spin_lock(&tpg->tpg_np_lock);
+	list_del(&tpg_np->tpg_np_list);
+	tpg->num_tpg_nps--;
+	spin_unlock(&tpg->tpg_np_lock);
 
-	if (!(tpg_np = iscsi_tpg_del_np_phase0(tpg, np))) {
-		TRACE_ERROR("Network Portal %s:%hu on %s does not exist on TPG %hu,"
-			" ignoring request.\n", ip_buf, tg->port,
-			(network_transport == ISCSI_TCP) ? "TCP" : "SCTP", tpg->tpgt);
-		return(ERR_DELNP_DOES_NOT_EXIST);
-	}
-
-	if (iscsi_tpg_del_np_phase1(tpg_np, tpg, np) < 0) 
-		ret = ERR_DELNP_DOES_NOT_EXIST;
-	
-	return(ret);
+	return(iscsi_tpg_release_np(tpg_np, tpg, np)); 
 }
 
 /*	iscsi_tpg_set_initiator_node_queue_depth():

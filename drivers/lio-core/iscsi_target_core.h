@@ -119,6 +119,7 @@
 #define TA_DEFAULT_QUEUE_DEPTH_MIN	1
 #define TA_CACHE_DYNAMIC_ACLS		0
 #define TA_DEMO_MODE_LUN_ACCESS		0 // READ-ONLY by default in demo mode
+#define TA_CACHE_CORE_NPS		0
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -1221,6 +1222,7 @@ typedef struct iscsi_tpg_attrib_s {
 	u32			cache_dynamic_acls;
 	u32			default_queue_depth;
 	u32			demo_mode_lun_access;
+	u32			cache_core_nps;
 }  ____cacheline_aligned iscsi_tpg_attrib_t;
 
 typedef struct se_lun_s {
@@ -1294,8 +1296,20 @@ typedef struct iscsi_tpg_np_s {
 #endif /* SNMP_SUPPORT */
 	iscsi_np_t		*tpg_np;
 	struct iscsi_portal_group_s *tpg;
+	struct iscsi_tpg_np_s	*tpg_np_parent;
 	struct list_head	tpg_np_list;
+	struct list_head	tpg_np_child_list;
+	struct list_head	tpg_np_parent_list;
+	struct config_group	tpg_np_group;
+	spinlock_t		tpg_np_parent_lock;
 } ____cacheline_aligned iscsi_tpg_np_t;
+
+typedef struct iscsi_np_addr_s {
+	u16		np_port;
+	u32		np_flags;
+	u32		np_ipv4;
+	unsigned char	np_ipv6[IPV6_ADDRESS_SPACE];
+} ____cacheline_aligned iscsi_np_addr_t;
   
 typedef struct iscsi_portal_group_s {
 	__u8			tpg_state;	/* TPG State */

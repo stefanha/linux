@@ -484,6 +484,13 @@ extern iscsi_np_t *core_get_np (
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) { 
+		spin_lock(&np->np_state_lock);
+		if (atomic_read(&np->np_shutdown)) {
+			spin_unlock(&np->np_state_lock);
+			continue;
+		}
+		spin_unlock(&np->np_state_lock);
+
 		if (!(memcmp(core_get_np_ip(np), ip, np->np_net_size)) &&
 		    (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
@@ -640,6 +647,13 @@ static iscsi_np_t *core_add_np_locate (
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) {
+		spin_lock(&np->np_state_lock);
+		if (atomic_read(&np->np_shutdown)) {
+			spin_unlock(&np->np_state_lock);
+			continue;
+		}
+		spin_unlock(&np->np_state_lock);
+
 		if (!(memcmp(core_get_np_ip(np), ip, np->np_net_size)) &&
 		    (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) { 
@@ -688,59 +702,50 @@ static iscsi_np_t *core_add_np_locate (
 }
 
 extern iscsi_np_t *core_add_np (
-	struct iscsi_target *tg,
+	iscsi_np_addr_t *np_addr,
 	int network_transport,
 	int *ret)
 {
-	iscsi_np_t *np = NULL;
-	unsigned char *ip_buf = NULL, *ip_ex_buf = NULL;
-	void *ip = NULL, *ip_ex = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf_ipv4_ex[IPV4_BUF_SIZE];
+	iscsi_np_t *np;
+	char *ip_buf = NULL;
+	void *ip;
+	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 	int net_size;
 
-	if (tg->net_params_set & PARAM_NET_IPV6_ADDRESS) {
-		ip = ip_buf = &tg->ip6[0];
-		ip_ex = (tg->net_params_set & PARAM_NET_IPV6_EX_ADDRESS) ?
-				&tg->ip6_ex[0] : NULL;
-		ip_ex_buf = (tg->net_params_set & PARAM_NET_IPV6_EX_ADDRESS) ?
-				&tg->ip6_ex[0] : NULL;
+	if (np_addr->np_flags & NPF_NET_IPV6) {
+		ip_buf = &np_addr->np_ipv6[0];
+		ip = (void *)&np_addr->np_ipv6[0];
 		net_size = IPV6_ADDRESS_SPACE;
 	} else {
-		ip = (void *)&tg->ip;
-		ip_ex = (tg->net_params_set & PARAM_NET_IPV4_EX_ADDRESS) ?
-				&tg->ip_ex : NULL;
+		ip = (void *)&np_addr->np_ipv4;
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		memset(buf_ipv4_ex, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, tg->ip);
-		iscsi_ntoa2(buf_ipv4_ex, tg->ip_ex);
+		iscsi_ntoa2(buf_ipv4, np_addr->np_ipv4);
 		ip_buf = &buf_ipv4[0];
-		ip_ex_buf = &buf_ipv4_ex[0];
 		net_size = IPV4_ADDRESS_SPACE;
 	}
 
-	if ((np = core_add_np_locate(ip, ip_ex, ip_buf, ip_ex_buf, tg->port, tg->port_ex,
-			network_transport, net_size, ret)))
+	if ((np = core_add_np_locate(ip, NULL, ip_buf, NULL, np_addr->np_port,
+			0, network_transport, net_size, ret)))
 		return(np);
 
 	if (*ret != 0)
 		return(NULL);
 
-	if (!(np = kmalloc(sizeof(iscsi_np_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate memory for iscsi_np_t\n");
-		*ret = ERR_NO_MEMORY;
+	if (!(np = kzalloc(sizeof(iscsi_np_t), GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for iscsi_np_t\n");
+		*ret = -ENOMEM;
 		return(NULL);
 	}
-	memset(np, 0, sizeof(iscsi_np_t));
 
 	np->np_flags |= NPF_IP_NETWORK;
-	if (tg->net_params_set & PARAM_NET_IPV6_ADDRESS) {
+	if (np_addr->np_flags & NPF_NET_IPV6) {
 		np->np_flags |= NPF_NET_IPV6;
-		memcpy(np->np_ipv6, tg->ip6, IPV6_ADDRESS_SPACE);
+		memcpy(np->np_ipv6, np_addr->np_ipv6, IPV6_ADDRESS_SPACE);
 	} else {
 		np->np_flags |= NPF_NET_IPV4;
-		np->np_ipv4 = tg->ip;
+		np->np_ipv4 = np_addr->np_ipv4;
 	}
-	np->np_port = tg->port;
+	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
 	np->np_net_size		= net_size;
 #ifdef SNMP_SUPPORT
@@ -771,15 +776,6 @@ extern iscsi_np_t *core_add_np (
 		return(NULL);
 	}
 	spin_unlock_bh(&np->np_thread_lock);
-
-	if (((tg->net_params_set & PARAM_NET_IPV6_EX_ADDRESS) ||
-	     (tg->net_params_set & PARAM_NET_IPV4_EX_ADDRESS)) &&
-			tg->port_ex) {
-		if ((*ret = core_add_np_ex(np, ip_ex, tg->port_ex, net_size)) < 0) {
-			kfree(np);
-			return(NULL);
-		}
-	}
 
 	spin_lock(&iscsi_global->np_lock);
 	list_add_tail(&np->np_list, &iscsi_global->g_np_list);
@@ -868,60 +864,18 @@ extern int core_del_np_comm (iscsi_np_t *np)
 	return(0);
 }
 
-static void core_del_tpg_nps (iscsi_np_t *np)
-{
-	iscsi_portal_group_t *tpg;
-	iscsi_tiqn_t *tiqn;		
-	iscsi_tpg_np_t *tpg_np;
-	int i;
-
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		spin_lock(&tiqn->tiqn_tpg_lock);
-		for (i = 0; i < ISCSI_MAX_TPGS; i++) {
-			tpg = &tiqn->tiqn_tpg_list[i]; 
-
-			spin_lock(&tpg->tpg_state_lock);
-			if (tpg->tpg_state == TPG_STATE_FREE) {
-				spin_unlock(&tpg->tpg_state_lock);
-				continue;
-			}
-			spin_unlock(&tpg->tpg_state_lock);
-
-			if (!(tpg_np = iscsi_tpg_del_np_phase0(tpg, np)))	
-				continue;
-
-			spin_unlock(&tiqn->tiqn_tpg_lock);
-			spin_unlock(&iscsi_global->tiqn_lock);
-			
-			iscsi_tpg_del_np_phase1(tpg_np, tpg, np);
-
-			spin_lock(&iscsi_global->tiqn_lock);
-			spin_lock(&tiqn->tiqn_tpg_lock);
-		}
-		spin_unlock(&tiqn->tiqn_tpg_lock);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-
-	if (np->np_exports) {
-		TRACE_ERROR("np->np_exports != 0\n");
-		BUG();
-	}
-	
-	return;
-}
-
-extern int __core_del_np (iscsi_np_t *np)
+extern int core_del_np (iscsi_np_t *np)
 {
 	unsigned char *ip = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
-	core_del_tpg_nps(np);
 	core_del_np_thread(np);
 	core_del_np_comm(np);
 	core_del_np_all_ex(np);
 
+	spin_lock(&iscsi_global->np_lock);
 	list_del(&np->np_list);
+	spin_unlock(&iscsi_global->np_lock);
 
 	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
 		ip = &np->np_ipv6[0];
@@ -939,48 +893,6 @@ extern int __core_del_np (iscsi_np_t *np)
 
 	kfree(np);
 	return(0);
-}
-
-extern int core_del_np (
-	struct iscsi_target *tg,
-	int network_transport)
-{
-	iscsi_np_t *np;
-	unsigned char *ip_buf = NULL, *ip_ex_buf = NULL;
-	void *ip = NULL, *ip_ex = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf_ipv4_ex[IPV4_BUF_SIZE];
-	int ret;
-			              
-	if (tg->net_params_set & PARAM_NET_IPV6_ADDRESS) {
-		ip = ip_buf = &tg->ip6[0];
-		ip_ex = ip_ex_buf = &tg->ip6_ex[0];
-	} else {
-		ip = (void *)&tg->ip;
-		ip_ex = (void *)&tg->ip_ex;
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		memset(buf_ipv4_ex, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, tg->ip);
-		iscsi_ntoa2(buf_ipv4_ex, tg->ip_ex);
-		ip_buf = &buf_ipv4[0];
-		ip_ex_buf = &buf_ipv4_ex[0];
-	}
-
-	if (!(np = core_get_np(ip, tg->port, network_transport)))
-		return(-1);
-
-	if (!(tg->net_params_set & PARAM_NET_IPV6_EX_ADDRESS) ||
-	    !(tg->net_params_set & PARAM_NET_IPV4_EX_ADDRESS) ||
-	    !tg->port_ex)
-		return(__core_del_np(np));
-
-	if (!(ret = core_del_np_ex(np, ip_ex, tg->port_ex, network_transport)))
-		return(ret);
-
-	TRACE_ERROR("Network Portal Internal %s:%hu External %s:%hu on %s does"
-		" not exist, ignoring request,", ip_buf, tg->port, ip_ex_buf,
-		tg->port_ex, (network_transport == ISCSI_TCP) ? "TCP" : "SCTP");
-
-	return(-1);
 }
 
 extern void core_reset_nps (void)
@@ -1005,7 +917,7 @@ extern void core_release_nps (void)
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
 		spin_unlock(&iscsi_global->np_lock);
-		__core_del_np(np);
+		core_del_np(np);
 		spin_lock(&iscsi_global->np_lock);
 	}
 	spin_unlock(&iscsi_global->np_lock);
@@ -1256,8 +1168,6 @@ extern int iscsi_target_release_phase1 (int rmmod)
 
 extern void iscsi_target_release_phase2 (void)
 {
-	se_plugin_class_t *pc;
-
 	core_reset_nps();
 	iscsi_disable_all_tpgs();
 	iscsi_deallocate_thread_sets(TARGET);

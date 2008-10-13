@@ -78,26 +78,135 @@ static u16 get_tpgt_from_tpg_ci (char *str, int *ret)
 
 // Start items for lio_target_portal_cit
 
-static ssize_t lio_target_portal_attr_show (struct config_item *item,
-					struct configfs_attribute *attr,
-					char *page)
+static ssize_t lio_target_show_np_info (void *p, char *page)
 {
-	return(sprintf(page, "lio_target_portal_attr_show()!\n"));
+	iscsi_tpg_np_t *tpg_np = (iscsi_tpg_np_t *)p;
+	ssize_t rb = 0;
+
+	return(rb);
 }
 
-static struct configfs_attribute lio_target_portal_attr = {
-	.ca_owner	= THIS_MODULE,
-	.ca_name	= "portal_info",
-	.ca_mode	= S_IRUGO,
+static struct lio_target_configfs_attribute lio_target_attr_np_info = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "info",
+		    .ca_mode = S_IRUGO },
+	.show	= lio_target_show_np_info,
+	.store	= NULL,
 };
 
-static struct configfs_item_operations lio_target_portal_item_ops = {
-	.show_attribute	= lio_target_portal_attr_show,
+static ssize_t lio_target_show_np_sctp (void *p, char *page)
+{
+	iscsi_tpg_np_t *tpg_np = (iscsi_tpg_np_t *)p, *tpg_np_sctp;
+	ssize_t rb;
+
+	if ((tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP)))
+		rb = sprintf(page, "1\n");
+	else
+		rb = sprintf(page, "0\n");
+
+	return(rb);
+}
+
+static ssize_t lio_target_store_np_sctp (void *p, const char *page, size_t count)
+{
+	iscsi_np_t *np;
+	iscsi_portal_group_t *tpg;
+	iscsi_tpg_np_t *tpg_np = (iscsi_tpg_np_t *)p;
+	iscsi_tpg_np_t *tpg_np_sctp = NULL;
+	iscsi_tiqn_t *tiqn;
+	char *endptr;
+	iscsi_np_addr_t np_addr;
+	u32 op;
+	int ret;
+
+	op = simple_strtoul(page, &endptr, 0); 
+	 if ((op != 1) && (op != 0)) {
+		printk(KERN_ERR "Illegal value for tpg_enable: %u\n", op);
+		return(-EINVAL);
+	}
+	if (!(np = tpg_np->tpg_np)) {
+		printk(KERN_ERR "Unable to locate iscsi_np_t from iscsi_tpg_np_t\n");
+		return(-EINVAL);
+	}
+
+	if (!(tpg = core_get_tpg_from_iqn(tpg_np->tpg->tpg_tiqn->tiqn,
+				&tiqn, tpg_np->tpg->tpgt, 0)))
+		return(-EINVAL);	
+
+	if (op) {
+		memset((void *)&np_addr, 0, sizeof(iscsi_np_addr_t));		
+		if (np->np_flags & NPF_NET_IPV6)
+			snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE, "%s", np->np_ipv6);	
+		else
+			np_addr.np_ipv4 = np->np_ipv4;
+		np_addr.np_flags = np->np_flags;
+		np_addr.np_port = np->np_port;
+
+		if (!(tpg_np_sctp = iscsi_tpg_add_network_portal(tpg, &np_addr,
+					tpg_np, ISCSI_SCTP_TCP))) 	
+			goto out;
+	} else {
+		if (!(tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP)))
+			goto out;
+		
+		if ((ret = iscsi_tpg_del_network_portal(tpg, tpg_np_sctp)) < 0) 
+			goto out;
+	}
+
+	iscsi_put_tpg(tpg);
+	return(count);
+out:
+	iscsi_put_tpg(tpg);
+	return(-EINVAL);
+}
+
+static struct lio_target_configfs_attribute lio_target_attr_np_sctp = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "sctp",
+		    .ca_mode = S_IRUGO | S_IWUSR },
+	.show	= lio_target_show_np_sctp,
+	.store	= lio_target_store_np_sctp,
 };
 
 static struct configfs_attribute *lio_target_portal_attrs[] = {
-	&lio_target_portal_attr,
+	&lio_target_attr_np_info.attr,
+	&lio_target_attr_np_sctp.attr,
 	NULL,
+};
+
+static ssize_t lio_target_portal_show (struct config_item *item,
+				       struct configfs_attribute *attr,
+				       char *page)
+{
+	iscsi_tpg_np_t *tpg_np = container_of(to_config_group(item),
+			iscsi_tpg_np_t, tpg_np_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->show))
+		return(-EINVAL);
+
+	return(lt_attr->show((void *)tpg_np, page));
+}
+
+static ssize_t lio_target_portal_store (struct config_item *item,
+					struct configfs_attribute *attr,
+					const char *page, size_t count)
+{
+	iscsi_tpg_np_t *tpg_np = container_of(to_config_group(item),
+			iscsi_tpg_np_t, tpg_np_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->store))
+		return(-EINVAL);
+
+	 return(lt_attr->store((void *)tpg_np, page, count));
+}
+
+static struct configfs_item_operations lio_target_portal_item_ops = {
+	.show_attribute		= lio_target_portal_show,
+	.store_attribute	= lio_target_portal_store,
 };
 
 static struct config_item_type lio_target_portal_cit = {
@@ -110,64 +219,7 @@ static struct config_item_type lio_target_portal_cit = {
 
 // Start items for lio_target_np_cit
 
-static struct iscsi_target *allocate_lio_ioctl_for_net (
-	const char *portal)
-{
-	struct iscsi_target *tg;
-	char *ip_str, *port_str, *str, *str2, *end_ptr;
-	char buf[256];
-	int ipv6 = 0;
-	unsigned short int port;
-
-	if (!(tg = kzalloc(sizeof(struct iscsi_target), GFP_KERNEL)))
-		return(ERR_PTR(-ENOMEM));
-
-	memset(buf, 0, 256);
-	snprintf(buf, 256, "%s", portal);
-
-	/*
-	 * Look for iSCSI IPv6 [$IP_ADDR]:PORT..
-	 */
-	if ((str = strstr(buf, "["))) {
-		if (!(str2 = strstr(str, "]")))	{
-			printk(KERN_ERR "Unable to locate trailing \"]\""
-				" in IPv6 iSCSI network portal address\n");
-			goto out;
-		}
-		str2 += 1; /* Skip over the "]" */
-		*str2 = '\0'; /* Terminate the IPv6 address */
-		str2 += 1; /* Set str2 to port */
-		port = simple_strtoul(str2, &end_ptr, 0);
-
-		sprintf(tg->ip6, "%s", str);
-		tg->net_params_set |= PARAM_NET_IPV6_ADDRESS;
-		tg->port = port;
-		tg->net_params_set |= PARAM_NET_PORT;
-	} else {
-		ipv6 = 0;
-		ip_str = &buf[0];
-
-		if (!(port_str = strstr(ip_str, ":"))) {
-			printk(KERN_ERR "Unable to locate \":port\""
-				" in IPv4 iSCSI network portal address\n");
-			goto out;
-		}
-		*port_str = '\0'; /* Terminate string for IP */
-		port_str += 1; /* Skip over ":" */
-		port = simple_strtoul(port_str, &end_ptr, 0);
-
-		tg->ip = in_aton(ip_str);
-		tg->ip = htonl(tg->ip);
-		tg->net_params_set |= PARAM_NET_IPV4_ADDRESS;
-		tg->port = port;
-		tg->net_params_set |= PARAM_NET_PORT;
-	}
-
-	return(tg);
-out:
-	kfree(tg);
-	return(NULL);
-}
+#define MAX_PORTAL_LEN		256
 
 static struct config_group *lio_target_call_addnptotpg (
         struct config_group *group,
@@ -175,65 +227,100 @@ static struct config_group *lio_target_call_addnptotpg (
 {
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
-	struct config_group *portal_cg = NULL;
+	iscsi_tpg_np_t *tpg_np;
 	struct config_item *np_ci, *tpg_ci, *tiqn_ci;
-	struct iscsi_target *tg = NULL;
+	char *str, *str2, *end_ptr, *ip_str, *port_str;
+	iscsi_np_addr_t np_addr;
+	u32 ipv4 = 0;
 	unsigned short int tpgt;
-	int network_transport, ret = 0;
+	int ret = 0;
+	char buf[MAX_PORTAL_LEN];
 
 	if (!(np_ci = &group->cg_item)) {
 		printk(KERN_ERR "Unable to locate config_item np_ci\n");
-		return(NULL);
+		return(ERR_PTR(-EINVAL));
 	}
 	if (!(tpg_ci = &np_ci->ci_group->cg_item)) {
 		printk(KERN_ERR "Unable to locate config_item tpg_ci\n");
-		return(NULL);
+		return(ERR_PTR(-EINVAL));
 	}
 	if (!(tiqn_ci = &tpg_ci->ci_group->cg_item)) {
 		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
-		return(NULL);
+		return(ERR_PTR(-EINVAL));
 	}
-
 	/*
 	 * Get the u16 tpgt from tpg_ci..
 	 */
 	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
 	if (ret != 0) 
-		return(NULL);
+		return(ERR_PTR(-EINVAL));
 
-	/*
-	 * Setup the structure members in struct iscsi_target that 
-	 * iscsi_tpg_add_network_portal() depends on..
-	 */
-	if (!(tg = allocate_lio_ioctl_for_net(name))) 
-		return(NULL);
+	if (strlen(name) > MAX_PORTAL_LEN) {
+		printk(KERN_ERR "strlen(name): %d exceeds MAX_PORTAL_LEN: %d\n",
+			strlen(name), MAX_PORTAL_LEN);
+		return(ERR_PTR(-EOVERFLOW));
+	}
+	memset(buf, 0, MAX_PORTAL_LEN);
+	snprintf(buf, MAX_PORTAL_LEN, "%s", name);
 
+	memset((void *)&np_addr, 0, sizeof(iscsi_np_addr_t));
+
+	if ((str = strstr(buf, "["))) {
+		if (!(str2 = strstr(str, "]"))) {
+			printk(KERN_ERR "Unable to locate trailing \"]\""
+				" in IPv6 iSCSI network portal address\n");
+			return(ERR_PTR(-EINVAL));
+		}
+		str2 += 1; /* Skip over the "]" */
+		*str2 = '\0'; /* Terminate the IPv6 address */
+		str2 += 1; /* Set str2 to port */
+		np_addr.np_port = simple_strtoul(str2, &end_ptr, 0);
+		snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE, "%s\n", str);
+		np_addr.np_flags |= NPF_NET_IPV6;
+	} else {
+		ip_str = &buf[0];
+		if (!(port_str = strstr(ip_str, ":"))) {
+			printk(KERN_ERR "Unable to locate \":port\""
+				" in IPv4 iSCSI network portal address\n");
+			return(ERR_PTR(-EINVAL));
+		}
+		*port_str = '\0'; /* Terminate string for IP */
+		port_str += 1; /* Skip over ":" */
+		np_addr.np_port = simple_strtoul(port_str, &end_ptr, 0);
+
+		ipv4 = in_aton(ip_str);
+		np_addr.np_ipv4 = htonl(ipv4);
+		np_addr.np_flags |= NPF_NET_IPV4;
+	}
 	printk("LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu PORTAL: %s\n",
 			config_item_name(tiqn_ci), tpgt, name);
 
 	if (!(tpg = core_get_tpg_from_iqn(config_item_name(tiqn_ci),
 				&tiqn, tpgt, 0)))
 		goto out;
-
-	if (!(portal_cg = kzalloc(sizeof(struct config_group), GFP_KERNEL)))
+	/*
+	 * Assume ISCSI_TCP by default.  Other network portals for other
+	 * iSCSI fabrics:
+	 *
+	 * Traditional iSCSI over SCTP (initial support)	
+	 * iSER/TCP (TODO, hardware available)
+	 * iSER/SCTP (TODO, software emulation with osc-iwarp)
+	 * iSER/IB (TODO, hardware available)
+	 *
+	 * can be enabled with atributes under
+	 * sys/kernel/config/iscsi/$IQN/$TPG/np/$IP:$PORT/
+	 *
+	 */
+	if (!(tpg_np = iscsi_tpg_add_network_portal(tpg, &np_addr, NULL, ISCSI_TCP)))
 		goto out;
 
-#warning FIXME: Assumes iSCSI/TCP for now..
-	network_transport = ISCSI_TCP;
-
-	if ((ret = iscsi_tpg_add_network_portal(tpg, tg, network_transport)) < 0)
-		goto out;
-
-	config_group_init_type_name(portal_cg, name, &lio_target_portal_cit);
+	config_group_init_type_name(&tpg_np->tpg_np_group, name, &lio_target_portal_cit);
 
 	printk("LIO_Target_ConfigFS: addnptotpg done!\n");
 
-	kfree(tg);
 	iscsi_put_tpg(tpg);
-	return(portal_cg);
+	return(&tpg_np->tpg_np_group);
 out:
-	kfree(tg);
-	kfree(portal_cg);
 	iscsi_put_tpg(tpg);
 	return(NULL);
 }
@@ -244,9 +331,9 @@ static void lio_target_call_delnpfromtpg (
 {   
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
+	iscsi_tpg_np_t *tpg_np;
 	struct config_item *np_ci, *tpg_ci, *tiqn_ci;
-	struct iscsi_target *tg;
-	int network_transport, ret = 0;
+	int ret = 0;
 	unsigned short int tpgt;
 
 	if (!(np_ci = &group->cg_item)) {
@@ -261,15 +348,14 @@ static void lio_target_call_delnpfromtpg (
 		printk(KERN_ERR "Unable to locate config_item tiqn_ci\n");
 		return;
 	}
+	if (!(tpg_np = container_of(to_config_group(item),
+			iscsi_tpg_np_t, tpg_np_group))) {
+		printk(KERN_ERR "Unable to locate iscsi_tpg_np_t\n");
+		return;
+	}
 
 	tpgt = get_tpgt_from_tpg_ci(config_item_name(tpg_ci), &ret);
 	if (ret != 0)
-		return;
-	/*
-	 * Setup the structure members in struct iscsi_target that 
-	 * iscsi_tpg_del_network_portal() depends on..
-	 */
-	if (!(tg = allocate_lio_ioctl_for_net(config_item_name(item))))
 		return;
 
 	printk("LIO_Target_ConfigFS: DEREGISTER -> %s TPGT: %hu PORTAL: %s\n",
@@ -281,18 +367,12 @@ static void lio_target_call_delnpfromtpg (
 
 	config_item_put(item);
 
-#warning FIXME: Assumes iSCSI/TCP for now..
-	network_transport = ISCSI_TCP;
-
-	ret = iscsi_tpg_del_network_portal(tpg, tg, network_transport);
+	if ((ret = iscsi_tpg_del_network_portal(tpg, tpg_np)) < 0)
+		goto out;
 
 	printk("LIO_Target_ConfigFS: delnpfromtpg done!\n");
-
-	kfree(tg);
-	iscsi_put_tpg(tpg);
-	return;
 out:
-	kfree(tg);
+	iscsi_put_tpg(tpg);
 	return;
 }
 

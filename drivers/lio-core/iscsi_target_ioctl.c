@@ -281,7 +281,7 @@ extern int iscsi_ioctl (
 			unsigned int cmd,
 			unsigned long arg)
 {
-	int network_transport = 0, ret = 0;
+	int ret = 0;
 	u32 lun_access = 0;
 	se_device_t *dev = NULL;
 	se_dev_transport_info_t devt_info;
@@ -471,6 +471,7 @@ extern int iscsi_ioctl (
 	  iscsi_put_tpg(tpg);
 	  break;
 	case ISCSI_TARGET_ADDNPTOTPG:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -489,7 +490,11 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_DELNPFROMTPG:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -508,6 +513,9 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_ADDHBATOTARGET:
 	  memset(&hba_info, 0, sizeof(se_hbainfo_t));
 	  hba_info.hba_id = t->hba_id;
@@ -831,6 +839,7 @@ extern int iscsi_ioctl (
 		ret = core_del_tiqn(t->targetname);
 		break;
 	case ISCSI_TARGET_ADDNPTOCORE:
+#if 0
 		if (t->net_params_set & PARAM_NET_SCTP_TCP)
 			network_transport = ISCSI_SCTP_TCP;
 		else if (t->net_params_set & PARAM_NET_SCTP_UDP)
@@ -842,7 +851,11 @@ extern int iscsi_ioctl (
 		if (ret != 0)
 			goto dumpout;
 		break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_DELNPFROMCORE:
+#if 0
 		if (t->net_params_set & PARAM_NET_SCTP_TCP)
 			network_transport = ISCSI_SCTP_TCP;
 		else if (t->net_params_set & PARAM_NET_SCTP_UDP)
@@ -853,6 +866,9 @@ extern int iscsi_ioctl (
 		if ((ret = core_del_np(t, network_transport)) < 0)
 			goto dumpout;
 		break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_SETDEVATTRIB:
 		memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
 		devt_info.hba_id = t->hba_id;
