@@ -279,7 +279,7 @@ static int iscsi_login_zero_tsih_s2 (
 	
 	iscsi_set_keys_to_negotiate(TARGET, 0, conn->param_list);
 
-	if (!(SESS_OPS(sess)->SessionType))
+	if (SESS_OPS(sess)->SessionType)
 		return(iscsi_set_keys_irrelevant_for_discovery(conn->param_list));
 
 	acl = sess->node_acl;
@@ -612,6 +612,12 @@ static int iscsi_post_login_handler (iscsi_np_t *np, iscsi_conn_t *conn, __u8 ze
 
 	iscsi_determine_maxcmdsn(sess, sess->node_acl);
 		
+	if (!(SESS_OPS(sess)->SessionType)) {
+		spin_lock_bh(&sess->node_acl->nacl_sess_lock);
+		sess->node_acl->nacl_sess = sess;
+		spin_unlock_bh(&sess->node_acl->nacl_sess_lock);
+	}
+
 	spin_lock_bh(&tpg->session_lock);
 	ADD_ENTRY_TO_LIST(sess, tpg->session_head, tpg->session_tail);
 	TRACE(TRACE_STATE, "Moving to TARG_SESS_STATE_LOGGED_IN.\n");

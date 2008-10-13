@@ -4934,6 +4934,17 @@ extern int iscsi_close_session (
 	spin_unlock_bh(&tpg->session_lock);
 
 	/*
+	 * Clear the iscsi_node_acl->nacl_sess pointer now as a iscsi_np
+	 * context can be setting in iscsi_post_login_handler()  again
+	 * after out iscsi_stop_session() below.
+	 */
+	if ((acl = sess->node_acl)) {
+		spin_lock(&acl->nacl_sess_lock);
+		acl->nacl_sess = NULL;
+		spin_unlock(&acl->nacl_sess_lock);
+	}
+
+	/*
 	 * If any other processes are accessing this session pointer we must wait until
 	 * they have completed.  If we are in an interrupt (the time2retain handler)
 	 * and contain and active session usage count we restart the timer and exit.
@@ -4960,7 +4971,7 @@ extern int iscsi_close_session (
 	 * generated.
 	 */
 	spin_lock_bh(&tpg->acl_node_lock);
-	if ((acl = sess->node_acl)) {
+	if (acl) {
 		if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 			if (!(ISCSI_TPG_ATTRIB(tpg)->cache_dynamic_acls)) {
 				REMOVE_ENTRY_FROM_LIST(acl, tpg->acl_node_head,
@@ -4972,9 +4983,6 @@ extern int iscsi_close_session (
 				spin_lock_bh(&tpg->acl_node_lock);
 			}
 		}
-		spin_lock(&acl->nacl_sess_lock);
-		acl->nacl_sess = NULL;
-		spin_unlock(&acl->nacl_sess_lock);
 		sess->node_acl = NULL;
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);

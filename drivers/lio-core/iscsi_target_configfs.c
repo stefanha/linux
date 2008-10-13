@@ -982,7 +982,8 @@ static ssize_t lio_target_initiator_nacl_info (void *p, char *page)
 
 	spin_lock_bh(&nacl->nacl_sess_lock);
 	if (!(sess = nacl->nacl_sess))
-		rb += sprintf(page+rb, "No active iSCSI Session for Endpoint\n");
+		rb += sprintf(page+rb, "No active iSCSI Session for Initiator"
+			" Endpoint: %s\n", nacl->initiatorname);
 	else {
 		if (SESS_OPS(sess)->InitiatorName)
 			rb += sprintf(page+rb, "InitiatorName: %s\n",

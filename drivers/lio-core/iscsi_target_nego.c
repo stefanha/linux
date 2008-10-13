@@ -747,7 +747,7 @@ static int iscsi_target_locate_portal (
 		if (!login->leading_connection)
 			goto get_target;
 
-		SESS_OPS(sess)->SessionType = sessiontype;
+		SESS_OPS(sess)->SessionType = 1;
 		/*
 		 * Serialize access across the discovery iscsi_portal_group_t to
 		 * process login attempt.
@@ -826,7 +826,7 @@ get_target:
 	/*
 	 * This value is required in iscsi_login_zero_tsih_s2()
 	 */
-	SESS_OPS(sess)->SessionType = sessiontype;
+	SESS_OPS(sess)->SessionType = 0;
 
 	/*
 	 * Locate incoming Initiator IQN reference from Storage Node.
@@ -841,9 +841,6 @@ get_target:
 		ret = -1;
 		goto out;
 	}
-	spin_lock_bh(&sess->node_acl->nacl_sess_lock);
-	sess->node_acl->nacl_sess = sess;
-	spin_unlock_bh(&sess->node_acl->nacl_sess_lock);
 
 	ret = 0;
 out:
