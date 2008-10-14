@@ -1451,7 +1451,7 @@ extern int iscsi_get_tpg_attrib_info (
 	memset(b, 0, TMP_BUF_LEN);
 
 	bl = sprintf(b, "       cache_dynamic_acls: %u\n", ISCSI_TPG_ATTRIB(tpg)->cache_dynamic_acls);
-	bl += sprintf(b+bl, "       default_queue_depth: %u\n", ISCSI_TPG_ATTRIB(tpg)->default_queue_depth);
+	bl += sprintf(b+bl, "       default_cmdsn_depth: %u\n", ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth);
 	bl += sprintf(b+bl, "       demo_mode_lun_access: %u\n", ISCSI_TPG_ATTRIB(tpg)->demo_mode_lun_access);
 
 	if (check_and_copy_buf(pb, b, &cl, &bl, &ml) < 0)

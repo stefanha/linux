@@ -1107,10 +1107,10 @@ static ssize_t lio_target_initiator_nacl_cmdsn_window_store (void *p, const char
 	unsigned short int tpgt;
 
 	cmdsn_depth = simple_strtoul(page, &endptr, 0);
-	if (cmdsn_depth > TA_DEFAULT_QUEUE_DEPTH_MAX) {
+	if (cmdsn_depth > TA_DEFAULT_CMDSN_DEPTH_MAX) {
 		printk(KERN_ERR "Passed cmdsn_depth: %u exceeds"
-			" TA_DEFAULT_QUEUE_DEPTH_MAX: %u\n", cmdsn_depth,
-			TA_DEFAULT_QUEUE_DEPTH_MAX);
+			" TA_DEFAULT_CMDSN_DEPTH_MAX: %u\n", cmdsn_depth,
+			TA_DEFAULT_CMDSN_DEPTH_MAX);
 		return(-EINVAL);
 	}
 	if (!(acl_ci = &nacl->acl_group.cg_item)) {
@@ -1244,8 +1244,8 @@ static struct config_group *lio_target_call_addnodetotpg (
 				&tiqn, tpgt, 0)))
                 return(NULL);
 	
-#warning FIXME: cmdsn_depth set to ISCSI_TPG_ATTRIB(tpg)->default_queue_depth
-	cmdsn_depth = ISCSI_TPG_ATTRIB(tpg)->default_queue_depth;
+#warning FIXME: cmdsn_depth set to ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth
+	cmdsn_depth = ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth;
 
 	if (!(acl = iscsi_tpg_add_initiator_node_acl(tpg, name,
 				cmdsn_depth, &ret)))
@@ -1320,6 +1320,128 @@ static struct config_item_type lio_target_acl_cit = {
 };
 
 // End items for lio_target_acl_cit
+
+// Start items for lio_target_tpg_attrib_cit
+
+#define SHOW_TPG_ATTRIB(name)						\
+									\
+static ssize_t lio_target_show_tpg_attrib_##name (			\
+	void *p,							\
+	char *page)							\
+{									\
+	iscsi_portal_group_t *tpg, *tpg_p = (iscsi_portal_group_t *)p;	\
+	iscsi_tiqn_t *tiqn;						\
+	ssize_t rb;							\
+									\
+	if (!(tpg = core_get_tpg_from_iqn(tpg_p->tpg_tiqn->tiqn,	\
+				&tiqn, tpg_p->tpgt, 0)))		\
+		return(-EINVAL);					\
+									\
+	rb = sprintf(page, "%u\n", ISCSI_TPG_ATTRIB(tpg)->name);	\
+	iscsi_put_tpg(tpg);						\
+	return(rb);							\
+}
+
+#define STORE_TPG_ATTRIB(name)						\
+									\
+static ssize_t lio_target_store_tpg_attrib_##name (			\
+	void *p,							\
+	const char *page,						\
+	size_t count)							\
+{									\
+	iscsi_portal_group_t *tpg, *tpg_p = (iscsi_portal_group_t *)p;	\
+	iscsi_tiqn_t *tiqn;						\
+	char *endptr;							\
+	u32 val;							\
+	int ret;							\
+									\
+	if (!(tpg = core_get_tpg_from_iqn(tpg_p->tpg_tiqn->tiqn,	\
+				&tiqn, tpg_p->tpgt, 0)))		\
+		return(-EINVAL);					\
+									\
+	val = simple_strtoul(page, &endptr, 0);				\
+	if ((ret = iscsi_ta_##name(tpg, val)) < 0)			\
+		goto out;						\
+									\
+	iscsi_put_tpg(tpg);						\
+	return(count);							\
+out:									\
+	iscsi_put_tpg(tpg);						\
+	return(ret);							\
+}
+
+#define DEF_TPG_ATTRIB(name, string_name)						\
+	SHOW_TPG_ATTRIB(name)						\
+	STORE_TPG_ATTRIB(name)						\
+									\
+static struct lio_target_configfs_attribute lio_target_attr_tpg_##name = { \
+	.attr	= { .ca_owner = THIS_MODULE,				\
+		    .ca_name = string_name,				\
+		    .ca_mode =  S_IRUGO | S_IWUSR },			\
+	.show	= lio_target_show_tpg_attrib_##name,			\
+	.store	= lio_target_store_tpg_attrib_##name,			\
+};
+
+DEF_TPG_ATTRIB(authentication, "authentication");
+DEF_TPG_ATTRIB(login_timeout, "login_timeout");
+DEF_TPG_ATTRIB(netif_timeout, "netif_timeout");
+DEF_TPG_ATTRIB(generate_node_acls, "generate_node_acls");
+DEF_TPG_ATTRIB(default_cmdsn_depth, "default_cmdsn_depth");
+DEF_TPG_ATTRIB(cache_dynamic_acls, "cache_dynamic_acls");
+DEF_TPG_ATTRIB(demo_mode_lun_access, "demo_mode_lun_access");
+
+static struct configfs_attribute *lio_target_tpg_attrib_attrs[] = {
+	&lio_target_attr_tpg_authentication.attr,
+	&lio_target_attr_tpg_login_timeout.attr,
+	&lio_target_attr_tpg_netif_timeout.attr,
+	&lio_target_attr_tpg_generate_node_acls.attr,
+	&lio_target_attr_tpg_default_cmdsn_depth.attr,
+	&lio_target_attr_tpg_cache_dynamic_acls.attr,
+	&lio_target_attr_tpg_demo_mode_lun_access.attr,
+};
+
+static ssize_t lio_target_tpg_attr_show (struct config_item *item,
+				       struct configfs_attribute *attr,
+				       char *page)
+{
+	iscsi_portal_group_t *tpg = container_of(to_config_group(item),
+			iscsi_portal_group_t, tpg_attrib_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->show))
+		return(-EINVAL);
+
+	return(lt_attr->show((void *)tpg, page));
+}
+
+static ssize_t lio_target_tpg_attr_store (struct config_item *item,
+					struct configfs_attribute *attr,
+					const char *page, size_t count)
+{
+	iscsi_portal_group_t *tpg = container_of(to_config_group(item),
+			iscsi_portal_group_t, tpg_attrib_group);
+	struct lio_target_configfs_attribute *lt_attr = container_of(
+			attr, struct lio_target_configfs_attribute, attr);
+
+	if (!(lt_attr->store))
+		return(-EINVAL);
+
+	return(lt_attr->store((void *)tpg, page, count));
+}
+
+static struct configfs_item_operations lio_target_tpg_attrib_ops = {
+	.show_attribute		= lio_target_tpg_attr_show,
+	.store_attribute	= lio_target_tpg_attr_store,
+};
+
+static struct config_item_type lio_target_tpg_attrib_cit = {
+	.ct_item_ops	= &lio_target_tpg_attrib_ops,
+	.ct_attrs	= lio_target_tpg_attrib_attrs,
+	.ct_owner	= THIS_MODULE,
+};
+
+// End items for lio_target_tpg_attrib_cit
 
 // Start items for lio_target_tpg_cit
 
@@ -1450,25 +1572,6 @@ static struct config_item_type lio_target_tpg_cit = {
 
 // Start items for lio_target_tiqn_cit
 
-#if 0
-static ssize_t lio_target_tiqn_attr_show_nodename (struct config_item *item,
-                                      struct configfs_attribute *attr,
-                                      char *page)
-{
-	return(sprintf(page, "lio_target_tpg_attr_show_nodename() called!\n"));
-}
-
-static struct configfs_item_operations lio_target_tiqn_item_ops = {
-        .show_attribute = lio_target_tiqn_attr_show_nodename,
-};
-
-static struct configfs_attribute lio_target_tiqn_attr_nodename = {
-        .ca_owner       = THIS_MODULE,
-        .ca_name        = "nodename",
-        .ca_mode        = S_IRUGO | S_IWUSR,
-};
-#endif
-
 static struct config_group *lio_target_tiqn_addtpg (
         struct config_group *group,
         const char *name)
@@ -1508,17 +1611,19 @@ static struct config_group *lio_target_tiqn_addtpg (
 	/*
 	 * Create default configfs groups for iscsi_portal_group_t..
 	 */
-	if (!(tpg_cg->default_groups = kzalloc(sizeof(struct config_group) * 4,
+	if (!(tpg_cg->default_groups = kzalloc(sizeof(struct config_group) * 5,
 			GFP_KERNEL)))
 		goto out;
 
 	config_group_init_type_name(&tpg->tpg_np_group, "np", &lio_target_np_cit);
 	config_group_init_type_name(&tpg->tpg_lun_group, "lun", &lio_target_lun_cit);
 	config_group_init_type_name(&tpg->tpg_acl_group, "acls", &lio_target_acl_cit);
+	config_group_init_type_name(&tpg->tpg_attrib_group, "attrib", &lio_target_tpg_attrib_cit);
 	tpg_cg->default_groups[0] = &tpg->tpg_np_group;
 	tpg_cg->default_groups[1] = &tpg->tpg_lun_group;
 	tpg_cg->default_groups[2] = &tpg->tpg_acl_group;
-	tpg_cg->default_groups[3] = NULL;
+	tpg_cg->default_groups[3] = &tpg->tpg_attrib_group;	
+	tpg_cg->default_groups[4] = NULL;
 
 	if ((ret = iscsi_tpg_add_portal_group(tiqn, tpg)) < 0)
 		goto out;

@@ -114,9 +114,9 @@
 #define TA_NETIF_TIMEOUT_MAX		15
 #define TA_NETIF_TIMEOUT_MIN		2
 #define TA_GENERATE_NODE_ACLS		0
-#define TA_DEFAULT_QUEUE_DEPTH		16
-#define TA_DEFAULT_QUEUE_DEPTH_MAX	512
-#define TA_DEFAULT_QUEUE_DEPTH_MIN	1
+#define TA_DEFAULT_CMDSN_DEPTH		16
+#define TA_DEFAULT_CMDSN_DEPTH_MAX	512
+#define TA_DEFAULT_CMDSN_DEPTH_MIN	1
 #define TA_CACHE_DYNAMIC_ACLS		0
 #define TA_DEMO_MODE_LUN_ACCESS		0 // READ-ONLY by default in demo mode
 #define TA_CACHE_CORE_NPS		0
@@ -1220,7 +1220,7 @@ typedef struct iscsi_tpg_attrib_s {
 	u32			netif_timeout;
 	u32			generate_node_acls;
 	u32			cache_dynamic_acls;
-	u32			default_queue_depth;
+	u32			default_cmdsn_depth;
 	u32			demo_mode_lun_access;
 	u32			cache_core_nps;
 }  ____cacheline_aligned iscsi_tpg_attrib_t;
@@ -1330,6 +1330,7 @@ typedef struct iscsi_portal_group_s {
 	se_lun_t		*tpg_lun_list;
 	iscsi_node_acl_t	*acl_node_head;	/* Pointer to start of Initiator ACL list */
 	iscsi_node_acl_t	*acl_node_tail;	/* Pointer to end of Initiator ACL list */
+	struct config_group	tpg_attrib_group;
 	struct config_group	tpg_np_group;
 	struct config_group	tpg_lun_group;
 	struct config_group	tpg_acl_group;

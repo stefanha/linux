@@ -459,6 +459,7 @@ extern int iscsi_ioctl (
 	  iscsi_put_tpg(tpg);
 	  break;
 	case ISCSI_TARGET_SETTPGATTRIB:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -470,6 +471,9 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_ADDNPTOTPG:
 #if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {

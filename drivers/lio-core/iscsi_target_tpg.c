@@ -74,7 +74,7 @@ extern int iscsi_close_session (iscsi_session_t *);
 extern int iscsi_free_session (iscsi_session_t *);
 extern int iscsi_stop_session (iscsi_session_t *, int, int);
 extern int iscsi_release_sessions_for_tpg (iscsi_portal_group_t *, int);
-static int iscsi_ta_set_authentication (iscsi_portal_group_t *, __u32);
+extern int iscsi_ta_authentication (iscsi_portal_group_t *, __u32);
 
 /*	init_iscsi_portal_groups():
  *
@@ -460,7 +460,7 @@ extern iscsi_node_acl_t *iscsi_tpg_check_initiator_node_acl (
 
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
-	acl->queue_depth = ISCSI_TPG_ATTRIB(tpg)->default_queue_depth;
+	acl->queue_depth = ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth;
 	snprintf(acl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
 	acl->tpg = tpg;
 #ifdef SNMP_SUPPORT
@@ -594,7 +594,7 @@ static void iscsi_set_default_tpg_attribs (iscsi_portal_group_t *tpg)
 	a->authentication = TA_AUTHENTICATION;
 	a->login_timeout = TA_LOGIN_TIMEOUT;
 	a->netif_timeout = TA_NETIF_TIMEOUT;
-	a->default_queue_depth = TA_DEFAULT_QUEUE_DEPTH;
+	a->default_cmdsn_depth = TA_DEFAULT_CMDSN_DEPTH;
 	a->generate_node_acls = TA_GENERATE_NODE_ACLS;
 	a->cache_dynamic_acls = TA_CACHE_DYNAMIC_ACLS;
 	a->demo_mode_lun_access = TA_DEMO_MODE_LUN_ACCESS;
@@ -785,7 +785,7 @@ extern int iscsi_tpg_enable_portal_group (iscsi_portal_group_t *tpg)
 				spin_unlock(&tpg->tpg_state_lock);
 				return(ERR_NO_MEMORY);
 			}
-		if (iscsi_ta_set_authentication(tpg, 1) < 0) {
+		if (iscsi_ta_authentication(tpg, 1) < 0) {
 			spin_unlock(&tpg->tpg_state_lock);
 			return(ERR_NO_MEMORY);
 		}
@@ -1105,7 +1105,6 @@ static int iscsi_tpg_release_np (
 {
 	char *ip;
 	char buf_ipv4[IPV4_BUF_SIZE];
-	int drop_np = 0;
 	
 	if (np->np_net_size == IPV6_ADDRESS_SPACE)
 		ip = &np->np_ipv6[0];
@@ -1429,11 +1428,11 @@ extern int iscsi_tpg_post_dellun (
 	return(0);	
 }
 
-/*	iscsi_ta_set_authentication():
+/*	iscsi_ta_authentication():
  *
  *
  */
-static int iscsi_ta_set_authentication (iscsi_portal_group_t *tpg, __u32 authentication)
+extern int iscsi_ta_authentication (iscsi_portal_group_t *tpg, u32 authentication)
 {
 	unsigned char buf1[256], buf2[256], *none = NULL;
 	int len;
@@ -1449,7 +1448,7 @@ static int iscsi_ta_set_authentication (iscsi_portal_group_t *tpg, __u32 authent
 	memset(buf1, 0, sizeof(buf1));
 	memset(buf2, 0, sizeof(buf2));
 	if (!(param = iscsi_find_param_from_key(AUTHMETHOD, tpg->param_list)))
-		return(-1);
+		return(-EINVAL);
 
 	if (authentication) {
 		snprintf(buf1, sizeof(buf1), "%s", param->value);
@@ -1471,7 +1470,7 @@ static int iscsi_ta_set_authentication (iscsi_portal_group_t *tpg, __u32 authent
 			sprintf(buf2, "%s", buf1);
 		}
 		if (iscsi_update_param_value(param, buf2) < 0)
-			return(-1);
+			return(-EINVAL);
 	} else {
 		snprintf(buf1, sizeof(buf1), "%s", param->value);
 		if ((none = strstr(buf1, NONE)))
@@ -1479,7 +1478,7 @@ static int iscsi_ta_set_authentication (iscsi_portal_group_t *tpg, __u32 authent
 		strncat(buf1, ",", strlen(","));
 		strncat(buf1, NONE, strlen(NONE));
 		if (iscsi_update_param_value(param, buf1) < 0)
-			return(-1);
+			return(-EINVAL);
 	}
 
 out:	
@@ -1490,24 +1489,24 @@ out:
 	return(0);
 }
 
-/*	iscsi_ta_set_login_timeout():
+/*	iscsi_ta_login_timeout():
  *
  *
  */
-static int iscsi_ta_set_login_timeout (
+extern int iscsi_ta_login_timeout (
 	iscsi_portal_group_t *tpg,
-	__u32 login_timeout)
+	u32 login_timeout)
 {
 	iscsi_tpg_attrib_t *a = &tpg->tpg_attrib;
 	
 	if (login_timeout > TA_LOGIN_TIMEOUT_MAX) {
 		TRACE_ERROR("Requested Login Timeout %u larger than maximum"
 			" %u\n", login_timeout, TA_LOGIN_TIMEOUT_MAX);
-		return(-1);
+		return(-EINVAL);
 	} else if (login_timeout < TA_LOGIN_TIMEOUT_MIN) {
 		TRACE_ERROR("Requested Logout Timeout %u smaller than minimum"
 			" %u\n", login_timeout, TA_LOGIN_TIMEOUT_MIN);
-		return(-1);
+		return(-EINVAL);
 	}
 
 	a->login_timeout = login_timeout;
@@ -1517,13 +1516,13 @@ static int iscsi_ta_set_login_timeout (
 	return(0);
 }
 
-/*	iscsi_ta_set_netif_timeout():
+/*	iscsi_ta_netif_timeout():
  *
  *
  */
-static int iscsi_ta_set_netif_timeout (
+extern int iscsi_ta_netif_timeout (
 	iscsi_portal_group_t *tpg,
-	__u32 netif_timeout)
+	u32 netif_timeout)
 {
 	iscsi_tpg_attrib_t *a = &tpg->tpg_attrib;
 
@@ -1531,12 +1530,12 @@ static int iscsi_ta_set_netif_timeout (
 		TRACE_ERROR("Requested Network Interface Timeout %u larger"
 			" than maximum %u\n", netif_timeout,
 				TA_NETIF_TIMEOUT_MAX);	
-		return(-1);
+		return(-EINVAL);
 	} else if (netif_timeout < TA_NETIF_TIMEOUT_MIN) {
 		TRACE_ERROR("Requested Network Interface Timeout %u smaller"
 			" than minimum %u\n", netif_timeout,
 				TA_NETIF_TIMEOUT_MIN);
-		return(-1);
+		return(-EINVAL);
 	}
 
 	a->netif_timeout = netif_timeout;
@@ -1546,15 +1545,15 @@ static int iscsi_ta_set_netif_timeout (
 	return(0);
 }
 
-static int iscsi_ta_generate_node_acls (
+extern int iscsi_ta_generate_node_acls (
 	iscsi_portal_group_t *tpg,
-	int flag)
+	u32 flag)
 {
 	iscsi_tpg_attrib_t *a = &tpg->tpg_attrib;
 
 	if ((flag != 0) && (flag != 1)) {
 		TRACE_ERROR("Illegal value %d\n", flag);
-		return(-1);
+		return(-EINVAL);
 	}
 
 	a->generate_node_acls = flag;
@@ -1564,40 +1563,40 @@ static int iscsi_ta_generate_node_acls (
 	return(0);
 }
 
-static int iscsi_ta_set_default_tcq (
+extern int iscsi_ta_default_cmdsn_depth (
 	iscsi_portal_group_t *tpg,
 	u32 tcq_depth)
 {
 	iscsi_tpg_attrib_t *a = &tpg->tpg_attrib;
 	
-	if (tcq_depth > TA_DEFAULT_QUEUE_DEPTH_MAX) {
+	if (tcq_depth > TA_DEFAULT_CMDSN_DEPTH_MAX) {
 		TRACE_ERROR("Requested Default Queue Depth: %u larger"
 			" than maximum %u\n", tcq_depth,
-				TA_DEFAULT_QUEUE_DEPTH_MAX);
-		return(-1);
-	} else if (tcq_depth < TA_DEFAULT_QUEUE_DEPTH_MIN) {
+				TA_DEFAULT_CMDSN_DEPTH_MAX);
+		return(-EINVAL);
+	} else if (tcq_depth < TA_DEFAULT_CMDSN_DEPTH_MIN) {
 		TRACE_ERROR("Requested Default Queue Depth: %u smaller"
 			" than minimum %u\n", tcq_depth,
-				TA_DEFAULT_QUEUE_DEPTH_MIN);
-		return(-1);
+				TA_DEFAULT_CMDSN_DEPTH_MIN);
+		return(-EINVAL);
 	}
 
-	a->default_queue_depth = tcq_depth;
-	PYXPRINT("iSCSI_TPG[%hu] - Set Default TCQ Depth to %u\n", tpg->tpgt,
-			a->default_queue_depth);
+	a->default_cmdsn_depth = tcq_depth;
+	PYXPRINT("iSCSI_TPG[%hu] - Set Default CmdSN TCQ Depth to %u\n", tpg->tpgt,
+			a->default_cmdsn_depth);
 
 	return(0);
 }
 
-static int iscsi_ta_set_cache_dynamic_acls (
+extern int iscsi_ta_cache_dynamic_acls (
 	iscsi_portal_group_t *tpg,
-	int flag)
+	u32 flag)
 {
 	iscsi_tpg_attrib_t *a = &tpg->tpg_attrib;
 
 	if ((flag != 0) && (flag != 1)) {
 		TRACE_ERROR("Illegal value %d\n", flag);
-		return(-1);
+		return(-EINVAL);
 	}
 
 	a->cache_dynamic_acls = flag;
@@ -1607,54 +1606,21 @@ static int iscsi_ta_set_cache_dynamic_acls (
 	return(0);
 }
 
-static int iscsi_ta_set_demo_mode_lun_access (
+extern int iscsi_ta_demo_mode_lun_access (
 	iscsi_portal_group_t *tpg,
-	int flag)
+	u32 flag)
 {
 	iscsi_tpg_attrib_t *a = &tpg->tpg_attrib;
 
 	if ((flag != 0) && (flag != 1)) {
 		TRACE_ERROR("Illegal value %d\n", flag);
-		return(-1);
+		return(-EINVAL);
 	}
 
 	a->demo_mode_lun_access = flag;
 	PYXPRINT("iSCSI_TPG[%hu] - Demo Mode iSCSI LUN Access: %s\n",
 		tpg->tpgt, (a->demo_mode_lun_access) ? "READ-WRITE" : "READ-ONLY");
 
-	return(0);
-}
-
-/*	iscsi_tpg_set_attributes():
- *                      
- *              
- */             
-extern int iscsi_tpg_set_attributes (
-	iscsi_portal_group_t *tpg,
-	__u32 ta_attrib,
-	__u32 ta_attrib_value)
-{
-	switch (ta_attrib) {
-	case TA_SET_AUTHENTICATION:
-		return(iscsi_ta_set_authentication(tpg, ta_attrib_value));
-	case TA_SET_LOGIN_TIMEOUT:
-		return(iscsi_ta_set_login_timeout(tpg, ta_attrib_value));
-	case TA_SET_NETIF_TIMEOUT:
-		return(iscsi_ta_set_netif_timeout(tpg, ta_attrib_value));
-	case TA_SET_GENERATE_NODE_ACLS:
-		return(iscsi_ta_generate_node_acls(tpg, ta_attrib_value));
-	case TA_SET_DEFAULT_QUEUE_DEPTH:
-		return(iscsi_ta_set_default_tcq(tpg, ta_attrib_value));
-	case TA_SET_CACHE_DYNAMIC_ACLS:
-		return(iscsi_ta_set_cache_dynamic_acls(tpg, ta_attrib_value));
-	case TA_SET_DEMO_MODE_LUN_ACCESS:
-		return(iscsi_ta_set_demo_mode_lun_access(tpg, ta_attrib_value));
-	default:
-		TRACE_ERROR("Unknown TPG Attribute %u, ignoring"
-			" request.\n", ta_attrib);
-		return(-1);
-	}
-		                
 	return(0);
 }
 
