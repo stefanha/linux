@@ -107,19 +107,6 @@ static int iscsi_target_check_login_request(iscsi_conn_t *conn, iscsi_login_t *l
 		return(-1);
 	}
 
-	if (ISCSI_TPG_C(conn)) {
-		if ((req_csg != 0) && !login->auth_complete &&
-		     ISCSI_TPG_ATTRIB(ISCSI_TPG_C(conn))->authentication) {
-			TRACE_ERROR("Initiator is requesting CSG: %d, has not been"
-				" successfully authenticated, and the Target is"
-				" enforcing iSCSI Authentication, login failed.\n",
-				req_csg);
-			iscsi_tx_login_rsp(conn, STAT_CLASS_INITIATOR,
-					STAT_DETAIL_NOT_AUTH);
-			return(-1);
-		}
-	}
-
 	if ((req_nsg == 2) || (req_csg >= 2) ||
 	   ((login_req->flags & T_BIT) && (req_nsg <= req_csg))) {
 		TRACE_ERROR("Illegal login_req->flags Combination, CSG: %d,"
@@ -580,6 +567,16 @@ static int iscsi_target_handle_csg_one(iscsi_conn_t *conn, iscsi_login_t *login)
 			&login_rsp->length,
 			conn->param_list)) < 0)
 		return(-1);
+
+	if (!(login->auth_complete) &&
+	      ISCSI_TPG_ATTRIB(ISCSI_TPG_C(conn))->authentication) {
+		TRACE_ERROR("Initiator is requesting CSG: 1, has not been"
+			 " successfully authenticated, and the Target is"
+			" enforcing iSCSI Authentication, login failed.\n");
+		iscsi_tx_login_rsp(conn, STAT_CLASS_INITIATOR,
+				STAT_DETAIL_NOT_AUTH);	
+		return(-1);
+	}
 
 	if (!(iscsi_check_negotiated_keys(conn->param_list)))
 		if ((login_req->flags & NSG3) && (login_req->flags & T_BIT))
