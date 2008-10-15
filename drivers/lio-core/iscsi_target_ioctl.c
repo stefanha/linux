@@ -719,6 +719,7 @@ extern int iscsi_ioctl (
 #else
 	goto dumpout;
 #endif
+#if 0
 	case ISCSI_TARGET_SETNODEATTRIB:
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
@@ -730,6 +731,9 @@ extern int iscsi_ioctl (
 		  goto dumpout;
 	  }
 	  iscsi_put_tpg(tpg);
+#else
+	goto dumpout;
+#endif
 	  break;
 	case ISCSI_TARGET_DEBUG_ERL:
 #ifdef DEBUG_ERL

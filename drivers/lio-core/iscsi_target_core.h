@@ -1188,6 +1188,8 @@ typedef struct iscsi_node_attrib_s {
 	__u32			random_r2t_offsets;
 	__u32			tmr_cold_reset;
 	__u32			tmr_warm_reset;
+	struct iscsi_node_acl_s *nacl;
+	struct config_group	acl_attrib_group;
 } ____cacheline_aligned iscsi_node_attrib_t;
 
 typedef struct iscsi_node_acl_s {

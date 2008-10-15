@@ -75,13 +75,13 @@ extern void iscsi_set_default_node_attribues (
 	return;
 }
 
-/*	iscsi_na_set_dataout_timeout():
+/*	iscsi_na_dataout_timeout():
  *
  *
  */
-static int iscsi_na_set_dataout_timeout (
+extern int iscsi_na_dataout_timeout (
 	iscsi_node_acl_t *acl,
-	__u32 dataout_timeout)
+	u32 dataout_timeout)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 	
@@ -90,11 +90,11 @@ static int iscsi_na_set_dataout_timeout (
 	if (dataout_timeout > NA_DATAOUT_TIMEOUT_MAX) {
 		TRACE_ERROR("Requested DataOut Timeout %u larger than maximum"
 			" %u\n", dataout_timeout, NA_DATAOUT_TIMEOUT_MAX);
-		return(ERR_NODEATTRIB_TOO_LARGE);
+		return(-EINVAL);
 	} else if (dataout_timeout < NA_DATAOUT_TIMEOUT_MIX) {
 		TRACE_ERROR("Requested DataOut Timeout %u smaller than minimum"
 			" %u\n", dataout_timeout, NA_DATAOUT_TIMEOUT_MIX);
-		return(ERR_NODEATTRIB_TOO_SMALL);
+		return(-EINVAL);
 	}
 
 	a->dataout_timeout = dataout_timeout;
@@ -105,13 +105,13 @@ static int iscsi_na_set_dataout_timeout (
 	return(0);
 }
 
-/*	iscsi_na_set_dataout_timeout_retries():
+/*	iscsi_na_dataout_timeout_retries():
  *
  *
  */
-static int iscsi_na_set_dataout_timeout_retries (
+extern int iscsi_na_dataout_timeout_retries (
 	iscsi_node_acl_t *acl,
-	__u32 dataout_timeout_retries)
+	u32 dataout_timeout_retries)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 	
@@ -121,12 +121,12 @@ static int iscsi_na_set_dataout_timeout_retries (
 		TRACE_ERROR("Requested DataOut Timeout Retries %u larger than"
 			" maximum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MAX);
-		return(ERR_NODEATTRIB_TOO_LARGE);
+		return(-EINVAL);
 	} else if (dataout_timeout_retries < NA_DATAOUT_TIMEOUT_RETRIES_MIN) {
 		TRACE_ERROR("Requested DataOut Timeout Retries %u smaller than"
 			" minimum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MIN);
-		return(ERR_NODEATTRIB_TOO_SMALL);
+		return(-EINVAL);
 	}
 
 	a->dataout_timeout_retries = dataout_timeout_retries;
@@ -137,13 +137,13 @@ static int iscsi_na_set_dataout_timeout_retries (
 	return(0);
 }
 
-/*	iscsi_na_set_nopin_timeout():
+/*	iscsi_na_nopin_timeout():
  *
  *
  */
-static int iscsi_na_set_nopin_timeout (
+extern int iscsi_na_nopin_timeout (
 	iscsi_node_acl_t *acl,
-	__u32 nopin_timeout)
+	u32 nopin_timeout)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
@@ -152,11 +152,11 @@ static int iscsi_na_set_nopin_timeout (
 	if (nopin_timeout > NA_NOPIN_TIMEOUT_MAX) {
 		TRACE_ERROR("Requested NopIn Timeout %u larger than maximum"
 			" %u\n", nopin_timeout, NA_NOPIN_TIMEOUT_MAX);
-		return(ERR_NODEATTRIB_TOO_LARGE);
+		return(-EINVAL);
 	} else if (nopin_timeout < NA_NOPIN_TIMEOUT_MIN) {
 		TRACE_ERROR("Requested NopIn Timeout %u smaller than minimum"
 			" %u\n", nopin_timeout, NA_NOPIN_TIMEOUT_MIN);
-		return(ERR_NODEATTRIB_TOO_SMALL);
+		return(-EINVAL);
 	}
 
 	a->nopin_timeout = nopin_timeout;
@@ -167,13 +167,13 @@ static int iscsi_na_set_nopin_timeout (
 	return(0);
 }
 
-/*	iscsi_na_set_nopin_response_timeout():
+/*	iscsi_na_nopin_response_timeout():
  *
  *
  */
-static int iscsi_na_set_nopin_response_timeout (
+extern int iscsi_na_nopin_response_timeout (
 	iscsi_node_acl_t *acl,
-	__u32 nopin_response_timeout)
+	u32 nopin_response_timeout)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
@@ -183,12 +183,12 @@ static int iscsi_na_set_nopin_response_timeout (
 		TRACE_ERROR("Requested NopIn Response Timeout %u larger than"
 			" maximum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MAX);
-		return(ERR_NODEATTRIB_TOO_LARGE);
+		return(-EINVAL);
 	} else if (nopin_response_timeout < NA_NOPIN_RESPONSE_TIMEOUT_MIN) {
 		TRACE_ERROR("Requested NopIn Response Timeout %u smaller than"
 			" minimum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MIN);
-		return(ERR_NODEATTRIB_TOO_SMALL);
+		return(-EINVAL);
 	}
 
 	a->nopin_response_timeout = nopin_response_timeout;
@@ -199,13 +199,13 @@ static int iscsi_na_set_nopin_response_timeout (
 	return(0);
 }
 
-/*	iscsi_na_set_random_datain_pdu_offsets():
+/*	iscsi_na_random_datain_pdu_offsets():
  *
  *
  */
-static int iscsi_na_set_random_datain_pdu_offsets (
+extern int iscsi_na_random_datain_pdu_offsets (
 	iscsi_node_acl_t *acl,
-	__u32 random_datain_pdu_offsets)
+	u32 random_datain_pdu_offsets)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
@@ -214,7 +214,7 @@ static int iscsi_na_set_random_datain_pdu_offsets (
 	if (random_datain_pdu_offsets != 0 && random_datain_pdu_offsets != 1) {
 		TRACE_ERROR("Requested Random DataIN PDU Offsets: %u not"
 			" 0 or 1\n", random_datain_pdu_offsets);
-		return(ERR_NODEATTRIB_BOOLEAN_ONLY);
+		return(-EINVAL);
 	}
 
 	a->random_datain_pdu_offsets = random_datain_pdu_offsets;
@@ -226,13 +226,13 @@ static int iscsi_na_set_random_datain_pdu_offsets (
 	return(0);
 }
 
-/*	iscsi_na_set_random_datain_seq_offsets():
+/*	iscsi_na_random_datain_seq_offsets():
  *
  *
  */
-static int iscsi_na_set_random_datain_seq_offsets (
+extern int iscsi_na_random_datain_seq_offsets (
 	iscsi_node_acl_t *acl,
-	__u32 random_datain_seq_offsets)
+	u32 random_datain_seq_offsets)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
@@ -241,7 +241,7 @@ static int iscsi_na_set_random_datain_seq_offsets (
 	if (random_datain_seq_offsets != 0 && random_datain_seq_offsets != 1) {
 		TRACE_ERROR("Requested Random DataIN Sequence Offsets: %u not"
 			" 0 or 1\n", random_datain_seq_offsets);
-		return(ERR_NODEATTRIB_BOOLEAN_ONLY);
+		return(-EINVAL);
 	}
 
 	a->random_datain_seq_offsets = random_datain_seq_offsets;
@@ -253,13 +253,13 @@ static int iscsi_na_set_random_datain_seq_offsets (
 	return(0);
 }
 
-/*	iscsi_na_set_random_r2t_offsets():
+/*	iscsi_na_random_r2t_offsets():
  *
  *
  */
-static int iscsi_na_set_random_r2t_offsets (
+extern int iscsi_na_random_r2t_offsets (
 	iscsi_node_acl_t *acl,
-	__u32 random_r2t_offsets)
+	u32 random_r2t_offsets)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
@@ -268,7 +268,7 @@ static int iscsi_na_set_random_r2t_offsets (
 	if (random_r2t_offsets != 0 && random_r2t_offsets != 1) {
 		TRACE_ERROR("Requested Random R2T Offsets: %u not"
 			" 0 or 1\n", random_r2t_offsets);
-		return(ERR_NODEATTRIB_BOOLEAN_ONLY);
+		return(-EINVAL);
 	}
 
 	a->random_r2t_offsets = random_r2t_offsets;
@@ -280,69 +280,21 @@ static int iscsi_na_set_random_r2t_offsets (
 	return(0);
 }
 
-static int iscsi_na_set_default_erl (
+extern int iscsi_na_default_erl (
 	iscsi_node_acl_t *acl,
-	__u32 default_erl)
+	u32 default_erl)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 	
 	if (default_erl != 0 && default_erl != 1 && default_erl != 2) {
 		TRACE_ERROR("Requested default ERL: %u not 0, 1, or 2\n",
 				default_erl);
-		return(ERR_NODEATTRIB_BOOLEAN_ONLY);
+		return(-EINVAL);
 	}
 
 	a->default_erl = default_erl;
 	TRACE(TRACE_NODEATTRIB, "Set use ERL0 flag to %u for Initiator"
 		" Node Node %s\n", a->default_erl, acl->initiatorname);
 	
-	return(0);
-}
-
-/*	iscsi_set_initiator_node_attribute():
- *
- *
- */
-extern int iscsi_set_initiator_node_attribute (
-	iscsi_portal_group_t *tpg,
-	unsigned char *initiatorname,
-	__u32 nattrib,
-	__u32 nattrib_value)
-{
-	iscsi_node_acl_t *acl;
-	
-	TRACE_ENTER
-
-	if (!(acl = iscsi_tpg_get_initiator_node_acl(tpg, initiatorname))) {
-		TRACE_ERROR("Access Control List Entry for iSCSI Initiator"
-			" Node %s does not exists for TPG %hu, ignoring"
-			" request.\n", initiatorname, tpg->tpgt);
-		return(ERR_NODEATTRIB_INITIATOR_DOES_NOT_EXIST);
-	}
-		
-	switch (nattrib) {
-	case NA_SET_DATAOUT_TIMEOUT:
-		return(iscsi_na_set_dataout_timeout(acl, nattrib_value));
-	case NA_SET_DATAOUT_TIMEOUT_RETRIES:
-		return(iscsi_na_set_dataout_timeout_retries(acl, nattrib_value));
-	case NA_SET_NOPIN_TIMEOUT:
-		return(iscsi_na_set_nopin_timeout(acl, nattrib_value));
-	case NA_SET_NOPIN_RESPONSE_TIMEOUT:
-		return(iscsi_na_set_nopin_response_timeout(acl, nattrib_value));
-	case NA_SET_RANDOM_DATAIN_PDU_OFFSETS:
-		return(iscsi_na_set_random_datain_pdu_offsets(acl, nattrib_value));
-	case NA_SET_RANDOM_DATAIN_SEQ_OFFSETS:
-		return(iscsi_na_set_random_datain_seq_offsets(acl, nattrib_value));
-	case NA_SET_RANDOM_R2T_OFFSETS:
-		return(iscsi_na_set_random_r2t_offsets(acl, nattrib_value));
-	case NA_SET_DEFAULT_ERL:
-		return(iscsi_na_set_default_erl(acl, nattrib_value));
-	default:
-		TRACE_ERROR("Unknown Initiator Node Attribute: %u\n",
-				nattrib_value);
-		return(ERR_NODEATTRIB_UNKNOWN_ATTRIB);
-	}
-
-	TRACE_LEAVE
 	return(0);
 }

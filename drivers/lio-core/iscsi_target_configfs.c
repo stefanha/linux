@@ -43,6 +43,7 @@
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
+#include <iscsi_target_nodeattrib.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 #include <target_core_transport.h>
@@ -688,6 +689,138 @@ static struct config_item_type lio_target_lun_cit = {
 
 // End items for lio_target_lun_cit
 
+// Start items for lio_target_nacl_attrib_cit
+
+#define DEF_NACL_ATTRIB(name)						\
+static ssize_t lio_target_show_nacl_attrib_##name (			\
+	struct iscsi_node_attrib_s *na,					\
+	char *page)							\
+{									\
+	iscsi_node_acl_t *nacl = na->nacl;				\
+	ssize_t rb;							\
+									\
+	rb = sprintf(page, "%u\n", ISCSI_NODE_ATTRIB(nacl)->name);	\
+	return(rb);							\
+}									\
+									\
+static ssize_t lio_target_store_nacl_attrib_##name (			\
+	struct iscsi_node_attrib_s *na,					\
+	const char *page,						\
+	size_t count)							\
+{									\
+	iscsi_node_acl_t *nacl = na->nacl;				\
+	char *endptr;							\
+	u32 val;							\
+	int ret;							\
+									\
+	val = simple_strtoul(page, &endptr, 0);				\
+	if ((ret = iscsi_na_##name(nacl, val)) < 0)			\
+		return(ret);						\
+									\
+	return(count);							\
+}
+
+static struct iscsi_node_attrib_s *to_iscsi_node_attrib_s (struct config_item *item)
+{
+	return((item) ? container_of(to_config_group(item), struct iscsi_node_attrib_s,
+		acl_attrib_group) : NULL);
+}
+
+/*
+ * Define the iSCSI Node attributes using hybrid wrappers from include/linux/configfs.h
+ */
+CONFIGFS_ATTR_STRUCT(iscsi_node_attrib_s);
+#define NACL_ATTR(_name, _mode, _show, _store)					\
+static struct iscsi_node_attrib_s_attribute iscsi_node_attrib_s_##_name =	\
+		__CONFIGFS_ATTR(_name, _mode, _show, _store)
+/*
+ * Define iscsi_node_attrib_s_dataout_timeout
+ */
+DEF_NACL_ATTRIB(dataout_timeout);
+NACL_ATTR(dataout_timeout, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_dataout_timeout,
+	lio_target_store_nacl_attrib_dataout_timeout);
+/*
+ * Define iscsi_node_attrib_s_dataout_timeout_retries
+ */
+DEF_NACL_ATTRIB(dataout_timeout_retries);
+NACL_ATTR(dataout_timeout_retries, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_dataout_timeout_retries,
+	lio_target_store_nacl_attrib_dataout_timeout_retries);
+/*
+ * Define iscsi_node_attrib_s_default_erl
+ */
+DEF_NACL_ATTRIB(default_erl);
+NACL_ATTR(default_erl, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_default_erl,
+	lio_target_store_nacl_attrib_default_erl);
+/*
+ * Define iscsi_node_attrib_s_nopin_timeout
+ */
+DEF_NACL_ATTRIB(nopin_timeout);
+NACL_ATTR(nopin_timeout, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_nopin_timeout,
+	lio_target_store_nacl_attrib_nopin_timeout);
+/*
+ * Define iscsi_node_attrib_s_nopin_response_timeout
+ */
+DEF_NACL_ATTRIB(nopin_response_timeout);
+NACL_ATTR(nopin_response_timeout, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_nopin_response_timeout,
+	lio_target_store_nacl_attrib_nopin_response_timeout);
+/*
+ * Define iscsi_node_attrib_s_random_datain_pdu_offsets
+ */
+DEF_NACL_ATTRIB(random_datain_pdu_offsets);
+NACL_ATTR(random_datain_pdu_offsets, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_random_datain_pdu_offsets,
+	lio_target_store_nacl_attrib_random_datain_pdu_offsets);
+/*
+ * Define iscsi_node_attrib_s_random_datain_seq_offsets
+ */
+DEF_NACL_ATTRIB(random_datain_seq_offsets);
+NACL_ATTR(random_datain_seq_offsets, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_random_datain_seq_offsets,
+	lio_target_store_nacl_attrib_random_datain_seq_offsets);
+/*
+ * Define iscsi_node_attrib_s_random_r2t_offsets
+ */
+DEF_NACL_ATTRIB(random_r2t_offsets);
+NACL_ATTR(random_r2t_offsets, S_IRUGO | S_IWUSR,
+	lio_target_show_nacl_attrib_random_r2t_offsets,
+	lio_target_store_nacl_attrib_random_r2t_offsets);
+
+/*
+ * Finally, define functions iscsi_node_attrib_s_attr_show() and
+ * iscsi_node_attrib_s_attr_store() for lio_target_nacl_attrib_ops below..
+ */
+CONFIGFS_ATTR_OPS(iscsi_node_attrib_s);
+
+static struct configfs_attribute *lio_target_nacl_attrib_attrs[] = {
+	&iscsi_node_attrib_s_dataout_timeout.attr,
+	&iscsi_node_attrib_s_dataout_timeout_retries.attr,
+	&iscsi_node_attrib_s_default_erl.attr,
+	&iscsi_node_attrib_s_nopin_timeout.attr,
+	&iscsi_node_attrib_s_nopin_response_timeout.attr,
+	&iscsi_node_attrib_s_random_datain_pdu_offsets.attr,
+	&iscsi_node_attrib_s_random_datain_seq_offsets.attr,
+	&iscsi_node_attrib_s_random_r2t_offsets.attr,
+	NULL,
+};
+
+static struct configfs_item_operations lio_target_nacl_attrib_ops = {
+	.show_attribute		= iscsi_node_attrib_s_attr_show,
+	.store_attribute	= iscsi_node_attrib_s_attr_store,
+};
+
+static struct config_item_type lio_target_nacl_attrib_cit = {
+	.ct_item_ops	= &lio_target_nacl_attrib_ops,
+	.ct_attrs	= lio_target_nacl_attrib_attrs,
+	.ct_owner	= THIS_MODULE,
+};
+
+// End items for lio_target_nacl_attrib_cit
+
 // Start items for lio_target_initiator_cit
 
 static int lio_target_initiator_lacl_link (struct config_item *lun_acl_ci, struct config_item *lun_ci)
@@ -1216,8 +1349,10 @@ static struct config_group *lio_target_call_addnodetotpg (
 	const char *name)
 {
 	iscsi_node_acl_t *acl;
+	iscsi_node_attrib_t *nattr;
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
+	struct config_group *nacl_cg;
 	struct config_item *acl_ci, *tpg_ci, *tiqn_ci;
 	u32 cmdsn_depth;
 	int ret = 0;
@@ -1251,13 +1386,27 @@ static struct config_group *lio_target_call_addnodetotpg (
 				cmdsn_depth, &ret)))
 		goto out;
 
+	nacl_cg = &acl->acl_group;
+	nattr = &acl->node_attrib;
+	/*
+	 * Create the default groups for iscsi_node_acl_t
+	 */
+	if (!(nacl_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+			GFP_KERNEL)))
+		goto node_out;
+
 	config_group_init_type_name(&acl->acl_group, name, &lio_target_initiator_cit);
+	config_group_init_type_name(&nattr->acl_attrib_group, "attrib", &lio_target_nacl_attrib_cit);
+	nacl_cg->default_groups[0] = &nattr->acl_attrib_group;
+	nacl_cg->default_groups[1] = NULL;
 
 	printk("LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu Initiator: %s CmdSN Depth: %u\n",
 		config_item_name(tiqn_ci), tpgt, name, acl->queue_depth);
 
 	iscsi_put_tpg(tpg);
 	return(&acl->acl_group);
+node_out:
+	iscsi_tpg_del_initiator_node_acl(tpg, name, 1);
 out:
 	iscsi_put_tpg(tpg);
 	return(NULL);
@@ -1370,25 +1519,25 @@ out:									\
 	return(ret);							\
 }
 
-#define DEF_TPG_ATTRIB(name, string_name)						\
+#define DEF_TPG_ATTRIB(name)						\
 	SHOW_TPG_ATTRIB(name)						\
 	STORE_TPG_ATTRIB(name)						\
 									\
 static struct lio_target_configfs_attribute lio_target_attr_tpg_##name = { \
 	.attr	= { .ca_owner = THIS_MODULE,				\
-		    .ca_name = string_name,				\
+		    .ca_name = __stringify(name),			\
 		    .ca_mode =  S_IRUGO | S_IWUSR },			\
 	.show	= lio_target_show_tpg_attrib_##name,			\
 	.store	= lio_target_store_tpg_attrib_##name,			\
 };
 
-DEF_TPG_ATTRIB(authentication, "authentication");
-DEF_TPG_ATTRIB(login_timeout, "login_timeout");
-DEF_TPG_ATTRIB(netif_timeout, "netif_timeout");
-DEF_TPG_ATTRIB(generate_node_acls, "generate_node_acls");
-DEF_TPG_ATTRIB(default_cmdsn_depth, "default_cmdsn_depth");
-DEF_TPG_ATTRIB(cache_dynamic_acls, "cache_dynamic_acls");
-DEF_TPG_ATTRIB(demo_mode_lun_access, "demo_mode_lun_access");
+DEF_TPG_ATTRIB(authentication);
+DEF_TPG_ATTRIB(login_timeout);
+DEF_TPG_ATTRIB(netif_timeout);
+DEF_TPG_ATTRIB(generate_node_acls);
+DEF_TPG_ATTRIB(default_cmdsn_depth);
+DEF_TPG_ATTRIB(cache_dynamic_acls);
+DEF_TPG_ATTRIB(demo_mode_lun_access);
 
 static struct configfs_attribute *lio_target_tpg_attrib_attrs[] = {
 	&lio_target_attr_tpg_authentication.attr,

@@ -883,6 +883,7 @@ extern iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl (
 	acl->queue_depth = queue_depth;
 	snprintf(acl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
 	acl->tpg = tpg;
+	ISCSI_NODE_ATTRIB(acl)->nacl = acl;
 #ifdef SNMP_SUPPORT
 	acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
 	spin_lock_init(&acl->stats_lock);
@@ -921,7 +922,7 @@ done:
  */
 extern int iscsi_tpg_del_initiator_node_acl (
 	iscsi_portal_group_t *tpg,
-	unsigned char *initiatorname,
+	const char *initiatorname,
 	int force)
 {
 	int dynamic_acl = 0;

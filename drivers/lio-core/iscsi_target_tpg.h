@@ -46,7 +46,7 @@ extern int iscsi_tpg_del_portal_group (iscsi_tiqn_t *, iscsi_portal_group_t *, i
 extern int iscsi_tpg_enable_portal_group (iscsi_portal_group_t *);
 extern int iscsi_tpg_disable_portal_group (iscsi_portal_group_t *, int);
 extern iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl (iscsi_portal_group_t *, const char *, __u32, int *);
-extern int iscsi_tpg_del_initiator_node_acl (iscsi_portal_group_t *, unsigned char *, int);
+extern int iscsi_tpg_del_initiator_node_acl (iscsi_portal_group_t *, const char *, int);
 extern void iscsi_tpg_del_external_nps (iscsi_tpg_np_t *);
 extern iscsi_tpg_np_t *iscsi_tpg_locate_child_np (iscsi_tpg_np_t *, int);
 extern iscsi_tpg_np_t *iscsi_tpg_add_network_portal (iscsi_portal_group_t *, iscsi_np_addr_t *, iscsi_tpg_np_t *, int);
