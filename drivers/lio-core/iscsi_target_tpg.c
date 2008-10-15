@@ -640,6 +640,8 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 	spin_lock_init(&tpg->tpg_lun_lock);
 	spin_lock_init(&tpg->tpg_np_lock);
 
+	ISCSI_TPG_ATTRIB(tpg)->tpg = tpg;
+
 	for (i = 0; i < ISCSI_MAX_LUNS_PER_TPG; i++) {
 		lun = &tpg->tpg_lun_list[i];
 		lun->iscsi_lun = i;

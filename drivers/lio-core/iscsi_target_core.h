@@ -1225,6 +1225,8 @@ typedef struct iscsi_tpg_attrib_s {
 	u32			default_cmdsn_depth;
 	u32			demo_mode_lun_access;
 	u32			cache_core_nps;
+	struct iscsi_portal_group_s *tpg;
+	struct config_group	tpg_attrib_group;
 }  ____cacheline_aligned iscsi_tpg_attrib_t;
 
 typedef struct se_lun_s {
@@ -1332,7 +1334,6 @@ typedef struct iscsi_portal_group_s {
 	se_lun_t		*tpg_lun_list;
 	iscsi_node_acl_t	*acl_node_head;	/* Pointer to start of Initiator ACL list */
 	iscsi_node_acl_t	*acl_node_tail;	/* Pointer to end of Initiator ACL list */
-	struct config_group	tpg_attrib_group;
 	struct config_group	tpg_np_group;
 	struct config_group	tpg_lun_group;
 	struct config_group	tpg_acl_group;
