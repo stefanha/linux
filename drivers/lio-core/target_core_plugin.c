@@ -220,7 +220,7 @@ extern void *plugin_get_obj (
 	*ret = 0;
 	return(p->plugin_obj);
 out:
-	*ret = -1;
+	*ret = -EINVAL;
 	spin_unlock(&pc->plugin_lock);
 	return(NULL);
 }

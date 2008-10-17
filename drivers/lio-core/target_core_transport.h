@@ -427,6 +427,10 @@ typedef struct se_subsystem_api_s {
 	 */	
 	ssize_t (*show_configfs_dev_params)(se_hba_t *, se_subsystem_dev_t *, char *);
 	/*
+	 * kobject_link():
+	 */
+	se_device_t *(*kobject_link)(se_subsystem_dev_t *, struct config_item *, struct kobject *);
+	/*
 	 * check_dev_params():
 	 */
 	int (*check_dev_params)(se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);

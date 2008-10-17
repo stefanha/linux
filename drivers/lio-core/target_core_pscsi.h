@@ -75,6 +75,7 @@ extern int pscsi_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t pscsi_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t pscsi_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t pscsi_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
+extern se_device_t *pscsi_kobject_link (se_subsystem_dev_t *, struct config_item *, struct kobject *);
 extern int pscsi_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern void pscsi_get_plugin_info (void *, char *, int *);
 extern void pscsi_get_hba_info (se_hba_t *, char *, int *);
@@ -166,6 +167,7 @@ se_subsystem_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 	check_configfs_dev_params: pscsi_check_configfs_dev_params, \
 	set_configfs_dev_params: pscsi_set_configfs_dev_params, \
 	show_configfs_dev_params: pscsi_show_configfs_dev_params, \
+	kobject_link:		pscsi_kobject_link,		\
 	check_dev_params:	pscsi_check_dev_params,		\
 	get_plugin_info:	pscsi_get_plugin_info,		\
 	get_hba_info:		pscsi_get_hba_info,		\

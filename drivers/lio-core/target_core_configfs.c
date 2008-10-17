@@ -586,6 +586,10 @@ static ssize_t target_core_store_dev_enable (void *p, const char *page, size_t c
 		printk(KERN_ERR "For dev_enable ops, only valid value is \"1\"\n");
 		return(-EINVAL);
 	}
+	if ((se_dev->se_dev_ptr)) {
+		printk(KERN_ERR "se_dev->se_dev_ptr already set for storage object\n");
+		return(-EEXIST);
+	}	
 
 	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0)) 
@@ -646,10 +650,99 @@ static ssize_t target_core_dev_store (struct config_item *item,
 	return(tc_attr->store((void *)se_dev, page, count));
 }
 
+#ifdef CONFIGFS_SYSFS_SYMLINKS
+
+static int target_core_dev_link_kobject (struct config_item *item,
+					 struct kobject *kobj)
+{
+	se_subsystem_dev_t *se_dev = container_of(
+			to_config_group(item), se_subsystem_dev_t, se_dev_group);
+	se_hba_t *hba, *hba_p = se_dev->se_dev_hba;
+	se_subsystem_api_t *t;
+	int ret = 0;
+
+	if (!(hba = core_get_hba_from_id(hba_p->hba_id, 0)))
+		return(-EINVAL);
+
+	if ((se_dev->se_dev_ptr)) {
+		printk(KERN_ERR "se_dev->se_dev_ptr already set for this storage object\n");
+		ret = -EEXIST;
+		goto out;
+	}
+	
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
+	if (!t || (ret != 0))
+		goto out;
+
+	if (!(t->kobject_link)) {	
+		printk(KERN_ERR "Missing se_subsystem_api_t->kobject_link()\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!(se_dev->se_dev_ptr = t->kobject_link(se_dev, item, kobj))) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	printk("Target_Core_ConfigFS: Linking %s -> %s\n",
+		config_item_name(item), kobject_name(kobj));
+
+	core_put_hba(hba);
+	return(0);
+out:
+	core_put_hba(hba);
+	return(ret);
+}
+
+static int target_core_dev_unlink_kobject (struct config_item *item,
+					   struct kobject *kobj)
+{
+	se_subsystem_dev_t *se_dev = container_of(
+		to_config_group(item), se_subsystem_dev_t, se_dev_group);
+	se_hba_t *hba, *hba_p = se_dev->se_dev_hba;
+	int ret = 0;
+
+	if (!(hba = core_get_hba_from_id(hba_p->hba_id, 0)))
+		return(-EINVAL);
+
+	if (!(se_dev->se_dev_su_ptr)) {
+		printk(KERN_ERR "Unable to locate se_subsystem_dev_t>se_dev_su_ptr\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	printk("Target_Core_ConfigFS: Calling se_free_virtual_device() for"
+			" se_dev_ptr: %p\n", se_dev->se_dev_ptr);
+
+	if ((ret = se_free_virtual_device(se_dev->se_dev_ptr, hba)) < 0)
+		goto out;
+	/*
+	 * Clear released se_subsystem_dev_t pointers so target_core_call_freedev()
+	 * below plays nice..
+	 */
+	se_dev->se_dev_ptr = NULL;
+	se_dev->se_dev_su_ptr = NULL;
+	printk("Target_Core_ConfigFS: Unlinking %s from %s\n",
+		config_item_name(item), kobject_name(kobj));
+
+	core_put_hba(hba);
+	return(0);
+out:
+	core_put_hba(hba);
+	return(ret);
+}
+
+#endif /* CONFIGFS_SYSFS_SYMLINKS */
+
 static struct configfs_item_operations target_core_dev_item_ops = {
 	.release		= NULL,
 	.show_attribute		= target_core_dev_show,
 	.store_attribute	= target_core_dev_store,
+#ifdef CONFIGFS_SYSFS_SYMLINKS
+	.allow_link_kobject	= target_core_dev_link_kobject,
+	.drop_link_kobject	= target_core_dev_unlink_kobject,
+#endif
 };
 
 static struct config_item_type target_core_dev_cit = {
@@ -756,7 +849,7 @@ static void target_core_call_freedev (
 
 		if ((ret = se_free_virtual_device(se_dev->se_dev_ptr, hba)) < 0)
 			goto hba_out;
-	} else {
+	} else if (se_dev->se_dev_su_ptr) {
 		/*
 		 * Release se_subsystem_dev_t->se_dev_su_ptr..
 		 */
