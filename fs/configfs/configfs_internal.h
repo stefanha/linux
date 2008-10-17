@@ -94,7 +94,8 @@ extern int configfs_unlink(struct inode *dir, struct dentry *dentry);
 
 struct configfs_symlink {
 	struct list_head sl_list;
-	struct config_item *sl_target;
+	struct config_item *sl_target; /* Symlink source of ConfigFS */
+	struct kobject *sl_kobject; /* Symlink source of SysFS */
 };
 
 extern int configfs_create_link(struct configfs_symlink *sl,
