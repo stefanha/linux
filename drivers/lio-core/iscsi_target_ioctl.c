@@ -285,8 +285,6 @@ extern int iscsi_ioctl (
 	u32 lun_access = 0;
 	se_device_t *dev = NULL;
 	se_dev_transport_info_t devt_info;
-	se_hba_t *hba = NULL;
-	se_hbainfo_t hba_info;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_session_t	*sess = NULL;
 	iscsi_tiqn_t *tiqn = NULL;
@@ -415,6 +413,7 @@ extern int iscsi_ioctl (
 	  //#warning FIXME: ISCSI_TARGET_SETSESSPARAM is incomplete
 	  break;
 	case ISCSI_TARGET_ADDTPG:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 1))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -425,7 +424,11 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_DELTPG:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_NOT_ACTIVE;
 		  goto dumpout;
@@ -436,7 +439,11 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_ENABLETPG:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -446,8 +453,12 @@ extern int iscsi_ioctl (
 		  goto dumpout;
 	  }
 	  iscsi_put_tpg(tpg);
+#else
+	goto dumpout;
+#endif
 	  break;
 	case ISCSI_TARGET_DISABLETPG:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -458,6 +469,9 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_SETTPGATTRIB:
 #if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
@@ -521,6 +535,7 @@ extern int iscsi_ioctl (
 	goto dumpout;
 #endif
 	case ISCSI_TARGET_ADDHBATOTARGET:
+#if 0
 	  memset(&hba_info, 0, sizeof(se_hbainfo_t));
 	  hba_info.hba_id = t->hba_id;
 	  hba_info.hba_type = t->hba_type;
@@ -538,7 +553,11 @@ extern int iscsi_ioctl (
 	  }
 	  core_put_hba(hba);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_DELHBAFROMTARGET:
+#if 0
 	  if (!(hba = core_get_hba_from_id(t->hba_id, 0))) {
 		  ret = ERR_HBA_CANNOT_LOCATE;
 		  goto dumpout;
@@ -549,6 +568,9 @@ extern int iscsi_ioctl (
 	  }
 	  core_put_hba(hba);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_ADDNODETOTPG:
 #if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
@@ -666,6 +688,7 @@ extern int iscsi_ioctl (
 	goto dumpout;
 #endif
 	case ISCSI_TARGET_DELLUNFROMDEV:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
@@ -676,6 +699,9 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_ADDNODETOLUN:
 #if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
@@ -719,8 +745,8 @@ extern int iscsi_ioctl (
 #else
 	goto dumpout;
 #endif
-#if 0
 	case ISCSI_TARGET_SETNODEATTRIB:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_DOES_NOT_EXIST;
 		  goto dumpout;
