@@ -586,6 +586,10 @@ static ssize_t target_core_store_dev_enable (void *p, const char *page, size_t c
 		printk(KERN_ERR "For dev_enable ops, only valid value is \"1\"\n");
 		return(-EINVAL);
 	}
+	if ((se_dev->se_dev_ptr)) {
+		printk(KERN_ERR "se_dev->se_dev_ptr already set for storage object\n");
+		return(-EEXIST);
+	}
 
 	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0)) 
