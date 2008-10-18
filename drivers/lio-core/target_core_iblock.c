@@ -636,24 +636,6 @@ extern ssize_t iblock_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_
 	return((ssize_t)bl);
 }
 
-extern se_device_t *iblock_kobject_link (
-	se_subsystem_dev_t *se_dev,
-	struct config_item *item,
-	struct kobject *kobj)
-{
-	iblock_dev_t *ibd = (iblock_dev_t *)se_dev->se_dev_su_ptr;
-	se_hba_t *se_hba = se_dev->se_dev_hba;
-	struct device *d = kobj_to_dev(kobj);
-	struct gendisk *gd = dev_to_disk(d);
-
-	ibd->ibd_major = gd->major;	
-	ibd->ibd_flags |= IBDF_HAS_MAJOR;
-	ibd->ibd_minor = gd->first_minor;
-	ibd->ibd_flags |= IBDF_HAS_MINOR;
-
-	return(iblock_create_virtdevice(se_hba, (void *)ibd));
-}
-
 extern int iblock_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) ||

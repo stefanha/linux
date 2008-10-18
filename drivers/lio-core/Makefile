@@ -109,9 +109,6 @@ ifeq ($(LIO_TARGET_CONFIGFS), 1)
 iscsi_target_mod-objs		+=	iscsi_target_configfs.o
 EXTRA_CFLAGS			+=	-DLIO_TARGET_CONFIGFS
 endif
-ifeq ($(CONFIGFS_SYSFS_SYMLINKS), 1)
-EXTRA_CFLAGS			+=	-DCONFIGFS_SYSFS_SYMLINKS
-endif
 ifeq ($(ERLTWO), 1)
 EXTRA_CFLAGS += -DERLONE -DERLTWO
 else

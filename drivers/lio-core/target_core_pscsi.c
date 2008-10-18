@@ -1011,26 +1011,6 @@ extern ssize_t pscsi_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t
 	return((ssize_t)bl);
 }
 
-extern se_device_t *pscsi_kobject_link (
-	se_subsystem_dev_t *se_dev,
-	struct config_item *item,
-	struct kobject *kobj)
-{
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
-	se_hba_t *se_hba = se_dev->se_dev_hba;
-	struct device *d = kobj_to_dev(kobj);
-	struct scsi_device *sd = to_scsi_device(d);
-
-	pdv->pdv_channel_id = sd->channel;	
-	pdv->pdv_flags |= PDF_HAS_CHANNEL_ID;
-	pdv->pdv_target_id = sd->id;
-	pdv->pdv_flags |= PDF_HAS_TARGET_ID;
-	pdv->pdv_lun_id = sd->lun;
-	pdv->pdv_flags |= PDF_HAS_LUN_ID;
-
-	return(pscsi_create_virtdevice(se_hba, (void *)pdv));
-}
-
 extern int pscsi_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
 {
 	if (!(t->hba_params_set & PARAM_HBA_SCSI_CHANNEL_ID)) {
