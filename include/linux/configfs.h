@@ -225,10 +225,8 @@ struct configfs_item_operations {
 	void (*release)(struct config_item *);
 	ssize_t	(*show_attribute)(struct config_item *, struct configfs_attribute *,char *);
 	ssize_t	(*store_attribute)(struct config_item *,struct configfs_attribute *,const char *, size_t);
-	int (*allow_link)(struct config_item *dst, struct config_item *src);
-	int (*drop_link)(struct config_item *dst, struct config_item *src);
-	int (*allow_link_kobject)(struct config_item *dst, struct kobject *src_kobj);
-	int (*drop_link_kobject)(struct config_item *dst, struct kobject *src_kobj);
+	int (*allow_link)(struct config_item *src, struct config_item *target);
+	int (*drop_link)(struct config_item *src, struct config_item *target);
 };
 
 struct configfs_group_operations {

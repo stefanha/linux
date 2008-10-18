@@ -22,25 +22,17 @@
  * 	sysfs is Copyright (C) 2001, 2002, 2003 Patrick Mochel
  *
  * configfs Copyright (C) 2005 Oracle.  All rights reserved.
- *
- * Added ConfigFS <-> SysFS Symlink support for Linux-ISCSI.org
- * Copyright (C) 2008 Nicholas A. Bellinger <nab@kernel.org>
  */
 
 #include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/namei.h>
-#include <linux/sysfs.h>
-#include <linux/kobject.h>
+
 #include <linux/configfs.h>
 #include "configfs_internal.h"
-#include "../sysfs/sysfs.h" // SysFS Internal
 
 /* Protects attachments of new symlinks */
 DEFINE_MUTEX(configfs_symlink_mutex);
-
-/* Used for sysfs kobject symlinks */
-extern struct super_block *sysfs_sb;
 
 static int item_depth(struct config_item * item)
 {
@@ -88,7 +80,7 @@ static int create_link(struct config_item *parent_item,
 	if (!configfs_dirent_is_ready(target_sd))
 		goto out;
 	ret = -ENOMEM;
-	sl = kzalloc(sizeof(struct configfs_symlink), GFP_KERNEL);
+	sl = kmalloc(sizeof(struct configfs_symlink), GFP_KERNEL);
 	if (sl) {
 		sl->sl_target = config_item_get(item);
 		spin_lock(&configfs_dirent_lock);
@@ -115,37 +107,34 @@ out:
 	return ret;
 }
 
-static int create_link_sysfs(struct config_item *parent_item,
-			     struct kobject *kobj,
-			     struct dentry *dentry)
+
+static int get_target(const char *symname, struct nameidata *nd,
+		      struct config_item **target)
 {
-	struct configfs_symlink *sl;
-	int ret = -ENOMEM;
+	int ret;
 
-	sl = kzalloc(sizeof(struct configfs_symlink), GFP_KERNEL);
-	if (sl) {
-		/*
-		 * Grab the reference to sysfs's struct kobject.
-		 * It will be released in configfs_unlink().
-		 */
-		sl->sl_kobject = kobject_get(kobj);
-
-		ret = configfs_create_link(sl, parent_item->ci_dentry, dentry);
-		if (ret) { 
-			kobject_put(kobj);
-			kfree(sl);
-		}
+	ret = path_lookup(symname, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, nd);
+	if (!ret) {
+		if (nd->path.dentry->d_sb == configfs_sb) {
+			*target = configfs_get_config_item(nd->path.dentry);
+			if (!*target) {
+				ret = -ENOENT;
+				path_put(&nd->path);
+			}
+		} else
+			ret = -EPERM;
 	}
 
 	return ret;
 }
+
 
 int configfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
 	int ret;
 	struct nameidata nd;
 	struct configfs_dirent *sd;
-	struct config_item *parent_item = NULL;
+	struct config_item *parent_item;
 	struct config_item *target_item;
 	struct config_item_type *type;
 
@@ -167,73 +156,30 @@ int configfs_symlink(struct inode *dir, struct dentry *dentry, const char *symna
 
 	ret = -EPERM;
 	if (!type || !type->ct_item_ops ||
-	    (!(type->ct_item_ops->allow_link) &&
-	     !(type->ct_item_ops->allow_link_kobject)))
-		goto out;
-	/*
-	 * Populate struct nameidata nd with Symlink SOURCE fs/ pointers..
-	 */
-	if ((ret = path_lookup(symname, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &nd)) < 0)
+	    !type->ct_item_ops->allow_link)
 		goto out_put;
-	/*
-	 * First check if the symlink destination is coming from a configfs
-	 * struct config_item..
-	 */
-	if (nd.path.dentry->d_sb == configfs_sb) {
-		if (!(type->ct_item_ops->allow_link)) {
-			ret = -EPERM;
-			goto out_put;
-		}
-		if (!(target_item = configfs_get_config_item(nd.path.dentry))) {
-			ret = -ENOENT;
-			goto out_put;
-		}
-		if (!(ret = type->ct_item_ops->allow_link(parent_item, target_item))) {
-			mutex_lock(&configfs_symlink_mutex);
-			ret = create_link(parent_item, target_item, dentry);
-			mutex_unlock(&configfs_symlink_mutex);
-			if (ret && type->ct_item_ops->drop_link)
-				type->ct_item_ops->drop_link(parent_item,
-							     target_item);
-		}
-		/*
-		 * Release reference to ConfigFS Symlink SOURCE from 
-		 * configfs_get_config_item()
-		 */
-		config_item_put(target_item);
-//	} else if (nd.path.dentry->d_sb == sysfs_sb) {
-#warning FIXME: How to determine which nameidata is from sysfs..?
-	} else if (1) {
-		struct sysfs_dirent *sd = (struct sysfs_dirent *)nd.path.dentry->d_fsdata;
-		struct kobject *kobj = sd->s_dir.kobj;
 
-		if (!(type->ct_item_ops->allow_link_kobject)) {
-			ret = -EPERM;
-			goto out_put;
-		}
-		/*
-		 * Now from a sysfs struct kobject..
-		 */
-		printk("Using struct kobject: %s for symlink source, %s configfs destination\n",
-				kobject_name(kobj), config_item_name(parent_item));
-
-		if (!(ret = type->ct_item_ops->allow_link_kobject(parent_item, kobj))) {
-			mutex_lock(&configfs_symlink_mutex);
-			ret = create_link_sysfs(parent_item, kobj, dentry);
-			mutex_unlock(&configfs_symlink_mutex);
-			if (ret && type->ct_item_ops->drop_link_kobject)
-				type->ct_item_ops->drop_link_kobject(parent_item,
-								     kobj);
-		}
-	} else {
-		ret = -EPERM;
+	ret = get_target(symname, &nd, &target_item);
+	if (ret)
 		goto out_put;
+
+	ret = type->ct_item_ops->allow_link(parent_item, target_item);
+	if (!ret) {
+		mutex_lock(&configfs_symlink_mutex);
+		ret = create_link(parent_item, target_item, dentry);
+		mutex_unlock(&configfs_symlink_mutex);
+		if (ret && type->ct_item_ops->drop_link)
+			type->ct_item_ops->drop_link(parent_item,
+						     target_item);
 	}
 
-out_put:
+	config_item_put(target_item);
 	path_put(&nd.path);
-out:
+
+out_put:
 	config_item_put(parent_item);
+
+out:
 	return ret;
 }
 
@@ -263,34 +209,22 @@ int configfs_unlink(struct inode *dir, struct dentry *dentry)
 	dput(dentry);
 	configfs_put(sd);
 
-	if (sl->sl_target) {
-		/*
-		 * drop_link() must be called before list_del_init(&sl->sl_list),
-		 * so that the order of drop_link(this, target) and drop_item(target)
-		 * is preserved.
-		 */
-		if (type && type->ct_item_ops &&
-		    type->ct_item_ops->drop_link)
-			type->ct_item_ops->drop_link(parent_item, sl->sl_target);
+	/*
+	 * drop_link() must be called before
+	 * list_del_init(&sl->sl_list), so that the order of
+	 * drop_link(this, target) and drop_item(target) is preserved.
+	 */
+	if (type && type->ct_item_ops &&
+	    type->ct_item_ops->drop_link)
+		type->ct_item_ops->drop_link(parent_item,
+					       sl->sl_target);
 
-		spin_lock(&configfs_dirent_lock);
-		list_del_init(&sl->sl_list);
-		spin_unlock(&configfs_dirent_lock);
-		/*
-		 * Put reference from create_link()
-		 */
-		config_item_put(sl->sl_target);
-		sl->sl_target = NULL;
-	} else if (sl->sl_kobject) {
-		if (type && type->ct_item_ops &&
-		   type->ct_item_ops->drop_link_kobject)
-			type->ct_item_ops->drop_link_kobject(parent_item, sl->sl_kobject);
-		/*
-		 * Put reference from create_link_sysfs()
-		 */
-		kobject_put(sl->sl_kobject);
-		sl->sl_kobject = NULL;
-	}
+	spin_lock(&configfs_dirent_lock);
+	list_del_init(&sl->sl_list);
+	spin_unlock(&configfs_dirent_lock);
+
+	/* Put reference from create_link() */
+	config_item_put(sl->sl_target);
 	kfree(sl);
 
 	config_item_put(parent_item);
