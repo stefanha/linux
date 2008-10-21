@@ -1548,39 +1548,6 @@ static int transport_dev_write_pending_nop (se_task_t *task)
 	return(0);
 }
 
-static const char *const scsi_peripheral_types[] = {
-	"Direct-Access    ",
-	"Sequential-Access",
-	"Printer          ",
-	"Processor        ",
-	"WORM             ",
-	"CD-ROM           ",
-	"Scanner          ",
-	"Optical Device   ",
-	"Medium Changer   ",
-	"Communications   ",
-	"ASC IT8          ",
-	"ASC IT8          ",
-	"RAID             ",
-	"Enclosure        ",
-	"Direct-Access-RBC",
-	"Optical card     ",
-	"Bridge controller",
-	"Object storage   ",
-	"Automation/Drive ",
-};
-
-static const char *scsi_peripheral_type (unsigned type)
-{
-	if (type == 0x1e)
-		return "Well-known LUN   ";
-	if (type == 0x1f)
-		return "No Device        ";
-	if (type >= ARRAY_SIZE(scsi_peripheral_types))
-		return "Unknown          ";
-	return scsi_peripheral_types[type];
-}
-
 static int transport_get_inquiry (se_obj_lun_type_t *obj_api, t10_wwn_t *wwn, void *obj_ptr)
 {
 	iscsi_cmd_t *cmd;
@@ -1637,7 +1604,7 @@ static int transport_get_inquiry (se_obj_lun_type_t *obj_api, t10_wwn_t *wwn, vo
 
 	i = buf[0] & 0x1f;
 	                        
-	PYXPRINT("  Type:   %s ", scsi_peripheral_type(i));
+	PYXPRINT("  Type:   %s ", scsi_device_type(i));
 	PYXPRINT("                 ANSI SCSI revision: %02x",
 	               buf[2] & 0x07);
         if ((buf[2] & 0x07) == 1 && (buf[3] & 0x0f) == 1)
