@@ -37,6 +37,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/genhd.h>
+#include <linux/file.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
@@ -243,23 +244,8 @@ extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, se_hbainf
 	PYXPRINT("CORE_HBA[%d] - Attached Parallel SCSI HBA to Generic Target Core"
 		" with TCQ Depth: %d MaxSectors: %hu\n", hba->hba_id,
 		atomic_read(&hba->max_queue_depth), max_sectors);
-#if 0
-	/*
-	 * For Parallel SCSI we assume the devices are already attached to the
-	 * HBA, so go ahead and scan the bus for devices to export as iSCSI LUNs.
-	 */
-	if ((pscsi_dev_count = pscsi_scan_devices(hba, hi)) < 0) {
-		PYXPRINT("No devices present, ignoring request to add"
-			" Parallel SCSI HBA %d.\n", sh->host_no);
-		goto fail;
-	}
-#endif		
+
 	return(0);
-#if 0
-fail:
-	scsi_host_put(sh);
-	return(-1);
-#endif
 }
 
 /*	pscsi_detach_hba(): (Part of se_subsystem_api_t template)
@@ -279,92 +265,6 @@ extern int pscsi_detach_hba (se_hba_t *hba)
 	
 	return(0);
 }
-
-/*	pscsi_scan_devices(): (Part of se_subsystem_api_t template)
- *
- * 	FIXME: For <= v2.4, check what locking the midlayer does for accessing Scsi_Host->host_queue (if any?)
- */
-#if 0
-extern int pscsi_scan_devices (se_hba_t *iscsi_hba, se_hbainfo_t *hi)
-{
-	int pscsi_dev_count = 0;
-	int dev_flags = 0;
-	se_device_t *dev;
-	struct scsi_device *sd;
-	struct Scsi_Host *sh = (struct Scsi_Host *) iscsi_hba->hba_ptr;
-
-	spin_lock_irq(sh->host_lock);
-	list_for_each_entry(sd, &sh->__devices, siblings) {
-		if (sd->type == TYPE_DISK) {
-			if (scsi_device_get(sd))
-			    continue;
-
-			spin_unlock_irq(sh->host_lock);
-
-			if (pscsi_check_sd(sd) < 0) {
-				spin_lock_irq(sh->host_lock);
-				scsi_device_put(sd);
-				continue;
-			}
-
-			/*
-			 * In some cases (namely the iSCSI Initiator Case) we want to
-			 * grab exclusive access to the underlying Linux block device
-			 * immediately at this point.  We use parameter that is passed
-			 * with addhbatotarget to determine when to claim for this case.
-			 */
-			if (hi->os_claim_devices) 
-				if (!(pscsi_claim_sd(sd))) {
-					dev_flags |= DF_CLAIMED_BLOCKDEV;
-					dev_flags |= DF_PERSISTENT_CLAIMED_BLOCKDEV;
-				}
-			
-			dev = pscsi_add_device_to_list(iscsi_hba, sd, dev_flags);
-			
-			if (dev_flags & DF_CLAIMED_BLOCKDEV) {
-				dev_flags &= ~DF_CLAIMED_BLOCKDEV;
-				dev_flags &= ~DF_PERSISTENT_CLAIMED_BLOCKDEV;
-			}
-			
-			spin_lock_irq(sh->host_lock);
-
-			if (!dev) {
-			    scsi_device_put(sd);
-			    continue;
-			}
-			
-			pscsi_dev_count++;
-			continue;
-		}
-
-		/*
-		 * We may need to do peripheral-type specific checking of access counts.
-		 */
-//#warning FIXME v2.8: Check usage of scsi_device_get() for non TYPE_DISK
-		if (sd->type == TYPE_ROM || sd->type == TYPE_TAPE || sd->type == TYPE_MEDIUM_CHANGER) {
-			spin_unlock_irq(sh->host_lock);
-			dev = pscsi_add_device_to_list(iscsi_hba, sd, dev_flags);
-			spin_lock_irq(sh->host_lock);
-
-			if (!dev)
-				continue;
-			
-			pscsi_dev_count++;
-			continue;
-		}
-
-	}
-	spin_unlock_irq(sh->host_lock);
-		
-	if (!pscsi_dev_count)
-		return(-1);
-
-	PYXPRINT("iSCSI_PSCSI[%d] - Detected %d Parallel SCSI Devices\n",
-			sh->host_no, pscsi_dev_count);
-
-	return(pscsi_dev_count);
-}
-#endif
 
 /*	pscsi_add_device_to_list():
  *
@@ -504,13 +404,105 @@ extern void *pscsi_allocate_virtdevice (se_hba_t *hba, const char *name)
 	return((void *)pdv);
 }
 
+/*
+ * Called with struct Scsi_Host->host_lock called.
+ */
+extern se_device_t *pscsi_create_type_disk (struct scsi_device *sd, pscsi_dev_virt_t *pdv, se_hba_t *hba)
+{
+	se_device_t *dev;
+	struct Scsi_Host *sh = sd->host;
+	u32 dev_flags = 0;
+
+	if (sd->type != TYPE_DISK)
+		return(NULL);
+
+	if (scsi_device_get(sd)) {
+		printk(KERN_ERR "scsi_device_get() failed for %d:%d:%d:%d\n",
+			sh->host_no, sd->channel, sd->id, sd->lun);
+		spin_unlock_irq(sh->host_lock);
+		return(NULL);
+	}
+	spin_unlock_irq(sh->host_lock);
+
+	if (pscsi_check_sd(sd) < 0) {
+		scsi_device_put(sd);
+		printk(KERN_ERR "pscsi_check_sd() failed for %d:%d:%d:%d\n",
+			sh->host_no, sd->channel, sd->id, sd->lun);
+		return(NULL);
+	}
+	if (!(pscsi_claim_sd(sd))) {
+		dev_flags |= DF_CLAIMED_BLOCKDEV;
+		dev_flags |= DF_PERSISTENT_CLAIMED_BLOCKDEV;
+	}	
+	if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags))) {
+		scsi_device_put(sd);
+		return(NULL);
+	}
+	PYXPRINT("CORE_PSCSI[%d] - Added TYPE_DISK for %d:%d:%d\n",
+		sh->host_no, sd->channel, sd->id, sd->lun);
+
+	return(dev);
+}
+
+/*
+ * Called with struct Scsi_Host->host_lock called.
+ */
+extern se_device_t *pscsi_create_type_rom (struct scsi_device *sd, pscsi_dev_virt_t *pdv, se_hba_t *hba)
+{
+	se_device_t *dev;
+	struct Scsi_Host *sh = sd->host;
+	u32 dev_flags = 0;
+
+	if (sd->type != TYPE_ROM)
+		return(NULL);
+
+	if (scsi_device_get(sd)) {
+		printk(KERN_ERR "scsi_device_get() failed for %d:%d:%d:%d\n",
+			sh->host_no, sd->channel, sd->id, sd->lun);
+		spin_unlock_irq(sh->host_lock);
+		return(NULL);
+	}
+	spin_unlock_irq(sh->host_lock);
+
+	if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags))) {
+		scsi_device_put(sd);
+		return(NULL);
+	}
+	PYXPRINT("CORE_PSCSI[%d] - Added Type: %s for %d:%d:%d\n",
+		sh->host_no, scsi_device_type(sd->type), sd->channel,
+		sd->id, sd->lun);
+
+	return(dev);	
+}
+
+/*
+ *Called with struct Scsi_Host->host_lock called.
+ */
+extern se_device_t *pscsi_create_type_other (struct scsi_device *sd, pscsi_dev_virt_t *pdv, se_hba_t *hba)
+{
+	se_device_t *dev;
+	struct Scsi_Host *sh = sd->host;
+	u32 dev_flags = 0;
+
+	if ((sd->type == TYPE_DISK) || (sd->type == TYPE_ROM))
+		return(NULL);
+	spin_unlock_irq(sh->host_lock);
+
+	if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags)))
+		return(NULL);
+	
+	PYXPRINT("CORE_PSCSI[%d] - Added Type: %s for %d:%d:%d\n",
+		sh->host_no, scsi_device_type(sd->type), sd->channel,
+		sd->id, sd->lun);
+
+	return(dev);
+}
+
 extern se_device_t *pscsi_create_virtdevice (se_hba_t *hba, void *p)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *)p;
-	se_device_t *dev;
 	struct scsi_device *sd;
 	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
-	u32 dev_flags = 0;
 
 	if (!(pdv)) {
 		printk(KERN_ERR "Unable to locate pscsi_dev_virt_t parameter\n");
@@ -523,54 +515,17 @@ extern se_device_t *pscsi_create_virtdevice (se_hba_t *hba, void *p)
 		    !(pdv->pdv_target_id == sd->id) ||
 		    !(pdv->pdv_lun_id == sd->lun))
 			continue;
-
-		if (sd->type == TYPE_DISK) {
-			if (scsi_device_get(sd)) {
-				spin_unlock_irq(sh->host_lock);
-				printk(KERN_ERR "scsi_device_get() failed for %d:%d:%d:%d\n",
-					sh->host_no, sd->channel, sd->id, sd->lun);
-				return(NULL);
-			}
-			spin_unlock_irq(sh->host_lock);
-
-			if (pscsi_check_sd(sd) < 0) {
-				scsi_device_put(sd);
-				printk(KERN_ERR "pscsi_check_sd() failed for %d:%d:%d:%d\n",
-					sh->host_no, sd->channel, sd->id, sd->lun);
-				return(NULL);
-			}
-#warning FIXME: Is this already being done inside target_core_mod..?
-			if (!(pscsi_claim_sd(sd))) {
-				dev_flags |= DF_CLAIMED_BLOCKDEV;
-				dev_flags |= DF_PERSISTENT_CLAIMED_BLOCKDEV;
-			}
-
-			if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags))) {
-				scsi_device_put(sd);
-				return(NULL);
-			}	
-			PYXPRINT("CORE_PSCSI[%d] - Added TYPE_DISK for %d:%d:%d\n",
-				sh->host_no, sd->channel, sd->id, sd->lun);	
-
-			return(dev);
+		/*
+		 * Functions will release struct scsi_host->host_lock
+		 */
+		switch (sd->type) {
+		case TYPE_DISK:
+			return(pscsi_create_type_disk(sd, pdv, hba));
+		case TYPE_ROM:
+			return(pscsi_create_type_rom(sd, pdv, hba));
+		default:
+			return(pscsi_create_type_other(sd, pdv, hba));
 		}
-#warning FIXME: Can all NON TYPE_DISK be handled this way..?
-		if ((sd->type == TYPE_ROM) ||
-		    (sd->type == TYPE_TAPE) ||
-		    (sd->type == TYPE_MEDIUM_CHANGER)) {	
-			spin_unlock_irq(sh->host_lock);
-
-			if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags)))
-				return(NULL);	
-
-			PYXPRINT("CORE_PSCSI[%d] - Added TYPE_DISK for %d:%d:%d\n",
-				sh->host_no, sd->channel, sd->id, sd->lun);   	
-
-			return(dev);
-		}
-
-		printk(KERN_ERR "Unable to process SCSI device type: %d\n", sd->type);
-		return(NULL);
 	}
 	spin_unlock_irq(sh->host_lock);
 
@@ -672,8 +627,10 @@ extern void pscsi_free_device (void *p)
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) p;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
-	if (sd && (sd->type == TYPE_DISK)) {
-		scsi_device_put(sd);
+	if (sd) {
+		if ((sd->type == TYPE_DISK) || (sd->type == TYPE_ROM)) 
+			scsi_device_put(sd);
+
 		pdv->pdv_sd = NULL;
 	}
 	
@@ -1009,6 +966,128 @@ extern ssize_t pscsi_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t
 
 	__pscsi_get_dev_info(pdv, page, &bl);
 	return((ssize_t)bl);
+}
+
+extern se_device_t *pscsi_create_virtdevice_from_fd (
+	se_subsystem_dev_t *se_dev,
+	const char *page)
+{
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
+	se_device_t *dev = NULL;
+	se_hba_t *hba = se_dev->se_dev_hba;
+	struct block_device *bd = NULL;
+	struct file *filp;
+	struct gendisk *gd = NULL;
+	struct inode *inode;
+	struct scsi_device *sd = NULL;
+	struct Scsi_Host *sh = (struct Scsi_Host *)hba->hba_ptr;
+	char *p = (char *)page;
+	int fd;
+
+	fd = simple_strtol(p, &p, 0);
+	if ((fd < 3 || fd > 7)) {
+		printk(KERN_ERR "PSCSI: Illegal value of file descriptor: %d\n", fd);
+		return(ERR_PTR(-EINVAL));
+	}
+	if (!(filp = fget(fd))) {
+		printk(KERN_ERR "PSCSI: Unable to fget() fd: %d\n", fd);
+		return(ERR_PTR(-EBADF));
+	}
+	if (!(inode = igrab(filp->f_mapping->host))) {
+		printk(KERN_ERR "PSCSI: Unable to locate struct inode for struct"
+				" block_device fd\n");
+		fput(filp);
+		return(ERR_PTR(-EINVAL));
+	}
+	/*
+	 * Look for struct scsi_device with a backing struct block_device.
+	 *
+	 * This means struct scsi_device->type == TYPE_DISK && TYPE_ROM.
+	 */
+	if (S_ISBLK(inode->i_mode)) {
+		if (!(bd = I_BDEV(filp->f_mapping->host))) {
+			printk(KERN_ERR "PSCSI: Unable to locate struct"
+				" block_device from I_BDEV()\n");
+			iput(inode);
+			fput(filp);
+			return(ERR_PTR(-EINVAL));
+		}
+		if (!(gd = bd->bd_disk)) {
+			printk(KERN_ERR "PSCSI: Unable to locate struct gendisk"
+				" from struct block_device\n");
+			iput(inode);
+			fput(filp);
+			return(ERR_PTR(-EINVAL));
+		}
+		/*
+		 * This struct gendisk->driver_fs() is marked as "// remove'
+		 * in include/linux/genhd.h..
+		 *
+		 * Currently in drivers/scsi/s[d,r].c:s[d,r]_probe(), this
+		 * pointer gets set by struct scsi_device->sdev_gendev.
+		 *
+		 * Is there a better way to locate struct scsi_device from
+		 * struct inode..?
+		 */
+		if (!(gd->driverfs_dev)) {
+			printk(KERN_ERR "PSCSI: struct gendisk->driverfs_dev"
+					" is NULL!\n");
+			iput(inode);
+			fput(filp);
+			return(ERR_PTR(-EINVAL));
+		}
+		if (!(sd = to_scsi_device(gd->driverfs_dev))) {
+			printk(KERN_ERR "PSCSI: Unable to locate struct scsi_device"
+				" from struct gendisk->driverfs_dev\n");
+			iput(inode);
+			fput(filp);
+			return(ERR_PTR(-EINVAL));
+		}
+		if (sd->host != sh) {
+			printk(KERN_ERR "PSCSI: Trying to attach scsi_device"
+				" Host ID: %d, but se_hba_t has SCSI Host ID: %d\n",
+				sd->host->host_no, sh->host_no);
+			iput(inode);
+			fput(filp);
+			return(ERR_PTR(-EINVAL));
+		}
+		/*
+		 * pscsi_create_type_[disk,rom]() will release host_lock..
+		 */
+		spin_lock_irq(sh->host_lock);
+		switch (sd->type) {
+		case TYPE_DISK:
+			dev = pscsi_create_type_disk(sd, pdv, se_dev->se_dev_hba);
+			break;
+		case TYPE_ROM:
+			dev = pscsi_create_type_rom(sd, pdv, se_dev->se_dev_hba);
+			break;
+		default:
+			printk(KERN_ERR "PSCSI: Unable to handle type S_ISBLK() =="
+				" TRUE Type: %s\n", scsi_device_type(sd->type));
+			spin_unlock_irq(sh->host_lock);
+			iput(inode);
+			fput(filp);
+			return(ERR_PTR(-ENOSYS));
+		}
+	} else if (S_ISCHR(inode->i_mode)) {
+#warning FIXME: Figure how to get struct scsi_device from character device's struct inode
+		printk(KERN_ERR "SCSI Character Device unsupported via"
+			" configfs/fd  method.  Use configfs/control instead\n");
+		iput(inode);
+		fput(filp);
+		return(ERR_PTR(-ENOSYS));
+	} else {
+		printk(KERN_ERR "PSCSI: File destriptor is not SCSI block or character"
+			" device, ignoring\n");
+		iput(inode);
+		fput(filp);
+		return(ERR_PTR(-ENODEV));
+	}
+
+	iput(inode);
+	fput(filp);
+	return(dev);
 }
 
 extern int pscsi_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
