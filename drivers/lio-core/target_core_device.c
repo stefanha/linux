@@ -64,7 +64,24 @@
 #undef TARGET_CORE_DEVICE_C
 
 extern se_global_t *se_global;
-extern __u32 iscsi_unpack_lun (unsigned char *);
+
+extern struct block_device *linux_blockdevice_claim_bd (struct block_device *bd, void *claim_ptr)
+{
+	if (blkdev_get(bd, FMODE_WRITE|FMODE_READ, O_RDWR) < 0)
+		return(NULL);	
+	/*
+	 * If no claim pointer was passed from claimee, use struct block_device.
+	 */
+	if (!claim_ptr)
+		claim_ptr = (void *)bd;
+
+	if (bd_claim(bd, claim_ptr) < 0) {
+		blkdev_put(bd);
+		return(NULL);
+	}
+	
+	return(bd);
+}
 
 extern struct block_device *__linux_blockdevice_claim (int major, int minor, void *claim_ptr, int *ret)
 {

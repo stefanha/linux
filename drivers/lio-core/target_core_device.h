@@ -27,6 +27,7 @@
 #ifndef TARGET_CORE_DEVICE_H
 #define TARGET_CORE_DEVICE_H
  
+extern struct block_device *linux_blockdevice_claim_bd (struct block_device *, void *);
 extern struct block_device *__linux_blockdevice_claim (int, int, void *, int *);
 extern struct block_device *linux_blockdevice_claim (int, int, void *);
 extern int linux_blockdevice_release (int, int, struct block_device *);

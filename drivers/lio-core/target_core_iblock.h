@@ -66,6 +66,7 @@ extern int iblock_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t iblock_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t iblock_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t iblock_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
+extern se_device_t *iblock_create_virtdevice_from_fd (se_subsystem_dev_t *, const char *);
 extern int iblock_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
 extern int iblock_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *);
 extern void iblock_get_plugin_info (void *, char *, int *);
@@ -160,6 +161,7 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	check_configfs_dev_params: iblock_check_configfs_dev_params, \
 	set_configfs_dev_params: iblock_set_configfs_dev_params, \
 	show_configfs_dev_params: iblock_show_configfs_dev_params, \
+	create_virtdevice_from_fd: iblock_create_virtdevice_from_fd, \
 	check_virtdev_params:	iblock_check_virtdev_params,	\
 	check_dev_params:	iblock_check_dev_params,	\
 	get_plugin_info:	iblock_get_plugin_info,		\

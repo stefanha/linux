@@ -37,6 +37,7 @@
 #include <linux/smp_lock.h>
 #include <linux/bio.h>
 #include <linux/genhd.h>
+#include <linux/file.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
         
@@ -48,6 +49,7 @@
 #include <iscsi_target_core.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
+#include <target_core_device.h>
 #include <iscsi_target_device.h>
 #include <target_core_transport.h>
 #include <iscsi_target_util.h>
@@ -57,10 +59,6 @@
 #undef TARGET_CORE_IBLOCK_C
 
 extern se_global_t *se_global;
-extern struct block_device *__linux_blockdevice_claim (int, int, void *, int *); 
-extern struct block_device *linux_blockdevice_claim(int, int, void *);
-
-extern int linux_blockdevice_release(int, int, struct block_device *);
 
 #if 0
 #define DEBUG_IBLOCK(x...) PYXPRINT(x)
@@ -203,32 +201,49 @@ extern se_device_t *iblock_create_virtdevice (se_hba_t *hba, void *p)
 		TRACE_ERROR("Unable to locate iblock_dev_t parameter\n");
 		return(0);
 	}
-
-	PYXPRINT("IBLOCK: Claiming %p Major:Minor - %d:%d\n", ib_dev,
-                ib_dev->ibd_major, ib_dev->ibd_minor);
-
-	if ((bd = __linux_blockdevice_claim(ib_dev->ibd_major, ib_dev->ibd_minor, ib_dev, &ret)))
-		if (ret == 1)
-			dev_flags = DF_CLAIMED_BLOCKDEV;
-		else if (ib_dev->ibd_force) {
-			dev_flags = DF_READ_ONLY;
-			PYXPRINT("IBLOCK: DF_READ_ONLY for Major:Minor - %d:%d\n",
-				ib_dev->ibd_major, ib_dev->ibd_minor);
-		} else {
-			TRACE_ERROR("WARNING: Unable to claim block device. Only use"
-				" force=1 for READ-ONLY access.\n");
-			goto failed;
-		}
-	else
-		goto failed;	
+	/*
+	 * Check if we have an open file descritpor passed through configfs
+	 * $TARGET/iblock_0/some_bd/fd pointing to an underlying.
+	 * struct block_device.  If so, claim it with the pointer from
+	 * iblock_create_virtdevice_from_fd()
+	 *
+	 * Otherwise, assume that parameters through 'control' attribute
+	 * have set ib_dev->ibd_[major,minor]
+	 */
+	if (ib_dev->ibd_bd) {
+		PYXPRINT("IBLOCK: Claiming struct block_device: %p\n", ib_dev->ibd_bd);
 	
-	ib_dev->ibd_bd = bd;
+		if (!(bd = linux_blockdevice_claim_bd(ib_dev->ibd_bd, ib_dev))) 
+			goto failed;
+		dev_flags = DF_CLAIMED_BLOCKDEV;
+		ib_dev->ibd_major = bd->bd_disk->major;
+		ib_dev->ibd_minor = bd->bd_disk->first_minor;
+	} else {
+		PYXPRINT("IBLOCK: Claiming %p Major:Minor - %d:%d\n", ib_dev,
+			ib_dev->ibd_major, ib_dev->ibd_minor);
+
+		if ((bd = __linux_blockdevice_claim(ib_dev->ibd_major,
+				ib_dev->ibd_minor, ib_dev, &ret))) {
+			if (ret == 1)
+				dev_flags = DF_CLAIMED_BLOCKDEV;
+			else if (ib_dev->ibd_force) {
+				dev_flags = DF_READ_ONLY;
+				PYXPRINT("IBLOCK: DF_READ_ONLY for Major:Minor - %d:%d\n",
+					ib_dev->ibd_major, ib_dev->ibd_minor);
+			} else {
+				TRACE_ERROR("WARNING: Unable to claim block device. Only use"
+					" force=1 for READ-ONLY access.\n");
+				goto failed;
+			}
+			ib_dev->ibd_bd = bd;
+		} else
+			goto failed;	
+	}
 	if (dev_flags & DF_CLAIMED_BLOCKDEV)
 		ib_dev->ibd_bd->bd_contains = bd;
 
 	if (!(ib_dev->ibd_bio_set = bioset_create(32, 64))) {
-		TRACE_ERROR("Unable to create bioset for IBLOCK\n");
-		dump_stack();
+		printk(KERN_ERR "IBLOCK: Unable to create bioset()\n");
 		goto failed;
 	}
 	printk("IBLOCK: Created bio_set() for major/minor: %d:%d\n",
@@ -634,6 +649,57 @@ extern ssize_t iblock_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_
 
 	__iblock_get_dev_info(ibd, page, &bl);
 	return((ssize_t)bl);
+}
+
+extern se_device_t *iblock_create_virtdevice_from_fd (
+	se_subsystem_dev_t *se_dev,
+	const char *page)
+{
+	iblock_dev_t *ibd = (iblock_dev_t *) se_dev->se_dev_su_ptr;
+	se_device_t *dev = NULL;
+	struct file *filp;
+	struct inode *inode;
+	char *p = (char *)page;
+	int fd;
+
+	fd = simple_strtol(p, &p, 0);	
+	if ((fd < 3 || fd > 7)) {
+		printk(KERN_ERR "IBLOCK: Illegal value of file descriptor: %d\n", fd);
+		return(ERR_PTR(-EINVAL));
+	}
+	if (!(filp = fget(fd))) {
+		printk(KERN_ERR "IBLOCK: Unable to fget() fd: %d\n", fd);
+		return(ERR_PTR(-EBADF));
+	}
+	if (!(inode = igrab(filp->f_mapping->host))) {
+		printk(KERN_ERR "IBLOCK: Unable to locate struct inode for struct"
+				" block_device fd\n");
+		fput(filp);
+		return(ERR_PTR(-EINVAL));
+	}
+	if (!(S_ISBLK(inode->i_mode))) {
+		printk(KERN_ERR "IBLOCK: S_ISBLK(inode->i_mode) failed for file"
+				" descriptor: %d\n", fd);
+		iput(inode);
+		fput(filp);
+		return(ERR_PTR(-ENODEV));
+	}
+	if (!(ibd->ibd_bd = I_BDEV(filp->f_mapping->host))) {
+		printk(KERN_ERR "IBLOCK: Unable to locate struct block_device"
+				" from I_BDEV()\n");
+		iput(inode);
+		fput(filp);
+		return(ERR_PTR(-EINVAL));
+	}
+	/*
+	 * iblock_create_virtdevice() will call linux_blockdevice_claim_bd()
+	 * to claim struct block_device.
+	 */
+	dev = iblock_create_virtdevice(se_dev->se_dev_hba, (void *)ibd);
+
+	iput(inode);
+	fput(filp);
+	return(dev);
 }
 
 extern int iblock_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
