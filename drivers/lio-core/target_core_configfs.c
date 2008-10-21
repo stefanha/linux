@@ -574,9 +574,57 @@ static struct target_core_configfs_attribute target_core_attr_dev_control = {
 	.store	= target_core_store_dev_control,
 };
 
+static ssize_t target_core_store_dev_fd (void *p, const char *page, size_t count)
+{
+	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;	
+	se_device_t *dev;
+	se_hba_t *hba = se_dev->se_dev_hba;
+	se_subsystem_api_t *t;
+	int ret = 0;
+
+	if (se_dev->se_dev_ptr) {
+		printk(KERN_ERR "se_dev->se_dev_ptr already set, ignoring fd request\n");
+		return(-EEXIST);
+	}
+
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);		
+	if (!t || (ret != 0))
+		return(-EINVAL);
+
+	if (!(t->create_virtdevice_from_fd)) {
+		printk(KERN_ERR "se_subsystem_api_t->create_virtdevice_from_fd()"
+			" NULL for: %s\n", hba->transport->name);
+		return(-EINVAL);
+	}
+	/*
+	 * The subsystem PLUGIN is responsible for calling target_core_mod
+	 * symbols to claim the underlying struct block_device for TYPE_DISK.
+	 */
+	dev = t->create_virtdevice_from_fd(se_dev, page);
+	if (!(dev) || IS_ERR(dev))
+		goto out;
+
+	se_dev->se_dev_ptr = dev;
+
+	printk("Target_Core_ConfigFS: Registered %s se_dev->se_dev_ptr: %p"
+		" from fd\n", hba->transport->name, se_dev->se_dev_ptr);
+	return(count);
+out:
+	return(-EINVAL);
+}
+
+static struct target_core_configfs_attribute target_core_attr_dev_fd = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "fd",
+		    .ca_mode = S_IWUSR },
+	.show	= NULL,
+	.store	= target_core_store_dev_fd,
+};
+
 static ssize_t target_core_store_dev_enable (void *p, const char *page, size_t count)
 {
 	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;
+	se_device_t *dev;
 	se_hba_t *hba = se_dev->se_dev_hba;
 	se_subsystem_api_t *t;
 	char *ptr;
@@ -598,10 +646,13 @@ static ssize_t target_core_store_dev_enable (void *p, const char *page, size_t c
 	if (t->check_configfs_dev_params(hba, se_dev) < 0)
 		return(-EINVAL);
 
-	if (!(se_dev->se_dev_ptr = t->create_virtdevice(hba, se_dev->se_dev_su_ptr)))
+	dev = t->create_virtdevice(hba, se_dev->se_dev_su_ptr);
+	if (!(dev) || IS_ERR(dev))
 		return(-EINVAL);
 
+	se_dev->se_dev_ptr = dev;
 	printk("Target_Core_ConfigFS: Registered se_dev->se_dev_ptr: %p\n", se_dev->se_dev_ptr);
+
 	return(count);
 }
 
@@ -616,6 +667,7 @@ static struct target_core_configfs_attribute target_core_attr_dev_enable = {
 static struct configfs_attribute *lio_core_dev_attrs[] = {
 	&target_core_attr_dev_info.attr,
 	&target_core_attr_dev_control.attr,
+	&target_core_attr_dev_fd.attr,
 	&target_core_attr_dev_enable.attr,
 	NULL,
 };

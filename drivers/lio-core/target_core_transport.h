@@ -427,6 +427,10 @@ typedef struct se_subsystem_api_s {
 	 */	
 	ssize_t (*show_configfs_dev_params)(se_hba_t *, se_subsystem_dev_t *, char *);
 	/*
+	 * create_virtdevice_from-fd():
+	 */
+	se_device_t *(*create_virtdevice_from_fd)(se_subsystem_dev_t *, const char *);
+	/*
 	 * check_dev_params():
 	 */
 	int (*check_dev_params)(se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
