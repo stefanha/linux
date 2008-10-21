@@ -413,9 +413,6 @@ extern se_device_t *pscsi_create_type_disk (struct scsi_device *sd, pscsi_dev_vi
 	struct Scsi_Host *sh = sd->host;
 	u32 dev_flags = 0;
 
-	if (sd->type != TYPE_DISK)
-		return(NULL);
-
 	if (scsi_device_get(sd)) {
 		printk(KERN_ERR "scsi_device_get() failed for %d:%d:%d:%d\n",
 			sh->host_no, sd->channel, sd->id, sd->lun);
@@ -453,9 +450,6 @@ extern se_device_t *pscsi_create_type_rom (struct scsi_device *sd, pscsi_dev_vir
 	struct Scsi_Host *sh = sd->host;
 	u32 dev_flags = 0;
 
-	if (sd->type != TYPE_ROM)
-		return(NULL);
-
 	if (scsi_device_get(sd)) {
 		printk(KERN_ERR "scsi_device_get() failed for %d:%d:%d:%d\n",
 			sh->host_no, sd->channel, sd->id, sd->lun);
@@ -484,10 +478,7 @@ extern se_device_t *pscsi_create_type_other (struct scsi_device *sd, pscsi_dev_v
 	struct Scsi_Host *sh = sd->host;
 	u32 dev_flags = 0;
 
-	if ((sd->type == TYPE_DISK) || (sd->type == TYPE_ROM))
-		return(NULL);
 	spin_unlock_irq(sh->host_lock);
-
 	if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags)))
 		return(NULL);
 	
