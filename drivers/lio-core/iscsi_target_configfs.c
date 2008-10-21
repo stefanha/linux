@@ -143,8 +143,9 @@ static ssize_t lio_target_store_np_sctp (void *p, const char *page, size_t count
 		np_addr.np_flags = np->np_flags;
 		np_addr.np_port = np->np_port;
 
-		if (!(tpg_np_sctp = iscsi_tpg_add_network_portal(tpg, &np_addr,
-					tpg_np, ISCSI_SCTP_TCP))) 	
+		tpg_np_sctp = iscsi_tpg_add_network_portal(tpg, &np_addr,
+					tpg_np, ISCSI_SCTP_TCP);
+		if (!(tpg_np_sctp) || IS_ERR(tpg_np_sctp))
 			goto out;
 	} else {
 		if (!(tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP)))
@@ -312,7 +313,8 @@ static struct config_group *lio_target_call_addnptotpg (
 	 * sys/kernel/config/iscsi/$IQN/$TPG/np/$IP:$PORT/
 	 *
 	 */
-	if (!(tpg_np = iscsi_tpg_add_network_portal(tpg, &np_addr, NULL, ISCSI_TCP)))
+	tpg_np = iscsi_tpg_add_network_portal(tpg, &np_addr, NULL, ISCSI_TCP);
+	if (!(tpg_np) || IS_ERR(tpg_np))
 		goto out;
 
 	config_group_init_type_name(&tpg_np->tpg_np_group, name, &lio_target_portal_cit);
