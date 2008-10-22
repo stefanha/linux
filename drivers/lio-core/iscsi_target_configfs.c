@@ -722,18 +722,12 @@ static ssize_t lio_target_store_nacl_attrib_##name (			\
 	return(count);							\
 }
 
-static struct iscsi_node_attrib_s *to_iscsi_node_attrib_s (struct config_item *item)
-{
-	return((item) ? container_of(to_config_group(item), struct iscsi_node_attrib_s,
-		acl_attrib_group) : NULL);
-}
-
 /*
  * Define the iSCSI Node attributes using hybrid wrappers from include/linux/configfs.h
  */
-CONFIGFS_ATTR_STRUCT(iscsi_node_attrib_s);
-#define NACL_ATTR(_name, _mode, _show, _store)					\
-static struct iscsi_node_attrib_s_attribute iscsi_node_attrib_s_##_name =	\
+CONFIGFS_ATTR_STRUCT(iscsi_node_attrib, iscsi_node_attrib_s);
+#define NACL_ATTR(_name, _mode, _show, _store)				\
+static struct iscsi_node_attrib_attribute iscsi_node_attrib_##_name =	\
 		__CONFIGFS_ATTR(_name, _mode, _show, _store)
 /*
  * Define iscsi_node_attrib_s_dataout_timeout
@@ -796,23 +790,23 @@ NACL_ATTR(random_r2t_offsets, S_IRUGO | S_IWUSR,
  * Finally, define functions iscsi_node_attrib_s_attr_show() and
  * iscsi_node_attrib_s_attr_store() for lio_target_nacl_attrib_ops below..
  */
-CONFIGFS_ATTR_OPS(iscsi_node_attrib_s);
+CONFIGFS_ATTR_OPS(iscsi_node_attrib, iscsi_node_attrib_s, acl_attrib_group);
 
 static struct configfs_attribute *lio_target_nacl_attrib_attrs[] = {
-	&iscsi_node_attrib_s_dataout_timeout.attr,
-	&iscsi_node_attrib_s_dataout_timeout_retries.attr,
-	&iscsi_node_attrib_s_default_erl.attr,
-	&iscsi_node_attrib_s_nopin_timeout.attr,
-	&iscsi_node_attrib_s_nopin_response_timeout.attr,
-	&iscsi_node_attrib_s_random_datain_pdu_offsets.attr,
-	&iscsi_node_attrib_s_random_datain_seq_offsets.attr,
-	&iscsi_node_attrib_s_random_r2t_offsets.attr,
+	&iscsi_node_attrib_dataout_timeout.attr,
+	&iscsi_node_attrib_dataout_timeout_retries.attr,
+	&iscsi_node_attrib_default_erl.attr,
+	&iscsi_node_attrib_nopin_timeout.attr,
+	&iscsi_node_attrib_nopin_response_timeout.attr,
+	&iscsi_node_attrib_random_datain_pdu_offsets.attr,
+	&iscsi_node_attrib_random_datain_seq_offsets.attr,
+	&iscsi_node_attrib_random_r2t_offsets.attr,
 	NULL,
 };
 
 static struct configfs_item_operations lio_target_nacl_attrib_ops = {
-	.show_attribute		= iscsi_node_attrib_s_attr_show,
-	.store_attribute	= iscsi_node_attrib_s_attr_store,
+	.show_attribute		= iscsi_node_attrib_attr_show,
+	.store_attribute	= iscsi_node_attrib_attr_store,
 };
 
 static struct config_item_type lio_target_nacl_attrib_cit = {
@@ -1519,18 +1513,12 @@ out:									\
 	return(ret);							\
 }
 
-static struct iscsi_tpg_attrib_s *to_iscsi_tpg_attrib_s (struct config_item *item)
-{
-	return((item) ? container_of(to_config_group(item), struct iscsi_tpg_attrib_s,
-		tpg_attrib_group) : NULL);	
-}
-
 /*
  * Define the iSCSI TPG attributes using hybrid wrappers from include/linux/configfs.h
  */
-CONFIGFS_ATTR_STRUCT(iscsi_tpg_attrib_s);
+CONFIGFS_ATTR_STRUCT(iscsi_tpg_attrib, iscsi_tpg_attrib_s);
 #define TPG_ATTR(_name, _mode, _show, _store)				\
-static struct iscsi_tpg_attrib_s_attribute iscsi_tpg_attrib_s_##_name =	\
+static struct iscsi_tpg_attrib_attribute iscsi_tpg_attrib_##_name =	\
 	__CONFIGFS_ATTR(_name, _mode, _show, _store)
 
 /*
@@ -1587,21 +1575,21 @@ TPG_ATTR(demo_mode_lun_access, S_IRUGO | S_IWUSR,
  * Finally, define functions iscsi_tpg_attrib_s_attr_show() and
  * iscsi_tpg_attrib_s_attr_store() for lio_target_tpg_attrib_ops below..
  */
-CONFIGFS_ATTR_OPS(iscsi_tpg_attrib_s);
+CONFIGFS_ATTR_OPS(iscsi_tpg_attrib, iscsi_tpg_attrib_s, tpg_attrib_group);
 
 static struct configfs_attribute *lio_target_tpg_attrib_attrs[] = {
-	&iscsi_tpg_attrib_s_authentication.attr,
-	&iscsi_tpg_attrib_s_login_timeout.attr,
-	&iscsi_tpg_attrib_s_netif_timeout.attr,
-	&iscsi_tpg_attrib_s_generate_node_acls.attr,
-	&iscsi_tpg_attrib_s_default_cmdsn_depth.attr,
-	&iscsi_tpg_attrib_s_cache_dynamic_acls.attr,
-	&iscsi_tpg_attrib_s_demo_mode_lun_access.attr,
+	&iscsi_tpg_attrib_authentication.attr,
+	&iscsi_tpg_attrib_login_timeout.attr,
+	&iscsi_tpg_attrib_netif_timeout.attr,
+	&iscsi_tpg_attrib_generate_node_acls.attr,
+	&iscsi_tpg_attrib_default_cmdsn_depth.attr,
+	&iscsi_tpg_attrib_cache_dynamic_acls.attr,
+	&iscsi_tpg_attrib_demo_mode_lun_access.attr,
 };
 
 static struct configfs_item_operations lio_target_tpg_attrib_ops = {
-	.show_attribute		= iscsi_tpg_attrib_s_attr_show,
-	.store_attribute	= iscsi_tpg_attrib_s_attr_store,
+	.show_attribute		= iscsi_tpg_attrib_attr_show,
+	.store_attribute	= iscsi_tpg_attrib_attr_store,
 };
 
 static struct config_item_type lio_target_tpg_attrib_cit = {
