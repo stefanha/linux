@@ -98,12 +98,14 @@ struct _name##_attribute {						\
  *		                      ^^_item^^^^^  ^^_item_member^^^
  * This macro expects the attributes to be named "struct <name>_attribute".
  */
-#define CONFIGFS_EATTR_OPS(_name, _item, _item_member)			\
+#define CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member)		\
 static struct _item *to_##_name(struct config_item *ci)			\
 {									\
 	return((ci) ? container_of(to_config_group(ci), struct _item,	\
 		_item_member) : NULL);					\
-}									\
+}
+
+#define CONFIGFS_EATTR_OPS_SHOW(_name, _item)				\
 static ssize_t _name##_attr_show(struct config_item *item,		\
 				 struct configfs_attribute *attr,	\
 				 char *page)				\
@@ -116,7 +118,9 @@ static ssize_t _name##_attr_show(struct config_item *item,		\
 	if (_name##_attr->show)						\
 		ret = _name##_attr->show(_item, page);			\
 	return ret;							\
-}									\
+}
+
+#define CONFIGFS_EATTR_OPS_STORE(_name, _item)				\
 static ssize_t _name##_attr_store(struct config_item *item,		\
 				  struct configfs_attribute *attr,	\
 				  const char *page, size_t count)	\
@@ -130,5 +134,14 @@ static ssize_t _name##_attr_store(struct config_item *item,		\
 		ret = _name##_attr->store(_item, page, count);		\
 	return ret;							\
 }
+
+#define CONFIGFS_EATTR_OPS(_name, _item, _item_member)			\
+CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member);			\
+CONFIGFS_EATTR_OPS_SHOW(_name, _item);					\
+CONFIGFS_EATTR_OPS_STORE(_name, _item);	
+
+#define CONFIGFS_EATTR_OPS_RO(_name, _item, _item_member)		\
+CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member);			\
+CONFIGFS_EATTR_OPS_SHOW(_name, _item);
 
 #endif /* _CONFIGFS_MACROS_H_ */
