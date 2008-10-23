@@ -132,13 +132,11 @@ struct configfs_attribute {
  * attributes, containing a configfs_attribute member and function pointers
  * for the show() and store() operations on that attribute. If they don't
  * need anything else on the extended attribute structure, they can use
- * this macro to define it.  The argument _name isends up as
- * 'struct _name_attribute, as well as names of to CONFIGFS_ATTR_OPS() below.
- * The argument _item is the name of the structure containing the
- * struct config_item or struct config_group structure members
+ * this macro to define it  The argument _item is the name of the
+ * config_item structure.
  */
-#define CONFIGFS_ATTR_STRUCT(_name, _item)				\
-struct _name##_attribute {						\
+#define CONFIGFS_ATTR_STRUCT(_item)					\
+struct _item##_attribute {						\
 	struct configfs_attribute attr;					\
 	ssize_t (*show)(struct _item *, char *);			\
 	ssize_t (*store)(struct _item *, const char *, size_t);		\
@@ -177,44 +175,35 @@ struct _name##_attribute {						\
  * With these extended attributes, the simple show_attribute() and
  * store_attribute() operations need to call the show() and store() of the
  * attributes.  This is a common pattern, so we provide a macro to define
- * them.  The argument _name is the name of the attribute defined by
- * CONFIGFS_ATTR_STRUCT(). The argument _item is the name of the structure
- * containing the struct config_item or struct config_group structure member.
- * The argument _item_member is the actual name of the struct config_* struct
- * in your _item structure.  Meaning  my_structure->some_config_group.
- *		                      ^^_item^^^^^  ^^_item_member^^^
- * This macro expects the attributes to be named "struct <name>_attribute".
+ * them.  The argument _item is the name of the config_item structure.
+ * This macro expects the attributes to be named "struct <name>_attribute"
+ * and the function to_<name>() to exist;
  */
-#define CONFIGFS_ATTR_OPS(_name, _item, _item_member)			\
-static struct _item *to_##_name(struct config_item *ci)			\
-{									\
-	return((ci) ? container_of(to_config_group(ci), struct _item,	\
-		_item_member) : NULL);					\
-}									\
-static ssize_t _name##_attr_show(struct config_item *item,		\
+#define CONFIGFS_ATTR_OPS(_item)					\
+static ssize_t _item##_attr_show(struct config_item *item,		\
 				 struct configfs_attribute *attr,	\
 				 char *page)				\
 {									\
-	struct _item *_item = to_##_name(item);				\
-	struct _name##_attribute *_name##_attr =			\
-		container_of(attr, struct _name##_attribute, attr);	\
+	struct _item *_item = to_##_item(item);				\
+	struct _item##_attribute *_item##_attr =			\
+		container_of(attr, struct _item##_attribute, attr);	\
 	ssize_t ret = 0;						\
 									\
-	if (_name##_attr->show)						\
-		ret = _name##_attr->show(_item, page);			\
+	if (_item##_attr->show)						\
+		ret = _item##_attr->show(_item, page);			\
 	return ret;							\
 }									\
-static ssize_t _name##_attr_store(struct config_item *item,		\
+static ssize_t _item##_attr_store(struct config_item *item,		\
 				  struct configfs_attribute *attr,	\
 				  const char *page, size_t count)	\
 {									\
-	struct _item *_item = to_##_name(item);				\
-	struct _name##_attribute *_name##_attr =			\
-		container_of(attr, struct _name##_attribute, attr);	\
+	struct _item *_item = to_##_item(item);				\
+	struct _item##_attribute *_item##_attr =			\
+		container_of(attr, struct _item##_attribute, attr);	\
 	ssize_t ret = -EINVAL;						\
 									\
-	if (_name##_attr->store)					\
-		ret = _name##_attr->store(_item, page, count);		\
+	if (_item##_attr->store)					\
+		ret = _item##_attr->store(_item, page, count);		\
 	return ret;							\
 }
 
