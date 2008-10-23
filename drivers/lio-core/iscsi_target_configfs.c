@@ -818,6 +818,98 @@ static struct config_item_type lio_target_nacl_attrib_cit = {
 
 // End items for lio_target_nacl_attrib_cit
 
+// Start items for lio_target_nacl_param_cit
+
+#define DEF_NACL_PARAM(name)						\
+static ssize_t lio_target_show_nacl_param_##name (			\
+	struct iscsi_node_acl_s *nacl,					\
+	char *page)							\
+{									\
+	iscsi_session_t *sess;						\
+	ssize_t rb;							\
+									\
+	spin_lock_bh(&nacl->nacl_sess_lock);				\
+	if (!(sess = nacl->nacl_sess)) {				\
+		rb = snprintf(page, PAGE_SIZE,				\
+			"No Active iSCSI Session\n");			\
+	} else {							\
+		rb = snprintf(page, PAGE_SIZE, "%u\n",			\
+			(u32)SESS_OPS(sess)->name);			\
+	}								\
+	spin_unlock_bh(&nacl->nacl_sess_lock);				\
+									\
+	return(rb);							\
+}
+
+CONFIGFS_EATTR_STRUCT(iscsi_nacl_param, iscsi_node_acl_s);
+#define NACL_PARAM_ATTR(_name)						\
+static struct iscsi_nacl_param_attribute iscsi_nacl_param_##_name =	\
+                __CONFIGFS_EATTR_RO(_name,				\
+		lio_target_show_nacl_param_##_name);			\
+
+DEF_NACL_PARAM(MaxConnections);
+NACL_PARAM_ATTR(MaxConnections);
+
+DEF_NACL_PARAM(InitialR2T);
+NACL_PARAM_ATTR(InitialR2T);
+
+DEF_NACL_PARAM(ImmediateData);
+NACL_PARAM_ATTR(ImmediateData);
+
+DEF_NACL_PARAM(MaxBurstLength);
+NACL_PARAM_ATTR(MaxBurstLength);
+
+DEF_NACL_PARAM(FirstBurstLength);
+NACL_PARAM_ATTR(FirstBurstLength);
+
+DEF_NACL_PARAM(DefaultTime2Wait);
+NACL_PARAM_ATTR(DefaultTime2Wait);
+
+DEF_NACL_PARAM(DefaultTime2Retain);
+NACL_PARAM_ATTR(DefaultTime2Retain);
+
+DEF_NACL_PARAM(MaxOutstandingR2T);
+NACL_PARAM_ATTR(MaxOutstandingR2T);
+
+DEF_NACL_PARAM(DataPDUInOrder);
+NACL_PARAM_ATTR(DataPDUInOrder);
+
+DEF_NACL_PARAM(DataSequenceInOrder);
+NACL_PARAM_ATTR(DataSequenceInOrder);
+
+DEF_NACL_PARAM(ErrorRecoveryLevel);
+NACL_PARAM_ATTR(ErrorRecoveryLevel);
+
+CONFIGFS_EATTR_OPS_RO(iscsi_nacl_param, iscsi_node_acl_s, acl_param_group);
+
+static struct configfs_attribute *lio_target_nacl_param_attrs[] = {
+	&iscsi_nacl_param_MaxConnections.attr,
+	&iscsi_nacl_param_InitialR2T.attr,
+	&iscsi_nacl_param_ImmediateData.attr,
+	&iscsi_nacl_param_MaxBurstLength.attr,
+	&iscsi_nacl_param_FirstBurstLength.attr,
+	&iscsi_nacl_param_DefaultTime2Wait.attr,
+	&iscsi_nacl_param_DefaultTime2Retain.attr,
+	&iscsi_nacl_param_MaxOutstandingR2T.attr,
+	&iscsi_nacl_param_DataPDUInOrder.attr,
+	&iscsi_nacl_param_DataSequenceInOrder.attr,
+	&iscsi_nacl_param_ErrorRecoveryLevel.attr,
+	NULL,
+};
+
+static struct configfs_item_operations lio_target_nacl_param_ops = {
+	.show_attribute		= iscsi_nacl_param_attr_show,
+	.store_attribute	= NULL,
+};
+
+static struct config_item_type lio_target_nacl_param_cit = {
+	.ct_item_ops	= &lio_target_nacl_param_ops,
+	.ct_attrs	= lio_target_nacl_param_attrs,
+	.ct_owner	= THIS_MODULE,
+};
+
+// End items for lio_target_nacl_param_cit
+
 // Start items for lio_target_initiator_cit
 
 static int lio_target_initiator_lacl_link (struct config_item *lun_acl_ci, struct config_item *lun_ci)
@@ -1391,14 +1483,16 @@ static struct config_group *lio_target_call_addnodetotpg (
 	/*
 	 * Create the default groups for iscsi_node_acl_t
 	 */
-	if (!(nacl_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+	if (!(nacl_cg->default_groups = kzalloc(sizeof(struct config_group) * 3,
 			GFP_KERNEL)))
 		goto node_out;
 
 	config_group_init_type_name(&acl->acl_group, name, &lio_target_initiator_cit);
+	config_group_init_type_name(&acl->acl_param_group, "param", &lio_target_nacl_param_cit);
 	config_group_init_type_name(&nattr->acl_attrib_group, "attrib", &lio_target_nacl_attrib_cit);
-	nacl_cg->default_groups[0] = &nattr->acl_attrib_group;
-	nacl_cg->default_groups[1] = NULL;
+	nacl_cg->default_groups[0] = &acl->acl_param_group;
+	nacl_cg->default_groups[1] = &nattr->acl_attrib_group;
+	nacl_cg->default_groups[2] = NULL;
 
 	printk("LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu Initiator: %s CmdSN Depth: %u\n",
 		config_item_name(tiqn_ci), tpgt, name, acl->queue_depth);

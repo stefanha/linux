@@ -1209,6 +1209,7 @@ typedef struct iscsi_node_acl_s {
 	iscsi_node_attrib_t	node_attrib;
 	iscsi_session_t		*nacl_sess;
 	struct config_group	acl_group;
+	struct config_group	acl_param_group;
 	struct iscsi_portal_group_s *tpg;
 	struct iscsi_node_acl_s	*next;
 	struct iscsi_node_acl_s	*prev;
