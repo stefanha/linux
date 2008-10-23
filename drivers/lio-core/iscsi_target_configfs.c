@@ -1600,7 +1600,7 @@ out:									\
  * Define the iSCSI TPG attributes using hybrid wrappers from include/linux/configfs.h
  */
 CONFIGFS_EATTR_STRUCT(iscsi_tpg_attrib, iscsi_tpg_attrib_s);
-#define TPG_ATTR(_name, _mode, _show, _store)				\
+#define TPG_ATTR(_name, _mode)						\
 static struct iscsi_tpg_attrib_attribute iscsi_tpg_attrib_##_name =	\
 	__CONFIGFS_EATTR(_name, _mode,					\
 		lio_target_show_tpg_attrib_##_name,			\
