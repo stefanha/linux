@@ -55,6 +55,7 @@
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>
 #include <iscsi_target_configfs.h>
+#include <configfs_macros.h>
 
 static struct target_fabric_configfs *lio_target_fabric_configfs = NULL;
 
@@ -725,10 +726,10 @@ static ssize_t lio_target_store_nacl_attrib_##name (			\
 /*
  * Define the iSCSI Node attributes using hybrid wrappers from include/linux/configfs.h
  */
-CONFIGFS_ATTR_STRUCT(iscsi_node_attrib, iscsi_node_attrib_s);
+CONFIGFS_EATTR_STRUCT(iscsi_node_attrib, iscsi_node_attrib_s);
 #define NACL_ATTR(_name, _mode, _show, _store)				\
 static struct iscsi_node_attrib_attribute iscsi_node_attrib_##_name =	\
-		__CONFIGFS_ATTR(_name, _mode, _show, _store)
+		__CONFIGFS_EATTR(_name, _mode, _show, _store)
 /*
  * Define iscsi_node_attrib_s_dataout_timeout
  */
@@ -790,7 +791,7 @@ NACL_ATTR(random_r2t_offsets, S_IRUGO | S_IWUSR,
  * Finally, define functions iscsi_node_attrib_s_attr_show() and
  * iscsi_node_attrib_s_attr_store() for lio_target_nacl_attrib_ops below..
  */
-CONFIGFS_ATTR_OPS(iscsi_node_attrib, iscsi_node_attrib_s, acl_attrib_group);
+CONFIGFS_EATTR_OPS(iscsi_node_attrib, iscsi_node_attrib_s, acl_attrib_group);
 
 static struct configfs_attribute *lio_target_nacl_attrib_attrs[] = {
 	&iscsi_node_attrib_dataout_timeout.attr,
@@ -1516,10 +1517,10 @@ out:									\
 /*
  * Define the iSCSI TPG attributes using hybrid wrappers from include/linux/configfs.h
  */
-CONFIGFS_ATTR_STRUCT(iscsi_tpg_attrib, iscsi_tpg_attrib_s);
+CONFIGFS_EATTR_STRUCT(iscsi_tpg_attrib, iscsi_tpg_attrib_s);
 #define TPG_ATTR(_name, _mode, _show, _store)				\
 static struct iscsi_tpg_attrib_attribute iscsi_tpg_attrib_##_name =	\
-	__CONFIGFS_ATTR(_name, _mode, _show, _store)
+	__CONFIGFS_EATTR(_name, _mode, _show, _store)
 
 /*
  * Define iscsi_tpg_attrib_s_authentication
@@ -1575,7 +1576,7 @@ TPG_ATTR(demo_mode_lun_access, S_IRUGO | S_IWUSR,
  * Finally, define functions iscsi_tpg_attrib_s_attr_show() and
  * iscsi_tpg_attrib_s_attr_store() for lio_target_tpg_attrib_ops below..
  */
-CONFIGFS_ATTR_OPS(iscsi_tpg_attrib, iscsi_tpg_attrib_s, tpg_attrib_group);
+CONFIGFS_EATTR_OPS(iscsi_tpg_attrib, iscsi_tpg_attrib_s, tpg_attrib_group);
 
 static struct configfs_attribute *lio_target_tpg_attrib_attrs[] = {
 	&iscsi_tpg_attrib_authentication.attr,
