@@ -47,6 +47,7 @@
 
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_error.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_ioctl.h>
@@ -63,8 +64,6 @@
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
 
-#include <iscsi_target_info.h>
-
 #undef ISCSI_TARGET_IOCTL_C
 
 extern iscsi_global_t *iscsi_global;
@@ -77,6 +76,7 @@ extern int se_free_virtual_device (struct se_device_s *, struct se_hba_s *);
 extern int linux_blockdevice_check (int, int);
 extern int se_dev_set_attrib (struct se_device_s *, u32, u32, int);
 
+#if 0
 static int get_out_count (int cmd, struct iscsi_target *t)
 {
 	switch (cmd) {
@@ -232,6 +232,7 @@ static int check_info_out (int cmd, struct iscsi_target *t)
 
 	return(ret);
 }
+#endif
 
 /*      iscsi_open():
  *
@@ -283,10 +284,7 @@ extern int iscsi_ioctl (
 {
 	int ret = 0;
 	u32 lun_access = 0;
-	se_device_t *dev = NULL;
-	se_dev_transport_info_t devt_info;
 	iscsi_portal_group_t *tpg = NULL;
-	iscsi_session_t	*sess = NULL;
 	iscsi_tiqn_t *tiqn = NULL;
 	struct iscsi_target *t;
 	
@@ -344,6 +342,7 @@ extern int iscsi_ioctl (
 	case ISCSI_TARGET_LISTGNINFO:
 	case ISCSI_TARGET_LISTGNPINFO:
 	case ISCSI_TARGET_LISTDEVATTRIB:
+#if 0
 	  switch (t->out_state) {
 	  case INFO_GET_OUT_COUNT:
 	    if ((ret = get_out_count(cmd, t)) < 0) {
@@ -367,12 +366,20 @@ extern int iscsi_ioctl (
 	    goto dumpout;
 	  }
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_LISTTPGPARAMS:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0)))
 		  goto dumpout;
 	  iscsi_tpg_dump_params(tpg);
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
+#if 0
 	case ISCSI_TARGET_LISTSESSPARAMS:
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0)))
 		  goto dumpout;
@@ -384,6 +391,9 @@ extern int iscsi_ioctl (
 	  iscsi_dec_session_usage_count(sess);
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_SETTARGETNAME:
 	  if (iscsi_global->targetname_set) {
 		  TRACE_ERROR("iSCSI Target Name already set\n");
@@ -398,6 +408,7 @@ extern int iscsi_ioctl (
 	  }
 	  break;
 	case ISCSI_TARGET_SETTPGPARAM:
+#if 0
 	  if (!(tpg = core_get_tpg_from_iqn(t->targetname, &tiqn, t->tpgt, 0))) {
 		  ret = ERR_TPG_NOT_ACTIVE;
 		  goto dumpout;
@@ -409,6 +420,9 @@ extern int iscsi_ioctl (
 	  }
 	  iscsi_put_tpg(tpg);
 	  break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_SETSESSPARAM:
 	  //#warning FIXME: ISCSI_TARGET_SETSESSPARAM is incomplete
 	  break;
@@ -867,11 +881,19 @@ extern int iscsi_ioctl (
 		
 		break;
 	case ISCSI_TARGET_ADDTIQN:
+#if 0
 		tiqn = core_add_tiqn(t->targetname, &ret);
 		break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_DELTIQN:
+#if 0
 		ret = core_del_tiqn(t->targetname);
 		break;
+#else
+	goto dumpout;
+#endif
 	case ISCSI_TARGET_ADDNPTOCORE:
 #if 0
 		if (t->net_params_set & PARAM_NET_SCTP_TCP)
@@ -904,6 +926,7 @@ extern int iscsi_ioctl (
 	goto dumpout;
 #endif
 	case ISCSI_TARGET_SETDEVATTRIB:
+#if 0
 		memset(&devt_info, 0, sizeof(se_dev_transport_info_t));
 		devt_info.hba_id = t->hba_id;
 
@@ -916,6 +939,9 @@ extern int iscsi_ioctl (
 		}
 		core_put_hba(dev->iscsi_hba);
 		break;
+#else
+	goto dumpout;
+#endif
 	default:
 	  	TRACE_ERROR("Unknown IOCTL cmd: 0x%08x\n", cmd);
 		goto dumpout;
