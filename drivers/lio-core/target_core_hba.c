@@ -46,6 +46,7 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_error.h>
@@ -62,41 +63,6 @@
 #undef TARGET_CORE_HBA_C
 
 extern se_global_t *se_global;
-
-/*	iscsi_hba_check_online():
- *
- *
- */
-extern int iscsi_hba_check_online (
-	se_dev_transport_info_t *dti)
-{
-	int found_hba = 0, ret = 0;
-	se_hba_t *hba;
-	se_hbainfo_t hi;
-	se_subsystem_api_t *t;
-
-	if (dti->hba_id < (ISCSI_MAX_GLOBAL_HBAS-1)) {
-		TRACE_ERROR("Passed HBA ID: %d exceeds ISCSI_MAX_GLOBAL_HBAS-1: %d\n", 
-			dti->hba_id, ISCSI_MAX_GLOBAL_HBAS-1);
-		return(-1);
-	}
-	
-	hba = &se_global->hba_list[dti->hba_id];
-		
-	if (hba->hba_status != HBA_STATUS_ACTIVE)
-		goto out;
-
-	memset(&hi, 0, sizeof(se_hbainfo_t));
-	
-	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
-		return(ret);
-
-	if (t->check_ghost_id(&hi))
-		found_hba = 1;
-
-out:
-	return(found_hba);
-}
 
 extern se_hba_t *iscsi_get_hba_from_ptr (void *p)
 {
