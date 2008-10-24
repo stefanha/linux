@@ -51,6 +51,7 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
@@ -273,6 +274,7 @@ extern int pscsi_detach_hba (se_hba_t *hba)
  */
 extern se_device_t *pscsi_add_device_to_list (
 	se_hba_t *hba,
+	se_subsystem_dev_t *se_dev,
 	pscsi_dev_virt_t *pdv,
 	struct scsi_device *sd,
 	int dev_flags)
@@ -330,8 +332,8 @@ extern se_device_t *pscsi_add_device_to_list (
 	 */
 	pdv->pdv_sd = sd;
 
-	if (!(dev = transport_add_device_to_iscsi_hba(hba, &pscsi_template,
-				dev_flags, (void *)pdv))) {
+	if (!(dev = transport_add_device_to_core_hba(hba, &pscsi_template,
+				se_dev, dev_flags, (void *)pdv))) {
 		pdv->pdv_sd = NULL;
 		return(NULL);
 	}
@@ -407,7 +409,11 @@ extern void *pscsi_allocate_virtdevice (se_hba_t *hba, const char *name)
 /*
  * Called with struct Scsi_Host->host_lock called.
  */
-extern se_device_t *pscsi_create_type_disk (struct scsi_device *sd, pscsi_dev_virt_t *pdv, se_hba_t *hba)
+extern se_device_t *pscsi_create_type_disk (
+	struct scsi_device *sd,
+	pscsi_dev_virt_t *pdv,
+	se_subsystem_dev_t *se_dev,
+	se_hba_t *hba)
 {
 	se_device_t *dev;
 	struct Scsi_Host *sh = sd->host;
@@ -431,7 +437,7 @@ extern se_device_t *pscsi_create_type_disk (struct scsi_device *sd, pscsi_dev_vi
 		dev_flags |= DF_CLAIMED_BLOCKDEV;
 		dev_flags |= DF_PERSISTENT_CLAIMED_BLOCKDEV;
 	}	
-	if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags))) {
+	if (!(dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags))) {
 		scsi_device_put(sd);
 		return(NULL);
 	}
@@ -444,7 +450,11 @@ extern se_device_t *pscsi_create_type_disk (struct scsi_device *sd, pscsi_dev_vi
 /*
  * Called with struct Scsi_Host->host_lock called.
  */
-extern se_device_t *pscsi_create_type_rom (struct scsi_device *sd, pscsi_dev_virt_t *pdv, se_hba_t *hba)
+extern se_device_t *pscsi_create_type_rom (
+	struct scsi_device *sd,
+	pscsi_dev_virt_t *pdv,
+	se_subsystem_dev_t *se_dev,
+	se_hba_t *hba)
 {
 	se_device_t *dev;
 	struct Scsi_Host *sh = sd->host;
@@ -458,7 +468,7 @@ extern se_device_t *pscsi_create_type_rom (struct scsi_device *sd, pscsi_dev_vir
 	}
 	spin_unlock_irq(sh->host_lock);
 
-	if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags))) {
+	if (!(dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags))) {
 		scsi_device_put(sd);
 		return(NULL);
 	}
@@ -472,14 +482,18 @@ extern se_device_t *pscsi_create_type_rom (struct scsi_device *sd, pscsi_dev_vir
 /*
  *Called with struct Scsi_Host->host_lock called.
  */
-extern se_device_t *pscsi_create_type_other (struct scsi_device *sd, pscsi_dev_virt_t *pdv, se_hba_t *hba)
+extern se_device_t *pscsi_create_type_other (
+	struct scsi_device *sd,
+	pscsi_dev_virt_t *pdv,
+	se_subsystem_dev_t *se_dev,
+	se_hba_t *hba)
 {
 	se_device_t *dev;
 	struct Scsi_Host *sh = sd->host;
 	u32 dev_flags = 0;
 
 	spin_unlock_irq(sh->host_lock);
-	if (!(dev = pscsi_add_device_to_list(hba, pdv, sd, dev_flags)))
+	if (!(dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags)))
 		return(NULL);
 	
 	PYXPRINT("CORE_PSCSI[%d] - Added Type: %s for %d:%d:%d\n",
@@ -489,7 +503,10 @@ extern se_device_t *pscsi_create_type_other (struct scsi_device *sd, pscsi_dev_v
 	return(dev);
 }
 
-extern se_device_t *pscsi_create_virtdevice (se_hba_t *hba, void *p)
+extern se_device_t *pscsi_create_virtdevice (
+	se_hba_t *hba,
+	se_subsystem_dev_t *se_dev,
+	void *p)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *)p;
 	struct scsi_device *sd;
@@ -511,11 +528,11 @@ extern se_device_t *pscsi_create_virtdevice (se_hba_t *hba, void *p)
 		 */
 		switch (sd->type) {
 		case TYPE_DISK:
-			return(pscsi_create_type_disk(sd, pdv, hba));
+			return(pscsi_create_type_disk(sd, pdv, se_dev, hba));
 		case TYPE_ROM:
-			return(pscsi_create_type_rom(sd, pdv, hba));
+			return(pscsi_create_type_rom(sd, pdv, se_dev, hba));
 		default:
-			return(pscsi_create_type_other(sd, pdv, hba));
+			return(pscsi_create_type_other(sd, pdv, se_dev, hba));
 		}
 	}
 	spin_unlock_irq(sh->host_lock);
@@ -558,23 +575,6 @@ extern void pscsi_deactivate_device (se_device_t *dev)
 		sd->queue_depth, sd->channel, sd->id, sd->lun);
 	
 	return;
-}
-
-/*	pscsi_check_device_location(): (Part of se_subsystem_api_t template)
- *
- *
- */
-extern int pscsi_check_device_location (se_device_t *dev, se_dev_transport_info_t *dti)
-{
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
-
-	if ((dti->scsi_channel_id == sd->channel) &&
-	    (dti->scsi_lun_id == sd->lun) &&
-	    (dti->scsi_target_id == sd->id))
-		return(0);
-
-	return(-1);	
 }
 
 /*	pscsi_check_ghost_id(): (Part of se_subsystem_api_t template)
@@ -1048,10 +1048,10 @@ extern se_device_t *pscsi_create_virtdevice_from_fd (
 		spin_lock_irq(sh->host_lock);
 		switch (sd->type) {
 		case TYPE_DISK:
-			dev = pscsi_create_type_disk(sd, pdv, se_dev->se_dev_hba);
+			dev = pscsi_create_type_disk(sd, pdv, se_dev, se_dev->se_dev_hba);
 			break;
 		case TYPE_ROM:
-			dev = pscsi_create_type_rom(sd, pdv, se_dev->se_dev_hba);
+			dev = pscsi_create_type_rom(sd, pdv, se_dev, se_dev->se_dev_hba);
 			break;
 		default:
 			printk(KERN_ERR "PSCSI: Unable to handle type S_ISBLK() =="
@@ -1079,36 +1079,6 @@ extern se_device_t *pscsi_create_virtdevice_from_fd (
 	iput(inode);
 	fput(filp);
 	return(dev);
-}
-
-extern int pscsi_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
-{
-	if (!(t->hba_params_set & PARAM_HBA_SCSI_CHANNEL_ID)) {
-		TRACE_ERROR("scsi_channel_id must be set for"
-			" addluntodev requests with Parallel"
-			" SCSI Devices.\n");
-		return(-1);
-	}
-
-	if (!(t->hba_params_set & PARAM_HBA_SCSI_TARGET_ID)) {
-		TRACE_ERROR("scsi_target_id must be set for"
-			" addluntodev requests with Parallel"
-			" SCSI Devices.\n");
-		return(-1);
-	}
-
-	if (!(t->hba_params_set & PARAM_HBA_SCSI_LUN_ID)) {
-		TRACE_ERROR("scsi_lun_id must be set for"
-			" addluntodev requests with Parallel"
-			" SCSI Devices.\n");
-		return(-1);
-	}
-
-	dti->scsi_channel_id = t->scsi_channel_id;
-	dti->scsi_lun_id = t->scsi_lun_id;
-	dti->scsi_target_id = t->scsi_target_id;
-
-	return(0);
 }
 
 extern void pscsi_get_plugin_info (void *p, char *b, int *bl)
