@@ -48,6 +48,7 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_ioctl.h> 
 #include <iscsi_target_ioctl_defs.h>
@@ -266,26 +267,6 @@ extern void se_release_device_for_hba (se_device_t *dev)
 	return;
 }
 
-/*	core_get_device_from_transport():
- *
- *
- */
-extern se_device_t *core_get_device_from_transport (se_hba_t *hba, se_dev_transport_info_t *dti)
-{
-	se_device_t *dev;
-	
-	spin_lock(&hba->device_lock);
-	for (dev = hba->device_head; dev; dev = dev->next) {
-		spin_unlock(&hba->device_lock);
-		if (!transport_generic_check_device_location(dev, dti))
-			return(dev);
-		spin_lock(&hba->device_lock);
-	}
-	spin_unlock(&hba->device_lock);
-		
-	return(NULL);
-}
-
 /*
  * Called with se_hba_t->device_lock held.
  */
@@ -337,46 +318,6 @@ extern int se_free_virtual_device (se_device_t *dev, se_hba_t *hba)
 
 EXPORT_SYMBOL(se_free_virtual_device);
 
-extern se_hba_t *core_get_hba_from_hbaid (
-	struct iscsi_target *tg,
-	se_dev_transport_info_t *dti,
-	int add)
-{
-	int ret = 0;
-	se_hba_t *hba;
-	se_subsystem_api_t *t;
-	
-	if (!(tg->params_set & PARAM_HBA_ID)) {
-		TRACE_ERROR("PARAM_HBA_ID not passed!\n");
-		return(NULL);
-	}
-	
-	if (dti->hba_id > (ISCSI_MAX_GLOBAL_HBAS-1)) {
-		 TRACE_ERROR("Passed HBA ID: %d exceeds ISCSI_MAX_GLOBAL_HBAS-1: %d\n",
-			dti->hba_id, ISCSI_MAX_GLOBAL_HBAS-1);
-		 return(NULL);
-	}
-	hba = &se_global->hba_list[dti->hba_id];
-
-	if (!(hba->hba_status & HBA_STATUS_ACTIVE)) {
-		TRACE_ERROR("iSCSI HBA ID: %d Status: [HBA,TPG_HBA]_NOT_ACTIVE,"
-			" ignoring request\n", dti->hba_id);
-		return(NULL);
-	}
-	
-	if (!add)
-		return(hba);
-	
-        t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0))
-                return(NULL);
-
-	if ((ret = t->check_dev_params(hba, tg, dti)) < 0)
-		return(NULL);
-	
-	return(hba);
-}
-
 extern void se_dev_start (se_device_t *dev)
 {
 	se_hba_t *hba = dev->iscsi_hba;
@@ -422,39 +363,41 @@ extern void se_dev_stop (se_device_t *dev)
 
 extern void se_dev_set_default_attribs (se_device_t *dev)
 {
-	DEV_ATTRIB(dev)->da_status_thread = DA_STATUS_THREAD;
-	DEV_ATTRIB(dev)->da_status_thread_tur = DA_STATUS_THREAD_TUR;
+	DEV_ATTRIB(dev)->status_thread = DA_STATUS_THREAD;
+	DEV_ATTRIB(dev)->status_thread_tur = DA_STATUS_THREAD_TUR;
 	/*
 	 * max_sectors is based on subsystem plugin dependent requirements.
 	 */
-	DEV_ATTRIB(dev)->da_max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
+	DEV_ATTRIB(dev)->hw_max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
+	DEV_ATTRIB(dev)->max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
 	/*
 	 * queue_depth is based on subsystem plugin dependent requirements.
 	 */
-	DEV_ATTRIB(dev)->da_queue_depth = TRANSPORT(dev)->get_queue_depth(dev);
+	DEV_ATTRIB(dev)->hw_queue_depth = TRANSPORT(dev)->get_queue_depth(dev);
+	DEV_ATTRIB(dev)->queue_depth = TRANSPORT(dev)->get_queue_depth(dev);
 	/*
 	 * task_timeout is based on device type.
 	 */
-	DEV_ATTRIB(dev)->da_task_timeout = transport_get_default_task_timeout(dev);
+	DEV_ATTRIB(dev)->task_timeout = transport_get_default_task_timeout(dev);
 
 	return;
 }
 
-static int se_dev_set_task_timeout (se_device_t *dev, u32 task_timeout)
+extern int se_dev_set_task_timeout (se_device_t *dev, u32 task_timeout)
 {
 	if (task_timeout > DA_TASK_TIMEOUT_MAX) {
 		TRACE_ERROR("dev[%p]: Passed task_timeout: %u larger then"
 			" DA_TASK_TIMEOUT_MAX\n", dev, task_timeout);
 		return(-1);
 	} else {
-		DEV_ATTRIB(dev)->da_task_timeout = task_timeout;
+		DEV_ATTRIB(dev)->task_timeout = task_timeout;
 		PYXPRINT("dev[%p]: Set SE Device task_timeout: %u\n", dev, task_timeout);
 	}
 
 	return(0);
 }
 
-static int se_dev_set_status_thread (se_device_t *dev, int flag)
+extern int se_dev_set_status_thread (se_device_t *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 	 	TRACE_ERROR("Illegal value %d\n", flag);
@@ -462,7 +405,7 @@ static int se_dev_set_status_thread (se_device_t *dev, int flag)
 	}
 
 	if (!flag) {
-		if (DEV_ATTRIB(dev)->da_status_thread) {
+		if (DEV_ATTRIB(dev)->status_thread) {
 			if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
 				TRACE_ERROR("dev[%p]: Unable to stop SE Device Status"
 					" Thread while dev_export_obj: %d count exists\n",
@@ -473,17 +416,17 @@ static int se_dev_set_status_thread (se_device_t *dev, int flag)
 	        	        DEV_OBJ_API(dev)->stop_status_thread((void *)dev);
 		}
 	} else {
-		if (!(DEV_ATTRIB(dev)->da_status_thread))
+		if (!(DEV_ATTRIB(dev)->status_thread))
 			DEV_OBJ_API(dev)->start_status_thread((void *)dev, 1);
 	}
 
-	DEV_ATTRIB(dev)->da_status_thread = flag;
+	DEV_ATTRIB(dev)->status_thread = flag;
 	PYXPRINT("dev[%p]: SE Device Status Thread: %s\n", dev, (flag) ?
 			"Enabled" : "Disabled");
 	return(0);
 }
 
-static int se_dev_set_status_thread_tur (se_device_t *dev, int flag)
+extern int se_dev_set_status_thread_tur (se_device_t *dev, int flag)
 {
 	int start = 0;
 
@@ -492,10 +435,10 @@ static int se_dev_set_status_thread_tur (se_device_t *dev, int flag)
 		return(-1);
 	}
 
-	if (flag && !(DEV_ATTRIB(dev)->da_status_thread_tur))
+	if (flag && !(DEV_ATTRIB(dev)->status_thread_tur))
 		start = 1;
 
-	DEV_ATTRIB(dev)->da_status_thread_tur = flag;
+	DEV_ATTRIB(dev)->status_thread_tur = flag;
 	if (start)
 		transport_start_status_timer(dev);
 	PYXPRINT("dev[%p]: SE Device Status Thread TUR: %s\n", dev, (flag) ?
@@ -506,7 +449,7 @@ static int se_dev_set_status_thread_tur (se_device_t *dev, int flag)
 /*
  * Note, this can only be called on unexported SE Device Object.
  */
-static int se_dev_set_queue_depth (se_device_t *dev, u32 queue_depth)
+extern int se_dev_set_queue_depth (se_device_t *dev, u32 queue_depth)
 {
 	u32 orig_queue_depth = dev->queue_depth;
 
@@ -527,7 +470,7 @@ static int se_dev_set_queue_depth (se_device_t *dev, u32 queue_depth)
 		return(-1);
 	}
 		
-	DEV_ATTRIB(dev)->da_queue_depth = dev->queue_depth = queue_depth;
+	DEV_ATTRIB(dev)->queue_depth = dev->queue_depth = queue_depth;
 	if (queue_depth > orig_queue_depth)
 		atomic_add(queue_depth - orig_queue_depth, &dev->depth_left);	
 	else if (queue_depth < orig_queue_depth)
@@ -537,8 +480,11 @@ static int se_dev_set_queue_depth (se_device_t *dev, u32 queue_depth)
 	return(0);
 }
 
-static int se_dev_set_max_sectors (se_device_t *dev, u32 max_sectors, int force)
+#warning FIXME: Forcing max_sectors greater than get_max_sectors() disabled
+extern int se_dev_set_max_sectors (se_device_t *dev, u32 max_sectors)
 {
+	int force = 0; /* Force setting for VDEVS */
+
 	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
 		TRACE_ERROR("dev[%p]: Unable to change SE Device max_sectors"
 			" while dev_export_obj: %d count exists\n", dev,
@@ -577,36 +523,8 @@ static int se_dev_set_max_sectors (se_device_t *dev, u32 max_sectors, int force)
 		}
 	}
 
-	DEV_ATTRIB(dev)->da_max_sectors = max_sectors;
+	DEV_ATTRIB(dev)->max_sectors = max_sectors;
 	PYXPRINT("dev[%p]: SE Device max_sectors changed to %u\n",
 			dev, max_sectors);
 	return(0);
 }
-
-extern int se_dev_set_attrib (
-	se_device_t *dev,
-	u32 da_attrib,
-	u32 da_attrib_value,
-	int force)
-{
-	switch (da_attrib) {
-	case DA_SET_TASK_TIMEOUT:
-		return(se_dev_set_task_timeout(dev, da_attrib_value));
-	case DA_SET_STATUS_THREAD:
-		return(se_dev_set_status_thread(dev, da_attrib_value));
-	case DA_SET_STATUS_THREAD_TUR:
-		return(se_dev_set_status_thread_tur(dev, da_attrib_value));
-	case DA_SET_QUEUE_DEPTH:
-		return(se_dev_set_queue_depth(dev, da_attrib_value));
-	case DA_SET_MAX_SECTORS:
-		return(se_dev_set_max_sectors(dev, da_attrib_value, force));
-	default:
-		TRACE_ERROR("Unknown SE Device Attribute: %u, ignoring"
-			" request\n", da_attrib);
-		return(-1);
-	}
-
-	return(0);
-}
-
-EXPORT_SYMBOL(se_dev_set_attrib);

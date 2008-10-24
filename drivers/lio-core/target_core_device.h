@@ -35,17 +35,15 @@ extern int linux_blockdevice_check (int, int);
 extern int iscsi_check_devices_access (se_hba_t *);
 extern void iscsi_disable_devices_for_hba (se_hba_t *);
 extern void se_release_device_for_hba (se_device_t *);
-extern se_device_t *core_get_device_from_transport (se_hba_t *, se_dev_transport_info_t *);
-extern int se_claim_physical_device (se_hba_t *, se_devinfo_t *, struct iscsi_target *);
-extern int se_release_physical_device (struct iscsi_target *, se_devinfo_t *, se_hba_t *);
 extern void se_clear_dev_ports (se_device_t *);
 extern int se_free_virtual_device (se_device_t *, se_hba_t *);
 extern void se_dev_start (se_device_t *);
 extern void se_dev_stop (se_device_t *);
-extern se_hba_t *core_get_hba_from_hbaid (struct iscsi_target *tg,
-					      se_dev_transport_info_t *dti,
-					      int add);
 extern void se_dev_set_default_attribs (se_device_t *);
-extern int se_dev_set_attrib (se_device_t *, u32, u32, int);
+extern int se_dev_set_task_timeout (se_device_t *, u32);
+extern int se_dev_set_status_thread (se_device_t *, int);
+extern int se_dev_set_status_thread_tur (se_device_t *, int);
+extern int se_dev_set_queue_depth (se_device_t *, u32);
+extern int se_dev_set_max_sectors (se_device_t *, u32);
 
 #endif /* TARGET_CORE_DEVICE_H */
