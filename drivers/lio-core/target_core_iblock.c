@@ -47,6 +47,7 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <target_core_device.h>
@@ -189,7 +190,10 @@ extern void *iblock_allocate_virtdevice (se_hba_t *hba, const char *name)
 	return(ib_dev);
 }
 
-extern se_device_t *iblock_create_virtdevice (se_hba_t *hba, void *p)
+extern se_device_t *iblock_create_virtdevice (
+	se_hba_t *hba,
+	se_subsystem_dev_t *se_dev,
+	void *p)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) p;
 	se_device_t *dev;
@@ -251,8 +255,8 @@ extern se_device_t *iblock_create_virtdevice (se_hba_t *hba, void *p)
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim() above..
 	 */
-	if (!(dev = transport_add_device_to_iscsi_hba(hba,
-			&iblock_template, dev_flags, (void *)ib_dev)))
+	if (!(dev = transport_add_device_to_core_hba(hba,
+			&iblock_template, se_dev, dev_flags, (void *)ib_dev)))
 		goto failed;
 
 	ib_dev->ibd_depth = dev->queue_depth;
@@ -296,17 +300,6 @@ extern void iblock_deactivate_device (se_device_t *dev)
 			ib_dev->ibd_major, ib_dev->ibd_minor);
 
 	return;
-}
-
-extern int iblock_check_device_location (se_device_t *dev, se_dev_transport_info_t *dti)
-{
-	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
-
-	if ((dti->iblock_major == ib_dev->ibd_major) &&
-	    (dti->iblock_minor == ib_dev->ibd_minor))
-		return(0);
-
-	return(-1);
 }
 
 extern int iblock_check_ghost_id (se_hbainfo_t *hi)
@@ -695,38 +688,11 @@ extern se_device_t *iblock_create_virtdevice_from_fd (
 	 * iblock_create_virtdevice() will call linux_blockdevice_claim_bd()
 	 * to claim struct block_device.
 	 */
-	dev = iblock_create_virtdevice(se_dev->se_dev_hba, (void *)ibd);
+	dev = iblock_create_virtdevice(se_dev->se_dev_hba, se_dev, (void *)ibd);
 
 	iput(inode);
 	fput(filp);
 	return(dev);
-}
-
-extern int iblock_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
-{
-	if (!(t->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) ||
-	    !(t->hba_params_set & PARAM_HBA_IBLOCK_MINOR)) {
-		TRACE_ERROR("Missing iblock_check_dev_params() parameters\n");
-		return(ERR_VIRTDEV_MISSING_PARAMS);
-	}
-	dti->iblock_major = t->iblock_major;
-	dti->iblock_minor = t->iblock_minor;
-
-	return(0);
-}
-
-extern int iblock_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
-{
-	if (!(t->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) ||
-	    !(t->hba_params_set & PARAM_HBA_IBLOCK_MINOR)) {
-		TRACE_ERROR("Missing iblock_check_virtdev_params() parameters\n");
-		return(ERR_VIRTDEV_MISSING_PARAMS);
-	}
-
-	di->iblock_major = t->iblock_major;
-	di->iblock_minor = t->iblock_minor;
-	
-	return(0);
 }
 
 extern void iblock_get_plugin_info (void *p, char *b, int *bl)

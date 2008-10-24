@@ -50,10 +50,9 @@ extern int iblock_detach_hba (se_hba_t *);
 extern int iblock_claim_phydevice (se_hba_t *, se_device_t *);
 extern int iblock_release_phydevice (se_device_t *);
 extern void *iblock_allocate_virtdevice (se_hba_t *, const char *);
-extern se_device_t *iblock_create_virtdevice (se_hba_t *, void *);
+extern se_device_t *iblock_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
 extern int iblock_activate_device (se_device_t *);
 extern void iblock_deactivate_device (se_device_t *);
-extern int iblock_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int iblock_check_ghost_id (se_hbainfo_t *);
 extern void iblock_free_device (void *);
 extern int iblock_transport_complete (se_task_t *);
@@ -67,8 +66,6 @@ extern ssize_t iblock_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *,
 extern ssize_t iblock_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t iblock_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
 extern se_device_t *iblock_create_virtdevice_from_fd (se_subsystem_dev_t *, const char *);
-extern int iblock_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
-extern int iblock_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *);
 extern void iblock_get_plugin_info (void *, char *, int *);
 extern void iblock_get_hba_info (se_hba_t *, char *, int *);
 extern void iblock_get_dev_info (se_device_t *, char *, int *);
@@ -149,7 +146,6 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	create_virtdevice:	iblock_create_virtdevice,	\
 	activate_device:	iblock_activate_device,		\
 	deactivate_device:	iblock_deactivate_device,	\
-	check_device_location:	iblock_check_device_location,	\
 	check_ghost_id:		iblock_check_ghost_id,		\
 	free_device:		iblock_free_device,		\
 	release_phydevice:	iblock_release_phydevice,	\
@@ -162,8 +158,6 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	set_configfs_dev_params: iblock_set_configfs_dev_params, \
 	show_configfs_dev_params: iblock_show_configfs_dev_params, \
 	create_virtdevice_from_fd: iblock_create_virtdevice_from_fd, \
-	check_virtdev_params:	iblock_check_virtdev_params,	\
-	check_dev_params:	iblock_check_dev_params,	\
 	get_plugin_info:	iblock_get_plugin_info,		\
 	get_hba_info:		iblock_get_hba_info,		\
 	get_dev_info:		iblock_get_dev_info,		\
