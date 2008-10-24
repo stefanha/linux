@@ -52,6 +52,7 @@
 #include <iscsi_protocol.h>
 #include <iscsi_lists.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
@@ -494,209 +495,6 @@ extern void transport_load_plugins (void)
 #endif
 	return;
 }
-
-static se_device_t *transport_scan_hbas_for_evpd_sn (
-	unsigned char *buf,
-	u32 len)
-{
-	u32 i;
-	se_device_t *dev = NULL;
-	se_hba_t *hba;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (hba->hba_status != HBA_STATUS_ACTIVE)
-			continue;
-
-		spin_lock(&hba->device_lock);
-		for (dev = hba->device_head; dev; dev = dev->next) {
-			if (DEV_OBJ_API(dev)->check_online((void *)dev) != 0) {
-				DEBUG_SO("obj_api->check_online() failed!\n");
-				continue;
-			}
-			DEBUG_SO("t10_wwn->unit_serial: %s\n",
-				dev->t10_wwn.unit_serial);
-			DEBUG_SO("buf: %s\n", buf);
-
-			if (!(strcmp(dev->t10_wwn.unit_serial, buf))) {
-				spin_unlock(&hba->device_lock);
-				spin_unlock(&se_global->hba_lock);
-				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
-			}
-		}
-		spin_unlock(&hba->device_lock);
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	return(NULL);
-}
-
-static se_device_t *transport_scan_hbas_for_evpd_di (
-	unsigned char *buf,
-	u32 len)
-{
-	u32 i;
-	se_device_t *dev = NULL;
-	se_hba_t *hba;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (hba->hba_status != HBA_STATUS_ACTIVE)
-			continue;
-
-		spin_lock(&hba->device_lock);
-		for (dev = hba->device_head; dev; dev = dev->next) {
-			if (DEV_OBJ_API(dev)->check_online((void *)dev) != 0) {
-				DEBUG_SO("obj_api->check_online() failed!\n");
-				continue;
-			}
-			DEBUG_SO("t10_wwn->device_identifier: %s\n",
-				dev->t10_wwn.device_identifier);
-			DEBUG_SO("buf: %s\n", buf);
-
-			if (!(strcmp(dev->t10_wwn.device_identifier, buf))) {
-				spin_unlock(&hba->device_lock);
-				spin_unlock(&se_global->hba_lock);
-				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
-			}
-		}
-		spin_unlock(&hba->device_lock);
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	return(NULL);
-}
-
-#ifdef PYX_IBLOCK
-
-static se_device_t *transport_scan_hbas_for_major_minor (
-	int major,
-	int minor)
-{
-	iblock_dev_t *ib_dev = NULL;
-	se_device_t *dev = NULL;
-	se_hba_t *hba;
-	int i;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (hba->hba_status != HBA_STATUS_ACTIVE)
-			continue;
-		/*
-		 * Assume only iblock for now, but this could be used
-		 * for PSCSI and FILE eventually as well.
-		 */
-		if (hba->type != IBLOCK)
-			continue;
-
-		spin_lock(&hba->device_lock);
-		for (dev = hba->device_head; dev; dev = dev->next) {
-			if (DEV_OBJ_API(dev)->check_online((void *)dev) != 0) {
-				DEBUG_SO("obj_api->check_online() failed!\n");
-				continue;
-			}
-			if (!(ib_dev = (iblock_dev_t *)dev->dev_ptr)) {
-				TRACE_ERROR("Could not locate ptr from dev->dev_ptr!\n");
-				continue;
-			}
-
-			if ((ib_dev->ibd_major == major) &&
-			    (ib_dev->ibd_minor == minor)) {
-				spin_unlock(&hba->device_lock);
-				spin_unlock(&se_global->hba_lock);
-				return(!(__core_get_hba_from_id(hba)) ? NULL : dev);
-			}
-		}
-		spin_unlock(&hba->device_lock);
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	return(NULL);
-}
-
-#endif /* PYX_IBLOCK */
-
-extern se_device_t *transport_core_locate_dev (
-	struct iscsi_target *tg,
-	se_dev_transport_info_t *dti,
-	int *ret)
-{
-	se_device_t *dev = NULL;
-	se_hba_t *hba;
-
-	dti->iscsi_lun = tg->iscsi_lun;
-	dti->force = tg->force;
-
-	if (tg->params_set & PARAM_QUEUE_DEPTH) {
-		dti->check_tcq = 1;
-		dti->queue_depth = tg->queue_depth;
-	}
-
-	if (tg->params_set & PARAM_EVPD_UNIT_SERIAL) {
-		if (!(dev = transport_scan_hbas_for_evpd_sn(tg->value,
-				strlen(tg->value)))) {
-			TRACE_ERROR("Unable to locate se_device_t from EVPD SN:"
-					" %s\n", tg->value);
-			*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
-			return(NULL);
-		}
-		return(dev);
-	} else if (tg->params_set & PARAM_EVPD_DEVICE_IDENT) {
-		if (!(dev = transport_scan_hbas_for_evpd_di(tg->value,
-				strlen(tg->value)))) {
-			TRACE_ERROR("Unable to locate se_device_t from EVPD DI:"
-					" %s\n", tg->value);
-			*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
-			return(NULL);
-		}
-		return(dev);
-		/*
-		 * Special case for non createvirtdev usage with hba_id parameter
-		 * using major/minor location.
-		 */
-	} else if ((tg->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) &&
-	    	   (tg->hba_params_set & PARAM_HBA_IBLOCK_MINOR) &&
-		   !(tg->params_set & PARAM_HBA_ID)) {
-			if (!(dev = transport_scan_hbas_for_major_minor(tg->iblock_major,
-						tg->iblock_minor))) {
-				TRACE_ERROR("Unable to locate se_device_t from %d:%d",
-						tg->iblock_major, tg->iblock_minor);
-				*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
-				return(NULL);
-			}
-			return(dev);
-	} else {
-		if (!(hba = core_get_hba_from_hbaid(tg, dti, 1))) {
-			*ret = ERR_HBA_CANNOT_LOCATE;
-			return(NULL);
-		}
-
-		if (!(hba = __core_get_hba_from_id(hba))) {
-			*ret = ERR_HBA_CANNOT_LOCATE;
-			return(NULL);
-		}
-
-		if (!(dev = core_get_device_from_transport(hba, dti))) {
-			TRACE_ERROR("Unable to locate se_device_t on iSCSI HBA:"
-				" %u\n", hba->hba_id);
-			core_put_hba(hba);
-			*ret = ERR_ADDLUN_GET_DEVICE_FAILED;
-			return(NULL);
-		}
-
-		return(dev);
-	}
-
-	return(dev);
-}
-
-EXPORT_SYMBOL(transport_core_locate_dev);
 
 extern se_plugin_t *transport_core_get_plugin_by_name (const char *name)
 {
@@ -1435,7 +1233,7 @@ extern void transport_dump_dev_state (
 		atomic_read(&dev->execute_tasks), atomic_read(&dev->depth_left),
 		dev->queue_depth);
 	*bl += sprintf(b+*bl, "  SectorSize: %u  MaxSectors: %u\n",
-		TRANSPORT(dev)->get_blocksize(dev), DEV_ATTRIB(dev)->da_max_sectors);
+		TRANSPORT(dev)->get_blocksize(dev), DEV_ATTRIB(dev)->max_sectors);
 	*bl += sprintf(b+*bl, "        ");
 
 	return;	
@@ -1762,15 +1560,16 @@ static int transport_get_read_capacity (se_device_t *dev)
 
 }
 
-/*	transport_add_device_to_iscsi_hba():
+/*	transport_add_device_to_core_hba():
  *
  *	Note that some plugins (IBLOCK) will pass device_flags == DF_CLAIMED_BLOCKDEV
  *	signifying OS that a dependent block_device has been claimed.  In exception cases we
  *	will release said block_device ourselves.
  */
-extern se_device_t *transport_add_device_to_iscsi_hba (
+extern se_device_t *transport_add_device_to_core_hba (
 	se_hba_t *hba,
 	se_subsystem_api_t *transport,
+	se_subsystem_dev_t *se_dev,
 	u32 device_flags,
 	void *transport_dev)
 {
@@ -1807,6 +1606,7 @@ extern se_device_t *transport_add_device_to_iscsi_hba (
 	dev->type		= transport->type;
 	dev->dev_ptr		= (void *) transport_dev;
 	dev->iscsi_hba		= hba;
+	dev->se_sub_dev		= se_dev;
 	dev->transport		= transport;
 	atomic_set(&dev->active_cmds, 0);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
@@ -2420,32 +2220,6 @@ extern int transport_generic_allocate_tasks (
 }
 
 EXPORT_SYMBOL(transport_generic_allocate_tasks);
-
-/*	transport_generic_check_device_location():
- *
- *
- */
-extern int transport_generic_check_device_location (
-	se_device_t *dev,
-	se_dev_transport_info_t *dti)
-{
-	int ret = 0;
-	se_hba_t *hba;
-	se_subsystem_api_t *t;
-	
-	if (!dev->iscsi_hba) {
-		TRACE_ERROR("se_device_t->iscsi_hba is NULL!\n");
-		return(-1);
-	}
-	hba = dev->iscsi_hba;
-	
-	if (!(t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT, hba->type, &ret)))
-		return(ret);
-
-	return(t->check_device_location(dev, dti));
-}
-
-EXPORT_SYMBOL(transport_generic_check_device_location);
 
 /*	transport_generic_handle_cdb():
  *
@@ -6565,7 +6339,7 @@ EXPORT_SYMBOL(transport_start_status_timer);
 
 extern void transport_stop_status_timer (se_device_t *dev)
 {
-	if (!(DEV_ATTRIB(dev)->da_status_thread_tur))
+	if (!(DEV_ATTRIB(dev)->status_thread_tur))
 		return;
 
 	spin_lock_bh(&dev->dev_status_thr_lock);
