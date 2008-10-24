@@ -56,11 +56,10 @@ extern int rd_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
 extern int rd_detach_hba (se_hba_t *);
 extern void *rd_DIRECT_allocate_virtdevice (se_hba_t *, const char *);
 extern void *rd_MEMCPY_allocate_virtdevice (se_hba_t *, const char *);
-extern se_device_t *rd_DIRECT_create_virtdevice (se_hba_t *, void *);
-extern se_device_t *rd_MEMCPY_create_virtdevice (se_hba_t *, void *);
+extern se_device_t *rd_DIRECT_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
+extern se_device_t *rd_MEMCPY_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
 extern int rd_activate_device (se_device_t *);
 extern void rd_deactivate_device (se_device_t *);
-extern int rd_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int rd_mcp_check_ghost_id (se_hbainfo_t *);
 extern int rd_dr_check_ghost_id (se_hbainfo_t *);
 extern void rd_free_device (void *);
@@ -78,8 +77,6 @@ extern int rd_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t rd_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t rd_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t rd_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
-extern int rd_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
-extern int rd_check_virtdev_params (se_devinfo_t *, struct iscsi_target *);
 extern void rd_dr_get_plugin_info (void *, char *, int *);
 extern void rd_mcp_get_plugin_info (void *, char *, int *);
 extern void rd_get_hba_info (se_hba_t *, char *, int *);
@@ -170,7 +167,6 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	create_virtdevice:	rd_DIRECT_create_virtdevice,	\
 	activate_device:	rd_activate_device,		\
 	deactivate_device:	rd_deactivate_device,		\
-	check_device_location:	rd_check_device_location,	\
 	check_ghost_id:		rd_dr_check_ghost_id,		\
 	free_device:		rd_free_device,			\
 	transport_complete:	rd_transport_complete,		\
@@ -183,8 +179,6 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	check_configfs_dev_params: rd_check_configfs_dev_params, \
 	set_configfs_dev_params: rd_set_configfs_dev_params,	\
 	show_configfs_dev_params: rd_show_configfs_dev_params,	\
-	check_dev_params:	rd_check_dev_params,		\
-	check_virtdev_params:	rd_check_virtdev_params,	\
 	get_plugin_info:	rd_dr_get_plugin_info,		\
 	get_hba_info:		rd_get_hba_info,		\
 	get_dev_info:		rd_get_dev_info,		\
@@ -220,7 +214,6 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 	create_virtdevice:	rd_MEMCPY_create_virtdevice,	\
 	activate_device:	rd_activate_device,		\
 	deactivate_device:	rd_deactivate_device,		\
-	check_device_location:	rd_check_device_location,	\
 	check_ghost_id:		rd_mcp_check_ghost_id,		\
 	free_device:		rd_free_device,			\
 	transport_complete:	rd_transport_complete,		\
@@ -231,8 +224,6 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 	check_configfs_dev_params: rd_check_configfs_dev_params, \
 	set_configfs_dev_params: rd_set_configfs_dev_params,	\
 	show_configfs_dev_params: rd_show_configfs_dev_params,	\
-	check_dev_params:	rd_check_dev_params,		\
-	check_virtdev_params:	rd_check_virtdev_params,	\
 	get_plugin_info:	rd_mcp_get_plugin_info,		\
 	get_hba_info:		rd_get_hba_info,		\
 	get_dev_info:		rd_get_dev_info,		\

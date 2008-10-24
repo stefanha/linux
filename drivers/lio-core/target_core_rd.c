@@ -45,6 +45,7 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
@@ -260,13 +261,15 @@ extern void *rd_MEMCPY_allocate_virtdevice (se_hba_t *hba, const char *name)
 	return(rd_allocate_virtdevice(hba, name, 0));
 }
 
-extern se_device_t *rd_add_device_to_list (se_hba_t *, rd_dev_t *, int);
-
 /*	rd_create_virtdevice():
  *
  *
  */
-static se_device_t *rd_create_virtdevice (se_hba_t *hba, void *p, int rd_direct)
+static se_device_t *rd_create_virtdevice (
+	se_hba_t *hba,
+	se_subsystem_dev_t *se_dev,
+	void *p,
+	int rd_direct)
 {
 	se_device_t *dev;
 	rd_dev_t *rd_dev = (rd_dev_t *) p;
@@ -286,7 +289,9 @@ static se_device_t *rd_create_virtdevice (se_hba_t *hba, void *p, int rd_direct)
 	if (rd_build_device_space(rd_dev) < 0)
 		goto fail;
 	
-	if (!(dev = rd_add_device_to_list(hba, rd_dev, dev_flags)))
+	if (!(dev = transport_add_device_to_core_hba(hba, 
+			(rd_dev->rd_direct) ? &rd_dr_template : &rd_mcp_template,
+			se_dev, dev_flags, (void *)rd_dev)))
 		goto fail;
 
 	rd_dev->rd_dev_id = rd_host->rd_host_dev_id_count++;
@@ -305,25 +310,20 @@ fail:
 	return(NULL);
 }
 
-extern se_device_t *rd_DIRECT_create_virtdevice (se_hba_t *hba, void *p)
+extern se_device_t *rd_DIRECT_create_virtdevice (
+	se_hba_t *hba,
+	se_subsystem_dev_t *se_dev,
+	void *p)
 {
-	return(rd_create_virtdevice(hba, p, 1));	
+	return(rd_create_virtdevice(hba, se_dev, p, 1));	
 }
 
-extern se_device_t *rd_MEMCPY_create_virtdevice (se_hba_t *hba, void *p)
+extern se_device_t *rd_MEMCPY_create_virtdevice (
+	se_hba_t *hba,
+	se_subsystem_dev_t *se_dev,
+	void *p)
 {
-	return(rd_create_virtdevice(hba, p, 0));
-}
-
-/*	rd_add_device_to_list():
- *
- *
- */
-extern se_device_t *rd_add_device_to_list (se_hba_t *hba, rd_dev_t *rd_dev, int dev_flags)
-{
-	return(transport_add_device_to_iscsi_hba(hba,
-			(rd_dev->rd_direct) ? &rd_dr_template : &rd_mcp_template,
-			dev_flags, (void *)rd_dev));
+	return(rd_create_virtdevice(hba, se_dev, p, 0));
 }
 
 /*	rd_activate_device(): (Part of se_subsystem_api_t template)
@@ -356,20 +356,6 @@ extern void rd_deactivate_device (se_device_t *dev)
 		rd_dev->rd_dev_id);
 
 	return;
-}
-
-/*	rd_check_device_location(): (Part of se_subsystem_api_t template)
- *
- *
- */
-extern int rd_check_device_location (se_device_t *dev, se_dev_transport_info_t *dti)
-{
-	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
-
-	if (dti->rd_device_id == rd_dev->rd_dev_id)
-		return(0);
-
-	return(-1);
 }
 
 extern int rd_check_ghost_id (se_hbainfo_t *hi, int type)
@@ -1198,32 +1184,6 @@ extern ssize_t rd_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *s
 	
 	 __rd_get_dev_info(rd_dev, page, &bl);
 	return((ssize_t)bl);
-}
-
-extern int rd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
-{
-	if (!(t->hba_params_set & PARAM_HBA_RD_DEVICE_ID)) {
-		TRACE_ERROR("Missing Ramdisk createvirtdev parameters\n");
-		return(ERR_VIRTDEV_MISSING_PARAMS);
-	}
-	dti->rd_device_id = t->rd_device_id; 
-
-	return(0);
-}
-
-extern int rd_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
-{
-	if (!(t->hba_params_set & PARAM_HBA_RD_DEVICE_ID) ||
-	    !(t->hba_params_set & PARAM_HBA_RD_PAGES)) {
-		TRACE_ERROR("Missing Ramdisk createvirtdev parameters\n");
-		return(ERR_VIRTDEV_MISSING_PARAMS);
-	}
-
-	di->rd_device_id = t->rd_device_id;
-	di->rd_direct = t->rd_direct;
-	di->rd_pages = t->rd_pages;
-
-	return(0);
 }
 
 extern void rd_dr_get_plugin_info (void *p, char *b, int *bl)
