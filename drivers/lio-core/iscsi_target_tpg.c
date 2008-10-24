@@ -48,13 +48,13 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_error.h>
 #include <target_core_hba.h>
-#include <iscsi_target_linux_proc.h>
 #include <iscsi_target_login.h>
 #include <iscsi_target_nodeattrib.h>
 #include <iscsi_target_tpg.h>
@@ -629,9 +629,6 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 	if (iscsi_create_default_params(&tpg->param_list) < 0)
 		goto err_out;
 
-	if (iscsi_OS_register_info_handlers(tpg->tpgt) < 0)
-		goto err_out;
-	
 	tpg->sid	= 1; /* First Assigned iSBE Session ID */
 	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
 	init_MUTEX(&tpg->np_login_sem);
@@ -730,8 +727,6 @@ extern int iscsi_tpg_del_portal_group (
 		tpg->param_list = NULL;
 	}
 
-	iscsi_OS_unregister_info_handlers(tpg->tpgt);
-	
 	kfree(tpg->tpg_lun_list);
 	tpg->tpg_lun_list = NULL;
 
