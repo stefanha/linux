@@ -45,6 +45,7 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
+#include <target_core_base.h>
 #include <iscsi_target_ioctl.h>
 #include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
@@ -188,13 +189,14 @@ extern void *fd_allocate_virtdevice (se_hba_t *hba, const char *name)
 	return(fd_dev);
 }
 
-extern se_device_t *fd_add_device_to_list (se_hba_t *, fd_dev_t *, int);
-
 /*	fd_create_virtdevice(): (Part of se_subsystem_api_t template)
  *
  *
  */
-extern se_device_t *fd_create_virtdevice (se_hba_t *hba, void *p)
+extern se_device_t *fd_create_virtdevice (
+	se_hba_t *hba,
+	se_subsystem_dev_t *se_dev,
+	void *p)
 {
 	char *dev_p = NULL;
 	se_device_t *dev;
@@ -311,7 +313,8 @@ extern se_device_t *fd_create_virtdevice (se_hba_t *hba, void *p)
 #endif
 	dev_flags |= DF_DISABLE_STATUS_THREAD;
 	
-	if (!(dev = fd_add_device_to_list(hba, fd_dev, dev_flags)))
+	if (!(dev = transport_add_device_to_core_hba(hba, &fileio_template,
+				se_dev, dev_flags, (void *)fd_dev)))
 		goto fail;
 
 	fd_dev->fd_dev_id = fd_host->fd_host_dev_id_count++;
@@ -332,16 +335,6 @@ fail:
 	putname(dev_p);
 	kfree(fd_dev);
 	return(NULL);
-}
-
-/*	fd_add_device_to_list():
- *
- *
- */
-extern se_device_t *fd_add_device_to_list (se_hba_t *hba, fd_dev_t *fd_dev, int dev_flags)
-{
-	return(transport_add_device_to_iscsi_hba(hba, &fileio_template,
-				dev_flags, (void *)fd_dev));
 }
 
 /*	fd_activate_device(): (Part of se_subsystem_api_t template)
@@ -374,20 +367,6 @@ extern void fd_deactivate_device (se_device_t *dev)
 		fd_dev->fd_dev_id);
 
 	return;
-}
-
-/*	fd_check_device_location(): (Part of se_subsystem_api_t template)
- *
- *
- */
-extern int fd_check_device_location (se_device_t *dev, se_dev_transport_info_t *dti)
-{
-	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
-
-	if (dti->fd_device_id == fd_dev->fd_dev_id)
-		return(0);
-
-	return(-1);
 }
 
 extern int fd_check_ghost_id (se_hbainfo_t *hi)
@@ -1056,58 +1035,6 @@ extern ssize_t fd_show_configfs_dev_params (se_hba_t *hba, se_subsystem_dev_t *s
 
 	__fd_get_dev_info(fd_dev, page, &bl);
 	return((ssize_t)bl);
-}
-
-extern int fd_check_dev_params (se_hba_t *hba, struct iscsi_target *t, se_dev_transport_info_t *dti)
-{
-	if (!(t->hba_params_set & PARAM_HBA_FD_DEVICE_ID)) {
-		TRACE_ERROR("Missing FILEIO createvirtdev parameters\n");
-		return(ERR_VIRTDEV_MISSING_PARAMS);
-	}
-	dti->fd_device_id = t->fd_device_id;
-
-	return(0);
-}
-
-extern int fd_check_virtdev_params (se_devinfo_t *di, struct iscsi_target *t)
-{
-	/*
-	 * Special case when we are using FILEIO with a block device that
-	 * contains a valid major/minor, currently passed into the stack
-	 * with iblock_major= and iblock_minor= target-ctl parameters.
-	 *
-	 * In this case, we will autodetect the fd_size in fd_create_virtdevice()
-	 */
-	if ((t->hba_params_set & PARAM_HBA_IBLOCK_MAJOR) &&
-	    (t->hba_params_set & PARAM_HBA_IBLOCK_MINOR)) {
-		if (!(t->hba_params_set & PARAM_HBA_FD_FILE) ||
-		    !(t->hba_params_set & PARAM_HBA_FD_DEVICE_ID)) {
-			TRACE_ERROR("Missing FILEIO createvirtdev parameters\n");
-			return(ERR_VIRTDEV_MISSING_PARAMS);
-		}
-
-		di->fd_claim_bd = 1;
-		di->iblock_major = t->iblock_major;
-		di->iblock_minor = t->iblock_minor;
-	} else {
-		if (!(t->hba_params_set & PARAM_HBA_FD_FILE) ||
-		    !(t->hba_params_set & PARAM_HBA_FD_SIZE) ||
-		    !(t->hba_params_set & PARAM_HBA_FD_DEVICE_ID)) {
-			TRACE_ERROR("Missing FILEIO createvirtdev parameters\n");
-			return(ERR_VIRTDEV_MISSING_PARAMS);
-		}
-	}
-
-	if (!(strlen(t->value))) {
-		TRACE_ERROR("fd_file= does not contain a valid path/filename!\n");
-		return(ERR_VIRTDEV_MISSING_PARAMS);
-	}
-
-	di->fd_device_id = t->fd_device_id;
-	di->fd_device_size = t->fd_dev_size;
-	snprintf(di->fd_dev_name, FD_MAX_DEV_NAME, "%s", t->value);
-
-	return(0);
 }
 
 extern void fd_get_plugin_info (void *p, char *b, int *bl)

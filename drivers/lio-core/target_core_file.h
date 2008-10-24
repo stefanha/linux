@@ -27,8 +27,8 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_FILE_H
-#define ISCSI_TARGET_FILE_H
+#ifndef TARGET_CORE_FILE_H
+#define TARGET_CORE_FILE_H
 
 #define FD_VERSION		"v3.0"
 
@@ -55,10 +55,9 @@ extern int fd_detach_hba (se_hba_t *);
 extern int fd_claim_phydevice (se_hba_t *, se_device_t *);
 extern int fd_release_phydevice (se_device_t *);
 extern void *fd_allocate_virtdevice (se_hba_t *, const char *);
-extern se_device_t *fd_create_virtdevice (se_hba_t *, void *);
+extern se_device_t *fd_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
 extern int fd_activate_device (se_device_t *);
 extern void fd_deactivate_device (se_device_t *);
-extern int fd_check_device_location (se_device_t *, se_dev_transport_info_t *);
 extern int fd_check_ghost_id (se_hbainfo_t *);
 extern void fd_free_device (void *);
 extern int fd_transport_complete (se_task_t *);
@@ -71,8 +70,6 @@ extern int fd_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t fd_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t fd_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t fd_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
-extern int fd_check_dev_params (se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
-extern int fd_check_virtdev_params (se_devinfo_t *, struct iscsi_target *);
 extern void fd_get_plugin_info (void *, char *, int *);
 extern void fd_get_hba_info (se_hba_t *, char *, int *);
 extern void fd_get_dev_info (se_device_t *, char *, int *);
@@ -176,7 +173,6 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	create_virtdevice:	fd_create_virtdevice,		\
 	activate_device:	fd_activate_device,		\
 	deactivate_device:	fd_deactivate_device,		\
-	check_device_location:	fd_check_device_location,	\
 	check_ghost_id:		fd_check_ghost_id,		\
 	free_device:		fd_free_device,			\
 	transport_complete:	fd_transport_complete,		\
@@ -187,8 +183,6 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	check_configfs_dev_params: fd_check_configfs_dev_params, \
 	set_configfs_dev_params: fd_set_configfs_dev_params,	\
 	show_configfs_dev_params: fd_show_configfs_dev_params,	\
-	check_dev_params:	fd_check_dev_params,		\
-	check_virtdev_params:	fd_check_virtdev_params,	\
 	get_plugin_info:	fd_get_plugin_info,		\
 	get_hba_info:		fd_get_hba_info,		\
 	get_dev_info:		fd_get_dev_info,		\
@@ -214,4 +208,4 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 se_subsystem_api_t fileio_template = ISCSI_FILEIO;
 #endif /* ! FD_INCLUDE_STRUCTS */
 
-#endif /* ISCSI_TARGET_FILE_H */
+#endif /* TARGET_CORE_FILE_H */
