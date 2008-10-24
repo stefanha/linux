@@ -27,8 +27,8 @@
  *********************************************************************************/
 
 
-#ifndef ISCSI_TARGET_TRANSPORT_H
-#define ISCSI_TARGET_TRANSPORT_H
+#ifndef TARGET_CORE_TRANSPORT_H
+#define TARGET_CORE_TRANSPORT_H
 
 #define PYX_TRANSPORT_WINDOW_CLOSED_THRESHOLD	3  /* Attempts before moving from SHORT to LONG */
 #define PYX_TRANSPORT_WINDOW_CLOSED_WAIT_SHORT	3  /* In milliseconds */
@@ -82,6 +82,12 @@
 #define DF_DISABLE_STATUS_THREAD		0x00000040
 #define DF_READ_ONLY				0x00000080
 
+/* se_dev_attrib_t sanity values */
+#define DA_TASK_TIMEOUT_MAX			600 /* 10 Minutes, see transport_get_default_task_timeout()  */
+#define DA_STATUS_THREAD			1 /* Enabled by default */
+#define DA_STATUS_THREAD_TUR			1 /* Enabled by default */
+#define DA_STATUS_MAX_SECTORS_MIN		16
+#define DA_STATUS_MAX_SECTORS_MAX		8192
 
 #define SE_MODE_PAGE_BUF			512
 #define SE_LVM_UUID_LEN				48 /* Must match PARAM_LVM_UUID_LEN */
@@ -100,7 +106,6 @@ extern int iscsi_debug_dev (se_device_t *);
 extern unsigned char *transport_get_iqn_sn (void);
 extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
-extern se_device_t *transport_core_locate_dev (struct iscsi_target *, se_dev_transport_info_t *, int *);
 extern struct se_plugin_s *transport_core_get_plugin_by_name (const char *name);
 extern void transport_check_dev_params_delim (char *, char **);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);
@@ -114,8 +119,7 @@ extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
 extern int transport_check_device_tcq (se_device_t *, u32, u32);
 extern void transport_dump_dev_state (struct se_device_s *, char *, int *);
 extern void transport_dump_dev_info (struct se_device_s *, struct se_lun_s *, unsigned long long, char *, int *);
-extern se_hba_t *transport_add_iscsi_hba (u8 type, u32, void *);
-extern se_device_t *transport_add_device_to_iscsi_hba (se_hba_t *, struct se_subsystem_api_s *, u32, void *);
+extern se_device_t *transport_add_device_to_core_hba (se_hba_t *, struct se_subsystem_api_s *, struct se_subsystem_dev_s *, u32, void *);
 extern void transport_generic_activate_device (se_device_t *);
 extern void transport_generic_deactivate_device (se_device_t *);
 extern int transport_generic_claim_phydevice (se_device_t *);
@@ -123,20 +127,8 @@ extern void transport_generic_release_phydevice (se_device_t *, int);
 extern void transport_generic_free_device (se_device_t *);
 extern int transport_allocate_iovecs_for_cmd (struct iscsi_cmd_s *, __u32);
 extern int transport_generic_obj_start (struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long);
-extern int transport_process_vol_transform (u32 *, struct se_transform_info_s *);
-extern int transport_jbod_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *);
-extern int transport_jbod_allocate_DMA (struct iscsi_cmd_s *cmd, struct se_transform_info_s *);
-extern int transport_process_jbod_rw (u32 *, struct se_transform_info_s *);
-extern int transport_stripe_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *);
-extern int transport_stripe_allocate_DMA (struct iscsi_cmd_s *cmd, struct se_transform_info_s *);
-extern int transport_process_stripe_rw (u32 *, struct se_transform_info_s *);
-extern int transport_generic_re_vol_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *);
-extern int transport_generic_re_vol_allocate_DMA (struct iscsi_cmd_s *, struct se_transform_info_s *);
-extern int transport_process_mirror_write (u32 *, struct se_transform_info_s *);
-extern int transport_mirror_vol_write_allocate_DMA (struct iscsi_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *);
 extern void transport_device_setup_cmd (iscsi_cmd_t *);
 extern int transport_generic_allocate_tasks (iscsi_cmd_t *, unsigned char *);
-extern int transport_generic_check_device_location (se_device_t *dev, struct se_dev_transport_info_s *);
 extern int transport_generic_handle_cdb (iscsi_cmd_t *);
 extern int transport_generic_handle_data (iscsi_cmd_t *);
 extern int transport_generic_handle_tmr (iscsi_cmd_t *, iscsi_tmr_req_t *);
@@ -219,73 +211,6 @@ typedef struct se_mem_s {
 	struct list_head se_list;
 } ____cacheline_aligned se_mem_t;
 
-#ifdef SNMP_SUPPORT
-#include <target_core_mib.h>
-#endif
-
-typedef struct se_port_s {
-#ifdef SNMP_SUPPORT
-	u32		sep_index;
-	scsi_port_stats_t sep_stats;
-#endif
-	struct se_lun_s *sep_lun;	
-	struct iscsi_portal_group_s *sep_tpg;
-	struct list_head sep_list;
-} se_port_t;
-
-typedef struct se_task_s {
-	unsigned char	task_sense;
-	unsigned char	*task_buf;
-	void		*transport_req;
-	u8		task_scsi_status;
-	u8		task_flags;
-	int		task_error_status;
-	int		task_state_flags;
-	unsigned long long	task_lba;
-	u32		task_no;
-	u32		task_sectors;
-	u32		task_size;
-	u32		task_sg_num;
-	u32		task_sg_offset;
-	iscsi_cmd_t	*iscsi_cmd;
-	se_device_t	*iscsi_dev;
-	struct semaphore	task_stop_sem;
-	atomic_t	task_active;
-	atomic_t	task_execute_queue;
-	atomic_t	task_timeout;
-	atomic_t	task_sent;
-	atomic_t	task_stop;
-	atomic_t	task_state_active;
-	struct timer_list	task_timer;
-	int (*transport_map_task)(struct se_task_s *, u32);
-	void *se_obj_ptr;
-	struct se_obj_lun_type_s *se_obj_api;
-	struct se_task_s *t_next;
-	struct se_task_s *t_prev;
-	struct se_task_s *ts_next;
-	struct se_task_s *ts_prev;
-	struct list_head t_list;
-} ____cacheline_aligned se_task_t;
-
-typedef struct se_transform_info_s {
-	int		ti_set_counts;
-	u32		ti_data_length;
-	unsigned long long	ti_lba;
-        struct iscsi_cmd_s *ti_cmd;
-        struct se_device_s *ti_dev;
-	void *se_obj_ptr;
-	void *ti_obj_ptr;
-	struct se_obj_lun_type_s *se_obj_api;
-	struct se_obj_lun_type_s *ti_obj_api;
-} ____cacheline_aligned se_transform_info_t;
-
-typedef struct se_subsystem_dev_s {
-	se_hba_t	*se_dev_hba;
-	se_device_t	*se_dev_ptr;
-	void		*se_dev_su_ptr;
-	struct config_group se_dev_group;
-} ____cacheline_aligned se_subsystem_dev_t;
-
 /*
  * Each type of DAS transport that uses the generic command sequencer needs
  * each of the following function pointers set. 
@@ -335,7 +260,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * create_virtdevice(): Only for Virtual HBAs
 	 */
-	se_device_t *(*create_virtdevice)(struct se_hba_s *, void *);
+	se_device_t *(*create_virtdevice)(struct se_hba_s *, struct se_subsystem_dev_s *, void *);
 	/*
 	 * activate_device():
 	 */
@@ -352,10 +277,6 @@ typedef struct se_subsystem_api_s {
 	 * free_device():
 	 */
 	void (*free_device)(void *);
-	/*
-	 * check_device_location():
-	 */
-	int (*check_device_location)(se_device_t *, se_dev_transport_info_t *);
 	/*
 	 * check_ghost_id():
 	 */
@@ -430,14 +351,6 @@ typedef struct se_subsystem_api_s {
 	 * create_virtdevice_from-fd():
 	 */
 	se_device_t *(*create_virtdevice_from_fd)(se_subsystem_dev_t *, const char *);
-	/*
-	 * check_dev_params():
-	 */
-	int (*check_dev_params)(se_hba_t *, struct iscsi_target *, se_dev_transport_info_t *);
-	/*
-	 * check_virtdev_params():
-	 */
-	int (*check_virtdev_params)(se_devinfo_t *, struct iscsi_target *);
 	/*
 	 * get_plugin_info():
 	 */
@@ -553,5 +466,5 @@ typedef struct se_subsystem_api_s {
 #define TRANSPORT_SPC(dev)	(dev)->transport->spc
 #define HBA_TRANSPORT(hba)	(hba)->transport
 
-#endif /* ISCSI_TARGET_TRANSPORT_H */
+#endif /* TARGET_CORE_TRANSPORT_H */
 
