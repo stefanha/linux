@@ -977,10 +977,9 @@ static int lio_target_initiator_lacl_link (struct config_item *lun_acl_ci, struc
 	 * iscsi/$IQN/$TPGT/lun/lun_* as on their iSCSI Initiator Ports.
 	 */
 	if ((ret = iscsi_dev_add_initiator_node_lun_acl(tpg, lacl,
-				lun->iscsi_lun, lun_access)) < 0) {
-		ret = -EEXIST;
+				lun->iscsi_lun, lun_access)) < 0)
 		goto out;
-	}
+
 	printk("LIO_Target_ConfigFS: Created Initiator LUN ACL Symlink: %s TPG LUN: %s"
 		" Mapped LUN: %s %s\n", lacl->initiatorname, config_item_name(lun_ci),
 		config_item_name(lun_acl_ci), (ro_ptr) ? "READ-ONLY" : "READ-WRITE");
