@@ -2480,6 +2480,7 @@ extern int iscsi_tx_login_rsp (iscsi_conn_t *conn, __u8 status_class, __u8 statu
 	hdr->opcode		= ISCSI_TARG_LOGIN_RSP;
 	hdr->status_class	= status_class;
 	hdr->status_detail	= status_detail;
+	hdr->init_task_tag	= cpu_to_be32(conn->login_itt);
 
 	iov.iov_base		= &iscsi_hdr;
 	iov.iov_len		= ISCSI_HDR_LEN;

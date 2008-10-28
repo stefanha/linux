@@ -1025,7 +1025,6 @@ get_new_sock:
 	/*
 	 * Allocate conn->conn_ops early as a failure calling
 	 * iscsi_tx_login_rsp() below will call tx_data().
-	 * Also initialize the rx_data and tx_data spinlocks.
 	 */     
 	if (!(conn->conn_ops = (iscsi_conn_ops_t *)kmalloc(
 			sizeof(iscsi_conn_ops_t), GFP_KERNEL))) {
@@ -1035,6 +1034,41 @@ get_new_sock:
 	}	
 	memset(conn->conn_ops, 0, sizeof(iscsi_conn_ops_t));
 
+        iscsi_login_init_conn(conn);
+
+        memset(buffer, 0, ISCSI_HDR_LEN);
+        memset(&iov, 0, sizeof(struct iovec));
+        iov.iov_base    = buffer;
+        iov.iov_len     = ISCSI_HDR_LEN;
+
+        if (rx_data(conn, &iov, 1, ISCSI_HDR_LEN) <= 0) {
+                TRACE_ERROR("rx_data() returned an error.\n");
+                goto new_sess_out;
+        }
+
+        iscsi_opcode = (buffer[0] & ISCSI_OPCODE);
+        if (!(iscsi_opcode & ISCSI_INIT_LOGIN_CMND)) {
+                TRACE_ERROR("First opcode is not login request,"
+                        " failing login request.\n");
+                goto new_sess_out;
+        }
+
+        pdu                     = (struct iscsi_init_login_cmnd *) buffer;
+        pdu->length             = be32_to_cpu(pdu->length);
+        pdu->cid                = be16_to_cpu(pdu->cid);
+        pdu->tsih               = be16_to_cpu(pdu->tsih);
+        pdu->init_task_tag      = be32_to_cpu(pdu->init_task_tag);
+        pdu->cmd_sn             = be32_to_cpu(pdu->cmd_sn);
+        pdu->exp_stat_sn        = be32_to_cpu(pdu->exp_stat_sn);
+        /*
+         * Used by iscsi_tx_login_rsp() for Login Resonses PDUs
+         * when Status-Class != 0.
+         */
+        conn->login_itt         = pdu->init_task_tag;
+
+#ifdef DEBUG_OPCODES
+        print_init_login_cmnd(pdu);
+#endif
 	if (np->np_net_size == IPV6_ADDRESS_SPACE) 
 		ip = &np->np_ipv6[0];
 	else {
@@ -1110,38 +1144,6 @@ get_new_sock:
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_IN_LOGIN.\n");
 	conn->conn_state	= TARG_CONN_STATE_IN_LOGIN;
 
-	iscsi_login_init_conn(conn);
-
-	memset(buffer, 0, ISCSI_HDR_LEN);
-	memset(&iov, 0, sizeof(struct iovec));
-	iov.iov_base	= buffer;
-	iov.iov_len	= ISCSI_HDR_LEN;
-
-	if (rx_data(conn, &iov, 1, ISCSI_HDR_LEN) <= 0) {
-		TRACE_ERROR("rx_data() returned an error.\n");
-		goto new_sess_out;
-	}
-
-	iscsi_opcode = (buffer[0] & ISCSI_OPCODE);
-	if (!(iscsi_opcode & ISCSI_INIT_LOGIN_CMND)) {
-		TRACE_ERROR("First opcode is not login request,"
-			" failing login request.\n");
-		iscsi_tx_login_rsp(conn, STAT_CLASS_INITIATOR,
-				STAT_DETAIL_INIT_ERROR);
-		goto new_sess_out;
-	}
-
-	pdu			= (struct iscsi_init_login_cmnd *) buffer;
-	pdu->length		= be32_to_cpu(pdu->length);
-	pdu->cid		= be16_to_cpu(pdu->cid);
-	pdu->tsih		= be16_to_cpu(pdu->tsih);
-	pdu->init_task_tag	= be32_to_cpu(pdu->init_task_tag);
-	pdu->cmd_sn		= be32_to_cpu(pdu->cmd_sn);
-	pdu->exp_stat_sn	= be32_to_cpu(pdu->exp_stat_sn);
-
-#ifdef DEBUG_OPCODES
-	print_init_login_cmnd(pdu);
-#endif
 	if (iscsi_login_check_initiator_version(conn, pdu->version_max,
 			pdu->version_min) < 0)
 		goto new_sess_out;
@@ -1157,8 +1159,9 @@ get_new_sock:
 	} else {
 		/*
 		 * Add a new connection to an existing session.
-		 * We check for a non-existant session here based
-		 * on ISID/TSIH,  but wait until after authentication
+		 * We check for a non-existant session in
+		 * iscsi_login_non_zero_tsih_s2() below based
+		 * on ISID/TSIH, but wait until after authentication
 		 * to check for connection reinstatement, etc.
 		 */
 		if (iscsi_login_non_zero_tsih_s1(conn, buffer) < 0)

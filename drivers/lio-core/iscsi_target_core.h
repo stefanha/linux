@@ -559,6 +559,7 @@ typedef struct iscsi_conn_s {
 	__u32			auth_id;
 	__u32			conn_flags;
 	__u32			login_ip;
+	__u32			login_itt;	/* Used for iscsi_tx_login_rsp() */
 	__u32			exp_statsn;
 	__u32			stat_sn;	/* Per connection status sequence number */
 	__u32			if_marker;	/* IFMarkInt's Current Value */
