@@ -306,23 +306,6 @@ struct se_transform_info_s;
 struct se_obj_lun_type_s;
 struct scatterlist;
 
-typedef struct se_hbainfo_s {
-	__u8		hba_type;
-	__u8		_pad[3];
-	u32		hba_id;
-	u32		iblock_host_id;
-	u32		fd_host_id;
-	u32		rd_host_id;
-	u32		vt_host_id;
-	u32		mc_host_id;
-	int		internal_dma_alloc;
-	int		pata_if_id;
-	int		pata_primary;
-	int		scsi_host_id;
-	int		iscsi_channel_id;
-	int		os_claim_devices;
-} ____cacheline_aligned se_hbainfo_t;
-
 typedef struct se_lun_acl_s {
 	char			initiatorname[ISCSI_IQN_LEN];
 	u32			mapped_lun;
@@ -448,7 +431,6 @@ typedef struct se_hba_s {
 	void			*hba_ptr;	/* Pointer to transport specific host structure. */
 	se_device_t		*device_head;	/* Pointer to start of devices for this HBA */
 	se_device_t		*device_tail;	/* Pointer to end of devices of this HBA */
-	se_hbainfo_t		hba_info;
 	spinlock_t		device_lock;	/* Spinlock for adding/removing devices */
 	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;

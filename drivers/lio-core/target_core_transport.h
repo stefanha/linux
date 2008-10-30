@@ -244,7 +244,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * attach_hba():
 	 */
-	int (*attach_hba)(iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
+	int (*attach_hba)(se_hba_t *, u32);
 	/*
 	 * detach_hba():
 	 */
@@ -277,10 +277,6 @@ typedef struct se_subsystem_api_s {
 	 * free_device():
 	 */
 	void (*free_device)(void *);
-	/*
-	 * check_ghost_id():
-	 */
-	int (*check_ghost_id)(se_hbainfo_t *);
 	/*
 	 * cmd_sequencer():
 	 *
@@ -331,10 +327,6 @@ typedef struct se_subsystem_api_s {
 	 * free_task():
 	 */
 	void (*free_task)(se_task_t *);
-	/*
-	 * check_hba_params():
-	 */
-	int (*check_hba_params)(se_hbainfo_t *, struct iscsi_target *, int);
 	/*
 	 * check_configfs_dev_params():
 	 */

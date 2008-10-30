@@ -252,26 +252,6 @@ extern int iscsi_close(struct inode *inode, struct file *filp)
 	return(0);
 }
 
-/*
- * In T/I mode, used by initiator to release se_hba_t from storage engine
- * before LUN shutdown.
- */
-extern int se_delhbafromtarget (void *p)
-{
-	se_hba_t *hba;
-	int ret;
-
-	if (!(hba = iscsi_get_hba_from_ptr(p)))
-		return(ERR_HBA_CANNOT_LOCATE);
-
-	ret = iscsi_hba_del_hba(hba);
-
-	core_put_hba(hba);
-	return(ret);
-}
-
-EXPORT_SYMBOL(se_delhbafromtarget);
-
 /*      iscsi_target_ioctl():
  *
  *
