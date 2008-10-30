@@ -159,7 +159,7 @@ extern int iblock_release_phydevice (se_device_t *dev)
 	if (dev->dev_flags & DF_READ_ONLY) {
 		PYXPRINT("IBLOCK: Calling blkdev_put() for Major:Minor - %d:%d\n",
 			ib_dev->ibd_major, ib_dev->ibd_minor);
-		blkdev_put((struct block_device *)ib_dev->ibd_bd);
+		blkdev_put((struct block_device *)ib_dev->ibd_bd, FMODE_READ);
 	} else {
 		PYXPRINT("IBLOCK: Releasing Major:Minor - %d:%d\n",
 			ib_dev->ibd_major, ib_dev->ibd_minor);
@@ -415,9 +415,9 @@ static int iblock_emulate_read_cap (se_task_t *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
-	u32 blocks = (bd->bd_disk->capacity - 1);
+	u32 blocks = (get_capacity(bd->bd_disk) - 1);
 
-	if ((bd->bd_disk->capacity - 1) >= 0x00000000ffffffff)
+	if ((get_capacity(bd->bd_disk) - 1) >= 0x00000000ffffffff)
 		blocks = 0xffffffff;
 
 	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, IBLOCK_BLOCKSIZE));
@@ -427,7 +427,7 @@ static int iblock_emulate_read_cap16 (se_task_t *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
-	unsigned long long blocks_long = (bd->bd_disk->capacity - 1);
+	unsigned long long blocks_long = (get_capacity(bd->bd_disk) - 1);
 
 	return(transport_generic_emulate_readcapacity_16(task->iscsi_cmd, blocks_long, IBLOCK_BLOCKSIZE));;
 }

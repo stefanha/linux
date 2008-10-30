@@ -68,7 +68,7 @@ extern se_global_t *se_global;
 
 extern struct block_device *linux_blockdevice_claim_bd (struct block_device *bd, void *claim_ptr)
 {
-	if (blkdev_get(bd, FMODE_WRITE|FMODE_READ, O_RDWR) < 0)
+	if (blkdev_get(bd, FMODE_WRITE|FMODE_READ) < 0)
 		return(NULL);	
 	/*
 	 * If no claim pointer was passed from claimee, use struct block_device.
@@ -77,7 +77,7 @@ extern struct block_device *linux_blockdevice_claim_bd (struct block_device *bd,
 		claim_ptr = (void *)bd;
 
 	if (bd_claim(bd, claim_ptr) < 0) {
-		blkdev_put(bd);
+		blkdev_put(bd, FMODE_WRITE|FMODE_READ);
 		return(NULL);
 	}
 	
@@ -96,7 +96,7 @@ extern struct block_device *__linux_blockdevice_claim (int major, int minor, voi
 		return(NULL);
 	}
 
-	if (blkdev_get(bd, FMODE_WRITE, O_RDWR) < 0) {
+	if (blkdev_get(bd, FMODE_WRITE|FMODE_READ) < 0) {
 		*ret = -1;
 		return(NULL);
 	}
@@ -129,7 +129,7 @@ extern struct block_device *linux_blockdevice_claim (int major, int minor, void 
 	if (!(bd = bdget(dev)))
 		return(NULL);
 
-	if (blkdev_get(bd, FMODE_WRITE, O_RDWR) < 0)
+	if (blkdev_get(bd, FMODE_WRITE|FMODE_READ) < 0)
 		return(NULL);
 	/*
 	 * If no claim pointer was passed from claimee, use struct block_device.
@@ -138,7 +138,7 @@ extern struct block_device *linux_blockdevice_claim (int major, int minor, void 
 		claim_ptr = (void *)bd;
 
 	if (bd_claim(bd, claim_ptr) < 0) {
-		blkdev_put(bd);
+		blkdev_put(bd, FMODE_WRITE|FMODE_READ);
 		return(NULL);
 	}
 	
@@ -159,7 +159,7 @@ extern int linux_blockdevice_release (int major, int minor, struct block_device 
 		bd = bd_p;
 
 	bd_release(bd);
-	blkdev_put(bd);
+	blkdev_put(bd, FMODE_WRITE|FMODE_READ);
 
 	return(0);
 }

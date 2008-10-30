@@ -159,7 +159,7 @@ extern int fd_release_phydevice (se_device_t *dev)
 	if (dev->dev_flags & DF_READ_ONLY) {
 		PYXPRINT("FILEIO: Calling blkdev_put() for Major:Minor - %d:%d\n",
 			fd_dev->fd_major, fd_dev->fd_minor);
-		blkdev_put((struct block_device *)fd_dev->fd_bd);
+		blkdev_put((struct block_device *)fd_dev->fd_bd, FMODE_READ);
 	} else {	
 		PYXPRINT("FILEIO: Releasing Major:Minor - %d:%d\n", fd_dev->fd_major,
 			fd_dev->fd_minor);
