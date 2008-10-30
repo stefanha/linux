@@ -46,7 +46,6 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
-#include <iscsi_target_ioctl.h>
 #include <target_core_hba.h>
 #include <target_core_transport.h>
 #include <target_core_scdb.h>

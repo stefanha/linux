@@ -54,8 +54,6 @@
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
 #include <iscsi_target_error.h>
-#include <iscsi_target_ioctl.h>
-#include <iscsi_target_ioctl_defs.h>
 #include <target_core_device.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
