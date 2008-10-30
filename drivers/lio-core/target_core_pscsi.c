@@ -52,8 +52,6 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
-#include <iscsi_target_ioctl.h>
-#include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
 #include <target_core_transport.h>
 #include <iscsi_target_util.h>
@@ -210,15 +208,16 @@ extern int pscsi_release_sd (struct scsi_device *sd)
 
 /*	pscsi_attach_hba():
  *
- *	FIXME: Check was locking the midlayer does for accessing scsi_hostlist.	
+ * 	pscsi_get_sh() used scsi_host_lookup() to locate struct Scsi_Host.
+ *	from the passed SCSI Host ID.
  */
-extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, se_hbainfo_t *hi)
+extern int pscsi_attach_hba (se_hba_t *hba, u32 host_id)
 {
 	int hba_depth, max_sectors;
 	struct Scsi_Host *sh;
 
-	if (!(sh = pscsi_get_sh(hi->scsi_host_id)))
-		return(-1);
+	if (!(sh = pscsi_get_sh(host_id)))
+		return(-EINVAL);
 
 	max_sectors = sh->max_sectors;
 
@@ -233,9 +232,7 @@ extern int pscsi_attach_hba (iscsi_portal_group_t *tpg, se_hba_t *hba, se_hbainf
 	atomic_set(&hba->max_queue_depth, hba_depth);
 
 	hba->hba_ptr = (void *) sh;
-	hba->hba_id = hi->hba_id;
 	hba->transport = &pscsi_template;
-	memcpy((void *)&hba->hba_info, (void *)hi, sizeof(se_hbainfo_t));
 	
 	PYXPRINT("CORE_HBA[%d] - %s Parallel SCSI HBA Driver %s on Generic"
 		" Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR,
@@ -577,38 +574,6 @@ extern void pscsi_deactivate_device (se_device_t *dev)
 	return;
 }
 
-/*	pscsi_check_ghost_id(): (Part of se_subsystem_api_t template)
- *
- *	
- */
-extern int pscsi_check_ghost_id (se_hbainfo_t *hi)
-{
-	int i;
-	se_hba_t *hba;
-	struct Scsi_Host *sh;
-	
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			continue;
-		if (hba->type != PSCSI)
-			continue;
-		sh = (struct Scsi_Host *) hba->hba_ptr;
-		if (sh->host_no == hi->scsi_host_id) {
-			TRACE_ERROR("Parallel SCSI HBA with SCSI Host ID: %d"
-				" already assigned to iSCSI HBA: %hu, ignoring"
-				" request.\n", hi->scsi_host_id, i);
-			spin_unlock(&se_global->hba_lock);
-			return(1);
-		}
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	return(0);
-}
-
 /*	pscsi_free_device(): (Part of se_subsystem_api_t template)
  *
  *
@@ -856,29 +821,6 @@ extern void pscsi_free_task (se_task_t *task)
 	return;
 }
 
-extern int pscsi_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
-{
-	if (virt) {
-		TRACE_ERROR("createvirtdev is not required for Physical"
-			" Storage Transports, ignoring request\n");
-		return(ERR_FREE_VIRTDEV_PHYSICAL_HBA);
-	}
-
-	if (!(t->hba_params_set & PARAM_HBA_SCSI_HOST_ID)) {
-		TRACE_ERROR("scsi_host_id must be set for"
-			" addhbatotarget requests with Parallel"
-			" SCSI HBAs.\n");
-		return(ERR_HBA_MISSING_PARAMS);
-	}
-	hi->scsi_host_id = t->scsi_host_id;
-
-	/* PSCSI T/I Repeater Mode */
-	if (t->hba_params_set & PARAM_HBA_ISCSI_CHANNEL_ID)
-		hi->iscsi_channel_id = t->iscsi_channel_id;
-
-	return(0);
-}
-
 extern ssize_t pscsi_set_configfs_dev_params (se_hba_t *hba,
 					      se_subsystem_dev_t *se_dev,
 					      const char *page, ssize_t count)
@@ -1094,15 +1036,9 @@ extern void pscsi_get_hba_info (se_hba_t *hba, char *b, int *bl)
 
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  SCSI Host ID: %u\n",
 			 hba->hba_id, sh->host_no);
+	*bl += sprintf(b+*bl, "        Parallel SCSI HBA: %s  <local>\n",
+		(sh->hostt->name) ? (sh->hostt->name) : "Unknown");
 
-	if (strcmp(sh->hostt->name, INIT_CORE_NAME))
-		*bl += sprintf(b+*bl, "        Parallel SCSI HBA: %s  <local>\n",
-			(sh->hostt->name) ? (sh->hostt->name) : "Unknown");
-	else
-		*bl += sprintf(b+*bl, "        Parallel SCSI HBA: %s "
-				" iSCSI Channel No: %d  <remote>\n",
-				(sh->hostt->name) ? (sh->hostt->name) : "Unknown",
-				hba->hba_info.iscsi_channel_id);
 	return;	
 }
 

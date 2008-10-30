@@ -53,16 +53,14 @@ extern int pscsi_CDB_write_non_SG (se_task_t *, u32);
 extern int pscsi_CDB_write_SG (se_task_t *, u32);
 
 #ifndef PSCSI_INCLUDE_STRUCTS
-extern int pscsi_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
+extern int pscsi_attach_hba (se_hba_t *, u32);
 extern int pscsi_detach_hba (se_hba_t *);
-extern int pscsi_scan_devices (se_hba_t *, se_hbainfo_t *);
 extern int pscsi_claim_phydevice (se_hba_t *, se_device_t *);
 extern int pscsi_release_phydevice (se_device_t *);
 extern void *pscsi_allocate_virtdevice (se_hba_t *, const char *);
 extern se_device_t *pscsi_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
 extern int pscsi_activate_device (se_device_t *);
 extern void pscsi_deactivate_device (se_device_t *);
-extern int pscsi_check_ghost_id (se_hbainfo_t *);
 extern void pscsi_free_device (void *);
 extern int pscsi_transport_complete (se_task_t *);
 extern void *pscsi_allocate_request (se_task_t *, se_device_t *);
@@ -70,7 +68,6 @@ extern void pscsi_get_evpd_prod (unsigned char *, u32, se_device_t *);
 extern void pscsi_get_evpd_sn (unsigned char *, u32, se_device_t *);
 extern int pscsi_do_task (se_task_t *);
 extern void pscsi_free_task (se_task_t *);
-extern int pscsi_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t pscsi_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t pscsi_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t pscsi_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
@@ -155,12 +152,10 @@ se_subsystem_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 	create_virtdevice:	pscsi_create_virtdevice,	\
 	free_device:		pscsi_free_device,		\
 	release_phydevice:	pscsi_release_phydevice,	\
-	check_ghost_id:		pscsi_check_ghost_id,		\
 	transport_complete:	pscsi_transport_complete,	\
 	allocate_request:	pscsi_allocate_request,		\
 	do_task:		pscsi_do_task,			\
 	free_task:		pscsi_free_task,		\
-	check_hba_params:	pscsi_check_hba_params,		\
 	check_configfs_dev_params: pscsi_check_configfs_dev_params, \
 	set_configfs_dev_params: pscsi_set_configfs_dev_params, \
 	show_configfs_dev_params: pscsi_show_configfs_dev_params, \
