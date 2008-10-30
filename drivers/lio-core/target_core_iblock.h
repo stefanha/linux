@@ -45,7 +45,7 @@ extern int iblock_CDB_read_SG (se_task_t *, u32);
 extern int iblock_CDB_write_non_SG (se_task_t *, u32);
 extern int iblock_CDB_write_SG (se_task_t *, u32);
 
-extern int iblock_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
+extern int iblock_attach_hba (se_hba_t *, u32);
 extern int iblock_detach_hba (se_hba_t *);
 extern int iblock_claim_phydevice (se_hba_t *, se_device_t *);
 extern int iblock_release_phydevice (se_device_t *);
@@ -53,7 +53,6 @@ extern void *iblock_allocate_virtdevice (se_hba_t *, const char *);
 extern se_device_t *iblock_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
 extern int iblock_activate_device (se_device_t *);
 extern void iblock_deactivate_device (se_device_t *);
-extern int iblock_check_ghost_id (se_hbainfo_t *);
 extern void iblock_free_device (void *);
 extern int iblock_transport_complete (se_task_t *);
 extern void *iblock_allocate_request (se_task_t *, se_device_t *);
@@ -61,7 +60,6 @@ extern void iblock_get_evpd_prod (unsigned char *, u32, se_device_t *);
 extern void iblock_get_evpd_sn (unsigned char *, u32, se_device_t *);
 extern int iblock_do_task (se_task_t *);
 extern void iblock_free_task (se_task_t *);
-extern int iblock_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t iblock_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t iblock_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t iblock_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
@@ -146,14 +144,12 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	create_virtdevice:	iblock_create_virtdevice,	\
 	activate_device:	iblock_activate_device,		\
 	deactivate_device:	iblock_deactivate_device,	\
-	check_ghost_id:		iblock_check_ghost_id,		\
 	free_device:		iblock_free_device,		\
 	release_phydevice:	iblock_release_phydevice,	\
 	transport_complete:	iblock_transport_complete,	\
 	allocate_request:	iblock_allocate_request,	\
 	do_task:		iblock_do_task,			\
 	free_task:		iblock_free_task,		\
-	check_hba_params:	iblock_check_hba_params,	\
 	check_configfs_dev_params: iblock_check_configfs_dev_params, \
 	set_configfs_dev_params: iblock_set_configfs_dev_params, \
 	show_configfs_dev_params: iblock_show_configfs_dev_params, \

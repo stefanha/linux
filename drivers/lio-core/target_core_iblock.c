@@ -48,8 +48,6 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
-#include <iscsi_target_ioctl.h>
-#include <iscsi_target_ioctl_defs.h>
 #include <target_core_device.h>
 #include <iscsi_target_device.h>
 #include <target_core_transport.h>
@@ -71,25 +69,20 @@ extern se_global_t *se_global;
  *
  *
  */
-extern int iblock_attach_hba (
-	iscsi_portal_group_t *tpg,
-	se_hba_t *hba,
-	se_hbainfo_t *hi)
+extern int iblock_attach_hba (se_hba_t *hba, u32 host_id)
 {
 	iblock_hba_t *ib_host;
 
-	if (!(ib_host = kmalloc(sizeof(iblock_hba_t), GFP_KERNEL))) {
+	if (!(ib_host = kzalloc(sizeof(iblock_hba_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for iblock_hba_t\n");
-		return(-1);
+		return(-ENOMEM);
 	}
-	memset(ib_host, 0, sizeof(iblock_hba_t));
 
-	ib_host->iblock_host_id = hi->iblock_host_id;
+	ib_host->iblock_host_id = host_id;
 
 	atomic_set(&hba->left_queue_depth, IBLOCK_HBA_QUEUE_DEPTH);
 	atomic_set(&hba->max_queue_depth, IBLOCK_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) ib_host;
-	hba->hba_id = hi->hba_id;
 	hba->transport = &iblock_template;
 
 	PYXPRINT("CORE_HBA[%d] - %s iBlock HBA Driver %s on"
@@ -302,35 +295,6 @@ extern void iblock_deactivate_device (se_device_t *dev)
 	return;
 }
 
-extern int iblock_check_ghost_id (se_hbainfo_t *hi)
-{
-	int i;
-	se_hba_t *hba;
-	iblock_hba_t *ib_hba;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		 hba = &se_global->hba_list[i];
-
-		 if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			 continue;
-		 if (hba->type != IBLOCK)
-			 continue;
-
-		 ib_hba = (iblock_hba_t *) hba->hba_ptr;
-		 if (ib_hba->iblock_host_id == hi->iblock_host_id) {
-			 TRACE_ERROR("iBlock HBA with iblock_hba_id: %u already"
-				" assigned to iSCSI HBA: %hu, ignoring request\n",
-				hi->iblock_host_id, hba->hba_id);
-			 spin_unlock(&se_global->hba_lock);
-			 return(-1);
-		}
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	return(0);
-}
-
 extern void iblock_free_device (void *p)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) p;
@@ -532,18 +496,6 @@ extern void iblock_free_task (se_task_t *task)
 	return;
 }
 
-extern int iblock_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
-{
-	if (!(t->hba_params_set & PARAM_HBA_IBLOCK_HOST_ID)) {
-		TRACE_ERROR("iblock_host_id must be set for"
-			" addhbatotarget requests with iBlock interfaces\n");
-		return(ERR_HBA_MISSING_PARAMS);
-	}
-	hi->iblock_host_id = t->iblock_host_id;
-
-	return(0);
-}
-
 extern ssize_t iblock_set_configfs_dev_params (se_hba_t *hba,
 					       se_subsystem_dev_t *se_dev,
 					       const char *page, ssize_t count)
@@ -704,8 +656,10 @@ extern void iblock_get_plugin_info (void *p, char *b, int *bl)
 
 extern void iblock_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
+	iblock_hba_t *ib_host = (iblock_hba_t *)hba->hba_ptr;
+
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  iBlock Host ID: %u\n",
-		hba->hba_id, hba->hba_info.iblock_host_id);
+		hba->hba_id, ib_host->iblock_host_id);
 	*bl += sprintf(b+*bl, "        LIO iBlock HBA\n");
 
 	return;
