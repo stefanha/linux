@@ -50,7 +50,7 @@ extern int fd_CDB_read_SG (se_task_t *, u32);
 extern int fd_CDB_write_non_SG (se_task_t *, u32);
 extern int fd_CDB_write_SG (se_task_t *, u32);
 
-extern int fd_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
+extern int fd_attach_hba (se_hba_t *, u32);
 extern int fd_detach_hba (se_hba_t *);
 extern int fd_claim_phydevice (se_hba_t *, se_device_t *);
 extern int fd_release_phydevice (se_device_t *);
@@ -58,7 +58,6 @@ extern void *fd_allocate_virtdevice (se_hba_t *, const char *);
 extern se_device_t *fd_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
 extern int fd_activate_device (se_device_t *);
 extern void fd_deactivate_device (se_device_t *);
-extern int fd_check_ghost_id (se_hbainfo_t *);
 extern void fd_free_device (void *);
 extern int fd_transport_complete (se_task_t *);
 extern void *fd_allocate_request (se_task_t *, se_device_t *);
@@ -66,7 +65,6 @@ extern void fd_get_evpd_prod (unsigned char *, u32, se_device_t *);
 extern void fd_get_evpd_sn (unsigned char *, u32, se_device_t *);
 extern int fd_do_task (se_task_t *);
 extern void fd_free_task (se_task_t *);
-extern int fd_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t fd_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t fd_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t fd_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
@@ -173,13 +171,11 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	create_virtdevice:	fd_create_virtdevice,		\
 	activate_device:	fd_activate_device,		\
 	deactivate_device:	fd_deactivate_device,		\
-	check_ghost_id:		fd_check_ghost_id,		\
 	free_device:		fd_free_device,			\
 	transport_complete:	fd_transport_complete,		\
 	allocate_request:	fd_allocate_request,		\
 	do_task:		fd_do_task,			\
 	free_task:		fd_free_task,			\
-	check_hba_params:	fd_check_hba_params,		\
 	check_configfs_dev_params: fd_check_configfs_dev_params, \
 	set_configfs_dev_params: fd_set_configfs_dev_params,	\
 	show_configfs_dev_params: fd_show_configfs_dev_params,	\

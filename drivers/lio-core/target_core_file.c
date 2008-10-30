@@ -46,8 +46,6 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
-#include <iscsi_target_ioctl.h>
-#include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
 #include <target_core_transport.h>
 #include <iscsi_target_util.h>
@@ -66,25 +64,20 @@ extern int linux_blockdevice_check(int, int);
  *
  *
  */
-extern int fd_attach_hba (
-	iscsi_portal_group_t *tpg,
-	se_hba_t *hba,
-	se_hbainfo_t *hi)
+extern int fd_attach_hba (se_hba_t *hba, u32 host_id)
 {
 	fd_host_t *fd_host;
 
-	if (!(fd_host = kmalloc(sizeof(fd_host_t), GFP_KERNEL))) {
+	if (!(fd_host = kzalloc(sizeof(fd_host_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for fd_host_t\n");
 		return(-1);
 	}
-	memset(fd_host, 0, sizeof(fd_host_t));
 
-	fd_host->fd_host_id = hi->fd_host_id;
+	fd_host->fd_host_id = host_id;
 	
 	atomic_set(&hba->left_queue_depth, FD_HBA_QUEUE_DEPTH);
 	atomic_set(&hba->max_queue_depth, FD_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) fd_host;
-	hba->hba_id = hi->hba_id;
 	hba->transport = &fileio_template;
 
 	PYXPRINT("CORE_HBA[%d] - %s FILEIO HBA Driver %s on"
@@ -367,35 +360,6 @@ extern void fd_deactivate_device (se_device_t *dev)
 		fd_dev->fd_dev_id);
 
 	return;
-}
-
-extern int fd_check_ghost_id (se_hbainfo_t *hi)
-{
-	int i;          
-	se_hba_t *hba;
-	fd_host_t *fh;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			continue;
-		if (hba->type != FILEIO)
-			continue;
-
-		fh = (fd_host_t *) hba->hba_ptr;
-		if (fh->fd_host_id == hi->fd_host_id) {
-			TRACE_ERROR("FILEIO HBA with FD_HOST_ID: %u already"
-				" assigned to iSCSI HBA: %hu, ignoring request\n",
-				hi->fd_host_id, hba->hba_id);
-			spin_unlock(&se_global->hba_lock);
-			return(-1);
-		}
-	}
-	spin_unlock(&se_global->hba_lock);
-		
-	return(0);
 }
 
 /*	fd_free_device(): (Part of se_subsystem_api_t template)
@@ -953,19 +917,6 @@ extern void fd_free_task (se_task_t *task)
 	return;
 }
 
-extern int fd_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
-{
-	if (!(t->hba_params_set & PARAM_HBA_FD_HOST_ID)) {
-		TRACE_ERROR("fd_host_id must be set for"
-			" addhbatotarget requests with FILEIO"
-				" Interfaces\n");
-		return(ERR_HBA_MISSING_PARAMS);
-	}
-	hi->fd_host_id = t->fd_host_id;
-
-	return(0);
-}
-
 extern ssize_t fd_set_configfs_dev_params (se_hba_t *hba,
 					       se_subsystem_dev_t *se_dev,
 					       const char *page, ssize_t count)
@@ -1046,8 +997,10 @@ extern void fd_get_plugin_info (void *p, char *b, int *bl)
 
 extern void fd_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
+	fd_host_t *fd_host = (fd_host_t *)hba->hba_ptr;
+
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  FD Host ID: %u\n",
-		 hba->hba_id, hba->hba_info.fd_host_id);
+		 hba->hba_id, fd_host->fd_host_id);
 	*bl += sprintf(b+*bl, "        LIO FILEIO HBA\n");
 
 	return;
