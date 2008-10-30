@@ -52,7 +52,7 @@ extern int rd_CDB_read_SG (se_task_t *, u32);
 extern int rd_CDB_write_non_SG (se_task_t *, u32);
 extern int rd_CDB_write_SG (se_task_t *, u32);
 
-extern int rd_attach_hba (iscsi_portal_group_t *, se_hba_t *, se_hbainfo_t *);
+extern int rd_attach_hba (se_hba_t *, u32);
 extern int rd_detach_hba (se_hba_t *);
 extern void *rd_DIRECT_allocate_virtdevice (se_hba_t *, const char *);
 extern void *rd_MEMCPY_allocate_virtdevice (se_hba_t *, const char *);
@@ -60,8 +60,6 @@ extern se_device_t *rd_DIRECT_create_virtdevice (se_hba_t *, se_subsystem_dev_t 
 extern se_device_t *rd_MEMCPY_create_virtdevice (se_hba_t *, se_subsystem_dev_t *, void *);
 extern int rd_activate_device (se_device_t *);
 extern void rd_deactivate_device (se_device_t *);
-extern int rd_mcp_check_ghost_id (se_hbainfo_t *);
-extern int rd_dr_check_ghost_id (se_hbainfo_t *);
 extern void rd_free_device (void *);
 extern int rd_transport_complete (se_task_t *);
 extern void *rd_allocate_request (se_task_t *, se_device_t *);
@@ -73,7 +71,6 @@ extern int rd_DIRECT_allocate_DMA (iscsi_cmd_t *, u32, u32);
 extern int rd_DIRECT_do_se_mem_map (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 extern void rd_DIRECT_free_DMA (iscsi_cmd_t *);
 extern void rd_free_task (se_task_t *);
-extern int rd_check_hba_params (se_hbainfo_t *, struct iscsi_target *, int);
 extern ssize_t rd_set_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, const char *, ssize_t);
 extern ssize_t rd_check_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *);
 extern ssize_t rd_show_configfs_dev_params (se_hba_t *, se_subsystem_dev_t *, char *);
@@ -167,7 +164,6 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	create_virtdevice:	rd_DIRECT_create_virtdevice,	\
 	activate_device:	rd_activate_device,		\
 	deactivate_device:	rd_deactivate_device,		\
-	check_ghost_id:		rd_dr_check_ghost_id,		\
 	free_device:		rd_free_device,			\
 	transport_complete:	rd_transport_complete,		\
 	allocate_DMA:		rd_DIRECT_allocate_DMA,		\
@@ -175,7 +171,6 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	allocate_request:	rd_allocate_request,		\
 	do_task:		rd_DIRECT_do_task,		\
 	free_task:		rd_free_task,			\
-	check_hba_params:	rd_check_hba_params,		\
 	check_configfs_dev_params: rd_check_configfs_dev_params, \
 	set_configfs_dev_params: rd_set_configfs_dev_params,	\
 	show_configfs_dev_params: rd_show_configfs_dev_params,	\
@@ -214,13 +209,11 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 	create_virtdevice:	rd_MEMCPY_create_virtdevice,	\
 	activate_device:	rd_activate_device,		\
 	deactivate_device:	rd_deactivate_device,		\
-	check_ghost_id:		rd_mcp_check_ghost_id,		\
 	free_device:		rd_free_device,			\
 	transport_complete:	rd_transport_complete,		\
 	allocate_request:	rd_allocate_request,		\
 	do_task:		rd_MEMCPY_do_task,		\
 	free_task:		rd_free_task,			\
-	check_hba_params:	rd_check_hba_params,		\
 	check_configfs_dev_params: rd_check_configfs_dev_params, \
 	set_configfs_dev_params: rd_set_configfs_dev_params,	\
 	show_configfs_dev_params: rd_show_configfs_dev_params,	\

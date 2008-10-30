@@ -46,8 +46,6 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
-#include <iscsi_target_ioctl.h>
-#include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_device.h>
 #include <target_core_transport.h>
 #include <iscsi_target_util.h>
@@ -65,26 +63,21 @@ extern se_global_t *se_global;
  *
  *
  */
-extern int rd_attach_hba (
-	iscsi_portal_group_t *tpg,
-	se_hba_t *hba,
-	se_hbainfo_t *hi)
+extern int rd_attach_hba (se_hba_t *hba, u32 host_id)
 {
 	rd_host_t *rd_host;
 
-	if (!(rd_host = kmalloc(sizeof(rd_host_t), GFP_KERNEL))) {
+	if (!(rd_host = kzalloc(sizeof(rd_host_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for rd_host_t\n");
-		return(-1);
+		return(-ENOMEM);
 	}
-	memset(rd_host, 0, sizeof(rd_host_t));
 
-	rd_host->rd_host_id = hi->rd_host_id;
+	rd_host->rd_host_id = host_id;
 	
 	atomic_set(&hba->left_queue_depth, RD_HBA_QUEUE_DEPTH);
 	atomic_set(&hba->max_queue_depth, RD_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) rd_host;
-	hba->hba_id = hi->hba_id;
-	hba->transport = (hi->hba_type == RAMDISK_DR) ? &rd_dr_template : &rd_mcp_template;
+	hba->transport = (hba->type == RAMDISK_DR) ? &rd_dr_template : &rd_mcp_template;
 
 	PYXPRINT("CORE_HBA[%d] - %s Ramdisk HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id, PYX_ISCSI_VENDOR,
@@ -356,45 +349,6 @@ extern void rd_deactivate_device (se_device_t *dev)
 		rd_dev->rd_dev_id);
 
 	return;
-}
-
-extern int rd_check_ghost_id (se_hbainfo_t *hi, int type)
-{
-	int i;          
-	se_hba_t *hba;
-	rd_host_t *rh;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			continue;
-		if (hba->type != type)
-			continue;
-
-		rh = (rd_host_t *) hba->hba_ptr;
-		if (rh->rd_host_id == hi->rd_host_id) {
-			TRACE_ERROR("RAMDISK HBA with RH_HOST_ID: %u already"
-				" assigned to iSCSI HBA: %hu, ignoring request\n",
-				hi->rd_host_id, hba->hba_id);
-			spin_unlock(&se_global->hba_lock);
-			return(-1);
-		}
-	}
-	spin_unlock(&se_global->hba_lock);
-		
-	return(0);
-}
-
-extern int rd_mcp_check_ghost_id (se_hbainfo_t *hi)
-{
-	return(rd_check_ghost_id(hi, RAMDISK_MCP));
-}
-
-extern int rd_dr_check_ghost_id (se_hbainfo_t *hi)
-{
-	return(rd_check_ghost_id(hi, RAMDISK_DR));
 }
 
 /*	rd_free_device(): (Part of se_subsystem_api_t template)
@@ -1112,19 +1066,6 @@ extern void rd_free_task (se_task_t *task)
 	return;
 }
 
-extern int rd_check_hba_params (se_hbainfo_t *hi, struct iscsi_target *t, int virt)
-{
-	if (!(t->hba_params_set & PARAM_HBA_RD_HOST_ID)) {
-		TRACE_ERROR("rd_host_id must be set for"
-			" addhbatotarget requests with Ramdisk"
-			" Interfaces\n");
-		return(ERR_HBA_MISSING_PARAMS);
-	}
-	hi->rd_host_id = t->rd_host_id;
-
-	return(0);
-}
-
 extern ssize_t rd_set_configfs_dev_params (se_hba_t *hba,
 						se_subsystem_dev_t *se_dev,
 						const char *page, ssize_t count)
@@ -1202,9 +1143,11 @@ extern void rd_mcp_get_plugin_info (void *p, char *b, int *bl)
 
 extern void rd_get_hba_info (se_hba_t *hba, char *b, int *bl)
 {
+	rd_host_t *rd_host = (rd_host_t *)hba->hba_ptr;
+
 	*bl += sprintf(b+*bl, "iSCSI Host ID: %u  RD Host ID: %u\n",
-		hba->hba_id, hba->hba_info.rd_host_id);
-	*bl += sprintf(b+*bl, "        iSBE RamDisk HBA\n");
+		hba->hba_id, rd_host->rd_host_id);
+	*bl += sprintf(b+*bl, "        LIO RamDisk HBA\n");
 
 	return;
 }
