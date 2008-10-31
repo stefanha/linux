@@ -84,7 +84,6 @@ iscsi_target_mod-objs		:=	iscsi_crc.o \
 					iscsi_target_erl0.o \
 					iscsi_target_erl1.o \
 					iscsi_target_erl2.o \
-					iscsi_target_ioctl.o \
 					iscsi_target_login.o \
 					iscsi_target_nego.o \
 					iscsi_target_nodeattrib.o \

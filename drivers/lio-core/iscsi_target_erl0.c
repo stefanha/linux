@@ -47,8 +47,6 @@
 #include <iscsi_debug.h>
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
-#include <iscsi_target_ioctl.h>
-#include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>

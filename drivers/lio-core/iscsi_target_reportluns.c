@@ -45,7 +45,6 @@
 #include <iscsi_debug.h>
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
-#include <iscsi_target_ioctl.h>
 #include <iscsi_target_device.h>
 #include <target_core_transport.h>
 #include <iscsi_target_util.h>

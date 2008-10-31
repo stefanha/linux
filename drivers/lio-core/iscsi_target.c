@@ -58,8 +58,6 @@
 #include <iscsi_target_core.h>
 #include <target_core_base.h>
 #include <iscsi_target_error.h>
-#include <iscsi_target_ioctl.h>
-#include <iscsi_target_ioctl_defs.h>
 #include <iscsi_target_datain_values.h>
 #include <iscsi_target_discovery.h>
 #include <iscsi_target_erl0.h>
@@ -1063,12 +1061,6 @@ static int iscsi_target_detect(void)
 	spin_lock_init(&iscsi_global->debug_dev_lock);
 #endif
 
-	if ((ret = misc_register(&iscsi_dev))) {
-		TRACE_ERROR("misc_register returned an error\n");
-		ret = -1;
-		goto out;
-	}
-
 #ifdef CONFIG_PROC_FS
 	if (!(dir_entry = proc_mkdir("iscsi_target", 0))) {
 		TRACE_ERROR("proc_mkdir() failed.\n");
@@ -1096,9 +1088,8 @@ static int iscsi_target_detect(void)
 #endif
 #endif /* CONFIG_PROC_FS */
 
-#if 1
 	iscsi_target_register_configfs();
-#endif
+
 	if (iscsi_allocate_thread_sets(TARGET_THREAD_SET_COUNT, TARGET) !=
 			TARGET_THREAD_SET_COUNT) {
 		TRACE_ERROR("iscsi_allocate_thread_sets() returned"
@@ -1123,9 +1114,7 @@ out:
 	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 	core_release_discovery_tpg();
 	iscsi_deallocate_thread_sets(TARGET);
-#if 1
 	iscsi_target_deregister_configfs();
-#endif
 #ifdef CONFIG_PROC_FS
 # ifdef SNMP_SUPPORT
         remove_iscsi_target_mib();
@@ -1134,8 +1123,6 @@ out:
 	remove_proc_entry("iscsi_target/target_nodename", 0);
 	remove_proc_entry("iscsi_target", 0);
 #endif
-	
-	misc_deregister(&iscsi_dev);
 #ifdef DEBUG_ERL
 	kfree(iscsi_global->debug_erl);
 #endif /* DEBUG_ERL */
@@ -1181,10 +1168,8 @@ extern void iscsi_target_release_phase2 (void)
 	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 
 	iscsi_global->ti_forcechanoffline = NULL;
-#if 1
 	iscsi_target_deregister_configfs();
-#endif
-	
+
 #ifdef CONFIG_PROC_FS
 # ifdef SNMP_SUPPORT
 	remove_iscsi_target_mib();
@@ -1211,11 +1196,6 @@ static int iscsi_target_release (void)
 	
 	iscsi_target_release_phase1(1);
 	iscsi_target_release_phase2();
-
-	if ((ret = misc_deregister(&iscsi_dev))) {
-		TRACE_ERROR("misc_deregister returned an error\n");
-		ret = -1;
-	}
 
 #ifdef DEBUG_ERL
 	kfree(iscsi_global->debug_erl);
