@@ -273,11 +273,19 @@ static struct config_group *lio_target_call_addnptotpg (
 				" in IPv6 iSCSI network portal address\n");
 			return(ERR_PTR(-EINVAL));
 		}
-		str2 += 1; /* Skip over the "]" */
+		str++; /* Skip over leading "[" */
 		*str2 = '\0'; /* Terminate the IPv6 address */
-		str2 += 1; /* Set str2 to port */
-		np_addr.np_port = simple_strtoul(str2, &end_ptr, 0);
-		snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE, "%s\n", str);
+		str2 += 1; /* Skip over the "]" */
+		if (!(port_str = strstr(str2, ":"))) {
+			printk(KERN_ERR "Unable to locate \":port\""
+				" in IPv6 iSCSI network portal address\n");
+			return(ERR_PTR(-EINVAL));
+		}
+		*port_str = '\0'; /* Terminate string for IP */
+		port_str += 1; /* Skip over ":" */
+		np_addr.np_port = simple_strtoul(port_str, &end_ptr, 0);
+
+		snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE, "%s", str);
 		np_addr.np_flags |= NPF_NET_IPV6;
 	} else {
 		ip_str = &buf[0];
