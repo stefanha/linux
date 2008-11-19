@@ -901,6 +901,11 @@ extern u32 iblock_get_queue_depth (se_device_t *dev)
 	return(IBLOCK_DEVICE_QUEUE_DEPTH);
 }
 
+extern u32 iblock_get_max_queue_depth (se_device_t *dev)
+{
+	return(IBLOCK_MAX_DEVICE_QUEUE_DEPTH);
+}
+
 extern unsigned char *iblock_get_non_SG (se_task_t *task)
 {
 	return((unsigned char *)task->iscsi_cmd->t_task->t_task_buf);

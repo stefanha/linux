@@ -35,6 +35,7 @@
 #define FD_MAX_DEV_NAME		256
 #define FD_HBA_QUEUE_DEPTH	256		/* Maximum queuedepth for the FILEIO HBA */
 #define FD_DEVICE_QUEUE_DEPTH	32
+#define FD_MAX_DEVICE_QUEUE_DEPTH 128
 #define FD_BLOCKSIZE		512
 #define FD_MAX_SECTORS		1024
 
@@ -80,6 +81,7 @@ extern u32 fd_get_device_type (se_device_t *);
 extern u32 fd_get_dma_length (u32, se_device_t *);
 extern u32 fd_get_max_sectors (se_device_t *);
 extern u32 fd_get_queue_depth (se_device_t *);
+extern u32 fd_get_max_queue_depth (se_device_t *);
 extern unsigned char *fd_get_non_SG (se_task_t *);
 extern struct scatterlist *fd_get_SG (se_task_t *);
 extern u32 fd_get_SG_count (se_task_t *);
@@ -193,6 +195,7 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	get_evpd_sn:		fd_get_evpd_sn,			\
 	get_max_sectors:	fd_get_max_sectors,		\
 	get_queue_depth:	fd_get_queue_depth,		\
+	get_max_queue_depth:	fd_get_max_queue_depth,		\
 	get_non_SG:		fd_get_non_SG,			\
 	get_SG:			fd_get_SG,			\
 	get_SG_count:		fd_get_SG_count,		\

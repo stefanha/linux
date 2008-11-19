@@ -461,11 +461,29 @@ extern int se_dev_set_queue_depth (se_device_t *dev, u32 queue_depth)
 		TRACE_ERROR("dev[%p]: Illegal ZERO value for queue_depth\n", dev);
 		return(-1);
 	}
-	if (queue_depth > TRANSPORT(dev)->get_queue_depth(dev)) {
-		TRACE_ERROR("dev[%p]: Passed queue_depth: %u exceeds"
-			" LIO-Core/SE_Device TCQ: %u\n", dev, queue_depth,
-			TRANSPORT(dev)->get_queue_depth(dev));
-		return(-1);
+	
+	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
+		if (queue_depth > TRANSPORT(dev)->get_queue_depth(dev)) {
+			TRACE_ERROR("dev[%p]: Passed queue_depth: %u exceeds"
+				" LIO-Core/SE_Device TCQ: %u\n", dev, queue_depth,
+				TRANSPORT(dev)->get_queue_depth(dev));
+			return(-1);
+		}
+	} else {
+		if (queue_depth > TRANSPORT(dev)->get_queue_depth(dev)) {
+			if (!(TRANSPORT(dev)->get_max_queue_depth)) {
+				TRACE_ERROR("dev[%p]: Unable to locate "
+					"get_max_queue_depth() function"
+					" pointer\n", dev);
+				return(-1);
+			}
+			if (queue_depth > TRANSPORT(dev)->get_max_queue_depth(dev)) {
+				TRACE_ERROR("dev[%p]: Passed queue_depth: %u exceeds"
+				" LIO-Core/SE_Device MAX TCQ: %u\n", dev, queue_depth,
+					TRANSPORT(dev)->get_max_queue_depth(dev));
+				return(-1);
+			}
+		}
 	}
 		
 	DEV_ATTRIB(dev)->queue_depth = dev->queue_depth = queue_depth;

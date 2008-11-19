@@ -1251,6 +1251,11 @@ extern u32 fd_get_queue_depth (se_device_t *dev)
 	return(FD_DEVICE_QUEUE_DEPTH);
 }
 
+extern u32 fd_get_max_queue_depth (se_device_t *dev)
+{
+	return(FD_MAX_DEVICE_QUEUE_DEPTH);
+}
+
 /*	fd_get_non_SG(): (Part of se_subsystem_api_t template)
  *
  *

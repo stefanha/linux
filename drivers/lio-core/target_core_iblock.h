@@ -34,6 +34,7 @@
 #define IBLOCK_MAX_SECTORS	128
 #define IBLOCK_HBA_QUEUE_DEPTH	512
 #define IBLOCK_DEVICE_QUEUE_DEPTH	32
+#define IBLOCK_MAX_DEVICE_QUEUE_DEPTH	128
 #define IBLOCK_MAX_CDBS		16
 #define IBLOCK_LBA_SHIFT	9
 
@@ -76,6 +77,7 @@ extern u32 iblock_get_device_type (se_device_t *);
 extern u32 iblock_get_dma_length (u32, se_device_t *);
 extern u32 iblock_get_max_sectors (se_device_t *);
 extern u32 iblock_get_queue_depth (se_device_t *);
+extern u32 iblock_get_max_queue_depth (se_device_t *);
 extern unsigned char *iblock_get_non_SG (se_task_t *);
 extern struct scatterlist *iblock_get_SG (se_task_t *);
 extern u32 iblock_get_SG_count (se_task_t *);
@@ -168,6 +170,7 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	get_evpd_sn:		iblock_get_evpd_sn,		\
 	get_max_sectors:	iblock_get_max_sectors,		\
 	get_queue_depth:	iblock_get_queue_depth,		\
+	get_max_queue_depth:	iblock_get_max_queue_depth,	\
 	get_non_SG:		iblock_get_non_SG,		\
 	get_SG:			iblock_get_SG,			\
 	get_SG_count:		iblock_get_SG_count,		\

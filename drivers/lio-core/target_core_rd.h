@@ -37,6 +37,7 @@
 #define RD_MAX_ALLOCATION_SIZE	65536		/* Largest piece of memory kmalloc can allocate */
 #define RD_HBA_QUEUE_DEPTH	256		/* Maximum queuedepth for the Ramdisk HBA */
 #define RD_DEVICE_QUEUE_DEPTH	32
+#define RD_MAX_DEVICE_QUEUE_DEPTH 128
 #define RD_BLOCKSIZE		512
 #define RD_MAX_SECTORS		1024
 
@@ -88,6 +89,7 @@ extern u32 rd_get_device_type (se_device_t *);
 extern u32 rd_get_dma_length (u32, se_device_t *);
 extern u32 rd_get_max_sectors (se_device_t *);
 extern u32 rd_get_queue_depth (se_device_t *);
+extern u32 rd_get_max_queue_depth (se_device_t *);
 extern unsigned char *rd_get_non_SG (se_task_t *);
 extern struct scatterlist *rd_get_SG (se_task_t *);
 extern u32 rd_get_SG_count (se_task_t *);
@@ -188,6 +190,7 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	get_evpd_sn:		rd_get_evpd_sn,			\
 	get_max_sectors:	rd_get_max_sectors,		\
 	get_queue_depth:	rd_get_queue_depth,		\
+	get_max_queue_depth:	rd_get_max_queue_depth,		\
 	do_se_mem_map:		rd_DIRECT_do_se_mem_map,	\
 	get_non_SG:		rd_get_non_SG,			\
 	get_SG:			rd_get_SG,			\
@@ -231,6 +234,7 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 	get_evpd_sn:		rd_get_evpd_sn,			\
 	get_max_sectors:	rd_get_max_sectors,		\
 	get_queue_depth:	rd_get_queue_depth,		\
+	get_max_queue_depth:	rd_get_max_queue_depth,		\
 	get_non_SG:		rd_get_non_SG,			\
 	get_SG:			rd_get_SG,			\
 	get_SG_count:		rd_get_SG_count,		\
