@@ -84,8 +84,8 @@
 
 /* se_dev_attrib_t sanity values */
 #define DA_TASK_TIMEOUT_MAX			600 /* 10 Minutes, see transport_get_default_task_timeout()  */
-#define DA_STATUS_THREAD			1 /* Enabled by default */
-#define DA_STATUS_THREAD_TUR			1 /* Enabled by default */
+#define DA_STATUS_THREAD			0 /* Disabled by default */
+#define DA_STATUS_THREAD_TUR			0 /* Disabled by default */
 #define DA_STATUS_MAX_SECTORS_MIN		16
 #define DA_STATUS_MAX_SECTORS_MAX		8192
 

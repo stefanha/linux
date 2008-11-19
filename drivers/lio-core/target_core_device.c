@@ -376,7 +376,13 @@ extern void se_dev_set_default_attribs (se_device_t *dev)
 	/*
 	 * task_timeout is based on device type.
 	 */
+#if 1
+	// Disabled by default due to known BUG in some cases when task_timeout fires..
+	// task_timeout, status_thread and status_thread_tur may end up being removed in v3.0..
+	DEV_ATTRIB(dev)->task_timeout = 0;
+#else
 	DEV_ATTRIB(dev)->task_timeout = transport_get_default_task_timeout(dev);
+#endif
 
 	return;
 }
