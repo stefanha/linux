@@ -763,9 +763,9 @@ static struct socket *iscsi_target_setup_login_socket (iscsi_np_t *np)
 		goto fail;
 	}
 	
-	if (sock_create_lite((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
+	if (sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
 			sock_type, ip_proto, &sock) < 0) {
-		TRACE_ERROR("sock_create_lite() failed.\n");
+		TRACE_ERROR("sock_create() failed.\n");
 		goto fail;
 	}
 	np->np_socket = sock;
