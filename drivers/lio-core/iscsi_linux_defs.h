@@ -48,29 +48,6 @@
 	copy_to_user((void *)(dest), (void *)(src), (len))
 
 /*
- * Sockets.
- */
-#define iscsi_sock_create(sock, f, t, p, uc, td) sock_create(f, t, p, sock)
-#define iscsi_sock_connect(sock, s_in, size, td) sock->ops->connect(sock, s_in, size, 0)
-#define iscsi_sock_bind(sock, s_in, size, td) sock->ops->bind(sock, s_in, size)
-#define iscsi_sock_listen(sock, backlog, td) sock->ops->listen(sock, backlog)
-#define iscsi_sock_accept(sock, newsock, td) sock->ops->accept(sock, newsock, 0)
-#define iscsi_sock_sockopt_off(sock, p, o) \
-	{ \
-	int value = 0; \
-	sock->ops->setsockopt(sock, p, o, (char *)&value, sizeof(value)); \
-	}
-#define iscsi_sock_sockopt_on(sock, p, o) \
-	{ \
-	int value = 1; \
-	sock->ops->setsockopt(sock, p, o, (char *)&value, sizeof(value)); \
-	}
-#define iscsi_sock_sockopt_bindtodev(sock, dev) \
-	{ \
-	sock->ops->setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, dev, strlen(dev)); \
-	}
-
-/*
  * Threads.
  */
 #define iscsi_daemon(thread, name, sigs) \

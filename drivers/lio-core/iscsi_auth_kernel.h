@@ -101,9 +101,8 @@ extern u32 iscsi_handle_authentication (
 	s_addr.sin_addr.s_addr	= htonl(INADDR_LOOPBACK);
 	s_addr.sin_port		= htons(AUTH_PORT);
 
-	if (iscsi_sock_create(&authsock, AF_INET, SOCK_DGRAM, IPPROTO_UDP,
-			NULL, NULL) < 0) {
-		TRACE_ERROR("iscsi_sock_create() failed!\n");
+	if (sock_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP, &authsock) < 0) {
+		TRACE_ERROR("sock_create() failed!\n");
 		ret = -1;
 		goto out;
 	}

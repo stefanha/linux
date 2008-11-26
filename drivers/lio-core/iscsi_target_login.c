@@ -737,7 +737,7 @@ static struct socket *iscsi_target_setup_login_socket (iscsi_np_t *np)
 {
 	const char *end;
 	struct socket *sock;
-	int backlog = 5, ip_proto, sock_type, ret;
+	int backlog = 5, ip_proto, sock_type, ret, opt = 0;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 	
@@ -763,9 +763,9 @@ static struct socket *iscsi_target_setup_login_socket (iscsi_np_t *np)
 		goto fail;
 	}
 	
-	if (iscsi_sock_create(&sock, (np->np_flags & NPF_NET_IPV6) ? AF_INET6 :
-			AF_INET, sock_type, ip_proto, NULL, NULL) < 0) {
-		TRACE_ERROR("iscsi_sock_create() failed.\n");
+	if (sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
+			sock_type, ip_proto, &sock) < 0) {
+		TRACE_ERROR("sock_create() failed.\n");
 		goto fail;
 	}
 	np->np_socket = sock;
@@ -814,28 +814,39 @@ static struct socket *iscsi_target_setup_login_socket (iscsi_np_t *np)
 
 	/*
 	 * Set SO_REUSEADDR, and disable Nagel Algorithm with TCP_NODELAY.
-	 * NOTE: setsockopt() w/ SO_REUSEADDR on LINUX 2.4 is broken,  force it.
 	 */
-	iscsi_sock_sockopt_on(sock, IPPROTO_TCP, TCP_NODELAY);
-	iscsi_sock_sockopt_on(sock, SOL_SOCKET, SO_REUSEADDR);
-	sock->sk->sk_reuse = 1;
+	opt = 1;
+	if (np->np_network_transport == ISCSI_TCP) {
+		if ((ret = kernel_setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+				(char *)&opt, sizeof(opt))) < 0) {
+			printk(KERN_ERR "kernel_setsockopt() for TCP_NODELAY"
+				" failed: %d\n", ret);
+			goto fail;
+		}
+	}
+	if ((ret = kernel_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, 
+			(char *)&opt, sizeof(opt))) < 0) {
+		printk(KERN_ERR "kernel_setsockopt() for SO_REUSEADDR"
+			" failed\n");
+		goto fail;
+	}
 	
 	if (np->np_flags & NPF_NET_IPV6) {
-		if ((ret = iscsi_sock_bind(sock, (struct sockaddr *)&sock_in6,
-				sizeof(struct sockaddr_in6), NULL)) < 0) {
-			TRACE_ERROR("iscsi_sock_bind() failed: %d\n", ret);
+		if ((ret = kernel_bind(sock, (struct sockaddr *)&sock_in6,
+				sizeof(struct sockaddr_in6))) < 0) {
+			TRACE_ERROR("kernel_bind() failed: %d\n", ret);
 			goto fail;
 		}
 	} else {
-		if ((ret = iscsi_sock_bind(sock, (struct sockaddr *)&sock_in,
-				sizeof(struct sockaddr), NULL)) < 0) {
-			TRACE_ERROR("iscsi_sock_bind() failed: %d\n", ret);
+		if ((ret = kernel_bind(sock, (struct sockaddr *)&sock_in,
+				sizeof(struct sockaddr))) < 0) {
+			TRACE_ERROR("kernel_bind() failed: %d\n", ret);
 			goto fail;
 		}
 	}
 
-	if (iscsi_sock_listen(sock, backlog, NULL)) {
-		TRACE_ERROR("iscsi_sock_listen() failed.\n");
+	if (kernel_listen(sock, backlog)) {
+		TRACE_ERROR("kernel_listen() failed.\n");
 		goto fail;
 	}
 	
@@ -914,9 +925,9 @@ get_new_sock:
 		return(-1);
 	}
 	
-	if (iscsi_sock_create(&new_sock, (np->np_flags & NPF_NET_IPV6) ? AF_INET6 :
-			AF_INET, sock_type, ip_proto, NULL, NULL) < 0) {
-		TRACE_ERROR("iscsi_sock_create() failed for new_sock\n");
+	if (sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
+			sock_type, ip_proto, &new_sock) < 0) {
+		TRACE_ERROR("sock_create() failed for new_sock\n");
 		if (start) {
 			up(&np->np_start_sem);
 			return(0);
@@ -968,7 +979,7 @@ get_new_sock:
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 	
-	if (iscsi_sock_accept(sock, new_sock, NULL) < 0) {
+	if (kernel_accept(sock, &new_sock, 0) < 0) {
 		if (new_sock) {
 			if (set_sctp_conn_flag) {
 				kfree(new_sock->file);
