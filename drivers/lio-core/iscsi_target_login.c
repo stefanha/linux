@@ -925,9 +925,9 @@ get_new_sock:
 		return(-1);
 	}
 	
-	if (sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
+	if (sock_create_lite((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
 			sock_type, ip_proto, &new_sock) < 0) {
-		TRACE_ERROR("sock_create() failed for new_sock\n");
+		TRACE_ERROR("sock_create_lite() failed for new_sock\n");
 		if (start) {
 			up(&np->np_start_sem);
 			return(0);
