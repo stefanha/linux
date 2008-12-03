@@ -906,27 +906,6 @@ extern u32 iblock_get_max_queue_depth (se_device_t *dev)
 	return(IBLOCK_MAX_DEVICE_QUEUE_DEPTH);
 }
 
-extern unsigned char *iblock_get_non_SG (se_task_t *task)
-{
-	return((unsigned char *)task->iscsi_cmd->t_task->t_task_buf);
-}
-
-extern struct scatterlist *iblock_get_SG (se_task_t *task)
-{
-	return((struct scatterlist *)task->task_buf);
-}
-
-extern u32 iblock_get_SG_count (se_task_t *task)
-{
-	return(task->task_sg_num);
-}
-
-//#warning FIXME v2.8: Breakage in iblock_set_non_SG_buf()
-extern int iblock_set_non_SG_buf (unsigned char *buf, se_task_t *task)
-{
-	return(0);
-}
-
 extern void iblock_bio_done (struct bio *bio, int err)
 {
 	se_task_t *task = (se_task_t *)bio->bi_private;

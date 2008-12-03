@@ -82,10 +82,6 @@ extern u32 fd_get_dma_length (u32, se_device_t *);
 extern u32 fd_get_max_sectors (se_device_t *);
 extern u32 fd_get_queue_depth (se_device_t *);
 extern u32 fd_get_max_queue_depth (se_device_t *);
-extern unsigned char *fd_get_non_SG (se_task_t *);
-extern struct scatterlist *fd_get_SG (se_task_t *);
-extern u32 fd_get_SG_count (se_task_t *);
-extern int fd_set_non_SG_buf (unsigned char *, se_task_t *);
 #endif /* ! FD_INCLUDE_STRUCTS */
 
 #define RRF_EMULATE_CDB		0x01
@@ -196,10 +192,6 @@ se_subsystem_spc_t fileio_template_spc = ISCSI_FILEIO_SPC;
 	get_max_sectors:	fd_get_max_sectors,		\
 	get_queue_depth:	fd_get_queue_depth,		\
 	get_max_queue_depth:	fd_get_max_queue_depth,		\
-	get_non_SG:		fd_get_non_SG,			\
-	get_SG:			fd_get_SG,			\
-	get_SG_count:		fd_get_SG_count,		\
-	set_non_SG_buf:		fd_set_non_SG_buf,		\
 	write_pending:		NULL,				\
 	spc:			&fileio_template_spc,		\
 };

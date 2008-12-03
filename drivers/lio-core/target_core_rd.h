@@ -90,10 +90,6 @@ extern u32 rd_get_dma_length (u32, se_device_t *);
 extern u32 rd_get_max_sectors (se_device_t *);
 extern u32 rd_get_queue_depth (se_device_t *);
 extern u32 rd_get_max_queue_depth (se_device_t *);
-extern unsigned char *rd_get_non_SG (se_task_t *);
-extern struct scatterlist *rd_get_SG (se_task_t *);
-extern u32 rd_get_SG_count (se_task_t *);
-extern int rd_set_non_SG_buf (unsigned char *, se_task_t *);
 #endif /* ! RD_INCLUDE_STRUCTS */
 
 #define RRF_EMULATE_CDB		0x01
@@ -192,10 +188,6 @@ se_subsystem_spc_t rd_template_spc = ISCSI_RD_SPC;
 	get_queue_depth:	rd_get_queue_depth,		\
 	get_max_queue_depth:	rd_get_max_queue_depth,		\
 	do_se_mem_map:		rd_DIRECT_do_se_mem_map,	\
-	get_non_SG:		rd_get_non_SG,			\
-	get_SG:			rd_get_SG,			\
-	get_SG_count:		rd_get_SG_count,		\
-	set_non_SG_buf:		rd_set_non_SG_buf,		\
 	write_pending:		NULL,				\
 	spc:			&rd_template_spc,		\
 };
@@ -235,10 +227,6 @@ se_subsystem_api_t rd_dr_template = ISCSI_RD_DR;
 	get_max_sectors:	rd_get_max_sectors,		\
 	get_queue_depth:	rd_get_queue_depth,		\
 	get_max_queue_depth:	rd_get_max_queue_depth,		\
-	get_non_SG:		rd_get_non_SG,			\
-	get_SG:			rd_get_SG,			\
-	get_SG_count:		rd_get_SG_count,		\
-	set_non_SG_buf:		rd_set_non_SG_buf,		\
 	write_pending:		NULL,				\
 	spc:			&rd_template_spc,		\
 };

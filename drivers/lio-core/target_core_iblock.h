@@ -78,10 +78,6 @@ extern u32 iblock_get_dma_length (u32, se_device_t *);
 extern u32 iblock_get_max_sectors (se_device_t *);
 extern u32 iblock_get_queue_depth (se_device_t *);
 extern u32 iblock_get_max_queue_depth (se_device_t *);
-extern unsigned char *iblock_get_non_SG (se_task_t *);
-extern struct scatterlist *iblock_get_SG (se_task_t *);
-extern u32 iblock_get_SG_count (se_task_t *);
-extern int iblock_set_non_SG_buf (unsigned char *, se_task_t *);
 extern void iblock_bio_done (struct bio *, int);
 #endif /* ! IBLOCK_INCLUDE_STRUCTS */
 
@@ -171,10 +167,6 @@ se_subsystem_spc_t iblock_template_spc = ISCSI_IBLOCK_SPC;
 	get_max_sectors:	iblock_get_max_sectors,		\
 	get_queue_depth:	iblock_get_queue_depth,		\
 	get_max_queue_depth:	iblock_get_max_queue_depth,	\
-	get_non_SG:		iblock_get_non_SG,		\
-	get_SG:			iblock_get_SG,			\
-	get_SG_count:		iblock_get_SG_count,		\
-	set_non_SG_buf:		iblock_set_non_SG_buf,		\
 	write_pending:		NULL,				\
 	spc:			&iblock_template_spc,		\
 };

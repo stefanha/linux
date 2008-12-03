@@ -417,22 +417,6 @@ typedef struct se_subsystem_api_s {
 	 */
 	unsigned char *(*get_sense_buffer)(se_task_t *);
 	/*
-	 * get_non_SG():
-	 */
-	unsigned char *(*get_non_SG)(se_task_t *);
-	/*
-	 * get_SG():
-	 */
-	struct scatterlist *(*get_SG)(se_task_t *);
-	/*
-	 * get_SG_count():
-	 */
-	__u32 (*get_SG_count)(se_task_t *);
-	/*
-	 * set_non_SG_buf():
-	 */
-	int (*set_non_SG_buf)(unsigned char *, se_task_t *);
-	/*
 	 * map_task_to_SG():
 	 */
 	void (*map_task_to_SG)(se_task_t *);

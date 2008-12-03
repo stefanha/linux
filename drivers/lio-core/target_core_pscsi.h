@@ -85,10 +85,6 @@ extern u32 pscsi_get_device_type (se_device_t *);
 extern u32 pscsi_get_dma_length (u32, se_device_t *);
 extern u32 pscsi_get_max_sectors (se_device_t *);
 extern u32 pscsi_get_queue_depth (se_device_t *);
-extern unsigned char *pscsi_get_non_SG (se_task_t *);
-extern struct scatterlist *pscsi_get_SG (se_task_t *);
-extern u32 pscsi_get_SG_count (se_task_t *);
-extern int pscsi_set_non_SG_buf (unsigned char *, se_task_t *);
 extern void pscsi_shutdown_hba (struct se_hba_s *);
 extern void pscsi_req_done (struct request *, int);
 #endif
@@ -176,10 +172,6 @@ se_subsystem_spc_t pscsi_template_spc = ISCSI_PSCSI_SPC;
 	get_evpd_sn:		pscsi_get_evpd_sn,		\
 	get_max_sectors:	pscsi_get_max_sectors,		\
 	get_queue_depth:	pscsi_get_queue_depth,		\
-	get_non_SG:		pscsi_get_non_SG,		\
-	get_SG:			pscsi_get_SG,			\
-	get_SG_count:		pscsi_get_SG_count,		\
-	set_non_SG_buf:		pscsi_set_non_SG_buf,		\
 	shutdown_hba:		pscsi_shutdown_hba,		\
 	write_pending:		NULL,				\
 	spc:			&pscsi_template_spc,		\

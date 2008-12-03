@@ -349,14 +349,3 @@ static void rl_free_task (se_task_t *task)
 	
 	return;
 }
-
-/*	rl_get_non_SG():
- *
- *
- */
-static unsigned char *rl_get_non_SG (se_task_t *task)
-{
-	rl_cmd_t *rl_cmd = (rl_cmd_t *) task->transport_req;
-	
-	return(rl_cmd->rl_buf);
-}

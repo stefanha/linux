@@ -39,13 +39,11 @@ extern int iscsi_build_report_luns_response (iscsi_cmd_t *);
 
 static int rl_check_for_SG (se_task_t *);
 static void rl_free_task (se_task_t *);
-static unsigned char *rl_get_non_SG (se_task_t *);
 
 #define ISCSI_RL { 					\
 	name:			"RL",			\
 	check_for_SG:		rl_check_for_SG,	\
 	free_task:		rl_free_task,		\
-	get_non_SG:		rl_get_non_SG,		\
 };
 
 se_subsystem_api_t rl_template = ISCSI_RL;

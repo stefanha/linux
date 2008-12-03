@@ -1417,50 +1417,6 @@ extern u32 pscsi_get_queue_depth (se_device_t *dev)
 	return(sd->queue_depth);
 }
 
-/*	pscsi_get_non_SG():
- *
- *
- */
-extern unsigned char *pscsi_get_non_SG (se_task_t *task)
-{
-	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	
-	return((unsigned char *)pt->pscsi_buf);
-}
-
-/*	pscsi_get_SG():
- *
- * 
- */
-extern struct scatterlist *pscsi_get_SG (se_task_t *task)
-{
-	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-
-	return((struct scatterlist *)pt->pscsi_buf);
-}
-
-/*	pscsi_get_SG_count():
- *
- *
- */
-extern u32 pscsi_get_SG_count (se_task_t *task)
-{
-	return(task->task_sg_num);
-}
-
-/*	pscsi_set_non_SG_buf(): (Part of se_subsystem_api_t template)
- *
- *
- */
-extern int pscsi_set_non_SG_buf (unsigned char *buf, se_task_t *task)
-{
-	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-
-	pt->pscsi_buf = (void *) buf;
-
-	return(0);
-}
-
 extern void pscsi_shutdown_hba (se_hba_t *hba)
 {
 	struct Scsi_Host *sh = (struct Scsi_Host *)hba->hba_ptr;
