@@ -303,8 +303,8 @@ static void scsi_bi_endio(struct bio *bio, int error)
  * request can be sent to the block layer. We do not trust the scatterlist
  * sent to use, as some ULDs use that struct to only organize the pages.
  */
-static int scsi_req_map_sg(struct request *rq, struct scatterlist *sgl,
-			   int nsegs, unsigned bufflen, gfp_t gfp)
+int scsi_req_map_sg(struct request *rq, struct scatterlist *sgl,
+		    int nsegs, unsigned bufflen, gfp_t gfp)
 {
 	struct request_queue *q = rq->q;
 	int nr_pages = (bufflen + sgl[0].offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
@@ -378,6 +378,8 @@ free_bios:
 
 	return err;
 }
+
+EXPORT_SYMBOL_GPL(scsi_req_map_sg);
 
 /**
  * scsi_execute_async - insert request

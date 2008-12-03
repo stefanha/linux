@@ -90,7 +90,7 @@ extern struct scatterlist *pscsi_get_SG (se_task_t *);
 extern u32 pscsi_get_SG_count (se_task_t *);
 extern int pscsi_set_non_SG_buf (unsigned char *, se_task_t *);
 extern void pscsi_shutdown_hba (struct se_hba_s *);
-extern void pscsi_req_done (void *, char *, int, int);
+extern void pscsi_req_done (struct request *, int);
 #endif
 
 #include <linux/device.h>
@@ -104,8 +104,9 @@ typedef struct pscsi_plugin_task_s {
 	unsigned char pscsi_sense[SCSI_SENSE_BUFFERSIZE];
 	int	pscsi_direction;
 	int	pscsi_result;
-	u32	pscsi_data_len;
+	u32	pscsi_resid;
 	void	*pscsi_buf;
+	struct request *pscsi_req;
 } pscsi_plugin_task_t;
 
 #define PDF_HAS_CHANNEL_ID	0x01
