@@ -586,7 +586,7 @@ static int fd_do_readv (fd_request_t *req, se_task_t *task)
 	u32 i;
 	mm_segment_t old_fs;
 	struct file *fd = req->fd_dev->fd_file;
-	struct scatterlist *sg = (struct scatterlist *) req->fd_buf;
+	struct scatterlist *sg = task->task_sg;
 	struct iovec iov[req->fd_sg_count];	
 
 	memset(iov, 0, sizeof(struct iovec) + req->fd_sg_count);
@@ -638,7 +638,7 @@ static int fd_do_aio_read (fd_request_t *req, se_task_t *task)
 	unsigned long long offset, lba = req->fd_lba;;
 	mm_segment_t old_fs;
 	struct file *fd = req->fd_dev->fd_file;
-	struct scatterlist *sg = (struct scatterlist *) req->fd_buf;
+	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	struct kiocb	*iocb;
 
@@ -716,7 +716,7 @@ static int fd_sendactor (read_descriptor_t * desc, struct page *page, unsigned l
 	unsigned long count = desc->count;
 	se_task_t *task = desc->arg.data;
 	fd_request_t *req = (fd_request_t *) task->transport_req;	
-	struct scatterlist *sg = (struct scatterlist *) req->fd_buf;
+	struct scatterlist *sg = task->task_sg;
 
 //	PYXPRINT("page: %p offset: %lu size: %lu\n", page, offset, size);
 
@@ -767,7 +767,7 @@ static int fd_do_writev (fd_request_t *req, se_task_t *task)
 	int ret = 0;
 	u32 i;
 	struct file *fd = req->fd_dev->fd_file;
-	struct scatterlist *sg = (struct scatterlist *) req->fd_buf;
+	struct scatterlist *sg = task->task_sg;
 	mm_segment_t old_fs;
 	struct iovec iov[req->fd_sg_count];
 
@@ -803,7 +803,7 @@ static int fd_do_aio_write (fd_request_t *req, se_task_t *task)
 	unsigned long long offset, lba = req->fd_lba;
 	mm_segment_t old_fs;
 	struct file *fd = req->fd_dev->fd_file;
-	struct scatterlist *sg = (struct scatterlist *) req->fd_buf;
+	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	struct kiocb    *iocb;
 
@@ -1065,7 +1065,7 @@ extern void fd_map_task_SG (se_task_t *task)
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
 	req->fd_bufflen		= task->task_size;
-	req->fd_buf		= (void *)task->task_buf;
+	req->fd_buf		= NULL;
 	req->fd_sg_count	= task->task_sg_num;
 
 	return;
