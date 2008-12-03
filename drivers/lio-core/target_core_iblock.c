@@ -755,7 +755,7 @@ extern int iblock_map_task_SG (se_task_t *task)
 	iblock_dev_t *ib_dev = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 	iblock_req_t *ib_req = (iblock_req_t *) task->transport_req;
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
-	struct scatterlist *sg = (struct scatterlist *)task->task_buf;
+	struct scatterlist *sg = task->task_sg;
 	int ret = 0;
 	u32 i, sg_num = task->task_sg_num;
 	u64 lba = task->task_lba;
@@ -769,7 +769,7 @@ extern int iblock_map_task_SG (se_task_t *task)
 	hbio = tbio = bio;
 	/*
 	 * Use fs/bio.c:bio_add_pages() to setup the bio_vec maplist
-	 * from LIO-SE se_mem_t -> task->task_buf -> struct scatterlist memory.
+	 * from LIO-SE se_mem_t -> task->task_sg -> struct scatterlist memory.
 	 */
 	for (i = 0; i < task->task_sg_num; i++) {
 		DEBUG_IBLOCK("task: %p bio: %p Calling bio_add_page(): page: %p len:"
