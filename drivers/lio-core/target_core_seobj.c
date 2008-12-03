@@ -348,8 +348,9 @@ extern int dev_obj_do_se_mem_map (
 	 * been done by the transport plugin.
 	 */
 	if (TRANSPORT(dev)->do_se_mem_map) {
-		if ((ret = TRANSPORT(dev)->do_se_mem_map(task, se_mem_list, in_mem, in_se_mem,
-				out_se_mem, se_mem_cnt, task_offset)) == 0)
+		if ((ret = TRANSPORT(dev)->do_se_mem_map(task, se_mem_list,
+				in_mem, in_se_mem, out_se_mem, se_mem_cnt,
+				task_offset)) == 0)
 			T_TASK(task->iscsi_cmd)->t_task_se_num += *se_mem_cnt;
 
 		return(ret);
@@ -362,10 +363,10 @@ extern int dev_obj_do_se_mem_map (
 		return(-1);
 	
 	/*
-	 * se_task_t->task_buf now contains the struct scatterlist array.
+	 * se_task_t->task_sg now contains the struct scatterlist array.
 	 */
-	return(transport_map_mem_to_sg(task, se_mem_list, task->task_buf, in_se_mem, out_se_mem,
-			se_mem_cnt, task_offset));
+	return(transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
+		in_se_mem, out_se_mem, se_mem_cnt, task_offset));
 }
 
 extern int dev_obj_get_mem_buf (void *p, iscsi_cmd_t *cmd)
