@@ -4643,7 +4643,7 @@ extern void transport_free_dev_tasks (iscsi_cmd_t *cmd)
 		if (!task->transport_req)
 			continue;
 		
-		kfree(task->task_sg);
+		kfree(task->task_buf);
 		
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 		if (task->iscsi_dev)
@@ -5097,12 +5097,13 @@ extern u32 transport_calc_sg_num (
 			break;
 	}
 
-	if (!(task->task_sg = kzalloc(task->task_sg_num * sizeof(struct scatterlist), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate memory for task->task_sg\n");
+	if (!(task->task_buf = kmalloc(task->task_sg_num * sizeof(struct scatterlist), GFP_KERNEL))) {
+		TRACE_ERROR("Unable to allocate memory for task->task_buf\n");
 		return(0);	
 	}
+	memset(task->task_buf, 0, task->task_sg_num * sizeof(struct scatterlist));
 
-	sg_init_table(&task->task_sg[0], task->task_sg_num);
+	sg_init_table((struct scatterlist *)&task->task_buf[0], task->task_sg_num);
 
 	DEBUG_SC("Successfully allocated task->task_sg_num: %u\n", task->task_sg_num);
 	

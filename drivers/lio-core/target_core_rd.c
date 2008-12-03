@@ -1195,7 +1195,7 @@ extern void rd_map_task_SG (se_task_t *task)
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
 	req->rd_bufflen		= task->task_size;
-	req->rd_buf		= task->task_sg;
+	req->rd_buf		= (void *)task->task_buf;
 	req->rd_sg_count	= task->task_sg_num;
 
 	return;

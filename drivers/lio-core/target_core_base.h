@@ -249,7 +249,7 @@ typedef struct se_transport_task_s {
 
 typedef struct se_task_s {
         unsigned char   task_sense;
-	struct scatterlist *task_sg;
+        unsigned char   *task_buf;
         void            *transport_req;
         u8              task_scsi_status;
         u8              task_flags;

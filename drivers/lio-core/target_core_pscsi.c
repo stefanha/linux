@@ -1165,19 +1165,22 @@ extern int pscsi_map_task_SG (se_task_t *task)
         pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	int ret = 0;
 
-	pt->pscsi_buf = (void *)task->task_sg;
+	pt->pscsi_buf = (void *)task->task_buf;
 
 	if (!task->task_size)
 		return(0);
 #if 0
 	if ((ret = blk_rq_map_sg(pdv->pdv_sd->request_queue,
-			pt->pscsi_req, task->task_sg)) < 0) {
+			pt->pscsi_req,
+			(struct scatterlist *)pt->pscsi_buf)) < 0) {
 		printk(KERN_ERR "PSCSI: blk_rq_map_sg() returned %d\n", ret);
 		return(PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE);
 	}
 #else
-	if ((ret = scsi_req_map_sg(pt->pscsi_req, task->task_sg,
-			task->task_sg_num, task->task_size, GFP_KERNEL)) < 0) {
+	if ((ret = scsi_req_map_sg(pt->pscsi_req,
+			(struct scatterlist *)pt->pscsi_buf,
+			task->task_sg_num, task->task_size,
+			GFP_KERNEL)) < 0) {
 		printk(KERN_ERR "PSCSI: scsi_req_map_sg() failed: %d\n", ret);
 		return(PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE);
 	}
