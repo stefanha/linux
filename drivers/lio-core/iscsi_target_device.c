@@ -346,23 +346,7 @@ extern int iscsi_free_device_list_for_node (iscsi_node_acl_t *nacl, iscsi_portal
 	return(0);
 }
 
-static int iscsi_check_device_list_access (
-	u32 mapped_lun,
-	iscsi_node_acl_t *nacl)
-{
-	int ret = 0;
-	se_dev_entry_t *deve;
-	
-	spin_lock_bh(&nacl->device_list_lock);
-	deve = &nacl->device_list[mapped_lun];
-	if (deve->lun_flags & ISCSI_LUNFLAGS_INITIATOR_ACCESS)
-		ret = -1;
-	spin_unlock_bh(&nacl->device_list_lock);
-
-	return(ret);
-}
-
-extern int iscsi_update_device_list_access (
+extern void iscsi_update_device_list_access (
 	u32 mapped_lun,
 	u32 lun_access,
 	iscsi_node_acl_t *nacl)
@@ -371,23 +355,16 @@ extern int iscsi_update_device_list_access (
 
 	spin_lock_bh(&nacl->device_list_lock);
 	deve = &nacl->device_list[mapped_lun];
-	if (!(deve->lun_flags & ISCSI_LUNFLAGS_INITIATOR_ACCESS)) {
-		TRACE_ERROR("TPG[%u] - Initiator: %s Mapped LUN: %u not present!\n",
-			nacl->tpg->tpgt, nacl->initiatorname, mapped_lun);
-		spin_unlock_bh(&nacl->device_list_lock);
-		return(ERR_LUN_NOT_ACTIVE);
-	}
-	
-	if (deve->lun_flags & ISCSI_LUNFLAGS_READ_ONLY) {
-		if (lun_access & ISCSI_LUNFLAGS_READ_WRITE)
-			deve->lun_flags &= ~ISCSI_LUNFLAGS_READ_ONLY;
+	if (lun_access & ISCSI_LUNFLAGS_READ_WRITE) {
+		deve->lun_flags &= ~ISCSI_LUNFLAGS_READ_ONLY;
+		deve->lun_flags |= ISCSI_LUNFLAGS_READ_WRITE;
 	} else {
-		if (lun_access & ISCSI_LUNFLAGS_READ_ONLY)
-			deve->lun_flags |= ISCSI_LUNFLAGS_READ_ONLY;
+		deve->lun_flags &= ~ISCSI_LUNFLAGS_READ_WRITE;
+		deve->lun_flags |= ISCSI_LUNFLAGS_READ_ONLY;
 	}
 	spin_unlock_bh(&nacl->device_list_lock);
 
-	return(0);
+	return;
 }
 
 /*	iscsi_update_device_list_for_node():
@@ -402,32 +379,30 @@ extern void iscsi_update_device_list_for_node (
 	iscsi_portal_group_t *tpg,
 	int enable)
 {
-	int status = 0;
 	se_dev_entry_t *deve;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	deve = &nacl->device_list[mapped_lun];
 	if (enable) {
-		if (!(deve->lun_flags & ISCSI_LUNFLAGS_INITIATOR_ACCESS)) {
-			deve->iscsi_lun = lun;
-			deve->mapped_lun = mapped_lun;
-			deve->lun_flags |= ISCSI_LUNFLAGS_INITIATOR_ACCESS;	
+		deve->iscsi_lun = lun;
+		deve->mapped_lun = mapped_lun;
+		deve->lun_flags |= ISCSI_LUNFLAGS_INITIATOR_ACCESS;	
 
-			if (lun_access & ISCSI_LUNFLAGS_READ_ONLY)
-				deve->lun_flags |= ISCSI_LUNFLAGS_READ_ONLY;
-			
-			status = 2;
+		if (lun_access & ISCSI_LUNFLAGS_READ_WRITE) {
+			deve->lun_flags &= ~ISCSI_LUNFLAGS_READ_ONLY;
+			deve->lun_flags |= ISCSI_LUNFLAGS_READ_WRITE;
+		} else {
+			deve->lun_flags &= ~ISCSI_LUNFLAGS_READ_WRITE;
+			deve->lun_flags |= ISCSI_LUNFLAGS_READ_ONLY;
+		}
 #ifdef SNMP_SUPPORT
-			deve->creation_time = get_jiffies_64();
-			deve->attach_count++;
+		deve->creation_time = get_jiffies_64();
+		deve->attach_count++;
 #endif /* SNMP_SUPPORT */
-		}
 	} else {
-		if (deve->lun_flags & ISCSI_LUNFLAGS_INITIATOR_ACCESS) {
-			deve->iscsi_lun = NULL;
-			deve->lun_flags = 0;
-			status = 1;
-		}
+		deve->iscsi_lun = NULL;
+		deve->lun_flags = 0;
+		deve->creation_time = 0;
 	}
 	spin_unlock_bh(&nacl->device_list_lock);
 		
@@ -745,16 +720,6 @@ extern se_lun_acl_t *iscsi_dev_init_initiator_node_lun_acl (
 		*ret = -EINVAL;
 		return(NULL);
 	}
-#warning iscsi_check_device_list_access() fails for IQN with active session when generate_node_acls=1,cache_dynmaic_acls=1
-	if (iscsi_check_device_list_access(mapped_lun, nacl) < 0) {
-		TRACE_ERROR("ACL Entry already exists for iSCSI"
-			" Initiator Node: %s for Mapped iSCSI Logout Unit Number: %u"
-			" on iSCSI Target Portal Group: %hu, ignoring request\n",
-				initiatorname, mapped_lun, tpg->tpgt);
-		*ret = -EEXIST;
-		return(NULL);
-	}
-	
 	if (!(lacl = (se_lun_acl_t *) kmalloc(sizeof(se_lun_acl_t), GFP_KERNEL))) {	
 		TRACE_ERROR("Unable to allocate memory for se_lun_acl_t.\n");
 		*ret = -ENOMEM;
@@ -763,6 +728,7 @@ extern se_lun_acl_t *iscsi_dev_init_initiator_node_lun_acl (
 	memset(lacl, 0, sizeof(se_lun_acl_t));
 
 	lacl->mapped_lun = mapped_lun;
+	lacl->se_lun_nacl = nacl;
 	snprintf(lacl->initiatorname, ISCSI_IQN_LEN, "%s", initiatorname);
 
 	return(lacl);
@@ -845,33 +811,4 @@ extern void iscsi_dev_free_initiator_node_lun_acl (
 
 	kfree(lacl);
 	return;
-}
-
-extern int iscsi_dev_set_initiator_node_lun_access (
-	iscsi_portal_group_t *tpg,
-	u32 mapped_lun,
-	u32 lun_access,
-	char *initiatorname)
-{
-	int ret;
-	iscsi_node_acl_t *nacl;
-	
-	if (strlen(initiatorname) > ISCSI_IQN_LEN) {
-		TRACE_ERROR("iSCSI InitiatorName exceeds maximum size.\n");
-		return(ERR_INITIATORNAME_TOO_LARGE);
-	}
-
-	if (mapped_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
-		TRACE_ERROR("iSCSI MAPPED LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
-			" %u for Target Portal Group: %hu\n", mapped_lun,
-			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
-		return(ERR_LUN_NOT_ACTIVE);
-	}
-	
-	if (!(nacl = iscsi_tpg_get_initiator_node_acl(tpg, initiatorname)))
-		 return(ERR_DELLUNACL_NODE_ACL_MISSING);
-
-	ret = iscsi_update_device_list_access(mapped_lun, lun_access, nacl);
-
-	return(ret);
 }
