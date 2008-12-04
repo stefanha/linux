@@ -110,7 +110,8 @@
 #define TA_DEFAULT_CMDSN_DEPTH_MAX	512
 #define TA_DEFAULT_CMDSN_DEPTH_MIN	1
 #define TA_CACHE_DYNAMIC_ACLS		0
-#define TA_DEMO_MODE_LUN_ACCESS		0 // READ-ONLY by default in demo mode
+#define TA_DEMO_MODE_WRITE_PROTECT	1 // Enabled by default in demo mode (generic_node_acls=1)
+#define TA_PROD_MODE_WRITE_PROTECT	0 // Disabled by default in production mode w/ explict ACLs
 #define TA_CACHE_CORE_NPS		0
 
 /* iscsi_map_sg_t->map_flags */
@@ -815,7 +816,8 @@ typedef struct iscsi_tpg_attrib_s {
 	u32			generate_node_acls;
 	u32			cache_dynamic_acls;
 	u32			default_cmdsn_depth;
-	u32			demo_mode_lun_access;
+	u32			demo_mode_write_protect;
+	u32			prod_mode_write_protect;
 	u32			cache_core_nps;
 	struct iscsi_portal_group_s *tpg;
 	struct config_group	tpg_attrib_group;

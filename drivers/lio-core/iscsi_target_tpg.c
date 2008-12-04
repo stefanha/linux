@@ -399,9 +399,9 @@ extern void iscsi_tpg_add_node_to_devs (
 		spin_unlock(&tpg->tpg_lun_lock);
 
 		/*
-		 * By default, demo_mode_lun_access is ZERO, or READ_ONLY;
+		 * By default, demo_mode_write_protect is ON, or READ_ONLY;
 		 */
-		if (ISCSI_TPG_ATTRIB(tpg)->demo_mode_lun_access) {
+		if (!(ISCSI_TPG_ATTRIB(tpg)->demo_mode_write_protect)) {
 			if (LUN_OBJ_API(lun)->get_device_access) {
 				if (LUN_OBJ_API(lun)->get_device_access(lun->lun_type_ptr) == 0)
 					lun_access = ISCSI_LUNFLAGS_READ_ONLY;
@@ -595,7 +595,8 @@ static void iscsi_set_default_tpg_attribs (iscsi_portal_group_t *tpg)
 	a->default_cmdsn_depth = TA_DEFAULT_CMDSN_DEPTH;
 	a->generate_node_acls = TA_GENERATE_NODE_ACLS;
 	a->cache_dynamic_acls = TA_CACHE_DYNAMIC_ACLS;
-	a->demo_mode_lun_access = TA_DEMO_MODE_LUN_ACCESS;
+	a->demo_mode_write_protect = TA_DEMO_MODE_WRITE_PROTECT;
+	a->prod_mode_write_protect = TA_PROD_MODE_WRITE_PROTECT;
 	a->cache_core_nps = TA_CACHE_CORE_NPS;
 		
 	return;
@@ -1602,7 +1603,7 @@ extern int iscsi_ta_cache_dynamic_acls (
 	return(0);
 }
 
-extern int iscsi_ta_demo_mode_lun_access (
+extern int iscsi_ta_demo_mode_write_protect (
 	iscsi_portal_group_t *tpg,
 	u32 flag)
 {
@@ -1613,9 +1614,27 @@ extern int iscsi_ta_demo_mode_lun_access (
 		return(-EINVAL);
 	}
 
-	a->demo_mode_lun_access = flag;
-	PYXPRINT("iSCSI_TPG[%hu] - Demo Mode iSCSI LUN Access: %s\n",
-		tpg->tpgt, (a->demo_mode_lun_access) ? "READ-WRITE" : "READ-ONLY");
+	a->demo_mode_write_protect = flag;
+	PYXPRINT("iSCSI_TPG[%hu] - Demo Mode Write Protect bit: %s\n",
+		tpg->tpgt, (a->demo_mode_write_protect) ? "ON" : "OFF");
+
+	return(0);
+}
+
+extern int iscsi_ta_prod_mode_write_protect (
+	iscsi_portal_group_t *tpg,
+	u32 flag)
+{
+	iscsi_tpg_attrib_t *a = &tpg->tpg_attrib;
+
+	if ((flag != 0) && (flag != 1)) {
+		TRACE_ERROR("Illegal value %d\n", flag);
+		return(-EINVAL);
+	}
+
+	a->prod_mode_write_protect = flag;
+	PYXPRINT("iSCSI_TPG[%hu] - Production Mode Write Protect bit: %s\n",
+		tpg->tpgt, (a->prod_mode_write_protect) ? "ON" : "OFF");
 
 	return(0);
 }
