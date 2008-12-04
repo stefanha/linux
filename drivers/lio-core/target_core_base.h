@@ -302,6 +302,7 @@ struct scatterlist;
 typedef struct se_lun_acl_s {
 	char			initiatorname[ISCSI_IQN_LEN];
 	u32			mapped_lun;
+	struct iscsi_node_acl_s *se_lun_nacl;
 	struct se_lun_s		*iscsi_lun;
 	struct se_lun_acl_s	*next;
 	struct se_lun_acl_s	*prev;
