@@ -56,7 +56,7 @@
 #include <iscsi_target_configfs.h>
 #include <configfs_macros.h>
 
-static struct target_fabric_configfs *lio_target_fabric_configfs = NULL;
+struct target_fabric_configfs *lio_target_fabric_configfs = NULL;
 
 struct lio_target_configfs_attribute {
 	struct configfs_attribute attr;
@@ -2271,13 +2271,12 @@ extern int iscsi_target_register_configfs (void)
 	/*
 	 * Temporary OPs function pointers used by target_core_mod..
 	 */
-	fabric->tf_ops.release_cmd_to_pool = &iscsi_release_cmd_to_pool;
-	fabric->tf_ops.release_cmd_direct = &iscsi_release_cmd_direct;
+	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd_to_pool;
+	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
 	fabric->tf_ops.dev_del_lun = &iscsi_dev_del_lun;
 	fabric->tf_ops.stop_session = &iscsi_stop_session;
 	fabric->tf_ops.fall_back_to_erl0 = &iscsi_fall_back_to_erl0;
-	fabric->tf_ops.add_cmd_to_response_queue = &iscsi_add_cmd_to_response_queue;
-	fabric->tf_ops.build_r2ts_for_cmd = &iscsi_build_r2ts_for_cmd;
+	fabric->tf_ops.write_pending = &lio_write_pending;
 	fabric->tf_ops.dec_nacl_count = &iscsi_dec_nacl_count;
 	fabric->tf_ops.scsi_auth_intr_seq_start = &lio_scsi_auth_intr_seq_start;
 	fabric->tf_ops.scsi_auth_intr_seq_next = &lio_scsi_auth_intr_seq_next;
@@ -2287,6 +2286,14 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.scsi_att_intr_port_seq_next = &lio_scsi_att_intr_port_seq_next;
 	fabric->tf_ops.scsi_att_intr_port_seq_show = &lio_scsi_att_intr_port_seq_show;
 	fabric->tf_ops.scsi_att_intr_port_seq_stop = &lio_scsi_att_intr_port_seq_stop;
+	fabric->tf_ops.get_task_tag = &iscsi_get_task_tag;
+	fabric->tf_ops.get_cmd_state = &iscsi_get_cmd_state;
+	fabric->tf_ops.new_cmd_failure = &iscsi_new_cmd_failure;
+	fabric->tf_ops.queue_data_in = &lio_queue_data_in;
+	fabric->tf_ops.queue_status = &lio_queue_status;
+	fabric->tf_ops.queue_tm_rsp = &lio_queue_tm_rsp;
+	fabric->tf_ops.is_state_remove = &iscsi_is_state_remove;
+	fabric->tf_ops.pack_lun = &iscsi_pack_lun;
 
 	if ((ret = target_fabric_configfs_register(fabric)) < 0) {
 		printk(KERN_ERR "target_fabric_configfs_register() for LIO-Target failed!\n");
