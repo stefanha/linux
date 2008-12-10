@@ -438,8 +438,9 @@ static inline int iscsi_handle_recovery_datain (
 {
 	iscsi_conn_t *conn = CONN(cmd);
 	iscsi_datain_req_t *dr;
+	se_cmd_t *se_cmd = cmd->se_cmd;
 	
-	if (!(atomic_read(&T_TASK(cmd)->t_transport_complete))) {
+	if (!(atomic_read(&T_TASK(se_cmd)->t_transport_complete))) {
 		TRACE_ERROR("Ignoring ITT: 0x%08x Data SNACK\n", cmd->init_task_tag);
 		return(0);
 	}
@@ -965,7 +966,8 @@ extern int iscsi_execute_ooo_cmdsns (iscsi_session_t *sess)
 		
 		cmd = ooo_cmdsn->cmd;
 		cmd->i_state = cmd->deferred_i_state;
-		cmd->t_state = cmd->deferred_t_state;
+#warning FIXME: Is deferred_t_state even needed..?
+//		cmd->t_state = cmd->deferred_t_state;
 		ooo_count++;
 		sess->exp_cmd_sn++;
 		TRACE(TRACE_CMDSN, "Executing out of order CmdSN: 0x%08x,"
@@ -995,8 +997,9 @@ extern int iscsi_execute_ooo_cmdsns (iscsi_session_t *sess)
  */
 extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 {
-	int lr = 0;
 	iscsi_tmr_req_t *tmr_req = NULL;
+	se_cmd_t *se_cmd = cmd->se_cmd;
+	int lr = 0;
 	
 	spin_lock_bh(&cmd->istate_lock);
 	if (ooo)
@@ -1008,8 +1011,8 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 		 * Go ahead and send the CHECK_CONDITION status for
 		 * any SCSI CDB exceptions that may have occurred.
 		 */
-		if (cmd->cmd_flags & ICF_SCSI_CDB_EXCEPTION) {
-			if (cmd->cmd_flags & ICF_SCSI_RESERVATION_CONFLICT) {
+		if (se_cmd->se_cmd_flags & SCF_SCSI_CDB_EXCEPTION) {
+			if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT) {
 				cmd->i_state = ISTATE_SEND_STATUS;
 				spin_unlock_bh(&cmd->istate_lock);
 				iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
@@ -1017,7 +1020,8 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 			}
 			spin_unlock_bh(&cmd->istate_lock);
 
-			return(iscsi_send_check_condition_and_sense(cmd, cmd->scsi_sense_reason, 0));	
+			return(iscsi_send_check_condition_and_sense(se_cmd,
+					se_cmd->scsi_sense_reason, 0));	
 		}
 		
 		/*
@@ -1027,7 +1031,7 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 		if (cmd->immediate_data) {
 			if (cmd->cmd_flags & ICF_GOT_LAST_DATAOUT) {
 				spin_unlock_bh(&cmd->istate_lock);
-				return(transport_generic_handle_data(cmd));
+				return(transport_generic_handle_data(cmd->se_cmd));
 			}
 			spin_unlock_bh(&cmd->istate_lock);
 
@@ -1041,6 +1045,8 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 		/*
 		 * Special case for REPORT_LUNs.
 		 */
+#warning FIXME: ICF_REPORT_LUNS in iscsi_execute_cmd() is broken!!!
+#if 0
 		if (cmd->cmd_flags & ICF_REPORT_LUNS) {
 			spin_unlock_bh(&cmd->istate_lock);
 			if (iscsi_build_report_luns_response(cmd) < 0)
@@ -1048,6 +1054,8 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 	
 			return(0);
 		} else {
+#endif
+		{
 			/*
 			 * The default handler.
 			 */
@@ -1061,7 +1069,7 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 				spin_unlock_bh(&cmd->dataout_timeout_lock);
 			}
 			
-			transport_generic_handle_cdb(cmd);
+			transport_generic_handle_cdb(cmd->se_cmd);
 			return(0);
 		}
 		break;
@@ -1180,8 +1188,9 @@ extern int iscsi_handle_ooo_cmdsn (
 
 	cmd->deferred_i_state		= cmd->i_state;
 	cmd->i_state			= ISTATE_DEFERRED_CMD;
-	cmd->deferred_t_state		= cmd->t_state;
-	cmd->t_state			= TRANSPORT_DEFERRED_CMD;
+#warning FIXME: Is deferred_t_state even needed..?
+//	cmd->deferred_t_state		= cmd->t_state;
+//	cmd->t_state			= TRANSPORT_DEFERRED_CMD;
 	cmd->cmd_flags			|= ICF_OOO_CMDSN;
 
 	if (!sess->ooo_cmdsn_tail)
