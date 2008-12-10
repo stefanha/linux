@@ -58,12 +58,16 @@
 #include <iscsi_target.h>
 #include <iscsi_parameters.h>
 
+#include <target_core_fabric_ops.h>
+#include <target_core_configfs.h>
+
 #ifdef DEBUG_ERL
 #include <iscsi_target_debugerl.h>
 #endif /* DEBUG_ERL */
 
 #undef ISCSI_TARGET_UTIL_C
 
+extern struct target_fabric_configfs *lio_target_fabric_configfs;
 extern iscsi_global_t *iscsi_global;
 extern int iscsi_check_acl_for_lun (se_device_t *, iscsi_conn_t *);
 extern int iscsi_add_nopin (iscsi_conn_t *, int);
@@ -312,31 +316,24 @@ extern void iscsi_free_r2ts_from_list (
 	return;
 }
 
-/*	iscsi_allocate_cmd():
+/*	__iscsi_allocate_cmd():
  *
  *
  */
-inline iscsi_cmd_t *iscsi_allocate_cmd (iscsi_conn_t *conn)
+extern iscsi_cmd_t *iscsi_allocate_cmd (
+	iscsi_conn_t *conn)
 {
 	iscsi_cmd_t *cmd;
 
 	if (!(cmd = iscsi_get_cmd_from_pool(SESS(conn)))) {
 		if (!(cmd = (iscsi_cmd_t *)
-				kmalloc(sizeof(iscsi_cmd_t), GFP_ATOMIC))) {
+				kzalloc(sizeof(iscsi_cmd_t), GFP_ATOMIC))) {
 			TRACE_ERROR("Unable to allocate memory"
 				" for iscsi_cmd_t.\n");
 			return(NULL);
 		}
-		memset(cmd, 0, sizeof(iscsi_cmd_t));
 	}
 
-	if (!(cmd->t_task = (se_transport_task_t *) kmalloc(
-			sizeof(se_transport_task_t), GFP_ATOMIC))) {
-		TRACE_ERROR("Unable to allocate cmd->t_task\n");
-		return(NULL);
-	}
-	memset(cmd->t_task, 0, sizeof(se_transport_task_t));
-	
 	cmd->conn	= conn;	
 	init_MUTEX_LOCKED(&cmd->reject_sem);
 	init_MUTEX_LOCKED(&cmd->unsolicited_data_sem);
@@ -346,6 +343,32 @@ inline iscsi_cmd_t *iscsi_allocate_cmd (iscsi_conn_t *conn)
 	spin_lock_init(&cmd->error_lock);
 	spin_lock_init(&cmd->r2t_lock);
 
+	return(cmd);
+}
+
+/*
+ * Called from iscsi_handle_scsi_cmd()
+ */
+extern iscsi_cmd_t *iscsi_allocate_se_cmd (
+	iscsi_conn_t *conn,
+	u32 data_length,
+	int data_direction)
+{
+	iscsi_cmd_t *cmd;
+	se_cmd_t *se_cmd;
+
+	if (!(cmd = iscsi_allocate_cmd(conn))) 
+		return(NULL);
+
+	cmd->data_direction = data_direction;
+	cmd->data_length = data_length;
+	/*
+	 * Use struct target_fabric_configfs->tf_ops for lio_target_fabric_configfs
+	 */
+	if (!(se_cmd = transport_alloc_se_cmd(&lio_target_fabric_configfs->tf_ops,
+			(void *)cmd, data_length, data_direction))) 
+		goto out;
+#if 0
 	INIT_LIST_HEAD(&T_TASK(cmd)->t_task_list);
 	init_MUTEX_LOCKED(&T_TASK(cmd)->transport_lun_fe_stop_sem);
 	init_MUTEX_LOCKED(&T_TASK(cmd)->transport_lun_stop_sem);
@@ -353,8 +376,11 @@ inline iscsi_cmd_t *iscsi_allocate_cmd (iscsi_conn_t *conn)
 	init_MUTEX_LOCKED(&T_TASK(cmd)->t_transport_passthrough_sem);
 	init_MUTEX_LOCKED(&T_TASK(cmd)->t_transport_passthrough_wsem);
 	spin_lock_init(&T_TASK(cmd)->t_state_lock);
-	
+#endif
 	return(cmd);
+out:
+	iscsi_release_cmd_to_pool(cmd);
+	return(NULL);
 }
 
 /*	iscsi_allocate_tmr_req():
@@ -612,6 +638,7 @@ ooo_cmdsn:
 extern int iscsi_check_unsolicited_dataout (iscsi_cmd_t *cmd, unsigned char *buf)
 {
 	iscsi_conn_t *conn = CONN(cmd);
+	se_cmd_t *se_cmd = SE_CMD(cmd);
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 	
@@ -620,7 +647,7 @@ extern int iscsi_check_unsolicited_dataout (iscsi_cmd_t *cmd, unsigned char *buf
 	if (SESS_OPS_C(conn)->InitialR2T) {
 		TRACE_ERROR("Received unexpected unsolicited data"
 			" while InitialR2T=Yes, protocol error.\n");
-		iscsi_send_check_condition_and_sense(cmd,
+		iscsi_send_check_condition_and_sense(se_cmd,
 				UNEXPECTED_UNSOLICITED_DATA, 0);
 		return(-1);
 	}
@@ -631,7 +658,7 @@ extern int iscsi_check_unsolicited_dataout (iscsi_cmd_t *cmd, unsigned char *buf
 			" for this Unsolicited DataOut Burst.\n",
 			(cmd->first_burst_len + hdr->length),
 				SESS_OPS_C(conn)->FirstBurstLength);
-		iscsi_send_check_condition_and_sense(cmd,
+		iscsi_send_check_condition_and_sense(se_cmd,
 				INCORRECT_AMOUNT_OF_DATA, 0);
 		return(-1);
 	}
@@ -647,7 +674,7 @@ extern int iscsi_check_unsolicited_dataout (iscsi_cmd_t *cmd, unsigned char *buf
 			" not equal ExpXferLen %u.\n",
 			(cmd->first_burst_len + hdr->length),
 			SESS_OPS_C(conn)->FirstBurstLength, cmd->data_length);
-		iscsi_send_check_condition_and_sense(cmd,
+		iscsi_send_check_condition_and_sense(se_cmd,
 				INCORRECT_AMOUNT_OF_DATA, 0);
 		return(-1);
 	}
@@ -1085,21 +1112,13 @@ extern iscsi_cmd_t *iscsi_get_cmd_from_pool (iscsi_session_t *sess)
 extern void iscsi_release_cmd_direct (iscsi_cmd_t *cmd)
 {
 	iscsi_free_r2ts_from_list(cmd);
-	
-	if (cmd->iov_data)
-		kfree(cmd->iov_data);
+
 	if (cmd->buf_ptr)
 		kfree(cmd->buf_ptr);
 	if (cmd->pdu_list)
 		kfree(cmd->pdu_list);
 	if (cmd->seq_list)
 		kfree(cmd->seq_list);
-
-	if (cmd->cmd_flags & ICF_CMD_PASSTHROUGH) 
-		kfree(cmd->iscsi_lun);
-
-	if (T_TASK(cmd))
-		kfree(T_TASK(cmd));
 
 	memset(cmd, 0, sizeof(iscsi_cmd_t));
 	
@@ -1108,35 +1127,37 @@ extern void iscsi_release_cmd_direct (iscsi_cmd_t *cmd)
 	return;
 }
 
+extern void lio_release_cmd_direct (se_cmd_t *se_cmd)
+{
+	iscsi_release_cmd_direct((iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr);
+}
+
+#warning FIXME: iscsi_dec_nacl_count() is broken
 extern void iscsi_dec_nacl_count (iscsi_node_acl_t *nacl, iscsi_cmd_t *cmd)
 {
 	se_dev_entry_t *deve;
 
 	if (!cmd)
 		return;
-
+#if 0
 	deve = &nacl->device_list[cmd->orig_fe_lun];
 	spin_lock_bh(&nacl->device_list_lock);
 	deve->deve_cmds--;
 	spin_unlock_bh(&nacl->device_list_lock);
+#else
+	BUG();
+#endif
 
 	return;
 }
 
-/*	iscsi_release_cmd_to_pool():
+/*	__iscsi_release_cmd_to_pool():
  *
  *
  */
-inline void iscsi_release_cmd_to_pool (iscsi_cmd_t *cmd, iscsi_session_t *sess)
+extern void __iscsi_release_cmd_to_pool (iscsi_cmd_t *cmd, iscsi_session_t *sess)
 {
-	__u32 iov_data_count = 0;
 	iscsi_conn_t *conn = CONN(cmd);
-	struct iovec *iov = NULL;
-	
-	if (cmd->orig_iov_data_count) {
-		iov = cmd->iov_data;
-		iov_data_count = cmd->orig_iov_data_count;
-	}
 
 	iscsi_free_r2ts_from_list(cmd);
 	
@@ -1149,16 +1170,8 @@ inline void iscsi_release_cmd_to_pool (iscsi_cmd_t *cmd, iscsi_session_t *sess)
 	
 	if (conn)
 		iscsi_remove_cmd_from_tx_queues(cmd, conn);
-	
-	if (T_TASK(cmd))
-		kfree(T_TASK(cmd));
-	
-	memset(cmd, 0, sizeof(iscsi_cmd_t));
 
-	if (iov_data_count) {
-		cmd->iov_data = iov;
-		cmd->orig_iov_data_count = iov_data_count;
-	}
+	memset(cmd, 0, sizeof(iscsi_cmd_t));
 
 	spin_lock_bh(&sess->pool_lock);
 	if (!sess->pool_head && !sess->pool_tail)
@@ -1171,6 +1184,30 @@ inline void iscsi_release_cmd_to_pool (iscsi_cmd_t *cmd, iscsi_session_t *sess)
 	atomic_inc(&sess->pool_count);
 
 	return;
+}
+
+extern void iscsi_release_cmd_to_pool (iscsi_cmd_t *cmd)
+{
+	if (!CONN(cmd) && !cmd->sess) {
+#if 0
+		TRACE_ERROR("Releasing cmd: %p ITT: 0x%08x i_state: 0x%02x,"
+			" deferred_i_state: 0x%02x directly\n", cmd,
+			CMD_TFO(se_cmd)->get_task_tag(se_cmd),
+			CMD_TFO(se_cmd)->get_cmd_state(se_cmd),
+			cmd->deferred_i_state);
+#endif
+		iscsi_release_cmd_direct(cmd);
+	} else {
+		__iscsi_release_cmd_to_pool(cmd, (CONN(cmd)) ?
+			CONN(cmd)->sess : cmd->sess);
+	}
+
+	return;
+}
+
+extern void lio_release_cmd_to_pool (se_cmd_t *se_cmd)
+{
+	iscsi_release_cmd_to_pool((iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr);
 }
 
 /*	iscsi_release_all_cmds_in_pool():
@@ -1189,8 +1226,6 @@ extern void iscsi_release_all_cmds_in_pool (iscsi_session_t *sess)
 		
 		if (cmd->buf_ptr) 
 			kfree(cmd->buf_ptr);
-		if (cmd->iov_data)
-			kfree(cmd->iov_data);
 		if (cmd->pdu_list)
 			kfree(cmd->pdu_list);
 		if (cmd->seq_list)
@@ -2296,8 +2331,8 @@ send_data:
 	tx_size = cmd->tx_size;
 		
 	if (!use_misc) {
-		iov = &cmd->iov_data[0];
-		iov_count = cmd->iov_data_count;
+		iov = &SE_CMD(cmd)->iov_data[0];
+		iov_count = SE_CMD(cmd)->iov_data_count;
 	} else {
 		iov = &cmd->iov_misc[0];
 		iov_count = cmd->iov_misc_count;
@@ -2317,13 +2352,14 @@ send_data:
 }
 
 extern int iscsi_fe_sendpage_sg (
-	iscsi_unmap_sg_t *u_sg,
+	se_unmap_sg_t *u_sg,
 	iscsi_conn_t *conn)
 {
 	int tx_sent;
-	iscsi_cmd_t *cmd = u_sg->cmd;
+	iscsi_cmd_t *cmd = (iscsi_cmd_t *)u_sg->fabric_cmd;
+	se_cmd_t *se_cmd = SE_CMD(cmd);
 	u32 len = cmd->tx_size, pg_len, se_len, se_off, tx_size;
-	struct iovec *iov = &cmd->iov_data[0];
+	struct iovec *iov = &se_cmd->iov_data[0];
 	struct page *page;
 	se_mem_t *se_mem = u_sg->cur_se_mem;
 
@@ -2403,7 +2439,7 @@ send_pg:
 			break;
 
 		if (!(se_len -= tx_sent)) {
-			list_for_each_entry_continue(se_mem, T_TASK(cmd)->t_mem_list, se_list)
+			list_for_each_entry_continue(se_mem, T_TASK(se_cmd)->t_mem_list, se_list)
 				break;
 
 			if (!se_mem) {
@@ -2423,7 +2459,7 @@ send_pg:
 
 send_padding:
 	if (u_sg->padding) {
-		struct iovec *iov_p = &cmd->iov_data[cmd->iov_data_count-2];
+		struct iovec *iov_p = &se_cmd->iov_data[se_cmd->iov_data_count-2];
 
 		tx_sent = tx_data(conn, iov_p, 1, u_sg->padding);
 		if (u_sg->padding != tx_sent) {
@@ -2437,7 +2473,7 @@ send_padding:
 	
 send_datacrc:
 	if (CONN_OPS(conn)->DataDigest) {
-		struct iovec *iov_d = &cmd->iov_data[cmd->iov_data_count-1];
+		struct iovec *iov_d = &se_cmd->iov_data[se_cmd->iov_data_count-1];
 
 		tx_sent = tx_data(conn, iov_d, 1, CRC_LEN);
 		if (CRC_LEN != tx_sent) {

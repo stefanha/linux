@@ -31,6 +31,9 @@
 
 #define MARKER_SIZE	8
 
+struct se_cmd_s;
+struct se_unmap_sg_s;
+
 extern void iscsi_attach_cmd_to_queue (iscsi_conn_t *, iscsi_cmd_t *);
 extern void iscsi_remove_cmd_from_conn_list (iscsi_cmd_t *, iscsi_conn_t *);
 extern void iscsi_ack_from_expstatsn (iscsi_conn_t *, __u32);
@@ -42,6 +45,7 @@ extern iscsi_r2t_t *iscsi_get_r2t_from_list (iscsi_cmd_t *);
 extern void iscsi_free_r2t (iscsi_r2t_t *, iscsi_cmd_t *);
 extern void iscsi_free_r2ts_from_list (iscsi_cmd_t *);
 extern iscsi_cmd_t *iscsi_allocate_cmd (iscsi_conn_t *);
+extern iscsi_cmd_t *iscsi_allocate_se_cmd (iscsi_conn_t *, u32, int);
 extern iscsi_tmr_req_t *iscsi_allocate_tmr_req (void);
 extern int iscsi_decide_list_to_build (iscsi_cmd_t *, __u32);
 extern iscsi_seq_t *iscsi_get_seq_holder_for_datain (iscsi_cmd_t *, __u32);
@@ -61,8 +65,11 @@ extern void iscsi_remove_cmd_from_tx_queues (iscsi_cmd_t *, iscsi_conn_t *);
 extern void iscsi_free_queue_reqs_for_conn (iscsi_conn_t *);
 extern iscsi_cmd_t *iscsi_get_cmd_from_pool (iscsi_session_t *);
 extern void iscsi_release_cmd_direct (iscsi_cmd_t *);
+extern void lio_release_cmd_direct (struct se_cmd_s *);
 extern void iscsi_dec_nacl_count (iscsi_node_acl_t *, iscsi_cmd_t *);
-extern void iscsi_release_cmd_to_pool (iscsi_cmd_t *, iscsi_session_t *);
+extern void __iscsi_release_cmd_to_pool (iscsi_cmd_t *, iscsi_session_t *);
+extern void iscsi_release_cmd_to_pool (iscsi_cmd_t *);
+extern void lio_release_cmd_to_pool (struct se_cmd_s *);
 extern void iscsi_release_all_cmds_in_pool (iscsi_session_t *);
 extern __u64 iscsi_pack_lun (unsigned int);
 extern __u32 iscsi_unpack_lun (unsigned char *);
@@ -91,7 +98,7 @@ extern void iscsi_stop_nopin_response_timer (iscsi_conn_t *);
 extern void iscsi_start_nopin_timer (iscsi_conn_t *);
 extern void iscsi_stop_nopin_timer (iscsi_conn_t *);
 extern int iscsi_send_tx_data (iscsi_cmd_t *, iscsi_conn_t *, int);
-extern int iscsi_fe_sendpage_sg (iscsi_unmap_sg_t *, iscsi_conn_t *);
+extern int iscsi_fe_sendpage_sg (struct se_unmap_sg_s *, iscsi_conn_t *);
 extern int iscsi_tx_login_rsp (iscsi_conn_t *, __u8, __u8);
 extern void iscsi_print_session_params (iscsi_session_t *);
 extern int iscsi_print_dev_to_proc (char *, char **, off_t, int);
