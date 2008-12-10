@@ -51,14 +51,14 @@
 #include <target_core_base.h>
 #include <iscsi_target_error.h>
 #include <target_core_device.h>
-#include <iscsi_target_device.h>
 #include <target_core_hba.h>
-#include <iscsi_target_tpg.h>
 #include <target_core_transport.h>
-#include <iscsi_target_util.h>
 
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
+#define RL_INCLUDE_STRUCTS
+#include <target_core_reportluns.h>
+#undef RL_INCLUDE_STRUCTS
 
 #undef TARGET_CORE_DEVICE_C
 
@@ -236,6 +236,104 @@ extern void iscsi_disable_devices_for_hba (se_hba_t *hba)
 	return;
 }
 
+extern int __transport_get_lun_for_cmd (
+	se_cmd_t *se_cmd,
+	u32 unpacked_lun)
+{
+	se_dev_entry_t *deve;
+	se_lun_t *se_lun = NULL;
+	se_session_t *se_sess = SE_SESS(se_cmd);
+	unsigned long flags;
+	int read_only = 0;
+
+	spin_lock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	deve = se_cmd->iscsi_deve = &SE_NODE_ACL(se_sess)->device_list[unpacked_lun];
+	if (deve->lun_flags & ISCSI_LUNFLAGS_INITIATOR_ACCESS) {
+                if (se_cmd) {
+                        deve->total_cmds++;
+                        deve->total_bytes += se_cmd->data_length;
+
+                        if (se_cmd->data_direction == SE_DIRECTION_WRITE) {
+                                if (deve->lun_flags & ISCSI_LUNFLAGS_READ_ONLY) {
+                                        read_only = 1;
+                                        goto out;
+                                }
+#ifdef SNMP_SUPPORT
+                                deve->write_bytes += se_cmd->data_length;
+#endif /* SNMP_SUPPORT */
+                        } else if (se_cmd->data_direction == SE_DIRECTION_READ) {
+#ifdef SNMP_SUPPORT
+                                deve->read_bytes += se_cmd->data_length;
+#endif /* SNMP_SUPPORT */
+                        }
+                }
+                deve->deve_cmds++;
+
+                se_lun = se_cmd->iscsi_lun = deve->iscsi_lun;
+                se_cmd->orig_fe_lun = unpacked_lun;
+                se_cmd->se_orig_obj_api = ISCSI_LUN(se_cmd)->lun_obj_api;
+                se_cmd->se_orig_obj_ptr = ISCSI_LUN(se_cmd)->lun_type_ptr;
+        }
+out:
+        spin_unlock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+
+        if (!se_lun) {
+		if (read_only) {
+			se_cmd->scsi_sense_reason = WRITE_PROTECTED;
+                        PYXPRINT("Detected WRITE_PROTECTED LUN Access for 0x%08x\n",
+				unpacked_lun);
+		} else {
+			se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
+                        PYXPRINT("Detected NON_EXISTENT_LUN Access for  0x%08x\n",
+				unpacked_lun);
+                }
+		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+                return(-1);
+        }
+        /*
+         * Determine if the se_lun_t is online.
+         */
+        if (LUN_OBJ_API(se_lun)->check_online(se_lun->lun_type_ptr) != 0) {
+		se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;	
+		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+                return(-1);
+	}
+
+#ifdef SNMP_SUPPORT
+	{
+	se_device_t *dev = se_lun->iscsi_dev;
+	spin_lock(&dev->stats_lock);
+	dev->num_cmds++;
+	if (se_cmd->data_direction == SE_DIRECTION_WRITE)
+		dev->write_bytes += se_cmd->data_length;
+	else if (se_cmd->data_direction == SE_DIRECTION_READ)
+		dev->read_bytes += se_cmd->data_length;
+	spin_unlock(&dev->stats_lock);
+	}
+#endif /* SNMP_SUPPORT */
+        /*
+         * REPORT_LUN never gets added to the LUN list because it never makes
+         * it to the storage engine queue.
+         */
+        if (se_cmd->se_cmd_flags & SCF_REPORT_LUNS)
+                return(1);
+
+        /*
+         * Add the iscsi_cmd_t to the se_lun_t's cmd list.  This list is used
+         * for tracking state of iscsi_cmd_ts during LUN shutdown events.
+         */
+        spin_lock_irqsave(&se_lun->lun_cmd_lock, flags);
+        ADD_ENTRY_TO_LIST_PREFIX(l, se_cmd, se_lun->lun_cmd_head, se_lun->lun_cmd_tail);
+        atomic_set(&T_TASK(se_cmd)->transport_lun_active, 1);
+#if 0
+        TRACE_ERROR("Adding ITT: 0x%08x to LUN LIST[%d]\n",
+		CMD_TFO(se_cmd)->get_task_tag(se_cmd), se_lun->iscsi_lun);
+#endif
+        spin_unlock_irqrestore(&se_lun->lun_cmd_lock, flags);
+
+	return(0);
+}
+
 /*	se_release_device_for_hba():
  *
  *
@@ -264,6 +362,24 @@ extern void se_release_device_for_hba (se_device_t *dev)
 
 	return;
 }
+
+extern int transport_get_lun_for_cmd (
+        se_cmd_t *se_cmd,
+	unsigned char *cdb,
+        u32 unpacked_lun)
+{
+	/*
+	 * REPORT_LUNS never actually goes to the transport layer.
+	 */
+	if (cdb[0] == REPORT_LUNS) {
+		if (se_allocate_rl_cmd(se_cmd, cdb, unpacked_lun) < 0)
+			return(PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES);
+	}
+
+	return(__transport_get_lun_for_cmd(se_cmd, unpacked_lun));
+}
+
+EXPORT_SYMBOL(transport_get_lun_for_cmd);
 
 /*
  * Called with se_hba_t->device_lock held.

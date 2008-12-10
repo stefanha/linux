@@ -34,6 +34,7 @@ extern int linux_blockdevice_release (int, int, struct block_device *);
 extern int linux_blockdevice_check (int, int);
 extern int iscsi_check_devices_access (se_hba_t *);
 extern void iscsi_disable_devices_for_hba (se_hba_t *);
+extern int transport_get_lun_for_cmd (struct se_cmd_s *, unsigned char *, u32);
 extern void se_release_device_for_hba (se_device_t *);
 extern void se_clear_dev_ports (se_device_t *);
 extern int se_free_virtual_device (se_device_t *, se_hba_t *);
