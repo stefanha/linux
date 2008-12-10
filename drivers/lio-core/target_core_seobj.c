@@ -249,7 +249,7 @@ extern void dev_obj_unexport (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 	return;
 }
 
-extern int dev_obj_transport_setup_cmd (void *p, iscsi_cmd_t *cmd)
+extern int dev_obj_transport_setup_cmd (void *p, se_cmd_t *cmd)
 {
 	transport_device_setup_cmd(cmd);
 	return(0);
@@ -262,7 +262,7 @@ extern int dev_obj_active_tasks (void *p)
 	return(atomic_read(&dev->execute_tasks));
 }
 
-extern int dev_obj_add_tasks (void *p, iscsi_cmd_t *cmd)
+extern int dev_obj_add_tasks (void *p, se_cmd_t *cmd)
 {
 	transport_add_tasks_from_cmd(cmd);
 	return(0);
@@ -351,7 +351,7 @@ extern int dev_obj_do_se_mem_map (
 		if ((ret = TRANSPORT(dev)->do_se_mem_map(task, se_mem_list,
 				in_mem, in_se_mem, out_se_mem, se_mem_cnt,
 				task_offset)) == 0)
-			T_TASK(task->iscsi_cmd)->t_task_se_num += *se_mem_cnt;
+			T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
 
 		return(ret);
 	}
@@ -369,7 +369,7 @@ extern int dev_obj_do_se_mem_map (
 		in_se_mem, out_se_mem, se_mem_cnt, task_offset));
 }
 
-extern int dev_obj_get_mem_buf (void *p, iscsi_cmd_t *cmd)
+extern int dev_obj_get_mem_buf (void *p, se_cmd_t *cmd)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
@@ -381,7 +381,7 @@ extern int dev_obj_get_mem_buf (void *p, iscsi_cmd_t *cmd)
 	return(0);
 }
 
-extern int dev_obj_get_mem_SG (void *p, iscsi_cmd_t *cmd)
+extern int dev_obj_get_mem_SG (void *p, se_cmd_t *cmd)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
@@ -397,7 +397,7 @@ extern map_func_t dev_obj_get_map_SG (void *p, int rw)
 {
 	se_device_t *dev  = (se_device_t *)p;
 	
-	return((rw == ISCSI_WRITE) ? dev->transport->spc->write_SG :
+	return((rw == SE_DIRECTION_WRITE) ? dev->transport->spc->write_SG :
 		dev->transport->spc->read_SG);
 }
 
@@ -405,7 +405,7 @@ extern map_func_t dev_obj_get_map_non_SG (void *p, int rw)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	return((rw == ISCSI_WRITE) ? dev->transport->spc->write_non_SG :
+	return((rw == SE_DIRECTION_WRITE) ? dev->transport->spc->write_non_SG :
 		dev->transport->spc->read_non_SG);
 }
 
@@ -425,7 +425,7 @@ extern void *dev_obj_get_transport_req (void *p, se_task_t *task)
 	return(dev->transport->allocate_request(task, dev));
 }
 
-extern void dev_obj_free_tasks (void *p, iscsi_cmd_t *cmd)
+extern void dev_obj_free_tasks (void *p, se_cmd_t *cmd)
 {
 	transport_free_dev_tasks(cmd);
 	return;
@@ -559,7 +559,7 @@ extern u32 dev_obj_get_cdb_count (
 	se_device_t *dev  = (se_device_t *)p;
 
 	ti->ti_dev = dev;
-	return(transport_generic_get_cdb_count(ti->ti_cmd, ti, DEV_OBJ_API(dev), p,
+	return(transport_generic_get_cdb_count(ti->ti_se_cmd, ti, DEV_OBJ_API(dev), p,
 		lba, sectors, se_mem_in, se_mem_out, task_offset_in));
 }
 
@@ -668,7 +668,7 @@ extern int dev_obj_get_task_timeout (void *p)
 	return(DEV_ATTRIB(dev)->task_timeout);
 }
 
-extern int dev_obj_task_failure_complete (void *p, iscsi_cmd_t *cmd)
+extern int dev_obj_task_failure_complete (void *p, se_cmd_t *cmd)
 {
 	return(transport_failure_tasks_generic(cmd));
 }

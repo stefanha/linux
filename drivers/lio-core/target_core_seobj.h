@@ -55,9 +55,9 @@ typedef struct se_obj_lun_type_s {
 	void (*put_obj)(void *);
 	int (*export_obj)(void *, struct iscsi_portal_group_s *, struct se_lun_s *);
 	void (*unexport_obj)(void *, struct iscsi_portal_group_s *, struct se_lun_s *);
-	int (*transport_setup_cmd)(void *, struct iscsi_cmd_s *);
+	int (*transport_setup_cmd)(void *, struct se_cmd_s *);
 	int (*active_tasks)(void *);
-	int (*add_tasks)(void *, struct iscsi_cmd_s *);
+	int (*add_tasks)(void *, struct se_cmd_s *);
 	int (*execute_tasks)(void *);
 	int (*depth_left)(void *);
 	int (*queue_depth)(void *);
@@ -68,13 +68,13 @@ typedef struct se_obj_lun_type_s {
 	unsigned long long (*get_next_lba)(void *, unsigned long long);
 	unsigned long long (*total_sectors)(void *, int);
 	int (*do_se_mem_map)(void *, struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
-	int (*get_mem_buf)(void *, struct iscsi_cmd_s *);
-	int (*get_mem_SG)(void *, struct iscsi_cmd_s *);
+	int (*get_mem_buf)(void *, struct se_cmd_s *);
+	int (*get_mem_SG)(void *, struct se_cmd_s *);
 	map_func_t (*get_map_SG)(void *, int);
 	map_func_t (*get_map_non_SG)(void *, int);
 	map_func_t (*get_map_none)(void *);
 	void *(*get_transport_req)(void *, struct se_task_s *);
-	void (*free_tasks)(void *, struct iscsi_cmd_s *);
+	void (*free_tasks)(void *, struct se_cmd_s *);
 	int (*activate)(void *);
 	void (*deactivate)(void *);
 	void (*notify_obj)(void *);
@@ -101,7 +101,7 @@ typedef struct se_obj_lun_type_s {
 	void (*get_evpd_prod)(void *, unsigned char *, u32);
 	void (*get_evpd_sn)(void *, unsigned char *, u32);
 	int (*get_task_timeout)(void *);
-	int (*task_failure_complete)(void *, struct iscsi_cmd_s *);
+	int (*task_failure_complete)(void *, struct se_cmd_s *);
 	int (*add_obj_to_lun)(struct iscsi_portal_group_s *, struct se_lun_s *);
 	int (*del_obj_from_lun)(struct iscsi_portal_group_s *, struct se_lun_s *);
 	struct se_obj_lun_type_s *(*get_next_obj_api)(void *, void **);
