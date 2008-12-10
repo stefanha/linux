@@ -28,7 +28,7 @@
 #define ISCSI_TARGET_DEVICE_H
  
 extern se_lun_t *iscsi_get_lun (iscsi_conn_t *, u64);
-extern int iscsi_get_lun_for_cmd (iscsi_cmd_t *, u64);
+extern int iscsi_get_lun_for_cmd (iscsi_cmd_t *, unsigned char *, u64);
 extern void iscsi_determine_maxcmdsn (iscsi_session_t *, iscsi_node_acl_t *);
 extern void iscsi_increment_maxcmdsn (iscsi_cmd_t *, iscsi_session_t *);
 extern int iscsi_set_queue_depth_for_node (iscsi_portal_group_t *, iscsi_node_acl_t *);

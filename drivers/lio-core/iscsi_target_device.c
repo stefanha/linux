@@ -51,6 +51,7 @@
 #include <target_core_base.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_device.h>
+#include <target_core_device.h>
 #include <target_core_hba.h>
 #include <iscsi_target_tpg.h>
 #include <target_core_transport.h>
@@ -108,119 +109,35 @@ extern se_lun_t *iscsi_get_lun (
 }
 
 /*	iscsi_get_lun_for_cmd():
- *
- *
+ *	
+ *	Returns (0) on success
+ * 	Returns (1) on REPORT_LUN cdb
+ * 	Returns (< 0) on failure
  */
 extern int iscsi_get_lun_for_cmd (
 	iscsi_cmd_t *cmd,
+	unsigned char *cdb,
 	u64 lun)
 {
-	int ret = -1;
+	iscsi_conn_t *conn = CONN(cmd);
+	iscsi_portal_group_t *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
-	iscsi_conn_t *conn= CONN(cmd);
-	se_dev_entry_t *deve;
-	se_lun_t *iscsi_lun = NULL;
-	iscsi_portal_group_t *tpg = conn->tpg;
-	iscsi_session_t *sess = SESS(conn);
-	unsigned long flags;
+	int ret;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
-
 	if (unpacked_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
 		TRACE_ERROR("iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
 			" %u for Target Portal Group: %hu\n", unpacked_lun,
 			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
 		return(-1);
 	}
-	
-	spin_lock_bh(&SESS_NODE_ACL(sess)->device_list_lock);
-	deve = cmd->iscsi_deve = &SESS_NODE_ACL(sess)->device_list[unpacked_lun];
-	if (deve->lun_flags & ISCSI_LUNFLAGS_INITIATOR_ACCESS) {
-		if (cmd) {
-			deve->total_cmds++;
-			deve->total_bytes += cmd->data_length;
 
-			if (cmd->data_direction == ISCSI_WRITE) {
-				if (deve->lun_flags & ISCSI_LUNFLAGS_READ_ONLY) {
-					ret = -2;
-					goto out;
-				}
-#ifdef SNMP_SUPPORT
-				deve->write_bytes += cmd->data_length;
-#endif /* SNMP_SUPPORT */  
-			} else if (cmd->data_direction == ISCSI_READ) {
-#ifdef SNMP_SUPPORT
-				deve->read_bytes += cmd->data_length;
-#endif /* SNMP_SUPPORT */
-			}
-		}
-		deve->deve_cmds++;
-
-		iscsi_lun = cmd->iscsi_lun = deve->iscsi_lun;
-		cmd->orig_fe_lun = unpacked_lun;
-		cmd->orig_fe_lun_type = cmd->iscsi_lun->lun_type;
-		cmd->se_orig_obj_api = ISCSI_LUN(cmd)->lun_obj_api;
-		cmd->se_orig_obj_ptr = ISCSI_LUN(cmd)->lun_type_ptr;
-		cmd->cmd_flags |= ICF_SE_LUN_CMD;
-	}
-out:
-	spin_unlock_bh(&SESS_NODE_ACL(sess)->device_list_lock);
-
-	if (!iscsi_lun) {
-		switch (ret) {
-		case -2:
-			PYXPRINT("Detected READ-ONLY LUN Access for 0x%08x on"
-				" iSCSI TPG: %hu\n", unpacked_lun, tpg->tpgt);
-			break;
-		default:
-			PYXPRINT("Unable to find Active iSCSI LUN: 0x%08x on"
-				" iSCSI TPG: %hu\n", unpacked_lun, tpg->tpgt);
-			break;
-		}
-
+	if ((ret = transport_get_lun_for_cmd(SE_CMD(cmd), cdb, unpacked_lun)) < 0)
 		return(ret);
-	}
+	if (ret > 0) /* For cdb[0] == REPORT_LUNS */
+		return(ret);
 
-	/*
-	 * Determine if the se_lun_t is online.
-	 */
-	if (LUN_OBJ_API(iscsi_lun)->check_online(iscsi_lun->lun_type_ptr) != 0)
-		return(-1);
-
-//#warning FIXME v2.8: Add SNMP bits to se_obj_api 
-#ifdef SNMP_SUPPORT
-	if (iscsi_lun->lun_type == ISCSI_LUN_TYPE_DEVICE) {
-		se_device_t *dev = iscsi_lun->iscsi_dev;
-
-		spin_lock(&dev->stats_lock);
-		dev->num_cmds++;
-		if (cmd->data_direction == ISCSI_WRITE)
-			dev->write_bytes += cmd->data_length;
-		else if (cmd->data_direction == ISCSI_READ)
-			dev->read_bytes += cmd->data_length;
-		spin_unlock(&dev->stats_lock);
-	}
-#endif /* SNMP_SUPPORT */
-	
-	/*
-	 * REPORT_LUN never gets added to the LUN list because it never makes
-	 * it to the storage engine queue.
-	 */
-	if (cmd->cmd_flags & ICF_REPORT_LUNS)
-		return(0);
-	
-	/*
-	 * Add the iscsi_cmd_t to the se_lun_t's cmd list.  This list is used
-	 * for tracking state of iscsi_cmd_ts during LUN shutdown events.
-	 */
-	spin_lock_irqsave(&iscsi_lun->lun_cmd_lock, flags);
-	ADD_ENTRY_TO_LIST_PREFIX(l, cmd, iscsi_lun->lun_cmd_head, iscsi_lun->lun_cmd_tail);
-	atomic_set(&T_TASK(cmd)->transport_lun_active, 1);
-#if 0
-	TRACE_ERROR("Adding ITT: 0x%08x to LUN LIST[%d]\n", cmd->init_task_tag, iscsi_lun->iscsi_lun);
-#endif
-	spin_unlock_irqrestore(&iscsi_lun->lun_cmd_lock, flags);
-	
+	cmd->cmd_flags |= ICF_SE_LUN_CMD;	
 	return(0);
 }
 
@@ -420,11 +337,12 @@ extern void iscsi_update_device_list_for_node (
  *
  *
  */
+#warning FIXME: iscsi_clear_lun_from_sessions() broken
 extern void iscsi_clear_lun_from_sessions (se_lun_t *lun, iscsi_portal_group_t *tpg)
 {
 	iscsi_cmd_t *cmd;
 	unsigned long flags;
-
+#if 0
 	/*
 	 * Do exception processing and return CHECK_CONDITION status to the 
 	 * Initiator Port.
@@ -504,7 +422,8 @@ extern void iscsi_clear_lun_from_sessions (se_lun_t *lun, iscsi_portal_group_t *
 		spin_lock_irqsave(&lun->lun_cmd_lock, flags);
 	}
 	spin_unlock_irqrestore(&lun->lun_cmd_lock, flags);
-
+#endif
+	BUG();
 	return;
 }
 
