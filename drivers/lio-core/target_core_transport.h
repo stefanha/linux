@@ -109,13 +109,13 @@ extern void transport_load_plugins (void);
 extern struct se_plugin_s *transport_core_get_plugin_by_name (const char *name);
 extern void transport_check_dev_params_delim (char *, char **);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);
-extern int transport_add_cmd_to_queue (struct iscsi_cmd_s *, struct se_queue_obj_s *, u8);
-extern void transport_complete_cmd (iscsi_cmd_t *, int);
+extern int transport_add_cmd_to_queue (struct se_cmd_s *, struct se_queue_obj_s *, u8);
+extern void transport_complete_cmd (se_cmd_t *, int);
 extern void transport_complete_task (struct se_task_s *, int);
 extern void transport_add_task_to_execute_queue (struct se_task_s *, struct se_device_s *);
-extern void transport_add_tasks_from_cmd (struct iscsi_cmd_s *);
+extern void transport_add_tasks_from_cmd (struct se_cmd_s *);
 extern struct se_task_s *transport_get_task_from_execute_queue (struct se_device_s *);
-extern iscsi_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
+extern se_queue_req_t *transport_get_qr_from_queue (struct se_queue_obj_s *);
 extern int transport_check_device_tcq (se_device_t *, u32, u32);
 extern void transport_dump_dev_state (struct se_device_s *, char *, int *);
 extern void transport_dump_dev_info (struct se_device_s *, struct se_lun_s *, unsigned long long, char *, int *);
@@ -125,70 +125,72 @@ extern void transport_generic_deactivate_device (se_device_t *);
 extern int transport_generic_claim_phydevice (se_device_t *);
 extern void transport_generic_release_phydevice (se_device_t *, int);
 extern void transport_generic_free_device (se_device_t *);
-extern int transport_allocate_iovecs_for_cmd (struct iscsi_cmd_s *, __u32);
+extern int transport_allocate_iovecs_for_cmd (struct se_cmd_s *, u32);
 extern int transport_generic_obj_start (struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long);
-extern void transport_device_setup_cmd (iscsi_cmd_t *);
-extern int transport_generic_allocate_tasks (iscsi_cmd_t *, unsigned char *);
-extern int transport_generic_handle_cdb (iscsi_cmd_t *);
-extern int transport_generic_handle_data (iscsi_cmd_t *);
-extern int transport_generic_handle_tmr (iscsi_cmd_t *, iscsi_tmr_req_t *);
-extern void transport_stop_tasks_for_cmd (struct iscsi_cmd_s *);
-extern int transport_failure_tasks_generic (iscsi_cmd_t *);
-extern void transport_generic_request_failure (iscsi_cmd_t *, se_device_t *, int, int); 
-extern void transport_direct_request_timeout (iscsi_cmd_t *);
-extern void transport_generic_request_timeout (iscsi_cmd_t *);
-extern int transport_generic_allocate_buf (iscsi_cmd_t *, u32, u32);
+extern void transport_device_setup_cmd (se_cmd_t *);
+extern se_cmd_t *transport_alloc_se_cmd (struct target_core_fabric_ops *, void *, u32, int);
+extern int transport_generic_allocate_tasks (se_cmd_t *, unsigned char *);
+extern int transport_generic_handle_cdb (se_cmd_t *);
+extern int transport_generic_handle_data (se_cmd_t *);
+extern int transport_generic_handle_tmr (se_cmd_t *, iscsi_tmr_req_t *);
+extern void transport_stop_tasks_for_cmd (struct se_cmd_s *);
+extern int transport_failure_tasks_generic (se_cmd_t *);
+extern void transport_generic_request_failure (se_cmd_t *, se_device_t *, int, int); 
+extern void transport_direct_request_timeout (se_cmd_t *);
+extern void transport_generic_request_timeout (se_cmd_t *);
+extern int transport_generic_allocate_buf (se_cmd_t *, u32, u32);
 extern int __transport_execute_tasks (struct se_device_s *);
-extern void transport_new_cmd_failure (struct iscsi_cmd_s *);
+extern void transport_new_cmd_failure (struct se_cmd_s *);
 extern u32 transport_get_default_task_timeout (struct se_device_s *);
+extern void transport_set_supported_SAM_opcode (struct se_cmd_s *);
 extern void transport_start_task_timer (struct se_task_s *);
 extern void __transport_stop_task_timer (struct se_task_s *, unsigned long *);
 extern void transport_stop_task_timer (struct se_task_s *);
-extern void transport_stop_all_task_timers (struct iscsi_cmd_s *);
-extern int transport_execute_tasks (struct iscsi_cmd_s *);
-extern int transport_generic_emulate_inquiry (struct iscsi_cmd_s *, unsigned char, unsigned char *, unsigned char *, unsigned char *, unsigned char *);
-extern int transport_generic_emulate_readcapacity (struct iscsi_cmd_s *, u32, u32);
-extern int transport_generic_emulate_readcapacity_16 (struct iscsi_cmd_s *, unsigned long long, u32);
-extern int transport_generic_emulate_modesense (struct iscsi_cmd_s *, unsigned char *, unsigned char *, int, int);
-extern int transport_get_sense_data (struct iscsi_cmd_s *);
-extern void transport_memcpy_read_contig (struct iscsi_cmd_s *, unsigned char *);
-extern void transport_memcpy_read_sg (struct iscsi_cmd_s *, struct scatterlist *);
-extern void transport_memcpy_write_contig (struct iscsi_cmd_s *, unsigned char *);
-extern void transport_memcpy_write_sg (struct iscsi_cmd_s *, struct scatterlist *);
-extern iscsi_cmd_t *transport_allocate_passthrough (unsigned char *, int, u32, void *, u32, u32, struct se_obj_lun_type_s *, void *);
-extern void transport_passthrough_release (iscsi_cmd_t *);
-extern int transport_passthrough_complete (iscsi_cmd_t *);
-extern int transport_generic_passthrough_async (iscsi_cmd_t *cmd,
-						void (*callback)(iscsi_cmd_t *cmd, void *callback_arg, int complete_status), 
+extern void transport_stop_all_task_timers (struct se_cmd_s *);
+extern int transport_execute_tasks (struct se_cmd_s *);
+extern int transport_generic_emulate_inquiry (struct se_cmd_s *, unsigned char, unsigned char *, unsigned char *, unsigned char *, unsigned char *);
+extern int transport_generic_emulate_readcapacity (struct se_cmd_s *, u32, u32);
+extern int transport_generic_emulate_readcapacity_16 (struct se_cmd_s *, unsigned long long, u32);
+extern int transport_generic_emulate_modesense (struct se_cmd_s *, unsigned char *, unsigned char *, int, int);
+extern int transport_get_sense_data (struct se_cmd_s *);
+extern void transport_memcpy_read_contig (struct se_cmd_s *, unsigned char *);
+extern void transport_memcpy_read_sg (struct se_cmd_s *, struct scatterlist *);
+extern void transport_memcpy_write_contig (struct se_cmd_s *, unsigned char *);
+extern void transport_memcpy_write_sg (struct se_cmd_s *, struct scatterlist *);
+extern se_cmd_t *transport_allocate_passthrough (unsigned char *, int, u32, void *, u32, u32, struct se_obj_lun_type_s *, void *);
+extern void transport_passthrough_release (se_cmd_t *);
+extern int transport_passthrough_complete (se_cmd_t *);
+extern int transport_generic_passthrough_async (se_cmd_t *cmd,
+						void (*callback)(se_cmd_t *cmd, void *callback_arg, int complete_status), 
 						void *callback_arg);
-extern int transport_generic_passthrough (iscsi_cmd_t *);
-extern void transport_generic_complete_ok (iscsi_cmd_t *);
-extern void transport_free_dev_tasks (iscsi_cmd_t *);
-extern void transport_release_tasks (iscsi_cmd_t *);
-extern void transport_release_fe_cmd (iscsi_cmd_t *);
-extern int transport_generic_remove (iscsi_cmd_t *, int, int);
-extern int transport_lun_wait_for_tasks (iscsi_cmd_t *, se_lun_t *);
-extern int iscsi_send_check_condition_and_sense (iscsi_cmd_t *, __u8, int);
-extern int iscsi_tpg_persistent_reservation_check (iscsi_cmd_t *);
-extern int iscsi_tpg_persistent_reservation_release (iscsi_cmd_t *);
-extern int iscsi_tpg_persistent_reservation_reserve (iscsi_cmd_t *);
-extern void transport_generic_free_cmd (iscsi_cmd_t *, int, int, int);
-extern void transport_generic_wait_for_cmds (iscsi_cmd_t *, int);
-extern int transport_generic_do_transform (struct iscsi_cmd_s *, struct se_transform_info_s *);
-extern int transport_get_sectors (struct iscsi_cmd_s *, struct se_obj_lun_type_s *, void *);
-extern int transport_new_cmd_obj (struct iscsi_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, int);
+extern int transport_generic_passthrough (se_cmd_t *);
+extern void transport_generic_complete_ok (se_cmd_t *);
+extern void transport_free_dev_tasks (se_cmd_t *);
+extern void transport_release_tasks (se_cmd_t *);
+extern void transport_release_fe_cmd (se_cmd_t *);
+extern int transport_generic_remove (se_cmd_t *, int, int);
+extern int transport_lun_wait_for_tasks (se_cmd_t *, se_lun_t *);
+extern int iscsi_send_check_condition_and_sense (se_cmd_t *, __u8, int);
+extern int iscsi_tpg_persistent_reservation_check (se_cmd_t *);
+extern int iscsi_tpg_persistent_reservation_release (se_cmd_t *);
+extern int iscsi_tpg_persistent_reservation_reserve (se_cmd_t *);
+extern void transport_generic_free_cmd (se_cmd_t *, int, int, int);
+extern void transport_generic_wait_for_cmds (se_cmd_t *, int);
+extern int transport_generic_do_transform (struct se_cmd_s *, struct se_transform_info_s *);
+extern int transport_get_sectors (struct se_cmd_s *, struct se_obj_lun_type_s *, void *);
+extern int transport_new_cmd_obj (struct se_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, int);
 extern unsigned char *transport_get_vaddr (struct se_mem_s *);
 extern struct list_head *transport_init_se_mem_list (void);
 extern void transport_free_se_mem_list (struct list_head *);
-extern int transport_generic_get_mem (struct iscsi_cmd_s *, u32, u32);
+extern int transport_generic_get_mem (struct se_cmd_s *, u32, u32);
 extern u32 transport_calc_sg_num (struct se_task_s *, struct se_mem_s *, u32);
 extern int transport_map_sg_to_mem (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 extern int transport_map_mem_to_mem (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 extern int transport_map_mem_to_sg (struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
-extern u32 transport_generic_get_cdb_count (struct iscsi_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
-extern int transport_generic_new_cmd (iscsi_cmd_t *);
-extern void transport_generic_process_write (iscsi_cmd_t *);
-extern int transport_generic_do_tmr (iscsi_cmd_t *);
+extern u32 transport_generic_get_cdb_count (struct se_cmd_s *, struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long, u32, struct se_mem_s *, struct se_mem_s **, u32 *);
+extern int transport_generic_new_cmd (se_cmd_t *);
+extern void transport_generic_process_write (se_cmd_t *);
+extern int transport_generic_do_tmr (se_cmd_t *);
 extern void transport_start_status_timer (se_device_t *);
 extern void transport_stop_status_timer (se_device_t *);
 extern void transport_status_thr_force_offline (se_device_t *, struct se_obj_lun_type_s *, void *);
@@ -284,14 +286,14 @@ typedef struct se_subsystem_api_s {
 	 * with a scsi_transport_spc_t struct as mentioned below.
 	 * Provided out of convenience.
 	 */
-	int (*cmd_sequencer)(iscsi_cmd_t *cmd);
+	int (*cmd_sequencer)(se_cmd_t *cmd);
 	/*
 	 * do_tmr():
 	 *
 	 * Use transport_do_tmr() for majority of DAS transport drivers.
 	 * Provided out of convenience.
 	 */
-	int (*do_tmr)(iscsi_cmd_t *cmd);
+	int (*do_tmr)(se_cmd_t *cmd);
 	/*
 	 * transport_complete():
 	 *
@@ -306,19 +308,19 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * allocate_buf():
 	 */
-	int (*allocate_buf)(iscsi_cmd_t *, u32, u32);
+	int (*allocate_buf)(se_cmd_t *, u32, u32);
 	/*
 	 * allocate_DMA();
 	 */
-	int (*allocate_DMA)(iscsi_cmd_t *, u32, u32);
+	int (*allocate_DMA)(se_cmd_t *, u32, u32);
 	/*
 	 * free_buf():
 	 */
-	void (*free_buf)(iscsi_cmd_t *);	
+	void (*free_buf)(se_cmd_t *);	
 	/*
 	 * free_DMA():
 	 */
-	void (*free_DMA)(iscsi_cmd_t *);
+	void (*free_DMA)(se_cmd_t *);
 	/*
 	 * do_task():
 	 */
@@ -423,7 +425,7 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * set_iovec_ptrs():
 	 */
-	int (*set_iovec_ptrs)(iscsi_map_sg_t *, iscsi_unmap_sg_t *);
+	int (*set_iovec_ptrs)(se_map_sg_t *, se_unmap_sg_t *);
 	/*
 	 * shutdown_hba():
 	 */
