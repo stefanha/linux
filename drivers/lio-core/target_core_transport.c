@@ -5842,21 +5842,6 @@ static int transport_generic_write_pending (se_cmd_t *cmd)
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	cmd->t_state = TRANSPORT_WRITE_PENDING;
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-#if 0
-	if (cmd->immediate_data || cmd->unsolicited_data)
-		up(&cmd->unsolicited_data_sem);
-	else {
-		struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-		if (!(iscsi_tf))
-			BUG();
-
-		if (iscsi_tf->build_r2ts_for_cmd(cmd, CONN(cmd), 1) < 0) {
-			transport_cmd_check_stop(cmd, 1, 0);
-			return(PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES);
-		}
-	}
-#else
 	/*
 	 * Call the fabric write_pending function here to let the
 	 * frontend know that WRITE buffers are ready.
@@ -5866,7 +5851,7 @@ static int transport_generic_write_pending (se_cmd_t *cmd)
 		transport_cmd_check_stop(cmd, 1, 0);
 		return(ret);
 	}
-#endif
+
 	transport_cmd_check_stop(cmd, 1, 0);
 	return(PYX_TRANSPORT_WRITE_PENDING);
 }
