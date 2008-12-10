@@ -419,7 +419,7 @@ static int rd_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
 	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
 	
 	memset(prod, 0, 64);
@@ -445,7 +445,7 @@ static int rd_emulate_read_cap (se_task_t *task)
 	if ((((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1) > 0x00000000ffffffff)
 		blocks = 0xffffffff;
 
-	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, RD_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity(TASK_CMD(task), blocks, RD_BLOCKSIZE));
 }
 
 static int rd_emulate_read_cap16 (se_task_t *task)
@@ -453,7 +453,7 @@ static int rd_emulate_read_cap16 (se_task_t *task)
 	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
 	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1;	
 
-	return(transport_generic_emulate_readcapacity_16(task->iscsi_cmd, blocks_long, RD_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long, RD_BLOCKSIZE));
 }
 
 /*	rd_emulate_scsi_cdb():
@@ -463,7 +463,7 @@ static int rd_emulate_read_cap16 (se_task_t *task)
 static int rd_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret;
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	rd_request_t *rd_req = (rd_request_t *) task->transport_req;
 
 	switch (rd_req->rd_scsi_cdb[0]) {
@@ -476,12 +476,12 @@ static int rd_emulate_scsi_cdb (se_task_t *task)
 			return(ret);
 		break;
 	case MODE_SENSE:
-		if ((ret = transport_generic_emulate_modesense(task->iscsi_cmd,
+		if ((ret = transport_generic_emulate_modesense(TASK_CMD(task),
 				rd_req->rd_scsi_cdb, rd_req->rd_buf, 0, TYPE_DISK)) < 0)
 			return(ret);
 		break;
 	case MODE_SENSE_10:
-		if ((ret = transport_generic_emulate_modesense(task->iscsi_cmd,
+		if ((ret = transport_generic_emulate_modesense(TASK_CMD(task),
 				rd_req->rd_scsi_cdb, rd_req->rd_buf, 1, TYPE_DISK)) < 0)
 			return(ret);
 		break;
@@ -771,7 +771,7 @@ extern int rd_MEMCPY_do_task (se_task_t *task)
 	int ret = 0;
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
-	if (!(task->iscsi_cmd->cmd_flags & ICF_SCSI_DATA_SG_IO_CDB))
+	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return(rd_emulate_scsi_cdb(task));
 		
 	req->rd_lba = task->task_lba;
@@ -882,7 +882,7 @@ check_eot:
 	}
 
 out:
-	T_TASK(task->iscsi_cmd)->t_task_se_num += *se_mem_cnt;
+	T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
 	printk("RD_DR - Allocated %u se_mem_t segments for task\n", *se_mem_cnt);
 #endif
@@ -955,7 +955,7 @@ static int rd_DIRECT_without_offset (se_task_t *task, struct list_head *se_mem_l
 	}
 
 out:
-	T_TASK(task->iscsi_cmd)->t_task_se_num += *se_mem_cnt;
+	T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
 	printk("RD_DR - Allocated %u se_mem_t segments for task\n", *se_mem_cnt);
 #endif
@@ -996,7 +996,7 @@ extern int rd_DIRECT_do_se_mem_map (
  *
  *
  */
-extern void rd_DIRECT_free_DMA (iscsi_cmd_t *cmd)
+extern void rd_DIRECT_free_DMA (se_cmd_t *cmd)
 {
 	se_mem_t *se_mem, *se_mem_tmp;
 
@@ -1020,7 +1020,7 @@ extern void rd_DIRECT_free_DMA (iscsi_cmd_t *cmd)
  *
  *	Note that rd_DIRECT_do_se_mem_map() actually does the real work.
  */
-extern int rd_DIRECT_allocate_DMA (iscsi_cmd_t *cmd, u32 length, u32 dma_size)
+extern int rd_DIRECT_allocate_DMA (se_cmd_t *cmd, u32 length, u32 dma_size)
 {
 	if (!(T_TASK(cmd)->t_mem_list = kmalloc(sizeof(struct list_head), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for T_TASK(cmd)->t_mem_list\n");
@@ -1039,7 +1039,7 @@ extern int rd_DIRECT_allocate_DMA (iscsi_cmd_t *cmd, u32 length, u32 dma_size)
  */
 extern int rd_DIRECT_do_task (se_task_t *task)
 {
-	if (!(task->iscsi_cmd->cmd_flags & ICF_SCSI_DATA_SG_IO_CDB))
+	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return(rd_emulate_scsi_cdb(task));
 
 	/*
@@ -1176,7 +1176,7 @@ extern void __rd_get_dev_info (rd_dev_t *rd_dev, char *b, int *bl)
  */
 extern void rd_map_task_non_SG (se_task_t *task)
 {
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
 	req->rd_bufflen		= task->task_size;
