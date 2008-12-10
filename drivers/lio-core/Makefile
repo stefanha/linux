@@ -33,6 +33,7 @@ target_core_mod-objs			:=	target_core_configfs.o \
 						target_core_device.o \
 						target_core_hba.o \
 						target_core_plugin.o \
+						target_core_reportluns.o \
 						target_core_scdb.o \
 						target_core_seobj.o \
 						target_core_transport.o \
@@ -87,7 +88,6 @@ iscsi_target_mod-objs		:=	iscsi_crc.o \
 					iscsi_target_login.o \
 					iscsi_target_nego.o \
 					iscsi_target_nodeattrib.o \
-					iscsi_target_reportluns.o \
 					iscsi_target_tmr.o \
 					iscsi_target_tpg.o \
 					iscsi_target_util.o \
