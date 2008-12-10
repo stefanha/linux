@@ -342,15 +342,16 @@ extern se_device_t *pscsi_add_device_to_list (
 	 */
 	if (sd->type == TYPE_TAPE) {
 		unsigned char *buf = NULL, cdb[SCSI_CDB_SIZE];
-		iscsi_cmd_t *cmd;
+		se_cmd_t *cmd;
 		u32 blocksize;
 
 		memset(cdb, 0, SCSI_CDB_SIZE);
 		cdb[0] = MODE_SENSE;
 		cdb[4] = 0x0c; /* 12 bytes */
 		
-		if (!(cmd = transport_allocate_passthrough(&cdb[0], ISCSI_READ, 0, NULL, 0,
-				12, DEV_OBJ_API(dev), dev))) {
+		if (!(cmd = transport_allocate_passthrough(&cdb[0],
+				SE_DIRECTION_READ, 0, NULL, 0, 12,
+				DEV_OBJ_API(dev), dev))) {
 			TRACE_ERROR("Unable to determine blocksize for TYPE_TAPE\n");
 			goto out;
 		}
@@ -695,10 +696,10 @@ extern int pscsi_transport_complete (se_task_t *task)
 	 */
 	if (((cdb[0] == MODE_SENSE) || (cdb[0] == MODE_SENSE_10)) &&
 	     (status_byte(result) << 1) == SAM_STAT_GOOD) {
-		if (!task->iscsi_cmd->iscsi_deve)
+		if (!TASK_CMD(task)->iscsi_deve)
 			goto after_mode_sense;
 
-		if (task->iscsi_cmd->iscsi_deve->lun_flags & ISCSI_LUNFLAGS_READ_ONLY) {
+		if (TASK_CMD(task)->iscsi_deve->lun_flags & ISCSI_LUNFLAGS_READ_ONLY) {
 			unsigned char *buf = (unsigned char *)pscsi_buf;
 
 			if (cdb[0] == MODE_SENSE_10) {
@@ -1191,7 +1192,7 @@ extern int pscsi_map_task_SG (se_task_t *task)
  */
 extern int pscsi_map_task_non_SG (se_task_t *task)
 {
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->iscsi_dev->dev_ptr;
@@ -1463,7 +1464,7 @@ static inline void pscsi_process_SAM_status (
 			pt->pscsi_result);
 		task->task_scsi_status = SAM_STAT_CHECK_CONDITION;
 		task->task_error_status = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
-		task->iscsi_cmd->transport_error_status = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+		TASK_CMD(task)->transport_error_status = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		transport_complete_task(task, 0);
 		break;
 	}
