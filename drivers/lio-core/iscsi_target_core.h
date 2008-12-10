@@ -41,14 +41,10 @@
 #include <iscsi_target_version.h>	    /* get version definition */
 
 #define SHUTDOWN_SIGS			(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
-#define ISCSI_IOV_DATA_BUFFER		5
 #define ISCSI_MISC_IOVECS		5
 #define ISCSI_MAX_DATASN_MISSING_COUNT	16
 #define ISCSI_TX_THREAD_TCP_TIMEOUT	2
 #define ISCSI_RX_THREAD_TCP_TIMEOUT	2
-#define ISCSI_SENSE_BUFFER		64
-#define ISCSI_SENSE_SEGMENT_LENGTH	66 /* Sense Data Segment */
-#define ISCSI_SENSE_SEGMENT_TOTAL	68 /* ISCSI_SENSE_SEGMENT_LENGTH + Padding */
 #define ISCSI_IQN_UNIQUENESS		14
 #define EVPD_BUF_LEN			256
 #define ISCSI_IQN_LEN			224
@@ -142,10 +138,12 @@
 #define ISCSI_DEVATTRIB_ADD_LUN_ACL		3
 #define ISCSI_DEVATTRIB_DELETE_LUN_ACL		4
 
-/* iscsi_cmd_t->data_direction */
+/* iscsi_cmd_t->data_direction, same values as target_core_base.h
+   and se_cmd_t->data_direction  */
+#define ISCSI_NONE				0
 #define ISCSI_READ				1
 #define ISCSI_WRITE				2
-#define ISCSI_NONE				3
+#define ISCSI_BIDI				3
 
 /* iscsi_tiqn_t->tiqn_state */
 #define TIQN_STATE_ACTIVE			1
@@ -159,28 +157,9 @@
 #define ICF_WITHIN_COMMAND_RECOVERY		0x00000010
 #define ICF_CONTIG_MEMORY			0x00000020
 #define ICF_ATTACHED_TO_RQUEUE			0x00000040
-#define ICF_SUPPORTED_SAM_OPCODE		0x00000080
-#define ICF_SENT_CHECK_CONDITION		0x00000100
-#define ICF_REPORT_LUNS				0x00000200
-#define ICF_OOO_CMDSN				0x00000400
-#define ICF_TRANSPORT_TASK_SENSE		0x00000800
-#define ICF_EMULATED_TASK_SENSE			0x00001000
-#define ICF_SCSI_DATA_SG_IO_CDB			0x00002000
-#define ICF_SCSI_CONTROL_SG_IO_CDB		0x00004000
-#define ICF_SCSI_CONTROL_NONSG_IO_CDB		0x00008000
-#define ICF_SCSI_NON_DATA_CDB			0x00010000
-#define ICF_SCSI_CDB_EXCEPTION			0x00020000
-#define ICF_SCSI_RESERVATION_CONFLICT		0x00040000
-#define ICF_CACHE_ACTIVE			0x00080000
-#define ICF_REJECT_FAIL_CONN			0x00100000
-#define ICF_OVERFLOW_BIT			0x00200000
-#define ICF_UNDERFLOW_BIT			0x00400000
-#define ICF_CMD_PASSTHROUGH			0x00800000
-#define ICF_CMD_PASSTHROUGH_NOALLOC		0x01000000
-#define ICF_SE_CMD_FAILED			0x02000000
-#define ICF_SE_LUN_CMD				0x04000000
-#define ICF_SE_ALLOW_EOO			0x08000000
-#define ICF_SE_DISABLE_ONLINE_CHECK		0x10000000
+#define ICF_OOO_CMDSN				0x00000080
+#define ICF_REJECT_FAIL_CONN			0x00000100
+#define ICF_SE_LUN_CMD				0x00000200
 
 /* iscsi_cmd_t->i_state */
 #define ISTATE_NO_STATE				0
@@ -390,6 +369,7 @@ typedef union
 	time_t	time;
 } iscsi_rsig_time_t;
 
+struct se_cmd_s;
 struct se_device_s;
 struct iscsi_map_sg_s;
 struct iscsi_unmap_sg_s;
@@ -410,9 +390,7 @@ typedef struct iscsi_cmd_s {
 	__u8			dataout_timeout_retries; /* DataOUT timeout retries */
 	__u8			error_recovery_count; /* Within command recovery count */
 	__u8			deferred_i_state; /* iSCSI dependent state for out or order CmdSNs */
-	__u8			deferred_t_state; /* Transport protocol dependent state for out of order CmdSNs */
 	__u8			i_state;	/* iSCSI dependent state */
-	__u8			t_state;	/* Transport protocol dependent state */
 	__u8			immediate_cmd;	/* Command is an immediate command (I_BIT set) */
 	__u8			immediate_data;	/* Immediate data present */
 	__u8			iscsi_opcode;	/* iSCSI Opcode */
@@ -420,11 +398,8 @@ typedef struct iscsi_cmd_s {
 	__u8			logout_reason;	/* Logout reason when iscsi_opcode == ISCSI_INIT_LOGOUT_CMND */
 	__u8			logout_response; /* Logout response code when iscsi_opcode == ISCSI_INIT_LOGOUT_CMND */
 	__u8			maxcmdsn_inc;	/* MaxCmdSN has been incremented */
-	__u8			scsi_status;	/* SAM response code being sent to initiator */
-	__u8			scsi_sense_reason;
 	__u8			unsolicited_data; /* Immediate Unsolicited Dataout */
 	__u16			logout_cid;	/* CID contained in logout PDU when iscsi_opcode == ISCSI_INIT_LOGOUT_CMND */
-	__u16			scsi_sense_length;
 	__u32			cmd_flags;	/* Command flags */
 	__u32 			init_task_tag;	/* Initiator Task Tag assigned from Initiator */
 	__u32			targ_xfer_tag;	/* Target Transfer Tag assigned from Target */
@@ -437,14 +412,9 @@ typedef struct iscsi_cmd_s {
 	__u32			buf_ptr_size;	/* Used for echoing NOPOUT ping data */
 	__u32			data_crc;	/* Used to store DataDigest */
 	__u32			data_length;	/* Total size in bytes associated with command */
-	__u32			cmd_spdtl;	/* SCSI Presented Data Transfer Length */
 	__u32			outstanding_r2ts; /* Counter for MaxOutstandingR2T */
 	__u32			r2t_offset;	/* Next R2T Offset when DataSequenceInOrder=Yes */
-	__u32			iov_data_count;	/* Number of iovecs iovecs used for IP stack calls */
 	__u32			iov_misc_count;  /* Number of miscellaneous iovecs used for IP stack calls */
-	__u32			orig_fe_lun;
-	__u32			orig_fe_lun_type;
-	__u32			orig_iov_data_count; /* Number of iovecs allocated for iscsi_cmd_t->iov_data */
 	__u32			pad_bytes;	/* Bytes used for 32-bit word padding */
 	__u32			pdu_count;	/* Number of iscsi_pdu_t in iscsi_cmd_t->pdu_list */
 	__u32			pdu_send_order; /* Next iscsi_pdu_t to send in iscsi_cmd_t->pdu_list */
@@ -460,7 +430,6 @@ typedef struct iscsi_cmd_s {
 	__u32			first_burst_len; /* Counter for FirstBurstLength key */
 	__u32			next_burst_len;	/* Counter for MaxBurstLength key */
 	__u32			tx_size;	/* Transfer size used for IP stack calls */
-	int			transport_error_status; /* Transport specific error status */
 	void			*buf_ptr;	/* Buffer used for various purposes */
 	unsigned char		pdu[ISCSI_HDR_LEN + CRC_LEN]; /* iSCSI PDU Header + CRC */
 	atomic_t		immed_queue_count; /* Number of times iscsi_cmd_t is present in immediate queue */
@@ -473,12 +442,11 @@ typedef struct iscsi_cmd_s {
 	spinlock_t		r2t_lock;	/* spinlock for adding R2Ts */
 	iscsi_datain_req_t	*datain_req_head; /* Start of DataIN list */
 	iscsi_datain_req_t	*datain_req_tail; /* End of DataIN list */
-	struct semaphore		reject_sem;
-	struct semaphore		unsolicited_data_sem; /* Semaphore used for allocating buffer */
+	struct semaphore	reject_sem;
+	struct semaphore	unsolicited_data_sem; /* Semaphore used for allocating buffer */
 	iscsi_r2t_t		*r2t_head;	/* Start of R2T list */
 	iscsi_r2t_t		*r2t_tail;	/* End of R2T list */
-	struct timer_list		dataout_timer;	/* Timer for DataOUT */
-	struct iovec		*iov_data;	/* Iovecs allocated from pool */
+	struct timer_list	dataout_timer;	/* Timer for DataOUT */
 	struct iovec		iov_misc[ISCSI_MISC_IOVECS]; /* Iovecs for miscellaneous purposes */
 	struct iscsi_pdu_s	*pdu_list;	/* Array of iscsi_pdu_t used for DataPDUInOrder=No */
 	struct iscsi_pdu_s	*pdu_ptr;	/* Current iscsi_pdu_t used for DataPDUInOrder=No */
@@ -488,15 +456,17 @@ typedef struct iscsi_cmd_s {
 	struct iscsi_conn_s 	*conn;		/* Connection this command is alligient to */
 	struct iscsi_conn_recovery_s *cr;	/* Pointer to connection recovery entry */
 	struct iscsi_session_s	*sess;		/* Session the command is part of,  used for connection recovery */
+#if 0
 	struct se_dev_entry_s	*iscsi_deve;
 	struct se_lun_s		*iscsi_lun;	/* iSCSI device/LUN this commands belongs to */
+#endif
 	struct iscsi_cmd_s	*next;		/* Next command in the session pool */
 	struct iscsi_cmd_s	*i_next;	/* Next command in connection list */
 	struct iscsi_cmd_s	*i_prev;	/* Previous command in connection list */
 	struct iscsi_cmd_s	*t_next;	/* Next command in DAS transport list */
 	struct iscsi_cmd_s	*t_prev;	/* Previous command in DAS transport list */
-	struct iscsi_cmd_s	*l_next;
-	struct iscsi_cmd_s	*l_prev;
+	struct se_cmd_s		*se_cmd;
+#if 0
 	struct se_device_s	*iscsi_dev;
 	struct se_obj_lun_type_s *se_obj_api;
 	void			*se_obj_ptr;
@@ -521,12 +491,10 @@ typedef struct iscsi_cmd_s {
 	void (*transport_wait_for_tasks)(struct iscsi_cmd_s *, int, int);
         void (*callback)(struct iscsi_cmd_s *cmd, void *callback_arg, int complete_status);
         void *callback_arg;
-  
+ #endif 
 }  ____cacheline_aligned iscsi_cmd_t;
 
-#define T_TASK(cmd)	((se_transport_task_t *)(cmd->t_task))
-#define CMD_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_obj_api))
-#define CMD_ORIG_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_orig_obj_api))
+#define SE_CMD(cmd)		((struct se_cmd_s *)(cmd)->se_cmd)
 
 #include <iscsi_seq_and_pdu_list.h>
 
@@ -922,40 +890,6 @@ typedef struct iscsi_portal_group_s {
 #define ISCSI_TPG_LUN(c, lun)	((iscsi_tpg_list_t *)(c)->tpg->tpg_lun_list_t[lun])
 #define ISCSI_TPG_S(s)		((iscsi_portal_group_t *)(s)->tpg)
 #define ISCSI_TPG_ATTRIB(t)	(&(t)->tpg_attrib)
-
-typedef struct iscsi_offset_map_s {
-	int			map_reset;
-	u32			iovec_length;
-	u32			iscsi_offset;
-	u32			current_offset;
-	u32			orig_offset;
-	u32			sg_count;
-	u32			sg_current;
-	u32			sg_length;
-	struct page		*sg_page;
-	struct se_mem_s		*map_se_mem;
-	struct se_mem_s		*map_orig_se_mem;
-	void			*iovec_base;
-} ____cacheline_aligned iscsi_offset_map_t;
-
-typedef struct iscsi_map_sg_s {
-	int			map_flags;
-	u32			data_length;
-	u32			data_offset;
-	iscsi_cmd_t		*cmd;
-	struct iovec		*iov;
-} ____cacheline_aligned iscsi_map_sg_t;
-
-typedef struct iscsi_unmap_sg_s {
-	u32			data_length;
-	u32			sg_count;
-	u32			sg_offset;
-	u32			padding;
-	u32			t_offset;
-	iscsi_cmd_t		*cmd;
-	iscsi_offset_map_t	lmap;
-	struct se_mem_s		*cur_se_mem;
-} ____cacheline_aligned iscsi_unmap_sg_t;
 
 typedef struct iscsi_tiqn_s {
 	unsigned char		tiqn[ISCSI_TIQN_LEN];
