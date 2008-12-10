@@ -351,7 +351,7 @@ extern void iblock_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 static int iblock_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
 	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
 	unsigned char *sub_sn = NULL;
@@ -384,7 +384,7 @@ static int iblock_emulate_read_cap (se_task_t *task)
 	if ((get_capacity(bd->bd_disk) - 1) >= 0x00000000ffffffff)
 		blocks = 0xffffffff;
 
-	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, IBLOCK_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity(TASK_CMD(task), blocks, IBLOCK_BLOCKSIZE));
 }
 
 static int iblock_emulate_read_cap16 (se_task_t *task)
@@ -393,13 +393,13 @@ static int iblock_emulate_read_cap16 (se_task_t *task)
 	struct block_device *bd = ibd->ibd_bd;
 	unsigned long long blocks_long = (get_capacity(bd->bd_disk) - 1);
 
-	return(transport_generic_emulate_readcapacity_16(task->iscsi_cmd, blocks_long, IBLOCK_BLOCKSIZE));;
+	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long, IBLOCK_BLOCKSIZE));;
 }
 
 static int iblock_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret;
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 
 	switch (T_TASK(cmd)->t_task_cdb[0]) {
 	case INQUIRY:
@@ -411,12 +411,12 @@ static int iblock_emulate_scsi_cdb (se_task_t *task)
 			return(ret);
 		break;	
 	case MODE_SENSE:
-		if ((ret = transport_generic_emulate_modesense(task->iscsi_cmd,
+		if ((ret = transport_generic_emulate_modesense(TASK_CMD(task),
 				T_TASK(cmd)->t_task_cdb, T_TASK(cmd)->t_task_buf, 0, TYPE_DISK)) < 0)
 			return(ret);
 		break;
 	case MODE_SENSE_10:
-		if ((ret = transport_generic_emulate_modesense(task->iscsi_cmd,
+		if ((ret = transport_generic_emulate_modesense(TASK_CMD(task),
 				T_TASK(cmd)->t_task_cdb, T_TASK(cmd)->t_task_buf, 1, TYPE_DISK)) < 0)
 			return(ret);
 		break;
@@ -463,7 +463,7 @@ extern int iblock_do_task (se_task_t *task)
 	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
 	struct bio *bio = req->ib_bio, *nbio = NULL;
 
-	if (!(task->iscsi_cmd->cmd_flags & ICF_SCSI_DATA_SG_IO_CDB))
+	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return(iblock_emulate_scsi_cdb(task));
 
 	while (bio) {
@@ -471,7 +471,7 @@ extern int iblock_do_task (se_task_t *task)
 		bio->bi_next = NULL;
 		DEBUG_IBLOCK("Calling submit_bio() task: %p bio: %p bio->bi_sector:"
 				" %llu\n", task, bio, bio->bi_sector);
-		submit_bio((task->iscsi_cmd->data_direction == ISCSI_WRITE), bio);
+		submit_bio((TASK_CMD(task)->data_direction == SE_DIRECTION_WRITE), bio);
 		bio = nbio;
 	}
 
