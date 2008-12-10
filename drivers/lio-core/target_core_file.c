@@ -432,7 +432,7 @@ extern int fd_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
 	unsigned char *sub_sn = NULL;
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	fd_dev_t *fdev = (fd_dev_t *) task->iscsi_dev->dev_ptr;
 	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
 	
@@ -467,7 +467,7 @@ static int fd_emulate_read_cap (se_task_t *task)
 	if ((fd_dev->fd_dev_size / FD_BLOCKSIZE) >= 0x00000000ffffffff)
 		blocks = 0xffffffff;
 	
-	return(transport_generic_emulate_readcapacity(task->iscsi_cmd, blocks, FD_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity(TASK_CMD(task), blocks, FD_BLOCKSIZE));
 }
 
 static int fd_emulate_read_cap16 (se_task_t *task)
@@ -475,7 +475,7 @@ static int fd_emulate_read_cap16 (se_task_t *task)
 	fd_dev_t *fd_dev = (fd_dev_t *) task->iscsi_dev->dev_ptr;
 	unsigned long long blocks_long = (fd_dev->fd_dev_size / FD_BLOCKSIZE);
 	
-	return(transport_generic_emulate_readcapacity_16(task->iscsi_cmd, blocks_long, FD_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long, FD_BLOCKSIZE));
 }
 
 /*	fd_emulate_scsi_cdb():
@@ -485,7 +485,7 @@ static int fd_emulate_read_cap16 (se_task_t *task)
 static int fd_emulate_scsi_cdb (se_task_t *task)
 {
 	int ret;
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	fd_request_t *fd_req = (fd_request_t *) task->transport_req;
 
 	switch (fd_req->fd_scsi_cdb[0]) {
@@ -498,12 +498,12 @@ static int fd_emulate_scsi_cdb (se_task_t *task)
 			return(ret);
 		break;
 	case MODE_SENSE:
-		if ((ret = transport_generic_emulate_modesense(task->iscsi_cmd,
+		if ((ret = transport_generic_emulate_modesense(TASK_CMD(task),
 				fd_req->fd_scsi_cdb, fd_req->fd_buf, 0, TYPE_DISK)) < 0)
 			return(ret);
 		break;
 	case MODE_SENSE_10:
-		if ((ret = transport_generic_emulate_modesense(task->iscsi_cmd,
+		if ((ret = transport_generic_emulate_modesense(TASK_CMD(task),
 				fd_req->fd_scsi_cdb, fd_req->fd_buf, 1, TYPE_DISK)) < 0)
 			return(ret);
 		break;
@@ -705,7 +705,7 @@ static int fd_do_aio_read (fd_request_t *req, se_task_t *task)
 	return(1);
 }
 
-extern void fd_sendfile_free_DMA (iscsi_cmd_t *cmd)
+extern void fd_sendfile_free_DMA (se_cmd_t *cmd)
 {
 	TRACE_ERROR("Release reference to pages now..\n");
 	return;
@@ -748,7 +748,7 @@ static int fd_do_sendfile (fd_request_t *req, se_task_t *task)
 	if (fd_seek(fd, req->fd_lba) < 0)
 		return(-1);
 
-	task->iscsi_cmd->transport_free_DMA = &fd_sendfile_free_DMA;
+	TASK_CMD(task)->transport_free_DMA = &fd_sendfile_free_DMA;
 	
 	ret = fd->f_op->sendfile(fd, &fd->f_pos, req->fd_sg_count, fd_sendactor, (void *)task);	
 
@@ -875,7 +875,7 @@ extern int fd_do_task (se_task_t *task)
 	int ret = 0;
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
-	if (!(task->iscsi_cmd->cmd_flags & ICF_SCSI_DATA_SG_IO_CDB))
+	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return(fd_emulate_scsi_cdb(task));
 
 	req->fd_lba = task->task_lba;
@@ -1046,7 +1046,7 @@ extern void __fd_get_dev_info (fd_dev_t *fd_dev, char *b, int *bl)
  */
 extern void fd_map_task_non_SG (se_task_t *task)
 {
-	iscsi_cmd_t *cmd = task->iscsi_cmd;
+	se_cmd_t *cmd = TASK_CMD(task);
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
 	req->fd_bufflen		= task->task_size;
