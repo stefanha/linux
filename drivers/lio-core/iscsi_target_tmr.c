@@ -410,6 +410,7 @@ static int iscsi_task_reassign_complete_write (iscsi_cmd_t *cmd, iscsi_tmr_req_t
 	int no_build_r2ts = 0;
 	__u32 length = 0, offset = 0;
 	iscsi_conn_t *conn = CONN(cmd);
+	se_cmd_t *se_cmd = SE_CMD(cmd);
 	
 	/*
 	 * The Initiator must not send a R2T SNACK with a Begrun less than
@@ -433,7 +434,7 @@ static int iscsi_task_reassign_complete_write (iscsi_cmd_t *cmd, iscsi_tmr_req_t
 			TRACE(TRACE_ERL2, "WRITE ITT: 0x%08x: t_state: %d, deferred_t_state:"
 				" %d never sent to transport\n", cmd->init_task_tag,
 					cmd->t_state, cmd->deferred_t_state);
-			return(transport_generic_handle_data(cmd));
+			return(transport_generic_handle_data(se_cmd));
 		}
 		
 		cmd->i_state = ISTATE_SEND_STATUS;
@@ -479,10 +480,12 @@ static int iscsi_task_reassign_complete_write (iscsi_cmd_t *cmd, iscsi_tmr_req_t
  *
  *
  */
+#warning FIXME: Reenable TRACE_ERROR() calls in iscsi_task_reassign_complete_read()
 static int iscsi_task_reassign_complete_read (iscsi_cmd_t *cmd, iscsi_tmr_req_t *tmr_req)
 {
 	iscsi_conn_t *conn = CONN(cmd);
 	iscsi_datain_req_t *dr;
+	se_cmd_t *se_cmd = SE_CMD(cmd);
 	
 	/*
 	 * The Initiator must not send a Data SNACK with a BegRun less than
@@ -497,17 +500,21 @@ static int iscsi_task_reassign_complete_read (iscsi_cmd_t *cmd, iscsi_tmr_req_t 
 	}
 	
 	if (!atomic_read(&cmd->transport_sent)) {
+#if 0
 		TRACE_ERROR("READ ITT: 0x%08x: t_state: %d, deferred_t_state:"
 			" %d never sent to transport\n", cmd->init_task_tag,
 			cmd->t_state, cmd->deferred_t_state);
-		transport_generic_handle_cdb(cmd);	
+#endif
+		transport_generic_handle_cdb(se_cmd);	
 		return(0);
 	}
 	
-	if (!(atomic_read(&T_TASK(cmd)->t_transport_complete))) {
+	if (!(atomic_read(&T_TASK(se_cmd)->t_transport_complete))) {
+#if 0
 		TRACE_ERROR("READ ITT: 0x%08x: t_state: %d, deferred_t_state:"
 			" %d never returned from transport\n", cmd->init_task_tag,
 			cmd->t_state, cmd->deferred_t_state);
+#endif
 		return(-1);
 	}
 
@@ -553,6 +560,7 @@ static int iscsi_task_reassign_complete_scsi_cmnd (iscsi_tmr_req_t *tmr_req, isc
 {
 	iscsi_cmd_t *cmd = tmr_req->ref_cmd;
 	iscsi_conn_recovery_t *cr;
+	se_cmd_t *se_cmd = SE_CMD(cmd);
 	
 	if (!cmd->cr) {
 		TRACE_ERROR("iscsi_conn_recovery_t pointer for ITT: 0x%08x"
@@ -571,7 +579,7 @@ static int iscsi_task_reassign_complete_scsi_cmnd (iscsi_tmr_req_t *tmr_req, isc
 	iscsi_task_reassign_remove_cmd(cmd, cr, SESS(conn));
 	iscsi_attach_cmd_to_queue(conn, cmd);
 
-	if (cmd->cmd_flags & ICF_SENT_CHECK_CONDITION) {
+	if (se_cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
 		cmd->i_state = ISTATE_SEND_STATUS;
 		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 		return(0);
@@ -987,11 +995,12 @@ drop_unacknowledged_r2ts:
 extern int iscsi_check_task_reassign_expdatasn (iscsi_tmr_req_t *tmr_req, iscsi_conn_t *conn)
 {
 	iscsi_cmd_t *ref_cmd = tmr_req->ref_cmd;
+	se_cmd_t *se_cmd = SE_CMD(ref_cmd);
 
 	if (ref_cmd->iscsi_opcode != ISCSI_INIT_SCSI_CMND)
 		return(0);
 
-	if (ref_cmd->cmd_flags & ICF_SENT_CHECK_CONDITION)
+	if (se_cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION)
 		return(0);
 	
 	if (ref_cmd->data_direction == ISCSI_NONE)
