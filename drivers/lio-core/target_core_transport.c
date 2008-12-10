@@ -5999,6 +5999,107 @@ extern int transport_lun_wait_for_tasks (se_cmd_t *cmd, se_lun_t *lun)
 
 EXPORT_SYMBOL(transport_lun_wait_for_tasks);
 
+//#define DEBUG_CLEAR_LUN
+#ifdef DEBUG_CLEAR_LUN
+#define DEBUG_CLEAR_L(x...) PYXPRINT(x)
+#else
+#define DEBUG_CLEAR_L(x...)
+#endif
+
+extern void transport_clear_lun_from_sessions (se_lun_t *lun)
+{
+	se_cmd_t *cmd;
+	unsigned long flags;
+        /*
+         * Do exception processing and return CHECK_CONDITION status to the 
+         * Initiator Port.
+         */
+        spin_lock_irqsave(&lun->lun_cmd_lock, flags);
+        while ((cmd = lun->lun_cmd_head)) {
+                if (!(T_TASK(cmd))) {
+                        TRACE_ERROR("ITT: 0x%08x, T_TASK(cmd) = NULL [i,t]_state: %u/%u\n",
+                                CMD_TFO(cmd)->get_task_tag(cmd),
+				CMD_TFO(cmd)->get_cmd_state(cmd), cmd->t_state);
+                        BUG();
+                }
+                
+                REMOVE_ENTRY_FROM_LIST_PREFIX(l, cmd, lun->lun_cmd_head, lun->lun_cmd_tail);
+                atomic_set(&T_TASK(cmd)->transport_lun_active, 0);
+
+                /*
+                 * This will notify iscsi_target_transport.c:transport_cmd_check_stop()
+                 * that a LUN shutdown is in progress for the iscsi_cmd_t.
+                 */
+                spin_lock(&T_TASK(cmd)->t_state_lock);
+                DEBUG_CLEAR_L("SE_LUN[%d] - Setting T_TASK(cmd)->transport"
+			"_lun_stop for  ITT: 0x%08x\n", ISCSI_LUN(cmd)->iscsi_lun,
+				CMD_TFO(cmd)->get_task_tag(cmd));
+                atomic_set(&T_TASK(cmd)->transport_lun_stop, 1);
+                spin_unlock(&T_TASK(cmd)->t_state_lock);
+
+                spin_unlock_irqrestore(&lun->lun_cmd_lock, flags);
+
+                if (!(ISCSI_LUN(cmd))) {
+                        TRACE_ERROR("ITT: 0x%08x, [i,t]_state: %u/%u\n",
+				CMD_TFO(cmd)->get_task_tag(cmd),
+				CMD_TFO(cmd)->get_cmd_state(cmd), cmd->t_state);
+                        BUG();
+                }
+                
+                /*
+                 * If the Storage engine still owns the iscsi_cmd_t, determine and/or
+                 * stop its context.
+                 */
+                DEBUG_CLEAR_L("SE_LUN[%d] - ITT: 0x%08x before transport"
+			"_lun_wait_for_tasks()\n", ISCSI_LUN(cmd)->iscsi_lun,
+			CMD_TFO(cmd)->get_task_tag(cmd));
+
+                if (transport_lun_wait_for_tasks(cmd, ISCSI_LUN(cmd)) < 0) {
+                        spin_lock_irqsave(&lun->lun_cmd_lock, flags);
+                        continue;
+                }
+
+                DEBUG_CLEAR_L("SE_LUN[%d] - ITT: 0x%08x after transport_lun"
+			"_wait_for_tasks(): SUCCESS\n", ISCSI_LUN(cmd)->iscsi_lun,
+				CMD_TFO(cmd)->get_task_tag(cmd));
+                /*
+                 * The Storage engine stopped this iscsi_cmd_t before it was
+                 * send to the iSCSI frontend for delivery back to the iSCSI
+                 * Initiator Node.  Return this SCSI CDB back with an CHECK_CONDITION
+                 * status.
+                 */
+                iscsi_send_check_condition_and_sense(cmd, NON_EXISTENT_LUN, 0);
+
+                /*
+                 * If the iSCSI frontend is waiting for this iscsi_cmd_t to be released,
+                 * notify the waiting thread now that LU has finished accessing it.
+                 */ 
+                spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+                if (atomic_read(&T_TASK(cmd)->transport_lun_fe_stop)) {
+                        DEBUG_CLEAR_L("SE_LUN[%d] - Detected FE stop for"
+				" iscsi_cmd_t: %p ITT: 0x%08x\n", lun->iscsi_lun,
+				cmd, CMD_TFO(cmd)->get_task_tag(cmd));
+
+                        spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+                        up(&T_TASK(cmd)->transport_lun_fe_stop_sem);
+                        spin_lock_irqsave(&lun->lun_cmd_lock, flags);
+                        continue;
+                }
+                atomic_set(&T_TASK(cmd)->transport_lun_stop, 0);
+                
+                DEBUG_CLEAR_L("SE_LUN[%d] - ITT: 0x%08x finished processing\n",
+                        lun->iscsi_lun, CMD_TFO(cmd)->get_task_tag(cmd));
+
+                spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+                spin_lock_irqsave(&lun->lun_cmd_lock, flags);
+        }
+        spin_unlock_irqrestore(&lun->lun_cmd_lock, flags);
+	
+	return;
+}
+
+EXPORT_SYMBOL(transport_clear_lun_from_sessions);
+
 /*	transport_generic_wait_for_tasks():
  *
  *	Called from frontend or passthrough context to wait for storage engine to pause
@@ -6016,8 +6117,8 @@ static void transport_generic_wait_for_tasks (se_cmd_t *cmd, int remove_cmd, int
 	 * If we are already stopped due to an external event (ie: LUN shutdown)
 	 * sleep until the connection can have the passed se_cmd_t back.
 	 * The T_TASK(cmd)->transport_lun_stopped_sem will be upped by
-	 * iscsi_target_device.c:iscsi_clear_lun_from_sessions() once the
-	 * IOCTL context caller has completed its operation on the se_cmd_t.
+	 * transport_clear_lun_from_sessions() once the ConfigFS context caller has
+	 * completed its operation on the se_cmd_t.
 	 */
 	if (atomic_read(&T_TASK(cmd)->transport_lun_stop)) {
 		atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 1);

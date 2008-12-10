@@ -170,6 +170,7 @@ extern void transport_release_tasks (se_cmd_t *);
 extern void transport_release_fe_cmd (se_cmd_t *);
 extern int transport_generic_remove (se_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks (se_cmd_t *, se_lun_t *);
+extern void transport_clear_lun_from_sessions (se_lun_t *);
 extern int iscsi_send_check_condition_and_sense (se_cmd_t *, __u8, int);
 extern int iscsi_tpg_persistent_reservation_check (se_cmd_t *);
 extern int iscsi_tpg_persistent_reservation_release (se_cmd_t *);

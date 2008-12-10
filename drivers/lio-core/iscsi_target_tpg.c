@@ -1394,7 +1394,7 @@ extern int iscsi_tpg_post_dellun (
 {
 	se_lun_acl_t *acl, *acl_next;
 	
-	iscsi_clear_lun_from_sessions(lun, tpg);
+	transport_clear_lun_from_sessions(lun);
 
 	LUN_OBJ_API(lun)->unexport_obj(lun->lun_type_ptr, tpg, lun);
 	LUN_OBJ_API(lun)->release_obj(lun->lun_type_ptr);
