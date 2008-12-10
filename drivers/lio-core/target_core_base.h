@@ -42,6 +42,10 @@
 #include <iscsi_target_version.h>	    /* get version definition */
 
 #define SCSI_CDB_SIZE			16 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
+#define TRANSPORT_IOV_DATA_BUFFER	5
+#define TRANSPORT_SENSE_BUFFER              64 /* Originally from iSCSI RFC, should be from SCSI_SENSE_BUFFERSIZE */
+#define TRANSPORT_SENSE_SEGMENT_LENGTH      66 /* Sense Data Segment */
+#define TRANSPORT_SENSE_SEGMENT_TOTAL       68 /* TRANSPORT_SENSE_SEGMENT_LENGTH + Padding */
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -110,6 +114,12 @@
 #define		VERIFY_16			0x8f
 #endif
 
+/* se_cmd_t->data_direction */
+#define SE_DIRECTION_NONE			0
+#define SE_DIRECTION_READ			1
+#define SE_DIRECTION_WRITE			2
+#define SE_DIRECTION_BIDI			3
+
 /* se_hba_t->hba_flags */
 #define HBA_FLAGS_INTERNAL_USE			0x00000001
 
@@ -126,7 +136,7 @@
 #define ISCSI_LUN_TYPE_NONE			0
 #define ISCSI_LUN_TYPE_DEVICE			1
 
-/* Special transport agnostic iscsi_cmd_t->t_states */
+/* Special transport agnostic se_cmd_t->t_states */
 #define TRANSPORT_NO_STATE			240
 #define TRANSPORT_NEW_CMD			241
 #define TRANSPORT_DEFERRED_CMD			242
@@ -143,6 +153,26 @@
 #define TRANSPORT_KILL				253
 #define TRANSPORT_REMOVE			254
 #define TRANSPORT_FREE				255
+
+#define SCF_SUPPORTED_SAM_OPCODE                0x00000001
+#define SCF_REPORT_LUNS                         0x00000002
+#define SCF_TRANSPORT_TASK_SENSE                0x00000004
+#define SCF_EMULATED_TASK_SENSE                 0x00000008
+#define SCF_SCSI_DATA_SG_IO_CDB                 0x00000010
+#define SCF_SCSI_CONTROL_SG_IO_CDB              0x00000020
+#define SCF_SCSI_CONTROL_NONSG_IO_CDB           0x00000040
+#define SCF_SCSI_NON_DATA_CDB                   0x00000080
+#define SCF_SCSI_CDB_EXCEPTION                  0x00000100
+#define SCF_SCSI_RESERVATION_CONFLICT           0x00000200
+#define SCF_CMD_PASSTHROUGH                     0x00000400
+#define SCF_CMD_PASSTHROUGH_NOALLOC             0x00000800
+#define SCF_SE_CMD_FAILED                       0x00001000
+#define SCF_SE_LUN_CMD                          0x00002000
+#define SCF_SE_ALLOW_EOO                        0x00004000
+#define SCF_SE_DISABLE_ONLINE_CHECK             0x00008000
+#define SCF_SENT_CHECK_CONDITION		0x00010000
+#define SCF_OVERFLOW_BIT                        0x00020000
+#define SCF_UNDERFLOW_BIT                       0x00040000
 
 /* se_device_t->type */
 #define PSCSI					1
@@ -201,10 +231,19 @@ typedef struct t10_wwn_s {
 	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
 } t10_wwn_t;
 
+typedef struct se_queue_req_s {
+        int                     state;
+        void                    *queue_se_obj_ptr;
+        void                    *cmd;
+        struct se_obj_lun_type_s *queue_se_obj_api;
+        struct se_queue_req_s   *next;
+        struct se_queue_req_s   *prev;
+} ____cacheline_aligned se_queue_req_t;
+
 typedef struct se_queue_obj_s {
 	spinlock_t		cmd_queue_lock;
-	iscsi_queue_req_t	*queue_head;
-	iscsi_queue_req_t	*queue_tail;
+	se_queue_req_t		*queue_head;
+	se_queue_req_t		*queue_tail;
 	struct semaphore		thread_sem;
 	struct semaphore		thread_create_sem;
 	struct semaphore		thread_done_sem;
@@ -242,7 +281,6 @@ typedef struct se_transport_task_s {
 	struct semaphore	transport_lun_stop_sem;
 	void			*t_task_buf;
 	void			*t_task_pt_buf;
-	struct iscsi_cmd_s	*t_task_pt_cmd;
 	struct list_head	t_task_list;
 	struct list_head	*t_mem_list;
 } ____cacheline_aligned se_transport_task_t;
@@ -261,7 +299,7 @@ typedef struct se_task_s {
         u32             task_size;
         u32             task_sg_num;
         u32             task_sg_offset;
-        iscsi_cmd_t     *iscsi_cmd;
+	struct se_cmd_s	*task_se_cmd;
         struct se_device_s     *iscsi_dev;
         struct semaphore        task_stop_sem;
         atomic_t        task_active;
@@ -281,11 +319,13 @@ typedef struct se_task_s {
         struct list_head t_list;
 } ____cacheline_aligned se_task_t;
 
+#define TASK_CMD(task)	((struct se_cmd_s *)task->task_se_cmd)
+
 typedef struct se_transform_info_s {
         int             ti_set_counts;
         u32             ti_data_length;
         unsigned long long      ti_lba;
-        struct iscsi_cmd_s *ti_cmd;
+        struct se_cmd_s *ti_se_cmd;
         struct se_device_s *ti_dev;
         void *se_obj_ptr;
         void *ti_obj_ptr;
@@ -293,6 +333,109 @@ typedef struct se_transform_info_s {
         struct se_obj_lun_type_s *ti_obj_api;
 } ____cacheline_aligned se_transform_info_t;
 
+typedef struct se_offset_map_s {
+        int                     map_reset;
+        u32                     iovec_length;
+        u32                     iscsi_offset;
+        u32                     current_offset;
+        u32                     orig_offset;
+        u32                     sg_count;
+        u32                     sg_current;
+        u32                     sg_length;
+        struct page             *sg_page;
+        struct se_mem_s         *map_se_mem;                                                                                 struct se_mem_s         *map_orig_se_mem;                                                                            void                    *iovec_base;
+} ____cacheline_aligned se_offset_map_t;
+        
+typedef struct se_map_sg_s {    
+        int                     map_flags;
+        u32                     data_length;
+        u32                     data_offset;
+	void			*fabric_cmd;
+        struct se_cmd_s         *se_cmd;
+        struct iovec            *iov;
+} ____cacheline_aligned se_map_sg_t;
+        
+typedef struct se_unmap_sg_s {  
+        u32                     data_length;
+        u32                     sg_count;
+        u32                     sg_offset;
+        u32                     padding;
+        u32                     t_offset;
+	void			*fabric_cmd;
+        struct se_cmd_s         *se_cmd;
+        se_offset_map_t         lmap;
+        struct se_mem_s         *cur_se_mem;
+} ____cacheline_aligned se_unmap_sg_t;
+
+typedef struct se_cmd_s {
+	u8			scsi_status; /* SAM response code being sent to initiator */
+	u8			scsi_sense_reason;
+	u16			scsi_sense_length;
+	int			data_direction;
+	int			t_state; /* Transport protocol dependent state */
+	int			deferred_t_state; /* Transport protocol dependent state for out of order CmdSNs */
+	int			transport_error_status; /* Transport specific error status */
+	u32			se_cmd_flags;
+	u32			data_length; /* Total size in bytes associated with command */
+	u32			cmd_spdtl;  /* SCSI Presented Data Transfer Length */
+	u32			residual_count;
+	u32			orig_fe_lun;
+	u32			iov_data_count; /* Number of iovecs iovecs used for IP stack calls */
+	u32			orig_iov_data_count; /* Number of iovecs allocated for iscsi_cmd_t->iov_data */
+	atomic_t                transport_sent;
+	void			*sense_buffer; /* Used for sense data */
+	struct iovec		*iov_data; /* Used with sockets based fabric plugins */
+	struct se_device_s      *iscsi_dev;
+	struct se_dev_entry_s   *iscsi_deve;
+	struct se_lun_s		*iscsi_lun; /* iSCSI device/LUN this commands belongs to */
+	struct se_obj_lun_type_s *se_obj_api;
+	void			*se_obj_ptr;
+	struct se_obj_lun_type_s *se_orig_obj_api;
+	void			*se_orig_obj_ptr;
+	void			*se_fabric_cmd_ptr;
+	struct se_session_s	*se_sess;
+	struct se_transport_task_s *t_task;
+	struct target_core_fabric_ops *se_tfo;
+        struct se_cmd_s      	*l_next;
+        struct se_cmd_s      	*l_prev;
+	int (*transport_add_cmd_to_queue)(struct se_cmd_s *, u8);
+	int (*transport_allocate_iovecs)(struct se_cmd_s *);
+	int (*transport_allocate_resources)(struct se_cmd_s *, u32, u32);
+	int (*transport_cdb_transform)(struct se_cmd_s *, struct se_transform_info_s *);
+	int (*transport_do_transform)(struct se_cmd_s *, struct se_transform_info_s *);
+	void (*transport_free_resources)(struct se_cmd_s *);
+	u32 (*transport_get_lba)(unsigned char *);
+	unsigned long long (*transport_get_long_lba)(unsigned char *);
+	struct se_task_s *(*transport_get_task)(struct se_transform_info_s *, struct se_cmd_s *, void *, struct se_obj_lun_type_s *);
+	int (*transport_map_buffers_to_tasks)(struct se_cmd_s *);
+	void (*transport_map_SG_segments)(struct se_unmap_sg_s *);
+	void (*transport_passthrough_done)(struct se_cmd_s *);
+	void (*transport_unmap_SG_segments)(struct se_unmap_sg_s *);
+	int (*transport_set_iovec_ptrs)(struct se_map_sg_s *, struct se_unmap_sg_s *);
+	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
+	void (*transport_wait_for_tasks)(struct se_cmd_s *, int, int);
+	void (*callback)(struct se_cmd_s *cmd, void *callback_arg, int complete_status);
+	void *callback_arg;
+} ____cacheline_aligned se_cmd_t;
+
+#define T_TASK(cmd)     ((se_transport_task_t *)(cmd->t_task))
+#define CMD_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_obj_api))
+#define CMD_ORIG_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_orig_obj_api))
+#define CMD_TFO(cmd) ((struct target_core_fabric_ops *)cmd->se_tfo)
+
+typedef struct se_node_acl_s {
+	struct se_dev_entry_s	*device_list;
+	void			*fabric_acl_ptr;
+	spinlock_t		device_list_lock;
+} se_node_acl_t;
+
+typedef struct se_session_s {
+	struct se_node_acl_s	*node_acl;
+	void			*fabric_sess_ptr;
+} se_session_t;
+
+#define SE_SESS(cmd)		((struct se_session_s *)(cmd)->se_sess)
+#define SE_NODE_ACL(sess)	((struct se_node_acl_s *)(sess)->node_acl)
 
 struct se_device_s;
 struct se_transform_info_s;
@@ -447,8 +590,8 @@ typedef struct se_lun_s {
 	spinlock_t		lun_cmd_lock;
 	spinlock_t		lun_reservation_lock;
 	spinlock_t		lun_sep_lock;
-	iscsi_cmd_t		*lun_cmd_head;
-	iscsi_cmd_t		*lun_cmd_tail;
+	se_cmd_t		*lun_cmd_head;
+	se_cmd_t		*lun_cmd_tail;
 	se_lun_acl_t		*lun_acl_head;
 	se_lun_acl_t		*lun_acl_tail;
 	struct iscsi_node_acl_s *lun_reserved_node_acl;
@@ -457,9 +600,9 @@ typedef struct se_lun_s {
 	struct config_group	lun_group;
 	struct se_obj_lun_type_s *lun_obj_api;
 	struct se_port_s	*lun_sep;
-	int (*persistent_reservation_check)(iscsi_cmd_t *);
-	int (*persistent_reservation_release)(iscsi_cmd_t *);
-	int (*persistent_reservation_reserve)(iscsi_cmd_t *);
+	int (*persistent_reservation_check)(se_cmd_t *);
+	int (*persistent_reservation_release)(se_cmd_t *);
+	int (*persistent_reservation_reserve)(se_cmd_t *);
 } ____cacheline_aligned se_lun_t;
 
 #define ISCSI_LUN(c)            ((se_lun_t *)(c)->iscsi_lun)
