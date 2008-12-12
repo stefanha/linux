@@ -72,9 +72,9 @@ extern se_hba_t *core_get_hba_from_id (u32 hba_id, int addhba)
 {
 	se_hba_t *hba;
 	
-	if (hba_id > (ISCSI_MAX_GLOBAL_HBAS-1)) {
-		TRACE_ERROR("iSCSI HBA_ID: %u exceeds ISCSI_MAX_GLOBAL_HBAS-1: %u\n",
-			hba_id, ISCSI_MAX_GLOBAL_HBAS-1);
+	if (hba_id > (TRANSPORT_MAX_GLOBAL_HBAS-1)) {
+		TRACE_ERROR("iSCSI HBA_ID: %u exceeds TRANSPORT_MAX_GLOBAL_HBAS-1: %u\n",
+			hba_id, TRANSPORT_MAX_GLOBAL_HBAS-1);
 		return(NULL);
 	}
 
@@ -94,7 +94,7 @@ extern se_hba_t *core_get_next_free_hba (void)
 	u32 i;
 
 	spin_lock(&se_global->hba_lock);     
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
+	for (i = 0; i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
 		hba = &se_global->hba_list[i];
 		if (hba->hba_status != HBA_STATUS_FREE)
 			continue;
@@ -182,7 +182,7 @@ extern int se_core_del_hba (
 	 * Do not allow the se_hba_t to be released if references exist to
 	 * from se_device_t->se_lun_t.
 	 */
-	if (iscsi_check_devices_access(hba) < 0) {
+	if (se_check_devices_access(hba) < 0) {
 		TRACE_ERROR("CORE_HBA[%u] - **ERROR** - Unable to release HBA"
 			" with active LUNs\n", hba->hba_id);
 		return(-EINVAL);
@@ -232,14 +232,14 @@ extern void iscsi_disable_all_hbas (void)
 	se_hba_t *hba;
 
 	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
+	for (i = 0; i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
 		hba = &se_global->hba_list[i];
 
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
 			continue;
 
 		spin_unlock(&se_global->hba_lock);
-		iscsi_disable_devices_for_hba(hba);
+		se_disable_devices_for_hba(hba);
 		spin_lock(&se_global->hba_lock);
 	}
 	spin_unlock(&se_global->hba_lock);
@@ -259,7 +259,7 @@ extern void iscsi_hba_del_all_hbas (void)
 	se_hba_t *hba;
 
 	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < ISCSI_MAX_GLOBAL_HBAS; i++) {
+	for (i = 0; i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
 		hba = &se_global->hba_list[i];
 	
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
