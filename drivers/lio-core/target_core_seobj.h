@@ -53,8 +53,8 @@ typedef struct se_obj_lun_type_s {
 	void (*access_obj)(void *);
 	void (*deaccess_obj)(void *);
 	void (*put_obj)(void *);
-	int (*export_obj)(void *, struct iscsi_portal_group_s *, struct se_lun_s *);
-	void (*unexport_obj)(void *, struct iscsi_portal_group_s *, struct se_lun_s *);
+	int (*export_obj)(void *, struct se_portal_group_s *, struct se_lun_s *);
+	void (*unexport_obj)(void *, struct se_portal_group_s *, struct se_lun_s *);
 	int (*transport_setup_cmd)(void *, struct se_cmd_s *);
 	int (*active_tasks)(void *);
 	int (*add_tasks)(void *, struct se_cmd_s *);
@@ -102,8 +102,8 @@ typedef struct se_obj_lun_type_s {
 	void (*get_evpd_sn)(void *, unsigned char *, u32);
 	int (*get_task_timeout)(void *);
 	int (*task_failure_complete)(void *, struct se_cmd_s *);
-	int (*add_obj_to_lun)(struct iscsi_portal_group_s *, struct se_lun_s *);
-	int (*del_obj_from_lun)(struct iscsi_portal_group_s *, struct se_lun_s *);
+	int (*add_obj_to_lun)(struct se_portal_group_s *, struct se_lun_s *);
+	int (*del_obj_from_lun)(struct se_portal_group_s *, struct se_lun_s *);
 	struct se_obj_lun_type_s *(*get_next_obj_api)(void *, void **);
 	int (*obtain_obj_lock)(void *);
 	int (*release_obj_lock)(void *);

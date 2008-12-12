@@ -178,11 +178,11 @@ extern void dev_put_obj (void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	core_put_hba(dev->iscsi_hba);
+	core_put_hba(dev->se_hba);
 	return;
 }
 
-extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
+extern int dev_obj_export (void *p, se_portal_group_t *tpg, se_lun_t *lun)
 {
 	se_device_t *dev  = (se_device_t *)p;
 	se_port_t *sep;
@@ -194,9 +194,9 @@ extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 	memset(sep, 0, sizeof(se_port_t));
 	INIT_LIST_HEAD(&sep->sep_list);
 
-	lun->iscsi_dev = dev;
+	lun->se_dev = dev;
 	if (DEV_OBJ_API(dev)->activate(p) < 0) {
-		lun->iscsi_dev = NULL;
+		lun->se_dev = NULL;
 		kfree(sep);
 		return(-1);
 	}
@@ -220,7 +220,7 @@ extern int dev_obj_export (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 	return(0);
 }
 
-extern void dev_obj_unexport (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
+extern void dev_obj_unexport (void *p, se_portal_group_t *tpg, se_lun_t *lun)
 {
 	se_device_t *dev  = (se_device_t *)p;
 	se_port_t *sep = lun->lun_sep;
@@ -244,7 +244,7 @@ extern void dev_obj_unexport (void *p, iscsi_portal_group_t *tpg, se_lun_t *lun)
 	kfree(sep);
 
 	DEV_OBJ_API(dev)->deactivate(p);
-	lun->iscsi_dev = NULL;
+	lun->se_dev = NULL;
 	
 	return;
 }
@@ -420,7 +420,7 @@ extern void *dev_obj_get_transport_req (void *p, se_task_t *task)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	task->iscsi_dev = dev;
+	task->se_dev = dev;
 	
 	return(dev->transport->allocate_request(task, dev));
 }
@@ -461,8 +461,8 @@ extern int dev_obj_check_online (void *p)
 	int ret;
 
 	spin_lock(&dev->dev_status_lock);
-	ret = ((dev->dev_status & ISCSI_DEVICE_ACTIVATED) ||
-	       (dev->dev_status & ISCSI_DEVICE_DEACTIVATED)) ? 0 : 1;
+	ret = ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
+	       (dev->dev_status & TRANSPORT_DEVICE_DEACTIVATED)) ? 0 : 1;
 	spin_unlock(&dev->dev_status_lock);
 
 	return(ret);
@@ -474,7 +474,7 @@ extern int dev_obj_check_shutdown (void *p)
 	int ret;
 
 	spin_lock(&dev->dev_status_lock);
-	ret = (dev->dev_status & ISCSI_DEVICE_SHUTDOWN);
+	ret = (dev->dev_status & TRANSPORT_DEVICE_SHUTDOWN);
 	spin_unlock(&dev->dev_status_lock);
 
 	return(ret);
@@ -500,15 +500,15 @@ extern void dev_obj_signal_shutdown (void *p)
 	se_device_t *dev  = (se_device_t *)p;
 
 	spin_lock(&dev->dev_status_lock);
-	if ((dev->dev_status & ISCSI_DEVICE_ACTIVATED) ||
-	    (dev->dev_status & ISCSI_DEVICE_DEACTIVATED) ||
-	    (dev->dev_status & ISCSI_DEVICE_OFFLINE_ACTIVATED) ||
-	    (dev->dev_status & ISCSI_DEVICE_OFFLINE_DEACTIVATED)) {
-		dev->dev_status |= ISCSI_DEVICE_SHUTDOWN;
-		dev->dev_status &= ~ISCSI_DEVICE_ACTIVATED;
-		dev->dev_status &= ~ISCSI_DEVICE_DEACTIVATED;
-		dev->dev_status &= ~ISCSI_DEVICE_OFFLINE_ACTIVATED;
-		dev->dev_status &= ~ISCSI_DEVICE_OFFLINE_DEACTIVATED;
+	if ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
+	    (dev->dev_status & TRANSPORT_DEVICE_DEACTIVATED) ||
+	    (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_ACTIVATED) ||
+	    (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_DEACTIVATED)) {
+		dev->dev_status |= TRANSPORT_DEVICE_SHUTDOWN;
+		dev->dev_status &= ~TRANSPORT_DEVICE_ACTIVATED;
+		dev->dev_status &= ~TRANSPORT_DEVICE_DEACTIVATED;
+		dev->dev_status &= ~TRANSPORT_DEVICE_OFFLINE_ACTIVATED;
+		dev->dev_status &= ~TRANSPORT_DEVICE_OFFLINE_DEACTIVATED;
 
 		up(&dev->dev_queue_obj->thread_sem);
 	}
@@ -522,9 +522,9 @@ extern void dev_obj_clear_shutdown (void *p)
 	se_device_t *dev  = (se_device_t *)p;
 
 	spin_lock(&dev->dev_status_lock);
-	if (dev->dev_status & ISCSI_DEVICE_SHUTDOWN) {
-		dev->dev_status &= ~ISCSI_DEVICE_SHUTDOWN;
-		dev->dev_status |= ISCSI_DEVICE_DEACTIVATED;
+	if (dev->dev_status & TRANSPORT_DEVICE_SHUTDOWN) {
+		dev->dev_status &= ~TRANSPORT_DEVICE_SHUTDOWN;
+		dev->dev_status |= TRANSPORT_DEVICE_DEACTIVATED;
 	}
 	spin_unlock(&dev->dev_status_lock);
 
@@ -673,19 +673,14 @@ extern int dev_obj_task_failure_complete (void *p, se_cmd_t *cmd)
 	return(transport_failure_tasks_generic(cmd));
 }
 
-extern int dev_add_obj_to_lun (iscsi_portal_group_t *tpg, se_lun_t *lun)
+extern int dev_add_obj_to_lun (se_portal_group_t *tpg, se_lun_t *lun)
 {
 	return(0);
 }
 
-extern int dev_del_obj_from_lun (iscsi_portal_group_t *tpg, se_lun_t *lun)
+extern int dev_del_obj_from_lun (se_portal_group_t *tpg, se_lun_t *lun)
 {
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-	
-	if (!(iscsi_tf))
-		BUG();
-
-	return(iscsi_tf->dev_del_lun(tpg, lun->iscsi_lun));
+	return(core_dev_del_lun(tpg, lun->unpacked_lun));
 }
 
 extern se_obj_lun_type_t *dev_get_next_obj_api (void *p, void **next_p)
@@ -708,7 +703,7 @@ extern int dev_release_obj_lock (void *p)
 }
 
 #define DEV_OBJ_PLUGIN {						\
-	se_obj_type:		ISCSI_LUN_TYPE_DEVICE,			\
+	se_obj_type:		TRANSPORT_LUN_TYPE_DEVICE,		\
 	get_obj_info:		dev_obj_get_obj_info,			\
 	get_plugin_info:	dev_obj_get_plugin_info,		\
 	get_obj:		dev_obj_get_obj,			\
@@ -816,7 +811,7 @@ extern int se_obj_load_plugins (void)
 	int ret = 0;
 	
 	dev_obj_template.obj_plugin = plugin_register((void *)&dev_obj_template,
-			ISCSI_LUN_TYPE_DEVICE, "dev", PLUGIN_TYPE_OBJ,
+			TRANSPORT_LUN_TYPE_DEVICE, "dev", PLUGIN_TYPE_OBJ,
 			dev_obj_template.get_plugin_info, &ret);
 	if (ret) {
 		TRACE_ERROR("plugin_register() failures\n");
