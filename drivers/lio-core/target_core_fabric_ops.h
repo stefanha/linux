@@ -1,11 +1,20 @@
 struct target_core_fabric_ops {
+	char *(*get_fabric_name)(void);
+	char *(*tpg_get_wwn)(struct se_portal_group_s *);
+	u32 (*tpg_get_tag)(struct se_portal_group_s *);
+	u32 (*tpg_get_default_depth)(struct se_portal_group_s *);
+	int (*tpg_check_demo_mode)(struct se_portal_group_s *);
+	int (*tpg_check_demo_mode_write_protect)(struct se_portal_group_s *);
+	int (*tpg_release_node_acl)(struct se_portal_group_s *, struct se_node_acl_s *);
+	int (*tpg_get_inst_index)(struct se_portal_group_s *);
         void (*release_cmd_to_pool)(struct se_cmd_s *);
         void (*release_cmd_direct)(struct se_cmd_s *);
-	int (*dev_del_lun)(struct iscsi_portal_group_s *, __u32);
-	int (*stop_session)(struct iscsi_session_s *, int, int);
-	void (*fall_back_to_erl0)(struct iscsi_conn_s *);
+	int (*dev_del_lun)(struct se_portal_group_s *, __u32);
+	int (*stop_session)(struct se_session_s *, int, int);
+	void (*fall_back_to_erl0)(struct se_session_s *);
 	int (*write_pending)(struct se_cmd_s *);
-	void (*dec_nacl_count)(struct iscsi_node_acl_s *, struct se_cmd_s *);
+	void (*dec_nacl_count)(struct se_node_acl_s *, struct se_cmd_s *);
+	void (*set_default_node_attributes)(struct se_node_acl_s *);
 	void *(*scsi_auth_intr_seq_start)(struct seq_file *, loff_t *);
 	void *(*scsi_auth_intr_seq_next)(struct seq_file *, void *, loff_t *);
 	int (*scsi_auth_intr_seq_show)(struct seq_file *, void *);
