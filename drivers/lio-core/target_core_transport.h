@@ -30,6 +30,8 @@
 #ifndef TARGET_CORE_TRANSPORT_H
 #define TARGET_CORE_TRANSPORT_H
 
+#define TARGET_CORE_VERSION			"v3.0.0"
+
 #define PYX_TRANSPORT_WINDOW_CLOSED_THRESHOLD	3  /* Attempts before moving from SHORT to LONG */
 #define PYX_TRANSPORT_WINDOW_CLOSED_WAIT_SHORT	3  /* In milliseconds */
 #define PYX_TRANSPORT_WINDOW_CLOSED_WAIT_LONG	10 /* In milliseconds */
@@ -108,6 +110,9 @@ extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
 extern struct se_plugin_s *transport_core_get_plugin_by_name (const char *name);
 extern void transport_check_dev_params_delim (char *, char **);
+extern struct se_session_s *transport_allocate_session (struct se_portal_group_s *, struct se_node_acl_s *);
+extern int transport_register_session (struct se_session_s *, void *);
+extern void transport_deregister_session (struct se_session_s *);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);
 extern int transport_add_cmd_to_queue (struct se_cmd_s *, struct se_queue_obj_s *, u8);
 extern void transport_complete_cmd (se_cmd_t *, int);
@@ -128,11 +133,11 @@ extern void transport_generic_free_device (se_device_t *);
 extern int transport_allocate_iovecs_for_cmd (struct se_cmd_s *, u32);
 extern int transport_generic_obj_start (struct se_transform_info_s *, struct se_obj_lun_type_s *, void *, unsigned long long);
 extern void transport_device_setup_cmd (se_cmd_t *);
-extern se_cmd_t *transport_alloc_se_cmd (struct target_core_fabric_ops *, void *, u32, int);
+extern se_cmd_t *transport_alloc_se_cmd (struct target_core_fabric_ops *, struct se_session_s *, void *, u32, int);
 extern int transport_generic_allocate_tasks (se_cmd_t *, unsigned char *);
 extern int transport_generic_handle_cdb (se_cmd_t *);
 extern int transport_generic_handle_data (se_cmd_t *);
-extern int transport_generic_handle_tmr (se_cmd_t *, iscsi_tmr_req_t *);
+extern int transport_generic_handle_tmr (se_cmd_t *, se_tmr_req_t *);
 extern void transport_stop_tasks_for_cmd (struct se_cmd_s *);
 extern int transport_failure_tasks_generic (se_cmd_t *);
 extern void transport_generic_request_failure (se_cmd_t *, se_device_t *, int, int); 
@@ -172,9 +177,9 @@ extern int transport_generic_remove (se_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks (se_cmd_t *, se_lun_t *);
 extern void transport_clear_lun_from_sessions (se_lun_t *);
 extern int iscsi_send_check_condition_and_sense (se_cmd_t *, __u8, int);
-extern int iscsi_tpg_persistent_reservation_check (se_cmd_t *);
-extern int iscsi_tpg_persistent_reservation_release (se_cmd_t *);
-extern int iscsi_tpg_persistent_reservation_reserve (se_cmd_t *);
+extern int core_tpg_persistent_reservation_check (se_cmd_t *);
+extern int core_tpg_persistent_reservation_release (se_cmd_t *);
+extern int core_tpg_persistent_reservation_reserve (se_cmd_t *);
 extern void transport_generic_free_cmd (se_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds (se_cmd_t *, int);
 extern int transport_generic_do_transform (struct se_cmd_s *, struct se_transform_info_s *);
