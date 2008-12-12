@@ -352,8 +352,8 @@ static int iblock_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
 	se_cmd_t *cmd = TASK_CMD(task);
-	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
-	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
+	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
+	se_hba_t *hba = task->se_dev->se_hba;
 	unsigned char *sub_sn = NULL;
 
 	memset(prod, 0, 64);
@@ -377,7 +377,7 @@ static int iblock_emulate_inquiry (se_task_t *task)
 
 static int iblock_emulate_read_cap (se_task_t *task)
 {
-	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
+	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
 	u32 blocks = (get_capacity(bd->bd_disk) - 1);
 
@@ -389,7 +389,7 @@ static int iblock_emulate_read_cap (se_task_t *task)
 
 static int iblock_emulate_read_cap16 (se_task_t *task)
 {
-	iblock_dev_t *ibd = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
+	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
 	unsigned long long blocks_long = (get_capacity(bd->bd_disk) - 1);
 
@@ -713,7 +713,7 @@ extern void iblock_map_task_non_SG (se_task_t *task)
 static void iblock_bio_destructor (struct bio *bio)
 {
 	se_task_t *task = (se_task_t *)bio->bi_private;
-	iblock_dev_t *ib_dev = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
+	iblock_dev_t *ib_dev = (iblock_dev_t *) task->se_dev->dev_ptr;
 
 	bio_free(bio, ib_dev->ibd_bio_set);
 }
@@ -752,7 +752,7 @@ static struct bio *iblock_get_bio (se_task_t *task,
 
 extern int iblock_map_task_SG (se_task_t *task)
 {
-	iblock_dev_t *ib_dev = (iblock_dev_t *) task->iscsi_dev->dev_ptr;
+	iblock_dev_t *ib_dev = (iblock_dev_t *) task->se_dev->dev_ptr;
 	iblock_req_t *ib_req = (iblock_req_t *) task->transport_req;
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
 	struct scatterlist *sg = task->task_sg;

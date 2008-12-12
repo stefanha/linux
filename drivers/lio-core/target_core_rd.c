@@ -405,7 +405,7 @@ extern void rd_get_evpd_prod (unsigned char *buf, u32 size, se_device_t *dev)
 extern void rd_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
-	se_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->se_hba;
 
 	snprintf(buf, size, "%u_%u", hba->hba_id, rd_dev->rd_dev_id);
 	return;
@@ -418,9 +418,9 @@ extern void rd_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 static int rd_emulate_inquiry (se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];
-	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
+	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
 	se_cmd_t *cmd = TASK_CMD(task);
-	se_hba_t *hba = task->iscsi_dev->iscsi_hba;
+	se_hba_t *hba = task->se_dev->se_hba;
 	
 	memset(prod, 0, 64);
 	memset(se_location, 0, 128);
@@ -439,7 +439,7 @@ static int rd_emulate_inquiry (se_task_t *task)
  */
 static int rd_emulate_read_cap (se_task_t *task)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
+	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
 	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1;
 
 	if ((((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1) > 0x00000000ffffffff)
@@ -450,7 +450,7 @@ static int rd_emulate_read_cap (se_task_t *task)
 
 static int rd_emulate_read_cap16 (se_task_t *task)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) task->iscsi_dev->dev_ptr;
+	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
 	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1;	
 
 	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long, RD_BLOCKSIZE));

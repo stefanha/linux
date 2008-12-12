@@ -603,7 +603,7 @@ extern void pscsi_free_device (void *p)
  */
 extern int pscsi_transport_complete (se_task_t *task)
 {
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->iscsi_dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	void *pscsi_buf;
 	int result;
@@ -618,8 +618,7 @@ extern int pscsi_transport_complete (se_task_t *task)
 		u32 len = 0;
 		unsigned char *dst = (unsigned char *)pscsi_buf, *iqn = NULL;
 		unsigned char buf[EVPD_BUF_LEN];
-//#warning FIXME v2.8: se_obj_api usage
-		se_hba_t *hba = task->iscsi_dev->iscsi_hba;
+		se_hba_t *hba = task->se_dev->se_hba;
 
 		/*
 		 * The Initiator port did not request EVPD information.
@@ -696,10 +695,10 @@ extern int pscsi_transport_complete (se_task_t *task)
 	 */
 	if (((cdb[0] == MODE_SENSE) || (cdb[0] == MODE_SENSE_10)) &&
 	     (status_byte(result) << 1) == SAM_STAT_GOOD) {
-		if (!TASK_CMD(task)->iscsi_deve)
+		if (!TASK_CMD(task)->se_deve)
 			goto after_mode_sense;
 
-		if (TASK_CMD(task)->iscsi_deve->lun_flags & ISCSI_LUNFLAGS_READ_ONLY) {
+		if (TASK_CMD(task)->se_deve->lun_flags & TRANSPORT_LUNFLAGS_READ_ONLY) {
 			unsigned char *buf = (unsigned char *)pscsi_buf;
 
 			if (cdb[0] == MODE_SENSE_10) {
@@ -785,7 +784,7 @@ extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
-	se_hba_t *hba = dev->iscsi_hba;
+	se_hba_t *hba = dev->se_hba;
 
 	snprintf(buf, size, "%u_%u_%u_%u", hba->hba_id, sd->channel, sd->id, sd->lun);
 	return;
@@ -794,7 +793,7 @@ extern void pscsi_get_evpd_sn (unsigned char *buf, u32 size, se_device_t *dev)
 static int pscsi_blk_get_request (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->iscsi_dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 
 	pt->pscsi_req = blk_get_request(pdv->pdv_sd->request_queue,
 			(pt->pscsi_direction == DMA_TO_DEVICE), GFP_KERNEL);
@@ -835,7 +834,7 @@ static int pscsi_blk_get_request (se_task_t *task)
 extern int pscsi_do_task (se_task_t *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->iscsi_dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	struct gendisk *gd = NULL;
 	/*
 	 * Grab pointer to struct gendisk for TYPE_DISK and TYPE_ROM
@@ -1195,7 +1194,7 @@ extern int pscsi_map_task_non_SG (se_task_t *task)
 	se_cmd_t *cmd = TASK_CMD(task);
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->iscsi_dev->dev_ptr;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	int ret = 0;
 
 	pt->pscsi_buf = (void *)buf;
