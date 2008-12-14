@@ -1,7 +1,7 @@
 /*********************************************************************************
  * Filename:  target_core_pscsi.h
  *
- * This file contains the iSCSI <-> Parallel SCSI transport
+ * This file contains the generic target mode <-> Linux SCSI subsystem plugin.
  * specific definitions and prototypes.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
@@ -101,7 +101,6 @@ typedef struct pscsi_plugin_task_s {
 	int	pscsi_direction;
 	int	pscsi_result;
 	u32	pscsi_resid;
-	void	*pscsi_buf;
 	struct request *pscsi_req;
 } pscsi_plugin_task_t;
 
