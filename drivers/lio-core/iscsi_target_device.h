@@ -29,20 +29,7 @@
  
 extern se_lun_t *iscsi_get_lun (iscsi_conn_t *, u64);
 extern int iscsi_get_lun_for_cmd (iscsi_cmd_t *, unsigned char *, u64);
-extern void iscsi_determine_maxcmdsn (iscsi_session_t *, iscsi_node_acl_t *);
+extern void iscsi_determine_maxcmdsn (iscsi_session_t *);
 extern void iscsi_increment_maxcmdsn (iscsi_cmd_t *, iscsi_session_t *);
-extern int iscsi_set_queue_depth_for_node (iscsi_portal_group_t *, iscsi_node_acl_t *);
-extern int iscsi_create_device_list_for_node (iscsi_node_acl_t *, iscsi_portal_group_t *);
-extern int iscsi_free_device_list_for_node (iscsi_node_acl_t *, iscsi_portal_group_t *);
-extern void iscsi_update_device_list_access (u32, u32, iscsi_node_acl_t *);
-extern void iscsi_update_device_list_for_node (se_lun_t *, u32, u32, iscsi_node_acl_t *, iscsi_portal_group_t *, int);     
-extern void iscsi_clear_lun_from_tpg (se_lun_t *, iscsi_portal_group_t *);
-extern se_lun_t *iscsi_dev_add_lun (iscsi_portal_group_t *, se_hba_t *, se_device_t *, u32, int *);
-extern int iscsi_dev_del_lun (iscsi_portal_group_t *, u32);
-extern se_lun_t *iscsi_get_lun_from_tpg (iscsi_portal_group_t *, u32);
-extern se_lun_acl_t *iscsi_dev_init_initiator_node_lun_acl (iscsi_portal_group_t *, u32, char *, int *);
-extern int iscsi_dev_add_initiator_node_lun_acl (iscsi_portal_group_t *, se_lun_acl_t *, u32, u32);
-extern int iscsi_dev_del_initiator_node_lun_acl (iscsi_portal_group_t *, se_lun_t *, se_lun_acl_t *);
-extern void iscsi_dev_free_initiator_node_lun_acl (iscsi_portal_group_t *, se_lun_acl_t *lacl);
 
 #endif /* ISCSI_TARGET_DEVICE_H */
