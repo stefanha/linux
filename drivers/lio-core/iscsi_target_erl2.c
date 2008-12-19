@@ -197,7 +197,8 @@ extern void iscsi_free_connection_recovery_entires (iscsi_session_t *sess)
 		
 			cmd->conn = NULL;
 			spin_unlock(&cr->conn_recovery_cmd_lock);
-			if (!(cmd->cmd_flags & ICF_SE_LUN_CMD) ||
+			if (!(SE_CMD(cmd)) ||
+			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
 				__iscsi_release_cmd_to_pool(cmd, sess);
 			else
@@ -229,7 +230,8 @@ extern void iscsi_free_connection_recovery_entires (iscsi_session_t *sess)
 
 			cmd->conn = NULL;
 			spin_unlock(&cr->conn_recovery_cmd_lock);
-			if (!(cmd->cmd_flags & ICF_SE_LUN_CMD) ||
+			if (!(SE_CMD(cmd)) ||
+			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
 				__iscsi_release_cmd_to_pool(cmd, sess);
 			else
@@ -373,7 +375,8 @@ extern void iscsi_discard_cr_cmds_by_expstatsn (
 		iscsi_remove_cmd_from_connection_recovery(cmd, sess);
 		
 		spin_unlock(&cr->conn_recovery_cmd_lock);
-		if (!(cmd->cmd_flags & ICF_SE_LUN_CMD) ||
+		if (!(SE_CMD(cmd)) ||
+		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 		    !(SE_CMD(cmd)->transport_wait_for_tasks))
 			__iscsi_release_cmd_to_pool(cmd, sess);
 		else
@@ -449,7 +452,8 @@ extern int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn (iscsi_conn_t *conn)
 		iscsi_remove_cmd_from_conn_list(cmd, conn);
 
 		spin_unlock_bh(&conn->cmd_lock);
-		if (!(cmd->cmd_flags & ICF_SE_LUN_CMD) ||
+		if (!(SE_CMD(cmd)) ||
+		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 		    !(SE_CMD(cmd)->transport_wait_for_tasks))
 			__iscsi_release_cmd_to_pool(cmd, sess);
 		else
@@ -514,7 +518,8 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 			iscsi_remove_cmd_from_conn_list(cmd, conn);
 
 			spin_unlock_bh(&conn->cmd_lock);
-			if (!(cmd->cmd_flags & ICF_SE_LUN_CMD) ||
+			if (!(SE_CMD(cmd)) ||
+			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
 				__iscsi_release_cmd_to_pool(cmd, SESS(conn));
 			else
@@ -542,7 +547,8 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 			iscsi_remove_cmd_from_conn_list(cmd, conn);
 
 			spin_unlock_bh(&conn->cmd_lock);
-			if (!(cmd->cmd_flags & ICF_SE_LUN_CMD) ||
+			if (!(SE_CMD(cmd)) ||
+			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
 				__iscsi_release_cmd_to_pool(cmd, SESS(conn));
 			else
@@ -570,7 +576,8 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 		spin_unlock_bh(&conn->cmd_lock);
 		iscsi_free_all_datain_reqs(cmd);
 
-		if ((cmd->cmd_flags & ICF_SE_LUN_CMD) &&
+		if ((SE_CMD(cmd)) &&
+		    (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) &&
 		     SE_CMD(cmd)->transport_wait_for_tasks)
 			SE_CMD(cmd)->transport_wait_for_tasks(SE_CMD(cmd), 0, 0);
 
