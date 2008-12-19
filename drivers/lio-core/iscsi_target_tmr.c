@@ -50,6 +50,7 @@
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>
 #include <iscsi_target_tmr.h>
+#include <iscsi_target_tpg.h>
 #include <target_core_transport.h>
 #include <iscsi_target_util.h>
 
@@ -236,13 +237,13 @@ extern __u8 iscsi_tmr_task_warm_reset (
 	iscsi_tmr_req_t *tmr_req,
 	unsigned char *buf)
 {
-	iscsi_node_acl_t *acl = SESS(conn)->node_acl;
 	iscsi_session_t *sess = SESS(conn);
+	iscsi_node_attrib_t *na = iscsi_tpg_get_node_attrib(sess);
 #if 0
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
 #endif	
-	if (!ISCSI_NODE_ATTRIB(acl)->tmr_warm_reset) {
+	if (!(na->tmr_warm_reset)) {
 		 TRACE_ERROR("TMR Opcode TARGET_WARM_RESET authorization failed"
 			" for Initiator Node: %s\n",
 			SESS_NODE_ACL(sess)->initiatorname);
@@ -265,11 +266,12 @@ extern __u8 iscsi_tmr_task_cold_reset (
 	unsigned char *buf)
 {
 	iscsi_session_t *sess = SESS(conn);
+	iscsi_node_attrib_t *na = iscsi_tpg_get_node_attrib(sess);
 #if 0
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
 #endif	
-	if (!ISCSI_NODE_ATTRIB(sess->node_acl)->tmr_cold_reset) {
+	if (!(na->tmr_cold_reset)) {
 		TRACE_ERROR("TMR Opcode TARGET_COLD_RESET authorization failed"
 			" for Initiator Node: %s\n",
 			SESS_NODE_ACL(sess)->initiatorname);
