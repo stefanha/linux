@@ -1045,7 +1045,6 @@ extern se_device_t *pscsi_create_virtdevice_from_fd (
 		}
 		/*
 		 * Keep track of the struct block_device for now, as we need it for
-		 * 
 		 */
 		pdv->pdv_bd = bd;
 		/*
