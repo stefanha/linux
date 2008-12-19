@@ -37,7 +37,7 @@ extern void iscsi_start_time2retain_handler (iscsi_session_t *);
 extern int iscsi_stop_time2retain_timer (iscsi_session_t *);
 extern void iscsi_connection_reinstatement_rcfr (iscsi_conn_t *);
 extern void iscsi_cause_connection_reinstatement (iscsi_conn_t *, int);
-extern void iscsi_fall_back_to_erl0 (iscsi_conn_t *);
+extern void iscsi_fall_back_to_erl0 (iscsi_session_t *);
 extern void iscsi_take_action_for_connection_exit (iscsi_conn_t *);
 extern int iscsi_recover_from_unknown_opcode (iscsi_conn_t *);
 

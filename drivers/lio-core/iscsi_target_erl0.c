@@ -835,15 +835,16 @@ static void iscsi_handle_time2retain_timeout (unsigned long data)
 {
 	iscsi_session_t *sess = (iscsi_session_t *) data;
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
+	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
 	
-	spin_lock_bh(&tpg->session_lock);
+	spin_lock_bh(&se_tpg->session_lock);
 	if (sess->time2retain_timer_flags & T2R_TF_STOP) {
-		spin_unlock_bh(&tpg->session_lock);
+		spin_unlock_bh(&se_tpg->session_lock);
 		return;
 	}
 	if (atomic_read(&sess->session_reinstatement)) {
 		TRACE_ERROR("Exiting Time2Retain handler because session_reinstatement=1\n");
-		spin_unlock_bh(&tpg->session_lock);
+		spin_unlock_bh(&se_tpg->session_lock);
 		return;
 	}
 	sess->time2retain_timer_flags |= T2R_TF_EXPIRED;
@@ -866,7 +867,7 @@ static void iscsi_handle_time2retain_timeout (unsigned long data)
 	}
 #endif /* SNMP_SUPPORT */
 
-	spin_unlock_bh(&tpg->session_lock);
+	spin_unlock_bh(&se_tpg->session_lock);
 	iscsi_close_session(sess);
 	
 	return;
@@ -909,11 +910,12 @@ extern void iscsi_start_time2retain_handler (iscsi_session_t *sess)
 
 /*	iscsi_stop_time2retain_timer():
  *
- *	Called with spin_lock_bh(&iscsi_portal_group_t->session_lock) held
+ *	Called with spin_lock_bh(&se_portal_group_t->session_lock) held
  */
 extern int iscsi_stop_time2retain_timer (iscsi_session_t *sess)
 {
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
+	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
 	
 	if (sess->time2retain_timer_flags & T2R_TF_EXPIRED)
 		return(-1);
@@ -922,11 +924,11 @@ extern int iscsi_stop_time2retain_timer (iscsi_session_t *sess)
 		return(0);
 	
 	sess->time2retain_timer_flags |= T2R_TF_STOP;
-	spin_unlock_bh(&tpg->session_lock);
+	spin_unlock_bh(&se_tpg->session_lock);
 
 	del_timer_sync(&sess->time2retain_timer);
 
-	spin_lock_bh(&tpg->session_lock);
+	spin_lock_bh(&se_tpg->session_lock);
 	sess->time2retain_timer_flags &= ~T2R_TF_RUNNING;
 	TRACE(TRACE_TIMER, "Stopped Time2Retain Timer for SID: %u\n", sess->sid);
 
@@ -1006,12 +1008,12 @@ extern void iscsi_cause_connection_reinstatement (iscsi_conn_t *conn, int sleep)
  *
  *
  */
-extern void iscsi_fall_back_to_erl0 (iscsi_conn_t *conn)
+extern void iscsi_fall_back_to_erl0 (iscsi_session_t *sess)
 {
 	TRACE(TRACE_ERL0, "Falling back to ErrorRecoveryLevel=0 for SID:"
-			" %u\n", SESS(conn)->sid);
+			" %u\n", sess->sid);
 		
-	atomic_set(&SESS(conn)->session_fall_back_to_erl0, 1); 
+	atomic_set(&sess->session_fall_back_to_erl0, 1); 
 
 	return;
 }
