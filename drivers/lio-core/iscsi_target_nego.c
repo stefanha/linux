@@ -42,8 +42,10 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
-#include <iscsi_target_core.h>
 #include <target_core_base.h>
+#include <target_core_tpg.h>
+
+#include <iscsi_target_core.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_login.h>
 #include <iscsi_target_nego.h>
@@ -162,8 +164,8 @@ static int iscsi_target_check_first_request(
 	iscsi_conn_t *conn,
 	iscsi_login_t *login)
 {
-	iscsi_node_acl_t *acl;
 	iscsi_param_t *param = NULL;
+	se_node_acl_t *se_nacl;
 
 	TRACE_ENTER
 
@@ -200,14 +202,14 @@ static int iscsi_target_check_first_request(
 			 * iscsi_node_acl_t.
 			 */
 			if (!login->leading_connection) {
-				if (!(acl = SESS(conn)->node_acl)) {
-					TRACE_ERROR("Unable to locate iscsi_node_acl_t\n");
+				if (!(se_nacl = SESS(conn)->se_sess->se_node_acl)) {
+					TRACE_ERROR("Unable to locate se_node_acl_t\n");
 					iscsi_tx_login_rsp(conn, STAT_CLASS_INITIATOR,
 							STAT_DETAIL_NOT_FOUND);
 					return(-1);
 				}
 
-				if (strcmp(param->value, acl->initiatorname)) {
+				if (strcmp(param->value, se_nacl->initiatorname)) {
 					TRACE_ERROR("Incorrect InitiatorName: %s for"
 						" this iSCSI Initiator Node.\n",
 						param->value);
@@ -682,11 +684,10 @@ static int iscsi_target_locate_portal (
 	if (iscsi_target_get_initial_payload(conn, login) < 0)
 		return(-1);
 
-	if (!(tmpbuf = (char *) kmalloc(login_req->length + 1, GFP_KERNEL))) {
+	if (!(tmpbuf = (char *) kzalloc(login_req->length + 1, GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate memory for tmpbuf.\n");
 		return(-1);
 	}
-	memset(tmpbuf, 0, login_req->length + 1);
 
 	memcpy(tmpbuf, login->req_buf, login_req->length);
 	tmpbuf[login_req->length] = '\0';
@@ -828,8 +829,8 @@ get_target:
 	/*
 	 * Locate incoming Initiator IQN reference from Storage Node.
 	 */
-	if (!(sess->node_acl = iscsi_tpg_check_initiator_node_acl(
-			conn->tpg, i_buf))) {
+	if (!(sess->se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
+			conn->tpg->tpg_se_tpg, i_buf))) {
 		TRACE_ERROR("iSCSI Initiator Node: %s is not authorized to"
 			" access iSCSI target portal group: %hu.\n",
 				i_buf, conn->tpg->tpgt);
