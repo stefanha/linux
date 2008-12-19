@@ -46,6 +46,7 @@ extern int __core_del_np_ex (iscsi_np_t *, iscsi_np_ex_t *);
 extern struct iscsi_np_s *core_add_np (iscsi_np_addr_t *, int, int *);
 extern int core_reset_np_thread (struct iscsi_np_s *, struct iscsi_tpg_np_s *, struct iscsi_portal_group_s *, int);
 extern int core_del_np (iscsi_np_t *);
+extern char *iscsi_get_fabric_name (void);
 extern iscsi_cmd_t *iscsi_get_cmd (struct se_cmd_s *);
 extern u32 iscsi_get_task_tag (struct se_cmd_s *);
 extern int iscsi_get_cmd_state (struct se_cmd_s *);
@@ -64,7 +65,7 @@ extern int iscsi_close_connection (iscsi_conn_t *);
 extern int iscsi_close_session (iscsi_session_t *);
 extern void iscsi_fail_session (iscsi_session_t *);
 extern int iscsi_free_session (iscsi_session_t *);
-extern int iscsi_stop_session (iscsi_session_t *, int, int);
+extern void iscsi_stop_session (iscsi_session_t *, int, int);
 extern int iscsi_release_sessions_for_tpg (iscsi_portal_group_t *, int);
 
 #endif   /*** ISCSI_TARGET_H ***/
