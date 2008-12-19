@@ -583,6 +583,9 @@ extern void pscsi_free_device (void *p)
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) p;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
+	if (pdv->pdv_bd)
+		pdv->pdv_bd = NULL;
+
 	if (sd) {
 		if ((sd->type == TYPE_DISK) || (sd->type == TYPE_ROM)) 
 			scsi_device_put(sd);
@@ -1041,6 +1044,11 @@ extern se_device_t *pscsi_create_virtdevice_from_fd (
 			return(ERR_PTR(-EINVAL));
 		}
 		/*
+		 * Keep track of the struct block_device for now, as we need it for
+		 * 
+		 */
+		pdv->pdv_bd = bd;
+		/*
 		 * pscsi_create_type_[disk,rom]() will release host_lock..
 		 */
 		spin_lock_irq(sh->host_lock);
@@ -1073,6 +1081,12 @@ extern se_device_t *pscsi_create_virtdevice_from_fd (
 		fput(filp);
 		return(ERR_PTR(-ENODEV));
 	}
+
+	/*
+	 * Clear pdv->pdv_bd on exception.
+	 */
+	if (!(dev))
+		pdv->pdv_bd = NULL;
 
 	iput(inode);
 	fput(filp);
@@ -1160,7 +1174,7 @@ static void pscsi_bi_endio (struct bio *bio, int error)
 	bio_put(bio);
 }
 
-static inline struct bio *pscsi_get_bio (int sg_num)
+static inline struct bio *pscsi_get_bio (pscsi_dev_virt_t *pdv, int sg_num)
 {
 	struct bio *bio;
 
@@ -1169,11 +1183,22 @@ static inline struct bio *pscsi_get_bio (int sg_num)
 		return(NULL);
 	}
 	bio->bi_end_io = pscsi_bi_endio;
+
+	/*
+	 * While using fs/bio.c:bio_add_page() in pscsi_map_task_SG(), each
+	 * struct bio->bi_bdev needs to be set in order for bdev_get_queue()
+	 * to locate struct request_queue in bio_add_page().
+	 */
+	if (!(bio->bi_bdev = pdv->pdv_bd)) {
+		printk(KERN_ERR "PSCSI: Unable to locate struct block_device for BIO\n");
+		bio_put(bio);
+		return(NULL);
+	}
 	
 	return(bio);
 }
 
-#if 1
+#if 0
 #define DEBUG_PSCSI(x...) printk(x)
 #else
 #define DEBUG_PSCSI(x...)
@@ -1186,6 +1211,7 @@ static inline struct bio *pscsi_get_bio (int sg_num)
 extern int pscsi_map_task_SG (se_task_t *task)
 {
         pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
 	struct page *page;
 	struct request *rq = pt->pscsi_req;
@@ -1226,12 +1252,15 @@ extern int pscsi_map_task_SG (se_task_t *task)
 				nr_vecs = min_t(int, BIO_MAX_PAGES, nr_pages);
 				nr_pages -= nr_vecs;
 
-				if (!(bio = pscsi_get_bio(nr_vecs)))
+				if (!(bio = pscsi_get_bio(pdv, nr_vecs)))
 					goto fail;	
 
 				DEBUG_PSCSI("PSCSI: Allocated bio: %p, nr_vecs: %d\n",
 					bio, nr_vecs);
-				tbio = tbio->bi_next = bio;
+				if (!tbio)
+					tbio = bio;
+				else
+					tbio = tbio->bi_next = bio;
 			}
 
 			DEBUG_PSCSI("PSCSI: Calling bio_add_page() i: %d bio: %p"
