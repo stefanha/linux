@@ -309,6 +309,8 @@ extern se_node_acl_t *core_tpg_check_initiator_node_acl (
 	return(acl);
 }
 
+EXPORT_SYMBOL(core_tpg_check_initiator_node_acl);
+
 /*	core_tpg_free_node_acls():
  *
  *
@@ -409,6 +411,7 @@ extern se_node_acl_t *core_tpg_add_initiator_node_acl (
 	}
 
 	spin_lock_init(&acl->device_list_lock);
+	acl->fabric_acl_ptr = fabric_acl_ptr;
 	acl->queue_depth = queue_depth;
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
@@ -452,7 +455,7 @@ EXPORT_SYMBOL(core_tpg_add_initiator_node_acl);
  *
  *
  */
-#warning FIXME: core_tpg_del_initiator_node_acl() broken
+#warning FIXME: core_tpg_del_initiator_node_acl() force session shudown is broken
 extern int core_tpg_del_initiator_node_acl (
 	se_portal_group_t *tpg,
 	const char *initiatorname,
@@ -648,9 +651,12 @@ extern int core_tpg_set_initiator_node_queue_depth (
 	return(0);
 }
 
+EXPORT_SYMBOL(core_tpg_set_initiator_node_queue_depth);
+
 extern se_portal_group_t *core_tpg_register (
 	struct target_core_fabric_ops *tfo,
-	void *tpg_fabric_ptr)
+	void *tpg_fabric_ptr,
+	int se_tpg_type)
 {
 	se_lun_t *lun;
 	se_portal_group_t *se_tpg;
@@ -682,17 +688,21 @@ extern se_portal_group_t *core_tpg_register (
 		spin_lock_init(&lun->lun_sep_lock);
 	}
 
+	se_tpg->se_tpg_type = se_tpg_type;
 	se_tpg->se_tpg_fabric_ptr = tpg_fabric_ptr;
 	se_tpg->se_tpg_tfo = tfo;
 	INIT_LIST_HEAD(&se_tpg->se_tpg_list);
+	INIT_LIST_HEAD(&se_tpg->tpg_sess_list);
 	spin_lock_init(&se_tpg->acl_node_lock);
 	spin_lock_init(&se_tpg->session_lock);
 	spin_lock_init(&se_tpg->tpg_lun_lock);
 #warning FIXME: Add se_portal_group to list..
 
-	printk("TARGET_CORE[%s]: Allocated se_portal_group_t for endpoint %s %u\n",
-		tfo->get_fabric_name(), tfo->tpg_get_wwn(se_tpg),
-		tfo->tpg_get_tag(se_tpg));
+	printk("TARGET_CORE[%s]: Allocated %s se_portal_group_t for endpoint:"
+		" %s, Portal Tag: %u\n", tfo->get_fabric_name(),
+		(se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) ?
+		"Normal" : "Discovery", (tfo->tpg_get_wwn(se_tpg) == NULL) ?
+		"None" : tfo->tpg_get_wwn(se_tpg), tfo->tpg_get_tag(se_tpg));
 
 	return(se_tpg);
 }
