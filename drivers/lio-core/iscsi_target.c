@@ -4744,7 +4744,14 @@ static void iscsi_release_commands_from_conn (iscsi_conn_t *conn)
 			spin_unlock_bh(&conn->cmd_lock);
 
 			iscsi_increment_maxcmdsn(cmd, sess);
-			__iscsi_release_cmd_to_pool(cmd, sess);
+			/*
+			 * Special case for transport_get_lun_for_cmd() failing
+			 * from iscsi_get_lun_for_cmd() in iscsi_handle_scsi_cmd().
+			 */
+			if (SE_CMD(cmd))
+				transport_release_cmd_to_pool(SE_CMD(cmd));	
+			else
+				__iscsi_release_cmd_to_pool(cmd, sess);
 
 			spin_lock_bh(&conn->cmd_lock);
 			cmd = cmd_next;
