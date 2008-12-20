@@ -113,6 +113,7 @@ extern void transport_check_dev_params_delim (char *, char **);
 extern struct se_session_s *transport_init_session (void);
 extern void __transport_register_session (struct se_portal_group_s *, struct se_node_acl_s *, struct se_session_s *, void *);
 extern void transport_register_session (struct se_portal_group_s *, struct se_node_acl_s *, struct se_session_s *, void *);
+extern void transport_free_session (struct se_session_s *);
 extern void transport_deregister_session_configfs (struct se_session_s *);
 extern void transport_deregister_session (struct se_session_s *);
 extern void transport_task_dev_remove_state (struct se_task_s *, struct se_device_s *);

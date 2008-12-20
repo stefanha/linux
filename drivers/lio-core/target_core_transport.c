@@ -654,10 +654,23 @@ extern void transport_deregister_session_configfs (se_session_t *se_sess)
 
 EXPORT_SYMBOL(transport_deregister_session_configfs);
 
+extern void transport_free_session (se_session_t *se_sess)
+{
+	kmem_cache_free(se_sess_cache, se_sess);
+	return;
+}
+
+EXPORT_SYMBOL(transport_free_session);
+
 extern void transport_deregister_session (se_session_t *se_sess)
 {
 	se_portal_group_t *se_tpg = se_sess->se_tpg;
 	se_node_acl_t *se_nacl;
+
+	if (!(se_tpg)) {
+		transport_free_session(se_sess);
+		return;
+	}
 
 	spin_lock_bh(&se_tpg->session_lock);
 	list_del(&se_sess->sess_list);	
@@ -685,7 +698,7 @@ extern void transport_deregister_session (se_session_t *se_sess)
 		spin_unlock_bh(&se_tpg->acl_node_lock);
 	}
 
-	kmem_cache_free(se_sess_cache, se_sess);
+	transport_free_session(se_sess);
 
 	printk("TARGET_CORE[%s]: Deregistered fabric_sess\n",
 		TPG_TFO(se_tpg)->get_fabric_name());
