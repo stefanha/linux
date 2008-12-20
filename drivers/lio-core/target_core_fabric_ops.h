@@ -11,6 +11,11 @@ struct target_core_fabric_ops {
         void (*release_cmd_to_pool)(struct se_cmd_s *);
         void (*release_cmd_direct)(struct se_cmd_s *);
 	int (*dev_del_lun)(struct se_portal_group_s *, __u32);
+	/*
+	 * Called with spin_lock_bh(se_portal_group_t->session_lock held.
+	 */
+	int (*shutdown_session)(struct se_session_s *);
+	void (*close_session)(struct se_session_s *);
 	void (*stop_session)(struct se_session_s *, int, int);
 	void (*fall_back_to_erl0)(struct se_session_s *);
 	int (*write_pending)(struct se_cmd_s *);
