@@ -4730,19 +4730,8 @@ static void iscsi_release_commands_from_conn (iscsi_conn_t *conn)
 
 		if (!(SE_CMD(cmd)) ||
 		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD)) {
-			/*
-			 * CLOSESESSION and CLOSECONNECTION with a matching
-			 * logout_cid will be freed in iscsi_logout_post_handler().
-			 */
-			if ((cmd->iscsi_opcode == ISCSI_INIT_LOGOUT_CMND) &&
-			   ((cmd->logout_reason == CLOSESESSION) ||
-			   ((cmd->logout_reason == CLOSECONNECTION) &&
-			   (cmd->logout_cid == conn->cid)))) {
-				cmd = cmd_next;
-				continue;
-			}
-			spin_unlock_bh(&conn->cmd_lock);
 
+			spin_unlock_bh(&conn->cmd_lock);
 			iscsi_increment_maxcmdsn(cmd, sess);
 			/*
 			 * Special case for transport_get_lun_for_cmd() failing
