@@ -214,7 +214,6 @@ struct kmem_cache *se_sess_cache = NULL;
 
 EXPORT_SYMBOL(se_global);
 extern int iscsi_release_sessions_for_tpg (iscsi_portal_group_t *, int);
-static void transport_release_cmd_to_pool (se_cmd_t *);
 static int transport_generic_write_pending (se_cmd_t *);
 static int transport_processing_thread (void *);
 
@@ -5930,7 +5929,7 @@ static int transport_generic_write_pending (se_cmd_t *cmd)
  *
  *
  */
-static void transport_release_cmd_to_pool (se_cmd_t *cmd)
+extern void transport_release_cmd_to_pool (se_cmd_t *cmd)
 {
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH) 
 		kfree(cmd->se_lun);
@@ -5942,6 +5941,8 @@ static void transport_release_cmd_to_pool (se_cmd_t *cmd)
 	transport_free_se_cmd(cmd);
 	return;
 }
+
+EXPORT_SYMBOL(transport_release_cmd_to_pool);
 
 /*	transport_generic_free_cmd():
  *

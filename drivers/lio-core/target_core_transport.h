@@ -182,6 +182,7 @@ extern int iscsi_send_check_condition_and_sense (se_cmd_t *, __u8, int);
 extern int core_tpg_persistent_reservation_check (se_cmd_t *);
 extern int core_tpg_persistent_reservation_release (se_cmd_t *);
 extern int core_tpg_persistent_reservation_reserve (se_cmd_t *);
+extern void transport_release_cmd_to_pool (se_cmd_t *);
 extern void transport_generic_free_cmd (se_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds (se_cmd_t *, int);
 extern int transport_generic_do_transform (struct se_cmd_s *, struct se_transform_info_s *);
