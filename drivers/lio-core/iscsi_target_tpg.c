@@ -129,6 +129,49 @@ extern void lio_tpg_release_node_acl (se_portal_group_t *se_tpg, se_node_acl_t *
 	return;
 }
 
+/*
+ * Called with spin_lock_bh(se_portal_group_t->session_lock) held..
+ *
+ * Also, this function calls iscsi_inc_session_usage_count() on the
+ * iscsi_session_t in question.
+ */
+extern int lio_tpg_shutdown_session (se_session_t *se_sess)
+{
+	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+
+	spin_lock(&sess->conn_lock);
+	if (atomic_read(&sess->session_fall_back_to_erl0) ||
+	    atomic_read(&sess->session_logout) ||
+	    (sess->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+		spin_unlock(&sess->conn_lock);
+		return(0);
+	}
+	atomic_set(&sess->session_reinstatement, 1);
+	spin_unlock(&sess->conn_lock);
+
+	iscsi_inc_session_usage_count(sess);
+	iscsi_stop_time2retain_timer(sess);
+
+	return(1);
+}
+
+/*
+ * Calls iscsi_dec_session_usage_count() as inverse of lio_tpg_shutdown_session()
+ */
+extern void lio_tpg_close_session (se_session_t *se_sess)
+{
+	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+	/*
+	 * If the iSCSI Session for the iSCSI Initiator Node exists,
+	 * forcefully shutdown the iSCSI NEXUS.
+	 */
+	iscsi_stop_session(sess, 1, 1);
+	iscsi_dec_session_usage_count(sess);
+	iscsi_close_session(sess);
+
+	return;
+}
+
 extern void lio_tpg_stop_session (se_session_t *se_sess, int sess_sleep, int conn_sleep)
 {
 	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;

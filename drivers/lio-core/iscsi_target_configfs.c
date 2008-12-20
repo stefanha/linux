@@ -2297,6 +2297,8 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.tpg_release_node_acl = &lio_tpg_release_node_acl;
 	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd_to_pool;
 	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
+	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;
+	fabric->tf_ops.close_session = &lio_tpg_close_session;
 	fabric->tf_ops.stop_session = &lio_tpg_stop_session;
 	fabric->tf_ops.fall_back_to_erl0 = &lio_tpg_fall_back_to_erl0;
 	fabric->tf_ops.write_pending = &lio_write_pending;

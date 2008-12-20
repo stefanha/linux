@@ -36,6 +36,8 @@ extern int lio_tpg_check_demo_mode (struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_cache (struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_write_protect (struct se_portal_group_s *);
 extern void lio_tpg_release_node_acl (struct se_portal_group_s *, struct se_node_acl_s *);
+extern int lio_tpg_shutdown_session (struct se_session_s *);
+extern void lio_tpg_close_session (struct se_session_s *);
 extern void lio_tpg_stop_session (struct se_session_s *, int, int);
 extern void lio_tpg_fall_back_to_erl0 (struct se_session_s *);
 extern u32 lio_tpg_get_inst_index (struct se_portal_group_s *);
