@@ -574,7 +574,7 @@ extern void transport_check_dev_params_delim (char *ptr, char **cur)
 	return;
 }
 
-extern se_session_t *transport_allocate_session (void)
+extern se_session_t *transport_init_session (void)
 {
 	se_session_t *se_sess;
 
@@ -587,7 +587,7 @@ extern se_session_t *transport_allocate_session (void)
 	return(se_sess);
 }
 
-EXPORT_SYMBOL(transport_allocate_session);
+EXPORT_SYMBOL(transport_init_session);
 
 /*
  * Called with spin_lock_bh(&se_portal_group_t->session_lock called.

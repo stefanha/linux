@@ -110,7 +110,7 @@ extern void transport_init_queue_obj (struct se_queue_obj_s *);
 extern void transport_load_plugins (void);
 extern struct se_plugin_s *transport_core_get_plugin_by_name (const char *name);
 extern void transport_check_dev_params_delim (char *, char **);
-extern struct se_session_s *transport_allocate_session (void);
+extern struct se_session_s *transport_init_session (void);
 extern void __transport_register_session (struct se_portal_group_s *, struct se_node_acl_s *, struct se_session_s *, void *);
 extern void transport_register_session (struct se_portal_group_s *, struct se_node_acl_s *, struct se_session_s *, void *);
 extern void transport_deregister_session_configfs (struct se_session_s *);

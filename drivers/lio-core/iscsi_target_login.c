@@ -253,7 +253,7 @@ static int iscsi_login_zero_tsih_s1 (
 		return(-1);
 	}
 
-	if (!(sess->se_sess = transport_allocate_session())) {
+	if (!(sess->se_sess = transport_init_session())) {
 		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET, STAT_DETAIL_OUT_OF_RESOURCE);
 		return(-1);
 	}
