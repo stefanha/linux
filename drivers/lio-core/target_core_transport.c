@@ -2321,15 +2321,12 @@ extern se_cmd_t *__transport_alloc_se_cmd (
 		printk(KERN_ERR "kmem_cache_alloc() failed for se_cmd_cache\n");
 		return(ERR_PTR(-ENOMEM));
 	}
-	printk("Alloced se_cmd: %p from se_cmd_cache\n", cmd);
-
-	if (!(cmd->t_task = (se_transport_task_t *) kmalloc(
+	if (!(cmd->t_task = (se_transport_task_t *) kzalloc(
 			sizeof(se_transport_task_t), GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate cmd->t_task\n");
 		kmem_cache_free(se_cmd_cache, cmd);
 		return(NULL);
 	}
-	memset(cmd->t_task, 0, sizeof(se_transport_task_t));
 
 	INIT_LIST_HEAD(&T_TASK(cmd)->t_task_list);
 	init_MUTEX_LOCKED(&T_TASK(cmd)->transport_lun_fe_stop_sem);
@@ -2367,7 +2364,6 @@ extern void transport_free_se_cmd (
 	kfree(se_cmd->iov_data);
 	kfree(se_cmd->sense_buffer);
 	kfree(se_cmd->t_task);
-	printk("Releasing se_cmd: %p back to se_cmd_cache\n", se_cmd);
 	kmem_cache_free(se_cmd_cache, se_cmd);
 
 	return;
