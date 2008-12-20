@@ -1240,7 +1240,8 @@ new_sess_out:
 
 	if (!zero_tsih || !SESS(conn))
 		goto old_sess_out;
-
+	if (SESS(conn)->se_sess)
+		transport_free_session(SESS(conn)->se_sess);
 	if (SESS(conn)->sess_ops)
 		kfree(SESS(conn)->sess_ops);
 	if (SESS(conn))
