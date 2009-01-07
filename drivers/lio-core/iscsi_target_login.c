@@ -156,6 +156,7 @@ extern int iscsi_check_for_session_reinstatement (iscsi_conn_t *conn)
 			break;
 		}
 		spin_unlock(&sess->conn_lock);
+		sess = NULL;
 	}
 	spin_unlock_bh(&se_tpg->session_lock);
 
