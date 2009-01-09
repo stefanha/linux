@@ -53,6 +53,7 @@
 #include <target_core_transport.h>
 
 #include <iscsi_target_core.h>
+#include <iscsi_target_datain_values.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>
@@ -1063,6 +1064,7 @@ extern void iscsi_free_queue_reqs_for_conn (iscsi_conn_t *conn)
 extern void iscsi_release_cmd_direct (iscsi_cmd_t *cmd)
 {
 	iscsi_free_r2ts_from_list(cmd);
+	iscsi_free_all_datain_reqs(cmd);
 
 	if (cmd->buf_ptr)
 		kfree(cmd->buf_ptr);
@@ -1089,6 +1091,7 @@ extern void __iscsi_release_cmd_to_pool (iscsi_cmd_t *cmd, iscsi_session_t *sess
 	iscsi_conn_t *conn = CONN(cmd);
 
 	iscsi_free_r2ts_from_list(cmd);
+	iscsi_free_all_datain_reqs(cmd);
 	
 	if (cmd->buf_ptr)
 		kfree(cmd->buf_ptr);

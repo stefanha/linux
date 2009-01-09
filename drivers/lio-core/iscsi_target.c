@@ -4792,7 +4792,6 @@ static void iscsi_release_commands_from_conn (iscsi_conn_t *conn)
 		}
 		spin_unlock_bh(&conn->cmd_lock);
 
-		iscsi_free_all_datain_reqs(cmd);
 		iscsi_increment_maxcmdsn(cmd, sess);
 
 		if (SE_CMD(cmd)->transport_wait_for_tasks)
