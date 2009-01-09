@@ -73,6 +73,7 @@
 extern struct target_fabric_configfs *lio_target_fabric_configfs;
 extern iscsi_global_t *iscsi_global;
 extern struct kmem_cache *lio_cmd_cache;
+extern struct kmem_cache *lio_qr_cache;
 
 extern int iscsi_add_nopin (iscsi_conn_t *, int);
 
@@ -823,11 +824,10 @@ extern void iscsi_add_cmd_to_immediate_queue (iscsi_cmd_t *cmd, iscsi_conn_t *co
 {
 	iscsi_queue_req_t *qr;
 
-	if (!(qr = kmalloc(sizeof(iscsi_queue_req_t), GFP_ATOMIC))) {
+	if (!(qr = kmem_cache_zalloc(lio_qr_cache, GFP_ATOMIC))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_queue_req_t\n");
 		return;
 	}
-	memset(qr, 0, sizeof(iscsi_queue_req_t));
 #if 0
 	printk("Adding ITT: 0x%08x state: %d to immediate queue\n", cmd->init_task_tag, state);
 #endif
@@ -896,7 +896,7 @@ static void iscsi_remove_cmd_from_immediate_queue (iscsi_cmd_t *cmd, iscsi_conn_
 
 		atomic_dec(&qr->cmd->immed_queue_count);
 		REMOVE_ENTRY_FROM_LIST(qr, conn->immed_queue_head, conn->immed_queue_tail);
-		kfree(qr);
+		kmem_cache_free(lio_qr_cache, qr);
 
 		qr = qr_next;
 	}
@@ -918,11 +918,10 @@ extern void iscsi_add_cmd_to_response_queue (iscsi_cmd_t *cmd, iscsi_conn_t *con
 {
 	iscsi_queue_req_t *qr;
 
-	if (!(qr = kmalloc(sizeof(iscsi_queue_req_t), GFP_ATOMIC))) {
+	if (!(qr = kmem_cache_zalloc(lio_qr_cache, GFP_ATOMIC))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_queue_req_t\n");
 		return;
 	}
-	memset(qr, 0, sizeof(iscsi_queue_req_t));
 #if 0
 	printk("Adding ITT: 0x%08x state: %d to response queue\n", cmd->init_task_tag, state);
 #endif
@@ -995,7 +994,7 @@ static void iscsi_remove_cmd_from_response_queue (iscsi_cmd_t *cmd, iscsi_conn_t
 		atomic_dec(&qr->cmd->response_queue_count);
 		
 		REMOVE_ENTRY_FROM_LIST(qr, conn->response_queue_head, conn->response_queue_tail);
-		kfree(qr);
+		kmem_cache_free(lio_qr_cache, qr);
 
 		qr = qr_next;
 	}
@@ -1033,7 +1032,7 @@ extern void iscsi_free_queue_reqs_for_conn (iscsi_conn_t *conn)
 		if (qr->cmd)
 			atomic_dec(&qr->cmd->immed_queue_count);
 		
-		kfree(qr);
+		kmem_cache_free(lio_qr_cache, qr);
 		qr = qr_next;
 	}
 	conn->immed_queue_head = conn->immed_queue_tail = NULL;
@@ -1047,7 +1046,7 @@ extern void iscsi_free_queue_reqs_for_conn (iscsi_conn_t *conn)
 		if (qr->cmd)
 			atomic_dec(&qr->cmd->response_queue_count);
 		
-		kfree(qr);
+		kmem_cache_free(lio_qr_cache, qr);
 		qr = qr_next;
 	}
 	conn->response_queue_head = conn->response_queue_tail = NULL;

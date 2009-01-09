@@ -96,6 +96,7 @@ iscsi_global_t *iscsi_global = NULL;
 
 struct kmem_cache *lio_cmd_cache = NULL;
 struct kmem_cache *lio_sess_cache = NULL;
+struct kmem_cache *lio_qr_cache = NULL;
 
 extern int se_allocate_rl_cmd (se_cmd_t *, unsigned char *, u64);
 extern int iscsi_build_report_luns_response (iscsi_cmd_t *);
@@ -1117,6 +1118,13 @@ static int iscsi_target_detect(void)
 		goto out;
 	}
 
+	if (!(lio_qr_cache = kmem_cache_create("lio_qr_cache",
+			sizeof(iscsi_queue_req_t), __alignof__(iscsi_queue_req_t),
+			0, NULL))) {
+		printk(KERN_ERR "nable to kmem_cache_create() for lio_qr_cache\n");
+		goto out;
+	}
+
 	if (core_load_discovery_tpg() < 0)
 		goto out;
 
@@ -1130,6 +1138,8 @@ out:
 		kmem_cache_destroy(lio_cmd_cache);
 	if (lio_sess_cache)
 		kmem_cache_destroy(lio_sess_cache);
+	if (lio_qr_cache)
+		kmem_cache_destroy(lio_qr_cache);
 	iscsi_deallocate_thread_sets(TARGET);
 	iscsi_target_deregister_configfs();
 #ifdef CONFIG_PROC_FS
@@ -1182,6 +1192,7 @@ extern void iscsi_target_release_phase2 (void)
 	iscsi_hba_del_all_hbas();
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_sess_cache);
+	kmem_cache_destroy(lio_qr_cache);
 	core_release_discovery_tpg();
 	core_release_tiqns();
 	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
@@ -4262,7 +4273,7 @@ get_immediate:
 			atomic_set(&conn->check_immediate_queue, 0);
 			cmd = qr->cmd;
 			state = qr->state;
-			kfree(qr);
+			kmem_cache_free(lio_qr_cache, qr);
 
 			spin_lock_bh(&cmd->istate_lock);
 			switch (state) {
@@ -4346,7 +4357,7 @@ get_response:
 		if ((qr = iscsi_get_cmd_from_response_queue(conn))) {
 			cmd = qr->cmd;
 			state = qr->state;
-			kfree(qr);
+			kmem_cache_free(lio_qr_cache, qr);
 
 			spin_lock_bh(&cmd->istate_lock);
 check_rsp_state:
