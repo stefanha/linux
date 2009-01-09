@@ -97,6 +97,7 @@ iscsi_global_t *iscsi_global = NULL;
 struct kmem_cache *lio_cmd_cache = NULL;
 struct kmem_cache *lio_sess_cache = NULL;
 struct kmem_cache *lio_qr_cache = NULL;
+struct kmem_cache *lio_dr_cache = NULL;
 
 extern int se_allocate_rl_cmd (se_cmd_t *, unsigned char *, u64);
 extern int iscsi_build_report_luns_response (iscsi_cmd_t *);
@@ -1125,6 +1126,13 @@ static int iscsi_target_detect(void)
 		goto out;
 	}
 
+	if (!(lio_dr_cache = kmem_cache_create("lio_dr_cache",
+			sizeof(iscsi_datain_req_t), __alignof__(iscsi_datain_req_t),
+			0, NULL))) {
+		printk(KERN_ERR "Unable to kmem_cache_create() for lio_dr_cache\n");
+		goto out;
+	}
+
 	if (core_load_discovery_tpg() < 0)
 		goto out;
 
@@ -1140,6 +1148,8 @@ out:
 		kmem_cache_destroy(lio_sess_cache);
 	if (lio_qr_cache)
 		kmem_cache_destroy(lio_qr_cache);
+	if (lio_dr_cache)
+		kmem_cache_destroy(lio_dr_cache);
 	iscsi_deallocate_thread_sets(TARGET);
 	iscsi_target_deregister_configfs();
 #ifdef CONFIG_PROC_FS
@@ -1193,6 +1203,7 @@ extern void iscsi_target_release_phase2 (void)
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_sess_cache);
 	kmem_cache_destroy(lio_qr_cache);
+	kmem_cache_destroy(lio_dr_cache);
 	core_release_discovery_tpg();
 	core_release_tiqns();
 	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);

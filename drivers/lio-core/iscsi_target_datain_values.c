@@ -50,16 +50,16 @@
 #undef ISCSI_TARGET_DATAIN_VALUES_C
 
 extern iscsi_global_t *iscsi_global;
+extern struct kmem_cache *lio_dr_cache;
 
 extern iscsi_datain_req_t *iscsi_allocate_datain_req (void)
 {
 	iscsi_datain_req_t *dr;
 
-	if (!(dr = kmalloc(sizeof(iscsi_datain_req_t), GFP_ATOMIC))) {
+	if (!(dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_datain_req_t\n");
 		return(NULL);
 	}
-	memset(dr, 0, sizeof(iscsi_datain_req_t));
 
 	return(dr);
 }
@@ -83,7 +83,7 @@ extern void iscsi_free_datain_req (
 	REMOVE_ENTRY_FROM_LIST(dr, cmd->datain_req_head, cmd->datain_req_tail);
 	spin_unlock(&cmd->datain_lock);
 
-	kfree(dr);
+	kmem_cache_free(lio_dr_cache, dr);
 
 	return;
 }
@@ -97,7 +97,7 @@ extern void iscsi_free_all_datain_reqs (
 	dr = cmd->datain_req_head;
 	while (dr) {
 		dr_next = dr->next;
-		kfree(dr);	
+		kmem_cache_free(lio_dr_cache, dr);
 		dr = dr_next;
 	}
 	cmd->datain_req_head = cmd->datain_req_tail = NULL;
