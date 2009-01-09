@@ -74,6 +74,7 @@ extern struct target_fabric_configfs *lio_target_fabric_configfs;
 extern iscsi_global_t *iscsi_global;
 extern struct kmem_cache *lio_cmd_cache;
 extern struct kmem_cache *lio_qr_cache;
+extern struct kmem_cache *lio_r2t_cache;
 
 extern int iscsi_add_nopin (iscsi_conn_t *, int);
 
@@ -197,11 +198,10 @@ extern int iscsi_add_r2t_to_list (
 {
 	iscsi_r2t_t *r2t;
 	
-	if (!(r2t = (iscsi_r2t_t *) kmalloc(sizeof(iscsi_r2t_t), GFP_ATOMIC))) {
+	if (!(r2t = (iscsi_r2t_t *) kmem_cache_zalloc(lio_r2t_cache, GFP_ATOMIC))) {
 		TRACE_ERROR("Unable to allocate memory for iscsi_r2t_t.\n");
 		return(-1);
 	}
-	memset(r2t, 0, sizeof(iscsi_r2t_t));
 
 	r2t->recovery_r2t = recovery;
 	r2t->r2t_sn = (!r2t_sn) ? cmd->r2t_sn++ : r2t_sn;
@@ -280,6 +280,7 @@ extern void iscsi_free_r2t (
 	iscsi_cmd_t *cmd)
 {
 	REMOVE_ENTRY_FROM_LIST(r2t, cmd->r2t_head, cmd->r2t_tail);
+	kmem_cache_free(lio_r2t_cache, r2t);
 
 	return;
 }
@@ -297,7 +298,7 @@ extern void iscsi_free_r2ts_from_list (
 	r2t = cmd->r2t_head;
 	while (r2t) {
 		r2t_next = r2t->next;
-		kfree(r2t);
+		kmem_cache_free(lio_r2t_cache, r2t);
 		r2t = r2t_next;
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
