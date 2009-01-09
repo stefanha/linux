@@ -60,6 +60,8 @@
 
 #undef ISCSI_TARGET_ERL1_C
 
+extern struct kmem_cache *lio_ooo_cache;
+
 extern int iscsi_add_reject_from_cmd (u8, int, int, unsigned char *, iscsi_cmd_t *);
 extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
 extern int iscsi_build_report_luns_response (iscsi_cmd_t *);
@@ -832,12 +834,11 @@ static inline iscsi_ooo_cmdsn_t *iscsi_allocate_ooo_cmdsn (void)
 	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL;
 
 	if (!(ooo_cmdsn = (iscsi_ooo_cmdsn_t *)
-	      kmalloc(sizeof(iscsi_ooo_cmdsn_t), GFP_ATOMIC))) {
+	      kmem_cache_zalloc(lio_ooo_cache, GFP_ATOMIC))) {
 		TRACE_ERROR("Unable to allocate memory for"
 			" iscsi_ooo_cmdsn_t.\n");
 		return(NULL);
 	}
-	memset(ooo_cmdsn, 0, sizeof(iscsi_ooo_cmdsn_t));
 
 	return(ooo_cmdsn);
 }
@@ -909,7 +910,7 @@ extern void iscsi_remove_ooo_cmdsn (
 	iscsi_ooo_cmdsn_t *ooo_cmdsn)
 {
 	REMOVE_ENTRY_FROM_LIST(ooo_cmdsn, sess->ooo_cmdsn_head, sess->ooo_cmdsn_tail);
-	kfree(ooo_cmdsn);
+	kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 
 	return;
 }
@@ -1165,7 +1166,7 @@ extern void iscsi_free_all_ooo_cmdsns (iscsi_session_t *sess)
 	while (ooo_cmdsn) {
 		ooo_cmdsn_next = ooo_cmdsn->next;
 
-		kfree(ooo_cmdsn);
+		kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 		
 		ooo_cmdsn = ooo_cmdsn_next;
 	}
@@ -1214,7 +1215,7 @@ extern int iscsi_handle_ooo_cmdsn (
 	ooo_cmdsn->cmdsn		= cmdsn;
 
 	if (iscsi_attach_ooo_cmdsn(sess, ooo_cmdsn) < 0) {
-		kfree(ooo_cmdsn);
+		kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 		return(CMDSN_ERROR_CANNOT_RECOVER);
 	}
 	
