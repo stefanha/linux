@@ -933,37 +933,7 @@ get_new_sock:
 			up(&np->np_start_sem);
 		return(-1);
 	}
-	
-	if (sock_create_lite((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
-			sock_type, ip_proto, &new_sock) < 0) {
-		TRACE_ERROR("sock_create_lite() failed for new_sock\n");
-		if (start) {
-			up(&np->np_start_sem);
-			return(0);
-		}
-		goto get_new_sock;
-	}
-	new_sock->ops = sock->ops;
 
-	/*
-	 * The SCTP stack needs struct socket->file.
-	 */
-	if ((np->np_network_transport == ISCSI_SCTP_TCP) ||
-	    (np->np_network_transport == ISCSI_SCTP_UDP)) {
-		if (!new_sock->file) {
-			if (!(new_sock->file = kzalloc(
-					sizeof(struct file), GFP_KERNEL))) {
-				TRACE_ERROR("Unable to allocate struct file for SCTP\n");
-				if (start) {
-					up(&np->np_start_sem);
-					return(0);
-				}
-				goto get_new_sock;
-			}
-			set_sctp_conn_flag = 1;
-		}
-	}
-	
 	spin_lock_bh(&np->np_thread_lock);
 	if (np->np_thread_state == ISCSI_NP_THREAD_SHUTDOWN)
 		goto out;
@@ -987,13 +957,6 @@ get_new_sock:
 	spin_unlock_bh(&np->np_thread_lock);
 	
 	if (kernel_accept(sock, &new_sock, 0) < 0) {
-		if (new_sock) {
-			if (set_sctp_conn_flag) {
-				kfree(new_sock->file);
-				new_sock->file = NULL;
-			}
-			sock_release(new_sock);
-		}
 		if (signal_pending(current)) {
 			spin_lock_bh(&np->np_thread_lock);
 			if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
@@ -1011,6 +974,22 @@ get_new_sock:
 		}
 		goto get_new_sock;
 	}
+	/*
+	 * The SCTP stack needs struct socket->file.
+	 */
+	if ((np->np_network_transport == ISCSI_SCTP_TCP) ||
+	    (np->np_network_transport == ISCSI_SCTP_UDP)) {
+		if (!new_sock->file) {
+			printk("Allocating new_sock->file for SCTP\n");
+			if (!(new_sock->file = kzalloc(
+					sizeof(struct file), GFP_KERNEL))) {
+				TRACE_ERROR("Unable to allocate struct file for SCTP\n");
+				sock_release(new_sock);
+				goto get_new_sock;
+			}
+			set_sctp_conn_flag = 1;
+		}
+        }
 
 	iscsi_start_login_thread_timer(np);
 	
@@ -1018,13 +997,12 @@ get_new_sock:
 			sizeof(iscsi_conn_t), GFP_KERNEL))) {
 		TRACE_ERROR("Could not allocate memory for"
 			" new connection\n");
-		if (new_sock) {
-			if (set_sctp_conn_flag) {
-				kfree(new_sock->file);
-				new_sock->file = NULL;
-			}
-			sock_release(new_sock);
+		if (set_sctp_conn_flag) {
+			kfree(new_sock->file);
+			new_sock->file = NULL;
 		}
+		sock_release(new_sock);
+
 		goto get_new_sock;
 	}
 	
