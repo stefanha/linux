@@ -63,6 +63,7 @@
 
 extern iscsi_global_t *iscsi_global;
 extern struct kmem_cache *lio_sess_cache;
+extern struct kmem_cache *lio_conn_cache;
 
 /*	iscsi_login_init_conn():
  *
@@ -993,8 +994,8 @@ get_new_sock:
 
 	iscsi_start_login_thread_timer(np);
 	
-	if (!(conn = (iscsi_conn_t *) kzalloc(
-			sizeof(iscsi_conn_t), GFP_KERNEL))) {
+	if (!(conn = (iscsi_conn_t *) kmem_cache_zalloc(lio_conn_cache,
+			GFP_KERNEL))) {
 		TRACE_ERROR("Could not allocate memory for"
 			" new connection\n");
 		if (set_sctp_conn_flag) {
@@ -1259,8 +1260,7 @@ old_sess_out:
 		}
 		sock_release(conn->sock);
 	}
-	if (conn)
-		kfree(conn);
+	kmem_cache_free(lio_conn_cache, conn);
 
 	if (tpg) {
 		core_deaccess_np(np, tpg);

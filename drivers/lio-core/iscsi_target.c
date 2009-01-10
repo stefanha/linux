@@ -96,6 +96,7 @@ iscsi_global_t *iscsi_global = NULL;
 
 struct kmem_cache *lio_cmd_cache = NULL;
 struct kmem_cache *lio_sess_cache = NULL;
+struct kmem_cache *lio_conn_cache = NULL;
 struct kmem_cache *lio_qr_cache = NULL;
 struct kmem_cache *lio_dr_cache = NULL;
 struct kmem_cache *lio_ooo_cache = NULL;
@@ -1121,6 +1122,13 @@ static int iscsi_target_detect(void)
 		goto out;
 	}
 
+	if (!(lio_conn_cache = kmem_cache_create("lio_conn_cache",
+			sizeof(iscsi_conn_t), __alignof__(iscsi_conn_t),
+			0, NULL))) {
+		printk(KERN_ERR "Unable to kmem_cache_create() for lio_conn_cache\n");
+		goto out;
+	}
+
 	if (!(lio_qr_cache = kmem_cache_create("lio_qr_cache",
 			sizeof(iscsi_queue_req_t), __alignof__(iscsi_queue_req_t),
 			0, NULL))) {
@@ -1162,6 +1170,8 @@ out:
 		kmem_cache_destroy(lio_cmd_cache);
 	if (lio_sess_cache)
 		kmem_cache_destroy(lio_sess_cache);
+	if (lio_conn_cache)
+		kmem_cache_destroy(lio_conn_cache);
 	if (lio_qr_cache)
 		kmem_cache_destroy(lio_qr_cache);
 	if (lio_dr_cache)
@@ -1222,6 +1232,7 @@ extern void iscsi_target_release_phase2 (void)
 	iscsi_hba_del_all_hbas();
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_sess_cache);
+	kmem_cache_destroy(lio_conn_cache);
 	kmem_cache_destroy(lio_qr_cache);
 	kmem_cache_destroy(lio_dr_cache);
 	kmem_cache_destroy(lio_ooo_cache);
@@ -4956,7 +4967,7 @@ extern int iscsi_close_connection (
 	
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_FREE.\n");
 	conn->conn_state = TARG_CONN_STATE_FREE;
-	kfree(conn);
+	kmem_cache_free(lio_conn_cache, conn);
 	conn = NULL;
 
 	spin_lock_bh(&sess->conn_lock);
