@@ -210,6 +210,7 @@
 se_global_t *se_global;
 
 struct kmem_cache *se_cmd_cache = NULL;
+struct kmem_cache *se_task_cache = NULL;
 struct kmem_cache *se_sess_cache = NULL;
 
 EXPORT_SYMBOL(se_global);
@@ -260,6 +261,11 @@ extern int init_se_global (void)
 		printk(KERN_ERR "kmem_cache_create for se_cmd_t failed\n");
 		goto out;
 	}
+	if (!(se_task_cache = kmem_cache_create("se_task_cache",
+			sizeof(se_task_t), __alignof__(se_task_t), 0, NULL))) {
+		printk(KERN_ERR "kmem_cache_create for se_task_t failed\n");
+		goto out;
+	}
 	if (!(se_sess_cache = kmem_cache_create("se_sess_cache",
 			sizeof(se_session_t), __alignof__(se_session_t),
 			0, NULL))) {
@@ -300,6 +306,8 @@ out:
 	kfree(global->plugin_class_list);
 	if (se_cmd_cache)
 		kmem_cache_destroy(se_cmd_cache);
+	if (se_task_cache)
+		kmem_cache_destroy(se_task_cache);
 	if (se_sess_cache)
 		kmem_cache_destroy(se_sess_cache);
 	kfree(global);
@@ -316,6 +324,7 @@ extern void release_se_global (void)
 	kfree(global->plugin_class_list);
 	kfree(global->hba_list);
 	kmem_cache_destroy(se_cmd_cache);
+	kmem_cache_destroy(se_task_cache);
 	kmem_cache_destroy(se_sess_cache);
 	kfree(global);
 
@@ -2148,11 +2157,10 @@ static se_task_t *transport_generic_get_task (
 	se_task_t *task;
 	unsigned long flags;
 
-	if (!(task = kmalloc(sizeof(se_task_t), GFP_KERNEL))) {
+	if (!(task = kmem_cache_zalloc(se_task_cache, GFP_KERNEL))) {
 		TRACE_ERROR("Unable to allocate se_task_t\n");
 		return(NULL);
 	}
-	memset(task, 0, sizeof(se_task_t));
 	
 	INIT_LIST_HEAD(&task->t_list);
 	init_MUTEX_LOCKED(&task->task_stop_sem);
@@ -4864,7 +4872,7 @@ extern void transport_free_dev_tasks (se_cmd_t *cmd)
 		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 		
 		list_del(&task->t_list);
-		kfree(task);
+		kmem_cache_free(se_task_cache, task);
 	}
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
