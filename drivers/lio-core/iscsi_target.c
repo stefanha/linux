@@ -2684,16 +2684,17 @@ extern int iscsi_logout_closesession (iscsi_cmd_t *cmd, iscsi_conn_t *conn)
 	atomic_set(&sess->session_logout, 1);
 	atomic_set(&conn->conn_logout_remove, 1);
 	conn->conn_logout_reason = CLOSESESSION;
+
+	iscsi_inc_conn_usage_count(conn);
+	iscsi_inc_session_usage_count(sess);
 	
 	spin_lock_bh(&sess->conn_lock);
 	for (conn_p = sess->conn_head; conn_p; conn_p = conn_p->next) {
 		if (conn_p->conn_state != TARG_CONN_STATE_LOGGED_IN)
 			continue;
 		
-		iscsi_inc_conn_usage_count(conn_p);
 		TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_IN_LOGOUT.\n");
 		conn_p->conn_state = TARG_CONN_STATE_IN_LOGOUT;
-		iscsi_dec_conn_usage_count(conn_p);
 	}
 	spin_unlock_bh(&sess->conn_lock);
 	
@@ -2722,8 +2723,11 @@ extern int iscsi_logout_closeconnection (iscsi_cmd_t *cmd, iscsi_conn_t *conn)
 		spin_lock_bh(&conn->state_lock);
 		TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_IN_LOGOUT.\n");
 		conn->conn_state = TARG_CONN_STATE_IN_LOGOUT;
+
 		atomic_set(&conn->conn_logout_remove, 1);
 		conn->conn_logout_reason = CLOSECONNECTION;
+		iscsi_inc_conn_usage_count(conn);
+
 		spin_unlock_bh(&conn->state_lock);
 	} else {
 		/*
@@ -3503,24 +3507,22 @@ static inline int iscsi_send_logout_response (
 		TRACE(TRACE_ISCSI, "iSCSI session logout successful, setting"
 			" logout response to CONNORSESSCLOSEDSUCCESSFULLY.\n");
 		cmd->logout_response = CONNORSESSCLOSEDSUCCESSFULLY;
-		iscsi_inc_conn_usage_count(conn);
-		iscsi_inc_session_usage_count(sess);
 		break;
 	case CLOSECONNECTION:
 		if (cmd->logout_response == CIDNOTFOUND)
 			break;
+		/*
+		 * For CLOSECONNECTION logout requests carrying
+		 * a matching logout CID -> local CID, the reference
+		 * for the local CID will have been incremented in
+		 * iscsi_logout_closeconnection().
+		 * 
+		 * For CLOSECONNECTION logout requests carrying
+		 * a different CID than the connection it arrived
+		 * on, the connection responding to cmd->logout_cid
+		 * is stopped in iscsi_logout_post_handler_diffcid().
+		 */
 
-		if (conn->cid == cmd->logout_cid)
-			iscsi_inc_conn_usage_count(conn);
-		else {
-			/*
-			 * For CLOSECONNECTION logout requests carrying
-			 * a different CID than the connection it arrived
-			 * on, the connection responding to cmd->logout_cid
-			 * is stopped in iscsi_logout_post_handler_diffcid().
-			 */
-			do {} while(0);
-		}
 		TRACE(TRACE_ISCSI, "iSCSI CID: %hu logout on CID: %hu"
 			" successful.\n", cmd->logout_cid, conn->cid);
 		cmd->logout_response = CONNORSESSCLOSEDSUCCESSFULLY;
