@@ -120,7 +120,7 @@ extern int iscsi_check_for_session_reinstatement (iscsi_conn_t *conn)
 	int sessiontype;
 	iscsi_param_t *initiatorname_param = NULL, *sessiontype_param = NULL;
 	iscsi_portal_group_t *tpg = conn->tpg;
-	iscsi_session_t *sess = NULL;
+	iscsi_session_t *sess = NULL, *sess_p = NULL;
 	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
 	se_session_t *se_sess, *se_sess_tmp;
 	
@@ -138,26 +138,26 @@ extern int iscsi_check_for_session_reinstatement (iscsi_conn_t *conn)
 	list_for_each_entry_safe(se_sess, se_sess_tmp, &se_tpg->tpg_sess_list,
 			sess_list) {
 
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
-		spin_lock(&sess->conn_lock);
-		if (atomic_read(&sess->session_fall_back_to_erl0) ||
-		    atomic_read(&sess->session_logout) ||
-		    (sess->time2retain_timer_flags & T2R_TF_EXPIRED)) {
-			spin_unlock(&sess->conn_lock);
+		sess_p = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		spin_lock(&sess_p->conn_lock);
+		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
+		    atomic_read(&sess_p->session_logout) ||
+		    (sess_p->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+			spin_unlock(&sess_p->conn_lock);
 			continue;
 		}
-		if (!memcmp((void *)sess->isid, (void *)SESS(conn)->isid, 6) &&
-		   (!strcmp((void *)SESS_OPS(sess)->InitiatorName,
+		if (!memcmp((void *)sess_p->isid, (void *)SESS(conn)->isid, 6) &&
+		   (!strcmp((void *)SESS_OPS(sess_p)->InitiatorName,
 			    (void *)initiatorname_param->value) &&
-		   (SESS_OPS(sess)->SessionType == sessiontype))) {
-			atomic_set(&sess->session_reinstatement, 1);
-			spin_unlock(&sess->conn_lock);
-			iscsi_inc_session_usage_count(sess);
-			iscsi_stop_time2retain_timer(sess);
+		   (SESS_OPS(sess_p)->SessionType == sessiontype))) {
+			atomic_set(&sess_p->session_reinstatement, 1);
+			spin_unlock(&sess_p->conn_lock);
+			iscsi_inc_session_usage_count(sess_p);
+			iscsi_stop_time2retain_timer(sess_p);
+			sess = sess_p;
 			break;
 		}
-		spin_unlock(&sess->conn_lock);
-		sess = NULL;
+		spin_unlock(&sess_p->conn_lock);
 	}
 	spin_unlock_bh(&se_tpg->session_lock);
 
@@ -384,7 +384,7 @@ static int iscsi_login_non_zero_tsih_s2 (
 	unsigned char *buf)
 {
 	iscsi_portal_group_t *tpg = conn->tpg;
-	iscsi_session_t *sess = NULL;
+	iscsi_session_t *sess = NULL, *sess_p = NULL;
 	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
 	se_session_t *se_sess, *se_sess_tmp;
 	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *) buf;
@@ -393,16 +393,17 @@ static int iscsi_login_non_zero_tsih_s2 (
 	list_for_each_entry_safe(se_sess, se_sess_tmp, &se_tpg->tpg_sess_list,
 			sess_list) {
 
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
-		if (atomic_read(&sess->session_fall_back_to_erl0) ||
-		    atomic_read(&sess->session_logout) ||
-		   (sess->time2retain_timer_flags & T2R_TF_EXPIRED))
+		sess_p = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
+		    atomic_read(&sess_p->session_logout) ||
+		   (sess_p->time2retain_timer_flags & T2R_TF_EXPIRED))
 			continue;
-		if (!(memcmp((const void *)sess->isid,
+		if (!(memcmp((const void *)sess_p->isid,
 		     (const void *)pdu->isid, 6)) &&
-		     (sess->tsih == pdu->tsih)) {
-			iscsi_inc_session_usage_count(sess);
-			iscsi_stop_time2retain_timer(sess);
+		     (sess_p->tsih == pdu->tsih)) {
+			iscsi_inc_session_usage_count(sess_p);
+			iscsi_stop_time2retain_timer(sess_p);
+			sess = sess_p;
 			break;
 		}
 	}
