@@ -1023,7 +1023,9 @@ extern int target_core_init_configfs (void)
 	 */
 	INIT_LIST_HEAD(&g_tf_list);
 	mutex_init(&g_tf_lock);
-
+#ifdef SNMP_SUPPORT
+	init_scsi_index_table();
+#endif
 	if ((ret = configfs_register_subsystem(subsys)) < 0) {
 		printk(KERN_ERR "Error %d while registering subsystem %s\n",
 			ret, subsys->su_group.cg_item.ci_namebuf);
