@@ -166,24 +166,23 @@
 #define TRANSPORT_FREE				255
 
 #define SCF_SUPPORTED_SAM_OPCODE                0x00000001
-#define SCF_REPORT_LUNS                         0x00000002
-#define SCF_TRANSPORT_TASK_SENSE                0x00000004
-#define SCF_EMULATED_TASK_SENSE                 0x00000008
-#define SCF_SCSI_DATA_SG_IO_CDB                 0x00000010
-#define SCF_SCSI_CONTROL_SG_IO_CDB              0x00000020
-#define SCF_SCSI_CONTROL_NONSG_IO_CDB           0x00000040
-#define SCF_SCSI_NON_DATA_CDB                   0x00000080
-#define SCF_SCSI_CDB_EXCEPTION                  0x00000100
-#define SCF_SCSI_RESERVATION_CONFLICT           0x00000200
-#define SCF_CMD_PASSTHROUGH                     0x00000400
-#define SCF_CMD_PASSTHROUGH_NOALLOC             0x00000800
-#define SCF_SE_CMD_FAILED                       0x00001000
-#define SCF_SE_LUN_CMD                          0x00002000
-#define SCF_SE_ALLOW_EOO                        0x00004000
-#define SCF_SE_DISABLE_ONLINE_CHECK             0x00008000
-#define SCF_SENT_CHECK_CONDITION		0x00010000
-#define SCF_OVERFLOW_BIT                        0x00020000
-#define SCF_UNDERFLOW_BIT                       0x00040000
+#define SCF_TRANSPORT_TASK_SENSE                0x00000002
+#define SCF_EMULATED_TASK_SENSE                 0x00000004
+#define SCF_SCSI_DATA_SG_IO_CDB                 0x00000008
+#define SCF_SCSI_CONTROL_SG_IO_CDB              0x00000010
+#define SCF_SCSI_CONTROL_NONSG_IO_CDB           0x00000020
+#define SCF_SCSI_NON_DATA_CDB                   0x00000040
+#define SCF_SCSI_CDB_EXCEPTION                  0x00000080
+#define SCF_SCSI_RESERVATION_CONFLICT           0x00000100
+#define SCF_CMD_PASSTHROUGH                     0x00000200
+#define SCF_CMD_PASSTHROUGH_NOALLOC             0x00000400
+#define SCF_SE_CMD_FAILED                       0x00000800
+#define SCF_SE_LUN_CMD                          0x00001000
+#define SCF_SE_ALLOW_EOO                        0x00002000
+#define SCF_SE_DISABLE_ONLINE_CHECK             0x00004000
+#define SCF_SENT_CHECK_CONDITION		0x00008000
+#define SCF_OVERFLOW_BIT                        0x00010000
+#define SCF_UNDERFLOW_BIT                       0x00020000
 
 /* se_device_t->type */
 #define PSCSI					1
@@ -414,6 +413,7 @@ typedef struct se_cmd_s {
 	int (*transport_allocate_resources)(struct se_cmd_s *, u32, u32);
 	int (*transport_cdb_transform)(struct se_cmd_s *, struct se_transform_info_s *);
 	int (*transport_do_transform)(struct se_cmd_s *, struct se_transform_info_s *);
+	int (*transport_emulate_cdb)(struct se_cmd_s *);
 	void (*transport_free_resources)(struct se_cmd_s *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);

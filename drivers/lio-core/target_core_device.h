@@ -40,6 +40,7 @@ extern void core_dec_lacl_count (struct se_node_acl_s *, struct se_cmd_s *);
 extern void core_update_device_list_access (u32, u32, se_node_acl_t *);
 extern void core_update_device_list_for_node (se_lun_t *lun, u32, u32, se_node_acl_t *, se_portal_group_t *, int);
 extern void core_clear_lun_from_tpg (se_lun_t *, se_portal_group_t *);
+extern int transport_core_report_lun_response (se_cmd_t *);
 extern void se_release_device_for_hba (se_device_t *);
 extern void se_clear_dev_ports (se_device_t *);
 extern int se_free_virtual_device (se_device_t *, se_hba_t *);

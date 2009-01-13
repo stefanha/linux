@@ -40,6 +40,7 @@
 #include <linux/in.h>
 #include <net/sock.h>
 #include <net/tcp.h>
+#include <scsi/scsi.h>
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
@@ -55,9 +56,6 @@
 
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#define RL_INCLUDE_STRUCTS
-#include <target_core_reportluns.h>
-#undef RL_INCLUDE_STRUCTS
 
 #undef TARGET_CORE_DEVICE_C
 
@@ -315,12 +313,6 @@ out:
 	spin_unlock(&dev->stats_lock);
 	}
 #endif /* SNMP_SUPPORT */
-        /*
-         * REPORT_LUN never gets added to the LUN list because it never makes
-         * it to the storage engine queue.
-         */
-        if (se_cmd->se_cmd_flags & SCF_REPORT_LUNS)
-                return(1);
 
         /*
          * Add the iscsi_cmd_t to the se_lun_t's cmd list.  This list is used
@@ -498,6 +490,87 @@ extern void core_clear_lun_from_tpg (se_lun_t *lun, se_portal_group_t *tpg)
         return;
 }
 
+extern int transport_core_report_lun_response (se_cmd_t *se_cmd)
+{
+	se_dev_entry_t *deve;
+	se_lun_t *se_lun;
+	se_session_t *se_sess = SE_SESS(se_cmd);
+	se_task_t *se_task;
+	unsigned char *buf = (unsigned char *)T_TASK(se_cmd)->t_task_buf;
+	u32 cdb_offset = 0, lun_count = 0, offset = 8;
+	u64 i, lun;
+
+	list_for_each_entry(se_task, &T_TASK(se_cmd)->t_task_list, t_list)
+		break;
+	
+	if (!(se_task)) {
+		printk(KERN_ERR "Unable to locate se_task_t for se_cmd_t\n");
+		return(PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE);
+	}
+
+	/*
+	 * If no se_session_t pointer is present, this se_cmd_t is
+	 * coming via a target_core_mod PASSTHROUGH op, and not through
+	 * a $FABRIC_MOD.  In that case, report LUN=0 only.
+	 */
+	if (!(se_sess)) {
+		lun = 0;
+		buf[offset++] = ((lun >> 56) & 0xff);
+		buf[offset++] = ((lun >> 48) & 0xff);
+		buf[offset++] = ((lun >> 40) & 0xff);
+		buf[offset++] = ((lun >> 32) & 0xff);
+		buf[offset++] = ((lun >> 24) & 0xff);
+		buf[offset++] = ((lun >> 16) & 0xff);
+		buf[offset++] = ((lun >> 8) & 0xff);
+		buf[offset++] = (lun & 0xff);
+		lun_count = 1;
+		goto done;	
+	}
+
+	spin_lock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
+		deve = &SE_NODE_ACL(se_sess)->device_list[i];
+		if (!(deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS))
+			continue;
+		se_lun = deve->se_lun; 
+		/*
+		 * We determine the correct LUN LIST LENGTH even once we
+		 * have reached the initial allocation length.
+		 * See SPC2-R20 7.19.
+		 */
+		lun_count++;
+		if ((cdb_offset + 8) >= se_cmd->data_length)
+			continue;
+
+		lun = cpu_to_be64(CMD_TFO(se_cmd)->pack_lun(deve->mapped_lun));
+		buf[offset++] = ((lun >> 56) & 0xff);
+		buf[offset++] = ((lun >> 48) & 0xff);
+		buf[offset++] = ((lun >> 40) & 0xff);
+		buf[offset++] = ((lun >> 32) & 0xff);
+		buf[offset++] = ((lun >> 24) & 0xff);
+		buf[offset++] = ((lun >> 16) & 0xff);
+		buf[offset++] = ((lun >> 8) & 0xff);
+		buf[offset++] = (lun & 0xff);
+		cdb_offset += 8;
+	}
+	spin_unlock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+
+	/*
+	 * See SPC3 r07, page 159.
+	 */
+done:
+	lun_count *= 8;
+	buf[0] = ((lun_count >> 24) & 0xff);
+	buf[1] = ((lun_count >> 16) & 0xff);
+	buf[2] = ((lun_count >> 8) & 0xff);
+	buf[3] = (lun_count & 0xff);
+
+	se_task->task_scsi_status = GOOD;
+	transport_complete_task(se_task, 1);
+
+	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
+}
+
 /*	se_release_device_for_hba():
  *
  *
@@ -532,14 +605,6 @@ extern int transport_get_lun_for_cmd (
 	unsigned char *cdb,
         u32 unpacked_lun)
 {
-	/*
-	 * REPORT_LUNS never actually goes to the transport layer.
-	 */
-	if (cdb[0] == REPORT_LUNS) {
-		if (se_allocate_rl_cmd(se_cmd, cdb, unpacked_lun) < 0)
-			return(PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES);
-	}
-
 	return(__transport_get_lun_for_cmd(se_cmd, unpacked_lun));
 }
 

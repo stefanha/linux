@@ -904,13 +904,6 @@ static void transport_lun_remove_cmd (se_cmd_t *cmd)
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)
 		return;
 
-	/*
-	 * REPORT_LUNS will be coming from the FE, and should not
-	 * be tracked.
-	 */
-	if (cmd->se_cmd_flags & SCF_REPORT_LUNS)
-		return;
-	
 	spin_lock_irqsave(&lun->lun_cmd_lock, flags);
 	if (atomic_read(&T_TASK(cmd)->transport_lun_active)) {
 		REMOVE_ENTRY_FROM_LIST_PREFIX(l, cmd,
@@ -3560,13 +3553,27 @@ check_depth:
 
 	transport_start_task_timer(task);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-
-	if ((error = TRANSPORT(dev)->do_task(task)) != 0) {
-		cmd->transport_error_status = error;
-		atomic_set(&task->task_active, 0);
-		atomic_set(&cmd->transport_sent, 0);
-		transport_stop_tasks_for_cmd(cmd);
-		transport_generic_request_failure(cmd, dev, 0, 1);
+	/*
+	 * The se_cmd_t->transport_emulate_cdb() function pointer is used
+	 * to grab REPORT_LUNS CDBs before they hit the
+	 * se_subsystem_api_t->do_task() caller below.
+	 */
+	if (cmd->transport_emulate_cdb) {
+		if ((error = cmd->transport_emulate_cdb(cmd)) != 0) {
+			cmd->transport_error_status = error;
+			atomic_set(&task->task_active, 0);
+			atomic_set(&cmd->transport_sent, 0);
+			transport_stop_tasks_for_cmd(cmd);
+			transport_generic_request_failure(cmd, dev, 0, 1);
+		}
+	} else {
+		if ((error = TRANSPORT(dev)->do_task(task)) != 0) {
+			cmd->transport_error_status = error;
+			atomic_set(&task->task_active, 0);
+			atomic_set(&cmd->transport_sent, 0);
+			transport_stop_tasks_for_cmd(cmd);
+			transport_generic_request_failure(cmd, dev, 0, 1);
+		}
 	}
 
 	goto check_depth;
@@ -4363,8 +4370,13 @@ static int transport_generic_cmd_sequencer (
 		ret = 3;
 		break;
 	case REPORT_LUNS:
-		TRACE_ERROR("Huh? REPORT_LUNS in sequencer.\n");
-		BUG();
+		SET_GENERIC_PYX_TRANSPORT_FUNCTIONS(cmd);
+		cmd->transport_emulate_cdb = &transport_core_report_lun_response;
+		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
+		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_get_maps(cmd);
+		ret = 2;
+		break;
 	default:
 		TRACE_ERROR("Unsupported SCSI Opcode 0x%02x, sending"
 			" CHECK_CONDITION.\n", cdb[0]);
