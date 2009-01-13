@@ -110,7 +110,6 @@ extern se_lun_t *iscsi_get_lun (
 /*	iscsi_get_lun_for_cmd():
  *	
  *	Returns (0) on success
- * 	Returns (1) on REPORT_LUN cdb
  * 	Returns (< 0) on failure
  */
 extern int iscsi_get_lun_for_cmd (
@@ -131,12 +130,7 @@ extern int iscsi_get_lun_for_cmd (
 		return(-1);
 	}
 
-	if ((ret = transport_get_lun_for_cmd(SE_CMD(cmd), cdb, unpacked_lun)) < 0)
-		return(ret);
-	if (ret > 0) /* For cdb[0] == REPORT_LUNS */
-		return(ret);
-
-	return(0);
+	return(transport_get_lun_for_cmd(SE_CMD(cmd), cdb, unpacked_lun));
 }
 
 /*	iscsi_determine_maxcmdsn():

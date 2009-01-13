@@ -64,7 +64,6 @@ extern struct kmem_cache *lio_ooo_cache;
 
 extern int iscsi_add_reject_from_cmd (u8, int, int, unsigned char *, iscsi_cmd_t *);
 extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
-extern int iscsi_build_report_luns_response (iscsi_cmd_t *);
 extern int iscsi_logout_closesession (iscsi_cmd_t *, iscsi_conn_t *);
 extern int iscsi_logout_closeconnection (iscsi_cmd_t *, iscsi_conn_t *);
 extern int iscsi_logout_removeconnforrecovery (iscsi_cmd_t *, iscsi_conn_t *);
@@ -1044,38 +1043,20 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 			}
 			return(0);
 		}
-
 		/*
-		 * Special case for REPORT_LUNs.
+		 * The default handler.
 		 */
-#warning FIXME: ICF_REPORT_LUNS in iscsi_execute_cmd() is broken!!!
-#if 0
-		if (cmd->cmd_flags & ICF_REPORT_LUNS) {
-			spin_unlock_bh(&cmd->istate_lock);
-			if (iscsi_build_report_luns_response(cmd) < 0)
-				return(-1);
-	
-			return(0);
-		} else {
-#endif
-		{
-			/*
-			 * The default handler.
-			 */
-			spin_unlock_bh(&cmd->istate_lock);
+		spin_unlock_bh(&cmd->istate_lock);
 
-			if ((cmd->data_direction == ISCSI_WRITE) &&
-			    !(cmd->cmd_flags & ICF_NON_IMMEDIATE_UNSOLICITED_DATA)) {
-				iscsi_set_dataout_sequence_values(cmd);
-				spin_lock_bh(&cmd->dataout_timeout_lock);
-				iscsi_start_dataout_timer(cmd, CONN(cmd));
-				spin_unlock_bh(&cmd->dataout_timeout_lock);
-			}
-			
-			transport_generic_handle_cdb(cmd->se_cmd);
-			return(0);
+		if ((cmd->data_direction == ISCSI_WRITE) &&
+		    !(cmd->cmd_flags & ICF_NON_IMMEDIATE_UNSOLICITED_DATA)) {
+			iscsi_set_dataout_sequence_values(cmd);
+			spin_lock_bh(&cmd->dataout_timeout_lock);
+			iscsi_start_dataout_timer(cmd, CONN(cmd));
+			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
-		break;
+		return(transport_generic_handle_cdb(cmd->se_cmd));
+
 	case ISCSI_INIT_NOP_OUT:
 	case ISCSI_INIT_TEXT_CMND:
 		spin_unlock_bh(&cmd->istate_lock);

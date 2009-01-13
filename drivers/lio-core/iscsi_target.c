@@ -102,8 +102,6 @@ struct kmem_cache *lio_dr_cache = NULL;
 struct kmem_cache *lio_ooo_cache = NULL;
 struct kmem_cache *lio_r2t_cache = NULL;
 
-extern int se_allocate_rl_cmd (se_cmd_t *, unsigned char *, u64);
-extern int iscsi_build_report_luns_response (iscsi_cmd_t *);
 static void iscsi_rx_thread_wait_for_TCP (iscsi_conn_t *);
 
 static int iscsi_target_detect (void);
@@ -1664,12 +1662,6 @@ done:
 		send_check_condition = 1;
 		goto attach_cmd;
 	}
-	/*
-	 * REPORT_LUNS never actually goes to the transport layer
-	 */
-	if (ret == 1)
-		goto build_list;
-
 	/*
 	 * The Initiator Node has access to the LUN (the addressing method
 	 * is handled inside of iscsi_get_lun_for_cmd()).  Now it's time to
