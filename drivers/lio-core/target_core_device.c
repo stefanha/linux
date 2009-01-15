@@ -592,10 +592,27 @@ extern void se_release_device_for_hba (se_device_t *dev)
 	REMOVE_ENTRY_FROM_LIST(dev, hba->device_head, hba->device_tail);
 	hba->dev_count--;
 	spin_unlock(&hba->device_lock);
+
+	se_release_evpd_for_dev(dev);
 		
 	kfree(dev->dev_status_queue_obj);
 	kfree(dev->dev_queue_obj);
 	kfree(dev);
+
+	return;
+}
+
+extern void se_release_evpd_for_dev (se_device_t *dev)
+{
+	t10_evpd_t *evpd, *evpd_tmp;
+
+	spin_lock(&dev->t10_wwn.t10_evpd_lock);
+	list_for_each_entry_safe(evpd, evpd_tmp, &dev->t10_wwn.t10_evpd_list,
+			evpd_list) {
+		list_del(&evpd->evpd_list);
+		kfree(evpd);
+	}
+	spin_unlock(&dev->t10_wwn.t10_evpd_lock);
 
 	return;
 }

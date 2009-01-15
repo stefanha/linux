@@ -51,6 +51,8 @@
 
 #define TRANSPORT_IQN_LEN			224 /* Currently same as ISCSI_IQN_LEN */
 
+#define EVPD_TMP_BUF_SIZE			128 /* Used to parse EVPD into t10_evpd_t */
+
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
 #define READ_CAP_LEN            		8
@@ -232,13 +234,22 @@ typedef struct se_obj_s {
 	atomic_t obj_access_count;
 } ____cacheline_aligned se_obj_t;
 
+typedef struct t10_evpd_s {
+	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
+	u32 protocol_identifier;
+	u32 device_identifier_code_set;
+	u32 association;
+	u32 device_identifier_type;
+	struct list_head evpd_list;
+} t10_evpd_t;
+
 typedef struct t10_wwn_s {
         unsigned char vendor[8];
         unsigned char model[16];
 	unsigned char revision[4];
         unsigned char unit_serial[INQUIRY_EVPD_SERIAL_LEN];
-	u32 device_identifier_code_set;
-	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
+	spinlock_t t10_evpd_lock;
+	struct list_head t10_evpd_list;
 } ____cacheline_aligned t10_wwn_t;
 
 typedef struct se_queue_req_s {
