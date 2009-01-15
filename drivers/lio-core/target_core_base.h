@@ -241,7 +241,7 @@ typedef struct t10_evpd_s {
 	u32 association;
 	u32 device_identifier_type;
 	struct list_head evpd_list;
-} t10_evpd_t;
+} ____cacheline_aligned t10_evpd_t;
 
 typedef struct t10_wwn_s {
         unsigned char vendor[8];
