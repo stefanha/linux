@@ -606,13 +606,13 @@ extern void se_release_evpd_for_dev (se_device_t *dev)
 {
 	t10_evpd_t *evpd, *evpd_tmp;
 
-	spin_lock(&dev->t10_wwn.t10_evpd_lock);
-	list_for_each_entry_safe(evpd, evpd_tmp, &dev->t10_wwn.t10_evpd_list,
-			evpd_list) {
+	spin_lock(&DEV_T10_WWN(dev)->t10_evpd_lock);
+	list_for_each_entry_safe(evpd, evpd_tmp,
+			&DEV_T10_WWN(dev)->t10_evpd_list, evpd_list) {
 		list_del(&evpd->evpd_list);
 		kfree(evpd);
 	}
-	spin_unlock(&dev->t10_wwn.t10_evpd_lock);
+	spin_unlock(&DEV_T10_WWN(dev)->t10_evpd_lock);
 
 	return;
 }

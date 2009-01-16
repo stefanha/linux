@@ -236,6 +236,7 @@ typedef struct se_obj_s {
 
 typedef struct t10_evpd_s {
 	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
+	int protocol_identifier_set;
 	u32 protocol_identifier;
 	u32 device_identifier_code_set;
 	u32 association;
@@ -249,6 +250,8 @@ typedef struct t10_wwn_s {
 	unsigned char revision[4];
         unsigned char unit_serial[INQUIRY_EVPD_SERIAL_LEN];
 	spinlock_t t10_evpd_lock;
+	struct se_subsystem_dev_s *t10_sub_dev;
+	struct config_group t10_wwn_group;
 	struct list_head t10_evpd_list;
 } ____cacheline_aligned t10_wwn_t;
 
@@ -530,6 +533,7 @@ typedef struct se_subsystem_dev_s {
         struct se_hba_s *se_dev_hba;
         struct se_device_s *se_dev_ptr;
         se_dev_attrib_t se_dev_attrib;
+	t10_wwn_t	t10_wwn;        /* T10 Inquiry and EVPD WWN Information */
         spinlock_t      se_dev_lock;
         void            *se_dev_su_ptr;
         struct config_group se_dev_group;
@@ -577,7 +581,6 @@ typedef struct se_device_s {
 	struct task_struct		*process_thread; /* Pointer to descriptor for processing thread */
         pid_t                   process_thread_pid;
 	struct task_struct		*dev_mgmt_thread;
-	t10_wwn_t		t10_wwn;	/* T10 Inquiry and EVPD WWN Information */
 	int (*write_pending)(struct se_task_s *);
 	void (*dev_generate_cdb)(unsigned long long, u32 *, unsigned char *, int);
 	struct se_obj_lun_type_s *dev_obj_api;
@@ -594,6 +597,7 @@ typedef struct se_device_s {
 
 #define ISCSI_DEV(cmd)		((se_device_t *)(cmd)->se_lun->se_dev)
 #define DEV_ATTRIB(dev)		(&(dev)->se_sub_dev->se_dev_attrib)
+#define DEV_T10_WWN(dev)	(&(dev)->se_sub_dev->t10_wwn)
 #define DEV_OBJ_API(dev)	((struct se_obj_lun_type_s *)(dev)->dev_obj_api)
 
 typedef struct se_hba_s {

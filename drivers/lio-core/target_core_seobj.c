@@ -619,7 +619,7 @@ extern t10_wwn_t *dev_obj_get_t10_wwn (void *p)
 {
 	se_device_t *dev = (se_device_t *)p;
 
-	return(&dev->t10_wwn);
+	return(DEV_T10_WWN(dev));
 }
 
 extern int dev_obj_check_tur_bit (void *p)

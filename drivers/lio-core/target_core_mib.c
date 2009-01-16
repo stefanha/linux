@@ -286,18 +286,18 @@ static int scsi_dev_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "%u %u %s %u\n", hba->hba_index,
 			   dev->dev_index, "Target", dev->dev_port_count);
 		
-		memcpy(&str[0], (void *)&dev->t10_wwn, 28);
+		memcpy(&str[0], (void *)DEV_T10_WWN(dev), 28);
 
 		/* vendor */
 		for (k = 0; k < 8; k++)
-			str[k] = ISPRINT(dev->t10_wwn.vendor[k]) ?
-					dev->t10_wwn.vendor[k]:0x20;
+			str[k] = ISPRINT(DEV_T10_WWN(dev)->vendor[k]) ?
+					DEV_T10_WWN(dev)->vendor[k]:0x20;
 		str[k] = 0x20;
 
 		/* model */
 		for (k = 0; k < 16; k++)
-			str[k+9] = ISPRINT(dev->t10_wwn.model[k]) ?
-					dev->t10_wwn.model[k]:0x20;
+			str[k+9] = ISPRINT(DEV_T10_WWN(dev)->model[k]) ?
+					DEV_T10_WWN(dev)->model[k]:0x20;
 		str[k + 9] = 0;
 
 		seq_printf(seq, "dev_alias: %s\n", str);
@@ -440,7 +440,7 @@ static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock(&hba->device_lock);
 	if ((dev = (se_device_t *)iterp->ti_ptr)) {
-		wwn = &dev->t10_wwn;
+		wwn = DEV_T10_WWN(dev);
 
 		spin_lock(&dev->se_port_lock);
 		list_for_each_entry_safe(se, se_tmp, &dev->dev_sep_list, sep_list) {
@@ -847,29 +847,29 @@ static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "%u %u %u %llu %s", hba->hba_index,
                                 dev->dev_index, SCSI_LU_INDEX,
 				(unsigned long long)0, /* scsiLuDefaultLun */
-				(strlen(dev->t10_wwn.unit_serial)) ?
-				(char *)&dev->t10_wwn.unit_serial[0] : "None"); /* scsiLuWwnName */
+				(strlen(DEV_T10_WWN(dev)->unit_serial)) ?
+				(char *)&DEV_T10_WWN(dev)->unit_serial[0] : "None"); /* scsiLuWwnName */
 
-		memcpy(&str[0], (void *)&dev->t10_wwn, 28);
+		memcpy(&str[0], (void *)DEV_T10_WWN(dev), 28);
 
 		/* scsiLuVendorId */
 		for (j = 0; j < 8; j++)
-                        str[j] = ISPRINT(dev->t10_wwn.vendor[j]) ?
-                                dev->t10_wwn.vendor[j]:0x20;
+                        str[j] = ISPRINT(DEV_T10_WWN(dev)->vendor[j]) ?
+                                DEV_T10_WWN(dev)->vendor[j]:0x20;
                 str[8] = 0;
                 seq_printf(seq, " %s", str);
 
 		/* scsiLuProductId */
 		for (j = 0; j < 16; j++)
-			str[j] = ISPRINT(dev->t10_wwn.model[j]) ?
-		               dev->t10_wwn.model[j]:0x20;
+			str[j] = ISPRINT(DEV_T10_WWN(dev)->model[j]) ?
+		               DEV_T10_WWN(dev)->model[j]:0x20;
 		str[16] = 0;
                 seq_printf(seq, " %s", str);
 
 		/* scsiLuRevisionId */
 		for (j = 0; j < 4; j++)
-                         str[j] = ISPRINT(dev->t10_wwn.revision[j]) ?
-	                       dev->t10_wwn.revision[j]:0x20;
+                         str[j] = ISPRINT(DEV_T10_WWN(dev)->revision[j]) ?
+	                       DEV_T10_WWN(dev)->revision[j]:0x20;
 	        str[4] = 0;
 	        seq_printf(seq, " %s", str);
 

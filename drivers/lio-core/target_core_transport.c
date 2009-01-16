@@ -1700,6 +1700,7 @@ extern void transport_set_evpd_proto_id (t10_evpd_t *evpd, unsigned char *page_8
 	 */
 	if (page_83[1] & 0x80) {
 		evpd->protocol_identifier = (page_83[0] & 0xf0);
+		evpd->protocol_identifier_set = 1;
 		transport_dump_evpd_proto_id(evpd, NULL, 0);	
 	}
 	
@@ -2062,7 +2063,6 @@ extern se_device_t *transport_add_device_to_core_hba (
 	dev->transport		= transport;
 	atomic_set(&dev->active_cmds, 0);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
-	INIT_LIST_HEAD(&dev->t10_wwn.t10_evpd_list);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_create_sem);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_done_sem);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_sem);
@@ -2072,7 +2072,6 @@ extern se_device_t *transport_add_device_to_core_hba (
 	spin_lock_init(&dev->dev_status_thr_lock);
 	spin_lock_init(&dev->se_port_lock);
 	spin_lock_init(&dev->dev_queue_obj->cmd_queue_lock);
-	spin_lock_init(&dev->t10_wwn.t10_evpd_lock);
 	
 	dev->queue_depth	= TRANSPORT(dev)->get_queue_depth(dev);
 	atomic_set(&dev->depth_left, dev->queue_depth);
@@ -2112,13 +2111,21 @@ extern se_device_t *transport_add_device_to_core_hba (
 		return(dev);
 	}
 
-	if ((ret = transport_get_inquiry(DEV_OBJ_API(dev), &dev->t10_wwn, (void *)dev)) < 0)
+	if ((ret = transport_get_inquiry(DEV_OBJ_API(dev),
+			DEV_T10_WWN(dev), (void *)dev)) < 0)
 		goto out;
 	/*
-	 * Locate EVPD WWN Information used for various purposes within the Storage Engine.
+	 * Locate EVPD WWN Information used for various purposes within
+	 * the Storage Engine.
 	 */
-	if (!(transport_get_inquiry_evpd_serial(DEV_OBJ_API(dev), &dev->t10_wwn, (void *)dev))) {
-		transport_get_inquiry_evpd_device_ident(DEV_OBJ_API(dev), &dev->t10_wwn, (void *)dev);		
+	if (!(transport_get_inquiry_evpd_serial(DEV_OBJ_API(dev),
+			DEV_T10_WWN(dev), (void *)dev))) {
+		/*
+		 * If EVPD Unit Serial returned GOOD status, try
+		 * EVPD Device Identification page (0x83).
+		 */
+		transport_get_inquiry_evpd_device_ident(DEV_OBJ_API(dev),
+			DEV_T10_WWN(dev), (void *)dev);		
 	}
 
 	/*
