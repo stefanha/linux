@@ -54,18 +54,6 @@ ifeq ($(LINUX_FILEIO), 1)
 target_core_mod-objs			+=	target_core_file.o
 EXTRA_CFLAGS				+=	-DPYX_FILEIO
 endif
-ifeq ($(LINUX_VROM), 1)
-target_core_mod-objs			+=	target_core_vrom.o
-EXTRA_CFLAGS				+=	-DPYX_VROM
-endif
-ifeq ($(LINUX_VTAPE), 1)
-target_core_mod-objs			+=	target_core_vt.o
-EXTRA_CFLAGS				+=	-DPYX_VTAPE
-endif
-ifeq ($(LINUX_MEDIA_CHANGER), 1)
-target_core_mod-objs			+=	target_core_mc.o
-EXTRA_CFLAGS				+=	-DPYX_MEDIA_CHANGER
-endif
 ifeq ($(SNMP_FEATURE), 1)
 target_core_mod-objs			+=	target_core_mib.o
 EXTRA_CFLAGS				+=	-DSNMP_SUPPORT

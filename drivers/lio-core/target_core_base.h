@@ -533,7 +533,7 @@ typedef struct se_subsystem_dev_s {
         struct se_hba_s *se_dev_hba;
         struct se_device_s *se_dev_ptr;
         se_dev_attrib_t se_dev_attrib;
-	t10_wwn_t	t10_wwn;        /* T10 Inquiry and EVPD WWN Information */
+	t10_wwn_t	t10_wwn;	/* T10 Inquiry and EVPD WWN Information */
         spinlock_t      se_dev_lock;
         void            *se_dev_su_ptr;
         struct config_group se_dev_group;
