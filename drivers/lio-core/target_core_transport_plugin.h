@@ -57,26 +57,4 @@ extern se_subsystem_api_t rd_mcp_template;
 extern se_subsystem_api_t fileio_template;
 #endif /* PYX_FILEIO */
 
-#ifdef PYX_VROM
-#define VR_INCLUDE_STRUCTS
-#include <target_core_vrom.h>
-#undef VR_INCLUDE_STRUCTS
-extern se_subsystem_api_t vrom_template;
-#endif /* PYX_VROM */
-
-#ifdef PYX_VTAPE
-#define VT_INCLUDE_STRUCTS
-#include <target_core_vt.h>
-#undef VT_INCLUDE_STRUCTS
-extern se_subsystem_api_t vtape_template;
-#endif /* PYX_VTAPE */
-
-#ifdef PYX_MEDIA_CHANGER
-#define MC_INCLUDE_STRUCTS
-#include <target_core_mc.h>
-#undef MC_INCLUDE_STRUCTS
-extern se_subsystem_api_t mc_template;
-#endif /* PYX_MEDIA_CHANGER */
-
 #endif    /*** _TARGET_CORE_TRANSPORT_PLUGIN_H_ ***/
-

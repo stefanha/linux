@@ -528,21 +528,6 @@ extern void transport_load_plugins (void)
 			fileio_template.name, PLUGIN_TYPE_TRANSPORT,
 			fileio_template.get_plugin_info, &ret);
 #endif
-#ifdef PYX_VROM
-        plugin_register((void *)&vrom_template, vrom_template.type,
-                        vrom_template.name, PLUGIN_TYPE_TRANSPORT,
-                        vrom_template.get_plugin_info, &ret);
-#endif
-#ifdef PYX_VTAPE
-	plugin_register((void *)&vtape_template, vtape_template.type,
-			vtape_template.name, PLUGIN_TYPE_TRANSPORT,
-			vtape_template.get_plugin_info, &ret);
-#endif
-#ifdef PYX_MEDIA_CHANGER
-	plugin_register((void *)&mc_template, mc_template.type,
-			mc_template.name, PLUGIN_TYPE_TRANSPORT,
-			mc_template.get_plugin_info, &ret);
-#endif
 	return;
 }
 
