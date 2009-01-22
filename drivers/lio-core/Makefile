@@ -33,6 +33,7 @@ target_core_mod-objs			:=	target_core_configfs.o \
 						target_core_device.o \
 						target_core_hba.o \
 						target_core_plugin.o \
+						target_core_pr.o \
 						target_core_scdb.o \
 						target_core_seobj.o \
 						target_core_tpg.o \
