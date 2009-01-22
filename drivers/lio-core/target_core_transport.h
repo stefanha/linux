@@ -88,6 +88,7 @@
 #define DA_TASK_TIMEOUT_MAX			600 /* 10 Minutes, see transport_get_default_task_timeout()  */
 #define DA_STATUS_THREAD			0 /* Disabled by default */
 #define DA_STATUS_THREAD_TUR			0 /* Disabled by default */
+#define DA_EMULATE_RESERVATIONS			0 /* No Emulation for PSCSI by default */
 #define DA_STATUS_MAX_SECTORS_MIN		16
 #define DA_STATUS_MAX_SECTORS_MAX		8192
 
@@ -184,9 +185,6 @@ extern int transport_generic_remove (se_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks (se_cmd_t *, se_lun_t *);
 extern void transport_clear_lun_from_sessions (se_lun_t *);
 extern int iscsi_send_check_condition_and_sense (se_cmd_t *, __u8, int);
-extern int core_tpg_persistent_reservation_check (se_cmd_t *);
-extern int core_tpg_persistent_reservation_release (se_cmd_t *);
-extern int core_tpg_persistent_reservation_reserve (se_cmd_t *);
 extern void transport_release_cmd_to_pool (se_cmd_t *);
 extern void transport_generic_free_cmd (se_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds (se_cmd_t *, int);

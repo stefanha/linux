@@ -672,13 +672,9 @@ extern se_portal_group_t *core_tpg_register (
 		lun = &se_tpg->tpg_lun_list[i];
 		lun->unpacked_lun = i;
 		lun->lun_type_ptr = NULL;
-		lun->persistent_reservation_check = &core_tpg_persistent_reservation_check;
-		lun->persistent_reservation_release = &core_tpg_persistent_reservation_release;
-		lun->persistent_reservation_reserve = &core_tpg_persistent_reservation_reserve;
 		lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 		spin_lock_init(&lun->lun_acl_lock);
 		spin_lock_init(&lun->lun_cmd_lock);
-		spin_lock_init(&lun->lun_reservation_lock);
 		spin_lock_init(&lun->lun_sep_lock);
 	}
 

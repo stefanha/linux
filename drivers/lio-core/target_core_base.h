@@ -255,6 +255,24 @@ typedef struct t10_wwn_s {
 	struct list_head t10_evpd_list;
 } ____cacheline_aligned t10_wwn_t;
 
+typedef enum {
+	SPC_PASSTHROUGH,
+	SPC2_RESERVATIONS,
+	SPC3_PERSISTENT_RESERVATIONS
+} t10_reservations_index_t;
+
+struct se_cmd_s;
+
+typedef struct t10_reservation_template_s {
+	t10_reservations_index_t res_type;
+	int (*t10_reservation_check)(struct se_cmd_s *);
+	int (*t10_reserve)(struct se_cmd_s *);
+	int (*t10_release)(struct se_cmd_s *);
+	int (*t10_seq_non_holder)(struct se_cmd_s *, unsigned char *);
+	int (*t10_pr_register)(struct se_cmd_s *);
+	int (*t10_pr_clear)(struct se_cmd_s *);
+} ____cacheline_aligned t10_reservation_template_t;
+
 typedef struct se_queue_req_s {
         int                     state;
         void                    *queue_se_obj_ptr;
@@ -520,6 +538,7 @@ typedef struct se_dev_entry_s {
 typedef struct se_dev_attrib_s {
         int             status_thread;
         int             status_thread_tur;
+	int		emulate_reservations;
 	u32		hw_max_sectors;
         u32             max_sectors;
 	u32		hw_queue_depth;
@@ -534,10 +553,13 @@ typedef struct se_subsystem_dev_s {
         struct se_device_s *se_dev_ptr;
         se_dev_attrib_t se_dev_attrib;
 	t10_wwn_t	t10_wwn;	/* T10 Inquiry and EVPD WWN Information */
+	t10_reservation_template_t t10_reservation;	/* T10 SPC-2 + SPC-3 Reservations */
         spinlock_t      se_dev_lock;
         void            *se_dev_su_ptr;
         struct config_group se_dev_group;
 } ____cacheline_aligned se_subsystem_dev_t;
+
+#define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 
 typedef struct se_device_s {
 	__u8			type;		/* Type of disk transport used for device */
@@ -572,10 +594,12 @@ typedef struct se_device_s {
 	se_queue_obj_t		*dev_status_queue_obj;
 	spinlock_t		execute_task_lock;
 	spinlock_t		state_task_lock;
+	spinlock_t		dev_reservation_lock;
 	spinlock_t		dev_state_lock;
 	spinlock_t		dev_status_lock;
 	spinlock_t		dev_status_thr_lock;
 	spinlock_t		se_port_lock;
+	struct se_node_acl_s	*dev_reserved_node_acl;
 	struct list_head	dev_sep_list;
 	struct timer_list		dev_status_timer;
 	struct task_struct		*process_thread; /* Pointer to descriptor for processing thread */
@@ -595,7 +619,8 @@ typedef struct se_device_s {
 	struct se_device_s	*prev;
 }  ____cacheline_aligned se_device_t;
 
-#define ISCSI_DEV(cmd)		((se_device_t *)(cmd)->se_lun->se_dev)
+#define SE_DEV(cmd)		((se_device_t *)(cmd)->se_lun->se_dev)
+#define ISCSI_DEV(cmd)		SE_DEV(cmd)
 #define DEV_ATTRIB(dev)		(&(dev)->se_sub_dev->se_dev_attrib)
 #define DEV_T10_WWN(dev)	(&(dev)->se_sub_dev->t10_wwn)
 #define DEV_OBJ_API(dev)	((struct se_obj_lun_type_s *)(dev)->dev_obj_api)
@@ -637,24 +662,20 @@ typedef struct se_lun_s {
 	u32			unpacked_lun;
 	spinlock_t		lun_acl_lock;
 	spinlock_t		lun_cmd_lock;
-	spinlock_t		lun_reservation_lock;
 	spinlock_t		lun_sep_lock;
 	se_cmd_t		*lun_cmd_head;
 	se_cmd_t		*lun_cmd_tail;
 	se_lun_acl_t		*lun_acl_head;
 	se_lun_acl_t		*lun_acl_tail;
-	struct se_node_acl_s	*lun_reserved_node_acl;
 	se_device_t		*se_dev;
 	void			*lun_type_ptr;
 	struct config_group	lun_group;
 	struct se_obj_lun_type_s *lun_obj_api;
 	struct se_port_s	*lun_sep;
-	int (*persistent_reservation_check)(se_cmd_t *);
-	int (*persistent_reservation_release)(se_cmd_t *);
-	int (*persistent_reservation_reserve)(se_cmd_t *);
 } ____cacheline_aligned se_lun_t;
 
-#define ISCSI_LUN(c)            ((se_lun_t *)(c)->se_lun)
+#define SE_LUN(c)		((se_lun_t *)(c)->se_lun)
+#define ISCSI_LUN(c)		SE_LUN(c)
 #define LUN_OBJ_API(lun)	((struct se_obj_lun_type_s *)(lun)->lun_obj_api)
 
 typedef struct se_port_s {

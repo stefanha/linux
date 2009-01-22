@@ -725,6 +725,7 @@ extern void se_dev_set_default_attribs (se_device_t *dev)
 {
 	DEV_ATTRIB(dev)->status_thread = DA_STATUS_THREAD;
 	DEV_ATTRIB(dev)->status_thread_tur = DA_STATUS_THREAD_TUR;
+	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	/*
 	 * max_sectors is based on subsystem plugin dependent requirements.
 	 */
