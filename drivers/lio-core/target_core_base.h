@@ -557,6 +557,7 @@ typedef struct se_subsystem_dev_s {
         spinlock_t      se_dev_lock;
         void            *se_dev_su_ptr;
         struct config_group se_dev_group;
+	struct config_group se_dev_pr_group;	/* For T10 Reservations */
 } ____cacheline_aligned se_subsystem_dev_t;
 
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
