@@ -69,11 +69,17 @@
 #define TRANSPORT_TIMEOUT_TYPE_TAPE		600
 #define TRANSPORT_TIMEOUT_TYPE_OTHER		300
 
-/* For iscsi_task->task_state_flags */
+/* For se_task->task_state_flags */
 #define TSF_EXCEPTION_CLEARED			0x01
 
 /*
- * iSCSI Device related Transport flags
+ * se_subsystem_dev_t->su_dev_flags
+*/
+#define SDF_FIRMWARE_EVPD_UNIT_SERIAL		0x00000001
+#define SDF_EMULATED_EVPD_UNIT_SERIAL		0x00000002
+
+/*
+ * se_device_t->dev_flags
  */
 #define DF_READAHEAD_ACTIVE                     0x00000001
 #define DF_TRANSPORT_DMA_ALLOC			0x00000002
@@ -93,7 +99,6 @@
 #define DA_STATUS_MAX_SECTORS_MAX		8192
 
 #define SE_MODE_PAGE_BUF			512
-#define SE_LVM_UUID_LEN				48 /* Must match PARAM_LVM_UUID_LEN */
 #define SE_UDEV_PATH_LEN			256 /* Must match PARAM_UDEV_PATH_LEN */
 
 #define MOD_MAX_SECTORS(ms, bs)			(ms % (PAGE_SIZE / bs))
@@ -161,7 +166,7 @@ extern void __transport_stop_task_timer (struct se_task_s *, unsigned long *);
 extern void transport_stop_task_timer (struct se_task_s *);
 extern void transport_stop_all_task_timers (struct se_cmd_s *);
 extern int transport_execute_tasks (struct se_cmd_s *);
-extern int transport_generic_emulate_inquiry (struct se_cmd_s *, unsigned char, unsigned char *, unsigned char *, unsigned char *, unsigned char *);
+extern int transport_generic_emulate_inquiry (struct se_cmd_s *, unsigned char, unsigned char *, unsigned char *, unsigned char *);
 extern int transport_generic_emulate_readcapacity (struct se_cmd_s *, u32, u32);
 extern int transport_generic_emulate_readcapacity_16 (struct se_cmd_s *, unsigned long long, u32);
 extern int transport_generic_emulate_modesense (struct se_cmd_s *, unsigned char *, unsigned char *, int, int);

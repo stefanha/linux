@@ -3988,13 +3988,13 @@ extern int transport_generic_emulate_inquiry (
 	unsigned char type,
 	unsigned char *prod,
 	unsigned char *version,
-	unsigned char *se_location,
-	unsigned char *sub_sn)
+	unsigned char *se_location)
 {
-	u32 len = 0;
+	se_device_t *dev = SE_DEV(cmd);
 	unsigned char *dst = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
 	unsigned char *iqn_sn, buf[EVPD_BUF_LEN];
+	u32 len = 0;
 	
 	memset(dst, 0, cmd->data_length);
 	memset(buf, 0, EVPD_BUF_LEN);
@@ -4028,8 +4028,9 @@ extern int transport_generic_emulate_inquiry (
 		break;
 	case 0x80: /* unit serial number */
 		buf[1] = 0x80;
-		if (sub_sn)
-			len += sprintf((unsigned char *)&buf[4], "%s", sub_sn);
+		if (dev->se_sub_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL)
+			len += sprintf((unsigned char *)&buf[4], "%s",
+				&DEV_T10_WWN(dev)->unit_serial[0]);
 		else {
 			iqn_sn = transport_get_iqn_sn();
 			len += sprintf((unsigned char *)&buf[4], "%s:%s",
@@ -4046,12 +4047,13 @@ extern int transport_generic_emulate_inquiry (
 		
 		len += sprintf((unsigned char *)&buf[8], "%-8s", "LIO-ORG");
 		
-		if (sub_sn)
-			len += sprintf((unsigned char *)&buf[16], "%s:%s", prod, sub_sn);
+		if (dev->se_sub_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL)
+			len += sprintf((unsigned char *)&buf[16], "%s:%s", prod,
+					&DEV_T10_WWN(dev)->unit_serial[0]);
 		else {
 			iqn_sn = transport_get_iqn_sn();
-			len += sprintf((unsigned char *)&buf[16], "%s:%s:%s", prod,
-					iqn_sn, se_location);
+			len += sprintf((unsigned char *)&buf[16], "%s:%s:%s",
+					prod, iqn_sn, se_location);
 		}
 		buf[7] = len; /* Identifier Length */
 		len += 4;

@@ -362,6 +362,7 @@ typedef struct se_task_s {
 } ____cacheline_aligned se_task_t;
 
 #define TASK_CMD(task)	((struct se_cmd_s *)task->task_se_cmd)
+#define TASK_DEV(task)	((struct se_device_s *)task->se_dev)
 
 typedef struct se_transform_info_s {
         int             ti_set_counts;
@@ -549,6 +550,7 @@ typedef struct se_dev_attrib_s {
 } ____cacheline_aligned se_dev_attrib_t;
 
 typedef struct se_subsystem_dev_s {
+	u32			su_dev_flags;
         struct se_hba_s *se_dev_hba;
         struct se_device_s *se_dev_ptr;
         se_dev_attrib_t se_dev_attrib;
