@@ -430,7 +430,7 @@ static int rd_emulate_inquiry (se_task_t *task)
 
 	return(transport_generic_emulate_inquiry(cmd, TYPE_DISK, prod,
 			(hba->transport->do_se_mem_map) ? RD_DR_VERSION : RD_MCP_VERSION,
-			se_location, NULL));
+			se_location));
 }
 
 /*	rd_emulate_read_cap():
