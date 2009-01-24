@@ -38,6 +38,7 @@
 #include <target_core_device.h>
 #include <target_core_hba.h>
 #include <target_core_plugin.h>
+#include <target_core_seobj.h>
 #include <target_core_transport.h>
 
 #ifdef SNMP_SUPPORT
@@ -536,7 +537,7 @@ static ssize_t target_core_dev_wwn_show_attr_evpd_unit_serial (
         if (!(dev = se_dev->se_dev_ptr)) 
                 return(-ENODEV);
 
-	return(sprintf(page, "T10 EVPD Unit Serial Number:: %s\n",
+	return(sprintf(page, "T10 EVPD Unit Serial Number: %s\n",
 		&t10_wwn->unit_serial[0]));
 }
 
@@ -545,7 +546,61 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_unit_serial (
 	const char *page,
 	size_t count)
 {
-	return(-ENOMEM);
+	se_subsystem_dev_t *su_dev = t10_wwn->t10_sub_dev;
+	se_device_t *dev;
+	unsigned char buf[INQUIRY_EVPD_SERIAL_LEN];
+
+	/*
+	 * If Linux/SCSI subsystem_api_t plugin got a EVPD Unit Serial
+	 * from the struct scsi_device level firmware, do not allow
+	 * EVPD Unit Serial to be emulated.
+	 *
+	 * Note this struct scsi_device could also be emulating EVPD
+	 * information from its drivers/scsi LLD.  But for now we assume
+	 * it is doing 'the right thing' wrt a world wide unique
+	 * EVPD Unit Serial Number that OS dependent multipath can depend on.
+	 */
+	if (su_dev->su_dev_flags & SDF_FIRMWARE_EVPD_UNIT_SERIAL) {
+		printk(KERN_ERR "Underlying SCSI device firmware provided EVPD"
+			" Unit Serial, ignoring request\n");
+		return(-EOPNOTSUPP);
+	}
+
+	if ((strlen(page) + 1) > INQUIRY_EVPD_SERIAL_LEN) {
+		printk(KERN_ERR "Emulated EVPD Unit Serial exceeds"
+		" INQUIRY_EVPD_SERIAL_LEN: %d\n", INQUIRY_EVPD_SERIAL_LEN);
+		return(-EOVERFLOW);
+	}
+	/*
+	 * Check to see if any active $FABRIC_MOD exports exist.  If they
+	 * do exist, fail here as changing this information on the fly 
+	 * (underneath the initiator side OS dependent multipath code)
+	 * could cause negative effects.
+	 */
+	if ((dev = su_dev->se_dev_ptr)) {
+		if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+			printk(KERN_ERR "Unable to set EVPD Unit Serial while"
+				" active %d $FABRIC_MOD exports exist\n",
+				DEV_OBJ_API(dev)->check_count(
+					&dev->dev_access_obj));
+			return(-EINVAL);
+		}
+	}
+	/*
+	 * This currently assumes ASCII encoding for emulated EVPD Unit Serial.
+	 *
+	 * Also, strip any newline added from the userspace
+	 * echo $UUID > $TARGET/$HBA/$STORAGE_OBJECT/wwn/evpd_unit_serial
+	 */
+	memset(buf, 0, INQUIRY_EVPD_SERIAL_LEN);
+	snprintf(buf, INQUIRY_EVPD_SERIAL_LEN, "%s", page);
+	snprintf(su_dev->t10_wwn.unit_serial, INQUIRY_EVPD_SERIAL_LEN,
+			"%s", strstrip(buf));
+	su_dev->su_dev_flags |= SDF_EMULATED_EVPD_UNIT_SERIAL;
+
+	printk("Target_Core_ConfigFS: Set emulated EVPD Unit Serial: %s\n",
+			su_dev->t10_wwn.unit_serial);
+	return(count);
 }
 
 SE_DEV_WWN_ATTR(evpd_unit_serial, S_IRUGO | S_IWUSR);
