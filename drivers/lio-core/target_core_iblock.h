@@ -90,22 +90,18 @@ typedef struct iblock_req_s {
 	struct iblock_dev_s *ib_dev;
 } ____cacheline_aligned iblock_req_t;
 
-#define IBDF_HAS_MD_UUID		0x01
-#define IBDF_HAS_LVM_UUID		0x02
-#define IBDF_HAS_UDEV_PATH		0x04
-#define IBDF_HAS_MAJOR			0x08
-#define IBDF_HAS_MINOR			0x10
-#define IBDF_HAS_FORCE			0x20
+#define IBDF_HAS_UDEV_PATH		0x01
+#define IBDF_HAS_MAJOR			0x02
+#define IBDF_HAS_MINOR			0x04
+#define IBDF_HAS_FORCE			0x08
 
 typedef struct iblock_dev_s {
-	unsigned char ibd_lvm_uuid[SE_LVM_UUID_LEN];
 	unsigned char ibd_udev_path[SE_UDEV_PATH_LEN];
 	int	ibd_force;
 	int	ibd_major;
 	int	ibd_minor;
 	u32	ibd_depth;
 	u32	ibd_flags;
-	u32	ibd_uu_id[4];
 	struct bio_set	*ibd_bio_set;
 	struct block_device *ibd_bd;
 	struct iblock_hba_s *ibd_host;
