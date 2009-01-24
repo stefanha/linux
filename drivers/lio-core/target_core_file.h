@@ -111,14 +111,10 @@ typedef struct fd_dev_sg_table_s {
 	struct scatterlist *sg_table;
 } ____cacheline_aligned fd_dev_sg_table_t;
 
-#define FBDF_HAS_MD_UUID	0x01
-#define FBDF_HAS_LVM_UUID	0x02
-#define FBDF_HAS_PATH		0x04
-#define FBDF_HAS_SIZE		0x08
+#define FBDF_HAS_PATH		0x01
+#define FBDF_HAS_SIZE		0x02
 
 typedef struct fd_dev_s {
-	unsigned char	fbd_lvm_uuid[SE_LVM_UUID_LEN];
-	u32		fbd_uu_id[4];
 	u32		fbd_flags;
 	unsigned char	fd_dev_name[FD_MAX_DEV_NAME];
 	int		fd_claim_bd;
