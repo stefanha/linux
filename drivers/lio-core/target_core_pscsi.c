@@ -617,6 +617,7 @@ extern int pscsi_transport_complete (se_task_t *task)
 		unsigned char *dst = (unsigned char *)
 				T_TASK(task->task_se_cmd)->t_task_buf;
 		unsigned char buf[EVPD_BUF_LEN], *iqn = NULL;
+		se_subsystem_dev_t *su_dev = TASK_DEV(task)->se_sub_dev;
 		se_hba_t *hba = task->se_dev->se_hba;
 
 		/*
@@ -628,9 +629,12 @@ extern int pscsi_transport_complete (se_task_t *task)
 		}
 			
 		/*
-		 * Assume the HBA did the right thing..
+		 * Assume the SCSI Device did the right thing if an EVPD length
+		 * is provided in the INQUIRY response payload.
 		 */
 		if (dst[3] != 0x00) {
+			su_dev->su_dev_flags |= SDF_FIRMWARE_EVPD_UNIT_SERIAL;
+			su_dev->su_dev_flags &= ~SDF_EMULATED_EVPD_UNIT_SERIAL;
 			task->task_scsi_status = GOOD;
 			return(0);
 		}
@@ -649,22 +653,35 @@ extern int pscsi_transport_complete (se_task_t *task)
 			len = 3;
 			break;
 		case 0x80:
-			iqn = transport_get_iqn_sn();
 			buf[1] = 0x80;
-			len += sprintf((unsigned char *)&buf[4], "%s:%u_%u_%u_%u",
-				iqn, hba->hba_id, sd->channel, sd->id, sd->lun);
+			if (su_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL)
+				len += sprintf((unsigned char *)&buf[4], "%s",
+					&su_dev->t10_wwn.unit_serial[0]);
+			else {
+				iqn = transport_get_iqn_sn();
+				len += sprintf((unsigned char *)&buf[4],
+					"%s:%u_%u_%u_%u", iqn, hba->hba_id,
+					sd->channel, sd->id, sd->lun);
+			}
 			buf[3] = len;
 			break;
 		case 0x83:
-			iqn = transport_get_iqn_sn();
 			buf[1] = 0x83;
 			/* Start Identifier Page */
 			buf[4] = 0x2; /* ASCII */
 			buf[5] = 0x1; 
 			buf[6] = 0x0;
-			len += sprintf((unsigned char *)&buf[8], "SBEi-INC");
-			len += sprintf((unsigned char *)&buf[16], "PSCSI:%s:%u_%u_%u_%u",
-					iqn, hba->hba_id, sd->channel, sd->id, sd->lun);
+			len += sprintf((unsigned char *)&buf[8], "LIO-ORG");
+
+			if (su_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL)
+				len += sprintf((unsigned char *)&buf[16],
+					"PSCSI:%s", &su_dev->t10_wwn.unit_serial[0]);
+			else {
+				iqn = transport_get_iqn_sn();
+				len += sprintf((unsigned char *)&buf[16],
+					"PSCSI:%s:%u_%u_%u_%u", iqn, hba->hba_id,
+					sd->channel, sd->id, sd->lun);
+			}
 			buf[7] = len; /* Identifer Length */
 			len += 4;
 			buf[3] = len; /* Page Length */
@@ -926,7 +943,6 @@ extern ssize_t pscsi_set_configfs_dev_params (se_hba_t *hba,
 			params++;
 		} else
 			cur = NULL;
-#warning FIXME: Add evpd_unit_serial= and evpd_dev_ident= parameter support for ConfigFS
 	}
 
 out:
