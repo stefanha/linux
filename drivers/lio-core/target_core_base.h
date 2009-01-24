@@ -520,18 +520,18 @@ typedef struct se_lun_acl_s {
 }  ____cacheline_aligned se_lun_acl_t;
 
 typedef struct se_dev_entry_s {
-	__u32			lun_flags;
-	__u32			deve_cmds;
-	__u32			mapped_lun;
-	__u32			average_bytes;
-	__u32			last_byte_count;
-	__u32			total_cmds;
-	__u32			total_bytes;
+	u32			lun_flags;
+	u32			deve_cmds;
+	u32			mapped_lun;
+	u32			average_bytes;
+	u32			last_byte_count;
+	u32			total_cmds;
+	u32			total_bytes;
 #ifdef SNMP_SUPPORT
-	__u64			creation_time;
-	__u32			attach_count;
-	__u64			read_bytes;
-	__u64			write_bytes;
+	u64			creation_time;
+	u32			attach_count;
+	u64			read_bytes;
+	u64			write_bytes;
 #endif /* SNMP_SUPPORT */
 	struct se_lun_s		*se_lun;
 }  ____cacheline_aligned se_dev_entry_t;
@@ -565,23 +565,23 @@ typedef struct se_subsystem_dev_s {
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 
 typedef struct se_device_s {
-	__u8			type;		/* Type of disk transport used for device */
-	__u8			thread_active;	/* Set to 1 if thread is NOT sleeping on thread_sem */
-	__u8			dev_status_timer_flags;
-	__u32			dev_flags;
-	__u32			dev_status;
-	__u32			dev_tcq_window_closed;
-	__u32			queue_depth;	/* Physical device queue depth */
+	u8			type;		/* Type of disk transport used for device */
+	u8			thread_active;	/* Set to 1 if thread is NOT sleeping on thread_sem */
+	u8			dev_status_timer_flags;
+	u32			dev_flags;
+	u32			dev_status;
+	u32			dev_tcq_window_closed;
+	u32			queue_depth;	/* Physical device queue depth */
 	unsigned long long		dev_sectors_total;
 	void 			*dev_ptr; 	/* Pointer to transport specific device structure */
 #ifdef SNMP_SUPPORT
-	__u32			dev_index;
-	__u32			dev_port_count;
-	__u64			creation_time;
-	__u32			num_resets;
-	__u64			num_cmds;
-	__u64			read_bytes;
-	__u64			write_bytes;
+	u32			dev_index;
+	u32			dev_port_count;
+	u64			creation_time;
+	u32			num_resets;
+	u64			num_cmds;
+	u64			read_bytes;
+	u64			write_bytes;
 	spinlock_t		stats_lock;
 #endif /* SNMP_SUPPORT */
 	atomic_t		active_cmds;	/* Active commands on this virtual iSCSI device */
