@@ -20,6 +20,24 @@
 #define PRI_READ_RESERVATION			0x01
 #define PRI_REPORT_CAPABILITIES			0x02
 #define PRI_READ_FULL_STATUS			0x03
+/*
+ * PERSISTENT_RESERVE_ SCOPE field
+ *
+ * spc4r17 section 6.13.3.3 Table 163
+ */
+#define PR_SCOPE_LU_SCOPE			0x00
+/*
+ * PERSISTENT_RESERVE_* TYPE field
+ *
+ * spc4r17 section 6.13.3.4 Table 164
+ */
+#define PR_TYPE_WRITE_EXCLUSIVE			0x01
+#define PR_TYPE_EXCLUSIVE_ACCESS		0x03
+#define PR_TYPE_WRITE_EXCLUSIVE_REGONLY		0x05
+#define PR_TYPE_EXCLUSIVE_ACCESS_REGONLY	0x06
+#define PR_TYPE_WRITE_EXCLUSIVE_ALLREG		0x07
+#define PR_TYPE_EXCLUSIVE_ACCESS_ALLREG		0x08
 
+extern void core_scsi3_free_all_registrations (struct se_device_s *);
 extern int core_scsi3_emulate_pr (struct se_cmd_s *);
 extern int core_setup_reservations (struct se_device_s *);

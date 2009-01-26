@@ -50,6 +50,7 @@
 #include <iscsi_target_error.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
+#include <target_core_pr.h>
 #include <target_core_tpg.h>
 #include <target_core_transport.h>
 #include <target_core_fabric_ops.h>
@@ -565,9 +566,6 @@ done:
 	buf[2] = ((lun_count >> 8) & 0xff);
 	buf[3] = (lun_count & 0xff);
 
-	se_task->task_scsi_status = GOOD;
-	transport_complete_task(se_task, 1);
-
 	return(PYX_TRANSPORT_SENT_TO_TRANSPORT);
 }
 
@@ -593,6 +591,7 @@ extern void se_release_device_for_hba (se_device_t *dev)
 	hba->dev_count--;
 	spin_unlock(&hba->device_lock);
 
+	core_scsi3_free_all_registrations(dev);
 	se_release_evpd_for_dev(dev);
 		
 	kfree(dev->dev_status_queue_obj);
