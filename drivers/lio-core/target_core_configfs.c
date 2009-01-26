@@ -855,7 +855,7 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_all_tgt_pts (
 		return(-ENODEV);
 
 	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS) {
-		return(sprintf(page, "res_pr_generation only valid for"
+		return(sprintf(page, "res_pr_all_tgt_pts only valid for"
 			" SPC3_PERSISTENT_RESERVATIONS\n"));
 	}
 
