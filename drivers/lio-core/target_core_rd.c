@@ -1347,12 +1347,12 @@ extern u32 rd_get_blocksize (se_device_t *dev)
 
 extern u32 rd_get_device_rev (se_device_t *dev)
 {
-	return(02);
+	return(SCSI_2);
 }
 
 extern u32 rd_get_device_type (se_device_t *dev)
 {
-	return(0); /* TYPE_DISK */
+	return(TYPE_DISK);
 }
 
 /*	rd_get_dma_length(): (Part of se_subsystem_api_t template)
