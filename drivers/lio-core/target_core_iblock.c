@@ -837,12 +837,12 @@ extern u32 iblock_get_blocksize (se_device_t *dev)
 
 extern u32 iblock_get_device_rev (se_device_t *dev)
 {
-	return(02);
+	return(SCSI_3);
 }
 
 extern u32 iblock_get_device_type (se_device_t *dev)
 {
-	return(0); /* TYPE_DISK */
+	return(TYPE_DISK);
 }
 
 extern u32 iblock_get_dma_length (u32 task_size, se_device_t *dev)
