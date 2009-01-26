@@ -46,10 +46,12 @@
 #define PYX_TRANSPORT_REQ_TOO_MANY_SECTORS	-3
 #define PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES	-4
 #define PYX_TRANSPORT_INVALID_CDB_FIELD		-5
-#define PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE -6
-#define PYX_TRANSPORT_UNKNOWN_MODE_PAGE		-7
-#define PYX_TRANSPORT_WRITE_PROTECTED		-8
-#define PYX_TRANSPORT_TASK_TIMEOUT		-9
+#define PYX_TRANSPORT_INVALID_PARAMETER_LIST	-6
+#define PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE -7
+#define PYX_TRANSPORT_UNKNOWN_MODE_PAGE		-8
+#define PYX_TRANSPORT_WRITE_PROTECTED		-9
+#define PYX_TRANSPORT_TASK_TIMEOUT		-10
+#define PYX_TRANSPORT_RESERVATION_CONFLICT	-11
 
 #ifndef SAM_STAT_RESERVATION_CONFLICT
 #define SAM_STAT_RESERVATION_CONFLICT		0x18
@@ -89,6 +91,8 @@
 #define DF_PERSISTENT_CLAIMED_BLOCKDEV		0x00000020
 #define DF_DISABLE_STATUS_THREAD		0x00000040
 #define DF_READ_ONLY				0x00000080
+#define DF_SPC3_PERSISTENT_RESERVE		0x00000100
+#define DF_SPC2_RESERVATIONS			0x00000200
 
 /* se_dev_attrib_t sanity values */
 #define DA_TASK_TIMEOUT_MAX			600 /* 10 Minutes, see transport_get_default_task_timeout()  */
@@ -189,7 +193,7 @@ extern void transport_release_fe_cmd (se_cmd_t *);
 extern int transport_generic_remove (se_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks (se_cmd_t *, se_lun_t *);
 extern void transport_clear_lun_from_sessions (se_lun_t *);
-extern int iscsi_send_check_condition_and_sense (se_cmd_t *, __u8, int);
+extern int transport_send_check_condition_and_sense (se_cmd_t *, __u8, int);
 extern void transport_release_cmd_to_pool (se_cmd_t *);
 extern void transport_generic_free_cmd (se_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds (se_cmd_t *, int);

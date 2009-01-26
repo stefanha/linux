@@ -206,6 +206,7 @@ se_global_t *se_global;
 struct kmem_cache *se_cmd_cache = NULL;
 struct kmem_cache *se_task_cache = NULL;
 struct kmem_cache *se_sess_cache = NULL;
+struct kmem_cache *t10_pr_reg_cache = NULL;
 
 EXPORT_SYMBOL(se_global);
 static int transport_generic_write_pending (se_cmd_t *);
@@ -271,7 +272,12 @@ extern int init_se_global (void)
 		printk(KERN_ERR "kmem_cache_create() for se_session_t failed\n");
 		goto out;
 	}
-
+	if (!(t10_pr_reg_cache = kmem_cache_create("t10_pr_reg_cache",
+			sizeof(t10_pr_registration_t), __alignof__(t10_pr_registration_t),
+			0, NULL))) {
+		printk(KERN_ERR "kmem_cache_create() for t10_pr_registration_t failed\n");
+		goto out;
+	}
         if (!(global->hba_list = kzalloc((sizeof(se_hba_t) *
 				TRANSPORT_MAX_GLOBAL_HBAS), GFP_KERNEL))) {
                 TRACE_ERROR("Unable to allocate global->hba_list\n");
@@ -309,6 +315,8 @@ out:
 		kmem_cache_destroy(se_task_cache);
 	if (se_sess_cache)
 		kmem_cache_destroy(se_sess_cache);
+	if (t10_pr_reg_cache)
+		kmem_cache_destroy(t10_pr_reg_cache);
 	kfree(global);
         return(-1);
 }
@@ -325,6 +333,7 @@ extern void release_se_global (void)
 	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_task_cache);
 	kmem_cache_destroy(se_sess_cache);
+	kmem_cache_destroy(t10_pr_reg_cache);
 	kfree(global);
 
 	se_global = NULL;
@@ -2946,6 +2955,9 @@ extern void transport_generic_request_failure (se_cmd_t *cmd, se_device_t *dev, 
 	case PYX_TRANSPORT_INVALID_CDB_FIELD:
 		cmd->scsi_sense_reason = INVALID_CDB_FIELD;
 		break;
+	case PYX_TRANSPORT_INVALID_PARAMETER_LIST:
+		cmd->scsi_sense_reason = INVALID_PARAMETER_LIST;
+		break;
 	case PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES:
 		if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)) {
 			if (!sc)
@@ -2970,6 +2982,18 @@ extern void transport_generic_request_failure (se_cmd_t *cmd, se_device_t *dev, 
 	case PYX_TRANSPORT_WRITE_PROTECTED:
 		cmd->scsi_sense_reason = WRITE_PROTECTED;
 		break;
+	case PYX_TRANSPORT_RESERVATION_CONFLICT:
+		/*
+		 * No SENSE Data payload for this case, set SCSI Status
+		 * and queue the response to $FABRIC_MOD.  
+		 *
+		 * Uses linux/include/scsi/scsi.h SAM status codes defs
+		 */
+		cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
+		if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
+			CMD_TFO(cmd)->queue_status(cmd);
+
+		goto check_stop;
 	default:
 		TRACE_ERROR("Unknown transport error for CDB 0x%02x: %d\n",
 			T_TASK(cmd)->t_task_cdb[0], cmd->transport_error_status);
@@ -2980,8 +3004,8 @@ extern void transport_generic_request_failure (se_cmd_t *cmd, se_device_t *dev, 
 	if (!sc)
 		transport_new_cmd_failure(cmd);
 	else
-		iscsi_send_check_condition_and_sense(cmd, cmd->scsi_sense_reason, 0);
-	
+		transport_send_check_condition_and_sense(cmd,
+			cmd->scsi_sense_reason, 0);
 check_stop:
 	transport_lun_remove_cmd(cmd);
 	if (!(transport_cmd_check_stop(cmd, 2, 0)))
@@ -3828,7 +3852,15 @@ check_depth:
 			atomic_set(&cmd->transport_sent, 0);
 			transport_stop_tasks_for_cmd(cmd);
 			transport_generic_request_failure(cmd, dev, 0, 1);
+			goto check_depth;
 		}
+		/*
+		 * Handle the successful completion for transport_emulate_cdb()
+		 * usage.
+		 */
+		cmd->scsi_status = SAM_STAT_GOOD;
+		task->task_scsi_status = GOOD;
+		transport_complete_task(task, 1);
 	} else {
 		if ((error = TRANSPORT(dev)->do_task(task)) != 0) {
 			cmd->transport_error_status = error;
@@ -4004,7 +4036,7 @@ extern int transport_generic_emulate_inquiry (
 	if (!(cdb[1] & 0x1)) {
 		if (type == TYPE_TAPE)
 			buf[1] = 0x80;
-		buf[2]          = 0x02;
+		buf[2]          = TRANSPORT(dev)->get_device_rev(dev);
 		buf[4]          = 31;
 		buf[7]		= 0x32; /* Sync=1 and CmdQue=1 */
 		
@@ -4506,9 +4538,9 @@ static int transport_generic_cmd_sequencer (
 			(T10_RES(su_dev)->res_type == SPC3_PERSISTENT_RESERVATIONS) ?
 			&core_scsi3_emulate_pr : NULL;
 		size = (cdb[7] << 8) + cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 1;
+		ret = 2;
 		break;
 	case READ_DVD_STRUCTURE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -5147,7 +5179,7 @@ extern void transport_generic_complete_ok (se_cmd_t *cmd)
 		 * a non GOOD status.
 		 */
 		if (cmd->scsi_status) {
-			iscsi_send_check_condition_and_sense(cmd, reason, 1);
+			transport_send_check_condition_and_sense(cmd, reason, 1);
 			transport_lun_remove_cmd(cmd);
 			transport_cmd_check_stop(cmd, 2, 0);
 			return;
@@ -6445,7 +6477,7 @@ extern void transport_clear_lun_from_sessions (se_lun_t *lun)
                  * Initiator Node.  Return this SCSI CDB back with an CHECK_CONDITION
                  * status.
                  */
-                iscsi_send_check_condition_and_sense(cmd, NON_EXISTENT_LUN, 0);
+                transport_send_check_condition_and_sense(cmd, NON_EXISTENT_LUN, 0);
 
                 /*
                  * If the iSCSI frontend is waiting for this iscsi_cmd_t to be released,
@@ -6556,7 +6588,7 @@ remove:
 	return;
 }
 
-extern int iscsi_send_check_condition_and_sense (se_cmd_t *cmd, u8 reason, int from_transport)
+extern int transport_send_check_condition_and_sense (se_cmd_t *cmd, u8 reason, int from_transport)
 {
 	unsigned char *buffer = NULL;
 	unsigned long flags;
@@ -6620,6 +6652,11 @@ extern int iscsi_send_check_condition_and_sense (se_cmd_t *cmd, u8 reason, int f
                 buffer[4] = 0x0b; /* ABORTED COMMAND */
                 buffer[14] = 0x24; /* INVALID FIELD IN CDB */
                 break;
+	case INVALID_PARAMETER_LIST:
+		buffer[2] = 0x70; /* CURRENT ERROR */
+		buffer[4] = 0x0b; /* ABORTED COMMAND */
+		buffer[14] = 0x26; /* INVALID FIELD IN PARAMETER LIST */
+		break;
         case UNEXPECTED_UNSOLICITED_DATA:
                 buffer[2] = 0x70; /* CURRENT ERROR */
                 buffer[4] = 0x0b; /* ABORTED COMMAND */
@@ -6650,12 +6687,13 @@ extern int iscsi_send_check_condition_and_sense (se_cmd_t *cmd, u8 reason, int f
                 buffer[14] = 0x80; /* LOGICAL UNIT COMMUNICATION FAILURE */
                 break;
         }
-
 	/*
-	 * LINUX defines CHECK_CONDITION as 0x01, but follow SPC-3 anyways.
+	 * This code uses linux/include/scsi/scsi.h SAM status codes!
 	 */
-        cmd->scsi_status        = 0x02; /* CHECK CONDITION */
-        cmd->scsi_sense_length  = TRANSPORT_SENSE_SEGMENT_LENGTH; /* Automatically padded */
+	cmd->scsi_status = SAM_STAT_CHECK_CONDITION;
+
+	/* Automatically padded */
+	cmd->scsi_sense_length  = TRANSPORT_SENSE_SEGMENT_LENGTH;
 
 after_reason:
         if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
@@ -6664,7 +6702,7 @@ after_reason:
 	return(0);
 }
 
-EXPORT_SYMBOL(iscsi_send_check_condition_and_sense);
+EXPORT_SYMBOL(transport_send_check_condition_and_sense);
 
 /*	transport_generic_lun_reset():
  *
@@ -7159,7 +7197,7 @@ fail_cmd:
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 		if (!remove)
-			iscsi_send_check_condition_and_sense(cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+			transport_send_check_condition_and_sense(cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 
 		transport_remove_cmd_from_queue(cmd,
 			CMD_ORIG_OBJ_API(cmd)->get_queue_obj(cmd->se_orig_obj_ptr));
@@ -7403,7 +7441,7 @@ static void transport_processing_shutdown (se_device_t *dev)
 
 			if (atomic_read(&T_TASK(cmd)->t_fe_count)) {
 				spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-				iscsi_send_check_condition_and_sense(cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+				transport_send_check_condition_and_sense(cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 				transport_remove_cmd_from_queue(cmd,
 						CMD_ORIG_OBJ_API(cmd)->get_queue_obj(cmd->se_orig_obj_ptr));
 
@@ -7431,7 +7469,7 @@ static void transport_processing_shutdown (se_device_t *dev)
 
 		if (atomic_read(&T_TASK(cmd)->t_fe_count)) {
 			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);	
-			iscsi_send_check_condition_and_sense(cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+			transport_send_check_condition_and_sense(cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 			transport_remove_cmd_from_queue(cmd,
 					CMD_ORIG_OBJ_API(cmd)->get_queue_obj(cmd->se_orig_obj_ptr));
 
@@ -7468,7 +7506,8 @@ static void transport_processing_shutdown (se_device_t *dev)
 		DEBUG_DO("From Device Queue: cmd: %p t_state: %d\n", cmd, state);
 		
 		if (atomic_read(&T_TASK(cmd)->t_fe_count)) {
-			iscsi_send_check_condition_and_sense(cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+			transport_send_check_condition_and_sense(cmd,
+				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 
 			transport_lun_remove_cmd(cmd);
 			if (!(transport_cmd_check_stop(cmd, 1, 0)))
