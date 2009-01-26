@@ -1922,7 +1922,7 @@ static inline int iscsi_handle_data_out (iscsi_conn_t *conn, unsigned char *buf)
 		if (SESS_OPS_C(conn)->InitialR2T) {
 			TRACE_ERROR("Received unexpected unsolicited data"
 				" while InitialR2T=Yes, protocol error.\n");
-			iscsi_send_check_condition_and_sense(SE_CMD(cmd),
+			transport_send_check_condition_and_sense(SE_CMD(cmd),
 					UNEXPECTED_UNSOLICITED_DATA, 0);
 			return(-1);
 		}

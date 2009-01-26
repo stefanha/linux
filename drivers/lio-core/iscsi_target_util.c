@@ -627,7 +627,7 @@ extern int iscsi_check_unsolicited_dataout (iscsi_cmd_t *cmd, unsigned char *buf
 	if (SESS_OPS_C(conn)->InitialR2T) {
 		TRACE_ERROR("Received unexpected unsolicited data"
 			" while InitialR2T=Yes, protocol error.\n");
-		iscsi_send_check_condition_and_sense(se_cmd,
+		transport_send_check_condition_and_sense(se_cmd,
 				UNEXPECTED_UNSOLICITED_DATA, 0);
 		return(-1);
 	}
@@ -638,7 +638,7 @@ extern int iscsi_check_unsolicited_dataout (iscsi_cmd_t *cmd, unsigned char *buf
 			" for this Unsolicited DataOut Burst.\n",
 			(cmd->first_burst_len + hdr->length),
 				SESS_OPS_C(conn)->FirstBurstLength);
-		iscsi_send_check_condition_and_sense(se_cmd,
+		transport_send_check_condition_and_sense(se_cmd,
 				INCORRECT_AMOUNT_OF_DATA, 0);
 		return(-1);
 	}
@@ -654,7 +654,7 @@ extern int iscsi_check_unsolicited_dataout (iscsi_cmd_t *cmd, unsigned char *buf
 			" not equal ExpXferLen %u.\n",
 			(cmd->first_burst_len + hdr->length),
 			SESS_OPS_C(conn)->FirstBurstLength, cmd->data_length);
-		iscsi_send_check_condition_and_sense(se_cmd,
+		transport_send_check_condition_and_sense(se_cmd,
 				INCORRECT_AMOUNT_OF_DATA, 0);
 		return(-1);
 	}

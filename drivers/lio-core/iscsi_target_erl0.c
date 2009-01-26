@@ -62,7 +62,7 @@ extern int iscsi_close_session (iscsi_session_t *);
 extern int iscsi_close_connection (iscsi_conn_t *);
 
 /* From target_core_mod */
-extern int iscsi_send_check_condition_and_sense (iscsi_cmd_t *, __u8, int);
+extern int transport_send_check_condition_and_sense (iscsi_cmd_t *, __u8, int);
 
 
 /*	iscsi_set_dataout_sequence_values():
@@ -211,7 +211,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence (
 		TRACE_ERROR("Total %u bytes exceeds FirstBurstLength: %u"
 			" for this Unsolicited DataOut Burst.\n",
 			first_burst_len, SESS_OPS_C(conn)->FirstBurstLength);
-		iscsi_send_check_condition_and_sense(cmd,
+		transport_send_check_condition_and_sense(cmd,
 				INCORRECT_AMOUNT_OF_DATA, 0);
 		return(DATAOUT_CANNOT_RECOVER);
 	}
@@ -236,7 +236,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence (
 				" equal ExpXferLen %u.\n", first_burst_len,
 				SESS_OPS_C(conn)->FirstBurstLength,
 				cmd->data_length);
-			iscsi_send_check_condition_and_sense(cmd,
+			transport_send_check_condition_and_sense(cmd,
 					INCORRECT_AMOUNT_OF_DATA, 0);
 			return(DATAOUT_CANNOT_RECOVER);
 		}

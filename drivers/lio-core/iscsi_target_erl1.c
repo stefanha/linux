@@ -1022,7 +1022,7 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 			}
 			spin_unlock_bh(&cmd->istate_lock);
 
-			return(iscsi_send_check_condition_and_sense(se_cmd,
+			return(transport_send_check_condition_and_sense(se_cmd,
 					se_cmd->scsi_sense_reason, 0));	
 		}
 		
