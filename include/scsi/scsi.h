@@ -104,7 +104,6 @@
 #define PERSISTENT_RESERVE_IN 0x5e
 #define PERSISTENT_RESERVE_OUT 0x5f
 #define VARIABLE_LENGTH_CMD   0x7f
-#define RECEIVE_CREDENTIAL    0x7f // spc4r17 section 6.9 Table 204
 #define REPORT_LUNS           0xa0
 #define SECURITY_PROTOCOL_IN  0xa2
 #define MAINTENANCE_IN        0xa3
@@ -134,6 +133,9 @@
 #define SERVICE_ACTION_IN     0x9e
 /* values for service action in */
 #define	SAI_READ_CAPACITY_16  0x10
+/* values for VARIABLE_LENGTH_CMD service action codes
+ * see spc4r17 Section D.3.5, table D.7 and D.8 */
+#define VLC_SA_RECEIVE_CREDENTIAL 0x1800
 /* values for maintenance in */
 #define MI_REPORT_IDENTIFYING_INFORMATION 0x05
 #define MI_REPORT_TARGET_PGS  0x0a
