@@ -787,8 +787,51 @@ static int core_scsi3_pri_read_reservation (se_cmd_t *cmd)
 	return(0);
 }
 
+/*
+ * PERSISTENT_RESERVE_IN Service Action REPORT_CAPABILITIES
+ *
+ * See spc4r17 section 6.13.4 Table 165
+ */
 static int core_scsi3_pri_report_capabilities (se_cmd_t *cmd)
 {
+	se_device_t *se_dev = SE_DEV(cmd);
+	se_subsystem_dev_t *su_dev = SU_DEV(se_dev);
+	t10_pr_registration_t *pr_reg;
+	unsigned char *buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
+	u16 add_len = 8; /* Hardcoded to 8. */
+
+	buf[0] = ((add_len << 8) & 0xff);
+	buf[1] = (add_len & 0xff);
+	/*
+	 * FIXME: Leave these features disabled for now..
+	 */
+//	buf[2] |= 0x10; /* CRH: Compatible Reservation Hanlding bit. */
+//	buf[2] |= 0x08; /* SIP_C: Specify Initiator Ports Capable bit */
+//	buf[2] |= 0x04; /* ATP_C: All Target Ports Capable bit */ 
+//	buf[2] |= 0x01; /* PTPL_C: Persistence across Target Power Loss Capable bit */
+	/*
+	 * We are filling in the PERSISTENT RESERVATION TYPE MASK below, so
+	 * set the TMV: Task Mask Valid bit.
+	 */
+	buf[3] |= 0x80; 
+	/*
+	 * Change ALLOW COMMANDs to 0x20 or 0x40 later from Table 166
+	 */
+	buf[3] |= 0x10; /* ALLOW COMMANDs field 001b */
+	/*
+	 * PTPL_A: Persistence across Target Power Loss Active bit
+	 */
+//	buf[3] |= 0x01;
+	/*
+	 * Setup the PERSISTENT RESERVATION TYPE MASK from Table 167
+	 */
+//	buf[4] |= 0x80; /* PR_TYPE_EXCLUSIVE_ACCESS_ALLREG */
+//	buf[4] |= 0x40; /* PR_TYPE_EXCLUSIVE_ACCESS_REGONLY */
+//	buf[4] |= 0x20; /* PR_TYPE_WRITE_EXCLUSIVE_REGONLY */
+	buf[4] |= 0x08; /* PR_TYPE_EXCLUSIVE_ACCESS */
+	buf[4] |= 0x02; /* PR_TYPE_WRITE_EXCLUSIVE */
+//	buf[5] |= 0x01; /* PR_TYPE_EXCLUSIVE_ACCESS_ALLREG */
+
 	return(0);
 }
 
@@ -804,9 +847,9 @@ static int core_scsi3_emulate_pr_in (se_cmd_t *cmd, unsigned char *cdb)
 		return(core_scsi3_pri_read_keys(cmd));
 	case PRI_READ_RESERVATION:
 		return(core_scsi3_pri_read_reservation(cmd));
-#if 0
 	case PRI_REPORT_CAPABILITIES:
 		return(core_scsi3_pri_report_capabilities(cmd));
+#if 0
 	case PRI_READ_FULL_STATUS:
 		return(core_scsi3_pri_read_full_status(cmd));
 #endif
