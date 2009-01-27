@@ -61,65 +61,6 @@
 #define INQUIRY_EVPD_SERIAL_LEN			254
 #define INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN	254
 
-/* used by PSCSI and iBlock Transport drivers */
-#ifndef GET_CONFIGURATION
-#define		GET_CONFIGURATION		0x46
-#endif
-#ifndef LOAD_UNLOAD_MEDIUM
-#define		LOAD_UNLOAD_MEDIUM		0xa6
-#endif
-#ifndef REPORT_LUNS
-#define         REPORT_LUNS     		0xa0
-#endif
-#ifndef READ_16
-#define         READ_16         		0x88
-#endif
-#ifndef WRITE_16
-#define         WRITE_16        		0x8a
-#endif
-#ifndef READ_CD
-#define		READ_CD				0xbe
-#endif
-#ifndef READ_DISK_INFORMATION
-#define		READ_DISK_INFORMATION		0x51
-#endif
-#ifndef READ_DVD_STRUCTURE
-#define		READ_DVD_STRUCTURE		0xad
-#endif
-#ifndef REPORT_KEY
-#define		REPORT_KEY			0xa4
-#endif
-#ifndef SEND_KEY
-#define		SEND_KEY			0xa3
-#endif
-#ifndef READ_TRACK_RZONE_INFO
-#define		READ_TRACK_RZONE_INFO		0x52
-#endif
-#ifndef SET_SPEED
-#define		SET_SPEED			0xbb
-#endif
-#ifndef CLOSE_TRACK
-#define		CLOSE_TRACK			0x5b
-#endif
-#ifndef READ_BUFFER_CAPACITY
-#define		READ_BUFFER_CAPACITY		0x5c
-#endif
-#ifndef SEND_OPC_INFORMATION
-#define		SEND_OPC_INFORMATION		0x54
-#endif
-#ifndef SERVICE_ACTION_IN
-#define		SERVICE_ACTION_IN		0x9e
-#endif
-#ifndef SAI_READ_CAPACITY_16
-#define		SAI_READ_CAPACITY_16		0x10
-#endif
-#ifndef INITIALIZE_ELEMENT_STATUS
-#define		INITIALIZE_ELEMENT_STATUS	0x07
-#endif
-#ifndef VERIFY_16
-#define		VERIFY_16			0x8f
-#endif
-
 /* se_cmd_t->data_direction */
 #define SE_DIRECTION_NONE			0
 #define SE_DIRECTION_READ			1

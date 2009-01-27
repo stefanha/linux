@@ -39,6 +39,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/in.h>
+#include <linux/cdrom.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 //#include <asm/div64.h>
@@ -4476,7 +4477,7 @@ static int transport_generic_cmd_sequencer (
 			// MAINTENANCE_IN from SCC-2
 			size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		} else {
-			// SEND_KEY from multi media commands
+			// GPCMD_SEND_KEY from multi media commands
 			size = (cdb[8] << 8) + cdb[9];
 		}
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
@@ -4505,8 +4506,8 @@ static int transport_generic_cmd_sequencer (
 		ret = 2;
 		break;
 	case MODE_SENSE_10:
-	case READ_BUFFER_CAPACITY:
-	case SEND_OPC_INFORMATION:
+	case GPCMD_READ_BUFFER_CAPACITY:
+	case GPCMD_SEND_OPC:
 	case LOG_SELECT:
 	case LOG_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -4522,9 +4523,10 @@ static int transport_generic_cmd_sequencer (
 		transport_get_maps(cmd);
 		ret = 2;
 		break;
-	case GET_CONFIGURATION:
-	case READ_DISK_INFORMATION:
-	case READ_TRACK_RZONE_INFO:
+	case GPCMD_GET_CONFIGURATION:
+	case GPCMD_READ_FORMAT_CAPACITIES:
+	case GPCMD_READ_DISC_INFO:
+	case GPCMD_READ_TRACK_RZONE_INFO:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
@@ -4542,7 +4544,8 @@ static int transport_generic_cmd_sequencer (
 		transport_get_maps(cmd);
 		ret = 2;
 		break;
-	case READ_DVD_STRUCTURE:
+	case GPCMD_MECHANISM_STATUS:
+	case GPCMD_READ_DVD_STRUCTURE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[8] << 8) + cdb[9];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
@@ -4562,7 +4565,7 @@ static int transport_generic_cmd_sequencer (
 			// MAINTENANCE_OUT from SCC-2
 			size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		} else  {
-			// REPORT_KEY from multi media commands
+			// GPCMD_REPORT_KEY from multi media commands
 			size = (cdb[8] << 8) + cdb[9];
 		}
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
@@ -4627,9 +4630,9 @@ static int transport_generic_cmd_sequencer (
 		transport_get_maps(cmd);
 		ret = 2;
 		break;
-//#warning FIXME: Figure out correct READ_CD blocksize.
+//#warning FIXME: Figure out correct GPCMD_READ_CD blocksize.
 #if 0
-	case READ_CD:
+	case GPCMD_READ_CD:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		size = (2336 * sectors);
@@ -4708,13 +4711,13 @@ static int transport_generic_cmd_sequencer (
 		ret = 3;
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
-	case CLOSE_TRACK:
+	case GPCMD_CLOSE_TRACK:
 	case ERASE:
 	case INITIALIZE_ELEMENT_STATUS:
-	case LOAD_UNLOAD_MEDIUM:
+	case GPCMD_LOAD_UNLOAD:
 	case REZERO_UNIT:
 	case SEEK_10:
-	case SET_SPEED:
+	case GPCMD_SET_SPEED:
 	case SPACE:
 	case START_STOP:
 	case SYNCHRONIZE_CACHE:
