@@ -495,7 +495,6 @@ static int rd_emulate_scsi_cdb (se_task_t *task)
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case ERASE:
-	case LOAD_UNLOAD_MEDIUM:
 	case REZERO_UNIT:
 	case SEEK_10:
 	case SPACE:
