@@ -40,6 +40,7 @@
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
 #include <target_core_transport.h>
+#include <target_core_pr.h>
 
 #ifdef SNMP_SUPPORT
 #include <linux/proc_fs.h>
@@ -786,7 +787,21 @@ static ssize_t target_core_dev_pr_show_spc3_res (
 	char *page,
 	ssize_t *len)
 {
-	*len += sprintf(page+*len, "Not Implemented yet\n");
+	se_node_acl_t *se_nacl;
+	t10_pr_registration_t *pr_reg;
+
+	spin_lock(&dev->dev_reservation_lock);
+	if (!(pr_reg = dev->dev_pr_res_holder)) {
+		*len += sprintf(page+*len, "No SPC-3 Reservation holder\n");
+		spin_unlock(&dev->dev_reservation_lock);
+		return(*len);	
+	}
+	se_nacl = pr_reg->pr_reg_nacl;
+	*len += sprintf(page+*len, "SPC-3 Reservation FABRIC[%s]: Initiator: %s\n",
+		TPG_TFO(se_nacl->se_tpg)->get_fabric_name(),
+		se_nacl->initiatorname);
+	spin_unlock(&dev->dev_reservation_lock);
+
 	return(*len);
 }
 
@@ -799,11 +814,11 @@ static ssize_t target_core_dev_pr_show_spc2_res (
 
 	spin_lock(&dev->dev_reservation_lock);
 	if (!(se_nacl = dev->dev_reserved_node_acl)) {
-		*len += sprintf(page+*len, "None\n");
+		*len += sprintf(page+*len, "No SPC-2 Reservation holder\n");
 		spin_unlock(&dev->dev_reservation_lock);
 		return(*len);
 	}
-	*len += sprintf(page+*len, "FABRIC[%s]: Initiator: %s\n",
+	*len += sprintf(page+*len, "SPC-2 Reservation FABRIC[%s]: Initiator: %s\n",
 		TPG_TFO(se_nacl->se_tpg)->get_fabric_name(),
 		se_nacl->initiatorname);
 	spin_unlock(&dev->dev_reservation_lock);
@@ -849,17 +864,50 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_all_tgt_pts (
 	struct se_subsystem_dev_s *su_dev,
 	char *page)
 {
+	se_device_t *dev;
+	se_node_acl_t *se_nacl;
+	se_portal_group_t *se_tpg;
+	t10_pr_registration_t *pr_reg;
 	ssize_t len = 0;
 
-	if (!(su_dev->se_dev_ptr))
+	if (!(dev = su_dev->se_dev_ptr))
 		return(-ENODEV);
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS) {
-		return(sprintf(page, "res_pr_all_tgt_pts only valid for"
-			" SPC3_PERSISTENT_RESERVATIONS\n"));
-	}
+	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS) 
+		return(len);
 
-	len = sprintf(page, "Not Implemented yet\n");
+	spin_lock(&dev->dev_reservation_lock);
+        if (!(pr_reg = dev->dev_pr_res_holder)) {
+		len = sprintf(page, "No SPC-3 Reservation holder\n");
+		spin_unlock(&dev->dev_reservation_lock);
+		return(len);
+	}
+	/*
+	 * See All Target Ports (ALL_TG_PT) bit in spcr17, section 6.14.3
+	 * Basic PERSISTENT RESERVER OUT parameter list, page 290
+	 */
+	if (pr_reg->pr_reg_all_tg_pt)
+		len = sprintf(page, "SPC-3 Reservation holder: All Target"
+			" Ports reserved\n");
+	else {
+		se_lun_t *lun = dev->dev_pr_tg_port_res_lun;
+		struct target_core_fabric_ops *tfo;
+
+		se_nacl = pr_reg->pr_reg_nacl;
+		se_tpg = se_nacl->se_tpg;
+		tfo = TPG_TFO(se_tpg);
+
+		len = sprintf(page, "SPC-3 Reservation holder: Single Target"
+			" Port reserved\n");	
+		len += sprintf(page+len, "SPC-3 Reservation holder: Fabric: "
+			" %s Node Endpoint: %s\n", tfo->get_fabric_name(),
+			tfo->tpg_get_wwn(se_tpg));	
+		len += sprintf(page+len, "SPC-3 Reservation holder: Portal"
+			" Identifer Tag: %hu Logical Unit: %u\n",
+			tfo->tpg_get_tag(se_tpg), lun->unpacked_lun);
+	}
+	spin_unlock(&dev->dev_reservation_lock);
+
 	return(len);
 }
 
@@ -875,10 +923,8 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_generation (
 	if (!(su_dev->se_dev_ptr))
 		return(-ENODEV);
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS) {
-		return(sprintf(page, "res_pr_generation only valid for"
-			" SPC3_PERSISTENT_RESERVATIONS\n"));
-	}
+	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+		return(0);
 
 	return(sprintf(page, "0x%08x\n", T10_RES(su_dev)->pr_generation));
 }
@@ -896,15 +942,16 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts (
 	t10_pr_registration_t *pr_reg;
 	unsigned char buf[384];
 	ssize_t len = 0;
+	int reg_count = 0;
 
 	if (!(su_dev->se_dev_ptr))
 		return(-ENODEV);
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS) {
-		len = sprintf(page, "res_pr_registered_i_pts only valid for"
-			" SPC3_PERSISTENT_RESERVATIONS\n");
+	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return(len);
-	}
+
+	len += sprintf(page+len, "SPC-3 PR Registrations:\n");
+
 	spin_lock(&T10_RES(su_dev)->registration_lock);
 	list_for_each_entry(pr_reg, &T10_RES(su_dev)->registration_list,
 			pr_reg_list) {
@@ -920,13 +967,49 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts (
 			break;
 
 		len += sprintf(page+len, "%s", buf);	
+		reg_count++;
 	}
 	spin_unlock(&T10_RES(su_dev)->registration_lock);
+
+	if (!(reg_count))
+		len += sprintf(page+len, "None\n");
 
 	return(len);
 }
 
 SE_DEV_PR_ATTR_RO(res_pr_registered_i_pts);
+
+/*
+ * res_pr_type
+ */
+static ssize_t target_core_dev_pr_show_attr_res_pr_type (
+	struct se_subsystem_dev_s *su_dev,
+	char *page)
+{
+	se_device_t *dev;
+	t10_pr_registration_t *pr_reg;
+	ssize_t len = 0;
+
+	if (!(dev = su_dev->se_dev_ptr))
+		return(-ENODEV);
+
+	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+		return(len);
+
+	spin_lock(&dev->dev_reservation_lock);
+	if (!(pr_reg = dev->dev_pr_res_holder)) {
+		len = sprintf(page, "No SPC-3 Reservation holder\n");
+		spin_unlock(&dev->dev_reservation_lock);
+		return(len);
+	}
+	len = sprintf(page, "SPC-3 Reservation Type: %s\n",
+		core_scsi3_pr_dump_type(pr_reg->pr_res_type));
+	spin_unlock(&dev->dev_reservation_lock);
+
+	return(len);
+}
+
+SE_DEV_PR_ATTR_RO(res_pr_type);
 
 /*
  * res_type
@@ -967,6 +1050,7 @@ static struct configfs_attribute *target_core_dev_pr_attrs[] = {
 	&target_core_dev_pr_res_pr_all_tgt_pts.attr,
 	&target_core_dev_pr_res_pr_generation.attr,
 	&target_core_dev_pr_res_pr_registered_i_pts.attr,
+	&target_core_dev_pr_res_pr_type.attr,
 	&target_core_dev_pr_res_type.attr,
 	NULL,
 };
