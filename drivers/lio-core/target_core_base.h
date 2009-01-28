@@ -231,6 +231,7 @@ typedef struct t10_pr_registration_s {
 	u64 pr_res_key;
 	struct se_node_acl_s *pr_reg_nacl;
 	struct se_dev_entry_s *pr_reg_deve;
+	struct se_lun_s *pr_reg_lun_single_tg_pt; /* Used when pr_reg_all_tg_pt=0 */
 	struct list_head pr_reg_list;
 } t10_pr_registration_t;
 
@@ -570,6 +571,7 @@ typedef struct se_device_s {
 	spinlock_t		se_port_lock;
 	struct se_node_acl_s	*dev_reserved_node_acl; /* Used for legacy SPC-2 reservationsa */
 	struct t10_pr_registration_s *dev_pr_res_holder; /* Used for SPC-3 Persistent Reservations */
+	struct se_lun_s		*dev_pr_tg_port_res_lun; /* Used for PR all_tgt_pt=0 */
 	struct list_head	dev_sep_list;
 	struct timer_list		dev_status_timer;
 	struct task_struct		*process_thread; /* Pointer to descriptor for processing thread */
@@ -640,7 +642,6 @@ typedef struct se_lun_s {
 	se_lun_acl_t		*lun_acl_head;
 	se_lun_acl_t		*lun_acl_tail;
 	se_device_t		*se_dev;
-	struct t10_pr_registration_s *lun_pr_res_holder; /* Used for SPC-3 Persistent Reservations */
 	void			*lun_type_ptr;
 	struct config_group	lun_group;
 	struct se_obj_lun_type_s *lun_obj_api;
