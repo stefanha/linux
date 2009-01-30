@@ -2291,6 +2291,8 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.tpg_get_wwn = &lio_tpg_get_endpoint_wwn;
 	fabric->tf_ops.tpg_get_tag = &lio_tpg_get_tag;
 	fabric->tf_ops.tpg_get_default_depth = &lio_tpg_get_default_depth;
+	fabric->tf_ops.tpg_get_pr_transport_id = &lio_tpg_get_pr_transport_id;
+	fabric->tf_ops.tpg_get_pr_transport_id_len = &lio_tpg_get_pr_transport_id_len;
 	fabric->tf_ops.tpg_check_demo_mode = &lio_tpg_check_demo_mode;
 	fabric->tf_ops.tpg_check_demo_mode_cache = &lio_tpg_check_demo_mode_cache;
 	fabric->tf_ops.tpg_check_demo_mode_write_protect = &lio_tpg_check_demo_mode_write_protect;
