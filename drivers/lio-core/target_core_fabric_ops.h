@@ -1,8 +1,10 @@
 struct target_core_fabric_ops {
 	char *(*get_fabric_name)(void);
 	char *(*tpg_get_wwn)(struct se_portal_group_s *);
-	u32 (*tpg_get_tag)(struct se_portal_group_s *);
+	u16 (*tpg_get_tag)(struct se_portal_group_s *);
 	u32 (*tpg_get_default_depth)(struct se_portal_group_s *);
+	u32 (*tpg_get_pr_transport_id)(struct se_portal_group_s *, struct se_node_acl_s *, int *, unsigned char *);
+	u32 (*tpg_get_pr_transport_id_len)(struct se_portal_group_s *, struct se_node_acl_s *, int *);
 	int (*tpg_check_demo_mode)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_cache)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_write_protect)(struct se_portal_group_s *);

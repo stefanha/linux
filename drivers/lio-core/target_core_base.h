@@ -225,6 +225,7 @@ typedef struct t10_reservation_template_s {
 
 typedef struct t10_pr_registration_s {
 	int pr_reg_all_tg_pt; /* Reservation effects all target ports */
+	int pr_res_holder;
 	int pr_res_type;
 	int pr_res_scope;
 	u32 pr_res_generation;
