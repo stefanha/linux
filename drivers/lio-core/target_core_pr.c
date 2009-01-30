@@ -331,12 +331,7 @@ static t10_pr_registration_t *core_scsi3_alloc_registration (
 	pr_reg->pr_reg_deve = deve;
 	pr_reg->pr_res_key = sa_res_key;
 	pr_reg->pr_reg_all_tg_pt = all_tg_pt;
-	/*
-	 * See All Target Ports (ALL_TG_PT) bit in spcr17, section 6.14.3
-	 * Basic PERSISTENT RESERVER OUT parameter list, page 290
-	 */
-	if (!(pr_reg->pr_reg_all_tg_pt)) 
-		pr_reg->pr_reg_lun_single_tg_pt = deve->se_lun; 
+	pr_reg->pr_reg_tg_pt_lun = deve->se_lun; 
 
 	/*
 	 * Increment PRgeneration counter for se_device_t upon a successful
@@ -371,7 +366,8 @@ static t10_pr_registration_t *core_scsi3_locate_pr_reg (
 	spin_lock(&pr_tmpl->registration_lock);
 	list_for_each_entry_safe(pr_reg, pr_reg_tmp,
 			&pr_tmpl->registration_list, pr_reg_list) {
-		if (pr_reg->pr_reg_nacl == nacl) {
+		if (!(strcmp(pr_reg->pr_reg_nacl->initiatorname,
+				nacl->initiatorname))) {
 			spin_unlock(&pr_tmpl->registration_lock);
 			return(pr_reg);
 		}
@@ -591,6 +587,17 @@ static int core_scsi3_pro_reserve (
 		return(PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE);
 	}
 	/*
+	 * For a given ALL_TG_PT=0 PR registration, a recevied PR reserve must
+	 * be on the same matching se_portal_group_t + se_lun_t.
+	 */
+	if (!(pr_reg->pr_reg_all_tg_pt) &&
+	     (pr_reg->pr_reg_tg_pt_lun != se_lun)) {
+		printk(KERN_ERR "SPC-3 PR: Unable to handle RESERVE because"
+			" ALL_TG_PT=0 and RESERVE was not received on same "
+			" target port as REGISTER\n");
+		return(PYX_TRANSPORT_RESERVATION_CONFLICT);
+	}
+	/*
 	 * From spc4r17 Section 5.7.9: Reserving:
 	 *
 	 * An application client creates a persistent reservation by issuing
@@ -692,13 +699,7 @@ static int core_scsi3_pro_reserve (
 	pr_reg->pr_res_scope = scope;
 	pr_reg->pr_res_type = type;
 	dev->dev_pr_res_holder = pr_reg;
-	/*
-	 * See All Target Ports (ALL_TG_PT) bit in spcr17, section 6.14.3
-	 * Basic PERSISTENT RESERVER OUT parameter list, page 290
-	 */
-	if (!(pr_reg->pr_reg_all_tg_pt)) {
-		dev->dev_pr_tg_port_res_lun = pr_reg->pr_reg_lun_single_tg_pt;
-	}
+
 	printk("SPC-3 PR [%s] Service Action: RESERVE created new reservation"
 		" holder TYPE: %s ALL_TG_PT: %d\n",
 		CMD_TFO(cmd)->get_fabric_name(), core_scsi3_pr_dump_type(type),
@@ -864,13 +865,7 @@ static int core_scsi3_emulate_pro_release (
 	 * Go ahead and release the current PR reservation holder.
 	 */
 	dev->dev_pr_res_holder = NULL;
-	/*
-	 * If All Target Ports (ALL_TG_PT) bit == 0, clear the
-	 * se_lun_t pointer as well..
-	 */
-	if (!(pr_reg->pr_reg_all_tg_pt)) {
-		dev->dev_pr_tg_port_res_lun = NULL;
-	}
+
 	printk("SPC-3 PR [%s] Service Action: RELEASE cleared reservation holder"
 		" TYPE: %s ALL_TG_PT: %d\n", CMD_TFO(cmd)->get_fabric_name(),
 		core_scsi3_pr_dump_type(pr_reg->pr_res_type),
