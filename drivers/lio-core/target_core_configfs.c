@@ -583,7 +583,7 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_unit_serial (
 			printk(KERN_ERR "Unable to set EVPD Unit Serial while"
 				" active %d $FABRIC_MOD exports exist\n",
 				DEV_OBJ_API(dev)->check_count(
-					&dev->dev_access_obj));
+					&dev->dev_export_obj));
 			return(-EINVAL);
 		}
 	}
