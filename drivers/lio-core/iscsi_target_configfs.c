@@ -1949,6 +1949,18 @@ static struct lio_target_configfs_attribute lio_target_attr_tpg_control = {
 	.store	= lio_target_store_tpg_control,
 };
 
+static ssize_t lio_target_show_tpg_enable (void *p, char *page)
+{
+	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
+	ssize_t len = 0;
+
+	spin_lock(&tpg->tpg_state_lock);
+	len = sprintf(page, "%d\n", (tpg->tpg_state == TPG_STATE_ACTIVE) ? 1 : 0);
+	spin_unlock(&tpg->tpg_state_lock);
+	
+	return(len);
+}
+
 static ssize_t lio_target_store_tpg_enable (void *p, const char *page, size_t count)
 {
 	iscsi_portal_group_t *tpg_p = (iscsi_portal_group_t *)p, *tpg;
@@ -1956,7 +1968,7 @@ static ssize_t lio_target_store_tpg_enable (void *p, const char *page, size_t co
 	struct config_item *tpg_ci, *tiqn_ci;
 	char *endptr;
 	u32 op;
-	int ret = 0;;
+	int ret = 0;
 
 	op = simple_strtoul(page, &endptr, 0);	
 	if ((op != 1) && (op != 0)) {
@@ -1999,8 +2011,8 @@ out:
 static struct lio_target_configfs_attribute lio_target_attr_tpg_enable = {
 	.attr	= { .ca_owner = THIS_MODULE,
 		    .ca_name = "enable",
-		    .ca_mode = S_IWUSR },
-	.show	= NULL,
+		    .ca_mode = S_IRUGO | S_IWUSR },
+	.show	= lio_target_show_tpg_enable,
 	.store	= lio_target_store_tpg_enable,
 };
 
