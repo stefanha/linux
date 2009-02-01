@@ -694,6 +694,7 @@ extern void transport_deregister_session (se_session_t *se_sess)
 				se_tpg->num_node_acls--;
 				spin_unlock_bh(&se_tpg->acl_node_lock);
 				core_free_device_list_for_node(se_nacl, se_tpg);
+				TPG_TFO(se_tpg)->tpg_release_fabric_acl(se_tpg, se_nacl);
 				kfree(se_nacl);
 				spin_lock_bh(&se_tpg->acl_node_lock);
 			}

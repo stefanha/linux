@@ -8,7 +8,8 @@ struct target_core_fabric_ops {
 	int (*tpg_check_demo_mode)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_cache)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_write_protect)(struct se_portal_group_s *);
-	void (*tpg_release_node_acl)(struct se_portal_group_s *, struct se_node_acl_s *);
+	void *(*tpg_alloc_fabric_acl)(struct se_portal_group_s *, struct se_node_acl_s *);
+	void (*tpg_release_fabric_acl)(struct se_portal_group_s *, struct se_node_acl_s *);
 	int (*tpg_get_inst_index)(struct se_portal_group_s *);
         void (*release_cmd_to_pool)(struct se_cmd_s *);
         void (*release_cmd_direct)(struct se_cmd_s *);

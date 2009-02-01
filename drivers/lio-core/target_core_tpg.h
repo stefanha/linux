@@ -35,7 +35,7 @@ extern void core_tpg_add_node_to_devs (struct se_node_acl_s *, struct se_portal_
 extern struct se_node_acl_s *core_tpg_check_initiator_node_acl (struct se_portal_group_s *, unsigned char *);
 extern void core_tpg_free_node_acls (struct se_portal_group_s *);
 extern void core_tpg_clear_object_luns (struct se_portal_group_s *);
-extern se_node_acl_t *core_tpg_add_initiator_node_acl (se_portal_group_t *, void *, const char *, u32, int *);
+extern se_node_acl_t *core_tpg_add_initiator_node_acl (se_portal_group_t *, const char *, u32, int *);
 extern int core_tpg_del_initiator_node_acl (se_portal_group_t *, const char *, int);
 extern int core_tpg_set_initiator_node_queue_depth (se_portal_group_t *, unsigned char *, u32, int);
 extern se_portal_group_t *core_tpg_register (struct target_core_fabric_ops *, void *, int);

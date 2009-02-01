@@ -281,15 +281,22 @@ extern se_node_acl_t *core_tpg_check_initiator_node_acl (
 #endif /* SNMP_SUPPORT */
 	acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
 
+	if (!(acl->fabric_acl_ptr = TPG_TFO(tpg)->tpg_alloc_fabric_acl(tpg,
+			acl))) {
+		kfree(acl);
+		return(NULL);
+	}
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
 
 	if (core_create_device_list_for_node(acl)  < 0) {
+		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
 		kfree(acl);
 		return(NULL);
 	}
 
 	if (core_set_queue_depth_for_node(tpg, acl) < 0) {
 		core_free_device_list_for_node(acl, tpg);
+		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
 		kfree(acl);
 		return(NULL);
 	}
@@ -375,7 +382,6 @@ EXPORT_SYMBOL(core_tpg_clear_object_luns);
  */
 extern se_node_acl_t *core_tpg_add_initiator_node_acl (
 	se_portal_group_t *tpg,
-	void *fabric_acl_ptr,
 	const char *initiatorname,
 	u32 queue_depth,
 	int *ret)
@@ -411,7 +417,6 @@ extern se_node_acl_t *core_tpg_add_initiator_node_acl (
 	}
 
 	spin_lock_init(&acl->device_list_lock);
-	acl->fabric_acl_ptr = fabric_acl_ptr;
 	acl->queue_depth = queue_depth;
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
@@ -419,10 +424,17 @@ extern se_node_acl_t *core_tpg_add_initiator_node_acl (
 	acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
 	spin_lock_init(&acl->stats_lock);
 #endif /* SNMP_SUPPORT */
-
+	
+	if (!(acl->fabric_acl_ptr = TPG_TFO(tpg)->tpg_alloc_fabric_acl(tpg,
+			acl))) {
+		kfree(acl);
+		*ret = ERR_NO_MEMORY;
+		return(NULL);
+	}
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
       
 	if (core_create_device_list_for_node(acl)  < 0) {
+		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
 		kfree(acl);
 		*ret = ERR_NO_MEMORY;
 		return(NULL);
@@ -430,6 +442,7 @@ extern se_node_acl_t *core_tpg_add_initiator_node_acl (
 	
 	if (core_set_queue_depth_for_node(tpg, acl) < 0) {
 		core_free_device_list_for_node(acl, tpg);
+		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);	
 		kfree(acl);
 		*ret = ERR_ADDINITACL_QUEUE_SET_FAILED;
 		return(NULL);
@@ -524,7 +537,7 @@ extern int core_tpg_del_initiator_node_acl (
 	core_clear_initiator_node_from_tpg(acl, tpg);
 	core_free_device_list_for_node(acl, tpg);
 
-	TPG_TFO(tpg)->tpg_release_node_acl(tpg, acl);
+	TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
 	acl->fabric_acl_ptr = NULL;
 
 	printk("%s_TPG[%hu] - Deleted ACL with TCQ Depth: %d for %s"
