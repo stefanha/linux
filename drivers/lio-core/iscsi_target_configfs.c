@@ -2308,7 +2308,8 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.tpg_check_demo_mode = &lio_tpg_check_demo_mode;
 	fabric->tf_ops.tpg_check_demo_mode_cache = &lio_tpg_check_demo_mode_cache;
 	fabric->tf_ops.tpg_check_demo_mode_write_protect = &lio_tpg_check_demo_mode_write_protect;
-	fabric->tf_ops.tpg_release_node_acl = &lio_tpg_release_node_acl;
+	fabric->tf_ops.tpg_alloc_fabric_acl = &lio_tpg_alloc_fabric_acl;
+	fabric->tf_ops.tpg_release_fabric_acl = &lio_tpg_release_fabric_acl;
 	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd_to_pool;
 	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;

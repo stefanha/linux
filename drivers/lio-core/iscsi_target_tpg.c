@@ -261,7 +261,22 @@ extern int lio_tpg_check_demo_mode_write_protect (se_portal_group_t *se_tpg)
 	return(ISCSI_TPG_ATTRIB(tpg)->demo_mode_write_protect);
 }
 
-extern void lio_tpg_release_node_acl (se_portal_group_t *se_tpg, se_node_acl_t *se_acl)
+extern void *lio_tpg_alloc_fabric_acl (
+	se_portal_group_t *se_tpg,
+	se_node_acl_t *se_nacl)
+{
+	iscsi_node_acl_t *acl;
+
+	if (!(acl = kzalloc(sizeof(iscsi_node_acl_t), GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for iscsi_node_acl_t\n");
+		return(NULL);
+        }
+	acl->se_node_acl = se_nacl;
+
+	return(acl);
+}
+
+extern void lio_tpg_release_fabric_acl (se_portal_group_t *se_tpg, se_node_acl_t *se_acl)
 {
 	iscsi_node_acl_t *acl = (iscsi_node_acl_t *)se_acl->fabric_acl_ptr;
 
@@ -838,20 +853,13 @@ extern iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl (
 	u32 queue_depth,
 	int *ret)
 {
-	iscsi_node_acl_t *acl = NULL;
+	se_node_acl_t *se_nacl;
 
-	if (!(acl = kzalloc(sizeof(iscsi_node_acl_t), GFP_KERNEL))) {	
-		printk(KERN_ERR "Unable to allocate memory for iscsi_node_acl_t\n");
+	if (!(se_nacl = core_tpg_add_initiator_node_acl(tpg->tpg_se_tpg,
+			initiatorname, queue_depth, ret))) 
 		return(NULL);
-	}
 
-	if (!(acl->se_node_acl = core_tpg_add_initiator_node_acl(tpg->tpg_se_tpg,
-			(void *)acl, initiatorname, queue_depth, ret))) {
-		kfree(acl);
-		return(NULL);
-	}
-
-	return(acl);
+	return((iscsi_node_acl_t *)se_nacl->fabric_acl_ptr);
 }
 
 /*	iscsi_tpg_del_initiator_node_acl():

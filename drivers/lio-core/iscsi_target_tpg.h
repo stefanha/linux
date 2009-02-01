@@ -37,7 +37,8 @@ extern u32 lio_tpg_get_pr_transport_id_len (struct se_portal_group_s *, struct s
 extern int lio_tpg_check_demo_mode (struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_cache (struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_write_protect (struct se_portal_group_s *);
-extern void lio_tpg_release_node_acl (struct se_portal_group_s *, struct se_node_acl_s *);
+extern void *lio_tpg_alloc_fabric_acl (struct se_portal_group_s *, struct se_node_acl_s *);
+extern void lio_tpg_release_fabric_acl (struct se_portal_group_s *, struct se_node_acl_s *);
 extern int lio_tpg_shutdown_session (struct se_session_s *);
 extern void lio_tpg_close_session (struct se_session_s *);
 extern void lio_tpg_stop_session (struct se_session_s *, int, int);
