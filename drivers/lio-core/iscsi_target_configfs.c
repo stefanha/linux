@@ -2300,6 +2300,7 @@ extern int iscsi_target_register_configfs (void)
 	 * Temporary OPs function pointers used by target_core_mod..
 	 */
 	fabric->tf_ops.get_fabric_name = &iscsi_get_fabric_name;
+	fabric->tf_ops.get_fabric_proto_ident = &iscsi_get_fabric_proto_ident;
 	fabric->tf_ops.tpg_get_wwn = &lio_tpg_get_endpoint_wwn;
 	fabric->tf_ops.tpg_get_tag = &lio_tpg_get_tag;
 	fabric->tf_ops.tpg_get_default_depth = &lio_tpg_get_default_depth;

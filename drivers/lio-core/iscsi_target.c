@@ -1326,6 +1326,15 @@ extern char *iscsi_get_fabric_name (void)
 	return("iSCSI");
 }
 
+extern u8 iscsi_get_fabric_proto_ident (void)
+{
+	/*
+	 * This value is defined for "Internet SCSI (iSCSI)"
+	 * in spc4r17 section 7.5.1 Table 362
+	 */
+	return(0x5);
+}
+
 extern iscsi_cmd_t *iscsi_get_cmd (se_cmd_t *se_cmd)
 {
         return((iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr);
