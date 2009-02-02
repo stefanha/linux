@@ -4032,16 +4032,13 @@ extern int transport_generic_emulate_inquiry (
 	se_device_t *dev = SE_DEV(cmd);
 	se_lun_t *lun = SE_LUN(cmd);
 	se_port_t *port = NULL;
-	unsigned char *dst = (unsigned char *) T_TASK(cmd)->t_task_buf;
+	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
-	unsigned char *iqn_sn, *buf;
+	unsigned char *iqn_sn;
 	u32 vend_len, prod_len, iqn_sn_len, se_location_len;
 	u32 unit_serial_len;
 	u32 len = 0, off = 0;
 	
-	memset(dst, 0, cmd->data_length);
-	buf = dst;
-
 	buf[0] = type;
 	
 	if (!(cdb[1] & 0x1)) {
@@ -4740,7 +4737,7 @@ static int transport_generic_cmd_sequencer (
 		break;
 	case INQUIRY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
-		size = cdb[4];
+		size = (cdb[3] << 8) + cdb[4];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = 2;
