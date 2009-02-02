@@ -593,7 +593,7 @@ static int core_scsi3_pro_reserve (
 	if (!(pr_reg->pr_reg_all_tg_pt) &&
 	     (pr_reg->pr_reg_tg_pt_lun != se_lun)) {
 		printk(KERN_ERR "SPC-3 PR: Unable to handle RESERVE because"
-			" ALL_TG_PT=0 and RESERVE was not received on same "
+			" ALL_TG_PT=0 and RESERVE was not received on same"
 			" target port as REGISTER\n");
 		return(PYX_TRANSPORT_RESERVATION_CONFLICT);
 	}
@@ -1249,10 +1249,10 @@ static int core_scsi3_pri_read_full_status (se_cmd_t *cmd)
 		 * IDENTIFIER field are not defined by this standard.
 		 */
 		if (!(pr_reg->pr_reg_all_tg_pt)) {
-			u16 tpgt = TPG_TFO(se_tpg)->tpg_get_tag(se_tpg);
+			se_port_t *port = pr_reg->pr_reg_tg_pt_lun->lun_sep;
 
-			buf[off++] = ((tpgt >> 8) & 0xff);
-			buf[off++] = (tpgt & 0xff);
+			buf[off++] = ((port->sep_rtpi >> 8) & 0xff);
+			buf[off++] = (port->sep_rtpi & 0xff);
 		} else
 			off += 2; /* Skip over RELATIVE TARGET PORT IDENTIFER */
 
