@@ -491,6 +491,72 @@ extern void core_clear_lun_from_tpg (se_lun_t *lun, se_portal_group_t *tpg)
         return;
 }
 
+extern se_port_t *core_alloc_port (se_device_t *dev)
+{
+	se_port_t *port, *port_tmp;
+	
+	if (!(port = kzalloc(sizeof(se_port_t), GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate se_port_t\n");
+		return(NULL);
+	}
+	INIT_LIST_HEAD(&port->sep_list);
+
+	spin_lock(&dev->se_port_lock);
+	if (dev->dev_port_count == 0x0000ffff) {
+		printk(KERN_WARNING "Reached dev->dev_port_count == 0x0000ffff\n");
+		spin_unlock(&dev->se_port_lock);
+		return(NULL);
+	}
+again:
+	port->sep_rtpi = dev->dev_rpti_counter++;
+	list_for_each_entry(port_tmp, &dev->dev_sep_list, sep_list) {
+		/*
+		 * Make sure RELATIVE TARGET PORT IDENTIFER is unique
+		 * for 16-bit wrap..
+		 */
+		if (port->sep_rtpi == port_tmp->sep_rtpi) 
+			goto again;
+	}
+	spin_unlock(&dev->se_port_lock);
+
+	return(port);
+}
+
+extern void core_export_port (
+	se_device_t *dev,
+	se_portal_group_t *tpg,
+	se_port_t *port,
+	se_lun_t *lun)
+{
+	spin_lock(&dev->se_port_lock);
+	spin_lock(&lun->lun_sep_lock);
+	port->sep_tpg = tpg;
+	port->sep_lun = lun;
+	lun->lun_sep = port;
+	spin_unlock(&lun->lun_sep_lock);
+
+	list_add_tail(&port->sep_list, &dev->dev_sep_list);
+	spin_unlock(&dev->se_port_lock);
+
+	dev->dev_port_count++;
+#ifdef SNMP_SUPPORT
+	port->sep_index = port->sep_rtpi; /* RELATIVE TARGET PORT IDENTIFER */
+#endif
+	return;
+}
+
+/*
+ *	Called with se_device_t->se_port_lock spinlock held.
+ */
+extern void core_release_port (se_device_t *dev, se_port_t *port)
+{
+	list_del(&port->sep_list);
+	dev->dev_port_count--;
+	kfree(port);
+
+	return;
+}
+
 extern int transport_core_report_lun_response (se_cmd_t *se_cmd)
 {
 	se_dev_entry_t *deve;

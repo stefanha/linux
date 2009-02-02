@@ -185,45 +185,28 @@ extern void dev_put_obj (void *p)
 extern int dev_obj_export (void *p, se_portal_group_t *tpg, se_lun_t *lun)
 {
 	se_device_t *dev  = (se_device_t *)p;
-	se_port_t *sep;
+	se_port_t *port;
 
-	if (!(sep = kmalloc(sizeof(se_port_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate se_port_t\n");
+	if (!(port = core_alloc_port(dev)))
 		return(-1);
-	}
-	memset(sep, 0, sizeof(se_port_t));
-	INIT_LIST_HEAD(&sep->sep_list);
 
 	lun->se_dev = dev;
 	if (DEV_OBJ_API(dev)->activate(p) < 0) {
 		lun->se_dev = NULL;
-		kfree(sep);
+		kfree(port);
 		return(-1);
 	}
 
 	DEV_OBJ_API(dev)->inc_count(&dev->dev_export_obj);
 
-	spin_lock(&dev->se_port_lock);
-	spin_lock(&lun->lun_sep_lock);
-	sep->sep_tpg = tpg;
-	sep->sep_lun = lun;
-	lun->lun_sep = sep;
-	spin_unlock(&lun->lun_sep_lock);
-
-	list_add_tail(&sep->sep_list, &dev->dev_sep_list);
-	spin_unlock(&dev->se_port_lock);
-#ifdef SNMP_SUPPORT
-	dev->dev_port_count++;
-	sep->sep_index = scsi_get_new_index(SCSI_PORT_INDEX);
-#endif
-
+	core_export_port(dev, tpg, port, lun);
 	return(0);
 }
 
 extern void dev_obj_unexport (void *p, se_portal_group_t *tpg, se_lun_t *lun)
 {
 	se_device_t *dev  = (se_device_t *)p;
-	se_port_t *sep = lun->lun_sep;
+	se_port_t *port = lun->lun_sep;
 
 	spin_lock(&dev->se_port_lock);
 	spin_lock(&lun->lun_sep_lock);
@@ -236,12 +219,8 @@ extern void dev_obj_unexport (void *p, se_portal_group_t *tpg, se_lun_t *lun)
 
 	DEV_OBJ_API(dev)->dec_count(&dev->dev_export_obj);
 
-	list_del(&sep->sep_list);
+	core_release_port(dev, port);
 	spin_unlock(&dev->se_port_lock);
-#ifdef SNMP_SUPPORT
-	dev->dev_port_count--;
-#endif  
-	kfree(sep);
 
 	DEV_OBJ_API(dev)->deactivate(p);
 	lun->se_dev = NULL;

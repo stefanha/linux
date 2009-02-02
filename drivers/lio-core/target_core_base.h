@@ -536,7 +536,9 @@ typedef struct se_device_s {
 	u8			type;		/* Type of disk transport used for device */
 	u8			thread_active;	/* Set to 1 if thread is NOT sleeping on thread_sem */
 	u8			dev_status_timer_flags;
+	u16			dev_rpti_counter; /* RELATIVE TARGET PORT IDENTIFER Counter */
 	u32			dev_flags;
+	u32			dev_port_count;
 	u32			dev_status;
 	u32			dev_tcq_window_closed;
 	u32			queue_depth;	/* Physical device queue depth */
@@ -544,7 +546,6 @@ typedef struct se_device_s {
 	void 			*dev_ptr; 	/* Pointer to transport specific device structure */
 #ifdef SNMP_SUPPORT
 	u32			dev_index;
-	u32			dev_port_count;
 	u64			creation_time;
 	u32			num_resets;
 	u64			num_cmds;
@@ -653,6 +654,7 @@ typedef struct se_lun_s {
 #define LUN_OBJ_API(lun)	((struct se_obj_lun_type_s *)(lun)->lun_obj_api)
 
 typedef struct se_port_s {
+	u16		sep_rtpi; /* RELATIVE TARGET PORT IDENTIFER */
 #ifdef SNMP_SUPPORT
         u32             sep_index;
         scsi_port_stats_t sep_stats;
