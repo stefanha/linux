@@ -179,6 +179,16 @@ typedef struct se_obj_s {
 	atomic_t obj_access_count;
 } ____cacheline_aligned se_obj_t;
 
+typedef enum {
+	SPC_ALUA_PASSTHROUGH,
+	SPC2_ALUA_DISABLED,
+	SPC3_ALUA_EMULATED
+} t10_alua_index_t;
+
+typedef struct t10_alua_s {
+	t10_alua_index_t alua_type;	
+} ____cacheline_aligned t10_alua_t;
+
 typedef struct t10_evpd_s {
 	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
 	int protocol_identifier_set;
@@ -508,6 +518,7 @@ typedef struct se_dev_attrib_s {
         int             status_thread;
         int             status_thread_tur;
 	int		emulate_reservations;
+	int		emulate_alua;
 	u32		hw_max_sectors;
         u32             max_sectors;
 	u32		hw_queue_depth;
@@ -522,6 +533,7 @@ typedef struct se_subsystem_dev_s {
         struct se_hba_s *se_dev_hba;
         struct se_device_s *se_dev_ptr;
         se_dev_attrib_t se_dev_attrib;
+	t10_alua_t	t10_alua;	/* T10 Asymmetric Logical Unit Assignment Information */
 	t10_wwn_t	t10_wwn;	/* T10 Inquiry and EVPD WWN Information */
 	t10_reservation_template_t t10_reservation;	/* T10 SPC-2 + SPC-3 Reservations */
         spinlock_t      se_dev_lock;
@@ -530,6 +542,7 @@ typedef struct se_subsystem_dev_s {
 	struct config_group se_dev_pr_group;	/* For T10 Reservations */
 } ____cacheline_aligned se_subsystem_dev_t;
 
+#define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 
 typedef struct se_device_s {

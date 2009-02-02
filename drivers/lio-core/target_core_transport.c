@@ -59,6 +59,7 @@
 #include <target_core_hba.h>
 #include <target_core_scdb.h>
 #include <target_core_pr.h>
+#include <target_core_alua.h>
 #include <target_core_transport.h>
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
@@ -2099,6 +2100,10 @@ extern se_device_t *transport_add_device_to_core_hba (
 	 */
 	core_setup_reservations(dev);
 	/*
+	 * Setup the Asymmetric Logical Unit Assignment for se_device_t
+	 */
+	core_setup_alua(dev);
+	/*
 	 * Startup the se_device_t processing thread
 	 */	
 	transport_generic_activate_device(dev);
@@ -4044,6 +4049,19 @@ extern int transport_generic_emulate_inquiry (
 			buf[1] = 0x80;
 		buf[2]          = TRANSPORT(dev)->get_device_rev(dev);
 		buf[4]          = 31;
+		/*
+		 * Enable SCCS and TPGS fields for Emulated ALUA
+		 */
+		if (T10_ALUA(dev->se_sub_dev)->alua_type == SPC3_ALUA_EMULATED) {
+			/*
+			 * Set SCCS for MAINTENANCE_IN + REPORT_TARGET_PORT_GROUPS
+			 */
+			buf[5]	= 0x80;
+			/*
+			 * Set TPGS field, see spc4r17 section 6.4.2 Table 135
+			 */	
+			buf[5] |= TPGS_IMPLICT_ALUA;
+		}
 		buf[7]		= 0x32; /* Sync=1 and CmdQue=1 */
 		
 		sprintf((unsigned char *)&buf[8], "LIO-ORG");
@@ -4612,16 +4630,25 @@ static int transport_generic_cmd_sequencer (
 		break;
 	case 0xa3:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
-		if (TRANSPORT(dev)->get_device_type(dev) == TYPE_RAID) {
+		if (TRANSPORT(dev)->get_device_type(dev) != TYPE_ROM) {
 			// MAINTENANCE_IN from SCC-2
+			/*
+			 * Check for emulated MI_REPORT_TARGET_PGS.
+			 */
+			if (cdb[1] == MI_REPORT_TARGET_PGS) {
+				cmd->transport_emulate_cdb =
+					(T10_ALUA(su_dev)->alua_type == SPC3_ALUA_EMULATED) ?		
+					&core_scsi3_emulate_report_target_port_groups :
+					NULL;
+			}
 			size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		} else {
 			// GPCMD_SEND_KEY from multi media commands
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 1;
+		ret = 2;
 		break;
 	case MODE_SELECT:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -4700,7 +4727,7 @@ static int transport_generic_cmd_sequencer (
 		break;
 	case 0xa4:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
-		if (TRANSPORT(dev)->get_device_type(dev) == TYPE_RAID) {
+		if (TRANSPORT(dev)->get_device_type(dev) != TYPE_ROM) {
 			// MAINTENANCE_OUT from SCC-2
 			size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		} else  {

@@ -99,6 +99,7 @@
 #define DA_STATUS_THREAD			0 /* Disabled by default */
 #define DA_STATUS_THREAD_TUR			0 /* Disabled by default */
 #define DA_EMULATE_RESERVATIONS			0 /* No Emulation for PSCSI by default */
+#define DA_EMULATE_ALUA				0 /* No Emulation for PSCSI by default */
 #define DA_STATUS_MAX_SECTORS_MIN		16
 #define DA_STATUS_MAX_SECTORS_MAX		8192
 
