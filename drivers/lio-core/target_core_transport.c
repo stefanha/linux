@@ -4025,13 +4025,17 @@ extern int transport_generic_emulate_inquiry (
 	unsigned char *se_location)
 {
 	se_device_t *dev = SE_DEV(cmd);
+	se_lun_t *lun = SE_LUN(cmd);
+	se_port_t *port = NULL;
 	unsigned char *dst = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
-	unsigned char *iqn_sn, buf[EVPD_BUF_LEN];
-	u32 len = 0;
+	unsigned char *iqn_sn, *buf;
+	u32 vend_len, prod_len, iqn_sn_len, se_location_len;
+	u32 unit_serial_len;
+	u32 len = 0, off = 0;
 	
 	memset(dst, 0, cmd->data_length);
-	memset(buf, 0, EVPD_BUF_LEN);
+	buf = dst;
 
 	buf[0] = type;
 	
@@ -4048,7 +4052,7 @@ extern int transport_generic_emulate_inquiry (
 		snprintf((unsigned char *)&buf[32], 5, "%s", version);
 		len = 32;
 
-		goto copy;
+		goto check;
 	}
 
 	switch (cdb[2]) {
@@ -4062,49 +4066,183 @@ extern int transport_generic_emulate_inquiry (
 		break;
 	case 0x80: /* unit serial number */
 		buf[1] = 0x80;
-		if (dev->se_sub_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL)
+		if (dev->se_sub_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL) {
+			unit_serial_len = strlen(&DEV_T10_WWN(dev)->unit_serial[0]);
+			unit_serial_len++; // For NULL Terminator
+
+			if (((len + 4) + unit_serial_len) > cmd->data_length) {
+				len += unit_serial_len; // Make check: below fail
+				goto check;
+			}
 			len += sprintf((unsigned char *)&buf[4], "%s",
 				&DEV_T10_WWN(dev)->unit_serial[0]);
-		else {
+		 } else {
 			iqn_sn = transport_get_iqn_sn();
+			iqn_sn_len = strlen(iqn_sn);
+			iqn_sn_len++; // For ":"
+			se_location_len = strlen(se_location);
+			se_location_len++; // For NULL Terminator
+
+			if (((len + 4) + (iqn_sn_len + se_location_len)) >
+					cmd->data_length) {
+				len += (iqn_sn_len + se_location_len);
+				goto check;
+			}
 			len += sprintf((unsigned char *)&buf[4], "%s:%s",
 				iqn_sn, se_location);
 		}
+		len++; // Extra Byte for NULL Terminator
 		buf[3] = len;
 		break;
-	case 0x83: /* device identification */
+	case 0x83:
+		/*
+	 	 * Device identification EVPD, for a complete list of
+		 * DESIGNATOR TYPEs see spc4r17 Table 459.
+		 */
 		buf[1] = 0x83;
-		/* Start Identifier Page */
+		/*
+		 * T10 Vendor Identifier Page, see spc4r17 section 7.7.3.4
+		 */
 		buf[4] = 0x2; /* ASCII */
-		buf[5] = 0x1;
+		buf[5] = 0x1; /* T10 Vendor ID */
 		buf[6] = 0x0;
-		
-		len += sprintf((unsigned char *)&buf[8], "%-8s", "LIO-ORG");
-		
-		if (dev->se_sub_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL)
+
+		vend_len = sprintf((unsigned char *)&buf[8], "%-8s", "LIO-ORG");		
+		len += vend_len;
+
+		prod_len = 4; // For EVPD Header
+		prod_len += vend_len; // For LIO-ORG
+		prod_len += strlen(prod);
+		prod_len++; // For :
+
+		if (dev->se_sub_dev->su_dev_flags & SDF_EMULATED_EVPD_UNIT_SERIAL) {
+			unit_serial_len = strlen(&DEV_T10_WWN(dev)->unit_serial[0]);
+			unit_serial_len++; // For NULL Terminator
+
+			if (((len + 4) + (prod_len + unit_serial_len)) >
+					cmd->data_length) {
+				// Make check: fail below
+				len += (prod_len + unit_serial_len); 
+				goto check;
+			}
 			len += sprintf((unsigned char *)&buf[16], "%s:%s", prod,
 					&DEV_T10_WWN(dev)->unit_serial[0]);
-		else {
+		} else {
 			iqn_sn = transport_get_iqn_sn();
+			iqn_sn_len = strlen(iqn_sn);
+			iqn_sn_len++; // For ":"
+			se_location_len = strlen(se_location);
+			se_location_len++; // For NULL Terminator
+
+			if (((len + 4) + (prod_len + iqn_sn_len + se_location_len)) >
+					cmd->data_length) {
+				// Make check: fail below
+				len += (prod_len + iqn_sn_len + se_location_len);
+				goto check; 
+			}
 			len += sprintf((unsigned char *)&buf[16], "%s:%s:%s",
 					prod, iqn_sn, se_location);
 		}
-		buf[7] = len; /* Identifier Length */
-		len += 4;
-		buf[3] = len; /* Page Length */
+		len++; // Extra Byte for NULL Terminator
+		buf[7] = len; // Identifier Length
+		len += 4; // Header size for Designation descriptor 
+		off = (len + 4);
+		/*
+		 * se_port_t is only set for INQUIRY EVPD=1 through $FABRIC_MOD
+		 */
+		if ((port = lun->lun_sep)) {	
+			se_portal_group_t *tpg = port->sep_tpg;
+			u32 padding, scsi_name_len;
+			u16 tpgt;
+			/*
+			 * Relative target port identifer, see spc4r17 section 7.7.3.7 
+			 *
+			 * Get the PROTOCOL IDENTIFIER as defined by spc4r17
+			 * section 7.5.1 Table 362
+			 */
+			if (((len + 4) + 8) > cmd->data_length) {
+				len += 8; // Make check: below fail
+				goto check;
+			}
+			buf[off] = (TPG_TFO(tpg)->get_fabric_proto_ident() << 4); 
+			buf[off++] |= 0x1; // CODE SET == Binary 
+			buf[off] = 0x80; // Set PIV=1 
+			buf[off] |= 0x10; // Set ASSOICATION == target port: 01b 
+			buf[off++] |= 0x4; // DESIGNATOR TYPE == Relative target port identifer
+			off++; // Skip over Reserved
+			buf[off++] = 4; /* DESIGNATOR LENGTH */
+			off += 2; // Skip over Obsolete field in RTPI payload in Table 472
+			buf[off++] = ((port->sep_rtpi >> 8) & 0xff);
+			buf[off++] = (port->sep_rtpi & 0xff);
+			len += 8; // Header size + Designation descriptor 
+			/*
+			 * SCSI name string designator, see spc4r17 section 7.7.3.11
+			 *
+			 * Get the PROTOCOL IDENTIFIER as defined by spc4r17
+			 * section 7.5.1 Table 362	
+			 */
+			scsi_name_len = strlen(TPG_TFO(tpg)->tpg_get_wwn(tpg));
+			scsi_name_len += 10; // UTF-8 ",t,0x<16-bit TPGT>" + NULL Terminator
+			scsi_name_len += 4; // Header size + Designation descriptor
+			if ((padding = ((-scsi_name_len) & 3)) != 0)
+                                scsi_name_len += padding;
+
+			if ((len + scsi_name_len) > cmd->data_length) {
+				len += scsi_name_len; // Make check: below fail
+				goto check;
+			}
+			buf[off] = (TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
+			buf[off++] |= 0x3; // CODE SET == UTF-8
+			buf[off] = 0x80; // Set PIV=1
+			buf[off] |= 0x10; // Set ASSOICATION == target port: 01b
+			buf[off++] |= 0x8; // DESIGNATOR TYPE == SCSI name string
+			off += 2; // Skip over Reserved and length
+			/*
+			 * SCSI name string identifer containing, $FABRIC_MOD
+			 * dependent information.  For LIO-Target and iSCSI
+			 * Target Port, this means "<iSCSI name>,t,0x<TPGT> in
+			 * UTF-8 encoding.
+			 */			
+			tpgt = TPG_TFO(tpg)->tpg_get_tag(tpg);
+			scsi_name_len = sprintf(&buf[off], "%s,t,0x%04x",
+					TPG_TFO(tpg)->tpg_get_wwn(tpg), tpgt); 
+			scsi_name_len += 1 /* Include  NULL terminator */;
+			/*
+			 * The null-terminated, null-padded (see 4.4.2) SCSI NAME STRING field
+			 * contains a UTF-8 format string. The number of bytes in the SCSI NAME
+			 * STRING field (i.e., the value in the DESIGNATOR LENGTH field) shall
+			 * be no larger than 256 and shall be a multiple of four.
+			 */
+			if (padding)
+				scsi_name_len += padding;
+
+			buf[off-1] = scsi_name_len;
+			off += scsi_name_len;
+			len += (scsi_name_len + 4); // Header size + Designation descriptor 
+		}
+
+		buf[3] = len; /* Page Length for EVPD 0x83 */
 		break;
 	default:
 		TRACE_ERROR("Unknown EVPD Code: 0x%02x\n", cdb[2]);
 		return(-1);
 	}
 
-copy:
+check:
 	if ((len + 4) > cmd->data_length) {
+		/*
+		 * From spc4r17 Section 4.3.5.6
+		 * If the amount of information to be transferred exceeds the
+		 * maximum value that the ALLOCATION LENGTH field is capable
+		 * of specifying, the device server shall transfer no data and
+		 * terminate the command with CHECK CONDITION status, with the
+		 * sense key set to ILLEGAL REQUEST, and the additional sense
+		 * code set to INVALID FIELD IN CDB.
+		 */
 		TRACE_ERROR("Inquiry EVPD Length: %u larger than"
 			" cmd->data_length: %u\n", (len + 4), cmd->data_length);
-		memcpy(dst, buf, cmd->data_length);
-	} else
-		memcpy(dst, buf, (len + 4));
+		return(PYX_TRANSPORT_INVALID_CDB_FIELD);
+	}
 
 	return(0);
 }
