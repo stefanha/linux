@@ -1,5 +1,5 @@
 /*********************************************************************************
- * Filename:  target_core_pr.c
+ * Filename:  target_core_alua.c
  *
  * This file contains SPC-3 compliant asymmetric logical unit assigntment (ALUA)
  *
