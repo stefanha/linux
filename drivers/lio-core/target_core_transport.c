@@ -4168,6 +4168,8 @@ extern int transport_generic_emulate_inquiry (
 		if ((port = lun->lun_sep)) {	
 			se_portal_group_t *tpg = port->sep_tpg;
 			u32 padding, scsi_name_len;
+			u16 lun_gp = 0;	// Set to zero for implict ALUA
+			u16 tg_pg_i = 0; // Set to zero for implict ALUA
 			u16 tpgt;
 			/*
 			 * Relative target port identifer, see spc4r17 section 7.7.3.7 
@@ -4190,6 +4192,42 @@ extern int transport_generic_emulate_inquiry (
 			buf[off++] = ((port->sep_rtpi >> 8) & 0xff);
 			buf[off++] = (port->sep_rtpi & 0xff);
 			len += 8; // Header size + Designation descriptor 
+			/*
+			 * Target port group identifier, see spc4r17 section 7.7.3.8
+			 *
+			 * Get the PROTOCOL IDENTIFIER as defined by spc4r17
+			 * section 7.5.1 Table 362 
+			 */
+			if (((len + 4) + 8) > cmd->data_length) {
+				len += 8; // Make check: below fail
+				goto check;
+			}
+			buf[off] = (TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
+			buf[off++] |= 0x1; // CODE SET == Binary
+			buf[off] = 0x80; // Set PIV=1
+			buf[off] |= 0x10; // Set ASSOICATION == target port: 01b 
+			buf[off++] |= 0x5; // DESIGNATOR TYPE == Target port group identifier
+			off++; // Skip over Reserved
+			buf[off++] = 4; /* DESIGNATOR LENGTH */
+			off += 2; // Skip over Reserved Field
+			buf[off++] = ((tg_pg_i >> 8) & 0xff);
+			buf[off++] = (tg_pg_i & 0xff);
+			len += 8; // Header size + Designation descriptor
+			/*
+			 * Logical Unit Group identifier, see spc4r17 section 7.7.3.8
+			 */	
+			if (((len + 4) + 8) > cmd->data_length) {
+				len += 8; // Make check: below fail
+				goto check;
+			}
+			buf[off++] |= 0x1; // CODE SET == Binary
+			buf[off++] |= 0x6; // DESIGNATOR TYPE == Logical Unit Group identifier
+			off++; // Skip over Reserved
+			buf[off++] = 4; /* DESIGNATOR LENGTH */
+			off += 2; // Skip over Reserved Field
+			buf[off++] = ((lun_gp >> 8) & 0xff);
+			buf[off++] = (lun_gp & 0xff);
+			len += 8; // Header size + Designation descriptor
 			/*
 			 * SCSI name string designator, see spc4r17 section 7.7.3.11
 			 *
