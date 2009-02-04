@@ -4087,7 +4087,7 @@ extern int transport_generic_emulate_inquiry (
 			unit_serial_len++; // For NULL Terminator
 
 			if (((len + 4) + unit_serial_len) > cmd->data_length) {
-				len += unit_serial_len; // Make check: below fail
+				len += unit_serial_len;
 				goto set_len;
 			}
 			len += sprintf((unsigned char *)&buf[4], "%s",
@@ -4131,7 +4131,6 @@ extern int transport_generic_emulate_inquiry (
 
 			if (((len + 4) + (prod_len + unit_serial_len)) >
 					cmd->data_length) {
-				// Make check: fail below
 				len += (prod_len + unit_serial_len); 
 				goto check_rtpi;
 			}
@@ -4146,7 +4145,6 @@ extern int transport_generic_emulate_inquiry (
 
 			if (((len + 4) + (prod_len + iqn_sn_len + se_location_len)) >
 					cmd->data_length) {
-				// Make check: fail below
 				len += (prod_len + iqn_sn_len + se_location_len);
 				goto check_rtpi;
 			}
@@ -4180,7 +4178,7 @@ extern int transport_generic_emulate_inquiry (
 			 */
 check_rtpi:
 			if (((len + 4) + 8) > cmd->data_length) {
-				len += 8; // Make check: below fail
+				len += 8;
 				goto check_tpgi;
 			}
 			buf[off] = (TPG_TFO(tpg)->get_fabric_proto_ident() << 4); 
@@ -4202,7 +4200,7 @@ check_rtpi:
 			 */
 check_tpgi:
 			if (((len + 4) + 8) > cmd->data_length) {
-				len += 8; // Make check: below fail
+				len += 8;
 				goto check_lu_gp;
 			}
 			buf[off] = (TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
@@ -4221,7 +4219,7 @@ check_tpgi:
 			 */	
 check_lu_gp:
 			if (((len + 4) + 8) > cmd->data_length) {
-				len += 8; // Make check: below fail
+				len += 8;
 				goto check_scsi_name;
 			}
 			buf[off++] |= 0x1; // CODE SET == Binary
@@ -4246,7 +4244,7 @@ check_scsi_name:
                                 scsi_name_len += padding;
 
 			if ((len + scsi_name_len) > cmd->data_length) {
-				len += scsi_name_len; // Make check: below fail
+				len += scsi_name_len;
 				goto set_len;
 			}
 			buf[off] = (TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
