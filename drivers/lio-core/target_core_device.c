@@ -508,7 +508,21 @@ extern se_port_t *core_alloc_port (se_device_t *dev)
 		return(NULL);
 	}
 again:
-	port->sep_rtpi = dev->dev_rpti_counter++;
+	/*
+	 * Allocate the next RELATIVE TARGET PORT IDENTIFER for this se_device_t.
+	 * Here is the table from spc4r17 section 7.7.3.8.
+	 * 
+	 *    Table 473 -- RELATIVE TARGET PORT IDENTIFIER field
+	 *
+	 * Code      Description
+	 * 0h        Reserved
+	 * 1h        Relative port 1, historically known as port A
+	 * 2h        Relative port 2, historically known as port B
+	 * 3h to FFFFh    Relative port 3 through 65 535
+	 */
+	if (!(port->sep_rtpi = dev->dev_rpti_counter++))
+		goto again;
+
 	list_for_each_entry(port_tmp, &dev->dev_sep_list, sep_list) {
 		/*
 		 * Make sure RELATIVE TARGET PORT IDENTIFER is unique
