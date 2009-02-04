@@ -4132,7 +4132,7 @@ extern int transport_generic_emulate_inquiry (
 			if (((len + 4) + (prod_len + unit_serial_len)) >
 					cmd->data_length) {
 				len += (prod_len + unit_serial_len); 
-				goto check_rtpi;
+				goto check_port;
 			}
 			len += sprintf((unsigned char *)&buf[16], "%s:%s", prod,
 					&DEV_T10_WWN(dev)->unit_serial[0]);
@@ -4146,7 +4146,7 @@ extern int transport_generic_emulate_inquiry (
 			if (((len + 4) + (prod_len + iqn_sn_len + se_location_len)) >
 					cmd->data_length) {
 				len += (prod_len + iqn_sn_len + se_location_len);
-				goto check_rtpi;
+				goto check_port;
 			}
 			len += sprintf((unsigned char *)&buf[16], "%s:%s:%s",
 					prod, iqn_sn, se_location);
@@ -4163,6 +4163,7 @@ extern int transport_generic_emulate_inquiry (
 		/*
 		 * se_port_t is only set for INQUIRY EVPD=1 through $FABRIC_MOD
 		 */
+check_port:
 		if ((port = lun->lun_sep)) {	
 			u32 padding, scsi_name_len;
 			u16 lun_gp = 0;	// Set to zero for implict ALUA
@@ -4176,7 +4177,6 @@ extern int transport_generic_emulate_inquiry (
 			 * Get the PROTOCOL IDENTIFIER as defined by spc4r17
 			 * section 7.5.1 Table 362
 			 */
-check_rtpi:
 			if (((len + 4) + 8) > cmd->data_length) {
 				len += 8;
 				goto check_tpgi;
