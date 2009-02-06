@@ -50,6 +50,7 @@
 #include <iscsi_target_error.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
+#include <target_core_alua.h>
 #include <target_core_pr.h>
 #include <target_core_tpg.h>
 #include <target_core_transport.h>
@@ -500,6 +501,8 @@ extern se_port_t *core_alloc_port (se_device_t *dev)
 		return(NULL);
 	}
 	INIT_LIST_HEAD(&port->sep_list);
+	INIT_LIST_HEAD(&port->sep_tg_pt_gp_list);
+	spin_lock_init(&port->sep_alua_lock);
 
 	spin_lock(&dev->se_port_lock);
 	if (dev->dev_port_count == 0x0000ffff) {
@@ -542,6 +545,8 @@ extern void core_export_port (
 	se_port_t *port,
 	se_lun_t *lun)
 {
+	se_subsystem_dev_t *su_dev = SU_DEV(dev);
+
 	spin_lock(&dev->se_port_lock);
 	spin_lock(&lun->lun_sep_lock);
 	port->sep_tpg = tpg;
@@ -551,6 +556,13 @@ extern void core_export_port (
 
 	list_add_tail(&port->sep_list, &dev->dev_sep_list);
 	spin_unlock(&dev->se_port_lock);
+
+	if (T10_ALUA(su_dev)->alua_type == SPC3_ALUA_EMULATED) {
+		core_alua_attach_tg_pt_gp(port, se_global->default_tg_pt_gp);
+		printk("%s/%s: Adding to default ALUA Target Port Group:"
+			" core/alua/tg_pt_gps/default_tg_pt_gp\n",
+			TRANSPORT(dev)->name, TPG_TFO(tpg)->get_fabric_name());
+	}
 
 	dev->dev_port_count++;
 #ifdef SNMP_SUPPORT
@@ -564,6 +576,8 @@ extern void core_export_port (
  */
 extern void core_release_port (se_device_t *dev, se_port_t *port)
 {
+	core_alua_put_tg_pt_gp(port, 1);
+
 	list_del(&port->sep_list);
 	dev->dev_port_count--;
 	kfree(port);
@@ -750,6 +764,8 @@ extern int se_free_virtual_device (se_device_t *dev, se_hba_t *hba)
 	se_clear_dev_ports(dev);
 	spin_unlock(&hba->device_lock);
 
+	core_alua_put_lu_gp(dev, 1);	
+	
 	se_release_device_for_hba(dev);
 	
 	return(0);
