@@ -189,6 +189,28 @@ typedef struct t10_alua_s {
 	t10_alua_index_t alua_type;	
 } ____cacheline_aligned t10_alua_t;
 
+typedef struct t10_alua_lu_gp_s {
+	u16	lu_gp_id;
+	int	lu_gp_alua_access_state;
+	u32	lu_gp_members;
+	atomic_t lu_gp_ref_cnt;
+	spinlock_t lu_gp_ref_lock;
+	struct config_group lu_gp_group;
+	struct list_head lu_gp_list;
+	struct list_head lu_gp_ref_list;
+} ____cacheline_aligned t10_alua_lu_gp_t;
+
+typedef struct t10_alua_tg_pt_gp_s {
+	u16	tg_pt_gp_id;
+	int	tg_pt_gp_alua_access_state;
+	u32	tg_pt_gp_members;
+	atomic_t tg_pt_gp_ref_cnt;
+	spinlock_t tg_pt_gp_ref_lock;
+	struct config_group tg_pt_gp_group;
+	struct list_head tg_pt_gp_list;
+	struct list_head tg_pt_gp_ref_list;
+} ____cacheline_aligned t10_alua_tg_pt_gp_t;
+
 typedef struct t10_evpd_s {
 	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
 	int protocol_identifier_set;
@@ -580,12 +602,15 @@ typedef struct se_device_s {
 	spinlock_t		execute_task_lock;
 	spinlock_t		state_task_lock;
 	spinlock_t		dev_reservation_lock;
+	spinlock_t		dev_alua_lock;
 	spinlock_t		dev_state_lock;
 	spinlock_t		dev_status_lock;
 	spinlock_t		dev_status_thr_lock;
 	spinlock_t		se_port_lock;
 	struct se_node_acl_s	*dev_reserved_node_acl; /* Used for legacy SPC-2 reservationsa */
+	struct t10_alua_lu_gp_s *dev_alua_lu_gp;	/* Used for ALUA Logical Unit Groups */
 	struct t10_pr_registration_s *dev_pr_res_holder; /* Used for SPC-3 Persistent Reservations */
+	struct list_head	dev_lu_gp_list;
 	struct list_head	dev_sep_list;
 	struct timer_list		dev_status_timer;
 	struct task_struct		*process_thread; /* Pointer to descriptor for processing thread */
@@ -672,9 +697,12 @@ typedef struct se_port_s {
         u32             sep_index;
         scsi_port_stats_t sep_stats;
 #endif
+	spinlock_t	sep_alua_lock;
+	struct t10_alua_tg_pt_gp_s *sep_alua_tg_pt_gp; /* Used for ALUA Target Port Groups */
         struct se_lun_s *sep_lun;
         struct se_portal_group_s *sep_tpg;
         struct list_head sep_list;
+	struct list_head sep_tg_pt_gp_list;
 } ____cacheline_aligned se_port_t;
 
 typedef struct se_portal_group_s {
@@ -695,11 +723,25 @@ typedef struct se_portal_group_s {
 #define TPG_TFO(se_tpg)		((struct target_core_fabric_ops *)(se_tpg)->se_tpg_tfo)
 
 typedef struct se_global_s {
+	u16			alua_lu_gps_counter;
+	u16			alua_tg_pt_gps_counter;
 	u32			in_shutdown;
+	u32			alua_lu_gps_count;
+	u32			alua_tg_pt_gps_count;
+	struct config_group	target_core_hbagroup;
+	struct config_group	alua_group;
+	struct config_group	alua_lu_gps_group;
+	struct config_group	alua_tg_pt_gps_group;
+	struct list_head	g_lu_gps_list;
+	struct list_head	g_tg_pt_gps_list;
 	struct list_head	g_se_tpg_list;
         struct se_plugin_class_s *plugin_class_list;
         se_hba_t                *hba_list;
+	t10_alua_lu_gp_t	*default_lu_gp;
+	t10_alua_tg_pt_gp_t	*default_tg_pt_gp;
 	spinlock_t		hba_lock;
+	spinlock_t		lu_gps_lock;
+	spinlock_t		tg_pt_gps_lock;
 	spinlock_t		plugin_class_lock;
 #ifdef DEBUG_DEV
         spinlock_t              debug_dev_lock;
