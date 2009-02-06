@@ -1176,7 +1176,7 @@ extern u32 fd_get_blocksize (se_device_t *dev)
  */
 extern u32 fd_get_device_rev (se_device_t *dev)
 {
-	return(SCSI_2); 
+	return(SCSI_SPC_2); // Returns SPC-3 in Initiator Data
 }
 
 /*	fd_get_device_type(): (Part of se_subsystem_api_t template)

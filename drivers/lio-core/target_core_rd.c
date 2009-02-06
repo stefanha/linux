@@ -1346,7 +1346,7 @@ extern u32 rd_get_blocksize (se_device_t *dev)
 
 extern u32 rd_get_device_rev (se_device_t *dev)
 {
-	return(SCSI_2);
+	return(SCSI_SPC_2); // Returns SPC-3 in Initiator Data
 }
 
 extern u32 rd_get_device_type (se_device_t *dev)
