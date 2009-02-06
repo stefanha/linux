@@ -38,6 +38,7 @@
 #include <target_core_fabric_ops.h>
 #include <target_core_device.h>
 #include <target_core_configfs.h>
+#include <target_core_alua.h>
 #include <configfs_macros.h>
 
 #include <iscsi_protocol.h>
@@ -402,51 +403,30 @@ static struct config_item_type lio_target_np_cit = {
 
 // Start items for lio_target_port_cit
 
-static ssize_t lio_target_show_port_info (void *p, char *page)
+static ssize_t lio_target_show_port_alua_tg_pt_gp (void *p, char *page)
 {
 	se_lun_t *lun = (se_lun_t *)p;
-	int read_bytes = 0;
 
-	read_bytes += sprintf(page, "lio_target_show_port_info()\n");
-	return(read_bytes);
+	return(core_alua_show_tg_pt_gp_info(lun->lun_sep, page));
 }
 
-static struct lio_target_configfs_attribute lio_target_attr_port_info = {
-	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "info",
-		    .ca_mode = S_IRUGO },
-	.show	= lio_target_show_port_info,
-	.store	= NULL,
-};
-
-static ssize_t lio_target_store_port_control (void *p, const char *page, size_t count)
+static ssize_t lio_target_store_port_alua_tg_pt_gp (void *p, const char *page, size_t count)
 {
 	se_lun_t *lun = (se_lun_t *)p;
-	char *buf, *cur;
 
-	if (!(buf = kzalloc(count, GFP_KERNEL))) {
-		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
-		return(-ENOMEM);
-	}
-	memcpy(buf, page, count);
-
-	printk("lio_target_store_port_control(): %s\n", buf);
-
-	kfree(buf);
-	return(count);
+	return(core_alua_store_tg_pt_gp_info(lun->lun_sep, page, count));
 }
 
-static struct lio_target_configfs_attribute lio_target_attr_port_control = {
+static struct lio_target_configfs_attribute lio_target_attr_port_alua_tg_pt_gp = {
 	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "control",
-		    .ca_mode = S_IWUSR },
-	.show	= NULL,
-	.store	= lio_target_store_port_control,
+		    .ca_name = "alua_tg_pt_gp",
+		    .ca_mode = S_IRUGO | S_IWUSR },
+	.show	= lio_target_show_port_alua_tg_pt_gp,
+	.store	= lio_target_store_port_alua_tg_pt_gp,
 };
 
 static struct configfs_attribute *lio_target_port_attrs[] = {
-	&lio_target_attr_port_info.attr,
-	&lio_target_attr_port_control.attr,
+	&lio_target_attr_port_alua_tg_pt_gp.attr,
 	NULL,
 };
 
