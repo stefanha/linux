@@ -166,20 +166,31 @@ again:
 extern void core_alua_free_lu_gp (t10_alua_lu_gp_t *lu_gp)
 {
 	se_device_t *dev, *dev_tmp;
-
-	spin_lock(&lu_gp->lu_gp_ref_lock);
-	list_for_each_entry_safe(dev, dev_tmp, &lu_gp->lu_gp_ref_list, dev_lu_gp_list) {
-		list_del(&dev->dev_lu_gp_list);	
-		spin_lock(&dev->dev_alua_lock);
-		dev->dev_alua_lu_gp = NULL;
-		spin_unlock(&dev->dev_alua_lock);
-	}
-	spin_unlock(&lu_gp->lu_gp_ref_lock);
-
+	/*
+	 * Once we have reached this point, config_item_put() has
+	 * already been called from target_core_alua_drop_lu_gp().
+	 * 
+	 * Here, we remove the *lu_gp from the global list so that
+	 * no associations can be made while we are releasing
+	 * t10_alua_lu_gp_t.
+	 */
 	spin_lock(&se_global->lu_gps_lock);
 	list_del(&lu_gp->lu_gp_list);
 	se_global->alua_lu_gps_count--;
 	spin_unlock(&se_global->lu_gps_lock);
+
+	spin_lock(&lu_gp->lu_gp_ref_lock);
+	list_for_each_entry_safe(dev, dev_tmp, &lu_gp->lu_gp_ref_list, dev_lu_gp_list) {
+		list_del(&dev->dev_lu_gp_list);	
+		spin_unlock(&lu_gp->lu_gp_ref_lock);
+
+		spin_lock(&dev->dev_alua_lock);
+		dev->dev_alua_lu_gp = NULL;
+		spin_unlock(&dev->dev_alua_lock);
+		
+		spin_lock(&lu_gp->lu_gp_ref_lock);
+	}
+	spin_unlock(&lu_gp->lu_gp_ref_lock);
 
 	kmem_cache_free(t10_alua_lu_gp_cache, lu_gp);
 	return;
@@ -305,21 +316,32 @@ again:
 extern void core_alua_free_tg_pt_gp (t10_alua_tg_pt_gp_t *tg_pt_gp)
 {
 	se_port_t *port, *port_tmp;
+	/*
+	 * Once we have reached this point, config_item_put() has already
+	 * been called from target_core_alua_drop_tg_pt_gp().
+	 *
+	 * Here we remove *tg_pt_gp from the global list so that
+	 * no assications *OR* explict ALUA via SET_TARGET_PORT_GROUPS
+	 * can be made while we are releasing t10_alua_tg_pt_gp_t.
+	 */
+	spin_lock(&se_global->tg_pt_gps_lock);
+	list_del(&tg_pt_gp->tg_pt_gp_list);
+	se_global->alua_tg_pt_gps_counter--;
+	spin_unlock(&se_global->tg_pt_gps_lock);
 
 	spin_lock(&tg_pt_gp->tg_pt_gp_ref_lock);
 	list_for_each_entry_safe(port, port_tmp, &tg_pt_gp->tg_pt_gp_ref_list,
 			sep_tg_pt_gp_list) {
 		list_del(&port->sep_tg_pt_gp_list);
+		spin_unlock(&tg_pt_gp->tg_pt_gp_ref_lock);
+
 		spin_lock(&port->sep_alua_lock);
 		port->sep_alua_tg_pt_gp = NULL;
 		spin_unlock(&port->sep_alua_lock);
+
+		spin_lock(&tg_pt_gp->tg_pt_gp_ref_lock);
 	}
 	spin_unlock(&tg_pt_gp->tg_pt_gp_ref_lock);
-
-	spin_lock(&se_global->tg_pt_gps_lock);
-	list_del(&tg_pt_gp->tg_pt_gp_list);
-	se_global->alua_tg_pt_gps_counter--;
-	spin_unlock(&se_global->tg_pt_gps_lock);
 
 	kmem_cache_free(t10_alua_tg_pt_gp_cache, tg_pt_gp);
 	return;
