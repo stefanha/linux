@@ -501,8 +501,6 @@ extern se_port_t *core_alloc_port (se_device_t *dev)
 		return(NULL);
 	}
 	INIT_LIST_HEAD(&port->sep_list);
-	INIT_LIST_HEAD(&port->sep_tg_pt_gp_list);
-	spin_lock_init(&port->sep_alua_lock);
 
 	spin_lock(&dev->se_port_lock);
 	if (dev->dev_port_count == 0x0000ffff) {
@@ -546,6 +544,7 @@ extern void core_export_port (
 	se_lun_t *lun)
 {
 	se_subsystem_dev_t *su_dev = SU_DEV(dev);
+	t10_alua_tg_pt_gp_member_t *tg_pt_gp_mem = NULL;
 
 	spin_lock(&dev->se_port_lock);
 	spin_lock(&lun->lun_sep_lock);
@@ -558,7 +557,16 @@ extern void core_export_port (
 	spin_unlock(&dev->se_port_lock);
 
 	if (T10_ALUA(su_dev)->alua_type == SPC3_ALUA_EMULATED) {
-		core_alua_attach_tg_pt_gp(port, se_global->default_tg_pt_gp);
+		tg_pt_gp_mem = core_alua_allocate_tg_pt_gp_mem(port);
+		if (IS_ERR(tg_pt_gp_mem) || !tg_pt_gp_mem) {
+			printk(KERN_ERR "Unable to allocate t10_alua_tg_pt_gp_member_t\n");
+			return;
+		}
+		spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
+		__core_alua_attach_tg_pt_gp_mem(tg_pt_gp_mem,
+			se_global->default_tg_pt_gp);
+		spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
+
 		printk("%s/%s: Adding to default ALUA Target Port Group:"
 			" core/alua/tg_pt_gps/default_tg_pt_gp\n",
 			TRANSPORT(dev)->name, TPG_TFO(tpg)->get_fabric_name());
@@ -576,7 +584,7 @@ extern void core_export_port (
  */
 extern void core_release_port (se_device_t *dev, se_port_t *port)
 {
-	core_alua_put_tg_pt_gp(port, 1);
+	core_alua_free_tg_pt_gp_mem(port);
 
 	list_del(&port->sep_list);
 	dev->dev_port_count--;

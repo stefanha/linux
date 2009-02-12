@@ -4212,7 +4212,7 @@ extern int transport_generic_emulate_inquiry (
 check_port:
 		if ((port = lun->lun_sep)) {	
 			t10_alua_lu_gp_t *lu_gp;
-			t10_alua_tg_pt_gp_t *tg_pt_gp_p;
+			t10_alua_tg_pt_gp_t *tg_pt_gp;
 			u32 padding, scsi_name_len;
 			u16 lu_gp_id = 0;
 			u16 tg_pt_gp_id = 0;
@@ -4254,10 +4254,16 @@ check_tpgi:
 				len += 8;
 				goto check_lu_gp;
 			}
-			spin_lock(&port->sep_alua_lock);
-			if ((tg_pt_gp_p = port->sep_alua_tg_pt_gp))
-				tg_pt_gp_id = tg_pt_gp_p->tg_pt_gp_id;
-			spin_unlock(&port->sep_alua_lock);
+			if (!(port->sep_alua_tg_pt_gp_mem))
+				goto check_lu_gp;
+
+			spin_lock(&port->sep_alua_tg_pt_gp_mem->tg_pt_gp_mem_lock);
+			if (!(tg_pt_gp = port->sep_alua_tg_pt_gp_mem->tg_pt_gp)) {
+				spin_unlock(&port->sep_alua_tg_pt_gp_mem->tg_pt_gp_mem_lock);
+				goto check_lu_gp;
+			}
+			tg_pt_gp_id = tg_pt_gp->tg_pt_gp_id;
+			spin_unlock(&port->sep_alua_tg_pt_gp_mem->tg_pt_gp_mem_lock);
 
 			buf[off] = (TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
 			buf[off++] |= 0x1; // CODE SET == Binary

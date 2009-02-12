@@ -51,6 +51,7 @@
 
 #define TRANSPORT_IQN_LEN			224 /* Currently same as ISCSI_IQN_LEN */
 #define LU_GROUP_NAME_BUF			256
+#define TG_PT_GROUP_NAME_BUF			256
 #define EVPD_TMP_BUF_SIZE			128 /* Used to parse EVPD into t10_evpd_t */
 
 /* used by PSCSI and iBlock Transport drivers */
@@ -214,10 +215,10 @@ typedef struct t10_alua_tg_pt_gp_s {
 	int	tg_pt_gp_alua_access_state;
 	u32	tg_pt_gp_members;
 	atomic_t tg_pt_gp_ref_cnt;
-	spinlock_t tg_pt_gp_ref_lock;
+	spinlock_t tg_pt_gp_lock;
 	struct config_group tg_pt_gp_group;
 	struct list_head tg_pt_gp_list;
-	struct list_head tg_pt_gp_ref_list;
+	struct list_head tg_pt_gp_mem_list;
 } ____cacheline_aligned t10_alua_tg_pt_gp_t;
 
 typedef struct t10_alua_tg_pt_gp_member_s {
@@ -712,12 +713,10 @@ typedef struct se_port_s {
         u32             sep_index;
         scsi_port_stats_t sep_stats;
 #endif
-	spinlock_t	sep_alua_lock;
-	struct t10_alua_tg_pt_gp_s *sep_alua_tg_pt_gp; /* Used for ALUA Target Port Groups */
+	struct t10_alua_tg_pt_gp_member_s *sep_alua_tg_pt_gp_mem; /* Used for ALUA Target Port Groups membership */
         struct se_lun_s *sep_lun;
         struct se_portal_group_s *sep_tpg;
         struct list_head sep_list;
-	struct list_head sep_tg_pt_gp_list;
 } ____cacheline_aligned se_port_t;
 
 typedef struct se_portal_group_s {

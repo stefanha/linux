@@ -1469,9 +1469,9 @@ static ssize_t target_core_alua_lu_gp_show_attr_members (
 	se_subsystem_dev_t *su_dev;
 	t10_alua_lu_gp_member_t *lu_gp_mem;
 	ssize_t len = 0, cur_len;
-	unsigned char buf[256];
+	unsigned char buf[LU_GROUP_NAME_BUF];
 
-	memset(buf, 0, 256);
+	memset(buf, 0, LU_GROUP_NAME_BUF);
 
 	spin_lock(&lu_gp->lu_gp_lock);
 	list_for_each_entry(lu_gp_mem, &lu_gp->lu_gp_mem_list, lu_gp_mem_list) {
@@ -1479,7 +1479,7 @@ static ssize_t target_core_alua_lu_gp_show_attr_members (
 		su_dev = dev->se_sub_dev;
 		hba = su_dev->se_dev_hba;
 
-		cur_len = snprintf(buf, 256, "%s/%s\n",
+		cur_len = snprintf(buf, LU_GROUP_NAME_BUF, "%s/%s\n",
 			config_item_name(&su_dev->se_dev_group.cg_item),
 			config_item_name(&hba->hba_group.cg_item));
 		cur_len++; // Extra byte for NULL terminator
@@ -1618,17 +1618,20 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_members (
 	se_port_t *port;
 	se_portal_group_t *tpg;
 	se_lun_t *lun;
+	t10_alua_tg_pt_gp_member_t *tg_pt_gp_mem;
 	ssize_t len = 0, cur_len;
-	unsigned char buf[256];
+	unsigned char buf[TG_PT_GROUP_NAME_BUF];
 
-	memset(buf, 0, 256);
+	memset(buf, 0, TG_PT_GROUP_NAME_BUF);
 
-	spin_lock(&tg_pt_gp->tg_pt_gp_ref_lock);
-	list_for_each_entry(port, &tg_pt_gp->tg_pt_gp_ref_list, sep_tg_pt_gp_list) {
+	spin_lock(&tg_pt_gp->tg_pt_gp_lock);
+	list_for_each_entry(tg_pt_gp_mem, &tg_pt_gp->tg_pt_gp_mem_list,
+			tg_pt_gp_mem_list) {
+		port = tg_pt_gp_mem->tg_pt;
 		tpg = port->sep_tpg;
 		lun = port->sep_lun;
 
-		cur_len = snprintf(buf, 256, "%s/tpgt_%hu/%s\n",
+		cur_len = snprintf(buf, TG_PT_GROUP_NAME_BUF, "%s/tpgt_%hu/%s\n",
 			TPG_TFO(tpg)->tpg_get_wwn(tpg),
 			TPG_TFO(tpg)->tpg_get_tag(tpg),
 			config_item_name(&lun->lun_group.cg_item));
@@ -1642,7 +1645,7 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_members (
 		memcpy(page+len, buf, cur_len);
 		len += cur_len;
 	}
-	spin_unlock(&tg_pt_gp->tg_pt_gp_ref_lock);
+	spin_unlock(&tg_pt_gp->tg_pt_gp_lock);
 
 	return(len);
 }
