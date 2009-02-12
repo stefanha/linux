@@ -50,7 +50,7 @@
 #define TRANSPORT_SENSE_SEGMENT_TOTAL       68 /* TRANSPORT_SENSE_SEGMENT_LENGTH + Padding */
 
 #define TRANSPORT_IQN_LEN			224 /* Currently same as ISCSI_IQN_LEN */
-
+#define LU_GROUP_NAME_BUF			256
 #define EVPD_TMP_BUF_SIZE			128 /* Used to parse EVPD into t10_evpd_t */
 
 /* used by PSCSI and iBlock Transport drivers */
@@ -193,12 +193,21 @@ typedef struct t10_alua_lu_gp_s {
 	u16	lu_gp_id;
 	int	lu_gp_alua_access_state;
 	u32	lu_gp_members;
+	atomic_t lu_gp_shutdown;
 	atomic_t lu_gp_ref_cnt;
-	spinlock_t lu_gp_ref_lock;
+	spinlock_t lu_gp_lock;
 	struct config_group lu_gp_group;
 	struct list_head lu_gp_list;
-	struct list_head lu_gp_ref_list;
+	struct list_head lu_gp_mem_list;
 } ____cacheline_aligned t10_alua_lu_gp_t;
+
+typedef struct t10_alua_lu_gp_member_s {
+	int lu_gp_assoc;
+	spinlock_t lu_gp_mem_lock;
+	t10_alua_lu_gp_t *lu_gp;
+	struct se_device_s *lu_gp_mem_dev;
+	struct list_head lu_gp_mem_list;
+} ____cacheline_aligned t10_alua_lu_gp_member_t;
 
 typedef struct t10_alua_tg_pt_gp_s {
 	u16	tg_pt_gp_id;
@@ -210,6 +219,14 @@ typedef struct t10_alua_tg_pt_gp_s {
 	struct list_head tg_pt_gp_list;
 	struct list_head tg_pt_gp_ref_list;
 } ____cacheline_aligned t10_alua_tg_pt_gp_t;
+
+typedef struct t10_alua_tg_pt_gp_member_s {
+	int tg_pt_gp_assoc;
+	spinlock_t tg_pt_gp_mem_lock;
+	t10_alua_tg_pt_gp_t *tg_pt_gp;
+	struct se_port_s *tg_pt;
+	struct list_head tg_pt_gp_mem_list;
+} ____cacheline_aligned t10_alua_tg_pt_gp_member_t;
 
 typedef struct t10_evpd_s {
 	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
@@ -602,15 +619,13 @@ typedef struct se_device_s {
 	spinlock_t		execute_task_lock;
 	spinlock_t		state_task_lock;
 	spinlock_t		dev_reservation_lock;
-	spinlock_t		dev_alua_lock;
 	spinlock_t		dev_state_lock;
 	spinlock_t		dev_status_lock;
 	spinlock_t		dev_status_thr_lock;
 	spinlock_t		se_port_lock;
 	struct se_node_acl_s	*dev_reserved_node_acl; /* Used for legacy SPC-2 reservationsa */
-	struct t10_alua_lu_gp_s *dev_alua_lu_gp;	/* Used for ALUA Logical Unit Groups */
+	struct t10_alua_lu_gp_member_s *dev_alua_lu_gp_mem; /* Used for ALUA Logical Unit Group membership */
 	struct t10_pr_registration_s *dev_pr_res_holder; /* Used for SPC-3 Persistent Reservations */
-	struct list_head	dev_lu_gp_list;
 	struct list_head	dev_sep_list;
 	struct timer_list		dev_status_timer;
 	struct task_struct		*process_thread; /* Pointer to descriptor for processing thread */

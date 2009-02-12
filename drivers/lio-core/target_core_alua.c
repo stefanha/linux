@@ -46,7 +46,9 @@
 extern se_global_t *se_global;
 
 extern struct kmem_cache *t10_alua_lu_gp_cache;
+extern struct kmem_cache *t10_alua_lu_gp_mem_cache;
 extern struct kmem_cache *t10_alua_tg_pt_gp_cache;
+extern struct kmem_cache *t10_alua_tg_pt_gp_mem_cache;
 
 /*
  * REPORT_TARGET_PORT_GROUPS
@@ -138,8 +140,8 @@ extern t10_alua_lu_gp_t *core_alua_allocate_lu_gp (const char *name)
 		return(NULL);
 	}
 	INIT_LIST_HEAD(&lu_gp->lu_gp_list);
-	INIT_LIST_HEAD(&lu_gp->lu_gp_ref_list);
-	spin_lock_init(&lu_gp->lu_gp_ref_lock);
+	INIT_LIST_HEAD(&lu_gp->lu_gp_mem_list);
+	spin_lock_init(&lu_gp->lu_gp_lock);
 	lu_gp->lu_gp_alua_access_state = ALUA_ACCESS_STATE_ACTIVE_OPTMIZED;
 
 	spin_lock(&se_global->lu_gps_lock);
@@ -163,9 +165,27 @@ again:
 	return(lu_gp);
 }
 
+extern t10_alua_lu_gp_member_t *core_alua_allocate_lu_gp_mem (
+	se_device_t *dev)
+{
+	t10_alua_lu_gp_member_t *lu_gp_mem;
+
+	if (!(lu_gp_mem = kmem_cache_zalloc(t10_alua_lu_gp_mem_cache, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate t10_alua_lu_gp_member_t\n");
+		return(ERR_PTR(-ENOMEM));
+	}
+	INIT_LIST_HEAD(&lu_gp_mem->lu_gp_mem_list);
+	spin_lock_init(&lu_gp_mem->lu_gp_mem_lock);
+
+	lu_gp_mem->lu_gp_mem_dev = dev;
+	dev->dev_alua_lu_gp_mem = lu_gp_mem;
+
+	return(lu_gp_mem);
+}
+
 extern void core_alua_free_lu_gp (t10_alua_lu_gp_t *lu_gp)
 {
-	se_device_t *dev, *dev_tmp;
+	t10_alua_lu_gp_member_t *lu_gp_mem, *lu_gp_mem_tmp;
 	/*
 	 * Once we have reached this point, config_item_put() has
 	 * already been called from target_core_alua_drop_lu_gp().
@@ -175,28 +195,85 @@ extern void core_alua_free_lu_gp (t10_alua_lu_gp_t *lu_gp)
 	 * t10_alua_lu_gp_t.
 	 */
 	spin_lock(&se_global->lu_gps_lock);
+	atomic_set(&lu_gp->lu_gp_shutdown, 1);
 	list_del(&lu_gp->lu_gp_list);
 	se_global->alua_lu_gps_count--;
 	spin_unlock(&se_global->lu_gps_lock);
+	/*
+	 * Allow a t10_alua_lu_gp_t * referenced by core_alua_get_lu_gp_by_name()
+	 * in target_core_configfs.c:target_core_store_alua_lu_gp() to be released
+	 * with core_alua_put_lu_gp_from_name()
+	 */
+	while(atomic_read(&lu_gp->lu_gp_ref_cnt))
+		msleep(10);
+	/*
+	 * Release reference to t10_alua_lu_gp_t * from all associated
+	 * se_device_t.
+	 */
+	spin_lock(&lu_gp->lu_gp_lock);
+	list_for_each_entry_safe(lu_gp_mem, lu_gp_mem_tmp,
+				&lu_gp->lu_gp_mem_list, lu_gp_mem_list) {
+		if (lu_gp_mem->lu_gp_assoc) {
+			list_del(&lu_gp_mem->lu_gp_mem_list);
+			lu_gp->lu_gp_members--;
+			lu_gp_mem->lu_gp_assoc = 0;
+		}
+		spin_unlock(&lu_gp->lu_gp_lock);
+		/*
+		 *
+		 * lu_gp_mem is assoicated with a single se_device_t->dev_alua_lu_gp_mem,
+		 * and is released when se_device_t is released via
+		 * core_alua_free_lu_gp_mem().
+		 *
+		 * If the passed lu_gp does NOT match the default_lu_gp, assume we
+		 * want to re-assocate a given lu_gp_mem with default_lu_gp.
+		 */
+		spin_lock(&lu_gp_mem->lu_gp_mem_lock);
+		if (lu_gp != se_global->default_lu_gp)
+			__core_alua_attach_lu_gp_mem(lu_gp_mem, se_global->default_lu_gp);
+		else
+			lu_gp_mem->lu_gp = NULL;
+		spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 
-	spin_lock(&lu_gp->lu_gp_ref_lock);
-	list_for_each_entry_safe(dev, dev_tmp, &lu_gp->lu_gp_ref_list, dev_lu_gp_list) {
-		list_del(&dev->dev_lu_gp_list);	
-		spin_unlock(&lu_gp->lu_gp_ref_lock);
-
-		spin_lock(&dev->dev_alua_lock);
-		dev->dev_alua_lu_gp = NULL;
-		spin_unlock(&dev->dev_alua_lock);
-		
-		spin_lock(&lu_gp->lu_gp_ref_lock);
+		spin_lock(&lu_gp->lu_gp_lock);
 	}
-	spin_unlock(&lu_gp->lu_gp_ref_lock);
+	spin_unlock(&lu_gp->lu_gp_lock);
 
 	kmem_cache_free(t10_alua_lu_gp_cache, lu_gp);
 	return;
 }
 
-extern t10_alua_lu_gp_t *core_alua_get_lu_gp_by_name (se_device_t *dev, const char *name)
+extern void core_alua_free_lu_gp_mem (se_device_t *dev)
+{
+	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
+	t10_alua_t *alua = T10_ALUA(su_dev);
+	t10_alua_lu_gp_t *lu_gp;
+	t10_alua_lu_gp_member_t *lu_gp_mem;
+
+	if (alua->alua_type != SPC3_ALUA_EMULATED)
+		return;
+
+	if (!(lu_gp_mem = dev->dev_alua_lu_gp_mem))
+		return;
+
+	spin_lock(&lu_gp_mem->lu_gp_mem_lock);
+	if ((lu_gp = lu_gp_mem->lu_gp)) {
+		spin_lock(&lu_gp->lu_gp_lock);
+		if (lu_gp_mem->lu_gp_assoc) {
+			list_del(&lu_gp_mem->lu_gp_mem_list);
+			lu_gp->lu_gp_members--;
+			lu_gp_mem->lu_gp_assoc = 0;
+		}
+		spin_unlock(&lu_gp->lu_gp_lock);
+		lu_gp_mem->lu_gp = NULL;
+	}
+	spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
+
+	kmem_cache_free(t10_alua_lu_gp_mem_cache, lu_gp_mem);
+	return;
+}
+
+extern t10_alua_lu_gp_t *core_alua_get_lu_gp_by_name (const char *name)
 {
 	t10_alua_lu_gp_t *lu_gp;
 	struct config_item *ci;
@@ -215,66 +292,41 @@ extern t10_alua_lu_gp_t *core_alua_get_lu_gp_by_name (se_device_t *dev, const ch
 	return(NULL);
 }
 
-extern void core_alua_attach_lu_gp (se_device_t *dev, t10_alua_lu_gp_t *lu_gp)
+extern void core_alua_put_lu_gp_from_name (t10_alua_lu_gp_t *lu_gp)
 {
-	spin_lock(&lu_gp->lu_gp_ref_lock);
-	list_add_tail(&dev->dev_lu_gp_list, &lu_gp->lu_gp_ref_list);
-	lu_gp->lu_gp_members++;
-	spin_lock(&dev->dev_alua_lock);
-	dev->dev_alua_lu_gp = lu_gp;
-	spin_unlock(&dev->dev_alua_lock);
-	spin_unlock(&lu_gp->lu_gp_ref_lock);
+	spin_lock(&se_global->lu_gps_lock);
+	atomic_dec(&lu_gp->lu_gp_ref_cnt);
+	spin_unlock(&se_global->lu_gps_lock);
 
 	return;
 }
 
 /*
- * Called with se_device_t->dev_alua_lock held.
+ * Called with t10_alua_lu_gp_member_t->lu_gp_mem_lock
  */
-extern void __core_alua_put_lu_gp (se_device_t *dev, int clear)
+extern void __core_alua_attach_lu_gp_mem (t10_alua_lu_gp_member_t *lu_gp_mem, t10_alua_lu_gp_t *lu_gp)
 {
-	t10_alua_lu_gp_t *lu_gp;
-
-	if (!(lu_gp = dev->dev_alua_lu_gp)) 
-		return;
-
-	spin_lock(&lu_gp->lu_gp_ref_lock);
-	list_del(&dev->dev_lu_gp_list);
-	atomic_dec(&lu_gp->lu_gp_ref_cnt);
-	lu_gp->lu_gp_members--;
-	
-	if (!(clear)) {
-		spin_unlock(&lu_gp->lu_gp_ref_lock);
-		return;
-	}
-	dev->dev_alua_lu_gp = NULL;
-	spin_unlock(&lu_gp->lu_gp_ref_lock);
+	spin_lock(&lu_gp->lu_gp_lock);
+	lu_gp_mem->lu_gp = lu_gp;
+	lu_gp_mem->lu_gp_assoc = 1;
+	list_add_tail(&lu_gp_mem->lu_gp_mem_list, &lu_gp->lu_gp_mem_list);
+	lu_gp->lu_gp_members++;
+	spin_unlock(&lu_gp->lu_gp_lock);
 
 	return;
 }
 
-extern void core_alua_put_lu_gp (se_device_t *dev, int clear)
+/*
+ * Called with t10_alua_lu_gp_member_t->lu_gp_mem_lock
+ */
+extern void __core_alua_drop_lu_gp_mem (t10_alua_lu_gp_member_t *lu_gp_mem, t10_alua_lu_gp_t *lu_gp)
 {
-	t10_alua_lu_gp_t *lu_gp;
-
-	spin_lock(&dev->dev_alua_lock);
-	if (!(lu_gp = dev->dev_alua_lu_gp)) {
-		spin_unlock(&dev->dev_alua_lock);
-		return;
-	}
-	spin_lock(&lu_gp->lu_gp_ref_lock);
-	list_del(&dev->dev_lu_gp_list);
-	atomic_dec(&lu_gp->lu_gp_ref_cnt);
+	spin_lock(&lu_gp->lu_gp_lock);
+	list_del(&lu_gp_mem->lu_gp_mem_list);
+	lu_gp_mem->lu_gp = NULL;
+	lu_gp_mem->lu_gp_assoc = 0;
 	lu_gp->lu_gp_members--;
-
-	if (!(clear)) {
-		spin_unlock(&lu_gp->lu_gp_ref_lock);
-		spin_unlock(&dev->dev_alua_lock);
-		return;
-	}
-	dev->dev_alua_lu_gp = NULL;
-	spin_unlock(&lu_gp->lu_gp_ref_lock);
-	spin_unlock(&dev->dev_alua_lock);
+	spin_unlock(&lu_gp->lu_gp_lock);
 
 	return;
 }
@@ -513,6 +565,7 @@ extern int core_setup_alua (se_device_t *dev)
 {
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
 	t10_alua_t *alua = T10_ALUA(su_dev);
+	t10_alua_lu_gp_member_t *lu_gp_mem;
 	/*
 	 * If this device is from Target_Core_Mod/pSCSI, use the ALUA logic
 	 * of the Underlying SCSI hardware.  In Linux/SCSI terms, this can
@@ -531,14 +584,20 @@ extern int core_setup_alua (se_device_t *dev)
 	 * use emulated ALUA.
 	 */
 	if (TRANSPORT(dev)->get_device_rev(dev) >= SCSI_3) {
-		alua->alua_type = SPC3_ALUA_EMULATED;
 		printk("%s: Enabling ALUA Emulation for SPC-3 device\n",
 				TRANSPORT(dev)->name);
 		/*
 		 * Assoicate this se_device_t with the default ALUA
 		 * LUN Group.
 		 */
-		core_alua_attach_lu_gp(dev, se_global->default_lu_gp);	
+		if (!(lu_gp_mem = core_alua_allocate_lu_gp_mem(dev)))
+			return(-1);
+		
+		alua->alua_type = SPC3_ALUA_EMULATED;
+		spin_lock(&lu_gp_mem->lu_gp_mem_lock);
+		__core_alua_attach_lu_gp_mem(lu_gp_mem, se_global->default_lu_gp);	
+		spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
+
 		printk("%s: Adding to default ALUA LU Group: core/alua"
 			"/lu_gps/default_lu_gp\n", TRANSPORT(dev)->name);
 	} else {

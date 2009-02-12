@@ -651,7 +651,7 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_protocol_identifier (
 SE_DEV_WWN_ATTR(evpd_protocol_identifier, S_IRUGO | S_IWUSR);
 
 /*
- * Generic wrapper for dumping EVPD identifiers by assoication.
+ * Generic wrapper for dumping EVPD identifiers by association.
  */
 #define DEF_DEV_WWN_ASSOC_SHOW(_name, _assoc)					\
 static ssize_t target_core_dev_wwn_show_attr_##_name (				\
@@ -1252,18 +1252,27 @@ static ssize_t target_core_show_alua_lu_gp (void *p, char *page)
 	se_subsystem_dev_t *su_dev = (se_subsystem_dev_t *)p;
 	struct config_item *lu_ci;
 	t10_alua_lu_gp_t *lu_gp;
+	t10_alua_lu_gp_member_t *lu_gp_mem;
 	ssize_t len = 0;
 
 	if (!(dev = su_dev->se_dev_ptr)) 
 		return(-ENODEV);
 
-	spin_lock(&dev->dev_alua_lock);
-	if ((lu_gp = dev->dev_alua_lu_gp)) {
+	if (T10_ALUA(su_dev)->alua_type != SPC3_ALUA_EMULATED)
+		return(len);
+
+	if (!(lu_gp_mem = dev->dev_alua_lu_gp_mem)) {
+		printk(KERN_ERR "NULL se_device_t->dev_alua_lu_gp_mem pointer\n");
+		return(-EINVAL);
+	}
+
+	spin_lock(&lu_gp_mem->lu_gp_mem_lock);
+	if ((lu_gp = lu_gp_mem->lu_gp)) {
 		lu_ci = &lu_gp->lu_gp_group.cg_item;
 		len += sprintf(page, "LU Group Alias: %s\nLU Group ID: %hu\n",
 			config_item_name(lu_ci), lu_gp->lu_gp_id);
 	}
-	spin_unlock(&dev->dev_alua_lock);	
+	spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 
 	return(len);
 }
@@ -1273,8 +1282,9 @@ static ssize_t target_core_store_alua_lu_gp (void *p, const char *page, size_t c
 	se_device_t *dev;
 	se_subsystem_dev_t *su_dev = (se_subsystem_dev_t *)p;
 	se_hba_t *hba = su_dev->se_dev_hba;
-	t10_alua_lu_gp_t *lu_gp = NULL, *lu_gp_new;
-	unsigned char buf[256];
+	t10_alua_lu_gp_t *lu_gp = NULL, *lu_gp_new = NULL;
+	t10_alua_lu_gp_member_t *lu_gp_mem;
+	unsigned char buf[LU_GROUP_NAME_BUF];
 	int move = 0;
 
 	if (!(dev = su_dev->se_dev_ptr)) 
@@ -1286,16 +1296,38 @@ static ssize_t target_core_store_alua_lu_gp (void *p, const char *page, size_t c
 			config_item_name(&su_dev->se_dev_group.cg_item));
 		return(-EINVAL);
 	}
-	if (count > 256) {
+	if (count > LU_GROUP_NAME_BUF) {
 		printk(KERN_ERR "ALUA LU Group Alias too large!\n");
 		return(-EINVAL);
 	}
-	memset(buf, 0, 256);
+	memset(buf, 0, LU_GROUP_NAME_BUF);
 	memcpy(buf, page, count);
+	/*
+	 * Any ALUA logical unit alias besides "NULL" means we will be
+	 * making a new group association.
+	 */
+	if (strcmp(strstrip(buf), "NULL")) {
+		/*
+		 * core_alua_get_lu_gp_by_name() will increment reference to
+		 * t10_alua_lu_gp_t.  This reference is released with
+		 * core_alua_get_lu_gp_by_name below().
+		 */
+		if (!(lu_gp_new = core_alua_get_lu_gp_by_name(strstrip(buf))))
+			return(-ENODEV);
+	}
+	if (!(lu_gp_mem = dev->dev_alua_lu_gp_mem)) {
+		if (lu_gp_new)
+			core_alua_put_lu_gp_from_name(lu_gp_new);
+		printk(KERN_ERR "NULL se_device_t->dev_alua_lu_gp_mem pointer\n");
+		return(-EINVAL);
+	}
 
-	spin_lock(&dev->dev_alua_lock);
-	if ((lu_gp = dev->dev_alua_lu_gp)) {
-		if (!(strcmp(strstrip(buf), "NULL"))) {
+	spin_lock(&lu_gp_mem->lu_gp_mem_lock);
+	if ((lu_gp = lu_gp_mem->lu_gp)) {
+		/*
+		 * Clearing an existing lu_gp association, and replacing with NULL
+		 */
+		if (!(lu_gp_new)) {
 			printk("Target_Core_ConfigFS: Releasing %s/%s from ALUA"
 				" LU Group: core/alua/lu_gps/%s, ID: %hu\n",  
 				config_item_name(&hba->hba_group.cg_item),
@@ -1303,22 +1335,22 @@ static ssize_t target_core_store_alua_lu_gp (void *p, const char *page, size_t c
 				config_item_name(&lu_gp->lu_gp_group.cg_item),
 				lu_gp->lu_gp_id);
 
-			__core_alua_put_lu_gp(dev, 1);
-			spin_unlock(&dev->dev_alua_lock);
+			__core_alua_drop_lu_gp_mem(lu_gp_mem, lu_gp);
+			spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 
 			return(count);
 		}
-	}
-	spin_unlock(&dev->dev_alua_lock);
-
-	if (!(lu_gp_new = core_alua_get_lu_gp_by_name(dev, strstrip(buf))))
-		return(-ENODEV);
-
-	if (lu_gp) {
-		core_alua_put_lu_gp(dev, 0);
+		/*
+		 * Removing existing association of lu_gp_mem with lu_gp
+		 */
+		__core_alua_drop_lu_gp_mem(lu_gp_mem, lu_gp);
 		move = 1;
 	}
-	core_alua_attach_lu_gp(dev, lu_gp_new);
+	/*
+	 * Associate lu_gp_mem with lu_gp_new.
+	 */
+	__core_alua_attach_lu_gp_mem(lu_gp_mem, lu_gp_new);
+	spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 
 	printk("Target_Core_ConfigFS: %s %s/%s to ALUA LU Group:"
 		" core/alua/lu_gps/%s, ID: %hu\n",
@@ -1328,6 +1360,7 @@ static ssize_t target_core_store_alua_lu_gp (void *p, const char *page, size_t c
 		config_item_name(&lu_gp_new->lu_gp_group.cg_item),
 		lu_gp_new->lu_gp_id);
 
+	core_alua_put_lu_gp_from_name(lu_gp_new);
 	return(count);
 }
 
@@ -1434,13 +1467,15 @@ static ssize_t target_core_alua_lu_gp_show_attr_members (
 	se_device_t *dev;
 	se_hba_t *hba;
 	se_subsystem_dev_t *su_dev;
+	t10_alua_lu_gp_member_t *lu_gp_mem;
 	ssize_t len = 0, cur_len;
 	unsigned char buf[256];
 
 	memset(buf, 0, 256);
 
-	spin_lock(&lu_gp->lu_gp_ref_lock);
-	list_for_each_entry(dev, &lu_gp->lu_gp_ref_list, dev_lu_gp_list) {
+	spin_lock(&lu_gp->lu_gp_lock);
+	list_for_each_entry(lu_gp_mem, &lu_gp->lu_gp_mem_list, lu_gp_mem_list) {
+		dev = lu_gp_mem->lu_gp_mem_dev;
 		su_dev = dev->se_sub_dev;
 		hba = su_dev->se_dev_hba;
 
@@ -1457,7 +1492,7 @@ static ssize_t target_core_alua_lu_gp_show_attr_members (
 		memcpy(page+len, buf, cur_len);
 		len += cur_len;
 	}
-	spin_unlock(&lu_gp->lu_gp_ref_lock);
+	spin_unlock(&lu_gp->lu_gp_lock);
 
 	return(len);
 }

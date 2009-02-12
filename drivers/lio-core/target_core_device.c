@@ -764,8 +764,7 @@ extern int se_free_virtual_device (se_device_t *dev, se_hba_t *hba)
 	se_clear_dev_ports(dev);
 	spin_unlock(&hba->device_lock);
 
-	core_alua_put_lu_gp(dev, 1);	
-	
+	core_alua_free_lu_gp_mem(dev);	
 	se_release_device_for_hba(dev);
 	
 	return(0);

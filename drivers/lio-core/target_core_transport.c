@@ -210,7 +210,9 @@ struct kmem_cache *se_task_cache = NULL;
 struct kmem_cache *se_sess_cache = NULL;
 struct kmem_cache *t10_pr_reg_cache = NULL;
 struct kmem_cache *t10_alua_lu_gp_cache = NULL;
+struct kmem_cache *t10_alua_lu_gp_mem_cache = NULL;
 struct kmem_cache *t10_alua_tg_pt_gp_cache = NULL;
+struct kmem_cache *t10_alua_tg_pt_gp_mem_cache = NULL;
 
 EXPORT_SYMBOL(se_global);
 static int transport_generic_write_pending (se_cmd_t *);
@@ -292,10 +294,22 @@ extern int init_se_global (void)
 		printk(KERN_ERR "kmem_cache_create() for t10_alua_lu_gp_cache failed\n");
 		goto out;
 	}
+	if (!(t10_alua_lu_gp_mem_cache = kmem_cache_create("t10_alua_lu_gp_mem_cache",
+			sizeof(t10_alua_lu_gp_member_t), __alignof__(t10_alua_lu_gp_member_t),
+			0, NULL))) {
+		printk(KERN_ERR "kmem_cache_create() for t10_alua_lu_gp_mem_cache failed\n");
+		goto out;
+	}
 	if (!(t10_alua_tg_pt_gp_cache = kmem_cache_create("t10_alua_tg_pt_gp_cache",
 			sizeof(t10_alua_tg_pt_gp_t), __alignof__(t10_alua_tg_pt_gp_t),
 			0, NULL))) {
 		printk(KERN_ERR "kmem_cache_create() for t10_alua_tg_pt_gp_cache failed\n");
+		goto out;
+	}
+	if (!(t10_alua_tg_pt_gp_mem_cache = kmem_cache_create("t10_alua_tg_pt_gp_mem_cache",
+			sizeof(t10_alua_tg_pt_gp_member_t), __alignof__(t10_alua_tg_pt_gp_member_t),
+			0, NULL))) {
+		printk(KERN_ERR "kmem_cache_create() for t10_alua_tg_pt_gp_mem_t failed\n");
 		goto out;
 	}
 
@@ -340,8 +354,12 @@ out:
 		kmem_cache_destroy(t10_pr_reg_cache);
 	if (t10_alua_lu_gp_cache)
 		kmem_cache_destroy(t10_alua_lu_gp_cache);
+	if (t10_alua_lu_gp_mem_cache)
+		kmem_cache_destroy(t10_alua_lu_gp_mem_cache);
 	if (t10_alua_tg_pt_gp_cache)
 		kmem_cache_destroy(t10_alua_tg_pt_gp_cache);
+	if (t10_alua_tg_pt_gp_mem_cache)
+		kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
 	kfree(global);
         return(-1);
 }
@@ -360,7 +378,9 @@ extern void release_se_global (void)
 	kmem_cache_destroy(se_sess_cache);
 	kmem_cache_destroy(t10_pr_reg_cache);
 	kmem_cache_destroy(t10_alua_lu_gp_cache);
+	kmem_cache_destroy(t10_alua_lu_gp_mem_cache);
 	kmem_cache_destroy(t10_alua_tg_pt_gp_cache);
+	kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
 	kfree(global);
 
 	se_global = NULL;
@@ -2084,13 +2104,11 @@ extern se_device_t *transport_add_device_to_core_hba (
 	dev->transport		= transport;
 	atomic_set(&dev->active_cmds, 0);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
-	INIT_LIST_HEAD(&dev->dev_lu_gp_list);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_create_sem);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_done_sem);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_sem);
 	spin_lock_init(&dev->execute_task_lock);
 	spin_lock_init(&dev->state_task_lock);
-	spin_lock_init(&dev->dev_alua_lock);
 	spin_lock_init(&dev->dev_reservation_lock);
 	spin_lock_init(&dev->dev_status_lock);
 	spin_lock_init(&dev->dev_status_thr_lock);
@@ -2129,7 +2147,8 @@ extern se_device_t *transport_add_device_to_core_hba (
 	/*
 	 * Setup the Asymmetric Logical Unit Assignment for se_device_t
 	 */
-	core_setup_alua(dev);
+	if (core_setup_alua(dev) < 0)
+		goto out;
 	/*
 	 * Startup the se_device_t processing thread
 	 */	
@@ -4192,7 +4211,7 @@ extern int transport_generic_emulate_inquiry (
 		 */
 check_port:
 		if ((port = lun->lun_sep)) {	
-			t10_alua_lu_gp_t *lu_gp_p;
+			t10_alua_lu_gp_t *lu_gp;
 			t10_alua_tg_pt_gp_t *tg_pt_gp_p;
 			u32 padding, scsi_name_len;
 			u16 lu_gp_id = 0;
@@ -4259,10 +4278,16 @@ check_lu_gp:
 				len += 8;
 				goto check_scsi_name;
 			}
-			spin_lock(&dev->dev_alua_lock);
-			if ((lu_gp_p = dev->dev_alua_lu_gp))
-				lu_gp_id = lu_gp_p->lu_gp_id;
-			spin_unlock(&dev->dev_alua_lock);
+			if (!(dev->dev_alua_lu_gp_mem))
+				goto check_scsi_name;
+
+			spin_lock(&dev->dev_alua_lu_gp_mem->lu_gp_mem_lock);
+			if (!(lu_gp = dev->dev_alua_lu_gp_mem->lu_gp)) {
+				spin_unlock(&dev->dev_alua_lu_gp_mem->lu_gp_mem_lock);
+				goto check_scsi_name;
+			}
+			lu_gp_id = lu_gp->lu_gp_id;
+			spin_unlock(&dev->dev_alua_lu_gp_mem->lu_gp_mem_lock);
 
 			buf[off++] |= 0x1; // CODE SET == Binary
 			buf[off++] |= 0x6; // DESIGNATOR TYPE == Logical Unit Group identifier
