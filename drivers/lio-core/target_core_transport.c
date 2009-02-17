@@ -60,6 +60,7 @@
 #include <target_core_scdb.h>
 #include <target_core_pr.h>
 #include <target_core_alua.h>
+#include <target_core_tmr.h>
 #include <target_core_transport.h>
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
@@ -207,6 +208,7 @@ se_global_t *se_global;
 
 struct kmem_cache *se_cmd_cache = NULL;
 struct kmem_cache *se_task_cache = NULL;
+struct kmem_cache *se_tmr_req_cache = NULL;
 struct kmem_cache *se_sess_cache = NULL;
 struct kmem_cache *t10_pr_reg_cache = NULL;
 struct kmem_cache *t10_alua_lu_gp_cache = NULL;
@@ -274,6 +276,12 @@ extern int init_se_global (void)
 	if (!(se_task_cache = kmem_cache_create("se_task_cache",
 			sizeof(se_task_t), __alignof__(se_task_t), 0, NULL))) {
 		printk(KERN_ERR "kmem_cache_create for se_task_t failed\n");
+		goto out;
+	}
+	if (!(se_tmr_req_cache = kmem_cache_create("se_tmr_cache",
+			sizeof(se_tmr_req_t), __alignof__(se_tmr_req_t),
+			0, NULL))) {
+		printk(KERN_ERR "kmem_cache_create() for se_tmr_req_t failed\n");
 		goto out;
 	}
 	if (!(se_sess_cache = kmem_cache_create("se_sess_cache",
@@ -348,6 +356,8 @@ out:
 		kmem_cache_destroy(se_cmd_cache);
 	if (se_task_cache)
 		kmem_cache_destroy(se_task_cache);
+	if (se_tmr_req_cache)
+		kmem_cache_destroy(se_tmr_req_cache);
 	if (se_sess_cache)
 		kmem_cache_destroy(se_sess_cache);
 	if (t10_pr_reg_cache)
@@ -375,6 +385,7 @@ extern void release_se_global (void)
 	kfree(global->hba_list);
 	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_task_cache);
+	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
 	kmem_cache_destroy(t10_pr_reg_cache);
 	kmem_cache_destroy(t10_alua_lu_gp_cache);
@@ -2104,6 +2115,7 @@ extern se_device_t *transport_add_device_to_core_hba (
 	dev->transport		= transport;
 	atomic_set(&dev->active_cmds, 0);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
+	INIT_LIST_HEAD(&dev->dev_tmr_list);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_create_sem);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_done_sem);
 	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_sem);
@@ -2113,6 +2125,7 @@ extern se_device_t *transport_add_device_to_core_hba (
 	spin_lock_init(&dev->dev_status_lock);
 	spin_lock_init(&dev->dev_status_thr_lock);
 	spin_lock_init(&dev->se_port_lock);
+	spin_lock_init(&dev->se_tmr_lock);
 	spin_lock_init(&dev->dev_queue_obj->cmd_queue_lock);
 	
 	dev->queue_depth	= TRANSPORT(dev)->get_queue_depth(dev);
@@ -2687,6 +2700,9 @@ EXPORT_SYMBOL(transport_alloc_se_cmd);
 extern void transport_free_se_cmd (
 	se_cmd_t *se_cmd)
 {
+	if (se_cmd->se_tmr_req)
+		core_tmr_release_req(se_cmd->se_tmr_req);		
+
 	kfree(se_cmd->iov_data);
 	kfree(se_cmd->sense_buffer);
 	kfree(se_cmd->t_task);
@@ -2849,12 +2865,19 @@ EXPORT_SYMBOL(transport_generic_handle_data);
  *
  */
 extern int transport_generic_handle_tmr (
-	se_cmd_t *cmd,
-	se_tmr_req_t *req)
+	se_cmd_t *cmd)
 {
+	/*
+	 * This is needed for early exceptions.
+	 */
+	cmd->transport_wait_for_tasks = &transport_generic_wait_for_tasks;
+	CMD_ORIG_OBJ_API(cmd)->transport_setup_cmd(cmd->se_orig_obj_ptr, cmd);
+
 	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_TMR);
 	return(0);
 }
+
+EXPORT_SYMBOL(transport_generic_handle_tmr);
 
 /*	transport_stop_tasks_for_cmd():
  *
@@ -6969,123 +6992,49 @@ after_reason:
 
 EXPORT_SYMBOL(transport_send_check_condition_and_sense);
 
-/*	transport_generic_lun_reset():
- *
- *
- */
-static void transport_generic_lun_reset (se_device_t *dev)
-{
-	return;
-}
-
-/*	transport_generic_host_reset():
- *
- *
- */
-static void transport_generic_host_reset (se_hba_t *hba)
-{
-	return;
-}
-
-/*	transport_generic_cold_reset():
- *
- *
- */
-//#warning FIXME: COLD_RESET
-static void transport_generic_cold_reset (se_hba_t *hba)
-{
-#if 0
-	int i, reset_hba = 0;
-	iscsi_portal_group_t *tpg = NULL;
-	
-	return;
-
-	/*
-	 * Note that we change the tpg_state here and disallow
-	 * logins until after TARGET_COLD_RESET has completed
-	 * terminating all sessions on this target portal group.
-	 */
-	spin_lock(&iscsi_global->tpg_lock);
-	for (i = 0 ; i < TRANSPORT_MAX_TPGS; i++) {
-		tpg = &iscsi_global->tpg_list[i];
-		spin_lock(&tpg->tpg_state_lock);
-		if (tpg->tpg_state == TPG_STATE_COLD_RESET) {
-			spin_unlock(&tpg->tpg_state_lock);
-			continue;
-		}
-		if (tpg->tpg_state != TPG_STATE_ACTIVE) {
-			spin_unlock(&tpg->tpg_state_lock);
-			continue;
-		}
-		tpg->tpg_state = TPG_STATE_COLD_RESET;
-		spin_unlock(&tpg->tpg_state_lock);
-
-		iscsi_clear_tpg_np_login_threads(tpg);
-		
-		iscsi_release_sessions_for_tpg(tpg, 1);
-		
-		if (reset_hba) {
-			/*
-			 * Call iSCSI Transport HOST_ABORT for each addtpgtohba.
-			 */	
-		}
-		
-		spin_lock(&tpg->tpg_state_lock);
-		tpg->tpg_state = TPG_STATE_ACTIVE;
-		spin_unlock(&tpg->tpg_state_lock);
-	}
-#endif
-
-	return;
-}
-
 /*	transport_generic_do_tmr():
  *
  *
  */
-#warning FIXME: transport_generic_do_tmr() broken
 extern int transport_generic_do_tmr (se_cmd_t *cmd)
 {
-#if 0
 	se_cmd_t *ref_cmd;
-	se_device_t *dev = ISCSI_DEV(cmd);
-	iscsi_tmr_req_t *req = cmd->tmr_req;
+	se_device_t *dev = SE_DEV(cmd);
+	se_tmr_req_t *tmr = cmd->se_tmr_req;
+	int ret;
 
-	if (TRANSPORT(dev)->do_tmr)
-		return(TRANSPORT(dev)->do_tmr(cmd));
-	
-	switch (req->function) {
+	switch (tmr->function) {
 	case ABORT_TASK:
-		ref_cmd = req->ref_cmd;
-		req->response = FUNCTION_REJECTED;
+		ref_cmd = tmr->ref_cmd;
+		tmr->response = FUNCTION_REJECTED;
 		break;
 	case ABORT_TASK_SET:
 	case CLEAR_ACA:
 	case CLEAR_TASK_SET:
-		req->response = FUNCTION_REJECTED;
+		tmr->response = TASK_MGMT_FUNCTION_NOT_SUPPORTED;
 		break;
 	case LUN_RESET:
-		transport_generic_lun_reset(dev);
-		req->response = FUNCTION_REJECTED;
+		ret = core_tmr_lun_reset(dev, tmr);
+		tmr->response = (!ret) ? FUNCTION_COMPLETE :
+					 FUNCTION_REJECTED;
 		break;
+#if 0
 	case TARGET_WARM_RESET:
 		transport_generic_host_reset(dev->se_hba);
-		req->response = FUNCTION_REJECTED;
+		tmr->response = FUNCTION_REJECTED;
 		break;
 	case TARGET_COLD_RESET:
 		transport_generic_host_reset(dev->se_hba);
 		transport_generic_cold_reset(dev->se_hba);
-		req->response = FUNCTION_COMPLETE;
+		tmr->response = FUNCTION_REJECTED;
 		break;
+#endif
 	default:
-		TRACE_ERROR("Unknown TMR function: 0x%02x.\n",
-				req->function);
-		req->response = FUNCTION_REJECTED;
+		printk(KERN_ERR "Uknown TMR function: 0x%02x.\n",
+				tmr->function);
+		tmr->response = FUNCTION_REJECTED;
 		break;
 	}
-#else
-	BUG();
-#endif
 
 	cmd->t_state = TRANSPORT_ISTATE_PROCESSING;
 	CMD_TFO(cmd)->queue_tm_rsp(cmd);

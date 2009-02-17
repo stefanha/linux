@@ -454,6 +454,7 @@ typedef struct se_cmd_s {
 	void			*se_orig_obj_ptr;
 	void			*se_fabric_cmd_ptr;
 	struct se_session_s	*se_sess;
+	struct se_tmr_req_s	*se_tmr_req;
 	struct se_transport_task_s *t_task;
 	struct target_core_fabric_ops *se_tfo;
         struct se_cmd_s      	*l_next;
@@ -485,7 +486,16 @@ typedef struct se_cmd_s {
 #define CMD_TFO(cmd) ((struct target_core_fabric_ops *)cmd->se_tfo)
 
 typedef struct se_tmr_req_s {
+	u8			function; // Task Management function to be preformed
+	u8			response; // Task Management response to send 
+	int			call_transport;
+	u32			ref_task_tag; // Reference to ITT that Task Mgmt should be preformed 	
+	u64			ref_task_lun; // 64-bit encoded SAM LUN from $FABRIC_MOD TMR header
 	void 			*fabric_tmr_ptr;	
+	se_cmd_t		*task_cmd;
+	se_cmd_t		*ref_cmd;
+	struct se_lun_s		*tmr_lun;
+	struct list_head	tmr_list;
 } ____cacheline_aligned se_tmr_req_t;
 
 typedef struct se_node_acl_s {
@@ -595,7 +605,7 @@ typedef struct se_device_s {
 	u32			dev_status;
 	u32			dev_tcq_window_closed;
 	u32			queue_depth;	/* Physical device queue depth */
-	unsigned long long		dev_sectors_total;
+	unsigned long long	dev_sectors_total;
 	void 			*dev_ptr; 	/* Pointer to transport specific device structure */
 #ifdef SNMP_SUPPORT
 	u32			dev_index;
@@ -624,10 +634,12 @@ typedef struct se_device_s {
 	spinlock_t		dev_status_lock;
 	spinlock_t		dev_status_thr_lock;
 	spinlock_t		se_port_lock;
+	spinlock_t		se_tmr_lock;
 	struct se_node_acl_s	*dev_reserved_node_acl; /* Used for legacy SPC-2 reservationsa */
 	struct t10_alua_lu_gp_member_s *dev_alua_lu_gp_mem; /* Used for ALUA Logical Unit Group membership */
 	struct t10_pr_registration_s *dev_pr_res_holder; /* Used for SPC-3 Persistent Reservations */
 	struct list_head	dev_sep_list;
+	struct list_head	dev_tmr_list;
 	struct timer_list		dev_status_timer;
 	struct task_struct		*process_thread; /* Pointer to descriptor for processing thread */
         pid_t                   process_thread_pid;
