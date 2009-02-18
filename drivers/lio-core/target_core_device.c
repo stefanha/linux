@@ -270,8 +270,8 @@ extern int __transport_get_lun_for_cmd (
 
                 se_lun = se_cmd->se_lun = deve->se_lun;
                 se_cmd->orig_fe_lun = unpacked_lun;
-                se_cmd->se_orig_obj_api = ISCSI_LUN(se_cmd)->lun_obj_api;
-                se_cmd->se_orig_obj_ptr = ISCSI_LUN(se_cmd)->lun_type_ptr;
+                se_cmd->se_orig_obj_api = SE_LUN(se_cmd)->lun_obj_api;
+                se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
 		se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
         }
 out:
@@ -297,6 +297,7 @@ out:
         /*
          * Determine if the se_lun_t is online.
          */
+#warning FIXME: Check for LUN_RESET + UNIT Attention
         if (LUN_OBJ_API(se_lun)->check_online(se_lun->lun_type_ptr) != 0) {
 		se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;	
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -332,13 +333,53 @@ out:
 	return(0);
 }
 
-#warning FIXME: Complete transport_get_lun_for_tmr()
 extern int transport_get_lun_for_tmr (
 	se_cmd_t *se_cmd,
 	u32 unpacked_lun)
 {
-	return(-1);
+	se_device_t *dev;
+	se_dev_entry_t *deve;
+	se_lun_t *se_lun = NULL;
+	se_session_t *se_sess = SE_SESS(se_cmd);
+	se_tmr_req_t *se_tmr = se_cmd->se_tmr_req;
+
+	spin_lock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	deve = se_cmd->se_deve = &SE_NODE_ACL(se_sess)->device_list[unpacked_lun];
+	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
+		se_lun = se_cmd->se_lun = se_tmr->tmr_lun = deve->se_lun;
+		dev = se_lun->se_dev;
+		se_cmd->orig_fe_lun = unpacked_lun;
+		se_cmd->se_orig_obj_api = SE_LUN(se_cmd)->lun_obj_api;
+		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
+//		se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
+	}
+	spin_unlock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+
+	if (!se_lun) {
+		printk("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
+			" Access for 0x%08x\n",
+			CMD_TFO(se_cmd)->get_fabric_name(),
+			unpacked_lun);
+		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		return(-1);
+	}
+	/*
+	 * Determine if the se_lun_t is online.
+	 */
+#warning FIXME: Check for LUN_RESET + UNIT Attention
+	if (LUN_OBJ_API(se_lun)->check_online(se_lun->lun_type_ptr) != 0) {
+		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		return(-1);
+	}
+
+	spin_lock(&dev->se_tmr_lock);
+	list_add_tail(&se_tmr->tmr_list, &dev->dev_tmr_list);
+	spin_unlock(&dev->se_tmr_lock);
+
+	return(0);
 }
+
+EXPORT_SYMBOL(transport_get_lun_for_tmr);
 
 extern int core_free_device_list_for_node (se_node_acl_t *nacl, se_portal_group_t *tpg)
 {

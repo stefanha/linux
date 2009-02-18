@@ -2335,13 +2335,11 @@ static inline int iscsi_handle_task_mgt_cmd (
 	iscsi_conn_t *conn,
 	unsigned char *buf)
 {
-	__u8 response;
-	int call_transport = 0, cmdsn_ret, out_of_order_cmdsn = 0;
 	iscsi_cmd_t *cmd;
-	se_device_t *dev = NULL;
-	se_lun_t *lun = NULL;
+	se_tmr_req_t *se_tmr;
 	iscsi_tmr_req_t *tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr;
+	int cmdsn_ret, out_of_order_cmdsn = 0, ret;
 
 	hdr			= (struct iscsi_init_task_mgt_cmnd *) buf;
 	hdr->length		= be32_to_cpu(hdr->length);
@@ -2365,6 +2363,7 @@ static inline int iscsi_handle_task_mgt_cmd (
 	if ((hdr->function != ABORT_TASK) && ((hdr->function != TASK_REASSIGN) &&
 	    (hdr->ref_task_tag != RESERVED))) {
 		TRACE_ERROR("RefTaskTag should be set to 0xFFFFFFFF.\n");
+		hdr->ref_task_tag = RESERVED;
 	}
 
 	if ((hdr->function == TASK_REASSIGN) && !(hdr->opcode & I_BIT)) {
@@ -2373,120 +2372,113 @@ static inline int iscsi_handle_task_mgt_cmd (
 				"implementation\n");
 		return(iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn));
 	}
-#if 0
 	if ((hdr->function != ABORT_TASK) && (hdr->ref_cmd_sn != RESERVED)) {
 		TRACE_ERROR("RefCmdSN should be set to 0xFFFFFFFF.\n"); 
+		hdr->ref_cmd_sn = RESERVED;
 	}
-#endif
-	if (!(tmr_req = iscsi_allocate_tmr_req()))
+
+	if (!(cmd = iscsi_allocate_se_cmd_for_tmr(conn, hdr->function))) 
 		return(iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn));
 
-	tmr_req->function = hdr->function;
-	switch (hdr->function) {
+	cmd->iscsi_opcode	= ISCSI_INIT_TASK_MGMT_CMND;
+	cmd->i_state		= ISTATE_SEND_TASKMGTRSP;
+	cmd->immediate_cmd	= ((hdr->opcode & I_BIT) ? 1:0);
+	cmd->init_task_tag	= hdr->init_task_tag;
+	cmd->targ_xfer_tag	= 0xFFFFFFFF;
+	cmd->cmd_sn		= hdr->cmd_sn;
+	cmd->exp_stat_sn	= hdr->exp_stat_sn;
+	se_tmr			= SE_CMD(cmd)->se_tmr_req;
+	tmr_req			= cmd->tmr_req;
+	/*
+	 * Locate the se_lun_t for all TMRs not related to ERL=2 TASK_REASSIGN
+	 */
+	if (se_tmr->function != TASK_REASSIGN) {
+		if ((ret = iscsi_get_lun_for_tmr(cmd, hdr->lun)) < 0) {
+			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+			se_tmr->response = LUN_DOES_NOT_EXIST;
+			goto attach;
+		}
+	}
+
+	switch (se_tmr->function) {
 	case ABORT_TASK:
-		response = iscsi_tmr_abort_task(conn, tmr_req, &lun, buf);
+		se_tmr->response = iscsi_tmr_abort_task(cmd, buf);
+		if (se_tmr->response != FUNCTION_COMPLETE) {
+			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+			goto attach;
+		}
 		break;
 	case ABORT_TASK_SET:
-		response = iscsi_tmr_abort_task_set(conn, tmr_req, &lun, buf);
-		break;
 	case CLEAR_ACA:
-		response = iscsi_tmr_clear_aca(conn, tmr_req, &lun, buf);
-		break;
 	case CLEAR_TASK_SET:
-		response = iscsi_tmr_clear_task_set(conn, tmr_req, &lun, buf);
-		break;
 	case LUN_RESET:
-		response = iscsi_tmr_lun_reset(conn, tmr_req, &lun, buf);
 		break;
 	case TARGET_WARM_RESET:
-		response = iscsi_tmr_task_warm_reset(conn, tmr_req, buf);
+		if (iscsi_tmr_task_warm_reset(conn, tmr_req, buf) < 0) {
+			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+			se_tmr->response = FUNCTION_AUTHORIZATION_FAILED;
+			goto attach;
+		}
 		break;
 	case TARGET_COLD_RESET:
-		response = iscsi_tmr_task_cold_reset(conn, tmr_req, buf);
+		if (iscsi_tmr_task_cold_reset(conn, tmr_req, buf) < 0) {
+			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+			se_tmr->response = FUNCTION_AUTHORIZATION_FAILED;
+			goto attach;
+		}
 		break;
 	case TASK_REASSIGN:
-		response = iscsi_tmr_task_reassign(conn, tmr_req, buf);
+		se_tmr->response = iscsi_tmr_task_reassign(cmd, buf);
 		/*
 		 * Perform sanity checks on the ExpDataSN only if the
 		 * TASK_REASSIGN was successful.
 		 */
-		if (response != FUNCTION_COMPLETE)
+		if (se_tmr->response != FUNCTION_COMPLETE)
 			break;
 			
-		if (iscsi_check_task_reassign_expdatasn(tmr_req, conn) < 0) {
-			iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn);
-			kfree(tmr_req);
-			return(-1);
-		}
+		if (iscsi_check_task_reassign_expdatasn(tmr_req, conn) < 0) 
+			return(iscsi_add_reject_from_cmd(REASON_INVALID_PDU_FIELD,
+				1, 1, buf, cmd));
 		break;
 	default:
 		TRACE_ERROR("Unknown TMR function: 0x%02x, protocol"
 			" error.\n", hdr->function);
-		kfree(tmr_req);
-		return(-1);
+		SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		se_tmr->response = TASK_MGMT_FUNCTION_NOT_SUPPORTED;
+		goto attach;
 	}
 
-	if ((hdr->function != TASK_REASSIGN) && (response == FUNCTION_COMPLETE))
-		call_transport = 1;
-
-	if (call_transport && !dev) {
-		TRACE_ERROR("Need to call transport for TMR request, but"
-			" iscsi_dev is NULL. Cannot continue.\n");
-		kfree(tmr_req);
-		return(-1);
-	}
+	if ((hdr->function != TASK_REASSIGN) &&
+	    (se_tmr->response == FUNCTION_COMPLETE))
+		se_tmr->call_transport = 1;
+attach:
+	iscsi_attach_cmd_to_queue(conn, cmd);
 		
-	if (!(cmd = iscsi_allocate_cmd(conn))) {
-		iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
-		kfree(tmr_req);
-		return (-1);
-	}
-
-	cmd->iscsi_opcode		= ISCSI_INIT_TASK_MGMT_CMND;
-	cmd->i_state			= ISTATE_SEND_TASKMGTRSP;
-	cmd->immediate_cmd		= ((hdr->opcode & I_BIT) ? 1:0);
-#warning FIXME: iscsi_handle_task_mgt_cmd() broken for iscsi_lun
-//	cmd->iscsi_lun			= lun;
-	BUG();
-	SESS(conn)->init_task_tag = cmd->init_task_tag	= hdr->init_task_tag;
-	cmd->targ_xfer_tag		= 0xFFFFFFFF;
-	cmd->cmd_sn			= hdr->cmd_sn;
-	cmd->exp_stat_sn		= hdr->exp_stat_sn;
-	cmd->tmr_req			= tmr_req;	
-	tmr_req->call_transport		= call_transport;
-	tmr_req->function		= hdr->function;
-	tmr_req->response		= response;
-	tmr_req->task_cmd		= cmd;
-
 	if (!(hdr->opcode & I_BIT)) {
-		cmdsn_ret = iscsi_check_received_cmdsn
-				(conn, cmd, hdr->cmd_sn);
+		cmdsn_ret = iscsi_check_received_cmdsn(conn,
+				cmd, hdr->cmd_sn);
 		if (cmdsn_ret == CMDSN_NORMAL_OPERATION)
 			do {} while(0);
 		else if (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)
 			out_of_order_cmdsn = 1;
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			__iscsi_release_cmd_to_pool(cmd, SESS(conn));
-			kfree(tmr_req);
+			cmd->i_state = ISTATE_REMOVE;
+			iscsi_add_cmd_to_immediate_queue(cmd, conn, cmd->i_state);
 			return(0);
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR, 1, 0, buf, cmd);
-			kfree(tmr_req);
-			return(-1);
+			return(iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+					1, 0, buf, cmd));
 		}
 	}
-
 	iscsi_ack_from_expstatsn(conn, hdr->exp_stat_sn);
-	iscsi_attach_cmd_to_queue(conn, cmd);
 
 	if (out_of_order_cmdsn)
 		return(0);
-	
 	/* 
 	 * Found the referenced task, send to transport for processing.
 	 */
-	if (call_transport)
-		return(transport_generic_handle_tmr(SE_CMD(cmd), tmr_req));
+	if (se_tmr->call_transport)
+		return(transport_generic_handle_tmr(SE_CMD(cmd)));
 
 	/* 
 	 * Could not find the referenced LUN, task, or Task Management
@@ -2497,7 +2489,6 @@ static inline int iscsi_handle_task_mgt_cmd (
 	 * TMR TASK_REASSIGN.
 	 */
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
-
 	return(0);
 }
 
@@ -4051,14 +4042,14 @@ static int iscsi_send_task_mgt_rsp (
 	iscsi_cmd_t *cmd,
 	iscsi_conn_t *conn)
 {
-	__u32 tx_size = 0;
-	iscsi_tmr_req_t *tmr_req = cmd->tmr_req;
+	se_tmr_req_t *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_targ_task_mgt_rsp *hdr;
+	u32 tx_size = 0;
 	
 	hdr			= (struct iscsi_targ_task_mgt_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
 	hdr->opcode		= ISCSI_TARG_TASK_MGMT_RSP;
-	hdr->response		= tmr_req->response;
+	hdr->response		= se_tmr->response;
 	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);

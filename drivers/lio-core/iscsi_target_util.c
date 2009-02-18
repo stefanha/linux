@@ -51,6 +51,7 @@
 
 #include <target_core_base.h>
 #include <target_core_transport.h>
+#include <target_core_tmr.h>
 
 #include <iscsi_target_core.h>
 #include <iscsi_target_datain_values.h>
@@ -367,17 +368,45 @@ out:
  *
  *
  */
-extern iscsi_tmr_req_t *iscsi_allocate_tmr_req (void)
+extern iscsi_cmd_t *iscsi_allocate_se_cmd_for_tmr (
+	iscsi_conn_t *conn,
+	u8 function)
 {
-	iscsi_tmr_req_t *tmr_req = NULL;
+	iscsi_cmd_t *cmd;
+	se_cmd_t *se_cmd = NULL;
 
-	if (!(tmr_req = (iscsi_tmr_req_t *) kmalloc(sizeof(iscsi_tmr_req_t), GFP_ATOMIC))) {
-		TRACE_ERROR("Unable to allocate memory for Task Management command!\n");
-		return NULL;
+	if (!(cmd = iscsi_allocate_cmd(conn)))
+		return(NULL);	
+
+	cmd->data_direction = SE_DIRECTION_NONE;
+
+	if (!(cmd->tmr_req = (iscsi_tmr_req_t *) kzalloc(sizeof(iscsi_tmr_req_t), GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate memory for Task Management command!\n");
+		return(NULL);
 	}
-	memset(tmr_req, 0, sizeof(iscsi_tmr_req_t));
+	/*
+	 * TASK_REASSIGN for ERL=2 / connection stays inside of LIO-Target $FABRIC_MOD
+	 */
+	if (function == TASK_REASSIGN)
+		return(cmd);
 
-	return(tmr_req);
+	if (!(cmd->se_cmd = transport_alloc_se_cmd(&lio_target_fabric_configfs->tf_ops,
+			SESS(conn)->se_sess, (void *)cmd, 0, SE_DIRECTION_NONE)))
+		goto out;
+
+	se_cmd = cmd->se_cmd;
+
+	if (!(se_cmd->se_tmr_req = core_tmr_alloc_req((void *)cmd->tmr_req, function))) 
+		goto out;
+
+	cmd->tmr_req->se_tmr_req = se_cmd->se_tmr_req;
+
+	return(cmd);
+out:
+	iscsi_release_cmd_to_pool(cmd);
+	if (se_cmd)
+		transport_free_se_cmd(se_cmd);	
+	return(NULL);
 }
 
 /*	iscsi_decide_list_to_build():
@@ -1072,6 +1101,8 @@ extern void iscsi_release_cmd_direct (iscsi_cmd_t *cmd)
 		kfree(cmd->pdu_list);
 	if (cmd->seq_list)
 		kfree(cmd->seq_list);
+	if (cmd->tmr_req)
+		kfree(cmd->tmr_req);
 
 	kmem_cache_free(lio_cmd_cache, cmd);
 	return;
@@ -1099,6 +1130,8 @@ extern void __iscsi_release_cmd_to_pool (iscsi_cmd_t *cmd, iscsi_session_t *sess
 		kfree(cmd->pdu_list);
 	if (cmd->seq_list)
 		kfree(cmd->seq_list);
+	if (cmd->tmr_req)
+		kfree(cmd->tmr_req);
 	
 	if (conn)
 		iscsi_remove_cmd_from_tx_queues(cmd, conn);

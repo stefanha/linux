@@ -462,16 +462,10 @@ typedef struct iscsi_cmd_s {
 #include <iscsi_seq_and_pdu_list.h>
 
 typedef struct iscsi_tmr_req_s {
-	__u8			function;	/* Task Management function to be preformed */
-	__u8			response;	/* Task Management response to send */ 
-	int			call_transport;
-	__u32			ref_task_tag;	/* Reference to ITT that Task Mgmt should be preformed */
-	__u32			ref_cmd_sn;
-	__u32			exp_data_sn;
-	__u64			ref_task_lun;
-	iscsi_cmd_t		*task_cmd;
-	iscsi_cmd_t		*ref_cmd;
+	u32			ref_cmd_sn;
+	u32			exp_data_sn;
 	struct iscsi_conn_recovery_s *conn_recovery;
+	struct se_tmr_req_s	*se_tmr_req;
 } ____cacheline_aligned iscsi_tmr_req_t;			
 
 typedef struct iscsi_conn_s {					

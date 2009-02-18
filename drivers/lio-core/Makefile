@@ -37,6 +37,7 @@ target_core_mod-objs			:=	target_core_configfs.o \
 						target_core_alua.o \
 						target_core_scdb.o \
 						target_core_seobj.o \
+						target_core_tmr.o \
 						target_core_tpg.o \
 						target_core_transport.o \
 

@@ -548,7 +548,7 @@ static int scsi_tgt_dev_seq_show(struct seq_file *seq, void *v)
 				
 		seq_printf(seq, "%u %u %u %s %u %u\n",
 			   hba->hba_index, dev->dev_index, LU_COUNT,
-			   status, non_accessible_lus, 0);
+			   status, non_accessible_lus, dev->num_resets);
 	}
 	spin_unlock(&hba->device_lock);
 
@@ -833,7 +833,7 @@ static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "inst dev indx LUN lu_name vend prod rev"
 		" dev_type status state-bit num_cmds read_mbytes"
-		" write_mbytes rests full_stat hs_num_cmds creation_time\n");
+		" write_mbytes resets full_stat hs_num_cmds creation_time\n");
 
 	if (!(hba = core_get_hba_from_id(iterp->ti_offset, 0))) {
 		/* Log error ? */
@@ -881,7 +881,7 @@ static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 			   (unsigned long long)dev->num_cmds,
 			   (u32)(dev->read_bytes >> 20),  /* scsiLuReadMegaBytes */
 			   (u32)(dev->write_bytes >> 20), /* scsiLuWrittenMegaBytes */
-			   0, /* scsiLuInResets */
+			   dev->num_resets, /* scsiLuInResets */
 			   0, /* scsiLuOutTaskSetFullStatus */
 			   0, /* scsiLuHSInCommands */
 			   (u32)(((u32)dev->creation_time - INITIAL_JIFFIES)*100/HZ));
