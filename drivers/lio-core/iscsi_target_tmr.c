@@ -63,176 +63,49 @@ extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
  *	Called from iscsi_handle_task_mgt_cmd().
  */
 extern __u8 iscsi_tmr_abort_task (
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
-	se_lun_t **lun,
+	iscsi_cmd_t *cmd,
 	unsigned char *buf)
 {
 	iscsi_cmd_t *ref_cmd;
+	iscsi_conn_t *conn = CONN(cmd);
+	iscsi_tmr_req_t *tmr_req = cmd->tmr_req;
+	se_tmr_req_t *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
 	
-//#warning FIXME: ABORT_TASK always sends FUNCTION_REJECTED
-	return(FUNCTION_REJECTED);
-		
-	if (!(*lun = iscsi_get_lun(conn, hdr->lun))) {
-		TRACE_ERROR("Responding to non-acl'ed, non-existant or"
-			" non-exported LUN: 0x%016Lx\n",
-				(unsigned long long)hdr->lun);
-		return(LUN_DOES_NOT_EXIST);
-	}
-
 	if (!(ref_cmd = iscsi_find_cmd_from_itt(conn, hdr->ref_task_tag))) {
-		TRACE_ERROR("Unable to locate RefTaskTag: 0x%08x on CID: %hu.\n",
+		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x on CID: %hu.\n",
 				hdr->ref_task_tag, conn->cid);
 		return(((hdr->ref_cmd_sn >= SESS(conn)->exp_cmd_sn) &&
 			(hdr->ref_cmd_sn <= SESS(conn)->max_cmd_sn)) ?
 				FUNCTION_COMPLETE : TASK_DOES_NOT_EXIST);
 	}
-
+	if (!(ref_cmd->se_cmd)) {
+		printk(KERN_ERR "ref_cmd->se_cmd for RefTaskTag: 0x%08x is"
+			" NULL!\n", hdr->ref_task_tag);
+		return(TASK_DOES_NOT_EXIST);
+	}
 	if (ref_cmd->cmd_sn != hdr->ref_cmd_sn) {
-		TRACE_ERROR("RefCmdSN 0x%08x does not equal"
+		printk(KERN_ERR "RefCmdSN 0x%08x does not equal"
 			" task's CmdSN 0x%08x. Rejecting ABORT_TASK.\n",
 			hdr->ref_cmd_sn, ref_cmd->cmd_sn);
 		return(FUNCTION_REJECTED);
 	}
 
-	tmr_req->ref_task_tag		= hdr->ref_task_tag;
+	se_tmr->ref_task_tag		= hdr->ref_task_tag;
+	se_tmr->ref_cmd			= ref_cmd->se_cmd;
+	se_tmr->ref_task_lun		= hdr->lun;
 	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
 	tmr_req->exp_data_sn		= hdr->exp_data_sn;
-	tmr_req->ref_task_lun		= hdr->lun;
-	tmr_req->ref_cmd		= ref_cmd;
 	
 	return(FUNCTION_COMPLETE);
-}
-
-/*	iscsi_tmr_abort_task_set():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
-//#warning FIXME: Add support for ABORT_TASK_SET
-extern __u8 iscsi_tmr_abort_task_set (
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
-	se_lun_t **lun,
-	unsigned char *buf)
-{
-	struct iscsi_init_task_mgt_cmnd *hdr =
-		(struct iscsi_init_task_mgt_cmnd *) buf;
-
-	if (!(*lun = iscsi_get_lun(conn, hdr->lun))) {
-		TRACE_ERROR("Responding to non-acl'ed, non-existant or"
-			" non-exported LUN: 0x%016Lx\n",
-				(unsigned long long)hdr->lun);
-		return(LUN_DOES_NOT_EXIST);
-	}
-
-	return(TASK_MGMT_FUNCTION_NOT_SUPPORTED);
-}
-
-/*	iscsi_tmr_clear_aca():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
-//#warning FIXME: Add support for CLEAR_ACA
-extern __u8 iscsi_tmr_clear_aca (
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
-	se_lun_t **lun,
-	unsigned char *buf)
-{
-	struct iscsi_init_task_mgt_cmnd *hdr =
-		(struct iscsi_init_task_mgt_cmnd *) buf;
-
-	if (!(*lun = iscsi_get_lun(conn, hdr->lun))) {
-		TRACE_ERROR("Responding to non-acl'ed, non-existant or"
-			" non-exported LUN: 0x%016Lx\n",
-				(unsigned long long)hdr->lun);
-		return(LUN_DOES_NOT_EXIST);
-	}
-
-	return(TASK_MGMT_FUNCTION_NOT_SUPPORTED);
-}
-
-/*	iscsi_tmr_clear_task_set():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
-//#warning FIXME: Add support for CLEAR_TASK_SET
-extern __u8 iscsi_tmr_clear_task_set (
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
-	se_lun_t **lun,
-	unsigned char *buf)
-{
-	struct iscsi_init_task_mgt_cmnd *hdr =
-		(struct iscsi_init_task_mgt_cmnd *) buf;
-	
-	if (!(*lun = iscsi_get_lun(conn, hdr->lun))) {
-		TRACE_ERROR("Responding to non-acl'ed, non-existant or"
-			" non-exported LUN: 0x%016Lx\n",
-				(unsigned long long)hdr->lun);
-		return(LUN_DOES_NOT_EXIST);
-	}
-
-	return(TASK_MGMT_FUNCTION_NOT_SUPPORTED);
-}
-
-/*	iscsi_tmr_check_LUN_RESET_acl():
- *
- *
- */
-//#warning FIXME: Add support for LUN_RESET ACL.
-#if 0
-static int iscsi_tmr_check_LUN_RESET_acl (
-	iscsi_tmr_req_t *tmr_req,
-	se_lun_t *lun,
-	iscsi_session_t *sess)
-{
-	TRACE_ERROR("TMR Opcode: LUN_RESET authorization failed for Initiator"
-		" Node: %s\n", SESS_NODE_ACL(sess)->initiatorname);
-	
-	return(-1);
-}
-#endif
-
-/*	iscsi_tmr_lun_reset():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
-extern __u8 iscsi_tmr_lun_reset (
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
-	se_lun_t **lun,
-	unsigned char *buf)
-{
-#if 0
-	iscsi_session_t *sess = SESS(conn);
-#endif
-	struct iscsi_init_task_mgt_cmnd *hdr =
-		(struct iscsi_init_task_mgt_cmnd *) buf;
-	
-	if (!(*lun = iscsi_get_lun(conn, hdr->lun))) {
-		TRACE_ERROR("Responding to non-acl'ed, non-existant or"
-			" non-exported LUN: 0x%016Lx\n",
-				(unsigned long long)hdr->lun);
-		return(LUN_DOES_NOT_EXIST);
-	}
-#if 0
-	if (iscsi_tmr_check_LUN_RESET_acl(tmr_req, *dev, sess) < 0)
-		return(FUNCTION_AUTHORIZATION_FAILED);
-#endif		
-	/*
-	 * Do the real work in transport_generic_do_tmr().
-	 */
-	return(FUNCTION_REJECTED);
 }
 
 /*	iscsi_tmr_task_warm_reset():
  *
  *	Called from iscsi_handle_task_mgt_cmd().
  */
-extern __u8 iscsi_tmr_task_warm_reset (
+extern int iscsi_tmr_task_warm_reset (
 	iscsi_conn_t *conn,
 	iscsi_tmr_req_t *tmr_req,
 	unsigned char *buf)
@@ -247,20 +120,20 @@ extern __u8 iscsi_tmr_task_warm_reset (
 		 TRACE_ERROR("TMR Opcode TARGET_WARM_RESET authorization failed"
 			" for Initiator Node: %s\n",
 			SESS_NODE_ACL(sess)->initiatorname);
-		 return(FUNCTION_AUTHORIZATION_FAILED);
+		 return(-1);
 	}
 
 	/*
 	 * Do the real work in transport_generic_do_tmr().
 	 */
-	return(FUNCTION_COMPLETE);
+	return(0);
 }
 
 /*	iscsi_tmr_task_cold_reset():
  *
  *	Called from iscsi_handle_task_mgt_cmd().
  */
-extern __u8 iscsi_tmr_task_cold_reset (
+extern int iscsi_tmr_task_cold_reset (
 	iscsi_conn_t *conn,
 	iscsi_tmr_req_t *tmr_req,
 	unsigned char *buf)
@@ -275,13 +148,13 @@ extern __u8 iscsi_tmr_task_cold_reset (
 		TRACE_ERROR("TMR Opcode TARGET_COLD_RESET authorization failed"
 			" for Initiator Node: %s\n",
 			SESS_NODE_ACL(sess)->initiatorname);
-		return(FUNCTION_AUTHORIZATION_FAILED);
+		return(-1);
 	}
 		
 	/*
 	 * Do the real work in transport_generic_do_tmr().
 	 */
-	return(FUNCTION_COMPLETE);
+	return(0);
 }
 
 /*	iscsi_tmr_task_reassign():
@@ -289,15 +162,17 @@ extern __u8 iscsi_tmr_task_cold_reset (
  *	Called from iscsi_handle_task_mgt_cmd().
  */
 extern __u8 iscsi_tmr_task_reassign (
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
+	iscsi_cmd_t *cmd,
 	unsigned char *buf)
 {
-	int ret;
 	iscsi_cmd_t *ref_cmd = NULL;
+	iscsi_conn_t *conn = CONN(cmd);
 	iscsi_conn_recovery_t *cr = NULL;
+	iscsi_tmr_req_t *tmr_req = cmd->tmr_req;
+	se_tmr_req_t *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
+	int ret;
 	
 	TRACE(TRACE_ERL2, "Got TASK_REASSIGN TMR ITT: 0x%08x,"
 		" RefTaskTag: 0x%08x, ExpDataSN: 0x%08x, CID: %hu\n",
@@ -305,7 +180,7 @@ extern __u8 iscsi_tmr_task_reassign (
 				conn->cid);
 
 	if (SESS_OPS_C(conn)->ErrorRecoveryLevel != 2) {
-		TRACE_ERROR("TMR TASK_REASSIGN not supported in ERL<2,"
+		printk(KERN_ERR "TMR TASK_REASSIGN not supported in ERL<2,"
 				" ignoring request.\n");
 		return(TASK_FAILOVER_NOT_SUPPORTED);
 	}
@@ -313,32 +188,35 @@ extern __u8 iscsi_tmr_task_reassign (
 	ret = iscsi_find_cmd_for_recovery(SESS(conn), &ref_cmd,
 			&cr, hdr->ref_task_tag);
 	if (ret == -2) {
-		TRACE_ERROR("Command ITT: 0x%08x is still alligent to CID:"
+		printk(KERN_ERR "Command ITT: 0x%08x is still alligent to CID:"
 			" %hu\n", ref_cmd->init_task_tag, cr->cid);
 		return(TASK_STILL_ALLEGIANT);
 	} else if (ret == -1) {
-		TRACE_ERROR("Unable to locate RefTaskTag: 0x%08x in"
+		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x in"
 			" connection recovery command list.\n",
 				hdr->ref_task_tag);
 		return(TASK_DOES_NOT_EXIST);
+	} else if (!(ref_cmd->se_cmd)) {
+		printk(KERN_ERR "ref_cmd->se_cmd for RefTaskTag: 0x%08x is"
+			" NULL!\n", hdr->ref_task_tag);
+		return(TASK_DOES_NOT_EXIST);
 	}
-	
 	/*
 	 * Temporary check to prevent connection recovery for
 	 * connections with a differing MaxRecvDataSegmentLength.
 	 */
 	if (cr->maxrecvdatasegmentlength !=
 	    CONN_OPS(conn)->MaxRecvDataSegmentLength) {
-		TRACE_ERROR("Unable to perform connection recovery for differing"
+		printk(KERN_ERR "Unable to perform connection recovery for differing"
 			" MaxRecvDataSegmentLength, rejecting TMR TASK_REASSIGN.\n");
 		return(FUNCTION_REJECTED);
 	}
 	
-	tmr_req->ref_task_tag		= hdr->ref_task_tag;
+	se_tmr->ref_task_tag		= hdr->ref_task_tag;
+	se_tmr->ref_cmd			= ref_cmd->se_cmd;
+	se_tmr->ref_task_lun		= hdr->lun;
 	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
 	tmr_req->exp_data_sn		= hdr->exp_data_sn;
-	tmr_req->ref_task_lun		= hdr->lun;
-	tmr_req->ref_cmd		= ref_cmd;
 	tmr_req->conn_recovery		= cr;
 
 	/*
@@ -376,7 +254,9 @@ static void iscsi_task_reassign_remove_cmd (iscsi_cmd_t *cmd, iscsi_conn_recover
  */
 static int iscsi_task_reassign_complete_nop_out (iscsi_tmr_req_t *tmr_req, iscsi_conn_t *conn)
 {
-	iscsi_cmd_t *cmd = tmr_req->ref_cmd;
+	se_tmr_req_t *se_tmr = tmr_req->se_tmr_req;
+	se_cmd_t *se_cmd = se_tmr->ref_cmd;
+	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
 	iscsi_conn_recovery_t *cr;
 
 	if (!cmd->cr) {
@@ -560,9 +440,10 @@ static int iscsi_task_reassign_complete_none (iscsi_cmd_t *cmd, iscsi_tmr_req_t 
  */
 static int iscsi_task_reassign_complete_scsi_cmnd (iscsi_tmr_req_t *tmr_req, iscsi_conn_t *conn)
 {
-	iscsi_cmd_t *cmd = tmr_req->ref_cmd;
+	se_tmr_req_t *se_tmr = tmr_req->se_tmr_req;
+	se_cmd_t *se_cmd = se_tmr->ref_cmd;
+	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
 	iscsi_conn_recovery_t *cr;
-	se_cmd_t *se_cmd = SE_CMD(cmd);
 	
 	if (!cmd->cr) {
 		TRACE_ERROR("iscsi_conn_recovery_t pointer for ITT: 0x%08x"
@@ -609,14 +490,17 @@ static int iscsi_task_reassign_complete_scsi_cmnd (iscsi_tmr_req_t *tmr_req, isc
  */
 static int iscsi_task_reassign_complete (iscsi_tmr_req_t *tmr_req, iscsi_conn_t *conn)
 {
-	int ret = 0;
+	se_tmr_req_t *se_tmr = tmr_req->se_tmr_req;
+	se_cmd_t *se_cmd;
 	iscsi_cmd_t *cmd;
+	int ret = 0;
 	
-	if (!tmr_req->ref_cmd) {
+	if (!se_tmr->ref_cmd) {
 		TRACE_ERROR("TMR Request is missing a RefCmd iscsi_cmd_t.\n");
 		return(-1);
 	}
-	cmd = tmr_req->ref_cmd;
+	se_cmd = se_tmr->ref_cmd;
+	cmd = se_cmd->se_fabric_cmd_ptr;
 
 	cmd->conn = conn;
 
@@ -652,9 +536,10 @@ static int iscsi_task_reassign_complete (iscsi_tmr_req_t *tmr_req, iscsi_conn_t 
 extern int iscsi_tmr_post_handler (iscsi_cmd_t *cmd, iscsi_conn_t *conn)
 {
 	iscsi_tmr_req_t *tmr_req = cmd->tmr_req;
+	se_tmr_req_t *se_tmr = SE_CMD(cmd)->se_tmr_req;
 
-	if ((tmr_req->function == TASK_REASSIGN) &&
-	    (tmr_req->response == FUNCTION_COMPLETE))
+	if ((se_tmr->function == TASK_REASSIGN) &&
+	    (se_tmr->response == FUNCTION_COMPLETE))
 		return(iscsi_task_reassign_complete(tmr_req, conn));
 		
 	return(0);
@@ -746,10 +631,12 @@ static void iscsi_task_reassign_prepare_unsolicited_dataout (iscsi_cmd_t *cmd, i
  */
 extern int iscsi_task_reassign_prepare_write (iscsi_tmr_req_t *tmr_req, iscsi_conn_t *conn)
 {
-	int first_incomplete_r2t = 1, i = 0;
-	iscsi_cmd_t *cmd = tmr_req->ref_cmd;
+	se_tmr_req_t *se_tmr = tmr_req->se_tmr_req;
+	se_cmd_t *se_cmd = se_tmr->ref_cmd;
+	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
 	iscsi_pdu_t *pdu = NULL;
 	iscsi_r2t_t *r2t = NULL, *r2t_next = NULL;
+	int first_incomplete_r2t = 1, i = 0;
 
 	/*
 	 * The command was in the process of receiving Unsolicited DataOUT when
@@ -996,8 +883,9 @@ drop_unacknowledged_r2ts:
  */
 extern int iscsi_check_task_reassign_expdatasn (iscsi_tmr_req_t *tmr_req, iscsi_conn_t *conn)
 {
-	iscsi_cmd_t *ref_cmd = tmr_req->ref_cmd;
-	se_cmd_t *se_cmd = SE_CMD(ref_cmd);
+	se_tmr_req_t *se_tmr = tmr_req->se_tmr_req;
+	se_cmd_t *se_cmd = se_tmr->ref_cmd;
+	iscsi_cmd_t *ref_cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
 
 	if (ref_cmd->iscsi_opcode != ISCSI_INIT_SCSI_CMND)
 		return(0);

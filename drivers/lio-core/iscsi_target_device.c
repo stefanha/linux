@@ -69,42 +69,23 @@ extern __u32 iscsi_unpack_lun (unsigned char *);
  *
  *
  */
-//#warning FIXME v2.8: Breakage in iscsi_get_lun() for TMRs
-extern se_lun_t *iscsi_get_lun (
-	iscsi_conn_t *conn,
-	u64 iscsi_lun)
+extern int iscsi_get_lun_for_tmr (
+	iscsi_cmd_t *cmd,
+	u64 lun)
 {
-	se_dev_entry_t *deve;
-	se_lun_t *lun = NULL;
-	iscsi_portal_group_t *tpg = conn->tpg;
-	iscsi_session_t *sess = SESS(conn);
+	iscsi_conn_t *conn = CONN(cmd);
+	iscsi_portal_group_t *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
-	unpacked_lun = iscsi_unpack_lun((unsigned char *)&iscsi_lun);
+	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
 	if (unpacked_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
 		TRACE_ERROR("iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
 			" %u for Target Portal Group: %hu\n", unpacked_lun,
 			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
-		return(NULL);
-	}
-#if 0
-	spin_lock_bh(&SESS_NODE_ACL(sess)->device_list_lock);
-	deve = &SESS_NODE_ACL(sess)->device_list[unpacked_lun];
-	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
-#if 0
-		TRACE_ERROR("deve->deve_cmds incremented to %d\n", deve->deve_cmds);
-#endif
-		iscsi_lun = deve->iscsi_lun;
-	}
-	spin_unlock_bh(&SESS_NODE_ACL(sess)->device_list_lock);
-#endif
-	if (!lun) {
-		TRACE_ERROR("Unable to find Active iSCSI LUN: 0x%08x on"
-			" iSCSI TPG: %hu\n", unpacked_lun, tpg->tpgt);
-		return(NULL);
+		return(-1);
 	}
 
-	return(lun);
+	return(transport_get_lun_for_tmr(SE_CMD(cmd), unpacked_lun));
 }
 
 /*	iscsi_get_lun_for_cmd():
@@ -120,7 +101,6 @@ extern int iscsi_get_lun_for_cmd (
 	iscsi_conn_t *conn = CONN(cmd);
 	iscsi_portal_group_t *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
-	int ret;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
 	if (unpacked_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {

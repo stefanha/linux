@@ -999,7 +999,6 @@ extern int iscsi_execute_ooo_cmdsns (iscsi_session_t *sess)
  */
 extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 {
-	iscsi_tmr_req_t *tmr_req = NULL;
 	se_cmd_t *se_cmd = cmd->se_cmd;
 	int lr = 0;
 	
@@ -1063,48 +1062,14 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 		iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
 		break;
 	case ISCSI_INIT_TASK_MGMT_CMND:
-		spin_unlock_bh(&cmd->istate_lock);
-		tmr_req = cmd->tmr_req;
-//#warning FIXME: TMR execute for non immediate iscsi_cmd_ts
-		return(-1);
-#if 0
-		if (tmr_req->call_transport)
-			transport_generic_handle_tmr(cmd, tmr_req);
-		else
-#endif
-		switch (tmr_req->function) {
-		case ABORT_TASK:
-			TRACE_ERROR("ABORT_TASK:\n");
-			break;
-		case ABORT_TASK_SET:
-			TRACE_ERROR("ABORT_TASK_SET:\n");
-			break;
-		case CLEAR_ACA:
-			TRACE_ERROR("CLEAR_ACA:\n");
-			break;
-		case CLEAR_TASK_SET:
-			TRACE_ERROR("CLEAR_TASK_SET:\n");
-			break;
-		case LUN_RESET:
-			TRACE_ERROR("LUN_RESET:\n");
-			break;
-		case TARGET_WARM_RESET:
-			TRACE_ERROR("TARGET_WARM_RESET:\n");
-			break;
-		case TARGET_COLD_RESET:
-			TRACE_ERROR("TARGET_COLD_RESET:\n");
-			break;
-		case TASK_REASSIGN:
-			TRACE_ERROR("TASK_REASSIGN:\n");
-			break;
-		default:
-			TRACE_ERROR("Unknown TMR 0x%02x\n", tmr_req->function);
-			break;
+		if (se_cmd->se_cmd_flags & SCF_SCSI_CDB_EXCEPTION) {
+			spin_unlock_bh(&cmd->istate_lock);
+			iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
+			return(0);
 		}
-			
-		cmd->i_state = ISTATE_SEND_TASKMGTRSP;
-		iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
-		break;
+		spin_unlock_bh(&cmd->istate_lock);
+
+		return(transport_generic_handle_tmr(SE_CMD(cmd)));
 	case ISCSI_INIT_LOGOUT_CMND:
 		spin_unlock_bh(&cmd->istate_lock);
 		switch (cmd->logout_reason) {
