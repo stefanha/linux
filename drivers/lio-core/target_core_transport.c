@@ -5780,10 +5780,10 @@ extern int transport_get_sectors (
 		return(0);
 
 	if ((T_TASK(cmd)->t_task_lba + T_TASK(cmd)->t_task_sectors) >
-	     obj_api->total_sectors(obj_ptr, 1)) {
+	     obj_api->total_sectors(obj_ptr)) {
 		TRACE_ERROR("LBA: %llu Sectors: %u exceeds"
 			" obj_api->total_sectors(): %llu\n", T_TASK(cmd)->t_task_lba,
-			T_TASK(cmd)->t_task_sectors, obj_api->total_sectors(obj_ptr, 1));
+			T_TASK(cmd)->t_task_sectors, obj_api->total_sectors(obj_ptr));
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = SECTOR_COUNT_TOO_MANY;
 		return(PYX_TRANSPORT_REQ_TOO_MANY_SECTORS);

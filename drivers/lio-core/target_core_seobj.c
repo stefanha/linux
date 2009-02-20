@@ -301,11 +301,11 @@ extern unsigned long long dev_obj_get_next_lba (void *p, unsigned long long lba)
 	return(lba);
 }
 
-extern unsigned long long dev_obj_total_sectors (void *p, int zero_lba)
+extern unsigned long long dev_obj_total_sectors (void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	return((dev->dev_sectors_total + ((zero_lba) ? 1 : 0)));
+	return(dev->dev_sectors_total);
 }
 
 extern int dev_obj_do_se_mem_map (

@@ -66,7 +66,7 @@ typedef struct se_obj_lun_type_s {
 	unsigned long long (*end_lba)(void *, int);
 	unsigned long long (*free_sectors)(void *);
 	unsigned long long (*get_next_lba)(void *, unsigned long long);
-	unsigned long long (*total_sectors)(void *, int);
+	unsigned long long (*total_sectors)(void *);
 	int (*do_se_mem_map)(void *, struct se_task_s *, struct list_head *, void *, struct se_mem_s *, struct se_mem_s **, u32 *, u32 *);
 	int (*get_mem_buf)(void *, struct se_cmd_s *);
 	int (*get_mem_SG)(void *, struct se_cmd_s *);
