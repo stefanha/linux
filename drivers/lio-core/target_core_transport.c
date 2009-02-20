@@ -1473,7 +1473,7 @@ extern void transport_dump_dev_state (
 		atomic_read(&dev->execute_tasks), atomic_read(&dev->depth_left),
 		dev->queue_depth);
 	*bl += sprintf(b+*bl, "  SectorSize: %u  MaxSectors: %u\n",
-		TRANSPORT(dev)->get_blocksize(dev), DEV_ATTRIB(dev)->max_sectors);
+		DEV_ATTRIB(dev)->block_size, DEV_ATTRIB(dev)->max_sectors);
 	*bl += sprintf(b+*bl, "        ");
 
 	return;	
@@ -4386,28 +4386,28 @@ set_len:
 
 extern int transport_generic_emulate_readcapacity (
 	se_cmd_t *cmd, 
-	u32 blocks,
-	u32 blocksize)
+	u32 blocks)
 {
+	se_device_t *dev = SE_DEV(cmd);
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 
 	buf[0] = (blocks >> 24) & 0xff;
 	buf[1] = (blocks >> 16) & 0xff;
 	buf[2] = (blocks >> 8) & 0xff;
 	buf[3] = blocks & 0xff;
-	buf[4] = (blocksize >> 24) & 0xff;
-	buf[5] = (blocksize >> 16) & 0xff;
-	buf[6] = (blocksize >> 8) & 0xff;
-	buf[7] = blocksize & 0xff;
+	buf[4] = (DEV_ATTRIB(dev)->block_size >> 24) & 0xff;
+	buf[5] = (DEV_ATTRIB(dev)->block_size >> 16) & 0xff;
+	buf[6] = (DEV_ATTRIB(dev)->block_size >> 8) & 0xff;
+	buf[7] = DEV_ATTRIB(dev)->block_size & 0xff;
 		
 	return(0);
 }
 
 extern int transport_generic_emulate_readcapacity_16 (
 	se_cmd_t *cmd,
-	unsigned long long blocks,
-	u32 blocksize)
+	unsigned long long blocks)
 {
+	se_device_t *dev = SE_DEV(cmd);
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 
 	buf[0] = (blocks >> 56) & 0xff;
@@ -4418,10 +4418,10 @@ extern int transport_generic_emulate_readcapacity_16 (
 	buf[5] = (blocks >> 16) & 0xff;
 	buf[6] = (blocks >> 8) & 0xff;
 	buf[7] = blocks & 0xff;
-	buf[8] = (blocksize >> 24) & 0xff;
-	buf[9] = (blocksize >> 16) & 0xff;
-	buf[10] = (blocksize >> 8) & 0xff;
-	buf[11] = blocksize & 0xff;
+	buf[8] = (DEV_ATTRIB(dev)->block_size >> 24) & 0xff;
+	buf[9] = (DEV_ATTRIB(dev)->block_size >> 16) & 0xff;
+	buf[10] = (DEV_ATTRIB(dev)->block_size >> 8) & 0xff;
+	buf[11] = DEV_ATTRIB(dev)->block_size & 0xff;
 
 	return(0);
 }
@@ -5024,8 +5024,8 @@ static int transport_generic_cmd_sequencer (
 		ret = 2;
 		break;
 	default:
-		TRACE_ERROR("TARGET_CORE[%s]: Unsupported SCSI Opcode 0x%02x,"
-			" sending CHECK_CONDITION.\n",
+		printk(KERN_WARNING "TARGET_CORE[%s]: Unsupported SCSI Opcode"
+			" 0x%02x, sending CHECK_CONDITION.\n",
 			CMD_TFO(cmd)->get_fabric_name(), cdb[0]);
 		cmd->transport_wait_for_tasks = &transport_nop_wait_for_tasks;
 		transport_get_maps(cmd);
@@ -5033,18 +5033,28 @@ static int transport_generic_cmd_sequencer (
 	}
 
 	if (size != cmd->data_length) {
-		TRACE_ERROR("TARGET_CORE[%s]: Expected Transfer Length: %u"
-			" does not match SCSI CDB Length: %u for SAM Opcode:"
+		printk(KERN_WARNING "TARGET_CORE[%s]: Expected Transfer Length:"
+			" %u does not match SCSI CDB Length: %u for SAM Opcode:"
 			" 0x%02x\n", CMD_TFO(cmd)->get_fabric_name(),
 				cmd->data_length, size, cdb[0]);
 
 		cmd->cmd_spdtl = size;
 
 		if (cmd->data_direction == SE_DIRECTION_WRITE) {
-			TRACE_ERROR("Rejecting underflow/overflow WRITE data\n");
+			printk(KERN_ERR "Rejecting underflow/overflow WRITE data\n");
 			return(6);
 		}
-
+		/*
+		 * Reject READ_* or WRITE_* with overflow/underflow for
+		 * type SCF_SCSI_DATA_SG_IO_CDB.
+		 */
+		if (!(ret) && (DEV_ATTRIB(dev)->block_size != 512))  {
+			printk(KERN_ERR "Failing OVERFLOW/UNDERFLOW for LBA op"
+				" CDB on non 512-byte sector setup subsystem"
+				" plugin: %s\n", TRANSPORT(dev)->name);
+			return(6); // Returns CHECK_CONDITION + INVALID_CDB_FIELD
+		}
+			
 		if (size > cmd->data_length) {
 			cmd->se_cmd_flags |= SCF_OVERFLOW_BIT;
 			cmd->residual_count = (size - cmd->data_length);

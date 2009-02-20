@@ -569,6 +569,8 @@ typedef struct se_dev_attrib_s {
         int             status_thread_tur;
 	int		emulate_reservations;
 	int		emulate_alua;
+	u32		hw_block_size;
+	u32		block_size;
 	u32		hw_max_sectors;
         u32             max_sectors;
 	u32		hw_queue_depth;

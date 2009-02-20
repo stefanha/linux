@@ -273,7 +273,7 @@ extern int dev_obj_blocksize (void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	return(TRANSPORT(dev)->get_blocksize(dev));
+	return(DEV_ATTRIB(dev)->block_size);
 }
 
 extern int dev_obj_max_sectors (void *p)
@@ -551,13 +551,19 @@ extern u32 dev_obj_get_cdb_size (
 
 	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE) {
 		if (cdb[1] & 1) { /* sectors */
-			return(TRANSPORT(dev)->get_blocksize(dev) * sectors);
+			return(DEV_ATTRIB(dev)->block_size * sectors);
 		} else /* bytes */
 			return(sectors);
 	}
 	
 	/* sectors */
-	return(TRANSPORT(dev)->get_blocksize(dev) * sectors);
+#if 0
+	printk("Returning block_size: %u, sectors: %u == %u for %s object\n",
+			DEV_ATTRIB(dev)->block_size, sectors, 
+			DEV_ATTRIB(dev)->block_size * sectors,
+			TRANSPORT(dev)->name);
+#endif
+	return(DEV_ATTRIB(dev)->block_size * sectors);
 }
 
 extern void dev_obj_generate_cdb (void *p, unsigned long long lba, u32 *sectors, unsigned char *cdb, int rw)
