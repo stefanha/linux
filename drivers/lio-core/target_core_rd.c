@@ -440,20 +440,23 @@ static int rd_emulate_inquiry (se_task_t *task)
 static int rd_emulate_read_cap (se_task_t *task)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
-	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1;
+	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) /
+		       DEV_ATTRIB(task->se_dev)->block_size) - 1;
 
-	if ((((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1) > 0x00000000ffffffff)
+	if ((((rd_dev->rd_page_count * PAGE_SIZE) /
+	       DEV_ATTRIB(task->se_dev)->block_size) - 1) >= 0x00000000ffffffff)
 		blocks = 0xffffffff;
 
-	return(transport_generic_emulate_readcapacity(TASK_CMD(task), blocks, RD_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity(TASK_CMD(task), blocks));
 }
 
 static int rd_emulate_read_cap16 (se_task_t *task)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
-	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) / RD_BLOCKSIZE) - 1;	
+	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) /
+				   DEV_ATTRIB(task->se_dev)->block_size) - 1;	
 
-	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long, RD_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long));
 }
 
 /*	rd_emulate_scsi_cdb():
@@ -767,15 +770,17 @@ static int rd_MEMCPY_write (rd_request_t *req)
  */
 extern int rd_MEMCPY_do_task (se_task_t *task)
 {
-	int ret = 0;
+	se_device_t *dev = task->se_dev;
 	rd_request_t *req = (rd_request_t *) task->transport_req;
+	int ret;
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return(rd_emulate_scsi_cdb(task));
 		
 	req->rd_lba = task->task_lba;
-	req->rd_page = (req->rd_lba * RD_BLOCKSIZE) / PAGE_SIZE;
-	req->rd_offset = (req->rd_lba % (PAGE_SIZE / RD_BLOCKSIZE)) * RD_BLOCKSIZE;
+	req->rd_page = (req->rd_lba * DEV_ATTRIB(dev)->block_size) / PAGE_SIZE;
+	req->rd_offset = (req->rd_lba % (PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
+			  DEV_ATTRIB(dev)->block_size;
 	req->rd_size = task->task_size;
 
 	if (req->rd_data_direction == RD_DATA_READ)
@@ -979,8 +984,11 @@ extern int rd_DIRECT_do_se_mem_map (
 
 	req->rd_lba = task->task_lba;
 	req->rd_req_flags = RRF_GOT_LBA;
-	req->rd_page = ((req->rd_lba * RD_BLOCKSIZE) / PAGE_SIZE);
-	req->rd_offset = (req->rd_lba % (PAGE_SIZE / RD_BLOCKSIZE)) * RD_BLOCKSIZE;
+	req->rd_page = ((req->rd_lba * DEV_ATTRIB(task->se_dev)->block_size) /
+			PAGE_SIZE);
+	req->rd_offset = (req->rd_lba %
+			(PAGE_SIZE / DEV_ATTRIB(task->se_dev)->block_size)) *
+			DEV_ATTRIB(task->se_dev)->block_size;
 	req->rd_size = task->task_size;
 
 	if (req->rd_offset)
@@ -1301,7 +1309,8 @@ extern int rd_CDB_write_SG (se_task_t *task, u32 size)
  */
 extern int rd_DIRECT_check_lba (unsigned long long lba, se_device_t *dev)
 {
-	return(((lba % (PAGE_SIZE / RD_BLOCKSIZE)) * RD_BLOCKSIZE) ? 1 : 0);
+	return(((lba % (PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
+		 DEV_ATTRIB(dev)->block_size) ? 1 : 0);
 }
 
 /*	rd_MEMCPY_check_lba():
