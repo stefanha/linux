@@ -365,25 +365,109 @@ static int iblock_emulate_inquiry (se_task_t *task)
 	       se_location));
 }
 
+static unsigned long long iblock_emulate_read_cap_with_block_size (
+	se_device_t *dev,
+	struct block_device *bd,
+	struct request_queue *q)
+{
+	unsigned long long blocks_long = (get_capacity(bd->bd_disk) - 1);
+
+	if (q->hardsect_size == DEV_ATTRIB(dev)->block_size)
+		return(blocks_long);
+
+	switch (q->hardsect_size) {
+	case 4096:
+		switch (DEV_ATTRIB(dev)->block_size) {
+		case 2048:
+			blocks_long <<= 1;
+			break;	
+		case 1024:
+			blocks_long <<= 2;
+			break;
+		case 512:
+			blocks_long <<= 3;
+		default:
+			break;
+		}
+		break;
+	case 2048:
+		switch (DEV_ATTRIB(dev)->block_size) {
+		case 4096:
+			blocks_long >>= 1;
+			break;
+		case 1024:
+			blocks_long <<= 1;
+			break;
+		case 512:
+			blocks_long <<= 2;
+			break;
+		default:
+			break;
+		}
+		break;
+	case 1024:
+		switch (DEV_ATTRIB(dev)->block_size) {
+		case 4096:
+			blocks_long >>= 2;
+			break;
+		case 2048:
+			blocks_long >>= 1;
+			break;
+		case 512:
+			blocks_long <<= 1;
+			break;
+		default:
+			break;
+		}
+		break;
+	case 512:
+		switch (DEV_ATTRIB(dev)->block_size) {
+		case 4096:
+			blocks_long >>= 3;
+			break;
+		case 2048:
+			blocks_long >>= 2;
+			break;
+		case 1024:
+			blocks_long >>= 1;
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return(blocks_long);
+}
+
 static int iblock_emulate_read_cap (se_task_t *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
-	u32 blocks = (get_capacity(bd->bd_disk) - 1);
+	struct request_queue *q = bdev_get_queue(bd);
+	unsigned long long blocks_long = 0;
+	u32 blocks = 0;
 
-	if ((get_capacity(bd->bd_disk) - 1) >= 0x00000000ffffffff)
+	blocks_long = iblock_emulate_read_cap_with_block_size(task->se_dev, bd, q);
+	if (blocks_long >= 0x00000000ffffffff)
 		blocks = 0xffffffff;
+	else
+		blocks = (u32)blocks_long;
 
-	return(transport_generic_emulate_readcapacity(TASK_CMD(task), blocks, IBLOCK_BLOCKSIZE));
+	return(transport_generic_emulate_readcapacity(TASK_CMD(task), blocks));
 }
 
 static int iblock_emulate_read_cap16 (se_task_t *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
-	unsigned long long blocks_long = (get_capacity(bd->bd_disk) - 1);
+	struct request_queue *q = bdev_get_queue(bd);
+	unsigned long long blocks_long;
 
-	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long, IBLOCK_BLOCKSIZE));;
+	blocks_long = iblock_emulate_read_cap_with_block_size(task->se_dev, bd, q);
+	return(transport_generic_emulate_readcapacity_16(TASK_CMD(task), blocks_long));
 }
 
 static int iblock_emulate_scsi_cdb (se_task_t *task)
@@ -831,7 +915,12 @@ extern unsigned char *iblock_get_cdb (se_task_t *task)
 
 extern u32 iblock_get_blocksize (se_device_t *dev)
 {
-	return(IBLOCK_BLOCKSIZE);
+	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
+	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
+	/*
+	 * Set via blk_queue_hardsect_size() in drivers/scsi/sd.c:sd_read_capacity()
+	 */
+	return(q->hardsect_size);
 }
 
 extern u32 iblock_get_device_rev (se_device_t *dev)
