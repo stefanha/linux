@@ -469,6 +469,12 @@ SE_DEV_ATTR(status_thread, S_IRUGO | S_IWUSR);
 DEF_DEV_ATTRIB(status_thread_tur);
 SE_DEV_ATTR(status_thread_tur, S_IRUGO | S_IWUSR);
 
+DEF_DEV_ATTRIB_RO(hw_block_size);
+SE_DEV_ATTR_RO(hw_block_size);
+
+DEF_DEV_ATTRIB(block_size);
+SE_DEV_ATTR(block_size, S_IRUGO | S_IWUSR);
+
 DEF_DEV_ATTRIB_RO(hw_max_sectors);
 SE_DEV_ATTR_RO(hw_max_sectors);
 
@@ -489,6 +495,8 @@ CONFIGFS_EATTR_OPS(target_core_dev_attrib, se_dev_attrib_s, da_group);
 static struct configfs_attribute *target_core_dev_attrib_attrs[] = {
 	&target_core_dev_attrib_status_thread.attr,
 	&target_core_dev_attrib_status_thread_tur.attr,
+	&target_core_dev_attrib_hw_block_size.attr,
+	&target_core_dev_attrib_block_size.attr,
 	&target_core_dev_attrib_hw_max_sectors.attr,
 	&target_core_dev_attrib_max_sectors.attr,
 	&target_core_dev_attrib_hw_queue_depth.attr,
