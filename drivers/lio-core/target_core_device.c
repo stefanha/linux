@@ -871,6 +871,11 @@ extern void se_dev_set_default_attribs (se_device_t *dev)
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	DEV_ATTRIB(dev)->emulate_alua = DA_EMULATE_ALUA;
 	/*
+	 * block_size is based on subsystem plugin dependent requirements.
+	 */
+	DEV_ATTRIB(dev)->hw_block_size = TRANSPORT(dev)->get_blocksize(dev);
+	DEV_ATTRIB(dev)->block_size = TRANSPORT(dev)->get_blocksize(dev);
+	/*
 	 * max_sectors is based on subsystem plugin dependent requirements.
 	 */
 	DEV_ATTRIB(dev)->hw_max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
@@ -1055,6 +1060,38 @@ extern int se_dev_set_max_sectors (se_device_t *dev, u32 max_sectors)
 	DEV_ATTRIB(dev)->max_sectors = max_sectors;
 	printk("dev[%p]: SE Device max_sectors changed to %u\n",
 			dev, max_sectors);
+	return(0);
+}
+
+extern int se_dev_set_block_size (se_device_t *dev, u32 block_size)
+{
+	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+		printk(KERN_ERR "dev[%p]: Unable to change SE Device block_size"
+			" while dev_export_obj: %d count exists\n", dev,
+			DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj));
+		return(-1);
+	}
+
+	if ((block_size != 512) &&
+	    (block_size != 1024) &&
+	    (block_size != 2048) &&
+	    (block_size != 4096)) {
+		printk(KERN_ERR "dev[%p]: Illegal value for block_device: %u"
+			" for SE device, must be 512, 1024, 2048 or 4096\n",
+			dev, block_size);
+		return(-1);
+	}
+
+	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
+		printk(KERN_ERR "dev[%p]: Not allowed to change block_size for"
+			" Physical Device, use for Linux/SCSI to change block_size"
+			" for underlying hardware\n", dev);
+		return(-1);
+	}
+
+	DEV_ATTRIB(dev)->block_size = block_size;
+	printk("dev[%p]: SE Device block_size changed to %u\n",
+			dev, block_size);
 	return(0);
 }
 
