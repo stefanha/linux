@@ -407,12 +407,18 @@ static ssize_t lio_target_show_port_alua_tg_pt_gp (void *p, char *page)
 {
 	se_lun_t *lun = (se_lun_t *)p;
 
+	if (!(lun->lun_sep))
+		return(-ENODEV);
+
 	return(core_alua_show_tg_pt_gp_info(lun->lun_sep, page));
 }
 
 static ssize_t lio_target_store_port_alua_tg_pt_gp (void *p, const char *page, size_t count)
 {
 	se_lun_t *lun = (se_lun_t *)p;
+
+	if (!(lun->lun_sep))
+		return(-ENODEV);
 
 	return(core_alua_store_tg_pt_gp_info(lun->lun_sep, page, count));
 }
