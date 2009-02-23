@@ -40,9 +40,9 @@
 #define PR_TYPE_WRITE_EXCLUSIVE_ALLREG		0x07
 #define PR_TYPE_EXCLUSIVE_ACCESS_ALLREG		0x08
 
-extern void core_scsi3_free_all_registrations (struct se_device_s *);
-extern unsigned char *core_scsi3_pr_dump_type (int);
-extern int core_scsi3_emulate_pr (struct se_cmd_s *);
-extern int core_setup_reservations (struct se_device_s *);
+extern void core_scsi3_free_all_registrations(struct se_device_s *);
+extern unsigned char *core_scsi3_pr_dump_type(int);
+extern int core_scsi3_emulate_pr(struct se_cmd_s *);
+extern int core_setup_reservations(struct se_device_s *);
 
-#endif // TARGET_CORE_PR_H
+#endif /* TARGET_CORE_PR_H */
