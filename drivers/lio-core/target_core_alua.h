@@ -32,6 +32,13 @@
 #define ALUA_STATUS_ALTERED_BY_EXPLICT_STPG		0x01
 #define ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA		0x02
 
+extern se_global_t *se_global;
+
+extern struct kmem_cache *t10_alua_lu_gp_cache;
+extern struct kmem_cache *t10_alua_lu_gp_mem_cache;
+extern struct kmem_cache *t10_alua_tg_pt_gp_cache;
+extern struct kmem_cache *t10_alua_tg_pt_gp_mem_cache;
+
 extern int core_scsi3_emulate_report_target_port_groups(struct se_cmd_s *);
 extern struct t10_alua_lu_gp_s *core_alua_allocate_lu_gp(const char *);
 extern struct t10_alua_lu_gp_member_s *core_alua_allocate_lu_gp_mem(
