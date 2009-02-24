@@ -31,6 +31,8 @@
 #define TARGET_CORE_NAME_MAX_LEN	64
 #define TARGET_FABRIC_NAME_SIZE		32
 
+extern se_global_t *se_global;
+
 /*
  * Temporary function required for target_core_mod to operate..
  */
