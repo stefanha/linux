@@ -45,6 +45,12 @@
 #define FD_DATA_WRITE		2
 #define FD_DATA_NONE		3
 
+extern se_global_t *se_global;
+extern struct block_device *__linux_blockdevice_claim(int, int, void *, int *);
+extern struct block_device *linux_blockdevice_claim(int, int, void *);
+extern int linux_blockdevice_release(int, int, struct block_device *);
+extern int linux_blockdevice_check(int, int);
+
 #ifndef FD_INCLUDE_STRUCTS
 extern int fd_CDB_inquiry(se_task_t *, u32);
 extern int fd_CDB_none(se_task_t *, u32);
@@ -148,6 +154,8 @@ typedef struct fd_dev_s {
 	/* Next FILEIO Device entry in list */
 	struct fd_dev_s *next;
 } ____cacheline_aligned fd_dev_t;
+
+extern void __fd_get_dev_info(struct fd_dev_s *, char *, int *);
 
 typedef struct fd_host_s {
 	u32		fd_host_dev_id_count;
