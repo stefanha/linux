@@ -30,6 +30,8 @@
 #ifndef TARGET_CORE_HBA_H
 #define TARGET_CORE_HBA_H
 
+extern se_global_t *se_global;
+
 extern struct se_hba_s *__core_get_hba_from_id(struct se_hba_s *);
 extern struct se_hba_s *core_get_hba_from_id(u32, int);
 extern struct se_hba_s *core_get_next_free_hba(void);
