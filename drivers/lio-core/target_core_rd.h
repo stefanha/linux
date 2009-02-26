@@ -48,6 +48,8 @@
 #define RD_DATA_WRITE		2
 #define RD_DATA_NONE		3
 
+extern se_global_t *se_global;
+
 #ifndef RD_INCLUDE_STRUCTS
 extern int rd_CDB_inquiry(se_task_t *, u32);
 extern int rd_CDB_none(se_task_t *, u32);
@@ -157,6 +159,8 @@ typedef struct rd_dev_s {
 	/* Next RD Device entry in list */
 	struct rd_dev_s *next;
 } ____cacheline_aligned rd_dev_t;
+
+extern void __rd_get_dev_info (rd_dev_t *, char *, int *);
 
 typedef struct rd_host_s {
 	u32		rd_host_dev_id_count;
