@@ -30,6 +30,8 @@
 #ifndef TARGET_CORE_TPG_H
 #define TARGET_CORE_TPG_H
 
+extern se_global_t *se_global;
+
 extern se_node_acl_t *core_tpg_get_initiator_node_acl(se_portal_group_t *tpg,
 						unsigned char *);
 extern void core_tpg_add_node_to_devs(struct se_node_acl_s *,
