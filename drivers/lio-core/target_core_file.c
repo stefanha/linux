@@ -42,8 +42,6 @@
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
 
-#include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 #include <iscsi_target_version.h>
 #include <target_core_base.h>
 #include <target_core_device.h>
@@ -198,7 +196,7 @@ se_device_t *fd_create_virtdevice(
 	int dev_flags = 0, flags, ret = 0;
 #if 0
 	if (strlen(di->fd_dev_name) > FD_MAX_DEV_NAME) {
-		TRACE_ERROR("di->fd_dev_name exceeds FD_MAX_DEV_NAME: %d\n",
+		printk(KERN_ERR "di->fd_dev_name exceeds FD_MAX_DEV_NAME: %d\n",
 				FD_MAX_DEV_NAME);
 		return 0;
 	}
