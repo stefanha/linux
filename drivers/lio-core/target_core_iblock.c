@@ -653,7 +653,8 @@ ssize_t iblock_set_configfs_dev_params(se_hba_t *hba,
 		ptr2 = strstr(cur, "force");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &ib_dev->ibd_force);
+			ret = strict_strtoul(ptr, 0,
+				(unsigned long *)&ib_dev->ibd_force);
 			if (ret < 0)
 				break;
 			printk(KERN_INFO "IBLOCK: Set force=%d\n",
