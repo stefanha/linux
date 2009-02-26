@@ -45,6 +45,11 @@
 #define PS_TIMEOUT_DISK		(15*HZ)
 #define PS_TIMEOUT_OTHER	(500*HZ)
 
+extern se_global_t *se_global;
+extern struct block_device *linux_blockdevice_claim(int, int, void *);
+extern int linux_blockdevice_release(int, int, struct block_device *);
+extern int linux_blockdevice_check(int, int);
+
 extern int pscsi_CDB_inquiry(se_task_t *, u32);
 extern int pscsi_CDB_none(se_task_t *, u32);
 extern int pscsi_CDB_read_non_SG(se_task_t *, u32);
@@ -124,6 +129,8 @@ typedef struct pscsi_dev_virt_s {
 	struct scsi_device *pdv_sd;
 	struct se_hba_s *pdv_se_hba;
 } pscsi_dev_virt_t;
+
+extern void __pscsi_get_dev_info (pscsi_dev_virt_t *, char *, int *);
 
 /*
  * We use the generic command sequencer, so we must setup

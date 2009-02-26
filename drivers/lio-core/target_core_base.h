@@ -61,6 +61,9 @@
 #define TG_PT_GROUP_NAME_BUF			256
 /* Used to parse EVPD into t10_evpd_t */
 #define EVPD_TMP_BUF_SIZE			128
+/* Used for target_core-pscsi.c:pscsi_transport_complete() */
+#define EVPD_BUF_LEN                    256
+
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
