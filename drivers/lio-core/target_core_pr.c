@@ -1337,7 +1337,7 @@ static int core_scsi3_emulate_pr_in(se_cmd_t *cmd, unsigned char *cdb)
 
 }
 
-extern int core_scsi3_emulate_pr(se_cmd_t *cmd)
+int core_scsi3_emulate_pr(se_cmd_t *cmd)
 {
 	unsigned char *cdb = &T_TASK(cmd)->t_task_cdb[0];
 
@@ -1366,7 +1366,7 @@ static int core_pt_seq_non_holder(se_cmd_t *cmd, unsigned char *cdb)
 	return 0;
 }
 
-extern int core_setup_reservations(se_device_t *dev)
+int core_setup_reservations(se_device_t *dev)
 {
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
 	t10_reservation_template_t *rest = &su_dev->t10_reservation;
