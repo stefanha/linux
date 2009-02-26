@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  target_core_tmr.c
  *
  * This file contains SPC-3 task management infrastructure
@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 #define TARGET_CORE_TMR_C
 
@@ -35,6 +35,7 @@
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
+#include <target_core_tmr.h>
 #include <target_core_transport.h>
 #include <target_core_alua.h>
 #include <target_core_transport_plugin.h>
@@ -43,28 +44,26 @@
 
 #undef TARGET_CORE_TMR_C
 
-extern struct kmem_cache *se_tmr_req_cache;
-
-extern se_tmr_req_t *core_tmr_alloc_req (
+se_tmr_req_t *core_tmr_alloc_req(
 	void *fabric_tmr_ptr,
 	u8 function)
 {
 	se_tmr_req_t *tmr;
 
-	if (!(tmr = kmem_cache_zalloc(se_tmr_req_cache, GFP_KERNEL))) {
-		printk("Unable to allocate se_tmr_req_t\n");
-		return(ERR_PTR(-ENOMEM));
+	tmr = kmem_cache_zalloc(se_tmr_req_cache, GFP_KERNEL);
+	if (!(tmr)) {
+		printk(KERN_ERR "Unable to allocate se_tmr_req_t\n");
+		return ERR_PTR(-ENOMEM);
 	}
 	tmr->fabric_tmr_ptr = fabric_tmr_ptr;
 	tmr->function = function;
 	INIT_LIST_HEAD(&tmr->tmr_list);
 
-	return(tmr);
+	return tmr;
 }
-
 EXPORT_SYMBOL(core_tmr_alloc_req);
 
-extern void core_tmr_release_req (
+void core_tmr_release_req(
 	se_tmr_req_t *tmr)
 {
 	se_lun_t *lun = tmr->tmr_lun;
@@ -75,14 +74,13 @@ extern void core_tmr_release_req (
 	spin_unlock(&dev->se_tmr_lock);
 
 	kmem_cache_free(se_tmr_req_cache, tmr);
-	return;
 }
 
-extern int core_tmr_lun_reset (se_device_t *dev, se_tmr_req_t *tmr)
+int core_tmr_lun_reset(se_device_t *dev, se_tmr_req_t *tmr)
 {
-	spin_lock(&dev->stats_lock);	
-	dev->num_resets++;	
+	spin_lock(&dev->stats_lock);
+	dev->num_resets++;
 	spin_unlock(&dev->stats_lock);
 
-	return(-1);
+	return -1;
 }
