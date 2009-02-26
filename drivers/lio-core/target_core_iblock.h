@@ -37,6 +37,8 @@
 #define IBLOCK_MAX_CDBS		16
 #define IBLOCK_LBA_SHIFT	9
 
+extern se_global_t *se_global;
+
 #ifndef IBLOCK_INCLUDE_STRUCTS
 extern int iblock_CDB_inquiry(se_task_t *, u32);
 extern int iblock_CDB_none(se_task_t *, u32);
@@ -110,6 +112,8 @@ typedef struct iblock_dev_s {
 	struct block_device *ibd_bd;
 	struct iblock_hba_s *ibd_host;
 } ____cacheline_aligned iblock_dev_t;
+
+void __iblock_get_dev_info (iblock_dev_t *, char *, int *);
 
 typedef struct iblock_hba_s {
 	int		iblock_host_id;
