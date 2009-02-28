@@ -291,7 +291,7 @@ unsigned long long dev_obj_total_sectors(void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	return dev->dev_sectors_total;
+	return (dev->dev_sectors_total + 1);
 }
 
 int dev_obj_do_se_mem_map(
