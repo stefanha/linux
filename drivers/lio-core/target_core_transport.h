@@ -121,7 +121,6 @@ extern int init_se_global(void);
 extern void release_se_global(void);
 #ifdef DEBUG_DEV
 extern int __iscsi_debug_dev(se_device_t *);
-extern int iscsi_debug_dev(se_device_t *);
 #endif
 extern unsigned char *transport_get_iqn_sn(void);
 extern void transport_init_queue_obj(struct se_queue_obj_s *);
