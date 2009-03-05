@@ -1,8 +1,8 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  target_core_transport_plugin.h
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
+ * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * Copyright (c) 2007 Rising Tide Software, Inc.
  * Copyright (c) 2008 Linux-iSCSI.org
  *
@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #ifndef _TARGET_CORE_TRANSPORT_PLUGIN_H_

@@ -1,4 +1,4 @@
-/*********************************************************************************
+/****************************************************************************
  * Filename:  target_core_base.h
  *
  * This file contains definitions related to the Target Core Engine.
@@ -24,7 +24,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ****************************************************************************/
 
 
 #ifndef TARGET_CORE_BASE_H
@@ -39,20 +39,31 @@
 #include <target_core_mib.h>
 #endif /* SNMP_SUPPORT */
 
-#define SCSI_CDB_SIZE			16 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
+/* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
+#define SCSI_CDB_SIZE			16
 #define TRANSPORT_IOV_DATA_BUFFER	5
 
-#define TRANSPORT_MAX_GLOBAL_HBAS           256 /* Maximum Physical or Virtual HBAs globally (not part of a TPG) */
-#define TRANSPORT_MAX_LUNS_PER_TPG	    256 /* Maximum Number of LUNs per Target Portal Group */
+/* Maximum Physical or Virtual HBAs globally (not part of a TPG) */
+#define TRANSPORT_MAX_GLOBAL_HBAS           256
+/* Maximum Number of LUNs per Target Portal Group */
+#define TRANSPORT_MAX_LUNS_PER_TPG	    256
 
-#define TRANSPORT_SENSE_BUFFER              64 /* Originally from iSCSI RFC, should be from SCSI_SENSE_BUFFERSIZE */
-#define TRANSPORT_SENSE_SEGMENT_LENGTH      66 /* Sense Data Segment */
-#define TRANSPORT_SENSE_SEGMENT_TOTAL       68 /* TRANSPORT_SENSE_SEGMENT_LENGTH + Padding */
+/* Originally from iSCSI RFC, should be from SCSI_SENSE_BUFFERSIZE */
+#define TRANSPORT_SENSE_BUFFER              64
+/* Sense Data Segment */
+#define TRANSPORT_SENSE_SEGMENT_LENGTH      66
+/* TRANSPORT_SENSE_SEGMENT_LENGTH + Padding */
+#define TRANSPORT_SENSE_SEGMENT_TOTAL       68
 
-#define TRANSPORT_IQN_LEN			224 /* Currently same as ISCSI_IQN_LEN */
+/* Currently same as ISCSI_IQN_LEN */
+#define TRANSPORT_IQN_LEN			224
 #define LU_GROUP_NAME_BUF			256
 #define TG_PT_GROUP_NAME_BUF			256
-#define EVPD_TMP_BUF_SIZE			128 /* Used to parse EVPD into t10_evpd_t */
+/* Used to parse EVPD into t10_evpd_t */
+#define EVPD_TMP_BUF_SIZE			128
+/* Used for target_core-pscsi.c:pscsi_transport_complete() */
+#define EVPD_BUF_LEN                    256
+
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -187,7 +198,7 @@ typedef enum {
 } t10_alua_index_t;
 
 typedef struct t10_alua_s {
-	t10_alua_index_t alua_type;	
+	t10_alua_index_t alua_type;
 } ____cacheline_aligned t10_alua_t;
 
 typedef struct t10_alua_lu_gp_s {
@@ -240,10 +251,10 @@ typedef struct t10_evpd_s {
 } ____cacheline_aligned t10_evpd_t;
 
 typedef struct t10_wwn_s {
-        unsigned char vendor[8];
-        unsigned char model[16];
+	unsigned char vendor[8];
+	unsigned char model[16];
 	unsigned char revision[4];
-        unsigned char unit_serial[INQUIRY_EVPD_SERIAL_LEN];
+	unsigned char unit_serial[INQUIRY_EVPD_SERIAL_LEN];
 	spinlock_t t10_evpd_lock;
 	struct se_subsystem_dev_s *t10_sub_dev;
 	struct config_group t10_wwn_group;
@@ -259,11 +270,13 @@ typedef enum {
 struct se_cmd_s;
 
 typedef struct t10_reservation_template_s {
-	int pr_all_tg_pt; /* Reservation effects all target ports */
+	/* Reservation effects all target ports */
+	int pr_all_tg_pt;
 	u32 pr_generation;
 	t10_reservations_index_t res_type;
 	spinlock_t registration_lock;
-	struct se_node_acl_s *pr_res_holder; /* Reservation holder when pr_all_tg_pt=1 */
+	/* Reservation holder when pr_all_tg_pt=1 */
+	struct se_node_acl_s *pr_res_holder;
 	struct list_head registration_list;
 	int (*t10_reservation_check)(struct se_cmd_s *);
 	int (*t10_reserve)(struct se_cmd_s *);
@@ -286,17 +299,13 @@ typedef struct t10_pr_registration_s {
 	struct list_head pr_reg_list;
 } t10_pr_registration_t;
 
-typedef struct t10_pr_reservation_s {
-	
-} t10_pr_reservation_t;
-
 typedef struct se_queue_req_s {
-        int                     state;
-        void                    *queue_se_obj_ptr;
-        void                    *cmd;
-        struct se_obj_lun_type_s *queue_se_obj_api;
-        struct se_queue_req_s   *next;
-        struct se_queue_req_s   *prev;
+	int			state;
+	void			*queue_se_obj_ptr;
+	void			*cmd;
+	struct se_obj_lun_type_s *queue_se_obj_api;
+	struct se_queue_req_s	*next;
+	struct se_queue_req_s	*prev;
 } ____cacheline_aligned se_queue_req_t;
 
 typedef struct se_queue_obj_s {
@@ -319,21 +328,21 @@ typedef struct se_transport_task_s {
 	u32			t_task_se_num;
 	atomic_t		t_fe_count;
 	atomic_t		t_se_count;
-	atomic_t		t_task_cdbs_left;       
+	atomic_t		t_task_cdbs_left;
 	atomic_t		t_task_cdbs_ex_left;
 	atomic_t		t_task_cdbs_timeout_left;
 	atomic_t		t_task_cdbs_sent;
-	atomic_t		t_transport_active;     
+	atomic_t		t_transport_active;
 	atomic_t		t_transport_complete;
 	atomic_t		t_transport_queue_active;
-	atomic_t		t_transport_sent;       
-	atomic_t		t_transport_stop;       
+	atomic_t		t_transport_sent;
+	atomic_t		t_transport_stop;
 	atomic_t		t_transport_timeout;
 	atomic_t		transport_lun_active;
 	atomic_t		transport_lun_fe_stop;
 	atomic_t		transport_lun_stop;
 	spinlock_t		t_state_lock;
-	struct semaphore	t_transport_stop_sem;   
+	struct semaphore	t_transport_stop_sem;
 	struct semaphore	t_transport_passthrough_sem;
 	struct semaphore	t_transport_passthrough_wsem;
 	struct semaphore	transport_lun_fe_stop_sem;
@@ -345,106 +354,118 @@ typedef struct se_transport_task_s {
 } ____cacheline_aligned se_transport_task_t;
 
 typedef struct se_task_s {
-        unsigned char   task_sense;
+	unsigned char	task_sense;
 	struct scatterlist *task_sg;
-        void            *transport_req;
-        u8              task_scsi_status;
-        u8              task_flags;
-        int             task_error_status;
-        int             task_state_flags;
-        unsigned long long      task_lba;
-        u32             task_no;
-        u32             task_sectors;
-        u32             task_size;
-        u32             task_sg_num;
-        u32             task_sg_offset;
-	struct se_cmd_s	*task_se_cmd;
-        struct se_device_s     *se_dev;
-        struct semaphore        task_stop_sem;
-        atomic_t        task_active;
-        atomic_t        task_execute_queue;
-        atomic_t        task_timeout;
-        atomic_t        task_sent;
-        atomic_t        task_stop;
-        atomic_t        task_state_active;
-        struct timer_list       task_timer;
-        int (*transport_map_task)(struct se_task_s *, u32);
-        void *se_obj_ptr;
-        struct se_obj_lun_type_s *se_obj_api;
-        struct se_task_s *t_next;
-        struct se_task_s *t_prev;
-        struct se_task_s *ts_next;
-        struct se_task_s *ts_prev;
-        struct list_head t_list;
+	void		*transport_req;
+	u8		task_scsi_status;
+	u8		task_flags;
+	int		task_error_status;
+	int		task_state_flags;
+	unsigned long long	task_lba;
+	u32		task_no;
+	u32		task_sectors;
+	u32		task_size;
+	u32		task_sg_num;
+	u32		task_sg_offset;
+	struct se_cmd_s *task_se_cmd;
+	struct se_device_s	*se_dev;
+	struct semaphore	task_stop_sem;
+	atomic_t	task_active;
+	atomic_t	task_execute_queue;
+	atomic_t	task_timeout;
+	atomic_t	task_sent;
+	atomic_t	task_stop;
+	atomic_t	task_state_active;
+	struct timer_list	task_timer;
+	int (*transport_map_task)(struct se_task_s *, u32);
+	void *se_obj_ptr;
+	struct se_obj_lun_type_s *se_obj_api;
+	struct se_task_s *t_next;
+	struct se_task_s *t_prev;
+	struct se_task_s *ts_next;
+	struct se_task_s *ts_prev;
+	struct list_head t_list;
 } ____cacheline_aligned se_task_t;
 
 #define TASK_CMD(task)	((struct se_cmd_s *)task->task_se_cmd)
 #define TASK_DEV(task)	((struct se_device_s *)task->se_dev)
 
 typedef struct se_transform_info_s {
-        int             ti_set_counts;
-        u32             ti_data_length;
-        unsigned long long      ti_lba;
-        struct se_cmd_s *ti_se_cmd;
-        struct se_device_s *ti_dev;
-        void *se_obj_ptr;
-        void *ti_obj_ptr;
-        struct se_obj_lun_type_s *se_obj_api;
-        struct se_obj_lun_type_s *ti_obj_api;
+	int		ti_set_counts;
+	u32		ti_data_length;
+	unsigned long long	ti_lba;
+	struct se_cmd_s *ti_se_cmd;
+	struct se_device_s *ti_dev;
+	void *se_obj_ptr;
+	void *ti_obj_ptr;
+	struct se_obj_lun_type_s *se_obj_api;
+	struct se_obj_lun_type_s *ti_obj_api;
 } ____cacheline_aligned se_transform_info_t;
 
 typedef struct se_offset_map_s {
-        int                     map_reset;
-        u32                     iovec_length;
-        u32                     iscsi_offset;
-        u32                     current_offset;
-        u32                     orig_offset;
-        u32                     sg_count;
-        u32                     sg_current;
-        u32                     sg_length;
-        struct page             *sg_page;
-        struct se_mem_s         *map_se_mem;                                                                                 struct se_mem_s         *map_orig_se_mem;                                                                            void                    *iovec_base;
+	int                     map_reset;
+	u32                     iovec_length;
+	u32                     iscsi_offset;
+	u32                     current_offset;
+	u32                     orig_offset;
+	u32                     sg_count;
+	u32                     sg_current;
+	u32                     sg_length;
+	struct page		*sg_page;
+	struct se_mem_s		*map_se_mem;
+	struct se_mem_s		*map_orig_se_mem;
+	void			*iovec_base;
 } ____cacheline_aligned se_offset_map_t;
-        
-typedef struct se_map_sg_s {    
-        int                     map_flags;
-        u32                     data_length;
-        u32                     data_offset;
+
+typedef struct se_map_sg_s {
+	int			map_flags;
+	u32			data_length;
+	u32			data_offset;
 	void			*fabric_cmd;
-        struct se_cmd_s         *se_cmd;
-        struct iovec            *iov;
+	struct se_cmd_s		*se_cmd;
+	struct iovec		*iov;
 } ____cacheline_aligned se_map_sg_t;
-        
-typedef struct se_unmap_sg_s {  
-        u32                     data_length;
-        u32                     sg_count;
-        u32                     sg_offset;
-        u32                     padding;
-        u32                     t_offset;
+
+typedef struct se_unmap_sg_s {
+	u32			data_length;
+	u32			sg_count;
+	u32			sg_offset;
+	u32			padding;
+	u32			t_offset;
 	void			*fabric_cmd;
-        struct se_cmd_s         *se_cmd;
-        se_offset_map_t         lmap;
-        struct se_mem_s         *cur_se_mem;
+	struct se_cmd_s		*se_cmd;
+	se_offset_map_t		lmap;
+	struct se_mem_s		*cur_se_mem;
 } ____cacheline_aligned se_unmap_sg_t;
 
 typedef struct se_cmd_s {
-	u8			scsi_status; /* SAM response code being sent to initiator */
+	/* SAM response code being sent to initiator */
+	u8			scsi_status;
 	u8			scsi_sense_reason;
 	u16			scsi_sense_length;
 	int			data_direction;
-	int			t_state; /* Transport protocol dependent state */
-	int			deferred_t_state; /* Transport protocol dependent state for out of order CmdSNs */
-	int			transport_error_status; /* Transport specific error status */
+	/* Transport protocol dependent state */
+	int			t_state;
+	/* Transport protocol dependent state for out of order CmdSNs */
+	int			deferred_t_state;
+	/* Transport specific error status */
+	int			transport_error_status;
 	u32			se_cmd_flags;
-	u32			data_length; /* Total size in bytes associated with command */
-	u32			cmd_spdtl;  /* SCSI Presented Data Transfer Length */
+	/* Total size in bytes associated with command */
+	u32			data_length;
+	/* SCSI Presented Data Transfer Length */
+	u32			cmd_spdtl;
 	u32			residual_count;
 	u32			orig_fe_lun;
-	u32			iov_data_count; /* Number of iovecs iovecs used for IP stack calls */
-	u32			orig_iov_data_count; /* Number of iovecs allocated for iscsi_cmd_t->iov_data */
+	/* Number of iovecs iovecs used for IP stack calls */
+	u32			iov_data_count;
+	/* Number of iovecs allocated for iscsi_cmd_t->iov_data */
+	u32			orig_iov_data_count;
 	atomic_t                transport_sent;
-	void			*sense_buffer; /* Used for sense data */
-	struct iovec		*iov_data; /* Used with sockets based fabric plugins */
+	/* Used for sense data */
+	void			*sense_buffer;
+	/* Used with sockets based fabric plugins */
+	struct iovec		*iov_data;
 	struct se_device_s      *se_dev;
 	struct se_dev_entry_s   *se_deve;
 	struct se_lun_s		*se_lun;
@@ -457,41 +478,52 @@ typedef struct se_cmd_s {
 	struct se_tmr_req_s	*se_tmr_req;
 	struct se_transport_task_s *t_task;
 	struct target_core_fabric_ops *se_tfo;
-        struct se_cmd_s      	*l_next;
-        struct se_cmd_s      	*l_prev;
+	struct se_cmd_s      	*l_next;
+	struct se_cmd_s      	*l_prev;
 	int (*transport_add_cmd_to_queue)(struct se_cmd_s *, u8);
 	int (*transport_allocate_iovecs)(struct se_cmd_s *);
 	int (*transport_allocate_resources)(struct se_cmd_s *, u32, u32);
-	int (*transport_cdb_transform)(struct se_cmd_s *, struct se_transform_info_s *);
-	int (*transport_do_transform)(struct se_cmd_s *, struct se_transform_info_s *);
+	int (*transport_cdb_transform)(struct se_cmd_s *,
+					struct se_transform_info_s *);
+	int (*transport_do_transform)(struct se_cmd_s *,
+					struct se_transform_info_s *);
 	int (*transport_emulate_cdb)(struct se_cmd_s *);
 	void (*transport_free_resources)(struct se_cmd_s *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	struct se_task_s *(*transport_get_task)(struct se_transform_info_s *, struct se_cmd_s *, void *, struct se_obj_lun_type_s *);
+	struct se_task_s *(*transport_get_task)(struct se_transform_info_s *,
+					struct se_cmd_s *, void *,
+					struct se_obj_lun_type_s *);
 	int (*transport_map_buffers_to_tasks)(struct se_cmd_s *);
 	void (*transport_map_SG_segments)(struct se_unmap_sg_s *);
 	void (*transport_passthrough_done)(struct se_cmd_s *);
 	void (*transport_unmap_SG_segments)(struct se_unmap_sg_s *);
-	int (*transport_set_iovec_ptrs)(struct se_map_sg_s *, struct se_unmap_sg_s *);
+	int (*transport_set_iovec_ptrs)(struct se_map_sg_s *,
+					struct se_unmap_sg_s *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd_s *, int, int);
-	void (*callback)(struct se_cmd_s *cmd, void *callback_arg, int complete_status);
+	void (*callback)(struct se_cmd_s *cmd, void *callback_arg,
+			int complete_status);
 	void *callback_arg;
 } ____cacheline_aligned se_cmd_t;
 
 #define T_TASK(cmd)     ((se_transport_task_t *)(cmd->t_task))
 #define CMD_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_obj_api))
-#define CMD_ORIG_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_orig_obj_api))
+#define CMD_ORIG_OBJ_API(cmd) ((struct se_obj_lun_type_s *)	\
+				(cmd->se_orig_obj_api))
 #define CMD_TFO(cmd) ((struct target_core_fabric_ops *)cmd->se_tfo)
 
 typedef struct se_tmr_req_s {
-	u8			function; // Task Management function to be preformed
-	u8			response; // Task Management response to send 
+	/* Task Management function to be preformed */
+	u8			function;
+	/* Task Management response to send */
+	u8			response;
 	int			call_transport;
-	u32			ref_task_tag; // Reference to ITT that Task Mgmt should be preformed 	
-	u64			ref_task_lun; // 64-bit encoded SAM LUN from $FABRIC_MOD TMR header
-	void 			*fabric_tmr_ptr;	
+	/* Reference to ITT that Task Mgmt should be preformed */
+	u32			ref_task_tag;
+	/* 64-bit encoded SAM LUN from $FABRIC_MOD TMR header */
+	u64			ref_task_lun;
+	void 			*fabric_tmr_ptr;
 	se_cmd_t		*task_cmd;
 	se_cmd_t		*ref_cmd;
 	struct se_lun_s		*tmr_lun;
@@ -565,50 +597,59 @@ typedef struct se_dev_entry_s {
 }  ____cacheline_aligned se_dev_entry_t;
 
 typedef struct se_dev_attrib_s {
-        int             status_thread;
-        int             status_thread_tur;
+	int		status_thread;
+	int		status_thread_tur;
 	int		emulate_reservations;
 	int		emulate_alua;
 	u32		hw_block_size;
 	u32		block_size;
 	u32		hw_max_sectors;
-        u32             max_sectors;
+	u32		max_sectors;
 	u32		hw_queue_depth;
-        u32             queue_depth;
-        u32             task_timeout;
-        struct se_subsystem_dev_s *da_sub_dev;
-        struct config_group da_group;
+	u32		queue_depth;
+	u32		task_timeout;
+	struct se_subsystem_dev_s *da_sub_dev;
+	struct config_group da_group;
 } ____cacheline_aligned se_dev_attrib_t;
 
 typedef struct se_subsystem_dev_s {
 	u32			su_dev_flags;
-        struct se_hba_s *se_dev_hba;
-        struct se_device_s *se_dev_ptr;
-        se_dev_attrib_t se_dev_attrib;
-	t10_alua_t	t10_alua;	/* T10 Asymmetric Logical Unit Assignment Information */
-	t10_wwn_t	t10_wwn;	/* T10 Inquiry and EVPD WWN Information */
-	t10_reservation_template_t t10_reservation;	/* T10 SPC-2 + SPC-3 Reservations */
-        spinlock_t      se_dev_lock;
-        void            *se_dev_su_ptr;
-        struct config_group se_dev_group;
-	struct config_group se_dev_pr_group;	/* For T10 Reservations */
+	struct se_hba_s *se_dev_hba;
+	struct se_device_s *se_dev_ptr;
+	se_dev_attrib_t se_dev_attrib;
+	/* T10 Asymmetric Logical Unit Assignment Information */
+	t10_alua_t	t10_alua;
+	/* T10 Inquiry and EVPD WWN Information */
+	t10_wwn_t	t10_wwn;
+	/* T10 SPC-2 + SPC-3 Reservations */
+	t10_reservation_template_t t10_reservation;
+	spinlock_t      se_dev_lock;
+	void            *se_dev_su_ptr;
+	struct config_group se_dev_group;
+	/* For T10 Reservations */
+	struct config_group se_dev_pr_group;
 } ____cacheline_aligned se_subsystem_dev_t;
 
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 
 typedef struct se_device_s {
-	u8			type;		/* Type of disk transport used for device */
-	u8			thread_active;	/* Set to 1 if thread is NOT sleeping on thread_sem */
+	/* Type of disk transport used for device */
+	u8			type;
+	/* Set to 1 if thread is NOT sleeping on thread_sem */
+	u8			thread_active;
 	u8			dev_status_timer_flags;
-	u16			dev_rpti_counter; /* RELATIVE TARGET PORT IDENTIFER Counter */
+	/* RELATIVE TARGET PORT IDENTIFER Counter */
+	u16			dev_rpti_counter;
 	u32			dev_flags;
 	u32			dev_port_count;
 	u32			dev_status;
 	u32			dev_tcq_window_closed;
-	u32			queue_depth;	/* Physical device queue depth */
+	/* Physical device queue depth */
+	u32			queue_depth;
 	unsigned long long	dev_sectors_total;
-	void 			*dev_ptr; 	/* Pointer to transport specific device structure */
+	/* Pointer to transport specific device structure */
+	void 			*dev_ptr;
 #ifdef SNMP_SUPPORT
 	u32			dev_index;
 	u64			creation_time;
@@ -618,7 +659,8 @@ typedef struct se_device_s {
 	u64			write_bytes;
 	spinlock_t		stats_lock;
 #endif /* SNMP_SUPPORT */
-	atomic_t		active_cmds;	/* Active commands on this virtual iSCSI device */
+	/* Active commands on this virtual SE device */
+	atomic_t		active_cmds;
 	atomic_t		depth_left;
 	atomic_t		dev_tur_active;
 	atomic_t		execute_tasks;
@@ -637,26 +679,34 @@ typedef struct se_device_s {
 	spinlock_t		dev_status_thr_lock;
 	spinlock_t		se_port_lock;
 	spinlock_t		se_tmr_lock;
-	struct se_node_acl_s	*dev_reserved_node_acl; /* Used for legacy SPC-2 reservationsa */
-	struct t10_alua_lu_gp_member_s *dev_alua_lu_gp_mem; /* Used for ALUA Logical Unit Group membership */
-	struct t10_pr_registration_s *dev_pr_res_holder; /* Used for SPC-3 Persistent Reservations */
+	/* Used for legacy SPC-2 reservationsa */
+	struct se_node_acl_s	*dev_reserved_node_acl;
+	/* Used for ALUA Logical Unit Group membership */
+	struct t10_alua_lu_gp_member_s *dev_alua_lu_gp_mem;
+	/* Used for SPC-3 Persistent Reservations */
+	struct t10_pr_registration_s *dev_pr_res_holder;
 	struct list_head	dev_sep_list;
 	struct list_head	dev_tmr_list;
-	struct timer_list		dev_status_timer;
-	struct task_struct		*process_thread; /* Pointer to descriptor for processing thread */
-        pid_t                   process_thread_pid;
+	struct timer_list	dev_status_timer;
+	/* Pointer to descriptor for processing thread */
+	struct task_struct	*process_thread;
+	pid_t			process_thread_pid;
 	struct task_struct		*dev_mgmt_thread;
 	int (*write_pending)(struct se_task_s *);
-	void (*dev_generate_cdb)(unsigned long long, u32 *, unsigned char *, int);
+	void (*dev_generate_cdb)(unsigned long long, u32 *,
+					unsigned char *, int);
 	struct se_obj_lun_type_s *dev_obj_api;
 	struct se_task_s	*execute_task_head;
 	struct se_task_s	*execute_task_tail;
 	struct se_task_s	*state_task_head;
 	struct se_task_s	*state_task_tail;
-	struct se_hba_s		*se_hba;	/* Pointer to associated iSCSI HBA */
+	/* Pointer to associated SE HBA */
+	struct se_hba_s		*se_hba;
 	struct se_subsystem_dev_s *se_sub_dev;
-	struct se_subsystem_api_s *transport;	/* Pointer to template of function pointers for transport */ 
-	struct se_device_s	*next;		/* Pointer to next device in TPG list */
+	/* Pointer to template of function pointers for transport */
+	struct se_subsystem_api_s *transport;
+	/* Pointer to next device in TPG list */
+	struct se_device_s	*next;
 	struct se_device_s	*prev;
 }  ____cacheline_aligned se_device_t;
 
@@ -668,23 +718,30 @@ typedef struct se_device_s {
 #define DEV_OBJ_API(dev)	((struct se_obj_lun_type_s *)(dev)->dev_obj_api)
 
 typedef struct se_hba_s {
-	u8			type;		/* Type of disk transport used for HBA. */
+	/* Type of disk transport used for HBA. */
+	u8			type;
 	u16			hba_tpgt;
 	u32			hba_status;
 	u32			hba_id;
 	u32			hba_flags;
-	u32			dev_count;      /* Virtual iSCSI devices attached. */
+	/* Virtual iSCSI devices attached. */
+	u32			dev_count;
 #ifdef SNMP_SUPPORT
 	u32			hba_index;
 #endif
 	atomic_t		dev_mib_access_count;
 	atomic_t		load_balance_queue;
 	atomic_t		left_queue_depth;
-	atomic_t		max_queue_depth; /* Maximum queue depth the HBA can handle. */
-	void			*hba_ptr;	/* Pointer to transport specific host structure. */
-	se_device_t		*device_head;	/* Pointer to start of devices for this HBA */
-	se_device_t		*device_tail;	/* Pointer to end of devices of this HBA */
-	spinlock_t		device_lock;	/* Spinlock for adding/removing devices */
+	/* Maximum queue depth the HBA can handle. */
+	atomic_t		max_queue_depth;
+	/* Pointer to transport specific host structure. */
+	void			*hba_ptr;
+	/* Pointer to start of devices for this HBA */
+	se_device_t		*device_head;
+	/* Pointer to end of devices of this HBA */
+	se_device_t		*device_tail;
+	/* Spinlock for adding/removing devices */
+	spinlock_t		device_lock;
 	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
 	struct semaphore	hba_access_sem;
@@ -694,7 +751,7 @@ typedef struct se_hba_s {
 }  ____cacheline_aligned se_hba_t;
 
 #define ISCSI_HBA(d)		((se_hba_t *)(d)->se_hba)
-// Using SE_HBA() for new code
+/* Using SE_HBA() for new code */
 #define SE_HBA(d)		((se_hba_t *)(d)->se_hba)
 
 typedef struct se_lun_s {
@@ -722,33 +779,44 @@ typedef struct se_lun_s {
 #define LUN_OBJ_API(lun)	((struct se_obj_lun_type_s *)(lun)->lun_obj_api)
 
 typedef struct se_port_s {
-	u16		sep_rtpi; /* RELATIVE TARGET PORT IDENTIFER */
+	/* RELATIVE TARGET PORT IDENTIFER */
+	u16		sep_rtpi;
 #ifdef SNMP_SUPPORT
-        u32             sep_index;
-        scsi_port_stats_t sep_stats;
+	u32		sep_index;
+	scsi_port_stats_t sep_stats;
 #endif
-	struct t10_alua_tg_pt_gp_member_s *sep_alua_tg_pt_gp_mem; /* Used for ALUA Target Port Groups membership */
-        struct se_lun_s *sep_lun;
-        struct se_portal_group_s *sep_tpg;
-        struct list_head sep_list;
+	/* Used for ALUA Target Port Groups membership */
+	struct t10_alua_tg_pt_gp_member_s *sep_alua_tg_pt_gp_mem;
+	struct se_lun_s *sep_lun;
+	struct se_portal_group_s *sep_tpg;
+	struct list_head sep_list;
 } ____cacheline_aligned se_port_t;
 
 typedef struct se_portal_group_s {
-	int			se_tpg_type;	/* Type of target portal group */
-	u32			num_node_acls;  /* Number of ACLed Initiator Nodes for this TPG */
-	spinlock_t		acl_node_lock;  /* Spinlock for adding/removing ACLed Nodes */
-	spinlock_t		session_lock;   /* Spinlock for adding/removing sessions */
+	/* Type of target portal group */
+	int			se_tpg_type;
+	/* Number of ACLed Initiator Nodes for this TPG */
+	u32			num_node_acls;
+	/* Spinlock for adding/removing ACLed Nodes */
+	spinlock_t		acl_node_lock;
+	/* Spinlock for adding/removing sessions */
+	spinlock_t		session_lock;
 	spinlock_t		tpg_lun_lock;
-	void			*se_tpg_fabric_ptr; /* Pointer to $FABRIC_MOD portal group */
+	/* Pointer to $FABRIC_MOD portal group */
+	void			*se_tpg_fabric_ptr;
 	struct list_head	se_tpg_list;
 	struct se_lun_s		*tpg_lun_list;
-	struct se_node_acl_s	*acl_node_head; /* Pointer to start of Initiator ACL list */
-	struct se_node_acl_s	*acl_node_tail; /* Pointer to end of Initiator ACL list */
-	struct list_head	tpg_sess_list;	/* List of TCM sessions assoicated wth this TPG */
-	struct target_core_fabric_ops *se_tpg_tfo; /* Pointer to $FABRIC_MOD dependent code */
+	/* Pointer to start of Initiator ACL list */
+	struct se_node_acl_s	*acl_node_head;
+	/* Pointer to end of Initiator ACL list */
+	struct se_node_acl_s	*acl_node_tail;
+	/* List of TCM sessions assoicated wth this TPG */
+	struct list_head	tpg_sess_list;
+	/* Pointer to $FABRIC_MOD dependent code */
+	struct target_core_fabric_ops *se_tpg_tfo;
 } ____cacheline_aligned se_portal_group_t;
 
-#define TPG_TFO(se_tpg)		((struct target_core_fabric_ops *)(se_tpg)->se_tpg_tfo)
+#define TPG_TFO(se_tpg)	((struct target_core_fabric_ops *)(se_tpg)->se_tpg_tfo)
 
 typedef struct se_global_s {
 	u16			alua_lu_gps_counter;
@@ -763,8 +831,8 @@ typedef struct se_global_s {
 	struct list_head	g_lu_gps_list;
 	struct list_head	g_tg_pt_gps_list;
 	struct list_head	g_se_tpg_list;
-        struct se_plugin_class_s *plugin_class_list;
-        se_hba_t                *hba_list;
+	struct se_plugin_class_s *plugin_class_list;
+	se_hba_t		*hba_list;
 	t10_alua_lu_gp_t	*default_lu_gp;
 	t10_alua_tg_pt_gp_t	*default_tg_pt_gp;
 	spinlock_t		hba_lock;
@@ -772,7 +840,7 @@ typedef struct se_global_s {
 	spinlock_t		tg_pt_gps_lock;
 	spinlock_t		plugin_class_lock;
 #ifdef DEBUG_DEV
-        spinlock_t              debug_dev_lock;
+	spinlock_t		debug_dev_lock;
 #endif
 } ____cacheline_aligned se_global_t;
 

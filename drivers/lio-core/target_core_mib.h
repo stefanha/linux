@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  target_core_mib.h
  *
  * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
@@ -21,11 +21,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #ifndef TARGET_CORE_MIB_H
 #define TARGET_CORE_MIB_H
+
+extern struct se_global_s *se_global;
 
 typedef enum {
 	SCSI_INST_INDEX,
@@ -35,7 +37,7 @@ typedef enum {
 } scsi_index_t;
 
 typedef struct scsi_index_table_s {
-	spinlock_t	lock;	
+	spinlock_t	lock;
 	u32 		scsi_mib_index[SCSI_INDEX_TYPE_MAX];
 } scsi_index_table_t;
 

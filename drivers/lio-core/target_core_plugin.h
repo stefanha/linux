@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  target_core_plugin.h
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
@@ -21,7 +21,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #ifndef TARGET_CORE_PLUGIN_H
@@ -53,14 +53,18 @@
 #define PLUGIN_FREE		0
 #define PLUGIN_REGISTERED	1
 
-extern void plugin_load_all_classes (void);
-extern struct se_plugin_class_s *plugin_get_class (u32);
-extern int plugin_register_class (u32, unsigned char *, int);
-extern int plugin_deregister_class (u32);
-extern void plugin_unload_all_classes (void);
-extern void *plugin_get_obj (u32, u32, int *);
-extern struct se_plugin_s *plugin_register (void *, u32, unsigned char *, u32, void (*get_plugin_info)(void *, char *, int *), int *);
-extern int plugin_deregister (u32, u32);
+extern se_global_t *se_global;
+
+extern void plugin_load_all_classes(void);
+extern struct se_plugin_class_s *plugin_get_class(u32);
+extern int plugin_register_class(u32, unsigned char *, int);
+extern int plugin_deregister_class(u32);
+extern void plugin_unload_all_classes(void);
+extern void *plugin_get_obj(u32, u32, int *);
+extern struct se_plugin_s *plugin_register(void *, u32, unsigned char *, u32,
+				void (*get_plugin_info)(void *, char *, int *),
+				int *);
+extern int plugin_deregister(u32, u32);
 
 typedef struct se_plugin_class_s {
 	unsigned char		plugin_class_name[MAX_PLUGIN_CLASS_NAME];
@@ -69,7 +73,7 @@ typedef struct se_plugin_class_s {
 	struct se_plugin_s	*plugin_array;
 	spinlock_t		plugin_lock;
 } se_plugin_class_t;
-	
+
 typedef struct se_plugin_s	{
 	unsigned char		plugin_name[MAX_PLUGIN_NAME];
 	int			plugin_state;
