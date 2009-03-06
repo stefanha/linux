@@ -4684,6 +4684,7 @@ int transport_get_sense_data(se_cmd_t *cmd)
  * Generic function pointers for target_core_mod/ConfigFS
  */
 #define SET_GENERIC_TRANSPORT_FUNCTIONS(cmd)				\
+do {									\
 	cmd->transport_allocate_iovecs =				\
 			&transport_generic_allocate_iovecs;		\
 	cmd->transport_get_task = &transport_generic_get_task;		\
@@ -4691,6 +4692,7 @@ int transport_get_sense_data(se_cmd_t *cmd)
 			&transport_generic_map_buffers_to_tasks;	\
 	cmd->transport_set_iovec_ptrs =					\
 			&transport_generic_set_iovec_ptrs;		\
+} while (0)
 
 /*	transport_generic_cmd_sequencer():
  *
