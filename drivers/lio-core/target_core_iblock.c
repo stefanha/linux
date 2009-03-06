@@ -1014,14 +1014,12 @@ void iblock_bio_done(struct bio *bio, int err)
 {
 	se_task_t *task = (se_task_t *)bio->bi_private;
 	iblock_req_t *ibr = (iblock_req_t *)task->transport_req;
-	int ret = 0;
 
-	err = test_bit(BIO_UPTODATE, &bio->bi_flags);
-	if (err) {
+	err = test_bit(BIO_UPTODATE, &bio->bi_flags) ? err : -EIO;
+	if (err != 0) {
 		printk(KERN_ERR "test_bit(BIO_UPTODATE) failed for bio: %p,"
-			" err: %d\n", bio, ret);
+			" err: %d\n", bio, err);
 		transport_complete_task(task, 0);
-		ret = 1;
 		goto out;
 	}
 	DEBUG_IBLOCK("done[%p] bio: %p task_lba: %llu bio_lba: %llu err=%d\n",

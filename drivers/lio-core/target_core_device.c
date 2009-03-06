@@ -232,7 +232,7 @@ void se_disable_devices_for_hba(se_hba_t *hba)
 			dev->dev_status &=
 					~TRANSPORT_DEVICE_OFFLINE_DEACTIVATED;
 
-			up(&dev->dev_queue_obj->thread_sem);
+			wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
 		}
 		spin_unlock(&dev->dev_status_lock);
 

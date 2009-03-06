@@ -121,7 +121,6 @@ extern int init_se_global(void);
 extern void release_se_global(void);
 #ifdef DEBUG_DEV
 extern int __iscsi_debug_dev(se_device_t *);
-extern int iscsi_debug_dev(se_device_t *);
 #endif
 extern unsigned char *transport_get_iqn_sn(void);
 extern void transport_init_queue_obj(struct se_queue_obj_s *);
@@ -166,7 +165,7 @@ extern se_device_t *transport_add_device_to_core_hba(se_hba_t *,
 					struct se_subsystem_api_s *,
 					struct se_subsystem_dev_s *, u32,
 					void *);
-extern void transport_generic_activate_device(se_device_t *);
+extern int transport_generic_activate_device(se_device_t *);
 extern void transport_generic_deactivate_device(se_device_t *);
 extern int transport_generic_claim_phydevice(se_device_t *);
 extern void transport_generic_release_phydevice(se_device_t *, int);
@@ -274,7 +273,7 @@ extern void transport_status_thr_force_offline(se_device_t *,
 extern int transport_status_thr_dev_offline(se_device_t *);
 extern int transport_status_thr_dev_offline_tasks(se_device_t *, void *);
 extern int transport_status_thr_rdev_offline(se_device_t *);
-extern void transport_start_status_thread(se_device_t *);
+extern int transport_start_status_thread(se_device_t *);
 extern void transport_stop_status_thread(se_device_t *);
 
 /*
