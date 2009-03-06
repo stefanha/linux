@@ -71,7 +71,6 @@
 #include <iscsi_target_util.h>
 
 #include <target_core_plugin.h>
-#include <target_core_frontend_plugin.h>
 
 #include <iscsi_target.h>
 #include <iscsi_target_device.h>
@@ -1100,12 +1099,6 @@ static int iscsi_target_detect(void)
 		goto out;
 	}
 
-	/*
-	 * Setup Frontend Plugins
-	 */
-	plugin_register_class(PLUGIN_TYPE_FRONTEND, "FRONTEND", MAX_PLUGINS);
-	frontend_load_plugins();
-
 	if (!(lio_cmd_cache = kmem_cache_create("lio_cmd_cache",
 			sizeof(iscsi_cmd_t), __alignof__(iscsi_cmd_t),
 			0, NULL))) {
@@ -1162,7 +1155,6 @@ static int iscsi_target_detect(void)
 
 	return(ret);
 out:
-	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 	core_release_discovery_tpg();
 	if (lio_cmd_cache)
 		kmem_cache_destroy(lio_cmd_cache);
@@ -1237,7 +1229,6 @@ extern void iscsi_target_release_phase2 (void)
 	kmem_cache_destroy(lio_r2t_cache);
 	core_release_discovery_tpg();
 	core_release_tiqns();
-	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 
 	iscsi_global->ti_forcechanoffline = NULL;
 	iscsi_target_deregister_configfs();
@@ -1277,48 +1268,6 @@ static int iscsi_target_release (void)
 	printk("Unloading Complete.\n");
 
 	return(ret);
-}
-
-extern void rfc3720_TCP_FE_plugin_info (void *p, char *b, int *bl)
-{
-        *bl += sprintf(b+*bl, "%s Internet Small Computer Systems Interface (iSCSI/TCP) Plugin %s\n",
-			PYX_ISCSI_VENDOR, ISCSI_TCP_VERSION);
-        return;
-}
-
-#define RFC3720_TCP {									\
-	get_plugin_info:		rfc3720_TCP_FE_plugin_info,			\
-}
-
-scsi_target_frontend_t rfc3720_TCP_FE_template = RFC3720_TCP;
-
-extern void rfc3720_SCTP_FE_plugin_info (void *p, char *b, int *bl)
-{
-        *bl += sprintf(b+*bl, "%s Internet Small Computer Systems Interface (iSCSI/SCTP) Plugin %s\n",
-			PYX_ISCSI_VENDOR, ISCSI_SCTP_VERSION);
-        return;
-}
-
-#define RFC3720_SCTP {									\
-	get_plugin_info:		rfc3720_SCTP_FE_plugin_info,			\
-}
-
-scsi_target_frontend_t rfc3720_SCTP_FE_template = RFC3720_SCTP;
-
-extern void frontend_load_plugins (void)
-{
-	int ret;
-
-	plugin_register((void *)&rfc3720_TCP_FE_template,
-			FRONTEND_RFC3720_TCP, "rfc3720_TCP_FE", PLUGIN_TYPE_FRONTEND,
-			rfc3720_TCP_FE_template.get_plugin_info, &ret);
-
-	plugin_register((void *)&rfc3720_SCTP_FE_template,
-			FRONTEND_RFC3720_SCTP, "rfc3720_SCTP_FE", PLUGIN_TYPE_FRONTEND,
-			rfc3720_SCTP_FE_template.get_plugin_info, &ret);
-
-
-	return;
 }
 
 extern char *iscsi_get_fabric_name (void)
