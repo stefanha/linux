@@ -27,23 +27,8 @@
 #ifndef TARGET_CORE_PLUGIN_H
 #define TARGET_CORE_PLUGIN_H
 
-#define PLUGIN_TYPE_FRONTEND	0
-#define PLUGIN_TYPE_TRANSPORT	1
-#define PLUGIN_TYPE_OBJ		2
-#define PLUGIN_TYPE_FEATURE	3
-
-#define FRONTEND_RFC3720_TCP	0
-#define FRONTEND_RFC3720_SCTP	1
-#define FRONTEND_ISER_IWARP_TCP	2
-#define FRONTEND_ISER_IWARP_SCTP 3
-#define FRONTEND_ISER_IB	4
-
-#define FEATURE_PLUGIN_RAID	0 /* Currently used for replication.. */
-#define FEATURE_PLUGIN_MIRROR	0 /* used for online replication */
-#define FEATURE_PLUGIN_SNAP	1 /* used for snapshot */
-#define FEATURE_PLUGIN_HA_AP	2 /* active-passive high availability */
-#define FEATURE_PLUGIN_HA_AA	3 /* active-active high availability */
-#define FEATURE_PLUGIN_REPL	4 /* used for offline replication */
+#define PLUGIN_TYPE_TRANSPORT	0
+#define PLUGIN_TYPE_OBJ		1
 
 #define MAX_PLUGINS		32
 #define MAX_PLUGIN_CLASSES	16
