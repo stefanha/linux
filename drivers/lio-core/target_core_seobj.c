@@ -101,15 +101,17 @@ se_queue_obj_t *dev_obj_get_queue_obj(void *p)
 	return dev->dev_queue_obj;
 }
 
-void dev_obj_start_status_thread(void *p, int force)
+int dev_obj_start_status_thread(void *p, int force)
 {
 	se_device_t *dev = (se_device_t *)p;
 
 	if (!(force) && !(DEV_ATTRIB(dev)->status_thread))
-		return;
+		return 0;
 
 	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_start_status_thread((se_device_t *)p);
+		return transport_start_status_thread(dev);
+
+	return 0;
 }
 
 void dev_obj_stop_status_thread(void *p)
@@ -291,7 +293,7 @@ unsigned long long dev_obj_total_sectors(void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	return (dev->dev_sectors_total + 1);
+	return  dev->dev_sectors_total + 1;
 }
 
 int dev_obj_do_se_mem_map(
@@ -416,7 +418,7 @@ void dev_obj_notify_obj(void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
 
-	up(&dev->dev_queue_obj->thread_sem);
+	wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
 }
 
 int dev_obj_check_online(void *p)
@@ -473,7 +475,7 @@ void dev_obj_signal_shutdown(void *p)
 		dev->dev_status &= ~TRANSPORT_DEVICE_OFFLINE_ACTIVATED;
 		dev->dev_status &= ~TRANSPORT_DEVICE_OFFLINE_DEACTIVATED;
 
-		up(&dev->dev_queue_obj->thread_sem);
+		wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
 	}
 	spin_unlock(&dev->dev_status_lock);
 }

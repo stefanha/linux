@@ -38,6 +38,7 @@
 #include <linux/blkdev.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/kthread.h>
 #include <linux/in.h>
 #include <linux/cdrom.h>
 #include <net/sock.h>
@@ -494,7 +495,8 @@ unsigned char *transport_get_iqn_sn(void)
 
 void transport_init_queue_obj(se_queue_obj_t *qobj)
 {
-	init_MUTEX_LOCKED(&qobj->thread_sem);
+	atomic_set(&qobj->queue_cnt, 0);
+	init_waitqueue_head(&qobj->thread_wq);
 	init_MUTEX_LOCKED(&qobj->thread_create_sem);
 	init_MUTEX_LOCKED(&qobj->thread_done_sem);
 	spin_lock_init(&qobj->cmd_queue_lock);
@@ -922,8 +924,8 @@ extern int transport_add_cmd_to_queue(
 	atomic_inc(&T_TASK(cmd)->t_transport_queue_active);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
-	up(&qobj->thread_sem);
-
+	atomic_inc(&qobj->queue_cnt);
+	wake_up_interruptible(&qobj->thread_wq);
 	return 0;
 }
 
@@ -950,6 +952,7 @@ se_queue_req_t *__transport_get_qr_from_queue(se_queue_obj_t *qobj)
 		cmd = (se_cmd_t *)qr->cmd;
 		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
 	}
+	atomic_dec(&qobj->queue_cnt);
 
 	qobj->queue_head = qobj->queue_head->next;
 	qr->next = qr->prev = NULL;
@@ -979,6 +982,7 @@ se_queue_req_t *transport_get_qr_from_queue(se_queue_obj_t *qobj)
 		cmd = (se_cmd_t *)qr->cmd;
 		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
 	}
+	atomic_dec(&qobj->queue_cnt);
 
 	qobj->queue_head = qobj->queue_head->next;
 	qr->next = qr->prev = NULL;
@@ -1015,6 +1019,7 @@ static void transport_remove_cmd_from_queue(se_cmd_t *cmd, se_queue_obj_t *qobj)
 		}
 
 		atomic_dec(&T_TASK(q_cmd)->t_transport_queue_active);
+		atomic_dec(&qobj->queue_cnt);
 		REMOVE_ENTRY_FROM_LIST(qr, qobj->queue_head, qobj->queue_tail);
 		kfree(qr);
 
@@ -2041,7 +2046,6 @@ se_device_t *transport_add_device_to_core_hba(
 		kfree(dev);
 		return NULL;
 	}
-
 	transport_init_queue_obj(dev->dev_queue_obj);
 
 	dev->dev_status_queue_obj = kzalloc(sizeof(se_queue_obj_t),
@@ -2053,7 +2057,6 @@ se_device_t *transport_add_device_to_core_hba(
 		kfree(dev);
 		return NULL;
 	}
-
 	transport_init_queue_obj(dev->dev_status_queue_obj);
 
 	dev->dev_flags		= device_flags;
@@ -2066,9 +2069,6 @@ se_device_t *transport_add_device_to_core_hba(
 	atomic_set(&dev->active_cmds, 0);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
 	INIT_LIST_HEAD(&dev->dev_tmr_list);
-	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_create_sem);
-	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_done_sem);
-	init_MUTEX_LOCKED(&dev->dev_queue_obj->thread_sem);
 	spin_lock_init(&dev->execute_task_lock);
 	spin_lock_init(&dev->state_task_lock);
 	spin_lock_init(&dev->dev_reservation_lock);
@@ -2076,7 +2076,6 @@ se_device_t *transport_add_device_to_core_hba(
 	spin_lock_init(&dev->dev_status_thr_lock);
 	spin_lock_init(&dev->se_port_lock);
 	spin_lock_init(&dev->se_tmr_lock);
-	spin_lock_init(&dev->dev_queue_obj->cmd_queue_lock);
 
 	dev->queue_depth	= TRANSPORT(dev)->get_queue_depth(dev);
 	atomic_set(&dev->depth_left, dev->queue_depth);
@@ -2115,8 +2114,8 @@ se_device_t *transport_add_device_to_core_hba(
 	/*
 	 * Startup the se_device_t processing thread
 	 */
-	transport_generic_activate_device(dev);
-
+	if (transport_generic_activate_device(dev) < 0)
+		goto out;
 	/*
 	 * This HBA is reserved for internal storage engine / feature plugin use
 	 */
@@ -2191,18 +2190,31 @@ out:
  *
  *
  */
-void transport_generic_activate_device(se_device_t *dev)
+int transport_generic_activate_device(se_device_t *dev)
 {
+	char name[16];
+
 	if (TRANSPORT(dev)->activate_device)
 		TRANSPORT(dev)->activate_device(dev);
 
-	kernel_thread((int (*)(void *)) transport_processing_thread,
-			(void *)dev, 0);
+	memset(name, 0, 16);
+	snprintf(name, 16, "LIO_%s", TRANSPORT(dev)->name);
+
+	dev->process_thread = kthread_run(transport_processing_thread,
+			(void *)dev, name);
+	if (IS_ERR(dev->process_thread)) {
+		printk(KERN_ERR "Unable to create kthread: %s\n", name);
+		return -1;
+	}
 
 	down(&dev->dev_queue_obj->thread_create_sem);
 
-	if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD))
-		DEV_OBJ_API(dev)->start_status_thread((void *)dev, 0);
+	if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD)) {
+		if (DEV_OBJ_API(dev)->start_status_thread((void *)dev, 0) < 0)
+			return -1;
+	}
+
+	return 0;
 }
 
 /*	transport_generic_deactivate_device():
@@ -2217,7 +2229,7 @@ void transport_generic_deactivate_device(se_device_t *dev)
 	if (TRANSPORT(dev)->deactivate_device)
 		TRANSPORT(dev)->deactivate_device(dev);
 
-	send_sig(SIGKILL, dev->process_thread, 1);
+	kthread_stop(dev->process_thread);
 
 	down(&dev->dev_queue_obj->thread_done_sem);
 }
@@ -3835,7 +3847,7 @@ static inline int transport_tcq_window_closed(se_device_t *dev)
 	} else
 		msleep(PYX_TRANSPORT_WINDOW_CLOSED_WAIT_LONG);
 
-	up(&dev->dev_queue_obj->thread_sem);
+	wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
 	return 0;
 }
 
@@ -7210,8 +7222,8 @@ static int transport_add_qr_to_queue(
 	printk(KERN_INFO "Adding obj_ptr: %p state: %d to qobj: %p\n",
 			se_obj_ptr, state, qobj);
 #endif
-	up(&qobj->thread_sem);
-
+	atomic_inc(&qobj->queue_cnt);
+	wake_up_interruptible(&qobj->thread_wq);
 	return 0;
 }
 
@@ -7633,23 +7645,27 @@ static int transport_status_thread(void *p)
 {
 	se_obj_lun_type_t *se_obj_api;
 	se_device_t *dev = (se_device_t *)p;
+	se_queue_obj_t *qobj = dev->dev_status_queue_obj;
 	se_queue_req_t *qr;
 	void *se_obj_ptr;
 	int ret, state;
 
-	{
-	char name[16];
-	sprintf(name, "LIO_st_%s", TRANSPORT(dev)->name);
-	iscsi_daemon(dev->dev_mgmt_thread, name, SHUTDOWN_SIGS);
-	}
+	current->policy = SCHED_NORMAL;
+	set_user_nice(current, -20);
+	spin_lock_irq(&current->sighand->siglock);
+	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
 
 	up(&dev->dev_status_queue_obj->thread_create_sem);
 
 	transport_start_status_timer(dev);
 
-	while (1) {
-		down_interruptible(&dev->dev_status_queue_obj->thread_sem);
-		if (signal_pending(current))
+	while (!(kthread_should_stop())) {
+		ret = wait_event_interruptible(qobj->thread_wq,
+				atomic_read(&qobj->queue_cnt) ||
+				kthread_should_stop());
+		if (ret < 0)
 			goto out;
 
 		spin_lock(&dev->dev_status_lock);
@@ -7702,18 +7718,30 @@ out:
 	return 0;
 }
 
-void transport_start_status_thread(se_device_t *dev)
+int transport_start_status_thread(se_device_t *dev)
 {
+	char name[16];
+
+	memset(name, 0, 16);
+	snprintf(name, 16, "LIO_st_%s", TRANSPORT(dev)->name);
+
 	spin_lock_bh(&dev->dev_status_thr_lock);
 	if (atomic_read(&dev->dev_status_thr_count) == 1) {
 		spin_unlock_bh(&dev->dev_status_thr_lock);
-		return;
+		return 0;
 	}
 	atomic_set(&dev->dev_status_thr_count, 1);
 	spin_unlock_bh(&dev->dev_status_thr_lock);
 
-	kernel_thread(transport_status_thread, (void *)dev, 0);
+	dev->dev_mgmt_thread = kthread_run(transport_status_thread,
+			(void *)dev, name);
+	if (IS_ERR(dev->dev_mgmt_thread)) {
+		printk(KERN_ERR "Unable to start status thread: %s\n", name);
+		return -1;
+	}
+
 	down(&dev->dev_status_queue_obj->thread_create_sem);
+	return 9;
 }
 
 void transport_stop_status_thread(se_device_t *dev)
@@ -7730,7 +7758,8 @@ void transport_stop_status_thread(se_device_t *dev)
 		spin_unlock_bh(&dev->dev_status_thr_lock);
 		return;
 	}
-	send_sig(SIGKILL, dev->dev_mgmt_thread, 1);
+
+	kthread_stop(dev->dev_mgmt_thread);
 	spin_unlock_bh(&dev->dev_status_thr_lock);
 
 	down(&dev->dev_status_queue_obj->thread_done_sem);
@@ -7928,18 +7957,20 @@ static int transport_processing_thread(void *param)
 	se_device_t *dev = (se_device_t *) param;
 	se_queue_req_t *qr;
 
-	{
-	char name[16];
-	sprintf(name, "LIO_%s", TRANSPORT(dev)->name);
-	iscsi_daemon(dev->process_thread, name, SHUTDOWN_SIGS);
-	}
+	current->policy = SCHED_NORMAL;
+	set_user_nice(current, -20);
+	spin_lock_irq(&current->sighand->siglock);
+	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
 
 	up(&dev->dev_queue_obj->thread_create_sem);
 
-	while (1) {
-		down_interruptible(&dev->dev_queue_obj->thread_sem);
-
-		if (signal_pending(current))
+	while (!(kthread_should_stop())) {
+		ret = wait_event_interruptible(dev->dev_queue_obj->thread_wq,
+				atomic_read(&dev->dev_queue_obj->queue_cnt) ||
+				kthread_should_stop());
+		if (ret < 0)
 			goto out;
 
 		spin_lock(&dev->dev_status_lock);
