@@ -1560,38 +1560,38 @@ static int transport_get_inquiry(
 	memcpy((void *)&wwn->revision[0], (void *)&buf[32],
 			sizeof(wwn->revision));
 
-	printk(KERN_INFO "  Vendor: ");
+	printk("  Vendor: ");
 	for (i = 8; i < 16; i++)
 		if (buf[i] >= 0x20 && i < buf[4] + 5)
-			printk(KERN_INFO "%c", buf[i]);
+			printk("%c", buf[i]);
 		else
-			printk(KERN_INFO " ");
+			printk(" ");
 
-	printk(KERN_INFO "  Model: ");
+	printk("  Model: ");
 	for (i = 16; i < 32; i++)
 		if (buf[i] >= 0x20 && i < buf[4] + 5)
-			printk(KERN_INFO "%c", buf[i]);
+			printk("%c", buf[i]);
 		else
-			printk(KERN_INFO " ");
+			printk(" ");
 
-	printk(KERN_INFO "  Revision: ");
+	printk("  Revision: ");
 	for (i = 32; i < 36; i++)
 		if (buf[i] >= 0x20 && i < buf[4] + 5)
-			printk(KERN_INFO "%c", buf[i]);
+			printk("%c", buf[i]);
 		else
-			printk(KERN_INFO " ");
+			printk(" ");
 
-	printk(KERN_INFO "\n");
+	printk("\n");
 
 	i = buf[0] & 0x1f;
 
-	printk(KERN_INFO "  Type:   %s ", scsi_device_type(i));
-	printk(KERN_INFO "                 ANSI SCSI revision: %02x",
+	printk("  Type:   %s ", scsi_device_type(i));
+	printk("                 ANSI SCSI revision: %02x",
 				buf[2] & 0x07);
 	if ((buf[2] & 0x07) == 1 && (buf[3] & 0x0f) == 1)
-		printk(KERN_INFO " CCS\n");
+		printk(" CCS\n");
 	else
-		printk(KERN_INFO "\n");
+		printk("\n");
 
 	transport_passthrough_release(cmd);
 	return 0;
@@ -4684,6 +4684,7 @@ int transport_get_sense_data(se_cmd_t *cmd)
  * Generic function pointers for target_core_mod/ConfigFS
  */
 #define SET_GENERIC_TRANSPORT_FUNCTIONS(cmd)				\
+do {									\
 	cmd->transport_allocate_iovecs =				\
 			&transport_generic_allocate_iovecs;		\
 	cmd->transport_get_task = &transport_generic_get_task;		\
@@ -4691,6 +4692,7 @@ int transport_get_sense_data(se_cmd_t *cmd)
 			&transport_generic_map_buffers_to_tasks;	\
 	cmd->transport_set_iovec_ptrs =					\
 			&transport_generic_set_iovec_ptrs;		\
+} while (0)
 
 /*	transport_generic_cmd_sequencer():
  *
