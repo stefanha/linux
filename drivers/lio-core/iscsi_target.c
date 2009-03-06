@@ -965,16 +965,6 @@ static int version_info_seq_show (struct seq_file *m, void *p)
 	return(0);
 }
 
-static int fp_auto_assign = 0; /* Do not perform feature plugin auto assignment by default */
-
-static int target_check_module_params(void)
-{
-	iscsi_global->fp_auto_assign = fp_auto_assign;
-	printk("SE: fp_auto_assign: %d\n", iscsi_global->fp_auto_assign);
-
-	return(0);
-}
-
 static int default_targetname_seq_open (struct inode *inode, struct file *file)
 {
 	return(single_open(file, default_targetname_seq_show, PDE(inode)->data));
@@ -1037,11 +1027,6 @@ static int iscsi_target_detect(void)
 	init_iscsi_index_table();
 #endif
 	if (init_iscsi_global(iscsi_global) < 0) {
-		kfree(iscsi_global);
-		return(-1);
-	}
-
-	if (target_check_module_params() < 0) {
 		kfree(iscsi_global);
 		return(-1);
 	}
@@ -5434,7 +5419,6 @@ static void iscsi_target_cleanup_module(void)
 #ifdef MODULE
 MODULE_DESCRIPTION("LIO Target Driver Core 3.x.x Release");
 MODULE_LICENSE("GPL");
-module_param(fp_auto_assign, int, 0);
 module_init(iscsi_target_init_module);
 module_exit(iscsi_target_cleanup_module);
 #endif /* MODULE */

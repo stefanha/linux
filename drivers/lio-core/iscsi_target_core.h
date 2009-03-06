@@ -845,7 +845,6 @@ typedef struct iscsi_global_s {
 	u32			in_rmmod;	/* In module removal */
 	u32			in_shutdown;	/* In core shutdown */
 	u32			targetname_set; /* Is the iSCSI Node name set? */
-	u32			fp_auto_assign;
 	u32			active_ts;
 	u32			auth_id;	/* Unique identifier used for the authentication daemon */
 	u32			inactive_ts;
