@@ -673,9 +673,7 @@ void transport_deregister_session(se_session_t *se_sess)
 		if (se_nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 			if (!(TPG_TFO(se_tpg)->tpg_check_demo_mode_cache(
 					se_tpg))) {
-				REMOVE_ENTRY_FROM_LIST(se_nacl,
-					se_tpg->acl_node_head,
-					se_tpg->acl_node_tail);
+				list_del(&se_nacl->acl_list);
 				se_tpg->num_node_acls--;
 				spin_unlock_bh(&se_tpg->acl_node_lock);
 				core_free_device_list_for_node(se_nacl, se_tpg);

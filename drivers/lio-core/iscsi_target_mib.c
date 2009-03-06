@@ -897,7 +897,7 @@ static int tgt_auth_seq_show(struct seq_file *seq, void *v)
 		return(0);
 
 	spin_lock_bh(&SE_TPG(tpg)->acl_node_lock);
-	for (acl = SE_TPG(tpg)->acl_node_head; acl; acl = acl->next) {
+	list_for_each_entry(acl, &SE_TPG(tpg)->acl_node_list, acl_list) {
 		seq_printf(seq,"%u %u %u %s\n",
 			   tiqn->tiqn_index, ISCSI_NODE_INDEX, acl->acl_index, 
 			   acl->initiatorname[0] ? acl->initiatorname : NONE);
@@ -1347,7 +1347,7 @@ extern int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 		return(0);
 
 	spin_lock_bh(&SE_TPG(tpg)->acl_node_lock);
-	for (se_nacl = SE_TPG(tpg)->acl_node_head; se_nacl; se_nacl = se_nacl->next) {
+	list_for_each_entry(se_nacl, &SE_TPG(tpg)->acl_node_list, acl_list) {
 		spin_lock_bh(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];

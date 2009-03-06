@@ -514,14 +514,12 @@ void core_update_device_list_for_node(
  */
 void core_clear_lun_from_tpg(se_lun_t *lun, se_portal_group_t *tpg)
 {
-	se_node_acl_t *nacl, *nacl_next;
+	se_node_acl_t *nacl;
 	se_dev_entry_t *deve;
 	u32 i;
 
 	spin_lock_bh(&tpg->acl_node_lock);
-	nacl = tpg->acl_node_head;
-	while (nacl) {
-		nacl_next = nacl->next;
+	list_for_each_entry(nacl, &tpg->acl_node_list, acl_list) {
 		spin_unlock_bh(&tpg->acl_node_lock);
 
 		spin_lock_bh(&nacl->device_list_lock);
@@ -539,7 +537,6 @@ void core_clear_lun_from_tpg(se_lun_t *lun, se_portal_group_t *tpg)
 		spin_unlock_bh(&nacl->device_list_lock);
 
 		spin_lock_bh(&tpg->acl_node_lock);
-		nacl = nacl_next;
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);
 
@@ -1171,7 +1168,7 @@ se_lun_t *core_dev_add_lun(
 	if (TPG_TFO(tpg)->tpg_check_demo_mode(tpg)) {
 		se_node_acl_t *acl;
 		spin_lock_bh(&tpg->acl_node_lock);
-		for (acl = tpg->acl_node_head; acl; acl = acl->next) {
+		list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
 			if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 				spin_unlock_bh(&tpg->acl_node_lock);
 				core_tpg_add_node_to_devs(acl, tpg);

@@ -550,8 +550,7 @@ typedef struct se_node_acl_s {
 	spinlock_t		nacl_sess_lock;
 	struct config_group	acl_group;
 	struct config_group	acl_param_group;
-	struct se_node_acl_s	*next;
-	struct se_node_acl_s	*prev;
+	struct list_head	acl_list;
 } ____cacheline_aligned se_node_acl_t;
 
 typedef struct se_session_s {
@@ -806,11 +805,9 @@ typedef struct se_portal_group_s {
 	/* Pointer to $FABRIC_MOD portal group */
 	void			*se_tpg_fabric_ptr;
 	struct list_head	se_tpg_list;
+	/* linked list for initiator ACL list */
+	struct list_head	acl_node_list;
 	struct se_lun_s		*tpg_lun_list;
-	/* Pointer to start of Initiator ACL list */
-	struct se_node_acl_s	*acl_node_head;
-	/* Pointer to end of Initiator ACL list */
-	struct se_node_acl_s	*acl_node_tail;
 	/* List of TCM sessions assoicated wth this TPG */
 	struct list_head	tpg_sess_list;
 	/* Pointer to $FABRIC_MOD dependent code */
