@@ -334,6 +334,7 @@ int init_se_global(void)
 
 		hba->hba_status |= HBA_STATUS_FREE;
 		hba->hba_id = i;
+		INIT_LIST_HEAD(&hba->hba_dev_list);
 		spin_lock_init(&hba->device_lock);
 		spin_lock_init(&hba->hba_queue_lock);
 		init_MUTEX(&hba->hba_access_sem);
@@ -2065,6 +2066,7 @@ se_device_t *transport_add_device_to_core_hba(
 	dev->se_sub_dev		= se_dev;
 	dev->transport		= transport;
 	atomic_set(&dev->active_cmds, 0);
+	INIT_LIST_HEAD(&dev->dev_list);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
 	INIT_LIST_HEAD(&dev->dev_tmr_list);
 	spin_lock_init(&dev->execute_task_lock);
@@ -2090,7 +2092,7 @@ se_device_t *transport_add_device_to_core_hba(
 #endif /* SNMP_SUPPORT */
 
 	spin_lock(&hba->device_lock);
-	ADD_ENTRY_TO_LIST(dev, hba->device_head, hba->device_tail);
+	list_add_tail(&dev->dev_list, &hba->hba_dev_list);
 	hba->dev_count++;
 	spin_unlock(&hba->device_lock);
 
@@ -2171,7 +2173,7 @@ out:
 	transport_generic_deactivate_device(dev);
 
 	spin_lock(&hba->device_lock);
-	REMOVE_ENTRY_FROM_LIST(dev, hba->device_head, hba->device_tail);
+	list_del(&dev->dev_list);
 	hba->dev_count--;
 	spin_unlock(&hba->device_lock);
 

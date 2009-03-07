@@ -185,22 +185,17 @@ EXPORT_SYMBOL(linux_blockdevice_check);
 
 int se_check_devices_access(se_hba_t *hba)
 {
+	se_device_t *dev;
 	int ret = 0;
-	se_device_t *dev = NULL, *dev_next = NULL;
 
 	spin_lock(&hba->device_lock);
-	dev = hba->device_head;
-	while (dev) {
-		dev_next = dev->next;
-
+	list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
 		if (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj) != 0) {
 			printk(KERN_ERR "check_count(&dev->dev_feature_obj):"
 				" %u\n", DEV_OBJ_API(dev)->check_count(
 					&dev->dev_feature_obj));
 			ret = -1;
 		}
-
-		dev = dev_next;
 	}
 	spin_unlock(&hba->device_lock);
 
@@ -213,12 +208,10 @@ int se_check_devices_access(se_hba_t *hba)
  */
 void se_disable_devices_for_hba(se_hba_t *hba)
 {
-	se_device_t *dev, *dev_next;
+	se_device_t *dev;
 
 	spin_lock(&hba->device_lock);
-	dev = hba->device_head;
-	while (dev) {
-		dev_next = dev->next;
+	list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
 
 		spin_lock(&dev->dev_status_lock);
 		if ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
@@ -235,8 +228,6 @@ void se_disable_devices_for_hba(se_hba_t *hba)
 			wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
 		}
 		spin_unlock(&dev->dev_status_lock);
-
-		dev = dev_next;
 	}
 	spin_unlock(&hba->device_lock);
 
@@ -744,7 +735,7 @@ void se_release_device_for_hba(se_device_t *dev)
 	transport_generic_free_device(dev);
 
 	spin_lock(&hba->device_lock);
-	REMOVE_ENTRY_FROM_LIST(dev, hba->device_head, hba->device_tail);
+	list_del(&dev->dev_list);
 	hba->dev_count--;
 	spin_unlock(&hba->device_lock);
 

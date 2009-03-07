@@ -704,9 +704,8 @@ typedef struct se_device_s {
 	struct se_subsystem_dev_s *se_sub_dev;
 	/* Pointer to template of function pointers for transport */
 	struct se_subsystem_api_s *transport;
-	/* Pointer to next device in TPG list */
-	struct se_device_s	*next;
-	struct se_device_s	*prev;
+	/* Linked list for se_hba_t se_device_t list */
+	struct list_head	dev_list;
 }  ____cacheline_aligned se_device_t;
 
 #define SE_DEV(cmd)		((se_device_t *)(cmd)->se_lun->se_dev)
@@ -735,11 +734,8 @@ typedef struct se_hba_s {
 	atomic_t		max_queue_depth;
 	/* Pointer to transport specific host structure. */
 	void			*hba_ptr;
-	/* Pointer to start of devices for this HBA */
-	se_device_t		*device_head;
-	/* Pointer to end of devices of this HBA */
-	se_device_t		*device_tail;
-	/* Spinlock for adding/removing devices */
+	/* Linked list for se_device_t */
+	struct list_head	hba_dev_list;
 	spinlock_t		device_lock;
 	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
