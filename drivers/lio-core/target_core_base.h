@@ -741,8 +741,6 @@ typedef struct se_hba_s {
 	struct config_group	hba_group;
 	struct semaphore	hba_access_sem;
 	struct se_subsystem_api_s *transport;
-	struct se_hba_s		*next;
-	struct se_hba_s		*prev;
 }  ____cacheline_aligned se_hba_t;
 
 #define ISCSI_HBA(d)		((se_hba_t *)(d)->se_hba)
