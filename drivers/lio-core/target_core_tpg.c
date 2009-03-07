@@ -67,7 +67,7 @@ static void core_clear_initiator_node_from_tpg(
 	int i;
 	se_dev_entry_t *deve;
 	se_lun_t *lun;
-	se_lun_acl_t *acl;
+	se_lun_acl_t *acl, *acl_tmp;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -89,7 +89,8 @@ static void core_clear_initiator_node_from_tpg(
 			TRANSPORT_LUNFLAGS_NO_ACCESS, nacl, tpg, 0);
 
 		spin_lock(&lun->lun_acl_lock);
-		for (acl = lun->lun_acl_head; acl; acl = acl->next) {
+		list_for_each_entry_safe(acl, acl_tmp,
+					&lun->lun_acl_list, lacl_list) {
 			if (!(strcmp(acl->initiatorname,
 					nacl->initiatorname)) &&
 			     (acl->mapped_lun == deve->mapped_lun))
@@ -105,8 +106,7 @@ static void core_clear_initiator_node_from_tpg(
 			continue;
 		}
 
-		REMOVE_ENTRY_FROM_LIST(acl, lun->lun_acl_head,
-				lun->lun_acl_tail);
+		list_del(&acl->lacl_list);
 		spin_unlock(&lun->lun_acl_lock);
 
 		spin_lock_bh(&nacl->device_list_lock);
@@ -687,6 +687,7 @@ se_portal_group_t *core_tpg_register(
 		lun->unpacked_lun = i;
 		lun->lun_type_ptr = NULL;
 		lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
+		INIT_LIST_HEAD(&lun->lun_acl_list);
 		spin_lock_init(&lun->lun_acl_lock);
 		spin_lock_init(&lun->lun_cmd_lock);
 		spin_lock_init(&lun->lun_sep_lock);
@@ -841,7 +842,7 @@ int core_tpg_post_dellun(
 	se_portal_group_t *tpg,
 	se_lun_t *lun)
 {
-	se_lun_acl_t *acl, *acl_next;
+	se_lun_acl_t *acl, *acl_tmp;
 
 	transport_clear_lun_from_sessions(lun);
 
@@ -855,13 +856,9 @@ int core_tpg_post_dellun(
 	spin_unlock(&tpg->tpg_lun_lock);
 
 	spin_lock(&lun->lun_acl_lock);
-	acl = lun->lun_acl_head;
-	while (acl) {
-		acl_next = acl->next;
+	list_for_each_entry_safe(acl, acl_tmp, &lun->lun_acl_list, lacl_list) {
 		kfree(acl);
-		acl = acl_next;
 	}
-	lun->lun_acl_head = lun->lun_acl_tail = NULL;
 	spin_unlock(&lun->lun_acl_lock);
 
 	return 0;

@@ -573,8 +573,7 @@ typedef struct se_lun_acl_s {
 	u32			mapped_lun;
 	struct se_node_acl_s	*se_lun_nacl;
 	struct se_lun_s		*se_lun;
-	struct se_lun_acl_s	*next;
-	struct se_lun_acl_s	*prev;
+	struct list_head	lacl_list;
 	struct config_group	se_lun_group;
 }  ____cacheline_aligned se_lun_acl_t;
 
@@ -765,8 +764,7 @@ typedef struct se_lun_s {
 	spinlock_t		lun_sep_lock;
 	se_cmd_t		*lun_cmd_head;
 	se_cmd_t		*lun_cmd_tail;
-	se_lun_acl_t		*lun_acl_head;
-	se_lun_acl_t		*lun_acl_tail;
+	struct list_head	lun_acl_list;
 	se_device_t		*se_dev;
 	void			*lun_type_ptr;
 	struct config_group	lun_group;

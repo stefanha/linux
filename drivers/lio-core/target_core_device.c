@@ -1300,6 +1300,7 @@ se_lun_acl_t *core_dev_init_initiator_node_lun_acl(
 		return NULL;
 	}
 
+	INIT_LIST_HEAD(&lacl->lacl_list);
 	lacl->mapped_lun = mapped_lun;
 	lacl->se_lun_nacl = nacl;
 	snprintf(lacl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
@@ -1331,7 +1332,7 @@ int core_dev_add_initiator_node_lun_acl(
 		return -EINVAL;
 
 	spin_lock(&lun->lun_acl_lock);
-	ADD_ENTRY_TO_LIST(lacl, lun->lun_acl_head, lun->lun_acl_tail);
+	list_add_tail(&lacl->lacl_list, &lun->lun_acl_list);
 	spin_unlock(&lun->lun_acl_lock);
 
 	if ((lun->lun_access & TRANSPORT_LUNFLAGS_READ_ONLY) &&
@@ -1369,7 +1370,7 @@ int core_dev_del_initiator_node_lun_acl(
 		return ERR_DELLUNACL_NODE_ACL_MISSING;
 
 	spin_lock(&lun->lun_acl_lock);
-	REMOVE_ENTRY_FROM_LIST(lacl, lun->lun_acl_head, lun->lun_acl_tail);
+	list_del(&lacl->lacl_list);
 	spin_unlock(&lun->lun_acl_lock);
 
 	core_update_device_list_for_node(lun, lacl->mapped_lun,
