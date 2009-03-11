@@ -185,22 +185,17 @@ EXPORT_SYMBOL(linux_blockdevice_check);
 
 int se_check_devices_access(se_hba_t *hba)
 {
+	se_device_t *dev;
 	int ret = 0;
-	se_device_t *dev = NULL, *dev_next = NULL;
 
 	spin_lock(&hba->device_lock);
-	dev = hba->device_head;
-	while (dev) {
-		dev_next = dev->next;
-
+	list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
 		if (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj) != 0) {
 			printk(KERN_ERR "check_count(&dev->dev_feature_obj):"
 				" %u\n", DEV_OBJ_API(dev)->check_count(
 					&dev->dev_feature_obj));
 			ret = -1;
 		}
-
-		dev = dev_next;
 	}
 	spin_unlock(&hba->device_lock);
 
@@ -213,12 +208,10 @@ int se_check_devices_access(se_hba_t *hba)
  */
 void se_disable_devices_for_hba(se_hba_t *hba)
 {
-	se_device_t *dev, *dev_next;
+	se_device_t *dev;
 
 	spin_lock(&hba->device_lock);
-	dev = hba->device_head;
-	while (dev) {
-		dev_next = dev->next;
+	list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
 
 		spin_lock(&dev->dev_status_lock);
 		if ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
@@ -235,8 +228,6 @@ void se_disable_devices_for_hba(se_hba_t *hba)
 			wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
 		}
 		spin_unlock(&dev->dev_status_lock);
-
-		dev = dev_next;
 	}
 	spin_unlock(&hba->device_lock);
 
@@ -514,14 +505,12 @@ void core_update_device_list_for_node(
  */
 void core_clear_lun_from_tpg(se_lun_t *lun, se_portal_group_t *tpg)
 {
-	se_node_acl_t *nacl, *nacl_next;
+	se_node_acl_t *nacl;
 	se_dev_entry_t *deve;
 	u32 i;
 
 	spin_lock_bh(&tpg->acl_node_lock);
-	nacl = tpg->acl_node_head;
-	while (nacl) {
-		nacl_next = nacl->next;
+	list_for_each_entry(nacl, &tpg->acl_node_list, acl_list) {
 		spin_unlock_bh(&tpg->acl_node_lock);
 
 		spin_lock_bh(&nacl->device_list_lock);
@@ -539,7 +528,6 @@ void core_clear_lun_from_tpg(se_lun_t *lun, se_portal_group_t *tpg)
 		spin_unlock_bh(&nacl->device_list_lock);
 
 		spin_lock_bh(&tpg->acl_node_lock);
-		nacl = nacl_next;
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);
 
@@ -747,7 +735,7 @@ void se_release_device_for_hba(se_device_t *dev)
 	transport_generic_free_device(dev);
 
 	spin_lock(&hba->device_lock);
-	REMOVE_ENTRY_FROM_LIST(dev, hba->device_head, hba->device_tail);
+	list_del(&dev->dev_list);
 	hba->dev_count--;
 	spin_unlock(&hba->device_lock);
 
@@ -1171,7 +1159,7 @@ se_lun_t *core_dev_add_lun(
 	if (TPG_TFO(tpg)->tpg_check_demo_mode(tpg)) {
 		se_node_acl_t *acl;
 		spin_lock_bh(&tpg->acl_node_lock);
-		for (acl = tpg->acl_node_head; acl; acl = acl->next) {
+		list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
 			if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 				spin_unlock_bh(&tpg->acl_node_lock);
 				core_tpg_add_node_to_devs(acl, tpg);
@@ -1303,6 +1291,7 @@ se_lun_acl_t *core_dev_init_initiator_node_lun_acl(
 		return NULL;
 	}
 
+	INIT_LIST_HEAD(&lacl->lacl_list);
 	lacl->mapped_lun = mapped_lun;
 	lacl->se_lun_nacl = nacl;
 	snprintf(lacl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
@@ -1334,7 +1323,7 @@ int core_dev_add_initiator_node_lun_acl(
 		return -EINVAL;
 
 	spin_lock(&lun->lun_acl_lock);
-	ADD_ENTRY_TO_LIST(lacl, lun->lun_acl_head, lun->lun_acl_tail);
+	list_add_tail(&lacl->lacl_list, &lun->lun_acl_list);
 	spin_unlock(&lun->lun_acl_lock);
 
 	if ((lun->lun_access & TRANSPORT_LUNFLAGS_READ_ONLY) &&
@@ -1372,7 +1361,7 @@ int core_dev_del_initiator_node_lun_acl(
 		return ERR_DELLUNACL_NODE_ACL_MISSING;
 
 	spin_lock(&lun->lun_acl_lock);
-	REMOVE_ENTRY_FROM_LIST(lacl, lun->lun_acl_head, lun->lun_acl_tail);
+	list_del(&lacl->lacl_list);
 	spin_unlock(&lun->lun_acl_lock);
 
 	core_update_device_list_for_node(lun, lacl->mapped_lun,

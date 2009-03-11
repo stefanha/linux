@@ -550,8 +550,7 @@ typedef struct se_node_acl_s {
 	spinlock_t		nacl_sess_lock;
 	struct config_group	acl_group;
 	struct config_group	acl_param_group;
-	struct se_node_acl_s	*next;
-	struct se_node_acl_s	*prev;
+	struct list_head	acl_list;
 } ____cacheline_aligned se_node_acl_t;
 
 typedef struct se_session_s {
@@ -574,8 +573,7 @@ typedef struct se_lun_acl_s {
 	u32			mapped_lun;
 	struct se_node_acl_s	*se_lun_nacl;
 	struct se_lun_s		*se_lun;
-	struct se_lun_acl_s	*next;
-	struct se_lun_acl_s	*prev;
+	struct list_head	lacl_list;
 	struct config_group	se_lun_group;
 }  ____cacheline_aligned se_lun_acl_t;
 
@@ -706,9 +704,8 @@ typedef struct se_device_s {
 	struct se_subsystem_dev_s *se_sub_dev;
 	/* Pointer to template of function pointers for transport */
 	struct se_subsystem_api_s *transport;
-	/* Pointer to next device in TPG list */
-	struct se_device_s	*next;
-	struct se_device_s	*prev;
+	/* Linked list for se_hba_t se_device_t list */
+	struct list_head	dev_list;
 }  ____cacheline_aligned se_device_t;
 
 #define SE_DEV(cmd)		((se_device_t *)(cmd)->se_lun->se_dev)
@@ -737,18 +734,13 @@ typedef struct se_hba_s {
 	atomic_t		max_queue_depth;
 	/* Pointer to transport specific host structure. */
 	void			*hba_ptr;
-	/* Pointer to start of devices for this HBA */
-	se_device_t		*device_head;
-	/* Pointer to end of devices of this HBA */
-	se_device_t		*device_tail;
-	/* Spinlock for adding/removing devices */
+	/* Linked list for se_device_t */
+	struct list_head	hba_dev_list;
 	spinlock_t		device_lock;
 	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
 	struct semaphore	hba_access_sem;
 	struct se_subsystem_api_s *transport;
-	struct se_hba_s		*next;
-	struct se_hba_s		*prev;
 }  ____cacheline_aligned se_hba_t;
 
 #define ISCSI_HBA(d)		((se_hba_t *)(d)->se_hba)
@@ -766,8 +758,7 @@ typedef struct se_lun_s {
 	spinlock_t		lun_sep_lock;
 	se_cmd_t		*lun_cmd_head;
 	se_cmd_t		*lun_cmd_tail;
-	se_lun_acl_t		*lun_acl_head;
-	se_lun_acl_t		*lun_acl_tail;
+	struct list_head	lun_acl_list;
 	se_device_t		*se_dev;
 	void			*lun_type_ptr;
 	struct config_group	lun_group;
@@ -806,11 +797,9 @@ typedef struct se_portal_group_s {
 	/* Pointer to $FABRIC_MOD portal group */
 	void			*se_tpg_fabric_ptr;
 	struct list_head	se_tpg_list;
+	/* linked list for initiator ACL list */
+	struct list_head	acl_node_list;
 	struct se_lun_s		*tpg_lun_list;
-	/* Pointer to start of Initiator ACL list */
-	struct se_node_acl_s	*acl_node_head;
-	/* Pointer to end of Initiator ACL list */
-	struct se_node_acl_s	*acl_node_tail;
 	/* List of TCM sessions assoicated wth this TPG */
 	struct list_head	tpg_sess_list;
 	/* Pointer to $FABRIC_MOD dependent code */

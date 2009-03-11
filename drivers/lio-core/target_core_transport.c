@@ -334,6 +334,7 @@ int init_se_global(void)
 
 		hba->hba_status |= HBA_STATUS_FREE;
 		hba->hba_id = i;
+		INIT_LIST_HEAD(&hba->hba_dev_list);
 		spin_lock_init(&hba->device_lock);
 		spin_lock_init(&hba->hba_queue_lock);
 		init_MUTEX(&hba->hba_access_sem);
@@ -673,9 +674,7 @@ void transport_deregister_session(se_session_t *se_sess)
 		if (se_nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 			if (!(TPG_TFO(se_tpg)->tpg_check_demo_mode_cache(
 					se_tpg))) {
-				REMOVE_ENTRY_FROM_LIST(se_nacl,
-					se_tpg->acl_node_head,
-					se_tpg->acl_node_tail);
+				list_del(&se_nacl->acl_list);
 				se_tpg->num_node_acls--;
 				spin_unlock_bh(&se_tpg->acl_node_lock);
 				core_free_device_list_for_node(se_nacl, se_tpg);
@@ -2067,6 +2066,7 @@ se_device_t *transport_add_device_to_core_hba(
 	dev->se_sub_dev		= se_dev;
 	dev->transport		= transport;
 	atomic_set(&dev->active_cmds, 0);
+	INIT_LIST_HEAD(&dev->dev_list);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
 	INIT_LIST_HEAD(&dev->dev_tmr_list);
 	spin_lock_init(&dev->execute_task_lock);
@@ -2092,7 +2092,7 @@ se_device_t *transport_add_device_to_core_hba(
 #endif /* SNMP_SUPPORT */
 
 	spin_lock(&hba->device_lock);
-	ADD_ENTRY_TO_LIST(dev, hba->device_head, hba->device_tail);
+	list_add_tail(&dev->dev_list, &hba->hba_dev_list);
 	hba->dev_count++;
 	spin_unlock(&hba->device_lock);
 
@@ -2173,7 +2173,7 @@ out:
 	transport_generic_deactivate_device(dev);
 
 	spin_lock(&hba->device_lock);
-	REMOVE_ENTRY_FROM_LIST(dev, hba->device_head, hba->device_tail);
+	list_del(&dev->dev_list);
 	hba->dev_count--;
 	spin_unlock(&hba->device_lock);
 
@@ -4127,14 +4127,22 @@ extern int transport_generic_emulate_inquiry(
 	u32 prod_len, iqn_sn_len, se_location_len;
 	u32 unit_serial_len, off = 0;
 	u16 len = 0;
-
+	
+	/*
+	 * Make sure we at least have 8 bytes of INQUIRY response payload
+	 * going back.
+	 */
+	if (cmd->data_length < 8) {
+		printk(KERN_ERR "SCSI Inquiry payload length: %u too small\n",
+				cmd->data_length);
+		return -1;		
+	}
 	buf[0] = type;
 
 	if (!(cdb[1] & 0x1)) {
 		if (type == TYPE_TAPE)
 			buf[1] = 0x80;
 		buf[2]          = TRANSPORT(dev)->get_device_rev(dev);
-		buf[4]          = 31;
 		/*
 		 * Enable SCCS and TPGS fields for Emulated ALUA
 		 */
@@ -4151,12 +4159,19 @@ extern int transport_generic_emulate_inquiry(
 			buf[5] |= TPGS_IMPLICT_ALUA;
 		}
 		buf[7]		= 0x32; /* Sync=1 and CmdQue=1 */
+		/*
+		 * Do not include vendor, product, reversion info in INQUIRY
+		 * response payload for cdbs with a small allocation length.
+		 */
+		if (cmd->data_length < 36) {
+			buf[4] = 3; /* Set additional length to 3 */
+			return 0;
+		}
 
-		sprintf((unsigned char *)&buf[8], "LIO-ORG");
-		sprintf((unsigned char *)&buf[16], "%s", prod);
-		snprintf((unsigned char *)&buf[32], 5, "%s", version);
-		len = 32;
-
+		snprintf((unsigned char *)&buf[8], 8, "LIO-ORG");
+		snprintf((unsigned char *)&buf[16], 16, "%s", prod);
+		snprintf((unsigned char *)&buf[32], 4, "%s", version);
+		buf[4] = 31; /* Set additional length to 31 */
 		return 0;
 	}
 

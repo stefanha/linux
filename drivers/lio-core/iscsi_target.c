@@ -71,7 +71,6 @@
 #include <iscsi_target_util.h>
 
 #include <target_core_plugin.h>
-#include <target_core_frontend_plugin.h>
 
 #include <iscsi_target.h>
 #include <iscsi_target_device.h>
@@ -966,16 +965,6 @@ static int version_info_seq_show (struct seq_file *m, void *p)
 	return(0);
 }
 
-static int fp_auto_assign = 0; /* Do not perform feature plugin auto assignment by default */
-
-static int target_check_module_params(void)
-{
-	iscsi_global->fp_auto_assign = fp_auto_assign;
-	printk("SE: fp_auto_assign: %d\n", iscsi_global->fp_auto_assign);
-
-	return(0);
-}
-
 static int default_targetname_seq_open (struct inode *inode, struct file *file)
 {
 	return(single_open(file, default_targetname_seq_show, PDE(inode)->data));
@@ -1042,11 +1031,6 @@ static int iscsi_target_detect(void)
 		return(-1);
 	}
 
-	if (target_check_module_params() < 0) {
-		kfree(iscsi_global);
-		return(-1);
-	}
-
 #ifdef DEBUG_ERL
 	if (!(iscsi_global->debug_erl = (iscsi_debug_erl_t *)kmalloc(
 			sizeof(iscsi_debug_erl_t), GFP_KERNEL))) {
@@ -1099,12 +1083,6 @@ static int iscsi_target_detect(void)
 		ret = -1;
 		goto out;
 	}
-
-	/*
-	 * Setup Frontend Plugins
-	 */
-	plugin_register_class(PLUGIN_TYPE_FRONTEND, "FRONTEND", MAX_PLUGINS);
-	frontend_load_plugins();
 
 	if (!(lio_cmd_cache = kmem_cache_create("lio_cmd_cache",
 			sizeof(iscsi_cmd_t), __alignof__(iscsi_cmd_t),
@@ -1162,7 +1140,6 @@ static int iscsi_target_detect(void)
 
 	return(ret);
 out:
-	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 	core_release_discovery_tpg();
 	if (lio_cmd_cache)
 		kmem_cache_destroy(lio_cmd_cache);
@@ -1237,7 +1214,6 @@ extern void iscsi_target_release_phase2 (void)
 	kmem_cache_destroy(lio_r2t_cache);
 	core_release_discovery_tpg();
 	core_release_tiqns();
-	plugin_deregister_class(PLUGIN_TYPE_FRONTEND);
 
 	iscsi_global->ti_forcechanoffline = NULL;
 	iscsi_target_deregister_configfs();
@@ -1277,48 +1253,6 @@ static int iscsi_target_release (void)
 	printk("Unloading Complete.\n");
 
 	return(ret);
-}
-
-extern void rfc3720_TCP_FE_plugin_info (void *p, char *b, int *bl)
-{
-        *bl += sprintf(b+*bl, "%s Internet Small Computer Systems Interface (iSCSI/TCP) Plugin %s\n",
-			PYX_ISCSI_VENDOR, ISCSI_TCP_VERSION);
-        return;
-}
-
-#define RFC3720_TCP {									\
-	get_plugin_info:		rfc3720_TCP_FE_plugin_info,			\
-}
-
-scsi_target_frontend_t rfc3720_TCP_FE_template = RFC3720_TCP;
-
-extern void rfc3720_SCTP_FE_plugin_info (void *p, char *b, int *bl)
-{
-        *bl += sprintf(b+*bl, "%s Internet Small Computer Systems Interface (iSCSI/SCTP) Plugin %s\n",
-			PYX_ISCSI_VENDOR, ISCSI_SCTP_VERSION);
-        return;
-}
-
-#define RFC3720_SCTP {									\
-	get_plugin_info:		rfc3720_SCTP_FE_plugin_info,			\
-}
-
-scsi_target_frontend_t rfc3720_SCTP_FE_template = RFC3720_SCTP;
-
-extern void frontend_load_plugins (void)
-{
-	int ret;
-
-	plugin_register((void *)&rfc3720_TCP_FE_template,
-			FRONTEND_RFC3720_TCP, "rfc3720_TCP_FE", PLUGIN_TYPE_FRONTEND,
-			rfc3720_TCP_FE_template.get_plugin_info, &ret);
-
-	plugin_register((void *)&rfc3720_SCTP_FE_template,
-			FRONTEND_RFC3720_SCTP, "rfc3720_SCTP_FE", PLUGIN_TYPE_FRONTEND,
-			rfc3720_SCTP_FE_template.get_plugin_info, &ret);
-
-
-	return;
 }
 
 extern char *iscsi_get_fabric_name (void)
@@ -5485,7 +5419,6 @@ static void iscsi_target_cleanup_module(void)
 #ifdef MODULE
 MODULE_DESCRIPTION("LIO Target Driver Core 3.x.x Release");
 MODULE_LICENSE("GPL");
-module_param(fp_auto_assign, int, 0);
 module_init(iscsi_target_init_module);
 module_exit(iscsi_target_cleanup_module);
 #endif /* MODULE */

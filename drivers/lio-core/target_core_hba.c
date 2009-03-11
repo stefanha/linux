@@ -165,7 +165,7 @@ static int se_core_shutdown_hba(
 int se_core_del_hba(
 	se_hba_t *hba)
 {
-	se_device_t *dev, *dev_next;
+	se_device_t *dev, *dev_tmp;
 
 	if (!(hba->hba_status & HBA_STATUS_ACTIVE)) {
 		printk(KERN_ERR "HBA ID: %d Status: INACTIVE, ignoring"
@@ -184,9 +184,7 @@ int se_core_del_hba(
 	}
 
 	spin_lock(&hba->device_lock);
-	dev = hba->device_head;
-	while (dev) {
-		dev_next = dev->next;
+	list_for_each_entry_safe(dev, dev_tmp, &hba->hba_dev_list, dev_list) {
 
 		se_clear_dev_ports(dev);
 		spin_unlock(&hba->device_lock);
@@ -194,7 +192,6 @@ int se_core_del_hba(
 		se_release_device_for_hba(dev);
 
 		spin_lock(&hba->device_lock);
-		dev = dev_next;
 	}
 	spin_unlock(&hba->device_lock);
 

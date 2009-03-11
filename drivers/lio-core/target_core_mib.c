@@ -151,7 +151,7 @@ static void *locate_hba_start(
 			continue;
 
 		spin_lock(&hba->device_lock);
-		for (dev = hba->device_head; dev; dev = dev->next) {
+		list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
 			tpg_iter->ti_ptr = (void *)dev;
 			tpg_iter->ti_offset = hba->hba_id;
 			atomic_inc(&hba->dev_mib_access_count);
@@ -178,7 +178,7 @@ static void *locate_hba_next(
 	int (*do_check)(void *))
 {
 	table_iter_t *iterp = (table_iter_t *)seq->private;
-	se_device_t *dev, *dev_next = NULL;
+	se_device_t *dev, *dev_p, *dev_next = NULL;
 	se_hba_t *hba;
 	int i;
 
@@ -188,8 +188,13 @@ static void *locate_hba_next(
 	if (!(iterp) || !(dev))
 		return NULL;
 
+	dev_p = dev;
 	spin_lock(&SE_HBA(dev)->device_lock);
-	dev_next = (void *)dev->next;
+	list_for_each_entry_continue(dev_p, &dev->se_hba->hba_dev_list,
+			dev_list) {
+		dev_next = dev_p;
+		break;
+	}
 	if ((dev_next)) {
 		iterp->ti_ptr = dev_next;
 		spin_unlock(&SE_HBA(dev)->device_lock);
@@ -211,8 +216,7 @@ static void *locate_hba_next(
 			continue;
 
 		spin_lock(&hba->device_lock);
-		for (dev = hba->device_head; dev; dev = dev->next) {
-
+		list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
 			iterp->ti_ptr = (void *)dev;
 			iterp->ti_offset = hba->hba_id;
 			atomic_inc(&hba->dev_mib_access_count);
