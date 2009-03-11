@@ -4127,14 +4127,22 @@ extern int transport_generic_emulate_inquiry(
 	u32 prod_len, iqn_sn_len, se_location_len;
 	u32 unit_serial_len, off = 0;
 	u16 len = 0;
-
+	
+	/*
+	 * Make sure we at least have 8 bytes of INQUIRY response payload
+	 * going back.
+	 */
+	if (cmd->data_length < 8) {
+		printk(KERN_ERR "SCSI Inquiry payload length: %u too small\n",
+				cmd->data_length);
+		return -1;		
+	}
 	buf[0] = type;
 
 	if (!(cdb[1] & 0x1)) {
 		if (type == TYPE_TAPE)
 			buf[1] = 0x80;
 		buf[2]          = TRANSPORT(dev)->get_device_rev(dev);
-		buf[4]          = 31;
 		/*
 		 * Enable SCCS and TPGS fields for Emulated ALUA
 		 */
@@ -4151,12 +4159,19 @@ extern int transport_generic_emulate_inquiry(
 			buf[5] |= TPGS_IMPLICT_ALUA;
 		}
 		buf[7]		= 0x32; /* Sync=1 and CmdQue=1 */
+		/*
+		 * Do not include vendor, product, reversion info in INQUIRY
+		 * response payload for cdbs with a small allocation length.
+		 */
+		if (cmd->data_length < 36) {
+			buf[4] = 3; /* Set additional length to 3 */
+			return 0;
+		}
 
-		sprintf((unsigned char *)&buf[8], "LIO-ORG");
-		sprintf((unsigned char *)&buf[16], "%s", prod);
-		snprintf((unsigned char *)&buf[32], 5, "%s", version);
-		len = 32;
-
+		snprintf((unsigned char *)&buf[8], 8, "LIO-ORG");
+		snprintf((unsigned char *)&buf[16], 16, "%s", prod);
+		snprintf((unsigned char *)&buf[32], 4, "%s", version);
+		buf[4] = 31; /* Set additional length to 31 */
 		return 0;
 	}
 
