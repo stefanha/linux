@@ -90,6 +90,7 @@ extern void iscsi_stop_netif_timer (iscsi_conn_t *);
 extern void iscsi_mod_nopin_response_timer (iscsi_conn_t *);
 extern void iscsi_start_nopin_response_timer (iscsi_conn_t *);
 extern void iscsi_stop_nopin_response_timer (iscsi_conn_t *);
+extern void __iscsi_start_nopin_timer (iscsi_conn_t *);
 extern void iscsi_start_nopin_timer (iscsi_conn_t *);
 extern void iscsi_stop_nopin_timer (iscsi_conn_t *);
 extern int iscsi_send_tx_data (iscsi_cmd_t *, iscsi_conn_t *, int);

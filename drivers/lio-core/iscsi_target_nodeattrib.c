@@ -145,6 +145,11 @@ extern int iscsi_na_nopin_timeout (
 	u32 nopin_timeout)
 {
 	iscsi_node_attrib_t *a = &acl->node_attrib;
+	iscsi_session_t *sess;
+	iscsi_conn_t *conn;
+	se_node_acl_t *se_nacl = a->nacl->se_node_acl;
+	se_session_t *se_sess;
+	u32 orig_nopin_timeout = a->nopin_timeout;
 
 	TRACE_ENTER
 
@@ -152,15 +157,38 @@ extern int iscsi_na_nopin_timeout (
 		TRACE_ERROR("Requested NopIn Timeout %u larger than maximum"
 			" %u\n", nopin_timeout, NA_NOPIN_TIMEOUT_MAX);
 		return(-EINVAL);
-	} else if (nopin_timeout < NA_NOPIN_TIMEOUT_MIN) {
+	} else if ((nopin_timeout < NA_NOPIN_TIMEOUT_MIN) &&
+		   (nopin_timeout != 0)) {
 		TRACE_ERROR("Requested NopIn Timeout %u smaller than minimum"
-			" %u\n", nopin_timeout, NA_NOPIN_TIMEOUT_MIN);
+			" %u and not 0\n", nopin_timeout, NA_NOPIN_TIMEOUT_MIN);
 		return(-EINVAL);
 	}
 
 	a->nopin_timeout = nopin_timeout;
 	TRACE(TRACE_NODEATTRIB, "Set NopIn Timeout to %u for Initiator"
 		" Node %s\n", a->nopin_timeout, acl->initiatorname);
+	/*
+	 * Reenable disabled nopin_timeout timer for all iSCSI connections.
+	 */
+	if (!(orig_nopin_timeout)) {
+		spin_lock_bh(&se_nacl->nacl_sess_lock);
+		se_sess = se_nacl->nacl_sess;
+		if (se_sess) {
+			sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+
+			spin_lock(&sess->conn_lock);		
+			for (conn = sess->conn_head; conn; conn = conn->next) {
+				if (conn->conn_state != TARG_CONN_STATE_LOGGED_IN)
+					continue;
+
+				spin_lock(&conn->nopin_timer_lock);
+				__iscsi_start_nopin_timer(conn);
+				spin_unlock(&conn->nopin_timer_lock);
+			}
+			spin_unlock(&sess->conn_lock);
+		}
+		spin_unlock_bh(&se_nacl->nacl_sess_lock);
+	}
 
 	TRACE_LEAVE
 	return(0);

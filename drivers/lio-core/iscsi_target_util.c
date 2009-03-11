@@ -2131,6 +2131,36 @@ static void iscsi_handle_nopin_timeout (
 	return;
 }
 
+/*
+ * Called with conn->nopin_timer_lock held.
+ */
+extern void __iscsi_start_nopin_timer(
+	iscsi_conn_t *conn)
+{
+	iscsi_session_t *sess = SESS(conn);
+	iscsi_node_attrib_t *na = iscsi_tpg_get_node_attrib(sess);
+	/*
+	* NOPIN timeout is disabled.
+	 */
+	if (!(na->nopin_timeout))
+		return;
+
+	if (conn->nopin_timer_flags & NOPIN_TF_RUNNING)
+		return;
+	
+	init_timer(&conn->nopin_timer);
+	SETUP_TIMER(conn->nopin_timer, na->nopin_timeout, conn,
+		iscsi_handle_nopin_timeout);
+	conn->nopin_timer_flags &= ~NOPIN_TF_STOP;
+	conn->nopin_timer_flags |= NOPIN_TF_RUNNING;
+	add_timer(&conn->nopin_timer);
+
+	TRACE(TRACE_TIMER, "Started NOPIN Timer on CID: %d at %u second"
+		" interval\n", conn->cid, na->nopin_timeout);
+
+	return;
+}
+
 /*	iscsi_start_nopin_timer():
  *
  *
@@ -2142,6 +2172,11 @@ extern void iscsi_start_nopin_timer (
 	iscsi_node_attrib_t *na = iscsi_tpg_get_node_attrib(sess);
 	
 	TRACE_ENTER
+	/*
+	 * NOPIN timeout is disabled..
+	 */
+	if (!(na->nopin_timeout))
+		return;
 
 	spin_lock_bh(&conn->nopin_timer_lock);
 	if (conn->nopin_timer_flags & NOPIN_TF_RUNNING) {
