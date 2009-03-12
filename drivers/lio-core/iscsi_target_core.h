@@ -106,9 +106,6 @@
 #define TA_PROD_MODE_WRITE_PROTECT	0 // Disabled by default in production mode w/ explict ACLs
 #define TA_CACHE_CORE_NPS		0
 
-/* iscsi_map_sg_t->map_flags */
-#define MAP_SG_KMAP			0x01
-
 /* iscsi_data_count_t->type */
 #define ISCSI_RX_DATA				1
 #define ISCSI_TX_DATA				2
@@ -246,10 +243,6 @@
 /* Used for iscsi_tpg_np->tpg_np_login_timer_flags */
 #define TPG_NP_TF_RUNNING			0x01
 #define TPG_NP_TF_STOP				0x02
-
-/* Used for generate timer flags */
-#define TF_RUNNING				0x01
-#define TF_STOP					0x02
 
 /* Used for iscsi_np_t->np_flags */
 #define NPF_IP_NETWORK				0x00
