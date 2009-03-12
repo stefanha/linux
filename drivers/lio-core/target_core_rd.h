@@ -160,7 +160,7 @@ typedef struct rd_dev_s {
 	struct rd_dev_s *next;
 } ____cacheline_aligned rd_dev_t;
 
-extern void __rd_get_dev_info (rd_dev_t *, char *, int *);
+extern void __rd_get_dev_info(rd_dev_t *, char *, int *);
 
 typedef struct rd_host_s {
 	u32		rd_host_dev_id_count;

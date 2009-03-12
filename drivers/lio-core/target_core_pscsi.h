@@ -130,7 +130,7 @@ typedef struct pscsi_dev_virt_s {
 	struct se_hba_s *pdv_se_hba;
 } pscsi_dev_virt_t;
 
-extern void __pscsi_get_dev_info (pscsi_dev_virt_t *, char *, int *);
+extern void __pscsi_get_dev_info(pscsi_dev_virt_t *, char *, int *);
 
 /*
  * We use the generic command sequencer, so we must setup
