@@ -39,6 +39,9 @@
 #include <target_core_mib.h>
 #endif /* SNMP_SUPPORT */
 
+#define TARGET_CORE_MOD_VERSION		"v3.0"
+#define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
+
 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
 #define SCSI_CDB_SIZE			16
 #define TRANSPORT_IOV_DATA_BUFFER	5
@@ -101,6 +104,13 @@
 
 /* Used for se_node_acl->nodeacl_flags */
 #define NAF_DYNAMIC_NODE_ACL                    0x01
+
+/* se_map_sg_t->map_flags */
+#define MAP_SG_KMAP				0x01
+
+/* Used for generate timer flags */
+#define TF_RUNNING				0x01
+#define TF_STOP					0x02
 
 /* Special transport agnostic se_cmd_t->t_states */
 #define TRANSPORT_NO_STATE			240
