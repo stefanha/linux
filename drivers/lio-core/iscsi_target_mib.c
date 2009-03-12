@@ -39,18 +39,15 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 
-#include "iscsi_protocol.h"
-#include <iscsi_debug_opcodes.h>
-#include "iscsi_target_core.h"
+#include <iscsi_protocol.h>
+#include <iscsi_target_core.h>
+#include <iscsi_target_device.h>
+#include <iscsi_target_tpg.h>
+#include <iscsi_target_util.h>
+#include <iscsi_target_mib.h>
 #include <target_core_base.h>
-#include <iscsi_target_error.h>
-#include "iscsi_target_device.h"
-#include "iscsi_target_tpg.h"
-#include "target_core_hba.h"
-#include "target_core_transport.h"
-#include "iscsi_target_util.h"
-#include "iscsi_target_mib.h"
-
+#include <target_core_hba.h>
+#include <target_core_transport.h>
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
 
