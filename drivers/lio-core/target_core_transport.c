@@ -1350,8 +1350,8 @@ static void transport_remove_task_from_execute_queue(
  */
 int transport_check_device_tcq(
 	se_device_t *dev,
-	__u32 unpacked_lun,
-	__u32 device_tcq)
+	u32 unpacked_lun,
+	u32 device_tcq)
 {
 	if (device_tcq > dev->queue_depth) {
 		printk(KERN_ERR "Attempting to set storage device queue depth"

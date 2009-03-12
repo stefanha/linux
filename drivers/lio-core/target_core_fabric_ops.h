@@ -18,7 +18,7 @@ struct target_core_fabric_ops {
 	u32 (*tpg_get_inst_index)(struct se_portal_group_s *);
 	void (*release_cmd_to_pool)(struct se_cmd_s *);
 	void (*release_cmd_direct)(struct se_cmd_s *);
-	int (*dev_del_lun)(struct se_portal_group_s *, __u32);
+	int (*dev_del_lun)(struct se_portal_group_s *, u32);
 	/*
 	 * Called with spin_lock_bh(se_portal_group_t->session_lock held.
 	 */

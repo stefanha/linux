@@ -918,7 +918,7 @@ fail:
 	return ret;
 }
 
-int iblock_CDB_inquiry(se_task_t *task, __u32 size)
+int iblock_CDB_inquiry(se_task_t *task, u32 size)
 {
 	return 0;
 }
