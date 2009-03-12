@@ -850,13 +850,13 @@ extern int iscsi_tpg_disable_portal_group (iscsi_portal_group_t *tpg, int force)
 extern iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl (
 	iscsi_portal_group_t *tpg,
 	const char *initiatorname,
-	u32 queue_depth,
-	int *ret)
+	u32 queue_depth)
 {
 	se_node_acl_t *se_nacl;
 
-	if (!(se_nacl = core_tpg_add_initiator_node_acl(tpg->tpg_se_tpg,
-			initiatorname, queue_depth, ret))) 
+	se_nacl = core_tpg_add_initiator_node_acl(tpg->tpg_se_tpg,
+			initiatorname, queue_depth);
+	if ((IS_ERR(se_nacl)) || !(se_nacl))
 		return(NULL);
 
 	return((iscsi_node_acl_t *)se_nacl->fabric_acl_ptr);
