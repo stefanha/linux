@@ -506,8 +506,9 @@ static int lio_target_port_link (struct config_item *lun_ci, struct config_item 
 		goto out;
 	}
 
-	if (!(lun_p = core_dev_add_lun(tpg->tpg_se_tpg, dev->se_hba, dev,
-			lun->unpacked_lun, &ret))) {
+	lun_p = core_dev_add_lun(tpg->tpg_se_tpg, dev->se_hba, dev,
+			lun->unpacked_lun);
+	if ((IS_ERR(lun_p)) || !(lun_p)) {
 		printk(KERN_ERR "core_dev_add_lun() failed: %d\n", ret);
 		ret = -EINVAL;
 		goto out;
@@ -1525,8 +1526,8 @@ static struct config_group *lio_target_call_addnodetotpg (
 	 */
 	cmdsn_depth = ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth;
 
-	if (!(acl = iscsi_tpg_add_initiator_node_acl(tpg, name,
-				cmdsn_depth, &ret)))
+	acl = iscsi_tpg_add_initiator_node_acl(tpg, name, cmdsn_depth);
+	if (!(acl))
 		goto out;
 
 	se_nacl = acl->se_node_acl;
