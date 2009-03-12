@@ -40,15 +40,11 @@
 #include <scsi/scsi_host.h>
 
 #include <target_core_base.h>
-#include <iscsi_target_error.h>
-#include "target_core_hba.h"
-#include "target_core_transport.h"
-
+#include <target_core_hba.h>
+#include <target_core_transport.h>
 #include "target_core_mib.h"
-
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>
 

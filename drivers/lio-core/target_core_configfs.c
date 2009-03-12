@@ -33,6 +33,7 @@
 #include <linux/string.h>
 #include <linux/syscalls.h>
 #include <linux/configfs.h>
+#include <linux/proc_fs.h>
 
 #include <target_core_base.h>
 #include <target_core_device.h>
@@ -42,12 +43,6 @@
 #include <target_core_transport.h>
 #include <target_core_alua.h>
 #include <target_core_pr.h>
-
-#ifdef SNMP_SUPPORT
-#include <linux/proc_fs.h>
-#include <iscsi_target_mib.h>
-#endif /* SNMP_SUPPORT */
-
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>
 #include <configfs_macros.h>
