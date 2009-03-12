@@ -66,7 +66,7 @@ extern int se_dev_set_queue_depth(se_device_t *, u32);
 extern int se_dev_set_max_sectors(se_device_t *, u32);
 extern int se_dev_set_block_size(se_device_t *, u32);
 extern se_lun_t *core_dev_add_lun(se_portal_group_t *, se_hba_t *,
-					se_device_t *, u32, int *);
+					se_device_t *, u32);
 extern int core_dev_del_lun(se_portal_group_t *, u32);
 extern se_lun_t *core_get_lun_from_tpg(se_portal_group_t *, u32);
 extern se_lun_acl_t *core_dev_init_initiator_node_lun_acl(se_portal_group_t *,
