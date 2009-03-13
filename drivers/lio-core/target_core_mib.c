@@ -862,9 +862,9 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 		    (!se_sess->se_node_acl) ||
 		    (!se_sess->se_node_acl->device_list))
 			continue;
-		
+
 		se_nacl = se_sess->se_node_acl;
-		
+
 		spin_lock(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];
