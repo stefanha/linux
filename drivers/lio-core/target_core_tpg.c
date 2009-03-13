@@ -44,7 +44,6 @@
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
 #include <iscsi_lists.h>
-#include <iscsi_target_error.h>
 
 #include <target_core_base.h>
 #include <target_core_device.h>
@@ -376,8 +375,7 @@ EXPORT_SYMBOL(core_tpg_clear_object_luns);
 se_node_acl_t *core_tpg_add_initiator_node_acl(
 	se_portal_group_t *tpg,
 	const char *initiatorname,
-	u32 queue_depth,
-	int *ret)
+	u32 queue_depth)
 {
 	se_node_acl_t *acl = NULL;
 
@@ -398,16 +396,14 @@ se_node_acl_t *core_tpg_add_initiator_node_acl(
 			" request.\n",  TPG_TFO(tpg)->get_fabric_name(),
 			initiatorname, TPG_TFO(tpg)->tpg_get_tag(tpg));
 		spin_unlock_bh(&tpg->acl_node_lock);
-		*ret = ERR_ADDINITACL_ACL_EXISTS;
-		return NULL;
+		return ERR_PTR(-EEXIST);
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);
 
 	acl = kzalloc(sizeof(se_node_acl_t), GFP_KERNEL);
 	if (!(acl)) {
 		printk(KERN_ERR "Unable to allocate memory for senode_acl_t.\n");
-		*ret = ERR_NO_MEMORY;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	INIT_LIST_HEAD(&acl->acl_list);
@@ -425,24 +421,21 @@ se_node_acl_t *core_tpg_add_initiator_node_acl(
 			acl);
 	if (!(acl->fabric_acl_ptr)) {
 		kfree(acl);
-		*ret = ERR_NO_MEMORY;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
 
 	if (core_create_device_list_for_node(acl) < 0) {
 		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
 		kfree(acl);
-		*ret = ERR_NO_MEMORY;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	if (core_set_queue_depth_for_node(tpg, acl) < 0) {
 		core_free_device_list_for_node(acl, tpg);
 		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
 		kfree(acl);
-		*ret = ERR_ADDINITACL_QUEUE_SET_FAILED;
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 
 	spin_lock_bh(&tpg->acl_node_lock);
@@ -481,7 +474,7 @@ int core_tpg_del_initiator_node_acl(
 			" request.\n", TPG_TFO(tpg)->get_fabric_name(),
 			initiatorname, TPG_TFO(tpg)->tpg_get_tag(tpg));
 		spin_unlock_bh(&tpg->acl_node_lock);
-		return ERR_INITIATORACL_DOES_NOT_EXIST;
+		return -EINVAL;
 	}
 	if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 		acl->nodeacl_flags &= ~NAF_DYNAMIC_NODE_ACL;
@@ -507,7 +500,7 @@ int core_tpg_del_initiator_node_acl(
 			if (dynamic_acl)
 				acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
 			spin_unlock_bh(&tpg->acl_node_lock);
-			return ERR_INITIATORACL_SESSION_EXISTS;
+			return -EEXIST;
 		}
 		/*
 		 * Determine if the session needs to be closed by our context.
@@ -702,7 +695,10 @@ se_portal_group_t *core_tpg_register(
 	spin_lock_init(&se_tpg->acl_node_lock);
 	spin_lock_init(&se_tpg->session_lock);
 	spin_lock_init(&se_tpg->tpg_lun_lock);
-#warning FIXME: Add se_portal_group to list..
+	
+	spin_lock_bh(&se_global->se_tpg_lock);
+	list_add_tail(&se_tpg->se_tpg_list, &se_global->g_se_tpg_list);
+	spin_unlock_bh(&se_global->se_tpg_lock);
 
 	printk(KERN_INFO "TARGET_CORE[%s]: Allocated %s se_portal_group_t for"
 		" endpoint: %s, Portal Tag: %u\n", tfo->get_fabric_name(),
@@ -723,7 +719,10 @@ int core_tpg_deregister(se_portal_group_t *se_tpg)
 		TPG_TFO(se_tpg)->tpg_get_wwn(se_tpg),
 		TPG_TFO(se_tpg)->tpg_get_tag(se_tpg));
 
-#warning FIXME: Release se_portal_group from list
+	spin_lock_bh(&se_global->se_tpg_lock);
+	list_del(&se_tpg->se_tpg_list);
+	spin_unlock_bh(&se_global->se_tpg_lock);
+
 	se_tpg->se_tpg_fabric_ptr = NULL;
 	kfree(se_tpg->tpg_lun_list);
 	kfree(se_tpg);
@@ -733,8 +732,7 @@ EXPORT_SYMBOL(core_tpg_deregister);
 
 se_lun_t *core_tpg_pre_addlun(
 	se_portal_group_t *tpg,
-	u32 unpacked_lun,
-	int *ret)
+	u32 unpacked_lun)
 {
 	se_lun_t *lun;
 
@@ -744,8 +742,7 @@ se_lun_t *core_tpg_pre_addlun(
 			TPG_TFO(tpg)->get_fabric_name(),
 			unpacked_lun, TRANSPORT_MAX_LUNS_PER_TPG-1,
 			TPG_TFO(tpg)->tpg_get_tag(tpg));
-		*ret = ERR_LUN_EXCEEDS_MAX;
-		return NULL;
+		return ERR_PTR(-EOVERFLOW);
 	}
 
 	spin_lock(&tpg->tpg_lun_lock);
@@ -756,8 +753,7 @@ se_lun_t *core_tpg_pre_addlun(
 			unpacked_lun, TPG_TFO(tpg)->get_fabric_name(),
 			TPG_TFO(tpg)->tpg_get_tag(tpg));
 		spin_unlock(&tpg->tpg_lun_lock);
-		*ret = ERR_ADDLUN_ALREADY_ACTIVE;
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 	spin_unlock(&tpg->tpg_lun_lock);
 
@@ -805,8 +801,7 @@ se_lun_t *core_tpg_pre_dellun(
 			TPG_TFO(tpg)->get_fabric_name(), unpacked_lun,
 			TRANSPORT_MAX_LUNS_PER_TPG-1,
 			TPG_TFO(tpg)->tpg_get_tag(tpg));
-		*ret = ERR_LUN_EXCEEDS_MAX;
-		return NULL;
+		return ERR_PTR(-EOVERFLOW);
 	}
 
 	spin_lock(&tpg->tpg_lun_lock);
@@ -817,8 +812,7 @@ se_lun_t *core_tpg_pre_dellun(
 			TPG_TFO(tpg)->get_fabric_name(), unpacked_lun,
 			TPG_TFO(tpg)->tpg_get_tag(tpg));
 		spin_unlock(&tpg->tpg_lun_lock);
-		*ret = ERR_DELLUN_NOT_ACTIVE;
-		return NULL;
+		return ERR_PTR(-ENODEV);
 	}
 
 	if (lun->lun_type != lun_type) {
@@ -827,8 +821,7 @@ se_lun_t *core_tpg_pre_dellun(
 			TPG_TFO(tpg)->get_fabric_name(),
 			unpacked_lun, lun->lun_type, lun_type);
 		spin_unlock(&tpg->tpg_lun_lock);
-		*ret = ERR_DELLUN_TYPE_MISMATCH;
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 	spin_unlock(&tpg->tpg_lun_lock);
 

@@ -42,10 +42,6 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 
-#include <iscsi_linux_os.h>
-#include <iscsi_linux_defs.h>
-
-#include <iscsi_target_version.h>
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_transport.h>
@@ -82,7 +78,7 @@ int iblock_attach_hba(se_hba_t *hba, u32 host_id)
 
 	printk(KERN_INFO "CORE_HBA[%d] - %s iBlock HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, IBLOCK_VERSION, PYX_ISCSI_VERSION);
+		PYX_ISCSI_VENDOR, IBLOCK_VERSION, TARGET_CORE_MOD_VERSION);
 
 	printk(KERN_INFO "CORE_HBA[%d] - Attached iBlock HBA: %u to Generic"
 		" Target Core TCQ Depth: %d\n", hba->hba_id,
@@ -918,7 +914,7 @@ fail:
 	return ret;
 }
 
-int iblock_CDB_inquiry(se_task_t *task, __u32 size)
+int iblock_CDB_inquiry(se_task_t *task, u32 size)
 {
 	return 0;
 }

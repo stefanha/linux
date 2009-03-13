@@ -39,7 +39,6 @@
 #include <linux/genhd.h>
 #include <linux/cdrom.h>
 #include <linux/file.h>
-
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
@@ -47,10 +46,6 @@
 #include <sd.h>
 #include <sr.h>
 
-#include <iscsi_linux_os.h>
-#include <iscsi_linux_defs.h>
-
-#include <iscsi_target_version.h>
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_transport.h>
@@ -233,7 +228,7 @@ int pscsi_attach_hba(se_hba_t *hba, u32 host_id)
 
 	printk(KERN_INFO "CORE_HBA[%d] - %s SCSI HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, PSCSI_VERSION, PYX_ISCSI_VERSION);
+		PYX_ISCSI_VENDOR, PSCSI_VERSION, TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
 			(sh->hostt->name) : "Unknown");
 	printk(KERN_INFO "CORE_HBA[%d] - Attached SCSI HBA to Generic"

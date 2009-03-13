@@ -231,7 +231,7 @@ extern void transport_release_fe_cmd(se_cmd_t *);
 extern int transport_generic_remove(se_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks(se_cmd_t *, se_lun_t *);
 extern void transport_clear_lun_from_sessions(se_lun_t *);
-extern int transport_send_check_condition_and_sense(se_cmd_t *, __u8, int);
+extern int transport_send_check_condition_and_sense(se_cmd_t *, u8, int);
 extern void transport_release_cmd_to_pool(se_cmd_t *);
 extern void transport_generic_free_cmd(se_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds(se_cmd_t *, int);
@@ -452,19 +452,19 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * get_blocksize():
 	 */
-	__u32 (*get_blocksize)(se_device_t *);
+	u32 (*get_blocksize)(se_device_t *);
 	/*
 	 * get_device_rev():
 	 */
-	__u32 (*get_device_rev)(se_device_t *);
+	u32 (*get_device_rev)(se_device_t *);
 	/*
 	 * get_device_type():
 	 */
-	__u32 (*get_device_type)(se_device_t *);
+	u32 (*get_device_type)(se_device_t *);
 	/*
 	 * get_dma_length():
 	 */
-	__u32 (*get_dma_length)(u32, se_device_t *);
+	u32 (*get_dma_length)(u32, se_device_t *);
 	/*
 	 * get_evpd_prod():
 	 */
@@ -476,20 +476,20 @@ typedef struct se_subsystem_api_s {
 	/*
 	 * get_max_cdbs():
 	 */
-	__u32 (*get_max_cdbs)(se_device_t *);
+	u32 (*get_max_cdbs)(se_device_t *);
 	/*
 	 * get_max_sectors():
 	 */
-	 __u32 (*get_max_sectors)(se_device_t *);
+	 u32 (*get_max_sectors)(se_device_t *);
 	/*
 	 * get_queue_depth():
 	 *
 	 */
-	__u32 (*get_queue_depth)(se_device_t *);
+	u32 (*get_queue_depth)(se_device_t *);
 	/*
 	 * get_max_queue_depth():
 	 */
-	__u32 (*get_max_queue_depth)(se_device_t *);
+	u32 (*get_max_queue_depth)(se_device_t *);
 	/*
 	 * do_se_mem_map():
 	 */

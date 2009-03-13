@@ -113,7 +113,7 @@ typedef struct iblock_dev_s {
 	struct iblock_hba_s *ibd_host;
 } ____cacheline_aligned iblock_dev_t;
 
-void __iblock_get_dev_info (iblock_dev_t *, char *, int *);
+void __iblock_get_dev_info(iblock_dev_t *, char *, int *);
 
 typedef struct iblock_hba_s {
 	int		iblock_host_id;

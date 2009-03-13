@@ -26,8 +26,6 @@
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
 
-#include <iscsi_debug.h>
-
 #define ISCSI_PORT			3260
 #define ISCSI_HDR_LEN			48	
 #define ISCSI_CDB_LEN			16

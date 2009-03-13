@@ -46,12 +46,7 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 
-#include <iscsi_linux_os.h>
-#include <iscsi_linux_defs.h>
-
-#include <iscsi_protocol.h>
 #include <iscsi_lists.h>
-#include <iscsi_target_core.h>
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
@@ -247,6 +242,7 @@ int init_se_global(void)
 	INIT_LIST_HEAD(&global->g_tg_pt_gps_list);
 	INIT_LIST_HEAD(&global->g_se_tpg_list);
 	spin_lock_init(&global->hba_lock);
+	spin_lock_init(&global->se_tpg_lock);
 	spin_lock_init(&global->lu_gps_lock);
 	spin_lock_init(&global->tg_pt_gps_lock);
 	spin_lock_init(&global->plugin_class_lock);
@@ -1350,8 +1346,8 @@ static void transport_remove_task_from_execute_queue(
  */
 int transport_check_device_tcq(
 	se_device_t *dev,
-	__u32 unpacked_lun,
-	__u32 device_tcq)
+	u32 unpacked_lun,
+	u32 device_tcq)
 {
 	if (device_tcq > dev->queue_depth) {
 		printk(KERN_ERR "Attempting to set storage device queue depth"
@@ -4127,7 +4123,7 @@ extern int transport_generic_emulate_inquiry(
 	u32 prod_len, iqn_sn_len, se_location_len;
 	u32 unit_serial_len, off = 0;
 	u16 len = 0;
-	
+
 	/*
 	 * Make sure we at least have 8 bytes of INQUIRY response payload
 	 * going back.
@@ -4135,7 +4131,7 @@ extern int transport_generic_emulate_inquiry(
 	if (cmd->data_length < 8) {
 		printk(KERN_ERR "SCSI Inquiry payload length: %u too small\n",
 				cmd->data_length);
-		return -1;		
+		return -1;
 	}
 	buf[0] = type;
 
@@ -7179,33 +7175,33 @@ int transport_generic_do_tmr(se_cmd_t *cmd)
 	switch (tmr->function) {
 	case ABORT_TASK:
 		ref_cmd = tmr->ref_cmd;
-		tmr->response = FUNCTION_REJECTED;
+		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
 	case ABORT_TASK_SET:
 	case CLEAR_ACA:
 	case CLEAR_TASK_SET:
-		tmr->response = TASK_MGMT_FUNCTION_NOT_SUPPORTED;
+		tmr->response = TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED;
 		break;
 	case LUN_RESET:
 		ret = core_tmr_lun_reset(dev, tmr);
-		tmr->response = (!ret) ? FUNCTION_COMPLETE :
-					 FUNCTION_REJECTED;
+		tmr->response = (!ret) ? TMR_FUNCTION_COMPLETE :
+					 TMR_FUNCTION_REJECTED;
 		break;
 #if 0
 	case TARGET_WARM_RESET:
 		transport_generic_host_reset(dev->se_hba);
-		tmr->response = FUNCTION_REJECTED;
+		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
 	case TARGET_COLD_RESET:
 		transport_generic_host_reset(dev->se_hba);
 		transport_generic_cold_reset(dev->se_hba);
-		tmr->response = FUNCTION_REJECTED;
+		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
 #endif
 	default:
 		printk(KERN_ERR "Uknown TMR function: 0x%02x.\n",
 				tmr->function);
-		tmr->response = FUNCTION_REJECTED;
+		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
 	}
 

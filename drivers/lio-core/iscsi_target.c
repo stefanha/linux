@@ -1301,6 +1301,43 @@ extern int iscsi_is_state_remove (se_cmd_t *se_cmd)
 	return((cmd->i_state == ISTATE_REMOVE));
 }
 
+extern int lio_sess_logged_in (se_session_t *se_sess)
+{
+	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+	int ret;
+	
+	/*
+	 * Called with spin_lock_bh(&se_global->se_tpg_lock); and
+	 * spin_lock(&se_tpg->session_lock); held.
+	 */
+	spin_lock(&sess->conn_lock);
+	ret = (sess->session_state != TARG_SESS_STATE_LOGGED_IN);
+	spin_unlock(&sess->conn_lock);
+
+	return ret;
+}
+
+extern u32 lio_sess_get_index (se_session_t *se_sess)
+{
+	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+
+	return sess->session_index;
+}
+
+extern u32 lio_sess_get_initiator_wwn (
+	se_session_t *se_sess,
+	unsigned char *buf,
+	u32 size)
+{
+	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+	/* 
+	 * iSCSI Initiator Session Identifier from RFC-3720.
+	 */
+	return snprintf(buf, size, "%02X%02X%02X%02X%02X%02X",
+		sess->isid[0], sess->isid[1], sess->isid[2],
+		sess->isid[3], sess->isid[4], sess->isid[5]);	
+}
+
 /*	iscsi_add_nopin():
  *
  *

@@ -35,10 +35,6 @@
 #include <linux/in.h>
 #include <scsi/scsi.h>
 
-#include <iscsi_linux_os.h>
-#include <iscsi_linux_defs.h>
-
-#include <iscsi_target_version.h>
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>

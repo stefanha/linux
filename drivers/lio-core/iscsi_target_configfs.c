@@ -506,8 +506,9 @@ static int lio_target_port_link (struct config_item *lun_ci, struct config_item 
 		goto out;
 	}
 
-	if (!(lun_p = core_dev_add_lun(tpg->tpg_se_tpg, dev->se_hba, dev,
-			lun->unpacked_lun, &ret))) {
+	lun_p = core_dev_add_lun(tpg->tpg_se_tpg, dev->se_hba, dev,
+			lun->unpacked_lun);
+	if ((IS_ERR(lun_p)) || !(lun_p)) {
 		printk(KERN_ERR "core_dev_add_lun() failed: %d\n", ret);
 		ret = -EINVAL;
 		goto out;
@@ -1525,8 +1526,8 @@ static struct config_group *lio_target_call_addnodetotpg (
 	 */
 	cmdsn_depth = ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth;
 
-	if (!(acl = iscsi_tpg_add_initiator_node_acl(tpg, name,
-				cmdsn_depth, &ret)))
+	acl = iscsi_tpg_add_initiator_node_acl(tpg, name, cmdsn_depth);
+	if (!(acl))
 		goto out;
 
 	se_nacl = acl->se_node_acl;
@@ -2304,16 +2305,11 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.close_session = &lio_tpg_close_session;
 	fabric->tf_ops.stop_session = &lio_tpg_stop_session;
 	fabric->tf_ops.fall_back_to_erl0 = &lio_tpg_fall_back_to_erl0;
+	fabric->tf_ops.sess_logged_in = &lio_sess_logged_in;
+	fabric->tf_ops.sess_get_index = &lio_sess_get_index;
+	fabric->tf_ops.sess_get_initiator_wwn = &lio_sess_get_initiator_wwn;
 	fabric->tf_ops.write_pending = &lio_write_pending;
 	fabric->tf_ops.set_default_node_attributes = &lio_set_default_node_attributes;
-	fabric->tf_ops.scsi_auth_intr_seq_start = &lio_scsi_auth_intr_seq_start;
-	fabric->tf_ops.scsi_auth_intr_seq_next = &lio_scsi_auth_intr_seq_next;
-	fabric->tf_ops.scsi_auth_intr_seq_show = &lio_scsi_auth_intr_seq_show;
-	fabric->tf_ops.scsi_auth_intr_seq_stop = &lio_scsi_auth_intr_seq_stop;
-	fabric->tf_ops.scsi_att_intr_port_seq_start = &lio_scsi_att_intr_port_seq_start;
-	fabric->tf_ops.scsi_att_intr_port_seq_next = &lio_scsi_att_intr_port_seq_next;
-	fabric->tf_ops.scsi_att_intr_port_seq_show = &lio_scsi_att_intr_port_seq_show;
-	fabric->tf_ops.scsi_att_intr_port_seq_stop = &lio_scsi_att_intr_port_seq_stop;
 	fabric->tf_ops.get_task_tag = &iscsi_get_task_tag;
 	fabric->tf_ops.get_cmd_state = &iscsi_get_cmd_state;
 	fabric->tf_ops.new_cmd_failure = &iscsi_new_cmd_failure;

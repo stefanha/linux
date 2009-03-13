@@ -42,12 +42,9 @@
 #include <net/tcp.h>
 #include <scsi/scsi.h>
 
-#include <iscsi_linux_os.h>
-#include <iscsi_linux_defs.h>
 #include <iscsi_lists.h>
 
 #include <target_core_base.h>
-#include <iscsi_target_error.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
 #include <target_core_alua.h>
@@ -1120,8 +1117,7 @@ se_lun_t *core_dev_add_lun(
 	se_portal_group_t *tpg,
 	se_hba_t *hba,
 	se_device_t *dev,
-	u32 lun,
-	int *ret)
+	u32 lun)
 {
 	se_lun_t *lun_p;
 	u32 lun_access = 0;
@@ -1129,12 +1125,11 @@ se_lun_t *core_dev_add_lun(
 	if (DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj) != 0) {
 		printk(KERN_ERR "Unable to export se_device_t while dev_access_obj: %d\n",
 			DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj));
-		*ret = ERR_OBJ_ACCESS_COUNT;
 		return NULL;
 	}
 
-	lun_p = core_tpg_pre_addlun(tpg, lun, ret);
-	if (!(lun_p))
+	lun_p = core_tpg_pre_addlun(tpg, lun);
+	if ((IS_ERR(lun_p)) || !(lun_p))
 		return NULL;
 
 	if (DEV_OBJ_API(dev)->get_device_access((void *)dev) == 0)
@@ -1144,7 +1139,6 @@ se_lun_t *core_dev_add_lun(
 
 	if (core_tpg_post_addlun(tpg, lun_p, TRANSPORT_LUN_TYPE_DEVICE,
 			lun_access, dev, dev->dev_obj_api) < 0) {
-		*ret = ERR_EXPORT_FAILED;
 		return NULL;
 	}
 
@@ -1169,7 +1163,6 @@ se_lun_t *core_dev_add_lun(
 		spin_unlock_bh(&tpg->acl_node_lock);
 	}
 
-	*ret = 0;
 	return lun_p;
 }
 EXPORT_SYMBOL(core_dev_add_lun);
@@ -1358,7 +1351,7 @@ int core_dev_del_initiator_node_lun_acl(
 
 	nacl = core_tpg_get_initiator_node_acl(tpg, lacl->initiatorname);
 	if (!(nacl))
-		return ERR_DELLUNACL_NODE_ACL_MISSING;
+		return -EINVAL;
 
 	spin_lock(&lun->lun_acl_lock);
 	list_del(&lacl->lacl_list);

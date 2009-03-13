@@ -39,17 +39,12 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 
-#include <iscsi_linux_os.h>
-#include <iscsi_linux_defs.h>
-
 #include <target_core_base.h>
-#include <iscsi_target_error.h>
 #include <target_core_device.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
 #include <target_core_tpg.h>
 #include <target_core_transport.h>
-
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
 
@@ -153,7 +148,7 @@ static int se_core_shutdown_hba(
 		return ret;
 
 	if (t->detach_hba(hba) < 0)
-		return ERR_SHUTDOWN_DETACH_HBA;
+		return -1;
 
 	return 0;
 }

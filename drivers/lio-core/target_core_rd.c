@@ -40,10 +40,6 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 
-#include <iscsi_linux_os.h>
-#include <iscsi_linux_defs.h>
-
-#include <iscsi_target_version.h>
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_transport.h>
@@ -78,7 +74,7 @@ int rd_attach_hba(se_hba_t *hba, u32 host_id)
 
 	printk(KERN_INFO "CORE_HBA[%d] - %s Ramdisk HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, RD_HBA_VERSION, PYX_ISCSI_VERSION);
+		PYX_ISCSI_VENDOR, RD_HBA_VERSION, TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - Attached Ramdisk HBA: %u to Generic"
 		" Target Core TCQ Depth: %d MaxSectors: %u\n", hba->hba_id,
 		rd_host->rd_host_id, atomic_read(&hba->max_queue_depth),
