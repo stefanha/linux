@@ -26,17 +26,12 @@ struct target_core_fabric_ops {
 	void (*close_session)(struct se_session_s *);
 	void (*stop_session)(struct se_session_s *, int, int);
 	void (*fall_back_to_erl0)(struct se_session_s *);
+	int (*sess_logged_in)(struct se_session_s *);
+	u32 (*sess_get_index)(struct se_session_s *);
+	u32 (*sess_get_initiator_wwn)(struct se_session_s *,
+				      unsigned char *, u32);
 	int (*write_pending)(struct se_cmd_s *);
 	void (*set_default_node_attributes)(struct se_node_acl_s *);
-	void *(*scsi_auth_intr_seq_start)(struct seq_file *, loff_t *);
-	void *(*scsi_auth_intr_seq_next)(struct seq_file *, void *, loff_t *);
-	int (*scsi_auth_intr_seq_show)(struct seq_file *, void *);
-	void (*scsi_auth_intr_seq_stop)(struct seq_file *, void *);
-	void *(*scsi_att_intr_port_seq_start)(struct seq_file *, loff_t *);
-	void *(*scsi_att_intr_port_seq_next)(struct seq_file *, void *,
-						loff_t *);
-	int (*scsi_att_intr_port_seq_show)(struct seq_file *, void *);
-	void (*scsi_att_intr_port_seq_stop)(struct seq_file *, void *);
 	u32 (*get_task_tag)(struct se_cmd_s *);
 	int (*get_cmd_state)(struct se_cmd_s *);
 	void (*new_cmd_failure)(struct se_cmd_s *);

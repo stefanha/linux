@@ -59,6 +59,7 @@ scsi_index_table_t scsi_index_table;
 #define SCSI_INST_SW_INDEX		1
 #define SCSI_TRANSPORT_INDEX		1
 
+#define NONE		"None"
 #define ISPRINT(a)   ((a >= ' ') && (a <= '~'))
 
 /* Structure for table row iteration with seq_file */
@@ -180,8 +181,11 @@ static void *locate_hba_next(
 
 	(*pos)++;
 
+	if (!(iterp))
+		return NULL;
+
 	dev = (se_device_t *)iterp->ti_ptr;
-	if (!(iterp) || !(dev))
+	if (!(dev))
 		return NULL;
 
 	dev_p = dev;
@@ -697,44 +701,95 @@ static const struct file_operations scsi_tgt_port_seq_fops = {
  */
 static void *scsi_auth_intr_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-	return (iscsi_tf) ? iscsi_tf->scsi_auth_intr_seq_start(seq, pos) :
-		NULL;
+	spin_lock_bh(&se_global->se_tpg_lock);
+	return seq_list_start(&se_global->g_se_tpg_list, *pos);
 }
 
 static void *scsi_auth_intr_seq_next(struct seq_file *seq, void *v,
 					 loff_t *pos)
 {
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-	return (iscsi_tf) ? iscsi_tf->scsi_auth_intr_seq_next(seq, v, pos) :
-		NULL;
+	return seq_list_next(v, &se_global->g_se_tpg_list, pos);
 }
 
 static void scsi_auth_intr_seq_stop(struct seq_file *seq, void *v)
 {
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+	spin_unlock_bh(&se_global->se_tpg_lock);
+}
 
-	if (iscsi_tf)
-		iscsi_tf->scsi_auth_intr_seq_stop(seq, v);
-
-	return;
+static inline int list_is_first(const struct list_head *list,
+				const struct list_head *head)
+{
+	return list->prev == head;
 }
 
 static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == SEQ_START_TOKEN)
+	se_portal_group_t *se_tpg = list_entry(v, se_portal_group_t,
+						se_tpg_list);
+	se_dev_entry_t *deve;
+	se_lun_t *lun;
+	se_node_acl_t *se_nacl;
+	int j;
+
+	if (list_is_first(&se_tpg->se_tpg_list,
+			  &se_global->g_se_tpg_list))
 		seq_puts(seq, "inst dev port indx dev_or_port intr_name "
 			 "map_indx att_count num_cmds read_mbytes "
 			 "write_mbytes hs_num_cmds creation_time row_status\n");
 
-	{
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+	if (!(se_tpg))
+		return 0;
 
-	if (iscsi_tf)
-		return iscsi_tf->scsi_auth_intr_seq_show(seq, v);
+	spin_lock(&se_tpg->acl_node_lock);
+	list_for_each_entry(se_nacl, &se_tpg->acl_node_list, acl_list) {
+		spin_lock(&se_nacl->device_list_lock);
+		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
+			deve = &se_nacl->device_list[j];
+			if (!(deve->lun_flags &
+					TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) ||
+			    (!deve->se_lun))
+				continue;
+			lun = deve->se_lun;
+			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
+			    (!lun->se_dev))
+				continue;
+
+			seq_printf(seq,"%u %u %u %u %u %s %u %u %u %u %u %u"
+						" %u %s\n",
+				/* scsiInstIndex */
+				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg),
+				/* scsiDeviceIndex */
+				lun->se_dev->dev_index,
+				/* scsiAuthIntrTgtPortIndex */
+				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg),
+				/* scsiAuthIntrIndex */
+				se_nacl->acl_index,
+				/* scsiAuthIntrDevOrPort */
+				1,
+				/* scsiAuthIntrName */
+				se_nacl->initiatorname[0] ?
+					se_nacl->initiatorname : NONE,
+				/* FIXME: scsiAuthIntrLunMapIndex */
+				0,
+				/* scsiAuthIntrAttachedTimes */
+				deve->attach_count,
+				/* scsiAuthIntrOutCommands */
+				deve->total_cmds,
+				/* scsiAuthIntrReadMegaBytes */
+				(u32)(deve->read_bytes >> 20),
+				/* scsiAuthIntrWrittenMegaBytes */
+				(u32)(deve->write_bytes >> 20),
+				/* FIXME: scsiAuthIntrHSOutCommands */
+				0,
+				/* scsiAuthIntrLastCreation */
+				(u32)(((u32)deve->creation_time -
+					    INITIAL_JIFFIES) * 100 / HZ),
+				/* FIXME: scsiAuthIntrRowStatus */
+				"Ready");
+		}
+		spin_unlock(&se_nacl->device_list_lock);
 	}
+	spin_unlock(&se_tpg->acl_node_lock);
 
 	return 0;
 }
@@ -767,43 +822,86 @@ static const struct file_operations scsi_auth_intr_seq_fops = {
  */
 static void *scsi_att_intr_port_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-	return (iscsi_tf) ? iscsi_tf->scsi_att_intr_port_seq_start(seq, pos) :
-		NULL;
+	spin_lock_bh(&se_global->se_tpg_lock);
+	return seq_list_start(&se_global->g_se_tpg_list, *pos);
 }
 
 static void *scsi_att_intr_port_seq_next(struct seq_file *seq, void *v,
 					 loff_t *pos)
 {
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-	return (iscsi_tf) ? iscsi_tf->scsi_att_intr_port_seq_next(seq, v, pos) :
-		NULL;
+	return seq_list_next(v, &se_global->g_se_tpg_list, pos);
 }
 
 static void scsi_att_intr_port_seq_stop(struct seq_file *seq, void *v)
 {
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
-
-	if (iscsi_tf)
-		iscsi_tf->scsi_att_intr_port_seq_stop(seq, v);
-
-	return;
+	spin_unlock_bh(&se_global->se_tpg_lock);
 }
 
 static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == SEQ_START_TOKEN)
+	se_portal_group_t *se_tpg = list_entry(v, se_portal_group_t,
+						se_tpg_list);
+	se_dev_entry_t *deve;
+	se_lun_t *lun;
+	se_node_acl_t *se_nacl;
+	se_session_t *se_sess;
+	unsigned char buf[64];
+	int j;
+
+	if (list_is_first(&se_tpg->se_tpg_list,
+			  &se_global->g_se_tpg_list))
 		seq_puts(seq, "inst dev port indx port_auth_indx port_name"
 			" port_ident\n");
 
-	{
-	struct target_core_fabric_ops *iscsi_tf = target_core_get_iscsi_ops();
+	if (!(se_tpg))
+		return 0;
 
-	if (iscsi_tf)
-		return iscsi_tf->scsi_att_intr_port_seq_show(seq, v);
+	spin_lock(&se_tpg->session_lock);
+	list_for_each_entry(se_sess, &se_tpg->tpg_sess_list, sess_list) {
+		if ((TPG_TFO(se_tpg)->sess_logged_in(se_sess)) ||
+		    (!se_sess->se_node_acl) ||
+		    (!se_sess->se_node_acl->device_list))
+			continue;
+		
+		se_nacl = se_sess->se_node_acl;
+		
+		spin_lock(&se_nacl->device_list_lock);
+		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
+			deve = &se_nacl->device_list[j];
+			if (!(deve->lun_flags &
+					TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) ||
+			   (!deve->se_lun))
+				continue;
+
+			lun = deve->se_lun;
+			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
+			    (!lun->se_dev))
+				continue;
+
+			memset(buf, 0, 64);
+			TPG_TFO(se_tpg)->sess_get_initiator_wwn(se_sess,
+					(unsigned char *)&buf[0], 64);
+
+			seq_printf(seq,"%u %u %u %u %u %s+i+%s\n",
+				/* scsiInstIndex */
+				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg),
+				/* scsiDeviceIndex */
+				lun->se_dev->dev_index,
+				/* scsiPortIndex */
+				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg),
+				/* scsiAttIntrPortIndex */
+				TPG_TFO(se_tpg)->sess_get_index(se_sess),
+					/* scsiAttIntrPortAuthIntrIdx */
+				se_nacl->acl_index,
+				/* scsiAttIntrPortName */
+				se_nacl->initiatorname[0] ?
+					se_nacl->initiatorname : NONE,
+				/* scsiAttIntrPortIdentifier */
+				buf);
+		}
+		spin_unlock(&se_nacl->device_list_lock);
 	}
+	spin_unlock(&se_tpg->session_lock);
 
 	return 0;
 }

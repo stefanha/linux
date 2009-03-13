@@ -50,19 +50,6 @@
 struct list_head g_tf_list;
 struct mutex g_tf_lock;
 
-/*
- * Temporary pointer required for target_core_mod to operate..
- */
-struct target_core_fabric_ops *iscsi_fabric_ops;
-
-/*
- * Tempory function required for target_core_mod to operate..
- */
-struct target_core_fabric_ops *target_core_get_iscsi_ops(void)
-{
-	return iscsi_fabric_ops;
-}
-
 struct target_core_configfs_attribute {
 	struct configfs_attribute attr;
 	ssize_t (*show)(void *, char *);
@@ -356,10 +343,6 @@ int target_fabric_configfs_register(
 	}
 	printk(KERN_INFO "<<<<<<<<<<<<<<<<<<<<<< END FABRIC API >>>>>>>>>>>>"
 		">>>>>>>>>>\n");
-
-#warning FIXME: Remove temporary pointer to iscsi_fabric_ops..
-	iscsi_fabric_ops = &tf->tf_ops;
-
 	return 0;
 }
 EXPORT_SYMBOL(target_fabric_configfs_register);
@@ -2281,9 +2264,6 @@ int target_core_init_configfs(void)
 	if (ret < 0)
 		goto out;
 #endif
-#warning FIXME: Remove temporary pointer to iscsi_fabric_ops..
-	iscsi_fabric_ops = NULL;
-
 	return 0;
 
 out:
