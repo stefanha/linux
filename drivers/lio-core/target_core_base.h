@@ -836,6 +836,7 @@ typedef struct se_global_s {
 	t10_alua_lu_gp_t	*default_lu_gp;
 	t10_alua_tg_pt_gp_t	*default_tg_pt_gp;
 	spinlock_t		hba_lock;
+	spinlock_t		se_tpg_lock;
 	spinlock_t		lu_gps_lock;
 	spinlock_t		tg_pt_gps_lock;
 	spinlock_t		plugin_class_lock;

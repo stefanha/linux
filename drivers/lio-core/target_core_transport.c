@@ -242,6 +242,7 @@ int init_se_global(void)
 	INIT_LIST_HEAD(&global->g_tg_pt_gps_list);
 	INIT_LIST_HEAD(&global->g_se_tpg_list);
 	spin_lock_init(&global->hba_lock);
+	spin_lock_init(&global->se_tpg_lock);
 	spin_lock_init(&global->lu_gps_lock);
 	spin_lock_init(&global->tg_pt_gps_lock);
 	spin_lock_init(&global->plugin_class_lock);

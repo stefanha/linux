@@ -695,7 +695,10 @@ se_portal_group_t *core_tpg_register(
 	spin_lock_init(&se_tpg->acl_node_lock);
 	spin_lock_init(&se_tpg->session_lock);
 	spin_lock_init(&se_tpg->tpg_lun_lock);
-#warning FIXME: Add se_portal_group to list..
+	
+	spin_lock_bh(&se_global->se_tpg_lock);
+	list_add_tail(&se_tpg->se_tpg_list, &se_global->g_se_tpg_list);
+	spin_unlock_bh(&se_global->se_tpg_lock);
 
 	printk(KERN_INFO "TARGET_CORE[%s]: Allocated %s se_portal_group_t for"
 		" endpoint: %s, Portal Tag: %u\n", tfo->get_fabric_name(),
@@ -716,7 +719,10 @@ int core_tpg_deregister(se_portal_group_t *se_tpg)
 		TPG_TFO(se_tpg)->tpg_get_wwn(se_tpg),
 		TPG_TFO(se_tpg)->tpg_get_tag(se_tpg));
 
-#warning FIXME: Release se_portal_group from list
+	spin_lock_bh(&se_global->se_tpg_lock);
+	list_del(&se_tpg->se_tpg_list);
+	spin_unlock_bh(&se_global->se_tpg_lock);
+
 	se_tpg->se_tpg_fabric_ptr = NULL;
 	kfree(se_tpg->tpg_lun_list);
 	kfree(se_tpg);
