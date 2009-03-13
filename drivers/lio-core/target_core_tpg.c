@@ -695,7 +695,7 @@ se_portal_group_t *core_tpg_register(
 	spin_lock_init(&se_tpg->acl_node_lock);
 	spin_lock_init(&se_tpg->session_lock);
 	spin_lock_init(&se_tpg->tpg_lun_lock);
-	
+
 	spin_lock_bh(&se_global->se_tpg_lock);
 	list_add_tail(&se_tpg->se_tpg_list, &se_global->g_se_tpg_list);
 	spin_unlock_bh(&se_global->se_tpg_lock);
