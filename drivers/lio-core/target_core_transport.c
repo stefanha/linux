@@ -46,7 +46,6 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 
-#include <iscsi_lists.h>
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
@@ -715,8 +714,7 @@ static void transport_all_task_dev_remove_state(se_cmd_t *cmd)
 			continue;
 
 		spin_lock_irqsave(&dev->execute_task_lock, flags);
-		REMOVE_ENTRY_FROM_LIST_PREFIX(ts, task,
-			dev->state_task_head, dev->state_task_tail);
+		list_del(&task->t_state_list);
 		DEBUG_TSTATE("Removed ITT: 0x%08x dev: %p task[%p]\n",
 			CMD_TFO(cmd)->tfo_get_task_tag(cmd), dev, task);
 		spin_unlock_irqrestore(&dev->execute_task_lock, flags);
@@ -750,8 +748,7 @@ void transport_task_dev_remove_state(se_task_t *task, se_device_t *dev)
 
 	if (atomic_read(&task->task_state_active)) {
 		spin_lock_irqsave(&dev->execute_task_lock, flags);
-		REMOVE_ENTRY_FROM_LIST_PREFIX(ts, task,
-			dev->state_task_head, dev->state_task_tail);
+		list_del(&task->t_state_list);
 		DEBUG_TSTATE("Removed ITT: 0x%08x dev: %p task[%p]\n",
 			CMD_TFO(task->task_se_cmd)->tfo_get_task_tag(
 			task->task_se_cmd), dev, task);
@@ -1158,21 +1155,13 @@ static void __transport_add_task_to_execute_queue(
 	se_task_t *task,
 	se_device_t *dev)
 {
-	if (!dev->execute_task_head && !dev->execute_task_tail) {
-		dev->execute_task_head = dev->execute_task_tail = task;
-		task->t_next = task->t_prev = NULL;
-	} else {
-		dev->execute_task_tail->t_next	= task;
-		task->t_prev = dev->execute_task_tail;
-		dev->execute_task_tail = task;
-	}
+	list_add_tail(&task->t_execute_list, &dev->execute_task_list);
 	atomic_inc(&dev->execute_tasks);
 
 	if (atomic_read(&task->task_state_active))
 		return;
 
-	ADD_ENTRY_TO_LIST_PREFIX(ts, task, dev->state_task_head,
-			dev->state_task_tail);
+	list_add_tail(&task->t_state_list, &dev->state_task_list);
 	atomic_set(&task->task_state_active, 1);
 
 	DEBUG_TSTATE("Added ITT: 0x%08x task[%p] to dev: %p\n",
@@ -1189,14 +1178,7 @@ void transport_add_task_to_execute_queue(se_task_t *task, se_device_t *dev)
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
-	if (!dev->execute_task_head && !dev->execute_task_tail) {
-		dev->execute_task_head = dev->execute_task_tail = task;
-		task->t_next = task->t_prev = NULL;
-	} else {
-		dev->execute_task_tail->t_next  = task;
-		task->t_prev = dev->execute_task_tail;
-		dev->execute_task_tail = task;
-	}
+	list_add_tail(&task->t_execute_list, &dev->execute_task_list);
 	atomic_inc(&dev->execute_tasks);
 
 	if (atomic_read(&task->task_state_active)) {
@@ -1204,8 +1186,7 @@ void transport_add_task_to_execute_queue(se_task_t *task, se_device_t *dev)
 		return;
 	}
 
-	ADD_ENTRY_TO_LIST_PREFIX(ts, task, dev->state_task_head,
-		dev->state_task_tail);
+	list_add_tail(&task->t_state_list, &dev->state_task_list);
 	atomic_set(&task->task_state_active, 1);
 
 	DEBUG_TSTATE("Added ITT: 0x%08x task[%p] to dev: %p\n",
@@ -1229,8 +1210,7 @@ static void transport_add_tasks_to_state_queue(se_cmd_t *cmd)
 			continue;
 
 		spin_lock(&dev->execute_task_lock);
-		ADD_ENTRY_TO_LIST_PREFIX(ts, task, dev->state_task_head,
-				dev->state_task_tail);
+		list_add_tail(&task->t_state_list, &dev->state_task_list);
 		atomic_set(&task->task_state_active, 1);
 
 		DEBUG_TSTATE("Added ITT: 0x%08x task[%p] to dev: %p\n",
@@ -1273,18 +1253,13 @@ se_task_t *transport_get_task_from_execute_queue(se_device_t *dev)
 {
 	se_task_t *task;
 
-	if (!dev->execute_task_head)
+	if (list_empty(&dev->execute_task_list))
 		return NULL;
 
-	task = dev->execute_task_head;
-	dev->execute_task_head = dev->execute_task_head->t_next;
-	task->t_next = task->t_prev = NULL;
+	list_for_each_entry(task, &dev->execute_task_list, t_execute_list)
+		break;
 
-	if (!dev->execute_task_head)
-		dev->execute_task_tail = NULL;
-	else
-		dev->execute_task_head->t_prev = NULL;
-
+	list_del(&task->t_execute_list);
 	atomic_dec(&dev->execute_tasks);
 
 	return task;
@@ -1301,24 +1276,7 @@ static void transport_remove_task_from_execute_queue(
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
-	if (!task->t_prev && !task->t_next)
-		dev->execute_task_head = dev->execute_task_tail = NULL;
-	else {
-		if (!task->t_prev) {
-			task->t_next->t_prev = NULL;
-			dev->execute_task_head = task->t_next;
-			if (dev->execute_task_head->t_next)
-				dev->execute_task_tail = dev->execute_task_head;
-		} else if (task->t_next) {
-			task->t_prev->t_next = NULL;
-			dev->execute_task_tail = task->t_prev;
-		} else {
-			task->t_next->t_prev = task->t_prev;
-			task->t_prev->t_next = task->t_next;
-
-		}
-		task->t_next = task->t_prev = NULL;
-	}
+	list_del(&task->t_execute_list);
 	atomic_dec(&dev->execute_tasks);
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 }
@@ -2047,6 +2005,8 @@ se_device_t *transport_add_device_to_core_hba(
 	INIT_LIST_HEAD(&dev->dev_list);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
 	INIT_LIST_HEAD(&dev->dev_tmr_list);
+	INIT_LIST_HEAD(&dev->execute_task_list);
+	INIT_LIST_HEAD(&dev->state_task_list);
 	spin_lock_init(&dev->execute_task_lock);
 	spin_lock_init(&dev->state_task_lock);
 	spin_lock_init(&dev->dev_reservation_lock);
@@ -2435,6 +2395,8 @@ static se_task_t *transport_generic_get_task(
 	}
 
 	INIT_LIST_HEAD(&task->t_list);
+	INIT_LIST_HEAD(&task->t_execute_list);
+	INIT_LIST_HEAD(&task->t_state_list);
 	init_MUTEX_LOCKED(&task->task_stop_sem);
 	task->task_no = T_TASK(cmd)->t_task_no++;
 	task->task_se_cmd = cmd;
@@ -7381,17 +7343,14 @@ static se_task_t *transport_get_task_from_state_list(se_device_t *dev)
 {
 	se_task_t *task;
 
-	if (!dev->state_task_head)
+	if (list_empty(&dev->state_task_list))
 		return NULL;
 
-	task = dev->state_task_head;
+	list_for_each_entry(task, &dev->state_task_list, t_state_list)
+		break;
+
+	list_del(&task->t_state_list);
 	atomic_set(&task->task_state_active, 0);
-
-	dev->state_task_head = dev->state_task_head->ts_next;
-	task->ts_next = NULL;
-
-	if (!dev->state_task_head)
-		dev->state_task_tail = NULL;
 
 	return task;
 }
@@ -7446,14 +7405,14 @@ int transport_status_thr_dev_offline_tasks(
 	void *se_obj_ptr)
 {
 	se_cmd_t *cmd;
-	se_task_t *task, *task_next;
+	se_task_t *task = NULL, *task_p = NULL;
 	int complete = 0, remove = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
-	task = dev->state_task_head;
-	while (task) {
-		task_next = task->ts_next;
+	list_for_each_entry_safe(task, task_p, &dev->state_task_list,
+			t_state_list) {
+
 		if (!(TASK_CMD(task))) {
 			printk(KERN_ERR "TASK_CMD(task) is NULL!\n");
 			BUG();
@@ -7463,10 +7422,9 @@ int transport_status_thr_dev_offline_tasks(
 		/*
 		 * Only proccess se_cmd_t with matching se_obj_ptr..
 		 */
-		if (cmd->se_orig_obj_ptr != se_obj_ptr) {
-			task = task_next;
+		if (cmd->se_orig_obj_ptr != se_obj_ptr)
 			continue;
-		}
+
 		spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 
 		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
@@ -7498,7 +7456,6 @@ int transport_status_thr_dev_offline_tasks(
 					&T_TASK(cmd)->t_state_lock, flags);
 				spin_lock_irqsave(
 					&dev->execute_task_lock, flags);
-				task = task_next;
 				continue;
 			}
 
@@ -7532,11 +7489,7 @@ int transport_status_thr_dev_offline_tasks(
 
 				spin_lock_irqsave(
 					&dev->execute_task_lock, flags);
-				REMOVE_ENTRY_FROM_LIST_PREFIX(ts, task,
-					dev->state_task_head,
-					dev->state_task_tail);
-
-				task = task_next;
+				list_del(&task->t_state_list);
 				continue;
 			}
 		}
@@ -7564,9 +7517,7 @@ int transport_status_thr_dev_offline_tasks(
 		complete = 0;
 
 		spin_lock_irqsave(&dev->execute_task_lock, flags);
-		REMOVE_ENTRY_FROM_LIST_PREFIX(ts, task,
-			dev->state_task_head, dev->state_task_tail);
-		task = task_next;
+		list_del(&task->t_state_list);
 		continue;
 
 fail_cmd:
@@ -7586,9 +7537,7 @@ fail_cmd:
 			transport_passthrough_check_stop(cmd);
 
 		spin_lock_irqsave(&dev->execute_task_lock, flags);
-		REMOVE_ENTRY_FROM_LIST_PREFIX(ts, task,
-			dev->state_task_head, dev->state_task_tail);
-		task = task_next;
+		list_del(&task->t_state_list);
 	}
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 

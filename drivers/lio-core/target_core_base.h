@@ -389,11 +389,9 @@ typedef struct se_task_s {
 	int (*transport_map_task)(struct se_task_s *, u32);
 	void *se_obj_ptr;
 	struct se_obj_lun_type_s *se_obj_api;
-	struct se_task_s *t_next;
-	struct se_task_s *t_prev;
-	struct se_task_s *ts_next;
-	struct se_task_s *ts_prev;
 	struct list_head t_list;
+	struct list_head t_execute_list;
+	struct list_head t_state_list;
 } ____cacheline_aligned se_task_t;
 
 #define TASK_CMD(task)	((struct se_cmd_s *)task->task_se_cmd)
@@ -702,10 +700,8 @@ typedef struct se_device_s {
 	void (*dev_generate_cdb)(unsigned long long, u32 *,
 					unsigned char *, int);
 	struct se_obj_lun_type_s *dev_obj_api;
-	struct se_task_s	*execute_task_head;
-	struct se_task_s	*execute_task_tail;
-	struct se_task_s	*state_task_head;
-	struct se_task_s	*state_task_tail;
+	struct list_head	execute_task_list;
+	struct list_head	state_task_list;
 	/* Pointer to associated SE HBA */
 	struct se_hba_s		*se_hba;
 	struct se_subsystem_dev_s *se_sub_dev;
