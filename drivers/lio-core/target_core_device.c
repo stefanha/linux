@@ -321,8 +321,7 @@ out:
 	 * for tracking state of se_cmd_ts during LUN shutdown events.
 	 */
 	spin_lock_irqsave(&se_lun->lun_cmd_lock, flags);
-	ADD_ENTRY_TO_LIST_PREFIX(l, se_cmd, se_lun->lun_cmd_head,
-				se_lun->lun_cmd_tail);
+	list_add_tail(&se_cmd->se_lun_list, &se_lun->lun_cmd_list);
 	atomic_set(&T_TASK(se_cmd)->transport_lun_active, 1);
 #if 0
 	printk(KERN_INFO "Adding ITT: 0x%08x to LUN LIST[%d]\n",

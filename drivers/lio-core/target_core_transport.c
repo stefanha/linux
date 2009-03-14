@@ -878,9 +878,7 @@ static void transport_lun_remove_cmd(se_cmd_t *cmd)
 
 	spin_lock_irqsave(&lun->lun_cmd_lock, flags);
 	if (atomic_read(&T_TASK(cmd)->transport_lun_active)) {
-		REMOVE_ENTRY_FROM_LIST_PREFIX(l, cmd,
-				lun->lun_cmd_head,
-				lun->lun_cmd_tail);
+		list_del(&cmd->se_lun_list);
 		atomic_set(&T_TASK(cmd)->transport_lun_active, 0);
 #if 0
 		printk(KERN_INFO "Removed ITT: 0x%08x from LUN LIST[%d]\n"
@@ -2627,6 +2625,7 @@ se_cmd_t *__transport_alloc_se_cmd(
 		printk(KERN_ERR "kmem_cache_alloc() failed for se_cmd_cache\n");
 		return ERR_PTR(-ENOMEM);
 	}
+	INIT_LIST_HEAD(&cmd->se_lun_list);
 
 	cmd->t_task = kzalloc(sizeof(se_transport_task_t), GFP_KERNEL);
 	if (!(cmd->t_task)) {
@@ -6847,14 +6846,14 @@ EXPORT_SYMBOL(transport_lun_wait_for_tasks);
 
 void transport_clear_lun_from_sessions(se_lun_t *lun)
 {
-	se_cmd_t *cmd;
+	se_cmd_t *cmd = NULL, *cmd_p = NULL;
 	unsigned long flags;
 	/*
 	 * Do exception processing and return CHECK_CONDITION status to the
 	 * Initiator Port.
 	 */
 	spin_lock_irqsave(&lun->lun_cmd_lock, flags);
-	while ((cmd = lun->lun_cmd_head)) {
+	list_for_each_entry_safe(cmd, cmd_p, &lun->lun_cmd_list, se_lun_list) {
 		if (!(T_TASK(cmd))) {
 			printk(KERN_ERR "ITT: 0x%08x, T_TASK(cmd) = NULL"
 				"[i,t]_state: %u/%u\n",
@@ -6862,9 +6861,7 @@ void transport_clear_lun_from_sessions(se_lun_t *lun)
 				CMD_TFO(cmd)->get_cmd_state(cmd), cmd->t_state);
 			BUG();
 		}
-
-		REMOVE_ENTRY_FROM_LIST_PREFIX(l, cmd, lun->lun_cmd_head,
-				lun->lun_cmd_tail);
+		list_del(&cmd->se_lun_list);
 		atomic_set(&T_TASK(cmd)->transport_lun_active, 0);
 		/*
 		 * This will notify iscsi_target_transport.c:

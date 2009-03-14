@@ -475,6 +475,7 @@ typedef struct se_cmd_s {
 	void			*sense_buffer;
 	/* Used with sockets based fabric plugins */
 	struct iovec		*iov_data;
+	struct list_head	se_lun_list;
 	struct se_device_s      *se_dev;
 	struct se_dev_entry_s   *se_deve;
 	struct se_lun_s		*se_lun;
@@ -487,8 +488,6 @@ typedef struct se_cmd_s {
 	struct se_tmr_req_s	*se_tmr_req;
 	struct se_transport_task_s *t_task;
 	struct target_core_fabric_ops *se_tfo;
-	struct se_cmd_s      	*l_next;
-	struct se_cmd_s      	*l_prev;
 	int (*transport_add_cmd_to_queue)(struct se_cmd_s *, u8);
 	int (*transport_allocate_iovecs)(struct se_cmd_s *);
 	int (*transport_allocate_resources)(struct se_cmd_s *, u32, u32);
@@ -764,8 +763,7 @@ typedef struct se_lun_s {
 	spinlock_t		lun_acl_lock;
 	spinlock_t		lun_cmd_lock;
 	spinlock_t		lun_sep_lock;
-	se_cmd_t		*lun_cmd_head;
-	se_cmd_t		*lun_cmd_tail;
+	struct list_head	lun_cmd_list;
 	struct list_head	lun_acl_list;
 	se_device_t		*se_dev;
 	void			*lun_type_ptr;
