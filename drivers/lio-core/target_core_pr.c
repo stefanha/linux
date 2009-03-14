@@ -314,7 +314,8 @@ static t10_pr_registration_t *core_scsi3_alloc_registration(
 	se_node_acl_t *nacl,
 	se_dev_entry_t *deve,
 	u64 sa_res_key,
-	int all_tg_pt)
+	int all_tg_pt,
+	int ignore_key)
 {
 	struct target_core_fabric_ops *tfo = nacl->se_tpg->se_tpg_tfo;
 	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
@@ -344,8 +345,9 @@ static t10_pr_registration_t *core_scsi3_alloc_registration(
 	spin_unlock(&pr_tmpl->registration_lock);
 
 	deve->deve_flags |= DEF_PR_REGISTERED;
-	printk(KERN_INFO "SPC-3 PR [%s] Service Action: REGISTER Initiator"
-		" Node: %s\n", tfo->get_fabric_name(), nacl->initiatorname);
+	printk(KERN_INFO "SPC-3 PR [%s] Service Action: REGISTER%s Initiator"
+		" Node: %s\n", tfo->get_fabric_name(), (ignore_key) ?
+		"_AND_IGNORE_EXISTING_KEY" : "", nacl->initiatorname);
 	printk(KERN_INFO "SPC-3 PR [%s] for %s TCM Subsystem %s Object Target"
 		" Port(s)\n",  tfo->get_fabric_name(),
 		(pr_reg->pr_reg_all_tg_pt) ? "ALL" : "SINGLE",
@@ -431,7 +433,8 @@ static int core_scsi3_emulate_pro_register(
 	u64 sa_res_key,
 	int aptpl,
 	int all_tg_pt,
-	int spec_i_pt)
+	int spec_i_pt,
+	int ignore_key)
 {
 	se_session_t *se_sess = SE_SESS(cmd);
 	se_dev_entry_t *se_deve;
@@ -474,7 +477,7 @@ static int core_scsi3_emulate_pro_register(
 			 */
 			pr_reg = core_scsi3_alloc_registration(SE_DEV(cmd),
 					se_sess->se_node_acl, se_deve,
-					sa_res_key, all_tg_pt);
+					sa_res_key, all_tg_pt, ignore_key);
 			if (!(pr_reg)) {
 				printk(KERN_ERR "Unable to allocate"
 					" t10_pr_registration_t\n");
@@ -501,12 +504,15 @@ static int core_scsi3_emulate_pro_register(
 				" PR_REGISTERED *pr_reg\n");
 			return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
-		if (res_key != pr_reg->pr_res_key) {
-			printk(KERN_ERR "SPC-3 PR REGISTER: Received res_key:"
-				" 0x%016Lx does not match existing SA REGISTER"
-				" res_key: 0x%016Lx\n", res_key,
-				pr_reg->pr_res_key);
-			return PYX_TRANSPORT_RESERVATION_CONFLICT;
+		if (!(ignore_key)) {
+			if (res_key != pr_reg->pr_res_key) {
+				printk(KERN_ERR "SPC-3 PR REGISTER: Received"
+					" res_key: 0x%016Lx does not match"
+					" existing SA REGISTER res_key:"
+					" 0x%016Lx\n", res_key,
+					pr_reg->pr_res_key);
+				return PYX_TRANSPORT_RESERVATION_CONFLICT;
+			}
 		}
 		if (spec_i_pt) {
 			printk(KERN_ERR "SPC-3 PR UNREGISTER: SPEC_I_PT"
@@ -529,9 +535,10 @@ static int core_scsi3_emulate_pro_register(
 			pr_reg->pr_res_generation = core_scsi3_pr_generation(
 							SE_DEV(cmd));
 			pr_reg->pr_res_key = sa_res_key;
-			printk("SPC-3 PR [%s] REGISTER: Changed Reservation Key"
-				" for %s to: 0x%016Lx PRgeneration: 0x%08x\n",
-				CMD_TFO(cmd)->get_fabric_name(),
+			printk("SPC-3 PR [%s] REGISTER%s: Changed Reservation"
+				" Key for %s to: 0x%016Lx PRgeneration:"
+				" 0x%08x\n", CMD_TFO(cmd)->get_fabric_name(),
+				(ignore_key) ? "_AND_IGNORE_EXISTING_KEY" : "",
 				pr_reg->pr_reg_nacl->initiatorname,
 				pr_reg->pr_res_key, pr_reg->pr_res_generation);
 		}
@@ -927,16 +934,6 @@ static int core_scsi3_emulate_pro_preempt_and_abort(
 	return 0;
 }
 
-static int core_scsi3_emulate_pro_register_and_ignore_existing_key(
-	se_cmd_t *cmd,
-	int sa_res_key,
-	int aptpl,
-	int all_tg_pt)
-{
-	core_scsi3_pr_generation(SE_DEV(cmd));
-	return 0;
-}
-
 static int core_scsi3_emulate_pro_register_and_move(
 	se_cmd_t *cmd,
 	int type,
@@ -1001,7 +998,7 @@ static int core_scsi3_emulate_pr_out(se_cmd_t *cmd, unsigned char *cdb)
 	switch (cdb[1] & 0x1f) {
 	case PRO_REGISTER:
 		return core_scsi3_emulate_pro_register(cmd,
-			res_key, sa_res_key, aptpl, all_tg_pt, spec_i_pt);
+			res_key, sa_res_key, aptpl, all_tg_pt, spec_i_pt, 0);
 	case PRO_RESERVE:
 		return core_scsi3_emulate_pro_reserve(cmd,
 			type, scope, res_key);
@@ -1018,9 +1015,11 @@ static int core_scsi3_emulate_pr_out(se_cmd_t *cmd, unsigned char *cdb)
 	case PRO_PREEMPT_AND_ABORT:
 		return core_scsi3_emulate_pro_preempt_and_abort(cmd,
 			type, scope, res_key, sa_res_key);
+#endif
 	case PRO_REGISTER_AND_IGNORE_EXISTING_KEY:
-		return core_scsi3_emulate_pro_register_and_ignore_existing_key(
-			cmd, sa_res_key, aptpl, all_tg_pt);
+		return core_scsi3_emulate_pro_register(cmd,
+			0, sa_res_key, aptpl, all_tg_pt, spec_i_pt, 1);
+#if 0
 	case PRO_REGISTER_AND_MOVE:
 		return core_scsi3_emulate_pro_register_and_move(cmd,
 			type, scope, res_key, sa_res_key);
