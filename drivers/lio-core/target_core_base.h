@@ -314,18 +314,16 @@ typedef struct se_queue_req_s {
 	void			*queue_se_obj_ptr;
 	void			*cmd;
 	struct se_obj_lun_type_s *queue_se_obj_api;
-	struct se_queue_req_s	*next;
-	struct se_queue_req_s	*prev;
+	struct list_head	qr_list;
 } ____cacheline_aligned se_queue_req_t;
 
 typedef struct se_queue_obj_s {
 	atomic_t		queue_cnt;
 	spinlock_t		cmd_queue_lock;
-	se_queue_req_t		*queue_head;
-	se_queue_req_t		*queue_tail;
-	wait_queue_head_t		thread_wq;
-	struct semaphore		thread_create_sem;
-	struct semaphore		thread_done_sem;
+	struct list_head	qobj_list;		
+	wait_queue_head_t	thread_wq;
+	struct semaphore	thread_create_sem;
+	struct semaphore	thread_done_sem;
 } ____cacheline_aligned se_queue_obj_t;
 
 typedef struct se_transport_task_s {

@@ -493,6 +493,7 @@ unsigned char *transport_get_iqn_sn(void)
 void transport_init_queue_obj(se_queue_obj_t *qobj)
 {
 	atomic_set(&qobj->queue_cnt, 0);
+	INIT_LIST_HEAD(&qobj->qobj_list);
 	init_waitqueue_head(&qobj->thread_wq);
 	init_MUTEX_LOCKED(&qobj->thread_create_sem);
 	init_MUTEX_LOCKED(&qobj->thread_done_sem);
@@ -903,6 +904,7 @@ extern int transport_add_cmd_to_queue(
 				" se_queue_req_t\n");
 		return -1;
 	}
+	INIT_LIST_HEAD(&qr->qr_list);
 
 	qr->cmd = (void *)cmd;
 	qr->state = t_state;
@@ -915,7 +917,7 @@ extern int transport_add_cmd_to_queue(
 	}
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	ADD_ENTRY_TO_LIST(qr, qobj->queue_head, qobj->queue_tail);
+	list_add_tail(&qr->qr_list, &qobj->qobj_list);
 	atomic_inc(&T_TASK(cmd)->t_transport_queue_active);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
@@ -937,25 +939,20 @@ static int transport_add_cmd_to_dev_queue(se_cmd_t *cmd, u8 t_state)
 se_queue_req_t *__transport_get_qr_from_queue(se_queue_obj_t *qobj)
 {
 	se_cmd_t *cmd;
-	se_queue_req_t *qr;
+	se_queue_req_t *qr = NULL;
 
-	if (!qobj->queue_head)
+	if (list_empty(&qobj->qobj_list))
 		return NULL;
 
-	qr = qobj->queue_head;
+	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
+		break;
+	
 	if (qr->cmd) {
 		cmd = (se_cmd_t *)qr->cmd;
 		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
 	}
+	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
-
-	qobj->queue_head = qobj->queue_head->next;
-	qr->next = qr->prev = NULL;
-
-	if (!qobj->queue_head)
-		qobj->queue_tail = NULL;
-	else
-		qobj->queue_head->prev = NULL;
 
 	return qr;
 }
@@ -967,25 +964,20 @@ se_queue_req_t *transport_get_qr_from_queue(se_queue_obj_t *qobj)
 	unsigned long flags;
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	if (!qobj->queue_head) {
+	if (list_empty(&qobj->qobj_list)) {
 		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 		return NULL;
 	}
 
-	qr = qobj->queue_head;
+	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
+		break;
+
 	if (qr->cmd) {
 		cmd = (se_cmd_t *)qr->cmd;
 		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
 	}
+	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
-
-	qobj->queue_head = qobj->queue_head->next;
-	qr->next = qr->prev = NULL;
-
-	if (!qobj->queue_head)
-		qobj->queue_tail = NULL;
-	else
-		qobj->queue_head->prev = NULL;
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
 	return qr;
@@ -994,7 +986,7 @@ se_queue_req_t *transport_get_qr_from_queue(se_queue_obj_t *qobj)
 static void transport_remove_cmd_from_queue(se_cmd_t *cmd, se_queue_obj_t *qobj)
 {
 	se_cmd_t *q_cmd;
-	se_queue_req_t *qr, *qr_next;
+	se_queue_req_t *qr = NULL, *qr_p = NULL;
 	unsigned long flags;
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
@@ -1003,22 +995,15 @@ static void transport_remove_cmd_from_queue(se_cmd_t *cmd, se_queue_obj_t *qobj)
 		return;
 	}
 
-	qr = qobj->queue_head;
-	while (qr) {
-		qr_next = qr->next;
-
+	list_for_each_entry_safe(qr, qr_p, &qobj->qobj_list, qr_list) {
 		q_cmd = (se_cmd_t *)qr->cmd;
-		if (q_cmd != cmd) {
-			qr = qr_next;
+		if (q_cmd != cmd)
 			continue;
-		}
 
 		atomic_dec(&T_TASK(q_cmd)->t_transport_queue_active);
 		atomic_dec(&qobj->queue_cnt);
-		REMOVE_ENTRY_FROM_LIST(qr, qobj->queue_head, qobj->queue_tail);
+		list_del(&qr->qr_list);
 		kfree(qr);
-
-		qr = qr_next;
 	}
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
@@ -1474,20 +1459,20 @@ void transport_dump_dev_info(
 static void transport_release_all_cmds(se_device_t *dev)
 {
 	se_cmd_t *cmd = NULL;
-	se_queue_req_t *qr, *qr_next;
+	se_queue_req_t *qr = NULL, *qr_p = NULL;
 	int bug_out = 0, t_state;
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev->dev_queue_obj->cmd_queue_lock, flags);
-	qr = dev->dev_queue_obj->queue_head;
-	while (qr) {
-		qr_next = qr->next;
-		spin_unlock_irqrestore(&dev->dev_queue_obj->cmd_queue_lock,
-				flags);
+	list_for_each_entry_safe(qr, qr_p, &dev->dev_queue_obj->qobj_list,
+				qr_list) {
 
 		cmd = (se_cmd_t *)qr->cmd;
 		t_state = qr->state;
+		list_del(&qr->qr_list);
 		kfree(qr);
+		spin_unlock_irqrestore(&dev->dev_queue_obj->cmd_queue_lock,
+				flags);
 
 		printk(KERN_ERR "Releasing %s ITT: 0x%08x, i_state: %u,"
 			" t_state: %u directly\n",
@@ -1500,7 +1485,6 @@ static void transport_release_all_cmds(se_device_t *dev)
 		bug_out = 1;
 
 		spin_lock_irqsave(&dev->dev_queue_obj->cmd_queue_lock, flags);
-		qr = qr_next;
 	}
 	spin_unlock_irqrestore(&dev->dev_queue_obj->cmd_queue_lock, flags);
 #if 0
@@ -7224,12 +7208,13 @@ static int transport_add_qr_to_queue(
 		printk(KERN_ERR "Unable to allocate memory for se_queue_req_t\n");
 		return -1;
 	}
+	INIT_LIST_HEAD(&qr->qr_list);
 
 	qr->state = state;
 	qr->queue_se_obj_ptr = se_obj_ptr;
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	ADD_ENTRY_TO_LIST(qr, qobj->queue_head, qobj->queue_tail);
+	list_add_tail(&qr->qr_list, &qobj->qobj_list);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 #if 0
 	printk(KERN_INFO "Adding obj_ptr: %p state: %d to qobj: %p\n",
