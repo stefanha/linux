@@ -279,23 +279,6 @@ typedef enum {
 
 struct se_cmd_s;
 
-typedef struct t10_reservation_template_s {
-	/* Reservation effects all target ports */
-	int pr_all_tg_pt;
-	u32 pr_generation;
-	t10_reservations_index_t res_type;
-	spinlock_t registration_lock;
-	/* Reservation holder when pr_all_tg_pt=1 */
-	struct se_node_acl_s *pr_res_holder;
-	struct list_head registration_list;
-	int (*t10_reservation_check)(struct se_cmd_s *);
-	int (*t10_reserve)(struct se_cmd_s *);
-	int (*t10_release)(struct se_cmd_s *);
-	int (*t10_seq_non_holder)(struct se_cmd_s *, unsigned char *);
-	int (*t10_pr_register)(struct se_cmd_s *);
-	int (*t10_pr_clear)(struct se_cmd_s *);
-} ____cacheline_aligned t10_reservation_template_t;
-
 typedef struct t10_pr_registration_s {
 	int pr_reg_all_tg_pt; /* Reservation effects all target ports */
 	int pr_res_holder;
@@ -308,6 +291,23 @@ typedef struct t10_pr_registration_s {
 	struct se_lun_s *pr_reg_tg_pt_lun;
 	struct list_head pr_reg_list;
 } t10_pr_registration_t;
+
+typedef struct t10_reservation_template_s {
+	/* Reservation effects all target ports */
+	int pr_all_tg_pt;
+	u32 pr_generation;
+	t10_reservations_index_t res_type;
+	spinlock_t registration_lock;
+	/* Reservation holder when pr_all_tg_pt=1 */
+	struct se_node_acl_s *pr_res_holder;
+	struct list_head registration_list;
+	int (*t10_reservation_check)(struct se_cmd_s *, u32 *);
+	int (*t10_reserve)(struct se_cmd_s *);
+	int (*t10_release)(struct se_cmd_s *);
+	int (*t10_seq_non_holder)(struct se_cmd_s *, unsigned char *, u32);
+	int (*t10_pr_register)(struct se_cmd_s *);
+	int (*t10_pr_clear)(struct se_cmd_s *);
+} ____cacheline_aligned t10_reservation_template_t;
 
 typedef struct se_queue_req_s {
 	int			state;

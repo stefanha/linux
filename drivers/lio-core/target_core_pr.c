@@ -46,7 +46,8 @@
 
 int core_scsi2_reservation_seq_non_holder(
 	se_cmd_t *cmd,
-	unsigned char *cdb)
+	unsigned char *cdb,
+	u32 pr_reg_type)
 {
 	switch (cdb[0]) {
 	case INQUIRY:
@@ -60,7 +61,7 @@ int core_scsi2_reservation_seq_non_holder(
 	return 1;
 }
 
-int core_scsi2_reservation_check(se_cmd_t *cmd)
+int core_scsi2_reservation_check(se_cmd_t *cmd, u32 *pr_reg_type)
 {
 	se_device_t *dev = cmd->se_dev;
 	se_session_t *sess = cmd->se_sess;
@@ -161,29 +162,82 @@ EXPORT_SYMBOL(core_scsi2_reservation_reserve);
 
 /*
  * Begin SPC-3/SPC-4 Persistent Reservations emulation support
+ *
+ * This function is called by those initiator ports who are *NOT*
+ * the active PR reservation holder when a reservation is present.
  */
 static int core_scsi3_pr_seq_non_holder(
 	se_cmd_t *cmd,
-	unsigned char *cdb)
+	unsigned char *cdb,
+	u32 pr_reg_type)
 {
-	int registered_nexus = 0; /* FIXME: Table 46 */
+	se_dev_entry_t *se_deve;
+	se_session_t *se_sess = SE_SESS(cmd);
+	se_lun_t *se_lun = SE_LUN(cmd);
+	int other_cdb = 0;
+	int registered_nexus = 0, ret = 1; /* Conflict by default */
+	int all_reg = 0; /* ALL_REG */
 	int we = 0; /* Write Exclusive */
 	int legacy = 0; /* Act like a legacy device and return
 			 * RESERVATION CONFLICT on some CDBs */
+
+	se_deve = &se_sess->se_node_acl->device_list[se_lun->unpacked_lun];
+
+	switch (pr_reg_type) {
+	case PR_TYPE_WRITE_EXCLUSIVE:
+		we = 1;
+	case PR_TYPE_EXCLUSIVE_ACCESS:
+		/*
+		 * Some commands are only allowed for the persistent reservation
+		 * holder.
+		 */
+		break;
+	case PR_TYPE_WRITE_EXCLUSIVE_REGONLY:
+		we = 1;
+	case PR_TYPE_EXCLUSIVE_ACCESS_REGONLY:
+		/*
+		 * Some commands are only allowed for registered I_T Nexuses.
+		 */
+		if (se_deve->deve_flags & DEF_PR_REGISTERED)
+			registered_nexus = 1;
+		break;
+	case PR_TYPE_WRITE_EXCLUSIVE_ALLREG:
+		we = 1;
+	case PR_TYPE_EXCLUSIVE_ACCESS_ALLREG:
+		/*
+		 * Each registered I_T Nexus is a reservation holder.
+		 */
+		all_reg = 1;
+		if (se_deve->deve_flags & DEF_PR_REGISTERED)
+			registered_nexus = 1;
+		break;
+	default:
+		return -1;
+	}
 	/*
 	 * Referenced from spc4r17 table 45 for *NON* PR holder access
 	 */
 	switch (cdb[0]) {
 	case SECURITY_PROTOCOL_IN:
-		return (we) ? 0 : 1;
+		if (registered_nexus)
+			return 0;
+		ret = (we) ? 0 : 1;
+		break;
 	case MODE_SENSE:
 	case MODE_SENSE_10:
 	case READ_ATTRIBUTE:
 	case READ_BUFFER:
 	case RECEIVE_DIAGNOSTIC:
-		if (legacy)
-			return 1;
-		return (we) ? 0 : 1; /* Allowed Write Exclusive */
+		if (legacy) {
+			ret = 1;
+			break;
+		}
+		if (registered_nexus) {
+			ret = 0;
+			break;
+		}
+		ret = (we) ? 0 : 1; /* Allowed Write Exclusive */
+		break;
 	case PERSISTENT_RESERVE_OUT:
 		/*
 		 * This follows PERSISTENT_RESERVE_OUT service actions that
@@ -194,49 +248,71 @@ static int core_scsi3_pr_seq_non_holder(
 		case PRO_CLEAR:
 		case PRO_PREEMPT:
 		case PRO_PREEMPT_AND_ABORT:
-			return (registered_nexus) ? 0 : 1;
+			ret = (registered_nexus) ? 0 : 1;
+			break;
 		case PRO_REGISTER:
 		case PRO_REGISTER_AND_IGNORE_EXISTING_KEY:
-			return 0;
+			ret = 0;
+			break;
 		case PRO_REGISTER_AND_MOVE:
 		case PRO_RESERVE:
-			return 1;
+			ret = 1;
+			break;
 		case PRO_RELEASE:
-			return (registered_nexus) ? 0 : 1;
+			ret = (registered_nexus) ? 0 : 1;
+			break;
 		default:
 			printk(KERN_ERR "Unknown PERSISTENT_RESERVE_OUT service"
 				" action: 0x%02x\n", cdb[1] & 0x1f);
 			return -1;
 		}
+		break;
 	/* FIXME PR + legacy RELEASE + RESERVE */
 	case RELEASE:
 	case RELEASE_10:
-		return 1; /* Conflict */
+		ret = 1; /* Conflict */
+		break;
 	case RESERVE:
 	case RESERVE_10:
-		return 1; /* Conflict */
+		ret = 1; /* Conflict */
+		break;
 	case TEST_UNIT_READY:
-		return (legacy) ? 1 : 0; /* Conflict for legacy */
+		ret = (legacy) ? 1 : 0; /* Conflict for legacy */
+		break;
 	case MAINTENANCE_IN:
 		switch (cdb[1] & 0x1f) {
 		case MI_MANAGEMENT_PROTOCOL_IN:
-			return (we) ? 0 : 1; /* Allowed Write Exclusive */
+			if (registered_nexus) {
+				ret = 0;
+				break;
+			}
+			ret = (we) ? 0 : 1; /* Allowed Write Exclusive */
+			break;
 		case MI_REPORT_SUPPORTED_OPERATION_CODES:
 		case MI_REPORT_SUPPORTED_TASK_MANAGEMENT_FUNCTIONS:
-			if (legacy)
-				return 1;
-			return (we) ? 0 : 1; /* Allowed Write Exclusive */
+			if (legacy) {
+				ret = 1;
+				break;
+			}
+			if (registered_nexus) {
+				ret = 0;
+				break;
+			}
+			ret = (we) ? 0 : 1; /* Allowed Write Exclusive */
+			break;
 		case MI_REPORT_ALIASES:
 		case MI_REPORT_IDENTIFYING_INFORMATION:
 		case MI_REPORT_PRIORITY:
 		case MI_REPORT_TARGET_PGS:
 		case MI_REPORT_TIMESTAMP:
-			return 0; /* Allowed */
+			ret = 0; /* Allowed */
+			break;
 		default:
 			printk(KERN_ERR "Unknown MI Service Action: 0x%02x\n",
 				(cdb[1] & 0x1f));
 			return -1;
 		}
+		break;
 	case ACCESS_CONTROL_IN:
 	case ACCESS_CONTROL_OUT:
 	case INQUIRY:
@@ -244,12 +320,61 @@ static int core_scsi3_pr_seq_non_holder(
 	case READ_MEDIA_SERIAL_NUMBER:
 	case REPORT_LUNS:
 	case REQUEST_SENSE:
-		return 0; /*/ Allowed CDBs */
+		ret = 0; /*/ Allowed CDBs */
+		break;
 	default:
-		return 1; /* Conflift by default */
+		other_cdb = 1;
+		break;
 	}
+	/*
+	 * Case where the CDB is explictly allowed in the above switch
+	 * statement.
+	 */
+	if (!(ret) && !(other_cdb)) {
+		printk("Allowing CDB: 0x%02x for NON %s reservation holder\n",
+			cdb[0], core_scsi3_pr_dump_type(pr_reg_type));
+		return ret;
+	}
+	/*
+	 * Check if write exclusive initiator ports *NOT* holding the
+	 * WRITE_EXCLUSIVE_* reservation.
+	 */
+	if (we) {
+		if ((cmd->data_direction == SE_DIRECTION_WRITE) ||
+		    (cmd->data_direction == SE_DIRECTION_BIDI)) {
+			/*
+			 * Conflict for write exclusive
+			 */
+			printk(KERN_INFO "Conflict for WRITE CDB: 0x%02x"
+				" to %s reservation\n", cdb[0],
+				core_scsi3_pr_dump_type(pr_reg_type));
+			return 1;
+		} else if (registered_nexus) {
+			/*
+			 * Allow non WRITE CDBs for PR_*_REG_ONLY and
+			 * PR_*_ALL_REG to pass for registered_nexuxes.
+			 */
+			printk(KERN_INFO "Allowing CDB: 0x%02x for %s"
+				" reservation\n", cdb[0],
+				core_scsi3_pr_dump_type(pr_reg_type));
+			return 0;
+		}
+	} else if (all_reg) {
+		if (registered_nexus) {
+			/*
+			 * For PR_*_ALL_REG reservation, treat all registered
+			 * nexuses as the reservation holder.
+			 */
+			printk(KERN_INFO "Allowing CDB: 0x%02x for %s"
+				" reservation\n", cdb[0],
+				core_scsi3_pr_dump_type(pr_reg_type));
+			return 0;
+		}
+	}
+	printk(KERN_INFO "Conflict for CDB: 0x%2x for %s reservation\n",
+		cdb[0], core_scsi3_pr_dump_type(pr_reg_type));
 
-	return 1;
+	return 1; /* Conflict by default */
 }
 
 static u32 core_scsi3_pr_generation(se_device_t *dev)
@@ -272,7 +397,9 @@ static u32 core_scsi3_pr_generation(se_device_t *dev)
 	return prg;
 }
 
-static int core_scsi3_pr_reservation_check(se_cmd_t *cmd)
+static int core_scsi3_pr_reservation_check(
+	se_cmd_t *cmd,
+	u32 *pr_reg_type)
 {
 	se_device_t *dev = cmd->se_dev;
 	se_session_t *sess = cmd->se_sess;
@@ -286,11 +413,12 @@ static int core_scsi3_pr_reservation_check(se_cmd_t *cmd)
 		spin_unlock(&dev->dev_reservation_lock);
 		return 0;
 	}
+	*pr_reg_type = dev->dev_pr_res_holder->pr_res_type;
 	ret = (dev->dev_pr_res_holder->pr_reg_nacl != sess->se_node_acl) ?
 		-1 : 0;
 	spin_unlock(&dev->dev_reservation_lock);
 
-	return 0;
+	return ret;
 }
 
 static int core_scsi3_legacy_reserve(se_cmd_t *cmd)
@@ -724,26 +852,6 @@ static int core_scsi3_pro_reserve(
 	return 0;
 }
 
-static int core_scsi3_pro_reserve_regonly(
-	se_cmd_t *cmd,
-	se_device_t *dev,
-	int type,
-	int scope,
-	u64 res_key)
-{
-	return 0;
-}
-
-static int core_scsi3_pro_reserve_allreg(
-	se_cmd_t *cmd,
-	se_device_t *dev,
-	int type,
-	int scope,
-	u64 res_key)
-{
-	return 0;
-}
-
 static int core_scsi3_emulate_pro_reserve(
 	se_cmd_t *cmd,
 	int type,
@@ -755,29 +863,13 @@ static int core_scsi3_emulate_pro_reserve(
 
 	switch (type) {
 	case PR_TYPE_WRITE_EXCLUSIVE:
-		ret = core_scsi3_pro_reserve(cmd, dev, type, scope, res_key);
-		break;
 	case PR_TYPE_EXCLUSIVE_ACCESS:
+	case PR_TYPE_WRITE_EXCLUSIVE_REGONLY:
+	case PR_TYPE_EXCLUSIVE_ACCESS_REGONLY:
+	case PR_TYPE_WRITE_EXCLUSIVE_ALLREG:
+	case PR_TYPE_EXCLUSIVE_ACCESS_ALLREG:
 		ret = core_scsi3_pro_reserve(cmd, dev, type, scope, res_key);
 		break;
-#if 0
-	case PR_TYPE_WRITE_EXCLUSIVE_REGONLY:
-		ret = core_scsi3_pro_reserve_regonly(cmd, dev, type, scope,
-				res_key);
-		break;
-	case PR_TYPE_EXCLUSIVE_ACCESS_REGONLY:
-		ret = core_scsi3_pro_reserve_regonly(cmd, dev, type, scope,
-				res_key);
-		break;
-	case PR_TYPE_WRITE_EXCLUSIVE_ALLREG:
-		ret = core_scsi3_pro_reserve_allreg(cmd, dev, type, scope,
-				res_key);
-		break;
-	case PR_TYPE_EXCLUSIVE_ACCESS_ALLREG:
-		ret = core_scsi3_pro_reserve_allreg(cmd, dev, type, scope,
-				res_key);
-		break;
-#endif
 	default:
 		printk(KERN_ERR "SPC-3 PR: Unknown Service Action RESERVE Type:"
 			" 0x%02x\n", type);
@@ -1093,6 +1185,7 @@ static int core_scsi3_pri_read_reservation(se_cmd_t *cmd)
 	se_subsystem_dev_t *su_dev = SU_DEV(se_dev);
 	t10_pr_registration_t *pr_reg;
 	unsigned char *buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
+	u64 pr_res_key;
 	u32 add_len = 16; /* Hardcoded to 16 when a reservation is held. */
 
 	buf[0] = ((T10_RES(su_dev)->pr_generation >> 24) & 0xff);
@@ -1111,16 +1204,35 @@ static int core_scsi3_pri_read_reservation(se_cmd_t *cmd)
 		buf[6] = ((add_len >> 8) & 0xff);
 		buf[7] = (add_len & 0xff);
 		/*
-		 * Set the Reservation key
+		 * Set the Reservation key.
+		 *
+		 * From spc4r17, section 5.7.10:
+		 * A persistent reservation holder has its reservation key
+		 * returned in the parameter data from a PERSISTENT
+		 * RESERVE IN command with READ RESERVATION service action as
+		 * follows:
+		 * a) For a persistent reservation of the type Write Exclusive
+		 *    - All Registrants or Exclusive Access ­ All Regitrants,
+		 *      the reservation key shall be set to zero; or
+		 * b) For all other persistent reservation types, the
+		 *    reservation key shall be set to the registered
+		 *    reservation key for the I_T nexus that holds the
+		 *    persistent reservation.
 		 */
-		buf[8] = ((pr_reg->pr_res_key >> 56) & 0xff);
-		buf[9] = ((pr_reg->pr_res_key >> 48) & 0xff);
-		buf[10] = ((pr_reg->pr_res_key >> 40) & 0xff);
-		buf[11] = ((pr_reg->pr_res_key >> 32) & 0xff);
-		buf[12] = ((pr_reg->pr_res_key >> 24) & 0xff);
-		buf[13] = ((pr_reg->pr_res_key >> 16) & 0xff);
-		buf[14] = ((pr_reg->pr_res_key >> 8) & 0xff);
-		buf[15] = (pr_reg->pr_res_key & 0xff);
+		if ((pr_reg->pr_res_type == PR_TYPE_WRITE_EXCLUSIVE_ALLREG) ||
+		    (pr_reg->pr_res_type == PR_TYPE_EXCLUSIVE_ACCESS_ALLREG))
+			pr_res_key = 0;
+		else
+			pr_res_key = pr_reg->pr_res_key;
+
+		buf[8] = ((pr_res_key >> 56) & 0xff);
+		buf[9] = ((pr_res_key >> 48) & 0xff);
+		buf[10] = ((pr_res_key >> 40) & 0xff);
+		buf[11] = ((pr_res_key >> 32) & 0xff);
+		buf[12] = ((pr_res_key >> 24) & 0xff);
+		buf[13] = ((pr_res_key >> 16) & 0xff);
+		buf[14] = ((pr_res_key >> 8) & 0xff);
+		buf[15] = (pr_res_key & 0xff);
 		/*
 		 * Set the SCOPE and TYPE
 		 */
@@ -1174,16 +1286,12 @@ static int core_scsi3_pri_report_capabilities(se_cmd_t *cmd)
 	/*
 	 * Setup the PERSISTENT RESERVATION TYPE MASK from Table 167
 	 */
-#if 0
 	buf[4] |= 0x80; /* PR_TYPE_EXCLUSIVE_ACCESS_ALLREG */
 	buf[4] |= 0x40; /* PR_TYPE_EXCLUSIVE_ACCESS_REGONLY */
 	buf[4] |= 0x20; /* PR_TYPE_WRITE_EXCLUSIVE_REGONLY */
-#endif
 	buf[4] |= 0x08; /* PR_TYPE_EXCLUSIVE_ACCESS */
 	buf[4] |= 0x02; /* PR_TYPE_WRITE_EXCLUSIVE */
-#if 0
 	buf[5] |= 0x01; /* PR_TYPE_EXCLUSIVE_ACCESS_ALLREG */
-#endif
 
 	return 0;
 }
@@ -1345,7 +1453,7 @@ int core_scsi3_emulate_pr(se_cmd_t *cmd)
 	       core_scsi3_emulate_pr_in(cmd, cdb);
 }
 
-static int core_pt_reservation_check(se_cmd_t *cmd)
+static int core_pt_reservation_check(se_cmd_t *cmd, u32 *pr_res_type)
 {
 	return 0;
 }
@@ -1360,7 +1468,7 @@ static int core_pt_release(se_cmd_t *cmd)
 	return 0;
 }
 
-static int core_pt_seq_non_holder(se_cmd_t *cmd, unsigned char *cdb)
+static int core_pt_seq_non_holder(se_cmd_t *cmd, unsigned char *cdb, u32 pr_reg_type)
 {
 	return 0;
 }

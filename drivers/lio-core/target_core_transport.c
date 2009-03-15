@@ -4667,10 +4667,10 @@ static int transport_generic_cmd_sequencer(
 	se_device_t *dev = SE_DEV(cmd);
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
 	int ret = 0, sector_ret = 0;
-	u32 sectors = 0, size = 0;
+	u32 sectors = 0, size = 0, pr_reg_type = 0;
 
-	if (T10_RES(su_dev)->t10_reservation_check(cmd) != 0) {
-		if (T10_RES(su_dev)->t10_seq_non_holder(cmd, cdb) != 0) {
+	if (T10_RES(su_dev)->t10_reservation_check(cmd, &pr_reg_type) != 0) {
+		if (T10_RES(su_dev)->t10_seq_non_holder(cmd, cdb, pr_reg_type) != 0) {
 			cmd->transport_wait_for_tasks =
 					&transport_nop_wait_for_tasks;
 			transport_get_maps(cmd);
