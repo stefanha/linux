@@ -630,7 +630,7 @@ static int core_scsi3_emulate_pro_register(
 				se_sess->se_node_acl);
 		if (!(pr_reg)) {
 			printk(KERN_ERR "SPC-3 PR: Unable to locate"
-				" PR_REGISTERED *pr_reg\n");
+				" PR_REGISTERED *pr_reg for REGISTER\n");
 			return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
 		if (!(ignore_key)) {
@@ -723,7 +723,7 @@ static int core_scsi3_pro_reserve(
 	pr_reg = core_scsi3_locate_pr_reg(SE_DEV(cmd), se_sess->se_node_acl);
 	if (!(pr_reg)) {
 		printk(KERN_ERR "SPC-3 PR: Unable to locate"
-			" PR_REGISTERED *pr_reg\n");
+			" PR_REGISTERED *pr_reg for RESERVE\n");
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 	/*
@@ -901,7 +901,7 @@ static int core_scsi3_emulate_pro_release(
 	pr_reg = core_scsi3_locate_pr_reg(dev, se_sess->se_node_acl);
 	if (!(pr_reg)) {
 		printk(KERN_ERR "SPC-3 PR: Unable to locate"
-			" PR_REGISTERED *pr_reg\n");
+			" PR_REGISTERED *pr_reg for RELEASE\n");
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 	/*
