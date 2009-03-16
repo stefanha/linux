@@ -331,8 +331,9 @@ static int core_scsi3_pr_seq_non_holder(
 	 * statement.
 	 */
 	if (!(ret) && !(other_cdb)) {
-		printk("Allowing CDB: 0x%02x for NON %s reservation holder\n",
-			cdb[0], core_scsi3_pr_dump_type(pr_reg_type));
+		printk("Allowing explict CDB: 0x%02x for %s reservation"
+			" holder\n", cdb[0],
+			core_scsi3_pr_dump_type(pr_reg_type));
 		return ret;
 	}
 	/*
@@ -354,7 +355,7 @@ static int core_scsi3_pr_seq_non_holder(
 			 * Allow non WRITE CDBs for PR_*_REG_ONLY and
 			 * PR_*_ALL_REG to pass for registered_nexuxes.
 			 */
-			printk(KERN_INFO "Allowing CDB: 0x%02x for %s"
+			printk(KERN_INFO "Allowing implict CDB: 0x%02x for %s"
 				" reservation\n", cdb[0],
 				core_scsi3_pr_dump_type(pr_reg_type));
 			return 0;
@@ -365,7 +366,7 @@ static int core_scsi3_pr_seq_non_holder(
 			 * For PR_*_ALL_REG reservation, treat all registered
 			 * nexuses as the reservation holder.
 			 */
-			printk(KERN_INFO "Allowing CDB: 0x%02x for %s"
+			printk(KERN_INFO "Allowing implict CDB: 0x%02x for %s"
 				" reservation\n", cdb[0],
 				core_scsi3_pr_dump_type(pr_reg_type));
 			return 0;
