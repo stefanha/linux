@@ -191,6 +191,8 @@ static int core_scsi3_pr_seq_non_holder(
 		 * Some commands are only allowed for the persistent reservation
 		 * holder.
 		 */
+		if (se_deve->deve_flags & DEF_PR_REGISTERED)
+			registered_nexus = 1;
 		break;
 	case PR_TYPE_WRITE_EXCLUSIVE_REGONLY:
 		we = 1;
@@ -350,14 +352,22 @@ static int core_scsi3_pr_seq_non_holder(
 				" to %s reservation\n", cdb[0],
 				core_scsi3_pr_dump_type(pr_reg_type));
 			return 1;
-		} else if (registered_nexus) {
+		} else {
 			/*
-			 * Allow non WRITE CDBs for PR_*_REG_ONLY and
-			 * PR_*_ALL_REG to pass for registered_nexuxes.
+			 * Allow non WRITE CDBs for all Write Exclusive
+			 * PR TYPEs to pass for registered and
+			 * non-registered_nexuxes NOT holding the reservation.
+			 *
+			 * We only make noise for the unregisterd nexuses,
+			 * as we expect registered non-reservation holding
+			 * nexuses to issue CDBs.
 			 */
-			printk(KERN_INFO "Allowing implict CDB: 0x%02x for %s"
-				" reservation\n", cdb[0],
-				core_scsi3_pr_dump_type(pr_reg_type));
+			if (!(registered_nexus)) {
+				printk(KERN_INFO "Allowing implict CDB: 0x%02x"
+					" for %s reservation on unregistered"
+					" nexus\n", cdb[0],
+					core_scsi3_pr_dump_type(pr_reg_type));
+			}
 			return 0;
 		}
 	} else if (all_reg) {
