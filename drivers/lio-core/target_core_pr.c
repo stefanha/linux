@@ -515,7 +515,41 @@ static void core_scsi3_free_registration(
 {
 	se_node_acl_t *nacl = pr_reg->pr_reg_nacl;
 	struct target_core_fabric_ops *tfo = nacl->se_tpg->se_tpg_tfo;
+	t10_pr_registration_t *pr_res_holder;
 	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
+
+	spin_lock(&dev->dev_reservation_lock);
+	pr_res_holder = dev->dev_pr_res_holder;
+	if (pr_res_holder == pr_reg) {
+		/*
+		 * Perform an implict RELEASE if the registration that
+		 * is being released is holding the reservation.
+		 *
+		 * From spc4r17, section 5.7.11.1:
+		 *
+		 * e) If the I_T nexus is the persistent reservation holder
+		 *    and the persistent reservation is not an all registrants
+		 *    type, then a PERSISTENT RESERVE OUT command with REGISTER
+		 *    service action or REGISTER AND  IGNORE EXISTING KEY
+		 *    service action with the SERVICE ACTION RESERVATION KEY
+		 *    field set to zero (see 5.7.11.3).
+		 */
+		dev->dev_pr_res_holder = NULL;
+
+		printk(KERN_INFO "SPC-3 PR [%s] Service Action: implict"
+			" RELEASE cleared reservation holder TYPE: %s"
+			" ALL_TG_PT: %d\n", tfo->get_fabric_name(),
+			core_scsi3_pr_dump_type(pr_reg->pr_res_type),
+			(pr_reg->pr_reg_all_tg_pt) ? 1 : 0);
+		printk(KERN_INFO "SPC-3 PR [%s] RELEASE Node: %s\n",
+			tfo->get_fabric_name(), nacl->initiatorname);
+	
+		pr_reg->pr_res_holder = pr_reg->pr_res_type = 0;
+		pr_reg->pr_res_scope = 0;
+#warning FIXME: Registrants only, UA + RESERVATIONS RELEASED
+#warning FIXME: All Registrants, only release reservation when last registration is freed.
+	}
+	spin_unlock(&dev->dev_reservation_lock);
 
 	pr_reg->pr_reg_deve->deve_flags &= ~DEF_PR_REGISTERED;
 
@@ -526,7 +560,7 @@ static void core_scsi3_free_registration(
 		(pr_reg->pr_reg_all_tg_pt) ? "ALL" : "SINGLE",
 		TRANSPORT(dev)->name);
 	printk(KERN_INFO "SPC-3 PR [%s] SA Res Key: 0x%016Lx PRgeneration:"
-		" 0x%08x\n", tfo->get_fabric_name(),  pr_reg->pr_res_key,
+		" 0x%08x\n", tfo->get_fabric_name(), pr_reg->pr_res_key,
 		pr_reg->pr_res_generation);
 
 	spin_lock(&pr_tmpl->registration_lock);
@@ -980,7 +1014,7 @@ static int core_scsi3_emulate_pro_release(
 	 */
 	dev->dev_pr_res_holder = NULL;
 
-	printk(KERN_INFO "SPC-3 PR [%s] Service Action: RELEASE cleared"
+	printk(KERN_INFO "SPC-3 PR [%s] Service Action: explict RELEASE cleared"
 		" reservation holder TYPE: %s ALL_TG_PT: %d\n",
 		CMD_TFO(cmd)->get_fabric_name(),
 		core_scsi3_pr_dump_type(pr_reg->pr_res_type),
