@@ -42,6 +42,8 @@
 
 extern struct kmem_cache *t10_pr_reg_cache;
 
+extern void core_scsi3_free_pr_reg_from_nacl(struct se_device_s *,
+					     struct se_node_acl_s *);
 extern void core_scsi3_free_all_registrations(struct se_device_s *);
 extern unsigned char *core_scsi3_pr_dump_type(int);
 extern int core_scsi3_emulate_pr(struct se_cmd_s *);

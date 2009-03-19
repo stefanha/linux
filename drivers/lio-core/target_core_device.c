@@ -482,13 +482,19 @@ void core_update_device_list_for_node(
 		deve->creation_time = get_jiffies_64();
 		deve->attach_count++;
 #endif /* SNMP_SUPPORT */
-	} else {
-		deve->se_lun = NULL;
-		deve->lun_flags = 0;
-		deve->creation_time = 0;
+		spin_unlock_bh(&nacl->device_list_lock);
+
+		return;
 	}
+	/*
+	 * Disable se_dev_entry_t LUN ACL mapping
+	 */
+	deve->se_lun = NULL;
+	deve->lun_flags = 0;
+	deve->creation_time = 0;
 	spin_unlock_bh(&nacl->device_list_lock);
 
+	core_scsi3_free_pr_reg_from_nacl(lun->se_dev, nacl);
 	return;
 }
 

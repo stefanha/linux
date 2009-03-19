@@ -286,6 +286,7 @@ typedef struct t10_pr_registration_s {
 	int pr_res_scope;
 	u32 pr_res_generation;
 	u64 pr_res_key;
+	atomic_t pr_res_holders;
 	struct se_node_acl_s *pr_reg_nacl;
 	struct se_dev_entry_s *pr_reg_deve;
 	struct se_lun_s *pr_reg_tg_pt_lun;
