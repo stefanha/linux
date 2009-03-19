@@ -1149,7 +1149,66 @@ static int core_scsi3_emulate_pro_clear(
 	se_cmd_t *cmd,
 	u64 res_key)
 {
-	core_scsi3_pr_generation(SE_DEV(cmd));
+	se_device_t *dev = cmd->se_dev;
+	se_session_t *se_sess = SE_SESS(cmd);
+	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
+	t10_pr_registration_t *pr_reg, *pr_reg_tmp, *pr_reg_n, *pr_res_holder;
+	/*
+	 * Locate the existing *pr_reg via se_node_acl_t pointers
+	 */
+	pr_reg_n = core_scsi3_locate_pr_reg(SE_DEV(cmd),
+			se_sess->se_node_acl);
+	if (!(pr_reg_n)) {
+		printk(KERN_ERR "SPC-3 PR: Unable to locate"
+			" PR_REGISTERED *pr_reg for CLEAR\n");
+			return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	}
+	/*
+	 * From spc4r17 section 5.7.11.6, Clearing:
+	 *
+	 * Any application client may release the persistent reservation and
+	 * remove all registrations from a device server by issuing a
+	 * PERSISTENT RESERVE OUT command with CLEAR service action through a
+	 * registered I_T nexus with the following parameter:
+	 *
+	 *	a) RESERVATION KEY field set to the value of the reservation key
+	 * 	   that is registered with the logical unit for the I_T nexus.
+	 */
+	if (res_key != pr_reg_n->pr_res_key) {
+		printk(KERN_ERR "SPC-3 PR REGISTER: Received"
+			" res_key: 0x%016Lx does not match"
+			" existing SA REGISTER res_key:"
+			" 0x%016Lx\n", res_key, pr_reg_n->pr_res_key);
+		core_scsi3_put_pr_reg(pr_reg_n);
+		return PYX_TRANSPORT_RESERVATION_CONFLICT;
+	}
+	/*
+	 * a) Release the persistent reservation, if any;
+	 */
+	spin_lock(&dev->dev_reservation_lock);
+	pr_res_holder = dev->dev_pr_res_holder;
+	if (pr_res_holder) {
+		se_node_acl_t *pr_res_nacl = pr_res_holder->pr_reg_nacl;
+		__core_scsi3_complete_pro_release(dev, pr_res_nacl,
+			pr_res_holder, 0);
+	}
+	spin_unlock(&dev->dev_reservation_lock);
+	/*
+	 * b) Remove all registration(s) (see spc4r17 5.7.7);
+	 */
+	spin_lock(&pr_tmpl->registration_lock);
+	list_for_each_entry_safe(pr_reg, pr_reg_tmp,
+			&pr_tmpl->registration_list, pr_reg_list) {
+#warning FIXME: UA + RESERVATIONS PREEMPTED for all other registered I_T nexuses
+		__core_scsi3_free_registration(dev, pr_reg,
+					(pr_reg_n == pr_reg) ? 1 : 0);
+	}
+	spin_unlock(&pr_tmpl->registration_lock);
+
+	printk(KERN_INFO "SPC-3 PR [%s] Service Action: CLEAR complete\n",
+		CMD_TFO(cmd)->get_fabric_name());
+
+	core_scsi3_pr_generation(dev);
 	return 0;
 }
 
@@ -1246,9 +1305,9 @@ static int core_scsi3_emulate_pr_out(se_cmd_t *cmd, unsigned char *cdb)
 	case PRO_RELEASE:
 		return core_scsi3_emulate_pro_release(cmd,
 			type, scope, res_key);
-#if 0
 	case PRO_CLEAR:
 		return core_scsi3_emulate_pro_clear(cmd, res_key);
+#if 0
 	case PRO_PREEMPT:
 		return core_scsi3_emulate_pro_preempt(cmd,
 			type, scope, res_key, sa_res_key);
