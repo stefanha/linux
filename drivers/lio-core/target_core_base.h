@@ -51,12 +51,11 @@
 /* Maximum Number of LUNs per Target Portal Group */
 #define TRANSPORT_MAX_LUNS_PER_TPG	    256
 
-/* Originally from iSCSI RFC, should be from SCSI_SENSE_BUFFERSIZE */
-#define TRANSPORT_SENSE_BUFFER              64
-/* Sense Data Segment */
-#define TRANSPORT_SENSE_SEGMENT_LENGTH      66
-/* TRANSPORT_SENSE_SEGMENT_LENGTH + Padding */
-#define TRANSPORT_SENSE_SEGMENT_TOTAL       68
+/* From include/scsi/scsi_cmnd.h:SCSI_SENSE_BUFFERSIZE */
+#define TRANSPORT_SENSE_BUFFER              SCSI_SENSE_BUFFERSIZE
+
+#define SPC_SENSE_KEY_OFFSET			2
+#define SPC_ASQ_KEY_OFFSET			12
 
 /* Currently same as ISCSI_IQN_LEN */
 #define TRANSPORT_IQN_LEN			224
@@ -533,6 +532,7 @@ typedef struct se_tmr_req_s {
 	void 			*fabric_tmr_ptr;
 	se_cmd_t		*task_cmd;
 	se_cmd_t		*ref_cmd;
+	struct se_device_s	*tmr_dev;
 	struct se_lun_s		*tmr_lun;
 	struct list_head	tmr_list;
 } ____cacheline_aligned se_tmr_req_t;

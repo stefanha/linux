@@ -218,11 +218,25 @@ static void transport_passthrough_release_cmd_direct(se_cmd_t *cmd)
 	return;
 }
 
+static u16 transport_passthrough_set_fabric_sense_len(
+	se_cmd_t *cmd,
+	u32 sense_len)
+{
+	return 0;
+}
+
+static u16 transport_passthrough_get_fabric_sense_len(void)
+{
+	return 0;
+}
+
 struct target_core_fabric_ops passthrough_fabric_ops = {
 	.release_cmd_direct	= transport_passthrough_release_cmd_direct,
 	.get_fabric_name	= transport_passthrough_get_fabric_name,
 	.get_task_tag		= transport_passthrough_get_task_tag,
 	.get_cmd_state		= transport_passthrough_get_cmd_state,
+	.set_fabric_sense_len	= transport_passthrough_set_fabric_sense_len,
+	.get_fabric_sense_len	= transport_passthrough_get_fabric_sense_len,
 };
 
 int init_se_global(void)
@@ -2596,6 +2610,16 @@ se_cmd_t *__transport_alloc_se_cmd(
 		return NULL;
 	}
 
+	cmd->sense_buffer = kzalloc(
+			TRANSPORT_SENSE_BUFFER + tfo->get_fabric_sense_len(),
+			GFP_KERNEL);
+	if (!(cmd->sense_buffer)) {
+		printk(KERN_ERR "Unable to allocate memory for"
+			" cmd->sense_buffer\n");
+		kfree(cmd->t_task);
+		kmem_cache_free(se_cmd_cache, cmd);
+		return NULL;
+	}
 	INIT_LIST_HEAD(&T_TASK(cmd)->t_task_list);
 	init_MUTEX_LOCKED(&T_TASK(cmd)->transport_lun_fe_stop_sem);
 	init_MUTEX_LOCKED(&T_TASK(cmd)->transport_lun_stop_sem);
@@ -4567,34 +4591,27 @@ int transport_generic_emulate_modesense(
 	return 0;
 }
 
+/*
+ * Used to obtain Sense Data from underlying Linux/SCSI struct scsi_cmnd
+ */
 int transport_get_sense_data(se_cmd_t *cmd)
 {
-	unsigned char *buffer = NULL, *sense_buffer = NULL;
+	unsigned char *buffer = cmd->sense_buffer, *sense_buffer = NULL;
 	se_device_t *dev;
 	se_task_t *task = NULL, *task_tmp;
 	unsigned long flags;
+	u32 offset = 0;
 
 	if (!SE_LUN(cmd)) {
 		printk(KERN_ERR "SE_LUN(cmd) is NULL\n");
 		return -1;
 	}
-
-	if (cmd->sense_buffer) {
-		printk(KERN_ERR "se_cmd_t->sense_buffer already present\n");
-		return -1;
-	}
-
-	buffer = kzalloc(TRANSPORT_SENSE_SEGMENT_TOTAL, GFP_KERNEL);
-	if (!(buffer)) {
-		printk(KERN_ERR "Unable to allocate memory for SENSE buffer\n");
-		return -1;
-	}
-	cmd->sense_buffer = buffer;
-
-	buffer[0]       = ((TRANSPORT_SENSE_BUFFER >> 8) & 0xff);
-	buffer[1]       = (TRANSPORT_SENSE_BUFFER & 0xff);
-
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+	if (cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+		return 0;
+	}
+
 	list_for_each_entry_safe(task, task_tmp,
 				&T_TASK(cmd)->t_task_list, t_list) {
 
@@ -4620,13 +4637,18 @@ int transport_get_sense_data(se_cmd_t *cmd)
 		}
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-		memcpy((void *)&buffer[2], (void *)sense_buffer,
+		offset = CMD_TFO(cmd)->set_fabric_sense_len(cmd,
+				TRANSPORT_SENSE_BUFFER);
+
+		memcpy((void *)&buffer[offset], (void *)sense_buffer,
 				TRANSPORT_SENSE_BUFFER);
 		cmd->scsi_status = task->task_scsi_status;
 		/* Automatically padded */
-		cmd->scsi_sense_length = TRANSPORT_SENSE_SEGMENT_LENGTH;
+		cmd->scsi_sense_length =
+				(TRANSPORT_SENSE_BUFFER + offset);
 
-		printk(KERN_INFO "HBA_[%u]_PLUG[%s]: Set SAM STATUS: 0x%02x\n",
+		printk(KERN_INFO "HBA_[%u]_PLUG[%s]: Set SAM STATUS: 0x%02x"
+				" and sense\n",
 			dev->se_hba->hba_id, TRANSPORT(dev)->name,
 				cmd->scsi_status);
 		return 0;
@@ -6991,9 +7013,9 @@ int transport_send_check_condition_and_sense(
 	u8 reason,
 	int from_transport)
 {
-	unsigned char *buffer = NULL;
+	unsigned char *buffer = cmd->sense_buffer;
 	unsigned long flags;
-	u16 size;
+	int offset;
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	if (cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
@@ -7008,93 +7030,120 @@ int transport_send_check_condition_and_sense(
 
 	if (!from_transport)
 		cmd->se_cmd_flags |= SCF_EMULATED_TASK_SENSE;
-
-	buffer = kzalloc(TRANSPORT_SENSE_SEGMENT_TOTAL, GFP_ATOMIC);
-	if (!(buffer)) {
-		printk(KERN_ERR "Unable to allocate memory for SENSE buffer\n");
-		return -1;
-	}
-	cmd->sense_buffer = buffer;
-
 	/*
-	 * Data Segment of the fabric  Response PDU.
+	 * Data Segment and SenseLength of the fabric response PDU.
 	 *
-	 * Originally from iSCSI RFC, should be from SCSI_SENSE_BUFFERSIZE
+	 * TRANSPORT_SENSE_BUFFER is now set to SCSI_SENSE_BUFFERSIZE
 	 * from include/scsi/scsi_cmnd.h
 	 */
-	size = TRANSPORT_SENSE_BUFFER;
-	/* SenseLength */
-	buffer[0] = ((TRANSPORT_SENSE_BUFFER >> 8) & 0xff);
-	buffer[1] = (TRANSPORT_SENSE_BUFFER & 0xff);
+	offset = CMD_TFO(cmd)->set_fabric_sense_len(cmd,
+				TRANSPORT_SENSE_BUFFER);
 	/*
-	 * Actual SENSE DATA, see SPC-3 7.23.2
+	 * Actual SENSE DATA, see SPC-3 7.23.2  SPC_SENSE_KEY_OFFSET uses
+	 * SENSE KEY values from include/scsi/scsi.h
 	 */
 	switch (reason) {
 	case NON_EXISTENT_LUN:
 	case UNSUPPORTED_SCSI_OPCODE:
 	case SECTOR_COUNT_TOO_MANY:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x05; /* ILLEGAL REQUEST */
-		buffer[14] = 0x20; /* INVALID COMMAND OPERATION CODE */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ILLEGAL REQUEST */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ILLEGAL_REQUEST;
+		/* INVALID COMMAND OPERATION CODE */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x20;
 		break;
 	case UNKNOWN_MODE_PAGE:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x05; /* ILLEGAL REQUEST */
-		buffer[14] = 0x24; /* INVALID FIELD IN CDB */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ILLEGAL REQUEST */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ILLEGAL_REQUEST;
+		/* INVALID FIELD IN CDB */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x24;
 		break;
 	case INCORRECT_AMOUNT_OF_DATA:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x0c; /* WRITE ERROR */
-		buffer[15] = 0x0d; /* NOT ENOUGH UNSOLICITED DATA */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ABORTED COMMAND */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ABORTED_COMMAND;
+		/* WRITE ERROR */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x0c;
+		/* NOT ENOUGH UNSOLICITED DATA */
+		buffer[offset+SPC_ASQ_KEY_OFFSET+1] = 0x0d;
 		break;
 	case INVALID_CDB_FIELD:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x24; /* INVALID FIELD IN CDB */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ABORTED COMMAND */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ABORTED_COMMAND;
+		/* INVALID FIELD IN CDB */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x24;
 		break;
 	case INVALID_PARAMETER_LIST:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x26; /* INVALID FIELD IN PARAMETER LIST */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ABORTED COMMAND */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ABORTED_COMMAND;
+		/* INVALID FIELD IN PARAMETER LIST */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x26;
 		break;
 	case UNEXPECTED_UNSOLICITED_DATA:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x0c; /* WRITE ERROR */
-		buffer[15] = 0x0c; /* UNEXPECTED_UNSOLICITED_DATA */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ABORTED COMMAND */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ABORTED_COMMAND;
+		/* WRITE ERROR */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x0c;
+		/* UNEXPECTED_UNSOLICITED_DATA */
+		buffer[offset+SPC_ASQ_KEY_OFFSET+1] = 0x0c;
 		break;
 	case SERVICE_CRC_ERROR:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x47; /* PROTOCOL SERVICE CRC ERROR */
-		buffer[15] = 0x05; /* N/A */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ABORTED COMMAND */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ABORTED_COMMAND;
+		/* PROTOCOL SERVICE CRC ERROR */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x47;
+		/* N/A */
+		buffer[offset+SPC_ASQ_KEY_OFFSET+1] = 0x05;
 		break;
 	case SNACK_REJECTED:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x0b; /* ABORTED COMMAND */
-		buffer[14] = 0x11; /* READ ERROR */
-		buffer[15] = 0x13; /* FAILED RETRANSMISSION REQUEST */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ABORTED COMMAND */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ABORTED_COMMAND;
+		/* READ ERROR */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x11;
+		/* FAILED RETRANSMISSION REQUEST */
+		buffer[offset+SPC_ASQ_KEY_OFFSET+1] = 0x13;
 		break;
 	case WRITE_PROTECTED:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x07; /* DATA PROTECT */
-		buffer[14] = 0x27; /* WRITE PROTECTED */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* DATA PROTECT */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = DATA_PROTECT;
+		/* WRITE PROTECTED */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x27;
 		break;
 	case LOGICAL_UNIT_COMMUNICATION_FAILURE:
 	default:
-		buffer[2] = 0x70; /* CURRENT ERROR */
-		buffer[4] = 0x05; /* ILLEGAL REQUEST */
-		buffer[14] = 0x80; /* LOGICAL UNIT COMMUNICATION FAILURE */
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* ILLEGAL REQUEST */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = ILLEGAL_REQUEST;
+		/* LOGICAL UNIT COMMUNICATION FAILURE */
+		buffer[offset+SPC_ASQ_KEY_OFFSET] = 0x80;
 		break;
 	}
 	/*
 	 * This code uses linux/include/scsi/scsi.h SAM status codes!
 	 */
 	cmd->scsi_status = SAM_STAT_CHECK_CONDITION;
-
-	/* Automatically padded */
-	cmd->scsi_sense_length  = TRANSPORT_SENSE_SEGMENT_LENGTH;
+	/*
+	 * Automatically padded, this value is encoded in the fabric's
+	 * data_length response PDU containing the SCSI defined sense data.
+	 */
+	cmd->scsi_sense_length  = TRANSPORT_SENSE_BUFFER + offset;
 
 after_reason:
 	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))

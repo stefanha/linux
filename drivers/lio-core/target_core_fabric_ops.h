@@ -38,6 +38,8 @@ struct target_core_fabric_ops {
 	int (*queue_data_in)(struct se_cmd_s *);
 	int (*queue_status)(struct se_cmd_s *);
 	int (*queue_tm_rsp)(struct se_cmd_s *);
+	u16 (*set_fabric_sense_len)(struct se_cmd_s *, u32);
+	u16 (*get_fabric_sense_len)(void);
 	int (*is_state_remove)(struct se_cmd_s *);
 	u64 (*pack_lun)(unsigned int);
 };
