@@ -3885,6 +3885,29 @@ extern int lio_queue_status (se_cmd_t *se_cmd)
 	return(0);
 }
 
+extern u16 lio_set_fabric_sense_len (se_cmd_t *se_cmd, u32 sense_length)
+{
+	unsigned char *buffer = se_cmd->sense_buffer;
+	/*
+	 * From RFC-3720 10.4.7.  Data Segment - Sense and Response Data Segment
+	 * 16-bit SenseLength.
+	 */
+	buffer[0] = ((sense_length >> 8) & 0xff);
+	buffer[1] = (sense_length & 0xff);
+	/*
+	 * Return two byte offset into allocated sense_buffer.
+	 */
+	return 2;
+}
+
+extern u16 lio_get_fabric_sense_len (void)
+{
+	/*
+	 * Return two byte offset into allocated sense_buffer.
+	 */
+	return 2;
+}
+
 /*	iscsi_send_status():
  *
  *

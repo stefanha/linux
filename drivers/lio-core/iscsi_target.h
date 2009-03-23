@@ -62,6 +62,8 @@ extern int iscsi_send_r2t (iscsi_cmd_t *, iscsi_conn_t *);
 extern int iscsi_build_r2ts_for_cmd (iscsi_cmd_t *, iscsi_conn_t *, int);
 extern int lio_write_pending (struct se_cmd_s *);
 extern int lio_queue_status (struct se_cmd_s *);
+extern u16 lio_set_fabric_sense_len (struct se_cmd_s *, u32);
+extern u16 lio_get_fabric_sense_len (void);
 extern int lio_queue_tm_rsp (struct se_cmd_s *);
 extern int iscsi_target_tx_thread (void *);
 extern int iscsi_target_rx_thread (void *);

@@ -2316,6 +2316,8 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.queue_data_in = &lio_queue_data_in;
 	fabric->tf_ops.queue_status = &lio_queue_status;
 	fabric->tf_ops.queue_tm_rsp = &lio_queue_tm_rsp;
+	fabric->tf_ops.set_fabric_sense_len = &lio_set_fabric_sense_len;
+	fabric->tf_ops.get_fabric_sense_len = &lio_get_fabric_sense_len;
 	fabric->tf_ops.is_state_remove = &iscsi_is_state_remove;
 	fabric->tf_ops.pack_lun = &iscsi_pack_lun;
 
