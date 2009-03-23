@@ -66,8 +66,7 @@ EXPORT_SYMBOL(core_tmr_alloc_req);
 void core_tmr_release_req(
 	se_tmr_req_t *tmr)
 {
-	se_lun_t *lun = tmr->tmr_lun;
-	se_device_t *dev = lun->se_dev;
+	se_device_t *dev = tmr->tmr_dev;
 
 	spin_lock(&dev->se_tmr_lock);
 	list_del(&tmr->tmr_list);

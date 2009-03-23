@@ -344,7 +344,7 @@ extern int transport_get_lun_for_tmr(
 			&SE_NODE_ACL(se_sess)->device_list[unpacked_lun];
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
 		se_lun = se_cmd->se_lun = se_tmr->tmr_lun = deve->se_lun;
-		dev = se_lun->se_dev;
+		dev = se_tmr->tmr_dev = se_lun->se_dev;
 		se_cmd->orig_fe_lun = unpacked_lun;
 		se_cmd->se_orig_obj_api = SE_LUN(se_cmd)->lun_obj_api;
 		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
