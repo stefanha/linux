@@ -102,6 +102,8 @@
 #define DA_STATUS_THREAD			0
 /* Disabled by default */
 #define DA_STATUS_THREAD_TUR			0
+/* Emulation for TASK_ABORTED status (TAS) by default */
+#define DA_EMULATE_TAS				1
 /* No Emulation for PSCSI by default */
 #define DA_EMULATE_RESERVATIONS			0
 /* No Emulation for PSCSI by default */
@@ -139,8 +141,14 @@ extern void transport_deregister_session_configfs(struct se_session_s *);
 extern void transport_deregister_session(struct se_session_s *);
 extern void transport_task_dev_remove_state(struct se_task_s *,
 						struct se_device_s *);
+extern void transport_cmd_finish_abort(struct se_cmd_s *, int);
+extern void transport_cmd_finish_abort_tmr(struct se_cmd_s *);
 extern int transport_add_cmd_to_queue(struct se_cmd_s *,
 					struct se_queue_obj_s *, u8);
+extern struct se_queue_req_s *__transport_get_qr_from_queue(
+					struct se_queue_obj_s *);
+extern void transport_remove_cmd_from_queue(struct se_cmd_s *,
+					    struct se_queue_obj_s *);
 extern void transport_complete_cmd(se_cmd_t *, int);
 extern void transport_complete_task(struct se_task_s *, int);
 extern void transport_add_task_to_execute_queue(struct se_task_s *,
@@ -208,6 +216,8 @@ extern int transport_generic_emulate_readcapacity_16(struct se_cmd_s *,
 extern int transport_generic_emulate_modesense(struct se_cmd_s *,
 						unsigned char *,
 						unsigned char *, int, int);
+extern int transport_generic_emulate_request_sense(struct se_cmd_s *,
+						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd_s *);
 extern void transport_memcpy_read_contig(struct se_cmd_s *, unsigned char *);
 extern void transport_memcpy_read_sg(struct se_cmd_s *, struct scatterlist *);
@@ -232,6 +242,7 @@ extern int transport_generic_remove(se_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks(se_cmd_t *, se_lun_t *);
 extern void transport_clear_lun_from_sessions(se_lun_t *);
 extern int transport_send_check_condition_and_sense(se_cmd_t *, u8, int);
+extern void transport_send_task_abort(struct se_cmd_s *);
 extern void transport_release_cmd_to_pool(se_cmd_t *);
 extern void transport_generic_free_cmd(se_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds(se_cmd_t *, int);
@@ -267,6 +278,8 @@ extern void transport_generic_process_write(se_cmd_t *);
 extern int transport_generic_do_tmr(se_cmd_t *);
 extern void transport_start_status_timer(se_device_t *);
 extern void transport_stop_status_timer(se_device_t *);
+extern struct se_task_s *transport_get_task_from_state_list(
+					struct se_device_s *);
 extern void transport_status_thr_force_offline(se_device_t *,
 					struct se_obj_lun_type_s *,
 					void *);

@@ -55,7 +55,8 @@
 #define TRANSPORT_SENSE_BUFFER              SCSI_SENSE_BUFFERSIZE
 
 #define SPC_SENSE_KEY_OFFSET			2
-#define SPC_ASQ_KEY_OFFSET			12
+#define SPC_ASC_KEY_OFFSET			12
+#define SPC_ASCQ_KEY_OFFSET			13
 
 /* Currently same as ISCSI_IQN_LEN */
 #define TRANSPORT_IQN_LEN			224
@@ -195,6 +196,7 @@
 #define LOGICAL_UNIT_COMMUNICATION_FAILURE	0xa
 #define UNKNOWN_MODE_PAGE			0xb
 #define WRITE_PROTECTED				0xc
+#define CHECK_CONDITION_ABORT_CMD		0xd
 
 typedef struct se_obj_s {
 	atomic_t obj_access_count;
@@ -320,7 +322,7 @@ typedef struct se_queue_req_s {
 typedef struct se_queue_obj_s {
 	atomic_t		queue_cnt;
 	spinlock_t		cmd_queue_lock;
-	struct list_head	qobj_list;		
+	struct list_head	qobj_list;
 	wait_queue_head_t	thread_wq;
 	struct semaphore	thread_create_sem;
 	struct semaphore	thread_done_sem;
@@ -604,6 +606,7 @@ typedef struct se_dev_entry_s {
 typedef struct se_dev_attrib_s {
 	int		status_thread;
 	int		status_thread_tur;
+	int		emulate_tas;
 	int		emulate_reservations;
 	int		emulate_alua;
 	u32		hw_block_size;
