@@ -869,6 +869,7 @@ void se_dev_set_default_attribs(se_device_t *dev)
 {
 	DEV_ATTRIB(dev)->status_thread = DA_STATUS_THREAD;
 	DEV_ATTRIB(dev)->status_thread_tur = DA_STATUS_THREAD_TUR;
+	DEV_ATTRIB(dev)->emulate_tas = DA_EMULATE_TAS;
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	DEV_ATTRIB(dev)->emulate_alua = DA_EMULATE_ALUA;
 	/*
@@ -966,6 +967,26 @@ int se_dev_set_status_thread_tur(se_device_t *dev, int flag)
 		transport_start_status_timer(dev);
 	printk(KERN_INFO "dev[%p]: SE Device Status Thread TUR: %s\n", dev,
 			(flag) ? "Enabled" : "Disabled");
+	return 0;
+}
+
+int se_dev_set_emulate_tas(se_device_t *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return 1;
+	}
+
+	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+		printk(KERN_ERR "dev[%p]: Unable to change SE Device TAS while"
+			" dev_export_obj: %d count exists\n", dev,
+			DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj));
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_tas = flag;
+	printk(KERN_INFO "dev[%p]: SE Device TASK_ABORTED status bit: %s\n",
+		dev, (DEV_ATTRIB(dev)->emulate_tas) ? "Enabled" : "Disabled");
+
 	return 0;
 }
 

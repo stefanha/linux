@@ -62,6 +62,7 @@ extern void se_dev_set_default_attribs(se_device_t *);
 extern int se_dev_set_task_timeout(se_device_t *, u32);
 extern int se_dev_set_status_thread(se_device_t *, int);
 extern int se_dev_set_status_thread_tur(se_device_t *, int);
+extern int se_dev_set_emulate_tas(se_device_t *, int);
 extern int se_dev_set_queue_depth(se_device_t *, u32);
 extern int se_dev_set_max_sectors(se_device_t *, u32);
 extern int se_dev_set_block_size(se_device_t *, u32);
