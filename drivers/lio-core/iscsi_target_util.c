@@ -396,7 +396,8 @@ extern iscsi_cmd_t *iscsi_allocate_se_cmd_for_tmr (
 
 	se_cmd = cmd->se_cmd;
 
-	if (!(se_cmd->se_tmr_req = core_tmr_alloc_req((void *)cmd->tmr_req, function))) 
+	if (!(se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd,
+			(void *)cmd->tmr_req, function))) 
 		goto out;
 
 	cmd->tmr_req->se_tmr_req = se_cmd->se_tmr_req;

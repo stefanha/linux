@@ -2343,10 +2343,8 @@ static inline int iscsi_handle_task_mgt_cmd (
 				"implementation\n");
 		return(iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn));
 	}
-	if ((hdr->function != ABORT_TASK) && (hdr->ref_cmd_sn != RESERVED)) {
-		TRACE_ERROR("RefCmdSN should be set to 0xFFFFFFFF.\n"); 
+	if ((hdr->function != ABORT_TASK) && (hdr->ref_cmd_sn != RESERVED))
 		hdr->ref_cmd_sn = RESERVED;
-	}
 
 	if (!(cmd = iscsi_allocate_se_cmd_for_tmr(conn, hdr->function))) 
 		return(iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn));
