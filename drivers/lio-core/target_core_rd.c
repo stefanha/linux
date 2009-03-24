@@ -501,6 +501,12 @@ static int rd_emulate_scsi_cdb(se_task_t *task)
 		if (ret < 0)
 			return ret;
 		break;
+	case REQUEST_SENSE:
+		ret = transport_generic_emulate_request_sense(cmd,
+				T_TASK(cmd)->t_task_cdb);
+		if (ret < 0)
+			return ret;
+		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case ERASE:
 	case REZERO_UNIT:
