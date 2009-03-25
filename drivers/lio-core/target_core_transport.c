@@ -53,6 +53,7 @@
 #include <target_core_pr.h>
 #include <target_core_alua.h>
 #include <target_core_tmr.h>
+#include <target_core_ua.h>
 #include <target_core_transport.h>
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
@@ -189,6 +190,7 @@ struct kmem_cache *se_cmd_cache;
 struct kmem_cache *se_task_cache;
 struct kmem_cache *se_tmr_req_cache;
 struct kmem_cache *se_sess_cache;
+struct kmem_cache *se_ua_cache;
 struct kmem_cache *t10_pr_reg_cache;
 struct kmem_cache *t10_alua_lu_gp_cache;
 struct kmem_cache *t10_alua_lu_gp_mem_cache;
@@ -288,6 +290,12 @@ int init_se_global(void)
 				" failed\n");
 		goto out;
 	}
+	se_ua_cache = kmem_cache_create("se_ua_cache",
+			sizeof(se_ua_t), __alignof__(se_ua_t), 0, NULL);
+	if (!(se_ua_cache)) {
+		printk(KERN_ERR "kmem_cache_create() for se_ua_t failed\n");
+		goto out;
+	}
 	t10_pr_reg_cache = kmem_cache_create("t10_pr_reg_cache",
 			sizeof(t10_pr_registration_t),
 			__alignof__(t10_pr_registration_t), 0, NULL);
@@ -374,6 +382,8 @@ out:
 		kmem_cache_destroy(se_tmr_req_cache);
 	if (se_sess_cache)
 		kmem_cache_destroy(se_sess_cache);
+	if (se_ua_cache)
+		kmem_cache_destroy(se_ua_cache);
 	if (t10_pr_reg_cache)
 		kmem_cache_destroy(t10_pr_reg_cache);
 	if (t10_alua_lu_gp_cache)
@@ -402,6 +412,7 @@ void release_se_global(void)
 	kmem_cache_destroy(se_task_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
+	kmem_cache_destroy(se_ua_cache);
 	kmem_cache_destroy(t10_pr_reg_cache);
 	kmem_cache_destroy(t10_alua_lu_gp_cache);
 	kmem_cache_destroy(t10_alua_lu_gp_mem_cache);
@@ -2778,6 +2789,18 @@ int transport_generic_allocate_tasks(
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->se_cmd_flags |= SCF_SCSI_RESERVATION_CONFLICT;
 		cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
+		/*
+		 * For UA Interlock Code 11b, a RESERVATION CONFLICT will
+		 * establish a UNIT ATTENTION with PREVIOUS RESERVATION
+		 * CONFLICT STATUS.
+		 *
+		 * See spc4r17, section 7.4.6 Control Mode Page, Table 349
+		 */
+		if (SE_SESS(cmd) &&
+		    DEV_ATTRIB(cmd->se_dev)->emulate_ua_intlck_ctrl == 2)
+			core_scsi3_ua_allocate(SE_SESS(cmd)->se_node_acl,
+				cmd->orig_fe_lun, 0x2C,
+				ASCQ_2CH_PREVIOUS_RESERVATION_CONFLICT_STATUS);
 		return -2;
 	case 6:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -2786,6 +2809,10 @@ int transport_generic_allocate_tasks(
 	case 7:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = ILLEGAL_REQUEST;
+		return -2;
+	case 8:
+		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		cmd->scsi_sense_reason = CHECK_CONDITION_UNIT_ATTENTION;
 		return -2;
 	default:
 		break;
@@ -4511,8 +4538,27 @@ static int transport_modesense_control(se_device_t *dev, unsigned char *p)
 	 * status and shall not establish a unit attention condition when a com-
 	 * mand is completed with BUSY, TASK SET FULL, or RESERVATION CONFLICT
 	 * status.
+	 *
+	 * 10b: The logical unit shall not clear any unit attention condition
+	 * reported in the same I_T_L_Q nexus transaction as a CHECK CONDITION
+	 * status and shall not establish a unit attention condition when
+	 * a command is completed with BUSY, TASK SET FULL, or RESERVATION
+	 * CONFLICT status.
+	 *
+	 * 11b a The logical unit shall not clear any unit attention condition
+	 * reported in the same I_T_L_Q nexus transaction as a CHECK CONDITION
+	 * status and shall establish a unit attention condition for the
+	 * initiator port associated with the I_T nexus on which the BUSY,
+	 * TASK SET FULL, or RESERVATION CONFLICT status is being returned.
+	 * Depending on the status, the additional sense code shall be set to
+	 * PREVIOUS BUSY STATUS, PREVIOUS TASK SET FULL STATUS, or PREVIOUS
+	 * RESERVATION CONFLICT STATUS. Until it is cleared by a REQUEST SENSE
+	 * command, a unit attention condition shall be established only once
+	 * for a BUSY, TASK SET FULL, or RESERVATION CONFLICT status regardless
+	 * to the number of commands completed with one of those status codes.
 	 */
-	p[4] = 0x00;
+	p[4] = (DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl == 2) ? 0x30 :
+	       (DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl == 1) ? 0x20 : 0x00;
 	/*
 	 * From spc4r17, section 7.4.6 Control mode Page
 	 *
@@ -4651,29 +4697,53 @@ int transport_generic_emulate_request_sense(
 	unsigned char *cdb)
 {
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
+	u8 ua_asc = 0, ua_ascq = 0;
 
 	if (cdb[1] & 0x01) {
 		printk(KERN_ERR "REQUEST_SENSE description emulation not"
 			" supported\n");
 		return PYX_TRANSPORT_INVALID_CDB_FIELD;
 	}
-	/*
-	 * CURRENT ERROR
-	 */
-	buf[0] = 0x70;
-	buf[SPC_SENSE_KEY_OFFSET] = NO_SENSE;
-	/*
-	 * Make sure request data length is enough for additional sense data.
-	 */
-	if (cmd->data_length <= 18) {
-		buf[7] = 0x00;
-		return 0;
+	if (!(core_scsi3_ua_clear_for_request_sense(cmd, &ua_asc, &ua_ascq))) {
+		/*
+		 * CURRENT ERROR, UNIT ATTENTION
+		 */
+		buf[0] = 0x70;
+		buf[SPC_SENSE_KEY_OFFSET] = UNIT_ATTENTION;
+		/*
+		 * Make sure request data length is enough for additional
+		 * sense data.
+		 */
+		if (cmd->data_length <= 18) {
+			buf[7] = 0x00;
+			return 0;
+		}
+		/*
+		 * The Additional Sense Code (ASC) from the UNIT ATTENTION
+		 */
+		buf[SPC_ASC_KEY_OFFSET] = ua_asc;
+		buf[SPC_ASCQ_KEY_OFFSET] = ua_ascq;
+		buf[7] = 0x0A;
+	} else {
+		/*
+		 * CURRENT ERROR, NO SENSE
+		 */
+		buf[0] = 0x70;
+		buf[SPC_SENSE_KEY_OFFSET] = NO_SENSE;
+		/*
+		 * Make sure request data length is enough for additional
+		 * sense data.
+		 */
+		if (cmd->data_length <= 18) {
+			buf[7] = 0x00;
+			return 0;
+		}
+		/*
+		 * NO ADDITIONAL SENSE INFORMATION
+		 */
+		buf[SPC_ASC_KEY_OFFSET] = 0x00;
+		buf[7] = 0x0A;
 	}
-	/*
-	 * NO ADDITIONAL SENSE INFORMATION
-	 */
-	buf[SPC_ASC_KEY_OFFSET] = 0x00;
-	buf[7] = 0x0A;
 
 	return 0;
 }
@@ -4777,7 +4847,18 @@ static int transport_generic_cmd_sequencer(
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
 	int ret = 0, sector_ret = 0;
 	u32 sectors = 0, size = 0, pr_reg_type = 0;
-
+	/*
+	 * Check for an existing UNIT ATTENTION condition
+	 */
+	if (core_scsi3_ua_check(cmd, cdb) < 0) {
+		cmd->transport_wait_for_tasks =
+				&transport_nop_wait_for_tasks;
+		transport_get_maps(cmd);
+		return 8; /* UNIT ATTENTION */
+	}
+	/*
+	 * Check status for SPC-3 Persistent Reservations
+	 */
 	if (T10_RES(su_dev)->t10_reservation_check(cmd, &pr_reg_type) != 0) {
 		if (T10_RES(su_dev)->t10_seq_non_holder(
 					cmd, cdb, pr_reg_type) != 0) {
@@ -7104,6 +7185,7 @@ int transport_send_check_condition_and_sense(
 	unsigned char *buffer = cmd->sense_buffer;
 	unsigned long flags;
 	int offset;
+	u8 asc = 0, ascq = 0;
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	if (cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
@@ -7221,6 +7303,15 @@ int transport_send_check_condition_and_sense(
 		buffer[offset+SPC_SENSE_KEY_OFFSET] = DATA_PROTECT;
 		/* WRITE PROTECTED */
 		buffer[offset+SPC_ASC_KEY_OFFSET] = 0x27;
+		break;
+	case CHECK_CONDITION_UNIT_ATTENTION:
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* UNIT ATTENTION */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = UNIT_ATTENTION;
+		core_scsi3_ua_for_check_condition(cmd, &asc, &ascq);
+		buffer[offset+SPC_ASC_KEY_OFFSET] = asc;
+		buffer[offset+SPC_ASCQ_KEY_OFFSET] = ascq;
 		break;
 	case LOGICAL_UNIT_COMMUNICATION_FAILURE:
 	default:

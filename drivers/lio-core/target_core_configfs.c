@@ -478,6 +478,9 @@ SE_DEV_ATTR(status_thread, S_IRUGO | S_IWUSR);
 DEF_DEV_ATTRIB(status_thread_tur);
 SE_DEV_ATTR(status_thread_tur, S_IRUGO | S_IWUSR);
 
+DEF_DEV_ATTRIB(emulate_ua_intlck_ctrl);
+SE_DEV_ATTR(emulate_ua_intlck_ctrl, S_IRUGO | S_IWUSR);
+
 DEF_DEV_ATTRIB(emulate_tas);
 SE_DEV_ATTR(emulate_tas, S_IRUGO | S_IWUSR);
 
@@ -507,6 +510,7 @@ CONFIGFS_EATTR_OPS(target_core_dev_attrib, se_dev_attrib_s, da_group);
 static struct configfs_attribute *target_core_dev_attrib_attrs[] = {
 	&target_core_dev_attrib_status_thread.attr,
 	&target_core_dev_attrib_status_thread_tur.attr,
+	&target_core_dev_attrib_emulate_ua_intlck_ctrl.attr,
 	&target_core_dev_attrib_emulate_tas.attr,
 	&target_core_dev_attrib_hw_block_size.attr,
 	&target_core_dev_attrib_block_size.attr,

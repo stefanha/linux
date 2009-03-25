@@ -235,12 +235,22 @@ static int core_set_queue_depth_for_node(
  */
 static int core_create_device_list_for_node(se_node_acl_t *nacl)
 {
+	se_dev_entry_t *deve;
+	int i;
+
 	nacl->device_list = kzalloc(sizeof(se_dev_entry_t) *
 				TRANSPORT_MAX_LUNS_PER_TPG, GFP_KERNEL);
 	if (!(nacl->device_list)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" se_node_acl_t->device_list\n");
 		return -1;
+	}
+	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
+		deve = &nacl->device_list[i];
+
+		atomic_set(&deve->ua_count, 0);
+		spin_lock_init(&deve->ua_lock);
+		INIT_LIST_HEAD(&deve->ua_list);
 	}
 
 	return 0;

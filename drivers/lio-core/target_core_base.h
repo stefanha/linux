@@ -197,6 +197,7 @@
 #define UNKNOWN_MODE_PAGE			0xb
 #define WRITE_PROTECTED				0xc
 #define CHECK_CONDITION_ABORT_CMD		0xd
+#define CHECK_CONDITION_UNIT_ATTENTION		0xe
 
 typedef struct se_obj_s {
 	atomic_t obj_access_count;
@@ -539,6 +540,14 @@ typedef struct se_tmr_req_s {
 	struct list_head	tmr_list;
 } ____cacheline_aligned se_tmr_req_t;
 
+typedef struct se_ua_s {
+	u8			ua_asc;
+	u8			ua_ascq;
+	struct se_node_acl_s	*ua_nacl;
+	struct list_head	ua_dev_list;
+	struct list_head	ua_nacl_list;
+} ____cacheline_aligned se_ua_t;
+
 typedef struct se_node_acl_s {
 	char			initiatorname[TRANSPORT_IQN_LEN];
 	int			nodeacl_flags;
@@ -600,12 +609,16 @@ typedef struct se_dev_entry_s {
 	u64			read_bytes;
 	u64			write_bytes;
 #endif /* SNMP_SUPPORT */
+	atomic_t		ua_count;
+	spinlock_t		ua_lock;
 	struct se_lun_s		*se_lun;
+	struct list_head	ua_list;
 }  ____cacheline_aligned se_dev_entry_t;
 
 typedef struct se_dev_attrib_s {
 	int		status_thread;
 	int		status_thread_tur;
+	int		emulate_ua_intlck_ctrl;
 	int		emulate_tas;
 	int		emulate_reservations;
 	int		emulate_alua;

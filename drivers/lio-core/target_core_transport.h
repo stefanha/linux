@@ -102,6 +102,8 @@
 #define DA_STATUS_THREAD			0
 /* Disabled by default */
 #define DA_STATUS_THREAD_TUR			0
+/* Emulation for UNIT ATTENTION Interlock Control */
+#define DA_EMULATE_UA_INTLLCK_CTRL		0
 /* Emulation for TASK_ABORTED status (TAS) by default */
 #define DA_EMULATE_TAS				1
 /* No Emulation for PSCSI by default */

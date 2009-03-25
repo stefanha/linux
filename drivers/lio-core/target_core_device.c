@@ -49,6 +49,7 @@
 #include <target_core_pr.h>
 #include <target_core_tpg.h>
 #include <target_core_transport.h>
+#include <target_core_ua.h>
 #include <target_core_fabric_ops.h>
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
@@ -483,12 +484,12 @@ void core_update_device_list_for_node(
 		deve->attach_count++;
 #endif /* SNMP_SUPPORT */
 		spin_unlock_bh(&nacl->device_list_lock);
-
 		return;
 	}
 	/*
 	 * Disable se_dev_entry_t LUN ACL mapping
 	 */
+	core_scsi3_ua_release_all(deve);
 	deve->se_lun = NULL;
 	deve->lun_flags = 0;
 	deve->creation_time = 0;
@@ -869,6 +870,7 @@ void se_dev_set_default_attribs(se_device_t *dev)
 {
 	DEV_ATTRIB(dev)->status_thread = DA_STATUS_THREAD;
 	DEV_ATTRIB(dev)->status_thread_tur = DA_STATUS_THREAD_TUR;
+	DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl = DA_EMULATE_UA_INTLLCK_CTRL;
 	DEV_ATTRIB(dev)->emulate_tas = DA_EMULATE_TAS;
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	DEV_ATTRIB(dev)->emulate_alua = DA_EMULATE_ALUA;
@@ -970,11 +972,32 @@ int se_dev_set_status_thread_tur(se_device_t *dev, int flag)
 	return 0;
 }
 
+int se_dev_set_emulate_ua_intlck_ctrl(se_device_t *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1) && (flag != 2)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+
+	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+		printk(KERN_ERR "dev[%p]: Unable to change SE Device"
+			" UA_INTRLCK_CTRL while dev_export_obj: %d count"
+			" exists\n", dev,
+			DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj));
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl = flag;
+	printk(KERN_INFO "dev[%p]: SE Device UA_INTRLCK_CTRL flag: %d\n",
+		dev, DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl);
+
+	return 0;
+}
+
 int se_dev_set_emulate_tas(se_device_t *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return 1;
+		return -1;
 	}
 
 	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
