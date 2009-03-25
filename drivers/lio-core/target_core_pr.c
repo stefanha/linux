@@ -1556,9 +1556,8 @@ static int core_scsi3_emulate_pro_preempt(
 		if (calling_it_nexus)
 			continue;
 
-		if (!(all_reg))
-			if (pr_reg->pr_res_key != sa_res_key)
-				continue;
+		if (pr_reg->pr_res_key != sa_res_key)
+			continue;
 
 		pr_reg_nacl = pr_reg->pr_reg_nacl;
 		pr_res_mapped_lun = pr_reg->pr_res_mapped_lun;
