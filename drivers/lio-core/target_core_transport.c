@@ -3087,6 +3087,19 @@ void transport_generic_request_failure(
 		 * Uses linux/include/scsi/scsi.h SAM status codes defs
 		 */
 		cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
+		/*
+		 * For UA Interlock Code 11b, a RESERVATION CONFLICT will
+		 * establish a UNIT ATTENTION with PREVIOUS RESERVATION
+		 * CONFLICT STATUS.
+		 *
+		 * See spc4r17, section 7.4.6 Control Mode Page, Table 349
+		 */
+		if (SE_SESS(cmd) &&
+		    DEV_ATTRIB(cmd->se_dev)->emulate_ua_intlck_ctrl == 2)
+			core_scsi3_ua_allocate(SE_SESS(cmd)->se_node_acl,
+				cmd->orig_fe_lun, 0x2C,
+				ASCQ_2CH_PREVIOUS_RESERVATION_CONFLICT_STATUS);
+
 		if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
 			CMD_TFO(cmd)->queue_status(cmd);
 
