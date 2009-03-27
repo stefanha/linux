@@ -104,7 +104,7 @@ int core_scsi3_ua_allocate(
 	if (!(nacl))
 		return -1;
 
-	ua = kmem_cache_zalloc(se_ua_cache, GFP_KERNEL);
+	ua = kmem_cache_zalloc(se_ua_cache, GFP_ATOMIC);
 	if (!(ua)) {
 		printk(KERN_ERR "Unable to allocate se_ua_t\n");
 		return -1;
@@ -267,11 +267,12 @@ void core_scsi3_ua_for_check_condition(
 	spin_unlock(&nacl->device_list_lock);
 
 	printk(KERN_INFO "[%s]: %s UNIT ATTENTION condition with"
-		" INTLCK_CTRL: %d, mapped LUN: %u, reported ASC: 0x%02x, ASCQ:"
-		" 0x%02x\n", TPG_TFO(nacl->se_tpg)->get_fabric_name(),
+		" INTLCK_CTRL: %d, mapped LUN: %u, got CDB: 0x%02x"
+		" reported ASC: 0x%02x, ASCQ: 0x%02x\n",
+		TPG_TFO(nacl->se_tpg)->get_fabric_name(),
 		(DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl != 0) ? "Reporting" :
 		"Releasing", DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl,
-		cmd->orig_fe_lun, *asc, *ascq);
+		cmd->orig_fe_lun, T_TASK(cmd)->t_task_cdb[0], *asc, *ascq);
 }
 
 int core_scsi3_ua_clear_for_request_sense(
@@ -325,9 +326,9 @@ int core_scsi3_ua_clear_for_request_sense(
 	spin_unlock(&nacl->device_list_lock);
 
 	printk(KERN_INFO "[%s]: Released UNIT ATTENTION condition, mapped"
-		" LUN: %u, reported ASC: 0x%02x, ASCQ: 0x%02x\n",
-		TPG_TFO(nacl->se_tpg)->get_fabric_name(), cmd->orig_fe_lun,
-		*asc, *ascq);
+		" LUN: %u, got REQUEST_SENSE reported ASC: 0x%02x,"
+		" ASCQ: 0x%02x\n", TPG_TFO(nacl->se_tpg)->get_fabric_name(),
+		cmd->orig_fe_lun, *asc, *ascq);
 
 	return (head) ? -1 : 0;
 }
