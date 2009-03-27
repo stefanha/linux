@@ -36,6 +36,7 @@
 #include <target_core_base.h>
 #include <target_core_device.h>
 #include <target_core_hba.h>
+#include <target_core_tmr.h>
 #include <target_core_transport.h>
 #include <target_core_pr.h>
 #include <target_core_ua.h>
@@ -368,12 +369,14 @@ static int core_scsi3_pr_seq_non_holder(
 			 * as we expect registered non-reservation holding
 			 * nexuses to issue CDBs.
 			 */
+#if 0
 			if (!(registered_nexus)) {
 				printk(KERN_INFO "Allowing implict CDB: 0x%02x"
 					" for %s reservation on unregistered"
 					" nexus\n", cdb[0],
 					core_scsi3_pr_dump_type(pr_reg_type));
 			}
+#endif
 			return 0;
 		}
 	} else if (all_reg) {
@@ -431,6 +434,7 @@ static int core_scsi3_pr_reservation_check(
 		return 0;
 	}
 	*pr_reg_type = dev->dev_pr_res_holder->pr_res_type;
+	cmd->pr_res_key = dev->dev_pr_res_holder->pr_res_key;
 	ret = (dev->dev_pr_res_holder->pr_reg_nacl != sess->se_node_acl) ?
 		-1 : 0;
 	spin_unlock(&dev->dev_reservation_lock);
@@ -473,6 +477,7 @@ static int core_scsi3_alloc_registration(
 	}
 
 	INIT_LIST_HEAD(&pr_reg->pr_reg_list);
+	INIT_LIST_HEAD(&pr_reg->pr_reg_abort_list);
 	atomic_set(&pr_reg->pr_res_holders, 0);
 	pr_reg->pr_reg_nacl = nacl;
 	pr_reg->pr_reg_deve = deve;
@@ -490,6 +495,7 @@ static int core_scsi3_alloc_registration(
 	spin_lock(&pr_tmpl->registration_lock);
 	list_add_tail(&pr_reg->pr_reg_list, &pr_tmpl->registration_list);
 	deve->deve_flags |= DEF_PR_REGISTERED;
+	deve->pr_res_key = sa_res_key;
 
 	printk(KERN_INFO "SPC-3 PR [%s] Service Action: REGISTER%s Initiator"
 		" Node: %s\n", tfo->get_fabric_name(), (ignore_key) ?
@@ -573,6 +579,7 @@ static int core_scsi3_check_implict_release(
 static void __core_scsi3_free_registration(
 	se_device_t *dev,
 	t10_pr_registration_t *pr_reg,
+	struct list_head *preempt_and_abort_list,
 	int dec_holders)
 {
 	struct target_core_fabric_ops *tfo =
@@ -580,6 +587,7 @@ static void __core_scsi3_free_registration(
 	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
 
 	pr_reg->pr_reg_deve->deve_flags &= ~DEF_PR_REGISTERED;
+	pr_reg->pr_reg_deve->pr_res_key = 0;
 	list_del(&pr_reg->pr_reg_list);
 	/*
 	 * Caller accessing *pr_reg using core_scsi3_locate_pr_reg(),
@@ -612,9 +620,17 @@ static void __core_scsi3_free_registration(
 		" 0x%08x\n", tfo->get_fabric_name(), pr_reg->pr_res_key,
 		pr_reg->pr_res_generation);
 
-	pr_reg->pr_reg_deve = NULL;
-	pr_reg->pr_reg_nacl = NULL;
-	kmem_cache_free(t10_pr_reg_cache, pr_reg);
+	if (!(preempt_and_abort_list)) {
+		pr_reg->pr_reg_deve = NULL;
+		pr_reg->pr_reg_nacl = NULL;
+		kmem_cache_free(t10_pr_reg_cache, pr_reg);
+		return;
+	}
+	/*
+	 * For PREEMPT_AND_ABORT, the list of *pr_reg in preempt_and_abort_list
+	 * are released once the ABORT_TASK_SET has completed..
+	 */
+	list_add_tail(&pr_reg->pr_reg_abort_list, preempt_and_abort_list);
 }
 
 void core_scsi3_free_pr_reg_from_nacl(
@@ -643,7 +659,7 @@ void core_scsi3_free_pr_reg_from_nacl(
 		if (pr_reg->pr_reg_nacl != nacl)
 			continue;
 
-		__core_scsi3_free_registration(dev, pr_reg, 0);
+		__core_scsi3_free_registration(dev, pr_reg, NULL, 0);
 	}
 	spin_unlock(&pr_tmpl->registration_lock);
 }
@@ -667,7 +683,7 @@ void core_scsi3_free_all_registrations(
 	list_for_each_entry_safe(pr_reg, pr_reg_tmp,
 			&pr_tmpl->registration_list, pr_reg_list) {
 
-		__core_scsi3_free_registration(dev, pr_reg, 0);
+		__core_scsi3_free_registration(dev, pr_reg, NULL, 0);
 	}
 	spin_unlock(&pr_tmpl->registration_lock);
 }
@@ -785,7 +801,8 @@ static int core_scsi3_emulate_pro_register(
 			/*
 			 * Release the calling I_T Nexus registration now..
 			 */
-			__core_scsi3_free_registration(SE_DEV(cmd), pr_reg, 1);
+			__core_scsi3_free_registration(SE_DEV(cmd), pr_reg,
+							NULL, 1);
 			/*
 			 * From spc4r17, section 5.7.11.3 Unregistering
 			 *
@@ -1285,7 +1302,8 @@ static int core_scsi3_emulate_pro_clear(
 		calling_it_nexus = (pr_reg_n == pr_reg) ? 1 : 0;
 		pr_reg_nacl = pr_reg->pr_reg_nacl;
 		pr_res_mapped_lun = pr_reg->pr_res_mapped_lun;
-		__core_scsi3_free_registration(dev, pr_reg, calling_it_nexus);
+		__core_scsi3_free_registration(dev, pr_reg, NULL,
+					calling_it_nexus);
 		/*
 		 * e) Establish a unit attention condition for the initiator
 		 *    port associated with every registered I_T nexus other
@@ -1312,8 +1330,10 @@ static int core_scsi3_emulate_pro_clear(
 static void __core_scsi3_complete_pro_preempt(
 	se_device_t *dev,
 	t10_pr_registration_t *pr_reg,
+	struct list_head *preempt_and_abort_list,
 	int type,
-	int scope)
+	int scope,
+	int abort)
 {
 	se_node_acl_t *nacl = pr_reg->pr_reg_nacl;
 	struct target_core_fabric_ops *tfo = nacl->se_tpg->se_tpg_tfo;
@@ -1329,12 +1349,60 @@ static void __core_scsi3_complete_pro_preempt(
 	pr_reg->pr_res_type = type;
 	pr_reg->pr_res_scope = scope;
 
-	printk(KERN_INFO "SPC-3 PR [%s] Service Action: PREEMPT created new"
+	printk(KERN_INFO "SPC-3 PR [%s] Service Action: PREEMPT%s created new"
 		" reservation holder TYPE: %s ALL_TG_PT: %d\n",
-		tfo->get_fabric_name(), core_scsi3_pr_dump_type(type),
+		tfo->get_fabric_name(), (abort) ? "_AND_ABORT" : "",
+		core_scsi3_pr_dump_type(type),
 		(pr_reg->pr_reg_all_tg_pt) ? 1 : 0);
-	printk(KERN_INFO "SPC-3 PR [%s] PREEMPT from Node: %s\n",
-		tfo->get_fabric_name(), nacl->initiatorname);
+	printk(KERN_INFO "SPC-3 PR [%s] PREEMPT%s from Node: %s\n",
+		tfo->get_fabric_name(), (abort) ? "_AND_ABORT" : "",
+		nacl->initiatorname);
+	/*
+	 * For PREEMPT_AND_ABORT, add the preempting reservation's
+	 * t10_pr_registration_t to the list that will be compared
+	 * against received CDBs..
+	 */
+	if (preempt_and_abort_list)
+		list_add_tail(&pr_reg->pr_reg_abort_list,
+				preempt_and_abort_list);
+}
+
+static void core_scsi3_release_preempt_and_abort(
+	struct list_head *preempt_and_abort_list,
+	t10_pr_registration_t *pr_reg_holder)
+{
+	t10_pr_registration_t *pr_reg, *pr_reg_tmp;
+
+	list_for_each_entry_safe(pr_reg, pr_reg_tmp, preempt_and_abort_list,
+				pr_reg_abort_list) {
+
+		list_del(&pr_reg->pr_reg_abort_list);
+		if (pr_reg_holder == pr_reg)
+			continue;
+		if (pr_reg->pr_res_holder) {
+			printk(KERN_WARNING "pr_reg->pr_res_holder still set\n");
+			continue;
+		}
+
+		pr_reg->pr_reg_deve = NULL;
+		pr_reg->pr_reg_nacl = NULL;
+		kmem_cache_free(t10_pr_reg_cache, pr_reg);
+	}
+}
+
+int core_scsi3_check_cdb_abort_and_preempt(
+	struct list_head *preempt_and_abort_list,
+	se_cmd_t *cmd)
+{
+	t10_pr_registration_t *pr_reg, *pr_reg_tmp;
+
+	list_for_each_entry_safe(pr_reg, pr_reg_tmp, preempt_and_abort_list,
+				pr_reg_abort_list) {
+		if (pr_reg->pr_res_key == cmd->pr_res_key)
+			return 0;
+	}
+
+	return 1;
 }
 
 static int core_scsi3_emulate_pro_preempt(
@@ -1342,13 +1410,15 @@ static int core_scsi3_emulate_pro_preempt(
 	int type,
 	int scope,
 	u64 res_key,
-	u64 sa_res_key)
+	u64 sa_res_key,
+	int abort)
 {
 	se_device_t *dev = SE_DEV(cmd);
 	se_dev_entry_t *se_deve;
 	se_lun_t *se_lun = SE_LUN(cmd);
 	se_node_acl_t *pr_reg_nacl;
 	se_session_t *se_sess = SE_SESS(cmd);
+	struct list_head preempt_and_abort_list;
 	t10_pr_registration_t *pr_reg, *pr_reg_tmp, *pr_reg_n, *pr_res_holder;
 	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
 	u32 pr_res_mapped_lun = 0;
@@ -1365,7 +1435,8 @@ static int core_scsi3_emulate_pro_preempt(
 	pr_reg_n = core_scsi3_locate_pr_reg(SE_DEV(cmd), se_sess->se_node_acl);
 	if (!(pr_reg_n)) {
 		printk(KERN_ERR "SPC-3 PR: Unable to locate"
-			" PR_REGISTERED *pr_reg for PREEMPT\n");
+			" PR_REGISTERED *pr_reg for PREEMPT%s\n",
+			(abort) ? "_AND_ABORT" : "");
 		return PYX_TRANSPORT_RESERVATION_CONFLICT;
 	}
 	if (pr_reg_n->pr_res_key != res_key) {
@@ -1377,6 +1448,7 @@ static int core_scsi3_emulate_pro_preempt(
 		core_scsi3_put_pr_reg(pr_reg_n);
 		return PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 	}
+	INIT_LIST_HEAD(&preempt_and_abort_list);
 
 	spin_lock(&dev->dev_reservation_lock);
 	pr_res_holder = dev->dev_pr_res_holder;
@@ -1434,7 +1506,8 @@ static int core_scsi3_emulate_pro_preempt(
 				pr_reg_nacl = pr_reg->pr_reg_nacl;
 				pr_res_mapped_lun = pr_reg->pr_res_mapped_lun;
 				__core_scsi3_free_registration(dev, pr_reg,
-							calling_it_nexus);
+					(abort) ? &preempt_and_abort_list :
+						NULL, calling_it_nexus);
 				released_regs++;
 			} else {
 				/*
@@ -1460,7 +1533,9 @@ static int core_scsi3_emulate_pro_preempt(
 
 				pr_reg_nacl = pr_reg->pr_reg_nacl;
 				pr_res_mapped_lun = pr_reg->pr_res_mapped_lun;
-				__core_scsi3_free_registration(dev, pr_reg, 0);
+				__core_scsi3_free_registration(dev, pr_reg,
+					(abort) ? &preempt_and_abort_list :
+						NULL, 0);
 				released_regs++;
 			}
 			if (!(calling_it_nexus))
@@ -1486,9 +1561,15 @@ static int core_scsi3_emulate_pro_preempt(
 		 * with a zero SA rservation key, preempt the existing
 		 * reservation with the new PR type and scope.
 		 */
-		if (pr_res_holder && all_reg && !(sa_res_key))
+		if (pr_res_holder && all_reg && !(sa_res_key)) {
 			__core_scsi3_complete_pro_preempt(dev, pr_reg_n,
-					type, scope);
+				(abort) ? &preempt_and_abort_list : NULL,
+				type, scope, abort);
+
+			if (abort)
+				core_scsi3_release_preempt_and_abort(
+					&preempt_and_abort_list, pr_reg_n);
+		}
 		spin_unlock(&dev->dev_reservation_lock);
 
 		core_scsi3_put_pr_reg(pr_reg_n);
@@ -1499,32 +1580,21 @@ static int core_scsi3_emulate_pro_preempt(
 	 * The PREEMPTing SA reservation key matches that of the
 	 * existing persistent reservation, first, we check if
 	 * we are preempting our own reservation.
+	 * From spc4r17, section 5.7.11.4.3 Preempting
+	 * persistent reservations and registration handling
+	 *
+	 * If an all registrants persistent reservation is not
+	 * present, it is not an error for the persistent
+	 * reservation holder to preempt itself (i.e., a
+	 * PERSISTENT RESERVE OUT with a PREEMPT service action
+	 * or a PREEMPT AND ABORT service action with the
+	 * SERVICE ACTION RESERVATION KEY value equal to the
+	 * persistent reservation holder's reservation key that
+	 * is received from the persistent reservation holder).
+	 * In that case, the device server shall establish the
+	 * new persistent reservation and maintain the
+	 * registration.
 	 */
-	if (pr_reg_n == pr_res_holder) {
-		/*
-		 * From spc4r17, section 5.7.11.4.3 Preempting
-		 * persistent reservations and registration handling
-		 *
-		 * If an all registrants persistent reservation is not
-		 * present, it is not an error for the persistent
-		 * reservation holder to preempt itself (i.e., a
-		 * PERSISTENT RESERVE OUT with a PREEMPT service action
-		 * or a PREEMPT AND ABORT service action with the
-		 * SERVICE ACTION RESERVATION KEY value equal to the
-		 * persistent reservation holder's reservation key that
-		 * is received from the persistent reservation holder).
-		 * In that case, the device server shall establish the
-		 * new persistent reservation and maintain the
-		 * registration.
-		 */
-		__core_scsi3_complete_pro_preempt(dev, pr_reg_n,
-				type, scope);
-		spin_unlock(&dev->dev_reservation_lock);
-
-		core_scsi3_put_pr_reg(pr_reg_n);
-		core_scsi3_pr_generation(SE_DEV(cmd));
-		return 0;
-	}
 	prh_type = pr_res_holder->pr_res_type;
 	prh_scope = pr_res_holder->pr_res_scope;
 	/*
@@ -1536,7 +1606,9 @@ static int core_scsi3_emulate_pro_preempt(
 	 * a) Release the persistent reservation for the holder
 	 *    identified by the SERVICE ACTION RESERVATION KEY field;
 	 */
-	__core_scsi3_complete_pro_release(dev, pr_res_holder->pr_reg_nacl,
+	if (pr_reg_n != pr_res_holder)
+		__core_scsi3_complete_pro_release(dev,
+				pr_res_holder->pr_reg_nacl,
 				dev->dev_pr_res_holder, 0);
 	/*
 	 * b) Remove the registrations for all I_T nexuses identified
@@ -1562,6 +1634,7 @@ static int core_scsi3_emulate_pro_preempt(
 		pr_reg_nacl = pr_reg->pr_reg_nacl;
 		pr_res_mapped_lun = pr_reg->pr_res_mapped_lun;
 		__core_scsi3_free_registration(dev, pr_reg,
+				(abort) ? &preempt_and_abort_list : NULL,
 				calling_it_nexus);
 		/*
 		 * e) Establish a unit attention condition for the initiator
@@ -1577,7 +1650,9 @@ static int core_scsi3_emulate_pro_preempt(
 	 * c) Establish a persistent reservation for the preempting
 	 *    I_T nexus using the contents of the SCOPE and TYPE fields;
 	 */
-	__core_scsi3_complete_pro_preempt(dev, pr_reg_n, type, scope);
+	__core_scsi3_complete_pro_preempt(dev, pr_reg_n,
+			(abort) ? &preempt_and_abort_list : NULL,
+			type, scope, abort);
 	/*
 	 * d) Process tasks as defined in 5.7.1;
 	 * e) See above..
@@ -1594,7 +1669,7 @@ static int core_scsi3_emulate_pro_preempt(
 	if ((prh_type != type) || (prh_scope != scope)) {
 		spin_lock(&pr_tmpl->registration_lock);
 		list_for_each_entry_safe(pr_reg, pr_reg_tmp,
-			&pr_tmpl->registration_list, pr_reg_list) {
+				&pr_tmpl->registration_list, pr_reg_list) {
 
 			calling_it_nexus = (pr_reg_n == pr_reg) ? 1 : 0;
 			if (calling_it_nexus)
@@ -1607,19 +1682,23 @@ static int core_scsi3_emulate_pro_preempt(
 		spin_unlock(&pr_tmpl->registration_lock);
 	}
 	spin_unlock(&dev->dev_reservation_lock);
+	/*
+	 * Call LUN_RESET logic upon list of t10_pr_registration_t,
+	 * All received CDBs for the matching existing reservation and
+	 * registrations undergo ABORT_TASK logic.
+	 *
+	 * From there, core_scsi3_release_preempt_and_abort() will
+	 * release every registration in the list (which have already
+	 * been removed from the primary pr_reg list), except the
+	 * new persistent reservation holder, the calling Initiator Port.
+	 */
+	if (abort) {
+		core_tmr_lun_reset(dev, NULL, &preempt_and_abort_list, cmd);
+		core_scsi3_release_preempt_and_abort(&preempt_and_abort_list,
+						pr_reg_n);
+	}
 
 	core_scsi3_put_pr_reg(pr_reg_n);
-	core_scsi3_pr_generation(SE_DEV(cmd));
-	return 0;
-}
-
-static int core_scsi3_emulate_pro_preempt_and_abort(
-	se_cmd_t *cmd,
-	int type,
-	int scope,
-	u64 res_key,
-	u64 sa_res_key)
-{
 	core_scsi3_pr_generation(SE_DEV(cmd));
 	return 0;
 }
@@ -1699,12 +1778,10 @@ static int core_scsi3_emulate_pr_out(se_cmd_t *cmd, unsigned char *cdb)
 		return core_scsi3_emulate_pro_clear(cmd, res_key);
 	case PRO_PREEMPT:
 		return core_scsi3_emulate_pro_preempt(cmd, type, scope,
-					res_key, sa_res_key);
-#if 0
+					res_key, sa_res_key, 0);
 	case PRO_PREEMPT_AND_ABORT:
-		return core_scsi3_emulate_pro_preempt_and_abort(cmd,
-			type, scope, res_key, sa_res_key);
-#endif
+		return core_scsi3_emulate_pro_preempt(cmd, type, scope,
+					res_key, sa_res_key, 1);
 	case PRO_REGISTER_AND_IGNORE_EXISTING_KEY:
 		return core_scsi3_emulate_pro_register(cmd,
 			0, sa_res_key, aptpl, all_tg_pt, spec_i_pt, 1);

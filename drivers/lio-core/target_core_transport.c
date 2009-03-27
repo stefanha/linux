@@ -7357,7 +7357,11 @@ EXPORT_SYMBOL(transport_send_check_condition_and_sense);
 void transport_send_task_abort(se_cmd_t *cmd)
 {
 	cmd->scsi_status = SAM_STAT_TASK_ABORTED;
-
+#if 0
+	printk(KERN_INFO "Setting SAM_STAT_TASK_ABORTED status for CDB: 0x%02x,"
+		" ITT: 0x%08x\n", T_TASK(cmd)->t_task_cdb[0],
+		CMD_TFO(cmd)->get_task_tag(cmd));
+#endif
 	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
 		CMD_TFO(cmd)->queue_status(cmd);
 }
@@ -7384,7 +7388,7 @@ int transport_generic_do_tmr(se_cmd_t *cmd)
 		tmr->response = TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED;
 		break;
 	case LUN_RESET:
-		ret = core_tmr_lun_reset(dev, tmr);
+		ret = core_tmr_lun_reset(dev, tmr, NULL, NULL);
 		tmr->response = (!ret) ? TMR_FUNCTION_COMPLETE :
 					 TMR_FUNCTION_REJECTED;
 		break;

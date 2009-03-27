@@ -266,6 +266,7 @@ extern int __transport_get_lun_for_cmd(
 		deve->deve_cmds++;
 
 		se_lun = se_cmd->se_lun = deve->se_lun;
+		se_cmd->pr_res_key = deve->pr_res_key;
 		se_cmd->orig_fe_lun = unpacked_lun;
 		se_cmd->se_orig_obj_api = SE_LUN(se_cmd)->lun_obj_api;
 		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
@@ -346,6 +347,7 @@ extern int transport_get_lun_for_tmr(
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
 		se_lun = se_cmd->se_lun = se_tmr->tmr_lun = deve->se_lun;
 		dev = se_tmr->tmr_dev = se_lun->se_dev;
+		se_cmd->pr_res_key = deve->pr_res_key;
 		se_cmd->orig_fe_lun = unpacked_lun;
 		se_cmd->se_orig_obj_api = SE_LUN(se_cmd)->lun_obj_api;
 		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;

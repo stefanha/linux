@@ -294,6 +294,7 @@ typedef struct t10_pr_registration_s {
 	struct se_dev_entry_s *pr_reg_deve;
 	struct se_lun_s *pr_reg_tg_pt_lun;
 	struct list_head pr_reg_list;
+	struct list_head pr_reg_abort_list;
 } t10_pr_registration_t;
 
 typedef struct t10_reservation_template_s {
@@ -472,6 +473,8 @@ typedef struct se_cmd_s {
 	u32			iov_data_count;
 	/* Number of iovecs allocated for iscsi_cmd_t->iov_data */
 	u32			orig_iov_data_count;
+	/* Persistent Reservation key */
+	u64			pr_res_key;
 	atomic_t                transport_sent;
 	/* Used for sense data */
 	void			*sense_buffer;
@@ -604,6 +607,7 @@ typedef struct se_dev_entry_s {
 	u32			last_byte_count;
 	u32			total_cmds;
 	u32			total_bytes;
+	u64			pr_res_key;
 #ifdef SNMP_SUPPORT
 	u64			creation_time;
 	u32			attach_count;
