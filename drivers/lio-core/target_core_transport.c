@@ -4142,6 +4142,33 @@ static inline void transport_get_maps(se_cmd_t *cmd)
 	cmd->transport_unmap_SG_segments = &transport_generic_unmap_SG_segments;
 }
 
+static unsigned char asciihex_to_binaryhex(unsigned char val[2])
+{
+	unsigned char result = 0;
+	/*
+	 * MSB
+	 */
+	if ((val[0] >= 'a') && (val[0] <= 'f'))
+		result = ((val[0] - 'a' + 10) & 0xf) << 4;
+	else
+		if ((val[0] >= 'A') && (val[0] <= 'F'))
+			result = ((val[0] - 'A' + 10) & 0xf) << 4;
+		else /* digit */
+			result = ((val[0] - '0') & 0xf) << 4;
+	/*
+	 * LSB
+	 */
+	if ((val[1] >= 'a') && (val[1] <= 'f'))
+		result |= ((val[1] - 'a' + 10) & 0xf);
+	else
+		if ((val[1] >= 'A') && (val[1] <= 'F'))
+			result |= ((val[1] - 'A' + 10) & 0xf);
+		else /* digit */
+			result |= ((val[1] - '0') & 0xf);
+
+	return result;
+}
+
 extern int transport_generic_emulate_inquiry(
 	se_cmd_t *cmd,
 	unsigned char type,
@@ -4157,10 +4184,11 @@ extern int transport_generic_emulate_inquiry(
 	t10_alua_tg_pt_gp_member_t *tg_pt_gp_mem;
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
-	unsigned char *iqn_sn;
+	unsigned char *iqn_sn, binary, binary_new;
 	u32 prod_len, iqn_sn_len, se_location_len;
 	u32 unit_serial_len, off = 0;
-	u16 len = 0;
+	int i;
+	u16 len = 0, id_len;
 
 	/*
 	 * Make sure we at least have 8 bytes of INQUIRY response payload
@@ -4256,10 +4284,61 @@ extern int transport_generic_emulate_inquiry(
 		 * DESIGNATOR TYPEs see spc4r17 Table 459.
 		 */
 		buf[1] = 0x83;
+		off = 4;
+		/*
+		 * NAA IEEE Registered Extended Assigned designator format,
+		 * see spc4r17 section 7.7.3.6.5
+		 *
+		 * We depend upon a target_core_mod/ConfigFS provided
+		 * /sys/kernel/config/target/core/$HBA/$DEV/wwn/evpd_unit_serial
+		 * value in order to return the NAA id.
+		 */
+		if (!(dev->se_sub_dev->su_dev_flags &
+					SDF_EMULATED_EVPD_UNIT_SERIAL))
+			goto check_t10_vend_desc;
+		if ((off + 20) > cmd->data_length)
+			goto check_t10_vend_desc;
+		/* CODE SET == Binary */
+		buf[off++] = 0x1;
+		/* Set ASSOICATION == addressed logical unit: 0)b */
+		buf[off] = 0x00;
+		/* Identifier/Designator type == NAA identifier */
+		buf[off++] = 0x3;
+		off++;
+		/* Identifier/Designator length */
+		buf[off++] = 0x10;
+		/*
+		 * Start NAA IEEE Registered Extended Identifier/Designator
+		 */
+		buf[off++] = (0x6 << 4);
+		/*
+		 * Use OpenFabrics IEEE Company ID: 00 14 05
+		 */
+		buf[off++] = 0x01;
+		buf[off++] = 0x40;
+		buf[off] = (0x5 << 4);
+		/*
+		 * Return ConfigFS Unit Serial Number information for
+		 * VENDOR_SPECIFIC_IDENTIFIER and
+		 * VENDOR_SPECIFIC_IDENTIFIER_EXTENTION
+		 */
+		binary = asciihex_to_binaryhex(
+					&DEV_T10_WWN(dev)->unit_serial[0]);
+		buf[off++] |= (binary & 0xf0) >> 4;
+		for (i = 0; i < 24; i += 2) {
+			binary_new = asciihex_to_binaryhex(
+				&DEV_T10_WWN(dev)->unit_serial[i+2]);
+			buf[off] = (binary & 0x0f) << 4;
+			buf[off++] |= (binary_new & 0xf0) >> 4;
+			binary = binary_new;
+		}
+		len = 20;
+		off = (len + 4);
+check_t10_vend_desc:
 		/*
 		 * T10 Vendor Identifier Page, see spc4r17 section 7.7.3.4
 		 */
-		len += 8; /* For Vendor field */
+		id_len = 8; /* For Vendor field */
 		prod_len = 4; /* For EVPD Header */
 		prod_len += 8; /* For Vendor field */
 		prod_len += strlen(prod);
@@ -4271,12 +4350,14 @@ extern int transport_generic_emulate_inquiry(
 				strlen(&DEV_T10_WWN(dev)->unit_serial[0]);
 			unit_serial_len++; /* For NULL Terminator */
 
-			if (((len + 4) + (prod_len + unit_serial_len)) >
+			if ((len + (id_len + 4) +
+			    (prod_len + unit_serial_len)) >
 					cmd->data_length) {
 				len += (prod_len + unit_serial_len);
 				goto check_port;
 			}
-			len += sprintf((unsigned char *)&buf[16], "%s:%s", prod,
+			id_len += sprintf((unsigned char *)&buf[off+12],
+					"%s:%s", prod,
 					&DEV_T10_WWN(dev)->unit_serial[0]);
 		} else {
 			iqn_sn = transport_get_iqn_sn();
@@ -4285,24 +4366,26 @@ extern int transport_generic_emulate_inquiry(
 			se_location_len = strlen(se_location);
 			se_location_len++; /* For NULL Terminator */
 
-			if (((len + 4) + (prod_len + iqn_sn_len +
+			if ((len + (id_len + 4) + (prod_len + iqn_sn_len +
 					se_location_len)) > cmd->data_length) {
 				len += (prod_len + iqn_sn_len +
 						se_location_len);
 				goto check_port;
 			}
-			len += sprintf((unsigned char *)&buf[16], "%s:%s:%s",
-					prod, iqn_sn, se_location);
+			id_len += sprintf((unsigned char *)&buf[off+12],
+				"%s:%s:%s", prod, iqn_sn, se_location);
 		}
-		buf[4] = 0x2; /* ASCII */
-		buf[5] = 0x1; /* T10 Vendor ID */
-		buf[6] = 0x0;
-		memcpy((unsigned char *)&buf[8], "LIO-ORG", 8);
-
-		len++; /* Extra Byte for NULL Terminator */
-		buf[7] = len; /* Identifier Length */
-		len += 4; /* Header size for Designation descriptor */
-		off = (len + 4);
+		buf[off] = 0x2; /* ASCII */
+		buf[off+1] = 0x1; /* T10 Vendor ID */
+		buf[off+2] = 0x0;
+		memcpy((unsigned char *)&buf[off+4], "LIO-ORG", 8);
+		/* Extra Byte for NULL Terminator */
+		id_len++;
+		/* Identifier Length */
+		buf[off+3] = id_len;
+		/* Header size for Designation descriptor */
+		len += (id_len + 4);
+		off += (id_len + 4);
 		/*
 		 * se_port_t is only set for INQUIRY EVPD=1 through $FABRIC_MOD
 		 */
