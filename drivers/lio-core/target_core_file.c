@@ -106,7 +106,7 @@ int fd_claim_phydevice(se_hba_t *hba, se_device_t *dev)
 	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
 	struct block_device *bd;
 
-	if (!fd_dev->fd_claim_bd)
+	if (fd_dev->fd_bd)
 		return 0;
 
 	if (dev->dev_flags & DF_READ_ONLY) {
@@ -133,9 +133,6 @@ int fd_release_phydevice(se_device_t *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
 
-	if (!fd_dev->fd_claim_bd)
-		return 0;
-
 	if (!fd_dev->fd_bd)
 		return 0;
 
@@ -149,7 +146,6 @@ int fd_release_phydevice(se_device_t *dev)
 		linux_blockdevice_release(fd_dev->fd_major, fd_dev->fd_minor,
 			(struct block_device *)fd_dev->fd_bd);
 	}
-
 	fd_dev->fd_bd = NULL;
 
 	return 0;
@@ -189,20 +185,10 @@ se_device_t *fd_create_virtdevice(
 	mm_segment_t old_fs;
 	struct block_device *bd = NULL;
 	struct file *file;
-	int dev_flags = 0, flags, ret = 0;
-#if 0
-	if (strlen(di->fd_dev_name) > FD_MAX_DEV_NAME) {
-		printk(KERN_ERR "di->fd_dev_name exceeds FD_MAX_DEV_NAME: %d\n",
-				FD_MAX_DEV_NAME);
-		return 0;
-	}
-
-	fd_dev->fd_dev_id = di->fd_device_id;
-	fd_dev->fd_host = fd_host;
-	fd_dev->fd_dev_size = di->fd_device_size;
-	fd_dev->fd_claim_bd = di->fd_claim_bd;
-	sprintf(fd_dev->fd_dev_name, "%s", di->fd_dev_name);
-#endif
+	struct inode *inode = NULL;
+	struct request_queue *q;
+	unsigned long long blocks_long;
+	int dev_flags = 0, flags;
 
 	old_fs = get_fs();
 	set_fs(get_ds());
@@ -230,58 +216,63 @@ se_device_t *fd_create_virtdevice(
 		printk(KERN_ERR "filp_open(%s) failed\n", dev_p);
 		goto fail;
 	}
-
 	fd_dev->fd_file = file;
-
 	/*
 	 * If we are claiming a blockend for this struct file, we extract
 	 * fd_dev->fd_size from struct block_device.
 	 *
-	 * Otherwise, we use the passed fd_size= from target-ctl.
+	 * Otherwise, we use the passed fd_size= from configfs
 	 */
-#warning FIXME: Complete fd_dev->fd_claim_bd = 1 support
-#if 0
-	if (fd_dev->fd_claim_bd) {
-		fd_dev->fd_major = di->iblock_major;
-		fd_dev->fd_minor = di->iblock_minor;
+	inode = igrab(file->f_mapping->host);
+	if (!(inode)) {
+		printk(KERN_ERR "FILEIO: Unable to locate struct inode from"
+			" struct file\n");
+		goto fail;
+	}
+	/*
+	 * If struct file is referencing a underlying struct block_device,
+	 * claim it now.
+	 */
+	if (S_ISBLK(inode->i_mode)) {
+		fd_dev->fd_bd = I_BDEV(file->f_mapping->host);
+		if (!(fd_dev->fd_bd)) {
+			printk(KERN_ERR "FILEIO: Unable to locate struct"
+				" block_device\n");
+			goto fail;
+		}
+		fd_dev->fd_major = fd_dev->fd_bd->bd_disk->major;
+		fd_dev->fd_minor = fd_dev->fd_bd->bd_disk->first_minor;
 
 		printk(KERN_INFO "FILEIO: Claiming %p Major:Minor - %d:%d\n",
 			fd_dev, fd_dev->fd_major, fd_dev->fd_minor);
 
-		bd = __linux_blockdevice_claim(fd_dev->fd_major,
-				fd_dev->fd_minor, (void *)fd_dev, &ret)
+		bd = linux_blockdevice_claim_bd(fd_dev->fd_bd, fd_dev);
 		if (!(bd))
 			goto fail;
 
-		if (ret == 1)
-			dev_flags |= DF_CLAIMED_BLOCKDEV;
-		else if (di->force) {
-			dev_flags |= DF_READ_ONLY;
-			printk(KERN_INFO "FILEIO: DF_READ_ONLY for"
-				" Major:Minor - %d:%d\n",
-				di->iblock_major, di->iblock_minor);
-		} else {
-			printk(KERN_ERR "Unable to claim block device. Only use"
-				" force=1 for READ-ONLY access.\n");
-			goto fail;
-		}
-
-		fd_dev->fd_bd = bd;
+		dev_flags |= DF_CLAIMED_BLOCKDEV;
 		if (dev_flags & DF_CLAIMED_BLOCKDEV)
 			fd_dev->fd_bd->bd_contains = bd;
-
 		/*
 		 * Determine the number of bytes for this FILEIO device from
-		 * struct block_device.
+		 * struct block_device's block count and block_size.
 		 */
-		fd_dev->fd_dev_size =
-			((unsigned long long)bd->bd_disk->capacity * 512);
-#if 0
-		printk(KERN_ERR "FILEIO: Using fd_dev_size %llu from struct"
-			" block_device\n", fd_dev->fd_dev_size);
-#endif
+		blocks_long = (get_capacity(bd->bd_disk) - 1);
+		q = bdev_get_queue(bd);
+		fd_dev->fd_dev_size = ((unsigned long long)blocks_long *
+					q->hardsect_size);
+		printk(KERN_INFO "FILEIO: Using size: %llu bytes from struct"
+			" block_device blocks: %llu hardsect_size: %d\n",
+				fd_dev->fd_dev_size, blocks_long,
+				q->hardsect_size);
+	} else {
+		if (!(fd_dev->fbd_flags & FBDF_HAS_SIZE)) {
+			printk(KERN_ERR "FILEIO: Missing fd_dev_size="
+				" parameter, and no backing struct"
+				" block_device\n");
+			goto fail;
+		}
 	}
-#endif
 	dev_flags |= DF_DISABLE_STATUS_THREAD;
 
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
@@ -296,14 +287,17 @@ se_device_t *fd_create_virtdevice(
 		" %llu total bytes\n", fd_host->fd_host_id, fd_dev->fd_dev_id,
 			fd_dev->fd_dev_name, fd_dev->fd_dev_size);
 
+	iput(inode);
 	putname(dev_p);
-
 	return dev;
 fail:
 	if (fd_dev->fd_file) {
 		filp_close(fd_dev->fd_file, NULL);
 		fd_dev->fd_file = NULL;
 	}
+	fd_dev->fd_bd = NULL;
+	if (inode)
+		iput(inode);
 	putname(dev_p);
 	kfree(fd_dev);
 	return NULL;
@@ -428,10 +422,10 @@ int fd_emulate_inquiry(se_task_t *task)
 static int fd_emulate_read_cap(se_task_t *task)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) task->se_dev->dev_ptr;
-	u32 blocks = ((fd_dev->fd_dev_size /
-		       DEV_ATTRIB(task->se_dev)->block_size) - 1);
+	u32 blocks = (fd_dev->fd_dev_size /
+		       DEV_ATTRIB(task->se_dev)->block_size);
 
-	if (((fd_dev->fd_dev_size / DEV_ATTRIB(task->se_dev)->block_size) - 1)
+	if ((fd_dev->fd_dev_size / DEV_ATTRIB(task->se_dev)->block_size)
 	      >= 0x00000000ffffffff)
 		blocks = 0xffffffff;
 
@@ -925,7 +919,6 @@ ssize_t fd_set_configfs_dev_params(
 	memcpy(buf, page, count);
 	cur = buf;
 
-#warning FIXME: Finish major/minor for real backend blockdevice
 	while (cur) {
 		ptr = strstr(cur, "=");
 		if (!(ptr))
@@ -954,8 +947,8 @@ ssize_t fd_set_configfs_dev_params(
 						" fd_dev_size=\n");
 				continue;
 			}
-			printk(KERN_INFO "FILEIO: Referencing Size: %llu\n",
-					fd_dev->fd_dev_size);
+			printk(KERN_INFO "FILEIO: Referencing Size: %llu"
+					" bytes\n", fd_dev->fd_dev_size);
 			fd_dev->fbd_flags |= FBDF_HAS_SIZE;
 			params++;
 			continue;
@@ -968,14 +961,12 @@ out:
 	return (params) ? count : -EINVAL;
 }
 
-#warning FIXME: Finish major/minor for real backend blockdevice
 ssize_t fd_check_configfs_dev_params(se_hba_t *hba, se_subsystem_dev_t *se_dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
 
-	if (!(fd_dev->fbd_flags & FBDF_HAS_PATH) ||
-	    !(fd_dev->fbd_flags & FBDF_HAS_SIZE)) {
-		printk(KERN_ERR "Missing fd_dev_name= and fd_dev_size=\n");
+	if (!(fd_dev->fbd_flags & FBDF_HAS_PATH)) {
+		printk(KERN_ERR "Missing fd_dev_name=\n");
 		return -1;
 	}
 
