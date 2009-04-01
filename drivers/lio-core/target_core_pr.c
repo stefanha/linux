@@ -181,7 +181,7 @@ static int core_scsi3_pr_seq_non_holder(
 	se_lun_t *se_lun = SE_LUN(cmd);
 	int other_cdb = 0;
 	int registered_nexus = 0, ret = 1; /* Conflict by default */
-	int all_reg = 0; /* ALL_REG */
+	int all_reg = 0, reg_only = 0; /* ALL_REG, REG_ONLY */
 	int we = 0; /* Write Exclusive */
 	int legacy = 0; /* Act like a legacy device and return
 			 * RESERVATION CONFLICT on some CDBs */
@@ -205,6 +205,7 @@ static int core_scsi3_pr_seq_non_holder(
 		/*
 		 * Some commands are only allowed for registered I_T Nexuses.
 		 */
+		reg_only = 1;
 		if (se_deve->deve_flags & DEF_PR_REGISTERED)
 			registered_nexus = 1;
 		break;
@@ -349,21 +350,17 @@ static int core_scsi3_pr_seq_non_holder(
 	 * Check if write exclusive initiator ports *NOT* holding the
 	 * WRITE_EXCLUSIVE_* reservation.
 	 */
-	if (we) {
+	if ((we) && !(registered_nexus)) {
 		if ((cmd->data_direction == SE_DIRECTION_WRITE) ||
 		    (cmd->data_direction == SE_DIRECTION_BIDI)) {
 			/*
 			 * Conflict for write exclusive
 			 */
-			printk(KERN_INFO "WRITE Conflict for %sregistered nexus"
+			printk(KERN_INFO "%s Conflict for unregistered nexus"
 				" %s CDB: 0x%02x to %s reservation\n",
-				(registered_nexus) ? "" : "un",
+				transport_dump_cmd_direction(cmd),
 				se_sess->se_node_acl->initiatorname, cdb[0],
 				core_scsi3_pr_dump_type(pr_reg_type));
-			if (cdb[0] == PERSISTENT_RESERVE_OUT)
-				printk(KERN_INFO "WRITE Conflict was"
-					" PERSISTENT_RESERVE_OUT, Service"
-					" Action: 0x%02x\n", cdb[1] & 0x1f);
 			return 1;
 		} else {
 			/*
@@ -385,20 +382,25 @@ static int core_scsi3_pr_seq_non_holder(
 #endif
 			return 0;
 		}
-	} else if (all_reg) {
+	} else if ((reg_only) || (all_reg)) {
 		if (registered_nexus) {
 			/*
-			 * For PR_*_ALL_REG reservation, treat all registered
-			 * nexuses as the reservation holder.
+			 * For PR_*_REG_ONLY and PR_*_ALL_REG reservations,
+			 * allow commands from registered nexuses.
 			 */
+#if 0
 			printk(KERN_INFO "Allowing implict CDB: 0x%02x for %s"
 				" reservation\n", cdb[0],
 				core_scsi3_pr_dump_type(pr_reg_type));
+#endif
 			return 0;
 		}
 	}
-	printk(KERN_INFO "Conflict for CDB: 0x%2x for %s reservation\n",
-		cdb[0], core_scsi3_pr_dump_type(pr_reg_type));
+	printk(KERN_INFO "%s Conflict for %sregistered nexus %s CDB: 0x%2x"
+		" for %s reservation\n", transport_dump_cmd_direction(cmd),
+		(registered_nexus) ? "" : "un",
+		se_sess->se_node_acl->initiatorname, cdb[0],
+		core_scsi3_pr_dump_type(pr_reg_type));
 
 	return 1; /* Conflict by default */
 }
