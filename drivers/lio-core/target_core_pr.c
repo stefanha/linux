@@ -355,9 +355,15 @@ static int core_scsi3_pr_seq_non_holder(
 			/*
 			 * Conflict for write exclusive
 			 */
-			printk(KERN_INFO "Conflict for WRITE CDB: 0x%02x"
-				" to %s reservation\n", cdb[0],
+			printk(KERN_INFO "WRITE Conflict for %sregistered nexus"
+				" %s CDB: 0x%02x to %s reservation\n",
+				(registered_nexus) ? "" : "un",
+				se_sess->se_node_acl->initiatorname, cdb[0],
 				core_scsi3_pr_dump_type(pr_reg_type));
+			if (cdb[0] == PERSISTENT_RESERVE_OUT)
+				printk(KERN_INFO "WRITE Conflict was"
+					" PERSISTENT_RESERVE_OUT, Service"
+					" Action: 0x%02x\n", cdb[1] & 0x1f);
 			return 1;
 		} else {
 			/*
