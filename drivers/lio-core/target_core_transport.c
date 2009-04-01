@@ -1365,6 +1365,24 @@ int transport_check_device_tcq(
 }
 EXPORT_SYMBOL(transport_check_device_tcq);
 
+unsigned char *transport_dump_cmd_direction (se_cmd_t *cmd)
+{
+	switch (cmd->data_direction) {
+	case SE_DIRECTION_NONE:
+		return "NONE";
+	case SE_DIRECTION_READ:
+		return "READ";
+	case SE_DIRECTION_WRITE:
+		return "WRITE";
+	case SE_DIRECTION_BIDI: 
+		return "BIDI";
+	default:
+		break;
+	}
+
+	return "UNKNOWN";
+}
+
 void transport_dump_dev_state(
 	se_device_t *dev,
 	char *b,
