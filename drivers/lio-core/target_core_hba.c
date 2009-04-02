@@ -52,8 +52,7 @@
 
 se_hba_t *__core_get_hba_from_id(se_hba_t *hba)
 {
-	down_interruptible(&hba->hba_access_sem);
-	return (signal_pending(current)) ? NULL : hba;
+	return ((down_interruptible(&hba->hba_access_sem) != 0) ? NULL : hba);
 }
 
 se_hba_t *core_get_hba_from_id(u32 hba_id, int addhba)

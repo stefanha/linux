@@ -1374,7 +1374,7 @@ unsigned char *transport_dump_cmd_direction (se_cmd_t *cmd)
 		return "READ";
 	case SE_DIRECTION_WRITE:
 		return "WRITE";
-	case SE_DIRECTION_BIDI: 
+	case SE_DIRECTION_BIDI:
 		return "BIDI";
 	default:
 		break;
@@ -5780,8 +5780,8 @@ int transport_generic_passthrough_async(
 		return -1;
 
 	if (write && !no_alloc) {
-		down_interruptible(&T_TASK(cmd)->t_transport_passthrough_wsem);
-		if (signal_pending(current))
+		if (down_interruptible(
+			&T_TASK(cmd)->t_transport_passthrough_wsem) != 0)
 			return -1;
 
 		transport_generic_process_write(cmd);
