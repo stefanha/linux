@@ -208,8 +208,8 @@ int configfs_unlink(struct inode *dir, struct dentry *dentry)
 	 */
 	if (type && type->ct_item_ops &&
 	    type->ct_item_ops->check_link) {
-		ret = type->ct_item_ops->check_link(parent_item);
-		if (ret != 0) {
+		if (type->ct_item_ops->check_link(parent_item,
+					sl->sl_target) != 0) {
 			config_item_put(parent_item);
 			goto out;
 		}
