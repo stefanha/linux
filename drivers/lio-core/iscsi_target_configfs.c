@@ -523,11 +523,13 @@ out:
 	return(ret);
 }
 
-static int lio_target_port_check_link(struct config_item *lun_ci)
+static int lio_target_port_check_link(
+	struct config_item *lun_ci,
+	struct config_item *se_dev_ci)
 {
 	se_lun_t *lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group);
 
-	return atomic_read(&lun->lun_acl_count) ? -EACCES : 0;
+	return atomic_read(&lun->lun_acl_count) ? -EPERM : 0;
 }
 
 static int lio_target_port_unlink (struct config_item *lun_ci, struct config_item *se_dev_ci)
