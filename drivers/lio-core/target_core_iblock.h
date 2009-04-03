@@ -25,8 +25,8 @@
  ******************************************************************************/
 
 
-#ifndef ISCSI_TARGET_IBLOCK_H
-#define ISCSI_TARGET_IBLOCK_H
+#ifndef TARGET_CORE_IBLOCK_H
+#define TARGET_CORE_IBLOCK_H
 
 #define IBLOCK_VERSION		"3.0"
 
@@ -171,4 +171,4 @@ se_subsystem_api_t iblock_template = {
 
 #endif /* IBLOCK_INCLUDE_STRUCTS */
 
-#endif /* ISCSI_TARGET_IBLOCK_H */
+#endif /* TARGET_CORE_IBLOCK_H */

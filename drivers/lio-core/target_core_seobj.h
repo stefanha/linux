@@ -24,8 +24,8 @@
  ******************************************************************************/
 
 
-#ifndef ISCSI_TARGET_SEOBJ_H
-#define ISCSI_TARGET_SEOBJ_H
+#ifndef TARGET_CORE_SEOBJ_H
+#define TARGET_CORE_SEOBJ_H
 
 extern struct se_obj_lun_type_s *se_obj_get_api(u32);
 extern int se_obj_load_plugins(void);
@@ -106,4 +106,9 @@ typedef struct se_obj_lun_type_s {
 	int (*release_obj_lock)(void *);
 } se_obj_lun_type_t;
 
-#endif /* ISCSI_TARGET_SEOBJ_H */
+/*
+ * object template for se_device_t storage objects
+ */
+extern se_obj_lun_type_t dev_obj_template;
+
+#endif /* TARGET_CORE_SEOBJ_H */

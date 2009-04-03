@@ -52,7 +52,6 @@
 #include <target_core_pscsi.h>
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#include <target_core_seobj_plugins.h>
 #include <target_core_transport_plugin.h>
 
 #undef TARGET_CORE_PSCSI_C

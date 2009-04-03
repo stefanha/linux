@@ -24,7 +24,7 @@
  ******************************************************************************/
 
 
-#define ISCSI_TARGET_SEOBJ_C
+#define TARGET_CORE_SEOBJ_C
 
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -42,11 +42,10 @@
 #include <target_core_transport.h>
 #include <target_core_plugin.h>
 #include <target_core_seobj.h>
-#include <target_core_seobj_plugins.h>
 #include <target_core_fabric_ops.h>
 #include <target_core_configfs.h>
 
-#undef ISCSI_TARGET_SEOBJ_C
+#undef TARGET_CORE_SEOBJ_C
 
 #define MAKE_OBJ_TYPE(type, op1, op2)			\
 void type##_obj_##op1##_count(struct se_obj_s *obj)	\
