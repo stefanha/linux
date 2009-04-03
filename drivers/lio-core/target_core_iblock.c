@@ -332,18 +332,6 @@ void *iblock_allocate_request(
 	return (void *)ib_req;
 }
 
-void iblock_get_evpd_prod(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	snprintf(buf, size, "IBLOCK");
-}
-
-void iblock_get_evpd_sn(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
-
-	snprintf(buf, size, "%u_%u", ibd->ibd_major, ibd->ibd_minor);
-}
-
 static int iblock_emulate_inquiry(se_task_t *task)
 {
 	unsigned char prod[64], se_location[128];

@@ -615,20 +615,6 @@ void dev_obj_set_tur_bit(void *p)
 	atomic_set(&dev->dev_tur_active, 1);
 }
 
-void dev_obj_get_evpd_prod(void *p, unsigned char *buf, u32 size)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	TRANSPORT(dev)->get_evpd_prod(buf, size, dev);
-}
-
-void dev_obj_get_evpd_sn(void *p, unsigned char *buf, u32 size)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	TRANSPORT(dev)->get_evpd_sn(buf, size, dev);
-}
-
 int dev_obj_get_task_timeout(void *p)
 {
 	se_device_t *dev = (se_device_t *)p;
@@ -730,8 +716,6 @@ se_obj_lun_type_t dev_obj_template = {
 	.check_tur_bit		= dev_obj_check_tur_bit,
 	.clear_tur_bit		= dev_obj_clear_tur_bit,
 	.set_tur_bit		= dev_obj_set_tur_bit,
-	.get_evpd_prod		= dev_obj_get_evpd_prod,
-	.get_evpd_sn		= dev_obj_get_evpd_sn,
 	.get_task_timeout	= dev_obj_get_task_timeout,
 	.task_failure_complete	= dev_obj_task_failure_complete,
 	.add_obj_to_lun		= dev_add_obj_to_lun,

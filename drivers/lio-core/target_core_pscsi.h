@@ -70,8 +70,6 @@ extern void pscsi_deactivate_device(se_device_t *);
 extern void pscsi_free_device(void *);
 extern int pscsi_transport_complete(se_task_t *);
 extern void *pscsi_allocate_request(se_task_t *, se_device_t *);
-extern void pscsi_get_evpd_prod(unsigned char *, u32, se_device_t *);
-extern void pscsi_get_evpd_sn(unsigned char *, u32, se_device_t *);
 extern int pscsi_do_task(se_task_t *);
 extern void pscsi_free_task(se_task_t *);
 extern ssize_t pscsi_set_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
@@ -117,8 +115,8 @@ typedef struct pscsi_plugin_task_s {
 #define PDF_HAS_CHANNEL_ID	0x01
 #define PDF_HAS_TARGET_ID	0x02
 #define PDF_HAS_LUN_ID		0x04
-#define PDF_HAS_EVPD_UNIT_SERIAL 0x08
-#define PDF_HAS_EVPD_DEV_IDENT	0x10
+#define PDF_HAS_VPD_UNIT_SERIAL 0x08
+#define PDF_HAS_VPD_DEV_IDENT	0x10
 
 typedef struct pscsi_dev_virt_s {
 	int	pdv_flags;
@@ -179,8 +177,6 @@ se_subsystem_api_t pscsi_template = {
 	.get_device_rev		= pscsi_get_device_rev,		\
 	.get_device_type	= pscsi_get_device_type,	\
 	.get_dma_length		= pscsi_get_dma_length,		\
-	.get_evpd_prod		= pscsi_get_evpd_prod,		\
-	.get_evpd_sn		= pscsi_get_evpd_sn,		\
 	.get_max_sectors	= pscsi_get_max_sectors,	\
 	.get_queue_depth	= pscsi_get_queue_depth,	\
 	.shutdown_hba		= pscsi_shutdown_hba,		\

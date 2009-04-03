@@ -59,8 +59,6 @@ extern void iblock_deactivate_device(se_device_t *);
 extern void iblock_free_device(void *);
 extern int iblock_transport_complete(se_task_t *);
 extern void *iblock_allocate_request(se_task_t *, se_device_t *);
-extern void iblock_get_evpd_prod(unsigned char *, u32, se_device_t *);
-extern void iblock_get_evpd_sn(unsigned char *, u32, se_device_t *);
 extern int iblock_do_task(se_task_t *);
 extern void iblock_free_task(se_task_t *);
 extern ssize_t iblock_set_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
@@ -164,8 +162,6 @@ se_subsystem_api_t iblock_template = {
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,
 	.get_dma_length		= iblock_get_dma_length,
-	.get_evpd_prod		= iblock_get_evpd_prod,
-	.get_evpd_sn		= iblock_get_evpd_sn,
 	.get_max_sectors	= iblock_get_max_sectors,
 	.get_queue_depth	= iblock_get_queue_depth,
 	.get_max_queue_depth	= iblock_get_max_queue_depth,

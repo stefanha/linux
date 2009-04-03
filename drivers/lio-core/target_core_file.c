@@ -381,19 +381,6 @@ void *fd_allocate_request(
 	return (void *)fd_req;
 }
 
-void fd_get_evpd_prod(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	snprintf(buf, size, "FILEIO");
-}
-
-void fd_get_evpd_sn(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	fd_dev_t *fdev = (fd_dev_t *) dev->dev_ptr;
-	se_hba_t *hba = dev->se_hba;
-
-	snprintf(buf, size, "%u_%u", hba->hba_id, fdev->fd_dev_id);
-}
-
 /*	fd_emulate_inquiry():
  *
  *

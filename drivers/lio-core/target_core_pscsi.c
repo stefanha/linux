@@ -614,17 +614,17 @@ int pscsi_transport_complete(se_task_t *task)
 
 	result = pt->pscsi_result;
 
-# ifdef LINUX_EVPD_PAGE_CHECK
+# ifdef LINUX_VPD_PAGE_CHECK
 	if ((cdb[0] == INQUIRY) && host_byte(result) == DID_OK) {
 		u32 len = 0;
 		unsigned char *dst = (unsigned char *)
 				T_TASK(task->task_se_cmd)->t_task_buf;
-		unsigned char buf[EVPD_BUF_LEN], *iqn = NULL;
+		unsigned char buf[VPD_BUF_LEN], *iqn = NULL;
 		se_subsystem_dev_t *su_dev = TASK_DEV(task)->se_sub_dev;
 		se_hba_t *hba = task->se_dev->se_hba;
 
 		/*
-		 * The Initiator port did not request EVPD information.
+		 * The Initiator port did not request VPD information.
 		 */
 		if (!(cdb[1] & 0x1)) {
 			task->task_scsi_status = GOOD;
@@ -632,17 +632,17 @@ int pscsi_transport_complete(se_task_t *task)
 		}
 
 		/*
-		 * Assume the SCSI Device did the right thing if an EVPD length
+		 * Assume the SCSI Device did the right thing if an VPD length
 		 * is provided in the INQUIRY response payload.
 		 */
 		if (dst[3] != 0x00) {
-			su_dev->su_dev_flags |= SDF_FIRMWARE_EVPD_UNIT_SERIAL;
-			su_dev->su_dev_flags &= ~SDF_EMULATED_EVPD_UNIT_SERIAL;
+			su_dev->su_dev_flags |= SDF_FIRMWARE_VPD_UNIT_SERIAL;
+			su_dev->su_dev_flags &= ~SDF_EMULATED_VPD_UNIT_SERIAL;
 			task->task_scsi_status = GOOD;
 			return 0;
 		}
 
-		memset(buf, 0, EVPD_BUF_LEN);
+		memset(buf, 0, VPD_BUF_LEN);
 		memset(dst, 0, task->task_size);
 		buf[0] = sd->type;
 
@@ -658,7 +658,7 @@ int pscsi_transport_complete(se_task_t *task)
 		case 0x80:
 			buf[1] = 0x80;
 			if (su_dev->su_dev_flags &
-					SDF_EMULATED_EVPD_UNIT_SERIAL)
+					SDF_EMULATED_VPD_UNIT_SERIAL)
 				len += sprintf((unsigned char *)&buf[4], "%s",
 					&su_dev->t10_wwn.unit_serial[0]);
 			else {
@@ -678,7 +678,7 @@ int pscsi_transport_complete(se_task_t *task)
 			len += sprintf((unsigned char *)&buf[8], "LIO-ORG");
 
 			if (su_dev->su_dev_flags &
-					SDF_EMULATED_EVPD_UNIT_SERIAL) {
+					SDF_EMULATED_VPD_UNIT_SERIAL) {
 				len += sprintf((unsigned char *)&buf[16],
 					"PSCSI:%s",
 					&su_dev->t10_wwn.unit_serial[0]);
@@ -698,7 +698,7 @@ int pscsi_transport_complete(se_task_t *task)
 		}
 
 		if ((len + 4) > task->task_size) {
-			printk(KERN_ERR "Inquiry EVPD Length: %u larger than"
+			printk(KERN_ERR "Inquiry VPD Length: %u larger than"
 				" req->sr_bufflen: %u\n", (len + 4),
 				task->task_size);
 			memcpy(dst, buf, task->task_size);
@@ -712,7 +712,7 @@ int pscsi_transport_complete(se_task_t *task)
 		return 0;
 	}
 
-# endif /* LINUX_EVPD_PAGE_CHECK */
+# endif /* LINUX_VPD_PAGE_CHECK */
 
 	/*
 	 * Hack to make sure that Write-Protect modepage is set if R/O mode is
@@ -805,21 +805,6 @@ void *pscsi_allocate_request(
 	}
 
 	return pt;
-}
-
-void pscsi_get_evpd_prod(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	snprintf(buf, size, "PSCSI");
-}
-
-void pscsi_get_evpd_sn(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
-	se_hba_t *hba = dev->se_hba;
-
-	snprintf(buf, size, "%u_%u_%u_%u", hba->hba_id, sd->channel,
-			sd->id, sd->lun);
 }
 
 static int pscsi_blk_get_request(se_task_t *task)

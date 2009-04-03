@@ -392,21 +392,6 @@ void *rd_allocate_request(
 	return (void *)rd_req;
 }
 
-void rd_get_evpd_prod(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
-
-	snprintf(buf, size, "RAMDISK-%s", (rd_dev->rd_direct) ? "DR" : "MCP");
-}
-
-void rd_get_evpd_sn(unsigned char *buf, u32 size, se_device_t *dev)
-{
-	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
-	se_hba_t *hba = dev->se_hba;
-
-	snprintf(buf, size, "%u_%u", hba->hba_id, rd_dev->rd_dev_id);
-}
-
 /*	rd_emulate_inquiry():
  *
  *

@@ -18,6 +18,6 @@ LINUX_FILEIO ?= 1
 #
 # Workarounds for stupidity
 #
-LINUX_EVPD_PAGE_CHECK?=1
+LINUX_VPD_PAGE_CHECK?=1
 
 LIO_TARGET_CONFIGFS?=1

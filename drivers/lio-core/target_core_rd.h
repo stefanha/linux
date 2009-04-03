@@ -71,8 +71,6 @@ extern void rd_deactivate_device(se_device_t *);
 extern void rd_free_device(void *);
 extern int rd_transport_complete(se_task_t *);
 extern void *rd_allocate_request(se_task_t *, se_device_t *);
-extern void rd_get_evpd_prod(unsigned char *, u32, se_device_t *);
-extern void rd_get_evpd_sn(unsigned char *, u32, se_device_t *);
 extern int rd_DIRECT_do_task(se_task_t *);
 extern int rd_MEMCPY_do_task(se_task_t *);
 extern int rd_DIRECT_allocate_DMA(se_cmd_t *, u32, u32);
@@ -211,8 +209,6 @@ se_subsystem_api_t rd_dr_template = {
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
 	.get_dma_length		= rd_get_dma_length,
-	.get_evpd_prod		= rd_get_evpd_prod,
-	.get_evpd_sn		= rd_get_evpd_sn,
 	.get_max_sectors	= rd_get_max_sectors,
 	.get_queue_depth	= rd_get_queue_depth,
 	.get_max_queue_depth	= rd_get_max_queue_depth,
@@ -249,8 +245,6 @@ se_subsystem_api_t rd_mcp_template = {
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
 	.get_dma_length		= rd_get_dma_length,
-	.get_evpd_prod		= rd_get_evpd_prod,
-	.get_evpd_sn		= rd_get_evpd_sn,
 	.get_max_sectors	= rd_get_max_sectors,
 	.get_queue_depth	= rd_get_queue_depth,
 	.get_max_queue_depth	= rd_get_max_queue_depth,

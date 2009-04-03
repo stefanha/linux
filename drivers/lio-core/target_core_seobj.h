@@ -107,8 +107,6 @@ typedef struct se_obj_lun_type_s {
 	int (*check_tur_bit)(void *);
 	void (*clear_tur_bit)(void *);
 	void (*set_tur_bit)(void *);
-	void (*get_evpd_prod)(void *, unsigned char *, u32);
-	void (*get_evpd_sn)(void *, unsigned char *, u32);
 	int (*get_task_timeout)(void *);
 	int (*task_failure_complete)(void *, struct se_cmd_s *);
 	int (*add_obj_to_lun)(struct se_portal_group_s *, struct se_lun_s *);
