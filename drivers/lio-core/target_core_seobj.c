@@ -97,45 +97,6 @@ se_queue_obj_t *dev_obj_get_queue_obj(void *p)
 	return dev->dev_queue_obj;
 }
 
-int dev_obj_start_status_thread(void *p, int force)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	if (!(force) && !(DEV_ATTRIB(dev)->status_thread))
-		return 0;
-
-	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		return transport_start_status_thread(dev);
-
-	return 0;
-}
-
-void dev_obj_stop_status_thread(void *p)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_stop_status_thread((se_device_t *)p);
-}
-
-int dev_obj_start_status_timer(void *p)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_start_status_timer((se_device_t *)p);
-
-	return 0;
-}
-
-void dev_obj_stop_status_timer(void *p)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	if (DEV_OBJ_API(dev)->get_device_type(p) == TYPE_DISK)
-		transport_stop_status_timer((se_device_t *)p);
-}
-
 int dev_obj_claim_obj(void *p)
 {
 	return transport_generic_claim_phydevice((se_device_t *)p);
@@ -442,20 +403,6 @@ int dev_obj_check_shutdown(void *p)
 	return ret;
 }
 
-void dev_obj_fail_operations(void *p)
-{
-	transport_status_thr_dev_offline((se_device_t *)p);
-	transport_status_thr_dev_offline_tasks((se_device_t *)p, p);
-}
-
-void dev_obj_signal_offline(void *p)
-{
-	se_device_t *dev  = (se_device_t *)p;
-
-	transport_status_thr_force_offline((se_device_t *)p,
-		DEV_OBJ_API(dev), p);
-}
-
 void dev_obj_signal_shutdown(void *p)
 {
 	se_device_t *dev  = (se_device_t *)p;
@@ -594,37 +541,11 @@ t10_wwn_t *dev_obj_get_t10_wwn(void *p)
 	return DEV_T10_WWN(dev);
 }
 
-int dev_obj_check_tur_bit(void *p)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	return atomic_read(&dev->dev_tur_active);
-}
-
-void dev_obj_clear_tur_bit(void *p)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	atomic_set(&dev->dev_tur_active, 0);
-}
-
-void dev_obj_set_tur_bit(void *p)
-{
-	se_device_t *dev = (se_device_t *)p;
-
-	atomic_set(&dev->dev_tur_active, 1);
-}
-
 int dev_obj_get_task_timeout(void *p)
 {
 	se_device_t *dev = (se_device_t *)p;
 
 	return DEV_ATTRIB(dev)->task_timeout;
-}
-
-int dev_obj_task_failure_complete(void *p, se_cmd_t *cmd)
-{
-	return transport_failure_tasks_generic(cmd);
 }
 
 int dev_add_obj_to_lun(se_portal_group_t *tpg, se_lun_t *lun)
@@ -661,10 +582,6 @@ se_obj_lun_type_t dev_obj_template = {
 	.get_plugin_info	= dev_obj_get_plugin_info,
 	.get_obj		= dev_obj_get_obj,
 	.get_queue_obj		= dev_obj_get_queue_obj,
-	.start_status_thread	= dev_obj_start_status_thread,
-	.stop_status_thread	= dev_obj_stop_status_thread,
-	.start_status_timer	= dev_obj_start_status_timer,
-	.stop_status_timer	= dev_obj_stop_status_timer,
 	.claim_obj		= dev_obj_claim_obj,
 	.release_obj		= dev_obj_release_obj,
 	.inc_count		= dev_obj_inc_count,
@@ -699,8 +616,6 @@ se_obj_lun_type_t dev_obj_template = {
 	.notify_obj		= dev_obj_notify_obj,
 	.check_online		= dev_obj_check_online,
 	.check_shutdown		= dev_obj_check_shutdown,
-	.fail_operations	= dev_obj_fail_operations,
-	.signal_offline		= dev_obj_signal_offline,
 	.signal_shutdown	= dev_obj_signal_shutdown,
 	.clear_shutdown		= dev_obj_clear_shutdown,
 	.get_cdb		= dev_obj_get_cdb,
@@ -712,12 +627,7 @@ se_obj_lun_type_t dev_obj_template = {
 	.get_device_type	= dev_obj_get_device_type,
 	.check_DMA_handler	= dev_obj_check_DMA_handler,
 	.get_t10_wwn		= dev_obj_get_t10_wwn,
-	.get_uu_id		= NULL,
-	.check_tur_bit		= dev_obj_check_tur_bit,
-	.clear_tur_bit		= dev_obj_clear_tur_bit,
-	.set_tur_bit		= dev_obj_set_tur_bit,
 	.get_task_timeout	= dev_obj_get_task_timeout,
-	.task_failure_complete	= dev_obj_task_failure_complete,
 	.add_obj_to_lun		= dev_add_obj_to_lun,
 	.del_obj_from_lun	= dev_del_obj_from_lun,
 	.get_next_obj_api	= dev_get_next_obj_api,

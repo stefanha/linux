@@ -42,10 +42,6 @@ typedef struct se_obj_lun_type_s {
 	void (*get_plugin_info)(void *, char *, int *);
 	void *(*get_obj)(void *);
 	struct se_queue_obj_s *(*get_queue_obj)(void *);
-	int (*start_status_thread)(void *, int);
-	void (*stop_status_thread)(void *);
-	int (*start_status_timer)(void *);
-	void (*stop_status_timer)(void *);
 	int (*claim_obj)(void *);
 	void (*release_obj)(void *);
 	void (*inc_count)(struct se_obj_s *);
@@ -86,8 +82,6 @@ typedef struct se_obj_lun_type_s {
 	int (*check_export)(void *);
 	int (*check_online)(void *);
 	int (*check_shutdown)(void *);
-	void (*fail_operations)(void *);
-	void (*signal_offline)(void *);
 	void (*signal_shutdown)(void *);
 	void (*clear_shutdown)(void *);
 	int (*obj_start)(void *, struct se_transform_info_s *,
@@ -103,10 +97,6 @@ typedef struct se_obj_lun_type_s {
 	int (*get_device_type)(void *);
 	int (*check_DMA_handler)(void *);
 	t10_wwn_t *(*get_t10_wwn)(void *);
-	u32 *(*get_uu_id)(void *);
-	int (*check_tur_bit)(void *);
-	void (*clear_tur_bit)(void *);
-	void (*set_tur_bit)(void *);
 	int (*get_task_timeout)(void *);
 	int (*task_failure_complete)(void *, struct se_cmd_s *);
 	int (*add_obj_to_lun)(struct se_portal_group_s *, struct se_lun_s *);

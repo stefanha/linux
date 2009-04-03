@@ -273,8 +273,6 @@ se_device_t *fd_create_virtdevice(
 			goto fail;
 		}
 	}
-	dev_flags |= DF_DISABLE_STATUS_THREAD;
-
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
 				se_dev, dev_flags, (void *)fd_dev);
 	if (!(dev))

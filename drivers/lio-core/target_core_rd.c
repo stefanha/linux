@@ -268,13 +268,6 @@ static se_device_t *rd_create_virtdevice(
 	rd_host_t *rd_host = (rd_host_t *) hba->hba_ptr;
 	int dev_flags = 0;
 
-#if 0
-	rd_dev->rd_dev_id = di->rd_device_id;
-	rd_dev->rd_page_count = di->rd_pages;
-	rd_dev->rd_host = rd_host;
-	rd_dev->rd_direct = rd_direct;
-#endif
-	dev_flags |= DF_DISABLE_STATUS_THREAD;
 	if (rd_dev->rd_direct)
 		dev_flags |= DF_TRANSPORT_DMA_ALLOC;
 

@@ -472,12 +472,6 @@ static struct target_core_dev_attrib_attribute				\
 		__CONFIGFS_EATTR_RO(_name,				\
 		target_core_dev_show_attr_##_name);
 
-DEF_DEV_ATTRIB(status_thread);
-SE_DEV_ATTR(status_thread, S_IRUGO | S_IWUSR);
-
-DEF_DEV_ATTRIB(status_thread_tur);
-SE_DEV_ATTR(status_thread_tur, S_IRUGO | S_IWUSR);
-
 DEF_DEV_ATTRIB(emulate_ua_intlck_ctrl);
 SE_DEV_ATTR(emulate_ua_intlck_ctrl, S_IRUGO | S_IWUSR);
 
@@ -508,8 +502,6 @@ SE_DEV_ATTR(task_timeout, S_IRUGO | S_IWUSR);
 CONFIGFS_EATTR_OPS(target_core_dev_attrib, se_dev_attrib_s, da_group);
 
 static struct configfs_attribute *target_core_dev_attrib_attrs[] = {
-	&target_core_dev_attrib_status_thread.attr,
-	&target_core_dev_attrib_status_thread_tur.attr,
 	&target_core_dev_attrib_emulate_ua_intlck_ctrl.attr,
 	&target_core_dev_attrib_emulate_tas.attr,
 	&target_core_dev_attrib_hw_block_size.attr,

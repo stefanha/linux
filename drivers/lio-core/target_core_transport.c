@@ -2219,11 +2219,6 @@ int transport_generic_activate_device(se_device_t *dev)
 
 	down(&dev->dev_queue_obj->thread_create_sem);
 
-	if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD)) {
-		if (DEV_OBJ_API(dev)->start_status_thread((void *)dev, 0) < 0)
-			return -1;
-	}
-
 	return 0;
 }
 
@@ -2233,9 +2228,6 @@ int transport_generic_activate_device(se_device_t *dev)
  */
 void transport_generic_deactivate_device(se_device_t *dev)
 {
-	if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD))
-		DEV_OBJ_API(dev)->stop_status_thread((void *)dev);
-
 	if (TRANSPORT(dev)->deactivate_device)
 		TRANSPORT(dev)->deactivate_device(dev);
 
@@ -2977,40 +2969,6 @@ static void transport_failure_reset_queue_depth(se_device_t *dev)
 	spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
 }
 
-/*
- * Used for se_device_t
- */
-int transport_failure_tasks_generic(se_cmd_t *cmd)
-{
-	unsigned long flags;
-	/*
-	 * This causes problems when VPD INQUIRY fails, disable this
-	 * functionality for now.
-	 */
-	se_task_t *task;
-
-	if (!(cmd->se_cmd_flags & SCF_SE_DISABLE_ONLINE_CHECK))
-		goto done;
-
-	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-	list_for_each_entry(task, &T_TASK(cmd)->t_task_list, t_list) {
-		DEBUG_TF("Exception Cmd ITT: 0x%08x: task[%p]: se_obj_api: %p"
-			" se_obj_ptr: %p task_scsi_status: %d\n",
-			CMD_TFO(cmd)->get_task_tag(cmd), task, task->se_obj_api,
-			task->se_obj_ptr, task->task_scsi_status);
-
-		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-		task->se_obj_api->signal_offline(task->se_obj_ptr);
-		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-	}
-	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-
-done:
-	cmd->transport_error_status =
-			PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-	return 0;
-}
-
 /*	transport_generic_request_failure():
  *
  *	Handle SAM-esque emulation for generic transport request failures.
@@ -3051,10 +3009,8 @@ void transport_generic_request_failure(
 
 	if (complete) {
 		transport_direct_request_timeout(cmd);
-
-		if (CMD_ORIG_OBJ_API(cmd)->task_failure_complete(
-				cmd->se_orig_obj_ptr, cmd) != 0)
-			return;
+		cmd->transport_error_status =
+			PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 
 	switch (cmd->transport_error_status) {
@@ -3157,15 +3113,11 @@ void transport_direct_request_timeout(se_cmd_t *cmd)
 
 	atomic_sub(atomic_read(&T_TASK(cmd)->t_transport_timeout),
 		   &T_TASK(cmd)->t_se_count);
-
-	CMD_ORIG_OBJ_API(cmd)->clear_tur_bit(cmd->se_orig_obj_ptr);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 }
 
 void transport_generic_request_timeout(se_cmd_t *cmd)
 {
-	unsigned char *cdb;
-	se_task_t *task;
 	unsigned long flags;
 
 	/*
@@ -3180,31 +3132,6 @@ void transport_generic_request_timeout(se_cmd_t *cmd)
 	}
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	/*
-	 * Clear the TUR bit that the status thread will be checking to
-	 * determine when the next TUR can be sent to this se_cmd_t's object.
-	 */
-	CMD_ORIG_OBJ_API(cmd)->clear_tur_bit(cmd->se_orig_obj_ptr);
-
-	/*
-	 * Handle the scenario where the TUR never made it to the SE object, so
-	 * we need to restart it here.
-	 */
-	list_for_each_entry(task, &T_TASK(cmd)->t_task_list, t_list)
-		break;
-
-	if (!task)
-		goto out;
-
-	cdb = CMD_ORIG_OBJ_API(cmd)->get_cdb(cmd->se_orig_obj_ptr, task);
-	if (!(cdb))
-		goto out;
-
-	if ((cdb[0] == TEST_UNIT_READY) &&
-	    (cmd->se_cmd_flags & SCF_SE_DISABLE_ONLINE_CHECK))
-		CMD_ORIG_OBJ_API(cmd)->start_status_timer(cmd->se_orig_obj_ptr);
-
-out:
 	transport_generic_remove(cmd, 0, 0);
 }
 
@@ -3804,7 +3731,6 @@ EXPORT_SYMBOL(transport_get_default_task_timeout);
  */
 void transport_start_task_timer(se_task_t *task)
 {
-	unsigned char *cdb;
 	int timeout;
 
 	if (task->task_flags & TF_RUNNING)
@@ -3815,14 +3741,6 @@ void transport_start_task_timer(se_task_t *task)
 	timeout = task->se_obj_api->get_task_timeout(task->se_obj_ptr);
 	if (!(timeout))
 		return;
-
-	cdb = task->se_obj_api->get_cdb(task->se_obj_ptr, task);
-	if (cdb) {
-		if ((cdb[0] == TEST_UNIT_READY) &&
-		    (task->task_se_cmd->se_cmd_flags &
-					SCF_SE_DISABLE_ONLINE_CHECK))
-			timeout = TRANSPORT_TIMEOUT_TUR;
-	}
 
 	init_timer(&task->task_timer);
 	SETUP_TIMER(task->task_timer, timeout, task,
@@ -5635,11 +5553,9 @@ se_cmd_t *transport_allocate_passthrough(
 	/*
 	 * Double check that the passed object is currently accepting CDBs
 	 */
-	if (!(se_cmd_flags & SCF_SE_DISABLE_ONLINE_CHECK)) {
-		if (obj_api->check_online(type_ptr) != 0) {
-			DEBUG_SO("obj_api->check_online() failed!\n");
-			goto fail;
-		}
+	if (obj_api->check_online(type_ptr) != 0) {
+		DEBUG_SO("obj_api->check_online() failed!\n");
+		goto fail;
 	}
 
 	cmd->data_length = length;
@@ -7517,187 +7433,6 @@ int transport_generic_do_tmr(se_cmd_t *cmd)
 	return 0;
 }
 
-static int transport_add_qr_to_queue(
-	se_queue_obj_t *qobj,
-	void *se_obj_ptr,
-	int state)
-{
-	se_queue_req_t *qr;
-	unsigned long flags;
-
-	qr = kzalloc(sizeof(se_queue_req_t), GFP_ATOMIC);
-	if (!(qr)) {
-		printk(KERN_ERR "Unable to allocate memory for se_queue_req_t\n");
-		return -1;
-	}
-	INIT_LIST_HEAD(&qr->qr_list);
-
-	qr->state = state;
-	qr->queue_se_obj_ptr = se_obj_ptr;
-
-	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	list_add_tail(&qr->qr_list, &qobj->qobj_list);
-	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-#if 0
-	printk(KERN_INFO "Adding obj_ptr: %p state: %d to qobj: %p\n",
-			se_obj_ptr, state, qobj);
-#endif
-	atomic_inc(&qobj->queue_cnt);
-	wake_up_interruptible(&qobj->thread_wq);
-	return 0;
-}
-
-static void transport_handle_status_timeout(unsigned long data)
-{
-	se_device_t *dev = (se_device_t *) data;
-
-	spin_lock_bh(&dev->dev_status_thr_lock);
-	if (dev->dev_status_timer_flags & TF_STOP) {
-		spin_unlock_bh(&dev->dev_status_thr_lock);
-		return;
-	}
-	dev->dev_status_timer_flags &= ~TF_RUNNING;
-	spin_unlock_bh(&dev->dev_status_thr_lock);
-
-	transport_add_qr_to_queue(dev->dev_status_queue_obj, (void *)dev,
-			DEV_STATUS_THR_TUR);
-}
-
-void transport_start_status_timer(se_device_t *dev)
-{
-	spin_lock_bh(&dev->dev_status_thr_lock);
-	if (dev->dev_status_timer_flags & TF_RUNNING) {
-		spin_unlock_bh(&dev->dev_status_thr_lock);
-		return;
-	}
-
-	init_timer(&dev->dev_status_timer);
-	SETUP_TIMER(dev->dev_status_timer, PYX_TRANSPORT_STATUS_INTERVAL, dev,
-		transport_handle_status_timeout);
-
-	dev->dev_status_timer_flags |= TF_RUNNING;
-	add_timer(&dev->dev_status_timer);
-
-	spin_unlock_bh(&dev->dev_status_thr_lock);
-
-	return;
-}
-EXPORT_SYMBOL(transport_start_status_timer);
-
-void transport_stop_status_timer(se_device_t *dev)
-{
-	if (!(DEV_ATTRIB(dev)->status_thread_tur))
-		return;
-
-	spin_lock_bh(&dev->dev_status_thr_lock);
-	if (!(dev->dev_status_timer_flags & TF_RUNNING)) {
-		spin_unlock_bh(&dev->dev_status_thr_lock);
-		return;
-	}
-	dev->dev_status_timer_flags |= TF_STOP;
-	spin_unlock_bh(&dev->dev_status_thr_lock);
-
-	del_timer_sync(&dev->dev_status_timer);
-
-	spin_lock_bh(&dev->dev_status_thr_lock);
-	dev->dev_status_timer_flags &= ~TF_RUNNING;
-	dev->dev_status_timer_flags &= ~TF_STOP;
-	spin_unlock_bh(&dev->dev_status_thr_lock);
-}
-
-static void transport_status_thr_complete(se_cmd_t *cmd)
-{
-	se_device_t *dev = SE_DEV(cmd);
-	int ret;
-
-	ret = transport_passthrough_complete(cmd);
-	/*
-	 * Return if the module is being removed.
-	 */
-	if (se_global->in_shutdown) {
-		transport_passthrough_release(cmd);
-		return;
-	}
-
-	transport_start_status_timer(dev);
-
-	/*
-	 * The TEST_UNIT_READY completed with GOOD status.
-	 */
-	if (!(ret)) {
-		CMD_ORIG_OBJ_API(cmd)->clear_tur_bit(cmd->se_orig_obj_ptr);
-
-		/*
-		 * If the se_obj had previously been taken offline, notify
-		 * the status thread to go back into an ONLINE state.
-		 */
-		if (DEV_OBJ_API(dev)->check_online((void *)dev) != 0) {
-			transport_add_qr_to_queue(dev->dev_status_queue_obj,
-				(void *)dev, DEV_STATUS_THR_TAKE_ONLINE);
-		}
-	} else {
-		/*
-		 * If an exception condition exists, determine if a timeout did
-		 * NOT occur, and clear the TUR bit.
-		 */
-		if (!(atomic_read(&T_TASK(cmd)->t_transport_timeout)))
-			CMD_ORIG_OBJ_API(cmd)->clear_tur_bit(
-				cmd->se_orig_obj_ptr);
-		/*
-		 * Only take the object OFFLINE if said object is currently in
-		 * an ONLINE state.
-		 */
-		if (!(DEV_OBJ_API(dev)->check_online((void *)dev))) {
-			transport_add_qr_to_queue(dev->dev_status_queue_obj,
-				(void *)dev, DEV_STATUS_THR_TAKE_OFFLINE);
-		}
-	}
-
-	transport_passthrough_release(cmd);
-}
-
-static int transport_status_thread_tur(
-	se_obj_lun_type_t *obj_api,
-	void *obj_ptr)
-{
-	se_cmd_t *cmd;
-	int ret;
-	unsigned char cdb[SCSI_CDB_SIZE];
-
-	memset(cdb, 0, SCSI_CDB_SIZE);
-	cdb[0] = 0x00; /* TEST_UNIT_READY :-) */
-	/*
-	 * Only issue a TUR to this object if one had not previously been
-	 * issued.
-	 */
-	if (obj_api->check_tur_bit(obj_ptr) != 0)
-		return -1;
-	/*
-	 * Pass SCF_SE_DISABLE_ONLINE_CHECK cmd_flag so we can still
-	 * issue TEST_UNIT_READY.
-	 */
-	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_NONE,
-			SCF_SE_DISABLE_ONLINE_CHECK, NULL, 0, 0, obj_api,
-			obj_ptr);
-	if (!(cmd))
-		return -1;
-
-	cmd->transport_passthrough_done = &transport_status_thr_complete;
-
-	DEBUG_ST("Submitting CDB 0x00 to se_obj_api: %p se_obj_ptr: %p\n",
-			obj_api, obj_ptr);
-
-	obj_api->set_tur_bit(obj_ptr);
-
-	ret = transport_generic_passthrough(cmd);
-	if (ret < 0) {
-		obj_api->clear_tur_bit(obj_ptr);
-		transport_passthrough_release(cmd);
-	}
-
-	return ret;
-}
-
 /*
  *	Called with spin_lock_irq(&dev->execute_task_lock); held
  *
@@ -7716,361 +7451,6 @@ se_task_t *transport_get_task_from_state_list(se_device_t *dev)
 	atomic_set(&task->task_state_active, 0);
 
 	return task;
-}
-
-void transport_status_thr_force_offline(
-	se_device_t *dev,
-	se_obj_lun_type_t *se_obj_api,
-	void *se_obj_ptr)
-{
-	if (se_obj_api->check_online(se_obj_ptr) != 0)
-		return;
-
-	if (se_obj_api->check_shutdown(se_obj_ptr) == 1)
-		return;
-
-	transport_add_qr_to_queue(dev->dev_status_queue_obj, se_obj_ptr,
-			DEV_STATUS_THR_TAKE_OFFLINE);
-}
-
-int transport_status_thr_dev_online(se_device_t *dev)
-{
-	spin_lock(&dev->dev_status_lock);
-	if (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_ACTIVATED) {
-		dev->dev_status |= TRANSPORT_DEVICE_ACTIVATED;
-		dev->dev_status &= ~TRANSPORT_DEVICE_OFFLINE_ACTIVATED;
-	} else if (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_DEACTIVATED) {
-		dev->dev_status |= TRANSPORT_DEVICE_DEACTIVATED;
-		dev->dev_status &= ~TRANSPORT_DEVICE_OFFLINE_DEACTIVATED;
-	}
-	spin_unlock(&dev->dev_status_lock);
-
-	return 0;
-}
-
-int transport_status_thr_dev_offline(se_device_t *dev)
-{
-	spin_lock(&dev->dev_status_lock);
-	if (dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) {
-		dev->dev_status |= TRANSPORT_DEVICE_OFFLINE_ACTIVATED;
-		dev->dev_status &= ~TRANSPORT_DEVICE_ACTIVATED;
-	} else if (dev->dev_status & TRANSPORT_DEVICE_DEACTIVATED) {
-		dev->dev_status |= TRANSPORT_DEVICE_OFFLINE_DEACTIVATED;
-		dev->dev_status &= ~TRANSPORT_DEVICE_DEACTIVATED;
-	}
-	spin_unlock(&dev->dev_status_lock);
-
-	return 0;
-}
-
-int transport_status_thr_dev_offline_tasks(
-	se_device_t *dev,
-	void *se_obj_ptr)
-{
-	se_cmd_t *cmd;
-	se_task_t *task = NULL, *task_p = NULL;
-	int complete = 0, remove = 0;
-	unsigned long flags;
-
-	spin_lock_irqsave(&dev->execute_task_lock, flags);
-	list_for_each_entry_safe(task, task_p, &dev->state_task_list,
-			t_state_list) {
-
-		if (!(TASK_CMD(task))) {
-			printk(KERN_ERR "TASK_CMD(task) is NULL!\n");
-			BUG();
-		}
-		cmd = TASK_CMD(task);
-
-		/*
-		 * Only proccess se_cmd_t with matching se_obj_ptr..
-		 */
-		if (cmd->se_orig_obj_ptr != se_obj_ptr)
-			continue;
-
-		spin_unlock_irqrestore(&dev->execute_task_lock, flags);
-
-		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-		DEBUG_DO("DO: task: %p cmd: %p ITT/CmdSN: 0x%08x/0x%08x "
-			"i_state/def_i_state: %d/%d t_state/def_t_state:"
-			" %d/%d\n", task, cmd, CMD_TFO(cmd)->get_task_tag(cmd),
-			cmd->cmd_sn, CMD_TFO(cmd)->get_cmd_state(cmd),
-			cmd->deferred_i_state, cmd->t_state,
-			cmd->deferred_t_state);
-
-		DEBUG_DO("DO: ITT[0x%08x] - t_task_cdbs: %d t_task_cdbs_left:"
-			" %d t_task_cdbs_sent: %d t_task_cdbs_ex_left: %d --"
-			" t_transport_active: %d t_transport_stop: %d"
-			" t_transport_sent: %d\n",
-			CMD_TFO(cmd)->get_task_tag(cmd),
-			T_TASK(cmd)->t_task_cdbs,
-			atomic_read(&T_TASK(cmd)->t_task_cdbs_left),
-			atomic_read(&T_TASK(cmd)->t_task_cdbs_sent),
-			atomic_read(&T_TASK(cmd)->t_task_cdbs_ex_left),
-			atomic_read(&T_TASK(cmd)->t_transport_active),
-			atomic_read(&T_TASK(cmd)->t_transport_stop),
-			atomic_read(&T_TASK(cmd)->t_transport_sent));
-
-		if (atomic_read(&task->task_active)) {
-			if (atomic_read(&task->task_timeout)) {
-				DEBUG_DO("DO: task->task_timeout == 1"
-					", skipping task\n");
-				spin_unlock_irqrestore(
-					&T_TASK(cmd)->t_state_lock, flags);
-				spin_lock_irqsave(
-					&dev->execute_task_lock, flags);
-				continue;
-			}
-
-			atomic_set(&task->task_stop, 1);
-			spin_unlock_irqrestore(
-				&T_TASK(cmd)->t_state_lock, flags);
-
-			DEBUG_DO("DO: BEFORE down(&task->task_stop_sem); ITT:"
-				" 0x%08x\n", CMD_TFO(cmd)->get_task_tag(cmd));
-			down(&task->task_stop_sem);
-			DEBUG_DO("DO: AFTER down(&task->task_stop_sem); ITT:"
-				" 0x%08x\n", CMD_TFO(cmd)->get_task_tag(cmd));
-
-			spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-			if (atomic_dec_and_test(&T_TASK(cmd)->t_task_cdbs_left))
-				complete = 1;
-
-			atomic_set(&task->task_active, 0);
-			atomic_set(&task->task_stop, 0);
-		}
-		__transport_stop_task_timer(task, &flags);
-		task->task_scsi_status = 1;
-
-		if (!(atomic_dec_and_test(&T_TASK(cmd)->t_task_cdbs_ex_left))) {
-			if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-				goto fail_cmd;
-
-			if (!complete) {
-				spin_unlock_irqrestore(
-					&T_TASK(cmd)->t_state_lock, flags);
-
-				spin_lock_irqsave(
-					&dev->execute_task_lock, flags);
-				list_del(&task->t_state_list);
-				continue;
-			}
-		}
-
-		if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-			goto fail_cmd;
-
-		if (cmd->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE)
-			cmd->se_cmd_flags &= ~SCF_TRANSPORT_TASK_SENSE;
-
-		transport_remove_cmd_from_queue(cmd,
-			CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-				cmd->se_orig_obj_ptr));
-
-		DEBUG_DO("DO: Completing %s ITT: 0x%08x last task: %p\n",
-			(cmd->data_direction ==  SE_DIRECTION_READ) ?
-			"READ" : "WRITE", CMD_TFO(cmd)->get_task_tag(cmd),
-			task);
-
-		cmd->t_state = TRANSPORT_COMPLETE_FAILURE;
-		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-
-		cmd->transport_add_cmd_to_queue(cmd,
-				TRANSPORT_COMPLETE_FAILURE);
-		complete = 0;
-
-		spin_lock_irqsave(&dev->execute_task_lock, flags);
-		list_del(&task->t_state_list);
-		continue;
-
-fail_cmd:
-		remove = CMD_TFO(cmd)->is_state_remove(cmd);
-		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-
-		if (!remove)
-			transport_send_check_condition_and_sense(cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
-
-		transport_remove_cmd_from_queue(cmd,
-			CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-				cmd->se_orig_obj_ptr));
-
-		transport_lun_remove_cmd(cmd);
-		if (!(transport_cmd_check_stop(cmd, 1, 0)))
-			transport_passthrough_check_stop(cmd);
-
-		spin_lock_irqsave(&dev->execute_task_lock, flags);
-		list_del(&task->t_state_list);
-	}
-	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
-
-	return 0;
-}
-
-static void transport_status_empty_queue(se_queue_obj_t *qobj)
-{
-	se_queue_req_t *qr;
-	unsigned long flags;
-
-	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	while ((qr = __transport_get_qr_from_queue(qobj))) {
-#if 0
-		printk(KERN_INFO "Freeing qr: %p qr->state: %d\n",
-				qr, qr->state);
-#endif
-		kfree(qr);
-	}
-	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-}
-
-static int transport_status_dev_offline(se_device_t *dev)
-{
-	if (DEV_OBJ_API(dev)->check_online((void *)dev) != 0) {
-		DEBUG_ST("Ignoring DEV_STATUS_THR_TAKE_OFFLINE"
-				" while OFFLINE\n");
-		return 0;
-	}
-	transport_status_thr_dev_offline(dev);
-	transport_status_thr_dev_offline_tasks(dev, (void *)dev);
-
-	return 0;
-}
-
-static int transport_status_dev_online(se_device_t *dev)
-{
-	if (!(DEV_OBJ_API(dev)->check_online((void *)dev))) {
-		DEBUG_ST("Ignoring DEV_STATUS_THR_TAKE_ONLINE"
-				" while ONLINE\n");
-		return 0;
-	}
-	transport_status_thr_dev_online(dev);
-
-	return 0;
-}
-
-static int transport_status_thread(void *p)
-{
-	se_obj_lun_type_t *se_obj_api;
-	se_device_t *dev = (se_device_t *)p;
-	se_queue_obj_t *qobj = dev->dev_status_queue_obj;
-	se_queue_req_t *qr;
-	void *se_obj_ptr;
-	int ret, state;
-
-	current->policy = SCHED_NORMAL;
-	set_user_nice(current, -20);
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	up(&dev->dev_status_queue_obj->thread_create_sem);
-
-	transport_start_status_timer(dev);
-
-	while (!(kthread_should_stop())) {
-		ret = wait_event_interruptible(qobj->thread_wq,
-				atomic_read(&qobj->queue_cnt) ||
-				kthread_should_stop());
-		if (ret < 0)
-			goto out;
-
-		spin_lock(&dev->dev_status_lock);
-		if (dev->dev_status & TRANSPORT_DEVICE_SHUTDOWN) {
-			spin_unlock(&dev->dev_status_lock);
-			continue;
-		}
-		spin_unlock(&dev->dev_status_lock);
-
-		qr = transport_get_qr_from_queue(dev->dev_status_queue_obj);
-		if (!(qr))
-			continue;
-
-		se_obj_ptr = qr->queue_se_obj_ptr;
-		se_obj_api = qr->queue_se_obj_api;
-		state = qr->state;
-		kfree(qr);
-
-		switch (state) {
-		case DEV_STATUS_THR_TUR:
-			DEBUG_ST("dev: %p DEV_STATUS_THR_TUR:\n", dev);
-			ret = transport_status_thread_tur(DEV_OBJ_API(dev),
-					(void *)dev);
-			if (ret != 0) {
-				transport_start_status_timer(dev);
-				break;
-			}
-			break;
-		case DEV_STATUS_THR_TAKE_OFFLINE:
-			DEBUG_ST("dev: %p DEV_STATUS_THR_TAKE_OFFLINE:\n", dev);
-			transport_status_dev_offline(dev);
-			break;
-		case DEV_STATUS_THR_TAKE_ONLINE:
-			DEBUG_ST("dev: %p DEV_STATUS_THR_TAKE_ONLINE:\n", dev);
-			transport_status_dev_online(dev);
-			break;
-		case DEV_STATUS_THR_SHUTDOWN:
-			DEBUG_ST("dev: %p DEV_STATUS_THR_SHUTDOWN:\n", dev);
-			goto out;
-		default:
-			break;
-		}
-	}
-
-out:
-	transport_status_empty_queue(dev->dev_status_queue_obj);
-	transport_stop_status_timer(dev);
-	dev->dev_mgmt_thread = NULL;
-	up(&dev->dev_status_queue_obj->thread_done_sem);
-	return 0;
-}
-
-int transport_start_status_thread(se_device_t *dev)
-{
-	char name[16];
-
-	memset(name, 0, 16);
-	snprintf(name, 16, "LIO_st_%s", TRANSPORT(dev)->name);
-
-	spin_lock_bh(&dev->dev_status_thr_lock);
-	if (atomic_read(&dev->dev_status_thr_count) == 1) {
-		spin_unlock_bh(&dev->dev_status_thr_lock);
-		return 0;
-	}
-	atomic_set(&dev->dev_status_thr_count, 1);
-	spin_unlock_bh(&dev->dev_status_thr_lock);
-
-	dev->dev_mgmt_thread = kthread_run(transport_status_thread,
-			(void *)dev, name);
-	if (IS_ERR(dev->dev_mgmt_thread)) {
-		printk(KERN_ERR "Unable to start status thread: %s\n", name);
-		return -1;
-	}
-
-	down(&dev->dev_status_queue_obj->thread_create_sem);
-	return 9;
-}
-
-void transport_stop_status_thread(se_device_t *dev)
-{
-	spin_lock_bh(&dev->dev_status_thr_lock);
-	if (!(atomic_read(&dev->dev_status_thr_count))) {
-		spin_unlock_bh(&dev->dev_status_thr_lock);
-		return;
-	}
-
-	if (!dev->dev_mgmt_thread) {
-		printk(KERN_ERR "dev[%p]: Status/Management struct task_struct"
-			" is NULL!\n", dev);
-		spin_unlock_bh(&dev->dev_status_thr_lock);
-		return;
-	}
-
-	kthread_stop(dev->dev_mgmt_thread);
-	spin_unlock_bh(&dev->dev_status_thr_lock);
-
-	down(&dev->dev_status_queue_obj->thread_done_sem);
-	atomic_set(&dev->dev_status_thr_count, 0);
 }
 
 static void transport_processing_shutdown(se_device_t *dev)

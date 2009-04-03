@@ -90,18 +90,13 @@
 #define DF_DEV_DEBUG				0x00000008
 #define DF_CLAIMED_BLOCKDEV			0x00000010
 #define DF_PERSISTENT_CLAIMED_BLOCKDEV		0x00000020
-#define DF_DISABLE_STATUS_THREAD		0x00000040
-#define DF_READ_ONLY				0x00000080
-#define DF_SPC3_PERSISTENT_RESERVE		0x00000100
-#define DF_SPC2_RESERVATIONS			0x00000200
+#define DF_READ_ONLY				0x00000040
+#define DF_SPC3_PERSISTENT_RESERVE		0x00000080
+#define DF_SPC2_RESERVATIONS			0x00000100
 
 /* se_dev_attrib_t sanity values */
 /* 10 Minutes, see transport_get_default_task_timeout()  */
 #define DA_TASK_TIMEOUT_MAX			600
-/* Disabled by default */
-#define DA_STATUS_THREAD			0
-/* Disabled by default */
-#define DA_STATUS_THREAD_TUR			0
 /* Emulation for UNIT ATTENTION Interlock Control */
 #define DA_EMULATE_UA_INTLLCK_CTRL		0
 /* Emulation for TASK_ABORTED status (TAS) by default */
@@ -195,7 +190,6 @@ extern int transport_generic_handle_cdb(se_cmd_t *);
 extern int transport_generic_handle_data(se_cmd_t *);
 extern int transport_generic_handle_tmr(se_cmd_t *);
 extern void transport_stop_tasks_for_cmd(struct se_cmd_s *);
-extern int transport_failure_tasks_generic(se_cmd_t *);
 extern void transport_generic_request_failure(se_cmd_t *, se_device_t *,
 						int, int);
 extern void transport_direct_request_timeout(se_cmd_t *);
@@ -279,18 +273,6 @@ extern u32 transport_generic_get_cdb_count(struct se_cmd_s *,
 extern int transport_generic_new_cmd(se_cmd_t *);
 extern void transport_generic_process_write(se_cmd_t *);
 extern int transport_generic_do_tmr(se_cmd_t *);
-extern void transport_start_status_timer(se_device_t *);
-extern void transport_stop_status_timer(se_device_t *);
-extern struct se_task_s *transport_get_task_from_state_list(
-					struct se_device_s *);
-extern void transport_status_thr_force_offline(se_device_t *,
-					struct se_obj_lun_type_s *,
-					void *);
-extern int transport_status_thr_dev_offline(se_device_t *);
-extern int transport_status_thr_dev_offline_tasks(se_device_t *, void *);
-extern int transport_status_thr_rdev_offline(se_device_t *);
-extern int transport_start_status_thread(se_device_t *);
-extern void transport_stop_status_thread(se_device_t *);
 
 /*
  * Each se_transport_task_t can have N number of possible se_task_t's

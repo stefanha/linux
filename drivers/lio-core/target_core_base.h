@@ -621,8 +621,6 @@ typedef struct se_dev_entry_s {
 }  ____cacheline_aligned se_dev_entry_t;
 
 typedef struct se_dev_attrib_s {
-	int		status_thread;
-	int		status_thread_tur;
 	int		emulate_ua_intlck_ctrl;
 	int		emulate_tas;
 	int		emulate_reservations;

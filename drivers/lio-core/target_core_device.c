@@ -870,8 +870,6 @@ void se_dev_stop(se_device_t *dev)
 
 void se_dev_set_default_attribs(se_device_t *dev)
 {
-	DEV_ATTRIB(dev)->status_thread = DA_STATUS_THREAD;
-	DEV_ATTRIB(dev)->status_thread_tur = DA_STATUS_THREAD_TUR;
 	DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl = DA_EMULATE_UA_INTLLCK_CTRL;
 	DEV_ATTRIB(dev)->emulate_tas = DA_EMULATE_TAS;
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
@@ -918,59 +916,6 @@ int se_dev_set_task_timeout(se_device_t *dev, u32 task_timeout)
 			dev, task_timeout);
 	}
 
-	return 0;
-}
-
-int se_dev_set_status_thread(se_device_t *dev, int flag)
-{
-	if ((flag != 0) && (flag != 1)) {
-		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
-	}
-
-	if (!flag) {
-		if (DEV_ATTRIB(dev)->status_thread) {
-			if (DEV_OBJ_API(dev)->check_count(
-					&dev->dev_export_obj)) {
-				printk(KERN_ERR "dev[%p]: Unable to stop SE"
-					" Device Status Thread while"
-					" dev_export_obj: %d count exists\n",
-					dev, DEV_OBJ_API(dev)->check_count(
-					&dev->dev_export_obj));
-				return -1;
-			}
-			if (!(dev->dev_flags & DF_DISABLE_STATUS_THREAD))
-				DEV_OBJ_API(dev)->stop_status_thread(
-						(void *)dev);
-		}
-	} else {
-		if (!(DEV_ATTRIB(dev)->status_thread))
-			DEV_OBJ_API(dev)->start_status_thread((void *)dev, 1);
-	}
-
-	DEV_ATTRIB(dev)->status_thread = flag;
-	printk(KERN_INFO "dev[%p]: SE Device Status Thread: %s\n", dev,
-			(flag) ? "Enabled" : "Disabled");
-	return 0;
-}
-
-int se_dev_set_status_thread_tur(se_device_t *dev, int flag)
-{
-	int start = 0;
-
-	if ((flag != 0) && (flag != 1)) {
-		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
-	}
-
-	if (flag && !(DEV_ATTRIB(dev)->status_thread_tur))
-		start = 1;
-
-	DEV_ATTRIB(dev)->status_thread_tur = flag;
-	if (start)
-		transport_start_status_timer(dev);
-	printk(KERN_INFO "dev[%p]: SE Device Status Thread TUR: %s\n", dev,
-			(flag) ? "Enabled" : "Disabled");
 	return 0;
 }
 
