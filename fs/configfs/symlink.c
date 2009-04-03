@@ -204,7 +204,7 @@ int configfs_unlink(struct inode *dir, struct dentry *dentry)
 
 	/*
 	 * See if the underlying struct config_item has dependent
-	 * symlinks, and should return -EACCES here.
+	 * symlinks, and should return -EPERM here.
 	 */
 	if (type && type->ct_item_ops &&
 	    type->ct_item_ops->check_link) {
