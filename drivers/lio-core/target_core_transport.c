@@ -5893,8 +5893,8 @@ int transport_new_cmd_obj(
 				&transport_process_data_sg_transform;
 #if 0
 		printk(KERN_INFO "[%s]: api: %p ptr: %p data_length: %u, LBA:"
-			" %llu t_task_sectors: %u, t_task_cdbs: %u\n"
-			" obj_api->obj_plugin->plugin_name, obj_api, obj_ptr,
+			" %llu t_task_sectors: %u, t_task_cdbs: %u\n",
+			obj_api->obj_plugin->plugin_name, obj_api, obj_ptr,
 			cmd->data_length, T_TASK(cmd)->t_task_lba,
 			T_TASK(cmd)->t_task_sectors, T_TASK(cmd)->t_task_cdbs);
 #endif

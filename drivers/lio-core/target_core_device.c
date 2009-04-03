@@ -335,7 +335,7 @@ extern int transport_get_lun_for_tmr(
 	se_cmd_t *se_cmd,
 	u32 unpacked_lun)
 {
-	se_device_t *dev;
+	se_device_t *dev = NULL;
 	se_dev_entry_t *deve;
 	se_lun_t *se_lun = NULL;
 	se_session_t *se_sess = SE_SESS(se_cmd);
