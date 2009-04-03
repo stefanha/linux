@@ -742,7 +742,7 @@ void se_release_device_for_hba(se_device_t *dev)
 	spin_unlock(&hba->device_lock);
 
 	core_scsi3_free_all_registrations(dev);
-	se_release_evpd_for_dev(dev);
+	se_release_vpd_for_dev(dev);
 
 	kfree(dev->dev_status_queue_obj);
 	kfree(dev->dev_queue_obj);
@@ -751,17 +751,17 @@ void se_release_device_for_hba(se_device_t *dev)
 	return;
 }
 
-void se_release_evpd_for_dev(se_device_t *dev)
+void se_release_vpd_for_dev(se_device_t *dev)
 {
-	t10_evpd_t *evpd, *evpd_tmp;
+	t10_vpd_t *vpd, *vpd_tmp;
 
-	spin_lock(&DEV_T10_WWN(dev)->t10_evpd_lock);
-	list_for_each_entry_safe(evpd, evpd_tmp,
-			&DEV_T10_WWN(dev)->t10_evpd_list, evpd_list) {
-		list_del(&evpd->evpd_list);
-		kfree(evpd);
+	spin_lock(&DEV_T10_WWN(dev)->t10_vpd_lock);
+	list_for_each_entry_safe(vpd, vpd_tmp,
+			&DEV_T10_WWN(dev)->t10_vpd_list, vpd_list) {
+		list_del(&vpd->vpd_list);
+		kfree(vpd);
 	}
-	spin_unlock(&DEV_T10_WWN(dev)->t10_evpd_lock);
+	spin_unlock(&DEV_T10_WWN(dev)->t10_vpd_lock);
 
 	return;
 }

@@ -78,8 +78,8 @@
 /*
  * se_subsystem_dev_t->su_dev_flags
 */
-#define SDF_FIRMWARE_EVPD_UNIT_SERIAL		0x00000001
-#define SDF_EMULATED_EVPD_UNIT_SERIAL		0x00000002
+#define SDF_FIRMWARE_VPD_UNIT_SERIAL		0x00000001
+#define SDF_EMULATED_VPD_UNIT_SERIAL		0x00000002
 
 /*
  * se_device_t->dev_flags
@@ -164,13 +164,13 @@ unsigned char *transport_dump_cmd_direction (struct se_cmd_s *);
 extern void transport_dump_dev_state(struct se_device_s *, char *, int *);
 extern void transport_dump_dev_info(struct se_device_s *, struct se_lun_s *,
 					unsigned long long, char *, int *);
-extern void transport_dump_evpd_proto_id(struct t10_evpd_s *,
+extern void transport_dump_vpd_proto_id(struct t10_vpd_s *,
 					unsigned char *, int);
-extern int transport_dump_evpd_assoc(struct t10_evpd_s *,
+extern int transport_dump_vpd_assoc(struct t10_vpd_s *,
 					unsigned char *, int);
-extern int transport_dump_evpd_ident_type(struct t10_evpd_s *,
+extern int transport_dump_vpd_ident_type(struct t10_vpd_s *,
 					unsigned char *, int);
-extern int transport_dump_evpd_ident(struct t10_evpd_s *,
+extern int transport_dump_vpd_ident(struct t10_vpd_s *,
 					unsigned char *, int);
 extern se_device_t *transport_add_device_to_core_hba(se_hba_t *,
 					struct se_subsystem_api_s *,
@@ -481,14 +481,6 @@ typedef struct se_subsystem_api_s {
 	 * get_dma_length():
 	 */
 	u32 (*get_dma_length)(u32, se_device_t *);
-	/*
-	 * get_evpd_prod():
-	 */
-	void (*get_evpd_prod)(unsigned char *, u32, se_device_t *);
-	/*
-	 * get_evpd_sn():
-	 */
-	void (*get_evpd_sn)(unsigned char *, u32, se_device_t *);
 	/*
 	 * get_max_cdbs():
 	 */

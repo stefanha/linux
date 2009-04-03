@@ -62,10 +62,10 @@
 #define TRANSPORT_IQN_LEN			224
 #define LU_GROUP_NAME_BUF			256
 #define TG_PT_GROUP_NAME_BUF			256
-/* Used to parse EVPD into t10_evpd_t */
-#define EVPD_TMP_BUF_SIZE			128
+/* Used to parse VPD into t10_vpd_t */
+#define VPD_TMP_BUF_SIZE			128
 /* Used for target_core-pscsi.c:pscsi_transport_complete() */
-#define EVPD_BUF_LEN                    256
+#define VPD_BUF_LEN                    256
 
 
 /* used by PSCSI and iBlock Transport drivers */
@@ -73,8 +73,8 @@
 #define READ_CAP_LEN            		8
 #define READ_POSITION_LEN       		20
 #define INQUIRY_LEN				36
-#define INQUIRY_EVPD_SERIAL_LEN			254
-#define INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN	254
+#define INQUIRY_VPD_SERIAL_LEN			254
+#define INQUIRY_VPD_DEVICE_IDENTIFIER_LEN	254
 
 /* se_cmd_t->data_direction */
 #define SE_DIRECTION_NONE			0
@@ -252,25 +252,25 @@ typedef struct t10_alua_tg_pt_gp_member_s {
 	struct list_head tg_pt_gp_mem_list;
 } ____cacheline_aligned t10_alua_tg_pt_gp_member_t;
 
-typedef struct t10_evpd_s {
-	unsigned char device_identifier[INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN];
+typedef struct t10_vpd_s {
+	unsigned char device_identifier[INQUIRY_VPD_DEVICE_IDENTIFIER_LEN];
 	int protocol_identifier_set;
 	u32 protocol_identifier;
 	u32 device_identifier_code_set;
 	u32 association;
 	u32 device_identifier_type;
-	struct list_head evpd_list;
-} ____cacheline_aligned t10_evpd_t;
+	struct list_head vpd_list;
+} ____cacheline_aligned t10_vpd_t;
 
 typedef struct t10_wwn_s {
 	unsigned char vendor[8];
 	unsigned char model[16];
 	unsigned char revision[4];
-	unsigned char unit_serial[INQUIRY_EVPD_SERIAL_LEN];
-	spinlock_t t10_evpd_lock;
+	unsigned char unit_serial[INQUIRY_VPD_SERIAL_LEN];
+	spinlock_t t10_vpd_lock;
 	struct se_subsystem_dev_s *t10_sub_dev;
 	struct config_group t10_wwn_group;
-	struct list_head t10_evpd_list;
+	struct list_head t10_vpd_list;
 } ____cacheline_aligned t10_wwn_t;
 
 typedef enum {
@@ -645,7 +645,7 @@ typedef struct se_subsystem_dev_s {
 	se_dev_attrib_t se_dev_attrib;
 	/* T10 Asymmetric Logical Unit Assignment Information */
 	t10_alua_t	t10_alua;
-	/* T10 Inquiry and EVPD WWN Information */
+	/* T10 Inquiry and VPD WWN Information */
 	t10_wwn_t	t10_wwn;
 	/* T10 SPC-2 + SPC-3 Reservations */
 	t10_reservation_template_t t10_reservation;

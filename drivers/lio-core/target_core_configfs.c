@@ -550,9 +550,9 @@ static struct target_core_dev_wwn_attribute target_core_dev_wwn_##_name = \
 		target_core_dev_wwn_show_attr_##_name);
 
 /*
- * EVPD page 0x80 Unit serial
+ * VPD page 0x80 Unit serial
  */
-static ssize_t target_core_dev_wwn_show_attr_evpd_unit_serial(
+static ssize_t target_core_dev_wwn_show_attr_vpd_unit_serial(
 	struct t10_wwn_s *t10_wwn,
 	char *page)
 {
@@ -563,38 +563,38 @@ static ssize_t target_core_dev_wwn_show_attr_evpd_unit_serial(
 	if (!(dev))
 		return -ENODEV;
 
-	return sprintf(page, "T10 EVPD Unit Serial Number: %s\n",
+	return sprintf(page, "T10 VPD Unit Serial Number: %s\n",
 		&t10_wwn->unit_serial[0]);
 }
 
-static ssize_t target_core_dev_wwn_store_attr_evpd_unit_serial(
+static ssize_t target_core_dev_wwn_store_attr_vpd_unit_serial(
 	struct t10_wwn_s *t10_wwn,
 	const char *page,
 	size_t count)
 {
 	se_subsystem_dev_t *su_dev = t10_wwn->t10_sub_dev;
 	se_device_t *dev;
-	unsigned char buf[INQUIRY_EVPD_SERIAL_LEN];
+	unsigned char buf[INQUIRY_VPD_SERIAL_LEN];
 
 	/*
-	 * If Linux/SCSI subsystem_api_t plugin got a EVPD Unit Serial
+	 * If Linux/SCSI subsystem_api_t plugin got a VPD Unit Serial
 	 * from the struct scsi_device level firmware, do not allow
-	 * EVPD Unit Serial to be emulated.
+	 * VPD Unit Serial to be emulated.
 	 *
-	 * Note this struct scsi_device could also be emulating EVPD
+	 * Note this struct scsi_device could also be emulating VPD
 	 * information from its drivers/scsi LLD.  But for now we assume
 	 * it is doing 'the right thing' wrt a world wide unique
-	 * EVPD Unit Serial Number that OS dependent multipath can depend on.
+	 * VPD Unit Serial Number that OS dependent multipath can depend on.
 	 */
-	if (su_dev->su_dev_flags & SDF_FIRMWARE_EVPD_UNIT_SERIAL) {
-		printk(KERN_ERR "Underlying SCSI device firmware provided EVPD"
+	if (su_dev->su_dev_flags & SDF_FIRMWARE_VPD_UNIT_SERIAL) {
+		printk(KERN_ERR "Underlying SCSI device firmware provided VPD"
 			" Unit Serial, ignoring request\n");
 		return -EOPNOTSUPP;
 	}
 
-	if ((strlen(page) + 1) > INQUIRY_EVPD_SERIAL_LEN) {
-		printk(KERN_ERR "Emulated EVPD Unit Serial exceeds"
-		" INQUIRY_EVPD_SERIAL_LEN: %d\n", INQUIRY_EVPD_SERIAL_LEN);
+	if ((strlen(page) + 1) > INQUIRY_VPD_SERIAL_LEN) {
+		printk(KERN_ERR "Emulated VPD Unit Serial exceeds"
+		" INQUIRY_VPD_SERIAL_LEN: %d\n", INQUIRY_VPD_SERIAL_LEN);
 		return -EOVERFLOW;
 	}
 	/*
@@ -606,7 +606,7 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_unit_serial(
 	dev = su_dev->se_dev_ptr;
 	if ((dev)) {
 		if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
-			printk(KERN_ERR "Unable to set EVPD Unit Serial while"
+			printk(KERN_ERR "Unable to set VPD Unit Serial while"
 				" active %d $FABRIC_MOD exports exist\n",
 				DEV_OBJ_API(dev)->check_count(
 					&dev->dev_export_obj));
@@ -614,61 +614,61 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_unit_serial(
 		}
 	}
 	/*
-	 * This currently assumes ASCII encoding for emulated EVPD Unit Serial.
+	 * This currently assumes ASCII encoding for emulated VPD Unit Serial.
 	 *
 	 * Also, strip any newline added from the userspace
-	 * echo $UUID > $TARGET/$HBA/$STORAGE_OBJECT/wwn/evpd_unit_serial
+	 * echo $UUID > $TARGET/$HBA/$STORAGE_OBJECT/wwn/vpd_unit_serial
 	 */
-	memset(buf, 0, INQUIRY_EVPD_SERIAL_LEN);
-	snprintf(buf, INQUIRY_EVPD_SERIAL_LEN, "%s", page);
-	snprintf(su_dev->t10_wwn.unit_serial, INQUIRY_EVPD_SERIAL_LEN,
+	memset(buf, 0, INQUIRY_VPD_SERIAL_LEN);
+	snprintf(buf, INQUIRY_VPD_SERIAL_LEN, "%s", page);
+	snprintf(su_dev->t10_wwn.unit_serial, INQUIRY_VPD_SERIAL_LEN,
 			"%s", strstrip(buf));
-	su_dev->su_dev_flags |= SDF_EMULATED_EVPD_UNIT_SERIAL;
+	su_dev->su_dev_flags |= SDF_EMULATED_VPD_UNIT_SERIAL;
 
-	printk(KERN_INFO "Target_Core_ConfigFS: Set emulated EVPD Unit Serial:"
+	printk(KERN_INFO "Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
 			" %s\n", su_dev->t10_wwn.unit_serial);
 	return count;
 }
 
-SE_DEV_WWN_ATTR(evpd_unit_serial, S_IRUGO | S_IWUSR);
+SE_DEV_WWN_ATTR(vpd_unit_serial, S_IRUGO | S_IWUSR);
 
 /*
- * EVPD page 0x83 Protocol Identifier
+ * VPD page 0x83 Protocol Identifier
  */
-static ssize_t target_core_dev_wwn_show_attr_evpd_protocol_identifier(
+static ssize_t target_core_dev_wwn_show_attr_vpd_protocol_identifier(
 	struct t10_wwn_s *t10_wwn,
 	char *page)
 {
 	se_subsystem_dev_t *se_dev = t10_wwn->t10_sub_dev;
 	se_device_t *dev;
-	t10_evpd_t *evpd;
-	unsigned char buf[EVPD_TMP_BUF_SIZE];
+	t10_vpd_t *vpd;
+	unsigned char buf[VPD_TMP_BUF_SIZE];
 	ssize_t len = 0;
 
 	dev = se_dev->se_dev_ptr;
 	if (!(dev))
 		return -ENODEV;
 
-	memset(buf, 0, EVPD_TMP_BUF_SIZE);
+	memset(buf, 0, VPD_TMP_BUF_SIZE);
 
-	spin_lock(&t10_wwn->t10_evpd_lock);
-	list_for_each_entry(evpd, &t10_wwn->t10_evpd_list, evpd_list) {
-		if (!(evpd->protocol_identifier_set))
+	spin_lock(&t10_wwn->t10_vpd_lock);
+	list_for_each_entry(vpd, &t10_wwn->t10_vpd_list, vpd_list) {
+		if (!(vpd->protocol_identifier_set))
 			continue;
 
-		transport_dump_evpd_proto_id(evpd, buf, EVPD_TMP_BUF_SIZE);
+		transport_dump_vpd_proto_id(vpd, buf, VPD_TMP_BUF_SIZE);
 
 		if ((len + strlen(buf) > PAGE_SIZE))
 			break;
 
 		len += sprintf(page+len, "%s", buf);
 	}
-	spin_unlock(&t10_wwn->t10_evpd_lock);
+	spin_unlock(&t10_wwn->t10_vpd_lock);
 
 	return len;
 }
 
-static ssize_t target_core_dev_wwn_store_attr_evpd_protocol_identifier(
+static ssize_t target_core_dev_wwn_store_attr_vpd_protocol_identifier(
 	struct t10_wwn_s *t10_wwn,
 	const char *page,
 	size_t count)
@@ -676,10 +676,10 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_protocol_identifier(
 	return -ENOSYS;
 }
 
-SE_DEV_WWN_ATTR(evpd_protocol_identifier, S_IRUGO | S_IWUSR);
+SE_DEV_WWN_ATTR(vpd_protocol_identifier, S_IRUGO | S_IWUSR);
 
 /*
- * Generic wrapper for dumping EVPD identifiers by association.
+ * Generic wrapper for dumping VPD identifiers by association.
  */
 #define DEF_DEV_WWN_ASSOC_SHOW(_name, _assoc)				\
 static ssize_t target_core_dev_wwn_show_attr_##_name(			\
@@ -688,48 +688,48 @@ static ssize_t target_core_dev_wwn_show_attr_##_name(			\
 {									\
 	se_subsystem_dev_t *se_dev = t10_wwn->t10_sub_dev;		\
 	se_device_t *dev;						\
-	t10_evpd_t *evpd;						\
-	unsigned char buf[EVPD_TMP_BUF_SIZE];				\
+	t10_vpd_t *vpd;							\
+	unsigned char buf[VPD_TMP_BUF_SIZE];				\
 	ssize_t len = 0;						\
 									\
 	dev = se_dev->se_dev_ptr;					\
 	if (!(dev))							\
 		return -ENODEV;						\
 									\
-	spin_lock(&t10_wwn->t10_evpd_lock);				\
-	list_for_each_entry(evpd, &t10_wwn->t10_evpd_list, evpd_list) {	\
-		if (evpd->association != _assoc)			\
+	spin_lock(&t10_wwn->t10_vpd_lock);				\
+	list_for_each_entry(vpd, &t10_wwn->t10_vpd_list, vpd_list) {	\
+		if (vpd->association != _assoc)				\
 			continue;					\
 									\
-		memset(buf, 0, EVPD_TMP_BUF_SIZE);			\
-		transport_dump_evpd_assoc(evpd, buf, EVPD_TMP_BUF_SIZE); \
+		memset(buf, 0, VPD_TMP_BUF_SIZE);			\
+		transport_dump_vpd_assoc(vpd, buf, VPD_TMP_BUF_SIZE);	\
 		if ((len + strlen(buf) > PAGE_SIZE))			\
 			break;						\
 		len += sprintf(page+len, "%s", buf);			\
 									\
-		memset(buf, 0, EVPD_TMP_BUF_SIZE);			\
-		transport_dump_evpd_ident_type(evpd, buf, EVPD_TMP_BUF_SIZE); \
+		memset(buf, 0, VPD_TMP_BUF_SIZE);			\
+		transport_dump_vpd_ident_type(vpd, buf, VPD_TMP_BUF_SIZE); \
 		if ((len + strlen(buf) > PAGE_SIZE))			\
 			break;						\
 		len += sprintf(page+len, "%s", buf);			\
 									\
-		memset(buf, 0, EVPD_TMP_BUF_SIZE);			\
-		transport_dump_evpd_ident(evpd, buf, EVPD_TMP_BUF_SIZE); \
+		memset(buf, 0, VPD_TMP_BUF_SIZE);			\
+		transport_dump_vpd_ident(vpd, buf, VPD_TMP_BUF_SIZE); \
 		if ((len + strlen(buf) > PAGE_SIZE))			\
 			break;						\
 		len += sprintf(page+len, "%s", buf);			\
 	}								\
-	spin_unlock(&t10_wwn->t10_evpd_lock);				\
+	spin_unlock(&t10_wwn->t10_vpd_lock);				\
 									\
 	return len;							\
 }
 
 /*
- * EVPD page 0x83 Assoication: Logical Unit
+ * VPD page 0x83 Assoication: Logical Unit
  */
-DEF_DEV_WWN_ASSOC_SHOW(evpd_assoc_logical_unit, 0x00);
+DEF_DEV_WWN_ASSOC_SHOW(vpd_assoc_logical_unit, 0x00);
 
-static ssize_t target_core_dev_wwn_store_attr_evpd_assoc_logical_unit(
+static ssize_t target_core_dev_wwn_store_attr_vpd_assoc_logical_unit(
 	struct t10_wwn_s *t10_wwn,
 	const char *page,
 	size_t count)
@@ -737,14 +737,14 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_assoc_logical_unit(
 	return -ENOSYS;
 }
 
-SE_DEV_WWN_ATTR(evpd_assoc_logical_unit, S_IRUGO | S_IWUSR);
+SE_DEV_WWN_ATTR(vpd_assoc_logical_unit, S_IRUGO | S_IWUSR);
 
 /*
- * EVPD page 0x83 Association: Target Port
+ * VPD page 0x83 Association: Target Port
  */
-DEF_DEV_WWN_ASSOC_SHOW(evpd_assoc_target_port, 0x10);
+DEF_DEV_WWN_ASSOC_SHOW(vpd_assoc_target_port, 0x10);
 
-static ssize_t target_core_dev_wwn_store_attr_evpd_assoc_target_port(
+static ssize_t target_core_dev_wwn_store_attr_vpd_assoc_target_port(
 	struct t10_wwn_s *t10_wwn,
 	const char *page,
 	size_t count)
@@ -752,14 +752,14 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_assoc_target_port(
 	return -ENOSYS;
 }
 
-SE_DEV_WWN_ATTR(evpd_assoc_target_port, S_IRUGO | S_IWUSR);
+SE_DEV_WWN_ATTR(vpd_assoc_target_port, S_IRUGO | S_IWUSR);
 
 /*
- * EVPD page 0x83 Association: SCSI Target Device
+ * VPD page 0x83 Association: SCSI Target Device
  */
-DEF_DEV_WWN_ASSOC_SHOW(evpd_assoc_scsi_target_device, 0x20);
+DEF_DEV_WWN_ASSOC_SHOW(vpd_assoc_scsi_target_device, 0x20);
 
-static ssize_t target_core_dev_wwn_store_attr_evpd_assoc_scsi_target_device(
+static ssize_t target_core_dev_wwn_store_attr_vpd_assoc_scsi_target_device(
 	struct t10_wwn_s *t10_wwn,
 	const char *page,
 	size_t count)
@@ -767,16 +767,16 @@ static ssize_t target_core_dev_wwn_store_attr_evpd_assoc_scsi_target_device(
 	return -ENOSYS;
 }
 
-SE_DEV_WWN_ATTR(evpd_assoc_scsi_target_device, S_IRUGO | S_IWUSR);
+SE_DEV_WWN_ATTR(vpd_assoc_scsi_target_device, S_IRUGO | S_IWUSR);
 
 CONFIGFS_EATTR_OPS(target_core_dev_wwn, t10_wwn_s, t10_wwn_group);
 
 static struct configfs_attribute *target_core_dev_wwn_attrs[] = {
-	&target_core_dev_wwn_evpd_unit_serial.attr,
-	&target_core_dev_wwn_evpd_protocol_identifier.attr,
-	&target_core_dev_wwn_evpd_assoc_logical_unit.attr,
-	&target_core_dev_wwn_evpd_assoc_target_port.attr,
-	&target_core_dev_wwn_evpd_assoc_scsi_target_device.attr,
+	&target_core_dev_wwn_vpd_unit_serial.attr,
+	&target_core_dev_wwn_vpd_protocol_identifier.attr,
+	&target_core_dev_wwn_vpd_assoc_logical_unit.attr,
+	&target_core_dev_wwn_vpd_assoc_target_port.attr,
+	&target_core_dev_wwn_vpd_assoc_scsi_target_device.attr,
 	NULL,
 };
 
@@ -1860,8 +1860,8 @@ static struct config_group *target_core_call_createdev(
 				" se_subsystem_dev_t\n");
 		return NULL;
 	}
-	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_evpd_list);
-	spin_lock_init(&se_dev->t10_wwn.t10_evpd_lock);
+	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_vpd_list);
+	spin_lock_init(&se_dev->t10_wwn.t10_vpd_lock);
 	INIT_LIST_HEAD(&se_dev->t10_reservation.registration_list);
 	spin_lock_init(&se_dev->t10_reservation.registration_lock);
 	spin_lock_init(&se_dev->se_dev_lock);

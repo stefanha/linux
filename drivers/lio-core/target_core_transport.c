@@ -1558,7 +1558,7 @@ static int transport_get_inquiry(
 	buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
 	/*
 	 * Save the basic Vendor, Model and Revision in passed t10_wwn_t.
-	 * We will obtain the EVPD in a seperate passthrough operation.
+	 * We will obtain the VPD in a seperate passthrough operation.
 	 */
 	memcpy((void *)&wwn->vendor[0], (void *)&buf[8],
 			sizeof(wwn->vendor));
@@ -1604,7 +1604,7 @@ static int transport_get_inquiry(
 	return 0;
 }
 
-static int transport_get_inquiry_evpd_serial(
+static int transport_get_inquiry_vpd_serial(
 	se_obj_lun_type_t *obj_api,
 	t10_wwn_t *wwn,
 	void *obj_ptr)
@@ -1615,13 +1615,13 @@ static int transport_get_inquiry_evpd_serial(
 
 	memset(cdb, 0, SCSI_CDB_SIZE);
 	cdb[0] = INQUIRY;
-	cdb[1] = 0x01; /* Query EVPD */
+	cdb[1] = 0x01; /* Query VPD */
 	cdb[2] = 0x80; /* Unit Serial Number */
-	cdb[3] = (INQUIRY_EVPD_SERIAL_LEN >> 8) & 0xff;
-	cdb[4] = (INQUIRY_EVPD_SERIAL_LEN & 0xff);
+	cdb[3] = (INQUIRY_VPD_SERIAL_LEN >> 8) & 0xff;
+	cdb[4] = (INQUIRY_VPD_SERIAL_LEN & 0xff);
 
 	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
-			0, NULL, 0, INQUIRY_EVPD_SERIAL_LEN, obj_api, obj_ptr);
+			0, NULL, 0, INQUIRY_VPD_SERIAL_LEN, obj_api, obj_ptr);
 	if (!(cmd))
 		return -1;
 
@@ -1632,8 +1632,8 @@ static int transport_get_inquiry_evpd_serial(
 
 	buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
 
-	printk(KERN_INFO "T10 EVPD Unit Serial Number: %s\n", &buf[4]);
-	snprintf(&wwn->unit_serial[0], INQUIRY_EVPD_SERIAL_LEN, "%s", &buf[4]);
+	printk(KERN_INFO "T10 VPD Unit Serial Number: %s\n", &buf[4]);
+	snprintf(&wwn->unit_serial[0], INQUIRY_VPD_SERIAL_LEN, "%s", &buf[4]);
 
 	transport_passthrough_release(cmd);
 	return 0;
@@ -1641,18 +1641,18 @@ static int transport_get_inquiry_evpd_serial(
 
 static const char hex_str[] = "0123456789abcdef";
 
-void transport_dump_evpd_proto_id(
-	t10_evpd_t *evpd,
+void transport_dump_vpd_proto_id(
+	t10_vpd_t *vpd,
 	unsigned char *p_buf,
 	int p_buf_len)
 {
-	unsigned char buf[EVPD_TMP_BUF_SIZE];
+	unsigned char buf[VPD_TMP_BUF_SIZE];
 	int len;
 
-	memset(buf, 0, EVPD_TMP_BUF_SIZE);
-	len = sprintf(buf, "T10 EVPD Protocol Identifier: ");
+	memset(buf, 0, VPD_TMP_BUF_SIZE);
+	len = sprintf(buf, "T10 VPD Protocol Identifier: ");
 
-	switch (evpd->protocol_identifier) {
+	switch (vpd->protocol_identifier) {
 	case 0x00:
 		sprintf(buf+len, "Fibre Channel\n");
 		break;
@@ -1684,7 +1684,7 @@ void transport_dump_evpd_proto_id(
 		break;
 	default:
 		sprintf(buf+len, "Unknown 0x%02x\n",
-				evpd->protocol_identifier);
+				vpd->protocol_identifier);
 		break;
 	}
 
@@ -1694,7 +1694,7 @@ void transport_dump_evpd_proto_id(
 		printk(KERN_INFO "%s", buf);
 }
 
-void transport_set_evpd_proto_id(t10_evpd_t *evpd, unsigned char *page_83)
+void transport_set_vpd_proto_id(t10_vpd_t *vpd, unsigned char *page_83)
 {
 	/*
 	 * Check if the Protocol Identifier Valid (PIV) bit is set..
@@ -1702,24 +1702,24 @@ void transport_set_evpd_proto_id(t10_evpd_t *evpd, unsigned char *page_83)
 	 * from spc3r23.pdf section 7.5.1
 	 */
 	if (page_83[1] & 0x80) {
-		evpd->protocol_identifier = (page_83[0] & 0xf0);
-		evpd->protocol_identifier_set = 1;
-		transport_dump_evpd_proto_id(evpd, NULL, 0);
+		vpd->protocol_identifier = (page_83[0] & 0xf0);
+		vpd->protocol_identifier_set = 1;
+		transport_dump_vpd_proto_id(vpd, NULL, 0);
 	}
 }
 
-int transport_dump_evpd_assoc(
-	t10_evpd_t *evpd,
+int transport_dump_vpd_assoc(
+	t10_vpd_t *vpd,
 	unsigned char *p_buf,
 	int p_buf_len)
 {
-	unsigned char buf[EVPD_TMP_BUF_SIZE];
+	unsigned char buf[VPD_TMP_BUF_SIZE];
 	int ret = 0, len;
 
-	memset(buf, 0, EVPD_TMP_BUF_SIZE);
-	len = sprintf(buf, "T10 EVPD Identifier Association: ");
+	memset(buf, 0, VPD_TMP_BUF_SIZE);
+	len = sprintf(buf, "T10 VPD Identifier Association: ");
 
-	switch (evpd->association) {
+	switch (vpd->association) {
 	case 0x00:
 		sprintf(buf+len, "addressed logical unit\n");
 		break;
@@ -1730,7 +1730,7 @@ int transport_dump_evpd_assoc(
 		sprintf(buf+len, "SCSI target device\n");
 		break;
 	default:
-		sprintf(buf+len, "Unknown 0x%02x\n", evpd->association);
+		sprintf(buf+len, "Unknown 0x%02x\n", vpd->association);
 		ret = -1;
 		break;
 	}
@@ -1743,29 +1743,29 @@ int transport_dump_evpd_assoc(
 	return ret;
 }
 
-static int transport_set_evpd_assoc(t10_evpd_t *evpd, unsigned char *page_83)
+static int transport_set_vpd_assoc(t10_vpd_t *vpd, unsigned char *page_83)
 {
 	/*
-	 * The EVPD identification association..
+	 * The VPD identification association..
 	 *
 	 * from spc3r23.pdf Section 7.6.3.1 Table 297
 	 */
-	evpd->association = (page_83[1] & 0x30);
-	return transport_dump_evpd_assoc(evpd, NULL, 0);
+	vpd->association = (page_83[1] & 0x30);
+	return transport_dump_vpd_assoc(vpd, NULL, 0);
 }
 
-int transport_dump_evpd_ident_type(
-	t10_evpd_t *evpd,
+int transport_dump_vpd_ident_type(
+	t10_vpd_t *vpd,
 	unsigned char *p_buf,
 	int p_buf_len)
 {
-	unsigned char buf[EVPD_TMP_BUF_SIZE];
+	unsigned char buf[VPD_TMP_BUF_SIZE];
 	int ret = 0, len;
 
-	memset(buf, 0, EVPD_TMP_BUF_SIZE);
-	len = sprintf(buf, "T10 EVPD Identifier Type: ");
+	memset(buf, 0, VPD_TMP_BUF_SIZE);
+	len = sprintf(buf, "T10 VPD Identifier Type: ");
 
-	switch (evpd->device_identifier_type) {
+	switch (vpd->device_identifier_type) {
 	case 0x00:
 		sprintf(buf+len, "Vendor specific\n");
 		break;
@@ -1786,7 +1786,7 @@ int transport_dump_evpd_ident_type(
 		break;
 	default:
 		sprintf(buf+len, "Unsupported: 0x%02x\n",
-				evpd->device_identifier_type);
+				vpd->device_identifier_type);
 		ret = -1;
 		break;
 	}
@@ -1799,43 +1799,43 @@ int transport_dump_evpd_ident_type(
 	return ret;
 }
 
-int transport_set_evpd_ident_type(t10_evpd_t *evpd, unsigned char *page_83)
+int transport_set_vpd_ident_type(t10_vpd_t *vpd, unsigned char *page_83)
 {
 	/*
-	 * The EVPD identifier type..
+	 * The VPD identifier type..
 	 *
 	 * from spc3r23.pdf Section 7.6.3.1 Table 298
 	 */
-	evpd->device_identifier_type = (page_83[1] & 0x0f);
-	return transport_dump_evpd_ident_type(evpd, NULL, 0);
+	vpd->device_identifier_type = (page_83[1] & 0x0f);
+	return transport_dump_vpd_ident_type(vpd, NULL, 0);
 }
 
-int transport_dump_evpd_ident(
-	t10_evpd_t *evpd,
+int transport_dump_vpd_ident(
+	t10_vpd_t *vpd,
 	unsigned char *p_buf,
 	int p_buf_len)
 {
-	unsigned char buf[EVPD_TMP_BUF_SIZE];
+	unsigned char buf[VPD_TMP_BUF_SIZE];
 	int ret = 0;
 
-	memset(buf, 0, EVPD_TMP_BUF_SIZE);
+	memset(buf, 0, VPD_TMP_BUF_SIZE);
 
-	switch (evpd->device_identifier_code_set) {
+	switch (vpd->device_identifier_code_set) {
 	case 0x01: /* Binary */
-		sprintf(buf, "T10 EVPD Binary Device Identifier: %s\n",
-			&evpd->device_identifier[0]);
+		sprintf(buf, "T10 VPD Binary Device Identifier: %s\n",
+			&vpd->device_identifier[0]);
 		break;
 	case 0x02: /* ASCII */
-		sprintf(buf, "T10 EVPD ASCII Device Identifier: %s\n",
-			&evpd->device_identifier[0]);
+		sprintf(buf, "T10 VPD ASCII Device Identifier: %s\n",
+			&vpd->device_identifier[0]);
 		break;
 	case 0x03: /* UTF-8 */
-		sprintf(buf, "T10 EVPD UTF-8 Device Identifier: %s\n",
-			&evpd->device_identifier[0]);
+		sprintf(buf, "T10 VPD UTF-8 Device Identifier: %s\n",
+			&vpd->device_identifier[0]);
 		break;
 	default:
-		sprintf(buf, "T10 EVPD Device Identifier encoding unsupported:"
-			" 0x%02x", evpd->device_identifier_code_set);
+		sprintf(buf, "T10 VPD Device Identifier encoding unsupported:"
+			" 0x%02x", vpd->device_identifier_code_set);
 		ret = -1;
 		break;
 	}
@@ -1848,24 +1848,24 @@ int transport_dump_evpd_ident(
 	return ret;
 }
 
-int transport_set_evpd_ident(t10_evpd_t *evpd, unsigned char *page_83)
+int transport_set_vpd_ident(t10_vpd_t *vpd, unsigned char *page_83)
 {
 	int j = 0, i = 4; /* offset to start of the identifer */
 
 	/*
-	 * The EVPD Code Set (encoding)
+	 * The VPD Code Set (encoding)
 	 *
 	 * from spc3r23.pdf Section 7.6.3.1 Table 296
 	 */
-	evpd->device_identifier_code_set = (page_83[0] & 0x0f);
-	switch (evpd->device_identifier_code_set) {
+	vpd->device_identifier_code_set = (page_83[0] & 0x0f);
+	switch (vpd->device_identifier_code_set) {
 	case 0x01: /* Binary */
-		evpd->device_identifier[j++] =
-				hex_str[evpd->device_identifier_type];
+		vpd->device_identifier[j++] =
+				hex_str[vpd->device_identifier_type];
 		while (i < (4 + page_83[3])) {
-			evpd->device_identifier[j++] =
+			vpd->device_identifier[j++] =
 				hex_str[(page_83[i] & 0xf0) >> 4];
-			evpd->device_identifier[j++] =
+			vpd->device_identifier[j++] =
 				hex_str[page_83[i] & 0x0f];
 			i++;
 		}
@@ -1873,36 +1873,36 @@ int transport_set_evpd_ident(t10_evpd_t *evpd, unsigned char *page_83)
 	case 0x02: /* ASCII */
 	case 0x03: /* UTF-8 */
 		while (i < (4 + page_83[3]))
-			evpd->device_identifier[j++] = page_83[i++];
+			vpd->device_identifier[j++] = page_83[i++];
 
 		break;
 	default:
 		break;
 	}
 
-	return transport_dump_evpd_ident(evpd, NULL, 0);
+	return transport_dump_vpd_ident(vpd, NULL, 0);
 }
 
-static int transport_get_inquiry_evpd_device_ident(
+static int transport_get_inquiry_vpd_device_ident(
 	se_obj_lun_type_t *obj_api,
 	t10_wwn_t *wwn,
 	void *obj_ptr)
 {
 	unsigned char *buf, *page_83;
 	se_cmd_t *cmd;
-	t10_evpd_t *evpd;
+	t10_vpd_t *vpd;
 	unsigned char cdb[SCSI_CDB_SIZE];
 	int ident_len, page_len, off = 4, ret = 0;
 
 	memset(cdb, 0, SCSI_CDB_SIZE);
 	cdb[0] = INQUIRY;
-	cdb[1] = 0x01; /* Query EVPD */
+	cdb[1] = 0x01; /* Query VPD */
 	cdb[2] = 0x83; /* Device Identifier */
-	cdb[3] = (INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN >> 8) & 0xff;
-	cdb[4] = (INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN & 0xff);
+	cdb[3] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN >> 8) & 0xff;
+	cdb[4] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN & 0xff);
 
 	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
-			0, NULL, 0, INQUIRY_EVPD_DEVICE_IDENTIFIER_LEN,
+			0, NULL, 0, INQUIRY_VPD_DEVICE_IDENTIFIER_LEN,
 			obj_api, obj_ptr);
 	if (!(cmd))
 		return -1;
@@ -1914,7 +1914,7 @@ static int transport_get_inquiry_evpd_device_ident(
 
 	buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
 	page_len = (buf[2] << 8) | buf[3];
-	printk("T10 EVPD Page Length: %d\n", page_len);
+	printk("T10 VPD Page Length: %d\n", page_len);
 
 	while (page_len > 0) {
 		/* Grab a pointer to the Identification descriptor */
@@ -1925,34 +1925,34 @@ static int transport_get_inquiry_evpd_device_ident(
 					" length zero!\n");
 			break;
 		}
-		printk(KERN_INFO "T10 EVPD Identifer Length: %d\n", ident_len);
+		printk(KERN_INFO "T10 VPD Identifer Length: %d\n", ident_len);
 
-		evpd = kzalloc(sizeof(t10_evpd_t), GFP_KERNEL);
-		if (!(evpd)) {
+		vpd = kzalloc(sizeof(t10_vpd_t), GFP_KERNEL);
+		if (!(vpd)) {
 			printk(KERN_ERR "Unable to allocate memory for"
-					" t10_evpd_t\n");
+					" t10_vpd_t\n");
 			ret = -1;
 			goto out;
 		}
-		INIT_LIST_HEAD(&evpd->evpd_list);
+		INIT_LIST_HEAD(&vpd->vpd_list);
 
-		transport_set_evpd_proto_id(evpd, page_83);
-		transport_set_evpd_assoc(evpd, page_83);
+		transport_set_vpd_proto_id(vpd, page_83);
+		transport_set_vpd_assoc(vpd, page_83);
 
-		if (transport_set_evpd_ident_type(evpd, page_83) < 0) {
+		if (transport_set_vpd_ident_type(vpd, page_83) < 0) {
 			off += (ident_len + 4);
 			page_len -= (ident_len + 4);
-			kfree(evpd);
+			kfree(vpd);
 			continue;
 		}
-		if (transport_set_evpd_ident(evpd, page_83) < 0) {
+		if (transport_set_vpd_ident(vpd, page_83) < 0) {
 			off += (ident_len + 4);
 			page_len -= (ident_len + 4);
-			kfree(evpd);
+			kfree(vpd);
 			continue;
 		}
 
-		list_add_tail(&evpd->evpd_list, &wwn->t10_evpd_list);
+		list_add_tail(&vpd->vpd_list, &wwn->t10_vpd_list);
 		off += (ident_len + 4);
 		page_len -= (ident_len + 4);
 	}
@@ -2142,16 +2142,16 @@ se_device_t *transport_add_device_to_core_hba(
 	if (ret < 0)
 		goto out;
 	/*
-	 * Locate EVPD WWN Information used for various purposes within
+	 * Locate VPD WWN Information used for various purposes within
 	 * the Storage Engine.
 	 */
-	if (!(transport_get_inquiry_evpd_serial(DEV_OBJ_API(dev),
+	if (!(transport_get_inquiry_vpd_serial(DEV_OBJ_API(dev),
 			DEV_T10_WWN(dev), (void *)dev))) {
 		/*
-		 * If EVPD Unit Serial returned GOOD status, try
-		 * EVPD Device Identification page (0x83).
+		 * If VPD Unit Serial returned GOOD status, try
+		 * VPD Device Identification page (0x83).
 		 */
-		transport_get_inquiry_evpd_device_ident(DEV_OBJ_API(dev),
+		transport_get_inquiry_vpd_device_ident(DEV_OBJ_API(dev),
 			DEV_T10_WWN(dev), (void *)dev);
 	}
 
@@ -2187,7 +2187,7 @@ out:
 	hba->dev_count--;
 	spin_unlock(&hba->device_lock);
 
-	se_release_evpd_for_dev(dev);
+	se_release_vpd_for_dev(dev);
 
 	kfree(dev->dev_status_queue_obj);
 	kfree(dev->dev_queue_obj);
@@ -2984,7 +2984,7 @@ int transport_failure_tasks_generic(se_cmd_t *cmd)
 {
 	unsigned long flags;
 	/*
-	 * This causes problems when EVPD INQUIRY fails, disable this
+	 * This causes problems when VPD INQUIRY fails, disable this
 	 * functionality for now.
 	 */
 	se_task_t *task;
@@ -4267,7 +4267,7 @@ extern int transport_generic_emulate_inquiry(
 	case 0x80: /* unit serial number */
 		buf[1] = 0x80;
 		if (dev->se_sub_dev->su_dev_flags &
-					SDF_EMULATED_EVPD_UNIT_SERIAL) {
+					SDF_EMULATED_VPD_UNIT_SERIAL) {
 			unit_serial_len =
 				strlen(&DEV_T10_WWN(dev)->unit_serial[0]);
 			unit_serial_len++; /* For NULL Terminator */
@@ -4298,7 +4298,7 @@ extern int transport_generic_emulate_inquiry(
 		break;
 	case 0x83:
 		/*
-		 * Device identification EVPD, for a complete list of
+		 * Device identification VPD, for a complete list of
 		 * DESIGNATOR TYPEs see spc4r17 Table 459.
 		 */
 		buf[1] = 0x83;
@@ -4308,11 +4308,11 @@ extern int transport_generic_emulate_inquiry(
 		 * see spc4r17 section 7.7.3.6.5
 		 *
 		 * We depend upon a target_core_mod/ConfigFS provided
-		 * /sys/kernel/config/target/core/$HBA/$DEV/wwn/evpd_unit_serial
+		 * /sys/kernel/config/target/core/$HBA/$DEV/wwn/vpd_unit_serial
 		 * value in order to return the NAA id.
 		 */
 		if (!(dev->se_sub_dev->su_dev_flags &
-					SDF_EMULATED_EVPD_UNIT_SERIAL))
+					SDF_EMULATED_VPD_UNIT_SERIAL))
 			goto check_t10_vend_desc;
 		if ((off + 20) > cmd->data_length)
 			goto check_t10_vend_desc;
@@ -4357,13 +4357,13 @@ check_t10_vend_desc:
 		 * T10 Vendor Identifier Page, see spc4r17 section 7.7.3.4
 		 */
 		id_len = 8; /* For Vendor field */
-		prod_len = 4; /* For EVPD Header */
+		prod_len = 4; /* For VPD Header */
 		prod_len += 8; /* For Vendor field */
 		prod_len += strlen(prod);
 		prod_len++; /* For : */
 
 		if (dev->se_sub_dev->su_dev_flags &
-					SDF_EMULATED_EVPD_UNIT_SERIAL) {
+					SDF_EMULATED_VPD_UNIT_SERIAL) {
 			unit_serial_len =
 				strlen(&DEV_T10_WWN(dev)->unit_serial[0]);
 			unit_serial_len++; /* For NULL Terminator */
@@ -4405,7 +4405,7 @@ check_t10_vend_desc:
 		len += (id_len + 4);
 		off += (id_len + 4);
 		/*
-		 * se_port_t is only set for INQUIRY EVPD=1 through $FABRIC_MOD
+		 * se_port_t is only set for INQUIRY VPD=1 through $FABRIC_MOD
 		 */
 check_port:
 		port = lun->lun_sep;
@@ -4577,10 +4577,10 @@ check_scsi_name:
 		}
 set_len:
 		buf[2] = ((len >> 8) & 0xff);
-		buf[3] = (len & 0xff); /* Page Length for EVPD 0x83 */
+		buf[3] = (len & 0xff); /* Page Length for VPD 0x83 */
 		break;
 	default:
-		printk(KERN_ERR "Unknown EVPD Code: 0x%02x\n", cdb[2]);
+		printk(KERN_ERR "Unknown VPD Code: 0x%02x\n", cdb[2]);
 		return -1;
 	}
 
