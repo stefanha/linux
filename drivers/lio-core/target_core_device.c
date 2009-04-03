@@ -295,7 +295,7 @@ out:
 	/*
 	 * Determine if the se_lun_t is online.
 	 */
-#warning FIXME: Check for LUN_RESET + UNIT Attention
+/* #warning FIXME: Check for LUN_RESET + UNIT Attention */
 	if (LUN_OBJ_API(se_lun)->check_online(se_lun->lun_type_ptr) != 0) {
 		se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -366,7 +366,7 @@ extern int transport_get_lun_for_tmr(
 	/*
 	 * Determine if the se_lun_t is online.
 	 */
-#warning FIXME: Check for LUN_RESET + UNIT Attention
+/* #warning FIXME: Check for LUN_RESET + UNIT Attention */
 	if (LUN_OBJ_API(se_lun)->check_online(se_lun->lun_type_ptr) != 0) {
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		return -1;
@@ -1018,7 +1018,7 @@ int se_dev_set_queue_depth(se_device_t *dev, u32 queue_depth)
 	return 0;
 }
 
-#warning FIXME: Forcing max_sectors greater than get_max_sectors() disabled
+/* #warning FIXME: Forcing max_sectors greater than get_max_sectors() disabled */
 int se_dev_set_max_sectors(se_device_t *dev, u32 max_sectors)
 {
 	int force = 0; /* Force setting for VDEVS */

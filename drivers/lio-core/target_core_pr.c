@@ -574,7 +574,7 @@ static int core_scsi3_check_implict_release(
 		 */
 		__core_scsi3_complete_pro_release(dev, nacl, pr_reg, 0);
 		ret = 1;
-#warning FIXME: All Registrants, only release reservation when last registration is freed.
+/* #warning FIXME: All Registrants, only release reservation when last registration is freed. */
 	}
 	spin_unlock(&dev->dev_reservation_lock);
 
@@ -1711,6 +1711,7 @@ static int core_scsi3_emulate_pro_preempt(
 	return 0;
 }
 
+#if 0
 static int core_scsi3_emulate_pro_register_and_move(
 	se_cmd_t *cmd,
 	int type,
@@ -1721,6 +1722,7 @@ static int core_scsi3_emulate_pro_register_and_move(
 	core_scsi3_pr_generation(SE_DEV(cmd));
 	return 0;
 }
+#endif
 
 static unsigned long long core_scsi3_extract_reservation_key(unsigned char *cdb)
 {

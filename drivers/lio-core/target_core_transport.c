@@ -488,30 +488,14 @@ int __iscsi_debug_dev(se_device_t *dev)
 
 #endif /* DEBUG_DEV */
 
-#warning FIXME: transport_get_iqn_sn() for se_global_t
+/* #warning FIXME: transport_get_iqn_sn() for se_global_t */
 unsigned char *transport_get_iqn_sn(void)
 {
-	unsigned char *iqn = NULL;
-#if 0
-	iqn = strstr(iscsi_global->targetname, ":sn.");
-	if (iqn)
-		iqn += 1; /* Skip over : */
-	else {
-		printk(KERN_ERR iSCSI TargetNode name does not contain"
-			" \":sn.\", using first %u characters for uniqueness\n",
-				ISCSI_IQN_UNIQUENESS);
-
-		if (strlen(iscsi_global->targetname) >= ISCSI_IQN_UNIQUENESS)
-			iqn = (iscsi_global->targetname +
-			      (strlen(iscsi_global->targetname) -
-				ISCSI_IQN_UNIQUENESS));
-		else
-			iqn = &iscsi_global->targetname[0];
-	}
-#else
+	/*
+	 * Assume that for production WWN information will come through
+	 * ConfigFS at /sys/kernel/config/target/core/$HBA/$DEV/vpd_unit_serial
+	 */
 	return "1234567890";
-#endif
-	return iqn;
 }
 
 void transport_init_queue_obj(se_queue_obj_t *qobj)
@@ -6736,7 +6720,6 @@ static int transport_generic_write_pending(se_cmd_t *cmd)
 	 * Call the fabric write_pending function here to let the
 	 * frontend know that WRITE buffers are ready.
 	 */
-#warning FIXME: Use include/asm-generic/errno.h codes..
 	ret = CMD_TFO(cmd)->write_pending(cmd);
 	if (ret < 0) {
 		transport_cmd_check_stop(cmd, 1, 0);

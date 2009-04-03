@@ -968,10 +968,9 @@ static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 	dev = (se_device_t *)iterp->ti_ptr;
 	if ((dev)) {
 		/* Fix LU state, if we can read it from the device */
-#warning FIXME: Get scsiLuDefaultLun from transport plugins
 		seq_printf(seq, "%u %u %u %llu %s", hba->hba_index,
 				dev->dev_index, SCSI_LU_INDEX,
-				(unsigned long long)0, /* scsiLuDefaultLun */
+				(unsigned long long)0, /* FIXME: scsiLuDefaultLun */
 				(strlen(DEV_T10_WWN(dev)->unit_serial)) ?
 				/* scsiLuWwnName */
 				(char *)&DEV_T10_WWN(dev)->unit_serial[0] :
