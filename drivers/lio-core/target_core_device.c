@@ -1310,6 +1310,8 @@ int core_dev_add_initiator_node_lun_acl(
 
 	spin_lock(&lun->lun_acl_lock);
 	list_add_tail(&lacl->lacl_list, &lun->lun_acl_list);
+	atomic_inc(&lun->lun_acl_count);
+	smp_mb__after_atomic_inc();
 	spin_unlock(&lun->lun_acl_lock);
 
 	if ((lun->lun_access & TRANSPORT_LUNFLAGS_READ_ONLY) &&
@@ -1348,6 +1350,8 @@ int core_dev_del_initiator_node_lun_acl(
 
 	spin_lock(&lun->lun_acl_lock);
 	list_del(&lacl->lacl_list);
+	atomic_dec(&lun->lun_acl_count);
+	smp_mb__after_atomic_dec();
 	spin_unlock(&lun->lun_acl_lock);
 
 	core_update_device_list_for_node(lun, lacl->mapped_lun,

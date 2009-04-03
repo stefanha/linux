@@ -776,6 +776,7 @@ typedef struct se_lun_s {
 	u32			lun_access;
 	u32			lun_flags;
 	u32			unpacked_lun;
+	atomic_t		lun_acl_count;
 	spinlock_t		lun_acl_lock;
 	spinlock_t		lun_cmd_lock;
 	spinlock_t		lun_sep_lock;

@@ -686,6 +686,7 @@ se_portal_group_t *core_tpg_register(
 		lun->unpacked_lun = i;
 		lun->lun_type_ptr = NULL;
 		lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
+		atomic_set(&lun->lun_acl_count, 0);
 		INIT_LIST_HEAD(&lun->lun_acl_list);
 		INIT_LIST_HEAD(&lun->lun_cmd_list);
 		spin_lock_init(&lun->lun_acl_lock);
