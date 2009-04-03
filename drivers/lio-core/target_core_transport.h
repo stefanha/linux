@@ -216,10 +216,6 @@ extern int transport_generic_emulate_modesense(struct se_cmd_s *,
 extern int transport_generic_emulate_request_sense(struct se_cmd_s *,
 						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd_s *);
-extern void transport_memcpy_read_contig(struct se_cmd_s *, unsigned char *);
-extern void transport_memcpy_read_sg(struct se_cmd_s *, struct scatterlist *);
-extern void transport_memcpy_write_contig(struct se_cmd_s *, unsigned char *);
-extern void transport_memcpy_write_sg(struct se_cmd_s *, struct scatterlist *);
 extern se_cmd_t *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32,
 						struct se_obj_lun_type_s *,
