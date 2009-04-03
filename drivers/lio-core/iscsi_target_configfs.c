@@ -523,6 +523,13 @@ out:
 	return(ret);
 }
 
+static int lio_target_port_check_link(struct config_item *lun_ci)
+{
+	se_lun_t *lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group);
+
+	return atomic_read(&lun->lun_acl_count) ? -EACCES : 0;
+}
+
 static int lio_target_port_unlink (struct config_item *lun_ci, struct config_item *se_dev_ci)
 {
 	iscsi_portal_group_t *tpg;
@@ -568,6 +575,7 @@ static struct configfs_item_operations lio_target_port_item_ops = {
 	.show_attribute		= lio_target_port_show,
 	.store_attribute	= lio_target_port_store,
 	.allow_link		= lio_target_port_link,
+	.check_link		= lio_target_port_check_link,
 	.drop_link		= lio_target_port_unlink,
 };
 
