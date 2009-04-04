@@ -28,7 +28,7 @@
  * configfs Copyright (C) 2005 Oracle.  All rights reserved.
  *
  * Added CONFIGFS_EATTR() macros from original configfs.h macros
- * Copright (C) 2008 Nicholas A. Bellinger
+ * Copright (C) 2008-2009 Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * Please read Documentation/filesystems/configfs.txt before using the
  * configfs interface, ESPECIALLY the parts about reference counts and

@@ -3,7 +3,10 @@
  *
  * This file contains ConfigFS logic for the Generic Target Engine project.
  *
- * Copyright (c) 2008, 2009  Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Copyright (c) 2008-2009 Rising Tide, Inc.
+ * Copyright (c) 2008-2009 Linux-iSCSI.org
+ *
+ * Nicholas A. Bellinger <nab@kernel.org>
  *
  * based on configfs Copyright (C) 2005 Oracle.  All rights reserved.
  *

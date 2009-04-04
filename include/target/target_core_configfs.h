@@ -4,7 +4,8 @@
  * This file contains the configfs defines and prototypes for the
  * Generic Target Engine project.
  *
- * Copyright (c) 2008 Linux-iSCSI.org
+ * Copyright (c) 2008-2009 Rising Tide, Inc.
+ * Copyright (c) 2008-2009 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
