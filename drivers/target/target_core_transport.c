@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Filename:  target_core_transport.c
  *
- * This file contains the iSCSI Target Generic DAS Transport Layer Core.
+ * This file contains the Generic Target Engine Core.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
