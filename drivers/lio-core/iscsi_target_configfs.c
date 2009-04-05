@@ -33,17 +33,17 @@
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
 
-#include <target_core_base.h>
-#include <target_core_transport.h>
-#include <target_core_fabric_ops.h>
-#include <target_core_device.h>
-#include <target_core_configfs.h>
-#include <target_core_alua.h>
-#include <configfs_macros.h>
+#include <target/target_core_base.h>
+#include <target/target_core_transport.h>
+#include <target/target_core_fabric_ops.h>
+#include <target/target_core_device.h>
+#include <target/target_core_configfs.h>
+#include <target/target_core_alua.h>
+#include <target/configfs_macros.h>
 
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
-#include <target_core_base.h>
+#include <target/target_core_base.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>

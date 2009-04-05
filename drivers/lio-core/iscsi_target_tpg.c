@@ -48,12 +48,12 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 
-#include <target_core_base.h>
-#include <target_core_transport.h>
-#include <target_core_fabric_ops.h>
-#include <target_core_configfs.h>
-#include <target_core_hba.h>
-#include <target_core_tpg.h>
+#include <target/target_core_base.h>
+#include <target/target_core_transport.h>
+#include <target/target_core_fabric_ops.h>
+#include <target/target_core_configfs.h>
+#include <target/target_core_hba.h>
+#include <target/target_core_tpg.h>
 
 #include <iscsi_target_core.h>
 #include <iscsi_target_device.h>
@@ -66,8 +66,8 @@
 #include <iscsi_target.h>
 #include <iscsi_parameters.h>
 
-#include <target_core_plugin.h>
-#include <target_core_seobj.h>
+#include <target/target_core_plugin.h>
+#include <target/target_core_seobj.h>
 
 #undef ISCSI_TARGET_TPG_C
 

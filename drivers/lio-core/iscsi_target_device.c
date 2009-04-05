@@ -48,17 +48,17 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
-#include <target_core_base.h>
+#include <target/target_core_base.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_device.h>
-#include <target_core_device.h>
-#include <target_core_hba.h>
+#include <target/target_core_device.h>
+#include <target/target_core_hba.h>
 #include <iscsi_target_tpg.h>
-#include <target_core_transport.h>
+#include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <target_core_plugin.h>
-#include <target_core_seobj.h>
+#include <target/target_core_plugin.h>
+#include <target/target_core_seobj.h>
 
 #undef ISCSI_TARGET_DEVICE_C
 

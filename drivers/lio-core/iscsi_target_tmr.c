@@ -43,7 +43,7 @@
 #include <iscsi_crc.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_core.h>
-#include <target_core_base.h>
+#include <target/target_core_base.h>
 #include <iscsi_target_datain_values.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
@@ -51,7 +51,7 @@
 #include <iscsi_target_erl2.h>
 #include <iscsi_target_tmr.h>
 #include <iscsi_target_tpg.h>
-#include <target_core_transport.h>
+#include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
 
 #undef ISCSI_TARGET_TMR_C

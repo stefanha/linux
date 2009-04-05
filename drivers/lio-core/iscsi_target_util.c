@@ -49,9 +49,9 @@
 #include <iscsi_protocol.h>
 #include <iscsi_serial.h>
 
-#include <target_core_base.h>
-#include <target_core_transport.h>
-#include <target_core_tmr.h>
+#include <target/target_core_base.h>
+#include <target/target_core_transport.h>
+#include <target/target_core_tmr.h>
 
 #include <iscsi_target_core.h>
 #include <iscsi_target_datain_values.h>
@@ -63,8 +63,8 @@
 #include <iscsi_target.h>
 #include <iscsi_parameters.h>
 
-#include <target_core_fabric_ops.h>
-#include <target_core_configfs.h>
+#include <target/target_core_fabric_ops.h>
+#include <target/target_core_configfs.h>
 
 #ifdef DEBUG_ERL
 #include <iscsi_target_debugerl.h>

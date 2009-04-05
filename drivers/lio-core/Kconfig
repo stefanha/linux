@@ -2,13 +2,6 @@ config LIO_TARGET
         tristate "Linux-iSCSI.org iSCSI Target Mode Stack"
         default m
         depends on TARGET_CORE
-        ---help---
-        Say Y here to enable the Linux-iSCSI.org iSCSI Target Mode Stack
-
-
-config TARGET_CORE
-        tristate "Generic Target Core w/ ConfigFS Infrastructure"
 	select CONFIGFS_FS
-        default m
         ---help---
-        Say Y here to enable the Storage Engine, Subsystem Plugins, and ConfigFS enabled control path for the Generic Target Engine.
+        Say Y here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI Target Mode Stack

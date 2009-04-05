@@ -45,11 +45,11 @@
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target_mib.h>
-#include <target_core_base.h>
-#include <target_core_hba.h>
-#include <target_core_transport.h>
-#include <target_core_plugin.h>
-#include <target_core_seobj.h>
+#include <target/target_core_base.h>
+#include <target/target_core_hba.h>
+#include <target/target_core_transport.h>
+#include <target/target_core_plugin.h>
+#include <target/target_core_seobj.h>
 
 extern se_global_t *se_global;
 extern iscsi_global_t *iscsi_global;

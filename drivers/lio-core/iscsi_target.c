@@ -56,21 +56,21 @@
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
 #include <iscsi_target_core.h>
-#include <target_core_base.h>
+#include <target/target_core_base.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_datain_values.h>
 #include <iscsi_target_discovery.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>
-#include <target_core_hba.h>
+#include <target/target_core_hba.h>
 #include <iscsi_target_login.h>
 #include <iscsi_target_tmr.h>
 #include <iscsi_target_tpg.h>
-#include <target_core_transport.h>
+#include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <target_core_plugin.h>
+#include <target/target_core_plugin.h>
 
 #include <iscsi_target.h>
 #include <iscsi_target_device.h>

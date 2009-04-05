@@ -28,42 +28,6 @@ CWD=$(shell pwd)
 include $(CWD)/drivers/lio-core/MCONFIG_TARGET
 include $(CWD)/drivers/lio-core/MCONFIG_ALL
 
-obj-$(CONFIG_TARGET_CORE)		+=	target_core_mod.o
-target_core_mod-objs			:=	target_core_configfs.o \
-						target_core_device.o \
-						target_core_hba.o \
-						target_core_plugin.o \
-						target_core_pr.o \
-						target_core_alua.o \
-						target_core_scdb.o \
-						target_core_seobj.o \
-						target_core_tmr.o \
-						target_core_tpg.o \
-						target_core_transport.o \
-						target_core_ua.o \
-						div64.o
-
-ifeq ($(LINUX_IBLOCK), 1)
-target_core_mod-objs			+=	target_core_iblock.o
-EXTRA_CFLAGS				+=	-DPYX_IBLOCK
-endif
-ifeq ($(LINUX_PARALLEL_SCSI), 1)
-target_core_mod-objs			+=	target_core_pscsi.o
-EXTRA_CFLAGS				+=	-DPARALLEL_SCSI
-endif
-ifeq ($(LINUX_RAMDISK), 1)
-target_core_mod-objs			+=	target_core_rd.o
-EXTRA_CFLAGS				+=	-DPYX_RAMDISK
-endif
-ifeq ($(LINUX_FILEIO), 1)
-target_core_mod-objs			+=	target_core_file.o
-EXTRA_CFLAGS				+=	-DPYX_FILEIO
-endif
-ifeq ($(SNMP_FEATURE), 1)
-target_core_mod-objs			+=	target_core_mib.o
-EXTRA_CFLAGS				+=	-DSNMP_SUPPORT
-endif
-
 obj-$(CONFIG_LIO_TARGET)	+=	iscsi_target_mod.o
 iscsi_target_mod-objs		:=	iscsi_crc.o \
 					iscsi_debug_opcodes.o \
@@ -141,8 +105,6 @@ install ins:
 
 clean:
 	rm -f $(foreach prog,$(iscsi_target_mod-objs) $(obj-m),$(CWD)/$(prog)) $(CWD)/iscsi_target_mod.mod.o
-	rm -f $(foreach prog,$(target_core_mod-objs) $(obj-m),$(CWD)/$(prog)) $(CWD)/target_core_mod.mod.o
-	rm -f iscsi_target_mod.ko iscsi_target_mod.mod.c 
 	rm -f target_core_mod.ko target_core_mod.mod.c
 	rm -f .*.cmd ../common/.*.cmd .make_autoconfig *~
 	rm -fr .tmp_versions
