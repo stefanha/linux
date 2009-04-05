@@ -1,0 +1,6 @@
+config TARGET_CORE
+        tristate "Generic Target Core Engine and ConfigFS Infrastructure"
+	select CONFIGFS_FS
+        default m
+        ---help---
+        Say Y here to enable the Storage Engine, Subsystem Plugins, and ConfigFS enabled control path for the Generic Target Engine.
