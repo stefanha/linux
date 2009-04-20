@@ -514,25 +514,25 @@ void transport_load_plugins(void)
 #ifdef PARALLEL_SCSI
 	plugin_register((void *)&pscsi_template, pscsi_template.type,
 			pscsi_template.name, PLUGIN_TYPE_TRANSPORT,
-			pscsi_template.get_plugin_info, &ret);
+			pscsi_template.get_plugin_info, NULL, NULL, &ret);
 #endif
 #ifdef PYX_IBLOCK
 	plugin_register((void *)&iblock_template, iblock_template.type,
 			iblock_template.name, PLUGIN_TYPE_TRANSPORT,
-			iblock_template.get_plugin_info, &ret);
+			iblock_template.get_plugin_info, NULL, NULL, &ret);
 #endif
 #ifdef PYX_RAMDISK
 	plugin_register((void *)&rd_dr_template, rd_dr_template.type,
 			rd_dr_template.name, PLUGIN_TYPE_TRANSPORT,
-			rd_dr_template.get_plugin_info, &ret);
+			rd_dr_template.get_plugin_info, NULL, NULL, &ret);
 	plugin_register((void *)&rd_mcp_template, rd_mcp_template.type,
 			rd_mcp_template.name, PLUGIN_TYPE_TRANSPORT,
-			rd_mcp_template.get_plugin_info, &ret);
+			rd_mcp_template.get_plugin_info, NULL, NULL, &ret);
 #endif
 #ifdef PYX_FILEIO
 	plugin_register((void *)&fileio_template, fileio_template.type,
 			fileio_template.name, PLUGIN_TYPE_TRANSPORT,
-			fileio_template.get_plugin_info, &ret);
+			fileio_template.get_plugin_info, NULL, NULL, &ret);
 #endif
 }
 
