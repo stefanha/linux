@@ -58,7 +58,7 @@
 
 #define to_stgt_hba(d)	container_of(d, struct stgt_hba_s, dev)
 
-static int stgt_host_no_cnt = 0;
+static int stgt_host_no_cnt;
 
 #define ISPRINT(a)  ((a >= ' ') && (a <= '~'))
 
@@ -94,7 +94,7 @@ static struct device stgt_primary = {
 };
 
 static struct scsi_host_template stgt_driver_template = {
-	.name		= STGT_NAME,	
+	.name		= STGT_NAME,
 	.module		= THIS_MODULE,
 	.can_queue	= 1,
 	.sg_tablesize	= SG_ALL,
@@ -107,7 +107,7 @@ static struct scsi_host_template stgt_driver_template = {
 	.supported_mode	= MODE_TARGET,
 };
 
-static void stgt_release_adapter(struct device * dev)
+static void stgt_release_adapter(struct device *dev)
 {
 	stgt_hba_t *stgt_hba;
 
@@ -137,6 +137,7 @@ int stgt_plugin_init(void)
 			" stgt_driverfs_driver\n");
 		goto bus_unreg;
 	}
+	stgt_host_no_cnt = 0;
 
 	printk(KERN_INFO "CORE_STGT[0]: Bus Initalization complete\n");
 	return 0;
@@ -151,8 +152,8 @@ dev_unreg:
 void stgt_plugin_free(void)
 {
 	driver_unregister(&stgt_driverfs_driver);
-        bus_unregister(&stgt_lld_bus);
-        device_unregister(&stgt_primary);
+	bus_unregister(&stgt_lld_bus);
+	device_unregister(&stgt_primary);
 
 	printk(KERN_INFO "CORE_STGT[0]: Bus release complete\n");
 }
@@ -167,7 +168,7 @@ int stgt_attach_hba(se_hba_t *hba, u32 host_id)
 
 	stgt_hba = kzalloc(sizeof(stgt_hba_t), GFP_KERNEL);
 	if (!(stgt_hba)) {
-		printk("Unable to allocate stgt_hba_t\n");
+		printk(KERN_ERR "Unable to allocate stgt_hba_t\n");
 		return -ENOMEM;
 	}
 	stgt_hba->se_hba = hba;
@@ -179,7 +180,8 @@ int stgt_attach_hba(se_hba_t *hba, u32 host_id)
 
 	err = device_register(&stgt_hba->dev);
 	if (err) {
-		printk(KERN_ERR "device_register() for stgt_hba failed: %d\n", err);
+		printk(KERN_ERR "device_register() for stgt_hba failed:"
+				" %d\n", err);
 		return err;
 	}
 	stgt_host_no_cnt++;
@@ -895,12 +897,12 @@ int stgt_transfer_response(struct scsi_cmnd *sc,
 	stgt_plugin_task_t *st;
 
 	if (!task) {
-		printk("se_task_t is NULL!\n");
+		printk(KERN_ERR "se_task_t is NULL!\n");
 		BUG();
 	}
 	st = (stgt_plugin_task_t *)task->transport_req;
 	if (!st) {
-		printk("stgt_plugin_task_t is NULL!\n");
+		printk(KERN_ERR "stgt_plugin_task_t is NULL!\n");
 		BUG();
 	}
 	st->stgt_result = sc->request->errors;

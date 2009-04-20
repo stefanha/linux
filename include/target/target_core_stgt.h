@@ -96,7 +96,7 @@ extern u32 stgt_get_queue_depth(se_device_t *);
 extern void stgt_shutdown_hba(struct se_hba_s *);
 extern void stgt_req_done(struct request *, int);
 extern int stgt_transfer_response(struct scsi_cmnd *,
-			          void (*done)(struct scsi_cmnd *));
+				  void (*done)(struct scsi_cmnd *));
 #endif
 
 #include <linux/device.h>
