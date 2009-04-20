@@ -516,6 +516,13 @@ void transport_load_plugins(void)
 			pscsi_template.name, PLUGIN_TYPE_TRANSPORT,
 			pscsi_template.get_plugin_info, NULL, NULL, &ret);
 #endif
+#ifdef STGT_PLUGIN
+	plugin_register((void *)&stgt_template, stgt_template.type,
+			stgt_template.name, PLUGIN_TYPE_TRANSPORT,
+			stgt_template.get_plugin_info,
+			stgt_template.plugin_init,
+			stgt_template.plugin_free, &ret);
+#endif
 #ifdef PYX_IBLOCK
 	plugin_register((void *)&iblock_template, iblock_template.type,
 			iblock_template.name, PLUGIN_TYPE_TRANSPORT,

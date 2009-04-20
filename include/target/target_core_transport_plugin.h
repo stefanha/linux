@@ -35,6 +35,13 @@
 extern se_subsystem_api_t pscsi_template;
 #endif /* PARALLEL_SCSI */
 
+#ifdef STGT_PLUGIN
+#define STGT_INCLUDE_STRUCTS
+#include <target/target_core_stgt.h>
+#undef STGT_INCLUDE_STRUCTS
+extern se_subsystem_api_t stgt_template;
+#endif /* STGT_PLUGIN */
+
 #ifdef PYX_IBLOCK
 #define IBLOCK_INCLUDE_STRUCTS
 #include <target/target_core_iblock.h>

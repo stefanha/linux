@@ -150,7 +150,7 @@
 
 /* se_device_t->type */
 #define PSCSI					1
-#define SSCSI					2
+#define STGT					2
 #define PATA					3
 #define IBLOCK					4
 #define RAMDISK_DR				5

@@ -9,6 +9,7 @@ PYX_ISCSI_VENDOR ?="Linux-iSCSI.org"
 # Transport Plugins and Devices.
 #
 LINUX_PARALLEL_SCSI ?= 1
+LINUX_STGT ?= 1
 LINUX_SCSI_MEDIA_ROM ?= 1
 LINUX_PARALLEL_ATA ?= 0
 LINUX_IBLOCK ?= 1

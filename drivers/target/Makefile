@@ -51,6 +51,10 @@ ifeq ($(LINUX_PARALLEL_SCSI), 1)
 target_core_mod-objs			+=	target_core_pscsi.o
 EXTRA_CFLAGS				+=	-DPARALLEL_SCSI
 endif
+ifeq ($(LINUX_STGT), 1)
+target_core_mod-objs			+=	target_core_stgt.o
+EXTRA_CFLAGS				+=	-DSTGT_PLUGIN
+endif
 ifeq ($(LINUX_RAMDISK), 1)
 target_core_mod-objs			+=	target_core_rd.o
 EXTRA_CFLAGS				+=	-DPYX_RAMDISK
