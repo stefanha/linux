@@ -219,10 +219,13 @@ struct se_plugin_s *plugin_register(
 	unsigned char *plugin_name,
 	u32 plugin_class,
 	void (*get_plugin_info)(void *, char *, int *),
+	int (*plugin_init)(void),
+	void (*plugin_free)(void),
 	int *ret)
 {
 	se_plugin_class_t *pc;
 	se_plugin_t *p;
+	int err;
 
 	if (!obj) {
 		printk(KERN_ERR "obj or plugin_class pointers are NULL!\n");
@@ -257,6 +260,7 @@ struct se_plugin_s *plugin_register(
 
 	p->plugin_obj = obj;
 	p->get_plugin_info = get_plugin_info;
+	p->plugin_free	= plugin_free;
 	p->plugin_state = PLUGIN_REGISTERED;
 	p->plugin_type = plugin_loc;
 	snprintf(p->plugin_name, MAX_PLUGIN_NAME, "%s", plugin_name);
@@ -264,6 +268,14 @@ struct se_plugin_s *plugin_register(
 	printk(KERN_INFO "PLUGIN_%s[%u] - %s registered\n",
 			pc->plugin_class_name, plugin_loc, plugin_name);
 	spin_unlock(&pc->plugin_lock);
+
+	if (*plugin_init != NULL) {
+		err = (*plugin_init)();
+		if (err) {	
+			plugin_deregister(plugin_loc, plugin_class);
+			return NULL;
+		}
+	}
 
 	return p;
 
@@ -300,10 +312,14 @@ int plugin_deregister(
 		ret = -1;
 		goto out;
 	}
+	spin_unlock(&pc->plugin_lock);
 
+	if (p->plugin_free)
+		p->plugin_free();
+
+	spin_lock(&pc->plugin_lock);
 	p->plugin_obj = NULL;
 	p->plugin_state = PLUGIN_FREE;
-
 out:
 	spin_unlock(&pc->plugin_lock);
 	return ret;

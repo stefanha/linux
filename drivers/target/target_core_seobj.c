@@ -671,7 +671,7 @@ int se_obj_load_plugins(void)
 
 	dev_obj_template.obj_plugin = plugin_register((void *)&dev_obj_template,
 			TRANSPORT_LUN_TYPE_DEVICE, "dev", PLUGIN_TYPE_OBJ,
-			dev_obj_template.get_plugin_info, &ret);
+			dev_obj_template.get_plugin_info, NULL, NULL, &ret);
 	if (ret)
 		printk(KERN_ERR "plugin_register() failures\n");
 

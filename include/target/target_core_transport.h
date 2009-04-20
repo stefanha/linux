@@ -420,6 +420,14 @@ typedef struct se_subsystem_api_s {
 	se_device_t *(*create_virtdevice_from_fd)(se_subsystem_dev_t *,
 						const char *);
 	/*
+	 * plugin_init():
+	 */
+	int (*plugin_init)(void);
+	/*
+	 * plugin_free():
+	 */
+	void (*plugin_free)(void);
+	/*
 	 * get_plugin_info():
 	 */
 	void (*get_plugin_info)(void *, char *, int *);

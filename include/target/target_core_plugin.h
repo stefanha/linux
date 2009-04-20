@@ -48,7 +48,8 @@ extern void plugin_unload_all_classes(void);
 extern void *plugin_get_obj(u32, u32, int *);
 extern struct se_plugin_s *plugin_register(void *, u32, unsigned char *, u32,
 				void (*get_plugin_info)(void *, char *, int *),
-				int *);
+				int (*plugin_init)(void),
+				void (*plugin_free)(void), int *);
 extern int plugin_deregister(u32, u32);
 
 typedef struct se_plugin_class_s {
@@ -66,6 +67,7 @@ typedef struct se_plugin_s	{
 	se_plugin_class_t	*plugin_class;
 	void			*plugin_obj;
 	void (*get_plugin_info)(void *, char *, int *);
+	void (*plugin_free)(void);
 } se_plugin_t;
 
 #endif /* TARGET_CORE_PLUGIN_H */
