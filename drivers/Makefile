@@ -42,13 +42,10 @@ obj-y				+= macintosh/
 obj-$(CONFIG_IDE)		+= ide/
 obj-$(CONFIG_SCSI)		+= scsi/
 obj-$(CONFIG_ATA)		+= ata/
-<<<<<<< HEAD:drivers/Makefile
 obj-$(CONFIG_TARGET_CORE)	+= target/
 obj-$(CONFIG_LIO_TARGET)	+= lio-core/
-=======
 obj-y				+= net/
 obj-$(CONFIG_ATM)		+= atm/
->>>>>>> 091069740304c979f957ceacec39c461d0192158:drivers/Makefile
 obj-$(CONFIG_FUSION)		+= message/
 obj-$(CONFIG_FIREWIRE)		+= firewire/
 obj-y				+= ieee1394/
