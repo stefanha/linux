@@ -277,6 +277,7 @@ int scsi_execute_req(struct scsi_device *sdev, const unsigned char *cmd,
 }
 EXPORT_SYMBOL(scsi_execute_req);
 
+<<<<<<< HEAD:drivers/scsi/scsi_lib.c
 struct scsi_io_context {
 	void *data;
 	void (*done)(void *data, char *sense, int result, int resid);
@@ -469,6 +470,8 @@ free_sense:
 }
 EXPORT_SYMBOL_GPL(scsi_execute_async);
 
+=======
+>>>>>>> 091069740304c979f957ceacec39c461d0192158:drivers/scsi/scsi_lib.c
 /*
  * Function:    scsi_init_cmd_errh()
  *
@@ -983,7 +986,22 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 				      "%d bytes done.\n",
 				      req->nr_sectors, good_bytes));
 
-	/* A number of bytes were successfully read.  If there
+	/*
+	 * Recovered errors need reporting, but they're always treated
+	 * as success, so fiddle the result code here.  For BLOCK_PC
+	 * we already took a copy of the original into rq->errors which
+	 * is what gets returned to the user
+	 */
+	if (sense_valid && sshdr.sense_key == RECOVERED_ERROR) {
+		if (!(req->cmd_flags & REQ_QUIET))
+			scsi_print_sense("", cmd);
+		result = 0;
+		/* BLOCK_PC may have set error */
+		error = 0;
+	}
+
+	/*
+	 * A number of bytes were successfully read.  If there
 	 * are leftovers and there is some kind of error
 	 * (result != 0), retry the rest.
 	 */
@@ -1922,20 +1940,12 @@ int __init scsi_init_queue(void)
 {
 	int i;
 
-	scsi_io_context_cache = kmem_cache_create("scsi_io_context",
-					sizeof(struct scsi_io_context),
-					0, 0, NULL);
-	if (!scsi_io_context_cache) {
-		printk(KERN_ERR "SCSI: can't init scsi io context cache\n");
-		return -ENOMEM;
-	}
-
 	scsi_sdb_cache = kmem_cache_create("scsi_data_buffer",
 					   sizeof(struct scsi_data_buffer),
 					   0, 0, NULL);
 	if (!scsi_sdb_cache) {
 		printk(KERN_ERR "SCSI: can't init scsi sdb cache\n");
-		goto cleanup_io_context;
+		return -ENOMEM;
 	}
 
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {
@@ -1970,8 +1980,6 @@ cleanup_sdb:
 			kmem_cache_destroy(sgp->slab);
 	}
 	kmem_cache_destroy(scsi_sdb_cache);
-cleanup_io_context:
-	kmem_cache_destroy(scsi_io_context_cache);
 
 	return -ENOMEM;
 }
@@ -1980,7 +1988,6 @@ void scsi_exit_queue(void)
 {
 	int i;
 
-	kmem_cache_destroy(scsi_io_context_cache);
 	kmem_cache_destroy(scsi_sdb_cache);
 
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {
