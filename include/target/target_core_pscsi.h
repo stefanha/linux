@@ -94,7 +94,6 @@ extern u32 pscsi_get_dma_length(u32, se_device_t *);
 extern u32 pscsi_get_max_sectors(se_device_t *);
 extern u32 pscsi_get_queue_depth(se_device_t *);
 extern void pscsi_shutdown_hba(struct se_hba_s *);
-extern void pscsi_req_done_legacy(void *, char *, int, int);
 extern void pscsi_req_done(struct request *, int);
 #endif
 
@@ -121,7 +120,6 @@ typedef struct pscsi_plugin_task_s {
 
 typedef struct pscsi_dev_virt_s {
 	int	pdv_flags;
-	int	pdv_legacy; /* Use scsi_execute_async() from HTCL */
 	int	pdv_channel_id;
 	int	pdv_target_id;
 	int	pdv_lun_id;

@@ -399,8 +399,6 @@ void *pscsi_allocate_virtdevice(se_hba_t *hba, const char *name)
 		return NULL;
 	}
 	pdv->pdv_se_hba = hba;
-	/* Use legacy path unless using ConfigFS FD method */
-	pdv->pdv_legacy = 1;
 
 	printk(KERN_INFO "PSCSI: Allocated pdv: %p for %s\n", pdv, name);
 	return (void *)pdv;
@@ -557,10 +555,9 @@ int pscsi_activate_device(se_device_t *dev)
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	struct Scsi_Host *sh = sd->host;
 
-	printk(KERN_INFO "CORE_PSCSI[%d] - Activating %s Device with TCQ: %d at"
+	printk(KERN_INFO "CORE_PSCSI[%d] - Activating Device with TCQ: %d at"
 		" SCSI Location (Channel/Target/LUN) %d/%d/%d\n", sh->host_no,
-		(pdv->pdv_legacy) ? "Legacy" : "REQ",  sd->queue_depth,
-		sd->channel, sd->id, sd->lun);
+		 sd->queue_depth, sd->channel, sd->id, sd->lun);
 
 	return 0;
 }
@@ -575,9 +572,8 @@ void pscsi_deactivate_device(se_device_t *dev)
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 	struct Scsi_Host *sh = sd->host;
 
-	printk(KERN_INFO "CORE_PSCSI[%d] - Deactivating %s Device with TCQ: %d"
-		" at SCSI Location (Channel/Target/LUN) %d/%d/%d\n",
-		sh->host_no, (pdv->pdv_legacy) ? "Legacy" : "REQ",
+	printk(KERN_INFO "CORE_PSCSI[%d] - Deactivating Device with TCQ: %d at"
+		" SCSI Location (Channel/Target/LUN) %d/%d/%d\n", sh->host_no,
 		sd->queue_depth, sd->channel, sd->id, sd->lun);
 }
 
@@ -847,30 +843,6 @@ static int pscsi_blk_get_request(se_task_t *task)
 	return 0;
 }
 
-static int pscsi_do_task_legacy(
-	se_task_t *task,
-	pscsi_plugin_task_t *pt,
-	pscsi_dev_virt_t *pdv)
-{
-	se_cmd_t *cmd = TASK_CMD(task);
-	void *pscsi_buf = (task->task_sg_num != 0) ? task->task_sg :
-			T_TASK(cmd)->t_task_buf;
-	int ret;
-
-	ret = scsi_execute_async(pdv->pdv_sd, pt->pscsi_cdb,
-			COMMAND_SIZE(pt->pscsi_cdb[0]), pt->pscsi_direction,
-			pscsi_buf, task->task_size, task->task_sg_num,
-			(pdv->pdv_sd->type == TYPE_DISK) ? PS_TIMEOUT_DISK :
-			PS_TIMEOUT_OTHER, PS_RETRY, (void *)task,
-			pscsi_req_done_legacy, GFP_KERNEL);
-	if (ret != 0) {
-		printk(KERN_ERR "PSCSI Execute(): returned: %d\n", ret);
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-	}
-
-	return 0;
-}
-
 /*      pscsi_do_task(): (Part of se_subsystem_api_t template)
  *
  *
@@ -880,9 +852,6 @@ int pscsi_do_task(se_task_t *task)
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	struct gendisk *gd = NULL;
-
-	if (pdv->pdv_legacy)
-		return pscsi_do_task_legacy(task, pt, pdv);
 	/*
 	 * Grab pointer to struct gendisk for TYPE_DISK and TYPE_ROM
 	 * cases (eg: cases where struct scsi_device has a backing
@@ -1135,7 +1104,6 @@ se_device_t *pscsi_create_virtdevice_from_fd(
 		 * Keep track of the struct block_device for now..
 		 */
 		pdv->pdv_bd = bd;
-		pdv->pdv_legacy = 0;
 		/*
 		 * pscsi_create_type_[disk,rom]() will release host_lock..
 		 */
@@ -1318,9 +1286,6 @@ int pscsi_map_task_SG(se_task_t *task)
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int nr_vecs = 0, ret = 0;
 
-	if (pdv->pdv_legacy)
-		return 0;
-
 	if (!task->task_size)
 		return 0;
 	/*
@@ -1422,9 +1387,6 @@ int pscsi_map_task_non_SG(se_task_t *task)
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	int ret = 0;
 
-	if (pdv->pdv_legacy)
-		return 0;
-
 	if (!task->task_size)
 		return 0;
 
@@ -1445,12 +1407,8 @@ int pscsi_map_task_non_SG(se_task_t *task)
 int pscsi_CDB_inquiry(se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
-	if (pdv->pdv_legacy)
-		return pscsi_map_task_non_SG(task);
-
 	if (pscsi_blk_get_request(task) < 0)
 		return -1;
 
@@ -1460,11 +1418,10 @@ int pscsi_CDB_inquiry(se_task_t *task, u32 size)
 int pscsi_CDB_none(se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 
 	pt->pscsi_direction = DMA_NONE;
 
-	return (pdv->pdv_legacy) ? 0 : pscsi_blk_get_request(task);
+	return pscsi_blk_get_request(task);
 }
 
 /*	pscsi_CDB_read_non_SG():
@@ -1474,11 +1431,8 @@ int pscsi_CDB_none(se_task_t *task, u32 size)
 int pscsi_CDB_read_non_SG(se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
-	if (pdv->pdv_legacy)
-		return pscsi_map_task_non_SG(task);
 
 	if (pscsi_blk_get_request(task) < 0)
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -1493,13 +1447,11 @@ int pscsi_CDB_read_non_SG(se_task_t *task, u32 size)
 int pscsi_CDB_read_SG(se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
 
-	if (!(pdv->pdv_legacy))
-		if (pscsi_blk_get_request(task) < 0)
-			return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	if (pscsi_blk_get_request(task) < 0)
+		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
 	if (pscsi_map_task_SG(task) < 0)
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -1514,13 +1466,11 @@ int pscsi_CDB_read_SG(se_task_t *task, u32 size)
 int pscsi_CDB_write_non_SG(se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 
 	pt->pscsi_direction = DMA_TO_DEVICE;
 
-	if (!(pdv->pdv_legacy))
-		if (pscsi_blk_get_request(task) < 0)
-			return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	if (pscsi_blk_get_request(task) < 0)
+		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
 	return pscsi_map_task_non_SG(task);
 }
@@ -1532,13 +1482,11 @@ int pscsi_CDB_write_non_SG(se_task_t *task, u32 size)
 int pscsi_CDB_write_SG(se_task_t *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 
 	pt->pscsi_direction = DMA_TO_DEVICE;
 
-	if (!(pdv->pdv_legacy))
-		if (pscsi_blk_get_request(task) < 0)
-			return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	if (pscsi_blk_get_request(task) < 0)
+		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
 	if (pscsi_map_task_SG(task) < 0)
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -1693,20 +1641,6 @@ static inline void pscsi_process_SAM_status(
 	}
 
 	return;
-}
-
-void pscsi_req_done_legacy(void *data, char *sense, int result, int data_len)
-{
-	se_task_t *task = (se_task_t *)data;
-	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *)task->transport_req;
-
-	pt->pscsi_result = result;
-	pt->pscsi_resid = data_len;
-
-	if (result != 0)
-		memcpy(pt->pscsi_sense, sense, SCSI_SENSE_BUFFERSIZE);	
-
-	pscsi_process_SAM_status(task, pt);
 }
 
 void pscsi_req_done(struct request *req, int uptodate)
