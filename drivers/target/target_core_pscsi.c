@@ -518,7 +518,12 @@ se_device_t *pscsi_create_virtdevice(
 				" parameter\n");
 		return NULL;
 	}
-
+#ifndef LINUX_USE_NEW_BLK_MAP
+	printk(KERN_ERR "Sorry, when running on >= v2.6.30 w/o blk-map branch"
+		" you need to use the ConfigFS file descriptor method for"
+		" accessing Linux/SCSI passthrough storage objects\n");
+	return -EINVAL;
+#endif
 	spin_lock_irq(sh->host_lock);
 	list_for_each_entry(sd, &sh->__devices, siblings) {
 		if (!(pdv->pdv_channel_id == sd->channel) ||
@@ -1269,6 +1274,39 @@ static inline struct bio *pscsi_get_bio(pscsi_dev_virt_t *pdv, int sg_num)
 #define DEBUG_PSCSI(x...)
 #endif
 
+#ifdef LINUX_USE_NEW_BLK_MAP
+
+/*	pscsi_map_task_SG()
+ *
+ *	This function uses the new struct scatterlist-> struct request mapping
+ *      from git.kernel.org/pub/scm/linux/kernel/tj/misc.git blk-map
+ *
+ *	This code is not upstream yet, so lio-core-2.6.git now has a blk-map
+ *	branch until this happens..
+ */
+int pscsi_map_task_SG(se_task_t *task)
+{
+	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
+	struct request *rq = pt->pscsi_req;
+	int ret;
+	/*
+	 * For SCF_SCSI_DATA_SG_IO_CDB, use block/blk-map.c:blk_rq_map_kern_sg()
+	 * for mapping struct scatterlist to struct request.  Thanks Tejun!
+	 */
+	ret = blk_rq_map_kern_sg(rq, task->task_sg, task->task_sg_num,
+			GFP_KERNEL);
+	if (ret != 0) {
+		printk(KERN_ERR "blk_rq_map_kern_sg() failed for rq: %p"
+				" task_sg: %p task_sg_num: %u\n",
+			rq, task->task_sg, task->task_sg_num);
+		return -1;
+	}
+
+	return task->task_sg_num;
+}
+
+#else
+
 /*      pscsi_map_task_SG():
  *
  *
@@ -1376,6 +1414,9 @@ fail:
 	return ret;
 }
 
+#endif /* LINUX_USE_NEW_BLK_MAP */
+
+
 /*	pscsi_map_task_non_SG():
  *
  *
@@ -1389,10 +1430,14 @@ int pscsi_map_task_non_SG(se_task_t *task)
 
 	if (!task->task_size)
 		return 0;
-
+#ifdef LINUX_USE_NEW_BLK_MAP
+	ret = blk_rq_map_kern(pt->pscsi_req, T_TASK(cmd)->t_task_buf,
+			task->task_size, GFP_KERNEL);
+#else
 	ret = blk_rq_map_kern(pdv->pdv_sd->request_queue,
 			pt->pscsi_req, T_TASK(cmd)->t_task_buf,
 			task->task_size, GFP_KERNEL);
+#endif
 	if (ret < 0) {
 		printk(KERN_ERR "PSCSI: blk_rq_map_kern() failed: %d\n", ret);
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
