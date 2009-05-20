@@ -123,7 +123,6 @@ typedef struct pscsi_dev_virt_s {
 	int	pdv_channel_id;
 	int	pdv_target_id;
 	int	pdv_lun_id;
-	struct block_device *pdv_bd; /* Temporary for v2.6.28 */
 	struct scsi_device *pdv_sd;
 	struct se_hba_s *pdv_se_hba;
 } pscsi_dev_virt_t;

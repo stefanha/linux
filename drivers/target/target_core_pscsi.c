@@ -519,11 +519,6 @@ se_device_t *pscsi_create_virtdevice(
 		return NULL;
 	}
 
-	printk(KERN_ERR "Sorry, when running on >= v2.6.30 w/o blk-map branch"
-		" you need to use the ConfigFS file descriptor method for"
-		" accessing Linux/SCSI passthrough storage objects\n");
-	return NULL;
-
 	spin_lock_irq(sh->host_lock);
 	list_for_each_entry(sd, &sh->__devices, siblings) {
 		if (!(pdv->pdv_channel_id == sd->channel) ||
@@ -590,9 +585,6 @@ void pscsi_free_device(void *p)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) p;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
-
-	if (pdv->pdv_bd)
-		pdv->pdv_bd = NULL;
 
 	if (sd) {
 		if ((sd->type == TYPE_DISK) || (sd->type == TYPE_ROM))
@@ -1106,10 +1098,6 @@ se_device_t *pscsi_create_virtdevice_from_fd(
 			return ERR_PTR(-EINVAL);
 		}
 		/*
-		 * Keep track of the struct block_device for now..
-		 */
-		pdv->pdv_bd = bd;
-		/*
 		 * pscsi_create_type_[disk,rom]() will release host_lock..
 		 */
 		spin_lock_irq(sh->host_lock);
@@ -1149,12 +1137,6 @@ se_device_t *pscsi_create_virtdevice_from_fd(
 		fput(filp);
 		return ERR_PTR(-ENODEV);
 	}
-
-	/*
-	 * Clear pdv->pdv_bd on exception.
-	 */
-	if (!(dev))
-		pdv->pdv_bd = NULL;
 
 	iput(inode);
 	fput(filp);
@@ -1252,19 +1234,6 @@ static inline struct bio *pscsi_get_bio(pscsi_dev_virt_t *pdv, int sg_num)
 	}
 	bio->bi_end_io = pscsi_bi_endio;
 
-	/*
-	 * While using fs/bio.c:bio_add_page() in pscsi_map_task_SG(), each
-	 * struct bio->bi_bdev needs to be set in order for bdev_get_queue()
-	 * to locate struct request_queue in bio_add_page().
-	 */
-	bio->bi_bdev = pdv->pdv_bd;
-	if (!(bio->bi_bdev)) {
-		printk(KERN_ERR "PSCSI: Unable to locate struct block_device"
-				" for BIO\n");
-		bio_put(bio);
-		return NULL;
-	}
-
 	return bio;
 }
 
@@ -1334,11 +1303,12 @@ int pscsi_map_task_SG(se_task_t *task)
 					tbio = tbio->bi_next = bio;
 			}
 
-			DEBUG_PSCSI("PSCSI: Calling bio_add_page() i: %d bio:"
+			DEBUG_PSCSI("PSCSI: Calling bio_add_pc_page() i: %d bio:"
 				" %p page: %p len: %d off: %d\n", i, bio, page,
 				len, off);
 
-			ret = bio_add_page(bio, page, bytes, off);
+			ret = bio_add_pc_page(pdv->pdv_sd->request_queue,
+					bio, page, bytes, off);
 			if (ret != bytes)
 				goto fail;
 
