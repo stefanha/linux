@@ -104,6 +104,7 @@ struct block_device *__linux_blockdevice_claim(
 		claim_ptr = (void *)bd;
 
 	if (bd_claim(bd, claim_ptr) < 0) {
+		blkdev_put(bd, FMODE_WRITE|FMODE_READ);
 		*ret = 0;
 		return bd;
 	}
