@@ -622,6 +622,9 @@ static ssize_t target_core_dev_wwn_store_attr_vpd_unit_serial(
 
 	printk(KERN_INFO "Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
 			" %s\n", su_dev->t10_wwn.unit_serial);
+	if (dev)
+		transport_rescan_evpd_device_ident(dev);	
+
 	return count;
 }
 

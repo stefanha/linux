@@ -1951,6 +1951,15 @@ out:
 	return 0;
 }
 
+int transport_rescan_evpd_device_ident(
+        se_device_t *dev)
+{
+	se_release_vpd_for_dev(dev);
+	transport_get_inquiry_vpd_device_ident(DEV_OBJ_API(dev),
+			DEV_T10_WWN(dev), (void *)dev);
+	return 0;
+}
+
 static int transport_get_read_capacity(se_device_t *dev)
 {
 	unsigned char cdb[SCSI_CDB_SIZE], *buf;

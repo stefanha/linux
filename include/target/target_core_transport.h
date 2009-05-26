@@ -167,6 +167,7 @@ extern int transport_dump_vpd_ident_type(struct t10_vpd_s *,
 					unsigned char *, int);
 extern int transport_dump_vpd_ident(struct t10_vpd_s *,
 					unsigned char *, int);
+extern int transport_rescan_evpd_device_ident(struct se_device_s *);
 extern se_device_t *transport_add_device_to_core_hba(se_hba_t *,
 					struct se_subsystem_api_s *,
 					struct se_subsystem_dev_s *, u32,
