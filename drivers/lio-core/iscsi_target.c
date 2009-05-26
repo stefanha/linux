@@ -1201,10 +1201,8 @@ extern void iscsi_target_release_phase2 (void)
 	core_reset_nps();
 	iscsi_disable_all_tpgs();
 	iscsi_deallocate_thread_sets(TARGET);
-	iscsi_disable_all_hbas();
 	iscsi_remove_all_tpgs();
 	core_release_nps();
-	iscsi_hba_del_all_hbas();
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_sess_cache);
 	kmem_cache_destroy(lio_conn_cache);
