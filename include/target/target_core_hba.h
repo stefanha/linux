@@ -38,7 +38,5 @@ extern struct se_hba_s *core_get_next_free_hba(void);
 extern void core_put_hba(struct se_hba_s *);
 extern int se_core_add_hba(struct se_hba_s *, u32);
 extern int se_core_del_hba(struct se_hba_s *);
-extern void iscsi_disable_all_hbas(void);
-extern void iscsi_hba_del_all_hbas(void);
 
 #endif /* TARGET_CORE_HBA_H */
