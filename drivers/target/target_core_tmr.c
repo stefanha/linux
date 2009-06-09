@@ -384,9 +384,11 @@ int core_tmr_lun_reset(
 	}
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
+#ifdef SNMP_SUPPORT
 	spin_lock(&dev->stats_lock);
 	dev->num_resets++;
 	spin_unlock(&dev->stats_lock);
+#endif /* SNMP_SUPPORT */
 
 	DEBUG_LR("LUN_RESET: %s for [%s] Complete\n",
 			(preempt_and_abort_list) ? "Preempt" : "TMR",

@@ -495,7 +495,10 @@ void core_update_device_list_for_node(
 	core_scsi3_ua_release_all(deve);
 	deve->se_lun = NULL;
 	deve->lun_flags = 0;
+#ifdef SNMP_SUPPORT
 	deve->creation_time = 0;
+	deve->attach_count--;
+#endif /* SNMP_SUPPORT */
 	spin_unlock_bh(&nacl->device_list_lock);
 
 	core_scsi3_free_pr_reg_from_nacl(lun->se_dev, nacl);
