@@ -2003,17 +2003,18 @@ static void iscsi_handle_nopin_response_timeout (
 #ifdef SNMP_SUPPORT
 	{
 	iscsi_portal_group_t *tpg = conn->sess->tpg;
-	iscsi_tiqn_t *tiqn = (tpg->tpg_tiqn) ? tpg->tpg_tiqn :
-		__core_get_default_tiqn();
+	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
 
-	spin_lock_bh(&tiqn->sess_err_stats.lock);
-	strcpy(tiqn->sess_err_stats.last_sess_fail_rem_name, 
-       	        (void *)SESS_OPS_C(conn)->InitiatorName);
-	tiqn->sess_err_stats.last_sess_failure_type =
-			ISCSI_SESS_ERR_CXN_TIMEOUT;
-	tiqn->sess_err_stats.cxn_timeout_errors++;
-	SESS(conn)->conn_timeout_errors++;
-	spin_unlock_bh(&tiqn->sess_err_stats.lock);
+	if (tiqn) {
+		spin_lock_bh(&tiqn->sess_err_stats.lock);
+		strcpy(tiqn->sess_err_stats.last_sess_fail_rem_name, 
+       		        (void *)SESS_OPS_C(conn)->InitiatorName);
+		tiqn->sess_err_stats.last_sess_failure_type =
+				ISCSI_SESS_ERR_CXN_TIMEOUT;
+		tiqn->sess_err_stats.cxn_timeout_errors++;
+		SESS(conn)->conn_timeout_errors++;
+		spin_unlock_bh(&tiqn->sess_err_stats.lock);
+	}
 	}
 #endif /* SNMP_SUPPORT */
 	
@@ -2819,6 +2820,8 @@ void iscsi_collect_login_stats (iscsi_conn_t *conn, __u8 status_class,
 	iscsi_tiqn_t *tiqn;
 
 	tiqn = iscsi_snmp_get_tiqn(conn);
+	if (!(tiqn))
+		return;
 
 	spin_lock(&tiqn->login_stats.lock);
 	if ((conn->login_ip == tiqn->login_stats.last_intr_fail_addr) &&
@@ -2879,13 +2882,15 @@ extern iscsi_tiqn_t *iscsi_snmp_get_tiqn (iscsi_conn_t *conn)
 {
 	iscsi_portal_group_t *tpg;
 	
-	if (!conn || !conn->sess || !conn->sess->tpg)
-		return(__core_get_default_tiqn());
+	if (!(conn) || !(conn->sess))
+		return NULL;
 
 	if (!(tpg = conn->sess->tpg))
-		return(__core_get_default_tiqn());
+		return NULL;
 
-	return((tpg->tpg_tiqn) ? tpg->tpg_tiqn :
-		__core_get_default_tiqn());
+	if (!(tpg->tpg_tiqn))
+		return NULL;
+
+	return tpg->tpg_tiqn;
 }
 #endif /* SNMP_SUPPORT */
