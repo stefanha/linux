@@ -43,7 +43,9 @@ extern int lio_tpg_shutdown_session (struct se_session_s *);
 extern void lio_tpg_close_session (struct se_session_s *);
 extern void lio_tpg_stop_session (struct se_session_s *, int, int);
 extern void lio_tpg_fall_back_to_erl0 (struct se_session_s *);
+#ifdef SNMP_SUPPORT
 extern u32 lio_tpg_get_inst_index (struct se_portal_group_s *);
+#endif /* SNMP_SUPPORT */
 extern void lio_set_default_node_attributes (struct se_node_acl_s *);
 
 extern void init_iscsi_portal_groups (struct iscsi_tiqn_s *);
@@ -51,6 +53,7 @@ extern int core_load_discovery_tpg (void);
 extern void core_release_discovery_tpg (void);
 extern iscsi_portal_group_t *core_get_tpg_from_np (struct iscsi_tiqn_s *, struct iscsi_np_s *);
 extern iscsi_portal_group_t *iscsi_get_tpg_from_tpgt (struct iscsi_tiqn_s *, __u16, int);
+extern int iscsi_get_tpg (struct iscsi_portal_group_s *);
 extern void iscsi_put_tpg (iscsi_portal_group_t *);
 extern void iscsi_clear_tpg_np_login_threads (iscsi_portal_group_t *, int);
 extern void iscsi_tpg_dump_params (iscsi_portal_group_t *);

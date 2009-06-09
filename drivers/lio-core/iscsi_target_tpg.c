@@ -343,12 +343,14 @@ extern void lio_tpg_fall_back_to_erl0 (se_session_t *se_sess)
 	return;
 }
 
+#ifdef SNMP_SUPPORT
 extern u32 lio_tpg_get_inst_index (se_portal_group_t *se_tpg)
 {
 	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
 
 	return(tpg->tpg_tiqn->tiqn_index);
 }
+#endif /* SNMP_SUPPORT */
 
 extern void lio_set_default_node_attributes (se_node_acl_t *se_acl)
 {
@@ -484,6 +486,13 @@ extern iscsi_portal_group_t *core_get_tpg_from_np (
 	return(NULL);
 }
 
+extern int iscsi_get_tpg (
+	iscsi_portal_group_t *tpg)
+{
+	down_interruptible(&tpg->tpg_access_sem);
+	return (signal_pending(current)) ? -1 : 0;
+}
+
 /*	iscsi_get_tpg_from_tpgt():
  *
  *
@@ -493,34 +502,31 @@ extern iscsi_portal_group_t *iscsi_get_tpg_from_tpgt (
 	__u16 tpgt,
 	int addtpg)
 {
-	int i;
 	iscsi_portal_group_t *tpg = NULL;
 
+	if (tpgt > (ISCSI_MAX_TPGS-1)) {
+		printk(KERN_ERR "tpgt exceeds ISCSI_MAX_TPGS-1: %d\n",
+			ISCSI_MAX_TPGS-1);
+		return NULL;
+	}
+
 	spin_lock(&tiqn->tiqn_tpg_lock);
-	for (i = 0; i < ISCSI_MAX_TPGS; i++) {
-		tpg = &tiqn->tiqn_tpg_list[i];
+	tpg = &tiqn->tiqn_tpg_list[tpgt];
 
-		if (tpg->tpgt != tpgt)
-			continue;
-
-		spin_lock(&tpg->tpg_state_lock);
-		if ((tpg->tpg_state == TPG_STATE_FREE) && !addtpg) {
-			spin_unlock(&tpg->tpg_state_lock);
-			break;
-		}
+	spin_lock(&tpg->tpg_state_lock);
+	if ((tpg->tpg_state == TPG_STATE_FREE) && !addtpg) {
 		spin_unlock(&tpg->tpg_state_lock);
 		spin_unlock(&tiqn->tiqn_tpg_lock);
-
-		down_interruptible(&tpg->tpg_access_sem);
-		return((signal_pending(current)) ? NULL : tpg);
-	}
-	spin_unlock(&tiqn->tiqn_tpg_lock);
-	
-	TRACE(TRACE_ISCSI, "CORE[%s] - Unable to locate iSCSI target"
-		" portal group with TPGT: %hu, ignoring request.\n",
+		TRACE(TRACE_ISCSI, "CORE[%s] - Unable to locate iSCSI target"
+			" portal group with TPGT: %hu, ignoring request.\n",
 			tiqn->tiqn, tpgt);
-	
-	return(NULL);
+		return NULL;
+	}
+	spin_unlock(&tpg->tpg_state_lock);
+	spin_unlock(&tiqn->tiqn_tpg_lock);
+
+	down_interruptible(&tpg->tpg_access_sem);
+	return (signal_pending(current)) ? NULL : tpg;
 }
 
 /*	iscsi_put_tpg():
@@ -529,10 +535,7 @@ extern iscsi_portal_group_t *iscsi_get_tpg_from_tpgt (
  */
 extern void iscsi_put_tpg (iscsi_portal_group_t *tpg)
 {
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-
 	up(&tpg->tpg_access_sem);
-	core_put_tiqn(tiqn);
 	return;
 }
 
