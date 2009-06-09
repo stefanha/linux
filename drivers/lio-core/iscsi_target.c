@@ -115,49 +115,6 @@ static int iscsi_send_text_rsp (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_send_reject (iscsi_cmd_t *, iscsi_conn_t *);
 static int iscsi_logout_post_handler (iscsi_cmd_t *, iscsi_conn_t *);
 
-/*
- * Legacy Mode, locate the first valid Target IQN.
- */
-extern iscsi_tiqn_t *__core_get_default_tiqn (void)
-{
-	iscsi_tiqn_t *tiqn = NULL;
-
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list)
-		break;
-
-	if (!tiqn) {
-		TRACE_ERROR("Unable to locate Default Target IQN\n");
-		return(NULL);
-	}
-
-	return(tiqn);
-}
-
-/*
- * Called with iscsi_global->tiqn_lock held.
- */
-extern iscsi_tiqn_t *core_get_default_tiqn (void)
-{
-	iscsi_tiqn_t *tiqn = NULL;
-
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		break;
-	}
-	if (!tiqn) {
-		TRACE_ERROR("Unable to locate Default Target IQN\n");
-		return(NULL);
-	}
-	spin_lock(&tiqn->tiqn_state_lock);
-	if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
-		spin_unlock(&tiqn->tiqn_state_lock);
-		down_interruptible(&tiqn->tiqn_access_sem);
-		return((signal_pending(current)) ? NULL : tiqn);
-	}
-	spin_unlock(&tiqn->tiqn_state_lock);
-
-	return(NULL);
-}
-
 extern iscsi_tiqn_t *core_get_tiqn_for_login(unsigned char *buf)
 {
 	iscsi_tiqn_t *tiqn = NULL;
@@ -181,44 +138,17 @@ extern iscsi_tiqn_t *core_get_tiqn_for_login(unsigned char *buf)
 	return(NULL);
 }
 
-extern iscsi_tiqn_t *core_get_tiqn (unsigned char *buf, int delete)
+static int core_set_tiqn_shutdown (iscsi_tiqn_t *tiqn)
 {
-	iscsi_tiqn_t *tiqn = NULL;
-
-	spin_lock(&iscsi_global->tiqn_lock);
-	if (!(strlen(buf))) {
-		tiqn = core_get_default_tiqn();
-		spin_unlock(&iscsi_global->tiqn_lock);
-		return(tiqn);
+	spin_lock(&tiqn->tiqn_state_lock);
+	if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
+		tiqn->tiqn_state = TIQN_STATE_SHUTDOWN;
+		spin_unlock(&tiqn->tiqn_state_lock);
+		return 0;
 	}
+	spin_unlock(&tiqn->tiqn_state_lock);
 
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (!(strcmp(tiqn->tiqn, buf))) {
-
-			spin_lock(&tiqn->tiqn_state_lock);
-			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
-				if (delete) 
-					tiqn->tiqn_state = TIQN_STATE_SHUTDOWN;
-
-				spin_unlock(&tiqn->tiqn_state_lock);
-				spin_unlock(&iscsi_global->tiqn_lock);
-				down_interruptible(&tiqn->tiqn_access_sem);
-				return((signal_pending(current)) ? NULL : tiqn);
-			}
-			spin_unlock(&tiqn->tiqn_state_lock);
-		}
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-
-	return(NULL);
-}
-
-extern void core_put_tiqn (iscsi_tiqn_t *tiqn)
-{
-	if (tiqn) {
-		up(&tiqn->tiqn_access_sem);
-	}
-	return;
+	return -1;
 }
 
 extern void core_put_tiqn_for_login (iscsi_tiqn_t *tiqn)
@@ -261,7 +191,6 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 
 	sprintf(tiqn->tiqn, "%s", buf);
 	INIT_LIST_HEAD(&tiqn->tiqn_list);
-	init_MUTEX(&tiqn->tiqn_access_sem);
 	spin_lock_init(&tiqn->tiqn_state_lock);
 	spin_lock_init(&tiqn->tiqn_tpg_lock);
 #ifdef SNMP_SUPPORT
@@ -327,24 +256,17 @@ static void core_wait_for_tiqn (iscsi_tiqn_t *tiqn)
 	return;
 }
 
-extern int core_del_tiqn (unsigned char *buf)
+extern int core_del_tiqn (iscsi_tiqn_t *tiqn)
 {
-	iscsi_tiqn_t *tiqn;
-
 	/*
-	 * core_get_tiqn(iqn_buf, 1) sets tiqn->tiqn_state = TIQN_STATE_SHUTDOWN while
-	 * holding tiqn->tiqn_state_lock.  This means that all subsequent attempts to
-	 * access this iscsi_tiqn_t will fail from both transport fabric and control code paths.
+	 * core_set_tiqn_shutdown sets tiqn->tiqn_state = TIQN_STATE_SHUTDOWN
+	 * while holding tiqn->tiqn_state_lock.  This means that all subsequent
+	 * attempts to access this iscsi_tiqn_t will fail from both transport
+	 * fabric and control code paths.
 	 */
-	if (!(tiqn = core_get_tiqn(buf, 1))) {
-		TRACE_ERROR("Unable to locate iscsi_tiqn_t: %s\n", buf);
-		return(-1);
-	}
-
-	if (tiqn == iscsi_global->global_tiqn) {
-		TRACE_ERROR("Unable to delete original IQN: %s\n", tiqn->tiqn);
-		core_put_tiqn(tiqn);
-		return(-1);
+	if (core_set_tiqn_shutdown(tiqn) < 0) {
+		printk(KERN_ERR "core_set_tiqn_shutdown() failed\n");
+		return -1;
 	}
 
 	core_wait_for_tiqn(tiqn);
@@ -377,31 +299,6 @@ extern int core_release_tiqns (void)
 	spin_unlock(&iscsi_global->tiqn_lock);
 
 	return(0);
-}
-
-extern iscsi_portal_group_t *core_get_tpg_from_iqn (
-	unsigned char *iqn,
-	iscsi_tiqn_t **tiqn_out,
-	u16 tpgt,
-	int addtpg)
-{
-	iscsi_tiqn_t *tiqn;
-	iscsi_portal_group_t *tpg;
-
-	/*
-	 * Legacy Mode, locate the first valid Target IQN.
-	 */
-	if (!iqn || !(tiqn = core_get_tiqn(iqn, 0)))
-		return(NULL);
-
-	*tiqn_out = tiqn;
-
-	if (!(tpg = iscsi_get_tpg_from_tpgt(tiqn, tpgt, addtpg))) {
-		core_put_tiqn(tiqn);
-		return(NULL);
-	}
-
-	return(tpg);
 }
 
 extern int core_access_np (iscsi_np_t *np, iscsi_portal_group_t *tpg)
@@ -1315,12 +1212,14 @@ extern int lio_sess_logged_in (se_session_t *se_sess)
 	return ret;
 }
 
+#ifdef SNMP_SUPPORT
 extern u32 lio_sess_get_index (se_session_t *se_sess)
 {
 	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 
 	return sess->session_index;
 }
+#endif /* SNMP_SUPPORT */
 
 extern u32 lio_sess_get_initiator_wwn (
 	se_session_t *se_sess,
@@ -1514,7 +1413,8 @@ static inline int iscsi_handle_scsi_cmd (
 		}
 
 		TRACE_ERROR("R_BIT or W_BIT set when Expected Data Transfer"
-			" Length is 0. Bad iSCSI Initiator.\n");
+			" Length is 0 for CDB: 0x%02x. Bad iSCSI Initiator.\n",
+			hdr->cdb[0]);
 		return(iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn));
 	}
 done:
@@ -2774,12 +2674,14 @@ static inline int iscsi_handle_logout_cmd (
 	{
 	iscsi_tiqn_t *tiqn = iscsi_snmp_get_tiqn(conn);
 
-	spin_lock(&tiqn->logout_stats.lock);
-	if (reason_code == CLOSESESSION)
-		tiqn->logout_stats.normal_logouts++;
-	else
-		tiqn->logout_stats.abnormal_logouts++;
-	spin_unlock(&tiqn->logout_stats.lock);
+	if (tiqn) {
+		spin_lock(&tiqn->logout_stats.lock);
+		if (reason_code == CLOSESESSION)
+			tiqn->logout_stats.normal_logouts++;
+		else
+			tiqn->logout_stats.abnormal_logouts++;
+		spin_unlock(&tiqn->logout_stats.lock);
+		}
 	}
 #endif /* SNMP_SUPPORT */
 

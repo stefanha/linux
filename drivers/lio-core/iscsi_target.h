@@ -29,15 +29,11 @@
 #ifndef ISCSI_TARGET_H
 #define ISCSI_TARGET_H
 
-extern iscsi_tiqn_t *__core_get_default_tiqn (void);
-extern iscsi_tiqn_t *core_get_default_tiqn (void);
 extern struct iscsi_tiqn_s *core_get_tiqn_for_login (unsigned char *);
 extern struct iscsi_tiqn_s *core_get_tiqn (unsigned char *, int);
-extern void core_put_tiqn (iscsi_tiqn_t *);
 extern void core_put_tiqn_for_login (iscsi_tiqn_t *);
 extern iscsi_tiqn_t *core_add_tiqn (unsigned char *, int *);
-extern int core_del_tiqn (unsigned char *);
-extern struct iscsi_portal_group_s *core_get_tpg_from_iqn (unsigned char *, struct iscsi_tiqn_s **, u16, int);
+extern int core_del_tiqn (iscsi_tiqn_t *);
 extern int core_access_np (iscsi_np_t *, iscsi_portal_group_t *);
 extern int core_deaccess_np (iscsi_np_t *, iscsi_portal_group_t *);
 extern void *core_get_np_ip (iscsi_np_t *np);
@@ -54,7 +50,9 @@ extern int iscsi_get_cmd_state (struct se_cmd_s *);
 extern void iscsi_new_cmd_failure (struct se_cmd_s *);
 extern int iscsi_is_state_remove (struct se_cmd_s *);
 extern int lio_sess_logged_in (struct se_session_s *);
+#ifdef SNMP_SUPPORT
 extern u32 lio_sess_get_index (struct se_session_s *);
+#endif /* SNMP_SUPPORT */
 extern u32 lio_sess_get_initiator_wwn (struct se_session_s *, unsigned char *, u32);
 extern int iscsi_send_async_msg (iscsi_conn_t *, __u16, __u8, __u8);
 extern int lio_queue_data_in (struct se_cmd_s *);

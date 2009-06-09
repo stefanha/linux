@@ -820,11 +820,11 @@ typedef struct iscsi_tiqn_s {
 	u32			tiqn_active_tpgs;
 	u32			tiqn_ntpgs;
 	struct list_head	tiqn_list;		
-	struct semaphore	tiqn_access_sem;
 	iscsi_portal_group_t	*tiqn_tpg_list;	
 	atomic_t		tiqn_access_count;
 	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
+	struct config_group	tiqn_group;
 #ifdef SNMP_SUPPORT
 	u32			tiqn_index;
         iscsi_sess_err_stats_t  sess_err_stats;
@@ -866,7 +866,6 @@ typedef struct iscsi_global_s {
 	se_thread_set_t		*active_ts_tail;
 	se_thread_set_t		*inactive_ts_head;
 	se_thread_set_t		*inactive_ts_tail;
-	iscsi_tiqn_t		*global_tiqn;
 } ____cacheline_aligned iscsi_global_t;
 
 #define ISCSI_DEBUG_ERL(g)	((iscsi_debug_erl_t *)(g)->debug_erl)
