@@ -85,29 +85,6 @@ extern iscsi_portal_group_t *lio_get_tpg_from_tpg_item (
 	return tpg;
 }
 
-extern iscsi_portal_group_t *lio_get_tpg_from_tiqn_item (
-	struct config_item *item,
-	iscsi_tiqn_t **tiqn_out,
-	u16 tpgt,
-	int add_tpg)
-{
-	iscsi_tiqn_t *tiqn = container_of(to_config_group(item), iscsi_tiqn_t, tiqn_group);
-	iscsi_portal_group_t *tpg;
-
-	if (!(tiqn)) {
-		printk(KERN_ERR "Unable to locate iscsi_tiqn_t pointer\n");
-		return NULL;
-	}
-	printk("lio_get_tpg_for_cfs(): tiqn: %s\n", tiqn->tiqn);
-
-	tpg = iscsi_get_tpg_from_tpgt(tiqn, tpgt, add_tpg);
-	if (!(tpg))
-		return NULL;
-
-	*tiqn_out = tiqn;
-	return tpg;
-}
-
 // Start items for lio_target_portal_cit
 
 static ssize_t lio_target_show_np_info (void *p, char *page)
@@ -2045,14 +2022,16 @@ static struct config_group *lio_target_tiqn_addtpg (
 	int ret = 0;
 	unsigned short int tpgt;
 
-	printk("lio_target_tiqn_addtpg() called: name %s\n", name);
-
 	if (!(tiqn_ci = &group->cg_item)) {
 		printk(KERN_ERR "Unable to locate valid group->cg_item pointer\n");
-		return(NULL);
+		return NULL;
 	}
 	printk("lio_target_tiqn_addtpg() parent name: %s\n", config_item_name(tiqn_ci));
-
+	tiqn = container_of(to_config_group(tiqn_ci), iscsi_tiqn_t, tiqn_group);
+	if (!(tiqn)) {
+		printk(KERN_ERR "Unable to locate iscsi_tiqn_t\n");
+		return NULL;
+	}
 	/*
 	 * Only tpgt_# directory groups can be created below target/iscsi/iqn.superturodiskarry/
 	*/
@@ -2062,13 +2041,12 @@ static struct config_group *lio_target_tiqn_addtpg (
 	}
 	tpgt_str += 5; /* Skip ahead of "tpgt_" */
 	tpgt = (unsigned short int) simple_strtoul(tpgt_str, &end_ptr, 0);
-	printk("lio_target_tiqn_addtpg() Using TPGT: %hu\n", tpgt);
 
-	if (!(tpg = lio_get_tpg_from_tiqn_item(tiqn_ci, &tiqn, tpgt, 1)))
-		return(NULL);
+	tpg = core_alloc_portal_group(tiqn, tpgt);
+	if (!(tpg))
+		return NULL;
 
 	tpg_cg = &tpg->tpg_group;
-
 	/*
 	 * Create default configfs groups for iscsi_portal_group_t..
 	 */
@@ -2090,7 +2068,8 @@ static struct config_group *lio_target_tiqn_addtpg (
 	tpg_cg->default_groups[4] = &tattr->tpg_attrib_group;	
 	tpg_cg->default_groups[5] = NULL;
 
-	if ((ret = iscsi_tpg_add_portal_group(tiqn, tpg)) < 0)
+	ret = iscsi_tpg_add_portal_group(tiqn, tpg);
+	if (ret != 0)
 		goto out;
 
 	printk("LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
@@ -2098,12 +2077,11 @@ static struct config_group *lio_target_tiqn_addtpg (
         printk("LIO_Target_ConfigFS: REGISTER -> Allocated TPG: %s\n",
                         tpg_cg->cg_item.ci_name);
 
-	iscsi_put_tpg(tpg);
-	return(tpg_cg);
+	return tpg_cg;
 out:	
 	kfree(tpg_cg->default_groups);
-	iscsi_put_tpg(tpg);
-	return(NULL);
+	kmem_cache_free(lio_tpg_cache, tpg);
+	return NULL;
 }
 
 static void lio_target_tiqn_deltpg (
@@ -2112,16 +2090,22 @@ static void lio_target_tiqn_deltpg (
 {
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
-	struct config_item *parent;
+	struct config_item *tiqn_ci;
 	char *tpgt_str, *end_ptr;
 	int ret = 0;
 	unsigned short int tpgt;
 
 	printk("LIO_Target_ConfigFS: DEREGISTER -> %s\n", config_item_name(item));
-	if (!(parent = &group->cg_item)) {
+	if (!(tiqn_ci = &group->cg_item)) {
 		printk(KERN_ERR "Unable to locate group_cg_item\n");
 		return;
 	}
+
+	tiqn = container_of(to_config_group(tiqn_ci), iscsi_tiqn_t, tiqn_group);
+        if (!(tiqn)) {
+                printk(KERN_ERR "Unable to locate iscsi_tiqn_t\n");
+                return;
+        }
 
 	if (!(tpgt_str = strstr(config_item_name(item), "tpgt_"))) {
 		printk(KERN_ERR "Unable to locate \"tpgt_#\" directory group\n");
@@ -2131,9 +2115,12 @@ static void lio_target_tiqn_deltpg (
 	tpgt = (unsigned short int) simple_strtoul(tpgt_str, &end_ptr, 0);
 	printk("lio_target_tiqn_deltpg(): Using TPGT: %hu\n", tpgt);
 
-	if (!(tpg = lio_get_tpg_from_tiqn_item(parent, &tiqn, tpgt, 0)))
+	tpg = container_of(to_config_group(item), iscsi_portal_group_t,
+				tpg_group);
+	if (!(tpg))
 		return;
 
+	printk("lio_target_tiqn_deltpg() got container_of: TPGT: %hu\n", tpg->tpgt);
 	printk("LIO_Target_ConfigFS: DEREGISTER -> calling config_item_put()\n");
 	/*
 	 * Does the last config_item_put() also release a groups->default_groups..?

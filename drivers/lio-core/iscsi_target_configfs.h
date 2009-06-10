@@ -19,3 +19,5 @@
 
 extern int iscsi_target_register_configfs (void);
 extern void iscsi_target_deregister_configfs (void);
+
+extern struct kmem_cache *lio_tpg_cache;
