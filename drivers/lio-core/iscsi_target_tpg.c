@@ -570,6 +570,7 @@ static void iscsi_tpg_free_network_portals (iscsi_portal_group_t *tpg)
 		np = tpg_np->tpg_np;
 		list_del(&tpg_np->tpg_np_list);
 		tpg->num_tpg_nps--;
+		tpg->tpg_tiqn->tiqn_num_tpg_nps--;
 
 		if (np->np_net_size == IPV6_ADDRESS_SPACE)
 			ip = &np->np_ipv6[0];
@@ -939,6 +940,8 @@ extern iscsi_tpg_np_t *iscsi_tpg_add_network_portal (
 	spin_lock(&tpg->tpg_np_lock);
 	list_add_tail(&tpg_np->tpg_np_list, &tpg->tpg_gnp_list);
 	tpg->num_tpg_nps++;
+	if (tpg->tpg_tiqn)
+		tpg->tpg_tiqn->tiqn_num_tpg_nps++;
 	spin_unlock(&tpg->tpg_np_lock);
 
 	if (tpg_np_parent) {
@@ -1050,6 +1053,8 @@ extern int iscsi_tpg_del_network_portal (
 	spin_lock(&tpg->tpg_np_lock);
 	list_del(&tpg_np->tpg_np_list);
 	tpg->num_tpg_nps--;
+	if (tpg->tpg_tiqn)
+		tpg->tpg_tiqn->tiqn_num_tpg_nps--;
 	spin_unlock(&tpg->tpg_np_lock);
 
 	return(iscsi_tpg_release_np(tpg_np, tpg, np)); 

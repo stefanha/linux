@@ -5002,6 +5002,9 @@ extern int iscsi_close_session (
 	PYXPRINT("Released iSCSI session from node: %s\n",
 			SESS_OPS(sess)->InitiatorName);
 	tpg->nsessions--;
+	if (tpg->tpg_tiqn)
+		tpg->tpg_tiqn->tiqn_nsessions--;
+
 	PYXPRINT("Decremented number of active iSCSI Sessions on"
 		" iSCSI TPG: %hu to %u\n", tpg->tpgt, tpg->nsessions);
 

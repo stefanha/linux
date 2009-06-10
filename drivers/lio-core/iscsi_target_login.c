@@ -653,6 +653,9 @@ static int iscsi_post_login_handler (iscsi_np_t *np, iscsi_conn_t *conn, __u8 ze
 			SESS_OPS(sess)->InitiatorName);
 	
 	tpg->nsessions++;
+	if (tpg->tpg_tiqn)
+		tpg->tpg_tiqn->tiqn_nsessions++;
+
 	PYXPRINT("Incremented number of active iSCSI sessions to %u on iSCSI"
 		" Target Portal Group: %hu\n", tpg->nsessions, tpg->tpgt); 
 	spin_unlock_bh(&se_tpg->session_lock);
