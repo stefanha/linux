@@ -59,6 +59,20 @@ struct target_core_configfs_attribute {
 	ssize_t (*store)(void *, const char *, size_t);
 };
 
+se_hba_t *target_core_get_hba_from_item(
+	struct config_item *item)
+{
+	se_hba_t *hba = container_of(to_config_group(item),
+				se_hba_t, hba_group);	
+	if (!(hba))
+		return NULL;
+
+	if (core_get_hba(hba) < 0)	
+		return NULL;
+
+	return hba;
+}
+
 /*
  * Attributes for /sys/kernel/config/target/
  */
@@ -1821,7 +1835,7 @@ static struct config_group *target_core_call_createdev(
 	const char *name)
 {
 	se_subsystem_dev_t *se_dev;
-	se_hba_t *hba, *hba_p;
+	se_hba_t *hba;
 	se_subsystem_api_t *t;
 	struct config_item *hba_ci;
 	struct config_group *dev_cg = NULL;
@@ -1833,15 +1847,12 @@ static struct config_group *target_core_call_createdev(
 		return NULL;
 	}
 
-	hba_p = container_of(to_config_group(hba_ci), se_hba_t, hba_group);
-	if (!(hba_p)) {
+	hba = target_core_get_hba_from_item(hba_ci);
+	if (!(hba)) {
 		printk(KERN_ERR "Unable to locate se_hba_t from struct config_item\n");
 		return NULL;
 	}
 
-	hba = core_get_hba_from_id(hba_p->hba_id, 0);
-	if (!(hba))
-		return NULL;
 	/*
 	 * Locate the se_subsystem_api_t from parent's se_hba_t.
 	 */
@@ -1858,6 +1869,7 @@ static struct config_group *target_core_call_createdev(
 				" se_subsystem_dev_t\n");
 		return NULL;
 	}
+	INIT_LIST_HEAD(&se_dev->g_se_dev_list);
 	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_vpd_list);
 	spin_lock_init(&se_dev->t10_wwn.t10_vpd_lock);
 	INIT_LIST_HEAD(&se_dev->t10_reservation.registration_list);
@@ -1883,6 +1895,9 @@ static struct config_group *target_core_call_createdev(
 			" from allocate_virtdevice()\n");
 		goto out;
 	}
+	spin_lock(&se_global->g_device_lock);
+	list_add_tail(&se_dev->g_se_dev_list, &se_global->g_se_dev_list);
+	spin_unlock(&se_global->g_device_lock);
 
 	config_group_init_type_name(&se_dev->se_dev_group, name,
 			&target_core_dev_cit);
@@ -1916,25 +1931,23 @@ static void target_core_call_freedev(
 {
 	se_subsystem_dev_t *se_dev = container_of(to_config_group(item),
 				se_subsystem_dev_t, se_dev_group);
-	se_hba_t *hba, *hba_p;
+	se_hba_t *hba;
 	se_subsystem_api_t *t;
 	int ret = 0;
 
-	hba_p = se_dev->se_dev_hba;
-	if (!(hba_p)) {
-		printk(KERN_ERR "Unable to locate se_hba_t from"
-				" se_subsystem_dev_t\n");
-		goto out;
-	}
-
-	hba = core_get_hba_from_id(hba_p->hba_id, 0);
+	hba = target_core_get_hba_from_item(
+			&se_dev->se_dev_hba->hba_group.cg_item);
 	if (!(hba))
 		goto out;
-
+	
 	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0))
 		goto hba_out;
+
+	spin_lock(&se_global->g_device_lock);
+	list_del(&se_dev->g_se_dev_list);
+	spin_unlock(&se_global->g_device_lock);
 
 	config_item_put(item);
 	/*
@@ -2068,11 +2081,9 @@ static struct config_group *target_core_call_addhbatotarget(
 		" plugin_name: %s hba_type: %d plugin_dep_id: %lu\n",
 		se_plugin, se_plugin->plugin_name, hba_type, plugin_dep_id);
 
-	hba = core_get_next_free_hba();
+	hba = core_alloc_hba(hba_type);
 	if (!(hba))
 		return ERR_PTR(-EINVAL);
-
-	hba->type = hba_type;
 
 	ret = se_core_add_hba(hba, (u32)plugin_dep_id);
 	if (ret < 0)
@@ -2081,11 +2092,8 @@ static struct config_group *target_core_call_addhbatotarget(
 	config_group_init_type_name(&hba->hba_group, name,
 			&target_core_hba_cit);
 
-	core_put_hba(hba);
 	return &hba->hba_group;
 out:
-	hba->type = 0;
-	core_put_hba(hba);
 	return ERR_PTR(ret);
 }
 
@@ -2094,24 +2102,11 @@ static void target_core_call_delhbafromtarget(
 	struct config_group *group,
 	struct config_item *item)
 {
-	se_hba_t *hba_p = container_of(to_config_group(item), se_hba_t,
-			hba_group);
-	se_hba_t *hba = NULL;
-	int ret;
-
-	if (!(hba_p)) {
-		printk(KERN_ERR "Unable to locate se_hba_t from struct config_item\n");
-		return;
-	}
-
-	hba = core_get_hba_from_id(hba_p->hba_id, 0);
-	if (!(hba))
-		return;
+	se_hba_t *hba = container_of(to_config_group(item), se_hba_t,
+				hba_group);
 
 	config_item_put(item);
-
-	ret = se_core_del_hba(hba);
-	core_put_hba(hba);
+	se_core_del_hba(hba);
 }
 
 static struct configfs_group_operations target_core_ops = {
