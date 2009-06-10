@@ -84,103 +84,101 @@ static inline int list_is_first(const struct list_head *list,
 /*
  * Instance Attributes Table 
  */
-static int __get_num_portals(iscsi_tiqn_t *tiqn)
-{
-	iscsi_portal_group_t *tpg;
-	int num_portals = 0;
-
-	list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
-		if (tpg->tpg_state == TPG_STATE_ACTIVE)
-			num_portals += tpg->num_tpg_nps;
-	}
-
-	return num_portals;
-}
-
 static int get_num_portals(iscsi_tiqn_t *tiqn)
 {
-	int num_portals;
-
-	spin_lock(&tiqn->tiqn_tpg_lock);
-	num_portals = __get_num_portals(tiqn);
-	spin_unlock(&tiqn->tiqn_tpg_lock);
-
-	return num_portals;
+	return tiqn->tiqn_num_tpg_nps;
 }
 
 static int get_num_sessions(iscsi_tiqn_t *tiqn)
 {
-	int num_sessions = 0;
-	iscsi_portal_group_t *tpg;
-
-	spin_lock(&tiqn->tiqn_tpg_lock);
-	list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
-		if (tpg->tpg_state == TPG_STATE_ACTIVE)
-			num_sessions += tpg->nsessions;
-	}
-	spin_unlock(&tiqn->tiqn_tpg_lock);
-
-	return num_sessions;
+	return tiqn->tiqn_nsessions;
 }
 
-static int check_tiqn_status (iscsi_tiqn_t *tiqn)
+static void *locate_tiqn_start(
+	struct seq_file *seq,
+	loff_t *pos)
 {
-	int ret;
+	spin_lock_bh(&iscsi_global->tiqn_lock);
+	return seq_list_start(&iscsi_global->g_tiqn_list, *pos);
+}
 
-	spin_lock(&tiqn->tiqn_state_lock);
-	ret = (tiqn->tiqn_state == TIQN_STATE_ACTIVE);
-	spin_unlock(&tiqn->tiqn_state_lock);
+static void *locate_tiqn_next(
+	struct seq_file *seq,
+	void *v,
+	loff_t *pos)
+{
+	return seq_list_next(v, &iscsi_global->g_tiqn_list, pos);
+}
 
-	return ret;
+static void locate_tiqn_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&iscsi_global->tiqn_lock);
+}
+
+static void *inst_attr_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return locate_tiqn_start(seq, pos);
+}
+
+static void *inst_attr_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	return locate_tiqn_next(seq, v, pos);
+}
+
+static void inst_attr_seq_stop(struct seq_file *seq, void *v)
+{
+	locate_tiqn_stop(seq, v);
 }
 
 static int inst_attr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_sess_err_stats_t *sess_err;
-	iscsi_tiqn_t *tiqn, *tiqn_tmp;
+	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
 	u32 sess_err_count;
 
-	seq_puts(seq, "inst min_ver max_ver portals nodes sessions fail_sess"
-		" fail_type fail_rem_name disc_time\n");
+	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
+		seq_puts(seq, "inst min_ver max_ver portals nodes sessions"
+			" fail_sess fail_type fail_rem_name disc_time\n");
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (check_tiqn_status(tiqn) == 0)
-			continue;
+	seq_printf(seq, "%u %u %u %u %u %u ",
+ 		   tiqn->tiqn_index, ISCSI_MIN_VERSION, ISCSI_MAX_VERSION,
+		   get_num_portals(tiqn), ISCSI_INST_NUM_NODES,
+		   get_num_sessions(tiqn));
 
-		seq_printf(seq, "%u %u %u %u %u %u ",
- 			   tiqn->tiqn_index, ISCSI_MIN_VERSION, ISCSI_MAX_VERSION,
-			   get_num_portals(tiqn), ISCSI_INST_NUM_NODES,
-			   get_num_sessions(tiqn));
+	sess_err = &tiqn->sess_err_stats;
 
-		sess_err = &tiqn->sess_err_stats;
+	spin_lock_bh(&sess_err->lock);
+	sess_err_count = (sess_err->digest_errors +
+			sess_err->cxn_timeout_errors +
+	 		sess_err->pdu_format_errors);
 
-		spin_lock_bh(&sess_err->lock);
-		sess_err_count = (sess_err->digest_errors +
-				sess_err->cxn_timeout_errors +
-		 		sess_err->pdu_format_errors);
-
-		seq_printf(seq, "%u %u %s %u\n", sess_err_count, 
-			  sess_err->last_sess_failure_type,
-			  sess_err->last_sess_fail_rem_name[0] ?
-			  	sess_err->last_sess_fail_rem_name : NONE,
-			  ISCSI_DISCONTINUITY_TIME);
-		spin_unlock_bh(&sess_err->lock);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
+	seq_printf(seq, "%u %u %s %u\n", sess_err_count, 
+		  sess_err->last_sess_failure_type,
+		  sess_err->last_sess_fail_rem_name[0] ?
+		  	sess_err->last_sess_fail_rem_name : NONE,
+		  ISCSI_DISCONTINUITY_TIME);
+	spin_unlock_bh(&sess_err->lock);
 
 	/* Display strings one per line */
-	seq_printf(seq, "description: %s\n", ISCSI_INST_DESCR);
-	seq_printf(seq, "vendor: %s\n", ISCSI_VENDOR);
-	seq_printf(seq, "version: %s on %s/%s\n", PYX_ISCSI_VERSION,
-		utsname()->sysname, utsname()->machine);
-
-	return(0);
+	if (list_is_last(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list)) {
+		seq_printf(seq, "description: %s\n", ISCSI_INST_DESCR);
+		seq_printf(seq, "vendor: %s\n", ISCSI_VENDOR);
+		seq_printf(seq, "version: %s on %s/%s\n", PYX_ISCSI_VERSION,
+			utsname()->sysname, utsname()->machine);
+	}
+	return 0;
 }
+
+static struct seq_operations inst_attr_seq_ops = {
+	.start	= inst_attr_seq_start,
+	.next	= inst_attr_seq_next,
+	.stop	= inst_attr_seq_stop,
+	.show	= inst_attr_seq_show
+};
 
 static int inst_attr_seq_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, inst_attr_seq_show, NULL);
+	return seq_open(file, &inst_attr_seq_ops);
 }
 
 static struct file_operations inst_attr_seq_fops = {
@@ -188,7 +186,7 @@ static struct file_operations inst_attr_seq_fops = {
 	.open	 = inst_attr_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = single_release,
+	.release = seq_release,
 };
 
 /*
@@ -197,29 +195,29 @@ static struct file_operations inst_attr_seq_fops = {
 static int sess_err_stats_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_sess_err_stats_t *sess_err;
-	iscsi_tiqn_t *tiqn, *tiqn_tmp;
+	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
 
-	seq_puts(seq, "inst digest_errors cxn_errors format_errors\n");
+	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
+		seq_puts(seq, "inst digest_errors cxn_errors format_errors\n");
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (check_tiqn_status(tiqn) == 0)
-			continue;
+	sess_err = &tiqn->sess_err_stats;
 
-		sess_err = &tiqn->sess_err_stats;
-
-		seq_printf(seq, "%u %u %u %u\n", tiqn->tiqn_index,
-			   sess_err->digest_errors, sess_err->cxn_timeout_errors,
-			   sess_err->pdu_format_errors);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-
-	return(0);
+	seq_printf(seq, "%u %u %u %u\n", tiqn->tiqn_index,
+		   sess_err->digest_errors, sess_err->cxn_timeout_errors,
+		   sess_err->pdu_format_errors);
+	return 0;
 }
+
+static struct seq_operations sess_err_seq_ops = {
+	.start	= locate_tiqn_start,
+	.next	= locate_tiqn_next,
+	.stop	= locate_tiqn_stop,
+	.show	= sess_err_stats_seq_show
+};
 
 static int sess_err_stats_seq_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, sess_err_stats_seq_show, NULL);
+	return seq_open(file, &sess_err_seq_ops);
 }
 
 static struct file_operations sess_err_stats_seq_fops = {
@@ -227,7 +225,7 @@ static struct file_operations sess_err_stats_seq_fops = {
 	.open	 = sess_err_stats_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = single_release,
+	.release = seq_release,
 };
 
 static void *locate_tpg_start(
@@ -530,41 +528,43 @@ static struct file_operations node_attr_seq_fops = {
 static int tgt_attr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_login_stats_t *lstat;
-	iscsi_tiqn_t *tiqn, *tiqn_tmp;
+	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
 	u32 fail_count;
 
-	seq_puts(seq, "inst indx login_fails last_fail_time last_fail_type "
-		 "fail_intr_name fail_intr_addr_type fail_intr_addr\n");
+	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
+		seq_puts(seq, "inst indx login_fails last_fail_time"
+			" last_fail_type fail_intr_name fail_intr_addr_type"
+			" fail_intr_addr\n");
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (check_tiqn_status(tiqn) == 0)
-			continue;
+	lstat = &tiqn->login_stats;
 
-		lstat = &tiqn->login_stats;
-
-		spin_lock(&lstat->lock);	
-		fail_count = (lstat->redirects + lstat->authorize_fails +
-			     lstat->authenticate_fails + lstat->negotiate_fails +
-				lstat->other_fails);
+	spin_lock(&lstat->lock);	
+	fail_count = (lstat->redirects + lstat->authorize_fails +
+		     lstat->authenticate_fails + lstat->negotiate_fails +
+			lstat->other_fails);
 #warning FIXME: IPv6
-		seq_printf(seq, "%u %u %u %u %u %s %s %08X\n", tiqn->tiqn_index,
-			   ISCSI_NODE_INDEX, fail_count, 
-			   lstat->last_fail_time ?
-			   (u32)(((u32)lstat->last_fail_time - INITIAL_JIFFIES) * 100/HZ):0,
-			   lstat->last_fail_type, lstat->last_intr_fail_name[0] ?
-			   lstat->last_intr_fail_name : NONE, "ipv4",
-			   lstat->last_intr_fail_addr);
-		spin_unlock(&lstat->lock);	
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
+	seq_printf(seq, "%u %u %u %u %u %s %s %08X\n", tiqn->tiqn_index,
+		   ISCSI_NODE_INDEX, fail_count, 
+		   lstat->last_fail_time ?
+		   (u32)(((u32)lstat->last_fail_time - INITIAL_JIFFIES) * 100/HZ):0,
+		   lstat->last_fail_type, lstat->last_intr_fail_name[0] ?
+		   lstat->last_intr_fail_name : NONE, "ipv4",
+		   lstat->last_intr_fail_addr);
+	spin_unlock(&lstat->lock);	
 
-	return(0);
+	return 0;
 }
+
+static struct seq_operations tgt_attr_seq_ops = {
+	.start	= locate_tiqn_start,
+	.next	= locate_tiqn_next,
+	.stop	= locate_tiqn_stop,
+	.show	= tgt_attr_seq_show
+};
 
 static int tgt_attr_seq_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, tgt_attr_seq_show, NULL);
+	return seq_open(file, &tgt_attr_seq_ops);
 }
 
 static struct file_operations tgt_attr_seq_fops = {
@@ -572,7 +572,7 @@ static struct file_operations tgt_attr_seq_fops = {
 	.open	 = tgt_attr_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = single_release,
+	.release = seq_release,
 };
 
 /*
@@ -581,30 +581,30 @@ static struct file_operations tgt_attr_seq_fops = {
 static int login_stats_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_login_stats_t *lstat;
-	iscsi_tiqn_t *tiqn, *tiqn_tmp;
+	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
 
-	seq_puts(seq, "inst indx accepts other_fails redirects authorize_fails "
-		 "authenticate_fails negotiate_fails\n");
+	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
+		seq_puts(seq, "inst indx accepts other_fails redirects"
+			" authorize_fails authenticate_fails negotiate_fails\n");
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (check_tiqn_status(tiqn) == 0)
-			continue;
-		
-		lstat = &tiqn->login_stats;
-		seq_printf(seq, "%u %u %u %u %u %u %u %u\n", tiqn->tiqn_index,
-			   ISCSI_NODE_INDEX, lstat->accepts, lstat->other_fails,
-			   lstat->redirects, lstat->authorize_fails,
-				lstat->authenticate_fails, lstat->negotiate_fails);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-
-	return(0);
+	lstat = &tiqn->login_stats;
+	seq_printf(seq, "%u %u %u %u %u %u %u %u\n", tiqn->tiqn_index,
+		   ISCSI_NODE_INDEX, lstat->accepts, lstat->other_fails,
+		   lstat->redirects, lstat->authorize_fails,
+			lstat->authenticate_fails, lstat->negotiate_fails);
+	return 0;
 }
+
+static struct seq_operations login_stats_seq_ops = {
+	.start	= locate_tiqn_start,
+        .next   = locate_tiqn_next,
+        .stop   = locate_tiqn_stop,
+        .show   = login_stats_seq_show
+};
 
 static int login_stats_seq_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, login_stats_seq_show, NULL);
+	return seq_open(file, &login_stats_seq_ops);
 }
 
 static struct file_operations login_stats_seq_fops = {
@@ -612,7 +612,7 @@ static struct file_operations login_stats_seq_fops = {
 	.open	 = login_stats_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = single_release,
+	.release = seq_release,
 };
 
 /*
@@ -620,27 +620,27 @@ static struct file_operations login_stats_seq_fops = {
  */
 static int logout_stats_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_tiqn_t *tiqn, *tiqn_tmp;
+	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
 
-	seq_puts(seq, "inst indx normal_logouts abnormal_logouts\n");
+	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
+		seq_puts(seq, "inst indx normal_logouts abnormal_logouts\n");
 	
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry_safe(tiqn, tiqn_tmp, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (check_tiqn_status(tiqn) == 0)
-			continue;
-
-		seq_printf(seq, "%u %u %u %u\n", tiqn->tiqn_index, ISCSI_NODE_INDEX,
-			tiqn->logout_stats.normal_logouts,
-			tiqn->logout_stats.abnormal_logouts);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-
-	return(0);
+	seq_printf(seq, "%u %u %u %u\n", tiqn->tiqn_index, ISCSI_NODE_INDEX,
+		tiqn->logout_stats.normal_logouts,
+		tiqn->logout_stats.abnormal_logouts);
+	return 0;
 }
+
+static struct seq_operations logout_stats_seq_ops = {
+        .start  = locate_tiqn_start,
+        .next   = locate_tiqn_next,
+        .stop   = locate_tiqn_stop,
+	.show	= logout_stats_seq_show
+};
 
 static int logout_stats_seq_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, logout_stats_seq_show, NULL);
+	return seq_open(file, &logout_stats_seq_ops);
 }
 
 static struct file_operations logout_stats_seq_fops = {
@@ -648,7 +648,7 @@ static struct file_operations logout_stats_seq_fops = {
 	.open	 = logout_stats_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = single_release,
+	.release = seq_release,
 };
 
 /*
