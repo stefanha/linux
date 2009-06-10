@@ -394,8 +394,9 @@ extern int core_load_discovery_tpg (void)
 	iscsi_param_t *param;
 	iscsi_portal_group_t *tpg;
 
-	if (!(tpg = kzalloc(sizeof(iscsi_portal_group_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate iscsi_portal_group_t\n");
+	tpg = core_alloc_portal_group(NULL, 1);
+	if (!(tpg)) {
+		printk(KERN_ERR "Unable to allocate iscsi_portal_group_t\n");
 		return(-1);
 	}
 
@@ -450,9 +451,8 @@ extern void core_release_discovery_tpg (void)
 	iscsi_portal_group_t *tpg = iscsi_global->discovery_tpg;
 
 	core_tpg_deregister(tpg->tpg_se_tpg);
-	tpg->tpg_se_tpg = NULL;
 
-	kfree(tpg);
+	kmem_cache_free(lio_tpg_cache, tpg);
 	iscsi_global->discovery_tpg = NULL;
 
 	return;

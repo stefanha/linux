@@ -1037,7 +1037,6 @@ static int iscsi_target_detect(void)
 
 	return(ret);
 out:
-	core_release_discovery_tpg();
 	if (lio_cmd_cache)
 		kmem_cache_destroy(lio_cmd_cache);
 	if (lio_sess_cache)
@@ -1102,6 +1101,8 @@ extern void iscsi_target_release_phase2 (void)
 	iscsi_deallocate_thread_sets(TARGET);
 	iscsi_remove_all_tpgs();
 	core_release_nps();
+	core_release_discovery_tpg();
+	core_release_tiqns();
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_sess_cache);
 	kmem_cache_destroy(lio_conn_cache);
@@ -1110,8 +1111,6 @@ extern void iscsi_target_release_phase2 (void)
 	kmem_cache_destroy(lio_ooo_cache);
 	kmem_cache_destroy(lio_r2t_cache);
 	kmem_cache_destroy(lio_tpg_cache);
-	core_release_discovery_tpg();
-	core_release_tiqns();
 
 	iscsi_global->ti_forcechanoffline = NULL;
 	iscsi_target_deregister_configfs();
