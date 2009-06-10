@@ -189,6 +189,7 @@ struct kmem_cache *se_cmd_cache;
 struct kmem_cache *se_task_cache;
 struct kmem_cache *se_tmr_req_cache;
 struct kmem_cache *se_sess_cache;
+struct kmem_cache *se_hba_cache;
 struct kmem_cache *se_ua_cache;
 struct kmem_cache *t10_pr_reg_cache;
 struct kmem_cache *t10_alua_lu_gp_cache;
@@ -243,8 +244,6 @@ struct target_core_fabric_ops passthrough_fabric_ops = {
 int init_se_global(void)
 {
 	se_global_t *global;
-	se_hba_t *hba;
-	int i;
 
 	global = kzalloc(sizeof(se_global_t), GFP_KERNEL);
 	if (!(global)) {
@@ -255,6 +254,9 @@ int init_se_global(void)
 	INIT_LIST_HEAD(&global->g_lu_gps_list);
 	INIT_LIST_HEAD(&global->g_tg_pt_gps_list);
 	INIT_LIST_HEAD(&global->g_se_tpg_list);
+	INIT_LIST_HEAD(&global->g_hba_list);
+	INIT_LIST_HEAD(&global->g_se_dev_list);
+	spin_lock_init(&global->g_device_lock);
 	spin_lock_init(&global->hba_lock);
 	spin_lock_init(&global->se_tpg_lock);
 	spin_lock_init(&global->lu_gps_lock);
@@ -286,6 +288,14 @@ int init_se_global(void)
 			0, NULL);
 	if (!(se_sess_cache)) {
 		printk(KERN_ERR "kmem_cache_create() for se_session_t"
+				" failed\n");
+		goto out;
+	}
+	se_hba_cache = kmem_cache_create("se_hba_cache",
+			sizeof(se_hba_t), __alignof__(se_hba_t),
+			0, NULL);
+	if (!(se_hba_cache)) {
+		printk(KERN_ERR "kmem_cache_create() for se_hba_t"
 				" failed\n");
 		goto out;
 	}
@@ -338,27 +348,6 @@ int init_se_global(void)
 		goto out;
 	}
 
-	global->hba_list = kzalloc((sizeof(se_hba_t) *
-				TRANSPORT_MAX_GLOBAL_HBAS), GFP_KERNEL);
-	if (!(global->hba_list)) {
-		printk(KERN_ERR "Unable to allocate global->hba_list\n");
-		goto out;
-	}
-
-	for (i = 0; i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
-		hba = &global->hba_list[i];
-
-		hba->hba_status |= HBA_STATUS_FREE;
-		hba->hba_id = i;
-		INIT_LIST_HEAD(&hba->hba_dev_list);
-		spin_lock_init(&hba->device_lock);
-		spin_lock_init(&hba->hba_queue_lock);
-		init_MUTEX(&hba->hba_access_sem);
-#ifdef SNMP_SUPPORT
-		hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
-#endif
-	}
-
 	global->plugin_class_list = kzalloc((sizeof(se_plugin_class_t) *
 				MAX_PLUGIN_CLASSES), GFP_KERNEL);
 	if (!(global->plugin_class_list)) {
@@ -371,7 +360,6 @@ int init_se_global(void)
 
 	return 0;
 out:
-	kfree(global->hba_list);
 	kfree(global->plugin_class_list);
 	if (se_cmd_cache)
 		kmem_cache_destroy(se_cmd_cache);
@@ -381,6 +369,8 @@ out:
 		kmem_cache_destroy(se_tmr_req_cache);
 	if (se_sess_cache)
 		kmem_cache_destroy(se_sess_cache);
+	if (se_hba_cache)
+		kmem_cache_destroy(se_hba_cache);
 	if (se_ua_cache)
 		kmem_cache_destroy(se_ua_cache);
 	if (t10_pr_reg_cache)
@@ -406,11 +396,11 @@ void release_se_global(void)
 		return;
 
 	kfree(global->plugin_class_list);
-	kfree(global->hba_list);
 	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_task_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
+	kmem_cache_destroy(se_hba_cache);
 	kmem_cache_destroy(se_ua_cache);
 	kmem_cache_destroy(t10_pr_reg_cache);
 	kmem_cache_destroy(t10_alua_lu_gp_cache);

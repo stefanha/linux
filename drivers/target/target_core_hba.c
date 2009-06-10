@@ -50,49 +50,34 @@
 
 #undef TARGET_CORE_HBA_C
 
-se_hba_t *__core_get_hba_from_id(se_hba_t *hba)
+int core_get_hba(se_hba_t *hba)
 {
-	return ((down_interruptible(&hba->hba_access_sem) != 0) ? NULL : hba);
+	return ((down_interruptible(&hba->hba_access_sem) != 0) ? -1 : 0);
 }
 
-se_hba_t *core_get_hba_from_id(u32 hba_id, int addhba)
+se_hba_t *core_alloc_hba(int hba_type)
 {
 	se_hba_t *hba;
 
-	if (hba_id > (TRANSPORT_MAX_GLOBAL_HBAS-1)) {
-		printk(KERN_ERR "SE HBA_ID: %u exceeds TRANSPORT_MAX_GLOBAL"
-			"_HBAS-1: %u\n", hba_id, TRANSPORT_MAX_GLOBAL_HBAS-1);
+	hba = kmem_cache_zalloc(se_hba_cache, GFP_KERNEL);
+	if (!(hba)) {
+		printk(KERN_ERR "Unable to allocate se_hba_t\n");
 		return NULL;
 	}
 
-	hba = &se_global->hba_list[hba_id];
+	hba->hba_status |= HBA_STATUS_FREE;
+	hba->type = hba_type;
+	INIT_LIST_HEAD(&hba->hba_dev_list);
+	spin_lock_init(&hba->device_lock);
+	spin_lock_init(&hba->hba_queue_lock);
+	init_MUTEX(&hba->hba_access_sem);
+#ifdef SNMP_SUPPORT
+	hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
+#endif
 
-	if (!addhba && !(hba->hba_status & HBA_STATUS_ACTIVE))
-		return NULL;
-
-	return __core_get_hba_from_id(hba);
+	return hba;
 }
-EXPORT_SYMBOL(core_get_hba_from_id);
-
-se_hba_t *core_get_next_free_hba(void)
-{
-	se_hba_t *hba;
-	u32 i;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-		if (hba->hba_status != HBA_STATUS_FREE)
-			continue;
-
-		spin_unlock(&se_global->hba_lock);
-		return __core_get_hba_from_id(hba);
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	printk(KERN_ERR "Unable to locate next free HBA\n");
-	return NULL;
-}
+EXPORT_SYMBOL(core_alloc_hba);
 
 void core_put_hba(se_hba_t *hba)
 {
@@ -128,6 +113,12 @@ int se_core_add_hba(
 
 	hba->hba_status &= ~HBA_STATUS_FREE;
 	hba->hba_status |= HBA_STATUS_ACTIVE;
+
+	spin_lock(&se_global->hba_lock);
+	hba->hba_id = se_global->g_hba_id_counter++;
+	list_add_tail(&hba->hba_list, &se_global->g_hba_list);
+	spin_unlock(&se_global->hba_lock);
+
 	printk(KERN_INFO "CORE_HBA[%d] - Attached HBA to Generic Target"
 			" Core\n", hba->hba_id);
 
@@ -191,6 +182,10 @@ int se_core_del_hba(
 
 	se_core_shutdown_hba(hba);
 
+	spin_lock(&se_global->hba_lock);
+	list_del(&hba->hba_list);
+	spin_unlock(&se_global->hba_lock);
+
 	hba->type = 0;
 	hba->transport = NULL;
 	hba->hba_status &= ~HBA_STATUS_ACTIVE;
@@ -198,6 +193,8 @@ int se_core_del_hba(
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached HBA from Generic Target"
 			" Core\n", hba->hba_id);
+
+	kmem_cache_free(se_hba_cache, hba);
 	return 0;
 }
 EXPORT_SYMBOL(se_core_del_hba);

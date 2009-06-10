@@ -32,9 +32,10 @@
 
 extern se_global_t *se_global;
 
-extern struct se_hba_s *__core_get_hba_from_id(struct se_hba_s *);
-extern struct se_hba_s *core_get_hba_from_id(u32, int);
-extern struct se_hba_s *core_get_next_free_hba(void);
+extern struct kmem_cache *se_hba_cache;
+
+extern int core_get_hba(struct se_hba_s *);
+extern se_hba_t *core_alloc_hba(int);
 extern void core_put_hba(struct se_hba_s *);
 extern int se_core_add_hba(struct se_hba_s *, u32);
 extern int se_core_del_hba(struct se_hba_s *);

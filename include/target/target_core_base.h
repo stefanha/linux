@@ -45,8 +45,6 @@
 #define SCSI_CDB_SIZE			16
 #define TRANSPORT_IOV_DATA_BUFFER	5
 
-/* Maximum Physical or Virtual HBAs globally (not part of a TPG) */
-#define TRANSPORT_MAX_GLOBAL_HBAS           256
 /* Maximum Number of LUNs per Target Portal Group */
 #define TRANSPORT_MAX_LUNS_PER_TPG	    256
 
@@ -88,6 +86,7 @@
 #define HBA_STATUS_FREE				0x00000001
 #define HBA_STATUS_ACTIVE			0x00000002
 #define HBA_STATUS_INACTIVE			0x00000004
+#define HBA_STATUS_SHUTDOWN			0x00000008
 
 /* se_lun_t->lun_status */
 #define TRANSPORT_LUN_STATUS_FREE		0
@@ -648,6 +647,7 @@ typedef struct se_subsystem_dev_s {
 	t10_reservation_template_t t10_reservation;
 	spinlock_t      se_dev_lock;
 	void            *se_dev_su_ptr;
+	struct list_head g_se_dev_list;
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
@@ -728,6 +728,8 @@ typedef struct se_device_s {
 	struct se_subsystem_api_s *transport;
 	/* Linked list for se_hba_t se_device_t list */
 	struct list_head	dev_list;
+	/* Linked list for se_global_t->g_se_dev_list */
+	struct list_head	g_se_dev_list;
 }  ____cacheline_aligned se_device_t;
 
 #define SE_DEV(cmd)		((se_device_t *)(cmd)->se_lun->se_dev)
@@ -758,6 +760,7 @@ typedef struct se_hba_s {
 	void			*hba_ptr;
 	/* Linked list for se_device_t */
 	struct list_head	hba_dev_list;
+	struct list_head	hba_list;
 	spinlock_t		device_lock;
 	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
@@ -836,6 +839,7 @@ typedef struct se_global_s {
 	u32			in_shutdown;
 	u32			alua_lu_gps_count;
 	u32			alua_tg_pt_gps_count;
+	u32			g_hba_id_counter;
 	struct config_group	target_core_hbagroup;
 	struct config_group	alua_group;
 	struct config_group	alua_lu_gps_group;
@@ -843,10 +847,12 @@ typedef struct se_global_s {
 	struct list_head	g_lu_gps_list;
 	struct list_head	g_tg_pt_gps_list;
 	struct list_head	g_se_tpg_list;
+	struct list_head	g_hba_list;
+	struct list_head	g_se_dev_list;
 	struct se_plugin_class_s *plugin_class_list;
-	se_hba_t		*hba_list;
 	t10_alua_lu_gp_t	*default_lu_gp;
 	t10_alua_tg_pt_gp_t	*default_tg_pt_gp;
+	spinlock_t		g_device_lock;
 	spinlock_t		hba_lock;
 	spinlock_t		se_tpg_lock;
 	spinlock_t		lu_gps_lock;
