@@ -62,12 +62,11 @@ scsi_index_table_t scsi_index_table;
 #define NONE		"None"
 #define ISPRINT(a)   ((a >= ' ') && (a <= '~'))
 
-/* Structure for table row iteration with seq_file */
-typedef struct table_iter_s {
-	int	ti_skip_body;
-	u32	ti_offset;
-	void	*ti_ptr;
-} table_iter_t;
+static inline int list_is_first(const struct list_head *list,
+			        const struct list_head *head)
+{
+	return list->prev == head;
+}
 
 /****************************************************************************
  * SCSI MIB Tables
@@ -79,18 +78,12 @@ typedef struct table_iter_s {
 static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
-	int i;
 
 	seq_puts(seq, "inst sw_indx\n");
 
 	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
+	list_for_each_entry(hba, &se_global->g_hba_list, hba_list) {
 		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			continue;
-
-		if (!hba->transport)
 			continue;
 
 		seq_printf(seq, "%u %u\n", hba->hba_index, SCSI_INST_SW_INDEX);
@@ -121,51 +114,8 @@ static void *locate_hba_start(
 	loff_t *pos,
 	int (*do_check)(void *))
 {
-	se_device_t *dev;
-	se_hba_t *hba;
-	table_iter_t *tpg_iter;
-	int i;
-
-	if (*pos != 0)
-		return NULL;
-
-	tpg_iter = kzalloc(sizeof(table_iter_t), GFP_KERNEL);
-	if (!(tpg_iter))
-		return NULL;
-#if 0
-	printk(KERN_INFO "%s[%d] - Allocating iterp: %p\n", current->comm,
-			current->pid, tpg_iter);
-#endif
-	seq->private = (void *)tpg_iter;
-
-	spin_lock(&se_global->hba_lock);
-	for (i = 0; i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			continue;
-		if (do_check((void *)hba) == 0)
-			continue;
-
-		spin_lock(&hba->device_lock);
-		list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
-			tpg_iter->ti_ptr = (void *)dev;
-			tpg_iter->ti_offset = hba->hba_id;
-			atomic_inc(&hba->dev_mib_access_count);
-#if 0
-			printk(KERN_INFO "[%d]: Incremented dev_mib_access"
-				"_count: %d\n", hba->hba_id,
-				atomic_read(&hba->dev_mib_access_count));
-#endif
-			spin_unlock(&hba->device_lock);
-			spin_unlock(&se_global->hba_lock);
-			return SEQ_START_TOKEN;
-		}
-		spin_unlock(&hba->device_lock);
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	return SEQ_START_TOKEN;
+	spin_lock(&se_global->g_device_lock);
+	return seq_list_start(&se_global->g_se_dev_list, *pos);
 }
 
 static void *locate_hba_next(
@@ -174,76 +124,12 @@ static void *locate_hba_next(
 	loff_t *pos,
 	int (*do_check)(void *))
 {
-	table_iter_t *iterp = (table_iter_t *)seq->private;
-	se_device_t *dev, *dev_p, *dev_next = NULL;
-	se_hba_t *hba;
-	int i;
-
-	(*pos)++;
-
-	if (!(iterp))
-		return NULL;
-
-	dev = (se_device_t *)iterp->ti_ptr;
-	if (!(dev))
-		return NULL;
-
-	dev_p = dev;
-	spin_lock(&SE_HBA(dev)->device_lock);
-	list_for_each_entry_continue(dev_p, &dev->se_hba->hba_dev_list,
-			dev_list) {
-		dev_next = dev_p;
-		break;
-	}
-	if ((dev_next)) {
-		iterp->ti_ptr = dev_next;
-		spin_unlock(&SE_HBA(dev)->device_lock);
-		return (void *)iterp;
-	}
-	spin_unlock(&SE_HBA(dev)->device_lock);
-
-	spin_lock(&se_global->hba_lock);
-	hba = &se_global->hba_list[iterp->ti_offset];
-	atomic_dec(&hba->dev_mib_access_count);
-	iterp->ti_ptr = NULL;
-
-	for (i = (iterp->ti_offset + 1); i < TRANSPORT_MAX_GLOBAL_HBAS; i++) {
-		hba = &se_global->hba_list[i];
-
-		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			continue;
-		if (do_check((void *)hba) == 0)
-			continue;
-
-		spin_lock(&hba->device_lock);
-		list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
-			iterp->ti_ptr = (void *)dev;
-			iterp->ti_offset = hba->hba_id;
-			atomic_inc(&hba->dev_mib_access_count);
-
-			spin_unlock(&hba->device_lock);
-			spin_unlock(&se_global->hba_lock);
-			return (void *)iterp;
-		}
-		spin_unlock(&hba->device_lock);
-	}
-	spin_unlock(&se_global->hba_lock);
-
-	return NULL;
+	return seq_list_next(v, &se_global->g_se_dev_list, pos);
 }
 
 static void locate_hba_stop(struct seq_file *seq, void *v)
 {
-	table_iter_t *iterp = (table_iter_t *)seq->private;
-
-	if (!(iterp))
-		return;
-
-	iterp->ti_ptr = NULL;
-	kfree(iterp);
-	seq->private = NULL;
-
-	return;
+	spin_unlock(&se_global->g_device_lock);
 }
 
 /*
@@ -274,44 +160,42 @@ static void scsi_dev_seq_stop(struct seq_file *seq, void *v)
 static int scsi_dev_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
-	se_device_t *dev;
-	table_iter_t *iterp = (table_iter_t *)seq->private;
+	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+						g_se_dev_list);
+	se_device_t *dev = se_dev->se_dev_ptr;
+	char str[28];
 	int k;
 
-	if (v == SEQ_START_TOKEN)
+	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
 		seq_puts(seq, "inst indx role ports\n");
 
-	hba = core_get_hba_from_id(iterp->ti_offset, 0);
+	if (!(dev))
+		return 0;
+
+	hba = dev->se_hba;
 	if (!(hba)) {
 		/* Log error ? */
 		return 0;
 	}
 
-	spin_lock(&hba->device_lock);
-	dev = (se_device_t *)iterp->ti_ptr;
-	if ((dev)) {
-		char str[28];
+	seq_printf(seq, "%u %u %s %u\n", hba->hba_index,
+		   dev->dev_index, "Target", dev->dev_port_count);
 
-		seq_printf(seq, "%u %u %s %u\n", hba->hba_index,
-			   dev->dev_index, "Target", dev->dev_port_count);
+	memcpy(&str[0], (void *)DEV_T10_WWN(dev), 28);
 
-		memcpy(&str[0], (void *)DEV_T10_WWN(dev), 28);
+	/* vendor */
+	for (k = 0; k < 8; k++)
+		str[k] = ISPRINT(DEV_T10_WWN(dev)->vendor[k]) ?
+				DEV_T10_WWN(dev)->vendor[k] : 0x20;
+	str[k] = 0x20;
 
-		/* vendor */
-		for (k = 0; k < 8; k++)
-			str[k] = ISPRINT(DEV_T10_WWN(dev)->vendor[k]) ?
-					DEV_T10_WWN(dev)->vendor[k] : 0x20;
-		str[k] = 0x20;
+	/* model */
+	for (k = 0; k < 16; k++)
+		str[k+9] = ISPRINT(DEV_T10_WWN(dev)->model[k]) ?
+				DEV_T10_WWN(dev)->model[k] : 0x20;
+	str[k + 9] = 0;
 
-		/* model */
-		for (k = 0; k < 16; k++)
-			str[k+9] = ISPRINT(DEV_T10_WWN(dev)->model[k]) ?
-					DEV_T10_WWN(dev)->model[k] : 0x20;
-		str[k + 9] = 0;
-
-		seq_printf(seq, "dev_alias: %s\n", str);
-	}
-	spin_unlock(&hba->device_lock);
+	seq_printf(seq, "dev_alias: %s\n", str);
 
 	/* Release the semaphore */
 	core_put_hba(hba);
@@ -360,37 +244,34 @@ static void scsi_port_seq_stop(struct seq_file *seq, void *v)
 static int scsi_port_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
-	se_device_t *dev;
+	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+						g_se_dev_list);
+	se_device_t *dev = se_dev->se_dev_ptr;
 	se_port_t *sep, *sep_tmp;
-	table_iter_t *iterp = (table_iter_t *)seq->private;
 
-	if (v == SEQ_START_TOKEN)
+	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
 		seq_puts(seq, "inst device indx role busy_count\n");
 
-	hba = core_get_hba_from_id(iterp->ti_offset, 0);
+	if (!(dev))
+		return 0;
+
+	hba = dev->se_hba;
 	if (!(hba)) {
 		/* Log error ? */
 		return 0;
 	}
 
 	/* FIXME: scsiPortBusyStatuses count */
-	spin_lock(&hba->device_lock);
-	dev = (se_device_t *)iterp->ti_ptr;
-	if ((dev)) {
-		spin_lock(&dev->se_port_lock);
-		list_for_each_entry_safe(sep, sep_tmp, &dev->dev_sep_list,
-				sep_list) {
-			seq_printf(seq, "%u %u %u %s%u %u\n", hba->hba_index,
-				dev->dev_index, sep->sep_index, "Device",
-				dev->dev_index, 0);
-		}
-		spin_unlock(&dev->se_port_lock);
+	spin_lock(&dev->se_port_lock);
+	list_for_each_entry_safe(sep, sep_tmp, &dev->dev_sep_list, sep_list) {
+		seq_printf(seq, "%u %u %u %s%u %u\n", hba->hba_index,
+			dev->dev_index, sep->sep_index, "Device",
+			dev->dev_index, 0);
 	}
-	spin_unlock(&hba->device_lock);
+	spin_unlock(&dev->se_port_lock);
 
 	/* Release the semaphore */
 	core_put_hba(hba);
-
 	return 0;
 }
 
@@ -435,46 +316,46 @@ static void scsi_transport_seq_stop(struct seq_file *seq, void *v)
 static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
-	se_device_t *dev;
-	table_iter_t *iterp = (table_iter_t *)seq->private;
+	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+						g_se_dev_list);
+	se_device_t *dev = se_dev->se_dev_ptr;
 	se_port_t *se, *se_tmp;
 	se_portal_group_t *tpg;
 	t10_wwn_t *wwn;
 	char buf[64];
 
-	if (v == SEQ_START_TOKEN)
+	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
 		seq_puts(seq, "inst device indx dev_name\n");
 
-	hba = core_get_hba_from_id(iterp->ti_offset, 0);
+	if (!(dev))
+		return 0;
+
+	hba = dev->se_hba;
 	if (!(hba)) {
 		/* Log error ? */
 		return 0;
 	}
 
-	spin_lock(&hba->device_lock);
-	dev = (se_device_t *)iterp->ti_ptr;
-	if ((dev)) {
-		wwn = DEV_T10_WWN(dev);
+	wwn = DEV_T10_WWN(dev);
 
-		spin_lock(&dev->se_port_lock);
-		list_for_each_entry_safe(se, se_tmp, &dev->dev_sep_list,
-				sep_list) {
-			tpg = se->sep_tpg;
-			sprintf(buf, "scsiTransport%s",
-					TPG_TFO(tpg)->get_fabric_name());
+	spin_lock(&dev->se_port_lock);
+	list_for_each_entry_safe(se, se_tmp, &dev->dev_sep_list, sep_list) {
+		tpg = se->sep_tpg;
+		sprintf(buf, "scsiTransport%s",
+				TPG_TFO(tpg)->get_fabric_name());
 
-			seq_printf(seq, "%u %s %u %s+%s\n",
-				hba->hba_index, /* scsiTransportIndex */
-				buf,  /* scsiTransportType */
-				TPG_TFO(tpg)->tpg_get_inst_index(tpg),
-				TPG_TFO(tpg)->tpg_get_wwn(tpg),
-				(strlen(wwn->unit_serial)) ?
-				/* scsiTransportDevName */
-				wwn->unit_serial : wwn->vendor);
-		}
-		spin_unlock(&dev->se_port_lock);
+		seq_printf(seq, "%u %s %u %s+%s\n",
+			hba->hba_index, /* scsiTransportIndex */
+			buf,  /* scsiTransportType */
+			(TPG_TFO(tpg)->tpg_get_inst_index != NULL) ?
+			TPG_TFO(tpg)->tpg_get_inst_index(tpg) :
+			0,
+			TPG_TFO(tpg)->tpg_get_wwn(tpg),
+			(strlen(wwn->unit_serial)) ?
+			/* scsiTransportDevName */
+			wwn->unit_serial : wwn->vendor);
 	}
-	spin_unlock(&hba->device_lock);
+	spin_unlock(&dev->se_port_lock);
 
 	/* Release the semaphore */
 	core_put_hba(hba);
@@ -525,51 +406,50 @@ static void scsi_tgt_dev_seq_stop(struct seq_file *seq, void *v)
 static int scsi_tgt_dev_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
-	se_device_t *dev;
-	table_iter_t *iterp = (table_iter_t *)seq->private;
+	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+						g_se_dev_list);
+	se_device_t *dev = se_dev->se_dev_ptr;
 	int non_accessible_lus = 0;
 	char status[16];
 
-	if (v == SEQ_START_TOKEN)
+	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
 		seq_puts(seq, "inst indx num_LUs status non_access_LUs"
 			" resets\n");
 
-	hba = core_get_hba_from_id(iterp->ti_offset, 0);
+	if (!(dev))
+		return 0;
+
+	hba = dev->se_hba;
 	if (!(hba)) {
 		/* Log error ? */
 		return 0;
 	}
 
-	spin_lock(&hba->device_lock);
-	dev = (se_device_t *)iterp->ti_ptr;
-	if ((dev)) {
-		switch (dev->dev_status) {
-		case TRANSPORT_DEVICE_ACTIVATED:
-			strcpy(status, "activated");
-			break;
-		case TRANSPORT_DEVICE_DEACTIVATED:
-			strcpy(status, "deactivated");
-			non_accessible_lus = 1;
-			break;
-		case TRANSPORT_DEVICE_SHUTDOWN:
-			strcpy(status, "shutdown");
-			non_accessible_lus = 1;
-			break;
-		case TRANSPORT_DEVICE_OFFLINE_ACTIVATED:
-		case TRANSPORT_DEVICE_OFFLINE_DEACTIVATED:
-			strcpy(status, "offline");
-			non_accessible_lus = 1;
-			break;
-		default:
-			sprintf(status, "unknown(%d)", dev->dev_status);
-			non_accessible_lus = 1;
-		}
-
-		seq_printf(seq, "%u %u %u %s %u %u\n",
-			   hba->hba_index, dev->dev_index, LU_COUNT,
-			   status, non_accessible_lus, dev->num_resets);
+	switch (dev->dev_status) {
+	case TRANSPORT_DEVICE_ACTIVATED:
+		strcpy(status, "activated");
+		break;
+	case TRANSPORT_DEVICE_DEACTIVATED:
+		strcpy(status, "deactivated");
+		non_accessible_lus = 1;
+		break;
+	case TRANSPORT_DEVICE_SHUTDOWN:
+		strcpy(status, "shutdown");
+		non_accessible_lus = 1;
+		break;
+	case TRANSPORT_DEVICE_OFFLINE_ACTIVATED:
+	case TRANSPORT_DEVICE_OFFLINE_DEACTIVATED:
+		strcpy(status, "offline");
+		non_accessible_lus = 1;
+		break;
+	default:
+		sprintf(status, "unknown(%d)", dev->dev_status);
+		non_accessible_lus = 1;
 	}
-	spin_unlock(&hba->device_lock);
+
+	seq_printf(seq, "%u %u %u %s %u %u\n",
+		   hba->hba_index, dev->dev_index, LU_COUNT,
+		   status, non_accessible_lus, dev->num_resets);
 
 	/* Release the semaphore */
 	core_put_hba(hba);
@@ -618,54 +498,52 @@ static void scsi_tgt_port_seq_stop(struct seq_file *seq, void *v)
 static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
-	se_device_t *dev;
+	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+						g_se_dev_list);
+	se_device_t *dev = se_dev->se_dev_ptr;
 	se_port_t *sep, *sep_tmp;
 	se_portal_group_t *tpg;
-	table_iter_t *iterp = (table_iter_t *)seq->private;
 	u32 rx_mbytes, tx_mbytes;
 	unsigned long long num_cmds;
 	char buf[64];
 
-	if (v == SEQ_START_TOKEN)
+	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
 		seq_puts(seq, "inst device indx name port_index in_cmds"
 			" write_mbytes read_mbytes hs_in_cmds\n");
 
-	hba = core_get_hba_from_id(iterp->ti_offset, 0);
+	if (!(dev))
+		return 0;
+
+	hba = dev->se_hba;
 	if (!(hba)) {
 		/* Log error ? */
 		return 0;
 	}
 
-	spin_lock(&hba->device_lock);
-	dev = (se_device_t *)iterp->ti_ptr;
-	if ((dev)) {
-		spin_lock(&dev->se_port_lock);
-		list_for_each_entry_safe(sep, sep_tmp, &dev->dev_sep_list,
-				sep_list) {
-			tpg = sep->sep_tpg;
-			sprintf(buf, "%sPort#",
-				TPG_TFO(tpg)->get_fabric_name());
+	spin_lock(&dev->se_port_lock);
+	list_for_each_entry_safe(sep, sep_tmp, &dev->dev_sep_list, sep_list) {
+		tpg = sep->sep_tpg;
+		sprintf(buf, "%sPort#",
+			TPG_TFO(tpg)->get_fabric_name());
 
-			seq_printf(seq, "%u %u %u %s%d %s%s%d ",
-			     hba->hba_index,
-			     dev->dev_index,
-			     sep->sep_index,
-			     buf, sep->sep_index,
-			     TPG_TFO(tpg)->tpg_get_wwn(tpg), "+t+",
-			     TPG_TFO(tpg)->tpg_get_tag(tpg));
+		seq_printf(seq, "%u %u %u %s%d %s%s%d ",
+		     hba->hba_index,
+		     dev->dev_index,
+		     sep->sep_index,
+		     buf, sep->sep_index,
+		     TPG_TFO(tpg)->tpg_get_wwn(tpg), "+t+",
+		     TPG_TFO(tpg)->tpg_get_tag(tpg));
 
-			spin_lock(&sep->sep_lun->lun_sep_lock);
-			num_cmds = sep->sep_stats.cmd_pdus;
-			rx_mbytes = (sep->sep_stats.rx_data_octets >> 20);
-			tx_mbytes = (sep->sep_stats.tx_data_octets >> 20);
-			spin_unlock(&sep->sep_lun->lun_sep_lock);
+		spin_lock(&sep->sep_lun->lun_sep_lock);
+		num_cmds = sep->sep_stats.cmd_pdus;
+		rx_mbytes = (sep->sep_stats.rx_data_octets >> 20);
+		tx_mbytes = (sep->sep_stats.tx_data_octets >> 20);
+		spin_unlock(&sep->sep_lun->lun_sep_lock);
 
-			seq_printf(seq, "%llu %u %u %u\n", num_cmds,
-				rx_mbytes, tx_mbytes, 0);
-		}
-		spin_unlock(&dev->se_port_lock);
+		seq_printf(seq, "%llu %u %u %u\n", num_cmds,
+			rx_mbytes, tx_mbytes, 0);
 	}
-	spin_unlock(&hba->device_lock);
+	spin_unlock(&dev->se_port_lock);
 
 	/* Release the semaphore */
 	core_put_hba(hba);
@@ -716,12 +594,6 @@ static void scsi_auth_intr_seq_stop(struct seq_file *seq, void *v)
 	spin_unlock_bh(&se_global->se_tpg_lock);
 }
 
-static inline int list_is_first(const struct list_head *list,
-				const struct list_head *head)
-{
-	return list->prev == head;
-}
-
 static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 {
 	se_portal_group_t *se_tpg = list_entry(v, se_portal_group_t,
@@ -757,7 +629,9 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 			seq_printf(seq,"%u %u %u %u %u %s %u %u %u %u %u %u"
 						" %u %s\n",
 				/* scsiInstIndex */
-				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg),
+				(TPG_TFO(se_tpg)->tpg_get_inst_index != NULL) ?
+				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
+				0,
 				/* scsiDeviceIndex */
 				lun->se_dev->dev_index,
 				/* scsiAuthIntrTgtPortIndex */
@@ -884,14 +758,18 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 
 			seq_printf(seq,"%u %u %u %u %u %s+i+%s\n",
 				/* scsiInstIndex */
-				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg),
+				(TPG_TFO(se_tpg)->tpg_get_inst_index != NULL) ?
+				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
+				0,
 				/* scsiDeviceIndex */
 				lun->se_dev->dev_index,
 				/* scsiPortIndex */
 				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg),
 				/* scsiAttIntrPortIndex */
-				TPG_TFO(se_tpg)->sess_get_index(se_sess),
-					/* scsiAttIntrPortAuthIntrIdx */
+				(TPG_TFO(se_tpg)->sess_get_index != NULL) ?
+				TPG_TFO(se_tpg)->sess_get_index(se_sess) :
+				0,
+				/* scsiAttIntrPortAuthIntrIdx */
 				se_nacl->acl_index,
 				/* scsiAttIntrPortName */
 				se_nacl->initiatorname[0] ?
@@ -948,75 +826,73 @@ static void scsi_lu_seq_stop(struct seq_file *seq, void *v)
 static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 {
 	se_hba_t *hba;
-	se_device_t *dev;
-	table_iter_t *iterp = (table_iter_t *)seq->private;
+	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+						g_se_dev_list);
+	se_device_t *dev = se_dev->se_dev_ptr;
 	int j;
 	char str[28];
 
-	if (v == SEQ_START_TOKEN)
+	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
 		seq_puts(seq, "inst dev indx LUN lu_name vend prod rev"
 		" dev_type status state-bit num_cmds read_mbytes"
 		" write_mbytes resets full_stat hs_num_cmds creation_time\n");
 
-	hba = core_get_hba_from_id(iterp->ti_offset, 0);
+	if (!(dev))
+		return 0;
+
+	hba = dev->se_hba;
 	if (!(hba)) {
 		/* Log error ? */
 		return 0;
 	}
 
-	spin_lock(&hba->device_lock);
-	dev = (se_device_t *)iterp->ti_ptr;
-	if ((dev)) {
-		/* Fix LU state, if we can read it from the device */
-		seq_printf(seq, "%u %u %u %llu %s", hba->hba_index,
-				dev->dev_index, SCSI_LU_INDEX,
-				(unsigned long long)0, /* FIXME: scsiLuDefaultLun */
-				(strlen(DEV_T10_WWN(dev)->unit_serial)) ?
-				/* scsiLuWwnName */
-				(char *)&DEV_T10_WWN(dev)->unit_serial[0] :
-				"None");
+	/* Fix LU state, if we can read it from the device */
+	seq_printf(seq, "%u %u %u %llu %s", hba->hba_index,
+			dev->dev_index, SCSI_LU_INDEX,
+			(unsigned long long)0, /* FIXME: scsiLuDefaultLun */
+			(strlen(DEV_T10_WWN(dev)->unit_serial)) ?
+			/* scsiLuWwnName */
+			(char *)&DEV_T10_WWN(dev)->unit_serial[0] :
+			"None");
 
-		memcpy(&str[0], (void *)DEV_T10_WWN(dev), 28);
-		/* scsiLuVendorId */
-		for (j = 0; j < 8; j++)
-			str[j] = ISPRINT(DEV_T10_WWN(dev)->vendor[j]) ?
-				DEV_T10_WWN(dev)->vendor[j] : 0x20;
-		str[8] = 0;
-		seq_printf(seq, " %s", str);
+	memcpy(&str[0], (void *)DEV_T10_WWN(dev), 28);
+	/* scsiLuVendorId */
+	for (j = 0; j < 8; j++)
+		str[j] = ISPRINT(DEV_T10_WWN(dev)->vendor[j]) ?
+			DEV_T10_WWN(dev)->vendor[j] : 0x20;
+	str[8] = 0;
+	seq_printf(seq, " %s", str);
 
-		/* scsiLuProductId */
-		for (j = 0; j < 16; j++)
-			str[j] = ISPRINT(DEV_T10_WWN(dev)->model[j]) ?
-				DEV_T10_WWN(dev)->model[j] : 0x20;
-		str[16] = 0;
-		seq_printf(seq, " %s", str);
+	/* scsiLuProductId */
+	for (j = 0; j < 16; j++)
+		str[j] = ISPRINT(DEV_T10_WWN(dev)->model[j]) ?
+			DEV_T10_WWN(dev)->model[j] : 0x20;
+	str[16] = 0;
+	seq_printf(seq, " %s", str);
 
-		/* scsiLuRevisionId */
-		for (j = 0; j < 4; j++)
-			str[j] = ISPRINT(DEV_T10_WWN(dev)->revision[j]) ?
-				DEV_T10_WWN(dev)->revision[j] : 0x20;
-		str[4] = 0;
-		seq_printf(seq, " %s", str);
+	/* scsiLuRevisionId */
+	for (j = 0; j < 4; j++)
+		str[j] = ISPRINT(DEV_T10_WWN(dev)->revision[j]) ?
+			DEV_T10_WWN(dev)->revision[j] : 0x20;
+	str[4] = 0;
+	seq_printf(seq, " %s", str);
 
-		seq_printf(seq, " %u %s %s %llu %u %u %u %u %u %u\n",
-			/* scsiLuPeripheralType */
-			   dev->dev_obj_api->get_device_type((void *)dev),
-			   (dev->dev_status == TRANSPORT_DEVICE_ACTIVATED) ?
-			"available" : "notavailable", /* scsiLuStatus */
-			"exposed", 	/* scsiLuState */
-			(unsigned long long)dev->num_cmds,
-			/* scsiLuReadMegaBytes */
-			(u32)(dev->read_bytes >> 20),
-			/* scsiLuWrittenMegaBytes */
-			(u32)(dev->write_bytes >> 20),
-			dev->num_resets, /* scsiLuInResets */
-			0, /* scsiLuOutTaskSetFullStatus */
-			0, /* scsiLuHSInCommands */
-			(u32)(((u32)dev->creation_time - INITIAL_JIFFIES) *
-								100 / HZ));
-	}
-	spin_unlock(&hba->device_lock);
-
+	seq_printf(seq, " %u %s %s %llu %u %u %u %u %u %u\n",
+		/* scsiLuPeripheralType */
+		   dev->dev_obj_api->get_device_type((void *)dev),
+		   (dev->dev_status == TRANSPORT_DEVICE_ACTIVATED) ?
+		"available" : "notavailable", /* scsiLuStatus */
+		"exposed", 	/* scsiLuState */
+		(unsigned long long)dev->num_cmds,
+		/* scsiLuReadMegaBytes */
+		(u32)(dev->read_bytes >> 20),
+		/* scsiLuWrittenMegaBytes */
+		(u32)(dev->write_bytes >> 20),
+		dev->num_resets, /* scsiLuInResets */
+		0, /* scsiLuOutTaskSetFullStatus */
+		0, /* scsiLuHSInCommands */
+		(u32)(((u32)dev->creation_time - INITIAL_JIFFIES) *
+							100 / HZ));
 	/* Release the semaphore */
 	core_put_hba(hba);
 
