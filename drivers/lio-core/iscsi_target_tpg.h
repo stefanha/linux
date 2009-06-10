@@ -48,11 +48,10 @@ extern u32 lio_tpg_get_inst_index (struct se_portal_group_s *);
 #endif /* SNMP_SUPPORT */
 extern void lio_set_default_node_attributes (struct se_node_acl_s *);
 
-extern void init_iscsi_portal_groups (struct iscsi_tiqn_s *);
+extern iscsi_portal_group_t *core_alloc_portal_group (iscsi_tiqn_t *, u16);
 extern int core_load_discovery_tpg (void);
 extern void core_release_discovery_tpg (void);
 extern iscsi_portal_group_t *core_get_tpg_from_np (struct iscsi_tiqn_s *, struct iscsi_np_s *);
-extern iscsi_portal_group_t *iscsi_get_tpg_from_tpgt (struct iscsi_tiqn_s *, __u16, int);
 extern int iscsi_get_tpg (struct iscsi_portal_group_s *);
 extern void iscsi_put_tpg (iscsi_portal_group_t *);
 extern void iscsi_clear_tpg_np_login_threads (iscsi_portal_group_t *, int);

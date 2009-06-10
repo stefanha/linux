@@ -73,6 +73,7 @@
 
 extern iscsi_global_t *iscsi_global;
 extern struct target_fabric_configfs *lio_target_fabric_configfs;
+extern struct kmem_cache *lio_tpg_cache;
 
 extern int iscsi_close_session (iscsi_session_t *); 
 extern int iscsi_free_session (iscsi_session_t *);
@@ -361,26 +362,29 @@ extern void lio_set_default_node_attributes (se_node_acl_t *se_acl)
 	return;
 }
 
-/*	init_iscsi_portal_groups():
- *
- *
- */
-extern void init_iscsi_portal_groups (iscsi_tiqn_t *tiqn)
+extern iscsi_portal_group_t *core_alloc_portal_group (iscsi_tiqn_t *tiqn, u16 tpgt)
 {
-	int i;
-	iscsi_portal_group_t *tpg = NULL;
+	iscsi_portal_group_t *tpg;
 
-	for (i = 0; i < ISCSI_MAX_TPGS; i++) {
-		tpg = &tiqn->tiqn_tpg_list[i];
-
-		tpg->tpgt = i;
-		tpg->tpg_state = TPG_STATE_FREE;
-		tpg->tpg_tiqn = tiqn;
-		init_MUTEX(&tpg->tpg_access_sem);
-		spin_lock_init(&tpg->tpg_state_lock);
+	tpg = kmem_cache_zalloc(lio_tpg_cache, GFP_KERNEL);
+	if (!(tpg)) {
+		printk(KERN_ERR "Unable to get tpg from lio_tpg_cache\n");
+		return NULL;
 	}
 
-	return;
+	tpg->tpgt = tpgt;
+	tpg->tpg_state = TPG_STATE_FREE;
+	tpg->tpg_tiqn = tiqn;
+	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
+	INIT_LIST_HEAD(&tpg->g_tpg_list);
+	INIT_LIST_HEAD(&tpg->tpg_list);
+	init_MUTEX(&tpg->tpg_access_sem);
+	init_MUTEX(&tpg->np_login_sem);
+	spin_lock_init(&tpg->tpg_state_lock);
+	spin_lock_init(&tpg->tpg_np_lock);
+	tpg->sid        = 1; /* First Assigned LIO-Target Session ID */
+
+	return tpg;
 }
 
 static void iscsi_set_default_tpg_attribs (iscsi_portal_group_t *);
@@ -404,9 +408,11 @@ extern int core_load_discovery_tpg (void)
 
 	tpg->sid        = 1; /* First Assigned LIO Session ID */
 	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
+	INIT_LIST_HEAD(&tpg->g_tpg_list);
+	INIT_LIST_HEAD(&tpg->tpg_list);
 	init_MUTEX(&tpg->tpg_access_sem);
-	spin_lock_init(&tpg->tpg_state_lock);
 	init_MUTEX(&tpg->np_login_sem);
+	spin_lock_init(&tpg->tpg_state_lock);
 	spin_lock_init(&tpg->tpg_np_lock);
 
 	iscsi_set_default_tpg_attribs(tpg);
@@ -456,13 +462,11 @@ extern iscsi_portal_group_t *core_get_tpg_from_np (
 	iscsi_tiqn_t *tiqn,
 	iscsi_np_t *np)
 {
-	int i;
 	iscsi_portal_group_t *tpg = NULL;
 	iscsi_tpg_np_t *tpg_np;
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
-	for (i = 0; i < ISCSI_MAX_TPGS; i++) {
-		tpg = &tiqn->tiqn_tpg_list[i];
+	list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
 
 		spin_lock(&tpg->tpg_state_lock);
 		if (tpg->tpg_state == TPG_STATE_FREE) {
@@ -491,42 +495,6 @@ extern int iscsi_get_tpg (
 {
 	down_interruptible(&tpg->tpg_access_sem);
 	return (signal_pending(current)) ? -1 : 0;
-}
-
-/*	iscsi_get_tpg_from_tpgt():
- *
- *
- */
-extern iscsi_portal_group_t *iscsi_get_tpg_from_tpgt (
-	iscsi_tiqn_t *tiqn,
-	__u16 tpgt,
-	int addtpg)
-{
-	iscsi_portal_group_t *tpg = NULL;
-
-	if (tpgt > (ISCSI_MAX_TPGS-1)) {
-		printk(KERN_ERR "tpgt exceeds ISCSI_MAX_TPGS-1: %d\n",
-			ISCSI_MAX_TPGS-1);
-		return NULL;
-	}
-
-	spin_lock(&tiqn->tiqn_tpg_lock);
-	tpg = &tiqn->tiqn_tpg_list[tpgt];
-
-	spin_lock(&tpg->tpg_state_lock);
-	if ((tpg->tpg_state == TPG_STATE_FREE) && !addtpg) {
-		spin_unlock(&tpg->tpg_state_lock);
-		spin_unlock(&tiqn->tiqn_tpg_lock);
-		TRACE(TRACE_ISCSI, "CORE[%s] - Unable to locate iSCSI target"
-			" portal group with TPGT: %hu, ignoring request.\n",
-			tiqn->tiqn, tpgt);
-		return NULL;
-	}
-	spin_unlock(&tpg->tpg_state_lock);
-	spin_unlock(&tiqn->tiqn_tpg_lock);
-
-	down_interruptible(&tpg->tpg_access_sem);
-	return (signal_pending(current)) ? NULL : tpg;
 }
 
 /*	iscsi_put_tpg():
@@ -664,7 +632,7 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 	if (tpg->tpg_state != TPG_STATE_FREE) {
 		TRACE_ERROR("Unable to add iSCSI Target Portal Group: %d while"
 			" not in TPG_STATE_FREE state.\n", tpg->tpgt);
-		return(ERR_ADDTPG_ALREADY_EXISTS);
+		return -EEXIST;
 	}
 
 	if (!(tpg->tpg_se_tpg = core_tpg_register(
@@ -677,11 +645,6 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 	if (iscsi_create_default_params(&tpg->param_list) < 0)
 		goto err_out;
 
-	tpg->sid	= 1; /* First Assigned LIO-Target Session ID */
-	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
-	init_MUTEX(&tpg->np_login_sem);
-	spin_lock_init(&tpg->tpg_np_lock);
-
 	ISCSI_TPG_ATTRIB(tpg)->tpg = tpg;
 
 	spin_lock(&tpg->tpg_state_lock);
@@ -689,13 +652,17 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 	spin_unlock(&tpg->tpg_state_lock);
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
+	list_add_tail(&tpg->tpg_list, &tiqn->tiqn_tpg_list);
 	tiqn->tiqn_ntpgs++;
 	PYXPRINT("CORE[%s]_TPG[%hu] - Added iSCSI Target Portal Group\n",
 			tiqn->tiqn, tpg->tpgt);
 	spin_unlock(&tiqn->tiqn_tpg_lock);
 
-	return(0);
+	spin_lock_bh(&iscsi_global->g_tpg_lock);
+	list_add_tail(&tpg->g_tpg_list, &iscsi_global->g_tpg_list);
+	spin_unlock_bh(&iscsi_global->g_tpg_lock);
 
+	return 0;
 err_out:
 	if (tpg->tpg_se_tpg)
 		core_tpg_deregister(tpg->tpg_se_tpg);
@@ -704,7 +671,7 @@ err_out:
 		tpg->param_list = NULL;
 	}
 	kfree(tpg);
-	return(ERR_NO_MEMORY);
+	return -ENOMEM;
 }	
 
 extern int iscsi_tpg_del_portal_group (
@@ -730,6 +697,10 @@ extern int iscsi_tpg_del_portal_group (
 	core_tpg_clear_object_luns(tpg->tpg_se_tpg);
 	iscsi_tpg_free_network_portals(tpg);
 	core_tpg_free_node_acls(tpg->tpg_se_tpg);
+
+	spin_lock_bh(&iscsi_global->g_tpg_lock);
+	list_del(&tpg->g_tpg_list);
+	spin_unlock_bh(&iscsi_global->g_tpg_lock);
 	
 	if (tpg->param_list) {
 		iscsi_release_param_list(tpg->param_list);
@@ -745,11 +716,14 @@ extern int iscsi_tpg_del_portal_group (
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
 	tiqn->tiqn_ntpgs--;
+	list_del(&tpg->tpg_list);	
+	spin_unlock(&tiqn->tiqn_tpg_lock);
+
 	PYXPRINT("CORE[%s]_TPG[%hu] - Deleted iSCSI Target Portal Group\n",
 			tiqn->tiqn, tpg->tpgt);
-	spin_unlock(&tiqn->tiqn_tpg_lock);
-	
-	return(0);
+
+	kmem_cache_free(lio_tpg_cache, tpg);
+	return 0;
 }
 
 /*	iscsi_tpg_enable_portal_group():
@@ -1310,12 +1284,10 @@ extern int iscsi_ta_prod_mode_write_protect (
 
 extern void iscsi_disable_tpgs (iscsi_tiqn_t *tiqn)
 {
-	int i;
 	iscsi_portal_group_t *tpg;
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
-	for (i = 0; i < ISCSI_MAX_TPGS; i++) {
-		tpg = &tiqn->tiqn_tpg_list[i];
+	list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
 
 		spin_lock(&tpg->tpg_state_lock);
 		if ((tpg->tpg_state == TPG_STATE_FREE) ||
@@ -1356,12 +1328,10 @@ extern void iscsi_disable_all_tpgs (void)
 
 extern void iscsi_remove_tpgs (iscsi_tiqn_t *tiqn)
 {
-	int i;
-	iscsi_portal_group_t *tpg;
+	iscsi_portal_group_t *tpg, *tpg_tmp;
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
-	for (i = 0; i < ISCSI_MAX_TPGS; i++) {
-		tpg = &tiqn->tiqn_tpg_list[i];
+	list_for_each_entry_safe(tpg, tpg_tmp, &tiqn->tiqn_tpg_list, tpg_list) {
 
 		spin_lock(&tpg->tpg_state_lock);
 		if (tpg->tpg_state == TPG_STATE_FREE) {

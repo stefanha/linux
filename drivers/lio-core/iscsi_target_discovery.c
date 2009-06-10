@@ -59,7 +59,7 @@ extern int iscsi_build_sendtargets_response (iscsi_cmd_t *cmd)
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
 	iscsi_tpg_np_t *tpg_np;
-	int i, buffer_len, end_of_buf = 0, len = 0, payload_len = 0;
+	int buffer_len, end_of_buf = 0, len = 0, payload_len = 0;
 	unsigned char buf[256];
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
@@ -91,8 +91,7 @@ extern int iscsi_build_sendtargets_response (iscsi_cmd_t *cmd)
 		payload_len += len;
 
 		spin_lock(&tiqn->tiqn_tpg_lock);
-		for (i = 0; i < ISCSI_MAX_TPGS; i++) {
-			tpg = &tiqn->tiqn_tpg_list[i];
+		list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
 
 			spin_lock(&tpg->tpg_state_lock);
 			if ((tpg->tpg_state == TPG_STATE_FREE) ||

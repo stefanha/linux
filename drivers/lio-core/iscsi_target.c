@@ -100,6 +100,7 @@ struct kmem_cache *lio_qr_cache = NULL;
 struct kmem_cache *lio_dr_cache = NULL;
 struct kmem_cache *lio_ooo_cache = NULL;
 struct kmem_cache *lio_r2t_cache = NULL;
+struct kmem_cache *lio_tpg_cache = NULL;
 
 static void iscsi_rx_thread_wait_for_TCP (iscsi_conn_t *);
 
@@ -182,15 +183,16 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 	}
 	spin_unlock(&iscsi_global->tiqn_lock);
 
-	if (!(tiqn = kmalloc(sizeof(iscsi_tiqn_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate iscsi_tiqn_t\n");
+	tiqn = kzalloc(sizeof(iscsi_tiqn_t), GFP_KERNEL);
+	if (!(tiqn)) {
+		printk(KERN_ERR "Unable to allocate iscsi_tiqn_t\n");
 		*ret = -1;
-		return(NULL);
+		return NULL;
 	}
-	memset(tiqn, 0, sizeof(iscsi_tiqn_t));
 
 	sprintf(tiqn->tiqn, "%s", buf);
 	INIT_LIST_HEAD(&tiqn->tiqn_list);
+	INIT_LIST_HEAD(&tiqn->tiqn_tpg_list);
 	spin_lock_init(&tiqn->tiqn_state_lock);
 	spin_lock_init(&tiqn->tiqn_tpg_lock);
 #ifdef SNMP_SUPPORT
@@ -199,19 +201,6 @@ extern iscsi_tiqn_t *core_add_tiqn (unsigned char *buf, int *ret)
 	spin_lock_init(&tiqn->logout_stats.lock);
 	tiqn->tiqn_index = iscsi_get_new_index(ISCSI_INST_INDEX);
 #endif
-	if (!(tiqn->tiqn_tpg_list = kmalloc(
-			(sizeof(iscsi_portal_group_t) * ISCSI_MAX_TPGS),
-			GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate tiqn->tiqn_tpg_list\n");
-		kfree(tiqn);
-		*ret = -1;
-		return(NULL);
-	}
-	memset(tiqn->tiqn_tpg_list, 0, (sizeof(iscsi_portal_group_t) *
-			ISCSI_MAX_TPGS));
-
-	init_iscsi_portal_groups(tiqn);
-
 	tiqn->tiqn_state = TIQN_STATE_ACTIVE;
 
 	spin_lock(&iscsi_global->tiqn_lock);
@@ -228,7 +217,6 @@ extern int __core_del_tiqn (iscsi_tiqn_t *tiqn)
 {
 	iscsi_disable_tpgs(tiqn);
 	iscsi_remove_tpgs(tiqn);
-	kfree(tiqn->tiqn_tpg_list);
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_del(&tiqn->tiqn_list);
@@ -840,7 +828,9 @@ static int init_iscsi_global (iscsi_global_t *global)
 	spin_lock_init(&global->np_lock);
 	spin_lock_init(&global->shutdown_lock);
 	spin_lock_init(&global->tiqn_lock);
+	spin_lock_init(&global->g_tpg_lock);
 	INIT_LIST_HEAD(&global->g_tiqn_list);
+	INIT_LIST_HEAD(&global->g_tpg_list);
 	INIT_LIST_HEAD(&global->g_np_list);
 	
 	return(0);
@@ -1030,6 +1020,16 @@ static int iscsi_target_detect(void)
 		goto out;
 	}
 
+	lio_tpg_cache = kmem_cache_create("lio_tpg_cache",
+			sizeof(iscsi_portal_group_t),
+			__alignof__(iscsi_portal_group_t),
+			0, NULL);
+	if (!(lio_tpg_cache)) {
+		printk(KERN_ERR "Unable to kmem_cache_create() for"
+			" iscsi_portal_group_t\n");
+		goto out;
+	}
+
 	if (core_load_discovery_tpg() < 0)
 		goto out;
 
@@ -1052,6 +1052,8 @@ out:
 		kmem_cache_destroy(lio_ooo_cache);
 	if (lio_r2t_cache)
 		kmem_cache_destroy(lio_r2t_cache);
+	if (lio_tpg_cache)
+		kmem_cache_destroy(lio_tpg_cache);
 	iscsi_deallocate_thread_sets(TARGET);
 	iscsi_target_deregister_configfs();
 #ifdef CONFIG_PROC_FS
@@ -1107,6 +1109,7 @@ extern void iscsi_target_release_phase2 (void)
 	kmem_cache_destroy(lio_dr_cache);
 	kmem_cache_destroy(lio_ooo_cache);
 	kmem_cache_destroy(lio_r2t_cache);
+	kmem_cache_destroy(lio_tpg_cache);
 	core_release_discovery_tpg();
 	core_release_tiqns();
 

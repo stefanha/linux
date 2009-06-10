@@ -806,6 +806,8 @@ typedef struct iscsi_portal_group_s {
 	struct iscsi_portal_group_s *next;	/* Pointer to next TPG entry */
 	struct iscsi_portal_group_s *prev;
 	struct list_head 	tpg_gnp_list;
+	struct list_head	tpg_list;
+	struct list_head	g_tpg_list;
 } ____cacheline_aligned iscsi_portal_group_t;
 
 #define ISCSI_TPG_C(c)		((iscsi_portal_group_t *)(c)->tpg)
@@ -820,7 +822,7 @@ typedef struct iscsi_tiqn_s {
 	u32			tiqn_active_tpgs;
 	u32			tiqn_ntpgs;
 	struct list_head	tiqn_list;		
-	iscsi_portal_group_t	*tiqn_tpg_list;	
+	struct list_head	tiqn_tpg_list;
 	atomic_t		tiqn_access_count;
 	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
@@ -845,6 +847,8 @@ typedef struct iscsi_global_s {
 	u32			thread_id;	/* Thread ID counter */
 	int (*ti_forcechanoffline)(void *);
 	struct list_head	g_tiqn_list;
+	struct list_head	g_tpg_list;
+	struct list_head	tpg_list;
 	struct list_head	g_np_list;
 	spinlock_t		active_ts_lock;
 	spinlock_t		check_thread_lock;
@@ -854,6 +858,7 @@ typedef struct iscsi_global_s {
 	spinlock_t		shutdown_lock;
 	spinlock_t		thread_set_lock; /* Spinlock for adding/removing thread sets */
 	spinlock_t		tiqn_lock;	/* Spinlock for iscsi_tiqn_t */
+	spinlock_t		g_tpg_lock;
 	spinlock_t		np_lock;	/* Spinlock g_np_list */
 	struct semaphore		auth_sem;	/* Semaphore used for communication to authentication daemon */
 	struct semaphore		auth_id_sem;	/* Semaphore used for allocate of iscsi_conn_t->auth_id */
