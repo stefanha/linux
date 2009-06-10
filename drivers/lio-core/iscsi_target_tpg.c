@@ -635,10 +635,11 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 		return -EEXIST;
 	}
 
-	if (!(tpg->tpg_se_tpg = core_tpg_register(
+	tpg->tpg_se_tpg = core_tpg_register(
 			&lio_target_fabric_configfs->tf_ops, (void *)tpg,
-			TRANSPORT_TPG_TYPE_NORMAL)))
-		goto err_out;
+			TRANSPORT_TPG_TYPE_NORMAL);
+	if (IS_ERR(tpg->tpg_se_tpg) || !(tpg->tpg_se_tpg))
+		return -ENOMEM;
 
 	iscsi_set_default_tpg_attribs(tpg);
 
