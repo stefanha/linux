@@ -68,6 +68,27 @@ static inline int list_is_first(const struct list_head *list,
 	return list->prev == head;
 }
 
+static void *locate_hba_start(
+	struct seq_file *seq,
+	loff_t *pos)
+{
+	spin_lock(&se_global->g_device_lock);
+	return seq_list_start(&se_global->g_se_dev_list, *pos);
+}
+
+static void *locate_hba_next(
+	struct seq_file *seq,
+	void *v,
+	loff_t *pos)
+{
+	return seq_list_next(v, &se_global->g_se_dev_list, pos);
+}
+
+static void locate_hba_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock(&se_global->g_device_lock);
+}
+
 /****************************************************************************
  * SCSI MIB Tables
  ****************************************************************************/
@@ -96,9 +117,16 @@ static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
+static const struct seq_operations scsi_inst_seq_ops = {
+	.start	= locate_hba_start,
+	.next	= locate_hba_next,
+	.stop	= locate_hba_stop,
+	.show	= scsi_inst_seq_show
+};
+
 static int scsi_inst_seq_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, scsi_inst_seq_show, NULL);
+	return seq_open(file, &scsi_inst_seq_ops);
 }
 
 static const struct file_operations scsi_inst_seq_fops = {
@@ -106,50 +134,20 @@ static const struct file_operations scsi_inst_seq_fops = {
 	.open	 = scsi_inst_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = single_release,
+	.release = seq_release,
 };
-
-static void *locate_hba_start(
-	struct seq_file *seq,
-	loff_t *pos,
-	int (*do_check)(void *))
-{
-	spin_lock(&se_global->g_device_lock);
-	return seq_list_start(&se_global->g_se_dev_list, *pos);
-}
-
-static void *locate_hba_next(
-	struct seq_file *seq,
-	void *v,
-	loff_t *pos,
-	int (*do_check)(void *))
-{
-	return seq_list_next(v, &se_global->g_se_dev_list, pos);
-}
-
-static void locate_hba_stop(struct seq_file *seq, void *v)
-{
-	spin_unlock(&se_global->g_device_lock);
-}
 
 /*
  * SCSI Device Table
  */
-int do_hba_check(void *p)
-{
-	se_hba_t *hba = (se_hba_t *)p;
-
-	return hba->dev_count;
-}
-
 static void *scsi_dev_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return locate_hba_start(seq, pos, &do_hba_check);
+	return locate_hba_start(seq, pos);
 }
 
 static void *scsi_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return locate_hba_next(seq, v, pos, &do_hba_check);
+	return locate_hba_next(seq, v, pos);
 }
 
 static void scsi_dev_seq_stop(struct seq_file *seq, void *v)
@@ -228,12 +226,12 @@ static const struct file_operations scsi_dev_seq_fops = {
  */
 static void *scsi_port_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return locate_hba_start(seq, pos, &do_hba_check);
+	return locate_hba_start(seq, pos);
 }
 
 static void *scsi_port_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return locate_hba_next(seq, v, pos, &do_hba_check);
+	return locate_hba_next(seq, v, pos);
 }
 
 static void scsi_port_seq_stop(struct seq_file *seq, void *v)
@@ -300,12 +298,12 @@ static const struct file_operations scsi_port_seq_fops = {
  */
 static void *scsi_transport_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return locate_hba_start(seq, pos, &do_hba_check);
+	return locate_hba_start(seq, pos);
 }
 
 static void *scsi_transport_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return locate_hba_next(seq, v, pos, &do_hba_check);
+	return locate_hba_next(seq, v, pos);
 }
 
 static void scsi_transport_seq_stop(struct seq_file *seq, void *v)
@@ -388,12 +386,12 @@ static const struct file_operations scsi_transport_seq_fops = {
  */
 static void *scsi_tgt_dev_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return locate_hba_start(seq, pos, &do_hba_check);
+	return locate_hba_start(seq, pos);
 }
 
 static void *scsi_tgt_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return locate_hba_next(seq, v, pos, &do_hba_check);
+	return locate_hba_next(seq, v, pos);
 }
 
 static void scsi_tgt_dev_seq_stop(struct seq_file *seq, void *v)
@@ -482,12 +480,12 @@ static const struct file_operations scsi_tgt_dev_seq_fops = {
  */
 static void *scsi_tgt_port_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return locate_hba_start(seq, pos, &do_hba_check);
+	return locate_hba_start(seq, pos);
 }
 
 static void *scsi_tgt_port_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return locate_hba_next(seq, v, pos, &do_hba_check);
+	return locate_hba_next(seq, v, pos);
 }
 
 static void scsi_tgt_port_seq_stop(struct seq_file *seq, void *v)
@@ -809,12 +807,12 @@ static const struct file_operations scsi_att_intr_port_seq_fops = {
  */
 static void *scsi_lu_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return locate_hba_start(seq, pos, &do_hba_check);
+	return locate_hba_start(seq, pos);
 }
 
 static void *scsi_lu_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return locate_hba_next(seq, v, pos, &do_hba_check);
+	return locate_hba_next(seq, v, pos);
 }
 
 static void scsi_lu_seq_stop(struct seq_file *seq, void *v)

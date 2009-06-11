@@ -821,6 +821,8 @@ typedef struct iscsi_tiqn_s {
 	int			tiqn_state;
 	u32			tiqn_active_tpgs;
 	u32			tiqn_ntpgs;
+	u32			tiqn_num_tpg_nps;
+	u32			tiqn_nsessions;
 	struct list_head	tiqn_list;		
 	struct list_head	tiqn_tpg_list;
 	atomic_t		tiqn_access_count;
