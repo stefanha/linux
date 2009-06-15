@@ -510,6 +510,7 @@ se_device_t *pscsi_create_virtdevice(
 	void *p)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *)p;
+	se_device_t *dev;
 	struct scsi_device *sd;
 	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
 
@@ -521,21 +522,32 @@ se_device_t *pscsi_create_virtdevice(
 
 	spin_lock_irq(sh->host_lock);
 	list_for_each_entry(sd, &sh->__devices, siblings) {
-		if (!(pdv->pdv_channel_id == sd->channel) ||
-		    !(pdv->pdv_target_id == sd->id) ||
-		    !(pdv->pdv_lun_id == sd->lun))
+		if ((pdv->pdv_channel_id != sd->channel) ||
+		    (pdv->pdv_target_id != sd->id) ||
+		    (pdv->pdv_lun_id != sd->lun))
 			continue;
 		/*
-		 * Functions will release struct scsi_host->host_lock
+		 * Functions will release the held struct scsi_host->host_lock
+		 * before calling calling pscsi_check_sd() and
+		 * pscsi_add_device_to_list() to register struct scsi_device
+		 * with target_core_mod.
 		 */
 		switch (sd->type) {
 		case TYPE_DISK:
-			return pscsi_create_type_disk(sd, pdv, se_dev, hba);
+			dev = pscsi_create_type_disk(sd, pdv, se_dev, hba);
+			break;
 		case TYPE_ROM:
-			return pscsi_create_type_rom(sd, pdv, se_dev, hba);
+			dev = pscsi_create_type_rom(sd, pdv, se_dev, hba);
+			break;	
 		default:
-			return pscsi_create_type_other(sd, pdv, se_dev, hba);
+			dev = pscsi_create_type_other(sd, pdv, se_dev, hba);
+			break;
 		}
+		if (!(dev)) {
+			pdv->pdv_sd = NULL;
+			return NULL;
+		}
+		return dev;
 	}
 	spin_unlock_irq(sh->host_lock);
 
