@@ -1887,7 +1887,15 @@ static struct config_group *target_core_call_createdev(
 	if (!(dev_cg->default_groups))
 		goto out;
 	/*
-	 * Set se_dev_ptr from se_subsystem_api_t returned void ptr..
+	 * Set se_dev_su_ptr from se_subsystem_api_t returned void ptr
+	 * for ->allocate_virtdevice()
+	 *
+	 * se_dev->se_dev_ptr will be set after ->create_virtdev()
+	 * has been called successfully in the next level up in the
+	 * configfs tree for device object's struct config_group.  This
+	 * pointer is set in target_core_store_dev_fd() and
+	 * target_core_store_dev_enable() above depending upon the
+	 * reference method for struct scsi_device.
 	 */
 	se_dev->se_dev_su_ptr = t->allocate_virtdevice(hba, name);
 	if (!(se_dev->se_dev_su_ptr)) {
