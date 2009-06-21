@@ -105,7 +105,7 @@ install ins:
 
 clean:
 	rm -f $(foreach prog,$(iscsi_target_mod-objs) $(obj-m),$(CWD)/$(prog)) $(CWD)/iscsi_target_mod.mod.o
-	rm -f target_core_mod.ko target_core_mod.mod.c
+	rm -f iscsi_target_mod.ko iscsi_target_mod.mod.c
 	rm -f .*.cmd ../common/.*.cmd .make_autoconfig *~
 	rm -fr .tmp_versions
 
