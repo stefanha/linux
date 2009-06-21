@@ -239,7 +239,7 @@ se_device_t *iblock_create_virtdevice(
 	 * These settings need to be made tunable..
 	 */
 	ib_dev->ibd_bio_set = bioset_create(32, 64);
-	if (!(ib_dev)) {
+	if (!(ib_dev->ibd_bio_set)) {
 		printk(KERN_ERR "IBLOCK: Unable to create bioset()\n");
 		goto failed;
 	}
