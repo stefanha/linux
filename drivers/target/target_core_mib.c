@@ -96,31 +96,48 @@ static void locate_hba_stop(struct seq_file *seq, void *v)
 /*
  * SCSI Instance Table
  */
+static void *scsi_inst_seq_start(
+	struct seq_file *seq,
+	loff_t *pos)
+{
+	spin_lock(&se_global->hba_lock);
+	return seq_list_start(&se_global->g_hba_list, *pos);
+}
+
+static void *scsi_inst_seq_next(
+	struct seq_file *seq,
+	void *v,
+	loff_t *pos)
+{
+	return seq_list_next(v, &se_global->g_hba_list, pos);
+}
+
+static void scsi_inst_seq_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock(&se_global->hba_lock);
+}
+
 static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba;
+	se_hba_t *hba = list_entry(v, se_hba_t, hba_list);
 
-	seq_puts(seq, "inst sw_indx\n");
+	if (list_is_first(&hba->hba_list, &se_global->g_hba_list))
+		seq_puts(seq, "inst sw_indx\n");
 
-	spin_lock(&se_global->hba_lock);
-	list_for_each_entry(hba, &se_global->g_hba_list, hba_list) {
-		if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-			continue;
+	if (!(hba->hba_status & HBA_STATUS_ACTIVE))
+		return 0;
 
-		seq_printf(seq, "%u %u\n", hba->hba_index, SCSI_INST_SW_INDEX);
-		seq_printf(seq, "plugin: %s version: %s\n",
-				hba->transport->name,
-				TARGET_CORE_VERSION);
-	}
-	spin_unlock(&se_global->hba_lock);
+	seq_printf(seq, "%u %u\n", hba->hba_index, SCSI_INST_SW_INDEX);
+	seq_printf(seq, "plugin: %s version: %s\n",
+			hba->transport->name, TARGET_CORE_VERSION);
 
 	return 0;
 }
 
 static const struct seq_operations scsi_inst_seq_ops = {
-	.start	= locate_hba_start,
-	.next	= locate_hba_next,
-	.stop	= locate_hba_stop,
+	.start	= scsi_inst_seq_start,
+	.next	= scsi_inst_seq_next,
+	.stop	= scsi_inst_seq_stop,
 	.show	= scsi_inst_seq_show
 };
 
