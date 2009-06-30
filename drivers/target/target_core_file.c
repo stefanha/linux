@@ -246,9 +246,13 @@ se_device_t *fd_create_virtdevice(
 		printk(KERN_INFO "FILEIO: Claiming %p Major:Minor - %d:%d\n",
 			fd_dev, fd_dev->fd_major, fd_dev->fd_minor);
 
-		bd = linux_blockdevice_claim_bd(fd_dev->fd_bd, fd_dev);
-		if (!(bd))
+		bd = linux_blockdevice_claim(fd_dev->fd_bd->bd_disk->major,
+					fd_dev->fd_bd->bd_disk->first_minor,
+					fd_dev);
+		if (!(bd)) {
+			printk("FILEIO: Unable to claim struct block_device\n");
 			goto fail;
+		}
 
 		dev_flags |= DF_CLAIMED_BLOCKDEV;
 		if (dev_flags & DF_CLAIMED_BLOCKDEV)
@@ -273,6 +277,14 @@ se_device_t *fd_create_virtdevice(
 			goto fail;
 		}
 	}
+	/*
+	 * Pass dev_flags for linux_blockdevice_claim_bd or
+	 * linux_blockdevice_claim() from the usage above.
+	 *
+	 * Note that transport_add_device_to_core_hba() will call
+	 * linux_blockdevice_release() internally on failure to
+	 * call bd_release() on the referenced struct block_device.
+	 */
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
 				se_dev, dev_flags, (void *)fd_dev);
 	if (!(dev))
@@ -294,10 +306,11 @@ fail:
 		fd_dev->fd_file = NULL;
 	}
 	fd_dev->fd_bd = NULL;
+	fd_dev->fd_major = 0;
+	fd_dev->fd_minor = 0;
 	if (inode)
 		iput(inode);
 	putname(dev_p);
-	kfree(fd_dev);
 	return NULL;
 }
 
