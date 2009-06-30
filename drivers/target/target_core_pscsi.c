@@ -1029,21 +1029,22 @@ se_device_t *pscsi_create_virtdevice_from_fd(
 	struct scsi_device *sd = NULL;
 	struct Scsi_Host *sh = (struct Scsi_Host *)hba->hba_ptr;
 	char *p = (char *)page;
-	int fd, ret;
+	unsigned long long fd;
+	int ret;
 
-	ret = strict_strtol(p, 0, (long *)&fd);
+	ret = strict_strtoull(p, 0, (unsigned long long *)&fd);
 	if (ret < 0) {
 		printk(KERN_ERR "strict_strtol() failed for fd\n");
 		return ERR_PTR(-EINVAL);
 	}
 	if ((fd < 3 || fd > 7)) {
 		printk(KERN_ERR "PSCSI: Illegal value of file descriptor:"
-			" %d\n", fd);
+			" %llu\n", fd);
 		return ERR_PTR(-EINVAL);
 	}
 	filp = fget(fd);
 	if (!(filp)) {
-		printk(KERN_ERR "PSCSI: Unable to fget() fd: %d\n", fd);
+		printk(KERN_ERR "PSCSI: Unable to fget() fd: %llu\n", fd);
 		return ERR_PTR(-EBADF);
 	}
 	inode = igrab(filp->f_mapping->host);
