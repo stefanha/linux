@@ -1163,11 +1163,11 @@ static ssize_t target_core_show_dev_info(void *p, char *page)
 	if (!t || (ret != 0))
 		return 0;
 
-	if (se_dev->se_dev_ptr) {
-		transport_dump_dev_state(se_dev->se_dev_ptr, page, &bl);
-		read_bytes += bl;
-	}
+	if (!(se_dev->se_dev_ptr))
+		return -ENODEV;
 
+	transport_dump_dev_state(se_dev->se_dev_ptr, page, &bl);
+	read_bytes += bl;
 	read_bytes += t->show_configfs_dev_params(hba, se_dev, page+read_bytes);
 	return read_bytes;
 }
