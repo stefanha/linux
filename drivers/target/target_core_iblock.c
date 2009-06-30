@@ -719,21 +719,22 @@ se_device_t *iblock_create_virtdevice_from_fd(
 	struct file *filp;
 	struct inode *inode;
 	char *p = (char *)page;
-	int fd, ret;
+	unsigned long long fd;
+	int ret;
 
-	ret = strict_strtol(p, 0, (long *)&fd);
+	ret = strict_strtoull(p, 0, (unsigned long long *)&fd);
 	if (ret < 0) {
 		printk(KERN_ERR "strict_strtol() failed for fd\n");
 		return ERR_PTR(-EINVAL);
 	}
 	if ((fd < 3 || fd > 7)) {
 		printk(KERN_ERR "IBLOCK: Illegal value of file descriptor:"
-				" %d\n", fd);
+				" %llu\n", fd);
 		return ERR_PTR(-EINVAL);
 	}
 	filp = fget(fd);
 	if (!(filp)) {
-		printk(KERN_ERR "IBLOCK: Unable to fget() fd: %d\n", fd);
+		printk(KERN_ERR "IBLOCK: Unable to fget() fd: %llu\n", fd);
 		return ERR_PTR(-EBADF);
 	}
 	inode = igrab(filp->f_mapping->host);
@@ -745,7 +746,7 @@ se_device_t *iblock_create_virtdevice_from_fd(
 	}
 	if (!(S_ISBLK(inode->i_mode))) {
 		printk(KERN_ERR "IBLOCK: S_ISBLK(inode->i_mode) failed for file"
-				" descriptor: %d\n", fd);
+				" descriptor: %llu\n", fd);
 		iput(inode);
 		fput(filp);
 		return ERR_PTR(-ENODEV);
