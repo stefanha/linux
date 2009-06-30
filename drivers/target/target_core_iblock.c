@@ -135,14 +135,12 @@ int iblock_claim_phydevice(se_hba_t *hba, se_device_t *dev)
 	return 0;
 }
 
-int iblock_release_phydevice(se_device_t *dev)
+static int __iblock_release_phydevice(iblock_dev_t *ib_dev, int ro)
 {
-	iblock_dev_t *ib_dev = (iblock_dev_t *)dev->dev_ptr;
-
 	if (!ib_dev->ibd_bd)
 		return 0;
 
-	if (dev->dev_flags & DF_READ_ONLY) {
+	if (ro == 1) {
 		printk(KERN_INFO "IBLOCK: Calling blkdev_put() for Major:Minor"
 			" - %d:%d\n", ib_dev->ibd_major, ib_dev->ibd_minor);
 		blkdev_put((struct block_device *)ib_dev->ibd_bd, FMODE_READ);
@@ -156,6 +154,17 @@ int iblock_release_phydevice(se_device_t *dev)
 	ib_dev->ibd_bd = NULL;
 
 	return 0;
+}
+
+int iblock_release_phydevice(se_device_t *dev)
+{
+	iblock_dev_t *ib_dev = (iblock_dev_t *)dev->dev_ptr;
+
+	if (!ib_dev->ibd_bd)
+		return 0;
+
+	return __iblock_release_phydevice(ib_dev,
+			(dev->dev_flags & DF_READ_ONLY) ? 1 : 0);
 }
 
 void *iblock_allocate_virtdevice(se_hba_t *hba, const char *name)
@@ -203,9 +212,14 @@ se_device_t *iblock_create_virtdevice(
 		printk(KERN_INFO  "IBLOCK: Claiming struct block_device: %p\n",
 			 ib_dev->ibd_bd);
 
-		bd = linux_blockdevice_claim_bd(ib_dev->ibd_bd, ib_dev);
-		if (!(bd))
+		bd = linux_blockdevice_claim(ib_dev->ibd_bd->bd_disk->major,
+				     ib_dev->ibd_bd->bd_disk->first_minor,
+				     ib_dev);
+		if (!(bd)) {
+			printk(KERN_INFO "IBLOCK: Unable to claim"
+					" struct block_device\n");
 			goto failed;
+		}
 		dev_flags = DF_CLAIMED_BLOCKDEV;
 		ib_dev->ibd_major = bd->bd_disk->major;
 		ib_dev->ibd_minor = bd->bd_disk->first_minor;
@@ -226,7 +240,7 @@ se_device_t *iblock_create_virtdevice(
 			} else {
 				printk(KERN_INFO "WARNING: Unable to claim"
 					" block device. Only use force=1 for"
-					"READ-ONLY access.\n");
+					" READ-ONLY access.\n");
 				goto failed;
 			}
 			ib_dev->ibd_bd = bd;
@@ -241,12 +255,19 @@ se_device_t *iblock_create_virtdevice(
 	ib_dev->ibd_bio_set = bioset_create(32, 64);
 	if (!(ib_dev->ibd_bio_set)) {
 		printk(KERN_ERR "IBLOCK: Unable to create bioset()\n");
+		__iblock_release_phydevice(ib_dev,
+				(dev_flags == DF_READ_ONLY ? 1 : 0));
 		goto failed;
 	}
 	printk(KERN_INFO "IBLOCK: Created bio_set() for major/minor: %d:%d\n",
 		ib_dev->ibd_major, ib_dev->ibd_minor);
 	/*
-	 * Pass dev_flags for linux_blockdevice_claim() above..
+	 * Pass dev_flags for linux_blockdevice_claim() or
+	 * linux_blockdevice_claim() from the usage above.
+	 *
+	 * Note that transport_add_device_to_core_hba() will call
+	 * linux_blockdevice_release() internally on failure to
+	 * call bd_release() on the referenced struct block_device.
 	 */
 	dev = transport_add_device_to_core_hba(hba,
 			&iblock_template, se_dev, dev_flags, (void *)ib_dev);
@@ -258,9 +279,11 @@ se_device_t *iblock_create_virtdevice(
 	return dev;
 
 failed:
-	if (ib_dev->ibd_bio_set)
+	if (ib_dev->ibd_bio_set) {
 		bioset_free(ib_dev->ibd_bio_set);
-	kfree(ib_dev);
+		ib_dev->ibd_bio_set = NULL;
+	}
+	ib_dev->ibd_bd = NULL;
 	return NULL;
 }
 
@@ -736,7 +759,7 @@ se_device_t *iblock_create_virtdevice_from_fd(
 		return ERR_PTR(-EINVAL);
 	}
 	/*
-	 * iblock_create_virtdevice() will call linux_blockdevice_claim_bd()
+	 * iblock_create_virtdevice() will call linux_blockdevice_claim()
 	 * to claim struct block_device.
 	 */
 	dev = iblock_create_virtdevice(se_dev->se_dev_hba, se_dev, (void *)ibd);
