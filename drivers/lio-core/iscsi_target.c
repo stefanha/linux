@@ -613,8 +613,10 @@ extern iscsi_np_t *core_add_np (
 			0, network_transport, net_size, ret)))
 		return(np);
 
-	if (*ret != 0)
+	if (*ret != 0) {
+		*ret = -EINVAL;
 		return(NULL);
+	}
 
 	if (!(np = kzalloc(sizeof(iscsi_np_t), GFP_KERNEL))) {
 		printk(KERN_ERR "Unable to allocate memory for iscsi_np_t\n");
@@ -657,7 +659,7 @@ extern iscsi_np_t *core_add_np (
 		TRACE_ERROR("Unable to start login thread for iSCSI Network"
 			" Portal %s:%hu\n", ip_buf, np->np_port);
 		kfree(np);
-		*ret = ERR_ADDNPTOTPG_NO_LOGIN_THREAD;
+		*ret = -EADDRINUSE;
 		return(NULL);
 	}
 	spin_unlock_bh(&np->np_thread_lock);

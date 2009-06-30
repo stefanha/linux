@@ -919,7 +919,7 @@ extern iscsi_tpg_np_t *iscsi_tpg_add_network_portal (
 	 */
 	if (!(np = core_get_np(ip, np_addr->np_port, network_transport))) {
 		if (!(np = core_add_np(np_addr, network_transport, &ret)))
-			return(ERR_PTR(-EINVAL));
+			return(ERR_PTR(ret));
 	}
 
 	if (!(tpg_np = (iscsi_tpg_np_t *) kzalloc(

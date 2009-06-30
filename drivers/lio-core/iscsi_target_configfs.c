@@ -303,8 +303,8 @@ static struct config_group *lio_target_call_addnptotpg (
 	}
 
 	tpg = lio_get_tpg_from_tpg_item(tpg_ci, &tiqn);
-	if (!(tiqn))
-		goto out;
+	if (!(tpg))
+		return ERR_PTR(-EINVAL);
 
 	printk("LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu PORTAL: %s\n",
 			config_item_name(tiqn_ci), tpg->tpgt, name);
@@ -323,8 +323,10 @@ static struct config_group *lio_target_call_addnptotpg (
 	 *
 	 */
 	tpg_np = iscsi_tpg_add_network_portal(tpg, &np_addr, NULL, ISCSI_TCP);
-	if (!(tpg_np) || IS_ERR(tpg_np))
-		goto out;
+	if (IS_ERR(tpg_np)) {
+		iscsi_put_tpg(tpg);
+		return ERR_PTR(PTR_ERR(tpg_np));
+	}
 
 	config_group_init_type_name(&tpg_np->tpg_np_group, name, &lio_target_portal_cit);
 
@@ -332,9 +334,6 @@ static struct config_group *lio_target_call_addnptotpg (
 
 	iscsi_put_tpg(tpg);
 	return(&tpg_np->tpg_np_group);
-out:
-	iscsi_put_tpg(tpg);
-	return(NULL);
 }
 
 static void lio_target_call_delnpfromtpg (
