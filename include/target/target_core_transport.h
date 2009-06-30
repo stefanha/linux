@@ -80,6 +80,7 @@
 */
 #define SDF_FIRMWARE_VPD_UNIT_SERIAL		0x00000001
 #define SDF_EMULATED_VPD_UNIT_SERIAL		0x00000002
+#define SDF_USING_UDEV_PATH			0x00000004
 
 /*
  * se_device_t->dev_flags
@@ -109,8 +110,6 @@
 #define DA_STATUS_MAX_SECTORS_MAX		8192
 
 #define SE_MODE_PAGE_BUF			512
-/* Must match PARAM_UDEV_PATH_LEN */
-#define SE_UDEV_PATH_LEN			256
 
 #define MOD_MAX_SECTORS(ms, bs)			(ms % (PAGE_SIZE / bs))
 

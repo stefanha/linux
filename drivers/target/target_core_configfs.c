@@ -1260,6 +1260,52 @@ static struct target_core_configfs_attribute target_core_attr_dev_fd = {
 	.store	= target_core_store_dev_fd,
 };
 
+static ssize_t target_core_show_dev_udev_path(void *p, char *page)
+{
+	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;
+
+	if (!(se_dev->su_dev_flags & SDF_USING_UDEV_PATH))
+		return 0;
+
+	return snprintf(page, PAGE_SIZE, "%s\n", se_dev->se_dev_udev_path);
+}
+
+static ssize_t target_core_store_dev_udev_path(
+	void *p,
+	const char *page,
+	size_t count)
+{
+	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;
+	se_hba_t *hba = se_dev->se_dev_hba;
+	ssize_t read_bytes;
+
+	if (count > (SE_UDEV_PATH_LEN-1)) {
+		printk(KERN_ERR "udev_path count: %d exceeds"
+			" SE_UDEV_PATH_LEN-1: %u\n", count,
+			SE_UDEV_PATH_LEN-1);
+		return -EINVAL;
+	}
+
+	se_dev->su_dev_flags |= SDF_USING_UDEV_PATH;
+	read_bytes = snprintf(&se_dev->se_dev_udev_path[0], SE_UDEV_PATH_LEN,
+			"%s", page);
+
+	printk(KERN_INFO "Target_Core_ConfigFS: %s/%s set udev_path: %s\n",
+		config_item_name(&hba->hba_group.cg_item),
+		config_item_name(&se_dev->se_dev_group.cg_item),
+		se_dev->se_dev_udev_path);
+		
+	return read_bytes;
+}
+
+static struct target_core_configfs_attribute target_core_attr_dev_udev_path = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "udev_path",
+		    .ca_mode =  S_IRUGO | S_IWUSR },
+	.show	= target_core_show_dev_udev_path,
+	.store	= target_core_store_dev_udev_path,
+};
+
 static ssize_t target_core_store_dev_enable(
 	void *p,
 	const char *page,
@@ -1455,6 +1501,7 @@ static struct configfs_attribute *lio_core_dev_attrs[] = {
 	&target_core_attr_dev_info.attr,
 	&target_core_attr_dev_control.attr,
 	&target_core_attr_dev_fd.attr,
+	&target_core_attr_dev_udev_path.attr,
 	&target_core_attr_dev_enable.attr,
 	&target_core_attr_dev_alua_lu_gp.attr,
 	NULL,

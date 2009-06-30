@@ -30,8 +30,6 @@
 
 extern se_global_t *se_global;
 
-extern struct block_device *linux_blockdevice_claim_bd(struct block_device *,
-							void *);
 extern struct block_device *__linux_blockdevice_claim(int, int, void *, int *);
 extern struct block_device *linux_blockdevice_claim(int, int, void *);
 extern int linux_blockdevice_release(int, int, struct block_device *);

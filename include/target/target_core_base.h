@@ -62,8 +62,10 @@
 /* Used to parse VPD into t10_vpd_t */
 #define VPD_TMP_BUF_SIZE			128
 /* Used for target_core-pscsi.c:pscsi_transport_complete() */
-#define VPD_BUF_LEN                    256
-
+#define VPD_BUF_LEN				256
+/* Used for se_subsystem_dev_t->se_dev_udev_path[], must be less than
+   PAGE_SIZE */
+#define SE_UDEV_PATH_LEN			512
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -635,7 +637,8 @@ typedef struct se_dev_attrib_s {
 } ____cacheline_aligned se_dev_attrib_t;
 
 typedef struct se_subsystem_dev_s {
-	u32			su_dev_flags;
+	unsigned char	se_dev_udev_path[SE_UDEV_PATH_LEN];
+	u32		su_dev_flags;
 	struct se_hba_s *se_dev_hba;
 	struct se_device_s *se_dev_ptr;
 	se_dev_attrib_t se_dev_attrib;
