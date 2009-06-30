@@ -144,6 +144,8 @@ void rd_release_device_space(rd_dev_t *rd_dev)
 		rd_dev->sg_table_count, (unsigned long)page_count * PAGE_SIZE);
 
 	kfree(sg_table);
+	rd_dev->sg_table_array = NULL;
+	rd_dev->sg_table_count = 0;
 }
 
 
@@ -294,7 +296,6 @@ static se_device_t *rd_create_virtdevice(
 
 fail:
 	rd_release_device_space(rd_dev);
-	kfree(rd_dev);
 	return NULL;
 }
 
