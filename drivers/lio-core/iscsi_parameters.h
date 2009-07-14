@@ -125,8 +125,8 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *, iscsi_param_list_t 
  * Initial values for Parameter Negotiation.
  */
 #define INITIAL_AUTHMETHOD			CHAP
-#define INITIAL_HEADERDIGEST			NONE
-#define INITIAL_DATADIGEST			NONE
+#define INITIAL_HEADERDIGEST			"CRC32C,None"
+#define INITIAL_DATADIGEST			"CRC32C,None"
 #define INITIAL_MAXCONNECTIONS			"1"
 #define INITIAL_SENDTARGETS			ALL
 #define INITIAL_TARGETNAME			"LIO.Target"
