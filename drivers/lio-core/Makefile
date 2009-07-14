@@ -29,7 +29,8 @@ include $(CWD)/drivers/lio-core/MCONFIG_TARGET
 include $(CWD)/drivers/lio-core/MCONFIG_ALL
 
 obj-$(CONFIG_LIO_TARGET)	+=	iscsi_target_mod.o
-iscsi_target_mod-objs		:=	iscsi_crc.o \
+iscsi_target_mod-objs		:=	iscsi_auth_chap.o \
+					iscsi_crc.o \
 					iscsi_debug_opcodes.o \
 					iscsi_parameters.o \
 					iscsi_seq_and_pdu_list.o \

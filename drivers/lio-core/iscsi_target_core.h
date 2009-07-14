@@ -219,6 +219,14 @@
 #define DATAOUT_SEND_TO_TRANSPORT		2
 #define DATAOUT_WITHIN_COMMAND_RECOVERY		3
 
+/* Used for iscsi_node_auth_t structure members */
+#define MAX_USER_LEN				256
+#define MAX_PASS_LEN				256
+#define NAF_USERID_SET				0x01
+#define NAF_PASSWORD_SET			0x02
+#define NAF_USERID_IN_SET			0x04
+#define NAF_PASSWORD_IN_SET			0x08
+
 /* Used for iscsi_cmd_t->dataout_timer_flags */
 #define DATAOUT_TF_RUNNING			0x01
 #define DATAOUT_TF_STOP				0x02
@@ -530,6 +538,7 @@ typedef struct iscsi_conn_s {
 	iscsi_queue_req_t	*response_queue_tail;
 	iscsi_conn_ops_t	*conn_ops;
 	iscsi_param_list_t	*param_list;
+	void			*auth_protocol; /* Used for per connection auth state machine */
 	struct iscsi_login_thread_s *login_thread;
 	struct iscsi_portal_group_s *tpg;
 	struct iscsi_session_s	*sess;		/* Pointer to parent session */
@@ -701,12 +710,24 @@ typedef struct iscsi_node_attrib_s {
 
 struct se_dev_entry_s;
 
+typedef struct iscsi_node_auth_s {
+	int			naf_flags;
+	int			authenticate_target;
+	char			userid[MAX_USER_LEN];
+	char			password[MAX_PASS_LEN];
+	char			userid_in[MAX_USER_LEN];
+	char			password_in[MAX_PASS_LEN];
+	struct config_group	auth_attrib_group;
+} ____cacheline_aligned iscsi_node_auth_t;
+
 typedef struct iscsi_node_acl_s {
 	iscsi_node_attrib_t	node_attrib;
+	iscsi_node_auth_t	node_auth;
 	struct se_node_acl_s	*se_node_acl;
 } ____cacheline_aligned iscsi_node_acl_t;
 
 #define ISCSI_NODE_ATTRIB(t)	(&(t)->node_attrib)
+#define ISCSI_NODE_AUTH(t)	(&(t)->node_auth)
 
 typedef struct iscsi_tpg_attrib_s {
 	u32			authentication;
@@ -782,6 +803,7 @@ typedef struct iscsi_np_addr_s {
 } ____cacheline_aligned iscsi_np_addr_t;
   
 typedef struct iscsi_portal_group_s {
+	unsigned char		tpg_chap_id;
 	__u8			tpg_state;	/* TPG State */
 	__u16			tpgt;		/* Target Portal Group Tag */
 	__u16			ntsih;		/* Id assigned to target sessions */

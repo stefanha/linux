@@ -785,6 +785,113 @@ static struct config_item_type lio_target_nacl_attrib_cit = {
 
 // End items for lio_target_nacl_attrib_cit
 
+// Start items for lio_target_nacl_auth_cit
+
+#define DEF_NACL_AUTH_STR(name, flags)					\
+static ssize_t lio_target_show_nacl_auth_##name (			\
+	struct iscsi_node_auth_s *auth,					\
+	char *page)							\
+{									\
+	ssize_t rb;							\
+									\
+	if (!capable(CAP_SYS_ADMIN))					\
+		return -EPERM;						\
+	rb = snprintf(page, PAGE_SIZE, "%s\n", auth->name);		\
+	return rb;							\
+}									\
+static ssize_t lio_target_store_nacl_auth_##name (			\
+	struct iscsi_node_auth_s *auth,					\
+	const char *page,						\
+	size_t count)							\
+{									\
+	if (!capable(CAP_SYS_ADMIN))					\
+		return -EPERM;						\
+									\
+	snprintf(auth->name, PAGE_SIZE, "%s", page);			\
+	auth->naf_flags |= flags;					\
+									\
+	if ((auth->naf_flags & NAF_USERID_IN_SET) &&			\
+	    (auth->naf_flags & NAF_PASSWORD_IN_SET))			\
+		auth->authenticate_target = 1;				\
+									\
+	return count;							\
+}
+
+#define DEF_NACL_AUTH_INT(name)						\
+static ssize_t lio_target_show_nacl_auth_##name (			\
+	struct iscsi_node_auth_s *auth,					\
+	char *page)							\
+{									\
+	ssize_t rb;							\
+									\
+	if (!capable(CAP_SYS_ADMIN))					\
+		return -EPERM;						\
+									\
+	rb = snprintf(page, PAGE_SIZE, "%d\n", auth->name);		\
+	return rb;							\
+}
+
+CONFIGFS_EATTR_STRUCT(iscsi_node_auth, iscsi_node_auth_s);
+#define AUTH_ATTR(_name, _mode)						\
+static struct iscsi_node_auth_attribute iscsi_node_auth_##_name =	\
+		__CONFIGFS_EATTR(_name, _mode,				\
+		lio_target_show_nacl_auth_##_name,			\
+		lio_target_store_nacl_auth_##_name);
+
+#define AUTH_ATTR_RO(_name)						\
+static struct iscsi_node_auth_attribute iscsi_node_auth_##_name =	\
+		__CONFIGFS_EATTR_RO(_name,				\
+		lio_target_show_nacl_auth_##_name);
+/*
+ * One-way authentication userid
+ */
+DEF_NACL_AUTH_STR(userid, NAF_USERID_SET);
+AUTH_ATTR(userid, S_IRUGO | S_IWUSR);
+/*
+ * One-way authentication password
+ */
+DEF_NACL_AUTH_STR(password, NAF_PASSWORD_SET);
+AUTH_ATTR(password, S_IRUGO | S_IWUSR);
+/*
+ * Enforce mutual authentication
+ */
+DEF_NACL_AUTH_INT(authenticate_target);
+AUTH_ATTR_RO(authenticate_target);
+/*
+ * Mutual authentication userid
+ */
+DEF_NACL_AUTH_STR(userid_in, NAF_USERID_IN_SET);
+AUTH_ATTR(userid_in, S_IRUGO | S_IWUSR);
+/*
+ * Mutual authentication password
+ */
+DEF_NACL_AUTH_STR(password_in, NAF_PASSWORD_IN_SET);
+AUTH_ATTR(password_in, S_IRUGO | S_IWUSR);
+
+CONFIGFS_EATTR_OPS(iscsi_node_auth, iscsi_node_auth_s, auth_attrib_group);
+
+static struct configfs_attribute *lio_target_nacl_auth_attrs[] = {
+	&iscsi_node_auth_userid.attr,
+	&iscsi_node_auth_password.attr,
+	&iscsi_node_auth_authenticate_target.attr,
+	&iscsi_node_auth_userid_in.attr,
+	&iscsi_node_auth_password_in.attr,
+	NULL,
+};
+
+static struct configfs_item_operations lio_target_nacl_auth_ops = {
+	.show_attribute		= iscsi_node_auth_attr_show,
+	.store_attribute	= iscsi_node_auth_attr_store,
+};
+
+static struct config_item_type lio_target_nacl_auth_cit = {
+	.ct_item_ops	= &lio_target_nacl_auth_ops,
+	.ct_attrs	= lio_target_nacl_auth_attrs,
+	.ct_owner	= THIS_MODULE,
+};
+
+// End items for lio_target_nacl_auth_cit
+
 // Start items for lio_target_nacl_param_cit
 
 #define DEF_NACL_PARAM(name)						\
@@ -1453,6 +1560,7 @@ static struct config_group *lio_target_call_addnodetotpg (
 {
 	iscsi_node_acl_t *acl;
 	iscsi_node_attrib_t *nattr;
+	iscsi_node_auth_t *auth;
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
 	se_node_acl_t *se_nacl;
@@ -1491,11 +1599,12 @@ static struct config_group *lio_target_call_addnodetotpg (
 	se_nacl = acl->se_node_acl;
 	nacl_cg = &se_nacl->acl_group;
 	nattr = &acl->node_attrib;
+	auth = &acl->node_auth;
 
 	/*
 	 * Create the default groups for iscsi_node_acl_t
 	 */
-	if (!(nacl_cg->default_groups = kzalloc(sizeof(struct config_group) * 3,
+	if (!(nacl_cg->default_groups = kzalloc(sizeof(struct config_group) * 4,
 			GFP_KERNEL)))
 		goto node_out;
 
@@ -1505,9 +1614,12 @@ static struct config_group *lio_target_call_addnodetotpg (
 			&lio_target_nacl_param_cit);
 	config_group_init_type_name(&nattr->acl_attrib_group, "attrib",
 			&lio_target_nacl_attrib_cit);
+	config_group_init_type_name(&auth->auth_attrib_group, "auth",
+			&lio_target_nacl_auth_cit);
 	nacl_cg->default_groups[0] = &se_nacl->acl_param_group;
 	nacl_cg->default_groups[1] = &nattr->acl_attrib_group;
-	nacl_cg->default_groups[2] = NULL;
+	nacl_cg->default_groups[2] = &auth->auth_attrib_group;
+	nacl_cg->default_groups[3] = NULL;
 
 	printk("LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu Initiator: %s"
 		" CmdSN Depth: %u\n", config_item_name(tiqn_ci), tpg->tpgt,

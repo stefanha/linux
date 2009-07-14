@@ -418,8 +418,7 @@ static int iscsi_target_do_authentication (iscsi_conn_t *conn, iscsi_login_t *lo
 	switch (authret) {
 		case 0:
 			PYXPRINT("Received OK response"
-			" from iSBE Authentication"
-			" Daemon, continuing.\n");
+			" from LIO Authentication, continuing.\n");
 			break;
 		case 1:
 			PYXPRINT("iSCSI security negotiation"
@@ -438,8 +437,7 @@ static int iscsi_target_do_authentication (iscsi_conn_t *conn, iscsi_login_t *lo
 			return(-1);
 		default:
 			TRACE_ERROR ("Received unknown"
-			" error %d from iSBE Authentication"
-				" Daemon.\n", authret);
+			" error %d from LIO Authentication\n", authret);
 			iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,
 					STAT_DETAIL_TARG_ERROR);
 			return(-1);

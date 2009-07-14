@@ -1,13 +1,11 @@
 /*********************************************************************************
  * Filename:  iscsi_auth_kernel.h
  *
- * $HeadURL: svn://subversion.sbei.com/pyx/target/branches/2.9-linux-iscsi.org/pyx-target/include/iscsi_auth_kernel.h $
- *   $LastChangedRevision: 7131 $
- *   $LastChangedBy: nab $
- *   $LastChangedDate: 2007-08-25 17:03:55 -0700 (Sat, 25 Aug 2007) $
- *
  * Copyright (c) 2003-2005 PyX Technologies, Inc.
  * Copyright (c) 2005-2006 SBE, Inc.  All Rights Reserved.
+ * Copyright (c) 2007-2009 Linux-iSCSI.org
+ * 
+ * Nicholas A. Bellinger <nab@kernel.org>
  *
  *   This program is distributed in the hope that it will be useful,
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,8 +24,73 @@
 #include <iscsi_linux_defs.h>
 
 #include <iscsi_auth.h>
+#include <iscsi_auth_chap.h>
 
-extern iscsi_global_t *iscsi_global;
+extern void convert_null_to_semi(char *buf, int len)
+{
+        int i;
+
+        for (i = 0; i < len; i++)
+                if (buf[i] == '\0')
+                        buf[i] = ';';
+}
+
+extern int strlen_semi(char *buf)
+{
+        int i = 0;
+
+        while (buf[i] != '\0') {
+		if (buf[i] == ';')
+			return i;
+		i++;
+        }
+         
+        return -1;
+}
+
+extern int extract_param(
+	const char *in_buf,
+	const char *pattern,
+	unsigned int max_length,
+	char *out_buf,
+	unsigned char *type)
+{
+	char *ptr;
+	int len;
+
+	if (!in_buf || !pattern || !out_buf || !type)
+		return -1;
+
+	ptr = strstr(in_buf, pattern);
+	if (!ptr)
+		return -1;
+
+	ptr = strstr(ptr, "=");
+	if (!ptr)
+	return -1;
+
+	ptr += 1;
+	if (*ptr== '0' && (*(ptr+1) == 'x' || *(ptr+1) == 'X')) {
+		ptr += 2; /* skip 0x */
+		*type = HEX;
+	} else
+		*type = DECIMAL;
+
+	len = strlen_semi(ptr);
+	if (len < 0)
+		return -1;
+
+	if (len > max_length) {
+		printk(KERN_ERR "Length of input: %d exeeds max_length:"
+			" %d\n", len, max_length);
+		return -1;
+	}
+	memcpy(out_buf, ptr, len);
+	out_buf[len] = '\0';
+
+        return 0;
+}
+
 
 /*	iscsi_handle_authetication():
  *
@@ -42,137 +105,46 @@ extern u32 iscsi_handle_authentication (
 	unsigned char *authtype,
 	int role)
 {
-	u32			rc = 0, ret = 0;
-	auth_daemon_t		*iscsi_auth = NULL;
-	mm_segment_t		oldfs;
-	se_node_acl_t		*se_nacl;
-	struct iovec 		iov;
-	struct msghdr		msg;
-	struct sockaddr_in 	s_addr;
-	struct socket 		*authsock = NULL;
+	iscsi_node_acl_t *iscsi_nacl;
+	se_node_acl_t *se_nacl;
 
-	down(&iscsi_global->auth_sem);
-
-	if (!(iscsi_auth = (auth_daemon_t *) kzalloc(sizeof(auth_daemon_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate memory for iscsi_auth\n");
-		up(&iscsi_global->auth_sem);
-		return(2);
+	se_nacl = SESS(conn)->se_sess->se_node_acl;
+	if (!(se_nacl)) {
+		printk(KERN_ERR "Unable to locate se_node_acl_t for"
+				" CHAP auth\n");
+		return -1;
 	}
-
-	if (authtype) {
-		memcpy(iscsi_auth->type, authtype, sizeof(iscsi_auth->type)); 
-	} else {
-		iscsi_auth->kill_auth_id = 1;
-		memcpy(iscsi_auth->type, NONE, sizeof(iscsi_auth->type));
+	iscsi_nacl = (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
+	if (!(iscsi_nacl)) {
+		printk(KERN_ERR "Unable to locate iscsi_node_acl_t for"
+				" CHAP auth\n");
+		return -1;
 	}
-
-	if (in_buf && in_length) {
-		memcpy(iscsi_auth->in_text, in_buf, in_length);
-		iscsi_auth->in_len = in_length;
-	}
-	if (out_buf && out_length) {
-		memcpy(iscsi_auth->out_text, out_buf, *out_length);
-		iscsi_auth->out_len = *out_length;
-	}
-
-	iscsi_auth->role = role;
-	iscsi_auth->cid = conn->cid;
-	iscsi_auth->sid = SESS(conn)->sid;
-	iscsi_auth->auth_id = conn->auth_id;
-	iscsi_auth->tpgt = SESS(conn)->tpg->tpgt;
-
-	if (!(se_nacl = SESS(conn)->se_sess->se_node_acl)) {
-		ret = -1;
-		goto out;
-	}
-	strncpy(iscsi_auth->initiatorname, se_nacl->initiatorname,
-		strlen(se_nacl->initiatorname) + 1);
 #ifdef SNMP_SUPPORT
-	if (strstr("CHAP", iscsi_auth->type))
+	if (strstr("CHAP", authtype))
 		strcpy(SESS(conn)->auth_type, "CHAP");
 	else
 		strcpy(SESS(conn)->auth_type, NONE);
 #endif /* SNMP_SUPPORT */
 
-	s_addr.sin_family	= AF_INET;
-	s_addr.sin_addr.s_addr	= htonl(INADDR_LOOPBACK);
-	s_addr.sin_port		= htons(AUTH_PORT);
-
-	if (sock_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP, &authsock) < 0) {
-		TRACE_ERROR("sock_create() failed!\n");
-		ret = -1;
-		goto out;
-	}
-
-	memset(&iov, 0, sizeof(struct iovec));
-	memset(&msg, 0, sizeof(struct msghdr));
-	iov.iov_base	= iscsi_auth;
-	iov.iov_len	= sizeof(auth_daemon_t);
-	msg.msg_iov	= &iov;
-	msg.msg_iovlen	= 1;
-	msg.msg_name	= &s_addr;
-	msg.msg_namelen = sizeof(struct sockaddr_in);
-	
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	if (sock_sendmsg(authsock, &msg, sizeof(auth_daemon_t)) < 0) {
-		TRACE_ERROR("sock_sendmsg() returned %u\n", rc);
-		ret = -1;
-		set_fs(oldfs);
-		goto out;
-	}
-	set_fs(oldfs);
-
-	memset(&iov, 0, sizeof(struct iovec));
-	memset(&msg, 0, sizeof(struct msghdr));
-	iov.iov_base	= iscsi_auth;
-	iov.iov_len	= sizeof(auth_daemon_t);
-	msg.msg_iov	= &iov;
-	msg.msg_iovlen	= 1;
-	msg.msg_name	= &s_addr;
-	msg.msg_namelen = sizeof(struct sockaddr_in);	
-
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	if (sock_recvmsg(authsock, &msg, sizeof(auth_daemon_t), 0) < 0) {
-		TRACE(TRACE_DEBUG, "sock_recvmsg() returned %u\n", rc);
-		set_fs(oldfs);
-		ret = -1;
-		goto out;
-	}
-	set_fs(oldfs);
-
-	switch (iscsi_auth->type[0]) {
-	case '0':
-		goto copy;
-	case '1':
-		ret = 1;
-		goto copy;
-	case '2':
-		ret = 2;
-		goto out;
-	case '3':
-		ret = 3;
-		goto out;
-	default:
-		ret = -1;
-		goto out;
-	}
-
-copy:
-	if (!out_buf)
-		goto out;
-	memcpy(out_buf, iscsi_auth->out_text, iscsi_auth->out_len);
-	*out_length = iscsi_auth->out_len;
-out:
-	if (authsock)
-		sock_release(authsock);
-	if (iscsi_auth)
-		kfree(iscsi_auth);
-
-	up(&iscsi_global->auth_sem);
-
-	return(ret);
+	if (strstr("None", authtype))
+		return 1;
+#ifdef CANSRP
+	else if (strstr("SRP", authtype))
+		return srp_main_loop(conn, iscsi_nacl, role,
+				in_buf, out_buf, &in_length, out_length);
+#endif
+	else if (strstr("CHAP", authtype))
+		return chap_main_loop(conn, iscsi_nacl, in_buf, out_buf,
+					&in_length, out_length);
+	else if (strstr("SPKM1", authtype))
+		return 2;
+	else if (strstr("SPKM2", authtype))
+		return 2;
+	else if (strstr("KRB5", authtype))
+		return 2;
+	else
+		return 2;
 }
 
 /*	iscsi_remove_failed_auth_entry():
@@ -183,9 +155,7 @@ extern void iscsi_remove_failed_auth_entry (
 	iscsi_conn_t *conn,
 	int role)
 {
-	iscsi_handle_authentication(conn, NULL, NULL, 0, NULL, NULL, role);
-
-	return;
+	kfree(conn->auth_protocol);
 }
 
 #endif   /*** ISCSI_AUTH_KERNEL_H ***/
