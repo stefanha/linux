@@ -405,10 +405,10 @@ int chap_server_compute_md5(
 		goto out;
 	}
 	
-	sg_init_one(&sg, (void *)auth->password_in, strlen(auth->password_in));
-	ret = crypto_hash_update(&desc, &sg, strlen(auth->password_in));
+	sg_init_one(&sg, (void *)auth->password_mutual, strlen(auth->password_mutual));
+	ret = crypto_hash_update(&desc, &sg, strlen(auth->password_mutual));
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for password_in\n");		
+		printk(KERN_ERR "crypto_hash_update() failed for password_mutual\n");		
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -433,9 +433,9 @@ int chap_server_compute_md5(
 	/*
 	 * Generate CHAP_N and CHAP_R.
 	 */
-	*NR_out_len = sprintf(NR_out_ptr, "CHAP_N=%s", auth->userid_in);
+	*NR_out_len = sprintf(NR_out_ptr, "CHAP_N=%s", auth->userid_mutual);
 	*NR_out_len += 1;
-	PRINT("[server] Sending CHAP_N=%s\n", auth->userid_in);
+	PRINT("[server] Sending CHAP_N=%s\n", auth->userid_mutual);
 	/*
 	 * Convert response from binary hex to ascii hext.
 	 */

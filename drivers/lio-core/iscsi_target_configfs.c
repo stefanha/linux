@@ -860,13 +860,13 @@ AUTH_ATTR_RO(authenticate_target);
 /*
  * Mutual authentication userid
  */
-DEF_NACL_AUTH_STR(userid_in, NAF_USERID_IN_SET);
-AUTH_ATTR(userid_in, S_IRUGO | S_IWUSR);
+DEF_NACL_AUTH_STR(userid_mutual, NAF_USERID_IN_SET);
+AUTH_ATTR(userid_mutual, S_IRUGO | S_IWUSR);
 /*
  * Mutual authentication password
  */
-DEF_NACL_AUTH_STR(password_in, NAF_PASSWORD_IN_SET);
-AUTH_ATTR(password_in, S_IRUGO | S_IWUSR);
+DEF_NACL_AUTH_STR(password_mutual, NAF_PASSWORD_IN_SET);
+AUTH_ATTR(password_mutual, S_IRUGO | S_IWUSR);
 
 CONFIGFS_EATTR_OPS(iscsi_node_auth, iscsi_node_auth_s, auth_attrib_group);
 
@@ -874,8 +874,8 @@ static struct configfs_attribute *lio_target_nacl_auth_attrs[] = {
 	&iscsi_node_auth_userid.attr,
 	&iscsi_node_auth_password.attr,
 	&iscsi_node_auth_authenticate_target.attr,
-	&iscsi_node_auth_userid_in.attr,
-	&iscsi_node_auth_password_in.attr,
+	&iscsi_node_auth_userid_mutual.attr,
+	&iscsi_node_auth_password_mutual.attr,
 	NULL,
 };
 

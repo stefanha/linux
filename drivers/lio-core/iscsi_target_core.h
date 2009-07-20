@@ -715,8 +715,8 @@ typedef struct iscsi_node_auth_s {
 	int			authenticate_target;
 	char			userid[MAX_USER_LEN];
 	char			password[MAX_PASS_LEN];
-	char			userid_in[MAX_USER_LEN];
-	char			password_in[MAX_PASS_LEN];
+	char			userid_mutual[MAX_USER_LEN];
+	char			password_mutual[MAX_PASS_LEN];
 	struct config_group	auth_attrib_group;
 } ____cacheline_aligned iscsi_node_auth_t;
 
