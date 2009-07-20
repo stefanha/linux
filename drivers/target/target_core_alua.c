@@ -128,9 +128,9 @@ int core_scsi3_emulate_report_target_port_groups(se_cmd_t *cmd)
 	return 0;
 }
 
-t10_alua_lu_gp_t *core_alua_allocate_lu_gp(const char *name)
+t10_alua_lu_gp_t *core_alua_allocate_lu_gp(const char *name, int def_group)
 {
-	t10_alua_lu_gp_t *lu_gp, *lu_gp_tmp;
+	t10_alua_lu_gp_t *lu_gp;
 
 	lu_gp = kmem_cache_zalloc(t10_alua_lu_gp_cache, GFP_KERNEL);
 	if (!(lu_gp)) {
@@ -143,25 +143,51 @@ t10_alua_lu_gp_t *core_alua_allocate_lu_gp(const char *name)
 	atomic_set(&lu_gp->lu_gp_ref_cnt, 0);
 	lu_gp->lu_gp_alua_access_state = ALUA_ACCESS_STATE_ACTIVE_OPTMIZED;
 
+	if (def_group) {
+		lu_gp->lu_gp_id = se_global->alua_lu_gps_counter++;;
+		lu_gp->lu_gp_valid_id = 1;
+		se_global->alua_lu_gps_count++;
+	}
+
+	return lu_gp;
+}
+
+int core_alua_set_lu_gp_id(t10_alua_lu_gp_t *lu_gp, u16 lu_gp_id)
+{
+	t10_alua_lu_gp_t *lu_gp_tmp;
+	u16 lu_gp_id_tmp;
+
 	spin_lock(&se_global->lu_gps_lock);
 	if (se_global->alua_lu_gps_count == 0x0000ffff) {
+		printk(KERN_ERR "Maximum ALUA se_global->alua_lu_gps_count:"
+				" 0x0000ffff reached\n");
 		spin_unlock(&se_global->lu_gps_lock);
 		kmem_cache_free(t10_alua_lu_gp_cache, lu_gp);
-		return NULL;
+		return -1;
 	}
 again:
-	lu_gp->lu_gp_id = se_global->alua_lu_gps_counter++;
+	lu_gp_id_tmp = (lu_gp_id != 0) ? lu_gp_id :
+				se_global->alua_lu_gps_counter++;
 
 	list_for_each_entry(lu_gp_tmp, &se_global->g_lu_gps_list, lu_gp_list) {
-		if (lu_gp_tmp->lu_gp_id == lu_gp->lu_gp_id)
-			goto again;
+		if (lu_gp_tmp->lu_gp_id == lu_gp_id_tmp) {
+			if (!(lu_gp_id))
+				goto again;
+
+			printk(KERN_ERR "ALUA Logical Unit Group ID: %hu already"
+				" exists, ignoring request\n", lu_gp_id);
+			spin_unlock(&se_global->lu_gps_lock);
+			return -1;
+		}
 	}
 
+	lu_gp->lu_gp_id = lu_gp_id_tmp;
+	lu_gp->lu_gp_valid_id = 1;
 	list_add_tail(&lu_gp->lu_gp_list, &se_global->g_lu_gps_list);
 	se_global->alua_lu_gps_count++;
 	spin_unlock(&se_global->lu_gps_lock);
 
-	return lu_gp;
+	return 0;
 }
 
 t10_alua_lu_gp_member_t *core_alua_allocate_lu_gp_mem(
@@ -281,6 +307,8 @@ t10_alua_lu_gp_t *core_alua_get_lu_gp_by_name(const char *name)
 
 	spin_lock(&se_global->lu_gps_lock);
 	list_for_each_entry(lu_gp, &se_global->g_lu_gps_list, lu_gp_list) {
+		if (!(lu_gp->lu_gp_valid_id))
+			continue;
 		ci = &lu_gp->lu_gp_group.cg_item;
 		if (!(strcmp(config_item_name(ci), name))) {
 			atomic_inc(&lu_gp->lu_gp_ref_cnt);
@@ -330,9 +358,9 @@ void __core_alua_drop_lu_gp_mem(
 	spin_unlock(&lu_gp->lu_gp_lock);
 }
 
-t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(const char *name)
+t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(const char *name, int def_group)
 {
-	t10_alua_tg_pt_gp_t *tg_pt_gp, *tg_pt_gp_tmp;
+	t10_alua_tg_pt_gp_t *tg_pt_gp;
 
 	tg_pt_gp = kmem_cache_zalloc(t10_alua_tg_pt_gp_cache, GFP_KERNEL);
 	if (!(tg_pt_gp)) {
@@ -346,26 +374,52 @@ t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(const char *name)
 	tg_pt_gp->tg_pt_gp_alua_access_state =
 			ALUA_ACCESS_STATE_ACTIVE_OPTMIZED;
 
+	if (def_group) {
+		tg_pt_gp->tg_pt_gp_id = se_global->alua_tg_pt_gps_counter++;
+		tg_pt_gp->tg_pt_gp_valid_id = 1;
+		se_global->alua_tg_pt_gps_count++;
+	}
+
+	return tg_pt_gp;
+}
+
+int core_alua_set_tg_pt_gp_id(t10_alua_tg_pt_gp_t *tg_pt_gp, u16 tg_pt_gp_id)
+{
+	t10_alua_tg_pt_gp_t *tg_pt_gp_tmp;
+	u16 tg_pt_gp_id_tmp;
+
 	spin_lock(&se_global->tg_pt_gps_lock);
 	if (se_global->alua_tg_pt_gps_count == 0x0000ffff) {
+		printk(KERN_ERR "Maximum ALUA se_global->alua_tg_pt_gps_count:"
+			" 0x0000ffff reached\n");
 		spin_unlock(&se_global->tg_pt_gps_lock);
 		kmem_cache_free(t10_alua_tg_pt_gp_cache, tg_pt_gp);
-		return NULL;
+		return -1;
 	}
 again:
-	tg_pt_gp->tg_pt_gp_id = se_global->alua_tg_pt_gps_counter++;
+	tg_pt_gp_id_tmp = (tg_pt_gp_id != 0) ? tg_pt_gp_id :
+			se_global->alua_tg_pt_gps_counter++;
 
 	list_for_each_entry(tg_pt_gp_tmp, &se_global->g_tg_pt_gps_list,
 			tg_pt_gp_list) {
-		if (tg_pt_gp_tmp->tg_pt_gp_id == tg_pt_gp->tg_pt_gp_id)
-			goto again;
+		if (tg_pt_gp_tmp->tg_pt_gp_id == tg_pt_gp_id_tmp) {
+			if (!(tg_pt_gp_id))
+				goto again;
+
+			printk(KERN_ERR "ALUA Target Port Group ID: %hu already"
+				" exists, ignoring request\n", tg_pt_gp_id);
+			spin_unlock(&se_global->tg_pt_gps_lock);
+			return -1;
+		}
 	}
 
+	tg_pt_gp->tg_pt_gp_id = tg_pt_gp_id_tmp;
+	tg_pt_gp->tg_pt_gp_valid_id = 1;
 	list_add_tail(&tg_pt_gp->tg_pt_gp_list, &se_global->g_tg_pt_gps_list);
 	se_global->alua_tg_pt_gps_count++;
 	spin_unlock(&se_global->tg_pt_gps_lock);
 
-	return tg_pt_gp;
+	return 0;
 }
 
 t10_alua_tg_pt_gp_member_t *core_alua_allocate_tg_pt_gp_mem(
@@ -487,6 +541,8 @@ t10_alua_tg_pt_gp_t *core_alua_get_tg_pt_gp_by_name(const char *name)
 	spin_lock(&se_global->tg_pt_gps_lock);
 	list_for_each_entry(tg_pt_gp, &se_global->g_tg_pt_gps_list,
 			tg_pt_gp_list) {
+		if (!(tg_pt_gp->tg_pt_gp_valid_id))
+			continue;
 		ci = &tg_pt_gp->tg_pt_gp_group.cg_item;
 		if (!(strcmp(config_item_name(ci), name))) {
 			atomic_inc(&tg_pt_gp->tg_pt_gp_ref_cnt);

@@ -40,7 +40,8 @@ extern struct kmem_cache *t10_alua_tg_pt_gp_cache;
 extern struct kmem_cache *t10_alua_tg_pt_gp_mem_cache;
 
 extern int core_scsi3_emulate_report_target_port_groups(struct se_cmd_s *);
-extern struct t10_alua_lu_gp_s *core_alua_allocate_lu_gp(const char *);
+extern struct t10_alua_lu_gp_s *core_alua_allocate_lu_gp(const char *, int);
+extern int core_alua_set_lu_gp_id(struct t10_alua_lu_gp_s *, u16);
 extern struct t10_alua_lu_gp_member_s *core_alua_allocate_lu_gp_mem(
 					struct se_device_s *);
 extern void core_alua_free_lu_gp(struct t10_alua_lu_gp_s *);
@@ -52,7 +53,8 @@ extern void __core_alua_attach_lu_gp_mem(struct t10_alua_lu_gp_member_s *,
 extern void __core_alua_drop_lu_gp_mem(struct t10_alua_lu_gp_member_s *,
 					struct t10_alua_lu_gp_s *);
 extern void core_alua_drop_lu_gp_dev(struct se_device_s *);
-extern struct t10_alua_tg_pt_gp_s *core_alua_allocate_tg_pt_gp(const char *);
+extern struct t10_alua_tg_pt_gp_s *core_alua_allocate_tg_pt_gp(const char *, int);
+extern int core_alua_set_tg_pt_gp_id(struct t10_alua_tg_pt_gp_s *, u16);
 extern struct t10_alua_tg_pt_gp_member_s *core_alua_allocate_tg_pt_gp_mem(
 					struct se_port_s *);
 extern void core_alua_free_tg_pt_gp(struct t10_alua_tg_pt_gp_s *);

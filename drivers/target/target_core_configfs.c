@@ -1556,6 +1556,13 @@ static struct config_item_type target_core_dev_cit = {
 /* Start functions for struct config_item_type target_core_alua_lu_gp_cit */
 
 CONFIGFS_EATTR_STRUCT(target_core_alua_lu_gp, t10_alua_lu_gp_s);
+#define SE_DEV_ALUA_LU_ATTR(_name, _mode)				\
+static struct target_core_alua_lu_gp_attribute				\
+			target_core_alua_lu_gp_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	target_core_alua_lu_gp_show_attr_##_name,			\
+	target_core_alua_lu_gp_store_attr_##_name);			
+
 #define SE_DEV_ALUA_LU_ATTR_RO(_name)					\
 static struct target_core_alua_lu_gp_attribute				\
 			target_core_alua_lu_gp_##_name =		\
@@ -1581,10 +1588,46 @@ static ssize_t target_core_alua_lu_gp_show_attr_lu_gp_id(
 	struct t10_alua_lu_gp_s *lu_gp,
 	char *page)
 {
+	if (!(lu_gp->lu_gp_valid_id))
+		return 0;
+
 	return sprintf(page, "%hu\n", lu_gp->lu_gp_id);
 }
 
-SE_DEV_ALUA_LU_ATTR_RO(lu_gp_id);
+static ssize_t target_core_alua_lu_gp_store_attr_lu_gp_id(
+	struct t10_alua_lu_gp_s *lu_gp,
+	const char *page,
+	size_t count)
+{
+	struct config_group *alua_lu_gp_cg = &lu_gp->lu_gp_group;
+	unsigned long lu_gp_id;
+	int ret;
+
+	ret = strict_strtoul(page, 0, &lu_gp_id);
+	if (ret < 0) {
+		printk(KERN_ERR "strict_strtoul() returned %d for"
+			" lu_gp_id\n", ret);
+		return -EINVAL;
+	}
+	if (lu_gp_id > 0x0000ffff) {
+		printk(KERN_ERR "ALUA lu_gp_id: %lu exceeds maximum:"
+			" 0x0000ffff\n", lu_gp_id);
+		return -EINVAL;
+	}
+
+	ret = core_alua_set_lu_gp_id(lu_gp, (u16)lu_gp_id);
+	if (ret < 0)
+		return -EINVAL;
+
+	printk(KERN_INFO "Target_Core_ConfigFS: Set ALUA Logical Unit"
+		" Group: core/alua/lu_gps/%s to ID: %hu\n",
+		config_item_name(&alua_lu_gp_cg->cg_item),
+		lu_gp->lu_gp_id);
+
+	return count;
+}
+
+SE_DEV_ALUA_LU_ATTR(lu_gp_id, S_IRUGO | S_IWUSR);
 
 /*
  * members
@@ -1609,8 +1652,8 @@ static ssize_t target_core_alua_lu_gp_show_attr_members(
 		hba = su_dev->se_dev_hba;
 
 		cur_len = snprintf(buf, LU_GROUP_NAME_BUF, "%s/%s\n",
-			config_item_name(&su_dev->se_dev_group.cg_item),
-			config_item_name(&hba->hba_group.cg_item));
+			config_item_name(&hba->hba_group.cg_item),
+			config_item_name(&su_dev->se_dev_group.cg_item));
 		cur_len++; /* Extra byte for NULL terminator */
 
 		if ((cur_len + len) > PAGE_SIZE) {
@@ -1628,7 +1671,7 @@ static ssize_t target_core_alua_lu_gp_show_attr_members(
 
 SE_DEV_ALUA_LU_ATTR_RO(members);
 
-CONFIGFS_EATTR_OPS_RO(target_core_alua_lu_gp, t10_alua_lu_gp_s, lu_gp_group);
+CONFIGFS_EATTR_OPS(target_core_alua_lu_gp, t10_alua_lu_gp_s, lu_gp_group);
 
 static struct configfs_attribute *target_core_alua_lu_gp_attrs[] = {
 	&target_core_alua_lu_gp_alua_access_state.attr,
@@ -1639,7 +1682,7 @@ static struct configfs_attribute *target_core_alua_lu_gp_attrs[] = {
 
 static struct configfs_item_operations target_core_alua_lu_gp_ops = {
 	.show_attribute		= target_core_alua_lu_gp_attr_show,
-	.store_attribute	= NULL,
+	.store_attribute	= target_core_alua_lu_gp_attr_store,
 };
 
 static struct config_item_type target_core_alua_lu_gp_cit = {
@@ -1660,7 +1703,7 @@ static struct config_group *target_core_alua_create_lu_gp(
 	struct config_group *alua_lu_gp_cg = NULL;
 	struct config_item *alua_lu_gp_ci = NULL;
 
-	lu_gp = core_alua_allocate_lu_gp(name);
+	lu_gp = core_alua_allocate_lu_gp(name, 0);
 	if (!(lu_gp))
 		return NULL;
 
@@ -1671,8 +1714,8 @@ static struct config_group *target_core_alua_create_lu_gp(
 			&target_core_alua_lu_gp_cit);
 
 	printk(KERN_INFO "Target_Core_ConfigFS: Allocated ALUA Logical Unit"
-		" Group: core/alua/lu_gps/%s, ID: %hu\n",
-		config_item_name(alua_lu_gp_ci), lu_gp->lu_gp_id);
+		" Group: core/alua/lu_gps/%s\n",
+		config_item_name(alua_lu_gp_ci));
 
 	return alua_lu_gp_cg;
 
@@ -1708,6 +1751,13 @@ static struct config_item_type target_core_alua_lu_gps_cit = {
 /* Start functions for struct config_item_type target_core_alua_tg_pt_gp_cit */
 
 CONFIGFS_EATTR_STRUCT(target_core_alua_tg_pt_gp, t10_alua_tg_pt_gp_s);
+#define SE_DEV_ALUA_TG_PT_ATTR(_name, _mode)				\
+static struct target_core_alua_tg_pt_gp_attribute			\
+			target_core_alua_tg_pt_gp_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	target_core_alua_tg_pt_gp_show_attr_##_name,			\
+	target_core_alua_tg_pt_gp_store_attr_##_name);
+
 #define SE_DEV_ALUA_TG_PT_ATTR_RO(_name)				\
 static struct target_core_alua_tg_pt_gp_attribute			\
 			target_core_alua_tg_pt_gp_##_name =		\
@@ -1733,10 +1783,46 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_tg_pt_gp_id(
 	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
 	char *page)
 {
+	if (!(tg_pt_gp->tg_pt_gp_valid_id))
+		return 0;
+
 	return sprintf(page, "%hu\n", tg_pt_gp->tg_pt_gp_id);
 }
 
-SE_DEV_ALUA_TG_PT_ATTR_RO(tg_pt_gp_id);
+static ssize_t target_core_alua_tg_pt_gp_store_attr_tg_pt_gp_id(
+	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
+	const char *page,
+	size_t count)
+{
+	struct config_group *alua_tg_pt_gp_cg = &tg_pt_gp->tg_pt_gp_group;
+	unsigned long tg_pt_gp_id;	
+	int ret;
+
+	ret = strict_strtoul(page, 0, &tg_pt_gp_id);
+	if (ret < 0) {
+		printk(KERN_ERR "strict_strtoul() returned %d for"
+			" tg_pt_gp_id\n", ret);
+		return -EINVAL;
+	}
+	if (tg_pt_gp_id > 0x0000ffff) {
+		printk(KERN_ERR "ALUA tg_pt_gp_id: %lu exceeds maximum:"
+			" 0x0000ffff\n", tg_pt_gp_id);
+		return -EINVAL;
+	}
+
+	ret = core_alua_set_tg_pt_gp_id(tg_pt_gp, (u16)tg_pt_gp_id);
+	if (ret < 0)
+		return -EINVAL;
+
+	printk(KERN_INFO "Target_Core_ConfigFS: Set ALUA Target Port Group: "
+		"core/alua/tg_pt_gps/%s to ID: %hu\n",
+		config_item_name(&alua_tg_pt_gp_cg->cg_item),
+		tg_pt_gp->tg_pt_gp_id);
+
+	return count;
+}
+
+SE_DEV_ALUA_TG_PT_ATTR(tg_pt_gp_id, S_IRUGO | S_IWUSR);
 
 /*
  * members
@@ -1761,8 +1847,9 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_members(
 		tpg = port->sep_tpg;
 		lun = port->sep_lun;
 
-		cur_len = snprintf(buf, TG_PT_GROUP_NAME_BUF, "%s/tpgt_%hu"
-			"/%s\n", TPG_TFO(tpg)->tpg_get_wwn(tpg),
+		cur_len = snprintf(buf, TG_PT_GROUP_NAME_BUF, "%s/%s/tpgt_%hu"
+			"/%s\n", TPG_TFO(tpg)->get_fabric_name(),
+			TPG_TFO(tpg)->tpg_get_wwn(tpg),
 			TPG_TFO(tpg)->tpg_get_tag(tpg),
 			config_item_name(&lun->lun_group.cg_item));
 		cur_len++; /* Extra byte for NULL terminator */
@@ -1782,7 +1869,7 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_members(
 
 SE_DEV_ALUA_TG_PT_ATTR_RO(members);
 
-CONFIGFS_EATTR_OPS_RO(target_core_alua_tg_pt_gp, t10_alua_tg_pt_gp_s,
+CONFIGFS_EATTR_OPS(target_core_alua_tg_pt_gp, t10_alua_tg_pt_gp_s,
 			tg_pt_gp_group);
 
 static struct configfs_attribute *target_core_alua_tg_pt_gp_attrs[] = {
@@ -1794,7 +1881,7 @@ static struct configfs_attribute *target_core_alua_tg_pt_gp_attrs[] = {
 
 static struct configfs_item_operations target_core_alua_tg_pt_gp_ops = {
 	.show_attribute		= target_core_alua_tg_pt_gp_attr_show,
-	.store_attribute	= NULL,
+	.store_attribute	= target_core_alua_tg_pt_gp_attr_store,
 };
 
 static struct config_item_type target_core_alua_tg_pt_gp_cit = {
@@ -1815,7 +1902,7 @@ static struct config_group *target_core_alua_create_tg_pt_gp(
 	struct config_group *alua_tg_pt_gp_cg = NULL;
 	struct config_item *alua_tg_pt_gp_ci = NULL;
 
-	tg_pt_gp = core_alua_allocate_tg_pt_gp(name);
+	tg_pt_gp = core_alua_allocate_tg_pt_gp(name, 0);
 	if (!(tg_pt_gp))
 		return NULL;
 
@@ -1826,8 +1913,8 @@ static struct config_group *target_core_alua_create_tg_pt_gp(
 			&target_core_alua_tg_pt_gp_cit);
 
 	printk(KERN_INFO "Target_Core_ConfigFS: Allocated ALUA Target Port"
-		" Group: core/alua/tg_pt_gps/%s, ID: %hu\n",
-		config_item_name(alua_tg_pt_gp_ci), tg_pt_gp->tg_pt_gp_id);
+		" Group: core/alua/tg_pt_gps/%s\n",
+		config_item_name(alua_tg_pt_gp_ci));
 
 	return alua_tg_pt_gp_cg;
 }
@@ -2258,7 +2345,7 @@ int target_core_init_configfs(void)
 	/*
 	 * Add core/alua/lu_gps/default_lu_gp
 	 */
-	lu_gp = core_alua_allocate_lu_gp("default_lu_gp");
+	lu_gp = core_alua_allocate_lu_gp("default_lu_gp", 1);
 	if (!(lu_gp))
 		goto out_global;
 
@@ -2278,7 +2365,7 @@ int target_core_init_configfs(void)
 	/*
 	 * Add core/alua/tg_pt_gps/default_tg_pt_gp
 	 */
-	tg_pt_gp = core_alua_allocate_tg_pt_gp("default_tg_pt_gp");
+	tg_pt_gp = core_alua_allocate_tg_pt_gp("default_tg_pt_gp", 1);
 	if (!(tg_pt_gp))
 		goto out_global;
 

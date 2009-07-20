@@ -215,6 +215,7 @@ typedef struct t10_alua_s {
 
 typedef struct t10_alua_lu_gp_s {
 	u16	lu_gp_id;
+	int	lu_gp_valid_id;
 	int	lu_gp_alua_access_state;
 	u32	lu_gp_members;
 	atomic_t lu_gp_shutdown;
@@ -235,6 +236,7 @@ typedef struct t10_alua_lu_gp_member_s {
 
 typedef struct t10_alua_tg_pt_gp_s {
 	u16	tg_pt_gp_id;
+	int	tg_pt_gp_valid_id;
 	int	tg_pt_gp_alua_access_state;
 	u32	tg_pt_gp_members;
 	atomic_t tg_pt_gp_ref_cnt;
