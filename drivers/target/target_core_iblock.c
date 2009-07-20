@@ -602,6 +602,7 @@ ssize_t iblock_set_configfs_dev_params(se_hba_t *hba,
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) se_dev->se_dev_su_ptr;
 	char *buf, *cur, *ptr, *ptr2;
+	unsigned long major, minor, force;
 	int params = 0, ret = 0;
 
 	buf = kzalloc(count, GFP_KERNEL);
@@ -636,10 +637,13 @@ ssize_t iblock_set_configfs_dev_params(se_hba_t *hba,
 		ptr2 = strstr(cur, "major");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0,
-				(unsigned long *)&ib_dev->ibd_major);
-			if (ret < 0)
+			ret = strict_strtoul(ptr, 0, &major);
+			if (ret < 0) {
+				printk(KERN_ERR "strict_strtoul() failed"
+					" for major=\n");
 				break;
+			}
+			ib_dev->ibd_major = (int)major;
 			printk(KERN_INFO "IBLOCK: Referencing Major: %d\n",
 					ib_dev->ibd_major);
 			ib_dev->ibd_flags |= IBDF_HAS_MAJOR;
@@ -649,14 +653,13 @@ ssize_t iblock_set_configfs_dev_params(se_hba_t *hba,
 		ptr2 = strstr(cur, "minor");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-
-			ret = strict_strtoul(ptr, 0,
-				(unsigned long *)&ib_dev->ibd_minor);
+			ret = strict_strtoul(ptr, 0, &minor);
 			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoul() failed"
 					" for minor=\n");
 				break;
 			}
+			ib_dev->ibd_minor = (int)minor;
 			printk(KERN_INFO "IBLOCK: Referencing Minor: %d\n",
 					ib_dev->ibd_minor);
 			ib_dev->ibd_flags |= IBDF_HAS_MINOR;
@@ -666,10 +669,13 @@ ssize_t iblock_set_configfs_dev_params(se_hba_t *hba,
 		ptr2 = strstr(cur, "force");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0,
-				(unsigned long *)&ib_dev->ibd_force);
-			if (ret < 0)
+			ret = strict_strtoul(ptr, 0, &force);
+			if (ret < 0) {
+				printk(KERN_ERR "strict_strtoul() failed"
+					" for force=\n");
 				break;
+			}
+			ib_dev->ibd_force = (int)force;
 			printk(KERN_INFO "IBLOCK: Set force=%d\n",
 				ib_dev->ibd_force);
 			params++;

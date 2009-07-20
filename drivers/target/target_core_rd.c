@@ -1112,6 +1112,7 @@ ssize_t rd_set_configfs_dev_params(
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
 	char *buf, *cur, *ptr, *ptr2;
+	unsigned long rd_pages;
 	int params = 0, ret;
 
 	buf = kzalloc(count, GFP_KERNEL);
@@ -1133,13 +1134,13 @@ ssize_t rd_set_configfs_dev_params(
 		ptr2 = strstr(cur, "rd_pages");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0,
-				(unsigned long *)&rd_dev->rd_page_count);
+			ret = strict_strtoul(ptr, 0, &rd_pages);
 			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoul() failed for"
 					" rd_pages=\n");
 				break;
 			}
+			rd_dev->rd_page_count = (u32)rd_pages;
 			printk(KERN_INFO "RAMDISK: Referencing Page"
 				" Count: %u\n", rd_dev->rd_page_count);
 			rd_dev->rd_flags |= RDF_HAS_PAGE_COUNT;

@@ -464,6 +464,7 @@ ssize_t stgt_set_configfs_dev_params(se_hba_t *hba,
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) se_dev->se_dev_su_ptr;
 	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
 	char *buf, *cur, *ptr, *ptr2;
+	unsigned long scsi_channel_id, scsi_target_id, scsi_lun_id;
 	int params = 0, ret;
 
 	buf = kzalloc(count, GFP_KERNEL);
@@ -486,13 +487,13 @@ ssize_t stgt_set_configfs_dev_params(se_hba_t *hba,
 		ptr2 = strstr(cur, "scsi_channel_id");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0,
-				(unsigned long *)&sdv->sdv_channel_id);
+			ret = strict_strtoul(ptr, 0, &scsi_channel_id);
 			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoul() failed for"
 					" scsi_channel_id=\n");
 				break;
 			}
+			sdv->sdv_channel_id = (int)scsi_channel_id;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI Channel"
 				" ID: %d\n",  sh->host_no, sdv->sdv_channel_id);
 			sdv->sdv_flags |= PDF_HAS_CHANNEL_ID;
@@ -502,13 +503,13 @@ ssize_t stgt_set_configfs_dev_params(se_hba_t *hba,
 		ptr2 = strstr(cur, "scsi_target_id");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0,
-				(unsigned long *)&sdv->sdv_target_id);
+			ret = strict_strtoul(ptr, 0, &scsi_target_id);
 			if (ret < 0) {
 				printk("strict_strtoul() failed for"
 					" strict_strtoul()\n");
 				break;
 			}
+			sdv->sdv_target_id = (int)scsi_target_id;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI Target"
 				" ID: %d\n", sh->host_no, sdv->sdv_target_id);
 			sdv->sdv_flags |= PDF_HAS_TARGET_ID;
@@ -518,13 +519,13 @@ ssize_t stgt_set_configfs_dev_params(se_hba_t *hba,
 		ptr2 = strstr(cur, "scsi_lun_id");
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0,
-				(unsigned long *)&sdv->sdv_lun_id);
+			ret = strict_strtoul(ptr, 0, &scsi_lun_id);
 			if (ret < 0) {
 				printk("strict_strtoul() failed for"
 					" scsi_lun_id=\n");
 				break;
 			}
+			sdv->sdv_lun_id = (int)scsi_lun_id;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI LUN ID:"
 				" %d\n", sh->host_no, sdv->sdv_lun_id);
 			sdv->sdv_flags |= PDF_HAS_LUN_ID;
