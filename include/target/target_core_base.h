@@ -297,7 +297,7 @@ typedef struct t10_pr_registration_s {
 	struct se_lun_s *pr_reg_tg_pt_lun;
 	struct list_head pr_reg_list;
 	struct list_head pr_reg_abort_list;
-} t10_pr_registration_t;
+} ____cacheline_aligned t10_pr_registration_t;
 
 typedef struct t10_reservation_template_s {
 	/* Reservation effects all target ports */
