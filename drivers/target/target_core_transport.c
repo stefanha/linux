@@ -2975,9 +2975,9 @@ void transport_generic_request_failure(
 		cmd->se_obj_ptr);
 	DEBUG_GRF("-----[ se_orig_obj_api: %p se_orig_obj_ptr: %p\n",
 		cmd->se_orig_obj_api, cmd->se_orig_obj_ptr);
-	DEBUG_GRF("-----[ i_state/def_i_state: %d/%d t_state/def_t_state:"
+	DEBUG_GRF("-----[ i_state: %d t_state/def_t_state:"
 		" %d/%d transport_error_status: %d\n",
-		CMD_TFO(cmd)->get_cmd_state(cmd), cmd->deferred_i_state,
+		CMD_TFO(cmd)->get_cmd_state(cmd),
 		cmd->t_state, cmd->deferred_t_state,
 		cmd->transport_error_status);
 	DEBUG_GRF("-----[ t_task_cdbs: %d t_task_cdbs_left: %d"
