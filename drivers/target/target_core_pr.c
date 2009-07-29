@@ -1822,6 +1822,12 @@ static int core_scsi3_pri_read_keys(se_cmd_t *cmd)
 	unsigned char *buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
 	u32 add_len = 0, off = 8;
 
+	if (cmd->data_length < 8) {
+		printk(KERN_ERR "PRIN SA READ_KEYS SCSI Data Length: %u"
+			" too small\n", cmd->data_length);
+		return PYX_TRANSPORT_INVALID_CDB_FIELD;
+	}
+
 	buf[0] = ((T10_RES(su_dev)->pr_generation >> 24) & 0xff);
 	buf[1] = ((T10_RES(su_dev)->pr_generation >> 16) & 0xff);
 	buf[2] = ((T10_RES(su_dev)->pr_generation >> 8) & 0xff);
@@ -1872,6 +1878,12 @@ static int core_scsi3_pri_read_reservation(se_cmd_t *cmd)
 	u64 pr_res_key;
 	u32 add_len = 16; /* Hardcoded to 16 when a reservation is held. */
 
+	if (cmd->data_length < 8) {
+		printk(KERN_ERR "PRIN SA READ_RESERVATIONS SCSI Data Length: %u"
+			" too small\n", cmd->data_length);
+		return PYX_TRANSPORT_INVALID_CDB_FIELD;
+	}
+
 	buf[0] = ((T10_RES(su_dev)->pr_generation >> 24) & 0xff);
 	buf[1] = ((T10_RES(su_dev)->pr_generation >> 16) & 0xff);
 	buf[2] = ((T10_RES(su_dev)->pr_generation >> 8) & 0xff);
@@ -1887,6 +1899,11 @@ static int core_scsi3_pri_read_reservation(se_cmd_t *cmd)
 		buf[5] = ((add_len >> 16) & 0xff);
 		buf[6] = ((add_len >> 8) & 0xff);
 		buf[7] = (add_len & 0xff);
+		
+		if (cmd->data_length < 22) {
+			spin_unlock(&se_dev->dev_reservation_lock);
+			return 0;
+		}
 		/*
 		 * Set the Reservation key.
 		 *
@@ -1937,6 +1954,12 @@ static int core_scsi3_pri_report_capabilities(se_cmd_t *cmd)
 {
 	unsigned char *buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
 	u16 add_len = 8; /* Hardcoded to 8. */
+
+	if (cmd->data_length < 6) {
+		printk(KERN_ERR "PRIN SA REPORT_CAPABILITIES SCSI Data Length:"
+			" %u too small\n", cmd->data_length);
+		return PYX_TRANSPORT_INVALID_CDB_FIELD;
+	}
 
 	buf[0] = ((add_len << 8) & 0xff);
 	buf[1] = (add_len & 0xff);
@@ -1996,6 +2019,12 @@ static int core_scsi3_pri_read_full_status(se_cmd_t *cmd)
 	u32 add_desc_len = 0, add_len = 0, desc_len, exp_desc_len;
 	u32 off = 8; /* off into first Full Status descriptor */
 	int format_code = 0;
+
+	if (cmd->data_length < 8) {
+		printk(KERN_ERR "PRIN SA READ_FULL_STATUS SCSI Data Length: %u"
+			" too small\n", cmd->data_length);
+		return PYX_TRANSPORT_INVALID_CDB_FIELD;
+	}
 
 	buf[0] = ((T10_RES(su_dev)->pr_generation >> 24) & 0xff);
 	buf[1] = ((T10_RES(su_dev)->pr_generation >> 16) & 0xff);
