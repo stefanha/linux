@@ -126,6 +126,7 @@ int core_scsi3_ua_allocate(
 		 */
 		if ((ua_p->ua_asc == asc) && (ua_p->ua_ascq == ascq)) {
 			spin_unlock(&deve->ua_lock);
+			spin_unlock(&nacl->device_list_lock);
 			kmem_cache_free(se_ua_cache, ua);
 			return 0;
 		}
@@ -170,6 +171,7 @@ int core_scsi3_ua_allocate(
 			list_add_tail(&ua->ua_nacl_list,
 				&deve->ua_list);
 		spin_unlock(&deve->ua_lock);
+		spin_unlock(&nacl->device_list_lock);
 
 		atomic_inc(&deve->ua_count);
 		smp_mb__after_atomic_inc();
