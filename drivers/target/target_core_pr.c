@@ -178,7 +178,6 @@ static int core_scsi3_pr_seq_non_holder(
 {
 	se_dev_entry_t *se_deve;
 	se_session_t *se_sess = SE_SESS(cmd);
-	se_lun_t *se_lun = SE_LUN(cmd);
 	int other_cdb = 0;
 	int registered_nexus = 0, ret = 1; /* Conflict by default */
 	int all_reg = 0, reg_only = 0; /* ALL_REG, REG_ONLY */
@@ -186,7 +185,7 @@ static int core_scsi3_pr_seq_non_holder(
 	int legacy = 0; /* Act like a legacy device and return
 			 * RESERVATION CONFLICT on some CDBs */
 
-	se_deve = &se_sess->se_node_acl->device_list[se_lun->unpacked_lun];
+	se_deve = &se_sess->se_node_acl->device_list[cmd->orig_fe_lun];
 
 	switch (pr_reg_type) {
 	case PR_TYPE_WRITE_EXCLUSIVE:
@@ -719,7 +718,7 @@ static int core_scsi3_emulate_pro_register(
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 	se_tpg = se_sess->se_tpg;
-	se_deve = &se_sess->se_node_acl->device_list[se_lun->unpacked_lun];
+	se_deve = &se_sess->se_node_acl->device_list[cmd->orig_fe_lun];
 
 	if (aptpl) {
 		printk(KERN_INFO "Activate Persistence across Target Power"
@@ -900,7 +899,7 @@ static int core_scsi3_pro_reserve(
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 	}
 	se_tpg = se_sess->se_tpg;
-	se_deve = &se_sess->se_node_acl->device_list[se_lun->unpacked_lun];
+	se_deve = &se_sess->se_node_acl->device_list[cmd->orig_fe_lun];
 	/*
 	 * Locate the existing *pr_reg via se_node_acl_t pointers
 	 */
@@ -1423,7 +1422,6 @@ static int core_scsi3_emulate_pro_preempt(
 {
 	se_device_t *dev = SE_DEV(cmd);
 	se_dev_entry_t *se_deve;
-	se_lun_t *se_lun = SE_LUN(cmd);
 	se_node_acl_t *pr_reg_nacl;
 	se_session_t *se_sess = SE_SESS(cmd);
 	struct list_head preempt_and_abort_list;
@@ -1436,7 +1434,7 @@ static int core_scsi3_emulate_pro_preempt(
 	if (!(se_sess))
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
-	se_deve = &se_sess->se_node_acl->device_list[se_lun->unpacked_lun];
+	se_deve = &se_sess->se_node_acl->device_list[cmd->orig_fe_lun];
 	if (!(se_deve->deve_flags & DEF_PR_REGISTERED))
 		return PYX_TRANSPORT_RESERVATION_CONFLICT;
 
