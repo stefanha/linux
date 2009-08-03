@@ -66,6 +66,12 @@
 /* Used for se_subsystem_dev_t->se_dev_udev_path[], must be less than
    PAGE_SIZE */
 #define SE_UDEV_PATH_LEN			512
+/* Used for se_dev_snap_attrib_t->contact */
+#define SNAP_CONTACT_LEN			128
+/* Used for se_dev_snap_attrib_t->lv_group */
+#define SNAP_GROUP_LEN				128
+/* Used for se_dev_snap_attrib->lvc_size */
+#define SNAP_LVC_LEN				32
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -638,12 +644,29 @@ typedef struct se_dev_attrib_s {
 	struct config_group da_group;
 } ____cacheline_aligned se_dev_attrib_t;
 
+typedef struct se_dev_snap_attrib_s {
+	unsigned char	contact[SNAP_CONTACT_LEN];
+	unsigned char	lv_group[SNAP_GROUP_LEN];
+	unsigned char	lvc_size[SNAP_LVC_LEN]; /* in lvcreate --size shorthand */
+	pid_t		pid;
+	int		enabled;	
+	int		permissions;
+	int		max_snapshots;
+	int		max_warn;
+	int		check_interval;
+	int		create_interval;
+	int		usage;
+	int		usage_warn;
+	int		vgs_usage_warn;
+} se_dev_snap_attrib_t;
+
 typedef struct se_subsystem_dev_s {
 	unsigned char	se_dev_udev_path[SE_UDEV_PATH_LEN];
 	u32		su_dev_flags;
 	struct se_hba_s *se_dev_hba;
 	struct se_device_s *se_dev_ptr;
 	se_dev_attrib_t se_dev_attrib;
+	se_dev_snap_attrib_t se_snap_attrib;
 	/* T10 Asymmetric Logical Unit Assignment Information */
 	t10_alua_t	t10_alua;
 	/* T10 Inquiry and VPD WWN Information */
@@ -656,8 +679,11 @@ typedef struct se_subsystem_dev_s {
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
+	/* For userspace lvm utils */
+	struct config_group se_dev_snap_group;
 } ____cacheline_aligned se_subsystem_dev_t;
 
+#define SE_DEV_SNAP(su_dev)	(&(su_dev)->se_snap_attrib)
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 
