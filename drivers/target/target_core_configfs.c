@@ -811,8 +811,8 @@ CONFIGFS_EATTR_STRUCT(target_core_dev_pr, se_subsystem_dev_s);
 #define SE_DEV_PR_ATTR(_name, _mode)					\
 static struct target_core_dev_pr_attribute target_core_dev_pr_##_name = \
 	__CONFIGFS_EATTR(_name, _mode,					\
-	target_core_dev_wwn_show_attr_##_name,				\
-	target_core_dev_wwn_store_attr_##_name);
+	target_core_dev_pr_show_attr_##_name,				\
+	target_core_dev_pr_store_attr_##_name);
 
 #define SE_DEV_PR_ATTR_RO(_name);					\
 static struct target_core_dev_pr_attribute target_core_dev_pr_##_name =	\
