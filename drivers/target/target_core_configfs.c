@@ -171,7 +171,10 @@ static struct config_group *target_core_register_fabric(
 	config_group_init_type_name(&tf->tf_group, name, tf->tf_fabric_cit);
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> Allocated Fabric:"
 			" %s\n", tf->tf_group.cg_item.ci_name);
-
+	/*
+	 * Setup tf_ops.tf_subsys pointer for usage with configfs_depend_item()
+	 */
+	tf->tf_ops.tf_subsys = tf->tf_subsys;
 	tf->tf_fabric = &tf->tf_group.cg_item;
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> Set tf->tf_fabric"
 			" for %s\n", name);

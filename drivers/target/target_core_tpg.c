@@ -80,7 +80,7 @@ static void core_clear_initiator_node_from_tpg(
 
 		lun = deve->se_lun;
 		spin_unlock_bh(&nacl->device_list_lock);
-		core_update_device_list_for_node(lun, deve->mapped_lun,
+		core_update_device_list_for_node(lun, NULL, deve->mapped_lun,
 			TRANSPORT_LUNFLAGS_NO_ACCESS, nacl, tpg, 0);
 
 		spin_lock(&lun->lun_acl_lock);
@@ -204,7 +204,7 @@ void core_tpg_add_node_to_devs(
 			(lun_access == TRANSPORT_LUNFLAGS_READ_WRITE) ?
 			"READ-WRITE" : "READ-ONLY");
 
-		core_update_device_list_for_node(lun, lun->unpacked_lun,
+		core_update_device_list_for_node(lun, NULL, lun->unpacked_lun,
 				lun_access, acl, tpg, 1);
 		spin_lock(&tpg->tpg_lun_lock);
 	}
@@ -468,7 +468,7 @@ int core_tpg_del_initiator_node_acl(
 	const char *initiatorname,
 	int force)
 {
-	se_session_t *sess, *init_sess = NULL;
+	se_session_t *sess, *sess_tmp;
 	se_node_acl_t *acl;
 	int dynamic_acl = 0;
 
@@ -486,50 +486,31 @@ int core_tpg_del_initiator_node_acl(
 		acl->nodeacl_flags &= ~NAF_DYNAMIC_NODE_ACL;
 		dynamic_acl = 1;
 	}
+	list_del(&acl->acl_list);
+	tpg->num_node_acls--;
 	spin_unlock_bh(&tpg->acl_node_lock);
 
 	spin_lock_bh(&tpg->session_lock);
-	list_for_each_entry(sess, &tpg->tpg_sess_list, sess_list) {
+	list_for_each_entry_safe(sess, sess_tmp,
+				&tpg->tpg_sess_list, sess_list) {
 		if (sess->se_node_acl != acl)
 			continue;
-
-		if (!force) {
-			printk(KERN_ERR "Unable to delete Access Control List"
-				" for %s Initiator Node: %s while session is"
-				" operational.  To forcefully delete the"
-				" session use the \"force=1\" parameter.\n",
-				TPG_TFO(tpg)->get_fabric_name(),
-				initiatorname);
-			spin_unlock_bh(&tpg->session_lock);
-
-			spin_lock_bh(&tpg->acl_node_lock);
-			if (dynamic_acl)
-				acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
-			spin_unlock_bh(&tpg->acl_node_lock);
-			return -EEXIST;
-		}
 		/*
 		 * Determine if the session needs to be closed by our context.
 		 */
 		if (!(TPG_TFO(tpg)->shutdown_session(sess)))
 			continue;
 
-		init_sess = sess;
-		break;
+		spin_unlock_bh(&tpg->session_lock);
+		/*
+		 * If the $FABRIC_MOD session for the Initiator Node ACL exists,
+		 * forcefully shutdown the $FABRIC_MOD session/nexus.
+		 */
+                TPG_TFO(tpg)->close_session(sess);
+
+		spin_lock_bh(&tpg->session_lock);
 	}
 	spin_unlock_bh(&tpg->session_lock);
-
-	spin_lock_bh(&tpg->acl_node_lock);
-	list_del(&acl->acl_list);
-	tpg->num_node_acls--;
-	spin_unlock_bh(&tpg->acl_node_lock);
-
-	/*
-	 * If the $FABRIC_MOD session for the Initiator Node ACL exists,
-	 * forcefully shutdown the $FABRIC_MOD session/nexus.
-	 */
-	if (init_sess)
-		TPG_TFO(tpg)->close_session(init_sess);
 
 	core_clear_initiator_node_from_tpg(acl, tpg);
 	core_free_device_list_for_node(acl, tpg);

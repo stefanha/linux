@@ -34,11 +34,6 @@
 
 extern se_global_t *se_global;
 
-/*
- * Temporary function required for target_core_mod to operate..
- */
-extern struct target_core_fabric_ops *target_core_get_iscsi_ops(void);
-
 extern struct se_hba_s *target_core_get_hba_from_item(struct config_item *);
 extern struct target_fabric_configfs *target_fabric_configfs_init(
 				struct config_item_type *, const char *name);

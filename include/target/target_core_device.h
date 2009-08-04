@@ -38,13 +38,14 @@ extern int se_check_devices_access(se_hba_t *);
 extern void se_disable_devices_for_hba(se_hba_t *);
 extern int transport_get_lun_for_cmd(struct se_cmd_s *, unsigned char *, u32);
 extern int transport_get_lun_for_tmr(struct se_cmd_s *, u32);
+extern struct se_dev_entry_s *core_get_se_deve_from_rtpi(struct se_node_acl_s *, u16);
 extern int core_free_device_list_for_node(se_node_acl_t *,
 					se_portal_group_t *);
 extern void core_dec_lacl_count(struct se_node_acl_s *, struct se_cmd_s *);
 extern void core_update_device_list_access(u32, u32, se_node_acl_t *);
-extern void core_update_device_list_for_node(se_lun_t *lun, u32, u32,
-					se_node_acl_t *, se_portal_group_t *,
-					int);
+extern void core_update_device_list_for_node(se_lun_t *, se_lun_acl_t *, u32,
+					u32, se_node_acl_t *,
+					se_portal_group_t *, int);
 extern void core_clear_lun_from_tpg(se_lun_t *, se_portal_group_t *);
 extern struct se_port_s *core_alloc_port(struct se_device_s *);
 extern void core_export_port(struct se_device_s *, struct se_portal_group_s *,

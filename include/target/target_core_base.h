@@ -623,6 +623,7 @@ typedef struct se_dev_entry_s {
 	u64			write_bytes;
 #endif /* SNMP_SUPPORT */
 	atomic_t		ua_count;
+	se_lun_acl_t		*se_lun_acl;
 	spinlock_t		ua_lock;
 	struct se_lun_s		*se_lun;
 	struct list_head	ua_list;
@@ -860,6 +861,7 @@ typedef struct se_portal_group_s {
 	struct list_head	tpg_sess_list;
 	/* Pointer to $FABRIC_MOD dependent code */
 	struct target_core_fabric_ops *se_tpg_tfo;
+	struct config_group	tpg_group;
 } ____cacheline_aligned se_portal_group_t;
 
 #define TPG_TFO(se_tpg)	((struct target_core_fabric_ops *)(se_tpg)->se_tpg_tfo)
