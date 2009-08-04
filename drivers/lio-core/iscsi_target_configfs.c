@@ -37,6 +37,7 @@
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_device.h>
+#include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
 #include <target/target_core_alua.h>
 #include <target/configfs_macros.h>
@@ -68,8 +69,10 @@ extern iscsi_portal_group_t *lio_get_tpg_from_tpg_item (
 	struct config_item *item,
 	iscsi_tiqn_t **tiqn_out)
 {
-	iscsi_portal_group_t *tpg = container_of(to_config_group(item),
-					iscsi_portal_group_t, tpg_group);
+	se_portal_group_t *se_tpg = container_of(to_config_group(item),
+					se_portal_group_t, tpg_group);
+	iscsi_portal_group_t *tpg =
+			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
 	int ret;
 
 	if (!(tpg)) {
@@ -138,7 +141,8 @@ static ssize_t lio_target_store_np_sctp (void *p, const char *page, size_t count
 		return(-EINVAL);
 	}
 
-	tpg = lio_get_tpg_from_tpg_item(&tpg_np->tpg->tpg_group.cg_item, &tiqn);
+	tpg = lio_get_tpg_from_tpg_item(
+			&tpg_np->tpg->tpg_se_tpg->tpg_group.cg_item, &tiqn);
 	if (!(tpg))
 		return(-EINVAL);	
 
@@ -1701,7 +1705,8 @@ static ssize_t lio_target_show_tpg_attrib_##name (			\
 	iscsi_tiqn_t *tiqn;						\
 	ssize_t rb;							\
 									\
-	tpg = lio_get_tpg_from_tpg_item(&ta->tpg->tpg_group.cg_item, &tiqn); \
+	tpg = lio_get_tpg_from_tpg_item(				\
+			&ta->tpg->tpg_se_tpg->tpg_group.cg_item, &tiqn); \
 	if (!(tpg))							\
 		return(-EINVAL);					\
 									\
@@ -1721,7 +1726,8 @@ static ssize_t lio_target_store_tpg_attrib_##name (			\
 	u32 val;							\
 	int ret;							\
 									\
-	tpg = lio_get_tpg_from_tpg_item(&ta->tpg->tpg_group.cg_item, &tiqn); \
+	tpg = lio_get_tpg_from_tpg_item(				\
+			&ta->tpg->tpg_se_tpg->tpg_group.cg_item, &tiqn); \
 	if (!(tpg))							\
 		return(-EINVAL);					\
 									\
@@ -1830,7 +1836,8 @@ static ssize_t lio_target_show_tpg_param_##name (			\
 	iscsi_param_t *param;						\
 	ssize_t rb;							\
 									\
-	tpg = lio_get_tpg_from_tpg_item(&tpg_p->tpg_group.cg_item, &tiqn); \
+	tpg = lio_get_tpg_from_tpg_item(				\
+			&tpg_p->tpg_se_tpg->tpg_group.cg_item, &tiqn);	\
 	if (!(tpg))							\
 		return(-EINVAL);					\
 									\
@@ -1859,7 +1866,8 @@ static ssize_t lio_target_store_tpg_param_##name (			\
 	snprintf(buf, PAGE_SIZE, "%s=%s", __stringify(name), page);	\
 	buf[strlen(buf)-1] = '\0'; /* Kill newline */			\
 									\
-	tpg = lio_get_tpg_from_tpg_item(&tpg_p->tpg_group.cg_item, &tiqn); \
+	tpg = lio_get_tpg_from_tpg_item(				\
+			&tpg_p->tpg_se_tpg->tpg_group.cg_item, &tiqn);	\
 	if (!(tpg)) {							\
 		kfree(buf);						\
 		return(-EINVAL);					\
@@ -2028,7 +2036,7 @@ static ssize_t lio_target_store_tpg_enable (void *p, const char *page, size_t co
 		return(-EINVAL);
 	}
 
-	if (!(tpg_ci = &tpg_p->tpg_group.cg_item)) {
+	if (!(tpg_ci = &tpg_p->tpg_se_tpg->tpg_group.cg_item)) {
 		printk(KERN_ERR "Unable to locate tpg_ci\n");
 		return(-EINVAL);
 	}
@@ -2078,8 +2086,10 @@ static ssize_t lio_target_tpg_show (struct config_item *item,
                                     struct configfs_attribute *attr,
                                     char *page)
 {
-	iscsi_portal_group_t *tpg = container_of(
-			to_config_group(item), iscsi_portal_group_t, tpg_group);
+	se_portal_group_t *se_tpg = container_of(
+			to_config_group(item), se_portal_group_t, tpg_group);
+	iscsi_portal_group_t *tpg =
+		(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
 	struct lio_target_configfs_attribute *lt_attr = container_of( 
 			attr, struct lio_target_configfs_attribute, attr);
 
@@ -2093,8 +2103,10 @@ static ssize_t lio_target_tpg_store (struct config_item *item,
 				     struct configfs_attribute *attr,
 				     const char *page, size_t count)
 {
-	iscsi_portal_group_t *tpg = container_of(
-			to_config_group(item), iscsi_portal_group_t, tpg_group);
+	se_portal_group_t *se_tpg = container_of(
+			to_config_group(item), se_portal_group_t, tpg_group);
+	iscsi_portal_group_t *tpg =
+			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
 	struct lio_target_configfs_attribute *lt_attr = container_of( 
 			attr, struct lio_target_configfs_attribute, attr);
 
@@ -2157,7 +2169,13 @@ static struct config_group *lio_target_tiqn_addtpg (
 	if (!(tpg))
 		return NULL;
 
-	tpg_cg = &tpg->tpg_group;
+        tpg->tpg_se_tpg = core_tpg_register(
+                        &lio_target_fabric_configfs->tf_ops, (void *)tpg,
+                        TRANSPORT_TPG_TYPE_NORMAL);
+        if (IS_ERR(tpg->tpg_se_tpg) || !(tpg->tpg_se_tpg))
+		return NULL;
+
+	tpg_cg = &tpg->tpg_se_tpg->tpg_group;
 	/*
 	 * Create default configfs groups for iscsi_portal_group_t..
 	 */
@@ -2190,6 +2208,8 @@ static struct config_group *lio_target_tiqn_addtpg (
 
 	return tpg_cg;
 out:	
+	if (tpg->tpg_se_tpg)
+		core_tpg_deregister(tpg->tpg_se_tpg);
 	kfree(tpg_cg->default_groups);
 	kmem_cache_free(lio_tpg_cache, tpg);
 	return NULL;
@@ -2199,6 +2219,7 @@ static void lio_target_tiqn_deltpg (
         struct config_group *group,
         struct config_item *item)
 {
+	se_portal_group_t *se_tpg;
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
 	struct config_item *tiqn_ci;
@@ -2226,10 +2247,11 @@ static void lio_target_tiqn_deltpg (
 	tpgt = (unsigned short int) simple_strtoul(tpgt_str, &end_ptr, 0);
 	printk("lio_target_tiqn_deltpg(): Using TPGT: %hu\n", tpgt);
 
-	tpg = container_of(to_config_group(item), iscsi_portal_group_t,
+	se_tpg = container_of(to_config_group(item), se_portal_group_t,
 				tpg_group);
-	if (!(tpg))
+	if (!(se_tpg))
 		return;
+	tpg = (iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
 
 	printk("lio_target_tiqn_deltpg() got container_of: TPGT: %hu\n", tpg->tpgt);
 	printk("LIO_Target_ConfigFS: DEREGISTER -> calling config_item_put()\n");
@@ -2367,6 +2389,7 @@ extern int iscsi_target_register_configfs (void)
 	fabric->tf_ops.tpg_get_default_depth = &lio_tpg_get_default_depth;
 	fabric->tf_ops.tpg_get_pr_transport_id = &lio_tpg_get_pr_transport_id;
 	fabric->tf_ops.tpg_get_pr_transport_id_len = &lio_tpg_get_pr_transport_id_len;
+	fabric->tf_ops.tpg_parse_pr_out_transport_id = &lio_tpg_parse_pr_out_transport_id;
 	fabric->tf_ops.tpg_check_demo_mode = &lio_tpg_check_demo_mode;
 	fabric->tf_ops.tpg_check_demo_mode_cache = &lio_tpg_check_demo_mode_cache;
 	fabric->tf_ops.tpg_check_demo_mode_write_protect = &lio_tpg_check_demo_mode_write_protect;

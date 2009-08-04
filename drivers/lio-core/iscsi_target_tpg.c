@@ -241,6 +241,52 @@ extern u32 lio_tpg_get_pr_transport_id_len (
 	return(len);
 }
 
+extern char *lio_tpg_parse_pr_out_transport_id(
+	const char *buf,
+	u32 tid_len,
+	char **port_nexus_ptr)
+{
+	char *p;
+	u8 format_code = (buf[0] & 0xc0);
+	/*
+	 * Check for FORMAT CODE 00b or 01b from spc4r17, section 7.5.4.6:
+	 *
+	 *	 TransportID for initiator ports using SCSI over iSCSI,
+	 * 	 from Table 388 -- iSCSI TransportID formats.
+	 *
+	 *    00b     Initiator port is identified using the world wide unique
+	 *	      SCSI device name of the iSCSI initiator
+	 *            device containing the initiator port (see table 389).
+	 *    01b     Initiator port is identified using the world wide unique
+	 *            initiator port identifier (see table 390).10b to 11b Reserved
+	 */
+	if ((format_code != 0x00) && (format_code != 0x40)) {
+		printk(KERN_ERR "Illegal format code: 0x%02x for iSCSI"
+			" Initiator Transport ID\n", format_code);
+		return NULL;
+	}
+	/*
+	 * Check for the ',i,0x' seperator between iSCSI Name and iSCSI Initiator
+	 * Session ID as defined in Table 390 -- iSCSI initiator port TransportID
+	 * format.
+	 */
+	if (format_code == 0x40) {
+		p = strstr((char *)&buf[4], ",i,0x");	
+		if (!(p)) {
+			printk(KERN_ERR "Unable to locate \",i,0x\" seperator"
+				" for Initiator port identifier: %s\n",
+				(char *)&buf[4]);
+			return NULL;
+		}
+		*p = '\0'; /* Terminate iSCSI Name */
+		p += 5; /* Skip over ",i,0x" seperator */
+
+		*port_nexus_ptr = p;	
+	}
+
+	return (char *)&buf[4];
+}
+
 extern int lio_tpg_check_demo_mode (se_portal_group_t *se_tpg)
 {
 	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -635,13 +681,6 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 			" not in TPG_STATE_FREE state.\n", tpg->tpgt);
 		return -EEXIST;
 	}
-
-	tpg->tpg_se_tpg = core_tpg_register(
-			&lio_target_fabric_configfs->tf_ops, (void *)tpg,
-			TRANSPORT_TPG_TYPE_NORMAL);
-	if (IS_ERR(tpg->tpg_se_tpg) || !(tpg->tpg_se_tpg))
-		return -ENOMEM;
-
 	iscsi_set_default_tpg_attribs(tpg);
 
 	if (iscsi_create_default_params(&tpg->param_list) < 0)
@@ -666,8 +705,6 @@ extern int iscsi_tpg_add_portal_group (iscsi_tiqn_t *tiqn, iscsi_portal_group_t 
 
 	return 0;
 err_out:
-	if (tpg->tpg_se_tpg)
-		core_tpg_deregister(tpg->tpg_se_tpg);
 	if (tpg->param_list) {
 		iscsi_release_param_list(tpg->param_list);
 		tpg->param_list = NULL;

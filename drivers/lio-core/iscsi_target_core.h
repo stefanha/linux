@@ -819,7 +819,6 @@ typedef struct iscsi_portal_group_s {
 	struct config_group	tpg_lun_group;
 	struct config_group	tpg_acl_group;
 	struct config_group	tpg_param_group;
-	struct config_group	tpg_group;
 	struct semaphore	tpg_access_sem;
 	struct semaphore	np_login_sem;
 	iscsi_tpg_attrib_t	tpg_attrib;
