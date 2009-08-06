@@ -6846,7 +6846,7 @@ EXPORT_SYMBOL(transport_lun_wait_for_tasks);
 
 /* #define DEBUG_CLEAR_LUN */
 #ifdef DEBUG_CLEAR_LUN
-#define DEBUG_CLEAR_L(x...) PYXPRINT(x)
+#define DEBUG_CLEAR_L(x...) printk(KERN_INFO x)
 #else
 #define DEBUG_CLEAR_L(x...)
 #endif
@@ -7003,12 +7003,11 @@ static void transport_generic_wait_for_tasks(
 
 	atomic_set(&T_TASK(cmd)->t_transport_stop, 1);
 
-	DEBUG_TRANSPORT_S("wait_for_tasks: Stopping %p ITT/CmdSN: 0x%08x/"
-		"0x%08x, i_state/def_i_state: %d/%d, t_state/def_t_state:"
-		" %d/%d, t_transport_stop = TRUE\n", cmd,
-		CMD_TFO(cmd)->get_task_tag(cmd), cmd->cmd_sn,
-		CMD_TFO(cmd)->get_cmd_state(cmd), cmd->deferred_i_state,
-		cmd->t_state, cmd->deferred_t_state);
+	DEBUG_TRANSPORT_S("wait_for_tasks: Stopping %p ITT: 0x%08x"
+		" i_state: %d, t_state/def_t_state: %d/%d, t_transport_stop"
+		" = TRUE\n", cmd, CMD_TFO(cmd)->get_task_tag(cmd),
+		CMD_TFO(cmd)->get_cmd_state(cmd), cmd->t_state,
+		cmd->deferred_t_state);
 
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
@@ -7206,6 +7205,7 @@ void transport_send_task_abort(se_cmd_t *cmd)
 	if (CMD_TFO(cmd)->write_pending_status(cmd) != 0) {
 		atomic_inc(&T_TASK(cmd)->t_transport_aborted);
 		smp_mb__after_atomic_inc();
+		transport_new_cmd_failure(cmd);
 		return;
 	}
 
