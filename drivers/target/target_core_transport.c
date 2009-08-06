@@ -7202,11 +7202,14 @@ void transport_send_task_abort(se_cmd_t *cmd)
 	 * response.  This  response with TASK_ABORTED status will be
 	 * queued back to fabric module by transport_generic_handle_data().
 	 */
-	if (CMD_TFO(cmd)->write_pending_status(cmd) != 0) {
-		atomic_inc(&T_TASK(cmd)->t_transport_aborted);
-		smp_mb__after_atomic_inc();
-		transport_new_cmd_failure(cmd);
-		return;
+	if ((cmd->data_direction == SE_DIRECTION_WRITE) ||
+	    (cmd->data_direction == SE_DIRECTION_BIDI)) {
+		if (CMD_TFO(cmd)->write_pending_status(cmd) != 0) {
+			atomic_inc(&T_TASK(cmd)->t_transport_aborted);
+			smp_mb__after_atomic_inc();
+			transport_new_cmd_failure(cmd);
+			return;
+		}
 	}
 
 	cmd->scsi_status = SAM_STAT_TASK_ABORTED;
