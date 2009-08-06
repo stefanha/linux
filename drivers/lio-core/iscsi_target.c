@@ -3777,6 +3777,19 @@ extern int lio_write_pending (
 	return(0);
 }
 
+extern int lio_write_pending_status(
+	se_cmd_t *se_cmd)
+{
+	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	int ret;
+
+	spin_lock_bh(&cmd->istate_lock);
+	ret = !(cmd->cmd_flags & ICF_GOT_LAST_DATAOUT);
+	spin_unlock_bh(&cmd->istate_lock);
+
+	return ret;
+}
+
 extern int lio_queue_status (se_cmd_t *se_cmd)
 {
 	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);

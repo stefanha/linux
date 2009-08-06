@@ -2410,6 +2410,7 @@ extern int iscsi_target_register_configfs (void)
 #endif /* SNMP_SUPPORT */
 	fabric->tf_ops.sess_get_initiator_wwn = &lio_sess_get_initiator_wwn;
 	fabric->tf_ops.write_pending = &lio_write_pending;
+	fabric->tf_ops.write_pending_status = &lio_write_pending_status;
 	fabric->tf_ops.set_default_node_attributes = &lio_set_default_node_attributes;
 	fabric->tf_ops.get_task_tag = &iscsi_get_task_tag;
 	fabric->tf_ops.get_cmd_state = &iscsi_get_cmd_state;
