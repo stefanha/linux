@@ -354,6 +354,7 @@ typedef struct se_transport_task_s {
 	atomic_t		t_task_cdbs_ex_left;
 	atomic_t		t_task_cdbs_timeout_left;
 	atomic_t		t_task_cdbs_sent;
+	atomic_t		t_transport_aborted;
 	atomic_t		t_transport_active;
 	atomic_t		t_transport_complete;
 	atomic_t		t_transport_queue_active;

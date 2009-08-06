@@ -2858,6 +2858,17 @@ int transport_generic_handle_data(
 		if (signal_pending(current))
 			return -1;
 	}
+	/*
+	 * If the received CDB has aleady been ABORTED by the generic
+	 * target engine, we can now safely call transport_send_task_abort()
+	 * to queue a status response for the received CDB to the fabric module
+	 * as we are expecting no futher incoming DATA OUT sequences at this
+	 * point.
+	 */
+	if (atomic_read(&T_TASK(cmd)->t_transport_aborted)) {
+		transport_send_task_abort(cmd);
+		return 0;
+	}
 
 	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_WRITE);
 	return 0;
@@ -7186,6 +7197,18 @@ EXPORT_SYMBOL(transport_send_check_condition_and_sense);
 
 void transport_send_task_abort(se_cmd_t *cmd)
 {
+	/*
+	 * If there are still expected incoming fabric WRITEs, we wait
+	 * until until they have completed before sending a TASK_ABORTED
+	 * response.  This  response with TASK_ABORTED status will be
+	 * queued back to fabric module by transport_generic_handle_data().
+	 */
+	if (CMD_TFO(cmd)->write_pending_status(cmd) != 0) {
+		atomic_inc(&T_TASK(cmd)->t_transport_aborted);
+		smp_mb__after_atomic_inc();
+		return;
+	}
+
 	cmd->scsi_status = SAM_STAT_TASK_ABORTED;
 #if 0
 	printk(KERN_INFO "Setting SAM_STAT_TASK_ABORTED status for CDB: 0x%02x,"

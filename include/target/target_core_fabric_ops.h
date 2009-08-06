@@ -33,6 +33,7 @@ struct target_core_fabric_ops {
 	u32 (*sess_get_initiator_wwn)(struct se_session_s *,
 				      unsigned char *, u32);
 	int (*write_pending)(struct se_cmd_s *);
+	int (*write_pending_status)(struct se_cmd_s *);
 	void (*set_default_node_attributes)(struct se_node_acl_s *);
 	u32 (*get_task_tag)(struct se_cmd_s *);
 	int (*get_cmd_state)(struct se_cmd_s *);
