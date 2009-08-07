@@ -10,7 +10,7 @@
 #include <asm/apic.h>
 #include <asm/ipi.h>
 
-DEFINE_PER_CPU(u32, x86_cpu_to_logical_apicid);
+static DEFINE_PER_CPU(u32, x86_cpu_to_logical_apicid);
 
 static int x2apic_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
@@ -170,7 +170,7 @@ static unsigned long set_apic_id(unsigned int id)
 
 static int x2apic_cluster_phys_pkg_id(int initial_apicid, int index_msb)
 {
-	return current_cpu_data.initial_apicid >> index_msb;
+	return initial_apicid >> index_msb;
 }
 
 static void x2apic_send_IPI_self(int vector)
