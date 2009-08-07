@@ -1772,7 +1772,7 @@ static inline int iscsi_handle_data_out (iscsi_conn_t *conn, unsigned char *buf)
 			" NON-WRITE command.\n", cmd->init_task_tag);
 		return(iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR, 1, 0, buf, cmd));
 	}
-		
+	se_cmd = SE_CMD(cmd);	
 	iscsi_mod_dataout_timer(cmd);
 
 	if ((hdr->offset + hdr->length) > cmd->data_length) {
@@ -1808,16 +1808,32 @@ static inline int iscsi_handle_data_out (iscsi_conn_t *conn, unsigned char *buf)
 					UNEXPECTED_UNSOLICITED_DATA, 0);
 			return(-1);
 		}
-		se_cmd = SE_CMD(cmd);
-
 		/*
 		 * Special case for dealing with Unsolicited DataOUT
 		 * and Unsupported SAM WRITE Opcodes and SE resource allocation
 		 * failures;
 		 */
 		spin_lock_irqsave(&T_TASK(se_cmd)->t_state_lock, flags);
-		wait_for_transport = (se_cmd->t_state != TRANSPORT_WRITE_PENDING); 
-		if (wait_for_transport && cmd->immediate_data)
+		/*
+		 * Handle cases where we do or do not want to sleep on unsolicited_data_sem
+		 * 
+		 * First, if TRANSPORT_WRITE_PENDING state has not been reached,
+		 * we need assume we need to wait and sleep..
+		 */ 
+		 wait_for_transport = (se_cmd->t_state != TRANSPORT_WRITE_PENDING);
+		/*	
+		 * For the ImmediateData=Yes cases, there will already be generic
+		 * target memory allocated with the original ISCSI_INIT_SCSI_CMND PDU,
+		 * so do not sleep for that case.
+		 * 
+		 * The last is a check for a delayed TASK_ABORTED status that means
+		 * the data payload will be dropped because SCF_SE_CMD_FAILED has been
+		 * set to indicate that an exception condition for this se_cmd_t has
+		 * occured in generic target code that requires us to drop payload.
+		 */
+		wait_for_transport = (se_cmd->t_state != TRANSPORT_WRITE_PENDING);
+		if ((cmd->immediate_data != 0) ||
+		    (atomic_read(&T_TASK(se_cmd)->t_transport_aborted) != 0))
 			wait_for_transport = 0;
 		spin_unlock_irqrestore(&T_TASK(se_cmd)->t_state_lock, flags);
 
@@ -1830,10 +1846,33 @@ static inline int iscsi_handle_data_out (iscsi_conn_t *conn, unsigned char *buf)
 			dump_unsolicited_data = 1;
 		spin_unlock_irqrestore(&T_TASK(se_cmd)->t_state_lock, flags);
 
-		if (dump_unsolicited_data)
-			return(iscsi_dump_data_payload(conn, hdr->length, 1));
+		if (dump_unsolicited_data) {
+			/*
+			 * Check if a delayed TASK_ABORTED status needs to
+			 * be sent now if the F_BIT has been received with
+			 * the unsolicitied data out.
+			 */
+			transport_check_aborted_status(se_cmd, (hdr->flags & F_BIT));
+			return iscsi_dump_data_payload(conn, hdr->length, 1);
+		}
+	} else {
+		/*
+		 * For the normal solicited data path:
+		 *
+		 * Check for a delayed TASK_ABORTED status and dump any incoming data
+		 * out payload if one exists.  Also, when the F_BIT is set to denote
+		 * the end of the current data out sequence, we decrement
+		 * outstanding_r2ts.  Once outstanding_r2ts reaches zero, go ahead
+		 * and send the delayed TASK_ABORTED status.
+		 */
+		if (atomic_read(&T_TASK(se_cmd)->t_transport_aborted) != 0) {
+			if (hdr->flags & F_BIT)
+				if (--cmd->outstanding_r2ts < 1)
+					transport_check_aborted_status(se_cmd, 1);
+				
+			return iscsi_dump_data_payload(conn, hdr->length, 1);
+		}
 	}
-
 	/*
 	 * Preform DataSN, DataSequenceInOrder, DataPDUInOrder, and
 	 * within-command recovery checks before receiving the payload.
