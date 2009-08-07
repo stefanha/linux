@@ -1010,7 +1010,8 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 	case ISCSI_INIT_SCSI_CMND:
 		/*
 		 * Go ahead and send the CHECK_CONDITION status for
-		 * any SCSI CDB exceptions that may have occurred.
+		 * any SCSI CDB exceptions that may have occurred, also
+		 * handle the SCF_SCSI_RESERVATION_CONFLICT case here as well.
 		 */
 		if (se_cmd->se_cmd_flags & SCF_SCSI_CDB_EXCEPTION) {
 			if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT) {
@@ -1020,7 +1021,19 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 				return(0);
 			}
 			spin_unlock_bh(&cmd->istate_lock);
-
+			/*
+			 * Determine if delayed TASK_ABORTED status for WRITEs
+			 * should be sent now if no unsolicited data out payloads
+			 * are expected, or if the delayed status should be sent
+			 * after unsolicited data out with F_BIT set in
+			 * iscsi_handle_data_out()
+			 */
+			if (transport_check_aborted_status(se_cmd,
+					(cmd->unsolicited_data == 0)) != 0)
+				return 0;
+			/*
+			 * Otherwise send CHECK_CONDITION and sense for exception
+			 */
 			return(transport_send_check_condition_and_sense(se_cmd,
 					se_cmd->scsi_sense_reason, 0));	
 		}
@@ -1037,6 +1050,13 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 			spin_unlock_bh(&cmd->istate_lock);
 
 			if (!(cmd->cmd_flags & ICF_NON_IMMEDIATE_UNSOLICITED_DATA)) {
+				/*
+				 * Send the delayed TASK_ABORTED status for WRITEs
+				 * if no more unsolicitied data is expected.
+				 */
+				if (transport_check_aborted_status(se_cmd, 1) != 0)
+					return 0;
+
 				iscsi_set_dataout_sequence_values(cmd);
 				iscsi_build_r2ts_for_cmd(cmd, CONN(cmd), 0);
 			}
@@ -1049,6 +1069,13 @@ extern int iscsi_execute_cmd (iscsi_cmd_t *cmd, int ooo)
 
 		if ((cmd->data_direction == ISCSI_WRITE) &&
 		    !(cmd->cmd_flags & ICF_NON_IMMEDIATE_UNSOLICITED_DATA)) {
+			/*
+			 * Send the delayed TASK_ABORTED status for WRITEs if
+			 * no more nsolicitied data is expected.
+			 */
+			if (transport_check_aborted_status(se_cmd, 1) != 0)
+				return 0;
+
 			iscsi_set_dataout_sequence_values(cmd);
 			spin_lock_bh(&cmd->dataout_timeout_lock);
 			iscsi_start_dataout_timer(cmd, CONN(cmd));
