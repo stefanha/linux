@@ -1852,6 +1852,9 @@ static inline int iscsi_handle_data_out (iscsi_conn_t *conn, unsigned char *buf)
 			 * be sent now if the F_BIT has been received with
 			 * the unsolicitied data out.
 			 */
+			if (hdr->flags & F_BIT)
+				iscsi_stop_dataout_timer(cmd);
+
 			transport_check_aborted_status(se_cmd, (hdr->flags & F_BIT));
 			return iscsi_dump_data_payload(conn, hdr->length, 1);
 		}
@@ -1867,8 +1870,10 @@ static inline int iscsi_handle_data_out (iscsi_conn_t *conn, unsigned char *buf)
 		 */
 		if (atomic_read(&T_TASK(se_cmd)->t_transport_aborted) != 0) {
 			if (hdr->flags & F_BIT)
-				if (--cmd->outstanding_r2ts < 1)
+				if (--cmd->outstanding_r2ts < 1) {
+					iscsi_stop_dataout_timer(cmd);
 					transport_check_aborted_status(se_cmd, 1);
+				}
 				
 			return iscsi_dump_data_payload(conn, hdr->length, 1);
 		}
