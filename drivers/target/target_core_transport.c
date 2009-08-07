@@ -2860,15 +2860,13 @@ int transport_generic_handle_data(
 	}
 	/*
 	 * If the received CDB has aleady been ABORTED by the generic
-	 * target engine, we can now safely call transport_send_task_abort()
-	 * to queue a status response for the received CDB to the fabric module
-	 * as we are expecting no futher incoming DATA OUT sequences at this
-	 * point.
+	 * target engine, we now call transport_check_aborted_status()
+	 * to queue any delated TASK_ABORTED status for the received CDB to the
+	 * fabric module as we are expecting no futher incoming DATA OUT sequences
+	 * at this point.
 	 */
-	if (atomic_read(&T_TASK(cmd)->t_transport_aborted)) {
-		transport_send_task_abort(cmd);
+	if (transport_check_aborted_status(cmd, 1) != 0)
 		return 0;
-	}
 
 	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_WRITE);
 	return 0;
@@ -7194,32 +7192,57 @@ after_reason:
 }
 EXPORT_SYMBOL(transport_send_check_condition_and_sense);
 
+int transport_check_aborted_status(se_cmd_t *cmd, int send_status)
+{
+	int ret = 0;
+
+	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
+		return 0;
+
+	if (atomic_read(&T_TASK(cmd)->t_transport_aborted) != 0) {
+		if (!(send_status) || (cmd->se_cmd_flags & SCF_SENT_DELAYED_TAS))
+			return 1;
+#if 0
+		printk(KERN_INFO "Sending delayed SAM_STAT_TASK_ABORTED"
+			" status for CDB: 0x%02x ITT: 0x%08x\n",
+			T_TASK(cmd)->t_task_cdb[0],
+			CMD_TFO(cmd)->get_task_tag(cmd));
+#endif
+		cmd->se_cmd_flags |= SCF_SENT_DELAYED_TAS;
+		CMD_TFO(cmd)->queue_status(cmd);
+		ret = 1;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(transport_check_aborted_status);
+
 void transport_send_task_abort(se_cmd_t *cmd)
 {
+	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
+		return;
 	/*
 	 * If there are still expected incoming fabric WRITEs, we wait
 	 * until until they have completed before sending a TASK_ABORTED
-	 * response.  This  response with TASK_ABORTED status will be
-	 * queued back to fabric module by transport_generic_handle_data().
+	 * response.  This response with TASK_ABORTED status will be
+	 * queued back to fabric module by transport_check_aborted_status().
 	 */
 	if ((cmd->data_direction == SE_DIRECTION_WRITE) ||
 	    (cmd->data_direction == SE_DIRECTION_BIDI)) {
 		if (CMD_TFO(cmd)->write_pending_status(cmd) != 0) {
 			atomic_inc(&T_TASK(cmd)->t_transport_aborted);
 			smp_mb__after_atomic_inc();
+			cmd->scsi_status = SAM_STAT_TASK_ABORTED;
 			transport_new_cmd_failure(cmd);
 			return;
 		}
 	}
-
 	cmd->scsi_status = SAM_STAT_TASK_ABORTED;
 #if 0
 	printk(KERN_INFO "Setting SAM_STAT_TASK_ABORTED status for CDB: 0x%02x,"
 		" ITT: 0x%08x\n", T_TASK(cmd)->t_task_cdb[0],
 		CMD_TFO(cmd)->get_task_tag(cmd));
 #endif
-	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
-		CMD_TFO(cmd)->queue_status(cmd);
+	CMD_TFO(cmd)->queue_status(cmd);
 }
 
 /*	transport_generic_do_tmr():

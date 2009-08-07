@@ -154,6 +154,7 @@
 #define SCF_SENT_CHECK_CONDITION		0x00008000
 #define SCF_OVERFLOW_BIT                        0x00010000
 #define SCF_UNDERFLOW_BIT                       0x00020000
+#define SCF_SENT_DELAYED_TAS			0x00040000
 
 /* se_device_t->type */
 #define PSCSI					1
