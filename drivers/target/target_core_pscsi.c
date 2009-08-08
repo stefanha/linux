@@ -815,18 +815,8 @@ void *pscsi_allocate_request(
 	return pt;
 }
 
-static int pscsi_blk_get_request(se_task_t *task)
+static inline void pscsi_blk_init_request(se_task_t *task, pscsi_plugin_task_t *pt)
 {
-	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
-	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
-
-	pt->pscsi_req = blk_get_request(pdv->pdv_sd->request_queue,
-			(pt->pscsi_direction == DMA_TO_DEVICE), GFP_KERNEL);
-	if (!(pt->pscsi_req) || IS_ERR(pt->pscsi_req)) {
-		printk(KERN_ERR "PSCSI: blk_get_request() failed: %ld\n",
-				IS_ERR(pt->pscsi_req));
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-	}
 	/*
 	 * Defined as "scsi command" in include/linux/blkdev.h.
 	 */
@@ -848,7 +838,28 @@ static int pscsi_blk_get_request(se_task_t *task)
 	 */
 	pt->pscsi_req->sense = (void *)&pt->pscsi_sense[0];
 	pt->pscsi_req->sense_len = 0;
+}
 
+/*
+ * Used for pSCSI data payloads for all *NON* SCF_SCSI_DATA_SG_IO_CDB
+*/
+static int pscsi_blk_get_request(se_task_t *task)
+{
+	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
+	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
+
+	pt->pscsi_req = blk_get_request(pdv->pdv_sd->request_queue,
+			(pt->pscsi_direction == DMA_TO_DEVICE), GFP_KERNEL);
+	if (!(pt->pscsi_req) || IS_ERR(pt->pscsi_req)) {
+		printk(KERN_ERR "PSCSI: blk_get_request() failed: %ld\n",
+				IS_ERR(pt->pscsi_req));
+		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	}
+	/*
+	 * Setup the newly allocated struct request for REQ_TYPE_BLOCK_PC,
+	 * and setup rq callback, CDB and sense.
+	 */
+	pscsi_blk_init_request(task, pt);
 	return 0;
 }
 
@@ -1240,10 +1251,13 @@ static void pscsi_bi_endio(struct bio *bio, int error)
 static inline struct bio *pscsi_get_bio(pscsi_dev_virt_t *pdv, int sg_num)
 {
 	struct bio *bio;
-
-	bio = bio_alloc(GFP_KERNEL, sg_num);
+	/*
+	 * Use bio_malloc() following the comment in for bio -> struct request
+	 * in block/blk-core.c:blk_make_request()
+	 */
+	bio = bio_kmalloc(GFP_KERNEL, sg_num);
 	if (!(bio)) {
-		printk(KERN_ERR "PSCSI: bio_alloc() failed\n");
+		printk(KERN_ERR "PSCSI: bio_kmalloc() failed\n");
 		return NULL;
 	}
 	bio->bi_end_io = pscsi_bi_endio;
@@ -1267,12 +1281,12 @@ int pscsi_map_task_SG(se_task_t *task)
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
 	struct page *page;
-	struct request *rq = pt->pscsi_req;
 	struct scatterlist *sg;
 	u32 data_len = task->task_size, i, len, bytes, off;
 	int nr_pages = (task->task_size + task->task_sg[0].offset +
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int nr_vecs = 0, ret = 0;
+	int rw = (TASK_CMD(task)->data_direction == SE_DIRECTION_WRITE);
 
 	if (!task->task_size)
 		return 0;
@@ -1304,15 +1318,29 @@ int pscsi_map_task_SG(se_task_t *task)
 			if (!(bio)) {
 				nr_vecs = min_t(int, BIO_MAX_PAGES, nr_pages);
 				nr_pages -= nr_vecs;
-
+				/*
+				 * Calls bio_kmalloc() and sets bio->bi_end_io()
+				 */
 				bio = pscsi_get_bio(pdv, nr_vecs);
 				if (!(bio))
 					goto fail;
+				/*
+				 * FIXME: Use bio_set_dir() when avaliable
+				 */
+				if (rw)
+					bio->bi_rw |= (1 << BIO_RW);
 
 				DEBUG_PSCSI("PSCSI: Allocated bio: %p,"
-					" nr_vecs: %d\n", bio, nr_vecs);
-				if (!tbio)
-					tbio = bio;
+					" dir: %s nr_vecs: %d\n", bio,
+					(rw) ? "rw" : "r", nr_vecs);
+				/*
+				 * Set *hbio pointer to handle the case:
+				 * nr_pages > BIO_MAX_PAGES, where additional
+				 * bios need to be added to complete a given
+				 * se_task_t
+				 */
+				if (!hbio)
+					hbio = tbio = bio;
 				else
 					tbio = tbio->bi_next = bio;
 			}
@@ -1329,18 +1357,16 @@ int pscsi_map_task_SG(se_task_t *task)
 			DEBUG_PSCSI("PSCSI: bio->bi_vcnt: %d nr_vecs: %d\n",
 				bio->bi_vcnt, nr_vecs);
 
-			if (bio->bi_vcnt >= nr_vecs) {
-				bio->bi_flags &= ~(1 << BIO_SEG_VALID);
-				if (rq_data_dir(rq) == WRITE)
-					bio->bi_rw |= (1 << BIO_RW);
-				blk_queue_bounce(rq->q, &bio);
-
-				DEBUG_PSCSI("PSCSI: Calling blk_rq_append_bio()"
-					": i: %d bio: %p\n", i, bio);
-				ret = blk_rq_append_bio(rq->q, rq, bio);
-				if (ret < 0)
-					goto fail;
-
+			if (bio->bi_vcnt > nr_vecs) {
+				DEBUG_PSCSI("PSCSI: Reached bio->bi_vcnt max:"
+					" %d i: %d bio: %p, allocating another"
+					" bio\n", bio->bi_vcnt, i, bio);
+				/*
+				 * Clear the pointer so that another bio will
+				 * be allocated with pscsi_get_bio() above, the
+				 * current bio has already been set *tbio and
+				 * bio->bi_next.
+				 */
 				bio = NULL;
 			}
 
@@ -1350,9 +1376,21 @@ int pscsi_map_task_SG(se_task_t *task)
 			off = 0;
 		}
 	}
-
-	rq->buffer = rq->data = NULL;
-	rq->data_len = task->task_size;
+	/*
+	 * Starting with v2.6.31, call blk_make_request() passing in *hbio to
+	 * allocate the pSCSI task a struct request.
+	 */
+	pt->pscsi_req = blk_make_request(pdv->pdv_sd->request_queue,
+				hbio, GFP_KERNEL);
+	if (!(pt->pscsi_req)) {
+		printk(KERN_ERR "pSCSI: blk_make_request() failed\n");
+		goto fail;
+	}
+	/*
+	 * Setup the newly allocated struct request for REQ_TYPE_BLOCK_PC,
+	 * and setup rq callback, CDB and sense.
+	 */
+	pscsi_blk_init_request(task, pt);
 
 	return task->task_sg_num;
 fail:
@@ -1438,10 +1476,10 @@ int pscsi_CDB_read_SG(se_task_t *task, u32 size)
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
-
-	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-
+	/*
+	 * pscsi_map_task_SG() calls block/blk-core.c:blk_make_request()
+	 * for >= v2.6.31 pSCSI
+	 */
 	if (pscsi_map_task_SG(task) < 0)
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
@@ -1473,10 +1511,10 @@ int pscsi_CDB_write_SG(se_task_t *task, u32 size)
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
 	pt->pscsi_direction = DMA_TO_DEVICE;
-
-	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-
+	/*
+	 * pscsi_map_task_SG() calls block/blk-core.c:blk_make_request()
+	 * for >= v2.6.31 pSCSI
+	 */
 	if (pscsi_map_task_SG(task) < 0)
 		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 
@@ -1576,8 +1614,9 @@ u32 pscsi_get_max_sectors(se_device_t *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
-	return (sd->host->max_sectors > sd->request_queue->max_sectors) ?
-		sd->request_queue->max_sectors : sd->host->max_sectors;
+
+	return (sd->host->max_sectors > sd->request_queue->limits.max_sectors) ?
+		sd->request_queue->limits.max_sectors : sd->host->max_sectors;
 }
 
 /*	pscsi_get_queue_depth():
@@ -1638,7 +1677,7 @@ void pscsi_req_done(struct request *req, int uptodate)
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *)task->transport_req;
 
 	pt->pscsi_result = req->errors;
-	pt->pscsi_resid = req->data_len;
+	pt->pscsi_resid = req->resid_len;
 
 	pscsi_process_SAM_status(task, pt);
 	__blk_put_request(req->q, req);
