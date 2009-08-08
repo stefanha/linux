@@ -379,11 +379,12 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	struct request_queue *q)
 {
 	unsigned long long blocks_long = (get_capacity(bd->bd_disk) - 1);
+	u32 block_size = bdev_logical_block_size(bd);
 
-	if (q->hardsect_size == DEV_ATTRIB(dev)->block_size)
+	if (block_size == DEV_ATTRIB(dev)->block_size)
 		return blocks_long;
 
-	switch (q->hardsect_size) {
+	switch (block_size) {
 	case 4096:
 		switch (DEV_ATTRIB(dev)->block_size) {
 		case 2048:
@@ -988,12 +989,8 @@ unsigned char *iblock_get_cdb(se_task_t *task)
 u32 iblock_get_blocksize(se_device_t *dev)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
-	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
-	/*
-	 * Set via blk_queue_hardsect_size() in
-	 * drivers/scsi/sd.c:sd_read_capacity()
-	 */
-	return q->hardsect_size;
+
+	return bdev_logical_block_size(ibd->ibd_bd);
 }
 
 u32 iblock_get_device_rev(se_device_t *dev)
@@ -1016,8 +1013,7 @@ u32 iblock_get_max_sectors(se_device_t *dev)
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
 	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
 
-	return (q->max_sectors < IBLOCK_MAX_SECTORS) ?
-		q->max_sectors : IBLOCK_MAX_SECTORS;
+	return q->limits.max_sectors;
 }
 
 u32 iblock_get_queue_depth(se_device_t *dev)
