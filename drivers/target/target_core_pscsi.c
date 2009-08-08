@@ -883,11 +883,6 @@ int pscsi_do_task(se_task_t *task)
 					&pdv->pdv_sd->sdev_gendev);
 		gd = sdisk->disk;
 		pt->pscsi_req->timeout = PS_TIMEOUT_DISK;
-	} else if (pdv->pdv_sd->type == TYPE_ROM) {
-		struct scsi_cd *scd = dev_get_drvdata(
-					&pdv->pdv_sd->sdev_gendev);
-		gd = scd->disk;
-		pt->pscsi_req->timeout = PS_TIMEOUT_OTHER;
 	} else
 		pt->pscsi_req->timeout = PS_TIMEOUT_OTHER;
 
