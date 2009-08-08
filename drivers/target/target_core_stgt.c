@@ -830,8 +830,8 @@ u32 stgt_get_max_sectors(se_device_t *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
-	return (sd->host->max_sectors > sd->request_queue->max_sectors) ?
-		sd->request_queue->max_sectors : sd->host->max_sectors;
+	return (sd->host->max_sectors > sd->request_queue->limits.max_sectors) ?
+		sd->request_queue->limits.max_sectors : sd->host->max_sectors;
 }
 
 /*	stgt_get_queue_depth():
@@ -907,7 +907,7 @@ int stgt_transfer_response(struct scsi_cmnd *sc,
 		BUG();
 	}
 	st->stgt_result = sc->request->errors;
-	st->stgt_resid = sc->request->data_len;
+	st->stgt_resid = sc->request->resid_len;
 
 #warning FIXME: Sense for STGT struct scsi_cmnd usage..
 #if 0
