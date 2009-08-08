@@ -264,11 +264,11 @@ se_device_t *fd_create_virtdevice(
 		blocks_long = (get_capacity(bd->bd_disk) - 1);
 		q = bdev_get_queue(bd);
 		fd_dev->fd_dev_size = ((unsigned long long)blocks_long *
-					q->hardsect_size);
+					bdev_logical_block_size(bd));
 		printk(KERN_INFO "FILEIO: Using size: %llu bytes from struct"
-			" block_device blocks: %llu hardsect_size: %d\n",
+			" block_device blocks: %llu logical_block_size: %d\n",
 				fd_dev->fd_dev_size, blocks_long,
-				q->hardsect_size);
+				bdev_logical_block_size(bd));
 	} else {
 		if (!(fd_dev->fbd_flags & FBDF_HAS_SIZE)) {
 			printk(KERN_ERR "FILEIO: Missing fd_dev_size="
