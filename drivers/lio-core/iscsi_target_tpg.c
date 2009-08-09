@@ -243,10 +243,12 @@ extern u32 lio_tpg_get_pr_transport_id_len (
 
 extern char *lio_tpg_parse_pr_out_transport_id(
 	const char *buf,
-	u32 tid_len,
+	u32 *out_tid_len,
 	char **port_nexus_ptr)
 {
 	char *p;
+	u32 tid_len, padding;
+	u16 add_len;
 	u8 format_code = (buf[0] & 0xc0);
 	/*
 	 * Check for FORMAT CODE 00b or 01b from spc4r17, section 7.5.4.6:
@@ -264,6 +266,28 @@ extern char *lio_tpg_parse_pr_out_transport_id(
 		printk(KERN_ERR "Illegal format code: 0x%02x for iSCSI"
 			" Initiator Transport ID\n", format_code);
 		return NULL;
+	}
+	/*
+	 * If the caller wants the TransportID Length, we set that value for the
+	 * entire iSCSI Tarnsport ID now.
+	 */
+	if (out_tid_len != NULL) {
+		add_len = ((buf[2] >> 8) & 0xff);
+		add_len |= (buf[3] & 0xff);
+
+		tid_len = strlen((char *)&buf[4]);
+		tid_len += 4; /* Add four bytes for iSCSI Transport ID header */
+		tid_len += 1; /* Add one byte for NULL terminator */
+		if ((padding = ((-tid_len) & 3)) != 0)
+			tid_len += padding;
+
+		if ((add_len + 4) != tid_len) {
+			printk(KERN_INFO "LIO-Target Extracted add_len: %hu "
+				"does not match calculated tid_len: %u,"
+				" using tid_len instead\n", add_len+4, tid_len);
+			*out_tid_len = tid_len;
+		} else 
+			*out_tid_len = (add_len + 4);
 	}
 	/*
 	 * Check for the ',i,0x' seperator between iSCSI Name and iSCSI Initiator
