@@ -72,6 +72,11 @@
 #define SNAP_GROUP_LEN				128
 /* Used for se_dev_snap_attrib->lvc_size */
 #define SNAP_LVC_LEN				32
+/* Used by t10_reservation_template_s->pr_[i,t]_port[] */
+#define PR_APTPL_MAX_IPORT_LEN			256
+#define PR_APTPL_MAX_TPORT_LEN			256
+/* Used by t10_reservation_template_s->pr_aptpl_buf_len */
+#define PR_APTPL_BUF_LEN			8192
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -291,11 +296,18 @@ typedef enum {
 struct se_cmd_s;
 
 typedef struct t10_pr_registration_s {
+	unsigned char pr_iport[PR_APTPL_MAX_IPORT_LEN]; /* Used during APTPL metadata reading */
+	unsigned char pr_tport[PR_APTPL_MAX_TPORT_LEN]; /* Used during APTPL metadata reading */
+	unsigned char *pr_aptpl_buf; /* For writing out live meta data */
+	u16 pr_aptpl_rpti;
+	u16 pr_reg_tpgt;
 	int pr_reg_all_tg_pt; /* Reservation effects all target ports */
+	int pr_reg_aptpl; /* Activate Persistence across Target Power Loss */
 	int pr_res_holder;
 	int pr_res_type;
 	int pr_res_scope;
 	u32 pr_res_mapped_lun;
+	u32 pr_aptpl_target_lun;
 	u32 pr_res_generation;
 	u64 pr_res_key;
 	atomic_t pr_res_holders;
@@ -304,17 +316,23 @@ typedef struct t10_pr_registration_s {
 	struct se_lun_s *pr_reg_tg_pt_lun;
 	struct list_head pr_reg_list;
 	struct list_head pr_reg_abort_list;
+	struct list_head pr_reg_aptpl_list;
 } ____cacheline_aligned t10_pr_registration_t;
 
 typedef struct t10_reservation_template_s {
 	/* Reservation effects all target ports */
 	int pr_all_tg_pt;
+	/* Activate Persistence across Target Power Loss enabled for SCSI device */
+	int pr_aptpl_active;
+	u32 pr_aptpl_buf_len;
 	u32 pr_generation;
 	t10_reservations_index_t res_type;
 	spinlock_t registration_lock;
+	spinlock_t aptpl_reg_lock;
 	/* Reservation holder when pr_all_tg_pt=1 */
 	struct se_node_acl_s *pr_res_holder;
 	struct list_head registration_list;
+	struct list_head aptpl_reg_list;
 	int (*t10_reservation_check)(struct se_cmd_s *, u32 *);
 	int (*t10_reserve)(struct se_cmd_s *);
 	int (*t10_release)(struct se_cmd_s *);

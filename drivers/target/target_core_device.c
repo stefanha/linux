@@ -1380,7 +1380,11 @@ int core_dev_add_initiator_node_lun_acl(
 		TPG_TFO(tpg)->tpg_get_tag(tpg), unpacked_lun, lacl->mapped_lun,
 		(lun_access & TRANSPORT_LUNFLAGS_READ_WRITE) ? "RW" : "RO",
 		lacl->initiatorname);
-
+	/*
+	 * Check to see if there are any existing persistent reservation APTPL
+	 * pre-registrations that need to be enabled for this LUN ACL..
+	 */
+	core_scsi3_check_aptpl_registration(lun->se_dev, tpg, lun, lacl);
 	return 0;
 }
 EXPORT_SYMBOL(core_dev_add_initiator_node_lun_acl);
