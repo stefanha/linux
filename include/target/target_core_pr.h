@@ -40,8 +40,18 @@
 #define PR_TYPE_WRITE_EXCLUSIVE_ALLREG		0x07
 #define PR_TYPE_EXCLUSIVE_ACCESS_ALLREG		0x08
 
+#define PR_APTPL_MAX_IPORT_LEN			256
+#define PR_APTPL_MAX_TPORT_LEN			256
+
 extern struct kmem_cache *t10_pr_reg_cache;
 
+extern int core_scsi3_alloc_aptpl_registration(
+			struct t10_reservation_template_s *, u64,
+			unsigned char *, u32, unsigned char *, u16, u32,
+			int, int, u8);
+extern int core_scsi3_check_aptpl_registration(struct se_device_s *,
+			struct se_portal_group_s *, struct se_lun_s *,
+			struct se_lun_acl_s *);
 extern void core_scsi3_free_pr_reg_from_nacl(struct se_device_s *,
 					     struct se_node_acl_s *);
 extern void core_scsi3_free_all_registrations(struct se_device_s *);
