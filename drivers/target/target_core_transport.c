@@ -252,7 +252,6 @@ int init_se_global(void)
 	}
 
 	INIT_LIST_HEAD(&global->g_lu_gps_list);
-	INIT_LIST_HEAD(&global->g_tg_pt_gps_list);
 	INIT_LIST_HEAD(&global->g_se_tpg_list);
 	INIT_LIST_HEAD(&global->g_hba_list);
 	INIT_LIST_HEAD(&global->g_se_dev_list);
@@ -260,7 +259,6 @@ int init_se_global(void)
 	spin_lock_init(&global->hba_lock);
 	spin_lock_init(&global->se_tpg_lock);
 	spin_lock_init(&global->lu_gps_lock);
-	spin_lock_init(&global->tg_pt_gps_lock);
 	spin_lock_init(&global->plugin_class_lock);
 
 	se_cmd_cache = kmem_cache_create("se_cmd_cache",
@@ -2070,6 +2068,7 @@ se_device_t *transport_add_device_to_core_hba(
 	INIT_LIST_HEAD(&dev->state_task_list);
 	spin_lock_init(&dev->execute_task_lock);
 	spin_lock_init(&dev->state_task_lock);
+	spin_lock_init(&dev->dev_alua_lock);
 	spin_lock_init(&dev->dev_reservation_lock);
 	spin_lock_init(&dev->dev_status_lock);
 	spin_lock_init(&dev->dev_status_thr_lock);
@@ -2705,7 +2704,7 @@ static void transport_generic_wait_for_tasks(se_cmd_t *, int, int);
 
 /*	transport_generic_allocate_tasks():
  *
- *	Called from the iSCSI RX Thread.
+ *	Called from fabric RX Thread.
  */
 int transport_generic_allocate_tasks(
 	se_cmd_t *cmd,
@@ -2813,8 +2812,14 @@ int transport_generic_allocate_tasks(
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = CHECK_CONDITION_UNIT_ATTENTION;
 		return -2;
+	case 9:
+		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		cmd->scsi_sense_reason = CHECK_CONDITION_NOT_READY;
+		return -2;
 	default:
-		break;
+		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		cmd->scsi_sense_reason = UNSUPPORTED_SCSI_OPCODE;
+		return -2;
 	}
 
 	return 0;
@@ -4117,6 +4122,7 @@ extern int transport_generic_emulate_inquiry(
 	se_port_t *port = NULL;
 	se_portal_group_t *tpg = NULL;
 	t10_alua_lu_gp_member_t *lu_gp_mem;
+	t10_alua_tg_pt_gp_t *tg_pt_gp;
 	t10_alua_tg_pt_gp_member_t *tg_pt_gp_mem;
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
@@ -4152,10 +4158,28 @@ extern int transport_generic_emulate_inquiry(
 			 */
 			buf[5]	= 0x80;
 			/*
-			 * Set TPGS field, see spc4r17 section 6.4.2 Table 135
+			 * Set TPGS field for explict and/or implict ALUA
+			 * access type and opteration.
+			 *
+			 * See spc4r17 section 6.4.2 Table 135
 			 */
-			buf[5] |= TPGS_IMPLICT_ALUA;
+			port = lun->lun_sep;
+			if (!(port))
+				goto after_tpgs;
+			tg_pt_gp_mem = port->sep_alua_tg_pt_gp_mem;
+			if (!(tg_pt_gp_mem))
+				goto after_tpgs;
+
+			spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
+			tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
+			if (!(tg_pt_gp)) {
+				spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
+				goto after_tpgs;
+			}
+			buf[5] |= tg_pt_gp->tg_pt_gp_alua_access_type;
+			spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 		}
+after_tpgs:
 		buf[7]		= 0x32; /* Sync=1 and CmdQue=1 */
 		/*
 		 * Do not include vendor, product, reversion info in INQUIRY
@@ -4329,7 +4353,6 @@ check_port:
 		port = lun->lun_sep;
 		if (port) {
 			t10_alua_lu_gp_t *lu_gp;
-			t10_alua_tg_pt_gp_t *tg_pt_gp;
 			u32 padding, scsi_name_len;
 			u16 lu_gp_id = 0;
 			u16 tg_pt_gp_id = 0;
@@ -4879,6 +4902,7 @@ static int transport_generic_cmd_sequencer(
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
 	int ret = 0, sector_ret = 0;
 	u32 sectors = 0, size = 0, pr_reg_type = 0;
+	u8 alua_ascq = 0;
 	/*
 	 * Check for an existing UNIT ATTENTION condition
 	 */
@@ -4887,6 +4911,29 @@ static int transport_generic_cmd_sequencer(
 				&transport_nop_wait_for_tasks;
 		transport_get_maps(cmd);
 		return 8; /* UNIT ATTENTION */
+	}
+	/*
+	 * Check status of Asymmetric Logical Unit Assignment port
+	 */
+	ret = T10_ALUA(su_dev)->alua_state_check(cmd, cdb, &alua_ascq);
+	if (ret != 0) {
+		cmd->transport_wait_for_tasks = &transport_nop_wait_for_tasks;
+		transport_get_maps(cmd);
+		/*
+		 * Set SCSI additional sense code (ASC) to 'LUN Not Accessable';
+		 * The ALUA additional sense code qualifier (ASCQ) is determined
+		 * by the ALUA primary or secondary access state..
+		 */
+		if (ret > 0) {
+#if 0
+			printk(KERN_INFO "[%s]: ALUA TG Port not available,"
+				" SenseKey: NOT_READY, ASC/ASCQ: 0x04/0x%02x\n",
+				CMD_TFO(cmd)->get_fabric_name(), alua_ascq);
+#endif
+			transport_set_sense_codes(cmd, 0x04, alua_ascq);
+			return 9; /* NOT READY */
+		}
+		return 6; /* INVALID_CDB_FIELD */	
 	}
 	/*
 	 * Check status for SPC-3 Persistent Reservations
@@ -5098,16 +5145,27 @@ static int transport_generic_cmd_sequencer(
 	case 0xa4:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		if (TRANSPORT(dev)->get_device_type(dev) != TYPE_ROM) {
-			/* MAINTENANCE_OUT from SCC-2 */
+			/* MAINTENANCE_OUT from SCC-2
+			 *
+			 * Check for emulated MO_SET_TARGET_PGS.
+                         */
+                        if (cdb[1] == MO_SET_TARGET_PGS) {
+                                cmd->transport_emulate_cdb =
+                                (T10_ALUA(su_dev)->alua_type ==
+                                 SPC3_ALUA_EMULATED) ?
+                                &core_scsi3_emulate_set_target_port_groups :
+                                NULL;
+                        }
+
 			size = (cdb[6] << 24) | (cdb[7] << 16) |
 			       (cdb[8] << 8) | cdb[9];
 		} else  {
 			/* GPCMD_REPORT_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 1;
+		ret = 2;
 		break;
 	case INQUIRY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -7028,6 +7086,28 @@ remove:
 	transport_generic_free_cmd(cmd, 0, 0, session_reinstatement);
 }
 
+int transport_get_sense_codes(
+	se_cmd_t *cmd,
+	u8 *asc,
+	u8 *ascq)
+{
+	*asc = cmd->scsi_asc;	
+	*ascq = cmd->scsi_ascq;
+	
+	return 0;
+}
+
+int transport_set_sense_codes(
+	se_cmd_t *cmd,
+	u8 asc,
+	u8 ascq)
+{
+	cmd->scsi_asc = asc;
+	cmd->scsi_ascq = ascq;
+
+	return 0;
+}
+
 int transport_send_check_condition_and_sense(
 	se_cmd_t *cmd,
 	u8 reason,
@@ -7161,6 +7241,15 @@ int transport_send_check_condition_and_sense(
 		/* UNIT ATTENTION */
 		buffer[offset+SPC_SENSE_KEY_OFFSET] = UNIT_ATTENTION;
 		core_scsi3_ua_for_check_condition(cmd, &asc, &ascq);
+		buffer[offset+SPC_ASC_KEY_OFFSET] = asc;
+		buffer[offset+SPC_ASCQ_KEY_OFFSET] = ascq;
+		break;
+	case CHECK_CONDITION_NOT_READY:
+		/* CURRENT ERROR */
+		buffer[offset] = 0x70;
+		/* Not Ready */
+		buffer[offset+SPC_SENSE_KEY_OFFSET] = NOT_READY;
+		transport_get_sense_codes(cmd, &asc, &ascq);
 		buffer[offset+SPC_ASC_KEY_OFFSET] = asc;
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = ascq;
 		break;

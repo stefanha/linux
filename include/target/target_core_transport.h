@@ -235,6 +235,8 @@ extern int transport_generic_remove(se_cmd_t *, int, int);
 extern int transport_lun_wait_for_tasks(se_cmd_t *, se_lun_t *);
 extern void transport_clear_lun_from_sessions(se_lun_t *);
 extern int transport_check_aborted_status(se_cmd_t *, int);
+extern int transport_get_sense_codes(se_cmd_t *, u8 *, u8 *);
+extern int transport_set_sense_codes(se_cmd_t *, u8, u8);
 extern int transport_send_check_condition_and_sense(se_cmd_t *, u8, int);
 extern void transport_send_task_abort(struct se_cmd_s *);
 extern void transport_release_cmd_to_pool(se_cmd_t *);
