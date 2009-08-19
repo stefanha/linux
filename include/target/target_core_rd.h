@@ -31,9 +31,9 @@
 #ifndef TARGET_CORE_RD_H
 #define TARGET_CORE_RD_H
 
-#define RD_HBA_VERSION		"v3.0"
-#define RD_DR_VERSION		"3.0"
-#define RD_MCP_VERSION		"3.0"
+#define RD_HBA_VERSION		"v3.1"
+#define RD_DR_VERSION		"3.1"
+#define RD_MCP_VERSION		"3.1"
 
 /* Largest piece of memory kmalloc can allocate */
 #define RD_MAX_ALLOCATION_SIZE	65536
