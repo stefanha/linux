@@ -402,66 +402,77 @@ static struct config_item_type lio_target_np_cit = {
 
 // Start items for lio_target_port_cit
 
-static ssize_t lio_target_show_port_alua_tg_pt_gp (void *p, char *page)
+CONFIGFS_EATTR_STRUCT(lio_target_port, se_lun_s);
+#define LIO_PORT_ATTR(_name, _mode)					\
+static struct lio_target_port_attribute lio_target_port_##_name =	\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	lio_target_port_show_attr_##_name,				\
+	lio_target_port_store_attr_##_name);
+
+#define LIO_PORT_ATTR_RO(_name, _mode)					\
+static struct lio_target_port_attribute lio_target_port_##_name =	\
+	__CONFIGFS_EATTR_RO(_name,					\
+	lio_target_port_show_attr_##_name);
+
+/*
+ * alua_tg_pt_gp
+ */
+static ssize_t lio_target_port_show_attr_alua_tg_pt_gp(
+	struct se_lun_s *lun,
+	char *page)
 {
-	se_lun_t *lun = (se_lun_t *)p;
-
 	if (!(lun->lun_sep))
-		return(-ENODEV);
+		return -ENODEV;
 
-	return(core_alua_show_tg_pt_gp_info(lun->lun_sep, page));
+	return core_alua_show_tg_pt_gp_info(lun->lun_sep, page);
 }
 
-static ssize_t lio_target_store_port_alua_tg_pt_gp (void *p, const char *page, size_t count)
+static ssize_t lio_target_port_store_attr_alua_tg_pt_gp(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
 {
-	se_lun_t *lun = (se_lun_t *)p;
-
 	if (!(lun->lun_sep))
-		return(-ENODEV);
+		return -ENODEV;
 
-	return(core_alua_store_tg_pt_gp_info(lun->lun_sep, page, count));
+	return core_alua_store_tg_pt_gp_info(lun->lun_sep, page, count);
 }
 
-static struct lio_target_configfs_attribute lio_target_attr_port_alua_tg_pt_gp = {
-	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "alua_tg_pt_gp",
-		    .ca_mode = S_IRUGO | S_IWUSR },
-	.show	= lio_target_show_port_alua_tg_pt_gp,
-	.store	= lio_target_store_port_alua_tg_pt_gp,
-};
+LIO_PORT_ATTR(alua_tg_pt_gp, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_offline
+ */
+static ssize_t lio_target_port_show_attr_alua_tg_pt_offline(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_offline_bit(lun, page);
+}
+
+static ssize_t lio_target_port_store_attr_alua_tg_pt_offline(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_offline_bit(lun, page, count);
+}
+
+LIO_PORT_ATTR(alua_tg_pt_offline, S_IRUGO | S_IWUSR);
 
 static struct configfs_attribute *lio_target_port_attrs[] = {
-	&lio_target_attr_port_alua_tg_pt_gp.attr,
+	&lio_target_port_alua_tg_pt_gp.attr,
+	&lio_target_port_alua_tg_pt_offline.attr,
 	NULL,
 };
 
-static ssize_t lio_target_port_show (struct config_item *item,
-				     struct configfs_attribute *attr,
-				     char *page)
-{
-	se_lun_t *lun = container_of(to_config_group(item), se_lun_t, lun_group);
-	struct lio_target_configfs_attribute *lt_attr = container_of(
-			attr, struct lio_target_configfs_attribute, attr);
-
-	if (!(lt_attr->show))
-		return(-EINVAL);
-
-	return(lt_attr->show((void *)lun, page));
-}
-
-static ssize_t lio_target_port_store (struct config_item *item,
-				      struct configfs_attribute *attr,
-				      const char *page, size_t count)
-{
-	se_lun_t *lun = container_of(to_config_group(item), se_lun_t, lun_group);
-	struct lio_target_configfs_attribute *lt_attr = container_of(
-			attr, struct lio_target_configfs_attribute, attr);
-
-	if (!(lt_attr->store))
-		return(-EINVAL);
-
-	return(lt_attr->store((void *)lun, page, count));
-}
+CONFIGFS_EATTR_OPS(lio_target_port, se_lun_s, lun_group);
 
 static int lio_target_port_link (struct config_item *lun_ci, struct config_item *se_dev_ci)
 {
@@ -563,8 +574,8 @@ static int lio_target_port_unlink (struct config_item *lun_ci, struct config_ite
 
 static struct configfs_item_operations lio_target_port_item_ops = {
 	.release		= NULL,
-	.show_attribute		= lio_target_port_show,
-	.store_attribute	= lio_target_port_store,
+	.show_attribute		= lio_target_port_attr_show,
+	.store_attribute	= lio_target_port_attr_store,
 	.allow_link		= lio_target_port_link,
 	.check_link		= lio_target_port_check_link,
 	.drop_link		= lio_target_port_unlink,

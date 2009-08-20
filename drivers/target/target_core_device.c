@@ -511,6 +511,7 @@ void core_update_device_list_for_node(
 	se_portal_group_t *tpg,
 	int enable)
 {
+	se_port_t *port = lun->lun_sep;
 	se_dev_entry_t *deve;
 
 	spin_lock_bh(&nacl->device_list_lock);
@@ -533,6 +534,11 @@ void core_update_device_list_for_node(
 		deve->attach_count++;
 #endif /* SNMP_SUPPORT */
 		spin_unlock_bh(&nacl->device_list_lock);
+
+		spin_lock_bh(&port->sep_alua_lock);
+		list_add_tail(&deve->alua_port_list, &port->sep_alua_list);
+		spin_unlock_bh(&port->sep_alua_lock);
+
 		return;
 	}
 	/*
@@ -547,6 +553,10 @@ void core_update_device_list_for_node(
 	deve->attach_count--;
 #endif /* SNMP_SUPPORT */
 	spin_unlock_bh(&nacl->device_list_lock);
+
+	spin_lock_bh(&port->sep_alua_lock);
+	list_del(&deve->alua_port_list);
+	spin_unlock_bh(&port->sep_alua_lock);
 
 	core_scsi3_free_pr_reg_from_nacl(lun->se_dev, nacl);
 	return;
@@ -597,7 +607,10 @@ se_port_t *core_alloc_port(se_device_t *dev)
 		printk(KERN_ERR "Unable to allocate se_port_t\n");
 		return NULL;
 	}
+	INIT_LIST_HEAD(&port->sep_alua_list);
 	INIT_LIST_HEAD(&port->sep_list);
+	atomic_set(&port->sep_tg_pt_secondary_offline, 0);
+	spin_lock_init(&port->sep_alua_lock);
 
 	spin_lock(&dev->se_port_lock);
 	if (dev->dev_port_count == 0x0000ffff) {
@@ -664,11 +677,10 @@ void core_export_port(
 		}
 		spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 		__core_alua_attach_tg_pt_gp_mem(tg_pt_gp_mem,
-			se_global->default_tg_pt_gp);
+			T10_ALUA(su_dev)->default_tg_pt_gp);
 		spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
-
 		printk(KERN_INFO "%s/%s: Adding to default ALUA Target Port"
-			" Group: core/alua/tg_pt_gps/default_tg_pt_gp\n",
+			" Group: alua/default_tg_pt_gp\n",
 			TRANSPORT(dev)->name, TPG_TFO(tpg)->get_fabric_name());
 	}
 

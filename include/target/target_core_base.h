@@ -38,7 +38,7 @@
 #include <target/target_core_mib.h>
 #endif /* SNMP_SUPPORT */
 
-#define TARGET_CORE_MOD_VERSION		"v3.0"
+#define TARGET_CORE_MOD_VERSION		"v3.1"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
@@ -160,6 +160,7 @@
 #define SCF_OVERFLOW_BIT                        0x00010000
 #define SCF_UNDERFLOW_BIT                       0x00020000
 #define SCF_SENT_DELAYED_TAS			0x00040000
+#define SCF_ALUA_NON_OPTIMIZED			0x00080000
 
 /* se_device_t->type */
 #define PSCSI					1
@@ -210,6 +211,7 @@
 #define WRITE_PROTECTED				0xc
 #define CHECK_CONDITION_ABORT_CMD		0xd
 #define CHECK_CONDITION_UNIT_ATTENTION		0xe
+#define CHECK_CONDITION_NOT_READY		0xf
 
 typedef struct se_obj_s {
 	atomic_t obj_access_count;
@@ -221,14 +223,26 @@ typedef enum {
 	SPC3_ALUA_EMULATED
 } t10_alua_index_t;
 
+struct se_cmd_s;
+
 typedef struct t10_alua_s {
 	t10_alua_index_t alua_type;
+	/* ALUA Target Port Group ID */
+	u16	alua_tg_pt_gps_counter;
+	u32	alua_tg_pt_gps_count;
+	spinlock_t tg_pt_gps_lock;
+	struct se_subsystem_dev_s *t10_sub_dev;
+	/* Used for default ALUA Target Port Group */
+	struct t10_alua_tg_pt_gp_s *default_tg_pt_gp;
+	/* Used for default ALUA Target Port Group ConfigFS group */
+	struct config_group alua_tg_pt_gps_group;
+	int (*alua_state_check)(struct se_cmd_s *, unsigned char *, u8 *);
+	struct list_head tg_pt_gps_list;
 } ____cacheline_aligned t10_alua_t;
 
 typedef struct t10_alua_lu_gp_s {
 	u16	lu_gp_id;
 	int	lu_gp_valid_id;
-	int	lu_gp_alua_access_state;
 	u32	lu_gp_members;
 	atomic_t lu_gp_shutdown;
 	atomic_t lu_gp_ref_cnt;
@@ -240,6 +254,7 @@ typedef struct t10_alua_lu_gp_s {
 
 typedef struct t10_alua_lu_gp_member_s {
 	int lu_gp_assoc;
+	atomic_t lu_gp_mem_ref_cnt;
 	spinlock_t lu_gp_mem_lock;
 	t10_alua_lu_gp_t *lu_gp;
 	struct se_device_s *lu_gp_mem_dev;
@@ -250,9 +265,14 @@ typedef struct t10_alua_tg_pt_gp_s {
 	u16	tg_pt_gp_id;
 	int	tg_pt_gp_valid_id;
 	int	tg_pt_gp_alua_access_state;
+	int	tg_pt_gp_alua_access_status;
+	int	tg_pt_gp_alua_access_type;
+	int	tg_pt_gp_nonop_delay_msecs;
+	int	tg_pt_gp_pref;
 	u32	tg_pt_gp_members;
 	atomic_t tg_pt_gp_ref_cnt;
 	spinlock_t tg_pt_gp_lock;
+	struct se_subsystem_dev_s *tg_pt_gp_su_dev;
 	struct config_group tg_pt_gp_group;
 	struct list_head tg_pt_gp_list;
 	struct list_head tg_pt_gp_mem_list;
@@ -260,6 +280,7 @@ typedef struct t10_alua_tg_pt_gp_s {
 
 typedef struct t10_alua_tg_pt_gp_member_s {
 	int tg_pt_gp_assoc;
+	atomic_t tg_pt_gp_mem_ref_cnt;
 	spinlock_t tg_pt_gp_mem_lock;
 	t10_alua_tg_pt_gp_t *tg_pt_gp;
 	struct se_port_s *tg_pt;
@@ -292,8 +313,6 @@ typedef enum {
 	SPC2_RESERVATIONS,
 	SPC3_PERSISTENT_RESERVATIONS
 } t10_reservations_index_t;
-
-struct se_cmd_s;
 
 typedef struct t10_pr_registration_s {
 	unsigned char pr_iport[PR_APTPL_MAX_IPORT_LEN]; /* Used during APTPL metadata reading */
@@ -481,8 +500,12 @@ typedef struct se_unmap_sg_s {
 typedef struct se_cmd_s {
 	/* SAM response code being sent to initiator */
 	u8			scsi_status;
+	u8			scsi_asc;
+	u8			scsi_ascq;
 	u8			scsi_sense_reason;
 	u16			scsi_sense_length;
+	/* Delay for ALUA Active/NonOptimized state access in milliseconds */
+	int			alua_nonop_delay;
 	int			data_direction;
 	/* Transport protocol dependent state */
 	int			t_state;
@@ -646,6 +669,7 @@ typedef struct se_dev_entry_s {
 	se_lun_acl_t		*se_lun_acl;
 	spinlock_t		ua_lock;
 	struct se_lun_s		*se_lun;
+	struct list_head	alua_port_list;
 	struct list_head	ua_list;
 }  ____cacheline_aligned se_dev_entry_t;
 
@@ -688,7 +712,7 @@ typedef struct se_subsystem_dev_s {
 	struct se_device_s *se_dev_ptr;
 	se_dev_attrib_t se_dev_attrib;
 	se_dev_snap_attrib_t se_snap_attrib;
-	/* T10 Asymmetric Logical Unit Assignment Information */
+	/* T10 Asymmetric Logical Unit Assignment for Target Ports */
 	t10_alua_t	t10_alua;
 	/* T10 Inquiry and VPD WWN Information */
 	t10_wwn_t	t10_wwn;
@@ -748,6 +772,7 @@ typedef struct se_device_s {
 	se_queue_obj_t		*dev_status_queue_obj;
 	spinlock_t		execute_task_lock;
 	spinlock_t		state_task_lock;
+	spinlock_t		dev_alua_lock;
 	spinlock_t		dev_reservation_lock;
 	spinlock_t		dev_state_lock;
 	spinlock_t		dev_status_lock;
@@ -850,14 +875,19 @@ typedef struct se_lun_s {
 typedef struct se_port_s {
 	/* RELATIVE TARGET PORT IDENTIFER */
 	u16		sep_rtpi;
+	int		sep_tg_pt_secondary_stat;
 #ifdef SNMP_SUPPORT
 	u32		sep_index;
 	scsi_port_stats_t sep_stats;
 #endif
 	/* Used for ALUA Target Port Groups membership */
+	atomic_t	sep_tg_pt_gp_active;
+	atomic_t	sep_tg_pt_secondary_offline;
+	spinlock_t	sep_alua_lock;
 	struct t10_alua_tg_pt_gp_member_s *sep_alua_tg_pt_gp_mem;
 	struct se_lun_s *sep_lun;
 	struct se_portal_group_s *sep_tpg;
+	struct list_head sep_alua_list;
 	struct list_head sep_list;
 } ____cacheline_aligned se_port_t;
 
@@ -888,28 +918,22 @@ typedef struct se_portal_group_s {
 
 typedef struct se_global_s {
 	u16			alua_lu_gps_counter;
-	u16			alua_tg_pt_gps_counter;
 	u32			in_shutdown;
 	u32			alua_lu_gps_count;
-	u32			alua_tg_pt_gps_count;
 	u32			g_hba_id_counter;
 	struct config_group	target_core_hbagroup;
 	struct config_group	alua_group;
 	struct config_group	alua_lu_gps_group;
-	struct config_group	alua_tg_pt_gps_group;
 	struct list_head	g_lu_gps_list;
-	struct list_head	g_tg_pt_gps_list;
 	struct list_head	g_se_tpg_list;
 	struct list_head	g_hba_list;
 	struct list_head	g_se_dev_list;
 	struct se_plugin_class_s *plugin_class_list;
 	t10_alua_lu_gp_t	*default_lu_gp;
-	t10_alua_tg_pt_gp_t	*default_tg_pt_gp;
 	spinlock_t		g_device_lock;
 	spinlock_t		hba_lock;
 	spinlock_t		se_tpg_lock;
 	spinlock_t		lu_gps_lock;
-	spinlock_t		tg_pt_gps_lock;
 	spinlock_t		plugin_class_lock;
 #ifdef DEBUG_DEV
 	spinlock_t		debug_dev_lock;

@@ -31,7 +31,7 @@
 #ifndef TARGET_CORE_FILE_H
 #define TARGET_CORE_FILE_H
 
-#define FD_VERSION		"3.0"
+#define FD_VERSION		"3.1"
 
 #define FD_MAX_DEV_NAME		256
 /* Maximum queuedepth for the FILEIO HBA */

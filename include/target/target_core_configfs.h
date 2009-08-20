@@ -25,7 +25,7 @@
  *
  *********************************************************************/
 
-#define TARGET_CORE_CONFIGFS_VERSION "v1.0.0"
+#define TARGET_CORE_CONFIGFS_VERSION "v2.0.0"
 
 #define TARGET_CORE_CONFIG_ROOT	"/sys/kernel/config"
 

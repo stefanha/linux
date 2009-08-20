@@ -57,6 +57,7 @@
 #include <iscsi_debug_opcodes.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
+#include <target/target_core_alua.h>
 #include <iscsi_target_error.h>
 #include <iscsi_target_datain_values.h>
 #include <iscsi_target_discovery.h>
@@ -1571,7 +1572,11 @@ build_list:
 
 attach_cmd:
 	iscsi_attach_cmd_to_queue(conn, cmd);
-
+	/*
+	 * Check if we need to delay processing because of ALUA
+	 * Active/NonOptimized primary access state..
+	 */
+	core_alua_check_nonop_delay(SE_CMD(cmd));
 	/*
 	 * Check the CmdSN against ExpCmdSN/MaxCmdSN here if
 	 * the Immediate Bit is not set, and no Immediate

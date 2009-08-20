@@ -31,7 +31,7 @@
 #ifndef TARGET_CORE_PSCSI_H
 #define TARGET_CORE_PSCSI_H
 
-#define PSCSI_VERSION		"v3.0"
+#define PSCSI_VERSION		"v3.1"
 
 /* used in pscsi_find_alloc_len() */
 #ifndef INQUIRY_DATA_SIZE
