@@ -36,6 +36,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/in.h>
+#include <linux/ctype.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi.h>
@@ -248,6 +249,7 @@ extern char *lio_tpg_parse_pr_out_transport_id(
 {
 	char *p;
 	u32 tid_len, padding;
+	int i;
 	u16 add_len;
 	u8 format_code = (buf[0] & 0xc0);
 	/*
@@ -306,6 +308,20 @@ extern char *lio_tpg_parse_pr_out_transport_id(
 		p += 5; /* Skip over ",i,0x" seperator */
 
 		*port_nexus_ptr = p;	
+		/*
+		 * Go ahead and do the lower case conversion of the received
+		 * 12 ASCII characters representing the ISID in the TransportID
+		 * for comparision against the running iSCSI session's ISID from
+		 * iscsi_target.c:lio_sess_get_initiator_wwn()
+		 */
+		for (i = 0; i < 12; i++) {
+			if (isdigit(*p)) {
+				p++;
+				continue;
+			}
+			*p = tolower(*p);
+			p++;
+		}
 	}
 
 	return (char *)&buf[4];
