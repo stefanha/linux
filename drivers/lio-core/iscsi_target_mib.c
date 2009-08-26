@@ -779,7 +779,7 @@ static int sess_attr_seq_show(struct seq_file *seq, void *v)
 			   sops->InitiatorName[0]? sops->InitiatorName:NONE,
 			   sops->TargetName[0]? sops->TargetName:NONE,
 			   sess->tsih);
-		seq_printf(seq, "%02X %02X %02X %02X %02X %02X %s %s %s %u ",
+		seq_printf(seq, "%02x %02x %02x %02x %02x %02x %s %s %s %u ",
 			   sess->isid[0], sess->isid[1], sess->isid[2],
 			   sess->isid[3], sess->isid[4], sess->isid[5],
 			   sops->InitialR2T? "Yes" :"No",
@@ -1225,7 +1225,7 @@ extern int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				continue;
 
 			seq_printf(seq,"%u %u %u %u %u "
-				   "%s+i+%02X%02X%02X%02X%02X%02X\n",
+				   "%s+i+%02x%02x%02x%02x%02x%02x\n",
 				   tiqn->tiqn_index, /* scsiInstIndex */
 				   lun->se_dev->dev_index, /* scsiDeviceIndex */
 				   tpg->tpgt, /* scsiPortIndex */

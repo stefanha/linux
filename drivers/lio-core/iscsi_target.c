@@ -1235,7 +1235,7 @@ extern u32 lio_sess_get_initiator_wwn (
 	/* 
 	 * iSCSI Initiator Session Identifier from RFC-3720.
 	 */
-	return snprintf(buf, size, "%02X%02X%02X%02X%02X%02X",
+	return snprintf(buf, size, "%02x%02x%02x%02x%02x%02x",
 		sess->isid[0], sess->isid[1], sess->isid[2],
 		sess->isid[3], sess->isid[4], sess->isid[5]);	
 }
