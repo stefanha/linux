@@ -264,12 +264,12 @@ typedef struct t10_alua_lu_gp_member_s {
 typedef struct t10_alua_tg_pt_gp_s {
 	u16	tg_pt_gp_id;
 	int	tg_pt_gp_valid_id;
-	int	tg_pt_gp_alua_access_state;
 	int	tg_pt_gp_alua_access_status;
 	int	tg_pt_gp_alua_access_type;
 	int	tg_pt_gp_nonop_delay_msecs;
 	int	tg_pt_gp_pref;
 	u32	tg_pt_gp_members;
+	atomic_t tg_pt_gp_alua_access_state;
 	atomic_t tg_pt_gp_ref_cnt;
 	spinlock_t tg_pt_gp_lock;
 	struct se_subsystem_dev_s *tg_pt_gp_su_dev;

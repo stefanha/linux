@@ -71,7 +71,8 @@ int core_scsi3_emulate_report_target_port_groups(se_cmd_t *cmd)
 		/*
 		 * Set the ASYMMETRIC ACCESS State
 		 */
-		buf[off++] |= (tg_pt_gp->tg_pt_gp_alua_access_state & 0xff);
+		buf[off++] |= (atomic_read(
+			&tg_pt_gp->tg_pt_gp_alua_access_state) & 0xff);
 		/*
 		 * Set supported ASYMMETRIC ACCESS State bits
 		 */
@@ -485,7 +486,7 @@ int core_alua_state_check(
 	tg_pt_gp_mem = port->sep_alua_tg_pt_gp_mem;
 	spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 	tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
-	out_alua_state = tg_pt_gp->tg_pt_gp_alua_access_state;
+	out_alua_state = atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state);
 	nonop_delay_msecs = tg_pt_gp->tg_pt_gp_nonop_delay_msecs;
 	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 	/*
@@ -625,8 +626,8 @@ int core_alua_do_transition_tg_pt(
 	t10_alua_tg_pt_gp_member_t *mem;
 	int old_state = 0;
 
-	old_state = tg_pt_gp->tg_pt_gp_alua_access_state;
-	tg_pt_gp->tg_pt_gp_alua_access_state = new_state;
+	old_state = atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state);
+	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state, new_state);
 	tg_pt_gp->tg_pt_gp_alua_access_status = (explict) ?
 				ALUA_STATUS_ALTERED_BY_EXPLICT_STPG :
 				ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA;
@@ -1094,8 +1095,8 @@ t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(
 	spin_lock_init(&tg_pt_gp->tg_pt_gp_lock);
 	atomic_set(&tg_pt_gp->tg_pt_gp_ref_cnt, 0);
 	tg_pt_gp->tg_pt_gp_su_dev = su_dev;
-	tg_pt_gp->tg_pt_gp_alua_access_state =
-			ALUA_ACCESS_STATE_ACTIVE_OPTMIZED;
+	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state,
+		ALUA_ACCESS_STATE_ACTIVE_OPTMIZED);
 	/*
 	 * Enable both explict and implict ALUA support by default
 	 */
@@ -1379,7 +1380,8 @@ ssize_t core_alua_show_tg_pt_gp_info(se_port_t *port, char *page)
 			"Primary Access Status: %s\nTG Port Secondary Access"
 			" State: %s\nTG Port Secondary Access Status: %s\n",
 			config_item_name(tg_pt_ci), tg_pt_gp->tg_pt_gp_id,
-			core_alua_dump_state(tg_pt_gp->tg_pt_gp_alua_access_state),
+			core_alua_dump_state(atomic_read(
+					&tg_pt_gp->tg_pt_gp_alua_access_state)),
 			core_alua_dump_status(tg_pt_gp->tg_pt_gp_alua_access_status),
 			(atomic_read(&port->sep_tg_pt_secondary_offline)) ?
 			"Offline" : "None",
