@@ -267,6 +267,7 @@ typedef struct t10_alua_tg_pt_gp_s {
 	int	tg_pt_gp_alua_access_status;
 	int	tg_pt_gp_alua_access_type;
 	int	tg_pt_gp_nonop_delay_msecs;
+	int	tg_pt_gp_trans_delay_msecs;
 	int	tg_pt_gp_pref;
 	u32	tg_pt_gp_members;
 	atomic_t tg_pt_gp_alua_access_state;
