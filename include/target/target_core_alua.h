@@ -43,7 +43,7 @@
  * Used as the default for Active/NonOptimized delay (in milliseconds)
  * This can also be changed via configfs on a per target port group basis..
  */
-#define ALUA_DEFAULT_NONOP_DEFLAY_MSECS			100
+#define ALUA_DEFAULT_NONOP_DELAY_MSECS			100
 #define ALUA_MAX_NONOP_DELAY_MSECS			10000 /* 10 seconds */
 
 extern se_global_t *se_global;

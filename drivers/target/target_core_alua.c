@@ -1104,7 +1104,7 @@ t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(
 	/*
 	 * Set the default Active/NonOptimized Delay in milliseconds
 	 */
-	tg_pt_gp->tg_pt_gp_nonop_delay_msecs = ALUA_DEFAULT_NONOP_DEFLAY_MSECS;
+	tg_pt_gp->tg_pt_gp_nonop_delay_msecs = ALUA_DEFAULT_NONOP_DELAY_MSECS;
 
 	if (def_group) {
 		spin_lock(&T10_ALUA(su_dev)->tg_pt_gps_lock);
