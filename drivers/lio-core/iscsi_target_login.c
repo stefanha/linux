@@ -1075,17 +1075,17 @@ get_new_sock:
 		ip = &buf_ipv4[0];
 	}
 	
-	spin_lock(&np->np_thread_lock);
+	spin_lock_bh(&np->np_thread_lock);
 	if ((atomic_read(&np->np_shutdown)) ||
 	    (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE)) {
-		spin_unlock(&np->np_thread_lock);
+		spin_unlock_bh(&np->np_thread_lock);
 		TRACE_ERROR("iSCSI Network Portal on %s:%hu currently not"
 			" active.\n", ip, np->np_port);
 		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,
 				STAT_DETAIL_SERVICE_UNAVAILABLE);
 		goto new_sess_out;
 	}
-	spin_unlock(&np->np_thread_lock);
+	spin_unlock_bh(&np->np_thread_lock);
 
 	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
 		memset(&sock_in6, 0, sizeof(struct sockaddr_in6));

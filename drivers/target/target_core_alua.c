@@ -71,7 +71,8 @@ int core_scsi3_emulate_report_target_port_groups(se_cmd_t *cmd)
 		/*
 		 * Set the ASYMMETRIC ACCESS State
 		 */
-		buf[off++] |= (tg_pt_gp->tg_pt_gp_alua_access_state & 0xff);
+		buf[off++] |= (atomic_read(
+			&tg_pt_gp->tg_pt_gp_alua_access_state) & 0xff);
 		/*
 		 * Set supported ASYMMETRIC ACCESS State bits
 		 */
@@ -485,7 +486,7 @@ int core_alua_state_check(
 	tg_pt_gp_mem = port->sep_alua_tg_pt_gp_mem;
 	spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 	tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
-	out_alua_state = tg_pt_gp->tg_pt_gp_alua_access_state;
+	out_alua_state = atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state);
 	nonop_delay_msecs = tg_pt_gp->tg_pt_gp_nonop_delay_msecs;
 	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 	/*
@@ -624,12 +625,21 @@ int core_alua_do_transition_tg_pt(
 	se_port_t *port;
 	t10_alua_tg_pt_gp_member_t *mem;
 	int old_state = 0;
-
-	old_state = tg_pt_gp->tg_pt_gp_alua_access_state;
-	tg_pt_gp->tg_pt_gp_alua_access_state = new_state;
+	/*
+	 * Save the old primary ALUA access state, and set the current state
+	 * to ALUA_ACCESS_STATE_TRANSITION.
+	 */
+	old_state = atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state);
+	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state,
+			ALUA_ACCESS_STATE_TRANSITION);
 	tg_pt_gp->tg_pt_gp_alua_access_status = (explict) ?
 				ALUA_STATUS_ALTERED_BY_EXPLICT_STPG :
 				ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA;
+	/*
+	 * Check for the optional ALUA primary state transition delay
+	 */
+	if (tg_pt_gp->tg_pt_gp_trans_delay_msecs != 0) 
+		msleep_interruptible(tg_pt_gp->tg_pt_gp_trans_delay_msecs);
 
 	spin_lock(&tg_pt_gp->tg_pt_gp_lock);
 	list_for_each_entry(mem, &tg_pt_gp->tg_pt_gp_mem_list,
@@ -673,6 +683,10 @@ int core_alua_do_transition_tg_pt(
 		smp_mb__after_atomic_dec();
 	}
 	spin_unlock(&tg_pt_gp->tg_pt_gp_lock);
+	/*
+	 * Set the current primary ALUA access state to the requested new state
+	 */
+	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state, new_state);
 
 	printk(KERN_INFO "Successful %s ALUA transition TG PT Group: %s ID: %hu"
 		" from primary access state: %s to %s\n", (explict) ? "explict" :
@@ -805,6 +819,7 @@ int core_alua_set_tg_pt_secondary_state(
 	int offline)
 {
 	struct t10_alua_tg_pt_gp_s *tg_pt_gp;
+	int trans_delay_msecs;
 
 	spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 	tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
@@ -814,6 +829,7 @@ int core_alua_set_tg_pt_secondary_state(
 				" transition\n");
 		return -1;
 	}
+	trans_delay_msecs = tg_pt_gp->tg_pt_gp_trans_delay_msecs;
 	/*
 	 * Set the secondary ALUA target port access state to OFFLINE
 	 * or release the previously secondary state for se_port_t
@@ -826,12 +842,16 @@ int core_alua_set_tg_pt_secondary_state(
 	port->sep_tg_pt_secondary_stat = (explict) ?
 			ALUA_STATUS_ALTERED_BY_EXPLICT_STPG :
 			ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA;
-	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 
 	printk(KERN_INFO "Successful %s ALUA transition TG PT Group: %s ID: %hu"
 		" to secondary access state: %s\n", (explict) ? "explict" :
 		"implict", config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item),
 		tg_pt_gp->tg_pt_gp_id, (offline) ? "OFFLINE" : "ONLINE");
+
+	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
+
+	if (trans_delay_msecs != 0)
+		msleep_interruptible(trans_delay_msecs);	
 
 	return 0;
 }
@@ -1094,8 +1114,8 @@ t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(
 	spin_lock_init(&tg_pt_gp->tg_pt_gp_lock);
 	atomic_set(&tg_pt_gp->tg_pt_gp_ref_cnt, 0);
 	tg_pt_gp->tg_pt_gp_su_dev = su_dev;
-	tg_pt_gp->tg_pt_gp_alua_access_state =
-			ALUA_ACCESS_STATE_ACTIVE_OPTMIZED;
+	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state,
+		ALUA_ACCESS_STATE_ACTIVE_OPTMIZED);
 	/*
 	 * Enable both explict and implict ALUA support by default
 	 */
@@ -1104,7 +1124,8 @@ t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(
 	/*
 	 * Set the default Active/NonOptimized Delay in milliseconds
 	 */
-	tg_pt_gp->tg_pt_gp_nonop_delay_msecs = ALUA_DEFAULT_NONOP_DEFLAY_MSECS;
+	tg_pt_gp->tg_pt_gp_nonop_delay_msecs = ALUA_DEFAULT_NONOP_DELAY_MSECS;
+	tg_pt_gp->tg_pt_gp_trans_delay_msecs = ALUA_DEFAULT_TRANS_DELAY_MSECS;
 
 	if (def_group) {
 		spin_lock(&T10_ALUA(su_dev)->tg_pt_gps_lock);
@@ -1379,7 +1400,8 @@ ssize_t core_alua_show_tg_pt_gp_info(se_port_t *port, char *page)
 			"Primary Access Status: %s\nTG Port Secondary Access"
 			" State: %s\nTG Port Secondary Access Status: %s\n",
 			config_item_name(tg_pt_ci), tg_pt_gp->tg_pt_gp_id,
-			core_alua_dump_state(tg_pt_gp->tg_pt_gp_alua_access_state),
+			core_alua_dump_state(atomic_read(
+					&tg_pt_gp->tg_pt_gp_alua_access_state)),
 			core_alua_dump_status(tg_pt_gp->tg_pt_gp_alua_access_status),
 			(atomic_read(&port->sep_tg_pt_secondary_offline)) ?
 			"Offline" : "None",
@@ -1567,6 +1589,37 @@ ssize_t core_alua_store_nonop_delay_msecs(
 		return -EINVAL;
 	}
 	tg_pt_gp->tg_pt_gp_nonop_delay_msecs = (int)tmp;
+
+	return count;
+}
+
+ssize_t core_alua_show_trans_delay_msecs(
+	t10_alua_tg_pt_gp_t *tg_pt_gp,
+	char *page)
+{
+	return sprintf(page, "%d\n", tg_pt_gp->tg_pt_gp_trans_delay_msecs);
+}
+
+ssize_t core_alua_store_trans_delay_msecs(
+	t10_alua_tg_pt_gp_t *tg_pt_gp,
+	const char *page,
+	size_t count)
+{
+	unsigned long tmp;
+	int ret;
+
+	ret = strict_strtoul(page, 0, &tmp);
+	if (ret < 0) {
+		printk(KERN_ERR "Unable to extract trans_delay_msecs\n");
+		return -EINVAL;
+	}
+	if (tmp > ALUA_MAX_TRANS_DELAY_MSECS) {
+		printk(KERN_ERR "Passed trans_delay_msecs: %lu, exceeds"
+			" ALUA_MAX_TRANS_DELAY_MSECS: %d\n", tmp,
+			ALUA_MAX_TRANS_DELAY_MSECS);
+		return -EINVAL;
+	}
+	tg_pt_gp->tg_pt_gp_trans_delay_msecs = (int)tmp;
 
 	return count;
 }

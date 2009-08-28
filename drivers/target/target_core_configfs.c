@@ -2171,7 +2171,8 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_alua_access_state(
 	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
 	char *page)
 {
-	return sprintf(page, "%d\n", tg_pt_gp->tg_pt_gp_alua_access_state);
+	return sprintf(page, "%d\n",
+		atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state));
 }
 
 static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_access_state(
@@ -2263,6 +2264,26 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_nonop_delay_msecs(
 }
 
 SE_DEV_ALUA_TG_PT_ATTR(nonop_delay_msecs, S_IRUGO | S_IWUSR);
+
+/*
+ * trans_delay_msecs
+ */
+static ssize_t target_core_alua_tg_pt_gp_show_attr_trans_delay_msecs(
+	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
+	char *page)
+{
+	return core_alua_show_trans_delay_msecs(tg_pt_gp, page);
+}
+
+static ssize_t target_core_alua_tg_pt_gp_store_attr_trans_delay_msecs(
+	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
+	const char *page,
+	size_t count)
+{
+	return core_alua_store_trans_delay_msecs(tg_pt_gp, page, count);	
+}
+
+SE_DEV_ALUA_TG_PT_ATTR(trans_delay_msecs, S_IRUGO | S_IWUSR);
 
 /*
  * preferred
@@ -2386,6 +2407,7 @@ static struct configfs_attribute *target_core_alua_tg_pt_gp_attrs[] = {
 	&target_core_alua_tg_pt_gp_alua_access_status.attr,
 	&target_core_alua_tg_pt_gp_alua_access_type.attr,
 	&target_core_alua_tg_pt_gp_nonop_delay_msecs.attr,
+	&target_core_alua_tg_pt_gp_trans_delay_msecs.attr,
 	&target_core_alua_tg_pt_gp_preferred.attr,
 	&target_core_alua_tg_pt_gp_tg_pt_gp_id.attr,
 	&target_core_alua_tg_pt_gp_members.attr,

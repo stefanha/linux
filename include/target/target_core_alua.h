@@ -43,8 +43,15 @@
  * Used as the default for Active/NonOptimized delay (in milliseconds)
  * This can also be changed via configfs on a per target port group basis..
  */
-#define ALUA_DEFAULT_NONOP_DEFLAY_MSECS			100
+#define ALUA_DEFAULT_NONOP_DELAY_MSECS			100
 #define ALUA_MAX_NONOP_DELAY_MSECS			10000 /* 10 seconds */
+/*
+ * Used for implict and explict ALUA transitional delay, that is disabled
+ * by default, and is intended to be used for debugging client side ALUA code.
+ */
+#define ALUA_DEFAULT_TRANS_DELAY_MSECS			0
+#define ALUA_MAX_TRANS_DELAY_MSECS			30000 /* 30 seconds */
+
 
 extern se_global_t *se_global;
 
@@ -103,6 +110,10 @@ extern ssize_t core_alua_store_access_type(struct t10_alua_tg_pt_gp_s *,
 extern ssize_t core_alua_show_nonop_delay_msecs(struct t10_alua_tg_pt_gp_s *,
 						char *);
 extern ssize_t core_alua_store_nonop_delay_msecs(struct t10_alua_tg_pt_gp_s *,
+					const char *, size_t);
+extern ssize_t core_alua_show_trans_delay_msecs(struct t10_alua_tg_pt_gp_s *,
+					char *);
+extern ssize_t core_alua_store_trans_delay_msecs(struct t10_alua_tg_pt_gp_s *,
 					const char *, size_t);
 extern ssize_t core_alua_show_preferred_bit(struct t10_alua_tg_pt_gp_s *, char *);
 extern ssize_t core_alua_store_preferred_bit(struct t10_alua_tg_pt_gp_s *,
