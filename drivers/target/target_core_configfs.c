@@ -2222,7 +2222,41 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_alua_access_status(
 		core_alua_dump_status(tg_pt_gp->tg_pt_gp_alua_access_status));
 }
 
-SE_DEV_ALUA_TG_PT_ATTR_RO(alua_access_status);
+static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_access_status(
+	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
+	const char *page,
+	size_t count)
+{
+	unsigned long tmp;
+	int new_status, ret;
+	
+	if (!(tg_pt_gp->tg_pt_gp_valid_id)) {
+		printk(KERN_ERR "Unable to do set ALUA access status on non"
+			" valid tg_pt_gp ID: %hu\n",
+			tg_pt_gp->tg_pt_gp_valid_id);
+		return -EINVAL;		
+	}
+
+	ret = strict_strtoul(page, 0, &tmp);
+	if (ret < 0) {
+		printk(KERN_ERR "Unable to extract new ALUA access status"
+				" from %s\n", page);
+		return -EINVAL;
+	}
+	new_status = (int)tmp;
+
+	if ((new_status != ALUA_STATUS_NONE) &&
+	    (new_status != ALUA_STATUS_ALTERED_BY_EXPLICT_STPG) &&
+	    (new_status != ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA)) {
+		printk(KERN_ERR "Illegal ALUA access status: 0x%02x\n", new_status);
+		return -EINVAL;
+	}
+
+	tg_pt_gp->tg_pt_gp_alua_access_status = new_status;
+	return count;
+}
+
+SE_DEV_ALUA_TG_PT_ATTR(alua_access_status, S_IRUGO | S_IWUSR);
 
 /*
  * alua_access_type
@@ -2243,6 +2277,44 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_access_type(
 }
 
 SE_DEV_ALUA_TG_PT_ATTR(alua_access_type, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_write_metadata
+ */
+static ssize_t target_core_alua_tg_pt_gp_show_attr_alua_write_metadata(
+	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
+	char *page)
+{
+	return sprintf(page, "%d\n", tg_pt_gp->tg_pt_gp_write_metadata);
+}
+
+static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_write_metadata(
+	struct t10_alua_tg_pt_gp_s *tg_pt_gp,
+	const char *page,
+	size_t count)
+{
+	unsigned long tmp;
+	int ret;
+
+	ret = strict_strtoul(page, 0, &tmp);
+	if (ret < 0) {
+		printk(KERN_ERR "Unable to extract alua_write_metadata\n");	
+		return -EINVAL;
+	}
+
+	if ((tmp != 0) && (tmp != 1)) {
+		printk(KERN_ERR "Illegal value for alua_write_metadata:"
+			" %lu\n", tmp);
+		return -EINVAL;
+	}
+	tg_pt_gp->tg_pt_gp_write_metadata = (int)tmp;
+
+	return count;
+}
+
+SE_DEV_ALUA_TG_PT_ATTR(alua_write_metadata, S_IRUGO | S_IWUSR);
+
+
 
 /*
  * nonop_delay_msecs
@@ -2406,6 +2478,7 @@ static struct configfs_attribute *target_core_alua_tg_pt_gp_attrs[] = {
 	&target_core_alua_tg_pt_gp_alua_access_state.attr,
 	&target_core_alua_tg_pt_gp_alua_access_status.attr,
 	&target_core_alua_tg_pt_gp_alua_access_type.attr,
+	&target_core_alua_tg_pt_gp_alua_write_metadata.attr,
 	&target_core_alua_tg_pt_gp_nonop_delay_msecs.attr,
 	&target_core_alua_tg_pt_gp_trans_delay_msecs.attr,
 	&target_core_alua_tg_pt_gp_preferred.attr,

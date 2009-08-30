@@ -613,10 +613,66 @@ int core_alua_check_nonop_delay(
 }
 EXPORT_SYMBOL(core_alua_check_nonop_delay);
 
+/*
+ * Called with tg_pt_gp->tg_pt_gp_md_mutex held
+ */
+int core_alua_update_tpg_primary_metadata(
+	t10_alua_tg_pt_gp_t *tg_pt_gp,
+	int primary_state,
+	unsigned char *md_buf)
+{
+	se_subsystem_dev_t *su_dev = tg_pt_gp->tg_pt_gp_su_dev;
+	t10_wwn_t *wwn = &su_dev->t10_wwn;
+	struct file *file;
+	struct iovec iov[1];
+	mm_segment_t old_fs;
+	char path[512];
+	int flags = O_RDWR | O_CREAT | O_TRUNC;
+	int len, ret;
+
+	memset(iov, 0, sizeof(struct iovec));
+	memset(path, 0, 512);
+
+	len = snprintf(md_buf, tg_pt_gp->tg_pt_gp_md_buf_len,
+			"tg_pt_gp_id=%hu\n"
+			"alua_access_state=0x%02x\n"
+			"alua_access_status=0x%02x\n",
+			tg_pt_gp->tg_pt_gp_id, primary_state,
+			tg_pt_gp->tg_pt_gp_alua_access_status);
+
+	snprintf(path, 512, "/var/target/alua/tpgs_%s/%s",
+		&wwn->unit_serial[0],
+		config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item));
+	file = filp_open(path, flags, 0600);
+	if (IS_ERR(file) || !file || !file->f_dentry) {
+		printk(KERN_ERR "filp_open(%s) for ALUA metadata failed\n",
+			path);
+		return -1;
+	}
+	
+	iov[0].iov_base = &md_buf[0];
+	iov[0].iov_len = len;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+	ret = vfs_writev(file, &iov[0], 1, &file->f_pos);
+	set_fs(old_fs);
+
+	if (ret < 0) {
+		printk("Error writing ALUA metadata file: %s\n", path);	
+		filp_close(file, NULL);
+		return -1;
+	}
+	filp_close(file, NULL);
+
+	return 0;
+}
+
 int core_alua_do_transition_tg_pt(
 	t10_alua_tg_pt_gp_t *tg_pt_gp,
 	se_port_t *l_port,
 	se_node_acl_t *nacl,
+	unsigned char *md_buf,
 	int new_state,
 	int explict)
 {
@@ -684,6 +740,24 @@ int core_alua_do_transition_tg_pt(
 	}
 	spin_unlock(&tg_pt_gp->tg_pt_gp_lock);
 	/*
+	 * Update the ALUA metadata buf that has been allocated in
+	 * core_alua_do_port_transition(), this metadata will be written
+	 * to struct file.
+	 *
+	 * Note that there is the case where we do not want to update the
+	 * metadata when the saved metadata is being parsed in userspace
+	 * when setting the existing port access state and access status.
+	 *
+	 * Also note that the failure to write out the ALUA metadata to
+	 * struct file does NOT affect the actual ALUA transition.
+	 */
+	if (tg_pt_gp->tg_pt_gp_write_metadata) {
+		mutex_lock(&tg_pt_gp->tg_pt_gp_md_mutex);
+		core_alua_update_tpg_primary_metadata(tg_pt_gp,
+					new_state, md_buf);
+		mutex_unlock(&tg_pt_gp->tg_pt_gp_md_mutex);
+	}
+	/*
 	 * Set the current primary ALUA access state to the requested new state
 	 */
 	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state, new_state);
@@ -712,10 +786,17 @@ int core_alua_do_port_transition(
 	t10_alua_lu_gp_t *lu_gp;
 	t10_alua_lu_gp_member_t *lu_gp_mem, *local_lu_gp_mem;
 	t10_alua_tg_pt_gp_t *tg_pt_gp;
+	unsigned char *md_buf;
 	int primary;
 
 	if (core_alua_check_transition(new_state, &primary) != 0)
 		return -1;
+
+	md_buf = kzalloc(l_tg_pt_gp->tg_pt_gp_md_buf_len, GFP_KERNEL);
+	if (!(md_buf)) {
+		printk("Unable to allocate buf for ALUA metadata\n");
+		return -1;
+	}
 
 	local_lu_gp_mem = l_dev->dev_alua_lu_gp_mem;
 	spin_lock(&local_lu_gp_mem->lu_gp_mem_lock);
@@ -734,9 +815,10 @@ int core_alua_do_port_transition(
 		 * success.
 		 */
 		core_alua_do_transition_tg_pt(l_tg_pt_gp, l_port, l_nacl,
-					new_state, explict);
+					md_buf, new_state, explict);
 		atomic_dec(&lu_gp->lu_gp_ref_cnt);
 		smp_mb__after_atomic_dec();
+		kfree(md_buf);
 		return 0;
 	}
 	/*
@@ -787,7 +869,7 @@ int core_alua_do_port_transition(
 			 * success.
 			 */
 			core_alua_do_transition_tg_pt(tg_pt_gp, port,
-					nacl, new_state, explict);
+					nacl, md_buf, new_state, explict);
 
 			spin_lock(&T10_ALUA(su_dev)->tg_pt_gps_lock);
 			atomic_dec(&tg_pt_gp->tg_pt_gp_ref_cnt);
@@ -809,6 +891,7 @@ int core_alua_do_port_transition(
 
 	atomic_dec(&lu_gp->lu_gp_ref_cnt);
 	smp_mb__after_atomic_dec();
+	kfree(md_buf);
 	return 0;
 }
 
@@ -1111,9 +1194,11 @@ t10_alua_tg_pt_gp_t *core_alua_allocate_tg_pt_gp(
 	}
 	INIT_LIST_HEAD(&tg_pt_gp->tg_pt_gp_list);
 	INIT_LIST_HEAD(&tg_pt_gp->tg_pt_gp_mem_list);
+	mutex_init(&tg_pt_gp->tg_pt_gp_md_mutex);
 	spin_lock_init(&tg_pt_gp->tg_pt_gp_lock);
 	atomic_set(&tg_pt_gp->tg_pt_gp_ref_cnt, 0);
 	tg_pt_gp->tg_pt_gp_su_dev = su_dev;
+	tg_pt_gp->tg_pt_gp_md_buf_len = ALUA_MD_BUF_LEN;
 	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state,
 		ALUA_ACCESS_STATE_ACTIVE_OPTMIZED);
 	/*

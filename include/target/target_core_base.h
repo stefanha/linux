@@ -77,6 +77,8 @@
 #define PR_APTPL_MAX_TPORT_LEN			256
 /* Used by t10_reservation_template_s->pr_aptpl_buf_len */
 #define PR_APTPL_BUF_LEN			8192
+/* Used by t10_alua_tg_pt_gp_t->tg_pt_gp_md_buf_len */
+#define ALUA_MD_BUF_LEN				1024
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -269,10 +271,13 @@ typedef struct t10_alua_tg_pt_gp_s {
 	int	tg_pt_gp_nonop_delay_msecs;
 	int	tg_pt_gp_trans_delay_msecs;
 	int	tg_pt_gp_pref;
+	int	tg_pt_gp_write_metadata;
+	u32	tg_pt_gp_md_buf_len;
 	u32	tg_pt_gp_members;
 	atomic_t tg_pt_gp_alua_access_state;
 	atomic_t tg_pt_gp_ref_cnt;
 	spinlock_t tg_pt_gp_lock;
+	struct mutex tg_pt_gp_md_mutex;
 	struct se_subsystem_dev_s *tg_pt_gp_su_dev;
 	struct config_group tg_pt_gp_group;
 	struct list_head tg_pt_gp_list;

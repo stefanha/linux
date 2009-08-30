@@ -66,7 +66,7 @@ extern int core_alua_check_transition(int, int *);
 extern int core_alua_check_nonop_delay(struct se_cmd_s *);
 extern int core_alua_do_transition_tg_pt(struct t10_alua_tg_pt_gp_s *,
 				struct se_port_s *, struct se_node_acl_s *,
-				int, int);
+				unsigned char *, int, int);
 extern int core_alua_do_port_transition(struct t10_alua_tg_pt_gp_s *,
 				struct se_device_s *, struct se_port_s *,
 				struct se_node_acl_s *, int, int);
