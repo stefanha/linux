@@ -466,9 +466,63 @@ static ssize_t lio_target_port_store_attr_alua_tg_pt_offline(
 
 LIO_PORT_ATTR(alua_tg_pt_offline, S_IRUGO | S_IWUSR);
 
+/*
+ * alua_tg_pt_status
+ */
+static ssize_t lio_target_port_show_attr_alua_tg_pt_status(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_secondary_status(lun, page);
+}
+
+static ssize_t lio_target_port_store_attr_alua_tg_pt_status(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;	
+
+	return core_alua_store_secondary_status(lun, page, count);
+}
+
+LIO_PORT_ATTR(alua_tg_pt_status, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_write_md
+ */
+static ssize_t lio_target_port_show_attr_alua_tg_pt_write_md(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_secondary_write_metadata(lun, page);
+}
+
+static ssize_t lio_target_port_store_attr_alua_tg_pt_write_md(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_secondary_write_metadata(lun, page, count);
+}
+
+LIO_PORT_ATTR(alua_tg_pt_write_md, S_IRUGO | S_IWUSR);
+
 static struct configfs_attribute *lio_target_port_attrs[] = {
 	&lio_target_port_alua_tg_pt_gp.attr,
 	&lio_target_port_alua_tg_pt_offline.attr,
+	&lio_target_port_alua_tg_pt_status.attr,
+	&lio_target_port_alua_tg_pt_write_md.attr,
 	NULL,
 };
 
