@@ -882,6 +882,7 @@ typedef struct se_port_s {
 	/* RELATIVE TARGET PORT IDENTIFER */
 	u16		sep_rtpi;
 	int		sep_tg_pt_secondary_stat;
+	int		sep_tg_pt_secondary_write_md;
 #ifdef SNMP_SUPPORT
 	u32		sep_index;
 	scsi_port_stats_t sep_stats;
@@ -890,6 +891,7 @@ typedef struct se_port_s {
 	atomic_t	sep_tg_pt_gp_active;
 	atomic_t	sep_tg_pt_secondary_offline;
 	spinlock_t	sep_alua_lock;
+	struct mutex	sep_tg_pt_md_mutex;
 	struct t10_alua_tg_pt_gp_member_s *sep_alua_tg_pt_gp_mem;
 	struct se_lun_s *sep_lun;
 	struct se_portal_group_s *sep_tpg;

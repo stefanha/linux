@@ -115,11 +115,20 @@ extern ssize_t core_alua_show_trans_delay_msecs(struct t10_alua_tg_pt_gp_s *,
 					char *);
 extern ssize_t core_alua_store_trans_delay_msecs(struct t10_alua_tg_pt_gp_s *,
 					const char *, size_t);
-extern ssize_t core_alua_show_preferred_bit(struct t10_alua_tg_pt_gp_s *, char *);
+extern ssize_t core_alua_show_preferred_bit(struct t10_alua_tg_pt_gp_s *,
+					char *);
 extern ssize_t core_alua_store_preferred_bit(struct t10_alua_tg_pt_gp_s *,
-				const char *, size_t);
+					const char *, size_t);
 extern ssize_t core_alua_show_offline_bit(struct se_lun_s *, char *);
-extern ssize_t core_alua_store_offline_bit(struct se_lun_s *, const char *, size_t);
+extern ssize_t core_alua_store_offline_bit(struct se_lun_s *, const char *,
+					size_t);
+extern ssize_t core_alua_show_secondary_status(struct se_lun_s *, char *);
+extern ssize_t core_alua_store_secondary_status(struct se_lun_s *,
+					const char *, size_t);
+extern ssize_t core_alua_show_secondary_write_metadata(struct se_lun_s *,
+					char *);
+extern ssize_t core_alua_store_secondary_write_metadata(struct se_lun_s *,
+					const char *, size_t);
 extern int core_setup_alua(struct se_device_s *);
 
 #endif /* TARGET_CORE_ALUA_H */

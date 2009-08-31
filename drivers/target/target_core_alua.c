@@ -614,6 +614,47 @@ int core_alua_check_nonop_delay(
 EXPORT_SYMBOL(core_alua_check_nonop_delay);
 
 /*
+ * Called with tg_pt_gp->tg_pt_gp_md_mutex or tg_pt_gp_mem->sep_tg_pt_md_mutex
+ * 
+ */
+int core_alua_write_tpg_metadata(
+	const char *path,
+	unsigned char *md_buf,
+	u32 md_buf_len) 
+{
+	mm_segment_t old_fs;
+	struct file *file;
+	struct iovec iov[1];
+	int flags = O_RDWR | O_CREAT | O_TRUNC, ret;
+
+	memset(iov, 0, sizeof(struct iovec));
+
+	file = filp_open(path, flags, 0600);
+	if (IS_ERR(file) || !file || !file->f_dentry) {
+		printk(KERN_ERR "filp_open(%s) for ALUA metadata failed\n",
+			path);
+		return -1;
+	}
+
+	iov[0].iov_base = &md_buf[0];
+	iov[0].iov_len = md_buf_len;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+	ret = vfs_writev(file, &iov[0], 1, &file->f_pos);
+	set_fs(old_fs);
+
+	if (ret < 0) {
+		printk("Error writing ALUA metadata file: %s\n", path);
+		filp_close(file, NULL);
+		return -1;
+	}
+	filp_close(file, NULL);
+
+	return 0;
+}
+
+/*
  * Called with tg_pt_gp->tg_pt_gp_md_mutex held
  */
 int core_alua_update_tpg_primary_metadata(
@@ -623,14 +664,9 @@ int core_alua_update_tpg_primary_metadata(
 {
 	se_subsystem_dev_t *su_dev = tg_pt_gp->tg_pt_gp_su_dev;
 	t10_wwn_t *wwn = &su_dev->t10_wwn;
-	struct file *file;
-	struct iovec iov[1];
-	mm_segment_t old_fs;
 	char path[512];
-	int flags = O_RDWR | O_CREAT | O_TRUNC;
-	int len, ret;
+	int len;
 
-	memset(iov, 0, sizeof(struct iovec));
 	memset(path, 0, 512);
 
 	len = snprintf(md_buf, tg_pt_gp->tg_pt_gp_md_buf_len,
@@ -643,29 +679,8 @@ int core_alua_update_tpg_primary_metadata(
 	snprintf(path, 512, "/var/target/alua/tpgs_%s/%s",
 		&wwn->unit_serial[0],
 		config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item));
-	file = filp_open(path, flags, 0600);
-	if (IS_ERR(file) || !file || !file->f_dentry) {
-		printk(KERN_ERR "filp_open(%s) for ALUA metadata failed\n",
-			path);
-		return -1;
-	}
-	
-	iov[0].iov_base = &md_buf[0];
-	iov[0].iov_len = len;
 
-	old_fs = get_fs();
-	set_fs(get_ds());
-	ret = vfs_writev(file, &iov[0], 1, &file->f_pos);
-	set_fs(old_fs);
-
-	if (ret < 0) {
-		printk("Error writing ALUA metadata file: %s\n", path);	
-		filp_close(file, NULL);
-		return -1;
-	}
-	filp_close(file, NULL);
-
-	return 0;
+	return core_alua_write_tpg_metadata(path, md_buf, len);
 }
 
 int core_alua_do_transition_tg_pt(
@@ -895,6 +910,41 @@ int core_alua_do_port_transition(
 	return 0;
 }
 
+/*
+ * Called with tg_pt_gp_mem->sep_tg_pt_md_mutex held
+ */
+int core_alua_update_tpg_secondary_metadata(
+	struct t10_alua_tg_pt_gp_member_s *tg_pt_gp_mem,
+	se_port_t *port,
+	unsigned char *md_buf,
+	u32 md_buf_len)
+{
+	se_portal_group_t *se_tpg = port->sep_tpg;
+	char path[512], wwn[1024];
+	int len;
+
+	memset(path, 0, 512);
+	memset(wwn, 0, 1024);
+
+	len = snprintf(wwn, 512, "%s",
+			TPG_TFO(se_tpg)->tpg_get_wwn(se_tpg));
+
+	if (TPG_TFO(se_tpg)->tpg_get_tag != NULL)
+		snprintf(wwn+len, 1024-len, "+%hu",
+				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg));
+
+	len = snprintf(md_buf, md_buf_len, "alua_tg_pt_offline=%d\n"
+			"alua_tg_pt_status=0x%02x\n",
+			atomic_read(&port->sep_tg_pt_secondary_offline),
+			port->sep_tg_pt_secondary_stat);
+
+	snprintf(path, 512, "/var/target/alua/%s/%s/lun_%u",
+			TPG_TFO(se_tpg)->get_fabric_name(), wwn,
+			port->sep_lun->unpacked_lun);
+	
+	return core_alua_write_tpg_metadata(path, md_buf, len);
+}
+
 int core_alua_set_tg_pt_secondary_state(
 	struct t10_alua_tg_pt_gp_member_s *tg_pt_gp_mem,
 	se_port_t *port,
@@ -902,6 +952,8 @@ int core_alua_set_tg_pt_secondary_state(
 	int offline)
 {
 	struct t10_alua_tg_pt_gp_s *tg_pt_gp;
+	unsigned char *md_buf;
+	u32 md_buf_len;
 	int trans_delay_msecs;
 
 	spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
@@ -922,6 +974,7 @@ int core_alua_set_tg_pt_secondary_state(
 	else
 		atomic_set(&port->sep_tg_pt_secondary_offline, 0);
 
+	md_buf_len = tg_pt_gp->tg_pt_gp_md_buf_len;
 	port->sep_tg_pt_secondary_stat = (explict) ?
 			ALUA_STATUS_ALTERED_BY_EXPLICT_STPG :
 			ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA;
@@ -932,9 +985,30 @@ int core_alua_set_tg_pt_secondary_state(
 		tg_pt_gp->tg_pt_gp_id, (offline) ? "OFFLINE" : "ONLINE");
 
 	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
-
+	/*
+	 * Do the optional transition delay after we set the secondary
+	 * ALUA access state.
+	 */
 	if (trans_delay_msecs != 0)
 		msleep_interruptible(trans_delay_msecs);	
+	/*
+	 * See if we need to update the ALUA fabric port metadata for
+	 * secondary state and status
+	 */
+	if (port->sep_tg_pt_secondary_write_md) {
+		md_buf = kzalloc(md_buf_len, GFP_KERNEL);
+		if (!(md_buf)) {
+			printk(KERN_ERR "Unable to allocate md_buf for"
+				" secondary ALUA access metadata\n");
+			return -1;
+		}
+		mutex_lock(&port->sep_tg_pt_md_mutex);
+		core_alua_update_tpg_secondary_metadata(tg_pt_gp_mem, port,
+				md_buf, md_buf_len);
+		mutex_unlock(&port->sep_tg_pt_md_mutex);
+
+		kfree(md_buf);
+	}
 
 	return 0;
 }
@@ -1780,6 +1854,73 @@ ssize_t core_alua_store_offline_bit(se_lun_t *lun, const char *page, size_t coun
 	return count;
 }
 EXPORT_SYMBOL(core_alua_store_offline_bit);
+
+ssize_t core_alua_show_secondary_status(
+	se_lun_t *lun,
+	char *page)
+{
+	return sprintf(page, "%d\n", lun->lun_sep->sep_tg_pt_secondary_stat);
+}
+EXPORT_SYMBOL(core_alua_show_secondary_status);
+
+ssize_t core_alua_store_secondary_status(
+	se_lun_t *lun,
+	const char *page,
+	size_t count)
+{
+	unsigned long tmp;
+	int ret;
+
+	ret = strict_strtoul(page, 0, &tmp);
+	if (ret < 0) {
+		printk(KERN_ERR "Unable to extract alua_tg_pt_status\n");
+		return -EINVAL;
+	}
+	if ((tmp != ALUA_STATUS_NONE) &&
+	    (tmp != ALUA_STATUS_ALTERED_BY_EXPLICT_STPG) &&
+	    (tmp != ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA)) {
+		printk(KERN_ERR "Illegal value for alua_tg_pt_status: %lu\n",
+				tmp);
+		return -EINVAL;
+	}
+	lun->lun_sep->sep_tg_pt_secondary_stat = (int)tmp;
+
+	return count;
+}
+EXPORT_SYMBOL(core_alua_store_secondary_status);
+
+ssize_t core_alua_show_secondary_write_metadata(
+	se_lun_t *lun,
+	char *page)
+{
+	return sprintf(page, "%d\n",
+			lun->lun_sep->sep_tg_pt_secondary_write_md);
+}
+EXPORT_SYMBOL(core_alua_show_secondary_write_metadata);
+
+ssize_t core_alua_store_secondary_write_metadata(
+	se_lun_t *lun,
+	const char *page,
+	size_t count)
+{
+	unsigned long tmp;
+	int ret;
+
+	ret = strict_strtoul(page, 0, &tmp);
+	if (ret < 0) {
+		printk(KERN_ERR "Unable to extract alua_tg_pt_write_md\n");
+		return -EINVAL;
+	}
+	if ((tmp != 0) && (tmp != 1)) {
+		printk(KERN_ERR "Illegal value for alua_tg_pt_write_md:"
+				" %lu\n", tmp);
+		return -EINVAL;
+	}
+	lun->lun_sep->sep_tg_pt_secondary_write_md = (int)tmp;
+
+	return count;
+}
+EXPORT_SYMBOL(core_alua_store_secondary_write_metadata);
 
 int core_setup_alua(se_device_t *dev)
 {
