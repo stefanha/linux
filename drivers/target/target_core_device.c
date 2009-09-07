@@ -611,6 +611,7 @@ se_port_t *core_alloc_port(se_device_t *dev)
 	INIT_LIST_HEAD(&port->sep_list);
 	atomic_set(&port->sep_tg_pt_secondary_offline, 0);
 	spin_lock_init(&port->sep_alua_lock);
+	mutex_init(&port->sep_tg_pt_md_mutex);
 
 	spin_lock(&dev->se_port_lock);
 	if (dev->dev_port_count == 0x0000ffff) {

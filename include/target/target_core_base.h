@@ -77,6 +77,8 @@
 #define PR_APTPL_MAX_TPORT_LEN			256
 /* Used by t10_reservation_template_s->pr_aptpl_buf_len */
 #define PR_APTPL_BUF_LEN			8192
+/* Used by t10_alua_tg_pt_gp_t->tg_pt_gp_md_buf_len */
+#define ALUA_MD_BUF_LEN				1024
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -269,10 +271,13 @@ typedef struct t10_alua_tg_pt_gp_s {
 	int	tg_pt_gp_nonop_delay_msecs;
 	int	tg_pt_gp_trans_delay_msecs;
 	int	tg_pt_gp_pref;
+	int	tg_pt_gp_write_metadata;
+	u32	tg_pt_gp_md_buf_len;
 	u32	tg_pt_gp_members;
 	atomic_t tg_pt_gp_alua_access_state;
 	atomic_t tg_pt_gp_ref_cnt;
 	spinlock_t tg_pt_gp_lock;
+	struct mutex tg_pt_gp_md_mutex;
 	struct se_subsystem_dev_s *tg_pt_gp_su_dev;
 	struct config_group tg_pt_gp_group;
 	struct list_head tg_pt_gp_list;
@@ -877,6 +882,7 @@ typedef struct se_port_s {
 	/* RELATIVE TARGET PORT IDENTIFER */
 	u16		sep_rtpi;
 	int		sep_tg_pt_secondary_stat;
+	int		sep_tg_pt_secondary_write_md;
 #ifdef SNMP_SUPPORT
 	u32		sep_index;
 	scsi_port_stats_t sep_stats;
@@ -885,6 +891,7 @@ typedef struct se_port_s {
 	atomic_t	sep_tg_pt_gp_active;
 	atomic_t	sep_tg_pt_secondary_offline;
 	spinlock_t	sep_alua_lock;
+	struct mutex	sep_tg_pt_md_mutex;
 	struct t10_alua_tg_pt_gp_member_s *sep_alua_tg_pt_gp_mem;
 	struct se_lun_s *sep_lun;
 	struct se_portal_group_s *sep_tpg;
