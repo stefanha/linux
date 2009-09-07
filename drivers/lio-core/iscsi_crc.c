@@ -1,10 +1,10 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_crc.c
  *
  * Routine to calculate a "running" crc for iscsi.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
+ * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * Copyright (c) 2007 Rising Tide Software, Inc.
  *
  * Nicholas A. Bellinger <nab@kernel.org>
@@ -23,7 +23,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #include <linux/slab.h>
@@ -133,10 +133,10 @@ u32  crctable[256] = {
  *
  *
  */
-inline void do_crc (u8 *data, u32 len, int restart, u32 *result)
+inline void do_crc(u8 *data, u32 len, int restart, u32 *result)
 {
 #ifdef ISCSI_BIG_ENDIAN
-	u8 byte0, byte1, byte2, byte3;	
+	u8 byte0, byte1, byte2, byte3;
 #endif
 	u32 crc_calc;
 
@@ -148,13 +148,15 @@ inline void do_crc (u8 *data, u32 len, int restart, u32 *result)
 		byte1 = ((*result >> 16) & 0xff);
 		byte2 = ((*result >> 8) & 0xff);
 		byte3 = (*result & 0xff);
-		*result = ((byte3 << 24) | (byte2 << 16) | (byte1 << 8) | (byte0)); 
+		*result = ((byte3 << 24) | (byte2 << 16) |
+			   (byte1 << 8) | (byte0));
 #endif
 		crc_calc = *result ^ TB_XOROT;
 	}
 
 	while (len-- > 0)
-		crc_calc = crctable[(crc_calc ^ *data++) & 0xFFL] ^ (crc_calc >> 8);
+		crc_calc = crctable[(crc_calc ^ *data++) & 0xFFL] ^
+				    (crc_calc >> 8);
 
 	*result = crc_calc ^ TB_XOROT;
 #ifdef ISCSI_BIG_ENDIAN
@@ -162,6 +164,6 @@ inline void do_crc (u8 *data, u32 len, int restart, u32 *result)
 	byte1 = ((*result >> 16) & 0xff);
 	byte2 = ((*result >> 8) & 0xff);
 	byte3 = (*result & 0xff);
-	*result = ((byte3 << 24) | (byte2 << 16) | (byte1 << 8) | (byte0));	
+	*result = ((byte3 << 24) | (byte2 << 16) | (byte1 << 8) | (byte0));
 #endif
 }

@@ -1,18 +1,3 @@
-/*********************************************************************************
- * Filename:  iscsi_crc.h
- *
- * $HeadURL: svn://subversion.sbei.com/pyx/target/branches/2.9-linux-iscsi.org/pyx-target/include/iscsi_crc.h $
- *   $LastChangedRevision: 4537 $
- *   $LastChangedBy: rickd $
- *   $LastChangedDate: 2006-08-02 11:25:26 -0700 (Wed, 02 Aug 2006) $
- *
- * -- PYX - CONFIDENTIAL --
- * Copyright (c) 2003 PyX Technologies, Inc.
- * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
- *
- *********************************************************************************/
-
-
 #ifndef _ISCSI_CRC_H_
 #define _ISCSI_CRC_H_
 
