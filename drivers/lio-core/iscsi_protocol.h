@@ -36,8 +36,6 @@
 #define INITIATOR                       1
 #define TARGET                          2
 #define MANAGEMENT			4
-#define TRUE                            1
-#define NOT_TRUE                        2
 #define ON				1
 #define OFF				0
 #define WHITE_SPACE			" \t\v\f\n\r"
