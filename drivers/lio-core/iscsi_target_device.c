@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_target_device.c
  *
  * This file contains the iSCSI Virtual Device and Disk Transport
@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #define ISCSI_TARGET_DEVICE_C
@@ -62,14 +62,11 @@
 
 #undef ISCSI_TARGET_DEVICE_C
 
-extern se_global_t *iscsi_global;
-extern __u32 iscsi_unpack_lun (unsigned char *);
-
 /*	iscsi_get_lun():
  *
  *
  */
-extern int iscsi_get_lun_for_tmr (
+int iscsi_get_lun_for_tmr(
 	iscsi_cmd_t *cmd,
 	u64 lun)
 {
@@ -82,18 +79,18 @@ extern int iscsi_get_lun_for_tmr (
 		TRACE_ERROR("iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
 			" %u for Target Portal Group: %hu\n", unpacked_lun,
 			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
-		return(-1);
+		return -1;
 	}
 
-	return(transport_get_lun_for_tmr(SE_CMD(cmd), unpacked_lun));
+	return transport_get_lun_for_tmr(SE_CMD(cmd), unpacked_lun);
 }
 
 /*	iscsi_get_lun_for_cmd():
- *	
+ *
  *	Returns (0) on success
  * 	Returns (< 0) on failure
  */
-extern int iscsi_get_lun_for_cmd (
+int iscsi_get_lun_for_cmd(
 	iscsi_cmd_t *cmd,
 	unsigned char *cdb,
 	u64 lun)
@@ -107,27 +104,28 @@ extern int iscsi_get_lun_for_cmd (
 		TRACE_ERROR("iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
 			" %u for Target Portal Group: %hu\n", unpacked_lun,
 			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
-		return(-1);
+		return -1;
 	}
 
-	return(transport_get_lun_for_cmd(SE_CMD(cmd), cdb, unpacked_lun));
+	return transport_get_lun_for_cmd(SE_CMD(cmd), cdb, unpacked_lun);
 }
 
 /*	iscsi_determine_maxcmdsn():
- * 
+ *
  *
  */
-extern void iscsi_determine_maxcmdsn (iscsi_session_t *sess)
+void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
 {
 	se_node_acl_t *se_nacl;
 
 	/*
-	 * This is a discovery session, the single queue slot was already assigned in
-	 * iscsi_login_zero_tsih().  Since only Logout and Text Opcodes are allowed
-	 * during discovery we do not have to worry about the HBA's queue depth here.
+	 * This is a discovery session, the single queue slot was already
+	 * assigned in iscsi_login_zero_tsih().  Since only Logout and
+	 * Text Opcodes are allowed during discovery we do not have to worry
+	 * about the HBA's queue depth here.
 	 */
 	if (SESS_OPS(sess)->SessionType)
-		return;	
+		return;
 
 	se_nacl = sess->se_sess->se_node_acl;
 
@@ -139,25 +137,21 @@ extern void iscsi_determine_maxcmdsn (iscsi_session_t *sess)
 	 */
 	sess->cmdsn_window = se_nacl->queue_depth;
 	sess->max_cmd_sn = (sess->max_cmd_sn + se_nacl->queue_depth) - 1;
-
-	return;
 }
 
 /*	iscsi_increment_maxcmdsn();
  *
- *	
+ *
  */
-extern void iscsi_increment_maxcmdsn (iscsi_cmd_t *cmd, iscsi_session_t *sess)
+void iscsi_increment_maxcmdsn(iscsi_cmd_t *cmd, iscsi_session_t *sess)
 {
 	if (cmd->immediate_cmd || cmd->maxcmdsn_inc)
 		return;
 
 	cmd->maxcmdsn_inc = 1;
-	
+
 	spin_lock(&sess->cmdsn_lock);
 	sess->max_cmd_sn += 1;
 	TRACE(TRACE_ISCSI, "Updated MaxCmdSN to 0x%08x\n", sess->max_cmd_sn);
 	spin_unlock(&sess->cmdsn_lock);
-	
-	return;
 }
