@@ -1,27 +1,3 @@
-/*********************************************************************************
- * Filename:  iscsi_seq_and_pdu_list.h
- *
- * This file contains main definitions related to iSCSI DataSequenceInOrder=No
- * and DataPDUInOrder=No.
- *
- * $HeadURL: svn://subversion.sbei.com/pyx/target/branches/2.9-linux-iscsi.org/pyx-target/include/iscsi_seq_and_pdu_list.h $
- *   $LastChangedRevision: 4795 $
- *   $LastChangedBy: rickd $
- *   $LastChangedDate: 2006-08-17 16:08:03 -0700 (Thu, 17 Aug 2006) $
- *
- * Copyright (c) 2003 PyX Technologies, Inc.
- * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- * For further information, contact via email: support@sbei.com
- * SBE, Inc.  San Ramon, California  U.S.A.
- *********************************************************************************/
-
-
 #ifndef ISCSI_SEQ_AND_PDU_LIST_H
 #define ISCSI_SEQ_AND_PDU_LIST_H
 
@@ -102,9 +78,11 @@ typedef struct iscsi_seq_s {
 	u32		xfer_len;
 } iscsi_seq_t;
 
-extern int iscsi_do_build_list (iscsi_cmd_t *, iscsi_build_list_t *);
-extern iscsi_pdu_t *iscsi_get_pdu_holder (iscsi_cmd_t *, u32, u32);
-extern iscsi_pdu_t *iscsi_get_pdu_holder_for_seq (iscsi_cmd_t *, iscsi_seq_t *);
-extern iscsi_seq_t *iscsi_get_seq_holder (iscsi_cmd_t *, u32, u32);
+extern struct iscsi_global_s *iscsi_global;
+
+extern int iscsi_do_build_list(iscsi_cmd_t *, iscsi_build_list_t *);
+extern iscsi_pdu_t *iscsi_get_pdu_holder(iscsi_cmd_t *, u32, u32);
+extern iscsi_pdu_t *iscsi_get_pdu_holder_for_seq(iscsi_cmd_t *, iscsi_seq_t *);
+extern iscsi_seq_t *iscsi_get_seq_holder(iscsi_cmd_t *, u32, u32);
 
 #endif /* ISCSI_SEQ_AND_PDU_LIST_H */
