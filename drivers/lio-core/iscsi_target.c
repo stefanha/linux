@@ -1492,7 +1492,9 @@ done:
 	data_direction = (hdr->flags & W_BIT) ? ISCSI_WRITE :
 			 (hdr->flags & R_BIT) ? ISCSI_READ : ISCSI_NONE;	
 	
-	if (!(cmd = iscsi_allocate_se_cmd(conn, hdr->exp_xfer_len, data_direction)))
+	cmd = iscsi_allocate_se_cmd(conn, hdr->exp_xfer_len, data_direction,
+				(hdr->flags & SAM2_ATTR));
+	if (!(cmd))
 		return(iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn));
 
 	TRACE(TRACE_ISCSI, "Got SCSI Command, ITT: 0x%08x, CmdSN: 0x%08x,"

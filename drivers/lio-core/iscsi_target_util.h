@@ -44,7 +44,7 @@ extern iscsi_r2t_t *iscsi_get_r2t_from_list (iscsi_cmd_t *);
 extern void iscsi_free_r2t (iscsi_r2t_t *, iscsi_cmd_t *);
 extern void iscsi_free_r2ts_from_list (iscsi_cmd_t *);
 extern iscsi_cmd_t *iscsi_allocate_cmd (iscsi_conn_t *);
-extern iscsi_cmd_t *iscsi_allocate_se_cmd (iscsi_conn_t *, u32, int);
+extern iscsi_cmd_t *iscsi_allocate_se_cmd (iscsi_conn_t *, u32, int, int);
 extern iscsi_cmd_t *iscsi_allocate_se_cmd_for_tmr (iscsi_conn_t *, u8);
 extern int iscsi_decide_list_to_build (iscsi_cmd_t *, __u32);
 extern iscsi_seq_t *iscsi_get_seq_holder_for_datain (iscsi_cmd_t *, __u32);

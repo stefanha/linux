@@ -40,6 +40,7 @@
 #include <net/tcp.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
+#include <scsi/libsas.h> /* For TASK_ATTR_* */
 
 #include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
@@ -342,9 +343,11 @@ extern iscsi_cmd_t *iscsi_allocate_cmd (
 extern iscsi_cmd_t *iscsi_allocate_se_cmd (
 	iscsi_conn_t *conn,
 	u32 data_length,
-	int data_direction)
+	int data_direction,
+	int iscsi_task_attr)
 {
 	iscsi_cmd_t *cmd;
+	int sam_task_attr;
 
 	if (!(cmd = iscsi_allocate_cmd(conn))) 
 		return(NULL);
@@ -352,10 +355,30 @@ extern iscsi_cmd_t *iscsi_allocate_se_cmd (
 	cmd->data_direction = data_direction;
 	cmd->data_length = data_length;
 	/*
+	 * Figure out the SAM Task Attribute for the incoming SCSI CDB
+	 */
+	if ((iscsi_task_attr == ISCSI_UNTAGGED) ||
+	    (iscsi_task_attr == ISCSI_SIMPLE))
+		sam_task_attr = TASK_ATTR_SIMPLE;
+	else if (iscsi_task_attr == ISCSI_ORDERED)
+		sam_task_attr = TASK_ATTR_ORDERED;
+	else if (iscsi_task_attr == ISCSI_HEAD_OF_QUEUE)
+		sam_task_attr = TASK_ATTR_HOQ;
+	else if (iscsi_task_attr == ISCSI_ACA)
+		sam_task_attr = TASK_ATTR_ACA;
+	else {
+		printk(KERN_INFO "Unknown iSCSI Task Attribute: 0x%02x, using"
+			" TASK_ATTR_SIMPLE\n", iscsi_task_attr);
+		sam_task_attr = TASK_ATTR_SIMPLE;
+	}
+	/*
 	 * Use struct target_fabric_configfs->tf_ops for lio_target_fabric_configfs
 	 */
-	if (!(cmd->se_cmd = transport_alloc_se_cmd(&lio_target_fabric_configfs->tf_ops,
-			SESS(conn)->se_sess, (void *)cmd, data_length, data_direction))) 
+	cmd->se_cmd = transport_alloc_se_cmd(
+			&lio_target_fabric_configfs->tf_ops,
+			SESS(conn)->se_sess, (void *)cmd, data_length,
+			data_direction, sam_task_attr);
+	if (!(cmd->se_cmd))
 		goto out;
 
 	return(cmd);
@@ -390,8 +413,11 @@ extern iscsi_cmd_t *iscsi_allocate_se_cmd_for_tmr (
 	if (function == TASK_REASSIGN)
 		return(cmd);
 
-	if (!(cmd->se_cmd = transport_alloc_se_cmd(&lio_target_fabric_configfs->tf_ops,
-			SESS(conn)->se_sess, (void *)cmd, 0, SE_DIRECTION_NONE)))
+	cmd->se_cmd = transport_alloc_se_cmd(
+				&lio_target_fabric_configfs->tf_ops,
+				SESS(conn)->se_sess, (void *)cmd, 0,
+				SE_DIRECTION_NONE, TASK_ATTR_SIMPLE);
+	if (!(cmd->se_cmd))
 		goto out;
 
 	se_cmd = cmd->se_cmd;
