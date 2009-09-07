@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_auth_chap.c
  *
  * This file houses the main functions for the iSCSI Chap support
@@ -23,7 +23,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 #include <linux/string.h>
 #include <linux/crypto.h>
@@ -41,8 +41,8 @@
 #define PRINT(x...)		printk(KERN_INFO x)
 #else
 #define PRINT(x...)
-#endif 
-		
+#endif
+
 unsigned char chap_asciihex_to_binaryhex(unsigned char val[2])
 {
 	unsigned char result = 0;
@@ -54,7 +54,7 @@ unsigned char chap_asciihex_to_binaryhex(unsigned char val[2])
 	else
 		if ((val[0] >= 'A') && (val[0] <= 'F'))
 			result = ((val[0] - 'A' + 10) & 0xf) << 4;
-		else // digit
+		else /* digit */
 			result = ((val[0] - '0') & 0xf) << 4;
 	/*
 	 * LSB
@@ -64,8 +64,8 @@ unsigned char chap_asciihex_to_binaryhex(unsigned char val[2])
 	else
 		if ((val[1] >= 'A') && (val[1] <= 'F'))
 			result |= ((val[1] - 'A' + 10) & 0xf);
-       		else // digit
-			result |= ((val[1] - '0') & 0xf);	
+		else /* digit */
+			result |= ((val[1] - '0') & 0xf);
 
 	return result;
 }
@@ -76,10 +76,10 @@ int chap_string_to_hex(unsigned char *dst, unsigned char *src, int len)
 
 	for (i = 0; i < len; i += 2)
 		dst[j++] = (unsigned char) chap_asciihex_to_binaryhex(&src[i]);
-	
+
 	dst[j] = '\0';
 	return j;
-}	
+}
 
 void chap_binaryhex_to_asciihex(char *dst, char *src, int src_len)
 {
@@ -115,8 +115,6 @@ void chap_set_random(char *data, int length)
 		 length--;
 	}
 }
-	
-int chap_gen_challenge(iscsi_conn_t *, int, char *, unsigned int *);
 
 static iscsi_chap_t *chap_server_open(
 	iscsi_conn_t *conn,
@@ -160,7 +158,7 @@ static iscsi_chap_t *chap_server_open(
 	 * Set Identifier.
 	 */
 	chap->id = ISCSI_TPG_C(conn)->tpg_chap_id++;
-	*AIC_len += sprintf(AIC_str+*AIC_len, "CHAP_I=%d", chap->id);
+	*AIC_len += sprintf(AIC_str + *AIC_len, "CHAP_I=%d", chap->id);
 	*AIC_len += 1;
 	PRINT("[server] Sending CHAP_I=%d\n", chap->id);
 	/*
@@ -189,14 +187,14 @@ int chap_gen_challenge(
 	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
 
 	memset(challenge_asciihex, 0, CHAP_CHALLENGE_LENGTH * 2 + 1);
-	
+
 	chap_set_random(chap->challenge, CHAP_CHALLENGE_LENGTH);
 	chap_binaryhex_to_asciihex(challenge_asciihex, chap->challenge,
 					CHAP_CHALLENGE_LENGTH);
 	/*
 	 * Set CHAP_C, and copy the generated challenge into C_str.
 	 */
-	*C_len += sprintf(C_str+*C_len, "CHAP_C=0x%s", challenge_asciihex);
+	*C_len += sprintf(C_str + *C_len, "CHAP_C=0x%s", challenge_asciihex);
 	*C_len += 1;
 
 	PRINT("[%s] Sending CHAP_C=0x%s\n\n", (caller) ? "server" : "client",
@@ -212,10 +210,11 @@ int chap_server_compute_md5(
 	unsigned int *NR_out_len)
 {
 	char *endptr;
-	unsigned char id;
-	unsigned char type, response[MD5_SIGNATURE_SIZE * 2 + 2], digest[MD5_SIGNATURE_SIZE];
+	unsigned char id, digest[MD5_SIGNATURE_SIZE];
+	unsigned char type, response[MD5_SIGNATURE_SIZE * 2 + 2];
 	unsigned char identifier[10], *challenge, *challenge_binhex;
-	unsigned char client_digest[MD5_SIGNATURE_SIZE], server_digest[MD5_SIGNATURE_SIZE];
+	unsigned char client_digest[MD5_SIGNATURE_SIZE];
+	unsigned char server_digest[MD5_SIGNATURE_SIZE];
 	unsigned char chap_n[MAX_CHAP_N_SIZE], chap_r[MAX_RESPONSE_LENGTH];
 	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
 	iscsi_node_auth_t *auth = ISCSI_NODE_AUTH(iscsi_nacl);
@@ -223,7 +222,7 @@ int chap_server_compute_md5(
 	struct hash_desc desc;
 	struct scatterlist sg;
 	int auth_ret = -1, ret, challenge_len;
-	
+
 	memset(identifier, 0, 10);
 	memset(chap_n, 0, MAX_CHAP_N_SIZE);
 	memset(chap_r, 0, MAX_RESPONSE_LENGTH);
@@ -300,7 +299,7 @@ int chap_server_compute_md5(
 		crypto_free_hash(tfm);
 		goto out;
 	}
-	
+
 	sg_init_one(&sg, (void *)&auth->password, strlen(auth->password));
 	ret = crypto_hash_update(&desc, &sg, strlen(auth->password));
 	if (ret < 0) {
@@ -332,10 +331,11 @@ int chap_server_compute_md5(
 		PRINT("[server] MD5 Digests do not match!\n\n");
 		goto out;
 	} else
-		PRINT("[server] MD5 Digests match, CHAP connetication successful.\n\n");
+		PRINT("[server] MD5 Digests match, CHAP connetication"
+				" successful.\n\n");
 	/*
-	 * One way authentication has succeeded, return now if mutual authentication
-	 * is not enabled.
+	 * One way authentication has succeeded, return now if mutual
+	 * authentication is not enabled.
 	 */
 	if (!auth->authenticate_target) {
 		kfree(challenge);
@@ -351,10 +351,10 @@ int chap_server_compute_md5(
 	}
 
 	if (type == HEX)
-		id = (unsigned char) simple_strtoul((char *)&identifier[2],
+		id = (unsigned char)simple_strtoul((char *)&identifier[2],
 					&endptr, 0);
 	else
-		id = (unsigned char ) simple_strtoul(identifier, &endptr, 0);
+		id = (unsigned char)simple_strtoul(identifier, &endptr, 0);
 	/*
 	 * RFC 1994 says Identifier is no more than octet (8 bits).
 	 */
@@ -404,11 +404,13 @@ int chap_server_compute_md5(
 		crypto_free_hash(tfm);
 		goto out;
 	}
-	
-	sg_init_one(&sg, (void *)auth->password_mutual, strlen(auth->password_mutual));
+
+	sg_init_one(&sg, (void *)auth->password_mutual,
+				strlen(auth->password_mutual));
 	ret = crypto_hash_update(&desc, &sg, strlen(auth->password_mutual));
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for password_mutual\n");		
+		printk(KERN_ERR "crypto_hash_update() failed for"
+				" password_mutual\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -440,14 +442,15 @@ int chap_server_compute_md5(
 	 * Convert response from binary hex to ascii hext.
 	 */
 	chap_binaryhex_to_asciihex(response, digest, MD5_SIGNATURE_SIZE);
-	*NR_out_len += sprintf(NR_out_ptr+*NR_out_len, "CHAP_R=0x%s", response);
+	*NR_out_len += sprintf(NR_out_ptr + *NR_out_len, "CHAP_R=0x%s",
+			response);
 	*NR_out_len += 1;
 	PRINT("[server] Sending CHAP_R=0x%s\n", response);
 	auth_ret = 0;
 out:
 	kfree(challenge);
 	kfree(challenge_binhex);
-	return auth_ret;	
+	return auth_ret;
 }
 
 int chap_got_response(
@@ -464,13 +467,13 @@ int chap_got_response(
 		if (chap_server_compute_md5(conn, iscsi_nacl, NR_in_ptr,
 				NR_out_ptr, NR_out_len) < 0)
 			return -1;
-		break;		
+		break;
 	default:
 		printk(KERN_ERR "Unknown CHAP digest type %d!\n",
 				chap->digest_type);
 		return -1;
 	}
-	
+
 	return 0;
 }
 

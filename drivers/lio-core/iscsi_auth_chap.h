@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_auth_chap.h
  *
  * This file contains definitions related to iSCSI CHAP Authenication.
@@ -12,7 +12,7 @@
  *
  * For further information, contact via email: support@sbei.com
  * SBE, Inc.  San Ramon, California  U.S.A.
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #ifndef _ISCSI_CHAP_H_
@@ -34,6 +34,7 @@
 #define CHAP_STAGE_CLIENT_NRIC	4
 #define CHAP_STAGE_SERVER_NR	5
 
+extern int chap_gen_challenge(iscsi_conn_t *, int, char *, unsigned int *);
 extern u32 chap_main_loop(iscsi_conn_t *, iscsi_node_acl_t *, char *, char *,
 				int *, int *);
 
@@ -44,6 +45,6 @@ typedef struct iscsi_chap_s {
 	unsigned int	challenge_len;
 	unsigned int	authenticate_target;
 	unsigned int	chap_state;
-} iscsi_chap_t;	
+} iscsi_chap_t;
 
 #endif   /*** _ISCSI_CHAP_H_ ***/
