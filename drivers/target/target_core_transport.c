@@ -45,6 +45,7 @@
 #include <net/tcp.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/libsas.h> /* For TASK_ATTR_* */
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
@@ -180,6 +181,13 @@
 #define DEBUG_GRF(x...) printk(KERN_INFO x)
 #else
 #define DEBUG_GRF(x...)
+#endif
+
+/* #define DEBUG_SAM_TASK_ATTRS */
+#ifdef DEBUG_SAM_TASK_ATTRS
+#define DEBUG_STA(x...) printk(KERN_INFO x)
+#else
+#define DEBUG_STA(x...)
 #endif
 
 se_global_t *se_global;
@@ -1179,53 +1187,85 @@ check_task_stop:
 	cmd->transport_add_cmd_to_queue(cmd, t_state);
 }
 
+/*
+ * Called by transport_add_tasks_from_cmd() once a se_cmd_t's
+ * se_task_t list are ready to be added to the active execution list
+ * se_device_t
+
+ * Called with se_dev_t->execute_task_lock called.
+ */
+static inline int transport_add_task_check_sam_attr(
+	se_task_t *task,
+	se_task_t *task_prev,
+	se_device_t *dev)
+{
+	/*
+	 * No SAM Task attribute emulation enabled, add to tail of
+	 * execution queue
+	 */
+	if (dev->dev_task_attr_type != SAM_TASK_ATTR_EMULATED) {
+		list_add_tail(&task->t_execute_list, &dev->execute_task_list);
+		return 0;
+	}
+	/*
+	 * HEAD_OF_QUEUE attribute for received CDB, which means
+	 * the first task that is associated with a se_cmd_t goes to
+	 * head of the se_device_t->execute_task_list, and task_prev
+	 * after that for each subsequent task
+	 */
+	if (task->task_se_cmd->sam_task_attr == TASK_ATTR_HOQ) {
+		list_add(&task->t_execute_list,
+				(task_prev != NULL) ?
+				&task_prev->t_execute_list :
+				&dev->execute_task_list);
+
+		DEBUG_STA("Set HEAD_OF_QUEUE for task CDB: 0x%02x"
+				" in execution queue\n",
+				T_TASK(task->task_se_cmd)->t_task_cdb[0]);
+		return 1;
+	}
+	/*
+	 * For ORDERED, SIMPLE or UNTAGGED attribute tasks once they have been
+	 * transitioned from Dermant -> Active state, and are added to the end
+	 * of the se_device_t->execute_task_list
+	 */
+	list_add_tail(&task->t_execute_list, &dev->execute_task_list);
+	return 0;
+}
+
 /*	__transport_add_task_to_execute_queue():
  *
  *	Called with se_dev_t->execute_task_lock called.
  */
 static void __transport_add_task_to_execute_queue(
 	se_task_t *task,
+	se_task_t *task_prev,
 	se_device_t *dev)
 {
-	list_add_tail(&task->t_execute_list, &dev->execute_task_list);
+	int head_of_queue;
+
+	head_of_queue = transport_add_task_check_sam_attr(task, task_prev, dev);
 	atomic_inc(&dev->execute_tasks);
 
 	if (atomic_read(&task->task_state_active))
 		return;
-
-	list_add_tail(&task->t_state_list, &dev->state_task_list);
+	/*
+	 * Determine if this task needs to go to HEAD_OF_QUEUE for the
+	 * state list as well.  Running with SAM Task Attribute emulation
+	 * will always return head_of_queue == 0 here
+	 */
+	if (head_of_queue)
+		list_add(&task->t_state_list, (task_prev) ?
+				&task_prev->t_state_list :
+				&dev->state_task_list);
+	else
+		list_add_tail(&task->t_state_list, &dev->state_task_list);
+	
 	atomic_set(&task->task_state_active, 1);
 
 	DEBUG_TSTATE("Added ITT: 0x%08x task[%p] to dev: %p\n",
 		CMD_TFO(task->task_se_cmd)->get_task_tag(task->task_se_cmd),
 		task, dev);
-}
-
-/*	transport_add_task_to_execute_queue():
- *
- *
- */
-void transport_add_task_to_execute_queue(se_task_t *task, se_device_t *dev)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&dev->execute_task_lock, flags);
-	list_add_tail(&task->t_execute_list, &dev->execute_task_list);
-	atomic_inc(&dev->execute_tasks);
-
-	if (atomic_read(&task->task_state_active)) {
-		spin_unlock_irqrestore(&dev->execute_task_lock, flags);
-		return;
-	}
-
-	list_add_tail(&task->t_state_list, &dev->state_task_list);
-	atomic_set(&task->task_state_active, 1);
-
-	DEBUG_TSTATE("Added ITT: 0x%08x task[%p] to dev: %p\n",
-		CMD_TFO(task->task_se_cmd)->get_task_tag(task->task_se_cmd),
-		task, dev);
-
-	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 }
 
 static void transport_add_tasks_to_state_queue(se_cmd_t *cmd)
@@ -1261,16 +1301,20 @@ static void transport_add_tasks_to_state_queue(se_cmd_t *cmd)
 void transport_add_tasks_from_cmd(se_cmd_t *cmd)
 {
 	se_device_t *dev = SE_DEV(cmd);
-	se_task_t *task;
+	se_task_t *task, *task_prev = NULL;
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
 	list_for_each_entry(task, &T_TASK(cmd)->t_task_list, t_list) {
 		if (atomic_read(&task->task_execute_queue))
 			continue;
-
-		__transport_add_task_to_execute_queue(task, dev);
+		/*
+		 * __transport_add_task_to_execute_queue() handles the
+		 * SAM Task Attribute emulation if enabled
+		 */
+		__transport_add_task_to_execute_queue(task, task_prev, dev);
 		atomic_set(&task->task_execute_queue, 1);
+		task_prev = task;
 	}
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 
@@ -2011,6 +2055,26 @@ static int transport_get_read_capacity(se_device_t *dev)
 	return 0;
 }
 
+static void core_setup_task_attr_emulation(se_device_t *dev)
+{
+	/*
+	 * If this device is from Target_Core_Mod/pSCSI, disable the
+	 * SAM Task Attribute emulation.
+	 *
+	 * This is currently not available in upsream Linux/SCSI Target
+	 * mode code, and is assumed to be disabled while using TCM/pSCSI.
+	 */
+	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
+		dev->dev_task_attr_type = SAM_TASK_ATTR_PASSTHROUGH;
+		return;
+	}
+
+	dev->dev_task_attr_type = SAM_TASK_ATTR_EMULATED;
+	DEBUG_STA("%s: Using SAM_TASK_ATTR_EMULATED for SPC: 0x%02x"
+		" device\n", TRANSPORT(dev)->name,
+		TRANSPORT(dev)->get_device_rev(dev));
+}
+
 /*	transport_add_device_to_core_hba():
  *
  *	Note that some plugins (IBLOCK) will pass device_flags ==
@@ -2065,8 +2129,12 @@ se_device_t *transport_add_device_to_core_hba(
 	INIT_LIST_HEAD(&dev->dev_sep_list);
 	INIT_LIST_HEAD(&dev->dev_tmr_list);
 	INIT_LIST_HEAD(&dev->execute_task_list);
+	INIT_LIST_HEAD(&dev->delayed_cmd_list);
+	INIT_LIST_HEAD(&dev->ordered_cmd_list);
 	INIT_LIST_HEAD(&dev->state_task_list);
 	spin_lock_init(&dev->execute_task_lock);
+	spin_lock_init(&dev->delayed_cmd_lock);
+	spin_lock_init(&dev->ordered_cmd_lock);
 	spin_lock_init(&dev->state_task_lock);
 	spin_lock_init(&dev->dev_alua_lock);
 	spin_lock_init(&dev->dev_reservation_lock);
@@ -2077,6 +2145,7 @@ se_device_t *transport_add_device_to_core_hba(
 
 	dev->queue_depth	= TRANSPORT(dev)->get_queue_depth(dev);
 	atomic_set(&dev->depth_left, dev->queue_depth);
+	atomic_set(&dev->dev_ordered_id, 0);
 
 	se_dev_set_default_attribs(dev);
 
@@ -2100,6 +2169,10 @@ se_device_t *transport_add_device_to_core_hba(
 	dev->dev_obj_api = se_obj_get_api(TRANSPORT_LUN_TYPE_DEVICE);
 	if (!(dev->dev_obj_api))
 		goto out;
+	/*
+	 * Setup the SAM Task Attribute emulation for se_device_t
+	 */
+	core_setup_task_attr_emulation(dev);
 	/*
 	 * Setup the Reservations infrastructure for se_device_t
 	 */
@@ -2625,7 +2698,8 @@ se_cmd_t *__transport_alloc_se_cmd(
 	se_session_t *se_sess,
 	void *fabric_cmd_ptr,
 	u32 data_length,
-	int data_direction)
+	int data_direction,
+	int task_attr)
 {
 	se_cmd_t *cmd;
 
@@ -2640,6 +2714,8 @@ se_cmd_t *__transport_alloc_se_cmd(
 		return ERR_PTR(-ENOMEM);
 	}
 	INIT_LIST_HEAD(&cmd->se_lun_list);
+	INIT_LIST_HEAD(&cmd->se_delayed_list);
+	INIT_LIST_HEAD(&cmd->se_ordered_list);
 
 	cmd->t_task = kzalloc(sizeof(se_transport_task_t), GFP_KERNEL);
 	if (!(cmd->t_task)) {
@@ -2671,8 +2747,35 @@ se_cmd_t *__transport_alloc_se_cmd(
 	cmd->se_fabric_cmd_ptr = fabric_cmd_ptr;
 	cmd->data_length = data_length;
 	cmd->data_direction = data_direction;
+	cmd->sam_task_attr = task_attr;
 
 	return cmd;
+}
+
+int transport_check_alloc_task_attr(se_cmd_t *cmd)
+{
+	/*
+	 * Check if SAM Task Attribute emulation is enabled for this
+	 * se_device_t storage object
+	 */
+	if (SE_DEV(cmd)->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
+		return 0;
+
+	if (cmd->sam_task_attr == TASK_ATTR_ACA) {
+		DEBUG_STA("SAM Task Attribute ACA"
+			" emulation is not supported\n");
+                return -1;
+        }
+	/*
+	 * Used to determine when ORDERED commands should go from
+	 * Dormant to Active status.
+	 */
+	cmd->se_ordered_id = atomic_inc_return(&SE_DEV(cmd)->dev_ordered_id);
+	smp_mb__after_atomic_inc();
+	DEBUG_STA("Allocated se_ordered_id: %u for Task Attr: 0x%02x on %s\n",
+			cmd->se_ordered_id, cmd->sam_task_attr,
+			TRANSPORT(cmd->se_dev)->name);
+	return 0;
 }
 
 se_cmd_t *transport_alloc_se_cmd(
@@ -2680,10 +2783,11 @@ se_cmd_t *transport_alloc_se_cmd(
 	se_session_t *se_sess,
 	void *fabric_cmd_ptr,
 	u32 data_length,
-	int data_direction)
+	int data_direction,
+	int task_attr)
 {
 	return __transport_alloc_se_cmd(tfo_api, se_sess, fabric_cmd_ptr,
-				data_length, data_direction);
+				data_length, data_direction, task_attr);
 }
 EXPORT_SYMBOL(transport_alloc_se_cmd);
 
@@ -2731,7 +2835,14 @@ int transport_generic_allocate_tasks(
 	 * Copy the original CDB into T_TASK(cmd).
 	 */
 	memcpy(T_TASK(cmd)->t_task_cdb, cdb, SCSI_CDB_SIZE);
-
+	/*
+	 * Check for SAM Task Attribute Emulation
+	 */
+	if (transport_check_alloc_task_attr(cmd) < 0) {
+		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		cmd->scsi_sense_reason = INVALID_CDB_FIELD;
+		return -2;
+	}
 #ifdef SNMP_SUPPORT
 	spin_lock(&cmd->se_lun->lun_sep_lock);
 	if (cmd->se_lun->lun_sep)
@@ -3007,8 +3118,14 @@ void transport_generic_request_failure(
 
 	transport_stop_all_task_timers(cmd);
 
-	if (dev)
+	if (dev) {
 		transport_failure_reset_queue_depth(dev);
+	}
+	/*
+	 * For SAM Task Attribute emulation for failed se_cmd_t
+	 */
+	if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+		transport_complete_task_attr(cmd);
 
 	if (complete) {
 		transport_direct_request_timeout(cmd);
@@ -3826,8 +3943,96 @@ static inline int transport_tcq_window_closed(se_device_t *dev)
 	return 0;
 }
 
+/*
+ * Called from Fabric Module context from transport_execute_tasks()
+ * 
+ * The return of this function determins if the tasks from se_cmd_t
+ * get added to the execution queue in transport_execute_tasks(),
+ * or are added to the delayed or ordered lists here.
+ */
+static inline int transport_execute_task_attr(se_cmd_t *cmd)
+{
+	if (SE_DEV(cmd)->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
+		return 1;
+	/*
+	 * Check for the existance of HEAD_OF_QUEUE, and if true return 1
+	 * to allow the passed se_cmd_t list of tasks to the front of the list.
+	 */
+	 if (cmd->sam_task_attr == TASK_ATTR_HOQ) {
+		atomic_inc(&SE_DEV(cmd)->dev_hoq_count);
+		smp_mb__after_atomic_inc();
+		DEBUG_STA("Added HEAD_OF_QUEUE for CDB:"
+			" 0x%02x, se_ordered_id: %u\n",
+			T_TASK(cmd)->t_task_cdb[0],
+			cmd->se_ordered_id);
+		return 1;
+	} else if (cmd->sam_task_attr == TASK_ATTR_ORDERED) {
+		spin_lock(&SE_DEV(cmd)->ordered_cmd_lock);
+		list_add_tail(&cmd->se_ordered_list,
+				&SE_DEV(cmd)->ordered_cmd_list);
+		spin_unlock(&SE_DEV(cmd)->ordered_cmd_lock);
+
+		atomic_inc(&SE_DEV(cmd)->dev_ordered_sync);
+		smp_mb__after_atomic_inc();
+
+		DEBUG_STA("Added ORDERED for CDB: 0x%02x to ordered"
+				" list, se_ordered_id: %u\n",
+				T_TASK(cmd)->t_task_cdb[0],
+				cmd->se_ordered_id);
+		/*
+		 * Add ORDERED command to tail of execution queue if
+		 * no other older commands exist that need to be
+		 * completed first.
+		 */
+		if (!(atomic_read(&SE_DEV(cmd)->simple_cmds)))
+			return 1;
+	} else {
+		/*
+		 * For SIMPLE and UNTAGGED Task Attribute commands
+		 */
+		atomic_inc(&SE_DEV(cmd)->simple_cmds);
+		smp_mb__after_atomic_inc();
+	}
+	/* 
+	 * Otherwise if one or more outstanding ORDERED task attribute exist,
+	 * add the dormant task(s) built for the passed se_cmd_t to the
+	 * execution queue and become in Active state for this se_device_t.
+	 */
+	if (atomic_read(&SE_DEV(cmd)->dev_ordered_sync) != 0) {
+		/*
+		 * Otherwise, add cmd w/ tasks to delayed cmd queue that
+		 * will be drained upon competion of HEAD_OF_QUEUE task.
+		 */
+		spin_lock(&SE_DEV(cmd)->delayed_cmd_lock);
+		cmd->se_cmd_flags |= SCF_DELAYED_CMD_FROM_SAM_ATTR;
+		list_add_tail(&cmd->se_delayed_list,
+				&SE_DEV(cmd)->delayed_cmd_list);
+		spin_unlock(&SE_DEV(cmd)->delayed_cmd_lock);
+
+		DEBUG_STA("Added CDB: 0x%02x Task Attr: 0x%02x to"
+			" delayed CMD list, se_ordered_id: %u\n",
+			T_TASK(cmd)->t_task_cdb[0], cmd->sam_task_attr,
+			cmd->se_ordered_id);
+		/*
+		 * Return zero to let transport_execute_tasks() know
+		 * not to add the delayed tasks to the execution list.
+		 */
+		return 0;
+	}
+	/*
+	 * Otherwise, no ORDERED task attributes exist..
+	 */
+	return 1;
+}
+
+/*
+ * Called from fabric module context in transport_generic_new_cmd() and
+ * transport_generic_process_write()
+ */
 int transport_execute_tasks(se_cmd_t *cmd)
 {
+	int add_tasks;
+
 	if (!(cmd->se_cmd_flags & SCF_SE_DISABLE_ONLINE_CHECK)) {
 		if (CMD_ORIG_OBJ_API(cmd)->check_online(
 					cmd->se_orig_obj_ptr) != 0) {
@@ -3838,17 +4043,40 @@ int transport_execute_tasks(se_cmd_t *cmd)
 		}
 	}
 	/*
-	 * Add the task(s) built for the passed se_cmd_t to the
-	 * execution queue for this se_device_t.
+	 * Call transport_cmd_check_stop() to see if a fabric exception
+	 * has occured that prevents execution.
 	 */
-	if (!transport_cmd_check_stop(cmd, 0, TRANSPORT_PROCESSING))
+	if (!(transport_cmd_check_stop(cmd, 0, TRANSPORT_PROCESSING))) {
+		/*
+		 * Check for SAM Task Attribute emulation and HEAD_OF_QUEUE
+		 * attribute for the tasks of the received se_cmd_t CDB
+		 */
+		add_tasks = transport_execute_task_attr(cmd);
+		if (add_tasks == 0)
+			goto execute_tasks;
+		/*
+		 * This calls transport_add_tasks_from_cmd() to handle
+		 * HEAD_OF_QUEUE ordering for SAM Task Attribute emulation
+		 * (if enabled) in __transport_add_task_to_execute_queue() and
+		 * transport_add_task_check_sam_attr().
+		 */
 		CMD_ORIG_OBJ_API(cmd)->add_tasks(cmd->se_orig_obj_ptr, cmd);
-
+	}
+	/*
+	 * Kick the execution queue for the cmd associated se_device_t
+	 * storage object.
+	 */
+execute_tasks:
 	CMD_ORIG_OBJ_API(cmd)->execute_tasks(cmd->se_orig_obj_ptr);
-
 	return 0;
 }
 
+/*
+ * Called to check se_device_t tcq depth window, and once open pull se_task_t from
+ * se_device_t->execute_task_list and
+ *
+ * Called from transport_processing_thread()
+ */
 int __transport_execute_tasks(se_device_t *dev)
 {
 	int error;
@@ -5172,6 +5400,12 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[3] << 8) + cdb[4];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
+		/*
+		 * Do implict HEAD_OF_QUEUE processing for INQUIRY.
+		 * See spc4r17 section 5.3
+		 */
+		if (SE_DEV(cmd)->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+			cmd->sam_task_attr = TASK_ATTR_HOQ;
 		ret = 2;
 		break;
 	case READ_BUFFER:
@@ -5337,6 +5571,12 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
+		/*
+		 * Do implict HEAD_OF_QUEUE processing for REPORT_LUNS
+		 * See spc4r17 section 5.3
+		 */
+		if (SE_DEV(cmd)->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+			cmd->sam_task_attr = TASK_ATTR_HOQ;
 		ret = 2;
 		break;
 	default:
@@ -5392,7 +5632,7 @@ static inline se_cmd_t *transport_alloc_passthrough_cmd(
 	int data_direction)
 {
 	return __transport_alloc_se_cmd(&passthrough_fabric_ops, NULL, NULL,
-			data_length, data_direction);
+			data_length, data_direction, TASK_ATTR_SIMPLE);
 }
 
 se_cmd_t *transport_allocate_passthrough(
@@ -5597,6 +5837,76 @@ int transport_generic_passthrough(se_cmd_t *cmd)
 	return transport_generic_passthrough_async(cmd, NULL, NULL);
 }
 
+/*
+ * Called from transport_generic_complete_ok() and
+ * transport_generic_request_failure() to determine which dormant/delayed
+ * and ordered cmds need to have their tasks added to the execution queue.
+ */
+void transport_complete_task_attr(se_cmd_t *cmd)
+{
+	se_device_t *dev = SE_DEV(cmd);
+	se_cmd_t *cmd_p, *cmd_tmp;
+	int new_active_tasks = 0;
+
+	if (cmd->sam_task_attr == TASK_ATTR_SIMPLE) {
+		atomic_dec(&dev->simple_cmds);
+		smp_mb__after_atomic_dec();
+		dev->dev_cur_ordered_id++;	
+		DEBUG_STA("Incremented dev->dev_cur_ordered_id: %u for"
+			" SIMPLE: %u\n", dev->dev_cur_ordered_id,
+			cmd->se_ordered_id);
+	} else if (cmd->sam_task_attr == TASK_ATTR_HOQ) {
+		atomic_dec(&dev->dev_hoq_count);
+		smp_mb__after_atomic_dec();
+		dev->dev_cur_ordered_id++;
+		DEBUG_STA("Incremented dev_cur_ordered_id: %u for HEAD_OF_QUEUE:"
+			" %u\n", dev->dev_cur_ordered_id, cmd->se_ordered_id);
+	} else if (cmd->sam_task_attr == TASK_ATTR_ORDERED) {
+		spin_lock(&dev->ordered_cmd_lock);
+		list_del(&cmd->se_ordered_list);
+		atomic_dec(&dev->dev_ordered_sync);
+		smp_mb__after_atomic_dec();
+		spin_unlock(&dev->ordered_cmd_lock);
+
+		dev->dev_cur_ordered_id++;
+		DEBUG_STA("Incremented dev_cur_ordered_id: %u for ORDERED: %u\n",
+			dev->dev_cur_ordered_id, cmd->se_ordered_id);
+	}
+	/*
+	 * Process all commands up to the last received
+	 * ORDERED task attribute which requires another blocking
+	 * boundary
+	 */
+	spin_lock(&dev->delayed_cmd_lock);
+	list_for_each_entry_safe(cmd_p, cmd_tmp,
+			&dev->delayed_cmd_list, se_delayed_list) {
+
+		list_del(&cmd_p->se_delayed_list);
+		spin_unlock(&dev->delayed_cmd_lock);
+	
+		DEBUG_STA("Calling add_tasks() for"
+			" cmd_p: 0x%02x Task Attr: 0x%02x"
+			" Dormant -> Active, se_ordered_id: %u\n",
+			T_TASK(cmd_p)->t_task_cdb[0],
+			cmd_p->sam_task_attr, cmd_p->se_ordered_id);
+
+		CMD_ORIG_OBJ_API(cmd_p)->add_tasks(
+				cmd_p->se_orig_obj_ptr, cmd_p);
+		new_active_tasks++;
+
+		spin_lock(&dev->delayed_cmd_lock);
+		if (cmd_p->sam_task_attr == TASK_ATTR_ORDERED)
+			break;
+	}
+	spin_unlock(&dev->delayed_cmd_lock);
+	/*
+	 * If new tasks have become active, wake up the transport thread
+	 * to do the processing of the Active tasks.
+	 */
+	if (new_active_tasks != 0)
+		wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
+}
+
 /*	transport_generic_complete_ok():
  *
  *
@@ -5604,6 +5914,13 @@ int transport_generic_passthrough(se_cmd_t *cmd)
 void transport_generic_complete_ok(se_cmd_t *cmd)
 {
 	int reason = 0;
+	/*
+	 * Check if we need to move delayed/dormant tasks from cmds on the
+	 * delayed execution list after a HEAD_OF_QUEUE or ORDERED Task
+	 * Attribute.
+	 */
+	if (SE_DEV(cmd)->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+		transport_complete_task_attr(cmd);
 	/*
 	 * Check if we need to retrieve a sense buffer from
 	 * the se_cmd_t in question.

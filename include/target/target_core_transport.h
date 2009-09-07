@@ -148,6 +148,7 @@ extern void transport_remove_cmd_from_queue(struct se_cmd_s *,
 extern void transport_complete_cmd(se_cmd_t *, int);
 extern void transport_complete_task(struct se_task_s *, int);
 extern void transport_add_task_to_execute_queue(struct se_task_s *,
+						struct se_task_s *,
 						struct se_device_s *);
 extern void transport_add_tasks_from_cmd(struct se_cmd_s *);
 extern struct se_task_s *transport_get_task_from_execute_queue(
@@ -181,9 +182,10 @@ extern int transport_generic_obj_start(struct se_transform_info_s *,
 					struct se_obj_lun_type_s *, void *,
 					unsigned long long);
 extern void transport_device_setup_cmd(se_cmd_t *);
+extern int transport_check_alloc_task_attr(se_cmd_t *);
 extern se_cmd_t *transport_alloc_se_cmd(struct target_core_fabric_ops *,
 					struct se_session_s *, void *,
-					u32, int);
+					u32, int, int);
 extern void transport_free_se_cmd(struct se_cmd_s *);
 extern int transport_generic_allocate_tasks(se_cmd_t *, unsigned char *);
 extern int transport_generic_handle_cdb(se_cmd_t *);
@@ -227,6 +229,7 @@ extern int transport_generic_passthrough_async(se_cmd_t *cmd,
 				void *callback_arg, int complete_status),
 				void *callback_arg);
 extern int transport_generic_passthrough(se_cmd_t *);
+extern void transport_complete_task_attr(se_cmd_t *);
 extern void transport_generic_complete_ok(se_cmd_t *);
 extern void transport_free_dev_tasks(se_cmd_t *);
 extern void transport_release_tasks(se_cmd_t *);

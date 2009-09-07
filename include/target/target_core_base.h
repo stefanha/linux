@@ -163,6 +163,7 @@
 #define SCF_UNDERFLOW_BIT                       0x00020000
 #define SCF_SENT_DELAYED_TAS			0x00040000
 #define SCF_ALUA_NON_OPTIMIZED			0x00080000
+#define SCF_DELAYED_CMD_FROM_SAM_ATTR		0x00100000
 
 /* se_device_t->type */
 #define PSCSI					1
@@ -224,6 +225,12 @@ typedef enum {
 	SPC2_ALUA_DISABLED,
 	SPC3_ALUA_EMULATED
 } t10_alua_index_t;
+
+typedef enum {
+	SAM_TASK_ATTR_PASSTHROUGH,
+	SAM_TASK_ATTR_UNTAGGED,
+	SAM_TASK_ATTR_EMULATED
+} t10_task_attr_index_t;
 
 struct se_cmd_s;
 
@@ -513,6 +520,8 @@ typedef struct se_cmd_s {
 	/* Delay for ALUA Active/NonOptimized state access in milliseconds */
 	int			alua_nonop_delay;
 	int			data_direction;
+	/* For SAM Task Attribute */
+	int			sam_task_attr;
 	/* Transport protocol dependent state */
 	int			t_state;
 	/* Transport protocol dependent state for out of order CmdSNs */
@@ -520,6 +529,7 @@ typedef struct se_cmd_s {
 	/* Transport specific error status */
 	int			transport_error_status;
 	u32			se_cmd_flags;
+	u32			se_ordered_id;
 	/* Total size in bytes associated with command */
 	u32			data_length;
 	/* SCSI Presented Data Transfer Length */
@@ -537,6 +547,8 @@ typedef struct se_cmd_s {
 	void			*sense_buffer;
 	/* Used with sockets based fabric plugins */
 	struct iovec		*iov_data;
+	struct list_head	se_delayed_list;
+	struct list_head	se_ordered_list;
 	struct list_head	se_lun_list;
 	struct se_device_s      *se_dev;
 	struct se_dev_entry_s   *se_deve;
@@ -746,12 +758,15 @@ typedef struct se_device_s {
 	u8			dev_status_timer_flags;
 	/* RELATIVE TARGET PORT IDENTIFER Counter */
 	u16			dev_rpti_counter;
+	/* Used for SAM Task Attribute ordering */
+	u32			dev_cur_ordered_id;
 	u32			dev_flags;
 	u32			dev_port_count;
 	u32			dev_status;
 	u32			dev_tcq_window_closed;
 	/* Physical device queue depth */
 	u32			queue_depth;
+	t10_task_attr_index_t	dev_task_attr_type;
 	unsigned long long	dev_sectors_total;
 	/* Pointer to transport specific device structure */
 	void 			*dev_ptr;
@@ -766,16 +781,22 @@ typedef struct se_device_s {
 #endif /* SNMP_SUPPORT */
 	/* Active commands on this virtual SE device */
 	atomic_t		active_cmds;
+	atomic_t		simple_cmds;
 	atomic_t		depth_left;
+	atomic_t		dev_ordered_id;
 	atomic_t		dev_tur_active;
 	atomic_t		execute_tasks;
 	atomic_t		dev_status_thr_count;
+	atomic_t		dev_hoq_count;
+	atomic_t		dev_ordered_sync;
 	struct se_obj_s		dev_obj;
 	struct se_obj_s		dev_access_obj;
 	struct se_obj_s		dev_export_obj;
 	struct se_obj_s		dev_feature_obj;
 	se_queue_obj_t		*dev_queue_obj;
 	se_queue_obj_t		*dev_status_queue_obj;
+	spinlock_t		delayed_cmd_lock;
+	spinlock_t		ordered_cmd_lock;
 	spinlock_t		execute_task_lock;
 	spinlock_t		state_task_lock;
 	spinlock_t		dev_alua_lock;
@@ -802,6 +823,8 @@ typedef struct se_device_s {
 	void (*dev_generate_cdb)(unsigned long long, u32 *,
 					unsigned char *, int);
 	struct se_obj_lun_type_s *dev_obj_api;
+	struct list_head	delayed_cmd_list;
+	struct list_head	ordered_cmd_list;
 	struct list_head	execute_task_list;
 	struct list_head	state_task_list;
 	/* Pointer to associated SE HBA */
