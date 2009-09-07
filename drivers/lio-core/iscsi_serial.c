@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_serial.c
  *
  * This file contains the Serial Number Arithmetic functions.
@@ -24,7 +24,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #ifndef ISCSI_SERIAL_C
@@ -37,26 +37,26 @@
 #define SERIAL_BITS	31
 #define MAX_BOUND	(u32)2147483647UL
 
-extern int serial_lt (u32 x, u32 y)
+int serial_lt(u32 x, u32 y)
 {
-	return((x != y) && (((x < y) && ((y - x) < MAX_BOUND)) ||
-			    ((x > y) && ((x - y) > MAX_BOUND))));
+	return (x != y) && (((x < y) && ((y - x) < MAX_BOUND)) ||
+			    ((x > y) && ((x - y) > MAX_BOUND)));
 }
 
-extern int serial_lte (u32 x, u32 y)
+int serial_lte(u32 x, u32 y)
 {
-	return((x == y) ? 1 : serial_lt(x, y));
+	return (x == y) ? 1 : serial_lt(x, y);
 }
 
-extern int serial_gt (u32 x, u32 y)
+int serial_gt(u32 x, u32 y)
 {
-	return((x != y) && (((x < y) && ((y - x) > MAX_BOUND)) ||
-			    ((x > y) && ((x - y) < MAX_BOUND))));
+	return (x != y) && (((x < y) && ((y - x) > MAX_BOUND)) ||
+			    ((x > y) && ((x - y) < MAX_BOUND)));
 }
 
-extern int serial_gte (u32 x, u32 y)
+int serial_gte(u32 x, u32 y)
 {
-	return((x == y) ? 1 : serial_gt(x, y));
+	return (x == y) ? 1 : serial_gt(x, y);
 }
 
 #endif /* ISCSI_SERIAL_C */
