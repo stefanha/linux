@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_target_datain_values.c
  *
  * This file contains the iSCSI Target DataIN value generation functions.
@@ -23,7 +23,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 #define ISCSI_TARGET_DATAIN_VALUES_C
 
@@ -49,47 +49,37 @@
 
 #undef ISCSI_TARGET_DATAIN_VALUES_C
 
-extern iscsi_global_t *iscsi_global;
-extern struct kmem_cache *lio_dr_cache;
-
-extern iscsi_datain_req_t *iscsi_allocate_datain_req (void)
+iscsi_datain_req_t *iscsi_allocate_datain_req(void)
 {
 	iscsi_datain_req_t *dr;
 
-	if (!(dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC))) {
-		TRACE_ERROR("Unable to allocate memory for iscsi_datain_req_t\n");
-		return(NULL);
+	dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC);
+	if (!(dr)) {
+		TRACE_ERROR("Unable to allocate memory for"
+				" iscsi_datain_req_t\n");
+		return NULL;
 	}
 
-	return(dr);
+	return dr;
 }
 
-extern void iscsi_attach_datain_req (
-	iscsi_cmd_t *cmd,
-	iscsi_datain_req_t *dr)
+void iscsi_attach_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
 {
 	spin_lock(&cmd->datain_lock);
 	ADD_ENTRY_TO_LIST(dr, cmd->datain_req_head, cmd->datain_req_tail);
 	spin_unlock(&cmd->datain_lock);
-
-	return;
 }
 
-extern void iscsi_free_datain_req (
-	iscsi_cmd_t *cmd,
-	iscsi_datain_req_t *dr)
+void iscsi_free_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
 {
 	spin_lock(&cmd->datain_lock);
 	REMOVE_ENTRY_FROM_LIST(dr, cmd->datain_req_head, cmd->datain_req_tail);
 	spin_unlock(&cmd->datain_lock);
 
 	kmem_cache_free(lio_dr_cache, dr);
-
-	return;
 }
 
-extern void iscsi_free_all_datain_reqs (
-	iscsi_cmd_t *cmd)
+void iscsi_free_all_datain_reqs(iscsi_cmd_t *cmd)
 {
 	iscsi_datain_req_t *dr, *dr_next = NULL;
 
@@ -102,26 +92,24 @@ extern void iscsi_free_all_datain_reqs (
 	}
 	cmd->datain_req_head = cmd->datain_req_tail = NULL;
 	spin_unlock(&cmd->datain_lock);
-
-	return;
 }
 
-extern iscsi_datain_req_t *iscsi_get_datain_req (
-	iscsi_cmd_t *cmd)
+iscsi_datain_req_t *iscsi_get_datain_req(iscsi_cmd_t *cmd)
 {
 	if (!cmd->datain_req_head) {
-		TRACE_ERROR("cmd->datain_req_head is NULL for ITT: 0x%08x\n", cmd->init_task_tag);
-		return(NULL);
+		TRACE_ERROR("cmd->datain_req_head is NULL for ITT: 0x%08x\n",
+				cmd->init_task_tag);
+		return NULL;
 	}
 
-	return(cmd->datain_req_head);
+	return cmd->datain_req_head;
 }
 
 /*	iscsi_set_datain_values_yes_and_yes():
  *
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=Yes.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes (
+static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes(
 	iscsi_cmd_t *cmd,
 	iscsi_datain_t *datain)
 {
@@ -129,25 +117,30 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes (
 	iscsi_conn_t *conn = CONN(cmd);
 	iscsi_datain_req_t *dr;
 
-	if (!(dr = iscsi_get_datain_req(cmd)))
-		return(NULL);
+	dr = iscsi_get_datain_req(cmd);
+	if (!(dr))
+		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(cmd, dr) < 0)
-			return(NULL);
-		
+		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(
+					cmd, dr) < 0)
+			return NULL;
+
 		dr->generate_recovery_values = 0;
 	}
 
-	next_burst_len = (!dr->recovery) ? cmd->next_burst_len : dr->next_burst_len;
-	read_data_done = (!dr->recovery) ? cmd->read_data_done : dr->read_data_done;
-	
-	if (!(read_data_left = (cmd->data_length - read_data_done))) {
+	next_burst_len = (!dr->recovery) ?
+			cmd->next_burst_len : dr->next_burst_len;
+	read_data_done = (!dr->recovery) ?
+			cmd->read_data_done : dr->read_data_done;
+
+	read_data_left = (cmd->data_length - read_data_done);
+	if (!(read_data_left)) {
 		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
-		return(NULL);
+		return NULL;
 	}
-	
+
 	if ((read_data_left <= CONN_OPS(conn)->MaxRecvDataSegmentLength) &&
 	    (read_data_left <= (SESS_OPS_C(conn)->MaxBurstLength -
 	     next_burst_len))) {
@@ -157,9 +150,11 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes (
 		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
 			datain->flags |= A_BIT;
 	} else {
-		if ((next_burst_len + CONN_OPS(conn)->MaxRecvDataSegmentLength) <
+		if ((next_burst_len +
+		     CONN_OPS(conn)->MaxRecvDataSegmentLength) <
 		     SESS_OPS_C(conn)->MaxBurstLength) {
-			datain->length = CONN_OPS(conn)->MaxRecvDataSegmentLength;
+			datain->length =
+				CONN_OPS(conn)->MaxRecvDataSegmentLength;
 			next_burst_len += datain->length;
 		} else {
 			datain->length = (SESS_OPS_C(conn)->MaxBurstLength -
@@ -174,7 +169,7 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes (
 
 	datain->data_sn = (!dr->recovery) ? cmd->data_sn++ : dr->data_sn++;
 	datain->offset = read_data_done;
-	
+
 	if (!dr->recovery) {
 		cmd->next_burst_len = next_burst_len;
 		cmd->read_data_done += datain->length;
@@ -187,31 +182,33 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes (
 		if (datain->flags & S_BIT)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
 
-		return(dr);
+		return dr;
 	}
-	
-        if (!dr->runlength) {
+
+	if (!dr->runlength) {
 		if (datain->flags & S_BIT) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	} else {
 		if ((dr->begrun + dr->runlength) == dr->data_sn) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	}
 
-	return(dr);	
+	return dr;
 }
 
 /*	iscsi_set_datain_values_no_and_yes():
  *
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=Yes.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes (
+static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes(
 	iscsi_cmd_t *cmd,
 	iscsi_datain_t *datain)
 {
@@ -220,33 +217,39 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes (
 	iscsi_datain_req_t *dr;
 	iscsi_seq_t *seq;
 
-	if (!(dr = iscsi_get_datain_req(cmd)))
-		return(NULL);
+	dr = iscsi_get_datain_req(cmd);
+	if (!(dr))
+		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(cmd, dr) < 0)
-			return(NULL);
+		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(
+					cmd, dr) < 0)
+			return NULL;
 
 		dr->generate_recovery_values = 0;
 	}
 
-	read_data_done = (!dr->recovery) ? cmd->read_data_done : dr->read_data_done;
-	seq_send_order = (!dr->recovery) ? cmd->seq_send_order : dr->seq_send_order;
+	read_data_done = (!dr->recovery) ?
+			cmd->read_data_done : dr->read_data_done;
+	seq_send_order = (!dr->recovery) ?
+			cmd->seq_send_order : dr->seq_send_order;
 
-	if (!(read_data_left = (cmd->data_length - read_data_done))) {
+	read_data_left = (cmd->data_length - read_data_done);
+	if (!(read_data_left)) {
 		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
-		return(NULL);
+		return NULL;
 	}
-	
-	if (!(seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order)))
-		return(NULL);
+
+	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
+	if (!(seq))
+		return NULL;
 
 	seq->sent = 1;
-	
+
 	if (!dr->recovery && !seq->next_burst_len)
 		seq->first_datasn = cmd->data_sn;
-		
+
 	offset = (seq->offset + seq->next_burst_len);
 
 	if ((offset + CONN_OPS(conn)->MaxRecvDataSegmentLength) >=
@@ -257,13 +260,15 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes (
 		datain->flags |= F_BIT;
 		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
 			datain->flags |= A_BIT;
-		
+
 		seq->next_burst_len = 0;
 		seq_send_order++;
 	} else {
-		if ((seq->next_burst_len + CONN_OPS(conn)->MaxRecvDataSegmentLength) <
+		if ((seq->next_burst_len +
+		     CONN_OPS(conn)->MaxRecvDataSegmentLength) <
 		     SESS_OPS_C(conn)->MaxBurstLength) {
-			datain->length = CONN_OPS(conn)->MaxRecvDataSegmentLength;
+			datain->length =
+				CONN_OPS(conn)->MaxRecvDataSegmentLength;
 			datain->offset = (seq->offset + seq->next_burst_len);
 
 			seq->next_burst_len += datain->length;
@@ -283,7 +288,7 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes (
 
 	if ((read_data_done + datain->length) == cmd->data_length)
 		datain->flags |= S_BIT;
-	
+
 	datain->data_sn = (!dr->recovery) ? cmd->data_sn++ : dr->data_sn++;
 	if (!dr->recovery) {
 		cmd->seq_send_order = seq_send_order;
@@ -292,38 +297,40 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes (
 		dr->seq_send_order = seq_send_order;
 		dr->read_data_done += datain->length;
 	}
-	
+
 	if (!dr->recovery) {
 		if (datain->flags & F_BIT)
 			seq->last_datasn = datain->data_sn;
 		if (datain->flags & S_BIT)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
-		
-		return(dr);
+
+		return dr;
 	}
 
 	if (!dr->runlength) {
 		if (datain->flags & S_BIT) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	} else {
 		if ((dr->begrun + dr->runlength) == dr->data_sn) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	}
-		
-	return(dr);
+
+	return dr;
 }
 
 /*	iscsi_set_datain_values_yes_and_no():
  *
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=No.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no (
+static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no(
 	iscsi_cmd_t *cmd,
 	iscsi_datain_t *datain)
 {
@@ -332,33 +339,39 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no (
 	iscsi_datain_req_t *dr;
 	iscsi_pdu_t *pdu;
 
-	if (!(dr = iscsi_get_datain_req(cmd)))
-		return(NULL);
+	dr = iscsi_get_datain_req(cmd);
+	if (!(dr))
+		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(cmd, dr) < 0)
-			return(NULL);
+		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(
+					cmd, dr) < 0)
+			return NULL;
 
 		dr->generate_recovery_values = 0;
 	}
 
-	next_burst_len = (!dr->recovery) ? cmd->next_burst_len : dr->next_burst_len;
-	read_data_done = (!dr->recovery) ? cmd->read_data_done : dr->read_data_done;
-	
-	if (!(read_data_left = (cmd->data_length - read_data_done))) {
+	next_burst_len = (!dr->recovery) ?
+			cmd->next_burst_len : dr->next_burst_len;
+	read_data_done = (!dr->recovery) ?
+			cmd->read_data_done : dr->read_data_done;
+
+	read_data_left = (cmd->data_length - read_data_done);
+	if (!(read_data_left)) {
 		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
-		return(dr);
+		return dr;
 	}
 
-	if (!(pdu = iscsi_get_pdu_holder_for_seq(cmd, NULL)))
-		return(dr);
+	pdu = iscsi_get_pdu_holder_for_seq(cmd, NULL);
+	if (!(pdu))
+		return dr;
 
 	if ((read_data_done + pdu->length) == cmd->data_length) {
 		pdu->flags |= (F_BIT | S_BIT);
 		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
 			pdu->flags |= A_BIT;
-		
+
 		next_burst_len = 0;
 	} else {
 		if ((next_burst_len + CONN_OPS(conn)->MaxRecvDataSegmentLength) <
@@ -381,7 +394,7 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no (
 		dr->next_burst_len = next_burst_len;
 		dr->read_data_done += pdu->length;
 	}
-	
+
 	datain->flags = pdu->flags;
 	datain->length = pdu->length;
 	datain->offset = pdu->offset;
@@ -391,31 +404,33 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no (
 		if (datain->flags & S_BIT)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
 
-		return(dr);
+		return dr;
 	}
 
 	if (!dr->runlength) {
 		if (datain->flags & S_BIT) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	} else {
 		if ((dr->begrun + dr->runlength) == dr->data_sn) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	}
-	
-	return(dr);
+
+	return dr;
 }
 
 /*	iscsi_set_datain_values_no_and_no():
  *
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=No.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no (
+static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no(
 	iscsi_cmd_t *cmd,
 	iscsi_datain_t *datain)
 {
@@ -425,35 +440,42 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no (
 	iscsi_pdu_t *pdu;
 	iscsi_seq_t *seq = NULL;
 
-	if (!(dr = iscsi_get_datain_req(cmd)))
-		return(NULL);
+	dr = iscsi_get_datain_req(cmd);
+	if (!(dr))
+		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(cmd, dr) < 0)
-			return(NULL);
+		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(
+					cmd, dr) < 0)
+			return NULL;
 
 		dr->generate_recovery_values = 0;
 	}
 
-	read_data_done = (!dr->recovery) ? cmd->read_data_done : dr->read_data_done;
-	seq_send_order = (!dr->recovery) ? cmd->seq_send_order : dr->seq_send_order;
-	
-	if (!(read_data_left = (cmd->data_length - read_data_done))) {
+	read_data_done = (!dr->recovery) ?
+			cmd->read_data_done : dr->read_data_done;
+	seq_send_order = (!dr->recovery) ?
+			cmd->seq_send_order : dr->seq_send_order;
+
+	read_data_left = (cmd->data_length - read_data_done);
+	if (!(read_data_left)) {
 		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
-		return(NULL);
+		return NULL;
 	}
-	
-	if (!(seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order)))
-		return(NULL);
+
+	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
+	if (!(seq))
+		return NULL;
 
 	seq->sent = 1;
-	
+
 	if (!dr->recovery && !seq->next_burst_len)
 		seq->first_datasn = cmd->data_sn;
-	
-	if (!(pdu = iscsi_get_pdu_holder_for_seq(cmd, seq)))
-		return(NULL);
+
+	pdu = iscsi_get_pdu_holder_for_seq(cmd, seq);
+	if (!(pdu))
+		return NULL;
 
 	if (seq->pdu_send_order == seq->pdu_count) {
 		pdu->flags |= F_BIT;
@@ -464,8 +486,8 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no (
 		seq_send_order++;
 	} else
 		seq->next_burst_len += pdu->length;
-	
-        if ((read_data_done + pdu->length) == cmd->data_length)
+
+	if ((read_data_done + pdu->length) == cmd->data_length)
 		pdu->flags |= S_BIT;
 
 	pdu->data_sn = (!dr->recovery) ? cmd->data_sn++ : dr->data_sn++;
@@ -476,61 +498,63 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no (
 		dr->seq_send_order = seq_send_order;
 		dr->read_data_done += pdu->length;
 	}
-	       
+
 	datain->flags = pdu->flags;
 	datain->length = pdu->length;
 	datain->offset = pdu->offset;
 	datain->data_sn = pdu->data_sn;
-	
+
 	if (!dr->recovery) {
-                if (datain->flags & F_BIT)
+		if (datain->flags & F_BIT)
 			seq->last_datasn = datain->data_sn;
 		if (datain->flags & S_BIT)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
 
-		return(dr);
+		return dr;
 	}
 
 	if (!dr->runlength) {
 		if (datain->flags & S_BIT) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	} else {
 		if ((dr->begrun + dr->runlength) == dr->data_sn) {
-			dr->dr_complete = (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
+			dr->dr_complete =
+			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
 				DATAIN_COMPLETE_CONNECTION_RECOVERY;
 		}
 	}
-	
-	return(dr);
+
+	return dr;
 }
 
 /*	iscsi_get_datain_values():
  *
  *
  */
-extern iscsi_datain_req_t *iscsi_get_datain_values (
+iscsi_datain_req_t *iscsi_get_datain_values(
 	iscsi_cmd_t *cmd,
 	iscsi_datain_t *datain)
 {
 	iscsi_conn_t *conn = CONN(cmd);
-	
+
 	if (SESS_OPS_C(conn)->DataSequenceInOrder &&
 	    SESS_OPS_C(conn)->DataPDUInOrder)
-		return(iscsi_set_datain_values_yes_and_yes(cmd, datain));
+		return iscsi_set_datain_values_yes_and_yes(cmd, datain);
 	else if (!SESS_OPS_C(conn)->DataSequenceInOrder &&
 		  SESS_OPS_C(conn)->DataPDUInOrder)
-		return(iscsi_set_datain_values_no_and_yes(cmd, datain));
+		return iscsi_set_datain_values_no_and_yes(cmd, datain);
 	else if (SESS_OPS_C(conn)->DataSequenceInOrder &&
 		 !SESS_OPS_C(conn)->DataPDUInOrder)
-		return(iscsi_set_datain_values_yes_and_no(cmd, datain));
+		return iscsi_set_datain_values_yes_and_no(cmd, datain);
 	else if (!SESS_OPS_C(conn)->DataSequenceInOrder &&
 		   !SESS_OPS_C(conn)->DataPDUInOrder)
-		return(iscsi_set_datain_values_no_and_no(cmd, datain));
+		return iscsi_set_datain_values_no_and_no(cmd, datain);
 
-	return(NULL);
+	return NULL;
 }
 
