@@ -1,4 +1,4 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_target_mib.c
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
@@ -21,7 +21,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #include <linux/kernel.h>
@@ -51,9 +51,6 @@
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
 
-extern se_global_t *se_global;
-extern iscsi_global_t *iscsi_global;
-
 /* iSCSI mib table index */
 iscsi_index_table_t iscsi_index_table;
 
@@ -70,7 +67,7 @@ iscsi_index_table_t iscsi_index_table;
 
 #define ISCSI_NODE_INDEX		1
 
-#define ISPRINT(a)   ((a >=' ')&&(a <= '~'))
+#define ISPRINT(a)   ((a >= ' ') && (a <= '~'))
 
 static inline int list_is_first(const struct list_head *list,
 				const struct list_head *head)
@@ -82,7 +79,7 @@ static inline int list_is_first(const struct list_head *list,
  * iSCSI MIB Tables
  ****************************************************************************/
 /*
- * Instance Attributes Table 
+ * Instance Attributes Table
  */
 static int get_num_portals(iscsi_tiqn_t *tiqn)
 {
@@ -141,7 +138,7 @@ static int inst_attr_seq_show(struct seq_file *seq, void *v)
 			" fail_sess fail_type fail_rem_name disc_time\n");
 
 	seq_printf(seq, "%u %u %u %u %u %u ",
- 		   tiqn->tiqn_index, ISCSI_MIN_VERSION, ISCSI_MAX_VERSION,
+		   tiqn->tiqn_index, ISCSI_MIN_VERSION, ISCSI_MAX_VERSION,
 		   get_num_portals(tiqn), ISCSI_INST_NUM_NODES,
 		   get_num_sessions(tiqn));
 
@@ -150,12 +147,12 @@ static int inst_attr_seq_show(struct seq_file *seq, void *v)
 	spin_lock_bh(&sess_err->lock);
 	sess_err_count = (sess_err->digest_errors +
 			sess_err->cxn_timeout_errors +
-	 		sess_err->pdu_format_errors);
+			sess_err->pdu_format_errors);
 
-	seq_printf(seq, "%u %u %s %u\n", sess_err_count, 
+	seq_printf(seq, "%u %u %s %u\n", sess_err_count,
 		  sess_err->last_sess_failure_type,
 		  sess_err->last_sess_fail_rem_name[0] ?
-		  	sess_err->last_sess_fail_rem_name : NONE,
+		  sess_err->last_sess_fail_rem_name : NONE,
 		  ISCSI_DISCONTINUITY_TIME);
 	spin_unlock_bh(&sess_err->lock);
 
@@ -169,7 +166,7 @@ static int inst_attr_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations inst_attr_seq_ops = {
+static const struct seq_operations inst_attr_seq_ops = {
 	.start	= inst_attr_seq_start,
 	.next	= inst_attr_seq_next,
 	.stop	= inst_attr_seq_stop,
@@ -181,7 +178,7 @@ static int inst_attr_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &inst_attr_seq_ops);
 }
 
-static struct file_operations inst_attr_seq_fops = {
+static const struct file_operations inst_attr_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = inst_attr_seq_open,
 	.read	 = seq_read,
@@ -208,7 +205,7 @@ static int sess_err_stats_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations sess_err_seq_ops = {
+static const struct seq_operations sess_err_seq_ops = {
 	.start	= locate_tiqn_start,
 	.next	= locate_tiqn_next,
 	.stop	= locate_tiqn_stop,
@@ -220,7 +217,7 @@ static int sess_err_stats_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &sess_err_seq_ops);
 }
 
-static struct file_operations sess_err_stats_seq_fops = {
+static const struct file_operations sess_err_stats_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = sess_err_stats_seq_open,
 	.read	 = seq_read,
@@ -247,7 +244,7 @@ static void *locate_tpg_next(
 }
 
 static void locate_tpg_stop(struct seq_file *seq, void *v)
-{       
+{
 	spin_unlock_bh(&iscsi_global->g_tpg_lock);
 }
 
@@ -255,7 +252,7 @@ int do_portal_check(void *p)
 {
 	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
 
-	return(tpg->num_tpg_nps);
+	return tpg->num_tpg_nps;
 }
 
 /*
@@ -264,12 +261,12 @@ int do_portal_check(void *p)
 */
 static void *portal_attr_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return(locate_tpg_start(seq, pos, &do_portal_check));
+	return locate_tpg_start(seq, pos, &do_portal_check);
 }
 
 static void *portal_attr_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return(locate_tpg_next(seq, v, pos, &do_portal_check));
+	return locate_tpg_next(seq, v, pos, &do_portal_check);
 }
 
 static void portal_attr_seq_stop(struct seq_file *seq, void *v)
@@ -291,7 +288,7 @@ static int portal_attr_seq_show(struct seq_file *seq, void *v)
 #warning FIXME: Add iscsiPortalStorageType
 	if (list_is_first(&tpg->g_tpg_list, &iscsi_global->g_tpg_list))
 		seq_puts(seq, "inst indx role addr_type addr proto max_rcv "
-		         "hdr_dgst(pri,sec) data_dgst(pri,sec) rcv_mark\n");
+			"hdr_dgst(pri,sec) data_dgst(pri,sec) rcv_mark\n");
 
 	maxrcvdseg = hdrdigest = datadigest = ofmark = NULL;
 	maxrcvdseg = iscsi_find_param_from_key(MAXRECVDATASEGMENTLENGTH,
@@ -303,10 +300,11 @@ static int portal_attr_seq_show(struct seq_file *seq, void *v)
 	ofmark = iscsi_find_param_from_key(OFMARKER, tpg->param_list);
 
 	spin_lock(&tpg->tpg_np_lock);
-	list_for_each_entry_safe(tpg_np, tpg_np_tmp, &tpg->tpg_gnp_list, tpg_np_list) {
+	list_for_each_entry_safe(tpg_np, tpg_np_tmp, &tpg->tpg_gnp_list,
+			tpg_np_list) {
 #warning FIXME: T/I Mode
-#warning FIXME: DNS 
-		seq_printf(seq, "%u %u %s %s ", 
+#warning FIXME: DNS
+		seq_printf(seq, "%u %u %s %s ",
 			   tiqn->tiqn_index, tpg_np->tpg_np_index, "Target",
 			   (tpg_np->tpg_np->np_net_size == IPV6_ADDRESS_SPACE) ?
 			   "ipv6" : "ipv4");
@@ -338,20 +336,20 @@ static int portal_attr_seq_show(struct seq_file *seq, void *v)
 		}
 
 		seq_printf(seq, "%s %s %s %s\n",
-			   maxrcvdseg? maxrcvdseg->value:
+			   maxrcvdseg ? maxrcvdseg->value :
 				       INITIAL_MAXRECVDATASEGMENTLENGTH,
-			   hdrdigest? hdrdigest->value:
+			   hdrdigest ? hdrdigest->value :
 					INITIAL_HEADERDIGEST","NONE,
-			   datadigest? datadigest->value:
+			   datadigest ? datadigest->value :
 					INITIAL_DATADIGEST","NONE,
-			   ofmark? ofmark->value:INITIAL_OFMARKER);
+			   ofmark ? ofmark->value : INITIAL_OFMARKER);
 	}
 	spin_unlock(&tpg->tpg_np_lock);
 
 	return 0;
 }
 
-static struct seq_operations portal_attr_seq_ops = {
+static const struct seq_operations portal_attr_seq_ops = {
 	.start	= portal_attr_seq_start,
 	.next	= portal_attr_seq_next,
 	.stop	= portal_attr_seq_stop,
@@ -363,7 +361,7 @@ static int portal_attr_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &portal_attr_seq_ops);
 }
 
-static struct file_operations portal_attr_seq_fops = {
+static const struct file_operations portal_attr_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = portal_attr_seq_open,
 	.read	 = seq_read,
@@ -376,17 +374,20 @@ static struct file_operations portal_attr_seq_fops = {
  */
 static void *tgt_portal_attr_seq_start(struct seq_file *seq, loff_t *pos)
 {
-        return locate_tpg_start(seq, pos, &do_portal_check);
+	return locate_tpg_start(seq, pos, &do_portal_check);
 }
 
-static void *tgt_portal_attr_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+static void *tgt_portal_attr_seq_next(
+	struct seq_file *seq,
+	void *v,
+	loff_t *pos)
 {
-        return locate_tpg_next(seq, v, pos, &do_portal_check);
+	return locate_tpg_next(seq, v, pos, &do_portal_check);
 }
 
 static void tgt_portal_attr_seq_stop(struct seq_file *seq, void *v)
 {
-        locate_tpg_stop(seq, v);
+	locate_tpg_stop(seq, v);
 }
 
 static int tgt_portal_attr_seq_show(struct seq_file *seq, void *v)
@@ -403,29 +404,31 @@ static int tgt_portal_attr_seq_show(struct seq_file *seq, void *v)
 		seq_puts(seq, "inst indx node_indx port tag\n");
 
 	spin_lock(&tpg->tpg_np_lock);
-	list_for_each_entry_safe(tpg_np, tpg_np_tmp, &tpg->tpg_gnp_list, tpg_np_list) {
-		seq_printf(seq, "%u %u %u %u %u\n", 
+	list_for_each_entry_safe(tpg_np, tpg_np_tmp, &tpg->tpg_gnp_list,
+			tpg_np_list) {
+		seq_printf(seq, "%u %u %u %u %u\n",
 			   tiqn->tiqn_index, tpg_np->tpg_np_index,
-			   ISCSI_NODE_INDEX, tpg_np->tpg_np->np_port, tpg->tpgt);
+			   ISCSI_NODE_INDEX, tpg_np->tpg_np->np_port,
+			   tpg->tpgt);
 	}
 	spin_unlock(&tpg->tpg_np_lock);
 
 	return 0;
 }
 
-static struct seq_operations tgt_portal_attr_seq_ops = {
-        .start  = tgt_portal_attr_seq_start,
-        .next   = tgt_portal_attr_seq_next,
-        .stop   = tgt_portal_attr_seq_stop,
-        .show   = tgt_portal_attr_seq_show
+static const struct seq_operations tgt_portal_attr_seq_ops = {
+	.start	= tgt_portal_attr_seq_start,
+	.next	= tgt_portal_attr_seq_next,
+	.stop	= tgt_portal_attr_seq_stop,
+	.show	= tgt_portal_attr_seq_show
 };
 
 static int tgt_portal_attr_seq_open(struct inode *inode, struct file *file)
 {
-        return seq_open(file, &tgt_portal_attr_seq_ops);
+	return seq_open(file, &tgt_portal_attr_seq_ops);
 }
 
-static struct file_operations tgt_portal_attr_seq_fops = {
+static const struct file_operations tgt_portal_attr_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = tgt_portal_attr_seq_open,
 	.read	 = seq_read,
@@ -437,7 +440,7 @@ int do_tpg_param_check(void *p)
 {
 	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
 
-	return((tpg->param_list) ? 1 : 0);
+	return (tpg->param_list) ? 1 : 0;
 }
 
 /*
@@ -445,12 +448,12 @@ int do_tpg_param_check(void *p)
  */
 static void *node_attr_seq_start(struct seq_file *seq, loff_t *pos)
 {
-        return(locate_tpg_start(seq, pos, &do_tpg_param_check));
+	return locate_tpg_start(seq, pos, &do_tpg_param_check);
 }
 
 static void *node_attr_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-        return(locate_tpg_next(seq, v, pos, &do_tpg_param_check));
+	return locate_tpg_next(seq, v, pos, &do_tpg_param_check);
 }
 
 static void node_attr_seq_stop(struct seq_file *seq, void *v)
@@ -476,45 +479,45 @@ static int node_attr_seq_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "%s %s %s %s %s %s %s %s %s %s %s ",
 	(p1 = iscsi_find_param_from_key(INITIALR2T, tpg->param_list)) ?
-			p1->value:INITIAL_INITIALR2T,
-	(p2 = iscsi_find_param_from_key(IMMEDIATEDATA, tpg->param_list))?
-			p2->value:INITIAL_IMMEDIATEDATA,
+			p1->value : INITIAL_INITIALR2T,
+	(p2 = iscsi_find_param_from_key(IMMEDIATEDATA, tpg->param_list)) ?
+			p2->value : INITIAL_IMMEDIATEDATA,
 	(p3 = iscsi_find_param_from_key(MAXOUTSTANDINGR2T, tpg->param_list)) ?
-			p3->value:INITIAL_MAXOUTSTANDINGR2T,
+			p3->value : INITIAL_MAXOUTSTANDINGR2T,
 	(p4 = iscsi_find_param_from_key(FIRSTBURSTLENGTH, tpg->param_list)) ?
-			p4->value:INITIAL_FIRSTBURSTLENGTH,
+			p4->value : INITIAL_FIRSTBURSTLENGTH,
 	(p5 = iscsi_find_param_from_key(MAXBURSTLENGTH, tpg->param_list)) ?
-			p5->value:INITIAL_MAXBURSTLENGTH,
+			p5->value : INITIAL_MAXBURSTLENGTH,
 	(p6 = iscsi_find_param_from_key(MAXCONNECTIONS, tpg->param_list)) ?
-			p6->value:INITIAL_MAXCONNECTIONS,
+			p6->value : INITIAL_MAXCONNECTIONS,
 	(p7 = iscsi_find_param_from_key(DATASEQUENCEINORDER, tpg->param_list)) ?
-			p7->value:INITIAL_DATASEQUENCEINORDER,
+			p7->value : INITIAL_DATASEQUENCEINORDER,
 	(p8 = iscsi_find_param_from_key(DATAPDUINORDER, tpg->param_list)) ?
-			p8->value:INITIAL_DATAPDUINORDER,
+			p8->value : INITIAL_DATAPDUINORDER,
 	(p9 = iscsi_find_param_from_key(DEFAULTTIME2WAIT, tpg->param_list)) ?
-			p9->value:INITIAL_DEFAULTTIME2WAIT,
+			p9->value : INITIAL_DEFAULTTIME2WAIT,
 	(p10 = iscsi_find_param_from_key(DEFAULTTIME2RETAIN, tpg->param_list)) ?
-			p10->value:INITIAL_DEFAULTTIME2RETAIN,
+			p10->value : INITIAL_DEFAULTTIME2RETAIN,
 	(p11 = iscsi_find_param_from_key(ERRORRECOVERYLEVEL, tpg->param_list)) ?
-			p11->value:INITIAL_ERRORRECOVERYLEVEL);
+			p11->value : INITIAL_ERRORRECOVERYLEVEL);
 	seq_printf(seq, "%u\n", ISCSI_DISCONTINUITY_TIME);
 
 	return 0;
 }
 
-static struct seq_operations node_attr_seq_ops = {
-        .start  = node_attr_seq_start,
-        .next   = node_attr_seq_next,
-        .stop   = node_attr_seq_stop,
-        .show   = node_attr_seq_show
+static const struct seq_operations node_attr_seq_ops = {
+	.start	= node_attr_seq_start,
+	.next	= node_attr_seq_next,
+	.stop	= node_attr_seq_stop,
+	.show	= node_attr_seq_show
 };
 
 static int node_attr_seq_open(struct inode *inode, struct file *file)
 {
-	return(seq_open(file, &node_attr_seq_ops));
+	return seq_open(file, &node_attr_seq_ops);
 }
 
-static struct file_operations node_attr_seq_fops = {
+static const struct file_operations node_attr_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = node_attr_seq_open,
 	.read	 = seq_read,
@@ -538,24 +541,25 @@ static int tgt_attr_seq_show(struct seq_file *seq, void *v)
 
 	lstat = &tiqn->login_stats;
 
-	spin_lock(&lstat->lock);	
+	spin_lock(&lstat->lock);
 	fail_count = (lstat->redirects + lstat->authorize_fails +
 		     lstat->authenticate_fails + lstat->negotiate_fails +
 			lstat->other_fails);
 #warning FIXME: IPv6
 	seq_printf(seq, "%u %u %u %u %u %s %s %08X\n", tiqn->tiqn_index,
-		   ISCSI_NODE_INDEX, fail_count, 
+		   ISCSI_NODE_INDEX, fail_count,
 		   lstat->last_fail_time ?
-		   (u32)(((u32)lstat->last_fail_time - INITIAL_JIFFIES) * 100/HZ):0,
+		   (u32)(((u32)lstat->last_fail_time - INITIAL_JIFFIES)
+				* 100 / HZ) : 0,
 		   lstat->last_fail_type, lstat->last_intr_fail_name[0] ?
 		   lstat->last_intr_fail_name : NONE, "ipv4",
 		   lstat->last_intr_fail_addr);
-	spin_unlock(&lstat->lock);	
+	spin_unlock(&lstat->lock);
 
 	return 0;
 }
 
-static struct seq_operations tgt_attr_seq_ops = {
+static const struct seq_operations tgt_attr_seq_ops = {
 	.start	= locate_tiqn_start,
 	.next	= locate_tiqn_next,
 	.stop	= locate_tiqn_stop,
@@ -567,7 +571,7 @@ static int tgt_attr_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &tgt_attr_seq_ops);
 }
 
-static struct file_operations tgt_attr_seq_fops = {
+static const struct file_operations tgt_attr_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = tgt_attr_seq_open,
 	.read	 = seq_read,
@@ -585,7 +589,8 @@ static int login_stats_seq_show(struct seq_file *seq, void *v)
 
 	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
 		seq_puts(seq, "inst indx accepts other_fails redirects"
-			" authorize_fails authenticate_fails negotiate_fails\n");
+			" authorize_fails authenticate_fails"
+			" negotiate_fails\n");
 
 	lstat = &tiqn->login_stats;
 	seq_printf(seq, "%u %u %u %u %u %u %u %u\n", tiqn->tiqn_index,
@@ -595,11 +600,11 @@ static int login_stats_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations login_stats_seq_ops = {
+static const struct seq_operations login_stats_seq_ops = {
 	.start	= locate_tiqn_start,
-        .next   = locate_tiqn_next,
-        .stop   = locate_tiqn_stop,
-        .show   = login_stats_seq_show
+	.next	= locate_tiqn_next,
+	.stop	= locate_tiqn_stop,
+	.show	= login_stats_seq_show
 };
 
 static int login_stats_seq_open(struct inode *inode, struct file *file)
@@ -607,7 +612,7 @@ static int login_stats_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &login_stats_seq_ops);
 }
 
-static struct file_operations login_stats_seq_fops = {
+static const struct file_operations login_stats_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = login_stats_seq_open,
 	.read	 = seq_read,
@@ -624,17 +629,17 @@ static int logout_stats_seq_show(struct seq_file *seq, void *v)
 
 	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
 		seq_puts(seq, "inst indx normal_logouts abnormal_logouts\n");
-	
+
 	seq_printf(seq, "%u %u %u %u\n", tiqn->tiqn_index, ISCSI_NODE_INDEX,
 		tiqn->logout_stats.normal_logouts,
 		tiqn->logout_stats.abnormal_logouts);
 	return 0;
 }
 
-static struct seq_operations logout_stats_seq_ops = {
-        .start  = locate_tiqn_start,
-        .next   = locate_tiqn_next,
-        .stop   = locate_tiqn_stop,
+static const struct seq_operations logout_stats_seq_ops = {
+	.start	= locate_tiqn_start,
+	.next	= locate_tiqn_next,
+	.stop	= locate_tiqn_stop,
 	.show	= logout_stats_seq_show
 };
 
@@ -643,7 +648,7 @@ static int logout_stats_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &logout_stats_seq_ops);
 }
 
-static struct file_operations logout_stats_seq_fops = {
+static const struct file_operations logout_stats_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = logout_stats_seq_open,
 	.read	 = seq_read,
@@ -662,7 +667,7 @@ int do_tgt_auth_check(void *p)
 {
 	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
 
-	return(SE_TPG(tpg)->num_node_acls);
+	return SE_TPG(tpg)->num_node_acls;
 }
 
 static void *tgt_auth_seq_start(struct seq_file *seq, loff_t *pos)
@@ -695,16 +700,16 @@ static int tgt_auth_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock_bh(&SE_TPG(tpg)->acl_node_lock);
 	list_for_each_entry(acl, &SE_TPG(tpg)->acl_node_list, acl_list) {
-		seq_printf(seq,"%u %u %u %s\n",
-			   tiqn->tiqn_index, ISCSI_NODE_INDEX, acl->acl_index, 
+		seq_printf(seq, "%u %u %u %s\n",
+			   tiqn->tiqn_index, ISCSI_NODE_INDEX, acl->acl_index,
 			   acl->initiatorname[0] ? acl->initiatorname : NONE);
 	}
 	spin_unlock_bh(&SE_TPG(tpg)->acl_node_lock);
 
-	return 0;	
+	return 0;
 }
 
-static struct seq_operations tgt_auth_seq_ops = {
+static const struct seq_operations tgt_auth_seq_ops = {
 	.start	= tgt_auth_seq_start,
 	.next	= tgt_auth_seq_next,
 	.stop	= tgt_auth_seq_stop,
@@ -716,7 +721,7 @@ static int tgt_auth_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &tgt_auth_seq_ops);
 }
 
-static struct file_operations tgt_auth_seq_fops = {
+static const struct file_operations tgt_auth_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = tgt_auth_seq_open,
 	.read	 = seq_read,
@@ -728,11 +733,11 @@ static struct file_operations tgt_auth_seq_fops = {
  * Session Attributes Table
  * Iterates through all active TPGs and lists all sessions belong to each TPG
  */
-static int do_sess_check (void *p)
+static int do_sess_check(void *p)
 {
-        iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
+	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
 
-        return(tpg->nsessions);
+	return tpg->nsessions;
 }
 
 static void *sess_attr_seq_start(struct seq_file *seq, loff_t *pos)
@@ -766,46 +771,47 @@ static int sess_attr_seq_show(struct seq_file *seq, void *v)
 		seq_puts(seq, "inst node indx dir intr_name tgt_name TSIH "
 			 "ISID R2T imm_data type out_R2T first_burst "
 			 "max_burst conn_num auth_type data_seq_order "
-			 "data_pdu_order ERL disc_time\n"); 
+			 "data_pdu_order ERL disc_time\n");
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
 		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 		sops = sess->sess_ops;
 
-		seq_printf(seq, "%u %u %u %s %s %s %u ", 
+		seq_printf(seq, "%u %u %u %s %s %s %u ",
 			   tiqn->tiqn_index, sops->SessionType ?
 			   0 : ISCSI_NODE_INDEX, sess->session_index, "Inbound",
-			   sops->InitiatorName[0]? sops->InitiatorName:NONE,
-			   sops->TargetName[0]? sops->TargetName:NONE,
+			   sops->InitiatorName[0] ? sops->InitiatorName : NONE,
+			   sops->TargetName[0] ? sops->TargetName : NONE,
 			   sess->tsih);
 		seq_printf(seq, "%02x %02x %02x %02x %02x %02x %s %s %s %u ",
 			   sess->isid[0], sess->isid[1], sess->isid[2],
 			   sess->isid[3], sess->isid[4], sess->isid[5],
-			   sops->InitialR2T? "Yes" :"No",
-			   sops->ImmediateData? "Yes":"No",
-			   sops->SessionType? "Discovery" : "Normal",
+			   sops->InitialR2T ? "Yes" : "No",
+			   sops->ImmediateData ? "Yes" : "No",
+			   sops->SessionType ? "Discovery" : "Normal",
 			   sops->MaxOutstandingR2T);
 		seq_printf(seq, "%u %u %u %s %s %s %u %u\n",
 			   sops->FirstBurstLength, sops->MaxBurstLength,
-			   atomic_read(&sess->nconn), 
-			   sess->auth_type[0]? sess->auth_type:NONE,
-			   sops->DataSequenceInOrder? "Yes":"No",
-			   sops->DataPDUInOrder? "Yes":"No",
-			   sops->ErrorRecoveryLevel, 
-		  	   (u32)(((u32)sess->creation_time - INITIAL_JIFFIES)*100/HZ));
+			   atomic_read(&sess->nconn),
+			   sess->auth_type[0] ? sess->auth_type : NONE,
+			   sops->DataSequenceInOrder ? "Yes" : "No",
+			   sops->DataPDUInOrder ? "Yes" : "No",
+			   sops->ErrorRecoveryLevel,
+			   (u32)(((u32)sess->creation_time - INITIAL_JIFFIES)
+					* 100 / HZ));
 
-		seq_printf(seq, "intr_alias: %s\n", sops->InitiatorAlias[0]?
-			   sops->InitiatorAlias:NONE);
-		seq_printf(seq, "tgt_alias: %s\n", sops->TargetAlias[0]?
-			   sops->TargetAlias:NONE); 
+		seq_printf(seq, "intr_alias: %s\n", sops->InitiatorAlias[0] ?
+			   sops->InitiatorAlias : NONE);
+		seq_printf(seq, "tgt_alias: %s\n", sops->TargetAlias[0] ?
+			   sops->TargetAlias : NONE);
 	}
 	spin_unlock_bh(&SE_TPG(tpg)->session_lock);
 
 	return 0;
 }
 
-static struct seq_operations sess_attr_seq_ops = {
+static const struct seq_operations sess_attr_seq_ops = {
 	.start	= sess_attr_seq_start,
 	.next	= sess_attr_seq_next,
 	.stop	= sess_attr_seq_stop,
@@ -817,7 +823,7 @@ static int sess_attr_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &sess_attr_seq_ops);
 }
 
-static struct file_operations sess_attr_seq_fops = {
+static const struct file_operations sess_attr_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = sess_attr_seq_open,
 	.read	 = seq_read,
@@ -830,12 +836,12 @@ static struct file_operations sess_attr_seq_fops = {
  */
 static void *sess_stats_seq_start(struct seq_file *seq, loff_t *pos)
 {
-        return locate_tpg_start(seq, pos, &do_sess_check);
+	return locate_tpg_start(seq, pos, &do_sess_check);
 }
 
 static void *sess_stats_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-        return locate_tpg_next(seq, v, pos, &do_sess_check);
+	return locate_tpg_next(seq, v, pos, &do_sess_check);
 }
 
 static void sess_stats_seq_stop(struct seq_file *seq, void *v)
@@ -856,7 +862,8 @@ static int sess_stats_seq_show(struct seq_file *seq, void *v)
 
 	if (list_is_first(&tpg->g_tpg_list, &iscsi_global->g_tpg_list))
 		seq_puts(seq,
-			 "inst node indx cmd_pdus rsp_pdus txdata_octs rxdata_octs\n");
+			 "inst node indx cmd_pdus rsp_pdus txdata_octs"
+			" rxdata_octs\n");
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
@@ -877,7 +884,7 @@ static int sess_stats_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations sess_stats_seq_ops = {
+static const struct seq_operations sess_stats_seq_ops = {
 	.start  = sess_stats_seq_start,
 	.next   = sess_stats_seq_next,
 	.stop   = sess_stats_seq_stop,
@@ -889,7 +896,7 @@ static int sess_stats_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &sess_stats_seq_ops);
 }
 
-static struct file_operations sess_stats_seq_fops = {
+static const struct file_operations sess_stats_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = sess_stats_seq_open,
 	.read	 = seq_read,
@@ -902,12 +909,12 @@ static struct file_operations sess_stats_seq_fops = {
  */
 static void *sess_conn_err_stats_seq_start(struct seq_file *seq, loff_t *pos)
 {
-        return locate_tpg_start(seq, pos, &do_sess_check);
+	return locate_tpg_start(seq, pos, &do_sess_check);
 }
 
 static void *sess_conn_err_stats_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-        return locate_tpg_next(seq, v, pos, &do_sess_check);
+	return locate_tpg_next(seq, v, pos, &do_sess_check);
 }
 
 static void sess_conn_err_stats_seq_stop(struct seq_file *seq, void *v)
@@ -934,7 +941,7 @@ static int sess_conn_err_stats_seq_show(struct seq_file *seq, void *v)
 		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 
 		spin_lock_bh(&sess->session_stats_lock);
-		seq_printf(seq, "%u %u %u %u %u\n", 
+		seq_printf(seq, "%u %u %u %u %u\n",
 			   tiqn->tiqn_index,
 			   sess->sess_ops->SessionType ?
 			   0 : ISCSI_NODE_INDEX, sess->session_index,
@@ -947,11 +954,11 @@ static int sess_conn_err_stats_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations sess_conn_err_stats_seq_ops = {
-        .start  = sess_conn_err_stats_seq_start,
-        .next   = sess_conn_err_stats_seq_next,
-        .stop   = sess_conn_err_stats_seq_stop,
-        .show   = sess_conn_err_stats_seq_show
+static const struct seq_operations sess_conn_err_stats_seq_ops = {
+	.start	= sess_conn_err_stats_seq_start,
+	.next	= sess_conn_err_stats_seq_next,
+	.stop	= sess_conn_err_stats_seq_stop,
+	.show	= sess_conn_err_stats_seq_show
 };
 
 static int sess_conn_err_stats_seq_open(struct inode *inode, struct file *file)
@@ -959,7 +966,7 @@ static int sess_conn_err_stats_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &sess_conn_err_stats_seq_ops);
 }
 
-static struct file_operations sess_conn_err_stats_seq_fops = {
+static const struct file_operations sess_conn_err_stats_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = sess_conn_err_stats_seq_open,
 	.read	 = seq_read,
@@ -995,17 +1002,17 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 	iscsi_conn_t *conn;
 	iscsi_conn_ops_t *conn_ops;
 	se_session_t *se_sess;
-	char state_str[16]; 
-	char proto_str[16]; 
+	char state_str[16];
+	char proto_str[16];
 
 	if (!(tiqn))
 		return 0;
-	
+
 	if (list_is_first(&tpg->g_tpg_list, &iscsi_global->g_tpg_list))
 		seq_puts(seq, "inst node ssn indx cid state addr_type "
 			 "local_ip proto local_port rem_ip rem_port "
-		         "max_rcv_data  max_xmit_data hdr_dgst data_dgst "
-			 "rcv_mark send_mark vers_active\n"); 
+			"max_rcv_data  max_xmit_data hdr_dgst data_dgst "
+			 "rcv_mark send_mark vers_active\n");
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
@@ -1037,7 +1044,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 				strcpy(proto_str, "SCTP");
 				break;
 			default:
-				sprintf(proto_str, "Unknown(%d)", 
+				sprintf(proto_str, "Unknown(%d)",
 					conn->network_transport);
 			}
 
@@ -1046,8 +1053,8 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 			seq_printf(seq, "%u %u %u %u %u %s %s %08X %s %u "
 				   "%08X %u ",
 				   tiqn->tiqn_index,
-				   SESS_OPS(sess)->SessionType?
-				   0:ISCSI_NODE_INDEX, sess->session_index,
+				   SESS_OPS(sess)->SessionType ?
+				   0 : ISCSI_NODE_INDEX, sess->session_index,
 				   conn->conn_index, conn->cid,
 				   state_str, "ipv4", conn->local_ip,
 				   proto_str, conn->local_port, conn->login_ip,
@@ -1056,10 +1063,10 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 			seq_printf(seq, "%u %u %s %s %s %s %u\n",
 				   conn_ops->MaxRecvDataSegmentLength,
 				   conn_ops->MaxRecvDataSegmentLength,
-				   conn_ops->HeaderDigest? "CRC32C":"None",
-				   conn_ops->DataDigest? "CRC32C":"None",
-				   conn_ops->OFMarker? "Yes":"No",
-				   conn_ops->IFMarker? "Yes":"No",
+				   conn_ops->HeaderDigest ? "CRC32C" : "None",
+				   conn_ops->DataDigest ? "CRC32C" : "None",
+				   conn_ops->OFMarker ? "Yes" : "No",
+				   conn_ops->IFMarker ? "Yes" : "No",
 				   ISCSI_MAX_VERSION);
 		}
 		spin_unlock(&sess->conn_lock);
@@ -1069,7 +1076,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations conn_attr_seq_ops = {
+static const struct seq_operations conn_attr_seq_ops = {
 	.start	= conn_attr_seq_start,
 	.next	= conn_attr_seq_next,
 	.stop	= conn_attr_seq_stop,
@@ -1081,7 +1088,7 @@ static int conn_attr_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &conn_attr_seq_ops);
 }
 
-static struct file_operations conn_attr_seq_fops = {
+static const struct file_operations conn_attr_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = conn_attr_seq_open,
 	.read	 = seq_read,
@@ -1095,23 +1102,23 @@ static struct file_operations conn_attr_seq_fops = {
  * local Target ports.
  * Iterates through all active TPGs and extracts the info from the ACLs
  */
-extern void *lio_scsi_auth_intr_seq_start(struct seq_file *seq, loff_t *pos)
+void *lio_scsi_auth_intr_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	return locate_tpg_start(seq, pos, &do_portal_check);
 }
 
-extern void *lio_scsi_auth_intr_seq_next(struct seq_file *seq, void *v,
+void *lio_scsi_auth_intr_seq_next(struct seq_file *seq, void *v,
 					 loff_t *pos)
 {
 	return locate_tpg_next(seq, v, pos, &do_portal_check);
 }
 
-extern void lio_scsi_auth_intr_seq_stop(struct seq_file *seq, void *v)
+void lio_scsi_auth_intr_seq_stop(struct seq_file *seq, void *v)
 {
-        locate_tpg_stop(seq, v);
+	locate_tpg_stop(seq, v);
 }
 
-extern int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
+int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
 						g_tpg_list);
@@ -1119,7 +1126,7 @@ extern int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 	se_lun_t *lun;
 	se_node_acl_t *se_nacl;
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	int j; 
+	int j;
 
 	if (!(tiqn))
 		return 0;
@@ -1129,7 +1136,8 @@ extern int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 		spin_lock_bh(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];
-			if (!(deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) ||
+			if (!(deve->lun_flags &
+					TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) ||
 			     (!deve->se_lun))
 				continue;
 
@@ -1138,53 +1146,59 @@ extern int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 			    (!lun->se_dev))
 				continue;
 
-			seq_printf(seq,"%u %u %u %u %u %s %u %u %u %u %u %u %u %s\n",
+			seq_printf(seq, "%u %u %u %u %u %s %u %u %u %u"
+				" %u %u %u %s\n",
 				tiqn->tiqn_index, /* scsiInstIndex */
 				lun->se_dev->dev_index, /* scsiDeviceIndex */
 				tpg->tpgt, /* scsiAuthIntrTgtPortIndex */
 				se_nacl->acl_index, /* scsiAuthIntrIndex */
 				1, /* scsiAuthIntrDevOrPort */
 				se_nacl->initiatorname[0] ?
-					se_nacl->initiatorname:NONE, /* scsiAuthIntrName */
+					se_nacl->initiatorname : NONE,
+					/* scsiAuthIntrName */
 				0, /* FIXME: scsiAuthIntrLunMapIndex */
-				deve->attach_count,  /* scsiAuthIntrAttachedTimes */
+				deve->attach_count,
+					/* scsiAuthIntrAttachedTimes */
 				deve->total_cmds, /* scsiAuthIntrOutCommands */
-				(u32)(deve->read_bytes >> 20),  /* scsiAuthIntrReadMegaBytes */
-				(u32)(deve->write_bytes >> 20), /* scsiAuthIntrWrittenMegaBytes */
+				(u32)(deve->read_bytes >> 20),
+					/* scsiAuthIntrReadMegaBytes */
+				(u32)(deve->write_bytes >> 20),
+					/* scsiAuthIntrWrittenMegaBytes */
 				0, /* FIXME: scsiAuthIntrHSOutCommands */
-				(u32)(((u32)deve->creation_time - INITIAL_JIFFIES)*100/HZ), /* scsiAuthIntrLastCreation */
+				(u32)(((u32)deve->creation_time - INITIAL_JIFFIES)
+					* 100 / HZ), /* scsiAuthIntrLastCreation */
 				"Ready"); /* FIXME: scsiAuthIntrRowStatus */
 		}
 		spin_unlock_bh(&se_nacl->device_list_lock);
 	}
 	spin_unlock_bh(&SE_TPG(tpg)->acl_node_lock);
 
-	return 0;					
+	return 0;
 }
 
 /*
  * SCSI Attached Initiator Port Table:
  * It lists the SCSI Initiators attached to one of the local Target ports.
- * Iterates through all active TPGs and use active sessions from each TPG 
+ * Iterates through all active TPGs and use active sessions from each TPG
  * to list the info fo this table.
  */
-extern void *lio_scsi_att_intr_port_seq_start(struct seq_file *seq, loff_t *pos)
+void *lio_scsi_att_intr_port_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	return locate_tpg_start(seq, pos, &do_portal_check);
 }
 
-extern void *lio_scsi_att_intr_port_seq_next(struct seq_file *seq, void *v,
+void *lio_scsi_att_intr_port_seq_next(struct seq_file *seq, void *v,
 					 loff_t *pos)
 {
 	return locate_tpg_next(seq, v, pos, &do_portal_check);
 }
 
-extern void lio_scsi_att_intr_port_seq_stop(struct seq_file *seq, void *v)
+void lio_scsi_att_intr_port_seq_stop(struct seq_file *seq, void *v)
 {
 	locate_tpg_stop(seq, v);
 }
 
-extern int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
+int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
 					g_tpg_list);
@@ -1215,7 +1229,8 @@ extern int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 		spin_lock_bh(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];
-			if (!(deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS)
+			if (!(deve->lun_flags &
+					TRANSPORT_LUNFLAGS_INITIATOR_ACCESS)
 			    || (!deve->se_lun))
 				continue;
 
@@ -1224,18 +1239,18 @@ extern int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 			    (!lun->se_dev))
 				continue;
 
-			seq_printf(seq,"%u %u %u %u %u "
+			seq_printf(seq, "%u %u %u %u %u "
 				   "%s+i+%02x%02x%02x%02x%02x%02x\n",
-				   tiqn->tiqn_index, /* scsiInstIndex */
-				   lun->se_dev->dev_index, /* scsiDeviceIndex */
-				   tpg->tpgt, /* scsiPortIndex */
-				   sess->session_index,  /* scsiAttIntrPortIndex */
-				   se_nacl->acl_index, /* scsiAttIntrPortAuthIntrIdx */
-				   sops->InitiatorName[0]?
-					  sops->InitiatorName:NONE, /* scsiAttIntrPortName */
-				   sess->isid[0], sess->isid[1], sess->isid[2],
-				   sess->isid[3], sess->isid[4], sess->isid[5]);
-			   					/* scsiAttIntrPortIdentifier */
+			   tiqn->tiqn_index, /* scsiInstIndex */
+			   lun->se_dev->dev_index, /* scsiDeviceIndex */
+			   tpg->tpgt, /* scsiPortIndex */
+			   sess->session_index,  /* scsiAttIntrPortIndex */
+			   se_nacl->acl_index, /* scsiAttIntrPortAuthIntrIdx */
+			   sops->InitiatorName[0] ?
+				  sops->InitiatorName : NONE, /* scsiAttIntrPortName */
+			   sess->isid[0], sess->isid[1], sess->isid[2],
+			   sess->isid[3], sess->isid[4], sess->isid[5]);
+				/* scsiAttIntrPortIdentifier */
 		}
 		spin_unlock_bh(&se_nacl->device_list_lock);
 	}
@@ -1249,12 +1264,12 @@ extern int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
  */
 static void *ips_auth_seq_start(struct seq_file *seq, loff_t *pos)
 {
-        return locate_tpg_start(seq, pos, &do_portal_check);
+	return locate_tpg_start(seq, pos, &do_portal_check);
 }
 
 static void *ips_auth_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-        return locate_tpg_next(seq, v, pos, &do_portal_check);
+	return locate_tpg_next(seq, v, pos, &do_portal_check);
 }
 
 static void ips_auth_seq_stop(struct seq_file *seq, void *v)
@@ -1263,7 +1278,8 @@ static void ips_auth_seq_stop(struct seq_file *seq, void *v)
 }
 
 /*
- * Note: This currently shows the storage object nexus authorization required status,
+ * Note: This currently shows the storage object nexus authorization
+ * required status,
  */
 #warning FIXME: ips_auth_seq_show()
 static int ips_auth_seq_show(struct seq_file *seq, void *v)
@@ -1284,11 +1300,11 @@ static int ips_auth_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations ips_auth_seq_ops = {
-        .start  = ips_auth_seq_start,
-        .next   = ips_auth_seq_next,
-        .stop   = ips_auth_seq_stop,
-        .show   = ips_auth_seq_show
+static const struct seq_operations ips_auth_seq_ops = {
+	.start	= ips_auth_seq_start,
+	.next	= ips_auth_seq_next,
+	.stop	= ips_auth_seq_stop,
+	.show	= ips_auth_seq_show
 };
 
 static int ips_auth_seq_open(struct inode *inode, struct file *file)
@@ -1296,7 +1312,7 @@ static int ips_auth_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &ips_auth_seq_ops);
 }
 
-static struct file_operations ips_auth_seq_fops = {
+static const struct file_operations ips_auth_seq_fops = {
 	.owner	 = THIS_MODULE,
 	.open	 = ips_auth_seq_open,
 	.read	 = seq_read,
@@ -1348,164 +1364,139 @@ int init_iscsi_target_mib(void)
 	struct proc_dir_entry *conn_attr_entry;
 	struct proc_dir_entry *ips_auth_entry;
 
-	if (!(dir_entry = proc_mkdir("iscsi_target/mib", NULL))) {
-		printk("proc_mkdir() failed.\n");
-		return(-1);
-        }
+	dir_entry = proc_mkdir("iscsi_target/mib", NULL);
+	if (!(dir_entry)) {
+		printk(KERN_ERR "proc_mkdir() failed.\n");
+		return -1;
+	}
 
-	inst_attr_entry = 
+	inst_attr_entry =
 		create_proc_entry("iscsi_target/mib/inst_attr", 0, NULL);
-	if (inst_attr_entry) {
+	if (inst_attr_entry)
 		inst_attr_entry->proc_fops = &inst_attr_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	sess_err_stats_entry = 
+	sess_err_stats_entry =
 		create_proc_entry("iscsi_target/mib/sess_err_stats", 0, NULL);
-	if (sess_err_stats_entry) {
+	if (sess_err_stats_entry)
 		sess_err_stats_entry->proc_fops = &sess_err_stats_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	portal_attr_entry = 
+	portal_attr_entry =
 		create_proc_entry("iscsi_target/mib/portal_attr", 0, NULL);
-	if (portal_attr_entry) {
+	if (portal_attr_entry)
 		portal_attr_entry->proc_fops = &portal_attr_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	tgt_portal_attr_entry = 
+	tgt_portal_attr_entry =
 		create_proc_entry("iscsi_target/mib/tgt_portal_attr", 0, NULL);
-	if (tgt_portal_attr_entry) {
+	if (tgt_portal_attr_entry)
 		tgt_portal_attr_entry->proc_fops = &tgt_portal_attr_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	node_attr_entry = 
+	node_attr_entry =
 		create_proc_entry("iscsi_target/mib/node_attr", 0, NULL);
-	if (node_attr_entry) {
+	if (node_attr_entry)
 		node_attr_entry->proc_fops = &node_attr_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	tgt_attr_entry = 
+	tgt_attr_entry =
 		create_proc_entry("iscsi_target/mib/tgt_attr", 0, NULL);
-	if (tgt_attr_entry) {
+	if (tgt_attr_entry)
 		tgt_attr_entry->proc_fops = &tgt_attr_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	login_stats_entry = 
+	login_stats_entry =
 		create_proc_entry("iscsi_target/mib/login_stats", 0, NULL);
-	if (login_stats_entry) {
+	if (login_stats_entry)
 		login_stats_entry->proc_fops = &login_stats_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	logout_stats_entry = 
+	logout_stats_entry =
 		create_proc_entry("iscsi_target/mib/logout_stats", 0, NULL);
-	if (logout_stats_entry) {
+	if (logout_stats_entry)
 		logout_stats_entry->proc_fops = &logout_stats_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	tgt_auth_entry = create_proc_entry("iscsi_target/mib/tgt_auth", 0,NULL);
-	if (tgt_auth_entry) {
+	tgt_auth_entry =
+		create_proc_entry("iscsi_target/mib/tgt_auth", 0, NULL);
+	if (tgt_auth_entry)
 		tgt_auth_entry->proc_fops = &tgt_auth_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	sess_attr_entry = 
+	sess_attr_entry =
 		create_proc_entry("iscsi_target/mib/sess_attr", 0, NULL);
-	if (sess_attr_entry) {
+	if (sess_attr_entry)
 		sess_attr_entry->proc_fops = &sess_attr_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	sess_stats_entry = 
+	sess_stats_entry =
 		create_proc_entry("iscsi_target/mib/sess_stats", 0, NULL);
-	if (sess_stats_entry) {
+	if (sess_stats_entry)
 		sess_stats_entry->proc_fops = &sess_stats_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	sess_conn_err_stats_entry = 
+	sess_conn_err_stats_entry =
 	    create_proc_entry("iscsi_target/mib/sess_conn_err_stats", 0, NULL);
-	if (sess_conn_err_stats_entry) {
-		sess_conn_err_stats_entry->proc_fops = 
+	if (sess_conn_err_stats_entry)
+		sess_conn_err_stats_entry->proc_fops =
 						&sess_conn_err_stats_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	conn_attr_entry = 
+	conn_attr_entry =
 		create_proc_entry("iscsi_target/mib/conn_attr", 0, NULL);
-	if (conn_attr_entry) {
+	if (conn_attr_entry)
 		conn_attr_entry->proc_fops = &conn_attr_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	ips_auth_entry = create_proc_entry("iscsi_target/mib/ips_auth", 0,NULL);
-	if (ips_auth_entry) {
+	ips_auth_entry =
+		create_proc_entry("iscsi_target/mib/ips_auth", 0, NULL);
+	if (ips_auth_entry)
 		ips_auth_entry->proc_fops = &ips_auth_seq_fops;
-	}
-	else {
+	else
 		goto error;
-	}
 
-	return(0);
+	return 0;
 
 error:
-	printk("create_proc_entry() failed.\n");
+	printk(KERN_ERR "create_proc_entry() failed.\n");
 	remove_iscsi_target_mib();
-	return(-1);
+	return -1;
 }
 
 /*
- * Initialize the index table for allocating unique row indexes to various mib 
+ * Initialize the index table for allocating unique row indexes to various mib
  * tables
- */ 
+ */
 void init_iscsi_index_table(void)
 {
-	memset(&iscsi_index_table, 0, sizeof(iscsi_index_table)); 
+	memset(&iscsi_index_table, 0, sizeof(iscsi_index_table));
 	spin_lock_init(&iscsi_index_table.lock);
 }
 
 /*
  * Allocate a new row index for the entry type specified
- */ 
+ */
 u32 iscsi_get_new_index(iscsi_index_t type)
 {
 	u32 new_index;
 
 	if ((type < 0) || (type >= INDEX_TYPE_MAX)) {
-		printk("Invalid index type %d\n", type);
-		return(-1);
+		printk(KERN_ERR "Invalid index type %d\n", type);
+		return -1;
 	}
 
 	spin_lock(&iscsi_index_table.lock);
@@ -1514,5 +1505,5 @@ u32 iscsi_get_new_index(iscsi_index_t type)
 		new_index = ++iscsi_index_table.iscsi_mib_index[type];
 	spin_unlock(&iscsi_index_table.lock);
 
-	return(new_index);
+	return new_index;
 }

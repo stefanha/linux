@@ -1,26 +1,3 @@
-/*********************************************************************************
- * Filename:  iscsi_target_mib.h
- *
- * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
- * Copyright (c) 2007 Rising Tide Software, Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
- *********************************************************************************/
-
-
 #ifndef ISCSI_TARGET_MIB_H
 #define ISCSI_TARGET_MIB_H
 
@@ -80,7 +57,7 @@ typedef enum {
 } iscsi_index_t;
 
 typedef struct iscsi_index_table_s {
-	spinlock_t	lock;	
+	spinlock_t	lock;
 	u32 		iscsi_mib_index[INDEX_TYPE_MAX];
 } iscsi_index_table_t;
 
@@ -89,13 +66,17 @@ extern void *lio_scsi_auth_intr_seq_next(struct seq_file *, void *, loff_t *);
 extern int lio_scsi_auth_intr_seq_show(struct seq_file *, void *);
 extern void lio_scsi_auth_intr_seq_stop(struct seq_file *, void *);
 extern void *lio_scsi_att_intr_port_seq_start(struct seq_file *, loff_t *);
-extern void *lio_scsi_att_intr_port_seq_next(struct seq_file *, void *, loff_t *);
+extern void *lio_scsi_att_intr_port_seq_next(struct seq_file *, void *,
+			loff_t *);
 extern int lio_scsi_att_intr_port_seq_show(struct seq_file *, void *);
 extern void lio_scsi_att_intr_port_seq_stop(struct seq_file *, void *);
 extern int init_iscsi_target_mib(void);
 extern void remove_iscsi_target_mib(void);
 extern void init_iscsi_index_table(void);
 extern u32 iscsi_get_new_index(iscsi_index_t);
+
+extern struct se_global_s *se_global;
+extern struct iscsi_global_s *iscsi_global;
 
 #endif   /*** ISCSI_TARGET_MIB_H ***/
 
