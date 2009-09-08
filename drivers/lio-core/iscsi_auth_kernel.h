@@ -1,22 +1,3 @@
-/*********************************************************************************
- * Filename:  iscsi_auth_kernel.h
- *
- * Copyright (c) 2003-2005 PyX Technologies, Inc.
- * Copyright (c) 2005-2006 SBE, Inc.  All Rights Reserved.
- * Copyright (c) 2007-2009 Linux-iSCSI.org
- * 
- * Nicholas A. Bellinger <nab@kernel.org>
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- * For further information, contact via email: support@sbei.com
- * SBE, Inc.  San Ramon, California  U.S.A.
- *********************************************************************************/
-
-
 #ifndef ISCSI_AUTH_KERNEL_H
 #define ISCSI_AUTH_KERNEL_H
 
@@ -26,29 +7,29 @@
 #include <iscsi_auth.h>
 #include <iscsi_auth_chap.h>
 
-extern void convert_null_to_semi(char *buf, int len)
+void convert_null_to_semi(char *buf, int len)
 {
-        int i;
+	int i;
 
-        for (i = 0; i < len; i++)
-                if (buf[i] == '\0')
-                        buf[i] = ';';
+	for (i = 0; i < len; i++)
+		if (buf[i] == '\0')
+			buf[i] = ';';
 }
 
-extern int strlen_semi(char *buf)
+int strlen_semi(char *buf)
 {
-        int i = 0;
+	int i = 0;
 
-        while (buf[i] != '\0') {
+	while (buf[i] != '\0') {
 		if (buf[i] == ';')
 			return i;
 		i++;
-        }
-         
-        return -1;
+	}
+
+	return -1;
 }
 
-extern int extract_param(
+int extract_param(
 	const char *in_buf,
 	const char *pattern,
 	unsigned int max_length,
@@ -67,10 +48,10 @@ extern int extract_param(
 
 	ptr = strstr(ptr, "=");
 	if (!ptr)
-	return -1;
+		return -1;
 
 	ptr += 1;
-	if (*ptr== '0' && (*(ptr+1) == 'x' || *(ptr+1) == 'X')) {
+	if (*ptr == '0' && (*(ptr+1) == 'x' || *(ptr+1) == 'X')) {
 		ptr += 2; /* skip 0x */
 		*type = HEX;
 	} else
@@ -88,7 +69,7 @@ extern int extract_param(
 	memcpy(out_buf, ptr, len);
 	out_buf[len] = '\0';
 
-        return 0;
+	return 0;
 }
 
 
@@ -96,7 +77,7 @@ extern int extract_param(
  *
  *
  */
-extern u32 iscsi_handle_authentication (
+u32 iscsi_handle_authentication(
 	iscsi_conn_t *conn,
 	char *in_buf,
 	char *out_buf,
@@ -151,7 +132,7 @@ extern u32 iscsi_handle_authentication (
  *
  *
  */
-extern void iscsi_remove_failed_auth_entry (
+void iscsi_remove_failed_auth_entry(
 	iscsi_conn_t *conn,
 	int role)
 {

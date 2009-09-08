@@ -162,39 +162,4 @@ if (iscsi_trace&trace) {					\
 #define TRACE_LEAVE ;
 #endif /* CONFIG_ISCSI_DEBUG */
 
-#ifndef __ISCSI_DEBUG_OPCODES_C
-
-static char iscsi_trace_err[256];
-
-#define TRACE_ERROR(args...)			\
-({sprintf(iscsi_trace_err, args);		\
-PRINT("%s:%i: ***ERROR*** %s",			\
-       __FUNCTION__, __LINE__,			\
-       iscsi_trace_err);})
-
-#define TRACE_RETURN(ret, args...)		\
-({sprintf(iscsi_trace_err, args);		\
-PRINT("%s:%i: ***ERROR*** %s",			\
-	__FUNCTION__, __LINE__,			\
-	iscsi_trace_err);			\
-	return(ret);})				\
-	
-#define TRACE_OPS(args...)			\
-({sprintf(iscsi_trace_err, args);		\
-PRINT("%s:%i: ***OPS*** %s",			\
-	__FUNCTION__, __LINE__,			\
-	iscsi_trace_err);})
-
-#endif /* __ISCSI_DEBUG_OPCODES_C */
-
-#if 0
-me getting stupid!
-
-#define RETURN_ERROR(ret, args...)					\
-({	printk("caller: %p, %s", __builtin_return_address(0), msg);	\
-	return(ret);							\
-	})							\
-
-#endif
-
 #endif   /*** ISCSI_DEBUG_H ***/

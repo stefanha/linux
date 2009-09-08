@@ -182,7 +182,7 @@ redo:
 		}
 		array = kzalloc(seq_count * sizeof(u32), GFP_KERNEL);
 		if (!(array)) {
-			TRACE_ERROR("Unable to allocate memory"
+			printk(KERN_ERR "Unable to allocate memory"
 				" for random array.\n");
 			return -1;
 		}
@@ -202,7 +202,7 @@ redo:
 	if (seq_count) {
 		array = kzalloc(seq_count * sizeof(u32), GFP_KERNEL);
 		if (!(array)) {
-			TRACE_ERROR("Unable to allocate memory for"
+			printk(KERN_ERR "Unable to allocate memory for"
 				" random array.\n");
 			return -1;
 		}
@@ -238,7 +238,7 @@ static inline int iscsi_randomize_seq_lists(
 
 	array = kzalloc(seq_count * sizeof(u32), GFP_KERNEL);
 	if (!(array)) {
-		TRACE_ERROR("Unable to allocate memory for random array.\n");
+		printk(KERN_ERR "Unable to allocate memory for random array.\n");
 		return -1;
 	}
 	iscsi_create_random_array(array, seq_count);
@@ -564,7 +564,7 @@ int iscsi_do_build_list(
 	if (!SESS_OPS_C(conn)->DataSequenceInOrder) {
 		seq = kzalloc(seq_count * sizeof(iscsi_seq_t), GFP_ATOMIC);
 		if (!(seq)) {
-			TRACE_ERROR("Unable to allocate iscsi_seq_t list\n");
+			printk(KERN_ERR "Unable to allocate iscsi_seq_t list\n");
 			return -1;
 		}
 		cmd->seq_list = seq;
@@ -574,7 +574,7 @@ int iscsi_do_build_list(
 	if (!SESS_OPS_C(conn)->DataPDUInOrder) {
 		pdu = kzalloc(pdu_count * sizeof(iscsi_pdu_t), GFP_ATOMIC);
 		if (!(pdu)) {
-			TRACE_ERROR("Unable to allocate iscsi_pdu_t list.\n");
+			printk(KERN_ERR "Unable to allocate iscsi_pdu_t list.\n");
 			kfree(seq);
 			return -1;
 		}
@@ -598,7 +598,7 @@ iscsi_pdu_t *iscsi_get_pdu_holder(
 	iscsi_pdu_t *pdu = NULL;
 
 	if (!cmd->pdu_list) {
-		TRACE_ERROR("iscsi_cmd_t->pdu_list is NULL!\n");
+		printk(KERN_ERR "iscsi_cmd_t->pdu_list is NULL!\n");
 		return NULL;
 	}
 
@@ -608,7 +608,7 @@ iscsi_pdu_t *iscsi_get_pdu_holder(
 		if ((pdu[i].offset == offset) && (pdu[i].length == length))
 			return &pdu[i];
 
-	TRACE_ERROR("Unable to locate PDU holder for ITT: 0x%08x, Offset:"
+	printk(KERN_ERR "Unable to locate PDU holder for ITT: 0x%08x, Offset:"
 		" %u, Length: %u\n", cmd->init_task_tag, offset, length);
 	return NULL;
 }
@@ -626,7 +626,7 @@ iscsi_pdu_t *iscsi_get_pdu_holder_for_seq(
 	iscsi_pdu_t *pdu = NULL;
 
 	if (!cmd->pdu_list) {
-		TRACE_ERROR("iscsi_cmd_t->pdu_list is NULL!\n");
+		printk(KERN_ERR "iscsi_cmd_t->pdu_list is NULL!\n");
 		return NULL;
 	}
 
@@ -655,13 +655,13 @@ redo:
 		if (cmd->pdu_start < cmd->pdu_count)
 			goto redo;
 
-		TRACE_ERROR("Command ITT: 0x%08x unable to locate iscsi_pdu_t"
+		printk(KERN_ERR "Command ITT: 0x%08x unable to locate iscsi_pdu_t"
 			" for cmd->pdu_send_order: %u.\n", cmd->init_task_tag,
 				cmd->pdu_send_order);
 		return NULL;
 	} else {
 		if (!seq) {
-			TRACE_ERROR("iscsi_seq_t is NULL!\n");
+			printk(KERN_ERR "iscsi_seq_t is NULL!\n");
 			return NULL;
 		}
 #if 0
@@ -672,7 +672,7 @@ redo:
 		pdu = &cmd->pdu_list[seq->pdu_start];
 
 		if (seq->pdu_send_order == seq->pdu_count) {
-			TRACE_ERROR("Command ITT: 0x%08x seq->pdu_send_order:"
+			printk(KERN_ERR "Command ITT: 0x%08x seq->pdu_send_order:"
 				" %u equals seq->pdu_count: %u\n",
 				cmd->init_task_tag, seq->pdu_send_order,
 				seq->pdu_count);
@@ -686,7 +686,7 @@ redo:
 			}
 		}
 
-		TRACE_ERROR("Command ITT: 0x%08x unable to locate iscsi_pdu_t"
+		printk(KERN_ERR "Command ITT: 0x%08x unable to locate iscsi_pdu_t"
 			" for seq->pdu_send_order: %u.\n", cmd->init_task_tag,
 				seq->pdu_send_order);
 		return NULL;
@@ -707,7 +707,7 @@ iscsi_seq_t *iscsi_get_seq_holder(
 	u32 i;
 
 	if (!cmd->seq_list) {
-		TRACE_ERROR("iscsi_cmd_t->seq_list is NULL!\n");
+		printk(KERN_ERR "iscsi_cmd_t->seq_list is NULL!\n");
 		return NULL;
 	}
 
@@ -724,7 +724,7 @@ iscsi_seq_t *iscsi_get_seq_holder(
 			return &cmd->seq_list[i];
 	}
 
-	TRACE_ERROR("Unable to locate Sequence holder for ITT: 0x%08x, Offset:"
+	printk(KERN_ERR "Unable to locate Sequence holder for ITT: 0x%08x, Offset:"
 		" %u, Length: %u\n", cmd->init_task_tag, offset, length);
 	return NULL;
 }

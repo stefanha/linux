@@ -80,11 +80,11 @@ extern int iscsi_na_dataout_timeout(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (dataout_timeout > NA_DATAOUT_TIMEOUT_MAX) {
-		TRACE_ERROR("Requested DataOut Timeout %u larger than maximum"
+		printk(KERN_ERR "Requested DataOut Timeout %u larger than maximum"
 			" %u\n", dataout_timeout, NA_DATAOUT_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (dataout_timeout < NA_DATAOUT_TIMEOUT_MIX) {
-		TRACE_ERROR("Requested DataOut Timeout %u smaller than minimum"
+		printk(KERN_ERR "Requested DataOut Timeout %u smaller than minimum"
 			" %u\n", dataout_timeout, NA_DATAOUT_TIMEOUT_MIX);
 		return -EINVAL;
 	}
@@ -107,12 +107,12 @@ extern int iscsi_na_dataout_timeout_retries(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (dataout_timeout_retries > NA_DATAOUT_TIMEOUT_RETRIES_MAX) {
-		TRACE_ERROR("Requested DataOut Timeout Retries %u larger than"
+		printk(KERN_ERR "Requested DataOut Timeout Retries %u larger than"
 			" maximum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MAX);
 		return -EINVAL;
 	} else if (dataout_timeout_retries < NA_DATAOUT_TIMEOUT_RETRIES_MIN) {
-		TRACE_ERROR("Requested DataOut Timeout Retries %u smaller than"
+		printk(KERN_ERR "Requested DataOut Timeout Retries %u smaller than"
 			" minimum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MIN);
 		return -EINVAL;
@@ -142,12 +142,12 @@ extern int iscsi_na_nopin_timeout(
 	u32 orig_nopin_timeout = a->nopin_timeout;
 
 	if (nopin_timeout > NA_NOPIN_TIMEOUT_MAX) {
-		TRACE_ERROR("Requested NopIn Timeout %u larger than maximum"
+		printk(KERN_ERR "Requested NopIn Timeout %u larger than maximum"
 			" %u\n", nopin_timeout, NA_NOPIN_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if ((nopin_timeout < NA_NOPIN_TIMEOUT_MIN) &&
 		   (nopin_timeout != 0)) {
-		TRACE_ERROR("Requested NopIn Timeout %u smaller than minimum"
+		printk(KERN_ERR "Requested NopIn Timeout %u smaller than minimum"
 			" %u and not 0\n", nopin_timeout, NA_NOPIN_TIMEOUT_MIN);
 		return -EINVAL;
 	}
@@ -193,12 +193,12 @@ extern int iscsi_na_nopin_response_timeout(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (nopin_response_timeout > NA_NOPIN_RESPONSE_TIMEOUT_MAX) {
-		TRACE_ERROR("Requested NopIn Response Timeout %u larger than"
+		printk(KERN_ERR "Requested NopIn Response Timeout %u larger than"
 			" maximum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (nopin_response_timeout < NA_NOPIN_RESPONSE_TIMEOUT_MIN) {
-		TRACE_ERROR("Requested NopIn Response Timeout %u smaller than"
+		printk(KERN_ERR "Requested NopIn Response Timeout %u smaller than"
 			" minimum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MIN);
 		return -EINVAL;
@@ -222,7 +222,7 @@ extern int iscsi_na_random_datain_pdu_offsets(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (random_datain_pdu_offsets != 0 && random_datain_pdu_offsets != 1) {
-		TRACE_ERROR("Requested Random DataIN PDU Offsets: %u not"
+		printk(KERN_ERR "Requested Random DataIN PDU Offsets: %u not"
 			" 0 or 1\n", random_datain_pdu_offsets);
 		return -EINVAL;
 	}
@@ -246,7 +246,7 @@ extern int iscsi_na_random_datain_seq_offsets(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (random_datain_seq_offsets != 0 && random_datain_seq_offsets != 1) {
-		TRACE_ERROR("Requested Random DataIN Sequence Offsets: %u not"
+		printk(KERN_ERR "Requested Random DataIN Sequence Offsets: %u not"
 			" 0 or 1\n", random_datain_seq_offsets);
 		return -EINVAL;
 	}
@@ -270,7 +270,7 @@ extern int iscsi_na_random_r2t_offsets(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (random_r2t_offsets != 0 && random_r2t_offsets != 1) {
-		TRACE_ERROR("Requested Random R2T Offsets: %u not"
+		printk(KERN_ERR "Requested Random R2T Offsets: %u not"
 			" 0 or 1\n", random_r2t_offsets);
 		return -EINVAL;
 	}
@@ -290,7 +290,7 @@ extern int iscsi_na_default_erl(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (default_erl != 0 && default_erl != 1 && default_erl != 2) {
-		TRACE_ERROR("Requested default ERL: %u not 0, 1, or 2\n",
+		printk(KERN_ERR "Requested default ERL: %u not 0, 1, or 2\n",
 				default_erl);
 		return -EINVAL;
 	}

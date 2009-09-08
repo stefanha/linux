@@ -65,7 +65,7 @@ extern int iscsi_build_sendtargets_response(iscsi_cmd_t *cmd)
 
 	payload = kzalloc(buffer_len, GFP_KERNEL);
 	if (!(payload)) {
-		TRACE_ERROR("Unable to allocate memory for sendtargets"
+		printk(KERN_ERR "Unable to allocate memory for sendtargets"
 			" response.\n");
 		return -1;
 	}

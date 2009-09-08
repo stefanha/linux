@@ -55,7 +55,7 @@ iscsi_datain_req_t *iscsi_allocate_datain_req(void)
 
 	dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC);
 	if (!(dr)) {
-		TRACE_ERROR("Unable to allocate memory for"
+		printk(KERN_ERR "Unable to allocate memory for"
 				" iscsi_datain_req_t\n");
 		return NULL;
 	}
@@ -97,7 +97,7 @@ void iscsi_free_all_datain_reqs(iscsi_cmd_t *cmd)
 iscsi_datain_req_t *iscsi_get_datain_req(iscsi_cmd_t *cmd)
 {
 	if (!cmd->datain_req_head) {
-		TRACE_ERROR("cmd->datain_req_head is NULL for ITT: 0x%08x\n",
+		printk(KERN_ERR "cmd->datain_req_head is NULL for ITT: 0x%08x\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
@@ -136,7 +136,7 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!(read_data_left)) {
-		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
+		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
@@ -236,7 +236,7 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!(read_data_left)) {
-		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
+		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
@@ -358,7 +358,7 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!(read_data_left)) {
-		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
+		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return dr;
 	}
@@ -459,7 +459,7 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!(read_data_left)) {
-		TRACE_ERROR("ITT: 0x%08x read_data_left is zero!\n",
+		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}

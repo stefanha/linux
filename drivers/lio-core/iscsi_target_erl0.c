@@ -163,7 +163,7 @@ static inline int iscsi_dataout_within_command_recovery_check(
 	return DATAOUT_NORMAL;
 
 dump:
-	TRACE_ERROR("Dumping DataOUT PDU Offset: %u Length: %d DataSN:"
+	printk(KERN_ERR "Dumping DataOUT PDU Offset: %u Length: %d DataSN:"
 		" 0x%08x\n", hdr->offset, hdr->length, hdr->data_sn);
 	return iscsi_dump_data_payload(conn, hdr->length, 1);
 }
@@ -183,7 +183,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 
 	if ((hdr->offset < cmd->seq_start_offset) ||
 	   ((hdr->offset + hdr->length) > cmd->seq_end_offset)) {
-		TRACE_ERROR("Command ITT: 0x%08x with Offset: %u,"
+		printk(KERN_ERR "Command ITT: 0x%08x with Offset: %u,"
 		" Length: %u outside of Unsolicited Sequence %u:%u while"
 		" DataSequenceInOrder=Yes.\n", cmd->init_task_tag,
 		hdr->offset, hdr->length, cmd->seq_start_offset,
@@ -194,7 +194,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 	first_burst_len = (cmd->first_burst_len + hdr->length);
 
 	if (first_burst_len > SESS_OPS_C(conn)->FirstBurstLength) {
-		TRACE_ERROR("Total %u bytes exceeds FirstBurstLength: %u"
+		printk(KERN_ERR "Total %u bytes exceeds FirstBurstLength: %u"
 			" for this Unsolicited DataOut Burst.\n",
 			first_burst_len, SESS_OPS_C(conn)->FirstBurstLength);
 		transport_send_check_condition_and_sense(SE_CMD(cmd),
@@ -217,7 +217,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 
 		if ((first_burst_len != cmd->data_length) &&
 		    (first_burst_len != SESS_OPS_C(conn)->FirstBurstLength)) {
-			TRACE_ERROR("Unsolicited non-immediate data received %u"
+			printk(KERN_ERR "Unsolicited non-immediate data received %u"
 			" does not equal FirstBurstLength: %u, and does not"
 				" equal ExpXferLen %u.\n", first_burst_len,
 				SESS_OPS_C(conn)->FirstBurstLength,
@@ -228,14 +228,14 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 		}
 	} else {
 		if (first_burst_len == SESS_OPS_C(conn)->FirstBurstLength) {
-			TRACE_ERROR("Command ITT: 0x%08x reached"
+			printk(KERN_ERR "Command ITT: 0x%08x reached"
 			" FirstBurstLength: %u, but F_BIT is not set. protocol"
 				" error.\n", cmd->init_task_tag,
 				SESS_OPS_C(conn)->FirstBurstLength);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 		if (first_burst_len == cmd->data_length) {
-			TRACE_ERROR("Command ITT: 0x%08x reached ExpXferLen: %u"
+			printk(KERN_ERR "Command ITT: 0x%08x reached ExpXferLen: %u"
 			", but F_BIT is not set. protocol error.\n",
 			cmd->init_task_tag, cmd->data_length);
 			return DATAOUT_CANNOT_RECOVER;
@@ -275,7 +275,7 @@ static inline int iscsi_dataout_check_sequence(
 		 */
 		if ((hdr->offset < cmd->seq_start_offset) ||
 		   ((hdr->offset + hdr->length) > cmd->seq_end_offset)) {
-			TRACE_ERROR("Command ITT: 0x%08x with Offset: %u,"
+			printk(KERN_ERR "Command ITT: 0x%08x with Offset: %u,"
 			" Length: %u outside of Sequence %u:%u while"
 			" DataSequenceInOrder=Yes.\n", cmd->init_task_tag,
 			hdr->offset, hdr->length, cmd->seq_start_offset,
@@ -306,7 +306,7 @@ static inline int iscsi_dataout_check_sequence(
 	}
 
 	if (next_burst_len > SESS_OPS_C(conn)->MaxBurstLength) {
-		TRACE_ERROR("Command ITT: 0x%08x, NextBurstLength: %u and"
+		printk(KERN_ERR "Command ITT: 0x%08x, NextBurstLength: %u and"
 			" Length: %u exceeds MaxBurstLength: %u. protocol"
 			" error.\n", cmd->init_task_tag,
 			(next_burst_len - hdr->length),
@@ -332,14 +332,14 @@ static inline int iscsi_dataout_check_sequence(
 			     SESS_OPS_C(conn)->MaxBurstLength) &&
 			   ((cmd->write_data_done + hdr->length) <
 			     cmd->data_length)) {
-				TRACE_ERROR("Command ITT: 0x%08x set F_BIT"
+				printk(KERN_ERR "Command ITT: 0x%08x set F_BIT"
 				" before end of DataOUT sequence, protocol"
 				" error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		} else {
 			if (next_burst_len < seq->xfer_len) {
-				TRACE_ERROR("Command ITT: 0x%08x set F_BIT"
+				printk(KERN_ERR "Command ITT: 0x%08x set F_BIT"
 				" before end of DataOUT sequence, protocol"
 				" error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
@@ -349,7 +349,7 @@ static inline int iscsi_dataout_check_sequence(
 		if (SESS_OPS_C(conn)->DataSequenceInOrder) {
 			if (next_burst_len ==
 					SESS_OPS_C(conn)->MaxBurstLength) {
-				TRACE_ERROR("Command ITT: 0x%08x reached"
+				printk(KERN_ERR "Command ITT: 0x%08x reached"
 				" MaxBurstLength: %u, but F_BIT is not set,"
 				" protocol error.", cmd->init_task_tag,
 				SESS_OPS_C(conn)->MaxBurstLength);
@@ -357,14 +357,14 @@ static inline int iscsi_dataout_check_sequence(
 			}
 			if ((cmd->write_data_done + hdr->length) ==
 					cmd->data_length) {
-				TRACE_ERROR("Command ITT: 0x%08x reached last"
+				printk(KERN_ERR "Command ITT: 0x%08x reached last"
 				" DataOUT PDU in sequence but F_BIT not set,"
 				" protocol error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		} else {
 			if (next_burst_len == seq->xfer_len) {
-				TRACE_ERROR("Command ITT: 0x%08x reached last"
+				printk(KERN_ERR "Command ITT: 0x%08x reached last"
 				" DataOUT PDU in sequence but F_BIT not set,"
 				" protocol error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
@@ -406,13 +406,13 @@ static inline int iscsi_dataout_check_datasn(
 	}
 
 	if (hdr->data_sn > data_sn) {
-		TRACE_ERROR("Command ITT: 0x%08x, received DataSN: 0x%08x"
+		printk(KERN_ERR "Command ITT: 0x%08x, received DataSN: 0x%08x"
 			" higher than expected 0x%08x.\n", cmd->init_task_tag,
 				hdr->data_sn, data_sn);
 		recovery = 1;
 		goto recover;
 	} else if (hdr->data_sn < data_sn) {
-		TRACE_ERROR("Command ITT: 0x%08x, received DataSN: 0x%08x"
+		printk(KERN_ERR "Command ITT: 0x%08x, received DataSN: 0x%08x"
 			" lower than expected 0x%08x, discarding payload.\n",
 			cmd->init_task_tag, hdr->data_sn, data_sn);
 		dump = 1;
@@ -423,7 +423,7 @@ static inline int iscsi_dataout_check_datasn(
 
 recover:
 	if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
-		TRACE_ERROR("Unable to perform within-command recovery"
+		printk(KERN_ERR "Unable to perform within-command recovery"
 				" while ERL=0.\n");
 		return DATAOUT_CANNOT_RECOVER;
 	}
@@ -459,7 +459,7 @@ static inline int iscsi_dataout_pre_datapduinorder_yes(
 	 */
 	if (SESS_OPS_C(conn)->DataSequenceInOrder) {
 		if (hdr->offset != cmd->write_data_done) {
-			TRACE_ERROR("Command ITT: 0x%08x, received offset"
+			printk(KERN_ERR "Command ITT: 0x%08x, received offset"
 			" %u different than expected %u.\n", cmd->init_task_tag,
 				hdr->offset, cmd->write_data_done);
 			recovery = 1;
@@ -469,13 +469,13 @@ static inline int iscsi_dataout_pre_datapduinorder_yes(
 		iscsi_seq_t *seq = cmd->seq_ptr;
 
 		if (hdr->offset > seq->offset) {
-			TRACE_ERROR("Command ITT: 0x%08x, received offset"
+			printk(KERN_ERR "Command ITT: 0x%08x, received offset"
 			" %u greater than expected %u.\n", cmd->init_task_tag,
 				hdr->offset, seq->offset);
 			recovery = 1;
 			goto recover;
 		} else if (hdr->offset < seq->offset) {
-			TRACE_ERROR("Command ITT: 0x%08x, received offset"
+			printk(KERN_ERR "Command ITT: 0x%08x, received offset"
 			" %u less than expected %u, discarding payload.\n",
 				cmd->init_task_tag, hdr->offset, seq->offset);
 			dump = 1;
@@ -487,7 +487,7 @@ static inline int iscsi_dataout_pre_datapduinorder_yes(
 
 recover:
 	if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
-		TRACE_ERROR("Unable to perform within-command recovery"
+		printk(KERN_ERR "Unable to perform within-command recovery"
 				" while ERL=0.\n");
 		return DATAOUT_CANNOT_RECOVER;
 	}
@@ -524,7 +524,7 @@ static inline int iscsi_dataout_pre_datapduinorder_no(
 	case ISCSI_PDU_TIMED_OUT:
 		break;
 	case ISCSI_PDU_RECEIVED_OK:
-		TRACE_ERROR("Command ITT: 0x%08x received already gotten"
+		printk(KERN_ERR "Command ITT: 0x%08x received already gotten"
 			" Offset: %u, Length: %u\n", cmd->init_task_tag,
 				hdr->offset, hdr->length);
 		return iscsi_dump_data_payload(CONN(cmd), hdr->length, 1);
@@ -799,7 +799,7 @@ int iscsi_check_post_dataout(
 		return iscsi_dataout_post_crc_passed(cmd, buf);
 	else {
 		if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
-			TRACE_ERROR("Unable to recover from DataOUT CRC failure"
+			printk(KERN_ERR "Unable to recover from DataOUT CRC failure"
 				" while ERL=0, closing session.\n") ;
 			iscsi_add_reject_from_cmd(REASON_DATA_DIGEST_ERR,
 					1, 0, buf, cmd);
@@ -828,14 +828,14 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 		return;
 	}
 	if (atomic_read(&sess->session_reinstatement)) {
-		TRACE_ERROR("Exiting Time2Retain handler because"
+		printk(KERN_ERR "Exiting Time2Retain handler because"
 				" session_reinstatement=1\n");
 		spin_unlock_bh(&se_tpg->session_lock);
 		return;
 	}
 	sess->time2retain_timer_flags |= T2R_TF_EXPIRED;
 
-	TRACE_ERROR("Time2Retain timer expired for SID: %u, cleaning up"
+	printk(KERN_ERR "Time2Retain timer expired for SID: %u, cleaning up"
 			" iSCSI session.\n", sess->sid);
 #ifdef SNMP_SUPPORT
 	{
@@ -1071,7 +1071,7 @@ int iscsi_recover_from_unknown_opcode(iscsi_conn_t *conn)
 	 * Make sure the remaining bytes to next maker is a sane value.
 	 */
 	if (conn->of_marker > (CONN_OPS(conn)->OFMarkInt * 4)) {
-		TRACE_ERROR("Remaining bytes to OFMarker: %u exceeds"
+		printk(KERN_ERR "Remaining bytes to OFMarker: %u exceeds"
 			" OFMarkInt bytes: %u.\n", conn->of_marker,
 				CONN_OPS(conn)->OFMarkInt * 4);
 		return -1;
@@ -1088,7 +1088,7 @@ int iscsi_recover_from_unknown_opcode(iscsi_conn_t *conn)
 	 */
 	if (conn->of_marker_offset > (ISCSI_HDR_LEN + (CRC_LEN * 2) +
 	    CONN_OPS(conn)->MaxRecvDataSegmentLength)) {
-		TRACE_ERROR("OfMarker offset value: %u exceeds limit.\n",
+		printk(KERN_ERR "OfMarker offset value: %u exceeds limit.\n",
 			conn->of_marker_offset);
 		return -1;
 	}

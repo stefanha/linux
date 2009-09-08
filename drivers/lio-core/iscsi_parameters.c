@@ -72,13 +72,13 @@ int iscsi_login_rx_data(
 	else if (role == TARGET)
 		conn->of_marker += length;
 	else {
-		TRACE_ERROR("Unknown role: 0x%02x.\n", role);
+		printk(KERN_ERR "Unknown role: 0x%02x.\n", role);
 		return -1;
 	}
 
 	rx_got = rx_data(conn, &iov, 1, length);
 	if (rx_got != length) {
-		TRACE_ERROR("rx_data returned %d, expecting %d.\n",
+		printk(KERN_ERR "rx_data returned %d, expecting %d.\n",
 				rx_got, length);
 		return -1;
 	}
@@ -118,13 +118,13 @@ int iscsi_login_tx_data(
 	else if (role == TARGET)
 		conn->if_marker += length;
 	else {
-		TRACE_ERROR("Unknown role: 0x%02x.\n", role);
+		printk(KERN_ERR "Unknown role: 0x%02x.\n", role);
 		return -1;
 	}
 
 	tx_sent = tx_data(conn, &iov[0], 2, length);
 	if (tx_sent != length) {
-		TRACE_ERROR("tx_data returned %d, expecting %d.\n",
+		printk(KERN_ERR "tx_data returned %d, expecting %d.\n",
 				tx_sent, length);
 		return -1;
 	}
@@ -204,19 +204,19 @@ static iscsi_param_t *iscsi_set_default_param(char *name, char *value, u8 phase,
 
 	param = kzalloc(sizeof(iscsi_param_t), GFP_KERNEL);
 	if (!(param)) {
-		TRACE_ERROR("Unable to allocate memory for parameter.\n");
+		printk(KERN_ERR "Unable to allocate memory for parameter.\n");
 		goto out;
 	}
 
 	param->name = kzalloc(strlen(name) + 1, GFP_KERNEL);
 	if (!(param->name)) {
-		TRACE_ERROR("Unable to allocate memory for parameter name.\n");
+		printk(KERN_ERR "Unable to allocate memory for parameter name.\n");
 		goto out;
 	}
 
 	param->value = kzalloc(strlen(value) + 1, GFP_KERNEL);
 	if (!(param->value)) {
-		TRACE_ERROR("Unable to allocate memory for parameter value.\n");
+		printk(KERN_ERR "Unable to allocate memory for parameter value.\n");
 		goto out;
 	}
 
@@ -261,7 +261,7 @@ static iscsi_param_t *iscsi_set_default_param(char *name, char *value, u8 phase,
 		param->type = TYPE_STRING;
 		break;
 	default:
-		TRACE_ERROR("Unknown type_range 0x%02x\n",
+		printk(KERN_ERR "Unknown type_range 0x%02x\n",
 				param->type_range);
 		goto out;
 	}
@@ -301,7 +301,7 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	param_list = (iscsi_param_list_t *)
 			kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
 	if (!(param_list)) {
-		TRACE_ERROR("Unable to allocate memory for"
+		printk(KERN_ERR "Unable to allocate memory for"
 				" iscsi_param_list_t.\n");
 		return -1 ;
 	}
@@ -630,7 +630,7 @@ int iscsi_copy_param_list(
 	param_list = (iscsi_param_list_t *)
 			kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
 	if (!(param_list)) {
-		TRACE_ERROR("Unable to allocate memory for"
+		printk(KERN_ERR "Unable to allocate memory for"
 				" iscsi_param_list_t.\n");
 		goto err_out;
 	}
@@ -646,7 +646,7 @@ int iscsi_copy_param_list(
 		new_param = (iscsi_param_t *)
 			      kzalloc(sizeof(iscsi_param_t), GFP_KERNEL);
 		if (!(new_param)) {
-			TRACE_ERROR("Unable to allocate memory for"
+			printk(KERN_ERR "Unable to allocate memory for"
 				" iscsi_param_t.\n");
 			goto err_out;
 		}
@@ -661,7 +661,7 @@ int iscsi_copy_param_list(
 
 		new_param->name = kzalloc(strlen(param->name) + 1, GFP_KERNEL);
 		if (!(new_param->name)) {
-			TRACE_ERROR("Unable to allocate memory for"
+			printk(KERN_ERR "Unable to allocate memory for"
 				" parameter name.\n");
 			goto err_out;
 		}
@@ -669,7 +669,7 @@ int iscsi_copy_param_list(
 		new_param->value = kzalloc(strlen(param->value) + 1,
 				GFP_KERNEL);
 		if (!(new_param->value)) {
-			TRACE_ERROR("Unable to allocate memory for"
+			printk(KERN_ERR "Unable to allocate memory for"
 				" parameter value.\n");
 			goto err_out;
 		}
@@ -685,7 +685,7 @@ int iscsi_copy_param_list(
 	if (param_list->param_start)
 		*dst_param_list = param_list;
 	else {
-		TRACE_ERROR("No parameters allocated.\n");
+		printk(KERN_ERR "No parameters allocated.\n");
 		goto err_out;
 	}
 
@@ -754,7 +754,7 @@ iscsi_param_t *iscsi_find_param_from_key(
 	iscsi_param_t *param;
 
 	if (!key || !param_list) {
-		TRACE_ERROR("Key or parameter list pointer is NULL.\n");
+		printk(KERN_ERR "Key or parameter list pointer is NULL.\n");
 		return NULL;
 	}
 
@@ -764,7 +764,7 @@ iscsi_param_t *iscsi_find_param_from_key(
 	}
 
 	if (!param) {
-		TRACE_ERROR("Unable to locate key \"%s\".\n", key);
+		printk(KERN_ERR "Unable to locate key \"%s\".\n", key);
 		return NULL;
 	}
 
@@ -779,7 +779,7 @@ int iscsi_extract_key_value(char *textbuf, char **key, char **value)
 {
 	*value = strchr(textbuf, '=');
 	if (!(*value)) {
-		TRACE_ERROR("Unable to locate \"=\" seperator for key,"
+		printk(KERN_ERR "Unable to locate \"=\" seperator for key,"
 				" ignoring request.\n");
 		return -1;
 	}
@@ -801,7 +801,7 @@ int iscsi_update_param_value(iscsi_param_t *param, char *value)
 
 	param->value = kzalloc(strlen(value) + 1, GFP_KERNEL);
 	if (!(param->value)) {
-		TRACE_ERROR("Unable to allocate memory for value.\n");
+		printk(KERN_ERR "Unable to allocate memory for value.\n");
 		return -1;
 	}
 
@@ -825,14 +825,14 @@ static int iscsi_add_notunderstood_response(
 	iscsi_extra_response_t *extra_response, *extra_response_ptr = NULL;
 
 	if (strlen(value) > MAX_KEY_VALUE_LENGTH) {
-		TRACE_ERROR("Value for notunderstood key \"%s\" exceeds %d,"
+		printk(KERN_ERR "Value for notunderstood key \"%s\" exceeds %d,"
 			" protocol error.\n", key, MAX_KEY_VALUE_LENGTH);
 		return -1;
 	}
 
 	extra_response = kzalloc(sizeof(iscsi_extra_response_t), GFP_KERNEL);
 	if (!(extra_response)) {
-		TRACE_ERROR("Unable to allocate memory for"
+		printk(KERN_ERR "Unable to allocate memory for"
 			" iscsi_extra_response_t.\n");
 		return -1;
 	}
@@ -905,7 +905,7 @@ static void iscsi_check_proposer_for_optional_reply(iscsi_param_t *param)
 static int iscsi_check_boolean_value(iscsi_param_t *param, char *value)
 {
 	if (strcmp(value, YES) && strcmp(value, NO)) {
-		TRACE_ERROR("Illegal value for \"%s\", must be either"
+		printk(KERN_ERR "Illegal value for \"%s\", must be either"
 			" \"%s\" or \"%s\".\n", param->name, YES, NO);
 		return -1;
 	}
@@ -927,14 +927,14 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 /* #warning FIXME: Fix this */
 #if 0
 	if (strspn(endptr, WHITE_SPACE) != strlen(endptr)) {
-		TRACE_ERROR("Illegal value \"%s\" for \"%s\".\n",
+		printk(KERN_ERR "Illegal value \"%s\" for \"%s\".\n",
 			value, param->name);
 		return -1;
 	}
 #endif
 	if (IS_TYPERANGE_0_TO_2(param)) {
 		if ((value < 0) || (value > 2)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be between"
+			printk(KERN_ERR "Illegal value for \"%s\", must be between"
 				" 0 and 2.\n", param->name);
 			return -1;
 		}
@@ -942,7 +942,7 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 	}
 	if (IS_TYPERANGE_0_TO_3600(param)) {
 		if ((value < 0) || (value > 3600)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be between"
+			printk(KERN_ERR "Illegal value for \"%s\", must be between"
 				" 0 and 3600.\n", param->name);
 			return -1;
 		}
@@ -950,7 +950,7 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 	}
 	if (IS_TYPERANGE_0_TO_32767(param)) {
 		if ((value < 0) || (value > 32767)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be between"
+			printk(KERN_ERR "Illegal value for \"%s\", must be between"
 				" 0 and 32767.\n", param->name);
 			return -1;
 		}
@@ -958,7 +958,7 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 	}
 	if (IS_TYPERANGE_0_TO_65535(param)) {
 		if ((value < 0) || (value > 65535)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be between"
+			printk(KERN_ERR "Illegal value for \"%s\", must be between"
 				" 0 and 65535.\n", param->name);
 			return -1;
 		}
@@ -966,7 +966,7 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 	}
 	if (IS_TYPERANGE_1_TO_65535(param)) {
 		if ((value < 1) || (value > 65535)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be between"
+			printk(KERN_ERR "Illegal value for \"%s\", must be between"
 				" 1 and 65535.\n", param->name);
 			return -1;
 		}
@@ -974,7 +974,7 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 	}
 	if (IS_TYPERANGE_2_TO_3600(param)) {
 		if ((value < 2) || (value > 3600)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be between"
+			printk(KERN_ERR "Illegal value for \"%s\", must be between"
 				" 2 and 3600.\n", param->name);
 			return -1;
 		}
@@ -982,7 +982,7 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 	}
 	if (IS_TYPERANGE_512_TO_16777215(param)) {
 		if ((value < 512) || (value > 16777215)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be between"
+			printk(KERN_ERR "Illegal value for \"%s\", must be between"
 				" 512 and 16777215.\n", param->name);
 			return -1;
 		}
@@ -1004,7 +1004,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 
 	if ((strcmp(param->name, IFMARKINT)) &&
 			(strcmp(param->name, OFMARKINT))) {
-	       TRACE_ERROR("Only parameters \"%s\" or \"%s\" may contain a"
+	       printk(KERN_ERR "Only parameters \"%s\" or \"%s\" may contain a"
 			" numerical range value.\n", IFMARKINT, OFMARKINT);
 		return -1;
 	}
@@ -1014,7 +1014,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 
 	tilde_ptr = strchr(value, '~');
 	if (!(tilde_ptr)) {
-		TRACE_ERROR("Unable to locate numerical range indicator"
+		printk(KERN_ERR "Unable to locate numerical range indicator"
 			" \"~\" for \"%s\".\n", param->name);
 		return -1;
 	}
@@ -1033,7 +1033,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 	*tilde_ptr = '~';
 
 	if (right_val < left_val) {
-		TRACE_ERROR("Numerical range for parameter \"%s\" contains"
+		printk(KERN_ERR "Numerical range for parameter \"%s\" contains"
 			" a right value which is less than the left.\n",
 				param->name);
 		return -1;
@@ -1044,7 +1044,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 	 */
 	tilde_ptr = strchr(param->value, '~');
 	if (!(tilde_ptr)) {
-		TRACE_ERROR("Unable to locate numerical range indicator"
+		printk(KERN_ERR "Unable to locate numerical range indicator"
 			" \"~\" for \"%s\".\n", param->name);
 		return -1;
 	}
@@ -1060,7 +1060,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 	if (param->set_param) {
 		if ((left_val < local_left_val) ||
 		    (right_val < local_left_val)) {
-			TRACE_ERROR("Passed value range \"%u~%u\" is below"
+			printk(KERN_ERR "Passed value range \"%u~%u\" is below"
 				" minimum left value \"%u\" for key \"%s\","
 				" rejecting.\n", left_val, right_val,
 				local_left_val, param->name);
@@ -1069,7 +1069,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 	} else {
 		if ((left_val < local_left_val) &&
 		    (right_val < local_left_val)) {
-			TRACE_ERROR("Received value range \"%u~%u\" is below"
+			printk(KERN_ERR "Received value range \"%u~%u\" is below"
 				" minimum left value \"%u\" for key \"%s\","
 				" rejecting.\n", left_val, right_val,
 				local_left_val, param->name);
@@ -1095,7 +1095,7 @@ static int iscsi_check_string_or_list_value(iscsi_param_t *param, char *value)
 		if (strcmp(value, KRB5) && strcmp(value, SPKM1) &&
 		    strcmp(value, SPKM2) && strcmp(value, SRP) &&
 		    strcmp(value, CHAP) && strcmp(value, NONE)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be"
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
 				" \"%s\", \"%s\", \"%s\", \"%s\", \"%s\""
 				" or \"%s\".\n", param->name, KRB5,
 					SPKM1, SPKM2, SRP, CHAP, NONE);
@@ -1104,7 +1104,7 @@ static int iscsi_check_string_or_list_value(iscsi_param_t *param, char *value)
 	}
 	if (IS_TYPERANGE_DIGEST_PARAM(param)) {
 		if (strcmp(value, CRC32C) && strcmp(value, NONE)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be"
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
 				" \"%s\" or \"%s\".\n", param->name,
 					CRC32C, NONE);
 			return -1;
@@ -1112,7 +1112,7 @@ static int iscsi_check_string_or_list_value(iscsi_param_t *param, char *value)
 	}
 	if (IS_TYPERANGE_SESSIONTYPE(param)) {
 		if (strcmp(value, DISCOVERY) && strcmp(value, NORMAL)) {
-			TRACE_ERROR("Illegal value for \"%s\", must be"
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
 				" \"%s\" or \"%s\".\n", param->name,
 					DISCOVERY, NORMAL);
 			return -1;
@@ -1218,7 +1218,7 @@ static int iscsi_check_acceptor_state(iscsi_param_t *param, char *value)
 	char *negoitated_value = NULL;
 
 	if (IS_PSTATE_ACCEPTOR(param)) {
-		TRACE_ERROR("Received key \"%s\" twice, protocol error.\n",
+		printk(KERN_ERR "Received key \"%s\" twice, protocol error.\n",
 				param->name);
 		return -1;
 	}
@@ -1300,7 +1300,7 @@ static int iscsi_check_acceptor_state(iscsi_param_t *param, char *value)
 		negoitated_value = iscsi_check_valuelist_for_support(
 					param, value);
 		if (!(negoitated_value)) {
-			TRACE_ERROR("Proposer's value list \"%s\" contains no"
+			printk(KERN_ERR "Proposer's value list \"%s\" contains no"
 				" valid values from Acceptor's value list"
 				" \"%s\".\n", value, param->value);
 			return -1;
@@ -1323,7 +1323,7 @@ static int iscsi_check_acceptor_state(iscsi_param_t *param, char *value)
 static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
 {
 	if (IS_PSTATE_RESPONSE_GOT(param)) {
-		TRACE_ERROR("Received key \"%s\" twice, protocol error.\n",
+		printk(KERN_ERR "Received key \"%s\" twice, protocol error.\n",
 				param->name);
 		return -1;
 	}
@@ -1341,13 +1341,13 @@ static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
 
 		tilde_ptr = strchr(value, '~');
 		if ((tilde_ptr)) {
-			TRACE_ERROR("Illegal \"~\" in response for \"%s\".\n",
+			printk(KERN_ERR "Illegal \"~\" in response for \"%s\".\n",
 					param->name);
 			return -1;
 		}
 		tilde_ptr = strchr(param->value, '~');
 		if (!(tilde_ptr)) {
-			TRACE_ERROR("Unable to locate numerical range indicator"
+			printk(KERN_ERR "Unable to locate numerical range indicator"
 				" \"~\" for \"%s\".\n", param->name);
 			return -1;
 		}
@@ -1363,7 +1363,7 @@ static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
 
 		if ((recieved_value < left_val) ||
 		    (recieved_value > right_val)) {
-			TRACE_ERROR("Illegal response \"%s=%u\", value must be"
+			printk(KERN_ERR "Illegal response \"%s=%u\", value must be"
 				" between %u and %u.\n", param->name,
 				recieved_value, left_val, right_val);
 			return -1;
@@ -1373,7 +1373,7 @@ static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
 
 		comma_ptr = strchr(value, ',');
 		if ((comma_ptr)) {
-			TRACE_ERROR("Illegal \",\" in response for \"%s\".\n",
+			printk(KERN_ERR "Illegal \",\" in response for \"%s\".\n",
 					param->name);
 			return -1;
 		}
@@ -1407,7 +1407,7 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 			SET_PSTATE_REJECT(param);
 			return 0;
 		}
-		TRACE_ERROR("Received %s=%s\n", param->name, value);
+		printk(KERN_ERR "Received %s=%s\n", param->name, value);
 		return -1;
 	}
 	if (!strcmp(value, IRRELEVANT)) {
@@ -1417,13 +1417,13 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 	}
 	if (!strcmp(value, NOTUNDERSTOOD)) {
 		if (!IS_PSTATE_PROPOSER(param)) {
-			TRACE_ERROR("Received illegal offer %s=%s\n",
+			printk(KERN_ERR "Received illegal offer %s=%s\n",
 				param->name, value);
 			return -1;
 		}
 
 /* #warning FIXME: Add check for X-ExtensionKey here */
-		TRACE_ERROR("Standard iSCSI key \"%s\" cannot be answered with"
+		printk(KERN_ERR "Standard iSCSI key \"%s\" cannot be answered with"
 			" \"%s\", protocol error.\n", param->name, value);
 		return -1;
 	}
@@ -1433,7 +1433,7 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 		comma_ptr = strchr(value, ',');
 
 		if (comma_ptr && !IS_TYPE_VALUE_LIST(param)) {
-			TRACE_ERROR("Detected value seperator \",\", but key"
+			printk(KERN_ERR "Detected value seperator \",\", but key"
 				" \"%s\" does not allow a value list,"
 				" protocol error.\n", param->name);
 			return -1;
@@ -1442,7 +1442,7 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 			*comma_ptr = '\0';
 
 		if (strlen(value) > MAX_KEY_VALUE_LENGTH) {
-			TRACE_ERROR("Value for key \"%s\" exceeds %d, protocol"
+			printk(KERN_ERR "Value for key \"%s\" exceeds %d, protocol"
 				" error.\n", param->name, MAX_KEY_VALUE_LENGTH);
 			return -1;
 		}
@@ -1460,7 +1460,7 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 			if (iscsi_check_string_or_list_value(param, value) < 0)
 				return -1;
 		} else {
-			TRACE_ERROR("Huh? 0x%02x\n", param->type);
+			printk(KERN_ERR "Huh? 0x%02x\n", param->type);
 			return -1;
 		}
 
@@ -1485,7 +1485,7 @@ static iscsi_param_t *__iscsi_check_key(
 	iscsi_param_t *param;
 
 	if (strlen(key) > MAX_KEY_NAME_LENGTH) {
-		TRACE_ERROR("Length of key name \"%s\" exceeds %d.\n",
+		printk(KERN_ERR "Length of key name \"%s\" exceeds %d.\n",
 			key, MAX_KEY_NAME_LENGTH);
 		return NULL;
 	}
@@ -1495,14 +1495,14 @@ static iscsi_param_t *__iscsi_check_key(
 		return NULL;
 
 	if ((sender & SENDER_INITIATOR) && !IS_SENDER_INITIATOR(param)) {
-		TRACE_ERROR("Key \"%s\" may not be sent to %s,"
+		printk(KERN_ERR "Key \"%s\" may not be sent to %s,"
 			" protocol error.\n", param->name,
 			(sender & SENDER_RECEIVER) ? "target" : "initiator");
 		return NULL;
 	}
 
 	if ((sender & SENDER_TARGET) && !IS_SENDER_TARGET(param)) {
-		TRACE_ERROR("Key \"%s\" may not be sent to %s,"
+		printk(KERN_ERR "Key \"%s\" may not be sent to %s,"
 			" protocol error.\n", param->name,
 			(sender & SENDER_RECEIVER) ? "initiator" : "target");
 		return NULL;
@@ -1527,7 +1527,7 @@ static iscsi_param_t *iscsi_check_key(
 	 * Key name length must not exceed 63 bytes. (See iSCSI v20 5.1)
 	 */
 	if (strlen(key) > MAX_KEY_NAME_LENGTH) {
-		TRACE_ERROR("Length of key name \"%s\" exceeds %d.\n",
+		printk(KERN_ERR "Length of key name \"%s\" exceeds %d.\n",
 			key, MAX_KEY_NAME_LENGTH);
 		return NULL;
 	}
@@ -1537,20 +1537,20 @@ static iscsi_param_t *iscsi_check_key(
 		return NULL;
 
 	if ((sender & SENDER_INITIATOR) && !IS_SENDER_INITIATOR(param)) {
-		TRACE_ERROR("Key \"%s\" may not be sent to %s,"
+		printk(KERN_ERR "Key \"%s\" may not be sent to %s,"
 			" protocol error.\n", param->name,
 			(sender & SENDER_RECEIVER) ? "target" : "initiator");
 		return NULL;
 	}
 	if ((sender & SENDER_TARGET) && !IS_SENDER_TARGET(param)) {
-		TRACE_ERROR("Key \"%s\" may not be sent to %s,"
+		printk(KERN_ERR "Key \"%s\" may not be sent to %s,"
 				" protocol error.\n", param->name,
 			(sender & SENDER_RECEIVER) ? "initiator" : "target");
 		return NULL;
 	}
 
 	if (IS_PSTATE_ACCEPTOR(param)) {
-		TRACE_ERROR("Key \"%s\" received twice, protocol error.\n",
+		printk(KERN_ERR "Key \"%s\" received twice, protocol error.\n",
 				key);
 		return NULL;
 	}
@@ -1559,7 +1559,7 @@ static iscsi_param_t *iscsi_check_key(
 		return param;
 
 	if (!(param->phase & phase)) {
-		TRACE_ERROR("Key \"%s\" may not be negotiated during ",
+		printk(KERN_ERR "Key \"%s\" may not be negotiated during ",
 				param->name);
 		switch (phase) {
 		case PHASE_SECURITY:
@@ -1712,7 +1712,7 @@ int iscsi_decode_text_input(
 
 	tmpbuf = kzalloc(length + 1, GFP_KERNEL);
 	if (!(tmpbuf)) {
-		TRACE_ERROR("Unable to allocate memory for tmpbuf.\n");
+		printk(KERN_ERR "Unable to allocate memory for tmpbuf.\n");
 		return -1;
 	}
 
@@ -1857,7 +1857,7 @@ int iscsi_check_negotiated_keys(iscsi_param_list_t *param_list)
 		    !IS_PSTATE_RESPONSE_GOT(param) &&
 		    !IS_PSTATE_REPLY_OPTIONAL(param) &&
 		    !IS_PHASE_DECLARATIVE(param)) {
-			TRACE_ERROR("No response for proposed key \"%s\".\n",
+			printk(KERN_ERR "No response for proposed key \"%s\".\n",
 					param->name);
 			ret = -1;
 		}

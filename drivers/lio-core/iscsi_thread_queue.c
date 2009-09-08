@@ -176,7 +176,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 		allocated_thread_pair_count++;
 	}
 
-	TRACE_OPS("Spawned %d thread set(s) (%d total threads).\n",
+	printk(KERN_INFO "Spawned %d thread set(s) (%d total threads).\n",
 		allocated_thread_pair_count, allocated_thread_pair_count * 2);
 	return allocated_thread_pair_count;
 }
@@ -213,10 +213,9 @@ extern void iscsi_deallocate_thread_sets(int role)
 		kfree(ts);
 	}
 
-	if (released_count) {
-		TRACE_OPS("Stopped %d thread set(s) (%d total threads).\n",
-			released_count, released_count * 2);
-	}
+	if (released_count)
+		printk(KERN_INFO "Stopped %d thread set(s) (%d total threads)."
+			"\n", released_count, released_count * 2);
 }
 
 /*	iscsi_deallocate_extra_thread_sets():
@@ -258,8 +257,8 @@ static void iscsi_deallocate_extra_thread_sets(int role)
 	}
 
 	if (released_count) {
-		TRACE_OPS("Stopped %d thread set(s) (%d total threads).\n",
-			released_count, released_count * 2);
+		printk(KERN_INFO "Stopped %d thread set(s) (%d total threads)."
+			"\n", released_count, released_count * 2);
 	}
 }
 
