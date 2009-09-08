@@ -1,11 +1,11 @@
-/*********************************************************************************
+/*******************************************************************************
  * Filename:  iscsi_target_erl2.c
  *
  * This file contains error recovery level two functions used by
  * the iSCSI Target driver.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc. 
+ * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * Copyright (c) 2007 Rising Tide Software, Inc.
  *
  * Nicholas A. Bellinger <nab@kernel.org>
@@ -24,7 +24,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- *********************************************************************************/
+ ******************************************************************************/
 
 
 #define ISCSI_TARGET_ERL2_C
@@ -54,27 +54,24 @@
 #include <iscsi_target_util.h>
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
-#include <iscsi_target_erl2.h> 
+#include <iscsi_target_erl2.h>
 
 #undef ISCSI_TARGET_ERL2_C
-
-extern int iscsi_send_async_msg (iscsi_conn_t *, __u16, __u8, __u8);
-extern int iscsi_close_connection (iscsi_conn_t *);
 
 /*	iscsi_create_conn_recovery_datain_values():
  *
  *	FIXME: Does RData SNACK apply here as well?
  */
-extern void iscsi_create_conn_recovery_datain_values (
+void iscsi_create_conn_recovery_datain_values(
 	iscsi_cmd_t *cmd,
-	__u32 exp_data_sn)
+	u32 exp_data_sn)
 {
-	__u32 data_sn = 0;
+	u32 data_sn = 0;
 	iscsi_conn_t *conn = CONN(cmd);
-	
+
 	cmd->next_burst_len = 0;
 	cmd->read_data_done = 0;
-		
+
 	while (exp_data_sn > data_sn) {
 		if ((cmd->next_burst_len +
 		     CONN_OPS(conn)->MaxRecvDataSegmentLength) <
@@ -86,23 +83,21 @@ extern void iscsi_create_conn_recovery_datain_values (
 		} else {
 			cmd->read_data_done +=
 				(SESS_OPS_C(conn)->MaxBurstLength -
-				 	cmd->next_burst_len);
+				cmd->next_burst_len);
 			cmd->next_burst_len = 0;
 		}
 		data_sn++;
 	}
-
-	return;
 }
 
 /*	iscsi_create_conn_recovery_dataout_values():
  *
  *
  */
-extern void iscsi_create_conn_recovery_dataout_values (
+void iscsi_create_conn_recovery_dataout_values(
 	iscsi_cmd_t *cmd)
 {
-	__u32 write_data_done = 0;
+	u32 write_data_done = 0;
 	iscsi_conn_t *conn = CONN(cmd);
 
 	cmd->data_sn = 0;
@@ -115,17 +110,15 @@ extern void iscsi_create_conn_recovery_dataout_values (
 		else
 			break;
 	}
-	
+
 	cmd->write_data_done = write_data_done;
-	
-	return;
 }
 
 /*	iscsi_attach_active_connection_recovery_entry():
  *
  *
  */
-static int iscsi_attach_active_connection_recovery_entry (
+static int iscsi_attach_active_connection_recovery_entry(
 	iscsi_session_t *sess,
 	iscsi_conn_recovery_t *cr)
 {
@@ -133,14 +126,14 @@ static int iscsi_attach_active_connection_recovery_entry (
 	ADD_ENTRY_TO_LIST(cr, sess->cr_a_head, sess->cr_a_tail);
 	spin_unlock(&sess->cr_a_lock);
 
-	return(0);
+	return 0;
 }
 
 /*	iscsi_attach_inactive_connection_recovery():
  *
  *
  */
-static int iscsi_attach_inactive_connection_recovery_entry (
+static int iscsi_attach_inactive_connection_recovery_entry(
 	iscsi_session_t *sess,
 	iscsi_conn_recovery_t *cr)
 {
@@ -151,17 +144,17 @@ static int iscsi_attach_inactive_connection_recovery_entry (
 	TRACE(TRACE_ERL2, "Incremented connection recovery count to %u for"
 		" SID: %u\n", sess->conn_recovery_count, sess->sid);
 	spin_unlock(&sess->cr_i_lock);
-		
-	return(0);
+
+	return 0;
 }
 
 /*	iscsi_get_inactive_connection_recovery_entry():
  *
  *
  */
-extern iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry (
+iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry(
 	iscsi_session_t *sess,
-	__u16 cid)
+	u16 cid)
 {
 	iscsi_conn_recovery_t *cr;
 
@@ -172,18 +165,18 @@ extern iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry (
 	}
 	spin_unlock(&sess->cr_i_lock);
 
-	return((cr) ? cr : NULL);
+	return (cr) ? cr : NULL;
 }
 
 /*	iscsi_free_connection_recovery_entires():
  *
  *
  */
-extern void iscsi_free_connection_recovery_entires (iscsi_session_t *sess)
+void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 {
 	iscsi_cmd_t *cmd, *cmd_next;
 	iscsi_conn_recovery_t *cr, *cr_next;
-	
+
 	spin_lock(&sess->cr_a_lock);
 	cr = sess->cr_a_head;
 	while (cr) {
@@ -194,7 +187,7 @@ extern void iscsi_free_connection_recovery_entires (iscsi_session_t *sess)
 		cmd = cr->conn_recovery_cmd_head;
 		while (cmd) {
 			cmd_next = cmd->i_next;
-		
+
 			cmd->conn = NULL;
 			spin_unlock(&cr->conn_recovery_cmd_lock);
 			if (!(SE_CMD(cmd)) ||
@@ -205,14 +198,14 @@ extern void iscsi_free_connection_recovery_entires (iscsi_session_t *sess)
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
 			spin_lock(&cr->conn_recovery_cmd_lock);
-			
+
 			cmd = cmd_next;
 		}
 		spin_unlock(&cr->conn_recovery_cmd_lock);
 		spin_lock(&sess->cr_a_lock);
 
 		kfree(cr);
-		
+
 		cr = cr_next;
 	}
 	spin_unlock(&sess->cr_a_lock);
@@ -257,7 +250,7 @@ extern void iscsi_free_connection_recovery_entires (iscsi_session_t *sess)
  *
  *
  */
-extern int iscsi_remove_active_connection_recovery_entry (
+int iscsi_remove_active_connection_recovery_entry(
 	iscsi_conn_recovery_t *cr,
 	iscsi_session_t *sess)
 {
@@ -268,46 +261,44 @@ extern int iscsi_remove_active_connection_recovery_entry (
 	TRACE(TRACE_ERL2, "Decremented connection recovery count to %u for"
 		" SID: %u\n", sess->conn_recovery_count, sess->sid);
 	spin_unlock(&sess->cr_a_lock);
-			
+
 	kfree(cr);
 
-	return(0);
+	return 0;
 }
 
 /*	iscsi_remove_inactive_connection_recovery_entry():
  *
  *
  */
-extern int iscsi_remove_inactive_connection_recovery_entry (
+int iscsi_remove_inactive_connection_recovery_entry(
 	iscsi_conn_recovery_t *cr,
 	iscsi_session_t *sess)
 {
 	spin_lock(&sess->cr_i_lock);
 	REMOVE_ENTRY_FROM_LIST(cr, sess->cr_i_head, sess->cr_i_tail);
 	spin_unlock(&sess->cr_i_lock);
-		
-	return(0);
+
+	return 0;
 }
 
 /*	iscsi_remove_cmd_from_connection_recovery():
  *
  *	Called with cr->conn_recovery_cmd_lock help.
  */
-extern int iscsi_remove_cmd_from_connection_recovery (
+int iscsi_remove_cmd_from_connection_recovery(
 	iscsi_cmd_t *cmd,
 	iscsi_session_t *sess)
 {
 	iscsi_conn_recovery_t *cr;
-	
-	TRACE_ENTER
 
 	if (!cmd->cr) {
-		TRACE_ERROR("iscsi_conn_recovery_t pointer for ITT: 0x%08x"
+		printk(KERN_ERR "iscsi_conn_recovery_t pointer for ITT: 0x%08x"
 			" is NULL!\n", cmd->init_task_tag);
 		BUG();
 	}
 	cr = cmd->cr;
-		
+
 	/*
 	/ * Only element in list.
 	 */
@@ -339,19 +330,19 @@ extern int iscsi_remove_cmd_from_connection_recovery (
 		}
 		cmd->i_next = cmd->i_prev = NULL;
 	}
-	
-	return(--cr->cmd_count);
+
+	return --cr->cmd_count;
 }
 
 /*	iscsi_discard_cr_cmds_by_expstatsn():
  *
  *
  */
-extern void iscsi_discard_cr_cmds_by_expstatsn (
+void iscsi_discard_cr_cmds_by_expstatsn(
 	iscsi_conn_recovery_t *cr,
-	__u32 exp_statsn)
+	u32 exp_statsn)
 {
-	__u32 dropped_count = 0;
+	u32 dropped_count = 0;
 	iscsi_cmd_t *cmd, *cmd_next;
 	iscsi_session_t *sess = cr->sess;
 
@@ -371,9 +362,9 @@ extern void iscsi_discard_cr_cmds_by_expstatsn (
 		TRACE(TRACE_ERL2, "Dropping Acknowledged ITT: 0x%08x, StatSN:"
 			" 0x%08x, CID: %hu.\n", cmd->init_task_tag,
 				cmd->stat_sn, cr->cid);
-		
+
 		iscsi_remove_cmd_from_connection_recovery(cmd, sess);
-		
+
 		spin_unlock(&cr->conn_recovery_cmd_lock);
 		if (!(SE_CMD(cmd)) ||
 		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
@@ -387,14 +378,15 @@ extern void iscsi_discard_cr_cmds_by_expstatsn (
 		cmd = cmd_next;
 	}
 	spin_unlock(&cr->conn_recovery_cmd_lock);
-	
+
 	TRACE(TRACE_ERL2, "Dropped %u total acknowledged commands on"
 		" CID: %hu less than old ExpStatSN: 0x%08x\n",
 			dropped_count, cr->cid, exp_statsn);
 
 	if (!cr->cmd_count) {
 		TRACE(TRACE_ERL2, "No commands to be reassigned for failed"
-			" connection CID: %hu on SID: %u\n", cr->cid, sess->sid);
+			" connection CID: %hu on SID: %u\n",
+			cr->cid, sess->sid);
 		iscsi_remove_inactive_connection_recovery_entry(cr, sess);
 		iscsi_attach_active_connection_recovery_entry(sess, cr);
 		PYXPRINT("iSCSI connection recovery successful for CID: %hu"
@@ -412,13 +404,13 @@ extern void iscsi_discard_cr_cmds_by_expstatsn (
  *
  *
  */
-extern int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn (iscsi_conn_t *conn)
+int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
 {
-	__u32 dropped_count = 0;
+	u32 dropped_count = 0;
 	iscsi_cmd_t *cmd = NULL, *cmd_next = NULL;
 	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_cmdsn_next = NULL;
 	iscsi_session_t *sess = SESS(conn);
-	
+
 	spin_lock(&sess->cmdsn_lock);
 	ooo_cmdsn = sess->ooo_cmdsn_head;
 	while (ooo_cmdsn) {
@@ -437,7 +429,7 @@ extern int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn (iscsi_conn_t *conn)
 		ooo_cmdsn = ooo_cmdsn_next;
 	}
 	SESS(conn)->ooo_cmdsn_count -= dropped_count;
-	spin_unlock(&sess->cmdsn_lock);	
+	spin_unlock(&sess->cmdsn_lock);
 
 	spin_lock_bh(&conn->cmd_lock);
 	cmd = conn->cmd_head;
@@ -448,7 +440,7 @@ extern int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn (iscsi_conn_t *conn)
 			cmd = cmd_next;
 			continue;
 		}
-		
+
 		iscsi_remove_cmd_from_conn_list(cmd, conn);
 
 		spin_unlock_bh(&conn->cmd_lock);
@@ -460,7 +452,7 @@ extern int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn (iscsi_conn_t *conn)
 			SE_CMD(cmd)->transport_wait_for_tasks(
 					SE_CMD(cmd), 1, 1);
 		spin_lock_bh(&conn->cmd_lock);
-		
+
 		cmd = cmd_next;
 	}
 	spin_unlock_bh(&conn->cmd_lock);
@@ -468,32 +460,32 @@ extern int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn (iscsi_conn_t *conn)
 	TRACE(TRACE_ERL2, "Dropped %u total unacknowledged commands on CID:"
 		" %hu for ExpCmdSN: 0x%08x.\n", dropped_count, conn->cid,
 				sess->exp_cmd_sn);
-	return(0);
+	return 0;
 }
 
 /*	iscsi_prepare_cmds_for_realligance():
  *
  *
  */
-extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
+int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 {
-	__u32 cmd_count = 0;
+	u32 cmd_count = 0;
 	iscsi_cmd_t *cmd, *cmd_next;
 	iscsi_conn_recovery_t *cr;
-	
+
 	/*
 	 * Allocate an iscsi_conn_recovery_t for this connection.
 	 * Each iscsi_cmd_t contains an iscsi_conn_recovery_t pointer
 	 * (iscsi_cmd_t->cr) so we need to allocate this before preparing the
 	 * connection's command list for connection recovery.
 	 */
-	if (!(cr = kmalloc(sizeof(iscsi_conn_recovery_t), GFP_KERNEL))) {
-		TRACE_ERROR("Unable to allocate memory for"
+	cr = kzalloc(sizeof(iscsi_conn_recovery_t), GFP_KERNEL);
+	if (!(cr)) {
+		printk(KERN_ERR "Unable to allocate memory for"
 			" iscsi_conn_recovery_t.\n");
-		return(-1);
+		return -1;
 	}
-	memset(cr, 0, sizeof(iscsi_conn_recovery_t));
-		
+
 	/*
 	 * Only perform connection recovery on ISCSI_INIT_SCSI_CMND or
 	 * ISCSI_INIT_NOP_OUT opcodes.  For all other opcodes call
@@ -510,10 +502,10 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 
 		if ((cmd->iscsi_opcode != ISCSI_INIT_SCSI_CMND) &&
 		    (cmd->iscsi_opcode != ISCSI_INIT_NOP_OUT)) {
-			TRACE(TRACE_ERL2, "Not performing realligence on Opcode:"
-				" 0x%02x, ITT: 0x%08x, CmdSN: 0x%08x, CID: %hu\n",
-				cmd->iscsi_opcode, cmd->init_task_tag, cmd->cmd_sn,
-						conn->cid);
+			TRACE(TRACE_ERL2, "Not performing realligence on"
+				" Opcode: 0x%02x, ITT: 0x%08x, CmdSN: 0x%08x,"
+				" CID: %hu\n", cmd->iscsi_opcode,
+				cmd->init_task_tag, cmd->cmd_sn, conn->cid);
 
 			iscsi_remove_cmd_from_conn_list(cmd, conn);
 
@@ -526,7 +518,7 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 0);
 			spin_lock_bh(&conn->cmd_lock);
-			
+
 			cmd = cmd_next;
 			continue;
 		}
@@ -559,12 +551,14 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 			cmd = cmd_next;
 			continue;
 		}
-		
+
 		cmd_count++;
-		TRACE(TRACE_ERL2, "Preparing Opcode: 0x%02x, ITT: 0x%08x, CmdSN: 0x%08x,"
-			" StatSN: 0x%08x, CID: %hu for realligence.\n", cmd->iscsi_opcode,
-			cmd->init_task_tag, cmd->cmd_sn, cmd->stat_sn, conn->cid);
-		
+		TRACE(TRACE_ERL2, "Preparing Opcode: 0x%02x, ITT: 0x%08x,"
+			" CmdSN: 0x%08x, StatSN: 0x%08x, CID: %hu for"
+			" realligence.\n", cmd->iscsi_opcode,
+			cmd->init_task_tag, cmd->cmd_sn, cmd->stat_sn,
+			conn->cid);
+
 		cmd->deferred_i_state = cmd->i_state;
 		cmd->i_state = ISTATE_IN_CONNECTION_RECOVERY;
 
@@ -572,14 +566,15 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 			iscsi_stop_dataout_timer(cmd);
 
 		cmd->sess = SESS(conn);
-		
+
 		spin_unlock_bh(&conn->cmd_lock);
 		iscsi_free_all_datain_reqs(cmd);
 
 		if ((SE_CMD(cmd)) &&
 		    (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) &&
 		     SE_CMD(cmd)->transport_wait_for_tasks)
-			SE_CMD(cmd)->transport_wait_for_tasks(SE_CMD(cmd), 0, 0);
+			SE_CMD(cmd)->transport_wait_for_tasks(SE_CMD(cmd),
+					0, 0);
 
 		spin_lock_bh(&conn->cmd_lock);
 
@@ -602,23 +597,23 @@ extern int iscsi_prepare_cmds_for_realligance (iscsi_conn_t *conn)
 	spin_lock_init(&cr->conn_recovery_cmd_lock);
 
 	conn->cmd_head = conn->cmd_tail = NULL;
-	
+
 	iscsi_attach_inactive_connection_recovery_entry(SESS(conn), cr);
-	
-	return(0);
+
+	return 0;
 }
 
 /*	iscsi_connection_recovery_transport_reset():
  *
  *
  */
-extern int iscsi_connection_recovery_transport_reset (iscsi_conn_t *conn)
+int iscsi_connection_recovery_transport_reset(iscsi_conn_t *conn)
 {
 	atomic_set(&conn->connection_recovery, 1);
 
 	if (iscsi_close_connection(conn) < 0)
-		return(-1);
-	
-	return(0);
+		return -1;
+
+	return 0;
 }
 
