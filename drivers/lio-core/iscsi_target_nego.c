@@ -165,8 +165,7 @@ static int iscsi_target_check_first_request(
 
 	login->first_request = 0;
 
-	for (param = conn->param_list->param_start; param;
-			param = param->next) {
+	list_for_each_entry(param, &conn->param_list->param_list, p_list) {
 		if (!strncmp(param->name, SESSIONTYPE, 11)) {
 			if (!IS_PSTATE_ACCEPTOR(param)) {
 				printk(KERN_ERR "SessionType key not received"

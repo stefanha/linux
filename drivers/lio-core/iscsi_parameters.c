@@ -189,7 +189,7 @@ void iscsi_print_params(iscsi_param_list_t *param_list)
 {
 	iscsi_param_t *param;
 
-	for (param = param_list->param_start; param; param = param->next)
+	list_for_each_entry(param, &param_list->param_list, p_list)
 		printk(KERN_INFO "%s: %s\n", param->name, param->value);
 }
 
@@ -197,8 +197,9 @@ void iscsi_print_params(iscsi_param_list_t *param_list)
  *
  *
  */
-static iscsi_param_t *iscsi_set_default_param(char *name, char *value, u8 phase,
-		u8 scope,  u8 sender, u16 type_range, u8 use)
+static iscsi_param_t *iscsi_set_default_param(iscsi_param_list_t *param_list,
+		char *name, char *value, u8 phase, u8 scope, u8 sender,
+		u16 type_range, u8 use)
 {
 	iscsi_param_t *param = NULL;
 
@@ -207,6 +208,7 @@ static iscsi_param_t *iscsi_set_default_param(char *name, char *value, u8 phase,
 		printk(KERN_ERR "Unable to allocate memory for parameter.\n");
 		goto out;
 	}
+	INIT_LIST_HEAD(&param->p_list);
 
 	param->name = kzalloc(strlen(name) + 1, GFP_KERNEL);
 	if (!(param->name)) {
@@ -265,6 +267,7 @@ static iscsi_param_t *iscsi_set_default_param(char *name, char *value, u8 phase,
 				param->type_range);
 		goto out;
 	}
+	list_add_tail(&param->p_list, &param_list->param_list);
 
 	return param;
 out:
@@ -277,17 +280,6 @@ out:
 	return NULL;
 }
 
-#define ADD_PARAM_TO_LIST(list, param)			\
-	if (!list)					\
-		list = param;				\
-	else {						\
-		iscsi_param_t *tmp_param = NULL;	\
-		tmp_param = list;			\
-		while (tmp_param && tmp_param->next)	\
-			tmp_param = tmp_param->next;	\
-		tmp_param->next = param;		\
-	}
-
 /*	iscsi_set_default_params():
  *
  *
@@ -296,15 +288,17 @@ out:
 int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 {
 	iscsi_param_t *param = NULL;
-	iscsi_param_list_t *param_list;
+	iscsi_param_list_t *pl;
 
-	param_list = (iscsi_param_list_t *)
-			kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
-	if (!(param_list)) {
+	pl = kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
+	if (!(pl)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" iscsi_param_list_t.\n");
 		return -1 ;
 	}
+	INIT_LIST_HEAD(&pl->param_list);
+	INIT_LIST_HEAD(&pl->extra_response_list);
+	
 	/*
 	 * The format for setting the initial parameter definitions are:
 	 *
@@ -316,181 +310,180 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	 * Typerange:
 	 * Use:
 	 */
-	param = iscsi_set_default_param(AUTHMETHOD, INITIAL_AUTHMETHOD,
+	param = iscsi_set_default_param(pl, AUTHMETHOD, INITIAL_AUTHMETHOD,
 			PHASE_SECURITY, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
 			TYPERANGE_AUTH, USE_INITIAL_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(HEADERDIGEST, INITIAL_HEADERDIGEST,
+
+	param = iscsi_set_default_param(pl, HEADERDIGEST, INITIAL_HEADERDIGEST,
 			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
 			TYPERANGE_DIGEST, USE_INITIAL_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(DATADIGEST, INITIAL_DATADIGEST,
+
+	param = iscsi_set_default_param(pl, DATADIGEST, INITIAL_DATADIGEST,
 			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
 			TYPERANGE_DIGEST, USE_INITIAL_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(MAXCONNECTIONS, INITIAL_MAXCONNECTIONS,
+
+	param = iscsi_set_default_param(pl, MAXCONNECTIONS, INITIAL_MAXCONNECTIONS,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_1_TO_65535, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(SENDTARGETS, INITIAL_SENDTARGETS,
+
+	param = iscsi_set_default_param(pl, SENDTARGETS, INITIAL_SENDTARGETS,
 			PHASE_FFP0, SCOPE_SESSION_WIDE, SENDER_INITIATOR,
 			TYPERANGE_UTF8, 0);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(TARGETNAME, INITIAL_TARGETNAME,
+
+	param = iscsi_set_default_param(pl, TARGETNAME, INITIAL_TARGETNAME,
 			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_ISCSINAME, USE_ALL);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(INITIATORNAME, INITIAL_INITIATORNAME,
+
+	param = iscsi_set_default_param(pl, INITIATORNAME, INITIAL_INITIATORNAME,
 			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_INITIATOR,
 			TYPERANGE_ISCSINAME, USE_INITIAL_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(TARGETALIAS, INITIAL_TARGETALIAS,
+
+	param = iscsi_set_default_param(pl, TARGETALIAS, INITIAL_TARGETALIAS,
 			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_TARGET,
 			TYPERANGE_UTF8, USE_ALL);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(INITIATORALIAS, INITIAL_INITIATORALIAS,
+
+	param = iscsi_set_default_param(pl, INITIATORALIAS, INITIAL_INITIATORALIAS,
 			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_INITIATOR,
 			TYPERANGE_UTF8, USE_ALL);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(TARGETADDRESS, INITIAL_TARGETADDRESS,
+
+	param = iscsi_set_default_param(pl, TARGETADDRESS, INITIAL_TARGETADDRESS,
 			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_TARGET,
 			TYPERANGE_TARGETADDRESS, USE_ALL);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(TARGETPORTALGROUPTAG,
+
+	param = iscsi_set_default_param(pl, TARGETPORTALGROUPTAG,
 			INITIAL_TARGETPORTALGROUPTAG,
 			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_TARGET,
 			TYPERANGE_0_TO_65535, USE_INITIAL_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(INITIALR2T, INITIAL_INITIALR2T,
+
+	param = iscsi_set_default_param(pl, INITIALR2T, INITIAL_INITIALR2T,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_BOOL_OR, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(IMMEDIATEDATA, INITIAL_IMMEDIATEDATA,
+
+	param = iscsi_set_default_param(pl, IMMEDIATEDATA, INITIAL_IMMEDIATEDATA,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_BOOL_AND, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(MAXRECVDATASEGMENTLENGTH,
+
+	param = iscsi_set_default_param(pl, MAXRECVDATASEGMENTLENGTH,
 			INITIAL_MAXRECVDATASEGMENTLENGTH,
 			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
 			TYPERANGE_512_TO_16777215, USE_ALL);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(MAXBURSTLENGTH, INITIAL_MAXBURSTLENGTH,
+
+	param = iscsi_set_default_param(pl, MAXBURSTLENGTH, INITIAL_MAXBURSTLENGTH,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_512_TO_16777215, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(FIRSTBURSTLENGTH,
+
+	param = iscsi_set_default_param(pl, FIRSTBURSTLENGTH,
 			INITIAL_FIRSTBURSTLENGTH,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_512_TO_16777215, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(DEFAULTTIME2WAIT,
+
+	param = iscsi_set_default_param(pl, DEFAULTTIME2WAIT,
 			INITIAL_DEFAULTTIME2WAIT,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_0_TO_3600, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(DEFAULTTIME2RETAIN,
+
+	param = iscsi_set_default_param(pl, DEFAULTTIME2RETAIN,
 			INITIAL_DEFAULTTIME2RETAIN,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_0_TO_3600, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(MAXOUTSTANDINGR2T,
+
+	param = iscsi_set_default_param(pl, MAXOUTSTANDINGR2T,
 			INITIAL_MAXOUTSTANDINGR2T,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_1_TO_65535, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(DATAPDUINORDER, INITIAL_DATAPDUINORDER,
+
+	param = iscsi_set_default_param(pl, DATAPDUINORDER, INITIAL_DATAPDUINORDER,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_BOOL_OR, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(DATASEQUENCEINORDER,
+
+	param = iscsi_set_default_param(pl, DATASEQUENCEINORDER,
 			INITIAL_DATASEQUENCEINORDER,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_BOOL_OR, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(ERRORRECOVERYLEVEL,
+
+	param = iscsi_set_default_param(pl, ERRORRECOVERYLEVEL,
 			INITIAL_ERRORRECOVERYLEVEL,
 			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_0_TO_2, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(SESSIONTYPE, INITIAL_SESSIONTYPE,
+
+	param = iscsi_set_default_param(pl, SESSIONTYPE, INITIAL_SESSIONTYPE,
 			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_INITIATOR,
 			TYPERANGE_SESSIONTYPE, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(IFMARKER, INITIAL_IFMARKER,
-			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
-			TYPERANGE_BOOL_AND, USE_INITIAL_ONLY);
-	if (!(param))
-		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(OFMARKER, INITIAL_OFMARKER,
-			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
-			TYPERANGE_BOOL_AND, USE_INITIAL_ONLY);
-	if (!(param))
-		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(IFMARKINT, INITIAL_IFMARKINT,
-			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
-			TYPERANGE_MARKINT, USE_INITIAL_ONLY);
-	if (!(param))
-		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
-	param = iscsi_set_default_param(OFMARKINT, INITIAL_OFMARKINT,
-			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
-			TYPERANGE_MARKINT, USE_INITIAL_ONLY);
-	if (!(param))
-		goto out;
-	ADD_PARAM_TO_LIST(param_list->param_start, param);
 
-	*param_list_ptr = param_list;
+	param = iscsi_set_default_param(pl, IFMARKER, INITIAL_IFMARKER,
+			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
+			TYPERANGE_BOOL_AND, USE_INITIAL_ONLY);
+	if (!(param))
+		goto out;
+
+	param = iscsi_set_default_param(pl, OFMARKER, INITIAL_OFMARKER,
+			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
+			TYPERANGE_BOOL_AND, USE_INITIAL_ONLY);
+	if (!(param))
+		goto out;
+
+	param = iscsi_set_default_param(pl, IFMARKINT, INITIAL_IFMARKINT,
+			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
+			TYPERANGE_MARKINT, USE_INITIAL_ONLY);
+	if (!(param))
+		goto out;
+
+	param = iscsi_set_default_param(pl, OFMARKINT, INITIAL_OFMARKINT,
+			PHASE_OPERATIONAL, SCOPE_CONNECTION_ONLY, SENDER_BOTH,
+			TYPERANGE_MARKINT, USE_INITIAL_ONLY);
+	if (!(param))
+		goto out;
+
+	*param_list_ptr = pl;
 	return 0;
 out:
-	iscsi_release_param_list(param_list);
+	iscsi_release_param_list(pl);
 	return -1;
 }
 
@@ -505,7 +498,7 @@ int iscsi_set_keys_to_negotiate(
 {
 	iscsi_param_t *param;
 
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		param->state = 0;
 		if (!strcmp(param->name, AUTHMETHOD)) {
 			SET_PSTATE_NEGOTIATE(param);
@@ -579,7 +572,7 @@ int iscsi_set_keys_irrelevant_for_discovery(
 {
 	iscsi_param_t *param;
 
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!strcmp(param->name, MAXCONNECTIONS))
 			param->state &= ~PSTATE_NEGOTIATE;
 		else if (!strcmp(param->name, INITIALR2T))
@@ -627,15 +620,16 @@ int iscsi_copy_param_list(
 	iscsi_param_t *new_param = NULL, *param = NULL;
 	iscsi_param_list_t *param_list = NULL;
 
-	param_list = (iscsi_param_list_t *)
-			kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
+	param_list = kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
 	if (!(param_list)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" iscsi_param_list_t.\n");
 		goto err_out;
 	}
+	INIT_LIST_HEAD(&param_list->param_list);
+	INIT_LIST_HEAD(&param_list->extra_response_list);
 
-	for (param = src_param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &src_param_list->param_list, p_list) {
 		if (!leading && (param->scope & SCOPE_SESSION_WIDE)) {
 			if ((strcmp(param->name, "TargetName") != 0) &&
 			    (strcmp(param->name, "InitiatorName") != 0) &&
@@ -643,8 +637,7 @@ int iscsi_copy_param_list(
 				continue;
 		}
 
-		new_param = (iscsi_param_t *)
-			      kzalloc(sizeof(iscsi_param_t), GFP_KERNEL);
+		new_param = kzalloc(sizeof(iscsi_param_t), GFP_KERNEL);
 		if (!(new_param)) {
 			printk(KERN_ERR "Unable to allocate memory for"
 				" iscsi_param_t.\n");
@@ -679,10 +672,10 @@ int iscsi_copy_param_list(
 		memcpy(new_param->value, param->value, strlen(param->value));
 		new_param->value[strlen(param->value)] = '\0';
 
-		ADD_PARAM_TO_LIST(param_list->param_start, new_param);
+		list_add_tail(&new_param->p_list, &param_list->param_list);
 	}
 
-	if (param_list->param_start)
+	if (!(list_empty(&param_list->param_list)))
 		*dst_param_list = param_list;
 	else {
 		printk(KERN_ERR "No parameters allocated.\n");
@@ -702,18 +695,13 @@ err_out:
  */
 static void iscsi_release_extra_responses(iscsi_param_list_t *param_list)
 {
-	iscsi_extra_response_t *extra_response, *extra_response_prev = NULL;
+	iscsi_extra_response_t *er, *er_tmp;
 
-	for (extra_response = param_list->extra_response_start; extra_response;
-	     extra_response = extra_response->next) {
-		if (extra_response_prev)
-			kfree(extra_response_prev);
-		extra_response_prev = extra_response;
+	list_for_each_entry_safe(er, er_tmp, &param_list->extra_response_list,
+			er_list) {
+		list_del(&er->er_list);
+		kfree(er);
 	}
-	if (extra_response_prev)
-		kfree(extra_response_prev);
-
-	param_list->extra_response_start = NULL;
 }
 
 /*	iscsi_release_param_list():
@@ -722,11 +710,11 @@ static void iscsi_release_extra_responses(iscsi_param_list_t *param_list)
  */
 void iscsi_release_param_list(iscsi_param_list_t *param_list)
 {
-	iscsi_param_t *param = NULL, *param_next = NULL;
+	iscsi_param_t *param, *param_tmp;
 
-	param = param_list->param_start;
-	while (param) {
-		param_next = param->next;
+	list_for_each_entry_safe(param, param_tmp, &param_list->param_list,
+			p_list) {
+		list_del(&param->p_list);
 
 		kfree(param->name);
 		param->name = NULL;
@@ -734,8 +722,6 @@ void iscsi_release_param_list(iscsi_param_list_t *param_list)
 		param->value = NULL;
 		kfree(param);
 		param = NULL;
-
-		param = param_next;
 	}
 
 	iscsi_release_extra_responses(param_list);
@@ -758,7 +744,7 @@ iscsi_param_t *iscsi_find_param_from_key(
 		return NULL;
 	}
 
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!strcmp(key, param->name))
 			break;
 	}
@@ -822,7 +808,7 @@ static int iscsi_add_notunderstood_response(
 	char *value,
 	iscsi_param_list_t *param_list)
 {
-	iscsi_extra_response_t *extra_response, *extra_response_ptr = NULL;
+	iscsi_extra_response_t *extra_response;
 
 	if (strlen(value) > MAX_KEY_VALUE_LENGTH) {
 		printk(KERN_ERR "Value for notunderstood key \"%s\" exceeds %d,"
@@ -836,20 +822,14 @@ static int iscsi_add_notunderstood_response(
 			" iscsi_extra_response_t.\n");
 		return -1;
 	}
+	INIT_LIST_HEAD(&extra_response->er_list);
 
 	strncpy(extra_response->key, key, strlen(key) + 1);
 	strncpy(extra_response->value, NOTUNDERSTOOD,
 			strlen(NOTUNDERSTOOD) + 1);
 
-	if (!param_list->extra_response_start)
-		param_list->extra_response_start = extra_response;
-	else {
-		extra_response_ptr = param_list->extra_response_start;
-		while (extra_response_ptr && extra_response_ptr->next)
-			extra_response_ptr = extra_response_ptr->next;
-		extra_response_ptr->next = extra_response;
-	}
-
+	list_add_tail(&extra_response->er_list,
+			&param_list->extra_response_list);
 	return 0;
 }
 
@@ -1592,7 +1572,7 @@ static int iscsi_enforce_integrity_rules(
 	u32 FirstBurstLength = 0, MaxBurstLength = 0;
 	iscsi_param_t *param = NULL;
 
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!(param->phase & phase))
 			continue;
 		if (!strcmp(param->name, SESSIONTYPE))
@@ -1621,7 +1601,7 @@ static int iscsi_enforce_integrity_rules(
 				OFMarkInt_Reject = 1;
 	}
 
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!(param->phase & phase))
 		       continue;
 		if (!SessionType && (!IS_PSTATE_ACCEPTOR(param) &&
@@ -1789,7 +1769,7 @@ int iscsi_encode_text_output(
 	iscsi_param_list_t *param_list)
 {
 	char *output_buf = NULL;
-	iscsi_extra_response_t *extra_response;
+	iscsi_extra_response_t *er;
 	iscsi_param_t *param;
 
 	output_buf = textbuf + *length;
@@ -1797,7 +1777,7 @@ int iscsi_encode_text_output(
 	if (iscsi_enforce_integrity_rules(phase, param_list) < 0)
 		return -1;
 
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!(param->sender & sender))
 			continue;
 		if (IS_PSTATE_ACCEPTOR(param) &&
@@ -1828,14 +1808,11 @@ int iscsi_encode_text_output(
 		}
 	}
 
-	for (extra_response = param_list->extra_response_start; extra_response;
-	     extra_response = extra_response->next) {
-		*length += sprintf(output_buf, "%s=%s",
-			extra_response->key, extra_response->value);
+	list_for_each_entry(er, &param_list->extra_response_list, er_list) {
+		*length += sprintf(output_buf, "%s=%s", er->key, er->value);
 		*length += 1;
 		output_buf = textbuf + *length;
-		TRACE(TRACE_PARAM, "Sending key: %s=%s\n",
-			extra_response->key, extra_response->value);
+		TRACE(TRACE_PARAM, "Sending key: %s=%s\n", er->key, er->value);
 	}
 	iscsi_release_extra_responses(param_list);
 
@@ -1851,7 +1828,7 @@ int iscsi_check_negotiated_keys(iscsi_param_list_t *param_list)
 	int ret = 0;
 	iscsi_param_t *param;
 
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (IS_PSTATE_NEGOTIATE(param) &&
 		    IS_PSTATE_PROPOSER(param) &&
 		    !IS_PSTATE_RESPONSE_GOT(param) &&
@@ -1918,7 +1895,7 @@ void iscsi_set_connection_parameters(
 
 	printk(KERN_INFO "-------------------------------------------------------"
 			"-----------\n");
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!IS_PSTATE_ACCEPTOR(param) && !IS_PSTATE_PROPOSER(param))
 			continue;
 		if (!strcmp(param->name, AUTHMETHOD)) {
@@ -1975,7 +1952,7 @@ void iscsi_set_session_parameters(
 
 	printk(KERN_INFO "----------------------------------------------------"
 			"--------------\n");
-	for (param = param_list->param_start; param; param = param->next) {
+	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!IS_PSTATE_ACCEPTOR(param) && !IS_PSTATE_PROPOSER(param))
 			continue;
 		if (!strcmp(param->name, INITIATORNAME)) {

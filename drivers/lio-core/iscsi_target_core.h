@@ -280,8 +280,8 @@ typedef struct iscsi_data_count_s {
 } ____cacheline_aligned iscsi_data_count_t;
 
 typedef struct iscsi_param_list_s {
-	struct iscsi_param_s	*param_start;
-	struct iscsi_extra_response_s *extra_response_start;
+	struct list_head	param_list;
+	struct list_head	extra_response_list;
 } ____cacheline_aligned iscsi_param_list_t;
 
 typedef struct iscsi_datain_req_s {

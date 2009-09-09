@@ -4,7 +4,7 @@
 typedef struct iscsi_extra_response_s {
 	char key[64];
 	char value[32];
-	struct iscsi_extra_response_s *next;
+	struct list_head er_list;
 } iscsi_extra_response_t;
 
 typedef struct iscsi_param_s {
@@ -18,7 +18,7 @@ typedef struct iscsi_param_s {
 	u8 use;
 	u16 type_range;
 	u32 state;
-	struct iscsi_param_s *next;
+	struct list_head p_list;
 } iscsi_param_t;
 
 extern struct iscsi_global_s *iscsi_global;
