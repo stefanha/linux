@@ -956,10 +956,8 @@ typedef struct iscsi_global_s {
 	iscsi_debug_erl_t	*debug_erl;
 	spinlock_t		debug_erl_lock;
 #endif /* DEBUG_ERL */
-	se_thread_set_t		*active_ts_head;
-	se_thread_set_t		*active_ts_tail;
-	se_thread_set_t		*inactive_ts_head;
-	se_thread_set_t		*inactive_ts_tail;
+	struct list_head	active_ts_list;
+	struct list_head	inactive_ts_list;
 } ____cacheline_aligned iscsi_global_t;
 
 #define ISCSI_DEBUG_ERL(g)	((iscsi_debug_erl_t *)(g)->debug_erl)

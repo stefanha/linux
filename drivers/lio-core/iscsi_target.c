@@ -835,6 +835,8 @@ static int init_iscsi_global(iscsi_global_t *global)
 	INIT_LIST_HEAD(&global->g_tiqn_list);
 	INIT_LIST_HEAD(&global->g_tpg_list);
 	INIT_LIST_HEAD(&global->g_np_list);
+	INIT_LIST_HEAD(&global->active_ts_list);
+	INIT_LIST_HEAD(&global->inactive_ts_list);
 
 	return 0;
 }

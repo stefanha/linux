@@ -90,10 +90,8 @@ typedef struct se_thread_set_s {
 	struct task_struct	*rx_thread;
 	/* OS descriptor for tx thread */
 	struct task_struct	*tx_thread;
-	/* next se_thread_set_t in list */
-	struct se_thread_set_s *next;
-	/* previous se_thread_set_t in list */
-	struct se_thread_set_s *prev;
+	/* se_thread_set_t in list list head*/
+	struct list_head	ts_list;
 } ____cacheline_aligned se_thread_set_t;
 
 #endif   /*** ISCSI_THREAD_QUEUE_H ***/

@@ -34,11 +34,11 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/list.h>
 #include <iscsi_linux_defs.h>
 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
-#include <iscsi_lists.h>
 #include <iscsi_target_core.h>
 
 #undef ISCSI_THREAD_QUEUE_C
@@ -54,8 +54,7 @@ static void iscsi_add_ts_to_active_list(se_thread_set_t *ts)
 			ts->thread_id);
 #endif
 	spin_lock(&iscsi_global->active_ts_lock);
-	ADD_ENTRY_TO_LIST(ts, iscsi_global->active_ts_head,
-			iscsi_global->active_ts_tail);
+	list_add_tail(&ts->ts_list, &iscsi_global->active_ts_list);
 	iscsi_global->active_ts++;
 	spin_unlock(&iscsi_global->active_ts_lock);
 }
@@ -71,8 +70,7 @@ extern void iscsi_add_ts_to_inactive_list(se_thread_set_t *ts)
 			ts->thread_id);
 #endif
 	spin_lock(&iscsi_global->inactive_ts_lock);
-	ADD_ENTRY_TO_LIST(ts, iscsi_global->inactive_ts_head,
-			iscsi_global->inactive_ts_tail);
+	list_add_tail(&ts->ts_list, &iscsi_global->inactive_ts_list);
 	iscsi_global->inactive_ts++;
 	spin_unlock(&iscsi_global->inactive_ts_lock);
 }
@@ -88,8 +86,7 @@ static void iscsi_del_ts_from_active_list(se_thread_set_t *ts)
 			ts->thread_id);
 #endif
 	spin_lock(&iscsi_global->active_ts_lock);
-	REMOVE_ENTRY_FROM_LIST(ts, iscsi_global->active_ts_head,
-			iscsi_global->active_ts_tail);
+	list_del(&ts->ts_list);
 	iscsi_global->active_ts--;
 	spin_unlock(&iscsi_global->active_ts_lock);
 
@@ -106,21 +103,16 @@ static se_thread_set_t *iscsi_get_ts_from_inactive_list(void)
 	se_thread_set_t *ts;
 
 	spin_lock(&iscsi_global->inactive_ts_lock);
-	if (!iscsi_global->inactive_ts_head) {
+	if (list_empty(&iscsi_global->inactive_ts_list)) {
 		spin_unlock(&iscsi_global->inactive_ts_lock);
 		return NULL;
 	}
 
-	ts = iscsi_global->inactive_ts_head;
-	iscsi_global->inactive_ts_head = iscsi_global->inactive_ts_head->next;
+	list_for_each_entry(ts, &iscsi_global->inactive_ts_list, ts_list)
+		break;
 
-	ts->next = ts->prev = NULL;
+	list_del(&ts->ts_list);
 	iscsi_global->inactive_ts--;
-
-	if (!iscsi_global->inactive_ts_head)
-		iscsi_global->inactive_ts_tail = NULL;
-	else
-		iscsi_global->inactive_ts_head->prev = NULL;
 	spin_unlock(&iscsi_global->inactive_ts_lock);
 
 	return ts;
@@ -143,8 +135,8 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 			return allocated_thread_pair_count;
 		}
 
-		memset(ts, 0, sizeof(se_thread_set_t));
 		ts->status = ISCSI_THREAD_SET_FREE;
+		INIT_LIST_HEAD(&ts->ts_list);
 		spin_lock_init(&ts->ts_state_lock);
 		init_MUTEX_LOCKED(&ts->stop_active_sem);
 		init_MUTEX_LOCKED(&ts->rx_create_sem);
