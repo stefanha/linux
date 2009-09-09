@@ -66,6 +66,7 @@
  */
 static void iscsi_login_init_conn(iscsi_conn_t *conn)
 {
+	INIT_LIST_HEAD(&conn->conn_list);
 	INIT_LIST_HEAD(&conn->conn_cmd_list);
 	INIT_LIST_HEAD(&conn->immed_queue_list);
 	INIT_LIST_HEAD(&conn->response_queue_list);
@@ -222,6 +223,7 @@ static int iscsi_login_zero_tsih_s1(
 	sess->init_task_tag	= pdu->init_task_tag;
 	memcpy((void *)&sess->isid, (void *)pdu->isid, 6);
 	sess->exp_cmd_sn	= pdu->cmd_sn;
+	INIT_LIST_HEAD(&sess->sess_conn_list);
 	INIT_LIST_HEAD(&sess->cr_active_list);
 	INIT_LIST_HEAD(&sess->cr_inactive_list);
 	init_MUTEX_LOCKED(&sess->async_msg_sem);
@@ -637,7 +639,7 @@ static int iscsi_post_login_handler(
 			" %s:%hu,%hu\n", conn->cid, ip, ip_np,
 				np->np_port, tpg->tpgt);
 
-		ADD_ENTRY_TO_LIST(conn, sess->conn_head, sess->conn_tail);
+		list_add_tail(&conn->conn_list, &sess->sess_conn_list);
 		atomic_inc(&sess->nconn);
 		printk(KERN_INFO "Incremented iSCSI Connection count to %hu from node:"
 			" %s\n", atomic_read(&sess->nconn),
@@ -672,7 +674,7 @@ static int iscsi_post_login_handler(
 		conn->cid, ip, ip_np, np->np_port, tpg->tpgt);
 
 	spin_lock_bh(&sess->conn_lock);
-	ADD_ENTRY_TO_LIST(conn, sess->conn_head, sess->conn_tail);
+	list_add_tail(&conn->conn_list, &sess->sess_conn_list);
 	atomic_inc(&sess->nconn);
 	printk(KERN_INFO "Incremented iSCSI Connection count to %hu from node:"
 		" %s\n", atomic_read(&sess->nconn),

@@ -2688,7 +2688,7 @@ int iscsi_logout_closesession(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
 	iscsi_inc_session_usage_count(sess);
 
 	spin_lock_bh(&sess->conn_lock);
-	for (conn_p = sess->conn_head; conn_p; conn_p = conn_p->next) {
+	list_for_each_entry(conn_p, &sess->sess_conn_list, conn_list) {
 		if (conn_p->conn_state != TARG_CONN_STATE_LOGGED_IN)
 			continue;
 
@@ -3235,7 +3235,7 @@ static void iscsi_build_conn_drop_async_message(iscsi_conn_t *conn)
 	 * Only send a Asynchronous Message on connections whos network
 	 * interface is still functional.
 	 */
-	for (conn_p = SESS(conn)->conn_head; conn_p; conn_p = conn_p->next) {
+	list_for_each_entry(conn_p, &SESS(conn)->sess_conn_list, conn_list) {
 		if ((conn_p->conn_state == TARG_CONN_STATE_LOGGED_IN) &&
 		    (iscsi_check_for_active_network_device(conn_p))) {
 			iscsi_inc_conn_usage_count(conn_p);
@@ -5236,7 +5236,7 @@ static void iscsi_logout_post_handler_diffcid(
 		return;
 
 	spin_lock_bh(&sess->conn_lock);
-	for (l_conn = sess->conn_head; l_conn; l_conn = l_conn->next) {
+	list_for_each_entry(l_conn, &sess->sess_conn_list, conn_list) {
 		if (l_conn->cid == cid) {
 			iscsi_inc_conn_usage_count(l_conn);
 			break;
@@ -5331,7 +5331,7 @@ void iscsi_fail_session(iscsi_session_t *sess)
 	iscsi_conn_t *conn;
 
 	spin_lock_bh(&sess->conn_lock);
-	for (conn = sess->conn_head; conn; conn = conn->next) {
+	list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
 		TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_CLEANUP_WAIT.\n");
 		conn->conn_state = TARG_CONN_STATE_CLEANUP_WAIT;
 	}
@@ -5348,30 +5348,23 @@ void iscsi_fail_session(iscsi_session_t *sess)
 int iscsi_free_session(iscsi_session_t *sess)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
-	iscsi_conn_t *conn, *conn_next;
+	iscsi_conn_t *conn, *conn_tmp;
 
 	spin_lock_bh(&sess->conn_lock);
 	atomic_set(&sess->sleep_on_sess_wait_sem, 1);
 
-	conn = sess->conn_head;
-	while (conn && (conn_count != 0)) {
+	list_for_each_entry_safe(conn, conn_tmp, &sess->sess_conn_list,
+			conn_list) {
+		if (conn_count == 0)
+			break;
+
 		iscsi_inc_conn_usage_count(conn);
 		spin_unlock_bh(&sess->conn_lock);
 		iscsi_cause_connection_reinstatement(conn, 1);
 		spin_lock_bh(&sess->conn_lock);
 
-		if (!sess->conn_head)
-			conn_next = NULL;
-		else {
-			if (sess->conn_head == conn)
-				conn_next = sess->conn_head->next;
-			else
-				conn_next = sess->conn_head;
-		}
-
 		iscsi_dec_conn_usage_count(conn);
 		conn_count--;
-		conn = conn_next;
 	}
 
 	if (atomic_read(&sess->nconn)) {
@@ -5394,42 +5387,29 @@ void iscsi_stop_session(
 	int connection_sleep)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
-	iscsi_conn_t *conn, *conn_next = NULL;
+	iscsi_conn_t *conn, *conn_tmp = NULL;
 
 	spin_lock_bh(&sess->conn_lock);
 	if (session_sleep)
 		atomic_set(&sess->sleep_on_sess_wait_sem, 1);
 
 	if (connection_sleep) {
-		conn = sess->conn_head;
-		while (conn && (conn_count != 0)) {
+		list_for_each_entry_safe(conn, conn_tmp, &sess->sess_conn_list,
+				conn_list) {
+			if (conn_count == 0)
+				break;
+
 			iscsi_inc_conn_usage_count(conn);
 			spin_unlock_bh(&sess->conn_lock);
 			iscsi_cause_connection_reinstatement(conn, 1);
 			spin_lock_bh(&sess->conn_lock);
 
-			if (!sess->conn_head)
-				conn_next = NULL;
-			else {
-				if (sess->conn_head == conn)
-					conn_next = sess->conn_head->next;
-				else
-					conn_next = sess->conn_head;
-			}
-
 			iscsi_dec_conn_usage_count(conn);
 			conn_count--;
-			conn = conn_next;
 		}
 	} else {
-		conn = sess->conn_head;
-		while (conn) {
-			conn_next = conn->next;
-
+		list_for_each_entry(conn, &sess->sess_conn_list, conn_list)
 			iscsi_cause_connection_reinstatement(conn, 0);
-
-			conn = conn_next;
-		}
 	}
 
 	if (session_sleep && atomic_read(&sess->nconn)) {

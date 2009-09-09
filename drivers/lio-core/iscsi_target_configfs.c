@@ -1535,7 +1535,7 @@ static ssize_t lio_target_initiator_nacl_info(void *p, char *page)
 				" Connections]-------------------------\n");
 
 		spin_lock(&sess->conn_lock);
-		for (conn = sess->conn_head; conn; conn = conn->next) {
+		list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
 			rb += sprintf(page+rb, "CID: %hu  Connection"
 					" State: ", conn->cid);
 			switch (conn->conn_state) {

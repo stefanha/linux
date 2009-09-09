@@ -1019,7 +1019,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 
 		spin_lock(&sess->conn_lock);
-		for (conn = sess->conn_head; conn; conn = conn->next) {
+		list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
 			switch (conn->conn_state) {
 			case TARG_CONN_STATE_IN_LOGIN:
 				strcpy(state_str, "login");

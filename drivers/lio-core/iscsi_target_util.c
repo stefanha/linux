@@ -131,7 +131,7 @@ inline void iscsi_ack_from_expstatsn(iscsi_conn_t *conn, u32 exp_statsn)
  */
 void iscsi_remove_conn_from_list(iscsi_session_t *sess, iscsi_conn_t *conn)
 {
-	REMOVE_ENTRY_FROM_LIST(conn, sess->conn_head, sess->conn_tail);
+	list_del(&conn->conn_list);
 }
 
 /*	iscsi_add_r2t_to_list():
@@ -1613,7 +1613,7 @@ iscsi_conn_t *iscsi_get_conn_from_cid(iscsi_session_t *sess, u16 cid)
 	iscsi_conn_t *conn;
 
 	spin_lock_bh(&sess->conn_lock);
-	for (conn = sess->conn_head; conn; conn = conn->next) {
+	list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
 		if ((conn->cid == cid) &&
 		    (conn->conn_state == TARG_CONN_STATE_LOGGED_IN)) {
 			iscsi_inc_conn_usage_count(conn);
@@ -1635,7 +1635,7 @@ iscsi_conn_t *iscsi_get_conn_from_cid_rcfr(iscsi_session_t *sess, u16 cid)
 	iscsi_conn_t *conn;
 
 	spin_lock_bh(&sess->conn_lock);
-	for (conn = sess->conn_head; conn; conn = conn->next) {
+	list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
 		if (conn->cid == cid) {
 			iscsi_inc_conn_usage_count(conn);
 			spin_lock(&conn->state_lock);
@@ -2291,7 +2291,7 @@ void iscsi_print_session_params(iscsi_session_t *sess)
 	printk(KERN_INFO "-----------------------------[Session Params for"
 		" SID: %u]-----------------------------\n", sess->sid);
 	spin_lock_bh(&sess->conn_lock);
-	for (conn = sess->conn_head; conn; conn = conn->next)
+	list_for_each_entry(conn, &sess->sess_conn_list, conn_list)
 		iscsi_dump_conn_ops(conn->conn_ops);
 	spin_unlock_bh(&sess->conn_lock);
 

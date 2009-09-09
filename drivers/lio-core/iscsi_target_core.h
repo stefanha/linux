@@ -580,9 +580,8 @@ typedef struct iscsi_conn_s {
 	struct iscsi_session_s	*sess;
 	/* Pointer to thread_set in use for this conn's threads */
 	struct se_thread_set_s	*thread_set;
-	/* Pointer to next connection in session */
-	struct iscsi_conn_s 	*next;
-	struct iscsi_conn_s	*prev;
+	/* list_head for session connection list */
+	struct list_head	conn_list;
 } ____cacheline_aligned iscsi_conn_t;
 
 #include <iscsi_parameters.h>
@@ -649,10 +648,8 @@ typedef struct iscsi_session_s {
 	atomic_t		session_waiting_on_uc;
 	atomic_t		sleep_on_sess_wait_sem;
 	atomic_t		transport_wait_cmds;
-	/* Pointer to start of connection list */
-	iscsi_conn_t		*conn_head;
-	/* Pointer to end of connection list */
-	iscsi_conn_t		*conn_tail;
+	/* connection list */
+	struct list_head	sess_conn_list;
 	struct list_head	cr_active_list;
 	struct list_head	cr_inactive_list;
 	spinlock_t		cmdsn_lock;
