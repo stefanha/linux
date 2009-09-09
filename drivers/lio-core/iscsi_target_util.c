@@ -152,19 +152,18 @@ int iscsi_add_r2t_to_list(
 		printk(KERN_ERR "Unable to allocate memory for iscsi_r2t_t.\n");
 		return -1;
 	}
+	INIT_LIST_HEAD(&r2t->r2t_list);
 
 	r2t->recovery_r2t = recovery;
 	r2t->r2t_sn = (!r2t_sn) ? cmd->r2t_sn++ : r2t_sn;
 	r2t->offset = offset;
 	r2t->xfer_len = xfer_len;
-
-	ADD_ENTRY_TO_LIST(r2t, cmd->r2t_head, cmd->r2t_tail);
+	list_add_tail(&r2t->r2t_list, &cmd->cmd_r2t_list);
 	spin_unlock_bh(&cmd->r2t_lock);
 
 	iscsi_add_cmd_to_immediate_queue(cmd, CONN(cmd), ISTATE_SEND_R2T);
 
 	spin_lock_bh(&cmd->r2t_lock);
-
 	return 0;
 }
 
@@ -180,7 +179,7 @@ iscsi_r2t_t *iscsi_get_r2t_for_eos(
 	iscsi_r2t_t *r2t;
 
 	spin_lock_bh(&cmd->r2t_lock);
-	for (r2t = cmd->r2t_head; r2t; r2t = r2t->next) {
+	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
 		if ((r2t->offset <= offset) &&
 		    (r2t->offset + r2t->xfer_len) >= (offset + length))
 			break;
@@ -205,7 +204,7 @@ iscsi_r2t_t *iscsi_get_r2t_from_list(iscsi_cmd_t *cmd)
 	iscsi_r2t_t *r2t;
 
 	spin_lock_bh(&cmd->r2t_lock);
-	for (r2t = cmd->r2t_head; r2t; r2t = r2t->next) {
+	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
 		if (!r2t->sent_r2t)
 			break;
 	}
@@ -226,7 +225,7 @@ iscsi_r2t_t *iscsi_get_r2t_from_list(iscsi_cmd_t *cmd)
  */
 void iscsi_free_r2t(iscsi_r2t_t *r2t, iscsi_cmd_t *cmd)
 {
-	REMOVE_ENTRY_FROM_LIST(r2t, cmd->r2t_head, cmd->r2t_tail);
+	list_del(&r2t->r2t_list);
 	kmem_cache_free(lio_r2t_cache, r2t);
 }
 
@@ -236,14 +235,12 @@ void iscsi_free_r2t(iscsi_r2t_t *r2t, iscsi_cmd_t *cmd)
  */
 void iscsi_free_r2ts_from_list(iscsi_cmd_t *cmd)
 {
-	iscsi_r2t_t *r2t = NULL, *r2t_next = NULL;
+	iscsi_r2t_t *r2t, *r2t_tmp;
 
 	spin_lock_bh(&cmd->r2t_lock);
-	r2t = cmd->r2t_head;
-	while (r2t) {
-		r2t_next = r2t->next;
+	list_for_each_entry_safe(r2t, r2t_tmp, &cmd->cmd_r2t_list, r2t_list) {
+		list_del(&r2t->r2t_list);
 		kmem_cache_free(lio_r2t_cache, r2t);
-		r2t = r2t_next;
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 }
@@ -264,6 +261,8 @@ iscsi_cmd_t *iscsi_allocate_cmd(iscsi_conn_t *conn)
 
 	cmd->conn	= conn;
 	INIT_LIST_HEAD(&cmd->i_list);
+	INIT_LIST_HEAD(&cmd->datain_list);
+	INIT_LIST_HEAD(&cmd->cmd_r2t_list);
 	init_MUTEX_LOCKED(&cmd->reject_sem);
 	init_MUTEX_LOCKED(&cmd->unsolicited_data_sem);
 	spin_lock_init(&cmd->datain_lock);
@@ -483,7 +482,7 @@ iscsi_r2t_t *iscsi_get_holder_for_r2tsn(
 	iscsi_r2t_t *r2t;
 
 	spin_lock_bh(&cmd->r2t_lock);
-	for (r2t = cmd->r2t_head; r2t; r2t = r2t->next) {
+	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
 		if (r2t->r2t_sn == r2t_sn)
 			break;
 	}

@@ -641,7 +641,7 @@ int iscsi_task_reassign_prepare_write(
 	se_cmd_t *se_cmd = se_tmr->ref_cmd;
 	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
 	iscsi_pdu_t *pdu = NULL;
-	iscsi_r2t_t *r2t = NULL, *r2t_next = NULL;
+	iscsi_r2t_t *r2t = NULL, *r2t_tmp;
 	int first_incomplete_r2t = 1, i = 0;
 
 	/*
@@ -672,32 +672,25 @@ int iscsi_task_reassign_prepare_write(
 	 * so iscsi_build_r2ts_for_cmd() in iscsi_task_reassign_complete_write()
 	 * will resend a new R2T for the DataOUT sequences in question.
 	 */
-	r2t = iscsi_get_holder_for_r2tsn(cmd, 0);
-	if (!(r2t))
-		return -1;
-
 	spin_lock_bh(&cmd->r2t_lock);
-	while (r2t) {
-		r2t_next = r2t->next;
+	if (list_empty(&cmd->cmd_r2t_list)) {
+		spin_unlock_bh(&cmd->r2t_lock);
+		return -1;
+	}
 
-		if (r2t->r2t_sn >= tmr_req->exp_data_sn) {
-			r2t = r2t_next;
+	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
+
+		if (r2t->r2t_sn >= tmr_req->exp_data_sn)
 			continue;
-		}
-
 		/*
 		 * Safely ignore Recovery R2Ts and R2Ts that have completed
 		 * DataOUT sequences.
 		 */
-		if (r2t->seq_complete) {
-			r2t = r2t_next;
+		if (r2t->seq_complete)
 			continue;
-		}
 
-		if (r2t->recovery_r2t) {
-			r2t = r2t_next;
+		if (r2t->recovery_r2t)
 			continue;
-		}
 
 		/*
 		 *                 DataSequenceInOrder=Yes:
@@ -799,7 +792,6 @@ int iscsi_task_reassign_prepare_write(
 
 next:
 		cmd->outstanding_r2ts--;
-		r2t = r2t_next;
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
@@ -818,13 +810,14 @@ drop_unacknowledged_r2ts:
 	cmd->cmd_flags &= ~ICF_SENT_LAST_R2T;
 	cmd->r2t_sn = tmr_req->exp_data_sn;
 
-	r2t = iscsi_get_holder_for_r2tsn(cmd, tmr_req->exp_data_sn);
-	if (!(r2t))
-		return 0;
-
 	spin_lock_bh(&cmd->r2t_lock);
-	while (r2t) {
-		r2t_next = r2t->next;
+	list_for_each_entry_safe(r2t, r2t_tmp, &cmd->cmd_r2t_list, r2t_list) {
+		/*
+		 * Skip up to the R2T Sequence number provided by the
+		 * iSCSI TASK_REASSIGN TMR
+		 */
+		if (r2t->r2t_sn < tmr_req->exp_data_sn)
+			continue;
 
 		if (r2t->seq_complete) {
 			printk(KERN_ERR "Initiator is requesting R2Ts from"
@@ -839,7 +832,6 @@ drop_unacknowledged_r2ts:
 
 		if (r2t->recovery_r2t) {
 			iscsi_free_r2t(r2t, cmd);
-			r2t = r2t_next;
 			continue;
 		}
 
@@ -866,8 +858,6 @@ drop_unacknowledged_r2ts:
 
 		cmd->outstanding_r2ts--;
 		iscsi_free_r2t(r2t, cmd);
-
-		r2t = r2t_next;
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 

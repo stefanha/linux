@@ -1234,16 +1234,15 @@ static int iscsi_set_dataout_timeout_values(
 	}
 
 	spin_lock_bh(&cmd->r2t_lock);
-	if (!cmd->r2t_head) {
-		printk(KERN_ERR "cmd->r2t_head is NULL!\n");
+	if (list_empty(&cmd->cmd_r2t_list)) {
+		printk(KERN_ERR "cmd->cmd_r2t_list is empty!\n");
 		spin_unlock_bh(&cmd->r2t_lock);
 		return -1;
 	}
 
-	for (r2t = cmd->r2t_head; r2t; r2t = r2t->next) {
+	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list)
 		if (r2t->sent_r2t && !r2t->recovery_r2t && !r2t->seq_complete)
 			break;
-	}
 
 	if (!r2t) {
 		printk(KERN_ERR "Unable to locate any incomplete DataOUT"
@@ -1256,7 +1255,6 @@ static int iscsi_set_dataout_timeout_values(
 	*length = r2t->xfer_len;
 
 	spin_unlock_bh(&cmd->r2t_lock);
-
 	return 0;
 }
 

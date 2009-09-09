@@ -57,6 +57,7 @@ iscsi_datain_req_t *iscsi_allocate_datain_req(void)
 				" iscsi_datain_req_t\n");
 		return NULL;
 	}
+	INIT_LIST_HEAD(&dr->dr_list);
 
 	return dr;
 }
@@ -64,14 +65,14 @@ iscsi_datain_req_t *iscsi_allocate_datain_req(void)
 void iscsi_attach_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
 {
 	spin_lock(&cmd->datain_lock);
-	ADD_ENTRY_TO_LIST(dr, cmd->datain_req_head, cmd->datain_req_tail);
+	list_add_tail(&dr->dr_list, &cmd->datain_list);
 	spin_unlock(&cmd->datain_lock);
 }
 
 void iscsi_free_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
 {
 	spin_lock(&cmd->datain_lock);
-	REMOVE_ENTRY_FROM_LIST(dr, cmd->datain_req_head, cmd->datain_req_tail);
+	list_del(&dr->dr_list);
 	spin_unlock(&cmd->datain_lock);
 
 	kmem_cache_free(lio_dr_cache, dr);
@@ -79,28 +80,29 @@ void iscsi_free_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
 
 void iscsi_free_all_datain_reqs(iscsi_cmd_t *cmd)
 {
-	iscsi_datain_req_t *dr, *dr_next = NULL;
+	iscsi_datain_req_t *dr, *dr_tmp;
 
 	spin_lock(&cmd->datain_lock);
-	dr = cmd->datain_req_head;
-	while (dr) {
-		dr_next = dr->next;
+	list_for_each_entry_safe(dr, dr_tmp, &cmd->datain_list, dr_list) {
+		list_del(&dr->dr_list);
 		kmem_cache_free(lio_dr_cache, dr);
-		dr = dr_next;
 	}
-	cmd->datain_req_head = cmd->datain_req_tail = NULL;
 	spin_unlock(&cmd->datain_lock);
 }
 
 iscsi_datain_req_t *iscsi_get_datain_req(iscsi_cmd_t *cmd)
 {
-	if (!cmd->datain_req_head) {
-		printk(KERN_ERR "cmd->datain_req_head is NULL for ITT: 0x%08x\n",
-				cmd->init_task_tag);
+	iscsi_datain_req_t *dr;
+
+	if (list_empty(&cmd->datain_list)) {
+		printk(KERN_ERR "cmd->datain_list is empty for ITT:"
+			" 0x%08x\n", cmd->init_task_tag);
 		return NULL;
 	}
+	list_for_each_entry(dr, &cmd->datain_list, dr_list)
+		break;
 
-	return cmd->datain_req_head;
+	return dr;
 }
 
 /*	iscsi_set_datain_values_yes_and_yes():

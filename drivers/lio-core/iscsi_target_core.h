@@ -298,8 +298,7 @@ typedef struct iscsi_datain_req_s {
 	u32			next_burst_len;
 	u32			read_data_done;
 	u32			seq_send_order;
-	struct iscsi_datain_req_s *next;
-	struct iscsi_datain_req_s *prev;
+	struct list_head	dr_list;
 } ____cacheline_aligned iscsi_datain_req_t;
 
 typedef struct iscsi_ooo_cmdsn_s {
@@ -327,8 +326,7 @@ typedef struct iscsi_r2t_s {
 	u32			offset;
 	u32			targ_xfer_tag;
 	u32			xfer_len;
-	struct iscsi_r2t_s	*next;
-	struct iscsi_r2t_s	*prev;
+	struct list_head	r2t_list;
 } ____cacheline_aligned iscsi_r2t_t;
 
 struct se_cmd_s;
@@ -445,17 +443,13 @@ typedef struct iscsi_cmd_s {
 	spinlock_t		error_lock;
 	/* spinlock for adding R2Ts */
 	spinlock_t		r2t_lock;
-	/* Start of DataIN list */
-	iscsi_datain_req_t	*datain_req_head;
-	/* End of DataIN list */
-	iscsi_datain_req_t	*datain_req_tail;
+	/* DataIN List */
+	struct list_head	datain_list;
+	/* R2T List */
+	struct list_head	cmd_r2t_list;
 	struct semaphore	reject_sem;
 	/* Semaphore used for allocating buffer */
 	struct semaphore	unsolicited_data_sem;
-	/* Start of R2T list */
-	iscsi_r2t_t		*r2t_head;
-	/* End of R2T list */
-	iscsi_r2t_t		*r2t_tail;
 	/* Timer for DataOUT */
 	struct timer_list	dataout_timer;
 	/* Iovecs for miscellaneous purposes */
@@ -608,8 +602,6 @@ typedef struct iscsi_conn_recovery_s {
 	struct semaphore		time2wait_sem;
 	struct timer_list		time2retain_timer;
 	struct iscsi_session_s	*sess;
-//	struct iscsi_conn_recovery_s *next;
-//	struct iscsi_conn_recovery_s *prev;
 	struct list_head	cr_list;
 }  ____cacheline_aligned iscsi_conn_recovery_t;
 
@@ -664,11 +656,7 @@ typedef struct iscsi_session_s {
 	iscsi_conn_t		*conn_head;
 	/* Pointer to end of connection list */
 	iscsi_conn_t		*conn_tail;
-//	iscsi_conn_recovery_t	*cr_a_head;
-//	iscsi_conn_recovery_t	*cr_a_tail;
 	struct list_head	cr_active_list;
-//	iscsi_conn_recovery_t	*cr_i_head;
-//	iscsi_conn_recovery_t	*cr_i_tail;
 	struct list_head	cr_inactive_list;
 	spinlock_t		cmdsn_lock;
 	spinlock_t		conn_lock;
