@@ -266,8 +266,7 @@ typedef struct iscsi_queue_req_s {
 	void			*queue_se_obj_ptr;
 	struct se_obj_lun_type_s *queue_se_obj_api;
 	struct iscsi_cmd_s	*cmd;
-	struct iscsi_queue_req_s *next;
-	struct iscsi_queue_req_s *prev;
+	struct list_head	qr_list;
 } ____cacheline_aligned iscsi_queue_req_t;
 
 typedef struct iscsi_data_count_s {
@@ -559,7 +558,7 @@ typedef struct iscsi_conn_s {
 	struct timer_list	nopin_timer;
 	struct timer_list	nopin_response_timer;
 	struct timer_list	transport_timer;;
-	/* Spinlock used for add/deleting cmd's from cmd_head */
+	/* Spinlock used for add/deleting cmd's from conn_cmd_list */
 	spinlock_t		cmd_lock;
 	spinlock_t		conn_usage_lock;
 	spinlock_t		immed_queue_lock;
@@ -569,10 +568,8 @@ typedef struct iscsi_conn_s {
 	spinlock_t		state_lock;
 	/* list_head of iscsi_cmd_t for this connection */
 	struct list_head	conn_cmd_list;
-	iscsi_queue_req_t	*immed_queue_head;
-	iscsi_queue_req_t	*immed_queue_tail;
-	iscsi_queue_req_t	*response_queue_head;
-	iscsi_queue_req_t	*response_queue_tail;
+	struct list_head	immed_queue_list;
+	struct list_head	response_queue_list;
 	iscsi_conn_ops_t	*conn_ops;
 	iscsi_param_list_t	*param_list;
 	/* Used for per connection auth state machine */

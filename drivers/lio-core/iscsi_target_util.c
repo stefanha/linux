@@ -820,6 +820,7 @@ void iscsi_add_cmd_to_immediate_queue(
 				" iscsi_queue_req_t\n");
 		return;
 	}
+	INIT_LIST_HEAD(&qr->qr_list);
 #if 0
 	printk(KERN_INFO "Adding ITT: 0x%08x state: %d to immediate queue\n",
 			cmd->init_task_tag, state);
@@ -828,7 +829,7 @@ void iscsi_add_cmd_to_immediate_queue(
 	qr->state = state;
 
 	spin_lock_bh(&conn->immed_queue_lock);
-	ADD_ENTRY_TO_LIST(qr, conn->immed_queue_head, conn->immed_queue_tail);
+	list_add_tail(&qr->qr_list, &conn->immed_queue_list);
 	atomic_inc(&cmd->immed_queue_count);
 	atomic_set(&conn->check_immediate_queue, 1);
 	spin_unlock_bh(&conn->immed_queue_lock);
@@ -845,22 +846,16 @@ iscsi_queue_req_t *iscsi_get_cmd_from_immediate_queue(iscsi_conn_t *conn)
 	iscsi_queue_req_t *qr;
 
 	spin_lock_bh(&conn->immed_queue_lock);
-	if (!conn->immed_queue_head) {
+	if (list_empty(&conn->immed_queue_list)) {
 		spin_unlock_bh(&conn->immed_queue_lock);
 		return NULL;
 	}
+	list_for_each_entry(qr, &conn->immed_queue_list, qr_list)
+		break;
 
-	qr = conn->immed_queue_head;
+	list_del(&qr->qr_list);
 	if (qr->cmd)
 		atomic_dec(&qr->cmd->immed_queue_count);
-
-	conn->immed_queue_head = conn->immed_queue_head->next;
-	qr->next = qr->prev = NULL;
-
-	if (!conn->immed_queue_head)
-		conn->immed_queue_tail = NULL;
-	else
-		conn->immed_queue_head->prev = NULL;
 	spin_unlock_bh(&conn->immed_queue_lock);
 
 	return qr;
@@ -870,7 +865,7 @@ static void iscsi_remove_cmd_from_immediate_queue(
 	iscsi_cmd_t *cmd,
 	iscsi_conn_t *conn)
 {
-	iscsi_queue_req_t *qr, *qr_next;
+	iscsi_queue_req_t *qr, *qr_tmp;
 
 	spin_lock_bh(&conn->immed_queue_lock);
 	if (!(atomic_read(&cmd->immed_queue_count))) {
@@ -878,21 +873,13 @@ static void iscsi_remove_cmd_from_immediate_queue(
 		return;
 	}
 
-	qr = conn->immed_queue_head;
-	while (qr) {
-		qr_next = qr->next;
-
-		if (qr->cmd != cmd) {
-			qr = qr_next;
+	list_for_each_entry_safe(qr, qr_tmp, &conn->immed_queue_list, qr_list) {
+		if (qr->cmd != cmd)
 			continue;
-		}
 
 		atomic_dec(&qr->cmd->immed_queue_count);
-		REMOVE_ENTRY_FROM_LIST(qr, conn->immed_queue_head,
-				conn->immed_queue_tail);
+		list_del(&qr->qr_list);
 		kmem_cache_free(lio_qr_cache, qr);
-
-		qr = qr_next;
 	}
 	spin_unlock_bh(&conn->immed_queue_lock);
 
@@ -920,6 +907,7 @@ void iscsi_add_cmd_to_response_queue(
 			" iscsi_queue_req_t\n");
 		return;
 	}
+	INIT_LIST_HEAD(&qr->qr_list);
 #if 0
 	printk(KERN_INFO "Adding ITT: 0x%08x state: %d to response queue\n",
 			cmd->init_task_tag, state);
@@ -928,8 +916,7 @@ void iscsi_add_cmd_to_response_queue(
 	qr->state = state;
 
 	spin_lock_bh(&conn->response_queue_lock);
-	ADD_ENTRY_TO_LIST(qr, conn->response_queue_head,
-			conn->response_queue_tail);
+	list_add_tail(&qr->qr_list, &conn->response_queue_list);
 	atomic_inc(&cmd->response_queue_count);
 	spin_unlock_bh(&conn->response_queue_lock);
 
@@ -945,22 +932,17 @@ iscsi_queue_req_t *iscsi_get_cmd_from_response_queue(iscsi_conn_t *conn)
 	iscsi_queue_req_t *qr;
 
 	spin_lock_bh(&conn->response_queue_lock);
-	if (!conn->response_queue_head) {
+	if (list_empty(&conn->response_queue_list)) {
 		spin_unlock_bh(&conn->response_queue_lock);
 		return NULL;
 	}
 
-	qr = conn->response_queue_head;
+	list_for_each_entry(qr, &conn->response_queue_list, qr_list)
+		break;
+	
+	list_del(&qr->qr_list);
 	if (qr->cmd)
 		atomic_dec(&qr->cmd->response_queue_count);
-
-	conn->response_queue_head = conn->response_queue_head->next;
-	qr->next = qr->prev = NULL;
-
-	if (!conn->response_queue_head)
-		conn->response_queue_tail = NULL;
-	else
-		conn->response_queue_head->prev = NULL;
 	spin_unlock_bh(&conn->response_queue_lock);
 
 	return qr;
@@ -974,7 +956,7 @@ static void iscsi_remove_cmd_from_response_queue(
 	iscsi_cmd_t *cmd,
 	iscsi_conn_t *conn)
 {
-	iscsi_queue_req_t *qr, *qr_next;
+	iscsi_queue_req_t *qr, *qr_tmp;
 
 	spin_lock_bh(&conn->response_queue_lock);
 	if (!(atomic_read(&cmd->response_queue_count))) {
@@ -982,22 +964,14 @@ static void iscsi_remove_cmd_from_response_queue(
 		return;
 	}
 
-	qr = conn->response_queue_head;
-	while (qr) {
-		qr_next = qr->next;
-
-		if (qr->cmd != cmd) {
-			qr = qr_next;
+	list_for_each_entry_safe(qr, qr_tmp, &conn->response_queue_list,
+				qr_list) {
+		if (qr->cmd != cmd)
 			continue;
-		}
 
 		atomic_dec(&qr->cmd->response_queue_count);
-
-		REMOVE_ENTRY_FROM_LIST(qr, conn->response_queue_head,
-				conn->response_queue_tail);
+		list_del(&qr->qr_list);
 		kmem_cache_free(lio_qr_cache, qr);
-
-		qr = qr_next;
 	}
 	spin_unlock_bh(&conn->response_queue_lock);
 
@@ -1020,34 +994,27 @@ void iscsi_remove_cmd_from_tx_queues(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
  */
 void iscsi_free_queue_reqs_for_conn(iscsi_conn_t *conn)
 {
-	iscsi_queue_req_t *qr, *qr_next;
+	iscsi_queue_req_t *qr, *qr_tmp;
 
 	spin_lock_bh(&conn->immed_queue_lock);
-	qr = conn->immed_queue_head;
-	while (qr) {
-		qr_next = qr->next;
-
+	list_for_each_entry_safe(qr, qr_tmp, &conn->immed_queue_list, qr_list) {
+		list_del(&qr->qr_list);
 		if (qr->cmd)
 			atomic_dec(&qr->cmd->immed_queue_count);
 
 		kmem_cache_free(lio_qr_cache, qr);
-		qr = qr_next;
 	}
-	conn->immed_queue_head = conn->immed_queue_tail = NULL;
 	spin_unlock_bh(&conn->immed_queue_lock);
 
 	spin_lock_bh(&conn->response_queue_lock);
-	qr = conn->response_queue_head;
-	while (qr) {
-		qr_next = qr->next;
-
+	list_for_each_entry_safe(qr, qr_tmp, &conn->response_queue_list,
+			qr_list) {
+		list_del(&qr->qr_list);
 		if (qr->cmd)
 			atomic_dec(&qr->cmd->response_queue_count);
 
 		kmem_cache_free(lio_qr_cache, qr);
-		qr = qr_next;
 	}
-	conn->response_queue_head = conn->response_queue_tail = NULL;
 	spin_unlock_bh(&conn->response_queue_lock);
 }
 
