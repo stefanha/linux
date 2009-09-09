@@ -1260,11 +1260,9 @@ get_new_sock:
 new_sess_out:
 	printk(KERN_ERR "iSCSI Login negotiation failed.\n");
 #ifdef SNMP_SUPPORT
-#warning FIXME: Make iscsi_collect_login_stats() return correct failure
 	iscsi_collect_login_stats(conn, STAT_CLASS_INITIATOR,
 				  STAT_DETAIL_INIT_ERROR);
 #endif
-
 	if (!zero_tsih || !SESS(conn))
 		goto old_sess_out;
 	if (SESS(conn)->se_sess)
