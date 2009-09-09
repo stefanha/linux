@@ -507,9 +507,12 @@ typedef struct iscsi_conn_s {
 	u8			which_thread;
 	/* connection id assigned by the Initiator */
 	u16			cid;
+	/* Remote TCP Port */
+	u16			login_port;
 	int			net_size;
 	u32			auth_id;
 	u32			conn_flags;
+	/* Remote TCP IP address */
 	u32			login_ip;
 	/* Used for iscsi_tx_login_rsp() */
 	u32			login_itt;

@@ -1048,17 +1048,21 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 					conn->network_transport);
 			}
 
-#warning FIXME: IPV6
-#warning FIXME: Remote IP and Port is broken
-			seq_printf(seq, "%u %u %u %u %u %s %s %08X %s %u "
-				   "%08X %u ",
+			seq_printf(seq, "%u %u %u %u %u %s %s %08X %s %u ",
 				   tiqn->tiqn_index,
 				   SESS_OPS(sess)->SessionType ?
 				   0 : ISCSI_NODE_INDEX, sess->session_index,
 				   conn->conn_index, conn->cid,
 				   state_str, "ipv4", conn->local_ip,
-				   proto_str, conn->local_port, conn->login_ip,
-				   conn->local_port);
+				   proto_str, conn->local_port);
+
+		        if (conn->ipv6_login_ip != NULL)
+				seq_printf(seq, "%s %u",
+						&conn->ipv6_login_ip[0],
+						conn->login_port);
+			else
+				seq_printf(seq, "%08X %u ", conn->login_ip,
+						conn->login_port);
 
 			seq_printf(seq, "%u %u %s %s %s %s %u\n",
 				   conn_ops->MaxRecvDataSegmentLength,

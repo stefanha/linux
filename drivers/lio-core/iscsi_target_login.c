@@ -1164,6 +1164,7 @@ get_new_sock:
 		}
 		memset(buf1_ipv4, 0, IPV4_BUF_SIZE);
 		conn->login_ip = ntohl(sock_in.sin_addr.s_addr);
+		conn->login_port = ntohs(sock_in.sin_port);
 		iscsi_ntoa2(buf1_ipv4, conn->login_ip);
 		ip_init_buf = &buf1_ipv4[0];
 	}
