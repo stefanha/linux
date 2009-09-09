@@ -210,7 +210,7 @@ iscsi_tiqn_t *core_add_tiqn(unsigned char *buf, int *ret)
 	list_add_tail(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list);
 	spin_unlock(&iscsi_global->tiqn_lock);
 
-	PYXPRINT("CORE[0] - Added iSCSI Target IQN: %s\n", tiqn->tiqn);
+	printk(KERN_INFO "CORE[0] - Added iSCSI Target IQN: %s\n", tiqn->tiqn);
 
 	return tiqn;
 
@@ -225,7 +225,7 @@ int __core_del_tiqn(iscsi_tiqn_t *tiqn)
 	list_del(&tiqn->tiqn_list);
 	spin_unlock(&iscsi_global->tiqn_lock);
 
-	PYXPRINT("CORE[0] - Deleted iSCSI Target IQN: %s\n", tiqn->tiqn);
+	printk(KERN_INFO "CORE[0] - Deleted iSCSI Target IQN: %s\n", tiqn->tiqn);
 	kfree(tiqn);
 
 	return 0;
@@ -462,7 +462,7 @@ int core_add_np_ex(
 	list_add_tail(&np_ex->np_ex_list, &np->np_nex_list);
 	spin_unlock(&np->np_ex_lock);
 
-	PYXPRINT("CORE[0] - Added Network Portal: Internal %s:%hu External"
+	printk(KERN_INFO "CORE[0] - Added Network Portal: Internal %s:%hu External"
 		" %s:%hu on %s on network device: %s\n", ip_buf, np->np_port,
 		ip_ex_buf, port_ex, (np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", strlen(np->np_net_dev) ?
@@ -495,7 +495,7 @@ int __core_del_np_ex(
 
 	list_del(&np_ex->np_ex_list);
 
-	PYXPRINT("CORE[0] - Removed Network Portal: Internal %s:%hu"
+	printk(KERN_INFO "CORE[0] - Removed Network Portal: Internal %s:%hu"
 		" External %s:%hu on %s on network device: %s\n",
 		ip_buf, np->np_port, ip_ex_buf, np_ex->np_ex_port,
 		(np->np_network_transport == ISCSI_TCP) ?
@@ -676,7 +676,7 @@ iscsi_np_t *core_add_np(
 	list_add_tail(&np->np_list, &iscsi_global->g_np_list);
 	spin_unlock(&iscsi_global->np_lock);
 
-	PYXPRINT("CORE[0] - Added Network Portal: %s:%hu on %s on network"
+	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on network"
 		" device: %s\n", ip_buf, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
@@ -780,7 +780,7 @@ int core_del_np(iscsi_np_t *np)
 		ip = &buf_ipv4[0];
 	}
 
-	PYXPRINT("CORE[0] - Removed Network Portal: %s:%hu on %s on network"
+	printk(KERN_INFO "CORE[0] - Removed Network Portal: %s:%hu on %s on network"
 		" device: %s\n", ip, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
@@ -5030,7 +5030,7 @@ int iscsi_close_connection(
 
 	spin_lock_bh(&sess->conn_lock);
 	atomic_dec(&sess->nconn);
-	PYXPRINT("Decremented iSCSI connection count to %hu from node:"
+	printk(KERN_INFO "Decremented iSCSI connection count to %hu from node:"
 		" %s\n", atomic_read(&sess->nconn),
 		SESS_OPS(sess)->InitiatorName);
 	/*
@@ -5169,13 +5169,13 @@ int iscsi_close_session(iscsi_session_t *sess)
 	spin_lock_bh(&se_tpg->session_lock);
 	TRACE(TRACE_STATE, "Moving to TARG_SESS_STATE_FREE.\n");
 	sess->session_state = TARG_SESS_STATE_FREE;
-	PYXPRINT("Released iSCSI session from node: %s\n",
+	printk(KERN_INFO "Released iSCSI session from node: %s\n",
 			SESS_OPS(sess)->InitiatorName);
 	tpg->nsessions--;
 	if (tpg->tpg_tiqn)
 		tpg->tpg_tiqn->tiqn_nsessions--;
 
-	PYXPRINT("Decremented number of active iSCSI Sessions on"
+	printk(KERN_INFO "Decremented number of active iSCSI Sessions on"
 		" iSCSI TPG: %hu to %u\n", tpg->tpgt, tpg->nsessions);
 
 	kfree(sess->sess_ops);

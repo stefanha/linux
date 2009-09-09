@@ -39,117 +39,117 @@
 
 void print_status_class_and_detail(u8 status_class, u8 status_detail)
 {
-	PYXPRINT("Status-Class: ");
+	printk(KERN_INFO "Status-Class: ");
 	switch (status_class) {
 	case STAT_CLASS_SUCCESS:
-		PYXPRINT("Success, ");
-		PYXPRINT("Status-Detail: ");
+		printk(KERN_INFO "Success, ");
+		printk(KERN_INFO "Status-Detail: ");
 		switch (status_detail) {
 		case STAT_DETAIL_SUCCESS:
-			PYXPRINT("Login is prcedding OK.\n");
+			printk(KERN_INFO "Login is prcedding OK.\n");
 			break;
 		default:
-			PYXPRINT("ERROR Unknown Status-Detail!\n");
+			printk(KERN_INFO "ERROR Unknown Status-Detail!\n");
 			break;
 		}
 		break;
 	case STAT_CLASS_REDIRECTION:
-		PYXPRINT("Redirection, ");
-		PYXPRINT("Status-Detail: ");
+		printk(KERN_INFO "Redirection, ");
+		printk(KERN_INFO "Status-Detail: ");
 		switch (status_detail) {
 		case STAT_DETAIL_TARG_MOVED_TEMP:
-			PYXPRINT("The requested iSCSI Target Name"
+			printk(KERN_INFO "The requested iSCSI Target Name"
 			" has temporarily moved to the address"
 				" provided.\n");
 			break;
 		case STAT_DETAIL_TARG_MOVED_PERM:
-			PYXPRINT("The requested iSCSI Target Name"
+			printk(KERN_INFO "The requested iSCSI Target Name"
 			" permanently moved to the address"
 				" provided.\n");
 			break;
 		default:
-			PYXPRINT("ERROR Unknown Status-Detail!\n");
+			printk(KERN_INFO "ERROR Unknown Status-Detail!\n");
 			break;
 		}
 		break;
 	case STAT_CLASS_INITIATOR:
-		PYXPRINT("Initiator Error, ");
-		PYXPRINT("Status-Detail: ");
+		printk(KERN_INFO "Initiator Error, ");
+		printk(KERN_INFO "Status-Detail: ");
 		switch (status_detail) {
 		case STAT_DETAIL_INIT_ERROR:
-			PYXPRINT("Miscellaneous iSCSI Initiator"
+			printk(KERN_INFO "Miscellaneous iSCSI Initiator"
 					" errors.\n");
 			break;
 		case STAT_DETAIL_NOT_AUTH:
-			PYXPRINT("The initiator could not be"
+			printk(KERN_INFO "The initiator could not be"
 			" successfully authenticated or target"
 			" authentication is not supported.\n");
 			break;
 		case STAT_DETAIL_NOT_ALLOWED:
-			PYXPRINT("The initiator is not allowed"
+			printk(KERN_INFO "The initiator is not allowed"
 			" access to the given target.\n");
 			break;
 		case STAT_DETAIL_NOT_FOUND:
-			PYXPRINT("The requested iSCSI Target Name"
+			printk(KERN_INFO "The requested iSCSI Target Name"
 			" does not exist at this address.\n");
 			break;
 		case STAT_DETAIL_TARG_REMOVED:
-			PYXPRINT("The requested iSCSI Target Name"
+			printk(KERN_INFO "The requested iSCSI Target Name"
 			" has been removed and no forwarding"
 			" address is provided.\n");
 			break;
 		case STAT_DETAIL_VERSION_NOT_SUPPORTED:
-			PYXPRINT("The requested iSCSI version range"
+			printk(KERN_INFO "The requested iSCSI version range"
 			" is not supported by the target.\n");
 			break;
 		case STAT_DETAIL_TOO_MANY_CONNECTIONS:
-			PYXPRINT("Too many connections on this SSID.\n");
+			printk(KERN_INFO "Too many connections on this SSID.\n");
 			break;
 		case STAT_DETAIL_MISSING_PARAMETER:
-			PYXPRINT("Missing parameters (e.g., iSCSI"
+			printk(KERN_INFO "Missing parameters (e.g., iSCSI"
 			" Initiator and/or Target Name).\n");
 			break;
 		case STAT_DETAIL_NOT_INCLUDED:
-			PYXPRINT("Target does not support session"
+			printk(KERN_INFO "Target does not support session"
 			" spanning to this connection (address).\n");
 			break;
 		case STAT_DETAIL_SESSION_TYPE:
-			PYXPRINT("Target does not support this type"
+			printk(KERN_INFO "Target does not support this type"
 			" of session or not from this Initiator.\n");
 		case STAT_DETAIL_SESSION_DOES_NOT_EXIST:
-			PYXPRINT("Attempt to add a connections to a"
+			printk(KERN_INFO "Attempt to add a connections to a"
 			" non-existent session.\n");
 			break;
 		case STAT_DETAIL_INVALID_DURING_LOGIN:
-			PYXPRINT("Invalid Request type during Login.\n");
+			printk(KERN_INFO "Invalid Request type during Login.\n");
 			break;
 		default:
-			PYXPRINT("ERROR Unknown Status-Detail!\n");
+			printk(KERN_INFO "ERROR Unknown Status-Detail!\n");
 			break;
 		}
 		break;
 	case STAT_CLASS_TARGET:
-		PYXPRINT("Target Error, ");
-		PYXPRINT("Status-Detail: ");
+		printk(KERN_INFO "Target Error, ");
+		printk(KERN_INFO "Status-Detail: ");
 		switch (status_detail) {
 		case STAT_DETAIL_TARG_ERROR:
-			PYXPRINT("Target hardware or software error.\n");
+			printk(KERN_INFO "Target hardware or software error.\n");
 			break;
 		case STAT_DETAIL_SERVICE_UNAVAILABLE:
-			PYXPRINT("The iSCSI server or target is not"
+			printk(KERN_INFO "The iSCSI server or target is not"
 			" currently operational.\n");
 			break;
 		case STAT_DETAIL_OUT_OF_RESOURCE:
-			PYXPRINT("The target has insufficient session,"
+			printk(KERN_INFO "The target has insufficient session,"
 			" connection, or other resources.\n");
 			break;
 		default:
-			PYXPRINT("ERROR Unknown Status-Detail!\n");
+			printk(KERN_INFO "ERROR Unknown Status-Detail!\n");
 			break;
 		}
 		break;
 	default:
-		PYXPRINT("ERROR: Unknown Login Status Class\n");
+		printk(KERN_INFO "ERROR: Unknown Login Status Class\n");
 		break;
 	}
 }

@@ -1369,7 +1369,7 @@ int iscsi_set_sync_and_steering_values(iscsi_conn_t *conn)
 			conn->of_marker = (next_marker - conn->of_marker);
 		}
 		conn->of_marker_offset = 0;
-		PYXPRINT("Setting OFMarker value to %u based on Initial"
+		printk(KERN_INFO "Setting OFMarker value to %u based on Initial"
 			" Markerless Interval.\n", conn->of_marker);
 	}
 
@@ -1382,7 +1382,7 @@ int iscsi_set_sync_and_steering_values(iscsi_conn_t *conn)
 					(login_ifmarker_count * MARKER_SIZE);
 			conn->if_marker = (next_marker - conn->if_marker);
 		}
-		PYXPRINT("Setting IFMarker value to %u based on Initial"
+		printk(KERN_INFO "Setting IFMarker value to %u based on Initial"
 			" Markerless Interval.\n", conn->if_marker);
 	}
 
@@ -2369,8 +2369,8 @@ void iscsi_print_session_params(iscsi_session_t *sess)
 {
 	iscsi_conn_t *conn;
 
-	PYXPRINT("-----------------------------[Session Params for SID: %u]"
-			"-----------------------------\n", sess->sid);
+	printk(KERN_INFO "-----------------------------[Session Params for"
+		" SID: %u]-----------------------------\n", sess->sid);
 	spin_lock_bh(&sess->conn_lock);
 	for (conn = sess->conn_head; conn; conn = conn->next)
 		iscsi_dump_conn_ops(conn->conn_ops);

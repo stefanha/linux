@@ -630,13 +630,13 @@ static int iscsi_post_login_handler(
 			stop_timer = 1;
 		}
 
-		PYXPRINT("iSCSI Login successful on CID: %hu from %s to"
+		printk(KERN_INFO "iSCSI Login successful on CID: %hu from %s to"
 			" %s:%hu,%hu\n", conn->cid, ip, ip_np,
 				np->np_port, tpg->tpgt);
 
 		ADD_ENTRY_TO_LIST(conn, sess->conn_head, sess->conn_tail);
 		atomic_inc(&sess->nconn);
-		PYXPRINT("Incremented iSCSI Connection count to %hu from node:"
+		printk(KERN_INFO "Incremented iSCSI Connection count to %hu from node:"
 			" %s\n", atomic_read(&sess->nconn),
 			SESS_OPS(sess)->InitiatorName);
 		spin_unlock_bh(&sess->conn_lock);
@@ -665,13 +665,13 @@ static int iscsi_post_login_handler(
 	TRACE(TRACE_STATE, "Moving to TARG_SESS_STATE_LOGGED_IN.\n");
 	sess->session_state = TARG_SESS_STATE_LOGGED_IN;
 
-	PYXPRINT("iSCSI Login successful on CID: %hu from %s to %s:%hu,%hu\n",
+	printk(KERN_INFO "iSCSI Login successful on CID: %hu from %s to %s:%hu,%hu\n",
 		conn->cid, ip, ip_np, np->np_port, tpg->tpgt);
 
 	spin_lock_bh(&sess->conn_lock);
 	ADD_ENTRY_TO_LIST(conn, sess->conn_head, sess->conn_tail);
 	atomic_inc(&sess->nconn);
-	PYXPRINT("Incremented iSCSI Connection count to %hu from node:"
+	printk(KERN_INFO "Incremented iSCSI Connection count to %hu from node:"
 		" %s\n", atomic_read(&sess->nconn),
 		SESS_OPS(sess)->InitiatorName);
 	spin_unlock_bh(&sess->conn_lock);
@@ -679,14 +679,14 @@ static int iscsi_post_login_handler(
 	sess->sid = tpg->sid++;
 	if (!sess->sid)
 		sess->sid = tpg->sid++;
-	PYXPRINT("Established iSCSI session from node: %s\n",
+	printk(KERN_INFO "Established iSCSI session from node: %s\n",
 			SESS_OPS(sess)->InitiatorName);
 
 	tpg->nsessions++;
 	if (tpg->tpg_tiqn)
 		tpg->tpg_tiqn->tiqn_nsessions++;
 
-	PYXPRINT("Incremented number of active iSCSI sessions to %u on iSCSI"
+	printk(KERN_INFO "Incremented number of active iSCSI sessions to %u on iSCSI"
 		" Target Portal Group: %hu\n", tpg->nsessions, tpg->tpgt);
 	spin_unlock_bh(&se_tpg->session_lock);
 
@@ -1141,7 +1141,7 @@ get_new_sock:
 			goto new_sess_out;
 		}
 #else
-		PYXPRINT("Skipping iscsi_ntop6()\n");
+		printk(KERN_INFO "Skipping iscsi_ntop6()\n");
 #endif
 		ip_init_buf = &conn->ipv6_login_ip[0];
 	} else {
@@ -1169,8 +1169,8 @@ get_new_sock:
 	conn->local_port = np->np_port;
 #endif
 
-	PYXPRINT("Received iSCSI login request from %s on %s Network Portal"
-			" %s:%hu\n", ip_init_buf,
+	printk(KERN_INFO "Received iSCSI login request from %s on %s Network"
+			" Portal %s:%hu\n", ip_init_buf,
 		(conn->network_transport == ISCSI_TCP) ? "TCP" : "SCTP",
 			ip, np->np_port);
 

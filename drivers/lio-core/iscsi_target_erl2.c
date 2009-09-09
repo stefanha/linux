@@ -389,8 +389,8 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 			cr->cid, sess->sid);
 		iscsi_remove_inactive_connection_recovery_entry(cr, sess);
 		iscsi_attach_active_connection_recovery_entry(sess, cr);
-		PYXPRINT("iSCSI connection recovery successful for CID: %hu"
-			" on SID: %u\n", cr->cid, sess->sid);
+		printk(KERN_INFO "iSCSI connection recovery successful for CID:"
+			" %hu on SID: %u\n", cr->cid, sess->sid);
 		iscsi_remove_active_connection_recovery_entry(cr, sess);
 	} else {
 		iscsi_remove_inactive_connection_recovery_entry(cr, sess);

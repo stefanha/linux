@@ -138,18 +138,18 @@ int iscsi_login_tx_data(
  */
 void iscsi_dump_conn_ops(iscsi_conn_ops_t *conn_ops)
 {
-	PYXPRINT("HeaderDigest: %s\n", (conn_ops->HeaderDigest) ?
+	printk(KERN_INFO "HeaderDigest: %s\n", (conn_ops->HeaderDigest) ?
 				"CRC32C" : "None");
-	PYXPRINT("DataDigest: %s\n", (conn_ops->DataDigest) ?
+	printk(KERN_INFO "DataDigest: %s\n", (conn_ops->DataDigest) ?
 				"CRC32C" : "None");
-	PYXPRINT("MaxRecvDataSegmentLength: %u\n",
+	printk(KERN_INFO "MaxRecvDataSegmentLength: %u\n",
 				conn_ops->MaxRecvDataSegmentLength);
-	PYXPRINT("OFMarker: %s\n", (conn_ops->OFMarker) ? "Yes" : "No");
-	PYXPRINT("IFMarker: %s\n", (conn_ops->IFMarker) ? "Yes" : "No");
+	printk(KERN_INFO "OFMarker: %s\n", (conn_ops->OFMarker) ? "Yes" : "No");
+	printk(KERN_INFO "IFMarker: %s\n", (conn_ops->IFMarker) ? "Yes" : "No");
 	if (conn_ops->OFMarker)
-		PYXPRINT("OFMarkInt: %u\n", conn_ops->OFMarkInt);
+		printk(KERN_INFO "OFMarkInt: %u\n", conn_ops->OFMarkInt);
 	if (conn_ops->IFMarker)
-		PYXPRINT("IFMarkInt: %u\n", conn_ops->IFMarkInt);
+		printk(KERN_INFO "IFMarkInt: %u\n", conn_ops->IFMarkInt);
 }
 
 /*	iscsi_dump_session_ops():
@@ -158,26 +158,26 @@ void iscsi_dump_conn_ops(iscsi_conn_ops_t *conn_ops)
  */
 void iscsi_dump_sess_ops(iscsi_sess_ops_t *sess_ops)
 {
-	PYXPRINT("InitiatorName: %s\n", sess_ops->InitiatorName);
-	PYXPRINT("InitiatorAlias: %s\n", sess_ops->InitiatorAlias);
-	PYXPRINT("TargetName: %s\n", sess_ops->TargetName);
-	PYXPRINT("TargetAlias: %s\n", sess_ops->TargetAlias);
-	PYXPRINT("TargetPortalGroupTag: %hu\n", sess_ops->TargetPortalGroupTag);
-	PYXPRINT("MaxConnections: %hu\n", sess_ops->MaxConnections);
-	PYXPRINT("InitialR2T: %s\n", (sess_ops->InitialR2T) ? "Yes" : "No");
-	PYXPRINT("ImmediateData: %s\n", (sess_ops->ImmediateData) ?
+	printk(KERN_INFO "InitiatorName: %s\n", sess_ops->InitiatorName);
+	printk(KERN_INFO "InitiatorAlias: %s\n", sess_ops->InitiatorAlias);
+	printk(KERN_INFO "TargetName: %s\n", sess_ops->TargetName);
+	printk(KERN_INFO "TargetAlias: %s\n", sess_ops->TargetAlias);
+	printk(KERN_INFO "TargetPortalGroupTag: %hu\n", sess_ops->TargetPortalGroupTag);
+	printk(KERN_INFO "MaxConnections: %hu\n", sess_ops->MaxConnections);
+	printk(KERN_INFO "InitialR2T: %s\n", (sess_ops->InitialR2T) ? "Yes" : "No");
+	printk(KERN_INFO "ImmediateData: %s\n", (sess_ops->ImmediateData) ?
 			"Yes" : "No");
-	PYXPRINT("MaxBurstLength: %u\n", sess_ops->MaxBurstLength);
-	PYXPRINT("FirstBurstLength: %u\n", sess_ops->FirstBurstLength);
-	PYXPRINT("DefaultTime2Wait: %hu\n", sess_ops->DefaultTime2Wait);
-	PYXPRINT("DefaultTime2Retain: %hu\n", sess_ops->DefaultTime2Retain);
-	PYXPRINT("MaxOutstandingR2T: %hu\n", sess_ops->MaxOutstandingR2T);
-	PYXPRINT("DataPDUInOrder: %s\n", (sess_ops->DataPDUInOrder) ?
+	printk(KERN_INFO "MaxBurstLength: %u\n", sess_ops->MaxBurstLength);
+	printk(KERN_INFO "FirstBurstLength: %u\n", sess_ops->FirstBurstLength);
+	printk(KERN_INFO "DefaultTime2Wait: %hu\n", sess_ops->DefaultTime2Wait);
+	printk(KERN_INFO "DefaultTime2Retain: %hu\n", sess_ops->DefaultTime2Retain);
+	printk(KERN_INFO "MaxOutstandingR2T: %hu\n", sess_ops->MaxOutstandingR2T);
+	printk(KERN_INFO "DataPDUInOrder: %s\n", (sess_ops->DataPDUInOrder) ?
 			"Yes" : "No");
-	PYXPRINT("DataSequenceInOrder: %s\n", (sess_ops->DataSequenceInOrder) ?
+	printk(KERN_INFO "DataSequenceInOrder: %s\n", (sess_ops->DataSequenceInOrder) ?
 			"Yes" : "No");
-	PYXPRINT("ErrorRecoveryLevel: %hu\n", sess_ops->ErrorRecoveryLevel);
-	PYXPRINT("SessionType: %s\n", (sess_ops->SessionType) ?
+	printk(KERN_INFO "ErrorRecoveryLevel: %hu\n", sess_ops->ErrorRecoveryLevel);
+	printk(KERN_INFO "SessionType: %s\n", (sess_ops->SessionType) ?
 			"Discovery" : "Normal");
 }
 
@@ -190,7 +190,7 @@ void iscsi_print_params(iscsi_param_list_t *param_list)
 	iscsi_param_t *param;
 
 	for (param = param_list->param_start; param; param = param->next)
-		PYXPRINT("%s: %s\n", param->name, param->value);
+		printk(KERN_INFO "%s: %s\n", param->name, param->value);
 }
 
 /*	iscsi_set_default_param():
@@ -1563,12 +1563,12 @@ static iscsi_param_t *iscsi_check_key(
 				param->name);
 		switch (phase) {
 		case PHASE_SECURITY:
-			PYXPRINT("Security phase.\n");
+			printk(KERN_INFO "Security phase.\n");
 			break;
 		case PHASE_OPERATIONAL:
-			PYXPRINT("Operational phase.\n");
+			printk(KERN_INFO "Operational phase.\n");
 		default:
-			PYXPRINT("Unknown phase.\n");
+			printk(KERN_INFO "Unknown phase.\n");
 		}
 		return NULL;
 	}
@@ -1916,48 +1916,48 @@ void iscsi_set_connection_parameters(
 	char *tmpptr;
 	iscsi_param_t *param;
 
-	PYXPRINT("-------------------------------------------------------"
+	printk(KERN_INFO "-------------------------------------------------------"
 			"-----------\n");
 	for (param = param_list->param_start; param; param = param->next) {
 		if (!IS_PSTATE_ACCEPTOR(param) && !IS_PSTATE_PROPOSER(param))
 			continue;
 		if (!strcmp(param->name, AUTHMETHOD)) {
-			PYXPRINT("AuthMethod:                   %s\n",
+			printk(KERN_INFO "AuthMethod:                   %s\n",
 				param->value);
 		} else if (!strcmp(param->name, HEADERDIGEST)) {
 			ops->HeaderDigest = !strcmp(param->value, CRC32C);
-			PYXPRINT("HeaderDigest:                 %s\n",
+			printk(KERN_INFO "HeaderDigest:                 %s\n",
 				param->value);
 		} else if (!strcmp(param->name, DATADIGEST)) {
 			ops->DataDigest = !strcmp(param->value, CRC32C);
-			PYXPRINT("DataDigest:                   %s\n",
+			printk(KERN_INFO "DataDigest:                   %s\n",
 				param->value);
 		} else if (!strcmp(param->name, MAXRECVDATASEGMENTLENGTH)) {
 			ops->MaxRecvDataSegmentLength =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("MaxRecvDataSegmentLength:     %s\n",
+			printk(KERN_INFO "MaxRecvDataSegmentLength:     %s\n",
 				param->value);
 		} else if (!strcmp(param->name, OFMARKER)) {
 			ops->OFMarker = !strcmp(param->value, YES);
-			PYXPRINT("OFMarker:                     %s\n",
+			printk(KERN_INFO "OFMarker:                     %s\n",
 				param->value);
 		} else if (!strcmp(param->name, IFMARKER)) {
 			ops->IFMarker = !strcmp(param->value, YES);
-			PYXPRINT("IFMarker:                     %s\n",
+			printk(KERN_INFO "IFMarker:                     %s\n",
 				param->value);
 		} else if (!strcmp(param->name, OFMARKINT)) {
 			ops->OFMarkInt =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("OFMarkInt:                    %s\n",
+			printk(KERN_INFO "OFMarkInt:                    %s\n",
 				param->value);
 		} else if (!strcmp(param->name, IFMARKINT)) {
 			ops->IFMarkInt =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("IFMarkInt:                    %s\n",
+			printk(KERN_INFO "IFMarkInt:                    %s\n",
 				param->value);
 		}
 	}
-	PYXPRINT("-------------------------------------------------------"
+	printk(KERN_INFO "-------------------------------------------------------"
 			"-----------\n");
 }
 
@@ -1973,7 +1973,7 @@ void iscsi_set_session_parameters(
 	char *tmpptr;
 	iscsi_param_t *param;
 
-	PYXPRINT("----------------------------------------------------"
+	printk(KERN_INFO "----------------------------------------------------"
 			"--------------\n");
 	for (param = param_list->param_start; param; param = param->next) {
 		if (!IS_PSTATE_ACCEPTOR(param) && !IS_PSTATE_PROPOSER(param))
@@ -1985,7 +1985,7 @@ void iscsi_set_session_parameters(
 				snprintf(ops->InitiatorName,
 						sizeof(ops->InitiatorName),
 						"%s", param->value);
-			PYXPRINT("InitiatorName:                %s\n",
+			printk(KERN_INFO "InitiatorName:                %s\n",
 				param->value);
 		} else if (!strcmp(param->name, INITIATORALIAS)) {
 			if (!param->value)
@@ -1993,7 +1993,7 @@ void iscsi_set_session_parameters(
 			snprintf(ops->InitiatorAlias,
 						sizeof(ops->InitiatorAlias),
 						"%s", param->value);
-			PYXPRINT("InitiatorAlias:               %s\n",
+			printk(KERN_INFO "InitiatorAlias:               %s\n",
 				param->value);
 		} else if (!strcmp(param->name, TARGETNAME)) {
 			if (!param->value)
@@ -2002,78 +2002,78 @@ void iscsi_set_session_parameters(
 				snprintf(ops->TargetName,
 						sizeof(ops->TargetName),
 						"%s", param->value);
-			PYXPRINT("TargetName:                   %s\n",
+			printk(KERN_INFO "TargetName:                   %s\n",
 				param->value);
 		} else if (!strcmp(param->name, TARGETALIAS)) {
 			if (!param->value)
 				continue;
 			snprintf(ops->TargetAlias, sizeof(ops->TargetAlias),
 					"%s", param->value);
-			PYXPRINT("TargetAlias:                  %s\n",
+			printk(KERN_INFO "TargetAlias:                  %s\n",
 				param->value);
 		} else if (!strcmp(param->name, TARGETPORTALGROUPTAG)) {
 			ops->TargetPortalGroupTag =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("TargetPortalGroupTag:         %s\n",
+			printk(KERN_INFO "TargetPortalGroupTag:         %s\n",
 				param->value);
 		} else if (!strcmp(param->name, MAXCONNECTIONS)) {
 			ops->MaxConnections =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("MaxConnections:               %s\n",
+			printk(KERN_INFO "MaxConnections:               %s\n",
 				param->value);
 		} else if (!strcmp(param->name, INITIALR2T)) {
 			ops->InitialR2T = !strcmp(param->value, YES);
-			 PYXPRINT("InitialR2T:                   %s\n",
+			 printk(KERN_INFO "InitialR2T:                   %s\n",
 				param->value);
 		} else if (!strcmp(param->name, IMMEDIATEDATA)) {
 			ops->ImmediateData = !strcmp(param->value, YES);
-			PYXPRINT("ImmediateData:                %s\n",
+			printk(KERN_INFO "ImmediateData:                %s\n",
 				param->value);
 		} else if (!strcmp(param->name, MAXBURSTLENGTH)) {
 			ops->MaxBurstLength =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("MaxBurstLength:               %s\n",
+			printk(KERN_INFO "MaxBurstLength:               %s\n",
 				param->value);
 		} else if (!strcmp(param->name, FIRSTBURSTLENGTH)) {
 			ops->FirstBurstLength =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("FirstBurstLength:             %s\n",
+			printk(KERN_INFO "FirstBurstLength:             %s\n",
 				param->value);
 		} else if (!strcmp(param->name, DEFAULTTIME2WAIT)) {
 			ops->DefaultTime2Wait =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("DefaultTime2Wait:             %s\n",
+			printk(KERN_INFO "DefaultTime2Wait:             %s\n",
 				param->value);
 		} else if (!strcmp(param->name, DEFAULTTIME2RETAIN)) {
 			ops->DefaultTime2Retain =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("DefaultTime2Retain:           %s\n",
+			printk(KERN_INFO "DefaultTime2Retain:           %s\n",
 				param->value);
 		} else if (!strcmp(param->name, MAXOUTSTANDINGR2T)) {
 			ops->MaxOutstandingR2T =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("MaxOutstandingR2T:            %s\n",
+			printk(KERN_INFO "MaxOutstandingR2T:            %s\n",
 				param->value);
 		} else if (!strcmp(param->name, DATAPDUINORDER)) {
 			ops->DataPDUInOrder = !strcmp(param->value, YES);
-			PYXPRINT("DataPDUInOrder:               %s\n",
+			printk(KERN_INFO "DataPDUInOrder:               %s\n",
 				param->value);
 		} else if (!strcmp(param->name, DATASEQUENCEINORDER)) {
 			ops->DataSequenceInOrder = !strcmp(param->value, YES);
-			PYXPRINT("DataSequenceInOrder:          %s\n",
+			printk(KERN_INFO "DataSequenceInOrder:          %s\n",
 				param->value);
 		} else if (!strcmp(param->name, ERRORRECOVERYLEVEL)) {
 			ops->ErrorRecoveryLevel =
 				simple_strtoul(param->value, &tmpptr, 0);
-			PYXPRINT("ErrorRecoveryLevel:           %s\n",
+			printk(KERN_INFO "ErrorRecoveryLevel:           %s\n",
 				param->value);
 		} else if (!strcmp(param->name, SESSIONTYPE)) {
 			ops->SessionType = !strcmp(param->value, DISCOVERY);
-			PYXPRINT("SessionType:                  %s\n",
+			printk(KERN_INFO "SessionType:                  %s\n",
 				param->value);
 		}
 	}
-	PYXPRINT("----------------------------------------------------"
+	printk(KERN_INFO "----------------------------------------------------"
 			"--------------\n");
 
 }

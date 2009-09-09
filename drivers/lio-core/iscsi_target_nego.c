@@ -413,11 +413,11 @@ static int iscsi_target_do_authentication(
 			AUTH_SERVER);
 	switch (authret) {
 	case 0:
-		PYXPRINT("Received OK response"
+		printk(KERN_INFO "Received OK response"
 		" from LIO Authentication, continuing.\n");
 		break;
 	case 1:
-		PYXPRINT("iSCSI security negotiation"
+		printk(KERN_INFO "iSCSI security negotiation"
 			" completed sucessfully.\n");
 		login->auth_complete = 1;
 		if ((login_req->flags & NSG1) &&
@@ -776,7 +776,7 @@ get_target:
 		ret = -1;
 		goto out;
 	}
-	PYXPRINT("Located Storage Object: %s\n", tiqn->tiqn);
+	printk(KERN_INFO "Located Storage Object: %s\n", tiqn->tiqn);
 
 	/*
 	 * Locate Target Portal Group from Storage Node.
@@ -791,7 +791,7 @@ get_target:
 		ret = -1;
 		goto out;
 	}
-	PYXPRINT("Located Portal Group Object: %hu\n", conn->tpg->tpgt);
+	printk(KERN_INFO "Located Portal Group Object: %hu\n", conn->tpg->tpgt);
 
 	/*
 	 * Serialize access across the iscsi_portal_group_t to
