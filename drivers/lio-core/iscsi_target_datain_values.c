@@ -39,7 +39,6 @@
 #include <iscsi_linux_defs.h>
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
-#include <iscsi_lists.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_util.h>
