@@ -637,8 +637,8 @@ redo:
 		for (i = 0; pdu[i].seq_no != cmd->seq_no; i++) {
 #if 0
 			printk(KERN_INFO "pdu[i].seq_no: %d, pdu[i].pdu"
-				"_send_order: %d, pdu[i].offset: %d,
-				pdu[i].length: %d\n", pdu[i].seq_no,
+				"_send_order: %d, pdu[i].offset: %d,"
+				" pdu[i].length: %d\n", pdu[i].seq_no,
 				pdu[i].pdu_send_order, pdu[i].offset,
 				pdu[i].length);
 #endif
