@@ -754,7 +754,7 @@ int iscsi_find_cmd_for_recovery(
 	 * If init_task_tag matches the command is still alligent.
 	 */
 	spin_lock(&sess->cr_i_lock);
-	for (cr = sess->cr_i_head; cr; cr = cr->next) {
+	list_for_each_entry(cr, &sess->cr_inactive_list, cr_list) {
 		spin_lock(&cr->conn_recovery_cmd_lock);
 		list_for_each_entry(cmd, &cr->conn_recovery_cmd_list, i_list) {
 			if (cmd->init_task_tag == init_task_tag) {
@@ -781,7 +781,7 @@ int iscsi_find_cmd_for_recovery(
 	 * If init_task_tag matches the command is ready to be reassigned.
 	 */
 	spin_lock(&sess->cr_a_lock);
-	for (cr = sess->cr_a_head; cr; cr = cr->next) {
+	list_for_each_entry(cr, &sess->cr_active_list, cr_list) {
 		spin_lock(&cr->conn_recovery_cmd_lock);
 		list_for_each_entry(cmd, &cr->conn_recovery_cmd_list, i_list) {
 			if (cmd->init_task_tag == init_task_tag) {

@@ -220,6 +220,8 @@ static int iscsi_login_zero_tsih_s1(
 	sess->init_task_tag	= pdu->init_task_tag;
 	memcpy((void *)&sess->isid, (void *)pdu->isid, 6);
 	sess->exp_cmd_sn	= pdu->cmd_sn;
+	INIT_LIST_HEAD(&sess->cr_active_list);
+	INIT_LIST_HEAD(&sess->cr_inactive_list);
 	init_MUTEX_LOCKED(&sess->async_msg_sem);
 	init_MUTEX_LOCKED(&sess->reinstatement_sem);
 	init_MUTEX_LOCKED(&sess->session_wait_sem);

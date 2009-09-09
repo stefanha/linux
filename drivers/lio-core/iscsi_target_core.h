@@ -608,8 +608,9 @@ typedef struct iscsi_conn_recovery_s {
 	struct semaphore		time2wait_sem;
 	struct timer_list		time2retain_timer;
 	struct iscsi_session_s	*sess;
-	struct iscsi_conn_recovery_s *next;
-	struct iscsi_conn_recovery_s *prev;
+//	struct iscsi_conn_recovery_s *next;
+//	struct iscsi_conn_recovery_s *prev;
+	struct list_head	cr_list;
 }  ____cacheline_aligned iscsi_conn_recovery_t;
 
 typedef struct iscsi_session_s {
@@ -663,10 +664,12 @@ typedef struct iscsi_session_s {
 	iscsi_conn_t		*conn_head;
 	/* Pointer to end of connection list */
 	iscsi_conn_t		*conn_tail;
-	iscsi_conn_recovery_t	*cr_a_head;
-	iscsi_conn_recovery_t	*cr_a_tail;
-	iscsi_conn_recovery_t	*cr_i_head;
-	iscsi_conn_recovery_t	*cr_i_tail;
+//	iscsi_conn_recovery_t	*cr_a_head;
+//	iscsi_conn_recovery_t	*cr_a_tail;
+	struct list_head	cr_active_list;
+//	iscsi_conn_recovery_t	*cr_i_head;
+//	iscsi_conn_recovery_t	*cr_i_tail;
+	struct list_head	cr_inactive_list;
 	spinlock_t		cmdsn_lock;
 	spinlock_t		conn_lock;
 	spinlock_t		cr_a_lock;

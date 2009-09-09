@@ -121,7 +121,7 @@ static int iscsi_attach_active_connection_recovery_entry(
 	iscsi_conn_recovery_t *cr)
 {
 	spin_lock(&sess->cr_a_lock);
-	ADD_ENTRY_TO_LIST(cr, sess->cr_a_head, sess->cr_a_tail);
+	list_add_tail(&cr->cr_list, &sess->cr_active_list);
 	spin_unlock(&sess->cr_a_lock);
 
 	return 0;
@@ -136,7 +136,7 @@ static int iscsi_attach_inactive_connection_recovery_entry(
 	iscsi_conn_recovery_t *cr)
 {
 	spin_lock(&sess->cr_i_lock);
-	ADD_ENTRY_TO_LIST(cr, sess->cr_i_head, sess->cr_i_tail);
+	list_add_tail(&cr->cr_list, &sess->cr_inactive_list);
 
 	sess->conn_recovery_count++;
 	TRACE(TRACE_ERL2, "Incremented connection recovery count to %u for"
@@ -157,7 +157,7 @@ iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry(
 	iscsi_conn_recovery_t *cr;
 
 	spin_lock(&sess->cr_i_lock);
-	for (cr = sess->cr_i_head; cr; cr = cr->next) {
+	list_for_each_entry(cr, &sess->cr_inactive_list, cr_list) {
 		if (cr->cid == cid)
 			break;
 	}
@@ -173,14 +173,13 @@ iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry(
 void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 {
 	iscsi_cmd_t *cmd, *cmd_tmp;
-	iscsi_conn_recovery_t *cr, *cr_next;
+	iscsi_conn_recovery_t *cr, *cr_tmp;
 
 	spin_lock(&sess->cr_a_lock);
-	cr = sess->cr_a_head;
-	while (cr) {
-		cr_next = cr->next;
-
+	list_for_each_entry_safe(cr, cr_tmp, &sess->cr_active_list, cr_list) {
+		list_del(&cr->cr_list);
 		spin_unlock(&sess->cr_a_lock);
+
 		spin_lock(&cr->conn_recovery_cmd_lock);
 		list_for_each_entry_safe(cmd, cmd_tmp,
 				&cr->conn_recovery_cmd_list, i_list) {
@@ -201,17 +200,14 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 		spin_lock(&sess->cr_a_lock);
 
 		kfree(cr);
-
-		cr = cr_next;
 	}
 	spin_unlock(&sess->cr_a_lock);
 
 	spin_lock(&sess->cr_i_lock);
-	cr = sess->cr_i_head;
-	while (cr) {
-		cr_next = cr->next;
-
+	list_for_each_entry_safe(cr, cr_tmp, &sess->cr_inactive_list, cr_list) {
+		list_del(&cr->cr_list);
 		spin_unlock(&sess->cr_i_lock);
+
 		spin_lock(&cr->conn_recovery_cmd_lock);
 		list_for_each_entry_safe(cmd, cmd_tmp,
 				&cr->conn_recovery_cmd_list, i_list) {
@@ -232,8 +228,6 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 		spin_lock(&sess->cr_i_lock);
 
 		kfree(cr);
-
-		cr = cr_next;
 	}
 	spin_unlock(&sess->cr_i_lock);
 }
@@ -247,7 +241,7 @@ int iscsi_remove_active_connection_recovery_entry(
 	iscsi_session_t *sess)
 {
 	spin_lock(&sess->cr_a_lock);
-	REMOVE_ENTRY_FROM_LIST(cr, sess->cr_a_head, sess->cr_a_tail);
+	list_del(&cr->cr_list);
 
 	sess->conn_recovery_count--;
 	TRACE(TRACE_ERL2, "Decremented connection recovery count to %u for"
@@ -268,7 +262,7 @@ int iscsi_remove_inactive_connection_recovery_entry(
 	iscsi_session_t *sess)
 {
 	spin_lock(&sess->cr_i_lock);
-	REMOVE_ENTRY_FROM_LIST(cr, sess->cr_i_head, sess->cr_i_tail);
+	list_del(&cr->cr_list);
 	spin_unlock(&sess->cr_i_lock);
 
 	return 0;
@@ -435,6 +429,7 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 			" iscsi_conn_recovery_t.\n");
 		return -1;
 	}
+	INIT_LIST_HEAD(&cr->cr_list);
 	INIT_LIST_HEAD(&cr->conn_recovery_cmd_list);
 	spin_lock_init(&cr->conn_recovery_cmd_lock);
 	/*
