@@ -270,7 +270,7 @@ static struct config_group *lio_target_call_addnptotpg(
 	}
 	if (strlen(name) > MAX_PORTAL_LEN) {
 		printk(KERN_ERR "strlen(name): %d exceeds MAX_PORTAL_LEN: %d\n",
-			strlen(name), MAX_PORTAL_LEN);
+			(int)strlen(name), MAX_PORTAL_LEN);
 		return ERR_PTR(-EOVERFLOW);
 	}
 	memset(buf, 0, MAX_PORTAL_LEN);
