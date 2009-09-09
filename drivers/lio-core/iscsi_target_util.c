@@ -2652,60 +2652,67 @@ void iscsi_collect_login_stats(
 {
 	iscsi_param_t *intrname = NULL;
 	iscsi_tiqn_t *tiqn;
+	iscsi_login_stats_t *ls;
 
 	tiqn = iscsi_snmp_get_tiqn(conn);
 	if (!(tiqn))
 		return;
 
-	spin_lock(&tiqn->login_stats.lock);
-	if ((conn->login_ip == tiqn->login_stats.last_intr_fail_addr) &&
-	    ((get_jiffies_64() - tiqn->login_stats.last_fail_time) < 10)) {
+	ls = &tiqn->login_stats;
+
+	spin_lock(&ls->lock);
+	if (((conn->login_ip == ls->last_intr_fail_addr) ||
+	    !(memcmp(conn->ipv6_login_ip, ls->last_intr_fail_ip6_addr,
+	     	IPV6_ADDRESS_SPACE))) &&
+	    ((get_jiffies_64() - ls->last_fail_time) < 10)) {
 		/* We already have the failure info for this login */
-		spin_unlock(&tiqn->login_stats.lock);
+		spin_unlock(&ls->lock);
 		return;
 	}
 
 	if (status_class == STAT_CLASS_SUCCESS)
-		tiqn->login_stats.accepts++;
+		ls->accepts++;
 	else if (status_class == STAT_CLASS_REDIRECTION) {
-		tiqn->login_stats.redirects++;
-		tiqn->login_stats.last_fail_type =
-						 ISCSI_LOGIN_FAIL_REDIRECT;
+		ls->redirects++;
+		ls->last_fail_type = ISCSI_LOGIN_FAIL_REDIRECT;
 	} else if ((status_class == STAT_CLASS_INITIATOR)  &&
 		 (status_detail == STAT_DETAIL_NOT_AUTH)) {
-		tiqn->login_stats.authenticate_fails++;
-		tiqn->login_stats.last_fail_type =
-						 ISCSI_LOGIN_FAIL_AUTHENTICATE;
+		ls->authenticate_fails++;
+		ls->last_fail_type =  ISCSI_LOGIN_FAIL_AUTHENTICATE;
 	} else if ((status_class == STAT_CLASS_INITIATOR)  &&
 		 (status_detail == STAT_DETAIL_NOT_ALLOWED)) {
-		tiqn->login_stats.authorize_fails++;
-		tiqn->login_stats.last_fail_type =
-						 ISCSI_LOGIN_FAIL_AUTHORIZE;
+		ls->authorize_fails++;
+		ls->last_fail_type = ISCSI_LOGIN_FAIL_AUTHORIZE;
 	} else if ((status_class == STAT_CLASS_INITIATOR)  &&
 		 (status_detail == STAT_DETAIL_INIT_ERROR)) {
-		tiqn->login_stats.negotiate_fails++;
-		tiqn->login_stats.last_fail_type =
-						 ISCSI_LOGIN_FAIL_NEGOTIATE;
+		ls->negotiate_fails++;
+		ls->last_fail_type = ISCSI_LOGIN_FAIL_NEGOTIATE;
 	} else {
-		tiqn->login_stats.other_fails++;
-		tiqn->login_stats.last_fail_type =
-						 ISCSI_LOGIN_FAIL_OTHER;
+		ls->other_fails++;
+		ls->last_fail_type = ISCSI_LOGIN_FAIL_OTHER;
 	}
 
 	/* Save initiator name, ip address and time, if it is a failed login */
-#warning FIXME: IPv6
 	if (status_class != STAT_CLASS_SUCCESS) {
 		if (conn->param_list)
 			intrname = iscsi_find_param_from_key(INITIATORNAME,
 							     conn->param_list);
-		strcpy(tiqn->login_stats.last_intr_fail_name,
+		strcpy(ls->last_intr_fail_name,
 		       (intrname ? intrname->value : "Unknown"));
-#warning FIXME: IPv6
-		tiqn->login_stats.last_intr_fail_addr = conn->login_ip;
-		tiqn->login_stats.last_fail_time = get_jiffies_64();
+
+		if (conn->ipv6_login_ip != NULL) {
+			memcpy(ls->last_intr_fail_ip6_addr,
+				conn->ipv6_login_ip, IPV6_ADDRESS_SPACE);
+			ls->last_intr_fail_addr = 0;
+		} else {
+			memset(ls->last_intr_fail_ip6_addr, 0,
+				IPV6_ADDRESS_SPACE);
+			ls->last_intr_fail_addr = conn->login_ip;
+		}
+		ls->last_fail_time = get_jiffies_64();
 	}
 
-	spin_unlock(&tiqn->login_stats.lock);
+	spin_unlock(&ls->lock);
 }
 
 iscsi_tiqn_t *iscsi_snmp_get_tiqn(iscsi_conn_t *conn)

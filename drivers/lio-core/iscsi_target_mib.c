@@ -285,7 +285,9 @@ static int portal_attr_seq_show(struct seq_file *seq, void *v)
 	if (!(tiqn))
 		return 0;
 
-#warning FIXME: Add iscsiPortalStorageType
+	/*
+	 * FIXME: Need to add iscsiPortalStorageType here..
+	 */
 	if (list_is_first(&tpg->g_tpg_list, &iscsi_global->g_tpg_list))
 		seq_puts(seq, "inst indx role addr_type addr proto max_rcv "
 			"hdr_dgst(pri,sec) data_dgst(pri,sec) rcv_mark\n");
@@ -302,20 +304,20 @@ static int portal_attr_seq_show(struct seq_file *seq, void *v)
 	spin_lock(&tpg->tpg_np_lock);
 	list_for_each_entry_safe(tpg_np, tpg_np_tmp, &tpg->tpg_gnp_list,
 			tpg_np_list) {
-#warning FIXME: T/I Mode
-#warning FIXME: DNS
+
 		seq_printf(seq, "%u %u %s %s ",
 			   tiqn->tiqn_index, tpg_np->tpg_np_index, "Target",
 			   (tpg_np->tpg_np->np_net_size == IPV6_ADDRESS_SPACE) ?
 			   "ipv6" : "ipv4");
 
-#warning FIXME: Double check usage of brackets around IPv6 address
 		if (tpg_np->tpg_np->np_net_size == IPV6_ADDRESS_SPACE)
 			seq_printf(seq, "[%s] ", tpg_np->tpg_np->np_ipv6);
 		else
 			seq_printf(seq, "%08X ", tpg_np->tpg_np->np_ipv4);
 
-#warning FIXME: Double check usage of SNMP of other transports
+		/*
+		 * Double check usage of non TCP transports with iSCSI MIBs
+		 */
 		switch (tpg_np->tpg_np->np_network_transport) {
 		case ISCSI_TCP:
 			seq_printf(seq, "%s ", "TCP");
@@ -545,15 +547,17 @@ static int tgt_attr_seq_show(struct seq_file *seq, void *v)
 	fail_count = (lstat->redirects + lstat->authorize_fails +
 		     lstat->authenticate_fails + lstat->negotiate_fails +
 			lstat->other_fails);
-#warning FIXME: IPv6
-	seq_printf(seq, "%u %u %u %u %u %s %s %08X\n", tiqn->tiqn_index,
+	seq_printf(seq, "%u %u %u %u %u %s\n", tiqn->tiqn_index,
 		   ISCSI_NODE_INDEX, fail_count,
 		   lstat->last_fail_time ?
 		   (u32)(((u32)lstat->last_fail_time - INITIAL_JIFFIES)
 				* 100 / HZ) : 0,
 		   lstat->last_fail_type, lstat->last_intr_fail_name[0] ?
-		   lstat->last_intr_fail_name : NONE, "ipv4",
-		   lstat->last_intr_fail_addr);
+		   lstat->last_intr_fail_name : NONE);
+	if (lstat->last_intr_fail_ip6_addr != NULL)
+		seq_printf(seq, "ipv6 [%s]\n", lstat->last_intr_fail_ip6_addr);
+	else
+		seq_printf(seq, "ipv4 %08X\n", lstat->last_intr_fail_addr);
 	spin_unlock(&lstat->lock);
 
 	return 0;
@@ -1057,7 +1061,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 				   proto_str, conn->local_port);
 
 		        if (conn->ipv6_login_ip != NULL)
-				seq_printf(seq, "%s %u",
+				seq_printf(seq, "[%s] %u",
 						&conn->ipv6_login_ip[0],
 						conn->login_port);
 			else
@@ -1284,8 +1288,9 @@ static void ips_auth_seq_stop(struct seq_file *seq, void *v)
 /*
  * Note: This currently shows the storage object nexus authorization
  * required status,
+ *
+ * FIXME: Need to update this to follow IPS AUTH MIB
  */
-#warning FIXME: ips_auth_seq_show()
 static int ips_auth_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,

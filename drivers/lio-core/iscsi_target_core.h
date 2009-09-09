@@ -6,10 +6,6 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <iscsi_linux_defs.h>
-#ifdef SNMP_SUPPORT
-#include <iscsi_target_mib.h>
-#endif /* SNMP_SUPPORT */
-
 #include <iscsi_target_version.h>	    /* get version definition */
 
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
@@ -32,6 +28,10 @@
 #define ISCSI_MAX_TPGS			64
 /* Size of the Network Device Name Buffer */
 #define ISCSI_NETDEV_NAME_SIZE		12
+
+#ifdef SNMP_SUPPORT
+#include <iscsi_target_mib.h>
+#endif /* SNMP_SUPPORT */
 
 /* iscsi_tpg_np_t->tpg_np_network_transport */
 #define ISCSI_TCP			0

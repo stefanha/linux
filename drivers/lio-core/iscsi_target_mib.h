@@ -36,6 +36,7 @@ typedef struct iscsi_login_stats_s {
 	u64		last_fail_time;		/* time stamp (jiffies) */
 	u32		last_fail_type;
 	u32		last_intr_fail_addr;
+	unsigned char	last_intr_fail_ip6_addr[IPV6_ADDRESS_SPACE];
 	char		last_intr_fail_name[224];
 } iscsi_login_stats_t;
 
