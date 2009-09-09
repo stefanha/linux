@@ -159,7 +159,10 @@ void core_put_tiqn_for_login(iscsi_tiqn_t *tiqn)
 	return;
 }
 
-#warning FIXME: Add IQN format checks to core_add_tiqn()
+/*
+ * Note that IQN formatting is expected to be done in userspace, and
+ * no explict IQN format checks are done here.
+ */
 iscsi_tiqn_t *core_add_tiqn(unsigned char *buf, int *ret)
 {
 	iscsi_tiqn_t *tiqn = NULL;
