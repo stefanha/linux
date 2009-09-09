@@ -57,7 +57,6 @@
 #include <iscsi_target_core.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_erl0.h>
-#include <iscsi_target_error.h>
 #include <iscsi_target_login.h>
 #include <iscsi_target_nodeattrib.h>
 #include <iscsi_target_tpg.h>
@@ -765,7 +764,7 @@ int iscsi_tpg_del_portal_group(
 			" %hu while active sessions exist, and force=0\n",
 			tpg->tpgt);
 		tpg->tpg_state = old_state;
-		return ERR_DELTPG_SESSIONS_ACTIVE;
+		return -EPERM;
 	}
 
 	core_tpg_clear_object_luns(tpg->tpg_se_tpg);
@@ -814,14 +813,14 @@ int iscsi_tpg_enable_portal_group(iscsi_portal_group_t *tpg)
 		printk(KERN_ERR "iSCSI target portal group: %hu is already"
 			" active, ignoring request.\n", tpg->tpgt);
 		spin_unlock(&tpg->tpg_state_lock);
-		return ERR_ENABLETPG_ALREADY_ACTIVE;
+		return -EINVAL;
 	}
 	if (!tpg->num_tpg_nps) {
 		printk(KERN_ERR "Unable to activate iSCSI target portal"
 			" group with no IP addresses, please add one with"
 			" addnptotpg.\n");
 		spin_unlock(&tpg->tpg_state_lock);
-		return ERR_ENABLETPG_NO_NPS;
+		return -EINVAL;
 	}
 
 	/*
@@ -832,18 +831,18 @@ int iscsi_tpg_enable_portal_group(iscsi_portal_group_t *tpg)
 	param = iscsi_find_param_from_key(AUTHMETHOD, tpg->param_list);
 	if (!(param)) {
 		spin_unlock(&tpg->tpg_state_lock);
-		return ERR_NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	if (ISCSI_TPG_ATTRIB(tpg)->authentication) {
 		if (!strcmp(param->value, NONE))
 			if (iscsi_update_param_value(param, CHAP) < 0) {
 				spin_unlock(&tpg->tpg_state_lock);
-				return ERR_NO_MEMORY;
+				return -ENOMEM;
 			}
 		if (iscsi_ta_authentication(tpg, 1) < 0) {
 			spin_unlock(&tpg->tpg_state_lock);
-			return ERR_NO_MEMORY;
+			return -ENOMEM;
 		}
 	}
 
@@ -873,7 +872,7 @@ int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *tpg, int force)
 		printk(KERN_ERR "iSCSI Target Portal Group: %hu is already"
 			" inactive, ignoring request.\n", tpg->tpgt);
 		spin_unlock(&tpg->tpg_state_lock);
-		return ERR_DISABLETPG_NOT_ACTIVE;
+		return -EINVAL;
 	}
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
@@ -887,7 +886,7 @@ int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *tpg, int force)
 		printk(KERN_ERR "Unable to disable iSCSI Target Portal Group:"
 			" %hu while active sessions exist, and force=0\n",
 			tpg->tpgt);
-		return ERR_DISABLETPG_SESSIONS_ACTIVE;
+		return -EPERM;
 	}
 
 	spin_lock(&tiqn->tiqn_tpg_lock);

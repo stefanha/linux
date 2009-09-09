@@ -47,7 +47,6 @@
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
-#include <iscsi_target_error.h>
 #include <iscsi_target_device.h>
 #include <target/target_core_device.h>
 #include <target/target_core_hba.h>

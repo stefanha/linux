@@ -56,7 +56,6 @@
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
 #include <target/target_core_alua.h>
-#include <iscsi_target_error.h>
 #include <iscsi_target_datain_values.h>
 #include <iscsi_target_discovery.h>
 #include <iscsi_target_erl0.h>
@@ -548,7 +547,7 @@ static iscsi_np_t *core_add_np_locate(
 					(network_transport == ISCSI_TCP) ?
 					"TCP" : "SCTP");
 				spin_unlock(&iscsi_global->np_lock);
-				*ret = ERR_ADDNPTOTPG_ALREADY_EXISTS;
+				*ret = -EEXIST;
 				return NULL;
 			}
 
@@ -567,7 +566,7 @@ static iscsi_np_t *core_add_np_locate(
 							? "TCP" : "SCTP");
 					spin_unlock(&np->np_ex_lock);
 					spin_unlock(&iscsi_global->np_lock);
-					*ret = ERR_ADDNPTOTPG_ALREADY_EXISTS;
+					*ret = -EEXIST;
 					return NULL;
 				}
 			}
