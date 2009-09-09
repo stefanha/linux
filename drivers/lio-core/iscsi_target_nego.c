@@ -36,9 +36,7 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 
-#include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>

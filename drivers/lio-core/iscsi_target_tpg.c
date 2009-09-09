@@ -42,9 +42,7 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 
-#include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-
 #include <iscsi_lists.h>
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>

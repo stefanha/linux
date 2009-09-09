@@ -1,7 +1,6 @@
 #ifndef _ISCSI_CRC_H_
 #define _ISCSI_CRC_H_
 
-#include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
 
 /*	calculate a 32-bit crc	*/

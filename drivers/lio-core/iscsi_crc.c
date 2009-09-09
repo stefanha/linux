@@ -25,9 +25,11 @@
  *
  ******************************************************************************/
 
-
 #include <linux/slab.h>
-#include <iscsi_linux_os.h>
+#include <asm/byteorder.h>
+#ifdef __BIG_ENDIAN
+# define ISCSI_BIG_ENDIAN 1
+#endif
 #include <iscsi_crc.h>
 
 /*****************************************************************/

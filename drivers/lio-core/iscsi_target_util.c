@@ -42,9 +42,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/libsas.h> /* For TASK_ATTR_* */
 
-#include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
-
 #include <iscsi_lists.h>
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>

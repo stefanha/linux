@@ -30,8 +30,6 @@
 #include <linux/timer.h>
 #include <linux/slab.h>
 
-#include <iscsi_linux_os.h>
-
 #define __ISCSI_DEBUG_OPCODES_C
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>

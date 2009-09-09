@@ -23,7 +23,6 @@
 #ifndef ISCSI_PROTOCOL_H
 #define ISCSI_PROTOCOL_H
 
-#include <iscsi_linux_os.h>
 #include <iscsi_linux_defs.h>
 
 #define ISCSI_PORT			3260
