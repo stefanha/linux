@@ -35,6 +35,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/in.h>
+#include <linux/list.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 
@@ -43,7 +44,6 @@
 #include <iscsi_debug_opcodes.h>
 #include <iscsi_crc.h>
 #include <iscsi_debug.h>
-#include <iscsi_lists.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -858,6 +858,7 @@ static inline iscsi_ooo_cmdsn_t *iscsi_allocate_ooo_cmdsn(void)
 			" iscsi_ooo_cmdsn_t.\n");
 		return NULL;
 	}
+	INIT_LIST_HEAD(&ooo_cmdsn->ooo_list);
 
 	return ooo_cmdsn;
 }
@@ -870,44 +871,38 @@ static inline int iscsi_attach_ooo_cmdsn(
 	iscsi_session_t *sess,
 	iscsi_ooo_cmdsn_t *ooo_cmdsn)
 {
+	iscsi_ooo_cmdsn_t *ooo_tail, *ooo_tmp;
 	/*
 	 * We attach the iscsi_ooo_cmdsn_t entry to the out of order
 	 * list in increasing CmdSN order.
 	 * This allows iscsi_execute_ooo_cmdsns() to detect any
 	 * additional CmdSN holes while performing delayed execution.
 	 */
-	if (!sess->ooo_cmdsn_head && !sess->ooo_cmdsn_tail) {
-		sess->ooo_cmdsn_head = sess->ooo_cmdsn_tail = ooo_cmdsn;
-		ooo_cmdsn->prev = ooo_cmdsn->next = NULL;
-	} else {
+	if (list_empty(&sess->sess_ooo_cmdsn_list))
+		list_add_tail(&ooo_cmdsn->ooo_list,
+				&sess->sess_ooo_cmdsn_list);
+	else {
+		ooo_tail = list_entry(sess->sess_ooo_cmdsn_list.prev,
+				typeof(*ooo_tail), ooo_list);
 		/*
 		 * CmdSN is greater than the tail of the list.
 		 */
-		if (sess->ooo_cmdsn_tail->cmdsn < ooo_cmdsn->cmdsn) {
-			sess->ooo_cmdsn_tail->next = ooo_cmdsn;
-			ooo_cmdsn->prev = sess->ooo_cmdsn_tail;
-			sess->ooo_cmdsn_tail = ooo_cmdsn;
-		} else {
+		if (ooo_tail->cmdsn < ooo_cmdsn->cmdsn)
+			list_add_tail(&ooo_cmdsn->ooo_list,
+					&sess->sess_ooo_cmdsn_list);
+		else {
 			/*
 			 * CmdSN is either lower than the head,  or somewhere
 			 * in the middle.
 			 */
-			iscsi_ooo_cmdsn_t *prev_ptr = NULL;
-			iscsi_ooo_cmdsn_t *ooo_cmdsn_ptr =
-					sess->ooo_cmdsn_head;
-			while (ooo_cmdsn_ptr->cmdsn < ooo_cmdsn->cmdsn) {
-				prev_ptr = ooo_cmdsn_ptr;
-				ooo_cmdsn_ptr = ooo_cmdsn_ptr->next;
-			}
-			if (!prev_ptr) {
-				ooo_cmdsn->next = sess->ooo_cmdsn_head;
-				sess->ooo_cmdsn_head->prev = ooo_cmdsn;
-				sess->ooo_cmdsn_head = ooo_cmdsn;
-			} else {
-				ooo_cmdsn->next = ooo_cmdsn_ptr;
-				ooo_cmdsn->prev = prev_ptr;
-				prev_ptr->next = ooo_cmdsn;
-				ooo_cmdsn_ptr->prev = ooo_cmdsn;
+			list_for_each_entry(ooo_tmp, &sess->sess_ooo_cmdsn_list,
+						ooo_list) {
+				while (ooo_tmp->cmdsn < ooo_cmdsn->cmdsn) 
+					continue;
+				
+				list_add(&ooo_cmdsn->ooo_list,
+					&ooo_tmp->ooo_list);
+				break;
 			}
 		}
 	}
@@ -928,8 +923,7 @@ void iscsi_remove_ooo_cmdsn(
 	iscsi_session_t *sess,
 	iscsi_ooo_cmdsn_t *ooo_cmdsn)
 {
-	REMOVE_ENTRY_FROM_LIST(ooo_cmdsn, sess->ooo_cmdsn_head,
-			sess->ooo_cmdsn_tail);
+	list_del(&ooo_cmdsn->ooo_list);
 	kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 }
 
@@ -939,20 +933,15 @@ void iscsi_remove_ooo_cmdsn(
  */
 void iscsi_clear_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
 {
-	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_cmdsn_next = NULL;
+	iscsi_ooo_cmdsn_t *ooo_cmdsn;
 	iscsi_session_t *sess = SESS(conn);
 
 	spin_lock(&sess->cmdsn_lock);
-	ooo_cmdsn = sess->ooo_cmdsn_head;
-	while (ooo_cmdsn) {
-		ooo_cmdsn_next = ooo_cmdsn->next;
-		if (ooo_cmdsn->cid != conn->cid) {
-			ooo_cmdsn = ooo_cmdsn_next;
+	list_for_each_entry(ooo_cmdsn, &sess->sess_ooo_cmdsn_list, ooo_list) {
+		if (ooo_cmdsn->cid != conn->cid)
 			continue;
-		}
 
 		ooo_cmdsn->cmd = NULL;
-		ooo_cmdsn = ooo_cmdsn_next;
 	}
 	spin_unlock(&sess->cmdsn_lock);
 }
@@ -965,20 +954,16 @@ int iscsi_execute_ooo_cmdsns(iscsi_session_t *sess)
 {
 	int ooo_count = 0;
 	iscsi_cmd_t *cmd = NULL;
-	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_cmdsn_next = NULL;
+	iscsi_ooo_cmdsn_t *ooo_cmdsn, *ooo_cmdsn_tmp;
 
-	ooo_cmdsn = sess->ooo_cmdsn_head;
-	while (ooo_cmdsn) {
-		ooo_cmdsn_next = ooo_cmdsn->next;
-		if (ooo_cmdsn->cmdsn != sess->exp_cmd_sn) {
-			ooo_cmdsn = ooo_cmdsn_next;
+	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
+				&sess->sess_ooo_cmdsn_list, ooo_list) {
+		if (ooo_cmdsn->cmdsn != sess->exp_cmd_sn)
 			continue;
-		}
 
 		if (!ooo_cmdsn->cmd) {
 			sess->exp_cmd_sn++;
 			iscsi_remove_ooo_cmdsn(sess, ooo_cmdsn);
-			ooo_cmdsn = ooo_cmdsn_next;
 			continue;
 		}
 
@@ -995,7 +980,6 @@ int iscsi_execute_ooo_cmdsns(iscsi_session_t *sess)
 		if (iscsi_execute_cmd(cmd, 1) < 0)
 			return -1;
 
-		ooo_cmdsn = ooo_cmdsn_next;
 		continue;
 	}
 
@@ -1153,16 +1137,14 @@ int iscsi_execute_cmd(iscsi_cmd_t *cmd, int ooo)
  */
 void iscsi_free_all_ooo_cmdsns(iscsi_session_t *sess)
 {
-	iscsi_ooo_cmdsn_t *ooo_cmdsn, *ooo_cmdsn_next;
+	iscsi_ooo_cmdsn_t *ooo_cmdsn, *ooo_cmdsn_tmp;
 
 	spin_lock(&sess->cmdsn_lock);
-	ooo_cmdsn = sess->ooo_cmdsn_head;
-	while (ooo_cmdsn) {
-		ooo_cmdsn_next = ooo_cmdsn->next;
+	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
+			&sess->sess_ooo_cmdsn_list, ooo_list) {
 
+		list_del(&ooo_cmdsn->ooo_list);
 		kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
-
-		ooo_cmdsn = ooo_cmdsn_next;
 	}
 	spin_unlock(&sess->cmdsn_lock);
 }
@@ -1177,7 +1159,7 @@ int iscsi_handle_ooo_cmdsn(
 	u32 cmdsn)
 {
 	int batch = 0;
-	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_cmdsn_tail = NULL;
+	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_tail = NULL;
 
 	sess->cmdsn_outoforder = 1;
 
@@ -1185,11 +1167,12 @@ int iscsi_handle_ooo_cmdsn(
 	cmd->i_state			= ISTATE_DEFERRED_CMD;
 	cmd->cmd_flags			|= ICF_OOO_CMDSN;
 
-	if (!sess->ooo_cmdsn_tail)
+	if (list_empty(&sess->sess_ooo_cmdsn_list))
 		batch = 1;
 	else {
-		ooo_cmdsn_tail = sess->ooo_cmdsn_tail;
-		if (ooo_cmdsn_tail->cmdsn != (cmdsn - 1))
+		ooo_tail = list_entry(sess->sess_ooo_cmdsn_list.prev,
+				typeof(*ooo_tail), ooo_list);
+		if (ooo_tail->cmdsn != (cmdsn - 1))
 			batch = 1;
 	}
 

@@ -224,6 +224,7 @@ static int iscsi_login_zero_tsih_s1(
 	memcpy((void *)&sess->isid, (void *)pdu->isid, 6);
 	sess->exp_cmd_sn	= pdu->cmd_sn;
 	INIT_LIST_HEAD(&sess->sess_conn_list);
+	INIT_LIST_HEAD(&sess->sess_ooo_cmdsn_list);
 	INIT_LIST_HEAD(&sess->cr_active_list);
 	INIT_LIST_HEAD(&sess->cr_inactive_list);
 	init_MUTEX_LOCKED(&sess->async_msg_sem);

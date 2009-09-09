@@ -358,26 +358,22 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
 {
 	u32 dropped_count = 0;
-	iscsi_cmd_t *cmd = NULL, *cmd_tmp = NULL;
-	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_cmdsn_next = NULL;
+	iscsi_cmd_t *cmd, *cmd_tmp;
+	iscsi_ooo_cmdsn_t *ooo_cmdsn, *ooo_cmdsn_tmp;
 	iscsi_session_t *sess = SESS(conn);
 
 	spin_lock(&sess->cmdsn_lock);
-	ooo_cmdsn = sess->ooo_cmdsn_head;
-	while (ooo_cmdsn) {
-		ooo_cmdsn_next = ooo_cmdsn->next;
-		if (ooo_cmdsn->cid != conn->cid) {
-			ooo_cmdsn = ooo_cmdsn_next;
+	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
+			&sess->sess_ooo_cmdsn_list, ooo_list) {
+
+		if (ooo_cmdsn->cid != conn->cid)
 			continue;
-		}
 
 		dropped_count++;
 		TRACE(TRACE_ERL2, "Dropping unacknowledged CmdSN:"
 		" 0x%08x during connection recovery on CID: %hu\n",
 			ooo_cmdsn->cmdsn, conn->cid);
 		iscsi_remove_ooo_cmdsn(sess, ooo_cmdsn);
-
-		ooo_cmdsn = ooo_cmdsn_next;
 	}
 	SESS(conn)->ooo_cmdsn_count -= dropped_count;
 	spin_unlock(&sess->cmdsn_lock);

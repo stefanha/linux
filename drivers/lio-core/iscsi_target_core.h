@@ -306,8 +306,7 @@ typedef struct iscsi_ooo_cmdsn_s {
 	u32			cmdsn;
 	u32			exp_cmdsn;
 	struct iscsi_cmd_s	*cmd;
-	struct iscsi_ooo_cmdsn_s *next;
-	struct iscsi_ooo_cmdsn_s *prev;
+	struct list_head	ooo_list;
 } ____cacheline_aligned iscsi_ooo_cmdsn_t;
 
 typedef struct iscsi_datain_s {
@@ -658,13 +657,12 @@ typedef struct iscsi_session_s {
 	spinlock_t		cr_i_lock;
 	spinlock_t		session_usage_lock;
 	spinlock_t		ttt_lock;
-	iscsi_ooo_cmdsn_t	*ooo_cmdsn_head;
-	iscsi_ooo_cmdsn_t	*ooo_cmdsn_tail;
-	struct semaphore		async_msg_sem;
-	struct semaphore		reinstatement_sem;
-	struct semaphore		session_wait_sem;
-	struct semaphore		session_waiting_on_uc_sem;
-	struct timer_list		time2retain_timer;
+	struct list_head	sess_ooo_cmdsn_list;
+	struct semaphore	async_msg_sem;
+	struct semaphore	reinstatement_sem;
+	struct semaphore	session_wait_sem;
+	struct semaphore	session_waiting_on_uc_sem;
+	struct timer_list	time2retain_timer;
 	iscsi_sess_ops_t	*sess_ops;
 	struct se_session_s	*se_sess;
 	struct iscsi_portal_group_s *tpg;
