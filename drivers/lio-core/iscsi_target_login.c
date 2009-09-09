@@ -190,8 +190,11 @@ static void iscsi_login_set_conn_values(
 {
 	conn->sess		= sess;
 	conn->cid 		= cid;
-#warning FIXME: Generate random default StatSN for connection
-	conn->stat_sn		= 1;
+	/*
+	 * Generate a random Status sequence number (statsn) for the new
+	 * iSCSI connection.
+	 */
+	get_random_bytes(&conn->stat_sn, sizeof(u32));
 
 	down(&iscsi_global->auth_id_sem);
 	conn->auth_id		= iscsi_global->auth_id++;
