@@ -478,10 +478,8 @@ typedef struct iscsi_cmd_s {
 	struct iscsi_session_s	*sess;
 	/* Next command in the session pool */
 	struct iscsi_cmd_s	*next;
-	/* Next command in connection list */
-	struct iscsi_cmd_s	*i_next;
-	/* Previous command in connection list */
-	struct iscsi_cmd_s	*i_prev;
+	/* list_head for connection list */
+	struct list_head	i_list;
 	/* Next command in DAS transport list */
 	struct iscsi_cmd_s	*t_next;
 	/* Previous command in DAS transport list */
@@ -575,10 +573,8 @@ typedef struct iscsi_conn_s {
 	spinlock_t		nopin_timer_lock;
 	spinlock_t		response_queue_lock;
 	spinlock_t		state_lock;
-	/* Head of command list for this connection */
-	iscsi_cmd_t		*cmd_head;
-	/* Tail of command list for this connection */
-	iscsi_cmd_t		*cmd_tail;
+	/* list_head of iscsi_cmd_t for this connection */
+	struct list_head	conn_cmd_list;
 	iscsi_queue_req_t	*immed_queue_head;
 	iscsi_queue_req_t	*immed_queue_tail;
 	iscsi_queue_req_t	*response_queue_head;
@@ -607,8 +603,7 @@ typedef struct iscsi_conn_recovery_s {
 	u32			cmd_count;
 	u32			maxrecvdatasegmentlength;
 	int			ready_for_reallegiance;
-	iscsi_cmd_t		*conn_recovery_cmd_head;
-	iscsi_cmd_t		*conn_recovery_cmd_tail;
+	struct list_head	conn_recovery_cmd_list;
 	spinlock_t		conn_recovery_cmd_lock;
 	struct semaphore		time2wait_sem;
 	struct timer_list		time2retain_timer;

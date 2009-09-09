@@ -36,6 +36,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/in.h>
+#include <linux/list.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi.h>
@@ -78,14 +79,7 @@
 inline void iscsi_attach_cmd_to_queue(iscsi_conn_t *conn, iscsi_cmd_t *cmd)
 {
 	spin_lock_bh(&conn->cmd_lock);
-	if (!conn->cmd_head && !conn->cmd_tail) {
-		conn->cmd_head = conn->cmd_tail = cmd;
-		cmd->i_prev = cmd->i_next = NULL;
-	} else {
-		conn->cmd_tail->i_next = cmd;
-		cmd->i_prev = conn->cmd_tail;
-		conn->cmd_tail = cmd;
-	}
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
 	spin_unlock_bh(&conn->cmd_lock);
 
 	atomic_inc(&conn->active_cmds);
@@ -99,39 +93,8 @@ inline void iscsi_remove_cmd_from_conn_list(
 	iscsi_cmd_t *cmd,
 	iscsi_conn_t *conn)
 {
-	/*
-	 * Only element in list.
-	 */
-	if (!cmd->i_prev && !cmd->i_next)
-		conn->cmd_head = conn->cmd_tail = NULL;
-	else {
-		/*
-		 * Head of list.
-		 */
-		if (!cmd->i_prev) {
-			cmd->i_next->i_prev = NULL;
-			conn->cmd_head = cmd->i_next;
-			if (!conn->cmd_head->i_next)
-				conn->cmd_tail = conn->cmd_head;
-		} else if (!cmd->i_next) {
-			/*
-			 * Tail of list.
-			 */
-			cmd->i_prev->i_next = NULL;
-			conn->cmd_tail = cmd->i_prev;
-		} else {
-			/*
-			 * Somewhere in the middle.
-			 */
-			cmd->i_next->i_prev = cmd->i_prev;
-			cmd->i_prev->i_next = cmd->i_next;
-		}
-		cmd->i_next = cmd->i_prev = NULL;
-	}
-
+	list_del(&cmd->i_list);
 	atomic_dec(&conn->active_cmds);
-
-	return;
 }
 
 
@@ -141,14 +104,12 @@ inline void iscsi_remove_cmd_from_conn_list(
  */
 inline void iscsi_ack_from_expstatsn(iscsi_conn_t *conn, u32 exp_statsn)
 {
-	iscsi_cmd_t *cmd = NULL, *cmd_next = NULL;
+	iscsi_cmd_t *cmd;
 
 	conn->exp_statsn = exp_statsn;
 
 	spin_lock_bh(&conn->cmd_lock);
-	cmd = conn->cmd_head;
-	while (cmd) {
-		cmd_next = cmd->i_next;
+	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 
 		spin_lock(&cmd->istate_lock);
 		if ((cmd->i_state == ISTATE_SENT_STATUS) &&
@@ -157,16 +118,11 @@ inline void iscsi_ack_from_expstatsn(iscsi_conn_t *conn, u32 exp_statsn)
 			spin_unlock(&cmd->istate_lock);
 			iscsi_add_cmd_to_immediate_queue(cmd, conn,
 					cmd->i_state);
-			cmd = cmd_next;
 			continue;
 		}
 		spin_unlock(&cmd->istate_lock);
-
-		cmd = cmd_next;
 	}
 	spin_unlock_bh(&conn->cmd_lock);
-
-	return;
 }
 
 /*	iscsi_remove_conn_from_list():
@@ -307,6 +263,7 @@ iscsi_cmd_t *iscsi_allocate_cmd(iscsi_conn_t *conn)
 	}
 
 	cmd->conn	= conn;
+	INIT_LIST_HEAD(&cmd->i_list);
 	init_MUTEX_LOCKED(&cmd->reject_sem);
 	init_MUTEX_LOCKED(&cmd->unsolicited_data_sem);
 	spin_lock_init(&cmd->datain_lock);
@@ -705,10 +662,10 @@ iscsi_cmd_t *iscsi_find_cmd_from_itt(
 	iscsi_conn_t *conn,
 	u32 init_task_tag)
 {
-	iscsi_cmd_t *cmd = NULL;
+	iscsi_cmd_t *cmd;
 
 	spin_lock_bh(&conn->cmd_lock);
-	for (cmd = conn->cmd_head; cmd; cmd = cmd->i_next) {
+	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 		if (cmd->init_task_tag == init_task_tag)
 			break;
 	}
@@ -732,10 +689,10 @@ iscsi_cmd_t *iscsi_find_cmd_from_itt_or_dump(
 	u32 init_task_tag,
 	u32 length)
 {
-	iscsi_cmd_t *cmd = NULL;
+	iscsi_cmd_t *cmd;
 
 	spin_lock_bh(&conn->cmd_lock);
-	for (cmd = conn->cmd_head; cmd; cmd = cmd->i_next) {
+	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 		if (cmd->init_task_tag == init_task_tag)
 			break;
 	}
@@ -763,7 +720,7 @@ iscsi_cmd_t *iscsi_find_cmd_from_ttt(
 	iscsi_cmd_t *cmd = NULL;
 
 	spin_lock_bh(&conn->cmd_lock);
-	for (cmd = conn->cmd_head; cmd; cmd = cmd->i_next) {
+	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 		if (cmd->targ_xfer_tag == targ_xfer_tag)
 			break;
 	}
@@ -799,8 +756,7 @@ int iscsi_find_cmd_for_recovery(
 	spin_lock(&sess->cr_i_lock);
 	for (cr = sess->cr_i_head; cr; cr = cr->next) {
 		spin_lock(&cr->conn_recovery_cmd_lock);
-		for (cmd = cr->conn_recovery_cmd_head; cmd;
-		     cmd = cmd->i_next) {
+		list_for_each_entry(cmd, &cr->conn_recovery_cmd_list, i_list) {
 			if (cmd->init_task_tag == init_task_tag) {
 				found_itt = 1;
 				break;
@@ -827,8 +783,7 @@ int iscsi_find_cmd_for_recovery(
 	spin_lock(&sess->cr_a_lock);
 	for (cr = sess->cr_a_head; cr; cr = cr->next) {
 		spin_lock(&cr->conn_recovery_cmd_lock);
-		for (cmd = cr->conn_recovery_cmd_head; cmd;
-		     cmd = cmd->i_next) {
+		list_for_each_entry(cmd, &cr->conn_recovery_cmd_list, i_list) {
 			if (cmd->init_task_tag == init_task_tag) {
 				found_itt = 1;
 				break;

@@ -66,6 +66,7 @@
  */
 static void iscsi_login_init_conn(iscsi_conn_t *conn)
 {
+	INIT_LIST_HEAD(&conn->conn_cmd_list);
 	init_MUTEX_LOCKED(&conn->conn_post_wait_sem);
 	init_MUTEX_LOCKED(&conn->conn_wait_sem);
 	init_MUTEX_LOCKED(&conn->conn_wait_rcfr_sem);

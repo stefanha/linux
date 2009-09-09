@@ -50,7 +50,6 @@
 
 #include <iscsi_linux_defs.h>
 #include <iscsi_debug.h>
-#include <iscsi_lists.h>
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
 #include <iscsi_target_core.h>
@@ -4843,17 +4842,15 @@ out:
  */
 static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
 {
-	iscsi_cmd_t *cmd = NULL, *cmd_next = NULL;
+	iscsi_cmd_t *cmd = NULL, *cmd_tmp = NULL;
 	iscsi_session_t *sess = SESS(conn);
 
 	spin_lock_bh(&conn->cmd_lock);
-	cmd = conn->cmd_head;
-	while (cmd) {
-		cmd_next = cmd->i_next;
-
+	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
 		if (!(SE_CMD(cmd)) ||
 		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD)) {
 
+			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
 			iscsi_increment_maxcmdsn(cmd, sess);
 			/*
@@ -4867,9 +4864,9 @@ static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
 				__iscsi_release_cmd_to_pool(cmd, sess);
 
 			spin_lock_bh(&conn->cmd_lock);
-			cmd = cmd_next;
 			continue;
 		}
+		list_del(&cmd->i_list);
 		spin_unlock_bh(&conn->cmd_lock);
 
 		iscsi_increment_maxcmdsn(cmd, sess);
@@ -4879,8 +4876,6 @@ static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
 						1, 1);
 
 		spin_lock_bh(&conn->cmd_lock);
-
-		cmd = cmd_next;
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 }
@@ -4892,21 +4887,14 @@ static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
 static void iscsi_stop_timers_for_cmds(
 	iscsi_conn_t *conn)
 {
-	iscsi_cmd_t *cmd = NULL, *cmd_next = NULL;
+	iscsi_cmd_t *cmd;
 
 	spin_lock_bh(&conn->cmd_lock);
-	cmd = conn->cmd_head;
-	while (cmd) {
-		cmd_next = cmd->i_next;
-
+	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 		if (cmd->data_direction == ISCSI_WRITE)
 			iscsi_stop_dataout_timer(cmd);
-
-		cmd = cmd_next;
 	}
 	spin_unlock_bh(&conn->cmd_lock);
-
-	return;
 }
 
 /*	iscsi_close_connection():

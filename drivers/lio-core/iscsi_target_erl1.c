@@ -566,7 +566,7 @@ int iscsi_handle_status_snack(
 
 	while (begrun < last_statsn) {
 		spin_lock_bh(&conn->cmd_lock);
-		for (cmd = conn->cmd_head; cmd; cmd = cmd->i_next) {
+		list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 			if (cmd->stat_sn == begrun)
 				break;
 		}

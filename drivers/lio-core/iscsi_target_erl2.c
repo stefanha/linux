@@ -172,7 +172,7 @@ iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry(
  */
 void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 {
-	iscsi_cmd_t *cmd, *cmd_next;
+	iscsi_cmd_t *cmd, *cmd_tmp;
 	iscsi_conn_recovery_t *cr, *cr_next;
 
 	spin_lock(&sess->cr_a_lock);
@@ -182,10 +182,10 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 
 		spin_unlock(&sess->cr_a_lock);
 		spin_lock(&cr->conn_recovery_cmd_lock);
-		cmd = cr->conn_recovery_cmd_head;
-		while (cmd) {
-			cmd_next = cmd->i_next;
+		list_for_each_entry_safe(cmd, cmd_tmp,
+				&cr->conn_recovery_cmd_list, i_list) {
 
+			list_del(&cmd->i_list);
 			cmd->conn = NULL;
 			spin_unlock(&cr->conn_recovery_cmd_lock);
 			if (!(SE_CMD(cmd)) ||
@@ -196,8 +196,6 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
 			spin_lock(&cr->conn_recovery_cmd_lock);
-
-			cmd = cmd_next;
 		}
 		spin_unlock(&cr->conn_recovery_cmd_lock);
 		spin_lock(&sess->cr_a_lock);
@@ -215,10 +213,10 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 
 		spin_unlock(&sess->cr_i_lock);
 		spin_lock(&cr->conn_recovery_cmd_lock);
-		cmd = cr->conn_recovery_cmd_head;
-		while (cmd) {
-			cmd_next = cmd->i_next;
+		list_for_each_entry_safe(cmd, cmd_tmp,
+				&cr->conn_recovery_cmd_list, i_list) {
 
+			list_del(&cmd->i_list);
 			cmd->conn = NULL;
 			spin_unlock(&cr->conn_recovery_cmd_lock);
 			if (!(SE_CMD(cmd)) ||
@@ -229,8 +227,6 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
 			spin_lock(&cr->conn_recovery_cmd_lock);
-
-			cmd = cmd_next;
 		}
 		spin_unlock(&cr->conn_recovery_cmd_lock);
 		spin_lock(&sess->cr_i_lock);
@@ -240,8 +236,6 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
 		cr = cr_next;
 	}
 	spin_unlock(&sess->cr_i_lock);
-
-	return;
 }
 
 /*	iscsi_remove_active_connection_recovery_entry():
@@ -297,38 +291,7 @@ int iscsi_remove_cmd_from_connection_recovery(
 	}
 	cr = cmd->cr;
 
-	/*
-	/ * Only element in list.
-	 */
-	if (!cmd->i_prev && !cmd->i_next)
-		cr->conn_recovery_cmd_head =
-		cr->conn_recovery_cmd_tail = NULL;
-	else {
-		/*
-		 * Head of list.
-		 */
-		if (!cmd->i_prev) {
-			cmd->i_next->i_prev = NULL;
-			cr->conn_recovery_cmd_head = cmd->i_next;
-			if (!cr->conn_recovery_cmd_head->i_next)
-				cr->conn_recovery_cmd_tail =
-				cr->conn_recovery_cmd_head;
-		} else if (!cmd->i_next) {
-			/*
-			 * Tail of list.
-			 */
-			cmd->i_prev->i_next = NULL;
-			cr->conn_recovery_cmd_tail = cmd->i_prev;
-		} else {
-			/*
-			 * Somewhere in the middle.
-			 */
-			cmd->i_next->i_prev = cmd->i_prev;
-			cmd->i_prev->i_next = cmd->i_next;
-		}
-		cmd->i_next = cmd->i_prev = NULL;
-	}
-
+	list_del(&cmd->i_list);
 	return --cr->cmd_count;
 }
 
@@ -341,18 +304,16 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 	u32 exp_statsn)
 {
 	u32 dropped_count = 0;
-	iscsi_cmd_t *cmd, *cmd_next;
+	iscsi_cmd_t *cmd, *cmd_tmp;
 	iscsi_session_t *sess = cr->sess;
 
 	spin_lock(&cr->conn_recovery_cmd_lock);
-	cmd = cr->conn_recovery_cmd_head;
-	while (cmd) {
-		cmd_next = cmd->i_next;
+	list_for_each_entry_safe(cmd, cmd_tmp,
+			&cr->conn_recovery_cmd_list, i_list) {
 
 		if (((cmd->deferred_i_state != ISTATE_SENT_STATUS) &&
 		     (cmd->deferred_i_state != ISTATE_REMOVE)) ||
 		     (cmd->stat_sn >= exp_statsn)) {
-			cmd = cmd_next;
 			continue;
 		}
 
@@ -372,8 +333,6 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 			SE_CMD(cmd)->transport_wait_for_tasks(
 					SE_CMD(cmd), 1, 0);
 		spin_lock(&cr->conn_recovery_cmd_lock);
-
-		cmd = cmd_next;
 	}
 	spin_unlock(&cr->conn_recovery_cmd_lock);
 
@@ -405,7 +364,7 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
 {
 	u32 dropped_count = 0;
-	iscsi_cmd_t *cmd = NULL, *cmd_next = NULL;
+	iscsi_cmd_t *cmd = NULL, *cmd_tmp = NULL;
 	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_cmdsn_next = NULL;
 	iscsi_session_t *sess = SESS(conn);
 
@@ -430,14 +389,9 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
 	spin_unlock(&sess->cmdsn_lock);
 
 	spin_lock_bh(&conn->cmd_lock);
-	cmd = conn->cmd_head;
-	while (cmd) {
-		cmd_next = cmd->i_next;
-
-		if (!(cmd->cmd_flags & ICF_OOO_CMDSN)) {
-			cmd = cmd_next;
+	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
+		if (!(cmd->cmd_flags & ICF_OOO_CMDSN))
 			continue;
-		}
 
 		iscsi_remove_cmd_from_conn_list(cmd, conn);
 
@@ -450,8 +404,6 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
 			SE_CMD(cmd)->transport_wait_for_tasks(
 					SE_CMD(cmd), 1, 1);
 		spin_lock_bh(&conn->cmd_lock);
-
-		cmd = cmd_next;
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
@@ -468,7 +420,7 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
 int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 {
 	u32 cmd_count = 0;
-	iscsi_cmd_t *cmd, *cmd_next;
+	iscsi_cmd_t *cmd, *cmd_tmp;
 	iscsi_conn_recovery_t *cr;
 
 	/*
@@ -483,7 +435,8 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 			" iscsi_conn_recovery_t.\n");
 		return -1;
 	}
-
+	INIT_LIST_HEAD(&cr->conn_recovery_cmd_list);
+	spin_lock_init(&cr->conn_recovery_cmd_lock);
 	/*
 	 * Only perform connection recovery on ISCSI_INIT_SCSI_CMND or
 	 * ISCSI_INIT_NOP_OUT opcodes.  For all other opcodes call
@@ -494,9 +447,7 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 	 * sending the TMR response.
 	 */
 	spin_lock_bh(&conn->cmd_lock);
-	cmd = conn->cmd_head;
-	while (cmd) {
-		cmd_next = cmd->i_next;
+	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
 
 		if ((cmd->iscsi_opcode != ISCSI_INIT_SCSI_CMND) &&
 		    (cmd->iscsi_opcode != ISCSI_INIT_NOP_OUT)) {
@@ -516,8 +467,6 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 0);
 			spin_lock_bh(&conn->cmd_lock);
-
-			cmd = cmd_next;
 			continue;
 		}
 
@@ -545,8 +494,6 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
 			spin_lock_bh(&conn->cmd_lock);
-
-			cmd = cmd_next;
 			continue;
 		}
 
@@ -565,7 +512,9 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 
 		cmd->sess = SESS(conn);
 
+		iscsi_remove_cmd_from_conn_list(cmd, conn);
 		spin_unlock_bh(&conn->cmd_lock);
+
 		iscsi_free_all_datain_reqs(cmd);
 
 		if ((SE_CMD(cmd)) &&
@@ -573,13 +522,16 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 		     SE_CMD(cmd)->transport_wait_for_tasks)
 			SE_CMD(cmd)->transport_wait_for_tasks(SE_CMD(cmd),
 					0, 0);
+		/*
+		 * Add the iscsi_cmd_t to the connection recovery cmd list
+		 */
+		spin_lock(&cr->conn_recovery_cmd_lock);
+		list_add_tail(&cmd->i_list, &cr->conn_recovery_cmd_list);
+		spin_unlock(&cr->conn_recovery_cmd_lock);
 
 		spin_lock_bh(&conn->cmd_lock);
-
 		cmd->cr = cr;
 		cmd->conn = NULL;
-
-		cmd = cmd_next;
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
@@ -590,11 +542,6 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 	cr->cmd_count = cmd_count;
 	cr->maxrecvdatasegmentlength = CONN_OPS(conn)->MaxRecvDataSegmentLength;
 	cr->sess = SESS(conn);
-	cr->conn_recovery_cmd_head = conn->cmd_head;
-	cr->conn_recovery_cmd_tail = conn->cmd_tail;
-	spin_lock_init(&cr->conn_recovery_cmd_lock);
-
-	conn->cmd_head = conn->cmd_tail = NULL;
 
 	iscsi_attach_inactive_connection_recovery_entry(SESS(conn), cr);
 
