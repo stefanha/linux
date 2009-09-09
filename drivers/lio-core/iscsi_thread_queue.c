@@ -540,6 +540,8 @@ static int iscsi_signal_thread_pre_handler(se_thread_set_t *ts)
  */
 iscsi_conn_t *iscsi_rx_thread_pre_handler(se_thread_set_t *ts, int role)
 {
+	int ret;
+
 	spin_lock_bh(&ts->ts_state_lock);
 	if (ts->create_threads) {
 		spin_unlock_bh(&ts->ts_state_lock);
@@ -571,7 +573,9 @@ iscsi_conn_t *iscsi_rx_thread_pre_handler(se_thread_set_t *ts, int role)
 	ts->thread_clear &= ~ISCSI_CLEAR_RX_THREAD;
 	spin_unlock_bh(&ts->ts_state_lock);
 sleep:
-	down_interruptible(&ts->rx_start_sem);
+	ret = down_interruptible(&ts->rx_start_sem);
+	if (ret != 0)
+		return NULL;
 
 	if (iscsi_signal_thread_pre_handler(ts) < 0)
 		return NULL;
@@ -598,6 +602,8 @@ sleep:
  */
 iscsi_conn_t *iscsi_tx_thread_pre_handler(se_thread_set_t *ts, int role)
 {
+	int ret;
+
 	spin_lock_bh(&ts->ts_state_lock);
 	if (ts->create_threads) {
 		spin_unlock_bh(&ts->ts_state_lock);
@@ -628,7 +634,9 @@ iscsi_conn_t *iscsi_tx_thread_pre_handler(se_thread_set_t *ts, int role)
 	ts->thread_clear &= ~ISCSI_CLEAR_TX_THREAD;
 	spin_unlock_bh(&ts->ts_state_lock);
 sleep:
-	down_interruptible(&ts->tx_start_sem);
+	ret = down_interruptible(&ts->tx_start_sem);
+	if (ret != 0)
+		return NULL;
 
 	if (iscsi_signal_thread_pre_handler(ts) < 0)
 		return NULL;

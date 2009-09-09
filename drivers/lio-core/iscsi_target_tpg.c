@@ -577,8 +577,10 @@ iscsi_portal_group_t *core_get_tpg_from_np(
 int iscsi_get_tpg(
 	iscsi_portal_group_t *tpg)
 {
-	down_interruptible(&tpg->tpg_access_sem);
-	return (signal_pending(current)) ? -1 : 0;
+	int ret;
+
+	ret = down_interruptible(&tpg->tpg_access_sem);
+	return ((ret != 0) || signal_pending(current)) ? -1 : 0;
 }
 
 /*	iscsi_put_tpg():

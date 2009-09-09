@@ -290,6 +290,7 @@ int core_release_tiqns(void)
 
 int core_access_np(iscsi_np_t *np, iscsi_portal_group_t *tpg)
 {
+	int ret;
 	/*
 	 * Determine if the network portal is accepting storage traffic.
 	 */
@@ -317,8 +318,8 @@ int core_access_np(iscsi_np_t *np, iscsi_portal_group_t *tpg)
 	/*
 	 * Here we serialize access across the TIQN+TPG Tuple.
 	 */
-	down_interruptible(&tpg->np_login_sem);
-	if (signal_pending(current))
+	ret = down_interruptible(&tpg->np_login_sem);
+	if ((ret != 0) || signal_pending(current))
 		return -1;
 
 	spin_lock_bh(&tpg->tpg_state_lock);
@@ -1316,6 +1317,7 @@ int iscsi_add_reject(
 {
 	iscsi_cmd_t *cmd;
 	struct iscsi_targ_rjt *hdr;
+	int ret;
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
@@ -1341,7 +1343,9 @@ int iscsi_add_reject(
 	cmd->i_state = ISTATE_SEND_REJECT;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
-	down_interruptible(&cmd->reject_sem);
+	ret = down_interruptible(&cmd->reject_sem);
+	if (ret != 0)
+		return -1;
 
 	return (!fail_conn) ? 0 : -1;
 }
@@ -1359,6 +1363,7 @@ int iscsi_add_reject_from_cmd(
 {
 	iscsi_conn_t *conn;
 	struct iscsi_targ_rjt *hdr;
+	int ret;
 
 	if (!CONN(cmd)) {
 		printk(KERN_ERR "cmd->conn is NULL for ITT: 0x%08x\n",
@@ -1388,7 +1393,9 @@ int iscsi_add_reject_from_cmd(
 	cmd->i_state = ISTATE_SEND_REJECT;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
-	down_interruptible(&cmd->reject_sem);
+	ret = down_interruptible(&cmd->reject_sem);
+	if (ret != 0)
+		return -1;
 
 	return (!fail_conn) ? 0 : -1;
 }
@@ -4305,6 +4312,7 @@ static void iscsi_tx_thread_TCP_timeout(unsigned long data)
 static void iscsi_tx_thread_wait_for_TCP(iscsi_conn_t *conn)
 {
 	struct timer_list tx_TCP_timer;
+	int ret;
 
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
@@ -4313,7 +4321,7 @@ static void iscsi_tx_thread_wait_for_TCP(iscsi_conn_t *conn)
 			&conn->tx_half_close_sem, iscsi_tx_thread_TCP_timeout);
 		add_timer(&tx_TCP_timer);
 
-		down_interruptible(&conn->tx_half_close_sem);
+		ret = down_interruptible(&conn->tx_half_close_sem);
 
 		del_timer_sync(&tx_TCP_timer);
 	}
@@ -4350,10 +4358,10 @@ restart:
 	eodr = map_sg = ret = sent_status = use_misc = 0;
 
 	while (1) {
-		down_interruptible(&conn->tx_sem);
+		ret = down_interruptible(&conn->tx_sem);
 
 		if ((ts->status == ISCSI_THREAD_SET_RESET) ||
-		     signal_pending(current))
+		     (ret != 0) || signal_pending(current))
 			goto transport_err;
 
 #ifdef DEBUG_ERL
@@ -4647,6 +4655,7 @@ static void iscsi_rx_thread_TCP_timeout(unsigned long data)
 static void iscsi_rx_thread_wait_for_TCP(iscsi_conn_t *conn)
 {
 	struct timer_list rx_TCP_timer;
+	int ret;
 
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
@@ -4655,7 +4664,7 @@ static void iscsi_rx_thread_wait_for_TCP(iscsi_conn_t *conn)
 			&conn->rx_half_close_sem, iscsi_rx_thread_TCP_timeout);
 		add_timer(&rx_TCP_timer);
 
-		down_interruptible(&conn->rx_half_close_sem);
+		ret = down_interruptible(&conn->rx_half_close_sem);
 
 		del_timer_sync(&rx_TCP_timer);
 	}
