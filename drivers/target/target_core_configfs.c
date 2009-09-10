@@ -63,11 +63,11 @@ se_hba_t *target_core_get_hba_from_item(
 	struct config_item *item)
 {
 	se_hba_t *hba = container_of(to_config_group(item),
-				se_hba_t, hba_group);	
+				se_hba_t, hba_group);
 	if (!(hba))
 		return NULL;
 
-	if (core_get_hba(hba) < 0)	
+	if (core_get_hba(hba) < 0)
 		return NULL;
 
 	return hba;
@@ -489,8 +489,8 @@ static struct target_core_dev_attrib_attribute				\
 #define SE_DEV_ATTR_RO(_name);						\
 static struct target_core_dev_attrib_attribute				\
 			target_core_dev_attrib_##_name =		\
-		__CONFIGFS_EATTR_RO(_name,				\
-		target_core_dev_show_attr_##_name);
+	__CONFIGFS_EATTR_RO(_name,					\
+	target_core_dev_show_attr_##_name);
 
 DEF_DEV_ATTRIB(emulate_ua_intlck_ctrl);
 SE_DEV_ATTR(emulate_ua_intlck_ctrl, S_IRUGO | S_IWUSR);
@@ -557,9 +557,12 @@ static struct target_core_dev_wwn_attribute target_core_dev_wwn_##_name = \
 		target_core_dev_wwn_store_attr_##_name);
 
 #define SE_DEV_WWN_ATTR_RO(_name);					\
-static struct target_core_dev_wwn_attribute target_core_dev_wwn_##_name = \
+do {									\
+	static struct target_core_dev_wwn_attribute			\
+			target_core_dev_wwn_##_name =			\
 		__CONFIGFS_EATTR_RO(_name,				\
-		target_core_dev_wwn_show_attr_##_name);
+		target_core_dev_wwn_show_attr_##_name);			\
+} while (0);
 
 /*
  * VPD page 0x80 Unit serial
@@ -640,7 +643,7 @@ static ssize_t target_core_dev_wwn_store_attr_vpd_unit_serial(
 	printk(KERN_INFO "Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
 			" %s\n", su_dev->t10_wwn.unit_serial);
 	if (dev)
-		transport_rescan_evpd_device_ident(dev);	
+		transport_rescan_evpd_device_ident(dev);
 
 	return count;
 }
@@ -820,7 +823,7 @@ static struct target_core_dev_pr_attribute target_core_dev_pr_##_name = \
 #define SE_DEV_PR_ATTR_RO(_name);					\
 static struct target_core_dev_pr_attribute target_core_dev_pr_##_name =	\
 	__CONFIGFS_EATTR_RO(_name,					\
-	target_core_dev_pr_show_attr_##_name);				\
+	target_core_dev_pr_show_attr_##_name);
 
 /*
  * res_holder
@@ -1219,14 +1222,14 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 			if (strlen(ptr) > PR_APTPL_MAX_IPORT_LEN) {
 				printk(KERN_ERR "APTPL metadata initiator_node="
 					" exceeds PR_APTPL_MAX_IPORT_LEN: %d\n",
-					PR_APTPL_MAX_IPORT_LEN);	
+					PR_APTPL_MAX_IPORT_LEN);
 				ret = -1;
 				break;
 			}
 			i_port = ptr;
 			continue;
 		}
-		ptr2 = strstr(cur, "sa_res_key");	
+		ptr2 = strstr(cur, "sa_res_key");
 		if (ptr2) {
 			transport_check_dev_params_delim(ptr, &cur);
 			ret = strict_strtoull(ptr, 0, &tmp_ll);
@@ -1286,7 +1289,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 					" res_all_tg_pt=\n");
 				break;
 			}
-			all_tg_pt = (int)tmp_l;	
+			all_tg_pt = (int)tmp_l;
 			continue;
 		}
 		ptr2 = strstr(cur, "mapped_lun");
@@ -1295,7 +1298,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 			ret = strict_strtoul(ptr, 0, &tmp_l);
 			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoul() failed for"
-					" mapped_lun=\n");	
+					" mapped_lun=\n");
 				break;
 			}
 			mapped_lun = (u32)tmp_l;
@@ -1303,8 +1306,8 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 		}
 		/*
 		 * PR APTPL Metadata for Target Port
-		 */	
-		ptr2 = strstr(cur, "target_fabric");	
+		 */
+		ptr2 = strstr(cur, "target_fabric");
 		if (ptr2) {
 			transport_check_dev_params_delim(ptr, &cur);
 			t_fabric = ptr;
@@ -1316,7 +1319,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 			if (strlen(ptr) > PR_APTPL_MAX_TPORT_LEN) {
 				printk(KERN_ERR "APTPL metadata target_node="
 					" exceeds PR_APTPL_MAX_TPORT_LEN: %d\n",
-					PR_APTPL_MAX_TPORT_LEN);        
+					PR_APTPL_MAX_TPORT_LEN);
 				ret = -1;
 				break;
 			}
@@ -1341,7 +1344,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 			ret = strict_strtoul(ptr, 0, &tmp_l);
 			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoul() failed for"
-					" port_rtpi=\n");	
+					" port_rtpi=\n");
 				break;
 			}
 			port_rpti = (u16)tmp_l;
@@ -1365,7 +1368,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 	if (!(i_port) || !(t_port) || !(sa_res_key)) {
 		printk(KERN_ERR "Illegal parameters for APTPL registration\n");
 		ret = -1;
-		goto out;	
+		goto out;
 	}
 
 	if (res_holder && !(type)) {
@@ -1376,8 +1379,8 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 	}
 
 	ret = core_scsi3_alloc_aptpl_registration(T10_RES(su_dev), sa_res_key,
-			i_port, mapped_lun, t_port, tpgt, target_lun, res_holder,
-			all_tg_pt, type);
+			i_port, mapped_lun, t_port, tpgt, target_lun,
+			res_holder, all_tg_pt, type);
 out:
 	kfree(buf);
 	return (ret == 0) ? count : -EINVAL;
@@ -1416,78 +1419,79 @@ static struct config_item_type target_core_dev_pr_cit = {
 /* Start functions for struct config_item type target_core_dev_snap_cit */
 
 CONFIGFS_EATTR_STRUCT(target_core_dev_snap, se_subsystem_dev_s);
-#define SE_DEV_SNAP_ATTR(_name, _mode)						\
-static struct target_core_dev_snap_attribute target_core_dev_snap_attr_##_name = \
-	__CONFIGFS_EATTR(_name, _mode,						\
-	target_core_dev_snap_show_attr_##_name,					\
+#define SE_DEV_SNAP_ATTR(_name, _mode)					\
+static struct target_core_dev_snap_attribute				\
+			target_core_dev_snap_attr_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	target_core_dev_snap_show_attr_##_name,				\
 	target_core_dev_snap_store_attr_##_name);
 
-#define DEF_SNAP_ATTRIB_STR_SHOW(_name)						\
-static ssize_t target_core_dev_snap_show_attr_##_name(				\
-	struct se_subsystem_dev_s *se_dev,					\
-	char *page)								\
-{										\
-	return snprintf(page, PAGE_SIZE, "%s\n", SE_DEV_SNAP(se_dev)->_name);	\
+#define DEF_SNAP_ATTRIB_STR_SHOW(_name)					\
+static ssize_t target_core_dev_snap_show_attr_##_name(			\
+	struct se_subsystem_dev_s *se_dev,				\
+	char *page)							\
+{									\
+	return snprintf(page, PAGE_SIZE, "%s\n", SE_DEV_SNAP(se_dev)->_name); \
 }
 
-#define DEF_SNAP_ATTRIB_STR_STORE(_name, _max)					\
-static ssize_t target_core_dev_snap_store_attr_##_name(				\
-	struct se_subsystem_dev_s *se_dev,					\
-	const char *page,							\
-	size_t count)								\
-{										\
-	if (strlen(page) > _max) {						\
-		printk(KERN_ERR "String length for attrib: %s exceeds max:"	\
-			" %d\n", __stringify(_name), _max);			\
-		return -EINVAL;							\
-	}									\
-	snprintf(SE_DEV_SNAP(se_dev)->_name, PAGE_SIZE, "%s", page);		\
-	return count;								\
+#define DEF_SNAP_ATTRIB_STR_STORE(_name, _max)				\
+static ssize_t target_core_dev_snap_store_attr_##_name(			\
+	struct se_subsystem_dev_s *se_dev,				\
+	const char *page,						\
+	size_t count)							\
+{									\
+	if (strlen(page) > _max) {					\
+		printk(KERN_ERR "String length for attrib: %s exceeds max:" \
+			" %d\n", __stringify(_name), _max);		\
+		return -EINVAL;						\
+	}								\
+	snprintf(SE_DEV_SNAP(se_dev)->_name, PAGE_SIZE, "%s", page);	\
+	return count;							\
 }
 
-#define DEF_SNAP_ATTRIB_STR(_name, _max)					\
-DEF_SNAP_ATTRIB_STR_SHOW(_name)							\
+#define DEF_SNAP_ATTRIB_STR(_name, _max)				\
+DEF_SNAP_ATTRIB_STR_SHOW(_name)						\
 DEF_SNAP_ATTRIB_STR_STORE(_name, _max)
 
-#define DEF_SNAP_ATTRIB_INT_SHOW(_name)						\
-static ssize_t target_core_dev_snap_show_attr_##_name(				\
-	struct se_subsystem_dev_s *se_dev,					\
-	char *page)								\
-{										\
-	return snprintf(page, PAGE_SIZE, "%d\n", SE_DEV_SNAP(se_dev)->_name);	\
+#define DEF_SNAP_ATTRIB_INT_SHOW(_name)					\
+static ssize_t target_core_dev_snap_show_attr_##_name(			\
+	struct se_subsystem_dev_s *se_dev,				\
+	char *page)							\
+{									\
+	return snprintf(page, PAGE_SIZE, "%d\n", SE_DEV_SNAP(se_dev)->_name); \
 }
 
-#define DEF_SNAP_ATTRIB_INT_STORE(_name, _max, _min)				\
-static ssize_t target_core_dev_snap_store_attr_##_name(				\
-	struct se_subsystem_dev_s *se_dev,					\
-	const char *page,							\
-	size_t count)								\
-{										\
-	int ret;								\
-	unsigned long val;							\
-										\
-	ret = strict_strtoul(page, 0, &val);					\
-	if (ret < 0) {								\
-		printk(KERN_ERR "strict_strtoul() failed for %s with"		\
-			" ret: %d\n", __stringify(_name), ret);			\
-		return -EINVAL;							\
-	}									\
-	if ((_max != 0) && (val > _max)) {					\
-		printk(KERN_ERR "snap attribute: %s exceeds max: %d\n",		\
-				__stringify(_name), _max);			\
-		return -EINVAL;							\
-	}									\
-	if (val < _min) {							\
-		printk(KERN_ERR "snap attribute: %s less than min: %d\n",	\
-				__stringify(_name), _min);			\
-		return -EINVAL;							\
-	}									\
-	SE_DEV_SNAP(se_dev)->_name = (int)val;					\
-	return count;								\
+#define DEF_SNAP_ATTRIB_INT_STORE(_name, _max, _min)			\
+static ssize_t target_core_dev_snap_store_attr_##_name(			\
+	struct se_subsystem_dev_s *se_dev,				\
+	const char *page,						\
+	size_t count)							\
+{									\
+	int ret;							\
+	unsigned long val;						\
+									\
+	ret = strict_strtoul(page, 0, &val);				\
+	if (ret < 0) {							\
+		printk(KERN_ERR "strict_strtoul() failed for %s with"	\
+			" ret: %d\n", __stringify(_name), ret);		\
+		return -EINVAL;						\
+	}								\
+	if ((_max != 0) && (val > _max)) {				\
+		printk(KERN_ERR "snap attribute: %s exceeds max: %d\n",	\
+				__stringify(_name), _max);		\
+		return -EINVAL;						\
+	}								\
+	if (val < _min) {						\
+		printk(KERN_ERR "snap attribute: %s less than min: %d\n", \
+				__stringify(_name), _min);		\
+		return -EINVAL;						\
+	}								\
+	SE_DEV_SNAP(se_dev)->_name = (int)val;				\
+	return count;							\
 }
 
-#define DEF_SNAP_ATTRIB_INT(_name, _max, _min)					\
-DEF_SNAP_ATTRIB_INT_SHOW(_name)							\
+#define DEF_SNAP_ATTRIB_INT(_name, _max, _min)				\
+DEF_SNAP_ATTRIB_INT_SHOW(_name)						\
 DEF_SNAP_ATTRIB_INT_STORE(_name, _max, _min)
 
 DEF_SNAP_ATTRIB_STR(contact, SNAP_CONTACT_LEN);
@@ -1508,25 +1512,32 @@ SE_DEV_SNAP_ATTR(enabled, S_IRUGO | S_IWUSR);
 DEF_SNAP_ATTRIB_INT(permissions, 1, 0);
 SE_DEV_SNAP_ATTR(permissions, S_IRUGO | S_IWUSR);
 
-DEF_SNAP_ATTRIB_INT(max_snapshots, 256, 1); /* Max number of snapshots to rotate */
+/* Max number of snapshots to rotate */
+DEF_SNAP_ATTRIB_INT(max_snapshots, 256, 1);
 SE_DEV_SNAP_ATTR(max_snapshots, S_IRUGO | S_IWUSR);
 
-DEF_SNAP_ATTRIB_INT(max_warn, 60, 0); /* Max minutes for warning emails about usage */
+/* Max minutes for warning emails about usage */
+DEF_SNAP_ATTRIB_INT(max_warn, 60, 0);
 SE_DEV_SNAP_ATTR(max_warn, S_IRUGO | S_IWUSR);
 
-DEF_SNAP_ATTRIB_INT(check_interval, 900, 5); /* 15 Minute max, 5 second min */
+/* 15 Minute max, 5 second min */
+DEF_SNAP_ATTRIB_INT(check_interval, 900, 5);
 SE_DEV_SNAP_ATTR(check_interval, S_IRUGO | S_IWUSR);
 
-DEF_SNAP_ATTRIB_INT(create_interval, 604800, 60); /* One 7-day week max, 1 minute min */
+/* One 7-day week max, 1 minute min */
+DEF_SNAP_ATTRIB_INT(create_interval, 604800, 60);
 SE_DEV_SNAP_ATTR(create_interval, S_IRUGO | S_IWUSR);
 
-DEF_SNAP_ATTRIB_INT(usage, 100, 0); /* Snapshot usage */
+/* Snapshot usage */
+DEF_SNAP_ATTRIB_INT(usage, 100, 0);
 SE_DEV_SNAP_ATTR(usage, S_IRUGO | S_IWUSR);
 
-DEF_SNAP_ATTRIB_INT(usage_warn, 100, 0); /* Snapshot usage before sending warning */
+/* Snapshot usage before sending warning */
+DEF_SNAP_ATTRIB_INT(usage_warn, 100, 0);
 SE_DEV_SNAP_ATTR(usage_warn, S_IRUGO | S_IWUSR);
 
-DEF_SNAP_ATTRIB_INT(vgs_usage_warn, 100, 0); /* Volume group usage before sending warning */
+/* Volume group usage before sending warning */
+DEF_SNAP_ATTRIB_INT(vgs_usage_warn, 100, 0);
 SE_DEV_SNAP_ATTR(vgs_usage_warn, S_IRUGO | S_IWUSR);
 
 CONFIGFS_EATTR_OPS(target_core_dev_snap, se_subsystem_dev_s, se_dev_snap_group);
@@ -1707,7 +1718,7 @@ static ssize_t target_core_store_dev_udev_path(
 		config_item_name(&hba->hba_group.cg_item),
 		config_item_name(&se_dev->se_dev_group.cg_item),
 		se_dev->se_dev_udev_path);
-		
+
 	return read_bytes;
 }
 
@@ -1974,7 +1985,7 @@ static struct target_core_alua_lu_gp_attribute				\
 			target_core_alua_lu_gp_##_name =		\
 	__CONFIGFS_EATTR(_name, _mode,					\
 	target_core_alua_lu_gp_show_attr_##_name,			\
-	target_core_alua_lu_gp_store_attr_##_name);			
+	target_core_alua_lu_gp_store_attr_##_name);
 
 #define SE_DEV_ALUA_LU_ATTR_RO(_name)					\
 static struct target_core_alua_lu_gp_attribute				\
@@ -2189,7 +2200,7 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_access_state(
 			" tg_pt_gp ID: %hu\n", tg_pt_gp->tg_pt_gp_valid_id);
 		return -EINVAL;
 	}
-	
+
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
 		printk("Unable to extract new ALUA access state from"
@@ -2206,7 +2217,7 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_access_state(
 
 	ret = core_alua_do_port_transition(tg_pt_gp, su_dev->se_dev_ptr,
 					NULL, NULL, new_state, 0);
-	return (!ret) ? count : -EINVAL;	
+	return (!ret) ? count : -EINVAL;
 }
 
 SE_DEV_ALUA_TG_PT_ATTR(alua_access_state, S_IRUGO | S_IWUSR);
@@ -2229,12 +2240,12 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_access_status(
 {
 	unsigned long tmp;
 	int new_status, ret;
-	
+
 	if (!(tg_pt_gp->tg_pt_gp_valid_id)) {
 		printk(KERN_ERR "Unable to do set ALUA access status on non"
 			" valid tg_pt_gp ID: %hu\n",
 			tg_pt_gp->tg_pt_gp_valid_id);
-		return -EINVAL;		
+		return -EINVAL;
 	}
 
 	ret = strict_strtoul(page, 0, &tmp);
@@ -2248,7 +2259,8 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_access_status(
 	if ((new_status != ALUA_STATUS_NONE) &&
 	    (new_status != ALUA_STATUS_ALTERED_BY_EXPLICT_STPG) &&
 	    (new_status != ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA)) {
-		printk(KERN_ERR "Illegal ALUA access status: 0x%02x\n", new_status);
+		printk(KERN_ERR "Illegal ALUA access status: 0x%02x\n",
+				new_status);
 		return -EINVAL;
 	}
 
@@ -2298,7 +2310,7 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_alua_write_metadata(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract alua_write_metadata\n");	
+		printk(KERN_ERR "Unable to extract alua_write_metadata\n");
 		return -EINVAL;
 	}
 
@@ -2352,7 +2364,7 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_trans_delay_msecs(
 	const char *page,
 	size_t count)
 {
-	return core_alua_store_trans_delay_msecs(tg_pt_gp, page, count);	
+	return core_alua_store_trans_delay_msecs(tg_pt_gp, page, count);
 }
 
 SE_DEV_ALUA_TG_PT_ATTR(trans_delay_msecs, S_IRUGO | S_IWUSR);
@@ -2397,7 +2409,7 @@ static ssize_t target_core_alua_tg_pt_gp_store_attr_tg_pt_gp_id(
 	size_t count)
 {
 	struct config_group *alua_tg_pt_gp_cg = &tg_pt_gp->tg_pt_gp_group;
-	unsigned long tg_pt_gp_id;	
+	unsigned long tg_pt_gp_id;
 	int ret;
 
 	ret = strict_strtoul(page, 0, &tg_pt_gp_id);
@@ -2707,7 +2719,7 @@ out:
 	if (T10_ALUA(se_dev)->default_tg_pt_gp) {
 		core_alua_free_tg_pt_gp(T10_ALUA(se_dev)->default_tg_pt_gp);
 		T10_ALUA(se_dev)->default_tg_pt_gp = NULL;
-        }
+	}
 	if (tg_pt_gp_cg)
 		kfree(tg_pt_gp_cg->default_groups);
 	if (dev_cg)
@@ -2735,7 +2747,7 @@ static void target_core_call_freedev(
 			&se_dev->se_dev_hba->hba_group.cg_item);
 	if (!(hba))
 		goto out;
-	
+
 	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0))

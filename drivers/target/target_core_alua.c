@@ -780,7 +780,7 @@ int core_alua_do_transition_tg_pt(
 	printk(KERN_INFO "Successful %s ALUA transition TG PT Group: %s ID: %hu"
 		" from primary access state %s to %s\n", (explict) ? "explict" :
 		"implict", config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item),
-		, tg_pt_gp->tg_pt_gp_id, core_alua_dump_state(old_state),
+		tg_pt_gp->tg_pt_gp_id, core_alua_dump_state(old_state),
 		core_alua_dump_state(new_state));
 
 	return 0;
