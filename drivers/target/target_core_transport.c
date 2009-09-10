@@ -1259,7 +1259,7 @@ static void __transport_add_task_to_execute_queue(
 				&dev->state_task_list);
 	else
 		list_add_tail(&task->t_state_list, &dev->state_task_list);
-	
+
 	atomic_set(&task->task_state_active, 1);
 
 	DEBUG_TSTATE("Added ITT: 0x%08x task[%p] to dev: %p\n",
@@ -1386,7 +1386,7 @@ int transport_check_device_tcq(
 }
 EXPORT_SYMBOL(transport_check_device_tcq);
 
-unsigned char *transport_dump_cmd_direction (se_cmd_t *cmd)
+unsigned char *transport_dump_cmd_direction(se_cmd_t *cmd)
 {
 	switch (cmd->data_direction) {
 	case SE_DIRECTION_NONE:
@@ -1613,13 +1613,13 @@ static int transport_get_inquiry(
 
 	i = buf[0] & 0x1f;
 
-	printk("  Type:   %s ", scsi_device_type(i));
-	printk("                 ANSI SCSI revision: %02x",
+	printk(KERN_INFO "  Type:   %s ", scsi_device_type(i));
+	printk(KERN_INFO "                 ANSI SCSI revision: %02x",
 				buf[2] & 0x07);
 	if ((buf[2] & 0x07) == 1 && (buf[3] & 0x0f) == 1)
-		printk(" CCS\n");
+		printk(KERN_INFO " CCS\n");
 	else
-		printk("\n");
+		printk(KERN_INFO "\n");
 
 	transport_passthrough_release(cmd);
 	return 0;
@@ -1983,7 +1983,7 @@ out:
 }
 
 int transport_rescan_evpd_device_ident(
-        se_device_t *dev)
+	se_device_t *dev)
 {
 	se_release_vpd_for_dev(dev);
 	transport_get_inquiry_vpd_device_ident(DEV_OBJ_API(dev),
@@ -2763,8 +2763,8 @@ int transport_check_alloc_task_attr(se_cmd_t *cmd)
 	if (cmd->sam_task_attr == TASK_ATTR_ACA) {
 		DEBUG_STA("SAM Task Attribute ACA"
 			" emulation is not supported\n");
-                return -1;
-        }
+		return -1;
+	}
 	/*
 	 * Used to determine when ORDERED commands should go from
 	 * Dormant to Active status.
@@ -2977,8 +2977,8 @@ int transport_generic_handle_data(
 	 * If the received CDB has aleady been ABORTED by the generic
 	 * target engine, we now call transport_check_aborted_status()
 	 * to queue any delated TASK_ABORTED status for the received CDB to the
-	 * fabric module as we are expecting no futher incoming DATA OUT sequences
-	 * at this point.
+	 * fabric module as we are expecting no futher incoming DATA OUT
+	 * sequences at this point.
 	 */
 	if (transport_check_aborted_status(cmd, 1) != 0)
 		return 0;
@@ -3117,9 +3117,8 @@ void transport_generic_request_failure(
 
 	transport_stop_all_task_timers(cmd);
 
-	if (dev) {
+	if (dev)
 		transport_failure_reset_queue_depth(dev);
-	}
 	/*
 	 * For SAM Task Attribute emulation for failed se_cmd_t
 	 */
@@ -3943,7 +3942,7 @@ static inline int transport_tcq_window_closed(se_device_t *dev)
 
 /*
  * Called from Fabric Module context from transport_execute_tasks()
- * 
+ *
  * The return of this function determins if the tasks from se_cmd_t
  * get added to the execution queue in transport_execute_tasks(),
  * or are added to the delayed or ordered lists here.
@@ -3991,7 +3990,7 @@ static inline int transport_execute_task_attr(se_cmd_t *cmd)
 		atomic_inc(&SE_DEV(cmd)->simple_cmds);
 		smp_mb__after_atomic_inc();
 	}
-	/* 
+	/*
 	 * Otherwise if one or more outstanding ORDERED task attribute exist,
 	 * add the dormant task(s) built for the passed se_cmd_t to the
 	 * execution queue and become in Active state for this se_device_t.
@@ -4070,8 +4069,8 @@ execute_tasks:
 }
 
 /*
- * Called to check se_device_t tcq depth window, and once open pull se_task_t from
- * se_device_t->execute_task_list and
+ * Called to check se_device_t tcq depth window, and once open pull se_task_t
+ * from se_device_t->execute_task_list and
  *
  * Called from transport_processing_thread()
  */
@@ -5159,7 +5158,7 @@ static int transport_generic_cmd_sequencer(
 			transport_set_sense_codes(cmd, 0x04, alua_ascq);
 			return 9; /* NOT READY */
 		}
-		return 6; /* INVALID_CDB_FIELD */	
+		return 6; /* INVALID_CDB_FIELD */
 	}
 	/*
 	 * Check status for SPC-3 Persistent Reservations
@@ -5374,14 +5373,14 @@ static int transport_generic_cmd_sequencer(
 			/* MAINTENANCE_OUT from SCC-2
 			 *
 			 * Check for emulated MO_SET_TARGET_PGS.
-                         */
-                        if (cdb[1] == MO_SET_TARGET_PGS) {
-                                cmd->transport_emulate_cdb =
-                                (T10_ALUA(su_dev)->alua_type ==
-                                 SPC3_ALUA_EMULATED) ?
-                                &core_scsi3_emulate_set_target_port_groups :
-                                NULL;
-                        }
+			 */
+			if (cdb[1] == MO_SET_TARGET_PGS) {
+				cmd->transport_emulate_cdb =
+				(T10_ALUA(su_dev)->alua_type ==
+					SPC3_ALUA_EMULATED) ?
+				&core_scsi3_emulate_set_target_port_groups :
+				NULL;
+			}
 
 			size = (cdb[6] << 24) | (cdb[7] << 16) |
 			       (cdb[8] << 8) | cdb[9];
@@ -5849,7 +5848,7 @@ void transport_complete_task_attr(se_cmd_t *cmd)
 	if (cmd->sam_task_attr == TASK_ATTR_SIMPLE) {
 		atomic_dec(&dev->simple_cmds);
 		smp_mb__after_atomic_dec();
-		dev->dev_cur_ordered_id++;	
+		dev->dev_cur_ordered_id++;
 		DEBUG_STA("Incremented dev->dev_cur_ordered_id: %u for"
 			" SIMPLE: %u\n", dev->dev_cur_ordered_id,
 			cmd->se_ordered_id);
@@ -5857,8 +5856,9 @@ void transport_complete_task_attr(se_cmd_t *cmd)
 		atomic_dec(&dev->dev_hoq_count);
 		smp_mb__after_atomic_dec();
 		dev->dev_cur_ordered_id++;
-		DEBUG_STA("Incremented dev_cur_ordered_id: %u for HEAD_OF_QUEUE:"
-			" %u\n", dev->dev_cur_ordered_id, cmd->se_ordered_id);
+		DEBUG_STA("Incremented dev_cur_ordered_id: %u for"
+			" HEAD_OF_QUEUE: %u\n", dev->dev_cur_ordered_id,
+			cmd->se_ordered_id);
 	} else if (cmd->sam_task_attr == TASK_ATTR_ORDERED) {
 		spin_lock(&dev->ordered_cmd_lock);
 		list_del(&cmd->se_ordered_list);
@@ -5867,8 +5867,8 @@ void transport_complete_task_attr(se_cmd_t *cmd)
 		spin_unlock(&dev->ordered_cmd_lock);
 
 		dev->dev_cur_ordered_id++;
-		DEBUG_STA("Incremented dev_cur_ordered_id: %u for ORDERED: %u\n",
-			dev->dev_cur_ordered_id, cmd->se_ordered_id);
+		DEBUG_STA("Incremented dev_cur_ordered_id: %u for ORDERED:"
+			" %u\n", dev->dev_cur_ordered_id, cmd->se_ordered_id);
 	}
 	/*
 	 * Process all commands up to the last received
@@ -5881,7 +5881,7 @@ void transport_complete_task_attr(se_cmd_t *cmd)
 
 		list_del(&cmd_p->se_delayed_list);
 		spin_unlock(&dev->delayed_cmd_lock);
-	
+
 		DEBUG_STA("Calling add_tasks() for"
 			" cmd_p: 0x%02x Task Attr: 0x%02x"
 			" Dormant -> Active, se_ordered_id: %u\n",
@@ -6388,7 +6388,7 @@ out:
 	return -1;
 }
 
-extern u32 transport_calc_sg_num (
+extern u32 transport_calc_sg_num(
 	se_task_t *task,
 	se_mem_t *in_se_mem,
 	u32 task_offset)
@@ -6568,7 +6568,7 @@ int transport_map_sg_to_mem(
 			se_mem->se_off = (*task_offset + sg_s[j].offset);
 
 			if ((sg_s[j].length - *task_offset) > task_size) {
-				 se_mem->se_len = task_size;
+				se_mem->se_len = task_size;
 
 				task_size -= se_mem->se_len;
 				if (!(task_size)) {
@@ -6653,7 +6653,8 @@ int transport_map_mem_to_mem(
 			if ((se_mem->se_len - *task_offset) > task_size) {
 				se_mem_new->se_len = task_size;
 
-				if (!(task_size -= se_mem_new->se_len)) {
+				task_size -= se_mem_new->se_len;
+				if (!(task_size)) {
 					*task_offset += se_mem_new->se_len;
 					goto next;
 				}
@@ -6876,7 +6877,8 @@ u32 transport_generic_get_cdb_count(
 		task->transport_map_task =
 			obj_api->get_map_SG(obj_ptr, cmd->data_direction);
 
-		if ((cdb = obj_api->get_cdb(obj_ptr, task))) {
+		cdb = obj_api->get_cdb(obj_ptr, task);
+		if ((cdb)) {
 			memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
 			cmd->transport_split_cdb(task->task_lba,
 					&task->task_sectors, cdb);
@@ -6949,7 +6951,7 @@ int transport_generic_new_cmd(se_cmd_t *cmd)
 	ti.se_obj_api = SE_LUN(cmd)->lun_obj_api;
 
 	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)) {
-/* #warning FIXME v2.8: Get rid of PAGE_SIZE usage */
+		/* #warning FIXME v3.2: Enable > PAGE_SIZE usage */
 		ret = cmd->transport_allocate_resources(cmd, cmd->data_length,
 				PAGE_SIZE);
 		if (ret < 0)
@@ -7406,9 +7408,9 @@ int transport_get_sense_codes(
 	u8 *asc,
 	u8 *ascq)
 {
-	*asc = cmd->scsi_asc;	
+	*asc = cmd->scsi_asc;
 	*ascq = cmd->scsi_ascq;
-	
+
 	return 0;
 }
 
@@ -7604,7 +7606,8 @@ int transport_check_aborted_status(se_cmd_t *cmd, int send_status)
 		return 0;
 
 	if (atomic_read(&T_TASK(cmd)->t_transport_aborted) != 0) {
-		if (!(send_status) || (cmd->se_cmd_flags & SCF_SENT_DELAYED_TAS))
+		if (!(send_status) ||
+		     (cmd->se_cmd_flags & SCF_SENT_DELAYED_TAS))
 			return 1;
 #if 0
 		printk(KERN_INFO "Sending delayed SAM_STAT_TASK_ABORTED"
