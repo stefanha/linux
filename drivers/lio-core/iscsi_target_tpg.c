@@ -535,6 +535,9 @@ void core_release_discovery_tpg(void)
 {
 	iscsi_portal_group_t *tpg = iscsi_global->discovery_tpg;
 
+	if (!(tpg))
+		return;
+
 	core_tpg_deregister(tpg->tpg_se_tpg);
 
 	kmem_cache_free(lio_tpg_cache, tpg);
