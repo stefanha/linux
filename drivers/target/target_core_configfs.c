@@ -1705,7 +1705,7 @@ static ssize_t target_core_store_dev_udev_path(
 
 	if (count > (SE_UDEV_PATH_LEN-1)) {
 		printk(KERN_ERR "udev_path count: %d exceeds"
-			" SE_UDEV_PATH_LEN-1: %u\n", count,
+			" SE_UDEV_PATH_LEN-1: %u\n", (int)count,
 			SE_UDEV_PATH_LEN-1);
 		return -EINVAL;
 	}
