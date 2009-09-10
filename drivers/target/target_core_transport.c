@@ -1613,13 +1613,13 @@ static int transport_get_inquiry(
 
 	i = buf[0] & 0x1f;
 
-	printk(KERN_INFO "  Type:   %s ", scsi_device_type(i));
-	printk(KERN_INFO "                 ANSI SCSI revision: %02x",
+	printk("  Type:   %s ", scsi_device_type(i));
+	printk("                 ANSI SCSI revision: %02x",
 				buf[2] & 0x07);
 	if ((buf[2] & 0x07) == 1 && (buf[3] & 0x0f) == 1)
-		printk(KERN_INFO " CCS\n");
+		printk(" CCS\n");
 	else
-		printk(KERN_INFO "\n");
+		printk("\n");
 
 	transport_passthrough_release(cmd);
 	return 0;
