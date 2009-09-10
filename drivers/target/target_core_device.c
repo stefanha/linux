@@ -411,7 +411,7 @@ se_dev_entry_t *core_get_se_deve_from_rtpi(
 				TPG_TFO(tpg)->get_fabric_name());
 			continue;
 		}
-		ret = configfs_depend_item(tf_ops->tf_subsys,	
+		ret = configfs_depend_item(tf_ops->tf_subsys,
 				&deve->se_lun_acl->se_lun_group.cg_item);
 		if (ret != 0) {
 			printk(KERN_ERR "configfs_depend_item() failed for"
@@ -1083,7 +1083,8 @@ int se_dev_set_queue_depth(se_device_t *dev, u32 queue_depth)
 	return 0;
 }
 
-/* #warning FIXME: Forcing max_sectors greater than get_max_sectors() disabled */
+/* #warning FIXME: Forcing max_sectors greater than
+	get_max_sectors() disabled */
 int se_dev_set_max_sectors(se_device_t *dev, u32 max_sectors)
 {
 	int force = 0; /* Force setting for VDEVS */
@@ -1108,7 +1109,7 @@ int se_dev_set_max_sectors(se_device_t *dev, u32 max_sectors)
 	}
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
 		if (max_sectors > TRANSPORT(dev)->get_max_sectors(dev)) {
-			 printk(KERN_ERR "dev[%p]: Passed max_sectors: %u"
+			printk(KERN_ERR "dev[%p]: Passed max_sectors: %u"
 				" greater than LIO-Core/SE_Device max_sectors:"
 				" %u\n", dev, max_sectors,
 				TRANSPORT(dev)->get_max_sectors(dev));

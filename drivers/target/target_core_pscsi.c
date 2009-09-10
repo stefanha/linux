@@ -538,7 +538,7 @@ se_device_t *pscsi_create_virtdevice(
 			break;
 		case TYPE_ROM:
 			dev = pscsi_create_type_rom(sd, pdv, se_dev, hba);
-			break;	
+			break;
 		default:
 			dev = pscsi_create_type_other(sd, pdv, se_dev, hba);
 			break;
@@ -815,7 +815,9 @@ void *pscsi_allocate_request(
 	return pt;
 }
 
-static inline void pscsi_blk_init_request(se_task_t *task, pscsi_plugin_task_t *pt)
+static inline void pscsi_blk_init_request(
+	se_task_t *task,
+	pscsi_plugin_task_t *pt)
 {
 	/*
 	 * Defined as "scsi command" in include/linux/blkdev.h.
@@ -1340,9 +1342,9 @@ int pscsi_map_task_SG(se_task_t *task)
 					tbio = tbio->bi_next = bio;
 			}
 
-			DEBUG_PSCSI("PSCSI: Calling bio_add_pc_page() i: %d bio:"
-				" %p page: %p len: %d off: %d\n", i, bio, page,
-				len, off);
+			DEBUG_PSCSI("PSCSI: Calling bio_add_pc_page() i: %d"
+				" bio: %p page: %p len: %d off: %d\n", i, bio,
+				page, len, off);
 
 			ret = bio_add_pc_page(pdv->pdv_sd->request_queue,
 					bio, page, bytes, off);

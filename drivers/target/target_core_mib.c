@@ -63,7 +63,7 @@ scsi_index_table_t scsi_index_table;
 #define ISPRINT(a)   ((a >= ' ') && (a <= '~'))
 
 static inline int list_is_first(const struct list_head *list,
-			        const struct list_head *head)
+				const struct list_head *head)
 {
 	return list->prev == head;
 }
@@ -641,8 +641,8 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 			    (!lun->se_dev))
 				continue;
 
-			seq_printf(seq,"%u %u %u %u %u %s %u %u %u %u %u %u"
-						" %u %s\n",
+			seq_printf(seq, "%u %u %u %u %u %s %u %u %u %u %u %u"
+					" %u %s\n",
 				/* scsiInstIndex */
 				(TPG_TFO(se_tpg)->tpg_get_inst_index != NULL) ?
 				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
@@ -771,7 +771,7 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 			TPG_TFO(se_tpg)->sess_get_initiator_wwn(se_sess,
 					(unsigned char *)&buf[0], 64);
 
-			seq_printf(seq,"%u %u %u %u %u %s+i+%s\n",
+			seq_printf(seq, "%u %u %u %u %u %s+i+%s\n",
 				/* scsiInstIndex */
 				(TPG_TFO(se_tpg)->tpg_get_inst_index != NULL) ?
 				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
@@ -971,7 +971,7 @@ int init_scsi_target_mib(void)
 
 	dir_entry = proc_mkdir("scsi_target/mib", NULL);
 	if (!(dir_entry)) {
-		printk("proc_mkdir() failed.\n");
+		printk(KERN_ERR "proc_mkdir() failed.\n");
 		return -1;
 	}
 

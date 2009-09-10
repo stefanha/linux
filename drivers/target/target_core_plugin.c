@@ -271,7 +271,7 @@ struct se_plugin_s *plugin_register(
 
 	if (*plugin_init != NULL) {
 		err = (*plugin_init)();
-		if (err) {	
+		if (err) {
 			plugin_deregister(plugin_loc, plugin_class);
 			return NULL;
 		}

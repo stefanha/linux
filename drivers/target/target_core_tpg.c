@@ -507,7 +507,7 @@ int core_tpg_del_initiator_node_acl(
 		 * If the $FABRIC_MOD session for the Initiator Node ACL exists,
 		 * forcefully shutdown the $FABRIC_MOD session/nexus.
 		 */
-                TPG_TFO(tpg)->close_session(sess);
+		TPG_TFO(tpg)->close_session(sess);
 
 		spin_lock_bh(&tpg->session_lock);
 	}

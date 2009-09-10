@@ -250,7 +250,8 @@ se_device_t *fd_create_virtdevice(
 					fd_dev->fd_bd->bd_disk->first_minor,
 					fd_dev);
 		if (!(bd)) {
-			printk("FILEIO: Unable to claim struct block_device\n");
+			printk(KERN_ERR "FILEIO: Unable to claim"
+				" struct block_device\n");
 			goto fail;
 		}
 
@@ -866,11 +867,11 @@ int fd_do_task(se_task_t *task)
 	req->fd_size = task->task_size;
 
 	if (req->fd_data_direction == FD_DATA_READ) {
-/*		ret = fd_do_aio_read(req, task); */
-/*		ret = fd_do_sendfile(req, task); */
+		/* ret = fd_do_aio_read(req, task); */
+		/* ret = fd_do_sendfile(req, task); */
 		ret = fd_do_readv(req, task);
 	} else {
-/*		ret = fd_do_aio_write(req, task); */
+		/* ret = fd_do_aio_write(req, task); */
 		ret = fd_do_writev(req, task);
 	}
 
