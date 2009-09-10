@@ -77,12 +77,14 @@ extern int iscsi_na_dataout_timeout(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (dataout_timeout > NA_DATAOUT_TIMEOUT_MAX) {
-		printk(KERN_ERR "Requested DataOut Timeout %u larger than maximum"
-			" %u\n", dataout_timeout, NA_DATAOUT_TIMEOUT_MAX);
+		printk(KERN_ERR "Requested DataOut Timeout %u larger than"
+			" maximum %u\n", dataout_timeout,
+			NA_DATAOUT_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (dataout_timeout < NA_DATAOUT_TIMEOUT_MIX) {
-		printk(KERN_ERR "Requested DataOut Timeout %u smaller than minimum"
-			" %u\n", dataout_timeout, NA_DATAOUT_TIMEOUT_MIX);
+		printk(KERN_ERR "Requested DataOut Timeout %u smaller than"
+			" minimum %u\n", dataout_timeout,
+			NA_DATAOUT_TIMEOUT_MIX);
 		return -EINVAL;
 	}
 
@@ -104,13 +106,13 @@ extern int iscsi_na_dataout_timeout_retries(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (dataout_timeout_retries > NA_DATAOUT_TIMEOUT_RETRIES_MAX) {
-		printk(KERN_ERR "Requested DataOut Timeout Retries %u larger than"
-			" maximum %u", dataout_timeout_retries,
+		printk(KERN_ERR "Requested DataOut Timeout Retries %u larger"
+			" than maximum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MAX);
 		return -EINVAL;
 	} else if (dataout_timeout_retries < NA_DATAOUT_TIMEOUT_RETRIES_MIN) {
-		printk(KERN_ERR "Requested DataOut Timeout Retries %u smaller than"
-			" minimum %u", dataout_timeout_retries,
+		printk(KERN_ERR "Requested DataOut Timeout Retries %u smaller"
+			" than minimum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MIN);
 		return -EINVAL;
 	}
@@ -144,8 +146,9 @@ extern int iscsi_na_nopin_timeout(
 		return -EINVAL;
 	} else if ((nopin_timeout < NA_NOPIN_TIMEOUT_MIN) &&
 		   (nopin_timeout != 0)) {
-		printk(KERN_ERR "Requested NopIn Timeout %u smaller than minimum"
-			" %u and not 0\n", nopin_timeout, NA_NOPIN_TIMEOUT_MIN);
+		printk(KERN_ERR "Requested NopIn Timeout %u smaller than"
+			" minimum %u and not 0\n", nopin_timeout,
+			NA_NOPIN_TIMEOUT_MIN);
 		return -EINVAL;
 	}
 
@@ -191,13 +194,13 @@ extern int iscsi_na_nopin_response_timeout(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (nopin_response_timeout > NA_NOPIN_RESPONSE_TIMEOUT_MAX) {
-		printk(KERN_ERR "Requested NopIn Response Timeout %u larger than"
-			" maximum %u\n", nopin_response_timeout,
+		printk(KERN_ERR "Requested NopIn Response Timeout %u larger"
+			" than maximum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (nopin_response_timeout < NA_NOPIN_RESPONSE_TIMEOUT_MIN) {
-		printk(KERN_ERR "Requested NopIn Response Timeout %u smaller than"
-			" minimum %u\n", nopin_response_timeout,
+		printk(KERN_ERR "Requested NopIn Response Timeout %u smaller"
+			" than minimum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MIN);
 		return -EINVAL;
 	}
@@ -244,8 +247,8 @@ extern int iscsi_na_random_datain_seq_offsets(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 
 	if (random_datain_seq_offsets != 0 && random_datain_seq_offsets != 1) {
-		printk(KERN_ERR "Requested Random DataIN Sequence Offsets: %u not"
-			" 0 or 1\n", random_datain_seq_offsets);
+		printk(KERN_ERR "Requested Random DataIN Sequence Offsets: %u"
+			" not 0 or 1\n", random_datain_seq_offsets);
 		return -EINVAL;
 	}
 

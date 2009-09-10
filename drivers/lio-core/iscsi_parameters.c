@@ -162,21 +162,26 @@ void iscsi_dump_sess_ops(iscsi_sess_ops_t *sess_ops)
 	printk(KERN_INFO "InitiatorAlias: %s\n", sess_ops->InitiatorAlias);
 	printk(KERN_INFO "TargetName: %s\n", sess_ops->TargetName);
 	printk(KERN_INFO "TargetAlias: %s\n", sess_ops->TargetAlias);
-	printk(KERN_INFO "TargetPortalGroupTag: %hu\n", sess_ops->TargetPortalGroupTag);
+	printk(KERN_INFO "TargetPortalGroupTag: %hu\n",
+			sess_ops->TargetPortalGroupTag);
 	printk(KERN_INFO "MaxConnections: %hu\n", sess_ops->MaxConnections);
-	printk(KERN_INFO "InitialR2T: %s\n", (sess_ops->InitialR2T) ? "Yes" : "No");
+	printk(KERN_INFO "InitialR2T: %s\n",
+			(sess_ops->InitialR2T) ? "Yes" : "No");
 	printk(KERN_INFO "ImmediateData: %s\n", (sess_ops->ImmediateData) ?
 			"Yes" : "No");
 	printk(KERN_INFO "MaxBurstLength: %u\n", sess_ops->MaxBurstLength);
 	printk(KERN_INFO "FirstBurstLength: %u\n", sess_ops->FirstBurstLength);
 	printk(KERN_INFO "DefaultTime2Wait: %hu\n", sess_ops->DefaultTime2Wait);
-	printk(KERN_INFO "DefaultTime2Retain: %hu\n", sess_ops->DefaultTime2Retain);
-	printk(KERN_INFO "MaxOutstandingR2T: %hu\n", sess_ops->MaxOutstandingR2T);
-	printk(KERN_INFO "DataPDUInOrder: %s\n", (sess_ops->DataPDUInOrder) ?
-			"Yes" : "No");
-	printk(KERN_INFO "DataSequenceInOrder: %s\n", (sess_ops->DataSequenceInOrder) ?
-			"Yes" : "No");
-	printk(KERN_INFO "ErrorRecoveryLevel: %hu\n", sess_ops->ErrorRecoveryLevel);
+	printk(KERN_INFO "DefaultTime2Retain: %hu\n",
+			sess_ops->DefaultTime2Retain);
+	printk(KERN_INFO "MaxOutstandingR2T: %hu\n",
+			sess_ops->MaxOutstandingR2T);
+	printk(KERN_INFO "DataPDUInOrder: %s\n",
+			(sess_ops->DataPDUInOrder) ? "Yes" : "No");
+	printk(KERN_INFO "DataSequenceInOrder: %s\n",
+			(sess_ops->DataSequenceInOrder) ? "Yes" : "No");
+	printk(KERN_INFO "ErrorRecoveryLevel: %hu\n",
+			sess_ops->ErrorRecoveryLevel);
 	printk(KERN_INFO "SessionType: %s\n", (sess_ops->SessionType) ?
 			"Discovery" : "Normal");
 }
@@ -298,7 +303,7 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	}
 	INIT_LIST_HEAD(&pl->param_list);
 	INIT_LIST_HEAD(&pl->extra_response_list);
-	
+
 	/*
 	 * The format for setting the initial parameter definitions are:
 	 *
@@ -328,8 +333,9 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	if (!(param))
 		goto out;
 
-	param = iscsi_set_default_param(pl, MAXCONNECTIONS, INITIAL_MAXCONNECTIONS,
-			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
+	param = iscsi_set_default_param(pl, MAXCONNECTIONS,
+			INITIAL_MAXCONNECTIONS, PHASE_OPERATIONAL,
+			SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_1_TO_65535, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
@@ -346,8 +352,9 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	if (!(param))
 		goto out;
 
-	param = iscsi_set_default_param(pl, INITIATORNAME, INITIAL_INITIATORNAME,
-			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_INITIATOR,
+	param = iscsi_set_default_param(pl, INITIATORNAME,
+			INITIAL_INITIATORNAME, PHASE_DECLARATIVE,
+			SCOPE_SESSION_WIDE, SENDER_INITIATOR,
 			TYPERANGE_ISCSINAME, USE_INITIAL_ONLY);
 	if (!(param))
 		goto out;
@@ -358,14 +365,16 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	if (!(param))
 		goto out;
 
-	param = iscsi_set_default_param(pl, INITIATORALIAS, INITIAL_INITIATORALIAS,
-			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_INITIATOR,
-			TYPERANGE_UTF8, USE_ALL);
+	param = iscsi_set_default_param(pl, INITIATORALIAS,
+			INITIAL_INITIATORALIAS, PHASE_DECLARATIVE,
+			SCOPE_SESSION_WIDE, SENDER_INITIATOR, TYPERANGE_UTF8,
+			USE_ALL);
 	if (!(param))
 		goto out;
 
-	param = iscsi_set_default_param(pl, TARGETADDRESS, INITIAL_TARGETADDRESS,
-			PHASE_DECLARATIVE, SCOPE_SESSION_WIDE, SENDER_TARGET,
+	param = iscsi_set_default_param(pl, TARGETADDRESS,
+			INITIAL_TARGETADDRESS, PHASE_DECLARATIVE,
+			SCOPE_SESSION_WIDE, SENDER_TARGET,
 			TYPERANGE_TARGETADDRESS, USE_ALL);
 	if (!(param))
 		goto out;
@@ -383,9 +392,10 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	if (!(param))
 		goto out;
 
-	param = iscsi_set_default_param(pl, IMMEDIATEDATA, INITIAL_IMMEDIATEDATA,
-			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
-			TYPERANGE_BOOL_AND, USE_LEADING_ONLY);
+	param = iscsi_set_default_param(pl, IMMEDIATEDATA,
+			INITIAL_IMMEDIATEDATA, PHASE_OPERATIONAL,
+			SCOPE_SESSION_WIDE, SENDER_BOTH, TYPERANGE_BOOL_AND,
+			USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
 
@@ -396,8 +406,9 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	if (!(param))
 		goto out;
 
-	param = iscsi_set_default_param(pl, MAXBURSTLENGTH, INITIAL_MAXBURSTLENGTH,
-			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
+	param = iscsi_set_default_param(pl, MAXBURSTLENGTH,
+			INITIAL_MAXBURSTLENGTH, PHASE_OPERATIONAL,
+			SCOPE_SESSION_WIDE, SENDER_BOTH,
 			TYPERANGE_512_TO_16777215, USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
@@ -430,9 +441,10 @@ int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
 	if (!(param))
 		goto out;
 
-	param = iscsi_set_default_param(pl, DATAPDUINORDER, INITIAL_DATAPDUINORDER,
-			PHASE_OPERATIONAL, SCOPE_SESSION_WIDE, SENDER_BOTH,
-			TYPERANGE_BOOL_OR, USE_LEADING_ONLY);
+	param = iscsi_set_default_param(pl, DATAPDUINORDER,
+			INITIAL_DATAPDUINORDER, PHASE_OPERATIONAL,
+			SCOPE_SESSION_WIDE, SENDER_BOTH, TYPERANGE_BOOL_OR,
+			USE_LEADING_ONLY);
 	if (!(param))
 		goto out;
 
@@ -914,56 +926,56 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
 #endif
 	if (IS_TYPERANGE_0_TO_2(param)) {
 		if ((value < 0) || (value > 2)) {
-			printk(KERN_ERR "Illegal value for \"%s\", must be between"
-				" 0 and 2.\n", param->name);
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
+				" between 0 and 2.\n", param->name);
 			return -1;
 		}
 		return 0;
 	}
 	if (IS_TYPERANGE_0_TO_3600(param)) {
 		if ((value < 0) || (value > 3600)) {
-			printk(KERN_ERR "Illegal value for \"%s\", must be between"
-				" 0 and 3600.\n", param->name);
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
+				" between 0 and 3600.\n", param->name);
 			return -1;
 		}
 		return 0;
 	}
 	if (IS_TYPERANGE_0_TO_32767(param)) {
 		if ((value < 0) || (value > 32767)) {
-			printk(KERN_ERR "Illegal value for \"%s\", must be between"
-				" 0 and 32767.\n", param->name);
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
+				" between 0 and 32767.\n", param->name);
 			return -1;
 		}
 		return 0;
 	}
 	if (IS_TYPERANGE_0_TO_65535(param)) {
 		if ((value < 0) || (value > 65535)) {
-			printk(KERN_ERR "Illegal value for \"%s\", must be between"
-				" 0 and 65535.\n", param->name);
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
+				" between 0 and 65535.\n", param->name);
 			return -1;
 		}
 		return 0;
 	}
 	if (IS_TYPERANGE_1_TO_65535(param)) {
 		if ((value < 1) || (value > 65535)) {
-			printk(KERN_ERR "Illegal value for \"%s\", must be between"
-				" 1 and 65535.\n", param->name);
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
+				" between 1 and 65535.\n", param->name);
 			return -1;
 		}
 		return 0;
 	}
 	if (IS_TYPERANGE_2_TO_3600(param)) {
 		if ((value < 2) || (value > 3600)) {
-			printk(KERN_ERR "Illegal value for \"%s\", must be between"
-				" 2 and 3600.\n", param->name);
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
+				" between 2 and 3600.\n", param->name);
 			return -1;
 		}
 		return 0;
 	}
 	if (IS_TYPERANGE_512_TO_16777215(param)) {
 		if ((value < 512) || (value > 16777215)) {
-			printk(KERN_ERR "Illegal value for \"%s\", must be between"
-				" 512 and 16777215.\n", param->name);
+			printk(KERN_ERR "Illegal value for \"%s\", must be"
+				" between 512 and 16777215.\n", param->name);
 			return -1;
 		}
 		return 0;
@@ -984,7 +996,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 
 	if ((strcmp(param->name, IFMARKINT)) &&
 			(strcmp(param->name, OFMARKINT))) {
-	       printk(KERN_ERR "Only parameters \"%s\" or \"%s\" may contain a"
+		printk(KERN_ERR "Only parameters \"%s\" or \"%s\" may contain a"
 			" numerical range value.\n", IFMARKINT, OFMARKINT);
 		return -1;
 	}
@@ -1049,9 +1061,9 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
 	} else {
 		if ((left_val < local_left_val) &&
 		    (right_val < local_left_val)) {
-			printk(KERN_ERR "Received value range \"%u~%u\" is below"
-				" minimum left value \"%u\" for key \"%s\","
-				" rejecting.\n", left_val, right_val,
+			printk(KERN_ERR "Received value range \"%u~%u\" is"
+				" below minimum left value \"%u\" for key"
+				" \"%s\", rejecting.\n", left_val, right_val,
 				local_left_val, param->name);
 			SET_PSTATE_REJECT(param);
 			if (iscsi_update_param_value(param, REJECT) < 0)
@@ -1280,8 +1292,8 @@ static int iscsi_check_acceptor_state(iscsi_param_t *param, char *value)
 		negoitated_value = iscsi_check_valuelist_for_support(
 					param, value);
 		if (!(negoitated_value)) {
-			printk(KERN_ERR "Proposer's value list \"%s\" contains no"
-				" valid values from Acceptor's value list"
+			printk(KERN_ERR "Proposer's value list \"%s\" contains"
+				" no valid values from Acceptor's value list"
 				" \"%s\".\n", value, param->value);
 			return -1;
 		}
@@ -1327,8 +1339,8 @@ static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
 		}
 		tilde_ptr = strchr(param->value, '~');
 		if (!(tilde_ptr)) {
-			printk(KERN_ERR "Unable to locate numerical range indicator"
-				" \"~\" for \"%s\".\n", param->name);
+			printk(KERN_ERR "Unable to locate numerical range"
+				" indicator \"~\" for \"%s\".\n", param->name);
 			return -1;
 		}
 		*tilde_ptr = '\0';
@@ -1343,8 +1355,8 @@ static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
 
 		if ((recieved_value < left_val) ||
 		    (recieved_value > right_val)) {
-			printk(KERN_ERR "Illegal response \"%s=%u\", value must be"
-				" between %u and %u.\n", param->name,
+			printk(KERN_ERR "Illegal response \"%s=%u\", value must"
+				" be between %u and %u.\n", param->name,
 				recieved_value, left_val, right_val);
 			return -1;
 		}
@@ -1403,8 +1415,8 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 		}
 
 /* #warning FIXME: Add check for X-ExtensionKey here */
-		printk(KERN_ERR "Standard iSCSI key \"%s\" cannot be answered with"
-			" \"%s\", protocol error.\n", param->name, value);
+		printk(KERN_ERR "Standard iSCSI key \"%s\" cannot be answered"
+			" with \"%s\", protocol error.\n", param->name, value);
 		return -1;
 	}
 
@@ -1413,8 +1425,8 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 		comma_ptr = strchr(value, ',');
 
 		if (comma_ptr && !IS_TYPE_VALUE_LIST(param)) {
-			printk(KERN_ERR "Detected value seperator \",\", but key"
-				" \"%s\" does not allow a value list,"
+			printk(KERN_ERR "Detected value seperator \",\", but"
+				" key \"%s\" does not allow a value list,"
 				" protocol error.\n", param->name);
 			return -1;
 		}
@@ -1422,8 +1434,9 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
 			*comma_ptr = '\0';
 
 		if (strlen(value) > MAX_KEY_VALUE_LENGTH) {
-			printk(KERN_ERR "Value for key \"%s\" exceeds %d, protocol"
-				" error.\n", param->name, MAX_KEY_VALUE_LENGTH);
+			printk(KERN_ERR "Value for key \"%s\" exceeds %d,"
+				" protocol error.\n", param->name,
+				MAX_KEY_VALUE_LENGTH);
 			return -1;
 		}
 
@@ -1603,7 +1616,7 @@ static int iscsi_enforce_integrity_rules(
 
 	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!(param->phase & phase))
-		       continue;
+			continue;
 		if (!SessionType && (!IS_PSTATE_ACCEPTOR(param) &&
 		     (strcmp(param->name, IFMARKER) &&
 		      strcmp(param->name, OFMARKER) &&
@@ -1622,7 +1635,7 @@ static int iscsi_enforce_integrity_rules(
 		if (!strcmp(param->name, MAXCONNECTIONS) && !SessionType) {
 			if (strcmp(param->value, "1")) {
 				if (iscsi_update_param_value(param, "1") < 0)
-					 return -1;
+					return -1;
 				TRACE(TRACE_PARAM, "Reset \"%s\" to \"%s\".\n",
 					param->name, param->value);
 			}
@@ -1668,7 +1681,7 @@ static int iscsi_enforce_integrity_rules(
 				continue;
 			param->state &= ~PSTATE_NEGOTIATE;
 			if (iscsi_update_param_value(param, IRRELEVANT) < 0)
-				 return -1;
+				return -1;
 			TRACE(TRACE_PARAM, "Reset \"%s\" to \"%s\".\n",
 					param->name, param->value);
 		}
@@ -1893,8 +1906,8 @@ void iscsi_set_connection_parameters(
 	char *tmpptr;
 	iscsi_param_t *param;
 
-	printk(KERN_INFO "-------------------------------------------------------"
-			"-----------\n");
+	printk(KERN_INFO "---------------------------------------------------"
+			"---------------\n");
 	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!IS_PSTATE_ACCEPTOR(param) && !IS_PSTATE_PROPOSER(param))
 			continue;
@@ -1934,8 +1947,8 @@ void iscsi_set_connection_parameters(
 				param->value);
 		}
 	}
-	printk(KERN_INFO "-------------------------------------------------------"
-			"-----------\n");
+	printk(KERN_INFO "----------------------------------------------------"
+			"--------------\n");
 }
 
 /*	iscsi_set_session_parameters():

@@ -897,9 +897,9 @@ static inline int iscsi_attach_ooo_cmdsn(
 			 */
 			list_for_each_entry(ooo_tmp, &sess->sess_ooo_cmdsn_list,
 						ooo_list) {
-				while (ooo_tmp->cmdsn < ooo_cmdsn->cmdsn) 
+				while (ooo_tmp->cmdsn < ooo_cmdsn->cmdsn)
 					continue;
-				
+
 				list_add(&ooo_cmdsn->ooo_list,
 					&ooo_tmp->ooo_list);
 				break;

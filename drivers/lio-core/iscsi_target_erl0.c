@@ -215,9 +215,9 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 
 		if ((first_burst_len != cmd->data_length) &&
 		    (first_burst_len != SESS_OPS_C(conn)->FirstBurstLength)) {
-			printk(KERN_ERR "Unsolicited non-immediate data received %u"
-			" does not equal FirstBurstLength: %u, and does not"
-				" equal ExpXferLen %u.\n", first_burst_len,
+			printk(KERN_ERR "Unsolicited non-immediate data"
+			" received %u does not equal FirstBurstLength: %u, and"
+			" does not equal ExpXferLen %u.\n", first_burst_len,
 				SESS_OPS_C(conn)->FirstBurstLength,
 				cmd->data_length);
 			transport_send_check_condition_and_sense(SE_CMD(cmd),
@@ -233,9 +233,9 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 			return DATAOUT_CANNOT_RECOVER;
 		}
 		if (first_burst_len == cmd->data_length) {
-			printk(KERN_ERR "Command ITT: 0x%08x reached ExpXferLen: %u"
-			", but F_BIT is not set. protocol error.\n",
-			cmd->init_task_tag, cmd->data_length);
+			printk(KERN_ERR "Command ITT: 0x%08x reached"
+			" ExpXferLen: %u, but F_BIT is not set. protocol"
+			" error.\n", cmd->init_task_tag, cmd->data_length);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 	}
@@ -355,16 +355,16 @@ static inline int iscsi_dataout_check_sequence(
 			}
 			if ((cmd->write_data_done + hdr->length) ==
 					cmd->data_length) {
-				printk(KERN_ERR "Command ITT: 0x%08x reached last"
-				" DataOUT PDU in sequence but F_BIT not set,"
-				" protocol error.\n", cmd->init_task_tag);
+				printk(KERN_ERR "Command ITT: 0x%08x reached"
+				" last DataOUT PDU in sequence but F_BIT not"
+				" set, protocol error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		} else {
 			if (next_burst_len == seq->xfer_len) {
-				printk(KERN_ERR "Command ITT: 0x%08x reached last"
-				" DataOUT PDU in sequence but F_BIT not set,"
-				" protocol error.\n", cmd->init_task_tag);
+				printk(KERN_ERR "Command ITT: 0x%08x reached"
+				" last DataOUT PDU in sequence but F_BIT not"
+				" set, protocol error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		}
@@ -797,8 +797,8 @@ int iscsi_check_post_dataout(
 		return iscsi_dataout_post_crc_passed(cmd, buf);
 	else {
 		if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
-			printk(KERN_ERR "Unable to recover from DataOUT CRC failure"
-				" while ERL=0, closing session.\n") ;
+			printk(KERN_ERR "Unable to recover from DataOUT CRC"
+				" failure while ERL=0, closing session.\n");
 			iscsi_add_reject_from_cmd(REASON_DATA_DIGEST_ERR,
 					1, 0, buf, cmd);
 			return DATAOUT_CANNOT_RECOVER;

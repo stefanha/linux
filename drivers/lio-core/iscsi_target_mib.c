@@ -916,7 +916,10 @@ static void *sess_conn_err_stats_seq_start(struct seq_file *seq, loff_t *pos)
 	return locate_tpg_start(seq, pos, &do_sess_check);
 }
 
-static void *sess_conn_err_stats_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+static void *sess_conn_err_stats_seq_next(
+	struct seq_file *seq,
+	void *v,
+	loff_t *pos)
 {
 	return locate_tpg_next(seq, v, pos, &do_sess_check);
 }
@@ -1060,7 +1063,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 				   state_str, "ipv4", conn->local_ip,
 				   proto_str, conn->local_port);
 
-		        if (conn->ipv6_login_ip != NULL)
+			if (conn->ipv6_login_ip != NULL)
 				seq_printf(seq, "[%s] %u",
 						&conn->ipv6_login_ip[0],
 						conn->login_port);
@@ -1173,8 +1176,9 @@ int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 				(u32)(deve->write_bytes >> 20),
 					/* scsiAuthIntrWrittenMegaBytes */
 				0, /* FIXME: scsiAuthIntrHSOutCommands */
-				(u32)(((u32)deve->creation_time - INITIAL_JIFFIES)
-					* 100 / HZ), /* scsiAuthIntrLastCreation */
+				(u32)(((u32)deve->creation_time -
+					INITIAL_JIFFIES) * 100 / HZ),
+					/* scsiAuthIntrLastCreation */
 				"Ready"); /* FIXME: scsiAuthIntrRowStatus */
 		}
 		spin_unlock_bh(&se_nacl->device_list_lock);
@@ -1255,7 +1259,8 @@ int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 			   sess->session_index,  /* scsiAttIntrPortIndex */
 			   se_nacl->acl_index, /* scsiAttIntrPortAuthIntrIdx */
 			   sops->InitiatorName[0] ?
-				  sops->InitiatorName : NONE, /* scsiAttIntrPortName */
+				  sops->InitiatorName : NONE,
+				/* scsiAttIntrPortName */
 			   sess->isid[0], sess->isid[1], sess->isid[2],
 			   sess->isid[3], sess->isid[4], sess->isid[5]);
 				/* scsiAttIntrPortIdentifier */

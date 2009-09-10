@@ -663,9 +663,9 @@ static void iscsi_tpg_free_network_portals(iscsi_portal_group_t *tpg)
 			ip = &buf_ipv4[0];
 		}
 
-		printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s"
-			" on network device: %s\n", tpg->tpg_tiqn->tiqn, ip,
-			np->np_port, tpg->tpgt,
+		printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu"
+			" on %s on network device: %s\n", tpg->tpg_tiqn->tiqn,
+			ip, np->np_port, tpg->tpgt,
 			(np->np_network_transport == ISCSI_TCP) ?
 			"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
 			(char *)np->np_net_dev : "None");
@@ -1031,9 +1031,10 @@ iscsi_tpg_np_t *iscsi_tpg_add_network_portal(
 		spin_unlock(&tpg_np_parent->tpg_np_parent_lock);
 	}
 
-	printk(KERN_INFO "CORE[%s] - Added Network Portal: %s:%hu,%hu on %s on network"
-		" device: %s\n", tpg->tpg_tiqn->tiqn, ip_buf, np->np_port,
-		tpg->tpgt, (np->np_network_transport == ISCSI_TCP) ?
+	printk(KERN_INFO "CORE[%s] - Added Network Portal: %s:%hu,%hu on %s on"
+		" network device: %s\n", tpg->tpg_tiqn->tiqn, ip_buf,
+		np->np_port, tpg->tpgt,
+		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
 
@@ -1064,8 +1065,8 @@ static int iscsi_tpg_release_np(
 
 	iscsi_clear_tpg_np_login_thread(tpg_np, tpg, 1);
 
-	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s on"
-		" network device: %s\n", tpg->tpg_tiqn->tiqn, ip,
+	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s"
+		" on network device: %s\n", tpg->tpg_tiqn->tiqn, ip,
 		np->np_port, tpg->tpgt,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
@@ -1334,8 +1335,8 @@ int iscsi_ta_cache_dynamic_acls(
 	}
 
 	a->cache_dynamic_acls = flag;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Cache Dynamic Initiator Portal Group ACLs"
-		": %s\n", tpg->tpgt, (a->cache_dynamic_acls) ?
+	printk(KERN_INFO "iSCSI_TPG[%hu] - Cache Dynamic Initiator Portal Group"
+		" ACLs %s\n", tpg->tpgt, (a->cache_dynamic_acls) ?
 		"Enabled" : "Disabled");
 
 	return 0;

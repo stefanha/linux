@@ -644,8 +644,8 @@ static int iscsi_post_login_handler(
 
 		list_add_tail(&conn->conn_list, &sess->sess_conn_list);
 		atomic_inc(&sess->nconn);
-		printk(KERN_INFO "Incremented iSCSI Connection count to %hu from node:"
-			" %s\n", atomic_read(&sess->nconn),
+		printk(KERN_INFO "Incremented iSCSI Connection count to %hu"
+			" from node: %s\n", atomic_read(&sess->nconn),
 			SESS_OPS(sess)->InitiatorName);
 		spin_unlock_bh(&sess->conn_lock);
 
@@ -694,8 +694,8 @@ static int iscsi_post_login_handler(
 	if (tpg->tpg_tiqn)
 		tpg->tpg_tiqn->tiqn_nsessions++;
 
-	printk(KERN_INFO "Incremented number of active iSCSI sessions to %u on iSCSI"
-		" Target Portal Group: %hu\n", tpg->nsessions, tpg->tpgt);
+	printk(KERN_INFO "Incremented number of active iSCSI sessions to %u on"
+		" iSCSI Target Portal Group: %hu\n", tpg->nsessions, tpg->tpgt);
 	spin_unlock_bh(&se_tpg->session_lock);
 
 	iscsi_post_login_start_timers(conn);

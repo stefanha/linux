@@ -655,9 +655,9 @@ redo:
 		if (cmd->pdu_start < cmd->pdu_count)
 			goto redo;
 
-		printk(KERN_ERR "Command ITT: 0x%08x unable to locate iscsi_pdu_t"
-			" for cmd->pdu_send_order: %u.\n", cmd->init_task_tag,
-				cmd->pdu_send_order);
+		printk(KERN_ERR "Command ITT: 0x%08x unable to locate"
+			" iscsi_pdu_t for cmd->pdu_send_order: %u.\n",
+			cmd->init_task_tag, cmd->pdu_send_order);
 		return NULL;
 	} else {
 		if (!seq) {
@@ -672,8 +672,8 @@ redo:
 		pdu = &cmd->pdu_list[seq->pdu_start];
 
 		if (seq->pdu_send_order == seq->pdu_count) {
-			printk(KERN_ERR "Command ITT: 0x%08x seq->pdu_send_order:"
-				" %u equals seq->pdu_count: %u\n",
+			printk(KERN_ERR "Command ITT: 0x%08x seq->pdu_send"
+				"_order: %u equals seq->pdu_count: %u\n",
 				cmd->init_task_tag, seq->pdu_send_order,
 				seq->pdu_count);
 			return NULL;
@@ -686,9 +686,9 @@ redo:
 			}
 		}
 
-		printk(KERN_ERR "Command ITT: 0x%08x unable to locate iscsi_pdu_t"
-			" for seq->pdu_send_order: %u.\n", cmd->init_task_tag,
-				seq->pdu_send_order);
+		printk(KERN_ERR "Command ITT: 0x%08x unable to locate iscsi"
+			"_pdu_t for seq->pdu_send_order: %u.\n",
+			cmd->init_task_tag, seq->pdu_send_order);
 		return NULL;
 	}
 
@@ -724,7 +724,8 @@ iscsi_seq_t *iscsi_get_seq_holder(
 			return &cmd->seq_list[i];
 	}
 
-	printk(KERN_ERR "Unable to locate Sequence holder for ITT: 0x%08x, Offset:"
-		" %u, Length: %u\n", cmd->init_task_tag, offset, length);
+	printk(KERN_ERR "Unable to locate Sequence holder for ITT: 0x%08x,"
+		" Offset: %u, Length: %u\n", cmd->init_task_tag, offset,
+		length);
 	return NULL;
 }

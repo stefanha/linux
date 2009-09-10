@@ -168,7 +168,8 @@ iscsi_tiqn_t *core_add_tiqn(unsigned char *buf, int *ret)
 	iscsi_tiqn_t *tiqn = NULL;
 
 	if (strlen(buf) > ISCSI_TIQN_LEN) {
-		printk(KERN_ERR "Target IQN exceeds %d bytes\n", ISCSI_TIQN_LEN);
+		printk(KERN_ERR "Target IQN exceeds %d bytes\n",
+				ISCSI_TIQN_LEN);
 		*ret = -1;
 		return NULL;
 	}
@@ -224,7 +225,8 @@ int __core_del_tiqn(iscsi_tiqn_t *tiqn)
 	list_del(&tiqn->tiqn_list);
 	spin_unlock(&iscsi_global->tiqn_lock);
 
-	printk(KERN_INFO "CORE[0] - Deleted iSCSI Target IQN: %s\n", tiqn->tiqn);
+	printk(KERN_INFO "CORE[0] - Deleted iSCSI Target IQN: %s\n",
+			tiqn->tiqn);
 	kfree(tiqn);
 
 	return 0;
@@ -462,9 +464,10 @@ int core_add_np_ex(
 	list_add_tail(&np_ex->np_ex_list, &np->np_nex_list);
 	spin_unlock(&np->np_ex_lock);
 
-	printk(KERN_INFO "CORE[0] - Added Network Portal: Internal %s:%hu External"
-		" %s:%hu on %s on network device: %s\n", ip_buf, np->np_port,
-		ip_ex_buf, port_ex, (np->np_network_transport == ISCSI_TCP) ?
+	printk(KERN_INFO "CORE[0] - Added Network Portal: Internal %s:%hu"
+		" External %s:%hu on %s on network device: %s\n", ip_buf,
+		np->np_port, ip_ex_buf, port_ex,
+		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", strlen(np->np_net_dev) ?
 			(char *)np->np_net_dev : "None");
 
@@ -560,9 +563,9 @@ static iscsi_np_t *core_add_np_locate(
 				if (!(memcmp(core_get_np_ex_ip(np_ex), ip_ex,
 				     np_ex->np_ex_net_size)) &&
 				    (np_ex->np_ex_port == port_ex)) {
-					printk(KERN_ERR "Network Portal Internal:"
-						" %s:%hu External: %s:%hu on"
-						" %s, ignoring request.\n",
+					printk(KERN_ERR "Network Portal Inter"
+						"nal: %s:%hu External: %s:%hu"
+						" on %s, ignoring request.\n",
 						ip_buf, port,
 						ip_ex_buf, port_ex,
 						(network_transport == ISCSI_TCP)
@@ -676,8 +679,8 @@ iscsi_np_t *core_add_np(
 	list_add_tail(&np->np_list, &iscsi_global->g_np_list);
 	spin_unlock(&iscsi_global->np_lock);
 
-	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on network"
-		" device: %s\n", ip_buf, np->np_port,
+	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on"
+		" network device: %s\n", ip_buf, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
@@ -780,8 +783,8 @@ int core_del_np(iscsi_np_t *np)
 		ip = &buf_ipv4[0];
 	}
 
-	printk(KERN_INFO "CORE[0] - Removed Network Portal: %s:%hu on %s on network"
-		" device: %s\n", ip, np->np_port,
+	printk(KERN_INFO "CORE[0] - Removed Network Portal: %s:%hu on %s on"
+		" network device: %s\n", ip, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
@@ -1530,8 +1533,8 @@ done:
 	}
 
 	if (hdr->opcode & I_BIT) {
-		printk(KERN_ERR "Initiator sending ISCSI_INIT_SCSI_CMND pdus with"
-			" immediate bit set, aborting connection\n");
+		printk(KERN_ERR "Initiator sending ISCSI_INIT_SCSI_CMND pdus"
+			" with immediate bit set, aborting connection\n");
 		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn);
 	}
 	data_direction = (hdr->flags & W_BIT) ? ISCSI_WRITE :
@@ -1826,8 +1829,8 @@ static inline int iscsi_handle_data_out(iscsi_conn_t *conn, unsigned char *buf)
 			hdr->offset, hdr->length, conn->cid);
 
 	if (cmd->cmd_flags & ICF_GOT_LAST_DATAOUT) {
-		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT after last"
-			" DataOUT received, dumping payload\n",
+		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT after"
+			" last DataOUT received, dumping payload\n",
 			cmd->init_task_tag);
 		return iscsi_dump_data_payload(conn, hdr->length, 1);
 	}
@@ -1842,9 +1845,9 @@ static inline int iscsi_handle_data_out(iscsi_conn_t *conn, unsigned char *buf)
 	iscsi_mod_dataout_timer(cmd);
 
 	if ((hdr->offset + hdr->length) > cmd->data_length) {
-		printk(KERN_ERR "DataOut Offset: %u, Length %u greater than iSCSI"
-			" Command EDTL %u, protocol error.\n", hdr->offset,
-				hdr->length, cmd->data_length);
+		printk(KERN_ERR "DataOut Offset: %u, Length %u greater than"
+			" iSCSI Command EDTL %u, protocol error.\n",
+			hdr->offset, hdr->length, cmd->data_length);
 		return iscsi_add_reject_from_cmd(REASON_INVALID_PDU_FIELD,
 				1, 0, buf, cmd);
 	}
@@ -2141,9 +2144,10 @@ static inline int iscsi_handle_nop_out(
 	}
 
 	if (hdr->length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
-		printk(KERN_ERR "NOPOUT Ping Data DataSegmentLength: %u is greater"
-			" than MaxRecvDataSegmentLength: %u, protocol error.\n",
-			hdr->length, CONN_OPS(conn)->MaxRecvDataSegmentLength);
+		printk(KERN_ERR "NOPOUT Ping Data DataSegmentLength: %u is"
+			" greater than MaxRecvDataSegmentLength: %u, protocol"
+			" error.\n", hdr->length,
+			CONN_OPS(conn)->MaxRecvDataSegmentLength);
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
 
@@ -2374,8 +2378,8 @@ static inline int iscsi_handle_task_mgt_cmd(
 	}
 
 	if ((hdr->function == TASK_REASSIGN) && !(hdr->opcode & I_BIT)) {
-		printk(KERN_ERR "Task Management Request TASK_REASSIGN not issued"
-			" as immediate command, bad iSCSI Initiator"
+		printk(KERN_ERR "Task Management Request TASK_REASSIGN not"
+			" issued as immediate command, bad iSCSI Initiator"
 				"implementation\n");
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
@@ -2582,9 +2586,9 @@ static inline int iscsi_handle_text_cmd(
 				do_crc((__u8 *)&pad_bytes, padding,
 					reset_crc, &data_crc);
 			if (checksum != data_crc) {
-				printk(KERN_ERR "Text data CRC32C DataDigest 0x%08x"
-					" does not match computed 0x%08x\n",
-					checksum, data_crc);
+				printk(KERN_ERR "Text data CRC32C DataDigest"
+					" 0x%08x does not match computed"
+					" 0x%08x\n", checksum, data_crc);
 				if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
 					printk(KERN_ERR "Unable to recover from"
 					" Text Data digest failure while in"
@@ -2834,8 +2838,8 @@ static inline int iscsi_handle_logout_cmd(
 				reason_code, hdr->cid, conn->cid);
 
 	if (conn->conn_state != TARG_CONN_STATE_LOGGED_IN) {
-		printk(KERN_ERR "Received logout request on connection that is not"
-			" in logged in state, ignoring request.\n");
+		printk(KERN_ERR "Received logout request on connection that"
+			" is not in logged in state, ignoring request.\n");
 		return 0;
 	}
 
@@ -3068,9 +3072,9 @@ static int iscsi_handle_immediate_data(
 				data_crc);
 
 			if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
-				printk(KERN_ERR "Unable to recover from Immediate"
-					" Data digest failure while in"
-					" ERL=0.\n");
+				printk(KERN_ERR "Unable to recover from"
+					" Immediate Data digest failure while"
+					" in ERL=0.\n");
 				iscsi_add_reject_from_cmd(
 						REASON_DATA_DIGEST_ERR,
 						1, 0, buf, cmd);
@@ -3212,9 +3216,9 @@ int iscsi_send_async_msg(
 		del_timer_sync(&async_msg_timer);
 
 		if (conn->conn_state == TARG_CONN_STATE_LOGOUT_REQUESTED) {
-			printk(KERN_ERR "Asynchronous message timer expired without"
-				" receiving a logout request,  dropping iSCSI"
-				" session.\n");
+			printk(KERN_ERR "Asynchronous message timer expired"
+				" without receiving a logout request,  dropping"
+				" iSCSI session.\n");
 			iscsi_send_async_msg(conn, 0,
 					ASYNC_EVENT_DROP_SESSION, 0);
 			iscsi_free_session(SESS(conn));
@@ -4453,9 +4457,10 @@ get_immediate:
 				spin_unlock_bh(&cmd->istate_lock);
 				break;
 			default:
-				printk(KERN_ERR "Unknown Opcode: 0x%02x ITT: 0x%08x"
-				",i_state: %d on CID: %hu\n", cmd->iscsi_opcode,
-					cmd->init_task_tag, state, conn->cid);
+				printk(KERN_ERR "Unknown Opcode: 0x%02x ITT:"
+					" 0x%08x, i_state: %d on CID: %hu\n",
+					cmd->iscsi_opcode, cmd->init_task_tag,
+					state, conn->cid);
 				spin_unlock_bh(&cmd->istate_lock);
 				goto transport_err;
 			}
@@ -4526,9 +4531,10 @@ check_rsp_state:
 				ret = iscsi_send_text_rsp(cmd, conn);
 				break;
 			default:
-				printk(KERN_ERR "Unknown Opcode: 0x%02x ITT: 0x%08x"
-				",i_state: %d on CID: %hu\n", cmd->iscsi_opcode,
-					cmd->init_task_tag, state, conn->cid);
+				printk(KERN_ERR "Unknown Opcode: 0x%02x ITT:"
+					" 0x%08x, i_state: %d on CID: %hu\n",
+					cmd->iscsi_opcode, cmd->init_task_tag,
+					state, conn->cid);
 				spin_unlock_bh(&cmd->istate_lock);
 				goto transport_err;
 			}
@@ -4616,10 +4622,10 @@ check_rsp_state:
 				sent_status = 1;
 				break;
 			default:
-				printk(KERN_ERR "Unknown Opcode: 0x%02x ITT: 0x%08x"
-				",i_state: %d on CID: %hu\n", cmd->iscsi_opcode,
-					cmd->init_task_tag, cmd->i_state,
-					conn->cid);
+				printk(KERN_ERR "Unknown Opcode: 0x%02x ITT:"
+					" 0x%08x, i_state: %d on CID: %hu\n",
+					cmd->iscsi_opcode, cmd->init_task_tag,
+					cmd->i_state, conn->cid);
 				spin_unlock_bh(&cmd->istate_lock);
 				goto transport_err;
 			}
@@ -4809,8 +4815,9 @@ restart:
 			printk(KERN_ERR "Got unknown iSCSI OpCode: 0x%02x\n",
 					opcode);
 			if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
-				printk(KERN_ERR "Cannot recover from unknown opcode"
-				" while ERL=0, closing iSCSI connection.\n");
+				printk(KERN_ERR "Cannot recover from unknown"
+				" opcode while ERL=0, closing iSCSI connection"
+				".\n");
 				goto transport_err;
 			}
 			if (!CONN_OPS(conn)->OFMarker) {

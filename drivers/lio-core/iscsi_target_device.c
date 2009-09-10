@@ -72,8 +72,8 @@ int iscsi_get_lun_for_tmr(
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
 	if (unpacked_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
-			" %u for Target Portal Group: %hu\n", unpacked_lun,
+		printk(KERN_ERR "iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG"
+			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
 			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
 		return -1;
 	}
@@ -97,8 +97,8 @@ int iscsi_get_lun_for_cmd(
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
 	if (unpacked_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG-1:"
-			" %u for Target Portal Group: %hu\n", unpacked_lun,
+		printk(KERN_ERR "iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG"
+			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
 			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
 		return -1;
 	}

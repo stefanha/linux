@@ -938,7 +938,7 @@ iscsi_queue_req_t *iscsi_get_cmd_from_response_queue(iscsi_conn_t *conn)
 
 	list_for_each_entry(qr, &conn->response_queue_list, qr_list)
 		break;
-	
+
 	list_del(&qr->qr_list);
 	if (qr->cmd)
 		atomic_dec(&qr->cmd->response_queue_count);
@@ -2663,7 +2663,7 @@ void iscsi_collect_login_stats(
 	spin_lock(&ls->lock);
 	if (((conn->login_ip == ls->last_intr_fail_addr) ||
 	    !(memcmp(conn->ipv6_login_ip, ls->last_intr_fail_ip6_addr,
-	     	IPV6_ADDRESS_SPACE))) &&
+		IPV6_ADDRESS_SPACE))) &&
 	    ((get_jiffies_64() - ls->last_fail_time) < 10)) {
 		/* We already have the failure info for this login */
 		spin_unlock(&ls->lock);

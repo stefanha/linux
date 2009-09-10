@@ -184,7 +184,7 @@ extern void iscsi_deallocate_thread_sets(int role)
 
 	while ((ts = iscsi_get_ts_from_inactive_list())) {
 #if 0
-		printk("Deallocating THREAD_ID: %d\n", ts->thread_id);
+		printk(KERN_INFO "Deallocating THREAD_ID: %d\n", ts->thread_id);
 #endif
 		spin_lock_bh(&ts->ts_state_lock);
 		ts->status = ISCSI_THREAD_SET_DIE;
