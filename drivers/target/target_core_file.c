@@ -675,7 +675,7 @@ static int fd_do_aio_read(fd_request_t *req, se_task_t *task)
 	printk(KERN_INFO"__generic_file_aio_read() returned %d\n", ret);
 
 	if (ret <= 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	if (ret != length)
 		printk(KERN_ERR "ret [%d] != LENGTH [%d]\n", ret, length);
@@ -845,7 +845,7 @@ static int fd_do_aio_write(fd_request_t *req, se_task_t *task)
 	printk(KERN_INFO "generic_file_aio_write_nolock() returned %d\n", ret);
 
 	if (ret <= 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	if (ret != length)
 		printk(KERN_ERR "ret [%d] != WRITE LENGTH [%d]\n", ret, length);

@@ -721,7 +721,7 @@ int transport_core_report_lun_response(se_cmd_t *se_cmd)
 
 	if (!(se_task)) {
 		printk(KERN_ERR "Unable to locate se_task_t for se_cmd_t\n");
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 
 	/*

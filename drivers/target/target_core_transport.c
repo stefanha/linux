@@ -1056,8 +1056,7 @@ void transport_complete_cmd(se_cmd_t *cmd, int success)
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	if (!success) {
-		cmd->transport_error_status =
-			PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		cmd->transport_error_status = PYX_TRANSPORT_LU_COMM_FAILURE;
 		t_state = TRANSPORT_COMPLETE_FAILURE;
 	} else {
 		t_state = TRANSPORT_COMPLETE_OK;
@@ -1152,7 +1151,7 @@ check_task_stop:
 			success = 0;
 			task->task_scsi_status = 1;
 			cmd->transport_error_status =
-			PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+				PYX_TRANSPORT_LU_COMM_FAILURE;
 		}
 	}
 #endif /* DEBUG_DEV */
@@ -3129,8 +3128,7 @@ void transport_generic_request_failure(
 
 	if (complete) {
 		transport_direct_request_timeout(cmd);
-		cmd->transport_error_status =
-			PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		cmd->transport_error_status = PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 
 	switch (cmd->transport_error_status) {
@@ -3164,7 +3162,7 @@ void transport_generic_request_failure(
 				LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
 		break;
-	case PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE:
+	case PYX_TRANSPORT_LU_COMM_FAILURE:
 		cmd->scsi_sense_reason = LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		break;
 	case PYX_TRANSPORT_UNKNOWN_MODE_PAGE:
@@ -4037,7 +4035,7 @@ int transport_execute_tasks(se_cmd_t *cmd)
 		if (CMD_ORIG_OBJ_API(cmd)->check_online(
 					cmd->se_orig_obj_ptr) != 0) {
 			cmd->transport_error_status =
-			PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+				PYX_TRANSPORT_LU_COMM_FAILURE;
 			transport_generic_request_failure(cmd, NULL, 0, 1);
 			return 0;
 		}
@@ -6277,7 +6275,7 @@ int transport_new_cmd_obj(
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			cmd->scsi_sense_reason =
 					LOGICAL_UNIT_COMMUNICATION_FAILURE;
-			return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+			return PYX_TRANSPORT_LU_COMM_FAILURE;
 		}
 		T_TASK(cmd)->t_task_cdbs += task_cdbs;
 

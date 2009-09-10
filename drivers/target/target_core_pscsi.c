@@ -853,7 +853,7 @@ static int pscsi_blk_get_request(se_task_t *task)
 	if (!(pt->pscsi_req) || IS_ERR(pt->pscsi_req)) {
 		printk(KERN_ERR "PSCSI: blk_get_request() failed: %ld\n",
 				IS_ERR(pt->pscsi_req));
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 	/*
 	 * Setup the newly allocated struct request for REQ_TYPE_BLOCK_PC,
@@ -1417,7 +1417,7 @@ int pscsi_map_task_non_SG(se_task_t *task)
 			task->task_size, GFP_KERNEL);
 	if (ret < 0) {
 		printk(KERN_ERR "PSCSI: blk_rq_map_kern() failed: %d\n", ret);
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 	return 0;
 }
@@ -1457,7 +1457,7 @@ int pscsi_CDB_read_non_SG(se_task_t *task, u32 size)
 	pt->pscsi_direction = DMA_FROM_DEVICE;
 
 	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	return pscsi_map_task_non_SG(task);
 }
@@ -1476,7 +1476,7 @@ int pscsi_CDB_read_SG(se_task_t *task, u32 size)
 	 * for >= v2.6.31 pSCSI
 	 */
 	if (pscsi_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	return task->task_sg_num;
 }
@@ -1492,7 +1492,7 @@ int pscsi_CDB_write_non_SG(se_task_t *task, u32 size)
 	pt->pscsi_direction = DMA_TO_DEVICE;
 
 	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	return pscsi_map_task_non_SG(task);
 }
@@ -1511,7 +1511,7 @@ int pscsi_CDB_write_SG(se_task_t *task, u32 size)
 	 * for >= v2.6.31 pSCSI
 	 */
 	if (pscsi_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	return task->task_sg_num;
 }

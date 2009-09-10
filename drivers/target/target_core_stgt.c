@@ -423,7 +423,7 @@ int stgt_do_task(se_task_t *task)
 	if (!sc) {
 		printk(KERN_ERR "Unable to allocate memory for struct"
 			" scsi_cmnd\n");
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 
 	memcpy(sc->cmnd, st->stgt_cdb, MAX_COMMAND_SIZE);
@@ -704,7 +704,7 @@ int stgt_CDB_read_SG(se_task_t *task, u32 size)
 	pt->stgt_direction = DMA_FROM_DEVICE;
 
 	if (stgt_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	return task->task_sg_num;
 }
@@ -732,7 +732,7 @@ int stgt_CDB_write_SG(se_task_t *task, u32 size)
 	st->stgt_direction = DMA_TO_DEVICE;
 
 	if (stgt_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	return task->task_sg_num;
 }
