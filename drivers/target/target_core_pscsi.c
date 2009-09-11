@@ -1628,11 +1628,6 @@ u32 pscsi_get_queue_depth(se_device_t *dev)
 	return sd->queue_depth;
 }
 
-void pscsi_shutdown_hba(se_hba_t *hba)
-{
-	return;
-}
-
 /*	pscsi_handle_SAM_STATUS_failures():
  *
  *

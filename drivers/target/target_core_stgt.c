@@ -846,11 +846,6 @@ u32 stgt_get_queue_depth(se_device_t *dev)
 	return sd->queue_depth;
 }
 
-void stgt_shutdown_hba(se_hba_t *hba)
-{
-	return;
-}
-
 /*	stgt_handle_SAM_STATUS_failures():
  *
  *

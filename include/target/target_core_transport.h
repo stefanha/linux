@@ -508,10 +508,6 @@ typedef struct se_subsystem_api_s {
 	 */
 	int (*set_iovec_ptrs)(se_map_sg_t *, se_unmap_sg_t *);
 	/*
-	 * shutdown_hba():
-	 */
-	void (*shutdown_hba)(se_hba_t *);
-	/*
 	 * write_pending():
 	 */
 	int (*write_pending)(se_task_t *);

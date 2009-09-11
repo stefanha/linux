@@ -198,11 +198,3 @@ int se_core_del_hba(
 	return 0;
 }
 EXPORT_SYMBOL(se_core_del_hba);
-
-static void se_hba_transport_shutdown(se_hba_t *hba)
-{
-	if (!(HBA_TRANSPORT(hba)->shutdown_hba))
-		return;
-
-	HBA_TRANSPORT(hba)->shutdown_hba(hba);
-}

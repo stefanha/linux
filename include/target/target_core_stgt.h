@@ -93,7 +93,6 @@ extern u32 stgt_get_device_type(se_device_t *);
 extern u32 stgt_get_dma_length(u32, se_device_t *);
 extern u32 stgt_get_max_sectors(se_device_t *);
 extern u32 stgt_get_queue_depth(se_device_t *);
-extern void stgt_shutdown_hba(struct se_hba_s *);
 extern void stgt_req_done(struct request *, int);
 extern int stgt_transfer_response(struct scsi_cmnd *,
 				  void (*done)(struct scsi_cmnd *));
@@ -190,7 +189,6 @@ se_subsystem_api_t stgt_template = {
 	.get_dma_length		= stgt_get_dma_length,		\
 	.get_max_sectors	= stgt_get_max_sectors,		\
 	.get_queue_depth	= stgt_get_queue_depth,		\
-	.shutdown_hba		= stgt_shutdown_hba,		\
 	.write_pending		= NULL,				\
 	.spc			= &stgt_template_spc,		\
 };

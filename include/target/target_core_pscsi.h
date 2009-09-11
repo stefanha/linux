@@ -93,7 +93,6 @@ extern u32 pscsi_get_device_type(se_device_t *);
 extern u32 pscsi_get_dma_length(u32, se_device_t *);
 extern u32 pscsi_get_max_sectors(se_device_t *);
 extern u32 pscsi_get_queue_depth(se_device_t *);
-extern void pscsi_shutdown_hba(struct se_hba_s *);
 extern void pscsi_req_done(struct request *, int);
 #endif
 
@@ -178,7 +177,6 @@ se_subsystem_api_t pscsi_template = {
 	.get_dma_length		= pscsi_get_dma_length,		\
 	.get_max_sectors	= pscsi_get_max_sectors,	\
 	.get_queue_depth	= pscsi_get_queue_depth,	\
-	.shutdown_hba		= pscsi_shutdown_hba,		\
 	.write_pending		= NULL,				\
 	.spc			= &pscsi_template_spc,		\
 };
