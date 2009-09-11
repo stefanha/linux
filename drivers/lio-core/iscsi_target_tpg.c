@@ -514,7 +514,7 @@ int core_load_discovery_tpg(void)
 	if (!(param))
 		goto out;
 
-	if (iscsi_update_param_value(param, NONE) < 0)
+	if (iscsi_update_param_value(param, "CHAP,None") < 0)
 		goto out;
 
 	tpg->tpg_attrib.authentication = 0;

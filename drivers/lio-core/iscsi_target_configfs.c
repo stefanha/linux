@@ -2640,10 +2640,8 @@ static ssize_t lio_target_store_da_attr_enforce_discovery_auth(
 		/*
 		 * Reset the AuthMethod key to CHAP.
 		 */
-		if (!strcmp(param->value, NONE)) {
-			if (iscsi_update_param_value(param, CHAP) < 0)
-				return -EINVAL;
-		}
+		if (iscsi_update_param_value(param, CHAP) < 0)
+			return -EINVAL;
 
 		discovery_tpg->tpg_attrib.authentication = 1;
 		iscsi_global->discovery_auth.enforce_discovery_auth = 1;
@@ -2652,9 +2650,9 @@ static ssize_t lio_target_store_da_attr_enforce_discovery_auth(
 			" Discovery TPG\n");
 	} else {
 		/*
-		 * Reset the AuthMethod key to None
+		 * Reset the AuthMethod key to CHAP,None
 		 */
-		if (iscsi_update_param_value(param, NONE) < 0)
+		if (iscsi_update_param_value(param, "CHAP,None") < 0)
 			return -EINVAL;
 
 		discovery_tpg->tpg_attrib.authentication = 0;
