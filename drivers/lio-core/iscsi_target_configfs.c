@@ -916,11 +916,16 @@ static ssize_t lio_target_store_nacl_auth_##name(			\
 		return -EPERM;						\
 									\
 	snprintf(auth->name, PAGE_SIZE, "%s", page);			\
-	auth->naf_flags |= flags;					\
+	if (!(strncmp("NULL", auth->name, 4)))				\
+		auth->naf_flags &= ~flags;				\
+	else								\
+		auth->naf_flags |= flags;				\
 									\
 	if ((auth->naf_flags & NAF_USERID_IN_SET) &&			\
 	    (auth->naf_flags & NAF_PASSWORD_IN_SET))			\
 		auth->authenticate_target = 1;				\
+	else								\
+		auth->authenticate_target = 0;				\
 									\
 	return count;							\
 }
