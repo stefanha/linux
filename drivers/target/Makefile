@@ -1,7 +1,24 @@
 CWD=$(shell pwd)
 
-include $(CWD)/drivers/target/MCONFIG_TARGET
-include $(CWD)/drivers/target/MCONFIG_ALL
+PYX_ISCSI_VENDOR ?="Linux-iSCSI.org"
+
+# Transport Plugins and Devices.
+ #
+LINUX_PARALLEL_SCSI ?= 1
+LINUX_STGT ?= 1
+LINUX_SCSI_MEDIA_ROM ?= 1
+LINUX_PARALLEL_ATA ?= 0
+LINUX_IBLOCK ?= 1
+LINUX_RAMDISK ?= 1
+LINUX_FILEIO ?= 1
+
+LINUX_VPD_PAGE_CHECK?=1
+LIO_TARGET_CONFIGFS?=1
+
+MODVER ?= 1
+USEGDB ?= 1
+DEBUG_DEV ?= 0
+SNMP_FEATURE ?= 1
 
 obj-$(CONFIG_TARGET_CORE)		+=	target_core_mod.o
 target_core_mod-objs			:=	target_core_configfs.o \
