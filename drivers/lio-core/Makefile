@@ -1,7 +1,14 @@
 CWD=$(shell pwd)
 
-include $(CWD)/drivers/lio-core/MCONFIG_TARGET
-include $(CWD)/drivers/lio-core/MCONFIG_ALL
+
+PYX_ISCSI_VENDOR ?="Linux-iSCSI.org"
+LIO_TARGET_CONFIGFS?=1
+
+MODVER ?= 1
+USEGDB ?= 1
+DEBUG_ISCSI ?= 0
+DEBUG_OPCODES ?= 0
+SNMP_FEATURE ?= 1
 
 obj-$(CONFIG_LIO_TARGET)	+=	iscsi_target_mod.o
 iscsi_target_mod-objs		:=	iscsi_auth_chap.o \
