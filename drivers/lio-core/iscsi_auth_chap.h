@@ -35,7 +35,7 @@
 #define CHAP_STAGE_SERVER_NR	5
 
 extern int chap_gen_challenge(iscsi_conn_t *, int, char *, unsigned int *);
-extern u32 chap_main_loop(iscsi_conn_t *, iscsi_node_acl_t *, char *, char *,
+extern u32 chap_main_loop(iscsi_conn_t *, iscsi_node_auth_t *, char *, char *,
 				int *, int *);
 
 typedef struct iscsi_chap_s {

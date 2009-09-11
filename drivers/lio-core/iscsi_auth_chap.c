@@ -117,12 +117,11 @@ void chap_set_random(char *data, int length)
 
 static iscsi_chap_t *chap_server_open(
 	iscsi_conn_t *conn,
-	iscsi_node_acl_t *iscsi_nacl,
+	iscsi_node_auth_t *auth,
 	const char *A_str,
 	char *AIC_str,
 	unsigned int *AIC_len)
 {
-	iscsi_node_auth_t *auth = ISCSI_NODE_AUTH(iscsi_nacl);
 	iscsi_chap_t *chap;
 	int ret;
 
@@ -203,7 +202,7 @@ int chap_gen_challenge(
 
 int chap_server_compute_md5(
 	iscsi_conn_t *conn,
-	iscsi_node_acl_t *iscsi_nacl,
+	iscsi_node_auth_t *auth,
 	char *NR_in_ptr,
 	char *NR_out_ptr,
 	unsigned int *NR_out_len)
@@ -216,7 +215,6 @@ int chap_server_compute_md5(
 	unsigned char server_digest[MD5_SIGNATURE_SIZE];
 	unsigned char chap_n[MAX_CHAP_N_SIZE], chap_r[MAX_RESPONSE_LENGTH];
 	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
-	iscsi_node_auth_t *auth = ISCSI_NODE_AUTH(iscsi_nacl);
 	struct crypto_hash *tfm;
 	struct hash_desc desc;
 	struct scatterlist sg;
@@ -454,7 +452,7 @@ out:
 
 int chap_got_response(
 	iscsi_conn_t *conn,
-	iscsi_node_acl_t *iscsi_nacl,
+	iscsi_node_auth_t *auth,
 	char *NR_in_ptr,
 	char *NR_out_ptr,
 	unsigned int *NR_out_len)
@@ -463,7 +461,7 @@ int chap_got_response(
 
 	switch (chap->digest_type) {
 	case CHAP_DIGEST_MD5:
-		if (chap_server_compute_md5(conn, iscsi_nacl, NR_in_ptr,
+		if (chap_server_compute_md5(conn, auth, NR_in_ptr,
 				NR_out_ptr, NR_out_len) < 0)
 			return -1;
 		break;
@@ -478,25 +476,23 @@ int chap_got_response(
 
 u32 chap_main_loop(
 	iscsi_conn_t *conn,
-	iscsi_node_acl_t *iscsi_nacl,
+	iscsi_node_auth_t *auth,
 	char *in_text,
 	char *out_text,
 	int *in_len,
 	int *out_len)
 {
-	iscsi_node_auth_t *auth = ISCSI_NODE_AUTH(iscsi_nacl);
 	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
 
 	if (!(chap)) {
-		chap = chap_server_open(conn, iscsi_nacl, in_text,
-				out_text, out_len);
+		chap = chap_server_open(conn, auth, in_text, out_text, out_len);
 		if (!(chap))
 			return 2;
 		chap->chap_state = CHAP_STAGE_SERVER_AIC;
 		return 0;
 	} else if (chap->chap_state == CHAP_STAGE_SERVER_AIC) {
 		convert_null_to_semi(in_text, *in_len);
-		if (chap_got_response(conn, iscsi_nacl, in_text, out_text,
+		if (chap_got_response(conn, auth, in_text, out_text,
 				out_len) < 0) {
 			chap_close(conn);
 			return 2;

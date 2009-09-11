@@ -504,9 +504,12 @@ int core_load_discovery_tpg(void)
 
 	if (iscsi_create_default_params(&tpg->param_list) < 0)
 		goto out;
-
-#warning FIXME: Add Discovery Session + Authentication
-#if 1
+	/*
+	 * By default we disable authentication for discovery sessions,
+	 * this can be changed with:
+	 *
+	 * /sys/kernel/config/target/iscsi/discovery_auth/enforce_discovery_auth
+	 */
 	param = iscsi_find_param_from_key(AUTHMETHOD, tpg->param_list);
 	if (!(param))
 		goto out;
@@ -515,7 +518,7 @@ int core_load_discovery_tpg(void)
 		goto out;
 
 	tpg->tpg_attrib.authentication = 0;
-#endif
+
 	spin_lock(&tpg->tpg_state_lock);
 	tpg->tpg_state  = TPG_STATE_ACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);

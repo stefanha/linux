@@ -741,6 +741,9 @@ struct se_dev_entry_s;
 typedef struct iscsi_node_auth_s {
 	int			naf_flags;
 	int			authenticate_target;
+	/* Used for iscsi_global->discovery_auth,
+	 * set to zero (auth disabled) by default */
+	int			enforce_discovery_auth;
 	char			userid[MAX_USER_LEN];
 	char			password[MAX_PASS_LEN];
 	char			userid_mutual[MAX_USER_LEN];
@@ -932,6 +935,8 @@ typedef struct iscsi_global_s {
 	struct semaphore	auth_sem;
 	/* Semaphore used for allocate of iscsi_conn_t->auth_id */
 	struct semaphore	auth_id_sem;
+	/* Used for iSCSI discovery session authentication */
+	iscsi_node_auth_t	discovery_auth;
 	iscsi_portal_group_t	*discovery_tpg;
 #ifdef DEBUG_ERL
 	iscsi_debug_erl_t	*debug_erl;

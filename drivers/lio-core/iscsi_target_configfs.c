@@ -2583,9 +2583,133 @@ static struct config_item_type lio_target_cit = {
 
 /* End LIO-Target TIQN struct contig_lio_target_cit */
 
+/* Start lio_target_discovery_auth_cit */
+
+CONFIGFS_EATTR_STRUCT(iscsi_discovery_auth, iscsi_node_auth_s);
+#define DISC_AUTH_ATTR(_name, _mode)					\
+static struct iscsi_node_auth_attribute iscsi_disc_auth_##_name =	\
+		__CONFIGFS_EATTR(_name, _mode,				\
+		lio_target_show_da_attr_##_name,			\
+		lio_target_store_da_attr_##_name);
+
+/*
+ * enforce_discovery_auth
+ */
+static ssize_t lio_target_show_da_attr_enforce_discovery_auth(
+	struct iscsi_node_auth_s *auth,
+	char *page)
+{
+	iscsi_node_auth_t *discovery_auth = &iscsi_global->discovery_auth;
+
+	return sprintf(page, "%d\n", discovery_auth->enforce_discovery_auth);
+}
+
+static ssize_t lio_target_store_da_attr_enforce_discovery_auth(
+	struct iscsi_node_auth_s *auth,
+	const char *page,
+	size_t count)
+{
+	iscsi_param_t *param;
+	iscsi_portal_group_t *discovery_tpg = iscsi_global->discovery_tpg;
+	char *endptr;
+	u32 op;
+
+	op = simple_strtoul(page, &endptr, 0);
+	if ((op != 1) && (op != 0)) {
+		printk(KERN_ERR "Illegal value for enforce_discovery_auth:"
+				" %u\n", op);
+		return -EINVAL;
+	}
+
+	if (!(discovery_tpg)) {
+		printk(KERN_ERR "iscsi_global->discovery_tpg is NULL\n");
+		return -EINVAL;
+	}
+
+	param = iscsi_find_param_from_key(AUTHMETHOD,
+				discovery_tpg->param_list);
+	if (!(param))
+		return -EINVAL;
+	
+	if (op) {
+		/*
+		 * Reset the AuthMethod key to CHAP.
+		 */
+		if (!strcmp(param->value, NONE)) {
+			if (iscsi_update_param_value(param, CHAP) < 0)
+				return -EINVAL;
+		}
+
+		discovery_tpg->tpg_attrib.authentication = 1;
+		iscsi_global->discovery_auth.enforce_discovery_auth = 1;
+		printk(KERN_INFO "LIO-CORE[0] Successfully enabled"
+			" authentication enforcement for iSCSI"
+			" Discovery TPG\n");
+	} else {
+		/*
+		 * Reset the AuthMethod key to None
+		 */
+		if (iscsi_update_param_value(param, NONE) < 0)
+			return -EINVAL;
+
+		discovery_tpg->tpg_attrib.authentication = 0;
+		iscsi_global->discovery_auth.enforce_discovery_auth = 0;
+		printk(KERN_INFO "LIO-CORE[0] Successfully disabled"
+			" authentication enforcement for iSCSI"
+			" Discovery TPG\n");
+	}
+
+	return count;
+}
+
+DISC_AUTH_ATTR(enforce_discovery_auth, S_IRUGO | S_IWUSR);
+
+CONFIGFS_EATTR_OPS(iscsi_discovery_auth, iscsi_node_auth_s, auth_attrib_group);
+
+/*
+ * Note that we reuse some of the same configfs structure defines for
+ * iscsi_node_auth from lio_target_nacl_auth_cit for the normal iSCSI
+ * Initiator Node authentication here the discovery auth group that lives in
+ * iscsi_global_t->discovery_auth
+ */
+static struct configfs_attribute *lio_target_discovery_auth_attrs[] = {
+	&iscsi_node_auth_userid.attr,
+	&iscsi_node_auth_password.attr,
+	&iscsi_node_auth_authenticate_target.attr,
+	&iscsi_node_auth_userid_mutual.attr,
+	&iscsi_node_auth_password_mutual.attr,
+	&iscsi_disc_auth_enforce_discovery_auth.attr,
+	NULL,
+};
+
+static struct configfs_item_operations lio_target_discovery_auth_ops = {
+	.show_attribute		= iscsi_discovery_auth_attr_show,
+	.store_attribute	= iscsi_discovery_auth_attr_store,
+};
+
+static struct config_item_type lio_target_discovery_auth_cit = {
+	.ct_item_ops	= &lio_target_discovery_auth_ops,
+	.ct_attrs	= lio_target_discovery_auth_attrs,
+	.ct_owner	= THIS_MODULE,
+};
+
+/* End lio_target_discovery_auth_cit */
+
+/*
+ * Callback for top level fabric module default configfs groups.
+ */
+void lio_target_reg_defgroups(struct target_fabric_configfs *fabric)
+{
+	iscsi_node_auth_t *discovery_auth = &iscsi_global->discovery_auth;
+
+	config_group_init_type_name(&discovery_auth->auth_attrib_group,
+			"discovery_auth", &lio_target_discovery_auth_cit);
+}
+
 int iscsi_target_register_configfs(void)
 {
 	struct target_fabric_configfs *fabric;
+	struct config_group *tf_cg;
 	int ret;
 
 	lio_target_fabric_configfs = NULL;
@@ -2644,6 +2768,27 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.get_fabric_sense_len = &lio_get_fabric_sense_len;
 	fabric->tf_ops.is_state_remove = &iscsi_is_state_remove;
 	fabric->tf_ops.pack_lun = &iscsi_pack_lun;
+	/*
+	 * Setup default configfs group for iSCSI Discovery Authentication.
+	 *
+	 * Note that the tf_cg->default_groups[] will be registered when
+	 * config_group_init_type_name() gets called for fabric->tf_groups
+	 * in the local callback lio_target_reg_defgroups() in generic
+	 * target_core_mod code in target_core_register_fabric().
+	 */
+	fabric->reg_default_groups_callback = &lio_target_reg_defgroups;
+	tf_cg = &fabric->tf_group;
+
+	tf_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+			GFP_KERNEL);
+	if (!(tf_cg->default_groups)) {
+		printk(KERN_ERR "Unable to allocate default fabric groups\n");
+		target_fabric_configfs_free(fabric);
+		return -1;
+	}
+	tf_cg->default_groups[0] =
+			&iscsi_global->discovery_auth.auth_attrib_group;
+	tf_cg->default_groups[1] = NULL;
 
 	ret = target_fabric_configfs_register(fabric);
 	if (ret < 0) {

@@ -85,21 +85,36 @@ u32 iscsi_handle_authentication(
 	unsigned char *authtype,
 	int role)
 {
+	iscsi_session_t *sess = SESS(conn);
+	iscsi_node_auth_t *auth;
 	iscsi_node_acl_t *iscsi_nacl;
 	se_node_acl_t *se_nacl;
 
-	se_nacl = SESS(conn)->se_sess->se_node_acl;
-	if (!(se_nacl)) {
-		printk(KERN_ERR "Unable to locate se_node_acl_t for"
-				" CHAP auth\n");
-		return -1;
+	if (!(SESS_OPS(sess)->SessionType)) {
+		/*
+		 * For SessionType=Normal
+		 */
+		se_nacl = SESS(conn)->se_sess->se_node_acl;
+		if (!(se_nacl)) {
+			printk(KERN_ERR "Unable to locate se_node_acl_t for"
+					" CHAP auth\n");
+			return -1;
+		}
+		iscsi_nacl = (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
+		if (!(iscsi_nacl)) {
+			printk(KERN_ERR "Unable to locate iscsi_node_acl_t for"
+					" CHAP auth\n");
+			return -1;
+		}
+
+		auth = ISCSI_NODE_AUTH(iscsi_nacl);
+	} else {
+		/*
+		 * For SessionType=Discovery
+		 */
+		auth = &iscsi_global->discovery_auth;	
 	}
-	iscsi_nacl = (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
-	if (!(iscsi_nacl)) {
-		printk(KERN_ERR "Unable to locate iscsi_node_acl_t for"
-				" CHAP auth\n");
-		return -1;
-	}
+
 #ifdef SNMP_SUPPORT
 	if (strstr("CHAP", authtype))
 		strcpy(SESS(conn)->auth_type, "CHAP");
@@ -111,12 +126,12 @@ u32 iscsi_handle_authentication(
 		return 1;
 #ifdef CANSRP
 	else if (strstr("SRP", authtype))
-		return srp_main_loop(conn, iscsi_nacl, role,
-				in_buf, out_buf, &in_length, out_length);
+		return srp_main_loop(conn, auth, role, in_buf, out_buf,
+				&in_length, out_length);
 #endif
 	else if (strstr("CHAP", authtype))
-		return chap_main_loop(conn, iscsi_nacl, in_buf, out_buf,
-					&in_length, out_length);
+		return chap_main_loop(conn, auth, in_buf, out_buf,
+				&in_length, out_length);
 	else if (strstr("SPKM1", authtype))
 		return 2;
 	else if (strstr("SPKM2", authtype))
