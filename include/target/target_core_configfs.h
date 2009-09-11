@@ -46,6 +46,7 @@ extern void target_core_exit_configfs(void);
 struct target_fabric_configfs {
 	char			tf_name[TARGET_FABRIC_NAME_SIZE];
 	atomic_t		tf_access_cnt;
+	void (*reg_default_groups_callback)(struct target_fabric_configfs *);
 	struct list_head	tf_list;
 	struct config_group	tf_group;
 	/* Pointer to fabric's config_item */

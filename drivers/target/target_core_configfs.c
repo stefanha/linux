@@ -169,6 +169,13 @@ static struct config_group *target_core_register_fabric(
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> %p\n",
 			tf->tf_fabric_cit);
 	config_group_init_type_name(&tf->tf_group, name, tf->tf_fabric_cit);
+	/*
+	 * Setup any default configfs groups in the top level directory of
+	 * this fabric module.
+	 */
+	if (tf->reg_default_groups_callback != NULL)
+		tf->reg_default_groups_callback(tf);
+
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> Allocated Fabric:"
 			" %s\n", tf->tf_group.cg_item.ci_name);
 	/*
@@ -309,6 +316,7 @@ void target_fabric_configfs_free(
 	list_del(&tf->tf_list);
 	mutex_unlock(&g_tf_lock);
 
+	kfree(tf->tf_group.default_groups);
 	kfree(tf);
 }
 EXPORT_SYMBOL(target_fabric_configfs_free);
@@ -407,6 +415,7 @@ void target_fabric_configfs_deregister(
 			" %s\n", tf->tf_name);
 	tf->tf_fabric_cit = NULL;
 	tf->tf_subsys = NULL;
+	kfree(tf->tf_group.default_groups);
 	kfree(tf);
 
 	printk("<<<<<<<<<<<<<<<<<<<<<< END FABRIC API >>>>>>>>>>>>>>>>>"
