@@ -416,11 +416,11 @@ typedef struct se_transport_task_s {
 	atomic_t		transport_lun_fe_stop;
 	atomic_t		transport_lun_stop;
 	spinlock_t		t_state_lock;
-	struct semaphore	t_transport_stop_sem;
-	struct semaphore	t_transport_passthrough_sem;
-	struct semaphore	t_transport_passthrough_wsem;
-	struct semaphore	transport_lun_fe_stop_sem;
-	struct semaphore	transport_lun_stop_sem;
+	struct completion	t_transport_stop_comp;
+	struct completion	t_transport_passthrough_comp;
+	struct completion	t_transport_passthrough_wcomp;
+	struct completion	transport_lun_fe_stop_comp;
+	struct completion	transport_lun_stop_comp;
 	void			*t_task_buf;
 	void			*t_task_pt_buf;
 	struct list_head	t_task_list;

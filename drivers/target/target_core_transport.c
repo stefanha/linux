@@ -780,7 +780,7 @@ static void transport_passthrough_check_stop(se_cmd_t *cmd)
 			cmd->callback(cmd, cmd->callback_arg,
 				transport_passthrough_complete(cmd));
 		} else
-			up(&T_TASK(cmd)->t_transport_passthrough_sem);
+			complete(&T_TASK(cmd)->t_transport_passthrough_comp);
 
 		return;
 	}
@@ -820,7 +820,7 @@ static int transport_cmd_check_stop(
 			transport_all_task_dev_remove_state(cmd);
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-		up(&T_TASK(cmd)->transport_lun_stop_sem);
+		complete(&T_TASK(cmd)->transport_lun_stop_comp);
 		return 1;
 	}
 	/*
@@ -846,7 +846,7 @@ static int transport_cmd_check_stop(
 			cmd->se_lun = NULL;
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-		up(&T_TASK(cmd)->t_transport_stop_sem);
+		complete(&T_TASK(cmd)->t_transport_stop_comp);
 		return 1;
 	}
 	if (transport_off) {
@@ -2734,11 +2734,11 @@ se_cmd_t *__transport_alloc_se_cmd(
 		return NULL;
 	}
 	INIT_LIST_HEAD(&T_TASK(cmd)->t_task_list);
-	init_MUTEX_LOCKED(&T_TASK(cmd)->transport_lun_fe_stop_sem);
-	init_MUTEX_LOCKED(&T_TASK(cmd)->transport_lun_stop_sem);
-	init_MUTEX_LOCKED(&T_TASK(cmd)->t_transport_stop_sem);
-	init_MUTEX_LOCKED(&T_TASK(cmd)->t_transport_passthrough_sem);
-	init_MUTEX_LOCKED(&T_TASK(cmd)->t_transport_passthrough_wsem);
+	init_completion(&T_TASK(cmd)->transport_lun_fe_stop_comp);
+	init_completion(&T_TASK(cmd)->transport_lun_stop_comp);
+	init_completion(&T_TASK(cmd)->t_transport_stop_comp);
+	init_completion(&T_TASK(cmd)->t_transport_passthrough_comp);
+	init_completion(&T_TASK(cmd)->t_transport_passthrough_wcomp);
 	spin_lock_init(&T_TASK(cmd)->t_state_lock);
 
 	cmd->se_tfo = tfo;
@@ -5814,8 +5814,8 @@ int transport_generic_passthrough_async(
 		return -1;
 
 	if (write && !no_alloc) {
-		if (down_interruptible(
-			&T_TASK(cmd)->t_transport_passthrough_wsem) != 0)
+		if (wait_for_completion_interruptible(
+			&T_TASK(cmd)->t_transport_passthrough_wcomp) != 0)
 			return -1;
 
 		transport_generic_process_write(cmd);
@@ -5824,7 +5824,7 @@ int transport_generic_passthrough_async(
 	if (callback || pt_done)
 		return 0;
 
-	down(&T_TASK(cmd)->t_transport_passthrough_sem);
+	wait_for_completion(&T_TASK(cmd)->t_transport_passthrough_comp);
 
 	return transport_passthrough_complete(cmd);
 }
@@ -7094,7 +7094,7 @@ static int transport_generic_write_pending(se_cmd_t *cmd)
 
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH) {
 		if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC)) {
-			up(&T_TASK(cmd)->t_transport_passthrough_wsem);
+			complete(&T_TASK(cmd)->t_transport_passthrough_wcomp);
 			transport_cmd_check_stop(cmd, 1, 0);
 			return PYX_TRANSPORT_WRITE_PENDING;
 		}
@@ -7205,7 +7205,7 @@ int transport_lun_wait_for_tasks(se_cmd_t *cmd, se_lun_t *lun)
 
 	DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopping cmd....\n",
 		CMD_TFO(cmd)->get_task_tag(cmd));
-	down(&T_TASK(cmd)->transport_lun_stop_sem);
+	wait_for_completion(&T_TASK(cmd)->transport_lun_stop_comp);
 	DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopped cmd....\n",
 		CMD_TFO(cmd)->get_task_tag(cmd));
 
@@ -7303,7 +7303,7 @@ void transport_clear_lun_from_sessions(se_lun_t *lun)
 
 			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock,
 					flags);
-			up(&T_TASK(cmd)->transport_lun_fe_stop_sem);
+			complete(&T_TASK(cmd)->transport_lun_fe_stop_comp);
 			spin_lock_irqsave(&lun->lun_cmd_lock, flags);
 			continue;
 		}
@@ -7346,18 +7346,19 @@ static void transport_generic_wait_for_tasks(
 		atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 1);
 
 		DEBUG_TRANSPORT_S("wait_for_tasks: Stopping"
-			" down(&T_TASK(cmd)transport_lun_fe_stop_sem);"
-			" for ITT: 0x%08x\n", CMD_TFO(cmd)->get_task_tag(cmd));
+			" wait_for_completion(&T_TASK(cmd)transport_lun_fe"
+			"_stop_comp); for ITT: 0x%08x\n",
+			CMD_TFO(cmd)->get_task_tag(cmd));
 		/*
 		 * There is a special case for WRITES where a FE exception +
 		 * LUN shutdown means ConfigFS context is still sleeping on
-		 * transport_lun_stop_sem in transport_lun_wait_for_tasks().
-		 * We go ahead and up transport_lun_stop_sem just to be sure
+		 * transport_lun_stop_comp in transport_lun_wait_for_tasks().
+		 * We go ahead and up transport_lun_stop_comp just to be sure
 		 * here.
 		 */
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-		up(&T_TASK(cmd)->transport_lun_stop_sem);
-		down(&T_TASK(cmd)->transport_lun_fe_stop_sem);
+		complete(&T_TASK(cmd)->transport_lun_stop_comp);
+		wait_for_completion(&T_TASK(cmd)->transport_lun_fe_stop_comp);
 		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 		/*
 		 * At this point, the frontend who was the originator of this
@@ -7365,8 +7366,9 @@ static void transport_generic_wait_for_tasks(
 		 * normal means below.
 		 */
 		DEBUG_TRANSPORT_S("wait_for_tasks: Stopped"
-			" down(&T_TASK(cmd)transport_lun_fe_stop_sem);"
-			" for ITT: 0x%08x\n", CMD_TFO(cmd)->get_task_tag(cmd));
+			" wait_for_completion(&T_TASK(cmd)transport_lun_fe_"
+			"stop_comp); for ITT: 0x%08x\n",
+			CMD_TFO(cmd)->get_task_tag(cmd));
 
 		atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 0);
 		atomic_set(&T_TASK(cmd)->transport_lun_stop, 0);
@@ -7386,14 +7388,14 @@ static void transport_generic_wait_for_tasks(
 
 	CMD_ORIG_OBJ_API(cmd)->notify_obj(cmd->se_orig_obj_ptr);
 
-	down(&T_TASK(cmd)->t_transport_stop_sem);
+	wait_for_completion(&T_TASK(cmd)->t_transport_stop_comp);
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	atomic_set(&T_TASK(cmd)->t_transport_active, 0);
 	atomic_set(&T_TASK(cmd)->t_transport_stop, 0);
 
-	DEBUG_TRANSPORT_S("wait_for_tasks: Stopped down(&T_TASK(cmd)->"
-		"t_transport_stop_sem) for ITT: 0x%08x\n",
+	DEBUG_TRANSPORT_S("wait_for_tasks: Stopped wait_for_compltion("
+		"&T_TASK(cmd)->t_transport_stop_comp) for ITT: 0x%08x\n",
 		CMD_TFO(cmd)->get_task_tag(cmd));
 remove:
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
