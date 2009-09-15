@@ -1122,7 +1122,7 @@ check_task_stop:
 		}
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-		up(&task->task_stop_sem);
+		complete(&task->task_stop_comp);
 		return;
 	}
 	/*
@@ -2521,7 +2521,7 @@ static se_task_t *transport_generic_get_task(
 	INIT_LIST_HEAD(&task->t_list);
 	INIT_LIST_HEAD(&task->t_execute_list);
 	INIT_LIST_HEAD(&task->t_state_list);
-	init_MUTEX_LOCKED(&task->task_stop_sem);
+	init_completion(&task->task_stop_comp);
 	task->task_no = T_TASK(cmd)->t_task_no++;
 	task->task_se_cmd = cmd;
 
@@ -3054,7 +3054,7 @@ void transport_stop_tasks_for_cmd(se_cmd_t *cmd)
 
 			DEBUG_TS("task_no[%d] - Waiting to complete\n",
 				task->task_no);
-			down(&task->task_stop_sem);
+			wait_for_completion(&task->task_stop_comp);
 			DEBUG_TS("task_no[%d] - Stopped successfully\n",
 				task->task_no);
 
@@ -3809,7 +3809,7 @@ void transport_task_timeout_handler(unsigned long data)
 		DEBUG_TT("transport task: %p cmd: %p timeout task_stop"
 				" == 1\n", task, cmd);
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-		up(&task->task_stop_sem);
+		complete(&task->task_stop_comp);
 		return;
 	}
 
@@ -7775,7 +7775,7 @@ static void transport_processing_shutdown(se_device_t *dev)
 
 			DEBUG_DO("Waiting for task: %p to shutdown for dev:"
 				" %p\n", task, dev);
-			down(&task->task_stop_sem);
+			wait_for_completion(&task->task_stop_comp);
 			DEBUG_DO("Completed task: %p shutdown for dev: %p\n",
 				task, dev);
 

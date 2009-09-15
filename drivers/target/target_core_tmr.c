@@ -256,7 +256,7 @@ int core_tmr_lun_reset(
 
 			DEBUG_LR("LUN_RESET: Waiting for task: %p to shutdown"
 				" for dev: %p\n", task, dev);
-			down(&task->task_stop_sem);
+			wait_for_completion(&task->task_stop_comp);
 			DEBUG_LR("LUN_RESET Completed task: %p shutdown for"
 				" dev: %p\n", task, dev);
 			spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);

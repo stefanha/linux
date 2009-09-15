@@ -443,7 +443,7 @@ typedef struct se_task_s {
 	u32		task_sg_offset;
 	struct se_cmd_s *task_se_cmd;
 	struct se_device_s	*se_dev;
-	struct semaphore	task_stop_sem;
+	struct completion	task_stop_comp;
 	atomic_t	task_active;
 	atomic_t	task_execute_queue;
 	atomic_t	task_timeout;
