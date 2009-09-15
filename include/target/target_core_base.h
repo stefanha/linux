@@ -386,8 +386,8 @@ typedef struct se_queue_obj_s {
 	spinlock_t		cmd_queue_lock;
 	struct list_head	qobj_list;
 	wait_queue_head_t	thread_wq;
-	struct semaphore	thread_create_sem;
-	struct semaphore	thread_done_sem;
+	struct completion	thread_create_comp;
+	struct completion	thread_done_comp;
 } ____cacheline_aligned se_queue_obj_t;
 
 typedef struct se_transport_task_s {

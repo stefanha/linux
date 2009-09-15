@@ -498,8 +498,8 @@ void transport_init_queue_obj(se_queue_obj_t *qobj)
 	atomic_set(&qobj->queue_cnt, 0);
 	INIT_LIST_HEAD(&qobj->qobj_list);
 	init_waitqueue_head(&qobj->thread_wq);
-	init_MUTEX_LOCKED(&qobj->thread_create_sem);
-	init_MUTEX_LOCKED(&qobj->thread_done_sem);
+	init_completion(&qobj->thread_create_comp);
+	init_completion(&qobj->thread_done_comp);
 	spin_lock_init(&qobj->cmd_queue_lock);
 }
 
@@ -2277,7 +2277,7 @@ int transport_generic_activate_device(se_device_t *dev)
 		return -1;
 	}
 
-	down(&dev->dev_queue_obj->thread_create_sem);
+	wait_for_completion(&dev->dev_queue_obj->thread_create_comp);
 
 	return 0;
 }
@@ -2293,7 +2293,7 @@ void transport_generic_deactivate_device(se_device_t *dev)
 
 	kthread_stop(dev->process_thread);
 
-	down(&dev->dev_queue_obj->thread_done_sem);
+	wait_for_completion(&dev->dev_queue_obj->thread_done_comp);
 }
 
 /*	transport_generic_claim_phydevice()
@@ -7920,7 +7920,7 @@ static int transport_processing_thread(void *param)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	up(&dev->dev_queue_obj->thread_create_sem);
+	complete(&dev->dev_queue_obj->thread_create_comp);
 
 	while (!(kthread_should_stop())) {
 		ret = wait_event_interruptible(dev->dev_queue_obj->thread_wq,
@@ -7994,6 +7994,6 @@ get_cmd:
 out:
 	transport_release_all_cmds(dev);
 	dev->process_thread = NULL;
-	up(&dev->dev_queue_obj->thread_done_sem);
+	complete(&dev->dev_queue_obj->thread_done_comp);
 	return 0;
 }
