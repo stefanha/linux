@@ -52,7 +52,8 @@
 
 int core_get_hba(se_hba_t *hba)
 {
-	return ((mutex_lock_interruptible(&hba->hba_access_mutex) != 0) ? -1 : 0);
+	return ((mutex_lock_interruptible(&hba->hba_access_mutex) != 0) ?
+		-1 : 0);
 }
 
 se_hba_t *core_alloc_hba(int hba_type)
