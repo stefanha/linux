@@ -52,7 +52,7 @@
 
 int core_get_hba(se_hba_t *hba)
 {
-	return ((down_interruptible(&hba->hba_access_sem) != 0) ? -1 : 0);
+	return ((mutex_lock_interruptible(&hba->hba_access_mutex) != 0) ? -1 : 0);
 }
 
 se_hba_t *core_alloc_hba(int hba_type)
@@ -70,7 +70,7 @@ se_hba_t *core_alloc_hba(int hba_type)
 	INIT_LIST_HEAD(&hba->hba_dev_list);
 	spin_lock_init(&hba->device_lock);
 	spin_lock_init(&hba->hba_queue_lock);
-	init_MUTEX(&hba->hba_access_sem);
+	mutex_init(&hba->hba_access_mutex);
 #ifdef SNMP_SUPPORT
 	hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
 #endif
@@ -81,7 +81,7 @@ EXPORT_SYMBOL(core_alloc_hba);
 
 void core_put_hba(se_hba_t *hba)
 {
-	up(&hba->hba_access_sem);
+	mutex_unlock(&hba->hba_access_mutex);
 }
 EXPORT_SYMBOL(core_put_hba);
 

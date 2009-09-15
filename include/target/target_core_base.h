@@ -870,7 +870,7 @@ typedef struct se_hba_s {
 	spinlock_t		device_lock;
 	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
-	struct semaphore	hba_access_sem;
+	struct mutex		hba_access_mutex;
 	struct se_subsystem_api_s *transport;
 }  ____cacheline_aligned se_hba_t;
 
