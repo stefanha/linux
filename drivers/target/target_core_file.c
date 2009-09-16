@@ -421,12 +421,14 @@ int fd_emulate_inquiry(se_task_t *task)
 static int fd_emulate_read_cap(se_task_t *task)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) task->se_dev->dev_ptr;
-	u32 blocks = (fd_dev->fd_dev_size /
-		       DEV_ATTRIB(task->se_dev)->block_size);
+	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
+				DEV_ATTRIB(task->se_dev)->block_size);
+	u32 blocks;
 
-	if ((fd_dev->fd_dev_size / DEV_ATTRIB(task->se_dev)->block_size)
-	      >= 0x00000000ffffffff)
+	if (blocks_long >= 0x00000000ffffffff)
 		blocks = 0xffffffff;
+	else
+		blocks = (u32)blocks_long;
 
 	return transport_generic_emulate_readcapacity(TASK_CMD(task), blocks);
 }
@@ -434,8 +436,8 @@ static int fd_emulate_read_cap(se_task_t *task)
 static int fd_emulate_read_cap16(se_task_t *task)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) task->se_dev->dev_ptr;
-	unsigned long long blocks_long = ((fd_dev->fd_dev_size /
-				  DEV_ATTRIB(task->se_dev)->block_size) - 1);
+	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
+				  DEV_ATTRIB(task->se_dev)->block_size);
 
 	return transport_generic_emulate_readcapacity_16(TASK_CMD(task),
 		blocks_long);
