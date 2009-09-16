@@ -794,9 +794,9 @@ int rd_MEMCPY_do_task(se_task_t *task)
 
 	req->rd_lba = task->task_lba;
 	req->rd_page = (req->rd_lba * DEV_ATTRIB(dev)->block_size) / PAGE_SIZE;
-	req->rd_offset = (req->rd_lba %
-			 (PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
-			  DEV_ATTRIB(dev)->block_size;
+	req->rd_offset = (do_div(req->rd_lba,
+			  (PAGE_SIZE / DEV_ATTRIB(dev)->block_size))) *
+			   DEV_ATTRIB(dev)->block_size;
 	req->rd_size = task->task_size;
 
 	if (req->rd_data_direction == RD_DATA_READ)
@@ -1017,9 +1017,9 @@ int rd_DIRECT_do_se_mem_map(
 	req->rd_req_flags = RRF_GOT_LBA;
 	req->rd_page = ((req->rd_lba * DEV_ATTRIB(task->se_dev)->block_size) /
 			PAGE_SIZE);
-	req->rd_offset = (req->rd_lba %
-			(PAGE_SIZE / DEV_ATTRIB(task->se_dev)->block_size)) *
-			DEV_ATTRIB(task->se_dev)->block_size;
+	req->rd_offset = (do_div(req->rd_lba,
+			  (PAGE_SIZE / DEV_ATTRIB(task->se_dev)->block_size))) *
+			   DEV_ATTRIB(task->se_dev)->block_size;
 	req->rd_size = task->task_size;
 
 	if (req->rd_offset)
@@ -1337,7 +1337,7 @@ int rd_CDB_write_SG(se_task_t *task, u32 size)
  */
 int rd_DIRECT_check_lba(unsigned long long lba, se_device_t *dev)
 {
-	return ((lba % (PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
+	return ((do_div(lba, PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
 		 DEV_ATTRIB(dev)->block_size) ? 1 : 0;
 }
 
