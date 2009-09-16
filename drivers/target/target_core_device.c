@@ -1047,7 +1047,7 @@ int se_dev_set_queue_depth(se_device_t *dev, u32 queue_depth)
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
 		if (queue_depth > TRANSPORT(dev)->get_queue_depth(dev)) {
 			printk(KERN_ERR "dev[%p]: Passed queue_depth: %u"
-				" exceeds LIO-Core/SE_Device TCQ: %u\n",
+				" exceeds TCM/SE_Device TCQ: %u\n",
 				dev, queue_depth,
 				TRANSPORT(dev)->get_queue_depth(dev));
 			return -1;
@@ -1063,7 +1063,7 @@ int se_dev_set_queue_depth(se_device_t *dev, u32 queue_depth)
 			if (queue_depth > TRANSPORT(dev)->get_max_queue_depth(
 					dev)) {
 				printk(KERN_ERR "dev[%p]: Passed queue_depth:"
-					" %u exceeds LIO-Core/SE_Device MAX"
+					" %u exceeds TCM/SE_Device MAX"
 					" TCQ: %u\n", dev, queue_depth,
 					TRANSPORT(dev)->get_max_queue_depth(
 						dev));
@@ -1110,7 +1110,7 @@ int se_dev_set_max_sectors(se_device_t *dev, u32 max_sectors)
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
 		if (max_sectors > TRANSPORT(dev)->get_max_sectors(dev)) {
 			printk(KERN_ERR "dev[%p]: Passed max_sectors: %u"
-				" greater than LIO-Core/SE_Device max_sectors:"
+				" greater than TCM/SE_Device max_sectors:"
 				" %u\n", dev, max_sectors,
 				TRANSPORT(dev)->get_max_sectors(dev));
 			 return -1;
@@ -1119,7 +1119,7 @@ int se_dev_set_max_sectors(se_device_t *dev, u32 max_sectors)
 		if (!(force) && (max_sectors >
 				 TRANSPORT(dev)->get_max_sectors(dev))) {
 			printk(KERN_ERR "dev[%p]: Passed max_sectors: %u"
-				" greater than LIO-Core/SE_Device max_sectors"
+				" greater than TCM/SE_Device max_sectors"
 				": %u, use force=1 to override.\n", dev,
 				max_sectors,
 				TRANSPORT(dev)->get_max_sectors(dev));

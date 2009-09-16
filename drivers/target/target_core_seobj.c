@@ -80,8 +80,8 @@ void dev_obj_get_obj_info(
 
 void dev_obj_get_plugin_info(void *p, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "%s Device Object Plugin %s\n",
-			PYX_ISCSI_VENDOR, DEV_OBJ_VERSION);
+	*bl += sprintf(b + *bl, "TCM Device Object Plugin %s\n",
+			DEV_OBJ_VERSION);
 }
 
 void *dev_obj_get_obj(void *p)

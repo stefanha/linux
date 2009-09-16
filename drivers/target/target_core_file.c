@@ -67,9 +67,9 @@ int fd_attach_hba(se_hba_t *hba, u32 host_id)
 	hba->hba_ptr = (void *) fd_host;
 	hba->transport = &fileio_template;
 
-	printk(KERN_INFO "CORE_HBA[%d] - %s FILEIO HBA Driver %s on Generic"
-		" Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, FD_VERSION, TARGET_CORE_MOD_VERSION);
+	printk(KERN_INFO "CORE_HBA[%d] - TCM FILEIO HBA Driver %s on Generic"
+		" Target Core Stack %s\n", hba->hba_id, FD_VERSION,
+		TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - Attached FILEIO HBA: %u to Generic"
 		" Target Core with TCQ Depth: %d MaxSectors: %u\n",
 		hba->hba_id, fd_host->fd_host_id,
@@ -294,7 +294,7 @@ se_device_t *fd_create_virtdevice(
 	fd_dev->fd_dev_id = fd_host->fd_host_dev_id_count++;
 	fd_dev->fd_queue_depth = dev->queue_depth;
 
-	printk(KERN_INFO "CORE_FILE[%u] - Added LIO FILEIO Device ID: %u at %s,"
+	printk(KERN_INFO "CORE_FILE[%u] - Added TCM FILEIO Device ID: %u at %s,"
 		" %llu total bytes\n", fd_host->fd_host_id, fd_dev->fd_dev_id,
 			fd_dev->fd_dev_name, fd_dev->fd_dev_size);
 
@@ -988,8 +988,7 @@ ssize_t fd_show_configfs_dev_params(
 
 void fd_get_plugin_info(void *p, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "%s FILEIO Plugin %s\n",
-			PYX_ISCSI_VENDOR, FD_VERSION);
+	*bl += sprintf(b + *bl, "TCM FILEIO Plugin %s\n", FD_VERSION);
 }
 
 void fd_get_hba_info(se_hba_t *hba, char *b, int *bl)
@@ -998,7 +997,7 @@ void fd_get_hba_info(se_hba_t *hba, char *b, int *bl)
 
 	*bl += sprintf(b + *bl, "SE Host ID: %u  FD Host ID: %u\n",
 		 hba->hba_id, fd_host->fd_host_id);
-	*bl += sprintf(b + *bl, "        LIO FILEIO HBA\n");
+	*bl += sprintf(b + *bl, "        TCM FILEIO HBA\n");
 }
 
 void fd_get_dev_info(se_device_t *dev, char *b, int *bl)
@@ -1010,7 +1009,7 @@ void fd_get_dev_info(se_device_t *dev, char *b, int *bl)
 
 void __fd_get_dev_info(fd_dev_t *fd_dev, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "LIO FILEIO ID: %u", fd_dev->fd_dev_id);
+	*bl += sprintf(b + *bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
 	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  ",
 		fd_dev->fd_dev_name, fd_dev->fd_dev_size);
 

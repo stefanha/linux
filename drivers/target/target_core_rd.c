@@ -72,9 +72,9 @@ int rd_attach_hba(se_hba_t *hba, u32 host_id)
 	hba->transport = (hba->type == RAMDISK_DR) ?
 			&rd_dr_template : &rd_mcp_template;
 
-	printk(KERN_INFO "CORE_HBA[%d] - %s Ramdisk HBA Driver %s on"
+	printk(KERN_INFO "CORE_HBA[%d] - TCM Ramdisk HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, RD_HBA_VERSION, TARGET_CORE_MOD_VERSION);
+		RD_HBA_VERSION, TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - Attached Ramdisk HBA: %u to Generic"
 		" Target Core TCQ Depth: %d MaxSectors: %u\n", hba->hba_id,
 		rd_host->rd_host_id, atomic_read(&hba->max_queue_depth),
@@ -285,7 +285,7 @@ static se_device_t *rd_create_virtdevice(
 	rd_dev->rd_dev_id = rd_host->rd_host_dev_id_count++;
 	rd_dev->rd_queue_depth = dev->queue_depth;
 
-	printk(KERN_INFO "CORE_RD[%u] - Added LIO %s Ramdisk Device ID: %u of"
+	printk(KERN_INFO "CORE_RD[%u] - Added TCM %s Ramdisk Device ID: %u of"
 		" %u pages in %u tables, %lu total bytes\n",
 		rd_host->rd_host_id, (!rd_dev->rd_direct) ? "MEMCPY" :
 		"DIRECT", rd_dev->rd_dev_id, rd_dev->rd_page_count,
@@ -1180,14 +1180,12 @@ ssize_t rd_show_configfs_dev_params(
 
 void rd_dr_get_plugin_info(void *p, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "%s RAMDISK_DR Plugin %s\n",
-			PYX_ISCSI_VENDOR, RD_DR_VERSION);
+	*bl += sprintf(b + *bl, "TCM RAMDISK_DR Plugin %s\n", RD_DR_VERSION);
 }
 
 void rd_mcp_get_plugin_info(void *p, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "%s RAMDISK_MCP Plugin %s\n",
-			PYX_ISCSI_VENDOR, RD_MCP_VERSION);
+	*bl += sprintf(b + *bl, "TCM RAMDISK_MCP Plugin %s\n", RD_MCP_VERSION);
 }
 
 void rd_get_hba_info(se_hba_t *hba, char *b, int *bl)
@@ -1196,7 +1194,7 @@ void rd_get_hba_info(se_hba_t *hba, char *b, int *bl)
 
 	*bl += sprintf(b + *bl, "SE Host ID: %u  RD Host ID: %u\n",
 		hba->hba_id, rd_host->rd_host_id);
-	*bl += sprintf(b + *bl, "        LIO RamDisk HBA\n");
+	*bl += sprintf(b + *bl, "        TCM RamDisk HBA\n");
 }
 
 void rd_get_dev_info(se_device_t *dev, char *b, int *bl)
@@ -1208,7 +1206,7 @@ void rd_get_dev_info(se_device_t *dev, char *b, int *bl)
 
 void __rd_get_dev_info(rd_dev_t *rd_dev, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "LIO RamDisk ID: %u  RamDisk Makeup: %s\n",
+	*bl += sprintf(b + *bl, "TCM RamDisk ID: %u  RamDisk Makeup: %s\n",
 			rd_dev->rd_dev_id, (rd_dev->rd_direct) ?
 			"rd_direct" : "rd_mcp");
 	*bl += sprintf(b + *bl, "        PAGES/PAGE_SIZE: %u*%lu"

@@ -225,9 +225,9 @@ int pscsi_attach_hba(se_hba_t *hba, u32 host_id)
 	hba->hba_ptr = (void *) sh;
 	hba->transport = &pscsi_template;
 
-	printk(KERN_INFO "CORE_HBA[%d] - %s SCSI HBA Driver %s on"
+	printk(KERN_INFO "CORE_HBA[%d] - TCM SCSI HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, PSCSI_VERSION, TARGET_CORE_MOD_VERSION);
+		PSCSI_VERSION, TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
 			(sh->hostt->name) : "Unknown");
 	printk(KERN_INFO "CORE_HBA[%d] - Attached SCSI HBA to Generic"
@@ -1167,8 +1167,7 @@ se_device_t *pscsi_create_virtdevice_from_fd(
 
 void pscsi_get_plugin_info(void *p, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "%s SCSI Plugin %s\n",
-		PYX_ISCSI_VENDOR, PSCSI_VERSION);
+	*bl += sprintf(b + *bl, "TCM SCSI Plugin %s\n", PSCSI_VERSION);
 }
 
 void pscsi_get_hba_info(se_hba_t *hba, char *b, int *bl)
@@ -1289,7 +1288,7 @@ int pscsi_map_task_SG(se_task_t *task)
 		return 0;
 	/*
 	 * For SCF_SCSI_DATA_SG_IO_CDB, Use fs/bio.c:bio_add_page() to setup
-	 * the bio_vec maplist from LIO-SE se_mem_t -> task->task_sg ->
+	 * the bio_vec maplist from TC< se_mem_t -> task->task_sg ->
 	 * struct scatterlist memory.  The se_task_t->task_sg[] currently needs
 	 * to be attached to struct bios for submission to Linux/SCSI using
 	 * struct request to struct scsi_device->request_queue.

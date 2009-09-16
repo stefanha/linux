@@ -76,9 +76,9 @@ int iblock_attach_hba(se_hba_t *hba, u32 host_id)
 	hba->hba_ptr = (void *) ib_host;
 	hba->transport = &iblock_template;
 
-	printk(KERN_INFO "CORE_HBA[%d] - %s iBlock HBA Driver %s on"
+	printk(KERN_INFO "CORE_HBA[%d] - TCM iBlock HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, IBLOCK_VERSION, TARGET_CORE_MOD_VERSION);
+		IBLOCK_VERSION, TARGET_CORE_MOD_VERSION);
 
 	printk(KERN_INFO "CORE_HBA[%d] - Attached iBlock HBA: %u to Generic"
 		" Target Core TCQ Depth: %d\n", hba->hba_id,
@@ -779,8 +779,7 @@ se_device_t *iblock_create_virtdevice_from_fd(
 
 void iblock_get_plugin_info(void *p, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "%s iBlock Plugin %s\n", PYX_ISCSI_VENDOR,
-			IBLOCK_VERSION);
+	*bl += sprintf(b + *bl, "TCM iBlock Plugin %s\n", IBLOCK_VERSION);
 }
 
 void iblock_get_hba_info(se_hba_t *hba, char *b, int *bl)
@@ -789,7 +788,7 @@ void iblock_get_hba_info(se_hba_t *hba, char *b, int *bl)
 
 	*bl += sprintf(b + *bl, "SE Host ID: %u  iBlock Host ID: %u\n",
 		hba->hba_id, ib_host->iblock_host_id);
-	*bl += sprintf(b + *bl, "        LIO iBlock HBA\n");
+	*bl += sprintf(b + *bl, "        TCM iBlock HBA\n");
 }
 
 void iblock_get_dev_info(se_device_t *dev, char *b, int *bl)
@@ -887,7 +886,7 @@ int iblock_map_task_SG(se_task_t *task)
 	hbio = tbio = bio;
 	/*
 	 * Use fs/bio.c:bio_add_pages() to setup the bio_vec maplist
-	 * from LIO-SE se_mem_t -> task->task_sg -> struct scatterlist memory.
+	 * from TCM se_mem_t -> task->task_sg -> struct scatterlist memory.
 	 */
 	for (i = 0; i < task->task_sg_num; i++) {
 		DEBUG_IBLOCK("task: %p bio: %p Calling bio_add_page(): page:"

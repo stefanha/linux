@@ -235,9 +235,9 @@ static int stgt_lld_probe(struct device *dev)
 	hba->hba_ptr = (void *) sh;
 	hba->transport = &stgt_template;
 
-	printk(KERN_INFO "CORE_HBA[%d] - %s STGT HBA Driver %s on"
+	printk(KERN_INFO "CORE_HBA[%d] - TCM STGT HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
-		PYX_ISCSI_VENDOR, STGT_VERSION, TARGET_CORE_MOD_VERSION);
+		STGT_VERSION, TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
 			(sh->hostt->name) : "Unknown");
 	printk(KERN_INFO "CORE_HBA[%d] - Attached STGT HBA to Generic"
@@ -570,8 +570,8 @@ ssize_t stgt_show_configfs_dev_params(
 
 void stgt_get_plugin_info(void *p, char *b, int *bl)
 {
-	*bl += sprintf(b + *bl, "%s STGT <-> Target_Core_Mod Plugin %s\n",
-		PYX_ISCSI_VENDOR, STGT_VERSION);
+	*bl += sprintf(b + *bl, "TCM STGT <-> Target_Core_Mod Plugin %s\n",
+		STGT_VERSION);
 }
 
 void stgt_get_hba_info(se_hba_t *hba, char *b, int *bl)
