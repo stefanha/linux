@@ -32,8 +32,7 @@ target_core_mod-objs			:=	target_core_configfs.o \
 						target_core_tmr.o \
 						target_core_tpg.o \
 						target_core_transport.o \
-						target_core_ua.o \
-						div64.o
+						target_core_ua.o
 
 ifeq ($(LINUX_IBLOCK), 1)
 target_core_mod-objs			+=	target_core_iblock.o
