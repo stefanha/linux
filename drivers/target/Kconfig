@@ -44,7 +44,7 @@ config TCM_STGT
 	tristate "TCM/STGT Subsystem Plugin"
 	depends on TARGET_CORE && EXPERIMENTAL
 	select SCSI_TGT
-	default y
+	default n
 	---help---
 	Say Y here to enable the WIP TCM/STGT subsystem plugin for accessing STGT device in TCM
 
