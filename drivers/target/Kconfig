@@ -17,7 +17,7 @@ config TCM_PSCSI
 	depends on TARGET_CORE
 	default y
 	---help---
-	Say Y here to enable the TCM/pSCSI subsystem plugin for non-buffered passthrough access to Linux/SCSI devices in TCM	
+	Say Y here to enable the TCM/pSCSI subsystem plugin for non-buffered passthrough access to Linux/SCSI devices in TCM
 
 config TCM_PSCSI_VPD_PAGE_CHECK
 	tristate "TCM/pSCSI EVPD Page Emulation for Linux/SCSI"
@@ -61,4 +61,4 @@ config TCM_DEBUG_DEV
 	default n
 	---help---
 	Say Y here to enable the TCM Debug device code
-	
+

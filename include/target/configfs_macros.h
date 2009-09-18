@@ -101,8 +101,8 @@ struct _name##_attribute {						\
 #define CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member)		\
 static struct _item *to_##_name(struct config_item *ci)			\
 {									\
-	return((ci) ? container_of(to_config_group(ci), struct _item,	\
-		_item_member) : NULL);					\
+	return (ci) ? container_of(to_config_group(ci), struct _item,	\
+		_item_member) : NULL;					\
 }
 
 #define CONFIGFS_EATTR_OPS_SHOW(_name, _item)				\
@@ -111,7 +111,7 @@ static ssize_t _name##_attr_show(struct config_item *item,		\
 				 char *page)				\
 {									\
 	struct _item *_item = to_##_name(item);				\
-	struct _name##_attribute *_name##_attr =			\
+	struct _name##_attribute * _name##_attr =			\
 		container_of(attr, struct _name##_attribute, attr);	\
 	ssize_t ret = 0;						\
 									\
@@ -126,7 +126,7 @@ static ssize_t _name##_attr_store(struct config_item *item,		\
 				  const char *page, size_t count)	\
 {									\
 	struct _item *_item = to_##_name(item);				\
-	struct _name##_attribute *_name##_attr =			\
+	struct _name##_attribute * _name##_attr =			\
 		container_of(attr, struct _name##_attribute, attr);	\
 	ssize_t ret = -EINVAL;						\
 									\
@@ -136,12 +136,12 @@ static ssize_t _name##_attr_store(struct config_item *item,		\
 }
 
 #define CONFIGFS_EATTR_OPS(_name, _item, _item_member)			\
-CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member);			\
-CONFIGFS_EATTR_OPS_SHOW(_name, _item);					\
-CONFIGFS_EATTR_OPS_STORE(_name, _item);	
+	CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member);		\
+	CONFIGFS_EATTR_OPS_SHOW(_name, _item);				\
+	CONFIGFS_EATTR_OPS_STORE(_name, _item);
 
 #define CONFIGFS_EATTR_OPS_RO(_name, _item, _item_member)		\
-CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member);			\
-CONFIGFS_EATTR_OPS_SHOW(_name, _item);
+	CONFIGFS_EATTR_OPS_TO_FUNC(_name, _item, _item_member);		\
+	CONFIGFS_EATTR_OPS_SHOW(_name, _item);
 
 #endif /* _CONFIGFS_MACROS_H_ */

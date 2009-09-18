@@ -155,7 +155,7 @@ extern struct se_task_s *transport_get_task_from_execute_queue(
 						struct se_device_s *);
 extern se_queue_req_t *transport_get_qr_from_queue(struct se_queue_obj_s *);
 extern int transport_check_device_tcq(se_device_t *, u32, u32);
-unsigned char *transport_dump_cmd_direction (struct se_cmd_s *);
+unsigned char *transport_dump_cmd_direction(struct se_cmd_s *);
 extern void transport_dump_dev_state(struct se_device_s *, char *, int *);
 extern void transport_dump_dev_info(struct se_device_s *, struct se_lun_s *,
 					unsigned long long, char *, int *);

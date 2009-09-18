@@ -328,13 +328,18 @@ typedef enum {
 } t10_reservations_index_t;
 
 typedef struct t10_pr_registration_s {
-	unsigned char pr_iport[PR_APTPL_MAX_IPORT_LEN]; /* Used during APTPL metadata reading */
-	unsigned char pr_tport[PR_APTPL_MAX_TPORT_LEN]; /* Used during APTPL metadata reading */
-	unsigned char *pr_aptpl_buf; /* For writing out live meta data */
+	/* Used during APTPL metadata reading */
+	unsigned char pr_iport[PR_APTPL_MAX_IPORT_LEN];
+	/* Used during APTPL metadata reading */
+	unsigned char pr_tport[PR_APTPL_MAX_TPORT_LEN];
+	/* For writing out live meta data */
+	unsigned char *pr_aptpl_buf;
 	u16 pr_aptpl_rpti;
 	u16 pr_reg_tpgt;
-	int pr_reg_all_tg_pt; /* Reservation effects all target ports */
-	int pr_reg_aptpl; /* Activate Persistence across Target Power Loss */
+	/* Reservation effects all target ports */
+	int pr_reg_all_tg_pt;
+	/* Activate Persistence across Target Power Loss */
+	int pr_reg_aptpl;
 	int pr_res_holder;
 	int pr_res_type;
 	int pr_res_scope;
@@ -354,7 +359,8 @@ typedef struct t10_pr_registration_s {
 typedef struct t10_reservation_template_s {
 	/* Reservation effects all target ports */
 	int pr_all_tg_pt;
-	/* Activate Persistence across Target Power Loss enabled for SCSI device */
+	/* Activate Persistence across Target Power Loss enabled
+	 * for SCSI device */
 	int pr_aptpl_active;
 	u32 pr_aptpl_buf_len;
 	u32 pr_generation;
@@ -710,9 +716,10 @@ typedef struct se_dev_attrib_s {
 typedef struct se_dev_snap_attrib_s {
 	unsigned char	contact[SNAP_CONTACT_LEN];
 	unsigned char	lv_group[SNAP_GROUP_LEN];
-	unsigned char	lvc_size[SNAP_LVC_LEN]; /* in lvcreate --size shorthand */
+	/* in lvcreate --size shorthand */
+	unsigned char	lvc_size[SNAP_LVC_LEN];
 	pid_t		pid;
-	int		enabled;	
+	int		enabled;
 	int		permissions;
 	int		max_snapshots;
 	int		max_warn;
