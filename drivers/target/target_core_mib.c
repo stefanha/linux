@@ -212,9 +212,6 @@ static int scsi_dev_seq_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "dev_alias: %s\n", str);
 
-	/* Release the semaphore */
-	core_put_hba(hba);
-
 	return 0;
 }
 
@@ -285,8 +282,6 @@ static int scsi_port_seq_show(struct seq_file *seq, void *v)
 	}
 	spin_unlock(&dev->se_port_lock);
 
-	/* Release the semaphore */
-	core_put_hba(hba);
 	return 0;
 }
 
@@ -371,9 +366,6 @@ static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 			wwn->unit_serial : wwn->vendor);
 	}
 	spin_unlock(&dev->se_port_lock);
-
-	/* Release the semaphore */
-	core_put_hba(hba);
 
 	return 0;
 }
@@ -466,9 +458,6 @@ static int scsi_tgt_dev_seq_show(struct seq_file *seq, void *v)
 		   hba->hba_index, dev->dev_index, LU_COUNT,
 		   status, non_accessible_lus, dev->num_resets);
 
-	/* Release the semaphore */
-	core_put_hba(hba);
-
 	return 0;
 }
 
@@ -559,9 +548,6 @@ static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 			rx_mbytes, tx_mbytes, 0);
 	}
 	spin_unlock(&dev->se_port_lock);
-
-	/* Release the semaphore */
-	core_put_hba(hba);
 
 	return 0;
 }
@@ -908,8 +894,6 @@ static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 		0, /* scsiLuHSInCommands */
 		(u32)(((u32)dev->creation_time - INITIAL_JIFFIES) *
 							100 / HZ));
-	/* Release the semaphore */
-	core_put_hba(hba);
 
 	return 0;
 }
