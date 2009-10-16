@@ -7236,6 +7236,7 @@ void transport_generic_process_write(se_cmd_t *cmd)
 #endif
 	transport_execute_tasks(cmd);
 }
+EXPORT_SYMBOL(transport_generic_process_write);
 
 /*	transport_generic_write_pending():
  *
