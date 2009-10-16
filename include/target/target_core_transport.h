@@ -177,7 +177,7 @@ extern void transport_generic_deactivate_device(se_device_t *);
 extern int transport_generic_claim_phydevice(se_device_t *);
 extern void transport_generic_release_phydevice(se_device_t *, int);
 extern void transport_generic_free_device(se_device_t *);
-extern int transport_allocate_iovecs_for_cmd(struct se_cmd_s *, u32);
+extern int transport_generic_allocate_iovecs(struct se_cmd_s *);
 extern int transport_generic_obj_start(struct se_transform_info_s *,
 					struct se_obj_lun_type_s *, void *,
 					unsigned long long);

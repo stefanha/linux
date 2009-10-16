@@ -2407,11 +2407,11 @@ void transport_generic_free_device(se_device_t *dev)
 }
 EXPORT_SYMBOL(transport_generic_free_device);
 
-int transport_allocate_iovecs_for_cmd(
+static inline int transport_allocate_iovecs_for_cmd(
 	se_cmd_t *cmd,
 	u32 iov_count)
 {
-	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_ATOMIC);
+	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_KERNEL);
 	if (!(cmd->iov_data)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" iscsi_cmd_t->iov_data.\n");
@@ -2421,13 +2421,16 @@ int transport_allocate_iovecs_for_cmd(
 
 	return 0;
 }
-EXPORT_SYMBOL(transport_allocate_iovecs_for_cmd);
 
 /*	transport_generic_allocate_iovecs():
  *
- *	Called from transport_generic_new_cmd() in Transport Processing Thread.
+ *	Attached to struct target_core_fabric_ops->alloc_cmd_iovecs()
+ *	for TCM fabric modules using Linux/NET with a struct iovec array.
+ *
+ *	Called by TCM fabric module in transport_generic_new_cmd() in
+ *	transport processing thread context.
  */
-static int transport_generic_allocate_iovecs(
+int transport_generic_allocate_iovecs(
 	se_cmd_t *cmd)
 {
 	u32 iov_count;
@@ -2442,11 +2445,9 @@ static int transport_generic_allocate_iovecs(
 #endif
 	iov_count += TRANSPORT_IOV_DATA_BUFFER;
 
-	if (transport_allocate_iovecs_for_cmd(cmd, iov_count))
-		return -1;
-
-	return 0;
+	return transport_allocate_iovecs_for_cmd(cmd, iov_count);
 }
+EXPORT_SYMBOL(transport_generic_allocate_iovecs);
 
 /*	transport_generic_prepare_cdb():
  *
@@ -5102,8 +5103,6 @@ int transport_get_sense_data(se_cmd_t *cmd)
  */
 #define SET_GENERIC_TRANSPORT_FUNCTIONS(cmd)				\
 do {									\
-	cmd->transport_allocate_iovecs =				\
-			&transport_generic_allocate_iovecs;		\
 	cmd->transport_get_task = &transport_generic_get_task;		\
 	cmd->transport_map_buffers_to_tasks =				\
 			&transport_generic_map_buffers_to_tasks;	\
@@ -7033,8 +7032,9 @@ out:
  */
 int transport_generic_new_cmd(se_cmd_t *cmd)
 {
-	int ret = 0;
+	se_portal_group_t *se_tpg;
 	se_transform_info_t ti;
+	int ret = 0;
 	/*
 	 * Generate se_task_t(s) and/or their payloads for this CDB.
 	 */
@@ -7068,17 +7068,18 @@ int transport_generic_new_cmd(se_cmd_t *cmd)
 					SE_LUN(cmd)->lun_type_ptr, 0);
 		if (ret < 0)
 			goto failure;
-
 		/*
-		 * Allocate iovecs for frontend mappings.  This currently
-		 * assumes traditional iSCSI going to sockets.
-		 *
-		 * FIXME: This should be specific to frontend protocol/hardware.
+		 * Determine if the calling TCM fabric module is talking to
+		 * Linux/NET via kernel sockets and needs to allocate a
+		 * struct iovec array to complete the se_cmd_t
 		 */
-		ret = cmd->transport_allocate_iovecs(cmd);
-		if (ret < 0) {
-			ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-			goto failure;
+		se_tpg = SE_LUN(cmd)->lun_sep->sep_tpg;
+		if (TPG_TFO(se_tpg)->alloc_cmd_iovecs != NULL) {
+			ret = TPG_TFO(se_tpg)->alloc_cmd_iovecs(cmd);
+			if (ret < 0) {
+				ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
+				goto failure;
+			}
 		}
 	}
 	/*

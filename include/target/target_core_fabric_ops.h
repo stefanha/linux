@@ -18,6 +18,11 @@ struct target_core_fabric_ops {
 	void (*tpg_release_fabric_acl)(struct se_portal_group_s *,
 					struct se_node_acl_s *);
 	u32 (*tpg_get_inst_index)(struct se_portal_group_s *);
+	/*
+	 * Optional function pointer for TCM fabric modules that use
+	 * Linux/NET sockets to allocate struct iovec array to se_cmd_t
+	 */
+	int (*alloc_cmd_iovecs)(struct se_cmd_s *);
 	void (*release_cmd_to_pool)(struct se_cmd_s *);
 	void (*release_cmd_direct)(struct se_cmd_s *);
 	int (*dev_del_lun)(struct se_portal_group_s *, u32);

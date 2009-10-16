@@ -571,7 +571,6 @@ typedef struct se_cmd_s {
 	struct se_transport_task_s *t_task;
 	struct target_core_fabric_ops *se_tfo;
 	int (*transport_add_cmd_to_queue)(struct se_cmd_s *, u8);
-	int (*transport_allocate_iovecs)(struct se_cmd_s *);
 	int (*transport_allocate_resources)(struct se_cmd_s *, u32, u32);
 	int (*transport_cdb_transform)(struct se_cmd_s *,
 					struct se_transform_info_s *);
