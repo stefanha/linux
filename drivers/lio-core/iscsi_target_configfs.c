@@ -2746,6 +2746,10 @@ int iscsi_target_register_configfs(void)
 #ifdef SNMP_SUPPORT
 	fabric->tf_ops.tpg_get_inst_index = &lio_tpg_get_inst_index;
 #endif /* SNMP_SUPPORT */
+	/*
+	 * Use transport_generic_allocate_iovecs from target_core_mod
+	 */
+	fabric->tf_ops.alloc_cmd_iovecs = &transport_generic_allocate_iovecs;
 	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd_to_pool;
 	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;
