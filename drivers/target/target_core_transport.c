@@ -2702,13 +2702,14 @@ se_cmd_t *__transport_alloc_se_cmd(
 	int task_attr)
 {
 	se_cmd_t *cmd;
+	int gfp_type = (in_interrupt()) ? GFP_ATOMIC : GFP_KERNEL;
 
 	if (data_direction == SE_DIRECTION_BIDI) {
 		printk(KERN_ERR "SCSI BiDirectional mode not supported yet\n");
 		return ERR_PTR(-ENOSYS);
 	}
 
-	cmd = kmem_cache_zalloc(se_cmd_cache, GFP_KERNEL);
+	cmd = kmem_cache_zalloc(se_cmd_cache, gfp_type);
 	if (!(cmd)) {
 		printk(KERN_ERR "kmem_cache_alloc() failed for se_cmd_cache\n");
 		return ERR_PTR(-ENOMEM);
@@ -2717,7 +2718,7 @@ se_cmd_t *__transport_alloc_se_cmd(
 	INIT_LIST_HEAD(&cmd->se_delayed_list);
 	INIT_LIST_HEAD(&cmd->se_ordered_list);
 
-	cmd->t_task = kzalloc(sizeof(se_transport_task_t), GFP_KERNEL);
+	cmd->t_task = kzalloc(sizeof(se_transport_task_t), gfp_type);
 	if (!(cmd->t_task)) {
 		printk(KERN_ERR "Unable to allocate cmd->t_task\n");
 		kmem_cache_free(se_cmd_cache, cmd);
@@ -2726,7 +2727,7 @@ se_cmd_t *__transport_alloc_se_cmd(
 
 	cmd->sense_buffer = kzalloc(
 			TRANSPORT_SENSE_BUFFER + tfo->get_fabric_sense_len(),
-			GFP_KERNEL);
+			gfp_type);
 	if (!(cmd->sense_buffer)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" cmd->sense_buffer\n");
