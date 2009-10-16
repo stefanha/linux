@@ -4360,18 +4360,18 @@ extern int transport_generic_emulate_inquiry(
 	int i;
 	u16 len = 0, id_len;
 
-	/*
-	 * Make sure we at least have 8 bytes of INQUIRY response payload
-	 * going back.
-	 */
-	if (cmd->data_length < 8) {
-		printk(KERN_ERR "SCSI Inquiry payload length: %u too small\n",
-				cmd->data_length);
-		return -1;
-	}
-	buf[0] = type;
-
 	if (!(cdb[1] & 0x1)) {
+		/*
+		 * Make sure we at least have 6 bytes of INQUIRY response
+		 * payload going back for EVPD=0
+		 */
+		if (cmd->data_length < 6) {
+			printk(KERN_ERR "SCSI Inquiry payload length: %u"
+				" too small for EVPD=0\n", cmd->data_length);
+			return -1;
+		}
+		buf[0] = type;
+
 		if (type == TYPE_TAPE)
 			buf[1] = 0x80;
 		buf[2]          = TRANSPORT(dev)->get_device_rev(dev);
@@ -4408,6 +4408,11 @@ extern int transport_generic_emulate_inquiry(
 			spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 		}
 after_tpgs:
+		if (cmd->data_length < 8) {
+			buf[4] = 1; /* Set additional length to 1 */
+			return 0;
+		}
+
 		buf[7]		= 0x32; /* Sync=1 and CmdQue=1 */
 		/*
 		 * Do not include vendor, product, reversion info in INQUIRY
@@ -4424,11 +4429,26 @@ after_tpgs:
 		buf[4] = 31; /* Set additional length to 31 */
 		return 0;
 	}
+	/*
+	 * Make sure we at least have 4 bytes of INQUIRY response
+	 * payload for 0x00 going back for EVPD=1.  Note that 0x80
+	 * and 0x83 will check for enough payload data length and
+	 * jump to set_len: label when there is not enough inquiry EVPD
+	 * payload length left for the next outgoing EVPD metadata
+	 */
+	if (cmd->data_length < 4) {
+		printk(KERN_ERR "SCSI Inquiry payload length: %u"
+			" too small for EVPD=1\n", cmd->data_length);
+		return -1;
+	}
+	buf[0] = type;
 
 	switch (cdb[2]) {
 	case 0x00: /* supported vital product data pages */
 		buf[1] = 0x00;
 		buf[3] = 3;
+		if (cmd->data_length < 8)
+			return 0;
 		buf[4] = 0x0;
 		buf[5] = 0x80;
 		buf[6] = 0x83;
