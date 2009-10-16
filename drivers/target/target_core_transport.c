@@ -502,6 +502,7 @@ void transport_init_queue_obj(se_queue_obj_t *qobj)
 	init_completion(&qobj->thread_done_comp);
 	spin_lock_init(&qobj->cmd_queue_lock);
 }
+EXPORT_SYMBOL(transport_init_queue_obj);
 
 void transport_load_plugins(void)
 {
