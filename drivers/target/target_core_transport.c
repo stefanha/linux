@@ -4311,7 +4311,7 @@ static inline void transport_get_maps(se_cmd_t *cmd)
 	cmd->transport_unmap_SG_segments = &transport_generic_unmap_SG_segments;
 }
 
-static unsigned char asciihex_to_binaryhex(unsigned char val[2])
+unsigned char transport_asciihex_to_binaryhex(unsigned char val[2])
 {
 	unsigned char result = 0;
 	/*
@@ -4337,6 +4337,7 @@ static unsigned char asciihex_to_binaryhex(unsigned char val[2])
 
 	return result;
 }
+EXPORT_SYMBOL(transport_asciihex_to_binaryhex);
 
 extern int transport_generic_emulate_inquiry(
 	se_cmd_t *cmd,
@@ -4530,11 +4531,11 @@ after_tpgs:
 		 * VENDOR_SPECIFIC_IDENTIFIER and
 		 * VENDOR_SPECIFIC_IDENTIFIER_EXTENTION
 		 */
-		binary = asciihex_to_binaryhex(
+		binary = transport_asciihex_to_binaryhex(
 					&DEV_T10_WWN(dev)->unit_serial[0]);
 		buf[off++] |= (binary & 0xf0) >> 4;
 		for (i = 0; i < 24; i += 2) {
-			binary_new = asciihex_to_binaryhex(
+			binary_new = transport_asciihex_to_binaryhex(
 				&DEV_T10_WWN(dev)->unit_serial[i+2]);
 			buf[off] = (binary & 0x0f) << 4;
 			buf[off++] |= (binary_new & 0xf0) >> 4;
