@@ -6173,6 +6173,68 @@ release_cmd:
 	return 0;
 }
 
+int transport_generic_map_mem_to_cmd(
+	se_cmd_t *cmd,
+	void *mem,
+	u32 se_mem_num)
+{
+	u32 se_mem_cnt_out = 0, se_mem_task_off = 0;
+	int ret;
+
+	if (!(mem) || !(se_mem_num))
+		return 0;
+	/*
+	 * Passed *mem will contain a list_head containing preformatted
+	 * se_mem_t elements...
+	 */
+	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM)) {
+		T_TASK(cmd)->t_mem_list = (struct list_head *)mem;
+		T_TASK(cmd)->t_task_se_num = se_mem_num;
+		cmd->se_cmd_flags |= SCF_CMD_PASSTHROUGH_NOALLOC;
+		return 0;
+	}
+	/*
+	 * Otherwise, assume the caller is passing a struct scatterlist
+	 * array from include/linux/scatterlist.h
+	 */
+	if ((cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
+	    (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
+		/*
+		 * For CDB using TCM se_mem_t linked list scatterlist memory
+		 * processed into a TCM se_subsystem_dev_t, we do the mapping
+		 * from the passed physical memory to se_mem_t->se_page here.
+		 */ 
+		T_TASK(cmd)->t_mem_list = transport_init_se_mem_list();
+		if (!(T_TASK(cmd)->t_mem_list))
+			return -1;
+
+		ret = transport_map_sg_to_mem(cmd,
+			T_TASK(cmd)->t_mem_list, mem, &se_mem_cnt_out,
+			&se_mem_task_off);
+		if (ret < 0)
+			return -1;
+
+		T_TASK(cmd)->t_task_se_num = se_mem_cnt_out;
+		cmd->se_cmd_flags |= SCF_CMD_PASSTHROUGH_NOALLOC;
+
+	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
+		/*
+		 * For CDBs using a contiguous buffer, save the passed
+		 * struct scatterlist memory.  After TCM storage object
+		 * processing has completed for this se_cmd_t, the calling
+		 * TCM fabric module is expected to call 
+		 * transport_memcpy_write_contig() to copy the TCM buffer
+		 * back into the passed *mem of type struct scatterlist array.
+		 */
+		cmd->se_cmd_flags |= SCF_PASSTHROUGH_CONTIG_TO_SG;
+		T_TASK(cmd)->t_task_pt_buf = mem;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(transport_generic_map_mem_to_cmd);
+	
+
 /*	transport_generic_map_buffers_to_tasks():
  *
  *	Called from transport_generic_new_cmd() in Transport Processing Thread.
@@ -6551,17 +6613,15 @@ static inline int transport_set_task_sectors(
 }
 
 int transport_map_sg_to_mem(
-	se_task_t *task,
+	se_cmd_t *cmd,
 	struct list_head *se_mem_list,
 	void *in_mem,
-	se_mem_t *in_se_mem,
-	se_mem_t **out_se_mem,
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
 	se_mem_t *se_mem;
 	struct scatterlist *sg_s;
-	u32 j = 0, saved_task_offset = 0, task_size = task->task_size;
+	u32 j = 0, saved_task_offset = 0, task_size = cmd->data_length;
 
 	if (!in_mem) {
 		printk(KERN_ERR "No source scatterlist\n");
@@ -6621,8 +6681,8 @@ next:
 		(*se_mem_cnt)++;
 	}
 
-	DEBUG_MEM("task[%u] - Mapped(%u) struct scatterlist segments to(%u)"
-		" se_mem_t\n", task->task_no, j, *se_mem_cnt);
+	DEBUG_MEM("task[0] - Mapped(%u) struct scatterlist segments to(%u)"
+		" se_mem_t\n", j, *se_mem_cnt);
 
 	return 0;
 }
@@ -6984,11 +7044,20 @@ int transport_generic_new_cmd(se_cmd_t *cmd)
 	ti.se_obj_api = SE_LUN(cmd)->lun_obj_api;
 
 	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)) {
-		/* #warning FIXME v3.2: Enable > PAGE_SIZE usage */
-		ret = cmd->transport_allocate_resources(cmd, cmd->data_length,
-				PAGE_SIZE);
-		if (ret < 0)
-			goto failure;
+		/*
+		 * Determine is the TCM fabric module has already allocated
+		 * physical memory, and is directly calling
+		 * transport_generic_map_mem_to_cmd() to setup beforehand
+		 * the linked list of physical memory at
+		 * T_TASK(cmd)->t_mem_list of se_mem_t->se_page
+		 */
+		if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC)) {
+			/* #warning FIXME v3.2: Enable > PAGE_SIZE usage */
+			ret = cmd->transport_allocate_resources(cmd,
+					cmd->data_length, PAGE_SIZE);
+			if (ret < 0)
+				goto failure;
+		}
 
 		ret = transport_get_sectors(cmd, SE_LUN(cmd)->lun_obj_api,
 					SE_LUN(cmd)->lun_type_ptr);

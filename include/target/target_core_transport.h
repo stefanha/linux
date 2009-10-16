@@ -237,6 +237,7 @@ extern void transport_free_dev_tasks(se_cmd_t *);
 extern void transport_release_tasks(se_cmd_t *);
 extern void transport_release_fe_cmd(se_cmd_t *);
 extern int transport_generic_remove(se_cmd_t *, int, int);
+extern int transport_generic_map_mem_to_cmd(se_cmd_t *cmd, void *, u32);
 extern int transport_lun_wait_for_tasks(se_cmd_t *, se_lun_t *);
 extern void transport_clear_lun_from_sessions(se_lun_t *);
 extern int transport_check_aborted_status(se_cmd_t *, int);
@@ -259,9 +260,8 @@ extern struct list_head *transport_init_se_mem_list(void);
 extern void transport_free_se_mem_list(struct list_head *);
 extern int transport_generic_get_mem(struct se_cmd_s *, u32, u32);
 extern u32 transport_calc_sg_num(struct se_task_s *, struct se_mem_s *, u32);
-extern int transport_map_sg_to_mem(struct se_task_s *, struct list_head *,
-					void *, struct se_mem_s *,
-					struct se_mem_s **, u32 *, u32 *);
+extern int transport_map_sg_to_mem(struct se_cmd_s *, struct list_head *,
+					void *, u32 *, u32 *);
 extern int transport_map_mem_to_mem(struct se_task_s *, struct list_head *,
 					void *, struct se_mem_s *,
 					struct se_mem_s **, u32 *, u32 *);
