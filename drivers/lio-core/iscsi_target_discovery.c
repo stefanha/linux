@@ -109,7 +109,7 @@ extern int iscsi_build_sendtargets_response(iscsi_cmd_t *cmd)
 				}
 
 				len = sprintf(buf, "TargetAddress="
-					"%s%s%s:%hu,%hu\n",
+					"%s%s%s:%hu,%hu",
 					(tpg_np->tpg_np->np_flags &
 						NPF_NET_IPV6) ?
 					"[" : "", ip,
