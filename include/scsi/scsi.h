@@ -153,7 +153,9 @@ struct scsi_cmnd;
 #define MO_SET_PRIORITY       0x0e
 #define MO_SET_TIMESTAMP      0x0f
 #define MO_MANAGEMENT_PROTOCOL_OUT 0x10
-
+/* values for variable length command */
+#define READ_32		      0x09
+#define WRITE_32	      0x0b
 /* Values for T10/04-262r7 */
 #define	ATA_16		      0x85	/* 16-byte pass-thru */
 #define	ATA_12		      0xa1	/* 12-byte pass-thru */
