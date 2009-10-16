@@ -5843,6 +5843,37 @@ void transport_memcpy_write_contig(
 }
 EXPORT_SYMBOL(transport_memcpy_write_contig);
 
+/*
+ * This function will copy a struct scatterlist array *sg_s into a destination
+ * contiguous *dst buffer.
+ */
+void transport_memcpy_read_contig(
+	se_cmd_t *cmd,
+	unsigned char *dst,
+	struct scatterlist *sg_s)
+{
+	u32 i = 0, length = 0, total_length = cmd->data_length;
+	void *src;
+
+	while (total_length) {
+		length = sg_s[i].length;
+
+		if (length > total_length)
+			length = total_length;
+
+		src = sg_virt(&sg_s[i]);
+
+		memcpy(dst, src, length);
+
+		if (!(total_length -= length))
+			return;
+
+		dst += length;
+		i++;
+	}
+}
+EXPORT_SYMBOL(transport_memcpy_read_contig);
+
 /*     transport_generic_passthrough():
  *
  *
