@@ -5793,6 +5793,37 @@ int transport_passthrough_complete(
 	return 0;
 }
 
+/*
+ * This function will copy a contiguous *src buffer into a destination
+ * struct scatterlist array.
+ */
+void transport_memcpy_write_contig(
+	se_cmd_t *cmd,
+	struct scatterlist *sg_d,
+	unsigned char *src)
+{
+	u32 i = 0, length = 0, total_length = cmd->data_length;
+	void *dst;
+
+	while (total_length) {
+		length = sg_d[i].length;
+
+		if (length > total_length)
+			length = total_length;
+
+		dst = sg_virt(&sg_d[i]);
+
+		memcpy(dst, src, length);
+
+		if (!(total_length -= length))
+			return;
+
+		src += length;
+		i++;
+        }
+}
+EXPORT_SYMBOL(transport_memcpy_write_contig);
+
 /*     transport_generic_passthrough():
  *
  *

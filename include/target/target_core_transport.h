@@ -224,6 +224,8 @@ extern se_cmd_t *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *);
 extern void transport_passthrough_release(se_cmd_t *);
 extern int transport_passthrough_complete(se_cmd_t *);
+extern void transport_memcpy_write_contig(se_cmd_t *cmd, struct scatterlist *,
+				unsigned char *);
 extern int transport_generic_passthrough_async(se_cmd_t *cmd,
 				void(*callback)(se_cmd_t *cmd,
 				void *callback_arg, int complete_status),
