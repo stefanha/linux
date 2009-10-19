@@ -63,6 +63,9 @@
 #define VPD_TMP_BUF_SIZE			128
 /* Used for target_core-pscsi.c:pscsi_transport_complete() */
 #define VPD_BUF_LEN				256
+/* Used for se_subsystem_dev_t-->se_dev_alias, must be less than
+   PAGE_SIZE */
+#define SE_DEV_ALIAS_LEN			512
 /* Used for se_subsystem_dev_t->se_dev_udev_path[], must be less than
    PAGE_SIZE */
 #define SE_UDEV_PATH_LEN			512
@@ -732,6 +735,7 @@ typedef struct se_dev_snap_attrib_s {
 } se_dev_snap_attrib_t;
 
 typedef struct se_subsystem_dev_s {
+	unsigned char	se_dev_alias[SE_DEV_ALIAS_LEN];
 	unsigned char	se_dev_udev_path[SE_UDEV_PATH_LEN];
 	u32		su_dev_flags;
 	struct se_hba_s *se_dev_hba;

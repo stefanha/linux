@@ -1693,6 +1693,52 @@ static struct target_core_configfs_attribute target_core_attr_dev_fd = {
 	.store	= target_core_store_dev_fd,
 };
 
+static ssize_t target_core_show_dev_alias(void *p, char *page)
+{
+	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;
+
+	if (!(se_dev->su_dev_flags & SDF_USING_ALIAS))
+		return 0;
+
+	return snprintf(page, PAGE_SIZE, "%s\n", se_dev->se_dev_alias);
+}
+
+static ssize_t target_core_store_dev_alias(
+	void *p,
+	const char *page,
+	size_t count)
+{
+	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;
+	se_hba_t *hba = se_dev->se_dev_hba;
+	ssize_t read_bytes;
+
+	if (count > (SE_DEV_ALIAS_LEN-1)) {
+		printk(KERN_ERR "alias count: %d exceeds"
+			" SE_DEV_ALIAS_LEN-1: %u\n", (int)count,
+			SE_DEV_ALIAS_LEN-1);
+		return -EINVAL;
+	}
+
+	se_dev->su_dev_flags |= SDF_USING_ALIAS;
+	read_bytes = snprintf(&se_dev->se_dev_alias[0], SE_DEV_ALIAS_LEN,
+			"%s", page);
+
+	printk(KERN_INFO "Target_Core_ConfigFS: %s/%s set alias: %s\n",
+		config_item_name(&hba->hba_group.cg_item),
+		config_item_name(&se_dev->se_dev_group.cg_item),
+		se_dev->se_dev_alias);
+
+	return read_bytes;
+}
+
+static struct target_core_configfs_attribute target_core_attr_dev_alias = {
+	.attr	= { .ca_owner = THIS_MODULE,
+		    .ca_name = "alias",
+		    .ca_mode =  S_IRUGO | S_IWUSR },
+	.show	= target_core_show_dev_alias,
+	.store	= target_core_store_dev_alias,
+};
+
 static ssize_t target_core_show_dev_udev_path(void *p, char *page)
 {
 	se_subsystem_dev_t *se_dev = (se_subsystem_dev_t *)p;
@@ -1934,6 +1980,7 @@ static struct configfs_attribute *lio_core_dev_attrs[] = {
 	&target_core_attr_dev_info.attr,
 	&target_core_attr_dev_control.attr,
 	&target_core_attr_dev_fd.attr,
+	&target_core_attr_dev_alias.attr,
 	&target_core_attr_dev_udev_path.attr,
 	&target_core_attr_dev_enable.attr,
 	&target_core_attr_dev_alua_lu_gp.attr,
