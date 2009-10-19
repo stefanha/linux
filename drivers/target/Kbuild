@@ -52,3 +52,5 @@ EXTRA_CFLAGS			+= -DDEBUG_DEV
 endif
 
 obj-$(CONFIG_TARGET_CORE)	+= target_core_mod.o
+
+obj-$(CONFIG_TCM_LOOP_FABRIC)	+= tcm_loop/

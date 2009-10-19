@@ -62,3 +62,16 @@ config TCM_DEBUG_DEV
 	---help---
 	Say Y here to enable the TCM Debug device code
 
+config TCM_LOOP_FABRIC
+        tristate "TCM Virtual SAS target and Linux/SCSI LDD fabric loopback module "
+        depends on TARGET_CORE && CONFIGFS_FS
+        default n
+        ---help---
+        Say Y here to enable the TCM Virtual SAS target and Linux/SCSI LDD fabric loopback module
+
+config TCM_LOOP_CDB_DEBUG
+	tristate "TCM loopback fabric module CDB debug code"
+	depends on TARGET_CORE && CONFIGFS_FS && TCM_LOOP_FABRIC
+	default n
+	---help---
+	Say Y here to enable the TCM loopback fabric module CDB debug code
