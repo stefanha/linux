@@ -125,7 +125,6 @@ static struct config_group *target_core_register_fabric(
 {
 	struct config_group *fabric_cg;
 	struct target_fabric_configfs *tf;
-	char *ptr;
 	int ret;
 
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> group: %p name:"
@@ -135,10 +134,22 @@ static struct config_group *target_core_register_fabric(
 	if (!(fabric_cg))
 		return ERR_PTR(-ENOMEM);
 	/*
-	 * Load LIO Target for $CONFIGFS/target/iscsi :-)
+	 * Below are some hardcoded request_module() calls to automatically
+	 * local fabric modules when the following is called:
+	 *
+	 * mkdir -p /sys/kernel/config/target/$MODULE_NAME
+	 *
+	 * Note that this does not limit which TCM fabric module can be
+	 * registered, but simply provids auto loading logic for modules with
+	 * mkdir(2) system calls with known TCM fabric modules.
 	 */
-	ptr = strstr(name, "iscsi");
-	if ((ptr)) {
+	if (!(strncmp(name, "iscsi", 5))) {
+		/*
+		 * Automatically load the LIO Target fabric module when the
+		 * following is called:
+		 *
+		 * mkdir -p $CONFIGFS/target/iscsi
+		 */
 		ret = request_module("iscsi_target_mod");
 		if (ret < 0) {
 			printk(KERN_ERR "request_module() failed for"
@@ -146,11 +157,20 @@ static struct config_group *target_core_register_fabric(
 			kfree(fabric_cg);
 			return ERR_PTR(-EINVAL);
 		}
-	} else {
-		printk(KERN_ERR "Unsupported configfs target fabric %s\n",
-			name);
-		kfree(fabric_cg);
-		return ERR_PTR(-EINVAL);
+	} else if (!(strncmp(name, "loopback", 8))) {
+		/*
+		 * Automatically load the tcm_loop fabric module when the
+		 * following is called:
+		 *
+		 * mkdir -p $CONFIGFS/target/loopback
+		 */
+		ret = request_module("tcm_loop");
+		if (ret < 0) {
+			printk(KERN_ERR "request_module() failed for"
+				" tcm_loop.ko: %d\n", ret);
+			kfree(fabric_cg);
+			return ERR_PTR(-EINVAL);
+		}
 	}
 
 	tf = target_core_get_fabric(name);
