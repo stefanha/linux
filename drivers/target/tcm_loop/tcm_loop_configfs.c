@@ -354,10 +354,8 @@ static struct config_group *tcm_loop_make_naa_tpg(
 	 */
 	tl_tpg->tl_se_tpg = core_tpg_register(&tcm_loop_fabric_configfs->tf_ops,
 			(void *)tl_tpg, TRANSPORT_TPG_TYPE_NORMAL);
-	if (IS_ERR(tl_tpg->tl_se_tpg) || !(tl_tpg->tl_se_tpg)) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (IS_ERR(tl_tpg->tl_se_tpg))
+		return ERR_PTR(-ENOMEM);
 	/*
 	 * Locate the pointer to the struct config_group that will be
 	 * registered below in order to setup the default groups.
