@@ -486,7 +486,7 @@ int core_load_discovery_tpg(void)
 	tpg->tpg_se_tpg = core_tpg_register(
 			&lio_target_fabric_configfs->tf_ops, (void *)tpg,
 			TRANSPORT_TPG_TYPE_DISCOVERY);
-	if (!(tpg->tpg_se_tpg)) {
+	if (IS_ERR(tpg->tpg_se_tpg)) {
 		kfree(tpg);
 		return -1;
 	}

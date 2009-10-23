@@ -2382,7 +2382,7 @@ static struct config_group *lio_target_tiqn_addtpg(
 	tpg->tpg_se_tpg = core_tpg_register(
 			&lio_target_fabric_configfs->tf_ops, (void *)tpg,
 			TRANSPORT_TPG_TYPE_NORMAL);
-	if (IS_ERR(tpg->tpg_se_tpg) || !(tpg->tpg_se_tpg))
+	if (IS_ERR(tpg->tpg_se_tpg))
 		return NULL;
 
 	tpg_cg = &tpg->tpg_se_tpg->tpg_group;
