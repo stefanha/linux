@@ -630,7 +630,7 @@ static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
 
 		if (ret != virt_size) {
 			printk(KERN_ERR "do_sync_read() returned %d, expecting"
-					" virt_size: %d\n", ret, virt_size);
+				" virt_size: %d\n", (int)ret, (int)virt_size);
 			return -1;
 		}
 	}
@@ -846,8 +846,9 @@ static int fd_do_sync_write(fd_request_t *req, se_task_t *task)
 		set_fs(old_fs);
 
 		if (write_ret != virt_size) {
-			printk(KERN_ERR "do_sync_write() returned %d, expecting"
-				" virt_size: %d\n", write_ret, virt_size);
+			printk(KERN_ERR "do_sync_write() returned %d,"
+				" expecting virt_size: %d\n", (int)write_ret,
+				(int)virt_size);
 			return -1;
 		}
 	}
