@@ -23,6 +23,11 @@ struct target_core_fabric_ops {
 	 * Linux/NET sockets to allocate struct iovec array to se_cmd_t
 	 */
 	int (*alloc_cmd_iovecs)(struct se_cmd_s *);
+	/*
+	 * Optional to release se_cmd_t and fabric dependent allocated
+	 * I/O descriptor in transport_cmd_check_stop()
+	 */
+	void (*check_stop_free)(struct se_cmd_s *);
 	void (*release_cmd_to_pool)(struct se_cmd_s *);
 	void (*release_cmd_direct)(struct se_cmd_s *);
 	int (*dev_del_lun)(struct se_portal_group_s *, u32);

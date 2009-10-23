@@ -862,16 +862,27 @@ static int transport_cmd_check_stop(
 	}
 	if (transport_off) {
 		atomic_set(&T_TASK(cmd)->t_transport_active, 0);
-		if (transport_off == 2)
+		if (transport_off == 2) {
 			transport_all_task_dev_remove_state(cmd);
+			/*
+			 * Clear se_cmd_t->se_lun before the transport_off == 2
+			 * handoff to fabric module.
+			 */
+			if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
+				cmd->se_lun = NULL;
+			/*
+			 * Some fabric modules like tcm_loop can release
+			 * their internally allocated I/O refrence now and
+			 * se_cmd_t now.
+			 */
+			if (CMD_TFO(cmd)->check_stop_free != NULL) {
+				spin_unlock_irqrestore(
+					&T_TASK(cmd)->t_state_lock, flags);
 
-		/*
-		 * Clear se_cmd_t->se_lun before the transport_off == 2 handoff
-		 * to FE.
-		 */
-		if ((transport_off == 2) && !(cmd->se_cmd_flags &
-						SCF_CMD_PASSTHROUGH))
-			cmd->se_lun = NULL;
+				CMD_TFO(cmd)->check_stop_free(cmd);
+				return 1;
+			}
+		}
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 		return 0;
@@ -880,6 +891,11 @@ static int transport_cmd_check_stop(
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 	return 0;
+}
+
+static int transport_cmd_check_stop_to_fabric(se_cmd_t *cmd)
+{
+	return transport_cmd_check_stop(cmd, 2, 0);
 }
 
 static void transport_lun_remove_cmd(se_cmd_t *cmd)
@@ -3223,7 +3239,7 @@ void transport_generic_request_failure(
 			cmd->scsi_sense_reason, 0);
 check_stop:
 	transport_lun_remove_cmd(cmd);
-	if (!(transport_cmd_check_stop(cmd, 2, 0)))
+	if (!(transport_cmd_check_stop_to_fabric(cmd)))
 		transport_passthrough_check_stop(cmd);
 }
 
@@ -6019,7 +6035,7 @@ void transport_generic_complete_ok(se_cmd_t *cmd)
 	 */
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH) {
 		transport_lun_remove_cmd(cmd);
-		if (!(transport_cmd_check_stop(cmd, 2, 0)))
+		if (!(transport_cmd_check_stop_to_fabric(cmd)))
 			transport_passthrough_check_stop(cmd);
 		return;
 	} else if (cmd->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE) {
@@ -6034,7 +6050,7 @@ void transport_generic_complete_ok(se_cmd_t *cmd)
 			transport_send_check_condition_and_sense(
 					cmd, reason, 1);
 			transport_lun_remove_cmd(cmd);
-			transport_cmd_check_stop(cmd, 2, 0);
+			transport_cmd_check_stop_to_fabric(cmd);
 			return;
 		}
 	}
@@ -6069,7 +6085,7 @@ void transport_generic_complete_ok(se_cmd_t *cmd)
 	}
 
 	transport_lun_remove_cmd(cmd);
-	transport_cmd_check_stop(cmd, 2, 0);
+	transport_cmd_check_stop_to_fabric(cmd);
 }
 
 void transport_free_dev_tasks(se_cmd_t *cmd)
