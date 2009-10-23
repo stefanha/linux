@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/kthread.h>
 #include <linux/types.h>
+#include <linux/list.h>
 #include <linux/string.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
@@ -445,9 +446,7 @@ static se_queue_req_t *tcm_loop_get_qr_from_queue(se_queue_obj_t *qobj)
 		return NULL;
 	}
 
-	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
-		break;
-
+	qr = list_first_entry(&qobj->qobj_list, se_queue_req_t, qr_list);
 	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
