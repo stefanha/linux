@@ -199,6 +199,7 @@ struct kmem_cache *se_tmr_req_cache;
 struct kmem_cache *se_sess_cache;
 struct kmem_cache *se_hba_cache;
 struct kmem_cache *se_ua_cache;
+struct kmem_cache *se_mem_cache;
 struct kmem_cache *t10_pr_reg_cache;
 struct kmem_cache *t10_alua_lu_gp_cache;
 struct kmem_cache *t10_alua_lu_gp_mem_cache;
@@ -311,6 +312,12 @@ int init_se_global(void)
 		printk(KERN_ERR "kmem_cache_create() for se_ua_t failed\n");
 		goto out;
 	}
+	se_mem_cache = kmem_cache_create("se_mem_cache",
+			sizeof(se_mem_t), __alignof__(se_mem_t), 0, NULL);
+	if (!(se_mem_cache)) {
+		printk(KERN_ERR "kmem_cache_create() for se_mem_t failed\n");
+		goto out;
+	}
 	t10_pr_reg_cache = kmem_cache_create("t10_pr_reg_cache",
 			sizeof(t10_pr_registration_t),
 			__alignof__(t10_pr_registration_t), 0, NULL);
@@ -379,6 +386,8 @@ out:
 		kmem_cache_destroy(se_hba_cache);
 	if (se_ua_cache)
 		kmem_cache_destroy(se_ua_cache);
+	if (se_mem_cache)
+		kmem_cache_destroy(se_mem_cache);
 	if (t10_pr_reg_cache)
 		kmem_cache_destroy(t10_pr_reg_cache);
 	if (t10_alua_lu_gp_cache)
@@ -408,6 +417,7 @@ void release_se_global(void)
 	kmem_cache_destroy(se_sess_cache);
 	kmem_cache_destroy(se_hba_cache);
 	kmem_cache_destroy(se_ua_cache);
+	kmem_cache_destroy(se_mem_cache);
 	kmem_cache_destroy(t10_pr_reg_cache);
 	kmem_cache_destroy(t10_alua_lu_gp_cache);
 	kmem_cache_destroy(t10_alua_lu_gp_mem_cache);
@@ -6120,7 +6130,7 @@ static inline void transport_free_pages(se_cmd_t *cmd)
 		__free_page(se_mem->se_page);
 
 		list_del(&se_mem->se_list);
-		kfree(se_mem);
+		kmem_cache_free(se_mem_cache, se_mem);
 	}
 
 	kfree(T_TASK(cmd)->t_mem_list);
@@ -6478,7 +6488,7 @@ void transport_free_se_mem_list(struct list_head *se_mem_list)
 
 	list_for_each_entry_safe(se_mem, se_mem_tmp, se_mem_list, se_list) {
 		list_del(&se_mem->se_list);
-		kfree(se_mem);
+		kmem_cache_free(se_mem_cache, se_mem);
 	}
 	kfree(se_mem_list);
 }
@@ -6493,7 +6503,7 @@ int transport_generic_get_mem(se_cmd_t *cmd, u32 length, u32 dma_size)
 		return -1;
 
 	while (length) {
-		se_mem = kzalloc(sizeof(se_mem_t), GFP_KERNEL);
+		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
 			printk(KERN_ERR "Unable to allocate se_mem_t\n");
 			goto out;
@@ -6681,7 +6691,7 @@ int transport_map_sg_to_mem(
 	sg_s = (struct scatterlist *)in_mem;
 
 	while (task_size) {
-		se_mem = kzalloc(sizeof(se_mem_t), GFP_KERNEL);
+		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
 			printk(KERN_ERR "Unable to allocate se_mem_t\n");
 			return -1;
@@ -6756,7 +6766,7 @@ int transport_map_mem_to_mem(
 	}
 
 	while (task_size) {
-		se_mem_new = kzalloc(sizeof(se_mem_t), GFP_KERNEL);
+		se_mem_new = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem_new)) {
 			printk(KERN_ERR "Unable to allocate se_mem_t\n");
 			return -1;

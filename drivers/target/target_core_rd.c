@@ -843,7 +843,7 @@ static int rd_DIRECT_with_offset(
 		req->rd_lba, req->rd_size, req->rd_page, req->rd_offset);
 #endif
 	while (req->rd_size) {
-		se_mem = kzalloc(sizeof(se_mem_t), GFP_KERNEL);
+		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
 			printk(KERN_ERR "Unable to allocate se_mem_t\n");
 			return -1;
@@ -944,7 +944,7 @@ static int rd_DIRECT_without_offset(
 		req->rd_lba, req->rd_size, req->rd_page);
 #endif
 	while (req->rd_size) {
-		se_mem = kzalloc(sizeof(se_mem_t), GFP_KERNEL);
+		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
 			printk(KERN_ERR "Unable to allocate se_mem_t\n");
 			return -1;
@@ -1049,7 +1049,7 @@ void rd_DIRECT_free_DMA(se_cmd_t *cmd)
 	list_for_each_entry_safe(se_mem, se_mem_tmp, T_TASK(cmd)->t_mem_list,
 				se_list) {
 		 list_del(&se_mem->se_list);
-		 kfree(se_mem);
+		 kmem_cache_free(se_mem_cache, se_mem);
 	}
 	kfree(T_TASK(cmd)->t_mem_list);
 	T_TASK(cmd)->t_mem_list = NULL;

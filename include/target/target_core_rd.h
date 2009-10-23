@@ -50,6 +50,8 @@
 
 extern se_global_t *se_global;
 
+extern struct kmem_cache *se_mem_cache;
+
 #ifndef RD_INCLUDE_STRUCTS
 extern int rd_CDB_inquiry(se_task_t *, u32);
 extern int rd_CDB_none(se_task_t *, u32);
