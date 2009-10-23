@@ -6105,6 +6105,8 @@ void transport_free_dev_tasks(se_cmd_t *cmd)
 static inline void transport_free_pages(se_cmd_t *cmd)
 {
 	se_mem_t *se_mem, *se_mem_tmp;
+	int free_page =
+		((cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC) == 0);
 
 	if (T_TASK(cmd)->t_task_buf) {
 		kfree(T_TASK(cmd)->t_task_buf);
@@ -6127,7 +6129,12 @@ static inline void transport_free_pages(se_cmd_t *cmd)
 
 	list_for_each_entry_safe(se_mem, se_mem_tmp,
 			T_TASK(cmd)->t_mem_list, se_list) {
-		__free_page(se_mem->se_page);
+		/*
+		 * We only release call __free_page(se_mem_t->se_page) when
+		 * SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC is NOT in use,
+		 */
+		if (free_page)
+			__free_page(se_mem->se_page);
 
 		list_del(&se_mem->se_list);
 		kmem_cache_free(se_mem_cache, se_mem);
@@ -6276,7 +6283,7 @@ int transport_generic_map_mem_to_cmd(
 			return -1;
 
 		T_TASK(cmd)->t_task_se_num = se_mem_cnt_out;
-		cmd->se_cmd_flags |= SCF_CMD_PASSTHROUGH_NOALLOC;
+		cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/*
@@ -7113,7 +7120,7 @@ int transport_generic_new_cmd(se_cmd_t *cmd)
 		 * the linked list of physical memory at
 		 * T_TASK(cmd)->t_mem_list of se_mem_t->se_page
 		 */
-		if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC)) {
+		if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC)) {
 			/* #warning FIXME v3.2: Enable > PAGE_SIZE usage */
 			ret = cmd->transport_allocate_resources(cmd,
 					cmd->data_length, PAGE_SIZE);
