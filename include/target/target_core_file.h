@@ -132,6 +132,7 @@ typedef struct fd_dev_sg_table_s {
 
 #define FBDF_HAS_PATH		0x01
 #define FBDF_HAS_SIZE		0x02
+#define FDBD_USE_BUFFERED_IO	0x04
 
 typedef struct fd_dev_s {
 	u32		fbd_flags;
@@ -151,6 +152,8 @@ typedef struct fd_dev_s {
 	struct fd_host_s *fd_host;
 	/* Next FILEIO Device entry in list */
 	struct fd_dev_s *next;
+	int (*fd_do_read)(fd_request_t *, se_task_t *);
+	int (*fd_do_write)(fd_request_t *, se_task_t *);
 } ____cacheline_aligned fd_dev_t;
 
 extern void __fd_get_dev_info(struct fd_dev_s *, char *, int *);

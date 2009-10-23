@@ -169,6 +169,11 @@ void *fd_allocate_virtdevice(se_hba_t *hba, const char *name)
 	return fd_dev;
 }
 
+static int fd_do_readv(fd_request_t *, se_task_t *);
+static int fd_do_writev(fd_request_t *, se_task_t *);
+static int fd_do_sync_read(fd_request_t *, se_task_t *);
+static int fd_do_sync_write(fd_request_t *, se_task_t *);
+
 /*	fd_create_virtdevice(): (Part of se_subsystem_api_t template)
  *
  *
@@ -277,6 +282,17 @@ se_device_t *fd_create_virtdevice(
 				" block_device\n");
 			goto fail;
 		}
+	}
+	/*
+	 * Setup synchronous FILEIO + page writeout for WRITE (the default) or
+	 * buffered vector based FILEIO on fd_buffered_id=1
+	 */
+	if (!(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO)) {
+		fd_dev->fd_do_read = &fd_do_sync_read;
+		fd_dev->fd_do_write = &fd_do_sync_write;
+	} else {
+		fd_dev->fd_do_read = &fd_do_readv;
+		fd_dev->fd_do_write = &fd_do_writev;
 	}
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim_bd or
@@ -937,15 +953,13 @@ int fd_do_task(se_task_t *task)
 
 	req->fd_lba = task->task_lba;
 	req->fd_size = task->task_size;
-
-	if (req->fd_data_direction == FD_DATA_READ) {
-		/* ret = fd_do_aio_read(req, task); */
-		/* ret = fd_do_sendfile(req, task); */
-		ret = fd_do_readv(req, task);
-	} else {
-		/* ret = fd_do_aio_write(req, task); */
-		ret = fd_do_writev(req, task);
-	}
+	/*
+	 * The function pointers called here are setup in fd_create_virtdevice()
+	 */
+	if (req->fd_data_direction == FD_DATA_READ)
+		ret = req->fd_dev->fd_do_read(req, task);
+	else
+		ret = req->fd_dev->fd_do_write(req, task);
 
 	if (ret < 0)
 		return ret;
@@ -1021,6 +1035,19 @@ ssize_t fd_set_configfs_dev_params(
 			printk(KERN_INFO "FILEIO: Referencing Size: %llu"
 					" bytes\n", fd_dev->fd_dev_size);
 			fd_dev->fbd_flags |= FBDF_HAS_SIZE;
+			params++;
+			continue;
+		}
+		ptr2 = strstr(cur, "fd_buffered_io");
+		if (ptr2) {
+			transport_check_dev_params_delim(ptr, &cur);
+			if (strncmp(ptr2, "1", 1))
+				continue;
+
+			printk(KERN_INFO "FILEIO: Using buffered I/O"
+				" operations for fd_dev_t\n");
+
+			fd_dev->fbd_flags |= FDBD_USE_BUFFERED_IO;
 			params++;
 			continue;
 		} else
