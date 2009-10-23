@@ -594,6 +594,34 @@ static int fd_do_readv(fd_request_t *req, se_task_t *task)
 	return 1;
 }
 
+static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
+{
+	struct file *fd = req->fd_dev->fd_file;
+	char *virt_buf;
+	mm_segment_t old_fs;
+	loff_t ppos = (task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	ssize_t ret, virt_size;
+	u32 i;
+
+	for (i = 0; i < req->fd_sg_count; i++) {
+		virt_buf = sg_virt(&task->task_sg[i]) + task->task_sg[i].offset;
+		virt_size = task->task_sg[i].length;
+
+		old_fs = get_fs();
+		set_fs(get_ds());
+		ret = do_sync_read(fd, virt_buf, virt_size, &ppos);
+		set_fs(old_fs);
+
+		if (ret != virt_size) {
+			printk(KERN_ERR "do_sync_read() returned %d, expecting"
+					" virt_size: %d\n", ret, virt_size);
+			return -1;
+		}
+	}
+
+	return 1;
+}
+
 #if 0
 
 static void fd_aio_intr(struct kiocb *kcb)
@@ -777,6 +805,48 @@ static int fd_do_writev(fd_request_t *req, se_task_t *task)
 		return -1;
 	}
 
+	return 1;
+}
+
+static int fd_do_sync_write(fd_request_t *req, se_task_t *task)
+{
+	struct file *fd = req->fd_dev->fd_file;
+	char *virt_buf;
+	mm_segment_t old_fs;
+	loff_t lba_start =
+		(task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	loff_t ppos = lba_start, lba_end = (lba_start + task->task_size) - 1;
+	ssize_t write_ret, virt_size;
+	int ret;
+	u32 i;
+
+	for (i = 0; i < req->fd_sg_count; i++) {
+		virt_buf = sg_virt(&task->task_sg[i]) + task->task_sg[i].offset;
+		virt_size = task->task_sg[i].length;
+
+		old_fs = get_fs();
+		set_fs(get_ds());
+		write_ret = do_sync_write(fd, virt_buf, virt_size, &ppos);
+		set_fs(old_fs);
+
+		if (write_ret != virt_size) {
+			printk(KERN_ERR "do_sync_write() returned %d, expecting"
+				" virt_size: %d\n", write_ret, virt_size);
+			return -1;
+		}
+	}
+	/*
+	 * Ensure that buffer cache for lba_start -> lba_end range are written
+	 * to struct file.
+	 */
+	ret = filemap_write_and_wait_range(fd->f_dentry->d_inode->i_mapping,
+				lba_start, lba_end);
+	if (ret != 0) {
+		printk(KERN_ERR "filemap_write_and_wait_range() failed with %d"
+			" for lba_start %llu lba_end: %llu\n", ret,
+			lba_start, lba_end);
+		return -1;
+	}
 	return 1;
 }
 
