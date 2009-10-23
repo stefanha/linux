@@ -368,11 +368,6 @@ int tcm_loop_queue_data_in(se_cmd_t *se_cmd)
 	spin_lock_irqsave(sc->device->host->host_lock, flags);
 	(*sc->scsi_done)(sc);
 	spin_unlock_irqrestore(sc->device->host->host_lock, flags);
-	/*
-	 * Release the se_cmd_t, which will make a callback to release
-	 * struct tcm_loop_cmd * as well.
-	 */	
-	transport_generic_free_cmd(se_cmd, 0, 1, 0);
 	return 0;
 }
 
@@ -400,11 +395,6 @@ int tcm_loop_queue_status(se_cmd_t *se_cmd)
 	spin_lock_irqsave(sc->device->host->host_lock, flags);
 	(*sc->scsi_done)(sc);
 	spin_unlock_irqrestore(sc->device->host->host_lock, flags);
-	/*
-	 * Release the se_cmd_t, which will make a callback to release
-	 * struct tcm_loop_cmd * as well.
-	 */
-	transport_generic_free_cmd(se_cmd, 0, 1, 0);
 	return 0;
 }
 

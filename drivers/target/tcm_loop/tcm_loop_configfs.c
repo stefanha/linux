@@ -650,6 +650,7 @@ int tcm_loop_register_configfs(void)
 	 * virtual memory address mappings
 	 */
 	fabric->tf_ops.alloc_cmd_iovecs = NULL;
+	fabric->tf_ops.check_stop_free = &tcm_loop_check_stop_free;
 	fabric->tf_ops.release_cmd_to_pool = &tcm_loop_deallocate_core_cmd;
 	fabric->tf_ops.release_cmd_direct = &tcm_loop_deallocate_core_cmd;
 	fabric->tf_ops.shutdown_session = &tcm_loop_shutdown_session; 

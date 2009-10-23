@@ -1,6 +1,7 @@
 extern struct kmem_cache *tcm_loop_cmd_cache;
 
 extern int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *, struct scsi_cmnd *);
+extern void tcm_loop_check_stop_free(struct se_cmd_s *);
 extern void tcm_loop_deallocate_core_cmd(struct se_cmd_s *);
 extern void tcm_loop_scsi_forget_host(struct Scsi_Host *);
 extern void tcm_loop_deallocate_core_cmd(se_cmd_t *);

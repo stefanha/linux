@@ -211,6 +211,18 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 }
 
 /*
+ * Called from struct target_core_fabric_ops->check_stop_free()
+ */
+void tcm_loop_check_stop_free(se_cmd_t *se_cmd)
+{
+	/*
+	 * Release the se_cmd_t, which will make a callback to release
+	 * struct tcm_loop_cmd * in tcm_loop_deallocate_core_cmd()
+	 */
+	transport_generic_free_cmd(se_cmd, 0, 1, 0);
+}
+
+/*
  * Called from struct target_core_fabric_ops->release_cmd_to_pool()
  */
 void tcm_loop_deallocate_core_cmd(se_cmd_t *se_cmd)
