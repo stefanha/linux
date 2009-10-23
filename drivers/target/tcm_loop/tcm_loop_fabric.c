@@ -516,9 +516,10 @@ static int __init tcm_loop_fabric_init(void)
 		return ret;
 
 	ret = tcm_loop_register_configfs();
-	if (ret)
+	if (ret) {
 		tcm_loop_release_core_bus();
 		return ret;
+	}
 
 	return 0;
 }
