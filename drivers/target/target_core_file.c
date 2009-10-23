@@ -571,7 +571,7 @@ static int fd_do_readv(fd_request_t *req, se_task_t *task)
 	struct scatterlist *sg = task->task_sg;
 	struct iovec iov[req->fd_sg_count];
 
-	memset(iov, 0, sizeof(struct iovec) + req->fd_sg_count);
+	memset(iov, 0, sizeof(struct iovec) * req->fd_sg_count);
 
 	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
 		return -1;
@@ -757,7 +757,7 @@ static int fd_do_writev(fd_request_t *req, se_task_t *task)
 	mm_segment_t old_fs;
 	struct iovec iov[req->fd_sg_count];
 
-	memset(iov, 0, sizeof(struct iovec) + req->fd_sg_count);
+	memset(iov, 0, sizeof(struct iovec) * req->fd_sg_count);
 
 	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
 		return -1;
