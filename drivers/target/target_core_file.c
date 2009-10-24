@@ -1042,7 +1042,7 @@ ssize_t fd_set_configfs_dev_params(
 		ptr2 = strstr(cur, "fd_buffered_io");
 		if (ptr2) {
 			transport_check_dev_params_delim(ptr, &cur);
-			if (strncmp(ptr2, "1", 1))
+			if (strncmp(ptr, "1", 1))
 				continue;
 
 			printk(KERN_INFO "FILEIO: Using buffered I/O"
