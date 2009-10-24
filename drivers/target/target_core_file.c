@@ -1108,8 +1108,10 @@ void fd_get_dev_info(se_device_t *dev, char *b, int *bl)
 void __fd_get_dev_info(fd_dev_t *fd_dev, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
-	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  ",
-		fd_dev->fd_dev_name, fd_dev->fd_dev_size);
+	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  Mode: %s  ",
+		fd_dev->fd_dev_name, fd_dev->fd_dev_size,
+		(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO) ?
+		"Buffered" : "Synchronous");
 
 	if (fd_dev->fd_bd) {
 		struct block_device *bd = fd_dev->fd_bd;
