@@ -169,11 +169,6 @@ void *fd_allocate_virtdevice(se_hba_t *hba, const char *name)
 	return fd_dev;
 }
 
-static int fd_do_readv(fd_request_t *, se_task_t *);
-static int fd_do_writev(fd_request_t *, se_task_t *);
-static int fd_do_sync_read(fd_request_t *, se_task_t *);
-static int fd_do_sync_write(fd_request_t *, se_task_t *);
-
 /*	fd_create_virtdevice(): (Part of se_subsystem_api_t template)
  *
  *
@@ -214,6 +209,12 @@ se_device_t *fd_create_virtdevice(
 	flags = O_RDWR | O_CREAT | O_LARGEFILE;
 #endif
 /*	flags |= O_DIRECT; */
+	/*
+	 * If fd_buffered_io=1 has not been set explictly (the default),
+	 * use O_SYNC to force FILEIO writes to disk.
+	 */
+	if (!(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO))
+		flags |= O_SYNC;
 
 	file = filp_open(dev_p, flags, 0600);
 
@@ -282,17 +283,6 @@ se_device_t *fd_create_virtdevice(
 				" block_device\n");
 			goto fail;
 		}
-	}
-	/*
-	 * Setup synchronous FILEIO + page writeout for WRITE (the default) or
-	 * buffered vector based FILEIO on fd_buffered_id=1
-	 */
-	if (!(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO)) {
-		fd_dev->fd_do_read = &fd_do_sync_read;
-		fd_dev->fd_do_write = &fd_do_sync_write;
-	} else {
-		fd_dev->fd_do_read = &fd_do_readv;
-		fd_dev->fd_do_write = &fd_do_writev;
 	}
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim_bd or
@@ -624,49 +614,6 @@ static int fd_do_readv(fd_request_t *req, se_task_t *task)
 	return 1;
 }
 
-static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
-{
-	struct file *fd = req->fd_dev->fd_file;
-	char *virt_buf;
-	mm_segment_t old_fs;
-	ssize_t ret, virt_size;
-	u32 i;
-
-	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
-		return -1;
-
-	for (i = 0; i < req->fd_sg_count; i++) {
-		virt_buf = sg_virt(&task->task_sg[i]);
-		virt_size = task->task_sg[i].length;
-
-		old_fs = get_fs();
-		set_fs(get_ds());
-		ret = do_sync_read(fd, virt_buf, virt_size, &fd->f_pos);
-		set_fs(old_fs);
-		/*
-		 * Return zeros and GOOD status even if the READ did not return
-		 * the expected virt_size for struct file w/o a backing struct
-		 * block_device.
-		 */
-		if (S_ISBLK(fd->f_dentry->d_inode->i_mode)) {
-			if (ret < 0 || ret != virt_size) {
-				printk(KERN_ERR "do_sync_read() returned %d,"
-					" expecting virt_size: %d for S_ISBLK"
-					"\n", ret, (int)virt_size);
-				return -1;
-			}
-		} else {
-			if (ret < 0) {
-				printk(KERN_ERR "do_sync_read() returned %d for"
-					" non S_ISBLK\n", ret);
-				return -1;
-			}
-		}
-	}
-
-	return 1;
-}
-
 #if 0
 
 void fd_sendfile_free_DMA(se_cmd_t *cmd)
@@ -763,52 +710,6 @@ static int fd_do_writev(fd_request_t *req, se_task_t *task)
 	return 1;
 }
 
-static int fd_do_sync_write(fd_request_t *req, se_task_t *task)
-{
-	struct file *fd = req->fd_dev->fd_file;
-	char *virt_buf;
-	mm_segment_t old_fs;
-	loff_t lba_start =
-		(task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
-	loff_t lba_end = (lba_start + task->task_size) - 1;
-	ssize_t write_ret, virt_size;
-	int ret;
-	u32 i;
-
-	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
-		return -1;
-
-	for (i = 0; i < req->fd_sg_count; i++) {
-		virt_buf = sg_virt(&task->task_sg[i]);
-		virt_size = task->task_sg[i].length;
-
-		old_fs = get_fs();
-		set_fs(get_ds());
-		write_ret = do_sync_write(fd, virt_buf, virt_size, &fd->f_pos);
-		set_fs(old_fs);
-
-		if (write_ret != virt_size) {
-			printk(KERN_ERR "do_sync_write() returned %d,"
-				" expecting virt_size: %d\n", (int)write_ret,
-				(int)virt_size);
-			return -1;
-		}
-	}
-	/*
-	 * Ensure that buffer cache for lba_start -> lba_end range are written
-	 * to struct file.
-	 */
-	ret = filemap_write_and_wait_range(fd->f_dentry->d_inode->i_mapping,
-				lba_start, lba_end);
-	if (ret != 0) {
-		printk(KERN_ERR "filemap_write_and_wait_range() failed with %d"
-			" for lba_start %llu lba_end: %llu\n", ret,
-			lba_start, lba_end);
-		return -1;
-	}
-	return 1;
-}
-
 int fd_do_task(se_task_t *task)
 {
 	int ret = 0;
@@ -820,12 +721,13 @@ int fd_do_task(se_task_t *task)
 	req->fd_lba = task->task_lba;
 	req->fd_size = task->task_size;
 	/*
-	 * The function pointers called here are setup in fd_create_virtdevice()
+	 * Call vectorized fileio functions to map struct scatterlist
+	 * physical memory addresses to struct iovec virtual memory.
 	 */
 	if (req->fd_data_direction == FD_DATA_READ)
-		ret = req->fd_dev->fd_do_read(req, task);
+		ret = fd_do_readv(req, task);
 	else
-		ret = req->fd_dev->fd_do_write(req, task);
+		ret = fd_do_writev(req, task);
 
 	if (ret < 0)
 		return ret;
