@@ -620,7 +620,7 @@ static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
 	u32 i;
 
 	for (i = 0; i < req->fd_sg_count; i++) {
-		virt_buf = sg_virt(&task->task_sg[i]) + task->task_sg[i].offset;
+		virt_buf = sg_virt(&task->task_sg[i]);
 		virt_size = task->task_sg[i].length;
 
 		old_fs = get_fs();
@@ -747,7 +747,7 @@ static int fd_do_sync_write(fd_request_t *req, se_task_t *task)
 	u32 i;
 
 	for (i = 0; i < req->fd_sg_count; i++) {
-		virt_buf = sg_virt(&task->task_sg[i]) + task->task_sg[i].offset;
+		virt_buf = sg_virt(&task->task_sg[i]);
 		virt_size = task->task_sg[i].length;
 
 		old_fs = get_fs();
