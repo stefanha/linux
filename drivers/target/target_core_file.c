@@ -728,7 +728,7 @@ static int fd_do_writev(fd_request_t *req, se_task_t *task)
 	ret = vfs_writev(fd, &iov[0], req->fd_sg_count, &fd->f_pos);
 	set_fs(old_fs);
 
-	if (ret < 0) {
+	if (ret < 0 || ret != req->fd_size) {
 		printk(KERN_ERR "vfs_writev() returned %d\n", ret);
 		return -1;
 	}
