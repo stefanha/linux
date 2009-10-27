@@ -615,9 +615,11 @@ static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
 	struct file *fd = req->fd_dev->fd_file;
 	char *virt_buf;
 	mm_segment_t old_fs;
-	loff_t ppos = (task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
 	ssize_t ret, virt_size;
 	u32 i;
+
+	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
+		return -1;
 
 	for (i = 0; i < req->fd_sg_count; i++) {
 		virt_buf = sg_virt(&task->task_sg[i]);
@@ -625,7 +627,7 @@ static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
 
 		old_fs = get_fs();
 		set_fs(get_ds());
-		ret = do_sync_read(fd, virt_buf, virt_size, &ppos);
+		ret = do_sync_read(fd, virt_buf, virt_size, &fd->f_pos);
 		set_fs(old_fs);
 
 		if (ret != virt_size) {
@@ -741,10 +743,13 @@ static int fd_do_sync_write(fd_request_t *req, se_task_t *task)
 	mm_segment_t old_fs;
 	loff_t lba_start =
 		(task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
-	loff_t ppos = lba_start, lba_end = (lba_start + task->task_size) - 1;
+	loff_t lba_end = (lba_start + task->task_size) - 1;
 	ssize_t write_ret, virt_size;
 	int ret;
 	u32 i;
+
+	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
+		return -1;
 
 	for (i = 0; i < req->fd_sg_count; i++) {
 		virt_buf = sg_virt(&task->task_sg[i]);
@@ -752,7 +757,7 @@ static int fd_do_sync_write(fd_request_t *req, se_task_t *task)
 
 		old_fs = get_fs();
 		set_fs(get_ds());
-		write_ret = do_sync_write(fd, virt_buf, virt_size, &ppos);
+		write_ret = do_sync_write(fd, virt_buf, virt_size, &fd->f_pos);
 		set_fs(old_fs);
 
 		if (write_ret != virt_size) {
