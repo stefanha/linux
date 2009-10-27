@@ -652,13 +652,13 @@ static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
 			if (ret < 0 || ret != virt_size) {
 				printk(KERN_ERR "do_sync_read() returned %d,"
 					" expecting virt_size: %d for S_ISBLK"
-					"\n", ret, (int)virt_size);
+					"\n", (int)ret, (int)virt_size);
 				return -1;
 			}
 		} else {
 			if (ret < 0) {
 				printk(KERN_ERR "do_sync_read() returned %d for"
-					" non S_ISBLK\n", ret);
+					" non S_ISBLK\n", (int)ret);
 				return -1;
 			}
 		}
