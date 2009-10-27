@@ -601,10 +601,24 @@ static int fd_do_readv(fd_request_t *req, se_task_t *task)
 	set_fs(get_ds());
 	ret = vfs_readv(fd, &iov[0], req->fd_sg_count, &fd->f_pos);
 	set_fs(old_fs);
-
-	if (ret < 0) {
-		printk(KERN_ERR "vfs_readv() returned %d\n", ret);
-		return -1;
+	/*
+	 * Return zeros and GOOD status even if the READ did not return
+	 * the expected virt_size for struct file w/o a backing struct
+	 * block_device.
+	 */
+	if (S_ISBLK(fd->f_dentry->d_inode->i_mode)) {
+		if (ret < 0 || ret != req->fd_size) {
+			printk(KERN_ERR "vfs_readv() returned %d,"
+				" expecting %d for S_ISBLK\n", ret,
+				(int)req->fd_size);
+			return -1;
+		}
+	} else {
+		if (ret < 0) {
+			printk(KERN_ERR "vfs_readv() returned %d for non"
+				" S_ISBLK\n", ret);
+			return -1;
+		}
 	}
 
 	return 1;
@@ -629,11 +643,24 @@ static int fd_do_sync_read(fd_request_t *req, se_task_t *task)
 		set_fs(get_ds());
 		ret = do_sync_read(fd, virt_buf, virt_size, &fd->f_pos);
 		set_fs(old_fs);
-
-		if (ret != virt_size) {
-			printk(KERN_ERR "do_sync_read() returned %d, expecting"
-				" virt_size: %d\n", (int)ret, (int)virt_size);
-			return -1;
+		/*
+		 * Return zeros and GOOD status even if the READ did not return
+		 * the expected virt_size for struct file w/o a backing struct
+		 * block_device.
+		 */
+		if (S_ISBLK(fd->f_dentry->d_inode->i_mode)) {
+			if (ret < 0 || ret != virt_size) {
+				printk(KERN_ERR "do_sync_read() returned %d,"
+					" expecting virt_size: %d for S_ISBLK"
+					"\n", ret, (int)virt_size);
+				return -1;
+			}
+		} else {
+			if (ret < 0) {
+				printk(KERN_ERR "do_sync_read() returned %d for"
+					" non S_ISBLK\n", ret);
+				return -1;
+			}
 		}
 	}
 
