@@ -1003,7 +1003,7 @@ ssize_t pscsi_check_configfs_dev_params(
 
 	if (!(pdv->pdv_flags & PDF_HAS_CHANNEL_ID) ||
 	    !(pdv->pdv_flags & PDF_HAS_TARGET_ID) ||
-	    !(pdv->pdv_flags & PDF_HAS_TARGET_ID)) {
+	    !(pdv->pdv_flags & PDF_HAS_LUN_ID)) {
 		printk(KERN_ERR "Missing scsi_channel_id=, scsi_target_id= and"
 			" scsi_lun_id= parameters\n");
 		return -1;
