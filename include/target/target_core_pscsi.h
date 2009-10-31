@@ -31,7 +31,8 @@
 #ifndef TARGET_CORE_PSCSI_H
 #define TARGET_CORE_PSCSI_H
 
-#define PSCSI_VERSION		"v3.1"
+#define PSCSI_VERSION		"v4.0"
+#define PSCSI_VIRTUAL_HBA_DEPTH	2048
 
 /* used in pscsi_find_alloc_len() */
 #ifndef INQUIRY_DATA_SIZE
@@ -60,6 +61,7 @@ extern int pscsi_CDB_write_SG(se_task_t *, u32);
 #ifndef PSCSI_INCLUDE_STRUCTS
 extern int pscsi_attach_hba(se_hba_t *, u32);
 extern int pscsi_detach_hba(se_hba_t *);
+extern int pscsi_pmode_enable_hba(se_hba_t *, unsigned long);
 extern int pscsi_claim_phydevice(se_hba_t *, se_device_t *);
 extern int pscsi_release_phydevice(se_device_t *);
 extern void *pscsi_allocate_virtdevice(se_hba_t *, const char *);
@@ -116,15 +118,28 @@ typedef struct pscsi_plugin_task_s {
 #define PDF_HAS_LUN_ID		0x04
 #define PDF_HAS_VPD_UNIT_SERIAL 0x08
 #define PDF_HAS_VPD_DEV_IDENT	0x10
+#define PDF_HAS_VIRT_HOST_ID	0x20	
 
 typedef struct pscsi_dev_virt_s {
 	int	pdv_flags;
+	int	pdv_host_id;
 	int	pdv_channel_id;
 	int	pdv_target_id;
 	int	pdv_lun_id;
 	struct scsi_device *pdv_sd;
 	struct se_hba_s *pdv_se_hba;
 } pscsi_dev_virt_t;
+
+typedef enum phv_modes {
+	PHV_VIRUTAL_HOST_ID,
+	PHV_LLD_SCSI_HOST_NO
+} phv_modes_t;
+
+typedef struct pscsi_hba_virt_s {
+	int			phv_host_id;
+	phv_modes_t		phv_mode;
+	struct Scsi_Host	*phv_lld_host;
+} pscsi_hba_virt_t;
 
 extern void __pscsi_get_dev_info(pscsi_dev_virt_t *, char *, int *);
 
