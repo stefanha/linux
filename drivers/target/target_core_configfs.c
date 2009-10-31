@@ -2880,36 +2880,90 @@ static struct configfs_group_operations target_core_hba_group_ops = {
 	.drop_item		= target_core_call_freedev,
 };
 
-static ssize_t target_core_hba_show(struct config_item *item,
-				struct configfs_attribute *attr,
-				char *page)
+CONFIGFS_EATTR_STRUCT(target_core_hba, se_hba_s);
+#define SE_HBA_ATTR(_name, _mode)				\
+static struct target_core_hba_attribute				\
+		target_core_hba_##_name =			\
+		__CONFIGFS_EATTR(_name, _mode,			\
+		target_core_hba_show_attr_##_name,		\
+		target_core_hba_store_attr_##_name);
+
+#define SE_HBA_ATTR_RO(_name)					\
+static struct target_core_hba_attribute				\
+		target_core_hba_##_name =			\
+		__CONFIGFS_EATTR_RO(_name,			\
+		target_core_hba_show_attr_##_name);
+
+static ssize_t target_core_hba_show_attr_hba_info(
+	struct se_hba_s *hba,
+	char *page)
 {
-	se_hba_t *hba = container_of(to_config_group(item), se_hba_t,
-					hba_group);
-
-	if (!(hba)) {
-		printk(KERN_ERR "Unable to locate se_hba_t\n");
-		return 0;
-	}
-
 	return sprintf(page, "HBA Index: %d plugin: %s version: %s\n",
 			hba->hba_id, hba->transport->name,
 			TARGET_CORE_CONFIGFS_VERSION);
 }
 
-static struct configfs_attribute target_core_hba_attr = {
-	.ca_owner		= THIS_MODULE,
-	.ca_name		= "hba_info",
-	.ca_mode		= S_IRUGO,
+SE_HBA_ATTR_RO(hba_info);
+
+static ssize_t target_core_hba_show_attr_hba_mode(struct se_hba_s *hba,
+				char *page)
+{
+	int hba_mode = 0;
+
+	if (hba->hba_flags & HBA_FLAGS_PSCSI_MODE)
+		hba_mode = 1;
+
+	return sprintf(page, "%d\n", hba_mode);
+}
+
+static ssize_t target_core_hba_store_attr_hba_mode(struct se_hba_s *hba,
+				const char *page, size_t count)
+{
+	struct se_subsystem_api_s *transport = hba->transport;
+	unsigned long mode_flag;
+	int ret;
+
+	if (transport->pmode_enable_hba == NULL)
+		return -EINVAL;
+
+	ret = strict_strtoul(page, 0, &mode_flag);
+	if (ret < 0) {
+		printk(KERN_ERR "Unable to extract hba mode flag: %d\n", ret);
+		return -EINVAL;
+	}
+
+	spin_lock(&hba->device_lock);
+	if (!(list_empty(&hba->hba_dev_list))) {
+		printk(KERN_ERR "Unable to set hba_mode with active devices\n");
+		spin_unlock(&hba->device_lock);
+		return -EINVAL;
+	}
+	spin_unlock(&hba->device_lock);
+	
+	ret = transport->pmode_enable_hba(hba, mode_flag);
+	if (ret < 0)
+		return -EINVAL;
+	if (ret > 0)
+		hba->hba_flags |= HBA_FLAGS_PSCSI_MODE;
+	else if (ret == 0)
+		hba->hba_flags &= ~HBA_FLAGS_PSCSI_MODE;
+	
+	return count;
+}
+
+SE_HBA_ATTR(hba_mode, S_IRUGO | S_IWUSR);
+
+CONFIGFS_EATTR_OPS(target_core_hba, se_hba_s, hba_group);
+
+static struct configfs_attribute *target_core_hba_attrs[] = {
+	&target_core_hba_hba_info.attr,
+	&target_core_hba_hba_mode.attr,
+	NULL,
 };
 
 static struct configfs_item_operations target_core_hba_item_ops = {
-	.show_attribute		= target_core_hba_show,
-};
-
-static struct configfs_attribute *target_core_hba_attrs[] = {
-	&target_core_hba_attr,
-	NULL,
+	.show_attribute		= target_core_hba_attr_show,
+	.store_attribute	= target_core_hba_attr_store,
 };
 
 static struct config_item_type target_core_hba_cit = {
