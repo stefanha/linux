@@ -164,6 +164,7 @@ se_subsystem_api_t pscsi_template = {
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,	\
 	.attach_hba		= pscsi_attach_hba,		\
 	.detach_hba		= pscsi_detach_hba,		\
+	.pmode_enable_hba	= pscsi_pmode_enable_hba,	\
 	.activate_device	= pscsi_activate_device,	\
 	.deactivate_device	= pscsi_deactivate_device,	\
 	.claim_phydevice	= pscsi_claim_phydevice,	\
