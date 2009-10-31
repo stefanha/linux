@@ -99,6 +99,7 @@
 
 /* se_hba_t->hba_flags */
 #define HBA_FLAGS_INTERNAL_USE			0x00000001
+#define HBA_FLAGS_PSCSI_MODE			0x00000002
 
 /* se_hba_t->hba_status and iscsi_tpg_hba->thba_status */
 #define HBA_STATUS_FREE				0x00000001

@@ -334,6 +334,11 @@ typedef struct se_subsystem_api_s {
 	 */
 	int (*detach_hba)(struct se_hba_s *);
 	/*
+	 * pmode_hba(): Used for TCM/pSCSI subsystem plugin HBA ->
+	 *		Linux/SCSI struct Scsi_Host passthrough
+	*/
+	int (*pmode_enable_hba)(struct se_hba_s *, unsigned long);
+	/*
 	 * claim_phydevice(): Only for Physical HBAs
 	 */
 	int (*claim_phydevice)(struct se_hba_s *, struct se_device_s *);
