@@ -247,7 +247,7 @@ int pscsi_detach_hba(se_hba_t *hba)
 			(scsi_host->hostt->name) ? (scsi_host->hostt->name) :
 			"Unknown");
 	} else
-		printk(KERN_INFO "CORE_HBA[%d] - Detached Virtual SCSI HBA "
+		printk(KERN_INFO "CORE_HBA[%d] - Detached Virtual SCSI HBA"
 			" from Generic Target Core\n", hba->hba_id);
 
 	kfree(phv);
@@ -259,13 +259,18 @@ int pscsi_pmode_enable_hba(se_hba_t *hba, unsigned long mode_flag)
 {
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)hba->hba_ptr;
 	struct Scsi_Host *sh = phv->phv_lld_host;
-	int hba_depth;
+	int hba_depth = PSCSI_VIRTUAL_HBA_DEPTH;
 	/*
 	 * Release the struct Scsi_Host
 	 */
 	if (!(mode_flag)) {
 		if (!(sh))
 			return 0;
+
+		phv->phv_lld_host = NULL;
+		phv->phv_mode = PHV_VIRUTAL_HOST_ID;
+		atomic_set(&hba->left_queue_depth, hba_depth);
+		atomic_set(&hba->max_queue_depth, hba_depth);
 
 		printk(KERN_INFO "CORE_HBA[%d] - Disabled pSCSI HBA Passthrough"
 			" %s\n", hba->hba_id, (sh->hostt->name) ?
@@ -564,6 +569,7 @@ se_device_t *pscsi_create_virtdevice(
 	struct scsi_device *sd;
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)hba->hba_ptr;
 	struct Scsi_Host *sh = phv->phv_lld_host;
+	int legacy_mode_enable = 0;
 
 	if (!(pdv)) {
 		printk(KERN_ERR "Unable to locate pscsi_dev_virt_t"
@@ -598,6 +604,7 @@ se_device_t *pscsi_create_virtdevice(
 			if (pscsi_pmode_enable_hba(hba, 1) != 1)
 				return NULL;
 
+			legacy_mode_enable = 1;
 			hba->hba_flags |= HBA_FLAGS_PSCSI_MODE;
 			sh = phv->phv_lld_host;
 		} else {
@@ -643,7 +650,10 @@ se_device_t *pscsi_create_virtdevice(
 		if (!(dev)) {
 			if (phv->phv_mode == PHV_VIRUTAL_HOST_ID)
 				scsi_host_put(sh);
-
+			else if (legacy_mode_enable) {
+				pscsi_pmode_enable_hba(hba, 0);
+				hba->hba_flags &= ~HBA_FLAGS_PSCSI_MODE;
+			}
 			pdv->pdv_sd = NULL;
 			return NULL;
 		}
@@ -654,8 +664,12 @@ se_device_t *pscsi_create_virtdevice(
 	printk(KERN_ERR "pSCSI: Unable to locate %d:%d:%d:%d\n", sh->host_no,
 		pdv->pdv_channel_id,  pdv->pdv_target_id, pdv->pdv_lun_id);
 
-	if (phv->phv_mode == PHV_LLD_SCSI_HOST_NO)
+	if (phv->phv_mode == PHV_VIRUTAL_HOST_ID)
 		scsi_host_put(sh);
+	else if (legacy_mode_enable) {
+		pscsi_pmode_enable_hba(hba, 0);
+		hba->hba_flags &= ~HBA_FLAGS_PSCSI_MODE;
+	}
 
 	return NULL;
 }
