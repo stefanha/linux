@@ -41,8 +41,8 @@ extern int iscsi_tpg_enable_portal_group(iscsi_portal_group_t *);
 extern int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *, int);
 extern iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl(
 			iscsi_portal_group_t *, const char *, u32);
-extern int iscsi_tpg_del_initiator_node_acl(iscsi_portal_group_t *,
-			const char *, int);
+extern void iscsi_tpg_del_initiator_node_acl(iscsi_portal_group_t *,
+			struct se_node_acl_s *);
 extern iscsi_node_attrib_t *iscsi_tpg_get_node_attrib(iscsi_session_t *);
 extern void iscsi_tpg_del_external_nps(iscsi_tpg_np_t *);
 extern iscsi_tpg_np_t *iscsi_tpg_locate_child_np(iscsi_tpg_np_t *, int);

@@ -928,16 +928,14 @@ iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl(
  *
  *
  */
-int iscsi_tpg_del_initiator_node_acl(
+void iscsi_tpg_del_initiator_node_acl(
 	iscsi_portal_group_t *tpg,
-	const char *initiatorname,
-	int force)
+	se_node_acl_t *se_nacl)
 {
 	/*
 	 * TPG_TFO(tpg)->tpg_release_acl() will kfree the iscsi_node_acl_t..
 	 */
-	core_tpg_del_initiator_node_acl(tpg->tpg_se_tpg, initiatorname, force);
-	return 0;
+	core_tpg_del_initiator_node_acl(tpg->tpg_se_tpg, se_nacl, 1);
 }
 
 iscsi_node_attrib_t *iscsi_tpg_get_node_attrib(

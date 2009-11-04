@@ -1676,6 +1676,19 @@ static struct lio_target_configfs_attribute
 	.store	= lio_target_initiator_nacl_cmdsn_window_store,
 };
 
+static void lio_target_initiator_nacl_release(struct config_item *item)
+{
+	se_node_acl_t *se_nacl = container_of(
+			to_config_group(item), se_node_acl_t, acl_group);
+	struct config_group *nacl_cg;
+
+	if (!(se_nacl))
+		return;
+
+	nacl_cg = &se_nacl->acl_group;
+	kfree(nacl_cg->default_groups);
+}
+
 static ssize_t lio_target_initiator_nacl_show(
 	struct config_item *item,
 	struct configfs_attribute *attr,
@@ -1716,6 +1729,7 @@ static struct configfs_attribute *lio_target_initiator_attrs[] = {
 };
 
 static struct configfs_item_operations lio_target_initiator_item_ops = {
+	.release		= lio_target_initiator_nacl_release,
 	.show_attribute		= lio_target_initiator_nacl_show,
 	.store_attribute	= lio_target_initiator_nacl_store,
 };
@@ -1813,7 +1827,7 @@ static struct config_group *lio_target_call_addnodetotpg(
 	iscsi_put_tpg(tpg);
 	return &se_nacl->acl_group;
 node_out:
-	iscsi_tpg_del_initiator_node_acl(tpg, name, 1);
+	iscsi_tpg_del_initiator_node_acl(tpg, se_nacl);
 out:
 	iscsi_put_tpg(tpg);
 	return NULL;
@@ -1825,8 +1839,11 @@ static void lio_target_call_delnodefromtpg(
 {
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
-	struct config_item *acl_ci, *tpg_ci, *tiqn_ci;
-	int ret = 0;
+	se_node_acl_t *se_nacl = container_of(to_config_group(item),
+				se_node_acl_t, acl_group);
+	struct config_item *acl_ci, *tpg_ci, *tiqn_ci, *df_item;
+	struct config_group *nacl_cg;
+	int i;
 
 	acl_ci = &group->cg_item;
 	if (!(acl_ci)) {
@@ -1847,19 +1864,21 @@ static void lio_target_call_delnodefromtpg(
 	tpg = lio_get_tpg_from_tpg_item(tpg_ci, &tiqn);
 	if (!(tpg))
 		return;
-	/*
-	 * iscsi_tpg_del_initiator_node_acl() assumes force=1
-	 */
-	ret = iscsi_tpg_del_initiator_node_acl(tpg, config_item_name(item), 1);
-	if (ret < 0)
-		goto out;
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s TPGT: %hu"
 		" Initiator: %s\n", config_item_name(tiqn_ci), tpg->tpgt,
 		config_item_name(item));
 
+	nacl_cg = &se_nacl->acl_group;
+	for (i = 0; nacl_cg->default_groups[i]; i++) {
+		df_item = &nacl_cg->default_groups[i]->cg_item;
+		nacl_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+
 	config_item_put(item);
-out:
+
+	iscsi_tpg_del_initiator_node_acl(tpg, se_nacl);
 	iscsi_put_tpg(tpg);
 }
 
@@ -2283,6 +2302,19 @@ static struct configfs_attribute *lio_target_tpg_attrs[] = {
 	NULL,
 };
 
+static void lio_target_tpg_release(struct config_item *item)
+{
+	se_portal_group_t *se_tpg = container_of(to_config_group(item),
+				se_portal_group_t, tpg_group);
+	struct config_group *tpg_cg;
+
+	if (!(se_tpg))
+		return;
+
+	tpg_cg = &se_tpg->tpg_group;
+	kfree(tpg_cg->default_groups);
+}
+
 static ssize_t lio_target_tpg_show(
 	struct config_item *item,
 	struct configfs_attribute *attr,
@@ -2321,6 +2353,7 @@ static ssize_t lio_target_tpg_store(
 }
 
 static struct configfs_item_operations lio_target_tpg_item_ops = {
+	.release		= lio_target_tpg_release,
 	.show_attribute		= lio_target_tpg_show,
 	.store_attribute	= lio_target_tpg_store,
 };
@@ -2438,9 +2471,10 @@ static void lio_target_tiqn_deltpg(
 	se_portal_group_t *se_tpg;
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
-	struct config_item *tiqn_ci;
+	struct config_item *tiqn_ci, *df_item;
+	struct config_group *tpg_cg;
 	char *tpgt_str, *end_ptr;
-	int ret = 0;
+	int ret = 0, i;
 	unsigned short int tpgt;
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s\n",
@@ -2477,9 +2511,16 @@ static void lio_target_tiqn_deltpg(
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> calling"
 			" config_item_put()\n");
 	/*
-	 * Does the last config_item_put() also release a
-	 * groups->default_groups..?
+	 * Release the default groups the fabric module is using for
+	 * se_portal_group_t->tpg_group.
 	 */
+	tpg_cg = &tpg->tpg_se_tpg->tpg_group;
+	for (i = 0; tpg_cg->default_groups[i]; i++) {
+		df_item = &tpg_cg->default_groups[i]->cg_item;
+		tpg_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+
 	config_item_put(item);
 	/*
 	 * iscsi_tpg_del_portal_group() assumes force=1
@@ -2635,7 +2676,7 @@ static ssize_t lio_target_store_da_attr_enforce_discovery_auth(
 				discovery_tpg->param_list);
 	if (!(param))
 		return -EINVAL;
-	
+
 	if (op) {
 		/*
 		 * Reset the AuthMethod key to CHAP.
