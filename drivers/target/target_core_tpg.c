@@ -466,23 +466,13 @@ EXPORT_SYMBOL(core_tpg_add_initiator_node_acl);
  */
 int core_tpg_del_initiator_node_acl(
 	se_portal_group_t *tpg,
-	const char *initiatorname,
+	se_node_acl_t *acl,
 	int force)
 {
 	se_session_t *sess, *sess_tmp;
-	se_node_acl_t *acl;
 	int dynamic_acl = 0;
 
 	spin_lock_bh(&tpg->acl_node_lock);
-	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
-	if (!(acl)) {
-		printk(KERN_ERR "Access Control List entry for %s Initiator"
-			" Node %s does not exists for TPG %hu, ignoring"
-			" request.\n", TPG_TFO(tpg)->get_fabric_name(),
-			initiatorname, TPG_TFO(tpg)->tpg_get_tag(tpg));
-		spin_unlock_bh(&tpg->acl_node_lock);
-		return -EINVAL;
-	}
 	if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
 		acl->nodeacl_flags &= ~NAF_DYNAMIC_NODE_ACL;
 		dynamic_acl = 1;
@@ -522,7 +512,7 @@ int core_tpg_del_initiator_node_acl(
 	printk(KERN_INFO "%s_TPG[%hu] - Deleted ACL with TCQ Depth: %d for %s"
 		" Initiator Node: %s\n", TPG_TFO(tpg)->get_fabric_name(),
 		TPG_TFO(tpg)->tpg_get_tag(tpg), acl->queue_depth,
-		TPG_TFO(tpg)->get_fabric_name(), initiatorname);
+		TPG_TFO(tpg)->get_fabric_name(), acl->initiatorname);
 
 	kfree(acl);
 	return 0;

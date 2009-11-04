@@ -85,7 +85,7 @@ static ssize_t target_core_attr_show(struct config_item *item,
 		utsname()->sysname, utsname()->machine);
 }
 
-static struct configfs_item_operations target_core_item_ops = {
+static struct configfs_item_operations target_core_fabric_item_ops = {
 	.show_attribute = target_core_attr_show,
 };
 
@@ -235,7 +235,7 @@ static void target_core_deregister_fabric(
 	config_item_put(item);
 }
 
-static struct configfs_group_operations target_core_group_ops = {
+static struct configfs_group_operations target_core_fabric_group_ops = {
 	.make_group	= &target_core_register_fabric,
 	.drop_item	= &target_core_deregister_fabric,
 };
@@ -243,7 +243,7 @@ static struct configfs_group_operations target_core_group_ops = {
 /*
  * All item attributes appearing in /sys/kernel/target/ appear here.
  */
-static struct configfs_attribute *target_core_item_attrs[] = {
+static struct configfs_attribute *target_core_fabric_item_attrs[] = {
 	&target_core_item_attr_version,
 	NULL,
 };
@@ -252,9 +252,9 @@ static struct configfs_attribute *target_core_item_attrs[] = {
  * Provides Fabrics Groups and Item Attributes for /sys/kernel/config/target/
  */
 static struct config_item_type target_core_fabrics_item = {
-	.ct_item_ops	= &target_core_item_ops,
-	.ct_group_ops	= &target_core_group_ops,
-	.ct_attrs	= target_core_item_attrs,
+	.ct_item_ops	= &target_core_fabric_item_ops,
+	.ct_group_ops	= &target_core_fabric_group_ops,
+	.ct_attrs	= target_core_fabric_item_attrs,
 	.ct_owner	= THIS_MODULE,
 };
 
@@ -2007,6 +2007,19 @@ static struct configfs_attribute *lio_core_dev_attrs[] = {
 	NULL,
 };
 
+static void target_core_dev_release(struct config_item *item)
+{
+	se_subsystem_dev_t *se_dev = container_of(to_config_group(item),
+				se_subsystem_dev_t, se_dev_group);
+	struct config_group *dev_cg;
+
+	if (!(se_dev))
+		return;
+
+	dev_cg = &se_dev->se_dev_group;
+	kfree(dev_cg->default_groups);
+}
+
 static ssize_t target_core_dev_show(struct config_item *item,
 				     struct configfs_attribute *attr,
 				     char *page)
@@ -2040,7 +2053,7 @@ static ssize_t target_core_dev_store(struct config_item *item,
 }
 
 static struct configfs_item_operations target_core_dev_item_ops = {
-	.release		= NULL,
+	.release		= target_core_dev_release,
 	.show_attribute		= target_core_dev_show,
 	.store_attribute	= target_core_dev_store,
 };
@@ -2229,6 +2242,7 @@ static struct configfs_group_operations target_core_alua_lu_gps_group_ops = {
 };
 
 static struct config_item_type target_core_alua_lu_gps_cit = {
+	.ct_item_ops		= NULL,
 	.ct_group_ops		= &target_core_alua_lu_gps_group_ops,
 	.ct_owner		= THIS_MODULE,
 };
@@ -2575,7 +2589,23 @@ static struct configfs_attribute *target_core_alua_tg_pt_gp_attrs[] = {
 	NULL,
 };
 
+static void target_core_alua_tg_pt_gp_attr_release(struct config_item *item)
+{
+	t10_alua_tg_pt_gp_t *tg_pt_gp = container_of(to_config_group(item),
+			t10_alua_tg_pt_gp_t, tg_pt_gp_group);
+	se_subsystem_dev_t *se_dev;
+	struct config_group *tg_pt_gp_cg;
+
+	if (!(tg_pt_gp))
+		return;
+
+	se_dev = tg_pt_gp->tg_pt_gp_su_dev;
+	tg_pt_gp_cg = &T10_ALUA(se_dev)->alua_tg_pt_gps_group;
+	kfree(tg_pt_gp_cg->default_groups);
+}
+
 static struct configfs_item_operations target_core_alua_tg_pt_gp_ops = {
+	.release		= target_core_alua_tg_pt_gp_attr_release,
 	.show_attribute		= target_core_alua_tg_pt_gp_attr_show,
 	.store_attribute	= target_core_alua_tg_pt_gp_attr_store,
 };
@@ -2816,7 +2846,7 @@ static void target_core_call_freedev(
 	se_hba_t *hba;
 	se_subsystem_api_t *t;
 	struct config_item *df_item;
-	struct config_group *tg_pt_gp_cg;
+	struct config_group *dev_cg, *tg_pt_gp_cg;
 	int i, ret = 0;
 
 	hba = target_core_get_hba_from_item(
@@ -2841,6 +2871,13 @@ static void target_core_call_freedev(
 	}
 	core_alua_free_tg_pt_gp(T10_ALUA(se_dev)->default_tg_pt_gp);
 	T10_ALUA(se_dev)->default_tg_pt_gp = NULL;
+
+	dev_cg = &se_dev->se_dev_group;
+	for (i = 0; dev_cg->default_groups[i]; i++) {
+		df_item = &dev_cg->default_groups[i]->cg_item;
+		dev_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
 
 	config_item_put(item);
 	/*
@@ -2939,7 +2976,7 @@ static ssize_t target_core_hba_store_attr_hba_mode(struct se_hba_s *hba,
 		return -EINVAL;
 	}
 	spin_unlock(&hba->device_lock);
-	
+
 	ret = transport->pmode_enable_hba(hba, mode_flag);
 	if (ret < 0)
 		return -EINVAL;
@@ -2947,7 +2984,7 @@ static ssize_t target_core_hba_store_attr_hba_mode(struct se_hba_s *hba,
 		hba->hba_flags |= HBA_FLAGS_PSCSI_MODE;
 	else if (ret == 0)
 		hba->hba_flags &= ~HBA_FLAGS_PSCSI_MODE;
-	
+
 	return count;
 }
 
@@ -3056,15 +3093,15 @@ static void target_core_call_delhbafromtarget(
 	se_core_del_hba(hba);
 }
 
-static struct configfs_group_operations target_core_ops = {
+static struct configfs_group_operations target_core_group_ops = {
 	.make_group	= target_core_call_addhbatotarget,
 	.drop_item	= target_core_call_delhbafromtarget,
 };
 
 static struct config_item_type target_core_cit = {
-/*	.ct_item_ops	= &target_core_item_ops, */
-	.ct_group_ops	= &target_core_ops,
-/*	.ct_attrs	= target_core_attrs, */
+	.ct_item_ops	= NULL,
+	.ct_group_ops	= &target_core_group_ops,
+	.ct_attrs	= NULL,
 	.ct_owner	= THIS_MODULE,
 };
 
@@ -3227,6 +3264,7 @@ void target_core_exit_configfs(void)
 		lu_gp_cg->default_groups[i] = NULL;
 		config_item_put(item);
 	}
+	kfree(lu_gp_cg->default_groups);
 	core_alua_free_lu_gp(se_global->default_lu_gp);
 	se_global->default_lu_gp = NULL;
 
@@ -3236,6 +3274,7 @@ void target_core_exit_configfs(void)
 		alua_cg->default_groups[i] = NULL;
 		config_item_put(item);
 	}
+	kfree(alua_cg->default_groups);
 
 	hba_cg = &se_global->target_core_hbagroup;
 	for (i = 0; hba_cg->default_groups[i]; i++) {
@@ -3243,12 +3282,14 @@ void target_core_exit_configfs(void)
 		hba_cg->default_groups[i] = NULL;
 		config_item_put(item);
 	}
+	kfree(hba_cg->default_groups);
 
 	for (i = 0; subsys->su_group.default_groups[i]; i++) {
 		item = &subsys->su_group.default_groups[i]->cg_item;
 		subsys->su_group.default_groups[i] = NULL;
 		config_item_put(item);
 	}
+	kfree(subsys->su_group.default_groups);
 
 	configfs_unregister_subsystem(subsys);
 	printk(KERN_INFO "TARGET_CORE[0]: Released ConfigFS Fabric"
