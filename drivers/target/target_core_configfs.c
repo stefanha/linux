@@ -2589,23 +2589,7 @@ static struct configfs_attribute *target_core_alua_tg_pt_gp_attrs[] = {
 	NULL,
 };
 
-static void target_core_alua_tg_pt_gp_attr_release(struct config_item *item)
-{
-	t10_alua_tg_pt_gp_t *tg_pt_gp = container_of(to_config_group(item),
-			t10_alua_tg_pt_gp_t, tg_pt_gp_group);
-	se_subsystem_dev_t *se_dev;
-	struct config_group *tg_pt_gp_cg;
-
-	if (!(tg_pt_gp))
-		return;
-
-	se_dev = tg_pt_gp->tg_pt_gp_su_dev;
-	tg_pt_gp_cg = &T10_ALUA(se_dev)->alua_tg_pt_gps_group;
-	kfree(tg_pt_gp_cg->default_groups);
-}
-
 static struct configfs_item_operations target_core_alua_tg_pt_gp_ops = {
-	.release		= target_core_alua_tg_pt_gp_attr_release,
 	.show_attribute		= target_core_alua_tg_pt_gp_attr_show,
 	.store_attribute	= target_core_alua_tg_pt_gp_attr_store,
 };
@@ -2869,6 +2853,7 @@ static void target_core_call_freedev(
 		tg_pt_gp_cg->default_groups[i] = NULL;
 		config_item_put(df_item);
 	}
+	kfree(tg_pt_gp_cg->default_groups);
 	core_alua_free_tg_pt_gp(T10_ALUA(se_dev)->default_tg_pt_gp);
 	T10_ALUA(se_dev)->default_tg_pt_gp = NULL;
 
