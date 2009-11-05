@@ -2474,7 +2474,7 @@ static void lio_target_tiqn_deltpg(
 	struct config_item *tiqn_ci, *df_item;
 	struct config_group *tpg_cg;
 	char *tpgt_str, *end_ptr;
-	int ret = 0, i;
+	int i;
 	unsigned short int tpgt;
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s\n",
@@ -2526,13 +2526,7 @@ static void lio_target_tiqn_deltpg(
 	 * iscsi_tpg_del_portal_group() assumes force=1
 	 */
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> Releasing TPG\n");
-	ret = iscsi_tpg_del_portal_group(tiqn, tpg, 1);
-	if (ret < 0) {
-		iscsi_put_tpg(tpg);
-		return;
-	}
-
-	iscsi_put_tpg(tpg);
+	iscsi_tpg_del_portal_group(tiqn, tpg, 1);
 }
 
 static struct configfs_group_operations lio_target_tiqn_group_ops = {
