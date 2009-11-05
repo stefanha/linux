@@ -1464,9 +1464,9 @@ static void lio_target_initiator_lacl_drop_item(
 		" %s Mapped LUN: %s\n", lacl->initiatorname,
 		config_item_name(item));
 
-	core_dev_free_initiator_node_lun_acl(tpg->tpg_se_tpg, lacl);
-
 	config_item_put(item);
+
+	core_dev_free_initiator_node_lun_acl(tpg->tpg_se_tpg, lacl);
 	iscsi_put_tpg(tpg);
 }
 
