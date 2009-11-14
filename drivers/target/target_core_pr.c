@@ -2084,15 +2084,19 @@ static int core_scsi3_emulate_pro_release(
 	__core_scsi3_complete_pro_release(dev, se_sess->se_node_acl,
 			pr_reg, 1);
 
+	spin_unlock(&dev->dev_reservation_lock);
+
 	if ((type != PR_TYPE_WRITE_EXCLUSIVE_REGONLY) &&
 	    (type != PR_TYPE_EXCLUSIVE_ACCESS_REGONLY) &&
 	    (type != PR_TYPE_WRITE_EXCLUSIVE_ALLREG) &&
 	    (type != PR_TYPE_EXCLUSIVE_ACCESS_ALLREG)) {
-		spin_unlock(&dev->dev_reservation_lock);
-		core_scsi3_put_pr_reg(pr_reg);
-		return 0;
+		/*
+		 * If no UNIT ATTENTION conditions will be established for
+		 * PR_TYPE_WRITE_EXCLUSIVE or PR_TYPE_EXCLUSIVE_ACCESS 
+		 * go ahead and check for APTPL=1 update+write below
+		 */
+		goto write_aptpl;
 	}
-	spin_unlock(&dev->dev_reservation_lock);
 
 	spin_lock(&pr_tmpl->registration_lock);
 	list_for_each_entry(pr_reg_p, &pr_tmpl->registration_list,
@@ -2110,6 +2114,7 @@ static int core_scsi3_emulate_pro_release(
 	}
 	spin_unlock(&pr_tmpl->registration_lock);
 
+write_aptpl:
 	if (pr_tmpl->pr_aptpl_active) {
 		ret = core_scsi3_update_and_write_aptpl(SE_DEV(cmd),
 				&pr_reg->pr_aptpl_buf[0],
