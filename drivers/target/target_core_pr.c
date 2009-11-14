@@ -1970,7 +1970,7 @@ static int core_scsi3_emulate_pro_release(
 	se_lun_t *se_lun = SE_LUN(cmd);
 	t10_pr_registration_t *pr_reg, *pr_reg_p, *pr_res_holder;
 	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
-	int ret;
+	int ret, all_reg = 0;
 
 	if (!(se_sess) || !(se_lun)) {
 		printk(KERN_ERR "SPC-3 PR: se_sess || se_lun_t is NULL!\n");
@@ -2007,8 +2007,13 @@ static int core_scsi3_emulate_pro_release(
 		core_scsi3_put_pr_reg(pr_reg);
 		return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 	}
-	if (pr_res_holder != pr_reg) {
+	if ((pr_res_holder->pr_res_type == PR_TYPE_WRITE_EXCLUSIVE_ALLREG) ||
+	    (pr_res_holder->pr_res_type == PR_TYPE_EXCLUSIVE_ACCESS_ALLREG))
+		all_reg = 1;
+
+	if ((all_reg == 0) && (pr_res_holder != pr_reg)) {
 		/*
+		 * Non 'All Registrants' PR Type cases..
 		 * Release request from a registered I_T nexus that is not a
 		 * persistent reservation holder. return GOOD status.
 		 */
