@@ -1070,6 +1070,8 @@ static int iscsi_target_detect(void)
 			" iscsi_portal_group_t\n");
 		goto out;
 	}
+	printk("Failing again..\n");
+	goto out;
 
 	if (core_load_discovery_tpg() < 0)
 		goto out;
@@ -1108,8 +1110,9 @@ out:
 	kfree(iscsi_global->debug_erl);
 #endif /* DEBUG_ERL */
 	kfree(iscsi_global);
+	iscsi_global = NULL;
 
-	return ret;
+	return -1;
 }
 
 int iscsi_target_release_phase1(int rmmod)
@@ -1175,10 +1178,8 @@ static int iscsi_target_release(void)
 {
 	int ret = 0;
 
-	if (!iscsi_global) {
-		printk(KERN_ERR "iscsi_global is NULL!\n");
-		return -1;
-	}
+	if (!iscsi_global)
+		return ret;
 
 	iscsi_target_release_phase1(1);
 	iscsi_target_release_phase2();
