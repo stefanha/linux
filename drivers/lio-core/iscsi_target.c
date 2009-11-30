@@ -1070,8 +1070,6 @@ static int iscsi_target_detect(void)
 			" iscsi_portal_group_t\n");
 		goto out;
 	}
-	printk("Failing again..\n");
-	goto out;
 
 	if (core_load_discovery_tpg() < 0)
 		goto out;
