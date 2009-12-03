@@ -822,14 +822,6 @@ int iscsi_tpg_enable_portal_group(iscsi_portal_group_t *tpg)
 		spin_unlock(&tpg->tpg_state_lock);
 		return -EINVAL;
 	}
-	if (!tpg->num_tpg_nps) {
-		printk(KERN_ERR "Unable to activate iSCSI target portal"
-			" group with no IP addresses, please add one with"
-			" addnptotpg.\n");
-		spin_unlock(&tpg->tpg_state_lock);
-		return -EINVAL;
-	}
-
 	/*
 	 * Make sure that AuthMethod does not contain None as an option
 	 * unless explictly disabled.  Set the default to CHAP if authentication
