@@ -33,6 +33,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/ctype.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 
@@ -638,6 +639,21 @@ static int iscsi_target_do_login(iscsi_conn_t *conn, iscsi_login_t *login)
 	return 0;
 }
 
+static void iscsi_initiatorname_tolower(
+	char *param_buf)
+{
+	char *c;
+	u32 iqn_size = strlen(param_buf), i;
+
+	for (i = 0; i < iqn_size; i++) {
+		c = (char *)&param_buf[i];
+		if (!(isupper(*c)))
+			continue;
+
+		*c = tolower(*c);
+	}
+}
+
 /*
  * Processes the first Login Request..
  */
@@ -714,6 +730,13 @@ static int iscsi_target_locate_portal(
 		ret = -1;
 		goto out;
 	}
+	/*
+	 * Convert the incoming InitiatorName to lowercase following
+	 * RFC-3720 3.2.6.1. section c) that says that iSCSI IQNs
+	 * are NOT case sensitive.
+	 */
+	iscsi_initiatorname_tolower(i_buf);
+
 	if (!s_buf) {
 		if (!login->leading_connection)
 			goto get_target;
