@@ -94,6 +94,7 @@ struct scsi_cmnd;
 #define WRITE_LONG            0x3f
 #define CHANGE_DEFINITION     0x40
 #define WRITE_SAME            0x41
+#define UNMAP		      0x42
 #define READ_TOC              0x43
 #define LOG_SELECT            0x4c
 #define LOG_SENSE             0x4d
@@ -131,9 +132,11 @@ struct scsi_cmnd;
 #define READ_ATTRIBUTE        0x8c
 #define WRITE_ATTRIBUTE	      0x8d
 #define VERIFY_16	      0x8f
+#define WRITE_SAME_16	      0x93
 #define SERVICE_ACTION_IN     0x9e
 /* values for service action in */
 #define	SAI_READ_CAPACITY_16  0x10
+#define SAI_GET_LBA_STATUS    0x12
 /* values for VARIABLE_LENGTH_CMD service action codes
  * see spc4r17 Section D.3.5, table D.7 and D.8 */
 #define VLC_SA_RECEIVE_CREDENTIAL 0x1800
@@ -156,6 +159,8 @@ struct scsi_cmnd;
 /* values for variable length command */
 #define READ_32		      0x09
 #define WRITE_32	      0x0b
+#define WRITE_SAME_32	      0x0d
+
 /* Values for T10/04-262r7 */
 #define	ATA_16		      0x85	/* 16-byte pass-thru */
 #define	ATA_12		      0xa1	/* 12-byte pass-thru */
