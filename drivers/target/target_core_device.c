@@ -502,7 +502,7 @@ EXPORT_SYMBOL(core_update_device_list_access);
  *
  *
  */
-void core_update_device_list_for_node(
+int core_update_device_list_for_node(
 	se_lun_t *lun,
 	se_lun_acl_t *lun_acl,
 	u32 mapped_lun,
@@ -513,14 +513,37 @@ void core_update_device_list_for_node(
 {
 	se_port_t *port = lun->lun_sep;
 	se_dev_entry_t *deve;
+	int trans = 0;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	deve = &nacl->device_list[mapped_lun];
 	if (enable) {
-		deve->se_lun = lun;
-		deve->se_lun_acl = lun_acl;
-		deve->mapped_lun = mapped_lun;
-		deve->lun_flags |= TRANSPORT_LUNFLAGS_INITIATOR_ACCESS;
+		/*
+		 * Check if the call is handling demo mode -> explict LUN ACL
+		 * transition.  This transition must be for the same se_lun_t
+		 * + mapped_lun that was setup in demo mode..
+		 */
+		if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
+			if (deve->se_lun_acl != NULL) {
+				printk(KERN_ERR "se_dev_entry_t->se_lun_acl"
+					" already set for demo mode -> explict"
+					" LUN ACL transition\n");
+				return -1;
+			}
+			if (deve->se_lun != lun) {
+				printk(KERN_ERR "se_dev_entry_t->se_lun does"
+					" match passed se_lun_t for demo mode"
+					" -> explict LUN ACL transition\n");
+				return -1;
+			}
+			deve->se_lun_acl = lun_acl;
+			trans = 1;
+		} else {
+			deve->se_lun = lun;
+			deve->se_lun_acl = lun_acl;
+			deve->mapped_lun = mapped_lun;
+			deve->lun_flags |= TRANSPORT_LUNFLAGS_INITIATOR_ACCESS;
+		}
 
 		if (lun_access & TRANSPORT_LUNFLAGS_READ_WRITE) {
 			deve->lun_flags &= ~TRANSPORT_LUNFLAGS_READ_ONLY;
@@ -528,6 +551,11 @@ void core_update_device_list_for_node(
 		} else {
 			deve->lun_flags &= ~TRANSPORT_LUNFLAGS_READ_WRITE;
 			deve->lun_flags |= TRANSPORT_LUNFLAGS_READ_ONLY;
+		}
+
+		if (trans) {	
+			spin_unlock_bh(&nacl->device_list_lock);
+			return 0;
 		}
 #ifdef SNMP_SUPPORT
 		deve->creation_time = get_jiffies_64();
@@ -539,7 +567,7 @@ void core_update_device_list_for_node(
 		list_add_tail(&deve->alua_port_list, &port->sep_alua_list);
 		spin_unlock_bh(&port->sep_alua_lock);
 
-		return;
+		return 0;
 	}
 	/*
 	 * Disable se_dev_entry_t LUN ACL mapping
@@ -559,7 +587,7 @@ void core_update_device_list_for_node(
 	spin_unlock_bh(&port->sep_alua_lock);
 
 	core_scsi3_free_pr_reg_from_nacl(lun->se_dev, nacl);
-	return;
+	return 0;
 }
 
 /*      core_clear_lun_from_tpg():
@@ -1374,20 +1402,21 @@ int core_dev_add_initiator_node_lun_acl(
 	if (!(nacl))
 		return -EINVAL;
 
-	spin_lock(&lun->lun_acl_lock);
-	list_add_tail(&lacl->lacl_list, &lun->lun_acl_list);
-	atomic_inc(&lun->lun_acl_count);
-	smp_mb__after_atomic_inc();
-	spin_unlock(&lun->lun_acl_lock);
-
 	if ((lun->lun_access & TRANSPORT_LUNFLAGS_READ_ONLY) &&
 	    (lun_access & TRANSPORT_LUNFLAGS_READ_WRITE))
 		lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
 
 	lacl->se_lun = lun;
 
-	core_update_device_list_for_node(lun, lacl, lacl->mapped_lun,
-			lun_access, nacl, tpg, 1);
+	if (core_update_device_list_for_node(lun, lacl, lacl->mapped_lun,
+			lun_access, nacl, tpg, 1) < 0)
+		return -EINVAL;
+
+	spin_lock(&lun->lun_acl_lock);
+	list_add_tail(&lacl->lacl_list, &lun->lun_acl_list);
+	atomic_inc(&lun->lun_acl_count);
+	smp_mb__after_atomic_inc();
+	spin_unlock(&lun->lun_acl_lock);
 
 	printk(KERN_INFO "%s_TPG[%hu]_LUN[%u->%u] - Added %s ACL for "
 		" InitiatorNode: %s\n", TPG_TFO(tpg)->get_fabric_name(),
