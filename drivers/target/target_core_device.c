@@ -512,11 +512,21 @@ int core_update_device_list_for_node(
 	int enable)
 {
 	se_port_t *port = lun->lun_sep;
-	se_dev_entry_t *deve;
+	se_dev_entry_t *deve = &nacl->device_list[mapped_lun];
 	int trans = 0;
+	/*
+	 * If the MappedLUN entry is being disabled, the entry in
+	 * port->sep_alua_list must be removed now before clearing the
+	 * se_dev_entry_t pointers below as logic in
+	 * core_alua_do_transition_tg_pt() depends on these being present.
+	 */
+	if (!(enable)) {
+		spin_lock_bh(&port->sep_alua_lock);
+		list_del(&deve->alua_port_list);
+		spin_unlock_bh(&port->sep_alua_lock);
+	}
 
 	spin_lock_bh(&nacl->device_list_lock);
-	deve = &nacl->device_list[mapped_lun];
 	if (enable) {
 		/*
 		 * Check if the call is handling demo mode -> explict LUN ACL
@@ -581,10 +591,6 @@ int core_update_device_list_for_node(
 	deve->attach_count--;
 #endif /* SNMP_SUPPORT */
 	spin_unlock_bh(&nacl->device_list_lock);
-
-	spin_lock_bh(&port->sep_alua_lock);
-	list_del(&deve->alua_port_list);
-	spin_unlock_bh(&port->sep_alua_lock);
 
 	core_scsi3_free_pr_reg_from_nacl(lun->se_dev, nacl);
 	return 0;
