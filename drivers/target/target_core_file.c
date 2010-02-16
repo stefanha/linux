@@ -123,7 +123,6 @@ int fd_claim_phydevice(se_hba_t *hba, se_device_t *dev)
 			return -1;
 
 		fd_dev->fd_bd = bd;
-		fd_dev->fd_bd->bd_contains = bd;
 	}
 
 	return 0;
@@ -186,8 +185,6 @@ se_device_t *fd_create_virtdevice(
 	struct block_device *bd = NULL;
 	struct file *file;
 	struct inode *inode = NULL;
-	struct request_queue *q;
-	unsigned long long blocks_long;
 	int dev_flags = 0, flags;
 
 	old_fs = get_fs();
@@ -246,36 +243,34 @@ se_device_t *fd_create_virtdevice(
 				" block_device\n");
 			goto fail;
 		}
-		fd_dev->fd_major = fd_dev->fd_bd->bd_disk->major;
-		fd_dev->fd_minor = fd_dev->fd_bd->bd_disk->first_minor;
+		
+		fd_dev->fd_major = MAJOR(fd_dev->fd_bd->bd_dev);
+		fd_dev->fd_minor = MINOR(fd_dev->fd_bd->bd_dev);
 
 		printk(KERN_INFO "FILEIO: Claiming %p Major:Minor - %d:%d\n",
 			fd_dev, fd_dev->fd_major, fd_dev->fd_minor);
 
-		bd = linux_blockdevice_claim(fd_dev->fd_bd->bd_disk->major,
-					fd_dev->fd_bd->bd_disk->first_minor,
+		bd = linux_blockdevice_claim(fd_dev->fd_major, fd_dev->fd_minor,
 					fd_dev);
 		if (!(bd)) {
 			printk(KERN_ERR "FILEIO: Unable to claim"
 				" struct block_device\n");
 			goto fail;
 		}
-
 		dev_flags |= DF_CLAIMED_BLOCKDEV;
-		if (dev_flags & DF_CLAIMED_BLOCKDEV)
-			fd_dev->fd_bd->bd_contains = bd;
 		/*
-		 * Determine the number of bytes for this FILEIO device from
-		 * struct block_device's block count and block_size.
+		 * Determine the number of bytes from i_size_read() minus
+		 * one (1) logical sector from underlying struct block_device
 		 */
-		blocks_long = (get_capacity(bd->bd_disk) - 1);
-		q = bdev_get_queue(bd);
-		fd_dev->fd_dev_size = ((unsigned long long)blocks_long *
-					bdev_logical_block_size(bd));
+		fd_dev->fd_dev_size = (i_size_read(file->f_mapping->host) -
+		  		       bdev_logical_block_size(bd));
+
 		printk(KERN_INFO "FILEIO: Using size: %llu bytes from struct"
 			" block_device blocks: %llu logical_block_size: %d\n",
-				fd_dev->fd_dev_size, blocks_long,
-				bdev_logical_block_size(bd));
+			fd_dev->fd_dev_size,
+			div_u64(fd_dev->fd_dev_size,
+				bdev_logical_block_size(bd)),
+			bdev_logical_block_size(bd));
 	} else {
 		if (!(fd_dev->fbd_flags & FBDF_HAS_SIZE)) {
 			printk(KERN_ERR "FILEIO: Missing fd_dev_size="
