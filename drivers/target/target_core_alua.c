@@ -738,6 +738,13 @@ int core_alua_do_transition_tg_pt(
 		list_for_each_entry(se_deve, &port->sep_alua_list,
 					alua_port_list) {
 			lacl = se_deve->se_lun_acl;
+			/*
+			 * se_deve->se_lun_acl pointer may be NULL for a
+			 * entry created without explict Node+MappedLUN ACLs
+			 */
+			if (!(lacl))
+				continue;
+
 			if (explict &&
 			   (nacl != NULL) && (nacl == lacl->se_lun_nacl) &&
 			   (l_port != NULL) && (l_port == port))
