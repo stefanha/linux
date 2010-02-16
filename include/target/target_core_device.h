@@ -44,7 +44,7 @@ extern int core_free_device_list_for_node(se_node_acl_t *,
 					se_portal_group_t *);
 extern void core_dec_lacl_count(struct se_node_acl_s *, struct se_cmd_s *);
 extern void core_update_device_list_access(u32, u32, se_node_acl_t *);
-extern void core_update_device_list_for_node(se_lun_t *, se_lun_acl_t *, u32,
+extern int core_update_device_list_for_node(se_lun_t *, se_lun_acl_t *, u32,
 					u32, se_node_acl_t *,
 					se_portal_group_t *, int);
 extern void core_clear_lun_from_tpg(se_lun_t *, se_portal_group_t *);
