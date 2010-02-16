@@ -129,7 +129,6 @@ int iblock_claim_phydevice(se_hba_t *hba, se_device_t *dev)
 			return -1;
 
 		ib_dev->ibd_bd = bd;
-		ib_dev->ibd_bd->bd_contains = bd;
 	}
 
 	return 0;
@@ -212,17 +211,17 @@ se_device_t *iblock_create_virtdevice(
 		printk(KERN_INFO  "IBLOCK: Claiming struct block_device: %p\n",
 			 ib_dev->ibd_bd);
 
-		bd = linux_blockdevice_claim(ib_dev->ibd_bd->bd_disk->major,
-				     ib_dev->ibd_bd->bd_disk->first_minor,
-				     ib_dev);
+		ib_dev->ibd_major = MAJOR(ib_dev->ibd_bd->bd_dev);
+		ib_dev->ibd_minor = MINOR(ib_dev->ibd_bd->bd_dev);
+
+		bd = linux_blockdevice_claim(ib_dev->ibd_major,
+				ib_dev->ibd_minor, ib_dev);
 		if (!(bd)) {
 			printk(KERN_INFO "IBLOCK: Unable to claim"
 					" struct block_device\n");
 			goto failed;
 		}
 		dev_flags = DF_CLAIMED_BLOCKDEV;
-		ib_dev->ibd_major = bd->bd_disk->major;
-		ib_dev->ibd_minor = bd->bd_disk->first_minor;
 	} else {
 		printk(KERN_INFO  "IBLOCK: Claiming %p Major:Minor - %d:%d\n",
 			ib_dev, ib_dev->ibd_major, ib_dev->ibd_minor);
@@ -247,8 +246,6 @@ se_device_t *iblock_create_virtdevice(
 		} else
 			goto failed;
 	}
-	if (dev_flags & DF_CLAIMED_BLOCKDEV)
-		ib_dev->ibd_bd->bd_contains = bd;
 	/*
 	 * These settings need to be made tunable..
 	 */
@@ -284,6 +281,8 @@ failed:
 		ib_dev->ibd_bio_set = NULL;
 	}
 	ib_dev->ibd_bd = NULL;
+	ib_dev->ibd_major = 0;
+	ib_dev->ibd_minor = 0;
 	return NULL;
 }
 
@@ -378,7 +377,8 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	struct block_device *bd,
 	struct request_queue *q)
 {
-	unsigned long long blocks_long = (get_capacity(bd->bd_disk) - 1);
+	unsigned long long blocks_long = (div_u64(i_size_read(bd->bd_inode), 
+					bdev_logical_block_size(bd)) - 1);
 	u32 block_size = bdev_logical_block_size(bd);
 
 	if (block_size == DEV_ATTRIB(dev)->block_size)
