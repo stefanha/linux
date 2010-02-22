@@ -117,7 +117,7 @@ int iscsi_check_for_session_reinstatement(iscsi_conn_t *conn)
 	iscsi_param_t *initiatorname_param = NULL, *sessiontype_param = NULL;
 	iscsi_portal_group_t *tpg = conn->tpg;
 	iscsi_session_t *sess = NULL, *sess_p = NULL;
-	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
+	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
 	se_session_t *se_sess, *se_sess_tmp;
 
 	initiatorname_param = iscsi_find_param_from_key(
@@ -412,7 +412,7 @@ static int iscsi_login_non_zero_tsih_s2(
 {
 	iscsi_portal_group_t *tpg = conn->tpg;
 	iscsi_session_t *sess = NULL, *sess_p = NULL;
-	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
+	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
 	se_session_t *se_sess, *se_sess_tmp;
 	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *)buf;
 
@@ -591,7 +591,7 @@ static int iscsi_post_login_handler(
 	iscsi_session_t *sess = SESS(conn);
 	se_session_t *se_sess = sess->se_sess;
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
+	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
 	se_thread_set_t *ts;
 
 	iscsi_inc_conn_usage_count(conn);
@@ -668,7 +668,7 @@ static int iscsi_post_login_handler(
 	iscsi_determine_maxcmdsn(sess);
 
 	spin_lock_bh(&se_tpg->session_lock);
-	__transport_register_session(sess->tpg->tpg_se_tpg,
+	__transport_register_session(&sess->tpg->tpg_se_tpg,
 			se_sess->se_node_acl, se_sess, (void *)sess);
 	TRACE(TRACE_STATE, "Moving to TARG_SESS_STATE_LOGGED_IN.\n");
 	sess->session_state = TARG_SESS_STATE_LOGGED_IN;
@@ -1285,7 +1285,7 @@ old_sess_out:
 		spin_lock_bh(&SESS(conn)->conn_lock);
 		if (SESS(conn)->session_state == TARG_SESS_STATE_FAILED) {
 			se_portal_group_t *se_tpg =
-					ISCSI_TPG_C(conn)->tpg_se_tpg;
+					&ISCSI_TPG_C(conn)->tpg_se_tpg;
 
 			atomic_set(&SESS(conn)->session_continuation, 0);
 			spin_unlock_bh(&SESS(conn)->conn_lock);

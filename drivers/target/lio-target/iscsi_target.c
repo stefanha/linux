@@ -5123,7 +5123,7 @@ int iscsi_close_connection(
 int iscsi_close_session(iscsi_session_t *sess)
 {
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
+	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
 
 	if (atomic_read(&sess->nconn)) {
 		printk(KERN_ERR "%d connection(s) still exist for iSCSI session"
@@ -5435,7 +5435,7 @@ void iscsi_stop_session(
 int iscsi_release_sessions_for_tpg(iscsi_portal_group_t *tpg, int force)
 {
 	iscsi_session_t *sess;
-	se_portal_group_t *se_tpg = tpg->tpg_se_tpg;
+	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
 	se_session_t *se_sess, *se_sess_tmp;
 	int session_count = 0;
 

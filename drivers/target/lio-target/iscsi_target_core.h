@@ -8,6 +8,8 @@
 #include <iscsi_linux_defs.h>
 #include <iscsi_target_version.h>	    /* get version definition */
 
+#include <target/target_core_base.h>
+
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 #define ISCSI_MISC_IOVECS		5
 #define ISCSI_MAX_DATASN_MISSING_COUNT	16
@@ -771,7 +773,6 @@ typedef struct iscsi_tpg_attrib_s {
 	u32			prod_mode_write_protect;
 	u32			cache_core_nps;
 	struct iscsi_portal_group_s *tpg;
-	struct config_group	tpg_attrib_group;
 }  ____cacheline_aligned iscsi_tpg_attrib_t;
 
 typedef struct iscsi_np_ex_s {
@@ -822,7 +823,7 @@ typedef struct iscsi_tpg_np_s {
 	struct list_head	tpg_np_list;
 	struct list_head	tpg_np_child_list;
 	struct list_head	tpg_np_parent_list;
-	struct config_group	tpg_np_group;
+	struct se_tpg_np_s	se_tpg_np;
 	spinlock_t		tpg_np_parent_lock;
 } ____cacheline_aligned iscsi_tpg_np_t;
 
@@ -850,11 +851,7 @@ typedef struct iscsi_portal_group_s {
 	/* Spinlock for adding/removing Network Portals */
 	spinlock_t		tpg_np_lock;
 	spinlock_t		tpg_state_lock;
-	struct se_portal_group_s *tpg_se_tpg;
-	struct config_group	tpg_np_group;
-	struct config_group	tpg_lun_group;
-	struct config_group	tpg_acl_group;
-	struct config_group	tpg_param_group;
+	struct se_portal_group_s tpg_se_tpg;
 	struct semaphore	tpg_access_sem;
 	struct semaphore	np_login_sem;
 	iscsi_tpg_attrib_t	tpg_attrib;
@@ -873,7 +870,7 @@ typedef struct iscsi_portal_group_s {
 #define ISCSI_TPG_LUN(c, l)  ((iscsi_tpg_list_t *)(c)->tpg->tpg_lun_list_t[l])
 #define ISCSI_TPG_S(s)		((iscsi_portal_group_t *)(s)->tpg)
 #define ISCSI_TPG_ATTRIB(t)	(&(t)->tpg_attrib)
-#define SE_TPG(tpg)		((struct se_portal_group_s *)(tpg)->tpg_se_tpg)
+#define SE_TPG(tpg)		(&(tpg)->tpg_se_tpg)
 
 typedef struct iscsi_tiqn_s {
 	unsigned char		tiqn[ISCSI_TIQN_LEN];
@@ -887,7 +884,7 @@ typedef struct iscsi_tiqn_s {
 	atomic_t		tiqn_access_count;
 	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
-	struct config_group	tiqn_group;
+	struct se_wwn_s		tiqn_wwn;
 #ifdef SNMP_SUPPORT
 	u32			tiqn_index;
 	iscsi_sess_err_stats_t  sess_err_stats;
