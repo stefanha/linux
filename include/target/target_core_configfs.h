@@ -36,12 +36,25 @@ extern se_global_t *se_global;
 
 extern struct se_hba_s *target_core_get_hba_from_item(struct config_item *);
 extern struct target_fabric_configfs *target_fabric_configfs_init(
-				struct config_item_type *, const char *name);
+				struct module *, const char *);
 extern void target_fabric_configfs_free(struct target_fabric_configfs *);
 extern int target_fabric_configfs_register(struct target_fabric_configfs *);
 extern void target_fabric_configfs_deregister(struct target_fabric_configfs *);
 extern int target_core_init_configfs(void);
 extern void target_core_exit_configfs(void);
+
+struct target_fabric_configfs_template {
+	struct config_item_type	tfc_wwn_cit;
+	struct config_item_type tfc_tpg_cit;
+	struct config_item_type tfc_tpg_base_cit;
+	struct config_item_type tfc_tpg_lun_cit;
+	struct config_item_type tfc_tpg_port_cit;
+	struct config_item_type tfc_tpg_np_cit;
+	struct config_item_type tfc_tpg_np_base_cit;
+	struct config_item_type tfc_tpg_attrib_cit;
+	struct config_item_type tfc_tpg_param_cit;
+	struct config_item_type tfc_tpg_acl_cit;
+};
 
 struct target_fabric_configfs {
 	char			tf_name[TARGET_FABRIC_NAME_SIZE];
@@ -55,5 +68,10 @@ struct target_fabric_configfs {
 	struct config_item_type	*tf_fabric_cit;
 	/* Pointer to target core subsystem */
 	struct configfs_subsystem *tf_subsys;
+	/* Pointer to fabric's struct module */
+	struct module *tf_module;
 	struct target_core_fabric_ops tf_ops;
+	struct target_fabric_configfs_template tf_cit_tmpl;
 };
+
+#define TF_CIT_TMPL(tf) (&(tf)->tf_cit_tmpl)

@@ -47,6 +47,7 @@
 #include <target/target_core_alua.h>
 #include <target/target_core_pr.h>
 #include <target/target_core_fabric_ops.h>
+#include <target/target_core_fabric_configfs.h>
 #include <target/target_core_configfs.h>
 #include <target/configfs_macros.h>
 
@@ -186,9 +187,10 @@ static struct config_group *target_core_register_fabric(
 	 * On a successful target_core_get_fabric() look, the returned
 	 * struct target_fabric_configfs *tf will contain a usage reference.
 	 */
-	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> %p\n",
-			tf->tf_fabric_cit);
-	config_group_init_type_name(&tf->tf_group, name, tf->tf_fabric_cit);
+	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER tfc_wwn_cit -> %p\n",
+			&TF_CIT_TMPL(tf)->tfc_wwn_cit);
+	config_group_init_type_name(&tf->tf_group, name,
+			&TF_CIT_TMPL(tf)->tfc_wwn_cit);
 	/*
 	 * Setup any default configfs groups in the top level directory of
 	 * this fabric module.
@@ -285,13 +287,13 @@ static struct configfs_subsystem *target_core_subsystem[] = {
  *    into target_fabric_configfs_register().
  */
 struct target_fabric_configfs *target_fabric_configfs_init(
-	struct config_item_type *fabric_cit,
+	struct module *fabric_mod,
 	const char *name)
 {
 	struct target_fabric_configfs *tf;
 
-	if (!(fabric_cit)) {
-		printk(KERN_ERR "Missing struct config_item_type * pointer\n");
+	if (!(fabric_mod)) {
+		printk(KERN_ERR "Missing struct module *fabric_mod pointer\n");
 		return NULL;
 	}
 	if (!(name)) {
@@ -310,7 +312,13 @@ struct target_fabric_configfs *target_fabric_configfs_init(
 
 	INIT_LIST_HEAD(&tf->tf_list);
 	atomic_set(&tf->tf_access_cnt, 0);
-	tf->tf_fabric_cit = fabric_cit;
+	/*
+	 * Setup the default generic struct config_item_type's (cits) in
+	 * struct target_fabric_configfs->tf_cit_tmpl
+	 */
+	tf->tf_module = fabric_mod;
+	target_fabric_setup_cits(tf);
+
 	tf->tf_subsys = target_core_subsystem[0];
 	snprintf(tf->tf_name, TARGET_FABRIC_NAME_SIZE, "%s", name);
 
@@ -433,7 +441,7 @@ void target_fabric_configfs_deregister(
 
 	printk(KERN_INFO "Target_Core_ConfigFS: DEREGISTER -> Releasing tf:"
 			" %s\n", tf->tf_name);
-	tf->tf_fabric_cit = NULL;
+	tf->tf_module = NULL;
 	tf->tf_subsys = NULL;
 	kfree(tf->tf_group.default_groups);
 	kfree(tf);

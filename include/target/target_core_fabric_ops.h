@@ -1,3 +1,6 @@
+/* Defined in target_core_configfs.h */
+struct target_fabric_configfs;
+
 struct target_core_fabric_ops {
 	struct configfs_subsystem *tf_subsys;
 	char *(*get_fabric_name)(void);
@@ -55,4 +58,20 @@ struct target_core_fabric_ops {
 	u16 (*get_fabric_sense_len)(void);
 	int (*is_state_remove)(struct se_cmd_s *);
 	u64 (*pack_lun)(unsigned int);
+	/*
+	 * fabric module calls for target_core_fabric_configfs.c
+	 */
+	struct se_wwn_s *(*fabric_make_wwn)(struct target_fabric_configfs *,
+				struct config_group *, const char *);
+	void (*fabric_drop_wwn)(struct se_wwn_s *);
+	struct se_portal_group_s *(*fabric_make_tpg)(struct se_wwn_s *,
+				struct config_group *, const char *);
+	void (*fabric_drop_tpg)(struct se_portal_group_s *);
+	int (*fabric_post_link)(struct se_portal_group_s *,
+				struct se_lun_s *);
+	void (*fabric_pre_unlink)(struct se_portal_group_s *,
+				struct se_lun_s *);
+	struct se_tpg_np_s *(*fabric_make_np)(struct se_portal_group_s *,
+				struct config_group *, const char *);
+	void (*fabric_drop_np)(struct se_tpg_np_s *);
 };

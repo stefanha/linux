@@ -629,28 +629,22 @@ int core_tpg_set_initiator_node_queue_depth(
 }
 EXPORT_SYMBOL(core_tpg_set_initiator_node_queue_depth);
 
-se_portal_group_t *core_tpg_register(
+int core_tpg_register(
 	struct target_core_fabric_ops *tfo,
+	struct se_wwn_s *se_wwn,
+	struct se_portal_group_s *se_tpg,
 	void *tpg_fabric_ptr,
 	int se_tpg_type)
 {
 	se_lun_t *lun;
-	se_portal_group_t *se_tpg;
 	u32 i;
-
-	se_tpg = kzalloc(sizeof(se_portal_group_t), GFP_KERNEL);
-	if (!(se_tpg)) {
-		printk(KERN_ERR "Unable to allocate se_portal_group_t\n");
-		return ERR_PTR(-ENOMEM);
-	}
 
 	se_tpg->tpg_lun_list = kzalloc((sizeof(se_lun_t) *
 				TRANSPORT_MAX_LUNS_PER_TPG), GFP_KERNEL);
 	if (!(se_tpg->tpg_lun_list)) {
 		printk(KERN_ERR "Unable to allocate se_portal_group_t->"
 				"tpg_lun_list\n");
-		kfree(se_tpg);
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 	}
 
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -669,6 +663,7 @@ se_portal_group_t *core_tpg_register(
 	se_tpg->se_tpg_type = se_tpg_type;
 	se_tpg->se_tpg_fabric_ptr = tpg_fabric_ptr;
 	se_tpg->se_tpg_tfo = tfo;
+	se_tpg->se_tpg_wwn = se_wwn;
 	INIT_LIST_HEAD(&se_tpg->acl_node_list);
 	INIT_LIST_HEAD(&se_tpg->se_tpg_list);
 	INIT_LIST_HEAD(&se_tpg->tpg_sess_list);
@@ -686,7 +681,7 @@ se_portal_group_t *core_tpg_register(
 		"Normal" : "Discovery", (tfo->tpg_get_wwn(se_tpg) == NULL) ?
 		"None" : tfo->tpg_get_wwn(se_tpg), tfo->tpg_get_tag(se_tpg));
 
-	return se_tpg;
+	return 0;
 }
 EXPORT_SYMBOL(core_tpg_register);
 
@@ -705,7 +700,6 @@ int core_tpg_deregister(se_portal_group_t *se_tpg)
 
 	se_tpg->se_tpg_fabric_ptr = NULL;
 	kfree(se_tpg->tpg_lun_list);
-	kfree(se_tpg);
 	return 0;
 }
 EXPORT_SYMBOL(core_tpg_deregister);

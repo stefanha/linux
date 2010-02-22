@@ -1,0 +1,50 @@
+/*
+ * Used for tfc_wwn_cit attributes
+ */
+
+#include <target/configfs_macros.h>
+
+CONFIGFS_EATTR_STRUCT(target_fabric_np_base, se_tpg_np_s);
+#define TF_NP_BASE_ATTR(_fabric, _name, _mode)				\
+static struct target_fabric_np_base_attribute _fabric##_np_##_name =	\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_np_show_##_name,					\
+	_fabric##_np_store_##_name);
+
+CONFIGFS_EATTR_STRUCT(target_fabric_tpg_attrib, se_portal_group_s);
+#define TF_TPG_ATTRIB_ATTR(_fabric, _name, _mode)			\
+static struct target_fabric_tpg_attrib_attribute _fabric##_tpg_attrib_##_name = \
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_tpg_attrib_show_##_name,				\
+	_fabric##_tpg_attrib_store_##_name);
+
+
+CONFIGFS_EATTR_STRUCT(target_fabric_tpg_param, se_portal_group_s);
+#define TF_TPG_PARAM_ATTR(_fabric, _name, _mode)			\
+static struct target_fabric_tpg_param_attribute _fabric##_tpg_param_##_name = \
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_tpg_param_show_##_name,				\
+	_fabric##_tpg_param_store_##_name);
+
+
+CONFIGFS_EATTR_STRUCT(target_fabric_tpg, se_portal_group_s);
+#define TF_TPG_BASE_ATTR(_fabric, _name, _mode)				\
+static struct target_fabric_tpg_attribute _fabric##_tpg_##_name =	\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_tpg_show_##_name,					\
+	_fabric##_tpg_store_##_name);
+
+
+CONFIGFS_EATTR_STRUCT(target_fabric_wwn, target_fabric_configfs);
+#define TF_WWN_ATTR(_fabric, _name, _mode)				\
+static struct target_fabric_wwn_attribute _fabric##_wwn_##_name =	\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_wwn_show_attr_##_name,				\
+	_fabric##_wwn_store_attr_##_name);
+
+#define TF_WWN_ATTR_RO(_fabric, _name)					\
+static struct target_fabric_wwn_attribute _fabric##_wwn_##_name =	\
+	__CONFIGFS_EATTR_RO(_name,					\
+	_fabric##_wwn_show_attr_##_name);
+
+extern int target_fabric_setup_cits(struct target_fabric_configfs *);
