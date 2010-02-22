@@ -324,7 +324,7 @@ static int tcm_loop_queuecommand(
 		return 0;	
 	}
 	tl_tpg = &tl_hba->tl_hba_tpgs[sc->device->id];
-	se_tpg = tl_tpg->tl_se_tpg;
+	se_tpg = &tl_tpg->tl_se_tpg;
 
 	if (sc->sc_data_direction == DMA_TO_DEVICE)
 		data_direction = SE_DIRECTION_WRITE;

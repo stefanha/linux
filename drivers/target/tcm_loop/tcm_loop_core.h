@@ -30,30 +30,16 @@ struct tcm_loop_nexus {
 	 * Pointer to TCM session for I_T Nexus
 	 */
 	struct se_session_s *se_sess;
-	/*
-	 * Used to reference the emulated SAS Address for SCSI Initiator Port
-	 */
-	struct config_group tl_iport_group;
 };
 
 struct tcm_loop_nacl {
 	struct se_node_acl_s *se_nacl;
 };
 
-struct tcm_loop_dev {
-	struct se_device_s *se_dev;
-	struct scsi_device *sd;
-	struct tcm_loop_hba *tl_hba;
-	struct tcm_loop_nexus *tl_nexus;
-	struct config_group tl_dev_group;
-};
-
 struct tcm_loop_tpg {
 	unsigned short tl_tpgt;
-	struct se_portal_group_s *tl_se_tpg;
+	struct se_portal_group_s tl_se_tpg;
 	struct tcm_loop_hba *tl_hba;
-	struct config_group tl_tpg_lun_group;
-	struct config_group tl_tpg_nexus_group;
 };
 
 struct tcm_loop_hba {
@@ -68,5 +54,5 @@ struct tcm_loop_hba {
 	struct device dev;
 	struct Scsi_Host *sh;
 	struct tcm_loop_tpg tl_hba_tpgs[TL_TPGS_PER_HBA];
-	struct config_group tl_hba_group;
+	struct se_wwn_s tl_hba_wwn;
 };
