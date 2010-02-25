@@ -184,8 +184,7 @@ int tcm_loop_check_demo_mode_write_protect(se_portal_group_t *se_tpg)
 }
 
 void *tcm_loop_tpg_alloc_fabric_acl(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl)
+	se_portal_group_t *se_tpg)
 {
 	struct tcm_loop_nacl *tl_nacl;
 
@@ -194,17 +193,16 @@ void *tcm_loop_tpg_alloc_fabric_acl(
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_nacl\n");
 		return NULL;
 	}
-	tl_nacl->se_nacl = se_nacl;
 
-	return (void *)tl_nacl;
+	return &tl_nacl->se_node_acl;
 }
 
 void tcm_loop_tpg_release_fabric_acl(
 	se_portal_group_t *se_tpg,
 	se_node_acl_t *se_nacl)
 {
-	struct tcm_loop_nacl *tl_nacl =
-			(struct tcm_loop_nacl *)se_nacl->fabric_acl_ptr;
+	struct tcm_loop_nacl *tl_nacl = container_of(se_nacl,
+				struct tcm_loop_nacl, se_node_acl);
 
 	kfree(tl_nacl);
 }

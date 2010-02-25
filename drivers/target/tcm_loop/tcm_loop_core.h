@@ -33,7 +33,7 @@ struct tcm_loop_nexus {
 };
 
 struct tcm_loop_nacl {
-	struct se_node_acl_s *se_nacl;
+	struct se_node_acl_s se_node_acl;
 };
 
 struct tcm_loop_tpg {

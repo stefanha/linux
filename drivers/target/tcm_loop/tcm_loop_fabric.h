@@ -11,7 +11,8 @@ extern char *tcm_loop_parse_pr_out_transport_id(const char *, u32 *, char **);
 extern int tcm_loop_check_demo_mode(se_portal_group_t *);
 extern int tcm_loop_check_demo_mode_cache(se_portal_group_t *);
 extern int tcm_loop_check_demo_mode_write_protect(se_portal_group_t *);
-void *tcm_loop_tpg_alloc_fabric_acl(se_portal_group_t *, se_node_acl_t *);
+extern struct se_node_acl_s *tcm_loop_tpg_alloc_fabric_acl(
+				se_portal_group_t *);
 void tcm_loop_tpg_release_fabric_acl(se_portal_group_t *, se_node_acl_t *);
 #ifdef SNMP_SUPPORT
 extern u32 tcm_loop_tpg_get_inst_index(se_portal_group_t *);

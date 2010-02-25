@@ -545,10 +545,7 @@ int tcm_loop_register_configfs(void)
 	fabric->tf_ops.get_fabric_sense_len = &tcm_loop_get_fabric_sense_len;
 	fabric->tf_ops.is_state_remove = &tcm_loop_is_state_remove;
 	fabric->tf_ops.pack_lun = &tcm_loop_pack_lun;
-	/*
-	 *  TCM_Loop does not currently register any default configfs group(s)
-	 */
-	fabric->reg_default_groups_callback = NULL;
+
 	tf_cg = &fabric->tf_group;
 	/*
 	 * Setup function pointers for generic logic in target_core_fabric_configfs.c
