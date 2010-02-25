@@ -189,14 +189,15 @@ static struct config_group *target_core_register_fabric(
 	 */
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER tfc_wwn_cit -> %p\n",
 			&TF_CIT_TMPL(tf)->tfc_wwn_cit);
+
+	tf->tf_group.default_groups = tf->tf_default_groups;
+	tf->tf_group.default_groups[0] = &tf->tf_disc_group;
+	tf->tf_group.default_groups[1] = NULL;
+
 	config_group_init_type_name(&tf->tf_group, name,
 			&TF_CIT_TMPL(tf)->tfc_wwn_cit);
-	/*
-	 * Setup any default configfs groups in the top level directory of
-	 * this fabric module.
-	 */
-	if (tf->reg_default_groups_callback != NULL)
-		tf->reg_default_groups_callback(tf);
+	config_group_init_type_name(&tf->tf_disc_group, "discovery_auth",
+			&TF_CIT_TMPL(tf)->tfc_discovery_cit);
 
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> Allocated Fabric:"
 			" %s\n", tf->tf_group.cg_item.ci_name);
@@ -220,6 +221,9 @@ static void target_core_deregister_fabric(
 {
 	struct target_fabric_configfs *tf = container_of(
 		to_config_group(item), struct target_fabric_configfs, tf_group);
+	struct config_group *tf_group;
+	struct config_item *df_item;
+	int i;
 
 	printk(KERN_INFO "Target_Core_ConfigFS: DEREGISTER -> Looking up %s in"
 		" tf list\n", config_item_name(item));
@@ -234,6 +238,13 @@ static void target_core_deregister_fabric(
 
 	printk(KERN_INFO "Target_Core_ConfigFS: DEREGISTER -> Releasing ci"
 			" %s\n", config_item_name(item));
+
+	tf_group = &tf->tf_group;
+	for (i = 0; tf_group->default_groups[i]; i++) {
+		df_item = &tf_group->default_groups[i]->cg_item;
+		tf_group->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
 	config_item_put(item);
 }
 
@@ -344,7 +355,6 @@ void target_fabric_configfs_free(
 	list_del(&tf->tf_list);
 	mutex_unlock(&g_tf_lock);
 
-	kfree(tf->tf_group.default_groups);
 	kfree(tf);
 }
 EXPORT_SYMBOL(target_fabric_configfs_free);
@@ -443,7 +453,6 @@ void target_fabric_configfs_deregister(
 			" %s\n", tf->tf_name);
 	tf->tf_module = NULL;
 	tf->tf_subsys = NULL;
-	kfree(tf->tf_group.default_groups);
 	kfree(tf);
 
 	printk("<<<<<<<<<<<<<<<<<<<<<< END FABRIC API >>>>>>>>>>>>>>>>>"

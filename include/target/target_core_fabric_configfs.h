@@ -47,4 +47,16 @@ static struct target_fabric_wwn_attribute _fabric##_wwn_##_name =	\
 	__CONFIGFS_EATTR_RO(_name,					\
 	_fabric##_wwn_show_attr_##_name);
 
+CONFIGFS_EATTR_STRUCT(target_fabric_discovery, target_fabric_configfs);
+#define TF_DISC_ATTR(_fabric, _name, _mode)				\
+static struct target_fabric_discovery_attribute _fabric##_disc_##_name = \
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_disc_show_##_name,					\
+	_fabric##_disc_store_##_name);
+
+#define TF_DISC_ATTR_RO(_fabric, _name)					\
+static struct target_fabric_discovery_attribute _fabric##_disc_##_name = \
+	__CONFIGFS_EATTR_RO(_name,					\
+	_fabric##_disc_show_##_name);					
+
 extern int target_fabric_setup_cits(struct target_fabric_configfs *);

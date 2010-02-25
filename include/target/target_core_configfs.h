@@ -44,6 +44,7 @@ extern int target_core_init_configfs(void);
 extern void target_core_exit_configfs(void);
 
 struct target_fabric_configfs_template {
+	struct config_item_type tfc_discovery_cit;
 	struct config_item_type	tfc_wwn_cit;
 	struct config_item_type tfc_tpg_cit;
 	struct config_item_type tfc_tpg_base_cit;
@@ -59,9 +60,10 @@ struct target_fabric_configfs_template {
 struct target_fabric_configfs {
 	char			tf_name[TARGET_FABRIC_NAME_SIZE];
 	atomic_t		tf_access_cnt;
-	void (*reg_default_groups_callback)(struct target_fabric_configfs *);
 	struct list_head	tf_list;
 	struct config_group	tf_group;
+	struct config_group	tf_disc_group;
+	struct config_group	*tf_default_groups[2];
 	/* Pointer to fabric's config_item */
 	struct config_item	*tf_fabric;
 	/* Passed from fabric modules */
