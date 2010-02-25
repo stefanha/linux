@@ -647,11 +647,13 @@ typedef struct se_node_acl_s {
 	struct se_dev_entry_s	*device_list;
 	struct se_session_s	*nacl_sess;
 	struct se_portal_group_s *se_tpg;
-	void			*fabric_acl_ptr;
 	spinlock_t		device_list_lock;
 	spinlock_t		nacl_sess_lock;
 	struct config_group	acl_group;
+	struct config_group	acl_attrib_group;
+	struct config_group	acl_auth_group;
 	struct config_group	acl_param_group;
+	struct config_group	*acl_default_groups[4];
 	struct list_head	acl_list;
 } ____cacheline_aligned se_node_acl_t;
 

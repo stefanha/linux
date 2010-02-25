@@ -4,6 +4,50 @@
 
 #include <target/configfs_macros.h>
 
+CONFIGFS_EATTR_STRUCT(target_fabric_nacl_attrib, se_node_acl_s);
+#define TF_NACL_ATTRIB_ATTR(_fabric, _name, _mode)			\
+static struct target_fabric_nacl_attrib_attribute _fabric##_nacl_attrib_##_name = \
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_nacl_attrib_show_##_name,				\
+	_fabric##_nacl_attrib_store_##_name);
+
+CONFIGFS_EATTR_STRUCT(target_fabric_nacl_auth, se_node_acl_s);
+#define TF_NACL_AUTH_ATTR(_fabric, _name, _mode)			\
+static struct target_fabric_nacl_auth_attribute _fabric##_nacl_auth_##_name = \
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_nacl_auth_show_##_name,				\
+	_fabric##_nacl_auth_store_##_name);
+
+#define TF_NACL_AUTH_ATTR_RO(_fabric, _name)				\
+static struct target_fabric_nacl_auth_attribute _fabric##_nacl_auth_##_name = \
+	__CONFIGFS_EATTR_RO(_name,					\
+	_fabric##_nacl_auth_show_##_name);
+
+CONFIGFS_EATTR_STRUCT(target_fabric_nacl_param, se_node_acl_s);
+#define TF_NACL_PARAM_ATTR(_fabric, _name, _mode)			\
+static struct target_fabric_nacl_param_attribute _fabric##_nacl_param_##_name = \
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_nacl_param_show_##_name,				\
+	_fabric##_nacl_param_store_##_name);
+
+#define TF_NACL_PARAM_ATTR_RO(_fabric, _name)				\
+static struct target_fabric_nacl_param_attribute _fabric##_nacl_param_##_name = \
+	__CONFIGFS_EATTR_RO(_name,					\
+	_fabric##_nacl_param_show_##_name);
+
+
+CONFIGFS_EATTR_STRUCT(target_fabric_nacl_base, se_node_acl_s);
+#define TF_NACL_BASE_ATTR(_fabric, _name, _mode)			\
+static struct target_fabric_nacl_base_attribute _fabric##_nacl_##_name = \
+	__CONFIGFS_EATTR(_name, _mode,					\
+	_fabric##_nacl_show_##_name,					\
+	_fabric##_nacl_store_##_name);
+
+#define TF_NACL_BASE_ATTR_RO(_fabric, _name)				\
+static struct target_fabric_nacl_base_attribute _fabric##_nacl_##_name = \
+	__CONFIGFS_EATTR_RO(_name,					\
+	_fabric##_nacl_show_##_name);
+
 CONFIGFS_EATTR_STRUCT(target_fabric_np_base, se_tpg_np_s);
 #define TF_NP_BASE_ATTR(_fabric, _name, _mode)				\
 static struct target_fabric_np_base_attribute _fabric##_np_##_name =	\

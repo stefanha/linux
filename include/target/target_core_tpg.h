@@ -41,8 +41,10 @@ extern struct se_node_acl_s *core_tpg_check_initiator_node_acl(
 						unsigned char *);
 extern void core_tpg_free_node_acls(struct se_portal_group_s *);
 extern void core_tpg_clear_object_luns(struct se_portal_group_s *);
-extern se_node_acl_t *core_tpg_add_initiator_node_acl(se_portal_group_t *,
-						const char *, u32);
+extern struct se_node_acl_s *core_tpg_add_initiator_node_acl(
+					struct se_portal_group_s *,
+					struct se_node_acl_s *,
+					const char *, u32);
 extern int core_tpg_del_initiator_node_acl(se_portal_group_t *,
 						se_node_acl_t *, int);
 extern int core_tpg_set_initiator_node_queue_depth(se_portal_group_t *,

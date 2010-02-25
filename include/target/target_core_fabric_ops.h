@@ -16,8 +16,9 @@ struct target_core_fabric_ops {
 	int (*tpg_check_demo_mode)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_cache)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_write_protect)(struct se_portal_group_s *);
-	void *(*tpg_alloc_fabric_acl)(struct se_portal_group_s *,
-					struct se_node_acl_s *);
+	int (*tpg_check_prod_mode_write_protect)(struct se_portal_group_s *);
+	struct se_node_acl_s *(*tpg_alloc_fabric_acl)(
+					struct se_portal_group_s *);
 	void (*tpg_release_fabric_acl)(struct se_portal_group_s *,
 					struct se_node_acl_s *);
 	u32 (*tpg_get_inst_index)(struct se_portal_group_s *);
@@ -74,4 +75,7 @@ struct target_core_fabric_ops {
 	struct se_tpg_np_s *(*fabric_make_np)(struct se_portal_group_s *,
 				struct config_group *, const char *);
 	void (*fabric_drop_np)(struct se_tpg_np_s *);
+	struct se_node_acl_s *(*fabric_make_nodeacl)(struct se_portal_group_s *,
+				struct config_group *, const char *);
+	void (*fabric_drop_nodeacl)(struct se_node_acl_s *);
 };

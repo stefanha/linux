@@ -274,12 +274,9 @@ se_node_acl_t *core_tpg_check_initiator_node_acl(
 	if (!(TPG_TFO(tpg)->tpg_check_demo_mode(tpg)))
 		return NULL;
 
-	acl = kzalloc(sizeof(se_node_acl_t), GFP_KERNEL);
-	if (!(acl)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-			" se_node_acl_t.\n");
+	acl =  TPG_TFO(tpg)->tpg_alloc_fabric_acl(tpg);
+	if (!(acl))
 		return NULL;
-	}
 
 	INIT_LIST_HEAD(&acl->acl_list);
 	spin_lock_init(&acl->device_list_lock);
@@ -293,24 +290,16 @@ se_node_acl_t *core_tpg_check_initiator_node_acl(
 #endif /* SNMP_SUPPORT */
 	acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
 
-	acl->fabric_acl_ptr = TPG_TFO(tpg)->tpg_alloc_fabric_acl(tpg,
-			acl);
-	if (!(acl->fabric_acl_ptr)) {
-		kfree(acl);
-		return NULL;
-	}
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
 
 	if (core_create_device_list_for_node(acl) < 0) {
 		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
-		kfree(acl);
 		return NULL;
 	}
 
 	if (core_set_queue_depth_for_node(tpg, acl) < 0) {
 		core_free_device_list_for_node(acl, tpg);
 		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
-		kfree(acl);
 		return NULL;
 	}
 
@@ -379,8 +368,9 @@ EXPORT_SYMBOL(core_tpg_clear_object_luns);
  *
  *
  */
-se_node_acl_t *core_tpg_add_initiator_node_acl(
-	se_portal_group_t *tpg,
+struct se_node_acl_s *core_tpg_add_initiator_node_acl(
+	struct se_portal_group_s *tpg,
+	struct se_node_acl_s *se_nacl,
 	const char *initiatorname,
 	u32 queue_depth)
 {
@@ -395,6 +385,14 @@ se_node_acl_t *core_tpg_add_initiator_node_acl(
 				" for %s\n", TPG_TFO(tpg)->get_fabric_name(),
 				TPG_TFO(tpg)->tpg_get_tag(tpg), initiatorname);
 			spin_unlock_bh(&tpg->acl_node_lock);
+			/*
+			 * Release the locally allocated struct se_node_acl_s
+			 * because * core_tpg_add_initiator_node_acl() returned
+			 * a pointer to an existing demo mode node ACL.
+			 */
+			if (se_nacl)
+				TPG_TFO(tpg)->tpg_release_fabric_acl(tpg,
+							se_nacl);
 			goto done;
 		}
 
@@ -407,11 +405,16 @@ se_node_acl_t *core_tpg_add_initiator_node_acl(
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);
 
-	acl = kzalloc(sizeof(se_node_acl_t), GFP_KERNEL);
-	if (!(acl)) {
-		printk(KERN_ERR "Unable to allocate memory for senode_acl_t.\n");
-		return ERR_PTR(-ENOMEM);
+	if (!(se_nacl)) {
+		printk("struct se_node_acl_s pointer is NULL\n");
+		return ERR_PTR(-EINVAL);
 	}
+	/*
+	 * For v4.x logic the se_node_acl_s is hanging off a fabric
+	 * dependent structure allocated via
+	 * struct target_core_fabric_ops->fabric_make_nodeacl()
+	 */
+	acl = se_nacl;
 
 	INIT_LIST_HEAD(&acl->acl_list);
 	spin_lock_init(&acl->device_list_lock);
@@ -423,25 +426,17 @@ se_node_acl_t *core_tpg_add_initiator_node_acl(
 	acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
 	spin_lock_init(&acl->stats_lock);
 #endif /* SNMP_SUPPORT */
-
-	acl->fabric_acl_ptr = TPG_TFO(tpg)->tpg_alloc_fabric_acl(tpg,
-			acl);
-	if (!(acl->fabric_acl_ptr)) {
-		kfree(acl);
-		return ERR_PTR(-ENOMEM);
-	}
+	
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
 
 	if (core_create_device_list_for_node(acl) < 0) {
 		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
-		kfree(acl);
 		return ERR_PTR(-ENOMEM);
 	}
 
 	if (core_set_queue_depth_for_node(tpg, acl) < 0) {
 		core_free_device_list_for_node(acl, tpg);
 		TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
-		kfree(acl);
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -505,9 +500,6 @@ int core_tpg_del_initiator_node_acl(
 
 	core_clear_initiator_node_from_tpg(acl, tpg);
 	core_free_device_list_for_node(acl, tpg);
-
-	TPG_TFO(tpg)->tpg_release_fabric_acl(tpg, acl);
-	acl->fabric_acl_ptr = NULL;
 
 	printk(KERN_INFO "%s_TPG[%hu] - Deleted ACL with TCQ Depth: %d for %s"
 		" Initiator Node: %s\n", TPG_TFO(tpg)->get_fabric_name(),
