@@ -100,7 +100,8 @@ u32 iscsi_handle_authentication(
 					" CHAP auth\n");
 			return -1;
 		}
-		iscsi_nacl = (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
+		iscsi_nacl = container_of(se_nacl, iscsi_node_acl_t,
+				se_node_acl);
 		if (!(iscsi_nacl)) {
 			printk(KERN_ERR "Unable to locate iscsi_node_acl_t for"
 					" CHAP auth\n");
@@ -112,7 +113,7 @@ u32 iscsi_handle_authentication(
 		/*
 		 * For SessionType=Discovery
 		 */
-		auth = &iscsi_global->discovery_auth;	
+		auth = &iscsi_global->discovery_acl.node_auth;	
 	}
 
 #ifdef SNMP_SUPPORT

@@ -12,8 +12,8 @@ extern char *lio_tpg_parse_pr_out_transport_id(const char *, u32 *, char **);
 extern int lio_tpg_check_demo_mode(struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_cache(struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_write_protect(struct se_portal_group_s *);
-extern void *lio_tpg_alloc_fabric_acl(struct se_portal_group_s *,
-			struct se_node_acl_s *);
+extern int lio_tpg_check_prod_mode_write_protect(struct se_portal_group_s *);
+extern struct se_node_acl_s *lio_tpg_alloc_fabric_acl(struct se_portal_group_s *);
 extern void lio_tpg_release_fabric_acl(struct se_portal_group_s *,
 			struct se_node_acl_s *);
 extern int lio_tpg_shutdown_session(struct se_session_s *);

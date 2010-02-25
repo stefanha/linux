@@ -735,7 +735,6 @@ typedef struct iscsi_node_attrib_s {
 	u32			tmr_cold_reset;
 	u32			tmr_warm_reset;
 	struct iscsi_node_acl_s *nacl;
-	struct config_group	acl_attrib_group;
 } ____cacheline_aligned iscsi_node_attrib_t;
 
 struct se_dev_entry_s;
@@ -750,13 +749,12 @@ typedef struct iscsi_node_auth_s {
 	char			password[MAX_PASS_LEN];
 	char			userid_mutual[MAX_USER_LEN];
 	char			password_mutual[MAX_PASS_LEN];
-	struct config_group	auth_attrib_group;
 } ____cacheline_aligned iscsi_node_auth_t;
 
 typedef struct iscsi_node_acl_s {
 	iscsi_node_attrib_t	node_attrib;
 	iscsi_node_auth_t	node_auth;
-	struct se_node_acl_s	*se_node_acl;
+	struct se_node_acl_s	se_node_acl;
 } ____cacheline_aligned iscsi_node_acl_t;
 
 #define ISCSI_NODE_ATTRIB(t)	(&(t)->node_attrib)
@@ -933,7 +931,7 @@ typedef struct iscsi_global_s {
 	/* Semaphore used for allocate of iscsi_conn_t->auth_id */
 	struct semaphore	auth_id_sem;
 	/* Used for iSCSI discovery session authentication */
-	iscsi_node_auth_t	discovery_auth;
+	iscsi_node_acl_t	discovery_acl;
 	iscsi_portal_group_t	*discovery_tpg;
 #ifdef DEBUG_ERL
 	iscsi_debug_erl_t	*debug_erl;

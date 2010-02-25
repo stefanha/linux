@@ -347,9 +347,16 @@ int lio_tpg_check_demo_mode_write_protect(se_portal_group_t *se_tpg)
 	return ISCSI_TPG_ATTRIB(tpg)->demo_mode_write_protect;
 }
 
-void *lio_tpg_alloc_fabric_acl(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl)
+int lio_tpg_check_prod_mode_write_protect(se_portal_group_t *se_tpg)
+{
+	iscsi_portal_group_t *tpg =
+			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
+
+	return ISCSI_TPG_ATTRIB(tpg)->prod_mode_write_protect;
+}
+
+struct se_node_acl_s *lio_tpg_alloc_fabric_acl(
+	se_portal_group_t *se_tpg)
 {
 	iscsi_node_acl_t *acl;
 
@@ -358,16 +365,16 @@ void *lio_tpg_alloc_fabric_acl(
 		printk(KERN_ERR "Unable to allocate memory for iscsi_node_acl_t\n");
 		return NULL;
 	}
-	acl->se_node_acl = se_nacl;
 
-	return acl;
+	return &acl->se_node_acl;
 }
 
 void lio_tpg_release_fabric_acl(
 	se_portal_group_t *se_tpg,
 	se_node_acl_t *se_acl)
 {
-	iscsi_node_acl_t *acl = (iscsi_node_acl_t *)se_acl->fabric_acl_ptr;
+	struct iscsi_node_acl_s *acl = container_of(se_acl,
+			struct iscsi_node_acl_s, se_node_acl);
 	kfree(acl);
 }
 
@@ -439,7 +446,8 @@ u32 lio_tpg_get_inst_index(se_portal_group_t *se_tpg)
 
 void lio_set_default_node_attributes(se_node_acl_t *se_acl)
 {
-	iscsi_node_acl_t *acl = (iscsi_node_acl_t *)se_acl->fabric_acl_ptr;
+	iscsi_node_acl_t *acl = container_of(se_acl, iscsi_node_acl_t,
+				se_node_acl);
 
 	ISCSI_NODE_ATTRIB(acl)->nacl = acl;
 	iscsi_set_default_node_attribues(acl);
@@ -890,45 +898,13 @@ int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *tpg, int force)
 	return 0;
 }
 
-/*	iscsi_tpg_add_initiator_node_acl():
- *
- *
- */
-iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl(
-	iscsi_portal_group_t *tpg,
-	const char *initiatorname,
-	u32 queue_depth)
-{
-	se_node_acl_t *se_nacl;
-
-	se_nacl = core_tpg_add_initiator_node_acl(&tpg->tpg_se_tpg,
-			initiatorname, queue_depth);
-	if ((IS_ERR(se_nacl)) || !(se_nacl))
-		return NULL;
-
-	return (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
-}
-
-/*	iscsi_tpg_del_initiator_node_acl():
- *
- *
- */
-void iscsi_tpg_del_initiator_node_acl(
-	iscsi_portal_group_t *tpg,
-	se_node_acl_t *se_nacl)
-{
-	/*
-	 * TPG_TFO(tpg)->tpg_release_acl() will kfree the iscsi_node_acl_t..
-	 */
-	core_tpg_del_initiator_node_acl(&tpg->tpg_se_tpg, se_nacl, 1);
-}
-
 iscsi_node_attrib_t *iscsi_tpg_get_node_attrib(
 	iscsi_session_t *sess)
 {
 	se_session_t *se_sess = sess->se_sess;
 	se_node_acl_t *se_nacl = se_sess->se_node_acl;
-	iscsi_node_acl_t *acl = (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
+	iscsi_node_acl_t *acl = container_of(se_nacl, iscsi_node_acl_t,
+					se_node_acl);
 
 	return &acl->node_attrib;
 }

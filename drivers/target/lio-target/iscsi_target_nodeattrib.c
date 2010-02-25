@@ -136,7 +136,7 @@ extern int iscsi_na_nopin_timeout(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 	iscsi_session_t *sess;
 	iscsi_conn_t *conn;
-	se_node_acl_t *se_nacl = a->nacl->se_node_acl;
+	se_node_acl_t *se_nacl = &a->nacl->se_node_acl;
 	se_session_t *se_sess;
 	u32 orig_nopin_timeout = a->nopin_timeout;
 
