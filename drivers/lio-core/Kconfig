@@ -1,7 +1,0 @@
-config LIO_TARGET
-        tristate "Linux-iSCSI.org iSCSI Target Mode Stack"
-        default m
-        depends on TARGET_CORE
-	select CONFIGFS_FS
-        ---help---
-        Say Y here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI Target Mode Stack
