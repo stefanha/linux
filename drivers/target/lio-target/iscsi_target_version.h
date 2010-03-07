@@ -1,6 +1,6 @@
 #ifndef ISCSI_TARGET_VERSION_H
 #define ISCSI_TARGET_VERSION_H
 
-#define PYX_ISCSI_VERSION		"v3.2.2"
+#define PYX_ISCSI_VERSION		"v3.3.0"
 
 #endif   /*** ISCSI_TARGET_VERSION_H ***/
