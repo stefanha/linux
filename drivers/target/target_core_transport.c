@@ -3224,6 +3224,10 @@ void transport_generic_request_failure(
 			CMD_TFO(cmd)->queue_status(cmd);
 
 		goto check_stop;
+
+	case PYX_TRANSPORT_ILLEGAL_REQUEST:
+		cmd->scsi_sense_reason = ILLEGAL_REQUEST;
+		break;
 	default:
 		printk(KERN_ERR "Unknown transport error for CDB 0x%02x: %d\n",
 			T_TASK(cmd)->t_task_cdb[0],
