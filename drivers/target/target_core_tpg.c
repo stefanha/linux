@@ -506,7 +506,6 @@ int core_tpg_del_initiator_node_acl(
 		TPG_TFO(tpg)->tpg_get_tag(tpg), acl->queue_depth,
 		TPG_TFO(tpg)->get_fabric_name(), acl->initiatorname);
 
-	kfree(acl);
 	return 0;
 }
 EXPORT_SYMBOL(core_tpg_del_initiator_node_acl);
