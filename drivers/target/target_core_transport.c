@@ -5563,14 +5563,17 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_none;
 		transport_get_maps(cmd);
-
-		ret = T10_RES(su_dev)->t10_reserve(cmd);
-		if (ret != 0) {
-			if (ret > 0)
-				return 5; /* RESERVATION_CONFILIT */
-			else
-				return 7; /* ILLEGAL_REQUEST */
-		}
+		/*
+		 * Setup the legacy emulated handler for SPC-2 and
+		 * >= SPC-3 compatible reservation handling (CRH=1)
+		 * Otherwise, we assume the underlying SCSI logic is
+		 * is running in SPC_PASSTHROUGH, and wants reservations
+		 * emulation disabled.
+		 */
+		cmd->transport_emulate_cdb =
+				(T10_RES(su_dev)->res_type !=
+				 SPC_PASSTHROUGH) ?
+				&core_scsi2_emulate_crh : NULL;
 		ret = 3;
 		break;
 	case RELEASE:
@@ -5588,8 +5591,10 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_none;
 		transport_get_maps(cmd);
-
-		T10_RES(su_dev)->t10_release(cmd);
+		cmd->transport_emulate_cdb =
+				(T10_RES(su_dev)->res_type !=
+				 SPC_PASSTHROUGH) ?
+				&core_scsi2_emulate_crh : NULL;
 		ret = 3;
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
