@@ -383,6 +383,18 @@ int core_tmr_lun_reset(
 		spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
 	}
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
+	/*
+	 * Clear any legacy SPC-2 reservation when called during
+	 * LOGICAL UNIT RESET
+	 */
+	if (!(preempt_and_abort_list) &&
+	     (dev->dev_flags & DF_SPC2_RESERVATIONS)) {
+		spin_lock(&dev->dev_reservation_lock);
+		dev->dev_reserved_node_acl = NULL;
+		dev->dev_flags &= ~DF_SPC2_RESERVATIONS;
+		spin_unlock(&dev->dev_reservation_lock);
+		printk(KERN_INFO "LUN_RESET: SCSI-2 Released reservation\n");	
+	}	
 
 #ifdef SNMP_SUPPORT
 	spin_lock(&dev->stats_lock);

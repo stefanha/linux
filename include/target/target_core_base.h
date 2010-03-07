@@ -379,8 +379,6 @@ typedef struct t10_reservation_template_s {
 	struct list_head registration_list;
 	struct list_head aptpl_reg_list;
 	int (*t10_reservation_check)(struct se_cmd_s *, u32 *);
-	int (*t10_reserve)(struct se_cmd_s *);
-	int (*t10_release)(struct se_cmd_s *);
 	int (*t10_seq_non_holder)(struct se_cmd_s *, unsigned char *, u32);
 	int (*t10_pr_register)(struct se_cmd_s *);
 	int (*t10_pr_clear)(struct se_cmd_s *);
