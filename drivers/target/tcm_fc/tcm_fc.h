@@ -1,0 +1,217 @@
+/*
+ * Copyright (c) 2010 Cisco Systems, Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+#ifndef __TCM_FC_H__
+#define __TCM_FC_H__
+
+#define FT_VERSION "0.1"
+
+#define FT_NAMELEN 32		/* length of ASCII WWPNs including pad */
+#define FT_TPG_NAMELEN 32	/* max length of TPG name */
+#define FT_LUN_NAMELEN 32	/* max length of LUN name */
+
+/*
+ * Debug options.
+ */
+#define FT_DEBUG_CONF	0x01	/* configuration messages */
+#define	FT_DEBUG_SESS	0x02	/* session messages */
+#define	FT_DEBUG_IO	0x04	/* I/O operations */
+
+extern unsigned int ft_debug_logging;	/* debug options */
+
+#define FT_DEBUG(mask, fmt, args...) 					\
+	do {								\
+		if (ft_debug_logging & (mask))				\
+			printk(KERN_INFO "tcm_fc: %s: " fmt, 		\
+			       __func__, ##args);			\
+	} while (0)
+
+#define	FT_CONF_DBG(fmt, args...)	FT_DEBUG(FT_DEBUG_CONF, fmt, ##args)
+#define	FT_SESS_DBG(fmt, args...)	FT_DEBUG(FT_DEBUG_SESS, fmt, ##args)
+#define	FT_IO_DBG(fmt, args...)		FT_DEBUG(FT_DEBUG_IO, fmt, ##args)
+
+struct ft_transport_id {
+	__u8	format;
+	__u8	__resvd1[7];
+	__u8	wwpn[8];
+	__u8	__resvd2[8];
+} __attribute__((__packed__));
+
+/*
+ * Session (remote port).
+ */
+struct ft_sess {
+	u32 port_id;			/* for hash lookup use only */
+	u32 params;
+	u16 max_frame;			/* maximum frame size */
+	u64 port_name;			/* port name for transport ID */
+	struct ft_tport *tport;
+	struct se_session_s *se_sess;
+	struct hlist_node hash;		/* linkage in ft_sess_hash table */
+	struct rcu_head rcu;
+	struct kref kref;		/* ref for hash and outstanding I/Os */
+};
+
+/*
+ * Hash table of sessions per local port.
+ * Hash lookup by remote port FC_ID.
+ */
+#define	FT_SESS_HASH_BITS	6
+#define	FT_SESS_HASH_SIZE	(1 << FT_SESS_HASH_BITS)
+
+/*
+ * Per local port data.
+ * This is created when the first session logs into the local port.
+ * Deleted when tpg is deleted or last session is logged off.
+ */
+struct ft_tport {
+	struct ft_tpg *tpg;		/* target port group */
+	u32	sess_count;		/* number of sessions in hash */
+	struct rcu_head rcu;
+	struct hlist_head hash[FT_SESS_HASH_SIZE];	/* list of sessions */
+};
+
+/*
+ * Node ID and authentication.
+ */
+struct ft_node_auth {
+	u64	port_name;
+	u64	node_name;
+};
+
+/*
+ * Node ACL for FC remote port session.
+ */
+struct ft_node_acl {
+	struct ft_node_auth node_auth;
+	struct se_node_acl_s *se_node_acl;
+
+	struct config_group auth_group;
+	struct config_group *groups[2];	/* NULL-terminator pointers to above */
+
+	/*
+	 * The configfs group holding the acl itself is temporarily
+	 * allocated here.  The one in se_acl->acl_group is intended for
+	 * this but it is freed at the wrong time, maybe.
+	 */
+	struct config_group group;	/* group for ACL */
+};
+
+struct ft_lun {
+	u32 index;
+	char name[FT_LUN_NAMELEN];
+};
+
+struct ft_lun_acl_group {
+	struct se_lun_acl_s *lun_acl;
+	struct config_group group;
+};
+
+/*
+ * Target portal group (local port).
+ */
+struct ft_tpg {
+	u32 index;
+	struct ft_lport_acl *lport_acl;
+	struct fc_lport *fc_lport;
+	struct list_head list;		/* linkage in ft_lport_acl tpg_list */
+	struct list_head lun_list;	/* head of LUNs */
+	struct se_portal_group_s *se_tpg;
+	struct config_group lun_group;	/* lun subdir */
+	struct config_group acl_group;	/* acl subdir */
+	struct config_group *groups[3];	/* pointers to subdirs, NULL-term */
+
+	struct task_struct *thread;	/* processing thread */
+	struct se_queue_obj_s qobj;	/* queue for processing thread */
+};
+
+struct ft_lport_acl {
+	u64 wwpn;
+	char name[FT_NAMELEN];
+	struct list_head list;
+	struct list_head tpg_list;
+	struct config_group group;
+};
+
+enum ft_cmd_state {
+	FC_CMD_ST_NEW = 0,
+	FC_CMD_ST_REJ
+};
+
+/*
+ * Commands
+ */
+struct ft_cmd {
+	enum ft_cmd_state state;
+	u16 lun;			/* LUN from request */
+	struct ft_sess *sess;		/* session held for cmd */
+	struct fc_seq *seq;		/* sequence in exchange mgr */
+	struct se_cmd_s *se_cmd;
+	struct fc_frame *req_frame;
+	unsigned char *cdb;		/* pointer to CDB inside frame */
+	u32 write_data_len;		/* data received on writes */
+	struct se_queue_req_s se_req;
+};
+
+extern struct list_head ft_lport_list;
+extern struct mutex ft_lport_lock;
+extern struct fc4_prov ft_prov;
+extern struct target_fabric_configfs *ft_configfs;
+
+/*
+ * Fabric methods.
+ */
+
+/*
+ * Session ops.
+ */
+void ft_sess_put(struct ft_sess *);
+int ft_sess_shutdown(struct se_session_s *);
+void ft_sess_close(struct se_session_s *);
+void ft_sess_stop(struct se_session_s *, int, int);
+int ft_sess_logged_in(struct se_session_s *);
+u32 ft_sess_get_index(struct se_session_s *);
+u32 ft_sess_get_port_name(struct se_session_s *, unsigned char *, u32);
+void ft_sess_set_erl0(struct se_session_s *);
+
+/*
+ * IO methods.
+ */
+void ft_release_cmd(struct se_cmd_s *);
+int ft_queue_status(struct se_cmd_s *);
+int ft_queue_data_in(struct se_cmd_s *);
+int ft_write_pending(struct se_cmd_s *);
+int ft_write_pending_status(struct se_cmd_s *);
+u32 ft_get_task_tag(struct se_cmd_s *);
+int ft_get_cmd_state(struct se_cmd_s *);
+void ft_new_cmd_failure(struct se_cmd_s *);
+int ft_queue_tm_resp(struct se_cmd_s *);
+int ft_is_state_remove(struct se_cmd_s *);
+
+/*
+ * other internal functions.
+ */
+int ft_thread(void *);
+void ft_recv_req(struct ft_sess *, struct fc_seq *, struct fc_frame *);
+struct ft_tpg *ft_lport_find_tpg(struct fc_lport *);
+struct ft_node_acl *ft_acl_get(struct ft_tpg *, struct fc_rport_priv *);
+
+void ft_recv_write_data(struct ft_cmd *, struct fc_frame *);
+void ft_dump_cmd(struct ft_cmd *, const char *caller);
+
+ssize_t ft_format_wwn(char *, size_t, u64);
+
+#endif /* __TCM_FC_H__ */
