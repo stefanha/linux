@@ -469,7 +469,7 @@ static void ft_recv_cmd(struct ft_sess *sess,
 {
 	struct ft_cmd *cmd;
 
-	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
+	cmd = kzalloc(sizeof(*cmd), GFP_ATOMIC);
 	if (!cmd)
 		goto busy;
 	cmd->sess = sess;

@@ -791,7 +791,10 @@ static void ft_del_tpg(struct config_group *group, struct config_item *item)
 
 	mutex_lock(&ft_lport_lock);
 	list_del(&tpg->list);
-	BUG_ON(tpg->fc_lport);
+	if (tpg->tport) {
+		tpg->tport->tpg = NULL;
+		tpg->tport = NULL;
+	}
 	mutex_unlock(&ft_lport_lock);
 
 	config_item_put(item);
