@@ -148,6 +148,7 @@ struct ft_lport_acl {
 
 enum ft_cmd_state {
 	FC_CMD_ST_NEW = 0,
+	FC_CMD_ST_TM,
 	FC_CMD_ST_REJ
 };
 
