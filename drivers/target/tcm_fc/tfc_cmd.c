@@ -373,9 +373,9 @@ static void ft_send_resp_code(struct ft_cmd *cmd, enum fcp_resp_rsp_codes code)
 }
 
 /*
- * Handle incoming Task Management Request.
+ * Handle Task Management Request.
  */
-static void ft_recv_tm(struct ft_cmd *cmd)
+static void ft_send_tm(struct ft_cmd *cmd)
 {
 	struct se_tmr_req_s *tmr;
 	struct fcp_cmnd *fcp;
@@ -424,18 +424,7 @@ static void ft_recv_tm(struct ft_cmd *cmd)
 		return;
 	}
 	cmd->se_cmd->se_tmr_req = tmr;
-	cmd->state = FC_CMD_ST_TM;
-	ft_queue_cmd(cmd->sess, cmd);
-}
-
-/*
- * Send task management request to target.
- */
-static void ft_send_tm(struct ft_cmd *cmd)
-{
-	struct se_cmd_s *se_cmd = cmd->se_cmd;
-
-	transport_generic_handle_tmr(se_cmd);
+	transport_generic_handle_tmr(cmd->se_cmd);
 }
 
 /*
@@ -478,12 +467,7 @@ int ft_queue_tm_resp(struct se_cmd_s *se_cmd)
 static void ft_recv_cmd(struct ft_sess *sess,
 			struct fc_seq *sp, struct fc_frame *fp)
 {
-	struct fcp_cmnd *fcp;
 	struct ft_cmd *cmd;
-	int ret;
-	int data_dir;
-	u32 data_len;
-	int task_attr;
 
 	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
 	if (!cmd)
@@ -491,66 +475,7 @@ static void ft_recv_cmd(struct ft_sess *sess,
 	cmd->sess = sess;
 	cmd->seq = sp;
 	cmd->req_frame = fp;		/* hold frame during cmd */
-
-	fcp = fc_frame_payload_get(fp, sizeof(*fcp));
-	if (!fcp)
-		goto err;
-
-	if (fcp->fc_flags & FCP_CFL_LEN_MASK)
-		goto err;		/* not handling longer CDBs yet */
-
-	if (fcp->fc_tm_flags) {
-		task_attr = FCP_PTA_SIMPLE;
-		data_dir = SE_DIRECTION_NONE;
-		data_len = 0;
-	} else {
-		switch (fcp->fc_flags & (FCP_CFL_RDDATA | FCP_CFL_WRDATA)) {
-		case 0:
-			data_dir = SE_DIRECTION_NONE;
-			break;
-		case FCP_CFL_RDDATA:
-			data_dir = SE_DIRECTION_READ;
-			break;
-		case FCP_CFL_WRDATA:
-			data_dir = SE_DIRECTION_WRITE;
-			break;
-		case FCP_CFL_WRDATA | FCP_CFL_RDDATA:
-			goto err;	/* TBD not supported by tcm_fc yet */
-		}
-
-		/* FCP_PTA_ maps 1:1 to TASK_ATTR_ */
-		task_attr = fcp->fc_pri_ta & FCP_PTA_MASK;
-		data_len = ntohl(fcp->fc_dl);
-		cmd->cdb = fcp->fc_cdb;
-	}
-
-	cmd->se_cmd = transport_alloc_se_cmd(&ft_configfs->tf_ops,
-					     sess->se_sess, cmd, data_len,
-					     data_dir, task_attr);
-	if (!cmd->se_cmd) {
-		kfree(cmd);
-		goto busy;
-	}
-
-	if (fcp->fc_tm_flags) {
-		ft_recv_tm(cmd);
-		return;
-	}
-
-	fc_seq_exch(sp)->lp->tt.seq_set_resp(sp, ft_recv_seq, cmd);
-
-	ret = ft_get_lun_for_cmd(cmd, fcp->fc_lun);
-	if (ret < 0) {
-		ft_dump_cmd(cmd, __func__);
-		transport_send_check_condition_and_sense(cmd->se_cmd,
-			cmd->se_cmd->scsi_sense_reason, 0);
-		return;
-	}
 	ft_queue_cmd(sess, cmd);
-	return;
-
-err:
-	ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
 	return;
 
 busy:
@@ -593,8 +518,72 @@ void ft_recv_req(struct ft_sess *sess, struct fc_seq *sp, struct fc_frame *fp)
 static void ft_send_cmd(struct ft_cmd *cmd)
 {
 	struct fc_frame_header *fh = fc_frame_header_get(cmd->req_frame);
-	struct se_cmd_s *se_cmd = cmd->se_cmd;
+	struct se_cmd_s *se_cmd;
+	struct fcp_cmnd *fcp;
+	int data_dir;
+	u32 data_len;
+	int task_attr;
 	int ret;
+
+	fcp = fc_frame_payload_get(cmd->req_frame, sizeof(*fcp));
+	if (!fcp)
+		goto err;
+
+	if (fcp->fc_flags & FCP_CFL_LEN_MASK)
+		goto err;		/* not handling longer CDBs yet */
+
+	if (fcp->fc_tm_flags) {
+		task_attr = FCP_PTA_SIMPLE;
+		data_dir = SE_DIRECTION_NONE;
+		data_len = 0;
+	} else {
+		switch (fcp->fc_flags & (FCP_CFL_RDDATA | FCP_CFL_WRDATA)) {
+		case 0:
+			data_dir = SE_DIRECTION_NONE;
+			break;
+		case FCP_CFL_RDDATA:
+			data_dir = SE_DIRECTION_READ;
+			break;
+		case FCP_CFL_WRDATA:
+			data_dir = SE_DIRECTION_WRITE;
+			break;
+		case FCP_CFL_WRDATA | FCP_CFL_RDDATA:
+			goto err;	/* TBD not supported by tcm_fc yet */
+		}
+
+		/* FCP_PTA_ maps 1:1 to TASK_ATTR_ */
+		task_attr = fcp->fc_pri_ta & FCP_PTA_MASK;
+		data_len = ntohl(fcp->fc_dl);
+		cmd->cdb = fcp->fc_cdb;
+	}
+
+	se_cmd = transport_alloc_se_cmd(&ft_configfs->tf_ops,
+					cmd->sess->se_sess, cmd, data_len,
+					data_dir, task_attr);
+	if (!se_cmd) {
+		FT_IO_DBG("se_cmd allocation failure - sending BUSY\n");
+		ft_send_resp_status(cmd->seq, SAM_STAT_BUSY, 0);
+		fc_frame_free(cmd->req_frame);
+		ft_sess_put(cmd->sess);		/* undo get from lookup */
+		kfree(cmd);
+		return;
+	}
+	cmd->se_cmd = se_cmd;
+
+	if (fcp->fc_tm_flags) {
+		ft_send_tm(cmd);
+		return;
+	}
+
+	fc_seq_exch(cmd->seq)->lp->tt.seq_set_resp(cmd->seq, ft_recv_seq, cmd);
+
+	ret = ft_get_lun_for_cmd(cmd, fcp->fc_lun);
+	if (ret < 0) {
+		ft_dump_cmd(cmd, __func__);
+		transport_send_check_condition_and_sense(cmd->se_cmd,
+			cmd->se_cmd->scsi_sense_reason, 0);
+		return;
+	}
 
 	ret = transport_generic_allocate_tasks(se_cmd, cmd->cdb);
 
@@ -617,6 +606,11 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 		return;
 	}
 	transport_generic_handle_cdb(se_cmd);
+	return;
+
+err:
+	ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
+	return;
 }
 
 /*
@@ -628,9 +622,6 @@ static void ft_exec_req(struct ft_cmd *cmd)
 	switch (cmd->state) {
 	case FC_CMD_ST_NEW:
 		ft_send_cmd(cmd);
-		break;
-	case FC_CMD_ST_TM:
-		ft_send_tm(cmd);
 		break;
 	default:
 		break;
