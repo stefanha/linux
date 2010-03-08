@@ -44,6 +44,7 @@
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_hba.h>
+#include <target/target_core_tpg.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
@@ -620,6 +621,39 @@ int core_tpg_set_initiator_node_queue_depth(
 }
 EXPORT_SYMBOL(core_tpg_set_initiator_node_queue_depth);
 
+static int core_tpg_setup_virtual_lun0(struct se_portal_group_s *se_tpg)
+{
+	/* Set in core_dev_setup_virtual_lun0() */
+	struct se_device_s *dev = se_global->g_lun0_dev;
+	struct se_lun_s *lun = &se_tpg->tpg_virt_lun0;
+	u32 lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
+	int ret;
+
+	lun->unpacked_lun = 0;	
+	lun->lun_type_ptr = NULL;
+	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
+	atomic_set(&lun->lun_acl_count, 0);
+	INIT_LIST_HEAD(&lun->lun_acl_list);
+	INIT_LIST_HEAD(&lun->lun_cmd_list);
+	spin_lock_init(&lun->lun_acl_lock);
+	spin_lock_init(&lun->lun_cmd_lock);
+	spin_lock_init(&lun->lun_sep_lock);
+
+	ret = core_tpg_post_addlun(se_tpg, lun, TRANSPORT_LUN_TYPE_DEVICE,	
+			lun_access, dev, dev->dev_obj_api);
+	if (ret < 0)
+		return -1;
+
+	return 0;
+}
+
+static void core_tpg_release_virtual_lun0(struct se_portal_group_s *se_tpg)
+{
+	struct se_lun_s *lun = &se_tpg->tpg_virt_lun0;
+
+	core_tpg_post_dellun(se_tpg, lun);
+}
+
 int core_tpg_register(
 	struct target_core_fabric_ops *tfo,
 	struct se_wwn_s *se_wwn,
@@ -662,6 +696,13 @@ int core_tpg_register(
 	spin_lock_init(&se_tpg->session_lock);
 	spin_lock_init(&se_tpg->tpg_lun_lock);
 
+	if (se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) {
+		if (core_tpg_setup_virtual_lun0(se_tpg) < 0) {
+			kfree(se_tpg);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
+
 	spin_lock_bh(&se_global->se_tpg_lock);
 	list_add_tail(&se_tpg->se_tpg_list, &se_global->g_se_tpg_list);
 	spin_unlock_bh(&se_global->se_tpg_lock);
@@ -688,6 +729,9 @@ int core_tpg_deregister(se_portal_group_t *se_tpg)
 	spin_lock_bh(&se_global->se_tpg_lock);
 	list_del(&se_tpg->se_tpg_list);
 	spin_unlock_bh(&se_global->se_tpg_lock);
+
+	if (se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL)
+		core_tpg_release_virtual_lun0(se_tpg);
 
 	se_tpg->se_tpg_fabric_ptr = NULL;
 	kfree(se_tpg->tpg_lun_list);

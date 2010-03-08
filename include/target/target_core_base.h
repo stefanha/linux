@@ -956,6 +956,7 @@ typedef struct se_portal_group_s {
 	/* linked list for initiator ACL list */
 	struct list_head	acl_node_list;
 	struct se_lun_s		*tpg_lun_list;
+	struct se_lun_s		tpg_virt_lun0;
 	/* List of TCM sessions assoicated wth this TPG */
 	struct list_head	tpg_sess_list;
 	/* Pointer to $FABRIC_MOD dependent code */
@@ -993,6 +994,9 @@ typedef struct se_global_s {
 	struct list_head	g_se_tpg_list;
 	struct list_head	g_hba_list;
 	struct list_head	g_se_dev_list;
+	struct se_hba_s		*g_lun0_hba;
+	struct se_subsystem_dev_s *g_lun0_su_dev;
+	struct se_device_s	*g_lun0_dev;
 	struct se_plugin_class_s *plugin_class_list;
 	t10_alua_lu_gp_t	*default_lu_gp;
 	spinlock_t		g_device_lock;

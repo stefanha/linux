@@ -2115,7 +2115,7 @@ se_device_t *transport_add_device_to_core_hba(
 	u32 device_flags,
 	void *transport_dev)
 {
-	int ret = 0;
+	int ret = 0, force_pt;
 	se_device_t  *dev;
 
 	dev = kzalloc(sizeof(se_device_t), GFP_KERNEL);
@@ -2200,29 +2200,23 @@ se_device_t *transport_add_device_to_core_hba(
 	 */
 	core_setup_task_attr_emulation(dev);
 	/*
+	 * Force PR and ALUA passthrough emulation with internal object use.
+	 */
+	force_pt = (hba->hba_flags & HBA_FLAGS_INTERNAL_USE);
+	/*
 	 * Setup the Reservations infrastructure for se_device_t
 	 */
-	core_setup_reservations(dev);
+	core_setup_reservations(dev, force_pt);
 	/*
 	 * Setup the Asymmetric Logical Unit Assignment for se_device_t
 	 */
-	if (core_setup_alua(dev) < 0)
+	if (core_setup_alua(dev, force_pt) < 0)
 		goto out;
 	/*
 	 * Startup the se_device_t processing thread
 	 */
 	if (transport_generic_activate_device(dev) < 0)
 		goto out;
-	/*
-	 * This HBA is reserved for internal storage engine / feature plugin use
-	 */
-	if (hba->hba_flags & HBA_FLAGS_INTERNAL_USE) {
-		ret = transport_get_read_capacity(dev);
-		if (ret < 0)
-			goto out;
-
-		return dev;
-	}
 
 	ret = transport_get_inquiry(DEV_OBJ_API(dev),
 			DEV_T10_WWN(dev), (void *)dev);

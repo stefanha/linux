@@ -78,5 +78,7 @@ extern int core_dev_del_initiator_node_lun_acl(se_portal_group_t *,
 						se_lun_t *, se_lun_acl_t *);
 extern void core_dev_free_initiator_node_lun_acl(se_portal_group_t *,
 						se_lun_acl_t *lacl);
+extern int core_dev_setup_virtual_lun0(void);
+extern void core_dev_release_virtual_lun0(void);
 
 #endif /* TARGET_CORE_DEVICE_H */

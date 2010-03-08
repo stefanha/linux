@@ -3654,7 +3654,7 @@ static int core_pt_seq_non_holder(
 	return 0;
 }
 
-int core_setup_reservations(se_device_t *dev)
+int core_setup_reservations(se_device_t *dev, int force_pt)
 {
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
 	t10_reservation_template_t *rest = &su_dev->t10_reservation;
@@ -3664,8 +3664,8 @@ int core_setup_reservations(se_device_t *dev)
 	 * cause a problem because libata and some SATA RAID HBAs appear
 	 * under Linux/SCSI, but to emulate reservations themselves.
 	 */
-	if ((TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) &&
-	    !(DEV_ATTRIB(dev)->emulate_reservations)) {
+	if (((TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) &&
+	    !(DEV_ATTRIB(dev)->emulate_reservations)) || force_pt) {
 		rest->res_type = SPC_PASSTHROUGH;
 		rest->t10_reservation_check = &core_pt_reservation_check;
 		rest->t10_seq_non_holder = &core_pt_seq_non_holder;

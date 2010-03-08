@@ -1935,7 +1935,7 @@ ssize_t core_alua_store_secondary_write_metadata(
 }
 EXPORT_SYMBOL(core_alua_store_secondary_write_metadata);
 
-int core_setup_alua(se_device_t *dev)
+int core_setup_alua(se_device_t *dev, int force_pt)
 {
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
 	t10_alua_t *alua = T10_ALUA(su_dev);
@@ -1946,8 +1946,8 @@ int core_setup_alua(se_device_t *dev)
 	 * cause a problem because libata and some SATA RAID HBAs appear
 	 * under Linux/SCSI, but emulate SCSI logic themselves.
 	 */
-	if ((TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) &&
-	    !(DEV_ATTRIB(dev)->emulate_alua)) {
+	if (((TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) &&
+	    !(DEV_ATTRIB(dev)->emulate_alua)) || force_pt) {
 		alua->alua_type = SPC_ALUA_PASSTHROUGH;
 		alua->alua_state_check = &core_alua_state_check_nop;
 		printk(KERN_INFO "%s: Using SPC_ALUA_PASSTHROUGH, no ALUA"

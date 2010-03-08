@@ -259,19 +259,46 @@ out:
 	if (!se_lun) {
 		if (read_only) {
 			se_cmd->scsi_sense_reason = WRITE_PROTECTED;
+			se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			printk("TARGET_CORE[%s]: Detected WRITE_PROTECTED LUN"
 				" Access for 0x%08x\n",
 				CMD_TFO(se_cmd)->get_fabric_name(),
 				unpacked_lun);
+			return -1;
 		} else {
-			se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
-			printk("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
-				" Access for 0x%08x\n",
-				CMD_TFO(se_cmd)->get_fabric_name(),
-				unpacked_lun);
+			/*
+			 * Use the se_portal_group->tpg_virt_lun0 to allow for
+			 * REPORT_LUNS, et al to be returned when no active
+			 * MappedLUN=0 exists for this Initiator Port.
+			 */
+			if (unpacked_lun != 0) {
+				se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
+				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+				printk("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
+					" Access for 0x%08x\n",
+					CMD_TFO(se_cmd)->get_fabric_name(),
+					unpacked_lun);
+				return -1;
+			}
+			/*
+			 * Force WRITE PROTECT for virtual LUN 0
+			 */
+			if ((se_cmd->data_direction != SE_DIRECTION_READ) &&
+			    (se_cmd->data_direction != SE_DIRECTION_NONE)) {
+				se_cmd->scsi_sense_reason = WRITE_PROTECTED;
+				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+				return -1;
+			}
+#if 0				   
+			printk("TARGET_CORE[%s]: Using virtual LUN0! :-)\n",
+				CMD_TFO(se_cmd)->get_fabric_name());
+#endif
+			se_lun = se_cmd->se_lun = &se_sess->se_tpg->tpg_virt_lun0;	
+			se_cmd->orig_fe_lun = 0;
+			se_cmd->se_orig_obj_api = SE_LUN(se_cmd)->lun_obj_api;
+			se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
+			se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
 		}
-		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		return -1;
 	}
 	/*
 	 * Determine if the se_lun_t is online.
@@ -1487,3 +1514,104 @@ void core_dev_free_initiator_node_lun_acl(
 	kfree(lacl);
 }
 EXPORT_SYMBOL(core_dev_free_initiator_node_lun_acl);
+
+int core_dev_setup_virtual_lun0(void)
+{
+	struct se_hba_s *hba;
+	struct se_device_s *dev;
+	struct se_subsystem_dev_s *se_dev = NULL;
+	struct se_subsystem_api_s *t;
+	char buf[16];
+	int ret;
+
+	hba = core_alloc_hba(RAMDISK_DR);
+	if (!(hba))
+		return -ENOMEM;
+
+	hba->hba_flags |= HBA_FLAGS_INTERNAL_USE;
+	ret = se_core_add_hba(hba, 0);
+	if (ret < 0) {
+		kmem_cache_free(se_hba_cache, hba);
+		return ret;
+	}
+
+	se_global->g_lun0_hba = hba;
+
+	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+			hba->type, &ret);
+	if (!t || (ret != 0)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	se_dev = kzalloc(sizeof(se_subsystem_dev_t), GFP_KERNEL);
+	if (!(se_dev)) {
+		printk(KERN_ERR "Unable to allocate memory for"
+				" se_subsystem_dev_t\n");
+		ret = -ENOMEM;
+		goto out;
+	}
+	INIT_LIST_HEAD(&se_dev->g_se_dev_list);
+	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_vpd_list);
+	spin_lock_init(&se_dev->t10_wwn.t10_vpd_lock);
+	INIT_LIST_HEAD(&se_dev->t10_reservation.registration_list);
+	INIT_LIST_HEAD(&se_dev->t10_reservation.aptpl_reg_list);
+	spin_lock_init(&se_dev->t10_reservation.registration_lock);
+	spin_lock_init(&se_dev->t10_reservation.aptpl_reg_lock);
+	INIT_LIST_HEAD(&se_dev->t10_alua.tg_pt_gps_list);
+	spin_lock_init(&se_dev->t10_alua.tg_pt_gps_lock);
+	spin_lock_init(&se_dev->se_dev_lock);
+	se_dev->t10_reservation.pr_aptpl_buf_len = PR_APTPL_BUF_LEN;
+	se_dev->t10_wwn.t10_sub_dev = se_dev;
+	se_dev->t10_alua.t10_sub_dev = se_dev;
+	se_dev->se_dev_attrib.da_sub_dev = se_dev;
+
+	se_dev->se_dev_hba = hba;
+
+	se_dev->se_dev_su_ptr = t->allocate_virtdevice(hba, "virt_lun0");
+	if (!(se_dev->se_dev_su_ptr)) {
+		printk(KERN_ERR "Unable to locate subsystem dependent pointer"
+			" from allocate_virtdevice()\n");
+		ret = -ENOMEM;
+		goto out;
+	}
+	se_global->g_lun0_su_dev = se_dev;
+
+	memset(buf, 0, 16);
+	sprintf(buf, "rd_pages=8");
+	t->set_configfs_dev_params(hba, se_dev, buf, sizeof(buf));
+
+	dev = t->create_virtdevice(hba, se_dev, se_dev->se_dev_su_ptr);
+	if (!(dev) || IS_ERR(dev)) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	se_dev->se_dev_ptr = dev;
+	se_global->g_lun0_dev = dev;
+
+	return 0;
+out:
+	se_global->g_lun0_su_dev = NULL;
+	kfree(se_dev);
+	if (se_global->g_lun0_hba) {
+		se_core_del_hba(se_global->g_lun0_hba);
+		se_global->g_lun0_hba = NULL;
+	}
+	return ret;
+}
+
+
+void core_dev_release_virtual_lun0(void)
+{
+	struct se_hba_s *hba = se_global->g_lun0_hba;
+        struct se_subsystem_dev_s *su_dev = se_global->g_lun0_su_dev;
+
+	if (!(hba))
+		return;
+
+	if (se_global->g_lun0_dev)
+		se_free_virtual_device(se_global->g_lun0_dev, hba);
+
+	kfree(su_dev);
+	se_core_del_hba(hba);
+}

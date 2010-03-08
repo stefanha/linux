@@ -3080,6 +3080,7 @@ static struct config_group *target_core_call_addhbatotarget(
 
 	return &hba->hba_group;
 out:
+	kmem_cache_free(se_hba_cache, hba);
 	return ERR_PTR(ret);
 }
 
@@ -3216,6 +3217,9 @@ int target_core_init_configfs(void)
 		" on "UTS_RELEASE"\n", utsname()->sysname, utsname()->machine);
 
 	plugin_load_all_classes();
+	if (core_dev_setup_virtual_lun0() < 0)
+		goto out;
+
 #ifdef SNMP_SUPPORT
 	scsi_target_proc = proc_mkdir("scsi_target", 0);
 	if (!(scsi_target_proc)) {
@@ -3233,6 +3237,7 @@ out:
 #ifdef SNMP_SUPPORT
 	remove_proc_entry("scsi_target", 0);
 #endif
+	core_dev_release_virtual_lun0();
 	plugin_unload_all_classes();
 out_global:
 	if (se_global->default_lu_gp) {
@@ -3300,6 +3305,7 @@ void target_core_exit_configfs(void)
 	remove_scsi_target_mib();
 	remove_proc_entry("scsi_target", 0);
 #endif
+	core_dev_release_virtual_lun0();
 	plugin_unload_all_classes();
 	release_se_global();
 
