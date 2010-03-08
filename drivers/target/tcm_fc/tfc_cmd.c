@@ -194,7 +194,18 @@ int ft_queue_status(struct se_cmd_s *se_cmd)
 		fcp->ext.fr_sns_len = htonl(len);
 		memcpy((fcp + 1), se_cmd->sense_buffer, len);
 	}
-	/* XXX figure out residual count */
+
+	/*
+	 * Test underflow and overflow with one mask.  Usually both are off.
+	 * Bidirectional commands are not handled yet.
+	 */
+	if (se_cmd->se_cmd_flags & (SCF_OVERFLOW_BIT | SCF_UNDERFLOW_BIT)) {
+		if (se_cmd->se_cmd_flags & SCF_OVERFLOW_BIT)
+			fcp->resp.fr_flags |= FCP_RESID_OVER;
+		else
+			fcp->resp.fr_flags |= FCP_RESID_UNDER;
+		fcp->ext.fr_resid = cpu_to_be32(se_cmd->residual_count);
+	}
 
 	/*
 	 * Send response.
