@@ -54,6 +54,8 @@
 #include <scsi/libfc.h>
 #include "tcm_fc.h"
 
+static void ft_sess_delete_all(struct ft_tport *);
+
 /*
  * Lookup or allocate target local port.
  * Caller holds ft_lport_lock.
@@ -65,19 +67,25 @@ static struct ft_tport *ft_tport_create(struct fc_lport *lport)
 	int i;
 
 	tport = rcu_dereference(lport->prov[FC_TYPE_FCP]);
-	if (tport)
+	if (tport && tport->tpg)
 		return tport;
 
 	tpg = ft_lport_find_tpg(lport);
 	if (!tpg)
 		return NULL;
 
+	if (tport) {
+		tport->tpg = tpg;
+		return tport;
+	}
+
 	tport = kzalloc(sizeof(*tport), GFP_KERNEL);
 	if (!tport)
 		return NULL;
 
-	tpg->fc_lport = lport;
+	tport->lport = lport;
 	tport->tpg = tpg;
+	tpg->tport = tport;
 	for (i = 0; i < FT_SESS_HASH_SIZE; i++)
 		INIT_HLIST_HEAD(&tport->hash[i]);
 
@@ -96,7 +104,7 @@ static void ft_tport_rcu_free(struct rcu_head *rcu)
 }
 
 /*
- * Delete target local port, if any, associated with the local port.
+ * Delete a target local port.
  * Caller holds ft_lport_lock.
  */
 static void ft_tport_delete(struct ft_tport *tport)
@@ -104,11 +112,16 @@ static void ft_tport_delete(struct ft_tport *tport)
 	struct fc_lport *lport;
 	struct ft_tpg *tpg;
 
-	tpg = tport->tpg;
-	lport = tpg->fc_lport;
+	ft_sess_delete_all(tport);
+	lport = tport->lport;
 	BUG_ON(tport != lport->prov[FC_TYPE_FCP]);
 	rcu_assign_pointer(lport->prov[FC_TYPE_FCP], NULL);
-	tpg->fc_lport = NULL;
+
+	tpg = tport->tpg;
+	if (tpg) {
+		tpg->tport = NULL;
+		tport->tpg = NULL;
+	}
 	call_rcu(&tport->rcu, ft_tport_rcu_free);
 }
 
@@ -272,6 +285,26 @@ static struct ft_sess *ft_sess_delete(struct ft_tport *tport, u32 port_id)
 }
 
 /*
+ * Delete all sessions from tport.
+ * Caller holds ft_lport_lock.
+ */
+static void ft_sess_delete_all(struct ft_tport *tport)
+{
+	struct hlist_head *head;
+	struct hlist_node *pos;
+	struct ft_sess *sess;
+
+	for (head = tport->hash;
+	     head < &tport->hash[FT_SESS_HASH_SIZE]; head++) {
+		hlist_for_each_entry_rcu(sess, pos, head, hash) {
+			ft_sess_unhash(sess);
+			transport_deregister_session_configfs(sess->se_sess);
+			ft_sess_put(sess);	/* release from table */
+		}
+	}
+}
+
+/*
  * TCM ops for sessions.
  */
 
@@ -298,7 +331,7 @@ void ft_sess_close(struct se_session_s *se_sess)
 	u32 port_id;
 
 	mutex_lock(&ft_lport_lock);
-	lport = sess->tport->tpg->fc_lport;
+	lport = sess->tport->lport;
 	port_id = sess->port_id;
 	if (port_id == -1) {
 		mutex_lock(&ft_lport_lock);
@@ -471,7 +504,6 @@ static void ft_prlo(struct fc_rport_priv *rdata)
 		mutex_unlock(&ft_lport_lock);
 		return;
 	}
-	sess->params = 0;
 	mutex_unlock(&ft_lport_lock);
 	transport_deregister_session_configfs(sess->se_sess);
 	ft_sess_put(sess);		/* release from table */

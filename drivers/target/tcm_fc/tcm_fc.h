@@ -74,11 +74,14 @@ struct ft_sess {
 
 /*
  * Per local port data.
- * This is created when the first session logs into the local port.
- * Deleted when tpg is deleted or last session is logged off.
+ * This is created only after a TPG exists that allows target function
+ * for the local port.  If the TPG exists, this is allocated when
+ * we're notified that the local port has been created, or when
+ * the first PRLI provider callback is received.
  */
 struct ft_tport {
-	struct ft_tpg *tpg;		/* target port group */
+	struct fc_lport *lport;
+	struct ft_tpg *tpg;		/* NULL if TPG deleted before tport */
 	u32	sess_count;		/* number of sessions in hash */
 	struct rcu_head rcu;
 	struct hlist_head hash[FT_SESS_HASH_SIZE];	/* list of sessions */
@@ -126,7 +129,7 @@ struct ft_lun_acl_group {
 struct ft_tpg {
 	u32 index;
 	struct ft_lport_acl *lport_acl;
-	struct fc_lport *fc_lport;
+	struct ft_tport *tport;		/* active tport or NULL */
 	struct list_head list;		/* linkage in ft_lport_acl tpg_list */
 	struct list_head lun_list;	/* head of LUNs */
 	struct se_portal_group_s *se_tpg;
