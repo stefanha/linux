@@ -28,7 +28,9 @@
  */
 #define FT_DEBUG_CONF	0x01	/* configuration messages */
 #define	FT_DEBUG_SESS	0x02	/* session messages */
-#define	FT_DEBUG_IO	0x04	/* I/O operations */
+#define	FT_DEBUG_TM	0x04	/* TM operations */
+#define	FT_DEBUG_IO	0x08	/* I/O commands */
+#define	FT_DEBUG_DATA	0x10	/* Data transfer */
 
 extern unsigned int ft_debug_logging;	/* debug options */
 
@@ -41,7 +43,9 @@ extern unsigned int ft_debug_logging;	/* debug options */
 
 #define	FT_CONF_DBG(fmt, args...)	FT_DEBUG(FT_DEBUG_CONF, fmt, ##args)
 #define	FT_SESS_DBG(fmt, args...)	FT_DEBUG(FT_DEBUG_SESS, fmt, ##args)
+#define	FT_TM_DBG(fmt, args...)		FT_DEBUG(FT_DEBUG_TM, fmt, ##args)
 #define	FT_IO_DBG(fmt, args...)		FT_DEBUG(FT_DEBUG_IO, fmt, ##args)
+#define	FT_DATA_DBG(fmt, args...)	FT_DEBUG(FT_DEBUG_DATA, fmt, ##args)
 
 struct ft_transport_id {
 	__u8	format;
