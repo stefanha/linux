@@ -566,6 +566,16 @@ struct libfc_function_template {
 	struct fc_seq *(*seq_start_next)(struct fc_seq *);
 
 	/*
+	 * Set a response handler for the exchange of the sequence.
+	 *
+	 * STATUS: OPTIONAL
+	 */
+	void (*seq_set_resp)(struct fc_seq *sp,
+			     void (*resp)(struct fc_seq *, struct fc_frame *,
+					  void *),
+			     void *arg);
+
+	/*
 	 * Reset an exchange manager, completing all sequences and exchanges.
 	 * If s_id is non-zero, reset only exchanges originating from that FID.
 	 * If d_id is non-zero, reset only exchanges sending to that FID.
@@ -1057,7 +1067,6 @@ struct fc_seq *fc_elsct_send(struct fc_lport *, u32 did,
 				    void *arg, u32 timer_msec);
 void fc_lport_flogi_resp(struct fc_seq *, struct fc_frame *, void *);
 void fc_lport_logo_resp(struct fc_seq *, struct fc_frame *, void *);
-
 
 /*
  * EXCHANGE MANAGER LAYER
