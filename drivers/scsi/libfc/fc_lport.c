@@ -865,7 +865,7 @@ out:
 static void fc_lport_recv_els_req(struct fc_lport *lport, struct fc_seq *sp,
 				  struct fc_frame *fp)
 {
-	struct fc_frame_header *fh = fc_frame_header_get(fp);
+	struct fc_frame_header *fh;
 	void (*recv) (struct fc_seq *, struct fc_frame *, struct fc_lport *);
 
 	mutex_lock(&lport->lp_mutex);
