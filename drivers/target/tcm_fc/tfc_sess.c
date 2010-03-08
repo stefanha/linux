@@ -82,7 +82,6 @@ static struct ft_tport *ft_tport_create(struct fc_lport *lport)
 		INIT_HLIST_HEAD(&tport->hash[i]);
 
 	rcu_assign_pointer(lport->prov[FC_TYPE_FCP], tport);
-	lport->service_params |= FCP_SPPF_TARG_FCN;	/* XXX lock */
 	return tport;
 }
 
@@ -109,9 +108,53 @@ static void ft_tport_delete(struct ft_tport *tport)
 	lport = tpg->fc_lport;
 	BUG_ON(tport != lport->prov[FC_TYPE_FCP]);
 	rcu_assign_pointer(lport->prov[FC_TYPE_FCP], NULL);
-	lport->service_params &= ~FCP_SPPF_TARG_FCN;	/* XXX lock */
 	tpg->fc_lport = NULL;
 	call_rcu(&tport->rcu, ft_tport_rcu_free);
+}
+
+/*
+ * Add local port.
+ * Called thru fc_lport_iterate().
+ */
+void ft_lport_add(struct fc_lport *lport, void *arg)
+{
+	mutex_lock(&ft_lport_lock);
+	ft_tport_create(lport);
+	mutex_unlock(&ft_lport_lock);
+}
+
+/*
+ * Delete local port.
+ * Called thru fc_lport_iterate().
+ */
+void ft_lport_del(struct fc_lport *lport, void *arg)
+{
+	struct ft_tport *tport;
+
+	mutex_lock(&ft_lport_lock);
+	tport = lport->prov[FC_TYPE_FCP];
+	if (tport)
+		ft_tport_delete(tport);
+	mutex_unlock(&ft_lport_lock);
+}
+
+/*
+ * Notification of local port change from libfc.
+ * Create or delete local port and associated tport.
+ */
+int ft_lport_notify(struct notifier_block *nb, unsigned long event, void *arg)
+{
+	struct fc_lport *lport = arg;
+
+	switch (event) {
+	case FC_LPORT_EV_ADD:
+		ft_lport_add(lport, NULL);
+		break;
+	case FC_LPORT_EV_DEL:
+		ft_lport_del(lport, NULL);
+		break;
+	}
+	return NOTIFY_DONE;
 }
 
 /*
@@ -125,7 +168,6 @@ static u32 ft_sess_hash(u32 port_id)
 /*
  * Find session in local port.
  * Sessions and hash lists are RCU-protected.
- * RCU read lock is held by caller.
  * A reference is taken which must be eventually freed.
  */
 static struct ft_sess *ft_sess_get(struct fc_lport *lport, u32 port_id)
@@ -135,18 +177,22 @@ static struct ft_sess *ft_sess_get(struct fc_lport *lport, u32 port_id)
 	struct hlist_node *pos;
 	struct ft_sess *sess;
 
+	rcu_read_lock();
 	tport = rcu_dereference(lport->prov[FC_TYPE_FCP]);
 	if (!tport)
-		return NULL;
+		goto out;
 
 	head = &tport->hash[ft_sess_hash(port_id)];
 	hlist_for_each_entry_rcu(sess, pos, head, hash) {
 		if (sess->port_id == port_id) {
 			kref_get(&sess->kref);
+			rcu_read_unlock();
 			FT_SESS_DBG("port_id %x found %p\n", port_id, sess);
 			return sess;
 		}
 	}
+out:
+	rcu_read_unlock();
 	FT_SESS_DBG("port_id %x not found\n", port_id);
 	return NULL;
 }
@@ -201,8 +247,6 @@ static void ft_sess_unhash(struct ft_sess *sess)
 	hlist_del_rcu(&sess->hash);
 	BUG_ON(!tport->sess_count);
 	tport->sess_count--;
-	if (!tport->sess_count)
-		ft_tport_delete(tport);
 	sess->port_id = -1;
 	sess->params = 0;
 }
@@ -314,7 +358,14 @@ static int ft_prli_locked(struct fc_rport_priv *rdata, u32 spp_len,
 	struct ft_sess *sess;
 	struct ft_node_acl *acl;
 	u32 fcp_parm;
-	int ret;
+
+	tport = ft_tport_create(rdata->local_port);
+	if (!tport)
+		return 0;	/* not a target for this local port */
+
+	acl = ft_acl_get(tport->tpg, rdata);
+	if (!acl)
+		return 0;
 
 	if (!rspp)
 		goto fill;
@@ -335,24 +386,11 @@ static int ft_prli_locked(struct fc_rport_priv *rdata, u32 spp_len,
 	 */
 	if (rspp->spp_flags & FC_SPP_EST_IMG_PAIR) {
 		spp->spp_flags |= FC_SPP_EST_IMG_PAIR;
-
-		tport = ft_tport_create(rdata->local_port);
-		if (!tport)
-			return 0;	/* not a target for this local port */
-		if (!(fcp_parm & FCP_SPPF_INIT_FCN)) {
-			ret = FC_SPP_RESP_CONF;
-			goto err;
-		}
-		acl = ft_acl_get(tport->tpg, rdata);
-		if (!acl) {
-			ret = 0;	/* not a target for that remote port */
-			goto err;
-		}
+		if (!(fcp_parm & FCP_SPPF_INIT_FCN))
+			return FC_SPP_RESP_CONF;
 		sess = ft_sess_create(tport, rdata->ids.port_id, acl);
-		if (!sess) {
-			ret = FC_SPP_RESP_RES;
-			goto err;
-		}
+		if (!sess)
+			return FC_SPP_RESP_RES;
 		if (!sess->params)
 			rdata->prli_count++;
 		sess->params = fcp_parm;
@@ -370,16 +408,11 @@ fill:
 	fcp_parm = ntohl(spp->spp_params);
 	spp->spp_params = htonl(fcp_parm | FCP_SPPF_TARG_FCN);
 	return FC_SPP_RESP_ACK;
-
-err:
-	if (!tport->sess_count)
-		ft_tport_delete(tport);
-	return ret;
 }
 
 /**
  * tcm_fcp_prli() - Handle incoming or outgoing PRLI for the FCP target
- * @rdata: remote port private (NULL for outgoing PRLI - XXX change)
+ * @rdata: remote port private
  * @spp_len: service parameter page length
  * @rspp: received service parameter page (NULL for outgoing PRLI)
  * @spp: response service parameter page
@@ -395,8 +428,7 @@ static int ft_prli(struct fc_rport_priv *rdata, u32 spp_len,
 	ret = ft_prli_locked(rdata, spp_len, rspp, spp);
 	mutex_unlock(&ft_lport_lock);
 	FT_SESS_DBG("port_id %x flags %x ret %x\n",
-	       rdata ? rdata->ids.port_id : -1,
-	       rspp ? rspp->spp_flags : 0, ret);
+	       rdata->ids.port_id, rspp ? rspp->spp_flags : 0, ret);
 	return ret;
 }
 
@@ -450,7 +482,6 @@ static void ft_prlo(struct fc_rport_priv *rdata)
 /*
  * Handle incoming FCP request.
  * Caller has verified that the frame is type FCP.
- * Caller has done rcu_read_lock() to protect module, which also protects sess.
  */
 static void ft_recv(struct fc_lport *lport,
 		    struct fc_seq *sp, struct fc_frame *fp)
