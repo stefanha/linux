@@ -187,6 +187,10 @@ u32 ft_sess_get_index(struct se_session_s *);
 u32 ft_sess_get_port_name(struct se_session_s *, unsigned char *, u32);
 void ft_sess_set_erl0(struct se_session_s *);
 
+void ft_lport_add(struct fc_lport *, void *);
+void ft_lport_del(struct fc_lport *, void *);
+int ft_lport_notify(struct notifier_block *, unsigned long, void *);
+
 /*
  * IO methods.
  */

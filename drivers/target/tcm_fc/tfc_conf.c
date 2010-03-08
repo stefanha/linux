@@ -1117,6 +1117,10 @@ void ft_deregister_configfs(void)
 	ft_configfs = NULL;
 }
 
+static struct notifier_block ft_notifier = {
+	.notifier_call = ft_lport_notify
+};
+
 static int __init ft_init(void)
 {
 	if (ft_register_configfs())
@@ -1125,15 +1129,19 @@ static int __init ft_init(void)
 		ft_deregister_configfs();
 		return -1;
 	}
+	blocking_notifier_chain_register(&fc_lport_notifier_head, &ft_notifier);
+	fc_lport_iterate(ft_lport_add, NULL);
 	return 0;
 }
 
 static void __exit ft_exit(void)
 {
+	blocking_notifier_chain_unregister(&fc_lport_notifier_head,
+					   &ft_notifier);
 	fc_fc4_deregister_provider(FC_TYPE_FCP, &ft_prov);
-	/* remove all sessions which should require getting lport lock */
-	/* after that it will be impossible for our receive to be called. */
+	fc_lport_iterate(ft_lport_del, NULL);
 	ft_deregister_configfs();
+	synchronize_rcu();
 }
 
 #ifdef MODULE
