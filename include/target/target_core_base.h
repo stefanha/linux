@@ -950,6 +950,7 @@ typedef struct se_portal_group_s {
 	/* linked list for initiator ACL list */
 	struct list_head	acl_node_list;
 	struct se_lun_s		*tpg_lun_list;
+	struct se_lun_s		tpg_virt_lun0;
 	/* List of TCM sessions assoicated wth this TPG */
 	struct list_head	tpg_sess_list;
 	/* Pointer to $FABRIC_MOD dependent code */
