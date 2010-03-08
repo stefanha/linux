@@ -3063,6 +3063,7 @@ static struct config_group *target_core_call_addhbatotarget(
 
 	return &hba->hba_group;
 out:
+	kmem_cache_free(se_hba_cache, hba);
 	return ERR_PTR(ret);
 }
 
