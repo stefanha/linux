@@ -47,6 +47,7 @@
 #include <target/target_core_alua.h>
 #include <target/target_core_base.h>
 #include <target/target_core_seobj.h>
+#include <target/target_core_tmr.h>
 #include <target/configfs_macros.h>
 
 #include "tcm_fc.h"
@@ -219,13 +220,6 @@ int ft_queue_status(struct se_cmd_s *se_cmd)
 	return 0;
 }
 
-int ft_queue_tm_resp(struct se_cmd_s *se_cmd)
-{
-	/* XXX TBD */
-	printk(KERN_INFO "%s: se_cmd %p\n", __func__, se_cmd);
-	return 0;
-}
-
 int ft_write_pending_status(struct se_cmd_s *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
@@ -324,6 +318,161 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 }
 
 /*
+ * Send a FCP response including SCSI status and optional FCP rsp_code.
+ * status is SAM_STAT_GOOD (zero) iff code is valid.
+ * This is used in error cases, such as allocation failures.
+ */
+static void ft_send_resp_status(struct fc_seq *sp, u32 status,
+				enum fcp_resp_rsp_codes code)
+{
+	struct fc_frame *fp;
+	size_t len;
+	struct fcp_resp_with_ext *fcp;
+	struct fcp_resp_rsp_info *info;
+	struct fc_lport *lport;
+	struct fc_exch *ep;
+
+	ep = fc_seq_exch(sp);
+
+	FT_IO_DBG("FCP error response: did %x oxid %x status %x code %x\n",
+		  ep->did, ep->oxid, status, code);
+	lport = ep->lp;
+	len = sizeof(*fcp);
+	if (status == SAM_STAT_GOOD)
+		len += sizeof(*info);
+	fp = fc_frame_alloc(lport, len);
+	if (!fp)
+		goto out;
+	fcp = fc_frame_payload_get(fp, len);
+	memset(fcp, 0, len);
+	fcp->resp.fr_status = status;
+	if (status == SAM_STAT_GOOD) {
+		fcp->ext.fr_rsp_len = htonl(sizeof(*info));
+		fcp->resp.fr_flags |= FCP_RSP_LEN_VAL;
+		info = (struct fcp_resp_rsp_info *)(fcp + 1);
+		info->rsp_code = code;
+	}
+
+	sp = lport->tt.seq_start_next(sp);
+	fc_fill_fc_hdr(fp, FC_RCTL_DD_CMD_STATUS, ep->did, ep->sid, FC_TYPE_FCP,
+		       FC_FC_EX_CTX | FC_FC_LAST_SEQ | FC_FC_END_SEQ, 0);
+
+	lport->tt.seq_send(lport, sp, fp);
+out:
+	lport->tt.exch_done(sp);
+}
+
+/*
+ * Send error or task management response.
+ * Always frees the cmd and associated state.
+ */
+static void ft_send_resp_code(struct ft_cmd *cmd, enum fcp_resp_rsp_codes code)
+{
+	ft_send_resp_status(cmd->seq, SAM_STAT_GOOD, code);
+	ft_free_cmd(cmd);
+}
+
+/*
+ * Handle incoming Task Management Request.
+ */
+static void ft_recv_tm(struct ft_cmd *cmd)
+{
+	struct se_tmr_req_s *tmr;
+	struct fcp_cmnd *fcp;
+	u8 tm_func;
+
+	fcp = fc_frame_payload_get(cmd->req_frame, sizeof(*fcp));
+
+	switch (fcp->fc_tm_flags) {
+	case FCP_TMF_LUN_RESET:
+		tm_func = LUN_RESET;
+		if (ft_get_lun_for_cmd(cmd, fcp->fc_lun) < 0) {
+			ft_dump_cmd(cmd, __func__);
+			transport_send_check_condition_and_sense(cmd->se_cmd,
+				cmd->se_cmd->scsi_sense_reason, 0);
+			ft_sess_put(cmd->sess);
+			return;
+		}
+		break;
+	case FCP_TMF_TGT_RESET:
+		tm_func = TARGET_WARM_RESET;
+		break;
+	case FCP_TMF_CLR_TASK_SET:
+		tm_func = CLEAR_TASK_SET;
+		break;
+	case FCP_TMF_ABT_TASK_SET:
+		tm_func = ABORT_TASK_SET;
+		break;
+	case FCP_TMF_CLR_ACA:
+		tm_func = CLEAR_ACA;
+		break;
+	default:
+		/*
+		 * FCP4r01 indicates having a combination of
+		 * tm_flags set is invalid.
+		 */
+		FT_IO_DBG("invalid FCP tm_flags %x\n", fcp->fc_tm_flags);
+		ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
+		return;
+	}
+
+	FT_IO_DBG("alloc tm cmd fn %d\n", tm_func);
+	tmr = core_tmr_alloc_req(cmd->se_cmd, cmd, tm_func);
+	if (!tmr) {
+		FT_IO_DBG("alloc failed\n");
+		ft_send_resp_code(cmd, FCP_TMF_FAILED);
+		return;
+	}
+	cmd->se_cmd->se_tmr_req = tmr;
+	cmd->state = FC_CMD_ST_TM;
+	ft_queue_cmd(cmd->sess, cmd);
+}
+
+/*
+ * Send task management request to target.
+ */
+static void ft_send_tm(struct ft_cmd *cmd)
+{
+	struct se_cmd_s *se_cmd = cmd->se_cmd;
+
+	transport_generic_handle_tmr(se_cmd);
+}
+
+/*
+ * Send status from completed task management request.
+ */
+int ft_queue_tm_resp(struct se_cmd_s *se_cmd)
+{
+	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct se_tmr_req_s *tmr = se_cmd->se_tmr_req;
+	enum fcp_resp_rsp_codes code;
+
+	switch (tmr->response) {
+	case TMR_FUNCTION_COMPLETE:
+		code = FCP_TMF_CMPL;
+		break;
+	case TMR_LUN_DOES_NOT_EXIST:
+		code = FCP_TMF_INVALID_LUN;
+		break;
+	case TMR_FUNCTION_REJECTED:
+		code = FCP_TMF_REJECTED;
+		break;
+	case TMR_TASK_DOES_NOT_EXIST:
+	case TMR_TASK_STILL_ALLEGIANT:
+	case TMR_TASK_FAILOVER_NOT_SUPPORTED:
+	case TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED:
+	case TMR_FUNCTION_AUTHORIZATION_FAILED:
+	default:
+		code = FCP_TMF_FAILED;
+		break;
+	}
+	FT_IO_DBG("tmr fn %d resp %d fcp code %d\n",
+		  tmr->function, tmr->response, code);
+	ft_send_resp_code(cmd, code);
+	return 0;
+}
+
+/*
  * Handle incoming FCP command.
  */
 static void ft_recv_cmd(struct ft_sess *sess,
@@ -336,46 +485,59 @@ static void ft_recv_cmd(struct ft_sess *sess,
 	u32 data_len;
 	int task_attr;
 
+	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
+	if (!cmd)
+		goto busy;
+	cmd->sess = sess;
+	cmd->seq = sp;
+	cmd->req_frame = fp;		/* hold frame during cmd */
+
 	fcp = fc_frame_payload_get(fp, sizeof(*fcp));
 	if (!fcp)
 		goto err;
+
 	if (fcp->fc_flags & FCP_CFL_LEN_MASK)
 		goto err;		/* not handling longer CDBs yet */
 
-	switch (fcp->fc_flags & (FCP_CFL_RDDATA | FCP_CFL_WRDATA)) {
-	case 0:
+	if (fcp->fc_tm_flags) {
+		task_attr = FCP_PTA_SIMPLE;
 		data_dir = SE_DIRECTION_NONE;
-		break;
-	case FCP_CFL_RDDATA:
-		data_dir = SE_DIRECTION_READ;
-		break;
-	case FCP_CFL_WRDATA:
-		data_dir = SE_DIRECTION_WRITE;
-		break;
-	case FCP_CFL_WRDATA | FCP_CFL_RDDATA:
-		data_dir = SE_DIRECTION_BIDI;
-		break;
+		data_len = 0;
+	} else {
+		switch (fcp->fc_flags & (FCP_CFL_RDDATA | FCP_CFL_WRDATA)) {
+		case 0:
+			data_dir = SE_DIRECTION_NONE;
+			break;
+		case FCP_CFL_RDDATA:
+			data_dir = SE_DIRECTION_READ;
+			break;
+		case FCP_CFL_WRDATA:
+			data_dir = SE_DIRECTION_WRITE;
+			break;
+		case FCP_CFL_WRDATA | FCP_CFL_RDDATA:
+			goto err;	/* TBD not supported by tcm_fc yet */
+		}
+
+		/* FCP_PTA_ maps 1:1 to TASK_ATTR_ */
+		task_attr = fcp->fc_pri_ta & FCP_PTA_MASK;
+		data_len = ntohl(fcp->fc_dl);
+		cmd->cdb = fcp->fc_cdb;
 	}
 
-	/* FCP_PTA_ maps 1:1 to TASK_ATTR_ */
-	task_attr = fcp->fc_pri_ta &
-		    (FCP_PTA_HEADQ | FCP_PTA_ORDERED | FCP_PTA_ACA);
-	data_len = ntohl(fcp->fc_dl);
-
-	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
-	if (!cmd)
-		goto err;
-	cmd->sess = sess;
-	cmd->seq = sp;
-	cmd->cdb = fcp->fc_cdb;
 	cmd->se_cmd = transport_alloc_se_cmd(&ft_configfs->tf_ops,
 					     sess->se_sess, cmd, data_len,
 					     data_dir, task_attr);
-	if (!cmd->se_cmd)
-		goto free;
+	if (!cmd->se_cmd) {
+		kfree(cmd);
+		goto busy;
+	}
+
+	if (fcp->fc_tm_flags) {
+		ft_recv_tm(cmd);
+		return;
+	}
 
 	fc_seq_exch(sp)->lp->tt.seq_set_resp(sp, ft_recv_seq, cmd);
-	cmd->req_frame = fp;		/* hold frame during cmd */
 
 	ret = ft_get_lun_for_cmd(cmd, fcp->fc_lun);
 	if (ret < 0) {
@@ -387,11 +549,13 @@ static void ft_recv_cmd(struct ft_sess *sess,
 	ft_queue_cmd(sess, cmd);
 	return;
 
-free:
-	ft_free_cmd(cmd);
+err:
+	ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
 	return;
 
-err:
+busy:
+	FT_IO_DBG("cmd allocation failure - sending BUSY\n");
+	ft_send_resp_status(sp, SAM_STAT_BUSY, 0);
 	fc_frame_free(fp);
 	ft_sess_put(sess);		/* undo get from lookup */
 }
@@ -460,11 +624,15 @@ static void ft_send_cmd(struct ft_cmd *cmd)
  */
 static void ft_exec_req(struct ft_cmd *cmd)
 {
+	FT_IO_DBG("cmd state %x\n", cmd->state);
 	switch (cmd->state) {
 	case FC_CMD_ST_NEW:
-	default:
-		FT_IO_DBG("cmd state %x\n", cmd->state);
 		ft_send_cmd(cmd);
+		break;
+	case FC_CMD_ST_TM:
+		ft_send_tm(cmd);
+		break;
+	default:
 		break;
 	}
 }
