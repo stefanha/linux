@@ -259,19 +259,46 @@ out:
 	if (!se_lun) {
 		if (read_only) {
 			se_cmd->scsi_sense_reason = WRITE_PROTECTED;
+			se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			printk("TARGET_CORE[%s]: Detected WRITE_PROTECTED LUN"
 				" Access for 0x%08x\n",
 				CMD_TFO(se_cmd)->get_fabric_name(),
 				unpacked_lun);
+			return -1;
 		} else {
-			se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
-			printk("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
-				" Access for 0x%08x\n",
-				CMD_TFO(se_cmd)->get_fabric_name(),
-				unpacked_lun);
+			/*
+			 * Use the se_portal_group->tpg_virt_lun0 to allow for
+			 * REPORT_LUNS, et al to be returned when no active
+			 * MappedLUN=0 exists for this Initiator Port.
+			 */
+			if (unpacked_lun != 0) {
+				se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
+				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+				printk("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
+					" Access for 0x%08x\n",
+					CMD_TFO(se_cmd)->get_fabric_name(),
+					unpacked_lun);
+				return -1;
+			}
+			/*
+			 * Force WRITE PROTECT for virtual LUN 0
+			 */
+			if ((se_cmd->data_direction != SE_DIRECTION_READ) &&
+			    (se_cmd->data_direction != SE_DIRECTION_NONE)) {
+				se_cmd->scsi_sense_reason = WRITE_PROTECTED;
+				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+				return -1;
+			}
+#if 0				   
+			printk("TARGET_CORE[%s]: Using virtual LUN0! :-)\n",
+				CMD_TFO(se_cmd)->get_fabric_name());
+#endif
+			se_lun = se_cmd->se_lun = &se_sess->se_tpg->tpg_virt_lun0;	
+			se_cmd->orig_fe_lun = 0;
+			se_cmd->se_orig_obj_api = SE_LUN(se_cmd)->lun_obj_api;
+			se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
+			se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
 		}
-		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		return -1;
 	}
 	/*
 	 * Determine if the se_lun_t is online.
