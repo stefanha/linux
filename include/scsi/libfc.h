@@ -770,6 +770,15 @@ struct fc_disc {
 			      enum fc_disc_event);
 };
 
+/*
+ * Local port notifier and events.
+ */
+extern struct blocking_notifier_head fc_lport_notifier_head;
+enum fc_lport_event {
+	FC_LPORT_EV_ADD,
+	FC_LPORT_EV_DEL,
+};
+
 /**
  * struct fc_lport - Local port
  * @host:                  The SCSI host associated with a local port
@@ -808,8 +817,9 @@ struct fc_disc {
  * @lso_max:               The maximum large offload send size
  * @fcts:                  FC-4 type mask
  * @lp_mutex:              Mutex to protect the local port
- * @list:                  Handle for list of local ports
+ * @list:                  Linkage on list of vport peers
  * @retry_work:            Handle to local port for delayed retry context
+ * @lport_list:            Linkage on module-wide list of local ports
  * @prov:		   Pointers available for use by passive FC-4 providers
  */
 struct fc_lport {
@@ -863,6 +873,7 @@ struct fc_lport {
 	struct mutex                   lp_mutex;
 	struct list_head               list;
 	struct delayed_work	       retry_work;
+	struct list_head               lport_list;
 	void			       *prov[FC_FC4_PROV_SIZE];
 };
 
@@ -1026,6 +1037,7 @@ int fc_set_mfs(struct fc_lport *, u32 mfs);
 struct fc_lport *libfc_vport_create(struct fc_vport *, int privsize);
 struct fc_lport *fc_vport_id_lookup(struct fc_lport *, u32 port_id);
 int fc_lport_bsg_request(struct fc_bsg_job *);
+void fc_lport_iterate(void (*func)(struct fc_lport *, void *), void *);
 
 /*
  * REMOTE PORT LAYER
