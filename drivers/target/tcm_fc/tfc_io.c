@@ -86,8 +86,6 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
 	void *from;
 	void *to = NULL;
 
-	ft_dump_cmd(cmd, __func__);
-
 	ep = fc_seq_exch(cmd->seq);
 	lport = ep->lp;
 	cmd->seq = lport->tt.seq_start_next(cmd->seq);
@@ -186,6 +184,7 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
 	}
 	return ft_queue_status(se_cmd);
 }
+
 /*
  * Receive write data frame.
  */

@@ -411,15 +411,15 @@ static void ft_send_tm(struct ft_cmd *cmd)
 		 * FCP4r01 indicates having a combination of
 		 * tm_flags set is invalid.
 		 */
-		FT_IO_DBG("invalid FCP tm_flags %x\n", fcp->fc_tm_flags);
+		FT_TM_DBG("invalid FCP tm_flags %x\n", fcp->fc_tm_flags);
 		ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
 		return;
 	}
 
-	FT_IO_DBG("alloc tm cmd fn %d\n", tm_func);
+	FT_TM_DBG("alloc tm cmd fn %d\n", tm_func);
 	tmr = core_tmr_alloc_req(cmd->se_cmd, cmd, tm_func);
 	if (!tmr) {
-		FT_IO_DBG("alloc failed\n");
+		FT_TM_DBG("alloc failed\n");
 		ft_send_resp_code(cmd, FCP_TMF_FAILED);
 		return;
 	}
@@ -455,7 +455,7 @@ int ft_queue_tm_resp(struct se_cmd_s *se_cmd)
 		code = FCP_TMF_FAILED;
 		break;
 	}
-	FT_IO_DBG("tmr fn %d resp %d fcp code %d\n",
+	FT_TM_DBG("tmr fn %d resp %d fcp code %d\n",
 		  tmr->function, tmr->response, code);
 	ft_send_resp_code(cmd, code);
 	return 0;
