@@ -59,6 +59,130 @@ static int tcm_loop_hba_no_cnt;
 
 /* Start items for tcm_loop_port_cit */
 
+/*
+ * For ALUA Target port attributes for port LUN
+ */
+CONFIGFS_EATTR_STRUCT(tcm_loop_port, se_lun_s);
+#define TL_PORT_ATTR(_name, _mode)					\
+static struct tcm_loop_port_attribute tcm_loop_port_##_name = 		\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	tcm_loop_port_show_attr_##_name,				\
+	tcm_loop_port_store_attr_##_name);
+
+/*
+ * alua_tg_pt_gp
+ */
+static ssize_t tcm_loop_port_show_attr_alua_tg_pt_gp(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_tg_pt_gp_info(lun->lun_sep, page);
+}
+
+static ssize_t tcm_loop_port_store_attr_alua_tg_pt_gp(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_tg_pt_gp_info(lun->lun_sep, page, count);
+}
+
+TL_PORT_ATTR(alua_tg_pt_gp, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_offline
+ */
+static ssize_t tcm_loop_port_show_attr_alua_tg_pt_offline(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_offline_bit(lun, page);
+}
+
+static ssize_t tcm_loop_port_store_attr_alua_tg_pt_offline(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_offline_bit(lun, page, count);
+}
+
+TL_PORT_ATTR(alua_tg_pt_offline, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_status
+ */
+static ssize_t tcm_loop_port_show_attr_alua_tg_pt_status(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_secondary_status(lun, page);
+}
+
+static ssize_t tcm_loop_port_store_attr_alua_tg_pt_status(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_secondary_status(lun, page, count);
+}
+
+TL_PORT_ATTR(alua_tg_pt_status, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_write_md
+ */
+static ssize_t tcm_loop_port_show_attr_alua_tg_pt_write_md(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_secondary_write_metadata(lun, page);
+}
+
+static ssize_t tcm_loop_port_store_attr_alua_tg_pt_write_md(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_secondary_write_metadata(lun, page, count);
+}
+
+TL_PORT_ATTR(alua_tg_pt_write_md, S_IRUGO | S_IWUSR);
+
+static struct configfs_attribute *tcm_loop_port_attrs[] = {
+	&tcm_loop_port_alua_tg_pt_gp.attr,
+	&tcm_loop_port_alua_tg_pt_offline.attr,
+	&tcm_loop_port_alua_tg_pt_status.attr,
+	&tcm_loop_port_alua_tg_pt_write_md.attr,
+	NULL,
+};
+
+CONFIGFS_EATTR_OPS(tcm_loop_port, se_lun_s, lun_group);
+
 static int tcm_loop_port_link(
 	struct config_item *tl_lun_ci,
 	struct config_item *se_dev_ci)
@@ -137,6 +261,8 @@ static int tcm_loop_port_unlink(
 }
 
 static struct configfs_item_operations tcm_loop_port_item_ops = {
+	.show_attribute		= &tcm_loop_port_attr_show,
+	.store_attribute	= &tcm_loop_port_attr_store,
 	.allow_link		= &tcm_loop_port_link,
 	.drop_link		= &tcm_loop_port_unlink,
 };
@@ -144,7 +270,7 @@ static struct configfs_item_operations tcm_loop_port_item_ops = {
 static struct config_item_type tcm_loop_port_cit = {
 	.ct_item_ops		= &tcm_loop_port_item_ops,
 	.ct_group_ops		= NULL,
-	.ct_attrs		= NULL,
+	.ct_attrs		= tcm_loop_port_attrs,
 	.ct_owner		= THIS_MODULE,			
 };
 
