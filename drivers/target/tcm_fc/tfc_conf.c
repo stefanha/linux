@@ -209,6 +209,130 @@ static struct ft_tpg *ft_tpg_from_lun_ci(struct config_item *lun_ci)
 	return se_tpg->se_tpg_fabric_ptr;
 }
 
+/*
+ * For ALUA Target port attributes for port LUN
+ */
+CONFIGFS_EATTR_STRUCT(ft_lun_port, se_lun_s);
+#define FT_PORT_ATTR(_name, _mode)					\
+static struct ft_lun_port_attribute ft_lun_port_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,					\
+	ft_lun_port_show_attr_##_name,					\
+	ft_lun_port_store_attr_##_name);
+
+/*
+ * alua_tg_pt_gp
+ */
+static ssize_t ft_lun_port_show_attr_alua_tg_pt_gp(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+	
+	return core_alua_show_tg_pt_gp_info(lun->lun_sep, page);
+}
+
+static ssize_t ft_lun_port_store_attr_alua_tg_pt_gp(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_tg_pt_gp_info(lun->lun_sep, page, count);
+}
+
+FT_PORT_ATTR(alua_tg_pt_gp, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_offline
+ */
+static ssize_t ft_lun_port_show_attr_alua_tg_pt_offline(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_offline_bit(lun, page);
+}
+
+static ssize_t ft_lun_port_store_attr_alua_tg_pt_offline(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_offline_bit(lun, page, count);
+}
+
+FT_PORT_ATTR(alua_tg_pt_offline, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_status
+ */
+static ssize_t ft_lun_port_show_attr_alua_tg_pt_status(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_secondary_status(lun, page);
+}
+
+static ssize_t ft_lun_port_store_attr_alua_tg_pt_status(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_secondary_status(lun, page, count);
+}
+
+FT_PORT_ATTR(alua_tg_pt_status, S_IRUGO | S_IWUSR);
+
+/*
+ * alua_tg_pt_write_md
+ */
+static ssize_t ft_lun_port_show_attr_alua_tg_pt_write_md(
+	struct se_lun_s *lun,
+	char *page)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_show_secondary_write_metadata(lun, page);
+}
+
+static ssize_t ft_lun_port_store_attr_alua_tg_pt_write_md(
+	struct se_lun_s *lun,
+	const char *page,
+	size_t count)
+{
+	if (!(lun->lun_sep))
+		return -ENODEV;
+
+	return core_alua_store_secondary_write_metadata(lun, page, count);
+}
+
+FT_PORT_ATTR(alua_tg_pt_write_md, S_IRUGO | S_IWUSR);
+
+static struct configfs_attribute *ft_lun_port_attrs[] = {
+	&ft_lun_port_alua_tg_pt_gp.attr,
+	&ft_lun_port_alua_tg_pt_offline.attr,
+	&ft_lun_port_alua_tg_pt_status.attr,
+	&ft_lun_port_alua_tg_pt_write_md.attr,
+	NULL,
+};
+
+CONFIGFS_EATTR_OPS(ft_lun_port, se_lun_s, lun_group);
+
 static int ft_lun_port_link(struct config_item *lun_ci,
 			    struct config_item *se_dev_ci)
 {
@@ -277,6 +401,8 @@ static int ft_lun_port_unlink(struct config_item *lun_ci,
 }
 
 static struct configfs_item_operations ft_lun_port_item_ops = {
+	.show_attribute = ft_lun_port_attr_show,
+	.store_attribute = ft_lun_port_attr_store,
 	.allow_link = ft_lun_port_link,
 	.check_link = ft_lun_port_check_link,
 	.drop_link = ft_lun_port_unlink,
@@ -284,6 +410,7 @@ static struct configfs_item_operations ft_lun_port_item_ops = {
 
 static struct config_item_type ft_lun_port_cit = {
 	.ct_item_ops = &ft_lun_port_item_ops,
+	.ct_attrs = ft_lun_port_attrs,
 	.ct_owner = THIS_MODULE,
 };
 
