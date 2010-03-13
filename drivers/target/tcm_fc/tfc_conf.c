@@ -925,6 +925,7 @@ static void ft_del_tpg(struct config_group *group, struct config_item *item)
 	mutex_unlock(&ft_lport_lock);
 
 	config_item_put(item);
+	core_tpg_deregister(se_tpg);
 	kfree(tpg);
 }
 
