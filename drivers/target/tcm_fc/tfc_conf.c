@@ -1099,19 +1099,16 @@ static u32 ft_get_pr_transport_id(se_portal_group_t *se_tpg,
 				  se_node_acl_t *se_nacl,
 				  int *format_code, unsigned char *buf)
 {
-	se_session_t *se_sess;
-	struct ft_sess *sess;
+	struct ft_node_acl *acl = (struct ft_node_acl *)se_nacl->fabric_acl_ptr;
 	struct ft_transport_id *id = (struct ft_transport_id *)buf;
+	/*
+	 * PROTOCOL IDENTIFIER is 0h for FCP-2
+	 * 
+	 * From spc4r17, 7.5.4.2 TransportID for initiator ports using
+	 * SCSI over Fibre Channel
+	 */
+	put_unaligned_be64(acl->node_auth.port_name, id->wwpn);
 
-	memset(id, 0, sizeof(*id));
-	spin_lock(&se_nacl->nacl_sess_lock);
-	se_sess = se_nacl->nacl_sess;
-	if (se_sess) {
-		sess = se_sess->fabric_sess_ptr;
-		if (sess)
-			put_unaligned_be64(sess->port_name, id->wwpn);
-	}
-	spin_unlock(&se_nacl->nacl_sess_lock);
 	return ft_get_pr_transport_id_len(se_tpg, se_nacl, format_code);
 }
 
