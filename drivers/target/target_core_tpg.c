@@ -285,6 +285,7 @@ se_node_acl_t *core_tpg_check_initiator_node_acl(
 	INIT_LIST_HEAD(&acl->acl_list);
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
+	atomic_set(&acl->acl_pr_ref_count, 0);
 	acl->queue_depth = TPG_TFO(tpg)->tpg_get_default_depth(tpg);
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
@@ -331,6 +332,12 @@ se_node_acl_t *core_tpg_check_initiator_node_acl(
 }
 EXPORT_SYMBOL(core_tpg_check_initiator_node_acl);
 
+void core_tpg_wait_for_nacl_pr_ref(se_node_acl_t *nacl)
+{
+	while (atomic_read(&nacl->acl_pr_ref_count) != 0)
+		msleep(100);
+}
+
 /*	core_tpg_free_node_acls():
  *
  *
@@ -343,11 +350,12 @@ void core_tpg_free_node_acls(se_portal_group_t *tpg)
 	list_for_each_entry_safe(acl, acl_tmp, &tpg->acl_node_list, acl_list) {
 		/*
 		 * The kfree() for dynamically allocated Node ACLS is done in
-		 * iscsi_close_session().
+		 * transport_deregister_session()
 		 */
 		if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
 			continue;
 
+		core_tpg_wait_for_nacl_pr_ref(acl);
 		kfree(acl);
 		tpg->num_node_acls--;
 	}
@@ -417,6 +425,7 @@ se_node_acl_t *core_tpg_add_initiator_node_acl(
 	INIT_LIST_HEAD(&acl->acl_list);
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
+	atomic_set(&acl->acl_pr_ref_count, 0);
 	acl->queue_depth = queue_depth;
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
@@ -504,6 +513,7 @@ int core_tpg_del_initiator_node_acl(
 	}
 	spin_unlock_bh(&tpg->session_lock);
 
+	core_tpg_wait_for_nacl_pr_ref(acl);
 	core_clear_initiator_node_from_tpg(acl, tpg);
 	core_free_device_list_for_node(acl, tpg);
 

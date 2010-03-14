@@ -41,6 +41,7 @@ extern void core_tpg_add_node_to_devs(struct se_node_acl_s *,
 extern struct se_node_acl_s *core_tpg_check_initiator_node_acl(
 						struct se_portal_group_s *,
 						unsigned char *);
+extern void core_tpg_wait_for_nacl_pr_ref(struct se_node_acl_s *);
 extern void core_tpg_free_node_acls(struct se_portal_group_s *);
 extern void core_tpg_clear_object_luns(struct se_portal_group_s *);
 extern se_node_acl_t *core_tpg_add_initiator_node_acl(se_portal_group_t *,

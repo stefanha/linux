@@ -642,6 +642,8 @@ typedef struct se_node_acl_s {
 	u64			write_bytes;
 	spinlock_t		stats_lock;
 #endif /* SNMP_SUPPORT */
+	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
+	atomic_t		acl_pr_ref_count;
 	struct se_dev_entry_s	*device_list;
 	struct se_session_s	*nacl_sess;
 	struct se_portal_group_s *se_tpg;
