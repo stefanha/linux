@@ -54,6 +54,7 @@
 struct pr_transport_id_holder {
 	int dest_local_nexus;
 	struct t10_pr_registration_s *dest_pr_reg;
+	struct se_portal_group_s *dest_tpg;
 	struct se_node_acl_s *dest_node_acl;
 	struct se_dev_entry_s *dest_se_deve;
 	struct list_head dest_list;
@@ -1033,6 +1034,90 @@ void core_scsi3_free_all_registrations(
 		kmem_cache_free(t10_pr_reg_cache, pr_reg);
 	}
 	spin_unlock(&pr_tmpl->aptpl_reg_lock);
+}
+
+static int core_scsi3_tpg_depend_item(se_portal_group_t *tpg)
+{
+	return configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
+			&tpg->tpg_group.cg_item);
+}
+
+static void core_scsi3_tpg_undepend_item(se_portal_group_t *tpg)
+{
+	configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
+			&tpg->tpg_group.cg_item);
+
+	atomic_dec(&tpg->tpg_pr_ref_count);
+	smp_mb__after_atomic_dec();
+}
+
+static int core_scsi3_nodeacl_depend_item(se_node_acl_t *nacl)
+{
+	se_portal_group_t *tpg = nacl->se_tpg;
+
+	if (nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+		return 0;
+
+	return configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
+			&nacl->acl_group.cg_item);
+}
+
+static void core_scsi3_nodeacl_undepend_item(se_node_acl_t *nacl)
+{
+	se_portal_group_t *tpg = nacl->se_tpg;
+
+	if (nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
+		atomic_dec(&nacl->acl_pr_ref_count);
+		smp_mb__after_atomic_dec();
+		return;
+	}
+
+	configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
+			&nacl->acl_group.cg_item);	
+
+	atomic_dec(&nacl->acl_pr_ref_count);
+	smp_mb__after_atomic_dec();
+}
+
+static int core_scsi3_lunacl_depend_item(se_dev_entry_t *se_deve)
+{
+	se_lun_acl_t *lun_acl = se_deve->se_lun_acl;
+	se_node_acl_t *nacl;
+	se_portal_group_t *tpg;
+	/*
+	 * For nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+	 */
+	if (!(lun_acl))
+		return 0;
+
+	nacl = lun_acl->se_lun_nacl;
+	tpg = nacl->se_tpg;
+
+	return configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
+			&lun_acl->se_lun_group.cg_item);
+}
+
+static void core_scsi3_lunacl_undepend_item(se_dev_entry_t *se_deve)
+{
+	se_lun_acl_t *lun_acl = se_deve->se_lun_acl;
+	se_node_acl_t *nacl;
+	se_portal_group_t *tpg;
+	/*
+	 * For nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+	 */
+	if (!(lun_acl)) {
+		atomic_dec(&se_deve->pr_ref_count);
+		smp_mb__after_atomic_dec();
+		return;	
+	}
+	nacl = lun_acl->se_lun_nacl;
+	tpg = nacl->se_tpg;
+
+	configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
+			&lun_acl->se_lun_group.cg_item);
+
+	atomic_dec(&se_deve->pr_ref_count);
+	smp_mb__after_atomic_dec();
 }
 
 static int core_scsi3_decode_spec_i_port(
