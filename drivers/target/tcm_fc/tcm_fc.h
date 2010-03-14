@@ -108,23 +108,11 @@ struct ft_node_acl {
 
 	struct config_group auth_group;
 	struct config_group *groups[2];	/* NULL-terminator pointers to above */
-
-	/*
-	 * The configfs group holding the acl itself is temporarily
-	 * allocated here.  The one in se_acl->acl_group is intended for
-	 * this but it is freed at the wrong time, maybe.
-	 */
-	struct config_group group;	/* group for ACL */
 };
 
 struct ft_lun {
 	u32 index;
 	char name[FT_LUN_NAMELEN];
-};
-
-struct ft_lun_acl_group {
-	struct se_lun_acl_s *lun_acl;
-	struct config_group group;
 };
 
 /*

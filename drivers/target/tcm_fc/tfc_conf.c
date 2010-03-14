@@ -5,10 +5,10 @@
  * Based on tcm_loop_configfs.c
  *
  * Copyright (c) 2010 Cisco Systems, Inc.
- * Copyright (c) 2009 Rising Tide, Inc.
- * Copyright (c) 2009 Linux-iSCSI.org
+ * Copyright (c) 2009,2010 Rising Tide, Inc.
+ * Copyright (c) 2009,2010 Linux-iSCSI.org
  *
- * Copyright (c) 2009 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Copyright (c) 2009,2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -469,11 +469,11 @@ static int ft_lun_acl_link(struct config_item *lun_acl_ci,
 {
 	struct se_node_acl_s *se_nacl;
 	struct se_lun_s *lun;
+	struct se_lun_acl_s *lun_acl;
 	struct se_portal_group_s *se_tpg;
 	struct se_dev_entry_s *deve;
 	struct config_item *item;
 	struct config_group *tpg_group;
-	struct ft_lun_acl_group *ft_lun_acl;
 	int lun_access;
 	int ret;
 
@@ -502,23 +502,22 @@ static int ft_lun_acl_link(struct config_item *lun_acl_ci,
 		return -EINVAL;
 	}
 
-	ft_lun_acl = container_of(to_config_group(lun_acl_ci),
-				   struct ft_lun_acl_group, group);
-
+	lun_acl = container_of(to_config_group(lun_acl_ci),
+				   struct se_lun_acl_s, se_lun_group);
 	lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group);
 
 	se_tpg = container_of(tpg_group, struct se_portal_group_s, tpg_group);
 
-	se_nacl = ft_lun_acl->lun_acl->se_lun_nacl;
+	se_nacl = lun_acl->se_lun_nacl;
 	spin_lock_bh(&se_nacl->device_list_lock);
-	deve = &se_nacl->device_list[ft_lun_acl->lun_acl->mapped_lun];
+	deve = &se_nacl->device_list[lun_acl->mapped_lun];
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS)
 		lun_access = deve->lun_flags;
 	else
 		lun_access = TRANSPORT_LUNFLAGS_READ_WRITE;	/* XXX */
 	spin_unlock_bh(&se_nacl->device_list_lock);
 
-	ret = core_dev_add_initiator_node_lun_acl(se_tpg, ft_lun_acl->lun_acl,
+	ret = core_dev_add_initiator_node_lun_acl(se_tpg, lun_acl,
 			lun->unpacked_lun, lun_access);
 	if (ret < 0) {
 		FT_CONF_DBG("link %s to %s ret %d\n",
@@ -533,9 +532,9 @@ static int ft_lun_acl_unlink(struct config_item *lun_acl_ci,
 			     struct config_item *lun_ci)
 {
 	struct se_lun_s *lun;
+	struct se_lun_acl_s *lun_acl;
 	struct se_portal_group_s *se_tpg;
 	struct config_group *tpg_group;
-	struct ft_lun_acl_group *ft_lun_acl;
 	int ret;
 
 	FT_CONF_DBG("unlink %s and %s\n",
@@ -551,14 +550,13 @@ static int ft_lun_acl_unlink(struct config_item *lun_acl_ci,
 		    config_item_name(&tpg_group->cg_item),
 		    config_item_name(lun_acl_ci));
 
-	ft_lun_acl = container_of(to_config_group(lun_acl_ci),
-				   struct ft_lun_acl_group, group);
+	lun_acl = container_of(to_config_group(lun_acl_ci),
+				   struct se_lun_acl_s, se_lun_group);
 	lun = container_of(to_config_group(lun_ci), se_lun_t, lun_group);
 
 	se_tpg = container_of(tpg_group, struct se_portal_group_s, tpg_group);
 
-	ret = core_dev_del_initiator_node_lun_acl(se_tpg, lun,
-						  ft_lun_acl->lun_acl);
+	ret = core_dev_del_initiator_node_lun_acl(se_tpg, lun, lun_acl);
 	if (ret < 0) {
 		FT_CONF_DBG("link %s to %s ret %d\n",
 			    config_item_name(lun_acl_ci),
@@ -568,14 +566,7 @@ static int ft_lun_acl_unlink(struct config_item *lun_acl_ci,
 	return 0;
 }
 
-static void ft_lun_acl_release(struct config_item *item)
-{
-	kfree(container_of(to_config_group(item),
-			   struct ft_lun_acl_group, group));
-}
-
 static struct configfs_item_operations ft_lun_acl_item_ops = {
-	.release =	ft_lun_acl_release,
 	.allow_link =	ft_lun_acl_link,
 	.drop_link =	ft_lun_acl_unlink,
 };
@@ -594,10 +585,9 @@ static struct config_group *ft_add_lun_acl(struct config_group *group,
 					   const char *name)
 {
 	struct se_lun_acl_s *lun_acl;
-	struct ft_tpg *tpg;
-	struct ft_node_acl *acl;
+	struct se_node_acl_s *se_nacl;
+	struct se_portal_group_s *se_tpg;
 	unsigned long index;
-	struct ft_lun_acl_group *ft_lun_acl;
 	int ret;
 
 	FT_CONF_DBG("add lun acl %s\n", name);
@@ -611,47 +601,38 @@ static struct config_group *ft_add_lun_acl(struct config_group *group,
 	if (strict_strtoul(name + 4, 10, &index) || index > UINT_MAX)
 		return NULL;
 
-	acl = container_of(group, struct ft_node_acl, group);
-	tpg = container_of(acl->group.cg_item.ci_group,
-			   struct ft_tpg, acl_group);
+	se_nacl = container_of(group, struct se_node_acl_s, acl_group);
+	se_tpg = se_nacl->se_tpg;
 
 	FT_CONF_DBG("add lun acl %s init name %s\n", name,
-		    config_item_name(&acl->group.cg_item));
+		    config_item_name(&se_nacl->acl_group.cg_item));
 
-	ft_lun_acl = kzalloc(sizeof(*ft_lun_acl), GFP_KERNEL);
-	if (!ft_lun_acl)
+	lun_acl = core_dev_init_initiator_node_lun_acl(se_tpg, index,
+			config_item_name(&se_nacl->acl_group.cg_item), &ret);
+	if (!lun_acl)
 		return NULL;
 
-	lun_acl = core_dev_init_initiator_node_lun_acl(tpg->se_tpg, index,
-			config_item_name(&acl->group.cg_item), &ret);
-	if (!lun_acl) {
-		kfree(ft_lun_acl);
-		return NULL;
-	}
-	ft_lun_acl->lun_acl = lun_acl;
-
-	config_group_init_type_name(&ft_lun_acl->group, name,
+	config_group_init_type_name(&lun_acl->se_lun_group, name,
 				    &ft_lun_acl_cit);
-	return &ft_lun_acl->group;
+
+	return &lun_acl->se_lun_group;
 }
 
 static void ft_del_lun_acl(struct config_group *group,
 			   struct config_item *item)
 {
-	struct ft_node_acl *acl;
-	struct ft_tpg *tpg;
-	struct ft_lun_acl_group *ft_lun_acl;
+	struct se_lun_acl_s *lun_acl;
+	struct se_node_acl_s *se_nacl;
+	struct se_portal_group_s *se_tpg;
 
 	FT_CONF_DBG("del lun acl %s p %p\n", config_item_name(item), item);
 
-	acl = container_of(group, struct ft_node_acl, group);
-	tpg = container_of(acl->group.cg_item.ci_group,
-			   struct ft_tpg, acl_group);
-	ft_lun_acl = container_of(to_config_group(item),
-				  struct ft_lun_acl_group, group);
-	FT_CONF_DBG("del lun acl. tpg %u\n", tpg->index);
+	se_nacl = container_of(group, struct se_node_acl_s, acl_group);
+	se_tpg = se_nacl->se_tpg;
+	lun_acl = container_of(to_config_group(item),
+				struct se_lun_acl_s, se_lun_group);
 
-	core_dev_free_initiator_node_lun_acl(tpg->se_tpg, ft_lun_acl->lun_acl);
+	core_dev_free_initiator_node_lun_acl(se_tpg, lun_acl);
 	config_item_put(item);
 }
 
@@ -666,7 +647,7 @@ static struct configfs_group_operations ft_lun_acl_group_ops = {
 
 static void *ft_acl_from_auth(struct config_item *item)
 {
-	return container_of(item->ci_group, struct ft_node_acl, group);
+	return container_of(item->ci_group, struct se_node_acl_s, acl_group);
 }
 
 static struct ft_attr ft_acl_port_name_attr =
@@ -685,15 +666,6 @@ static struct configfs_attribute *ft_nacl_auth_attrs[] = {
 	NULL,
 };
 
-static void ft_acl_release(struct config_item *item)
-{
-	kfree(container_of(item, struct ft_node_acl, group.cg_item));
-}
-
-static struct configfs_item_operations ft_acl_item_ops = {
-	.release = ft_acl_release,
-};
-
 static struct config_item_type ft_nacl_auth_cit = {
 	.ct_item_ops = &ft_item_ops,
 	.ct_attrs = ft_nacl_auth_attrs,
@@ -701,7 +673,6 @@ static struct config_item_type ft_nacl_auth_cit = {
 };
 
 static struct config_item_type ft_nacl_cit = {
-	.ct_item_ops = &ft_acl_item_ops,
 	.ct_group_ops = &ft_lun_acl_group_ops,
 	.ct_owner = THIS_MODULE,
 };
@@ -718,8 +689,7 @@ static struct config_group *ft_add_acl(struct config_group *group,
 				       const char *name)
 {
 	struct ft_node_acl *acl;
-	struct se_node_acl_s *se_acl;
-	struct config_group *new;
+	struct se_node_acl_s *se_nacl;
 	struct ft_tpg *tpg;
 	u64 wwpn;
 	u32 q_depth;
@@ -731,22 +701,21 @@ static struct config_group *ft_add_acl(struct config_group *group,
 		return NULL;
 
 	q_depth = 32;		/* XXX bogus default - get from tpg? */
-	se_acl = core_tpg_add_initiator_node_acl(tpg->se_tpg, name, q_depth);
-	if (IS_ERR(se_acl) || !se_acl)
+	se_nacl = core_tpg_add_initiator_node_acl(tpg->se_tpg, name, q_depth);
+	if (IS_ERR(se_nacl) || !se_nacl)
 		return NULL;
 
-	acl = se_acl->fabric_acl_ptr;
+	acl = se_nacl->fabric_acl_ptr;
 	acl->node_auth.port_name = wwpn;
-	new = &acl->group;
-	config_group_init_type_name(new, name, &ft_nacl_cit);
+	config_group_init_type_name(&se_nacl->acl_group, name, &ft_nacl_cit);
 	config_group_init_type_name(&acl->auth_group, "auth",
 				    &ft_nacl_auth_cit);
 /* XXXX TBD add se_acl->param_group to groups */
 	acl->groups[0] = &acl->auth_group;
 	acl->groups[3] = NULL;
-	new->default_groups = acl->groups;
+	se_nacl->acl_group.default_groups = acl->groups;
 
-	return new;
+	return &se_nacl->acl_group;
 }
 
 static void ft_del_acl(struct config_group *group, struct config_item *item)
@@ -758,8 +727,9 @@ static void ft_del_acl(struct config_group *group, struct config_item *item)
 	FT_CONF_DBG("del acl %s\n", config_item_name(item));
 
 	tpg = container_of(group, struct ft_tpg, acl_group);
-	acl = container_of(to_config_group(item), struct ft_node_acl, group);
-	se_acl = acl->se_node_acl;
+	se_acl = container_of(to_config_group(item), struct se_node_acl_s,
+			acl_group);
+	acl = se_acl->fabric_acl_ptr;
 
 	FT_CONF_DBG("del acl %p se_acl %p tpg %p se_tpg %p\n",
 		    acl, se_acl, tpg, tpg->se_tpg);
