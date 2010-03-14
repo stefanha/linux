@@ -696,6 +696,8 @@ typedef struct se_dev_entry_s {
 	u64			write_bytes;
 #endif /* SNMP_SUPPORT */
 	atomic_t		ua_count;
+	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
+	atomic_t		pr_ref_count;
 	se_lun_acl_t		*se_lun_acl;
 	spinlock_t		ua_lock;
 	struct se_lun_s		*se_lun;

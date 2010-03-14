@@ -250,6 +250,7 @@ static int core_create_device_list_for_node(se_node_acl_t *nacl)
 		deve = &nacl->device_list[i];
 
 		atomic_set(&deve->ua_count, 0);
+		atomic_set(&deve->pr_ref_count, 0);
 		spin_lock_init(&deve->ua_lock);
 		INIT_LIST_HEAD(&deve->alua_port_list);
 		INIT_LIST_HEAD(&deve->ua_list);
