@@ -939,6 +939,8 @@ typedef struct se_portal_group_s {
 	int			se_tpg_type;
 	/* Number of ACLed Initiator Nodes for this TPG */
 	u32			num_node_acls;
+	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
+	atomic_t		tpg_pr_ref_count;
 	/* Spinlock for adding/removing ACLed Nodes */
 	spinlock_t		acl_node_lock;
 	/* Spinlock for adding/removing sessions */

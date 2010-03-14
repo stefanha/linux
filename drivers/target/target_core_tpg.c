@@ -703,6 +703,7 @@ se_portal_group_t *core_tpg_register(
 	se_tpg->se_tpg_type = se_tpg_type;
 	se_tpg->se_tpg_fabric_ptr = tpg_fabric_ptr;
 	se_tpg->se_tpg_tfo = tfo;
+	atomic_set(&se_tpg->tpg_pr_ref_count, 0);
 	INIT_LIST_HEAD(&se_tpg->acl_node_list);
 	INIT_LIST_HEAD(&se_tpg->se_tpg_list);
 	INIT_LIST_HEAD(&se_tpg->tpg_sess_list);
@@ -743,6 +744,9 @@ int core_tpg_deregister(se_portal_group_t *se_tpg)
 	spin_lock_bh(&se_global->se_tpg_lock);
 	list_del(&se_tpg->se_tpg_list);
 	spin_unlock_bh(&se_global->se_tpg_lock);
+
+	while (atomic_read(&se_tpg->tpg_pr_ref_count) != 0)
+		msleep(100);
 
 	if (se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL)
 		core_tpg_release_virtual_lun0(se_tpg);
