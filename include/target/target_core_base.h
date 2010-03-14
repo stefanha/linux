@@ -642,6 +642,8 @@ typedef struct se_node_acl_s {
 	u64			write_bytes;
 	spinlock_t		stats_lock;
 #endif /* SNMP_SUPPORT */
+	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
+	atomic_t		acl_pr_ref_count;
 	struct se_dev_entry_s	*device_list;
 	struct se_session_s	*nacl_sess;
 	struct se_portal_group_s *se_tpg;
@@ -694,6 +696,8 @@ typedef struct se_dev_entry_s {
 	u64			write_bytes;
 #endif /* SNMP_SUPPORT */
 	atomic_t		ua_count;
+	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
+	atomic_t		pr_ref_count;
 	se_lun_acl_t		*se_lun_acl;
 	spinlock_t		ua_lock;
 	struct se_lun_s		*se_lun;
@@ -939,6 +943,8 @@ typedef struct se_portal_group_s {
 	int			se_tpg_type;
 	/* Number of ACLed Initiator Nodes for this TPG */
 	u32			num_node_acls;
+	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
+	atomic_t		tpg_pr_ref_count;
 	/* Spinlock for adding/removing ACLed Nodes */
 	spinlock_t		acl_node_lock;
 	/* Spinlock for adding/removing sessions */

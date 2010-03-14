@@ -54,6 +54,7 @@
 struct pr_transport_id_holder {
 	int dest_local_nexus;
 	struct t10_pr_registration_s *dest_pr_reg;
+	struct se_portal_group_s *dest_tpg;
 	struct se_node_acl_s *dest_node_acl;
 	struct se_dev_entry_s *dest_se_deve;
 	struct list_head dest_list;
@@ -898,8 +899,12 @@ static int core_scsi3_check_implict_release(
 		 */
 		__core_scsi3_complete_pro_release(dev, nacl, pr_reg, 0);
 		ret = 1;
-/* #warning FIXME: All Registrants, only release reservation when
-   last registration is freed. */
+		/*
+		 * For 'All Registrants' reservation types, all existing
+		 * registrations are still processed as reservation holders
+		 * in core_scsi3_pr_seq_non_holder() after the initial
+		 * reservation holder is implictly released here.
+		 */
 	}
 	spin_unlock(&dev->dev_reservation_lock);
 
@@ -1031,6 +1036,90 @@ void core_scsi3_free_all_registrations(
 	spin_unlock(&pr_tmpl->aptpl_reg_lock);
 }
 
+static int core_scsi3_tpg_depend_item(se_portal_group_t *tpg)
+{
+	return configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
+			&tpg->tpg_group.cg_item);
+}
+
+static void core_scsi3_tpg_undepend_item(se_portal_group_t *tpg)
+{
+	configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
+			&tpg->tpg_group.cg_item);
+
+	atomic_dec(&tpg->tpg_pr_ref_count);
+	smp_mb__after_atomic_dec();
+}
+
+static int core_scsi3_nodeacl_depend_item(se_node_acl_t *nacl)
+{
+	se_portal_group_t *tpg = nacl->se_tpg;
+
+	if (nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+		return 0;
+
+	return configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
+			&nacl->acl_group.cg_item);
+}
+
+static void core_scsi3_nodeacl_undepend_item(se_node_acl_t *nacl)
+{
+	se_portal_group_t *tpg = nacl->se_tpg;
+
+	if (nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
+		atomic_dec(&nacl->acl_pr_ref_count);
+		smp_mb__after_atomic_dec();
+		return;
+	}
+
+	configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
+			&nacl->acl_group.cg_item);	
+
+	atomic_dec(&nacl->acl_pr_ref_count);
+	smp_mb__after_atomic_dec();
+}
+
+static int core_scsi3_lunacl_depend_item(se_dev_entry_t *se_deve)
+{
+	se_lun_acl_t *lun_acl = se_deve->se_lun_acl;
+	se_node_acl_t *nacl;
+	se_portal_group_t *tpg;
+	/*
+	 * For nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+	 */
+	if (!(lun_acl))
+		return 0;
+
+	nacl = lun_acl->se_lun_nacl;
+	tpg = nacl->se_tpg;
+
+	return configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
+			&lun_acl->se_lun_group.cg_item);
+}
+
+static void core_scsi3_lunacl_undepend_item(se_dev_entry_t *se_deve)
+{
+	se_lun_acl_t *lun_acl = se_deve->se_lun_acl;
+	se_node_acl_t *nacl;
+	se_portal_group_t *tpg;
+	/*
+	 * For nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+	 */
+	if (!(lun_acl)) {
+		atomic_dec(&se_deve->pr_ref_count);
+		smp_mb__after_atomic_dec();
+		return;	
+	}
+	nacl = lun_acl->se_lun_nacl;
+	tpg = nacl->se_tpg;
+
+	configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
+			&lun_acl->se_lun_group.cg_item);
+
+	atomic_dec(&se_deve->pr_ref_count);
+	smp_mb__after_atomic_dec();
+}
+
 static int core_scsi3_decode_spec_i_port(
 	se_cmd_t *cmd,
 	se_portal_group_t *tpg,
@@ -1038,19 +1127,22 @@ static int core_scsi3_decode_spec_i_port(
 	int all_tg_pt,
 	int aptpl)
 {
-	se_lun_t *lun = SE_LUN(cmd);
-	se_port_t *port = lun->lun_sep;
+	se_device_t *dev = SE_DEV(cmd);
+	se_port_t *tmp_port;
+	se_portal_group_t *dest_tpg = NULL, *tmp_tpg;
 	se_session_t *se_sess = SE_SESS(cmd);
 	se_node_acl_t *dest_node_acl;
 	se_dev_entry_t *dest_se_deve = NULL, *local_se_deve;
 	t10_pr_registration_t *dest_pr_reg, *local_pr_reg;
 	struct list_head tid_dest_list;
 	struct pr_transport_id_holder *tidh_new, *tidh, *tidh_tmp;
+	struct target_core_fabric_ops *tmp_tf_ops;
 	unsigned char *buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
-	unsigned char *ptr, *i_str = NULL;
+	unsigned char *ptr, *i_str = NULL, proto_ident, tmp_proto_ident;
 	char *iport_ptr = NULL, dest_iport[64];
 	u32 tpdl, tid_len = 0;
 	int ret, dest_local_nexus;
+	u32 dest_rtpi;
 
 	memset(dest_iport, 0, 64);
 	INIT_LIST_HEAD(&tid_dest_list);
@@ -1068,6 +1160,7 @@ static int core_scsi3_decode_spec_i_port(
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 	INIT_LIST_HEAD(&tidh_new->dest_list);
+	tidh_new->dest_tpg = tpg;
 	tidh_new->dest_node_acl = se_sess->se_node_acl;
 	tidh_new->dest_se_deve = local_se_deve;
 
@@ -1103,16 +1196,6 @@ static int core_scsi3_decode_spec_i_port(
 		return PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 	}
 	/*
-	 * struct target_fabric_core_ops->tpg_parse_pr_out_transport_id()
-	 * must exist to parse the fabric dependent transport IDs.
-	 */
-	if (TPG_TFO(tpg)->tpg_parse_pr_out_transport_id == NULL) {
-		printk(KERN_ERR "SPC-3 SPEC_I_PT: Fabric does not"
-			" containing a valid tpg_parse_pr_out_transport_id"
-			" function pointer\n");
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	/*
 	 * Start processing the received transport IDs using the
 	 * receiving I_T Nexus portal's fabric dependent methods to
 	 * obtain the SCSI Initiator Port/Device Identifiers.
@@ -1120,46 +1203,106 @@ static int core_scsi3_decode_spec_i_port(
 	ptr = &buf[28];
 
 	while (tpdl > 0) {
-		i_str = TPG_TFO(tpg)->tpg_parse_pr_out_transport_id(
+		proto_ident = (ptr[0] & 0x0f);
+		dest_tpg = NULL;
+
+		spin_lock(&dev->se_port_lock);
+		list_for_each_entry(tmp_port, &dev->dev_sep_list, sep_list) {
+			tmp_tpg = tmp_port->sep_tpg;
+			if (!(tmp_tpg))
+				continue;
+			tmp_tf_ops = TPG_TFO(tmp_tpg);
+			if (!(tmp_tf_ops))
+				continue;
+			if (!(tmp_tf_ops->get_fabric_proto_ident) ||
+			    !(tmp_tf_ops->tpg_parse_pr_out_transport_id))
+				continue;
+			/*
+			 * Look for the matching proto_ident provided by
+			 * the received TransportID
+			 */
+			tmp_proto_ident = tmp_tf_ops->get_fabric_proto_ident();
+			if (tmp_proto_ident != proto_ident) 
+				continue;
+			dest_rtpi = tmp_port->sep_rtpi;
+
+			i_str = tmp_tf_ops->tpg_parse_pr_out_transport_id(
 					(const char *)ptr, &tid_len,
 					&iport_ptr);
-		if (!(i_str)) {
+			if (!(i_str))
+				continue;
+
+			atomic_inc(&tmp_tpg->tpg_pr_ref_count);
+			smp_mb__after_atomic_inc();
+			spin_unlock(&dev->se_port_lock);
+
+			ret = core_scsi3_tpg_depend_item(tmp_tpg);
+			if (ret != 0) {
+				printk(KERN_ERR " core_scsi3_tpg_depend_item()"
+					" for tmp_tpg\n");
+				atomic_dec(&tmp_tpg->tpg_pr_ref_count);
+				smp_mb__after_atomic_dec();
+				ret = PYX_TRANSPORT_LU_COMM_FAILURE;
+				goto out;
+			}
+			/*
+			 * Locate the desination initiator ACL to be registered
+			 * from the decoded fabric module specific TransportID
+			 * at *i_str.
+			 */
+			spin_lock_bh(&tmp_tpg->acl_node_lock);
+			dest_node_acl = __core_tpg_get_initiator_node_acl(
+						tmp_tpg, i_str);
+			atomic_inc(&dest_node_acl->acl_pr_ref_count);
+			smp_mb__after_atomic_inc();
+			spin_unlock_bh(&tmp_tpg->acl_node_lock);
+
+			if (!(dest_node_acl)) {
+				core_scsi3_tpg_undepend_item(tmp_tpg);
+				spin_lock(&dev->se_port_lock);
+				continue;
+			}
+
+			ret = core_scsi3_nodeacl_depend_item(dest_node_acl);
+			if (ret != 0) {
+				printk(KERN_ERR "configfs_depend_item() failed"
+					" for dest_node_acl->acl_group\n");
+				atomic_dec(&dest_node_acl->acl_pr_ref_count);
+				smp_mb__after_atomic_dec();
+				core_scsi3_tpg_undepend_item(tmp_tpg);
+				ret = PYX_TRANSPORT_LU_COMM_FAILURE;
+				goto out;
+			}
+
+			dest_tpg = tmp_tpg;
+			printk(KERN_INFO "SPC-3 PR SPEC_I_PT: Located %s Node:"
+				" %s Port RTPI: %hu\n",
+				TPG_TFO(dest_tpg)->get_fabric_name(),
+				dest_node_acl->initiatorname, dest_rtpi);
+
+			spin_lock(&dev->se_port_lock);
+			break;
+		}
+		spin_unlock(&dev->se_port_lock);
+		
+		if (!(dest_tpg)) {
 			printk(KERN_ERR "SPC-3 PR SPEC_I_PT: Unable to locate"
-				" i_str from Transport ID\n");
+					" dest_tpg\n");
 			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 			goto out;
 		}
 #if 0
 		printk("SPC-3 PR SPEC_I_PT: Got %s data_length: %u tpdl: %u"
 			" tid_len: %d for %s + %s\n",
-			TPG_TFO(tpg)->get_fabric_name(), cmd->data_length,
+			TPG_TFO(dest_tpg)->get_fabric_name(), cmd->data_length,
 			tpdl, tid_len, i_str, iport_ptr);
 #endif
 		if (tid_len > tpdl) {
 			printk(KERN_ERR "SPC-3 PR SPEC_I_PT: Illegal tid_len:"
 				" %u for Transport ID: %s\n", tid_len, ptr);
+			core_scsi3_nodeacl_undepend_item(dest_node_acl);
+			core_scsi3_tpg_undepend_item(dest_tpg);
 			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
-			goto out;
-		}
-		/*
-		 * Locate the desination initiator ACL to be registered.
-		 */
-		dest_node_acl = core_tpg_get_initiator_node_acl(tpg, i_str);
-		if (!(dest_node_acl)) {
-			printk(KERN_ERR "Unable to locate %s dest_node_acl"
-				" for TransportID: %s %s\n",
-				TPG_TFO(tpg)->get_fabric_name(),
-				i_str, (iport_ptr != NULL) ? iport_ptr : "");
-			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
-			goto out;
-		}
-
-		ret = configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
-				&dest_node_acl->acl_group.cg_item);
-		if (ret != 0) {
-			printk(KERN_ERR "configfs_depend_item() failed for"
-				" dest_node_acl->acl_group\n");
-			ret = PYX_TRANSPORT_LU_COMM_FAILURE;
 			goto out;
 		}
 		/*
@@ -1175,17 +1318,16 @@ static int core_scsi3_decode_spec_i_port(
 					" presented in Transport ID, but no "
 					" active nexus exists for %s Fabric"
 					" Node: %s\n", iport_ptr,
-					TPG_TFO(tpg)->get_fabric_name(),
+					TPG_TFO(dest_tpg)->get_fabric_name(),
 					dest_node_acl->initiatorname);
 				spin_unlock(&dest_node_acl->nacl_sess_lock);
 
-				configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-					&dest_node_acl->acl_group.cg_item);
-
+				core_scsi3_nodeacl_undepend_item(dest_node_acl);
+				core_scsi3_tpg_undepend_item(dest_tpg);
 				ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 				goto out;
 			}
-			TPG_TFO(tpg)->sess_get_initiator_wwn(
+			TPG_TFO(dest_tpg)->sess_get_initiator_wwn(
 					dest_node_acl->nacl_sess,
 					&dest_iport[0], 64);
 			spin_unlock(&dest_node_acl->nacl_sess_lock);
@@ -1195,9 +1337,8 @@ static int core_scsi3_decode_spec_i_port(
 					" %s and iport_ptr: %s do not match!\n",
 					dest_iport, iport_ptr);
 
-				configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-					&dest_node_acl->acl_group.cg_item);
-
+				core_scsi3_nodeacl_undepend_item(dest_node_acl);
+				core_scsi3_tpg_undepend_item(dest_tpg);
 				ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 				goto out;
 			}
@@ -1206,29 +1347,36 @@ static int core_scsi3_decode_spec_i_port(
 		 * Locate the desintation se_dev_entry_t pointer for matching
 		 * RELATIVE TARGET PORT IDENTIFIER on the receiving I_T Nexus
 		 * Target Port.
-		 *
-		 * Note that core_get_se_deve_from_rtpi() will call
-		 * configfs_item_depend() on
-		 * deve->se_lun_acl->se_lun_group.cg_item.
 		 */
 		dest_se_deve = core_get_se_deve_from_rtpi(dest_node_acl,
-					port->sep_rtpi);
+					dest_rtpi);
 		if (!(dest_se_deve)) {
 			printk(KERN_ERR "Unable to locate %s dest_se_deve"
-				" from local RTPI: %hu\n",
-				TPG_TFO(tpg)->get_fabric_name(),
-				port->sep_rtpi);
+				" from destination RTPI: %hu\n",
+				TPG_TFO(dest_tpg)->get_fabric_name(),
+				dest_rtpi);
 
-			configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-				&dest_node_acl->acl_group.cg_item);
-
+			core_scsi3_nodeacl_undepend_item(dest_node_acl);
+			core_scsi3_tpg_undepend_item(dest_tpg);
 			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
+			goto out;
+		}
+		
+		ret = core_scsi3_lunacl_depend_item(dest_se_deve);
+		if (ret < 0) {
+			printk(KERN_ERR "core_scsi3_lunacl_depend_item()"
+					" failed\n");
+			atomic_dec(&dest_se_deve->pr_ref_count);
+			smp_mb__after_atomic_dec();	
+			core_scsi3_nodeacl_undepend_item(dest_node_acl);
+			core_scsi3_tpg_undepend_item(dest_tpg);
+			ret = PYX_TRANSPORT_LU_COMM_FAILURE;
 			goto out;
 		}
 #if 0
 		printk(KERN_INFO "SPC-3 PR SPEC_I_PT: Located %s Node: %s"
 			" dest_se_deve mapped_lun: %u\n",
-			TPG_TFO(tpg)->get_fabric_name(),
+			TPG_TFO(dest_tpg)->get_fabric_name(),
 			dest_node_acl->initiatorname, dest_se_deve->mapped_lun);
 #endif
 		/*
@@ -1236,13 +1384,13 @@ static int core_scsi3_decode_spec_i_port(
 		 * this target port.
 		 */
 		if (dest_se_deve->deve_flags & DEF_PR_REGISTERED) {
-			configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			    &dest_se_deve->se_lun_acl->se_lun_group.cg_item);
-			configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			    &dest_node_acl->acl_group.cg_item);
+			core_scsi3_lunacl_undepend_item(dest_se_deve);
+			core_scsi3_nodeacl_undepend_item(dest_node_acl);
+			core_scsi3_tpg_undepend_item(dest_tpg);
 			ptr += tid_len;
 			tpdl -= tid_len;
 			tid_len = 0;
+			continue;
 		}
 		/*
 		 * Allocate a struct pr_transport_id_holder and setup
@@ -1253,10 +1401,14 @@ static int core_scsi3_decode_spec_i_port(
 				GFP_KERNEL);
 		if (!(tidh_new)) {
 			printk(KERN_ERR "Unable to allocate tidh_new\n");
+			core_scsi3_lunacl_undepend_item(dest_se_deve);
+			core_scsi3_nodeacl_undepend_item(dest_node_acl);
+			core_scsi3_tpg_undepend_item(dest_tpg);
 			ret = PYX_TRANSPORT_LU_COMM_FAILURE;
 			goto out;
 		}
 		INIT_LIST_HEAD(&tidh_new->dest_list);
+		tidh_new->dest_tpg = dest_tpg;
 		tidh_new->dest_node_acl = dest_node_acl;
 		tidh_new->dest_se_deve = dest_se_deve;
 
@@ -1280,10 +1432,10 @@ static int core_scsi3_decode_spec_i_port(
 				dest_node_acl, dest_se_deve,
 				sa_res_key, all_tg_pt, aptpl);
 		if (!(dest_pr_reg)) {
-			configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			    &dest_se_deve->se_lun_acl->se_lun_group.cg_item);
-			configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			    &dest_node_acl->acl_group.cg_item);
+			core_scsi3_lunacl_undepend_item(dest_se_deve);
+			core_scsi3_nodeacl_undepend_item(dest_node_acl);
+			core_scsi3_tpg_undepend_item(dest_tpg);
+			kfree(tidh_new);
 			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 			goto out;
 		}
@@ -1309,6 +1461,7 @@ static int core_scsi3_decode_spec_i_port(
 	 * was received.
 	 */
 	list_for_each_entry_safe(tidh, tidh_tmp, &tid_dest_list, dest_list) {
+		dest_tpg = tidh->dest_tpg;
 		dest_node_acl = tidh->dest_node_acl;
 		dest_se_deve = tidh->dest_se_deve;
 		dest_pr_reg = tidh->dest_pr_reg;
@@ -1322,17 +1475,16 @@ static int core_scsi3_decode_spec_i_port(
 
 		printk(KERN_INFO "SPC-3 PR [%s] SPEC_I_PT: Successfully"
 			" registered Transport ID for Node: %s Mapped LUN:"
-			" %u\n", TPG_TFO(tpg)->get_fabric_name(),
+			" %u\n", TPG_TFO(dest_tpg)->get_fabric_name(),
 				dest_node_acl->initiatorname,
 				dest_se_deve->mapped_lun);
 
 		if (dest_local_nexus)
 			continue;
 
-		configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			&dest_se_deve->se_lun_acl->se_lun_group.cg_item);
-		configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			&dest_node_acl->acl_group.cg_item);
+		core_scsi3_lunacl_undepend_item(dest_se_deve);
+		core_scsi3_nodeacl_undepend_item(dest_node_acl);
+		core_scsi3_tpg_undepend_item(dest_tpg);
 	}
 
 	return 0;
@@ -1342,6 +1494,7 @@ out:
 	 * including *dest_pr_reg and the configfs dependances..
 	 */
 	list_for_each_entry_safe(tidh, tidh_tmp, &tid_dest_list, dest_list) {
+		dest_tpg = tidh->dest_tpg;
 		dest_node_acl = tidh->dest_node_acl;
 		dest_se_deve = tidh->dest_se_deve;
 		dest_pr_reg = tidh->dest_pr_reg;
@@ -1356,10 +1509,9 @@ out:
 		if (dest_local_nexus)
 			continue;
 
-		configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			&dest_se_deve->se_lun_acl->se_lun_group.cg_item);
-		configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			&dest_node_acl->acl_group.cg_item);
+		core_scsi3_lunacl_undepend_item(dest_se_deve);
+		core_scsi3_nodeacl_undepend_item(dest_node_acl);
+		core_scsi3_tpg_undepend_item(dest_tpg);
 	}
 	return ret;
 }
@@ -2753,7 +2905,7 @@ static int core_scsi3_emulate_pro_register_and_move(
 	unsigned char *buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
 	unsigned char *initiator_str;
 	char *iport_ptr = NULL, dest_iport[64];
-	u32 tid_len;
+	u32 tid_len, tmp_tid_len;
 	int new_reg = 0, type, scope, ret;
 	unsigned short rtpi;
 	unsigned char proto_ident;
@@ -2834,13 +2986,17 @@ static int core_scsi3_emulate_pro_register_and_move(
 		dest_tf_ops = TPG_TFO(dest_se_tpg);
 		if (!(dest_tf_ops))
 			continue;
+
+		atomic_inc(&dest_se_tpg->tpg_pr_ref_count);
+		smp_mb__after_atomic_inc();
 		spin_unlock(&dev->se_port_lock);
 
-		ret = configfs_depend_item(dest_tf_ops->tf_subsys,
-				&dest_se_tpg->tpg_group.cg_item);
+		ret = core_scsi3_tpg_depend_item(dest_se_tpg);
 		if (ret != 0) {
-			printk(KERN_ERR "configfs_depend_item() failed for"
-				" dest_se_tpg->tpg_group\n");
+			printk(KERN_ERR "core_scsi3_tpg_depend_item() failed"
+				" for dest_se_tpg\n");
+			atomic_dec(&dest_se_tpg->tpg_pr_ref_count);
+			smp_mb__after_atomic_dec();
 			core_scsi3_put_pr_reg(pr_reg);
 			return PYX_TRANSPORT_LU_COMM_FAILURE;
 		}
@@ -2879,7 +3035,7 @@ static int core_scsi3_emulate_pro_register_and_move(
 		goto out;
 	}
 	initiator_str = dest_tf_ops->tpg_parse_pr_out_transport_id(
-			(const char *)&buf[24], NULL, &iport_ptr);
+			(const char *)&buf[24], &tmp_tid_len, &iport_ptr);
 	if (!(initiator_str)) {
 		printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE: Unable to locate"
 			" initiator_str from Transport ID\n");
@@ -2910,8 +3066,13 @@ static int core_scsi3_emulate_pro_register_and_move(
 	/*
 	 * Locate the destination se_node_acl_t from the received Transport ID
 	 */
-	dest_node_acl = core_tpg_get_initiator_node_acl(dest_se_tpg,
+	spin_lock_bh(&dest_se_tpg->acl_node_lock);
+	dest_node_acl = __core_tpg_get_initiator_node_acl(dest_se_tpg,
 				initiator_str);
+	atomic_inc(&dest_node_acl->acl_pr_ref_count);
+	smp_mb__after_atomic_inc();
+	spin_unlock_bh(&dest_se_tpg->acl_node_lock);
+
 	if (!(dest_node_acl)) {
 		printk(KERN_ERR "Unable to locate %s dest_node_acl for"
 			" TransportID%s\n", dest_tf_ops->get_fabric_name(),
@@ -2919,11 +3080,12 @@ static int core_scsi3_emulate_pro_register_and_move(
 		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 		goto out;
 	}
-	ret = configfs_depend_item(dest_tf_ops->tf_subsys,
-				&dest_node_acl->acl_group.cg_item);
+	ret = core_scsi3_nodeacl_depend_item(dest_node_acl);
 	if (ret != 0) {
-		printk(KERN_ERR "configfs_depend_item() failed for"
-			" dest_node_acl->acl_group\n");
+		printk(KERN_ERR "core_scsi3_nodeacl_depend_item() for"
+			" dest_node_acl\n");
+		atomic_dec(&dest_node_acl->acl_pr_ref_count);
+		smp_mb__after_atomic_dec();
 		ret = PYX_TRANSPORT_LU_COMM_FAILURE;
 		dest_node_acl = NULL;
 		goto out;
@@ -2967,14 +3129,22 @@ static int core_scsi3_emulate_pro_register_and_move(
 	}
 	/*
 	 * Locate the se_dev_entry_t pointer for the matching RELATIVE TARGET
-	 * PORT IDENTIFIER.  core_get_se_deve_from_rtpi() will call
-	 * configfs_item_depend() on deve->se_lun_acl->se_lun_group.cg_item
+	 * PORT IDENTIFIER.
 	 */
 	dest_se_deve = core_get_se_deve_from_rtpi(dest_node_acl, rtpi);
 	if (!(dest_se_deve)) {
 		printk(KERN_ERR "Unable to locate %s dest_se_deve from RTPI:"
 			" %hu\n",  dest_tf_ops->get_fabric_name(), rtpi);
 		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
+		goto out;
+	}
+	
+	ret = core_scsi3_lunacl_depend_item(dest_se_deve);
+	if (ret < 0) {
+		printk(KERN_ERR "core_scsi3_lunacl_depend_item() failed\n");
+		atomic_dec(&dest_se_deve->pr_ref_count);
+		smp_mb__after_atomic_dec();
+		ret = PYX_TRANSPORT_LU_COMM_FAILURE;
 		goto out;
 	}
 #if 0
@@ -3112,12 +3282,9 @@ static int core_scsi3_emulate_pro_register_and_move(
 	 * It is now safe to release configfs group dependencies for destination
 	 * of Transport ID Initiator Device/Port Identifier
 	 */
-	configfs_undepend_item(dest_tf_ops->tf_subsys,
-			&dest_se_deve->se_lun_acl->se_lun_group.cg_item);
-	configfs_undepend_item(dest_tf_ops->tf_subsys,
-			&dest_node_acl->acl_group.cg_item);
-	configfs_undepend_item(dest_tf_ops->tf_subsys,
-			&dest_se_tpg->tpg_group.cg_item);
+	core_scsi3_lunacl_undepend_item(dest_se_deve);
+	core_scsi3_nodeacl_undepend_item(dest_node_acl);
+	core_scsi3_tpg_undepend_item(dest_se_tpg);
 	/*
 	 * h) If the UNREG bit is set to one, unregister (see 5.7.11.3) the I_T
 	 * nexus on which PERSISTENT RESERVE OUT command was received.
@@ -3152,13 +3319,10 @@ static int core_scsi3_emulate_pro_register_and_move(
 	return 0;
 out:
 	if (dest_se_deve)
-		configfs_undepend_item(dest_tf_ops->tf_subsys,
-			&dest_se_deve->se_lun_acl->se_lun_group.cg_item);
+		core_scsi3_lunacl_undepend_item(dest_se_deve);
 	if (dest_node_acl)
-		configfs_undepend_item(dest_tf_ops->tf_subsys,
-				&dest_node_acl->acl_group.cg_item);
-	configfs_undepend_item(dest_tf_ops->tf_subsys,
-			&dest_se_tpg->tpg_group.cg_item);
+		core_scsi3_nodeacl_undepend_item(dest_node_acl);
+	core_scsi3_tpg_undepend_item(dest_se_tpg);
 	core_scsi3_put_pr_reg(pr_reg);
 	return ret;
 }

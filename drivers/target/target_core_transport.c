@@ -54,6 +54,7 @@
 #include <target/target_core_pr.h>
 #include <target/target_core_alua.h>
 #include <target/target_core_tmr.h>
+#include <target/target_core_tpg.h>
 #include <target/target_core_ua.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_plugin.h>
@@ -695,6 +696,8 @@ void transport_deregister_session(se_session_t *se_sess)
 				list_del(&se_nacl->acl_list);
 				se_tpg->num_node_acls--;
 				spin_unlock_bh(&se_tpg->acl_node_lock);
+
+				core_tpg_wait_for_nacl_pr_ref(se_nacl);
 				core_free_device_list_for_node(se_nacl, se_tpg);
 				TPG_TFO(se_tpg)->tpg_release_fabric_acl(se_tpg,
 						se_nacl);

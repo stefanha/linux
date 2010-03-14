@@ -390,11 +390,8 @@ EXPORT_SYMBOL(transport_get_lun_for_tmr);
 
 /*
  * This function is called from core_scsi3_emulate_pro_register_and_move()
- * and will call configfs_depend_item() for &deve->se_lun_acl->se_lun_group
- * to obtain the dependancy for the struct config_group's configfs item.
- *
- * core_scsi3_emulate_pro_register_and_move() (and any other code) is
- * expected to call configfs_undepend_item() once they are done.
+ * and core_scsi3_decode_spec_i_port(), and will increment &deve->pr_ref_count
+ * when a matching rtpi is found.
  */
 se_dev_entry_t *core_get_se_deve_from_rtpi(
 	se_node_acl_t *nacl,
@@ -404,9 +401,7 @@ se_dev_entry_t *core_get_se_deve_from_rtpi(
 	se_lun_t *lun;
 	se_port_t *port;
 	se_portal_group_t *tpg = nacl->se_tpg;
-	struct target_core_fabric_ops *tf_ops = TPG_TFO(tpg);
 	u32 i;
-	int ret;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -431,20 +426,11 @@ se_dev_entry_t *core_get_se_deve_from_rtpi(
 		}
 		if (port->sep_rtpi != rtpi)
 			continue;
+		
+		atomic_inc(&deve->pr_ref_count);
+		smp_mb__after_atomic_inc();
 		spin_unlock_bh(&nacl->device_list_lock);
-		if (!(deve->se_lun_acl)) {
-			printk(KERN_ERR "%s device entries device pointer to"
-				" se_lun_acl cannot be located\n",
-				TPG_TFO(tpg)->get_fabric_name());
-			continue;
-		}
-		ret = configfs_depend_item(tf_ops->tf_subsys,
-				&deve->se_lun_acl->se_lun_group.cg_item);
-		if (ret != 0) {
-			printk(KERN_ERR "configfs_depend_item() failed for"
-				"&deve->se_lun_acl->se_lun_group\n");
-			continue;
-		}
+
 		return deve;
 	}
 	spin_unlock_bh(&nacl->device_list_lock);
@@ -606,6 +592,14 @@ int core_update_device_list_for_node(
 
 		return 0;
 	}
+	/*
+	 * Wait for any in process SPEC_I_PT=1 or REGISTER_AND_MOVE
+	 * PR operation to complete.
+	 */
+	spin_unlock_bh(&nacl->device_list_lock);
+	while (atomic_read(&deve->pr_ref_count) != 0)
+		msleep(100);
+	spin_lock_bh(&nacl->device_list_lock);
 	/*
 	 * Disable se_dev_entry_t LUN ACL mapping
 	 */
