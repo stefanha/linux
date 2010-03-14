@@ -115,7 +115,7 @@ static void core_clear_initiator_node_from_tpg(
  *
  *	spin_lock_bh(&tpg->acl_node_lock); must be held when calling
  */
-static se_node_acl_t *__core_tpg_get_initiator_node_acl(
+se_node_acl_t *__core_tpg_get_initiator_node_acl(
 	se_portal_group_t *tpg,
 	const char *initiatorname)
 {
