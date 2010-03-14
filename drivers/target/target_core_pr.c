@@ -898,8 +898,12 @@ static int core_scsi3_check_implict_release(
 		 */
 		__core_scsi3_complete_pro_release(dev, nacl, pr_reg, 0);
 		ret = 1;
-/* #warning FIXME: All Registrants, only release reservation when
-   last registration is freed. */
+		/*
+		 * For 'All Registrants' reservation types, all existing
+		 * registrations are still processed as reservation holders
+		 * in core_scsi3_pr_seq_non_holder() after the initial
+		 * reservation holder is implictly released here.
+		 */
 	}
 	spin_unlock(&dev->dev_reservation_lock);
 
