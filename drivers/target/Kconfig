@@ -77,3 +77,4 @@ config TCM_LOOP_CDB_DEBUG
 	Say Y here to enable the TCM loopback fabric module CDB debug code
 
 source "drivers/target/lio-target/Kconfig"
+source "drivers/target/tcm_fc/Kconfig"

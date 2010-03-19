@@ -227,9 +227,12 @@ static void fc_lport_ptp_setup(struct fc_lport *lport,
 			       u64 remote_wwnn)
 {
 	mutex_lock(&lport->disc.disc_mutex);
-	if (lport->ptp_rdata)
+	if (lport->ptp_rdata) {
 		lport->tt.rport_logoff(lport->ptp_rdata);
+		kref_put(&lport->ptp_rdata->kref, lport->tt.rport_destroy);
+	}
 	lport->ptp_rdata = lport->tt.rport_create(lport, remote_fid);
+	kref_get(&lport->ptp_rdata->kref);
 	lport->ptp_rdata->ids.port_name = remote_wwpn;
 	lport->ptp_rdata->ids.node_name = remote_wwnn;
 	mutex_unlock(&lport->disc.disc_mutex);
@@ -654,6 +657,7 @@ int fc_lport_destroy(struct fc_lport *lport)
 	lport->tt.fcp_abort_io(lport);
 	lport->tt.disc_stop_final(lport);
 	lport->tt.exch_mgr_reset(lport, 0, 0);
+	fc_fc4_del_lport(lport);
 	return 0;
 }
 EXPORT_SYMBOL(fc_lport_destroy);
@@ -831,7 +835,7 @@ static void fc_lport_recv_flogi_req(struct fc_seq *sp_in,
 		 */
 		f_ctl = FC_FC_EX_CTX | FC_FC_LAST_SEQ | FC_FC_END_SEQ;
 		ep = fc_seq_exch(sp);
-		fc_fill_fc_hdr(fp, FC_RCTL_ELS_REP, ep->did, ep->sid,
+		fc_fill_fc_hdr(fp, FC_RCTL_ELS_REP, remote_fid, local_fid,
 			       FC_TYPE_ELS, f_ctl, 0);
 		lport->tt.seq_send(lport, sp, fp);
 
@@ -847,7 +851,7 @@ out:
 }
 
 /**
- * fc_lport_recv_req() - The generic lport request handler
+ * fc_lport_recv_els_req() - The generic lport ELS request handler
  * @lport: The local port that received the request
  * @sp:	   The sequence the request is on
  * @fp:	   The request frame
@@ -858,10 +862,10 @@ out:
  * Locking Note: This function should not be called with the lport
  *		 lock held becuase it will grab the lock.
  */
-static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
-			      struct fc_frame *fp)
+static void fc_lport_recv_els_req(struct fc_lport *lport, struct fc_seq *sp,
+				  struct fc_frame *fp)
 {
-	struct fc_frame_header *fh = fc_frame_header_get(fp);
+	struct fc_frame_header *fh;
 	void (*recv) (struct fc_seq *, struct fc_frame *, struct fc_lport *);
 
 	mutex_lock(&lport->lp_mutex);
@@ -873,8 +877,7 @@ static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
 	 */
 	if (!lport->link_up)
 		fc_frame_free(fp);
-	else if (fh->fh_type == FC_TYPE_ELS &&
-		 fh->fh_r_ctl == FC_RCTL_ELS_REQ) {
+	else {
 		/*
 		 * Check opcode.
 		 */
@@ -903,17 +906,59 @@ static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
 		}
 
 		recv(sp, fp, lport);
-	} else {
-		FC_LPORT_DBG(lport, "dropping invalid frame (eof %x)\n",
-			     fr_eof(fp));
-		fc_frame_free(fp);
 	}
 	mutex_unlock(&lport->lp_mutex);
+	lport->tt.exch_done(sp);
+}
+
+static int fc_lport_els_prli(struct fc_rport_priv *rdata, u32 spp_len,
+			     const struct fc_els_spp *spp_in,
+			     struct fc_els_spp *spp_out)
+{
+	return FC_SPP_RESP_INVL;
+}
+
+struct fc4_prov fc_lport_els_prov = {
+	.prli = fc_lport_els_prli,
+	.recv = fc_lport_recv_els_req,
+};
+
+/**
+ * fc_lport_recv_req() - The generic lport request handler
+ * @lport: The lport that received the request
+ * @sp: The sequence the request is on
+ * @fp: The frame the request is in
+ *
+ * Locking Note: This function should not be called with the lport
+ *		 lock held becuase it may grab the lock.
+ */
+static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
+			      struct fc_frame *fp)
+{
+	struct fc_frame_header *fh = fc_frame_header_get(fp);
+	struct fc4_prov *prov;
 
 	/*
-	 *  The common exch_done for all request may not be good
-	 *  if any request requires longer hold on exhange. XXX
+	 * Use RCU read lock and module_lock to be sure module doesn't
+	 * deregister and get unloaded while we're calling it.
+	 * try_module_get() is inlined and accepts a NULL parameter.
+	 * Only ELSes and FCP target ops should come through here.
+	 * The locking is unfortunate, and a better scheme is being sought.
 	 */
+	rcu_read_lock();
+	if (fh->fh_type >= FC_FC4_PROV_SIZE)
+		goto drop;
+	prov = rcu_dereference(fc_passive_prov[fh->fh_type]);
+	if (!prov || !try_module_get(prov->module))
+		goto drop;
+	rcu_read_unlock();
+	prov->recv(lport, sp, fp);
+	module_put(prov->module);
+	return;
+drop:
+	rcu_read_unlock();
+	FC_LPORT_DBG(lport, "dropping unexpected frame type %x\n", fh->fh_type);
+	fc_frame_free(fp);
 	lport->tt.exch_done(sp);
 }
 
@@ -946,7 +991,11 @@ static void fc_lport_reset_locked(struct fc_lport *lport)
 	if (lport->dns_rdata)
 		lport->tt.rport_logoff(lport->dns_rdata);
 
-	lport->ptp_rdata = NULL;
+	if (lport->ptp_rdata) {
+		lport->tt.rport_logoff(lport->ptp_rdata);
+		kref_put(&lport->ptp_rdata->kref, lport->tt.rport_destroy);
+		lport->ptp_rdata = NULL;
+	}
 
 	lport->tt.disc_stop(lport);
 
@@ -1597,6 +1646,7 @@ int fc_lport_init(struct fc_lport *lport)
 		fc_host_supported_speeds(lport->host) |= FC_PORTSPEED_1GBIT;
 	if (lport->link_supported_speeds & FC_PORTSPEED_10GBIT)
 		fc_host_supported_speeds(lport->host) |= FC_PORTSPEED_10GBIT;
+	fc_fc4_add_lport(lport);
 
 	return 0;
 }
