@@ -752,6 +752,15 @@ void core_export_port(
  */
 void core_release_port(se_device_t *dev, se_port_t *port)
 {
+	/*
+	 * Wait for any port reference for PR ALL_TG_PT=1 operation
+	 * to complete in __core_scsi3_alloc_registration()
+	 */
+	spin_unlock(&dev->se_port_lock);
+	if (atomic_read(&port->sep_tg_pt_ref_cnt))
+		msleep(100);
+	spin_lock(&dev->se_port_lock);
+
 	core_alua_free_tg_pt_gp_mem(port);
 
 	list_del(&port->sep_list);
