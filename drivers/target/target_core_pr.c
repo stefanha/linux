@@ -568,7 +568,7 @@ static int core_scsi3_pr_reservation_check(
 	return ret;
 }
 
-static t10_pr_registration_t *__core_scsi3_alloc_registration(
+static t10_pr_registration_t *__core_scsi3_do_alloc_registration(
 	se_device_t *dev,
 	se_node_acl_t *nacl,
 	se_dev_entry_t *deve,
@@ -596,6 +596,8 @@ static t10_pr_registration_t *__core_scsi3_alloc_registration(
 	INIT_LIST_HEAD(&pr_reg->pr_reg_list);
 	INIT_LIST_HEAD(&pr_reg->pr_reg_abort_list);
 	INIT_LIST_HEAD(&pr_reg->pr_reg_aptpl_list);
+	INIT_LIST_HEAD(&pr_reg->pr_reg_atp_list);
+	INIT_LIST_HEAD(&pr_reg->pr_reg_atp_mem_list);
 	atomic_set(&pr_reg->pr_res_holders, 0);
 	pr_reg->pr_reg_nacl = nacl;
 	pr_reg->pr_reg_deve = deve;
@@ -607,6 +609,143 @@ static t10_pr_registration_t *__core_scsi3_alloc_registration(
 	pr_reg->pr_reg_tg_pt_lun = deve->se_lun;
 
 	return pr_reg;
+}
+
+static int core_scsi3_lunacl_depend_item(se_dev_entry_t *);
+static void core_scsi3_lunacl_undepend_item(se_dev_entry_t *);
+
+/*
+ * Function used for handling PR registrations for ALL_TG_PT=1 and ALL_TG_PT=0
+ * modes.
+ */
+static t10_pr_registration_t *__core_scsi3_alloc_registration(
+	se_device_t *dev,
+	se_node_acl_t *nacl,
+	se_dev_entry_t *deve,
+	u64 sa_res_key,
+	int all_tg_pt,
+	int aptpl)
+{
+	se_dev_entry_t *deve_tmp;
+	se_node_acl_t *nacl_tmp;
+	se_port_t *port, *port_tmp;
+	struct target_core_fabric_ops *tfo = nacl->se_tpg->se_tpg_tfo;
+	t10_pr_registration_t *pr_reg, *pr_reg_atp, *pr_reg_tmp, *pr_reg_tmp_safe;
+	int ret;
+	/*
+	 * Create a registration for the I_T Nexus upon which the
+	 * PROUT REGISTER was received.
+	 */
+	pr_reg = __core_scsi3_do_alloc_registration(dev, nacl, deve,
+			sa_res_key, all_tg_pt, aptpl);
+	if (!(pr_reg))
+		return NULL;
+	/*
+	 * Return pointer to pr_reg for ALL_TG_PT=0
+	 */
+	if (!(all_tg_pt))
+		return pr_reg;
+	/*
+	 * Create list of matching SCSI Initiator Port registrations
+	 * for ALL_TG_PT=1
+	 */
+	spin_lock(&dev->se_port_lock);
+	list_for_each_entry_safe(port, port_tmp, &dev->dev_sep_list, sep_list) {
+		atomic_inc(&port->sep_tg_pt_ref_cnt);
+		smp_mb__after_atomic_inc();
+		spin_unlock(&dev->se_port_lock);
+
+		spin_lock_bh(&port->sep_alua_lock);
+		list_for_each_entry(deve_tmp, &port->sep_alua_list,
+					alua_port_list) {
+			/*
+			 * This pointer will be NULL for demo mode MappedLUNs
+			 * that have not been make explict via a ConfigFS
+			 * MappedLUN group for the SCSI Initiator Node ACL.
+			 */
+			if (!(deve_tmp->se_lun_acl))
+				continue;
+
+			nacl_tmp = deve_tmp->se_lun_acl->se_lun_nacl;
+			/*
+			 * Skip the matching se_node_acl_t that is allocated
+			 * above..
+			 */
+			if (nacl == nacl_tmp)
+				continue;
+			/*
+			 * Only perform PR registrations for target ports on
+			 * the same fabric module as the REGISTER w/ ALL_TG_PT=1			
+			 * arrived.
+			 */
+			if (tfo != nacl_tmp->se_tpg->se_tpg_tfo)
+				continue;
+			/*
+			 * Look for a matching Initiator Node ACL in ASCII format
+			 */
+			if (strcmp(nacl->initiatorname, nacl_tmp->initiatorname))
+				continue;
+
+			atomic_inc(&deve_tmp->pr_ref_count);
+			smp_mb__after_atomic_inc();
+			spin_unlock_bh(&port->sep_alua_lock);
+			/*
+			 * Grab a configfs group dependency that is released
+			 * for the exception path at label out: below, or upon
+			 * completion of adding ALL_TG_PT=1 registrations in
+			 * __core_scsi3_add_registration()
+			 */
+			ret = core_scsi3_lunacl_depend_item(deve_tmp);
+			if (ret < 0) {
+				printk(KERN_ERR "core_scsi3_lunacl_depend"
+						"_item() failed\n");
+				atomic_dec(&port->sep_tg_pt_ref_cnt);
+				smp_mb__after_atomic_dec();
+				atomic_dec(&deve_tmp->pr_ref_count);
+				smp_mb__after_atomic_dec();
+				goto out;
+			}
+			/*
+			 * Located a matching SCSI Initiator Port on a different
+			 * port, allocate the pr_reg_atp and attach it to the
+			 * pr_reg->pr_reg_atp_list that will be processed once
+			 * the original *pr_reg is processed in
+			 * __core_scsi3_add_registration()
+			 */
+			pr_reg_atp = __core_scsi3_do_alloc_registration(dev,
+						nacl_tmp, deve_tmp, sa_res_key,
+						all_tg_pt, aptpl);
+			if (!(pr_reg_atp)) {
+				atomic_dec(&port->sep_tg_pt_ref_cnt);
+				smp_mb__after_atomic_dec();
+				atomic_dec(&deve_tmp->pr_ref_count);
+				smp_mb__after_atomic_dec();
+				core_scsi3_lunacl_undepend_item(deve_tmp);
+				goto out;
+			}
+
+			list_add_tail(&pr_reg_atp->pr_reg_atp_mem_list,
+				      &pr_reg->pr_reg_atp_list);
+			spin_lock_bh(&port->sep_alua_lock);
+		}
+		spin_unlock_bh(&port->sep_alua_lock);
+
+		spin_lock(&dev->se_port_lock);
+		atomic_dec(&port->sep_tg_pt_ref_cnt);
+		smp_mb__after_atomic_dec();
+	}
+	spin_unlock(&dev->se_port_lock);
+
+	return pr_reg;
+out:
+	list_for_each_entry_safe(pr_reg_tmp, pr_reg_tmp_safe,
+			&pr_reg->pr_reg_atp_list, pr_reg_atp_mem_list) {
+		list_del(&pr_reg_tmp->pr_reg_atp_mem_list);
+		core_scsi3_lunacl_undepend_item(pr_reg_tmp->pr_reg_deve);
+		kmem_cache_free(t10_pr_reg_cache, pr_reg_tmp);
+	}
+	kmem_cache_free(t10_pr_reg_cache, pr_reg);
+	return NULL;
 }
 
 int core_scsi3_alloc_aptpl_registration(
@@ -638,6 +777,8 @@ int core_scsi3_alloc_aptpl_registration(
 	INIT_LIST_HEAD(&pr_reg->pr_reg_list);
 	INIT_LIST_HEAD(&pr_reg->pr_reg_abort_list);
 	INIT_LIST_HEAD(&pr_reg->pr_reg_aptpl_list);
+	INIT_LIST_HEAD(&pr_reg->pr_reg_atp_list);
+	INIT_LIST_HEAD(&pr_reg->pr_reg_atp_mem_list);
 	atomic_set(&pr_reg->pr_res_holders, 0);
 	pr_reg->pr_reg_nacl = NULL;
 	pr_reg->pr_reg_deve = NULL;
@@ -774,6 +915,32 @@ int core_scsi3_check_aptpl_registration(
 				lun->unpacked_lun, nacl, deve);
 }
 
+static void __core_scsi3_dump_registration(
+	struct target_core_fabric_ops *tfo,
+	se_device_t *dev,
+	se_node_acl_t *nacl,
+	t10_pr_registration_t *pr_reg,
+	int register_type)
+{
+	se_portal_group_t *se_tpg = nacl->se_tpg;
+
+	printk(KERN_INFO "SPC-3 PR [%s] Service Action: REGISTER%s Initiator"
+		" Node: %s\n", tfo->get_fabric_name(), (register_type == 2) ?
+		"_AND_MOVE" : (register_type == 1) ?
+		"_AND_IGNORE_EXISTING_KEY" : "", nacl->initiatorname);
+	printk(KERN_INFO "SPC-3 PR [%s] registration on Target Port: %s,0x%04x\n",
+		 tfo->get_fabric_name(), tfo->tpg_get_wwn(se_tpg),
+		tfo->tpg_get_tag(se_tpg));
+	printk(KERN_INFO "SPC-3 PR [%s] for %s TCM Subsystem %s Object Target"
+		" Port(s)\n",  tfo->get_fabric_name(),
+		(pr_reg->pr_reg_all_tg_pt) ? "ALL" : "SINGLE",
+		TRANSPORT(dev)->name);
+	printk(KERN_INFO "SPC-3 PR [%s] SA Res Key: 0x%016Lx PRgeneration:"
+		" 0x%08x  APTPL: %d\n", tfo->get_fabric_name(),
+		pr_reg->pr_res_key, pr_reg->pr_res_generation,
+		pr_reg->pr_reg_aptpl);
+}
+
 /*
  * this function can be called with se_device_t->dev_reservation_lock
  * when register_move = 1
@@ -787,6 +954,7 @@ static void __core_scsi3_add_registration(
 {
 	se_subsystem_dev_t *su_dev = SU_DEV(dev);
 	struct target_core_fabric_ops *tfo = nacl->se_tpg->se_tpg_tfo;
+	t10_pr_registration_t *pr_reg_tmp, *pr_reg_tmp_safe;
 	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
 
 	/*
@@ -806,21 +974,38 @@ static void __core_scsi3_add_registration(
 	list_add_tail(&pr_reg->pr_reg_list, &pr_tmpl->registration_list);
 	pr_reg->pr_reg_deve->deve_flags |= DEF_PR_REGISTERED;
 
-	printk(KERN_INFO "SPC-3 PR [%s] Service Action: REGISTER%s Initiator"
-		" Node: %s\n", tfo->get_fabric_name(), (register_type == 2) ?
-		"_AND_MOVE" : (register_type == 1) ?
-		"_AND_IGNORE_EXISTING_KEY" : "", nacl->initiatorname);
-	printk(KERN_INFO "SPC-3 PR [%s] for %s TCM Subsystem %s Object Target"
-		" Port(s)\n",  tfo->get_fabric_name(),
-		(pr_reg->pr_reg_all_tg_pt) ? "ALL" : "SINGLE",
-		TRANSPORT(dev)->name);
-	printk(KERN_INFO "SPC-3 PR [%s] SA Res Key: 0x%016Lx PRgeneration:"
-		" 0x%08x  APTPL: %d\n", tfo->get_fabric_name(),
-		pr_reg->pr_res_key, pr_reg->pr_res_generation,
-		pr_reg->pr_reg_aptpl);
+	__core_scsi3_dump_registration(tfo, dev, nacl, pr_reg, register_type);
 	spin_unlock(&pr_tmpl->registration_lock);
+	/*
+	 * Skip extra processing for ALL_TG_PT=0 or REGISTER_AND_MOVE.
+	 */
+	if (!(pr_reg->pr_reg_all_tg_pt) || (register_move))
+		return;
+	/*
+	 * Walk pr_reg->pr_reg_atp_list and add registrations for ALL_TG_PT=1
+	 * allocated in __core_scsi3_alloc_registration()
+	 */
+	list_for_each_entry_safe(pr_reg_tmp, pr_reg_tmp_safe,
+			&pr_reg->pr_reg_atp_list, pr_reg_atp_mem_list) {
+		list_del(&pr_reg_tmp->pr_reg_atp_mem_list);
 
-	return;
+		pr_reg_tmp->pr_res_generation = core_scsi3_pr_generation(dev);
+
+		spin_lock(&pr_tmpl->registration_lock);
+		list_add_tail(&pr_reg_tmp->pr_reg_list,
+			      &pr_tmpl->registration_list);
+		pr_reg_tmp->pr_reg_deve->deve_flags |= DEF_PR_REGISTERED;
+
+		__core_scsi3_dump_registration(tfo, dev,
+				pr_reg_tmp->pr_reg_nacl, pr_reg_tmp,
+				register_type);
+		spin_unlock(&pr_tmpl->registration_lock);
+		/*
+		 * Drop configfs group dependency reference from
+		 * __core_scsi3_alloc_registration()
+		 */
+		core_scsi3_lunacl_undepend_item(pr_reg_tmp->pr_reg_deve);
+	}
 }
 
 static int core_scsi3_alloc_registration(
@@ -1134,6 +1319,7 @@ static int core_scsi3_decode_spec_i_port(
 	se_node_acl_t *dest_node_acl;
 	se_dev_entry_t *dest_se_deve = NULL, *local_se_deve;
 	t10_pr_registration_t *dest_pr_reg, *local_pr_reg;
+	t10_pr_registration_t *pr_reg_tmp, *pr_reg_tmp_safe;
 	struct list_head tid_dest_list;
 	struct pr_transport_id_holder *tidh_new, *tidh, *tidh_tmp;
 	struct target_core_fabric_ops *tmp_tf_ops;
@@ -1193,7 +1379,8 @@ static int core_scsi3_decode_spec_i_port(
 		printk(KERN_ERR "SPC-3 PR: Illegal tpdl: %u + 28 byte header"
 			" does not equal CDB data_length: %u\n", tpdl,
 			cmd->data_length);
-		return PYX_TRANSPORT_INVALID_PARAMETER_LIST;
+		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
+		goto out;
 	}
 	/*
 	 * Start processing the received transport IDs using the
@@ -1502,6 +1689,17 @@ out:
 
 		list_del(&tidh->dest_list);
 		kfree(tidh);
+		/*
+		 * Release any extra ALL_TG_PT=1 registrations for
+		 * the SPEC_I_PT=1 case.
+		 */
+		list_for_each_entry_safe(pr_reg_tmp, pr_reg_tmp_safe,
+				&dest_pr_reg->pr_reg_atp_list,
+				pr_reg_atp_mem_list) {
+			list_del(&pr_reg_tmp->pr_reg_atp_mem_list);
+			core_scsi3_lunacl_undepend_item(pr_reg_tmp->pr_reg_deve);
+			kmem_cache_free(t10_pr_reg_cache, pr_reg_tmp);
+		}
 
 		kfree(dest_pr_reg->pr_aptpl_buf);
 		kmem_cache_free(t10_pr_reg_cache, dest_pr_reg);
@@ -2000,18 +2198,6 @@ static int core_scsi3_pro_reserve(
 		printk(KERN_ERR "SPC-3 PR: Unable to locate"
 			" PR_REGISTERED *pr_reg for RESERVE\n");
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	/*
-	 * For a given ALL_TG_PT=0 PR registration, a recevied PR reserve must
-	 * be on the same matching se_portal_group_t + se_lun_t.
-	 */
-	if (!(pr_reg->pr_reg_all_tg_pt) &&
-	     (pr_reg->pr_reg_tg_pt_lun != se_lun)) {
-		printk(KERN_ERR "SPC-3 PR: Unable to handle RESERVE because"
-			" ALL_TG_PT=0 and RESERVE was not received on same"
-			" target port as REGISTER\n");
-		core_scsi3_put_pr_reg(pr_reg);
-		return PYX_TRANSPORT_RESERVATION_CONFLICT;
 	}
 	/*
 	 * From spc4r17 Section 5.7.9: Reserving:

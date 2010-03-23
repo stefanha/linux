@@ -361,6 +361,8 @@ typedef struct t10_pr_registration_s {
 	struct list_head pr_reg_list;
 	struct list_head pr_reg_abort_list;
 	struct list_head pr_reg_aptpl_list;
+	struct list_head pr_reg_atp_list;
+	struct list_head pr_reg_atp_mem_list;
 } ____cacheline_aligned t10_pr_registration_t;
 
 typedef struct t10_reservation_template_s {
@@ -931,6 +933,8 @@ typedef struct se_port_s {
 	/* Used for ALUA Target Port Groups membership */
 	atomic_t	sep_tg_pt_gp_active;
 	atomic_t	sep_tg_pt_secondary_offline;
+	/* Used for PR ALL_TG_PT=1 */
+	atomic_t	sep_tg_pt_ref_cnt;
 	spinlock_t	sep_alua_lock;
 	struct mutex	sep_tg_pt_md_mutex;
 	struct t10_alua_tg_pt_gp_member_s *sep_alua_tg_pt_gp_mem;
