@@ -1440,8 +1440,10 @@ static int core_scsi3_decode_spec_i_port(
 			spin_lock_bh(&tmp_tpg->acl_node_lock);
 			dest_node_acl = __core_tpg_get_initiator_node_acl(
 						tmp_tpg, i_str);
-			atomic_inc(&dest_node_acl->acl_pr_ref_count);
-			smp_mb__after_atomic_inc();
+			if (dest_node_acl) {
+				atomic_inc(&dest_node_acl->acl_pr_ref_count);
+				smp_mb__after_atomic_inc();
+			}
 			spin_unlock_bh(&tmp_tpg->acl_node_lock);
 
 			if (!(dest_node_acl)) {
