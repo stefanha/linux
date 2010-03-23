@@ -1193,7 +1193,8 @@ static int core_scsi3_decode_spec_i_port(
 		printk(KERN_ERR "SPC-3 PR: Illegal tpdl: %u + 28 byte header"
 			" does not equal CDB data_length: %u\n", tpdl,
 			cmd->data_length);
-		return PYX_TRANSPORT_INVALID_PARAMETER_LIST;
+		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
+		goto out;
 	}
 	/*
 	 * Start processing the received transport IDs using the
