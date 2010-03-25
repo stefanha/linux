@@ -2198,6 +2198,24 @@ static int core_scsi3_emulate_pro_register(
 				pr_reg->pr_reg_nacl->initiatorname,
 				pr_reg->pr_res_key, pr_reg->pr_res_generation);
 
+			if (!(aptpl)) {
+				pr_tmpl->pr_aptpl_active = 0;
+				core_scsi3_update_and_write_aptpl(dev, NULL, 0);
+				printk("SPC-3 PR: Set APTPL Bit Deactivated"
+						" for REGISTER\n");
+				return 0;
+			}
+
+			ret = core_scsi3_update_and_write_aptpl(dev,
+					&pr_aptpl_buf[0],
+					pr_tmpl->pr_aptpl_buf_len);
+			if (!(ret)) {
+				pr_tmpl->pr_aptpl_active = 1;
+				printk("SPC-3 PR: Set APTPL Bit Activated"
+						" for REGISTER\n");
+			}
+
+			kfree(pr_aptpl_buf);
 			core_scsi3_put_pr_reg(pr_reg);
 		}
 	}
