@@ -1068,7 +1068,11 @@ static int core_scsi3_check_implict_release(
 
 	spin_lock(&dev->dev_reservation_lock);
 	pr_res_holder = dev->dev_pr_res_holder;
-	if ((pr_res_holder != NULL) && (pr_res_holder == pr_reg)) {
+	if (!(pr_res_holder)) {
+		spin_unlock(&dev->dev_reservation_lock);
+		return ret;
+	}
+	if (pr_res_holder == pr_reg) {
 		/*
 		 * Perform an implict RELEASE if the registration that
 		 * is being released is holding the reservation.
@@ -1090,6 +1094,15 @@ static int core_scsi3_check_implict_release(
 		 * in core_scsi3_pr_seq_non_holder() after the initial
 		 * reservation holder is implictly released here.
 		 */
+	} else if (pr_reg->pr_reg_all_tg_pt &&
+		  (!strcmp(pr_res_holder->pr_reg_nacl->initiatorname,
+			  pr_reg->pr_reg_nacl->initiatorname)) &&
+		  (pr_res_holder->pr_res_key == pr_reg->pr_res_key)) {
+		printk(KERN_ERR "SPC-3 PR: Unable to perform ALL_TG_PT=1"
+			" UNREGISTER while existing reservation with matching"
+			" key 0x%016Lx is present from another SCSI Initiator"
+			" Port\n", pr_reg->pr_res_key);
+		ret = -1;
 	}
 	spin_unlock(&dev->dev_reservation_lock);
 
@@ -1939,7 +1952,7 @@ static int core_scsi3_emulate_pro_register(
 	se_dev_entry_t *se_deve;
 	se_lun_t *se_lun = SE_LUN(cmd);
 	se_portal_group_t *se_tpg;
-	t10_pr_registration_t *pr_reg, *pr_reg_p;
+	t10_pr_registration_t *pr_reg, *pr_reg_p, *pr_reg_tmp;
 	t10_reservation_template_t *pr_tmpl = &SU_DEV(dev)->t10_reservation;
 	/* Used for APTPL metadata w/ UNREGISTER */
 	unsigned char *pr_aptpl_buf = NULL;
@@ -2054,6 +2067,17 @@ static int core_scsi3_emulate_pro_register(
 			return PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 		}
 		/*
+		 * An existing ALL_TG_PT=1 registration being released
+		 * must also set ALL_TG_PT=1 in the incoming PROUT.
+		 */
+		if (pr_reg->pr_reg_all_tg_pt && !(all_tg_pt)) {
+			printk(KERN_ERR "SPC-3 PR UNREGISTER: ALL_TG_PT=1"
+				" registration exists, but ALL_TG_PT=1 bit not"
+				" present in received PROUT\n");
+			core_scsi3_put_pr_reg(pr_reg);
+			return PYX_TRANSPORT_INVALID_CDB_FIELD;	
+		}
+		/*
 		 * Allocate APTPL metadata buffer used for UNREGISTER ops
 		 */
 		if (aptpl) {
@@ -2074,8 +2098,39 @@ static int core_scsi3_emulate_pro_register(
 		if (!(sa_res_key)) {
 			pr_holder = core_scsi3_check_implict_release(
 					SE_DEV(cmd), pr_reg);
+			if (pr_holder < 0) {
+				kfree(pr_aptpl_buf);
+				core_scsi3_put_pr_reg(pr_reg);
+				return PYX_TRANSPORT_RESERVATION_CONFLICT;
+			}
 
 			spin_lock(&pr_tmpl->registration_lock);
+			/*
+			 * Release all ALL_TG_PT=1 for the matching SCSI Initiator Port
+			 * and matching pr_res_key.
+			 */
+			if (pr_reg->pr_reg_all_tg_pt) {
+				list_for_each_entry_safe(pr_reg_p, pr_reg_tmp,
+						&pr_tmpl->registration_list,
+						pr_reg_list) {
+
+					if (!(pr_reg_p->pr_reg_all_tg_pt))
+						continue;
+
+					if (pr_reg_p->pr_res_key != res_key)
+						continue;
+
+					if (pr_reg == pr_reg_p)
+						continue;
+
+					if (strcmp(pr_reg->pr_reg_nacl->initiatorname,
+						   pr_reg_p->pr_reg_nacl->initiatorname))
+						continue;
+
+					__core_scsi3_free_registration(dev,
+							pr_reg_p, NULL, 0);
+				}
+			}
 			/*
 			 * Release the calling I_T Nexus registration now..
 			 */
