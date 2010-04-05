@@ -30,7 +30,7 @@
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/version.h>
-#include <linux/utsrelease.h>
+#include <generated/utsrelease.h>
 #include <linux/utsname.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>

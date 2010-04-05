@@ -24,7 +24,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/version.h>
-#include <linux/utsrelease.h>
+#include <generated/utsrelease.h>
 #include <linux/utsname.h>
 #include <linux/init.h>
 #include <linux/fs.h>
