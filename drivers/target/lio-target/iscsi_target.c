@@ -1263,7 +1263,7 @@ u32 lio_sess_get_index(se_session_t *se_sess)
 }
 #endif /* SNMP_SUPPORT */
 
-u32 lio_sess_get_initiator_wwn(
+u32 lio_sess_get_initiator_sid(
 	se_session_t *se_sess,
 	unsigned char *buf,
 	u32 size)
