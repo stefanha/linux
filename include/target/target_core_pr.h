@@ -50,8 +50,8 @@ extern int core_pr_dump_initiator_port(struct t10_pr_registration_s *,
 extern int core_scsi2_emulate_crh(struct se_cmd_s *);
 extern int core_scsi3_alloc_aptpl_registration(
 			struct t10_reservation_template_s *, u64,
-			unsigned char *, u32, unsigned char *, u16, u32,
-			int, int, u8);
+			unsigned char *, unsigned char *, u32,
+			unsigned char *, u16, u32, int, int, u8);
 extern int core_scsi3_check_aptpl_registration(struct se_device_s *,
 			struct se_portal_group_s *, struct se_lun_s *,
 			struct se_lun_acl_s *);

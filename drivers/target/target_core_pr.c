@@ -814,6 +814,7 @@ int core_scsi3_alloc_aptpl_registration(
 	t10_reservation_template_t *pr_tmpl,
 	u64 sa_res_key,
 	unsigned char *i_port,
+	unsigned char *isid,
 	u32 mapped_lun,
 	unsigned char *t_port,
 	u16 tpgt,
@@ -853,6 +854,15 @@ int core_scsi3_alloc_aptpl_registration(
 	pr_reg->pr_res_scope = 0; /* Always LUN_SCOPE */
 	pr_reg->pr_res_type = type;
 	/*
+	 * If an ISID value had been saved in APTPL metadata for this
+	 * SCSI Initiator Port, restore it now.
+	 */
+	if (isid != NULL) {
+		pr_reg->pr_reg_bin_isid = get_unaligned_be64(isid);
+		snprintf(pr_reg->pr_reg_isid, PR_REG_ISID_LEN, "%s", isid);
+		pr_reg->pr_reg_flags |= PRF_ISID_PRESENT_AT_REG;
+        }
+	/*
 	 * Copy the i_port and t_port information from caller.
 	 */
 	snprintf(pr_reg->pr_iport, PR_APTPL_MAX_IPORT_LEN, "%s", i_port);
@@ -878,6 +888,13 @@ static void core_scsi3_aptpl_reserve(
 	se_node_acl_t *node_acl,
 	t10_pr_registration_t *pr_reg)
 {
+	char i_buf[PR_REG_ISID_ID_LEN];
+	int prf_isid;
+
+	memset(i_buf, 0, PR_REG_ISID_ID_LEN);
+	prf_isid = core_pr_dump_initiator_port(pr_reg, &i_buf[0],
+				PR_REG_ISID_ID_LEN);
+
 	spin_lock(&dev->dev_reservation_lock);
 	dev->dev_pr_res_holder = pr_reg;
 	spin_unlock(&dev->dev_reservation_lock);
@@ -887,8 +904,9 @@ static void core_scsi3_aptpl_reserve(
 		TPG_TFO(tpg)->get_fabric_name(),
 		core_scsi3_pr_dump_type(pr_reg->pr_res_type),
 		(pr_reg->pr_reg_all_tg_pt) ? 1 : 0);
-	printk(KERN_INFO "SPC-3 PR [%s] RESERVE Node: %s\n",
-		TPG_TFO(tpg)->get_fabric_name(), node_acl->initiatorname);
+	printk(KERN_INFO "SPC-3 PR [%s] RESERVE Node: %s%s\n",
+		TPG_TFO(tpg)->get_fabric_name(), node_acl->initiatorname,
+		(prf_isid) ? &i_buf[0] : "");
 }
 
 static void __core_scsi3_add_registration(se_device_t *, se_node_acl_t *,
@@ -917,7 +935,12 @@ static int __core_scsi3_check_aptpl_registration(
 	snprintf(t_port, PR_APTPL_MAX_TPORT_LEN, "%s",
 			TPG_TFO(tpg)->tpg_get_wwn(tpg));
 	tpgt = TPG_TFO(tpg)->tpg_get_tag(tpg);
-
+	/*
+	 * Look for the matching registrations+reservation from those
+	 * created from APTPL metadata.  Note that multiple registrations
+	 * may exist for fabrics that use ISIDs in their SCSI Initiator Port
+	 * TransportIDs.
+	 */
 	spin_lock(&pr_tmpl->aptpl_reg_lock);
 	list_for_each_entry_safe(pr_reg, pr_reg_tmp, &pr_tmpl->aptpl_reg_list,
 				pr_reg_aptpl_list) {
@@ -950,9 +973,8 @@ static int __core_scsi3_check_aptpl_registration(
 			 * Reenable pr_aptpl_active to accept new metadata
 			 * updates once the SCSI device is active again..
 			 */
+			spin_lock(&pr_tmpl->aptpl_reg_lock);
 			pr_tmpl->pr_aptpl_active = 1;
-
-			return 1;
 		}
 	}
 	spin_unlock(&pr_tmpl->aptpl_reg_lock);
@@ -1843,7 +1865,7 @@ static int __core_scsi3_update_aptpl_buf(
 	se_portal_group_t *tpg;
 	se_subsystem_dev_t *su_dev = SU_DEV(dev);
 	t10_pr_registration_t *pr_reg;
-	unsigned char tmp[1024];
+	unsigned char tmp[1024], isid_buf[32];
 	ssize_t len = 0;
 	int reg_count = 0;
 
@@ -1864,8 +1886,16 @@ static int __core_scsi3_update_aptpl_buf(
 			pr_reg_list) {
 
 		memset(tmp, 0, 1024);
+		memset(isid_buf, 0, 32);
 		tpg = pr_reg->pr_reg_nacl->se_tpg;
 		lun = pr_reg->pr_reg_tg_pt_lun;
+		/*
+		 * Write out any ISID value to APTPL metadata that was included
+		 * in the original registration.
+		 */	
+		if (pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG)
+			snprintf(isid_buf, 32, "initiator_sid=%s\n",
+					pr_reg->pr_reg_isid);
 		/*
 		 * Include special metadata if the pr_reg matches the
 		 * reservation holder.
@@ -1873,23 +1903,23 @@ static int __core_scsi3_update_aptpl_buf(
 		if (dev->dev_pr_res_holder == pr_reg) {
 			snprintf(tmp, 1024, "PR_REG_START: %d"
 				"\ninitiator_fabric=%s\n"
-				"initiator_node=%s\n"
+				"initiator_node=%s\n%s"
 				"sa_res_key=%llu\n"
 				"res_holder=1\nres_type=%02x\n"
 				"res_scope=%02x\nres_all_tg_pt=%d\n"
 				"mapped_lun=%u\n", reg_count,
 				TPG_TFO(tpg)->get_fabric_name(),
-				pr_reg->pr_reg_nacl->initiatorname,
+				pr_reg->pr_reg_nacl->initiatorname, isid_buf,
 				pr_reg->pr_res_key, pr_reg->pr_res_type,
 				pr_reg->pr_res_scope, pr_reg->pr_reg_all_tg_pt,
 				pr_reg->pr_res_mapped_lun);
 		} else {
 			snprintf(tmp, 1024, "PR_REG_START: %d\n"
-				"initiator_fabric=%s\ninitiator_node=%s\n"
+				"initiator_fabric=%s\ninitiator_node=%s\n%s"
 				"sa_res_key=%llu\nres_holder=0\n"
 				"res_all_tg_pt=%d\nmapped_lun=%u\n",
 				reg_count, TPG_TFO(tpg)->get_fabric_name(),
-				pr_reg->pr_reg_nacl->initiatorname,
+				pr_reg->pr_reg_nacl->initiatorname, isid_buf,
 				pr_reg->pr_res_key, pr_reg->pr_reg_all_tg_pt,
 				pr_reg->pr_res_mapped_lun);
 		}

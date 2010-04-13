@@ -1212,6 +1212,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 {
 	se_device_t *dev;
 	unsigned char *i_fabric, *t_fabric, *i_port = NULL, *t_port = NULL;
+	unsigned char *isid = NULL;
 	char *ptr, *ptr2, *cur, *buf;
 	unsigned long long tmp_ll;
 	unsigned long tmp_l;
@@ -1268,6 +1269,19 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 				break;
 			}
 			i_port = ptr;
+			continue;
+		}
+		ptr2 = strstr(cur, "initiator_sid");
+		if (ptr2) {
+			transport_check_dev_params_delim(ptr, &cur);
+			if (strlen(ptr) > PR_REG_ISID_LEN) {
+				printk(KERN_ERR "APTPL metadata initiator_isid"
+					"= exceeds PR_REG_ISID_LEN: %d\n",
+					PR_REG_ISID_LEN);
+				ret = -1;
+				break;
+			}
+			isid = ptr;
 			continue;
 		}
 		ptr2 = strstr(cur, "sa_res_key");
@@ -1420,7 +1434,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 	}
 
 	ret = core_scsi3_alloc_aptpl_registration(T10_RES(su_dev), sa_res_key,
-			i_port, mapped_lun, t_port, tpgt, target_lun,
+			i_port, isid, mapped_lun, t_port, tpgt, target_lun,
 			res_holder, all_tg_pt, type);
 out:
 	kfree(buf);
