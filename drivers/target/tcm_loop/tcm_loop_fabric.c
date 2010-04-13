@@ -185,7 +185,7 @@ int tcm_loop_check_demo_mode_write_protect(se_portal_group_t *se_tpg)
 	return 0;
 }
 
-void *tcm_loop_tpg_alloc_fabric_acl(
+struct se_node_acl_s *tcm_loop_tpg_alloc_fabric_acl(
 	se_portal_group_t *se_tpg)
 {
 	struct tcm_loop_nacl *tl_nacl;

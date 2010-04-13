@@ -299,10 +299,6 @@ struct se_portal_group_s *tcm_loop_make_naa_tpg(
 		config_item_name(&wwn->wwn_group.cg_item), tpgt);
 
 	return &tl_tpg->tl_se_tpg;
-
-out:
-	core_tpg_deregister(&tl_tpg->tl_se_tpg);
-	return ERR_PTR(ret);
 }
 
 void tcm_loop_drop_naa_tpg(
@@ -340,7 +336,6 @@ struct se_wwn_s *tcm_loop_make_scsi_hba(
 	const char *name)
 {
 	struct tcm_loop_hba *tl_hba;
-	struct config_item *tl_hba_ci;
 	struct Scsi_Host *sh;
 	char *ptr;
 	int ret;
