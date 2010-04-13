@@ -82,6 +82,10 @@
 #define PR_APTPL_BUF_LEN			8192
 /* Used by t10_alua_tg_pt_gp_t->tg_pt_gp_md_buf_len */
 #define ALUA_MD_BUF_LEN				1024
+/* Used by t10_pr_registration_t->pr_reg_isid */
+#define PR_REG_ISID_LEN				16
+/* PR_REG_ISID_LEN + ',i,0x' */
+#define PR_REG_ISID_ID_LEN			(PR_REG_ISID_LEN + 5)
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -655,13 +659,16 @@ typedef struct se_node_acl_s {
 	struct config_group	acl_group;
 	struct config_group	acl_param_group;
 	struct list_head	acl_list;
+	struct list_head	acl_sess_list;
 } ____cacheline_aligned se_node_acl_t;
 
 typedef struct se_session_s {
+	u64			sess_bin_isid;
 	struct se_node_acl_s	*se_node_acl;
 	struct se_portal_group_s *se_tpg;
 	void			*fabric_sess_ptr;
 	struct list_head	sess_list;
+	struct list_head	sess_acl_list;
 } ____cacheline_aligned se_session_t;
 
 #define SE_SESS(cmd)		((struct se_session_s *)(cmd)->se_sess)

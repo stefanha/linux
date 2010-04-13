@@ -284,6 +284,7 @@ se_node_acl_t *core_tpg_check_initiator_node_acl(
 	}
 
 	INIT_LIST_HEAD(&acl->acl_list);
+	INIT_LIST_HEAD(&acl->acl_sess_list);
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
 	atomic_set(&acl->acl_pr_ref_count, 0);
@@ -424,6 +425,7 @@ se_node_acl_t *core_tpg_add_initiator_node_acl(
 	}
 
 	INIT_LIST_HEAD(&acl->acl_list);
+	INIT_LIST_HEAD(&acl->acl_sess_list);
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
 	atomic_set(&acl->acl_pr_ref_count, 0);

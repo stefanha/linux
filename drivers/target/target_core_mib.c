@@ -754,8 +754,9 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				continue;
 
 			memset(buf, 0, 64);
-			TPG_TFO(se_tpg)->sess_get_initiator_wwn(se_sess,
-					(unsigned char *)&buf[0], 64);
+			if (TPG_TFO(se_tpg)->sess_get_initiator_sid != NULL)
+				TPG_TFO(se_tpg)->sess_get_initiator_sid(
+					se_sess, (unsigned char *)&buf[0], 64);
 
 			seq_printf(seq, "%u %u %u %u %u %s+i+%s\n",
 				/* scsiInstIndex */

@@ -40,7 +40,11 @@ struct target_core_fabric_ops {
 	void (*fall_back_to_erl0)(struct se_session_s *);
 	int (*sess_logged_in)(struct se_session_s *);
 	u32 (*sess_get_index)(struct se_session_s *);
-	u32 (*sess_get_initiator_wwn)(struct se_session_s *,
+	/*
+	 * Used only for SCSI fabrics that contain multi-value TransportIDs
+	 * (like iSCSI).  All other SCSI fabrics should set this to NULL.
+	 */
+	u32 (*sess_get_initiator_sid)(struct se_session_s *,
 				      unsigned char *, u32);
 	int (*write_pending)(struct se_cmd_s *);
 	int (*write_pending_status)(struct se_cmd_s *);

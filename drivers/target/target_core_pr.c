@@ -1508,44 +1508,6 @@ static int core_scsi3_decode_spec_i_port(
 			goto out;
 		}
 		/*
-		 * If the a SCSI Initiator Port identifier is presented, then
-		 * the SCSI nexus must be present and matching the provided
-		 * TransportID.  The active se_session_t pointer is available
-		 * from dest_node_acl->nacl_sess;
-		 */
-		if (iport_ptr != NULL) {
-			spin_lock(&dest_node_acl->nacl_sess_lock);
-			if (dest_node_acl->nacl_sess == NULL) {
-				printk(KERN_ERR "SPC-3 SPEC_I_PT: iport_ptr: %s"
-					" presented in Transport ID, but no "
-					" active nexus exists for %s Fabric"
-					" Node: %s\n", iport_ptr,
-					TPG_TFO(dest_tpg)->get_fabric_name(),
-					dest_node_acl->initiatorname);
-				spin_unlock(&dest_node_acl->nacl_sess_lock);
-
-				core_scsi3_nodeacl_undepend_item(dest_node_acl);
-				core_scsi3_tpg_undepend_item(dest_tpg);
-				ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
-				goto out;
-			}
-			TPG_TFO(dest_tpg)->sess_get_initiator_wwn(
-					dest_node_acl->nacl_sess,
-					&dest_iport[0], 64);
-			spin_unlock(&dest_node_acl->nacl_sess_lock);
-
-			if (strcmp(dest_iport, iport_ptr)) {
-				printk(KERN_ERR "SPC-3 SPEC_I_PT: dest_iport:"
-					" %s and iport_ptr: %s do not match!\n",
-					dest_iport, iport_ptr);
-
-				core_scsi3_nodeacl_undepend_item(dest_node_acl);
-				core_scsi3_tpg_undepend_item(dest_tpg);
-				ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
-				goto out;
-			}
-		}
-		/*
 		 * Locate the desintation se_dev_entry_t pointer for matching
 		 * RELATIVE TARGET PORT IDENTIFIER on the receiving I_T Nexus
 		 * Target Port.
@@ -3356,38 +3318,6 @@ static int core_scsi3_emulate_pro_register_and_move(
 		" %s from TransportID\n", dest_tf_ops->get_fabric_name(),
 		dest_node_acl->initiatorname);
 #endif
-	/*
-	 * If the a SCSI Initiator Port identifier is presented, then
-	 * the SCSI nexus must be present and matching the provided
-	 * TransportID.  The active se_session_t pointer is available
-	 * from dest_node_acl->nacl_sess;
-	 */
-	if (iport_ptr != NULL) {
-		spin_lock(&dest_node_acl->nacl_sess_lock);
-		if (dest_node_acl->nacl_sess == NULL) {
-			printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE: "
-				"iport_ptr: %s presented in Transport ID,"
-				" but no active nexus exists for %s Fabric"
-				" Node: %s\n", iport_ptr,
-				dest_tf_ops->get_fabric_name(),
-				dest_node_acl->initiatorname);
-			spin_unlock(&dest_node_acl->nacl_sess_lock);
-			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
-			goto out;
-		}
-		TPG_TFO(se_tpg)->sess_get_initiator_wwn(
-					dest_node_acl->nacl_sess,
-					&dest_iport[0], 64);
-		spin_unlock(&dest_node_acl->nacl_sess_lock);
-
-		if (strcmp(dest_iport, iport_ptr)) {
-			printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE:"
-				" dest_iport: %s and iport_ptr: %s do not"
-				" match!\n", dest_iport, iport_ptr);
-			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
-			goto out;
-		}
-	}
 	/*
 	 * Locate the se_dev_entry_t pointer for the matching RELATIVE TARGET
 	 * PORT IDENTIFIER.
