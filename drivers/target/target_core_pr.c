@@ -3858,7 +3858,7 @@ static int core_scsi3_pri_read_full_status(se_cmd_t *cmd)
 		 * TransportID full status descriptor..
 		 */
 		exp_desc_len = TPG_TFO(se_tpg)->tpg_get_pr_transport_id_len(
-				se_tpg, se_nacl, &format_code);
+				se_tpg, se_nacl, pr_reg, &format_code);
 
 		if ((exp_desc_len + add_len) > cmd->data_length) {
 			printk(KERN_WARNING "SPC-3 PRIN READ_FULL_STATUS ran"
@@ -3920,7 +3920,7 @@ static int core_scsi3_pri_read_full_status(se_cmd_t *cmd)
 		 * Now, have the $FABRIC_MOD fill in the protocol identifier
 		 */
 		desc_len = TPG_TFO(se_tpg)->tpg_get_pr_transport_id(se_tpg,
-				se_nacl, &format_code, &buf[off+4]);
+				se_nacl, pr_reg, &format_code, &buf[off+4]);
 		/*
 		 * Set the ADDITIONAL DESCRIPTOR LENGTH
 		 */

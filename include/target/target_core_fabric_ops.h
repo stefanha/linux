@@ -6,9 +6,12 @@ struct target_core_fabric_ops {
 	u16 (*tpg_get_tag)(struct se_portal_group_s *);
 	u32 (*tpg_get_default_depth)(struct se_portal_group_s *);
 	u32 (*tpg_get_pr_transport_id)(struct se_portal_group_s *,
-				struct se_node_acl_s *, int *, unsigned char *);
+				struct se_node_acl_s *,
+				struct t10_pr_registration_s *, int *,
+				unsigned char *);
 	u32 (*tpg_get_pr_transport_id_len)(struct se_portal_group_s *,
-				struct se_node_acl_s *, int *);
+				struct se_node_acl_s *,
+				struct t10_pr_registration_s *, int *);
 	char *(*tpg_parse_pr_out_transport_id)(const char *, u32 *, char **);
 	int (*tpg_check_demo_mode)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_cache)(struct se_portal_group_s *);

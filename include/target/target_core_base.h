@@ -210,6 +210,9 @@
 /* se_dev_entry_t->deve_flags */
 #define DEF_PR_REGISTERED			0x01
 
+/* Used for t10_pr_registration_t->pr_reg_flags */
+#define PRF_ISID_PRESENT_AT_REG			0x01
+
 /* transport_send_check_condition_and_sense() */
 #define NON_EXISTENT_LUN			0x1
 #define UNSUPPORTED_SCSI_OPCODE			0x2
@@ -339,6 +342,8 @@ typedef enum {
 } t10_reservations_index_t;
 
 typedef struct t10_pr_registration_s {
+	/* Used for fabrics that contain WWN+ISID */
+	char pr_reg_isid[PR_REG_ISID_LEN];
 	/* Used during APTPL metadata reading */
 	unsigned char pr_iport[PR_APTPL_MAX_IPORT_LEN];
 	/* Used during APTPL metadata reading */
@@ -354,6 +359,7 @@ typedef struct t10_pr_registration_s {
 	int pr_res_holder;
 	int pr_res_type;
 	int pr_res_scope;
+	u32 pr_reg_flags;
 	u32 pr_res_mapped_lun;
 	u32 pr_aptpl_target_lun;
 	u32 pr_res_generation;
