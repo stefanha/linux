@@ -1059,7 +1059,9 @@ static u32 ft_get_default_depth(se_portal_group_t *se_tpg)
 }
 
 static u32 ft_get_pr_transport_id_len(se_portal_group_t *se_tpg,
-				      se_node_acl_t *se_nacl, int *format_code)
+				      se_node_acl_t *se_nacl,
+				      t10_pr_registration_t *pr_reg,
+				      int *format_code)
 {
 	*format_code = 0;
 	return sizeof(struct ft_transport_id);
@@ -1067,6 +1069,7 @@ static u32 ft_get_pr_transport_id_len(se_portal_group_t *se_tpg,
 
 static u32 ft_get_pr_transport_id(se_portal_group_t *se_tpg,
 				  se_node_acl_t *se_nacl,
+				  t10_pr_registration_t *pr_reg,
 				  int *format_code, unsigned char *buf)
 {
 	struct ft_node_acl *acl = (struct ft_node_acl *)se_nacl->fabric_acl_ptr;
@@ -1079,7 +1082,7 @@ static u32 ft_get_pr_transport_id(se_portal_group_t *se_tpg,
 	 */
 	put_unaligned_be64(acl->node_auth.port_name, id->wwpn);
 
-	return ft_get_pr_transport_id_len(se_tpg, se_nacl, format_code);
+	return ft_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg, format_code);
 }
 
 static char *ft_parse_pr_out_transport_id(const char *buf, u32 *out_tid_len,
@@ -1154,7 +1157,7 @@ static struct target_core_fabric_ops ft_fabric_ops = {
 #ifdef SNMP_SUPPORT
 	.sess_get_index =		ft_sess_get_index,
 #endif /* SNMP_SUPPORT */
-	.sess_get_initiator_wwn =	ft_sess_get_port_name,
+	.sess_get_initiator_sid =	NULL,
 	.write_pending =		ft_write_pending,
 	.write_pending_status =		ft_write_pending_status,
 	.set_default_node_attributes =	ft_set_default_node_attr,
