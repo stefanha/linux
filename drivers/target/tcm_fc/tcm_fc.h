@@ -104,10 +104,7 @@ struct ft_node_auth {
  */
 struct ft_node_acl {
 	struct ft_node_auth node_auth;
-	struct se_node_acl_s *se_node_acl;
-
-	struct config_group auth_group;
-	struct config_group *groups[2];	/* NULL-terminator pointers to above */
+	struct se_node_acl_s se_node_acl;
 };
 
 struct ft_lun {
@@ -124,11 +121,7 @@ struct ft_tpg {
 	struct ft_tport *tport;		/* active tport or NULL */
 	struct list_head list;		/* linkage in ft_lport_acl tpg_list */
 	struct list_head lun_list;	/* head of LUNs */
-	struct se_portal_group_s *se_tpg;
-	struct config_group lun_group;	/* lun subdir */
-	struct config_group acl_group;	/* acl subdir */
-	struct config_group *groups[3];	/* pointers to subdirs, NULL-term */
-
+	struct se_portal_group_s se_tpg;
 	struct task_struct *thread;	/* processing thread */
 	struct se_queue_obj_s qobj;	/* queue for processing thread */
 };
@@ -138,7 +131,7 @@ struct ft_lport_acl {
 	char name[FT_NAMELEN];
 	struct list_head list;
 	struct list_head tpg_list;
-	struct config_group group;
+	struct se_wwn_s fc_lport_wwn;
 };
 
 enum ft_cmd_state {
