@@ -1003,6 +1003,7 @@ void se_dev_set_default_attribs(se_device_t *dev)
 	DEV_ATTRIB(dev)->emulate_tas = DA_EMULATE_TAS;
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	DEV_ATTRIB(dev)->emulate_alua = DA_EMULATE_ALUA;
+	DEV_ATTRIB(dev)->enforce_pr_isids = DA_ENFORCE_PR_ISIDS;
 	/*
 	 * block_size is based on subsystem plugin dependent requirements.
 	 */
@@ -1089,6 +1090,17 @@ int se_dev_set_emulate_tas(se_device_t *dev, int flag)
 	return 0;
 }
 
+int se_dev_set_enforce_pr_isids(se_device_t *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+	DEV_ATTRIB(dev)->enforce_pr_isids = flag;
+	printk(KERN_INFO "dev[%p]: SE Device enforce_pr_isids bit: %s\n", dev,
+		(DEV_ATTRIB(dev)->enforce_pr_isids) ? "Enabled" : "Disabled");
+	return 0;
+}
 /*
  * Note, this can only be called on unexported SE Device Object.
  */
