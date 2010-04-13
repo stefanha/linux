@@ -1679,7 +1679,10 @@ static int core_scsi3_decode_spec_i_port(
 		 * Skip any TransportIDs that already have a registration for
 		 * this target port.
 		 */
-		if (dest_se_deve->deve_flags & DEF_PR_REGISTERED) {
+		pr_reg_e = __core_scsi3_locate_pr_reg(dev, dest_node_acl,
+					iport_ptr);
+		if (pr_reg_e) { 
+			core_scsi3_put_pr_reg(pr_reg_e);	
 			core_scsi3_lunacl_undepend_item(dest_se_deve);
 			core_scsi3_nodeacl_undepend_item(dest_node_acl);
 			core_scsi3_tpg_undepend_item(dest_tpg);
@@ -2073,7 +2076,8 @@ static int core_scsi3_emulate_pro_register(
 	/*
 	 * Follow logic from spc4r17 Section 5.7.7, Register Behaviors Table 47
 	 */
-	if (!(se_deve->deve_flags & DEF_PR_REGISTERED)) {
+	pr_reg_e = core_scsi3_locate_pr_reg(dev, se_sess->se_node_acl, se_sess);
+	if (!(pr_reg_e)) {
 		if (res_key) {
 			printk(KERN_WARNING "SPC-3 PR: Reservation Key non-zero"
 				" for SA REGISTER, returning CONFLICT\n");
@@ -2146,13 +2150,7 @@ static int core_scsi3_emulate_pro_register(
 		/*
 		 * Locate the existing *pr_reg via se_node_acl_t pointers
 		 */
-		pr_reg = core_scsi3_locate_pr_reg(SE_DEV(cmd),
-				se_sess->se_node_acl);
-		if (!(pr_reg)) {
-			printk(KERN_ERR "SPC-3 PR: Unable to locate"
-				" PR_REGISTERED *pr_reg for REGISTER\n");
-			return PYX_TRANSPORT_LU_COMM_FAILURE;
-		}
+		pr_reg = pr_reg_e;
 		type = pr_reg->pr_res_type;
 
 		if (!(ignore_key)) {
@@ -3306,13 +3304,7 @@ static int core_scsi3_emulate_pro_register_and_move(
 	/*
 	 * Follow logic from spc4r17 Section 5.7.8, Table 50 --
 	 *	Register behaviors for a REGISTER AND MOVE service action
-	 */
-	if (!(se_deve->deve_flags & DEF_PR_REGISTERED)) {
-		printk(KERN_WARNING "SPC-3 PR: Received REGISTER_AND_MOVE SA"
-				" from unregistered nexus\n");
-		return PYX_TRANSPORT_RESERVATION_CONFLICT;
-	}
-	/*
+	 *
 	 * Locate the existing *pr_reg via se_node_acl_t pointers
 	 */
 	pr_reg = core_scsi3_locate_pr_reg(SE_DEV(cmd), se_sess->se_node_acl,
@@ -3594,28 +3586,20 @@ after_iport_check:
 	 * register an I_T nexus that is already registered with the same
 	 * reservation key or a different reservation key.
 	 */
-	if (!(dest_se_deve->deve_flags & DEF_PR_REGISTERED)) {
+	dest_pr_reg = __core_scsi3_locate_pr_reg(dev, dest_node_acl,
+					iport_ptr);
+	if (!(dest_pr_reg)) {
 		ret = core_scsi3_alloc_registration(SE_DEV(cmd),
-				dest_node_acl, dest_se_deve,
+				dest_node_acl, dest_se_deve, iport_ptr,
 				sa_res_key, 0, aptpl, 2, 1);
 		if (ret != 0) {
 			spin_unlock(&dev->dev_reservation_lock);
 			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 			goto out;
 		}
+		dest_pr_reg = __core_scsi3_locate_pr_reg(dev, dest_node_acl,
+						iport_ptr);
 		new_reg = 1;
-	}
-	/*
-	 * Locate the Destination registration where the reservation
-	 * is being moved.
-	 */
-	dest_pr_reg = core_scsi3_locate_pr_reg(dev, dest_node_acl);
-	if (!(dest_pr_reg)) {
-		printk(KERN_ERR "Unable to locate dest_pr_reg for"
-			" REGISTERED I_T Nexus for %s\n", initiator_str);
-		spin_unlock(&dev->dev_reservation_lock);
-		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
-		goto out;
 	}
 	/*
 	 * f) Release the persistent reservation for the persistent reservation
