@@ -95,11 +95,10 @@ u32 lio_tpg_get_default_depth(se_portal_group_t *se_tpg)
 u32 lio_tpg_get_pr_transport_id(
 	se_portal_group_t *se_tpg,
 	se_node_acl_t *se_nacl,
+	t10_pr_registration_t *pr_reg,
 	int *format_code,
 	unsigned char *buf)
 {
-	iscsi_session_t *sess;
-	se_session_t *se_sess;
 	u32 off = 4, padding = 0;
 	u16 len = 0;
 
@@ -125,15 +124,15 @@ u32 lio_tpg_get_pr_transport_id(
 	 */
 	len++;
 	/*
-	 * If there is an active iSCSI session, and *format code == 1
+	 * If there is ISID present with the registration and *format code == 1
 	 * 1, use iSCSI Initiator port TransportID format.
 	 *
 	 * Otherwise use iSCSI Initiator device TransportID format that
 	 * does not contain the ASCII encoded iSCSI Initiator iSID value
 	 * provied by the iSCSi Initiator during the iSCSI login process.
 	 */
-	se_sess = se_nacl->nacl_sess;
-	if ((*format_code == 1) && (se_sess)) {
+	if ((*format_code == 1) &&
+	    (pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG)) {
 		/*
 		 * Set FORMAT CODE 01b for iSCSI Initiator port TransportID
 		 * format.
@@ -153,19 +152,18 @@ u32 lio_tpg_get_pr_transport_id(
 		 * session identifier value. The first ISCSI INITIATOR SESSION
 		 * ID field byte containing an ASCII null character
 		 */
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 		buf[off+len] = 0x2c; off++; /* ASCII Character: "," */
 		buf[off+len] = 0x69; off++; /* ASCII Character: "i" */
 		buf[off+len] = 0x2c; off++; /* ASCII Character: "," */
 		buf[off+len] = 0x30; off++; /* ASCII Character: "0" */
 		buf[off+len] = 0x78; off++; /* ASCII Character: "x" */
 		len += 5;
-		buf[off+len] = sess->isid[0]; off++;
-		buf[off+len] = sess->isid[1]; off++;
-		buf[off+len] = sess->isid[2]; off++;
-		buf[off+len] = sess->isid[3]; off++;
-		buf[off+len] = sess->isid[4]; off++;
-		buf[off+len] = sess->isid[5]; off++;
+		buf[off+len] = pr_reg->pr_reg_isid[0]; off++;
+		buf[off+len] = pr_reg->pr_reg_isid[1]; off++;
+		buf[off+len] = pr_reg->pr_reg_isid[2]; off++;
+		buf[off+len] = pr_reg->pr_reg_isid[3]; off++;
+		buf[off+len] = pr_reg->pr_reg_isid[4]; off++;
+		buf[off+len] = pr_reg->pr_reg_isid[5]; off++;
 		buf[off+len] = '\0'; off++;
 		len += 7;
 	}
@@ -193,9 +191,9 @@ u32 lio_tpg_get_pr_transport_id(
 u32 lio_tpg_get_pr_transport_id_len(
 	se_portal_group_t *se_tpg,
 	se_node_acl_t *se_nacl,
+	t10_pr_registration_t *pr_reg,
 	int *format_code)
 {
-	se_session_t *se_sess;
 	u32 len = 0, padding = 0;
 
 	spin_lock(&se_nacl->nacl_sess_lock);
@@ -205,14 +203,13 @@ u32 lio_tpg_get_pr_transport_id_len(
 	 */
 	len++;
 	/*
-	 * If there is an active iSCSI session, use format code:
+	 * If there is ISID present with the registration, use format code:
 	 * 01b: iSCSI Initiator port TransportID format
 	 *
 	 * If there is not an active iSCSI session, use format code:
 	 * 00b: iSCSI Initiator device TransportID format
 	 */
-	se_sess = se_nacl->nacl_sess;
-	if ((se_sess)) {
+	if (pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG) {
 		len += 5; /* For ",i,0x" ASCII seperator */
 		len += 7; /* For iSCSI Initiator Session ID + Null terminator */
 		*format_code = 1;
@@ -308,7 +305,7 @@ char *lio_tpg_parse_pr_out_transport_id(
 		 * Go ahead and do the lower case conversion of the received
 		 * 12 ASCII characters representing the ISID in the TransportID
 		 * for comparision against the running iSCSI session's ISID from
-		 * iscsi_target.c:lio_sess_get_initiator_wwn()
+		 * iscsi_target.c:lio_sess_get_initiator_sid()
 		 */
 		for (i = 0; i < 12; i++) {
 			if (isdigit(*p)) {

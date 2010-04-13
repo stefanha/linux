@@ -544,6 +544,9 @@ SE_DEV_ATTR(emulate_ua_intlck_ctrl, S_IRUGO | S_IWUSR);
 DEF_DEV_ATTRIB(emulate_tas);
 SE_DEV_ATTR(emulate_tas, S_IRUGO | S_IWUSR);
 
+DEF_DEV_ATTRIB(enforce_pr_isids);
+SE_DEV_ATTR(enforce_pr_isids, S_IRUGO | S_IWUSR);
+
 DEF_DEV_ATTRIB_RO(hw_block_size);
 SE_DEV_ATTR_RO(hw_block_size);
 
@@ -570,6 +573,7 @@ CONFIGFS_EATTR_OPS(target_core_dev_attrib, se_dev_attrib_s, da_group);
 static struct configfs_attribute *target_core_dev_attrib_attrs[] = {
 	&target_core_dev_attrib_emulate_ua_intlck_ctrl.attr,
 	&target_core_dev_attrib_emulate_tas.attr,
+	&target_core_dev_attrib_enforce_pr_isids.attr,
 	&target_core_dev_attrib_hw_block_size.attr,
 	&target_core_dev_attrib_block_size.attr,
 	&target_core_dev_attrib_hw_max_sectors.attr,
@@ -881,6 +885,10 @@ static ssize_t target_core_dev_pr_show_spc3_res(
 {
 	se_node_acl_t *se_nacl;
 	t10_pr_registration_t *pr_reg;
+	char i_buf[PR_REG_ISID_ID_LEN];
+	int prf_isid;
+
+	memset(i_buf, 0, PR_REG_ISID_ID_LEN);
 
 	spin_lock(&dev->dev_reservation_lock);
 	pr_reg = dev->dev_pr_res_holder;
@@ -890,9 +898,12 @@ static ssize_t target_core_dev_pr_show_spc3_res(
 		return *len;
 	}
 	se_nacl = pr_reg->pr_reg_nacl;
-	*len += sprintf(page + *len, "SPC-3 Reservation: %s Initiator: %s\n",
+	prf_isid = core_pr_dump_initiator_port(pr_reg, &i_buf[0],
+				PR_REG_ISID_ID_LEN);
+
+	*len += sprintf(page + *len, "SPC-3 Reservation: %s Initiator: %s%s\n",
 		TPG_TFO(se_nacl->se_tpg)->get_fabric_name(),
-		se_nacl->initiatorname);
+		se_nacl->initiatorname, (prf_isid) ? &i_buf[0] : "");
 	spin_unlock(&dev->dev_reservation_lock);
 
 	return *len;
@@ -1070,8 +1081,9 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts(
 	struct target_core_fabric_ops *tfo;
 	t10_pr_registration_t *pr_reg;
 	unsigned char buf[384];
+	char i_buf[PR_REG_ISID_ID_LEN];
 	ssize_t len = 0;
-	int reg_count = 0;
+	int reg_count = 0, prf_isid;
 
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
@@ -1086,11 +1098,15 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts(
 			pr_reg_list) {
 
 		memset(buf, 0, 384);
+		memset(i_buf, 0, PR_REG_ISID_ID_LEN);
 		tfo = pr_reg->pr_reg_nacl->se_tpg->se_tpg_tfo;
-		sprintf(buf, "%s Node: %s Key: 0x%016Lx PRgen: 0x%08x\n",
+		prf_isid = core_pr_dump_initiator_port(pr_reg, &i_buf[0],
+					PR_REG_ISID_ID_LEN);
+		sprintf(buf, "%s Node: %s%s Key: 0x%016Lx PRgen: 0x%08x\n",
 			tfo->get_fabric_name(),
-			pr_reg->pr_reg_nacl->initiatorname,
-			pr_reg->pr_res_key, pr_reg->pr_res_generation);
+			pr_reg->pr_reg_nacl->initiatorname, (prf_isid) ?
+			&i_buf[0] : "", pr_reg->pr_res_key,
+			pr_reg->pr_res_generation);
 
 		if ((len + strlen(buf) > PAGE_SIZE))
 			break;
@@ -1217,6 +1233,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 {
 	se_device_t *dev;
 	unsigned char *i_fabric, *t_fabric, *i_port = NULL, *t_port = NULL;
+	unsigned char *isid = NULL;
 	char *ptr, *ptr2, *cur, *buf;
 	unsigned long long tmp_ll;
 	unsigned long tmp_l;
@@ -1273,6 +1290,19 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 				break;
 			}
 			i_port = ptr;
+			continue;
+		}
+		ptr2 = strstr(cur, "initiator_sid");
+		if (ptr2) {
+			transport_check_dev_params_delim(ptr, &cur);
+			if (strlen(ptr) > PR_REG_ISID_LEN) {
+				printk(KERN_ERR "APTPL metadata initiator_isid"
+					"= exceeds PR_REG_ISID_LEN: %d\n",
+					PR_REG_ISID_LEN);
+				ret = -1;
+				break;
+			}
+			isid = ptr;
 			continue;
 		}
 		ptr2 = strstr(cur, "sa_res_key");
@@ -1425,7 +1455,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 	}
 
 	ret = core_scsi3_alloc_aptpl_registration(T10_RES(su_dev), sa_res_key,
-			i_port, mapped_lun, t_port, tpgt, target_lun,
+			i_port, isid, mapped_lun, t_port, tpgt, target_lun,
 			res_holder, all_tg_pt, type);
 out:
 	kfree(buf);

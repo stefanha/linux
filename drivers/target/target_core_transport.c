@@ -41,6 +41,7 @@
 #include <linux/kthread.h>
 #include <linux/in.h>
 #include <linux/cdrom.h>
+#include <asm/unaligned.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi.h>
@@ -599,6 +600,7 @@ se_session_t *transport_init_session(void)
 		return ERR_PTR(-ENOMEM);
 	}
 	INIT_LIST_HEAD(&se_sess->sess_list);
+	INIT_LIST_HEAD(&se_sess->sess_acl_list);
 
 	return se_sess;
 }
@@ -613,6 +615,8 @@ void __transport_register_session(
 	se_session_t *se_sess,
 	void *fabric_sess_ptr)
 {
+	unsigned char buf[PR_REG_ISID_LEN];
+
 	se_sess->se_tpg = se_tpg;
 	se_sess->fabric_sess_ptr = fabric_sess_ptr;
 	/*
@@ -622,8 +626,25 @@ void __transport_register_session(
 	 * eg: *NOT* discovery sessions.
 	 */
 	if (se_nacl) {
+		/*
+		 * If the fabric module supports an ISID based TransportID,
+		 * save this value in binary from the fabric I_T Nexus now.
+		 */
+		if (TPG_TFO(se_tpg)->sess_get_initiator_sid != NULL) {
+			memset(&buf[0], 0, PR_REG_ISID_LEN);
+			TPG_TFO(se_tpg)->sess_get_initiator_sid(se_sess,
+					&buf[0], PR_REG_ISID_LEN);
+			se_sess->sess_bin_isid = get_unaligned_be64(&buf[0]);
+		}
 		spin_lock_bh(&se_nacl->nacl_sess_lock);
+		/*
+		 * The se_nacl->nacl_sess pointer will be set to the
+		 * last active I_T Nexus for each se_node_acl_t.
+		 */
 		se_nacl->nacl_sess = se_sess;
+
+		list_add_tail(&se_sess->sess_acl_list,
+			      &se_nacl->acl_sess_list);
 		spin_unlock_bh(&se_nacl->nacl_sess_lock);
 	}
 	list_add_tail(&se_sess->sess_list, &se_tpg->tpg_sess_list);
@@ -655,7 +676,19 @@ void transport_deregister_session_configfs(se_session_t *se_sess)
 	se_nacl = se_sess->se_node_acl;
 	if ((se_nacl)) {
 		spin_lock_bh(&se_nacl->nacl_sess_lock);
-		se_nacl->nacl_sess = NULL;
+		list_del(&se_sess->sess_acl_list);
+		/*
+		 * If the session list is empty, then clear the pointer.
+		 * Otherwise, set the se_session_t pointer from the tail
+		 * element of the per se_node_acl_t active session list.
+		 */
+		if (list_empty(&se_nacl->acl_sess_list))
+			se_nacl->nacl_sess = NULL;
+		else {
+			se_nacl->nacl_sess = container_of(
+					se_nacl->acl_sess_list.prev,
+					se_session_t, sess_acl_list);	
+		}
 		spin_unlock_bh(&se_nacl->nacl_sess_lock);
 	}
 }

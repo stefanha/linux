@@ -1471,7 +1471,7 @@ int iscsi_target_register_configfs(void)
 #ifdef SNMP_SUPPORT
 	fabric->tf_ops.sess_get_index = &lio_sess_get_index;
 #endif /* SNMP_SUPPORT */
-	fabric->tf_ops.sess_get_initiator_wwn = &lio_sess_get_initiator_wwn;
+	fabric->tf_ops.sess_get_initiator_sid = &lio_sess_get_initiator_sid;
 	fabric->tf_ops.write_pending = &lio_write_pending;
 	fabric->tf_ops.write_pending_status = &lio_write_pending_status;
 	fabric->tf_ops.set_default_node_attributes =

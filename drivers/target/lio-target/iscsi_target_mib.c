@@ -39,17 +39,17 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 
+#include <target/target_core_base.h>
+#include <target/target_core_hba.h>
+#include <target/target_core_transport.h>
+#include <target/target_core_plugin.h>
+#include <target/target_core_seobj.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target_mib.h>
-#include <target/target_core_base.h>
-#include <target/target_core_hba.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_plugin.h>
-#include <target/target_core_seobj.h>
 
 /* iSCSI mib table index */
 iscsi_index_table_t iscsi_index_table;

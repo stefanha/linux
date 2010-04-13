@@ -527,7 +527,7 @@ int tcm_loop_register_configfs(void)
 #ifdef SNMP_SUPPORT
 	fabric->tf_ops.sess_get_index = &tpg_loop_sess_get_index:
 #endif /* SNMP_SUPPORT */
-	fabric->tf_ops.sess_get_initiator_wwn = &tcm_loop_get_initiator_wwn;
+	fabric->tf_ops.sess_get_initiator_sid = NULL;
 	fabric->tf_ops.write_pending = &tcm_loop_write_pending;
 	fabric->tf_ops.write_pending_status = &tcm_loop_write_pending_status;
 	/*

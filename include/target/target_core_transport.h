@@ -96,6 +96,7 @@
 #define DF_READ_ONLY				0x00000040
 #define DF_SPC3_PERSISTENT_RESERVE		0x00000080
 #define DF_SPC2_RESERVATIONS			0x00000100
+#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000200
 
 /* se_dev_attrib_t sanity values */
 /* 10 Minutes, see transport_get_default_task_timeout()  */
@@ -108,6 +109,8 @@
 #define DA_EMULATE_RESERVATIONS			0
 /* No Emulation for PSCSI by default */
 #define DA_EMULATE_ALUA				0
+/* Enforce SCSI Initiator Port TransportID with 'ISID' for PR */
+#define DA_ENFORCE_PR_ISIDS			1
 #define DA_STATUS_MAX_SECTORS_MIN		16
 #define DA_STATUS_MAX_SECTORS_MAX		8192
 

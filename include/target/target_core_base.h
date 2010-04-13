@@ -82,6 +82,10 @@
 #define PR_APTPL_BUF_LEN			8192
 /* Used by t10_alua_tg_pt_gp_t->tg_pt_gp_md_buf_len */
 #define ALUA_MD_BUF_LEN				1024
+/* Used by t10_pr_registration_t->pr_reg_isid */
+#define PR_REG_ISID_LEN				16
+/* PR_REG_ISID_LEN + ',i,0x' */
+#define PR_REG_ISID_ID_LEN			(PR_REG_ISID_LEN + 5)
 
 /* used by PSCSI and iBlock Transport drivers */
 #define READ_BLOCK_LEN          		6
@@ -205,6 +209,9 @@
 
 /* se_dev_entry_t->deve_flags */
 #define DEF_PR_REGISTERED			0x01
+
+/* Used for t10_pr_registration_t->pr_reg_flags */
+#define PRF_ISID_PRESENT_AT_REG			0x01
 
 /* transport_send_check_condition_and_sense() */
 #define NON_EXISTENT_LUN			0x1
@@ -335,6 +342,8 @@ typedef enum {
 } t10_reservations_index_t;
 
 typedef struct t10_pr_registration_s {
+	/* Used for fabrics that contain WWN+ISID */
+	char pr_reg_isid[PR_REG_ISID_LEN];
 	/* Used during APTPL metadata reading */
 	unsigned char pr_iport[PR_APTPL_MAX_IPORT_LEN];
 	/* Used during APTPL metadata reading */
@@ -350,9 +359,11 @@ typedef struct t10_pr_registration_s {
 	int pr_res_holder;
 	int pr_res_type;
 	int pr_res_scope;
+	u32 pr_reg_flags;
 	u32 pr_res_mapped_lun;
 	u32 pr_aptpl_target_lun;
 	u32 pr_res_generation;
+	u64 pr_reg_bin_isid;
 	u64 pr_res_key;
 	atomic_t pr_res_holders;
 	struct se_node_acl_s *pr_reg_nacl;
@@ -657,13 +668,16 @@ typedef struct se_node_acl_s {
 	struct config_group	acl_param_group;
 	struct config_group	*acl_default_groups[4];
 	struct list_head	acl_list;
+	struct list_head	acl_sess_list;
 } ____cacheline_aligned se_node_acl_t;
 
 typedef struct se_session_s {
+	u64			sess_bin_isid;
 	struct se_node_acl_s	*se_node_acl;
 	struct se_portal_group_s *se_tpg;
 	void			*fabric_sess_ptr;
 	struct list_head	sess_list;
+	struct list_head	sess_acl_list;
 } ____cacheline_aligned se_session_t;
 
 #define SE_SESS(cmd)		((struct se_session_s *)(cmd)->se_sess)
@@ -714,6 +728,7 @@ typedef struct se_dev_attrib_s {
 	int		emulate_tas;
 	int		emulate_reservations;
 	int		emulate_alua;
+	int		enforce_pr_isids;
 	u32		hw_block_size;
 	u32		block_size;
 	u32		hw_max_sectors;
@@ -786,6 +801,8 @@ typedef struct se_device_s {
 	u32			dev_tcq_window_closed;
 	/* Physical device queue depth */
 	u32			queue_depth;
+	/* Used for SPC-2 reservations enforce of ISIDs */
+	u64			dev_res_bin_isid;
 	t10_task_attr_index_t	dev_task_attr_type;
 	unsigned long long	dev_sectors_total;
 	/* Pointer to transport specific device structure */

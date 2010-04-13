@@ -90,6 +90,7 @@ u32 tcm_loop_get_default_depth(se_portal_group_t *se_tpg)
 u32 tcm_loop_get_pr_transport_id(
 	se_portal_group_t *se_tpg,
 	se_node_acl_t *se_nacl,
+	t10_pr_registration_t *pr_reg,
 	int *format_code,
 	unsigned char *buf)
 {
@@ -125,6 +126,7 @@ u32 tcm_loop_get_pr_transport_id(
 u32 tcm_loop_get_pr_transport_id_len(
 	se_portal_group_t *se_tpg,
 	se_node_acl_t *se_nacl,
+	t10_pr_registration_t *pr_reg,
 	int *format_code)
 {
 	*format_code = 0;
@@ -242,16 +244,6 @@ int tcm_loop_sess_logged_in(se_session_t *se_sess)
 	 * Assume that TL Nexus is always active
 	 */
 	return 1;
-}
-
-int tcm_loop_get_initiator_wwn(
-	se_session_t *se_sess,
-	unsigned char *buf,
-	u32 size)
-{
-	se_node_acl_t *se_nacl = se_sess->se_node_acl;
-
-	return snprintf(buf, size, se_nacl->initiatorname);
 }
 
 #ifdef SNMP_SUPPORT

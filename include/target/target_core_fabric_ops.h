@@ -9,9 +9,12 @@ struct target_core_fabric_ops {
 	u16 (*tpg_get_tag)(struct se_portal_group_s *);
 	u32 (*tpg_get_default_depth)(struct se_portal_group_s *);
 	u32 (*tpg_get_pr_transport_id)(struct se_portal_group_s *,
-				struct se_node_acl_s *, int *, unsigned char *);
+				struct se_node_acl_s *,
+				struct t10_pr_registration_s *, int *,
+				unsigned char *);
 	u32 (*tpg_get_pr_transport_id_len)(struct se_portal_group_s *,
-				struct se_node_acl_s *, int *);
+				struct se_node_acl_s *,
+				struct t10_pr_registration_s *, int *);
 	char *(*tpg_parse_pr_out_transport_id)(const char *, u32 *, char **);
 	int (*tpg_check_demo_mode)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_cache)(struct se_portal_group_s *);
@@ -44,7 +47,11 @@ struct target_core_fabric_ops {
 	void (*fall_back_to_erl0)(struct se_session_s *);
 	int (*sess_logged_in)(struct se_session_s *);
 	u32 (*sess_get_index)(struct se_session_s *);
-	u32 (*sess_get_initiator_wwn)(struct se_session_s *,
+	/*
+	 * Used only for SCSI fabrics that contain multi-value TransportIDs
+	 * (like iSCSI).  All other SCSI fabrics should set this to NULL.
+	 */
+	u32 (*sess_get_initiator_sid)(struct se_session_s *,
 				      unsigned char *, u32);
 	int (*write_pending)(struct se_cmd_s *);
 	int (*write_pending_status)(struct se_cmd_s *);

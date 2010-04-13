@@ -26,7 +26,7 @@ extern int lio_sess_logged_in(struct se_session_s *);
 #ifdef SNMP_SUPPORT
 extern u32 lio_sess_get_index(struct se_session_s *);
 #endif /* SNMP_SUPPORT */
-extern u32 lio_sess_get_initiator_wwn(struct se_session_s *,
+extern u32 lio_sess_get_initiator_sid(struct se_session_s *,
 				unsigned char *, u32);
 extern int iscsi_send_async_msg(iscsi_conn_t *, __u16, __u8, __u8);
 extern int lio_queue_data_in(struct se_cmd_s *);
