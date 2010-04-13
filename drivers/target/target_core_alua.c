@@ -314,7 +314,7 @@ static inline int core_alua_state_nonoptimized(
 	 * later to determine if processing of this cmd needs to be
 	 * temporarily delayed for the Active/NonOptimized primary access state.
 	 */
-	cmd->se_cmd_flags = SCF_ALUA_NON_OPTIMIZED;
+	cmd->se_cmd_flags |= SCF_ALUA_NON_OPTIMIZED;
 	cmd->alua_nonop_delay = nonop_delay_msecs;
 	return 0;
 }
