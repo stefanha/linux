@@ -96,6 +96,7 @@
 #define DF_READ_ONLY				0x00000040
 #define DF_SPC3_PERSISTENT_RESERVE		0x00000080
 #define DF_SPC2_RESERVATIONS			0x00000100
+#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000200
 
 /* se_dev_attrib_t sanity values */
 /* 10 Minutes, see transport_get_default_task_timeout()  */

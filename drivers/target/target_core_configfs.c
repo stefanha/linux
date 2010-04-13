@@ -864,6 +864,10 @@ static ssize_t target_core_dev_pr_show_spc3_res(
 {
 	se_node_acl_t *se_nacl;
 	t10_pr_registration_t *pr_reg;
+	char i_buf[PR_REG_ISID_ID_LEN];
+	int prf_isid;
+
+	memset(i_buf, 0, PR_REG_ISID_ID_LEN);
 
 	spin_lock(&dev->dev_reservation_lock);
 	pr_reg = dev->dev_pr_res_holder;
@@ -873,9 +877,12 @@ static ssize_t target_core_dev_pr_show_spc3_res(
 		return *len;
 	}
 	se_nacl = pr_reg->pr_reg_nacl;
-	*len += sprintf(page + *len, "SPC-3 Reservation: %s Initiator: %s\n",
+	prf_isid = core_pr_dump_initiator_port(pr_reg, &i_buf[0],
+				PR_REG_ISID_ID_LEN);
+
+	*len += sprintf(page + *len, "SPC-3 Reservation: %s Initiator: %s%s\n",
 		TPG_TFO(se_nacl->se_tpg)->get_fabric_name(),
-		se_nacl->initiatorname);
+		se_nacl->initiatorname, (prf_isid) ? &i_buf[0] : "");
 	spin_unlock(&dev->dev_reservation_lock);
 
 	return *len;
@@ -1053,8 +1060,9 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts(
 	struct target_core_fabric_ops *tfo;
 	t10_pr_registration_t *pr_reg;
 	unsigned char buf[384];
+	char i_buf[PR_REG_ISID_ID_LEN];
 	ssize_t len = 0;
-	int reg_count = 0;
+	int reg_count = 0, prf_isid;
 
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
@@ -1069,11 +1077,15 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts(
 			pr_reg_list) {
 
 		memset(buf, 0, 384);
+		memset(i_buf, 0, PR_REG_ISID_ID_LEN);
 		tfo = pr_reg->pr_reg_nacl->se_tpg->se_tpg_tfo;
-		sprintf(buf, "%s Node: %s Key: 0x%016Lx PRgen: 0x%08x\n",
+		prf_isid = core_pr_dump_initiator_port(pr_reg, &i_buf[0],
+					PR_REG_ISID_ID_LEN);
+		sprintf(buf, "%s Node: %s%s Key: 0x%016Lx PRgen: 0x%08x\n",
 			tfo->get_fabric_name(),
-			pr_reg->pr_reg_nacl->initiatorname,
-			pr_reg->pr_res_key, pr_reg->pr_res_generation);
+			pr_reg->pr_reg_nacl->initiatorname, (prf_isid) ?
+			&i_buf[0] : "", pr_reg->pr_res_key,
+			pr_reg->pr_res_generation);
 
 		if ((len + strlen(buf) > PAGE_SIZE))
 			break;

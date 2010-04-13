@@ -363,6 +363,7 @@ typedef struct t10_pr_registration_s {
 	u32 pr_res_mapped_lun;
 	u32 pr_aptpl_target_lun;
 	u32 pr_res_generation;
+	u64 pr_reg_bin_isid;
 	u64 pr_res_key;
 	atomic_t pr_res_holders;
 	struct se_node_acl_s *pr_reg_nacl;
@@ -725,6 +726,7 @@ typedef struct se_dev_attrib_s {
 	int		emulate_tas;
 	int		emulate_reservations;
 	int		emulate_alua;
+	int		enforce_pr_isids;
 	u32		hw_block_size;
 	u32		block_size;
 	u32		hw_max_sectors;
@@ -797,6 +799,8 @@ typedef struct se_device_s {
 	u32			dev_tcq_window_closed;
 	/* Physical device queue depth */
 	u32			queue_depth;
+	/* Used for SPC-2 reservations enforce of ISIDs */
+	u64			dev_res_bin_isid;
 	t10_task_attr_index_t	dev_task_attr_type;
 	unsigned long long	dev_sectors_total;
 	/* Pointer to transport specific device structure */
