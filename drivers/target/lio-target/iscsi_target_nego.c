@@ -845,7 +845,7 @@ get_target:
 	 * Locate incoming Initiator IQN reference from Storage Node.
 	 */
 	sess->se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
-			conn->tpg->tpg_se_tpg, i_buf);
+			&conn->tpg->tpg_se_tpg, i_buf);
 	if (!(sess->se_sess->se_node_acl)) {
 		printk(KERN_ERR "iSCSI Initiator Node: %s is not authorized to"
 			" access iSCSI target portal group: %hu.\n",

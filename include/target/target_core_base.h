@@ -38,7 +38,7 @@
 #include <target/target_core_mib.h>
 #endif /* SNMP_SUPPORT */
 
-#define TARGET_CORE_MOD_VERSION		"v3.4.0-rc1"
+#define TARGET_CORE_MOD_VERSION		"v3.9.8"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
@@ -660,11 +660,13 @@ typedef struct se_node_acl_s {
 	struct se_dev_entry_s	*device_list;
 	struct se_session_s	*nacl_sess;
 	struct se_portal_group_s *se_tpg;
-	void			*fabric_acl_ptr;
 	spinlock_t		device_list_lock;
 	spinlock_t		nacl_sess_lock;
 	struct config_group	acl_group;
+	struct config_group	acl_attrib_group;
+	struct config_group	acl_auth_group;
 	struct config_group	acl_param_group;
+	struct config_group	*acl_default_groups[4];
 	struct list_head	acl_list;
 	struct list_head	acl_sess_list;
 } ____cacheline_aligned se_node_acl_t;
@@ -959,6 +961,10 @@ typedef struct se_port_s {
 	struct list_head sep_list;
 } ____cacheline_aligned se_port_t;
 
+typedef struct se_tpg_np_s {
+	struct config_group	tpg_np_group;
+} ____cacheline_aligned se_tpg_np_t;
+
 typedef struct se_portal_group_s {
 	/* Type of target portal group */
 	int			se_tpg_type;
@@ -982,10 +988,26 @@ typedef struct se_portal_group_s {
 	struct list_head	tpg_sess_list;
 	/* Pointer to $FABRIC_MOD dependent code */
 	struct target_core_fabric_ops *se_tpg_tfo;
+	struct se_wwn_s		*se_tpg_wwn;
 	struct config_group	tpg_group;
+	struct config_group	*tpg_default_groups[6];
+	struct config_group	tpg_lun_group;
+	struct config_group	tpg_np_group;
+	struct config_group	tpg_acl_group;
+	struct config_group	tpg_attrib_group;
+	struct config_group	tpg_param_group;
 } ____cacheline_aligned se_portal_group_t;
 
 #define TPG_TFO(se_tpg)	((struct target_core_fabric_ops *)(se_tpg)->se_tpg_tfo)
+
+typedef struct se_auth_s {
+	struct config_group	auth_group;
+} ____cacheline_aligned se_auth_t;
+
+typedef struct se_wwn_s {
+	struct target_fabric_configfs *wwn_tf;
+	struct config_group	wwn_group;
+} ____cacheline_aligned se_wwn_t;
 
 typedef struct se_global_s {
 	u16			alua_lu_gps_counter;

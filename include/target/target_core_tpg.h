@@ -44,14 +44,18 @@ extern struct se_node_acl_s *core_tpg_check_initiator_node_acl(
 extern void core_tpg_wait_for_nacl_pr_ref(struct se_node_acl_s *);
 extern void core_tpg_free_node_acls(struct se_portal_group_s *);
 extern void core_tpg_clear_object_luns(struct se_portal_group_s *);
-extern se_node_acl_t *core_tpg_add_initiator_node_acl(se_portal_group_t *,
-						const char *, u32);
+extern struct se_node_acl_s *core_tpg_add_initiator_node_acl(
+					struct se_portal_group_s *,
+					struct se_node_acl_s *,
+					const char *, u32);
 extern int core_tpg_del_initiator_node_acl(se_portal_group_t *,
 						se_node_acl_t *, int);
 extern int core_tpg_set_initiator_node_queue_depth(se_portal_group_t *,
 						unsigned char *, u32, int);
-extern se_portal_group_t *core_tpg_register(struct target_core_fabric_ops *,
-					void *, int);
+extern int core_tpg_register(struct target_core_fabric_ops *,
+					struct se_wwn_s *,
+					struct se_portal_group_s *, void *,
+					int);
 extern int core_tpg_deregister(struct se_portal_group_s *);
 extern se_lun_t *core_tpg_pre_addlun(se_portal_group_t *, u32);
 extern int core_tpg_post_addlun(se_portal_group_t *, se_lun_t *, int, u32,

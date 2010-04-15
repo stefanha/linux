@@ -344,9 +344,16 @@ int lio_tpg_check_demo_mode_write_protect(se_portal_group_t *se_tpg)
 	return ISCSI_TPG_ATTRIB(tpg)->demo_mode_write_protect;
 }
 
-void *lio_tpg_alloc_fabric_acl(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl)
+int lio_tpg_check_prod_mode_write_protect(se_portal_group_t *se_tpg)
+{
+	iscsi_portal_group_t *tpg =
+			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
+
+	return ISCSI_TPG_ATTRIB(tpg)->prod_mode_write_protect;
+}
+
+struct se_node_acl_s *lio_tpg_alloc_fabric_acl(
+	se_portal_group_t *se_tpg)
 {
 	iscsi_node_acl_t *acl;
 
@@ -355,16 +362,16 @@ void *lio_tpg_alloc_fabric_acl(
 		printk(KERN_ERR "Unable to allocate memory for iscsi_node_acl_t\n");
 		return NULL;
 	}
-	acl->se_node_acl = se_nacl;
 
-	return acl;
+	return &acl->se_node_acl;
 }
 
 void lio_tpg_release_fabric_acl(
 	se_portal_group_t *se_tpg,
 	se_node_acl_t *se_acl)
 {
-	iscsi_node_acl_t *acl = (iscsi_node_acl_t *)se_acl->fabric_acl_ptr;
+	struct iscsi_node_acl_s *acl = container_of(se_acl,
+			struct iscsi_node_acl_s, se_node_acl);
 	kfree(acl);
 }
 
@@ -436,7 +443,8 @@ u32 lio_tpg_get_inst_index(se_portal_group_t *se_tpg)
 
 void lio_set_default_node_attributes(se_node_acl_t *se_acl)
 {
-	iscsi_node_acl_t *acl = (iscsi_node_acl_t *)se_acl->fabric_acl_ptr;
+	iscsi_node_acl_t *acl = container_of(se_acl, iscsi_node_acl_t,
+				se_node_acl);
 
 	ISCSI_NODE_ATTRIB(acl)->nacl = acl;
 	iscsi_set_default_node_attribues(acl);
@@ -462,7 +470,6 @@ iscsi_portal_group_t *core_alloc_portal_group(iscsi_tiqn_t *tiqn, u16 tpgt)
 	init_MUTEX(&tpg->np_login_sem);
 	spin_lock_init(&tpg->tpg_state_lock);
 	spin_lock_init(&tpg->tpg_np_lock);
-	tpg->sid        = 1; /* First Assigned LIO-Target Session ID */
 
 	return tpg;
 }
@@ -473,6 +480,7 @@ int core_load_discovery_tpg(void)
 {
 	iscsi_param_t *param;
 	iscsi_portal_group_t *tpg;
+	int ret;
 
 	tpg = core_alloc_portal_group(NULL, 1);
 	if (!(tpg)) {
@@ -480,23 +488,16 @@ int core_load_discovery_tpg(void)
 		return -1;
 	}
 
-	tpg->tpg_se_tpg = core_tpg_register(
-			&lio_target_fabric_configfs->tf_ops, (void *)tpg,
+	ret = core_tpg_register(
+			&lio_target_fabric_configfs->tf_ops,
+			NULL, &tpg->tpg_se_tpg, (void *)tpg,
 			TRANSPORT_TPG_TYPE_DISCOVERY);
-	if (IS_ERR(tpg->tpg_se_tpg)) {
+	if (ret < 0) {
 		kfree(tpg);
 		return -1;
 	}
 
-	tpg->sid        = 1; /* First Assigned LIO Session ID */
-	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
-	INIT_LIST_HEAD(&tpg->g_tpg_list);
-	INIT_LIST_HEAD(&tpg->tpg_list);
-	init_MUTEX(&tpg->tpg_access_sem);
-	init_MUTEX(&tpg->np_login_sem);
-	spin_lock_init(&tpg->tpg_state_lock);
-	spin_lock_init(&tpg->tpg_np_lock);
-
+	tpg->sid = 1; /* First Assigned LIO Session ID */
 	iscsi_set_default_tpg_attribs(tpg);
 
 	if (iscsi_create_default_params(&tpg->param_list) < 0)
@@ -525,8 +526,8 @@ int core_load_discovery_tpg(void)
 
 	return 0;
 out:
-	if (tpg->tpg_se_tpg)
-		core_tpg_deregister(tpg->tpg_se_tpg);
+	if (tpg->sid == 1)
+		core_tpg_deregister(&tpg->tpg_se_tpg);
 	kfree(tpg);
 	return -1;
 }
@@ -538,7 +539,7 @@ void core_release_discovery_tpg(void)
 	if (!(tpg))
 		return;
 
-	core_tpg_deregister(tpg->tpg_se_tpg);
+	core_tpg_deregister(&tpg->tpg_se_tpg);
 
 	kmem_cache_free(lio_tpg_cache, tpg);
 	iscsi_global->discovery_tpg = NULL;
@@ -771,9 +772,9 @@ int iscsi_tpg_del_portal_group(
 		return -EPERM;
 	}
 
-	core_tpg_clear_object_luns(tpg->tpg_se_tpg);
+	core_tpg_clear_object_luns(&tpg->tpg_se_tpg);
 	iscsi_tpg_free_network_portals(tpg);
-	core_tpg_free_node_acls(tpg->tpg_se_tpg);
+	core_tpg_free_node_acls(&tpg->tpg_se_tpg);
 
 	spin_lock_bh(&iscsi_global->g_tpg_lock);
 	list_del(&tpg->g_tpg_list);
@@ -784,8 +785,8 @@ int iscsi_tpg_del_portal_group(
 		tpg->param_list = NULL;
 	}
 
-	core_tpg_deregister(tpg->tpg_se_tpg);
-	tpg->tpg_se_tpg = NULL;
+	core_tpg_deregister(&tpg->tpg_se_tpg);
+//	tpg->tpg_se_tpg = NULL;
 
 	spin_lock(&tpg->tpg_state_lock);
 	tpg->tpg_state = TPG_STATE_FREE;
@@ -894,45 +895,13 @@ int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *tpg, int force)
 	return 0;
 }
 
-/*	iscsi_tpg_add_initiator_node_acl():
- *
- *
- */
-iscsi_node_acl_t *iscsi_tpg_add_initiator_node_acl(
-	iscsi_portal_group_t *tpg,
-	const char *initiatorname,
-	u32 queue_depth)
-{
-	se_node_acl_t *se_nacl;
-
-	se_nacl = core_tpg_add_initiator_node_acl(tpg->tpg_se_tpg,
-			initiatorname, queue_depth);
-	if ((IS_ERR(se_nacl)) || !(se_nacl))
-		return NULL;
-
-	return (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
-}
-
-/*	iscsi_tpg_del_initiator_node_acl():
- *
- *
- */
-void iscsi_tpg_del_initiator_node_acl(
-	iscsi_portal_group_t *tpg,
-	se_node_acl_t *se_nacl)
-{
-	/*
-	 * TPG_TFO(tpg)->tpg_release_acl() will kfree the iscsi_node_acl_t..
-	 */
-	core_tpg_del_initiator_node_acl(tpg->tpg_se_tpg, se_nacl, 1);
-}
-
 iscsi_node_attrib_t *iscsi_tpg_get_node_attrib(
 	iscsi_session_t *sess)
 {
 	se_session_t *se_sess = sess->se_sess;
 	se_node_acl_t *se_nacl = se_sess->se_node_acl;
-	iscsi_node_acl_t *acl = (iscsi_node_acl_t *)se_nacl->fabric_acl_ptr;
+	iscsi_node_acl_t *acl = container_of(se_nacl, iscsi_node_acl_t,
+					se_node_acl);
 
 	return &acl->node_attrib;
 }
@@ -1148,7 +1117,7 @@ int iscsi_tpg_set_initiator_node_queue_depth(
 	u32 queue_depth,
 	int force)
 {
-	return core_tpg_set_initiator_node_queue_depth(tpg->tpg_se_tpg,
+	return core_tpg_set_initiator_node_queue_depth(&tpg->tpg_se_tpg,
 		initiatorname, queue_depth, force);
 }
 
