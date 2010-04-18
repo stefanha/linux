@@ -774,7 +774,6 @@ int iscsi_tpg_del_portal_group(
 
 	core_tpg_clear_object_luns(&tpg->tpg_se_tpg);
 	iscsi_tpg_free_network_portals(tpg);
-	core_tpg_free_node_acls(&tpg->tpg_se_tpg);
 
 	spin_lock_bh(&iscsi_global->g_tpg_lock);
 	list_del(&tpg->g_tpg_list);
