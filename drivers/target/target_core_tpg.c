@@ -713,7 +713,7 @@ int core_tpg_register(
 	if (se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) {
 		if (core_tpg_setup_virtual_lun0(se_tpg) < 0) {
 			kfree(se_tpg);
-			return ERR_PTR(-ENOMEM);
+			return -ENOMEM;
 		}
 	}
 
