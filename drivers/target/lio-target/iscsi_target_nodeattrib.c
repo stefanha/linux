@@ -90,7 +90,7 @@ extern int iscsi_na_dataout_timeout(
 
 	a->dataout_timeout = dataout_timeout;
 	TRACE(TRACE_NODEATTRIB, "Set DataOut Timeout to %u for Initiator Node"
-			" %s\n", a->dataout_timeout, acl->initiatorname);
+		" %s\n", a->dataout_timeout, acl->se_node_acl.initiatorname);
 
 	return 0;
 }
@@ -120,7 +120,7 @@ extern int iscsi_na_dataout_timeout_retries(
 	a->dataout_timeout_retries = dataout_timeout_retries;
 	TRACE(TRACE_NODEATTRIB, "Set DataOut Timeout Retries to %u for"
 		" Initiator Node %s\n", a->dataout_timeout_retries,
-		acl->initiatorname);
+		acl->se_node_acl.initiatorname);
 
 	return 0;
 }
@@ -154,7 +154,7 @@ extern int iscsi_na_nopin_timeout(
 
 	a->nopin_timeout = nopin_timeout;
 	TRACE(TRACE_NODEATTRIB, "Set NopIn Timeout to %u for Initiator"
-		" Node %s\n", a->nopin_timeout, acl->initiatorname);
+		" Node %s\n", a->nopin_timeout, acl->se_node_acl.initiatorname);
 	/*
 	 * Reenable disabled nopin_timeout timer for all iSCSI connections.
 	 */
@@ -207,7 +207,8 @@ extern int iscsi_na_nopin_response_timeout(
 
 	a->nopin_response_timeout = nopin_response_timeout;
 	TRACE(TRACE_NODEATTRIB, "Set NopIn Response Timeout to %u for"
-		" Initiator Node %s\n", a->nopin_timeout, acl->initiatorname);
+		" Initiator Node %s\n", a->nopin_timeout,
+		acl->se_node_acl.initiatorname);
 
 	return 0;
 }
@@ -231,7 +232,7 @@ extern int iscsi_na_random_datain_pdu_offsets(
 	a->random_datain_pdu_offsets = random_datain_pdu_offsets;
 	TRACE(TRACE_NODEATTRIB, "Set Random DataIN PDU Offsets to %u for"
 		" Initiator Node %s\n", a->random_datain_pdu_offsets,
-			acl->initiatorname);
+		acl->se_node_acl.initiatorname);
 
 	return 0;
 }
@@ -255,7 +256,7 @@ extern int iscsi_na_random_datain_seq_offsets(
 	a->random_datain_seq_offsets = random_datain_seq_offsets;
 	TRACE(TRACE_NODEATTRIB, "Set Random DataIN Sequence Offsets to %u for"
 		" Initiator Node %s\n", a->random_datain_seq_offsets,
-			acl->initiatorname);
+		acl->se_node_acl.initiatorname);
 
 	return 0;
 }
@@ -279,7 +280,7 @@ extern int iscsi_na_random_r2t_offsets(
 	a->random_r2t_offsets = random_r2t_offsets;
 	TRACE(TRACE_NODEATTRIB, "Set Random R2T Offsets to %u for"
 		" Initiator Node %s\n", a->random_r2t_offsets,
-			acl->initiatorname);
+		acl->se_node_acl.initiatorname);
 
 	return 0;
 }
@@ -298,7 +299,7 @@ extern int iscsi_na_default_erl(
 
 	a->default_erl = default_erl;
 	TRACE(TRACE_NODEATTRIB, "Set use ERL0 flag to %u for Initiator"
-		" Node Node %s\n", a->default_erl, acl->initiatorname);
+		" Node %s\n", a->default_erl, acl->se_node_acl.initiatorname);
 
 	return 0;
 }
