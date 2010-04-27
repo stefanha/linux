@@ -4093,7 +4093,7 @@ static inline int iscsi_send_status(
 	TRACE(trace_type, "Built %sSCSI Response, ITT: 0x%08x, StatSN: 0x%08x,"
 		" Response: 0x%02x, SAM Status: 0x%02x, CID: %hu\n",
 		(!recovery) ? "" : "Recovery ", cmd->init_task_tag,
-		cmd->stat_sn, 0x00, cmd->scsi_status, conn->cid);
+		cmd->stat_sn, 0x00, cmd->se_cmd->scsi_status, conn->cid);
 
 	return 0;
 }
