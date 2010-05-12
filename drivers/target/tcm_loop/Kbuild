@@ -6,6 +6,6 @@ tcm_loop-objs			:= tcm_loop_fabric.o \
 
 obj-$(CONFIG_TCM_LOOP_FABRIC)	+= tcm_loop.o
 
-ifdef CONFIGFS_TCM_LOOP_CDB_DEBUG
+ifdef CONFIG_TCM_LOOP_CDB_DEBUG
 EXTRA_CFLAGS			+= -DTCM_LOOP_CDB_DEBUG
 endif
