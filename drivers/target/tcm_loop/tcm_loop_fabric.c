@@ -144,6 +144,7 @@ u32 tcm_loop_get_pr_transport_id_len(
  * Persistent Reservation SPEC_I_PT=1 and PROUT REGISTER_AND_MOVE operations.
  */
 char *tcm_loop_parse_pr_out_transport_id(
+	se_portal_group_t *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
 	char **port_nexus_ptr)

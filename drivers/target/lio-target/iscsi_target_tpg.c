@@ -234,6 +234,7 @@ u32 lio_tpg_get_pr_transport_id_len(
 }
 
 char *lio_tpg_parse_pr_out_transport_id(
+	se_portal_group_t *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
 	char **port_nexus_ptr)

@@ -1581,7 +1581,7 @@ static int core_scsi3_decode_spec_i_port(
 			dest_rtpi = tmp_port->sep_rtpi;
 
 			i_str = tmp_tf_ops->tpg_parse_pr_out_transport_id(
-					(const char *)ptr, &tid_len,
+					tmp_tpg, (const char *)ptr, &tid_len,
 					&iport_ptr);
 			if (!(i_str))
 				continue;
@@ -3442,7 +3442,7 @@ static int core_scsi3_emulate_pro_register_and_move(
 		ret = PYX_TRANSPORT_LU_COMM_FAILURE;
 		goto out;
 	}
-	initiator_str = dest_tf_ops->tpg_parse_pr_out_transport_id(
+	initiator_str = dest_tf_ops->tpg_parse_pr_out_transport_id(dest_se_tpg,
 			(const char *)&buf[24], &tmp_tid_len, &iport_ptr);
 	if (!(initiator_str)) {
 		printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE: Unable to locate"

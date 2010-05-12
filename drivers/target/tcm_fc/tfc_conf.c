@@ -536,7 +536,8 @@ static u32 ft_get_pr_transport_id(se_portal_group_t *se_tpg,
 	return ft_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg, format_code);
 }
 
-static char *ft_parse_pr_out_transport_id(const char *buf, u32 *out_tid_len,
+static char *ft_parse_pr_out_transport_id(se_portal_group_t *se_tpg,
+				          const char *buf, u32 *out_tid_len,
 					  char **port_nexus_ptr)
 {
 	struct ft_transport_id *id = (struct ft_transport_id *)buf;

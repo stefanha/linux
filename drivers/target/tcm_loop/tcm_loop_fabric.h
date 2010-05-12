@@ -9,7 +9,8 @@ extern u32 tcm_loop_get_pr_transport_id(se_portal_group_t *, se_node_acl_t *,
 extern u32 tcm_loop_get_pr_transport_id_len(se_portal_group_t *,
 				se_node_acl_t *, t10_pr_registration_t *,
 				int *);
-extern char *tcm_loop_parse_pr_out_transport_id(const char *, u32 *, char **);
+extern char *tcm_loop_parse_pr_out_transport_id(se_portal_group_t *,
+				const char *, u32 *, char **);
 extern int tcm_loop_check_demo_mode(se_portal_group_t *);
 extern int tcm_loop_check_demo_mode_cache(se_portal_group_t *);
 extern int tcm_loop_check_demo_mode_write_protect(se_portal_group_t *);

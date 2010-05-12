@@ -15,7 +15,8 @@ struct target_core_fabric_ops {
 	u32 (*tpg_get_pr_transport_id_len)(struct se_portal_group_s *,
 				struct se_node_acl_s *,
 				struct t10_pr_registration_s *, int *);
-	char *(*tpg_parse_pr_out_transport_id)(const char *, u32 *, char **);
+	char *(*tpg_parse_pr_out_transport_id)(struct se_portal_group_s *,
+				const char *, u32 *, char **);
 	int (*tpg_check_demo_mode)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_cache)(struct se_portal_group_s *);
 	int (*tpg_check_demo_mode_write_protect)(struct se_portal_group_s *);
