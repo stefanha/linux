@@ -1,5 +1,5 @@
 extern char *tcm_loop_get_fabric_name(void);
-extern u8 tcm_loop_get_fabric_proto_ident(void);
+extern u8 tcm_loop_get_fabric_proto_ident(se_portal_group_t *);
 extern char *tcm_loop_get_endpoint_wwn(se_portal_group_t *);
 extern u16 tcm_loop_get_tag(se_portal_group_t *);
 extern u32 tcm_loop_get_default_depth(se_portal_group_t *);

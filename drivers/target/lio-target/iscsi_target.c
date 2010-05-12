@@ -1197,7 +1197,7 @@ char *iscsi_get_fabric_name(void)
 	return "iSCSI";
 }
 
-u8 iscsi_get_fabric_proto_ident(void)
+u8 iscsi_get_fabric_proto_ident(se_portal_group_t *se_tpg)
 {
 	/*
 	 * This value is defined for "Internet SCSI (iSCSI)"

@@ -51,7 +51,7 @@ char *tcm_loop_get_fabric_name(void)
 	return "loopback";
 }
 
-u8 tcm_loop_get_fabric_proto_ident(void)
+u8 tcm_loop_get_fabric_proto_ident(se_portal_group_t *se_tpg)
 {
 	/*
 	 * Return a SAS Serial SCSI Protocol identifier for loopback operations

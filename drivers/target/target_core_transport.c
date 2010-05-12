@@ -4679,7 +4679,7 @@ check_port:
 				goto check_tpgi;
 			}
 			buf[off] =
-				(TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
+				(TPG_TFO(tpg)->get_fabric_proto_ident(tpg) << 4);
 			buf[off++] |= 0x1; /* CODE SET == Binary */
 			buf[off] = 0x80; /* Set PIV=1 */
 			/* Set ASSOICATION == target port: 01b */
@@ -4724,7 +4724,7 @@ check_tpgi:
 			spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 
 			buf[off] =
-				(TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
+				(TPG_TFO(tpg)->get_fabric_proto_ident(tpg) << 4);
 			buf[off++] |= 0x1; /* CODE SET == Binary */
 			buf[off] = 0x80; /* Set PIV=1 */
 			/* Set ASSOICATION == target port: 01b */
@@ -4791,7 +4791,7 @@ check_scsi_name:
 				goto set_len;
 			}
 			buf[off] =
-				(TPG_TFO(tpg)->get_fabric_proto_ident() << 4);
+				(TPG_TFO(tpg)->get_fabric_proto_ident(tpg) << 4);
 			buf[off++] |= 0x3; /* CODE SET == UTF-8 */
 			buf[off] = 0x80; /* Set PIV=1 */
 			/* Set ASSOICATION == target port: 01b */

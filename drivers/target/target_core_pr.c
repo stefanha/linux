@@ -1575,7 +1575,7 @@ static int core_scsi3_decode_spec_i_port(
 			 * Look for the matching proto_ident provided by
 			 * the received TransportID
 			 */
-			tmp_proto_ident = tmp_tf_ops->get_fabric_proto_ident();
+			tmp_proto_ident = tmp_tf_ops->get_fabric_proto_ident(tmp_tpg);
 			if (tmp_proto_ident != proto_ident) 
 				continue;
 			dest_rtpi = tmp_port->sep_rtpi;
@@ -3426,11 +3426,11 @@ static int core_scsi3_emulate_pro_register_and_move(
 	printk("SPC-3 PR REGISTER_AND_MOVE: Extracted Protocol Identifier:"
 			" 0x%02x\n", proto_ident);
 #endif
-	if (proto_ident != dest_tf_ops->get_fabric_proto_ident()) {
+	if (proto_ident != dest_tf_ops->get_fabric_proto_ident(dest_se_tpg)) {
 		printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE: Received"
 			" proto_ident: 0x%02x does not match ident: 0x%02x"
 			" from fabric: %s\n", proto_ident,
-			dest_tf_ops->get_fabric_proto_ident(),
+			dest_tf_ops->get_fabric_proto_ident(dest_se_tpg),
 			dest_tf_ops->get_fabric_name());
 		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 		goto out;

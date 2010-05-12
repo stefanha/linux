@@ -480,7 +480,7 @@ static char *ft_get_fabric_name(void)
 	return "fc";
 }
 
-static u8 ft_get_fabric_proto_ident(void)
+static u8 ft_get_fabric_proto_ident(se_portal_group_t *se_tpg)
 {
 	return 0;	/* 0 = fcp-2 per SPC4 section 7.5.1 */
 }
