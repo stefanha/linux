@@ -391,11 +391,11 @@ static struct scsi_host_template tcm_loop_driver_template = {
 	.eh_device_reset_handler = NULL,
 	.eh_host_reset_handler	= NULL,
 	.bios_param		= NULL,
-	.can_queue		= 1,
+	.can_queue		= TL_SCSI_CAN_QUEUE,
 	.this_id		= -1,
-	.sg_tablesize		= 256,
-	.cmd_per_lun		= 1,
-	.max_sectors		= 128,
+	.sg_tablesize		= TL_SCSI_SG_TABLESIZE,
+	.cmd_per_lun		= TL_SCSI_CMD_PER_LUN,
+	.max_sectors		= TL_SCSI_MAX_SECTORS,
 	.use_clustering		= DISABLE_CLUSTERING,
 	.module			= THIS_MODULE,
 };
@@ -426,6 +426,7 @@ static int tcm_loop_driver_probe(struct device *dev)
 	sh->max_id = 2;
 	sh->max_lun = 0;
 	sh->max_channel = 0;
+	sh->max_cmd_len = TL_SCSI_MAX_CMD_LEN;
 
 	error = scsi_add_host(sh, &tl_hba->dev);
 	if (error) {
