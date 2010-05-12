@@ -1,13 +1,13 @@
 /*******************************************************************************
  * Filename:  tcm_loop_fabric.c
  *
- * This file contains the TCM fabric module for initiator side virtual SAS
- * using emulated target mode SAS ports
+ * This file contains the TCM loopback fabric module for initiator and target
+ * side CDB level emulation of SAS, FC and iSCSI ports to Linux/SCSI LUNs.
  *
- * Copyright (c) 2009 Rising Tide, Inc.
- * Copyright (c) 2009 Linux-iSCSI.org
+ * Copyright (c) 2009, 2010 Rising Tide, Inc.
+ * Copyright (c) 2009, 2010 Linux-iSCSI.org
  *
- * Copyright (c) 2009 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Copyright (c) 2009, 2010  Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
+#include <target/target_core_fabric_lib.h>
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
@@ -53,11 +54,30 @@ char *tcm_loop_get_fabric_name(void)
 
 u8 tcm_loop_get_fabric_proto_ident(se_portal_group_t *se_tpg)
 {
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 	/*
-	 * Return a SAS Serial SCSI Protocol identifier for loopback operations
-	 * This is defined in  section 7.5.1 Table 362 in spc4r17
+	 * tl_proto_id is set at tcm_loop_configfs.c:tcm_loop_make_scsi_hba()
+	 * time based on the protocol dependent prefix of the passed configfs group.
+	 *
+	 * Based upon tl_proto_id, TCM_Loop emulates the requested fabric
+	 * ProtocolID using target_core_fabric_lib.c symbols.
 	 */
-	return 0x6;
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_get_fabric_proto_ident(se_tpg);
+	case SCSI_PROTOCOL_FCP:
+		return fc_get_fabric_proto_ident(se_tpg);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_get_fabric_proto_ident(se_tpg);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
+	}
+
+	return sas_get_fabric_proto_ident(se_tpg);
 }
 
 char *tcm_loop_get_endpoint_wwn(se_portal_group_t *se_tpg)
@@ -67,7 +87,7 @@ char *tcm_loop_get_endpoint_wwn(se_portal_group_t *se_tpg)
 	/*
 	 * Return the passed NAA identifier for the SAS Target Port
 	 */
-	return &tl_tpg->tl_hba->naa_sas_address[0];
+	return &tl_tpg->tl_hba->tl_wwn_address[0];
 }
 
 u16 tcm_loop_get_tag(se_portal_group_t *se_tpg)
@@ -94,33 +114,28 @@ u32 tcm_loop_get_pr_transport_id(
 	int *format_code,
 	unsigned char *buf)
 {
-	unsigned char binary, *ptr;
-	int i;
-	u32 off = 4;
-	/*
-	 * Set PROTOCOL IDENTIFIER to 6h for SAS
-	 */
-	buf[0] = 0x06;
-	/*
-	 * From spc4r17, 7.5.4.7 TransportID for initiator ports using SCSI
-	 * over SAS Serial SCSI Protocol
-	 * 
-	 * For TCM_Loop, we use the configfs group name of INIT_SAS_ADDRESS:
-	 * and converting the 16-byte ASCII value into a 8-byte binary hex
-	 * buffer.
-	 *
-	 * target/loopback/naa.<TGT_SAS_ADDRESS>/nexus/naa.<INIt_SAS_ADDRESS>
-	 */
-	ptr = &se_nacl->initiatorname[4]; /* Skip over 'naa. prefix */
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 
-	for (i = 0; i < 16; i += 2) {
-		binary = transport_asciihex_to_binaryhex(&ptr[i]);	
-		buf[off++] = binary;
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+					format_code, buf);
+	case SCSI_PROTOCOL_FCP:
+		return fc_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+					format_code, buf);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+					format_code, buf);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
 	}
-	/*
-	 * The SAS Transport ID is a hardcoded 24-byte length
-	 */
-	return 24;
+
+	return sas_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+			format_code, buf);
 }
 
 u32 tcm_loop_get_pr_transport_id_len(
@@ -129,14 +144,28 @@ u32 tcm_loop_get_pr_transport_id_len(
 	t10_pr_registration_t *pr_reg,
 	int *format_code)
 {
-	*format_code = 0;
-	/*
-	 * From spc4r17, 7.5.4.7 TransportID for initiator ports using SCSI
-	 * over SAS Serial SCSI Protocol
-	 *
-	 * The SAS Transport ID is a hardcoded 24-byte length
-	 */
-	return 24;
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
+
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+					format_code);
+	case SCSI_PROTOCOL_FCP:
+		return fc_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+					format_code);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+					format_code);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
+	}
+
+	return sas_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+			format_code);
 }
 
 /*
@@ -149,18 +178,28 @@ char *tcm_loop_parse_pr_out_transport_id(
 	u32 *out_tid_len,
 	char **port_nexus_ptr)
 {
-	/*
-	 * Assume the FORMAT CODE 00b from spc4r17, 7.5.4.7 TransportID
-	 * for initiator ports using SCSI over SAS Serial SCSI Protocol
-	 *
-	 * The TransportID for a SAS Initiator Port is of fixed size of
-	 * 24 bytes, and SAS does not contain a I_T nexus identifier,
-	 * so we return the **port_nexus_ptr set to NULL.
-	 */
-	*port_nexus_ptr = NULL;
-	*out_tid_len = 24;
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 
-	return (char *)&buf[4];
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+					port_nexus_ptr);
+	case SCSI_PROTOCOL_FCP:
+		return fc_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+					port_nexus_ptr);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+					port_nexus_ptr);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
+	}
+
+	return sas_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+			port_nexus_ptr);
 }
 
 /*

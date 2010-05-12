@@ -1,5 +1,5 @@
-#define TCM_LOOP_VERSION		"v1.0"
-#define TL_NAA_SAS_ADDR_LEN		64
+#define TCM_LOOP_VERSION		"v2.0"
+#define TL_WWN_ADDR_LEN			256
 #define TL_TPGS_PER_HBA			32
 /*
  * Defaults for struct scsi_host_template tcm_loop_driver_template
@@ -57,7 +57,8 @@ struct tcm_loop_tpg {
 };
 
 struct tcm_loop_hba {
-	unsigned char naa_sas_address[TL_NAA_SAS_ADDR_LEN];
+	u8 tl_proto_id;
+	unsigned char tl_wwn_address[TL_WWN_ADDR_LEN];
 	struct se_hba_s *se_hba;
 	struct se_lun_s *tl_hba_lun;
 	struct se_port_s *tl_hba_lun_sep;
