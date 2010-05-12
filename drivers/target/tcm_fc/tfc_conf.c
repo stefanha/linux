@@ -44,6 +44,7 @@
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_fabric_configfs.h>
+#include <target/target_core_fabric_lib.h>
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
@@ -480,11 +481,6 @@ static char *ft_get_fabric_name(void)
 	return "fc";
 }
 
-static u8 ft_get_fabric_proto_ident(se_portal_group_t *se_tpg)
-{
-	return 0;	/* 0 = fcp-2 per SPC4 section 7.5.1 */
-}
-
 static char *ft_get_fabric_wwn(se_portal_group_t *se_tpg)
 {
 	struct ft_tpg *tpg = se_tpg->se_tpg_fabric_ptr;
@@ -506,47 +502,6 @@ static u16 ft_get_tag(se_portal_group_t *se_tpg)
 static u32 ft_get_default_depth(se_portal_group_t *se_tpg)
 {
 	return 1;
-}
-
-static u32 ft_get_pr_transport_id_len(se_portal_group_t *se_tpg,
-				      se_node_acl_t *se_nacl,
-				      t10_pr_registration_t *pr_reg,
-				      int *format_code)
-{
-	*format_code = 0;
-	return sizeof(struct ft_transport_id);
-}
-
-static u32 ft_get_pr_transport_id(se_portal_group_t *se_tpg,
-				  se_node_acl_t *se_nacl,
-				  t10_pr_registration_t *pr_reg,
-				  int *format_code, unsigned char *buf)
-{
-	struct ft_node_acl *acl = container_of(se_nacl, struct ft_node_acl,
-					se_node_acl);
-	struct ft_transport_id *id = (struct ft_transport_id *)buf;
-	/*
-	 * PROTOCOL IDENTIFIER is 0h for FCP-2
-	 * 
-	 * From spc4r17, 7.5.4.2 TransportID for initiator ports using
-	 * SCSI over Fibre Channel
-	 */
-	put_unaligned_be64(acl->node_auth.port_name, id->wwpn);
-
-	return ft_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg, format_code);
-}
-
-static char *ft_parse_pr_out_transport_id(se_portal_group_t *se_tpg,
-				          const char *buf, u32 *out_tid_len,
-					  char **port_nexus_ptr)
-{
-	struct ft_transport_id *id = (struct ft_transport_id *)buf;
-
-	*port_nexus_ptr = NULL;
-	*out_tid_len = sizeof(*id);
-	return (char *)&id->wwpn;
-
-	/* XXX may be a problem with the caller expecting ASCII */
 }
 
 static int ft_check_false(se_portal_group_t *se_tpg)
@@ -584,13 +539,13 @@ static u64 ft_pack_lun(unsigned int index)
 
 static struct target_core_fabric_ops ft_fabric_ops = {
 	.get_fabric_name =		ft_get_fabric_name,
-	.get_fabric_proto_ident =	ft_get_fabric_proto_ident,
+	.get_fabric_proto_ident =	fc_get_fabric_proto_ident,
 	.tpg_get_wwn =			ft_get_fabric_wwn,
 	.tpg_get_tag =			ft_get_tag,
 	.tpg_get_default_depth =	ft_get_default_depth,
-	.tpg_get_pr_transport_id =	ft_get_pr_transport_id,
-	.tpg_get_pr_transport_id_len =	ft_get_pr_transport_id_len,
-	.tpg_parse_pr_out_transport_id = ft_parse_pr_out_transport_id,
+	.tpg_get_pr_transport_id =	fc_get_pr_transport_id,
+	.tpg_get_pr_transport_id_len =	fc_get_pr_transport_id_len,
+	.tpg_parse_pr_out_transport_id = fc_parse_pr_out_transport_id,
 	.tpg_check_demo_mode =		ft_check_false,
 	.tpg_check_demo_mode_cache =	ft_check_false,
 	.tpg_check_demo_mode_write_protect = ft_check_false,
