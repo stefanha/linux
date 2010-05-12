@@ -4779,13 +4779,14 @@ check_scsi_name:
 			scsi_name_len = strlen(TPG_TFO(tpg)->tpg_get_wwn(tpg));
 			/* UTF-8 ",t,0x<16-bit TPGT>" + NULL Terminator */
 			scsi_name_len += 10;
-			/* Header size + Designation descriptor */
-			scsi_name_len += 4;
+			/* Check for 4-byte padding */
 			padding = ((-scsi_name_len) & 3);
 			if (padding != 0)
 				scsi_name_len += padding;
+			/* Header size + Designation descriptor */
+			scsi_name_len += 4;
 
-			if ((len + scsi_name_len) > cmd->data_length) {
+			if (((len + 4) + scsi_name_len) > cmd->data_length) {
 				len += scsi_name_len;
 				goto set_len;
 			}
