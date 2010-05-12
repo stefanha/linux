@@ -16,7 +16,6 @@ extern int core_reset_np_thread(struct iscsi_np_s *, struct iscsi_tpg_np_s *,
 				struct iscsi_portal_group_s *, int);
 extern int core_del_np(iscsi_np_t *);
 extern char *iscsi_get_fabric_name(void);
-extern u8 iscsi_get_fabric_proto_ident(struct se_portal_group_s *);
 extern iscsi_cmd_t *iscsi_get_cmd(struct se_cmd_s *);
 extern u32 iscsi_get_task_tag(struct se_cmd_s *);
 extern int iscsi_get_cmd_state(struct se_cmd_s *);

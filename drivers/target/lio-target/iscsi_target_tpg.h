@@ -4,14 +4,6 @@
 extern char *lio_tpg_get_endpoint_wwn(struct se_portal_group_s *);
 extern u16 lio_tpg_get_tag(struct se_portal_group_s *);
 extern u32 lio_tpg_get_default_depth(struct se_portal_group_s *);
-extern u32 lio_tpg_get_pr_transport_id(struct se_portal_group_s *,
-			struct se_node_acl_s *, struct t10_pr_registration_s *,
-			int *, unsigned char *);
-extern u32 lio_tpg_get_pr_transport_id_len(struct se_portal_group_s *,
-			struct se_node_acl_s *, struct t10_pr_registration_s *,
-			int *);
-extern char *lio_tpg_parse_pr_out_transport_id(struct se_portal_group_s *,
-			const char *, u32 *, char **);
 extern int lio_tpg_check_demo_mode(struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_cache(struct se_portal_group_s *);
 extern int lio_tpg_check_demo_mode_write_protect(struct se_portal_group_s *);

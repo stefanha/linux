@@ -37,6 +37,7 @@
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_fabric_configfs.h>
+#include <target/target_core_fabric_lib.h>
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
@@ -1440,11 +1441,11 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.tpg_get_wwn = &lio_tpg_get_endpoint_wwn;
 	fabric->tf_ops.tpg_get_tag = &lio_tpg_get_tag;
 	fabric->tf_ops.tpg_get_default_depth = &lio_tpg_get_default_depth;
-	fabric->tf_ops.tpg_get_pr_transport_id = &lio_tpg_get_pr_transport_id;
+	fabric->tf_ops.tpg_get_pr_transport_id = &iscsi_get_pr_transport_id;
 	fabric->tf_ops.tpg_get_pr_transport_id_len =
-				&lio_tpg_get_pr_transport_id_len;
+				&iscsi_get_pr_transport_id_len;
 	fabric->tf_ops.tpg_parse_pr_out_transport_id =
-				&lio_tpg_parse_pr_out_transport_id;
+				&iscsi_parse_pr_out_transport_id;
 	fabric->tf_ops.tpg_check_demo_mode = &lio_tpg_check_demo_mode;
 	fabric->tf_ops.tpg_check_demo_mode_cache =
 				&lio_tpg_check_demo_mode_cache;
