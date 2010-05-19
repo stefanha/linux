@@ -38,7 +38,7 @@
 #include <target/target_core_mib.h>
 #endif /* SNMP_SUPPORT */
 
-#define TARGET_CORE_MOD_VERSION		"v3.4.0-rc2"
+#define TARGET_CORE_MOD_VERSION		"v3.4.0"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
