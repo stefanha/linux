@@ -9,7 +9,7 @@
  */
 #define TL_SCSI_CAN_QUEUE		1024
 #define TL_SCSI_CMD_PER_LUN		1024
-#define TL_SCSI_MAX_SECTORS		256
+#define TL_SCSI_MAX_SECTORS		1024
 #define TL_SCSI_SG_TABLESIZE		256
 /*
  * Used in tcm_loop_driver_probe() for struct Scsi_Host->max_cmd_len
