@@ -2908,7 +2908,7 @@ int transport_generic_allocate_tasks(
 #endif /* SNMP_SUPPORT */
 
 	switch (non_data_cdb) {
-	case 0:
+	case TGCS_DATA_SG_IO_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to "
 				"SCF_SCSI_DATA_SG_IO_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
@@ -2922,34 +2922,34 @@ int transport_generic_allocate_tasks(
 			cmd->transport_get_lba(cdb);
 
 		break;
-	case 1:
+	case TGCS_CONTROL_SG_IO_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
 				" SCF_SCSI_CONTROL_SG_IO_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		cmd->transport_cdb_transform =
 				&transport_process_control_sg_transform;
 		break;
-	case 2:
+	case TGCS_CONTROL_NONSG_IO_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to "
 				"SCF_SCSI_CONTROL_NONSG_IO_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
 		cmd->transport_cdb_transform =
 				&transport_process_control_nonsg_transform;
 		break;
-	case 3:
+	case TGCS_NON_DATA_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to "
 				"SCF_SCSI_NON_DATA_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 		cmd->transport_cdb_transform =
 				&transport_process_non_data_transform;
 		break;
-	case 4:
+	case TGCS_UNSUPPORTED_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
 				" SCF_SCSI_UNSUPPORTED_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = UNSUPPORTED_SCSI_OPCODE;
 		return -2;
-	case 5:
+	case TGCS_RESERVATION_CONFLICT:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
 				" SCF_SCSI_RESERVATION_CONFLICT\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -2968,19 +2968,19 @@ int transport_generic_allocate_tasks(
 				cmd->orig_fe_lun, 0x2C,
 				ASCQ_2CH_PREVIOUS_RESERVATION_CONFLICT_STATUS);
 		return -2;
-	case 6:
+	case TGCS_INVALID_CDB_FIELD:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = INVALID_CDB_FIELD;
 		return -2;
-	case 7:
+	case TGCS_ILLEGAL_REQUEST:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = ILLEGAL_REQUEST;
 		return -2;
-	case 8:
+	case TGCS_CHECK_CONDITION_UNIT_ATTENTION:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = CHECK_CONDITION_UNIT_ATTENTION;
 		return -2;
-	case 9:
+	case TGCS_CHECK_CONDITION_NOT_READY:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = CHECK_CONDITION_NOT_READY;
 		return -2;
@@ -5207,7 +5207,7 @@ static int transport_generic_cmd_sequencer(
 {
 	se_device_t *dev = SE_DEV(cmd);
 	se_subsystem_dev_t *su_dev = dev->se_sub_dev;
-	int ret = 0, sector_ret = 0;
+	int ret, sector_ret = 0;
 	u32 sectors = 0, size = 0, pr_reg_type = 0;
 	u8 alua_ascq = 0;
 	/*
@@ -5217,7 +5217,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_wait_for_tasks =
 				&transport_nop_wait_for_tasks;
 		transport_get_maps(cmd);
-		return 8; /* UNIT ATTENTION */
+		return TGCS_CHECK_CONDITION_UNIT_ATTENTION;
 	}
 	/*
 	 * Check status of Asymmetric Logical Unit Assignment port
@@ -5238,9 +5238,9 @@ static int transport_generic_cmd_sequencer(
 				CMD_TFO(cmd)->get_fabric_name(), alua_ascq);
 #endif
 			transport_set_sense_codes(cmd, 0x04, alua_ascq);
-			return 9; /* NOT READY */
+			return TGCS_CHECK_CONDITION_NOT_READY;
 		}
-		return 6; /* INVALID_CDB_FIELD */
+		return TGCS_INVALID_CDB_FIELD;
 	}
 	/*
 	 * Check status for SPC-3 Persistent Reservations
@@ -5251,7 +5251,7 @@ static int transport_generic_cmd_sequencer(
 			cmd->transport_wait_for_tasks =
 					&transport_nop_wait_for_tasks;
 			transport_get_maps(cmd);
-			return 5; /* RESERVATION CONFLIT */
+			return TGCS_RESERVATION_CONFLICT;
 		}
 		/*
 		 * This means the CDB is allowed for the SCSI Initiator port
@@ -5265,89 +5265,97 @@ static int transport_generic_cmd_sequencer(
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_6(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_10:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_10(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_12:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_12(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_16:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_6:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_6(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_10:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_10(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_12:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_12(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_16:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
 		if (sector_ret)
-			return 4;
+			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case 0xa3:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -5371,28 +5379,28 @@ static int transport_generic_cmd_sequencer(
 		}
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case MODE_SELECT:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 1;
+		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SELECT_10:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 1;
+		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case MODE_SENSE_10:
 	case GPCMD_READ_BUFFER_CAPACITY:
@@ -5403,14 +5411,14 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[7] << 8) + cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_BLOCK_LIMITS:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_BLOCK_LEN;
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case GPCMD_GET_CONFIGURATION:
 	case GPCMD_READ_FORMAT_CAPACITIES:
@@ -5420,7 +5428,7 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[7] << 8) + cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 1;
+		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case PERSISTENT_RESERVE_IN:
 	case PERSISTENT_RESERVE_OUT:
@@ -5432,7 +5440,7 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[7] << 8) + cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case GPCMD_MECHANISM_STATUS:
 	case GPCMD_READ_DVD_STRUCTURE:
@@ -5440,14 +5448,14 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[8] << 8) + cdb[9];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 1;
+		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case READ_POSITION:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_POSITION_LEN;
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case 0xa4:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -5472,7 +5480,7 @@ static int transport_generic_cmd_sequencer(
 		}
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case INQUIRY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -5485,21 +5493,21 @@ static int transport_generic_cmd_sequencer(
 		 */
 		if (SE_DEV(cmd)->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 			cmd->sam_task_attr = TASK_ATTR_HOQ;
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_BUFFER:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_CAPACITY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_CAP_LEN;
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_MEDIA_SERIAL_NUMBER:
 	case SECURITY_PROTOCOL_IN:
@@ -5508,7 +5516,7 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case SERVICE_ACTION_IN:
 	case ACCESS_CONTROL_IN:
@@ -5522,14 +5530,14 @@ static int transport_generic_cmd_sequencer(
 		       (cdb[12] << 8) | cdb[13];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case VARIABLE_LENGTH_CMD:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[10] << 8) | cdb[11];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case RECEIVE_DIAGNOSTIC:
 	case SEND_DIAGNOSTIC:
@@ -5537,7 +5545,7 @@ static int transport_generic_cmd_sequencer(
 		size = (cdb[3] << 8) | cdb[4];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 /* #warning FIXME: Figure out correct GPCMD_READ_CD blocksize. */
 #if 0
@@ -5547,7 +5555,7 @@ static int transport_generic_cmd_sequencer(
 		size = (2336 * sectors);
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 #endif
 	case READ_TOC:
@@ -5555,28 +5563,28 @@ static int transport_generic_cmd_sequencer(
 		size = cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case REQUEST_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_ELEMENT_STATUS:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = 65536 * cdb[7] + 256 * cdb[8] + cdb[9];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case WRITE_BUFFER:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case RESERVE:
 	case RESERVE_10:
@@ -5604,7 +5612,7 @@ static int transport_generic_cmd_sequencer(
 				(T10_RES(su_dev)->res_type !=
 				 SPC_PASSTHROUGH) ?
 				&core_scsi2_emulate_crh : NULL;
-		ret = 3;
+		ret = TGCS_NON_DATA_CDB;
 		break;
 	case RELEASE:
 	case RELEASE_10:
@@ -5625,7 +5633,7 @@ static int transport_generic_cmd_sequencer(
 				(T10_RES(su_dev)->res_type !=
 				 SPC_PASSTHROUGH) ?
 				&core_scsi2_emulate_crh : NULL;
-		ret = 3;
+		ret = TGCS_NON_DATA_CDB;
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case GPCMD_CLOSE_TRACK:
@@ -5646,7 +5654,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_none;
 		transport_get_maps(cmd);
-		ret = 3;
+		ret = TGCS_NON_DATA_CDB;
 		break;
 	case REPORT_LUNS:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -5661,7 +5669,7 @@ static int transport_generic_cmd_sequencer(
 		 */
 		if (SE_DEV(cmd)->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 			cmd->sam_task_attr = TASK_ATTR_HOQ;
-		ret = 2;
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	default:
 		printk(KERN_WARNING "TARGET_CORE[%s]: Unsupported SCSI Opcode"
@@ -5669,7 +5677,7 @@ static int transport_generic_cmd_sequencer(
 			CMD_TFO(cmd)->get_fabric_name(), cdb[0]);
 		cmd->transport_wait_for_tasks = &transport_nop_wait_for_tasks;
 		transport_get_maps(cmd);
-		return 4;
+		return TGCS_UNSUPPORTED_CDB;
 	}
 
 	if (size != cmd->data_length) {
@@ -5683,7 +5691,7 @@ static int transport_generic_cmd_sequencer(
 		if (cmd->data_direction == SE_DIRECTION_WRITE) {
 			printk(KERN_ERR "Rejecting underflow/overflow"
 					" WRITE data\n");
-			return 6;
+			return TGCS_INVALID_CDB_FIELD;
 		}
 		/*
 		 * Reject READ_* or WRITE_* with overflow/underflow for
@@ -5694,7 +5702,7 @@ static int transport_generic_cmd_sequencer(
 				" CDB on non 512-byte sector setup subsystem"
 				" plugin: %s\n", TRANSPORT(dev)->name);
 			/* Returns CHECK_CONDITION + INVALID_CDB_FIELD */
-			return 6;
+			return TGCS_INVALID_CDB_FIELD;
 		}
 
 		if (size > cmd->data_length) {
