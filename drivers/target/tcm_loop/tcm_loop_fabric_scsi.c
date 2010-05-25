@@ -288,6 +288,31 @@ static struct device tcm_loop_primary = {
 	.release		= tcm_loop_primary_release,
 };
 
+/*
+ * Copied from drivers/scsi/libfc/fc_fcp.c:fc_change_queue_depth() and
+ * drivers/scsi/libiscsi.c:iscsi_change_queue_depth()
+ */
+static int tcm_loop_change_queue_depth(
+	struct scsi_device *sdev,
+	int depth,
+	int reason)
+{
+	switch (reason) {
+	case SCSI_QDEPTH_DEFAULT:
+		scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), depth);
+		break;
+	case SCSI_QDEPTH_QFULL:
+		scsi_track_queue_full(sdev, depth);
+		break;
+	case SCSI_QDEPTH_RAMP_UP:
+		scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), depth);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return sdev->queue_depth;
+}
+
 static inline struct tcm_loop_hba *tcm_loop_get_hba(struct scsi_cmnd *sc)
 {
 	return (struct tcm_loop_hba *)sc->device->host->hostdata[0];
@@ -483,6 +508,7 @@ static struct scsi_host_template tcm_loop_driver_template = {
 	.slave_destroy		= NULL,
 	.ioctl			= NULL,
 	.queuecommand		= tcm_loop_queuecommand,
+	.change_queue_depth	= tcm_loop_change_queue_depth,
 	.eh_abort_handler	= NULL,
 	.eh_bus_reset_handler	= NULL,
 	.eh_device_reset_handler = tcm_loop_device_reset,
