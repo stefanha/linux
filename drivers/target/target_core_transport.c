@@ -7860,7 +7860,7 @@ EXPORT_SYMBOL(transport_check_aborted_status);
 
 void transport_send_task_abort(se_cmd_t *cmd)
 {
-	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH))
+	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)
 		return;
 	/*
 	 * If there are still expected incoming fabric WRITEs, we wait
