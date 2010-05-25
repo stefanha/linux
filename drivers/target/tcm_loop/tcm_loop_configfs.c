@@ -85,6 +85,8 @@ int tcm_loop_port_link(
 				struct tcm_loop_tpg, tl_se_tpg);
 	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 
+	atomic_inc(&tl_tpg->tl_tpg_port_count);
+	smp_mb__after_atomic_inc();
 	/*
 	 * Add Linux/SCSI struct scsi_device by HCTL
 	 */
@@ -117,6 +119,9 @@ void tcm_loop_port_unlink(
 	 */
 	scsi_remove_device(sd);	
 	scsi_device_put(sd);
+	
+	atomic_dec(&tl_tpg->tl_tpg_port_count);
+	smp_mb__after_atomic_dec();
 
 	printk(KERN_INFO "TCM_Loop_ConfigFS: Port Unlink Successful\n");
 }
@@ -144,7 +149,6 @@ static int tcm_loop_make_nexus(
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_nexus\n");
 		return -ENOMEM;
 	}
-	tl_tpg->tl_hba->tl_nexus = tl_nexus;
 	/*
 	 * Initialize the se_session_t pointer
 	 */
@@ -168,7 +172,7 @@ static int tcm_loop_make_nexus(
 	 */
 	__transport_register_session(se_tpg, tl_nexus->se_sess->se_node_acl,
 			tl_nexus->se_sess, (void *)tl_nexus);
-
+	tl_tpg->tl_hba->tl_nexus = tl_nexus;
 	printk(KERN_INFO "TCM_Loop_ConfigFS: Established I_T Nexus to emulated"
 		" %s Initiator Port: %s\n", tcm_loop_dump_proto_id(tl_hba),
 		name);
@@ -179,15 +183,27 @@ out:
 	return -ENOMEM;
 }
 
-static void tcm_loop_drop_nexus(
+static int tcm_loop_drop_nexus(
 	struct tcm_loop_tpg *tpg)
 {
+	se_session_t *se_sess;
 	struct tcm_loop_nexus *tl_nexus;
 	struct tcm_loop_hba *tl_hba = tpg->tl_hba;
 
 	tl_nexus = tpg->tl_hba->tl_nexus;
 	if (!(tl_nexus))
-		return;
+		return -ENODEV;
+
+	se_sess = tl_nexus->se_sess;
+	if (!(se_sess))
+		return -ENODEV;
+
+	if (atomic_read(&tpg->tl_tpg_port_count)) {
+		printk(KERN_ERR "Unable to remove TCM_Loop I_T Nexus with"
+			" active TPG port count: %d\n",
+			atomic_read(&tpg->tl_tpg_port_count));
+		return -EPERM;
+	}
 
 	printk(KERN_INFO "TCM_Loop_ConfigFS: Removing I_T Nexus to emulated"
 		" %s Initiator Port: %s\n", tcm_loop_dump_proto_id(tl_hba),
@@ -198,6 +214,7 @@ static void tcm_loop_drop_nexus(
 	transport_deregister_session(tl_nexus->se_sess);
 	tpg->tl_hba->tl_nexus = NULL;
 	kfree(tl_nexus);
+	return 0;
 }
 
 /* End items for tcm_loop_nexus_cit */
@@ -235,8 +252,8 @@ static ssize_t tcm_loop_tpg_store_nexus(
 	 * Shutdown the active I_T nexus if 'NULL' is passed..
 	 */
 	if (!(strncmp(page, "NULL", 4))) {
-		tcm_loop_drop_nexus(tl_tpg);
-		return count;
+		ret = tcm_loop_drop_nexus(tl_tpg);
+		return (!ret) ? count : ret;
 	}
 	/*
 	 * Otherwise make sure the passed virtual Initiator port WWN matches

@@ -61,9 +61,17 @@ static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
 	struct scsi_cmnd *sc,
 	int data_direction)
 {
-	se_session_t *se_sess = tl_hba->tl_nexus->se_sess;
+	se_session_t *se_sess;
+	struct tcm_loop_nexus *tl_nexus = tl_hba->tl_nexus;
 	struct tcm_loop_cmd *tl_cmd;
 	int sam_task_attr;
+
+	if (!(tl_nexus)) {
+		scmd_printk(KERN_ERR, sc, "TCM_Loop I_T Nexus"
+				" does not exist\n");
+		return NULL;
+	}
+	se_sess = tl_nexus->se_sess;
 
 	tl_cmd = kmem_cache_zalloc(tcm_loop_cmd_cache, GFP_ATOMIC);
 	if (!(tl_cmd)) {

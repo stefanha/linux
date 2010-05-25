@@ -57,6 +57,7 @@ struct tcm_loop_nacl {
 
 struct tcm_loop_tpg {
 	unsigned short tl_tpgt;
+	atomic_t tl_tpg_port_count;
 	struct se_portal_group_s tl_se_tpg;
 	struct tcm_loop_hba *tl_hba;
 };
