@@ -34,6 +34,11 @@ struct tcm_loop_cmd {
 	struct list_head *tl_cmd_list;
 };
 
+struct tcm_loop_tmr {
+	atomic_t tmr_complete;
+	wait_queue_head_t tl_tmr_wait;
+};
+
 struct tcm_loop_nexus {
 	int it_nexus_active;
 	/*

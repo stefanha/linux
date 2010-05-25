@@ -430,6 +430,14 @@ int tcm_loop_queue_status(se_cmd_t *se_cmd)
 
 int tcm_loop_queue_tm_rsp(se_cmd_t *se_cmd)
 {
+	struct se_tmr_req_s *se_tmr = se_cmd->se_tmr_req;
+	struct tcm_loop_tmr *tl_tmr = (struct tcm_loop_tmr *)se_tmr->fabric_tmr_ptr;
+	/*
+	 * The SCSI EH thread will be sleeping on se_tmr->tl_tmr_wait, go ahead
+	 * and wake up the wait_queue_head_t in tcm_loop_device_reset()
+	 */
+	atomic_set(&tl_tmr->tmr_complete, 1);
+	wake_up(&tl_tmr->tl_tmr_wait);
 	return 0;
 }
 
