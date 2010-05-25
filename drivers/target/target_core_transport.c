@@ -966,10 +966,8 @@ void transport_cmd_finish_abort(se_cmd_t *cmd, int remove)
 
 	transport_lun_remove_cmd(cmd);
 
-	if (!(transport_cmd_check_stop(cmd, 1, 0))) {
-		transport_passthrough_check_stop(cmd);
+	if (transport_cmd_check_stop_to_fabric(cmd))
 		return;
-	}
 	if (remove)
 		transport_generic_remove(cmd, 0, 0);
 }
@@ -980,10 +978,9 @@ void transport_cmd_finish_abort_tmr(se_cmd_t *cmd)
 			CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
 			cmd->se_orig_obj_ptr));
 
-	if (!(transport_cmd_check_stop(cmd, 1, 0))) {
-		transport_passthrough_check_stop(cmd);
+	if (transport_cmd_check_stop_to_fabric(cmd))
 		return;
-	}
+
 	transport_generic_remove(cmd, 0, 0);
 }
 
