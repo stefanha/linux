@@ -721,7 +721,6 @@ static struct config_group *target_fabric_make_lun(
 	
 	char *str, *endptr;
 	u32 unpacked_lun;
-	int ret;
 
 	str = strstr(name, "_");
 	if (!(str)) {
@@ -746,11 +745,6 @@ static void target_fabric_drop_lun(
 	struct config_group *group,
 	struct config_item *item)
 {
-	struct se_portal_group_s *se_tpg = container_of(group,
-			struct se_portal_group_s, tpg_lun_group);
-	struct se_lun_s *lun = container_of(to_config_group(item),
-			se_lun_t, lun_group);
-
 	config_item_put(item);
 }
 
