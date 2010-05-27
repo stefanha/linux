@@ -1483,7 +1483,7 @@ static int core_scsi3_decode_spec_i_port(
 	se_port_t *tmp_port;
 	se_portal_group_t *dest_tpg = NULL, *tmp_tpg;
 	se_session_t *se_sess = SE_SESS(cmd);
-	se_node_acl_t *dest_node_acl;
+	se_node_acl_t *dest_node_acl = NULL;
 	se_dev_entry_t *dest_se_deve = NULL, *local_se_deve;
 	t10_pr_registration_t *dest_pr_reg, *local_pr_reg, *pr_reg_e;
 	t10_pr_registration_t *pr_reg_tmp, *pr_reg_tmp_safe;
@@ -1495,7 +1495,7 @@ static int core_scsi3_decode_spec_i_port(
 	char *iport_ptr = NULL, dest_iport[64], i_buf[PR_REG_ISID_ID_LEN];
 	u32 tpdl, tid_len = 0;
 	int ret, dest_local_nexus, prf_isid;
-	u32 dest_rtpi;
+	u32 dest_rtpi = 0;
 
 	memset(dest_iport, 0, 64);
 	INIT_LIST_HEAD(&tid_dest_list);
