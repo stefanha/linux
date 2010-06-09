@@ -1197,15 +1197,6 @@ char *iscsi_get_fabric_name(void)
 	return "iSCSI";
 }
 
-u8 iscsi_get_fabric_proto_ident(void)
-{
-	/*
-	 * This value is defined for "Internet SCSI (iSCSI)"
-	 * in spc4r17 section 7.5.1 Table 362
-	 */
-	return 0x5;
-}
-
 iscsi_cmd_t *iscsi_get_cmd(se_cmd_t *se_cmd)
 {
 	return (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
@@ -4093,7 +4084,7 @@ static inline int iscsi_send_status(
 	TRACE(trace_type, "Built %sSCSI Response, ITT: 0x%08x, StatSN: 0x%08x,"
 		" Response: 0x%02x, SAM Status: 0x%02x, CID: %hu\n",
 		(!recovery) ? "" : "Recovery ", cmd->init_task_tag,
-		cmd->stat_sn, 0x00, cmd->scsi_status, conn->cid);
+		cmd->stat_sn, 0x00, cmd->se_cmd->scsi_status, conn->cid);
 
 	return 0;
 }

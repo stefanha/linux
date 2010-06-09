@@ -4,10 +4,10 @@
  * This file contains the Linux/SCSI LLD virtual SCSI initiator driver
  * for emulated SAS initiator ports
  *
- * Copyright (c) 2009 Rising Tide, Inc.
- * Copyright (c) 2009 Linux-iSCSI.org
+ * Copyright (c) 2009-2010 Rising Tide, Inc.
+ * Copyright (c) 2009-2010 Linux-iSCSI.org
  *
- * Copyright (c) 2009 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Copyright (c) 2009-2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,6 +29,8 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/string.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_tcq.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
@@ -40,6 +42,7 @@
 #include <target/target_core_device.h>
 #include <target/target_core_seobj.h>
 #include <target/target_core_tpg.h>
+#include <target/target_core_tmr.h>
 
 #include <tcm_loop_core.h>
 #include <tcm_loop_fabric.h>
@@ -58,9 +61,17 @@ static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
 	struct scsi_cmnd *sc,
 	int data_direction)
 {
-	se_session_t *se_sess = tl_hba->tl_nexus->se_sess;
+	se_session_t *se_sess;
+	struct tcm_loop_nexus *tl_nexus = tl_hba->tl_nexus;
 	struct tcm_loop_cmd *tl_cmd;
 	int sam_task_attr;
+
+	if (!(tl_nexus)) {
+		scmd_printk(KERN_ERR, sc, "TCM_Loop I_T Nexus"
+				" does not exist\n");
+		return NULL;
+	}
+	se_sess = tl_nexus->se_sess;
 
 	tl_cmd = kmem_cache_zalloc(tcm_loop_cmd_cache, GFP_ATOMIC);
 	if (!(tl_cmd)) {
@@ -285,6 +296,31 @@ static struct device tcm_loop_primary = {
 	.release		= tcm_loop_primary_release,
 };
 
+/*
+ * Copied from drivers/scsi/libfc/fc_fcp.c:fc_change_queue_depth() and
+ * drivers/scsi/libiscsi.c:iscsi_change_queue_depth()
+ */
+static int tcm_loop_change_queue_depth(
+	struct scsi_device *sdev,
+	int depth,
+	int reason)
+{
+	switch (reason) {
+	case SCSI_QDEPTH_DEFAULT:
+		scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), depth);
+		break;
+	case SCSI_QDEPTH_QFULL:
+		scsi_track_queue_full(sdev, depth);
+		break;
+	case SCSI_QDEPTH_RAMP_UP:
+		scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), depth);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return sdev->queue_depth;
+}
+
 static inline struct tcm_loop_hba *tcm_loop_get_hba(struct scsi_cmnd *sc)
 {
 	return (struct tcm_loop_hba *)sc->device->host->hostdata[0];
@@ -376,6 +412,100 @@ static int tcm_loop_queuecommand(
 	return 0;
 }
 
+/*
+ * Called from SCSI EH process context to issue a LUN_RESET TMR
+ * to struct scsi_device
+ */
+static int tcm_loop_device_reset(struct scsi_cmnd *sc)
+{
+	se_cmd_t *se_cmd = NULL;
+	se_portal_group_t *se_tpg;
+	se_session_t *se_sess;
+	struct tcm_loop_cmd *tl_cmd = NULL;
+	struct tcm_loop_hba *tl_hba;
+	struct tcm_loop_nexus *tl_nexus;
+	struct tcm_loop_tmr *tl_tmr = NULL;
+	struct tcm_loop_tpg *tl_tpg;
+	int ret = FAILED;
+	/*
+	 * Locate the tcm_loop_hba_t pointer 
+	 */
+	tl_hba = tcm_loop_get_hba(sc);
+	if (!(tl_hba)) {
+		printk(KERN_ERR "Unable to locate struct tcm_loop_hba from"
+				" struct scsi_cmnd\n");
+		return FAILED;
+	}
+	/*
+	 * Locate the tl_nexus and se_sess pointers
+	 */
+	tl_nexus = tl_hba->tl_nexus;
+	if (!(tl_nexus)) {
+		printk(KERN_ERR "Unable to perform device reset without"
+				" active I_T Nexus\n");
+		return FAILED;
+	}
+	se_sess = tl_nexus->se_sess;
+	/*
+	 * Locate the tl_tpg and se_tpg pointers from TargetID in sc->device->id
+	 */
+	tl_tpg = &tl_hba->tl_hba_tpgs[sc->device->id];
+	se_tpg = &tl_tpg->tl_se_tpg;
+
+	tl_cmd = kmem_cache_zalloc(tcm_loop_cmd_cache, GFP_KERNEL);
+	if (!(tl_cmd)) {
+		printk(KERN_ERR "Unable to allocate memory for tl_cmd\n");
+		return FAILED;
+	}
+
+	tl_tmr = kzalloc(sizeof(struct tcm_loop_tmr), GFP_KERNEL);
+	if (!(tl_tmr)) {
+		printk(KERN_ERR "Unable to allocate memory for tl_tmr\n");
+		goto release;
+	}
+	init_waitqueue_head(&tl_tmr->tl_tmr_wait);
+	/*
+	 * Allocate the se_cmd_t for a LUN_RESET TMR
+	 */
+	tl_cmd->tl_se_cmd = transport_alloc_se_cmd(se_tpg->se_tpg_tfo,
+			se_sess, (void *)tl_cmd, 0, SE_DIRECTION_NONE,
+			TASK_ATTR_SIMPLE);
+	if (!(tl_cmd->tl_se_cmd))
+		goto release;
+	se_cmd = tl_cmd->tl_se_cmd;
+	/*
+	 * Allocate the LUN_RESET TMR
+	 */
+	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, (void *)tl_tmr,
+				LUN_RESET);
+	if (!(se_cmd->se_tmr_req))
+		goto release;
+	/*
+	 * Locate the underlying TCM se_lun_t from sc->device->lun
+	 */
+	if (transport_get_lun_for_tmr(se_cmd, sc->device->lun) < 0)
+		goto release;
+	/*
+	 * Queue the TMR to TCM Core and sleep waiting for tcm_loop_queue_tm_rsp()
+	 * to wake us up.
+	 */
+	transport_generic_handle_tmr(se_cmd);	
+	wait_event(tl_tmr->tl_tmr_wait, atomic_read(&tl_tmr->tmr_complete));
+	/*
+	 * The TMR LUN_RESET has completed, check the response status and
+	 * then release allocations.
+	 */
+	ret = (se_cmd->se_tmr_req->response == TMR_FUNCTION_COMPLETE) ?
+		SUCCESS : FAILED;
+release:
+	if (se_cmd)
+		transport_generic_free_cmd(se_cmd, 1, 1, 0);
+	else
+		kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
+	kfree(tl_tmr);
+	return ret;
+}
+
 static struct scsi_host_template tcm_loop_driver_template = {
 	.proc_info		= tcm_loop_proc_info,
 	.proc_name		= "tcm_loopback",
@@ -386,16 +516,17 @@ static struct scsi_host_template tcm_loop_driver_template = {
 	.slave_destroy		= NULL,
 	.ioctl			= NULL,
 	.queuecommand		= tcm_loop_queuecommand,
+	.change_queue_depth	= tcm_loop_change_queue_depth,
 	.eh_abort_handler	= NULL,
 	.eh_bus_reset_handler	= NULL,
-	.eh_device_reset_handler = NULL,
+	.eh_device_reset_handler = tcm_loop_device_reset,
 	.eh_host_reset_handler	= NULL,
 	.bios_param		= NULL,
-	.can_queue		= 1,
+	.can_queue		= TL_SCSI_CAN_QUEUE,
 	.this_id		= -1,
-	.sg_tablesize		= 256,
-	.cmd_per_lun		= 1,
-	.max_sectors		= 128,
+	.sg_tablesize		= TL_SCSI_SG_TABLESIZE,
+	.cmd_per_lun		= TL_SCSI_CMD_PER_LUN,
+	.max_sectors		= TL_SCSI_MAX_SECTORS,
 	.use_clustering		= DISABLE_CLUSTERING,
 	.module			= THIS_MODULE,
 };
@@ -426,6 +557,7 @@ static int tcm_loop_driver_probe(struct device *dev)
 	sh->max_id = 2;
 	sh->max_lun = 0;
 	sh->max_channel = 0;
+	sh->max_cmd_len = TL_SCSI_MAX_CMD_LEN;
 
 	error = scsi_add_host(sh, &tl_hba->dev);
 	if (error) {

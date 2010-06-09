@@ -1,6 +1,20 @@
-#define TCM_LOOP_VERSION		"v1.0"
-#define TL_NAA_SAS_ADDR_LEN		64
+#define TCM_LOOP_VERSION		"v2.0"
+#define TL_WWN_ADDR_LEN			256
 #define TL_TPGS_PER_HBA			32
+/*
+ * Defaults for struct scsi_host_template tcm_loop_driver_template
+ *
+ * We use large can_queue and cmd_per_lun here and let TCM enforce
+ * the underlying se_device_t->queue_depth.
+ */
+#define TL_SCSI_CAN_QUEUE		1024
+#define TL_SCSI_CMD_PER_LUN		1024
+#define TL_SCSI_MAX_SECTORS		1024
+#define TL_SCSI_SG_TABLESIZE		256
+/*
+ * Used in tcm_loop_driver_probe() for struct Scsi_Host->max_cmd_len
+ */
+#define TL_SCSI_MAX_CMD_LEN		16
 
 #ifdef TCM_LOOP_CDB_DEBUG
 # define TL_CDB_DEBUG(x...)		printk(KERN_INFO x)
@@ -18,6 +32,11 @@ struct tcm_loop_cmd {
 	/* Pointer to the TCM allocated se_cmd_t */
 	struct se_cmd_s *tl_se_cmd;
 	struct list_head *tl_cmd_list;
+};
+
+struct tcm_loop_tmr {
+	atomic_t tmr_complete;
+	wait_queue_head_t tl_tmr_wait;
 };
 
 struct tcm_loop_nexus {
@@ -38,12 +57,14 @@ struct tcm_loop_nacl {
 
 struct tcm_loop_tpg {
 	unsigned short tl_tpgt;
+	atomic_t tl_tpg_port_count;
 	struct se_portal_group_s tl_se_tpg;
 	struct tcm_loop_hba *tl_hba;
 };
 
 struct tcm_loop_hba {
-	unsigned char naa_sas_address[TL_NAA_SAS_ADDR_LEN];
+	u8 tl_proto_id;
+	unsigned char tl_wwn_address[TL_WWN_ADDR_LEN];
 	struct se_hba_s *se_hba;
 	struct se_lun_s *tl_hba_lun;
 	struct se_port_s *tl_hba_lun_sep;

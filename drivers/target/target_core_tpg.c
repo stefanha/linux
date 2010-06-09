@@ -329,31 +329,6 @@ void core_tpg_wait_for_nacl_pr_ref(se_node_acl_t *nacl)
 		msleep(100);
 }
 
-/*	core_tpg_free_node_acls():
- *
- *
- */
-void core_tpg_free_node_acls(se_portal_group_t *tpg)
-{
-	se_node_acl_t *acl, *acl_tmp;
-
-	spin_lock_bh(&tpg->acl_node_lock);
-	list_for_each_entry_safe(acl, acl_tmp, &tpg->acl_node_list, acl_list) {
-		/*
-		 * The kfree() for dynamically allocated Node ACLS is done in
-		 * transport_deregister_session()
-		 */
-		if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
-			continue;
-
-		core_tpg_wait_for_nacl_pr_ref(acl);
-		kfree(acl);
-		tpg->num_node_acls--;
-	}
-	spin_unlock_bh(&tpg->acl_node_lock);
-}
-EXPORT_SYMBOL(core_tpg_free_node_acls);
-
 void core_tpg_clear_object_luns(se_portal_group_t *tpg)
 {
 	int i, ret;
@@ -713,7 +688,7 @@ int core_tpg_register(
 	if (se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) {
 		if (core_tpg_setup_virtual_lun0(se_tpg) < 0) {
 			kfree(se_tpg);
-			return ERR_PTR(-ENOMEM);
+			return -ENOMEM;
 		}
 	}
 

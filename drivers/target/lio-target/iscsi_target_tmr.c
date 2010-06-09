@@ -311,8 +311,8 @@ static int iscsi_task_reassign_complete_write(
 	if (cmd->cmd_flags & ICF_GOT_LAST_DATAOUT) {
 		if (!atomic_read(&cmd->transport_sent)) {
 			TRACE(TRACE_ERL2, "WRITE ITT: 0x%08x: t_state: %d"
-				" %d never sent to transport\n",
-				cmd->init_task_tag, cmd->t_state);
+				" never sent to transport\n",
+				cmd->init_task_tag, cmd->se_cmd->t_state);
 			return transport_generic_handle_data(se_cmd);
 		}
 

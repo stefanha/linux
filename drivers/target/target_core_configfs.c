@@ -3146,7 +3146,7 @@ int target_core_init_configfs(void)
 	struct config_group *lu_gp_cg = NULL;
 	struct configfs_subsystem *subsys;
 #ifdef SNMP_SUPPORT
-	struct proc_dir_entry *scsi_target_proc;
+	struct proc_dir_entry *scsi_target_proc = NULL;
 #endif
 	t10_alua_lu_gp_t *lu_gp;
 	int ret;
@@ -3265,7 +3265,8 @@ int target_core_init_configfs(void)
 out:
 	configfs_unregister_subsystem(subsys);
 #ifdef SNMP_SUPPORT
-	remove_proc_entry("scsi_target", 0);
+	if (scsi_target_proc)
+		remove_proc_entry("scsi_target", 0);
 #endif
 	core_dev_release_virtual_lun0();
 	plugin_unload_all_classes();

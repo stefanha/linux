@@ -1483,7 +1483,7 @@ static int core_scsi3_decode_spec_i_port(
 	se_port_t *tmp_port;
 	se_portal_group_t *dest_tpg = NULL, *tmp_tpg;
 	se_session_t *se_sess = SE_SESS(cmd);
-	se_node_acl_t *dest_node_acl;
+	se_node_acl_t *dest_node_acl = NULL;
 	se_dev_entry_t *dest_se_deve = NULL, *local_se_deve;
 	t10_pr_registration_t *dest_pr_reg, *local_pr_reg, *pr_reg_e;
 	t10_pr_registration_t *pr_reg_tmp, *pr_reg_tmp_safe;
@@ -1495,7 +1495,7 @@ static int core_scsi3_decode_spec_i_port(
 	char *iport_ptr = NULL, dest_iport[64], i_buf[PR_REG_ISID_ID_LEN];
 	u32 tpdl, tid_len = 0;
 	int ret, dest_local_nexus, prf_isid;
-	u32 dest_rtpi;
+	u32 dest_rtpi = 0;
 
 	memset(dest_iport, 0, 64);
 	INIT_LIST_HEAD(&tid_dest_list);
@@ -1575,13 +1575,13 @@ static int core_scsi3_decode_spec_i_port(
 			 * Look for the matching proto_ident provided by
 			 * the received TransportID
 			 */
-			tmp_proto_ident = tmp_tf_ops->get_fabric_proto_ident();
+			tmp_proto_ident = tmp_tf_ops->get_fabric_proto_ident(tmp_tpg);
 			if (tmp_proto_ident != proto_ident) 
 				continue;
 			dest_rtpi = tmp_port->sep_rtpi;
 
 			i_str = tmp_tf_ops->tpg_parse_pr_out_transport_id(
-					(const char *)ptr, &tid_len,
+					tmp_tpg, (const char *)ptr, &tid_len,
 					&iport_ptr);
 			if (!(i_str))
 				continue;
@@ -3426,11 +3426,11 @@ static int core_scsi3_emulate_pro_register_and_move(
 	printk("SPC-3 PR REGISTER_AND_MOVE: Extracted Protocol Identifier:"
 			" 0x%02x\n", proto_ident);
 #endif
-	if (proto_ident != dest_tf_ops->get_fabric_proto_ident()) {
+	if (proto_ident != dest_tf_ops->get_fabric_proto_ident(dest_se_tpg)) {
 		printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE: Received"
 			" proto_ident: 0x%02x does not match ident: 0x%02x"
 			" from fabric: %s\n", proto_ident,
-			dest_tf_ops->get_fabric_proto_ident(),
+			dest_tf_ops->get_fabric_proto_ident(dest_se_tpg),
 			dest_tf_ops->get_fabric_name());
 		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 		goto out;
@@ -3442,7 +3442,7 @@ static int core_scsi3_emulate_pro_register_and_move(
 		ret = PYX_TRANSPORT_LU_COMM_FAILURE;
 		goto out;
 	}
-	initiator_str = dest_tf_ops->tpg_parse_pr_out_transport_id(
+	initiator_str = dest_tf_ops->tpg_parse_pr_out_transport_id(dest_se_tpg,
 			(const char *)&buf[24], &tmp_tid_len, &iport_ptr);
 	if (!(initiator_str)) {
 		printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE: Unable to locate"
