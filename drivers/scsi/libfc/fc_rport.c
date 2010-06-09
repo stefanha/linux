@@ -1479,6 +1479,8 @@ static void fc_rport_recv_prli_req(struct fc_rport_priv *rdata,
 	enum fc_els_spp_resp passive;
 	struct fc_seq_els_data rjt_data;
 	u32 f_ctl;
+	u32 fcp_parm;
+	u32 roles = FC_RPORT_ROLE_UNKNOWN;
 
 	rjt_data.fp = NULL;
 	fh = fc_frame_header_get(rx_fp);
@@ -1516,6 +1518,9 @@ static void fc_rport_recv_prli_req(struct fc_rport_priv *rdata,
 	pp->prli.prli_spp_len = plen;
 	pp->prli.prli_len = htons(len);
 	len -= sizeof(struct fc_els_prli);
+
+	/* reinitialize remote port roles */
+	rdata->ids.roles = FC_RPORT_ROLE_UNKNOWN;
 
 	/*
 	 * Go through all the service parameter pages and build
