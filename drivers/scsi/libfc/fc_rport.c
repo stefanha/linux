@@ -1517,6 +1517,9 @@ static void fc_rport_recv_prli_req(struct fc_rport_priv *rdata,
 	pp->prli.prli_len = htons(len);
 	len -= sizeof(struct fc_els_prli);
 
+	/* reinitialize remote port roles */
+	rdata->ids.roles = FC_RPORT_ROLE_UNKNOWN;
+
 	/*
 	 * Go through all the service parameter pages and build
 	 * response.  If plen indicates longer SPP than standard,
