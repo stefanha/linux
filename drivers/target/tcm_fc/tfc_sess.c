@@ -237,7 +237,7 @@ static struct ft_sess *ft_sess_create(struct ft_tport *tport, u32 port_id,
 	}
 	sess->tport = tport;
 	sess->port_id = port_id;
-	kref_set(&sess->kref, 1);	/* ref for table entry */
+	kref_init(&sess->kref);	/* ref for table entry */
 	hlist_add_head_rcu(&sess->hash, head);
 	tport->sess_count++;
 
