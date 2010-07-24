@@ -261,7 +261,7 @@ extern void transport_release_fe_cmd(se_cmd_t *);
 extern int transport_generic_remove(se_cmd_t *, int, int);
 extern int transport_generic_map_mem_to_cmd(se_cmd_t *cmd, void *, u32);
 extern int transport_lun_wait_for_tasks(se_cmd_t *, se_lun_t *);
-extern void transport_clear_lun_from_sessions(se_lun_t *);
+extern int transport_clear_lun_from_sessions(se_lun_t *);
 extern int transport_check_aborted_status(se_cmd_t *, int);
 extern int transport_get_sense_codes(se_cmd_t *, u8 *, u8 *);
 extern int transport_set_sense_codes(se_cmd_t *, u8, u8);

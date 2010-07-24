@@ -926,6 +926,7 @@ typedef struct se_lun_s {
 	spinlock_t		lun_acl_lock;
 	spinlock_t		lun_cmd_lock;
 	spinlock_t		lun_sep_lock;
+	struct completion	lun_shutdown_comp;
 	struct list_head	lun_cmd_list;
 	struct list_head	lun_acl_list;
 	se_device_t		*se_dev;

@@ -621,6 +621,7 @@ static int core_tpg_setup_virtual_lun0(struct se_portal_group_s *se_tpg)
 	lun->lun_type_ptr = NULL;
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 	atomic_set(&lun->lun_acl_count, 0);
+	init_completion(&lun->lun_shutdown_comp);
 	INIT_LIST_HEAD(&lun->lun_acl_list);
 	INIT_LIST_HEAD(&lun->lun_cmd_list);
 	spin_lock_init(&lun->lun_acl_lock);
@@ -666,6 +667,7 @@ int core_tpg_register(
 		lun->lun_type_ptr = NULL;
 		lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 		atomic_set(&lun->lun_acl_count, 0);
+		init_completion(&lun->lun_shutdown_comp);
 		INIT_LIST_HEAD(&lun->lun_acl_list);
 		INIT_LIST_HEAD(&lun->lun_cmd_list);
 		spin_lock_init(&lun->lun_acl_lock);
@@ -788,6 +790,14 @@ int core_tpg_post_addlun(
 }
 EXPORT_SYMBOL(core_tpg_post_addlun);
 
+void core_tpg_shutdown_lun(
+	struct se_portal_group_s *tpg,
+	struct se_lun_s *lun)
+{
+	core_clear_lun_from_tpg(lun, tpg);
+	transport_clear_lun_from_sessions(lun);
+}
+
 se_lun_t *core_tpg_pre_dellun(
 	se_portal_group_t *tpg,
 	u32 unpacked_lun,
@@ -826,8 +836,6 @@ se_lun_t *core_tpg_pre_dellun(
 	}
 	spin_unlock(&tpg->tpg_lun_lock);
 
-	core_clear_lun_from_tpg(lun, tpg);
-
 	return lun;
 }
 EXPORT_SYMBOL(core_tpg_pre_dellun);
@@ -838,7 +846,7 @@ int core_tpg_post_dellun(
 {
 	se_lun_acl_t *acl, *acl_tmp;
 
-	transport_clear_lun_from_sessions(lun);
+	core_tpg_shutdown_lun(tpg, lun);
 
 	LUN_OBJ_API(lun)->unexport_obj(lun->lun_type_ptr, tpg, lun);
 	LUN_OBJ_API(lun)->release_obj(lun->lun_type_ptr);

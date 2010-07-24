@@ -7493,16 +7493,20 @@ EXPORT_SYMBOL(transport_lun_wait_for_tasks);
 #define DEBUG_CLEAR_L(x...)
 #endif
 
-void transport_clear_lun_from_sessions(se_lun_t *lun)
+static void __transport_clear_lun_from_sessions(se_lun_t *lun)
 {
-	se_cmd_t *cmd = NULL, *cmd_p = NULL;
-	unsigned long flags;
+	se_cmd_t *cmd = NULL;
+	unsigned long lun_flags, cmd_flags;
 	/*
 	 * Do exception processing and return CHECK_CONDITION status to the
 	 * Initiator Port.
 	 */
-	spin_lock_irqsave(&lun->lun_cmd_lock, flags);
-	list_for_each_entry_safe(cmd, cmd_p, &lun->lun_cmd_list, se_lun_list) {
+	spin_lock_irqsave(&lun->lun_cmd_lock, lun_flags);
+	while (!list_empty_careful(&lun->lun_cmd_list)) {
+		cmd = list_entry(lun->lun_cmd_list.next,
+			struct se_cmd_s, se_lun_list);
+		list_del(&cmd->se_lun_list);
+
 		if (!(T_TASK(cmd))) {
 			printk(KERN_ERR "ITT: 0x%08x, T_TASK(cmd) = NULL"
 				"[i,t]_state: %u/%u\n",
@@ -7510,7 +7514,6 @@ void transport_clear_lun_from_sessions(se_lun_t *lun)
 				CMD_TFO(cmd)->get_cmd_state(cmd), cmd->t_state);
 			BUG();
 		}
-		list_del(&cmd->se_lun_list);
 		atomic_set(&T_TASK(cmd)->transport_lun_active, 0);
 		/*
 		 * This will notify iscsi_target_transport.c:
@@ -7525,7 +7528,7 @@ void transport_clear_lun_from_sessions(se_lun_t *lun)
 		atomic_set(&T_TASK(cmd)->transport_lun_stop, 1);
 		spin_unlock(&T_TASK(cmd)->t_state_lock);
 
-		spin_unlock_irqrestore(&lun->lun_cmd_lock, flags);
+		spin_unlock_irqrestore(&lun->lun_cmd_lock, lun_flags);
 
 		if (!(SE_LUN(cmd))) {
 			printk(KERN_ERR "ITT: 0x%08x, [i,t]_state: %u/%u\n",
@@ -7542,7 +7545,7 @@ void transport_clear_lun_from_sessions(se_lun_t *lun)
 			CMD_TFO(cmd)->get_task_tag(cmd));
 
 		if (transport_lun_wait_for_tasks(cmd, SE_LUN(cmd)) < 0) {
-			spin_lock_irqsave(&lun->lun_cmd_lock, flags);
+			spin_lock_irqsave(&lun->lun_cmd_lock, lun_flags);
 			continue;
 		}
 
@@ -7575,7 +7578,7 @@ check_cond:
 		 * be released, notify the waiting thread now that LU has
 		 * finished accessing it.
 		 */
-		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, cmd_flags);
 		if (atomic_read(&T_TASK(cmd)->transport_lun_fe_stop)) {
 			DEBUG_CLEAR_L("SE_LUN[%d] - Detected FE stop for"
 				" se_cmd_t: %p ITT: 0x%08x\n",
@@ -7583,20 +7586,45 @@ check_cond:
 				cmd, CMD_TFO(cmd)->get_task_tag(cmd));
 
 			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock,
-					flags);
+					cmd_flags);
+			transport_cmd_check_stop(cmd, 1, 0);
 			complete(&T_TASK(cmd)->transport_lun_fe_stop_comp);
-			spin_lock_irqsave(&lun->lun_cmd_lock, flags);
+			spin_lock_irqsave(&lun->lun_cmd_lock, lun_flags);
 			continue;
 		}
-		atomic_set(&T_TASK(cmd)->transport_lun_stop, 0);
-
 		DEBUG_CLEAR_L("SE_LUN[%d] - ITT: 0x%08x finished processing\n",
 			lun->unpacked_lun, CMD_TFO(cmd)->get_task_tag(cmd));
 
-		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
-		spin_lock_irqsave(&lun->lun_cmd_lock, flags);
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, cmd_flags);
+		spin_lock_irqsave(&lun->lun_cmd_lock, lun_flags);
 	}
-	spin_unlock_irqrestore(&lun->lun_cmd_lock, flags);
+	spin_unlock_irqrestore(&lun->lun_cmd_lock, lun_flags);
+}
+EXPORT_SYMBOL(__transport_clear_lun_from_sessions);
+
+static int transport_clear_lun_thread(void *p)
+{
+	struct se_lun_s *lun = (struct se_lun_s *)p;
+
+	__transport_clear_lun_from_sessions(lun);
+	complete(&lun->lun_shutdown_comp);	
+
+	return 0;
+}
+
+int transport_clear_lun_from_sessions(struct se_lun_s *lun)
+{
+	struct task_struct *kt;
+	
+	kt = kthread_run(transport_clear_lun_thread, (void *)lun,
+			"tcm_cl_%u", lun->unpacked_lun);
+	if (IS_ERR(kt)) {
+		printk(KERN_ERR "Unable to start clear_lun thread\n");
+		return -1;
+	}
+	wait_for_completion(&lun->lun_shutdown_comp);
+
+	return 0;
 }
 EXPORT_SYMBOL(transport_clear_lun_from_sessions);
 
