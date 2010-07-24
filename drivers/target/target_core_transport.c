@@ -7613,7 +7613,6 @@ static void transport_generic_wait_for_tasks(
 	 * has completed its operation on the se_cmd_t.
 	 */
 	if (atomic_read(&T_TASK(cmd)->transport_lun_stop)) {
-		atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 1);
 
 		DEBUG_TRANSPORT_S("wait_for_tasks: Stopping"
 			" wait_for_completion(&T_TASK(cmd)transport_lun_fe"
@@ -7630,6 +7629,8 @@ static void transport_generic_wait_for_tasks(
 		complete(&T_TASK(cmd)->transport_lun_stop_comp);
 		wait_for_completion(&T_TASK(cmd)->transport_lun_fe_stop_comp);
 		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+
+		transport_all_task_dev_remove_state(cmd);
 		/*
 		 * At this point, the frontend who was the originator of this
 		 * se_cmd_t, now owns the structure and can be released through
@@ -7640,7 +7641,6 @@ static void transport_generic_wait_for_tasks(
 			"stop_comp); for ITT: 0x%08x\n",
 			CMD_TFO(cmd)->get_task_tag(cmd));
 
-		atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 0);
 		atomic_set(&T_TASK(cmd)->transport_lun_stop, 0);
 	}
 	if (!atomic_read(&T_TASK(cmd)->t_transport_active))
