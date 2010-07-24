@@ -946,6 +946,18 @@ static void transport_lun_remove_cmd(se_cmd_t *cmd)
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)
 		return;
 
+	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+	if (!(atomic_read(&T_TASK(cmd)->transport_dev_active))) {
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+		goto check_lun;
+	}
+	atomic_set(&T_TASK(cmd)->transport_dev_active, 0);
+	transport_all_task_dev_remove_state(cmd);
+	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+
+	transport_free_dev_tasks(cmd);
+
+check_lun:
 	spin_lock_irqsave(&lun->lun_cmd_lock, flags);
 	if (atomic_read(&T_TASK(cmd)->transport_lun_active)) {
 		list_del(&cmd->se_lun_list);
@@ -2795,6 +2807,7 @@ se_cmd_t *__transport_alloc_se_cmd(
 	init_completion(&T_TASK(cmd)->t_transport_passthrough_comp);
 	init_completion(&T_TASK(cmd)->t_transport_passthrough_wcomp);
 	spin_lock_init(&T_TASK(cmd)->t_state_lock);
+	atomic_set(&T_TASK(cmd)->transport_dev_active, 1);
 
 	cmd->se_tfo = tfo;
 	cmd->se_sess = se_sess;
@@ -6243,10 +6256,16 @@ void transport_release_fe_cmd(se_cmd_t *cmd)
 		return;
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+	if (!(atomic_read(&T_TASK(cmd)->transport_dev_active))) {
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+		goto free_pages;
+	}
+	atomic_set(&T_TASK(cmd)->transport_dev_active, 0);
 	transport_all_task_dev_remove_state(cmd);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 	transport_release_tasks(cmd);
+free_pages:
 	transport_free_pages(cmd);
 
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)
@@ -6281,10 +6300,16 @@ int transport_generic_remove(
 	}
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+	if (!(atomic_read(&T_TASK(cmd)->transport_dev_active))) {
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+		goto free_pages;
+	}
+	atomic_set(&T_TASK(cmd)->transport_dev_active, 0);
 	transport_all_task_dev_remove_state(cmd);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 	transport_release_tasks(cmd);
+free_pages:
 	transport_free_pages(cmd);
 
 release_cmd:
@@ -7514,12 +7539,24 @@ void transport_clear_lun_from_sessions(se_lun_t *lun)
 			"_wait_for_tasks(): SUCCESS\n",
 			SE_LUN(cmd)->unpacked_lun,
 			CMD_TFO(cmd)->get_task_tag(cmd));
+
+		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, cmd_flags);
+		if (!(atomic_read(&T_TASK(cmd)->transport_dev_active))) {
+			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, cmd_flags);
+			goto check_cond;
+		}
+		atomic_set(&T_TASK(cmd)->transport_dev_active, 0);
+		transport_all_task_dev_remove_state(cmd);
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, cmd_flags);
+
+		transport_free_dev_tasks(cmd);
 		/*
 		 * The Storage engine stopped this se_cmd_t before it was
 		 * send to the fabric frontend for delivery back to the
 		 * Initiator Node.  Return this SCSI CDB back with an
 		 * CHECK_CONDITION status.
 		 */
+check_cond:
 		transport_send_check_condition_and_sense(cmd,
 				NON_EXISTENT_LUN, 0);
 		/*

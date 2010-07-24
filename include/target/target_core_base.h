@@ -436,6 +436,7 @@ typedef struct se_transport_task_s {
 	atomic_t		t_transport_sent;
 	atomic_t		t_transport_stop;
 	atomic_t		t_transport_timeout;
+	atomic_t		transport_dev_active;
 	atomic_t		transport_lun_active;
 	atomic_t		transport_lun_fe_stop;
 	atomic_t		transport_lun_stop;
