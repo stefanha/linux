@@ -3078,10 +3078,11 @@ EXPORT_SYMBOL(transport_generic_handle_tmr);
  *
  *
  */
-void transport_stop_tasks_for_cmd(se_cmd_t *cmd)
+int transport_stop_tasks_for_cmd(se_cmd_t *cmd)
 {
 	se_task_t *task, *task_tmp;
 	unsigned long flags;
+	int ret = 0;
 
 	DEBUG_TS("ITT[0x%08x] - Stopping tasks\n",
 		CMD_TFO(cmd)->get_task_tag(cmd));
@@ -3133,11 +3134,14 @@ void transport_stop_tasks_for_cmd(se_cmd_t *cmd)
 			atomic_set(&task->task_stop, 0);
 		} else {
 			DEBUG_TS("task_no[%d] - Did nothing\n", task->task_no);
+			ret++;
 		}
 
 		__transport_stop_task_timer(task, &flags);
 	}
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+
+	return ret;
 }
 
 static void transport_failure_reset_queue_depth(se_device_t *dev)
@@ -7445,6 +7449,7 @@ static void transport_nop_wait_for_tasks(
 int transport_lun_wait_for_tasks(se_cmd_t *cmd, se_lun_t *lun)
 {
 	unsigned long flags;
+	int ret;
 	/*
 	 * If the frontend has already requested this se_cmd_t to
 	 * be stopped, we can safely ignore this se_cmd_t.
@@ -7455,21 +7460,27 @@ int transport_lun_wait_for_tasks(se_cmd_t *cmd, se_lun_t *lun)
 		DEBUG_TRANSPORT_S("ConfigFS ITT[0x%08x] - t_transport_stop =="
 			" TRUE, skipping\n", CMD_TFO(cmd)->get_task_tag(cmd));
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+		transport_cmd_check_stop(cmd, 1, 0);
 		return -1;
 	}
+	atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 1);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 	CMD_ORIG_OBJ_API(cmd)->notify_obj(cmd->se_orig_obj_ptr);
 
-	DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopping cmd....\n",
-		CMD_TFO(cmd)->get_task_tag(cmd));
-	wait_for_completion(&T_TASK(cmd)->transport_lun_stop_comp);
-	DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopped cmd....\n",
-		CMD_TFO(cmd)->get_task_tag(cmd));
+	ret = transport_stop_tasks_for_cmd(cmd);
 
-	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-	atomic_set(&T_TASK(cmd)->transport_lun_stop, 0);
-	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+	DEBUG_TRANSPORT_S("ConfigFS: cmd: %p t_task_cdbs: %d stop tasks ret:"
+			" %d\n", cmd, T_TASK(cmd)->t_task_cdbs, ret);
+	if (!ret) {
+		DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopping cmd....\n",
+				CMD_TFO(cmd)->get_task_tag(cmd));
+		wait_for_completion(&T_TASK(cmd)->transport_lun_stop_comp);
+		DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopped cmd....\n",
+				CMD_TFO(cmd)->get_task_tag(cmd));
+	}
+	transport_remove_cmd_from_queue(cmd,
+		CMD_ORIG_OBJ_API(cmd)->get_queue_obj(cmd->se_orig_obj_ptr));
 
 	return 0;
 }

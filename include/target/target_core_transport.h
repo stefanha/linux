@@ -210,7 +210,7 @@ extern int transport_generic_allocate_tasks(se_cmd_t *, unsigned char *);
 extern int transport_generic_handle_cdb(se_cmd_t *);
 extern int transport_generic_handle_data(se_cmd_t *);
 extern int transport_generic_handle_tmr(se_cmd_t *);
-extern void transport_stop_tasks_for_cmd(struct se_cmd_s *);
+extern int transport_stop_tasks_for_cmd(struct se_cmd_s *);
 extern void transport_generic_request_failure(se_cmd_t *, se_device_t *,
 						int, int);
 extern void transport_direct_request_timeout(se_cmd_t *);
