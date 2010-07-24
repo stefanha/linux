@@ -1534,6 +1534,11 @@ void iscsi_target_deregister_configfs(void)
 {
 	if (!(lio_target_fabric_configfs))
 		return;
+	/*
+	 * Shutdown discovery sessions and disable discovery TPG
+	 */
+	if (iscsi_global->discovery_tpg)
+		iscsi_tpg_disable_portal_group(iscsi_global->discovery_tpg, 1);
 
 	target_fabric_configfs_deregister(lio_target_fabric_configfs);
 	lio_target_fabric_configfs = NULL;

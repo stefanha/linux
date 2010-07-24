@@ -632,7 +632,7 @@ int iscsi_tpg_enable_portal_group(iscsi_portal_group_t *tpg)
  */
 int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *tpg, int force)
 {
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	iscsi_tiqn_t *tiqn;
 	u8 old_state = tpg->tpg_state;
 
 	spin_lock(&tpg->tpg_state_lock);
@@ -656,6 +656,10 @@ int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *tpg, int force)
 			tpg->tpgt);
 		return -EPERM;
 	}
+
+	tiqn = tpg->tpg_tiqn;
+	if (!(tiqn) || (tpg == iscsi_global->discovery_tpg))
+		return 0;
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
 	tiqn->tiqn_active_tpgs--;
