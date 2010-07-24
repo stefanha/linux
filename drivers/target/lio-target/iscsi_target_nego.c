@@ -548,12 +548,12 @@ static int iscsi_target_handle_csg_one(iscsi_conn_t *conn, iscsi_login_t *login)
 	if (ret < 0)
 		return -1;
 
-	if (login->first_request) {
+	if (login->first_request)
 		if (iscsi_target_check_first_request(conn, login) < 0)
 			return -1;
-		if (iscsi_target_check_for_existing_instances(conn, login) < 0)
-			return -1;
-	}
+
+	if (iscsi_target_check_for_existing_instances(conn, login) < 0)
+		return -1;
 
 	ret = iscsi_encode_text_output(
 			PHASE_OPERATIONAL|PHASE_DECLARATIVE,
