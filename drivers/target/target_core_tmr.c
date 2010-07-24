@@ -187,10 +187,22 @@ int core_tmr_lun_reset(
 			continue;
 		spin_unlock(&dev->se_tmr_lock);
 
+		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+		if (!(atomic_read(&T_TASK(cmd)->t_transport_active))) {
+			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+			spin_lock(&dev->se_tmr_lock);
+			continue;
+		}
+		if (cmd->t_state == TRANSPORT_ISTATE_PROCESSING) {
+			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+			spin_lock(&dev->se_tmr_lock);
+			continue;
+		}
 		DEBUG_LR("LUN_RESET: %s releasing TMR %p Function: 0x%02x,"
 			" Response: 0x%02x, t_state: %d\n",
 			(preempt_and_abort_list) ? "Preempt" : "", tmr_p,
 			tmr_p->function, tmr_p->response, cmd->t_state);
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 		transport_cmd_finish_abort_tmr(cmd);
 		spin_lock(&dev->se_tmr_lock);

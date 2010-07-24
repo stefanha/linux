@@ -7640,7 +7640,7 @@ static void transport_generic_wait_for_tasks(
 {
 	unsigned long flags;
 
-	if (!(cmd->se_cmd_flags & SCF_SE_LUN_CMD))
+	if (!(cmd->se_cmd_flags & SCF_SE_LUN_CMD) && !(cmd->se_tmr_req))
 		return;
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
@@ -8010,6 +8010,7 @@ int transport_generic_do_tmr(se_cmd_t *cmd)
 	cmd->t_state = TRANSPORT_ISTATE_PROCESSING;
 	CMD_TFO(cmd)->queue_tm_rsp(cmd);
 
+	transport_cmd_check_stop(cmd, 2, 0);
 	return 0;
 }
 
