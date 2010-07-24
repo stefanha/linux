@@ -4844,6 +4844,7 @@ static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
 {
 	iscsi_cmd_t *cmd = NULL, *cmd_tmp = NULL;
 	iscsi_session_t *sess = SESS(conn);
+	struct se_cmd_s *se_cmd;
 
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
@@ -4853,13 +4854,17 @@ static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
 			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
 			iscsi_increment_maxcmdsn(cmd, sess);
+			se_cmd = SE_CMD(cmd);
 			/*
-			 * Special case for transport_get_lun_for_cmd() failing
-			 * from iscsi_get_lun_for_cmd() in
-			 * iscsi_handle_scsi_cmd().
+			 * Special cases for active iSCSI TMR, and
+			 * transport_get_lun_for_cmd() failing from
+			 * iscsi_get_lun_for_cmd() in iscsi_handle_scsi_cmd().
 			 */
-			if (SE_CMD(cmd))
-				transport_release_cmd_to_pool(SE_CMD(cmd));
+			if (cmd->tmr_req && se_cmd &&
+			    se_cmd->transport_wait_for_tasks)
+				se_cmd->transport_wait_for_tasks(se_cmd, 1, 1);
+			else if (se_cmd)
+				transport_release_cmd_to_pool(se_cmd);
 			else
 				__iscsi_release_cmd_to_pool(cmd, sess);
 
@@ -4870,10 +4875,10 @@ static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
 		spin_unlock_bh(&conn->cmd_lock);
 
 		iscsi_increment_maxcmdsn(cmd, sess);
+		se_cmd = SE_CMD(cmd);
 
-		if (SE_CMD(cmd)->transport_wait_for_tasks)
-			SE_CMD(cmd)->transport_wait_for_tasks(SE_CMD(cmd),
-						1, 1);
+		if (se_cmd->transport_wait_for_tasks)
+			se_cmd->transport_wait_for_tasks(se_cmd, 1, 1);
 
 		spin_lock_bh(&conn->cmd_lock);
 	}
