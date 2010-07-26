@@ -59,9 +59,9 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 {
 	struct fc_exch *ep;
 	struct fc_seq *sp;
-	struct se_cmd_s *se_cmd;
+	struct se_cmd *se_cmd;
 	struct se_mem_s *mem;
-	struct se_transport_task_s *task;
+	struct se_transport_task *task;
 
 	if (!(ft_debug_logging & FT_DEBUG_IO))
 		return;
@@ -120,7 +120,7 @@ static int ft_get_lun_for_cmd(struct ft_cmd *cmd, u8 *lunp)
 
 static void ft_queue_cmd(struct ft_sess *sess, struct ft_cmd *cmd)
 {
-	struct se_queue_obj_s *qobj;
+	struct se_queue_obj *qobj;
 	unsigned long flags;
 
 	qobj = &sess->tport->tpg->qobj;
@@ -131,17 +131,17 @@ static void ft_queue_cmd(struct ft_sess *sess, struct ft_cmd *cmd)
 	wake_up_interruptible(&qobj->thread_wq);
 }
 
-static struct ft_cmd *ft_dequeue_cmd(struct se_queue_obj_s *qobj)
+static struct ft_cmd *ft_dequeue_cmd(struct se_queue_obj *qobj)
 {
 	unsigned long flags;
-	struct se_queue_req_s *qr;
+	struct se_queue_req *qr;
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
 	if (list_empty(&qobj->qobj_list)) {
 		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 		return NULL;
 	}
-	qr = list_first_entry(&qobj->qobj_list, struct se_queue_req_s, qr_list);
+	qr = list_first_entry(&qobj->qobj_list, struct se_queue_req, qr_list);
 	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
@@ -157,7 +157,7 @@ static void ft_free_cmd(struct ft_cmd *cmd)
 	kfree(cmd);
 }
 
-void ft_release_cmd(struct se_cmd_s *se_cmd)
+void ft_release_cmd(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
 
@@ -167,7 +167,7 @@ void ft_release_cmd(struct se_cmd_s *se_cmd)
 /*
  * Send response.
  */
-int ft_queue_status(struct se_cmd_s *se_cmd)
+int ft_queue_status(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
 	struct fc_frame *fp;
@@ -220,7 +220,7 @@ int ft_queue_status(struct se_cmd_s *se_cmd)
 	return 0;
 }
 
-int ft_write_pending_status(struct se_cmd_s *se_cmd)
+int ft_write_pending_status(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
 
@@ -230,7 +230,7 @@ int ft_write_pending_status(struct se_cmd_s *se_cmd)
 /*
  * Send TX_RDY (transfer ready).
  */
-int ft_write_pending(struct se_cmd_s *se_cmd)
+int ft_write_pending(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
 	struct fc_frame *fp;
@@ -258,26 +258,26 @@ int ft_write_pending(struct se_cmd_s *se_cmd)
 	return 0;
 }
 
-u32 ft_get_task_tag(struct se_cmd_s *se_cmd)
+u32 ft_get_task_tag(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
 
 	return fc_seq_exch(cmd->seq)->rxid;
 }
 
-int ft_get_cmd_state(struct se_cmd_s *se_cmd)
+int ft_get_cmd_state(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
 
 	return cmd->state;
 }
 
-int ft_is_state_remove(struct se_cmd_s *se_cmd)
+int ft_is_state_remove(struct se_cmd *se_cmd)
 {
 	return 0;	/* XXX TBD */
 }
 
-void ft_new_cmd_failure(struct se_cmd_s *se_cmd)
+void ft_new_cmd_failure(struct se_cmd *se_cmd)
 {
 	/* XXX TBD */
 	printk(KERN_INFO "%s: se_cmd %p\n", __func__, se_cmd);
@@ -377,7 +377,7 @@ static void ft_send_resp_code(struct ft_cmd *cmd, enum fcp_resp_rsp_codes code)
  */
 static void ft_send_tm(struct ft_cmd *cmd)
 {
-	struct se_tmr_req_s *tmr;
+	struct se_tmr_req *tmr;
 	struct fcp_cmnd *fcp;
 	u8 tm_func;
 
@@ -430,10 +430,10 @@ static void ft_send_tm(struct ft_cmd *cmd)
 /*
  * Send status from completed task management request.
  */
-int ft_queue_tm_resp(struct se_cmd_s *se_cmd)
+int ft_queue_tm_resp(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
-	struct se_tmr_req_s *tmr = se_cmd->se_tmr_req;
+	struct se_tmr_req *tmr = se_cmd->se_tmr_req;
 	enum fcp_resp_rsp_codes code;
 
 	switch (tmr->response) {
@@ -518,7 +518,7 @@ void ft_recv_req(struct ft_sess *sess, struct fc_seq *sp, struct fc_frame *fp)
 static void ft_send_cmd(struct ft_cmd *cmd)
 {
 	struct fc_frame_header *fh = fc_frame_header_get(cmd->req_frame);
-	struct se_cmd_s *se_cmd;
+	struct se_cmd *se_cmd;
 	struct fcp_cmnd *fcp;
 	int data_dir;
 	u32 data_len;
@@ -635,7 +635,7 @@ static void ft_exec_req(struct ft_cmd *cmd)
 int ft_thread(void *arg)
 {
 	struct ft_tpg *tpg = arg;
-	struct se_queue_obj_s *qobj = &tpg->qobj;
+	struct se_queue_obj *qobj = &tpg->qobj;
 	struct ft_cmd *cmd;
 	int ret;
 

@@ -39,60 +39,60 @@
 #define PS_TIMEOUT_DISK		(15*HZ)
 #define PS_TIMEOUT_OTHER	(500*HZ)
 
-extern se_global_t *se_global;
+extern struct se_global *se_global;
 extern struct block_device *linux_blockdevice_claim(int, int, void *);
 extern int linux_blockdevice_release(int, int, struct block_device *);
 extern int linux_blockdevice_check(int, int);
 
-extern int stgt_CDB_inquiry(se_task_t *, u32);
-extern int stgt_CDB_none(se_task_t *, u32);
-extern int stgt_CDB_read_non_SG(se_task_t *, u32);
-extern int stgt_CDB_read_SG(se_task_t *, u32);
-extern int stgt_CDB_write_non_SG(se_task_t *, u32);
-extern int stgt_CDB_write_SG(se_task_t *, u32);
+extern int stgt_CDB_inquiry(struct se_task *, u32);
+extern int stgt_CDB_none(struct se_task *, u32);
+extern int stgt_CDB_read_non_SG(struct se_task *, u32);
+extern int stgt_CDB_read_SG(struct se_task *, u32);
+extern int stgt_CDB_write_non_SG(struct se_task *, u32);
+extern int stgt_CDB_write_SG(struct se_task *, u32);
 
 #ifndef STGT_INCLUDE_STRUCTS
 extern int stgt_plugin_init(void);
 extern void stgt_plugin_free(void);
-extern int stgt_attach_hba(se_hba_t *, u32);
-extern int stgt_detach_hba(se_hba_t *);
+extern int stgt_attach_hba(struct se_hba *, u32);
+extern int stgt_detach_hba(struct se_hba *);
 #if 0
-extern int pscsi_claim_phydevice(se_hba_t *, se_device_t *);
-extern int pscsi_release_phydevice(se_device_t *);
+extern int pscsi_claim_phydevice(struct se_hba *, struct se_device *);
+extern int pscsi_release_phydevice(struct se_device *);
 #endif
-extern void *stgt_allocate_virtdevice(se_hba_t *, const char *);
-extern se_device_t *stgt_create_virtdevice(se_hba_t *, se_subsystem_dev_t *,
+extern void *stgt_allocate_virtdevice(struct se_hba *, const char *);
+extern struct se_device *stgt_create_virtdevice(struct se_hba *, struct se_subsystem_dev *,
 					void *);
-extern int stgt_activate_device(se_device_t *);
-extern void stgt_deactivate_device(se_device_t *);
+extern int stgt_activate_device(struct se_device *);
+extern void stgt_deactivate_device(struct se_device *);
 extern void stgt_free_device(void *);
-extern int stgt_transport_complete(se_task_t *);
-extern void *stgt_allocate_request(se_task_t *, se_device_t *);
-extern int stgt_do_task(se_task_t *);
-extern void stgt_free_task(se_task_t *);
-extern ssize_t stgt_set_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
+extern int stgt_transport_complete(struct se_task *);
+extern void *stgt_allocate_request(struct se_task *, struct se_device *);
+extern int stgt_do_task(struct se_task *);
+extern void stgt_free_task(struct se_task *);
+extern ssize_t stgt_set_configfs_dev_params(struct se_hba *, struct se_subsystem_dev *,
 						const char *, ssize_t);
-extern ssize_t stgt_check_configfs_dev_params(se_hba_t *,
-						se_subsystem_dev_t *);
-extern ssize_t stgt_show_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
+extern ssize_t stgt_check_configfs_dev_params(struct se_hba *,
+						struct se_subsystem_dev *);
+extern ssize_t stgt_show_configfs_dev_params(struct se_hba *, struct se_subsystem_dev *,
 						char *);
 #if 0
-extern se_device_t *scsi_create_virtdevice_from_fd(se_subsystem_dev_t *,
+extern struct se_device *scsi_create_virtdevice_from_fd(struct se_subsystem_dev *,
 						const char *);
 #endif
 extern void stgt_get_plugin_info(void *, char *, int *);
-extern void stgt_get_hba_info(se_hba_t *, char *, int *);
-extern void stgt_get_dev_info(se_device_t *, char *, int *);
-extern int stgt_check_lba(unsigned long long, se_device_t *);
-extern int stgt_check_for_SG(se_task_t *);
-extern unsigned char *stgt_get_cdb(se_task_t *);
-extern unsigned char *stgt_get_sense_buffer(se_task_t *);
-extern u32 stgt_get_blocksize(se_device_t *);
-extern u32 stgt_get_device_rev(se_device_t *);
-extern u32 stgt_get_device_type(se_device_t *);
-extern u32 stgt_get_dma_length(u32, se_device_t *);
-extern u32 stgt_get_max_sectors(se_device_t *);
-extern u32 stgt_get_queue_depth(se_device_t *);
+extern void stgt_get_hba_info(struct se_hba *, char *, int *);
+extern void stgt_get_dev_info(struct se_device *, char *, int *);
+extern int stgt_check_lba(unsigned long long, struct se_device *);
+extern int stgt_check_for_SG(struct se_task *);
+extern unsigned char *stgt_get_cdb(struct se_task *);
+extern unsigned char *stgt_get_sense_buffer(struct se_task *);
+extern u32 stgt_get_blocksize(struct se_device *);
+extern u32 stgt_get_device_rev(struct se_device *);
+extern u32 stgt_get_device_type(struct se_device *);
+extern u32 stgt_get_dma_length(u32, struct se_device *);
+extern u32 stgt_get_max_sectors(struct se_device *);
+extern u32 stgt_get_queue_depth(struct se_device *);
 extern void stgt_req_done(struct request *, int);
 extern int stgt_transfer_response(struct scsi_cmnd *,
 				  void (*done)(struct scsi_cmnd *));
@@ -127,12 +127,12 @@ typedef struct stgt_dev_virt_s {
 	int	sdv_lun_id;
 	struct block_device *sdv_bd; /* Temporary for v2.6.28 */
 	struct scsi_device *sdv_sd;
-	struct se_hba_s *sdv_se_hba;
+	struct se_hba *sdv_se_hba;
 } stgt_dev_virt_t;
 
 typedef struct stgt_hba_s {
 	struct device dev;
-	struct se_hba_s *se_hba;
+	struct se_hba *se_hba;
 	struct Scsi_Host *scsi_host;
 } stgt_hba_t;
 

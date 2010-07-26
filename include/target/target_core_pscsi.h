@@ -46,55 +46,55 @@
 #define PS_TIMEOUT_DISK		(15*HZ)
 #define PS_TIMEOUT_OTHER	(500*HZ)
 
-extern se_global_t *se_global;
+extern struct se_global *se_global;
 extern struct block_device *linux_blockdevice_claim(int, int, void *);
 extern int linux_blockdevice_release(int, int, struct block_device *);
 extern int linux_blockdevice_check(int, int);
 
-extern int pscsi_CDB_inquiry(se_task_t *, u32);
-extern int pscsi_CDB_none(se_task_t *, u32);
-extern int pscsi_CDB_read_non_SG(se_task_t *, u32);
-extern int pscsi_CDB_read_SG(se_task_t *, u32);
-extern int pscsi_CDB_write_non_SG(se_task_t *, u32);
-extern int pscsi_CDB_write_SG(se_task_t *, u32);
+extern int pscsi_CDB_inquiry(struct se_task *, u32);
+extern int pscsi_CDB_none(struct se_task *, u32);
+extern int pscsi_CDB_read_non_SG(struct se_task *, u32);
+extern int pscsi_CDB_read_SG(struct se_task *, u32);
+extern int pscsi_CDB_write_non_SG(struct se_task *, u32);
+extern int pscsi_CDB_write_SG(struct se_task *, u32);
 
 #ifndef PSCSI_INCLUDE_STRUCTS
-extern int pscsi_attach_hba(se_hba_t *, u32);
-extern int pscsi_detach_hba(se_hba_t *);
-extern int pscsi_pmode_enable_hba(se_hba_t *, unsigned long);
-extern int pscsi_claim_phydevice(se_hba_t *, se_device_t *);
-extern int pscsi_release_phydevice(se_device_t *);
-extern void *pscsi_allocate_virtdevice(se_hba_t *, const char *);
-extern se_device_t *pscsi_create_virtdevice(se_hba_t *, se_subsystem_dev_t *,
+extern int pscsi_attach_hba(struct se_hba *, u32);
+extern int pscsi_detach_hba(struct se_hba *);
+extern int pscsi_pmode_enable_hba(struct se_hba *, unsigned long);
+extern int pscsi_claim_phydevice(struct se_hba *, struct se_device *);
+extern int pscsi_release_phydevice(struct se_device *);
+extern void *pscsi_allocate_virtdevice(struct se_hba *, const char *);
+extern struct se_device *pscsi_create_virtdevice(struct se_hba *, struct se_subsystem_dev *,
 					void *);
-extern int pscsi_activate_device(se_device_t *);
-extern void pscsi_deactivate_device(se_device_t *);
+extern int pscsi_activate_device(struct se_device *);
+extern void pscsi_deactivate_device(struct se_device *);
 extern void pscsi_free_device(void *);
-extern int pscsi_transport_complete(se_task_t *);
-extern void *pscsi_allocate_request(se_task_t *, se_device_t *);
-extern int pscsi_do_task(se_task_t *);
-extern void pscsi_free_task(se_task_t *);
-extern ssize_t pscsi_set_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
+extern int pscsi_transport_complete(struct se_task *);
+extern void *pscsi_allocate_request(struct se_task *, struct se_device *);
+extern int pscsi_do_task(struct se_task *);
+extern void pscsi_free_task(struct se_task *);
+extern ssize_t pscsi_set_configfs_dev_params(struct se_hba *, struct se_subsystem_dev *,
 						const char *, ssize_t);
-extern ssize_t pscsi_check_configfs_dev_params(se_hba_t *,
-						se_subsystem_dev_t *);
-extern ssize_t pscsi_show_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
+extern ssize_t pscsi_check_configfs_dev_params(struct se_hba *,
+						struct se_subsystem_dev *);
+extern ssize_t pscsi_show_configfs_dev_params(struct se_hba *, struct se_subsystem_dev *,
 						char *);
-extern se_device_t *pscsi_create_virtdevice_from_fd(se_subsystem_dev_t *,
+extern struct se_device *pscsi_create_virtdevice_from_fd(struct se_subsystem_dev *,
 						const char *);
 extern void pscsi_get_plugin_info(void *, char *, int *);
-extern void pscsi_get_hba_info(se_hba_t *, char *, int *);
-extern void pscsi_get_dev_info(se_device_t *, char *, int *);
-extern int pscsi_check_lba(unsigned long long, se_device_t *);
-extern int pscsi_check_for_SG(se_task_t *);
-extern unsigned char *pscsi_get_cdb(se_task_t *);
-extern unsigned char *pscsi_get_sense_buffer(se_task_t *);
-extern u32 pscsi_get_blocksize(se_device_t *);
-extern u32 pscsi_get_device_rev(se_device_t *);
-extern u32 pscsi_get_device_type(se_device_t *);
-extern u32 pscsi_get_dma_length(u32, se_device_t *);
-extern u32 pscsi_get_max_sectors(se_device_t *);
-extern u32 pscsi_get_queue_depth(se_device_t *);
+extern void pscsi_get_hba_info(struct se_hba *, char *, int *);
+extern void pscsi_get_dev_info(struct se_device *, char *, int *);
+extern int pscsi_check_lba(unsigned long long, struct se_device *);
+extern int pscsi_check_for_SG(struct se_task *);
+extern unsigned char *pscsi_get_cdb(struct se_task *);
+extern unsigned char *pscsi_get_sense_buffer(struct se_task *);
+extern u32 pscsi_get_blocksize(struct se_device *);
+extern u32 pscsi_get_device_rev(struct se_device *);
+extern u32 pscsi_get_device_type(struct se_device *);
+extern u32 pscsi_get_dma_length(u32, struct se_device *);
+extern u32 pscsi_get_max_sectors(struct se_device *);
+extern u32 pscsi_get_queue_depth(struct se_device *);
 extern void pscsi_req_done(struct request *, int);
 #endif
 
@@ -127,7 +127,7 @@ typedef struct pscsi_dev_virt_s {
 	int	pdv_target_id;
 	int	pdv_lun_id;
 	struct scsi_device *pdv_sd;
-	struct se_hba_s *pdv_se_hba;
+	struct se_hba *pdv_se_hba;
 } pscsi_dev_virt_t;
 
 typedef enum phv_modes {

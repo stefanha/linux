@@ -54,7 +54,7 @@
  *
  *
  */
-int rd_attach_hba(se_hba_t *hba, u32 host_id)
+int rd_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	rd_host_t *rd_host;
 
@@ -87,7 +87,7 @@ int rd_attach_hba(se_hba_t *hba, u32 host_id)
  *
  *
  */
-int rd_detach_hba(se_hba_t *hba)
+int rd_detach_hba(struct se_hba *hba)
 {
 	rd_host_t *rd_host;
 
@@ -226,7 +226,7 @@ static int rd_build_device_space(rd_dev_t *rd_dev)
 }
 
 static void *rd_allocate_virtdevice(
-	se_hba_t *hba,
+	struct se_hba *hba,
 	const char *name,
 	int rd_direct)
 {
@@ -245,12 +245,12 @@ static void *rd_allocate_virtdevice(
 	return rd_dev;
 }
 
-void *rd_DIRECT_allocate_virtdevice(se_hba_t *hba, const char *name)
+void *rd_DIRECT_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	return rd_allocate_virtdevice(hba, name, 1);
 }
 
-void *rd_MEMCPY_allocate_virtdevice(se_hba_t *hba, const char *name)
+void *rd_MEMCPY_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	return rd_allocate_virtdevice(hba, name, 0);
 }
@@ -259,13 +259,13 @@ void *rd_MEMCPY_allocate_virtdevice(se_hba_t *hba, const char *name)
  *
  *
  */
-static se_device_t *rd_create_virtdevice(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+static struct se_device *rd_create_virtdevice(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	void *p,
 	int rd_direct)
 {
-	se_device_t *dev;
+	struct se_device *dev;
 	rd_dev_t *rd_dev = (rd_dev_t *) p;
 	rd_host_t *rd_host = (rd_host_t *) hba->hba_ptr;
 	int dev_flags = 0;
@@ -299,17 +299,17 @@ fail:
 	return NULL;
 }
 
-se_device_t *rd_DIRECT_create_virtdevice(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+struct se_device *rd_DIRECT_create_virtdevice(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	void *p)
 {
 	return rd_create_virtdevice(hba, se_dev, p, 1);
 }
 
-se_device_t *rd_MEMCPY_create_virtdevice(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+struct se_device *rd_MEMCPY_create_virtdevice(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	void *p)
 {
 	return rd_create_virtdevice(hba, se_dev, p, 0);
@@ -319,7 +319,7 @@ se_device_t *rd_MEMCPY_create_virtdevice(
  *
  *
  */
-int rd_activate_device(se_device_t *dev)
+int rd_activate_device(struct se_device *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 	rd_host_t *rd_host = rd_dev->rd_host;
@@ -335,7 +335,7 @@ int rd_activate_device(se_device_t *dev)
  *
  *
  */
-void rd_deactivate_device(se_device_t *dev)
+void rd_deactivate_device(struct se_device *dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 	rd_host_t *rd_host = rd_dev->rd_host;
@@ -361,7 +361,7 @@ void rd_free_device(void *p)
  *
  *
  */
-int rd_transport_complete(se_task_t *task)
+int rd_transport_complete(struct se_task *task)
 {
 	return 0;
 }
@@ -371,8 +371,8 @@ int rd_transport_complete(se_task_t *task)
  *
  */
 void *rd_allocate_request(
-	se_task_t *task,
-	se_device_t *dev)
+	struct se_task *task,
+	struct se_device *dev)
 {
 	rd_request_t *rd_req;
 
@@ -390,12 +390,12 @@ void *rd_allocate_request(
  *
  *
  */
-static int rd_emulate_inquiry(se_task_t *task)
+static int rd_emulate_inquiry(struct se_task *task)
 {
 	unsigned char prod[64], se_location[128];
 	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
-	se_cmd_t *cmd = TASK_CMD(task);
-	se_hba_t *hba = task->se_dev->se_hba;
+	struct se_cmd *cmd = TASK_CMD(task);
+	struct se_hba *hba = task->se_dev->se_hba;
 
 	memset(prod, 0, 64);
 	memset(se_location, 0, 128);
@@ -412,7 +412,7 @@ static int rd_emulate_inquiry(se_task_t *task)
  *
  *
  */
-static int rd_emulate_read_cap(se_task_t *task)
+static int rd_emulate_read_cap(struct se_task *task)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
 	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) /
@@ -425,7 +425,7 @@ static int rd_emulate_read_cap(se_task_t *task)
 	return transport_generic_emulate_readcapacity(TASK_CMD(task), blocks);
 }
 
-static int rd_emulate_read_cap16(se_task_t *task)
+static int rd_emulate_read_cap16(struct se_task *task)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
 	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) /
@@ -439,10 +439,10 @@ static int rd_emulate_read_cap16(se_task_t *task)
  *
  *
  */
-static int rd_emulate_scsi_cdb(se_task_t *task)
+static int rd_emulate_scsi_cdb(struct se_task *task)
 {
 	int ret;
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 	rd_request_t *rd_req = (rd_request_t *) task->transport_req;
 
 	switch (rd_req->rd_scsi_cdb[0]) {
@@ -783,9 +783,9 @@ static int rd_MEMCPY_write(rd_request_t *req)
  *
  *
  */
-int rd_MEMCPY_do_task(se_task_t *task)
+int rd_MEMCPY_do_task(struct se_task *task)
 {
-	se_device_t *dev = task->se_dev;
+	struct se_device *dev = task->se_dev;
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 	int ret;
 
@@ -818,7 +818,7 @@ int rd_MEMCPY_do_task(se_task_t *task)
  *
  */
 static int rd_DIRECT_with_offset(
-	se_task_t *task,
+	struct se_task *task,
 	struct list_head *se_mem_list,
 	u32 *se_mem_cnt,
 	u32 *task_offset)
@@ -921,7 +921,7 @@ out:
  *
  */
 static int rd_DIRECT_without_offset(
-	se_task_t *task,
+	struct se_task *task,
 	struct list_head *se_mem_list,
 	u32 *se_mem_cnt,
 	u32 *task_offset)
@@ -1002,7 +1002,7 @@ out:
  *
  */
 int rd_DIRECT_do_se_mem_map(
-	se_task_t *task,
+	struct se_task *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
 	se_mem_t *in_se_mem,
@@ -1036,7 +1036,7 @@ int rd_DIRECT_do_se_mem_map(
  *
  *
  */
-void rd_DIRECT_free_DMA(se_cmd_t *cmd)
+void rd_DIRECT_free_DMA(struct se_cmd *cmd)
 {
 	se_mem_t *se_mem, *se_mem_tmp;
 
@@ -1060,7 +1060,7 @@ void rd_DIRECT_free_DMA(se_cmd_t *cmd)
  *
  *	Note that rd_DIRECT_do_se_mem_map() actually does the real work.
  */
-int rd_DIRECT_allocate_DMA(se_cmd_t *cmd, u32 length, u32 dma_size)
+int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
 {
 	T_TASK(cmd)->t_mem_list = kzalloc(sizeof(struct list_head), GFP_KERNEL);
 	if (!(T_TASK(cmd)->t_mem_list)) {
@@ -1077,7 +1077,7 @@ int rd_DIRECT_allocate_DMA(se_cmd_t *cmd, u32 length, u32 dma_size)
  *
  *
  */
-int rd_DIRECT_do_task(se_task_t *task)
+int rd_DIRECT_do_task(struct se_task *task)
 {
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return rd_emulate_scsi_cdb(task);
@@ -1096,7 +1096,7 @@ int rd_DIRECT_do_task(se_task_t *task)
  *
  *
  */
-void rd_free_task(se_task_t *task)
+void rd_free_task(struct se_task *task)
 {
 	rd_request_t *req;
 	req = (rd_request_t *) task->transport_req;
@@ -1105,8 +1105,8 @@ void rd_free_task(se_task_t *task)
 }
 
 ssize_t rd_set_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	const char *page,
 	ssize_t count)
 {
@@ -1154,7 +1154,7 @@ out:
 	return (params) ? count : -EINVAL;
 }
 
-ssize_t rd_check_configfs_dev_params(se_hba_t *hba, se_subsystem_dev_t *se_dev)
+ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
 
@@ -1167,8 +1167,8 @@ ssize_t rd_check_configfs_dev_params(se_hba_t *hba, se_subsystem_dev_t *se_dev)
 }
 
 ssize_t rd_show_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	char *page)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
@@ -1188,7 +1188,7 @@ void rd_mcp_get_plugin_info(void *p, char *b, int *bl)
 	*bl += sprintf(b + *bl, "TCM RAMDISK_MCP Plugin %s\n", RD_MCP_VERSION);
 }
 
-void rd_get_hba_info(se_hba_t *hba, char *b, int *bl)
+void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
 	rd_host_t *rd_host = (rd_host_t *)hba->hba_ptr;
 
@@ -1197,7 +1197,7 @@ void rd_get_hba_info(se_hba_t *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM RamDisk HBA\n");
 }
 
-void rd_get_dev_info(se_device_t *dev, char *b, int *bl)
+void rd_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
 	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
 
@@ -1220,9 +1220,9 @@ void __rd_get_dev_info(rd_dev_t *rd_dev, char *b, int *bl)
  *
  *
  */
-void rd_map_task_non_SG(se_task_t *task)
+void rd_map_task_non_SG(struct se_task *task)
 {
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
 	req->rd_bufflen		= task->task_size;
@@ -1234,7 +1234,7 @@ void rd_map_task_non_SG(se_task_t *task)
  *
  *
  */
-void rd_map_task_SG(se_task_t *task)
+void rd_map_task_SG(struct se_task *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1247,7 +1247,7 @@ void rd_map_task_SG(se_task_t *task)
  *
  *
  */
-int rd_CDB_inquiry(se_task_t *task, u32 size)
+int rd_CDB_inquiry(struct se_task *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1261,7 +1261,7 @@ int rd_CDB_inquiry(se_task_t *task, u32 size)
  *
  *
  */
-int rd_CDB_none(se_task_t *task, u32 size)
+int rd_CDB_none(struct se_task *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1277,7 +1277,7 @@ int rd_CDB_none(se_task_t *task, u32 size)
  *
  *
  */
-int rd_CDB_read_non_SG(se_task_t *task, u32 size)
+int rd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1291,7 +1291,7 @@ int rd_CDB_read_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int rd_CDB_read_SG(se_task_t *task, u32 size)
+int rd_CDB_read_SG(struct se_task *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1305,7 +1305,7 @@ int rd_CDB_read_SG(se_task_t *task, u32 size)
  *
  *
  */
-int rd_CDB_write_non_SG(se_task_t *task, u32 size)
+int rd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1319,7 +1319,7 @@ int rd_CDB_write_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int rd_CDB_write_SG(se_task_t *task, u32 size)
+int rd_CDB_write_SG(struct se_task *task, u32 size)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1333,7 +1333,7 @@ int rd_CDB_write_SG(se_task_t *task, u32 size)
  *
  *
  */
-int rd_DIRECT_check_lba(unsigned long long lba, se_device_t *dev)
+int rd_DIRECT_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return ((do_div(lba, PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
 		 DEV_ATTRIB(dev)->block_size) ? 1 : 0;
@@ -1343,7 +1343,7 @@ int rd_DIRECT_check_lba(unsigned long long lba, se_device_t *dev)
  *
  *
  */
-int rd_MEMCPY_check_lba(unsigned long long lba, se_device_t *dev)
+int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
 }
@@ -1352,7 +1352,7 @@ int rd_MEMCPY_check_lba(unsigned long long lba, se_device_t *dev)
  *
  *
  */
-int rd_check_for_SG(se_task_t *task)
+int rd_check_for_SG(struct se_task *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1363,7 +1363,7 @@ int rd_check_for_SG(se_task_t *task)
  *
  *
  */
-unsigned char *rd_get_cdb(se_task_t *task)
+unsigned char *rd_get_cdb(struct se_task *task)
 {
 	rd_request_t *req = (rd_request_t *) task->transport_req;
 
@@ -1374,17 +1374,17 @@ unsigned char *rd_get_cdb(se_task_t *task)
  *
  *
  */
-u32 rd_get_blocksize(se_device_t *dev)
+u32 rd_get_blocksize(struct se_device *dev)
 {
 	return RD_BLOCKSIZE;
 }
 
-u32 rd_get_device_rev(se_device_t *dev)
+u32 rd_get_device_rev(struct se_device *dev)
 {
 	return SCSI_SPC_2; /* Returns SPC-3 in Initiator Data */
 }
 
-u32 rd_get_device_type(se_device_t *dev)
+u32 rd_get_device_type(struct se_device *dev)
 {
 	return TYPE_DISK;
 }
@@ -1393,7 +1393,7 @@ u32 rd_get_device_type(se_device_t *dev)
  *
  *
  */
-u32 rd_get_dma_length(u32 task_size, se_device_t *dev)
+u32 rd_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
 }
@@ -1402,7 +1402,7 @@ u32 rd_get_dma_length(u32 task_size, se_device_t *dev)
  *
  *
  */
-u32 rd_get_max_sectors(se_device_t *dev)
+u32 rd_get_max_sectors(struct se_device *dev)
 {
 	return RD_MAX_SECTORS;
 }
@@ -1411,12 +1411,12 @@ u32 rd_get_max_sectors(se_device_t *dev)
  *
  *
  */
-u32 rd_get_queue_depth(se_device_t *dev)
+u32 rd_get_queue_depth(struct se_device *dev)
 {
 	return RD_DEVICE_QUEUE_DEPTH;
 }
 
-u32 rd_get_max_queue_depth(se_device_t *dev)
+u32 rd_get_max_queue_depth(struct se_device *dev)
 {
 	return RD_MAX_DEVICE_QUEUE_DEPTH;
 }

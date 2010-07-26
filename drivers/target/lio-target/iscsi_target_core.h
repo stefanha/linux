@@ -111,7 +111,7 @@
 #define ISCSI_DEVATTRIB_DELETE_LUN_ACL		4
 
 /* iscsi_cmd_t->data_direction, same values as target_core_base.h
-   and se_cmd_t->data_direction  */
+   and struct se_cmd->data_direction  */
 #define ISCSI_NONE				0
 #define ISCSI_READ				1
 #define ISCSI_WRITE				2
@@ -329,7 +329,7 @@ typedef struct iscsi_r2t_s {
 	struct list_head	r2t_list;
 } ____cacheline_aligned iscsi_r2t_t;
 
-struct se_cmd_s;
+struct se_cmd;
 struct se_device_s;
 struct iscsi_map_sg_s;
 struct iscsi_unmap_sg_s;
@@ -478,10 +478,10 @@ typedef struct iscsi_cmd_s {
 	struct iscsi_cmd_s	*t_next;
 	/* Previous command in DAS transport list */
 	struct iscsi_cmd_s	*t_prev;
-	struct se_cmd_s		*se_cmd;
+	struct se_cmd		*se_cmd;
 }  ____cacheline_aligned iscsi_cmd_t;
 
-#define SE_CMD(cmd)		((struct se_cmd_s *)(cmd)->se_cmd)
+#define SE_CMD(cmd)		((struct se_cmd *)(cmd)->se_cmd)
 
 #include <iscsi_seq_and_pdu_list.h>
 
@@ -489,7 +489,7 @@ typedef struct iscsi_tmr_req_s {
 	u32			ref_cmd_sn;
 	u32			exp_data_sn;
 	struct iscsi_conn_recovery_s *conn_recovery;
-	struct se_tmr_req_s	*se_tmr_req;
+	struct se_tmr_req	*se_tmr_req;
 } ____cacheline_aligned iscsi_tmr_req_t;
 
 typedef struct iscsi_conn_s {
@@ -669,14 +669,14 @@ typedef struct iscsi_session_s {
 	struct semaphore	session_waiting_on_uc_sem;
 	struct timer_list	time2retain_timer;
 	iscsi_sess_ops_t	*sess_ops;
-	struct se_session_s	*se_sess;
+	struct se_session	*se_sess;
 	struct iscsi_portal_group_s *tpg;
 } ____cacheline_aligned iscsi_session_t;
 
 #define SESS(conn)		((iscsi_session_t *)(conn)->sess)
 #define SESS_OPS(sess)		((iscsi_sess_ops_t *)(sess)->sess_ops)
 #define SESS_OPS_C(conn)	((iscsi_sess_ops_t *)(conn)->sess->sess_ops)
-#define SESS_NODE_ACL(sess)	((se_node_acl_t *)(sess)->se_sess->se_node_acl)
+#define SESS_NODE_ACL(sess)	((struct se_node_acl *)(sess)->se_sess->se_node_acl)
 
 typedef struct iscsi_login_s {
 	u8 auth_complete;
@@ -754,7 +754,7 @@ typedef struct iscsi_node_auth_s {
 typedef struct iscsi_node_acl_s {
 	iscsi_node_attrib_t	node_attrib;
 	iscsi_node_auth_t	node_auth;
-	struct se_node_acl_s	se_node_acl;
+	struct se_node_acl	se_node_acl;
 } ____cacheline_aligned iscsi_node_acl_t;
 
 #define ISCSI_NODE_ATTRIB(t)	(&(t)->node_attrib)
@@ -821,7 +821,7 @@ typedef struct iscsi_tpg_np_s {
 	struct list_head	tpg_np_list;
 	struct list_head	tpg_np_child_list;
 	struct list_head	tpg_np_parent_list;
-	struct se_tpg_np_s	se_tpg_np;
+	struct se_tpg_np	se_tpg_np;
 	spinlock_t		tpg_np_parent_lock;
 } ____cacheline_aligned iscsi_tpg_np_t;
 
@@ -849,7 +849,7 @@ typedef struct iscsi_portal_group_s {
 	/* Spinlock for adding/removing Network Portals */
 	spinlock_t		tpg_np_lock;
 	spinlock_t		tpg_state_lock;
-	struct se_portal_group_s tpg_se_tpg;
+	struct se_portal_group tpg_se_tpg;
 	struct semaphore	tpg_access_sem;
 	struct semaphore	np_login_sem;
 	iscsi_tpg_attrib_t	tpg_attrib;
@@ -882,7 +882,7 @@ typedef struct iscsi_tiqn_s {
 	atomic_t		tiqn_access_count;
 	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
-	struct se_wwn_s		tiqn_wwn;
+	struct se_wwn		tiqn_wwn;
 #ifdef SNMP_SUPPORT
 	u32			tiqn_index;
 	iscsi_sess_err_stats_t  sess_err_stats;

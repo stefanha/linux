@@ -26,11 +26,11 @@
 
 extern struct kmem_cache *se_ua_cache;
 
-extern int core_scsi3_ua_check(struct se_cmd_s *, unsigned char *);
-extern int core_scsi3_ua_allocate(struct se_node_acl_s *, u32, u8, u8);
-extern void core_scsi3_ua_release_all(struct se_dev_entry_s *);
-extern void core_scsi3_ua_for_check_condition(struct se_cmd_s *, u8 *, u8 *);
-extern int core_scsi3_ua_clear_for_request_sense(struct se_cmd_s *,
+extern int core_scsi3_ua_check(struct se_cmd *, unsigned char *);
+extern int core_scsi3_ua_allocate(struct se_node_acl *, u32, u8, u8);
+extern void core_scsi3_ua_release_all(struct se_dev_entry *);
+extern void core_scsi3_ua_for_check_condition(struct se_cmd *, u8 *, u8 *);
+extern int core_scsi3_ua_clear_for_request_sense(struct se_cmd *,
 						u8 *, u8 *);
 
 #endif /* TARGET_CORE_UA_H */

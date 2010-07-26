@@ -63,7 +63,7 @@ struct ft_sess {
 	u16 max_frame;			/* maximum frame size */
 	u64 port_name;			/* port name for transport ID */
 	struct ft_tport *tport;
-	struct se_session_s *se_sess;
+	struct se_session *se_sess;
 	struct hlist_node hash;		/* linkage in ft_sess_hash table */
 	struct rcu_head rcu;
 	struct kref kref;		/* ref for hash and outstanding I/Os */
@@ -104,7 +104,7 @@ struct ft_node_auth {
  */
 struct ft_node_acl {
 	struct ft_node_auth node_auth;
-	struct se_node_acl_s se_node_acl;
+	struct se_node_acl se_node_acl;
 };
 
 struct ft_lun {
@@ -121,9 +121,9 @@ struct ft_tpg {
 	struct ft_tport *tport;		/* active tport or NULL */
 	struct list_head list;		/* linkage in ft_lport_acl tpg_list */
 	struct list_head lun_list;	/* head of LUNs */
-	struct se_portal_group_s se_tpg;
+	struct se_portal_group se_tpg;
 	struct task_struct *thread;	/* processing thread */
-	struct se_queue_obj_s qobj;	/* queue for processing thread */
+	struct se_queue_obj qobj;	/* queue for processing thread */
 };
 
 struct ft_lport_acl {
@@ -131,7 +131,7 @@ struct ft_lport_acl {
 	char name[FT_NAMELEN];
 	struct list_head list;
 	struct list_head tpg_list;
-	struct se_wwn_s fc_lport_wwn;
+	struct se_wwn fc_lport_wwn;
 };
 
 enum ft_cmd_state {
@@ -147,11 +147,11 @@ struct ft_cmd {
 	u16 lun;			/* LUN from request */
 	struct ft_sess *sess;		/* session held for cmd */
 	struct fc_seq *seq;		/* sequence in exchange mgr */
-	struct se_cmd_s *se_cmd;
+	struct se_cmd *se_cmd;
 	struct fc_frame *req_frame;
 	unsigned char *cdb;		/* pointer to CDB inside frame */
 	u32 write_data_len;		/* data received on writes */
-	struct se_queue_req_s se_req;
+	struct se_queue_req se_req;
 };
 
 extern struct list_head ft_lport_list;
@@ -167,13 +167,13 @@ extern struct target_fabric_configfs *ft_configfs;
  * Session ops.
  */
 void ft_sess_put(struct ft_sess *);
-int ft_sess_shutdown(struct se_session_s *);
-void ft_sess_close(struct se_session_s *);
-void ft_sess_stop(struct se_session_s *, int, int);
-int ft_sess_logged_in(struct se_session_s *);
-u32 ft_sess_get_index(struct se_session_s *);
-u32 ft_sess_get_port_name(struct se_session_s *, unsigned char *, u32);
-void ft_sess_set_erl0(struct se_session_s *);
+int ft_sess_shutdown(struct se_session *);
+void ft_sess_close(struct se_session *);
+void ft_sess_stop(struct se_session *, int, int);
+int ft_sess_logged_in(struct se_session *);
+u32 ft_sess_get_index(struct se_session *);
+u32 ft_sess_get_port_name(struct se_session *, unsigned char *, u32);
+void ft_sess_set_erl0(struct se_session *);
 
 void ft_lport_add(struct fc_lport *, void *);
 void ft_lport_del(struct fc_lport *, void *);
@@ -182,16 +182,16 @@ int ft_lport_notify(struct notifier_block *, unsigned long, void *);
 /*
  * IO methods.
  */
-void ft_release_cmd(struct se_cmd_s *);
-int ft_queue_status(struct se_cmd_s *);
-int ft_queue_data_in(struct se_cmd_s *);
-int ft_write_pending(struct se_cmd_s *);
-int ft_write_pending_status(struct se_cmd_s *);
-u32 ft_get_task_tag(struct se_cmd_s *);
-int ft_get_cmd_state(struct se_cmd_s *);
-void ft_new_cmd_failure(struct se_cmd_s *);
-int ft_queue_tm_resp(struct se_cmd_s *);
-int ft_is_state_remove(struct se_cmd_s *);
+void ft_release_cmd(struct se_cmd *);
+int ft_queue_status(struct se_cmd *);
+int ft_queue_data_in(struct se_cmd *);
+int ft_write_pending(struct se_cmd *);
+int ft_write_pending_status(struct se_cmd *);
+u32 ft_get_task_tag(struct se_cmd *);
+int ft_get_cmd_state(struct se_cmd *);
+void ft_new_cmd_failure(struct se_cmd *);
+int ft_queue_tm_resp(struct se_cmd *);
+int ft_is_state_remove(struct se_cmd *);
 
 /*
  * other internal functions.

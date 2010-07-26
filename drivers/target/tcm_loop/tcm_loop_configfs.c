@@ -78,8 +78,8 @@ static char *tcm_loop_dump_proto_id(struct tcm_loop_hba *tl_hba)
 /* Start items for tcm_loop_port_cit */
 
 int tcm_loop_port_link(
-	struct se_portal_group_s *se_tpg,
-	struct se_lun_s *lun)
+	struct se_portal_group *se_tpg,
+	struct se_lun *lun)
 {
 	struct tcm_loop_tpg *tl_tpg = container_of(se_tpg,
 				struct tcm_loop_tpg, tl_se_tpg);
@@ -97,8 +97,8 @@ int tcm_loop_port_link(
 }
 
 void tcm_loop_port_unlink(
-	struct se_portal_group_s *se_tpg,
-	struct se_lun_s *se_lun)
+	struct se_portal_group *se_tpg,
+	struct se_lun *se_lun)
 {
 	struct scsi_device *sd;
 	struct tcm_loop_hba *tl_hba;
@@ -134,7 +134,7 @@ static int tcm_loop_make_nexus(
 	struct tcm_loop_tpg *tl_tpg,
 	const char *name)
 {
-	se_portal_group_t *se_tpg;
+	struct se_portal_group *se_tpg;
 	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 	struct tcm_loop_nexus *tl_nexus;
 
@@ -150,14 +150,14 @@ static int tcm_loop_make_nexus(
 		return -ENOMEM;
 	}
 	/*
-	 * Initialize the se_session_t pointer
+	 * Initialize the struct se_session pointer
 	 */
 	tl_nexus->se_sess = transport_init_session();
 	if (!(tl_nexus->se_sess))
 		goto out;
 	/*
 	 * Since we are running in 'demo mode' this call with generate a
-	 * se_node_acl_t for the tcm_loop se_portal_group_t with the SCSI
+	 * struct se_node_acl for the tcm_loop struct se_portal_group with the SCSI
 	 * Initiator port name of the passed configfs group 'name'.
 	 */	
 	tl_nexus->se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
@@ -186,7 +186,7 @@ out:
 static int tcm_loop_drop_nexus(
 	struct tcm_loop_tpg *tpg)
 {
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 	struct tcm_loop_nexus *tl_nexus;
 	struct tcm_loop_hba *tl_hba = tpg->tl_hba;
 
@@ -220,7 +220,7 @@ static int tcm_loop_drop_nexus(
 /* End items for tcm_loop_nexus_cit */
 
 static ssize_t tcm_loop_tpg_show_nexus(
-	struct se_portal_group_s *se_tpg,
+	struct se_portal_group *se_tpg,
 	char *page)
 {
 	struct tcm_loop_tpg *tl_tpg = container_of(se_tpg,
@@ -239,7 +239,7 @@ static ssize_t tcm_loop_tpg_show_nexus(
 }
 
 static ssize_t tcm_loop_tpg_store_nexus(
-	struct se_portal_group_s *se_tpg,
+	struct se_portal_group *se_tpg,
 	const char *page,
 	size_t count)
 {
@@ -326,8 +326,8 @@ static struct configfs_attribute *tcm_loop_tpg_attrs[] = {
 
 /* Start items for tcm_loop_naa_cit */
 
-struct se_portal_group_s *tcm_loop_make_naa_tpg(
-	struct se_wwn_s *wwn,
+struct se_portal_group *tcm_loop_make_naa_tpg(
+	struct se_wwn *wwn,
 	struct config_group *group,
 	const char *name)
 {
@@ -372,9 +372,9 @@ struct se_portal_group_s *tcm_loop_make_naa_tpg(
 }
 
 void tcm_loop_drop_naa_tpg(
-	struct se_portal_group_s *se_tpg)
+	struct se_portal_group *se_tpg)
 {
-	struct se_wwn_s *wwn = se_tpg->se_tpg_wwn;
+	struct se_wwn *wwn = se_tpg->se_tpg_wwn;
 	struct tcm_loop_tpg *tl_tpg = container_of(se_tpg,
 				struct tcm_loop_tpg, tl_se_tpg);
 	struct tcm_loop_hba *tl_hba;
@@ -400,7 +400,7 @@ void tcm_loop_drop_naa_tpg(
 
 /* Start items for tcm_loop_cit */
 
-struct se_wwn_s *tcm_loop_make_scsi_hba(
+struct se_wwn *tcm_loop_make_scsi_hba(
 	struct target_fabric_configfs *tf,
 	struct config_group *group,
 	const char *name)
@@ -453,7 +453,7 @@ check_len:
 	/*
 	 * Setup the tl_hba->tl_hba_qobj
 	 */
-	tl_hba->tl_hba_qobj = kzalloc(sizeof(se_queue_obj_t), GFP_KERNEL);
+	tl_hba->tl_hba_qobj = kzalloc(sizeof(struct se_queue_obj), GFP_KERNEL);
 	if (!(tl_hba->tl_hba_qobj)) {
 		kfree(tl_hba);
 		printk("Unable to allocate tl_hba->tl_hba_qobj\n");
@@ -497,7 +497,7 @@ out:
 }
 
 void tcm_loop_drop_scsi_hba(
-	struct se_wwn_s *wwn)
+	struct se_wwn *wwn)
 {
 	struct tcm_loop_hba *tl_hba = container_of(wwn,
 				struct tcm_loop_hba, tl_hba_wwn);

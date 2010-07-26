@@ -50,7 +50,7 @@
  *
  *
  */
-int fd_attach_hba(se_hba_t *hba, u32 host_id)
+int fd_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	fd_host_t *fd_host;
 
@@ -82,7 +82,7 @@ int fd_attach_hba(se_hba_t *hba, u32 host_id)
  *
  *
  */
-int fd_detach_hba(se_hba_t *hba)
+int fd_detach_hba(struct se_hba *hba)
 {
 	fd_host_t *fd_host;
 
@@ -101,7 +101,7 @@ int fd_detach_hba(se_hba_t *hba)
 	return 0;
 }
 
-int fd_claim_phydevice(se_hba_t *hba, se_device_t *dev)
+int fd_claim_phydevice(struct se_hba *hba, struct se_device *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
 	struct block_device *bd;
@@ -128,7 +128,7 @@ int fd_claim_phydevice(se_hba_t *hba, se_device_t *dev)
 	return 0;
 }
 
-int fd_release_phydevice(se_device_t *dev)
+int fd_release_phydevice(struct se_device *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
 
@@ -150,7 +150,7 @@ int fd_release_phydevice(se_device_t *dev)
 	return 0;
 }
 
-void *fd_allocate_virtdevice(se_hba_t *hba, const char *name)
+void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	fd_dev_t *fd_dev;
 	fd_host_t *fd_host = (fd_host_t *) hba->hba_ptr;
@@ -172,13 +172,13 @@ void *fd_allocate_virtdevice(se_hba_t *hba, const char *name)
  *
  *
  */
-se_device_t *fd_create_virtdevice(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+struct se_device *fd_create_virtdevice(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	void *p)
 {
 	char *dev_p = NULL;
-	se_device_t *dev;
+	struct se_device *dev;
 	fd_dev_t *fd_dev = (fd_dev_t *) p;
 	fd_host_t *fd_host = (fd_host_t *) hba->hba_ptr;
 	mm_segment_t old_fs;
@@ -320,7 +320,7 @@ fail:
  *
  *
  */
-int fd_activate_device(se_device_t *dev)
+int fd_activate_device(struct se_device *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 	fd_host_t *fd_host = fd_dev->fd_host;
@@ -336,7 +336,7 @@ int fd_activate_device(se_device_t *dev)
  *
  *
  */
-void fd_deactivate_device(se_device_t *dev)
+void fd_deactivate_device(struct se_device *dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 	fd_host_t *fd_host = fd_dev->fd_host;
@@ -368,7 +368,7 @@ void fd_free_device(void *p)
  *
  *
  */
-int fd_transport_complete(se_task_t *task)
+int fd_transport_complete(struct se_task *task)
 {
 	return 0;
 }
@@ -378,8 +378,8 @@ int fd_transport_complete(se_task_t *task)
  *
  */
 void *fd_allocate_request(
-	se_task_t *task,
-	se_device_t *dev)
+	struct se_task *task,
+	struct se_device *dev)
 {
 	fd_request_t *fd_req;
 
@@ -398,12 +398,12 @@ void *fd_allocate_request(
  *
  *
  */
-int fd_emulate_inquiry(se_task_t *task)
+int fd_emulate_inquiry(struct se_task *task)
 {
 	unsigned char prod[64], se_location[128];
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 	fd_dev_t *fdev = (fd_dev_t *) task->se_dev->dev_ptr;
-	se_hba_t *hba = task->se_dev->se_hba;
+	struct se_hba *hba = task->se_dev->se_hba;
 
 	memset(prod, 0, 64);
 	memset(se_location, 0, 128);
@@ -419,7 +419,7 @@ int fd_emulate_inquiry(se_task_t *task)
  *
  *
  */
-static int fd_emulate_read_cap(se_task_t *task)
+static int fd_emulate_read_cap(struct se_task *task)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) task->se_dev->dev_ptr;
 	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
@@ -434,7 +434,7 @@ static int fd_emulate_read_cap(se_task_t *task)
 	return transport_generic_emulate_readcapacity(TASK_CMD(task), blocks);
 }
 
-static int fd_emulate_read_cap16(se_task_t *task)
+static int fd_emulate_read_cap16(struct se_task *task)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) task->se_dev->dev_ptr;
 	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
@@ -448,10 +448,10 @@ static int fd_emulate_read_cap16(se_task_t *task)
  *
  *
  */
-static int fd_emulate_scsi_cdb(se_task_t *task)
+static int fd_emulate_scsi_cdb(struct se_task *task)
 {
 	int ret;
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 	fd_request_t *fd_req = (fd_request_t *) task->transport_req;
 
 	switch (fd_req->fd_scsi_cdb[0]) {
@@ -563,7 +563,7 @@ static inline int fd_seek(
 	return 0;
 }
 
-static int fd_do_readv(fd_request_t *req, se_task_t *task)
+static int fd_do_readv(fd_request_t *req, struct se_task *task)
 {
 	int ret = 0;
 	u32 i;
@@ -611,7 +611,7 @@ static int fd_do_readv(fd_request_t *req, se_task_t *task)
 
 #if 0
 
-void fd_sendfile_free_DMA(se_cmd_t *cmd)
+void fd_sendfile_free_DMA(struct se_cmd *cmd)
 {
 	printk(KERN_INFO "Release reference to pages now..\n");
 }
@@ -623,7 +623,7 @@ static int fd_sendactor(
 	unsigned long size)
 {
 	unsigned long count = desc->count;
-	se_task_t *task = desc->arg.data;
+	struct se_task *task = desc->arg.data;
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 	struct scatterlist *sg = task->task_sg;
 
@@ -651,7 +651,7 @@ static int fd_sendactor(
 	return size;
 }
 
-static int fd_do_sendfile(fd_request_t *req, se_task_t *task)
+static int fd_do_sendfile(fd_request_t *req, struct se_task *task)
 {
 	int ret = 0;
 	struct file *fd = req->fd_dev->fd_file;
@@ -673,7 +673,7 @@ static int fd_do_sendfile(fd_request_t *req, se_task_t *task)
 }
 #endif
 
-static int fd_do_writev(fd_request_t *req, se_task_t *task)
+static int fd_do_writev(fd_request_t *req, struct se_task *task)
 {
 	int ret = 0;
 	u32 i;
@@ -705,7 +705,7 @@ static int fd_do_writev(fd_request_t *req, se_task_t *task)
 	return 1;
 }
 
-int fd_do_task(se_task_t *task)
+int fd_do_task(struct se_task *task)
 {
 	int ret = 0;
 	fd_request_t *req = (fd_request_t *) task->transport_req;
@@ -739,7 +739,7 @@ int fd_do_task(se_task_t *task)
  *
  *
  */
-void fd_free_task(se_task_t *task)
+void fd_free_task(struct se_task *task)
 {
 	fd_request_t *req;
 
@@ -750,8 +750,8 @@ void fd_free_task(se_task_t *task)
 }
 
 ssize_t fd_set_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	const char *page, ssize_t count)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
@@ -822,7 +822,7 @@ out:
 	return (params) ? count : -EINVAL;
 }
 
-ssize_t fd_check_configfs_dev_params(se_hba_t *hba, se_subsystem_dev_t *se_dev)
+ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
 
@@ -835,8 +835,8 @@ ssize_t fd_check_configfs_dev_params(se_hba_t *hba, se_subsystem_dev_t *se_dev)
 }
 
 ssize_t fd_show_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	char *page)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
@@ -851,7 +851,7 @@ void fd_get_plugin_info(void *p, char *b, int *bl)
 	*bl += sprintf(b + *bl, "TCM FILEIO Plugin %s\n", FD_VERSION);
 }
 
-void fd_get_hba_info(se_hba_t *hba, char *b, int *bl)
+void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
 	fd_host_t *fd_host = (fd_host_t *)hba->hba_ptr;
 
@@ -860,7 +860,7 @@ void fd_get_hba_info(se_hba_t *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM FILEIO HBA\n");
 }
 
-void fd_get_dev_info(se_device_t *dev, char *b, int *bl)
+void fd_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
 	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
 
@@ -890,9 +890,9 @@ void __fd_get_dev_info(fd_dev_t *fd_dev, char *b, int *bl)
  *
  *
  */
-void fd_map_task_non_SG(se_task_t *task)
+void fd_map_task_non_SG(struct se_task *task)
 {
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
 	req->fd_bufflen		= task->task_size;
@@ -904,7 +904,7 @@ void fd_map_task_non_SG(se_task_t *task)
  *
  *
  */
-void fd_map_task_SG(se_task_t *task)
+void fd_map_task_SG(struct se_task *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -917,7 +917,7 @@ void fd_map_task_SG(se_task_t *task)
  *
  *
  */
-int fd_CDB_inquiry(se_task_t *task, u32 size)
+int fd_CDB_inquiry(struct se_task *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -931,7 +931,7 @@ int fd_CDB_inquiry(se_task_t *task, u32 size)
  *
  *
  */
-int fd_CDB_none(se_task_t *task, u32 size)
+int fd_CDB_none(struct se_task *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -947,7 +947,7 @@ int fd_CDB_none(se_task_t *task, u32 size)
  *
  *
  */
-int fd_CDB_read_non_SG(se_task_t *task, u32 size)
+int fd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -961,7 +961,7 @@ int fd_CDB_read_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int fd_CDB_read_SG(se_task_t *task, u32 size)
+int fd_CDB_read_SG(struct se_task *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -975,7 +975,7 @@ int fd_CDB_read_SG(se_task_t *task, u32 size)
  *
  *
  */
-int fd_CDB_write_non_SG(se_task_t *task, u32 size)
+int fd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -989,7 +989,7 @@ int fd_CDB_write_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int fd_CDB_write_SG(se_task_t *task, u32 size)
+int fd_CDB_write_SG(struct se_task *task, u32 size)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1003,7 +1003,7 @@ int fd_CDB_write_SG(se_task_t *task, u32 size)
  *
  *
  */
-int fd_check_lba(unsigned long long lba, se_device_t *dev)
+int fd_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
 }
@@ -1012,7 +1012,7 @@ int fd_check_lba(unsigned long long lba, se_device_t *dev)
  *
  *
  */
-int fd_check_for_SG(se_task_t *task)
+int fd_check_for_SG(struct se_task *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1023,7 +1023,7 @@ int fd_check_for_SG(se_task_t *task)
  *
  *
  */
-unsigned char *fd_get_cdb(se_task_t *task)
+unsigned char *fd_get_cdb(struct se_task *task)
 {
 	fd_request_t *req = (fd_request_t *) task->transport_req;
 
@@ -1034,7 +1034,7 @@ unsigned char *fd_get_cdb(se_task_t *task)
  *
  *
  */
-u32 fd_get_blocksize(se_device_t *dev)
+u32 fd_get_blocksize(struct se_device *dev)
 {
 	return FD_BLOCKSIZE;
 }
@@ -1043,7 +1043,7 @@ u32 fd_get_blocksize(se_device_t *dev)
  *
  *
  */
-u32 fd_get_device_rev(se_device_t *dev)
+u32 fd_get_device_rev(struct se_device *dev)
 {
 	return SCSI_SPC_2; /* Returns SPC-3 in Initiator Data */
 }
@@ -1052,7 +1052,7 @@ u32 fd_get_device_rev(se_device_t *dev)
  *
  *
  */
-u32 fd_get_device_type(se_device_t *dev)
+u32 fd_get_device_type(struct se_device *dev)
 {
 	return TYPE_DISK;
 }
@@ -1061,7 +1061,7 @@ u32 fd_get_device_type(se_device_t *dev)
  *
  *
  */
-u32 fd_get_dma_length(u32 task_size, se_device_t *dev)
+u32 fd_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
 }
@@ -1070,7 +1070,7 @@ u32 fd_get_dma_length(u32 task_size, se_device_t *dev)
  *
  *
  */
-u32 fd_get_max_sectors(se_device_t *dev)
+u32 fd_get_max_sectors(struct se_device *dev)
 {
 	return FD_MAX_SECTORS;
 }
@@ -1079,12 +1079,12 @@ u32 fd_get_max_sectors(se_device_t *dev)
  *
  *
  */
-u32 fd_get_queue_depth(se_device_t *dev)
+u32 fd_get_queue_depth(struct se_device *dev)
 {
 	return FD_DEVICE_QUEUE_DEPTH;
 }
 
-u32 fd_get_max_queue_depth(se_device_t *dev)
+u32 fd_get_max_queue_depth(struct se_device *dev)
 {
 	return FD_MAX_DEVICE_QUEUE_DEPTH;
 }

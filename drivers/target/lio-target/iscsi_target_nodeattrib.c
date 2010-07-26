@@ -50,7 +50,7 @@
 static inline char *iscsi_na_get_initiatorname(
 	iscsi_node_acl_t *nacl)
 {
-	se_node_acl_t *se_nacl = &nacl->se_node_acl;	
+	struct se_node_acl *se_nacl = &nacl->se_node_acl;	
 
 	return &se_nacl->initiatorname[0];
 }
@@ -144,8 +144,8 @@ extern int iscsi_na_nopin_timeout(
 	iscsi_node_attrib_t *a = &acl->node_attrib;
 	iscsi_session_t *sess;
 	iscsi_conn_t *conn;
-	se_node_acl_t *se_nacl = &a->nacl->se_node_acl;
-	se_session_t *se_sess;
+	struct se_node_acl *se_nacl = &a->nacl->se_node_acl;
+	struct se_session *se_sess;
 	u32 orig_nopin_timeout = a->nopin_timeout;
 
 	if (nopin_timeout > NA_NOPIN_TIMEOUT_MAX) {

@@ -57,11 +57,11 @@
  */
 static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
 	struct tcm_loop_hba *tl_hba,
-	se_portal_group_t *se_tpg,
+	struct se_portal_group *se_tpg,
 	struct scsi_cmnd *sc,
 	int data_direction)
 {
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 	struct tcm_loop_nexus *tl_nexus = tl_hba->tl_nexus;
 	struct tcm_loop_cmd *tl_cmd;
 	int sam_task_attr;
@@ -101,7 +101,7 @@ static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
 	} else
 		sam_task_attr = TASK_ATTR_SIMPLE;
 	/*
-	 * Allocate the se_cmd_t descriptor from target_core_mod infrastructure
+	 * Allocate the struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	tl_cmd->tl_se_cmd = transport_alloc_se_cmd(se_tpg->se_tpg_tfo,
 			se_sess, (void *)tl_cmd, scsi_bufflen(sc),
@@ -121,16 +121,16 @@ static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
  * Can be called from interrupt context in tcm_loop_queuecommand() below
  */
 static int tcm_loop_queue_core_cmd(
-	se_queue_obj_t *qobj,
+	struct se_queue_obj *qobj,
 	struct tcm_loop_cmd *tl_cmd)
 {
-	se_queue_req_t *qr;
+	struct se_queue_req *qr;
 	unsigned long flags;
 
-	qr = kzalloc(sizeof(se_queue_req_t), GFP_ATOMIC);
+	qr = kzalloc(sizeof(struct se_queue_req), GFP_ATOMIC);
 	if (!(qr)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-				" se_queue_req_t\n");
+				" struct se_queue_req\n");
 		return -1;	
 	}
 	INIT_LIST_HEAD(&qr->qr_list);
@@ -152,11 +152,11 @@ static int tcm_loop_queue_core_cmd(
  */
 int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 {
-	se_cmd_t *se_cmd = tl_cmd->tl_se_cmd;
+	struct se_cmd *se_cmd = tl_cmd->tl_se_cmd;
 	void *mem_ptr;
 	int ret;
 	/*
-	 * Locate the se_lun_t pointer and attach it to se_cmd_t
+	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
 	if (transport_get_lun_for_cmd(se_cmd, NULL,
 				tl_cmd->sc->device->lun) < 0) {
@@ -215,7 +215,7 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 		return 0;
 	}
 	/*
-	 * Queue up the se_cmd_t + tasks to be processed by the
+	 * Queue up the struct se_cmd + tasks to be processed by the
 	 * TCM storage object.
 	 */
 	return transport_generic_handle_cdb(se_cmd);
@@ -224,19 +224,19 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 /*
  * Called from struct target_core_fabric_ops->check_stop_free()
  */
-void tcm_loop_check_stop_free(se_cmd_t *se_cmd)
+void tcm_loop_check_stop_free(struct se_cmd *se_cmd)
 {
 	/*
-	 * Release the se_cmd_t, which will make a callback to release
+	 * Release the struct se_cmd, which will make a callback to release
 	 * struct tcm_loop_cmd * in tcm_loop_deallocate_core_cmd()
 	 */
 	transport_generic_free_cmd(se_cmd, 0, 1, 0);
 }
 
 /*
- * Called from struct target_core_fabric_ops->release_cmd_to_pool()
+ * Called from struct target_core_fabric_ops->releastruct se_cmdo_pool()
  */
-void tcm_loop_deallocate_core_cmd(se_cmd_t *se_cmd)
+void tcm_loop_deallocate_core_cmd(struct se_cmd *se_cmd)
 {
 	struct tcm_loop_cmd *tl_cmd =
 			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
@@ -334,7 +334,7 @@ static int tcm_loop_queuecommand(
 	struct scsi_cmnd *sc,
 	void (*done)(struct scsi_cmnd *))
 {
-	se_portal_group_t *se_tpg;
+	struct se_portal_group *se_tpg;
 	struct tcm_loop_cmd *tl_cmd;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_tpg *tl_tpg;
@@ -393,7 +393,7 @@ static int tcm_loop_queuecommand(
 	 */
 	if (tcm_loop_queue_core_cmd(tl_hba->tl_hba_qobj, tl_cmd) < 0) {
 		/*
-		 * Will free both struct tcm_loop_cmd and se_cmd_t
+		 * Will free both struct tcm_loop_cmd and struct se_cmd
 		 */
 		transport_release_cmd_to_pool(tl_cmd->tl_se_cmd);
 		/*
@@ -418,9 +418,9 @@ static int tcm_loop_queuecommand(
  */
 static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 {
-	se_cmd_t *se_cmd = NULL;
-	se_portal_group_t *se_tpg;
-	se_session_t *se_sess;
+	struct se_cmd *se_cmd = NULL;
+	struct se_portal_group *se_tpg;
+	struct se_session *se_sess;
 	struct tcm_loop_cmd *tl_cmd = NULL;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_nexus *tl_nexus;
@@ -465,7 +465,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	}
 	init_waitqueue_head(&tl_tmr->tl_tmr_wait);
 	/*
-	 * Allocate the se_cmd_t for a LUN_RESET TMR
+	 * Allocate the struct se_cmd for a LUN_RESET TMR
 	 */
 	tl_cmd->tl_se_cmd = transport_alloc_se_cmd(se_tpg->se_tpg_tfo,
 			se_sess, (void *)tl_cmd, 0, SE_DIRECTION_NONE,
@@ -481,7 +481,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	if (!(se_cmd->se_tmr_req))
 		goto release;
 	/*
-	 * Locate the underlying TCM se_lun_t from sc->device->lun
+	 * Locate the underlying TCM struct se_lun from sc->device->lun
 	 */
 	if (transport_get_lun_for_tmr(se_cmd, sc->device->lun) < 0)
 		goto release;

@@ -162,7 +162,7 @@ static int iscsi_target_check_first_request(
 	iscsi_login_t *login)
 {
 	iscsi_param_t *param = NULL;
-	se_node_acl_t *se_nacl;
+	struct se_node_acl *se_nacl;
 
 	login->first_request = 0;
 
@@ -200,7 +200,7 @@ static int iscsi_target_check_first_request(
 				se_nacl = SESS(conn)->se_sess->se_node_acl;
 				if (!(se_nacl)) {
 					printk(KERN_ERR "Unable to locate"
-						" se_node_acl_t\n");
+						" struct se_node_acl\n");
 					iscsi_tx_login_rsp(conn,
 							STAT_CLASS_INITIATOR,
 							STAT_DETAIL_NOT_FOUND);

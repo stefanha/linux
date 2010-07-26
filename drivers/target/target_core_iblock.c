@@ -59,7 +59,7 @@
  *
  *
  */
-int iblock_attach_hba(se_hba_t *hba, u32 host_id)
+int iblock_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	iblock_hba_t *ib_host;
 
@@ -91,7 +91,7 @@ int iblock_attach_hba(se_hba_t *hba, u32 host_id)
  *
  *
  */
-int iblock_detach_hba(se_hba_t *hba)
+int iblock_detach_hba(struct se_hba *hba)
 {
 	iblock_hba_t *ib_host;
 
@@ -110,7 +110,7 @@ int iblock_detach_hba(se_hba_t *hba)
 	return 0;
 }
 
-int iblock_claim_phydevice(se_hba_t *hba, se_device_t *dev)
+int iblock_claim_phydevice(struct se_hba *hba, struct se_device *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *)dev->dev_ptr;
 	struct block_device *bd;
@@ -155,7 +155,7 @@ static int __iblock_release_phydevice(iblock_dev_t *ib_dev, int ro)
 	return 0;
 }
 
-int iblock_release_phydevice(se_device_t *dev)
+int iblock_release_phydevice(struct se_device *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *)dev->dev_ptr;
 
@@ -166,7 +166,7 @@ int iblock_release_phydevice(se_device_t *dev)
 			(dev->dev_flags & DF_READ_ONLY) ? 1 : 0);
 }
 
-void *iblock_allocate_virtdevice(se_hba_t *hba, const char *name)
+void *iblock_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	iblock_dev_t *ib_dev = NULL;
 	iblock_hba_t *ib_host = (iblock_hba_t *) hba->hba_ptr;
@@ -183,13 +183,13 @@ void *iblock_allocate_virtdevice(se_hba_t *hba, const char *name)
 	return ib_dev;
 }
 
-se_device_t *iblock_create_virtdevice(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+struct se_device *iblock_create_virtdevice(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	void *p)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) p;
-	se_device_t *dev;
+	struct se_device *dev;
 	struct block_device *bd = NULL;
 	u32 dev_flags = 0;
 	int ret = 0;
@@ -290,7 +290,7 @@ failed:
  *
  *
  */
-int iblock_activate_device(se_device_t *dev)
+int iblock_activate_device(struct se_device *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 	iblock_hba_t *ib_hba = ib_dev->ibd_host;
@@ -306,7 +306,7 @@ int iblock_activate_device(se_device_t *dev)
  *
  *
  */
-void iblock_deactivate_device(se_device_t *dev)
+void iblock_deactivate_device(struct se_device *dev)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) dev->dev_ptr;
 	iblock_hba_t *ib_hba = ib_dev->ibd_host;
@@ -329,7 +329,7 @@ void iblock_free_device(void *p)
 	kfree(ib_dev);
 }
 
-int iblock_transport_complete(se_task_t *task)
+int iblock_transport_complete(struct se_task *task)
 {
 	return 0;
 }
@@ -339,8 +339,8 @@ int iblock_transport_complete(se_task_t *task)
  *
  */
 void *iblock_allocate_request(
-	se_task_t *task,
-	se_device_t *dev)
+	struct se_task *task,
+	struct se_device *dev)
 {
 	iblock_req_t *ib_req;
 
@@ -354,12 +354,12 @@ void *iblock_allocate_request(
 	return (void *)ib_req;
 }
 
-static int iblock_emulate_inquiry(se_task_t *task)
+static int iblock_emulate_inquiry(struct se_task *task)
 {
 	unsigned char prod[64], se_location[128];
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
-	se_hba_t *hba = task->se_dev->se_hba;
+	struct se_hba *hba = task->se_dev->se_hba;
 
 	memset(prod, 0, 64);
 	memset(se_location, 0, 128);
@@ -373,7 +373,7 @@ static int iblock_emulate_inquiry(se_task_t *task)
 }
 
 static unsigned long long iblock_emulate_read_cap_with_block_size(
-	se_device_t *dev,
+	struct se_device *dev,
 	struct block_device *bd,
 	struct request_queue *q)
 {
@@ -451,7 +451,7 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	return blocks_long;
 }
 
-static int iblock_emulate_read_cap(se_task_t *task)
+static int iblock_emulate_read_cap(struct se_task *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
@@ -469,7 +469,7 @@ static int iblock_emulate_read_cap(se_task_t *task)
 	return transport_generic_emulate_readcapacity(TASK_CMD(task), blocks);
 }
 
-static int iblock_emulate_read_cap16(se_task_t *task)
+static int iblock_emulate_read_cap16(struct se_task *task)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) task->se_dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
@@ -482,10 +482,10 @@ static int iblock_emulate_read_cap16(se_task_t *task)
 				TASK_CMD(task), blocks_long);
 }
 
-static int iblock_emulate_scsi_cdb(se_task_t *task)
+static int iblock_emulate_scsi_cdb(struct se_task *task)
 {
 	int ret;
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 
 	switch (T_TASK(cmd)->t_task_cdb[0]) {
 	case INQUIRY:
@@ -555,7 +555,7 @@ static int iblock_emulate_scsi_cdb(se_task_t *task)
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
-int iblock_do_task(se_task_t *task)
+int iblock_do_task(struct se_task *task)
 {
 	iblock_req_t *req = (iblock_req_t *)task->transport_req;
 	iblock_dev_t *ibd = (iblock_dev_t *)req->ib_dev;
@@ -584,7 +584,7 @@ int iblock_do_task(se_task_t *task)
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
-void iblock_free_task(se_task_t *task)
+void iblock_free_task(struct se_task *task)
 {
 	iblock_req_t *req = (iblock_req_t *) task->transport_req;
 
@@ -597,8 +597,8 @@ void iblock_free_task(se_task_t *task)
 	task->transport_req = NULL;
 }
 
-ssize_t iblock_set_configfs_dev_params(se_hba_t *hba,
-					       se_subsystem_dev_t *se_dev,
+ssize_t iblock_set_configfs_dev_params(struct se_hba *hba,
+					       struct se_subsystem_dev *se_dev,
 					       const char *page, ssize_t count)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) se_dev->se_dev_su_ptr;
@@ -690,8 +690,8 @@ out:
 }
 
 ssize_t iblock_check_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev)
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) se_dev->se_dev_su_ptr;
 
@@ -706,8 +706,8 @@ ssize_t iblock_check_configfs_dev_params(
 }
 
 ssize_t iblock_show_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	char *page)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) se_dev->se_dev_su_ptr;
@@ -717,12 +717,12 @@ ssize_t iblock_show_configfs_dev_params(
 	return (ssize_t)bl;
 }
 
-se_device_t *iblock_create_virtdevice_from_fd(
-	se_subsystem_dev_t *se_dev,
+struct se_device *iblock_create_virtdevice_from_fd(
+	struct se_subsystem_dev *se_dev,
 	const char *page)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) se_dev->se_dev_su_ptr;
-	se_device_t *dev = NULL;
+	struct se_device *dev = NULL;
 	struct file *filp;
 	struct inode *inode;
 	char *p = (char *)page;
@@ -782,7 +782,7 @@ void iblock_get_plugin_info(void *p, char *b, int *bl)
 	*bl += sprintf(b + *bl, "TCM iBlock Plugin %s\n", IBLOCK_VERSION);
 }
 
-void iblock_get_hba_info(se_hba_t *hba, char *b, int *bl)
+void iblock_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
 	iblock_hba_t *ib_host = (iblock_hba_t *)hba->hba_ptr;
 
@@ -791,7 +791,7 @@ void iblock_get_hba_info(se_hba_t *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM iBlock HBA\n");
 }
 
-void iblock_get_dev_info(se_device_t *dev, char *b, int *bl)
+void iblock_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
 
@@ -826,13 +826,13 @@ void __iblock_get_dev_info(iblock_dev_t *ibd, char *b, int *bl)
 
 static void iblock_bio_destructor(struct bio *bio)
 {
-	se_task_t *task = (se_task_t *)bio->bi_private;
+	struct se_task *task = (struct se_task *)bio->bi_private;
 	iblock_dev_t *ib_dev = (iblock_dev_t *) task->se_dev->dev_ptr;
 
 	bio_free(bio, ib_dev->ibd_bio_set);
 }
 
-static struct bio *iblock_get_bio(se_task_t *task,
+static struct bio *iblock_get_bio(struct se_task *task,
 	iblock_req_t *ib_req,
 	iblock_dev_t *ib_dev,
 	int *ret,
@@ -865,7 +865,7 @@ static struct bio *iblock_get_bio(se_task_t *task,
 	return bio;
 }
 
-int iblock_map_task_SG(se_task_t *task)
+int iblock_map_task_SG(struct se_task *task)
 {
 	iblock_dev_t *ib_dev = (iblock_dev_t *) task->se_dev->dev_ptr;
 	iblock_req_t *ib_req = (iblock_req_t *) task->transport_req;
@@ -938,76 +938,76 @@ fail:
 	return ret;
 }
 
-int iblock_CDB_inquiry(se_task_t *task, u32 size)
+int iblock_CDB_inquiry(struct se_task *task, u32 size)
 {
 	return 0;
 }
 
-int iblock_CDB_none(se_task_t *task, u32 size)
+int iblock_CDB_none(struct se_task *task, u32 size)
 {
 	return 0;
 }
 
-int iblock_CDB_read_non_SG(se_task_t *task, u32 size)
+int iblock_CDB_read_non_SG(struct se_task *task, u32 size)
 {
 	return 0;
 }
 
-int iblock_CDB_read_SG(se_task_t *task, u32 size)
+int iblock_CDB_read_SG(struct se_task *task, u32 size)
 {
 	return iblock_map_task_SG(task);
 }
 
-int iblock_CDB_write_non_SG(se_task_t *task, u32 size)
+int iblock_CDB_write_non_SG(struct se_task *task, u32 size)
 {
 	return 0;
 }
 
-int iblock_CDB_write_SG(se_task_t *task, u32 size)
+int iblock_CDB_write_SG(struct se_task *task, u32 size)
 {
 	return iblock_map_task_SG(task);
 }
 
-int iblock_check_lba(unsigned long long lba, se_device_t *dev)
+int iblock_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
 }
 
-int iblock_check_for_SG(se_task_t *task)
+int iblock_check_for_SG(struct se_task *task)
 {
 	return task->task_sg_num;
 }
 
-unsigned char *iblock_get_cdb(se_task_t *task)
+unsigned char *iblock_get_cdb(struct se_task *task)
 {
 	iblock_req_t *req = (iblock_req_t *) task->transport_req;
 
 	return req->ib_scsi_cdb;
 }
 
-u32 iblock_get_blocksize(se_device_t *dev)
+u32 iblock_get_blocksize(struct se_device *dev)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
 
 	return bdev_logical_block_size(ibd->ibd_bd);
 }
 
-u32 iblock_get_device_rev(se_device_t *dev)
+u32 iblock_get_device_rev(struct se_device *dev)
 {
 	return SCSI_SPC_2; /* Returns SPC-3 in Initiator Data */
 }
 
-u32 iblock_get_device_type(se_device_t *dev)
+u32 iblock_get_device_type(struct se_device *dev)
 {
 	return TYPE_DISK;
 }
 
-u32 iblock_get_dma_length(u32 task_size, se_device_t *dev)
+u32 iblock_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
 }
 
-u32 iblock_get_max_sectors(se_device_t *dev)
+u32 iblock_get_max_sectors(struct se_device *dev)
 {
 	iblock_dev_t *ibd = (iblock_dev_t *) dev->dev_ptr;
 	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
@@ -1015,19 +1015,19 @@ u32 iblock_get_max_sectors(se_device_t *dev)
 	return q->limits.max_sectors;
 }
 
-u32 iblock_get_queue_depth(se_device_t *dev)
+u32 iblock_get_queue_depth(struct se_device *dev)
 {
 	return IBLOCK_DEVICE_QUEUE_DEPTH;
 }
 
-u32 iblock_get_max_queue_depth(se_device_t *dev)
+u32 iblock_get_max_queue_depth(struct se_device *dev)
 {
 	return IBLOCK_MAX_DEVICE_QUEUE_DEPTH;
 }
 
 void iblock_bio_done(struct bio *bio, int err)
 {
-	se_task_t *task = (se_task_t *)bio->bi_private;
+	struct se_task *task = (struct se_task *)bio->bi_private;
 	iblock_req_t *ibr = (iblock_req_t *)task->transport_req;
 
 	err = test_bit(BIO_UPTODATE, &bio->bi_flags) ? err : -EIO;

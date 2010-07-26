@@ -46,10 +46,10 @@
 
 #undef TARGET_CORE_SEOBJ_C
 
-int dev_obj_export(void *p, se_portal_group_t *tpg, se_lun_t *lun)
+int dev_obj_export(void *p, struct se_portal_group *tpg, struct se_lun *lun)
 {
-	se_device_t *dev  = (se_device_t *)p;
-	se_port_t *port;
+	struct se_device *dev  = (struct se_device *)p;
+	struct se_port *port;
 
 	port = core_alloc_port(dev);
 	if (!(port))
@@ -63,10 +63,10 @@ int dev_obj_export(void *p, se_portal_group_t *tpg, se_lun_t *lun)
 	return 0;
 }
 
-void dev_obj_unexport(void *p, se_portal_group_t *tpg, se_lun_t *lun)
+void dev_obj_unexport(void *p, struct se_portal_group *tpg, struct se_lun *lun)
 {
-	se_device_t *dev  = (se_device_t *)p;
-	se_port_t *port = lun->lun_sep;
+	struct se_device *dev  = (struct se_device *)p;
+	struct se_port *port = lun->lun_sep;
 
 	spin_lock(&dev->se_port_lock);
 	spin_lock(&lun->lun_sep_lock);
@@ -87,7 +87,7 @@ void dev_obj_unexport(void *p, se_portal_group_t *tpg, se_lun_t *lun)
 
 int dev_obj_max_sectors(void *p)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
 		return (DEV_ATTRIB(dev)->max_sectors >
@@ -100,14 +100,14 @@ int dev_obj_max_sectors(void *p)
 
 unsigned long long dev_obj_end_lba(void *p)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 
 	 return dev->dev_sectors_total + 1;
 }
 
 int dev_obj_do_se_mem_map(
 	void *p,
-	se_task_t *task,
+	struct se_task *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
 	se_mem_t *in_se_mem,
@@ -115,7 +115,7 @@ int dev_obj_do_se_mem_map(
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 	u32 tmp_task_offset = *task_offset;
 	int ret = 0;
 
@@ -141,15 +141,15 @@ int dev_obj_do_se_mem_map(
 		return -1;
 
 	/*
-	 * se_task_t->task_sg now contains the struct scatterlist array.
+	 * struct se_task->task_sg now contains the struct scatterlist array.
 	 */
 	return transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
 		in_se_mem, out_se_mem, se_mem_cnt, task_offset);
 }
 
-int dev_obj_get_mem_buf(void *p, se_cmd_t *cmd)
+int dev_obj_get_mem_buf(void *p, struct se_cmd *cmd)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 
 	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_buf) ?
 		TRANSPORT(dev)->allocate_buf : &transport_generic_allocate_buf;
@@ -159,9 +159,9 @@ int dev_obj_get_mem_buf(void *p, se_cmd_t *cmd)
 	return 0;
 }
 
-int dev_obj_get_mem_SG(void *p, se_cmd_t *cmd)
+int dev_obj_get_mem_SG(void *p, struct se_cmd *cmd)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 
 	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_DMA) ?
 		TRANSPORT(dev)->allocate_DMA : &transport_generic_get_mem;
@@ -173,7 +173,7 @@ int dev_obj_get_mem_SG(void *p, se_cmd_t *cmd)
 
 map_func_t dev_obj_get_map_SG(void *p, int rw)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 
 	return (rw == SE_DIRECTION_WRITE) ? dev->transport->spc->write_SG :
 		dev->transport->spc->read_SG;
@@ -181,7 +181,7 @@ map_func_t dev_obj_get_map_SG(void *p, int rw)
 
 map_func_t dev_obj_get_map_non_SG(void *p, int rw)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 
 	return (rw == SE_DIRECTION_WRITE) ? dev->transport->spc->write_non_SG :
 		dev->transport->spc->read_non_SG;
@@ -189,14 +189,14 @@ map_func_t dev_obj_get_map_non_SG(void *p, int rw)
 
 map_func_t dev_obj_get_map_none(void *p)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 
 	return dev->transport->spc->none;
 }
 
 int dev_obj_check_online(void *p)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 	int ret;
 
 	spin_lock(&dev->dev_status_lock);
@@ -209,7 +209,7 @@ int dev_obj_check_online(void *p)
 
 int dev_obj_check_shutdown(void *p)
 {
-	se_device_t *dev  = (se_device_t *)p;
+	struct se_device *dev  = (struct se_device *)p;
 	int ret;
 
 	spin_lock(&dev->dev_status_lock);

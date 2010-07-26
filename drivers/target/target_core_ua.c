@@ -46,12 +46,12 @@
 #undef TARGET_CORE_UA_C
 
 int core_scsi3_ua_check(
-	se_cmd_t *cmd,
+	struct se_cmd *cmd,
 	unsigned char *cdb)
 {
-	se_dev_entry_t *deve;
-	se_session_t *sess = cmd->se_sess;
-	se_node_acl_t *nacl;
+	struct se_dev_entry *deve;
+	struct se_session *sess = cmd->se_sess;
+	struct se_node_acl *nacl;
 
 	if (!(sess))
 		return 0;
@@ -91,13 +91,13 @@ int core_scsi3_ua_check(
 }
 
 int core_scsi3_ua_allocate(
-	se_node_acl_t *nacl,
+	struct se_node_acl *nacl,
 	u32 unpacked_lun,
 	u8 asc,
 	u8 ascq)
 {
-	se_dev_entry_t *deve;
-	se_ua_t *ua, *ua_p, *ua_tmp;
+	struct se_dev_entry *deve;
+	struct se_ua *ua, *ua_p, *ua_tmp;
 	/*
 	 * PASSTHROUGH OPS
 	 */
@@ -106,7 +106,7 @@ int core_scsi3_ua_allocate(
 
 	ua = kmem_cache_zalloc(se_ua_cache, GFP_ATOMIC);
 	if (!(ua)) {
-		printk(KERN_ERR "Unable to allocate se_ua_t\n");
+		printk(KERN_ERR "Unable to allocate struct se_ua\n");
 		return -1;
 	}
 	INIT_LIST_HEAD(&ua->ua_dev_list);
@@ -192,9 +192,9 @@ int core_scsi3_ua_allocate(
 }
 
 void core_scsi3_ua_release_all(
-	se_dev_entry_t *deve)
+	struct se_dev_entry *deve)
 {
-	se_ua_t *ua, *ua_p;
+	struct se_ua *ua, *ua_p;
 
 	spin_lock(&deve->ua_lock);
 	list_for_each_entry_safe(ua, ua_p, &deve->ua_list, ua_nacl_list) {
@@ -208,15 +208,15 @@ void core_scsi3_ua_release_all(
 }
 
 void core_scsi3_ua_for_check_condition(
-	se_cmd_t *cmd,
+	struct se_cmd *cmd,
 	u8 *asc,
 	u8 *ascq)
 {
-	se_device_t *dev = SE_DEV(cmd);
-	se_dev_entry_t *deve;
-	se_session_t *sess = cmd->se_sess;
-	se_node_acl_t *nacl;
-	se_ua_t *ua = NULL, *ua_p;
+	struct se_device *dev = SE_DEV(cmd);
+	struct se_dev_entry *deve;
+	struct se_session *sess = cmd->se_sess;
+	struct se_node_acl *nacl;
+	struct se_ua *ua = NULL, *ua_p;
 	int head = 1;
 
 	if (!(sess))
@@ -234,7 +234,7 @@ void core_scsi3_ua_for_check_condition(
 	}
 	/*
 	 * The highest priority Unit Attentions are placed at the head of the
-	 * se_dev_entry_t->ua_list, and will be returned in CHECK_CONDITION +
+	 * struct se_dev_entry->ua_list, and will be returned in CHECK_CONDITION +
 	 * sense data for the received CDB.
 	 */
 	spin_lock(&deve->ua_lock);
@@ -278,14 +278,14 @@ void core_scsi3_ua_for_check_condition(
 }
 
 int core_scsi3_ua_clear_for_request_sense(
-	se_cmd_t *cmd,
+	struct se_cmd *cmd,
 	u8 *asc,
 	u8 *ascq)
 {
-	se_dev_entry_t *deve;
-	se_session_t *sess = cmd->se_sess;
-	se_node_acl_t *nacl;
-	se_ua_t *ua = NULL, *ua_p;
+	struct se_dev_entry *deve;
+	struct se_session *sess = cmd->se_sess;
+	struct se_node_acl *nacl;
+	struct se_ua *ua = NULL, *ua_p;
 	int head = 1;
 
 	if (!(sess))
@@ -303,13 +303,13 @@ int core_scsi3_ua_clear_for_request_sense(
 	}
 	/*
 	 * The highest priority Unit Attentions are placed at the head of the
-	 * se_dev_entry_t->ua_list.  The First (and hence highest priority)
+	 * struct se_dev_entry->ua_list.  The First (and hence highest priority)
 	 * ASC/ASCQ will be returned in REQUEST_SENSE payload data for the
-	 * matching se_lun_t.
+	 * matching struct se_lun.
 	 *
 	 * Once the returning ASC/ASCQ values are set, we go ahead and
 	 * release all of the Unit Attention conditions for the assoicated
-	 * se_lun_t.
+	 * struct se_lun.
 	 */
 	spin_lock(&deve->ua_lock);
 	list_for_each_entry_safe(ua, ua_p, &deve->ua_list, ua_nacl_list) {

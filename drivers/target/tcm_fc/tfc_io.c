@@ -64,10 +64,10 @@
  * Deliver read data back to initiator.
  * XXX TBD handle resource problems later.
  */
-int ft_queue_data_in(struct se_cmd_s *se_cmd)
+int ft_queue_data_in(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
-	struct se_transport_task_s *task;
+	struct se_transport_task *task;
 	struct fc_frame *fp = NULL;
 	struct fc_exch *ep;
 	struct fc_lport *lport;
@@ -190,8 +190,8 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
  */
 void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 {
-	struct se_cmd_s *se_cmd = cmd->se_cmd;
-	struct se_transport_task_s *task;
+	struct se_cmd *se_cmd = cmd->se_cmd;
+	struct se_transport_task *task;
 	struct fc_frame_header *fh;
 	struct se_mem_s *mem;
 	u32 mem_off;

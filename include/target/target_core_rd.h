@@ -48,59 +48,59 @@
 #define RD_DATA_WRITE		2
 #define RD_DATA_NONE		3
 
-extern se_global_t *se_global;
+extern struct se_global *se_global;
 
 extern struct kmem_cache *se_mem_cache;
 
 #ifndef RD_INCLUDE_STRUCTS
-extern int rd_CDB_inquiry(se_task_t *, u32);
-extern int rd_CDB_none(se_task_t *, u32);
-extern int rd_CDB_read_non_SG(se_task_t *, u32);
-extern int rd_CDB_read_SG(se_task_t *, u32);
-extern int rd_CDB_write_non_SG(se_task_t *, u32);
-extern int rd_CDB_write_SG(se_task_t *, u32);
+extern int rd_CDB_inquiry(struct se_task *, u32);
+extern int rd_CDB_none(struct se_task *, u32);
+extern int rd_CDB_read_non_SG(struct se_task *, u32);
+extern int rd_CDB_read_SG(struct se_task *, u32);
+extern int rd_CDB_write_non_SG(struct se_task *, u32);
+extern int rd_CDB_write_SG(struct se_task *, u32);
 
-extern int rd_attach_hba(se_hba_t *, u32);
-extern int rd_detach_hba(se_hba_t *);
-extern void *rd_DIRECT_allocate_virtdevice(se_hba_t *, const char *);
-extern void *rd_MEMCPY_allocate_virtdevice(se_hba_t *, const char *);
-extern se_device_t *rd_DIRECT_create_virtdevice(se_hba_t *,
-				se_subsystem_dev_t *, void *);
-extern se_device_t *rd_MEMCPY_create_virtdevice(se_hba_t *,
-				se_subsystem_dev_t *, void *);
-extern int rd_activate_device(se_device_t *);
-extern void rd_deactivate_device(se_device_t *);
+extern int rd_attach_hba(struct se_hba *, u32);
+extern int rd_detach_hba(struct se_hba *);
+extern void *rd_DIRECT_allocate_virtdevice(struct se_hba *, const char *);
+extern void *rd_MEMCPY_allocate_virtdevice(struct se_hba *, const char *);
+extern struct se_device *rd_DIRECT_create_virtdevice(struct se_hba *,
+				struct se_subsystem_dev *, void *);
+extern struct se_device *rd_MEMCPY_create_virtdevice(struct se_hba *,
+				struct se_subsystem_dev *, void *);
+extern int rd_activate_device(struct se_device *);
+extern void rd_deactivate_device(struct se_device *);
 extern void rd_free_device(void *);
-extern int rd_transport_complete(se_task_t *);
-extern void *rd_allocate_request(se_task_t *, se_device_t *);
-extern int rd_DIRECT_do_task(se_task_t *);
-extern int rd_MEMCPY_do_task(se_task_t *);
-extern int rd_DIRECT_allocate_DMA(se_cmd_t *, u32, u32);
-extern int rd_DIRECT_do_se_mem_map(struct se_task_s *, struct list_head *,
+extern int rd_transport_complete(struct se_task *);
+extern void *rd_allocate_request(struct se_task *, struct se_device *);
+extern int rd_DIRECT_do_task(struct se_task *);
+extern int rd_MEMCPY_do_task(struct se_task *);
+extern int rd_DIRECT_allocate_DMA(struct se_cmd *, u32, u32);
+extern int rd_DIRECT_do_se_mem_map(struct se_task *, struct list_head *,
 				void *, struct se_mem_s *, struct se_mem_s **,
 				u32 *, u32 *);
-extern void rd_DIRECT_free_DMA(se_cmd_t *);
-extern void rd_free_task(se_task_t *);
-extern ssize_t rd_set_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
+extern void rd_DIRECT_free_DMA(struct se_cmd *);
+extern void rd_free_task(struct se_task *);
+extern ssize_t rd_set_configfs_dev_params(struct se_hba *, struct se_subsystem_dev *,
 						const char *, ssize_t);
-extern ssize_t rd_check_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *);
-extern ssize_t rd_show_configfs_dev_params(se_hba_t *, se_subsystem_dev_t *,
+extern ssize_t rd_check_configfs_dev_params(struct se_hba *, struct se_subsystem_dev *);
+extern ssize_t rd_show_configfs_dev_params(struct se_hba *, struct se_subsystem_dev *,
 						char *);
 extern void rd_dr_get_plugin_info(void *, char *, int *);
 extern void rd_mcp_get_plugin_info(void *, char *, int *);
-extern void rd_get_hba_info(se_hba_t *, char *, int *);
-extern void rd_get_dev_info(se_device_t *, char *, int *);
-extern int rd_DIRECT_check_lba(unsigned long long, se_device_t *);
-extern int rd_MEMCPY_check_lba(unsigned long long, se_device_t *);
-extern int rd_check_for_SG(se_task_t *);
-extern unsigned char *rd_get_cdb(se_task_t *);
-extern u32 rd_get_blocksize(se_device_t *);
-extern u32 rd_get_device_rev(se_device_t *);
-extern u32 rd_get_device_type(se_device_t *);
-extern u32 rd_get_dma_length(u32, se_device_t *);
-extern u32 rd_get_max_sectors(se_device_t *);
-extern u32 rd_get_queue_depth(se_device_t *);
-extern u32 rd_get_max_queue_depth(se_device_t *);
+extern void rd_get_hba_info(struct se_hba *, char *, int *);
+extern void rd_get_dev_info(struct se_device *, char *, int *);
+extern int rd_DIRECT_check_lba(unsigned long long, struct se_device *);
+extern int rd_MEMCPY_check_lba(unsigned long long, struct se_device *);
+extern int rd_check_for_SG(struct se_task *);
+extern unsigned char *rd_get_cdb(struct se_task *);
+extern u32 rd_get_blocksize(struct se_device *);
+extern u32 rd_get_device_rev(struct se_device *);
+extern u32 rd_get_device_type(struct se_device *);
+extern u32 rd_get_dma_length(u32, struct se_device *);
+extern u32 rd_get_max_sectors(struct se_device *);
+extern u32 rd_get_queue_depth(struct se_device *);
+extern u32 rd_get_max_queue_depth(struct se_device *);
 #endif /* ! RD_INCLUDE_STRUCTS */
 
 #define RRF_EMULATE_CDB		0x01

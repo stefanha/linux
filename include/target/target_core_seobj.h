@@ -27,17 +27,17 @@
 #ifndef TARGET_CORE_SEOBJ_H
 #define TARGET_CORE_SEOBJ_H
 
-typedef int (*map_func_t)(struct se_task_s *, u32);
+typedef int (*map_func_t)(struct se_task *, u32);
 
-extern int dev_obj_export(void *, se_portal_group_t *, se_lun_t *);
-extern void dev_obj_unexport(void *, se_portal_group_t *, se_lun_t *);
+extern int dev_obj_export(void *, struct se_portal_group *, struct se_lun *);
+extern void dev_obj_unexport(void *, struct se_portal_group *, struct se_lun *);
 extern int dev_obj_max_sectors(void *);
 extern unsigned long long dev_obj_end_lba(void *);
-extern int dev_obj_do_se_mem_map(void *, se_task_t *, struct list_head *,
+extern int dev_obj_do_se_mem_map(void *, struct se_task *, struct list_head *,
 			void *, struct se_mem_s *, struct se_mem_s **,
 			u32 *, u32 *);
-extern int dev_obj_get_mem_buf(void *, se_cmd_t *);
-extern int dev_obj_get_mem_SG(void *, se_cmd_t *);
+extern int dev_obj_get_mem_buf(void *, struct se_cmd *);
+extern int dev_obj_get_mem_SG(void *, struct se_cmd *);
 extern map_func_t dev_obj_get_map_SG(void *, int);
 extern map_func_t dev_obj_get_map_non_SG(void *, int);
 extern map_func_t dev_obj_get_map_none(void *);

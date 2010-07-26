@@ -161,7 +161,7 @@ void stgt_plugin_free(void)
 /*	stgt_attach_hba():
  *
  */
-int stgt_attach_hba(se_hba_t *hba, u32 host_id)
+int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	stgt_hba_t *stgt_hba;
 	int err;
@@ -192,7 +192,7 @@ int stgt_attach_hba(se_hba_t *hba, u32 host_id)
 
 static int stgt_lld_probe(struct device *dev)
 {
-	se_hba_t *hba;
+	struct se_hba *hba;
 	stgt_hba_t *stgt_hba;
 	struct Scsi_Host *sh;
 	int hba_depth, max_sectors, err;
@@ -265,7 +265,7 @@ static int stgt_lld_remove(struct device *dev)
  *
  *
  */
-int stgt_detach_hba(se_hba_t *hba)
+int stgt_detach_hba(struct se_hba *hba)
 {
 	struct Scsi_Host *scsi_host = (struct Scsi_Host *) hba->hba_ptr;
 	stgt_hba_t *stgt_hba = *(stgt_hba_t **)shost_priv(scsi_host);
@@ -281,7 +281,7 @@ int stgt_detach_hba(se_hba_t *hba)
 	return 0;
 }
 
-void *stgt_allocate_virtdevice(se_hba_t *hba, const char *name)
+void *stgt_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	stgt_dev_virt_t *sdv;
 
@@ -297,9 +297,9 @@ void *stgt_allocate_virtdevice(se_hba_t *hba, const char *name)
 }
 
 #warning FIXME: implement stgt_create_virtdevice()
-se_device_t *stgt_create_virtdevice(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+struct se_device *stgt_create_virtdevice(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	void *p)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *)p;
@@ -321,7 +321,7 @@ se_device_t *stgt_create_virtdevice(
  *
  *
  */
-int stgt_activate_device(se_device_t *dev)
+int stgt_activate_device(struct se_device *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -339,7 +339,7 @@ int stgt_activate_device(se_device_t *dev)
  *
  *
  */
-void stgt_deactivate_device(se_device_t *dev)
+void stgt_deactivate_device(struct se_device *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -377,7 +377,7 @@ void stgt_free_device(void *p)
  *
  *
  */
-int stgt_transport_complete(se_task_t *task)
+int stgt_transport_complete(struct se_task *task)
 {
 	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
 	int result;
@@ -394,8 +394,8 @@ int stgt_transport_complete(se_task_t *task)
  *
  */
 void *stgt_allocate_request(
-	se_task_t *task,
-	se_device_t *dev)
+	struct se_task *task,
+	struct se_device *dev)
 {
 	stgt_plugin_task_t *st;
 
@@ -412,7 +412,7 @@ void *stgt_allocate_request(
  *
  *
  */
-int stgt_do_task(se_task_t *task)
+int stgt_do_task(struct se_task *task)
 {
 	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
 	struct Scsi_Host *sh = task->se_dev->se_hba->hba_ptr;
@@ -449,15 +449,15 @@ int stgt_do_task(se_task_t *task)
  *
  *
  */
-void stgt_free_task(se_task_t *task)
+void stgt_free_task(struct se_task *task)
 {
 	stgt_plugin_task_t *st = (stgt_plugin_task_t *)task->transport_req;
 
 	kfree(st);
 }
 
-ssize_t stgt_set_configfs_dev_params(se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	const char *page,
 	ssize_t count)
 {
@@ -540,8 +540,8 @@ out:
 }
 
 ssize_t stgt_check_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev)
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) se_dev->se_dev_su_ptr;
 
@@ -557,8 +557,8 @@ ssize_t stgt_check_configfs_dev_params(
 }
 
 ssize_t stgt_show_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	char *page)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) se_dev->se_dev_su_ptr;
@@ -574,7 +574,7 @@ void stgt_get_plugin_info(void *p, char *b, int *bl)
 		STGT_VERSION);
 }
 
-void stgt_get_hba_info(se_hba_t *hba, char *b, int *bl)
+void stgt_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
 	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
 
@@ -584,7 +584,7 @@ void stgt_get_hba_info(se_hba_t *hba, char *b, int *bl)
 		(sh->hostt->name) ? (sh->hostt->name) : "Unknown");
 }
 
-void stgt_get_dev_info(se_device_t *dev, char *b, int *bl)
+void stgt_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 
@@ -647,7 +647,7 @@ void __stgt_get_dev_info(stgt_dev_virt_t *sdv, char *b, int *bl)
  *
  *
  */
-int stgt_map_task_SG(se_task_t *task)
+int stgt_map_task_SG(struct se_task *task)
 {
 	return 0;
 }
@@ -656,7 +656,7 @@ int stgt_map_task_SG(se_task_t *task)
  *
  *
  */
-int stgt_map_task_non_SG(se_task_t *task)
+int stgt_map_task_non_SG(struct se_task *task)
 {
 	return 0;
 }
@@ -665,7 +665,7 @@ int stgt_map_task_non_SG(se_task_t *task)
  *
  *
  */
-int stgt_CDB_inquiry(se_task_t *task, u32 size)
+int stgt_CDB_inquiry(struct se_task *task, u32 size)
 {
 	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
 
@@ -673,7 +673,7 @@ int stgt_CDB_inquiry(se_task_t *task, u32 size)
 	return stgt_map_task_non_SG(task);
 }
 
-int stgt_CDB_none(se_task_t *task, u32 size)
+int stgt_CDB_none(struct se_task *task, u32 size)
 {
 	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
 
@@ -685,7 +685,7 @@ int stgt_CDB_none(se_task_t *task, u32 size)
  *
  *
  */
-int stgt_CDB_read_non_SG(se_task_t *task, u32 size)
+int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
 {
 	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
 
@@ -697,7 +697,7 @@ int stgt_CDB_read_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int stgt_CDB_read_SG(se_task_t *task, u32 size)
+int stgt_CDB_read_SG(struct se_task *task, u32 size)
 {
 	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
 
@@ -713,7 +713,7 @@ int stgt_CDB_read_SG(se_task_t *task, u32 size)
  *
  *
  */
-int stgt_CDB_write_non_SG(se_task_t *task, u32 size)
+int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
 {
 	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
 
@@ -725,7 +725,7 @@ int stgt_CDB_write_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int stgt_CDB_write_SG(se_task_t *task, u32 size)
+int stgt_CDB_write_SG(struct se_task *task, u32 size)
 {
 	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
 
@@ -741,7 +741,7 @@ int stgt_CDB_write_SG(se_task_t *task, u32 size)
  *
  *
  */
-int stgt_check_lba(unsigned long long lba, se_device_t *dev)
+int stgt_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
 }
@@ -750,7 +750,7 @@ int stgt_check_lba(unsigned long long lba, se_device_t *dev)
  *
  *
  */
-int stgt_check_for_SG(se_task_t *task)
+int stgt_check_for_SG(struct se_task *task)
 {
 	return task->task_sg_num;
 }
@@ -759,7 +759,7 @@ int stgt_check_for_SG(se_task_t *task)
  *
  *
  */
-unsigned char *stgt_get_cdb(se_task_t *task)
+unsigned char *stgt_get_cdb(struct se_task *task)
 {
 	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
 
@@ -770,7 +770,7 @@ unsigned char *stgt_get_cdb(se_task_t *task)
  *
  *
  */
-unsigned char *stgt_get_sense_buffer(se_task_t *task)
+unsigned char *stgt_get_sense_buffer(struct se_task *task)
 {
 	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
 
@@ -781,7 +781,7 @@ unsigned char *stgt_get_sense_buffer(se_task_t *task)
  *
  *
  */
-u32 stgt_get_blocksize(se_device_t *dev)
+u32 stgt_get_blocksize(struct se_device *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -793,7 +793,7 @@ u32 stgt_get_blocksize(se_device_t *dev)
  *
  *
  */
-u32 stgt_get_device_rev(se_device_t *dev)
+u32 stgt_get_device_rev(struct se_device *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -805,7 +805,7 @@ u32 stgt_get_device_rev(se_device_t *dev)
  *
  *
  */
-u32 stgt_get_device_type(se_device_t *dev)
+u32 stgt_get_device_type(struct se_device *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -817,7 +817,7 @@ u32 stgt_get_device_type(se_device_t *dev)
  *
  *
  */
-u32 stgt_get_dma_length(u32 task_size, se_device_t *dev)
+u32 stgt_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
 }
@@ -826,7 +826,7 @@ u32 stgt_get_dma_length(u32 task_size, se_device_t *dev)
  *
  *
  */
-u32 stgt_get_max_sectors(se_device_t *dev)
+u32 stgt_get_max_sectors(struct se_device *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -838,7 +838,7 @@ u32 stgt_get_max_sectors(se_device_t *dev)
  *
  *
  */
-u32 stgt_get_queue_depth(se_device_t *dev)
+u32 stgt_get_queue_depth(struct se_device *dev)
 {
 	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -851,7 +851,7 @@ u32 stgt_get_queue_depth(se_device_t *dev)
  *
  */
 static inline void stgt_process_SAM_status(
-	se_task_t *task,
+	struct se_task *task,
 	stgt_plugin_task_t *st)
 {
 	task->task_scsi_status = status_byte(st->stgt_result);
@@ -889,11 +889,11 @@ static inline void stgt_process_SAM_status(
 int stgt_transfer_response(struct scsi_cmnd *sc,
 			   void (*done)(struct scsi_cmnd *))
 {
-	se_task_t *task = (se_task_t *)sc->SCp.ptr;
+	struct se_task *task = (struct se_task *)sc->SCp.ptr;
 	stgt_plugin_task_t *st;
 
 	if (!task) {
-		printk(KERN_ERR "se_task_t is NULL!\n");
+		printk(KERN_ERR "struct se_task is NULL!\n");
 		BUG();
 	}
 	st = (stgt_plugin_task_t *)task->transport_req;

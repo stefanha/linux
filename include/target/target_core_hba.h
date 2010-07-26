@@ -30,14 +30,14 @@
 #ifndef TARGET_CORE_HBA_H
 #define TARGET_CORE_HBA_H
 
-extern se_global_t *se_global;
+extern struct se_global *se_global;
 
 extern struct kmem_cache *se_hba_cache;
 
-extern int core_get_hba(struct se_hba_s *);
-extern se_hba_t *core_alloc_hba(int);
-extern void core_put_hba(struct se_hba_s *);
-extern int se_core_add_hba(struct se_hba_s *, u32);
-extern int se_core_del_hba(struct se_hba_s *);
+extern int core_get_hba(struct se_hba *);
+extern struct se_hba *core_alloc_hba(int);
+extern void core_put_hba(struct se_hba *);
+extern int se_core_add_hba(struct se_hba *, u32);
+extern int se_core_del_hba(struct se_hba *);
 
 #endif /* TARGET_CORE_HBA_H */

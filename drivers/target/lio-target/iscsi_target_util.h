@@ -3,8 +3,8 @@
 
 #define MARKER_SIZE	8
 
-struct se_cmd_s;
-struct se_unmap_sg_s;
+struct se_cmd;
+struct se_unmap_sg;
 
 extern void iscsi_attach_cmd_to_queue(iscsi_conn_t *, iscsi_cmd_t *);
 extern void iscsi_remove_cmd_from_conn_list(iscsi_cmd_t *, iscsi_conn_t *);
@@ -37,10 +37,10 @@ extern iscsi_queue_req_t *iscsi_get_cmd_from_response_queue(iscsi_conn_t *);
 extern void iscsi_remove_cmd_from_tx_queues(iscsi_cmd_t *, iscsi_conn_t *);
 extern void iscsi_free_queue_reqs_for_conn(iscsi_conn_t *);
 extern void iscsi_release_cmd_direct(iscsi_cmd_t *);
-extern void lio_release_cmd_direct(struct se_cmd_s *);
+extern void lio_release_cmd_direct(struct se_cmd *);
 extern void __iscsi_release_cmd_to_pool(iscsi_cmd_t *, iscsi_session_t *);
 extern void iscsi_release_cmd_to_pool(iscsi_cmd_t *);
-extern void lio_release_cmd_to_pool(struct se_cmd_s *);
+extern void lio_release_cmd_to_pool(struct se_cmd *);
 extern __u64 iscsi_pack_lun(unsigned int);
 extern __u32 iscsi_unpack_lun(unsigned char *);
 extern int iscsi_check_session_usage_count(iscsi_session_t *);
@@ -68,7 +68,7 @@ extern void __iscsi_start_nopin_timer(iscsi_conn_t *);
 extern void iscsi_start_nopin_timer(iscsi_conn_t *);
 extern void iscsi_stop_nopin_timer(iscsi_conn_t *);
 extern int iscsi_send_tx_data(iscsi_cmd_t *, iscsi_conn_t *, int);
-extern int iscsi_fe_sendpage_sg(struct se_unmap_sg_s *, iscsi_conn_t *);
+extern int iscsi_fe_sendpage_sg(struct se_unmap_sg *, iscsi_conn_t *);
 extern int iscsi_tx_login_rsp(iscsi_conn_t *, __u8, __u8);
 extern void iscsi_print_session_params(iscsi_session_t *);
 extern int iscsi_print_dev_to_proc(char *, char **, off_t, int);

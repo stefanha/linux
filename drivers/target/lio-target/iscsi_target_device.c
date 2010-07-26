@@ -112,7 +112,7 @@ int iscsi_get_lun_for_cmd(
  */
 void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
 {
-	se_node_acl_t *se_nacl;
+	struct se_node_acl *se_nacl;
 
 	/*
 	 * This is a discovery session, the single queue slot was already
@@ -127,7 +127,7 @@ void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
 
 	/*
 	 * This is a normal session, set the Session's CmdSN window to the
-	 * se_node_acl_t->queue_depth.  The value in se_node_acl_t->queue_depth
+	 * struct se_node_acl->queue_depth.  The value in struct se_node_acl->queue_depth
 	 * has already been validated as a legal value in
 	 * core_set_queue_depth_for_node().
 	 */

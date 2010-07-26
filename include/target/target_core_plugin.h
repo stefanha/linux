@@ -37,7 +37,7 @@
 #define PLUGIN_FREE		0
 #define PLUGIN_REGISTERED	1
 
-extern se_global_t *se_global;
+extern struct se_global *se_global;
 
 extern void plugin_load_all_classes(void);
 extern struct se_plugin_class_s *plugin_get_class(u32);

@@ -818,7 +818,7 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 {
 	iscsi_session_t *sess = (iscsi_session_t *) data;
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
+	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 
 	spin_lock_bh(&se_tpg->session_lock);
 	if (sess->time2retain_timer_flags & T2R_TF_STOP) {
@@ -893,12 +893,12 @@ extern void iscsi_start_time2retain_handler (iscsi_session_t *sess)
 
 /*	iscsi_stop_time2retain_timer():
  *
- *	Called with spin_lock_bh(&se_portal_group_t->session_lock) held
+ *	Called with spin_lock_bh(&struct se_portal_group->session_lock) held
  */
 extern int iscsi_stop_time2retain_timer(iscsi_session_t *sess)
 {
 	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
+	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 
 	if (sess->time2retain_timer_flags & T2R_TF_EXPIRED)
 		return -1;

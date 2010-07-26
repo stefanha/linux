@@ -50,19 +50,19 @@
 
 #undef TARGET_CORE_HBA_C
 
-int core_get_hba(se_hba_t *hba)
+int core_get_hba(struct se_hba *hba)
 {
 	return ((mutex_lock_interruptible(&hba->hba_access_mutex) != 0) ?
 		-1 : 0);
 }
 
-se_hba_t *core_alloc_hba(int hba_type)
+struct se_hba *core_alloc_hba(int hba_type)
 {
-	se_hba_t *hba;
+	struct se_hba *hba;
 
 	hba = kmem_cache_zalloc(se_hba_cache, GFP_KERNEL);
 	if (!(hba)) {
-		printk(KERN_ERR "Unable to allocate se_hba_t\n");
+		printk(KERN_ERR "Unable to allocate struct se_hba\n");
 		return NULL;
 	}
 
@@ -80,7 +80,7 @@ se_hba_t *core_alloc_hba(int hba_type)
 }
 EXPORT_SYMBOL(core_alloc_hba);
 
-void core_put_hba(se_hba_t *hba)
+void core_put_hba(struct se_hba *hba)
 {
 	mutex_unlock(&hba->hba_access_mutex);
 }
@@ -91,7 +91,7 @@ EXPORT_SYMBOL(core_put_hba);
  *
  */
 int se_core_add_hba(
-	se_hba_t *hba,
+	struct se_hba *hba,
 	u32 plugin_dep_id)
 {
 	se_subsystem_api_t *t;
@@ -128,7 +128,7 @@ int se_core_add_hba(
 EXPORT_SYMBOL(se_core_add_hba);
 
 static int se_core_shutdown_hba(
-	se_hba_t *hba)
+	struct se_hba *hba)
 {
 	int ret = 0;
 	se_subsystem_api_t *t;
@@ -149,9 +149,9 @@ static int se_core_shutdown_hba(
  *
  */
 int se_core_del_hba(
-	se_hba_t *hba)
+	struct se_hba *hba)
 {
-	se_device_t *dev, *dev_tmp;
+	struct se_device *dev, *dev_tmp;
 
 	if (!(hba->hba_status & HBA_STATUS_ACTIVE)) {
 		printk(KERN_ERR "HBA ID: %d Status: INACTIVE, ignoring"

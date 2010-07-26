@@ -88,7 +88,7 @@ u32 iscsi_handle_authentication(
 	iscsi_session_t *sess = SESS(conn);
 	iscsi_node_auth_t *auth;
 	iscsi_node_acl_t *iscsi_nacl;
-	se_node_acl_t *se_nacl;
+	struct se_node_acl *se_nacl;
 
 	if (!(SESS_OPS(sess)->SessionType)) {
 		/*
@@ -96,7 +96,7 @@ u32 iscsi_handle_authentication(
 		 */
 		se_nacl = SESS(conn)->se_sess->se_node_acl;
 		if (!(se_nacl)) {
-			printk(KERN_ERR "Unable to locate se_node_acl_t for"
+			printk(KERN_ERR "Unable to locate struct se_node_acl for"
 					" CHAP auth\n");
 			return -1;
 		}

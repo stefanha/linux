@@ -35,9 +35,9 @@
 
 extern struct kmem_cache *se_tmr_req_cache;
 
-extern struct se_tmr_req_s *core_tmr_alloc_req(struct se_cmd_s *, void *, u8);
-extern void core_tmr_release_req(struct se_tmr_req_s *);
-extern int core_tmr_lun_reset(struct se_device_s *, struct se_tmr_req_s *,
-				struct list_head *, struct se_cmd_s *);
+extern struct se_tmr_req *core_tmr_alloc_req(struct se_cmd *, void *, u8);
+extern void core_tmr_release_req(struct se_tmr_req *);
+extern int core_tmr_lun_reset(struct se_device *, struct se_tmr_req *,
+				struct list_head *, struct se_cmd *);
 
 #endif /* TARGET_CORE_TMR_H */

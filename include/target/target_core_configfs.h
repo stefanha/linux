@@ -32,9 +32,9 @@
 #define TARGET_CORE_NAME_MAX_LEN	64
 #define TARGET_FABRIC_NAME_SIZE		32
 
-extern se_global_t *se_global;
+extern struct se_global *se_global;
 
-extern struct se_hba_s *target_core_get_hba_from_item(struct config_item *);
+extern struct se_hba *target_core_get_hba_from_item(struct config_item *);
 extern struct target_fabric_configfs *target_fabric_configfs_init(
 				struct module *, const char *);
 extern void target_fabric_configfs_free(struct target_fabric_configfs *);

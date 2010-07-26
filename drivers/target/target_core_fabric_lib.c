@@ -48,7 +48,7 @@
 /*
  * Handlers for Serial Attached SCSI (SAS)
  */
-u8 sas_get_fabric_proto_ident(se_portal_group_t *se_tpg)
+u8 sas_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 {
 	/*
 	 * Return a SAS Serial SCSI Protocol identifier for loopback operations
@@ -59,9 +59,9 @@ u8 sas_get_fabric_proto_ident(se_portal_group_t *se_tpg)
 EXPORT_SYMBOL(sas_get_fabric_proto_ident);
 
 u32 sas_get_pr_transport_id(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code,
 	unsigned char *buf)
 {
@@ -90,9 +90,9 @@ u32 sas_get_pr_transport_id(
 EXPORT_SYMBOL(sas_get_pr_transport_id);
 
 u32 sas_get_pr_transport_id_len(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code)
 {
 	*format_code = 0;
@@ -111,7 +111,7 @@ EXPORT_SYMBOL(sas_get_pr_transport_id_len);
  * Persistent Reservation SPEC_I_PT=1 and PROUT REGISTER_AND_MOVE operations.
  */
 char *sas_parse_pr_out_transport_id(
-	se_portal_group_t *se_tpg,
+	struct se_portal_group *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
 	char **port_nexus_ptr)
@@ -134,16 +134,16 @@ EXPORT_SYMBOL(sas_parse_pr_out_transport_id);
 /*
  * Handlers for Fibre Channel Protocol (FCP)
  */
-u8 fc_get_fabric_proto_ident(se_portal_group_t *se_tpg)
+u8 fc_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 {
 	return 0x0;	/* 0 = fcp-2 per SPC4 section 7.5.1 */
 }
 EXPORT_SYMBOL(fc_get_fabric_proto_ident);
 
 u32 fc_get_pr_transport_id_len(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code)
 {
         *format_code = 0;
@@ -155,9 +155,9 @@ u32 fc_get_pr_transport_id_len(
 EXPORT_SYMBOL(fc_get_pr_transport_id_len);
 
 u32 fc_get_pr_transport_id(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code,
 	unsigned char *buf)
 {
@@ -192,7 +192,7 @@ u32 fc_get_pr_transport_id(
 EXPORT_SYMBOL(fc_get_pr_transport_id);
 
 char *fc_parse_pr_out_transport_id(
-	se_portal_group_t *se_tpg,
+	struct se_portal_group *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
 	char **port_nexus_ptr)
@@ -213,7 +213,7 @@ EXPORT_SYMBOL(fc_parse_pr_out_transport_id);
  * Handlers for Internet Small Computer Systems Interface (iSCSI)
  */
 
-u8 iscsi_get_fabric_proto_ident(se_portal_group_t *se_tpg)
+u8 iscsi_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 {
 	/*
 	 * This value is defined for "Internet SCSI (iSCSI)"
@@ -224,9 +224,9 @@ u8 iscsi_get_fabric_proto_ident(se_portal_group_t *se_tpg)
 EXPORT_SYMBOL(iscsi_get_fabric_proto_ident);
 
 u32 iscsi_get_pr_transport_id(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code,
 	unsigned char *buf)
 {
@@ -321,9 +321,9 @@ u32 iscsi_get_pr_transport_id(
 EXPORT_SYMBOL(iscsi_get_pr_transport_id);
 
 u32 iscsi_get_pr_transport_id_len(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code)
 {
 	u32 len = 0, padding = 0;
@@ -367,7 +367,7 @@ u32 iscsi_get_pr_transport_id_len(
 EXPORT_SYMBOL(iscsi_get_pr_transport_id_len);
 
 char *iscsi_parse_pr_out_transport_id(
-	se_portal_group_t *se_tpg,
+	struct se_portal_group *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
 	char **port_nexus_ptr)

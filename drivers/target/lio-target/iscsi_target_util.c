@@ -334,7 +334,7 @@ iscsi_cmd_t *iscsi_allocate_se_cmd_for_tmr(
 	u8 function)
 {
 	iscsi_cmd_t *cmd;
-	se_cmd_t *se_cmd = NULL;
+	struct se_cmd *se_cmd = NULL;
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
@@ -611,7 +611,7 @@ ooo_cmdsn:
 int iscsi_check_unsolicited_dataout(iscsi_cmd_t *cmd, unsigned char *buf)
 {
 	iscsi_conn_t *conn = CONN(cmd);
-	se_cmd_t *se_cmd = SE_CMD(cmd);
+	struct se_cmd *se_cmd = SE_CMD(cmd);
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -1034,7 +1034,7 @@ void iscsi_release_cmd_direct(iscsi_cmd_t *cmd)
 	kmem_cache_free(lio_cmd_cache, cmd);
 }
 
-void lio_release_cmd_direct(se_cmd_t *se_cmd)
+void lio_release_cmd_direct(struct se_cmd *se_cmd)
 {
 	iscsi_release_cmd_direct((iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr);
 }
@@ -1078,7 +1078,7 @@ void iscsi_release_cmd_to_pool(iscsi_cmd_t *cmd)
 	}
 }
 
-void lio_release_cmd_to_pool(se_cmd_t *se_cmd)
+void lio_release_cmd_to_pool(struct se_cmd *se_cmd)
 {
 	iscsi_release_cmd_to_pool((iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr);
 }
@@ -2089,12 +2089,12 @@ send_data:
 }
 
 int iscsi_fe_sendpage_sg(
-	se_unmap_sg_t *u_sg,
+	struct se_unmap_sg *u_sg,
 	iscsi_conn_t *conn)
 {
 	int tx_sent;
 	iscsi_cmd_t *cmd = (iscsi_cmd_t *)u_sg->fabric_cmd;
-	se_cmd_t *se_cmd = SE_CMD(cmd);
+	struct se_cmd *se_cmd = SE_CMD(cmd);
 	u32 len = cmd->tx_size, pg_len, se_len, se_off, tx_size;
 	struct iovec *iov = &se_cmd->iov_data[0];
 	struct page *page;

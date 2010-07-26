@@ -693,7 +693,7 @@ static int tgt_auth_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
 					g_tpg_list);
-	se_node_acl_t *acl;
+	struct se_node_acl *acl;
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
 
 	if (!(tiqn))
@@ -766,7 +766,7 @@ static int sess_attr_seq_show(struct seq_file *seq, void *v)
 	iscsi_session_t *sess;
 	iscsi_sess_ops_t *sops;
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 
 	if (!(tiqn))
 		return 0;
@@ -859,7 +859,7 @@ static int sess_stats_seq_show(struct seq_file *seq, void *v)
 						g_tpg_list);
 	iscsi_session_t *sess;
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 
 	if (!(tiqn))
 		return 0;
@@ -935,7 +935,7 @@ static int sess_conn_err_stats_seq_show(struct seq_file *seq, void *v)
 						g_tpg_list);
 	iscsi_session_t *sess;
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 
 	if (!(tiqn))
 		return 0;
@@ -1008,7 +1008,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
 	iscsi_conn_t *conn;
 	iscsi_conn_ops_t *conn_ops;
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 	char state_str[16];
 	char proto_str[16];
 
@@ -1133,9 +1133,9 @@ int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 {
 	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
 						g_tpg_list);
-	se_dev_entry_t *deve;
-	se_lun_t *lun;
-	se_node_acl_t *se_nacl;
+	struct se_dev_entry *deve;
+	struct se_lun *lun;
+	struct se_node_acl *se_nacl;
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
 	int j;
 
@@ -1216,10 +1216,10 @@ int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 					g_tpg_list);
 	iscsi_session_t *sess;
 	iscsi_sess_ops_t *sops;
-	se_dev_entry_t *deve;
-	se_lun_t *lun;
-	se_node_acl_t *se_nacl;
-	se_session_t *se_sess;
+	struct se_dev_entry *deve;
+	struct se_lun *lun;
+	struct se_node_acl *se_nacl;
+	struct se_session *se_sess;
 	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
 	int j;
 

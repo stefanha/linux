@@ -57,13 +57,13 @@
  *
  */
 static void core_clear_initiator_node_from_tpg(
-	se_node_acl_t *nacl,
-	se_portal_group_t *tpg)
+	struct se_node_acl *nacl,
+	struct se_portal_group *tpg)
 {
 	int i;
-	se_dev_entry_t *deve;
-	se_lun_t *lun;
-	se_lun_acl_t *acl, *acl_tmp;
+	struct se_dev_entry *deve;
+	struct se_lun *lun;
+	struct se_lun_acl *acl, *acl_tmp;
 
 	spin_lock_bh(&nacl->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -94,7 +94,7 @@ static void core_clear_initiator_node_from_tpg(
 		}
 
 		if (!acl) {
-			printk(KERN_ERR "Unable to locate se_lun_acl_t for %s,"
+			printk(KERN_ERR "Unable to locate struct se_lun_acl for %s,"
 				" mapped_lun: %u\n", nacl->initiatorname,
 				deve->mapped_lun);
 			spin_unlock(&lun->lun_acl_lock);
@@ -115,11 +115,11 @@ static void core_clear_initiator_node_from_tpg(
  *
  *	spin_lock_bh(&tpg->acl_node_lock); must be held when calling
  */
-se_node_acl_t *__core_tpg_get_initiator_node_acl(
-	se_portal_group_t *tpg,
+struct se_node_acl *__core_tpg_get_initiator_node_acl(
+	struct se_portal_group *tpg,
 	const char *initiatorname)
 {
-	se_node_acl_t *acl;
+	struct se_node_acl *acl;
 
 	list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
 		if (!(strcmp(acl->initiatorname, initiatorname)))
@@ -133,11 +133,11 @@ se_node_acl_t *__core_tpg_get_initiator_node_acl(
  *
  *
  */
-se_node_acl_t *core_tpg_get_initiator_node_acl(
-	se_portal_group_t *tpg,
+struct se_node_acl *core_tpg_get_initiator_node_acl(
+	struct se_portal_group *tpg,
 	unsigned char *initiatorname)
 {
-	se_node_acl_t *acl;
+	struct se_node_acl *acl;
 
 	spin_lock_bh(&tpg->acl_node_lock);
 	list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
@@ -157,13 +157,13 @@ se_node_acl_t *core_tpg_get_initiator_node_acl(
  *
  */
 void core_tpg_add_node_to_devs(
-	se_node_acl_t *acl,
-	se_portal_group_t *tpg)
+	struct se_node_acl *acl,
+	struct se_portal_group *tpg)
 {
 	int i = 0;
 	u32 lun_access = 0;
-	se_lun_t *lun;
-	struct se_device_s *dev;
+	struct se_lun *lun;
+	struct se_device *dev;
 
 	spin_lock(&tpg->tpg_lun_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -213,8 +213,8 @@ void core_tpg_add_node_to_devs(
  *
  */
 static int core_set_queue_depth_for_node(
-	se_portal_group_t *tpg,
-	se_node_acl_t *acl)
+	struct se_portal_group *tpg,
+	struct se_node_acl *acl)
 {
 	if (!acl->queue_depth) {
 		printk(KERN_ERR "Queue depth for %s Initiator Node: %s is 0,"
@@ -230,16 +230,16 @@ static int core_set_queue_depth_for_node(
  *
  *
  */
-static int core_create_device_list_for_node(se_node_acl_t *nacl)
+static int core_create_device_list_for_node(struct se_node_acl *nacl)
 {
-	se_dev_entry_t *deve;
+	struct se_dev_entry *deve;
 	int i;
 
-	nacl->device_list = kzalloc(sizeof(se_dev_entry_t) *
+	nacl->device_list = kzalloc(sizeof(struct se_dev_entry) *
 				TRANSPORT_MAX_LUNS_PER_TPG, GFP_KERNEL);
 	if (!(nacl->device_list)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-			" se_node_acl_t->device_list\n");
+			" struct se_node_acl->device_list\n");
 		return -1;
 	}
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -259,11 +259,11 @@ static int core_create_device_list_for_node(se_node_acl_t *nacl)
  *
  *
  */
-se_node_acl_t *core_tpg_check_initiator_node_acl(
-	se_portal_group_t *tpg,
+struct se_node_acl *core_tpg_check_initiator_node_acl(
+	struct se_portal_group *tpg,
 	unsigned char *initiatorname)
 {
-	se_node_acl_t *acl;
+	struct se_node_acl *acl;
 
 	acl = core_tpg_get_initiator_node_acl(tpg, initiatorname);
 	if ((acl))
@@ -319,16 +319,16 @@ se_node_acl_t *core_tpg_check_initiator_node_acl(
 }
 EXPORT_SYMBOL(core_tpg_check_initiator_node_acl);
 
-void core_tpg_wait_for_nacl_pr_ref(se_node_acl_t *nacl)
+void core_tpg_wait_for_nacl_pr_ref(struct se_node_acl *nacl)
 {
 	while (atomic_read(&nacl->acl_pr_ref_count) != 0)
 		msleep(100);
 }
 
-void core_tpg_clear_object_luns(se_portal_group_t *tpg)
+void core_tpg_clear_object_luns(struct se_portal_group *tpg)
 {
 	int i, ret;
-	se_lun_t *lun;
+	struct se_lun *lun;
 
 	spin_lock(&tpg->tpg_lun_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -350,13 +350,13 @@ EXPORT_SYMBOL(core_tpg_clear_object_luns);
  *
  *
  */
-struct se_node_acl_s *core_tpg_add_initiator_node_acl(
-	struct se_portal_group_s *tpg,
-	struct se_node_acl_s *se_nacl,
+struct se_node_acl *core_tpg_add_initiator_node_acl(
+	struct se_portal_group *tpg,
+	struct se_node_acl *se_nacl,
 	const char *initiatorname,
 	u32 queue_depth)
 {
-	se_node_acl_t *acl = NULL;
+	struct se_node_acl *acl = NULL;
 
 	spin_lock_bh(&tpg->acl_node_lock);
 	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
@@ -368,7 +368,7 @@ struct se_node_acl_s *core_tpg_add_initiator_node_acl(
 				TPG_TFO(tpg)->tpg_get_tag(tpg), initiatorname);
 			spin_unlock_bh(&tpg->acl_node_lock);
 			/*
-			 * Release the locally allocated struct se_node_acl_s
+			 * Release the locally allocated struct se_node_acl
 			 * because * core_tpg_add_initiator_node_acl() returned
 			 * a pointer to an existing demo mode node ACL.
 			 */
@@ -388,7 +388,7 @@ struct se_node_acl_s *core_tpg_add_initiator_node_acl(
 	spin_unlock_bh(&tpg->acl_node_lock);
 
 	if (!(se_nacl)) {
-		printk("struct se_node_acl_s pointer is NULL\n");
+		printk("struct se_node_acl pointer is NULL\n");
 		return ERR_PTR(-EINVAL);
 	}
 	/*
@@ -444,11 +444,11 @@ EXPORT_SYMBOL(core_tpg_add_initiator_node_acl);
  *
  */
 int core_tpg_del_initiator_node_acl(
-	se_portal_group_t *tpg,
-	se_node_acl_t *acl,
+	struct se_portal_group *tpg,
+	struct se_node_acl *acl,
 	int force)
 {
-	se_session_t *sess, *sess_tmp;
+	struct se_session *sess, *sess_tmp;
 	int dynamic_acl = 0;
 
 	spin_lock_bh(&tpg->acl_node_lock);
@@ -500,13 +500,13 @@ EXPORT_SYMBOL(core_tpg_del_initiator_node_acl);
  *
  */
 int core_tpg_set_initiator_node_queue_depth(
-	se_portal_group_t *tpg,
+	struct se_portal_group *tpg,
 	unsigned char *initiatorname,
 	u32 queue_depth,
 	int force)
 {
-	se_session_t *sess, *init_sess = NULL;
-	se_node_acl_t *acl;
+	struct se_session *sess, *init_sess = NULL;
+	struct se_node_acl *acl;
 	int dynamic_acl = 0;
 
 	spin_lock_bh(&tpg->acl_node_lock);
@@ -557,7 +557,7 @@ int core_tpg_set_initiator_node_queue_depth(
 
 	/*
 	 * User has requested to change the queue depth for a Initiator Node.
-	 * Change the value in the Node's se_node_acl_t, and call
+	 * Change the value in the Node's struct se_node_acl, and call
 	 * core_set_queue_depth_for_node() to add the requested queue depth.
 	 *
 	 * Finally call  TPG_TFO(tpg)->close_session() to force session
@@ -605,11 +605,11 @@ int core_tpg_set_initiator_node_queue_depth(
 }
 EXPORT_SYMBOL(core_tpg_set_initiator_node_queue_depth);
 
-static int core_tpg_setup_virtual_lun0(struct se_portal_group_s *se_tpg)
+static int core_tpg_setup_virtual_lun0(struct se_portal_group *se_tpg)
 {
 	/* Set in core_dev_setup_virtual_lun0() */
-	struct se_device_s *dev = se_global->g_lun0_dev;
-	struct se_lun_s *lun = &se_tpg->tpg_virt_lun0;
+	struct se_device *dev = se_global->g_lun0_dev;
+	struct se_lun *lun = &se_tpg->tpg_virt_lun0;
 	u32 lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
 	int ret;
 
@@ -632,27 +632,27 @@ static int core_tpg_setup_virtual_lun0(struct se_portal_group_s *se_tpg)
 	return 0;
 }
 
-static void core_tpg_release_virtual_lun0(struct se_portal_group_s *se_tpg)
+static void core_tpg_release_virtual_lun0(struct se_portal_group *se_tpg)
 {
-	struct se_lun_s *lun = &se_tpg->tpg_virt_lun0;
+	struct se_lun *lun = &se_tpg->tpg_virt_lun0;
 
 	core_tpg_post_dellun(se_tpg, lun);
 }
 
 int core_tpg_register(
 	struct target_core_fabric_ops *tfo,
-	struct se_wwn_s *se_wwn,
-	struct se_portal_group_s *se_tpg,
+	struct se_wwn *se_wwn,
+	struct se_portal_group *se_tpg,
 	void *tpg_fabric_ptr,
 	int se_tpg_type)
 {
-	se_lun_t *lun;
+	struct se_lun *lun;
 	u32 i;
 
-	se_tpg->tpg_lun_list = kzalloc((sizeof(se_lun_t) *
+	se_tpg->tpg_lun_list = kzalloc((sizeof(struct se_lun) *
 				TRANSPORT_MAX_LUNS_PER_TPG), GFP_KERNEL);
 	if (!(se_tpg->tpg_lun_list)) {
-		printk(KERN_ERR "Unable to allocate se_portal_group_t->"
+		printk(KERN_ERR "Unable to allocate struct se_portal_group->"
 				"tpg_lun_list\n");
 		return -ENOMEM;
 	}
@@ -694,7 +694,7 @@ int core_tpg_register(
 	list_add_tail(&se_tpg->se_tpg_list, &se_global->g_se_tpg_list);
 	spin_unlock_bh(&se_global->se_tpg_lock);
 
-	printk(KERN_INFO "TARGET_CORE[%s]: Allocated %s se_portal_group_t for"
+	printk(KERN_INFO "TARGET_CORE[%s]: Allocated %s struct se_portal_group for"
 		" endpoint: %s, Portal Tag: %u\n", tfo->get_fabric_name(),
 		(se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) ?
 		"Normal" : "Discovery", (tfo->tpg_get_wwn(se_tpg) == NULL) ?
@@ -704,9 +704,9 @@ int core_tpg_register(
 }
 EXPORT_SYMBOL(core_tpg_register);
 
-int core_tpg_deregister(se_portal_group_t *se_tpg)
+int core_tpg_deregister(struct se_portal_group *se_tpg)
 {
-	printk(KERN_INFO "TARGET_CORE[%s]: Deallocating %s se_portal_group_t"
+	printk(KERN_INFO "TARGET_CORE[%s]: Deallocating %s struct se_portal_group"
 		" for endpoint: %s Portal Tag %u\n",
 		(se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) ?
 		"Normal" : "Discovery", TPG_TFO(se_tpg)->get_fabric_name(),
@@ -729,11 +729,11 @@ int core_tpg_deregister(se_portal_group_t *se_tpg)
 }
 EXPORT_SYMBOL(core_tpg_deregister);
 
-se_lun_t *core_tpg_pre_addlun(
-	se_portal_group_t *tpg,
+struct se_lun *core_tpg_pre_addlun(
+	struct se_portal_group *tpg,
 	u32 unpacked_lun)
 {
-	se_lun_t *lun;
+	struct se_lun *lun;
 
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
 		printk(KERN_ERR "%s LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
@@ -761,8 +761,8 @@ se_lun_t *core_tpg_pre_addlun(
 EXPORT_SYMBOL(core_tpg_pre_addlun);
 
 int core_tpg_post_addlun(
-	se_portal_group_t *tpg,
-	se_lun_t *lun,
+	struct se_portal_group *tpg,
+	struct se_lun *lun,
 	int lun_type,
 	u32 lun_access,
 	void *lun_ptr)
@@ -784,20 +784,20 @@ int core_tpg_post_addlun(
 EXPORT_SYMBOL(core_tpg_post_addlun);
 
 void core_tpg_shutdown_lun(
-	struct se_portal_group_s *tpg,
-	struct se_lun_s *lun)
+	struct se_portal_group *tpg,
+	struct se_lun *lun)
 {
 	core_clear_lun_from_tpg(lun, tpg);
 	transport_clear_lun_from_sessions(lun);
 }
 
-se_lun_t *core_tpg_pre_dellun(
-	se_portal_group_t *tpg,
+struct se_lun *core_tpg_pre_dellun(
+	struct se_portal_group *tpg,
 	u32 unpacked_lun,
 	int lun_type,
 	int *ret)
 {
-	se_lun_t *lun;
+	struct se_lun *lun;
 
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
 		printk(KERN_ERR "%s LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
@@ -834,10 +834,10 @@ se_lun_t *core_tpg_pre_dellun(
 EXPORT_SYMBOL(core_tpg_pre_dellun);
 
 int core_tpg_post_dellun(
-	se_portal_group_t *tpg,
-	se_lun_t *lun)
+	struct se_portal_group *tpg,
+	struct se_lun *lun)
 {
-	se_lun_acl_t *acl, *acl_tmp;
+	struct se_lun_acl *acl, *acl_tmp;
 
 	core_tpg_shutdown_lun(tpg, lun);
 

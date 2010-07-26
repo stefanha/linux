@@ -68,7 +68,7 @@
 
 #undef ISCSI_TARGET_TPG_C
 
-char *lio_tpg_get_endpoint_wwn(se_portal_group_t *se_tpg)
+char *lio_tpg_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -76,7 +76,7 @@ char *lio_tpg_get_endpoint_wwn(se_portal_group_t *se_tpg)
 	return &tpg->tpg_tiqn->tiqn[0];
 }
 
-u16 lio_tpg_get_tag(se_portal_group_t *se_tpg)
+u16 lio_tpg_get_tag(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -84,7 +84,7 @@ u16 lio_tpg_get_tag(se_portal_group_t *se_tpg)
 	return tpg->tpgt;
 }
 
-u32 lio_tpg_get_default_depth(se_portal_group_t *se_tpg)
+u32 lio_tpg_get_default_depth(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -92,7 +92,7 @@ u32 lio_tpg_get_default_depth(se_portal_group_t *se_tpg)
 	return ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth;
 }
 
-int lio_tpg_check_demo_mode(se_portal_group_t *se_tpg)
+int lio_tpg_check_demo_mode(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			 (iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -100,7 +100,7 @@ int lio_tpg_check_demo_mode(se_portal_group_t *se_tpg)
 	return ISCSI_TPG_ATTRIB(tpg)->generate_node_acls;
 }
 
-int lio_tpg_check_demo_mode_cache(se_portal_group_t *se_tpg)
+int lio_tpg_check_demo_mode_cache(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -108,7 +108,7 @@ int lio_tpg_check_demo_mode_cache(se_portal_group_t *se_tpg)
 	return ISCSI_TPG_ATTRIB(tpg)->cache_dynamic_acls;
 }
 
-int lio_tpg_check_demo_mode_write_protect(se_portal_group_t *se_tpg)
+int lio_tpg_check_demo_mode_write_protect(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -116,7 +116,7 @@ int lio_tpg_check_demo_mode_write_protect(se_portal_group_t *se_tpg)
 	return ISCSI_TPG_ATTRIB(tpg)->demo_mode_write_protect;
 }
 
-int lio_tpg_check_prod_mode_write_protect(se_portal_group_t *se_tpg)
+int lio_tpg_check_prod_mode_write_protect(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -124,8 +124,8 @@ int lio_tpg_check_prod_mode_write_protect(se_portal_group_t *se_tpg)
 	return ISCSI_TPG_ATTRIB(tpg)->prod_mode_write_protect;
 }
 
-struct se_node_acl_s *lio_tpg_alloc_fabric_acl(
-	se_portal_group_t *se_tpg)
+struct se_node_acl *lio_tpg_alloc_fabric_acl(
+	struct se_portal_group *se_tpg)
 {
 	iscsi_node_acl_t *acl;
 
@@ -139,8 +139,8 @@ struct se_node_acl_s *lio_tpg_alloc_fabric_acl(
 }
 
 void lio_tpg_release_fabric_acl(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_acl)
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_acl)
 {
 	struct iscsi_node_acl_s *acl = container_of(se_acl,
 			struct iscsi_node_acl_s, se_node_acl);
@@ -148,12 +148,12 @@ void lio_tpg_release_fabric_acl(
 }
 
 /*
- * Called with spin_lock_bh(se_portal_group_t->session_lock) held..
+ * Called with spin_lock_bh(struct se_portal_group->session_lock) held..
  *
  * Also, this function calls iscsi_inc_session_usage_count() on the
  * iscsi_session_t in question.
  */
-int lio_tpg_shutdown_session(se_session_t *se_sess)
+int lio_tpg_shutdown_session(struct se_session *se_sess)
 {
 	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 
@@ -177,7 +177,7 @@ int lio_tpg_shutdown_session(se_session_t *se_sess)
  * Calls iscsi_dec_session_usage_count() as inverse of
  * lio_tpg_shutdown_session()
  */
-void lio_tpg_close_session(se_session_t *se_sess)
+void lio_tpg_close_session(struct se_session *se_sess)
 {
 	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 	/*
@@ -189,14 +189,14 @@ void lio_tpg_close_session(se_session_t *se_sess)
 	iscsi_close_session(sess);
 }
 
-void lio_tpg_stop_session(se_session_t *se_sess, int sess_sleep, int conn_sleep)
+void lio_tpg_stop_session(struct se_session *se_sess, int sess_sleep, int conn_sleep)
 {
 	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 
 	iscsi_stop_session(sess, sess_sleep, conn_sleep);
 }
 
-void lio_tpg_fall_back_to_erl0(se_session_t *se_sess)
+void lio_tpg_fall_back_to_erl0(struct se_session *se_sess)
 {
 	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
 
@@ -204,7 +204,7 @@ void lio_tpg_fall_back_to_erl0(se_session_t *se_sess)
 }
 
 #ifdef SNMP_SUPPORT
-u32 lio_tpg_get_inst_index(se_portal_group_t *se_tpg)
+u32 lio_tpg_get_inst_index(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
@@ -213,7 +213,7 @@ u32 lio_tpg_get_inst_index(se_portal_group_t *se_tpg)
 }
 #endif /* SNMP_SUPPORT */
 
-void lio_set_default_node_attributes(se_node_acl_t *se_acl)
+void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 {
 	iscsi_node_acl_t *acl = container_of(se_acl, iscsi_node_acl_t,
 				se_node_acl);
@@ -673,8 +673,8 @@ int iscsi_tpg_disable_portal_group(iscsi_portal_group_t *tpg, int force)
 iscsi_node_attrib_t *iscsi_tpg_get_node_attrib(
 	iscsi_session_t *sess)
 {
-	se_session_t *se_sess = sess->se_sess;
-	se_node_acl_t *se_nacl = se_sess->se_node_acl;
+	struct se_session *se_sess = sess->se_sess;
+	struct se_node_acl *se_nacl = se_sess->se_node_acl;
 	iscsi_node_acl_t *acl = container_of(se_nacl, iscsi_node_acl_t,
 					se_node_acl);
 

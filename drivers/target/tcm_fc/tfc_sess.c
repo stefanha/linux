@@ -311,7 +311,7 @@ static void ft_sess_delete_all(struct ft_tport *tport)
  * Determine whether session is allowed to be shutdown in the current context.
  * Returns non-zero if the session should be shutdown.
  */
-int ft_sess_shutdown(struct se_session_s *se_sess)
+int ft_sess_shutdown(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
@@ -323,7 +323,7 @@ int ft_sess_shutdown(struct se_session_s *se_sess)
  * Remove session and send PRLO.
  * This is called when the ACL is being deleted or queue depth is changing.
  */
-void ft_sess_close(struct se_session_s *se_sess)
+void ft_sess_close(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 	struct fc_lport *lport;
@@ -345,28 +345,28 @@ void ft_sess_close(struct se_session_s *se_sess)
 	synchronize_rcu();		/* let transport deregister happen */
 }
 
-void ft_sess_stop(struct se_session_s *se_sess, int sess_sleep, int conn_sleep)
+void ft_sess_stop(struct se_session *se_sess, int sess_sleep, int conn_sleep)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
 	FT_SESS_DBG("port_id %x\n", sess->port_id);
 }
 
-int ft_sess_logged_in(struct se_session_s *se_sess)
+int ft_sess_logged_in(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
 	return sess->port_id != -1;
 }
 
-u32 ft_sess_get_index(struct se_session_s *se_sess)
+u32 ft_sess_get_index(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
 	return sess->port_id;	/* XXX TBD probably not what is needed */
 }
 
-u32 ft_sess_get_port_name(struct se_session_s *se_sess,
+u32 ft_sess_get_port_name(struct se_session *se_sess,
 			  unsigned char *buf, u32 len)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
@@ -374,7 +374,7 @@ u32 ft_sess_get_port_name(struct se_session_s *se_sess,
 	return ft_format_wwn(buf, len, sess->port_name);
 }
 
-void ft_sess_set_erl0(struct se_session_s *se_sess)
+void ft_sess_set_erl0(struct se_session *se_sess)
 {
 	/* XXX TBD called when out of memory */
 }

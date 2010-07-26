@@ -70,8 +70,8 @@ iscsi_portal_group_t *lio_get_tpg_from_tpg_item(
 	struct config_item *item,
 	iscsi_tiqn_t **tiqn_out)
 {
-	se_portal_group_t *se_tpg = container_of(to_config_group(item),
-					se_portal_group_t, tpg_group);
+	struct se_portal_group *se_tpg = container_of(to_config_group(item),
+					struct se_portal_group, tpg_group);
 	iscsi_portal_group_t *tpg =
 			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
 	int ret;
@@ -92,7 +92,7 @@ iscsi_portal_group_t *lio_get_tpg_from_tpg_item(
 /* Start items for lio_target_portal_cit */
 
 static ssize_t lio_target_np_show_sctp(
-	struct se_tpg_np_s *se_tpg_np,
+	struct se_tpg_np *se_tpg_np,
 	char *page)
 {
 	struct iscsi_tpg_np_s *tpg_np = container_of(se_tpg_np,
@@ -110,7 +110,7 @@ static ssize_t lio_target_np_show_sctp(
 }
 
 static ssize_t lio_target_np_store_sctp(
-	struct se_tpg_np_s *se_tpg_np,
+	struct se_tpg_np *se_tpg_np,
 	const char *page,
 	size_t count)
 {
@@ -184,8 +184,8 @@ static struct configfs_attribute *lio_target_portal_attrs[] = {
 
 #define MAX_PORTAL_LEN		256
 
-struct se_tpg_np_s *lio_target_call_addnptotpg(
-	struct se_portal_group_s *se_tpg,
+struct se_tpg_np *lio_target_call_addnptotpg(
+	struct se_portal_group *se_tpg,
 	struct config_group *group,
 	const char *name)
 {
@@ -280,11 +280,11 @@ struct se_tpg_np_s *lio_target_call_addnptotpg(
 }
 
 static void lio_target_call_delnpfromtpg(
-	struct se_tpg_np_s *se_tpg_np)
+	struct se_tpg_np *se_tpg_np)
 {
 	iscsi_portal_group_t *tpg;
 	iscsi_tpg_np_t *tpg_np;
-	struct se_portal_group_s *se_tpg;
+	struct se_portal_group *se_tpg;
 	int ret = 0;
 
 	tpg_np = container_of(se_tpg_np, struct iscsi_tpg_np_s, se_tpg_np);
@@ -313,7 +313,7 @@ out:
 
 #define DEF_NACL_ATTRIB(name)						\
 static ssize_t iscsi_nacl_attrib_show_##name(				\
-	struct se_node_acl_s *se_nacl,					\
+	struct se_node_acl *se_nacl,					\
 	char *page)							\
 {									\
 	iscsi_node_acl_t *nacl = container_of(se_nacl, iscsi_node_acl_t, \
@@ -325,7 +325,7 @@ static ssize_t iscsi_nacl_attrib_show_##name(				\
 }									\
 									\
 static ssize_t iscsi_nacl_attrib_store_##name(				\
-	struct se_node_acl_s *se_nacl,					\
+	struct se_node_acl *se_nacl,					\
 	const char *page,						\
 	size_t count)							\
 {									\
@@ -458,14 +458,14 @@ static ssize_t __iscsi_##prefix##_show_##name(				\
 #define DEF_NACL_AUTH_STR(name, flags)					\
 	__DEF_NACL_AUTH_STR(nacl_auth, name, flags)			\
 static ssize_t iscsi_nacl_auth_show_##name(				\
-	struct se_node_acl_s *nacl,					\
+	struct se_node_acl *nacl,					\
 	char *page)							\
 {									\
 	return __iscsi_nacl_auth_show_##name(container_of(nacl,		\
 			iscsi_node_acl_t, se_node_acl), page);		\
 }									\
 static ssize_t iscsi_nacl_auth_store_##name(				\
-	struct se_node_acl_s *nacl,					\
+	struct se_node_acl *nacl,					\
 	const char *page,						\
 	size_t count)							\
 {									\
@@ -476,7 +476,7 @@ static ssize_t iscsi_nacl_auth_store_##name(				\
 #define DEF_NACL_AUTH_INT(name)						\
 	__DEF_NACL_AUTH_INT(nacl_auth, name)				\
 static ssize_t iscsi_nacl_auth_show_##name(				\
-	struct se_node_acl_s *nacl,					\
+	struct se_node_acl *nacl,					\
 	char *page)							\
 {									\
 	return __iscsi_nacl_auth_show_##name(container_of(nacl,		\
@@ -527,11 +527,11 @@ static struct configfs_attribute *lio_target_nacl_auth_attrs[] = {
 
 #define DEF_NACL_PARAM(name)						\
 static ssize_t iscsi_nacl_param_show_##name(				\
-	struct se_node_acl_s *se_nacl,					\
+	struct se_node_acl *se_nacl,					\
 	char *page)							\
 {									\
 	iscsi_session_t *sess;						\
-	se_session_t *se_sess;						\
+	struct se_session *se_sess;						\
 	ssize_t rb;							\
 									\
 	spin_lock_bh(&se_nacl->nacl_sess_lock);				\
@@ -604,12 +604,12 @@ static struct configfs_attribute *lio_target_nacl_param_attrs[] = {
 /* Start items for lio_target_acl_cit */
 
 static ssize_t lio_target_nacl_show_info(
-	struct se_node_acl_s *se_nacl,
+	struct se_node_acl *se_nacl,
 	char *page)
 {
 	iscsi_session_t *sess;
 	iscsi_conn_t *conn;
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 	unsigned char *ip, buf_ipv4[IPV4_BUF_SIZE];
 	ssize_t rb = 0;
 
@@ -734,18 +734,18 @@ static ssize_t lio_target_nacl_show_info(
 TF_NACL_BASE_ATTR_RO(lio_target, info);
 
 static ssize_t lio_target_nacl_show_cmdsn_depth(
-	struct se_node_acl_s *se_nacl,
+	struct se_node_acl *se_nacl,
 	char *page)
 {
 	return sprintf(page, "%u\n", se_nacl->queue_depth);
 }
 
 static ssize_t lio_target_nacl_store_cmdsn_depth(
-	struct se_node_acl_s *se_nacl,
+	struct se_node_acl *se_nacl,
 	const char *page,
 	size_t count)
 {
-	struct se_portal_group_s *se_tpg = se_nacl->se_tpg;
+	struct se_portal_group *se_tpg = se_nacl->se_tpg;
 	iscsi_portal_group_t *tpg = container_of(se_tpg,
 			iscsi_portal_group_t, tpg_se_tpg);
 	struct config_item *acl_ci, *tpg_ci, *wwn_ci;
@@ -801,13 +801,13 @@ static struct configfs_attribute *lio_target_initiator_attrs[] = {
 	NULL,
 };
 
-static struct se_node_acl_s *lio_target_make_nodeacl(
-	struct se_portal_group_s *se_tpg,
+static struct se_node_acl *lio_target_make_nodeacl(
+	struct se_portal_group *se_tpg,
 	struct config_group *group,
 	const char *name)
 {
 	struct iscsi_node_acl_s *acl;
-	struct se_node_acl_s *se_nacl_new, *se_nacl;
+	struct se_node_acl *se_nacl_new, *se_nacl;
 	struct iscsi_portal_group_s *tpg = container_of(se_tpg,
 			struct iscsi_portal_group_s, tpg_se_tpg);
 	u32 cmdsn_depth;
@@ -831,9 +831,9 @@ static struct se_node_acl_s *lio_target_make_nodeacl(
 }
 
 static void lio_target_drop_nodeacl(
-	struct se_node_acl_s *se_nacl)
+	struct se_node_acl *se_nacl)
 {
-	struct se_portal_group_s *se_tpg = se_nacl->se_tpg;
+	struct se_portal_group *se_tpg = se_nacl->se_tpg;
 	struct iscsi_node_acl_s *acl = container_of(se_nacl,
 			struct iscsi_node_acl_s, se_node_acl);
 
@@ -848,7 +848,7 @@ static void lio_target_drop_nodeacl(
 #define DEF_TPG_ATTRIB(name)						\
 									\
 static ssize_t iscsi_tpg_attrib_show_##name(				\
-	struct se_portal_group_s *se_tpg,				\
+	struct se_portal_group *se_tpg,				\
 	char *page)							\
 {									\
 	iscsi_portal_group_t *tpg = container_of(se_tpg,		\
@@ -864,7 +864,7 @@ static ssize_t iscsi_tpg_attrib_show_##name(				\
 }									\
 									\
 static ssize_t iscsi_tpg_attrib_store_##name(				\
-	struct se_portal_group_s *se_tpg,				\
+	struct se_portal_group *se_tpg,				\
 	const char *page,						\
 	size_t count)							\
 {									\
@@ -950,7 +950,7 @@ static struct configfs_attribute *lio_target_tpg_attrib_attrs[] = {
 
 #define DEF_TPG_PARAM(name)						\
 static ssize_t iscsi_tpg_param_show_##name(				\
-	struct se_portal_group_s *se_tpg,				\
+	struct se_portal_group *se_tpg,				\
 	char *page)							\
 {									\
 	iscsi_portal_group_t *tpg = container_of(se_tpg,		\
@@ -973,7 +973,7 @@ static ssize_t iscsi_tpg_param_show_##name(				\
 	return rb;							\
 }									\
 static ssize_t iscsi_tpg_param_store_##name(				\
-	struct se_portal_group_s *se_tpg,				\
+	struct se_portal_group *se_tpg,				\
 	const char *page,						\
 	size_t count)							\
 {									\
@@ -1096,7 +1096,7 @@ static struct configfs_attribute *lio_target_tpg_param_attrs[] = {
 /* Start items for lio_target_tpg_cit */
 
 static ssize_t lio_target_tpg_show_enable(
-	struct se_portal_group_s *se_tpg,
+	struct se_portal_group *se_tpg,
 	char *page)
 {
 	iscsi_portal_group_t *tpg = container_of(se_tpg,
@@ -1112,7 +1112,7 @@ static ssize_t lio_target_tpg_show_enable(
 }
 
 static ssize_t lio_target_tpg_store_enable(
-	struct se_portal_group_s *se_tpg,
+	struct se_portal_group *se_tpg,
 	const char *page,
 	size_t count)
 {
@@ -1163,8 +1163,8 @@ static struct configfs_attribute *lio_target_tpg_attrs[] = {
 
 /* Start items for lio_target_tiqn_cit */
 
-struct se_portal_group_s *lio_target_tiqn_addtpg(
-	struct se_wwn_s *wwn,
+struct se_portal_group *lio_target_tiqn_addtpg(
+	struct se_wwn *wwn,
 	struct config_group *group,
 	const char *name)
 {
@@ -1213,7 +1213,7 @@ out:
 	return NULL;
 }
 
-void lio_target_tiqn_deltpg(struct se_portal_group_s *se_tpg)
+void lio_target_tiqn_deltpg(struct se_portal_group *se_tpg)
 {
 	iscsi_portal_group_t *tpg;
 	iscsi_tiqn_t *tiqn;
@@ -1247,7 +1247,7 @@ static struct configfs_attribute *lio_target_wwn_attrs[] = {
 	NULL,
 };
 
-struct se_wwn_s *lio_target_call_coreaddtiqn(
+struct se_wwn *lio_target_call_coreaddtiqn(
 	struct target_fabric_configfs *tf,
 	struct config_group *group,
 	const char *name)
@@ -1266,7 +1266,7 @@ struct se_wwn_s *lio_target_call_coreaddtiqn(
 }
 
 void lio_target_call_coredeltiqn(
-	struct se_wwn_s *wwn)
+	struct se_wwn *wwn)
 {
 	iscsi_tiqn_t *tiqn = container_of(wwn, iscsi_tiqn_t, tiqn_wwn);
 	

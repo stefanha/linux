@@ -201,7 +201,7 @@ int pscsi_release_sd(struct scsi_device *sd)
  * 	pscsi_get_sh() used scsi_host_lookup() to locate struct Scsi_Host.
  *	from the passed SCSI Host ID.
  */
-int pscsi_attach_hba(se_hba_t *hba, u32 host_id)
+int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	int hba_depth;
 	pscsi_hba_virt_t *phv;
@@ -234,7 +234,7 @@ int pscsi_attach_hba(se_hba_t *hba, u32 host_id)
  *
  *
  */
-int pscsi_detach_hba(se_hba_t *hba)
+int pscsi_detach_hba(struct se_hba *hba)
 {
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)hba->hba_ptr;
 	struct Scsi_Host *scsi_host = phv->phv_lld_host;
@@ -255,7 +255,7 @@ int pscsi_detach_hba(se_hba_t *hba)
 	return 0;
 }
 
-int pscsi_pmode_enable_hba(se_hba_t *hba, unsigned long mode_flag)
+int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 {
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)hba->hba_ptr;
 	struct Scsi_Host *sh = phv->phv_lld_host;
@@ -313,14 +313,14 @@ int pscsi_pmode_enable_hba(se_hba_t *hba, unsigned long mode_flag)
  *
  *
  */
-se_device_t *pscsi_add_device_to_list(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+struct se_device *pscsi_add_device_to_list(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	pscsi_dev_virt_t *pdv,
 	struct scsi_device *sd,
 	int dev_flags)
 {
-	se_device_t *dev;
+	struct se_device *dev;
 
 	/*
 	 * Some pseudo SCSI HBAs do not fill in sector_size
@@ -386,7 +386,7 @@ se_device_t *pscsi_add_device_to_list(
 	 */
 	if (sd->type == TYPE_TAPE) {
 		unsigned char *buf = NULL, cdb[SCSI_CDB_SIZE];
-		se_cmd_t *cmd;
+		struct se_cmd *cmd;
 		u32 blocksize;
 
 		memset(cdb, 0, SCSI_CDB_SIZE);
@@ -424,7 +424,7 @@ out:
 	return dev;
 }
 
-int pscsi_claim_phydevice(se_hba_t *hba, se_device_t *dev)
+int pscsi_claim_phydevice(struct se_hba *hba, struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *)pdv->pdv_sd;
@@ -432,7 +432,7 @@ int pscsi_claim_phydevice(se_hba_t *hba, se_device_t *dev)
 	return pscsi_claim_sd(sd);
 }
 
-int pscsi_release_phydevice(se_device_t *dev)
+int pscsi_release_phydevice(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *)pdv->pdv_sd;
@@ -440,7 +440,7 @@ int pscsi_release_phydevice(se_device_t *dev)
 	return pscsi_release_sd(sd);
 }
 
-void *pscsi_allocate_virtdevice(se_hba_t *hba, const char *name)
+void *pscsi_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	pscsi_dev_virt_t *pdv;
 
@@ -458,13 +458,13 @@ void *pscsi_allocate_virtdevice(se_hba_t *hba, const char *name)
 /*
  * Called with struct Scsi_Host->host_lock called.
  */
-se_device_t *pscsi_create_type_disk(
+struct se_device *pscsi_create_type_disk(
 	struct scsi_device *sd,
 	pscsi_dev_virt_t *pdv,
-	se_subsystem_dev_t *se_dev,
-	se_hba_t *hba)
+	struct se_subsystem_dev *se_dev,
+	struct se_hba *hba)
 {
-	se_device_t *dev;
+	struct se_device *dev;
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)pdv->pdv_se_hba->hba_ptr;
 	struct Scsi_Host *sh = sd->host;
 	u32 dev_flags = 0;
@@ -501,13 +501,13 @@ se_device_t *pscsi_create_type_disk(
 /*
  * Called with struct Scsi_Host->host_lock called.
  */
-se_device_t *pscsi_create_type_rom(
+struct se_device *pscsi_create_type_rom(
 	struct scsi_device *sd,
 	pscsi_dev_virt_t *pdv,
-	se_subsystem_dev_t *se_dev,
-	se_hba_t *hba)
+	struct se_subsystem_dev *se_dev,
+	struct se_hba *hba)
 {
-	se_device_t *dev;
+	struct se_device *dev;
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)pdv->pdv_se_hba->hba_ptr;
 	struct Scsi_Host *sh = sd->host;
 	u32 dev_flags = 0;
@@ -535,13 +535,13 @@ se_device_t *pscsi_create_type_rom(
 /*
  *Called with struct Scsi_Host->host_lock called.
  */
-se_device_t *pscsi_create_type_other(
+struct se_device *pscsi_create_type_other(
 	struct scsi_device *sd,
 	pscsi_dev_virt_t *pdv,
-	se_subsystem_dev_t *se_dev,
-	se_hba_t *hba)
+	struct se_subsystem_dev *se_dev,
+	struct se_hba *hba)
 {
-	se_device_t *dev;
+	struct se_device *dev;
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)pdv->pdv_se_hba->hba_ptr;
 	struct Scsi_Host *sh = sd->host;
 	u32 dev_flags = 0;
@@ -558,13 +558,13 @@ se_device_t *pscsi_create_type_other(
 	return dev;
 }
 
-se_device_t *pscsi_create_virtdevice(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+struct se_device *pscsi_create_virtdevice(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	void *p)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *)p;
-	se_device_t *dev;
+	struct se_device *dev;
 	struct scsi_device *sd;
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)hba->hba_ptr;
 	struct Scsi_Host *sh = phv->phv_lld_host;
@@ -677,7 +677,7 @@ se_device_t *pscsi_create_virtdevice(
  *
  *
  */
-int pscsi_activate_device(se_device_t *dev)
+int pscsi_activate_device(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *) pdv->pdv_se_hba->hba_ptr;
@@ -696,7 +696,7 @@ int pscsi_activate_device(se_device_t *dev)
  *
  *
  */
-void pscsi_deactivate_device(se_device_t *dev)
+void pscsi_deactivate_device(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *) pdv->pdv_se_hba->hba_ptr;
@@ -741,7 +741,7 @@ void pscsi_free_device(void *p)
  *
  *
  */
-int pscsi_transport_complete(se_task_t *task)
+int pscsi_transport_complete(struct se_task *task)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
@@ -757,8 +757,8 @@ int pscsi_transport_complete(se_task_t *task)
 		unsigned char *dst = (unsigned char *)
 				T_TASK(task->task_se_cmd)->t_task_buf;
 		unsigned char buf[VPD_BUF_LEN], *iqn = NULL;
-		se_subsystem_dev_t *su_dev = TASK_DEV(task)->se_sub_dev;
-		se_hba_t *hba = task->se_dev->se_hba;
+		struct se_subsystem_dev *su_dev = TASK_DEV(task)->se_sub_dev;
+		struct se_hba *hba = task->se_dev->se_hba;
 
 		/*
 		 * The Initiator port did not request VPD information.
@@ -930,8 +930,8 @@ after_mode_select:
  *
  */
 void *pscsi_allocate_request(
-	se_task_t *task,
-	se_device_t *dev)
+	struct se_task *task,
+	struct se_device *dev)
 {
 	pscsi_plugin_task_t *pt;
 
@@ -945,7 +945,7 @@ void *pscsi_allocate_request(
 }
 
 static inline void pscsi_blk_init_request(
-	se_task_t *task,
+	struct se_task *task,
 	pscsi_plugin_task_t *pt)
 {
 	/*
@@ -954,12 +954,12 @@ static inline void pscsi_blk_init_request(
 	pt->pscsi_req->cmd_type = REQ_TYPE_BLOCK_PC;
 	/*
 	 * Setup the done function pointer for struct request,
-	 * also set the end_io_data pointer.to se_task_t.
+	 * also set the end_io_data pointer.to struct se_task.
 	 */
 	pt->pscsi_req->end_io = pscsi_req_done;
 	pt->pscsi_req->end_io_data = (void *)task;
 	/*
-	 * Load the referenced se_task_t's SCSI CDB into
+	 * Load the referenced struct se_task's SCSI CDB into
 	 * include/linux/blkdev.h:struct request->cmd
 	 */
 	pt->pscsi_req->cmd_len = COMMAND_SIZE(pt->pscsi_cdb[0]);
@@ -974,7 +974,7 @@ static inline void pscsi_blk_init_request(
 /*
  * Used for pSCSI data payloads for all *NON* SCF_SCSI_DATA_SG_IO_CDB
 */
-static int pscsi_blk_get_request(se_task_t *task)
+static int pscsi_blk_get_request(struct se_task *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
@@ -998,7 +998,7 @@ static int pscsi_blk_get_request(se_task_t *task)
  *
  *
  */
-int pscsi_do_task(se_task_t *task)
+int pscsi_do_task(struct se_task *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
@@ -1031,7 +1031,7 @@ int pscsi_do_task(se_task_t *task)
  *
  *
  */
-void pscsi_free_task(se_task_t *task)
+void pscsi_free_task(struct se_task *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *)task->transport_req;
 	/*
@@ -1041,8 +1041,8 @@ void pscsi_free_task(se_task_t *task)
 	kfree(pt);
 }
 
-ssize_t pscsi_set_configfs_dev_params(se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+ssize_t pscsi_set_configfs_dev_params(struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	const char *page,
 	ssize_t count)
 {
@@ -1151,8 +1151,8 @@ out:
 }
 
 ssize_t pscsi_check_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev)
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
 
@@ -1168,8 +1168,8 @@ ssize_t pscsi_check_configfs_dev_params(
 }
 
 ssize_t pscsi_show_configfs_dev_params(
-	se_hba_t *hba,
-	se_subsystem_dev_t *se_dev,
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
 	char *page)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
@@ -1179,13 +1179,13 @@ ssize_t pscsi_show_configfs_dev_params(
 	return (ssize_t)bl;
 }
 
-se_device_t *pscsi_create_virtdevice_from_fd(
-	se_subsystem_dev_t *se_dev,
+struct se_device *pscsi_create_virtdevice_from_fd(
+	struct se_subsystem_dev *se_dev,
 	const char *page)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) se_dev->se_dev_su_ptr;
-	se_device_t *dev = NULL;
-	se_hba_t *hba = se_dev->se_dev_hba;
+	struct se_device *dev = NULL;
+	struct se_hba *hba = se_dev->se_dev_hba;
 	struct block_device *bd = NULL;
 	struct file *filp;
 	struct gendisk *gd = NULL;
@@ -1274,7 +1274,7 @@ se_device_t *pscsi_create_virtdevice_from_fd(
 		}
 		if (sd->host != sh) {
 			printk(KERN_ERR "PSCSI: Trying to attach scsi_device"
-				" Host ID: %d, but se_hba_t has SCSI Host ID:"
+				" Host ID: %d, but struct se_hba has SCSI Host ID:"
 				" %d\n", sd->host->host_no, sh->host_no);
 			iput(inode);
 			fput(filp);
@@ -1331,7 +1331,7 @@ void pscsi_get_plugin_info(void *p, char *b, int *bl)
 	*bl += sprintf(b + *bl, "TCM SCSI Plugin %s\n", PSCSI_VERSION);
 }
 
-void pscsi_get_hba_info(se_hba_t *hba, char *b, int *bl)
+void pscsi_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
 	pscsi_hba_virt_t *phv = (pscsi_hba_virt_t *)hba->hba_ptr;
 	struct Scsi_Host *sh = phv->phv_lld_host;
@@ -1344,7 +1344,7 @@ void pscsi_get_hba_info(se_hba_t *hba, char *b, int *bl)
 			(sh->hostt->name) : "Unknown");
 }
 
-void pscsi_get_dev_info(se_device_t *dev, char *b, int *bl)
+void pscsi_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 
@@ -1443,7 +1443,7 @@ static inline struct bio *pscsi_get_bio(pscsi_dev_virt_t *pdv, int sg_num)
  *
  *
  */
-int pscsi_map_task_SG(se_task_t *task)
+int pscsi_map_task_SG(struct se_task *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
@@ -1461,7 +1461,7 @@ int pscsi_map_task_SG(se_task_t *task)
 	/*
 	 * For SCF_SCSI_DATA_SG_IO_CDB, Use fs/bio.c:bio_add_page() to setup
 	 * the bio_vec maplist from TC< se_mem_t -> task->task_sg ->
-	 * struct scatterlist memory.  The se_task_t->task_sg[] currently needs
+	 * struct scatterlist memory.  The struct se_task->task_sg[] currently needs
 	 * to be attached to struct bios for submission to Linux/SCSI using
 	 * struct request to struct scsi_device->request_queue.
 	 *
@@ -1505,7 +1505,7 @@ int pscsi_map_task_SG(se_task_t *task)
 				 * Set *hbio pointer to handle the case:
 				 * nr_pages > BIO_MAX_PAGES, where additional
 				 * bios need to be added to complete a given
-				 * se_task_t
+				 * struct se_task
 				 */
 				if (!hbio)
 					hbio = tbio = bio;
@@ -1575,9 +1575,9 @@ fail:
  *
  *
  */
-int pscsi_map_task_non_SG(se_task_t *task)
+int pscsi_map_task_non_SG(struct se_task *task)
 {
-	se_cmd_t *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = TASK_CMD(task);
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) task->se_dev->dev_ptr;
 	int ret = 0;
@@ -1599,7 +1599,7 @@ int pscsi_map_task_non_SG(se_task_t *task)
  *
  *
  */
-int pscsi_CDB_inquiry(se_task_t *task, u32 size)
+int pscsi_CDB_inquiry(struct se_task *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1610,7 +1610,7 @@ int pscsi_CDB_inquiry(se_task_t *task, u32 size)
 	return pscsi_map_task_non_SG(task);
 }
 
-int pscsi_CDB_none(se_task_t *task, u32 size)
+int pscsi_CDB_none(struct se_task *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1623,7 +1623,7 @@ int pscsi_CDB_none(se_task_t *task, u32 size)
  *
  *
  */
-int pscsi_CDB_read_non_SG(se_task_t *task, u32 size)
+int pscsi_CDB_read_non_SG(struct se_task *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1639,7 +1639,7 @@ int pscsi_CDB_read_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int pscsi_CDB_read_SG(se_task_t *task, u32 size)
+int pscsi_CDB_read_SG(struct se_task *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1658,7 +1658,7 @@ int pscsi_CDB_read_SG(se_task_t *task, u32 size)
  *
  *
  */
-int pscsi_CDB_write_non_SG(se_task_t *task, u32 size)
+int pscsi_CDB_write_non_SG(struct se_task *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1674,7 +1674,7 @@ int pscsi_CDB_write_non_SG(se_task_t *task, u32 size)
  *
  *
  */
-int pscsi_CDB_write_SG(se_task_t *task, u32 size)
+int pscsi_CDB_write_SG(struct se_task *task, u32 size)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1693,7 +1693,7 @@ int pscsi_CDB_write_SG(se_task_t *task, u32 size)
  *
  *
  */
-int pscsi_check_lba(unsigned long long lba, se_device_t *dev)
+int pscsi_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
 }
@@ -1702,7 +1702,7 @@ int pscsi_check_lba(unsigned long long lba, se_device_t *dev)
  *
  *
  */
-int pscsi_check_for_SG(se_task_t *task)
+int pscsi_check_for_SG(struct se_task *task)
 {
 	return task->task_sg_num;
 }
@@ -1711,7 +1711,7 @@ int pscsi_check_for_SG(se_task_t *task)
  *
  *
  */
-unsigned char *pscsi_get_cdb(se_task_t *task)
+unsigned char *pscsi_get_cdb(struct se_task *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1722,7 +1722,7 @@ unsigned char *pscsi_get_cdb(se_task_t *task)
  *
  *
  */
-unsigned char *pscsi_get_sense_buffer(se_task_t *task)
+unsigned char *pscsi_get_sense_buffer(struct se_task *task)
 {
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *) task->transport_req;
 
@@ -1733,7 +1733,7 @@ unsigned char *pscsi_get_sense_buffer(se_task_t *task)
  *
  *
  */
-u32 pscsi_get_blocksize(se_device_t *dev)
+u32 pscsi_get_blocksize(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
@@ -1745,7 +1745,7 @@ u32 pscsi_get_blocksize(se_device_t *dev)
  *
  *
  */
-u32 pscsi_get_device_rev(se_device_t *dev)
+u32 pscsi_get_device_rev(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
@@ -1757,7 +1757,7 @@ u32 pscsi_get_device_rev(se_device_t *dev)
  *
  *
  */
-u32 pscsi_get_device_type(se_device_t *dev)
+u32 pscsi_get_device_type(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
@@ -1769,7 +1769,7 @@ u32 pscsi_get_device_type(se_device_t *dev)
  *
  *
  */
-u32 pscsi_get_dma_length(u32 task_size, se_device_t *dev)
+u32 pscsi_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
 }
@@ -1778,7 +1778,7 @@ u32 pscsi_get_dma_length(u32 task_size, se_device_t *dev)
  *
  *
  */
-u32 pscsi_get_max_sectors(se_device_t *dev)
+u32 pscsi_get_max_sectors(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
@@ -1791,7 +1791,7 @@ u32 pscsi_get_max_sectors(se_device_t *dev)
  *
  *
  */
-u32 pscsi_get_queue_depth(se_device_t *dev)
+u32 pscsi_get_queue_depth(struct se_device *dev)
 {
 	pscsi_dev_virt_t *pdv = (pscsi_dev_virt_t *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
@@ -1804,7 +1804,7 @@ u32 pscsi_get_queue_depth(se_device_t *dev)
  *
  */
 static inline void pscsi_process_SAM_status(
-	se_task_t *task,
+	struct se_task *task,
 	pscsi_plugin_task_t *pt)
 {
 	task->task_scsi_status = status_byte(pt->pscsi_result);
@@ -1836,7 +1836,7 @@ static inline void pscsi_process_SAM_status(
 
 void pscsi_req_done(struct request *req, int uptodate)
 {
-	se_task_t *task = (se_task_t *)req->end_io_data;
+	struct se_task *task = (struct se_task *)req->end_io_data;
 	pscsi_plugin_task_t *pt = (pscsi_plugin_task_t *)task->transport_req;
 
 	pt->pscsi_result = req->errors;

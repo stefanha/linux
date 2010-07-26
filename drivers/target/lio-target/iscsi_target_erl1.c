@@ -449,7 +449,7 @@ static inline int iscsi_handle_recovery_datain(
 {
 	iscsi_conn_t *conn = CONN(cmd);
 	iscsi_datain_req_t *dr;
-	se_cmd_t *se_cmd = cmd->se_cmd;
+	struct se_cmd *se_cmd = cmd->se_cmd;
 
 	if (!(atomic_read(&T_TASK(se_cmd)->t_transport_complete))) {
 		printk(KERN_ERR "Ignoring ITT: 0x%08x Data SNACK\n",
@@ -997,7 +997,7 @@ int iscsi_execute_ooo_cmdsns(iscsi_session_t *sess)
  */
 int iscsi_execute_cmd(iscsi_cmd_t *cmd, int ooo)
 {
-	se_cmd_t *se_cmd = cmd->se_cmd;
+	struct se_cmd *se_cmd = cmd->se_cmd;
 	int lr = 0;
 
 	spin_lock_bh(&cmd->istate_lock);
