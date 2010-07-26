@@ -163,6 +163,7 @@ void core_tpg_add_node_to_devs(
 	int i = 0;
 	u32 lun_access = 0;
 	se_lun_t *lun;
+	struct se_device_s *dev;
 
 	spin_lock(&tpg->tpg_lun_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -171,28 +172,23 @@ void core_tpg_add_node_to_devs(
 			continue;
 
 		spin_unlock(&tpg->tpg_lun_lock);
+
+		dev = lun->se_dev;
 		/*
 		 * By default in LIO-Target $FABRIC_MOD,
 		 * demo_mode_write_protect is ON, or READ_ONLY;
 		 */
 		if (!(TPG_TFO(tpg)->tpg_check_demo_mode_write_protect(tpg))) {
-			if (LUN_OBJ_API(lun)->get_device_access) {
-				if (LUN_OBJ_API(lun)->get_device_access(
-						lun->lun_type_ptr) == 0)
-					lun_access =
-						TRANSPORT_LUNFLAGS_READ_ONLY;
-				else
-					lun_access =
-						TRANSPORT_LUNFLAGS_READ_WRITE;
-			} else
+			if (dev->dev_flags & DF_READ_ONLY)
+				lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
+			else
 				lun_access = TRANSPORT_LUNFLAGS_READ_WRITE;
 		} else {
 			/*
 			 * Allow only optical drives to issue R/W in default RO
 			 * demo mode.
 			 */
-			if (LUN_OBJ_API(lun)->get_device_type(
-					lun->lun_type_ptr) == TYPE_DISK)
+			if (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK)
 				lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
 			else
 				lun_access = TRANSPORT_LUNFLAGS_READ_WRITE;
@@ -343,7 +339,7 @@ void core_tpg_clear_object_luns(se_portal_group_t *tpg)
 			continue;
 
 		spin_unlock(&tpg->tpg_lun_lock);
-		ret = LUN_OBJ_API(lun)->del_obj_from_lun(tpg, lun);
+		ret = core_dev_del_lun(tpg, lun->unpacked_lun);
 		spin_lock(&tpg->tpg_lun_lock);
 	}
 	spin_unlock(&tpg->tpg_lun_lock);
@@ -629,7 +625,7 @@ static int core_tpg_setup_virtual_lun0(struct se_portal_group_s *se_tpg)
 	spin_lock_init(&lun->lun_sep_lock);
 
 	ret = core_tpg_post_addlun(se_tpg, lun, TRANSPORT_LUN_TYPE_DEVICE,	
-			lun_access, dev, dev->dev_obj_api);
+			lun_access, dev);
 	if (ret < 0)
 		return -1;
 
@@ -769,14 +765,11 @@ int core_tpg_post_addlun(
 	se_lun_t *lun,
 	int lun_type,
 	u32 lun_access,
-	void *lun_ptr,
-	struct se_obj_lun_type_s *obj_api)
+	void *lun_ptr)
 {
-	lun->lun_obj_api = obj_api;
 	lun->lun_type_ptr = lun_ptr;
-	if (LUN_OBJ_API(lun)->export_obj(lun_ptr, tpg, lun) < 0) {
+	if (dev_obj_export(lun_ptr, tpg, lun) < 0) {
 		lun->lun_type_ptr = NULL;
-		lun->lun_obj_api = NULL;
 		return -1;
 	}
 
@@ -848,8 +841,8 @@ int core_tpg_post_dellun(
 
 	core_tpg_shutdown_lun(tpg, lun);
 
-	LUN_OBJ_API(lun)->unexport_obj(lun->lun_type_ptr, tpg, lun);
-	LUN_OBJ_API(lun)->release_obj(lun->lun_type_ptr);
+	dev_obj_unexport(lun->lun_type_ptr, tpg, lun);
+	transport_generic_release_phydevice(lun->lun_type_ptr, 1);
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;

@@ -159,16 +159,6 @@ int se_core_del_hba(
 		return -EINVAL;
 	}
 
-	/*
-	 * Do not allow the se_hba_t to be released if references exist to
-	 * from se_device_t->se_lun_t.
-	 */
-	if (se_check_devices_access(hba) < 0) {
-		printk(KERN_ERR "CORE_HBA[%u] - **ERROR** - Unable to release"
-			" HBA with active LUNs\n", hba->hba_id);
-		return -EINVAL;
-	}
-
 	spin_lock(&hba->device_lock);
 	list_for_each_entry_safe(dev, dev_tmp, &hba->hba_dev_list, dev_list) {
 

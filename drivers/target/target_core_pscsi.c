@@ -394,8 +394,7 @@ se_device_t *pscsi_add_device_to_list(
 		cdb[4] = 0x0c; /* 12 bytes */
 
 		cmd = transport_allocate_passthrough(&cdb[0],
-				SE_DIRECTION_READ, 0, NULL, 0, 12,
-				DEV_OBJ_API(dev), dev);
+				SE_DIRECTION_READ, 0, NULL, 0, 12, dev);
 		if (!(cmd)) {
 			printk(KERN_ERR "Unable to determine blocksize for"
 				" TYPE_TAPE\n");

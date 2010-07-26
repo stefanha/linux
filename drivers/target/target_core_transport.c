@@ -972,10 +972,7 @@ check_lun:
 
 void transport_cmd_finish_abort(se_cmd_t *cmd, int remove)
 {
-	transport_remove_cmd_from_queue(cmd,
-		CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-			cmd->se_orig_obj_ptr));
-
+	transport_remove_cmd_from_queue(cmd, SE_DEV(cmd)->dev_queue_obj);
 	transport_lun_remove_cmd(cmd);
 
 	if (transport_cmd_check_stop_to_fabric(cmd))
@@ -986,9 +983,7 @@ void transport_cmd_finish_abort(se_cmd_t *cmd, int remove)
 
 void transport_cmd_finish_abort_tmr(se_cmd_t *cmd)
 {
-	transport_remove_cmd_from_queue(cmd,
-			CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-			cmd->se_orig_obj_ptr));
+	transport_remove_cmd_from_queue(cmd, SE_DEV(cmd)->dev_queue_obj);
 
 	if (transport_cmd_check_stop_to_fabric(cmd))
 		return;
@@ -1530,8 +1525,8 @@ void transport_dump_dev_info(
 	*bl += sprintf(b + *bl, "ANSI SCSI revision: %02x  ",
 		TRANSPORT(dev)->get_device_rev(dev));
 
-	if (DEV_OBJ_API(dev)->get_t10_wwn) {
-		t10_wwn_t *wwn = DEV_OBJ_API(dev)->get_t10_wwn((void *)dev);
+	if (DEV_T10_WWN(dev)) {
+		t10_wwn_t *wwn = DEV_T10_WWN(dev);
 
 		*bl += sprintf(b + *bl, "Unit Serial: %s  ",
 			((strlen(wwn->unit_serial) != 0) ?
@@ -1539,10 +1534,9 @@ void transport_dump_dev_info(
 	}
 	*bl += sprintf(b + *bl, "%s", "DIRECT");
 
-	if ((DEV_OBJ_API(dev)->check_count(&dev->dev_access_obj)) ||
-	    (DEV_OBJ_API(dev)->check_count(&dev->dev_feature_obj)))
+	if (atomic_read(&dev->dev_access_obj.obj_access_count))
 		*bl += sprintf(b + *bl, "  ACCESSED\n");
-	else if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj))
+	else if (atomic_read(&dev->dev_export_obj.obj_access_count))
 		*bl += sprintf(b + *bl, "  EXPORTED\n");
 	else
 		*bl += sprintf(b + *bl, "  FREE\n");
@@ -1623,7 +1617,6 @@ static int transport_dev_write_pending_nop(se_task_t *task)
 }
 
 static int transport_get_inquiry(
-	se_obj_lun_type_t *obj_api,
 	t10_wwn_t *wwn,
 	void *obj_ptr)
 {
@@ -1638,7 +1631,7 @@ static int transport_get_inquiry(
 	cdb[4] = (INQUIRY_LEN & 0xff);
 
 	cmd = transport_allocate_passthrough(&cdb[0],  SE_DIRECTION_READ,
-			0, NULL, 0, INQUIRY_LEN, obj_api, obj_ptr);
+			0, NULL, 0, INQUIRY_LEN, obj_ptr);
 	if (!(cmd))
 		return -1;
 
@@ -1697,7 +1690,6 @@ static int transport_get_inquiry(
 }
 
 static int transport_get_inquiry_vpd_serial(
-	se_obj_lun_type_t *obj_api,
 	t10_wwn_t *wwn,
 	void *obj_ptr)
 {
@@ -1713,7 +1705,7 @@ static int transport_get_inquiry_vpd_serial(
 	cdb[4] = (INQUIRY_VPD_SERIAL_LEN & 0xff);
 
 	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
-			0, NULL, 0, INQUIRY_VPD_SERIAL_LEN, obj_api, obj_ptr);
+			0, NULL, 0, INQUIRY_VPD_SERIAL_LEN, obj_ptr);
 	if (!(cmd))
 		return -1;
 
@@ -1976,7 +1968,6 @@ int transport_set_vpd_ident(t10_vpd_t *vpd, unsigned char *page_83)
 }
 
 static int transport_get_inquiry_vpd_device_ident(
-	se_obj_lun_type_t *obj_api,
 	t10_wwn_t *wwn,
 	void *obj_ptr)
 {
@@ -1995,7 +1986,7 @@ static int transport_get_inquiry_vpd_device_ident(
 
 	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
 			0, NULL, 0, INQUIRY_VPD_DEVICE_IDENTIFIER_LEN,
-			obj_api, obj_ptr);
+			obj_ptr);
 	if (!(cmd))
 		return -1;
 
@@ -2057,8 +2048,7 @@ int transport_rescan_evpd_device_ident(
 	se_device_t *dev)
 {
 	se_release_vpd_for_dev(dev);
-	transport_get_inquiry_vpd_device_ident(DEV_OBJ_API(dev),
-			DEV_T10_WWN(dev), (void *)dev);
+	transport_get_inquiry_vpd_device_ident(DEV_T10_WWN(dev), (void *)dev);
 	return 0;
 }
 
@@ -2073,8 +2063,7 @@ static int transport_get_read_capacity(se_device_t *dev)
 	cdb[0] = 0x25; /* READ_CAPACITY */
 
 	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
-			0, NULL, 0, READ_CAP_LEN, DEV_OBJ_API(dev),
-			(void *)dev);
+			0, NULL, 0, READ_CAP_LEN, (void *)dev);
 	if (!(cmd))
 		return -1;
 
@@ -2103,7 +2092,7 @@ static int transport_get_read_capacity(se_device_t *dev)
 	cdb[13] = 12;
 
 	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
-			0, NULL, 0, 12, DEV_OBJ_API(dev), (void *)dev);
+			0, NULL, 0, 12, (void *)dev);
 	if (!(cmd))
 		return -1;
 
@@ -2232,13 +2221,6 @@ se_device_t *transport_add_device_to_core_hba(
 	list_add_tail(&dev->dev_list, &hba->hba_dev_list);
 	hba->dev_count++;
 	spin_unlock(&hba->device_lock);
-
-	/*
-	 * Get this se_device_t's API from the device object plugin.
-	 */
-	dev->dev_obj_api = se_obj_get_api(TRANSPORT_LUN_TYPE_DEVICE);
-	if (!(dev->dev_obj_api))
-		goto out;
 	/*
 	 * Setup the SAM Task Attribute emulation for se_device_t
 	 */
@@ -2262,22 +2244,21 @@ se_device_t *transport_add_device_to_core_hba(
 	if (transport_generic_activate_device(dev) < 0)
 		goto out;
 
-	ret = transport_get_inquiry(DEV_OBJ_API(dev),
-			DEV_T10_WWN(dev), (void *)dev);
+	ret = transport_get_inquiry(DEV_T10_WWN(dev), (void *)dev);
 	if (ret < 0)
 		goto out;
 	/*
 	 * Locate VPD WWN Information used for various purposes within
 	 * the Storage Engine.
 	 */
-	if (!(transport_get_inquiry_vpd_serial(DEV_OBJ_API(dev),
-			DEV_T10_WWN(dev), (void *)dev))) {
+	if (!(transport_get_inquiry_vpd_serial(DEV_T10_WWN(dev),
+				(void *)dev))) {
 		/*
 		 * If VPD Unit Serial returned GOOD status, try
 		 * VPD Device Identification page (0x83).
 		 */
-		transport_get_inquiry_vpd_device_ident(DEV_OBJ_API(dev),
-			DEV_T10_WWN(dev), (void *)dev);
+		transport_get_inquiry_vpd_device_ident(DEV_T10_WWN(dev),
+					(void *)dev);
 	}
 
 	/*
@@ -2547,13 +2528,12 @@ static inline void transport_generic_prepare_cdb(
  *	1 on unsupported request sector count.
  */
 static inline int transport_check_device_cdb_sector_count(
-	se_obj_lun_type_t *se_obj_api,
 	void *se_obj_ptr,
 	u32 sectors)
 {
 	u32 max_sectors;
 
-	max_sectors = se_obj_api->max_sectors(se_obj_ptr);
+	max_sectors = dev_obj_max_sectors(se_obj_ptr);
 	if (!(max_sectors)) {
 		printk(KERN_ERR "TRANSPORT->get_max_sectors returned zero!\n");
 		return 1;
@@ -2572,10 +2552,10 @@ static inline int transport_check_device_cdb_sector_count(
 static se_task_t *transport_generic_get_task(
 	se_transform_info_t *ti,
 	se_cmd_t *cmd,
-	void *se_obj_ptr,
-	se_obj_lun_type_t *se_obj_api)
+	void *se_obj_ptr)
 {
 	se_task_t *task;
+	struct se_device_s *dev = SE_DEV(cmd);
 	unsigned long flags;
 
 	task = kmem_cache_zalloc(se_task_cache, GFP_KERNEL);
@@ -2590,33 +2570,31 @@ static se_task_t *transport_generic_get_task(
 	init_completion(&task->task_stop_comp);
 	task->task_no = T_TASK(cmd)->t_task_no++;
 	task->task_se_cmd = cmd;
+	task->se_dev = dev;
 
 	DEBUG_SO("se_obj_ptr: %p\n", se_obj_ptr);
-	DEBUG_SO("se_obj_api: %p\n", se_obj_api);
-	DEBUG_SO("Plugin: %s\n", se_obj_api->obj_plugin->plugin_name);
 
-	task->transport_req = se_obj_api->get_transport_req(se_obj_ptr, task);
-	if (!(task->transport_req))
+	task->transport_req = TRANSPORT(dev)->allocate_request(task, dev);
+	if (!(task->transport_req)) {
+		kmem_cache_free(se_task_cache, task);
 		return NULL;
+	}
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	list_add_tail(&task->t_list, &T_TASK(cmd)->t_task_list);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	task->se_obj_api = se_obj_api;
 	task->se_obj_ptr = se_obj_ptr;
 
 	return task;
 }
 
-int transport_generic_obj_start(
+static inline int transport_generic_obj_start(
 	se_transform_info_t *ti,
-	se_obj_lun_type_t *obj_api,
 	void *p,
 	unsigned long long starting_lba)
 {
 	ti->ti_lba = starting_lba;
-	ti->ti_obj_api = obj_api;
 	ti->ti_obj_ptr = p;
 
 	return 0;
@@ -2643,6 +2621,7 @@ static int transport_process_control_sg_transform(
 	unsigned char *cdb;
 	se_task_t *task;
 	se_mem_t *se_mem, *se_mem_lout = NULL;
+	struct se_device_s *dev = SE_DEV(cmd);
 	int ret;
 	u32 se_mem_cnt = 0, task_offset = 0;
 
@@ -2654,15 +2633,14 @@ static int transport_process_control_sg_transform(
 		return -1;
 	}
 
-	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr,
-				ti->se_obj_api);
+	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr);
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = ti->se_obj_api->get_map_SG(
-			ti->se_obj_ptr, cmd->data_direction);
+	task->transport_map_task = dev_obj_get_map_SG(ti->se_obj_ptr,
+				cmd->data_direction);
 
-	cdb = ti->se_obj_api->get_cdb(ti->se_obj_ptr, task);
+	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
 		memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
 
@@ -2672,7 +2650,7 @@ static int transport_process_control_sg_transform(
 	atomic_inc(&T_TASK(cmd)->t_fe_count);
 	atomic_inc(&T_TASK(cmd)->t_se_count);
 
-	ret = ti->se_obj_api->do_se_mem_map(ti->se_obj_ptr, task,
+	ret = dev_obj_do_se_mem_map(ti->se_obj_ptr, task,
 			T_TASK(cmd)->t_mem_list, NULL, se_mem, &se_mem_lout,
 			&se_mem_cnt, &task_offset);
 	if (ret < 0)
@@ -2691,18 +2669,18 @@ static int transport_process_control_nonsg_transform(
 	se_cmd_t *cmd,
 	se_transform_info_t *ti)
 {
+	struct se_device_s *dev = SE_DEV(cmd);
 	unsigned char *cdb;
 	se_task_t *task;
 
-	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr,
-				ti->se_obj_api);
+	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr);
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = ti->se_obj_api->get_map_non_SG(
-			ti->se_obj_ptr, cmd->data_direction);
+	task->transport_map_task = dev_obj_get_map_non_SG(ti->se_obj_ptr,
+				cmd->data_direction);
 
-	cdb = ti->se_obj_api->get_cdb(ti->se_obj_ptr, task);
+	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
 		memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
 
@@ -2725,17 +2703,17 @@ static int transport_process_non_data_transform(
 	se_cmd_t *cmd,
 	se_transform_info_t *ti)
 {
+	struct se_device_s *dev = SE_DEV(cmd);
 	unsigned char *cdb;
 	se_task_t *task;
 
-	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr,
-				ti->se_obj_api);
+	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr);
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = ti->se_obj_api->get_map_none(ti->se_obj_ptr);
+	task->transport_map_task = dev_obj_get_map_none(ti->se_obj_ptr);
 
-	cdb = ti->se_obj_api->get_cdb(ti->se_obj_ptr, task);
+	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
 		memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
 
@@ -2890,7 +2868,7 @@ int transport_generic_allocate_tasks(
 	 */
 	cmd->transport_wait_for_tasks = &transport_generic_wait_for_tasks;
 
-	CMD_ORIG_OBJ_API(cmd)->transport_setup_cmd(cmd->se_orig_obj_ptr, cmd);
+	transport_device_setup_cmd(cmd);
 	/*
 	 * See if this is a CDB which follows SAM, also grab a function
 	 * pointer to see if we need to do extra work.
@@ -3067,7 +3045,7 @@ int transport_generic_handle_tmr(
 	 * This is needed for early exceptions.
 	 */
 	cmd->transport_wait_for_tasks = &transport_generic_wait_for_tasks;
-	CMD_ORIG_OBJ_API(cmd)->transport_setup_cmd(cmd->se_orig_obj_ptr, cmd);
+	transport_device_setup_cmd(cmd);
 
 	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_TMR);
 	return 0;
@@ -3167,10 +3145,6 @@ void transport_generic_request_failure(
 	DEBUG_GRF("-----[ Storage Engine Exception for cmd: %p ITT: 0x%08x"
 		" CDB: 0x%02x\n", cmd, CMD_TFO(cmd)->get_task_tag(cmd),
 		T_TASK(cmd)->t_task_cdb[0]);
-	DEBUG_GRF("-----[ se_obj_api: %p se_obj_ptr: %p\n", cmd->se_obj_api,
-		cmd->se_obj_ptr);
-	DEBUG_GRF("-----[ se_orig_obj_api: %p se_orig_obj_ptr: %p\n",
-		cmd->se_orig_obj_api, cmd->se_orig_obj_ptr);
 	DEBUG_GRF("-----[ i_state: %d t_state/def_t_state:"
 		" %d/%d transport_error_status: %d\n",
 		CMD_TFO(cmd)->get_cmd_state(cmd),
@@ -3924,6 +3898,7 @@ EXPORT_SYMBOL(transport_get_default_task_timeout);
  */
 void transport_start_task_timer(se_task_t *task)
 {
+	struct se_device_s *dev = task->se_obj_ptr;
 	int timeout;
 
 	if (task->task_flags & TF_RUNNING)
@@ -3931,7 +3906,7 @@ void transport_start_task_timer(se_task_t *task)
 	/*
 	 * If the task_timeout is disabled, exit now.
 	 */
-	timeout = task->se_obj_api->get_task_timeout(task->se_obj_ptr);
+	timeout = DEV_ATTRIB(dev)->task_timeout;
 	if (!(timeout))
 		return;
 
@@ -4107,8 +4082,7 @@ int transport_execute_tasks(se_cmd_t *cmd)
 	int add_tasks;
 
 	if (!(cmd->se_cmd_flags & SCF_SE_DISABLE_ONLINE_CHECK)) {
-		if (CMD_ORIG_OBJ_API(cmd)->check_online(
-					cmd->se_orig_obj_ptr) != 0) {
+		if (dev_obj_check_online(cmd->se_orig_obj_ptr) != 0) {
 			cmd->transport_error_status =
 				PYX_TRANSPORT_LU_COMM_FAILURE;
 			transport_generic_request_failure(cmd, NULL, 0, 1);
@@ -4133,14 +4107,14 @@ int transport_execute_tasks(se_cmd_t *cmd)
 		 * (if enabled) in __transport_add_task_to_execute_queue() and
 		 * transport_add_task_check_sam_attr().
 		 */
-		CMD_ORIG_OBJ_API(cmd)->add_tasks(cmd->se_orig_obj_ptr, cmd);
+		transport_add_tasks_from_cmd(cmd);
 	}
 	/*
 	 * Kick the execution queue for the cmd associated se_device_t
 	 * storage object.
 	 */
 execute_tasks:
-	CMD_ORIG_OBJ_API(cmd)->execute_tasks(cmd->se_orig_obj_ptr);
+	__transport_execute_tasks(SE_DEV(cmd));
 	return 0;
 }
 
@@ -4374,8 +4348,21 @@ static inline u32 transport_get_size(
 	unsigned char *cdb,
 	se_cmd_t *cmd)
 {
-	return CMD_ORIG_OBJ_API(cmd)->get_cdb_size(cmd->se_orig_obj_ptr,
-		sectors, cdb);
+	struct se_device_s *dev = SE_DEV(cmd);
+
+	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE) {
+		if (cdb[1] & 1) { /* sectors */
+			return DEV_ATTRIB(dev)->block_size * sectors;
+		} else /* bytes */
+			return sectors;
+	}
+#if 0
+	printk(KERN_INFO "Returning block_size: %u, sectors: %u == %u for"
+			" %s object\n", DEV_ATTRIB(dev)->block_size, sectors,
+			DEV_ATTRIB(dev)->block_size * sectors,
+			TRANSPORT(dev)->name);
+#endif
+	return DEV_ATTRIB(dev)->block_size * sectors;
 }
 
 static inline void transport_get_maps(se_cmd_t *cmd)
@@ -5281,7 +5268,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
@@ -5293,7 +5280,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5305,7 +5292,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5317,7 +5304,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
@@ -5329,7 +5316,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
@@ -5341,7 +5328,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5353,7 +5340,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5365,7 +5352,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
@@ -5391,28 +5378,28 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_SEND_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case MODE_SELECT:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SELECT_10:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5423,14 +5410,14 @@ static int transport_generic_cmd_sequencer(
 	case LOG_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_BLOCK_LIMITS:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_BLOCK_LEN;
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5440,7 +5427,7 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_READ_TRACK_RZONE_INFO:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
@@ -5452,7 +5439,7 @@ static int transport_generic_cmd_sequencer(
 			 SPC3_PERSISTENT_RESERVATIONS) ?
 			&core_scsi3_emulate_pr : NULL;
 		size = (cdb[7] << 8) + cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5460,14 +5447,14 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_READ_DVD_STRUCTURE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[8] << 8) + cdb[9];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case READ_POSITION:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_POSITION_LEN;
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5492,14 +5479,14 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_REPORT_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case INQUIRY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[3] << 8) + cdb[4];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for INQUIRY.
@@ -5512,14 +5499,14 @@ static int transport_generic_cmd_sequencer(
 	case READ_BUFFER:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_CAPACITY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_CAP_LEN;
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5528,7 +5515,7 @@ static int transport_generic_cmd_sequencer(
 	case SECURITY_PROTOCOL_OUT:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5542,14 +5529,14 @@ static int transport_generic_cmd_sequencer(
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[10] << 24) | (cdb[11] << 16) |
 		       (cdb[12] << 8) | cdb[13];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case VARIABLE_LENGTH_CMD:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[10] << 8) | cdb[11];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5557,7 +5544,7 @@ static int transport_generic_cmd_sequencer(
 	case SEND_DIAGNOSTIC:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[3] << 8) | cdb[4];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5567,7 +5554,7 @@ static int transport_generic_cmd_sequencer(
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		size = (2336 * sectors);
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5575,28 +5562,28 @@ static int transport_generic_cmd_sequencer(
 	case READ_TOC:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case REQUEST_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_ELEMENT_STATUS:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = 65536 * cdb[7] + 256 * cdb[8] + cdb[9];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case WRITE_BUFFER:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5675,7 +5662,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_emulate_cdb =
 				&transport_core_report_lun_response;
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
-		CMD_ORIG_OBJ_API(cmd)->get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for REPORT_LUNS
@@ -5741,6 +5728,8 @@ static inline se_cmd_t *transport_alloc_passthrough_cmd(
 			data_length, data_direction, TASK_ATTR_SIMPLE);
 }
 
+static inline void transport_release_tasks(se_cmd_t *);
+
 se_cmd_t *transport_allocate_passthrough(
 	unsigned char *cdb,
 	int data_direction,
@@ -5748,7 +5737,6 @@ se_cmd_t *transport_allocate_passthrough(
 	void *mem,
 	u32 se_mem_num,
 	u32 length,
-	se_obj_lun_type_t *obj_api,
 	void *type_ptr)
 {
 	se_cmd_t *cmd;
@@ -5768,11 +5756,8 @@ se_cmd_t *transport_allocate_passthrough(
 	}
 
 	spin_lock_init(&cmd->se_lun->lun_sep_lock);
-	SE_LUN(cmd)->lun_type = obj_api->se_obj_type;
 	SE_LUN(cmd)->lun_type_ptr = type_ptr;
-	SE_LUN(cmd)->lun_obj_api = obj_api;
 
-	cmd->se_orig_obj_api = obj_api;
 	cmd->se_orig_obj_ptr = type_ptr;
 	cmd->se_cmd_flags = se_cmd_flags;
 	SE_LUN(cmd)->se_dev = (se_device_t *) type_ptr;
@@ -5780,8 +5765,8 @@ se_cmd_t *transport_allocate_passthrough(
 	/*
 	 * Double check that the passed object is currently accepting CDBs
 	 */
-	if (obj_api->check_online(type_ptr) != 0) {
-		DEBUG_SO("obj_api->check_online() failed!\n");
+	if (dev_obj_check_online(type_ptr) != 0) {
+		DEBUG_SO("dev_obj_check_online() failed!\n");
 		goto fail;
 	}
 
@@ -5797,11 +5782,8 @@ se_cmd_t *transport_allocate_passthrough(
 	ti.ti_dev = SE_LUN(cmd)->se_dev;
 	ti.ti_se_cmd = cmd;
 	ti.se_obj_ptr = type_ptr;
-	ti.se_obj_api = SE_LUN(cmd)->lun_obj_api;
 
 	DEBUG_SO("ti.se_obj_ptr: %p\n", ti.se_obj_ptr);
-	DEBUG_SO("ti.se_obj_api: %p\n", ti.se_obj_api);
-	DEBUG_SO("Plugin: %s\n", ti.se_obj_api->obj_plugin->plugin_name);
 
 	if (!mem) {
 		if (cmd->transport_allocate_resources(cmd, cmd->data_length,
@@ -5844,11 +5826,10 @@ se_cmd_t *transport_allocate_passthrough(
 #endif
 	}
 
-	if (transport_get_sectors(cmd, SE_LUN(cmd)->lun_obj_api, type_ptr) < 0)
+	if (transport_get_sectors(cmd, type_ptr) < 0)
 		goto fail;
 
-	if (transport_new_cmd_obj(cmd, &ti, SE_LUN(cmd)->lun_obj_api,
-			type_ptr, 0) < 0)
+	if (transport_new_cmd_obj(cmd, &ti, type_ptr, 0) < 0)
 		goto fail;
 
 	return cmd;
@@ -5881,7 +5862,7 @@ void transport_passthrough_release(
 int transport_passthrough_complete(
 	se_cmd_t *cmd)
 {
-	if (cmd->se_orig_obj_api->check_shutdown(cmd->se_orig_obj_ptr) != 0)
+	if (dev_obj_check_shutdown(cmd->se_orig_obj_ptr) != 0)
 		return -2;
 
 	switch (cmd->scsi_status) {
@@ -6059,8 +6040,7 @@ void transport_complete_task_attr(se_cmd_t *cmd)
 			T_TASK(cmd_p)->t_task_cdb[0],
 			cmd_p->sam_task_attr, cmd_p->se_ordered_id);
 
-		CMD_ORIG_OBJ_API(cmd_p)->add_tasks(
-				cmd_p->se_orig_obj_ptr, cmd_p);
+		transport_add_tasks_from_cmd(cmd_p);
 		new_active_tasks++;
 
 		spin_lock(&dev->delayed_cmd_lock);
@@ -6222,9 +6202,9 @@ static inline void transport_free_pages(se_cmd_t *cmd)
 	T_TASK(cmd)->t_task_se_num = 0;
 }
 
-void transport_release_tasks(se_cmd_t *cmd)
+static inline void transport_release_tasks(se_cmd_t *cmd)
 {
-	CMD_ORIG_OBJ_API(cmd)->free_tasks(cmd->se_orig_obj_ptr, cmd);
+	transport_free_dev_tasks(cmd);
 }
 
 static inline int transport_dec_and_check(se_cmd_t *cmd)
@@ -6475,26 +6455,27 @@ int transport_generic_do_transform(se_cmd_t *cmd, se_transform_info_t *ti)
 
 int transport_get_sectors(
 	se_cmd_t *cmd,
-	se_obj_lun_type_t *obj_api,
 	void *obj_ptr)
 {
+	struct se_device_s *dev = SE_DEV(cmd);
+
 	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return 0;
 
 	T_TASK(cmd)->t_task_sectors =
-		(cmd->data_length / obj_api->blocksize(obj_ptr));
+		(cmd->data_length / DEV_ATTRIB(dev)->block_size);
 	if (!(T_TASK(cmd)->t_task_sectors))
 		T_TASK(cmd)->t_task_sectors = 1;
 
-	if (obj_api->get_device_type(obj_ptr) != TYPE_DISK)
+	if (TRANSPORT(dev)->get_device_type(dev) != TYPE_DISK)
 		return 0;
 
 	if ((T_TASK(cmd)->t_task_lba + T_TASK(cmd)->t_task_sectors) >
-	     obj_api->total_sectors(obj_ptr)) {
+	     dev_obj_end_lba(obj_ptr)) {
 		printk(KERN_ERR "LBA: %llu Sectors: %u exceeds"
-			" obj_api->total_sectors(): %llu\n",
+			" dev_obj_end_lba(): %llu\n",
 			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_task_sectors,
-			obj_api->total_sectors(obj_ptr));
+			dev_obj_end_lba(obj_ptr));
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = SECTOR_COUNT_TOO_MANY;
 		return PYX_TRANSPORT_REQ_TOO_MANY_SECTORS;
@@ -6506,20 +6487,21 @@ int transport_get_sectors(
 int transport_new_cmd_obj(
 	se_cmd_t *cmd,
 	se_transform_info_t *ti,
-	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	int post_execute)
 {
 	u32 task_cdbs = 0, task_offset = 0;
 	se_mem_t *se_mem_out = NULL;
+	struct se_device_s *dev = SE_DEV(cmd);
 
 	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)) {
 		task_cdbs++;
 		T_TASK(cmd)->t_task_cdbs++;
 	} else {
 		ti->ti_set_counts = 1;
+		ti->ti_dev = dev;
 
-		task_cdbs = obj_api->get_cdb_count(obj_ptr, ti,
+		task_cdbs = transport_generic_get_cdb_count(cmd, ti, obj_ptr,
 				T_TASK(cmd)->t_task_lba,
 				T_TASK(cmd)->t_task_sectors,
 				NULL, &se_mem_out, &task_offset);
@@ -6534,11 +6516,10 @@ int transport_new_cmd_obj(
 		cmd->transport_cdb_transform =
 				&transport_process_data_sg_transform;
 #if 0
-		printk(KERN_INFO "[%s]: api: %p ptr: %p data_length: %u, LBA:"
-			" %llu t_task_sectors: %u, t_task_cdbs: %u\n",
-			obj_api->obj_plugin->plugin_name, obj_api, obj_ptr,
-			cmd->data_length, T_TASK(cmd)->t_task_lba,
-			T_TASK(cmd)->t_task_sectors, T_TASK(cmd)->t_task_cdbs);
+		printk(KERN_INFO "data_length: %u, LBA: %llu t_task_sectors:"
+			" %u, t_task_cdbs: %u\n", obj_ptr, cmd->data_length,
+			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_task_sectors,
+			T_TASK(cmd)->t_task_cdbs);
 #endif
 	}
 
@@ -6713,22 +6694,21 @@ extern u32 transport_calc_sg_num(
 
 static inline int transport_set_task_sectors_disk(
 	se_task_t *task,
-	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if ((lba + sectors) > obj_api->end_lba(obj_ptr, 1)) {
-		task->task_sectors = ((obj_api->end_lba(obj_ptr, 1) - lba) + 1);
+	if ((lba + sectors) > dev_obj_end_lba(obj_ptr)) {
+		task->task_sectors = ((dev_obj_end_lba(obj_ptr) - lba) + 1);
 
-		if (task->task_sectors > obj_api->max_sectors(obj_ptr)) {
-			task->task_sectors = obj_api->max_sectors(obj_ptr);
+		if (task->task_sectors > dev_obj_max_sectors(obj_ptr)) {
+			task->task_sectors = dev_obj_max_sectors(obj_ptr);
 			*max_sectors_set = 1;
 		}
 	} else {
-		if (sectors > obj_api->max_sectors(obj_ptr)) {
-			task->task_sectors = obj_api->max_sectors(obj_ptr);
+		if (sectors > dev_obj_max_sectors(obj_ptr)) {
+			task->task_sectors = dev_obj_max_sectors(obj_ptr);
 			*max_sectors_set = 1;
 		} else
 			task->task_sectors = sectors;
@@ -6739,14 +6719,13 @@ static inline int transport_set_task_sectors_disk(
 
 static inline int transport_set_task_sectors_non_disk(
 	se_task_t *task,
-	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if (sectors > obj_api->max_sectors(obj_ptr)) {
-		task->task_sectors = obj_api->max_sectors(obj_ptr);
+	if (sectors > dev_obj_max_sectors(obj_ptr)) {
+		task->task_sectors = dev_obj_max_sectors(obj_ptr);
 		*max_sectors_set = 1;
 	} else
 		task->task_sectors = sectors;
@@ -6756,17 +6735,18 @@ static inline int transport_set_task_sectors_non_disk(
 
 static inline int transport_set_task_sectors(
 	se_task_t *task,
-	se_obj_lun_type_t *obj_api,
 	void *obj_ptr,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
-	return (obj_api->get_device_type(obj_ptr) == TYPE_DISK)	?
-		transport_set_task_sectors_disk(task, obj_api, obj_ptr,
-				lba, sectors, max_sectors_set) :
-		transport_set_task_sectors_non_disk(task, obj_api, obj_ptr,
-				lba, sectors, max_sectors_set);
+	struct se_device_s *dev = obj_ptr;	
+
+	return (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK) ?
+		transport_set_task_sectors_disk(task, obj_ptr, lba, sectors,
+				max_sectors_set) :
+		transport_set_task_sectors_non_disk(task, obj_ptr, lba, sectors,
+				max_sectors_set);
 }
 
 int transport_map_sg_to_mem(
@@ -7051,7 +7031,6 @@ next:
 u32 transport_generic_get_cdb_count(
 	se_cmd_t *cmd,
 	se_transform_info_t *ti,
-	se_obj_lun_type_t *head_obj_api,
 	void *head_obj_ptr,
 	unsigned long long starting_lba,
 	u32 sectors,
@@ -7060,10 +7039,10 @@ u32 transport_generic_get_cdb_count(
 	u32 *task_offset_in)
 {
 	unsigned char *cdb = NULL;
-	void *obj_ptr, *next_obj_ptr = NULL;
+	void *obj_ptr;
 	se_task_t *task;
 	se_mem_t *se_mem, *se_mem_lout = NULL;
-	se_obj_lun_type_t *obj_api;
+	struct se_device_s *dev = SE_DEV(cmd);
 	int max_sectors_set = 0, ret;
 	u32 se_mem_cnt = 0, task_cdbs = 0;
 	unsigned long long lba;
@@ -7083,51 +7062,38 @@ u32 transport_generic_get_cdb_count(
 	 * Locate the start volume segment in which the received LBA will be
 	 * executed upon.
 	 */
-	head_obj_api->obtain_obj_lock(head_obj_ptr);
-	if (head_obj_api->obj_start(head_obj_ptr, ti, starting_lba) < 0) {
-		head_obj_api->release_obj_lock(head_obj_ptr);
+	ret = transport_generic_obj_start(ti, head_obj_ptr, starting_lba);
+	if (ret < 0)
 		return 0;
-	}
-
 	/*
 	 * Locate starting object from original starting_lba.
 	 */
 	lba = ti->ti_lba;
-	obj_api = ti->ti_obj_api;
 	obj_ptr = ti->ti_obj_ptr;
-	DEBUG_VOL("Starting Physical LBA(%llu) for head_obj_api->(%p)\n",
-			lba, head_obj_api);
+	DEBUG_VOL("Starting Physical LBA(%llu)\n", lba);
 
 	while (sectors) {
-		if (!obj_api) {
-			head_obj_api->release_obj_lock(head_obj_ptr);
-			printk(KERN_ERR "obj_api is NULL LBA(%llu)->Sectors"
-				"(%u)\n", lba, sectors);
-			return 0;
-		}
 
 		DEBUG_VOL("ITT[0x%08x] LBA(%llu) SectorsLeft(%u) EOBJ(%llu)\n",
 			CMD_TFO(cmd)->get_task_tag(cmd), lba, sectors,
-			obj_api->end_lba(obj_ptr, 1));
+			dev_obj_end_lba(obj_ptr));
 
-		head_obj_api->release_obj_lock(head_obj_ptr);
-
-		task = cmd->transport_get_task(ti, cmd, obj_ptr, obj_api);
+		task = cmd->transport_get_task(ti, cmd, obj_ptr);
 		if (!(task))
 			goto out;
 
-		transport_set_task_sectors(task, obj_api, obj_ptr, lba,
-				sectors, &max_sectors_set);
+		transport_set_task_sectors(task, obj_ptr, lba, sectors,
+				&max_sectors_set);
 
 		task->task_lba = lba;
 		lba += task->task_sectors;
 		sectors -= task->task_sectors;
 		task->task_size = (task->task_sectors *
-					obj_api->blocksize(obj_ptr));
-		task->transport_map_task =
-			obj_api->get_map_SG(obj_ptr, cmd->data_direction);
+				   DEV_ATTRIB(dev)->block_size);
+		task->transport_map_task = dev_obj_get_map_SG(
+				obj_ptr, cmd->data_direction);
 
-		cdb = obj_api->get_cdb(obj_ptr, task);
+		cdb = TRANSPORT(dev)->get_cdb(task);
 		if ((cdb)) {
 			memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
 			cmd->transport_split_cdb(task->task_lba,
@@ -7138,13 +7104,11 @@ u32 transport_generic_get_cdb_count(
 		 * Perform the SE OBJ plugin and/or Transport plugin specific
 		 * mapping for T_TASK(cmd)->t_mem_list.
 		 */
-		ret = obj_api->do_se_mem_map(obj_ptr, task,
+		ret = dev_obj_do_se_mem_map(obj_ptr, task,
 				T_TASK(cmd)->t_mem_list, NULL, se_mem,
 				&se_mem_lout, &se_mem_cnt, task_offset_in);
 		if (ret < 0)
 			goto out;
-
-		head_obj_api->obtain_obj_lock(head_obj_ptr);
 
 		se_mem = se_mem_lout;
 		*se_mem_out = se_mem_lout;
@@ -7160,14 +7124,7 @@ u32 transport_generic_get_cdb_count(
 
 		if (!sectors)
 			break;
-
-		obj_api = obj_api->get_next_obj_api(obj_ptr, &next_obj_ptr);
-		if (obj_api) {
-			obj_ptr = next_obj_ptr;
-			lba = obj_api->get_next_lba(obj_ptr, lba);
-		}
 	}
-	head_obj_api->release_obj_lock(head_obj_ptr);
 
 	if (ti->ti_set_counts) {
 		atomic_inc(&T_TASK(cmd)->t_fe_count);
@@ -7199,7 +7156,6 @@ int transport_generic_new_cmd(se_cmd_t *cmd)
 	memset((void *)&ti, 0, sizeof(se_transform_info_t));
 	ti.ti_se_cmd = cmd;
 	ti.se_obj_ptr = SE_LUN(cmd)->lun_type_ptr;
-	ti.se_obj_api = SE_LUN(cmd)->lun_obj_api;
 
 	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)) {
 		/*
@@ -7217,12 +7173,11 @@ int transport_generic_new_cmd(se_cmd_t *cmd)
 				goto failure;
 		}
 
-		ret = transport_get_sectors(cmd, SE_LUN(cmd)->lun_obj_api,
-					SE_LUN(cmd)->lun_type_ptr);
+		ret = transport_get_sectors(cmd, SE_LUN(cmd)->lun_type_ptr);
 		if (ret < 0)
 			goto failure;
 
-		ret = transport_new_cmd_obj(cmd, &ti, SE_LUN(cmd)->lun_obj_api,
+		ret = transport_new_cmd_obj(cmd, &ti,
 					SE_LUN(cmd)->lun_type_ptr, 0);
 		if (ret < 0)
 			goto failure;
@@ -7466,7 +7421,7 @@ int transport_lun_wait_for_tasks(se_cmd_t *cmd, se_lun_t *lun)
 	atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 1);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	CMD_ORIG_OBJ_API(cmd)->notify_obj(cmd->se_orig_obj_ptr);
+	wake_up_interruptible(&SE_DEV(cmd)->dev_queue_obj->thread_wq);
 
 	ret = transport_stop_tasks_for_cmd(cmd);
 
@@ -7479,8 +7434,7 @@ int transport_lun_wait_for_tasks(se_cmd_t *cmd, se_lun_t *lun)
 		DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopped cmd....\n",
 				CMD_TFO(cmd)->get_task_tag(cmd));
 	}
-	transport_remove_cmd_from_queue(cmd,
-		CMD_ORIG_OBJ_API(cmd)->get_queue_obj(cmd->se_orig_obj_ptr));
+	transport_remove_cmd_from_queue(cmd, SE_DEV(cmd)->dev_queue_obj);
 
 	return 0;
 }
@@ -7695,7 +7649,7 @@ static void transport_generic_wait_for_tasks(
 
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	CMD_ORIG_OBJ_API(cmd)->notify_obj(cmd->se_orig_obj_ptr);
+	wake_up_interruptible(&SE_DEV(cmd)->dev_queue_obj->thread_wq);
 
 	wait_for_completion(&T_TASK(cmd)->t_transport_stop_comp);
 
@@ -8122,8 +8076,7 @@ static void transport_processing_shutdown(se_device_t *dev)
 					cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE,
 					0);
 				transport_remove_cmd_from_queue(cmd,
-					CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-						cmd->se_orig_obj_ptr));
+					SE_DEV(cmd)->dev_queue_obj);
 
 				transport_lun_remove_cmd(cmd);
 				if (!(transport_cmd_check_stop(cmd, 1, 0)))
@@ -8133,8 +8086,7 @@ static void transport_processing_shutdown(se_device_t *dev)
 					&T_TASK(cmd)->t_state_lock, flags);
 
 				transport_remove_cmd_from_queue(cmd,
-					CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-						cmd->se_orig_obj_ptr));
+					SE_DEV(cmd)->dev_queue_obj);
 
 				transport_lun_remove_cmd(cmd);
 
@@ -8156,8 +8108,7 @@ static void transport_processing_shutdown(se_device_t *dev)
 			transport_send_check_condition_and_sense(cmd,
 				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 			transport_remove_cmd_from_queue(cmd,
-				CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-					cmd->se_orig_obj_ptr));
+				SE_DEV(cmd)->dev_queue_obj);
 
 			transport_lun_remove_cmd(cmd);
 			if (!(transport_cmd_check_stop(cmd, 1, 0)))
@@ -8167,8 +8118,7 @@ static void transport_processing_shutdown(se_device_t *dev)
 				&T_TASK(cmd)->t_state_lock, flags);
 
 			transport_remove_cmd_from_queue(cmd,
-				CMD_ORIG_OBJ_API(cmd)->get_queue_obj(
-					cmd->se_orig_obj_ptr));
+				SE_DEV(cmd)->dev_queue_obj);
 			transport_lun_remove_cmd(cmd);
 
 			if (!(transport_cmd_check_stop(cmd, 1, 0)))

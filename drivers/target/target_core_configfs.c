@@ -670,11 +670,10 @@ static ssize_t target_core_dev_wwn_store_attr_vpd_unit_serial(
 	 */
 	dev = su_dev->se_dev_ptr;
 	if ((dev)) {
-		if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+		if (atomic_read(&dev->dev_export_obj.obj_access_count)) {
 			printk(KERN_ERR "Unable to set VPD Unit Serial while"
 				" active %d $FABRIC_MOD exports exist\n",
-				DEV_OBJ_API(dev)->check_count(
-					&dev->dev_export_obj));
+				atomic_read(&dev->dev_export_obj.obj_access_count));
 			return -EINVAL;
 		}
 	}
@@ -1250,7 +1249,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return 0;
 
-	if (DEV_OBJ_API(dev)->check_count(&dev->dev_export_obj)) {
+	if (atomic_read(&dev->dev_export_obj.obj_access_count)) {
 		printk(KERN_INFO "Unable to process APTPL metadata while"
 			" active fabric exports exist\n");
 		return -EINVAL;

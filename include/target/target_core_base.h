@@ -399,9 +399,7 @@ typedef struct t10_reservation_template_s {
 
 typedef struct se_queue_req_s {
 	int			state;
-	void			*queue_se_obj_ptr;
 	void			*cmd;
-	struct se_obj_lun_type_s *queue_se_obj_api;
 	struct list_head	qr_list;
 } ____cacheline_aligned se_queue_req_t;
 
@@ -477,8 +475,7 @@ typedef struct se_task_s {
 	atomic_t	task_state_active;
 	struct timer_list	task_timer;
 	int (*transport_map_task)(struct se_task_s *, u32);
-	void *se_obj_ptr;
-	struct se_obj_lun_type_s *se_obj_api;
+	struct se_device_s *se_obj_ptr;
 	struct list_head t_list;
 	struct list_head t_execute_list;
 	struct list_head t_state_list;
@@ -493,10 +490,8 @@ typedef struct se_transform_info_s {
 	unsigned long long	ti_lba;
 	struct se_cmd_s *ti_se_cmd;
 	struct se_device_s *ti_dev;
-	void *se_obj_ptr;
-	void *ti_obj_ptr;
-	struct se_obj_lun_type_s *se_obj_api;
-	struct se_obj_lun_type_s *ti_obj_api;
+	struct se_device_s *se_obj_ptr;
+	struct se_device_s *ti_obj_ptr;
 } ____cacheline_aligned se_transform_info_t;
 
 typedef struct se_offset_map_s {
@@ -577,11 +572,9 @@ typedef struct se_cmd_s {
 	struct list_head	se_lun_list;
 	struct se_device_s      *se_dev;
 	struct se_dev_entry_s   *se_deve;
+	struct se_device_s	*se_obj_ptr;
+	struct se_device_s	*se_orig_obj_ptr;
 	struct se_lun_s		*se_lun;
-	struct se_obj_lun_type_s *se_obj_api;
-	void			*se_obj_ptr;
-	struct se_obj_lun_type_s *se_orig_obj_api;
-	void			*se_orig_obj_ptr;
 	void			*se_fabric_cmd_ptr;
 	struct se_session_s	*se_sess;
 	struct se_tmr_req_s	*se_tmr_req;
@@ -598,8 +591,7 @@ typedef struct se_cmd_s {
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
 	struct se_task_s *(*transport_get_task)(struct se_transform_info_s *,
-					struct se_cmd_s *, void *,
-					struct se_obj_lun_type_s *);
+					struct se_cmd_s *, void *);
 	int (*transport_map_buffers_to_tasks)(struct se_cmd_s *);
 	void (*transport_map_SG_segments)(struct se_unmap_sg_s *);
 	void (*transport_passthrough_done)(struct se_cmd_s *);
@@ -614,9 +606,6 @@ typedef struct se_cmd_s {
 } ____cacheline_aligned se_cmd_t;
 
 #define T_TASK(cmd)     ((se_transport_task_t *)(cmd->t_task))
-#define CMD_OBJ_API(cmd) ((struct se_obj_lun_type_s *)(cmd->se_obj_api))
-#define CMD_ORIG_OBJ_API(cmd) ((struct se_obj_lun_type_s *)	\
-				(cmd->se_orig_obj_api))
 #define CMD_TFO(cmd) ((struct target_core_fabric_ops *)cmd->se_tfo)
 
 typedef struct se_tmr_req_s {
@@ -686,7 +675,6 @@ typedef struct se_session_s {
 
 struct se_device_s;
 struct se_transform_info_s;
-struct se_obj_lun_type_s;
 struct scatterlist;
 
 typedef struct se_lun_acl_s {
@@ -830,7 +818,6 @@ typedef struct se_device_s {
 	struct se_obj_s		dev_obj;
 	struct se_obj_s		dev_access_obj;
 	struct se_obj_s		dev_export_obj;
-	struct se_obj_s		dev_feature_obj;
 	se_queue_obj_t		*dev_queue_obj;
 	se_queue_obj_t		*dev_status_queue_obj;
 	spinlock_t		delayed_cmd_lock;
@@ -860,7 +847,6 @@ typedef struct se_device_s {
 	int (*write_pending)(struct se_task_s *);
 	void (*dev_generate_cdb)(unsigned long long, u32 *,
 					unsigned char *, int);
-	struct se_obj_lun_type_s *dev_obj_api;
 	struct list_head	delayed_cmd_list;
 	struct list_head	ordered_cmd_list;
 	struct list_head	execute_task_list;
@@ -881,7 +867,6 @@ typedef struct se_device_s {
 #define ISCSI_DEV(cmd)		SE_DEV(cmd)
 #define DEV_ATTRIB(dev)		(&(dev)->se_sub_dev->se_dev_attrib)
 #define DEV_T10_WWN(dev)	(&(dev)->se_sub_dev->t10_wwn)
-#define DEV_OBJ_API(dev)	((struct se_obj_lun_type_s *)(dev)->dev_obj_api)
 
 typedef struct se_hba_s {
 	/* Type of disk transport used for HBA. */
@@ -932,13 +917,11 @@ typedef struct se_lun_s {
 	se_device_t		*se_dev;
 	void			*lun_type_ptr;
 	struct config_group	lun_group;
-	struct se_obj_lun_type_s *lun_obj_api;
 	struct se_port_s	*lun_sep;
 } ____cacheline_aligned se_lun_t;
 
 #define SE_LUN(c)		((se_lun_t *)(c)->se_lun)
 #define ISCSI_LUN(c)		SE_LUN(c)
-#define LUN_OBJ_API(lun)	((struct se_obj_lun_type_s *)(lun)->lun_obj_api)
 
 typedef struct se_port_s {
 	/* RELATIVE TARGET PORT IDENTIFER */

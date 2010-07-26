@@ -197,9 +197,6 @@ extern int transport_generic_claim_phydevice(se_device_t *);
 extern void transport_generic_release_phydevice(se_device_t *, int);
 extern void transport_generic_free_device(se_device_t *);
 extern int transport_generic_allocate_iovecs(struct se_cmd_s *);
-extern int transport_generic_obj_start(struct se_transform_info_s *,
-					struct se_obj_lun_type_s *, void *,
-					unsigned long long);
 extern void transport_device_setup_cmd(se_cmd_t *);
 extern int transport_check_alloc_task_attr(se_cmd_t *);
 extern se_cmd_t *transport_alloc_se_cmd(struct target_core_fabric_ops *,
@@ -239,9 +236,7 @@ extern int transport_generic_emulate_request_sense(struct se_cmd_s *,
 						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd_s *);
 extern se_cmd_t *transport_allocate_passthrough(unsigned char *, int, u32,
-						void *, u32, u32,
-						struct se_obj_lun_type_s *,
-						void *);
+						void *, u32, u32, void *);
 extern void transport_passthrough_release(se_cmd_t *);
 extern int transport_passthrough_complete(se_cmd_t *);
 extern void transport_memcpy_write_contig(se_cmd_t *, struct scatterlist *,
@@ -256,7 +251,6 @@ extern int transport_generic_passthrough(se_cmd_t *);
 extern void transport_complete_task_attr(se_cmd_t *);
 extern void transport_generic_complete_ok(se_cmd_t *);
 extern void transport_free_dev_tasks(se_cmd_t *);
-extern void transport_release_tasks(se_cmd_t *);
 extern void transport_release_fe_cmd(se_cmd_t *);
 extern int transport_generic_remove(se_cmd_t *, int, int);
 extern int transport_generic_map_mem_to_cmd(se_cmd_t *cmd, void *, u32);
@@ -272,11 +266,9 @@ extern void transport_generic_free_cmd(se_cmd_t *, int, int, int);
 extern void transport_generic_wait_for_cmds(se_cmd_t *, int);
 extern int transport_generic_do_transform(struct se_cmd_s *,
 					struct se_transform_info_s *);
-extern int transport_get_sectors(struct se_cmd_s *, struct se_obj_lun_type_s *,
-					void *);
+extern int transport_get_sectors(struct se_cmd_s *, void *);
 extern int transport_new_cmd_obj(struct se_cmd_s *,
-				struct se_transform_info_s *,
-				struct se_obj_lun_type_s *, void *, int);
+				struct se_transform_info_s *, void *, int);
 extern unsigned char *transport_get_vaddr(struct se_mem_s *);
 extern struct list_head *transport_init_se_mem_list(void);
 extern void transport_free_se_mem_list(struct list_head *);
@@ -292,8 +284,7 @@ extern int transport_map_mem_to_sg(struct se_task_s *, struct list_head *,
 					struct se_mem_s **, u32 *, u32 *);
 extern u32 transport_generic_get_cdb_count(struct se_cmd_s *,
 					struct se_transform_info_s *,
-					struct se_obj_lun_type_s *, void *,
-					unsigned long long, u32,
+					void *, unsigned long long, u32,
 					struct se_mem_s *, struct se_mem_s **,
 					u32 *);
 extern int transport_generic_new_cmd(se_cmd_t *);

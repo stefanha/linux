@@ -50,12 +50,6 @@ void plugin_load_all_classes(void)
 	 */
 	plugin_register_class(PLUGIN_TYPE_TRANSPORT, "TRANSPORT", MAX_PLUGINS);
 	transport_load_plugins();
-
-	/*
-	 * Setup Storage Engine Object Plugins
-	 */
-	plugin_register_class(PLUGIN_TYPE_OBJ, "OBJ", MAX_PLUGINS);
-	se_obj_load_plugins();
 }
 EXPORT_SYMBOL(plugin_load_all_classes);
 
