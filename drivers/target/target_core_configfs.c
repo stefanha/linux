@@ -1653,11 +1653,11 @@ static ssize_t target_core_show_dev_info(void *p, char *page)
 {
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	int ret = 0, bl = 0;
 	ssize_t read_bytes = 0;
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0))
 		return 0;
@@ -1686,7 +1686,7 @@ static ssize_t target_core_store_dev_control(
 {
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	int ret = 0;
 
 	if (!(se_dev->se_dev_su_ptr)) {
@@ -1695,7 +1695,7 @@ static ssize_t target_core_store_dev_control(
 		return -EINVAL;
 	}
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0))
 		return -EINVAL;
@@ -1716,7 +1716,7 @@ static ssize_t target_core_store_dev_fd(void *p, const char *page, size_t count)
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_device *dev;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	int ret = 0;
 
 	if (se_dev->se_dev_ptr) {
@@ -1725,13 +1725,13 @@ static ssize_t target_core_store_dev_fd(void *p, const char *page, size_t count)
 		return -EEXIST;
 	}
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0))
 		return -EINVAL;
 
 	if (!(t->create_virtdevice_from_fd)) {
-		printk(KERN_ERR "se_subsystem_api_t->create_virtdevice_from"
+		printk(KERN_ERR "struct se_subsystem_api->create_virtdevice_from"
 			"_fd() NULL for: %s\n", hba->transport->name);
 		return -EINVAL;
 	}
@@ -1859,7 +1859,7 @@ static ssize_t target_core_store_dev_enable(
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_device *dev;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	char *ptr;
 	int ret = 0;
 
@@ -1875,7 +1875,7 @@ static ssize_t target_core_store_dev_enable(
 		return -EEXIST;
 	}
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0))
 		return -EINVAL;
@@ -2730,7 +2730,7 @@ static struct config_group *target_core_call_createdev(
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
 	struct se_subsystem_dev *se_dev;
 	struct se_hba *hba;
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	struct config_item *hba_ci;
 	struct config_group *dev_cg = NULL, *tg_pt_gp_cg = NULL;
 	int ret = 0;
@@ -2748,9 +2748,9 @@ static struct config_group *target_core_call_createdev(
 	}
 
 	/*
-	 * Locate the se_subsystem_api_t from parent's struct se_hba.
+	 * Locate the struct se_subsystem_api from parent's struct se_hba.
 	 */
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0)) {
 		core_put_hba(hba);
@@ -2786,7 +2786,7 @@ static struct config_group *target_core_call_createdev(
 	if (!(dev_cg->default_groups))
 		goto out;
 	/*
-	 * Set se_dev_su_ptr from se_subsystem_api_t returned void ptr
+	 * Set se_dev_su_ptr from struct se_subsystem_api returned void ptr
 	 * for ->allocate_virtdevice()
 	 *
 	 * se_dev->se_dev_ptr will be set after ->create_virtdev()
@@ -2874,7 +2874,7 @@ static void target_core_call_freedev(
 	struct se_subsystem_dev *se_dev = container_of(to_config_group(item),
 				struct se_subsystem_dev, se_dev_group);
 	struct se_hba *hba;
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	struct config_item *df_item;
 	struct config_group *dev_cg, *tg_pt_gp_cg;
 	int i, ret = 0;
@@ -2884,7 +2884,7 @@ static void target_core_call_freedev(
 	if (!(hba))
 		goto out;
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0))
 		goto hba_out;
@@ -2987,7 +2987,7 @@ static ssize_t target_core_hba_show_attr_hba_mode(struct se_hba *hba,
 static ssize_t target_core_hba_store_attr_hba_mode(struct se_hba *hba,
 				const char *page, size_t count)
 {
-	struct se_subsystem_api_s *transport = hba->transport;
+	struct se_subsystem_api *transport = hba->transport;
 	unsigned long mode_flag;
 	int ret;
 
@@ -3047,7 +3047,7 @@ static struct config_group *target_core_call_addhbatotarget(
 {
 	char *se_plugin_str, *str, *str2;
 	struct se_hba *hba;
-	se_plugin_t *se_plugin;
+	struct se_plugin *se_plugin;
 	char buf[TARGET_CORE_NAME_MAX_LEN];
 	unsigned long plugin_dep_id = 0;
 	int hba_type = 0, ret;

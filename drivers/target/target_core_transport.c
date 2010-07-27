@@ -316,9 +316,9 @@ int init_se_global(void)
 		goto out;
 	}
 	se_mem_cache = kmem_cache_create("se_mem_cache",
-			sizeof(se_mem_t), __alignof__(se_mem_t), 0, NULL);
+			sizeof(struct se_mem), __alignof__(struct se_mem), 0, NULL);
 	if (!(se_mem_cache)) {
-		printk(KERN_ERR "kmem_cache_create() for se_mem_t failed\n");
+		printk(KERN_ERR "kmem_cache_create() for struct se_mem failed\n");
 		goto out;
 	}
 	t10_pr_reg_cache = kmem_cache_create("t10_pr_reg_cache",
@@ -364,7 +364,7 @@ int init_se_global(void)
 		goto out;
 	}
 
-	global->plugin_class_list = kzalloc((sizeof(se_plugin_class_t) *
+	global->plugin_class_list = kzalloc((sizeof(struct se_plugin_class) *
 				MAX_PLUGIN_CLASSES), GFP_KERNEL);
 	if (!(global->plugin_class_list)) {
 		printk(KERN_ERR "Unable to allocate global->"
@@ -553,10 +553,10 @@ void transport_load_plugins(void)
 #endif
 }
 
-se_plugin_t *transport_core_get_plugin_by_name(const char *name)
+struct se_plugin *transport_core_get_plugin_by_name(const char *name)
 {
-	se_plugin_class_t *pc;
-	se_plugin_t *p;
+	struct se_plugin_class *pc;
+	struct se_plugin *p;
 	int i;
 
 	pc = plugin_get_class(PLUGIN_TYPE_TRANSPORT);
@@ -1511,10 +1511,10 @@ void transport_dump_dev_info(
 	char *b,        /* Pointer to info buffer */
 	int *bl)
 {
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	int ret = 0;
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			dev->type, &ret);
 	if (!t || (ret != 0))
 		return;
@@ -2144,7 +2144,7 @@ static void core_setup_task_attr_emulation(struct se_device *dev)
  */
 struct se_device *transport_add_device_to_core_hba(
 	struct se_hba *hba,
-	se_subsystem_api_t *transport,
+	struct se_subsystem_api *transport,
 	struct se_subsystem_dev *se_dev,
 	u32 device_flags,
 	void *transport_dev)
@@ -2397,7 +2397,7 @@ EXPORT_SYMBOL(transport_generic_claim_phydevice);
  *
  *	In Linux v2.6 this means calling fs/block_dev.c:bd_release()
  *	see iscsi_target_pscsi.c and iscsi_target_iblock.c functions for
- *	se_subsystem_api_t->[claim,release]_phydevice()
+ *	struct se_subsystem_api->[claim,release]_phydevice()
  */
 void transport_generic_release_phydevice(struct se_device *dev, int check_pscsi)
 {
@@ -2621,7 +2621,7 @@ static int transport_process_control_sg_transform(
 {
 	unsigned char *cdb;
 	struct se_task *task;
-	se_mem_t *se_mem, *se_mem_lout = NULL;
+	struct se_mem *se_mem, *se_mem_lout = NULL;
 	struct se_device *dev = SE_DEV(cmd);
 	int ret;
 	u32 se_mem_cnt = 0, task_offset = 0;
@@ -3319,13 +3319,13 @@ static inline void transport_calculate_map_segment(
 	struct se_offset_map *lm)
 {
 	u32 sg_offset = 0;
-	se_mem_t *se_mem = lm->map_se_mem;
+	struct se_mem *se_mem = lm->map_se_mem;
 
 	DEBUG_MAP_SEGMENTS(" START Mapping se_mem: %p, Length: %d"
 		"  Remaining iSCSI Data: %u\n", se_mem, se_mem->se_len,
 		*data_length);
 	/*
-	 * Still working on pages in the current se_mem_t.
+	 * Still working on pages in the current struct se_mem.
 	 */
 	if (!lm->map_reset) {
 		lm->iovec_length = (lm->sg_length > PAGE_SIZE) ?
@@ -3458,7 +3458,7 @@ static int transport_get_iscsi_offset(
 	u32 current_length = 0, current_iscsi_offset = lmap->iscsi_offset;
 	u32 total_offset = 0;
 	struct se_cmd *cmd = usg->se_cmd;
-	se_mem_t *se_mem;
+	struct se_mem *se_mem;
 
 	list_for_each_entry(se_mem, T_TASK(cmd)->t_mem_list, se_list)
 		break;
@@ -3474,12 +3474,12 @@ static int transport_get_iscsi_offset(
 	 */
 	while (lmap->iscsi_offset != current_length) {
 		/*
-		 * The iSCSI Offset is within the current se_mem_t.
+		 * The iSCSI Offset is within the current struct se_mem.
 		 *
 		 * Or:
 		 *
-		 * The iSCSI Offset is outside of the current se_mem_t.
-		 * Recalculate the values and obtain the next se_mem_t pointer.
+		 * The iSCSI Offset is outside of the current struct se_mem.
+		 * Recalculate the values and obtain the next struct se_mem pointer.
 		 */
 		total_offset += se_mem->se_len;
 
@@ -3492,7 +3492,7 @@ static int transport_get_iscsi_offset(
 			lmap->orig_offset = lmap->current_offset =
 				usg->t_offset = current_iscsi_offset;
 			DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: Within Current"
-				" se_mem_t: %p, current_length incremented to"
+				" struct se_mem: %p, current_length incremented to"
 				" %u\n", se_mem, current_length);
 		} else {
 			current_length += se_mem->se_len;
@@ -3509,7 +3509,7 @@ static int transport_get_iscsi_offset(
 				break;
 
 			if (!se_mem) {
-				printk(KERN_ERR "Unable to locate se_mem_t\n");
+				printk(KERN_ERR "Unable to locate struct se_mem\n");
 				return -1;
 			}
 		}
@@ -3533,7 +3533,7 @@ static void iscsi_check_iovec_map(
 	u32 i, iovec_map_length = 0;
 	struct se_cmd *cmd = map_sg->se_cmd;
 	struct iovec *iov = map_sg->iov;
-	se_mem_t *se_mem;
+	struct se_mem *se_mem;
 
 	for (i = 0; i < iovec_count; i++)
 		iovec_map_length += iov[i].iov_len;
@@ -3595,7 +3595,7 @@ static int transport_generic_set_iovec_ptrs(
 	 * Used for non scatterlist operations, assume a single iovec.
 	 */
 	if (!T_TASK(cmd)->t_task_se_num) {
-		DEBUG_IOVEC_SCATTERLISTS("ITT: 0x%08x No se_mem_t elements"
+		DEBUG_IOVEC_SCATTERLISTS("ITT: 0x%08x No struct se_mem elements"
 			" present\n", CMD_TFO(cmd)->get_task_tag(cmd));
 		iov[0].iov_base = (unsigned char *) T_TASK(cmd)->t_task_buf +
 							map_sg->data_offset;
@@ -3686,7 +3686,7 @@ static int transport_generic_set_iovec_ptrs(
 
 			if (!lmap->map_se_mem) {
 				printk(KERN_ERR "Unable to locate next"
-					" lmap->map_se_mem_t entry\n");
+					" lmap->map_struct se_mem entry\n");
 				return -1;
 			}
 			j++;
@@ -3751,7 +3751,7 @@ static void transport_generic_map_SG_segments(struct se_unmap_sg *unmap_sg)
 {
 	u32 i = 0;
 	struct se_cmd *cmd = unmap_sg->se_cmd;
-	se_mem_t *se_mem = unmap_sg->cur_se_mem;
+	struct se_mem *se_mem = unmap_sg->cur_se_mem;
 
 	if (!(T_TASK(cmd)->t_task_se_num))
 		return;
@@ -3772,7 +3772,7 @@ static void transport_generic_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 {
 	u32 i = 0;
 	struct se_cmd *cmd = unmap_sg->se_cmd;
-	se_mem_t *se_mem = unmap_sg->cur_se_mem;
+	struct se_mem *se_mem = unmap_sg->cur_se_mem;
 
 	if (!(T_TASK(cmd)->t_task_se_num))
 		return;
@@ -4174,7 +4174,7 @@ check_depth:
 	/*
 	 * The struct se_cmd->transport_emulate_cdb() function pointer is used
 	 * to grab REPORT_LUNS CDBs before they hit the
-	 * se_subsystem_api_t->do_task() caller below.
+	 * struct se_subsystem_api->do_task() caller below.
 	 */
 	if (cmd->transport_emulate_cdb) {
 		error = cmd->transport_emulate_cdb(cmd);
@@ -5793,7 +5793,7 @@ struct se_cmd *transport_allocate_passthrough(
 	} else {
 		/*
 		 * Passed *mem will contain a list_head containing preformatted
-		 * se_mem_t elements...
+		 * struct se_mem elements...
 		 */
 		T_TASK(cmd)->t_mem_list = (struct list_head *)mem;
 		T_TASK(cmd)->t_task_se_num = se_mem_num;
@@ -5802,7 +5802,7 @@ struct se_cmd *transport_allocate_passthrough(
 #ifdef DEBUG_PASSTHROUGH
 		{
 		u32 total_se_length = 0;
-		se_mem_t *se_mem, *se_mem_tmp;
+		struct se_mem *se_mem, *se_mem_tmp;
 
 		DEBUG_PT("Preallocated se_mem_list: %p se_mem_num: %d\n",
 				mem, se_mem_num);
@@ -6162,7 +6162,7 @@ void transport_free_dev_tasks(struct se_cmd *cmd)
 
 static inline void transport_free_pages(struct se_cmd *cmd)
 {
-	se_mem_t *se_mem, *se_mem_tmp;
+	struct se_mem *se_mem, *se_mem_tmp;
 	int free_page =
 		((cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC) == 0);
 
@@ -6177,7 +6177,7 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 		return;
 	}
 	/*
-	 * Caller will handle releasing of se_mem_t.
+	 * Caller will handle releasing of struct se_mem.
 	 */
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC)
 		return;
@@ -6188,7 +6188,7 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 	list_for_each_entry_safe(se_mem, se_mem_tmp,
 			T_TASK(cmd)->t_mem_list, se_list) {
 		/*
-		 * We only release call __free_page(se_mem_t->se_page) when
+		 * We only release call __free_page(struct se_mem->se_page) when
 		 * SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC is NOT in use,
 		 */
 		if (free_page)
@@ -6323,7 +6323,7 @@ int transport_generic_map_mem_to_cmd(
 		return 0;
 	/*
 	 * Passed *mem will contain a list_head containing preformatted
-	 * se_mem_t elements...
+	 * struct se_mem elements...
 	 */
 	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM)) {
 		T_TASK(cmd)->t_mem_list = (struct list_head *)mem;
@@ -6338,9 +6338,9 @@ int transport_generic_map_mem_to_cmd(
 	if ((cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
 	    (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		/*
-		 * For CDB using TCM se_mem_t linked list scatterlist memory
+		 * For CDB using TCM struct se_mem linked list scatterlist memory
 		 * processed into a TCM struct se_subsystem_dev, we do the mapping
-		 * from the passed physical memory to se_mem_t->se_page here.
+		 * from the passed physical memory to struct se_mem->se_page here.
 		 */ 
 		T_TASK(cmd)->t_mem_list = transport_init_se_mem_list();
 		if (!(T_TASK(cmd)->t_mem_list))
@@ -6492,7 +6492,7 @@ int transport_new_cmd_obj(
 	int post_execute)
 {
 	u32 task_cdbs = 0, task_offset = 0;
-	se_mem_t *se_mem_out = NULL;
+	struct se_mem *se_mem_out = NULL;
 	struct se_device *dev = SE_DEV(cmd);
 
 	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)) {
@@ -6538,7 +6538,7 @@ int transport_new_cmd_obj(
 	return 0;
 }
 
-unsigned char *transport_get_vaddr(se_mem_t *se_mem)
+unsigned char *transport_get_vaddr(struct se_mem *se_mem)
 {
 	return page_address(se_mem->se_page) + se_mem->se_off;
 }
@@ -6559,7 +6559,7 @@ struct list_head *transport_init_se_mem_list(void)
 
 void transport_free_se_mem_list(struct list_head *se_mem_list)
 {
-	se_mem_t *se_mem, *se_mem_tmp;
+	struct se_mem *se_mem, *se_mem_tmp;
 
 	if (!se_mem_list)
 		return;
@@ -6574,7 +6574,7 @@ void transport_free_se_mem_list(struct list_head *se_mem_list)
 int transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 {
 	unsigned char *buf;
-	se_mem_t *se_mem;
+	struct se_mem *se_mem;
 
 	T_TASK(cmd)->t_mem_list = transport_init_se_mem_list();
 	if (!(T_TASK(cmd)->t_mem_list))
@@ -6583,13 +6583,13 @@ int transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 	while (length) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
-			printk(KERN_ERR "Unable to allocate se_mem_t\n");
+			printk(KERN_ERR "Unable to allocate struct se_mem\n");
 			goto out;
 		}
 		INIT_LIST_HEAD(&se_mem->se_list);
 		se_mem->se_len = (length > dma_size) ? dma_size : length;
 
-/* #warning FIXME Allocate contigous pages for se_mem_t elements */
+/* #warning FIXME Allocate contigous pages for struct se_mem elements */
 		se_mem->se_page = (struct page *) alloc_pages(GFP_KERNEL, 0);
 		if (!(se_mem->se_page)) {
 			printk(KERN_ERR "alloc_pages() failed\n");
@@ -6607,14 +6607,14 @@ int transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 		list_add_tail(&se_mem->se_list, T_TASK(cmd)->t_mem_list);
 		T_TASK(cmd)->t_task_se_num++;
 
-		DEBUG_MEM("Allocated se_mem_t page(%p) Length(%u)"
+		DEBUG_MEM("Allocated struct se_mem page(%p) Length(%u)"
 			" Offset(%u)\n", se_mem->se_page, se_mem->se_len,
 			se_mem->se_off);
 
 		length -= se_mem->se_len;
 	}
 
-	DEBUG_MEM("Allocated total se_mem_t elements(%u)\n",
+	DEBUG_MEM("Allocated total struct se_mem elements(%u)\n",
 			T_TASK(cmd)->t_task_se_num);
 
 	return 0;
@@ -6624,10 +6624,10 @@ out:
 
 extern u32 transport_calc_sg_num(
 	struct se_task *task,
-	se_mem_t *in_se_mem,
+	struct se_mem *in_se_mem,
 	u32 task_offset)
 {
-	se_mem_t *se_mem = in_se_mem;
+	struct se_mem *se_mem = in_se_mem;
 	u32 sg_length, sg_offset, task_size = task->task_size;
 	u32 saved_task_offset = 0;
 
@@ -6757,7 +6757,7 @@ int transport_map_sg_to_mem(
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	se_mem_t *se_mem;
+	struct se_mem *se_mem;
 	struct scatterlist *sg_s;
 	u32 j = 0, saved_task_offset = 0, task_size = cmd->data_length;
 
@@ -6770,7 +6770,7 @@ int transport_map_sg_to_mem(
 	while (task_size) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
-			printk(KERN_ERR "Unable to allocate se_mem_t\n");
+			printk(KERN_ERR "Unable to allocate struct se_mem\n");
 			return -1;
 		}
 		INIT_LIST_HEAD(&se_mem->se_list);
@@ -6820,7 +6820,7 @@ next:
 	}
 
 	DEBUG_MEM("task[0] - Mapped(%u) struct scatterlist segments to(%u)"
-		" se_mem_t\n", j, *se_mem_cnt);
+		" struct se_mem\n", j, *se_mem_cnt);
 
 	return 0;
 }
@@ -6829,23 +6829,23 @@ int transport_map_mem_to_mem(
 	struct se_task *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
-	se_mem_t *in_se_mem,
-	se_mem_t **out_se_mem,
+	struct se_mem *in_se_mem,
+	struct se_mem **out_se_mem,
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	se_mem_t *se_mem = in_se_mem, *se_mem_new;
+	struct se_mem *se_mem = in_se_mem, *se_mem_new;
 	u32 saved_task_offset = 0, task_size = task->task_size;
 
 	if (!se_mem) {
-		printk(KERN_ERR "Invalid se_mem_t pointer\n");
+		printk(KERN_ERR "Invalid struct se_mem pointer\n");
 		return -1;
 	}
 
 	while (task_size) {
 		se_mem_new = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem_new)) {
-			printk(KERN_ERR "Unable to allocate se_mem_t\n");
+			printk(KERN_ERR "Unable to allocate struct se_mem\n");
 			return -1;
 		}
 		INIT_LIST_HEAD(&se_mem_new->se_list);
@@ -6858,10 +6858,10 @@ int transport_map_mem_to_mem(
 				se_mem_new->se_len = se_mem->se_len;
 
 				se_mem = list_entry(se_mem->se_list.next,
-							se_mem_t, se_list);
+							struct se_mem, se_list);
 				if (!(se_mem)) {
 					printk(KERN_ERR "Unable to locate next"
-							" se_mem_t\n");
+							" struct se_mem\n");
 					return -1;
 				}
 			} else {
@@ -6894,10 +6894,10 @@ int transport_map_mem_to_mem(
 							*task_offset);
 
 				se_mem = list_entry(se_mem->se_list.next,
-							se_mem_t, se_list);
+							struct se_mem, se_list);
 				if (!(se_mem)) {
 					printk(KERN_ERR "Unable to locate next"
-							" se_mem_t\n");
+							" struct se_mem\n");
 					return -1;
 				}
 			}
@@ -6930,12 +6930,12 @@ int transport_map_mem_to_sg(
 	struct se_task *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
-	se_mem_t *in_se_mem,
-	se_mem_t **out_se_mem,
+	struct se_mem *in_se_mem,
+	struct se_mem **out_se_mem,
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	se_mem_t *se_mem = in_se_mem;
+	struct se_mem *se_mem = in_se_mem;
 	struct scatterlist *sg = (struct scatterlist *)in_mem;
 	u32 saved_task_offset = 0, sg_no = 0;
 	u32 task_size = task->task_size;
@@ -6955,10 +6955,10 @@ int transport_map_mem_to_sg(
 				sg[sg_no].length = se_mem->se_len;
 
 				se_mem = list_entry(se_mem->se_list.next,
-							se_mem_t, se_list);
+							struct se_mem, se_list);
 				if (!(se_mem)) {
 					printk(KERN_ERR "Unable to locate"
-						" next se_mem_t\n");
+						" next struct se_mem\n");
 					return -1;
 				}
 				(*se_mem_cnt)++;
@@ -6966,7 +6966,7 @@ int transport_map_mem_to_sg(
 				sg[sg_no].length = task_size;
 				/*
 				 * Determine if we need to calculate an offset
-				 * into the se_mem_t on the next go around..
+				 * into the struct se_mem on the next go around..
 				 */
 				task_size -= sg[sg_no].length;
 				if (!(task_size)) {
@@ -6986,7 +6986,7 @@ int transport_map_mem_to_sg(
 				sg[sg_no].length = task_size;
 				/*
 				 * Determine if we need to calculate an offset
-				 * into the se_mem_t on the next go around..
+				 * into the struct se_mem on the next go around..
 				 */
 				task_size -= sg[sg_no].length;
 				if (!(task_size)) {
@@ -6998,10 +6998,10 @@ int transport_map_mem_to_sg(
 						*task_offset);
 
 				se_mem = list_entry(se_mem->se_list.next,
-						se_mem_t, se_list);
+						struct se_mem, se_list);
 				if (!(se_mem)) {
 					printk(KERN_ERR "Unable to locate"
-						" next se_mem_t\n");
+						" next struct se_mem\n");
 					return -1;
 				}
 				(*se_mem_cnt)++;
@@ -7022,7 +7022,7 @@ next:
 	*out_se_mem = se_mem;
 	task->task_sg_num = sg_no;
 
-	DEBUG_MEM("task[%u] - Mapped(%u) se_mem_t segments to total(%u) SGs"
+	DEBUG_MEM("task[%u] - Mapped(%u) struct se_mem segments to total(%u) SGs"
 		" saved task_offset(%u)\n", task->task_no, *se_mem_cnt,
 			sg_no, *task_offset);
 
@@ -7035,14 +7035,14 @@ u32 transport_generic_get_cdb_count(
 	void *head_obj_ptr,
 	unsigned long long starting_lba,
 	u32 sectors,
-	se_mem_t *se_mem_in,
-	se_mem_t **se_mem_out,
+	struct se_mem *se_mem_in,
+	struct se_mem **se_mem_out,
 	u32 *task_offset_in)
 {
 	unsigned char *cdb = NULL;
 	void *obj_ptr;
 	struct se_task *task;
-	se_mem_t *se_mem, *se_mem_lout = NULL;
+	struct se_mem *se_mem, *se_mem_lout = NULL;
 	struct se_device *dev = SE_DEV(cmd);
 	int max_sectors_set = 0, ret;
 	u32 se_mem_cnt = 0, task_cdbs = 0;
@@ -7164,7 +7164,7 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 		 * physical memory, and is directly calling
 		 * transport_generic_map_mem_to_cmd() to setup beforehand
 		 * the linked list of physical memory at
-		 * T_TASK(cmd)->t_mem_list of se_mem_t->se_page
+		 * T_TASK(cmd)->t_mem_list of struct se_mem->se_page
 		 */
 		if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC)) {
 			/* #warning FIXME v3.2: Enable > PAGE_SIZE usage */

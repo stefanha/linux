@@ -34,7 +34,7 @@ extern void dev_obj_unexport(void *, struct se_portal_group *, struct se_lun *);
 extern int dev_obj_max_sectors(void *);
 extern unsigned long long dev_obj_end_lba(void *);
 extern int dev_obj_do_se_mem_map(void *, struct se_task *, struct list_head *,
-			void *, struct se_mem_s *, struct se_mem_s **,
+			void *, struct se_mem *, struct se_mem **,
 			u32 *, u32 *);
 extern int dev_obj_get_mem_buf(void *, struct se_cmd *);
 extern int dev_obj_get_mem_SG(void *, struct se_cmd *);

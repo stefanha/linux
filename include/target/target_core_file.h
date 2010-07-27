@@ -96,7 +96,7 @@ extern u32 fd_get_max_queue_depth(struct se_device *);
 #define RRF_EMULATE_CDB		0x01
 #define RRF_GOT_LBA		0x02
 
-typedef struct fd_request_s {
+struct fd_request {
 	/* SCSI CDB from iSCSI Command PDU */
 	unsigned char	fd_scsi_cdb[SCSI_CDB_SIZE];
 	/* Data Direction */
@@ -120,21 +120,14 @@ typedef struct fd_request_s {
 	   memory segments */
 	void		*fd_buf;
 	/* FILEIO device */
-	struct fd_dev_s	*fd_dev;
-} ____cacheline_aligned fd_request_t;
-
-typedef struct fd_dev_sg_table_s {
-	u32		page_start_offset;
-	u32		page_end_offset;
-	u32		fd_sg_count;
-	struct scatterlist *sg_table;
-} ____cacheline_aligned fd_dev_sg_table_t;
+	struct fd_dev	*fd_dev;
+} ____cacheline_aligned;
 
 #define FBDF_HAS_PATH		0x01
 #define FBDF_HAS_SIZE		0x02
 #define FDBD_USE_BUFFERED_IO	0x04
 
-typedef struct fd_dev_s {
+struct fd_dev {
 	u32		fbd_flags;
 	unsigned char	fd_dev_name[FD_MAX_DEV_NAME];
 	int		fd_claim_bd;
@@ -149,27 +142,25 @@ typedef struct fd_dev_s {
 	struct file	*fd_file;
 	struct block_device *fd_bd;
 	/* FILEIO HBA device is connected to */
-	struct fd_host_s *fd_host;
-	/* Next FILEIO Device entry in list */
-	struct fd_dev_s *next;
-	int (*fd_do_read)(fd_request_t *, struct se_task *);
-	int (*fd_do_write)(fd_request_t *, struct se_task *);
-} ____cacheline_aligned fd_dev_t;
+	struct fd_host *fd_host;
+	int (*fd_do_read)(struct fd_request *, struct se_task *);
+	int (*fd_do_write)(struct fd_request *, struct se_task *);
+} ____cacheline_aligned;
 
-extern void __fd_get_dev_info(struct fd_dev_s *, char *, int *);
+extern void __fd_get_dev_info(struct fd_dev *, char *, int *);
 
-typedef struct fd_host_s {
+struct fd_host {
 	u32		fd_host_dev_id_count;
 	/* Unique FILEIO Host ID */
 	u32		fd_host_id;
-} ____cacheline_aligned fd_host_t;
+} ____cacheline_aligned;
 
 #ifndef FD_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * se_subsystem_spc_t.
+ * struct se_subsystem_spc.
  */
-se_subsystem_spc_t fileio_template_spc = {
+struct se_subsystem_spc fileio_template_spc = {
 	.inquiry		= fd_CDB_inquiry,
 	.none			= fd_CDB_none,
 	.read_non_SG		= fd_CDB_read_non_SG,
@@ -181,7 +172,7 @@ se_subsystem_spc_t fileio_template_spc = {
 /*#warning FIXME v2.8: transport_type for FILEIO will need to change
   with DIRECT_IO to blockdevs */
 
-se_subsystem_api_t fileio_template = {
+struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
 	.type			= FILEIO,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,

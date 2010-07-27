@@ -53,10 +53,10 @@ void plugin_load_all_classes(void)
 }
 EXPORT_SYMBOL(plugin_load_all_classes);
 
-se_plugin_class_t *plugin_get_class(
+struct se_plugin_class *plugin_get_class(
 	u32 plugin_class_type)
 {
-	se_plugin_class_t *pc;
+	struct se_plugin_class *pc;
 
 	if (plugin_class_type > MAX_PLUGIN_CLASSES) {
 		printk(KERN_ERR "Passed plugin class type: %u exceeds"
@@ -78,8 +78,8 @@ int plugin_register_class(
 	int max_plugins)
 {
 	u32 i;
-	se_plugin_class_t *pc;
-	se_plugin_t *p;
+	struct se_plugin_class *pc;
+	struct se_plugin *p;
 
 	if (strlen(plugin_class_name) > MAX_PLUGIN_CLASS_NAME) {
 		printk(KERN_ERR "plugin_class_name exceeds MAX_PLUGIN_CLASS"
@@ -102,7 +102,7 @@ int plugin_register_class(
 	}
 	spin_unlock(&se_global->plugin_class_lock);
 
-	pc->plugin_array = kzalloc(sizeof(se_plugin_t) * max_plugins,
+	pc->plugin_array = kzalloc(sizeof(struct se_plugin) * max_plugins,
 				GFP_KERNEL);
 	if (!(pc->plugin_array)) {
 		printk(KERN_ERR "Unable to locate pc->plugin_array\n");
@@ -130,8 +130,8 @@ EXPORT_SYMBOL(plugin_register_class);
 int plugin_deregister_class(u32 plugin_class_type)
 {
 	int i;
-	se_plugin_class_t *pc;
-	se_plugin_t *p;
+	struct se_plugin_class *pc;
+	struct se_plugin *p;
 
 	pc = plugin_get_class(plugin_class_type);
 	if (!(pc))
@@ -156,7 +156,7 @@ EXPORT_SYMBOL(plugin_deregister_class);
 void plugin_unload_all_classes(void)
 {
 	u32 i;
-	se_plugin_class_t *pc;
+	struct se_plugin_class *pc;
 
 	for (i = 0; i < MAX_PLUGIN_CLASSES; i++) {
 		pc = &se_global->plugin_class_list[i];
@@ -176,8 +176,8 @@ void *plugin_get_obj(
 	u32 plugin_loc,
 	int *ret)
 {
-	se_plugin_class_t *pc;
-	se_plugin_t *p;
+	struct se_plugin_class *pc;
+	struct se_plugin *p;
 
 	pc = plugin_get_class(plugin_class);
 	if (!(pc))
@@ -207,7 +207,7 @@ out:
 }
 EXPORT_SYMBOL(plugin_get_obj);
 
-struct se_plugin_s *plugin_register(
+struct se_plugin *plugin_register(
 	void *obj,
 	u32 plugin_loc,
 	unsigned char *plugin_name,
@@ -217,8 +217,8 @@ struct se_plugin_s *plugin_register(
 	void (*plugin_free)(void),
 	int *ret)
 {
-	se_plugin_class_t *pc;
-	se_plugin_t *p;
+	struct se_plugin_class *pc;
+	struct se_plugin *p;
 	int err;
 
 	if (!obj) {
@@ -284,8 +284,8 @@ int plugin_deregister(
 	u32 plugin_class)
 {
 	int ret = 0;
-	se_plugin_class_t *pc;
-	se_plugin_t *p;
+	struct se_plugin_class *pc;
+	struct se_plugin *p;
 
 	pc = plugin_get_class(plugin_class);
 	if (!(pc))

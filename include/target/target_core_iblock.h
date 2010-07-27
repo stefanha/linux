@@ -84,21 +84,21 @@ extern u32 iblock_get_max_queue_depth(struct se_device *);
 extern void iblock_bio_done(struct bio *, int);
 #endif /* ! IBLOCK_INCLUDE_STRUCTS */
 
-typedef struct iblock_req_s {
+struct iblock_req {
 	unsigned char ib_scsi_cdb[SCSI_CDB_SIZE];
 	atomic_t ib_bio_cnt;
 	u32	ib_sg_count;
 	void	*ib_buf;
 	struct bio *ib_bio;
-	struct iblock_dev_s *ib_dev;
-} ____cacheline_aligned iblock_req_t;
+	struct iblock_dev *ib_dev;
+} ____cacheline_aligned;
 
 #define IBDF_HAS_UDEV_PATH		0x01
 #define IBDF_HAS_MAJOR			0x02
 #define IBDF_HAS_MINOR			0x04
 #define IBDF_HAS_FORCE			0x08
 
-typedef struct iblock_dev_s {
+struct iblock_dev {
 	unsigned char ibd_udev_path[SE_UDEV_PATH_LEN];
 	int	ibd_force;
 	int	ibd_major;
@@ -107,21 +107,21 @@ typedef struct iblock_dev_s {
 	u32	ibd_flags;
 	struct bio_set	*ibd_bio_set;
 	struct block_device *ibd_bd;
-	struct iblock_hba_s *ibd_host;
-} ____cacheline_aligned iblock_dev_t;
+	struct iblock_hba *ibd_host;
+} ____cacheline_aligned;
 
-void __iblock_get_dev_info(iblock_dev_t *, char *, int *);
+void __iblock_get_dev_info(struct iblock_dev *, char *, int *);
 
-typedef struct iblock_hba_s {
+struct iblock_hba {
 	int		iblock_host_id;
-} ____cacheline_aligned iblock_hba_t;
+} ____cacheline_aligned;
 
 #ifndef IBLOCK_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * se_subsystem_spc_t.
+ * struct se_subsystem_spc.
  */
-se_subsystem_spc_t iblock_template_spc = {
+struct se_subsystem_spc iblock_template_spc = {
 	.inquiry		= iblock_CDB_inquiry,
 	.none			= iblock_CDB_none,
 	.read_non_SG		= iblock_CDB_read_non_SG,
@@ -130,7 +130,7 @@ se_subsystem_spc_t iblock_template_spc = {
 	.write_SG		= iblock_CDB_write_SG,
 };
 
-se_subsystem_api_t iblock_template = {
+struct se_subsystem_api iblock_template = {
 	.name			= "iblock",
 	.type			= IBLOCK,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,

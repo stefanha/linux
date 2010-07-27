@@ -56,7 +56,7 @@
 
 #undef TARGET_CORE_STGT_C
 
-#define to_stgt_hba(d)	container_of(d, struct stgt_hba_s, dev)
+#define to_stgt_hba(d)	container_of(d, struct stgt_hba, dev)
 
 static int stgt_host_no_cnt;
 
@@ -109,7 +109,7 @@ static struct scsi_host_template stgt_driver_template = {
 
 static void stgt_release_adapter(struct device *dev)
 {
-	stgt_hba_t *stgt_hba;
+	struct stgt_hba *stgt_hba;
 
 	stgt_hba = to_stgt_hba(dev);
 	kfree(stgt_hba);
@@ -163,12 +163,12 @@ void stgt_plugin_free(void)
  */
 int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 {
-	stgt_hba_t *stgt_hba;
+	struct stgt_hba *stgt_hba;
 	int err;
 
-	stgt_hba = kzalloc(sizeof(stgt_hba_t), GFP_KERNEL);
+	stgt_hba = kzalloc(sizeof(struct stgt_hba), GFP_KERNEL);
 	if (!(stgt_hba)) {
-		printk(KERN_ERR "Unable to allocate stgt_hba_t\n");
+		printk(KERN_ERR "Unable to allocate struct stgt_hba\n");
 		return -ENOMEM;
 	}
 	stgt_hba->se_hba = hba;
@@ -193,7 +193,7 @@ int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 static int stgt_lld_probe(struct device *dev)
 {
 	struct se_hba *hba;
-	stgt_hba_t *stgt_hba;
+	struct stgt_hba *stgt_hba;
 	struct Scsi_Host *sh;
 	int hba_depth, max_sectors, err;
 
@@ -211,9 +211,9 @@ static int stgt_lld_probe(struct device *dev)
 	sh->max_lun = 10;
 
 	/*
-	 * Assign the stgt_hba_t pointer to struct Scsi_Host->hostdata..
+	 * Assign the struct stgt_hba pointer to struct Scsi_Host->hostdata..
 	 */
-	*(stgt_hba_t **)&sh->hostdata = stgt_hba;
+	*(struct stgt_hba **)&sh->hostdata = stgt_hba;
 
 	err = scsi_add_host(sh, &stgt_hba->dev);
 	if (err) {
@@ -249,7 +249,7 @@ static int stgt_lld_probe(struct device *dev)
 
 static int stgt_lld_remove(struct device *dev)
 {
-	stgt_hba_t *stgt_hba;
+	struct stgt_hba *stgt_hba;
 	struct Scsi_Host *sh;
 
 	stgt_hba = to_stgt_hba(dev);
@@ -268,7 +268,7 @@ static int stgt_lld_remove(struct device *dev)
 int stgt_detach_hba(struct se_hba *hba)
 {
 	struct Scsi_Host *scsi_host = (struct Scsi_Host *) hba->hba_ptr;
-	stgt_hba_t *stgt_hba = *(stgt_hba_t **)shost_priv(scsi_host);
+	struct stgt_hba *stgt_hba = *(struct stgt_hba **)shost_priv(scsi_host);
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached STGT HBA: %s from"
 		" Generic Target Core\n", hba->hba_id,
@@ -283,11 +283,11 @@ int stgt_detach_hba(struct se_hba *hba)
 
 void *stgt_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
-	stgt_dev_virt_t *sdv;
+	struct stgt_dev_virt *sdv;
 
-	sdv = kzalloc(sizeof(stgt_dev_virt_t), GFP_KERNEL);
+	sdv = kzalloc(sizeof(struct stgt_dev_virt), GFP_KERNEL);
 	if (!(sdv)) {
-		printk(KERN_ERR "Unable to allocate memory for stgt_dev_virt_t\n");
+		printk(KERN_ERR "Unable to allocate memory for struct stgt_dev_virt\n");
 		return NULL;
 	}
 	sdv->sdv_se_hba = hba;
@@ -302,11 +302,11 @@ struct se_device *stgt_create_virtdevice(
 	struct se_subsystem_dev *se_dev,
 	void *p)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *)p;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *)p;
 	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
 
 	if (!(sdv)) {
-		printk(KERN_ERR "Unable to locate stgt_dev_virt_t"
+		printk(KERN_ERR "Unable to locate struct stgt_dev_virt"
 				" parameter\n");
 		return NULL;
 	}
@@ -323,7 +323,7 @@ struct se_device *stgt_create_virtdevice(
  */
 int stgt_activate_device(struct se_device *dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 	struct Scsi_Host *sh = sd->host;
 
@@ -341,7 +341,7 @@ int stgt_activate_device(struct se_device *dev)
  */
 void stgt_deactivate_device(struct se_device *dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 	struct Scsi_Host *sh = sd->host;
 
@@ -357,7 +357,7 @@ void stgt_deactivate_device(struct se_device *dev)
  */
 void stgt_free_device(void *p)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) p;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) p;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 
 	if (sdv->sdv_bd)
@@ -379,7 +379,7 @@ void stgt_free_device(void *p)
  */
 int stgt_transport_complete(struct se_task *task)
 {
-	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
 	int result;
 
 	result = st->stgt_result;
@@ -397,11 +397,11 @@ void *stgt_allocate_request(
 	struct se_task *task,
 	struct se_device *dev)
 {
-	stgt_plugin_task_t *st;
+	struct stgt_plugin_task *st;
 
-	st = kzalloc(sizeof(stgt_plugin_task_t), GFP_KERNEL);
+	st = kzalloc(sizeof(struct stgt_plugin_task), GFP_KERNEL);
 	if (!(st)) {
-		printk(KERN_ERR "Unable to allocate stgt_plugin_task_t\n");
+		printk(KERN_ERR "Unable to allocate struct stgt_plugin_task\n");
 		return NULL;
 	}
 
@@ -414,7 +414,7 @@ void *stgt_allocate_request(
  */
 int stgt_do_task(struct se_task *task)
 {
-	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
 	struct Scsi_Host *sh = task->se_dev->se_hba->hba_ptr;
 	struct scsi_cmnd *sc;
 	int tag = MSG_SIMPLE_TAG;
@@ -451,7 +451,7 @@ int stgt_do_task(struct se_task *task)
  */
 void stgt_free_task(struct se_task *task)
 {
-	stgt_plugin_task_t *st = (stgt_plugin_task_t *)task->transport_req;
+	struct stgt_plugin_task *st = (struct stgt_plugin_task *)task->transport_req;
 
 	kfree(st);
 }
@@ -461,7 +461,7 @@ ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 	const char *page,
 	ssize_t count)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) se_dev->se_dev_su_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) se_dev->se_dev_su_ptr;
 	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
 	char *buf, *cur, *ptr, *ptr2;
 	unsigned long scsi_channel_id, scsi_target_id, scsi_lun_id;
@@ -543,7 +543,7 @@ ssize_t stgt_check_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) se_dev->se_dev_su_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) se_dev->se_dev_su_ptr;
 
 	if (!(sdv->sdv_flags & PDF_HAS_CHANNEL_ID) ||
 	    !(sdv->sdv_flags & PDF_HAS_TARGET_ID) ||
@@ -561,7 +561,7 @@ ssize_t stgt_show_configfs_dev_params(
 	struct se_subsystem_dev *se_dev,
 	char *page)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) se_dev->se_dev_su_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) se_dev->se_dev_su_ptr;
 	int bl = 0;
 
 	__stgt_get_dev_info(sdv, page, &bl);
@@ -586,12 +586,12 @@ void stgt_get_hba_info(struct se_hba *hba, char *b, int *bl)
 
 void stgt_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 
 	__stgt_get_dev_info(sdv, b, bl);
 }
 
-void __stgt_get_dev_info(stgt_dev_virt_t *sdv, char *b, int *bl)
+void __stgt_get_dev_info(struct stgt_dev_virt *sdv, char *b, int *bl)
 {
 	int i;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
@@ -667,7 +667,7 @@ int stgt_map_task_non_SG(struct se_task *task)
  */
 int stgt_CDB_inquiry(struct se_task *task, u32 size)
 {
-	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
 
 	st->stgt_direction = DMA_FROM_DEVICE;
 	return stgt_map_task_non_SG(task);
@@ -675,7 +675,7 @@ int stgt_CDB_inquiry(struct se_task *task, u32 size)
 
 int stgt_CDB_none(struct se_task *task, u32 size)
 {
-	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
 
 	st->stgt_direction = DMA_NONE;
 	return 0;
@@ -687,7 +687,7 @@ int stgt_CDB_none(struct se_task *task, u32 size)
  */
 int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
 
 	pt->stgt_direction = DMA_FROM_DEVICE;
 	return stgt_map_task_non_SG(task);
@@ -699,7 +699,7 @@ int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 int stgt_CDB_read_SG(struct se_task *task, u32 size)
 {
-	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
 
 	pt->stgt_direction = DMA_FROM_DEVICE;
 
@@ -715,7 +715,7 @@ int stgt_CDB_read_SG(struct se_task *task, u32 size)
  */
 int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
 
 	pt->stgt_direction = DMA_TO_DEVICE;
 	return stgt_map_task_non_SG(task);
@@ -727,7 +727,7 @@ int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 int stgt_CDB_write_SG(struct se_task *task, u32 size)
 {
-	stgt_plugin_task_t *st = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
 
 	st->stgt_direction = DMA_TO_DEVICE;
 
@@ -761,7 +761,7 @@ int stgt_check_for_SG(struct se_task *task)
  */
 unsigned char *stgt_get_cdb(struct se_task *task)
 {
-	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
 
 	return pt->stgt_cdb;
 }
@@ -772,7 +772,7 @@ unsigned char *stgt_get_cdb(struct se_task *task)
  */
 unsigned char *stgt_get_sense_buffer(struct se_task *task)
 {
-	stgt_plugin_task_t *pt = (stgt_plugin_task_t *) task->transport_req;
+	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
 
 	return (unsigned char *)&pt->stgt_sense[0];
 }
@@ -783,7 +783,7 @@ unsigned char *stgt_get_sense_buffer(struct se_task *task)
  */
 u32 stgt_get_blocksize(struct se_device *dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 
 	return sd->sector_size;
@@ -795,7 +795,7 @@ u32 stgt_get_blocksize(struct se_device *dev)
  */
 u32 stgt_get_device_rev(struct se_device *dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 
 	return (sd->scsi_level - 1) ? sd->scsi_level - 1 : 1;
@@ -807,7 +807,7 @@ u32 stgt_get_device_rev(struct se_device *dev)
  */
 u32 stgt_get_device_type(struct se_device *dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 
 	return sd->type;
@@ -828,7 +828,7 @@ u32 stgt_get_dma_length(u32 task_size, struct se_device *dev)
  */
 u32 stgt_get_max_sectors(struct se_device *dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 	return (sd->host->max_sectors > sd->request_queue->limits.max_sectors) ?
 		sd->request_queue->limits.max_sectors : sd->host->max_sectors;
@@ -840,7 +840,7 @@ u32 stgt_get_max_sectors(struct se_device *dev)
  */
 u32 stgt_get_queue_depth(struct se_device *dev)
 {
-	stgt_dev_virt_t *sdv = (stgt_dev_virt_t *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
 	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
 
 	return sd->queue_depth;
@@ -852,7 +852,7 @@ u32 stgt_get_queue_depth(struct se_device *dev)
  */
 static inline void stgt_process_SAM_status(
 	struct se_task *task,
-	stgt_plugin_task_t *st)
+	struct stgt_plugin_task *st)
 {
 	task->task_scsi_status = status_byte(st->stgt_result);
 	if ((task->task_scsi_status)) {
@@ -890,15 +890,15 @@ int stgt_transfer_response(struct scsi_cmnd *sc,
 			   void (*done)(struct scsi_cmnd *))
 {
 	struct se_task *task = (struct se_task *)sc->SCp.ptr;
-	stgt_plugin_task_t *st;
+	struct stgt_plugin_task *st;
 
 	if (!task) {
 		printk(KERN_ERR "struct se_task is NULL!\n");
 		BUG();
 	}
-	st = (stgt_plugin_task_t *)task->transport_req;
+	st = (struct stgt_plugin_task *)task->transport_req;
 	if (!st) {
-		printk(KERN_ERR "stgt_plugin_task_t is NULL!\n");
+		printk(KERN_ERR "struct stgt_plugin_task is NULL!\n");
 		BUG();
 	}
 	st->stgt_result = sc->request->errors;

@@ -56,11 +56,11 @@
  */
 int rd_attach_hba(struct se_hba *hba, u32 host_id)
 {
-	rd_host_t *rd_host;
+	struct rd_host *rd_host;
 
-	rd_host = kzalloc(sizeof(rd_host_t), GFP_KERNEL);
+	rd_host = kzalloc(sizeof(struct rd_host), GFP_KERNEL);
 	if (!(rd_host)) {
-		printk(KERN_ERR "Unable to allocate memory for rd_host_t\n");
+		printk(KERN_ERR "Unable to allocate memory for struct rd_host\n");
 		return -ENOMEM;
 	}
 
@@ -89,14 +89,14 @@ int rd_attach_hba(struct se_hba *hba, u32 host_id)
  */
 int rd_detach_hba(struct se_hba *hba)
 {
-	rd_host_t *rd_host;
+	struct rd_host *rd_host;
 
 	if (!hba->hba_ptr) {
 		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
 		return -1;
 	}
 
-	rd_host = (rd_host_t *) hba->hba_ptr;
+	rd_host = (struct rd_host *) hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached Ramdisk HBA: %u from"
 		" Generic Target Core\n", hba->hba_id, rd_host->rd_host_id);
@@ -111,10 +111,10 @@ int rd_detach_hba(struct se_hba *hba)
  *
  *
  */
-void rd_release_device_space(rd_dev_t *rd_dev)
+void rd_release_device_space(struct rd_dev *rd_dev)
 {
 	u32 i, j, page_count = 0, sg_per_table;
-	rd_dev_sg_table_t *sg_table;
+	struct rd_dev_sg_table *sg_table;
 	struct page *pg;
 	struct scatterlist *sg;
 
@@ -153,12 +153,12 @@ void rd_release_device_space(rd_dev_t *rd_dev)
  *
  *
  */
-static int rd_build_device_space(rd_dev_t *rd_dev)
+static int rd_build_device_space(struct rd_dev *rd_dev)
 {
 	u32 i = 0, j, page_offset = 0, sg_per_table, sg_tables, total_sg_needed;
 	u32 max_sg_per_table = (RD_MAX_ALLOCATION_SIZE /
 				sizeof(struct scatterlist));
-	rd_dev_sg_table_t *sg_table;
+	struct rd_dev_sg_table *sg_table;
 	struct page *pg;
 	struct scatterlist *sg;
 
@@ -171,7 +171,7 @@ static int rd_build_device_space(rd_dev_t *rd_dev)
 
 	sg_tables = (total_sg_needed / max_sg_per_table) + 1;
 
-	sg_table = kzalloc(sg_tables * sizeof(rd_dev_sg_table_t), GFP_KERNEL);
+	sg_table = kzalloc(sg_tables * sizeof(struct rd_dev_sg_table), GFP_KERNEL);
 	if (!(sg_table)) {
 		printk(KERN_ERR "Unable to allocate memory for Ramdisk"
 			" scatterlist tables\n");
@@ -189,7 +189,7 @@ static int rd_build_device_space(rd_dev_t *rd_dev)
 				GFP_KERNEL);
 		if (!(sg)) {
 			printk(KERN_ERR "Unable to allocate scatterlist array"
-				" for rd_dev_t\n");
+				" for struct rd_dev\n");
 			return -1;
 		}
 
@@ -206,7 +206,7 @@ static int rd_build_device_space(rd_dev_t *rd_dev)
 					GFP_KERNEL, 0);
 			if (!(pg)) {
 				printk(KERN_ERR "Unable to allocate scatterlist"
-					" pages for rd_dev_sg_table_t\n");
+					" pages for struct rd_dev_sg_table\n");
 				return -1;
 			}
 			sg_assign_page(&sg[j], pg);
@@ -230,12 +230,12 @@ static void *rd_allocate_virtdevice(
 	const char *name,
 	int rd_direct)
 {
-	rd_dev_t *rd_dev;
-	rd_host_t *rd_host = (rd_host_t *) hba->hba_ptr;
+	struct rd_dev *rd_dev;
+	struct rd_host *rd_host = (struct rd_host *) hba->hba_ptr;
 
-	rd_dev = kzalloc(sizeof(rd_dev_t), GFP_KERNEL);
+	rd_dev = kzalloc(sizeof(struct rd_dev), GFP_KERNEL);
 	if (!(rd_dev)) {
-		printk(KERN_ERR "Unable to allocate memory for rd_dev_t\n");
+		printk(KERN_ERR "Unable to allocate memory for struct rd_dev\n");
 		return NULL;
 	}
 
@@ -266,8 +266,8 @@ static struct se_device *rd_create_virtdevice(
 	int rd_direct)
 {
 	struct se_device *dev;
-	rd_dev_t *rd_dev = (rd_dev_t *) p;
-	rd_host_t *rd_host = (rd_host_t *) hba->hba_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) p;
+	struct rd_host *rd_host = (struct rd_host *) hba->hba_ptr;
 	int dev_flags = 0;
 
 	if (rd_dev->rd_direct)
@@ -321,8 +321,8 @@ struct se_device *rd_MEMCPY_create_virtdevice(
  */
 int rd_activate_device(struct se_device *dev)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
-	rd_host_t *rd_host = rd_dev->rd_host;
+	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
+	struct rd_host *rd_host = rd_dev->rd_host;
 
 	printk(KERN_INFO "CORE_RD[%u] - Activating Device with TCQ: %d at"
 		" Ramdisk Device ID: %d\n", rd_host->rd_host_id,
@@ -337,8 +337,8 @@ int rd_activate_device(struct se_device *dev)
  */
 void rd_deactivate_device(struct se_device *dev)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
-	rd_host_t *rd_host = rd_dev->rd_host;
+	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
+	struct rd_host *rd_host = rd_dev->rd_host;
 
 	printk(KERN_INFO "CORE_RD[%u] - Deactivating Device with TCQ: %d at"
 		" Ramdisk Device ID: %d\n", rd_host->rd_host_id,
@@ -351,7 +351,7 @@ void rd_deactivate_device(struct se_device *dev)
  */
 void rd_free_device(void *p)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) p;
+	struct rd_dev *rd_dev = (struct rd_dev *) p;
 
 	rd_release_device_space(rd_dev);
 	kfree(rd_dev);
@@ -374,14 +374,14 @@ void *rd_allocate_request(
 	struct se_task *task,
 	struct se_device *dev)
 {
-	rd_request_t *rd_req;
+	struct rd_request *rd_req;
 
-	rd_req = kzalloc(sizeof(rd_request_t), GFP_KERNEL);
+	rd_req = kzalloc(sizeof(struct rd_request), GFP_KERNEL);
 	if (!(rd_req)) {
-		printk(KERN_ERR "Unable to allocate rd_request_t\n");
+		printk(KERN_ERR "Unable to allocate struct rd_request\n");
 		return NULL;
 	}
-	rd_req->rd_dev = (rd_dev_t *) dev->dev_ptr;
+	rd_req->rd_dev = (struct rd_dev *) dev->dev_ptr;
 
 	return (void *)rd_req;
 }
@@ -393,7 +393,7 @@ void *rd_allocate_request(
 static int rd_emulate_inquiry(struct se_task *task)
 {
 	unsigned char prod[64], se_location[128];
-	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) task->se_dev->dev_ptr;
 	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_hba *hba = task->se_dev->se_hba;
 
@@ -414,7 +414,7 @@ static int rd_emulate_inquiry(struct se_task *task)
  */
 static int rd_emulate_read_cap(struct se_task *task)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) task->se_dev->dev_ptr;
 	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) /
 		       DEV_ATTRIB(task->se_dev)->block_size) - 1;
 
@@ -427,7 +427,7 @@ static int rd_emulate_read_cap(struct se_task *task)
 
 static int rd_emulate_read_cap16(struct se_task *task)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) task->se_dev->dev_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) task->se_dev->dev_ptr;
 	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) /
 				   DEV_ATTRIB(task->se_dev)->block_size) - 1;
 
@@ -443,7 +443,7 @@ static int rd_emulate_scsi_cdb(struct se_task *task)
 {
 	int ret;
 	struct se_cmd *cmd = TASK_CMD(task);
-	rd_request_t *rd_req = (rd_request_t *) task->transport_req;
+	struct rd_request *rd_req = (struct rd_request *) task->transport_req;
 
 	switch (rd_req->rd_scsi_cdb[0]) {
 	case INQUIRY:
@@ -517,10 +517,10 @@ static int rd_emulate_scsi_cdb(struct se_task *task)
  *
  *
  */
-static rd_dev_sg_table_t *rd_get_sg_table(rd_dev_t *rd_dev, u32 page)
+static struct rd_dev_sg_table *rd_get_sg_table(struct rd_dev *rd_dev, u32 page)
 {
 	u32 i;
-	rd_dev_sg_table_t *sg_table;
+	struct rd_dev_sg_table *sg_table;
 
 	for (i = 0; i < rd_dev->sg_table_count; i++) {
 		sg_table = &rd_dev->sg_table_array[i];
@@ -529,7 +529,7 @@ static rd_dev_sg_table_t *rd_get_sg_table(rd_dev_t *rd_dev, u32 page)
 			return sg_table;
 	}
 
-	printk(KERN_ERR "Unable to locate rd_dev_sg_table_t for page: %u\n",
+	printk(KERN_ERR "Unable to locate struct rd_dev_sg_table for page: %u\n",
 			page);
 
 	return NULL;
@@ -539,10 +539,10 @@ static rd_dev_sg_table_t *rd_get_sg_table(rd_dev_t *rd_dev, u32 page)
  *
  *
  */
-static int rd_MEMCPY_read(rd_request_t *req)
+static int rd_MEMCPY_read(struct rd_request *req)
 {
-	rd_dev_t *dev = req->rd_dev;
-	rd_dev_sg_table_t *table;
+	struct rd_dev *dev = req->rd_dev;
+	struct rd_dev_sg_table *table;
 	struct scatterlist *sg_d, *sg_s;
 	void *dst, *src;
 	u32 i = 0, j = 0, dst_offset = 0, src_offset = 0;
@@ -661,10 +661,10 @@ static int rd_MEMCPY_read(rd_request_t *req)
  *
  *
  */
-static int rd_MEMCPY_write(rd_request_t *req)
+static int rd_MEMCPY_write(struct rd_request *req)
 {
-	rd_dev_t *dev = req->rd_dev;
-	rd_dev_sg_table_t *table;
+	struct rd_dev *dev = req->rd_dev;
+	struct rd_dev_sg_table *table;
 	struct scatterlist *sg_d, *sg_s;
 	void *dst, *src;
 	u32 i = 0, j = 0, dst_offset = 0, src_offset = 0;
@@ -786,7 +786,7 @@ static int rd_MEMCPY_write(rd_request_t *req)
 int rd_MEMCPY_do_task(struct se_task *task)
 {
 	struct se_device *dev = task->se_dev;
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 	int ret;
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
@@ -823,10 +823,10 @@ static int rd_DIRECT_with_offset(
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	rd_request_t *req = (rd_request_t *)task->transport_req;
-	rd_dev_t *dev = req->rd_dev;
-	rd_dev_sg_table_t *table;
-	se_mem_t *se_mem;
+	struct rd_request *req = (struct rd_request *)task->transport_req;
+	struct rd_dev *dev = req->rd_dev;
+	struct rd_dev_sg_table *table;
+	struct se_mem *se_mem;
 	struct scatterlist *sg_s;
 	u32 j = 0, set_offset = 1;
 	u32 get_next_table = 0, offset_length, table_sg_end;
@@ -845,7 +845,7 @@ static int rd_DIRECT_with_offset(
 	while (req->rd_size) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
-			printk(KERN_ERR "Unable to allocate se_mem_t\n");
+			printk(KERN_ERR "Unable to allocate struct se_mem\n");
 			return -1;
 		}
 		INIT_LIST_HEAD(&se_mem->se_list);
@@ -910,7 +910,7 @@ check_eot:
 out:
 	T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
-	printk(KERN_INFO "RD_DR - Allocated %u se_mem_t segments for task\n",
+	printk(KERN_INFO "RD_DR - Allocated %u struct se_mem segments for task\n",
 			*se_mem_cnt);
 #endif
 	return 0;
@@ -926,10 +926,10 @@ static int rd_DIRECT_without_offset(
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	rd_request_t *req = (rd_request_t *)task->transport_req;
-	rd_dev_t *dev = req->rd_dev;
-	rd_dev_sg_table_t *table;
-	se_mem_t *se_mem;
+	struct rd_request *req = (struct rd_request *)task->transport_req;
+	struct rd_dev *dev = req->rd_dev;
+	struct rd_dev_sg_table *table;
+	struct se_mem *se_mem;
 	struct scatterlist *sg_s;
 	u32 length, j = 0;
 
@@ -946,7 +946,7 @@ static int rd_DIRECT_without_offset(
 	while (req->rd_size) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
-			printk(KERN_ERR "Unable to allocate se_mem_t\n");
+			printk(KERN_ERR "Unable to allocate struct se_mem\n");
 			return -1;
 		}
 		INIT_LIST_HEAD(&se_mem->se_list);
@@ -991,7 +991,7 @@ static int rd_DIRECT_without_offset(
 out:
 	T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
-	printk(KERN_INFO "RD_DR - Allocated %u se_mem_t segments for task\n",
+	printk(KERN_INFO "RD_DR - Allocated %u struct se_mem segments for task\n",
 			*se_mem_cnt);
 #endif
 	return 0;
@@ -1005,12 +1005,12 @@ int rd_DIRECT_do_se_mem_map(
 	struct se_task *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
-	se_mem_t *in_se_mem,
-	se_mem_t **out_se_mem,
+	struct se_mem *in_se_mem,
+	struct se_mem **out_se_mem,
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 	int ret;
 
 	req->rd_lba = task->task_lba;
@@ -1038,13 +1038,13 @@ int rd_DIRECT_do_se_mem_map(
  */
 void rd_DIRECT_free_DMA(struct se_cmd *cmd)
 {
-	se_mem_t *se_mem, *se_mem_tmp;
+	struct se_mem *se_mem, *se_mem_tmp;
 
 	/*
 	 * The scatterlists in the RAMDISK DIRECT case are using the pages
 	 * from the rd_device_t's scatterlist table. They are referencing
 	 * valid memory that is held within the RD transport plugin, so we
-	 * only free the se_mem_t elements.
+	 * only free the struct se_mem elements.
 	 */
 	list_for_each_entry_safe(se_mem, se_mem_tmp, T_TASK(cmd)->t_mem_list,
 				se_list) {
@@ -1084,7 +1084,7 @@ int rd_DIRECT_do_task(struct se_task *task)
 
 	/*
 	 * At this point the locally allocated RD tables have been mapped
-	 * to se_mem_t elements in rd_DIRECT_do_se_mem_map().
+	 * to struct se_mem elements in rd_DIRECT_do_se_mem_map().
 	 */
 	task->task_scsi_status = GOOD;
 	transport_complete_task(task, 1);
@@ -1098,8 +1098,8 @@ int rd_DIRECT_do_task(struct se_task *task)
  */
 void rd_free_task(struct se_task *task)
 {
-	rd_request_t *req;
-	req = (rd_request_t *) task->transport_req;
+	struct rd_request *req;
+	req = (struct rd_request *) task->transport_req;
 
 	kfree(req);
 }
@@ -1110,7 +1110,7 @@ ssize_t rd_set_configfs_dev_params(
 	const char *page,
 	ssize_t count)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) se_dev->se_dev_su_ptr;
 	char *buf, *cur, *ptr, *ptr2;
 	unsigned long rd_pages;
 	int params = 0, ret;
@@ -1156,7 +1156,7 @@ out:
 
 ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) se_dev->se_dev_su_ptr;
 
 	if (!(rd_dev->rd_flags & RDF_HAS_PAGE_COUNT)) {
 		printk(KERN_INFO "Missing rd_pages= parameter\n");
@@ -1171,7 +1171,7 @@ ssize_t rd_show_configfs_dev_params(
 	struct se_subsystem_dev *se_dev,
 	char *page)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) se_dev->se_dev_su_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) se_dev->se_dev_su_ptr;
 	int bl = 0;
 
 	 __rd_get_dev_info(rd_dev, page, &bl);
@@ -1190,7 +1190,7 @@ void rd_mcp_get_plugin_info(void *p, char *b, int *bl)
 
 void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
-	rd_host_t *rd_host = (rd_host_t *)hba->hba_ptr;
+	struct rd_host *rd_host = (struct rd_host *)hba->hba_ptr;
 
 	*bl += sprintf(b + *bl, "SE Host ID: %u  RD Host ID: %u\n",
 		hba->hba_id, rd_host->rd_host_id);
@@ -1199,12 +1199,12 @@ void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 
 void rd_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
-	rd_dev_t *rd_dev = (rd_dev_t *) dev->dev_ptr;
+	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
 
 	__rd_get_dev_info(rd_dev, b, bl);
 }
 
-void __rd_get_dev_info(rd_dev_t *rd_dev, char *b, int *bl)
+void __rd_get_dev_info(struct rd_dev *rd_dev, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM RamDisk ID: %u  RamDisk Makeup: %s\n",
 			rd_dev->rd_dev_id, (rd_dev->rd_direct) ?
@@ -1223,7 +1223,7 @@ void __rd_get_dev_info(rd_dev_t *rd_dev, char *b, int *bl)
 void rd_map_task_non_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_bufflen		= task->task_size;
 	req->rd_buf		= (void *) T_TASK(cmd)->t_task_buf;
@@ -1236,7 +1236,7 @@ void rd_map_task_non_SG(struct se_task *task)
  */
 void rd_map_task_SG(struct se_task *task)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_bufflen		= task->task_size;
 	req->rd_buf		= task->task_sg;
@@ -1249,7 +1249,7 @@ void rd_map_task_SG(struct se_task *task)
  */
 int rd_CDB_inquiry(struct se_task *task, u32 size)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_data_direction  = RD_DATA_READ;
 
@@ -1263,7 +1263,7 @@ int rd_CDB_inquiry(struct se_task *task, u32 size)
  */
 int rd_CDB_none(struct se_task *task, u32 size)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_data_direction	= RD_DATA_NONE;
 	req->rd_bufflen		= 0;
@@ -1279,7 +1279,7 @@ int rd_CDB_none(struct se_task *task, u32 size)
  */
 int rd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_data_direction = RD_DATA_READ;
 	rd_map_task_non_SG(task);
@@ -1293,7 +1293,7 @@ int rd_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 int rd_CDB_read_SG(struct se_task *task, u32 size)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_data_direction = RD_DATA_READ;
 	rd_map_task_SG(task);
@@ -1307,7 +1307,7 @@ int rd_CDB_read_SG(struct se_task *task, u32 size)
  */
 int rd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_data_direction = RD_DATA_WRITE;
 	rd_map_task_non_SG(task);
@@ -1321,7 +1321,7 @@ int rd_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 int rd_CDB_write_SG(struct se_task *task, u32 size)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	req->rd_data_direction = RD_DATA_WRITE;
 	rd_map_task_SG(task);
@@ -1354,7 +1354,7 @@ int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
  */
 int rd_check_for_SG(struct se_task *task)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	return req->rd_sg_count;
 }
@@ -1365,7 +1365,7 @@ int rd_check_for_SG(struct se_task *task)
  */
 unsigned char *rd_get_cdb(struct se_task *task)
 {
-	rd_request_t *req = (rd_request_t *) task->transport_req;
+	struct rd_request *req = (struct rd_request *) task->transport_req;
 
 	return req->rd_scsi_cdb;
 }

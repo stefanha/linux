@@ -94,7 +94,7 @@ int se_core_add_hba(
 	struct se_hba *hba,
 	u32 plugin_dep_id)
 {
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	int ret = 0;
 
 	if (hba->hba_status & HBA_STATUS_ACTIVE)
@@ -103,7 +103,7 @@ int se_core_add_hba(
 	atomic_set(&hba->max_queue_depth, 0);
 	atomic_set(&hba->left_queue_depth, 0);
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 				hba->type, &ret);
 	if (!(t))
 		return -EINVAL;
@@ -131,9 +131,9 @@ static int se_core_shutdown_hba(
 	struct se_hba *hba)
 {
 	int ret = 0;
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 				hba->type, &ret);
 	if (!(t))
 		return ret;

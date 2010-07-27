@@ -104,14 +104,14 @@ extern void pscsi_req_done(struct request *, int);
 #include <linux/kref.h>
 #include <linux/kobject.h>
 
-typedef struct pscsi_plugin_task_s {
+struct pscsi_plugin_task {
 	unsigned char pscsi_cdb[SCSI_CDB_SIZE];
 	unsigned char pscsi_sense[SCSI_SENSE_BUFFERSIZE];
 	int	pscsi_direction;
 	int	pscsi_result;
 	u32	pscsi_resid;
 	struct request *pscsi_req;
-} pscsi_plugin_task_t;
+} ____cacheline_aligned;
 
 #define PDF_HAS_CHANNEL_ID	0x01
 #define PDF_HAS_TARGET_ID	0x02
@@ -120,7 +120,7 @@ typedef struct pscsi_plugin_task_s {
 #define PDF_HAS_VPD_DEV_IDENT	0x10
 #define PDF_HAS_VIRT_HOST_ID	0x20	
 
-typedef struct pscsi_dev_virt_s {
+struct pscsi_dev_virt {
 	int	pdv_flags;
 	int	pdv_host_id;
 	int	pdv_channel_id;
@@ -128,28 +128,28 @@ typedef struct pscsi_dev_virt_s {
 	int	pdv_lun_id;
 	struct scsi_device *pdv_sd;
 	struct se_hba *pdv_se_hba;
-} pscsi_dev_virt_t;
+} ____cacheline_aligned;
 
 typedef enum phv_modes {
 	PHV_VIRUTAL_HOST_ID,
 	PHV_LLD_SCSI_HOST_NO
 } phv_modes_t;
 
-typedef struct pscsi_hba_virt_s {
+struct pscsi_hba_virt {
 	int			phv_host_id;
 	phv_modes_t		phv_mode;
 	struct Scsi_Host	*phv_lld_host;
-} pscsi_hba_virt_t;
+} ____cacheline_aligned;
 
-extern void __pscsi_get_dev_info(pscsi_dev_virt_t *, char *, int *);
+extern void __pscsi_get_dev_info(struct pscsi_dev_virt *, char *, int *);
 
 /*
  * We use the generic command sequencer, so we must setup
- * se_subsystem_spc_t.
+ * struct se_subsystem_spc.
  */
 #ifndef PSCSI_INCLUDE_STRUCTS
 
-se_subsystem_spc_t pscsi_template_spc = {
+struct se_subsystem_spc pscsi_template_spc = {
 	.inquiry		= pscsi_CDB_inquiry,
 	.none			= pscsi_CDB_none,
 	.read_non_SG		= pscsi_CDB_read_non_SG,
@@ -158,7 +158,7 @@ se_subsystem_spc_t pscsi_template_spc = {
 	.write_SG		= pscsi_CDB_write_SG,
 };
 
-se_subsystem_api_t pscsi_template = {
+struct se_subsystem_api pscsi_template = {
 	.name			= "pscsi",			\
 	.type			= PSCSI,			\
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,	\

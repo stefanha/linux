@@ -71,7 +71,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	struct fc_frame *fp = NULL;
 	struct fc_exch *ep;
 	struct fc_lport *lport;
-	struct se_mem_s *mem;
+	struct se_mem *mem;
 	size_t remaining;
 	u32 f_ctl = FC_FC_EX_CTX | FC_FC_REL_OFF;
 	u32 mem_off;
@@ -99,7 +99,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	 */
 	if (task->t_task_se_num) {
 		mem = list_first_entry(task->t_mem_list,
-			 struct se_mem_s, se_list);
+			 struct se_mem, se_list);
 		mem_len = mem->se_len;
 		mem_off = mem->se_off;
 		page = mem->se_page;
@@ -118,7 +118,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 		if (!mem_len) {
 			BUG_ON(!mem);
 			mem = list_entry(mem->se_list.next,
-				struct se_mem_s, se_list);
+				struct se_mem, se_list);
 			mem_len = min((size_t)mem->se_len, remaining);
 			mem_off = mem->se_off;
 			page = mem->se_page;
@@ -193,7 +193,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	struct se_cmd *se_cmd = cmd->se_cmd;
 	struct se_transport_task *task;
 	struct fc_frame_header *fh;
-	struct se_mem_s *mem;
+	struct se_mem *mem;
 	u32 mem_off;
 	u32 rel_off;
 	size_t frame_len;
@@ -225,7 +225,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	 */
 	if (task->t_task_se_num) {
 		mem = list_first_entry(task->t_mem_list,
-				       struct se_mem_s, se_list);
+				       struct se_mem, se_list);
 		mem_len = mem->se_len;
 		mem_off = mem->se_off;
 		page = mem->se_page;
@@ -240,7 +240,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		if (!mem_len) {
 			BUG_ON(!mem);
 			mem = list_entry(mem->se_list.next,
-					 struct se_mem_s, se_list);
+					 struct se_mem, se_list);
 			mem_len = mem->se_len;
 			mem_off = mem->se_off;
 			page = mem->se_page;

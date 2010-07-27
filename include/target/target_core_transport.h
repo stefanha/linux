@@ -132,7 +132,7 @@
 
 #define MOD_MAX_SECTORS(ms, bs)			(ms % (PAGE_SIZE / bs))
 
-struct se_mem_s;
+struct se_mem;
 
 extern int init_se_global(void);
 extern void release_se_global(void);
@@ -142,7 +142,7 @@ extern int __iscsi_debug_dev(struct se_device *);
 extern unsigned char *transport_get_iqn_sn(void);
 extern void transport_init_queue_obj(struct se_queue_obj *);
 extern void transport_load_plugins(void);
-extern struct se_plugin_s *transport_core_get_plugin_by_name(const char *name);
+extern struct se_plugin *transport_core_get_plugin_by_name(const char *name);
 extern void transport_check_dev_params_delim(char *, char **);
 extern struct se_session *transport_init_session(void);
 extern void __transport_register_session(struct se_portal_group *,
@@ -188,7 +188,7 @@ extern int transport_dump_vpd_ident(struct t10_vpd *,
 					unsigned char *, int);
 extern int transport_rescan_evpd_device_ident(struct se_device *);
 extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
-					struct se_subsystem_api_s *,
+					struct se_subsystem_api *,
 					struct se_subsystem_dev *, u32,
 					void *);
 extern int transport_generic_activate_device(struct se_device *);
@@ -269,23 +269,23 @@ extern int transport_generic_do_transform(struct se_cmd *,
 extern int transport_get_sectors(struct se_cmd *, void *);
 extern int transport_new_cmd_obj(struct se_cmd *,
 				struct se_transform_info *, void *, int);
-extern unsigned char *transport_get_vaddr(struct se_mem_s *);
+extern unsigned char *transport_get_vaddr(struct se_mem *);
 extern struct list_head *transport_init_se_mem_list(void);
 extern void transport_free_se_mem_list(struct list_head *);
 extern int transport_generic_get_mem(struct se_cmd *, u32, u32);
-extern u32 transport_calc_sg_num(struct se_task *, struct se_mem_s *, u32);
+extern u32 transport_calc_sg_num(struct se_task *, struct se_mem *, u32);
 extern int transport_map_sg_to_mem(struct se_cmd *, struct list_head *,
 					void *, u32 *, u32 *);
 extern int transport_map_mem_to_mem(struct se_task *, struct list_head *,
-					void *, struct se_mem_s *,
-					struct se_mem_s **, u32 *, u32 *);
+					void *, struct se_mem *,
+					struct se_mem **, u32 *, u32 *);
 extern int transport_map_mem_to_sg(struct se_task *, struct list_head *,
-					void *, struct se_mem_s *,
-					struct se_mem_s **, u32 *, u32 *);
+					void *, struct se_mem *,
+					struct se_mem **, u32 *, u32 *);
 extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 					struct se_transform_info *,
 					void *, unsigned long long, u32,
-					struct se_mem_s *, struct se_mem_s **,
+					struct se_mem *, struct se_mem **,
 					u32 *);
 extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
@@ -297,31 +297,31 @@ extern int transport_generic_do_tmr(struct se_cmd *);
  * Used primarily for splitting up CDBs that exceed the physical storage
  * HBA's maximum sector count per task.
  */
-typedef struct se_mem_s {
+struct se_mem {
 	struct page	*se_page;
 	u32		se_len;
 	u32		se_off;
 	struct list_head se_list;
-} ____cacheline_aligned se_mem_t;
+} ____cacheline_aligned;
 
 /*
  * Each type of DAS transport that uses the generic command sequencer needs
  * each of the following function pointers set.
  */
-typedef struct se_subsystem_spc_s {
+struct se_subsystem_spc {
 	int (*inquiry)(struct se_task *, u32);
 	int (*none)(struct se_task *, u32);
 	int (*read_non_SG)(struct se_task *, u32);
 	int (*read_SG)(struct se_task *, u32);
 	int (*write_non_SG)(struct se_task *, u32);
 	int (*write_SG)(struct se_task *, u32);
-} se_subsystem_spc_t;
+};
 
 /*
  * 	Each type of disk transport supported MUST have a template defined
  *	within its .h file.
  */
-typedef struct se_subsystem_api_s {
+struct se_subsystem_api {
 	/*
 	 * The Name. :-)
 	 */
@@ -514,7 +514,7 @@ typedef struct se_subsystem_api_s {
 	 * do_se_mem_map():
 	 */
 	int (*do_se_mem_map)(struct se_task *, struct list_head *, void *,
-				se_mem_t *, se_mem_t **, u32 *, u32 *);
+				struct se_mem *, struct se_mem **, u32 *, u32 *);
 	/*
 	 * get_sense_buffer():
 	 */
@@ -532,14 +532,14 @@ typedef struct se_subsystem_api_s {
 	 */
 	int (*write_pending)(struct se_task *);
 	/*
-	 * se_subsystem_spc_t structure:
+	 * struct se_subsystem_spc structure:
 	 *
 	 * Contains function pointers of SPC opcodes to call from the generic
 	 * command sequencer into a transport driver if the generic command
 	 * sequencer is used. (ie: cmd_sequencer() is NULL)
 	 */
-	se_subsystem_spc_t *spc;
-} ____cacheline_aligned se_subsystem_api_t;
+	struct se_subsystem_spc *spc;
+} ____cacheline_aligned;
 
 #define TRANSPORT(dev)		((dev)->transport)
 #define TRANSPORT_SPC(dev)	((dev)->transport->spc)

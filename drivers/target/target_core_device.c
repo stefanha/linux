@@ -1512,7 +1512,7 @@ int core_dev_setup_virtual_lun0(void)
 	struct se_hba *hba;
 	struct se_device *dev;
 	struct se_subsystem_dev *se_dev = NULL;
-	struct se_subsystem_api_s *t;
+	struct se_subsystem_api *t;
 	char buf[16];
 	int ret;
 
@@ -1529,7 +1529,7 @@ int core_dev_setup_virtual_lun0(void)
 
 	se_global->g_lun0_hba = hba;
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
+	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
 			hba->type, &ret);
 	if (!t || (ret != 0)) {
 		ret = -EINVAL;

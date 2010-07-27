@@ -504,8 +504,8 @@ struct se_offset_map {
 	u32                     sg_current;
 	u32                     sg_length;
 	struct page		*sg_page;
-	struct se_mem_s		*map_se_mem;
-	struct se_mem_s		*map_orig_se_mem;
+	struct se_mem		*map_se_mem;
+	struct se_mem		*map_orig_se_mem;
 	void			*iovec_base;
 } ____cacheline_aligned;
 
@@ -527,7 +527,7 @@ struct se_unmap_sg {
 	void			*fabric_cmd;
 	struct se_cmd		*se_cmd;
 	struct se_offset_map	lmap;
-	struct se_mem_s		*cur_se_mem;
+	struct se_mem		*cur_se_mem;
 } ____cacheline_aligned;
 
 struct se_cmd {
@@ -855,7 +855,7 @@ struct se_device {
 	struct se_hba		*se_hba;
 	struct se_subsystem_dev *se_sub_dev;
 	/* Pointer to template of function pointers for transport */
-	struct se_subsystem_api_s *transport;
+	struct se_subsystem_api *transport;
 	/* Linked list for struct se_hba struct se_device list */
 	struct list_head	dev_list;
 	/* Linked list for struct se_global->g_se_dev_list */
@@ -894,7 +894,7 @@ struct se_hba {
 	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
 	struct mutex		hba_access_mutex;
-	struct se_subsystem_api_s *transport;
+	struct se_subsystem_api *transport;
 }  ____cacheline_aligned;
 
 #define ISCSI_HBA(d)		((struct se_hba *)(d)->se_hba)
@@ -930,7 +930,7 @@ struct se_port {
 	int		sep_tg_pt_secondary_write_md;
 #ifdef SNMP_SUPPORT
 	u32		sep_index;
-	scsi_port_stats_t sep_stats;
+	struct scsi_port_stats sep_stats;
 #endif
 	/* Used for ALUA Target Port Groups membership */
 	atomic_t	sep_tg_pt_gp_active;
@@ -1005,7 +1005,7 @@ struct se_global {
 	struct se_hba		*g_lun0_hba;
 	struct se_subsystem_dev *g_lun0_su_dev;
 	struct se_device	*g_lun0_dev;
-	struct se_plugin_class_s *plugin_class_list;
+	struct se_plugin_class *plugin_class_list;
 	struct t10_alua_lu_gp	*default_lu_gp;
 	spinlock_t		g_device_lock;
 	spinlock_t		hba_lock;

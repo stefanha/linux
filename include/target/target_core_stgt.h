@@ -104,14 +104,14 @@ extern int stgt_transfer_response(struct scsi_cmnd *,
 #include <linux/kref.h>
 #include <linux/kobject.h>
 
-typedef struct stgt_plugin_task_s {
+struct stgt_plugin_task {
 	unsigned char stgt_cdb[SCSI_CDB_SIZE];
 	unsigned char stgt_sense[SCSI_SENSE_BUFFERSIZE];
 	int	stgt_direction;
 	int	stgt_result;
 	u32	stgt_resid;
 	struct scsi_cmnd *stgt_cmd;
-} stgt_plugin_task_t;
+} ____cacheline_aligned;
 
 #define PDF_HAS_CHANNEL_ID	0x01
 #define PDF_HAS_TARGET_ID	0x02
@@ -119,7 +119,7 @@ typedef struct stgt_plugin_task_s {
 #define PDF_HAS_VPD_UNIT_SERIAL 0x08
 #define PDF_HAS_VPD_DEV_IDENT	0x10
 
-typedef struct stgt_dev_virt_s {
+struct stgt_dev_virt {
 	int	sdv_flags;
 	int	sdv_legacy; /* Use scsi_execute_async() from HTCL */
 	int	sdv_channel_id;
@@ -128,23 +128,23 @@ typedef struct stgt_dev_virt_s {
 	struct block_device *sdv_bd; /* Temporary for v2.6.28 */
 	struct scsi_device *sdv_sd;
 	struct se_hba *sdv_se_hba;
-} stgt_dev_virt_t;
+} ____cacheline_aligned;
 
-typedef struct stgt_hba_s {
+struct stgt_hba {
 	struct device dev;
 	struct se_hba *se_hba;
 	struct Scsi_Host *scsi_host;
-} stgt_hba_t;
+} ____cacheline_aligned;
 
-extern void __stgt_get_dev_info(stgt_dev_virt_t *, char *, int *);
+extern void __stgt_get_dev_info(struct stgt_dev_virt *, char *, int *);
 
 /*
  * We use the generic command sequencer, so we must setup
- * se_subsystem_spc_t.
+ * struct se_subsystem_spc.
  */
 #ifndef STGT_INCLUDE_STRUCTS
 
-se_subsystem_spc_t stgt_template_spc = {
+struct se_subsystem_spc stgt_template_spc = {
 	.inquiry		= stgt_CDB_inquiry,
 	.none			= stgt_CDB_none,
 	.read_non_SG		= stgt_CDB_read_non_SG,
@@ -153,7 +153,7 @@ se_subsystem_spc_t stgt_template_spc = {
 	.write_SG		= stgt_CDB_write_SG,
 };
 
-se_subsystem_api_t stgt_template = {
+struct se_subsystem_api stgt_template = {
 	.name			= "stgt",			\
 	.type			= STGT,				\
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,	\

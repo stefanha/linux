@@ -77,7 +77,7 @@ extern int rd_DIRECT_do_task(struct se_task *);
 extern int rd_MEMCPY_do_task(struct se_task *);
 extern int rd_DIRECT_allocate_DMA(struct se_cmd *, u32, u32);
 extern int rd_DIRECT_do_se_mem_map(struct se_task *, struct list_head *,
-				void *, struct se_mem_s *, struct se_mem_s **,
+				void *, struct se_mem *, struct se_mem **,
 				u32 *, u32 *);
 extern void rd_DIRECT_free_DMA(struct se_cmd *);
 extern void rd_free_task(struct se_task *);
@@ -106,7 +106,7 @@ extern u32 rd_get_max_queue_depth(struct se_device *);
 #define RRF_EMULATE_CDB		0x01
 #define RRF_GOT_LBA		0x02
 
-typedef struct rd_request_s {
+struct rd_request {
 	/* SCSI CDB from iSCSI Command PDU */
 	unsigned char	rd_scsi_cdb[SCSI_CDB_SIZE];
 	/* Data Direction */
@@ -130,19 +130,19 @@ typedef struct rd_request_s {
 	  * contiguous memory segments */
 	void		*rd_buf;
 	/* Ramdisk device */
-	struct rd_dev_s	*rd_dev;
-} ____cacheline_aligned rd_request_t;
+	struct rd_dev	*rd_dev;
+} ____cacheline_aligned;
 
-typedef struct rd_dev_sg_table_s {
+struct rd_dev_sg_table {
 	u32		page_start_offset;
 	u32		page_end_offset;
 	u32		rd_sg_count;
 	struct scatterlist *sg_table;
-} ____cacheline_aligned rd_dev_sg_table_t;
+} ____cacheline_aligned;
 
 #define RDF_HAS_PAGE_COUNT	0x01
 
-typedef struct rd_dev_s {
+struct rd_dev {
 	int		rd_direct;
 	u32		rd_flags;
 	/* Unique Ramdisk Device ID in Ramdisk HBA */
@@ -153,26 +153,24 @@ typedef struct rd_dev_s {
 	u32		sg_table_count;
 	u32		rd_queue_depth;
 	/* Array of rd_dev_sg_table_t containing scatterlists */
-	rd_dev_sg_table_t *sg_table_array;
+	struct rd_dev_sg_table *sg_table_array;
 	/* Ramdisk HBA device is connected to */
-	struct rd_host_s *rd_host;
-	/* Next RD Device entry in list */
-	struct rd_dev_s *next;
-} ____cacheline_aligned rd_dev_t;
+	struct rd_host *rd_host;
+} ____cacheline_aligned;
 
-extern void __rd_get_dev_info(rd_dev_t *, char *, int *);
+extern void __rd_get_dev_info(struct rd_dev *, char *, int *);
 
-typedef struct rd_host_s {
+struct rd_host {
 	u32		rd_host_dev_id_count;
 	u32		rd_host_id;		/* Unique Ramdisk Host ID */
-} ____cacheline_aligned rd_host_t;
+} ____cacheline_aligned;
 
 #ifndef RD_INCLUDE_STRUCTS
 /*
  * We use the generic command sequencer, so we must setup
- * se_subsystem_spc_t.
+ * struct se_subsystem_spc.
  */
-se_subsystem_spc_t rd_template_spc = {
+struct se_subsystem_spc rd_template_spc = {
 	.inquiry		= rd_CDB_inquiry,
 	.none			= rd_CDB_none,
 	.read_non_SG		= rd_CDB_read_non_SG,
@@ -181,7 +179,7 @@ se_subsystem_spc_t rd_template_spc = {
 	.write_SG		= rd_CDB_write_SG,
 };
 
-se_subsystem_api_t rd_dr_template = {
+struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
 	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
@@ -219,7 +217,7 @@ se_subsystem_api_t rd_dr_template = {
 	.spc			= &rd_template_spc,
 };
 
-se_subsystem_api_t rd_mcp_template = {
+struct se_subsystem_api rd_mcp_template = {
 	.name			= "rd_mcp",
 	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,

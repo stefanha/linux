@@ -2098,7 +2098,7 @@ int iscsi_fe_sendpage_sg(
 	u32 len = cmd->tx_size, pg_len, se_len, se_off, tx_size;
 	struct iovec *iov = &se_cmd->iov_data[0];
 	struct page *page;
-	se_mem_t *se_mem = u_sg->cur_se_mem;
+	struct se_mem *se_mem = u_sg->cur_se_mem;
 
 send_hdr:
 	tx_size = (CONN_OPS(conn)->HeaderDigest) ? ISCSI_HDR_LEN + CRC_LEN :
@@ -2118,7 +2118,7 @@ send_hdr:
 		len -= CRC_LEN;
 
 	/*
-	 * Start calculating from the first page of current se_mem_t.
+	 * Start calculating from the first page of current struct se_mem.
 	 */
 	page = se_mem->se_page;
 	pg_len = (PAGE_SIZE - se_mem->se_off);
@@ -2132,7 +2132,7 @@ send_hdr:
 #endif
 	/*
 	 * Calucate new se_len and se_off based upon u_sg->t_offset into
-	 * the current se_mem_t and possibily a different page.
+	 * the current struct se_mem and possibily a different page.
 	 */
 	while (u_sg->t_offset) {
 #if 0
@@ -2154,7 +2154,7 @@ send_hdr:
 	}
 
 	/*
-	 * Perform sendpage() for each page in the se_mem_t
+	 * Perform sendpage() for each page in the struct se_mem
 	 */
 	while (len) {
 #if 0
@@ -2189,7 +2189,7 @@ send_pg:
 				break;
 
 			if (!se_mem) {
-				printk(KERN_ERR "Unable to locate next se_mem_t\n");
+				printk(KERN_ERR "Unable to locate next struct se_mem\n");
 				return -1;
 			}
 

@@ -204,7 +204,7 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
                 mem_ptr = NULL;
         }
 	/*
-	 * Map the SG memory into se_mem_t->page linked list using the same
+	 * Map the SG memory into struct se_mem->page linked list using the same
 	 * physical memory at sg->page_link.
 	 */
 	ret = transport_generic_map_mem_to_cmd(se_cmd, mem_ptr,

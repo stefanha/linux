@@ -49,7 +49,7 @@
 #include <target/target_core_configfs.h>
 
 /* SCSI mib table index */
-scsi_index_table_t scsi_index_table;
+struct scsi_index_table scsi_index_table;
 
 #ifndef INITIAL_JIFFIES
 #define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
@@ -1037,7 +1037,7 @@ error:
  */
 void init_scsi_index_table(void)
 {
-	memset(&scsi_index_table, 0, sizeof(scsi_index_table));
+	memset(&scsi_index_table, 0, sizeof(struct scsi_index_table));
 	spin_lock_init(&scsi_index_table.lock);
 }
 

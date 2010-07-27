@@ -52,11 +52,11 @@
  */
 int fd_attach_hba(struct se_hba *hba, u32 host_id)
 {
-	fd_host_t *fd_host;
+	struct fd_host *fd_host;
 
-	fd_host = kzalloc(sizeof(fd_host_t), GFP_KERNEL);
+	fd_host = kzalloc(sizeof(struct fd_host), GFP_KERNEL);
 	if (!(fd_host)) {
-		printk(KERN_ERR "Unable to allocate memory for fd_host_t\n");
+		printk(KERN_ERR "Unable to allocate memory for struct fd_host\n");
 		return -1;
 	}
 
@@ -84,13 +84,13 @@ int fd_attach_hba(struct se_hba *hba, u32 host_id)
  */
 int fd_detach_hba(struct se_hba *hba)
 {
-	fd_host_t *fd_host;
+	struct fd_host *fd_host;
 
 	if (!hba->hba_ptr) {
 		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
 		return -1;
 	}
-	fd_host = (fd_host_t *) hba->hba_ptr;
+	fd_host = (struct fd_host *) hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached FILEIO HBA: %u from Generic"
 		" Target Core\n", hba->hba_id, fd_host->fd_host_id);
@@ -103,7 +103,7 @@ int fd_detach_hba(struct se_hba *hba)
 
 int fd_claim_phydevice(struct se_hba *hba, struct se_device *dev)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *)dev->dev_ptr;
 	struct block_device *bd;
 
 	if (fd_dev->fd_bd)
@@ -130,7 +130,7 @@ int fd_claim_phydevice(struct se_hba *hba, struct se_device *dev)
 
 int fd_release_phydevice(struct se_device *dev)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *)dev->dev_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *)dev->dev_ptr;
 
 	if (!fd_dev->fd_bd)
 		return 0;
@@ -152,12 +152,12 @@ int fd_release_phydevice(struct se_device *dev)
 
 void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
-	fd_dev_t *fd_dev;
-	fd_host_t *fd_host = (fd_host_t *) hba->hba_ptr;
+	struct fd_dev *fd_dev;
+	struct fd_host *fd_host = (struct fd_host *) hba->hba_ptr;
 
-	fd_dev = kzalloc(sizeof(fd_dev_t), GFP_KERNEL);
+	fd_dev = kzalloc(sizeof(struct fd_dev), GFP_KERNEL);
 	if (!(fd_dev)) {
-		printk(KERN_ERR "Unable to allocate memory for fd_dev_t\n");
+		printk(KERN_ERR "Unable to allocate memory for struct fd_dev\n");
 		return NULL;
 	}
 
@@ -179,8 +179,8 @@ struct se_device *fd_create_virtdevice(
 {
 	char *dev_p = NULL;
 	struct se_device *dev;
-	fd_dev_t *fd_dev = (fd_dev_t *) p;
-	fd_host_t *fd_host = (fd_host_t *) hba->hba_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *) p;
+	struct fd_host *fd_host = (struct fd_host *) hba->hba_ptr;
 	mm_segment_t old_fs;
 	struct block_device *bd = NULL;
 	struct file *file;
@@ -322,8 +322,8 @@ fail:
  */
 int fd_activate_device(struct se_device *dev)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
-	fd_host_t *fd_host = fd_dev->fd_host;
+	struct fd_dev *fd_dev = (struct fd_dev *) dev->dev_ptr;
+	struct fd_host *fd_host = fd_dev->fd_host;
 
 	printk(KERN_INFO "CORE_FILE[%u] - Activating Device with TCQ: %d at"
 		" FILEIO Device ID: %d\n", fd_host->fd_host_id,
@@ -338,8 +338,8 @@ int fd_activate_device(struct se_device *dev)
  */
 void fd_deactivate_device(struct se_device *dev)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
-	fd_host_t *fd_host = fd_dev->fd_host;
+	struct fd_dev *fd_dev = (struct fd_dev *) dev->dev_ptr;
+	struct fd_host *fd_host = fd_dev->fd_host;
 
 	printk(KERN_INFO "CORE_FILE[%u] - Deactivating Device with TCQ: %d at"
 		" FILEIO Device ID: %d\n", fd_host->fd_host_id,
@@ -354,7 +354,7 @@ void fd_deactivate_device(struct se_device *dev)
  */
 void fd_free_device(void *p)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) p;
+	struct fd_dev *fd_dev = (struct fd_dev *) p;
 
 	if (fd_dev->fd_file) {
 		filp_close(fd_dev->fd_file, NULL);
@@ -381,15 +381,15 @@ void *fd_allocate_request(
 	struct se_task *task,
 	struct se_device *dev)
 {
-	fd_request_t *fd_req;
+	struct fd_request *fd_req;
 
-	fd_req = kzalloc(sizeof(fd_request_t), GFP_KERNEL);
+	fd_req = kzalloc(sizeof(struct fd_request), GFP_KERNEL);
 	if (!(fd_req)) {
-		printk(KERN_ERR "Unable to allocate fd_request_t\n");
+		printk(KERN_ERR "Unable to allocate struct fd_request\n");
 		return NULL;
 	}
 
-	fd_req->fd_dev = (fd_dev_t *) dev->dev_ptr;
+	fd_req->fd_dev = (struct fd_dev *) dev->dev_ptr;
 
 	return (void *)fd_req;
 }
@@ -402,7 +402,7 @@ int fd_emulate_inquiry(struct se_task *task)
 {
 	unsigned char prod[64], se_location[128];
 	struct se_cmd *cmd = TASK_CMD(task);
-	fd_dev_t *fdev = (fd_dev_t *) task->se_dev->dev_ptr;
+	struct fd_dev *fdev = (struct fd_dev *) task->se_dev->dev_ptr;
 	struct se_hba *hba = task->se_dev->se_hba;
 
 	memset(prod, 0, 64);
@@ -421,7 +421,7 @@ int fd_emulate_inquiry(struct se_task *task)
  */
 static int fd_emulate_read_cap(struct se_task *task)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) task->se_dev->dev_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *) task->se_dev->dev_ptr;
 	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
 				DEV_ATTRIB(task->se_dev)->block_size);
 	u32 blocks;
@@ -436,7 +436,7 @@ static int fd_emulate_read_cap(struct se_task *task)
 
 static int fd_emulate_read_cap16(struct se_task *task)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) task->se_dev->dev_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *) task->se_dev->dev_ptr;
 	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
 				  DEV_ATTRIB(task->se_dev)->block_size);
 
@@ -452,7 +452,7 @@ static int fd_emulate_scsi_cdb(struct se_task *task)
 {
 	int ret;
 	struct se_cmd *cmd = TASK_CMD(task);
-	fd_request_t *fd_req = (fd_request_t *) task->transport_req;
+	struct fd_request *fd_req = (struct fd_request *) task->transport_req;
 
 	switch (fd_req->fd_scsi_cdb[0]) {
 	case INQUIRY:
@@ -522,7 +522,7 @@ static int fd_emulate_scsi_cdb(struct se_task *task)
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
-static inline int fd_iovec_alloc(fd_request_t *req)
+static inline int fd_iovec_alloc(struct fd_request *req)
 {
 	req->fd_iovs = kzalloc(sizeof(struct iovec) * req->fd_sg_count,
 				GFP_KERNEL);
@@ -563,7 +563,7 @@ static inline int fd_seek(
 	return 0;
 }
 
-static int fd_do_readv(fd_request_t *req, struct se_task *task)
+static int fd_do_readv(struct fd_request *req, struct se_task *task)
 {
 	int ret = 0;
 	u32 i;
@@ -624,7 +624,7 @@ static int fd_sendactor(
 {
 	unsigned long count = desc->count;
 	struct se_task *task = desc->arg.data;
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 	struct scatterlist *sg = task->task_sg;
 
 	printk(KERN_INFO "page: %p offset: %lu size: %lu\n", page,
@@ -651,7 +651,7 @@ static int fd_sendactor(
 	return size;
 }
 
-static int fd_do_sendfile(fd_request_t *req, struct se_task *task)
+static int fd_do_sendfile(struct fd_request *req, struct se_task *task)
 {
 	int ret = 0;
 	struct file *fd = req->fd_dev->fd_file;
@@ -673,7 +673,7 @@ static int fd_do_sendfile(fd_request_t *req, struct se_task *task)
 }
 #endif
 
-static int fd_do_writev(fd_request_t *req, struct se_task *task)
+static int fd_do_writev(struct fd_request *req, struct se_task *task)
 {
 	int ret = 0;
 	u32 i;
@@ -708,7 +708,7 @@ static int fd_do_writev(fd_request_t *req, struct se_task *task)
 int fd_do_task(struct se_task *task)
 {
 	int ret = 0;
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return fd_emulate_scsi_cdb(task);
@@ -741,9 +741,9 @@ int fd_do_task(struct se_task *task)
  */
 void fd_free_task(struct se_task *task)
 {
-	fd_request_t *req;
+	struct fd_request *req;
 
-	req = (fd_request_t *) task->transport_req;
+	req = (struct fd_request *) task->transport_req;
 	kfree(req->fd_iovs);
 
 	kfree(req);
@@ -754,7 +754,7 @@ ssize_t fd_set_configfs_dev_params(
 	struct se_subsystem_dev *se_dev,
 	const char *page, ssize_t count)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
 	char *buf, *cur, *ptr, *ptr2;
 	int params = 0;
 
@@ -808,7 +808,7 @@ ssize_t fd_set_configfs_dev_params(
 				continue;
 
 			printk(KERN_INFO "FILEIO: Using buffered I/O"
-				" operations for fd_dev_t\n");
+				" operations for struct fd_dev\n");
 
 			fd_dev->fbd_flags |= FDBD_USE_BUFFERED_IO;
 			params++;
@@ -824,7 +824,7 @@ out:
 
 ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
 
 	if (!(fd_dev->fbd_flags & FBDF_HAS_PATH)) {
 		printk(KERN_ERR "Missing fd_dev_name=\n");
@@ -839,7 +839,7 @@ ssize_t fd_show_configfs_dev_params(
 	struct se_subsystem_dev *se_dev,
 	char *page)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) se_dev->se_dev_su_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
 	int bl = 0;
 
 	__fd_get_dev_info(fd_dev, page, &bl);
@@ -853,7 +853,7 @@ void fd_get_plugin_info(void *p, char *b, int *bl)
 
 void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
-	fd_host_t *fd_host = (fd_host_t *)hba->hba_ptr;
+	struct fd_host *fd_host = (struct fd_host *)hba->hba_ptr;
 
 	*bl += sprintf(b + *bl, "SE Host ID: %u  FD Host ID: %u\n",
 		 hba->hba_id, fd_host->fd_host_id);
@@ -862,12 +862,12 @@ void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 
 void fd_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
-	fd_dev_t *fd_dev = (fd_dev_t *) dev->dev_ptr;
+	struct fd_dev *fd_dev = (struct fd_dev *) dev->dev_ptr;
 
 	__fd_get_dev_info(fd_dev, b, bl);
 }
 
-void __fd_get_dev_info(fd_dev_t *fd_dev, char *b, int *bl)
+void __fd_get_dev_info(struct fd_dev *fd_dev, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
 	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  Mode: %s  ",
@@ -880,7 +880,7 @@ void __fd_get_dev_info(fd_dev_t *fd_dev, char *b, int *bl)
 
 		*bl += sprintf(b + *bl, "%s\n",
 				(!bd->bd_contains) ? "" :
-				(bd->bd_holder == (fd_dev_t *)fd_dev) ?
+				(bd->bd_holder == (struct fd_dev *)fd_dev) ?
 					"CLAIMED: FILEIO" : "CLAIMED: OS");
 	} else
 		*bl += sprintf(b + *bl, "\n");
@@ -893,7 +893,7 @@ void __fd_get_dev_info(fd_dev_t *fd_dev, char *b, int *bl)
 void fd_map_task_non_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_bufflen		= task->task_size;
 	req->fd_buf		= (void *) T_TASK(cmd)->t_task_buf;
@@ -906,7 +906,7 @@ void fd_map_task_non_SG(struct se_task *task)
  */
 void fd_map_task_SG(struct se_task *task)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_bufflen		= task->task_size;
 	req->fd_buf		= NULL;
@@ -919,7 +919,7 @@ void fd_map_task_SG(struct se_task *task)
  */
 int fd_CDB_inquiry(struct se_task *task, u32 size)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_data_direction  = FD_DATA_READ;
 	fd_map_task_non_SG(task);
@@ -933,7 +933,7 @@ int fd_CDB_inquiry(struct se_task *task, u32 size)
  */
 int fd_CDB_none(struct se_task *task, u32 size)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_data_direction	= FD_DATA_NONE;
 	req->fd_bufflen		= 0;
@@ -949,7 +949,7 @@ int fd_CDB_none(struct se_task *task, u32 size)
  */
 int fd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_data_direction = FD_DATA_READ;
 	fd_map_task_non_SG(task);
@@ -963,7 +963,7 @@ int fd_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 int fd_CDB_read_SG(struct se_task *task, u32 size)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_data_direction = FD_DATA_READ;
 	fd_map_task_SG(task);
@@ -977,7 +977,7 @@ int fd_CDB_read_SG(struct se_task *task, u32 size)
  */
 int fd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_data_direction = FD_DATA_WRITE;
 	fd_map_task_non_SG(task);
@@ -991,7 +991,7 @@ int fd_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 int fd_CDB_write_SG(struct se_task *task, u32 size)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	req->fd_data_direction = FD_DATA_WRITE;
 	fd_map_task_SG(task);
@@ -1014,7 +1014,7 @@ int fd_check_lba(unsigned long long lba, struct se_device *dev)
  */
 int fd_check_for_SG(struct se_task *task)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	return req->fd_sg_count;
 }
@@ -1025,7 +1025,7 @@ int fd_check_for_SG(struct se_task *task)
  */
 unsigned char *fd_get_cdb(struct se_task *task)
 {
-	fd_request_t *req = (fd_request_t *) task->transport_req;
+	struct fd_request *req = (struct fd_request *) task->transport_req;
 
 	return req->fd_scsi_cdb;
 }

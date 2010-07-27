@@ -110,8 +110,8 @@ int dev_obj_do_se_mem_map(
 	struct se_task *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
-	se_mem_t *in_se_mem,
-	se_mem_t **out_se_mem,
+	struct se_mem *in_se_mem,
+	struct se_mem **out_se_mem,
 	u32 *se_mem_cnt,
 	u32 *task_offset)
 {

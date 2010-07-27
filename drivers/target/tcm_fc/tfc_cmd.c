@@ -60,7 +60,7 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 	struct fc_exch *ep;
 	struct fc_seq *sp;
 	struct se_cmd *se_cmd;
-	struct se_mem_s *mem;
+	struct se_mem *mem;
 	struct se_transport_task *task;
 
 	if (!(ft_debug_logging & FT_DEBUG_IO))

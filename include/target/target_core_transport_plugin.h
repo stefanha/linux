@@ -32,36 +32,36 @@
 #define PSCSI_INCLUDE_STRUCTS
 #include <target/target_core_pscsi.h>
 #undef PSCSI_INCLUDE_STRUCTS
-extern se_subsystem_api_t pscsi_template;
+extern struct se_subsystem_api pscsi_template;
 #endif /* PARALLEL_SCSI */
 
 #ifdef STGT_PLUGIN
 #define STGT_INCLUDE_STRUCTS
 #include <target/target_core_stgt.h>
 #undef STGT_INCLUDE_STRUCTS
-extern se_subsystem_api_t stgt_template;
+extern struct se_subsystem_api stgt_template;
 #endif /* STGT_PLUGIN */
 
 #ifdef PYX_IBLOCK
 #define IBLOCK_INCLUDE_STRUCTS
 #include <target/target_core_iblock.h>
 #undef IBLOCK_INCLUDE_STRUCTS
-extern se_subsystem_api_t iblock_template;
+extern struct se_subsystem_api iblock_template;
 #endif /* PYX_IBLOCK */
 
 #ifdef PYX_RAMDISK
 #define RD_INCLUDE_STRUCTS
 #include <target/target_core_rd.h>
 #undef RD_INCLUDE_STRUCTS
-extern se_subsystem_api_t rd_dr_template;
-extern se_subsystem_api_t rd_mcp_template;
+extern struct se_subsystem_api rd_dr_template;
+extern struct se_subsystem_api rd_mcp_template;
 #endif /* PYX_RAMDISK */
 
 #ifdef PYX_FILEIO
 #define FD_INCLUDE_STRUCTS
 #include <target/target_core_file.h>
 #undef FD_INCLUDE_STRUCTS
-extern se_subsystem_api_t fileio_template;
+extern struct se_subsystem_api fileio_template;
 #endif /* PYX_FILEIO */
 
 #endif    /*** _TARGET_CORE_TRANSPORT_PLUGIN_H_ ***/

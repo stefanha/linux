@@ -40,33 +40,33 @@
 extern struct se_global *se_global;
 
 extern void plugin_load_all_classes(void);
-extern struct se_plugin_class_s *plugin_get_class(u32);
+extern struct se_plugin_class *plugin_get_class(u32);
 extern int plugin_register_class(u32, unsigned char *, int);
 extern int plugin_deregister_class(u32);
 extern void plugin_unload_all_classes(void);
 extern void *plugin_get_obj(u32, u32, int *);
-extern struct se_plugin_s *plugin_register(void *, u32, unsigned char *, u32,
+extern struct se_plugin *plugin_register(void *, u32, unsigned char *, u32,
 				void (*get_plugin_info)(void *, char *, int *),
 				int (*plugin_init)(void),
 				void (*plugin_free)(void), int *);
 extern int plugin_deregister(u32, u32);
 
-typedef struct se_plugin_class_s {
+struct se_plugin_class {
 	unsigned char		plugin_class_name[MAX_PLUGIN_CLASS_NAME];
 	u32			plugin_class;
 	u32			max_plugins;
-	struct se_plugin_s	*plugin_array;
+	struct se_plugin	*plugin_array;
 	spinlock_t		plugin_lock;
-} se_plugin_class_t;
+} ____cacheline_aligned;
 
-typedef struct se_plugin_s	{
+struct se_plugin {
 	unsigned char		plugin_name[MAX_PLUGIN_NAME];
 	int			plugin_state;
 	u32			plugin_type;
-	se_plugin_class_t	*plugin_class;
+	struct se_plugin_class	*plugin_class;
 	void			*plugin_obj;
 	void (*get_plugin_info)(void *, char *, int *);
 	void (*plugin_free)(void);
-} se_plugin_t;
+} ____cacheline_aligned;
 
 #endif /* TARGET_CORE_PLUGIN_H */
