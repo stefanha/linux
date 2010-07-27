@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_ERL2_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -52,8 +49,6 @@
 #include <iscsi_target_erl0.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>
-
-#undef ISCSI_TARGET_ERL2_C
 
 /*	iscsi_create_conn_recovery_datain_values():
  *

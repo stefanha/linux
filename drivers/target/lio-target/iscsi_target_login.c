@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_LOGIN_C
-
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -56,8 +53,6 @@
 #include <iscsi_target_util.h>
 #include <iscsi_target.h>
 #include <iscsi_parameters.h>
-
-#undef ISCSI_TARGET_LOGIN_C
 
 /*	iscsi_login_init_conn():
  *

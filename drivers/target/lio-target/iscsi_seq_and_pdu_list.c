@@ -27,8 +27,6 @@
  ******************************************************************************/
 
 
-#define ISCSI_SEQ_AND_PDU_LIST_C
-
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <iscsi_linux_defs.h>
@@ -36,17 +34,8 @@
 #include <iscsi_protocol.h>
 #include <iscsi_debug.h>
 #include <iscsi_debug_opcodes.h>
-#ifdef _INITIATOR
-#include <iscsi_initiator_core.h>
-#include <iscsi_initiator_util.h>
-#elif _TARGET
 #include <iscsi_target_core.h>
 #include <iscsi_target_util.h>
-#else
-#error Neither _INITIATOR or _TARGET defined!
-#endif
-
-#undef ISCSI_SEQ_AND_PDU_LIST_C
 
 #define OFFLOAD_BUF_SIZE	32768
 

@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_TPG_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -65,8 +62,6 @@
 
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
-
-#undef ISCSI_TARGET_TPG_C
 
 char *lio_tpg_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {

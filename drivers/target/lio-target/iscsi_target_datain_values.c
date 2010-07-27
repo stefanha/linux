@@ -25,8 +25,6 @@
  *
  ******************************************************************************/
 
-#define ISCSI_TARGET_DATAIN_VALUES_C
-
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -43,8 +41,6 @@
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target_datain_values.h>
-
-#undef ISCSI_TARGET_DATAIN_VALUES_C
 
 struct iscsi_datain_req *iscsi_allocate_datain_req(void)
 {

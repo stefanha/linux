@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_ERL0_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -52,8 +49,6 @@
 #include <iscsi_target_util.h>
 
 #include <iscsi_target.h>
-
-#undef ISCSI_TARGET_ERL0_C
 
 /*	iscsi_set_dataout_sequence_values():
  *

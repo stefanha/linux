@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_TMR_C
-
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -51,8 +48,6 @@
 #include <iscsi_target_tpg.h>
 #include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
-
-#undef ISCSI_TARGET_TMR_C
 
 /*	iscsi_tmr_abort_task():
  *

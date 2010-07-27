@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_DEBUGERL_C
-
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -43,8 +40,6 @@
 #include <iscsi_target_core.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target_debugerl.h>
-
-#undef ISCSI_TARGET_DEBUGERL_C
 
 /*	iscsi_target_check_debug_erl():
  *

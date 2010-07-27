@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_NEGOTIATE_C
-
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -54,8 +51,6 @@
 #include <iscsi_auth_kernel.h>
 #include <iscsi_parameters.h>
 #include <iscsi_crc.h>
-
-#undef ISCSI_TARGET_NEGOTIATE_C
 
 #define MAX_LOGIN_PDUS	7
 

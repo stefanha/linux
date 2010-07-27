@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_UTIL_C
-
 #include <linux/string.h>
 #include <linux/version.h>
 #include <linux/timer.h>
@@ -68,8 +65,6 @@
 #ifdef DEBUG_ERL
 #include <iscsi_target_debugerl.h>
 #endif /* DEBUG_ERL */
-
-#undef ISCSI_TARGET_UTIL_C
 
 /*	iscsi_attach_cmd_to_queue():
  *

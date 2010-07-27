@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_C
-
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/version.h>
@@ -85,8 +82,6 @@
 #endif /* SNMP_SUPPORT */
 
 #include <iscsi_target_configfs.h>
-
-#undef ISCSI_TARGET_C
 
 struct iscsi_global *iscsi_global;
 

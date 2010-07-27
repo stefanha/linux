@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_DISCOVERY_C
-
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -39,8 +36,6 @@
 #include <iscsi_target_core.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_discovery.h>
-
-#undef ISCSI_TARGET_DISCOVERY_C
 
 /*	iscsi_build_sendtargets_response():
  *

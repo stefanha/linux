@@ -32,18 +32,9 @@
 #include <iscsi_protocol.h>
 #include <iscsi_debug.h>
 #include <iscsi_debug_opcodes.h>
-#ifdef _INITIATOR
-#include <iscsi_initiator_core.h>
-#include <iscsi_initiator_util.h>
-#elif _TARGET
 #include <iscsi_target_core.h>
 #include <iscsi_target_util.h>
-#else
-#error Neither _INITIATOR or _TARGET defined!
-#endif
 #include <iscsi_parameters.h>
-
-#define ISCSI_PARAMETER_C
 
 /*	iscsi_login_rx_data():
  *

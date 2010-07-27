@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_THREAD_QUEUE_C
-
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -40,8 +37,6 @@
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
-
-#undef ISCSI_THREAD_QUEUE_C
 
 /*	iscsi_add_ts_to_active_list():
  *

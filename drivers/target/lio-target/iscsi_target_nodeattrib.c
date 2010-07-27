@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_NODEATTRIB_C
-
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -44,8 +41,6 @@
 #include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target_nodeattrib.h>
-
-#undef ISCSI_TARGET_NODEATTRIB_C
 
 static inline char *iscsi_na_get_initiatorname(
 	struct iscsi_node_acl *nacl)

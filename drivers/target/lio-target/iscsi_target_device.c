@@ -27,9 +27,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_DEVICE_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/delay.h>
@@ -55,8 +52,6 @@
 
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
-
-#undef ISCSI_TARGET_DEVICE_C
 
 /*	iscsi_get_lun():
  *
