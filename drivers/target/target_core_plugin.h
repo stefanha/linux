@@ -39,17 +39,17 @@
 
 extern struct se_global *se_global;
 
-extern void plugin_load_all_classes(void);
-extern struct se_plugin_class *plugin_get_class(u32);
-extern int plugin_register_class(u32, unsigned char *, int);
-extern int plugin_deregister_class(u32);
-extern void plugin_unload_all_classes(void);
-extern void *plugin_get_obj(u32, u32, int *);
-extern struct se_plugin *plugin_register(void *, u32, unsigned char *, u32,
+extern void tcm_sub_plugin_load_all_classes(void);
+extern struct se_plugin_class *tcm_sub_plugin_get_class(u32);
+extern int tcm_sub_plugin_register_class(u32, unsigned char *, int);
+extern int tcm_sub_plugin_deregister_class(u32);
+extern void tcm_sub_plugin_unload_all_classes(void);
+extern void *tcm_sub_plugin_get_obj(u32, u32, int *);
+extern struct se_plugin *tcm_sub_plugin_register(void *, u32, unsigned char *, u32,
 				void (*get_plugin_info)(void *, char *, int *),
 				int (*plugin_init)(void),
-				void (*plugin_free)(void), int *);
-extern int plugin_deregister(u32, u32);
+				void (*plugin_free)(void));
+extern int tcm_sub_plugin_deregister(u32, u32);
 
 struct se_plugin_class {
 	unsigned char		plugin_class_name[MAX_PLUGIN_CLASS_NAME];

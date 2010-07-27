@@ -42,7 +42,6 @@
 #include <target/target_core_base.h>
 #include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>

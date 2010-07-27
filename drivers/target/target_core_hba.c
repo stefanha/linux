@@ -42,8 +42,9 @@
 #include <target/target_core_hba.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
+
+#include "target_core_plugin.h"
 
 int core_get_hba(struct se_hba *hba)
 {
@@ -98,8 +99,8 @@ int se_core_add_hba(
 	atomic_set(&hba->max_queue_depth, 0);
 	atomic_set(&hba->left_queue_depth, 0);
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-				hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!(t))
 		return -EINVAL;
 
@@ -128,8 +129,8 @@ static int se_core_shutdown_hba(
 	int ret = 0;
 	struct se_subsystem_api *t;
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-				hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!(t))
 		return ret;
 

@@ -55,11 +55,16 @@
 #include <target/target_core_tpg.h>
 #include <target/target_core_ua.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
-#include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
+
+#include "target_core_plugin.h"
+#include "target_core_iblock.h"
+#include "target_core_pscsi.h"
+#include "target_core_file.h"
+#include "target_core_rd.h"
+#include "target_core_stgt.h"
 
 /* #define DEBUG_CDB_HANDLER */
 #ifdef DEBUG_CDB_HANDLER
@@ -514,38 +519,11 @@ EXPORT_SYMBOL(transport_init_queue_obj);
 
 void transport_load_plugins(void)
 {
-	int ret = 0;
-
-#ifdef PARALLEL_SCSI
-	plugin_register((void *)&pscsi_template, pscsi_template.type,
-			pscsi_template.name, PLUGIN_TYPE_TRANSPORT,
-			pscsi_template.get_plugin_info, NULL, NULL, &ret);
-#endif
-#ifdef STGT_PLUGIN
-	plugin_register((void *)&stgt_template, stgt_template.type,
-			stgt_template.name, PLUGIN_TYPE_TRANSPORT,
-			stgt_template.get_plugin_info,
-			stgt_template.plugin_init,
-			stgt_template.plugin_free, &ret);
-#endif
-#ifdef PYX_IBLOCK
-	plugin_register((void *)&iblock_template, iblock_template.type,
-			iblock_template.name, PLUGIN_TYPE_TRANSPORT,
-			iblock_template.get_plugin_info, NULL, NULL, &ret);
-#endif
-#ifdef PYX_RAMDISK
-	plugin_register((void *)&rd_dr_template, rd_dr_template.type,
-			rd_dr_template.name, PLUGIN_TYPE_TRANSPORT,
-			rd_dr_template.get_plugin_info, NULL, NULL, &ret);
-	plugin_register((void *)&rd_mcp_template, rd_mcp_template.type,
-			rd_mcp_template.name, PLUGIN_TYPE_TRANSPORT,
-			rd_mcp_template.get_plugin_info, NULL, NULL, &ret);
-#endif
-#ifdef PYX_FILEIO
-	plugin_register((void *)&fileio_template, fileio_template.type,
-			fileio_template.name, PLUGIN_TYPE_TRANSPORT,
-			fileio_template.get_plugin_info, NULL, NULL, &ret);
-#endif
+	pscsi_subsystem_init();
+	iblock_subsystem_init();
+	fileio_subsystem_init();
+	rd_subsystem_init();
+	stgt_subsystem_init();
 }
 
 struct se_plugin *transport_core_get_plugin_by_name(const char *name)
@@ -554,7 +532,7 @@ struct se_plugin *transport_core_get_plugin_by_name(const char *name)
 	struct se_plugin *p;
 	int i;
 
-	pc = plugin_get_class(PLUGIN_TYPE_TRANSPORT);
+	pc = tcm_sub_plugin_get_class(PLUGIN_TYPE_TRANSPORT);
 	if (!(pc))
 		return NULL;
 
@@ -1509,8 +1487,8 @@ void transport_dump_dev_info(
 	struct se_subsystem_api *t;
 	int ret = 0;
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			dev->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, dev->type, &ret);
 	if (!t || (ret != 0))
 		return;
 

@@ -37,19 +37,21 @@
 #include <target/target_core_hba.h>
 #include <target/target_core_seobj.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_plugin.h>
 
-void plugin_load_all_classes(void)
+#include "target_core_plugin.h"
+
+void tcm_sub_plugin_load_all_classes(void)
 {
 	/*
 	 * Setup Transport Plugins
 	 */
-	plugin_register_class(PLUGIN_TYPE_TRANSPORT, "TRANSPORT", MAX_PLUGINS);
+	tcm_sub_plugin_register_class(PLUGIN_TYPE_TRANSPORT,
+				"TRANSPORT", MAX_PLUGINS);
 	transport_load_plugins();
 }
-EXPORT_SYMBOL(plugin_load_all_classes);
+EXPORT_SYMBOL(tcm_sub_plugin_load_all_classes);
 
-struct se_plugin_class *plugin_get_class(
+struct se_plugin_class *tcm_sub_plugin_get_class(
 	u32 plugin_class_type)
 {
 	struct se_plugin_class *pc;
@@ -68,7 +70,7 @@ struct se_plugin_class *plugin_get_class(
 	return pc;
 }
 
-int plugin_register_class(
+int tcm_sub_plugin_register_class(
 	u32 plugin_class_type,
 	unsigned char *plugin_class_name,
 	int max_plugins)
@@ -121,15 +123,15 @@ int plugin_register_class(
 
 	return 0;
 }
-EXPORT_SYMBOL(plugin_register_class);
+EXPORT_SYMBOL(tcm_sub_plugin_register_class);
 
-int plugin_deregister_class(u32 plugin_class_type)
+int tcm_sub_plugin_deregister_class(u32 plugin_class_type)
 {
 	int i;
 	struct se_plugin_class *pc;
 	struct se_plugin *p;
 
-	pc = plugin_get_class(plugin_class_type);
+	pc = tcm_sub_plugin_get_class(plugin_class_type);
 	if (!(pc))
 		return -1;
 
@@ -139,7 +141,7 @@ int plugin_deregister_class(u32 plugin_class_type)
 		if (!p->plugin_obj)
 			continue;
 
-		plugin_deregister(i, plugin_class_type);
+		tcm_sub_plugin_deregister(i, plugin_class_type);
 	}
 
 	kfree(pc->plugin_array);
@@ -147,9 +149,9 @@ int plugin_deregister_class(u32 plugin_class_type)
 
 	return 0;
 }
-EXPORT_SYMBOL(plugin_deregister_class);
+EXPORT_SYMBOL(tcm_sub_plugin_deregister_class);
 
-void plugin_unload_all_classes(void)
+void tcm_sub_plugin_unload_all_classes(void)
 {
 	u32 i;
 	struct se_plugin_class *pc;
@@ -160,14 +162,14 @@ void plugin_unload_all_classes(void)
 		if (!pc->plugin_array)
 			continue;
 
-		plugin_deregister_class(i);
+		tcm_sub_plugin_deregister_class(i);
 	}
 
 	return;
 }
-EXPORT_SYMBOL(plugin_unload_all_classes);
+EXPORT_SYMBOL(tcm_sub_plugin_unload_all_classes);
 
-void *plugin_get_obj(
+void *tcm_sub_plugin_get_obj(
 	u32 plugin_class,
 	u32 plugin_loc,
 	int *ret)
@@ -175,7 +177,7 @@ void *plugin_get_obj(
 	struct se_plugin_class *pc;
 	struct se_plugin *p;
 
-	pc = plugin_get_class(plugin_class);
+	pc = tcm_sub_plugin_get_class(plugin_class);
 	if (!(pc))
 		return NULL;
 
@@ -201,17 +203,16 @@ out:
 	spin_unlock(&pc->plugin_lock);
 	return NULL;
 }
-EXPORT_SYMBOL(plugin_get_obj);
+EXPORT_SYMBOL(tcm_sub_plugin_get_obj);
 
-struct se_plugin *plugin_register(
+struct se_plugin *tcm_sub_plugin_register(
 	void *obj,
 	u32 plugin_loc,
 	unsigned char *plugin_name,
 	u32 plugin_class,
 	void (*get_plugin_info)(void *, char *, int *),
 	int (*plugin_init)(void),
-	void (*plugin_free)(void),
-	int *ret)
+	void (*plugin_free)(void))
 {
 	struct se_plugin_class *pc;
 	struct se_plugin *p;
@@ -228,7 +229,7 @@ struct se_plugin *plugin_register(
 		return NULL;
 	}
 
-	pc = plugin_get_class(plugin_class);
+	pc = tcm_sub_plugin_get_class(plugin_class);
 	if (!(pc))
 		return NULL;
 
@@ -236,7 +237,6 @@ struct se_plugin *plugin_register(
 	if (plugin_loc > pc->max_plugins) {
 		printk(KERN_ERR "Passed plugin_loc: %u exceeds pc->max_plugins:"
 			" %d\n", plugin_loc, pc->max_plugins);
-		*ret = -1;
 		goto out;
 	}
 
@@ -244,7 +244,6 @@ struct se_plugin *plugin_register(
 	if (p->plugin_obj) {
 		printk(KERN_ERR "Passed plugin_loc: %u already registered\n",
 			plugin_loc);
-		*ret = -1;
 		goto out;
 	}
 
@@ -262,7 +261,7 @@ struct se_plugin *plugin_register(
 	if (*plugin_init != NULL) {
 		err = (*plugin_init)();
 		if (err) {
-			plugin_deregister(plugin_loc, plugin_class);
+			tcm_sub_plugin_deregister(plugin_loc, plugin_class);
 			return NULL;
 		}
 	}
@@ -273,9 +272,9 @@ out:
 	spin_unlock(&pc->plugin_lock);
 	return NULL;
 }
-EXPORT_SYMBOL(plugin_register);
+EXPORT_SYMBOL(tcm_sub_plugin_register);
 
-int plugin_deregister(
+int tcm_sub_plugin_deregister(
 	u32 plugin_loc,
 	u32 plugin_class)
 {
@@ -283,7 +282,7 @@ int plugin_deregister(
 	struct se_plugin_class *pc;
 	struct se_plugin *p;
 
-	pc = plugin_get_class(plugin_class);
+	pc = tcm_sub_plugin_get_class(plugin_class);
 	if (!(pc))
 		return -1;
 

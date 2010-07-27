@@ -48,8 +48,9 @@
 #include <target/target_core_transport.h>
 #include <target/target_core_ua.h>
 #include <target/target_core_fabric_ops.h>
-#include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
+
+#include "target_core_plugin.h"
 
 struct block_device *__linux_blockdevice_claim(
 	int major,
@@ -1524,8 +1525,8 @@ int core_dev_setup_virtual_lun0(void)
 
 	se_global->g_lun0_hba = hba;
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0)) {
 		ret = -EINVAL;
 		goto out;

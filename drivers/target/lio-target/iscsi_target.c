@@ -64,7 +64,6 @@
 #include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <target/target_core_plugin.h>
 
 #include <iscsi_target.h>
 #include <iscsi_target_device.h>

@@ -43,10 +43,11 @@
 #include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_mib.h>
-#include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
+
+#include "target_core_plugin.h"
 
 /* SCSI mib table index */
 struct scsi_index_table scsi_index_table;

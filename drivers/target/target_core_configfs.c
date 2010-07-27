@@ -41,7 +41,6 @@
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_hba.h>
-#include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_alua.h>
@@ -50,6 +49,8 @@
 #include <target/target_core_fabric_configfs.h>
 #include <target/target_core_configfs.h>
 #include <target/configfs_macros.h>
+
+#include "target_core_plugin.h"
 
 struct list_head g_tf_list;
 struct mutex g_tf_lock;
@@ -1657,8 +1658,8 @@ static ssize_t target_core_show_dev_info(void *p, char *page)
 	int ret = 0, bl = 0;
 	ssize_t read_bytes = 0;
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		return 0;
 
@@ -1695,8 +1696,8 @@ static ssize_t target_core_store_dev_control(
 		return -EINVAL;
 	}
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		return -EINVAL;
 
@@ -1725,8 +1726,8 @@ static ssize_t target_core_store_dev_fd(void *p, const char *page, size_t count)
 		return -EEXIST;
 	}
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		return -EINVAL;
 
@@ -1875,8 +1876,8 @@ static ssize_t target_core_store_dev_enable(
 		return -EEXIST;
 	}
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		return -EINVAL;
 
@@ -2750,8 +2751,8 @@ static struct config_group *target_core_call_createdev(
 	/*
 	 * Locate the struct se_subsystem_api from parent's struct se_hba.
 	 */
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0)) {
 		core_put_hba(hba);
 		return NULL;
@@ -2884,8 +2885,8 @@ static void target_core_call_freedev(
 	if (!(hba))
 		goto out;
 
-	t = (struct se_subsystem_api *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-			hba->type, &ret);
+	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
+			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
 	if (!t || (ret != 0))
 		goto hba_out;
 
@@ -3245,7 +3246,7 @@ int target_core_init_configfs(void)
 		" Infrastructure: "TARGET_CORE_CONFIGFS_VERSION" on %s/%s"
 		" on "UTS_RELEASE"\n", utsname()->sysname, utsname()->machine);
 
-	plugin_load_all_classes();
+	tcm_sub_plugin_load_all_classes();
 	if (core_dev_setup_virtual_lun0() < 0)
 		goto out;
 
@@ -3268,7 +3269,7 @@ out:
 		remove_proc_entry("scsi_target", 0);
 #endif
 	core_dev_release_virtual_lun0();
-	plugin_unload_all_classes();
+	tcm_sub_plugin_unload_all_classes();
 out_global:
 	if (se_global->default_lu_gp) {
 		core_alua_free_lu_gp(se_global->default_lu_gp);
@@ -3336,7 +3337,7 @@ void target_core_exit_configfs(void)
 	remove_proc_entry("scsi_target", 0);
 #endif
 	core_dev_release_virtual_lun0();
-	plugin_unload_all_classes();
+	tcm_sub_plugin_unload_all_classes();
 	release_se_global();
 
 	return;

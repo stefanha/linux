@@ -37,7 +37,6 @@
 #include <target/target_core_alua.h>
 #include <target/target_core_pr.h>
 #include <target/target_core_ua.h>
-#include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 

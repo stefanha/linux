@@ -50,7 +50,6 @@
 #include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
 
-#include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
 
 /*	iscsi_get_lun():

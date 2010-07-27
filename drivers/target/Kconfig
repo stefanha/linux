@@ -5,49 +5,6 @@ config TARGET_CORE
         ---help---
         Say Y or M here to enable the TCM Storage Engine and ConfigFS enabled control path for target_core_mod
 
-config TCM_IBLOCK
-	tristate "TCM/IBLOCK Subsystem Plugin for Linux/BLOCK"
-	depends on TARGET_CORE
-	default y
-	---help---
-	Say Y here to enable the TCM/IBLOCK subsystem plugin for non-buffered access to Linux/Block devices using BIO in TCM
-
-config TCM_PSCSI
-	tristate "TCM/pSCSI Subsystem Plugin for Linux/SCSI"
-	depends on TARGET_CORE
-	default y
-	---help---
-	Say Y here to enable the TCM/pSCSI subsystem plugin for non-buffered passthrough access to Linux/SCSI devices in TCM
-
-config TCM_PSCSI_VPD_PAGE_CHECK
-	tristate "TCM/pSCSI EVPD Page Emulation for Linux/SCSI"
-	depends on TARGET_CORE && TCM_PSCSI
-	default y
-	---help---
-	Say Y here to enable the TCM/pSCSI EVPD emulation that is required to register emulated SCSI LUNs on some non Linux OSes when using the Linux/SCSI passthrough for certain devices.
-
-config TCM_FILEIO
-	tristate "TCM/FILEIO Subsystem Plugin for Linux/VFS"
-	depends on TARGET_CORE
-	default y
-	---help---
-	Say Y here to enable the TCM/FILEIO subsystem plugin for buffered access to Linux/VFS files or block devices in TCM
-
-config TCM_RAMDISK
-	tristate "TCM/RAMDISK Subsystem Plugin"
-	depends on TARGET_CORE
-	default y
-	---help---
-	Say Y here to enable the TCM/RAMDISK subsystem plugins for internal struct page ramdisk device access for performance testing and debugging
-
-config TCM_STGT
-	tristate "TCM/STGT Subsystem Plugin"
-	depends on TARGET_CORE && EXPERIMENTAL
-	select SCSI_TGT
-	default n
-	---help---
-	Say Y here to enable the WIP TCM/STGT subsystem plugin for accessing STGT device in TCM
-
 config TCM_SNMP
 	tristate "TCM SCSI MIBs"
 	depends on TARGET_CORE && PROC_FS

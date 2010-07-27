@@ -39,7 +39,6 @@
 #include <target/target_core_tmr.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_alua.h>
-#include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 

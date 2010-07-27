@@ -40,7 +40,14 @@
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_rd.h>
+
+#include "target_core_plugin.h"
+#include "target_core_rd.h"
+
+static struct se_subsystem_api rd_dr_template;
+static struct se_subsystem_api rd_mcp_template;
+
+static void __rd_get_dev_info(struct rd_dev *, char *, int *);
 
 /* #define DEBUG_RAMDISK_MCP */
 /* #define DEBUG_RAMDISK_DR */
@@ -49,7 +56,7 @@
  *
  *
  */
-int rd_attach_hba(struct se_hba *hba, u32 host_id)
+static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 {
 	struct rd_host *rd_host;
 
@@ -82,7 +89,7 @@ int rd_attach_hba(struct se_hba *hba, u32 host_id)
  *
  *
  */
-int rd_detach_hba(struct se_hba *hba)
+static int rd_detach_hba(struct se_hba *hba)
 {
 	struct rd_host *rd_host;
 
@@ -106,7 +113,7 @@ int rd_detach_hba(struct se_hba *hba)
  *
  *
  */
-void rd_release_device_space(struct rd_dev *rd_dev)
+static void rd_release_device_space(struct rd_dev *rd_dev)
 {
 	u32 i, j, page_count = 0, sg_per_table;
 	struct rd_dev_sg_table *sg_table;
@@ -240,12 +247,12 @@ static void *rd_allocate_virtdevice(
 	return rd_dev;
 }
 
-void *rd_DIRECT_allocate_virtdevice(struct se_hba *hba, const char *name)
+static void *rd_DIRECT_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	return rd_allocate_virtdevice(hba, name, 1);
 }
 
-void *rd_MEMCPY_allocate_virtdevice(struct se_hba *hba, const char *name)
+static void *rd_MEMCPY_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	return rd_allocate_virtdevice(hba, name, 0);
 }
@@ -294,7 +301,7 @@ fail:
 	return NULL;
 }
 
-struct se_device *rd_DIRECT_create_virtdevice(
+static struct se_device *rd_DIRECT_create_virtdevice(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	void *p)
@@ -302,7 +309,7 @@ struct se_device *rd_DIRECT_create_virtdevice(
 	return rd_create_virtdevice(hba, se_dev, p, 1);
 }
 
-struct se_device *rd_MEMCPY_create_virtdevice(
+static struct se_device *rd_MEMCPY_create_virtdevice(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	void *p)
@@ -314,7 +321,7 @@ struct se_device *rd_MEMCPY_create_virtdevice(
  *
  *
  */
-int rd_activate_device(struct se_device *dev)
+static int rd_activate_device(struct se_device *dev)
 {
 	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
 	struct rd_host *rd_host = rd_dev->rd_host;
@@ -330,7 +337,7 @@ int rd_activate_device(struct se_device *dev)
  *
  *
  */
-void rd_deactivate_device(struct se_device *dev)
+static void rd_deactivate_device(struct se_device *dev)
 {
 	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
 	struct rd_host *rd_host = rd_dev->rd_host;
@@ -344,7 +351,7 @@ void rd_deactivate_device(struct se_device *dev)
  *
  *
  */
-void rd_free_device(void *p)
+static void rd_free_device(void *p)
 {
 	struct rd_dev *rd_dev = (struct rd_dev *) p;
 
@@ -356,7 +363,7 @@ void rd_free_device(void *p)
  *
  *
  */
-int rd_transport_complete(struct se_task *task)
+static int rd_transport_complete(struct se_task *task)
 {
 	return 0;
 }
@@ -365,7 +372,7 @@ int rd_transport_complete(struct se_task *task)
  *
  *
  */
-void *rd_allocate_request(
+static void *rd_allocate_request(
 	struct se_task *task,
 	struct se_device *dev)
 {
@@ -778,7 +785,7 @@ static int rd_MEMCPY_write(struct rd_request *req)
  *
  *
  */
-int rd_MEMCPY_do_task(struct se_task *task)
+static int rd_MEMCPY_do_task(struct se_task *task)
 {
 	struct se_device *dev = task->se_dev;
 	struct rd_request *req = (struct rd_request *) task->transport_req;
@@ -996,7 +1003,7 @@ out:
  *
  *
  */
-int rd_DIRECT_do_se_mem_map(
+static int rd_DIRECT_do_se_mem_map(
 	struct se_task *task,
 	struct list_head *se_mem_list,
 	void *in_mem,
@@ -1031,7 +1038,7 @@ int rd_DIRECT_do_se_mem_map(
  *
  *
  */
-void rd_DIRECT_free_DMA(struct se_cmd *cmd)
+static void rd_DIRECT_free_DMA(struct se_cmd *cmd)
 {
 	struct se_mem *se_mem, *se_mem_tmp;
 
@@ -1055,7 +1062,7 @@ void rd_DIRECT_free_DMA(struct se_cmd *cmd)
  *
  *	Note that rd_DIRECT_do_se_mem_map() actually does the real work.
  */
-int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
+static int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
 {
 	T_TASK(cmd)->t_mem_list = kzalloc(sizeof(struct list_head), GFP_KERNEL);
 	if (!(T_TASK(cmd)->t_mem_list)) {
@@ -1072,7 +1079,7 @@ int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
  *
  *
  */
-int rd_DIRECT_do_task(struct se_task *task)
+static int rd_DIRECT_do_task(struct se_task *task)
 {
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return rd_emulate_scsi_cdb(task);
@@ -1091,7 +1098,7 @@ int rd_DIRECT_do_task(struct se_task *task)
  *
  *
  */
-void rd_free_task(struct se_task *task)
+static void rd_free_task(struct se_task *task)
 {
 	struct rd_request *req;
 	req = (struct rd_request *) task->transport_req;
@@ -1099,7 +1106,7 @@ void rd_free_task(struct se_task *task)
 	kfree(req);
 }
 
-ssize_t rd_set_configfs_dev_params(
+static ssize_t rd_set_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	const char *page,
@@ -1149,7 +1156,7 @@ out:
 	return (params) ? count : -EINVAL;
 }
 
-ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
+static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
 {
 	struct rd_dev *rd_dev = (struct rd_dev *) se_dev->se_dev_su_ptr;
 
@@ -1161,7 +1168,7 @@ ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev
 	return 0;
 }
 
-ssize_t rd_show_configfs_dev_params(
+static ssize_t rd_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	char *page)
@@ -1173,17 +1180,17 @@ ssize_t rd_show_configfs_dev_params(
 	return (ssize_t)bl;
 }
 
-void rd_dr_get_plugin_info(void *p, char *b, int *bl)
+static void rd_dr_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM RAMDISK_DR Plugin %s\n", RD_DR_VERSION);
 }
 
-void rd_mcp_get_plugin_info(void *p, char *b, int *bl)
+static void rd_mcp_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM RAMDISK_MCP Plugin %s\n", RD_MCP_VERSION);
 }
 
-void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
+static void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
 	struct rd_host *rd_host = (struct rd_host *)hba->hba_ptr;
 
@@ -1192,14 +1199,14 @@ void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM RamDisk HBA\n");
 }
 
-void rd_get_dev_info(struct se_device *dev, char *b, int *bl)
+static void rd_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
 	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
 
 	__rd_get_dev_info(rd_dev, b, bl);
 }
 
-void __rd_get_dev_info(struct rd_dev *rd_dev, char *b, int *bl)
+static void __rd_get_dev_info(struct rd_dev *rd_dev, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM RamDisk ID: %u  RamDisk Makeup: %s\n",
 			rd_dev->rd_dev_id, (rd_dev->rd_direct) ?
@@ -1215,7 +1222,7 @@ void __rd_get_dev_info(struct rd_dev *rd_dev, char *b, int *bl)
  *
  *
  */
-void rd_map_task_non_SG(struct se_task *task)
+static void rd_map_task_non_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
 	struct rd_request *req = (struct rd_request *) task->transport_req;
@@ -1229,7 +1236,7 @@ void rd_map_task_non_SG(struct se_task *task)
  *
  *
  */
-void rd_map_task_SG(struct se_task *task)
+static void rd_map_task_SG(struct se_task *task)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1242,7 +1249,7 @@ void rd_map_task_SG(struct se_task *task)
  *
  *
  */
-int rd_CDB_inquiry(struct se_task *task, u32 size)
+static int rd_CDB_inquiry(struct se_task *task, u32 size)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1256,7 +1263,7 @@ int rd_CDB_inquiry(struct se_task *task, u32 size)
  *
  *
  */
-int rd_CDB_none(struct se_task *task, u32 size)
+static int rd_CDB_none(struct se_task *task, u32 size)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1272,7 +1279,7 @@ int rd_CDB_none(struct se_task *task, u32 size)
  *
  *
  */
-int rd_CDB_read_non_SG(struct se_task *task, u32 size)
+static int rd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1286,7 +1293,7 @@ int rd_CDB_read_non_SG(struct se_task *task, u32 size)
  *
  *
  */
-int rd_CDB_read_SG(struct se_task *task, u32 size)
+static int rd_CDB_read_SG(struct se_task *task, u32 size)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1300,7 +1307,7 @@ int rd_CDB_read_SG(struct se_task *task, u32 size)
  *
  *
  */
-int rd_CDB_write_non_SG(struct se_task *task, u32 size)
+static int rd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1314,7 +1321,7 @@ int rd_CDB_write_non_SG(struct se_task *task, u32 size)
  *
  *
  */
-int rd_CDB_write_SG(struct se_task *task, u32 size)
+static int rd_CDB_write_SG(struct se_task *task, u32 size)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1328,7 +1335,7 @@ int rd_CDB_write_SG(struct se_task *task, u32 size)
  *
  *
  */
-int rd_DIRECT_check_lba(unsigned long long lba, struct se_device *dev)
+static int rd_DIRECT_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return ((do_div(lba, PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
 		 DEV_ATTRIB(dev)->block_size) ? 1 : 0;
@@ -1338,7 +1345,7 @@ int rd_DIRECT_check_lba(unsigned long long lba, struct se_device *dev)
  *
  *
  */
-int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
+static int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
 }
@@ -1347,7 +1354,7 @@ int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
  *
  *
  */
-int rd_check_for_SG(struct se_task *task)
+static int rd_check_for_SG(struct se_task *task)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1358,7 +1365,7 @@ int rd_check_for_SG(struct se_task *task)
  *
  *
  */
-unsigned char *rd_get_cdb(struct se_task *task)
+static unsigned char *rd_get_cdb(struct se_task *task)
 {
 	struct rd_request *req = (struct rd_request *) task->transport_req;
 
@@ -1369,17 +1376,17 @@ unsigned char *rd_get_cdb(struct se_task *task)
  *
  *
  */
-u32 rd_get_blocksize(struct se_device *dev)
+static u32 rd_get_blocksize(struct se_device *dev)
 {
 	return RD_BLOCKSIZE;
 }
 
-u32 rd_get_device_rev(struct se_device *dev)
+static u32 rd_get_device_rev(struct se_device *dev)
 {
 	return SCSI_SPC_2; /* Returns SPC-3 in Initiator Data */
 }
 
-u32 rd_get_device_type(struct se_device *dev)
+static u32 rd_get_device_type(struct se_device *dev)
 {
 	return TYPE_DISK;
 }
@@ -1388,7 +1395,7 @@ u32 rd_get_device_type(struct se_device *dev)
  *
  *
  */
-u32 rd_get_dma_length(u32 task_size, struct se_device *dev)
+static u32 rd_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
 }
@@ -1397,7 +1404,7 @@ u32 rd_get_dma_length(u32 task_size, struct se_device *dev)
  *
  *
  */
-u32 rd_get_max_sectors(struct se_device *dev)
+static u32 rd_get_max_sectors(struct se_device *dev)
 {
 	return RD_MAX_SECTORS;
 }
@@ -1406,12 +1413,108 @@ u32 rd_get_max_sectors(struct se_device *dev)
  *
  *
  */
-u32 rd_get_queue_depth(struct se_device *dev)
+static u32 rd_get_queue_depth(struct se_device *dev)
 {
 	return RD_DEVICE_QUEUE_DEPTH;
 }
 
-u32 rd_get_max_queue_depth(struct se_device *dev)
+static u32 rd_get_max_queue_depth(struct se_device *dev)
 {
 	return RD_MAX_DEVICE_QUEUE_DEPTH;
+}
+
+/*
+ * We use the generic command sequencer, so we must setup
+ * struct se_subsystem_spc.
+ */
+static struct se_subsystem_spc rd_template_spc = {
+	.inquiry		= rd_CDB_inquiry,
+	.none			= rd_CDB_none,
+	.read_non_SG		= rd_CDB_read_non_SG,
+	.read_SG		= rd_CDB_read_SG,
+	.write_non_SG		= rd_CDB_write_non_SG,
+	.write_SG		= rd_CDB_write_SG,
+};
+
+static struct se_subsystem_api rd_dr_template = {
+	.name			= "rd_dr",
+	.type			= RAMDISK_DR,
+	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
+	.attach_hba		= rd_attach_hba,
+	.detach_hba		= rd_detach_hba,
+	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
+	.create_virtdevice	= rd_DIRECT_create_virtdevice,
+	.activate_device	= rd_activate_device,
+	.deactivate_device	= rd_deactivate_device,
+	.free_device		= rd_free_device,
+	.transport_complete	= rd_transport_complete,
+	.allocate_DMA		= rd_DIRECT_allocate_DMA,
+	.free_DMA		= rd_DIRECT_free_DMA,
+	.allocate_request	= rd_allocate_request,
+	.do_task		= rd_DIRECT_do_task,
+	.free_task		= rd_free_task,
+	.check_configfs_dev_params = rd_check_configfs_dev_params,
+	.set_configfs_dev_params = rd_set_configfs_dev_params,
+	.show_configfs_dev_params = rd_show_configfs_dev_params,
+	.get_plugin_info	= rd_dr_get_plugin_info,
+	.get_hba_info		= rd_get_hba_info,
+	.get_dev_info		= rd_get_dev_info,
+	.check_lba		= rd_DIRECT_check_lba,
+	.check_for_SG		= rd_check_for_SG,
+	.get_cdb		= rd_get_cdb,
+	.get_blocksize		= rd_get_blocksize,
+	.get_device_rev		= rd_get_device_rev,
+	.get_device_type	= rd_get_device_type,
+	.get_dma_length		= rd_get_dma_length,
+	.get_max_sectors	= rd_get_max_sectors,
+	.get_queue_depth	= rd_get_queue_depth,
+	.get_max_queue_depth	= rd_get_max_queue_depth,
+	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
+	.write_pending		= NULL,
+	.spc			= &rd_template_spc,
+};
+
+static struct se_subsystem_api rd_mcp_template = {
+	.name			= "rd_mcp",
+	.type			= RAMDISK_MCP,
+	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
+	.attach_hba		= rd_attach_hba,
+	.detach_hba		= rd_detach_hba,
+	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
+	.create_virtdevice	= rd_MEMCPY_create_virtdevice,
+	.activate_device	= rd_activate_device,
+	.deactivate_device	= rd_deactivate_device,
+	.free_device		= rd_free_device,
+	.transport_complete	= rd_transport_complete,
+	.allocate_request	= rd_allocate_request,
+	.do_task		= rd_MEMCPY_do_task,
+	.free_task		= rd_free_task,
+	.check_configfs_dev_params = rd_check_configfs_dev_params,
+	.set_configfs_dev_params = rd_set_configfs_dev_params,
+	.show_configfs_dev_params = rd_show_configfs_dev_params,
+	.get_plugin_info	= rd_mcp_get_plugin_info,
+	.get_hba_info		= rd_get_hba_info,
+	.get_dev_info		= rd_get_dev_info,
+	.check_lba		= rd_MEMCPY_check_lba,
+	.check_for_SG		= rd_check_for_SG,
+	.get_cdb		= rd_get_cdb,
+	.get_blocksize		= rd_get_blocksize,
+	.get_device_rev		= rd_get_device_rev,
+	.get_device_type	= rd_get_device_type,
+	.get_dma_length		= rd_get_dma_length,
+	.get_max_sectors	= rd_get_max_sectors,
+	.get_queue_depth	= rd_get_queue_depth,
+	.get_max_queue_depth	= rd_get_max_queue_depth,
+	.write_pending		= NULL,
+	.spc			= &rd_template_spc,
+};
+
+void __init rd_subsystem_init(void)
+{
+	tcm_sub_plugin_register((void *)&rd_dr_template, rd_dr_template.type,
+			rd_dr_template.name, PLUGIN_TYPE_TRANSPORT,
+			rd_dr_template.get_plugin_info, NULL, NULL);
+	tcm_sub_plugin_register((void *)&rd_mcp_template, rd_mcp_template.type,
+			rd_mcp_template.name, PLUGIN_TYPE_TRANSPORT,
+			rd_mcp_template.get_plugin_info, NULL, NULL);
 }

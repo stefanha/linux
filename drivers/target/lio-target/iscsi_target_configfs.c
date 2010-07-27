@@ -1423,7 +1423,6 @@ static struct configfs_attribute *lio_target_discovery_auth_attrs[] = {
 int iscsi_target_register_configfs(void)
 {
 	struct target_fabric_configfs *fabric;
-	struct config_group *tf_cg;
 	int ret;
 
 	lio_target_fabric_configfs = NULL;
