@@ -25,8 +25,6 @@
  *
  ******************************************************************************/
 
-#define TARGET_CORE_FABRIC_LIB_C
-
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/spinlock.h>
@@ -42,8 +40,6 @@
 #include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
-
-#undef TARGET_CORE_FABRIC_LIB_C
 
 /*
  * Handlers for Serial Attached SCSI (SAS)

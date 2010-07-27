@@ -23,8 +23,6 @@
  *
  ******************************************************************************/
 
-#define TARGET_CORE_PLUGIN_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -40,8 +38,6 @@
 #include <target/target_core_seobj.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_plugin.h>
-
-#undef TARGET_CORE_PLUGIN_C
 
 void plugin_load_all_classes(void)
 {

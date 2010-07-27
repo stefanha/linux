@@ -27,9 +27,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_RD_C
-
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -44,8 +41,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_rd.h>
-
-#undef TARGET_CORE_RD_C
 
 /* #define DEBUG_RAMDISK_MCP */
 /* #define DEBUG_RAMDISK_DR */

@@ -24,8 +24,6 @@
  ******************************************************************************/
 
 
-#define TARGET_CORE_SEOBJ_C
-
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -43,8 +41,6 @@
 #include <target/target_core_seobj.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
-
-#undef TARGET_CORE_SEOBJ_C
 
 int dev_obj_export(void *p, struct se_portal_group *tpg, struct se_lun *lun)
 {

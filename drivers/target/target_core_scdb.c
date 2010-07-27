@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_SCDB_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 
@@ -36,8 +33,6 @@
 #include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_scdb.h>
-
-#undef TARGET_CORE_SCDB_C
 
 /*	split_cdb_XX_6():
  *

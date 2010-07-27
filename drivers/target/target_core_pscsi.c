@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_PSCSI_C
-
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -53,8 +50,6 @@
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
 #include <target/target_core_transport_plugin.h>
-
-#undef TARGET_CORE_PSCSI_C
 
 #define ISPRINT(a)  ((a >= ' ') && (a <= '~'))
 

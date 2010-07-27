@@ -24,8 +24,6 @@
  *
  ******************************************************************************/
 
-#define TARGET_CORE_UA_C
-
 #include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -42,8 +40,6 @@
 #include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
-
-#undef TARGET_CORE_UA_C
 
 int core_scsi3_ua_check(
 	struct se_cmd *cmd,

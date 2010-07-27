@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_TPG_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -49,8 +46,6 @@
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
 #include <target/target_core_fabric_ops.h>
-
-#undef TARGET_CORE_TPG_C
 
 /*	core_clear_initiator_node_from_tpg():
  *

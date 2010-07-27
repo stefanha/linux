@@ -25,8 +25,6 @@
  *
  ******************************************************************************/
 
-#define TARGET_CORE_PR_C
-
 #include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -46,8 +44,6 @@
 #include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
-
-#undef TARGET_CORE_PR_C
 
 /*
  * Used for Specify Initiator Ports Capable Bit (SPEC_I_PT)

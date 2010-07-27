@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_HBA_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -47,8 +44,6 @@
 #include <target/target_core_transport.h>
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
-
-#undef TARGET_CORE_HBA_C
 
 int core_get_hba(struct se_hba *hba)
 {

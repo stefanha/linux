@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_TRANSPORT_C
-
 #include <linux/version.h>
 #include <linux/net.h>
 #include <linux/delay.h>
@@ -63,8 +60,6 @@
 #include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
-
-#undef TARGET_CORE_TRANSPORT_C
 
 /* #define DEBUG_CDB_HANDLER */
 #ifdef DEBUG_CDB_HANDLER

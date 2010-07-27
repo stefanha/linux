@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_FILE_C
-
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -43,8 +40,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_file.h>
-
-#undef TARGET_CORE_FILE_C
 
 /*	fd_attach_hba(): (Part of se_subsystem_api_t template)
  *

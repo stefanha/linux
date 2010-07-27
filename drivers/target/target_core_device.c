@@ -27,9 +27,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_DEVICE_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/delay.h>
@@ -53,8 +50,6 @@
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_plugin.h>
 #include <target/target_core_seobj.h>
-
-#undef TARGET_CORE_DEVICE_C
 
 struct block_device *__linux_blockdevice_claim(
 	int major,

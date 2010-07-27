@@ -24,8 +24,6 @@
  *
  ******************************************************************************/
 
-#define TARGET_CORE_ALUA_C
-
 #include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -42,8 +40,6 @@
 #include <target/target_core_ua.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
-
-#undef TARGET_CORE_ALUA_C
 
 /*
  * REPORT_TARGET_PORT_GROUPS
