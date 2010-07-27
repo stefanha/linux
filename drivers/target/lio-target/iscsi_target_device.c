@@ -63,11 +63,11 @@
  *
  */
 int iscsi_get_lun_for_tmr(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u64 lun)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_portal_group_t *tpg = ISCSI_TPG_C(conn);
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
@@ -87,12 +87,12 @@ int iscsi_get_lun_for_tmr(
  * 	Returns (< 0) on failure
  */
 int iscsi_get_lun_for_cmd(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *cdb,
 	u64 lun)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_portal_group_t *tpg = ISCSI_TPG_C(conn);
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
@@ -110,7 +110,7 @@ int iscsi_get_lun_for_cmd(
  *
  *
  */
-void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
+void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
 {
 	struct se_node_acl *se_nacl;
 
@@ -139,7 +139,7 @@ void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
  *
  *
  */
-void iscsi_increment_maxcmdsn(iscsi_cmd_t *cmd, iscsi_session_t *sess)
+void iscsi_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess)
 {
 	if (cmd->immediate_cmd || cmd->maxcmdsn_inc)
 		return;

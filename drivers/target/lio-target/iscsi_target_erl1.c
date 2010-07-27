@@ -69,7 +69,7 @@
  *	to be dumped.
  */
 int iscsi_dump_data_payload(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	u32 buf_len,
 	int dump_padding_digest)
 {
@@ -142,11 +142,11 @@ out:
  *	Used for retransmitting R2Ts from a R2T SNACK request.
  */
 static int iscsi_send_recovery_r2t_for_snack(
-	iscsi_cmd_t *cmd,
-	iscsi_r2t_t *r2t)
+	struct iscsi_cmd *cmd,
+	struct iscsi_r2t *r2t)
 {
 	/*
-	 * If the iscsi_r2t_t has not been sent yet, we can safely
+	 * If the struct iscsi_r2t has not been sent yet, we can safely
 	 * ignore retransmission
 	 * of the R2TSN in question.
 	 */
@@ -168,13 +168,13 @@ static int iscsi_send_recovery_r2t_for_snack(
  *
  */
 static int iscsi_handle_r2t_snack(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	u32 begrun,
 	u32 runlength)
 {
 	u32 last_r2tsn;
-	iscsi_r2t_t *r2t;
+	struct iscsi_r2t *r2t;
 
 	/*
 	 * Make sure the initiator is not requesting retransmission
@@ -228,13 +228,13 @@ static int iscsi_handle_r2t_snack(
  *	FIXME: How is this handled for a RData SNACK?
  */
 int iscsi_create_recovery_datain_values_datasequenceinorder_yes(
-	iscsi_cmd_t *cmd,
-	iscsi_datain_req_t *dr)
+	struct iscsi_cmd *cmd,
+	struct iscsi_datain_req *dr)
 {
 	u32 data_sn = 0, data_sn_count = 0;
 	u32 pdu_start = 0, seq_no = 0;
 	u32 begrun = dr->begrun;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	while (begrun > data_sn++) {
 		data_sn_count++;
@@ -275,18 +275,18 @@ int iscsi_create_recovery_datain_values_datasequenceinorder_yes(
  *	FIXME: How is this handled for a RData SNACK?
  */
 int iscsi_create_recovery_datain_values_datasequenceinorder_no(
-	iscsi_cmd_t *cmd,
-	iscsi_datain_req_t *dr)
+	struct iscsi_cmd *cmd,
+	struct iscsi_datain_req *dr)
 {
 	int found_seq = 0, i;
 	u32 data_sn, read_data_done = 0, seq_send_order = 0;
 	u32 begrun = dr->begrun;
 	u32 runlength = dr->runlength;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_seq_t *first_seq = NULL, *seq = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_seq *first_seq = NULL, *seq = NULL;
 
 	if (!cmd->seq_list) {
-		printk(KERN_ERR "iscsi_cmd_t->seq_list is NULL!\n");
+		printk(KERN_ERR "struct iscsi_cmd->seq_list is NULL!\n");
 		return -1;
 	}
 
@@ -294,10 +294,10 @@ int iscsi_create_recovery_datain_values_datasequenceinorder_no(
 	 * Calculate read_data_done for all sequences containing a
 	 * first_datasn and last_datasn less than the BegRun.
 	 *
-	 * Locate the iscsi_seq_t the BegRun lies within and calculate
+	 * Locate the struct iscsi_seq the BegRun lies within and calculate
 	 * NextBurstLenghth up to the DataSN based on MaxRecvDataSegmentLength.
 	 *
-	 * Also use iscsi_seq_t->seq_send_order to determine where to start.
+	 * Also use struct iscsi_seq->seq_send_order to determine where to start.
 	 */
 	for (i = 0; i < cmd->seq_count; i++) {
 		seq = &cmd->seq_list[i];
@@ -358,7 +358,7 @@ int iscsi_create_recovery_datain_values_datasequenceinorder_no(
 			 *
 			 * For DataPDUInOrder=No, while the first DataSN of the
 			 * sequence is less than the received BegRun, find the
-			 * iscsi_pdu_t of the DataSN in question and add the
+			 * struct iscsi_pdu of the DataSN in question and add the
 			 * MaxRecvDataSegmentLength to read_data_done and to the
 			 * sequence's next_burst_len;
 			 */
@@ -373,7 +373,7 @@ int iscsi_create_recovery_datain_values_datasequenceinorder_no(
 				}
 			} else {
 				int j;
-				iscsi_pdu_t *pdu;
+				struct iscsi_pdu *pdu;
 
 				while (data_sn < begrun) {
 					seq->pdu_send_order++;
@@ -422,7 +422,7 @@ int iscsi_create_recovery_datain_values_datasequenceinorder_no(
 			goto done;
 		}
 
-		printk(KERN_ERR "Unable to locate iscsi_seq_t for ITT: 0x%08x,"
+		printk(KERN_ERR "Unable to locate struct iscsi_seq for ITT: 0x%08x,"
 			" BegRun: 0x%08x, RunLength: 0x%08x while"
 			" DataSequenceInOrder=No and DataPDUInOrder=%s.\n",
 				cmd->init_task_tag, begrun, runlength,
@@ -442,13 +442,13 @@ done:
  *
  */
 static inline int iscsi_handle_recovery_datain(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	u32 begrun,
 	u32 runlength)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_datain_req_t *dr;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_datain_req *dr;
 	struct se_cmd *se_cmd = cmd->se_cmd;
 
 	if (!(atomic_read(&T_TASK(se_cmd)->t_transport_complete))) {
@@ -508,14 +508,14 @@ static inline int iscsi_handle_recovery_datain(
  *
  */
 int iscsi_handle_recovery_datain_or_r2t(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf,
 	u32 init_task_tag,
 	u32 targ_xfer_tag,
 	u32 begrun,
 	u32 runlength)
 {
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 
 	cmd = iscsi_find_cmd_from_itt(conn, init_task_tag);
 	if (!(cmd))
@@ -545,14 +545,14 @@ int iscsi_handle_recovery_datain_or_r2t(
  */
 /* #warning FIXME: Status SNACK needs to be dependent on OPCODE!!! */
 int iscsi_handle_status_snack(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	u32 init_task_tag,
 	u32 targ_xfer_tag,
 	u32 begrun,
 	u32 runlength)
 {
 	u32 last_statsn;
-	iscsi_cmd_t *cmd = NULL;
+	struct iscsi_cmd *cmd = NULL;
 
 	if (conn->exp_statsn > begrun) {
 		printk(KERN_ERR "Got Status SNACK Begrun: 0x%08x, RunLength:"
@@ -606,12 +606,12 @@ int iscsi_handle_status_snack(
  *
  */
 int iscsi_handle_data_ack(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	u32 targ_xfer_tag,
 	u32 begrun,
 	u32 runlength)
 {
-	iscsi_cmd_t *cmd = NULL;
+	struct iscsi_cmd *cmd = NULL;
 
 	cmd = iscsi_find_cmd_from_ttt(conn, targ_xfer_tag);
 	if (!(cmd)) {
@@ -646,7 +646,7 @@ int iscsi_handle_data_ack(
  *
  */
 static int iscsi_send_recovery_r2t(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u32 offset,
 	u32 xfer_len)
 {
@@ -664,16 +664,16 @@ static int iscsi_send_recovery_r2t(
  *
  */
 int iscsi_dataout_datapduinorder_no_fbit(
-	iscsi_cmd_t *cmd,
-	iscsi_pdu_t *pdu)
+	struct iscsi_cmd *cmd,
+	struct iscsi_pdu *pdu)
 {
 	int i, send_recovery_r2t = 0, recovery = 0;
 	u32 length = 0, offset = 0, pdu_count = 0, xfer_len = 0;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_pdu_t *first_pdu = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_pdu *first_pdu = NULL;
 
 	/*
-	 * Get an iscsi_pdu_t pointer to the first PDU, and total PDU count
+	 * Get an struct iscsi_pdu pointer to the first PDU, and total PDU count
 	 * of the DataOUT sequence.
 	 */
 	if (SESS_OPS_C(conn)->DataSequenceInOrder) {
@@ -687,7 +687,7 @@ int iscsi_dataout_datapduinorder_no_fbit(
 				break;
 		}
 	} else {
-		iscsi_seq_t *seq = cmd->seq_ptr;
+		struct iscsi_seq *seq = cmd->seq_ptr;
 
 		first_pdu = &cmd->pdu_list[seq->pdu_start];
 		pdu_count = seq->pdu_count;
@@ -697,7 +697,7 @@ int iscsi_dataout_datapduinorder_no_fbit(
 		return DATAOUT_CANNOT_RECOVER;
 
 	/*
-	 * Loop through the ending DataOUT Sequence checking each iscsi_pdu_t.
+	 * Loop through the ending DataOUT Sequence checking each struct iscsi_pdu.
 	 * The following ugly logic does batching of not received PDUs.
 	 */
 	for (i = 0; i < pdu_count; i++) {
@@ -744,15 +744,15 @@ int iscsi_dataout_datapduinorder_no_fbit(
  *
  */
 static int iscsi_recalculate_dataout_values(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u32 pdu_offset,
 	u32 pdu_length,
 	u32 *r2t_offset,
 	u32 *r2t_length)
 {
 	int i;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_pdu_t *pdu = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_pdu *pdu = NULL;
 
 	if (SESS_OPS_C(conn)->DataSequenceInOrder) {
 		cmd->data_sn = 0;
@@ -786,7 +786,7 @@ static int iscsi_recalculate_dataout_values(
 			}
 		}
 	} else {
-		iscsi_seq_t *seq = NULL;
+		struct iscsi_seq *seq = NULL;
 
 		seq = iscsi_get_seq_holder(cmd, pdu_offset, pdu_length);
 		if (!(seq))
@@ -825,7 +825,7 @@ static int iscsi_recalculate_dataout_values(
  *
  */
 int iscsi_recover_dataout_sequence(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u32 pdu_offset,
 	u32 pdu_length)
 {
@@ -848,14 +848,14 @@ int iscsi_recover_dataout_sequence(
  *
  *
  */
-static inline iscsi_ooo_cmdsn_t *iscsi_allocate_ooo_cmdsn(void)
+static inline struct iscsi_ooo_cmdsn *iscsi_allocate_ooo_cmdsn(void)
 {
-	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL;
+	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL;
 
 	ooo_cmdsn = kmem_cache_zalloc(lio_ooo_cache, GFP_ATOMIC);
 	if (!(ooo_cmdsn)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-			" iscsi_ooo_cmdsn_t.\n");
+			" struct iscsi_ooo_cmdsn.\n");
 		return NULL;
 	}
 	INIT_LIST_HEAD(&ooo_cmdsn->ooo_list);
@@ -868,12 +868,12 @@ static inline iscsi_ooo_cmdsn_t *iscsi_allocate_ooo_cmdsn(void)
  *	Called with sess->cmdsn_lock held.
  */
 static inline int iscsi_attach_ooo_cmdsn(
-	iscsi_session_t *sess,
-	iscsi_ooo_cmdsn_t *ooo_cmdsn)
+	struct iscsi_session *sess,
+	struct iscsi_ooo_cmdsn *ooo_cmdsn)
 {
-	iscsi_ooo_cmdsn_t *ooo_tail, *ooo_tmp;
+	struct iscsi_ooo_cmdsn *ooo_tail, *ooo_tmp;
 	/*
-	 * We attach the iscsi_ooo_cmdsn_t entry to the out of order
+	 * We attach the struct iscsi_ooo_cmdsn entry to the out of order
 	 * list in increasing CmdSN order.
 	 * This allows iscsi_execute_ooo_cmdsns() to detect any
 	 * additional CmdSN holes while performing delayed execution.
@@ -916,12 +916,12 @@ static inline int iscsi_attach_ooo_cmdsn(
 
 /*	iscsi_remove_ooo_cmdsn()
  *
- *	Removes an iscsi_ooo_cmdsn_t from a session's list,
- *	called with iscsi_session_t->cmdsn_lock held.
+ *	Removes an struct iscsi_ooo_cmdsn from a session's list,
+ *	called with struct iscsi_session->cmdsn_lock held.
  */
 void iscsi_remove_ooo_cmdsn(
-	iscsi_session_t *sess,
-	iscsi_ooo_cmdsn_t *ooo_cmdsn)
+	struct iscsi_session *sess,
+	struct iscsi_ooo_cmdsn *ooo_cmdsn)
 {
 	list_del(&ooo_cmdsn->ooo_list);
 	kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
@@ -931,10 +931,10 @@ void iscsi_remove_ooo_cmdsn(
  *
  *
  */
-void iscsi_clear_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
+void iscsi_clear_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 {
-	iscsi_ooo_cmdsn_t *ooo_cmdsn;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_ooo_cmdsn *ooo_cmdsn;
+	struct iscsi_session *sess = SESS(conn);
 
 	spin_lock(&sess->cmdsn_lock);
 	list_for_each_entry(ooo_cmdsn, &sess->sess_ooo_cmdsn_list, ooo_list) {
@@ -950,11 +950,11 @@ void iscsi_clear_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
  *
  *	Called with sess->cmdsn_lock held.
  */
-int iscsi_execute_ooo_cmdsns(iscsi_session_t *sess)
+int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
 {
 	int ooo_count = 0;
-	iscsi_cmd_t *cmd = NULL;
-	iscsi_ooo_cmdsn_t *ooo_cmdsn, *ooo_cmdsn_tmp;
+	struct iscsi_cmd *cmd = NULL;
+	struct iscsi_ooo_cmdsn *ooo_cmdsn, *ooo_cmdsn_tmp;
 
 	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
 				&sess->sess_ooo_cmdsn_list, ooo_list) {
@@ -995,7 +995,7 @@ int iscsi_execute_ooo_cmdsns(iscsi_session_t *sess)
  *	2. With no locks held directly from iscsi_handle_XXX_pdu() functions
  *	for immediate commands.
  */
-int iscsi_execute_cmd(iscsi_cmd_t *cmd, int ooo)
+int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 {
 	struct se_cmd *se_cmd = cmd->se_cmd;
 	int lr = 0;
@@ -1135,9 +1135,9 @@ int iscsi_execute_cmd(iscsi_cmd_t *cmd, int ooo)
  *
  *
  */
-void iscsi_free_all_ooo_cmdsns(iscsi_session_t *sess)
+void iscsi_free_all_ooo_cmdsns(struct iscsi_session *sess)
 {
-	iscsi_ooo_cmdsn_t *ooo_cmdsn, *ooo_cmdsn_tmp;
+	struct iscsi_ooo_cmdsn *ooo_cmdsn, *ooo_cmdsn_tmp;
 
 	spin_lock(&sess->cmdsn_lock);
 	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
@@ -1154,12 +1154,12 @@ void iscsi_free_all_ooo_cmdsns(iscsi_session_t *sess)
  *
  */
 int iscsi_handle_ooo_cmdsn(
-	iscsi_session_t *sess,
-	iscsi_cmd_t *cmd,
+	struct iscsi_session *sess,
+	struct iscsi_cmd *cmd,
 	u32 cmdsn)
 {
 	int batch = 0;
-	iscsi_ooo_cmdsn_t *ooo_cmdsn = NULL, *ooo_tail = NULL;
+	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL, *ooo_tail = NULL;
 
 	sess->cmdsn_outoforder = 1;
 
@@ -1200,12 +1200,12 @@ int iscsi_handle_ooo_cmdsn(
  *
  */
 static int iscsi_set_dataout_timeout_values(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u32 *offset,
 	u32 *length)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_r2t_t *r2t;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_r2t *r2t;
 
 	if (cmd->unsolicited_data) {
 		*offset = 0;
@@ -1249,10 +1249,10 @@ static void iscsi_handle_dataout_timeout(unsigned long data)
 {
 	u32 pdu_length = 0, pdu_offset = 0;
 	u32 r2t_length = 0, r2t_offset = 0;
-	iscsi_cmd_t *cmd = (iscsi_cmd_t *) data;
-	iscsi_conn_t *conn = conn = CONN(cmd);
-	iscsi_session_t *sess = NULL;
-	iscsi_node_attrib_t *na;
+	struct iscsi_cmd *cmd = (struct iscsi_cmd *) data;
+	struct iscsi_conn *conn = conn = CONN(cmd);
+	struct iscsi_session *sess = NULL;
+	struct iscsi_node_attrib *na;
 
 	iscsi_inc_conn_usage_count(conn);
 
@@ -1332,11 +1332,11 @@ failure:
  *
  *
  */
-void iscsi_mod_dataout_timer(iscsi_cmd_t *cmd)
+void iscsi_mod_dataout_timer(struct iscsi_cmd *cmd)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_session_t *sess = SESS(conn);
-	iscsi_node_attrib_t *na = na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_node_attrib *na = na = iscsi_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&cmd->dataout_timeout_lock);
 	if (!(cmd->dataout_timer_flags & DATAOUT_TF_RUNNING)) {
@@ -1355,11 +1355,11 @@ void iscsi_mod_dataout_timer(iscsi_cmd_t *cmd)
  *	Called with cmd->dataout_timeout_lock held.
  */
 void iscsi_start_dataout_timer(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
-	iscsi_session_t *sess = SESS(conn);
-	iscsi_node_attrib_t *na = na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_node_attrib *na = na = iscsi_tpg_get_node_attrib(sess);
 
 	if (cmd->dataout_timer_flags & DATAOUT_TF_RUNNING)
 		return;
@@ -1379,7 +1379,7 @@ void iscsi_start_dataout_timer(
  *
  *
  */
-void iscsi_stop_dataout_timer(iscsi_cmd_t *cmd)
+void iscsi_stop_dataout_timer(struct iscsi_cmd *cmd)
 {
 	spin_lock_bh(&cmd->dataout_timeout_lock);
 	if (!(cmd->dataout_timer_flags & DATAOUT_TF_RUNNING)) {

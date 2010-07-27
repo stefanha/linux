@@ -115,14 +115,14 @@ void chap_set_random(char *data, int length)
 	}
 }
 
-static iscsi_chap_t *chap_server_open(
-	iscsi_conn_t *conn,
-	iscsi_node_auth_t *auth,
+static struct iscsi_chap *chap_server_open(
+	struct iscsi_conn *conn,
+	struct iscsi_node_auth *auth,
 	const char *A_str,
 	char *AIC_str,
 	unsigned int *AIC_len)
 {
-	iscsi_chap_t *chap;
+	struct iscsi_chap *chap;
 	int ret;
 
 	if (!(auth->naf_flags & NAF_USERID_SET) ||
@@ -132,11 +132,11 @@ static iscsi_chap_t *chap_server_open(
 		return NULL;
 	}
 
-	conn->auth_protocol = kzalloc(sizeof(iscsi_chap_t), GFP_KERNEL);
+	conn->auth_protocol = kzalloc(sizeof(struct iscsi_chap), GFP_KERNEL);
 	if (!(conn->auth_protocol))
 		return NULL;
 
-	chap = (iscsi_chap_t *) conn->auth_protocol;
+	chap = (struct iscsi_chap *) conn->auth_protocol;
 	/*
 	 * We only support MD5 MDA presently.
 	 */
@@ -169,20 +169,20 @@ static iscsi_chap_t *chap_server_open(
 	return chap;
 }
 
-void chap_close(iscsi_conn_t *conn)
+void chap_close(struct iscsi_conn *conn)
 {
 	kfree(conn->auth_protocol);
 	conn->auth_protocol = NULL;
 }
 
 int chap_gen_challenge(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	int caller,
 	char *C_str,
 	unsigned int *C_len)
 {
 	unsigned char challenge_asciihex[CHAP_CHALLENGE_LENGTH * 2 + 1];
-	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
+	struct iscsi_chap *chap = (struct iscsi_chap *) conn->auth_protocol;
 
 	memset(challenge_asciihex, 0, CHAP_CHALLENGE_LENGTH * 2 + 1);
 
@@ -201,8 +201,8 @@ int chap_gen_challenge(
 }
 
 int chap_server_compute_md5(
-	iscsi_conn_t *conn,
-	iscsi_node_auth_t *auth,
+	struct iscsi_conn *conn,
+	struct iscsi_node_auth *auth,
 	char *NR_in_ptr,
 	char *NR_out_ptr,
 	unsigned int *NR_out_len)
@@ -214,7 +214,7 @@ int chap_server_compute_md5(
 	unsigned char client_digest[MD5_SIGNATURE_SIZE];
 	unsigned char server_digest[MD5_SIGNATURE_SIZE];
 	unsigned char chap_n[MAX_CHAP_N_SIZE], chap_r[MAX_RESPONSE_LENGTH];
-	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
+	struct iscsi_chap *chap = (struct iscsi_chap *) conn->auth_protocol;
 	struct crypto_hash *tfm;
 	struct hash_desc desc;
 	struct scatterlist sg;
@@ -451,13 +451,13 @@ out:
 }
 
 int chap_got_response(
-	iscsi_conn_t *conn,
-	iscsi_node_auth_t *auth,
+	struct iscsi_conn *conn,
+	struct iscsi_node_auth *auth,
 	char *NR_in_ptr,
 	char *NR_out_ptr,
 	unsigned int *NR_out_len)
 {
-	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
+	struct iscsi_chap *chap = (struct iscsi_chap *) conn->auth_protocol;
 
 	switch (chap->digest_type) {
 	case CHAP_DIGEST_MD5:
@@ -475,14 +475,14 @@ int chap_got_response(
 }
 
 u32 chap_main_loop(
-	iscsi_conn_t *conn,
-	iscsi_node_auth_t *auth,
+	struct iscsi_conn *conn,
+	struct iscsi_node_auth *auth,
 	char *in_text,
 	char *out_text,
 	int *in_len,
 	int *out_len)
 {
-	iscsi_chap_t *chap = (iscsi_chap_t *) conn->auth_protocol;
+	struct iscsi_chap *chap = (struct iscsi_chap *) conn->auth_protocol;
 
 	if (!(chap)) {
 		chap = chap_server_open(conn, auth, in_text, out_text, out_len);

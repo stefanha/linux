@@ -88,7 +88,7 @@
 
 #undef ISCSI_TARGET_C
 
-iscsi_global_t *iscsi_global;
+struct iscsi_global *iscsi_global;
 
 struct kmem_cache *lio_cmd_cache;
 struct kmem_cache *lio_sess_cache;
@@ -99,25 +99,25 @@ struct kmem_cache *lio_ooo_cache;
 struct kmem_cache *lio_r2t_cache;
 struct kmem_cache *lio_tpg_cache;
 
-static void iscsi_rx_thread_wait_for_TCP(iscsi_conn_t *);
+static void iscsi_rx_thread_wait_for_TCP(struct iscsi_conn *);
 
 static int iscsi_target_detect(void);
 static int iscsi_target_release(void);
-static int iscsi_handle_immediate_data(iscsi_cmd_t *,
+static int iscsi_handle_immediate_data(struct iscsi_cmd *,
 			unsigned char *buf, __u32);
-static inline int iscsi_send_data_in(iscsi_cmd_t *, iscsi_conn_t *,
+static inline int iscsi_send_data_in(struct iscsi_cmd *, struct iscsi_conn *,
 			struct se_unmap_sg *, int *);
-static inline int iscsi_send_logout_response(iscsi_cmd_t *, iscsi_conn_t *);
-static inline int iscsi_send_nopin_response(iscsi_cmd_t *, iscsi_conn_t *);
-static inline int iscsi_send_status(iscsi_cmd_t *, iscsi_conn_t *);
-static int iscsi_send_task_mgt_rsp(iscsi_cmd_t *, iscsi_conn_t *);
-static int iscsi_send_text_rsp(iscsi_cmd_t *, iscsi_conn_t *);
-static int iscsi_send_reject(iscsi_cmd_t *, iscsi_conn_t *);
-static int iscsi_logout_post_handler(iscsi_cmd_t *, iscsi_conn_t *);
+static inline int iscsi_send_logout_response(struct iscsi_cmd *, struct iscsi_conn *);
+static inline int iscsi_send_nopin_response(struct iscsi_cmd *, struct iscsi_conn *);
+static inline int iscsi_send_status(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsi_send_task_mgt_rsp(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsi_send_text_rsp(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsi_send_reject(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsi_logout_post_handler(struct iscsi_cmd *, struct iscsi_conn *);
 
-iscsi_tiqn_t *core_get_tiqn_for_login(unsigned char *buf)
+struct iscsi_tiqn *core_get_tiqn_for_login(unsigned char *buf)
 {
-	iscsi_tiqn_t *tiqn = NULL;
+	struct iscsi_tiqn *tiqn = NULL;
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
@@ -138,7 +138,7 @@ iscsi_tiqn_t *core_get_tiqn_for_login(unsigned char *buf)
 	return NULL;
 }
 
-static int core_set_tiqn_shutdown(iscsi_tiqn_t *tiqn)
+static int core_set_tiqn_shutdown(struct iscsi_tiqn *tiqn)
 {
 	spin_lock(&tiqn->tiqn_state_lock);
 	if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
@@ -151,7 +151,7 @@ static int core_set_tiqn_shutdown(iscsi_tiqn_t *tiqn)
 	return -1;
 }
 
-void core_put_tiqn_for_login(iscsi_tiqn_t *tiqn)
+void core_put_tiqn_for_login(struct iscsi_tiqn *tiqn)
 {
 	spin_lock(&tiqn->tiqn_state_lock);
 	atomic_dec(&tiqn->tiqn_access_count);
@@ -163,9 +163,9 @@ void core_put_tiqn_for_login(iscsi_tiqn_t *tiqn)
  * Note that IQN formatting is expected to be done in userspace, and
  * no explict IQN format checks are done here.
  */
-iscsi_tiqn_t *core_add_tiqn(unsigned char *buf, int *ret)
+struct iscsi_tiqn *core_add_tiqn(unsigned char *buf, int *ret)
 {
-	iscsi_tiqn_t *tiqn = NULL;
+	struct iscsi_tiqn *tiqn = NULL;
 
 	if (strlen(buf) > ISCSI_TIQN_LEN) {
 		printk(KERN_ERR "Target IQN exceeds %d bytes\n",
@@ -186,9 +186,9 @@ iscsi_tiqn_t *core_add_tiqn(unsigned char *buf, int *ret)
 	}
 	spin_unlock(&iscsi_global->tiqn_lock);
 
-	tiqn = kzalloc(sizeof(iscsi_tiqn_t), GFP_KERNEL);
+	tiqn = kzalloc(sizeof(struct iscsi_tiqn), GFP_KERNEL);
 	if (!(tiqn)) {
-		printk(KERN_ERR "Unable to allocate iscsi_tiqn_t\n");
+		printk(KERN_ERR "Unable to allocate struct iscsi_tiqn\n");
 		*ret = -1;
 		return NULL;
 	}
@@ -216,7 +216,7 @@ iscsi_tiqn_t *core_add_tiqn(unsigned char *buf, int *ret)
 
 }
 
-int __core_del_tiqn(iscsi_tiqn_t *tiqn)
+int __core_del_tiqn(struct iscsi_tiqn *tiqn)
 {
 	iscsi_disable_tpgs(tiqn);
 	iscsi_remove_tpgs(tiqn);
@@ -232,10 +232,10 @@ int __core_del_tiqn(iscsi_tiqn_t *tiqn)
 	return 0;
 }
 
-static void core_wait_for_tiqn(iscsi_tiqn_t *tiqn)
+static void core_wait_for_tiqn(struct iscsi_tiqn *tiqn)
 {
 	/*
-	 * Wait for accesses to said iscsi_tiqn_t to end.
+	 * Wait for accesses to said struct iscsi_tiqn to end.
 	 */
 	spin_lock(&tiqn->tiqn_state_lock);
 	while (atomic_read(&tiqn->tiqn_access_count)) {
@@ -246,12 +246,12 @@ static void core_wait_for_tiqn(iscsi_tiqn_t *tiqn)
 	spin_unlock(&tiqn->tiqn_state_lock);
 }
 
-int core_del_tiqn(iscsi_tiqn_t *tiqn)
+int core_del_tiqn(struct iscsi_tiqn *tiqn)
 {
 	/*
 	 * core_set_tiqn_shutdown sets tiqn->tiqn_state = TIQN_STATE_SHUTDOWN
 	 * while holding tiqn->tiqn_state_lock.  This means that all subsequent
-	 * attempts to access this iscsi_tiqn_t will fail from both transport
+	 * attempts to access this struct iscsi_tiqn will fail from both transport
 	 * fabric and control code paths.
 	 */
 	if (core_set_tiqn_shutdown(tiqn) < 0) {
@@ -265,7 +265,7 @@ int core_del_tiqn(iscsi_tiqn_t *tiqn)
 
 int core_release_tiqns(void)
 {
-	iscsi_tiqn_t *tiqn, *t_tiqn;
+	struct iscsi_tiqn *tiqn, *t_tiqn;
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry_safe(tiqn, t_tiqn,
@@ -292,7 +292,7 @@ int core_release_tiqns(void)
 	return 0;
 }
 
-int core_access_np(iscsi_np_t *np, iscsi_portal_group_t *tpg)
+int core_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 {
 	int ret;
 	/*
@@ -340,9 +340,9 @@ int core_access_np(iscsi_np_t *np, iscsi_portal_group_t *tpg)
 	return 0;
 }
 
-int core_deaccess_np(iscsi_np_t *np, iscsi_portal_group_t *tpg)
+int core_deaccess_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 {
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_login_tpg = NULL;
@@ -356,19 +356,19 @@ int core_deaccess_np(iscsi_np_t *np, iscsi_portal_group_t *tpg)
 	return 0;
 }
 
-void *core_get_np_ip(iscsi_np_t *np)
+void *core_get_np_ip(struct iscsi_np *np)
 {
 	return (np->np_flags & NPF_NET_IPV6) ?
 	       (void *)&np->np_ipv6[0] :
 	       (void *)&np->np_ipv4;
 }
 
-iscsi_np_t *core_get_np(
+struct iscsi_np *core_get_np(
 	void *ip,
 	u16 port,
 	int network_transport)
 {
-	iscsi_np_t *np;
+	struct iscsi_np *np;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) {
@@ -391,7 +391,7 @@ iscsi_np_t *core_get_np(
 	return NULL;
 }
 
-void *core_get_np_ex_ip(iscsi_np_ex_t *np_ex)
+void *core_get_np_ex_ip(struct iscsi_np_ex *np_ex)
 {
 	return (np_ex->np_ex_net_size == IPV6_ADDRESS_SPACE) ?
 	       (void *)&np_ex->np_ex_ipv6 :
@@ -399,12 +399,12 @@ void *core_get_np_ex_ip(iscsi_np_ex_t *np_ex)
 }
 
 int core_del_np_ex(
-	iscsi_np_t *np,
+	struct iscsi_np *np,
 	void *ip_ex,
 	u16 port_ex,
 	int network_transport)
 {
-	iscsi_np_ex_t *np_ex, *np_ex_t;
+	struct iscsi_np_ex *np_ex, *np_ex_t;
 
 	spin_lock(&np->np_ex_lock);
 	list_for_each_entry_safe(np_ex, np_ex_t, &np->np_nex_list, np_ex_list) {
@@ -422,19 +422,19 @@ int core_del_np_ex(
 }
 
 int core_add_np_ex(
-	iscsi_np_t *np,
+	struct iscsi_np *np,
 	void *ip_ex,
 	u16 port_ex,
 	int net_size)
 {
-	iscsi_np_ex_t *np_ex;
+	struct iscsi_np_ex *np_ex;
 	unsigned char *ip_buf = NULL, *ip_ex_buf = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf_ipv4_ex[IPV4_BUF_SIZE];
 	u32 ip_ex_ipv4;
 
-	np_ex = kzalloc(sizeof(iscsi_np_ex_t), GFP_KERNEL);
+	np_ex = kzalloc(sizeof(struct iscsi_np_ex), GFP_KERNEL);
 	if (!(np_ex)) {
-		printk(KERN_ERR "iscsi_np_ex_t memory allocate failed!\n");
+		printk(KERN_ERR "struct iscsi_np_ex memory allocate failed!\n");
 		return -1;
 	}
 
@@ -475,11 +475,11 @@ int core_add_np_ex(
 }
 
 /*
- * Called with iscsi_np_t->np_ex_lock held.
+ * Called with struct iscsi_np->np_ex_lock held.
  */
 int __core_del_np_ex(
-	iscsi_np_t *np,
-	iscsi_np_ex_t *np_ex)
+	struct iscsi_np *np,
+	struct iscsi_np_ex *np_ex)
 {
 	unsigned char *ip_buf = NULL, *ip_ex_buf = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf_ipv4_ex[IPV4_BUF_SIZE];
@@ -510,9 +510,9 @@ int __core_del_np_ex(
 }
 
 void core_del_np_all_ex(
-	iscsi_np_t *np)
+	struct iscsi_np *np)
 {
-	iscsi_np_ex_t *np_ex, *np_ex_t;
+	struct iscsi_np_ex *np_ex, *np_ex_t;
 
 	spin_lock(&np->np_ex_lock);
 	list_for_each_entry_safe(np_ex, np_ex_t, &np->np_nex_list, np_ex_list)
@@ -520,7 +520,7 @@ void core_del_np_all_ex(
 	spin_unlock(&np->np_ex_lock);
 }
 
-static iscsi_np_t *core_add_np_locate(
+static struct iscsi_np *core_add_np_locate(
 	void *ip,
 	void *ip_ex,
 	unsigned char *ip_buf,
@@ -531,8 +531,8 @@ static iscsi_np_t *core_add_np_locate(
 	int net_size,
 	int *ret)
 {
-	iscsi_np_t *np;
-	iscsi_np_ex_t *np_ex;
+	struct iscsi_np *np;
+	struct iscsi_np_ex *np_ex;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) {
@@ -595,12 +595,12 @@ static iscsi_np_t *core_add_np_locate(
 	return NULL;
 }
 
-iscsi_np_t *core_add_np(
-	iscsi_np_addr_t *np_addr,
+struct iscsi_np *core_add_np(
+	struct iscsi_np_addr *np_addr,
 	int network_transport,
 	int *ret)
 {
-	iscsi_np_t *np;
+	struct iscsi_np *np;
 	char *ip_buf = NULL;
 	void *ip;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
@@ -628,9 +628,9 @@ iscsi_np_t *core_add_np(
 		return NULL;
 	}
 
-	np = kzalloc(sizeof(iscsi_np_t), GFP_KERNEL);
+	np = kzalloc(sizeof(struct iscsi_np), GFP_KERNEL);
 	if (!(np)) {
-		printk(KERN_ERR "Unable to allocate memory for iscsi_np_t\n");
+		printk(KERN_ERR "Unable to allocate memory for struct iscsi_np\n");
 		*ret = -ENOMEM;
 		return NULL;
 	}
@@ -690,16 +690,16 @@ iscsi_np_t *core_add_np(
 }
 
 int core_reset_np_thread(
-	iscsi_np_t *np,
-	iscsi_tpg_np_t *tpg_np,
-	iscsi_portal_group_t *tpg,
+	struct iscsi_np *np,
+	struct iscsi_tpg_np *tpg_np,
+	struct iscsi_portal_group *tpg,
 	int shutdown)
 {
 	spin_lock_bh(&np->np_thread_lock);
 	if (tpg && tpg_np) {
 		/*
 		 * The reset operation need only be performed when the
-		 * passed iscsi_portal_group_t has a login in progress
+		 * passed struct iscsi_portal_group has a login in progress
 		 * to one of the network portals.
 		 */
 		if (tpg_np->tpg_np->np_login_tpg != tpg) {
@@ -727,7 +727,7 @@ int core_reset_np_thread(
 	return 0;
 }
 
-int core_del_np_thread(iscsi_np_t *np)
+int core_del_np_thread(struct iscsi_np *np)
 {
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
@@ -744,7 +744,7 @@ int core_del_np_thread(iscsi_np_t *np)
 	return 0;
 }
 
-int core_del_np_comm(iscsi_np_t *np)
+int core_del_np_comm(struct iscsi_np *np)
 {
 	if (!np->np_socket)
 		return 0;
@@ -762,7 +762,7 @@ int core_del_np_comm(iscsi_np_t *np)
 	return 0;
 }
 
-int core_del_np(iscsi_np_t *np)
+int core_del_np(struct iscsi_np *np)
 {
 	unsigned char *ip = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
@@ -795,7 +795,7 @@ int core_del_np(iscsi_np_t *np)
 
 void core_reset_nps(void)
 {
-	iscsi_np_t *np, *t_np;
+	struct iscsi_np *np, *t_np;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
@@ -808,7 +808,7 @@ void core_reset_nps(void)
 
 void core_release_nps(void)
 {
-	iscsi_np_t *np, *t_np;
+	struct iscsi_np *np, *t_np;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
@@ -821,11 +821,11 @@ void core_release_nps(void)
 
 /* init_iscsi_target():
  *
- * This function is called during module initialization to setup iscsi_global_t.
+ * This function is called during module initialization to setup struct iscsi_global.
  */
-static int init_iscsi_global(iscsi_global_t *global)
+static int init_iscsi_global(struct iscsi_global *global)
 {
-	memset(global, 0, sizeof(iscsi_global_t));
+	memset(global, 0, sizeof(struct iscsi_global));
 	init_MUTEX(&global->auth_sem);
 	init_MUTEX(&global->auth_id_sem);
 	spin_lock_init(&global->active_ts_lock);
@@ -893,11 +893,11 @@ static const struct file_operations version_info = {
  *	This function is called upon module_init and does the following
  *	actions in said order:
  *
- *	0) Allocates and initializes the iscsi_global_t structure.
+ *	0) Allocates and initializes the struct iscsi_global structure.
  *	1) Registers the character device for the IOCTL.
  *	2) Registers /proc filesystem entries.
- *	3) Creates a lookaside cache entry for the iscsi_cmd_t and
- *	   iscsi_conn_t structures.
+ *	3) Creates a lookaside cache entry for the struct iscsi_cmd and
+ *	   struct iscsi_conn structures.
  *	4) Allocates threads to handle login requests.
  *	5) Allocates thread_sets for the thread_set queue.
  *	6) Creates the default list of iSCSI parameters.
@@ -929,7 +929,7 @@ static int iscsi_target_detect(void)
 	lio_r2t_cache = NULL;
 	lio_tpg_cache = NULL;
 
-	iscsi_global = kzalloc(sizeof(iscsi_global_t), GFP_KERNEL);
+	iscsi_global = kzalloc(sizeof(struct iscsi_global), GFP_KERNEL);
 	if (!(iscsi_global)) {
 		printk(KERN_ERR "Unable to allocate memory for iscsi_global\n");
 		return -1;
@@ -943,11 +943,11 @@ static int iscsi_target_detect(void)
 	}
 
 #ifdef DEBUG_ERL
-	iscsi_global->debug_erl = kzalloc(sizeof(iscsi_debug_erl_t),
+	iscsi_global->debug_erl = kzalloc(sizeof(struct iscsi_debug_erl),
 			GFP_KERNEL);
 	if (!(iscsi_global->debug_erl)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-				" iscsi_debug_erl_t\n");
+				" struct iscsi_debug_erl\n");
 		ret = -1;
 		goto out;
 	}
@@ -999,7 +999,7 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_cmd_cache = kmem_cache_create("lio_cmd_cache",
-			sizeof(iscsi_cmd_t), __alignof__(iscsi_cmd_t),
+			sizeof(struct iscsi_cmd), __alignof__(struct iscsi_cmd),
 			0, NULL);
 	if (!(lio_cmd_cache)) {
 		printk(KERN_ERR "Unable to kmem_cache_create() for"
@@ -1008,7 +1008,7 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_sess_cache = kmem_cache_create("lio_sess_cache",
-			sizeof(iscsi_session_t), __alignof__(iscsi_session_t),
+			sizeof(struct iscsi_session), __alignof__(struct iscsi_session),
 			0, NULL);
 	if (!(lio_sess_cache)) {
 		printk(KERN_ERR "Unable to kmem_cache_create() for"
@@ -1017,7 +1017,7 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_conn_cache = kmem_cache_create("lio_conn_cache",
-			sizeof(iscsi_conn_t), __alignof__(iscsi_conn_t),
+			sizeof(struct iscsi_conn), __alignof__(struct iscsi_conn),
 			0, NULL);
 	if (!(lio_conn_cache)) {
 		printk(KERN_ERR "Unable to kmem_cache_create() for"
@@ -1026,8 +1026,8 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_qr_cache = kmem_cache_create("lio_qr_cache",
-			sizeof(iscsi_queue_req_t),
-			__alignof__(iscsi_queue_req_t), 0, NULL);
+			sizeof(struct iscsi_queue_req),
+			__alignof__(struct iscsi_queue_req), 0, NULL);
 	if (!(lio_qr_cache)) {
 		printk(KERN_ERR "nable to kmem_cache_create() for"
 				" lio_qr_cache\n");
@@ -1035,8 +1035,8 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_dr_cache = kmem_cache_create("lio_dr_cache",
-			sizeof(iscsi_datain_req_t),
-			__alignof__(iscsi_datain_req_t), 0, NULL);
+			sizeof(struct iscsi_datain_req),
+			__alignof__(struct iscsi_datain_req), 0, NULL);
 	if (!(lio_dr_cache)) {
 		printk(KERN_ERR "Unable to kmem_cache_create() for"
 				" lio_dr_cache\n");
@@ -1044,8 +1044,8 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_ooo_cache = kmem_cache_create("lio_ooo_cache",
-			sizeof(iscsi_ooo_cmdsn_t),
-			__alignof__(iscsi_ooo_cmdsn_t), 0, NULL);
+			sizeof(struct iscsi_ooo_cmdsn),
+			__alignof__(struct iscsi_ooo_cmdsn), 0, NULL);
 	if (!(lio_ooo_cache)) {
 		printk(KERN_ERR "Unable to kmem_cache_create() for"
 				" lio_ooo_cache\n");
@@ -1053,7 +1053,7 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_r2t_cache = kmem_cache_create("lio_r2t_cache",
-			sizeof(iscsi_r2t_t), __alignof__(iscsi_r2t_t),
+			sizeof(struct iscsi_r2t), __alignof__(struct iscsi_r2t),
 			0, NULL);
 	if (!(lio_r2t_cache)) {
 		printk(KERN_ERR "Unable to kmem_cache_create() for"
@@ -1062,12 +1062,12 @@ static int iscsi_target_detect(void)
 	}
 
 	lio_tpg_cache = kmem_cache_create("lio_tpg_cache",
-			sizeof(iscsi_portal_group_t),
-			__alignof__(iscsi_portal_group_t),
+			sizeof(struct iscsi_portal_group),
+			__alignof__(struct iscsi_portal_group),
 			0, NULL);
 	if (!(lio_tpg_cache)) {
 		printk(KERN_ERR "Unable to kmem_cache_create() for"
-			" iscsi_portal_group_t\n");
+			" struct iscsi_portal_group\n");
 		goto out;
 	}
 
@@ -1197,26 +1197,26 @@ char *iscsi_get_fabric_name(void)
 	return "iSCSI";
 }
 
-iscsi_cmd_t *iscsi_get_cmd(struct se_cmd *se_cmd)
+struct iscsi_cmd *iscsi_get_cmd(struct se_cmd *se_cmd)
 {
-	return (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
+	return (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
 }
 
 u32 iscsi_get_task_tag(struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
 	return cmd->init_task_tag;
 }
 
 int iscsi_get_cmd_state(struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
 	return cmd->i_state;
 }
 
 void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	if (cmd->immediate_data || cmd->unsolicited_data)
 		up(&cmd->unsolicited_data_sem);
@@ -1224,14 +1224,14 @@ void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
 
 int iscsi_is_state_remove(struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	return (cmd->i_state == ISTATE_REMOVE);
 }
 
 int lio_sess_logged_in(struct se_session *se_sess)
 {
-	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 	int ret;
 
 	/*
@@ -1248,7 +1248,7 @@ int lio_sess_logged_in(struct se_session *se_sess)
 #ifdef SNMP_SUPPORT
 u32 lio_sess_get_index(struct se_session *se_sess)
 {
-	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 	return sess->session_index;
 }
@@ -1259,7 +1259,7 @@ u32 lio_sess_get_initiator_sid(
 	unsigned char *buf,
 	u32 size)
 {
-	iscsi_session_t *sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 	/*
 	 * iSCSI Initiator Session Identifier from RFC-3720.
 	 */
@@ -1273,11 +1273,11 @@ u32 lio_sess_get_initiator_sid(
  *
  */
 int iscsi_add_nopin(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	int want_response)
 {
 	u8 state;
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
@@ -1310,9 +1310,9 @@ int iscsi_add_reject(
 	u8 reason,
 	int fail_conn,
 	unsigned char *buf,
-	iscsi_conn_t *conn)
+	struct iscsi_conn *conn)
 {
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 	struct iscsi_targ_rjt *hdr;
 	int ret;
 
@@ -1356,9 +1356,9 @@ int iscsi_add_reject_from_cmd(
 	int fail_conn,
 	int add_to_conn,
 	unsigned char *buf,
-	iscsi_cmd_t *cmd)
+	struct iscsi_cmd *cmd)
 {
-	iscsi_conn_t *conn;
+	struct iscsi_conn *conn;
 	struct iscsi_targ_rjt *hdr;
 	int ret;
 
@@ -1402,12 +1402,12 @@ int iscsi_add_reject_from_cmd(
  *
  */
 static inline int iscsi_handle_scsi_cmd(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
 	int	data_direction, cmdsn_ret = 0, immed_ret, ret, transport_ret;
 	int	dump_immediate_data = 0, send_check_condition = 0;
-	iscsi_cmd_t	*cmd = NULL;
+	struct iscsi_cmd	*cmd = NULL;
 	struct iscsi_init_scsi_cmnd *hdr;
 
 #ifdef SNMP_SUPPORT
@@ -1562,7 +1562,7 @@ done:
 	cmd->first_burst_len	= hdr->length;
 
 	if (cmd->data_direction == ISCSI_READ) {
-		iscsi_datain_req_t *dr;
+		struct iscsi_datain_req *dr;
 
 		dr = iscsi_allocate_datain_req();
 		if (!(dr))
@@ -1758,12 +1758,12 @@ after_immediate_data:
  *
  *
  */
-static inline int iscsi_handle_data_out(iscsi_conn_t *conn, unsigned char *buf)
+static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 {
 	int iov_ret, ooo_cmdsn = 0, ret;
 	__u8 data_crc_failed = 0, *pad_bytes[4];
 	__u32 checksum, iov_count = 0, padding = 0, rx_got = 0, rx_size = 0;
-	iscsi_cmd_t *cmd = NULL;
+	struct iscsi_cmd *cmd = NULL;
 	struct se_cmd *se_cmd;
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
@@ -2104,14 +2104,14 @@ static inline int iscsi_handle_data_out(iscsi_conn_t *conn, unsigned char *buf)
  *
  */
 static inline int iscsi_handle_nop_out(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
 	unsigned char *ping_data = NULL;
 	int cmdsn_ret, niov = 0, ret = 0, rx_got, rx_size;
 	__u8 reset_crc = 1;
 	__u32 checksum, data_crc, padding = 0;
-	iscsi_cmd_t *cmd = NULL;
+	struct iscsi_cmd *cmd = NULL;
 	struct iovec *iov = NULL;
 	struct iscsi_init_nop_out *hdr;
 
@@ -2150,7 +2150,7 @@ static inline int iscsi_handle_nop_out(
 	 * This is not a response to a Unsolicited NopIN, which means
 	 * it can either be a NOPOUT ping request (with a valid ITT),
 	 * or a NOPOUT not requesting a NOPIN (with a reserved ITT).
-	 * Either way, make sure we allocate an iscsi_cmd_t, as both
+	 * Either way, make sure we allocate an struct iscsi_cmd, as both
 	 * can contain ping data.
 	 */
 	if (hdr->targ_xfer_tag == 0xFFFFFFFF) {
@@ -2241,7 +2241,7 @@ static inline int iscsi_handle_nop_out(
 
 		ping_data[hdr->length] = '\0';
 		/*
-		 * Attach ping data to iscsi_cmd_t->buf_ptr.
+		 * Attach ping data to struct iscsi_cmd->buf_ptr.
 		 */
 		cmd->buf_ptr = (void *)ping_data;
 		cmd->buf_ptr_size = hdr->length;
@@ -2332,12 +2332,12 @@ ping_out:
  *
  */
 static inline int iscsi_handle_task_mgt_cmd(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 	struct se_tmr_req *se_tmr;
-	iscsi_tmr_req_t *tmr_req;
+	struct iscsi_tmr_req *tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr;
 	int cmdsn_ret, out_of_order_cmdsn = 0, ret;
 
@@ -2501,7 +2501,7 @@ attach:
  */
 /* #warning FIXME: Support Text Command parameters besides SendTargets */
 static inline int iscsi_handle_text_cmd(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
 	char *text_ptr, *text_in;
@@ -2509,7 +2509,7 @@ static inline int iscsi_handle_text_cmd(
 	__u8 reset_crc = 1;
 	__u32 checksum = 0, data_crc = 0;
 	__u32 padding = 0, pad_bytes = 0, text_length = 0;
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 	struct iovec iov[3];
 	struct iscsi_init_text_cmnd *hdr;
 
@@ -2669,10 +2669,10 @@ static inline int iscsi_handle_text_cmd(
  *
  *
  */
-int iscsi_logout_closesession(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
+int iscsi_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	iscsi_conn_t *conn_p;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_conn *conn_p;
+	struct iscsi_session *sess = SESS(conn);
 
 	TRACE(TRACE_ISCSI, "Received logout request CLOSESESSION on CID: %hu"
 		" for SID: %u.\n", conn->cid, SESS(conn)->sid);
@@ -2703,10 +2703,10 @@ int iscsi_logout_closesession(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
  *
  *
  */
-int iscsi_logout_closeconnection(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
+int iscsi_logout_closeconnection(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	iscsi_conn_t *l_conn;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_conn *l_conn;
+	struct iscsi_session *sess = SESS(conn);
 
 	TRACE(TRACE_ISCSI, "Received logout request CLOSECONNECTION for CID:"
 		" %hu on CID: %hu.\n", cmd->logout_cid, conn->cid);
@@ -2755,9 +2755,9 @@ int iscsi_logout_closeconnection(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
  *
  *
  */
-int iscsi_logout_removeconnforrecovery(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
+int iscsi_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_session *sess = SESS(conn);
 
 	TRACE(TRACE_ERL2, "Received explicit REMOVECONNFORRECOVERY logout for"
 		" CID: %hu on CID: %hu.\n", cmd->logout_cid, conn->cid);
@@ -2789,12 +2789,12 @@ int iscsi_logout_removeconnforrecovery(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
  *
  */
 static inline int iscsi_handle_logout_cmd(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
 	int cmdsn_ret, logout_remove = 0;
 	u8 reason_code = 0;
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 	struct iscsi_init_logout_cmnd *hdr;
 
 	hdr			= (struct iscsi_init_logout_cmnd *) buf;
@@ -2809,7 +2809,7 @@ static inline int iscsi_handle_logout_cmd(
 #endif
 #ifdef SNMP_SUPPORT
 	{
-	iscsi_tiqn_t *tiqn = iscsi_snmp_get_tiqn(conn);
+	struct iscsi_tiqn *tiqn = iscsi_snmp_get_tiqn(conn);
 
 	if (tiqn) {
 		spin_lock(&tiqn->logout_stats.lock);
@@ -2893,7 +2893,7 @@ static inline int iscsi_handle_logout_cmd(
  *
  */
 static inline int iscsi_handle_snack(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
 	__u32 debug_type;
@@ -2957,13 +2957,13 @@ static inline int iscsi_handle_snack(
  *
  */
 static int iscsi_handle_immediate_data(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	__u32 length)
 {
 	int iov_ret, rx_got = 0, rx_size = 0;
 	__u32 checksum, iov_count = 0, padding = 0, pad_bytes = 0;
-	iscsi_conn_t *conn = cmd->conn;
+	struct iscsi_conn *conn = cmd->conn;
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
 	struct iovec *iov;
@@ -3099,7 +3099,7 @@ static int iscsi_handle_immediate_data(
  *	FIXME: Support SCSI AEN.
  */
 int iscsi_send_async_msg(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	__u16 cid,
 	__u8 async_event,
 	__u8 async_vcode)
@@ -3223,10 +3223,10 @@ int iscsi_send_async_msg(
  */
 /* #warning iscsi_build_conn_drop_async_message() only sends out on connections
 	with active network interface */
-static void iscsi_build_conn_drop_async_message(iscsi_conn_t *conn)
+static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
 {
-	iscsi_cmd_t *cmd;
-	iscsi_conn_t *conn_p;
+	struct iscsi_cmd *cmd;
+	struct iscsi_conn *conn_p;
 
 	/*
 	 * Only send a Asynchronous Message on connections whos network
@@ -3264,8 +3264,8 @@ static void iscsi_build_conn_drop_async_message(iscsi_conn_t *conn)
  *
  */
 static int iscsi_send_conn_drop_async_message(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	struct iscsi_targ_async_msg *hdr;
 
@@ -3313,7 +3313,7 @@ static int iscsi_send_conn_drop_async_message(
 
 int lio_queue_data_in(struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	cmd->i_state = ISTATE_SEND_DATAIN;
 	iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
@@ -3325,21 +3325,21 @@ int lio_queue_data_in(struct se_cmd *se_cmd)
  *
  */
 static inline int iscsi_send_data_in(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn,
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn,
 	struct se_unmap_sg *unmap_sg,
 	int *eodr)
 {
 	int iov_ret = 0, set_statsn = 0;
 	__u8 *pad_bytes, reset_crc = 1;
 	__u32 iov_count = 0, tx_size = 0;
-	iscsi_datain_t datain;
-	iscsi_datain_req_t *dr;
+	struct iscsi_datain datain;
+	struct iscsi_datain_req *dr;
 	struct se_map_sg map_sg;
 	struct iscsi_targ_scsi_data_in *hdr;
 	struct iovec *iov;
 
-	memset(&datain, 0, sizeof(iscsi_datain_t));
+	memset(&datain, 0, sizeof(struct iscsi_datain));
 	dr = iscsi_get_datain_values(cmd, &datain);
 	if (!(dr)) {
 		printk(KERN_ERR "iscsi_get_datain_values failed for ITT: 0x%08x\n",
@@ -3509,13 +3509,13 @@ static inline int iscsi_send_data_in(
  *
  */
 static inline int iscsi_send_logout_response(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	int niov = 0, tx_size;
-	iscsi_conn_t *logout_conn = NULL;
-	iscsi_conn_recovery_t *cr = NULL;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_conn *logout_conn = NULL;
+	struct iscsi_conn_recovery *cr = NULL;
+	struct iscsi_session *sess = SESS(conn);
 	struct iovec *iov;
 	struct iscsi_targ_logout_rsp *hdr;
 
@@ -3631,8 +3631,8 @@ static inline int iscsi_send_logout_response(
  *	Unsolicited NOPIN, either requesting a response or not.
  */
 static inline int iscsi_send_unsolicited_nopin(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn,
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn,
 	int want_response)
 {
 	int tx_size = ISCSI_HDR_LEN;
@@ -3678,8 +3678,8 @@ static inline int iscsi_send_unsolicited_nopin(
  *
  */
 static inline int iscsi_send_nopin_response(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	int niov = 0, tx_size;
 	__u8 reset_crc = 1;
@@ -3717,8 +3717,8 @@ static inline int iscsi_send_nopin_response(
 	}
 
 	/*
-	 * NOPOUT Ping Data is attached to iscsi_cmd_t->buf_ptr.
-	 * NOPOUT DataSegmentLength is at iscsi_cmd_t->buf_ptr_size.
+	 * NOPOUT Ping Data is attached to struct iscsi_cmd->buf_ptr.
+	 * NOPOUT DataSegmentLength is at struct iscsi_cmd->buf_ptr_size.
 	 */
 	if (cmd->buf_ptr_size) {
 		iov[niov].iov_base	= cmd->buf_ptr;
@@ -3772,12 +3772,12 @@ static inline int iscsi_send_nopin_response(
  *
  */
 int iscsi_send_r2t(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	int tx_size = 0;
 	__u32 trace_type;
-	iscsi_r2t_t *r2t;
+	struct iscsi_r2t *r2t;
 	struct iscsi_targ_r2t *hdr;
 
 	r2t = iscsi_get_r2t_from_list(cmd);
@@ -3844,8 +3844,8 @@ int iscsi_send_r2t(
  *	        connection recovery.
  */
 int iscsi_build_r2ts_for_cmd(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn,
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn,
 	int type)
 {
 	int first_r2t = 1;
@@ -3885,7 +3885,7 @@ int iscsi_build_r2ts_for_cmd(
 			if (cmd->r2t_offset == cmd->data_length)
 				cmd->cmd_flags |= ICF_SENT_LAST_R2T;
 		} else {
-			iscsi_seq_t *seq;
+			struct iscsi_seq *seq;
 
 			seq = iscsi_get_seq_holder_for_r2t(cmd);
 			if (!(seq)) {
@@ -3918,7 +3918,7 @@ int iscsi_build_r2ts_for_cmd(
 int lio_write_pending(
 	struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	if (cmd->immediate_data || cmd->unsolicited_data)
 		up(&cmd->unsolicited_data_sem);
@@ -3933,7 +3933,7 @@ int lio_write_pending(
 int lio_write_pending_status(
 	struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 	int ret;
 
 	spin_lock_bh(&cmd->istate_lock);
@@ -3945,7 +3945,7 @@ int lio_write_pending_status(
 
 int lio_queue_status(struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	cmd->i_state = ISTATE_SEND_STATUS;
 	iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
@@ -3981,8 +3981,8 @@ u16 lio_get_fabric_sense_len(void)
  *
  */
 static inline int iscsi_send_status(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	__u8 iov_count = 0, recovery;
 	__u32 padding = 0, trace_type, tx_size = 0;
@@ -4091,7 +4091,7 @@ static inline int iscsi_send_status(
 
 int lio_queue_tm_rsp(struct se_cmd *se_cmd)
 {
-	iscsi_cmd_t *cmd = iscsi_get_cmd(se_cmd);
+	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	cmd->i_state = ISTATE_SEND_TASKMGTRSP;
 	iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
@@ -4104,8 +4104,8 @@ int lio_queue_tm_rsp(struct se_cmd *se_cmd)
  *
  */
 static int iscsi_send_task_mgt_rsp(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_targ_task_mgt_rsp *hdr;
@@ -4156,8 +4156,8 @@ static int iscsi_send_task_mgt_rsp(
  *	MaxRecvDataSegmentLength.
  */
 static int iscsi_send_text_rsp(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	__u8 iov_count = 0;
 	__u32 padding = 0, text_length = 0, tx_size = 0;
@@ -4235,8 +4235,8 @@ static int iscsi_send_text_rsp(
  *
  */
 static int iscsi_send_reject(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	__u32 iov_count = 0, tx_size = 0;
 	struct iscsi_targ_rjt *hdr;
@@ -4307,7 +4307,7 @@ static void iscsi_tx_thread_TCP_timeout(unsigned long data)
  *
  *
  */
-static void iscsi_tx_thread_wait_for_TCP(iscsi_conn_t *conn)
+static void iscsi_tx_thread_wait_for_TCP(struct iscsi_conn *conn)
 {
 	struct timer_list tx_TCP_timer;
 	int ret;
@@ -4333,10 +4333,10 @@ int iscsi_target_tx_thread(void *arg)
 {
 	u8 state;
 	int eodr = 0, map_sg = 0, ret = 0, sent_status = 0, use_misc = 0;
-	iscsi_cmd_t *cmd = NULL;
-	iscsi_conn_t *conn;
-	iscsi_queue_req_t *qr = NULL;
-	se_thread_set_t *ts = (se_thread_set_t *) arg;
+	struct iscsi_cmd *cmd = NULL;
+	struct iscsi_conn *conn;
+	struct iscsi_queue_req *qr = NULL;
+	struct se_thread_set *ts = (struct se_thread_set *) arg;
 	struct se_unmap_sg unmap_sg;
 
 	{
@@ -4392,7 +4392,7 @@ get_immediate:
 				spin_unlock_bh(&conn->cmd_lock);
 				/*
 				 * Determine if a struct se_cmd is assoicated with
-				 * this iscsi_cmd_t.
+				 * this struct iscsi_cmd.
 				 */
 				if (!(SE_CMD(cmd)))
 					iscsi_release_cmd_to_pool(cmd);
@@ -4652,7 +4652,7 @@ static void iscsi_rx_thread_TCP_timeout(unsigned long data)
  *
  *
  */
-static void iscsi_rx_thread_wait_for_TCP(iscsi_conn_t *conn)
+static void iscsi_rx_thread_wait_for_TCP(struct iscsi_conn *conn)
 {
 	struct timer_list rx_TCP_timer;
 	int ret;
@@ -4679,8 +4679,8 @@ int iscsi_target_rx_thread(void *arg)
 	int ret;
 	__u8 buffer[ISCSI_HDR_LEN], opcode;
 	__u32 checksum = 0, digest = 0;
-	iscsi_conn_t *conn = NULL;
-	se_thread_set_t *ts = (se_thread_set_t *) arg;
+	struct iscsi_conn *conn = NULL;
+	struct se_thread_set *ts = (struct se_thread_set *) arg;
 	struct iovec iov;
 
 	{
@@ -4840,10 +4840,10 @@ out:
  *
  *
  */
-static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
+static void iscsi_release_commands_from_conn(struct iscsi_conn *conn)
 {
-	iscsi_cmd_t *cmd = NULL, *cmd_tmp = NULL;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_cmd *cmd = NULL, *cmd_tmp = NULL;
+	struct iscsi_session *sess = SESS(conn);
 	struct se_cmd *se_cmd;
 
 	spin_lock_bh(&conn->cmd_lock);
@@ -4890,9 +4890,9 @@ static void iscsi_release_commands_from_conn(iscsi_conn_t *conn)
  *
  */
 static void iscsi_stop_timers_for_cmds(
-	iscsi_conn_t *conn)
+	struct iscsi_conn *conn)
 {
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
@@ -4907,10 +4907,10 @@ static void iscsi_stop_timers_for_cmds(
  *
  */
 int iscsi_close_connection(
-	iscsi_conn_t *conn)
+	struct iscsi_conn *conn)
 {
 	int conn_logout = (conn->conn_state == TARG_CONN_STATE_IN_LOGOUT);
-	iscsi_session_t	*sess = SESS(conn);
+	struct iscsi_session	*sess = SESS(conn);
 
 	TRACE(TRACE_ISCSI, "Closing iSCSI connection CID %hu on SID:"
 		" %u\n", conn->cid, sess->sid);
@@ -4937,8 +4937,8 @@ int iscsi_close_connection(
 	 * for realligence.
 	 *
 	 * During normal operation clear the out of order commands (but
-	 * do not free the iscsi_ooo_cmdsn_t's) and release all
-	 * iscsi_cmd_ts.
+	 * do not free the struct iscsi_ooo_cmdsn's) and release all
+	 * struct iscsi_cmds.
 	 */
 	if (atomic_read(&conn->connection_recovery)) {
 		iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(conn);
@@ -5116,9 +5116,9 @@ int iscsi_close_connection(
  *
  *
  */
-int iscsi_close_session(iscsi_session_t *sess)
+int iscsi_close_session(struct iscsi_session *sess)
 {
-	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
+	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 
 	if (atomic_read(&sess->nconn)) {
@@ -5193,9 +5193,9 @@ int iscsi_close_session(iscsi_session_t *sess)
  *
  */
 static void iscsi_logout_post_handler_closesession(
-	iscsi_conn_t *conn)
+	struct iscsi_conn *conn)
 {
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_session *sess = SESS(conn);
 
 	iscsi_set_thread_clear(conn, ISCSI_CLEAR_TX_THREAD);
 	iscsi_set_thread_set_signal(conn, ISCSI_SIGNAL_TX_THREAD);
@@ -5214,7 +5214,7 @@ static void iscsi_logout_post_handler_closesession(
  *
  */
 static void iscsi_logout_post_handler_samecid(
-	iscsi_conn_t *conn)
+	struct iscsi_conn *conn)
 {
 	iscsi_set_thread_clear(conn, ISCSI_CLEAR_TX_THREAD);
 	iscsi_set_thread_set_signal(conn, ISCSI_SIGNAL_TX_THREAD);
@@ -5231,11 +5231,11 @@ static void iscsi_logout_post_handler_samecid(
  *
  */
 static void iscsi_logout_post_handler_diffcid(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	__u16 cid)
 {
-	iscsi_conn_t *l_conn;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_conn *l_conn;
+	struct iscsi_session *sess = SESS(conn);
 
 	if (!sess)
 		return;
@@ -5269,8 +5269,8 @@ static void iscsi_logout_post_handler_diffcid(
  *	Return of 0 causes the TX thread to restart.
  */
 static int iscsi_logout_post_handler(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	int ret = 0;
 
@@ -5331,9 +5331,9 @@ static int iscsi_logout_post_handler(
  *
  *
  */
-void iscsi_fail_session(iscsi_session_t *sess)
+void iscsi_fail_session(struct iscsi_session *sess)
 {
-	iscsi_conn_t *conn;
+	struct iscsi_conn *conn;
 
 	spin_lock_bh(&sess->conn_lock);
 	list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
@@ -5350,10 +5350,10 @@ void iscsi_fail_session(iscsi_session_t *sess)
  *
  *
  */
-int iscsi_free_session(iscsi_session_t *sess)
+int iscsi_free_session(struct iscsi_session *sess)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
-	iscsi_conn_t *conn, *conn_tmp;
+	struct iscsi_conn *conn, *conn_tmp;
 
 	spin_lock_bh(&sess->conn_lock);
 	atomic_set(&sess->sleep_on_sess_wait_sem, 1);
@@ -5387,12 +5387,12 @@ int iscsi_free_session(iscsi_session_t *sess)
  *
  */
 void iscsi_stop_session(
-	iscsi_session_t *sess,
+	struct iscsi_session *sess,
 	int session_sleep,
 	int connection_sleep)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
-	iscsi_conn_t *conn, *conn_tmp = NULL;
+	struct iscsi_conn *conn, *conn_tmp = NULL;
 
 	spin_lock_bh(&sess->conn_lock);
 	if (session_sleep)
@@ -5428,9 +5428,9 @@ void iscsi_stop_session(
  *
  *
  */
-int iscsi_release_sessions_for_tpg(iscsi_portal_group_t *tpg, int force)
+int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
 {
-	iscsi_session_t *sess;
+	struct iscsi_session *sess;
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 	struct se_session *se_sess, *se_sess_tmp;
 	int session_count = 0;
@@ -5443,7 +5443,7 @@ int iscsi_release_sessions_for_tpg(iscsi_portal_group_t *tpg, int force)
 
 	list_for_each_entry_safe(se_sess, se_sess_tmp, &se_tpg->tpg_sess_list,
 			sess_list) {
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 		spin_lock(&sess->conn_lock);
 		if (atomic_read(&sess->session_fall_back_to_erl0) ||

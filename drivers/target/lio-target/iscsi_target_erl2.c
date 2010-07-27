@@ -60,11 +60,11 @@
  *	FIXME: Does RData SNACK apply here as well?
  */
 void iscsi_create_conn_recovery_datain_values(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u32 exp_data_sn)
 {
 	u32 data_sn = 0;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	cmd->next_burst_len = 0;
 	cmd->read_data_done = 0;
@@ -92,10 +92,10 @@ void iscsi_create_conn_recovery_datain_values(
  *
  */
 void iscsi_create_conn_recovery_dataout_values(
-	iscsi_cmd_t *cmd)
+	struct iscsi_cmd *cmd)
 {
 	u32 write_data_done = 0;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	cmd->data_sn = 0;
 	cmd->next_burst_len = 0;
@@ -116,8 +116,8 @@ void iscsi_create_conn_recovery_dataout_values(
  *
  */
 static int iscsi_attach_active_connection_recovery_entry(
-	iscsi_session_t *sess,
-	iscsi_conn_recovery_t *cr)
+	struct iscsi_session *sess,
+	struct iscsi_conn_recovery *cr)
 {
 	spin_lock(&sess->cr_a_lock);
 	list_add_tail(&cr->cr_list, &sess->cr_active_list);
@@ -131,8 +131,8 @@ static int iscsi_attach_active_connection_recovery_entry(
  *
  */
 static int iscsi_attach_inactive_connection_recovery_entry(
-	iscsi_session_t *sess,
-	iscsi_conn_recovery_t *cr)
+	struct iscsi_session *sess,
+	struct iscsi_conn_recovery *cr)
 {
 	spin_lock(&sess->cr_i_lock);
 	list_add_tail(&cr->cr_list, &sess->cr_inactive_list);
@@ -149,11 +149,11 @@ static int iscsi_attach_inactive_connection_recovery_entry(
  *
  *
  */
-iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry(
-	iscsi_session_t *sess,
+struct iscsi_conn_recovery *iscsi_get_inactive_connection_recovery_entry(
+	struct iscsi_session *sess,
 	u16 cid)
 {
-	iscsi_conn_recovery_t *cr;
+	struct iscsi_conn_recovery *cr;
 
 	spin_lock(&sess->cr_i_lock);
 	list_for_each_entry(cr, &sess->cr_inactive_list, cr_list) {
@@ -169,10 +169,10 @@ iscsi_conn_recovery_t *iscsi_get_inactive_connection_recovery_entry(
  *
  *
  */
-void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
+void iscsi_free_connection_recovery_entires(struct iscsi_session *sess)
 {
-	iscsi_cmd_t *cmd, *cmd_tmp;
-	iscsi_conn_recovery_t *cr, *cr_tmp;
+	struct iscsi_cmd *cmd, *cmd_tmp;
+	struct iscsi_conn_recovery *cr, *cr_tmp;
 
 	spin_lock(&sess->cr_a_lock);
 	list_for_each_entry_safe(cr, cr_tmp, &sess->cr_active_list, cr_list) {
@@ -236,8 +236,8 @@ void iscsi_free_connection_recovery_entires(iscsi_session_t *sess)
  *
  */
 int iscsi_remove_active_connection_recovery_entry(
-	iscsi_conn_recovery_t *cr,
-	iscsi_session_t *sess)
+	struct iscsi_conn_recovery *cr,
+	struct iscsi_session *sess)
 {
 	spin_lock(&sess->cr_a_lock);
 	list_del(&cr->cr_list);
@@ -257,8 +257,8 @@ int iscsi_remove_active_connection_recovery_entry(
  *
  */
 int iscsi_remove_inactive_connection_recovery_entry(
-	iscsi_conn_recovery_t *cr,
-	iscsi_session_t *sess)
+	struct iscsi_conn_recovery *cr,
+	struct iscsi_session *sess)
 {
 	spin_lock(&sess->cr_i_lock);
 	list_del(&cr->cr_list);
@@ -272,13 +272,13 @@ int iscsi_remove_inactive_connection_recovery_entry(
  *	Called with cr->conn_recovery_cmd_lock help.
  */
 int iscsi_remove_cmd_from_connection_recovery(
-	iscsi_cmd_t *cmd,
-	iscsi_session_t *sess)
+	struct iscsi_cmd *cmd,
+	struct iscsi_session *sess)
 {
-	iscsi_conn_recovery_t *cr;
+	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
-		printk(KERN_ERR "iscsi_conn_recovery_t pointer for ITT: 0x%08x"
+		printk(KERN_ERR "struct iscsi_conn_recovery pointer for ITT: 0x%08x"
 			" is NULL!\n", cmd->init_task_tag);
 		BUG();
 	}
@@ -293,12 +293,12 @@ int iscsi_remove_cmd_from_connection_recovery(
  *
  */
 void iscsi_discard_cr_cmds_by_expstatsn(
-	iscsi_conn_recovery_t *cr,
+	struct iscsi_conn_recovery *cr,
 	u32 exp_statsn)
 {
 	u32 dropped_count = 0;
-	iscsi_cmd_t *cmd, *cmd_tmp;
-	iscsi_session_t *sess = cr->sess;
+	struct iscsi_cmd *cmd, *cmd_tmp;
+	struct iscsi_session *sess = cr->sess;
 
 	spin_lock(&cr->conn_recovery_cmd_lock);
 	list_for_each_entry_safe(cmd, cmd_tmp,
@@ -354,12 +354,12 @@ void iscsi_discard_cr_cmds_by_expstatsn(
  *
  *
  */
-int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
+int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 {
 	u32 dropped_count = 0;
-	iscsi_cmd_t *cmd, *cmd_tmp;
-	iscsi_ooo_cmdsn_t *ooo_cmdsn, *ooo_cmdsn_tmp;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_cmd *cmd, *cmd_tmp;
+	struct iscsi_ooo_cmdsn *ooo_cmdsn, *ooo_cmdsn_tmp;
+	struct iscsi_session *sess = SESS(conn);
 
 	spin_lock(&sess->cmdsn_lock);
 	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
@@ -406,22 +406,22 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(iscsi_conn_t *conn)
  *
  *
  */
-int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
+int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 {
 	u32 cmd_count = 0;
-	iscsi_cmd_t *cmd, *cmd_tmp;
-	iscsi_conn_recovery_t *cr;
+	struct iscsi_cmd *cmd, *cmd_tmp;
+	struct iscsi_conn_recovery *cr;
 
 	/*
-	 * Allocate an iscsi_conn_recovery_t for this connection.
-	 * Each iscsi_cmd_t contains an iscsi_conn_recovery_t pointer
-	 * (iscsi_cmd_t->cr) so we need to allocate this before preparing the
+	 * Allocate an struct iscsi_conn_recovery for this connection.
+	 * Each struct iscsi_cmd contains an struct iscsi_conn_recovery pointer
+	 * (struct iscsi_cmd->cr) so we need to allocate this before preparing the
 	 * connection's command list for connection recovery.
 	 */
-	cr = kzalloc(sizeof(iscsi_conn_recovery_t), GFP_KERNEL);
+	cr = kzalloc(sizeof(struct iscsi_conn_recovery), GFP_KERNEL);
 	if (!(cr)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-			" iscsi_conn_recovery_t.\n");
+			" struct iscsi_conn_recovery.\n");
 		return -1;
 	}
 	INIT_LIST_HEAD(&cr->cr_list);
@@ -513,7 +513,7 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 			SE_CMD(cmd)->transport_wait_for_tasks(SE_CMD(cmd),
 					0, 0);
 		/*
-		 * Add the iscsi_cmd_t to the connection recovery cmd list
+		 * Add the struct iscsi_cmd to the connection recovery cmd list
 		 */
 		spin_lock(&cr->conn_recovery_cmd_lock);
 		list_add_tail(&cmd->i_list, &cr->conn_recovery_cmd_list);
@@ -526,7 +526,7 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
 	spin_unlock_bh(&conn->cmd_lock);
 
 	/*
-	 * Fill in the various values in the preallocated iscsi_conn_recovery_t.
+	 * Fill in the various values in the preallocated struct iscsi_conn_recovery.
 	 */
 	cr->cid = conn->cid;
 	cr->cmd_count = cmd_count;
@@ -542,7 +542,7 @@ int iscsi_prepare_cmds_for_realligance(iscsi_conn_t *conn)
  *
  *
  */
-int iscsi_connection_recovery_transport_reset(iscsi_conn_t *conn)
+int iscsi_connection_recovery_transport_reset(struct iscsi_conn *conn)
 {
 	atomic_set(&conn->connection_recovery, 1);
 

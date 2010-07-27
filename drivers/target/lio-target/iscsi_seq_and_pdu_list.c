@@ -54,10 +54,10 @@
  *
  *
  */
-void iscsi_dump_seq_list(iscsi_cmd_t *cmd)
+void iscsi_dump_seq_list(struct iscsi_cmd *cmd)
 {
 	int i;
-	iscsi_seq_t *seq;
+	struct iscsi_seq *seq;
 
 	printk(KERN_INFO "Dumping Sequence List for ITT: 0x%08x:\n",
 			cmd->init_task_tag);
@@ -76,10 +76,10 @@ void iscsi_dump_seq_list(iscsi_cmd_t *cmd)
  *
  *
  */
-void iscsi_dump_pdu_list(iscsi_cmd_t *cmd)
+void iscsi_dump_pdu_list(struct iscsi_cmd *cmd)
 {
 	int i;
-	iscsi_pdu_t *pdu;
+	struct iscsi_pdu *pdu;
 
 	printk(KERN_INFO "Dumping PDU List for ITT: 0x%08x:\n",
 			cmd->init_task_tag);
@@ -97,7 +97,7 @@ void iscsi_dump_pdu_list(iscsi_cmd_t *cmd)
  *
  */
 static inline void iscsi_ordered_seq_lists(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u8 type)
 {
 	u32 i, seq_count = 0;
@@ -114,7 +114,7 @@ static inline void iscsi_ordered_seq_lists(
  *
  */
 static inline void iscsi_ordered_pdu_lists(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u8 type)
 {
 	u32 i, pdu_send_order = 0, seq_no = 0;
@@ -168,7 +168,7 @@ redo:
  *
  */
 static inline int iscsi_randomize_pdu_lists(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u8 type)
 {
 	int i = 0;
@@ -222,7 +222,7 @@ redo:
  *
  */
 static inline int iscsi_randomize_seq_lists(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u8 type)
 {
 	int i, j = 0;
@@ -258,15 +258,15 @@ static inline int iscsi_randomize_seq_lists(
  *
  */
 static inline void iscsi_determine_counts_for_list(
-	iscsi_cmd_t *cmd,
-	iscsi_build_list_t *bl,
+	struct iscsi_cmd *cmd,
+	struct iscsi_build_list *bl,
 	u32 *seq_count,
 	u32 *pdu_count)
 {
 	int check_immediate = 0;
 	u32 burstlength = 0, offset = 0;
 	u32 unsolicited_data_length = 0;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	if ((bl->type == PDULIST_IMMEDIATE) ||
 	    (bl->type == PDULIST_IMMEDIATE_AND_UNSOLICITED))
@@ -341,15 +341,15 @@ static inline void iscsi_determine_counts_for_list(
  *	and DataPDUInOrder=No.
  */
 static inline int iscsi_build_pdu_and_seq_list(
-	iscsi_cmd_t *cmd,
-	iscsi_build_list_t *bl)
+	struct iscsi_cmd *cmd,
+	struct iscsi_build_list *bl)
 {
 	int check_immediate = 0, datapduinorder, datasequenceinorder;
 	u32 burstlength = 0, offset = 0, i = 0;
 	u32 pdu_count = 0, seq_no = 0, unsolicited_data_length = 0;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_pdu_t *pdu = cmd->pdu_list;
-	iscsi_seq_t *seq = cmd->seq_list;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_pdu *pdu = cmd->pdu_list;
+	struct iscsi_seq *seq = cmd->seq_list;
 
 	datapduinorder = SESS_OPS_C(conn)->DataPDUInOrder;
 	datasequenceinorder = SESS_OPS_C(conn)->DataSequenceInOrder;
@@ -551,20 +551,20 @@ static inline int iscsi_build_pdu_and_seq_list(
  *	Only called while DataSequenceInOrder=No or DataPDUInOrder=No.
  */
 int iscsi_do_build_list(
-	iscsi_cmd_t *cmd,
-	iscsi_build_list_t *bl)
+	struct iscsi_cmd *cmd,
+	struct iscsi_build_list *bl)
 {
 	u32 pdu_count = 0, seq_count = 1;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_pdu_t *pdu = NULL;
-	iscsi_seq_t *seq = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_pdu *pdu = NULL;
+	struct iscsi_seq *seq = NULL;
 
 	iscsi_determine_counts_for_list(cmd, bl, &seq_count, &pdu_count);
 
 	if (!SESS_OPS_C(conn)->DataSequenceInOrder) {
-		seq = kzalloc(seq_count * sizeof(iscsi_seq_t), GFP_ATOMIC);
+		seq = kzalloc(seq_count * sizeof(struct iscsi_seq), GFP_ATOMIC);
 		if (!(seq)) {
-			printk(KERN_ERR "Unable to allocate iscsi_seq_t list\n");
+			printk(KERN_ERR "Unable to allocate struct iscsi_seq list\n");
 			return -1;
 		}
 		cmd->seq_list = seq;
@@ -572,9 +572,9 @@ int iscsi_do_build_list(
 	}
 
 	if (!SESS_OPS_C(conn)->DataPDUInOrder) {
-		pdu = kzalloc(pdu_count * sizeof(iscsi_pdu_t), GFP_ATOMIC);
+		pdu = kzalloc(pdu_count * sizeof(struct iscsi_pdu), GFP_ATOMIC);
 		if (!(pdu)) {
-			printk(KERN_ERR "Unable to allocate iscsi_pdu_t list.\n");
+			printk(KERN_ERR "Unable to allocate struct iscsi_pdu list.\n");
 			kfree(seq);
 			return -1;
 		}
@@ -589,16 +589,16 @@ int iscsi_do_build_list(
  *
  *
  */
-iscsi_pdu_t *iscsi_get_pdu_holder(
-	iscsi_cmd_t *cmd,
+struct iscsi_pdu *iscsi_get_pdu_holder(
+	struct iscsi_cmd *cmd,
 	u32 offset,
 	u32 length)
 {
 	u32 i;
-	iscsi_pdu_t *pdu = NULL;
+	struct iscsi_pdu *pdu = NULL;
 
 	if (!cmd->pdu_list) {
-		printk(KERN_ERR "iscsi_cmd_t->pdu_list is NULL!\n");
+		printk(KERN_ERR "struct iscsi_cmd->pdu_list is NULL!\n");
 		return NULL;
 	}
 
@@ -617,16 +617,16 @@ iscsi_pdu_t *iscsi_get_pdu_holder(
  *
  *
  */
-iscsi_pdu_t *iscsi_get_pdu_holder_for_seq(
-	iscsi_cmd_t *cmd,
-	iscsi_seq_t *seq)
+struct iscsi_pdu *iscsi_get_pdu_holder_for_seq(
+	struct iscsi_cmd *cmd,
+	struct iscsi_seq *seq)
 {
 	u32 i;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_pdu_t *pdu = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_pdu *pdu = NULL;
 
 	if (!cmd->pdu_list) {
-		printk(KERN_ERR "iscsi_cmd_t->pdu_list is NULL!\n");
+		printk(KERN_ERR "struct iscsi_cmd->pdu_list is NULL!\n");
 		return NULL;
 	}
 
@@ -656,12 +656,12 @@ redo:
 			goto redo;
 
 		printk(KERN_ERR "Command ITT: 0x%08x unable to locate"
-			" iscsi_pdu_t for cmd->pdu_send_order: %u.\n",
+			" struct iscsi_pdu for cmd->pdu_send_order: %u.\n",
 			cmd->init_task_tag, cmd->pdu_send_order);
 		return NULL;
 	} else {
 		if (!seq) {
-			printk(KERN_ERR "iscsi_seq_t is NULL!\n");
+			printk(KERN_ERR "struct iscsi_seq is NULL!\n");
 			return NULL;
 		}
 #if 0
@@ -699,15 +699,15 @@ redo:
  *
  *
  */
-iscsi_seq_t *iscsi_get_seq_holder(
-	iscsi_cmd_t *cmd,
+struct iscsi_seq *iscsi_get_seq_holder(
+	struct iscsi_cmd *cmd,
 	u32 offset,
 	u32 length)
 {
 	u32 i;
 
 	if (!cmd->seq_list) {
-		printk(KERN_ERR "iscsi_cmd_t->seq_list is NULL!\n");
+		printk(KERN_ERR "struct iscsi_cmd->seq_list is NULL!\n");
 		return NULL;
 	}
 

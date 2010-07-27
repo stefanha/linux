@@ -66,18 +66,18 @@ struct lio_target_configfs_attribute {
 	ssize_t (*store)(void *, const char *, size_t);
 };
 
-iscsi_portal_group_t *lio_get_tpg_from_tpg_item(
+struct iscsi_portal_group *lio_get_tpg_from_tpg_item(
 	struct config_item *item,
-	iscsi_tiqn_t **tiqn_out)
+	struct iscsi_tiqn **tiqn_out)
 {
 	struct se_portal_group *se_tpg = container_of(to_config_group(item),
 					struct se_portal_group, tpg_group);
-	iscsi_portal_group_t *tpg =
-			(iscsi_portal_group_t *)se_tpg->se_tpg_fabric_ptr;
+	struct iscsi_portal_group *tpg =
+			(struct iscsi_portal_group *)se_tpg->se_tpg_fabric_ptr;
 	int ret;
 
 	if (!(tpg)) {
-		printk(KERN_ERR "Unable to locate iscsi_portal_group_t "
+		printk(KERN_ERR "Unable to locate struct iscsi_portal_group "
 			"pointer\n");
 		return NULL;
 	}
@@ -95,9 +95,9 @@ static ssize_t lio_target_np_show_sctp(
 	struct se_tpg_np *se_tpg_np,
 	char *page)
 {
-	struct iscsi_tpg_np_s *tpg_np = container_of(se_tpg_np,
-				struct iscsi_tpg_np_s, se_tpg_np);
-	struct iscsi_tpg_np_s *tpg_np_sctp;
+	struct iscsi_tpg_np *tpg_np = container_of(se_tpg_np,
+				struct iscsi_tpg_np, se_tpg_np);
+	struct iscsi_tpg_np *tpg_np_sctp;
 	ssize_t rb;
 
 	tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP);
@@ -114,12 +114,12 @@ static ssize_t lio_target_np_store_sctp(
 	const char *page,
 	size_t count)
 {
-	struct iscsi_np_s *np;
-	struct iscsi_portal_group_s *tpg;
-	struct iscsi_tpg_np_s *tpg_np = container_of(se_tpg_np,
-				struct iscsi_tpg_np_s, se_tpg_np);
-	struct iscsi_tpg_np_s *tpg_np_sctp = NULL;
-	struct iscsi_np_addr_s np_addr;
+	struct iscsi_np *np;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tpg_np *tpg_np = container_of(se_tpg_np,
+				struct iscsi_tpg_np, se_tpg_np);
+	struct iscsi_tpg_np *tpg_np_sctp = NULL;
+	struct iscsi_np_addr np_addr;
 	char *endptr;
 	u32 op;
 	int ret;
@@ -131,8 +131,8 @@ static ssize_t lio_target_np_store_sctp(
 	}
 	np = tpg_np->tpg_np;
 	if (!(np)) {
-		printk(KERN_ERR "Unable to locate iscsi_np_t from"
-				" iscsi_tpg_np_t\n");
+		printk(KERN_ERR "Unable to locate struct iscsi_np from"
+				" struct iscsi_tpg_np\n");
 		return -EINVAL;
 	}
 
@@ -141,7 +141,7 @@ static ssize_t lio_target_np_store_sctp(
 		return -EINVAL;
 
 	if (op) {
-		memset((void *)&np_addr, 0, sizeof(iscsi_np_addr_t));
+		memset((void *)&np_addr, 0, sizeof(struct iscsi_np_addr));
 		if (np->np_flags & NPF_NET_IPV6)
 			snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE,
 				"%s", np->np_ipv6);
@@ -189,10 +189,10 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	struct config_group *group,
 	const char *name)
 {
-	iscsi_portal_group_t *tpg;
-	iscsi_tpg_np_t *tpg_np;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tpg_np *tpg_np;
 	char *str, *str2, *end_ptr, *ip_str, *port_str;
-	iscsi_np_addr_t np_addr;
+	struct iscsi_np_addr np_addr;
 	u32 ipv4 = 0;
 	int ret;
 	char buf[MAX_PORTAL_LEN];
@@ -205,7 +205,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	memset(buf, 0, MAX_PORTAL_LEN);
 	snprintf(buf, MAX_PORTAL_LEN, "%s", name);
 
-	memset((void *)&np_addr, 0, sizeof(iscsi_np_addr_t));
+	memset((void *)&np_addr, 0, sizeof(struct iscsi_np_addr));
 
 	str = strstr(buf, "[");
 	if ((str)) {
@@ -246,7 +246,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		np_addr.np_ipv4 = htonl(ipv4);
 		np_addr.np_flags |= NPF_NET_IPV4;
 	}
-	tpg = container_of(se_tpg, struct iscsi_portal_group_s, tpg_se_tpg);
+	tpg = container_of(se_tpg, struct iscsi_portal_group, tpg_se_tpg);
 	ret = iscsi_get_tpg(tpg);
 	if (ret < 0)
 		return ERR_PTR(-EINVAL);
@@ -282,12 +282,12 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 static void lio_target_call_delnpfromtpg(
 	struct se_tpg_np *se_tpg_np)
 {
-	iscsi_portal_group_t *tpg;
-	iscsi_tpg_np_t *tpg_np;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tpg_np *tpg_np;
 	struct se_portal_group *se_tpg;
 	int ret = 0;
 
-	tpg_np = container_of(se_tpg_np, struct iscsi_tpg_np_s, se_tpg_np);
+	tpg_np = container_of(se_tpg_np, struct iscsi_tpg_np, se_tpg_np);
 	tpg = tpg_np->tpg;
 	ret = iscsi_get_tpg(tpg);
 	if (ret < 0)
@@ -316,7 +316,7 @@ static ssize_t iscsi_nacl_attrib_show_##name(				\
 	struct se_node_acl *se_nacl,					\
 	char *page)							\
 {									\
-	iscsi_node_acl_t *nacl = container_of(se_nacl, iscsi_node_acl_t, \
+	struct iscsi_node_acl *nacl = container_of(se_nacl, struct iscsi_node_acl, \
 					se_node_acl);			\
 	ssize_t rb;							\
 									\
@@ -329,7 +329,7 @@ static ssize_t iscsi_nacl_attrib_store_##name(				\
 	const char *page,						\
 	size_t count)							\
 {									\
-	iscsi_node_acl_t *nacl = container_of(se_nacl, iscsi_node_acl_t, \
+	struct iscsi_node_acl *nacl = container_of(se_nacl, struct iscsi_node_acl, \
 					se_node_acl);			\
 	char *endptr;							\
 	u32 val;							\
@@ -403,10 +403,10 @@ static struct configfs_attribute *lio_target_nacl_attrib_attrs[] = {
 
 #define __DEF_NACL_AUTH_STR(prefix, name, flags)			\
 static ssize_t __iscsi_##prefix##_show_##name(				\
-	struct iscsi_node_acl_s *nacl,					\
+	struct iscsi_node_acl *nacl,					\
 	char *page)							\
 {									\
-	struct iscsi_node_auth_s *auth = &nacl->node_auth;		\
+	struct iscsi_node_auth *auth = &nacl->node_auth;		\
 	ssize_t rb;							\
 									\
 	if (!capable(CAP_SYS_ADMIN))					\
@@ -416,11 +416,11 @@ static ssize_t __iscsi_##prefix##_show_##name(				\
 }									\
 									\
 static ssize_t __iscsi_##prefix##_store_##name(				\
-	struct iscsi_node_acl_s *nacl,					\
+	struct iscsi_node_acl *nacl,					\
 	const char *page,						\
 	size_t count)							\
 {									\
-	struct iscsi_node_auth_s *auth = &nacl->node_auth;		\
+	struct iscsi_node_auth *auth = &nacl->node_auth;		\
 									\
 	if (!capable(CAP_SYS_ADMIN))					\
 		return -EPERM;						\
@@ -442,10 +442,10 @@ static ssize_t __iscsi_##prefix##_store_##name(				\
 
 #define __DEF_NACL_AUTH_INT(prefix, name)				\
 static ssize_t __iscsi_##prefix##_show_##name(				\
-	struct iscsi_node_acl_s *nacl,					\
+	struct iscsi_node_acl *nacl,					\
 	char *page)							\
 {									\
-	struct iscsi_node_auth_s *auth = &nacl->node_auth;		\
+	struct iscsi_node_auth *auth = &nacl->node_auth;		\
 	ssize_t rb;							\
 									\
 	if (!capable(CAP_SYS_ADMIN))					\
@@ -462,7 +462,7 @@ static ssize_t iscsi_nacl_auth_show_##name(				\
 	char *page)							\
 {									\
 	return __iscsi_nacl_auth_show_##name(container_of(nacl,		\
-			iscsi_node_acl_t, se_node_acl), page);		\
+			struct iscsi_node_acl, se_node_acl), page);		\
 }									\
 static ssize_t iscsi_nacl_auth_store_##name(				\
 	struct se_node_acl *nacl,					\
@@ -470,7 +470,7 @@ static ssize_t iscsi_nacl_auth_store_##name(				\
 	size_t count)							\
 {									\
 	return __iscsi_nacl_auth_store_##name(container_of(nacl,	\
-			iscsi_node_acl_t, se_node_acl), page, count);	\
+			struct iscsi_node_acl, se_node_acl), page, count);	\
 }
 
 #define DEF_NACL_AUTH_INT(name)						\
@@ -480,7 +480,7 @@ static ssize_t iscsi_nacl_auth_show_##name(				\
 	char *page)							\
 {									\
 	return __iscsi_nacl_auth_show_##name(container_of(nacl,		\
-			iscsi_node_acl_t, se_node_acl), page);		\
+			struct iscsi_node_acl, se_node_acl), page);		\
 }
 
 #define AUTH_ATTR(_name, _mode)	TF_NACL_AUTH_ATTR(iscsi, _name, _mode);
@@ -530,7 +530,7 @@ static ssize_t iscsi_nacl_param_show_##name(				\
 	struct se_node_acl *se_nacl,					\
 	char *page)							\
 {									\
-	iscsi_session_t *sess;						\
+	struct iscsi_session *sess;						\
 	struct se_session *se_sess;						\
 	ssize_t rb;							\
 									\
@@ -540,7 +540,7 @@ static ssize_t iscsi_nacl_param_show_##name(				\
 		rb = snprintf(page, PAGE_SIZE,				\
 			"No Active iSCSI Session\n");			\
 	} else {							\
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;	\
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;	\
 		rb = snprintf(page, PAGE_SIZE, "%u\n",			\
 			(u32)SESS_OPS(sess)->name);			\
 	}								\
@@ -607,8 +607,8 @@ static ssize_t lio_target_nacl_show_info(
 	struct se_node_acl *se_nacl,
 	char *page)
 {
-	iscsi_session_t *sess;
-	iscsi_conn_t *conn;
+	struct iscsi_session *sess;
+	struct iscsi_conn *conn;
 	struct se_session *se_sess;
 	unsigned char *ip, buf_ipv4[IPV4_BUF_SIZE];
 	ssize_t rb = 0;
@@ -619,7 +619,7 @@ static ssize_t lio_target_nacl_show_info(
 		rb += sprintf(page+rb, "No active iSCSI Session for Initiator"
 			" Endpoint: %s\n", se_nacl->initiatorname);
 	else {
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 		if (SESS_OPS(sess)->InitiatorName)
 			rb += sprintf(page+rb, "InitiatorName: %s\n",
@@ -746,8 +746,8 @@ static ssize_t lio_target_nacl_store_cmdsn_depth(
 	size_t count)
 {
 	struct se_portal_group *se_tpg = se_nacl->se_tpg;
-	iscsi_portal_group_t *tpg = container_of(se_tpg,
-			iscsi_portal_group_t, tpg_se_tpg);
+	struct iscsi_portal_group *tpg = container_of(se_tpg,
+			struct iscsi_portal_group, tpg_se_tpg);
 	struct config_item *acl_ci, *tpg_ci, *wwn_ci;
 	char *endptr;
 	u32 cmdsn_depth = 0;
@@ -806,15 +806,15 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	struct config_group *group,
 	const char *name)
 {
-	struct iscsi_node_acl_s *acl;
+	struct iscsi_node_acl *acl;
 	struct se_node_acl *se_nacl_new, *se_nacl;
-	struct iscsi_portal_group_s *tpg = container_of(se_tpg,
-			struct iscsi_portal_group_s, tpg_se_tpg);
+	struct iscsi_portal_group *tpg = container_of(se_tpg,
+			struct iscsi_portal_group, tpg_se_tpg);
 	u32 cmdsn_depth;
 
 	se_nacl_new = lio_tpg_alloc_fabric_acl(se_tpg);
 
-	acl = container_of(se_nacl_new, struct iscsi_node_acl_s,
+	acl = container_of(se_nacl_new, struct iscsi_node_acl,
 				se_node_acl);
 
 	cmdsn_depth = ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth;
@@ -834,8 +834,8 @@ static void lio_target_drop_nodeacl(
 	struct se_node_acl *se_nacl)
 {
 	struct se_portal_group *se_tpg = se_nacl->se_tpg;
-	struct iscsi_node_acl_s *acl = container_of(se_nacl,
-			struct iscsi_node_acl_s, se_node_acl);
+	struct iscsi_node_acl *acl = container_of(se_nacl,
+			struct iscsi_node_acl, se_node_acl);
 
 	core_tpg_del_initiator_node_acl(se_tpg, se_nacl, 1);
 	kfree(acl);
@@ -851,8 +851,8 @@ static ssize_t iscsi_tpg_attrib_show_##name(				\
 	struct se_portal_group *se_tpg,				\
 	char *page)							\
 {									\
-	iscsi_portal_group_t *tpg = container_of(se_tpg,		\
-			struct iscsi_portal_group_s, tpg_se_tpg);	\
+	struct iscsi_portal_group *tpg = container_of(se_tpg,		\
+			struct iscsi_portal_group, tpg_se_tpg);	\
 	ssize_t rb;							\
 									\
 	if (iscsi_get_tpg(tpg) < 0)					\
@@ -868,8 +868,8 @@ static ssize_t iscsi_tpg_attrib_store_##name(				\
 	const char *page,						\
 	size_t count)							\
 {									\
-	iscsi_portal_group_t *tpg = container_of(se_tpg,		\
-			struct iscsi_portal_group_s, tpg_se_tpg);	\
+	struct iscsi_portal_group *tpg = container_of(se_tpg,		\
+			struct iscsi_portal_group, tpg_se_tpg);	\
 	char *endptr;							\
 	u32 val;							\
 	int ret;							\
@@ -953,9 +953,9 @@ static ssize_t iscsi_tpg_param_show_##name(				\
 	struct se_portal_group *se_tpg,				\
 	char *page)							\
 {									\
-	iscsi_portal_group_t *tpg = container_of(se_tpg,		\
-			struct iscsi_portal_group_s, tpg_se_tpg);	\
-	iscsi_param_t *param;						\
+	struct iscsi_portal_group *tpg = container_of(se_tpg,		\
+			struct iscsi_portal_group, tpg_se_tpg);	\
+	struct iscsi_param *param;						\
 	ssize_t rb;							\
 									\
 	if (iscsi_get_tpg(tpg) < 0)					\
@@ -977,8 +977,8 @@ static ssize_t iscsi_tpg_param_store_##name(				\
 	const char *page,						\
 	size_t count)							\
 {									\
-	iscsi_portal_group_t *tpg = container_of(se_tpg,		\
-			struct iscsi_portal_group_s, tpg_se_tpg);	\
+	struct iscsi_portal_group *tpg = container_of(se_tpg,		\
+			struct iscsi_portal_group, tpg_se_tpg);	\
 	char *buf;							\
 	int ret;							\
 									\
@@ -1099,8 +1099,8 @@ static ssize_t lio_target_tpg_show_enable(
 	struct se_portal_group *se_tpg,
 	char *page)
 {
-	iscsi_portal_group_t *tpg = container_of(se_tpg,
-			struct iscsi_portal_group_s, tpg_se_tpg);
+	struct iscsi_portal_group *tpg = container_of(se_tpg,
+			struct iscsi_portal_group, tpg_se_tpg);
 	ssize_t len = 0;
 
 	spin_lock(&tpg->tpg_state_lock);
@@ -1116,8 +1116,8 @@ static ssize_t lio_target_tpg_store_enable(
 	const char *page,
 	size_t count)
 {
-	iscsi_portal_group_t *tpg = container_of(se_tpg,
-			struct iscsi_portal_group_s, tpg_se_tpg);
+	struct iscsi_portal_group *tpg = container_of(se_tpg,
+			struct iscsi_portal_group, tpg_se_tpg);
 	char *endptr;
 	u32 op;
 	int ret = 0;
@@ -1168,13 +1168,13 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	struct config_group *group,
 	const char *name)
 {
-	iscsi_portal_group_t *tpg;
-	iscsi_tiqn_t *tiqn;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tiqn *tiqn;
 	char *tpgt_str, *end_ptr;
 	int ret = 0;
 	unsigned short int tpgt;
 
-	tiqn = container_of(wwn, struct iscsi_tiqn_s, tiqn_wwn);
+	tiqn = container_of(wwn, struct iscsi_tiqn, tiqn_wwn);
 	/*
 	 * Only tpgt_# directory groups can be created below
 	 * target/iscsi/iqn.superturodiskarry/
@@ -1215,10 +1215,10 @@ out:
 
 void lio_target_tiqn_deltpg(struct se_portal_group *se_tpg)
 {
-	iscsi_portal_group_t *tpg;
-	iscsi_tiqn_t *tiqn;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tiqn *tiqn;
 
-	tpg = container_of(se_tpg, struct iscsi_portal_group_s, tpg_se_tpg);
+	tpg = container_of(se_tpg, struct iscsi_portal_group, tpg_se_tpg);
 	tiqn = tpg->tpg_tiqn;
 	/*
 	 * iscsi_tpg_del_portal_group() assumes force=1
@@ -1252,7 +1252,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	struct config_group *group,
 	const char *name)
 {
-	iscsi_tiqn_t *tiqn;
+	struct iscsi_tiqn *tiqn;
 	int ret = 0;
 
 	tiqn = core_add_tiqn((unsigned char *)name, &ret);
@@ -1268,7 +1268,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 void lio_target_call_coredeltiqn(
 	struct se_wwn *wwn)
 {
-	iscsi_tiqn_t *tiqn = container_of(wwn, iscsi_tiqn_t, tiqn_wwn);
+	struct iscsi_tiqn *tiqn = container_of(wwn, struct iscsi_tiqn, tiqn_wwn);
 	
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s\n",
 			tiqn->tiqn);
@@ -1345,7 +1345,7 @@ static ssize_t iscsi_disc_show_enforce_discovery_auth(
 	struct target_fabric_configfs *tf,
 	char *page)
 {
-	iscsi_node_auth_t *discovery_auth = &iscsi_global->discovery_acl.node_auth;
+	struct iscsi_node_auth *discovery_auth = &iscsi_global->discovery_acl.node_auth;
 
 	return sprintf(page, "%d\n", discovery_auth->enforce_discovery_auth);
 }
@@ -1355,8 +1355,8 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 	const char *page,
 	size_t count)
 {
-	iscsi_param_t *param;
-	iscsi_portal_group_t *discovery_tpg = iscsi_global->discovery_tpg;
+	struct iscsi_param *param;
+	struct iscsi_portal_group *discovery_tpg = iscsi_global->discovery_tpg;
 	char *endptr;
 	u32 op;
 

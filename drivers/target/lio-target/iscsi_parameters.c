@@ -50,7 +50,7 @@
  *
  */
 int iscsi_login_rx_data(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	char *buf,
 	int length,
 	int role)
@@ -91,7 +91,7 @@ int iscsi_login_rx_data(
  *
  */
 int iscsi_login_tx_data(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	char *pdu_buf,
 	char *text_buf,
 	int text_length,
@@ -136,7 +136,7 @@ int iscsi_login_tx_data(
  *
  *
  */
-void iscsi_dump_conn_ops(iscsi_conn_ops_t *conn_ops)
+void iscsi_dump_conn_ops(struct iscsi_conn_ops *conn_ops)
 {
 	printk(KERN_INFO "HeaderDigest: %s\n", (conn_ops->HeaderDigest) ?
 				"CRC32C" : "None");
@@ -156,7 +156,7 @@ void iscsi_dump_conn_ops(iscsi_conn_ops_t *conn_ops)
  *
  *
  */
-void iscsi_dump_sess_ops(iscsi_sess_ops_t *sess_ops)
+void iscsi_dump_sess_ops(struct iscsi_sess_ops *sess_ops)
 {
 	printk(KERN_INFO "InitiatorName: %s\n", sess_ops->InitiatorName);
 	printk(KERN_INFO "InitiatorAlias: %s\n", sess_ops->InitiatorAlias);
@@ -190,9 +190,9 @@ void iscsi_dump_sess_ops(iscsi_sess_ops_t *sess_ops)
  *
  *
  */
-void iscsi_print_params(iscsi_param_list_t *param_list)
+void iscsi_print_params(struct iscsi_param_list *param_list)
 {
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	list_for_each_entry(param, &param_list->param_list, p_list)
 		printk(KERN_INFO "%s: %s\n", param->name, param->value);
@@ -202,13 +202,13 @@ void iscsi_print_params(iscsi_param_list_t *param_list)
  *
  *
  */
-static iscsi_param_t *iscsi_set_default_param(iscsi_param_list_t *param_list,
+static struct iscsi_param *iscsi_set_default_param(struct iscsi_param_list *param_list,
 		char *name, char *value, u8 phase, u8 scope, u8 sender,
 		u16 type_range, u8 use)
 {
-	iscsi_param_t *param = NULL;
+	struct iscsi_param *param = NULL;
 
-	param = kzalloc(sizeof(iscsi_param_t), GFP_KERNEL);
+	param = kzalloc(sizeof(struct iscsi_param), GFP_KERNEL);
 	if (!(param)) {
 		printk(KERN_ERR "Unable to allocate memory for parameter.\n");
 		goto out;
@@ -290,15 +290,15 @@ out:
  *
  */
 /* #warning Add extension keys */
-int iscsi_create_default_params(iscsi_param_list_t **param_list_ptr)
+int iscsi_create_default_params(struct iscsi_param_list **param_list_ptr)
 {
-	iscsi_param_t *param = NULL;
-	iscsi_param_list_t *pl;
+	struct iscsi_param *param = NULL;
+	struct iscsi_param_list *pl;
 
-	pl = kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
+	pl = kzalloc(sizeof(struct iscsi_param_list), GFP_KERNEL);
 	if (!(pl)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-				" iscsi_param_list_t.\n");
+				" struct iscsi_param_list.\n");
 		return -1 ;
 	}
 	INIT_LIST_HEAD(&pl->param_list);
@@ -506,9 +506,9 @@ out:
 int iscsi_set_keys_to_negotiate(
 	int role,
 	int sessiontype,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	list_for_each_entry(param, &param_list->param_list, p_list) {
 		param->state = 0;
@@ -580,9 +580,9 @@ int iscsi_set_keys_to_negotiate(
  *
  */
 int iscsi_set_keys_irrelevant_for_discovery(
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!strcmp(param->name, MAXCONNECTIONS))
@@ -625,17 +625,17 @@ int iscsi_set_keys_irrelevant_for_discovery(
  *
  */
 int iscsi_copy_param_list(
-	iscsi_param_list_t **dst_param_list,
-	iscsi_param_list_t *src_param_list,
+	struct iscsi_param_list **dst_param_list,
+	struct iscsi_param_list *src_param_list,
 	int leading)
 {
-	iscsi_param_t *new_param = NULL, *param = NULL;
-	iscsi_param_list_t *param_list = NULL;
+	struct iscsi_param *new_param = NULL, *param = NULL;
+	struct iscsi_param_list *param_list = NULL;
 
-	param_list = kzalloc(sizeof(iscsi_param_list_t), GFP_KERNEL);
+	param_list = kzalloc(sizeof(struct iscsi_param_list), GFP_KERNEL);
 	if (!(param_list)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-				" iscsi_param_list_t.\n");
+				" struct iscsi_param_list.\n");
 		goto err_out;
 	}
 	INIT_LIST_HEAD(&param_list->param_list);
@@ -649,10 +649,10 @@ int iscsi_copy_param_list(
 				continue;
 		}
 
-		new_param = kzalloc(sizeof(iscsi_param_t), GFP_KERNEL);
+		new_param = kzalloc(sizeof(struct iscsi_param), GFP_KERNEL);
 		if (!(new_param)) {
 			printk(KERN_ERR "Unable to allocate memory for"
-				" iscsi_param_t.\n");
+				" struct iscsi_param.\n");
 			goto err_out;
 		}
 
@@ -705,9 +705,9 @@ err_out:
  *
  *
  */
-static void iscsi_release_extra_responses(iscsi_param_list_t *param_list)
+static void iscsi_release_extra_responses(struct iscsi_param_list *param_list)
 {
-	iscsi_extra_response_t *er, *er_tmp;
+	struct iscsi_extra_response *er, *er_tmp;
 
 	list_for_each_entry_safe(er, er_tmp, &param_list->extra_response_list,
 			er_list) {
@@ -720,9 +720,9 @@ static void iscsi_release_extra_responses(iscsi_param_list_t *param_list)
  *
  *
  */
-void iscsi_release_param_list(iscsi_param_list_t *param_list)
+void iscsi_release_param_list(struct iscsi_param_list *param_list)
 {
-	iscsi_param_t *param, *param_tmp;
+	struct iscsi_param *param, *param_tmp;
 
 	list_for_each_entry_safe(param, param_tmp, &param_list->param_list,
 			p_list) {
@@ -745,11 +745,11 @@ void iscsi_release_param_list(iscsi_param_list_t *param_list)
  *
  *
  */
-iscsi_param_t *iscsi_find_param_from_key(
+struct iscsi_param *iscsi_find_param_from_key(
 	char *key,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	if (!key || !param_list) {
 		printk(KERN_ERR "Key or parameter list pointer is NULL.\n");
@@ -793,7 +793,7 @@ int iscsi_extract_key_value(char *textbuf, char **key, char **value)
  *
  *
  */
-int iscsi_update_param_value(iscsi_param_t *param, char *value)
+int iscsi_update_param_value(struct iscsi_param *param, char *value)
 {
 	kfree(param->value);
 
@@ -818,9 +818,9 @@ int iscsi_update_param_value(iscsi_param_t *param, char *value)
 static int iscsi_add_notunderstood_response(
 	char *key,
 	char *value,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
-	iscsi_extra_response_t *extra_response;
+	struct iscsi_extra_response *extra_response;
 
 	if (strlen(value) > MAX_KEY_VALUE_LENGTH) {
 		printk(KERN_ERR "Value for notunderstood key \"%s\" exceeds %d,"
@@ -828,10 +828,10 @@ static int iscsi_add_notunderstood_response(
 		return -1;
 	}
 
-	extra_response = kzalloc(sizeof(iscsi_extra_response_t), GFP_KERNEL);
+	extra_response = kzalloc(sizeof(struct iscsi_extra_response), GFP_KERNEL);
 	if (!(extra_response)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-			" iscsi_extra_response_t.\n");
+			" struct iscsi_extra_response.\n");
 		return -1;
 	}
 	INIT_LIST_HEAD(&extra_response->er_list);
@@ -875,7 +875,7 @@ static int iscsi_check_for_auth_key(char *key)
  *
  *
  */
-static void iscsi_check_proposer_for_optional_reply(iscsi_param_t *param)
+static void iscsi_check_proposer_for_optional_reply(struct iscsi_param *param)
 {
 	if (IS_TYPE_BOOL_AND(param)) {
 		if (!strcmp(param->value, NO))
@@ -920,7 +920,7 @@ static void iscsi_check_proposer_for_optional_reply(iscsi_param_t *param)
  *
  *
  */
-static int iscsi_check_boolean_value(iscsi_param_t *param, char *value)
+static int iscsi_check_boolean_value(struct iscsi_param *param, char *value)
 {
 	if (strcmp(value, YES) && strcmp(value, NO)) {
 		printk(KERN_ERR "Illegal value for \"%s\", must be either"
@@ -935,7 +935,7 @@ static int iscsi_check_boolean_value(iscsi_param_t *param, char *value)
  *
  *
  */
-static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
+static int iscsi_check_numerical_value(struct iscsi_param *param, char *value_ptr)
 {
 	char *tmpptr;
 	int value = 0;
@@ -1014,7 +1014,7 @@ static int iscsi_check_numerical_value(iscsi_param_t *param, char *value_ptr)
  *
  *
  */
-static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
+static int iscsi_check_numerical_range_value(struct iscsi_param *param, char *value)
 {
 	char *left_val_ptr = NULL, *right_val_ptr = NULL;
 	char *tilde_ptr = NULL, *tmp_ptr = NULL;
@@ -1104,7 +1104,7 @@ static int iscsi_check_numerical_range_value(iscsi_param_t *param, char *value)
  *
  *
  */
-static int iscsi_check_string_or_list_value(iscsi_param_t *param, char *value)
+static int iscsi_check_string_or_list_value(struct iscsi_param *param, char *value)
 {
 	if (IS_PSTATE_PROPOSER(param))
 		return 0;
@@ -1146,7 +1146,7 @@ static int iscsi_check_string_or_list_value(iscsi_param_t *param, char *value)
  *	returns the lesser of both right values.
  */
 static char *iscsi_get_value_from_number_range(
-	iscsi_param_t *param,
+	struct iscsi_param *param,
 	char *value)
 {
 	char *end_ptr, *tilde_ptr1 = NULL, *tilde_ptr2 = NULL;
@@ -1173,7 +1173,7 @@ static char *iscsi_get_value_from_number_range(
  *
  */
 static char *iscsi_check_valuelist_for_support(
-	iscsi_param_t *param,
+	struct iscsi_param *param,
 	char *value)
 {
 	char *tmp1 = NULL, *tmp2 = NULL;
@@ -1230,7 +1230,7 @@ out:
  *
  *
  */
-static int iscsi_check_acceptor_state(iscsi_param_t *param, char *value)
+static int iscsi_check_acceptor_state(struct iscsi_param *param, char *value)
 {
 	u8 acceptor_boolean_value = 0, proposer_boolean_value = 0;
 	char *negoitated_value = NULL;
@@ -1338,7 +1338,7 @@ static int iscsi_check_acceptor_state(iscsi_param_t *param, char *value)
  *
  *
  */
-static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
+static int iscsi_check_proposer_state(struct iscsi_param *param, char *value)
 {
 	if (IS_PSTATE_RESPONSE_GOT(param)) {
 		printk(KERN_ERR "Received key \"%s\" twice, protocol error.\n",
@@ -1411,7 +1411,7 @@ static int iscsi_check_proposer_state(iscsi_param_t *param, char *value)
  *
  *
  */
-static int iscsi_check_value(iscsi_param_t *param, char *value)
+static int iscsi_check_value(struct iscsi_param *param, char *value)
 {
 	char *comma_ptr = NULL;
 
@@ -1496,12 +1496,12 @@ static int iscsi_check_value(iscsi_param_t *param, char *value)
  *
  *
  */
-static iscsi_param_t *__iscsi_check_key(
+static struct iscsi_param *__iscsi_check_key(
 	char *key,
 	int sender,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	if (strlen(key) > MAX_KEY_NAME_LENGTH) {
 		printk(KERN_ERR "Length of key name \"%s\" exceeds %d.\n",
@@ -1534,13 +1534,13 @@ static iscsi_param_t *__iscsi_check_key(
  *
  *
  */
-static iscsi_param_t *iscsi_check_key(
+static struct iscsi_param *iscsi_check_key(
 	char *key,
 	int phase,
 	int sender,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	/*
 	 * Key name length must not exceed 63 bytes. (See iSCSI v20 5.1)
@@ -1601,7 +1601,7 @@ static iscsi_param_t *iscsi_check_key(
  */
 static int iscsi_enforce_integrity_rules(
 	u8 phase,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
 	char *tmpptr;
 	u8 DataSequenceInOrder = 0;
@@ -1609,7 +1609,7 @@ static int iscsi_enforce_integrity_rules(
 	u8 IFMarker = 0, OFMarker = 0;
 	u8 IFMarkInt_Reject = 0, OFMarkInt_Reject = 0;
 	u32 FirstBurstLength = 0, MaxBurstLength = 0;
-	iscsi_param_t *param = NULL;
+	struct iscsi_param *param = NULL;
 
 	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!(param->phase & phase))
@@ -1725,7 +1725,7 @@ int iscsi_decode_text_input(
 	u8 sender,
 	char *textbuf,
 	u32 length,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
 	char *tmpbuf, *start = NULL, *end = NULL;
 
@@ -1742,7 +1742,7 @@ int iscsi_decode_text_input(
 
 	while (start < end) {
 		char *key, *value;
-		iscsi_param_t *param;
+		struct iscsi_param *param;
 
 		if (iscsi_extract_key_value(start, &key, &value) < 0) {
 			kfree(tmpbuf);
@@ -1805,11 +1805,11 @@ int iscsi_encode_text_output(
 	u8 sender,
 	char *textbuf,
 	u32 *length,
-	iscsi_param_list_t *param_list)
+	struct iscsi_param_list *param_list)
 {
 	char *output_buf = NULL;
-	iscsi_extra_response_t *er;
-	iscsi_param_t *param;
+	struct iscsi_extra_response *er;
+	struct iscsi_param *param;
 
 	output_buf = textbuf + *length;
 
@@ -1862,10 +1862,10 @@ int iscsi_encode_text_output(
  *
  *
  */
-int iscsi_check_negotiated_keys(iscsi_param_list_t *param_list)
+int iscsi_check_negotiated_keys(struct iscsi_param_list *param_list)
 {
 	int ret = 0;
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (IS_PSTATE_NEGOTIATE(param) &&
@@ -1889,11 +1889,11 @@ int iscsi_check_negotiated_keys(iscsi_param_list_t *param_list)
 int iscsi_change_param_value(
 	char *keyvalue,
 	int sender,
-	iscsi_param_list_t *param_list,
+	struct iscsi_param_list *param_list,
 	int check_key)
 {
 	char *key = NULL, *value = NULL;
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	if (iscsi_extract_key_value(keyvalue, &key, &value) < 0)
 		return -1;
@@ -1926,11 +1926,11 @@ int iscsi_change_param_value(
  *
  */
 void iscsi_set_connection_parameters(
-	iscsi_conn_ops_t *ops,
-	iscsi_param_list_t *param_list)
+	struct iscsi_conn_ops *ops,
+	struct iscsi_param_list *param_list)
 {
 	char *tmpptr;
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	printk(KERN_INFO "---------------------------------------------------"
 			"---------------\n");
@@ -1982,12 +1982,12 @@ void iscsi_set_connection_parameters(
  *
  */
 void iscsi_set_session_parameters(
-	iscsi_sess_ops_t *ops,
-	iscsi_param_list_t *param_list,
+	struct iscsi_sess_ops *ops,
+	struct iscsi_param_list *param_list,
 	int leading)
 {
 	char *tmpptr;
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	printk(KERN_INFO "----------------------------------------------------"
 			"--------------\n");

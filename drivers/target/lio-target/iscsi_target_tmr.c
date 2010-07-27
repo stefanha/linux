@@ -59,12 +59,12 @@
  *	Called from iscsi_handle_task_mgt_cmd().
  */
 u8 iscsi_tmr_abort_task(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
-	iscsi_cmd_t *ref_cmd;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_tmr_req_t *tmr_req = cmd->tmr_req;
+	struct iscsi_cmd *ref_cmd;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
@@ -103,12 +103,12 @@ u8 iscsi_tmr_abort_task(
  *	Called from iscsi_handle_task_mgt_cmd().
  */
 int iscsi_tmr_task_warm_reset(
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
+	struct iscsi_conn *conn,
+	struct iscsi_tmr_req *tmr_req,
 	unsigned char *buf)
 {
-	iscsi_session_t *sess = SESS(conn);
-	iscsi_node_attrib_t *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 #if 0
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
@@ -130,12 +130,12 @@ int iscsi_tmr_task_warm_reset(
  *	Called from iscsi_handle_task_mgt_cmd().
  */
 int iscsi_tmr_task_cold_reset(
-	iscsi_conn_t *conn,
-	iscsi_tmr_req_t *tmr_req,
+	struct iscsi_conn *conn,
+	struct iscsi_tmr_req *tmr_req,
 	unsigned char *buf)
 {
-	iscsi_session_t *sess = SESS(conn);
-	iscsi_node_attrib_t *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 
 	if (!(na->tmr_cold_reset)) {
 		printk(KERN_ERR "TMR Opcode TARGET_COLD_RESET authorization"
@@ -154,13 +154,13 @@ int iscsi_tmr_task_cold_reset(
  *	Called from iscsi_handle_task_mgt_cmd().
  */
 u8 iscsi_tmr_task_reassign(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
-	iscsi_cmd_t *ref_cmd = NULL;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_conn_recovery_t *cr = NULL;
-	iscsi_tmr_req_t *tmr_req = cmd->tmr_req;
+	struct iscsi_cmd *ref_cmd = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn_recovery *cr = NULL;
+	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
@@ -225,9 +225,9 @@ u8 iscsi_tmr_task_reassign(
  *
  */
 static void iscsi_task_reassign_remove_cmd(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_recovery_t *cr,
-	iscsi_session_t *sess)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn_recovery *cr,
+	struct iscsi_session *sess)
 {
 	int ret;
 
@@ -248,16 +248,16 @@ static void iscsi_task_reassign_remove_cmd(
  *
  */
 static int iscsi_task_reassign_complete_nop_out(
-	iscsi_tmr_req_t *tmr_req,
-	iscsi_conn_t *conn)
+	struct iscsi_tmr_req *tmr_req,
+	struct iscsi_conn *conn)
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
-	iscsi_conn_recovery_t *cr;
+	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
-		printk(KERN_ERR "iscsi_conn_recovery_t pointer for ITT: 0x%08x"
+		printk(KERN_ERR "struct iscsi_conn_recovery pointer for ITT: 0x%08x"
 			" is NULL!\n", cmd->init_task_tag);
 		return -1;
 	}
@@ -284,12 +284,12 @@ static int iscsi_task_reassign_complete_nop_out(
  *
  */
 static int iscsi_task_reassign_complete_write(
-	iscsi_cmd_t *cmd,
-	iscsi_tmr_req_t *tmr_req)
+	struct iscsi_cmd *cmd,
+	struct iscsi_tmr_req *tmr_req)
 {
 	int no_build_r2ts = 0;
 	u32 length = 0, offset = 0;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 	struct se_cmd *se_cmd = SE_CMD(cmd);
 	/*
 	 * The Initiator must not send a R2T SNACK with a Begrun less than
@@ -360,11 +360,11 @@ static int iscsi_task_reassign_complete_write(
  *
  */
 static int iscsi_task_reassign_complete_read(
-	iscsi_cmd_t *cmd,
-	iscsi_tmr_req_t *tmr_req)
+	struct iscsi_cmd *cmd,
+	struct iscsi_tmr_req *tmr_req)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_datain_req_t *dr;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_datain_req *dr;
 	struct se_cmd *se_cmd = SE_CMD(cmd);
 
 	/*
@@ -419,10 +419,10 @@ static int iscsi_task_reassign_complete_read(
  *
  */
 static int iscsi_task_reassign_complete_none(
-	iscsi_cmd_t *cmd,
-	iscsi_tmr_req_t *tmr_req)
+	struct iscsi_cmd *cmd,
+	struct iscsi_tmr_req *tmr_req)
 {
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	cmd->i_state = ISTATE_SEND_STATUS;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
@@ -434,16 +434,16 @@ static int iscsi_task_reassign_complete_none(
  *
  */
 static int iscsi_task_reassign_complete_scsi_cmnd(
-	iscsi_tmr_req_t *tmr_req,
-	iscsi_conn_t *conn)
+	struct iscsi_tmr_req *tmr_req,
+	struct iscsi_conn *conn)
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
-	iscsi_conn_recovery_t *cr;
+	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
-		printk(KERN_ERR "iscsi_conn_recovery_t pointer for ITT: 0x%08x"
+		printk(KERN_ERR "struct iscsi_conn_recovery pointer for ITT: 0x%08x"
 			" is NULL!\n", cmd->init_task_tag);
 		return -1;
 	}
@@ -486,16 +486,16 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
  *	Called from iscsi_tmr_post_handler().
  */
 static int iscsi_task_reassign_complete(
-	iscsi_tmr_req_t *tmr_req,
-	iscsi_conn_t *conn)
+	struct iscsi_tmr_req *tmr_req,
+	struct iscsi_conn *conn)
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd;
-	iscsi_cmd_t *cmd;
+	struct iscsi_cmd *cmd;
 	int ret = 0;
 
 	if (!se_tmr->ref_cmd) {
-		printk(KERN_ERR "TMR Request is missing a RefCmd iscsi_cmd_t.\n");
+		printk(KERN_ERR "TMR Request is missing a RefCmd struct iscsi_cmd.\n");
 		return -1;
 	}
 	se_cmd = se_tmr->ref_cmd;
@@ -532,9 +532,9 @@ static int iscsi_task_reassign_complete(
  *	Right now the only one that its really needed for is
  *	connection recovery releated TASK_REASSIGN.
  */
-extern int iscsi_tmr_post_handler(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
+extern int iscsi_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
-	iscsi_tmr_req_t *tmr_req = cmd->tmr_req;
+	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 
 	if ((se_tmr->function == TASK_REASSIGN) &&
@@ -549,8 +549,8 @@ extern int iscsi_tmr_post_handler(iscsi_cmd_t *cmd, iscsi_conn_t *conn)
  *	Nothing to do here, but leave it for good measure. :-)
  */
 int iscsi_task_reassign_prepare_read(
-	iscsi_tmr_req_t *tmr_req,
-	iscsi_conn_t *conn)
+	struct iscsi_tmr_req *tmr_req,
+	struct iscsi_conn *conn)
 {
 	return 0;
 }
@@ -560,12 +560,12 @@ int iscsi_task_reassign_prepare_read(
  *
  */
 static void iscsi_task_reassign_prepare_unsolicited_dataout(
-	iscsi_cmd_t *cmd,
-	iscsi_conn_t *conn)
+	struct iscsi_cmd *cmd,
+	struct iscsi_conn *conn)
 {
 	int i, j;
-	iscsi_pdu_t *pdu = NULL;
-	iscsi_seq_t *seq = NULL;
+	struct iscsi_pdu *pdu = NULL;
+	struct iscsi_seq *seq = NULL;
 
 	if (SESS_OPS_C(conn)->DataSequenceInOrder) {
 		cmd->data_sn = 0;
@@ -634,14 +634,14 @@ static void iscsi_task_reassign_prepare_unsolicited_dataout(
  *
  */
 int iscsi_task_reassign_prepare_write(
-	iscsi_tmr_req_t *tmr_req,
-	iscsi_conn_t *conn)
+	struct iscsi_tmr_req *tmr_req,
+	struct iscsi_conn *conn)
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	iscsi_cmd_t *cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
-	iscsi_pdu_t *pdu = NULL;
-	iscsi_r2t_t *r2t = NULL, *r2t_tmp;
+	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_pdu *pdu = NULL;
+	struct iscsi_r2t *r2t = NULL, *r2t_tmp;
 	int first_incomplete_r2t = 1, i = 0;
 
 	/*
@@ -653,7 +653,7 @@ int iscsi_task_reassign_prepare_write(
 
 	/*
 	 * The Initiator is requesting R2Ts starting from zero,  skip
-	 * checking acknowledged R2Ts and start checking iscsi_r2t_ts
+	 * checking acknowledged R2Ts and start checking struct iscsi_r2ts
 	 * greater than zero.
 	 */
 	if (!tmr_req->exp_data_sn)
@@ -668,7 +668,7 @@ int iscsi_task_reassign_prepare_write(
 	 *
 	 * If we have not received all DataOUT in question,  we must
 	 * make sure to make the appropriate changes to values in
-	 * iscsi_cmd_t (and elsewhere depending on session parameters)
+	 * struct iscsi_cmd (and elsewhere depending on session parameters)
 	 * so iscsi_build_r2ts_for_cmd() in iscsi_task_reassign_complete_write()
 	 * will resend a new R2T for the DataOUT sequences in question.
 	 */
@@ -759,7 +759,7 @@ int iscsi_task_reassign_prepare_write(
 
 			first_incomplete_r2t = 0;
 		} else {
-			iscsi_seq_t *seq;
+			struct iscsi_seq *seq;
 
 			seq = iscsi_get_seq_holder(cmd, r2t->offset,
 					r2t->xfer_len);
@@ -801,7 +801,7 @@ next:
 	 * to check that the Initiator is not requesting R2Ts for DataOUT
 	 * sequences it has already completed.
 	 *
-	 * Free each R2T in question and adjust values in iscsi_cmd_t
+	 * Free each R2T in question and adjust values in struct iscsi_cmd
 	 * accordingly so iscsi_build_r2ts_for_cmd() do the rest of
 	 * the work after the TMR TASK_REASSIGN Response is sent.
 	 */
@@ -844,7 +844,7 @@ drop_unacknowledged_r2ts:
 		 *
 		 *		   DataSequenceInOrder=No:
 		 *
-		 * We subtract the difference from iscsi_seq_t between the
+		 * We subtract the difference from struct iscsi_seq between the
 		 * current offset and original offset from cmd->write_data_done
 		 * for account for DataOUT PDUs already received.  Then reset
 		 * the current offset to the original and zero out the current
@@ -867,15 +867,15 @@ drop_unacknowledged_r2ts:
 /*	iscsi_check_task_reassign_expdatasn():
  *
  *	Performs sanity checks TMR TASK_REASSIGN's ExpDataSN for
- *	a given iscsi_cmd_t.
+ *	a given struct iscsi_cmd.
  */
 int iscsi_check_task_reassign_expdatasn(
-	iscsi_tmr_req_t *tmr_req,
-	iscsi_conn_t *conn)
+	struct iscsi_tmr_req *tmr_req,
+	struct iscsi_conn *conn)
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	iscsi_cmd_t *ref_cmd = (iscsi_cmd_t *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *ref_cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
 
 	if (ref_cmd->iscsi_opcode != ISCSI_INIT_SCSI_CMND)
 		return 0;

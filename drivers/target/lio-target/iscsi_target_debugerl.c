@@ -50,7 +50,7 @@
  *
  *
  */
-static int iscsi_target_check_debug_erl(iscsi_conn_t *conn, u8 debug_type)
+static int iscsi_target_check_debug_erl(struct iscsi_conn *conn, u8 debug_type)
 {
 	spin_lock(&iscsi_global->debug_erl_lock);
 	if (ISCSI_DEBUG_ERL(iscsi_global)->debug_erl &&
@@ -68,7 +68,7 @@ static int iscsi_target_check_debug_erl(iscsi_conn_t *conn, u8 debug_type)
  *
  *
  */
-int iscsi_target_debugerl_tx_thread(iscsi_conn_t *conn)
+int iscsi_target_debugerl_tx_thread(struct iscsi_conn *conn)
 {
 	if (iscsi_target_check_debug_erl(conn,
 				TARGET_ERL_FORCE_TX_TRANSPORT_RESET)) {
@@ -79,7 +79,7 @@ int iscsi_target_debugerl_tx_thread(iscsi_conn_t *conn)
 		}
 
 		memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-				sizeof(iscsi_debug_erl_t));
+				sizeof(struct iscsi_debug_erl));
 		spin_unlock(&iscsi_global->debug_erl_lock);
 		printk(KERN_INFO "TARGET_ERL_FORCE_TX_TRANSPORT_RESET: CID: %hu.\n",
 				conn->cid);
@@ -93,7 +93,7 @@ int iscsi_target_debugerl_tx_thread(iscsi_conn_t *conn)
  *
  *
  */
-int iscsi_target_debugerl_rx_thread0(iscsi_conn_t *conn)
+int iscsi_target_debugerl_rx_thread0(struct iscsi_conn *conn)
 {
 	if (iscsi_target_check_debug_erl(conn,
 				TARGET_ERL_FORCE_RX_TRANSPORT_RESET)) {
@@ -104,7 +104,7 @@ int iscsi_target_debugerl_rx_thread0(iscsi_conn_t *conn)
 		}
 
 		memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-				sizeof(iscsi_debug_erl_t));
+				sizeof(struct iscsi_debug_erl));
 		spin_unlock(&iscsi_global->debug_erl_lock);
 		printk(KERN_INFO "TARGET_ERL_FORCE_RX_TRANSPORT_RESET: CID: %hu.\n",
 				conn->cid);
@@ -118,12 +118,12 @@ int iscsi_target_debugerl_rx_thread0(iscsi_conn_t *conn)
  *
  *
  */
-int iscsi_target_debugerl_rx_thread1(iscsi_conn_t *conn)
+int iscsi_target_debugerl_rx_thread1(struct iscsi_conn *conn)
 {
 	if (iscsi_target_check_debug_erl(conn, TARGET_ERL_HEADER_CRC_FAILURE)) {
 		spin_lock(&iscsi_global->debug_erl_lock);
 		memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-				sizeof(iscsi_debug_erl_t));
+				sizeof(struct iscsi_debug_erl));
 		spin_unlock(&iscsi_global->debug_erl_lock);
 		printk(KERN_INFO "TARGET_ERL_HEADER_CRC_FAILURE: CID: %hu.\n",
 				conn->cid);
@@ -137,7 +137,7 @@ int iscsi_target_debugerl_rx_thread1(iscsi_conn_t *conn)
  *
  *
  */
-int iscsi_target_debugerl_data_out_0(iscsi_conn_t *conn, unsigned char *buf)
+int iscsi_target_debugerl_data_out_0(struct iscsi_conn *conn, unsigned char *buf)
 {
 	struct iscsi_init_scsi_data_out *hdr =
 			(struct iscsi_init_scsi_data_out *) buf;
@@ -150,7 +150,7 @@ int iscsi_target_debugerl_data_out_0(iscsi_conn_t *conn, unsigned char *buf)
 			return 0;
 		}
 		memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-				sizeof(iscsi_debug_erl_t));
+				sizeof(struct iscsi_debug_erl));
 		spin_unlock(&iscsi_global->debug_erl_lock);
 		printk(KERN_INFO "TARGET_ERL_DATA_OUT_CRC_FAILURE: ITT: 0x%08x,"
 			" DataSN: 0x%08x, Offset: %u\n", hdr->init_task_tag,
@@ -190,7 +190,7 @@ int iscsi_target_debugerl_data_out_0(iscsi_conn_t *conn, unsigned char *buf)
 				return -1;
 			} else {
 				memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-					sizeof(iscsi_debug_erl_t));
+					sizeof(struct iscsi_debug_erl));
 				spin_unlock(&iscsi_global->debug_erl_lock);
 				return 0;
 			}
@@ -226,7 +226,7 @@ int iscsi_target_debugerl_data_out_0(iscsi_conn_t *conn, unsigned char *buf)
 				return 0;
 			} else {
 				memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-						sizeof(iscsi_debug_erl_t));
+						sizeof(struct iscsi_debug_erl));
 				spin_unlock(&iscsi_global->debug_erl_lock);
 				printk(KERN_INFO "TARGET_ERL_DATA_OUT_CRC_"
 					"FAILURE_MIX: STATE: 1, ITT: 0x%08x,"
@@ -279,7 +279,7 @@ int iscsi_target_debugerl_data_out_0(iscsi_conn_t *conn, unsigned char *buf)
 				return -1;
 			} else {
 				memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-						sizeof(iscsi_debug_erl_t));
+						sizeof(struct iscsi_debug_erl));
 				spin_unlock(&iscsi_global->debug_erl_lock);
 				printk(KERN_INFO "TARGET_ERL_DATA_OUT_CRC_"
 					"FAILURE_MULTI: STATE: 2 ITT: 0x%08x,"
@@ -300,7 +300,7 @@ int iscsi_target_debugerl_data_out_0(iscsi_conn_t *conn, unsigned char *buf)
  *
  *
  */
-int iscsi_target_debugerl_data_out_1(iscsi_conn_t *conn, unsigned char *buf)
+int iscsi_target_debugerl_data_out_1(struct iscsi_conn *conn, unsigned char *buf)
 {
 	struct iscsi_init_scsi_data_out *hdr =
 			(struct iscsi_init_scsi_data_out *) buf;
@@ -343,7 +343,7 @@ int iscsi_target_debugerl_data_out_1(iscsi_conn_t *conn, unsigned char *buf)
 			}
 #endif
 			memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-					sizeof(iscsi_debug_erl_t));
+					sizeof(struct iscsi_debug_erl));
 			spin_unlock(&iscsi_global->debug_erl_lock);
 			printk(KERN_INFO "TARGET_ERL_DATA_OUT_TIMEOUT: ITT:"
 				" 0x%08x, STATE: 1, DataSN: 0x%08x, Offset:"
@@ -362,7 +362,7 @@ int iscsi_target_debugerl_data_out_1(iscsi_conn_t *conn, unsigned char *buf)
 			return 0;
 		}
 		memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-				sizeof(iscsi_debug_erl_t));
+				sizeof(struct iscsi_debug_erl));
 		spin_unlock(&iscsi_global->debug_erl_lock);
 		printk(KERN_INFO "TARGET_ERL_DATA_OUT_FAIL: 0x%08x, DataSN: 0x%08x\n",
 				hdr->init_task_tag, hdr->data_sn);
@@ -377,14 +377,14 @@ int iscsi_target_debugerl_data_out_1(iscsi_conn_t *conn, unsigned char *buf)
  *
  */
 int iscsi_target_debugerl_immeidate_data(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	u32 init_task_tag)
 {
 	if (iscsi_target_check_debug_erl(conn,
 				TARGET_ERL_IMMEDIATE_DATA_CRC_FAILURE)) {
 		spin_lock(&iscsi_global->debug_erl_lock);
 		memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-				sizeof(iscsi_debug_erl_t));
+				sizeof(struct iscsi_debug_erl));
 		spin_unlock(&iscsi_global->debug_erl_lock);
 		printk(KERN_INFO "TARGET_ERL_IMMEDIATE_DATA_CRC_FAILURE: ITT:"
 				" 0x%08x.\n", init_task_tag);
@@ -398,12 +398,12 @@ int iscsi_target_debugerl_immeidate_data(
  *
  *
  */
-int iscsi_target_debugerl_cmdsn(iscsi_conn_t *conn, u32 cmdsn)
+int iscsi_target_debugerl_cmdsn(struct iscsi_conn *conn, u32 cmdsn)
 {
 	if (iscsi_target_check_debug_erl(conn, TARGET_ERL_MISSING_CMD_SN)) {
 		spin_lock(&iscsi_global->debug_erl_lock);
 		memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-				sizeof(iscsi_debug_erl_t));
+				sizeof(struct iscsi_debug_erl));
 		spin_unlock(&iscsi_global->debug_erl_lock);
 		printk(KERN_INFO "TARGET_ERL_MISSING_CMD_SN: CmdSN:"
 				" 0x%08x.\n", cmdsn);
@@ -432,7 +432,7 @@ int iscsi_target_debugerl_cmdsn(iscsi_conn_t *conn, u32 cmdsn)
 				return -1;
 			} else {
 				memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-					sizeof(iscsi_debug_erl_t));
+					sizeof(struct iscsi_debug_erl));
 				printk(KERN_INFO "TARGET_ERL_MISSING_CMDSN"
 					"_BATCH: CmdSN: 0x%08x, STATE: 2.\n",
 					cmdsn);
@@ -462,7 +462,7 @@ int iscsi_target_debugerl_cmdsn(iscsi_conn_t *conn, u32 cmdsn)
 				return 0;
 			} else {
 				memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-					sizeof(iscsi_debug_erl_t));
+					sizeof(struct iscsi_debug_erl));
 				spin_unlock(&iscsi_global->debug_erl_lock);
 				printk(KERN_INFO "TARGET_ERL_MISSING_CMDSN_MIX"
 					": CmdSN: 0x%08x, STATE: 1.\n", cmdsn);
@@ -499,7 +499,7 @@ int iscsi_target_debugerl_cmdsn(iscsi_conn_t *conn, u32 cmdsn)
 				return -1;
 			} else {
 				memset(ISCSI_DEBUG_ERL(iscsi_global), 0,
-					sizeof(iscsi_debug_erl_t));
+					sizeof(struct iscsi_debug_erl));
 				spin_unlock(&iscsi_global->debug_erl_lock);
 				printk(KERN_INFO "TARGET_ERL_MISSING_CMDSN_"
 					"MULTI: CmdSN: 0x%08x, STATE: 2.\n",

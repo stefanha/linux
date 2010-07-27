@@ -35,7 +35,7 @@
 #include <iscsi_target_mib.h>
 #endif /* SNMP_SUPPORT */
 
-/* iscsi_tpg_np_t->tpg_np_network_transport */
+/* struct iscsi_tpg_np->tpg_np_network_transport */
 #define ISCSI_TCP			0
 #define ISCSI_SCTP_TCP			1
 #define ISCSI_SCTP_UDP			2
@@ -46,7 +46,7 @@
 #define ISCSI_TCP_VERSION		"v3.0"
 #define ISCSI_SCTP_VERSION		"v3.0"
 
-/* iscsi_node_attrib_t sanity values */
+/* struct iscsi_node_attrib sanity values */
 #define NA_DATAOUT_TIMEOUT		3
 #define NA_DATAOUT_TIMEOUT_MAX		60
 #define NA_DATAOUT_TIMEOUT_MIX		2
@@ -66,7 +66,7 @@
 #define NA_DEFAULT_ERL_MAX		2
 #define NA_DEFAULT_ERL_MIN		0
 
-/* iscsi_tpg_attrib_t sanity values */
+/* struct iscsi_tpg_attrib sanity values */
 #define TA_AUTHENTICATION		1
 #define TA_LOGIN_TIMEOUT		15
 #define TA_LOGIN_TIMEOUT_MAX		30
@@ -85,20 +85,20 @@
 #define TA_PROD_MODE_WRITE_PROTECT	0
 #define TA_CACHE_CORE_NPS		0
 
-/* iscsi_data_count_t->type */
+/* struct iscsi_data_count->type */
 #define ISCSI_RX_DATA				1
 #define ISCSI_TX_DATA				2
 
-/* iscsi_datain_req_t->dr_done */
+/* struct iscsi_datain_req->dr_done */
 #define DATAIN_COMPLETE_NORMAL			1
 #define DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY 2
 #define DATAIN_COMPLETE_CONNECTION_RECOVERY	3
 
-/* iscsi_datain_req_t->recovery */
+/* struct iscsi_datain_req->recovery */
 #define DATAIN_WITHIN_COMMAND_RECOVERY		1
 #define DATAIN_CONNECTION_RECOVERY		2
 
-/* iscsi_portal_group_t->state */
+/* struct iscsi_portal_group->state */
 #define TPG_STATE_FREE				0
 #define TPG_STATE_ACTIVE			1
 #define TPG_STATE_INACTIVE			2
@@ -110,18 +110,18 @@
 #define ISCSI_DEVATTRIB_ADD_LUN_ACL		3
 #define ISCSI_DEVATTRIB_DELETE_LUN_ACL		4
 
-/* iscsi_cmd_t->data_direction, same values as target_core_base.h
+/* struct iscsi_cmd->data_direction, same values as target_core_base.h
    and struct se_cmd->data_direction  */
 #define ISCSI_NONE				0
 #define ISCSI_READ				1
 #define ISCSI_WRITE				2
 #define ISCSI_BIDI				3
 
-/* iscsi_tiqn_t->tiqn_state */
+/* struct iscsi_tiqn->tiqn_state */
 #define TIQN_STATE_ACTIVE			1
 #define TIQN_STATE_SHUTDOWN			2
 
-/* iscsi_cmd_t->cmd_flags */
+/* struct iscsi_cmd->cmd_flags */
 #define ICF_GOT_LAST_DATAOUT			0x00000001
 #define ICF_GOT_DATACK_SNACK			0x00000002
 #define ICF_NON_IMMEDIATE_UNSOLICITED_DATA	0x00000004
@@ -132,7 +132,7 @@
 #define ICF_OOO_CMDSN				0x00000080
 #define ICF_REJECT_FAIL_CONN			0x00000100
 
-/* iscsi_cmd_t->i_state */
+/* struct iscsi_cmd->i_state */
 #define ISTATE_NO_STATE				0
 #define ISTATE_NEW_CMD				1
 #define ISTATE_DEFERRED_CMD			2
@@ -177,7 +177,7 @@
 #define ISTATE_REMOVE				41
 #define ISTATE_FREE				42
 
-/* Used in iscsi_conn_t->conn_flags */
+/* Used in struct iscsi_conn->conn_flags */
 #define CONNFLAG_SCTP_STRUCT_FILE		0x01
 
 /* Used for iscsi_recover_cmdsn() return values */
@@ -198,7 +198,7 @@
 #define DATAOUT_SEND_TO_TRANSPORT		2
 #define DATAOUT_WITHIN_COMMAND_RECOVERY		3
 
-/* Used for iscsi_node_auth_t structure members */
+/* Used for struct iscsi_node_auth structure members */
 #define MAX_USER_LEN				256
 #define MAX_PASS_LEN				256
 #define NAF_USERID_SET				0x01
@@ -206,23 +206,23 @@
 #define NAF_USERID_IN_SET			0x04
 #define NAF_PASSWORD_IN_SET			0x08
 
-/* Used for iscsi_cmd_t->dataout_timer_flags */
+/* Used for struct iscsi_cmd->dataout_timer_flags */
 #define DATAOUT_TF_RUNNING			0x01
 #define DATAOUT_TF_STOP				0x02
 
-/* Used for iscsi_conn_t->netif_timer_flags */
+/* Used for struct iscsi_conn->netif_timer_flags */
 #define NETIF_TF_RUNNING			0x01
 #define NETIF_TF_STOP				0x02
 
-/* Used for iscsi_conn_t->nopin_timer_flags */
+/* Used for struct iscsi_conn->nopin_timer_flags */
 #define NOPIN_TF_RUNNING			0x01
 #define NOPIN_TF_STOP				0x02
 
-/* Used for iscsi_conn_t->nopin_response_timer_flags */
+/* Used for struct iscsi_conn->nopin_response_timer_flags */
 #define NOPIN_RESPONSE_TF_RUNNING		0x01
 #define NOPIN_RESPONSE_TF_STOP			0x02
 
-/* Used for iscsi_session_t->time2retain_timer_flags */
+/* Used for struct iscsi_session->time2retain_timer_flags */
 #define T2R_TF_RUNNING				0x01
 #define T2R_TF_STOP				0x02
 #define T2R_TF_EXPIRED				0x04
@@ -231,13 +231,13 @@
 #define TPG_NP_TF_RUNNING			0x01
 #define TPG_NP_TF_STOP				0x02
 
-/* Used for iscsi_np_t->np_flags */
+/* Used for struct iscsi_np->np_flags */
 #define NPF_IP_NETWORK				0x00
 #define NPF_NET_IPV4                            0x01
 #define NPF_NET_IPV6                            0x02
 #define NPF_SCTP_STRUCT_FILE			0x20 /* Bugfix */
 
-/* Used for iscsi_np_t->np_thread_state */
+/* Used for struct iscsi_np->np_thread_state */
 #define ISCSI_NP_THREAD_ACTIVE			1
 #define ISCSI_NP_THREAD_INACTIVE		2
 #define ISCSI_NP_THREAD_RESET			3
@@ -263,15 +263,15 @@
 #define TARGET_ERL_FORCE_TX_TRANSPORT_RESET		16
 #define TARGET_ERL_FORCE_RX_TRANSPORT_RESET		17
 
-typedef struct iscsi_queue_req_s {
+struct iscsi_queue_req {
 	int			state;
 	void			*queue_se_obj_ptr;
 	struct se_obj_lun_type_s *queue_se_obj_api;
-	struct iscsi_cmd_s	*cmd;
+	struct iscsi_cmd	*cmd;
 	struct list_head	qr_list;
-} ____cacheline_aligned iscsi_queue_req_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_data_count_s {
+struct iscsi_data_count {
 	int			data_length;
 	int			sync_and_steering;
 	int			type;
@@ -279,14 +279,14 @@ typedef struct iscsi_data_count_s {
 	u32			ss_iov_count;
 	u32			ss_marker_count;
 	struct iovec		*iov;
-} ____cacheline_aligned iscsi_data_count_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_param_list_s {
+struct iscsi_param_list {
 	struct list_head	param_list;
 	struct list_head	extra_response_list;
-} ____cacheline_aligned iscsi_param_list_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_datain_req_s {
+struct iscsi_datain_req {
 	int			dr_complete;
 	int			generate_recovery_values;
 	int			recovery;
@@ -300,25 +300,25 @@ typedef struct iscsi_datain_req_s {
 	u32			read_data_done;
 	u32			seq_send_order;
 	struct list_head	dr_list;
-} ____cacheline_aligned iscsi_datain_req_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_ooo_cmdsn_s {
+struct iscsi_ooo_cmdsn {
 	u16			cid;
 	u32			batch_count;
 	u32			cmdsn;
 	u32			exp_cmdsn;
-	struct iscsi_cmd_s	*cmd;
+	struct iscsi_cmd	*cmd;
 	struct list_head	ooo_list;
-} ____cacheline_aligned iscsi_ooo_cmdsn_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_datain_s {
+struct iscsi_datain {
 	u8			flags;
 	u32			data_sn;
 	u32			length;
 	u32			offset;
-} ____cacheline_aligned iscsi_datain_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_r2t_s {
+struct iscsi_r2t {
 	int			seq_complete;
 	int			recovery_r2t;
 	int			sent_r2t;
@@ -327,18 +327,9 @@ typedef struct iscsi_r2t_s {
 	u32			targ_xfer_tag;
 	u32			xfer_len;
 	struct list_head	r2t_list;
-} ____cacheline_aligned iscsi_r2t_t;
+} ____cacheline_aligned;
 
-struct se_cmd;
-struct se_device_s;
-struct iscsi_map_sg_s;
-struct iscsi_unmap_sg_s;
-struct se_transport_task_s;
-struct se_transform_info_s;
-struct se_obj_lun_type_s;
-struct scatterlist;
-
-typedef struct iscsi_cmd_s {
+struct iscsi_cmd {
 	/* iSCSI data direction */
 	u8			data_direction;
 	u8			dataout_timer_flags;
@@ -400,18 +391,18 @@ typedef struct iscsi_cmd_s {
 	u32			iov_misc_count;
 	/* Bytes used for 32-bit word padding */
 	u32			pad_bytes;
-	/* Number of iscsi_pdu_t in iscsi_cmd_t->pdu_list */
+	/* Number of struct iscsi_pdu in struct iscsi_cmd->pdu_list */
 	u32			pdu_count;
-	/* Next iscsi_pdu_t to send in iscsi_cmd_t->pdu_list */
+	/* Next struct iscsi_pdu to send in struct iscsi_cmd->pdu_list */
 	u32			pdu_send_order;
-	/* Current iscsi_pdu_t in iscsi_cmd_t->pdu_list */
+	/* Current struct iscsi_pdu in struct iscsi_cmd->pdu_list */
 	u32			pdu_start;
 	u32			residual_count;
-	/* Next iscsi_seq_t to send in iscsi_cmd_t->seq_list */
+	/* Next struct iscsi_seq to send in struct iscsi_cmd->seq_list */
 	u32			seq_send_order;
-	/* Number of iscsi_seq_t in iscsi_cmd_t->seq_list */
+	/* Number of struct iscsi_seq in struct iscsi_cmd->seq_list */
 	u32			seq_count;
-	/* Current iscsi_seq_t in iscsi_cmd_t->seq_list */
+	/* Current struct iscsi_seq in struct iscsi_cmd->seq_list */
 	u32			seq_no;
 	/* Lowest offset in current DataOUT sequence */
 	u32			seq_start_offset;
@@ -431,13 +422,13 @@ typedef struct iscsi_cmd_s {
 	void			*buf_ptr;
 	/* iSCSI PDU Header + CRC */
 	unsigned char		pdu[ISCSI_HDR_LEN + CRC_LEN];
-	/* Number of times iscsi_cmd_t is present in immediate queue */
+	/* Number of times struct iscsi_cmd is present in immediate queue */
 	atomic_t		immed_queue_count;
 	atomic_t		response_queue_count;
 	atomic_t		transport_sent;
 	spinlock_t		datain_lock;
 	spinlock_t		dataout_timeout_lock;
-	/* spinlock for protecting iscsi_cmd_t->i_state */
+	/* spinlock for protecting struct iscsi_cmd->i_state */
 	spinlock_t		istate_lock;
 	/* spinlock for adding within command recovery entries */
 	spinlock_t		error_lock;
@@ -454,45 +445,45 @@ typedef struct iscsi_cmd_s {
 	struct timer_list	dataout_timer;
 	/* Iovecs for miscellaneous purposes */
 	struct iovec		iov_misc[ISCSI_MISC_IOVECS];
-	/* Array of iscsi_pdu_t used for DataPDUInOrder=No */
-	struct iscsi_pdu_s	*pdu_list;
-	/* Current iscsi_pdu_t used for DataPDUInOrder=No */
-	struct iscsi_pdu_s	*pdu_ptr;
-	/* Array of iscsi_seq_t used for DataSequenceInOrder=No */
-	struct iscsi_seq_s	*seq_list;
-	/* Current iscsi_seq_t used for DataSequenceInOrder=No */
-	struct iscsi_seq_s	*seq_ptr;
+	/* Array of struct iscsi_pdu used for DataPDUInOrder=No */
+	struct iscsi_pdu	*pdu_list;
+	/* Current struct iscsi_pdu used for DataPDUInOrder=No */
+	struct iscsi_pdu	*pdu_ptr;
+	/* Array of struct iscsi_seq used for DataSequenceInOrder=No */
+	struct iscsi_seq	*seq_list;
+	/* Current struct iscsi_seq used for DataSequenceInOrder=No */
+	struct iscsi_seq	*seq_ptr;
 	/* TMR Request when iscsi_opcode == ISCSI_INIT_TASK_MGMT_CMND */
-	struct iscsi_tmr_req_s	*tmr_req;
+	struct iscsi_tmr_req	*tmr_req;
 	/* Connection this command is alligient to */
-	struct iscsi_conn_s 	*conn;
+	struct iscsi_conn 	*conn;
 	/* Pointer to connection recovery entry */
-	struct iscsi_conn_recovery_s *cr;
+	struct iscsi_conn_recovery *cr;
 	/* Session the command is part of,  used for connection recovery */
-	struct iscsi_session_s	*sess;
+	struct iscsi_session	*sess;
 	/* Next command in the session pool */
-	struct iscsi_cmd_s	*next;
+	struct iscsi_cmd	*next;
 	/* list_head for connection list */
 	struct list_head	i_list;
 	/* Next command in DAS transport list */
-	struct iscsi_cmd_s	*t_next;
+	struct iscsi_cmd	*t_next;
 	/* Previous command in DAS transport list */
-	struct iscsi_cmd_s	*t_prev;
+	struct iscsi_cmd	*t_prev;
 	struct se_cmd		*se_cmd;
-}  ____cacheline_aligned iscsi_cmd_t;
+}  ____cacheline_aligned;
 
 #define SE_CMD(cmd)		((struct se_cmd *)(cmd)->se_cmd)
 
 #include <iscsi_seq_and_pdu_list.h>
 
-typedef struct iscsi_tmr_req_s {
+struct iscsi_tmr_req {
 	u32			ref_cmd_sn;
 	u32			exp_data_sn;
-	struct iscsi_conn_recovery_s *conn_recovery;
+	struct iscsi_conn_recovery *conn_recovery;
 	struct se_tmr_req	*se_tmr_req;
-} ____cacheline_aligned iscsi_tmr_req_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_conn_s {
+struct iscsi_conn {
 	char			net_dev[ISCSI_NETDEV_NAME_SIZE];
 	/* Authentication Successful for this connection */
 	u8			auth_complete;
@@ -570,29 +561,29 @@ typedef struct iscsi_conn_s {
 	spinlock_t		nopin_timer_lock;
 	spinlock_t		response_queue_lock;
 	spinlock_t		state_lock;
-	/* list_head of iscsi_cmd_t for this connection */
+	/* list_head of struct iscsi_cmd for this connection */
 	struct list_head	conn_cmd_list;
 	struct list_head	immed_queue_list;
 	struct list_head	response_queue_list;
-	iscsi_conn_ops_t	*conn_ops;
-	iscsi_param_list_t	*param_list;
+	struct iscsi_conn_ops	*conn_ops;
+	struct iscsi_param_list	*param_list;
 	/* Used for per connection auth state machine */
 	void			*auth_protocol;
 	struct iscsi_login_thread_s *login_thread;
-	struct iscsi_portal_group_s *tpg;
+	struct iscsi_portal_group *tpg;
 	/* Pointer to parent session */
-	struct iscsi_session_s	*sess;
+	struct iscsi_session	*sess;
 	/* Pointer to thread_set in use for this conn's threads */
-	struct se_thread_set_s	*thread_set;
+	struct se_thread_set	*thread_set;
 	/* list_head for session connection list */
 	struct list_head	conn_list;
-} ____cacheline_aligned iscsi_conn_t;
+} ____cacheline_aligned;
 
 #include <iscsi_parameters.h>
-#define CONN(cmd)		((struct iscsi_conn_s *)(cmd)->conn)
-#define CONN_OPS(conn)		((iscsi_conn_ops_t *)(conn)->conn_ops)
+#define CONN(cmd)		((struct iscsi_conn *)(cmd)->conn)
+#define CONN_OPS(conn)		((struct iscsi_conn_ops *)(conn)->conn_ops)
 
-typedef struct iscsi_conn_recovery_s {
+struct iscsi_conn_recovery {
 	u16			cid;
 	u32			cmd_count;
 	u32			maxrecvdatasegmentlength;
@@ -601,11 +592,11 @@ typedef struct iscsi_conn_recovery_s {
 	spinlock_t		conn_recovery_cmd_lock;
 	struct semaphore		time2wait_sem;
 	struct timer_list		time2retain_timer;
-	struct iscsi_session_s	*sess;
+	struct iscsi_session	*sess;
 	struct list_head	cr_list;
-}  ____cacheline_aligned iscsi_conn_recovery_t;
+}  ____cacheline_aligned;
 
-typedef struct iscsi_session_s {
+struct iscsi_session {
 	u8			cmdsn_outoforder;
 	u8			initiator_vendor;
 	u8			isid[6];
@@ -668,17 +659,17 @@ typedef struct iscsi_session_s {
 	struct semaphore	session_wait_sem;
 	struct semaphore	session_waiting_on_uc_sem;
 	struct timer_list	time2retain_timer;
-	iscsi_sess_ops_t	*sess_ops;
+	struct iscsi_sess_ops	*sess_ops;
 	struct se_session	*se_sess;
-	struct iscsi_portal_group_s *tpg;
-} ____cacheline_aligned iscsi_session_t;
+	struct iscsi_portal_group *tpg;
+} ____cacheline_aligned;
 
-#define SESS(conn)		((iscsi_session_t *)(conn)->sess)
-#define SESS_OPS(sess)		((iscsi_sess_ops_t *)(sess)->sess_ops)
-#define SESS_OPS_C(conn)	((iscsi_sess_ops_t *)(conn)->sess->sess_ops)
+#define SESS(conn)		((struct iscsi_session *)(conn)->sess)
+#define SESS_OPS(sess)		((struct iscsi_sess_ops *)(sess)->sess_ops)
+#define SESS_OPS_C(conn)	((struct iscsi_sess_ops *)(conn)->sess->sess_ops)
 #define SESS_NODE_ACL(sess)	((struct se_node_acl *)(sess)->se_sess->se_node_acl)
 
-typedef struct iscsi_login_s {
+struct iscsi_login {
 	u8 auth_complete;
 	u8 checked_for_existing;
 	u8 current_stage;
@@ -696,18 +687,12 @@ typedef struct iscsi_login_s {
 	char *rsp;
 	char *req_buf;
 	char *rsp_buf;
-} ____cacheline_aligned iscsi_login_t;
-
-typedef struct iscsi_logout_s {
-	u8		logout_reason;
-	u8		logout_response;
-	u16		logout_cid;
-} ____cacheline_aligned iscsi_logout_t;
+} ____cacheline_aligned;
 
 #include <iscsi_thread_queue.h>
 
 #ifdef DEBUG_ERL
-typedef struct iscsi_debug_erl_s {
+struct iscsi_debug_erl {
 	u8		counter;
 	u8		state;
 	u8		debug_erl;
@@ -720,10 +705,10 @@ typedef struct iscsi_debug_erl_s {
 	u32		data_sn;
 	u32		init_task_tag;
 	u32		sid;
-}  ____cacheline_aligned iscsi_debug_erl_t;
+}  ____cacheline_aligned;
 #endif /* DEBUG_ERL */
 
-typedef struct iscsi_node_attrib_s {
+struct iscsi_node_attrib {
 	u32			dataout_timeout;
 	u32			dataout_timeout_retries;
 	u32			default_erl;
@@ -734,12 +719,12 @@ typedef struct iscsi_node_attrib_s {
 	u32			random_r2t_offsets;
 	u32			tmr_cold_reset;
 	u32			tmr_warm_reset;
-	struct iscsi_node_acl_s *nacl;
-} ____cacheline_aligned iscsi_node_attrib_t;
+	struct iscsi_node_acl *nacl;
+} ____cacheline_aligned;
 
 struct se_dev_entry_s;
 
-typedef struct iscsi_node_auth_s {
+struct iscsi_node_auth {
 	int			naf_flags;
 	int			authenticate_target;
 	/* Used for iscsi_global->discovery_auth,
@@ -749,18 +734,18 @@ typedef struct iscsi_node_auth_s {
 	char			password[MAX_PASS_LEN];
 	char			userid_mutual[MAX_USER_LEN];
 	char			password_mutual[MAX_PASS_LEN];
-} ____cacheline_aligned iscsi_node_auth_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_node_acl_s {
-	iscsi_node_attrib_t	node_attrib;
-	iscsi_node_auth_t	node_auth;
+struct iscsi_node_acl {
+	struct iscsi_node_attrib node_attrib;
+	struct iscsi_node_auth	node_auth;
 	struct se_node_acl	se_node_acl;
-} ____cacheline_aligned iscsi_node_acl_t;
+} ____cacheline_aligned;
 
 #define ISCSI_NODE_ATTRIB(t)	(&(t)->node_attrib)
 #define ISCSI_NODE_AUTH(t)	(&(t)->node_auth)
 
-typedef struct iscsi_tpg_attrib_s {
+struct iscsi_tpg_attrib {
 	u32			authentication;
 	u32			login_timeout;
 	u32			netif_timeout;
@@ -770,18 +755,18 @@ typedef struct iscsi_tpg_attrib_s {
 	u32			demo_mode_write_protect;
 	u32			prod_mode_write_protect;
 	u32			cache_core_nps;
-	struct iscsi_portal_group_s *tpg;
-}  ____cacheline_aligned iscsi_tpg_attrib_t;
+	struct iscsi_portal_group *tpg;
+}  ____cacheline_aligned;
 
-typedef struct iscsi_np_ex_s {
+struct iscsi_np_ex {
 	int			np_ex_net_size;
 	u16			np_ex_port;
 	u32			np_ex_ipv4;
 	unsigned char		np_ex_ipv6[IPV6_ADDRESS_SPACE];
 	struct list_head	np_ex_list;
-} iscsi_np_ex_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_np_s {
+struct iscsi_np {
 	unsigned char		np_net_dev[ISCSI_NETDEV_NAME_SIZE];
 	int			np_network_transport;
 	int			np_thread_state;
@@ -806,33 +791,33 @@ typedef struct iscsi_np_s {
 	struct socket		*np_socket;
 	struct task_struct		*np_thread;
 	struct timer_list		np_login_timer;
-	struct iscsi_portal_group_s *np_login_tpg;
+	struct iscsi_portal_group *np_login_tpg;
 	struct list_head	np_list;
 	struct list_head	np_nex_list;
-} ____cacheline_aligned iscsi_np_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_tpg_np_s {
+struct iscsi_tpg_np {
 #ifdef SNMP_SUPPORT
 	u32			tpg_np_index;
 #endif /* SNMP_SUPPORT */
-	iscsi_np_t		*tpg_np;
-	struct iscsi_portal_group_s *tpg;
-	struct iscsi_tpg_np_s	*tpg_np_parent;
+	struct iscsi_np		*tpg_np;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tpg_np	*tpg_np_parent;
 	struct list_head	tpg_np_list;
 	struct list_head	tpg_np_child_list;
 	struct list_head	tpg_np_parent_list;
 	struct se_tpg_np	se_tpg_np;
 	spinlock_t		tpg_np_parent_lock;
-} ____cacheline_aligned iscsi_tpg_np_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_np_addr_s {
+struct iscsi_np_addr {
 	u16		np_port;
 	u32		np_flags;
 	u32		np_ipv4;
 	unsigned char	np_ipv6[IPV6_ADDRESS_SPACE];
-} ____cacheline_aligned iscsi_np_addr_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_portal_group_s {
+struct iscsi_portal_group {
 	unsigned char		tpg_chap_id;
 	/* TPG State */
 	u8			tpg_state;
@@ -852,25 +837,22 @@ typedef struct iscsi_portal_group_s {
 	struct se_portal_group tpg_se_tpg;
 	struct semaphore	tpg_access_sem;
 	struct semaphore	np_login_sem;
-	iscsi_tpg_attrib_t	tpg_attrib;
+	struct iscsi_tpg_attrib	tpg_attrib;
 	/* Pointer to default list of iSCSI parameters for TPG */
-	iscsi_param_list_t	*param_list;
-	struct iscsi_tiqn_s	*tpg_tiqn;
-	/* Pointer to next TPG entry */
-	struct iscsi_portal_group_s *next;
-	struct iscsi_portal_group_s *prev;
+	struct iscsi_param_list	*param_list;
+	struct iscsi_tiqn	*tpg_tiqn;
 	struct list_head 	tpg_gnp_list;
 	struct list_head	tpg_list;
 	struct list_head	g_tpg_list;
-} ____cacheline_aligned iscsi_portal_group_t;
+} ____cacheline_aligned;
 
-#define ISCSI_TPG_C(c)		((iscsi_portal_group_t *)(c)->tpg)
+#define ISCSI_TPG_C(c)		((struct iscsi_portal_group *)(c)->tpg)
 #define ISCSI_TPG_LUN(c, l)  ((iscsi_tpg_list_t *)(c)->tpg->tpg_lun_list_t[l])
-#define ISCSI_TPG_S(s)		((iscsi_portal_group_t *)(s)->tpg)
+#define ISCSI_TPG_S(s)		((struct iscsi_portal_group *)(s)->tpg)
 #define ISCSI_TPG_ATTRIB(t)	(&(t)->tpg_attrib)
 #define SE_TPG(tpg)		(&(tpg)->tpg_se_tpg)
 
-typedef struct iscsi_tiqn_s {
+struct iscsi_tiqn {
 	unsigned char		tiqn[ISCSI_TIQN_LEN];
 	int			tiqn_state;
 	u32			tiqn_active_tpgs;
@@ -885,13 +867,13 @@ typedef struct iscsi_tiqn_s {
 	struct se_wwn		tiqn_wwn;
 #ifdef SNMP_SUPPORT
 	u32			tiqn_index;
-	iscsi_sess_err_stats_t  sess_err_stats;
-	iscsi_login_stats_t     login_stats;
-	iscsi_logout_stats_t    logout_stats;
+	struct iscsi_sess_err_stats  sess_err_stats;
+	struct iscsi_login_stats     login_stats;
+	struct iscsi_logout_stats    logout_stats;
 #endif /* SNMP_SUPPORT */
-} ____cacheline_aligned iscsi_tiqn_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_global_s {
+struct iscsi_global {
 	/* iSCSI Node Name */
 	char			targetname[ISCSI_IQN_LEN];
 	/* In module removal */
@@ -921,26 +903,26 @@ typedef struct iscsi_global_s {
 	spinlock_t		shutdown_lock;
 	/* Spinlock for adding/removing thread sets */
 	spinlock_t		thread_set_lock;
-	/* Spinlock for iscsi_tiqn_t */
+	/* Spinlock for struct iscsi_tiqn */
 	spinlock_t		tiqn_lock;
 	spinlock_t		g_tpg_lock;
 	/* Spinlock g_np_list */
 	spinlock_t		np_lock;
 	/* Semaphore used for communication to authentication daemon */
 	struct semaphore	auth_sem;
-	/* Semaphore used for allocate of iscsi_conn_t->auth_id */
+	/* Semaphore used for allocate of struct iscsi_conn->auth_id */
 	struct semaphore	auth_id_sem;
 	/* Used for iSCSI discovery session authentication */
-	iscsi_node_acl_t	discovery_acl;
-	iscsi_portal_group_t	*discovery_tpg;
+	struct iscsi_node_acl	discovery_acl;
+	struct iscsi_portal_group	*discovery_tpg;
 #ifdef DEBUG_ERL
-	iscsi_debug_erl_t	*debug_erl;
+	struct iscsi_debug_erl	*debug_erl;
 	spinlock_t		debug_erl_lock;
 #endif /* DEBUG_ERL */
 	struct list_head	active_ts_list;
 	struct list_head	inactive_ts_list;
-} ____cacheline_aligned iscsi_global_t;
+} ____cacheline_aligned;
 
-#define ISCSI_DEBUG_ERL(g)	((iscsi_debug_erl_t *)(g)->debug_erl)
+#define ISCSI_DEBUG_ERL(g)	((struct iscsi_debug_erl *)(g)->debug_erl)
 
 #endif /* ISCSI_TARGET_CORE_H */

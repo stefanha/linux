@@ -46,14 +46,14 @@
 
 #undef ISCSI_TARGET_DATAIN_VALUES_C
 
-iscsi_datain_req_t *iscsi_allocate_datain_req(void)
+struct iscsi_datain_req *iscsi_allocate_datain_req(void)
 {
-	iscsi_datain_req_t *dr;
+	struct iscsi_datain_req *dr;
 
 	dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC);
 	if (!(dr)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-				" iscsi_datain_req_t\n");
+				" struct iscsi_datain_req\n");
 		return NULL;
 	}
 	INIT_LIST_HEAD(&dr->dr_list);
@@ -61,14 +61,14 @@ iscsi_datain_req_t *iscsi_allocate_datain_req(void)
 	return dr;
 }
 
-void iscsi_attach_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
+void iscsi_attach_datain_req(struct iscsi_cmd *cmd, struct iscsi_datain_req *dr)
 {
 	spin_lock(&cmd->datain_lock);
 	list_add_tail(&dr->dr_list, &cmd->datain_list);
 	spin_unlock(&cmd->datain_lock);
 }
 
-void iscsi_free_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
+void iscsi_free_datain_req(struct iscsi_cmd *cmd, struct iscsi_datain_req *dr)
 {
 	spin_lock(&cmd->datain_lock);
 	list_del(&dr->dr_list);
@@ -77,9 +77,9 @@ void iscsi_free_datain_req(iscsi_cmd_t *cmd, iscsi_datain_req_t *dr)
 	kmem_cache_free(lio_dr_cache, dr);
 }
 
-void iscsi_free_all_datain_reqs(iscsi_cmd_t *cmd)
+void iscsi_free_all_datain_reqs(struct iscsi_cmd *cmd)
 {
-	iscsi_datain_req_t *dr, *dr_tmp;
+	struct iscsi_datain_req *dr, *dr_tmp;
 
 	spin_lock(&cmd->datain_lock);
 	list_for_each_entry_safe(dr, dr_tmp, &cmd->datain_list, dr_list) {
@@ -89,9 +89,9 @@ void iscsi_free_all_datain_reqs(iscsi_cmd_t *cmd)
 	spin_unlock(&cmd->datain_lock);
 }
 
-iscsi_datain_req_t *iscsi_get_datain_req(iscsi_cmd_t *cmd)
+struct iscsi_datain_req *iscsi_get_datain_req(struct iscsi_cmd *cmd)
 {
-	iscsi_datain_req_t *dr;
+	struct iscsi_datain_req *dr;
 
 	if (list_empty(&cmd->datain_list)) {
 		printk(KERN_ERR "cmd->datain_list is empty for ITT:"
@@ -108,13 +108,13 @@ iscsi_datain_req_t *iscsi_get_datain_req(iscsi_cmd_t *cmd)
  *
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=Yes.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes(
-	iscsi_cmd_t *cmd,
-	iscsi_datain_t *datain)
+static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
+	struct iscsi_cmd *cmd,
+	struct iscsi_datain *datain)
 {
 	__u32 next_burst_len, read_data_done, read_data_left;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_datain_req_t *dr;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_datain_req *dr;
 
 	dr = iscsi_get_datain_req(cmd);
 	if (!(dr))
@@ -207,14 +207,14 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_yes(
  *
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=Yes.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes(
-	iscsi_cmd_t *cmd,
-	iscsi_datain_t *datain)
+static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
+	struct iscsi_cmd *cmd,
+	struct iscsi_datain *datain)
 {
 	__u32 offset, read_data_done, read_data_left, seq_send_order;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_datain_req_t *dr;
-	iscsi_seq_t *seq;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_datain_req *dr;
+	struct iscsi_seq *seq;
 
 	dr = iscsi_get_datain_req(cmd);
 	if (!(dr))
@@ -329,14 +329,14 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_yes(
  *
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=No.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no(
-	iscsi_cmd_t *cmd,
-	iscsi_datain_t *datain)
+static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
+	struct iscsi_cmd *cmd,
+	struct iscsi_datain *datain)
 {
 	__u32 next_burst_len, read_data_done, read_data_left;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_datain_req_t *dr;
-	iscsi_pdu_t *pdu;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_datain_req *dr;
+	struct iscsi_pdu *pdu;
 
 	dr = iscsi_get_datain_req(cmd);
 	if (!(dr))
@@ -429,15 +429,15 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_yes_and_no(
  *
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=No.
  */
-static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no(
-	iscsi_cmd_t *cmd,
-	iscsi_datain_t *datain)
+static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
+	struct iscsi_cmd *cmd,
+	struct iscsi_datain *datain)
 {
 	__u32 read_data_done, read_data_left, seq_send_order;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_datain_req_t *dr;
-	iscsi_pdu_t *pdu;
-	iscsi_seq_t *seq = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_datain_req *dr;
+	struct iscsi_pdu *pdu;
+	struct iscsi_seq *seq = NULL;
 
 	dr = iscsi_get_datain_req(cmd);
 	if (!(dr))
@@ -535,11 +535,11 @@ static inline iscsi_datain_req_t *iscsi_set_datain_values_no_and_no(
  *
  *
  */
-iscsi_datain_req_t *iscsi_get_datain_values(
-	iscsi_cmd_t *cmd,
-	iscsi_datain_t *datain)
+struct iscsi_datain_req *iscsi_get_datain_values(
+	struct iscsi_cmd *cmd,
+	struct iscsi_datain *datain)
 {
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	if (SESS_OPS_C(conn)->DataSequenceInOrder &&
 	    SESS_OPS_C(conn)->DataPDUInOrder)

@@ -48,7 +48,7 @@
 #undef ISCSI_TARGET_NODEATTRIB_C
 
 static inline char *iscsi_na_get_initiatorname(
-	iscsi_node_acl_t *nacl)
+	struct iscsi_node_acl *nacl)
 {
 	struct se_node_acl *se_nacl = &nacl->se_node_acl;	
 
@@ -60,9 +60,9 @@ static inline char *iscsi_na_get_initiatorname(
  *
  */
 void iscsi_set_default_node_attribues(
-	iscsi_node_acl_t *acl)
+	struct iscsi_node_acl *acl)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	a->dataout_timeout = NA_DATAOUT_TIMEOUT;
 	a->dataout_timeout_retries = NA_DATAOUT_TIMEOUT_RETRIES;
@@ -79,10 +79,10 @@ void iscsi_set_default_node_attribues(
  *
  */
 extern int iscsi_na_dataout_timeout(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 dataout_timeout)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (dataout_timeout > NA_DATAOUT_TIMEOUT_MAX) {
 		printk(KERN_ERR "Requested DataOut Timeout %u larger than"
@@ -108,10 +108,10 @@ extern int iscsi_na_dataout_timeout(
  *
  */
 extern int iscsi_na_dataout_timeout_retries(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 dataout_timeout_retries)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (dataout_timeout_retries > NA_DATAOUT_TIMEOUT_RETRIES_MAX) {
 		printk(KERN_ERR "Requested DataOut Timeout Retries %u larger"
@@ -138,12 +138,12 @@ extern int iscsi_na_dataout_timeout_retries(
  *
  */
 extern int iscsi_na_nopin_timeout(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 nopin_timeout)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
-	iscsi_session_t *sess;
-	iscsi_conn_t *conn;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
+	struct iscsi_session *sess;
+	struct iscsi_conn *conn;
 	struct se_node_acl *se_nacl = &a->nacl->se_node_acl;
 	struct se_session *se_sess;
 	u32 orig_nopin_timeout = a->nopin_timeout;
@@ -171,7 +171,7 @@ extern int iscsi_na_nopin_timeout(
 		spin_lock_bh(&se_nacl->nacl_sess_lock);
 		se_sess = se_nacl->nacl_sess;
 		if (se_sess) {
-			sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+			sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 			spin_lock(&sess->conn_lock);
 			list_for_each_entry(conn, &sess->sess_conn_list,
@@ -197,10 +197,10 @@ extern int iscsi_na_nopin_timeout(
  *
  */
 extern int iscsi_na_nopin_response_timeout(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 nopin_response_timeout)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (nopin_response_timeout > NA_NOPIN_RESPONSE_TIMEOUT_MAX) {
 		printk(KERN_ERR "Requested NopIn Response Timeout %u larger"
@@ -227,10 +227,10 @@ extern int iscsi_na_nopin_response_timeout(
  *
  */
 extern int iscsi_na_random_datain_pdu_offsets(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 random_datain_pdu_offsets)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (random_datain_pdu_offsets != 0 && random_datain_pdu_offsets != 1) {
 		printk(KERN_ERR "Requested Random DataIN PDU Offsets: %u not"
@@ -251,10 +251,10 @@ extern int iscsi_na_random_datain_pdu_offsets(
  *
  */
 extern int iscsi_na_random_datain_seq_offsets(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 random_datain_seq_offsets)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (random_datain_seq_offsets != 0 && random_datain_seq_offsets != 1) {
 		printk(KERN_ERR "Requested Random DataIN Sequence Offsets: %u"
@@ -275,10 +275,10 @@ extern int iscsi_na_random_datain_seq_offsets(
  *
  */
 extern int iscsi_na_random_r2t_offsets(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 random_r2t_offsets)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (random_r2t_offsets != 0 && random_r2t_offsets != 1) {
 		printk(KERN_ERR "Requested Random R2T Offsets: %u not"
@@ -295,10 +295,10 @@ extern int iscsi_na_random_r2t_offsets(
 }
 
 extern int iscsi_na_default_erl(
-	iscsi_node_acl_t *acl,
+	struct iscsi_node_acl *acl,
 	u32 default_erl)
 {
-	iscsi_node_attrib_t *a = &acl->node_attrib;
+	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (default_erl != 0 && default_erl != 1 && default_erl != 2) {
 		printk(KERN_ERR "Requested default ERL: %u not 0, 1, or 2\n",
