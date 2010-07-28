@@ -53,9 +53,7 @@
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target.h>
-#ifdef SNMP_SUPPORT
 #include <iscsi_target_mib.h>
-#endif /* SNMP_SUPPORT */
 #include <iscsi_target_configfs.h>
 
 struct target_fabric_configfs *lio_target_fabric_configfs;
@@ -1454,9 +1452,7 @@ int iscsi_target_register_configfs(void)
 				&lio_tpg_check_prod_mode_write_protect;
 	fabric->tf_ops.tpg_alloc_fabric_acl = &lio_tpg_alloc_fabric_acl;
 	fabric->tf_ops.tpg_release_fabric_acl = &lio_tpg_release_fabric_acl;
-#ifdef SNMP_SUPPORT
 	fabric->tf_ops.tpg_get_inst_index = &lio_tpg_get_inst_index;
-#endif /* SNMP_SUPPORT */
 	/*
 	 * Use transport_generic_allocate_iovecs from target_core_mod
 	 */
@@ -1468,9 +1464,7 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.stop_session = &lio_tpg_stop_session;
 	fabric->tf_ops.fall_back_to_erl0 = &lio_tpg_fall_back_to_erl0;
 	fabric->tf_ops.sess_logged_in = &lio_sess_logged_in;
-#ifdef SNMP_SUPPORT
 	fabric->tf_ops.sess_get_index = &lio_sess_get_index;
-#endif /* SNMP_SUPPORT */
 	fabric->tf_ops.sess_get_initiator_sid = &lio_sess_get_initiator_sid;
 	fabric->tf_ops.write_pending = &lio_write_pending;
 	fabric->tf_ops.write_pending_status = &lio_write_pending_status;

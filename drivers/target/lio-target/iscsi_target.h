@@ -22,9 +22,7 @@ extern int iscsi_get_cmd_state(struct se_cmd *);
 extern void iscsi_new_cmd_failure(struct se_cmd *);
 extern int iscsi_is_state_remove(struct se_cmd *);
 extern int lio_sess_logged_in(struct se_session *);
-#ifdef SNMP_SUPPORT
 extern u32 lio_sess_get_index(struct se_session *);
-#endif /* SNMP_SUPPORT */
 extern u32 lio_sess_get_initiator_sid(struct se_session *,
 				unsigned char *, u32);
 extern int iscsi_send_async_msg(struct iscsi_conn *, __u16, __u8, __u8);

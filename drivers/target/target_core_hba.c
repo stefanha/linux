@@ -68,9 +68,7 @@ struct se_hba *core_alloc_hba(int hba_type)
 	spin_lock_init(&hba->device_lock);
 	spin_lock_init(&hba->hba_queue_lock);
 	mutex_init(&hba->hba_access_mutex);
-#ifdef SNMP_SUPPORT
 	hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
-#endif
 
 	return hba;
 }

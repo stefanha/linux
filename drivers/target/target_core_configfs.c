@@ -3145,9 +3145,7 @@ int target_core_init_configfs(void)
 	struct config_group *target_cg, *hba_cg = NULL, *alua_cg = NULL;
 	struct config_group *lu_gp_cg = NULL;
 	struct configfs_subsystem *subsys;
-#ifdef SNMP_SUPPORT
 	struct proc_dir_entry *scsi_target_proc = NULL;
-#endif
 	struct t10_alua_lu_gp *lu_gp;
 	int ret;
 
@@ -3161,9 +3159,7 @@ int target_core_init_configfs(void)
 
 	INIT_LIST_HEAD(&g_tf_list);
 	mutex_init(&g_tf_lock);
-#ifdef SNMP_SUPPORT
 	init_scsi_index_table();
-#endif
 	ret = init_se_global();
 	if (ret < 0)
 		return -1;
@@ -3250,7 +3246,6 @@ int target_core_init_configfs(void)
 	if (core_dev_setup_virtual_lun0() < 0)
 		goto out;
 
-#ifdef SNMP_SUPPORT
 	scsi_target_proc = proc_mkdir("scsi_target", 0);
 	if (!(scsi_target_proc)) {
 		printk(KERN_ERR "proc_mkdir(scsi_target, 0) failed\n");
@@ -3259,15 +3254,13 @@ int target_core_init_configfs(void)
 	ret = init_scsi_target_mib();
 	if (ret < 0)
 		goto out;
-#endif
+
 	return 0;
 
 out:
 	configfs_unregister_subsystem(subsys);
-#ifdef SNMP_SUPPORT
 	if (scsi_target_proc)
 		remove_proc_entry("scsi_target", 0);
-#endif
 	core_dev_release_virtual_lun0();
 	tcm_sub_plugin_unload_all_classes();
 out_global:
@@ -3332,10 +3325,9 @@ void target_core_exit_configfs(void)
 	configfs_unregister_subsystem(subsys);
 	printk(KERN_INFO "TARGET_CORE[0]: Released ConfigFS Fabric"
 			" Infrastructure\n");
-#ifdef SNMP_SUPPORT
+
 	remove_scsi_target_mib();
 	remove_proc_entry("scsi_target", 0);
-#endif
 	core_dev_release_virtual_lun0();
 	tcm_sub_plugin_unload_all_classes();
 	release_se_global();

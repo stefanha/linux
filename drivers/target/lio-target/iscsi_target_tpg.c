@@ -197,7 +197,6 @@ void lio_tpg_fall_back_to_erl0(struct se_session *se_sess)
 	iscsi_fall_back_to_erl0(sess);
 }
 
-#ifdef SNMP_SUPPORT
 u32 lio_tpg_get_inst_index(struct se_portal_group *se_tpg)
 {
 	struct iscsi_portal_group *tpg =
@@ -205,7 +204,6 @@ u32 lio_tpg_get_inst_index(struct se_portal_group *se_tpg)
 
 	return tpg->tpg_tiqn->tiqn_index;
 }
-#endif /* SNMP_SUPPORT */
 
 void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 {
@@ -737,9 +735,7 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 				" struct iscsi_tpg_np.\n");
 		return ERR_PTR(-ENOMEM);
 	}
-#ifdef SNMP_SUPPORT
 	tpg_np->tpg_np_index	= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
-#endif /* SNMP_SUPPORT */
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_child_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_parent_list);

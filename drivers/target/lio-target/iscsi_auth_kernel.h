@@ -116,12 +116,10 @@ u32 iscsi_handle_authentication(
 		auth = &iscsi_global->discovery_acl.node_auth;	
 	}
 
-#ifdef SNMP_SUPPORT
 	if (strstr("CHAP", authtype))
 		strcpy(SESS(conn)->auth_type, "CHAP");
 	else
 		strcpy(SESS(conn)->auth_type, NONE);
-#endif /* SNMP_SUPPORT */
 
 	if (strstr("None", authtype))
 		return 1;

@@ -5,13 +5,6 @@ config TARGET_CORE
         ---help---
         Say Y or M here to enable the TCM Storage Engine and ConfigFS enabled control path for target_core_mod
 
-config TCM_SNMP
-	tristate "TCM SCSI MIBs"
-	depends on TARGET_CORE && PROC_FS
-	default y
-	---help---
-	Say Y here to enable the SCSI MIBs via procfs for TCM
-
 config TCM_DEBUG_DEV
 	tristate "TCM Debug device code"
 	depends on TARGET_CORE

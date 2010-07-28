@@ -76,10 +76,8 @@ extern int iscsi_print_sessions_to_proc(char *, char **, off_t, int);
 extern int iscsi_print_tpg_to_proc(char *, char **, off_t, int);
 extern int rx_data(struct iscsi_conn *, struct iovec *, int, int);
 extern int tx_data(struct iscsi_conn *, struct iovec *, int, int);
-#ifdef SNMP_SUPPORT
 extern void iscsi_collect_login_stats(struct iscsi_conn *, __u8, __u8);
 extern struct iscsi_tiqn *iscsi_snmp_get_tiqn(struct iscsi_conn *);
-#endif
 
 extern struct target_fabric_configfs *lio_target_fabric_configfs;
 extern struct iscsi_global *iscsi_global;

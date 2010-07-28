@@ -15,9 +15,7 @@ extern int lio_tpg_shutdown_session(struct se_session *);
 extern void lio_tpg_close_session(struct se_session *);
 extern void lio_tpg_stop_session(struct se_session *, int, int);
 extern void lio_tpg_fall_back_to_erl0(struct se_session *);
-#ifdef SNMP_SUPPORT
 extern u32 lio_tpg_get_inst_index(struct se_portal_group *);
-#endif /* SNMP_SUPPORT */
 extern void lio_set_default_node_attributes(struct se_node_acl *);
 
 extern struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *, u16);

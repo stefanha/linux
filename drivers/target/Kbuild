@@ -18,12 +18,8 @@ target_core_mod-y		:= target_core_configfs.o \
 				   target_core_pscsi.o \
 				   target_core_file.o \
 				   target_core_rd.o \
-				   target_core_stgt.o
-
-ifdef CONFIG_TCM_SNMP
-target_core_mod-y		+= target_core_mib.o
-EXTRA_CFLAGS			+= -DSNMP_SUPPORT
-endif
+				   target_core_stgt.o \
+				   target_core_mib.o
 
 ifdef CONFIG_TCM_PSCSI_VPD_PAGE_CHECK
 EXTRA_CFLAGS			+= -DLINUX_VPD_PAGE_CHECK

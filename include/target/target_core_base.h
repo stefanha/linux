@@ -34,9 +34,7 @@
 #include <linux/configfs.h>
 #include <net/sock.h>
 #include <net/tcp.h>
-#ifdef SNMP_SUPPORT
 #include <target/target_core_mib.h>
-#endif /* SNMP_SUPPORT */
 
 #define TARGET_CORE_MOD_VERSION		"v4.0.0-rc1"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
@@ -638,13 +636,11 @@ struct se_node_acl {
 	char			initiatorname[TRANSPORT_IQN_LEN];
 	int			nodeacl_flags;
 	u32			queue_depth;
-#ifdef SNMP_SUPPORT
 	u32			acl_index;
 	u64			num_cmds;
 	u64			read_bytes;
 	u64			write_bytes;
 	spinlock_t		stats_lock;
-#endif /* SNMP_SUPPORT */
 	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
 	atomic_t		acl_pr_ref_count;
 	struct se_dev_entry	*device_list;
@@ -696,12 +692,10 @@ struct se_dev_entry {
 	u32			total_cmds;
 	u32			total_bytes;
 	u64			pr_res_key;
-#ifdef SNMP_SUPPORT
 	u64			creation_time;
 	u32			attach_count;
 	u64			read_bytes;
 	u64			write_bytes;
-#endif /* SNMP_SUPPORT */
 	atomic_t		ua_count;
 	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
 	atomic_t		pr_ref_count;
@@ -796,7 +790,6 @@ struct se_device {
 	unsigned long long	dev_sectors_total;
 	/* Pointer to transport specific device structure */
 	void 			*dev_ptr;
-#ifdef SNMP_SUPPORT
 	u32			dev_index;
 	u64			creation_time;
 	u32			num_resets;
@@ -804,7 +797,6 @@ struct se_device {
 	u64			read_bytes;
 	u64			write_bytes;
 	spinlock_t		stats_lock;
-#endif /* SNMP_SUPPORT */
 	/* Active commands on this virtual SE device */
 	atomic_t		active_cmds;
 	atomic_t		simple_cmds;
@@ -877,9 +869,7 @@ struct se_hba {
 	u32			hba_flags;
 	/* Virtual iSCSI devices attached. */
 	u32			dev_count;
-#ifdef SNMP_SUPPORT
 	u32			hba_index;
-#endif
 	atomic_t		dev_mib_access_count;
 	atomic_t		load_balance_queue;
 	atomic_t		left_queue_depth;
@@ -928,10 +918,8 @@ struct se_port {
 	u16		sep_rtpi;
 	int		sep_tg_pt_secondary_stat;
 	int		sep_tg_pt_secondary_write_md;
-#ifdef SNMP_SUPPORT
 	u32		sep_index;
 	struct scsi_port_stats sep_stats;
-#endif
 	/* Used for ALUA Target Port Groups membership */
 	atomic_t	sep_tg_pt_gp_active;
 	atomic_t	sep_tg_pt_secondary_offline;

@@ -1854,7 +1854,6 @@ static void iscsi_handle_nopin_response_timeout(unsigned long data)
 	conn->nopin_response_timer_flags &= ~NOPIN_RESPONSE_TF_RUNNING;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 
-#ifdef SNMP_SUPPORT
 	{
 	struct iscsi_portal_group *tpg = conn->sess->tpg;
 	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
@@ -1870,7 +1869,6 @@ static void iscsi_handle_nopin_response_timeout(unsigned long data)
 		spin_unlock_bh(&tiqn->sess_err_stats.lock);
 	}
 	}
-#endif /* SNMP_SUPPORT */
 
 	iscsi_cause_connection_reinstatement(conn, 0);
 	iscsi_dec_conn_usage_count(conn);
@@ -2247,9 +2245,7 @@ int iscsi_tx_login_rsp(struct iscsi_conn *conn, u8 status_class, u8 status_detai
 	struct iovec iov;
 	struct iscsi_targ_login_rsp *hdr;
 
-#ifdef SNMP_SUPPORT
 	iscsi_collect_login_stats(conn, status_class, status_detail);
-#endif
 
 	memset((void *)&iov, 0, sizeof(struct iovec));
 	memset((void *)&iscsi_hdr, 0x0, ISCSI_HDR_LEN);
@@ -2636,7 +2632,6 @@ int tx_data(
 	return iscsi_do_tx_data(conn, &c);
 }
 
-#ifdef SNMP_SUPPORT
 /*
  * Collect login statistics
  */
@@ -2726,4 +2721,3 @@ struct iscsi_tiqn *iscsi_snmp_get_tiqn(struct iscsi_conn *conn)
 
 	return tpg->tpg_tiqn;
 }
-#endif /* SNMP_SUPPORT */

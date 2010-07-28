@@ -76,9 +76,7 @@
 #include <iscsi_target_debugerl.h>
 #endif /* DEBUG_ERL */
 
-#ifdef SNMP_SUPPORT
 #include <iscsi_target_mib.h>
-#endif /* SNMP_SUPPORT */
 
 #include <iscsi_target_configfs.h>
 
@@ -192,12 +190,10 @@ struct iscsi_tiqn *core_add_tiqn(unsigned char *buf, int *ret)
 	INIT_LIST_HEAD(&tiqn->tiqn_tpg_list);
 	spin_lock_init(&tiqn->tiqn_state_lock);
 	spin_lock_init(&tiqn->tiqn_tpg_lock);
-#ifdef SNMP_SUPPORT
 	spin_lock_init(&tiqn->sess_err_stats.lock);
 	spin_lock_init(&tiqn->login_stats.lock);
 	spin_lock_init(&tiqn->logout_stats.lock);
 	tiqn->tiqn_index = iscsi_get_new_index(ISCSI_INST_INDEX);
-#endif
 	tiqn->tiqn_state = TIQN_STATE_ACTIVE;
 
 	spin_lock(&iscsi_global->tiqn_lock);
@@ -640,9 +636,7 @@ struct iscsi_np *core_add_np(
 	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
 	np->np_net_size		= net_size;
-#ifdef SNMP_SUPPORT
 	np->np_index		= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
-#endif
 	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
@@ -928,9 +922,8 @@ static int iscsi_target_detect(void)
 		printk(KERN_ERR "Unable to allocate memory for iscsi_global\n");
 		return -1;
 	}
-#ifdef SNMP_SUPPORT
 	init_iscsi_index_table();
-#endif
+
 	if (init_iscsi_global(iscsi_global) < 0) {
 		kfree(iscsi_global);
 		return -1;
@@ -952,7 +945,6 @@ static int iscsi_target_detect(void)
 	spin_lock_init(&iscsi_global->debug_dev_lock);
 #endif
 
-#ifdef CONFIG_PROC_FS
 	dir_entry = proc_mkdir("iscsi_target", 0);
 	if (!(dir_entry)) {
 		printk(KERN_ERR "proc_mkdir() failed.\n");
@@ -977,11 +969,7 @@ static int iscsi_target_detect(void)
 		goto out;
 	}
 
-#ifdef SNMP_SUPPORT
 	init_iscsi_target_mib();
-#endif
-#endif /* CONFIG_PROC_FS */
-
 	iscsi_target_register_configfs();
 
 	if (iscsi_allocate_thread_sets(TARGET_THREAD_SET_COUNT, TARGET) !=
@@ -1090,14 +1078,11 @@ out:
 		kmem_cache_destroy(lio_tpg_cache);
 	iscsi_deallocate_thread_sets(TARGET);
 	iscsi_target_deregister_configfs();
-#ifdef CONFIG_PROC_FS
-# ifdef SNMP_SUPPORT
+
 	remove_iscsi_target_mib();
-# endif
 	remove_proc_entry("iscsi_target/version_info", 0);
 	remove_proc_entry("iscsi_target/target_nodename", 0);
 	remove_proc_entry("iscsi_target", 0);
-#endif
 #ifdef DEBUG_ERL
 	kfree(iscsi_global->debug_erl);
 #endif /* DEBUG_ERL */
@@ -1151,15 +1136,10 @@ void iscsi_target_release_phase2(void)
 	iscsi_global->ti_forcechanoffline = NULL;
 	iscsi_target_deregister_configfs();
 
-#ifdef CONFIG_PROC_FS
-# ifdef SNMP_SUPPORT
 	remove_iscsi_target_mib();
-# endif
 	remove_proc_entry("iscsi_target/version_info", 0);
 	remove_proc_entry("iscsi_target/target_nodename", 0);
 	remove_proc_entry("iscsi_target", 0);
-#endif
-	return;
 }
 
 /*	iscsi_target_release():
@@ -1239,14 +1219,12 @@ int lio_sess_logged_in(struct se_session *se_sess)
 	return ret;
 }
 
-#ifdef SNMP_SUPPORT
 u32 lio_sess_get_index(struct se_session *se_sess)
 {
 	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 	return sess->session_index;
 }
-#endif /* SNMP_SUPPORT */
 
 u32 lio_sess_get_initiator_sid(
 	struct se_session *se_sess,
@@ -1404,7 +1382,6 @@ static inline int iscsi_handle_scsi_cmd(
 	struct iscsi_cmd	*cmd = NULL;
 	struct iscsi_init_scsi_cmnd *hdr;
 
-#ifdef SNMP_SUPPORT
 	spin_lock_bh(&SESS(conn)->session_stats_lock);
 	SESS(conn)->cmd_pdus++;
 	if (SESS_NODE_ACL(SESS(conn))) {
@@ -1413,7 +1390,6 @@ static inline int iscsi_handle_scsi_cmd(
 		spin_unlock(&SESS_NODE_ACL(SESS(conn))->stats_lock);
 	}
 	spin_unlock_bh(&SESS(conn)->session_stats_lock);
-#endif /* SNMP_SUPPORT */
 
 	hdr			= (struct iscsi_init_scsi_cmnd *) buf;
 	hdr->length		= be32_to_cpu(hdr->length);
@@ -1783,7 +1759,6 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
 
-#ifdef SNMP_SUPPORT
 	/* iSCSI write */
 	spin_lock_bh(&SESS(conn)->session_stats_lock);
 	SESS(conn)->rx_data_octets += hdr->length;
@@ -1793,7 +1768,6 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		spin_unlock(&SESS_NODE_ACL(SESS(conn))->stats_lock);
 	}
 	spin_unlock_bh(&SESS(conn)->session_stats_lock);
-#endif /* SNMP_SUPPORT */
 
 	if (hdr->length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
@@ -2801,7 +2775,6 @@ static inline int iscsi_handle_logout_cmd(
 #ifdef DEBUG_OPCODES
 	print_init_logout_cmnd(hdr);
 #endif
-#ifdef SNMP_SUPPORT
 	{
 	struct iscsi_tiqn *tiqn = iscsi_snmp_get_tiqn(conn);
 
@@ -2814,7 +2787,6 @@ static inline int iscsi_handle_logout_cmd(
 		spin_unlock(&tiqn->logout_stats.lock);
 		}
 	}
-#endif /* SNMP_SUPPORT */
 
 	TRACE(TRACE_ISCSI, "Got Logout Request ITT: 0x%08x CmdSN: 0x%08x"
 		" ExpStatSN: 0x%08x Reason: 0x%02x CID: %hu on CID: %hu\n",
@@ -3352,7 +3324,6 @@ static inline int iscsi_send_data_in(
 		return -1;
 	}
 
-#ifdef SNMP_SUPPORT
 	spin_lock_bh(&SESS(conn)->session_stats_lock);
 	SESS(conn)->tx_data_octets += datain.length;
 	if (SESS_NODE_ACL(SESS(conn))) {
@@ -3361,8 +3332,6 @@ static inline int iscsi_send_data_in(
 		spin_unlock(&SESS_NODE_ACL(SESS(conn))->stats_lock);
 	}
 	spin_unlock_bh(&SESS(conn)->session_stats_lock);
-#endif /* SNMP_SUPPORT */
-
 	/*
 	 * Special case for successfully execution w/ both DATAIN
 	 * and Sense Data.
@@ -3987,11 +3956,9 @@ static inline int iscsi_send_status(
 	if (!recovery)
 		cmd->stat_sn = conn->stat_sn++;
 
-#ifdef SNMP_SUPPORT
 	spin_lock_bh(&SESS(conn)->session_stats_lock);
 	SESS(conn)->rsp_pdus++;
 	spin_unlock_bh(&SESS(conn)->session_stats_lock);
-#endif /* SNMP_SUPPORT */
 
 	hdr			= (struct iscsi_targ_scsi_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
@@ -4737,11 +4704,9 @@ restart:
 				 * hit default in the switch below.
 				 */
 				memset((void *)buffer, 0xff, ISCSI_HDR_LEN);
-#ifdef SNMP_SUPPORT
 				spin_lock_bh(&SESS(conn)->session_stats_lock);
 				SESS(conn)->conn_digest_errors++;
 				spin_unlock_bh(&SESS(conn)->session_stats_lock);
-#endif /* SNMP_SUPPORT */
 			} else {
 				TRACE(TRACE_DIGEST, "Got HeaderDigest CRC32C"
 						" 0x%08x\n", checksum);

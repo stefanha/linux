@@ -551,9 +551,7 @@ static struct target_core_fabric_ops ft_fabric_ops = {
 	.tpg_check_demo_mode_write_protect = ft_check_false,
 	.tpg_alloc_fabric_acl =		ft_tpg_alloc_fabric_acl,
 	.tpg_release_fabric_acl =	ft_tpg_release_fabric_acl,
-#ifdef SNMP_SUPPORT
 	.tpg_get_inst_index = 		ft_tpg_get_inst_index,
-#endif /* SNMP_SUPPORT */
 	.release_cmd_to_pool =		ft_release_cmd,
 	.release_cmd_direct =		ft_release_cmd,
 	.shutdown_session = 		ft_sess_shutdown,
@@ -561,9 +559,7 @@ static struct target_core_fabric_ops ft_fabric_ops = {
 	.stop_session =			ft_sess_stop,
 	.fall_back_to_erl0 =		ft_sess_set_erl0,
 	.sess_logged_in =		ft_sess_logged_in,
-#ifdef SNMP_SUPPORT
 	.sess_get_index =		ft_sess_get_index,
-#endif /* SNMP_SUPPORT */
 	.sess_get_initiator_sid =	NULL,
 	.write_pending =		ft_write_pending,
 	.write_pending_status =		ft_write_pending_status,

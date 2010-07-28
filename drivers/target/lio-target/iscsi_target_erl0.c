@@ -830,7 +830,6 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 
 	printk(KERN_ERR "Time2Retain timer expired for SID: %u, cleaning up"
 			" iSCSI session.\n", sess->sid);
-#ifdef SNMP_SUPPORT
 	{
 	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
@@ -845,7 +844,6 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 		spin_unlock(&tiqn->sess_err_stats.lock);
 	}
 	}
-#endif /* SNMP_SUPPORT */
 
 	spin_unlock_bh(&se_tpg->session_lock);
 	iscsi_close_session(sess);

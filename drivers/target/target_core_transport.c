@@ -2185,11 +2185,9 @@ struct se_device *transport_add_device_to_core_hba(
 	dev->write_pending = (transport->write_pending) ?
 		transport->write_pending : &transport_dev_write_pending_nop;
 
-#ifdef SNMP_SUPPORT
 	dev->dev_index = scsi_get_new_index(SCSI_DEVICE_INDEX);
 	dev->creation_time = get_jiffies_64();
 	spin_lock_init(&dev->stats_lock);
-#endif /* SNMP_SUPPORT */
 
 	spin_lock(&hba->device_lock);
 	list_add_tail(&dev->dev_list, &hba->hba_dev_list);
@@ -2862,12 +2860,10 @@ int transport_generic_allocate_tasks(
 		cmd->scsi_sense_reason = INVALID_CDB_FIELD;
 		return -2;
 	}
-#ifdef SNMP_SUPPORT
 	spin_lock(&cmd->se_lun->lun_sep_lock);
 	if (cmd->se_lun->lun_sep)
 		cmd->se_lun->lun_sep->sep_stats.cmd_pdus++;
 	spin_unlock(&cmd->se_lun->lun_sep_lock);
-#endif /* SNMP_SUPPORT */
 
 	switch (non_data_cdb) {
 	case TGCS_DATA_SG_IO_CDB:
@@ -6072,25 +6068,21 @@ void transport_generic_complete_ok(struct se_cmd *cmd)
 
 	switch (cmd->data_direction) {
 	case SE_DIRECTION_READ:
-#ifdef SNMP_SUPPORT
 		spin_lock(&cmd->se_lun->lun_sep_lock);
 		if (SE_LUN(cmd)->lun_sep) {
 			SE_LUN(cmd)->lun_sep->sep_stats.tx_data_octets +=
 					cmd->data_length;
 		}
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
-#endif
 		CMD_TFO(cmd)->queue_data_in(cmd);
 		break;
 	case SE_DIRECTION_WRITE:
-#ifdef SNMP_SUPPORT
 		spin_lock(&cmd->se_lun->lun_sep_lock);
 		if (SE_LUN(cmd)->lun_sep) {
 			SE_LUN(cmd)->lun_sep->sep_stats.rx_data_octets +=
 				cmd->data_length;
 		}
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
-#endif
 		/* Fall through for SE_DIRECTION_WRITE */
 	case SE_DIRECTION_NONE:
 		CMD_TFO(cmd)->queue_status(cmd);

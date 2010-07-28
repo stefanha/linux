@@ -280,10 +280,8 @@ struct se_node_acl *core_tpg_check_initiator_node_acl(
 	acl->queue_depth = TPG_TFO(tpg)->tpg_get_default_depth(tpg);
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
-#ifdef SNMP_SUPPORT
 	acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
 	spin_lock_init(&acl->stats_lock);
-#endif /* SNMP_SUPPORT */
 	acl->nodeacl_flags |= NAF_DYNAMIC_NODE_ACL;
 
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
@@ -402,10 +400,8 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	acl->queue_depth = queue_depth;
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
-#ifdef SNMP_SUPPORT
 	acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
 	spin_lock_init(&acl->stats_lock);
-#endif /* SNMP_SUPPORT */
 	
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
 

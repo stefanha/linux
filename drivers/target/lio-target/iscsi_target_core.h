@@ -31,9 +31,7 @@
 /* Size of the Network Device Name Buffer */
 #define ISCSI_NETDEV_NAME_SIZE		12
 
-#ifdef SNMP_SUPPORT
 #include <iscsi_target_mib.h>
-#endif /* SNMP_SUPPORT */
 
 /* struct iscsi_tpg_np->tpg_np_network_transport */
 #define ISCSI_TCP			0
@@ -521,11 +519,9 @@ struct iscsi_conn {
 	/* Complete Bad PDU for sending reject */
 	unsigned char		bad_hdr[ISCSI_HDR_LEN];
 	unsigned char		ipv6_login_ip[IPV6_ADDRESS_SPACE];
-#ifdef SNMP_SUPPORT
 	u16			local_port;
 	u32			local_ip;
 	u32			conn_index;
-#endif /* SNMP_SUPPORT */
 	atomic_t		active_cmds;
 	atomic_t		check_immediate_queue;
 	atomic_t		conn_logout_remove;
@@ -619,7 +615,6 @@ struct iscsi_session {
 	u32			ooo_cmdsn_count;
 	/* LIO specific session ID */
 	u32			sid;
-#ifdef SNMP_SUPPORT
 	char			auth_type[8];
 	/* unique within the target */
 	u32			session_index;
@@ -631,7 +626,6 @@ struct iscsi_session {
 	u32			conn_timeout_errors;
 	u64			creation_time;
 	spinlock_t		session_stats_lock;
-#endif /* SNMP_SUPPORT */
 	/* Number of active connections */
 	atomic_t		nconn;
 	atomic_t		session_continuation;
@@ -776,9 +770,7 @@ struct iscsi_np {
 	u32			np_flags;
 	u32			np_ipv4;
 	unsigned char		np_ipv6[IPV6_ADDRESS_SPACE];
-#ifdef SNMP_SUPPORT
 	u32			np_index;
-#endif
 	u16			np_port;
 	atomic_t		np_shutdown;
 	spinlock_t		np_ex_lock;
@@ -797,9 +789,7 @@ struct iscsi_np {
 } ____cacheline_aligned;
 
 struct iscsi_tpg_np {
-#ifdef SNMP_SUPPORT
 	u32			tpg_np_index;
-#endif /* SNMP_SUPPORT */
 	struct iscsi_np		*tpg_np;
 	struct iscsi_portal_group *tpg;
 	struct iscsi_tpg_np	*tpg_np_parent;
@@ -865,12 +855,10 @@ struct iscsi_tiqn {
 	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
 	struct se_wwn		tiqn_wwn;
-#ifdef SNMP_SUPPORT
 	u32			tiqn_index;
 	struct iscsi_sess_err_stats  sess_err_stats;
 	struct iscsi_login_stats     login_stats;
 	struct iscsi_logout_stats    logout_stats;
-#endif /* SNMP_SUPPORT */
 } ____cacheline_aligned;
 
 struct iscsi_global {

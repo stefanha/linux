@@ -211,14 +211,10 @@ extern int __transport_get_lun_for_cmd(
 					read_only = 1;
 					goto out;
 				}
-#ifdef SNMP_SUPPORT
 				deve->write_bytes += se_cmd->data_length;
-#endif /* SNMP_SUPPORT */
 			} else if (se_cmd->data_direction ==
 				   SE_DIRECTION_READ) {
-#ifdef SNMP_SUPPORT
 				deve->read_bytes += se_cmd->data_length;
-#endif /* SNMP_SUPPORT */
 			}
 		}
 		deve->deve_cmds++;
@@ -285,7 +281,6 @@ out:
 		return -1;
 	}
 
-#ifdef SNMP_SUPPORT
 	{
 	struct se_device *dev = se_lun->se_dev;
 	spin_lock(&dev->stats_lock);
@@ -296,7 +291,6 @@ out:
 		dev->read_bytes += se_cmd->data_length;
 	spin_unlock(&dev->stats_lock);
 	}
-#endif /* SNMP_SUPPORT */
 
 	/*
 	 * Add the iscsi_cmd_t to the struct se_lun's cmd list.  This list is used
@@ -554,10 +548,8 @@ int core_update_device_list_for_node(
 			spin_unlock_bh(&nacl->device_list_lock);
 			return 0;
 		}
-#ifdef SNMP_SUPPORT
 		deve->creation_time = get_jiffies_64();
 		deve->attach_count++;
-#endif /* SNMP_SUPPORT */
 		spin_unlock_bh(&nacl->device_list_lock);
 
 		spin_lock_bh(&port->sep_alua_lock);
@@ -581,10 +573,8 @@ int core_update_device_list_for_node(
 	deve->se_lun = NULL;
 	deve->se_lun_acl = NULL;
 	deve->lun_flags = 0;
-#ifdef SNMP_SUPPORT
 	deve->creation_time = 0;
 	deve->attach_count--;
-#endif /* SNMP_SUPPORT */
 	spin_unlock_bh(&nacl->device_list_lock);
 
 	core_scsi3_free_pr_reg_from_nacl(lun->se_dev, nacl);
@@ -715,10 +705,7 @@ void core_export_port(
 	}
 
 	dev->dev_port_count++;
-#ifdef SNMP_SUPPORT
 	port->sep_index = port->sep_rtpi; /* RELATIVE TARGET PORT IDENTIFER */
-#endif
-	return;
 }
 
 /*

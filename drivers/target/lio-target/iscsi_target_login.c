@@ -234,12 +234,9 @@ static int iscsi_login_zero_tsih_s1(
 	spin_lock_init(&sess->cr_i_lock);
 	spin_lock_init(&sess->session_usage_lock);
 	spin_lock_init(&sess->ttt_lock);
-#ifdef SNMP_SUPPORT
 	sess->session_index = iscsi_get_new_index(ISCSI_SESSION_INDEX);
 	sess->creation_time = get_jiffies_64();
 	spin_lock_init(&sess->session_stats_lock);
-#endif /* SNMP_SUPPORT */
-
 	/*
 	 * The FFP CmdSN window values will be allocated from the TPG's
 	 * Initiator Node's ACL once the login has been successfully completed.
@@ -591,10 +588,8 @@ static int iscsi_post_login_handler(
 
 	iscsi_inc_conn_usage_count(conn);
 
-#ifdef SNMP_SUPPORT
 	iscsi_collect_login_stats(conn, STAT_CLASS_SUCCESS,
 			STAT_DETAIL_SUCCESS);
-#endif
 
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_LOGGED_IN.\n");
 	conn->conn_state = TARG_CONN_STATE_LOGGED_IN;
@@ -1167,11 +1162,9 @@ get_new_sock:
 	conn->network_transport = np->np_network_transport;
 	snprintf(conn->net_dev, ISCSI_NETDEV_NAME_SIZE, "%s", np->np_net_dev);
 
-#ifdef SNMP_SUPPORT
 	conn->conn_index = iscsi_get_new_index(ISCSI_CONNECTION_INDEX);
 	conn->local_ip = np->np_ipv4;
 	conn->local_port = np->np_port;
-#endif
 
 	printk(KERN_INFO "Received iSCSI login request from %s on %s Network"
 			" Portal %s:%hu\n", ip_init_buf,
@@ -1258,10 +1251,8 @@ get_new_sock:
 
 new_sess_out:
 	printk(KERN_ERR "iSCSI Login negotiation failed.\n");
-#ifdef SNMP_SUPPORT
 	iscsi_collect_login_stats(conn, STAT_CLASS_INITIATOR,
 				  STAT_DETAIL_INIT_ERROR);
-#endif
 	if (!zero_tsih || !SESS(conn))
 		goto old_sess_out;
 	if (SESS(conn)->se_sess)
