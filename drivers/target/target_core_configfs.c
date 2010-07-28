@@ -40,17 +40,17 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_alua.h>
-#include <target/target_core_pr.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_fabric_configfs.h>
 #include <target/target_core_configfs.h>
 #include <target/configfs_macros.h>
 
+#include "target_core_alua.h"
+#include "target_core_hba.h"
 #include "target_core_plugin.h"
+#include "target_core_pr.h"
+#include "target_core_seobj.h"
 
 struct list_head g_tf_list;
 struct mutex g_tf_lock;

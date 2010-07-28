@@ -34,7 +34,7 @@
 #include <linux/configfs.h>
 #include <net/sock.h>
 #include <net/tcp.h>
-#include <target/target_core_mib.h>
+#include "target_core_mib.h"
 
 #define TARGET_CORE_MOD_VERSION		"v4.0.0-rc1"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))

@@ -45,12 +45,9 @@
 #include <target/target_core_base.h>
 #include <iscsi_target_device.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
 #include <iscsi_target_tpg.h>
 #include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
-
-#include <target/target_core_seobj.h>
 
 /*	iscsi_get_lun():
  *

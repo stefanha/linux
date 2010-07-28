@@ -34,14 +34,13 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 
 #include "target_core_plugin.h"
+#include "target_core_seobj.h"
 
 int dev_obj_export(void *p, struct se_portal_group *tpg, struct se_lun *lun)
 {

@@ -47,19 +47,20 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
-#include <target/target_core_scdb.h>
-#include <target/target_core_pr.h>
-#include <target/target_core_alua.h>
 #include <target/target_core_tmr.h>
 #include <target/target_core_tpg.h>
-#include <target/target_core_ua.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 
+#include "target_core_alua.h"
+#include "target_core_hba.h"
 #include "target_core_plugin.h"
+#include "target_core_pr.h"
+#include "target_core_scdb.h"
+#include "target_core_seobj.h"
+#include "target_core_ua.h"
+
 #include "target_core_iblock.h"
 #include "target_core_pscsi.h"
 #include "target_core_file.h"

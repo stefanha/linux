@@ -34,8 +34,6 @@
 #include <net/tcp.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_hba.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_transport.h>
 
 #include "target_core_plugin.h"

@@ -47,7 +47,6 @@
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_tpg.h>
 
 #include <iscsi_target_core.h>
@@ -59,8 +58,6 @@
 #include <iscsi_target_util.h>
 #include <iscsi_target.h>
 #include <iscsi_parameters.h>
-
-#include <target/target_core_seobj.h>
 
 char *lio_tpg_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {

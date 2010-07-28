@@ -30,9 +30,9 @@
 #include <linux/string.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_scdb.h>
+
+#include "target_core_scdb.h"
 
 /*	split_cdb_XX_6():
  *

@@ -39,7 +39,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 
 #include <tcm_loop_core.h>
 #include <tcm_loop_configfs.h>

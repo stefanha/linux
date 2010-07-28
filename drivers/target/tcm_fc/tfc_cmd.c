@@ -44,9 +44,7 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 #include <target/target_core_base.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_tmr.h>
 #include <target/configfs_macros.h>
 

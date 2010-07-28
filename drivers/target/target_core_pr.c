@@ -35,14 +35,15 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_tmr.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_pr.h>
-#include <target/target_core_ua.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
+
+#include "target_core_hba.h"
+#include "target_core_pr.h"
+#include "target_core_ua.h"
 
 /*
  * Used for Specify Initiator Ports Capable Bit (SPEC_I_PT)

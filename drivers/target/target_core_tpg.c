@@ -40,13 +40,13 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_fabric_ops.h>
 
+#include "target_core_hba.h"
 #include "target_core_plugin.h"
+#include "target_core_seobj.h"
 
 /*	core_clear_initiator_node_from_tpg():
  *
