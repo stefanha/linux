@@ -1,8 +1,6 @@
 #ifndef ISCSI_PROTOCOL_H
 #define ISCSI_PROTOCOL_H
 
-#include <iscsi_linux_defs.h>
-
 #define ISCSI_PORT			3260
 #define ISCSI_HDR_LEN			48
 #define ISCSI_CDB_LEN			16

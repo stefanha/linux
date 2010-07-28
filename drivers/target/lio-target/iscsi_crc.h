@@ -1,8 +1,6 @@
 #ifndef _ISCSI_CRC_H_
 #define _ISCSI_CRC_H_
 
-#include <iscsi_linux_defs.h>
-
 /*	calculate a 32-bit crc	*/
 /*	if restart has 0x01 set, initialize the accumulator */
 /*	if restart has 0x02 set, save result in network byte order */

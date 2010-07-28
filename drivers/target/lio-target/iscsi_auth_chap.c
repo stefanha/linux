@@ -30,7 +30,6 @@
 #include <linux/err.h>
 #include <linux/scatterlist.h>
 
-#include <iscsi_linux_defs.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_auth.h>

@@ -1,8 +1,6 @@
 #ifndef ISCSI_AUTH_KERNEL_H
 #define ISCSI_AUTH_KERNEL_H
 
-#include <iscsi_linux_defs.h>
-
 #include <iscsi_auth.h>
 #include <iscsi_auth_chap.h>
 

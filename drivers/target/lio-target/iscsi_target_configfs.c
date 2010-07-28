@@ -32,7 +32,6 @@
 #include <linux/configfs.h>
 #include <linux/inet.h>
 
-#include <iscsi_linux_defs.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
