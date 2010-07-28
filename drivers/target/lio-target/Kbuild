@@ -22,7 +22,6 @@ iscsi_target_mod-objs		:=	iscsi_auth_chap.o \
 					iscsi_target_tpg.o \
 					iscsi_target_util.o \
 					iscsi_target.o \
-					div64.o \
 					iscsi_target_configfs.o \
 					iscsi_target_mib.o
 
