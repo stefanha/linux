@@ -147,12 +147,21 @@ static int __iblock_release_phydevice(struct iblock_dev *ib_dev, int ro)
 	if (ro == 1) {
 		printk(KERN_INFO "IBLOCK: Calling blkdev_put() for Major:Minor"
 			" - %d:%d\n", ib_dev->ibd_major, ib_dev->ibd_minor);
-		blkdev_put((struct block_device *)ib_dev->ibd_bd, FMODE_READ);
+
+		if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
+			close_bdev_exclusive(ib_dev->ibd_bd, FMODE_READ);
+		else
+			blkdev_put(ib_dev->ibd_bd, FMODE_READ);
 	} else {
 		printk(KERN_INFO "IBLOCK: Releasing Major:Minor - %d:%d\n",
 			ib_dev->ibd_major, ib_dev->ibd_minor);
-		linux_blockdevice_release(ib_dev->ibd_major, ib_dev->ibd_minor,
-			(struct block_device *)ib_dev->ibd_bd);
+
+		if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
+			close_bdev_exclusive(ib_dev->ibd_bd,
+					FMODE_WRITE|FMODE_READ);
+		else
+			linux_blockdevice_release(ib_dev->ibd_major,
+					ib_dev->ibd_minor, ib_dev->ibd_bd);
 	}
 
 	ib_dev->ibd_bd = NULL;
@@ -197,7 +206,6 @@ static struct se_device *iblock_create_virtdevice(
 	struct se_device *dev;
 	struct block_device *bd = NULL;
 	u32 dev_flags = 0;
-	int ret = 0;
 
 	if (!(ib_dev)) {
 		printk(KERN_ERR "Unable to locate struct iblock_dev parameter\n");
@@ -228,28 +236,24 @@ static struct se_device *iblock_create_virtdevice(
 		}
 		dev_flags = DF_CLAIMED_BLOCKDEV;
 	} else {
-		printk(KERN_INFO  "IBLOCK: Claiming %p Major:Minor - %d:%d\n",
-			ib_dev, ib_dev->ibd_major, ib_dev->ibd_minor);
+		/*
+		 * iblock_check_configfs_dev_params() ensures that
+		 * ib_dev->ibd_udev_path must already have been set
+		 * in order for echo 1 > $HBA/$DEV/enable to run.
+		 */
+		printk(KERN_INFO  "IBLOCK: Claiming struct block_device: %s\n",
+				ib_dev->ibd_udev_path);
 
-		bd = __linux_blockdevice_claim(ib_dev->ibd_major,
-				ib_dev->ibd_minor, ib_dev, &ret);
-		if ((bd)) {
-			if (ret == 1)
-				dev_flags = DF_CLAIMED_BLOCKDEV;
-			else if (ib_dev->ibd_force) {
-				dev_flags = DF_READ_ONLY;
-				printk(KERN_INFO "IBLOCK: DF_READ_ONLY for"
-					" Major:Minor - %d:%d\n",
-					ib_dev->ibd_major, ib_dev->ibd_minor);
-			} else {
-				printk(KERN_INFO "WARNING: Unable to claim"
-					" block device. Only use force=1 for"
-					" READ-ONLY access.\n");
-				goto failed;
-			}
-			ib_dev->ibd_bd = bd;
-		} else
+		bd = open_bdev_exclusive(ib_dev->ibd_udev_path,
+				FMODE_WRITE|FMODE_READ, ib_dev);
+		if (!(bd))
 			goto failed;
+
+		dev_flags = DF_CLAIMED_BLOCKDEV;
+		ib_dev->ibd_major = MAJOR(bd->bd_dev);
+		ib_dev->ibd_minor = MINOR(bd->bd_dev);
+		ib_dev->ibd_bd = bd;
+		ib_dev->ibd_flags |= IBDF_BDEV_EXCLUSIVE;
 	}
 	/*
 	 * These settings need to be made tunable..
@@ -608,7 +612,7 @@ static ssize_t iblock_set_configfs_dev_params(struct se_hba *hba,
 {
 	struct iblock_dev *ib_dev = (struct iblock_dev *) se_dev->se_dev_su_ptr;
 	char *buf, *cur, *ptr, *ptr2;
-	unsigned long major, minor, force;
+	unsigned long force;
 	int params = 0, ret = 0;
 
 	buf = kzalloc(count, GFP_KERNEL);
@@ -632,43 +636,18 @@ static ssize_t iblock_set_configfs_dev_params(struct se_hba *hba,
 		if ((ptr2)) {
 			transport_check_dev_params_delim(ptr, &cur);
 			ptr = strstrip(ptr);
+			if (ib_dev->ibd_bd) {
+				printk(KERN_ERR "Unable to set udev_path= while"
+					" ib_dev->ibd_bd exists\n");
+				params = 0;
+				goto out;
+			}
+
 			ret = snprintf(ib_dev->ibd_udev_path, SE_UDEV_PATH_LEN,
 				"%s", ptr);
 			printk(KERN_INFO "IBLOCK: Referencing UDEV path: %s\n",
 					ib_dev->ibd_udev_path);
 			ib_dev->ibd_flags |= IBDF_HAS_UDEV_PATH;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "major");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &major);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed"
-					" for major=\n");
-				break;
-			}
-			ib_dev->ibd_major = (int)major;
-			printk(KERN_INFO "IBLOCK: Referencing Major: %d\n",
-					ib_dev->ibd_major);
-			ib_dev->ibd_flags |= IBDF_HAS_MAJOR;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "minor");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &minor);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed"
-					" for minor=\n");
-				break;
-			}
-			ib_dev->ibd_minor = (int)minor;
-			printk(KERN_INFO "IBLOCK: Referencing Minor: %d\n",
-					ib_dev->ibd_minor);
-			ib_dev->ibd_flags |= IBDF_HAS_MINOR;
 			params++;
 			continue;
 		}
@@ -700,10 +679,8 @@ static ssize_t iblock_check_configfs_dev_params(
 {
 	struct iblock_dev *ibd = (struct iblock_dev *) se_dev->se_dev_su_ptr;
 
-	if (!(ibd->ibd_flags & IBDF_HAS_MAJOR) ||
-	    !(ibd->ibd_flags & IBDF_HAS_MINOR)) {
-		printk(KERN_ERR "Missing iblock_major= and iblock_minor="
-			" parameters\n");
+	if (!(ibd->ibd_flags & IBDF_HAS_UDEV_PATH)) {
+		printk(KERN_ERR "Missing udev_path= parameters for IBLOCK\n");
 		return -1;
 	}
 
