@@ -90,17 +90,14 @@ struct fd_request {
 struct fd_dev {
 	u32		fbd_flags;
 	unsigned char	fd_dev_name[FD_MAX_DEV_NAME];
-	int		fd_claim_bd;
-	int		fd_major;
-	int		fd_minor;
 	/* Unique Ramdisk Device ID in Ramdisk HBA */
 	u32		fd_dev_id;
 	/* Number of SG tables in sg_table_array */
 	u32		fd_table_count;
 	u32		fd_queue_depth;
+	u32		fd_block_size;
 	unsigned long long fd_dev_size;
 	struct file	*fd_file;
-	struct block_device *fd_bd;
 	/* FILEIO HBA device is connected to */
 	struct fd_host *fd_host;
 	int (*fd_do_read)(struct fd_request *, struct se_task *);

@@ -104,50 +104,11 @@ static int fd_detach_hba(struct se_hba *hba)
 
 static int fd_claim_phydevice(struct se_hba *hba, struct se_device *dev)
 {
-	struct fd_dev *fd_dev = (struct fd_dev *)dev->dev_ptr;
-	struct block_device *bd;
-
-	if (fd_dev->fd_bd)
-		return 0;
-
-	if (dev->dev_flags & DF_READ_ONLY) {
-		printk(KERN_INFO "FILEIO: Using previously claimed %p Major"
-			":Minor - %d:%d\n", fd_dev->fd_bd, fd_dev->fd_major,
-			fd_dev->fd_minor);
-	} else {
-		printk(KERN_INFO "FILEIO: Claiming %p Major:Minor - %d:%d\n",
-			fd_dev, fd_dev->fd_major, fd_dev->fd_minor);
-
-		bd = linux_blockdevice_claim(fd_dev->fd_major,
-				fd_dev->fd_minor, (void *)fd_dev);
-		if (!(bd))
-			return -1;
-
-		fd_dev->fd_bd = bd;
-	}
-
 	return 0;
 }
 
 static int fd_release_phydevice(struct se_device *dev)
 {
-	struct fd_dev *fd_dev = (struct fd_dev *)dev->dev_ptr;
-
-	if (!fd_dev->fd_bd)
-		return 0;
-
-	if (dev->dev_flags & DF_READ_ONLY) {
-		printk(KERN_INFO "FILEIO: Calling blkdev_put() for Major:Minor"
-			" - %d:%d\n", fd_dev->fd_major, fd_dev->fd_minor);
-		blkdev_put((struct block_device *)fd_dev->fd_bd, FMODE_READ);
-	} else {
-		printk(KERN_INFO "FILEIO: Releasing Major:Minor - %d:%d\n",
-			fd_dev->fd_major, fd_dev->fd_minor);
-		linux_blockdevice_release(fd_dev->fd_major, fd_dev->fd_minor,
-			(struct block_device *)fd_dev->fd_bd);
-	}
-	fd_dev->fd_bd = NULL;
-
 	return 0;
 }
 
@@ -183,7 +144,6 @@ static struct se_device *fd_create_virtdevice(
 	struct fd_dev *fd_dev = (struct fd_dev *) p;
 	struct fd_host *fd_host = (struct fd_host *) hba->hba_ptr;
 	mm_segment_t old_fs;
-	struct block_device *bd = NULL;
 	struct file *file;
 	struct inode *inode = NULL;
 	int dev_flags = 0, flags;
@@ -238,40 +198,19 @@ static struct se_device *fd_create_virtdevice(
 	 * claim it now.
 	 */
 	if (S_ISBLK(inode->i_mode)) {
-		fd_dev->fd_bd = I_BDEV(file->f_mapping->host);
-		if (!(fd_dev->fd_bd)) {
-			printk(KERN_ERR "FILEIO: Unable to locate struct"
-				" block_device\n");
-			goto fail;
-		}
-		
-		fd_dev->fd_major = MAJOR(fd_dev->fd_bd->bd_dev);
-		fd_dev->fd_minor = MINOR(fd_dev->fd_bd->bd_dev);
-
-		printk(KERN_INFO "FILEIO: Claiming %p Major:Minor - %d:%d\n",
-			fd_dev, fd_dev->fd_major, fd_dev->fd_minor);
-
-		bd = linux_blockdevice_claim(fd_dev->fd_major, fd_dev->fd_minor,
-					fd_dev);
-		if (!(bd)) {
-			printk(KERN_ERR "FILEIO: Unable to claim"
-				" struct block_device\n");
-			goto fail;
-		}
-		dev_flags |= DF_CLAIMED_BLOCKDEV;
 		/*
 		 * Determine the number of bytes from i_size_read() minus
 		 * one (1) logical sector from underlying struct block_device
 		 */
+		fd_dev->fd_block_size = bdev_logical_block_size(inode->i_bdev);
 		fd_dev->fd_dev_size = (i_size_read(file->f_mapping->host) -
-		  		       bdev_logical_block_size(bd));
+		  		       fd_dev->fd_block_size);
 
 		printk(KERN_INFO "FILEIO: Using size: %llu bytes from struct"
 			" block_device blocks: %llu logical_block_size: %d\n",
 			fd_dev->fd_dev_size,
-			div_u64(fd_dev->fd_dev_size,
-				bdev_logical_block_size(bd)),
-			bdev_logical_block_size(bd));
+			div_u64(fd_dev->fd_dev_size, fd_dev->fd_block_size),
+			fd_dev->fd_block_size);
 	} else {
 		if (!(fd_dev->fbd_flags & FBDF_HAS_SIZE)) {
 			printk(KERN_ERR "FILEIO: Missing fd_dev_size="
@@ -279,6 +218,7 @@ static struct se_device *fd_create_virtdevice(
 				" block_device\n");
 			goto fail;
 		}
+		fd_dev->fd_block_size = FD_BLOCKSIZE;
 	}
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim_bd or
@@ -308,9 +248,6 @@ fail:
 		filp_close(fd_dev->fd_file, NULL);
 		fd_dev->fd_file = NULL;
 	}
-	fd_dev->fd_bd = NULL;
-	fd_dev->fd_major = 0;
-	fd_dev->fd_minor = 0;
 	if (inode)
 		iput(inode);
 	putname(dev_p);
@@ -871,20 +808,10 @@ static void fd_get_dev_info(struct se_device *dev, char *b, int *bl)
 static void __fd_get_dev_info(struct fd_dev *fd_dev, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
-	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  Mode: %s  ",
+	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  Mode: %s\n",
 		fd_dev->fd_dev_name, fd_dev->fd_dev_size,
 		(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO) ?
 		"Buffered" : "Synchronous");
-
-	if (fd_dev->fd_bd) {
-		struct block_device *bd = fd_dev->fd_bd;
-
-		*bl += sprintf(b + *bl, "%s\n",
-				(!bd->bd_contains) ? "" :
-				(bd->bd_holder == (struct fd_dev *)fd_dev) ?
-					"CLAIMED: FILEIO" : "CLAIMED: OS");
-	} else
-		*bl += sprintf(b + *bl, "\n");
 }
 
 /*	fd_map_task_non_SG():
@@ -1037,7 +964,9 @@ static unsigned char *fd_get_cdb(struct se_task *task)
  */
 static u32 fd_get_blocksize(struct se_device *dev)
 {
-	return FD_BLOCKSIZE;
+	struct fd_dev *fd_dev = (struct fd_dev *) dev->dev_ptr;
+
+	return fd_dev->fd_block_size;
 }
 
 /*	fd_get_device_rev(): (Part of se_subsystem_api_t template)
