@@ -424,22 +424,6 @@ out:
 	return dev;
 }
 
-static int pscsi_claim_phydevice(struct se_hba *hba, struct se_device *dev)
-{
-	struct pscsi_dev_virt *pdv = (struct pscsi_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *)pdv->pdv_sd;
-
-	return pscsi_claim_sd(sd);
-}
-
-static int pscsi_release_phydevice(struct se_device *dev)
-{
-	struct pscsi_dev_virt *pdv = (struct pscsi_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *)pdv->pdv_sd;
-
-	return pscsi_release_sd(sd);
-}
-
 static void *pscsi_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	struct pscsi_dev_virt *pdv;
@@ -720,6 +704,11 @@ static void pscsi_free_device(void *p)
 	struct scsi_device *sd = (struct scsi_device *) pdv->pdv_sd;
 
 	if (sd) {
+		/*
+		 * Release exclusive pSCSI internal struct block_device claim for
+		 * struct scsi_device with TYPE_DISK if one exists..
+		 */
+		pscsi_release_sd(sd);
 		/*
 		 * For HBA mode PHV_LLD_SCSI_HOST_NO, release the reference
 		 * to struct Scsi_Host now.
@@ -1865,11 +1854,9 @@ static struct se_subsystem_api pscsi_template = {
 	.pmode_enable_hba	= pscsi_pmode_enable_hba,
 	.activate_device	= pscsi_activate_device,
 	.deactivate_device	= pscsi_deactivate_device,
-	.claim_phydevice	= pscsi_claim_phydevice,
 	.allocate_virtdevice	= pscsi_allocate_virtdevice,
 	.create_virtdevice	= pscsi_create_virtdevice,
 	.free_device		= pscsi_free_device,
-	.release_phydevice	= pscsi_release_phydevice,
 	.transport_complete	= pscsi_transport_complete,
 	.allocate_request	= pscsi_allocate_request,
 	.do_task		= pscsi_do_task,

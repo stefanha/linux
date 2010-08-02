@@ -193,8 +193,6 @@ extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					void *);
 extern int transport_generic_activate_device(struct se_device *);
 extern void transport_generic_deactivate_device(struct se_device *);
-extern int transport_generic_claim_phydevice(struct se_device *);
-extern void transport_generic_release_phydevice(struct se_device *, int);
 extern void transport_generic_free_device(struct se_device *);
 extern int transport_generic_allocate_iovecs(struct se_cmd *);
 extern void transport_device_setup_cmd(struct se_cmd *);
@@ -350,10 +348,6 @@ struct se_subsystem_api {
 	*/
 	int (*pmode_enable_hba)(struct se_hba *, unsigned long);
 	/*
-	 * claim_phydevice(): Only for Physical HBAs
-	 */
-	int (*claim_phydevice)(struct se_hba *, struct se_device *);
-	/*
 	 * allocate_virtdevice():
 	 */
 	void *(*allocate_virtdevice)(struct se_hba *, const char *);
@@ -370,10 +364,6 @@ struct se_subsystem_api {
 	 * deactivate_device():
 	 */
 	void (*deactivate_device)(struct se_device *);
-	/*
-	 * release_phydevice():
-	 */
-	int (*release_phydevice)(struct se_device *);
 	/*
 	 * free_device():
 	 */

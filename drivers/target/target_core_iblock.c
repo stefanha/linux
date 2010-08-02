@@ -115,71 +115,6 @@ static int iblock_detach_hba(struct se_hba *hba)
 	return 0;
 }
 
-static int iblock_claim_phydevice(struct se_hba *hba, struct se_device *dev)
-{
-	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
-	struct block_device *bd;
-
-	if (dev->dev_flags & DF_READ_ONLY) {
-		printk(KERN_INFO "IBLOCK: Using previously claimed %p Major:"
-			"Minor" " - %d:%d\n", ib_dev->ibd_bd, ib_dev->ibd_major,
-			ib_dev->ibd_minor);
-	} else {
-		printk(KERN_INFO "IBLOCK: Claiming %p Major:Minor - %d:%d\n",
-			ib_dev, ib_dev->ibd_major, ib_dev->ibd_minor);
-
-		bd = linux_blockdevice_claim(ib_dev->ibd_major,
-			ib_dev->ibd_minor, (void *)ib_dev);
-		if (!(bd))
-			return -1;
-
-		ib_dev->ibd_bd = bd;
-	}
-
-	return 0;
-}
-
-static int __iblock_release_phydevice(struct iblock_dev *ib_dev, int ro)
-{
-	if (!ib_dev->ibd_bd)
-		return 0;
-
-	if (ro == 1) {
-		printk(KERN_INFO "IBLOCK: Calling blkdev_put() for Major:Minor"
-			" - %d:%d\n", ib_dev->ibd_major, ib_dev->ibd_minor);
-
-		if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
-			close_bdev_exclusive(ib_dev->ibd_bd, FMODE_READ);
-		else
-			blkdev_put(ib_dev->ibd_bd, FMODE_READ);
-	} else {
-		printk(KERN_INFO "IBLOCK: Releasing Major:Minor - %d:%d\n",
-			ib_dev->ibd_major, ib_dev->ibd_minor);
-
-		if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
-			close_bdev_exclusive(ib_dev->ibd_bd,
-					FMODE_WRITE|FMODE_READ);
-		else
-			linux_blockdevice_release(ib_dev->ibd_major,
-					ib_dev->ibd_minor, ib_dev->ibd_bd);
-	}
-
-	ib_dev->ibd_bd = NULL;
-
-	return 0;
-}
-
-static int iblock_release_phydevice(struct se_device *dev)
-{
-	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
-
-	if (!ib_dev->ibd_bd)
-		return 0;
-
-	return __iblock_release_phydevice(ib_dev,
-			(dev->dev_flags & DF_READ_ONLY) ? 1 : 0);
-}
-
 static void *iblock_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	struct iblock_dev *ib_dev = NULL;
@@ -211,6 +146,15 @@ static struct se_device *iblock_create_virtdevice(
 		printk(KERN_ERR "Unable to locate struct iblock_dev parameter\n");
 		return 0;
 	}
+	/*
+	 * These settings need to be made tunable..
+	 */
+	ib_dev->ibd_bio_set = bioset_create(32, 64);
+	if (!(ib_dev->ibd_bio_set)) {
+		printk(KERN_ERR "IBLOCK: Unable to create bioset()\n");
+		return 0;
+	}
+	printk(KERN_INFO "IBLOCK: Created bio_set()\n");
 	/*
 	 * Check if we have an open file descritpor passed through configfs
 	 * $TARGET/iblock_0/some_bd/fd pointing to an underlying.
@@ -255,18 +199,6 @@ static struct se_device *iblock_create_virtdevice(
 		ib_dev->ibd_bd = bd;
 		ib_dev->ibd_flags |= IBDF_BDEV_EXCLUSIVE;
 	}
-	/*
-	 * These settings need to be made tunable..
-	 */
-	ib_dev->ibd_bio_set = bioset_create(32, 64);
-	if (!(ib_dev->ibd_bio_set)) {
-		printk(KERN_ERR "IBLOCK: Unable to create bioset()\n");
-		__iblock_release_phydevice(ib_dev,
-				(dev_flags == DF_READ_ONLY ? 1 : 0));
-		goto failed;
-	}
-	printk(KERN_INFO "IBLOCK: Created bio_set() for major/minor: %d:%d\n",
-		ib_dev->ibd_major, ib_dev->ibd_minor);
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim() or
 	 * linux_blockdevice_claim() from the usage above.
@@ -328,6 +260,16 @@ static void iblock_deactivate_device(struct se_device *dev)
 static void iblock_free_device(void *p)
 {
 	struct iblock_dev *ib_dev = (struct iblock_dev *) p;
+
+	printk(KERN_INFO "IBLOCK: Releasing Major:Minor - %d:%d\n",
+		ib_dev->ibd_major, ib_dev->ibd_minor);
+
+	if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
+		close_bdev_exclusive(ib_dev->ibd_bd, FMODE_WRITE|FMODE_READ);
+	else
+		linux_blockdevice_release(ib_dev->ibd_major, ib_dev->ibd_minor,
+				ib_dev->ibd_bd);
+	ib_dev->ibd_bd = NULL;
 
 	if (ib_dev->ibd_bio_set) {
 		DEBUG_IBLOCK("Calling bioset_free ib_dev->ibd_bio_set: %p\n",
@@ -1058,13 +1000,11 @@ static struct se_subsystem_api iblock_template = {
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.attach_hba		= iblock_attach_hba,
 	.detach_hba		= iblock_detach_hba,
-	.claim_phydevice	= iblock_claim_phydevice,
 	.allocate_virtdevice	= iblock_allocate_virtdevice,
 	.create_virtdevice	= iblock_create_virtdevice,
 	.activate_device	= iblock_activate_device,
 	.deactivate_device	= iblock_deactivate_device,
 	.free_device		= iblock_free_device,
-	.release_phydevice	= iblock_release_phydevice,
 	.transport_complete	= iblock_transport_complete,
 	.allocate_request	= iblock_allocate_request,
 	.do_task		= iblock_do_task,

@@ -2249,13 +2249,6 @@ struct se_device *transport_add_device_to_core_hba(
 out:
 	if (!ret)
 		return dev;
-
-	/*
-	 * Release claim to OS dependant block_device that may have been
-	 * set by plugin with passed dev_flags.
-	 */
-	transport_generic_release_phydevice(dev, 0);
-
 	/*
 	 * Release newly allocated state for struct se_device
 	 */
@@ -2315,98 +2308,6 @@ void transport_generic_deactivate_device(struct se_device *dev)
 	wait_for_completion(&dev->dev_queue_obj->thread_done_comp);
 }
 
-/*	transport_generic_claim_phydevice()
- *
- *	Obtain exclusive access to OS dependant block-device via
- *	Storage Transport Plugin API.
- *
- *	In Linux v2.6 this means calling fs/block_dev.c:bd_claim()
- *	that is called in an plugin dependent method for claiming
- *	struct block_device.
- *
- *	Returns 0 - Already claimed or not able to claim
- *	Returns 1 - Successfuly claimed
- *	Returns < 0 - Error
- */
-int transport_generic_claim_phydevice(struct se_device *dev)
-{
-	int ret;
-	struct se_hba *hba;
-
-	/*
-	 * This function pointer is present when handling access
-	 * control to a OS dependant block subsystem.
-	 */
-	if (!TRANSPORT(dev)->claim_phydevice)
-		return 0;
-
-	if (dev->dev_flags & DF_READ_ONLY)
-		return 0;
-
-	if (dev->dev_flags & DF_CLAIMED_BLOCKDEV)
-		return 0;
-
-	hba = dev->se_hba;
-	if (!(hba)) {
-		printk(KERN_ERR "struct se_device->se_hba is NULL!\n");
-		return -1;
-	}
-
-	ret = TRANSPORT(dev)->claim_phydevice(hba, dev);
-	if (ret < 0)
-		return ret;
-
-	dev->dev_flags |= DF_CLAIMED_BLOCKDEV;
-
-	return 1;
-}
-EXPORT_SYMBOL(transport_generic_claim_phydevice);
-
-/*	transport_generic_release_phydevice():
- *
- *	Release exclusive access from OS dependant block-device via
- *	Storage Transport Plugin API.
- *
- *	In Linux v2.6 this means calling fs/block_dev.c:bd_release()
- *	see iscsi_target_pscsi.c and iscsi_target_iblock.c functions for
- *	struct se_subsystem_api->[claim,release]_phydevice()
- */
-void transport_generic_release_phydevice(struct se_device *dev, int check_pscsi)
-{
-	if (!TRANSPORT(dev)->release_phydevice)
-		return;
-
-	if (dev->dev_flags & DF_READ_ONLY) {
-		if (check_pscsi &&
-		   (TRANSPORT(dev)->transport_type !=
-		    TRANSPORT_PLUGIN_PHBA_PDEV))
-				return;
-
-		TRANSPORT(dev)->release_phydevice(dev);
-		return;
-	}
-
-	if (!(dev->dev_flags & DF_CLAIMED_BLOCKDEV))
-		return;
-
-	if (!dev->dev_ptr) {
-		printk(KERN_ERR "struct se_device->dev_ptr is NULL!\n");
-		BUG();
-	}
-
-	if (check_pscsi) {
-		if (TRANSPORT(dev)->transport_type !=
-		    TRANSPORT_PLUGIN_PHBA_PDEV)
-			return;
-
-		if (dev->dev_flags & DF_PERSISTENT_CLAIMED_BLOCKDEV)
-			return;
-	}
-
-	TRANSPORT(dev)->release_phydevice(dev);
-	dev->dev_flags &= ~DF_CLAIMED_BLOCKDEV;
-}
-
 /*	transport_generic_free_device():
  *
  *
@@ -2417,8 +2318,6 @@ void transport_generic_free_device(struct se_device *dev)
 		return;
 
 	transport_generic_deactivate_device(dev);
-
-	transport_generic_release_phydevice(dev, 0);
 
 	if (TRANSPORT(dev)->free_device)
 		TRANSPORT(dev)->free_device(dev->dev_ptr);

@@ -102,16 +102,6 @@ static int fd_detach_hba(struct se_hba *hba)
 	return 0;
 }
 
-static int fd_claim_phydevice(struct se_hba *hba, struct se_device *dev)
-{
-	return 0;
-}
-
-static int fd_release_phydevice(struct se_device *dev)
-{
-	return 0;
-}
-
 static void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)
 {
 	struct fd_dev *fd_dev;
@@ -1041,8 +1031,6 @@ static struct se_subsystem_api fileio_template = {
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
-	.claim_phydevice	= fd_claim_phydevice,
-	.release_phydevice	= fd_release_phydevice,
 	.allocate_virtdevice	= fd_allocate_virtdevice,
 	.create_virtdevice	= fd_create_virtdevice,
 	.activate_device	= fd_activate_device,

@@ -834,7 +834,6 @@ int core_tpg_post_dellun(
 	core_tpg_shutdown_lun(tpg, lun);
 
 	dev_obj_unexport(lun->lun_type_ptr, tpg, lun);
-	transport_generic_release_phydevice(lun->lun_type_ptr, 1);
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
