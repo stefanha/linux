@@ -46,7 +46,6 @@
 
 #include "target_core_hba.h"
 #include "target_core_mib.h"
-#include "target_core_plugin.h"
 
 /* SCSI mib table index */
 struct scsi_index_table scsi_index_table;

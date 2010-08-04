@@ -133,6 +133,7 @@
 #define MOD_MAX_SECTORS(ms, bs)			(ms % (PAGE_SIZE / bs))
 
 struct se_mem;
+struct se_subsystem_api;
 
 extern int init_se_global(void);
 extern void release_se_global(void);
@@ -141,8 +142,12 @@ extern int __iscsi_debug_dev(struct se_device *);
 #endif
 extern unsigned char *transport_get_iqn_sn(void);
 extern void transport_init_queue_obj(struct se_queue_obj *);
+extern int transport_subsystem_check_init(void);
+extern int transport_subsystem_register(struct se_subsystem_api *);
+extern void transport_subsystem_release(struct se_subsystem_api *);
 extern void transport_load_plugins(void);
-extern struct se_plugin *transport_core_get_plugin_by_name(const char *name);
+extern struct se_subsystem_api *transport_core_get_sub_by_name(const char *);
+extern void transport_core_put_sub(struct se_subsystem_api *);
 extern void transport_check_dev_params_delim(char *, char **);
 extern struct se_session *transport_init_session(void);
 extern void __transport_register_session(struct se_portal_group *,
@@ -334,6 +339,14 @@ struct se_subsystem_api {
 	 * Transport Type.
 	 */
 	u8 transport_type;
+	/*
+	 * Counter for struct se_hba reference
+	 */
+	atomic_t sub_api_hba_cnt;
+	/*
+	 * Used for global se_subsystem_api list_head
+	 */
+	struct list_head sub_api_list;
 	/*
 	 * attach_hba():
 	 */

@@ -48,9 +48,9 @@
 
 #include "target_core_alua.h"
 #include "target_core_hba.h"
-#include "target_core_plugin.h"
 #include "target_core_pr.h"
 #include "target_core_seobj.h"
+#include "target_core_rd.h"
 
 struct list_head g_tf_list;
 struct mutex g_tf_lock;
@@ -131,6 +131,13 @@ static struct config_group *target_core_register_fabric(
 
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> group: %p name:"
 			" %s\n", group, name);
+	/*
+	 * Ensure that TCM subsystem plugins are loaded at this point for
+	 * using the RAMDISK_DR virtual LUN 0 and all other struct se_port
+	 * LUN symlinks.
+	 */
+	if (transport_subsystem_check_init() < 0)
+		return ERR_PTR(-EINVAL);
 
 	fabric_cg = kzalloc(sizeof(struct config_group), GFP_KERNEL);
 	if (!(fabric_cg))
@@ -1654,14 +1661,9 @@ static ssize_t target_core_show_dev_info(void *p, char *page)
 {
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	struct se_subsystem_api *t;
-	int ret = 0, bl = 0;
+	struct se_subsystem_api *t = hba->transport;
+	int bl = 0;
 	ssize_t read_bytes = 0;
-
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0))
-		return 0;
 
 	if (!(se_dev->se_dev_ptr))
 		return -ENODEV;
@@ -1687,19 +1689,13 @@ static ssize_t target_core_store_dev_control(
 {
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	struct se_subsystem_api *t;
-	int ret = 0;
+	struct se_subsystem_api *t = hba->transport;
 
 	if (!(se_dev->se_dev_su_ptr)) {
 		printk(KERN_ERR "Unable to locate struct se_subsystem_dev>se"
 				"_dev_su_ptr\n");
 		return -EINVAL;
 	}
-
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0))
-		return -EINVAL;
 
 	return t->set_configfs_dev_params(hba, se_dev, page, count);
 }
@@ -1717,19 +1713,13 @@ static ssize_t target_core_store_dev_fd(void *p, const char *page, size_t count)
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_device *dev;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	struct se_subsystem_api *t;
-	int ret = 0;
+	struct se_subsystem_api *t = hba->transport;
 
 	if (se_dev->se_dev_ptr) {
 		printk(KERN_ERR "se_dev->se_dev_ptr already set, ignoring"
 			" fd request\n");
 		return -EEXIST;
 	}
-
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0))
-		return -EINVAL;
 
 	if (!(t->create_virtdevice_from_fd)) {
 		printk(KERN_ERR "struct se_subsystem_api->create_virtdevice_from"
@@ -1860,9 +1850,8 @@ static ssize_t target_core_store_dev_enable(
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
 	struct se_device *dev;
 	struct se_hba *hba = se_dev->se_dev_hba;
-	struct se_subsystem_api *t;
+	struct se_subsystem_api *t = hba->transport;
 	char *ptr;
-	int ret = 0;
 
 	ptr = strstr(page, "1");
 	if (!(ptr)) {
@@ -1875,11 +1864,6 @@ static ssize_t target_core_store_dev_enable(
 				" object\n");
 		return -EEXIST;
 	}
-
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0))
-		return -EINVAL;
 
 	if (t->check_configfs_dev_params(hba, se_dev) < 0)
 		return -EINVAL;
@@ -2734,7 +2718,6 @@ static struct config_group *target_core_call_createdev(
 	struct se_subsystem_api *t;
 	struct config_item *hba_ci;
 	struct config_group *dev_cg = NULL, *tg_pt_gp_cg = NULL;
-	int ret = 0;
 
 	hba_ci = &group->cg_item;
 	if (!(hba_ci)) {
@@ -2747,21 +2730,16 @@ static struct config_group *target_core_call_createdev(
 		printk(KERN_ERR "Unable to locate struct se_hba from struct config_item\n");
 		return NULL;
 	}
-
 	/*
 	 * Locate the struct se_subsystem_api from parent's struct se_hba.
 	 */
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0)) {
-		core_put_hba(hba);
-		return NULL;
-	}
+	t = hba->transport;
 
 	se_dev = kzalloc(sizeof(struct se_subsystem_dev), GFP_KERNEL);
 	if (!(se_dev)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" struct se_subsystem_dev\n");
+		core_put_hba(hba);
 		return NULL;
 	}
 	INIT_LIST_HEAD(&se_dev->g_se_dev_list);
@@ -2878,17 +2856,14 @@ static void target_core_call_freedev(
 	struct se_subsystem_api *t;
 	struct config_item *df_item;
 	struct config_group *dev_cg, *tg_pt_gp_cg;
-	int i, ret = 0;
+	int i, ret;
 
 	hba = target_core_get_hba_from_item(
 			&se_dev->se_dev_hba->hba_group.cg_item);
 	if (!(hba))
 		goto out;
 
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0))
-		goto hba_out;
+	t = hba->transport;
 
 	spin_lock(&se_global->g_device_lock);
 	list_del(&se_dev->g_se_dev_list);
@@ -3048,10 +3023,9 @@ static struct config_group *target_core_call_addhbatotarget(
 {
 	char *se_plugin_str, *str, *str2;
 	struct se_hba *hba;
-	struct se_plugin *se_plugin;
 	char buf[TARGET_CORE_NAME_MAX_LEN];
 	unsigned long plugin_dep_id = 0;
-	int hba_type = 0, ret;
+	int ret;
 
 	memset(buf, 0, TARGET_CORE_NAME_MAX_LEN);
 	if (strlen(name) > TARGET_CORE_NAME_MAX_LEN) {
@@ -3082,26 +3056,23 @@ static struct config_group *target_core_call_addhbatotarget(
 		str++; /* Skip to start of plugin dependent ID */
 	}
 
-	se_plugin = transport_core_get_plugin_by_name(se_plugin_str);
-	if (!(se_plugin))
-		return ERR_PTR(-EINVAL);
-
-	hba_type = se_plugin->plugin_type;
 	ret = strict_strtoul(str, 0, &plugin_dep_id);
 	if (ret < 0) {
 		printk(KERN_ERR "strict_strtoul() returned %d for"
 				" plugin_dep_id\n", ret);
 		return ERR_PTR(-EINVAL);
 	}
-	printk(KERN_INFO "Target_Core_ConfigFS: Located se_plugin: %p"
-		" plugin_name: %s hba_type: %d plugin_dep_id: %lu\n",
-		se_plugin, se_plugin->plugin_name, hba_type, plugin_dep_id);
+	/*
+	 * Load up TCM subsystem plugins if they have not already been loaded.
+	 */
+	if (transport_subsystem_check_init() < 0)
+		return ERR_PTR(-EINVAL);
 
-	hba = core_alloc_hba(hba_type);
+	hba = core_alloc_hba();
 	if (!(hba))
 		return ERR_PTR(-EINVAL);
 
-	ret = se_core_add_hba(hba, (u32)plugin_dep_id);
+	ret = se_core_add_hba(hba, se_plugin_str, (u32)plugin_dep_id);
 	if (ret < 0)
 		goto out;
 
@@ -3241,8 +3212,13 @@ int target_core_init_configfs(void)
 	printk(KERN_INFO "TARGET_CORE[0]: Initialized ConfigFS Fabric"
 		" Infrastructure: "TARGET_CORE_CONFIGFS_VERSION" on %s/%s"
 		" on "UTS_RELEASE"\n", utsname()->sysname, utsname()->machine);
-
-	tcm_sub_plugin_load_all_classes();
+	/*
+	 * Register built-in RAMDISK subsystem logic for virtual LUN 0
+	 */
+	ret = rd_module_init();
+	if (ret < 0)
+		goto out;
+	
 	if (core_dev_setup_virtual_lun0() < 0)
 		goto out;
 
@@ -3261,8 +3237,8 @@ out:
 	configfs_unregister_subsystem(subsys);
 	if (scsi_target_proc)
 		remove_proc_entry("scsi_target", 0);
-	core_dev_release_virtual_lun0();
-	tcm_sub_plugin_unload_all_classes();
+	core_dev_release_virtual_lun0();	
+	rd_module_exit();
 out_global:
 	if (se_global->default_lu_gp) {
 		core_alua_free_lu_gp(se_global->default_lu_gp);
@@ -3329,7 +3305,7 @@ void target_core_exit_configfs(void)
 	remove_scsi_target_mib();
 	remove_proc_entry("scsi_target", 0);
 	core_dev_release_virtual_lun0();
-	tcm_sub_plugin_unload_all_classes();
+	rd_module_exit();
 	release_se_global();
 
 	return;

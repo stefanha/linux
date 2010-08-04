@@ -41,7 +41,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 
-#include "target_core_plugin.h"
 #include "target_core_rd.h"
 
 static struct se_subsystem_api rd_dr_template;
@@ -71,8 +70,6 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 	atomic_set(&hba->left_queue_depth, RD_HBA_QUEUE_DEPTH);
 	atomic_set(&hba->max_queue_depth, RD_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) rd_host;
-	hba->transport = (hba->type == RAMDISK_DR) ?
-			&rd_dr_template : &rd_mcp_template;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM Ramdisk HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -1509,12 +1506,28 @@ static struct se_subsystem_api rd_mcp_template = {
 	.spc			= &rd_template_spc,
 };
 
-void __init rd_subsystem_init(void)
+int __init rd_module_init(void)
 {
-	tcm_sub_plugin_register((void *)&rd_dr_template, rd_dr_template.type,
-			rd_dr_template.name, PLUGIN_TYPE_TRANSPORT,
-			rd_dr_template.get_plugin_info, NULL, NULL);
-	tcm_sub_plugin_register((void *)&rd_mcp_template, rd_mcp_template.type,
-			rd_mcp_template.name, PLUGIN_TYPE_TRANSPORT,
-			rd_mcp_template.get_plugin_info, NULL, NULL);
+	int ret;
+
+	INIT_LIST_HEAD(&rd_dr_template.sub_api_list);
+	INIT_LIST_HEAD(&rd_mcp_template.sub_api_list);
+
+	ret = transport_subsystem_register(&rd_dr_template);
+	if (ret < 0)
+		return ret;
+
+	ret = transport_subsystem_register(&rd_mcp_template);
+	if (ret < 0) {
+		transport_subsystem_release(&rd_dr_template);
+		return ret;
+	}
+
+	return 0;
+}
+
+void rd_module_exit(void)
+{
+	transport_subsystem_release(&rd_dr_template);
+	transport_subsystem_release(&rd_mcp_template);
 }

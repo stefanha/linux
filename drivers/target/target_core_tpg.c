@@ -45,7 +45,6 @@
 #include <target/target_core_fabric_ops.h>
 
 #include "target_core_hba.h"
-#include "target_core_plugin.h"
 #include "target_core_seobj.h"
 
 /*	core_clear_initiator_node_from_tpg():

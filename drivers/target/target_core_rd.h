@@ -52,7 +52,9 @@ extern struct se_global *se_global;
 
 extern struct kmem_cache *se_mem_cache;
 
-void __init rd_subsystem_init(void);
+/* Used in target_core_init_configfs() for virtual LUN 0 access */
+int __init rd_module_init(void);
+void rd_module_exit(void);
 
 #define RRF_EMULATE_CDB		0x01
 #define RRF_GOT_LBA		0x02

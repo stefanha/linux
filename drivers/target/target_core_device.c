@@ -47,7 +47,6 @@
 
 #include "target_core_alua.h"
 #include "target_core_hba.h"
-#include "target_core_plugin.h"
 #include "target_core_pr.h"
 #include "target_core_seobj.h"
 #include "target_core_ua.h"
@@ -118,6 +117,7 @@ struct block_device *linux_blockdevice_claim(
 
 	return bd;
 }
+EXPORT_SYMBOL(linux_blockdevice_claim);
 
 int linux_blockdevice_release(int major, int minor, struct block_device *bd_p)
 {
@@ -138,6 +138,7 @@ int linux_blockdevice_release(int major, int minor, struct block_device *bd_p)
 
 	return 0;
 }
+EXPORT_SYMBOL(linux_blockdevice_release);
 
 int linux_blockdevice_check(int major, int minor)
 {
@@ -1499,25 +1500,20 @@ int core_dev_setup_virtual_lun0(void)
 	char buf[16];
 	int ret;
 
-	hba = core_alloc_hba(RAMDISK_DR);
+	hba = core_alloc_hba();
 	if (!(hba))
 		return -ENOMEM;
 
 	hba->hba_flags |= HBA_FLAGS_INTERNAL_USE;
-	ret = se_core_add_hba(hba, 0);
+	ret = se_core_add_hba(hba, "rd_dr", 0);
 	if (ret < 0) {
+		printk("se_core_add_hba() with %d\n", ret);
 		kmem_cache_free(se_hba_cache, hba);
 		return ret;
 	}
 
 	se_global->g_lun0_hba = hba;
-
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!t || (ret != 0)) {
-		ret = -EINVAL;
-		goto out;
-	}
+	t = hba->transport;
 
 	se_dev = kzalloc(sizeof(struct se_subsystem_dev), GFP_KERNEL);
 	if (!(se_dev)) {

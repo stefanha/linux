@@ -43,7 +43,6 @@
 #include <target/target_core_transport.h>
 
 #include "target_core_hba.h"
-#include "target_core_plugin.h"
 
 int core_get_hba(struct se_hba *hba)
 {
@@ -51,7 +50,7 @@ int core_get_hba(struct se_hba *hba)
 		-1 : 0);
 }
 
-struct se_hba *core_alloc_hba(int hba_type)
+struct se_hba *core_alloc_hba(void)
 {
 	struct se_hba *hba;
 
@@ -62,7 +61,6 @@ struct se_hba *core_alloc_hba(int hba_type)
 	}
 
 	hba->hba_status |= HBA_STATUS_FREE;
-	hba->type = hba_type;
 	INIT_LIST_HEAD(&hba->hba_dev_list);
 	spin_lock_init(&hba->device_lock);
 	spin_lock_init(&hba->hba_queue_lock);
@@ -85,6 +83,7 @@ EXPORT_SYMBOL(core_put_hba);
  */
 int se_core_add_hba(
 	struct se_hba *hba,
+	const char *plugin_name,
 	u32 plugin_dep_id)
 {
 	struct se_subsystem_api *t;
@@ -96,14 +95,18 @@ int se_core_add_hba(
 	atomic_set(&hba->max_queue_depth, 0);
 	atomic_set(&hba->left_queue_depth, 0);
 
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
+	t = transport_core_get_sub_by_name(plugin_name);
 	if (!(t))
 		return -EINVAL;
 
+	hba->transport = t;
+
 	ret = t->attach_hba(hba, plugin_dep_id);
-	if (ret < 0)
+	if (ret < 0) {
+		hba->transport = NULL;
+		transport_core_put_sub(t);
 		return ret;
+	}
 
 	hba->hba_status &= ~HBA_STATUS_FREE;
 	hba->hba_status |= HBA_STATUS_ACTIVE;
@@ -123,13 +126,7 @@ EXPORT_SYMBOL(se_core_add_hba);
 static int se_core_shutdown_hba(
 	struct se_hba *hba)
 {
-	int ret = 0;
-	struct se_subsystem_api *t;
-
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, hba->type, &ret);
-	if (!(t))
-		return ret;
+	struct se_subsystem_api *t = hba->transport;;
 
 	if (t->detach_hba(hba) < 0)
 		return -1;
@@ -165,12 +162,13 @@ int se_core_del_hba(
 	spin_unlock(&hba->device_lock);
 
 	se_core_shutdown_hba(hba);
+	if (!(hba->hba_flags & HBA_FLAGS_INTERNAL_USE))
+		transport_core_put_sub(hba->transport);
 
 	spin_lock(&se_global->hba_lock);
 	list_del(&hba->hba_list);
 	spin_unlock(&se_global->hba_lock);
 
-	hba->type = 0;
 	hba->transport = NULL;
 	hba->hba_status &= ~HBA_STATUS_ACTIVE;
 	hba->hba_status |= HBA_STATUS_FREE;

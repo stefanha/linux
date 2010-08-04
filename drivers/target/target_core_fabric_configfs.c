@@ -47,7 +47,6 @@
 
 #include "target_core_alua.h"
 #include "target_core_hba.h"
-#include "target_core_plugin.h"
 #include "target_core_pr.h"
 #include "target_core_seobj.h"
 

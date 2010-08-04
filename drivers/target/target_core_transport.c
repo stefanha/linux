@@ -55,17 +55,10 @@
 
 #include "target_core_alua.h"
 #include "target_core_hba.h"
-#include "target_core_plugin.h"
 #include "target_core_pr.h"
 #include "target_core_scdb.h"
 #include "target_core_seobj.h"
 #include "target_core_ua.h"
-
-#include "target_core_iblock.h"
-#include "target_core_pscsi.h"
-#include "target_core_file.h"
-#include "target_core_rd.h"
-#include "target_core_stgt.h"
 
 /* #define DEBUG_CDB_HANDLER */
 #ifdef DEBUG_CDB_HANDLER
@@ -203,6 +196,7 @@ struct kmem_cache *se_sess_cache;
 struct kmem_cache *se_hba_cache;
 struct kmem_cache *se_ua_cache;
 struct kmem_cache *se_mem_cache;
+EXPORT_SYMBOL(se_mem_cache); /* Used for target_core_rd.c */
 struct kmem_cache *t10_pr_reg_cache;
 struct kmem_cache *t10_alua_lu_gp_cache;
 struct kmem_cache *t10_alua_lu_gp_mem_cache;
@@ -267,11 +261,13 @@ int init_se_global(void)
 	INIT_LIST_HEAD(&global->g_se_tpg_list);
 	INIT_LIST_HEAD(&global->g_hba_list);
 	INIT_LIST_HEAD(&global->g_se_dev_list);
+	INIT_LIST_HEAD(&global->g_sub_api_list);
 	spin_lock_init(&global->g_device_lock);
 	spin_lock_init(&global->hba_lock);
 	spin_lock_init(&global->se_tpg_lock);
 	spin_lock_init(&global->lu_gps_lock);
 	spin_lock_init(&global->plugin_class_lock);
+	mutex_init(&global->g_sub_api_mutex);
 
 	se_cmd_cache = kmem_cache_create("se_cmd_cache",
 			sizeof(struct se_cmd), __alignof__(struct se_cmd), 0, NULL);
@@ -365,19 +361,10 @@ int init_se_global(void)
 		goto out;
 	}
 
-	global->plugin_class_list = kzalloc((sizeof(struct se_plugin_class) *
-				MAX_PLUGIN_CLASSES), GFP_KERNEL);
-	if (!(global->plugin_class_list)) {
-		printk(KERN_ERR "Unable to allocate global->"
-			"plugin_class_list\n");
-		goto out;
-	}
-
 	se_global = global;
 
 	return 0;
 out:
-	kfree(global->plugin_class_list);
 	if (se_cmd_cache)
 		kmem_cache_destroy(se_cmd_cache);
 	if (se_task_cache)
@@ -414,7 +401,6 @@ void release_se_global(void)
 	if (!(global))
 		return;
 
-	kfree(global->plugin_class_list);
 	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_task_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
@@ -506,6 +492,7 @@ unsigned char *transport_get_iqn_sn(void)
 	 */
 	return "1234567890";
 }
+EXPORT_SYMBOL(transport_get_iqn_sn);
 
 void transport_init_queue_obj(struct se_queue_obj *qobj)
 {
@@ -518,36 +505,96 @@ void transport_init_queue_obj(struct se_queue_obj *qobj)
 }
 EXPORT_SYMBOL(transport_init_queue_obj);
 
-void transport_load_plugins(void)
+static int transport_subsystem_reqmods(void)
 {
-	pscsi_subsystem_init();
-	iblock_subsystem_init();
-	fileio_subsystem_init();
-	rd_subsystem_init();
-	stgt_subsystem_init();
+	int ret;
+
+	ret = request_module("target_core_iblock");
+	if (ret != 0)
+		printk(KERN_ERR "Unable to load target_core_iblock\n");
+		
+	ret = request_module("target_core_file");
+	if (ret != 0)
+		printk(KERN_ERR "Unable to load target_core_file\n");
+
+	ret = request_module("target_core_pscsi");
+	if (ret != 0)
+		printk(KERN_ERR "Unable to load target_core_pscsi\n");
+
+	ret = request_module("target_core_stgt");
+	if (ret != 0)
+		printk(KERN_ERR "Unable to load target_core_stgt\n");
+
+	return 0;
 }
 
-struct se_plugin *transport_core_get_plugin_by_name(const char *name)
+int transport_subsystem_check_init(void)
 {
-	struct se_plugin_class *pc;
-	struct se_plugin *p;
-	int i;
+	if (se_global->g_sub_api_initialized)
+		return 0;
+	/*
+	 * Request the loading of known TCM subsystem plugins..
+	 */
+	if (transport_subsystem_reqmods() < 0)
+		return -1;
 
-	pc = tcm_sub_plugin_get_class(PLUGIN_TYPE_TRANSPORT);
-	if (!(pc))
-		return NULL;
+	se_global->g_sub_api_initialized = 1;
+	return 0;
+}
 
-	for (i = 0; i < MAX_PLUGINS; i++) {
-		p = &pc->plugin_array[i];
+int transport_subsystem_register(struct se_subsystem_api *sub_api)
+{
+	struct se_subsystem_api *s;
 
-		if (!p->plugin_obj)
-			continue;
-
-		if (!(strncmp(name, p->plugin_name, strlen(p->plugin_name))))
-			return p;
+	mutex_lock(&se_global->g_sub_api_mutex);
+	list_for_each_entry(s, &se_global->g_sub_api_list, sub_api_list) {
+		if (!(strcmp(s->name, sub_api->name))) {
+			printk(KERN_ERR "%p is already registered with"
+				" duplicate name %s, unable to process"
+				" request\n", s, s->name);
+			mutex_unlock(&se_global->g_sub_api_mutex);
+			return -EEXIST;
+		}
 	}
+	list_add_tail(&sub_api->sub_api_list, &se_global->g_sub_api_list);
+	mutex_unlock(&se_global->g_sub_api_mutex);
+
+	printk(KERN_INFO "TCM: Registered subsystem plugin: %s\n",
+			sub_api->name);
+	return 0;
+}
+EXPORT_SYMBOL(transport_subsystem_register);
+
+void transport_subsystem_release(struct se_subsystem_api *sub_api)
+{
+	mutex_lock(&se_global->g_sub_api_mutex);
+	list_del(&sub_api->sub_api_list);
+	mutex_unlock(&se_global->g_sub_api_mutex);
+}
+EXPORT_SYMBOL(transport_subsystem_release);
+
+struct se_subsystem_api *transport_core_get_sub_by_name(const char *sub_name)
+{
+	struct se_subsystem_api *s;
+
+	mutex_lock(&se_global->g_sub_api_mutex);
+	list_for_each_entry(s, &se_global->g_sub_api_list, sub_api_list) {
+		if (!(strcmp(s->name, sub_name))) {
+			atomic_inc(&s->sub_api_hba_cnt);
+			smp_mb__after_atomic_inc();
+			mutex_unlock(&se_global->g_sub_api_mutex);
+			return s;
+		}
+	}
+	mutex_unlock(&se_global->g_sub_api_mutex);
 
 	return NULL;
+}
+
+void transport_core_put_sub(struct se_subsystem_api *s)
+{
+	atomic_dec(&s->sub_api_hba_cnt);
+	smp_mb__after_atomic_dec();
 }
 
 void transport_check_dev_params_delim(char *ptr, char **cur)
@@ -563,6 +610,7 @@ void transport_check_dev_params_delim(char *ptr, char **cur)
 			*cur = NULL;
 	}
 }
+EXPORT_SYMBOL(transport_check_dev_params_delim);
 
 struct se_session *transport_init_session(void)
 {
@@ -1226,6 +1274,7 @@ check_task_stop:
 
 	cmd->transport_add_cmd_to_queue(cmd, t_state);
 }
+EXPORT_SYMBOL(transport_complete_task);
 
 /*
  * Called by transport_add_tasks_from_cmd() once a struct se_cmd's
@@ -1485,13 +1534,8 @@ void transport_dump_dev_info(
 	char *b,        /* Pointer to info buffer */
 	int *bl)
 {
-	struct se_subsystem_api *t;
-	int ret = 0;
-
-	t = (struct se_subsystem_api *)tcm_sub_plugin_get_obj(
-			PLUGIN_TYPE_TRANSPORT, dev->type, &ret);
-	if (!t || (ret != 0))
-		return;
+	struct se_hba *hba = dev->se_hba;
+	struct se_subsystem_api *t = hba->transport;
 
 	t->get_dev_info(dev, b, bl);
 	*bl += sprintf(b + *bl, "        ");
@@ -2267,6 +2311,7 @@ out:
 
 	return NULL;
 }
+EXPORT_SYMBOL(transport_add_device_to_core_hba);
 
 /*	transport_generic_activate_device():
  *
@@ -4707,6 +4752,7 @@ set_len:
 
 	return 0;
 }
+EXPORT_SYMBOL(transport_generic_emulate_inquiry);
 
 int transport_generic_emulate_readcapacity(
 	struct se_cmd *cmd,
@@ -4726,6 +4772,7 @@ int transport_generic_emulate_readcapacity(
 
 	return 0;
 }
+EXPORT_SYMBOL(transport_generic_emulate_readcapacity);
 
 int transport_generic_emulate_readcapacity_16(
 	struct se_cmd *cmd,
@@ -4749,6 +4796,7 @@ int transport_generic_emulate_readcapacity_16(
 
 	return 0;
 }
+EXPORT_SYMBOL(transport_generic_emulate_readcapacity_16);
 
 static int transport_modesense_rwrecovery(unsigned char *p)
 {
@@ -4926,6 +4974,7 @@ int transport_generic_emulate_modesense(
 
 	return 0;
 }
+EXPORT_SYMBOL(transport_generic_emulate_modesense);
 
 int transport_generic_emulate_request_sense(
 	struct se_cmd *cmd,
@@ -4982,6 +5031,7 @@ int transport_generic_emulate_request_sense(
 
 	return 0;
 }
+EXPORT_SYMBOL(transport_generic_emulate_request_sense);
 
 /*
  * Used to obtain Sense Data from underlying Linux/SCSI struct scsi_cmnd
@@ -5713,6 +5763,7 @@ fail:
 
 	return NULL;
 }
+EXPORT_SYMBOL(transport_allocate_passthrough);
 
 void transport_passthrough_release(
 	struct se_cmd *cmd)
@@ -5728,6 +5779,7 @@ void transport_passthrough_release(
 
 	transport_generic_remove(cmd, 0, 0);
 }
+EXPORT_SYMBOL(transport_passthrough_release);
 
 int transport_passthrough_complete(
 	struct se_cmd *cmd)
@@ -5855,6 +5907,7 @@ int transport_generic_passthrough(struct se_cmd *cmd)
 {
 	return transport_generic_passthrough_async(cmd, NULL, NULL);
 }
+EXPORT_SYMBOL(transport_generic_passthrough);
 
 /*
  * Called from transport_generic_complete_ok() and
