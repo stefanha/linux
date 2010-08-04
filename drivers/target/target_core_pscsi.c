@@ -217,7 +217,6 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	atomic_set(&hba->max_queue_depth, hba_depth);
 
 	hba->hba_ptr = (void *)phv;
-	try_module_get(THIS_MODULE);
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM SCSI HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -251,7 +250,6 @@ static int pscsi_detach_hba(struct se_hba *hba)
 
 	kfree(phv);
 	hba->hba_ptr = NULL;
-	module_put(THIS_MODULE);
 
 	return 0;
 }
@@ -1850,6 +1848,7 @@ static struct se_subsystem_api pscsi_template = {
 	.name			= "pscsi",
 	.type			= PSCSI,
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,
+	.external_submod	= 1,
 	.attach_hba		= pscsi_attach_hba,
 	.detach_hba		= pscsi_detach_hba,
 	.pmode_enable_hba	= pscsi_pmode_enable_hba,
@@ -1889,7 +1888,7 @@ int __init pscsi_module_init(void)
 
 	INIT_LIST_HEAD(&pscsi_template.sub_api_list);
 
-	ret = transport_subsystem_register(&pscsi_template);
+	ret = transport_subsystem_register(&pscsi_template, THIS_MODULE);
 	if (ret < 0)
 		return ret;
 

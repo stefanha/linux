@@ -542,9 +542,19 @@ int transport_subsystem_check_init(void)
 	return 0;
 }
 
-int transport_subsystem_register(struct se_subsystem_api *sub_api)
+int transport_subsystem_register(
+	struct se_subsystem_api *sub_api,
+	struct module *sub_owner)
 {
 	struct se_subsystem_api *s;
+	/*
+	 * Save struct module * for TFO [attach,detach]_hba() reference
+	 * in se_core_add_hba()
+	 */
+	if (sub_api->external_submod && (sub_owner != NULL))
+		sub_api->sub_owner = sub_owner;
+	else
+		sub_api->sub_owner = NULL;
 
 	mutex_lock(&se_global->g_sub_api_mutex);
 	list_for_each_entry(s, &se_global->g_sub_api_list, sub_api_list) {
@@ -559,8 +569,8 @@ int transport_subsystem_register(struct se_subsystem_api *sub_api)
 	list_add_tail(&sub_api->sub_api_list, &se_global->g_sub_api_list);
 	mutex_unlock(&se_global->g_sub_api_mutex);
 
-	printk(KERN_INFO "TCM: Registered subsystem plugin: %s\n",
-			sub_api->name);
+	printk(KERN_INFO "TCM: Registered subsystem plugin: %s struct module:"
+			" %p\n", sub_api->name, sub_api->sub_owner);
 	return 0;
 }
 EXPORT_SYMBOL(transport_subsystem_register);

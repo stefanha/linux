@@ -143,7 +143,8 @@ extern int __iscsi_debug_dev(struct se_device *);
 extern unsigned char *transport_get_iqn_sn(void);
 extern void transport_init_queue_obj(struct se_queue_obj *);
 extern int transport_subsystem_check_init(void);
-extern int transport_subsystem_register(struct se_subsystem_api *);
+extern int transport_subsystem_register(struct se_subsystem_api *,
+				struct module *);
 extern void transport_subsystem_release(struct se_subsystem_api *);
 extern void transport_load_plugins(void);
 extern struct se_subsystem_api *transport_core_get_sub_by_name(const char *);
@@ -339,6 +340,14 @@ struct se_subsystem_api {
 	 * Transport Type.
 	 */
 	u8 transport_type;
+	/*
+	 * For target_core_rd.c internal usage
+	 */
+	int external_submod;
+	/*
+	 * struct module for struct se_hba references
+	 */
+	struct module *sub_owner;
 	/*
 	 * Counter for struct se_hba reference
 	 */

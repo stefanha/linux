@@ -183,7 +183,6 @@ static int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 		return err;
 	}
 	stgt_host_no_cnt++;
-	try_module_get(THIS_MODULE);
 
 	return 0;
 }
@@ -275,7 +274,6 @@ static int stgt_detach_hba(struct se_hba *hba)
 
 	device_unregister(&stgt_hba->dev);
 	hba->hba_ptr = NULL;
-	module_put(THIS_MODULE);
 
 	return 0;
 }
@@ -925,6 +923,7 @@ static struct se_subsystem_api stgt_template = {
 	.name			= "stgt",
 	.type			= STGT,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
+	.external_submod	= 1,
 	.attach_hba		= stgt_attach_hba,
 	.detach_hba		= stgt_detach_hba,
 	.activate_device	= stgt_activate_device,
@@ -965,7 +964,7 @@ int __init stgt_module_init(void)
 
 	INIT_LIST_HEAD(&stgt_template.sub_api_list);
 
-	ret = transport_subsystem_register(&stgt_template);
+	ret = transport_subsystem_register(&stgt_template, THIS_MODULE);
 	if (ret < 0)
 		return ret;
 

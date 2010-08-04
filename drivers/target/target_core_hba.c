@@ -100,6 +100,20 @@ int se_core_add_hba(
 		return -EINVAL;
 
 	hba->transport = t;
+	/*
+	 * Get TCM subsystem api struct module reference to struct se_hba
+	 */
+	if (t->external_submod) {
+		if (!(t->sub_owner)) {
+			printk(KERN_ERR "Pointer to struct module does not"
+				" exist for %s\n", t->name);
+			hba->transport = NULL;
+			transport_core_put_sub(t);
+			return -EINVAL;
+		}
+
+		__module_get(t->sub_owner);
+	}
 
 	ret = t->attach_hba(hba, plugin_dep_id);
 	if (ret < 0) {
@@ -130,6 +144,11 @@ static int se_core_shutdown_hba(
 
 	if (t->detach_hba(hba) < 0)
 		return -1;
+	/*
+	 * Release TCM subsystem api struct module reference from struct se_hba
+	 */
+	if (t->external_submod)
+		module_put(t->sub_owner);
 
 	return 0;
 }

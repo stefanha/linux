@@ -65,7 +65,6 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 	atomic_set(&hba->left_queue_depth, FD_HBA_QUEUE_DEPTH);
 	atomic_set(&hba->max_queue_depth, FD_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) fd_host;
-	try_module_get(THIS_MODULE);
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM FILEIO HBA Driver %s on Generic"
 		" Target Core Stack %s\n", hba->hba_id, FD_VERSION,
@@ -97,7 +96,6 @@ static int fd_detach_hba(struct se_hba *hba)
 
 	kfree(fd_host);
 	hba->hba_ptr = NULL;
-	module_put(THIS_MODULE);
 
 	return 0;
 }
@@ -1029,6 +1027,7 @@ static struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
 	.type			= FILEIO,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
+	.external_submod	= 1,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
 	.allocate_virtdevice	= fd_allocate_virtdevice,
@@ -1066,7 +1065,7 @@ int __init fileio_module_init(void)
 
 	INIT_LIST_HEAD(&fileio_template.sub_api_list);
 
-	ret = transport_subsystem_register(&fileio_template);
+	ret = transport_subsystem_register(&fileio_template, THIS_MODULE);
 	if (ret < 0)
 		return ret;
 

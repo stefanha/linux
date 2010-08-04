@@ -1437,6 +1437,7 @@ static struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
 	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
+	.external_submod	= 0,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
@@ -1475,6 +1476,7 @@ static struct se_subsystem_api rd_mcp_template = {
 	.name			= "rd_mcp",
 	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
+	.external_submod	= 0,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
@@ -1513,11 +1515,11 @@ int __init rd_module_init(void)
 	INIT_LIST_HEAD(&rd_dr_template.sub_api_list);
 	INIT_LIST_HEAD(&rd_mcp_template.sub_api_list);
 
-	ret = transport_subsystem_register(&rd_dr_template);
+	ret = transport_subsystem_register(&rd_dr_template, NULL);
 	if (ret < 0)
 		return ret;
 
-	ret = transport_subsystem_register(&rd_mcp_template);
+	ret = transport_subsystem_register(&rd_mcp_template, NULL);
 	if (ret < 0) {
 		transport_subsystem_release(&rd_dr_template);
 		return ret;
