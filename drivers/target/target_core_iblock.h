@@ -38,8 +38,6 @@
 
 extern struct se_global *se_global;
 
-void __init iblock_subsystem_init(void);
-
 struct iblock_req {
 	unsigned char ib_scsi_cdb[SCSI_CDB_SIZE];
 	atomic_t ib_bio_cnt;

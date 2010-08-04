@@ -51,8 +51,6 @@ extern struct block_device *linux_blockdevice_claim(int, int, void *);
 extern int linux_blockdevice_release(int, int, struct block_device *);
 extern int linux_blockdevice_check(int, int);
 
-void __init fileio_subsystem_init(void);
-
 #define RRF_EMULATE_CDB		0x01
 #define RRF_GOT_LBA		0x02
 

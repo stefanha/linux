@@ -44,8 +44,6 @@ extern struct block_device *linux_blockdevice_claim(int, int, void *);
 extern int linux_blockdevice_release(int, int, struct block_device *);
 extern int linux_blockdevice_check(int, int);
 
-void __init stgt_subsystem_init(void);
-
 #include <linux/device.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_device.h>

@@ -45,7 +45,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 
-#include "target_core_plugin.h"
 #include "target_core_iblock.h"
 
 #if 0
@@ -79,7 +78,7 @@ static int iblock_attach_hba(struct se_hba *hba, u32 host_id)
 	atomic_set(&hba->left_queue_depth, IBLOCK_HBA_QUEUE_DEPTH);
 	atomic_set(&hba->max_queue_depth, IBLOCK_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) ib_host;
-	hba->transport = &iblock_template;
+	try_module_get(THIS_MODULE);
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM iBlock HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -111,6 +110,7 @@ static int iblock_detach_hba(struct se_hba *hba)
 
 	kfree(ib_host);
 	hba->hba_ptr = NULL;
+	module_put(THIS_MODULE);
 
 	return 0;
 }
@@ -1030,9 +1030,27 @@ static struct se_subsystem_api iblock_template = {
 	.spc			= &iblock_template_spc,
 };
 
-void __init iblock_subsystem_init(void)
+int __init iblock_module_init(void)
 {
-	tcm_sub_plugin_register((void *)&iblock_template, iblock_template.type,
-			iblock_template.name, PLUGIN_TYPE_TRANSPORT,
-			iblock_template.get_plugin_info, NULL, NULL);
+	int ret;
+
+	INIT_LIST_HEAD(&iblock_template.sub_api_list);
+
+	ret = transport_subsystem_register(&iblock_template);
+	if (ret < 0)
+		return ret;
+
+	return 0;
 }
+
+void iblock_module_exit(void)
+{
+	transport_subsystem_release(&iblock_template);
+}
+
+MODULE_DESCRIPTION("TCM IBLOCK subsystem plugin");
+MODULE_AUTHOR("nab@Linux-iSCSI.org");
+MODULE_LICENSE("GPL");
+
+module_init(iblock_module_init);
+module_exit(iblock_module_exit);

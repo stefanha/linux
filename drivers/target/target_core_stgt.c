@@ -47,7 +47,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 
-#include "target_core_plugin.h"
 #include "target_core_stgt.h"
 
 #define to_stgt_hba(d)	container_of(d, struct stgt_hba, dev)
@@ -184,6 +183,7 @@ static int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 		return err;
 	}
 	stgt_host_no_cnt++;
+	try_module_get(THIS_MODULE);
 
 	return 0;
 }
@@ -232,7 +232,6 @@ static int stgt_lld_probe(struct device *dev)
 	atomic_set(&hba->max_queue_depth, hba_depth);
 
 	hba->hba_ptr = (void *) sh;
-	hba->transport = &stgt_template;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM STGT HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -276,6 +275,7 @@ static int stgt_detach_hba(struct se_hba *hba)
 
 	device_unregister(&stgt_hba->dev);
 	hba->hba_ptr = NULL;
+	module_put(THIS_MODULE);
 
 	return 0;
 }
@@ -959,11 +959,27 @@ static struct se_subsystem_api stgt_template = {
 	.spc			= &stgt_template_spc,
 };
 
-void __init stgt_subsystem_init(void)
+int __init stgt_module_init(void)
 {
-	tcm_sub_plugin_register((void *)&stgt_template, stgt_template.type,
-			stgt_template.name, PLUGIN_TYPE_TRANSPORT,
-			stgt_template.get_plugin_info,
-			stgt_template.plugin_init,
-			stgt_template.plugin_free);
+	int ret;
+
+	INIT_LIST_HEAD(&stgt_template.sub_api_list);
+
+	ret = transport_subsystem_register(&stgt_template);
+	if (ret < 0)
+		return ret;
+
+	return 0;
 }
+
+void stgt_module_exit(void)
+{
+	transport_subsystem_release(&stgt_template);
+}
+
+MODULE_DESCRIPTION("TCM STGT subsystem plugin");
+MODULE_AUTHOR("nab@Linux-iSCSI.org");
+MODULE_LICENSE("GPL");
+
+module_init(stgt_module_init);
+module_exit(stgt_module_exit);

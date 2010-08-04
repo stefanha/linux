@@ -47,7 +47,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 
-#include "target_core_plugin.h"
 #include "target_core_pscsi.h"
 
 #define ISPRINT(a)  ((a >= ' ') && (a <= '~'))
@@ -218,7 +217,7 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	atomic_set(&hba->max_queue_depth, hba_depth);
 
 	hba->hba_ptr = (void *)phv;
-	hba->transport = &pscsi_template;
+	try_module_get(THIS_MODULE);
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM SCSI HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -252,6 +251,8 @@ static int pscsi_detach_hba(struct se_hba *hba)
 
 	kfree(phv);
 	hba->hba_ptr = NULL;
+	module_put(THIS_MODULE);
+
 	return 0;
 }
 
@@ -1882,9 +1883,27 @@ static struct se_subsystem_api pscsi_template = {
 	.spc			= &pscsi_template_spc,
 };
 
-void __init pscsi_subsystem_init(void)
+int __init pscsi_module_init(void)
 {
-	tcm_sub_plugin_register((void *)&pscsi_template, pscsi_template.type,
-			pscsi_template.name, PLUGIN_TYPE_TRANSPORT,
-			pscsi_template.get_plugin_info, NULL, NULL);
+	int ret;
+
+	INIT_LIST_HEAD(&pscsi_template.sub_api_list);
+
+	ret = transport_subsystem_register(&pscsi_template);
+	if (ret < 0)
+		return ret;
+
+	return 0;
 }
+
+void pscsi_module_exit(void)
+{
+	transport_subsystem_release(&pscsi_template);
+}
+
+MODULE_DESCRIPTION("TCM PSCSI subsystem plugin");
+MODULE_AUTHOR("nab@Linux-iSCSI.org");
+MODULE_LICENSE("GPL");
+
+module_init(pscsi_module_init);
+module_exit(pscsi_module_exit);

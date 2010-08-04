@@ -40,7 +40,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 
-#include "target_core_plugin.h"
 #include "target_core_file.h"
 
 static struct se_subsystem_api fileio_template;
@@ -66,7 +65,7 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 	atomic_set(&hba->left_queue_depth, FD_HBA_QUEUE_DEPTH);
 	atomic_set(&hba->max_queue_depth, FD_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) fd_host;
-	hba->transport = &fileio_template;
+	try_module_get(THIS_MODULE);
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM FILEIO HBA Driver %s on Generic"
 		" Target Core Stack %s\n", hba->hba_id, FD_VERSION,
@@ -98,6 +97,7 @@ static int fd_detach_hba(struct se_hba *hba)
 
 	kfree(fd_host);
 	hba->hba_ptr = NULL;
+	module_put(THIS_MODULE);
 
 	return 0;
 }
@@ -1060,9 +1060,27 @@ static struct se_subsystem_api fileio_template = {
 	.spc			= &fileio_template_spc,
 };
 
-void __init fileio_subsystem_init(void)
+int __init fileio_module_init(void)
 {
-	tcm_sub_plugin_register((void *)&fileio_template, fileio_template.type,
-			fileio_template.name, PLUGIN_TYPE_TRANSPORT,
-			fileio_template.get_plugin_info, NULL, NULL);
+	int ret;
+
+	INIT_LIST_HEAD(&fileio_template.sub_api_list);
+
+	ret = transport_subsystem_register(&fileio_template);
+	if (ret < 0)
+		return ret;
+
+	return 0;
 }
+
+void fileio_module_exit(void)
+{
+	transport_subsystem_release(&fileio_template);
+}
+
+MODULE_DESCRIPTION("TCM FILEIO subsystem plugin");
+MODULE_AUTHOR("nab@Linux-iSCSI.org");
+MODULE_LICENSE("GPL");
+
+module_init(fileio_module_init);
+module_exit(fileio_module_exit);

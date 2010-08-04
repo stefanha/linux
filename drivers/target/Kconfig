@@ -3,7 +3,7 @@ config TARGET_CORE
 	select CONFIGFS_FS
         default m
         ---help---
-        Say Y or M here to enable the TCM Storage Engine and ConfigFS enabled control path for target_core_mod
+        Say Y or M here to enable the TCM Storage Engine and ConfigFS enabled control path for target_core_mod.  This includes built-in TCM RAMDISK subsystem logic for virtual LUN 0 access
 
 config TCM_DEBUG_DEV
 	tristate "TCM Debug device code"
@@ -11,6 +11,35 @@ config TCM_DEBUG_DEV
 	default n
 	---help---
 	Say Y here to enable the TCM Debug device code
+
+config TCM_IBLOCK
+	tristate "TCM/IBLOCK Subsystem Plugin for Linux/BLOCK"
+	depends on TARGET_CORE
+	default y
+	---help---
+	Say Y here to enable the TCM/IBLOCK subsystem plugin for non-buffered access to Linux/Block devices using BIO
+
+config TCM_FILEIO
+	tristate "TCM/FILEIO Subsystem Plugin for Linux/VFS"
+	depends on TARGET_CORE
+	default y
+	---help---
+	Say Y here to enable the TCM/FILEIO subsystem plugin for buffered access to Linux/VFS struct file or struct block_device
+
+config TCM_PSCSI
+	tristate "TCM/pSCSI Subsystem Plugin for Linux/SCSI"
+	depends on TARGET_CORE
+	default y
+	---help---
+	Say Y here to enable the TCM/pSCSI subsystem plugin for non-buffered passthrough access to Linux/SCSI device
+
+config TCM_STGT
+	tristate "TCM/STGT Subsystem Plugin"
+	depends on TARGET_CORE && EXPERIMENTAL
+	select SCSI_TGT
+	default n
+	---help---
+	Say Y here to enable the WIP TCM/STGT subsystem plugin for accessing STGT device
 
 source "drivers/target/tcm_loop/Kconfig"
 source "drivers/target/lio-target/Kconfig"
