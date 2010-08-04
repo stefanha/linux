@@ -36,7 +36,7 @@
 #include <net/tcp.h>
 #include "target_core_mib.h"
 
-#define TARGET_CORE_MOD_VERSION		"v4.0.0-rc1"
+#define TARGET_CORE_MOD_VERSION		"v4.0.0-rc2"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
