@@ -111,13 +111,23 @@ int se_core_add_hba(
 			transport_core_put_sub(t);
 			return -EINVAL;
 		}
-
-		__module_get(t->sub_owner);
+		/*
+		 * Grab a struct module reference count for subsystem plugin
+		 */
+		if (!(try_module_get(t->sub_owner))) {
+			printk(KERN_ERR "try_module_get() failed for"
+				" t->sub_owner\n");
+			hba->transport = NULL;
+			transport_core_put_sub(t);
+			return -EINVAL;
+		}
 	}
 
 	ret = t->attach_hba(hba, plugin_dep_id);
 	if (ret < 0) {
 		hba->transport = NULL;
+		if (t->external_submod)
+			module_put(t->sub_owner);
 		transport_core_put_sub(t);
 		return ret;
 	}
