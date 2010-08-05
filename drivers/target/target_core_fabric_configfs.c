@@ -74,9 +74,18 @@ static int target_fabric_mappedlun_link(
 			struct se_lun, lun_group);
 	struct se_lun_acl *lacl = container_of(to_config_group(lun_acl_ci),
 			struct se_lun_acl, se_lun_group);
-	struct se_portal_group *se_tpg = lun->lun_sep->sep_tpg;
+	struct se_portal_group *se_tpg;
 	struct config_item *nacl_ci, *tpg_ci, *tpg_ci_s, *wwn_ci, *wwn_ci_s;
 	int ret = 0, lun_access;
+	/*
+	 * Ensure that the source port exists
+	 */
+	if (!(lun->lun_sep) || !(lun->lun_sep->sep_tpg)) {
+		printk(KERN_ERR "Source se_lun->lun_sep or lun->lun_sep->sep"
+				"_tpg does not exist\n");
+		return -EINVAL;
+	}
+	se_tpg = lun->lun_sep->sep_tpg;
 
 	nacl_ci = &lun_acl_ci->ci_parent->ci_group->cg_item;
 	tpg_ci = &nacl_ci->ci_group->cg_item;
