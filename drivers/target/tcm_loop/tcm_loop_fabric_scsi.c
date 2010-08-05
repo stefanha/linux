@@ -334,6 +334,7 @@ static int tcm_loop_queuecommand(
 	void (*done)(struct scsi_cmnd *))
 {
 	struct se_portal_group *se_tpg;
+	struct Scsi_Host *host = sc->device->host;
 	struct tcm_loop_cmd *tl_cmd;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_tpg *tl_tpg;
@@ -346,7 +347,7 @@ static int tcm_loop_queuecommand(
 		sc->device->id, sc->device->channel, sc->device->lun,
 		sc->cmnd[0], scsi_bufflen(sc));
 
-	spin_unlock_irq(sc->device->host->host_lock);
+	spin_unlock_irq(host->host_lock);
 	/*
 	 * Locate the tcm_loop_hba_t pointer 
 	 */
@@ -368,7 +369,7 @@ static int tcm_loop_queuecommand(
 	else if (sc->sc_data_direction == DMA_NONE)
 		data_direction = SE_DIRECTION_NONE;
 	else {
-		spin_lock_irq(sc->device->host->host_lock);
+		spin_lock_irq(host->host_lock);
 		printk(KERN_ERR "Unsupported sc->sc_data_direction: %d\n",
 			sc->sc_data_direction);	
 		sc->result = host_byte(DID_ERROR);
@@ -381,7 +382,7 @@ static int tcm_loop_queuecommand(
 	 */
 	tl_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc, data_direction);
 	if (!(tl_cmd)) {
-		spin_lock_irq(sc->device->host->host_lock);
+		spin_lock_irq(host->host_lock);
 		sc->result = host_byte(DID_ERROR);
 		(*done)(sc);
 		return 0;
@@ -399,7 +400,7 @@ static int tcm_loop_queuecommand(
 		 * Reaquire the struct scsi_host->host_lock, and
 		 * complete the struct scsi_cmnd
 		 */
-		spin_lock_irq(sc->device->host->host_lock);
+		spin_lock_irq(host->host_lock);
 		sc->result = host_byte(DID_ERROR);
 		(*done)(sc);
 		return 0;
@@ -407,7 +408,7 @@ static int tcm_loop_queuecommand(
 	/*
 	 * Reaquire the the struct scsi_host->host_lock before returning
 	 */
-	spin_lock_irq(sc->device->host->host_lock);
+	spin_lock_irq(host->host_lock);
 	return 0;
 }
 
