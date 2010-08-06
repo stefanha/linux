@@ -860,11 +860,6 @@ fail:
 	return ret;
 }
 
-static int iblock_CDB_inquiry(struct se_task *task, u32 size)
-{
-	return 0;
-}
-
 static int iblock_CDB_none(struct se_task *task, u32 size)
 {
 	return 0;
@@ -979,24 +974,16 @@ out:
 	return;
 }
 
-/*
- * We use the generic command sequencer, so we must setup
- * struct se_subsystem_spc.
- */
-static struct se_subsystem_spc iblock_template_spc = {
-	.inquiry		= iblock_CDB_inquiry,
-	.none			= iblock_CDB_none,
-	.read_non_SG		= iblock_CDB_read_non_SG,
-	.read_SG		= iblock_CDB_read_SG,
-	.write_non_SG		= iblock_CDB_write_non_SG,
-	.write_SG		= iblock_CDB_write_SG,
-};
-
 static struct se_subsystem_api iblock_template = {
 	.name			= "iblock",
 	.type			= IBLOCK,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.external_submod	= 1,
+	.cdb_none		= iblock_CDB_none,
+	.cdb_read_non_SG	= iblock_CDB_read_non_SG,
+	.cdb_read_SG		= iblock_CDB_read_SG,
+	.cdb_write_non_SG	= iblock_CDB_write_non_SG,
+	.cdb_write_SG		= iblock_CDB_write_SG,
 	.attach_hba		= iblock_attach_hba,
 	.detach_hba		= iblock_detach_hba,
 	.allocate_virtdevice	= iblock_allocate_virtdevice,
@@ -1026,7 +1013,6 @@ static struct se_subsystem_api iblock_template = {
 	.get_queue_depth	= iblock_get_queue_depth,
 	.get_max_queue_depth	= iblock_get_max_queue_depth,
 	.write_pending		= NULL,
-	.spc			= &iblock_template_spc,
 };
 
 int __init iblock_module_init(void)

@@ -1242,20 +1242,6 @@ static void rd_map_task_SG(struct se_task *task)
 	req->rd_sg_count	= task->task_sg_num;
 }
 
-/*      iblock_CDB_inquiry():
- *
- *
- */
-static int rd_CDB_inquiry(struct se_task *task, u32 size)
-{
-	struct rd_request *req = (struct rd_request *) task->transport_req;
-
-	req->rd_data_direction  = RD_DATA_READ;
-
-	rd_map_task_non_SG(task);
-	return 0;
-}
-
 /*      rd_CDB_none():
  *
  *
@@ -1420,24 +1406,16 @@ static u32 rd_get_max_queue_depth(struct se_device *dev)
 	return RD_MAX_DEVICE_QUEUE_DEPTH;
 }
 
-/*
- * We use the generic command sequencer, so we must setup
- * struct se_subsystem_spc.
- */
-static struct se_subsystem_spc rd_template_spc = {
-	.inquiry		= rd_CDB_inquiry,
-	.none			= rd_CDB_none,
-	.read_non_SG		= rd_CDB_read_non_SG,
-	.read_SG		= rd_CDB_read_SG,
-	.write_non_SG		= rd_CDB_write_non_SG,
-	.write_SG		= rd_CDB_write_SG,
-};
-
 static struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
 	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
 	.external_submod	= 0,
+	.cdb_none		= rd_CDB_none,
+	.cdb_read_non_SG	= rd_CDB_read_non_SG,
+	.cdb_read_SG		= rd_CDB_read_SG,
+	.cdb_write_non_SG	= rd_CDB_write_non_SG,
+	.cdb_write_SG		= rd_CDB_write_SG,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
@@ -1469,7 +1447,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.get_max_queue_depth	= rd_get_max_queue_depth,
 	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
 	.write_pending		= NULL,
-	.spc			= &rd_template_spc,
 };
 
 static struct se_subsystem_api rd_mcp_template = {
@@ -1477,6 +1454,11 @@ static struct se_subsystem_api rd_mcp_template = {
 	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
 	.external_submod	= 0,
+	.cdb_none		= rd_CDB_none,
+	.cdb_read_non_SG	= rd_CDB_read_non_SG,
+	.cdb_read_SG		= rd_CDB_read_SG,
+	.cdb_write_non_SG	= rd_CDB_write_non_SG,
+	.cdb_write_SG		= rd_CDB_write_SG,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
@@ -1505,7 +1487,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.get_queue_depth	= rd_get_queue_depth,
 	.get_max_queue_depth	= rd_get_max_queue_depth,
 	.write_pending		= NULL,
-	.spc			= &rd_template_spc,
 };
 
 int __init rd_module_init(void)

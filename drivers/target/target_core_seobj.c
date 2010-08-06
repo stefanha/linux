@@ -170,23 +170,23 @@ map_func_t dev_obj_get_map_SG(void *p, int rw)
 {
 	struct se_device *dev  = (struct se_device *)p;
 
-	return (rw == SE_DIRECTION_WRITE) ? dev->transport->spc->write_SG :
-		dev->transport->spc->read_SG;
+	return (rw == SE_DIRECTION_WRITE) ? dev->transport->cdb_write_SG :
+		dev->transport->cdb_read_SG;
 }
 
 map_func_t dev_obj_get_map_non_SG(void *p, int rw)
 {
 	struct se_device *dev  = (struct se_device *)p;
 
-	return (rw == SE_DIRECTION_WRITE) ? dev->transport->spc->write_non_SG :
-		dev->transport->spc->read_non_SG;
+	return (rw == SE_DIRECTION_WRITE) ? dev->transport->cdb_write_non_SG :
+		dev->transport->cdb_read_non_SG;
 }
 
 map_func_t dev_obj_get_map_none(void *p)
 {
 	struct se_device *dev  = (struct se_device *)p;
 
-	return dev->transport->spc->none;
+	return dev->transport->cdb_none;
 }
 
 int dev_obj_check_online(void *p)

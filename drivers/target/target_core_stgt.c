@@ -658,18 +658,6 @@ static int stgt_map_task_non_SG(struct se_task *task)
 	return 0;
 }
 
-/*	stgt_CDB_inquiry():
- *
- *
- */
-static int stgt_CDB_inquiry(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
-
-	st->stgt_direction = DMA_FROM_DEVICE;
-	return stgt_map_task_non_SG(task);
-}
-
 static int stgt_CDB_none(struct se_task *task, u32 size)
 {
 	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
@@ -910,20 +898,16 @@ static int stgt_transfer_response(struct scsi_cmnd *sc,
 	return 0;
 }
 
-static struct se_subsystem_spc stgt_template_spc = {
-	.inquiry		= stgt_CDB_inquiry,
-	.none			= stgt_CDB_none,
-	.read_non_SG		= stgt_CDB_read_non_SG,
-	.read_SG		= stgt_CDB_read_SG,
-	.write_non_SG		= stgt_CDB_write_non_SG,
-	.write_SG		= stgt_CDB_write_SG,
-};
-
 static struct se_subsystem_api stgt_template = {
 	.name			= "stgt",
 	.type			= STGT,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.external_submod	= 1,
+	.cdb_none		= stgt_CDB_none,
+	.cdb_read_non_SG	= stgt_CDB_read_non_SG,
+	.cdb_read_SG		= stgt_CDB_read_SG,
+	.cdb_write_non_SG	= stgt_CDB_write_non_SG,
+	.cdb_write_SG		= stgt_CDB_write_SG,
 	.attach_hba		= stgt_attach_hba,
 	.detach_hba		= stgt_detach_hba,
 	.activate_device	= stgt_activate_device,
@@ -955,7 +939,6 @@ static struct se_subsystem_api stgt_template = {
 	.get_max_sectors	= stgt_get_max_sectors,
 	.get_queue_depth	= stgt_get_queue_depth,
 	.write_pending		= NULL,
-	.spc			= &stgt_template_spc,
 };
 
 int __init stgt_module_init(void)

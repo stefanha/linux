@@ -1583,21 +1583,6 @@ static int pscsi_map_task_non_SG(struct se_task *task)
 	return 0;
 }
 
-/*	pscsi_CDB_inquiry():
- *
- *
- */
-static int pscsi_CDB_inquiry(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = (struct pscsi_plugin_task *) task->transport_req;
-
-	pt->pscsi_direction = DMA_FROM_DEVICE;
-	if (pscsi_blk_get_request(task) < 0)
-		return -1;
-
-	return pscsi_map_task_non_SG(task);
-}
-
 static int pscsi_CDB_none(struct se_task *task, u32 size)
 {
 	struct pscsi_plugin_task *pt = (struct pscsi_plugin_task *) task->transport_req;
@@ -1835,20 +1820,16 @@ static void pscsi_req_done(struct request *req, int uptodate)
 	pt->pscsi_req = NULL;
 }
 
-static struct se_subsystem_spc pscsi_template_spc = {
-	.inquiry		= pscsi_CDB_inquiry,
-	.none			= pscsi_CDB_none,
-	.read_non_SG		= pscsi_CDB_read_non_SG,
-	.read_SG		= pscsi_CDB_read_SG,
-	.write_non_SG		= pscsi_CDB_write_non_SG,
-	.write_SG		= pscsi_CDB_write_SG,
-};
-
 static struct se_subsystem_api pscsi_template = {
 	.name			= "pscsi",
 	.type			= PSCSI,
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,
 	.external_submod	= 1,
+	.cdb_none		= pscsi_CDB_none,
+	.cdb_read_non_SG	= pscsi_CDB_read_non_SG,
+	.cdb_read_SG		= pscsi_CDB_read_SG,
+	.cdb_write_non_SG	= pscsi_CDB_write_non_SG,
+	.cdb_write_SG		= pscsi_CDB_write_SG,
 	.attach_hba		= pscsi_attach_hba,
 	.detach_hba		= pscsi_detach_hba,
 	.pmode_enable_hba	= pscsi_pmode_enable_hba,
@@ -1879,7 +1860,6 @@ static struct se_subsystem_api pscsi_template = {
 	.get_max_sectors	= pscsi_get_max_sectors,
 	.get_queue_depth	= pscsi_get_queue_depth,
 	.write_pending		= NULL,
-	.spc			= &pscsi_template_spc,
 };
 
 int __init pscsi_module_init(void)

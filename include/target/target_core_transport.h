@@ -311,19 +311,6 @@ struct se_mem {
 } ____cacheline_aligned;
 
 /*
- * Each type of DAS transport that uses the generic command sequencer needs
- * each of the following function pointers set.
- */
-struct se_subsystem_spc {
-	int (*inquiry)(struct se_task *, u32);
-	int (*none)(struct se_task *, u32);
-	int (*read_non_SG)(struct se_task *, u32);
-	int (*read_SG)(struct se_task *, u32);
-	int (*write_non_SG)(struct se_task *, u32);
-	int (*write_SG)(struct se_task *, u32);
-};
-
-/*
  * 	Each type of disk transport supported MUST have a template defined
  *	within its .h file.
  */
@@ -356,6 +343,26 @@ struct se_subsystem_api {
 	 * Used for global se_subsystem_api list_head
 	 */
 	struct list_head sub_api_list;
+	/*
+	 * For SCF_SCSI_NON_DATA_CDB
+	 */
+	int (*cdb_none)(struct se_task *, u32);
+	/*
+	 * For READ SCF_SCSI_CONTROL_NONSG_IO_CDB
+	 */
+	int (*cdb_read_non_SG)(struct se_task *, u32);
+	/*
+	 * For READ SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
+	 */
+	int (*cdb_read_SG)(struct se_task *, u32);
+	/*
+	 * For WRITE SCF_SCSI_CONTROL_NONSG_IO_CDB
+	 */
+	int (*cdb_write_non_SG)(struct se_task *, u32);
+	/*
+	 * For WRITE SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
+	 */
+	int (*cdb_write_SG)(struct se_task *, u32);
 	/*
 	 * attach_hba():
 	 */
@@ -545,18 +552,9 @@ struct se_subsystem_api {
 	 * write_pending():
 	 */
 	int (*write_pending)(struct se_task *);
-	/*
-	 * struct se_subsystem_spc structure:
-	 *
-	 * Contains function pointers of SPC opcodes to call from the generic
-	 * command sequencer into a transport driver if the generic command
-	 * sequencer is used. (ie: cmd_sequencer() is NULL)
-	 */
-	struct se_subsystem_spc *spc;
 } ____cacheline_aligned;
 
 #define TRANSPORT(dev)		((dev)->transport)
-#define TRANSPORT_SPC(dev)	((dev)->transport->spc)
 #define HBA_TRANSPORT(hba)	((hba)->transport)
 
 #endif /* TARGET_CORE_TRANSPORT_H */

@@ -829,20 +829,6 @@ static void fd_map_task_SG(struct se_task *task)
 	req->fd_sg_count	= task->task_sg_num;
 }
 
-/*      fd_CDB_inquiry():
- *
- *
- */
-static int fd_CDB_inquiry(struct se_task *task, u32 size)
-{
-	struct fd_request *req = (struct fd_request *) task->transport_req;
-
-	req->fd_data_direction  = FD_DATA_READ;
-	fd_map_task_non_SG(task);
-
-	return 0;
-}
-
 /*      fd_CDB_none():
  *
  *
@@ -1007,19 +993,6 @@ static u32 fd_get_max_queue_depth(struct se_device *dev)
 	return FD_MAX_DEVICE_QUEUE_DEPTH;
 }
 
-/*
- * We use the generic command sequencer, so we must setup
- * struct se_subsystem_spc.
- */
-static struct se_subsystem_spc fileio_template_spc = {
-	.inquiry		= fd_CDB_inquiry,
-	.none			= fd_CDB_none,
-	.read_non_SG		= fd_CDB_read_non_SG,
-	.read_SG		= fd_CDB_read_SG,
-	.write_non_SG		= fd_CDB_write_non_SG,
-	.write_SG		= fd_CDB_write_SG,
-};
-
 /*#warning FIXME v2.8: transport_type for FILEIO will need to change
   with DIRECT_IO to blockdevs */
 
@@ -1030,6 +1003,11 @@ static struct se_subsystem_api fileio_template = {
 	.external_submod	= 1,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
+	.cdb_none		= fd_CDB_none,
+	.cdb_read_non_SG	= fd_CDB_read_non_SG,
+	.cdb_read_SG		= fd_CDB_read_SG,
+	.cdb_write_non_SG	= fd_CDB_write_non_SG,
+	.cdb_write_SG		= fd_CDB_write_SG,
 	.allocate_virtdevice	= fd_allocate_virtdevice,
 	.create_virtdevice	= fd_create_virtdevice,
 	.activate_device	= fd_activate_device,
@@ -1056,7 +1034,6 @@ static struct se_subsystem_api fileio_template = {
 	.get_queue_depth	= fd_get_queue_depth,
 	.get_max_queue_depth	= fd_get_max_queue_depth,
 	.write_pending		= NULL,
-	.spc			= &fileio_template_spc,
 };
 
 int __init fileio_module_init(void)
