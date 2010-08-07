@@ -74,126 +74,6 @@ static struct Scsi_Host *pscsi_get_sh(u32 host_no)
 	return sh;
 }
 
-/*	pscsi_check_sd():
- *
- *	Should be called with scsi_device_get(sd) held
- */
-static int pscsi_check_sd(struct scsi_device *sd)
-{
-	struct gendisk *disk;
-	struct scsi_disk *sdisk;
-
-	if (!sd) {
-		printk(KERN_ERR "struct scsi_device is NULL!\n");
-		return -1;
-	}
-
-	if (sd->type != TYPE_DISK)
-		return 0;
-
-	/*
-	 * Some struct scsi_device of Type: Direct-Access, namely the
-	 * SGI Univerisal Xport do not have a corrasponding block device.
-	 * We skip these for now.
-	 */
-	sdisk = dev_get_drvdata(&sd->sdev_gendev);
-	if (!(sdisk))
-		return -1;
-
-	disk = (struct gendisk *) sdisk->disk;
-	if (!(disk->major)) {
-		printk(KERN_ERR "dev_get_drvdata() failed\n");
-		return -1;
-	}
-
-	if (linux_blockdevice_check(disk->major, disk->first_minor) < 0)
-		return -1;
-
-	return 0;
-}
-
-/*	pscsi_claim_sd():
- *
- *	Should be called with scsi_device_get(sd) held
- */
-static int pscsi_claim_sd(struct scsi_device *sd)
-{
-	struct block_device *bdev;
-	struct gendisk *disk;
-	struct scsi_disk *sdisk;
-
-	if (!sd) {
-		printk(KERN_ERR "struct scsi_device is NULL!\n");
-		return -1;
-	}
-
-	if (sd->type != TYPE_DISK)
-		return 0;
-
-	/*
-	 * Some struct scsi_device of Type: Direct-Access, namely the
-	 * SGI Univerisal Xport do not have a corrasponding block device.
-	 * We skip these for now.
-	 */
-	sdisk = dev_get_drvdata(&sd->sdev_gendev);
-	if (!(sdisk))
-		return -1;
-
-	disk = (struct gendisk *) sdisk->disk;
-	if (!(disk->major)) {
-		printk(KERN_ERR "dev_get_drvdata() failed\n");
-		return -1;
-	}
-
-	printk(KERN_INFO "PSCSI: Claiming %p Major:Minor - %d:%d\n",
-		sd, disk->major, disk->first_minor);
-
-	bdev = linux_blockdevice_claim(disk->major, disk->first_minor,
-				(void *)sd);
-	if (!(bdev))
-		return -1;
-
-	return 0;
-}
-
-/*	pscsi_release_sd()
- *
- * 	Should be called with scsi_device_get(sd) held
- */
-static int pscsi_release_sd(struct scsi_device *sd)
-{
-	struct gendisk *disk;
-	struct scsi_disk *sdisk;
-
-	if (!sd) {
-		printk(KERN_ERR "struct scsi_device is NULL!\n");
-		return -1;
-	}
-
-	if (sd->type != TYPE_DISK)
-		return 0;
-
-	/*
-	 * Some struct scsi_device of Type: Direct-Access, namely the
-	 * SGI Univerisal Xport do not have a corrasponding block device.
-	 * We skip these for now.
-	 */
-	sdisk = dev_get_drvdata(&sd->sdev_gendev);
-	if (!(sdisk))
-		return -1;
-
-	disk = (struct gendisk *) sdisk->disk;
-	if (!(disk->major)) {
-		printk(KERN_ERR "dev_get_drvdata() failed\n");
-		return -1;
-	}
-
-	printk(KERN_INFO "PSCSI: Releasing Major:Minor - %d:%d\n",
-		disk->major, disk->first_minor);
-
-	return linux_blockdevice_release(disk->major, disk->first_minor, NULL);
-}
-
 /*	pscsi_attach_hba():
  *
  * 	pscsi_get_sh() used scsi_host_lookup() to locate struct Scsi_Host.
@@ -449,6 +329,7 @@ static struct se_device *pscsi_create_type_disk(
 	struct se_device *dev;
 	struct pscsi_hba_virt *phv = (struct pscsi_hba_virt *)pdv->pdv_se_hba->hba_ptr;
 	struct Scsi_Host *sh = sd->host;
+	struct block_device *bd;
 	u32 dev_flags = 0;
 
 	if (scsi_device_get(sd)) {
@@ -458,19 +339,22 @@ static struct se_device *pscsi_create_type_disk(
 		return NULL;
 	}
 	spin_unlock_irq(sh->host_lock);
-
-	if (pscsi_check_sd(sd) < 0) {
+	/*
+	 * Claim exclusive struct block_device access to struct scsi_device
+	 * for TYPE_DISK using supplied udev_path
+	 */
+	bd = open_bdev_exclusive(se_dev->se_dev_udev_path,
+				FMODE_WRITE|FMODE_READ, pdv);
+	if (!(bd)) {
+		printk("pSCSI: open_bdev_exclusive() failed\n");
 		scsi_device_put(sd);
-		printk(KERN_ERR "pscsi_check_sd() failed for %d:%d:%d:%d\n",
-			sh->host_no, sd->channel, sd->id, sd->lun);
 		return NULL;
 	}
-	if (!(pscsi_claim_sd(sd))) {
-		dev_flags |= DF_CLAIMED_BLOCKDEV;
-		dev_flags |= DF_PERSISTENT_CLAIMED_BLOCKDEV;
-	}
+	pdv->pdv_bd = bd;
+
 	dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags);
 	if (!(dev)) {
+		close_bdev_exclusive(pdv->pdv_bd, FMODE_WRITE|FMODE_READ);
 		scsi_device_put(sd);
 		return NULL;
 	}
@@ -568,6 +452,15 @@ static struct se_device *pscsi_create_virtdevice(
 			return NULL;
 		}
 		/*
+		 * For the newer PHV_VIRUTAL_HOST_ID struct scsi_device
+		 * reference, we enforce that udev_path has been set
+		 */
+		if (!(se_dev->su_dev_flags & SDF_USING_UDEV_PATH)) {
+			printk(KERN_ERR "pSCSI: udev_path attribute has not"
+				" been set before ENABLE=1\n");
+			return NULL;
+		}
+		/*
 		 * If no scsi_host_id= was passed for PHV_VIRUTAL_HOST_ID,
 		 * use the original TCM hba ID to reference Linux/SCSI Host No
 		 * and enable for PHV_LLD_SCSI_HOST_NO mode.
@@ -612,9 +505,8 @@ static struct se_device *pscsi_create_virtdevice(
 			continue;
 		/*
 		 * Functions will release the held struct scsi_host->host_lock
-		 * before calling calling pscsi_check_sd() and
-		 * pscsi_add_device_to_list() to register struct scsi_device
-		 * with target_core_mod.
+		 * before calling calling pscsi_add_device_to_list() to register
+		 * struct scsi_device with target_core_mod.
 		 */
 		switch (sd->type) {
 		case TYPE_DISK:
@@ -704,9 +596,11 @@ static void pscsi_free_device(void *p)
 	if (sd) {
 		/*
 		 * Release exclusive pSCSI internal struct block_device claim for
-		 * struct scsi_device with TYPE_DISK if one exists..
+		 * struct scsi_device with TYPE_DISK from pscsi_create_type_disk()
 		 */
-		pscsi_release_sd(sd);
+		if (sd->type == TYPE_DISK)
+        		close_bdev_exclusive(pdv->pdv_bd,
+					FMODE_WRITE|FMODE_READ);
 		/*
 		 * For HBA mode PHV_LLD_SCSI_HOST_NO, release the reference
 		 * to struct Scsi_Host now.
