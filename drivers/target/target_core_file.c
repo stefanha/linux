@@ -460,48 +460,16 @@ static inline int fd_iovec_alloc(struct fd_request *req)
 	return 0;
 }
 
-static inline int fd_seek(
-	struct file *fd,
-	unsigned long long lba,
-	u32 block_size)
-{
-	mm_segment_t old_fs;
-	unsigned long long offset;
-
-	old_fs = get_fs();
-	set_fs(get_ds());
-	if (fd->f_op->llseek)
-		offset = fd->f_op->llseek(fd, lba * block_size, 0);
-	else
-		offset = default_llseek(fd, lba * block_size, 0);
-	set_fs(old_fs);
-#if 0
-	printk(KERN_INFO "lba: %llu : block_size: %d\n", lba, block_size);
-	printk(KERN_INFO "offset from llseek: %llu\n", offset);
-	printk(KERN_INFO "(lba * block_size): %llu\n", (lba * block_size));
-#endif
-	if (offset != (lba * block_size)) {
-		printk(KERN_ERR "offset: %llu not equal to LBA: %llu\n",
-			offset, (lba * block_size));
-		return -1;
-	}
-
-	return 0;
-}
-
 static int fd_do_readv(struct fd_request *req, struct se_task *task)
 {
-	int ret = 0;
-	u32 i;
-	mm_segment_t old_fs;
 	struct file *fd = req->fd_dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
 	struct iovec iov[req->fd_sg_count];
+	mm_segment_t old_fs;
+	loff_t pos = (req->fd_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	int ret = 0, i;
 
 	memset(iov, 0, sizeof(struct iovec) * req->fd_sg_count);
-
-	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
-		return -1;
 
 	for (i = 0; i < req->fd_sg_count; i++) {
 		iov[i].iov_len = sg[i].length;
@@ -510,7 +478,7 @@ static int fd_do_readv(struct fd_request *req, struct se_task *task)
 
 	old_fs = get_fs();
 	set_fs(get_ds());
-	ret = vfs_readv(fd, &iov[0], req->fd_sg_count, &fd->f_pos);
+	ret = vfs_readv(fd, &iov[0], req->fd_sg_count, &pos);
 	set_fs(old_fs);
 	/*
 	 * Return zeros and GOOD status even if the READ did not return
@@ -601,17 +569,14 @@ static int fd_do_sendfile(struct fd_request *req, struct se_task *task)
 
 static int fd_do_writev(struct fd_request *req, struct se_task *task)
 {
-	int ret = 0;
-	u32 i;
 	struct file *fd = req->fd_dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
-	mm_segment_t old_fs;
 	struct iovec iov[req->fd_sg_count];
+	mm_segment_t old_fs;
+	loff_t pos = (req->fd_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	int ret, i = 0;
 
 	memset(iov, 0, sizeof(struct iovec) * req->fd_sg_count);
-
-	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
-		return -1;
 
 	for (i = 0; i < req->fd_sg_count; i++) {
 		iov[i].iov_len = sg[i].length;
@@ -620,7 +585,7 @@ static int fd_do_writev(struct fd_request *req, struct se_task *task)
 
 	old_fs = get_fs();
 	set_fs(get_ds());
-	ret = vfs_writev(fd, &iov[0], req->fd_sg_count, &fd->f_pos);
+	ret = vfs_writev(fd, &iov[0], req->fd_sg_count, &pos);
 	set_fs(old_fs);
 
 	if (ret < 0 || ret != req->fd_size) {
