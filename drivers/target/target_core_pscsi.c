@@ -50,7 +50,6 @@
 #include "target_core_pscsi.h"
 
 #define ISPRINT(a)  ((a >= ' ') && (a <= '~'))
-#define LINUX_VPD_PAGE_CHECK
 
 static struct se_subsystem_api pscsi_template;
 
@@ -738,107 +737,6 @@ static int pscsi_transport_complete(struct se_task *task)
 	unsigned char *cdb = &pt->pscsi_cdb[0];
 
 	result = pt->pscsi_result;
-
-# ifdef LINUX_VPD_PAGE_CHECK
-	if ((cdb[0] == INQUIRY) && host_byte(result) == DID_OK) {
-		u32 len = 0;
-		unsigned char *dst = (unsigned char *)
-				T_TASK(task->task_se_cmd)->t_task_buf;
-		unsigned char buf[VPD_BUF_LEN], *iqn = NULL;
-		struct se_subsystem_dev *su_dev = TASK_DEV(task)->se_sub_dev;
-		struct se_hba *hba = task->se_dev->se_hba;
-
-		/*
-		 * The Initiator port did not request VPD information.
-		 */
-		if (!(cdb[1] & 0x1)) {
-			task->task_scsi_status = GOOD;
-			return 0;
-		}
-
-		/*
-		 * Assume the SCSI Device did the right thing if an VPD length
-		 * is provided in the INQUIRY response payload.
-		 */
-		if (dst[3] != 0x00) {
-			su_dev->su_dev_flags |= SDF_FIRMWARE_VPD_UNIT_SERIAL;
-			su_dev->su_dev_flags &= ~SDF_EMULATED_VPD_UNIT_SERIAL;
-			task->task_scsi_status = GOOD;
-			return 0;
-		}
-
-		memset(buf, 0, VPD_BUF_LEN);
-		memset(dst, 0, task->task_size);
-		buf[0] = sd->type;
-
-		switch (cdb[2]) {
-		case 0x00:
-			buf[1] = 0x00;
-			buf[3] = 3;
-			buf[4] = 0x0;
-			buf[5] = 0x80;
-			buf[6] = 0x83;
-			len = 3;
-			break;
-		case 0x80:
-			buf[1] = 0x80;
-			if (su_dev->su_dev_flags &
-					SDF_EMULATED_VPD_UNIT_SERIAL)
-				len += sprintf((unsigned char *)&buf[4], "%s",
-					&su_dev->t10_wwn.unit_serial[0]);
-			else {
-				iqn = transport_get_iqn_sn();
-				len += sprintf((unsigned char *)&buf[4],
-					"%s:%u_%u_%u_%u", iqn, hba->hba_id,
-					sd->channel, sd->id, sd->lun);
-			}
-			buf[3] = len;
-			break;
-		case 0x83:
-			buf[1] = 0x83;
-			/* Start Identifier Page */
-			buf[4] = 0x2; /* ASCII */
-			buf[5] = 0x1;
-			buf[6] = 0x0;
-			len += sprintf((unsigned char *)&buf[8], "LIO-ORG");
-
-			if (su_dev->su_dev_flags &
-					SDF_EMULATED_VPD_UNIT_SERIAL) {
-				len += sprintf((unsigned char *)&buf[16],
-					"PSCSI:%s",
-					&su_dev->t10_wwn.unit_serial[0]);
-			} else {
-				iqn = transport_get_iqn_sn();
-				len += sprintf((unsigned char *)&buf[16],
-					"PSCSI:%s:%u_%u_%u_%u", iqn,
-					hba->hba_id, sd->channel,
-					sd->id, sd->lun);
-			}
-			buf[7] = len; /* Identifer Length */
-			len += 4;
-			buf[3] = len; /* Page Length */
-			break;
-		default:
-			break;
-		}
-
-		if ((len + 4) > task->task_size) {
-			printk(KERN_ERR "Inquiry VPD Length: %u larger than"
-				" req->sr_bufflen: %u\n", (len + 4),
-				task->task_size);
-			memcpy(dst, buf, task->task_size);
-		} else
-			memcpy(dst, buf, (len + 4));
-
-		/*
-		 * Fake the GOOD SAM status here too.
-		 */
-		task->task_scsi_status = GOOD;
-		return 0;
-	}
-
-# endif /* LINUX_VPD_PAGE_CHECK */
-
 	/*
 	 * Hack to make sure that Write-Protect modepage is set if R/O mode is
 	 * forced.
