@@ -259,15 +259,18 @@ static void iblock_free_device(void *p)
 {
 	struct iblock_dev *ib_dev = (struct iblock_dev *) p;
 
-	printk(KERN_INFO "IBLOCK: Releasing Major:Minor - %d:%d\n",
-		ib_dev->ibd_major, ib_dev->ibd_minor);
+	if (ib_dev->ibd_bd) {
+		printk(KERN_INFO "IBLOCK: Releasing Major:Minor - %d:%d\n",
+			ib_dev->ibd_major, ib_dev->ibd_minor);
 
-	if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
-		close_bdev_exclusive(ib_dev->ibd_bd, FMODE_WRITE|FMODE_READ);
-	else
-		linux_blockdevice_release(ib_dev->ibd_major, ib_dev->ibd_minor,
-				ib_dev->ibd_bd);
-	ib_dev->ibd_bd = NULL;
+		if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
+			close_bdev_exclusive(ib_dev->ibd_bd,
+				FMODE_WRITE|FMODE_READ);
+		else
+			linux_blockdevice_release(ib_dev->ibd_major,
+					ib_dev->ibd_minor, ib_dev->ibd_bd);
+		ib_dev->ibd_bd = NULL;
+	}
 
 	if (ib_dev->ibd_bio_set) {
 		DEBUG_IBLOCK("Calling bioset_free ib_dev->ibd_bio_set: %p\n",
