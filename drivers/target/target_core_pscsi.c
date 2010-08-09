@@ -598,9 +598,11 @@ static void pscsi_free_device(void *p)
 		 * Release exclusive pSCSI internal struct block_device claim for
 		 * struct scsi_device with TYPE_DISK from pscsi_create_type_disk()
 		 */
-		if (sd->type == TYPE_DISK)
+		if ((sd->type == TYPE_DISK) && pdv->pdv_bd) {
         		close_bdev_exclusive(pdv->pdv_bd,
 					FMODE_WRITE|FMODE_READ);
+			pdv->pdv_bd = NULL;
+		}
 		/*
 		 * For HBA mode PHV_LLD_SCSI_HOST_NO, release the reference
 		 * to struct Scsi_Host now.
