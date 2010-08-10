@@ -40,8 +40,6 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_host.h>
-#include <sd.h>
-#include <sr.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
@@ -784,26 +782,20 @@ static int pscsi_do_task(struct se_task *task)
 {
 	struct pscsi_plugin_task *pt = (struct pscsi_plugin_task *) task->transport_req;
 	struct pscsi_dev_virt *pdv = (struct pscsi_dev_virt *) task->se_dev->dev_ptr;
-	struct gendisk *gd = NULL;
 	/*
-	 * Grab pointer to struct gendisk for TYPE_DISK and TYPE_ROM
-	 * cases (eg: cases where struct scsi_device has a backing
-	 * struct block_device.  Also set the struct request->timeout
-	 * value based on peripheral device type (from SCSI).
+	 * Set the struct request->timeout value based on peripheral
+	 * device type from SCSI.
 	 */
-	if (pdv->pdv_sd->type == TYPE_DISK) {
-		struct scsi_disk *sdisk = dev_get_drvdata(
-					&pdv->pdv_sd->sdev_gendev);
-		gd = sdisk->disk;
+	if (pdv->pdv_sd->type == TYPE_DISK)
 		pt->pscsi_req->timeout = PS_TIMEOUT_DISK;
-	} else
+	else
 		pt->pscsi_req->timeout = PS_TIMEOUT_OTHER;
 
 	pt->pscsi_req->retries = PS_RETRY;
 	/*
 	 * Queue the struct request into the struct scsi_device->request_queue.
 	 */
-	blk_execute_rq_nowait(pdv->pdv_sd->request_queue, gd,
+	blk_execute_rq_nowait(pdv->pdv_sd->request_queue, NULL,
 			      pt->pscsi_req, 1, pscsi_req_done);
 
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
@@ -1026,24 +1018,8 @@ static void __pscsi_get_dev_info(struct pscsi_dev_virt *pdv, char *b, int *bl)
 			else
 				*bl += sprintf(b + *bl, " ");
 		}
-
-		if (sd->type == TYPE_DISK) {
-			struct scsi_disk *sdisk =
-					dev_get_drvdata(&sd->sdev_gendev);
-			struct gendisk *disk = (struct gendisk *) sdisk->disk;
-			struct block_device *bdev = bdget(MKDEV(disk->major,
-						disk->first_minor));
-
-			bdev->bd_disk = disk;
-			*bl += sprintf(b + *bl, "   %s\n", (!bdev->bd_holder) ?
-					"" : (bdev->bd_holder ==
-					(struct scsi_device *)sd) ?
-					"CLAIMED: PSCSI" : "CLAIMED: OS");
-		} else
-			*bl += sprintf(b + *bl, "\n");
+		*bl += sprintf(b + *bl, "\n");
 	}
-
-	return;
 }
 
 static void pscsi_bi_endio(struct bio *bio, int error)
