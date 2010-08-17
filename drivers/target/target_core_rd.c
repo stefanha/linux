@@ -1039,6 +1039,8 @@ static void rd_DIRECT_free_DMA(struct se_cmd *cmd)
 {
 	struct se_mem *se_mem, *se_mem_tmp;
 
+	if (!(T_TASK(cmd)->t_mem_list))
+		return;
 	/*
 	 * The scatterlists in the RAMDISK DIRECT case are using the pages
 	 * from the rd_device_t's scatterlist table. They are referencing
