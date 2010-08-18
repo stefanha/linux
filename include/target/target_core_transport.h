@@ -289,8 +289,7 @@ extern int transport_map_mem_to_sg(struct se_task *, struct list_head *,
 extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 					struct se_transform_info *,
 					void *, unsigned long long, u32,
-					struct se_mem *, struct se_mem **,
-					u32 *);
+					struct se_mem *, struct se_mem **);
 extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);

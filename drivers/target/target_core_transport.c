@@ -6419,7 +6419,7 @@ int transport_new_cmd_obj(
 	void *obj_ptr,
 	int post_execute)
 {
-	u32 task_cdbs = 0, task_offset = 0;
+	u32 task_cdbs = 0;
 	struct se_mem *se_mem_out = NULL;
 	struct se_device *dev = SE_DEV(cmd);
 
@@ -6433,7 +6433,7 @@ int transport_new_cmd_obj(
 		task_cdbs = transport_generic_get_cdb_count(cmd, ti, obj_ptr,
 				T_TASK(cmd)->t_task_lba,
 				T_TASK(cmd)->t_task_sectors,
-				NULL, &se_mem_out, &task_offset);
+				NULL, &se_mem_out);
 		if (!(task_cdbs)) {
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			cmd->scsi_sense_reason =
@@ -6981,8 +6981,7 @@ u32 transport_generic_get_cdb_count(
 	unsigned long long starting_lba,
 	u32 sectors,
 	struct se_mem *se_mem_in,
-	struct se_mem **se_mem_out,
-	u32 *task_offset_in)
+	struct se_mem **se_mem_out)
 {
 	unsigned char *cdb = NULL;
 	void *obj_ptr;
@@ -6990,7 +6989,7 @@ u32 transport_generic_get_cdb_count(
 	struct se_mem *se_mem, *se_mem_lout = NULL;
 	struct se_device *dev = SE_DEV(cmd);
 	int max_sectors_set = 0, ret;
-	u32 se_mem_cnt = 0, task_cdbs = 0;
+	u32 task_offset_in = 0, se_mem_cnt = 0, task_cdbs = 0;
 	unsigned long long lba;
 
 	if (!se_mem_in) {
@@ -7052,7 +7051,7 @@ u32 transport_generic_get_cdb_count(
 		 */
 		ret = dev_obj_do_se_mem_map(obj_ptr, task,
 				T_TASK(cmd)->t_mem_list, NULL, se_mem,
-				&se_mem_lout, &se_mem_cnt, task_offset_in);
+				&se_mem_lout, &se_mem_cnt, &task_offset_in);
 		if (ret < 0)
 			goto out;
 
