@@ -108,12 +108,11 @@ int dev_obj_do_se_mem_map(
 	struct se_mem *in_se_mem,
 	struct se_mem **out_se_mem,
 	u32 *se_mem_cnt,
-	u32 *task_offset)
+	u32 *task_offset_in)
 {
 	struct se_device *dev  = (struct se_device *)p;
-	u32 tmp_task_offset = *task_offset;
+	u32 task_offset = *task_offset_in;
 	int ret = 0;
-
 	/*
 	 * se_subsystem_api_t->do_se_mem_map is used when internal allocation
 	 * has been done by the transport plugin.
@@ -121,7 +120,7 @@ int dev_obj_do_se_mem_map(
 	if (TRANSPORT(dev)->do_se_mem_map) {
 		ret = TRANSPORT(dev)->do_se_mem_map(task, se_mem_list,
 				in_mem, in_se_mem, out_se_mem, se_mem_cnt,
-				task_offset);
+				task_offset_in);
 		if (ret == 0)
 			T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
 
@@ -132,14 +131,14 @@ int dev_obj_do_se_mem_map(
 	 * Assume default that transport plugin speaks preallocated
 	 * scatterlists.
 	 */
-	if (!(transport_calc_sg_num(task, in_se_mem, tmp_task_offset)))
+	if (!(transport_calc_sg_num(task, in_se_mem, task_offset)))
 		return -1;
 
 	/*
 	 * struct se_task->task_sg now contains the struct scatterlist array.
 	 */
 	return transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
-		in_se_mem, out_se_mem, se_mem_cnt, task_offset);
+		in_se_mem, out_se_mem, se_mem_cnt, task_offset_in);
 }
 
 int dev_obj_get_mem_buf(void *p, struct se_cmd *cmd)
