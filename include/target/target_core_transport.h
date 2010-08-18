@@ -279,7 +279,7 @@ extern void transport_free_se_mem_list(struct list_head *);
 extern int transport_generic_get_mem(struct se_cmd *, u32, u32);
 extern u32 transport_calc_sg_num(struct se_task *, struct se_mem *, u32);
 extern int transport_map_sg_to_mem(struct se_cmd *, struct list_head *,
-					void *, u32 *, u32 *);
+					void *, u32 *);
 extern int transport_map_mem_to_mem(struct se_task *, struct list_head *,
 					void *, struct se_mem *,
 					struct se_mem **, u32 *, u32 *);

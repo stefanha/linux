@@ -6244,7 +6244,7 @@ int transport_generic_map_mem_to_cmd(
 	void *mem,
 	u32 se_mem_num)
 {
-	u32 se_mem_cnt_out = 0, se_mem_task_off = 0;
+	u32 se_mem_cnt_out = 0;
 	int ret;
 
 	if (!(mem) || !(se_mem_num))
@@ -6275,8 +6275,7 @@ int transport_generic_map_mem_to_cmd(
 			return -1;
 
 		ret = transport_map_sg_to_mem(cmd,
-			T_TASK(cmd)->t_mem_list, mem, &se_mem_cnt_out,
-			&se_mem_task_off);
+			T_TASK(cmd)->t_mem_list, mem, &se_mem_cnt_out);
 		if (ret < 0)
 			return -1;
 
@@ -6682,12 +6681,11 @@ int transport_map_sg_to_mem(
 	struct se_cmd *cmd,
 	struct list_head *se_mem_list,
 	void *in_mem,
-	u32 *se_mem_cnt,
-	u32 *task_offset)
+	u32 *se_mem_cnt)
 {
 	struct se_mem *se_mem;
 	struct scatterlist *sg;
-	u32 sg_count = 0, saved_task_offset = 0, task_size = cmd->data_length;
+	u32 sg_count = 1, cmd_size = cmd->data_length;
 
 	if (!in_mem) {
 		printk(KERN_ERR "No source scatterlist\n");
@@ -6695,65 +6693,31 @@ int transport_map_sg_to_mem(
 	}
 	sg = (struct scatterlist *)in_mem;
 
-	while (task_size) {
+	while (cmd_size) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
 			printk(KERN_ERR "Unable to allocate struct se_mem\n");
 			return -1;
 		}
 		INIT_LIST_HEAD(&se_mem->se_list);
-		DEBUG_MEM("sg_to_mem: Starting loop with task_size: %u"
-			" sg_page: %p offset: %d length: %d\n", task_size,
+		DEBUG_MEM("sg_to_mem: Starting loop with cmd_size: %u"
+			" sg_page: %p offset: %d length: %d\n", cmd_size,
 			sg_page(sg), sg->offset, sg->length);
 
-		if (*task_offset == 0) {
-			se_mem->se_page = sg_page(sg);
-			se_mem->se_off = sg->offset;
+		se_mem->se_page = sg_page(sg);
+		se_mem->se_off = sg->offset;
 
-			if (task_size >= sg->length) {
-				se_mem->se_len =  sg->length;
-				sg = sg_next(sg);
-				sg_count++;
-			} else {
-				se_mem->se_len = task_size;
+		if (cmd_size > sg->length) {
+			se_mem->se_len = sg->length;
+			sg = sg_next(sg);
+			sg_count++;
+		} else
+			se_mem->se_len = cmd_size;
 
-				task_size -= se_mem->se_len;
-				if (!(task_size)) {
-					*task_offset = (se_mem->se_len +
-							saved_task_offset);
-					goto next;
-				}
-			}
+		cmd_size -= se_mem->se_len;
 
-			if (saved_task_offset)
-				*task_offset = saved_task_offset;
-		} else {
-			se_mem->se_page = sg_page(sg);
-			se_mem->se_off = (*task_offset + sg->offset);
-
-			if ((sg->length - *task_offset) > task_size) {
-				se_mem->se_len = task_size;
-
-				task_size -= se_mem->se_len;
-				if (!(task_size)) {
-					*task_offset += se_mem->se_len;
-					goto next;
-				}
-			} else {
-				se_mem->se_len = (sg->length - *task_offset);
-				sg = sg_next(sg);
-				sg_count++;
-			}
-
-			saved_task_offset = *task_offset;
-			*task_offset = 0;
-		}
-		task_size -= se_mem->se_len;
-next:
-		DEBUG_MEM("sg_to_mem: *se_mem_cnt: %u task_size: %u, *task_offset: %u "
-			"saved_task_offset: %d\n", *se_mem_cnt, task_size, *task_offset,
-			saved_task_offset);
-				
+		DEBUG_MEM("sg_to_mem: *se_mem_cnt: %u cmd_size: %u\n",
+				*se_mem_cnt, cmd_size);
 		DEBUG_MEM("sg_to_mem: Final se_page: %p se_off: %d se_len: %d\n",
 				se_mem->se_page, se_mem->se_off, se_mem->se_len);
 
