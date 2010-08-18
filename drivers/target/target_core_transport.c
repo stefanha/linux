@@ -6554,54 +6554,57 @@ extern u32 transport_calc_sg_num(
 	struct se_mem *in_se_mem,
 	u32 task_offset)
 {
+	struct se_cmd *se_cmd = task->task_se_cmd;
 	struct se_mem *se_mem = in_se_mem;
-	u32 sg_length, sg_offset, task_size = task->task_size;
-	u32 saved_task_offset = 0;
+	u32 sg_length, task_size = task->task_size;
 
-	while (task_size) {
+	while (task_size != 0) {
 		DEBUG_SC("se_mem->se_page(%p) se_mem->se_len(%u)"
 			" se_mem->se_off(%u) task_offset(%u)\n",
 			se_mem->se_page, se_mem->se_len,
 			se_mem->se_off, task_offset);
 
 		if (task_offset == 0) {
-			if (task_size > se_mem->se_len)
+			if (task_size >= se_mem->se_len) {
 				sg_length = se_mem->se_len;
-			else
+
+				if (!(list_is_last(&se_mem->se_list,
+						T_TASK(se_cmd)->t_mem_list)))
+					se_mem = list_entry(se_mem->se_list.next,
+							struct se_mem, se_list);
+			} else {
 				sg_length = task_size;
+				task_size -= sg_length;
+				goto next;
+			}
 
 			DEBUG_SC("sg_length(%u) task_size(%u)\n",
 					sg_length, task_size);
-
-			if (saved_task_offset)
-				task_offset = saved_task_offset;
 		} else {
-			sg_offset = task_offset;
-
-			if ((se_mem->se_len - task_offset) > task_size)
+			if ((se_mem->se_len - task_offset) > task_size) {
 				sg_length = task_size;
-			else
+				task_size -= sg_length;
+				goto next;
+			 } else {
 				sg_length = (se_mem->se_len - task_offset);
 
+				if (!(list_is_last(&se_mem->se_list,
+						T_TASK(se_cmd)->t_mem_list)))
+					se_mem = list_entry(se_mem->se_list.next,
+							struct se_mem, se_list);
+			}
+
 			DEBUG_SC("sg_length(%u) task_size(%u)\n",
 					sg_length, task_size);
 
-			saved_task_offset = task_offset;
 			task_offset = 0;
 		}
 		task_size -= sg_length;
-
+next:
 		DEBUG_SC("task[%u] - Reducing task_size to(%u)\n",
 			task->task_no, task_size);
 
 		task->task_sg_num++;
-
-		list_for_each_entry_continue(se_mem,
-				task->task_se_cmd->t_task->t_mem_list, se_list)
-			break;
-
-		if (!se_mem)
-			break;
 	}
 
 	task->task_sg = kzalloc(task->task_sg_num *
