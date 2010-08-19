@@ -1441,7 +1441,7 @@ void core_alua_free_tg_pt_gp(
 
 void core_alua_free_tg_pt_gp_mem(struct se_port *port)
 {
-	struct se_subsystem_dev *su_dev = port->sep_lun->se_dev->se_sub_dev;
+	struct se_subsystem_dev *su_dev = port->sep_lun->lun_se_dev->se_sub_dev;
 	struct t10_alua *alua = T10_ALUA(su_dev);
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
 	struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem;
@@ -1540,7 +1540,7 @@ void __core_alua_drop_tg_pt_gp_mem(
 
 ssize_t core_alua_show_tg_pt_gp_info(struct se_port *port, char *page)
 {
-	struct se_subsystem_dev *su_dev = port->sep_lun->se_dev->se_sub_dev;
+	struct se_subsystem_dev *su_dev = port->sep_lun->lun_se_dev->se_sub_dev;
 	struct config_item *tg_pt_ci;
 	struct t10_alua *alua = T10_ALUA(su_dev);
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
@@ -1584,7 +1584,7 @@ ssize_t core_alua_store_tg_pt_gp_info(
 {
 	struct se_portal_group *tpg;
 	struct se_lun *lun;
-	struct se_subsystem_dev *su_dev = port->sep_lun->se_dev->se_sub_dev;
+	struct se_subsystem_dev *su_dev = port->sep_lun->lun_se_dev->se_sub_dev;
 	struct t10_alua_tg_pt_gp *tg_pt_gp = NULL, *tg_pt_gp_new = NULL;
 	struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem;
 	unsigned char buf[TG_PT_GROUP_NAME_BUF];

@@ -2532,17 +2532,6 @@ static struct se_task *transport_generic_get_task(
 	return task;
 }
 
-static inline int transport_generic_obj_start(
-	struct se_transform_info *ti,
-	void *p,
-	unsigned long long starting_lba)
-{
-	ti->ti_lba = starting_lba;
-	ti->ti_obj_ptr = p;
-
-	return 0;
-}
-
 static inline map_func_t transport_dev_get_map_SG(
 	struct se_device *dev,
 	int rw)
@@ -2702,7 +2691,7 @@ static int transport_generic_cmd_sequencer(struct se_cmd *, unsigned char *);
 void transport_device_setup_cmd(struct se_cmd *cmd)
 {
 	cmd->transport_add_cmd_to_queue = &transport_add_cmd_to_dev_queue;
-	cmd->se_dev = SE_LUN(cmd)->se_dev;
+	cmd->se_dev = SE_LUN(cmd)->lun_se_dev;
 }
 
 struct se_cmd *__transport_alloc_se_cmd(
@@ -4202,7 +4191,7 @@ static inline u32 transport_get_sectors_6(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = SE_LUN(cmd)->se_dev;
+	struct se_device *dev = SE_LUN(cmd)->lun_se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -4230,7 +4219,7 @@ static inline u32 transport_get_sectors_10(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = SE_LUN(cmd)->se_dev;
+	struct se_device *dev = SE_LUN(cmd)->lun_se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -4260,7 +4249,7 @@ static inline u32 transport_get_sectors_12(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = SE_LUN(cmd)->se_dev;
+	struct se_device *dev = SE_LUN(cmd)->lun_se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -4290,7 +4279,7 @@ static inline u32 transport_get_sectors_16(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = SE_LUN(cmd)->se_dev;
+	struct se_device *dev = SE_LUN(cmd)->lun_se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -5748,11 +5737,9 @@ struct se_cmd *transport_allocate_passthrough(
 	}
 
 	spin_lock_init(&cmd->se_lun->lun_sep_lock);
-	SE_LUN(cmd)->lun_type_ptr = type_ptr;
-
 	cmd->se_orig_obj_ptr = type_ptr;
 	cmd->se_cmd_flags = se_cmd_flags;
-	SE_LUN(cmd)->se_dev = (struct se_device *) type_ptr;
+	SE_LUN(cmd)->lun_se_dev = (struct se_device *) type_ptr;
 
 	/*
 	 * Double check that the passed object is currently accepting CDBs
@@ -5771,7 +5758,7 @@ struct se_cmd *transport_allocate_passthrough(
 
 	memset(&ti, 0, sizeof(struct se_transform_info));
 	ti.ti_data_length = cmd->data_length;
-	ti.ti_dev = SE_LUN(cmd)->se_dev;
+	ti.ti_dev = SE_LUN(cmd)->lun_se_dev;
 	ti.ti_se_cmd = cmd;
 	ti.se_obj_ptr = type_ptr;
 
@@ -5818,10 +5805,10 @@ struct se_cmd *transport_allocate_passthrough(
 #endif
 	}
 
-	if (transport_get_sectors(cmd, type_ptr) < 0)
+	if (transport_get_sectors(cmd) < 0)
 		goto fail;
 
-	if (transport_new_cmd_obj(cmd, &ti, type_ptr, 0) < 0)
+	if (transport_new_cmd_obj(cmd, &ti, 0) < 0)
 		goto fail;
 
 	return cmd;
@@ -6449,8 +6436,7 @@ static inline long long transport_dev_end_lba(struct se_device *dev)
 }
 
 int transport_get_sectors(
-	struct se_cmd *cmd,
-	void *obj_ptr)
+	struct se_cmd *cmd)
 {
 	struct se_device *dev = SE_DEV(cmd);
 
@@ -6466,11 +6452,11 @@ int transport_get_sectors(
 		return 0;
 
 	if ((T_TASK(cmd)->t_task_lba + T_TASK(cmd)->t_task_sectors) >
-	     transport_dev_end_lba(obj_ptr)) {
+	     transport_dev_end_lba(dev)) {
 		printk(KERN_ERR "LBA: %llu Sectors: %u exceeds"
 			" transport_dev_end_lba(): %llu\n",
 			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_task_sectors,
-			transport_dev_end_lba(obj_ptr));
+			transport_dev_end_lba(dev));
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = SECTOR_COUNT_TOO_MANY;
 		return PYX_TRANSPORT_REQ_TOO_MANY_SECTORS;
@@ -6482,7 +6468,6 @@ int transport_get_sectors(
 int transport_new_cmd_obj(
 	struct se_cmd *cmd,
 	struct se_transform_info *ti,
-	void *obj_ptr,
 	int post_execute)
 {
 	u32 task_cdbs = 0;
@@ -6496,7 +6481,7 @@ int transport_new_cmd_obj(
 		ti->ti_set_counts = 1;
 		ti->ti_dev = dev;
 
-		task_cdbs = transport_generic_get_cdb_count(cmd, ti, obj_ptr,
+		task_cdbs = transport_generic_get_cdb_count(cmd, ti,
 				T_TASK(cmd)->t_task_lba,
 				T_TASK(cmd)->t_task_sectors,
 				NULL, &se_mem_out);
@@ -6692,21 +6677,21 @@ next:
 
 static inline int transport_set_task_sectors_disk(
 	struct se_task *task,
-	void *obj_ptr,
+	struct se_device *dev,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if ((lba + sectors) > transport_dev_end_lba(obj_ptr)) {
-		task->task_sectors = ((transport_dev_end_lba(obj_ptr) - lba) + 1);
+	if ((lba + sectors) > transport_dev_end_lba(dev)) {
+		task->task_sectors = ((transport_dev_end_lba(dev) - lba) + 1);
 
-		if (task->task_sectors > transport_dev_max_sectors(obj_ptr)) {
-			task->task_sectors = transport_dev_max_sectors(obj_ptr);
+		if (task->task_sectors > transport_dev_max_sectors(dev)) {
+			task->task_sectors = transport_dev_max_sectors(dev);
 			*max_sectors_set = 1;
 		}
 	} else {
-		if (sectors > transport_dev_max_sectors(obj_ptr)) {
-			task->task_sectors = transport_dev_max_sectors(obj_ptr);
+		if (sectors > transport_dev_max_sectors(dev)) {
+			task->task_sectors = transport_dev_max_sectors(dev);
 			*max_sectors_set = 1;
 		} else
 			task->task_sectors = sectors;
@@ -6717,13 +6702,13 @@ static inline int transport_set_task_sectors_disk(
 
 static inline int transport_set_task_sectors_non_disk(
 	struct se_task *task,
-	void *obj_ptr,
+	struct se_device *dev,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if (sectors > transport_dev_max_sectors(obj_ptr)) {
-		task->task_sectors = transport_dev_max_sectors(obj_ptr);
+	if (sectors > transport_dev_max_sectors(dev)) {
+		task->task_sectors = transport_dev_max_sectors(dev);
 		*max_sectors_set = 1;
 	} else
 		task->task_sectors = sectors;
@@ -6733,17 +6718,15 @@ static inline int transport_set_task_sectors_non_disk(
 
 static inline int transport_set_task_sectors(
 	struct se_task *task,
-	void *obj_ptr,
+	struct se_device *dev,
 	unsigned long long lba,
 	u32 sectors,
 	int *max_sectors_set)
 {
-	struct se_device *dev = obj_ptr;	
-
 	return (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK) ?
-		transport_set_task_sectors_disk(task, obj_ptr, lba, sectors,
+		transport_set_task_sectors_disk(task, dev, lba, sectors,
 				max_sectors_set) :
-		transport_set_task_sectors_non_disk(task, obj_ptr, lba, sectors,
+		transport_set_task_sectors_non_disk(task, dev, lba, sectors,
 				max_sectors_set);
 }
 
@@ -6952,14 +6935,12 @@ static int transport_do_se_mem_map(
 u32 transport_generic_get_cdb_count(
 	struct se_cmd *cmd,
 	struct se_transform_info *ti,
-	void *head_obj_ptr,
 	unsigned long long starting_lba,
 	u32 sectors,
 	struct se_mem *se_mem_in,
 	struct se_mem **se_mem_out)
 {
 	unsigned char *cdb = NULL;
-	void *obj_ptr;
 	struct se_task *task;
 	struct se_mem *se_mem, *se_mem_lout = NULL;
 	struct se_device *dev = SE_DEV(cmd);
@@ -6982,27 +6963,25 @@ u32 transport_generic_get_cdb_count(
 	 * Locate the start volume segment in which the received LBA will be
 	 * executed upon.
 	 */
-	ret = transport_generic_obj_start(ti, head_obj_ptr, starting_lba);
-	if (ret < 0)
-		return 0;
+	ti->ti_lba = starting_lba;
+        ti->ti_obj_ptr = dev;
 	/*
 	 * Locate starting object from original starting_lba.
 	 */
 	lba = ti->ti_lba;
-	obj_ptr = ti->ti_obj_ptr;
 	DEBUG_VOL("Starting Physical LBA(%llu)\n", lba);
 
 	while (sectors) {
 
 		DEBUG_VOL("ITT[0x%08x] LBA(%llu) SectorsLeft(%u) EOBJ(%llu)\n",
 			CMD_TFO(cmd)->get_task_tag(cmd), lba, sectors,
-			transport_dev_end_lba(obj_ptr));
+			transport_dev_end_lba(dev));
 
-		task = cmd->transport_get_task(ti, cmd, obj_ptr);
+		task = cmd->transport_get_task(ti, cmd, dev);
 		if (!(task))
 			goto out;
 
-		transport_set_task_sectors(task, obj_ptr, lba, sectors,
+		transport_set_task_sectors(task, dev, lba, sectors,
 				&max_sectors_set);
 
 		task->task_lba = lba;
@@ -7010,7 +6989,7 @@ u32 transport_generic_get_cdb_count(
 		sectors -= task->task_sectors;
 		task->task_size = (task->task_sectors *
 				   DEV_ATTRIB(dev)->block_size);
-		task->transport_map_task = transport_dev_get_map_SG(obj_ptr,
+		task->transport_map_task = transport_dev_get_map_SG(dev,
 					cmd->data_direction);
 
 		cdb = TRANSPORT(dev)->get_cdb(task);
@@ -7024,7 +7003,7 @@ u32 transport_generic_get_cdb_count(
 		 * Perform the SE OBJ plugin and/or Transport plugin specific
 		 * mapping for T_TASK(cmd)->t_mem_list.
 		 */
-		ret = transport_do_se_mem_map((struct se_device *)obj_ptr, task,
+		ret = transport_do_se_mem_map(dev, task,
 				T_TASK(cmd)->t_mem_list, NULL, se_mem,
 				&se_mem_lout, &se_mem_cnt, &task_offset_in);
 		if (ret < 0)
@@ -7075,7 +7054,7 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 	 */
 	memset((void *)&ti, 0, sizeof(struct se_transform_info));
 	ti.ti_se_cmd = cmd;
-	ti.se_obj_ptr = SE_LUN(cmd)->lun_type_ptr;
+	ti.se_obj_ptr = SE_LUN(cmd)->lun_se_dev;
 
 	if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)) {
 		/*
@@ -7093,12 +7072,11 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 				goto failure;
 		}
 
-		ret = transport_get_sectors(cmd, SE_LUN(cmd)->lun_type_ptr);
+		ret = transport_get_sectors(cmd);
 		if (ret < 0)
 			goto failure;
 
-		ret = transport_new_cmd_obj(cmd, &ti,
-					SE_LUN(cmd)->lun_type_ptr, 0);
+		ret = transport_new_cmd_obj(cmd, &ti, 0);
 		if (ret < 0)
 			goto failure;
 		/*

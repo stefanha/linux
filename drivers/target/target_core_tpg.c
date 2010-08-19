@@ -167,7 +167,7 @@ void core_tpg_add_node_to_devs(
 
 		spin_unlock(&tpg->tpg_lun_lock);
 
-		dev = lun->se_dev;
+		dev = lun->lun_se_dev;
 		/*
 		 * By default in LIO-Target $FABRIC_MOD,
 		 * demo_mode_write_protect is ON, or READ_ONLY;
@@ -327,7 +327,7 @@ void core_tpg_clear_object_luns(struct se_portal_group *tpg)
 		lun = &tpg->tpg_lun_list[i];
 
 		if ((lun->lun_status != TRANSPORT_LUN_STATUS_ACTIVE) ||
-		    (lun->lun_type_ptr == NULL))
+		    (lun->lun_se_dev == NULL))
 			continue;
 
 		spin_unlock(&tpg->tpg_lun_lock);
@@ -604,7 +604,6 @@ static int core_tpg_setup_virtual_lun0(struct se_portal_group *se_tpg)
 	int ret;
 
 	lun->unpacked_lun = 0;	
-	lun->lun_type_ptr = NULL;
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 	atomic_set(&lun->lun_acl_count, 0);
 	init_completion(&lun->lun_shutdown_comp);
@@ -650,7 +649,6 @@ int core_tpg_register(
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
 		lun = &se_tpg->tpg_lun_list[i];
 		lun->unpacked_lun = i;
-		lun->lun_type_ptr = NULL;
 		lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 		atomic_set(&lun->lun_acl_count, 0);
 		init_completion(&lun->lun_shutdown_comp);
@@ -757,11 +755,8 @@ int core_tpg_post_addlun(
 	u32 lun_access,
 	void *lun_ptr)
 {
-	lun->lun_type_ptr = lun_ptr;
-	if (core_dev_export(lun_ptr, tpg, lun) < 0) {
-		lun->lun_type_ptr = NULL;
+	if (core_dev_export(lun_ptr, tpg, lun) < 0)
 		return -1;
-	}
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_access = lun_access;
@@ -831,12 +826,11 @@ int core_tpg_post_dellun(
 
 	core_tpg_shutdown_lun(tpg, lun);
 
-	core_dev_unexport(lun->lun_type_ptr, tpg, lun);
+	core_dev_unexport(lun->lun_se_dev, tpg, lun);
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 	lun->lun_type = 0;
-	lun->lun_type_ptr = NULL;
 	spin_unlock(&tpg->tpg_lun_lock);
 
 	spin_lock(&lun->lun_acl_lock);

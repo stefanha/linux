@@ -854,7 +854,7 @@ struct se_device {
 	struct list_head	g_se_dev_list;
 }  ____cacheline_aligned;
 
-#define SE_DEV(cmd)		((struct se_device *)(cmd)->se_lun->se_dev)
+#define SE_DEV(cmd)		((struct se_device *)(cmd)->se_lun->lun_se_dev)
 #define SU_DEV(dev)		((struct se_subsystem_dev *)(dev)->se_sub_dev)
 #define ISCSI_DEV(cmd)		SE_DEV(cmd)
 #define DEV_ATTRIB(dev)		(&(dev)->se_sub_dev->se_dev_attrib)
@@ -902,8 +902,7 @@ struct se_lun {
 	struct completion	lun_shutdown_comp;
 	struct list_head	lun_cmd_list;
 	struct list_head	lun_acl_list;
-	struct se_device		*se_dev;
-	void			*lun_type_ptr;
+	struct se_device	*lun_se_dev;
 	struct config_group	lun_group;
 	struct se_port	*lun_sep;
 } ____cacheline_aligned;

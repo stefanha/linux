@@ -1151,13 +1151,13 @@ int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 
 			lun = deve->se_lun;
 			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			    (!lun->lun_se_dev))
 				continue;
 
 			seq_printf(seq, "%u %u %u %u %u %s %u %u %u %u"
 				" %u %u %u %s\n",
 				tiqn->tiqn_index, /* scsiInstIndex */
-				lun->se_dev->dev_index, /* scsiDeviceIndex */
+				lun->lun_se_dev->dev_index, /* scsiDeviceIndex */
 				tpg->tpgt, /* scsiAuthIntrTgtPortIndex */
 				se_nacl->acl_index, /* scsiAuthIntrIndex */
 				1, /* scsiAuthIntrDevOrPort */
@@ -1245,13 +1245,13 @@ int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 
 			lun = deve->se_lun;
 			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			    (!lun->lun_se_dev))
 				continue;
 
 			seq_printf(seq, "%u %u %u %u %u "
 				   "%s+i+%02x%02x%02x%02x%02x%02x\n",
 			   tiqn->tiqn_index, /* scsiInstIndex */
-			   lun->se_dev->dev_index, /* scsiDeviceIndex */
+			   lun->lun_se_dev->dev_index, /* scsiDeviceIndex */
 			   tpg->tpgt, /* scsiPortIndex */
 			   sess->session_index,  /* scsiAttIntrPortIndex */
 			   se_nacl->acl_index, /* scsiAttIntrPortAuthIntrIdx */

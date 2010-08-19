@@ -270,9 +270,9 @@ extern void transport_generic_free_cmd(struct se_cmd *, int, int, int);
 extern void transport_generic_wait_for_cmds(struct se_cmd *, int);
 extern int transport_generic_do_transform(struct se_cmd *,
 					struct se_transform_info *);
-extern int transport_get_sectors(struct se_cmd *, void *);
+extern int transport_get_sectors(struct se_cmd *);
 extern int transport_new_cmd_obj(struct se_cmd *,
-				struct se_transform_info *, void *, int);
+				struct se_transform_info *, int);
 extern unsigned char *transport_get_vaddr(struct se_mem *);
 extern struct list_head *transport_init_se_mem_list(void);
 extern void transport_free_se_mem_list(struct list_head *);
@@ -285,8 +285,8 @@ extern int transport_map_mem_to_sg(struct se_task *, struct list_head *,
 					struct se_mem **, u32 *, u32 *);
 extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 					struct se_transform_info *,
-					void *, unsigned long long, u32,
-					struct se_mem *, struct se_mem **);
+					unsigned long long, u32, struct se_mem *,
+					struct se_mem **);
 extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);

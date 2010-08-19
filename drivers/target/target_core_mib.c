@@ -623,7 +623,7 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 				continue;
 			lun = deve->se_lun;
 			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			    (!lun->lun_se_dev))
 				continue;
 
 			seq_printf(seq, "%u %u %u %u %u %s %u %u %u %u %u %u"
@@ -633,7 +633,7 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
 				0,
 				/* scsiDeviceIndex */
-				lun->se_dev->dev_index,
+				lun->lun_se_dev->dev_index,
 				/* scsiAuthIntrTgtPortIndex */
 				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg),
 				/* scsiAuthIntrIndex */
@@ -749,7 +749,7 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 
 			lun = deve->se_lun;
 			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			    (!lun->lun_se_dev))
 				continue;
 
 			memset(buf, 0, 64);
@@ -763,7 +763,7 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
 				0,
 				/* scsiDeviceIndex */
-				lun->se_dev->dev_index,
+				lun->lun_se_dev->dev_index,
 				/* scsiPortIndex */
 				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg),
 				/* scsiAttIntrPortIndex */

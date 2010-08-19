@@ -637,7 +637,7 @@ static int target_fabric_port_link(
 				struct se_portal_group, tpg_group);
 	tf = se_tpg->se_tpg_wwn->wwn_tf;
 
-	if (lun->lun_type_ptr != NULL) {
+	if (lun->lun_se_dev!= NULL) {
 		printk(KERN_ERR "Port Symlink already exists\n");
 		return -EEXIST;
 	}

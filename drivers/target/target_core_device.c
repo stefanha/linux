@@ -222,7 +222,7 @@ extern int __transport_get_lun_for_cmd(
 		se_lun = se_cmd->se_lun = deve->se_lun;
 		se_cmd->pr_res_key = deve->pr_res_key;
 		se_cmd->orig_fe_lun = unpacked_lun;
-		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
+		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_se_dev;
 		se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
 	}
 out:
@@ -267,7 +267,7 @@ out:
 #endif
 			se_lun = se_cmd->se_lun = &se_sess->se_tpg->tpg_virt_lun0;	
 			se_cmd->orig_fe_lun = 0;
-			se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
+			se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_se_dev;
 			se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
 		}
 	}
@@ -275,14 +275,14 @@ out:
 	 * Determine if the struct se_lun is online.
 	 */
 /* #warning FIXME: Check for LUN_RESET + UNIT Attention */
-	if (se_dev_check_online(se_lun->lun_type_ptr) != 0) {
+	if (se_dev_check_online(se_lun->lun_se_dev) != 0) {
 		se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		return -1;
 	}
 
 	{
-	struct se_device *dev = se_lun->se_dev;
+	struct se_device *dev = se_lun->lun_se_dev;
 	spin_lock(&dev->stats_lock);
 	dev->num_cmds++;
 	if (se_cmd->data_direction == SE_DIRECTION_WRITE)
@@ -323,10 +323,10 @@ extern int transport_get_lun_for_tmr(
 			&SE_NODE_ACL(se_sess)->device_list[unpacked_lun];
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
 		se_lun = se_cmd->se_lun = se_tmr->tmr_lun = deve->se_lun;
-		dev = se_tmr->tmr_dev = se_lun->se_dev;
+		dev = se_tmr->tmr_dev = se_lun->lun_se_dev;
 		se_cmd->pr_res_key = deve->pr_res_key;
 		se_cmd->orig_fe_lun = unpacked_lun;
-		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_type_ptr;
+		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_se_dev;
 /*		se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD; */
 	}
 	spin_unlock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
@@ -343,7 +343,7 @@ extern int transport_get_lun_for_tmr(
 	 * Determine if the struct se_lun is online.
 	 */
 /* #warning FIXME: Check for LUN_RESET + UNIT Attention */
-	if (se_dev_check_online(se_lun->lun_type_ptr) != 0) {
+	if (se_dev_check_online(se_lun->lun_se_dev) != 0) {
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		return -1;
 	}
@@ -577,7 +577,7 @@ int core_update_device_list_for_node(
 	deve->attach_count--;
 	spin_unlock_bh(&nacl->device_list_lock);
 
-	core_scsi3_free_pr_reg_from_nacl(lun->se_dev, nacl);
+	core_scsi3_free_pr_reg_from_nacl(lun->lun_se_dev, nacl);
 	return 0;
 }
 
@@ -742,7 +742,7 @@ int core_dev_export(
 	if (!(port))
 		return -1;
 
-	lun->se_dev = dev;
+	lun->lun_se_dev = dev;
 	se_dev_start(dev);
 
 	atomic_inc(&dev->dev_export_obj.obj_access_count);
@@ -758,7 +758,7 @@ void core_dev_unexport(
 	struct se_port *port = lun->lun_sep;
 
 	spin_lock(&lun->lun_sep_lock);
-	if (lun->lun_type_ptr == NULL) {
+	if (lun->lun_se_dev == NULL) {
 		spin_unlock(&lun->lun_sep_lock);
 		return;
 	}
@@ -770,7 +770,7 @@ void core_dev_unexport(
 	spin_unlock(&dev->se_port_lock);
 
 	se_dev_stop(dev);
-	lun->se_dev = NULL;
+	lun->lun_se_dev = NULL;
 }
 
 int transport_core_report_lun_response(struct se_cmd *se_cmd)
@@ -925,7 +925,7 @@ void se_clear_dev_ports(struct se_device *dev)
 		lun = sep->sep_lun;
 		tpg = sep->sep_tpg;
 		spin_lock(&lun->lun_sep_lock);
-		if (lun->lun_type_ptr == NULL) {
+		if (lun->lun_se_dev == NULL) {
 			spin_unlock(&lun->lun_sep_lock);
 			continue;
 		}
@@ -1500,7 +1500,7 @@ int core_dev_add_initiator_node_lun_acl(
 	 * Check to see if there are any existing persistent reservation APTPL
 	 * pre-registrations that need to be enabled for this LUN ACL..
 	 */
-	core_scsi3_check_aptpl_registration(lun->se_dev, tpg, lun, lacl);
+	core_scsi3_check_aptpl_registration(lun->lun_se_dev, tpg, lun, lacl);
 	return 0;
 }
 EXPORT_SYMBOL(core_dev_add_initiator_node_lun_acl);
