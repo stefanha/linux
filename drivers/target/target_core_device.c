@@ -48,7 +48,6 @@
 #include "target_core_alua.h"
 #include "target_core_hba.h"
 #include "target_core_pr.h"
-#include "target_core_seobj.h"
 #include "target_core_ua.h"
 
 struct block_device *__linux_blockdevice_claim(
@@ -276,7 +275,7 @@ out:
 	 * Determine if the struct se_lun is online.
 	 */
 /* #warning FIXME: Check for LUN_RESET + UNIT Attention */
-	if (dev_obj_check_online(se_lun->lun_type_ptr) != 0) {
+	if (se_dev_check_online(se_lun->lun_type_ptr) != 0) {
 		se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		return -1;
@@ -344,7 +343,7 @@ extern int transport_get_lun_for_tmr(
 	 * Determine if the struct se_lun is online.
 	 */
 /* #warning FIXME: Check for LUN_RESET + UNIT Attention */
-	if (dev_obj_check_online(se_lun->lun_type_ptr) != 0) {
+	if (se_dev_check_online(se_lun->lun_type_ptr) != 0) {
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		return -1;
 	}
@@ -732,6 +731,48 @@ void core_release_port(struct se_device *dev, struct se_port *port)
 	return;
 }
 
+int core_dev_export(
+	struct se_device *dev,
+	struct se_portal_group *tpg,
+	struct se_lun *lun)
+{
+	struct se_port *port;
+	
+	port = core_alloc_port(dev);
+	if (!(port))
+		return -1;
+
+	lun->se_dev = dev;
+	se_dev_start(dev);
+
+	atomic_inc(&dev->dev_export_obj.obj_access_count);
+	core_export_port(dev, tpg, port, lun);
+	return 0;
+}
+
+void core_dev_unexport(
+	struct se_device *dev,
+	struct se_portal_group *tpg,
+	struct se_lun *lun)
+{
+	struct se_port *port = lun->lun_sep;
+
+	spin_lock(&lun->lun_sep_lock);
+	if (lun->lun_type_ptr == NULL) {
+		spin_unlock(&lun->lun_sep_lock);
+		return;
+	}
+	spin_unlock(&lun->lun_sep_lock);
+
+	spin_lock(&dev->se_port_lock);
+	atomic_dec(&dev->dev_export_obj.obj_access_count);
+	core_release_port(dev, port);
+	spin_unlock(&dev->se_port_lock);
+
+	se_dev_stop(dev);
+	lun->se_dev = NULL;
+}
+
 int transport_core_report_lun_response(struct se_cmd *se_cmd)
 {
 	struct se_dev_entry *deve;
@@ -957,6 +998,29 @@ void se_dev_stop(struct se_device *dev)
 
 	while (atomic_read(&hba->dev_mib_access_count))
 		msleep(10);
+}
+
+int se_dev_check_online(struct se_device *dev)
+{
+	int ret;
+
+	spin_lock(&dev->dev_status_lock);
+	ret = ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
+	       (dev->dev_status & TRANSPORT_DEVICE_DEACTIVATED)) ? 0 : 1;
+	spin_unlock(&dev->dev_status_lock);
+	
+	return ret;
+}
+
+int se_dev_check_shutdown(struct se_device *dev)
+{
+	int ret;
+
+	spin_lock(&dev->dev_status_lock);
+	ret = (dev->dev_status & TRANSPORT_DEVICE_SHUTDOWN);
+	spin_unlock(&dev->dev_status_lock);
+
+	return ret;
 }
 
 void se_dev_set_default_attribs(struct se_device *dev)

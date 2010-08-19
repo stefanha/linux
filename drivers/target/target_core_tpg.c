@@ -45,7 +45,6 @@
 #include <target/target_core_fabric_ops.h>
 
 #include "target_core_hba.h"
-#include "target_core_seobj.h"
 
 /*	core_clear_initiator_node_from_tpg():
  *
@@ -759,7 +758,7 @@ int core_tpg_post_addlun(
 	void *lun_ptr)
 {
 	lun->lun_type_ptr = lun_ptr;
-	if (dev_obj_export(lun_ptr, tpg, lun) < 0) {
+	if (core_dev_export(lun_ptr, tpg, lun) < 0) {
 		lun->lun_type_ptr = NULL;
 		return -1;
 	}
@@ -832,7 +831,7 @@ int core_tpg_post_dellun(
 
 	core_tpg_shutdown_lun(tpg, lun);
 
-	dev_obj_unexport(lun->lun_type_ptr, tpg, lun);
+	core_dev_unexport(lun->lun_type_ptr, tpg, lun);
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;

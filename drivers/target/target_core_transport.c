@@ -57,7 +57,6 @@
 #include "target_core_hba.h"
 #include "target_core_pr.h"
 #include "target_core_scdb.h"
-#include "target_core_seobj.h"
 #include "target_core_ua.h"
 
 /* #define DEBUG_CDB_HANDLER */
@@ -202,6 +201,9 @@ struct kmem_cache *t10_alua_lu_gp_cache;
 struct kmem_cache *t10_alua_lu_gp_mem_cache;
 struct kmem_cache *t10_alua_tg_pt_gp_cache;
 struct kmem_cache *t10_alua_tg_pt_gp_mem_cache;
+
+/* Used for transport_dev_get_map_*() */
+typedef int (*map_func_t)(struct se_task *, u32);
 
 static int transport_generic_write_pending(struct se_cmd *);
 static int transport_processing_thread(void *);
@@ -2448,6 +2450,20 @@ static inline void transport_generic_prepare_cdb(
 	}
 }
 
+static inline u32 transport_dev_max_sectors(struct se_device *dev)
+{
+	/*
+	 * Always enforce the underlying max_sectors for TCM/pSCSI
+	 */
+	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV)
+		return (DEV_ATTRIB(dev)->max_sectors >
+			TRANSPORT(dev)->get_max_sectors(dev) ?
+			TRANSPORT(dev)->get_max_sectors(dev) :
+			DEV_ATTRIB(dev)->max_sectors);
+
+	return DEV_ATTRIB(dev)->max_sectors;
+}
+
 /*	transport_check_device_cdb_sector_count():
  *
  *	returns:
@@ -2460,9 +2476,9 @@ static inline int transport_check_device_cdb_sector_count(
 {
 	u32 max_sectors;
 
-	max_sectors = dev_obj_max_sectors(se_obj_ptr);
+	max_sectors = transport_dev_max_sectors(se_obj_ptr);
 	if (!(max_sectors)) {
-		printk(KERN_ERR "TRANSPORT->get_max_sectors returned zero!\n");
+		printk(KERN_ERR "transport_dev_max_sectors returned zero!\n");
 		return 1;
 	}
 
@@ -2527,6 +2543,28 @@ static inline int transport_generic_obj_start(
 	return 0;
 }
 
+static inline map_func_t transport_dev_get_map_SG(
+	struct se_device *dev,
+	int rw)
+{
+	return (rw == SE_DIRECTION_WRITE) ? dev->transport->cdb_write_SG :
+		dev->transport->cdb_read_SG;
+}
+
+static inline map_func_t transport_dev_get_map_non_SG(
+	struct se_device *dev,
+	int rw)
+{
+	return (rw == SE_DIRECTION_WRITE) ? dev->transport->cdb_write_non_SG :
+		dev->transport->cdb_read_non_SG;
+}
+
+static inline map_func_t transport_dev_get_map_none(
+	struct se_device *dev)
+{
+	return dev->transport->cdb_none;
+}
+
 static int transport_process_data_sg_transform(
 	struct se_cmd *cmd,
 	struct se_transform_info *ti)
@@ -2536,6 +2574,10 @@ static int transport_process_data_sg_transform(
 	 */
 	return 0;
 }
+
+static int transport_do_se_mem_map(struct se_device *, struct se_task *,
+	struct list_head *, void *, struct se_mem *, struct se_mem **,
+	u32 *, u32 *);
 
 /*	transport_process_control_sg_transform():
  *
@@ -2564,7 +2606,7 @@ static int transport_process_control_sg_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = dev_obj_get_map_SG(ti->se_obj_ptr,
+	task->transport_map_task = transport_dev_get_map_SG(ti->se_obj_ptr,
 				cmd->data_direction);
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
@@ -2577,7 +2619,7 @@ static int transport_process_control_sg_transform(
 	atomic_inc(&T_TASK(cmd)->t_fe_count);
 	atomic_inc(&T_TASK(cmd)->t_se_count);
 
-	ret = dev_obj_do_se_mem_map(ti->se_obj_ptr, task,
+	ret = transport_do_se_mem_map(ti->se_obj_ptr, task,
 			T_TASK(cmd)->t_mem_list, NULL, se_mem, &se_mem_lout,
 			&se_mem_cnt, &task_offset);
 	if (ret < 0)
@@ -2604,7 +2646,7 @@ static int transport_process_control_nonsg_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = dev_obj_get_map_non_SG(ti->se_obj_ptr,
+	task->transport_map_task = transport_dev_get_map_non_SG(ti->se_obj_ptr,
 				cmd->data_direction);
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
@@ -2638,7 +2680,7 @@ static int transport_process_non_data_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = dev_obj_get_map_none(ti->se_obj_ptr);
+	task->transport_map_task = transport_dev_get_map_none(ti->se_obj_ptr);
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
@@ -4007,7 +4049,7 @@ int transport_execute_tasks(struct se_cmd *cmd)
 	int add_tasks;
 
 	if (!(cmd->se_cmd_flags & SCF_SE_DISABLE_ONLINE_CHECK)) {
-		if (dev_obj_check_online(cmd->se_orig_obj_ptr) != 0) {
+		if (se_dev_check_online(cmd->se_orig_obj_ptr) != 0) {
 			cmd->transport_error_status =
 				PYX_TRANSPORT_LU_COMM_FAILURE;
 			transport_generic_request_failure(cmd, NULL, 0, 1);
@@ -5110,6 +5152,26 @@ int transport_get_sense_data(struct se_cmd *cmd)
 	return -1;
 }
 
+static inline void transport_dev_get_mem_buf(
+	struct se_device *dev,
+	struct se_cmd *cmd)
+{
+	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_buf) ?
+		TRANSPORT(dev)->allocate_buf : &transport_generic_allocate_buf;
+	cmd->transport_free_resources = (TRANSPORT(dev)->free_buf) ?
+		TRANSPORT(dev)->free_buf : NULL;
+}
+
+static inline void transport_dev_get_mem_SG(
+	struct se_device *dev,
+	struct se_cmd *cmd)
+{
+	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_DMA) ?
+		TRANSPORT(dev)->allocate_DMA : &transport_generic_get_mem;
+	cmd->transport_free_resources = (TRANSPORT(dev)->free_DMA) ?
+		TRANSPORT(dev)->free_DMA : NULL;
+}
+
 /*
  * Generic function pointers for target_core_mod/ConfigFS
  */
@@ -5198,7 +5260,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
@@ -5210,7 +5272,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5222,7 +5284,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5234,7 +5296,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
@@ -5246,7 +5308,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
@@ -5258,7 +5320,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5270,7 +5332,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
@@ -5282,7 +5344,7 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
@@ -5308,28 +5370,28 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_SEND_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case MODE_SELECT:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SELECT_10:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5340,14 +5402,14 @@ static int transport_generic_cmd_sequencer(
 	case LOG_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_BLOCK_LIMITS:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_BLOCK_LEN;
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5357,7 +5419,7 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_READ_TRACK_RZONE_INFO:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
@@ -5369,7 +5431,7 @@ static int transport_generic_cmd_sequencer(
 			 SPC3_PERSISTENT_RESERVATIONS) ?
 			&core_scsi3_emulate_pr : NULL;
 		size = (cdb[7] << 8) + cdb[8];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5377,14 +5439,14 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_READ_DVD_STRUCTURE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[8] << 8) + cdb[9];
-		dev_obj_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case READ_POSITION:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_POSITION_LEN;
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5409,14 +5471,14 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_REPORT_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case INQUIRY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[3] << 8) + cdb[4];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for INQUIRY.
@@ -5429,14 +5491,14 @@ static int transport_generic_cmd_sequencer(
 	case READ_BUFFER:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_CAPACITY:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_CAP_LEN;
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5445,7 +5507,7 @@ static int transport_generic_cmd_sequencer(
 	case SECURITY_PROTOCOL_OUT:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5459,14 +5521,14 @@ static int transport_generic_cmd_sequencer(
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[10] << 24) | (cdb[11] << 16) |
 		       (cdb[12] << 8) | cdb[13];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case VARIABLE_LENGTH_CMD:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[10] << 8) | cdb[11];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5474,7 +5536,7 @@ static int transport_generic_cmd_sequencer(
 	case SEND_DIAGNOSTIC:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[3] << 8) | cdb[4];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5484,7 +5546,7 @@ static int transport_generic_cmd_sequencer(
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		size = (2336 * sectors);
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5492,28 +5554,28 @@ static int transport_generic_cmd_sequencer(
 	case READ_TOC:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[8];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case REQUEST_SENSE:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_ELEMENT_STATUS:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = 65536 * cdb[7] + 256 * cdb[8] + cdb[9];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case WRITE_BUFFER:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
@@ -5592,7 +5654,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_emulate_cdb =
 				&transport_core_report_lun_response;
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
-		dev_obj_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for REPORT_LUNS
@@ -5695,8 +5757,8 @@ struct se_cmd *transport_allocate_passthrough(
 	/*
 	 * Double check that the passed object is currently accepting CDBs
 	 */
-	if (dev_obj_check_online(type_ptr) != 0) {
-		DEBUG_SO("dev_obj_check_online() failed!\n");
+	if (se_dev_check_online(type_ptr) != 0) {
+		DEBUG_SO("se_dev_check_online() failed!\n");
 		goto fail;
 	}
 
@@ -5794,7 +5856,7 @@ EXPORT_SYMBOL(transport_passthrough_release);
 int transport_passthrough_complete(
 	struct se_cmd *cmd)
 {
-	if (dev_obj_check_shutdown(cmd->se_orig_obj_ptr) != 0)
+	if (se_dev_check_shutdown(cmd->se_orig_obj_ptr) != 0)
 		return -2;
 
 	switch (cmd->scsi_status) {
@@ -6381,6 +6443,11 @@ int transport_generic_do_transform(struct se_cmd *cmd, struct se_transform_info 
 	return 0;
 }
 
+static inline long long transport_dev_end_lba(struct se_device *dev)
+{
+	return dev->dev_sectors_total + 1;
+}
+
 int transport_get_sectors(
 	struct se_cmd *cmd,
 	void *obj_ptr)
@@ -6399,11 +6466,11 @@ int transport_get_sectors(
 		return 0;
 
 	if ((T_TASK(cmd)->t_task_lba + T_TASK(cmd)->t_task_sectors) >
-	     dev_obj_end_lba(obj_ptr)) {
+	     transport_dev_end_lba(obj_ptr)) {
 		printk(KERN_ERR "LBA: %llu Sectors: %u exceeds"
-			" dev_obj_end_lba(): %llu\n",
+			" transport_dev_end_lba(): %llu\n",
 			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_task_sectors,
-			dev_obj_end_lba(obj_ptr));
+			transport_dev_end_lba(obj_ptr));
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = SECTOR_COUNT_TOO_MANY;
 		return PYX_TRANSPORT_REQ_TOO_MANY_SECTORS;
@@ -6630,16 +6697,16 @@ static inline int transport_set_task_sectors_disk(
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if ((lba + sectors) > dev_obj_end_lba(obj_ptr)) {
-		task->task_sectors = ((dev_obj_end_lba(obj_ptr) - lba) + 1);
+	if ((lba + sectors) > transport_dev_end_lba(obj_ptr)) {
+		task->task_sectors = ((transport_dev_end_lba(obj_ptr) - lba) + 1);
 
-		if (task->task_sectors > dev_obj_max_sectors(obj_ptr)) {
-			task->task_sectors = dev_obj_max_sectors(obj_ptr);
+		if (task->task_sectors > transport_dev_max_sectors(obj_ptr)) {
+			task->task_sectors = transport_dev_max_sectors(obj_ptr);
 			*max_sectors_set = 1;
 		}
 	} else {
-		if (sectors > dev_obj_max_sectors(obj_ptr)) {
-			task->task_sectors = dev_obj_max_sectors(obj_ptr);
+		if (sectors > transport_dev_max_sectors(obj_ptr)) {
+			task->task_sectors = transport_dev_max_sectors(obj_ptr);
 			*max_sectors_set = 1;
 		} else
 			task->task_sectors = sectors;
@@ -6655,8 +6722,8 @@ static inline int transport_set_task_sectors_non_disk(
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if (sectors > dev_obj_max_sectors(obj_ptr)) {
-		task->task_sectors = dev_obj_max_sectors(obj_ptr);
+	if (sectors > transport_dev_max_sectors(obj_ptr)) {
+		task->task_sectors = transport_dev_max_sectors(obj_ptr);
 		*max_sectors_set = 1;
 	} else
 		task->task_sectors = sectors;
@@ -6843,6 +6910,45 @@ next:
 	return 0;
 }
 
+static int transport_do_se_mem_map(
+	struct se_device *dev,
+	struct se_task *task,
+	struct list_head *se_mem_list,
+	void *in_mem,
+	struct se_mem *in_se_mem,
+	struct se_mem **out_se_mem,
+	u32 *se_mem_cnt,
+	u32 *task_offset_in)
+{
+	u32 task_offset = *task_offset_in;
+	int ret = 0;
+	/*
+	 * se_subsystem_api_t->do_se_mem_map is used when internal allocation
+	 * has been done by the transport plugin.
+	 */
+	if (TRANSPORT(dev)->do_se_mem_map) {
+		ret = TRANSPORT(dev)->do_se_mem_map(task, se_mem_list,
+				in_mem, in_se_mem, out_se_mem, se_mem_cnt,
+				task_offset_in);
+		if (ret == 0)
+			T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
+
+		return ret;
+	}
+	/*
+	 * Assume default that transport plugin speaks preallocated
+	 * scatterlists.
+	 */
+	if (!(transport_calc_sg_num(task, in_se_mem, task_offset)))
+		return -1;
+	/*
+	 * struct se_task->task_sg now contains the struct scatterlist array.
+	 */
+	return transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
+					in_se_mem, out_se_mem, se_mem_cnt,
+					task_offset_in);
+}
+
 u32 transport_generic_get_cdb_count(
 	struct se_cmd *cmd,
 	struct se_transform_info *ti,
@@ -6890,7 +6996,7 @@ u32 transport_generic_get_cdb_count(
 
 		DEBUG_VOL("ITT[0x%08x] LBA(%llu) SectorsLeft(%u) EOBJ(%llu)\n",
 			CMD_TFO(cmd)->get_task_tag(cmd), lba, sectors,
-			dev_obj_end_lba(obj_ptr));
+			transport_dev_end_lba(obj_ptr));
 
 		task = cmd->transport_get_task(ti, cmd, obj_ptr);
 		if (!(task))
@@ -6904,8 +7010,8 @@ u32 transport_generic_get_cdb_count(
 		sectors -= task->task_sectors;
 		task->task_size = (task->task_sectors *
 				   DEV_ATTRIB(dev)->block_size);
-		task->transport_map_task = dev_obj_get_map_SG(
-				obj_ptr, cmd->data_direction);
+		task->transport_map_task = transport_dev_get_map_SG(obj_ptr,
+					cmd->data_direction);
 
 		cdb = TRANSPORT(dev)->get_cdb(task);
 		if ((cdb)) {
@@ -6918,7 +7024,7 @@ u32 transport_generic_get_cdb_count(
 		 * Perform the SE OBJ plugin and/or Transport plugin specific
 		 * mapping for T_TASK(cmd)->t_mem_list.
 		 */
-		ret = dev_obj_do_se_mem_map(obj_ptr, task,
+		ret = transport_do_se_mem_map((struct se_device *)obj_ptr, task,
 				T_TASK(cmd)->t_mem_list, NULL, se_mem,
 				&se_mem_lout, &se_mem_cnt, &task_offset_in);
 		if (ret < 0)
