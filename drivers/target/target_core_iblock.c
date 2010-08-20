@@ -798,7 +798,7 @@ static int iblock_map_task_SG(struct se_task *task)
 	struct iblock_dev *ib_dev = (struct iblock_dev *) task->se_dev->dev_ptr;
 	struct iblock_req *ib_req = (struct iblock_req *) task->transport_req;
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
-	struct scatterlist *sg = task->task_sg;
+	struct scatterlist *sg;
 	int ret = 0;
 	u32 i, sg_num = task->task_sg_num;
 	sector_t block_lba;
@@ -832,14 +832,13 @@ static int iblock_map_task_SG(struct se_task *task)
 	 * Use fs/bio.c:bio_add_pages() to setup the bio_vec maplist
 	 * from TCM struct se_mem -> task->task_sg -> struct scatterlist memory.
 	 */
-	for (i = 0; i < task->task_sg_num; i++) {
+	for_each_sg(task->task_sg, sg, task->task_sg_num, i) {
 		DEBUG_IBLOCK("task: %p bio: %p Calling bio_add_page(): page:"
-			" %p len: %u offset: %u\n", task, bio, sg_page(&sg[i]),
-				sg[i].length, sg[i].offset);
+			" %p len: %u offset: %u\n", task, bio, sg_page(sg),
+				sg->length, sg->offset);
 again:
-		ret = bio_add_page(bio, sg_page(&sg[i]), sg[i].length,
-				sg[i].offset);
-		if (ret != sg[i].length) {
+		ret = bio_add_page(bio, sg_page(sg), sg->length, sg->offset);
+		if (ret != sg->length) {
 
 			DEBUG_IBLOCK("*** Set bio->bi_sector: %llu\n",
 					bio->bi_sector);
@@ -861,7 +860,7 @@ again:
 			goto again;
 		}
 		/* Always in 512 byte units for Linux/Block */
-		block_lba += sg[i].length >> IBLOCK_LBA_SHIFT;
+		block_lba += sg->length >> IBLOCK_LBA_SHIFT;
 		sg_num--;
 		DEBUG_IBLOCK("task: %p bio-add_page() passed!, decremented"
 			" sg_num to %u\n", task, sg_num);
