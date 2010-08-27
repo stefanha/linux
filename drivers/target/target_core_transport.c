@@ -1168,6 +1168,32 @@ void transport_complete_cmd(struct se_cmd *cmd, int success)
 	cmd->transport_add_cmd_to_queue(cmd, t_state);
 }
 
+/*
+ * Completion function used by TCM subsystem plugins (such as FILEIO)
+ * for queueing up response from a struct se_subsystem_api
+ * ->do_sync_cache() and ->do_sync_cache_range().  This completion is
+ * enabled by setting 'struct se_cmd->se_cmd_flags |= SCF_EMULATE_SYNC_CACHE |
+ * SCF_EMULATE_CDB_ASYNC
+ */
+void transport_complete_sync_cache(struct se_cmd *cmd, int good)
+{
+	struct se_task *task = list_entry(T_TASK(cmd)->t_task_list.next,
+				struct se_task, t_list);
+
+	if (good) {
+		cmd->scsi_status = SAM_STAT_GOOD;
+		task->task_scsi_status = GOOD;
+	} else {
+		task->task_scsi_status = SAM_STAT_CHECK_CONDITION;
+		task->task_error_status = PYX_TRANSPORT_ILLEGAL_REQUEST;
+		TASK_CMD(task)->transport_error_status =
+					PYX_TRANSPORT_ILLEGAL_REQUEST;
+	}
+
+	transport_complete_task(task, good);
+}
+EXPORT_SYMBOL(transport_complete_sync_cache);
+
 /*	transport_complete_task():
  *
  *	Called from interrupt and non interrupt context depending
@@ -4143,11 +4169,15 @@ check_depth:
 		}
 		/*
 		 * Handle the successful completion for transport_emulate_cdb()
-		 * usage.
+		 * for synchronous operation, following SCF_EMULATE_CDB_ASYNC 
+		 * Otherwise the caller is expected to complete the task with
+		 * proper status.
 		 */
-		cmd->scsi_status = SAM_STAT_GOOD;
-		task->task_scsi_status = GOOD;
-		transport_complete_task(task, 1);
+		if (!(cmd->se_cmd_flags & SCF_EMULATE_CDB_ASYNC)) {
+			cmd->scsi_status = SAM_STAT_GOOD;
+			task->task_scsi_status = GOOD;
+			transport_complete_task(task, 1);
+		}
 	} else {
 		error = TRANSPORT(dev)->do_task(task);
 		if (error != 0) {
@@ -5141,6 +5171,42 @@ int transport_get_sense_data(struct se_cmd *cmd)
 	return -1;
 }
 
+static int transport_generic_synchronize_cache(struct se_cmd *cmd)
+{
+	struct se_device *dev = cmd->se_dev;
+	/*
+	 * Determine if we will be flushing the entire device.
+	 */
+	if ((T_TASK(cmd)->t_task_lba == 0) && (cmd->data_length == 0)) {
+		if (TRANSPORT(dev)->do_sync_cache == NULL) {
+			printk(KERN_ERR "TRANSPORT(dev)->do_sync_cache is NULL\n");
+			return PYX_TRANSPORT_LU_COMM_FAILURE;
+		}
+		/*
+		 * The TCM subsystem plugin is expected to handle the
+		 * completion of the SYNCHRONIZE_CACHE op emulation
+		 */
+		TRANSPORT(dev)->do_sync_cache(cmd);
+		return 0;
+	}
+	/*
+	 * Otherwise we are flushing a specific range of LBAs.  The
+	 * ->do_sync_cache_range() caller is expected to handle any
+	 * LBA -> offset conversion.
+	 */
+	if (TRANSPORT(dev)->do_sync_cache_range == NULL) {
+		printk(KERN_ERR "TRANSPORT(dev)->do_sync_cache_range is NULL\n");
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	}
+	/*
+	 * The TCM subsystem plugin is expected to handle the
+	 * completion of the SYNCHRONIZE_CACHE op emulation
+	 */
+	TRANSPORT(dev)->do_sync_cache_range(cmd, T_TASK(cmd)->t_task_lba,
+					cmd->data_length);
+	return 0;
+}
+
 static inline void transport_dev_get_mem_buf(
 	struct se_device *dev,
 	struct se_cmd *cmd)
@@ -5313,6 +5379,7 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
+		T_TASK(cmd)->t_task_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_12:
@@ -5325,6 +5392,7 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
+		T_TASK(cmd)->t_task_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_16:
@@ -5337,6 +5405,7 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
+		T_TASK(cmd)->t_task_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case 0xa3:
@@ -5617,6 +5686,46 @@ static int transport_generic_cmd_sequencer(
 				&core_scsi2_emulate_crh : NULL;
 		ret = TGCS_NON_DATA_CDB;
 		break;
+	case SYNCHRONIZE_CACHE:
+	case 0x91: /* SYNCHRONIZE_CACHE_16: */
+		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
+		cmd->transport_allocate_resources =
+				&transport_generic_allocate_none;
+		transport_get_maps(cmd);
+		/*
+		 * Extract LBA and range to be flushed for emulated SYNCHRONIZE_CACHE
+		 */
+		if (cdb[0] == SYNCHRONIZE_CACHE) {
+			sectors = transport_get_sectors_10(cdb, cmd, &sector_ret);
+			T_TASK(cmd)->t_task_lba = transport_lba_32(cdb);
+		} else {
+			sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
+			T_TASK(cmd)->t_task_lba = transport_lba_64(cdb);
+		}
+                if (sector_ret)
+                        return TGCS_UNSUPPORTED_CDB;
+
+                size = transport_get_size(sectors, cdb, cmd);
+		ret = TGCS_NON_DATA_CDB;
+		/*
+		 * For TCM/pSCSI passthrough, skip cmd->transport_emulate_cdb()
+		 */
+		if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV)
+			break;
+		/*
+		 * Setup the transport_generic_synchronize_cache() callback
+		 * Also set SCF_EMULATE_CDB_ASYNC to ensure asynchronous operation
+		 * for SYNCHRONIZE_CACHE* Immed=1 case in __transport_execute_tasks()
+		 */
+		cmd->transport_emulate_cdb = &transport_generic_synchronize_cache;
+		cmd->se_cmd_flags |= (SCF_EMULATE_SYNC_CACHE | SCF_EMULATE_CDB_ASYNC);
+		/*
+		 * Check to ensure that LBA + Range does not exceed past end of
+		 * device.
+		 */
+		if (transport_get_sectors(cmd) < 0)
+			return TGCS_INVALID_CDB_FIELD;
+		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case GPCMD_CLOSE_TRACK:
 	case ERASE:
@@ -5627,7 +5736,6 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_SET_SPEED:
 	case SPACE:
 	case START_STOP:
-	case SYNCHRONIZE_CACHE:
 	case TEST_UNIT_READY:
 	case VERIFY:
 	case WRITE_FILEMARKS:
@@ -6435,12 +6543,12 @@ static inline long long transport_dev_end_lba(struct se_device *dev)
 	return dev->dev_sectors_total + 1;
 }
 
-int transport_get_sectors(
-	struct se_cmd *cmd)
+int transport_get_sectors(struct se_cmd *cmd)
 {
 	struct se_device *dev = SE_DEV(cmd);
 
-	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
+	if (!(cmd->se_cmd_flags & SCF_EMULATE_SYNC_CACHE) &&
+	    !(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return 0;
 
 	T_TASK(cmd)->t_task_sectors =

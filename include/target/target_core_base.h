@@ -173,6 +173,8 @@
 #define SCF_PASSTHROUGH_SG_TO_MEM		0x00200000
 #define SCF_PASSTHROUGH_CONTIG_TO_SG		0x00400000
 #define SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC	0x00800000
+#define SCF_EMULATE_SYNC_CACHE			0x01000000
+#define SCF_EMULATE_CDB_ASYNC			0x02000000
 
 /* struct se_device->type */
 #define PSCSI					1
@@ -414,6 +416,7 @@ struct se_transport_task {
 	unsigned char		t_task_cdb[SCSI_CDB_SIZE];
 	unsigned long long	t_task_lba;
 	int			t_tasks_failed;
+	int			t_task_fua;
 	u32			t_task_cdbs;
 	u32			t_task_check;
 	u32			t_task_no;
