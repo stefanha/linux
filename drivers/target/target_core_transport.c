@@ -4933,13 +4933,12 @@ static int transport_modesense_control(struct se_device *dev, unsigned char *p)
 	return 12;
 }
 
-static int transport_modesense_caching(unsigned char *p)
+static int transport_modesense_caching(struct se_device *dev, unsigned char *p)
 {
 	p[0] = 0x08;
 	p[1] = 0x12;
-#if 0
-	p[2] = 0x04; /* Write Cache Enable */
-#endif
+	if (DEV_ATTRIB(dev)->emulate_write_cache > 0)
+		p[2] = 0x04; /* Write Cache Enable */
 	p[12] = 0x20; /* Disabled Read Ahead */
 
 	return 20;
@@ -4972,6 +4971,19 @@ static void transport_modesense_write_protect(
 	}
 }
 
+static void transport_modesense_dpofua(
+	unsigned char *buf,
+	int type)
+{
+	switch (type) {
+	case TYPE_DISK:
+		buf[0] |= 0x10; /* DPOFUA bit */
+		break;
+	default:
+		break;
+	}
+}
+
 int transport_generic_emulate_modesense(
 	struct se_cmd *cmd,
 	unsigned char *cdb,
@@ -4991,7 +5003,7 @@ int transport_generic_emulate_modesense(
 		length = transport_modesense_rwrecovery(&buf[offset]);
 		break;
 	case 0x08:
-		length = transport_modesense_caching(&buf[offset]);
+		length = transport_modesense_caching(dev, &buf[offset]);
 		break;
 	case 0x0a:
 		length = transport_modesense_control(dev, &buf[offset]);
@@ -5003,7 +5015,7 @@ int transport_generic_emulate_modesense(
 #endif
 	case 0x3f:
 		length = transport_modesense_rwrecovery(&buf[offset]);
-		length += transport_modesense_caching(&buf[offset+length]);
+		length += transport_modesense_caching(dev, &buf[offset+length]);
 		length += transport_modesense_control(dev, &buf[offset+length]);
 #if 0
 		length += transport_modesense_devicecaps(&buf[offset+length]);
@@ -5026,6 +5038,10 @@ int transport_generic_emulate_modesense(
 		    (cmd->se_deve->lun_flags & TRANSPORT_LUNFLAGS_READ_ONLY)))
 			transport_modesense_write_protect(&buf[3], type);
 
+		if ((DEV_ATTRIB(dev)->emulate_write_cache > 0) &&
+		    (DEV_ATTRIB(dev)->emulate_fua_write > 0))
+			transport_modesense_dpofua(&buf[3], type);
+
 		if ((offset + 2) > cmd->data_length)
 			offset = cmd->data_length;
 
@@ -5037,6 +5053,10 @@ int transport_generic_emulate_modesense(
 		    (cmd->se_deve &&
 		    (cmd->se_deve->lun_flags & TRANSPORT_LUNFLAGS_READ_ONLY)))
 			transport_modesense_write_protect(&buf[2], type);
+
+		if ((DEV_ATTRIB(dev)->emulate_write_cache > 0) &&
+		    (DEV_ATTRIB(dev)->emulate_fua_write > 0))
+			transport_modesense_dpofua(&buf[2], type);
 
 		if ((offset + 1) > cmd->data_length)
 			offset = cmd->data_length;
