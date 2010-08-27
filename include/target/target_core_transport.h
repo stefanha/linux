@@ -115,6 +115,14 @@
 /* struct se_dev_attrib sanity values */
 /* 10 Minutes, see transport_get_default_task_timeout()  */
 #define DA_TASK_TIMEOUT_MAX			600
+/* Emulation for Direct Page Out */
+#define DA_EMULATE_DPO				0
+/* Emulation for Forced Unit Access WRITEs */
+#define DA_EMULATE_FUA_WRITE			1
+/* Emulation for Forced Unit Access READs */
+#define DA_EMULATE_FUA_READ			0
+/* Emulation for WriteCache and SYNCHRONIZE_CACHE */
+#define DA_EMULATE_WRITE_CACHE			0
 /* Emulation for UNIT ATTENTION Interlock Control */
 #define DA_EMULATE_UA_INTLLCK_CTRL		0
 /* Emulation for TASK_ABORTED status (TAS) by default */
@@ -170,6 +178,7 @@ extern struct se_queue_req *__transport_get_qr_from_queue(
 					struct se_queue_obj *);
 extern void transport_remove_cmd_from_queue(struct se_cmd *,
 					    struct se_queue_obj *);
+extern void transport_complete_sync_cache(struct se_cmd *, int);
 extern void transport_complete_cmd(struct se_cmd *, int);
 extern void transport_complete_task(struct se_task *, int);
 extern void transport_add_task_to_execute_queue(struct se_task *,
@@ -408,6 +417,36 @@ struct se_subsystem_api {
 	 * Provided out of convenience.
 	 */
 	int (*do_tmr)(struct se_cmd *cmd);
+	/*
+	 * do_sync_cache():
+	 *
+	 * Notify subsystem backstore when a SYNCHRONIZE_CACHE has been
+	 * received with WriteCache=1
+	 */
+	void (*do_sync_cache)(struct se_cmd *);
+	/*
+	 * do_sync_cache_range():
+	 *
+	 * Notify subsystem backstore when a SYNCHRONIZE_CACHE w/ explict
+	 * LBA + Range has been received with WriteCache=1
+	 */
+	void (*do_sync_cache_range)(struct se_cmd *, unsigned long long, u32);
+	/*
+	 * dpo_emulated():
+	 */
+	int (*dpo_emulated)(struct se_device *);
+	/*
+	 * fua_write_emulated():
+	 */
+	int (*fua_write_emulated)(struct se_device *);
+	/*
+	 * fua_read_emulated():
+	 */
+	int (*fua_read_emulated)(struct se_device *);
+	/*
+	 * write_cache_emulated():
+	 */
+	int (*write_cache_emulated)(struct se_device *);
 	/*
 	 * transport_complete():
 	 *

@@ -1025,6 +1025,10 @@ int se_dev_check_shutdown(struct se_device *dev)
 
 void se_dev_set_default_attribs(struct se_device *dev)
 {
+	DEV_ATTRIB(dev)->emulate_dpo = DA_EMULATE_DPO;
+	DEV_ATTRIB(dev)->emulate_fua_write = DA_EMULATE_FUA_WRITE;
+	DEV_ATTRIB(dev)->emulate_fua_read = DA_EMULATE_FUA_READ;
+	DEV_ATTRIB(dev)->emulate_write_cache = DA_EMULATE_WRITE_CACHE;
 	DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl = DA_EMULATE_UA_INTLLCK_CTRL;
 	DEV_ATTRIB(dev)->emulate_tas = DA_EMULATE_TAS;
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
@@ -1072,6 +1076,86 @@ int se_dev_set_task_timeout(struct se_device *dev, u32 task_timeout)
 			dev, task_timeout);
 	}
 
+	return 0;
+}
+
+int se_dev_set_emulate_dpo(struct se_device *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+	if (TRANSPORT(dev)->dpo_emulated == NULL) {
+		printk(KERN_ERR "TRANSPORT(dev)->dpo_emulated is NULL\n");
+		return -1;
+	}
+	if (TRANSPORT(dev)->dpo_emulated(dev) == 0) {
+		printk(KERN_ERR "TRANSPORT(dev)->dpo_emulated not supported\n");
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_dpo = flag;
+	printk(KERN_INFO "dev[%p]: SE Device Page Out (DPO) Emulation"
+			" bit: %d\n", dev, DEV_ATTRIB(dev)->emulate_dpo);
+	return 0;
+}
+
+int se_dev_set_emulate_fua_write(struct se_device *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+	if (TRANSPORT(dev)->fua_write_emulated == NULL) {
+		printk(KERN_ERR "TRANSPORT(dev)->fua_write_emulated is NULL\n");
+		return -1;
+	}
+	if (TRANSPORT(dev)->fua_write_emulated(dev) == 0) {
+		printk(KERN_ERR "TRANSPORT(dev)->fua_write_emulated not supported\n");
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_fua_write = flag;
+	printk(KERN_INFO "dev[%p]: SE Device Forced Unit Access WRITEs: %d\n",
+			dev, DEV_ATTRIB(dev)->emulate_fua_write);
+	return 0;
+}
+
+int se_dev_set_emulate_fua_read(struct se_device *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+	if (TRANSPORT(dev)->fua_read_emulated == NULL) {
+		printk(KERN_ERR "TRANSPORT(dev)->fua_read_emulated is NULL\n");
+		return -1;
+	}
+	if (TRANSPORT(dev)->fua_read_emulated(dev) == 0) {
+		printk(KERN_ERR "TRANSPORT(dev)->fua_read_emulated not supported\n");
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_fua_read = flag;
+	printk(KERN_INFO "dev[%p]: SE Device Forced Unit Access READs: %d\n",
+			dev, DEV_ATTRIB(dev)->emulate_fua_read);
+	return 0;
+}
+
+int se_dev_set_emulate_write_cache(struct se_device *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+	if (TRANSPORT(dev)->write_cache_emulated == NULL) {
+		printk(KERN_ERR "TRANSPORT(dev)->write_cache_emulated is NULL\n");
+		return -1;
+	}
+	if (TRANSPORT(dev)->write_cache_emulated(dev) == 0) {
+		printk(KERN_ERR "TRANSPORT(dev)->write_cache_emulated not supported\n");
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_write_cache = flag;
+	printk(KERN_INFO "dev[%p]: SE Device WRITE_CACHE_EMULATION flag: %d\n",
+			dev, DEV_ATTRIB(dev)->emulate_write_cache);
 	return 0;
 }
 

@@ -545,6 +545,18 @@ static struct target_core_dev_attrib_attribute				\
 	__CONFIGFS_EATTR_RO(_name,					\
 	target_core_dev_show_attr_##_name);
 
+DEF_DEV_ATTRIB(emulate_dpo);
+SE_DEV_ATTR(emulate_dpo, S_IRUGO | S_IWUSR);
+
+DEF_DEV_ATTRIB(emulate_fua_write);
+SE_DEV_ATTR(emulate_fua_write, S_IRUGO | S_IWUSR);
+
+DEF_DEV_ATTRIB(emulate_fua_read);
+SE_DEV_ATTR(emulate_fua_read, S_IRUGO | S_IWUSR);
+
+DEF_DEV_ATTRIB(emulate_write_cache);
+SE_DEV_ATTR(emulate_write_cache, S_IRUGO | S_IWUSR);
+
 DEF_DEV_ATTRIB(emulate_ua_intlck_ctrl);
 SE_DEV_ATTR(emulate_ua_intlck_ctrl, S_IRUGO | S_IWUSR);
 
@@ -578,6 +590,10 @@ SE_DEV_ATTR(task_timeout, S_IRUGO | S_IWUSR);
 CONFIGFS_EATTR_OPS(target_core_dev_attrib, se_dev_attrib, da_group);
 
 static struct configfs_attribute *target_core_dev_attrib_attrs[] = {
+	&target_core_dev_attrib_emulate_dpo.attr,
+	&target_core_dev_attrib_emulate_fua_write.attr,
+	&target_core_dev_attrib_emulate_fua_read.attr,
+	&target_core_dev_attrib_emulate_write_cache.attr,
 	&target_core_dev_attrib_emulate_ua_intlck_ctrl.attr,
 	&target_core_dev_attrib_emulate_tas.attr,
 	&target_core_dev_attrib_enforce_pr_isids.attr,

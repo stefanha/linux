@@ -707,6 +707,10 @@ struct se_dev_entry {
 }  ____cacheline_aligned;
 
 struct se_dev_attrib {
+	int		emulate_dpo;
+	int		emulate_fua_write;
+	int		emulate_fua_read;
+	int		emulate_write_cache;
 	int		emulate_ua_intlck_ctrl;
 	int		emulate_tas;
 	int		emulate_reservations;
