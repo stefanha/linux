@@ -5195,24 +5195,9 @@ static int transport_generic_synchronize_cache(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
 	/*
-	 * Determine if we will be flushing the entire device.
-	 */
-	if ((T_TASK(cmd)->t_task_lba == 0) && (cmd->data_length == 0)) {
-		if (TRANSPORT(dev)->do_sync_cache == NULL) {
-			printk(KERN_ERR "TRANSPORT(dev)->do_sync_cache is NULL\n");
-			return PYX_TRANSPORT_LU_COMM_FAILURE;
-		}
-		/*
-		 * The TCM subsystem plugin is expected to handle the
-		 * completion of the SYNCHRONIZE_CACHE op emulation
-		 */
-		TRANSPORT(dev)->do_sync_cache(cmd);
-		return 0;
-	}
-	/*
-	 * Otherwise we are flushing a specific range of LBAs.  The
-	 * ->do_sync_cache_range() caller is expected to handle any
-	 * LBA -> offset conversion.
+	 * We may be flushing the entire cache or only a specific
+	 * range of LBAs.  The ->do_sync_cache_range() caller is expected
+	 * to handle any LBA -> offset conversion.
 	 */
 	if (TRANSPORT(dev)->do_sync_cache_range == NULL) {
 		printk(KERN_ERR "TRANSPORT(dev)->do_sync_cache_range is NULL\n");

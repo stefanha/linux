@@ -418,13 +418,6 @@ struct se_subsystem_api {
 	 */
 	int (*do_tmr)(struct se_cmd *cmd);
 	/*
-	 * do_sync_cache():
-	 *
-	 * Notify subsystem backstore when a SYNCHRONIZE_CACHE has been
-	 * received with WriteCache=1
-	 */
-	void (*do_sync_cache)(struct se_cmd *);
-	/*
 	 * do_sync_cache_range():
 	 *
 	 * Notify subsystem backstore when a SYNCHRONIZE_CACHE w/ explict
