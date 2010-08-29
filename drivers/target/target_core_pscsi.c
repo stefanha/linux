@@ -30,6 +30,7 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
+#include <linux/blk_types.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
@@ -1103,11 +1104,9 @@ static int pscsi_map_task_SG(struct se_task *task)
 				bio = pscsi_get_bio(pdv, nr_vecs);
 				if (!(bio))
 					goto fail;
-				/*
-				 * FIXME: Use bio_set_dir() when avaliable
-				 */
+
 				if (rw)
-					bio->bi_rw |= (1 << BIO_RW);
+					bio->bi_rw |= REQ_WRITE;
 
 				DEBUG_PSCSI("PSCSI: Allocated bio: %p,"
 					" dir: %s nr_vecs: %d\n", bio,
