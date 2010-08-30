@@ -3,8 +3,8 @@
  *
  * This file contains the generic target mode <-> Linux SCSI subsystem plugin.
  *
- * Copyright (c) 2009 Rising Tide Systems, Inc.
- * Copyright (c) 2009 Linux-iSCSI.org
+ * Copyright (c) 2009,2010 Rising Tide Systems
+ * Copyright (c) 2009,2010 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
