@@ -154,8 +154,8 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			from += mem_off & ~PAGE_MASK;
 			tlen = min(tlen, PAGE_SIZE - (mem_off & ~PAGE_MASK));
 			memcpy(to, from, tlen);
-			kunmap_atomic(page + (mem_off >> PAGE_SHIFT),
-				      KM_SOFTIRQ0);
+			kunmap_atomic((void *)page + (mem_off >> PAGE_SHIFT),
+					KM_SOFTIRQ0);
 			to += tlen;
 		} else {
 			from = task->t_task_buf + mem_off;
@@ -262,7 +262,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 			to += mem_off & ~PAGE_MASK;
 			tlen = min(tlen, PAGE_SIZE - (mem_off & ~PAGE_MASK));
 			memcpy(to, from, tlen);
-			kunmap_atomic(page + (mem_off >> PAGE_SHIFT),
+			kunmap_atomic((void *)page + (mem_off >> PAGE_SHIFT),
 				      KM_SOFTIRQ0);
 		} else {
 			to = task->t_task_buf + mem_off;
