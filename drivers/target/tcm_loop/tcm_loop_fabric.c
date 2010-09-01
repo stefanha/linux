@@ -379,7 +379,6 @@ int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 	struct tcm_loop_cmd *tl_cmd =
 			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
 	struct scsi_cmnd *sc = tl_cmd->sc;
-	unsigned long flags;
 
 	TL_CDB_DEBUG( "tcm_loop_queue_data_in() called for scsi_cmnd: %p"
 			" cdb: 0x%02x\n", sc, sc->cmnd[0]);
@@ -393,10 +392,7 @@ int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 	}
 
 	sc->result = host_byte(DID_OK) | SAM_STAT_GOOD;
-
-	spin_lock_irqsave(sc->device->host->host_lock, flags);
 	(*sc->scsi_done)(sc);
-	spin_unlock_irqrestore(sc->device->host->host_lock, flags);
 	return 0;
 }
 
@@ -405,7 +401,6 @@ int tcm_loop_queue_status(struct se_cmd *se_cmd)
 	struct tcm_loop_cmd *tl_cmd =
 			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
 	struct scsi_cmnd *sc = tl_cmd->sc;
-	unsigned long flags;
 
 	TL_CDB_DEBUG("tcm_loop_queue_status() called for scsi_cmnd: %p"
 			" cdb: 0x%02x\n", sc, sc->cmnd[0]);
@@ -421,9 +416,7 @@ int tcm_loop_queue_status(struct se_cmd *se_cmd)
 	} else
 		sc->result = host_byte(DID_OK) | se_cmd->scsi_status;
 
-	spin_lock_irqsave(sc->device->host->host_lock, flags);
 	(*sc->scsi_done)(sc);
-	spin_unlock_irqrestore(sc->device->host->host_lock, flags);
 	return 0;
 }
 
