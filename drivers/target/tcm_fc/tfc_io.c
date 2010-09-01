@@ -81,6 +81,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	struct page *page;
 	int use_sg;
 	int error;
+	void *page_addr;
 	void *from;
 	void *to = NULL;
 
@@ -148,14 +149,12 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			BUG_ON(!page);
 			from = kmap_atomic(page + (mem_off >> PAGE_SHIFT),
 					   KM_SOFTIRQ0);
-			WARN_ON(!from);
-			if (!from)
-				break;	/* XXX for now initiator will retry */
+			page_addr = from;
 			from += mem_off & ~PAGE_MASK;
-			tlen = min(tlen, PAGE_SIZE - (mem_off & ~PAGE_MASK));
+			tlen = min(tlen, (size_t)(PAGE_SIZE -
+						(mem_off & ~PAGE_MASK)));
 			memcpy(to, from, tlen);
-			kunmap_atomic((void *)page + (mem_off >> PAGE_SHIFT),
-					KM_SOFTIRQ0);
+			kunmap_atomic(page_addr, KM_SOFTIRQ0);
 			to += tlen;
 		} else {
 			from = task->t_task_buf + mem_off;
@@ -198,6 +197,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	size_t mem_len;
 	size_t tlen;
 	struct page *page;
+	void *page_addr;
 	void *from;
 	void *to;
 
@@ -257,13 +257,12 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		if (mem) {
 			to = kmap_atomic(page + (mem_off >> PAGE_SHIFT),
 					 KM_SOFTIRQ0);
-			if (!to)
-				break;
+			page_addr = to;
 			to += mem_off & ~PAGE_MASK;
-			tlen = min(tlen, PAGE_SIZE - (mem_off & ~PAGE_MASK));
+			tlen = min(tlen, (size_t)(PAGE_SIZE -
+						(mem_off & ~PAGE_MASK)));
 			memcpy(to, from, tlen);
-			kunmap_atomic((void *)page + (mem_off >> PAGE_SHIFT),
-				      KM_SOFTIRQ0);
+			kunmap_atomic(page_addr, KM_SOFTIRQ0);
 		} else {
 			to = task->t_task_buf + mem_off;
 			memcpy(to, from, tlen);
