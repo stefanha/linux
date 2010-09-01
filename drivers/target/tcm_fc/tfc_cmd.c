@@ -148,9 +148,16 @@ static struct ft_cmd *ft_dequeue_cmd(struct se_queue_obj *qobj)
 
 static void ft_free_cmd(struct ft_cmd *cmd)
 {
+	struct fc_frame *fp;
+	struct fc_lport *lport;
+
 	if (!cmd)
 		return;
-	fc_frame_free(cmd->req_frame);
+	fp = cmd->req_frame;
+	lport = fr_dev(fp);
+	if (fr_seq(fp))
+		lport->tt.seq_release(fr_seq(fp));
+	fc_frame_free(fp);
 	ft_sess_put(cmd->sess);	/* undo get from lookup at recv */
 	kfree(cmd);
 }
@@ -320,27 +327,26 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
  * status is SAM_STAT_GOOD (zero) iff code is valid.
  * This is used in error cases, such as allocation failures.
  */
-static void ft_send_resp_status(struct fc_seq *sp, u32 status,
-				enum fcp_resp_rsp_codes code)
+static void ft_send_resp_status(struct fc_lport *lport,
+				const struct fc_frame *rx_fp,
+				u32 status, enum fcp_resp_rsp_codes code)
 {
 	struct fc_frame *fp;
+	struct fc_seq *sp;
+	const struct fc_frame_header *fh;
 	size_t len;
 	struct fcp_resp_with_ext *fcp;
 	struct fcp_resp_rsp_info *info;
-	struct fc_lport *lport;
-	struct fc_exch *ep;
 
-	ep = fc_seq_exch(sp);
-
+	fh = fc_frame_header_get(rx_fp);
 	FT_IO_DBG("FCP error response: did %x oxid %x status %x code %x\n",
-		  ep->did, ep->oxid, status, code);
-	lport = ep->lp;
+		  ntoh24(fh->fh_s_id), ntohs(fh->fh_ox_id), status, code);
 	len = sizeof(*fcp);
 	if (status == SAM_STAT_GOOD)
 		len += sizeof(*info);
 	fp = fc_frame_alloc(lport, len);
 	if (!fp)
-		goto out;
+		return;
 	fcp = fc_frame_payload_get(fp, len);
 	memset(fcp, 0, len);
 	fcp->resp.fr_status = status;
@@ -351,13 +357,12 @@ static void ft_send_resp_status(struct fc_seq *sp, u32 status,
 		info->rsp_code = code;
 	}
 
-	sp = lport->tt.seq_start_next(sp);
-	fc_fill_fc_hdr(fp, FC_RCTL_DD_CMD_STATUS, ep->did, ep->sid, FC_TYPE_FCP,
-		       FC_FC_EX_CTX | FC_FC_LAST_SEQ | FC_FC_END_SEQ, 0);
-
-	lport->tt.seq_send(lport, sp, fp);
-out:
-	lport->tt.exch_done(sp);
+	fc_fill_reply_hdr(fp, rx_fp, FC_RCTL_DD_CMD_STATUS, 0);
+	sp = fr_seq(fp);
+	if (sp)
+		lport->tt.seq_send(lport, sp, fp);
+	else
+		lport->tt.frame_send(lport, fp);
 }
 
 /*
@@ -366,7 +371,8 @@ out:
  */
 static void ft_send_resp_code(struct ft_cmd *cmd, enum fcp_resp_rsp_codes code)
 {
-	ft_send_resp_status(cmd->seq, SAM_STAT_GOOD, code);
+	ft_send_resp_status(cmd->sess->tport->lport,
+			    cmd->req_frame, SAM_STAT_GOOD, code);
 	ft_free_cmd(cmd);
 }
 
@@ -462,23 +468,27 @@ int ft_queue_tm_resp(struct se_cmd *se_cmd)
 /*
  * Handle incoming FCP command.
  */
-static void ft_recv_cmd(struct ft_sess *sess,
-			struct fc_seq *sp, struct fc_frame *fp)
+static void ft_recv_cmd(struct ft_sess *sess, struct fc_frame *fp)
 {
 	struct ft_cmd *cmd;
+	struct fc_lport *lport = sess->tport->lport;
 
 	cmd = kzalloc(sizeof(*cmd), GFP_ATOMIC);
 	if (!cmd)
 		goto busy;
 	cmd->sess = sess;
-	cmd->seq = sp;
+	cmd->seq = lport->tt.seq_assign(lport, fp);
+	if (!cmd->seq) {
+		kfree(cmd);
+		goto busy;
+	}
 	cmd->req_frame = fp;		/* hold frame during cmd */
 	ft_queue_cmd(sess, cmd);
 	return;
 
 busy:
-	FT_IO_DBG("cmd allocation failure - sending BUSY\n");
-	ft_send_resp_status(sp, SAM_STAT_BUSY, 0);
+	FT_IO_DBG("cmd or seq allocation failure - sending BUSY\n");
+	ft_send_resp_status(lport, fp, SAM_STAT_BUSY, 0);
 	fc_frame_free(fp);
 	ft_sess_put(sess);		/* undo get from lookup */
 }
@@ -488,13 +498,13 @@ busy:
  * Handle incoming FCP frame.
  * Caller has verified that the frame is type FCP.
  */
-void ft_recv_req(struct ft_sess *sess, struct fc_seq *sp, struct fc_frame *fp)
+void ft_recv_req(struct ft_sess *sess, struct fc_frame *fp)
 {
 	struct fc_frame_header *fh = fc_frame_header_get(fp);
 
 	switch (fh->fh_r_ctl) {
 	case FC_RCTL_DD_UNSOL_CMD:	/* command */
-		ft_recv_cmd(sess, sp, fp);
+		ft_recv_cmd(sess, fp);
 		break;
 	case FC_RCTL_DD_SOL_DATA:	/* write data */
 	case FC_RCTL_DD_UNSOL_CTL:
@@ -560,10 +570,9 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 					data_dir, task_attr);
 	if (!se_cmd) {
 		FT_IO_DBG("se_cmd allocation failure - sending BUSY\n");
-		ft_send_resp_status(cmd->seq, SAM_STAT_BUSY, 0);
-		fc_frame_free(cmd->req_frame);
-		ft_sess_put(cmd->sess);		/* undo get from lookup */
-		kfree(cmd);
+		ft_send_resp_status(cmd->sess->tport->lport, cmd->req_frame,
+				    SAM_STAT_BUSY, 0);
+		ft_free_cmd(cmd);
 		return;
 	}
 	cmd->se_cmd = se_cmd;

@@ -512,27 +512,21 @@ static void ft_prlo(struct fc_rport_priv *rdata)
  * Handle incoming FCP request.
  * Caller has verified that the frame is type FCP.
  */
-static void ft_recv(struct fc_lport *lport,
-		    struct fc_seq *sp, struct fc_frame *fp)
+static void ft_recv(struct fc_lport *lport, struct fc_frame *fp)
 {
 	struct ft_sess *sess;
-	struct fc_frame_header *fh;
-	u32 sid;
-
-	fh = fc_frame_header_get(fp);
-	sid = ntoh24(fh->fh_s_id);
+	u32 sid = fc_frame_sid(fp);
 
 	FT_SESS_DBG("sid %x\n", sid);
 
 	sess = ft_sess_get(lport, sid);
 	if (!sess) {
 		FT_SESS_DBG("sid %x sess lookup failed\n", sid);
-		lport->tt.exch_done(sp);
 		/* TBD XXX - if FCP_CMND, send PRLO */
 		fc_frame_free(fp);
 		return;
 	}
-	ft_recv_req(sess, sp, fp);	/* must do ft_sess_put() */
+	ft_recv_req(sess, fp);	/* must do ft_sess_put() */
 }
 
 /*

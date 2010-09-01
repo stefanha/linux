@@ -197,7 +197,7 @@ int ft_is_state_remove(struct se_cmd *);
  * other internal functions.
  */
 int ft_thread(void *);
-void ft_recv_req(struct ft_sess *, struct fc_seq *, struct fc_frame *);
+void ft_recv_req(struct ft_sess *, struct fc_frame *);
 struct ft_tpg *ft_lport_find_tpg(struct fc_lport *);
 struct ft_node_acl *ft_acl_get(struct ft_tpg *, struct fc_rport_priv *);
 
