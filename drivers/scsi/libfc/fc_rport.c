@@ -1086,8 +1086,8 @@ static void fc_rport_enter_prli(struct fc_rport_priv *rdata)
 		       fc_host_port_id(lport->host), FC_TYPE_ELS,
 		       FC_FC_FIRST_SEQ | FC_FC_END_SEQ | FC_FC_SEQ_INIT, 0);
 
-	if (lport->tt.exch_seq_send(lport, fp, fc_rport_prli_resp,
-				    NULL, rdata, 2 * lport->r_a_tov))
+	if (!lport->tt.exch_seq_send(lport, fp, fc_rport_prli_resp,
+				     NULL, rdata, 2 * lport->r_a_tov))
 		fc_rport_error_retry(rdata, NULL);
 	else
 		kref_get(&rdata->kref);
