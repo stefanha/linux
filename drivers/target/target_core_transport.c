@@ -4499,6 +4499,7 @@ after_tpgs:
 		buf[4] = 0x0;
 		buf[5] = 0x80;
 		buf[6] = 0x83;
+		buf[7] = 0x86;
 		len = 3;
 		break;
 	case 0x80: /* unit serial number */
@@ -4815,6 +4816,22 @@ check_scsi_name:
 set_len:
 		buf[2] = ((len >> 8) & 0xff);
 		buf[3] = (len & 0xff); /* Page Length for VPD 0x83 */
+		break;
+	case 0x86: /* Extended INQUIRY Data VPD Page */
+		/*
+		 * This page uses a hardcoded value of 60
+		 */
+		if (cmd->data_length < 60)
+			return 0;
+
+		buf[1] = 0x86;
+		buf[2] = 0x3c;
+		/* Set HEADSUP, ORDSUP, SIMPSUP */
+		buf[5] = 0x07;
+		/* If WriteCache emulation is enabled, set V_SUP */
+		if (DEV_ATTRIB(dev)->emulate_write_cache > 0)
+			buf[6] = 0x01;
+
 		break;
 	default:
 		printk(KERN_ERR "Unknown VPD Code: 0x%02x\n", cdb[2]);
