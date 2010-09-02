@@ -547,6 +547,7 @@ static struct target_core_fabric_ops ft_fabric_ops = {
 	.tpg_check_demo_mode =		ft_check_false,
 	.tpg_check_demo_mode_cache =	ft_check_false,
 	.tpg_check_demo_mode_write_protect = ft_check_false,
+	.tpg_check_prod_mode_write_protect = ft_check_false,
 	.tpg_alloc_fabric_acl =		ft_tpg_alloc_fabric_acl,
 	.tpg_release_fabric_acl =	ft_tpg_release_fabric_acl,
 	.tpg_get_inst_index = 		ft_tpg_get_inst_index,
