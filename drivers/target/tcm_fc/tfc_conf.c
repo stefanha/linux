@@ -212,7 +212,6 @@ static struct se_node_acl *ft_add_acl(
 	const char *name)
 {
 	struct ft_node_acl *acl;
-	struct se_node_acl *se_nacl;
 	struct ft_tpg *tpg;
 	u64 wwpn;
 	u32 q_depth;
@@ -226,17 +225,11 @@ static struct se_node_acl *ft_add_acl(
 	acl = kzalloc(sizeof(struct ft_node_acl), GFP_KERNEL);
 	if (!(acl))
 		return ERR_PTR(-ENOMEM);
+	acl->node_auth.port_name = wwpn;
 
 	q_depth = 32;		/* XXX bogus default - get from tpg? */
-	se_nacl = core_tpg_add_initiator_node_acl(&tpg->se_tpg,
+	return core_tpg_add_initiator_node_acl(&tpg->se_tpg,
 				&acl->se_node_acl, name, q_depth);
-	if (IS_ERR(se_nacl) || !se_nacl) {
-		kfree(acl);
-		return se_nacl;
-	}
-
-	acl->node_auth.port_name = wwpn;
-	return &acl->se_node_acl;
 }
 
 static void ft_del_acl(struct se_node_acl *se_acl)

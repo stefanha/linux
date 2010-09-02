@@ -233,6 +233,7 @@ static struct ft_sess *ft_sess_create(struct ft_tport *tport, u32 port_id,
 		kfree(sess);
 		return NULL;
 	}
+	sess->se_sess->se_node_acl = &acl->se_node_acl;
 	sess->tport = tport;
 	sess->port_id = port_id;
 	kref_init(&sess->kref);	/* ref for table entry */
@@ -241,7 +242,7 @@ static struct ft_sess *ft_sess_create(struct ft_tport *tport, u32 port_id,
 
 	FT_SESS_DBG("port_id %x sess %p\n", port_id, sess);
 
-	__transport_register_session(&tport->tpg->se_tpg, &acl->se_node_acl,
+	transport_register_session(&tport->tpg->se_tpg, &acl->se_node_acl,
 				   sess->se_sess, sess);
 	return sess;
 }
