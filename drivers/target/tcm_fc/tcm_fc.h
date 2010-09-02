@@ -182,6 +182,7 @@ int ft_lport_notify(struct notifier_block *, unsigned long, void *);
 /*
  * IO methods.
  */
+void ft_check_stop_free(struct se_cmd *);
 void ft_release_cmd(struct se_cmd *);
 int ft_queue_status(struct se_cmd *);
 int ft_queue_data_in(struct se_cmd *);
