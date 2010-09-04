@@ -423,16 +423,21 @@ struct se_queue_obj {
 	struct completion	thread_done_comp;
 } ____cacheline_aligned;
 
+/*
+ * Used one per struct se_cmd to hold all extra struct se_task
+ * metadata.  This structure is setup and allocated in
+ * drivers/target/target_core_transport.c:__transport_alloc_se_cmd()
+ */
 struct se_transport_task {
 	unsigned char		t_task_cdb[SCSI_CDB_SIZE];
 	unsigned long long	t_task_lba;
 	int			t_tasks_failed;
-	int			t_task_fua;
+	int			t_tasks_fua;
 	u32			t_task_cdbs;
-	u32			t_task_check;
-	u32			t_task_no;
-	u32			t_task_sectors;
-	u32			t_task_se_num;
+	u32			t_tasks_check;
+	u32			t_tasks_no;
+	u32			t_tasks_sectors;
+	u32			t_tasks_se_num;
 	atomic_t		t_fe_count;
 	atomic_t		t_se_count;
 	atomic_t		t_task_cdbs_left;

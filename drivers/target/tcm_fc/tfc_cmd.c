@@ -73,7 +73,7 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 
 	task = T_TASK(se_cmd);
 	printk(KERN_INFO "%s: cmd %p task %p se_num %u buf %p len %u\n",
-	       caller, cmd, task, task->t_task_se_num,
+	       caller, cmd, task, task->t_tasks_se_num,
 	       task->t_task_buf, se_cmd->data_length);
 	if (task->t_mem_list)
 		list_for_each_entry(mem, task->t_mem_list, se_list)

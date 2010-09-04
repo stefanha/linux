@@ -4492,7 +4492,7 @@ check_rsp_state:
 			}
 
 			if (map_sg && !CONN_OPS(conn)->IFMarker &&
-			    T_TASK(cmd->se_cmd)->t_task_se_num) {
+			    T_TASK(cmd->se_cmd)->t_tasks_se_num) {
 				SE_CMD(cmd)->transport_map_SG_segments(&unmap_sg);
 				if (iscsi_fe_sendpage_sg(&unmap_sg, conn) < 0) {
 					conn->tx_response_queue = 0;

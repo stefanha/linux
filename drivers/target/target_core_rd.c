@@ -907,7 +907,7 @@ check_eot:
 	}
 
 out:
-	T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
+	T_TASK(task->task_se_cmd)->t_tasks_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
 	printk(KERN_INFO "RD_DR - Allocated %u struct se_mem segments for task\n",
 			*se_mem_cnt);
@@ -988,7 +988,7 @@ static int rd_DIRECT_without_offset(
 	}
 
 out:
-	T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
+	T_TASK(task->task_se_cmd)->t_tasks_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
 	printk(KERN_INFO "RD_DR - Allocated %u struct se_mem segments for task\n",
 			*se_mem_cnt);
@@ -1054,7 +1054,7 @@ static void rd_DIRECT_free_DMA(struct se_cmd *cmd)
 	}
 	kfree(T_TASK(cmd)->t_mem_list);
 	T_TASK(cmd)->t_mem_list = NULL;
-	T_TASK(cmd)->t_task_se_num = 0;
+	T_TASK(cmd)->t_tasks_se_num = 0;
 }
 
 /*	rd_DIRECT_allocate_DMA():

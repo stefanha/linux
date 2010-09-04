@@ -626,7 +626,7 @@ static int iblock_do_task(struct se_task *task)
 	 */
 	if ((DEV_ATTRIB(dev)->emulate_write_cache > 0) &&
 	    (DEV_ATTRIB(dev)->emulate_fua_write > 0) &&
-	    write && T_TASK(task->task_se_cmd)->t_task_fua) {
+	    write && T_TASK(task->task_se_cmd)->t_tasks_fua) {
 		/*
 		 * We might need to be a bit smarter here
 		 * and return some sense data to let the initiator

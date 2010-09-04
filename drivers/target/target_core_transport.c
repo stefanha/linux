@@ -2435,13 +2435,13 @@ int transport_generic_allocate_iovecs(
 {
 	u32 iov_count;
 
-	iov_count = T_TASK(cmd)->t_task_se_num;
+	iov_count = T_TASK(cmd)->t_tasks_se_num;
 	if (!(iov_count))
 		iov_count = 1;
 #if 0
-	printk(KERN_INFO "Allocated %d iovecs for ITT: 0x%08x t_task_se_num:"
+	printk(KERN_INFO "Allocated %d iovecs for ITT: 0x%08x t_tasks_se_num:"
 		" %u\n", iov_count, CMD_TFO(cmd)->get_task_tag(cmd),
-		T_TASK(cmd)->t_task_se_num);
+		T_TASK(cmd)->t_tasks_se_num);
 #endif
 	iov_count += TRANSPORT_IOV_DATA_BUFFER;
 
@@ -2537,7 +2537,7 @@ static struct se_task *transport_generic_get_task(
 	INIT_LIST_HEAD(&task->t_execute_list);
 	INIT_LIST_HEAD(&task->t_state_list);
 	init_completion(&task->task_stop_comp);
-	task->task_no = T_TASK(cmd)->t_task_no++;
+	task->task_no = T_TASK(cmd)->t_tasks_no++;
 	task->task_se_cmd = cmd;
 	task->se_dev = dev;
 
@@ -3572,7 +3572,7 @@ static int transport_generic_set_iovec_ptrs(
 	/*
 	 * Used for non scatterlist operations, assume a single iovec.
 	 */
-	if (!T_TASK(cmd)->t_task_se_num) {
+	if (!T_TASK(cmd)->t_tasks_se_num) {
 		DEBUG_IOVEC_SCATTERLISTS("ITT: 0x%08x No struct se_mem elements"
 			" present\n", CMD_TFO(cmd)->get_task_tag(cmd));
 		iov[0].iov_base = (unsigned char *) T_TASK(cmd)->t_task_buf +
@@ -3703,7 +3703,7 @@ int transport_generic_allocate_buf(
 		return -1;
 	}
 
-	T_TASK(cmd)->t_task_se_num = 0;
+	T_TASK(cmd)->t_tasks_se_num = 0;
 	T_TASK(cmd)->t_task_buf = buf;
 
 	return 0;
@@ -3731,7 +3731,7 @@ static void transport_generic_map_SG_segments(struct se_unmap_sg *unmap_sg)
 	struct se_cmd *cmd = unmap_sg->se_cmd;
 	struct se_mem *se_mem = unmap_sg->cur_se_mem;
 
-	if (!(T_TASK(cmd)->t_task_se_num))
+	if (!(T_TASK(cmd)->t_tasks_se_num))
 		return;
 
 	list_for_each_entry_continue(se_mem, T_TASK(cmd)->t_mem_list, se_list) {
@@ -3752,7 +3752,7 @@ static void transport_generic_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 	struct se_cmd *cmd = unmap_sg->se_cmd;
 	struct se_mem *se_mem = unmap_sg->cur_se_mem;
 
-	if (!(T_TASK(cmd)->t_task_se_num))
+	if (!(T_TASK(cmd)->t_tasks_se_num))
 		return;
 
 	list_for_each_entry_continue(se_mem, T_TASK(cmd)->t_mem_list, se_list) {
@@ -5398,7 +5398,7 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
-		T_TASK(cmd)->t_task_fua = (cdb[1] & 0x8);
+		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_12:
@@ -5411,7 +5411,7 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
-		T_TASK(cmd)->t_task_fua = (cdb[1] & 0x8);
+		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_16:
@@ -5424,7 +5424,7 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
-		T_TASK(cmd)->t_task_fua = (cdb[1] & 0x8);
+		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case 0xa3:
@@ -5901,7 +5901,7 @@ struct se_cmd *transport_allocate_passthrough(
 		 * struct se_mem elements...
 		 */
 		T_TASK(cmd)->t_mem_list = (struct list_head *)mem;
-		T_TASK(cmd)->t_task_se_num = se_mem_num;
+		T_TASK(cmd)->t_tasks_se_num = se_mem_num;
 		cmd->se_cmd_flags |= SCF_CMD_PASSTHROUGH_NOALLOC;
 
 #ifdef DEBUG_PASSTHROUGH
@@ -6286,7 +6286,7 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC)
 		return;
 
-	if (!(T_TASK(cmd)->t_task_se_num))
+	if (!(T_TASK(cmd)->t_tasks_se_num))
 		return;
 
 	list_for_each_entry_safe(se_mem, se_mem_tmp,
@@ -6304,7 +6304,7 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 
 	kfree(T_TASK(cmd)->t_mem_list);
 	T_TASK(cmd)->t_mem_list = NULL;
-	T_TASK(cmd)->t_task_se_num = 0;
+	T_TASK(cmd)->t_tasks_se_num = 0;
 }
 
 static inline void transport_release_tasks(struct se_cmd *cmd)
@@ -6431,7 +6431,7 @@ int transport_generic_map_mem_to_cmd(
 	 */
 	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM)) {
 		T_TASK(cmd)->t_mem_list = (struct list_head *)mem;
-		T_TASK(cmd)->t_task_se_num = se_mem_num;
+		T_TASK(cmd)->t_tasks_se_num = se_mem_num;
 		cmd->se_cmd_flags |= SCF_CMD_PASSTHROUGH_NOALLOC;
 		return 0;
 	}
@@ -6455,7 +6455,7 @@ int transport_generic_map_mem_to_cmd(
 		if (ret < 0)
 			return -1;
 
-		T_TASK(cmd)->t_task_se_num = se_mem_cnt_out;
+		T_TASK(cmd)->t_tasks_se_num = se_mem_cnt_out;
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
@@ -6570,19 +6570,19 @@ int transport_get_sectors(struct se_cmd *cmd)
 	    !(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return 0;
 
-	T_TASK(cmd)->t_task_sectors =
+	T_TASK(cmd)->t_tasks_sectors =
 		(cmd->data_length / DEV_ATTRIB(dev)->block_size);
-	if (!(T_TASK(cmd)->t_task_sectors))
-		T_TASK(cmd)->t_task_sectors = 1;
+	if (!(T_TASK(cmd)->t_tasks_sectors))
+		T_TASK(cmd)->t_tasks_sectors = 1;
 
 	if (TRANSPORT(dev)->get_device_type(dev) != TYPE_DISK)
 		return 0;
 
-	if ((T_TASK(cmd)->t_task_lba + T_TASK(cmd)->t_task_sectors) >
+	if ((T_TASK(cmd)->t_task_lba + T_TASK(cmd)->t_tasks_sectors) >
 	     transport_dev_end_lba(dev)) {
 		printk(KERN_ERR "LBA: %llu Sectors: %u exceeds"
 			" transport_dev_end_lba(): %llu\n",
-			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_task_sectors,
+			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_tasks_sectors,
 			transport_dev_end_lba(dev));
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = TCM_SECTOR_COUNT_TOO_MANY;
@@ -6610,7 +6610,7 @@ int transport_new_cmd_obj(
 
 		task_cdbs = transport_generic_get_cdb_count(cmd, ti,
 				T_TASK(cmd)->t_task_lba,
-				T_TASK(cmd)->t_task_sectors,
+				T_TASK(cmd)->t_tasks_sectors,
 				NULL, &se_mem_out);
 		if (!(task_cdbs)) {
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -6623,9 +6623,9 @@ int transport_new_cmd_obj(
 		cmd->transport_cdb_transform =
 				&transport_process_data_sg_transform;
 #if 0
-		printk(KERN_INFO "data_length: %u, LBA: %llu t_task_sectors:"
+		printk(KERN_INFO "data_length: %u, LBA: %llu t_tasks_sectors:"
 			" %u, t_task_cdbs: %u\n", obj_ptr, cmd->data_length,
-			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_task_sectors,
+			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_tasks_sectors,
 			T_TASK(cmd)->t_task_cdbs);
 #endif
 	}
@@ -6711,7 +6711,7 @@ int transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 		kunmap_atomic(buf, KM_IRQ0);
 
 		list_add_tail(&se_mem->se_list, T_TASK(cmd)->t_mem_list);
-		T_TASK(cmd)->t_task_se_num++;
+		T_TASK(cmd)->t_tasks_se_num++;
 
 		DEBUG_MEM("Allocated struct se_mem page(%p) Length(%u)"
 			" Offset(%u)\n", se_mem->se_page, se_mem->se_len,
@@ -6721,7 +6721,7 @@ int transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 	}
 
 	DEBUG_MEM("Allocated total struct se_mem elements(%u)\n",
-			T_TASK(cmd)->t_task_se_num);
+			T_TASK(cmd)->t_tasks_se_num);
 
 	return 0;
 out:
@@ -6802,7 +6802,7 @@ next:
 	return task->task_sg_num;
 }
 
-static inline int transport_set_task_sectors_disk(
+static inline int transport_set_tasks_sectors_disk(
 	struct se_task *task,
 	struct se_device *dev,
 	unsigned long long lba,
@@ -6827,7 +6827,7 @@ static inline int transport_set_task_sectors_disk(
 	return 0;
 }
 
-static inline int transport_set_task_sectors_non_disk(
+static inline int transport_set_tasks_sectors_non_disk(
 	struct se_task *task,
 	struct se_device *dev,
 	unsigned long long lba,
@@ -6843,7 +6843,7 @@ static inline int transport_set_task_sectors_non_disk(
 	return 0;
 }
 
-static inline int transport_set_task_sectors(
+static inline int transport_set_tasks_sectors(
 	struct se_task *task,
 	struct se_device *dev,
 	unsigned long long lba,
@@ -6851,9 +6851,9 @@ static inline int transport_set_task_sectors(
 	int *max_sectors_set)
 {
 	return (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK) ?
-		transport_set_task_sectors_disk(task, dev, lba, sectors,
+		transport_set_tasks_sectors_disk(task, dev, lba, sectors,
 				max_sectors_set) :
-		transport_set_task_sectors_non_disk(task, dev, lba, sectors,
+		transport_set_tasks_sectors_non_disk(task, dev, lba, sectors,
 				max_sectors_set);
 }
 
@@ -7041,7 +7041,7 @@ static int transport_do_se_mem_map(
 				in_mem, in_se_mem, out_se_mem, se_mem_cnt,
 				task_offset_in);
 		if (ret == 0)
-			T_TASK(task->task_se_cmd)->t_task_se_num += *se_mem_cnt;
+			T_TASK(task->task_se_cmd)->t_tasks_se_num += *se_mem_cnt;
 
 		return ret;
 	}
@@ -7108,7 +7108,7 @@ u32 transport_generic_get_cdb_count(
 		if (!(task))
 			goto out;
 
-		transport_set_task_sectors(task, dev, lba, sectors,
+		transport_set_tasks_sectors(task, dev, lba, sectors,
 				&max_sectors_set);
 
 		task->task_lba = lba;
@@ -7269,7 +7269,7 @@ void transport_generic_process_write(struct se_cmd *cmd)
 	 * original EDTL
 	 */
 	if (cmd->se_cmd_flags & SCF_UNDERFLOW_BIT) {
-		if (!T_TASK(cmd)->t_task_se_num) {
+		if (!T_TASK(cmd)->t_tasks_se_num) {
 			unsigned char *dst, *buf =
 				(unsigned char *)T_TASK(cmd)->t_task_buf;
 
@@ -7291,7 +7291,7 @@ void transport_generic_process_write(struct se_cmd *cmd)
 			struct scatterlist *orig_sg;
 
 			orig_sg = kzalloc(sizeof(struct scatterlist) *
-					T_TASK(cmd)->t_task_se_num,
+					T_TASK(cmd)->t_tasks_se_num,
 					GFP_KERNEL))) {
 			if (!(orig_sg)) {
 				printk(KERN_ERR "Unable to allocate memory"
@@ -7303,7 +7303,7 @@ void transport_generic_process_write(struct se_cmd *cmd)
 
 			memcpy(orig_sg, T_TASK(cmd)->t_task_buf,
 					sizeof(struct scatterlist) *
-					T_TASK(cmd)->t_task_se_num);
+					T_TASK(cmd)->t_tasks_se_num);
 
 			cmd->data_length = cmd->cmd_spdtl;
 			/*

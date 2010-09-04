@@ -96,7 +96,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	/*
 	 * Setup to use first mem list entry if any.
 	 */
-	if (task->t_task_se_num) {
+	if (task->t_tasks_se_num) {
 		mem = list_first_entry(task->t_mem_list,
 			 struct se_mem, se_list);
 		mem_len = mem->se_len;
@@ -221,7 +221,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	/*
 	 * Setup to use first mem list entry if any.
 	 */
-	if (task->t_task_se_num) {
+	if (task->t_tasks_se_num) {
 		mem = list_first_entry(task->t_mem_list,
 				       struct se_mem, se_list);
 		mem_len = mem->se_len;
