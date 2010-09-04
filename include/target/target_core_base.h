@@ -212,12 +212,20 @@ struct se_obj {
 	atomic_t obj_access_count;
 } ____cacheline_aligned;
 
+/*
+ * Used by TCM Core internally to signal if ALUA emulation is enabled or
+ * disabled, or running in with TCM/pSCSI passthrough mode
+ */
 typedef enum {
 	SPC_ALUA_PASSTHROUGH,
 	SPC2_ALUA_DISABLED,
 	SPC3_ALUA_EMULATED
 } t10_alua_index_t;
 
+/*
+ * Used by TCM Core internally to signal if SAM Task Attribute emulation
+ * is enabled or disabled, or running in with TCM/pSCSI passthrough mode
+ */
 typedef enum {
 	SAM_TASK_ATTR_PASSTHROUGH,
 	SAM_TASK_ATTR_UNTAGGED,
@@ -313,6 +321,12 @@ struct t10_wwn {
 	struct list_head t10_vpd_list;
 } ____cacheline_aligned;
 
+
+/*
+ * Used by TCM Core internally to signal if >= SPC-3 peristent reservations
+ * emulation is enabled or disabled, or running in with TCM/pSCSI passthrough
+ * mode
+ */
 typedef enum {
 	SPC_PASSTHROUGH,
 	SPC2_RESERVATIONS,
