@@ -1381,10 +1381,8 @@ struct se_lun *core_dev_add_lun(
 	else
 		lun_access = TRANSPORT_LUNFLAGS_READ_WRITE;
 
-	if (core_tpg_post_addlun(tpg, lun_p, TRANSPORT_LUN_TYPE_DEVICE,
-			lun_access, dev) < 0) {
+	if (core_tpg_post_addlun(tpg, lun_p, lun_access, dev) < 0)
 		return NULL;
-	}
 
 	printk(KERN_INFO "%s_TPG[%u]_LUN[%u] - Activated %s Logical Unit from"
 		" CORE HBA: %u\n", TPG_TFO(tpg)->get_fabric_name(),
@@ -1422,8 +1420,7 @@ int core_dev_del_lun(
 	struct se_lun *lun;
 	int ret = 0;
 
-	lun = core_tpg_pre_dellun(tpg, unpacked_lun, TRANSPORT_LUN_TYPE_DEVICE,
-			&ret);
+	lun = core_tpg_pre_dellun(tpg, unpacked_lun, &ret);
 	if (!(lun))
 		return ret;
 

@@ -28,11 +28,11 @@ extern int core_tpg_register(struct target_core_fabric_ops *,
 					int);
 extern int core_tpg_deregister(struct se_portal_group *);
 extern struct se_lun *core_tpg_pre_addlun(struct se_portal_group *, u32);
-extern int core_tpg_post_addlun(struct se_portal_group *, struct se_lun *, int, u32,
+extern int core_tpg_post_addlun(struct se_portal_group *, struct se_lun *, u32,
 				void *);
 extern void core_tpg_shutdown_lun(struct se_portal_group *,
 				struct se_lun *);
-extern struct se_lun *core_tpg_pre_dellun(struct se_portal_group *, u32, int, int *);
+extern struct se_lun *core_tpg_pre_dellun(struct se_portal_group *, u32, int *);
 extern int core_tpg_post_dellun(struct se_portal_group *, struct se_lun *);
 
 #endif /* TARGET_CORE_TPG_H */

@@ -84,10 +84,6 @@
 #define TRANSPORT_LUN_STATUS_FREE		0
 #define TRANSPORT_LUN_STATUS_ACTIVE		1
 
-/* struct se_lun->lun_type */
-#define TRANSPORT_LUN_TYPE_NONE			0
-#define TRANSPORT_LUN_TYPE_DEVICE		1
-
 /* struct se_portal_group->se_tpg_type */
 #define TRANSPORT_TPG_TYPE_NORMAL		0
 #define TRANSPORT_TPG_TYPE_DISCOVERY		1
@@ -868,7 +864,6 @@ struct se_hba {
 #define SE_HBA(d)		((struct se_hba *)(d)->se_hba)
 
 struct se_lun {
-	int			lun_type;
 	int			lun_status;
 	u32			lun_access;
 	u32			lun_flags;

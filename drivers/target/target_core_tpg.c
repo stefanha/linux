@@ -613,8 +613,7 @@ static int core_tpg_setup_virtual_lun0(struct se_portal_group *se_tpg)
 	spin_lock_init(&lun->lun_cmd_lock);
 	spin_lock_init(&lun->lun_sep_lock);
 
-	ret = core_tpg_post_addlun(se_tpg, lun, TRANSPORT_LUN_TYPE_DEVICE,	
-			lun_access, dev);
+	ret = core_tpg_post_addlun(se_tpg, lun, lun_access, dev);
 	if (ret < 0)
 		return -1;
 
@@ -751,7 +750,6 @@ EXPORT_SYMBOL(core_tpg_pre_addlun);
 int core_tpg_post_addlun(
 	struct se_portal_group *tpg,
 	struct se_lun *lun,
-	int lun_type,
 	u32 lun_access,
 	void *lun_ptr)
 {
@@ -760,7 +758,6 @@ int core_tpg_post_addlun(
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_access = lun_access;
-	lun->lun_type = lun_type;
 	lun->lun_status = TRANSPORT_LUN_STATUS_ACTIVE;
 	spin_unlock(&tpg->tpg_lun_lock);
 
@@ -779,7 +776,6 @@ void core_tpg_shutdown_lun(
 struct se_lun *core_tpg_pre_dellun(
 	struct se_portal_group *tpg,
 	u32 unpacked_lun,
-	int lun_type,
 	int *ret)
 {
 	struct se_lun *lun;
@@ -803,15 +799,6 @@ struct se_lun *core_tpg_pre_dellun(
 		spin_unlock(&tpg->tpg_lun_lock);
 		return ERR_PTR(-ENODEV);
 	}
-
-	if (lun->lun_type != lun_type) {
-		printk(KERN_ERR "%s Logical Unit Number: %u type: %d does not"
-			" match passed type: %d\n",
-			TPG_TFO(tpg)->get_fabric_name(),
-			unpacked_lun, lun->lun_type, lun_type);
-		spin_unlock(&tpg->tpg_lun_lock);
-		return ERR_PTR(-EINVAL);
-	}
 	spin_unlock(&tpg->tpg_lun_lock);
 
 	return lun;
@@ -830,7 +817,6 @@ int core_tpg_post_dellun(
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
-	lun->lun_type = 0;
 	spin_unlock(&tpg->tpg_lun_lock);
 
 	spin_lock(&lun->lun_acl_lock);
