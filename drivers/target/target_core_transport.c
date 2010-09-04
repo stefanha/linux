@@ -5312,8 +5312,8 @@ static int transport_generic_cmd_sequencer(
 	/*
 	 * Check status for SPC-3 Persistent Reservations
 	 */
-	if (T10_RES(su_dev)->t10_reservation_check(cmd, &pr_reg_type) != 0) {
-		if (T10_RES(su_dev)->t10_seq_non_holder(
+	if (T10_PR_OPS(su_dev)->t10_reservation_check(cmd, &pr_reg_type) != 0) {
+		if (T10_PR_OPS(su_dev)->t10_seq_non_holder(
 					cmd, cdb, pr_reg_type) != 0) {
 			cmd->transport_wait_for_tasks =
 					&transport_nop_wait_for_tasks;

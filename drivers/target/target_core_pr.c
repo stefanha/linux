@@ -4215,8 +4215,8 @@ int core_setup_reservations(struct se_device *dev, int force_pt)
 	if (((TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) &&
 	    !(DEV_ATTRIB(dev)->emulate_reservations)) || force_pt) {
 		rest->res_type = SPC_PASSTHROUGH;
-		rest->t10_reservation_check = &core_pt_reservation_check;
-		rest->t10_seq_non_holder = &core_pt_seq_non_holder;
+		rest->pr_ops.t10_reservation_check = &core_pt_reservation_check;
+		rest->pr_ops.t10_seq_non_holder = &core_pt_seq_non_holder;
 		printk(KERN_INFO "%s: Using SPC_PASSTHROUGH, no reservation"
 			" emulation\n", TRANSPORT(dev)->name);
 		return 0;
@@ -4227,14 +4227,14 @@ int core_setup_reservations(struct se_device *dev, int force_pt)
 	 */
 	if (TRANSPORT(dev)->get_device_rev(dev) >= SCSI_3) {
 		rest->res_type = SPC3_PERSISTENT_RESERVATIONS;
-		rest->t10_reservation_check = &core_scsi3_pr_reservation_check;
-		rest->t10_seq_non_holder = &core_scsi3_pr_seq_non_holder;
+		rest->pr_ops.t10_reservation_check = &core_scsi3_pr_reservation_check;
+		rest->pr_ops.t10_seq_non_holder = &core_scsi3_pr_seq_non_holder;
 		printk(KERN_INFO "%s: Using SPC3_PERSISTENT_RESERVATIONS"
 			" emulation\n", TRANSPORT(dev)->name);
 	} else {
 		rest->res_type = SPC2_RESERVATIONS;
-		rest->t10_reservation_check = &core_scsi2_reservation_check;
-		rest->t10_seq_non_holder =
+		rest->pr_ops.t10_reservation_check = &core_scsi2_reservation_check;
+		rest->pr_ops.t10_seq_non_holder =
 				&core_scsi2_reservation_seq_non_holder;
 		printk(KERN_INFO "%s: Using SPC2_RESERVATIONS emulation\n",
 			TRANSPORT(dev)->name);

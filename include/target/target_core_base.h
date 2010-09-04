@@ -369,6 +369,18 @@ struct t10_pr_registration {
 	struct list_head pr_reg_atp_mem_list;
 } ____cacheline_aligned;
 
+/*
+ * This set of function pointer ops is set based upon SPC3_PERSISTENT_RESERVATIONS,
+ * SPC2_RESERVATIONS or SPC_PASSTHROUGH in drivers/target/target_core_pr.c:
+ * core_setup_reservations()
+ */
+struct t10_reservation_ops {
+	int (*t10_reservation_check)(struct se_cmd *, u32 *);
+	int (*t10_seq_non_holder)(struct se_cmd *, unsigned char *, u32);
+	int (*t10_pr_register)(struct se_cmd *);
+	int (*t10_pr_clear)(struct se_cmd *);
+};
+
 struct t10_reservation_template {
 	/* Reservation effects all target ports */
 	int pr_all_tg_pt;
@@ -393,10 +405,7 @@ struct t10_reservation_template {
 	struct se_node_acl *pr_res_holder;
 	struct list_head registration_list;
 	struct list_head aptpl_reg_list;
-	int (*t10_reservation_check)(struct se_cmd *, u32 *);
-	int (*t10_seq_non_holder)(struct se_cmd *, unsigned char *, u32);
-	int (*t10_pr_register)(struct se_cmd *);
-	int (*t10_pr_clear)(struct se_cmd *);
+	struct t10_reservation_ops pr_ops;
 } ____cacheline_aligned;
 
 struct se_queue_req {
@@ -777,6 +786,7 @@ struct se_subsystem_dev {
 #define SE_DEV_SNAP(su_dev)	(&(su_dev)->se_snap_attrib)
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
+#define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
 
 struct se_device {
 	/* Type of disk transport used for device */
