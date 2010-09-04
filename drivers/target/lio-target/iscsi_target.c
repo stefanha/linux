@@ -1929,7 +1929,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	map_sg.fabric_cmd = (void *)cmd;
 	map_sg.se_cmd = SE_CMD(cmd);
 	map_sg.iov = iov;
-	map_sg.map_flags |= MAP_SG_KMAP;
+	map_sg.sg_kmap_active = 1;
 	map_sg.data_length = hdr->length;
 	map_sg.data_offset = hdr->offset;
 	unmap_sg.fabric_cmd = (void *)cmd;
@@ -2935,7 +2935,7 @@ static int iscsi_handle_immediate_data(
 	memset((void *)&unmap_sg, 0, sizeof(struct se_unmap_sg));
 	map_sg.fabric_cmd = (void *)cmd;
 	map_sg.se_cmd = SE_CMD(cmd);
-	map_sg.map_flags |= MAP_SG_KMAP;
+	map_sg.sg_kmap_active = 1;
 	map_sg.iov = &SE_CMD(cmd)->iov_data[0];
 	map_sg.data_length = length;
 	map_sg.data_offset = cmd->write_data_done;
@@ -3392,7 +3392,7 @@ static inline int iscsi_send_data_in(
 	memset((void *)&map_sg, 0, sizeof(struct se_map_sg));
 	map_sg.fabric_cmd = (void *)cmd;
 	map_sg.se_cmd = SE_CMD(cmd);
-	map_sg.map_flags |= MAP_SG_KMAP;
+	map_sg.sg_kmap_active = 1;
 	map_sg.iov = &SE_CMD(cmd)->iov_data[1];
 	map_sg.data_length = datain.length;
 	map_sg.data_offset = datain.offset;

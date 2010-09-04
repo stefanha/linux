@@ -98,9 +98,6 @@ enum {
 	TRANSPORT_TPG_TYPE_DISCOVERY = 1,
 };
 
-/* struct se_map_sg->map_flags */
-#define MAP_SG_KMAP				0x01
-
 /* Used for generate timer flags */
 #define TF_RUNNING				0x01
 #define TF_STOP					0x02
@@ -480,7 +477,7 @@ struct se_offset_map {
 } ____cacheline_aligned;
 
 struct se_map_sg {
-	int			map_flags;
+	int			sg_kmap_active:1;
 	u32			data_length;
 	u32			data_offset;
 	void			*fabric_cmd;

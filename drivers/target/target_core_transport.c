@@ -3600,7 +3600,7 @@ static int transport_generic_set_iovec_ptrs(
 	 * offset. Also set the rest of the needed values in iscsi_linux_map_t.
 	 */
 	lmap->iscsi_offset = map_sg->data_offset;
-	if (map_sg->map_flags & MAP_SG_KMAP) {
+	if (map_sg->sg_kmap_active) {
 		unmap_sg->se_cmd = map_sg->se_cmd;
 		transport_get_iscsi_offset(lmap, unmap_sg);
 		unmap_sg->data_length = map_sg->data_length;
