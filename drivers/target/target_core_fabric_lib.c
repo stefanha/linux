@@ -258,8 +258,7 @@ u32 iscsi_get_pr_transport_id(
 	 * does not contain the ASCII encoded iSCSI Initiator iSID value
 	 * provied by the iSCSi Initiator during the iSCSI login process.
 	 */
-	if ((*format_code == 1) &&
-	    (pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG)) {
+	if ((*format_code == 1) && (pr_reg->isid_present_at_reg)) {
 		/*
 		 * Set FORMAT CODE 01b for iSCSI Initiator port TransportID
 		 * format.
@@ -337,7 +336,7 @@ u32 iscsi_get_pr_transport_id_len(
 	 * If there is not an active iSCSI session, use format code:
 	 * 00b: iSCSI Initiator device TransportID format
 	 */
-	if (pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG) {
+	if (pr_reg->isid_present_at_reg) {
 		len += 5; /* For ",i,0x" ASCII seperator */
 		len += 7; /* For iSCSI Initiator Session ID + Null terminator */
 		*format_code = 1;

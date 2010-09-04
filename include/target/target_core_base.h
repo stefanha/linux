@@ -186,9 +186,6 @@ enum {
 	TRANSPORT_DEVICE_OFFLINE_DEACTIVATED	= 0x20,
 };
 
-/* Used for struct t10_pr_registration->pr_reg_flags */
-#define PRF_ISID_PRESENT_AT_REG			0x01
-
 /* transport_send_check_condition_and_sense() */
 #define NON_EXISTENT_LUN			0x1
 #define UNSUPPORTED_SCSI_OPCODE			0x2
@@ -335,7 +332,8 @@ struct t10_pr_registration {
 	int pr_res_holder;
 	int pr_res_type;
 	int pr_res_scope;
-	u32 pr_reg_flags;
+	/* Used for fabric initiator WWPNs using a ISID */
+	int isid_present_at_reg:1;
 	u32 pr_res_mapped_lun;
 	u32 pr_aptpl_target_lun;
 	u32 pr_res_generation;

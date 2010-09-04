@@ -62,7 +62,7 @@ int core_pr_dump_initiator_port(
 	char *buf,
 	u32 size)
 {
-	if (!(pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG))
+	if (!(pr_reg->isid_present_at_reg))
 		return 0;
 
 	snprintf(buf, size, ",i,0x%s", &pr_reg->pr_reg_isid[0]);
@@ -598,7 +598,7 @@ static int core_scsi3_pr_reservation_check(
 		spin_unlock(&dev->dev_reservation_lock);
 		return -1;
 	}
-	if (!(dev->dev_pr_res_holder->pr_reg_flags & PRF_ISID_PRESENT_AT_REG)) {
+	if (!(dev->dev_pr_res_holder->isid_present_at_reg)) {
 		spin_unlock(&dev->dev_reservation_lock);
 		return 0;
 	}
@@ -662,7 +662,7 @@ static struct t10_pr_registration *__core_scsi3_do_alloc_registration(
 	if (isid != NULL) {
 		pr_reg->pr_reg_bin_isid = get_unaligned_be64(isid);
 		snprintf(pr_reg->pr_reg_isid, PR_REG_ISID_LEN, "%s", isid);
-		pr_reg->pr_reg_flags |= PRF_ISID_PRESENT_AT_REG;
+		pr_reg->isid_present_at_reg = 1;
 	}
 
 	return pr_reg;
@@ -856,7 +856,7 @@ int core_scsi3_alloc_aptpl_registration(
 	if (isid != NULL) {
 		pr_reg->pr_reg_bin_isid = get_unaligned_be64(isid);
 		snprintf(pr_reg->pr_reg_isid, PR_REG_ISID_LEN, "%s", isid);
-		pr_reg->pr_reg_flags |= PRF_ISID_PRESENT_AT_REG;
+		pr_reg->isid_present_at_reg = 1;
         }
 	/*
 	 * Copy the i_port and t_port information from caller.
@@ -1141,7 +1141,7 @@ static struct t10_pr_registration *__core_scsi3_locate_pr_reg(
 		 * If this registration does NOT contain a fabric provided
 		 * ISID, then we have found a match.
 		 */
-		if (!(pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG)) {
+		if (!(pr_reg->isid_present_at_reg)) {
 			/*
 			 * Determine if this SCSI device server requires that
 			 * SCSI Intiatior TransportID w/ ISIDs is enforced
@@ -1889,7 +1889,7 @@ static int __core_scsi3_update_aptpl_buf(
 		 * Write out any ISID value to APTPL metadata that was included
 		 * in the original registration.
 		 */	
-		if (pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG)
+		if (pr_reg->isid_present_at_reg)
 			snprintf(isid_buf, 32, "initiator_sid=%s\n",
 					pr_reg->pr_reg_isid);
 		/*
@@ -3465,7 +3465,7 @@ static int core_scsi3_emulate_pro_register_and_move(
 	if (!(matching_iname))
 		goto after_iport_check;
 
-	if (!(iport_ptr) || !(pr_reg->pr_reg_flags & PRF_ISID_PRESENT_AT_REG)) {
+	if (!(iport_ptr) || !(pr_reg->isid_present_at_reg)) {
 		printk(KERN_ERR "SPC-3 PR REGISTER_AND_MOVE: TransportID: %s"
 			" matches: %s on received I_T Nexus\n", initiator_str,
 			pr_reg_nacl->initiatorname);
