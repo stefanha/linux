@@ -186,9 +186,6 @@ enum {
 	TRANSPORT_DEVICE_OFFLINE_DEACTIVATED	= 0x20,
 };
 
-/* struct se_dev_entry->deve_flags */
-#define DEF_PR_REGISTERED			0x01
-
 /* Used for struct t10_pr_registration->pr_reg_flags */
 #define PRF_ISID_PRESENT_AT_REG			0x01
 
@@ -666,9 +663,9 @@ struct se_lun_acl {
 }  ____cacheline_aligned;
 
 struct se_dev_entry {
+	int			def_pr_registered:1;
 	u32			lun_flags;
 	u32			deve_cmds;
-	u32			deve_flags;
 	u32			mapped_lun;
 	u32			average_bytes;
 	u32			last_byte_count;

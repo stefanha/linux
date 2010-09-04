@@ -341,7 +341,7 @@ static int core_scsi3_pr_seq_non_holder(
 		 * Some commands are only allowed for the persistent reservation
 		 * holder.
 		 */
-		if ((se_deve->deve_flags & DEF_PR_REGISTERED) && !(ignore_reg))
+		if ((se_deve->def_pr_registered) && !(ignore_reg))
 			registered_nexus = 1;
 		break;
 	case PR_TYPE_WRITE_EXCLUSIVE_REGONLY:
@@ -351,7 +351,7 @@ static int core_scsi3_pr_seq_non_holder(
 		 * Some commands are only allowed for registered I_T Nexuses.
 		 */
 		reg_only = 1;
-		if ((se_deve->deve_flags & DEF_PR_REGISTERED) && !(ignore_reg))
+		if ((se_deve->def_pr_registered) && !(ignore_reg))
 			registered_nexus = 1;
 		break;
 	case PR_TYPE_WRITE_EXCLUSIVE_ALLREG:
@@ -361,7 +361,7 @@ static int core_scsi3_pr_seq_non_holder(
 		 * Each registered I_T Nexus is a reservation holder.
 		 */
 		all_reg = 1;
-		if ((se_deve->deve_flags & DEF_PR_REGISTERED) && !(ignore_reg))
+		if ((se_deve->def_pr_registered) && !(ignore_reg))
 			registered_nexus = 1;
 		break;
 	default:
@@ -1059,7 +1059,7 @@ static void __core_scsi3_add_registration(
 
 	spin_lock(&pr_tmpl->registration_lock);
 	list_add_tail(&pr_reg->pr_reg_list, &pr_tmpl->registration_list);
-	pr_reg->pr_reg_deve->deve_flags |= DEF_PR_REGISTERED;
+	pr_reg->pr_reg_deve->def_pr_registered = 1;
 
 	__core_scsi3_dump_registration(tfo, dev, nacl, pr_reg, register_type);
 	spin_unlock(&pr_tmpl->registration_lock);
@@ -1081,7 +1081,7 @@ static void __core_scsi3_add_registration(
 		spin_lock(&pr_tmpl->registration_lock);
 		list_add_tail(&pr_reg_tmp->pr_reg_list,
 			      &pr_tmpl->registration_list);
-		pr_reg_tmp->pr_reg_deve->deve_flags |= DEF_PR_REGISTERED;
+		pr_reg_tmp->pr_reg_deve->def_pr_registered = 1;
 
 		__core_scsi3_dump_registration(tfo, dev,
 				pr_reg_tmp->pr_reg_nacl, pr_reg_tmp,
@@ -1270,7 +1270,7 @@ static void __core_scsi3_free_registration(
 	prf_isid = core_pr_dump_initiator_port(pr_reg, &i_buf[0],
 				PR_REG_ISID_ID_LEN);
 
-	pr_reg->pr_reg_deve->deve_flags &= ~DEF_PR_REGISTERED;
+	pr_reg->pr_reg_deve->def_pr_registered = 0;
 	pr_reg->pr_reg_deve->pr_res_key = 0;
 	list_del(&pr_reg->pr_reg_list);
 	/*
