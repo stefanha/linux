@@ -380,7 +380,16 @@ struct t10_reservation_template {
 	t10_reservations_index_t res_type;
 	spinlock_t registration_lock;
 	spinlock_t aptpl_reg_lock;
-	/* Reservation holder when pr_all_tg_pt=1 */
+	/*
+	 * This will always be set by one individual I_T Nexus.
+	 * However with all_tg_pt=1, other I_T Nexus from the
+	 * same initiator can access PR reg/res info on a different
+	 * target port.
+	 *
+	 * There is also the 'All Registrants' case, where there is
+	 * a single *pr_res_holder of the reservation, but all
+	 * registrations are considered reservation holders.
+	 */
 	struct se_node_acl *pr_res_holder;
 	struct list_head registration_list;
 	struct list_head aptpl_reg_list;
