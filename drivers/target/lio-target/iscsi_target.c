@@ -1544,7 +1544,7 @@ done:
 	 */
 	ret = iscsi_get_lun_for_cmd(cmd, hdr->cdb, hdr->lun);
 	if (ret < 0) {
-		if (SE_CMD(cmd)->scsi_sense_reason == NON_EXISTENT_LUN) {
+		if (SE_CMD(cmd)->scsi_sense_reason == TCM_NON_EXISTENT_LUN) {
 			TRACE(TRACE_VANITY, "Responding to non-acl'ed,"
 				" non-existent or non-exported iSCSI LUN:"
 				" 0x%016Lx\n", (unsigned long long)hdr->lun);
@@ -1831,7 +1831,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 			printk(KERN_ERR "Received unexpected unsolicited data"
 				" while InitialR2T=Yes, protocol error.\n");
 			transport_send_check_condition_and_sense(SE_CMD(cmd),
-					UNEXPECTED_UNSOLICITED_DATA, 0);
+					TCM_UNEXPECTED_UNSOLICITED_DATA, 0);
 			return -1;
 		}
 		/*

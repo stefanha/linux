@@ -613,7 +613,7 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 		printk(KERN_ERR "Received unexpected unsolicited data"
 			" while InitialR2T=Yes, protocol error.\n");
 		transport_send_check_condition_and_sense(se_cmd,
-				UNEXPECTED_UNSOLICITED_DATA, 0);
+				TCM_UNEXPECTED_UNSOLICITED_DATA, 0);
 		return -1;
 	}
 
@@ -624,7 +624,7 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 			(cmd->first_burst_len + hdr->length),
 				SESS_OPS_C(conn)->FirstBurstLength);
 		transport_send_check_condition_and_sense(se_cmd,
-				INCORRECT_AMOUNT_OF_DATA, 0);
+				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return -1;
 	}
 
@@ -640,7 +640,7 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 			(cmd->first_burst_len + hdr->length),
 			SESS_OPS_C(conn)->FirstBurstLength, cmd->data_length);
 		transport_send_check_condition_and_sense(se_cmd,
-				INCORRECT_AMOUNT_OF_DATA, 0);
+				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return -1;
 	}
 	return 0;

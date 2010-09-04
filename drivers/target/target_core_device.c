@@ -230,7 +230,7 @@ out:
 
 	if (!se_lun) {
 		if (read_only) {
-			se_cmd->scsi_sense_reason = WRITE_PROTECTED;
+			se_cmd->scsi_sense_reason = TCM_WRITE_PROTECTED;
 			se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			printk("TARGET_CORE[%s]: Detected WRITE_PROTECTED LUN"
 				" Access for 0x%08x\n",
@@ -244,7 +244,7 @@ out:
 			 * MappedLUN=0 exists for this Initiator Port.
 			 */
 			if (unpacked_lun != 0) {
-				se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
+				se_cmd->scsi_sense_reason = TCM_NON_EXISTENT_LUN;
 				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 				printk("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
 					" Access for 0x%08x\n",
@@ -257,7 +257,7 @@ out:
 			 */
 			if ((se_cmd->data_direction != SE_DIRECTION_READ) &&
 			    (se_cmd->data_direction != SE_DIRECTION_NONE)) {
-				se_cmd->scsi_sense_reason = WRITE_PROTECTED;
+				se_cmd->scsi_sense_reason = TCM_WRITE_PROTECTED;
 				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 				return -1;
 			}
@@ -276,7 +276,7 @@ out:
 	 */
 /* #warning FIXME: Check for LUN_RESET + UNIT Attention */
 	if (se_dev_check_online(se_lun->lun_se_dev) != 0) {
-		se_cmd->scsi_sense_reason = NON_EXISTENT_LUN;
+		se_cmd->scsi_sense_reason = TCM_NON_EXISTENT_LUN;
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		return -1;
 	}

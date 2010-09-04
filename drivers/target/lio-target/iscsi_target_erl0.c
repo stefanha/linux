@@ -190,7 +190,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 			" for this Unsolicited DataOut Burst.\n",
 			first_burst_len, SESS_OPS_C(conn)->FirstBurstLength);
 		transport_send_check_condition_and_sense(SE_CMD(cmd),
-				INCORRECT_AMOUNT_OF_DATA, 0);
+				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return DATAOUT_CANNOT_RECOVER;
 	}
 
@@ -215,7 +215,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 				SESS_OPS_C(conn)->FirstBurstLength,
 				cmd->data_length);
 			transport_send_check_condition_and_sense(SE_CMD(cmd),
-					INCORRECT_AMOUNT_OF_DATA, 0);
+					TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 	} else {

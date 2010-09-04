@@ -604,7 +604,7 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 	if (ret == -1) {
 		transport_send_check_condition_and_sense(se_cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 		transport_generic_free_cmd(se_cmd, 0, 1, 0);
 		return;
 	}

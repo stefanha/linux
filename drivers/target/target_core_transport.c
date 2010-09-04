@@ -2869,7 +2869,7 @@ int transport_generic_allocate_tasks(
 	 */
 	if (transport_check_alloc_task_attr(cmd) < 0) {
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = INVALID_CDB_FIELD;
+		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
 		return -2;
 	}
 	spin_lock(&cmd->se_lun->lun_sep_lock);
@@ -2917,7 +2917,7 @@ int transport_generic_allocate_tasks(
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
 				" SCF_SCSI_UNSUPPORTED_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = UNSUPPORTED_SCSI_OPCODE;
+		cmd->scsi_sense_reason = TCM_UNSUPPORTED_SCSI_OPCODE;
 		return -2;
 	case TGCS_RESERVATION_CONFLICT:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
@@ -2940,23 +2940,23 @@ int transport_generic_allocate_tasks(
 		return -2;
 	case TGCS_INVALID_CDB_FIELD:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = INVALID_CDB_FIELD;
+		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
 		return -2;
 	case TGCS_ILLEGAL_REQUEST:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = ILLEGAL_REQUEST;
+		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		return -2;
 	case TGCS_CHECK_CONDITION_UNIT_ATTENTION:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = CHECK_CONDITION_UNIT_ATTENTION;
+		cmd->scsi_sense_reason = TCM_CHECK_CONDITION_UNIT_ATTENTION;
 		return -2;
 	case TGCS_CHECK_CONDITION_NOT_READY:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = CHECK_CONDITION_NOT_READY;
+		cmd->scsi_sense_reason = TCM_CHECK_CONDITION_NOT_READY;
 		return -2;
 	default:
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = UNSUPPORTED_SCSI_OPCODE;
+		cmd->scsi_sense_reason = TCM_UNSUPPORTED_SCSI_OPCODE;
 		return -2;
 	}
 
@@ -3160,16 +3160,16 @@ void transport_generic_request_failure(
 
 	switch (cmd->transport_error_status) {
 	case PYX_TRANSPORT_UNKNOWN_SAM_OPCODE:
-		cmd->scsi_sense_reason = UNSUPPORTED_SCSI_OPCODE;
+		cmd->scsi_sense_reason = TCM_UNSUPPORTED_SCSI_OPCODE;
 		break;
 	case PYX_TRANSPORT_REQ_TOO_MANY_SECTORS:
-		cmd->scsi_sense_reason = SECTOR_COUNT_TOO_MANY;
+		cmd->scsi_sense_reason = TCM_SECTOR_COUNT_TOO_MANY;
 		break;
 	case PYX_TRANSPORT_INVALID_CDB_FIELD:
-		cmd->scsi_sense_reason = INVALID_CDB_FIELD;
+		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
 		break;
 	case PYX_TRANSPORT_INVALID_PARAMETER_LIST:
-		cmd->scsi_sense_reason = INVALID_PARAMETER_LIST;
+		cmd->scsi_sense_reason = TCM_INVALID_PARAMETER_LIST;
 		break;
 	case PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES:
 		if (!(cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)) {
@@ -3186,17 +3186,18 @@ void transport_generic_request_failure(
 			goto check_stop;
 		} else {
 			cmd->scsi_sense_reason =
-				LOGICAL_UNIT_COMMUNICATION_FAILURE;
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
 		break;
 	case PYX_TRANSPORT_LU_COMM_FAILURE:
-		cmd->scsi_sense_reason = LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	case PYX_TRANSPORT_ILLEGAL_REQUEST:
+		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		break;
 	case PYX_TRANSPORT_UNKNOWN_MODE_PAGE:
-		cmd->scsi_sense_reason = UNKNOWN_MODE_PAGE;
+		cmd->scsi_sense_reason = TCM_UNKNOWN_MODE_PAGE;
 		break;
 	case PYX_TRANSPORT_WRITE_PROTECTED:
-		cmd->scsi_sense_reason = WRITE_PROTECTED;
+		cmd->scsi_sense_reason = TCM_WRITE_PROTECTED;
 		break;
 	case PYX_TRANSPORT_RESERVATION_CONFLICT:
 		/*
@@ -3223,15 +3224,11 @@ void transport_generic_request_failure(
 			CMD_TFO(cmd)->queue_status(cmd);
 
 		goto check_stop;
-
-	case PYX_TRANSPORT_ILLEGAL_REQUEST:
-		cmd->scsi_sense_reason = ILLEGAL_REQUEST;
-		break;
 	default:
 		printk(KERN_ERR "Unknown transport error for CDB 0x%02x: %d\n",
 			T_TASK(cmd)->t_task_cdb[0],
 			cmd->transport_error_status);
-		cmd->scsi_sense_reason = UNSUPPORTED_SCSI_OPCODE;
+		cmd->scsi_sense_reason = TCM_UNSUPPORTED_SCSI_OPCODE;
 		break;
 	}
 
@@ -6193,7 +6190,7 @@ void transport_generic_complete_ok(struct se_cmd *cmd)
 		return;
 	} else if (cmd->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE) {
 		if (transport_get_sense_data(cmd) < 0)
-			reason = NON_EXISTENT_LUN;
+			reason = TCM_NON_EXISTENT_LUN;
 
 		/*
 		 * Only set when an struct se_task->task_scsi_status returned
@@ -6588,7 +6585,7 @@ int transport_get_sectors(struct se_cmd *cmd)
 			T_TASK(cmd)->t_task_lba, T_TASK(cmd)->t_task_sectors,
 			transport_dev_end_lba(dev));
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = SECTOR_COUNT_TOO_MANY;
+		cmd->scsi_sense_reason = TCM_SECTOR_COUNT_TOO_MANY;
 		return PYX_TRANSPORT_REQ_TOO_MANY_SECTORS;
 	}
 
@@ -6618,7 +6615,7 @@ int transport_new_cmd_obj(
 		if (!(task_cdbs)) {
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			cmd->scsi_sense_reason =
-					LOGICAL_UNIT_COMMUNICATION_FAILURE;
+					TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 			return PYX_TRANSPORT_LU_COMM_FAILURE;
 		}
 		T_TASK(cmd)->t_task_cdbs += task_cdbs;
@@ -7554,7 +7551,7 @@ static void __transport_clear_lun_from_sessions(struct se_lun *lun)
 		 */
 check_cond:
 		transport_send_check_condition_and_sense(cmd,
-				NON_EXISTENT_LUN, 0);
+				TCM_NON_EXISTENT_LUN, 0);
 		/*
 		 *  If the fabric frontend is waiting for this iscsi_cmd_t to
 		 * be released, notify the waiting thread now that LU has
@@ -7754,9 +7751,9 @@ int transport_send_check_condition_and_sense(
 	 * SENSE KEY values from include/scsi/scsi.h
 	 */
 	switch (reason) {
-	case NON_EXISTENT_LUN:
-	case UNSUPPORTED_SCSI_OPCODE:
-	case SECTOR_COUNT_TOO_MANY:
+	case TCM_NON_EXISTENT_LUN:
+	case TCM_UNSUPPORTED_SCSI_OPCODE:
+	case TCM_SECTOR_COUNT_TOO_MANY:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ILLEGAL REQUEST */
@@ -7764,7 +7761,7 @@ int transport_send_check_condition_and_sense(
 		/* INVALID COMMAND OPERATION CODE */
 		buffer[offset+SPC_ASC_KEY_OFFSET] = 0x20;
 		break;
-	case UNKNOWN_MODE_PAGE:
+	case TCM_UNKNOWN_MODE_PAGE:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ILLEGAL REQUEST */
@@ -7772,7 +7769,7 @@ int transport_send_check_condition_and_sense(
 		/* INVALID FIELD IN CDB */
 		buffer[offset+SPC_ASC_KEY_OFFSET] = 0x24;
 		break;
-	case CHECK_CONDITION_ABORT_CMD:
+	case TCM_CHECK_CONDITION_ABORT_CMD:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ABORTED COMMAND */
@@ -7781,7 +7778,7 @@ int transport_send_check_condition_and_sense(
 		buffer[offset+SPC_ASC_KEY_OFFSET] = 0x29;
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = 0x03;
 		break;
-	case INCORRECT_AMOUNT_OF_DATA:
+	case TCM_INCORRECT_AMOUNT_OF_DATA:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ABORTED COMMAND */
@@ -7791,7 +7788,7 @@ int transport_send_check_condition_and_sense(
 		/* NOT ENOUGH UNSOLICITED DATA */
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = 0x0d;
 		break;
-	case INVALID_CDB_FIELD:
+	case TCM_INVALID_CDB_FIELD:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ABORTED COMMAND */
@@ -7799,7 +7796,7 @@ int transport_send_check_condition_and_sense(
 		/* INVALID FIELD IN CDB */
 		buffer[offset+SPC_ASC_KEY_OFFSET] = 0x24;
 		break;
-	case INVALID_PARAMETER_LIST:
+	case TCM_INVALID_PARAMETER_LIST:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ABORTED COMMAND */
@@ -7807,7 +7804,7 @@ int transport_send_check_condition_and_sense(
 		/* INVALID FIELD IN PARAMETER LIST */
 		buffer[offset+SPC_ASC_KEY_OFFSET] = 0x26;
 		break;
-	case UNEXPECTED_UNSOLICITED_DATA:
+	case TCM_UNEXPECTED_UNSOLICITED_DATA:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ABORTED COMMAND */
@@ -7817,7 +7814,7 @@ int transport_send_check_condition_and_sense(
 		/* UNEXPECTED_UNSOLICITED_DATA */
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = 0x0c;
 		break;
-	case SERVICE_CRC_ERROR:
+	case TCM_SERVICE_CRC_ERROR:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ABORTED COMMAND */
@@ -7827,7 +7824,7 @@ int transport_send_check_condition_and_sense(
 		/* N/A */
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = 0x05;
 		break;
-	case SNACK_REJECTED:
+	case TCM_SNACK_REJECTED:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* ABORTED COMMAND */
@@ -7837,7 +7834,7 @@ int transport_send_check_condition_and_sense(
 		/* FAILED RETRANSMISSION REQUEST */
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = 0x13;
 		break;
-	case WRITE_PROTECTED:
+	case TCM_WRITE_PROTECTED:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* DATA PROTECT */
@@ -7845,7 +7842,7 @@ int transport_send_check_condition_and_sense(
 		/* WRITE PROTECTED */
 		buffer[offset+SPC_ASC_KEY_OFFSET] = 0x27;
 		break;
-	case CHECK_CONDITION_UNIT_ATTENTION:
+	case TCM_CHECK_CONDITION_UNIT_ATTENTION:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* UNIT ATTENTION */
@@ -7854,7 +7851,7 @@ int transport_send_check_condition_and_sense(
 		buffer[offset+SPC_ASC_KEY_OFFSET] = asc;
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = ascq;
 		break;
-	case CHECK_CONDITION_NOT_READY:
+	case TCM_CHECK_CONDITION_NOT_READY:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
 		/* Not Ready */
@@ -7863,7 +7860,7 @@ int transport_send_check_condition_and_sense(
 		buffer[offset+SPC_ASC_KEY_OFFSET] = asc;
 		buffer[offset+SPC_ASCQ_KEY_OFFSET] = ascq;
 		break;
-	case LOGICAL_UNIT_COMMUNICATION_FAILURE:
+	case TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE:
 	default:
 		/* CURRENT ERROR */
 		buffer[offset] = 0x70;
@@ -8101,7 +8098,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 				spin_unlock_irqrestore(
 					&T_TASK(cmd)->t_state_lock, flags);
 				transport_send_check_condition_and_sense(
-					cmd, LOGICAL_UNIT_COMMUNICATION_FAILURE,
+					cmd, TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE,
 					0);
 				transport_remove_cmd_from_queue(cmd,
 					SE_DEV(cmd)->dev_queue_obj);
@@ -8134,7 +8131,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 			spin_unlock_irqrestore(
 				&T_TASK(cmd)->t_state_lock, flags);
 			transport_send_check_condition_and_sense(cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 			transport_remove_cmd_from_queue(cmd,
 				SE_DEV(cmd)->dev_queue_obj);
 
@@ -8174,7 +8171,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 
 		if (atomic_read(&T_TASK(cmd)->t_fe_count)) {
 			transport_send_check_condition_and_sense(cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 
 			transport_lun_remove_cmd(cmd);
 			if (!(transport_cmd_check_stop(cmd, 1, 0)))

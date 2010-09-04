@@ -171,7 +171,7 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 	if (ret == -1) {
 		/* Out of Resources */
 		transport_send_check_condition_and_sense(se_cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 		return 0;
 	} else if (ret == -2) {
 		/*
@@ -210,7 +210,7 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 				scsi_sg_count(sc));
 	if (ret < 0) {
 		transport_send_check_condition_and_sense(se_cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 		return 0;
 	}
 	/*
