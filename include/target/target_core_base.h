@@ -65,28 +65,38 @@
 #define INQUIRY_VPD_DEVICE_IDENTIFIER_LEN	254
 
 /* struct se_cmd->data_direction */
-#define SE_DIRECTION_NONE			0
-#define SE_DIRECTION_READ			1
-#define SE_DIRECTION_WRITE			2
-#define SE_DIRECTION_BIDI			3
+enum {
+	SE_DIRECTION_NONE	= 0,
+	SE_DIRECTION_READ	= 1,
+	SE_DIRECTION_WRITE	= 2,
+	SE_DIRECTION_BIDI	= 3,
+};
 
 /* struct se_hba->hba_flags */
-#define HBA_FLAGS_INTERNAL_USE			0x00000001
-#define HBA_FLAGS_PSCSI_MODE			0x00000002
+enum {
+	HBA_FLAGS_INTERNAL_USE	= 0x01,
+	HBA_FLAGS_PSCSI_MODE	= 0x02,
+};
 
 /* struct se_hba->hba_status and iscsi_tpg_hba->thba_status */
-#define HBA_STATUS_FREE				0x00000001
-#define HBA_STATUS_ACTIVE			0x00000002
-#define HBA_STATUS_INACTIVE			0x00000004
-#define HBA_STATUS_SHUTDOWN			0x00000008
+enum {
+	HBA_STATUS_FREE		= 0x01,
+	HBA_STATUS_ACTIVE	= 0x02,
+	HBA_STATUS_INACTIVE	= 0x04,
+	HBA_STATUS_SHUTDOWN	= 0x08,
+};
 
 /* struct se_lun->lun_status */
-#define TRANSPORT_LUN_STATUS_FREE		0
-#define TRANSPORT_LUN_STATUS_ACTIVE		1
+enum {
+	TRANSPORT_LUN_STATUS_FREE = 0,
+	TRANSPORT_LUN_STATUS_ACTIVE = 1,
+};
 
 /* struct se_portal_group->se_tpg_type */
-#define TRANSPORT_TPG_TYPE_NORMAL		0
-#define TRANSPORT_TPG_TYPE_DISCOVERY		1
+enum {
+	TRANSPORT_TPG_TYPE_NORMAL = 0,
+	TRANSPORT_TPG_TYPE_DISCOVERY = 1,
+};
 
 /* Used for se_node_acl->nodeacl_flags */
 #define NAF_DYNAMIC_NODE_ACL                    0x01
