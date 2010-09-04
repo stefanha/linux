@@ -98,9 +98,6 @@ enum {
 	TRANSPORT_TPG_TYPE_DISCOVERY = 1,
 };
 
-/* Used for se_node_acl->nodeacl_flags */
-#define NAF_DYNAMIC_NODE_ACL                    0x01
-
 /* struct se_map_sg->map_flags */
 #define MAP_SG_KMAP				0x01
 
@@ -609,7 +606,8 @@ struct se_ua {
 
 struct se_node_acl {
 	char			initiatorname[TRANSPORT_IQN_LEN];
-	int			nodeacl_flags;
+	/* Used to signal demo mode created ACL, disabled by default */
+	int			dynamic_node_acl:1;
 	u32			queue_depth;
 	u32			acl_index;
 	u64			num_cmds;

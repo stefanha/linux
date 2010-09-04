@@ -758,7 +758,7 @@ void transport_deregister_session(struct se_session *se_sess)
 	se_nacl = se_sess->se_node_acl;
 	if ((se_nacl)) {
 		spin_lock_bh(&se_tpg->acl_node_lock);
-		if (se_nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
+		if (se_nacl->dynamic_node_acl) {
 			if (!(TPG_TFO(se_tpg)->tpg_check_demo_mode_cache(
 					se_tpg))) {
 				list_del(&se_nacl->acl_list);

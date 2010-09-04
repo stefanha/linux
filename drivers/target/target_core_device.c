@@ -1396,7 +1396,7 @@ struct se_lun *core_dev_add_lun(
 		struct se_node_acl *acl;
 		spin_lock_bh(&tpg->acl_node_lock);
 		list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
-			if (acl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
+			if (acl->dynamic_node_acl) {
 				spin_unlock_bh(&tpg->acl_node_lock);
 				core_tpg_add_node_to_devs(acl, tpg);
 				spin_lock_bh(&tpg->acl_node_lock);

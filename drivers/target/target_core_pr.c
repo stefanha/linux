@@ -1402,7 +1402,7 @@ static int core_scsi3_nodeacl_depend_item(struct se_node_acl *nacl)
 {
 	struct se_portal_group *tpg = nacl->se_tpg;
 
-	if (nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+	if (nacl->dynamic_node_acl)
 		return 0;
 
 	return configfs_depend_item(TPG_TFO(tpg)->tf_subsys,
@@ -1413,7 +1413,7 @@ static void core_scsi3_nodeacl_undepend_item(struct se_node_acl *nacl)
 {
 	struct se_portal_group *tpg = nacl->se_tpg;
 
-	if (nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL) {
+	if (nacl->dynamic_node_acl) {
 		atomic_dec(&nacl->acl_pr_ref_count);
 		smp_mb__after_atomic_dec();
 		return;
@@ -1432,7 +1432,7 @@ static int core_scsi3_lunacl_depend_item(struct se_dev_entry *se_deve)
 	struct se_node_acl *nacl;
 	struct se_portal_group *tpg;
 	/*
-	 * For nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+	 * For nacl->dynamic_node_acl=1
 	 */
 	if (!(lun_acl))
 		return 0;
@@ -1450,7 +1450,7 @@ static void core_scsi3_lunacl_undepend_item(struct se_dev_entry *se_deve)
 	struct se_node_acl *nacl;
 	struct se_portal_group *tpg;
 	/*
-	 * For nacl->nodeacl_flags & NAF_DYNAMIC_NODE_ACL)
+	 * For nacl->dynamic_node_acl=1
 	 */
 	if (!(lun_acl)) {
 		atomic_dec(&se_deve->pr_ref_count);
