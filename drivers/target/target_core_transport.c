@@ -6736,7 +6736,8 @@ extern u32 transport_calc_sg_num(
 {
 	struct se_cmd *se_cmd = task->task_se_cmd;
 	struct se_mem *se_mem = in_se_mem;
-	u32 sg_length, task_size = task->task_size;
+	struct target_core_fabric_ops *tfo = CMD_TFO(se_cmd);
+	u32 sg_length, task_size = task->task_size, task_sg_num_padded;
 
 	while (task_size != 0) {
 		DEBUG_SC("se_mem->se_page(%p) se_mem->se_len(%u)"
@@ -6786,8 +6787,19 @@ next:
 
 		task->task_sg_num++;
 	}
+	/*
+	 * Check if the fabric module driver is requesting that all
+	 * struct se_task->task_sg[] be chained together..  If so,
+	 * then allocate an extra padding SG entry for linking and
+	 * marking the end of the chained SGL.
+	 */
+	if (tfo->task_sg_chaining) {
+		task_sg_num_padded = (task->task_sg_num + 1);
+		task->task_padded_sg = 1;
+	} else
+		task_sg_num_padded = task->task_sg_num;
 
-	task->task_sg = kzalloc(task->task_sg_num *
+	task->task_sg = kzalloc(task_sg_num_padded *
 			sizeof(struct scatterlist), GFP_KERNEL);
 	if (!(task->task_sg)) {
 		printk(KERN_ERR "Unable to allocate memory for"
@@ -6795,10 +6807,18 @@ next:
 		return 0;
 	}
 
-	sg_init_table(&task->task_sg[0], task->task_sg_num);
+	sg_init_table(&task->task_sg[0], task_sg_num_padded);
+	/*
+	 * For the chaining case, setup the proper end of SGL for the
+	 * initial submission struct task into struct se_subsystem_api.
+	 * This will be cleared later by transport_do_task_sg_chain()
+	 */
+	if (task->task_padded_sg)
+		sg_mark_end(&task->task_sg[task->task_sg_num - 1]);
 
-	DEBUG_SC("Successfully allocated task->task_sg_num(%u)\n",
-			task->task_sg_num);
+	DEBUG_SC("Successfully allocated task->task_sg_num(%u),"
+		" task_sg_num_padded(%u)\n", task->task_sg_num,
+		task_sg_num_padded);
 
 	return task->task_sg_num;
 }
@@ -7020,6 +7040,103 @@ next:
 
 	return 0;
 }
+
+/*
+ * This function can be used by HW target mode drivers to create a linked
+ * scatterlist from all contiguously allocated struct se_task->task_sg[].
+ * This is intended to be called during the completion path by TCM Core
+ * when struct target_core_fabric_ops->check_task_sg_chaining is enabled.
+ */
+void transport_do_task_sg_chain(struct se_cmd *cmd)
+{
+	struct scatterlist *sg_head = NULL, *sg_link = NULL, *sg_first = NULL;
+	struct scatterlist *sg_head_cur = NULL, *sg_link_cur = NULL;
+	struct scatterlist *sg, *sg_end = NULL, *sg_end_cur = NULL;
+	struct se_task *task;
+	struct target_core_fabric_ops *tfo = CMD_TFO(cmd);
+	u32 task_sg_num = 0, sg_count = 0;
+	int i;
+
+	if (tfo->task_sg_chaining == 0) {
+		printk(KERN_ERR "task_sg_chaining is diabled for fabric module:"
+				" %s\n", tfo->get_fabric_name());
+		dump_stack();
+		return;
+	}
+	/*
+	 * Walk the struct se_task list and setup scatterlist chains
+	 * for each contiguosly allocated struct se_task->task_sg[].
+	 */
+	list_for_each_entry(task, &T_TASK(cmd)->t_task_list, t_list) {
+		if (!(task->task_sg) || !(task->task_padded_sg))
+			continue;
+
+		if (sg_head && sg_link) {
+			sg_head_cur = &task->task_sg[0];
+			sg_link_cur = &task->task_sg[task->task_sg_num];
+			/*
+			 * Either add chain or mark end of scatterlist
+			 */
+			if (!(list_is_last(&task->t_list,
+					&T_TASK(cmd)->t_task_list))) {
+				/*
+				 * Clear existing SGL termination bit set in
+				 * transport_calc_sg_num(), see sg_mark_end()
+				 */
+				sg_end_cur = &task->task_sg[task->task_sg_num - 1];
+				sg_end_cur->page_link &= ~0x02;
+
+				sg_chain(sg_head, task_sg_num, sg_head_cur);
+				sg_count += (task->task_sg_num + 1);
+			} else
+				sg_count += task->task_sg_num;
+
+			sg_head = sg_head_cur;
+			sg_link = sg_link_cur;
+			task_sg_num = task->task_sg_num;
+			continue;
+		}
+		sg_head = sg_first = &task->task_sg[0];
+		sg_link = &task->task_sg[task->task_sg_num];
+		task_sg_num = task->task_sg_num;
+		/*
+		 * Check for single task..
+		 */
+		if (!(list_is_last(&task->t_list, &T_TASK(cmd)->t_task_list))) {
+			/*
+			 * Clear existing SGL termination bit set in
+			 * transport_calc_sg_num(), see sg_mark_end()
+			 */
+			sg_end = &task->task_sg[task->task_sg_num - 1];
+			sg_end->page_link &= ~0x02;
+			sg_count += (task->task_sg_num + 1);
+		} else
+			sg_count += task->task_sg_num;
+	}
+	/*
+	 * Setup the starting pointer and total t_tasks_sg_linked_no including
+	 * padding SGs for linking and to mark the end.
+	 */
+	T_TASK(cmd)->t_tasks_sg_chained = sg_first;
+	T_TASK(cmd)->t_tasks_sg_chained_no = sg_count;
+
+	printk("Setup T_TASK(cmd)->t_tasks_sg_chained: %p and"
+		" t_tasks_sg_chained_no: %u\n", T_TASK(cmd)->t_tasks_sg_chained,
+		T_TASK(cmd)->t_tasks_sg_chained_no);
+
+	for_each_sg(T_TASK(cmd)->t_tasks_sg_chained, sg,
+			T_TASK(cmd)->t_tasks_sg_chained_no, i) {
+
+		printk("SG: %p page: %p length: %d offset: %d\n",
+			sg, sg_page(sg), sg->length, sg->offset);
+		if (sg_is_chain(sg))
+			printk("SG: %p sg_is_chain=1\n", sg);
+		if (sg_is_last(sg))
+			printk("SG: %p sg_is_last=1\n", sg);
+	}
+
+}
+EXPORT_SYMBOL(transport_do_task_sg_chain);
 
 static int transport_do_se_mem_map(
 	struct se_device *dev,

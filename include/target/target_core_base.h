@@ -439,6 +439,7 @@ struct se_transport_task {
 	u32			t_tasks_no;
 	u32			t_tasks_sectors;
 	u32			t_tasks_se_num;
+	u32			t_tasks_sg_chained_no;
 	atomic_t		t_fe_count;
 	atomic_t		t_se_count;
 	atomic_t		t_task_cdbs_left;
@@ -462,6 +463,8 @@ struct se_transport_task {
 	struct completion	t_transport_passthrough_wcomp;
 	struct completion	transport_lun_fe_stop_comp;
 	struct completion	transport_lun_stop_comp;
+	struct scatterlist	*t_tasks_sg_chained;
+	struct scatterlist	t_tasks_sg_bounce;
 	void			*t_task_buf;
 	void			*t_task_pt_buf;
 	struct list_head	t_task_list;
@@ -476,6 +479,7 @@ struct se_task {
 	u8		task_flags;
 	int		task_error_status;
 	int		task_state_flags;
+	int		task_padded_sg:1;
 	unsigned long long	task_lba;
 	u32		task_no;
 	u32		task_sectors;

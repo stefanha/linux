@@ -3,6 +3,12 @@ struct target_fabric_configfs;
 
 struct target_core_fabric_ops {
 	struct configfs_subsystem *tf_subsys;
+	/*
+	 * Optional to signal struct se_task->task_sg[] padding entries
+	 * for scatterlist chaining using transport_do_task_sg_link(),
+	 * disabled by default
+	 */
+	int task_sg_chaining:1;
 	char *(*get_fabric_name)(void);
 	u8 (*get_fabric_proto_ident)(struct se_portal_group *);
 	char *(*tpg_get_wwn)(struct se_portal_group *);

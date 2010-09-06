@@ -263,6 +263,7 @@ extern int transport_map_sg_to_mem(struct se_cmd *, struct list_head *,
 extern int transport_map_mem_to_sg(struct se_task *, struct list_head *,
 					void *, struct se_mem *,
 					struct se_mem **, u32 *, u32 *);
+extern void transport_do_task_sg_chain(struct se_cmd *);
 extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 					struct se_transform_info *,
 					unsigned long long, u32, struct se_mem *,
