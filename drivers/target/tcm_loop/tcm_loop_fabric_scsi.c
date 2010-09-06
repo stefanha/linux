@@ -572,9 +572,9 @@ int tcm_loop_alloc_core_bus(void)
 	int ret;
 
 	tcm_loop_primary = root_device_register("tcm_loop_0");
-	if (!(tcm_loop_primary)) {
+	if (IS_ERR(tcm_loop_primary)) {
 		printk(KERN_ERR "Unable to allocate tcm_loop_primary\n");
-		return -ENOMEM;
+		return PTR_ERR(tcm_loop_primary);
 	}
 	
 	ret = bus_register(&tcm_loop_lld_bus);
