@@ -8342,13 +8342,13 @@ static int transport_processing_thread(void *param)
 		if (ret < 0)
 			goto out;
 
-		spin_lock(&dev->dev_status_lock);
+		spin_lock_irq(&dev->dev_status_lock);
 		if (dev->dev_status & TRANSPORT_DEVICE_SHUTDOWN) {
-			spin_unlock(&dev->dev_status_lock);
+			spin_unlock_irq(&dev->dev_status_lock);
 			transport_processing_shutdown(dev);
 			continue;
 		}
-		spin_unlock(&dev->dev_status_lock);
+		spin_unlock_irq(&dev->dev_status_lock);
 
 get_cmd:
 		__transport_execute_tasks(dev);

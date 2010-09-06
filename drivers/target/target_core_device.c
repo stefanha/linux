@@ -155,38 +155,6 @@ int linux_blockdevice_check(int major, int minor)
 }
 EXPORT_SYMBOL(linux_blockdevice_check);
 
-/*	se_disable_devices_for_hba():
- *
- *
- */
-void se_disable_devices_for_hba(struct se_hba *hba)
-{
-	struct se_device *dev;
-
-	spin_lock(&hba->device_lock);
-	list_for_each_entry(dev, &hba->hba_dev_list, dev_list) {
-
-		spin_lock(&dev->dev_status_lock);
-		if ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
-		    (dev->dev_status & TRANSPORT_DEVICE_DEACTIVATED) ||
-		    (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_ACTIVATED) ||
-		    (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_DEACTIVATED)) {
-			dev->dev_status |= TRANSPORT_DEVICE_SHUTDOWN;
-			dev->dev_status &= ~TRANSPORT_DEVICE_ACTIVATED;
-			dev->dev_status &= ~TRANSPORT_DEVICE_DEACTIVATED;
-			dev->dev_status &= ~TRANSPORT_DEVICE_OFFLINE_ACTIVATED;
-			dev->dev_status &=
-					~TRANSPORT_DEVICE_OFFLINE_DEACTIVATED;
-
-			wake_up_interruptible(&dev->dev_queue_obj->thread_wq);
-		}
-		spin_unlock(&dev->dev_status_lock);
-	}
-	spin_unlock(&hba->device_lock);
-
-	return;
-}
-
 extern int __transport_get_lun_for_cmd(
 	struct se_cmd *se_cmd,
 	u32 unpacked_lun)
@@ -1004,10 +972,10 @@ int se_dev_check_online(struct se_device *dev)
 {
 	int ret;
 
-	spin_lock(&dev->dev_status_lock);
+	spin_lock_irq(&dev->dev_status_lock);
 	ret = ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
 	       (dev->dev_status & TRANSPORT_DEVICE_DEACTIVATED)) ? 0 : 1;
-	spin_unlock(&dev->dev_status_lock);
+	spin_unlock_irq(&dev->dev_status_lock);
 	
 	return ret;
 }
@@ -1016,9 +984,9 @@ int se_dev_check_shutdown(struct se_device *dev)
 {
 	int ret;
 
-	spin_lock(&dev->dev_status_lock);
+	spin_lock_irq(&dev->dev_status_lock);
 	ret = (dev->dev_status & TRANSPORT_DEVICE_SHUTDOWN);
-	spin_unlock(&dev->dev_status_lock);
+	spin_unlock_irq(&dev->dev_status_lock);
 
 	return ret;
 }
