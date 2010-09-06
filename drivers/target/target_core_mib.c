@@ -614,7 +614,12 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock(&se_tpg->acl_node_lock);
 	list_for_each_entry(se_nacl, &se_tpg->acl_node_list, acl_list) {
-		spin_lock(&se_nacl->device_list_lock);
+
+		atomic_inc(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_inc();
+		spin_unlock(&se_tpg->acl_node_lock);
+
+		spin_lock_irq(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];
 			if (!(deve->lun_flags &
@@ -660,7 +665,11 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 				/* FIXME: scsiAuthIntrRowStatus */
 				"Ready");
 		}
-		spin_unlock(&se_nacl->device_list_lock);
+		spin_unlock_irq(&se_nacl->device_list_lock);
+
+		spin_lock(&se_tpg->acl_node_lock);
+		atomic_dec(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_dec();
 	}
 	spin_unlock(&se_tpg->acl_node_lock);
 
@@ -736,9 +745,14 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 		    (!se_sess->se_node_acl->device_list))
 			continue;
 
+		atomic_inc(&se_sess->mib_ref_count);
+		smp_mb__after_atomic_inc();
 		se_nacl = se_sess->se_node_acl;
+		atomic_inc(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_inc();
+		spin_unlock(&se_tpg->session_lock);
 
-		spin_lock(&se_nacl->device_list_lock);
+		spin_lock_irq(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];
 			if (!(deve->lun_flags &
@@ -776,7 +790,13 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				/* scsiAttIntrPortIdentifier */
 				buf);
 		}
-		spin_unlock(&se_nacl->device_list_lock);
+		spin_unlock_irq(&se_nacl->device_list_lock);
+
+		spin_lock(&se_tpg->session_lock);
+		atomic_dec(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_dec();
+		atomic_dec(&se_sess->mib_ref_count);
+		smp_mb__after_atomic_dec();
 	}
 	spin_unlock(&se_tpg->session_lock);
 

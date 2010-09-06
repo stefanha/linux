@@ -197,7 +197,7 @@ extern int __transport_get_lun_for_cmd(
 	unsigned long flags;
 	int read_only = 0;
 
-	spin_lock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	spin_lock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
 	deve = se_cmd->se_deve =
 			&SE_NODE_ACL(se_sess)->device_list[unpacked_lun];
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
@@ -226,7 +226,7 @@ extern int __transport_get_lun_for_cmd(
 		se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
 	}
 out:
-	spin_unlock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	spin_unlock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
 
 	if (!se_lun) {
 		if (read_only) {
@@ -318,7 +318,7 @@ extern int transport_get_lun_for_tmr(
 	struct se_session *se_sess = SE_SESS(se_cmd);
 	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
 
-	spin_lock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	spin_lock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
 	deve = se_cmd->se_deve =
 			&SE_NODE_ACL(se_sess)->device_list[unpacked_lun];
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
@@ -329,7 +329,7 @@ extern int transport_get_lun_for_tmr(
 		se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_se_dev;
 /*		se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD; */
 	}
-	spin_unlock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	spin_unlock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
 
 	if (!se_lun) {
 		printk(KERN_INFO "TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
@@ -371,7 +371,7 @@ struct se_dev_entry *core_get_se_deve_from_rtpi(
 	struct se_portal_group *tpg = nacl->se_tpg;
 	u32 i;
 
-	spin_lock_bh(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
 		deve = &nacl->device_list[i];
 
@@ -397,11 +397,11 @@ struct se_dev_entry *core_get_se_deve_from_rtpi(
 		
 		atomic_inc(&deve->pr_ref_count);
 		smp_mb__after_atomic_inc();
-		spin_unlock_bh(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 
 		return deve;
 	}
-	spin_unlock_bh(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 
 	return NULL;
 }
@@ -417,7 +417,7 @@ int core_free_device_list_for_node(
 	if (!nacl->device_list)
 		return 0;
 
-	spin_lock_bh(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
 		deve = &nacl->device_list[i];
 
@@ -432,12 +432,12 @@ int core_free_device_list_for_node(
 		}
 		lun = deve->se_lun;
 
-		spin_unlock_bh(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 		core_update_device_list_for_node(lun, NULL, deve->mapped_lun,
 			TRANSPORT_LUNFLAGS_NO_ACCESS, nacl, tpg, 0);
-		spin_lock_bh(&nacl->device_list_lock);
+		spin_lock_irq(&nacl->device_list_lock);
 	}
-	spin_unlock_bh(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 
 	kfree(nacl->device_list);
 	nacl->device_list = NULL;
@@ -449,10 +449,10 @@ void core_dec_lacl_count(struct se_node_acl *se_nacl, struct se_cmd *se_cmd)
 {
 	struct se_dev_entry *deve;
 
-	spin_lock_bh(&se_nacl->device_list_lock);
+	spin_lock_irq(&se_nacl->device_list_lock);
 	deve = &se_nacl->device_list[se_cmd->orig_fe_lun];
 	deve->deve_cmds--;
-	spin_unlock_bh(&se_nacl->device_list_lock);
+	spin_unlock_irq(&se_nacl->device_list_lock);
 
 	return;
 }
@@ -464,7 +464,7 @@ void core_update_device_list_access(
 {
 	struct se_dev_entry *deve;
 
-	spin_lock_bh(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	deve = &nacl->device_list[mapped_lun];
 	if (lun_access & TRANSPORT_LUNFLAGS_READ_WRITE) {
 		deve->lun_flags &= ~TRANSPORT_LUNFLAGS_READ_ONLY;
@@ -473,7 +473,7 @@ void core_update_device_list_access(
 		deve->lun_flags &= ~TRANSPORT_LUNFLAGS_READ_WRITE;
 		deve->lun_flags |= TRANSPORT_LUNFLAGS_READ_ONLY;
 	}
-	spin_unlock_bh(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 
 	return;
 }
@@ -507,7 +507,7 @@ int core_update_device_list_for_node(
 		spin_unlock_bh(&port->sep_alua_lock);
 	}
 
-	spin_lock_bh(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	if (enable) {
 		/*
 		 * Check if the call is handling demo mode -> explict LUN ACL
@@ -545,12 +545,12 @@ int core_update_device_list_for_node(
 		}
 
 		if (trans) {	
-			spin_unlock_bh(&nacl->device_list_lock);
+			spin_unlock_irq(&nacl->device_list_lock);
 			return 0;
 		}
 		deve->creation_time = get_jiffies_64();
 		deve->attach_count++;
-		spin_unlock_bh(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 
 		spin_lock_bh(&port->sep_alua_lock);
 		list_add_tail(&deve->alua_port_list, &port->sep_alua_list);
@@ -562,10 +562,10 @@ int core_update_device_list_for_node(
 	 * Wait for any in process SPEC_I_PT=1 or REGISTER_AND_MOVE
 	 * PR operation to complete.
 	 */
-	spin_unlock_bh(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 	while (atomic_read(&deve->pr_ref_count) != 0)
 		msleep(100);
-	spin_lock_bh(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	/*
 	 * Disable struct se_dev_entry LUN ACL mapping
 	 */
@@ -575,7 +575,7 @@ int core_update_device_list_for_node(
 	deve->lun_flags = 0;
 	deve->creation_time = 0;
 	deve->attach_count--;
-	spin_unlock_bh(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 
 	core_scsi3_free_pr_reg_from_nacl(lun->lun_se_dev, nacl);
 	return 0;
@@ -595,20 +595,20 @@ void core_clear_lun_from_tpg(struct se_lun *lun, struct se_portal_group *tpg)
 	list_for_each_entry(nacl, &tpg->acl_node_list, acl_list) {
 		spin_unlock_bh(&tpg->acl_node_lock);
 
-		spin_lock_bh(&nacl->device_list_lock);
+		spin_lock_irq(&nacl->device_list_lock);
 		for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
 			deve = &nacl->device_list[i];
 			if (lun != deve->se_lun)
 				continue;
-			spin_unlock_bh(&nacl->device_list_lock);
+			spin_unlock_irq(&nacl->device_list_lock);
 
 			core_update_device_list_for_node(lun, NULL,
 				deve->mapped_lun, TRANSPORT_LUNFLAGS_NO_ACCESS,
 				nacl, tpg, 0);
 
-			spin_lock_bh(&nacl->device_list_lock);
+			spin_lock_irq(&nacl->device_list_lock);
 		}
-		spin_unlock_bh(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 
 		spin_lock_bh(&tpg->acl_node_lock);
 	}
@@ -810,7 +810,7 @@ int transport_core_report_lun_response(struct se_cmd *se_cmd)
 		goto done;
 	}
 
-	spin_lock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	spin_lock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
 		deve = &SE_NODE_ACL(se_sess)->device_list[i];
 		if (!(deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS))
@@ -836,7 +836,7 @@ int transport_core_report_lun_response(struct se_cmd *se_cmd)
 		buf[offset++] = (lun & 0xff);
 		cdb_offset += 8;
 	}
-	spin_unlock_bh(&SE_NODE_ACL(se_sess)->device_list_lock);
+	spin_unlock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
 
 	/*
 	 * See SPC3 r07, page 159.

@@ -13,6 +13,7 @@ extern struct se_node_acl *core_tpg_check_initiator_node_acl(
 						struct se_portal_group *,
 						unsigned char *);
 extern void core_tpg_wait_for_nacl_pr_ref(struct se_node_acl *);
+extern void core_tpg_wait_for_mib_ref(struct se_node_acl *);
 extern void core_tpg_clear_object_luns(struct se_portal_group *);
 extern struct se_node_acl *core_tpg_add_initiator_node_acl(
 					struct se_portal_group *,

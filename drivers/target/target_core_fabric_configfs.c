@@ -111,7 +111,7 @@ static int target_fabric_mappedlun_link(
 	 * which be will write protected (READ-ONLY) when
 	 * tpg_1/attrib/demo_mode_write_protect=1
 	 */
-	spin_lock_bh(&lacl->se_lun_nacl->device_list_lock);
+	spin_lock_irq(&lacl->se_lun_nacl->device_list_lock);
 	deve = &lacl->se_lun_nacl->device_list[lacl->mapped_lun];
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS)
 		lun_access = deve->lun_flags;
@@ -120,7 +120,7 @@ static int target_fabric_mappedlun_link(
 			(TPG_TFO(se_tpg)->tpg_check_prod_mode_write_protect(
 				se_tpg)) ? TRANSPORT_LUNFLAGS_READ_ONLY :
 					   TRANSPORT_LUNFLAGS_READ_WRITE;
-	spin_unlock_bh(&lacl->se_lun_nacl->device_list_lock);
+	spin_unlock_irq(&lacl->se_lun_nacl->device_list_lock);
 	/*
 	 * Determine the actual mapped LUN value user wants..
 	 *
@@ -162,12 +162,12 @@ static ssize_t target_fabric_mappedlun_show_write_protect(
 	struct se_dev_entry *deve;
 	ssize_t len;
 
-	spin_lock_bh(&se_nacl->device_list_lock);
+	spin_lock_irq(&se_nacl->device_list_lock);
 	deve = &se_nacl->device_list[lacl->mapped_lun];
 	len = sprintf(page, "%d\n",
 			(deve->lun_flags & TRANSPORT_LUNFLAGS_READ_ONLY) ?
 			1 : 0);
-	spin_unlock_bh(&se_nacl->device_list_lock);
+	spin_unlock_irq(&se_nacl->device_list_lock);
 
 	return len;
 }

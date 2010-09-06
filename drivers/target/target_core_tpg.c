@@ -59,7 +59,7 @@ static void core_clear_initiator_node_from_tpg(
 	struct se_lun *lun;
 	struct se_lun_acl *acl, *acl_tmp;
 
-	spin_lock_bh(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
 		deve = &nacl->device_list[i];
 
@@ -74,7 +74,7 @@ static void core_clear_initiator_node_from_tpg(
 		}
 
 		lun = deve->se_lun;
-		spin_unlock_bh(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 		core_update_device_list_for_node(lun, NULL, deve->mapped_lun,
 			TRANSPORT_LUNFLAGS_NO_ACCESS, nacl, tpg, 0);
 
@@ -92,17 +92,17 @@ static void core_clear_initiator_node_from_tpg(
 				" mapped_lun: %u\n", nacl->initiatorname,
 				deve->mapped_lun);
 			spin_unlock(&lun->lun_acl_lock);
-			spin_lock_bh(&nacl->device_list_lock);
+			spin_lock_irq(&nacl->device_list_lock);
 			continue;
 		}
 
 		list_del(&acl->lacl_list);
 		spin_unlock(&lun->lun_acl_lock);
 
-		spin_lock_bh(&nacl->device_list_lock);
+		spin_lock_irq(&nacl->device_list_lock);
 		kfree(acl);
 	}
-	spin_unlock_bh(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 }
 
 /*	__core_tpg_get_initiator_node_acl():
@@ -275,6 +275,7 @@ struct se_node_acl *core_tpg_check_initiator_node_acl(
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
 	atomic_set(&acl->acl_pr_ref_count, 0);
+	atomic_set(&acl->mib_ref_count, 0);
 	acl->queue_depth = TPG_TFO(tpg)->tpg_get_default_depth(tpg);
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
@@ -314,6 +315,12 @@ EXPORT_SYMBOL(core_tpg_check_initiator_node_acl);
 void core_tpg_wait_for_nacl_pr_ref(struct se_node_acl *nacl)
 {
 	while (atomic_read(&nacl->acl_pr_ref_count) != 0)
+		msleep(100);
+}
+
+void core_tpg_wait_for_mib_ref(struct se_node_acl *nacl)
+{
+	while (atomic_read(&nacl->mib_ref_count) != 0)
 		msleep(100);
 }
 
@@ -473,6 +480,7 @@ int core_tpg_del_initiator_node_acl(
 	spin_unlock_bh(&tpg->session_lock);
 
 	core_tpg_wait_for_nacl_pr_ref(acl);
+	core_tpg_wait_for_mib_ref(acl);
 	core_clear_initiator_node_from_tpg(acl, tpg);
 	core_free_device_list_for_node(acl, tpg);
 

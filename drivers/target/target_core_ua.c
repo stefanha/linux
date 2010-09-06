@@ -112,7 +112,7 @@ int core_scsi3_ua_allocate(
 	ua->ua_asc = asc;
 	ua->ua_ascq = ascq;
 
-	spin_lock(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	deve = &nacl->device_list[unpacked_lun];
 
 	spin_lock(&deve->ua_lock);
@@ -122,7 +122,7 @@ int core_scsi3_ua_allocate(
 		 */
 		if ((ua_p->ua_asc == asc) && (ua_p->ua_ascq == ascq)) {
 			spin_unlock(&deve->ua_lock);
-			spin_unlock(&nacl->device_list_lock);
+			spin_unlock_irq(&nacl->device_list_lock);
 			kmem_cache_free(se_ua_cache, ua);
 			return 0;
 		}
@@ -167,7 +167,7 @@ int core_scsi3_ua_allocate(
 			list_add_tail(&ua->ua_nacl_list,
 				&deve->ua_list);
 		spin_unlock(&deve->ua_lock);
-		spin_unlock(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 
 		atomic_inc(&deve->ua_count);
 		smp_mb__after_atomic_inc();
@@ -175,7 +175,7 @@ int core_scsi3_ua_allocate(
 	}
 	list_add_tail(&ua->ua_nacl_list, &deve->ua_list);
 	spin_unlock(&deve->ua_lock);
-	spin_unlock(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 
 	printk(KERN_INFO "[%s]: Allocated UNIT ATTENTION, mapped LUN: %u, ASC:"
 		" 0x%02x, ASCQ: 0x%02x\n",
@@ -222,10 +222,10 @@ void core_scsi3_ua_for_check_condition(
 	if (!(nacl))
 		return;
 
-	spin_lock(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	deve = &nacl->device_list[cmd->orig_fe_lun];
 	if (!(atomic_read(&deve->ua_count))) {
-		spin_unlock(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 		return;
 	}
 	/*
@@ -262,7 +262,7 @@ void core_scsi3_ua_for_check_condition(
 		smp_mb__after_atomic_dec();
 	}
 	spin_unlock(&deve->ua_lock);
-	spin_unlock(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 
 	printk(KERN_INFO "[%s]: %s UNIT ATTENTION condition with"
 		" INTLCK_CTRL: %d, mapped LUN: %u, got CDB: 0x%02x"
@@ -291,10 +291,10 @@ int core_scsi3_ua_clear_for_request_sense(
 	if (!(nacl))
 		return -1;
 
-	spin_lock(&nacl->device_list_lock);
+	spin_lock_irq(&nacl->device_list_lock);
 	deve = &nacl->device_list[cmd->orig_fe_lun];
 	if (!(atomic_read(&deve->ua_count))) {
-		spin_unlock(&nacl->device_list_lock);
+		spin_unlock_irq(&nacl->device_list_lock);
 		return -1;
 	}
 	/*
@@ -321,7 +321,7 @@ int core_scsi3_ua_clear_for_request_sense(
 		smp_mb__after_atomic_dec();
 	}
 	spin_unlock(&deve->ua_lock);
-	spin_unlock(&nacl->device_list_lock);
+	spin_unlock_irq(&nacl->device_list_lock);
 
 	printk(KERN_INFO "[%s]: Released UNIT ATTENTION condition, mapped"
 		" LUN: %u, got REQUEST_SENSE reported ASC: 0x%02x,"
