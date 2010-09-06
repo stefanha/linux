@@ -257,16 +257,10 @@ static struct device_driver tcm_loop_driverfs = {
 	.name			= "tcm_loop",
 	.bus			= &tcm_loop_lld_bus,
 };
-
-static void tcm_loop_primary_release(struct device *dev)
-{
-	return;
-}
-
-static struct device tcm_loop_primary = {
-	.init_name		= "tcm_loop_0",
-	.release		= tcm_loop_primary_release,
-};
+/*
+ * Used with root_device_register() in tcm_loop_alloc_core_bus() below
+ */
+struct device *tcm_loop_primary;
 
 /*
  * Copied from drivers/scsi/libfc/fc_fcp.c:fc_change_queue_depth() and
@@ -555,7 +549,7 @@ int tcm_loop_setup_hba_bus(struct tcm_loop_hba *tl_hba, int tcm_loop_host_id)
 	int ret;
 
 	tl_hba->dev.bus = &tcm_loop_lld_bus;
-	tl_hba->dev.parent = &tcm_loop_primary;
+	tl_hba->dev.parent = tcm_loop_primary;
 	tl_hba->dev.release = &tcm_loop_release_adapter;
 	dev_set_name(&tl_hba->dev, "tcm_loop_adapter_%d", tcm_loop_host_id);
 
@@ -577,11 +571,10 @@ int tcm_loop_alloc_core_bus(void)
 {
 	int ret;
 
-	ret = device_register(&tcm_loop_primary);
-	if (ret) {
-		printk(KERN_ERR "device_register() failed for"
-				" tcm_loop_primary\n");
-		return ret;
+	tcm_loop_primary = root_device_register("tcm_loop_0");
+	if (!(tcm_loop_primary)) {
+		printk(KERN_ERR "Unable to allocate tcm_loop_primary\n");
+		return -ENOMEM;
 	}
 	
 	ret = bus_register(&tcm_loop_lld_bus);
@@ -603,7 +596,7 @@ int tcm_loop_alloc_core_bus(void)
 bus_unreg:
 	bus_unregister(&tcm_loop_lld_bus);
 dev_unreg:
-	device_unregister(&tcm_loop_primary);
+	root_device_unregister(tcm_loop_primary);
 	return ret;
 }
 
@@ -611,7 +604,7 @@ void tcm_loop_release_core_bus(void)
 {
 	driver_unregister(&tcm_loop_driverfs);
 	bus_unregister(&tcm_loop_lld_bus);
-	device_unregister(&tcm_loop_primary);
+	root_device_unregister(tcm_loop_primary);
 
 	printk(KERN_INFO "Releasing TCM Loop Core BUS\n");
 }
