@@ -27,6 +27,12 @@ struct target_core_fabric_ops {
 					struct se_node_acl *);
 	u32 (*tpg_get_inst_index)(struct se_portal_group *);
 	/*
+	 * Optional function pointer for TCM to perform command map
+	 * from TCM processing thread context, for those struct se_cmd
+	 * initally allocated in interrupt context.
+	 */
+	int (*new_cmd_map)(struct se_cmd *);
+	/*
 	 * Optional function pointer for TCM fabric modules that use
 	 * Linux/NET sockets to allocate struct iovec array to struct se_cmd
 	 */

@@ -1029,7 +1029,7 @@ void transport_cmd_finish_abort_tmr(struct se_cmd *cmd)
 int transport_add_cmd_to_queue(
 	struct se_cmd *cmd,
 	struct se_queue_obj *qobj,
-	u8 t_state)
+	int t_state)
 {
 	struct se_queue_req *qr;
 	unsigned long flags;
@@ -1062,7 +1062,7 @@ int transport_add_cmd_to_queue(
 	return 0;
 }
 
-static int transport_add_cmd_to_dev_queue(struct se_cmd *cmd, u8 t_state)
+static int transport_add_cmd_to_dev_queue(struct se_cmd *cmd, int t_state)
 {
 	struct se_device *dev = cmd->se_dev;
 
@@ -2719,6 +2719,7 @@ void transport_device_setup_cmd(struct se_cmd *cmd)
 	cmd->transport_add_cmd_to_queue = &transport_add_cmd_to_dev_queue;
 	cmd->se_dev = SE_LUN(cmd)->lun_se_dev;
 }
+EXPORT_SYMBOL(transport_device_setup_cmd);
 
 struct se_cmd *__transport_alloc_se_cmd(
 	struct target_core_fabric_ops *tfo,
@@ -8236,6 +8237,20 @@ get_cmd:
 		kfree(qr);
 
 		switch (t_state) {
+		case TRANSPORT_NEW_CMD_MAP:
+			if (!(CMD_TFO(cmd)->new_cmd_map)) {
+				printk(KERN_ERR "CMD_TFO(cmd)->new_cmd_map is"
+					" NULL for TRANSPORT_NEW_CMD_MAP\n");
+				BUG();
+			}
+			ret = CMD_TFO(cmd)->new_cmd_map(cmd);
+			if (ret < 0) {
+				cmd->transport_error_status = ret;
+				transport_generic_request_failure(cmd, NULL,
+						0, (cmd->data_direction !=
+						    SE_DIRECTION_WRITE));
+			}
+			/* Fall through */
 		case TRANSPORT_NEW_CMD:
 			ret = transport_generic_new_cmd(cmd);
 			if (ret < 0) {

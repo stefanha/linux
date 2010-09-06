@@ -144,7 +144,7 @@ extern void transport_task_dev_remove_state(struct se_task *,
 extern void transport_cmd_finish_abort(struct se_cmd *, int);
 extern void transport_cmd_finish_abort_tmr(struct se_cmd *);
 extern int transport_add_cmd_to_queue(struct se_cmd *,
-					struct se_queue_obj *, u8);
+					struct se_queue_obj *, int);
 extern struct se_queue_req *__transport_get_qr_from_queue(
 					struct se_queue_obj *);
 extern void transport_remove_cmd_from_queue(struct se_cmd *,
