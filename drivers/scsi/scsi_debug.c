@@ -3344,8 +3344,9 @@ static int __init scsi_debug_init(void)
 	}
 
 	pseudo_primary = root_device_register("pseudo_0");
-	if (!(pseudo_primary)) {
+	if (IS_ERR(pseudo_primary)) {
 		printk(KERN_WARNING "scsi_debug: root_device_register() error\n");
+		ret = PTR_ERR(pseudo_primary);
 		goto free_vm;
 	}
 	ret = bus_register(&pseudo_lld_bus);
