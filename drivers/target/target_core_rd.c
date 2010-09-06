@@ -40,6 +40,7 @@
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
+#include <target/target_core_fabric_ops.h>
 
 #include "target_core_rd.h"
 
@@ -1007,9 +1008,11 @@ static int rd_DIRECT_do_se_mem_map(
 	struct se_mem *in_se_mem,
 	struct se_mem **out_se_mem,
 	u32 *se_mem_cnt,
-	u32 *task_offset)
+	u32 *task_offset_in)
 {
+	struct se_cmd *cmd = task->task_se_cmd;
 	struct rd_request *req = (struct rd_request *) task->transport_req;
+	u32 task_offset = *task_offset_in;
 	int ret;
 
 	req->rd_lba = task->task_lba;
@@ -1023,12 +1026,46 @@ static int rd_DIRECT_do_se_mem_map(
 
 	if (req->rd_offset)
 		ret = rd_DIRECT_with_offset(task, se_mem_list, se_mem_cnt,
-				task_offset);
+				task_offset_in);
 	else
 		ret = rd_DIRECT_without_offset(task, se_mem_list, se_mem_cnt,
-				task_offset);
+				task_offset_in);
 
-	return ret;
+	if (ret < 0)
+		return ret;
+
+	if (CMD_TFO(cmd)->task_sg_chaining == 0)
+		return 0;
+	/*
+	 * Currently prevent writers from multiple HW fabrics doing
+	 * pci_map_sg() to RD_DR's internal scatterlist memory.
+	 */
+	if (cmd->data_direction == SE_DIRECTION_WRITE) {
+		printk(KERN_ERR "SE_DIRECTION_WRITE not supported for"
+				" RAMDISK_DR with task_sg_chaining=1\n");
+		return -1;
+	}
+	/*
+	 * Special case for if task_sg_chaining is enabled, then
+	 * we setup struct se_task->task_sg[], as it will be used by
+	 * transport_do_task_sg_chain() for creating chainged SGLs
+	 * across multiple struct se_task->task_sg[].
+	 *
+	 * Note that kfree(task->task_sg); does not need to be called
+	 * in rd_DIRECT_free_DMA(), because transport_free_dev_tasks()
+	 * will already be taking care of this for all TCM subsystem
+	 * plugins.
+	 */
+	if (!(transport_calc_sg_num(task,
+			list_entry(T_TASK(cmd)->t_mem_list->next,
+				   struct se_mem, se_list),
+			task_offset)))
+		return -1;	
+
+	return transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
+			list_entry(T_TASK(cmd)->t_mem_list->next,
+				   struct se_mem, se_list),
+			out_se_mem, se_mem_cnt, task_offset_in);
 }
 
 /*	rd_DIRECT_free_DMA():
