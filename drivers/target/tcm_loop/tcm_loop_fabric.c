@@ -455,67 +455,6 @@ u64 tcm_loop_pack_lun(unsigned int lun)
 	return cpu_to_le64(result);
 }
 
-static struct se_queue_req *tcm_loop_get_qr_from_queue(struct se_queue_obj *qobj)
-{
-	struct se_queue_req *qr;
-	unsigned long flags;
-
-	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	if (list_empty(&qobj->qobj_list)) {
-		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-		return NULL;
-	}
-
-	qr = list_first_entry(&qobj->qobj_list, struct se_queue_req, qr_list);
-	list_del(&qr->qr_list);
-	atomic_dec(&qobj->queue_cnt);
-	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-
-	return qr;
-}
-
-int tcm_loop_processing_thread(void *p)
-{
-	struct scsi_cmnd *sc;
-	struct tcm_loop_cmd *tl_cmd;
-	struct tcm_loop_hba *tl_hba = (struct tcm_loop_hba *)p;
-	struct se_queue_obj *qobj = tl_hba->tl_hba_qobj;
-	struct se_queue_req *qr;
-	int ret;
-
-	current->policy = SCHED_NORMAL;
-	set_user_nice(current, -20);
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	complete(&qobj->thread_create_comp);
-
-	while (!(kthread_should_stop())) {
-		ret = wait_event_interruptible(qobj->thread_wq,
-			atomic_read(&qobj->queue_cnt) || kthread_should_stop());
-		if (ret < 0)
-			goto out;
-
-		qr = tcm_loop_get_qr_from_queue(qobj);
-		if (!(qr))
-			continue;
-
-		tl_cmd = (struct tcm_loop_cmd *)qr->cmd;
-		sc = tl_cmd->sc;
-		kfree(qr);
-
-		TL_CDB_DEBUG("processing_thread, calling tcm_loop_execute"
-			"_core_cmd() for tl_cmd: %p, sc: %p\n", tl_cmd, sc);
-		tcm_loop_execute_core_cmd(tl_cmd, sc);
-	}
-
-out:
-	complete(&qobj->thread_done_comp);
-	return 0;
-}
-
 static int __init tcm_loop_fabric_init(void)
 {
 	int ret;

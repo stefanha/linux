@@ -449,17 +449,6 @@ check_len:
 	snprintf(&tl_hba->tl_wwn_address[0], TL_WWN_ADDR_LEN, "%s", &name[off]);
 
 	/*
-	 * Setup the tl_hba->tl_hba_qobj
-	 */
-	tl_hba->tl_hba_qobj = kzalloc(sizeof(struct se_queue_obj), GFP_KERNEL);
-	if (!(tl_hba->tl_hba_qobj)) {
-		kfree(tl_hba);
-		printk("Unable to allocate tl_hba->tl_hba_qobj\n");
-		return ERR_PTR(-ENOMEM);
-	}
-	transport_init_queue_obj(tl_hba->tl_hba_qobj);
-
-	/*
 	 * Call device_register(tl_hba->dev) to register the emulated
 	 * Linux/SCSI LLD of type struct Scsi_Host at tl_hba->sh after
 	 * device_register() callbacks in tcm_loop_driver_probe()
@@ -469,19 +458,6 @@ check_len:
 		goto out;
 
 	sh = tl_hba->sh;
-	/*
-	 * Start up the per struct Scsi_Host tcm_loop processing thread
-	 */
-	tl_hba->tl_kthread = kthread_run(tcm_loop_processing_thread,
-			(void *)tl_hba, "tcm_loop_%d", sh->host_no);
-	if (IS_ERR(tl_hba->tl_kthread)) {
-		printk(KERN_ERR "Unable to start tcm_loop kthread\n");
-		device_unregister(&tl_hba->dev);
-		ret = -ENOMEM;
-		goto out;
-	}
-	wait_for_completion(&tl_hba->tl_hba_qobj->thread_create_comp);
-
 	tcm_loop_hba_no_cnt++;
 	printk(KERN_INFO "TCM_Loop_ConfigFS: Allocated emulated Target"
 		" %s Address: %s at Linux/SCSI Host ID: %d\n",
@@ -489,7 +465,6 @@ check_len:
 
 	return &tl_hba->tl_hba_wwn;
 out:
-	kfree(tl_hba->tl_hba_qobj);
 	kfree(tl_hba);
 	return ERR_PTR(ret);
 }
@@ -500,12 +475,6 @@ void tcm_loop_drop_scsi_hba(
 	struct tcm_loop_hba *tl_hba = container_of(wwn,
 				struct tcm_loop_hba, tl_hba_wwn);
 	int host_no = tl_hba->sh->host_no;
-
-	/*
-	 * Shutdown the per HBA tcm_loop processing kthread
-	 */
-	kthread_stop(tl_hba->tl_kthread);
-	wait_for_completion(&tl_hba->tl_hba_qobj->thread_done_comp);
 	/*
 	 * Call device_unregister() on the original tl_hba->dev.
 	 * tcm_loop_fabric_scsi.c:tcm_loop_release_adapter() will
@@ -590,6 +559,10 @@ int tcm_loop_register_configfs(void)
 	 * virtual memory address mappings
 	 */
 	fabric->tf_ops.alloc_cmd_iovecs = NULL;
+	/*
+	 * Used for setting up remaining TCM resources in process context
+	 */
+	fabric->tf_ops.new_cmd_map = &tcm_loop_new_cmd_map;
 	fabric->tf_ops.check_stop_free = &tcm_loop_check_stop_free;
 	fabric->tf_ops.release_cmd_to_pool = &tcm_loop_deallocate_core_cmd;
 	fabric->tf_ops.release_cmd_direct = &tcm_loop_deallocate_core_cmd;

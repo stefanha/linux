@@ -54,12 +54,13 @@
  *
  * Can be called from interrupt context in tcm_loop_queuecommand() below
  */
-static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
+static struct se_cmd *tcm_loop_allocate_core_cmd(
 	struct tcm_loop_hba *tl_hba,
 	struct se_portal_group *se_tpg,
 	struct scsi_cmnd *sc,
 	int data_direction)
 {
+	struct se_cmd *se_cmd;
 	struct se_session *se_sess;
 	struct tcm_loop_nexus *tl_nexus = tl_hba->tl_nexus;
 	struct tcm_loop_cmd *tl_cmd;
@@ -109,51 +110,7 @@ static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
 		kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
 		return NULL;
 	}
-			
-	return tl_cmd;
-}
-
-/*
- * Queue up the newly allocated struct tcm_loop_cmd to be processed by
- * tcm_loop_fabri.c:tcm_loop_processing_thread()
- *
- * Can be called from interrupt context in tcm_loop_queuecommand() below
- */
-static int tcm_loop_queue_core_cmd(
-	struct se_queue_obj *qobj,
-	struct tcm_loop_cmd *tl_cmd)
-{
-	struct se_queue_req *qr;
-	unsigned long flags;
-
-	qr = kzalloc(sizeof(struct se_queue_req), GFP_ATOMIC);
-	if (!(qr)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" struct se_queue_req\n");
-		return -1;	
-	}
-	INIT_LIST_HEAD(&qr->qr_list);
-
-	qr->cmd = (void *)tl_cmd;
-	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	list_add_tail(&qr->qr_list, &qobj->qobj_list);
-	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-
-	atomic_inc(&qobj->queue_cnt);
-	wake_up_interruptible(&qobj->thread_wq);
-	return 0;
-}
-
-/*
- * Called by tcm_loop_processing_thread() in tcm_loop_fabric.c
- *
- * Always called in process context
- */
-int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
-{
-	struct se_cmd *se_cmd = tl_cmd->tl_se_cmd;
-	void *mem_ptr;
-	int ret;
+	se_cmd = tl_cmd->tl_se_cmd;
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
@@ -164,6 +121,25 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 				se_cmd->scsi_sense_reason, 0);
 		return 0;
 	}
+	/*
+	 * Make early call to setup se_cmd->transport_add_cmd_to_queue() pointer
+	 */
+	transport_device_setup_cmd(se_cmd);
+
+	return se_cmd;
+}
+
+/*
+ * Called by struct target_core_fabric_ops->new_cmd_map()
+ *
+ * Always called in process context
+ */
+int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
+{
+	struct tcm_loop_cmd *tl_cmd = se_cmd->se_fabric_cmd_ptr;
+	struct scsi_cmnd *sc = tl_cmd->sc;
+	void *mem_ptr;
+	int ret;
 	/*
 	 * Allocate the necessary tasks to complete the received CDB+data
 	 */
@@ -213,11 +189,8 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 		return 0;
 	}
-	/*
-	 * Queue up the struct se_cmd + tasks to be processed by the
-	 * TCM storage object.
-	 */
-	return transport_generic_handle_cdb(se_cmd);
+
+	return 0;
 }
 
 /*
@@ -333,9 +306,9 @@ static int tcm_loop_queuecommand(
 	struct scsi_cmnd *sc,
 	void (*done)(struct scsi_cmnd *))
 {
+	struct se_cmd *se_cmd;
 	struct se_portal_group *se_tpg;
 	struct Scsi_Host *host = sc->device->host;
-	struct tcm_loop_cmd *tl_cmd;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_tpg *tl_tpg;
 	int data_direction;
@@ -380,31 +353,17 @@ static int tcm_loop_queuecommand(
 	 * Determine the SAM Task Attribute and allocate tl_cmd and
 	 * tl_cmd->tl_se_cmd from TCM infrastructure
 	 */
-	tl_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc, data_direction);
-	if (!(tl_cmd)) {
+	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc, data_direction);
+	if (!(se_cmd)) {
 		spin_lock_irq(host->host_lock);
 		sc->result = host_byte(DID_ERROR);
 		(*done)(sc);
 		return 0;
 	}
 	/*
-	 * Queue the tl_cmd to be executed in process context by the
-	 * tcm_loop kernel thread
-	 */
-	if (tcm_loop_queue_core_cmd(tl_hba->tl_hba_qobj, tl_cmd) < 0) {
-		/*
-		 * Will free both struct tcm_loop_cmd and struct se_cmd
-		 */
-		transport_release_cmd_to_pool(tl_cmd->tl_se_cmd);
-		/*
-		 * Reaquire the struct scsi_host->host_lock, and
-		 * complete the struct scsi_cmnd
-		 */
-		spin_lock_irq(host->host_lock);
-		sc->result = host_byte(DID_ERROR);
-		(*done)(sc);
-		return 0;
-	}
+	 * Queue up the newly allocated to be processed in TCM thread context.
+	*/
+	se_cmd->transport_add_cmd_to_queue(se_cmd, TRANSPORT_NEW_CMD_MAP);
 	/*
 	 * Reaquire the the struct scsi_host->host_lock before returning
 	 */
@@ -585,7 +544,6 @@ static void tcm_loop_release_adapter(struct device *dev)
 {
 	struct tcm_loop_hba *tl_hba = to_tcm_loop_hba(dev);
 
-	kfree(tl_hba->tl_hba_qobj);
 	kfree(tl_hba);
 }
 

@@ -41,5 +41,3 @@ extern int tcm_loop_queue_tm_rsp(struct se_cmd *);
 extern u16 tcm_loop_set_fabric_sense_len(struct se_cmd *, u32);
 extern u16 tcm_loop_get_fabric_sense_len(void);
 extern u64 tcm_loop_pack_lun(unsigned int);
-
-extern int tcm_loop_processing_thread(void *);
