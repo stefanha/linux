@@ -51,7 +51,15 @@
  */
 #define ALUA_DEFAULT_TRANS_DELAY_MSECS			0
 #define ALUA_MAX_TRANS_DELAY_MSECS			30000 /* 30 seconds */
-
+/*
+ * Used by core_alua_update_tpg_primary_metadata() and
+ * core_alua_update_tpg_secondary_metadata()
+ */
+#define ALUA_METADATA_PATH_LEN				512
+/*
+ * Used by core_alua_update_tpg_secondary_metadata()
+ */
+#define ALUA_SECONDARY_METADATA_WWN_LEN			256
 
 extern struct se_global *se_global;
 
@@ -60,8 +68,8 @@ extern struct kmem_cache *t10_alua_lu_gp_mem_cache;
 extern struct kmem_cache *t10_alua_tg_pt_gp_cache;
 extern struct kmem_cache *t10_alua_tg_pt_gp_mem_cache;
 
-extern int core_scsi3_emulate_report_target_port_groups(struct se_cmd *);
-extern int core_scsi3_emulate_set_target_port_groups(struct se_cmd *);
+extern int core_emulate_report_target_port_groups(struct se_cmd *);
+extern int core_emulate_set_target_port_groups(struct se_cmd *);
 extern int core_alua_check_transition(int, int *);
 extern int core_alua_check_nonop_delay(struct se_cmd *);
 extern int core_alua_do_transition_tg_pt(struct t10_alua_tg_pt_gp *,

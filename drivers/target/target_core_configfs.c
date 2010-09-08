@@ -2250,7 +2250,7 @@ static struct config_group *target_core_alua_create_lu_gp(
 	struct config_item *alua_lu_gp_ci = NULL;
 
 	lu_gp = core_alua_allocate_lu_gp(name, 0);
-	if (!(lu_gp))
+	if (IS_ERR(lu_gp))
 		return NULL;
 
 	alua_lu_gp_cg = &lu_gp->lu_gp_group;
@@ -3199,7 +3199,7 @@ int target_core_init_configfs(void)
 	 * Add core/alua/lu_gps/default_lu_gp
 	 */
 	lu_gp = core_alua_allocate_lu_gp("default_lu_gp", 1);
-	if (!(lu_gp))
+	if (IS_ERR(lu_gp))
 		goto out_global;
 
 	lu_gp_cg = &se_global->alua_lu_gps_group;

@@ -5447,7 +5447,7 @@ static int transport_generic_cmd_sequencer(
 				cmd->transport_emulate_cdb =
 				(T10_ALUA(su_dev)->alua_type ==
 				 SPC3_ALUA_EMULATED) ?
-				&core_scsi3_emulate_report_target_port_groups :
+				&core_emulate_report_target_port_groups :
 				NULL;
 			}
 			size = (cdb[6] << 24) | (cdb[7] << 16) |
@@ -5547,7 +5547,7 @@ static int transport_generic_cmd_sequencer(
 				cmd->transport_emulate_cdb =
 				(T10_ALUA(su_dev)->alua_type ==
 					SPC3_ALUA_EMULATED) ?
-				&core_scsi3_emulate_set_target_port_groups :
+				&core_emulate_set_target_port_groups :
 				NULL;
 			}
 
