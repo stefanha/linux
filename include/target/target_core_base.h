@@ -41,7 +41,7 @@
 #define INQUIRY_VPD_DEVICE_IDENTIFIER_LEN	254
 
 /* struct se_cmd->data_direction */
-enum {
+enum se_direction_table {
 	SE_DIRECTION_NONE	= 0,
 	SE_DIRECTION_READ	= 1,
 	SE_DIRECTION_WRITE	= 2,
@@ -49,13 +49,13 @@ enum {
 };
 
 /* struct se_hba->hba_flags */
-enum {
+enum hba_flags_table {
 	HBA_FLAGS_INTERNAL_USE	= 0x01,
 	HBA_FLAGS_PSCSI_MODE	= 0x02,
 };
 
 /* struct se_hba->hba_status and iscsi_tpg_hba->thba_status */
-enum {
+enum hba_status_table {
 	HBA_STATUS_FREE		= 0x01,
 	HBA_STATUS_ACTIVE	= 0x02,
 	HBA_STATUS_INACTIVE	= 0x04,
@@ -63,25 +63,25 @@ enum {
 };
 
 /* struct se_lun->lun_status */
-enum {
+enum transport_lun_status_table {
 	TRANSPORT_LUN_STATUS_FREE = 0,
 	TRANSPORT_LUN_STATUS_ACTIVE = 1,
 };
 
 /* struct se_portal_group->se_tpg_type */
-enum {
+enum transport_tpg_type_table {
 	TRANSPORT_TPG_TYPE_NORMAL = 0,
 	TRANSPORT_TPG_TYPE_DISCOVERY = 1,
 };
 
 /* Used for generate timer flags */
-enum {
+enum timer_flags_table {
 	TF_RUNNING	= 0x01,
 	TF_STOP		= 0x02,
 };
 
 /* Special transport agnostic struct se_cmd->t_states */
-enum {
+enum transport_state_table {
 	TRANSPORT_NO_STATE	= 0,
 	TRANSPORT_NEW_CMD	= 1,
 	TRANSPORT_DEFERRED_CMD	= 2,
@@ -102,7 +102,7 @@ enum {
 };	
 
 /* Used for struct se_cmd->se_cmd_flags */
-enum {
+enum se_cmd_flags_table {
 	SCF_SUPPORTED_SAM_OPCODE	= 0x00000001,
 	SCF_TRANSPORT_TASK_SENSE	= 0x00000002,
 	SCF_EMULATED_TASK_SENSE		= 0x00000004,
@@ -132,7 +132,7 @@ enum {
 };
 	
 /* struct se_device->type for known subsystem plugins */
-enum {
+enum se_device_type_table {
 	PSCSI		= 1,
 	STGT		= 2,
 	PATA		= 3,
@@ -146,7 +146,7 @@ enum {
 };
 
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
-enum {
+enum transport_lunflags_table {
 	TRANSPORT_LUNFLAGS_NO_ACCESS		= 0x00,
 	TRANSPORT_LUNFLAGS_INITIATOR_ACCESS	= 0x01,
 	TRANSPORT_LUNFLAGS_READ_ONLY		= 0x02,
@@ -154,7 +154,7 @@ enum {
 };
 
 /* struct se_device->dev_status */
-enum {
+enum transport_device_status_table {
 	TRANSPORT_DEVICE_ACTIVATED		= 0x01,
 	TRANSPORT_DEVICE_DEACTIVATED		= 0x02,
 	TRANSPORT_DEVICE_QUEUE_FULL		= 0x04,
@@ -167,7 +167,7 @@ enum {
  * Used by transport_send_check_condition_and_sense() and se_cmd->scsi_sense_reason
  * to signal which ASC/ASCQ sense payload should be built.
  */
-enum {
+enum tcm_sense_reason_table {
 	TCM_NON_EXISTENT_LUN			= 0x01,
 	TCM_UNSUPPORTED_SCSI_OPCODE		= 0x02,
 	TCM_INCORRECT_AMOUNT_OF_DATA		= 0x03,
@@ -546,15 +546,17 @@ struct se_cmd {
 	u16			scsi_sense_length;
 	/* Delay for ALUA Active/NonOptimized state access in milliseconds */
 	int			alua_nonop_delay;
+	/* See enum se_direction_table */
 	int			data_direction;
 	/* For SAM Task Attribute */
 	int			sam_task_attr;
-	/* Transport protocol dependent state */
+	/* Transport protocol dependent state, see transport_state_table */
 	int			t_state;
 	/* Transport protocol dependent state for out of order CmdSNs */
 	int			deferred_t_state;
 	/* Transport specific error status */
 	int			transport_error_status;
+	/* See se_cmd_flags_table */
 	u32			se_cmd_flags;
 	u32			se_ordered_id;
 	/* Total size in bytes associated with command */
@@ -698,6 +700,7 @@ struct se_lun_acl {
 
 struct se_dev_entry {
 	int			def_pr_registered:1;
+	/* See transport_lunflags_table */
 	u32			lun_flags;
 	u32			deve_cmds;
 	u32			mapped_lun;
@@ -794,7 +797,7 @@ struct se_subsystem_dev {
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
 
 struct se_device {
-	/* Type of disk transport used for device */
+	/* Type of disk transport used for device, see se_device_type_table */
 	u8			type;
 	/* Set to 1 if thread is NOT sleeping on thread_sem */
 	u8			thread_active;
@@ -805,6 +808,7 @@ struct se_device {
 	u32			dev_cur_ordered_id;
 	u32			dev_flags;
 	u32			dev_port_count;
+	/* See transport_device_status_table */
 	u32			dev_status;
 	u32			dev_tcq_window_closed;
 	/* Physical device queue depth */
@@ -887,8 +891,10 @@ struct se_device {
 
 struct se_hba {
 	u16			hba_tpgt;
+	/* See hba_status_table */
 	u32			hba_status;
 	u32			hba_id;
+	/* See hba_flags_table */
 	u32			hba_flags;
 	/* Virtual iSCSI devices attached. */
 	u32			dev_count;
@@ -915,6 +921,7 @@ struct se_hba {
 #define SE_HBA(d)		((struct se_hba *)(d)->se_hba)
 
 struct se_lun {
+	/* See transport_lun_status_table */
 	int			lun_status;
 	u32			lun_access;
 	u32			lun_flags;
@@ -960,7 +967,7 @@ struct se_tpg_np {
 } ____cacheline_aligned;
 
 struct se_portal_group {
-	/* Type of target portal group */
+	/* Type of target portal group, see transport_tpg_type_table */
 	int			se_tpg_type;
 	/* Number of ACLed Initiator Nodes for this TPG */
 	u32			num_node_acls;
