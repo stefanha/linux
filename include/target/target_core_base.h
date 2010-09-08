@@ -11,57 +11,33 @@
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
 /* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
-#define SCSI_CDB_SIZE			16
-#define TRANSPORT_IOV_DATA_BUFFER	5
-
+#define SCSI_CDB_SIZE				16
+/* Used by transport_generic_allocate_iovecs() */
+#define TRANSPORT_IOV_DATA_BUFFER		5
 /* Maximum Number of LUNs per Target Portal Group */
-#define TRANSPORT_MAX_LUNS_PER_TPG	    256
-
+#define TRANSPORT_MAX_LUNS_PER_TPG		256
 /* From include/scsi/scsi_cmnd.h:SCSI_SENSE_BUFFERSIZE */
-#define TRANSPORT_SENSE_BUFFER              SCSI_SENSE_BUFFERSIZE
-
+#define TRANSPORT_SENSE_BUFFER			SCSI_SENSE_BUFFERSIZE
+/* Used by transport_send_check_condition_and_sense() */
 #define SPC_SENSE_KEY_OFFSET			2
 #define SPC_ASC_KEY_OFFSET			12
 #define SPC_ASCQ_KEY_OFFSET			13
-
 /* Currently same as ISCSI_IQN_LEN */
 #define TRANSPORT_IQN_LEN			224
+/* Used by target_core_store_alua_lu_gp() and target_core_alua_lu_gp_show_attr_members() */
 #define LU_GROUP_NAME_BUF			256
+/* Used by core_alua_store_tg_pt_gp_info() and target_core_alua_tg_pt_gp_show_attr_members() */
 #define TG_PT_GROUP_NAME_BUF			256
 /* Used to parse VPD into struct t10_vpd */
 #define VPD_TMP_BUF_SIZE			128
-/* Used for target_core-pscsi.c:pscsi_transport_complete() */
-#define VPD_BUF_LEN				256
-/* Used for struct se_subsystem_dev-->se_dev_alias, must be less than
-   PAGE_SIZE */
-#define SE_DEV_ALIAS_LEN			512
-/* Used for struct se_subsystem_dev->se_dev_udev_path[], must be less than
-   PAGE_SIZE */
-#define SE_UDEV_PATH_LEN			512
-/* Used for struct se_dev_snap_attrib->contact */
-#define SNAP_CONTACT_LEN			128
-/* Used for struct se_dev_snap_attrib->lv_group */
-#define SNAP_GROUP_LEN				128
-/* Used for struct se_dev_snap_attrib->lvc_size */
-#define SNAP_LVC_LEN				32
-/* Used by struct t10_reservation_template->pr_[i,t]_port[] */
-#define PR_APTPL_MAX_IPORT_LEN			256
-#define PR_APTPL_MAX_TPORT_LEN			256
-/* Used by struct t10_reservation_template->pr_aptpl_buf_len */
-#define PR_APTPL_BUF_LEN			8192
-/* Used by struct t10_alua_tg_pt_gp->tg_pt_gp_md_buf_len */
-#define ALUA_MD_BUF_LEN				1024
-/* Used by struct t10_pr_registration->pr_reg_isid */
-#define PR_REG_ISID_LEN				16
-/* PR_REG_ISID_LEN + ',i,0x' */
-#define PR_REG_ISID_ID_LEN			(PR_REG_ISID_LEN + 5)
-
-/* used by PSCSI and iBlock Transport drivers */
+/* Used by transport_generic_cmd_sequencer() */
 #define READ_BLOCK_LEN          		6
 #define READ_CAP_LEN            		8
 #define READ_POSITION_LEN       		20
 #define INQUIRY_LEN				36
+/* Used by transport_get_inquiry_vpd_serial() */
 #define INQUIRY_VPD_SERIAL_LEN			254
+/* Used by transport_get_inquiry_vpd_device_ident() */
 #define INQUIRY_VPD_DEVICE_IDENTIFIER_LEN	254
 
 /* struct se_cmd->data_direction */
@@ -280,6 +256,8 @@ struct t10_alua_tg_pt_gp {
 	int	tg_pt_gp_trans_delay_msecs;
 	int	tg_pt_gp_pref;
 	int	tg_pt_gp_write_metadata;
+	/* Used by struct t10_alua_tg_pt_gp->tg_pt_gp_md_buf_len */
+#define ALUA_MD_BUF_LEN				1024
 	u32	tg_pt_gp_md_buf_len;
 	u32	tg_pt_gp_members;
 	atomic_t tg_pt_gp_alua_access_state;
@@ -336,10 +314,15 @@ typedef enum {
 
 struct t10_pr_registration {
 	/* Used for fabrics that contain WWN+ISID */
+#define PR_REG_ISID_LEN				16
+	/* PR_REG_ISID_LEN + ',i,0x' */
+#define PR_REG_ISID_ID_LEN			(PR_REG_ISID_LEN + 5)
 	char pr_reg_isid[PR_REG_ISID_LEN];
 	/* Used during APTPL metadata reading */
+#define PR_APTPL_MAX_IPORT_LEN			256
 	unsigned char pr_iport[PR_APTPL_MAX_IPORT_LEN];
 	/* Used during APTPL metadata reading */
+#define PR_APTPL_MAX_TPORT_LEN			256
 	unsigned char pr_tport[PR_APTPL_MAX_TPORT_LEN];
 	/* For writing out live meta data */
 	unsigned char *pr_aptpl_buf;
@@ -388,6 +371,8 @@ struct t10_reservation_template {
 	/* Activate Persistence across Target Power Loss enabled
 	 * for SCSI device */
 	int pr_aptpl_active;
+	/* Used by struct t10_reservation_template->pr_aptpl_buf_len */
+#define PR_APTPL_BUF_LEN			8192
 	u32 pr_aptpl_buf_len;
 	u32 pr_generation;
 	t10_reservations_index_t res_type;
@@ -757,9 +742,11 @@ struct se_dev_attrib {
 } ____cacheline_aligned;
 
 struct se_dev_snap_attrib {
+#define SNAP_CONTACT_LEN		128
 	unsigned char	contact[SNAP_CONTACT_LEN];
+#define SNAP_GROUP_LEN			128
 	unsigned char	lv_group[SNAP_GROUP_LEN];
-	/* in lvcreate --size shorthand */
+#define SNAP_LVC_LEN			32
 	unsigned char	lvc_size[SNAP_LVC_LEN];
 	pid_t		pid;
 	int		enabled;
@@ -774,7 +761,11 @@ struct se_dev_snap_attrib {
 } ____cacheline_aligned;
 
 struct se_subsystem_dev {
+/* Used for struct se_subsystem_dev-->se_dev_alias, must be less than PAGE_SIZE */
+#define SE_DEV_ALIAS_LEN		512
 	unsigned char	se_dev_alias[SE_DEV_ALIAS_LEN];
+/* Used for struct se_subsystem_dev->se_dev_udev_path[], must be less than PAGE_SIZE */
+#define SE_UDEV_PATH_LEN		512
 	unsigned char	se_dev_udev_path[SE_UDEV_PATH_LEN];
 	u32		su_dev_flags;
 	struct se_hba *se_dev_hba;
