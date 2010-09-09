@@ -1289,7 +1289,7 @@ static void __core_scsi3_free_registration(
 		spin_unlock(&pr_tmpl->registration_lock);
 		printk("SPC-3 PR [%s] waiting for pr_res_holders\n",
 				tfo->get_fabric_name());
-		msleep(10);
+		cpu_relax();
 		spin_lock(&pr_tmpl->registration_lock);
 	}
 

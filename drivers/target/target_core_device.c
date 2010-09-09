@@ -532,7 +532,7 @@ int core_update_device_list_for_node(
 	 */
 	spin_unlock_irq(&nacl->device_list_lock);
 	while (atomic_read(&deve->pr_ref_count) != 0)
-		msleep(100);
+		cpu_relax();
 	spin_lock_irq(&nacl->device_list_lock);
 	/*
 	 * Disable struct se_dev_entry LUN ACL mapping
@@ -687,7 +687,7 @@ void core_release_port(struct se_device *dev, struct se_port *port)
 	 */
 	spin_unlock(&dev->se_port_lock);
 	if (atomic_read(&port->sep_tg_pt_ref_cnt))
-		msleep(100);
+		cpu_relax();
 	spin_lock(&dev->se_port_lock);
 
 	core_alua_free_tg_pt_gp_mem(port);
@@ -965,7 +965,7 @@ void se_dev_stop(struct se_device *dev)
 	spin_unlock(&hba->device_lock);
 
 	while (atomic_read(&hba->dev_mib_access_count))
-		msleep(10);
+		cpu_relax();
 }
 
 int se_dev_check_online(struct se_device *dev)

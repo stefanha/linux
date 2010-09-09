@@ -315,13 +315,13 @@ EXPORT_SYMBOL(core_tpg_check_initiator_node_acl);
 void core_tpg_wait_for_nacl_pr_ref(struct se_node_acl *nacl)
 {
 	while (atomic_read(&nacl->acl_pr_ref_count) != 0)
-		msleep(100);
+		cpu_relax();
 }
 
 void core_tpg_wait_for_mib_ref(struct se_node_acl *nacl)
 {
 	while (atomic_read(&nacl->mib_ref_count) != 0)
-		msleep(100);
+		cpu_relax();
 }
 
 void core_tpg_clear_object_luns(struct se_portal_group *tpg)
@@ -713,7 +713,7 @@ int core_tpg_deregister(struct se_portal_group *se_tpg)
 	spin_unlock_bh(&se_global->se_tpg_lock);
 
 	while (atomic_read(&se_tpg->tpg_pr_ref_count) != 0)
-		msleep(100);
+		cpu_relax();
 
 	if (se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL)
 		core_tpg_release_virtual_lun0(se_tpg);

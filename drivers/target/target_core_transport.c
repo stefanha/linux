@@ -750,7 +750,7 @@ void transport_deregister_session(struct se_session *se_sess)
 	 * scsi_att_intr_port_seq_show()
 	 */
 	while (atomic_read(&se_sess->mib_ref_count) != 0)
-		msleep(100);
+		cpu_relax();
 
 	spin_lock_bh(&se_tpg->session_lock);
 	list_del(&se_sess->sess_list);
