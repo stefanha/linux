@@ -443,7 +443,7 @@ static inline int iscsi_handle_recovery_datain(
 {
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_datain_req *dr;
-	struct se_cmd *se_cmd = cmd->se_cmd;
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 
 	if (!(atomic_read(&T_TASK(se_cmd)->t_transport_complete))) {
 		printk(KERN_ERR "Ignoring ITT: 0x%08x Data SNACK\n",
@@ -991,7 +991,7 @@ int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
  */
 int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 {
-	struct se_cmd *se_cmd = cmd->se_cmd;
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	int lr = 0;
 
 	spin_lock_bh(&cmd->istate_lock);
@@ -1040,7 +1040,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 			if (cmd->cmd_flags & ICF_GOT_LAST_DATAOUT) {
 				spin_unlock_bh(&cmd->istate_lock);
 				return transport_generic_handle_data(
-						cmd->se_cmd);
+						&cmd->se_cmd);
 			}
 			spin_unlock_bh(&cmd->istate_lock);
 
@@ -1079,7 +1079,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 			iscsi_start_dataout_timer(cmd, CONN(cmd));
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
-		return transport_generic_handle_cdb(cmd->se_cmd);
+		return transport_generic_handle_cdb(&cmd->se_cmd);
 
 	case ISCSI_INIT_NOP_OUT:
 	case ISCSI_INIT_TEXT_CMND:

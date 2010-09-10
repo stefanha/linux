@@ -1170,18 +1170,22 @@ char *iscsi_get_fabric_name(void)
 
 struct iscsi_cmd *iscsi_get_cmd(struct se_cmd *se_cmd)
 {
-	return (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	return cmd;
 }
 
 u32 iscsi_get_task_tag(struct se_cmd *se_cmd)
 {
-	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
 	return cmd->init_task_tag;
 }
 
 int iscsi_get_cmd_state(struct se_cmd *se_cmd)
 {
-	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
 	return cmd->i_state;
 }
 
@@ -4294,6 +4298,7 @@ int iscsi_target_tx_thread(void *arg)
 	struct iscsi_cmd *cmd = NULL;
 	struct iscsi_conn *conn;
 	struct iscsi_queue_req *qr = NULL;
+	struct se_cmd *se_cmd;
 	struct se_thread_set *ts = (struct se_thread_set *) arg;
 	struct se_unmap_sg unmap_sg;
 
@@ -4352,11 +4357,12 @@ get_immediate:
 				 * Determine if a struct se_cmd is assoicated with
 				 * this struct iscsi_cmd.
 				 */
-				if (!(SE_CMD(cmd)))
+				if (!(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) &&
+				    !(cmd->tmr_req))
 					iscsi_release_cmd_to_pool(cmd);
 				else
-					transport_generic_free_cmd(
-							SE_CMD(cmd), 1, 1, 0);
+					transport_generic_free_cmd(SE_CMD(cmd),
+								1, 1, 0);
 				goto get_immediate;
 			case ISTATE_SEND_NOPIN_WANT_RESPONSE:
 				spin_unlock_bh(&cmd->istate_lock);
@@ -4491,8 +4497,10 @@ check_rsp_state:
 				goto transport_err;
 			}
 
+			se_cmd = &cmd->se_cmd;
+
 			if (map_sg && !CONN_OPS(conn)->IFMarker &&
-			    T_TASK(cmd->se_cmd)->t_tasks_se_num) {
+			    T_TASK(se_cmd)->t_tasks_se_num) {
 				SE_CMD(cmd)->transport_map_SG_segments(&unmap_sg);
 				if (iscsi_fe_sendpage_sg(&unmap_sg, conn) < 0) {
 					conn->tx_response_queue = 0;
@@ -4816,10 +4824,9 @@ static void iscsi_release_commands_from_conn(struct iscsi_conn *conn)
 			 * transport_get_lun_for_cmd() failing from
 			 * iscsi_get_lun_for_cmd() in iscsi_handle_scsi_cmd().
 			 */
-			if (cmd->tmr_req && se_cmd &&
-			    se_cmd->transport_wait_for_tasks)
+			if (cmd->tmr_req && se_cmd->transport_wait_for_tasks)
 				se_cmd->transport_wait_for_tasks(se_cmd, 1, 1);
-			else if (se_cmd)
+			else if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD)
 				transport_release_cmd_to_pool(se_cmd);
 			else
 				__iscsi_release_cmd_to_pool(cmd, sess);

@@ -71,11 +71,6 @@ u8 iscsi_tmr_abort_task(
 			(hdr->ref_cmd_sn <= SESS(conn)->max_cmd_sn)) ?
 				FUNCTION_COMPLETE : TASK_DOES_NOT_EXIST;
 	}
-	if (!(ref_cmd->se_cmd)) {
-		printk(KERN_ERR "ref_cmd->se_cmd for RefTaskTag: 0x%08x is"
-			" NULL!\n", hdr->ref_task_tag);
-		return TASK_DOES_NOT_EXIST;
-	}
 	if (ref_cmd->cmd_sn != hdr->ref_cmd_sn) {
 		printk(KERN_ERR "RefCmdSN 0x%08x does not equal"
 			" task's CmdSN 0x%08x. Rejecting ABORT_TASK.\n",
@@ -84,7 +79,7 @@ u8 iscsi_tmr_abort_task(
 	}
 
 	se_tmr->ref_task_tag		= hdr->ref_task_tag;
-	se_tmr->ref_cmd			= ref_cmd->se_cmd;
+	se_tmr->ref_cmd			= &ref_cmd->se_cmd;
 	se_tmr->ref_task_lun		= hdr->lun;
 	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
 	tmr_req->exp_data_sn		= hdr->exp_data_sn;
@@ -182,10 +177,6 @@ u8 iscsi_tmr_task_reassign(
 			" connection recovery command list.\n",
 				hdr->ref_task_tag);
 		return TASK_DOES_NOT_EXIST;
-	} else if (!(ref_cmd->se_cmd)) {
-		printk(KERN_ERR "ref_cmd->se_cmd for RefTaskTag: 0x%08x is"
-			" NULL!\n", hdr->ref_task_tag);
-		return TASK_DOES_NOT_EXIST;
 	}
 	/*
 	 * Temporary check to prevent connection recovery for
@@ -200,7 +191,7 @@ u8 iscsi_tmr_task_reassign(
 	}
 
 	se_tmr->ref_task_tag		= hdr->ref_task_tag;
-	se_tmr->ref_cmd			= ref_cmd->se_cmd;
+	se_tmr->ref_cmd			= &ref_cmd->se_cmd;
 	se_tmr->ref_task_lun		= hdr->lun;
 	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
 	tmr_req->exp_data_sn		= hdr->exp_data_sn;
@@ -247,7 +238,7 @@ static int iscsi_task_reassign_complete_nop_out(
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
@@ -433,7 +424,7 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
@@ -493,7 +484,7 @@ static int iscsi_task_reassign_complete(
 		return -1;
 	}
 	se_cmd = se_tmr->ref_cmd;
-	cmd = se_cmd->se_fabric_cmd_ptr;
+	cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
 	cmd->conn = conn;
 
@@ -633,7 +624,7 @@ int iscsi_task_reassign_prepare_write(
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	struct iscsi_cmd *cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 	struct iscsi_pdu *pdu = NULL;
 	struct iscsi_r2t *r2t = NULL, *r2t_tmp;
 	int first_incomplete_r2t = 1, i = 0;
@@ -869,7 +860,7 @@ int iscsi_check_task_reassign_expdatasn(
 {
 	struct se_tmr_req *se_tmr = tmr_req->se_tmr_req;
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
-	struct iscsi_cmd *ref_cmd = (struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct iscsi_cmd *ref_cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
 	if (ref_cmd->iscsi_opcode != ISCSI_INIT_SCSI_CMND)
 		return 0;

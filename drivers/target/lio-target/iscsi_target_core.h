@@ -5,6 +5,7 @@
 #include <linux/configfs.h>
 #include <net/sock.h>
 #include <net/tcp.h>
+#include <scsi/scsi_cmnd.h>
 #include <iscsi_target_version.h>	    /* get version definition */
 
 #include <target/target_core_base.h>
@@ -29,6 +30,8 @@
 #define ISCSI_MAX_TPGS			64
 /* Size of the Network Device Name Buffer */
 #define ISCSI_NETDEV_NAME_SIZE		12
+/* Size of iSCSI specific sense buffer */
+#define ISCSI_SENSE_BUFFER_LEN		TRANSPORT_SENSE_BUFFER + 2
 
 #include <iscsi_target_mib.h>
 
@@ -487,10 +490,13 @@ struct iscsi_cmd {
 	struct iscsi_cmd	*t_next;
 	/* Previous command in DAS transport list */
 	struct iscsi_cmd	*t_prev;
-	struct se_cmd		*se_cmd;
+	/* The TCM I/O descriptor that is accessed via container_of() */
+	struct se_cmd		se_cmd;
+	/* Sense buffer that will be mapped into outgoing status */
+	unsigned char		sense_buffer[ISCSI_SENSE_BUFFER_LEN];
 }  ____cacheline_aligned;
 
-#define SE_CMD(cmd)		((struct se_cmd *)(cmd)->se_cmd)
+#define SE_CMD(cmd)		(&(cmd)->se_cmd)
 
 #include <iscsi_seq_and_pdu_list.h>
 

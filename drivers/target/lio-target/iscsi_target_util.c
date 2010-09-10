@@ -277,6 +277,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd(
 	int iscsi_task_attr)
 {
 	struct iscsi_cmd *cmd;
+	struct se_cmd *se_cmd;
 	int sam_task_attr;
 
 	cmd = iscsi_allocate_cmd(conn);
@@ -302,21 +303,15 @@ struct iscsi_cmd *iscsi_allocate_se_cmd(
 			" TASK_ATTR_SIMPLE\n", iscsi_task_attr);
 		sam_task_attr = TASK_ATTR_SIMPLE;
 	}
-	/*
-	 * Use struct target_fabric_configfs->tf_ops for
-	 * lio_target_fabric_configfs
-	 */
-	cmd->se_cmd = transport_alloc_se_cmd(
-			&lio_target_fabric_configfs->tf_ops,
-			SESS(conn)->se_sess, (void *)cmd, data_length,
-			data_direction, sam_task_attr);
-	if (!(cmd->se_cmd))
-		goto out;
 
+	se_cmd = &cmd->se_cmd;
+	/*
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
+	 */
+	transport_init_se_cmd(se_cmd, &lio_target_fabric_configfs->tf_ops,
+			SESS(conn)->se_sess, data_length, data_direction,
+			sam_task_attr, &cmd->sense_buffer[0]);
 	return cmd;
-out:
-	iscsi_release_cmd_to_pool(cmd);
-	return NULL;
 }
 
 /*	iscsi_allocate_tmr_req():
@@ -328,7 +323,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	u8 function)
 {
 	struct iscsi_cmd *cmd;
-	struct se_cmd *se_cmd = NULL;
+	struct se_cmd *se_cmd;
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
@@ -349,14 +344,13 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	if (function == TASK_REASSIGN)
 		return cmd;
 
-	cmd->se_cmd = transport_alloc_se_cmd(
-				&lio_target_fabric_configfs->tf_ops,
-				SESS(conn)->se_sess, (void *)cmd, 0,
-				SE_DIRECTION_NONE, TASK_ATTR_SIMPLE);
-	if (!(cmd->se_cmd))
-		goto out;
-
-	se_cmd = cmd->se_cmd;
+	se_cmd = &cmd->se_cmd;
+	/*
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
+	 */
+	transport_init_se_cmd(se_cmd, &lio_target_fabric_configfs->tf_ops,
+				SESS(conn)->se_sess, 0, SE_DIRECTION_NONE,
+				TASK_ATTR_SIMPLE, &cmd->sense_buffer[0]);
 
 	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd,
 				(void *)cmd->tmr_req, function);
@@ -1030,7 +1024,9 @@ void iscsi_release_cmd_direct(struct iscsi_cmd *cmd)
 
 void lio_release_cmd_direct(struct se_cmd *se_cmd)
 {
-	iscsi_release_cmd_direct((struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr);
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	iscsi_release_cmd_direct(cmd);
 }
 
 /*	__iscsi_release_cmd_to_pool():
@@ -1074,7 +1070,9 @@ void iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd)
 
 void lio_release_cmd_to_pool(struct se_cmd *se_cmd)
 {
-	iscsi_release_cmd_to_pool((struct iscsi_cmd *)se_cmd->se_fabric_cmd_ptr);
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	iscsi_release_cmd_to_pool(cmd);
 }
 
 /*	iscsi_pack_lun():
