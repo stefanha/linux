@@ -2738,6 +2738,7 @@ struct se_cmd *__transport_alloc_se_cmd(
 	int task_attr)
 {
 	struct se_cmd *cmd;
+	unsigned char *sense_buffer;
 	int gfp_type = (in_interrupt()) ? GFP_ATOMIC : GFP_KERNEL;
 
 	if (data_direction == SE_DIRECTION_BIDI) {
@@ -2750,27 +2751,50 @@ struct se_cmd *__transport_alloc_se_cmd(
 		printk(KERN_ERR "kmem_cache_alloc() failed for se_cmd_cache\n");
 		return ERR_PTR(-ENOMEM);
 	}
+
+	sense_buffer = kzalloc(
+			TRANSPORT_SENSE_BUFFER + tfo->get_fabric_sense_len(),
+			gfp_type);
+	if (!(sense_buffer)) {
+		printk(KERN_ERR "Unable to allocate memory for"
+			" cmd->sense_buffer\n");
+		kmem_cache_free(se_cmd_cache, cmd);
+		return NULL;
+	}
+	/*
+	 * Initialize the new struct se_cmd descriptor
+	 */
+	transport_init_se_cmd(cmd, tfo, se_sess, data_length, data_direction,
+			task_attr, sense_buffer);
+	/*
+	 * Setup the se_fabric_cmd_ptr assignment which will signal
+	 * TCM allocation of struct se_cmd in the release and free codepaths
+	 */
+	cmd->se_fabric_cmd_ptr = fabric_cmd_ptr;
+	return cmd;
+}
+
+/*
+ * Used by fabric modules containing a local struct se_cmd within their
+ * fabric dependent per I/O descriptor.
+ */
+void transport_init_se_cmd(
+	struct se_cmd *cmd,
+	struct target_core_fabric_ops *tfo,
+	struct se_session *se_sess,
+	u32 data_length,
+	int data_direction,
+	int task_attr,
+	unsigned char *sense_buffer)
+{
 	INIT_LIST_HEAD(&cmd->se_lun_list);
 	INIT_LIST_HEAD(&cmd->se_delayed_list);
 	INIT_LIST_HEAD(&cmd->se_ordered_list);
+	/*
+	 * Setup t_task pointer to t_task_backstore
+	 */
+	cmd->t_task = &cmd->t_task_backstore;
 
-	cmd->t_task = kzalloc(sizeof(struct se_transport_task), gfp_type);
-	if (!(cmd->t_task)) {
-		printk(KERN_ERR "Unable to allocate cmd->t_task\n");
-		kmem_cache_free(se_cmd_cache, cmd);
-		return NULL;
-	}
-
-	cmd->sense_buffer = kzalloc(
-			TRANSPORT_SENSE_BUFFER + tfo->get_fabric_sense_len(),
-			gfp_type);
-	if (!(cmd->sense_buffer)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-			" cmd->sense_buffer\n");
-		kfree(cmd->t_task);
-		kmem_cache_free(se_cmd_cache, cmd);
-		return NULL;
-	}
 	INIT_LIST_HEAD(&T_TASK(cmd)->t_task_list);
 	init_completion(&T_TASK(cmd)->transport_lun_fe_stop_comp);
 	init_completion(&T_TASK(cmd)->transport_lun_stop_comp);
@@ -2782,13 +2806,12 @@ struct se_cmd *__transport_alloc_se_cmd(
 
 	cmd->se_tfo = tfo;
 	cmd->se_sess = se_sess;
-	cmd->se_fabric_cmd_ptr = fabric_cmd_ptr;
 	cmd->data_length = data_length;
 	cmd->data_direction = data_direction;
 	cmd->sam_task_attr = task_attr;
-
-	return cmd;
+	cmd->sense_buffer = sense_buffer;
 }
+EXPORT_SYMBOL(transport_init_se_cmd);
 
 int transport_check_alloc_task_attr(struct se_cmd *cmd)
 {
@@ -2834,11 +2857,19 @@ void transport_free_se_cmd(
 {
 	if (se_cmd->se_tmr_req)
 		core_tmr_release_req(se_cmd->se_tmr_req);
-
+	/*
+	 * Release any optional TCM fabric dependent iovecs allocated by
+	 * transport_allocate_iovecs_for_cmd()
+	 */
 	kfree(se_cmd->iov_data);
-	kfree(se_cmd->sense_buffer);
-	kfree(se_cmd->t_task);
-	kmem_cache_free(se_cmd_cache, se_cmd);
+	/*
+	 * Only release the sense_buffer, t_task, and remaining se_cmd memory
+	 * if this descriptor was allocated with transport_alloc_se_cmd()
+	 */
+	if (se_cmd->se_fabric_cmd_ptr) {
+		kfree(se_cmd->sense_buffer);
+		kmem_cache_free(se_cmd_cache, se_cmd);
+	}
 }
 EXPORT_SYMBOL(transport_free_se_cmd);
 
@@ -5841,8 +5872,8 @@ static inline struct se_cmd *transport_alloc_passthrough_cmd(
 	u32 data_length,
 	int data_direction)
 {
-	return __transport_alloc_se_cmd(&passthrough_fabric_ops, NULL, NULL,
-			data_length, data_direction, TASK_ATTR_SIMPLE);
+	return __transport_alloc_se_cmd(&passthrough_fabric_ops, NULL,
+		(void *)1, data_length, data_direction, TASK_ATTR_SIMPLE);
 }
 
 static inline void transport_release_tasks(struct se_cmd *);
@@ -6346,6 +6377,22 @@ static inline int transport_dec_and_check(struct se_cmd *cmd)
 	return 0;
 }
 
+static inline void transport_release_se_cmd(struct se_cmd *cmd)
+{
+	/*
+	 * Determine if this struct se_cmd descriptor was allocated
+	 * with __transport_alloc_se_cmd(), or is a member of a
+	 * TCM fabric module dependent descriptor.
+	 */
+	if (cmd->se_fabric_cmd_ptr) {
+		CMD_TFO(cmd)->release_cmd_direct(cmd);
+		transport_free_se_cmd(cmd);
+	} else {
+		transport_free_se_cmd(cmd);
+		CMD_TFO(cmd)->release_cmd_direct(cmd);
+	}
+}
+
 void transport_release_fe_cmd(struct se_cmd *cmd)
 {
 	unsigned long flags;
@@ -6369,8 +6416,7 @@ free_pages:
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)
 		kfree(cmd->se_lun);
 
-	CMD_TFO(cmd)->release_cmd_direct(cmd);
-	transport_free_se_cmd(cmd);
+	transport_release_se_cmd(cmd);
 }
 
 /*	transport_generic_remove():
@@ -6417,8 +6463,7 @@ release_cmd:
 		if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)
 			kfree(cmd->se_lun);
 
-		CMD_TFO(cmd)->release_cmd_direct(cmd);
-		transport_free_se_cmd(cmd);
+		transport_release_se_cmd(cmd);
 	}
 
 	return 0;
@@ -7498,9 +7543,39 @@ void transport_release_cmd_to_pool(struct se_cmd *cmd)
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH)
 		kfree(cmd->se_lun);
 	/*
-	 * Release struct se_cmd->se_fabric_cmd_ptr in fabric
+	 * A NULL cmd->se_fabric_cmd_ptr signals that the TCM fabric module
+	 * is using struct se_cmd as part of it's internal fabric per I/O
+	 * descriptor
 	 */
-	CMD_TFO(cmd)->release_cmd_to_pool(cmd);
+	if (!(cmd->se_fabric_cmd_ptr)) {
+		transport_free_se_cmd(cmd);
+		/*
+		 * Make sure that this is only called for struct se_cmd
+		 * descriptors containing valid T_TASK(cmd) and CMD_TFO(cmd)
+		 * pointers
+		 */	
+		if ((T_TASK(cmd) && (CMD_TFO(cmd))))
+			CMD_TFO(cmd)->release_cmd_to_pool(cmd);
+		else {
+			printk(KERN_ERR "T_TASK(cmd) && (CMD_TFO(cmd) NULL for"
+				" se_fabric_cmd_ptr=NULL inside of"
+				" transport_release_cmd_to_pool()\n");
+			dump_stack();
+		}
+
+		return;
+	}
+	/*
+	 * Release explict allocated struct se_cmd->se_fabric_cmd_ptr in fabric
+	 */
+	if ((T_TASK(cmd) && (CMD_TFO(cmd))))
+		CMD_TFO(cmd)->release_cmd_to_pool(cmd);
+	else {
+		dump_stack();
+		printk(KERN_ERR "NULL T_TASK(cmd) && (CMD_TFO(cmd) for"
+			" se_fabric_cmd_ptr=1 inside of"
+			" transport_release_cmd_to_pool()\n");
+	}
 
 	transport_free_se_cmd(cmd);
 }

@@ -186,6 +186,10 @@ extern int transport_check_alloc_task_attr(struct se_cmd *);
 extern struct se_cmd *transport_alloc_se_cmd(struct target_core_fabric_ops *,
 					struct se_session *, void *,
 					u32, int, int);
+extern void transport_init_se_cmd(struct se_cmd *,
+					struct target_core_fabric_ops *,
+					struct se_session *, u32, int, int,
+					unsigned char *);
 extern void transport_free_se_cmd(struct se_cmd *);
 extern int transport_generic_allocate_tasks(struct se_cmd *, unsigned char *);
 extern int transport_generic_handle_cdb(struct se_cmd *);

@@ -584,10 +584,13 @@ struct se_cmd {
 	struct se_device	*se_obj_ptr;
 	struct se_device	*se_orig_obj_ptr;
 	struct se_lun		*se_lun;
+	/* Only used for internal passthrough and legacy TCM fabric modules */
 	void			*se_fabric_cmd_ptr;
 	struct se_session	*se_sess;
 	struct se_tmr_req	*se_tmr_req;
+	/* t_task is setup to t_task_backstore in transport_init_se_cmd() */
 	struct se_transport_task *t_task;
+	struct se_transport_task t_task_backstore;
 	struct target_core_fabric_ops *se_tfo;
 	int (*transport_add_cmd_to_queue)(struct se_cmd *, int);
 	int (*transport_allocate_resources)(struct se_cmd *, u32, u32);
