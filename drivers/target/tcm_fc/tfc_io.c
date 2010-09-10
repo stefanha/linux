@@ -64,7 +64,7 @@
  */
 int ft_queue_data_in(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 	struct se_transport_task *task;
 	struct fc_frame *fp = NULL;
 	struct fc_exch *ep;
@@ -187,7 +187,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
  */
 void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 {
-	struct se_cmd *se_cmd = cmd->se_cmd;
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	struct se_transport_task *task;
 	struct fc_frame_header *fh;
 	struct se_mem *mem;
