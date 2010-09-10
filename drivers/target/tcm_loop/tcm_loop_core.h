@@ -29,9 +29,11 @@ struct tcm_loop_cmd {
 	u32 sc_cmd_state;
 	/* Pointer to the CDB+Data descriptor from Linux/SCSI subsystem */
 	struct scsi_cmnd *sc;
-	/* Pointer to the TCM allocated struct se_cmd */
-	struct se_cmd *tl_se_cmd;
 	struct list_head *tl_cmd_list;
+	/* The TCM I/O descriptor that is accessed via container_of() */
+	struct se_cmd tl_se_cmd;
+	/* Sense buffer that will be mapped into outgoing status */
+	unsigned char tl_sense_buf[TRANSPORT_SENSE_BUFFER];
 };
 
 struct tcm_loop_tmr {

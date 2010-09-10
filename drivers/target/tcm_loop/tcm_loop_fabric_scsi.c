@@ -100,17 +100,14 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 		}
 	} else
 		sam_task_attr = TASK_ATTR_SIMPLE;
+
+	se_cmd = &tl_cmd->tl_se_cmd;
 	/*
-	 * Allocate the struct se_cmd descriptor from target_core_mod infrastructure
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
-	tl_cmd->tl_se_cmd = transport_alloc_se_cmd(se_tpg->se_tpg_tfo,
-			se_sess, (void *)tl_cmd, scsi_bufflen(sc),
-			data_direction, sam_task_attr);
-	if (!(tl_cmd->tl_se_cmd)) {
-		kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
-		return NULL;
-	}
-	se_cmd = tl_cmd->tl_se_cmd;
+	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
+			scsi_bufflen(sc), data_direction, sam_task_attr,
+			&tl_cmd->tl_sense_buf[0]);
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
@@ -136,7 +133,8 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
  */
 int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd = se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
 	struct scsi_cmnd *sc = tl_cmd->sc;
 	void *mem_ptr;
 	int ret;
@@ -206,12 +204,12 @@ void tcm_loop_check_stop_free(struct se_cmd *se_cmd)
 }
 
 /*
- * Called from struct target_core_fabric_ops->releastruct se_cmdo_pool()
+ * Called from struct target_core_fabric_ops->release_cmd_to_pool()
  */
 void tcm_loop_deallocate_core_cmd(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
 
 	kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
 }
@@ -417,15 +415,14 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 		goto release;
 	}
 	init_waitqueue_head(&tl_tmr->tl_tmr_wait);
+
+	se_cmd = &tl_cmd->tl_se_cmd;
 	/*
-	 * Allocate the struct se_cmd for a LUN_RESET TMR
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
-	tl_cmd->tl_se_cmd = transport_alloc_se_cmd(se_tpg->se_tpg_tfo,
-			se_sess, (void *)tl_cmd, 0, SE_DIRECTION_NONE,
-			TASK_ATTR_SIMPLE);
-	if (!(tl_cmd->tl_se_cmd))
-		goto release;
-	se_cmd = tl_cmd->tl_se_cmd;
+	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
+				SE_DIRECTION_NONE, TASK_ATTR_SIMPLE,
+				&tl_cmd->tl_sense_buf[0]);
 	/*
 	 * Allocate the LUN_RESET TMR
 	 */

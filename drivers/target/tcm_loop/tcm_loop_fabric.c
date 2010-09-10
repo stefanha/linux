@@ -305,8 +305,8 @@ u32 tcm_loop_get_task_tag(struct se_cmd *se_cmd)
 
 int tcm_loop_get_cmd_state(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+			struct tcm_loop_cmd, tl_se_cmd);
 
 	return tl_cmd->sc_cmd_state;
 }
@@ -376,8 +376,8 @@ int tcm_loop_write_pending_status(struct se_cmd *se_cmd)
 
 int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
 	struct scsi_cmnd *sc = tl_cmd->sc;
 
 	TL_CDB_DEBUG( "tcm_loop_queue_data_in() called for scsi_cmnd: %p"
@@ -398,8 +398,8 @@ int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 
 int tcm_loop_queue_status(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
 	struct scsi_cmnd *sc = tl_cmd->sc;
 
 	TL_CDB_DEBUG("tcm_loop_queue_status() called for scsi_cmnd: %p"
