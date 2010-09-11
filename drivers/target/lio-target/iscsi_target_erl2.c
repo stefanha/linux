@@ -38,7 +38,6 @@
 
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
-#include <iscsi_crc.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>

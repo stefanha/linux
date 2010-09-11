@@ -33,6 +33,7 @@
 #include <linux/smp_lock.h>
 #include <linux/in.h>
 #include <linux/inet.h>
+#include <linux/crypto.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/ipv6.h>
@@ -57,7 +58,7 @@
  *
  *
  */
-static void iscsi_login_init_conn(struct iscsi_conn *conn)
+static int iscsi_login_init_conn(struct iscsi_conn *conn)
 {
 	INIT_LIST_HEAD(&conn->conn_list);
 	INIT_LIST_HEAD(&conn->conn_cmd_list);
@@ -78,6 +79,27 @@ static void iscsi_login_init_conn(struct iscsi_conn *conn)
 	spin_lock_init(&conn->nopin_timer_lock);
 	spin_lock_init(&conn->response_queue_lock);
 	spin_lock_init(&conn->state_lock);
+	/*
+	 * Setup the RX and TX libcrypto contexts
+	 */
+	conn->conn_rx_hash.flags = 0;
+	conn->conn_rx_hash.tfm = crypto_alloc_hash("crc32c", 0,
+						CRYPTO_ALG_ASYNC);
+	if (IS_ERR(conn->conn_rx_hash.tfm)) {
+		printk(KERN_ERR "crypto_alloc_hash() failed for conn_rx_tfm\n");
+		return -ENOMEM;
+	}
+
+	conn->conn_tx_hash.flags = 0;
+	conn->conn_tx_hash.tfm = crypto_alloc_hash("crc32c", 0,
+						CRYPTO_ALG_ASYNC);
+	if (IS_ERR(conn->conn_tx_hash.tfm)) {	
+		printk(KERN_ERR "crypto_alloc_hash() failed for conn_tx_tfm\n");
+		crypto_free_hash(conn->conn_rx_hash.tfm);
+		return -ENOMEM;
+	}
+
+	return 0;
 }
 
 /*	iscsi_login_check_initiator_version():
@@ -1062,7 +1084,11 @@ get_new_sock:
 			" struct iscsi_conn_ops.\n");
 		goto new_sess_out;
 	}
-	iscsi_login_init_conn(conn);
+	/*
+	 * Perform the remaining iSCSI connection initialization items..
+	 */
+	if (iscsi_login_init_conn(conn) < 0)
+		goto new_sess_out;
 
 	memset(buffer, 0, ISCSI_HDR_LEN);
 	memset(&iov, 0, sizeof(struct iovec));
@@ -1281,6 +1307,11 @@ old_sess_out:
 			spin_unlock_bh(&SESS(conn)->conn_lock);
 		iscsi_dec_session_usage_count(SESS(conn));
 	}
+
+	if (conn->conn_rx_hash.tfm)
+		crypto_free_hash(conn->conn_rx_hash.tfm);
+	if (conn->conn_tx_hash.tfm)
+		crypto_free_hash(conn->conn_tx_hash.tfm);
 
 	kfree(conn->conn_ops);
 

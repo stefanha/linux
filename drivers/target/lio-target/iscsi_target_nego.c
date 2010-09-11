@@ -49,7 +49,6 @@
 #include <iscsi_target.h>
 #include <iscsi_auth_kernel.h>
 #include <iscsi_parameters.h>
-#include <iscsi_crc.h>
 
 #define MAX_LOGIN_PDUS	7
 

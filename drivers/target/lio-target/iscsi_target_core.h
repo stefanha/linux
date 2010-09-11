@@ -583,6 +583,9 @@ struct iscsi_conn {
 	spinlock_t		nopin_timer_lock;
 	spinlock_t		response_queue_lock;
 	spinlock_t		state_lock;
+	/* libcrypto RX and TX contexts for crc32c */
+	struct hash_desc	conn_rx_hash;
+	struct hash_desc	conn_tx_hash;
 	/* list_head of struct iscsi_cmd for this connection */
 	struct list_head	conn_cmd_list;
 	struct list_head	immed_queue_list;
