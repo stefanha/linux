@@ -753,6 +753,14 @@ static int iscsi_target_locate_portal(
 
 		SESS_OPS(sess)->SessionType = 1;
 		/*
+ 		 * Setup crc32c modules from libcrypto
+		 */
+		if (iscsi_login_setup_crypto(conn) < 0) {
+			printk(KERN_ERR "iscsi_login_setup_crypto() failed\n");
+			ret = -1;
+			goto out;
+		}
+		/*
 		 * Serialize access across the discovery struct iscsi_portal_group to
 		 * process login attempt.
 		 */
@@ -805,7 +813,14 @@ get_target:
 		goto out;
 	}
 	printk(KERN_INFO "Located Portal Group Object: %hu\n", conn->tpg->tpgt);
-
+	/*
+	 * Setup crc32c modules from libcrypto
+	 */
+	if (iscsi_login_setup_crypto(conn) < 0) {
+		printk(KERN_ERR "iscsi_login_setup_crypto() failed\n");
+		ret = -1;
+		goto out;
+	}
 	/*
 	 * Serialize access across the struct iscsi_portal_group to
 	 * process login attempt.

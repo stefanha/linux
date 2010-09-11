@@ -79,8 +79,49 @@ static int iscsi_login_init_conn(struct iscsi_conn *conn)
 	spin_lock_init(&conn->nopin_timer_lock);
 	spin_lock_init(&conn->response_queue_lock);
 	spin_lock_init(&conn->state_lock);
+
+	return 0;
+}
+
+/*
+ * Used by iscsi_target_nego.c:iscsi_target_locate_portal() to setup
+ * per struct iscsi_conn libcrypto contexts for crc32c and crc32-intel
+ */
+int iscsi_login_setup_crypto(struct iscsi_conn *conn)
+{
+	struct iscsi_portal_group *tpg = conn->tpg;
+#ifdef CONFIG_X86
 	/*
-	 * Setup the RX and TX libcrypto contexts
+	 * Check for the Nehalem optimized crc32c-intel instructions
+	 * This is only currently available while running on bare-metal,
+	 * and is not yet available with QEMU-KVM guests.
+	 */
+	if (cpu_has_xmm4_2 && ISCSI_TPG_ATTRIB(tpg)->crc32c_x86_offload) {
+		conn->conn_rx_hash.flags = 0;
+		conn->conn_rx_hash.tfm = crypto_alloc_hash("crc32c-intel", 0,
+						CRYPTO_ALG_ASYNC);
+		if (IS_ERR(conn->conn_rx_hash.tfm)) {
+			printk(KERN_ERR "crypto_alloc_hash() failed for conn_rx_tfm\n");
+			goto check_crc32c;
+		}
+
+		conn->conn_tx_hash.flags = 0;
+		conn->conn_tx_hash.tfm = crypto_alloc_hash("crc32c-intel", 0,
+						CRYPTO_ALG_ASYNC);
+		if (IS_ERR(conn->conn_tx_hash.tfm)) {   
+			printk(KERN_ERR "crypto_alloc_hash() failed for conn_tx_tfm\n");
+			crypto_free_hash(conn->conn_rx_hash.tfm);
+			goto check_crc32c;
+		}
+
+		printk(KERN_INFO "LIO-Target[0]: Using Nehalem crc32c-intel"
+					" offload instructions\n");
+		return 0;
+	}
+check_crc32c:
+#endif /* CONFIG_X86 */
+	/*
+	 * Setup slicing by 1x CRC32C algorithm for RX and TX libcrypto contexts
 	 */
 	conn->conn_rx_hash.flags = 0;
 	conn->conn_rx_hash.tfm = crypto_alloc_hash("crc32c", 0,
