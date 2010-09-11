@@ -1,8 +1,6 @@
 #ifndef ISCSI_PROTOCOL_H
 #define ISCSI_PROTOCOL_H
 
-#include <iscsi_linux_defs.h>
-
 #define ISCSI_PORT			3260
 #define ISCSI_HDR_LEN			48
 #define ISCSI_CDB_LEN			16
@@ -598,7 +596,7 @@ struct iscsi_targ_nop_in {
 	u32	header_digest;
 };
 
-typedef struct iscsi_conn_ops_s {
+struct iscsi_conn_ops {
 	u8	HeaderDigest;			/* [0,1] == [None,CRC32C] */
 	u8	DataDigest;			/* [0,1] == [None,CRC32C] */
 	u32	MaxRecvDataSegmentLength;	/* [512..2**24-1] */
@@ -606,9 +604,9 @@ typedef struct iscsi_conn_ops_s {
 	u8	IFMarker;			/* [0,1] == [No,Yes] */
 	u32	OFMarkInt;			/* [1..65535] */
 	u32	IFMarkInt;			/* [1..65535] */
-} iscsi_conn_ops_t;
+};
 
-typedef struct iscsi_sess_ops_s {
+struct iscsi_sess_ops {
 	char	InitiatorName[224];
 	char	InitiatorAlias[256];
 	char	TargetName[224];
@@ -627,6 +625,6 @@ typedef struct iscsi_sess_ops_s {
 	u8	DataSequenceInOrder;		/* [0,1] == [No,Yes] */
 	u8	ErrorRecoveryLevel;		/* [0..2] */
 	u8	SessionType;			/* [0,1] == [Normal,Discovery]*/
-} iscsi_sess_ops_t;
+};
 
 #endif /* ISCSI_PROTOCOL_H */

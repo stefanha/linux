@@ -1,15 +1,15 @@
 #ifndef ISCSI_SEQ_AND_PDU_LIST_H
 #define ISCSI_SEQ_AND_PDU_LIST_H
 
-/* iscsi_pdu_t->status */
+/* struct iscsi_pdu->status */
 #define DATAOUT_PDU_SENT			1
 
-/* iscsi_seq_t->type */
+/* struct iscsi_seq->type */
 #define SEQTYPE_IMMEDIATE			1
 #define SEQTYPE_UNSOLICITED			2
 #define SEQTYPE_NORMAL				3
 
-/* iscsi_seq_t->status */
+/* struct iscsi_seq->status */
 #define DATAOUT_SEQUENCE_GOT_R2T		1
 #define DATAOUT_SEQUENCE_WITHIN_COMMAND_RECOVERY 2
 #define DATAOUT_SEQUENCE_COMPLETE		3
@@ -20,35 +20,35 @@
 #define PDULIST_UNSOLICITED			3
 #define PDULIST_IMMEDIATE_AND_UNSOLICITED	4
 
-/* iscsi_pdu_t->type */
+/* struct iscsi_pdu->type */
 #define PDUTYPE_IMMEDIATE			1
 #define PDUTYPE_UNSOLICITED			2
 #define PDUTYPE_NORMAL				3
 
-/* iscsi_pdu_t->status */
+/* struct iscsi_pdu->status */
 #define ISCSI_PDU_NOT_RECEIVED			0
 #define ISCSI_PDU_RECEIVED_OK			1
 #define ISCSI_PDU_CRC_FAILED			2
 #define ISCSI_PDU_TIMED_OUT			3
 
-/* iscsi_build_list_t->randomize */
+/* struct iscsi_build_list->randomize */
 #define RANDOM_DATAIN_PDU_OFFSETS		0x01
 #define RANDOM_DATAIN_SEQ_OFFSETS		0x02
 #define RANDOM_DATAOUT_PDU_OFFSETS		0x04
 #define RANDOM_R2T_OFFSETS			0x08
 
-/* iscsi_build_list_t->data_direction */
+/* struct iscsi_build_list->data_direction */
 #define ISCSI_PDU_READ				0x01
 #define ISCSI_PDU_WRITE				0x02
 
-typedef struct iscsi_build_list_s {
+struct iscsi_build_list {
 	u8		data_direction;
 	u8		randomize;
 	u8		type;
 	u32		immediate_data_length;
-} iscsi_build_list_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_pdu_s {
+struct iscsi_pdu {
 	int		status;
 	int		type;
 	u8		flags;
@@ -57,9 +57,9 @@ typedef struct iscsi_pdu_s {
 	u32		offset;
 	u32		pdu_send_order;
 	u32		seq_no;
-} iscsi_pdu_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_seq_s {
+struct iscsi_seq {
 	int		sent;
 	int		status;
 	int		type;
@@ -76,13 +76,13 @@ typedef struct iscsi_seq_s {
 	u32		seq_send_order;
 	u32		seq_no;
 	u32		xfer_len;
-} iscsi_seq_t;
+} ____cacheline_aligned;
 
-extern struct iscsi_global_s *iscsi_global;
+extern struct iscsi_global *iscsi_global;
 
-extern int iscsi_do_build_list(iscsi_cmd_t *, iscsi_build_list_t *);
-extern iscsi_pdu_t *iscsi_get_pdu_holder(iscsi_cmd_t *, u32, u32);
-extern iscsi_pdu_t *iscsi_get_pdu_holder_for_seq(iscsi_cmd_t *, iscsi_seq_t *);
-extern iscsi_seq_t *iscsi_get_seq_holder(iscsi_cmd_t *, u32, u32);
+extern int iscsi_do_build_list(struct iscsi_cmd *, struct iscsi_build_list *);
+extern struct iscsi_pdu *iscsi_get_pdu_holder(struct iscsi_cmd *, u32, u32);
+extern struct iscsi_pdu *iscsi_get_pdu_holder_for_seq(struct iscsi_cmd *, struct iscsi_seq *);
+extern struct iscsi_seq *iscsi_get_seq_holder(struct iscsi_cmd *, u32, u32);
 
 #endif /* ISCSI_SEQ_AND_PDU_LIST_H */

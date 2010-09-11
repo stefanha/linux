@@ -27,9 +27,6 @@
  ******************************************************************************/
 
 
-#ifndef ISCSI_SERIAL_C
-#define ISCSI_SERIAL_C
-
 #include <linux/types.h>
 #include <iscsi_serial.h>
 
@@ -57,5 +54,3 @@ int serial_gte(u32 x, u32 y)
 {
 	return (x == y) ? 1 : serial_gt(x, y);
 }
-
-#endif /* ISCSI_SERIAL_C */

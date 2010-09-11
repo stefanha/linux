@@ -1,8 +1,6 @@
 #ifndef ISCSI_AUTH_KERNEL_H
 #define ISCSI_AUTH_KERNEL_H
 
-#include <iscsi_linux_defs.h>
-
 #include <iscsi_auth.h>
 #include <iscsi_auth_chap.h>
 
@@ -77,7 +75,7 @@ int extract_param(
  *
  */
 u32 iscsi_handle_authentication(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	char *in_buf,
 	char *out_buf,
 	int in_length,
@@ -85,10 +83,10 @@ u32 iscsi_handle_authentication(
 	unsigned char *authtype,
 	int role)
 {
-	iscsi_session_t *sess = SESS(conn);
-	iscsi_node_auth_t *auth;
-	iscsi_node_acl_t *iscsi_nacl;
-	se_node_acl_t *se_nacl;
+	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_node_auth *auth;
+	struct iscsi_node_acl *iscsi_nacl;
+	struct se_node_acl *se_nacl;
 
 	if (!(SESS_OPS(sess)->SessionType)) {
 		/*
@@ -96,14 +94,14 @@ u32 iscsi_handle_authentication(
 		 */
 		se_nacl = SESS(conn)->se_sess->se_node_acl;
 		if (!(se_nacl)) {
-			printk(KERN_ERR "Unable to locate se_node_acl_t for"
+			printk(KERN_ERR "Unable to locate struct se_node_acl for"
 					" CHAP auth\n");
 			return -1;
 		}
-		iscsi_nacl = container_of(se_nacl, iscsi_node_acl_t,
+		iscsi_nacl = container_of(se_nacl, struct iscsi_node_acl,
 				se_node_acl);
 		if (!(iscsi_nacl)) {
-			printk(KERN_ERR "Unable to locate iscsi_node_acl_t for"
+			printk(KERN_ERR "Unable to locate struct iscsi_node_acl for"
 					" CHAP auth\n");
 			return -1;
 		}
@@ -116,12 +114,10 @@ u32 iscsi_handle_authentication(
 		auth = &iscsi_global->discovery_acl.node_auth;	
 	}
 
-#ifdef SNMP_SUPPORT
 	if (strstr("CHAP", authtype))
 		strcpy(SESS(conn)->auth_type, "CHAP");
 	else
 		strcpy(SESS(conn)->auth_type, NONE);
-#endif /* SNMP_SUPPORT */
 
 	if (strstr("None", authtype))
 		return 1;
@@ -148,7 +144,7 @@ u32 iscsi_handle_authentication(
  *
  */
 void iscsi_remove_failed_auth_entry(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	int role)
 {
 	kfree(conn->auth_protocol);

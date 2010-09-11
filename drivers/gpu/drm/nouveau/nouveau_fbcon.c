@@ -250,6 +250,7 @@ nouveau_fbcon_create(struct nouveau_fbdev *nfbdev,
 		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_COPYAREA |
 			      FBINFO_HWACCEL_FILLRECT |
 			      FBINFO_HWACCEL_IMAGEBLIT;
+	info->flags |= FBINFO_CAN_FORCE_OUTPUT;
 	info->fbops = &nouveau_fbcon_ops;
 	info->fix.smem_start = dev->mode_config.fb_base + nvbo->bo.offset -
 			       dev_priv->vm_vram_base;
@@ -280,6 +281,8 @@ nouveau_fbcon_create(struct nouveau_fbdev *nfbdev,
 
 	if (dev_priv->channel && !nouveau_nofbaccel) {
 		switch (dev_priv->card_type) {
+		case NV_C0:
+			break;
 		case NV_50:
 			nv50_fbcon_accel_init(info);
 			info->fbops = &nv50_fbcon_ops;
@@ -333,7 +336,7 @@ nouveau_fbcon_output_poll_changed(struct drm_device *dev)
 	drm_fb_helper_hotplug_event(&dev_priv->nfbdev->helper);
 }
 
-int
+static int
 nouveau_fbcon_destroy(struct drm_device *dev, struct nouveau_fbdev *nfbdev)
 {
 	struct nouveau_framebuffer *nouveau_fb = &nfbdev->nouveau_fb;
@@ -387,7 +390,8 @@ int nouveau_fbcon_init(struct drm_device *dev)
 	dev_priv->nfbdev = nfbdev;
 	nfbdev->helper.funcs = &nouveau_fbcon_helper_funcs;
 
-	ret = drm_fb_helper_init(dev, &nfbdev->helper, 2, 4);
+	ret = drm_fb_helper_init(dev, &nfbdev->helper,
+				 nv_two_heads(dev) ? 2 : 1, 4);
 	if (ret) {
 		kfree(nfbdev);
 		return ret;

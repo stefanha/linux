@@ -5,8 +5,8 @@
  *
  * Copyright (c) 2004-2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007-2009 Rising Tide Software, Inc.
- * Copyright (c) 2008-2009 Linux-iSCSI.org
+ * Copyright (c) 2007-2010 Rising Tide Systems
+ * Copyright (c) 2008-2010 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,18 +26,13 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_SCDB_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_scdb.h>
 
-#undef TARGET_CORE_SCDB_C
+#include "target_core_scdb.h"
 
 /*	split_cdb_XX_6():
  *

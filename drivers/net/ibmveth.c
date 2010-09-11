@@ -677,7 +677,7 @@ static int ibmveth_close(struct net_device *netdev)
 	if (!adapter->pool_config)
 		netif_stop_queue(netdev);
 
-	free_irq(netdev->irq, netdev);
+	h_vio_signal(adapter->vdev->unit_address, VIO_IRQ_DISABLE);
 
 	do {
 		lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
@@ -688,6 +688,8 @@ static int ibmveth_close(struct net_device *netdev)
 		ibmveth_error_printk("h_free_logical_lan failed with %lx, continuing with close\n",
 				     lpar_rc);
 	}
+
+	free_irq(netdev->irq, netdev);
 
 	adapter->rx_no_buffer = *(u64*)(((char*)adapter->buffer_list_addr) + 4096 - 8);
 
@@ -1111,7 +1113,8 @@ static int ibmveth_change_mtu(struct net_device *dev, int new_mtu)
 	struct ibmveth_adapter *adapter = netdev_priv(dev);
 	struct vio_dev *viodev = adapter->vdev;
 	int new_mtu_oh = new_mtu + IBMVETH_BUFF_OH;
-	int i;
+	int i, rc;
+	int need_restart = 0;
 
 	if (new_mtu < IBMVETH_MAX_MTU)
 		return -EINVAL;
@@ -1125,35 +1128,32 @@ static int ibmveth_change_mtu(struct net_device *dev, int new_mtu)
 
 	/* Deactivate all the buffer pools so that the next loop can activate
 	   only the buffer pools necessary to hold the new MTU */
-	for (i = 0; i < IbmVethNumBufferPools; i++)
-		if (adapter->rx_buff_pool[i].active) {
-			ibmveth_free_buffer_pool(adapter,
-						 &adapter->rx_buff_pool[i]);
-			adapter->rx_buff_pool[i].active = 0;
-		}
+	if (netif_running(adapter->netdev)) {
+		need_restart = 1;
+		adapter->pool_config = 1;
+		ibmveth_close(adapter->netdev);
+		adapter->pool_config = 0;
+	}
 
 	/* Look for an active buffer pool that can hold the new MTU */
 	for(i = 0; i<IbmVethNumBufferPools; i++) {
 		adapter->rx_buff_pool[i].active = 1;
 
 		if (new_mtu_oh < adapter->rx_buff_pool[i].buff_size) {
-			if (netif_running(adapter->netdev)) {
-				adapter->pool_config = 1;
-				ibmveth_close(adapter->netdev);
-				adapter->pool_config = 0;
-				dev->mtu = new_mtu;
-				vio_cmo_set_dev_desired(viodev,
-						ibmveth_get_desired_dma
-						(viodev));
-				return ibmveth_open(adapter->netdev);
-			}
 			dev->mtu = new_mtu;
 			vio_cmo_set_dev_desired(viodev,
 						ibmveth_get_desired_dma
 						(viodev));
+			if (need_restart) {
+				return ibmveth_open(adapter->netdev);
+			}
 			return 0;
 		}
 	}
+
+	if (need_restart && (rc = ibmveth_open(adapter->netdev)))
+		return rc;
+
 	return -EINVAL;
 }
 

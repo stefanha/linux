@@ -3,8 +3,8 @@
  *
  * This file contains SPC-3 task management infrastructure
  *
- * Copyright (c) 2009 Rising Tide, Inc.
- * Copyright (c) 2009 Linux-iSCSI.org
+ * Copyright (c) 2009,2010 Rising Tide Systems
+ * Copyright (c) 2009,2010 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -24,8 +24,6 @@
  *
  ******************************************************************************/
 
-#define TARGET_CORE_TMR_C
-
 #include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -35,17 +33,13 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
-#include <target/target_core_pr.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_tmr.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_alua.h>
-#include <target/target_core_transport_plugin.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 
-#undef TARGET_CORE_TMR_C
+#include "target_core_alua.h"
+#include "target_core_pr.h"
 
 #define DEBUG_LUN_RESET
 #ifdef DEBUG_LUN_RESET
@@ -54,16 +48,16 @@
 #define DEBUG_LR(x...)
 #endif
 
-se_tmr_req_t *core_tmr_alloc_req(
-	se_cmd_t *se_cmd,
+struct se_tmr_req *core_tmr_alloc_req(
+	struct se_cmd *se_cmd,
 	void *fabric_tmr_ptr,
 	u8 function)
 {
-	se_tmr_req_t *tmr;
+	struct se_tmr_req *tmr;
 
 	tmr = kmem_cache_zalloc(se_tmr_req_cache, GFP_KERNEL);
 	if (!(tmr)) {
-		printk(KERN_ERR "Unable to allocate se_tmr_req_t\n");
+		printk(KERN_ERR "Unable to allocate struct se_tmr_req\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	tmr->task_cmd = se_cmd;
@@ -76,19 +70,19 @@ se_tmr_req_t *core_tmr_alloc_req(
 EXPORT_SYMBOL(core_tmr_alloc_req);
 
 /*
- * Called with se_device_t->se_tmr_lock held.
+ * Called with struct se_device->se_tmr_lock held.
  */
 void __core_tmr_release_req(
-	se_tmr_req_t *tmr)
+	struct se_tmr_req *tmr)
 {
 	list_del(&tmr->tmr_list);
 	kmem_cache_free(se_tmr_req_cache, tmr);
 }
 
 void core_tmr_release_req(
-	se_tmr_req_t *tmr)
+	struct se_tmr_req *tmr)
 {
-	se_device_t *dev = tmr->tmr_dev;
+	struct se_device *dev = tmr->tmr_dev;
 
 	spin_lock(&dev->se_tmr_lock);
 	__core_tmr_release_req(tmr);
@@ -96,8 +90,8 @@ void core_tmr_release_req(
 }
 
 static void core_tmr_handle_tas_abort(
-	se_node_acl_t *tmr_nacl,
-	se_cmd_t *cmd,
+	struct se_node_acl *tmr_nacl,
+	struct se_cmd *cmd,
 	int tas,
 	int fe_count)
 {
@@ -116,23 +110,23 @@ static void core_tmr_handle_tas_abort(
 }
 
 int core_tmr_lun_reset(
-	se_device_t *dev,
-	se_tmr_req_t *tmr,
+	struct se_device *dev,
+	struct se_tmr_req *tmr,
 	struct list_head *preempt_and_abort_list,
-	se_cmd_t *prout_cmd)
+	struct se_cmd *prout_cmd)
 {
-	se_cmd_t *cmd;
-	se_queue_req_t *qr, *qr_tmp;
-	se_node_acl_t *tmr_nacl = NULL;
-	se_portal_group_t *tmr_tpg = NULL;
-	se_queue_obj_t *qobj = dev->dev_queue_obj;
-	se_tmr_req_t *tmr_p, *tmr_pp;
-	se_task_t *task, *task_tmp;
+	struct se_cmd *cmd;
+	struct se_queue_req *qr, *qr_tmp;
+	struct se_node_acl *tmr_nacl = NULL;
+	struct se_portal_group *tmr_tpg = NULL;
+	struct se_queue_obj *qobj = dev->dev_queue_obj;
+	struct se_tmr_req *tmr_p, *tmr_pp;
+	struct se_task *task, *task_tmp;
 	unsigned long flags;
 	int fe_count, state, tas;
 	/*
 	 * TASK_ABORTED status bit, this is configurable via ConfigFS
-	 * se_device_t attributes.  spc4r17 section 7.4.6 Control mode page
+	 * struct se_device attributes.  spc4r17 section 7.4.6 Control mode page
 	 *
 	 * A task aborted status (TAS) bit set to zero specifies that aborted
 	 * tasks shall be terminated by the device server without any response
@@ -144,7 +138,7 @@ int core_tmr_lun_reset(
 	tas = DEV_ATTRIB(dev)->emulate_tas;
 	/*
 	 * Determine if this se_tmr is coming from a $FABRIC_MOD
-	 * or se_device_t passthrough..
+	 * or struct se_device passthrough..
 	 */
 	if (tmr && tmr->task_cmd && tmr->task_cmd->se_sess) {
 		tmr_nacl = tmr->task_cmd->se_sess->se_node_acl;
@@ -173,7 +167,7 @@ int core_tmr_lun_reset(
 
 		cmd = tmr_p->task_cmd;
 		if (!(cmd)) {
-			printk(KERN_ERR "Unable to locate se_cmd_t for TMR\n");
+			printk(KERN_ERR "Unable to locate struct se_cmd for TMR\n");
 			continue;
 		}
 		/*
@@ -187,17 +181,29 @@ int core_tmr_lun_reset(
 			continue;
 		spin_unlock(&dev->se_tmr_lock);
 
+		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
+		if (!(atomic_read(&T_TASK(cmd)->t_transport_active))) {
+			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+			spin_lock(&dev->se_tmr_lock);
+			continue;
+		}
+		if (cmd->t_state == TRANSPORT_ISTATE_PROCESSING) {
+			spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+			spin_lock(&dev->se_tmr_lock);
+			continue;
+		}
 		DEBUG_LR("LUN_RESET: %s releasing TMR %p Function: 0x%02x,"
 			" Response: 0x%02x, t_state: %d\n",
 			(preempt_and_abort_list) ? "Preempt" : "", tmr_p,
 			tmr_p->function, tmr_p->response, cmd->t_state);
+		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
 		transport_cmd_finish_abort_tmr(cmd);
 		spin_lock(&dev->se_tmr_lock);
 	}
 	spin_unlock(&dev->se_tmr_lock);
 	/*
-	 * Complete outstanding se_task_t CDBs with TASK_ABORTED SAM status.
+	 * Complete outstanding struct se_task CDBs with TASK_ABORTED SAM status.
 	 * This is following sam4r17, section 5.6 Aborting commands, Table 38
 	 * for TMR LUN_RESET:
 	 *
@@ -321,16 +327,16 @@ int core_tmr_lun_reset(
 	}
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 	/*
-	 * Release all commands remaining in the se_device_t cmd queue.
+	 * Release all commands remaining in the struct se_device cmd queue.
 	 *
-	 * This follows the same logic as above for the se_device_t
-	 * se_task_t state list, where commands are returned with
+	 * This follows the same logic as above for the struct se_device
+	 * struct se_task state list, where commands are returned with
 	 * TASK_ABORTED status, if there is an outstanding $FABRIC_MOD
-	 * reference, otherwise the se_cmd_t is released.
+	 * reference, otherwise the struct se_cmd is released.
 	 */
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
 	list_for_each_entry_safe(qr, qr_tmp, &qobj->qobj_list, qr_list) {
-		cmd = (se_cmd_t *)qr->cmd;
+		cmd = (struct se_cmd *)qr->cmd;
 		if (!(cmd)) {
 			/*
 			 * Skip these for non PREEMPT_AND_ABORT usage..
@@ -388,11 +394,9 @@ int core_tmr_lun_reset(
 		printk(KERN_INFO "LUN_RESET: SCSI-2 Released reservation\n");	
 	}	
 
-#ifdef SNMP_SUPPORT
 	spin_lock(&dev->stats_lock);
 	dev->num_resets++;
 	spin_unlock(&dev->stats_lock);
-#endif /* SNMP_SUPPORT */
 
 	DEBUG_LR("LUN_RESET: %s for [%s] Complete\n",
 			(preempt_and_abort_list) ? "Preempt" : "TMR",

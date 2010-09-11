@@ -40,10 +40,7 @@
 #include <scsi/scsi_host.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_plugin.h>
-#include <target/target_core_seobj.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_device.h>
@@ -52,7 +49,7 @@
 #include <iscsi_target_mib.h>
 
 /* iSCSI mib table index */
-iscsi_index_table_t iscsi_index_table;
+struct iscsi_index_table iscsi_index_table;
 
 #ifndef INITIAL_JIFFIES
 #define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
@@ -81,12 +78,12 @@ static inline int list_is_first(const struct list_head *list,
 /*
  * Instance Attributes Table
  */
-static int get_num_portals(iscsi_tiqn_t *tiqn)
+static int get_num_portals(struct iscsi_tiqn *tiqn)
 {
 	return tiqn->tiqn_num_tpg_nps;
 }
 
-static int get_num_sessions(iscsi_tiqn_t *tiqn)
+static int get_num_sessions(struct iscsi_tiqn *tiqn)
 {
 	return tiqn->tiqn_nsessions;
 }
@@ -129,8 +126,8 @@ static void inst_attr_seq_stop(struct seq_file *seq, void *v)
 
 static int inst_attr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_sess_err_stats_t *sess_err;
-	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
+	struct iscsi_sess_err_stats *sess_err;
+	struct iscsi_tiqn *tiqn = list_entry(v, struct iscsi_tiqn, tiqn_list);
 	u32 sess_err_count;
 
 	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
@@ -191,8 +188,8 @@ static const struct file_operations inst_attr_seq_fops = {
  */
 static int sess_err_stats_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_sess_err_stats_t *sess_err;
-	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
+	struct iscsi_sess_err_stats *sess_err;
+	struct iscsi_tiqn *tiqn = list_entry(v, struct iscsi_tiqn, tiqn_list);
 
 	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
 		seq_puts(seq, "inst digest_errors cxn_errors format_errors\n");
@@ -250,7 +247,7 @@ static void locate_tpg_stop(struct seq_file *seq, void *v)
 
 int do_portal_check(void *p)
 {
-	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
+	struct iscsi_portal_group *tpg = (struct iscsi_portal_group *)p;
 
 	return tpg->num_tpg_nps;
 }
@@ -276,11 +273,11 @@ static void portal_attr_seq_stop(struct seq_file *seq, void *v)
 
 static int portal_attr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 						g_tpg_list);
-	iscsi_tpg_np_t *tpg_np, *tpg_np_tmp;
-	iscsi_param_t *maxrcvdseg, *hdrdigest, *datadigest, *ofmark;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct iscsi_tpg_np *tpg_np, *tpg_np_tmp;
+	struct iscsi_param *maxrcvdseg, *hdrdigest, *datadigest, *ofmark;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
 	if (!(tiqn))
 		return 0;
@@ -394,10 +391,10 @@ static void tgt_portal_attr_seq_stop(struct seq_file *seq, void *v)
 
 static int tgt_portal_attr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 						g_tpg_list);
-	iscsi_tpg_np_t *tpg_np, *tpg_np_tmp;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct iscsi_tpg_np *tpg_np, *tpg_np_tmp;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
 	if (!(tiqn))
 		return 0;
@@ -440,7 +437,7 @@ static const struct file_operations tgt_portal_attr_seq_fops = {
 
 int do_tpg_param_check(void *p)
 {
-	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
+	struct iscsi_portal_group *tpg = (struct iscsi_portal_group *)p;
 
 	return (tpg->param_list) ? 1 : 0;
 }
@@ -465,11 +462,11 @@ static void node_attr_seq_stop(struct seq_file *seq, void *v)
 
 static int node_attr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_param_t *p1, *p2, *p3, *p4, *p5, *p6;
-	iscsi_param_t *p7, *p8, *p9, *p10, *p11;
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_param *p1, *p2, *p3, *p4, *p5, *p6;
+	struct iscsi_param *p7, *p8, *p9, *p10, *p11;
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 					g_tpg_list);
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
 	if (!(tiqn))
 		return 0;
@@ -532,8 +529,8 @@ static const struct file_operations node_attr_seq_fops = {
  */
 static int tgt_attr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_login_stats_t *lstat;
-	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
+	struct iscsi_login_stats *lstat;
+	struct iscsi_tiqn *tiqn = list_entry(v, struct iscsi_tiqn, tiqn_list);
 	u32 fail_count;
 
 	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
@@ -588,8 +585,8 @@ static const struct file_operations tgt_attr_seq_fops = {
  */
 static int login_stats_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_login_stats_t *lstat;
-	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
+	struct iscsi_login_stats *lstat;
+	struct iscsi_tiqn *tiqn = list_entry(v, struct iscsi_tiqn, tiqn_list);
 
 	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
 		seq_puts(seq, "inst indx accepts other_fails redirects"
@@ -629,7 +626,7 @@ static const struct file_operations login_stats_seq_fops = {
  */
 static int logout_stats_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_tiqn_t *tiqn = list_entry(v, iscsi_tiqn_t, tiqn_list);
+	struct iscsi_tiqn *tiqn = list_entry(v, struct iscsi_tiqn, tiqn_list);
 
 	if (list_is_first(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list))
 		seq_puts(seq, "inst indx normal_logouts abnormal_logouts\n");
@@ -669,7 +666,7 @@ static const struct file_operations logout_stats_seq_fops = {
 
 int do_tgt_auth_check(void *p)
 {
-	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
+	struct iscsi_portal_group *tpg = (struct iscsi_portal_group *)p;
 
 	return SE_TPG(tpg)->num_node_acls;
 }
@@ -691,10 +688,10 @@ static void tgt_auth_seq_stop(struct seq_file *seq, void *v)
 
 static int tgt_auth_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 					g_tpg_list);
-	se_node_acl_t *acl;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct se_node_acl *acl;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
 	if (!(tiqn))
 		return 0;
@@ -739,7 +736,7 @@ static const struct file_operations tgt_auth_seq_fops = {
  */
 static int do_sess_check(void *p)
 {
-	iscsi_portal_group_t *tpg = (iscsi_portal_group_t *)p;
+	struct iscsi_portal_group *tpg = (struct iscsi_portal_group *)p;
 
 	return tpg->nsessions;
 }
@@ -761,12 +758,12 @@ static void sess_attr_seq_stop(struct seq_file *seq, void *v)
 
 static int sess_attr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 						g_tpg_list);
-	iscsi_session_t *sess;
-	iscsi_sess_ops_t *sops;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	se_session_t *se_sess;
+	struct iscsi_session *sess;
+	struct iscsi_sess_ops *sops;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
+	struct se_session *se_sess;
 
 	if (!(tiqn))
 		return 0;
@@ -779,7 +776,7 @@ static int sess_attr_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 		sops = sess->sess_ops;
 
 		seq_printf(seq, "%u %u %u %s %s %s %u ",
@@ -855,11 +852,11 @@ static void sess_stats_seq_stop(struct seq_file *seq, void *v)
 
 static int sess_stats_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 						g_tpg_list);
-	iscsi_session_t *sess;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	se_session_t *se_sess;
+	struct iscsi_session *sess;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
+	struct se_session *se_sess;
 
 	if (!(tiqn))
 		return 0;
@@ -871,7 +868,7 @@ static int sess_stats_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 		spin_lock_bh(&sess->session_stats_lock);
 		seq_printf(seq, "%u %u %u %u %u %llu %llu\n",
@@ -931,11 +928,11 @@ static void sess_conn_err_stats_seq_stop(struct seq_file *seq, void *v)
 
 static int sess_conn_err_stats_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 						g_tpg_list);
-	iscsi_session_t *sess;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	se_session_t *se_sess;
+	struct iscsi_session *sess;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
+	struct se_session *se_sess;
 
 	if (!(tiqn))
 		return 0;
@@ -945,7 +942,7 @@ static int sess_conn_err_stats_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 		spin_lock_bh(&sess->session_stats_lock);
 		seq_printf(seq, "%u %u %u %u %u\n",
@@ -1002,13 +999,13 @@ static void conn_attr_seq_stop(struct seq_file *seq, void *v)
 
 static int conn_attr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 					g_tpg_list);
-	iscsi_session_t *sess;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
-	iscsi_conn_t *conn;
-	iscsi_conn_ops_t *conn_ops;
-	se_session_t *se_sess;
+	struct iscsi_session *sess;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
+	struct iscsi_conn *conn;
+	struct iscsi_conn_ops *conn_ops;
+	struct se_session *se_sess;
 	char state_str[16];
 	char proto_str[16];
 
@@ -1023,7 +1020,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 		spin_lock(&sess->conn_lock);
 		list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
@@ -1131,12 +1128,12 @@ void lio_scsi_auth_intr_seq_stop(struct seq_file *seq, void *v)
 
 int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 						g_tpg_list);
-	se_dev_entry_t *deve;
-	se_lun_t *lun;
-	se_node_acl_t *se_nacl;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct se_dev_entry *deve;
+	struct se_lun *lun;
+	struct se_node_acl *se_nacl;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 	int j;
 
 	if (!(tiqn))
@@ -1153,14 +1150,13 @@ int lio_scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 				continue;
 
 			lun = deve->se_lun;
-			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			if (!lun->lun_se_dev)
 				continue;
 
 			seq_printf(seq, "%u %u %u %u %u %s %u %u %u %u"
 				" %u %u %u %s\n",
 				tiqn->tiqn_index, /* scsiInstIndex */
-				lun->se_dev->dev_index, /* scsiDeviceIndex */
+				lun->lun_se_dev->dev_index, /* scsiDeviceIndex */
 				tpg->tpgt, /* scsiAuthIntrTgtPortIndex */
 				se_nacl->acl_index, /* scsiAuthIntrIndex */
 				1, /* scsiAuthIntrDevOrPort */
@@ -1212,15 +1208,15 @@ void lio_scsi_att_intr_port_seq_stop(struct seq_file *seq, void *v)
 
 int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 					g_tpg_list);
-	iscsi_session_t *sess;
-	iscsi_sess_ops_t *sops;
-	se_dev_entry_t *deve;
-	se_lun_t *lun;
-	se_node_acl_t *se_nacl;
-	se_session_t *se_sess;
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct iscsi_session *sess;
+	struct iscsi_sess_ops *sops;
+	struct se_dev_entry *deve;
+	struct se_lun *lun;
+	struct se_node_acl *se_nacl;
+	struct se_session *se_sess;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 	int j;
 
 	if (!(tiqn))
@@ -1228,7 +1224,7 @@ int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock_bh(&SE_TPG(tpg)->session_lock);
 	list_for_each_entry(se_sess, &SE_TPG(tpg)->tpg_sess_list, sess_list) {
-		sess = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 		sops = sess->sess_ops;
 
 		if ((sess->session_state != TARG_SESS_STATE_LOGGED_IN) ||
@@ -1247,14 +1243,13 @@ int lio_scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				continue;
 
 			lun = deve->se_lun;
-			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			if (!lun->lun_se_dev)
 				continue;
 
 			seq_printf(seq, "%u %u %u %u %u "
 				   "%s+i+%02x%02x%02x%02x%02x%02x\n",
 			   tiqn->tiqn_index, /* scsiInstIndex */
-			   lun->se_dev->dev_index, /* scsiDeviceIndex */
+			   lun->lun_se_dev->dev_index, /* scsiDeviceIndex */
 			   tpg->tpgt, /* scsiPortIndex */
 			   sess->session_index,  /* scsiAttIntrPortIndex */
 			   se_nacl->acl_index, /* scsiAttIntrPortAuthIntrIdx */
@@ -1298,9 +1293,9 @@ static void ips_auth_seq_stop(struct seq_file *seq, void *v)
  */
 static int ips_auth_seq_show(struct seq_file *seq, void *v)
 {
-	iscsi_portal_group_t *tpg = list_entry(v, iscsi_portal_group_t,
+	struct iscsi_portal_group *tpg = list_entry(v, struct iscsi_portal_group,
 					g_tpg_list);
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
 	if (!(tiqn))
 		return 0;

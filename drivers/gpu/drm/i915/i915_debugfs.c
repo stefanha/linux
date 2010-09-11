@@ -467,6 +467,9 @@ static int i915_error_state(struct seq_file *m, void *unused)
 		}
 	}
 
+	if (error->overlay)
+		intel_overlay_print_error_state(m, error->overlay);
+
 out:
 	spin_unlock_irqrestore(&dev_priv->error_lock, flags);
 
@@ -604,6 +607,9 @@ static int i915_fbc_status(struct seq_file *m, void *unused)
 			break;
 		case FBC_NOT_TILED:
 			seq_printf(m, "scanout buffer not tiled");
+			break;
+		case FBC_MULTIPLE_PIPES:
+			seq_printf(m, "multiple pipes are enabled");
 			break;
 		default:
 			seq_printf(m, "unknown reason");

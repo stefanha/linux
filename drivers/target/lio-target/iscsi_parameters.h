@@ -1,13 +1,13 @@
 #ifndef ISCSI_PARAMETERS_H
 #define ISCSI_PARAMETERS_H
 
-typedef struct iscsi_extra_response_s {
+struct iscsi_extra_response {
 	char key[64];
 	char value[32];
 	struct list_head er_list;
-} iscsi_extra_response_t;
+} ____cacheline_aligned;
 
-typedef struct iscsi_param_s {
+struct iscsi_param {
 	char *name;
 	char *value;
 	u8 set_param;
@@ -19,33 +19,33 @@ typedef struct iscsi_param_s {
 	u16 type_range;
 	u32 state;
 	struct list_head p_list;
-} iscsi_param_t;
+} ____cacheline_aligned;
 
-extern struct iscsi_global_s *iscsi_global;
+extern struct iscsi_global *iscsi_global;
 
-extern int iscsi_login_rx_data(iscsi_conn_t *, char *, int, int);
-extern int iscsi_login_tx_data(iscsi_conn_t *, char *, char *, int, int);
-extern void iscsi_dump_conn_ops(iscsi_conn_ops_t *);
-extern void iscsi_dump_sess_ops(iscsi_sess_ops_t *);
-extern void iscsi_print_params(iscsi_param_list_t *);
-extern int iscsi_create_default_params(iscsi_param_list_t **);
-extern int iscsi_set_keys_to_negotiate(int, int, iscsi_param_list_t *);
-extern int iscsi_set_keys_irrelevant_for_discovery(iscsi_param_list_t *);
-extern int iscsi_copy_param_list(iscsi_param_list_t **,
-			iscsi_param_list_t *, int);
-extern int iscsi_change_param_value(char *, int, iscsi_param_list_t *, int);
-extern void iscsi_release_param_list(iscsi_param_list_t *);
-extern iscsi_param_t *iscsi_find_param_from_key(char *, iscsi_param_list_t *);
+extern int iscsi_login_rx_data(struct iscsi_conn *, char *, int, int);
+extern int iscsi_login_tx_data(struct iscsi_conn *, char *, char *, int, int);
+extern void iscsi_dump_conn_ops(struct iscsi_conn_ops *);
+extern void iscsi_dump_sess_ops(struct iscsi_sess_ops *);
+extern void iscsi_print_params(struct iscsi_param_list *);
+extern int iscsi_create_default_params(struct iscsi_param_list **);
+extern int iscsi_set_keys_to_negotiate(int, int, struct iscsi_param_list *);
+extern int iscsi_set_keys_irrelevant_for_discovery(struct iscsi_param_list *);
+extern int iscsi_copy_param_list(struct iscsi_param_list **,
+			struct iscsi_param_list *, int);
+extern int iscsi_change_param_value(char *, int, struct iscsi_param_list *, int);
+extern void iscsi_release_param_list(struct iscsi_param_list *);
+extern struct iscsi_param *iscsi_find_param_from_key(char *, struct iscsi_param_list *);
 extern int iscsi_extract_key_value(char *, char **, char **);
-extern int iscsi_update_param_value(iscsi_param_t *, char *);
-extern int iscsi_decode_text_input(u8, u8, char *, u32, iscsi_param_list_t *);
+extern int iscsi_update_param_value(struct iscsi_param *, char *);
+extern int iscsi_decode_text_input(u8, u8, char *, u32, struct iscsi_param_list *);
 extern int iscsi_encode_text_output(u8, u8, char *, u32 *,
-			iscsi_param_list_t *);
-extern int iscsi_check_negotiated_keys(iscsi_param_list_t *);
-extern void iscsi_set_connection_parameters(iscsi_conn_ops_t *,
-			iscsi_param_list_t *);
-extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
-			iscsi_param_list_t *, int);
+			struct iscsi_param_list *);
+extern int iscsi_check_negotiated_keys(struct iscsi_param_list *);
+extern void iscsi_set_connection_parameters(struct iscsi_conn_ops *,
+			struct iscsi_param_list *);
+extern void iscsi_set_session_parameters(struct iscsi_sess_ops *,
+			struct iscsi_param_list *, int);
 
 #define YES				"Yes"
 #define NO				"No"
@@ -141,7 +141,7 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
 #define NORMAL				"Normal"
 
 /*
- * iscsi_param_t->use
+ * struct iscsi_param->use
  */
 #define USE_LEADING_ONLY		0x01
 #define USE_INITIAL_ONLY		0x02
@@ -154,7 +154,7 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
 #define SET_USE_INITIAL_ONLY(p)		((p)->use |= USE_INITIAL_ONLY)
 
 /*
- * iscsi_param_t->sender
+ * struct iscsi_param->sender
  */
 #define	SENDER_INITIATOR		0x01
 #define SENDER_TARGET			0x02
@@ -167,7 +167,7 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
 #define IS_SENDER_BOTH(p)		((p)->sender & SENDER_BOTH)
 
 /*
- * iscsi_param_t->scope
+ * struct iscsi_param->scope
  */
 #define SCOPE_CONNECTION_ONLY		0x01
 #define SCOPE_SESSION_WIDE		0x02
@@ -176,7 +176,7 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
 #define IS_SCOPE_SESSION_WIDE(p)	((p)->scope & SCOPE_SESSION_WIDE)
 
 /*
- * iscsi_param_t->phase
+ * struct iscsi_param->phase
  */
 #define PHASE_SECURITY			0x01
 #define PHASE_OPERATIONAL		0x02
@@ -189,7 +189,7 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
 #define IS_PHASE_FFP0(p)		((p)->phase & PHASE_FFP0)
 
 /*
- * iscsi_param_t->type
+ * struct iscsi_param->type
  */
 #define TYPE_BOOL_AND			0x01
 #define TYPE_BOOL_OR			0x02
@@ -206,7 +206,7 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
 #define IS_TYPE_VALUE_LIST(p)		((p)->type & TYPE_VALUE_LIST)
 
 /*
- * iscsi_param_t->type_range
+ * struct iscsi_param->type_range
  */
 #define TYPERANGE_BOOL_AND		0x0001
 #define TYPERANGE_BOOL_OR		0x0002
@@ -239,7 +239,7 @@ extern void iscsi_set_session_parameters(iscsi_sess_ops_t *,
 						TYPERANGE_SESSIONTYPE)
 
 /*
- * iscsi_param_t->state
+ * struct iscsi_param->state
  */
 #define PSTATE_ACCEPTOR			0x01
 #define PSTATE_NEGOTIATE		0x02

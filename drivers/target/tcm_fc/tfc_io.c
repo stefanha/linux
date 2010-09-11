@@ -53,9 +53,7 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 #include <target/target_core_base.h>
-#include <target/target_core_seobj.h>
 #include <target/configfs_macros.h>
 
 #include "tcm_fc.h"
@@ -64,14 +62,14 @@
  * Deliver read data back to initiator.
  * XXX TBD handle resource problems later.
  */
-int ft_queue_data_in(struct se_cmd_s *se_cmd)
+int ft_queue_data_in(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
-	struct se_transport_task_s *task;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
+	struct se_transport_task *task;
 	struct fc_frame *fp = NULL;
 	struct fc_exch *ep;
 	struct fc_lport *lport;
-	struct se_mem_s *mem;
+	struct se_mem *mem;
 	size_t remaining;
 	u32 f_ctl = FC_FC_EX_CTX | FC_FC_REL_OFF;
 	u32 mem_off;
@@ -83,6 +81,7 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
 	struct page *page;
 	int use_sg;
 	int error;
+	void *page_addr;
 	void *from;
 	void *to = NULL;
 
@@ -97,9 +96,9 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
 	/*
 	 * Setup to use first mem list entry if any.
 	 */
-	if (task->t_task_se_num) {
+	if (task->t_tasks_se_num) {
 		mem = list_first_entry(task->t_mem_list,
-			 struct se_mem_s, se_list);
+			 struct se_mem, se_list);
 		mem_len = mem->se_len;
 		mem_off = mem->se_off;
 		page = mem->se_page;
@@ -118,7 +117,7 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
 		if (!mem_len) {
 			BUG_ON(!mem);
 			mem = list_entry(mem->se_list.next,
-				struct se_mem_s, se_list);
+				struct se_mem, se_list);
 			mem_len = min((size_t)mem->se_len, remaining);
 			mem_off = mem->se_off;
 			page = mem->se_page;
@@ -150,14 +149,12 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
 			BUG_ON(!page);
 			from = kmap_atomic(page + (mem_off >> PAGE_SHIFT),
 					   KM_SOFTIRQ0);
-			WARN_ON(!from);
-			if (!from)
-				break;	/* XXX for now initiator will retry */
+			page_addr = from;
 			from += mem_off & ~PAGE_MASK;
-			tlen = min(tlen, PAGE_SIZE - (mem_off & ~PAGE_MASK));
+			tlen = min(tlen, (size_t)(PAGE_SIZE -
+						(mem_off & ~PAGE_MASK)));
 			memcpy(to, from, tlen);
-			kunmap_atomic(page + (mem_off >> PAGE_SHIFT),
-				      KM_SOFTIRQ0);
+			kunmap_atomic(page_addr, KM_SOFTIRQ0);
 			to += tlen;
 		} else {
 			from = task->t_task_buf + mem_off;
@@ -190,16 +187,17 @@ int ft_queue_data_in(struct se_cmd_s *se_cmd)
  */
 void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 {
-	struct se_cmd_s *se_cmd = cmd->se_cmd;
-	struct se_transport_task_s *task;
+	struct se_cmd *se_cmd = &cmd->se_cmd;
+	struct se_transport_task *task;
 	struct fc_frame_header *fh;
-	struct se_mem_s *mem;
+	struct se_mem *mem;
 	u32 mem_off;
 	u32 rel_off;
 	size_t frame_len;
 	size_t mem_len;
 	size_t tlen;
 	struct page *page;
+	void *page_addr;
 	void *from;
 	void *to;
 
@@ -223,9 +221,9 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	/*
 	 * Setup to use first mem list entry if any.
 	 */
-	if (task->t_task_se_num) {
+	if (task->t_tasks_se_num) {
 		mem = list_first_entry(task->t_mem_list,
-				       struct se_mem_s, se_list);
+				       struct se_mem, se_list);
 		mem_len = mem->se_len;
 		mem_off = mem->se_off;
 		page = mem->se_page;
@@ -240,7 +238,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		if (!mem_len) {
 			BUG_ON(!mem);
 			mem = list_entry(mem->se_list.next,
-					 struct se_mem_s, se_list);
+					 struct se_mem, se_list);
 			mem_len = mem->se_len;
 			mem_off = mem->se_off;
 			page = mem->se_page;
@@ -259,13 +257,12 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		if (mem) {
 			to = kmap_atomic(page + (mem_off >> PAGE_SHIFT),
 					 KM_SOFTIRQ0);
-			if (!to)
-				break;
+			page_addr = to;
 			to += mem_off & ~PAGE_MASK;
-			tlen = min(tlen, PAGE_SIZE - (mem_off & ~PAGE_MASK));
+			tlen = min(tlen, (size_t)(PAGE_SIZE -
+						(mem_off & ~PAGE_MASK)));
 			memcpy(to, from, tlen);
-			kunmap_atomic(page + (mem_off >> PAGE_SHIFT),
-				      KM_SOFTIRQ0);
+			kunmap_atomic(page_addr, KM_SOFTIRQ0);
 		} else {
 			to = task->t_task_buf + mem_off;
 			memcpy(to, from, tlen);

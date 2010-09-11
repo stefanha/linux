@@ -1,30 +1,3 @@
-/***************************************************************************
- * Filename:  target_core_configfs.h
- *
- * This file contains the configfs defines and prototypes for the
- * Generic Target Engine project.
- *
- * Copyright (c) 2008-2009 Rising Tide, Inc.
- * Copyright (c) 2008-2009 Linux-iSCSI.org
- *
- * Nicholas A. Bellinger <nab@kernel.org>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
- *********************************************************************/
-
 #define TARGET_CORE_CONFIGFS_VERSION TARGET_CORE_MOD_VERSION
 
 #define TARGET_CORE_CONFIG_ROOT	"/sys/kernel/config"
@@ -32,9 +5,9 @@
 #define TARGET_CORE_NAME_MAX_LEN	64
 #define TARGET_FABRIC_NAME_SIZE		32
 
-extern se_global_t *se_global;
+extern struct se_global *se_global;
 
-extern struct se_hba_s *target_core_get_hba_from_item(struct config_item *);
+extern struct se_hba *target_core_get_hba_from_item(struct config_item *);
 extern struct target_fabric_configfs *target_fabric_configfs_init(
 				struct module *, const char *);
 extern void target_fabric_configfs_free(struct target_fabric_configfs *);

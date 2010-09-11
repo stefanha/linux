@@ -1,8 +1,6 @@
 #ifndef ISCSI_OPCODES_DEBUG_H
 #define ISCSI_OPCODES_DEBUG_H
 
-#include <iscsi_linux_defs.h>
-
 void print_status_class_and_detail(u8, u8);
 void print_reject_reason(u8);
 void print_reserved8(int, unsigned char);
