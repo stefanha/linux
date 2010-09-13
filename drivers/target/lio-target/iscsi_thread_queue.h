@@ -15,6 +15,8 @@ extern void iscsi_set_thread_set_signal(struct iscsi_conn *, u8);
 extern int iscsi_release_thread_set(struct iscsi_conn *, int);
 extern struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *, int);
 extern struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *, int);
+extern int iscsi_thread_set_init(void);
+extern void iscsi_thread_set_free(void);
 
 extern int iscsi_target_tx_thread(void *);
 extern int iscsi_target_rx_thread(void *);
@@ -40,6 +42,9 @@ extern struct iscsi_global *iscsi_global;
 #define ISCSI_THREAD_SET_DIE			3
 #define ISCSI_THREAD_SET_RESET			4
 #define ISCSI_THREAD_SET_DEALLOCATE_THREADS	5
+
+/* By default allow a maximum of 32K iSCSI connections */
+#define ISCSI_TS_BITMAP_BITS			32768
 
 struct se_thread_set {
 	/* flags used for blocking and restarting sets */

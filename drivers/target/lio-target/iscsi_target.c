@@ -821,6 +821,7 @@ static int init_iscsi_global(struct iscsi_global *global)
 	spin_lock_init(&global->np_lock);
 	spin_lock_init(&global->shutdown_lock);
 	spin_lock_init(&global->tiqn_lock);
+	spin_lock_init(&global->ts_bitmap_lock);
 	spin_lock_init(&global->g_tpg_lock);
 	INIT_LIST_HEAD(&global->g_tiqn_list);
 	INIT_LIST_HEAD(&global->g_tpg_list);
@@ -969,6 +970,8 @@ static int iscsi_target_detect(void)
 	init_iscsi_target_mib();
 	iscsi_target_register_configfs();
 
+	iscsi_thread_set_init();
+
 	if (iscsi_allocate_thread_sets(TARGET_THREAD_SET_COUNT, TARGET) !=
 			TARGET_THREAD_SET_COUNT) {
 		printk(KERN_ERR "iscsi_allocate_thread_sets() returned"
@@ -1074,6 +1077,7 @@ out:
 	if (lio_tpg_cache)
 		kmem_cache_destroy(lio_tpg_cache);
 	iscsi_deallocate_thread_sets(TARGET);
+	iscsi_thread_set_free();
 	iscsi_target_deregister_configfs();
 
 	remove_iscsi_target_mib();
@@ -1117,6 +1121,7 @@ void iscsi_target_release_phase2(void)
 	core_reset_nps();
 	iscsi_disable_all_tpgs();
 	iscsi_deallocate_thread_sets(TARGET);
+	iscsi_thread_set_free();
 	iscsi_remove_all_tpgs();
 	core_release_nps();
 	core_release_discovery_tpg();
@@ -4452,11 +4457,10 @@ int iscsi_target_tx_thread(void *arg)
 	struct se_unmap_sg unmap_sg;
 
 	{
-	    static unsigned int x = 1;  /* unique number added to thread name */
 	    char name[20];
 
 	    memset(name, 0, 20);
-	    sprintf(name, "%s/%u", ISCSI_TX_THREAD_NAME, x++);
+	    sprintf(name, "%s/%u", ISCSI_TX_THREAD_NAME, ts->thread_id);
 	    iscsi_daemon(ts->tx_thread, name, SHUTDOWN_SIGS);
 	}
 
@@ -4800,11 +4804,10 @@ int iscsi_target_rx_thread(void *arg)
 	struct scatterlist sg;
 
 	{
-	    static unsigned int x = 1;  /* unique number added to thread name */
 	    char name[20];
 
 	    memset(name, 0, 20);
-	    sprintf(name, "%s/%u", ISCSI_RX_THREAD_NAME, x++);
+	    sprintf(name, "%s/%u", ISCSI_RX_THREAD_NAME, ts->thread_id);
 	    iscsi_daemon(ts->rx_thread, name, SHUTDOWN_SIGS);
 	}
 

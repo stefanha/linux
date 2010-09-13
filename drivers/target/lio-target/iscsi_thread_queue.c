@@ -32,6 +32,7 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
+#include <linux/bitmap.h>
 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
@@ -118,7 +119,7 @@ static struct se_thread_set *iscsi_get_ts_from_inactive_list(void)
  */
 extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 {
-	int allocated_thread_pair_count = 0, i;
+	int allocated_thread_pair_count = 0, i, thread_id;
 	struct se_thread_set *ts = NULL;
 
 	for (i = 0; i < thread_pair_count; i++) {
@@ -128,7 +129,21 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 					" thread set.\n");
 			return allocated_thread_pair_count;
 		}
+		/*
+		 * Locate the next available regision in the thread_set_bitmap
+		 */
+		spin_lock(&iscsi_global->ts_bitmap_lock);
+		thread_id = bitmap_find_free_region(iscsi_global->ts_bitmap,
+				iscsi_global->ts_bitmap_count, get_order(1));
+		spin_unlock(&iscsi_global->ts_bitmap_lock);
+		if (thread_id < 0) {
+			printk(KERN_ERR "bitmap_find_free_region() failed for"
+				" thread_set_bitmap\n");
+			kfree(ts);
+			return allocated_thread_pair_count;
+		}
 
+		ts->thread_id = thread_id;
 		ts->status = ISCSI_THREAD_SET_FREE;
 		INIT_LIST_HEAD(&ts->ts_list);
 		spin_lock_init(&ts->ts_state_lock);
@@ -143,10 +158,6 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 		init_MUTEX_LOCKED(&ts->tx_restart_sem);
 		init_MUTEX_LOCKED(&ts->rx_start_sem);
 		init_MUTEX_LOCKED(&ts->tx_start_sem);
-
-		ts->thread_id = iscsi_global->thread_id++;
-		if (!ts->thread_id)
-			ts->thread_id = iscsi_global->thread_id++;
 
 		ts->create_threads = 1;
 		kernel_thread(iscsi_target_rx_thread,
@@ -195,6 +206,14 @@ extern void iscsi_deallocate_thread_sets(int role)
 #if 0
 		printk(KERN_INFO "Deallocated THREAD_ID: %d\n", ts->thread_id);
 #endif
+		/*
+		 * Release this thread_id in the thread_set_bitmap
+		 */
+		spin_lock(&iscsi_global->ts_bitmap_lock);
+		bitmap_release_region(iscsi_global->ts_bitmap,
+				ts->thread_id, get_order(1));
+		spin_unlock(&iscsi_global->ts_bitmap_lock);
+
 		released_count++;
 		kfree(ts);
 	}
@@ -238,6 +257,14 @@ static void iscsi_deallocate_extra_thread_sets(int role)
 #if 0
 		printk(KERN_INFO "Deallocated THREAD_ID: %d\n", ts->thread_id);
 #endif
+		/*
+		 * Release this thread_id in the thread_set_bitmap
+		 */
+		spin_lock(&iscsi_global->ts_bitmap_lock);
+		bitmap_release_region(iscsi_global->ts_bitmap,
+				ts->thread_id, get_order(1));
+		spin_unlock(&iscsi_global->ts_bitmap_lock);
+
 		released_count++;
 		kfree(ts);
 	}
@@ -651,4 +678,25 @@ sleep:
 #endif
 	spin_unlock_bh(&ts->ts_state_lock);
 	return ts->conn;
+}
+
+int iscsi_thread_set_init(void)
+{
+	int size;
+
+	iscsi_global->ts_bitmap_count = ISCSI_TS_BITMAP_BITS;
+
+	size = BITS_TO_LONGS(iscsi_global->ts_bitmap_count) * sizeof(long);
+	iscsi_global->ts_bitmap = kzalloc(size, GFP_KERNEL);
+	if (!(iscsi_global->ts_bitmap)) {
+		printk(KERN_ERR "Unable to allocate iscsi_global->ts_bitmap\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+void iscsi_thread_set_free(void)
+{
+	kfree(iscsi_global->ts_bitmap);
 }

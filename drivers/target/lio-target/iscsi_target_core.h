@@ -907,8 +907,10 @@ struct iscsi_global {
 	/* Unique identifier used for the authentication daemon */
 	u32			auth_id;
 	u32			inactive_ts;
-	/* Thread ID counter */
-	u32			thread_id;
+	/* Thread Set bitmap count */
+	int			ts_bitmap_count;
+	/* Thread Set bitmap pointer */
+	unsigned long		*ts_bitmap;
 	int (*ti_forcechanoffline)(void *);
 	struct list_head	g_tiqn_list;
 	struct list_head	g_tpg_list;
@@ -924,6 +926,8 @@ struct iscsi_global {
 	spinlock_t		shutdown_lock;
 	/* Spinlock for adding/removing thread sets */
 	spinlock_t		thread_set_lock;
+	/* Spinlock for iscsi_global->ts_bitmap */
+	spinlock_t		ts_bitmap_lock;
 	/* Spinlock for struct iscsi_tiqn */
 	spinlock_t		tiqn_lock;
 	spinlock_t		g_tpg_lock;
