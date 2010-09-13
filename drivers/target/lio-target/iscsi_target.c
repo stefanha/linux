@@ -4441,6 +4441,76 @@ static void iscsi_tx_thread_wait_for_TCP(struct iscsi_conn *conn)
 	}
 }
 
+#ifdef CONFIG_SMP
+
+void iscsi_thread_get_cpumask(struct iscsi_conn *conn)
+{
+	struct se_thread_set *ts = conn->thread_set;
+	int ord, cpu;
+	/*
+	 * thread_id is assigned from iscsi_global->ts_bitmap from
+	 * within iscsi_thread_set.c:iscsi_allocate_thread_sets()
+	 *
+	 * Here we use thread_id to determine which CPU that this
+	 * iSCSI connection's se_thread_set will be scheduled to
+	 * execute upon.
+	 */
+	ord = ts->thread_id % cpumask_weight(cpu_online_mask);
+#if 0
+	printk(">>>>>>>>>>>>>>>>>>>> Generated ord: %d from thread_id: %d\n",
+			ord, ts->thread_id);
+#endif
+	for_each_online_cpu(cpu) {
+		if (ord-- == 0) {
+			cpumask_set_cpu(cpu, conn->conn_cpumask);
+			return;
+		}
+	}
+	/*
+	 * This should never be reached..
+	 */
+	dump_stack();
+	cpumask_setall(conn->conn_cpumask);
+}
+
+static inline void iscsi_thread_check_cpumask(
+	struct iscsi_conn *conn,
+	struct task_struct *p,
+	int mode)
+{
+	char buf[128];
+	/*
+	 * mode == 1 signals iscsi_target_tx_thread() usage.
+	 * mode == 0 signals iscsi_target_rx_thread() usage.
+	 */
+	if (mode == 1) {
+		if (!(conn->conn_tx_reset_cpumask))
+			return;
+		conn->conn_tx_reset_cpumask = 0;
+	} else {
+		if (!(conn->conn_rx_reset_cpumask))
+			return;
+		conn->conn_rx_reset_cpumask = 0;
+	}
+	/*
+	 * Update the CPU mask for this single kthread so that
+	 * both TX and RX kthreads are scheduled to run on the
+	 * same CPU.
+	 */
+	memset(buf, 0, 128);
+	cpumask_scnprintf(buf, 128, conn->conn_cpumask);
+#if 0
+	printk(">>>>>>>>>>>>>> Calling set_cpus_allowed_ptr(): %s for %s\n",
+			buf, p->comm);
+#endif
+	set_cpus_allowed_ptr(p, conn->conn_cpumask);
+}
+
+#else
+#define iscsi_thread_get_cpumask(X) ({})
+#define iscsi_thread_check_cpumask(X, Y, Z) ({})
+#endif /* CONFIG_SMP */
+
 /*	iscsi_target_tx_thread():
  *
  *
@@ -4472,6 +4542,12 @@ restart:
 	eodr = map_sg = ret = sent_status = use_misc = 0;
 
 	while (1) {
+		/*
+		 * Ensure that both TX and RX per connection kthreads
+		 * are scheduled to run on the same CPU.
+		 */
+		iscsi_thread_check_cpumask(conn, current, 1);
+
 		ret = down_interruptible(&conn->tx_sem);
 
 		if ((ts->status == ISCSI_THREAD_SET_RESET) ||
@@ -4817,6 +4893,12 @@ restart:
 		goto out;
 
 	while (1) {
+		/*
+		 * Ensure that both TX and RX per connection kthreads
+		 * are scheduled to run on the same CPU.
+		 */
+		iscsi_thread_check_cpumask(conn, current, 0);
+
 		memset((void *)buffer, 0, ISCSI_HDR_LEN);
 		memset((void *)&iov, 0, sizeof(struct iovec));
 
@@ -5140,6 +5222,9 @@ int iscsi_close_connection(
 		crypto_free_hash(conn->conn_rx_hash.tfm);
 	if (conn->conn_tx_hash.tfm)
 		crypto_free_hash(conn->conn_tx_hash.tfm);
+
+	if (conn->conn_cpumask)
+		free_cpumask_var(conn->conn_cpumask);
 
 	kfree(conn->conn_ops);
 	conn->conn_ops = NULL;

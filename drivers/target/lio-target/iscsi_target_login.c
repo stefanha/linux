@@ -80,6 +80,11 @@ static int iscsi_login_init_conn(struct iscsi_conn *conn)
 	spin_lock_init(&conn->response_queue_lock);
 	spin_lock_init(&conn->state_lock);
 
+	if (!(zalloc_cpumask_var(&conn->conn_cpumask, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate conn->conn_cpumask\n");
+		return -ENOMEM;
+	}
+
 	return 0;
 }
 
@@ -703,6 +708,14 @@ static int iscsi_post_login_handler(
 
 		iscsi_post_login_start_timers(conn);
 		iscsi_activate_thread_set(conn, ts);
+		/*
+		 * Determine CPU mask to ensure connection's RX and TX kthreads
+		 * are scheduled on the same CPU.
+		 */
+		iscsi_thread_get_cpumask(conn);
+		conn->conn_rx_reset_cpumask = 1;
+		conn->conn_tx_reset_cpumask = 1;
+
 		iscsi_dec_conn_usage_count(conn);
 		if (stop_timer) {
 			spin_lock_bh(&se_tpg->session_lock);
@@ -752,6 +765,13 @@ static int iscsi_post_login_handler(
 
 	iscsi_post_login_start_timers(conn);
 	iscsi_activate_thread_set(conn, ts);
+	/*
+	 * Determine CPU mask to ensure connection's RX and TX kthreads
+	 * are scheduled on the same CPU.
+	 */
+	iscsi_thread_get_cpumask(conn);
+	conn->conn_rx_reset_cpumask = 1;
+	conn->conn_tx_reset_cpumask = 1;
 
 	iscsi_dec_conn_usage_count(conn);
 
@@ -1353,6 +1373,9 @@ old_sess_out:
 		crypto_free_hash(conn->conn_rx_hash.tfm);
 	if (conn->conn_tx_hash.tfm)
 		crypto_free_hash(conn->conn_tx_hash.tfm);
+
+	if (conn->conn_cpumask)
+		free_cpumask_var(conn->conn_cpumask);
 
 	kfree(conn->conn_ops);
 

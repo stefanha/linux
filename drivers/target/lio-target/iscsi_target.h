@@ -35,6 +35,7 @@ extern int lio_queue_status(struct se_cmd *);
 extern u16 lio_set_fabric_sense_len(struct se_cmd *, u32);
 extern u16 lio_get_fabric_sense_len(void);
 extern int lio_queue_tm_rsp(struct se_cmd *);
+extern void iscsi_thread_get_cpumask(struct iscsi_conn *);
 extern int iscsi_target_tx_thread(void *);
 extern int iscsi_target_rx_thread(void *);
 extern int iscsi_close_connection(struct iscsi_conn *);
