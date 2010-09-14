@@ -57,8 +57,7 @@
 static struct se_cmd *tcm_loop_allocate_core_cmd(
 	struct tcm_loop_hba *tl_hba,
 	struct se_portal_group *se_tpg,
-	struct scsi_cmnd *sc,
-	int data_direction)
+	struct scsi_cmnd *sc)
 {
 	struct se_cmd *se_cmd;
 	struct se_session *se_sess;
@@ -106,7 +105,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
-			scsi_bufflen(sc), data_direction, sam_task_attr,
+			scsi_bufflen(sc), sc->sc_data_direction, sam_task_attr,
 			&tl_cmd->tl_sense_buf[0]);
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
@@ -303,7 +302,6 @@ static int tcm_loop_queuecommand(
 	struct Scsi_Host *host = sc->device->host;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_tpg *tl_tpg;
-	int data_direction;
 
 	sc->scsi_done = done;
 
@@ -327,15 +325,9 @@ static int tcm_loop_queuecommand(
 	tl_tpg = &tl_hba->tl_hba_tpgs[sc->device->id];
 	se_tpg = &tl_tpg->tl_se_tpg;
 
-	if (sc->sc_data_direction == DMA_TO_DEVICE)
-		data_direction = SE_DIRECTION_WRITE;
-	else if (sc->sc_data_direction == DMA_FROM_DEVICE)
-		data_direction = SE_DIRECTION_READ;
-	else if (sc->sc_data_direction == DMA_NONE)
-		data_direction = SE_DIRECTION_NONE;
-	else {
+	if (sc->sc_data_direction == DMA_BIDIRECTIONAL) {
 		spin_lock_irq(host->host_lock);
-		printk(KERN_ERR "Unsupported sc->sc_data_direction: %d\n",
+		printk(KERN_ERR "Unsupported BIDI sc->sc_data_direction: %d\n",
 			sc->sc_data_direction);	
 		sc->result = host_byte(DID_ERROR);
 		(*done)(sc);
@@ -345,7 +337,7 @@ static int tcm_loop_queuecommand(
 	 * Determine the SAM Task Attribute and allocate tl_cmd and
 	 * tl_cmd->tl_se_cmd from TCM infrastructure
 	 */
-	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc, data_direction);
+	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc);
 	if (!(se_cmd)) {
 		spin_lock_irq(host->host_lock);
 		sc->result = host_byte(DID_ERROR);
@@ -421,7 +413,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
-				SE_DIRECTION_NONE, TASK_ATTR_SIMPLE,
+				DMA_NONE, TASK_ATTR_SIMPLE,
 				&tl_cmd->tl_sense_buf[0]);
 	/*
 	 * Allocate the LUN_RESET TMR

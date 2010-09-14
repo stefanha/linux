@@ -23,8 +23,6 @@
 #endif
 
 struct tcm_loop_cmd {
-	/* Data Direction from Linux/SCSI CDB+Data descriptor */
-	int sc_data_direction;
 	/* State of Linux/SCSI CDB+Data descriptor */
 	u32 sc_cmd_state;
 	/* Pointer to the CDB+Data descriptor from Linux/SCSI subsystem */
