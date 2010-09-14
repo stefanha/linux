@@ -23,7 +23,7 @@ extern int linux_blockdevice_check(int, int);
 #include <linux/kobject.h>
 
 struct stgt_plugin_task {
-	unsigned char stgt_cdb[SCSI_CDB_SIZE];
+	unsigned char stgt_cdb[MAX_COMMAND_SIZE];
 	unsigned char stgt_sense[SCSI_SENSE_BUFFERSIZE];
 	int	stgt_direction;
 	int	stgt_result;

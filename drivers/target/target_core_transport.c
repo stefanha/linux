@@ -1688,9 +1688,9 @@ static int transport_get_inquiry(
 	struct se_cmd *cmd;
 	unsigned char *buf;
 	int i;
-	unsigned char cdb[SCSI_CDB_SIZE];
+	unsigned char cdb[MAX_COMMAND_SIZE];
 
-	memset(cdb, 0, SCSI_CDB_SIZE);
+	memset(cdb, 0, MAX_COMMAND_SIZE);
 	cdb[0] = INQUIRY;
 	cdb[3] = (INQUIRY_LEN >> 8) & 0xff;
 	cdb[4] = (INQUIRY_LEN & 0xff);
@@ -1760,9 +1760,9 @@ static int transport_get_inquiry_vpd_serial(
 {
 	unsigned char *buf;
 	struct se_cmd *cmd;
-	unsigned char cdb[SCSI_CDB_SIZE];
+	unsigned char cdb[MAX_COMMAND_SIZE];
 
-	memset(cdb, 0, SCSI_CDB_SIZE);
+	memset(cdb, 0, MAX_COMMAND_SIZE);
 	cdb[0] = INQUIRY;
 	cdb[1] = 0x01; /* Query VPD */
 	cdb[2] = 0x80; /* Unit Serial Number */
@@ -2039,10 +2039,10 @@ static int transport_get_inquiry_vpd_device_ident(
 	unsigned char *buf, *page_83;
 	struct se_cmd *cmd;
 	struct t10_vpd *vpd;
-	unsigned char cdb[SCSI_CDB_SIZE];
+	unsigned char cdb[MAX_COMMAND_SIZE];
 	int ident_len, page_len, off = 4, ret = 0;
 
-	memset(cdb, 0, SCSI_CDB_SIZE);
+	memset(cdb, 0, MAX_COMMAND_SIZE);
 	cdb[0] = INQUIRY;
 	cdb[1] = 0x01; /* Query VPD */
 	cdb[2] = 0x83; /* Device Identifier */
@@ -2119,12 +2119,12 @@ int transport_rescan_evpd_device_ident(
 
 static int transport_get_read_capacity(struct se_device *dev)
 {
-	unsigned char cdb[SCSI_CDB_SIZE], *buf;
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
 	u32 blocks, v1, v2;
 	struct se_cmd *cmd;
 	unsigned long long blocks_long;
 
-	memset(cdb, 0, SCSI_CDB_SIZE);
+	memset(cdb, 0, MAX_COMMAND_SIZE);
 	cdb[0] = 0x25; /* READ_CAPACITY */
 
 	cmd = transport_allocate_passthrough(&cdb[0], DMA_FROM_DEVICE,
@@ -2151,7 +2151,7 @@ static int transport_get_read_capacity(struct se_device *dev)
 	printk(KERN_INFO "READ_CAPACITY returned 0xFFFFFFFF, issuing"
 			" SAI_READ_CAPACITY_16\n");
 
-	memset(cdb, 0, SCSI_CDB_SIZE);
+	memset(cdb, 0, MAX_COMMAND_SIZE);
 	cdb[0] = 0x9e; /* SERVICE_ACTION_IN */
 	cdb[1] = 0x10; /* SAI_READ_CAPACITY_16 */
 	cdb[13] = 12;
@@ -2634,7 +2634,7 @@ static int transport_process_control_sg_transform(
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
-		memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
+		memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
 
 	task->task_size = cmd->data_length;
 	task->task_sg_num = 1;
@@ -2674,7 +2674,7 @@ static int transport_process_control_nonsg_transform(
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
-		memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
+		memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
 
 	task->task_size = cmd->data_length;
 	task->task_sg_num = 0;
@@ -2707,7 +2707,7 @@ static int transport_process_non_data_transform(
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
-		memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
+		memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
 
 	task->task_size = cmd->data_length;
 	task->task_sg_num = 0;
@@ -2903,7 +2903,7 @@ int transport_generic_allocate_tasks(
 	/*
 	 * Copy the original CDB into T_TASK(cmd).
 	 */
-	memcpy(T_TASK(cmd)->t_task_cdb, cdb, SCSI_CDB_SIZE);
+	memcpy(T_TASK(cmd)->t_task_cdb, cdb, MAX_COMMAND_SIZE);
 	/*
 	 * Check for SAM Task Attribute Emulation
 	 */
@@ -7292,7 +7292,7 @@ u32 transport_generic_get_cdb_count(
 
 		cdb = TRANSPORT(dev)->get_cdb(task);
 		if ((cdb)) {
-			memcpy(cdb, T_TASK(cmd)->t_task_cdb, SCSI_CDB_SIZE);
+			memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
 			cmd->transport_split_cdb(task->task_lba,
 					&task->task_sectors, cdb);
 		}

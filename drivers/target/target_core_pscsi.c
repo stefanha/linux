@@ -262,11 +262,11 @@ static struct se_device *pscsi_add_device_to_list(
 	 * For TYPE_TAPE, attempt to determine blocksize with MODE_SENSE.
 	 */
 	if (sd->type == TYPE_TAPE) {
-		unsigned char *buf = NULL, cdb[SCSI_CDB_SIZE];
+		unsigned char *buf = NULL, cdb[MAX_COMMAND_SIZE];
 		struct se_cmd *cmd;
 		u32 blocksize;
 
-		memset(cdb, 0, SCSI_CDB_SIZE);
+		memset(cdb, 0, MAX_COMMAND_SIZE);
 		cdb[0] = MODE_SENSE;
 		cdb[4] = 0x0c; /* 12 bytes */
 

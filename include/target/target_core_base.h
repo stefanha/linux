@@ -4,6 +4,7 @@
 #include <linux/in.h>
 #include <linux/configfs.h>
 #include <linux/dma-mapping.h>
+#include <scsi/scsi_cmnd.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include "target_core_mib.h"
@@ -11,8 +12,6 @@
 #define TARGET_CORE_MOD_VERSION		"v4.0.0-rc3"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
-/* SCSI Command Descriptor Block Size a la SCSI's MAX_COMMAND_SIZE */
-#define SCSI_CDB_SIZE				16
 /* Used by transport_generic_allocate_iovecs() */
 #define TRANSPORT_IOV_DATA_BUFFER		5
 /* Maximum Number of LUNs per Target Portal Group */
@@ -408,7 +407,7 @@ struct se_queue_obj {
  * drivers/target/target_core_transport.c:__transport_alloc_se_cmd()
  */
 struct se_transport_task {
-	unsigned char		t_task_cdb[SCSI_CDB_SIZE];
+	unsigned char		t_task_cdb[MAX_COMMAND_SIZE];
 	unsigned long long	t_task_lba;
 	int			t_tasks_failed;
 	int			t_tasks_fua;

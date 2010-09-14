@@ -31,7 +31,7 @@ void rd_module_exit(void);
 
 struct rd_request {
 	/* SCSI CDB from iSCSI Command PDU */
-	unsigned char	rd_scsi_cdb[SCSI_CDB_SIZE];
+	unsigned char	rd_scsi_cdb[MAX_COMMAND_SIZE];
 	/* Data Direction */
 	u8		rd_data_direction;
 	/* Total length of request */
