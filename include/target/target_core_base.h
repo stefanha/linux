@@ -3,6 +3,7 @@
 
 #include <linux/in.h>
 #include <linux/configfs.h>
+#include <linux/dma-mapping.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include "target_core_mib.h"
@@ -39,14 +40,6 @@
 #define INQUIRY_VPD_SERIAL_LEN			254
 /* Used by transport_get_inquiry_vpd_device_ident() */
 #define INQUIRY_VPD_DEVICE_IDENTIFIER_LEN	254
-
-/* struct se_cmd->data_direction */
-enum se_direction_table {
-	SE_DIRECTION_NONE	= 0,
-	SE_DIRECTION_READ	= 1,
-	SE_DIRECTION_WRITE	= 2,
-	SE_DIRECTION_BIDI	= 3,
-};
 
 /* struct se_hba->hba_flags */
 enum hba_flags_table {
@@ -546,8 +539,8 @@ struct se_cmd {
 	u16			scsi_sense_length;
 	/* Delay for ALUA Active/NonOptimized state access in milliseconds */
 	int			alua_nonop_delay;
-	/* See enum se_direction_table */
-	int			data_direction;
+	/* See include/linux/dma-mapping.h */
+	enum dma_data_direction	data_direction;
 	/* For SAM Task Attribute */
 	int			sam_task_attr;
 	/* Transport protocol dependent state, see transport_state_table */

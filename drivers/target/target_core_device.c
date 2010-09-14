@@ -173,7 +173,7 @@ extern int __transport_get_lun_for_cmd(
 			deve->total_cmds++;
 			deve->total_bytes += se_cmd->data_length;
 
-			if (se_cmd->data_direction == SE_DIRECTION_WRITE) {
+			if (se_cmd->data_direction == DMA_TO_DEVICE) {
 				if (deve->lun_flags &
 						TRANSPORT_LUNFLAGS_READ_ONLY) {
 					read_only = 1;
@@ -181,7 +181,7 @@ extern int __transport_get_lun_for_cmd(
 				}
 				deve->write_bytes += se_cmd->data_length;
 			} else if (se_cmd->data_direction ==
-				   SE_DIRECTION_READ) {
+				   DMA_FROM_DEVICE) {
 				deve->read_bytes += se_cmd->data_length;
 			}
 		}
@@ -223,8 +223,8 @@ out:
 			/*
 			 * Force WRITE PROTECT for virtual LUN 0
 			 */
-			if ((se_cmd->data_direction != SE_DIRECTION_READ) &&
-			    (se_cmd->data_direction != SE_DIRECTION_NONE)) {
+			if ((se_cmd->data_direction != DMA_FROM_DEVICE) &&
+			    (se_cmd->data_direction != DMA_NONE)) {
 				se_cmd->scsi_sense_reason = TCM_WRITE_PROTECTED;
 				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 				return -1;
@@ -253,9 +253,9 @@ out:
 	struct se_device *dev = se_lun->lun_se_dev;
 	spin_lock(&dev->stats_lock);
 	dev->num_cmds++;
-	if (se_cmd->data_direction == SE_DIRECTION_WRITE)
+	if (se_cmd->data_direction == DMA_TO_DEVICE)
 		dev->write_bytes += se_cmd->data_length;
-	else if (se_cmd->data_direction == SE_DIRECTION_READ)
+	else if (se_cmd->data_direction == DMA_FROM_DEVICE)
 		dev->read_bytes += se_cmd->data_length;
 	spin_unlock(&dev->stats_lock);
 	}

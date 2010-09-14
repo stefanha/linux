@@ -1040,8 +1040,8 @@ static int rd_DIRECT_do_se_mem_map(
 	 * Currently prevent writers from multiple HW fabrics doing
 	 * pci_map_sg() to RD_DR's internal scatterlist memory.
 	 */
-	if (cmd->data_direction == SE_DIRECTION_WRITE) {
-		printk(KERN_ERR "SE_DIRECTION_WRITE not supported for"
+	if (cmd->data_direction == DMA_TO_DEVICE) {
+		printk(KERN_ERR "DMA_TO_DEVICE not supported for"
 				" RAMDISK_DR with task_sg_chaining=1\n");
 		return -1;
 	}

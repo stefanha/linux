@@ -1525,13 +1525,13 @@ EXPORT_SYMBOL(transport_check_device_tcq);
 unsigned char *transport_dump_cmd_direction(struct se_cmd *cmd)
 {
 	switch (cmd->data_direction) {
-	case SE_DIRECTION_NONE:
+	case DMA_NONE:
 		return "NONE";
-	case SE_DIRECTION_READ:
+	case DMA_FROM_DEVICE:
 		return "READ";
-	case SE_DIRECTION_WRITE:
+	case DMA_TO_DEVICE:
 		return "WRITE";
-	case SE_DIRECTION_BIDI:
+	case DMA_BIDIRECTIONAL:
 		return "BIDI";
 	default:
 		break;
@@ -1695,7 +1695,7 @@ static int transport_get_inquiry(
 	cdb[3] = (INQUIRY_LEN >> 8) & 0xff;
 	cdb[4] = (INQUIRY_LEN & 0xff);
 
-	cmd = transport_allocate_passthrough(&cdb[0],  SE_DIRECTION_READ,
+	cmd = transport_allocate_passthrough(&cdb[0],  DMA_FROM_DEVICE,
 			0, NULL, 0, INQUIRY_LEN, obj_ptr);
 	if (!(cmd))
 		return -1;
@@ -1769,7 +1769,7 @@ static int transport_get_inquiry_vpd_serial(
 	cdb[3] = (INQUIRY_VPD_SERIAL_LEN >> 8) & 0xff;
 	cdb[4] = (INQUIRY_VPD_SERIAL_LEN & 0xff);
 
-	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
+	cmd = transport_allocate_passthrough(&cdb[0], DMA_FROM_DEVICE,
 			0, NULL, 0, INQUIRY_VPD_SERIAL_LEN, obj_ptr);
 	if (!(cmd))
 		return -1;
@@ -2049,7 +2049,7 @@ static int transport_get_inquiry_vpd_device_ident(
 	cdb[3] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN >> 8) & 0xff;
 	cdb[4] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN & 0xff);
 
-	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
+	cmd = transport_allocate_passthrough(&cdb[0], DMA_FROM_DEVICE,
 			0, NULL, 0, INQUIRY_VPD_DEVICE_IDENTIFIER_LEN,
 			obj_ptr);
 	if (!(cmd))
@@ -2127,7 +2127,7 @@ static int transport_get_read_capacity(struct se_device *dev)
 	memset(cdb, 0, SCSI_CDB_SIZE);
 	cdb[0] = 0x25; /* READ_CAPACITY */
 
-	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
+	cmd = transport_allocate_passthrough(&cdb[0], DMA_FROM_DEVICE,
 			0, NULL, 0, READ_CAP_LEN, (void *)dev);
 	if (!(cmd))
 		return -1;
@@ -2156,7 +2156,7 @@ static int transport_get_read_capacity(struct se_device *dev)
 	cdb[1] = 0x10; /* SAI_READ_CAPACITY_16 */
 	cdb[13] = 12;
 
-	cmd = transport_allocate_passthrough(&cdb[0], SE_DIRECTION_READ,
+	cmd = transport_allocate_passthrough(&cdb[0], DMA_FROM_DEVICE,
 			0, NULL, 0, 12, (void *)dev);
 	if (!(cmd))
 		return -1;
@@ -2570,7 +2570,7 @@ static inline map_func_t transport_dev_get_map_SG(
 	struct se_device *dev,
 	int rw)
 {
-	return (rw == SE_DIRECTION_WRITE) ? dev->transport->cdb_write_SG :
+	return (rw == DMA_TO_DEVICE) ? dev->transport->cdb_write_SG :
 		dev->transport->cdb_read_SG;
 }
 
@@ -2578,7 +2578,7 @@ static inline map_func_t transport_dev_get_map_non_SG(
 	struct se_device *dev,
 	int rw)
 {
-	return (rw == SE_DIRECTION_WRITE) ? dev->transport->cdb_write_non_SG :
+	return (rw == DMA_TO_DEVICE) ? dev->transport->cdb_write_non_SG :
 		dev->transport->cdb_read_non_SG;
 }
 
@@ -2741,7 +2741,7 @@ struct se_cmd *__transport_alloc_se_cmd(
 	unsigned char *sense_buffer;
 	int gfp_type = (in_interrupt()) ? GFP_ATOMIC : GFP_KERNEL;
 
-	if (data_direction == SE_DIRECTION_BIDI) {
+	if (data_direction == DMA_BIDIRECTIONAL) {
 		printk(KERN_ERR "SCSI BiDirectional mode not supported yet\n");
 		return ERR_PTR(-ENOSYS);
 	}
@@ -5837,7 +5837,7 @@ static int transport_generic_cmd_sequencer(
 
 		cmd->cmd_spdtl = size;
 
-		if (cmd->data_direction == SE_DIRECTION_WRITE) {
+		if (cmd->data_direction == DMA_TO_DEVICE) {
 			printk(KERN_ERR "Rejecting underflow/overflow"
 					" WRITE data\n");
 			return TGCS_INVALID_CDB_FIELD;
@@ -6101,7 +6101,7 @@ int transport_generic_passthrough_async(
 		void *callback_arg, int complete_status),
 	void *callback_arg)
 {
-	int write = (cmd->data_direction == SE_DIRECTION_WRITE);
+	int write = (cmd->data_direction == DMA_TO_DEVICE);
 	int no_alloc = (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC);
 	int pt_done = (cmd->transport_passthrough_done != NULL);
 
@@ -6246,7 +6246,7 @@ void transport_generic_complete_ok(struct se_cmd *cmd)
 	}
 
 	switch (cmd->data_direction) {
-	case SE_DIRECTION_READ:
+	case DMA_FROM_DEVICE:
 		spin_lock(&cmd->se_lun->lun_sep_lock);
 		if (SE_LUN(cmd)->lun_sep) {
 			SE_LUN(cmd)->lun_sep->sep_stats.tx_data_octets +=
@@ -6255,15 +6255,15 @@ void transport_generic_complete_ok(struct se_cmd *cmd)
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
 		CMD_TFO(cmd)->queue_data_in(cmd);
 		break;
-	case SE_DIRECTION_WRITE:
+	case DMA_TO_DEVICE:
 		spin_lock(&cmd->se_lun->lun_sep_lock);
 		if (SE_LUN(cmd)->lun_sep) {
 			SE_LUN(cmd)->lun_sep->sep_stats.rx_data_octets +=
 				cmd->data_length;
 		}
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
-		/* Fall through for SE_DIRECTION_WRITE */
-	case SE_DIRECTION_NONE:
+		/* Fall through for DMA_TO_DEVICE */
+	case DMA_NONE:
 		CMD_TFO(cmd)->queue_status(cmd);
 		break;
 	default:
@@ -7413,7 +7413,7 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 	 * data has arrived. (ie: It gets handled by the transport processing
 	 * thread a second time)
 	 */
-	if (cmd->data_direction == SE_DIRECTION_WRITE) {
+	if (cmd->data_direction == DMA_TO_DEVICE) {
 		transport_add_tasks_to_state_queue(cmd);
 		return transport_generic_write_pending(cmd);
 	}
@@ -8124,8 +8124,8 @@ void transport_send_task_abort(struct se_cmd *cmd)
 	 * response.  This response with TASK_ABORTED status will be
 	 * queued back to fabric module by transport_check_aborted_status().
 	 */
-	if ((cmd->data_direction == SE_DIRECTION_WRITE) ||
-	    (cmd->data_direction == SE_DIRECTION_BIDI)) {
+	if ((cmd->data_direction == DMA_TO_DEVICE) ||
+	    (cmd->data_direction == DMA_BIDIRECTIONAL)) {
 		if (CMD_TFO(cmd)->write_pending_status(cmd) != 0) {
 			atomic_inc(&T_TASK(cmd)->t_transport_aborted);
 			smp_mb__after_atomic_inc();
@@ -8448,7 +8448,7 @@ get_cmd:
 				cmd->transport_error_status = ret;
 				transport_generic_request_failure(cmd, NULL,
 						0, (cmd->data_direction !=
-						    SE_DIRECTION_WRITE));
+						    DMA_TO_DEVICE));
 			}
 			/* Fall through */
 		case TRANSPORT_NEW_CMD:
@@ -8457,7 +8457,7 @@ get_cmd:
 				cmd->transport_error_status = ret;
 				transport_generic_request_failure(cmd, NULL,
 					0, (cmd->data_direction !=
-					 SE_DIRECTION_WRITE));
+					 DMA_TO_DEVICE));
 			}
 			break;
 		case TRANSPORT_PROCESS_WRITE:

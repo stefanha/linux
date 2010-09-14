@@ -271,7 +271,7 @@ static struct se_device *pscsi_add_device_to_list(
 		cdb[4] = 0x0c; /* 12 bytes */
 
 		cmd = transport_allocate_passthrough(&cdb[0],
-				SE_DIRECTION_READ, 0, NULL, 0, 12, dev);
+				DMA_FROM_DEVICE, 0, NULL, 0, 12, dev);
 		if (!(cmd)) {
 			printk(KERN_ERR "Unable to determine blocksize for"
 				" TYPE_TAPE\n");
@@ -1066,7 +1066,7 @@ static int pscsi_map_task_SG(struct se_task *task)
 	int nr_pages = (task->task_size + task->task_sg[0].offset +
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int nr_vecs = 0, ret = 0;
-	int rw = (TASK_CMD(task)->data_direction == SE_DIRECTION_WRITE);
+	int rw = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
 
 	if (!task->task_size)
 		return 0;

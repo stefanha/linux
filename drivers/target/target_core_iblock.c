@@ -603,7 +603,7 @@ static int iblock_do_task(struct se_task *task)
 	struct iblock_dev *ibd = (struct iblock_dev *)req->ib_dev;
 	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
 	struct bio *bio = req->ib_bio, *nbio = NULL;
-	int write = (TASK_CMD(task)->data_direction == SE_DIRECTION_WRITE);
+	int write = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
 	int ret;
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
