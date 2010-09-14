@@ -547,18 +547,18 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 	if (fcp->fc_tm_flags) {
 		task_attr = FCP_PTA_SIMPLE;
-		data_dir = SE_DIRECTION_NONE;
+		data_dir = DMA_NONE;
 		data_len = 0;
 	} else {
 		switch (fcp->fc_flags & (FCP_CFL_RDDATA | FCP_CFL_WRDATA)) {
 		case 0:
-			data_dir = SE_DIRECTION_NONE;
+			data_dir = DMA_NONE;
 			break;
 		case FCP_CFL_RDDATA:
-			data_dir = SE_DIRECTION_READ;
+			data_dir = DMA_FROM_DEVICE;
 			break;
 		case FCP_CFL_WRDATA:
-			data_dir = SE_DIRECTION_WRITE;
+			data_dir = DMA_TO_DEVICE;
 			break;
 		case FCP_CFL_WRDATA | FCP_CFL_RDDATA:
 			goto err;	/* TBD not supported by tcm_fc yet */
