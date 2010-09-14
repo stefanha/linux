@@ -544,7 +544,7 @@ struct se_cmd {
 	/* For SAM Task Attribute */
 	int			sam_task_attr;
 	/* Transport protocol dependent state, see transport_state_table */
-	int			t_state;
+	enum transport_state_table t_state;
 	/* Transport protocol dependent state for out of order CmdSNs */
 	int			deferred_t_state;
 	/* Transport specific error status */
@@ -794,7 +794,7 @@ struct se_subsystem_dev {
 
 struct se_device {
 	/* Type of disk transport used for device, see se_device_type_table */
-	u8			type;
+	enum se_device_type_table type;
 	/* Set to 1 if thread is NOT sleeping on thread_sem */
 	u8			thread_active;
 	u8			dev_status_timer_flags;
@@ -918,7 +918,7 @@ struct se_hba {
 
 struct se_lun {
 	/* See transport_lun_status_table */
-	int			lun_status;
+	enum transport_lun_status_table lun_status;
 	u32			lun_access;
 	u32			lun_flags;
 	u32			unpacked_lun;
@@ -964,7 +964,7 @@ struct se_tpg_np {
 
 struct se_portal_group {
 	/* Type of target portal group, see transport_tpg_type_table */
-	int			se_tpg_type;
+	enum transport_tpg_type_table se_tpg_type;
 	/* Number of ACLed Initiator Nodes for this TPG */
 	u32			num_node_acls;
 	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
