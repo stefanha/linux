@@ -1503,8 +1503,8 @@ done:
 			" with immediate bit set, aborting connection\n");
 		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn);
 	}
-	data_direction = (hdr->flags & W_BIT) ? ISCSI_WRITE :
-			 (hdr->flags & R_BIT) ? ISCSI_READ : ISCSI_NONE;
+	data_direction = (hdr->flags & W_BIT) ? DMA_TO_DEVICE :
+			 (hdr->flags & R_BIT) ? DMA_FROM_DEVICE : DMA_NONE;
 
 	cmd = iscsi_allocate_se_cmd(conn, hdr->exp_xfer_len, data_direction,
 				(hdr->flags & SAM2_ATTR));
@@ -1537,7 +1537,7 @@ done:
 	cmd->exp_stat_sn	= hdr->exp_stat_sn;
 	cmd->first_burst_len	= hdr->length;
 
-	if (cmd->data_direction == ISCSI_READ) {
+	if (cmd->data_direction == DMA_FROM_DEVICE) {
 		struct iscsi_datain_req *dr;
 
 		dr = iscsi_allocate_datain_req();
@@ -1799,7 +1799,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		return iscsi_dump_data_payload(conn, hdr->length, 1);
 	}
 
-	if (cmd->data_direction != ISCSI_WRITE) {
+	if (cmd->data_direction != DMA_TO_DEVICE) {
 		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT for a"
 			" NON-WRITE command.\n", cmd->init_task_tag);
 		return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
@@ -2146,7 +2146,7 @@ static inline int iscsi_handle_nop_out(
 		cmd->targ_xfer_tag	= 0xFFFFFFFF;
 		cmd->cmd_sn		= hdr->cmd_sn;
 		cmd->exp_stat_sn	= hdr->exp_stat_sn;
-		cmd->data_direction	= ISCSI_NONE;
+		cmd->data_direction	= DMA_NONE;
 	}
 
 	if (hdr->length && (hdr->targ_xfer_tag == 0xFFFFFFFF)) {
@@ -2634,7 +2634,7 @@ static inline int iscsi_handle_text_cmd(
 	cmd->targ_xfer_tag	= 0xFFFFFFFF;
 	cmd->cmd_sn		= hdr->cmd_sn;
 	cmd->exp_stat_sn	= hdr->exp_stat_sn;
-	cmd->data_direction	= ISCSI_NONE;
+	cmd->data_direction	= DMA_NONE;
 
 	iscsi_attach_cmd_to_queue(conn, cmd);
 	iscsi_ack_from_expstatsn(conn, hdr->exp_stat_sn);
@@ -2838,7 +2838,7 @@ static inline int iscsi_handle_logout_cmd(
 	cmd->exp_stat_sn        = hdr->exp_stat_sn;
 	cmd->logout_cid         = hdr->cid;
 	cmd->logout_reason      = reason_code;
-	cmd->data_direction     = ISCSI_NONE;
+	cmd->data_direction     = DMA_NONE;
 
 	/*
 	 * We need to sleep in these cases (by returning 1) until the Logout
@@ -4576,7 +4576,7 @@ get_immediate:
 			case ISTATE_REMOVE:
 				spin_unlock_bh(&cmd->istate_lock);
 
-				if (cmd->data_direction == ISCSI_WRITE)
+				if (cmd->data_direction == DMA_TO_DEVICE)
 					iscsi_stop_dataout_timer(cmd);
 
 				spin_lock_bh(&conn->cmd_lock);
@@ -5101,7 +5101,7 @@ static void iscsi_stop_timers_for_cmds(
 
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
-		if (cmd->data_direction == ISCSI_WRITE)
+		if (cmd->data_direction == DMA_TO_DEVICE)
 			iscsi_stop_dataout_timer(cmd);
 	}
 	spin_unlock_bh(&conn->cmd_lock);

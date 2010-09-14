@@ -518,9 +518,9 @@ int iscsi_handle_recovery_datain_or_r2t(
 	 * FIXME: This will not work for bidi commands.
 	 */
 	switch (cmd->data_direction) {
-	case ISCSI_WRITE:
+	case DMA_TO_DEVICE:
 		return iscsi_handle_r2t_snack(cmd, buf, begrun, runlength);
-	case ISCSI_READ:
+	case DMA_FROM_DEVICE:
 		return iscsi_handle_recovery_datain(cmd, buf, begrun,
 				runlength);
 	default:
@@ -1064,7 +1064,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		 */
 		spin_unlock_bh(&cmd->istate_lock);
 
-		if ((cmd->data_direction == ISCSI_WRITE) &&
+		if ((cmd->data_direction == DMA_TO_DEVICE) &&
 		    !(cmd->cmd_flags & ICF_NON_IMMEDIATE_UNSOLICITED_DATA)) {
 			/*
 			 * Send the delayed TASK_ABORTED status for WRITEs if

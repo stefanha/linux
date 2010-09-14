@@ -112,13 +112,6 @@
 #define ISCSI_DEVATTRIB_ADD_LUN_ACL		3
 #define ISCSI_DEVATTRIB_DELETE_LUN_ACL		4
 
-/* struct iscsi_cmd->data_direction, same values as target_core_base.h
-   and struct se_cmd->data_direction  */
-#define ISCSI_NONE				0
-#define ISCSI_READ				1
-#define ISCSI_WRITE				2
-#define ISCSI_BIDI				3
-
 /* struct iscsi_tiqn->tiqn_state */
 #define TIQN_STATE_ACTIVE			1
 #define TIQN_STATE_SHUTDOWN			2
@@ -353,8 +346,6 @@ struct iscsi_r2t {
 } ____cacheline_aligned;
 
 struct iscsi_cmd {
-	/* iSCSI data direction */
-	u8			data_direction;
 	u8			dataout_timer_flags;
 	/* DataOUT timeout retries */
 	u8			dataout_timeout_retries;
@@ -443,6 +434,8 @@ struct iscsi_cmd {
 	u32			tx_size;
 	/* Buffer used for various purposes */
 	void			*buf_ptr;
+	/* See include/linux/dma-mapping.h */
+	enum dma_data_direction	data_direction;
 	/* iSCSI PDU Header + CRC */
 	unsigned char		pdu[ISCSI_HDR_LEN + CRC_LEN];
 	/* Number of times struct iscsi_cmd is present in immediate queue */

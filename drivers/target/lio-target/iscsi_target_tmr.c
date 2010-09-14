@@ -450,11 +450,11 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
 	}
 
 	switch (cmd->data_direction) {
-	case ISCSI_WRITE:
+	case DMA_TO_DEVICE:
 		return iscsi_task_reassign_complete_write(cmd, tmr_req);
-	case ISCSI_READ:
+	case DMA_FROM_DEVICE:
 		return iscsi_task_reassign_complete_read(cmd, tmr_req);
-	case ISCSI_NONE:
+	case DMA_NONE:
 		return iscsi_task_reassign_complete_none(cmd, tmr_req);
 	default:
 		printk(KERN_ERR "Unknown cmd->data_direction: 0x%02x\n",
@@ -867,7 +867,7 @@ int iscsi_check_task_reassign_expdatasn(
 	if (se_cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION)
 		return 0;
 
-	if (ref_cmd->data_direction == ISCSI_NONE)
+	if (ref_cmd->data_direction == DMA_NONE)
 		return 0;
 
 	/*
@@ -877,7 +877,7 @@ int iscsi_check_task_reassign_expdatasn(
 	 * Also check that the Initiator is not re-requesting DataIN that has
 	 * already been acknowledged with a DataAck SNACK.
 	 */
-	if (ref_cmd->data_direction == ISCSI_READ) {
+	if (ref_cmd->data_direction == DMA_FROM_DEVICE) {
 		if (tmr_req->exp_data_sn > ref_cmd->data_sn) {
 			printk(KERN_ERR "Received ExpDataSN: 0x%08x for READ"
 				" in TMR TASK_REASSIGN greater than command's"
@@ -903,7 +903,7 @@ int iscsi_check_task_reassign_expdatasn(
 	 *
 	 * Do the magic in iscsi_task_reassign_prepare_write().
 	 */
-	if (ref_cmd->data_direction == ISCSI_WRITE) {
+	if (ref_cmd->data_direction == DMA_TO_DEVICE) {
 		if (tmr_req->exp_data_sn > ref_cmd->r2t_sn) {
 			printk(KERN_ERR "Received ExpDataSN: 0x%08x for WRITE"
 				" in TMR TASK_REASSIGN greater than command's"

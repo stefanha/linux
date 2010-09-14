@@ -329,7 +329,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	if (!(cmd))
 		return NULL;
 
-	cmd->data_direction = SE_DIRECTION_NONE;
+	cmd->data_direction = DMA_NONE;
 
 	cmd->tmr_req = kzalloc(sizeof(struct iscsi_tmr_req), GFP_KERNEL);
 	if (!(cmd->tmr_req)) {
@@ -349,7 +349,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	transport_init_se_cmd(se_cmd, &lio_target_fabric_configfs->tf_ops,
-				SESS(conn)->se_sess, 0, SE_DIRECTION_NONE,
+				SESS(conn)->se_sess, 0, DMA_NONE,
 				TASK_ATTR_SIMPLE, &cmd->sense_buffer[0]);
 
 	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd,
@@ -384,13 +384,13 @@ int iscsi_decide_list_to_build(
 	    SESS_OPS(sess)->DataPDUInOrder)
 		return 0;
 
-	if (cmd->data_direction == ISCSI_NONE)
+	if (cmd->data_direction == DMA_NONE)
 		return 0;
 
 	na = iscsi_tpg_get_node_attrib(sess);
 	memset(&bl, 0, sizeof(struct iscsi_build_list));
 
-	if (cmd->data_direction == ISCSI_READ) {
+	if (cmd->data_direction == DMA_FROM_DEVICE) {
 		bl.data_direction = ISCSI_PDU_READ;
 		bl.type = PDULIST_NORMAL;
 		if (na->random_datain_pdu_offsets)

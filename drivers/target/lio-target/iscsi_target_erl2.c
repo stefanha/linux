@@ -490,7 +490,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		cmd->deferred_i_state = cmd->i_state;
 		cmd->i_state = ISTATE_IN_CONNECTION_RECOVERY;
 
-		if (cmd->data_direction == ISCSI_WRITE)
+		if (cmd->data_direction == DMA_TO_DEVICE)
 			iscsi_stop_dataout_timer(cmd);
 
 		cmd->sess = SESS(conn);
