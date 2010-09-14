@@ -16,7 +16,10 @@
 #define TRANSPORT_IOV_DATA_BUFFER		5
 /* Maximum Number of LUNs per Target Portal Group */
 #define TRANSPORT_MAX_LUNS_PER_TPG		256
-/* From include/scsi/scsi_cmnd.h:SCSI_SENSE_BUFFERSIZE */
+/*
+ * From include/scsi/scsi_cmnd.h:SCSI_SENSE_BUFFERSIZE, currently
+ * defined 96, but the real limit is 252 (or 260 including the header)
+ */
 #define TRANSPORT_SENSE_BUFFER			SCSI_SENSE_BUFFERSIZE
 /* Used by transport_send_check_condition_and_sense() */
 #define SPC_SENSE_KEY_OFFSET			2
