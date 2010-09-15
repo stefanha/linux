@@ -2745,11 +2745,6 @@ struct se_cmd *__transport_alloc_se_cmd(
 	unsigned char *sense_buffer;
 	int gfp_type = (in_interrupt()) ? GFP_ATOMIC : GFP_KERNEL;
 
-	if (data_direction == DMA_BIDIRECTIONAL) {
-		printk(KERN_ERR "SCSI BiDirectional mode not supported yet\n");
-		return ERR_PTR(-ENOSYS);
-	}
-
 	cmd = kmem_cache_zalloc(se_cmd_cache, gfp_type);
 	if (!(cmd)) {
 		printk(KERN_ERR "kmem_cache_alloc() failed for se_cmd_cache\n");
@@ -5526,7 +5521,8 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case XDWRITEREAD_10:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
-		if (cmd->data_direction != DMA_BIDIRECTIONAL)
+		if ((cmd->data_direction != DMA_TO_DEVICE) ||
+		    !(T_TASK(cmd)->t_tasks_bidi))
 			return TGCS_INVALID_CDB_FIELD;
 		sectors = transport_get_sectors_10(cdb, cmd, &sector_ret);
 		if (sector_ret)
@@ -5913,10 +5909,9 @@ static int transport_generic_cmd_sequencer(
 
 		cmd->cmd_spdtl = size;
 
-		if ((cmd->data_direction == DMA_TO_DEVICE) ||
-		    (cmd->data_direction == DMA_BIDIRECTIONAL)) {
+		if (cmd->data_direction == DMA_TO_DEVICE) {
 			printk(KERN_ERR "Rejecting underflow/overflow"
-					" WRITE or BIDI data\n");
+					" WRITE data\n");
 			return TGCS_INVALID_CDB_FIELD;
 		}
 		/*
@@ -6378,6 +6373,19 @@ void transport_generic_complete_ok(struct se_cmd *cmd)
 				cmd->data_length;
 		}
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
+		/*
+		 * Check if we need to send READ payload for BIDI-COMMAND
+		 */	
+		if (T_TASK(cmd)->t_mem_bidi_list != NULL) {
+			spin_lock(&cmd->se_lun->lun_sep_lock);
+			if (SE_LUN(cmd)->lun_sep) {
+				SE_LUN(cmd)->lun_sep->sep_stats.tx_data_octets +=
+					cmd->data_length;
+			}
+			spin_unlock(&cmd->se_lun->lun_sep_lock);
+			CMD_TFO(cmd)->queue_data_in(cmd);
+			break;
+		}
 		/* Fall through for DMA_TO_DEVICE */
 	case DMA_NONE:
 		CMD_TFO(cmd)->queue_status(cmd);
@@ -6614,22 +6622,14 @@ int transport_generic_map_mem_to_cmd(
 
 	if (!(mem) || !(se_mem_num))
 		return 0;
-
-	if ((cmd->data_direction == DMA_BIDIRECTIONAL) &&
-	    (!(mem_bidi_in) || !(se_mem_bidi_num))) {
-		printk(KERN_ERR "Unable to process DMA_BIDIRECTIONAL with mem_bidi_in:"
-			" %p and se_mem_bidi_num: %u\n", mem_bidi_in, se_mem_bidi_num);
-		return -EINVAL;
-	}
-
 	/*
 	 * Passed *mem will contain a list_head containing preformatted
 	 * struct se_mem elements...
 	 */
 	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM)) {
-		if (cmd->data_direction == DMA_BIDIRECTIONAL) {
+		if ((mem_bidi_in) || (se_mem_bidi_num)) {
 			printk(KERN_ERR "SCF_CMD_PASSTHROUGH_NOALLOC not supported"
-				" with DMA_BIDIRECTIONAL\n");
+				" with BIDI-COMMAND\n");
 			return -ENOSYS;
 		}
 
@@ -6662,7 +6662,7 @@ int transport_generic_map_mem_to_cmd(
 		/*
 		 * Setup BIDI READ list of struct se_mem elements
 		 */
-		if (cmd->data_direction == DMA_BIDIRECTIONAL) {
+		if ((mem_bidi_in) && (se_mem_bidi_num)) {
 			T_TASK(cmd)->t_mem_bidi_list = transport_init_se_mem_list();
 			if (!(T_TASK(cmd)->t_mem_bidi_list)) {
 				kfree(T_TASK(cmd)->t_mem_list);
@@ -6827,7 +6827,6 @@ int transport_new_cmd_obj(
 	int post_execute)
 {
 	struct se_device *dev = SE_DEV(cmd);
-	enum dma_data_direction data_direction;
 	u32 task_cdbs = 0, rc;
 
 	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)) {
@@ -6841,7 +6840,7 @@ int transport_new_cmd_obj(
 		 * T_TASK(cmd)->t_mem_bidi_list so the READ struct se_tasks
 		 * are queued first..
 		 */
-		if (cmd->data_direction == DMA_BIDIRECTIONAL) {
+		if (T_TASK(cmd)->t_mem_bidi_list != NULL) {
 			rc = transport_generic_get_cdb_count(cmd, ti,
 				T_TASK(cmd)->t_task_lba,
 				T_TASK(cmd)->t_tasks_sectors,
@@ -6853,13 +6852,7 @@ int transport_new_cmd_obj(
 				return PYX_TRANSPORT_LU_COMM_FAILURE;
 			}
 			ti->ti_set_counts = 0;
-			/*
-			 * Setup the DMA_TO_DEVICE direction for the next
-			 * call to transport_generic_get_cdb_count()
-			 */
-			data_direction = DMA_TO_DEVICE;
-		} else
-			data_direction = cmd->data_direction;
+		}
 		/*
 		 * Setup the tasks and memory from T_TASK(cmd)->t_mem_list
 		 * Note for BIDI transfers this will contain the WRITE payload
@@ -6867,7 +6860,7 @@ int transport_new_cmd_obj(
 		task_cdbs = transport_generic_get_cdb_count(cmd, ti,
 				T_TASK(cmd)->t_task_lba,
 				T_TASK(cmd)->t_tasks_sectors,
-				data_direction,	T_TASK(cmd)->t_mem_list);
+				cmd->data_direction, T_TASK(cmd)->t_mem_list);
 		if (!(task_cdbs)) {
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			cmd->scsi_sense_reason =
@@ -6942,9 +6935,9 @@ int transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 	if (!(T_TASK(cmd)->t_mem_list))
 		return -ENOMEM;
 	/*
-	 * Setup BIDI READ list of struct se_mem elements
+	 * Setup BIDI-COMMAND READ list of struct se_mem elements
 	 */
-	if (cmd->data_direction == DMA_BIDIRECTIONAL) {
+	if (T_TASK(cmd)->t_tasks_bidi) {
 		T_TASK(cmd)->t_mem_bidi_list = transport_init_se_mem_list();
 		if (!(T_TASK(cmd)->t_mem_bidi_list)) {
 			kfree(T_TASK(cmd)->t_mem_list);
@@ -8341,8 +8334,7 @@ void transport_send_task_abort(struct se_cmd *cmd)
 	 * response.  This response with TASK_ABORTED status will be
 	 * queued back to fabric module by transport_check_aborted_status().
 	 */
-	if ((cmd->data_direction == DMA_TO_DEVICE) ||
-	    (cmd->data_direction == DMA_BIDIRECTIONAL)) {
+	if (cmd->data_direction == DMA_TO_DEVICE) {
 		if (CMD_TFO(cmd)->write_pending_status(cmd) != 0) {
 			atomic_inc(&T_TASK(cmd)->t_transport_aborted);
 			smp_mb__after_atomic_inc();

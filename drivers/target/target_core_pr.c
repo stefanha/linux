@@ -497,8 +497,7 @@ static int core_scsi3_pr_seq_non_holder(
 	 * WRITE_EXCLUSIVE_* reservation.
 	 */
 	if ((we) && !(registered_nexus)) {
-		if ((cmd->data_direction == DMA_TO_DEVICE) ||
-		    (cmd->data_direction == DMA_BIDIRECTIONAL)) {
+		if (cmd->data_direction == DMA_TO_DEVICE) {
 			/*
 			 * Conflict for write exclusive
 			 */
