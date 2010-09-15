@@ -3264,6 +3264,11 @@ void transport_generic_request_failure(
 			CMD_TFO(cmd)->queue_status(cmd);
 
 		goto check_stop;
+	case PYX_TRANSPORT_USE_SENSE_REASON:
+		/*
+		 * struct se_cmd->scsi_sense_reason already set
+		 */
+		break;
 	default:
 		printk(KERN_ERR "Unknown transport error for CDB 0x%02x: %d\n",
 			T_TASK(cmd)->t_task_cdb[0],
@@ -8449,6 +8454,7 @@ get_cmd:
 				transport_generic_request_failure(cmd, NULL,
 						0, (cmd->data_direction !=
 						    DMA_TO_DEVICE));
+				break;
 			}
 			/* Fall through */
 		case TRANSPORT_NEW_CMD:
