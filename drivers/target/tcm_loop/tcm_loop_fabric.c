@@ -311,34 +311,29 @@ int tcm_loop_get_cmd_state(struct se_cmd *se_cmd)
 	return tl_cmd->sc_cmd_state;
 }
 
-#warning FIXME: tcm_loop_shutdown_session()
 int tcm_loop_shutdown_session(struct se_session *se_sess)
 {
-	BUG();
 	return 0;
 }
 
-#warning FIXME: tcm_loop_close_session()
 void tcm_loop_close_session(struct se_session *se_sess)
 {
-	BUG();
+	return;
 };
 
 
-#warning FIXME: tcm_loop_stop_session()
 void tcm_loop_stop_session(
 	struct se_session *se_sess,
 	int sess_sleep,
 	int conn_sleep)
 {
-	BUG();
+	return;
 }
 
 
-#warning FIXME: tcm_loop_fall_back_to_erl0()
 void tcm_loop_fall_back_to_erl0(struct se_session *se_sess)
 {
-	BUG();
+	return;
 }
 
 int tcm_loop_write_pending(struct se_cmd *se_cmd)
