@@ -612,7 +612,7 @@ struct se_cmd {
 					struct se_unmap_sg *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
-	void (*transport_xor_callback)(struct se_cmd *);
+	void (*transport_complete_callback)(struct se_cmd *);
 	void (*callback)(struct se_cmd *cmd, void *callback_arg,
 			int complete_status);
 	void *callback_arg;

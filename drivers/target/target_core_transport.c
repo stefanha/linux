@@ -5535,7 +5535,7 @@ static int transport_generic_cmd_sequencer(
 		/*
 		 * Setup BIDI XOR callback to be run during transport_generic_complete_ok()
 		 */
-		cmd->transport_xor_callback = &transport_xor_callback;
+		cmd->transport_complete_callback = &transport_xor_callback;
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
@@ -6343,21 +6343,15 @@ void transport_generic_complete_ok(struct se_cmd *cmd)
 			return;
 		}
 	}
+	/*
+	 * Check for a callback, used by amoungst other things
+	 * XDWRITE_READ_10 emulation.
+	 */
+	if (cmd->transport_complete_callback)
+		cmd->transport_complete_callback(cmd);
 
 	switch (cmd->data_direction) {
 	case DMA_FROM_DEVICE:
-	case DMA_BIDIRECTIONAL:
-		/*
-		 * Check for the XOR BIDI callback emulation for XD_WRITEREAD_*
-		 */
-		if (cmd->transport_xor_callback) {
-			/*
-			 * For fully emulated HBAs, this will translate to
-			 * transport_xor_callback()
-			 */
-			cmd->transport_xor_callback(cmd);
-		}
-
 		spin_lock(&cmd->se_lun->lun_sep_lock);
 		if (SE_LUN(cmd)->lun_sep) {
 			SE_LUN(cmd)->lun_sep->sep_stats.tx_data_octets +=
