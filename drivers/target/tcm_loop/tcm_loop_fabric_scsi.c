@@ -143,24 +143,18 @@ int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 	ret = transport_generic_allocate_tasks(se_cmd, tl_cmd->sc->cmnd);
 	if (ret == -1) {
 		/* Out of Resources */
-		transport_send_check_condition_and_sense(se_cmd,
-				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
-		return 0;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	} else if (ret == -2) {
 		/*
 		 * Handle case for SAM_STAT_RESERVATION_CONFLICT
 		 */
-		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT) {
-			tcm_loop_queue_status(se_cmd);
-			return 0;
-		}
+		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
+			return PYX_TRANSPORT_RESERVATION_CONFLICT;
 		/*
 		 * Otherwise, return SAM_STAT_CHECK_CONDITION and return
 		 * sense data.
 		 */
-		transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
-		return 0;
+		return PYX_TRANSPORT_USE_SENSE_REASON;
 	}
 	/*
 	 * Setup the struct scatterlist memory from the received
@@ -180,12 +174,9 @@ int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 	 * physical memory at sg->page_link.
 	 */
 	ret = transport_generic_map_mem_to_cmd(se_cmd, mem_ptr,
-				scsi_sg_count(sc));
-	if (ret < 0) {
-		transport_send_check_condition_and_sense(se_cmd,
-				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
-		return 0;
-	}
+			scsi_sg_count(sc), mem_bidi_ptr, sg_no_bidi);
+	if (ret < 0)
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	return 0;
 }
