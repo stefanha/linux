@@ -232,6 +232,8 @@ extern void transport_memcpy_write_contig(struct se_cmd *, struct scatterlist *,
 				unsigned char *);
 extern void transport_memcpy_read_contig(struct se_cmd *, unsigned char *,
 				struct scatterlist *);
+extern void transport_memcpy_se_mem_read_contig(struct se_cmd *,
+				unsigned char *, struct list_head *);
 extern int transport_generic_passthrough_async(struct se_cmd *cmd,
 				void(*callback)(struct se_cmd *cmd,
 				void *callback_arg, int complete_status),
@@ -242,7 +244,8 @@ extern void transport_generic_complete_ok(struct se_cmd *);
 extern void transport_free_dev_tasks(struct se_cmd *);
 extern void transport_release_fe_cmd(struct se_cmd *);
 extern int transport_generic_remove(struct se_cmd *, int, int);
-extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, void *, u32);
+extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, void *, u32,
+				void *, u32);
 extern int transport_lun_wait_for_tasks(struct se_cmd *, struct se_lun *);
 extern int transport_clear_lun_from_sessions(struct se_lun *);
 extern int transport_check_aborted_status(struct se_cmd *, int);
@@ -271,8 +274,9 @@ extern int transport_map_mem_to_sg(struct se_task *, struct list_head *,
 extern void transport_do_task_sg_chain(struct se_cmd *);
 extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 					struct se_transform_info *,
-					unsigned long long, u32, struct se_mem *,
-					struct se_mem **);
+					unsigned long long, u32,
+					enum dma_data_direction,
+					struct list_head *);
 extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);

@@ -419,6 +419,7 @@ struct se_transport_task {
 	u32			t_tasks_no;
 	u32			t_tasks_sectors;
 	u32			t_tasks_se_num;
+	u32			t_tasks_se_bidi_num;
 	u32			t_tasks_sg_chained_no;
 	atomic_t		t_fe_count;
 	atomic_t		t_se_count;
@@ -447,8 +448,10 @@ struct se_transport_task {
 	struct scatterlist	t_tasks_sg_bounce;
 	void			*t_task_buf;
 	void			*t_task_pt_buf;
-	struct list_head	t_task_list;
 	struct list_head	*t_mem_list;
+	/* Used for BIDI READ */
+	struct list_head	*t_mem_bidi_list;
+	struct list_head	t_task_list;
 } ____cacheline_aligned;
 
 struct se_task {
@@ -598,7 +601,8 @@ struct se_cmd {
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
 	struct se_task *(*transport_get_task)(struct se_transform_info *,
-					struct se_cmd *, void *);
+					struct se_cmd *, void *,
+					enum dma_data_direction);
 	int (*transport_map_buffers_to_tasks)(struct se_cmd *);
 	void (*transport_map_SG_segments)(struct se_unmap_sg *);
 	void (*transport_passthrough_done)(struct se_cmd *);
@@ -607,6 +611,7 @@ struct se_cmd {
 					struct se_unmap_sg *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
+	void (*transport_xor_callback)(struct se_cmd *);
 	void (*callback)(struct se_cmd *cmd, void *callback_arg,
 			int complete_status);
 	void *callback_arg;
