@@ -64,7 +64,6 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	struct tcm_loop_nexus *tl_nexus = tl_hba->tl_nexus;
 	struct tcm_loop_cmd *tl_cmd;
 	int sam_task_attr;
-	enum dma_data_direction data_direction;
 
 	if (!(tl_nexus)) {
 		scmd_printk(KERN_ERR, sc, "TCM_Loop I_T Nexus"
@@ -78,18 +77,11 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_cmd\n");
 		return NULL;
 	}
+	se_cmd = &tl_cmd->tl_se_cmd;
 	/*
 	 * Save the pointer to struct scsi_cmnd *sc
 	 */
 	tl_cmd->sc = sc;
-	/*
-	 * Check for scsi_bidi_cmnd() to signal TCM Core for DMA_BIDIRECTIONAL
-	 */
-	if (scsi_bidi_cmnd(sc))
-		data_direction = DMA_BIDIRECTIONAL;
-	else
-		data_direction = sc->sc_data_direction;
-
 	/*
 	 * Locate the SAM Task Attr from struct scsi_cmnd *
 	 */
@@ -108,13 +100,18 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	} else
 		sam_task_attr = TASK_ATTR_SIMPLE;
 
-	se_cmd = &tl_cmd->tl_se_cmd;
 	/*
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
-			scsi_bufflen(sc), data_direction, sam_task_attr,
+			scsi_bufflen(sc), sc->sc_data_direction, sam_task_attr,
 			&tl_cmd->tl_sense_buf[0]);
+
+	/*
+	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
+	 */
+	if (scsi_bidi_cmnd(sc))
+		T_TASK(se_cmd)->t_tasks_bidi = 1;
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
@@ -177,7 +174,7 @@ int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 		 * For BIDI commands, pass in the extra READ buffer
 		 * to transport_generic_map_mem_to_cmd() below..
 		 */
-		if (se_cmd->data_direction == DMA_BIDIRECTIONAL) {
+		if (T_TASK(se_cmd)->t_tasks_bidi) {
 			struct scsi_data_buffer *sdb = scsi_in(sc);
 
 			mem_bidi_ptr = (void *)sdb->table.sgl;
