@@ -84,7 +84,7 @@
 /* Disabled by default in production mode w/ explict ACLs */
 #define TA_PROD_MODE_WRITE_PROTECT	0
 /* Disabled by default for the moment for testing... */
-#define TA_CRC32C_X86_OFFLOAD		0
+#define TA_CRC32C_X86_OFFLOAD		1
 #define TA_CACHE_CORE_NPS		0
 
 /* struct iscsi_data_count->type */
