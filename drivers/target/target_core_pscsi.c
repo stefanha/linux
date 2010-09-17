@@ -743,7 +743,7 @@ static inline void pscsi_blk_init_request(
 	 * Load the referenced struct se_task's SCSI CDB into
 	 * include/linux/blkdev.h:struct request->cmd
 	 */
-	pt->pscsi_req->cmd_len = COMMAND_SIZE(pt->pscsi_cdb[0]);
+	pt->pscsi_req->cmd_len = scsi_command_size(pt->pscsi_cdb);
 	memcpy(pt->pscsi_req->cmd, pt->pscsi_cdb, pt->pscsi_req->cmd_len);
 	/*
 	 * Setup pointer for outgoing sense data.

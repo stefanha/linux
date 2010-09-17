@@ -28,6 +28,7 @@
 
 #include <linux/net.h>
 #include <linux/string.h>
+#include <scsi/scsi.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -146,4 +147,41 @@ void split_cdb_RW_16(
 {
 	cdb[0] = (rw) ? 0x8a : 0x88;
 	split_cdb_XX_16(lba, sectors, &cdb[0]);
+}
+
+/*
+ *	split_cdb_XX_32():
+ *	
+ * 	64-bit LBA w/ 32-bit SECTORS such as READ_32, WRITE_32 and XDWRITEREAD_32
+ */
+void split_cdb_XX_32(
+	unsigned long long lba,
+	u32 *sectors,
+	unsigned char *cdb)
+{
+	cdb[12] = (lba >> 56) & 0xff;
+	cdb[13] = (lba >> 48) & 0xff;
+	cdb[14] = (lba >> 40) & 0xff;
+	cdb[15] = (lba >> 32) & 0xff;
+	cdb[16] = (lba >> 24) & 0xff;
+	cdb[17] = (lba >> 16) & 0xff;
+	cdb[18] = (lba >> 8) & 0xff;
+	cdb[19] = lba & 0xff;
+	cdb[28] = (*sectors >> 24) & 0xff;
+	cdb[29] = (*sectors >> 16) & 0xff;
+	cdb[30] = (*sectors >> 8) & 0xff;
+	cdb[31] = *sectors & 0xff;
+}
+
+void split_cdb_RW_32(
+	unsigned long long lba,
+	u32 *sectors,
+	unsigned char *cdb,
+	int rw)
+{
+	/*
+	 * Set service action for VARIABLE_LENGTH_CMD
+	 */
+	cdb[9] = (rw) ? WRITE_32 : READ_32;
+	split_cdb_XX_32(lba, sectors, &cdb[0]);	
 }

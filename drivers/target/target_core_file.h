@@ -26,7 +26,7 @@ extern int linux_blockdevice_check(int, int);
 
 struct fd_request {
 	/* SCSI CDB from iSCSI Command PDU */
-	unsigned char	fd_scsi_cdb[MAX_COMMAND_SIZE];
+	unsigned char	fd_scsi_cdb[TCM_MAX_COMMAND_SIZE];
 	/* Data Direction */
 	u8		fd_data_direction;
 	/* Total length of request */

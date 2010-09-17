@@ -2636,7 +2636,8 @@ static int transport_process_control_sg_transform(
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
-		memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
+		memcpy(cdb, T_TASK(cmd)->t_task_cdb,
+			scsi_command_size(T_TASK(cmd)->t_task_cdb));
 
 	task->task_size = cmd->data_length;
 	task->task_sg_num = 1;
@@ -2677,7 +2678,8 @@ static int transport_process_control_nonsg_transform(
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
-		memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
+		memcpy(cdb, T_TASK(cmd)->t_task_cdb,
+			scsi_command_size(T_TASK(cmd)->t_task_cdb));
 
 	task->task_size = cmd->data_length;
 	task->task_sg_num = 0;
@@ -2711,7 +2713,8 @@ static int transport_process_non_data_transform(
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
-		memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
+		memcpy(cdb, T_TASK(cmd)->t_task_cdb,
+			scsi_command_size(T_TASK(cmd)->t_task_cdb));
 
 	task->task_size = cmd->data_length;
 	task->task_sg_num = 0;
@@ -2902,7 +2905,7 @@ int transport_generic_allocate_tasks(
 	/*
 	 * Copy the original CDB into T_TASK(cmd).
 	 */
-	memcpy(T_TASK(cmd)->t_task_cdb, cdb, MAX_COMMAND_SIZE);
+	memcpy(T_TASK(cmd)->t_task_cdb, cdb, scsi_command_size(cdb));
 	/*
 	 * Check for SAM Task Attribute Emulation
 	 */
@@ -3829,6 +3832,19 @@ static inline unsigned long long transport_lba_64(unsigned char *cdb)
 	return ((unsigned long long)__v2) | (unsigned long long)__v1 << 32;
 }
 
+/*
+ * For VARIABLE_LENGTH_CDB w/ 32 byte extended CDBs
+ */
+static inline unsigned long long transport_lba_64_ext(unsigned char *cdb)
+{
+	unsigned int __v1, __v2;
+
+	__v1 = (cdb[12] << 24) | (cdb[13] << 16) | (cdb[14] << 8) | cdb[15];
+	__v2 = (cdb[16] << 24) | (cdb[17] << 16) | (cdb[18] << 8) | cdb[19];
+
+	return ((unsigned long long)__v2) | (unsigned long long)__v1 << 32;
+}
+
 /*	transport_set_supported_SAM_opcode():
  *
  *
@@ -4368,6 +4384,23 @@ static inline u32 transport_get_sectors_16(
 type_disk:
 	return (u32)(cdb[10] << 24) + (cdb[11] << 16) +
 		    (cdb[12] << 8) + cdb[13];
+}
+
+/*
+ * Used for VARIABLE_LENGTH_CDB WRITE_32 and READ_32 variants
+ */
+static inline u32 transport_get_sectors_32(
+	unsigned char *cdb,
+	struct se_cmd *cmd,
+	int *ret)
+{
+	/*
+	 * Assume TYPE_DISK for non struct se_device objects.
+	 * Use 32-bit sector value.
+	 */
+	return (u32)(cdb[28] << 24) + (cdb[29] << 16) +
+		    (cdb[30] << 8) + cdb[31];
+
 }
 
 static inline u32 transport_get_size(
@@ -7496,7 +7529,8 @@ u32 transport_generic_get_cdb_count(
 
 		cdb = TRANSPORT(dev)->get_cdb(task);
 		if ((cdb)) {
-			memcpy(cdb, T_TASK(cmd)->t_task_cdb, MAX_COMMAND_SIZE);
+			memcpy(cdb, T_TASK(cmd)->t_task_cdb,
+				scsi_command_size(T_TASK(cmd)->t_task_cdb));
 			cmd->transport_split_cdb(task->task_lba,
 					&task->task_sectors, cdb);
 		}

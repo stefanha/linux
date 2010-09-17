@@ -28,7 +28,7 @@ extern int linux_blockdevice_check(int, int);
 #include <linux/kobject.h>
 
 struct pscsi_plugin_task {
-	unsigned char pscsi_cdb[MAX_COMMAND_SIZE];
+	unsigned char pscsi_cdb[TCM_MAX_COMMAND_SIZE];
 	unsigned char pscsi_sense[SCSI_SENSE_BUFFERSIZE];
 	int	pscsi_direction;
 	int	pscsi_result;
