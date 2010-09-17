@@ -14,7 +14,7 @@
 /*
  * Used in tcm_loop_driver_probe() for struct Scsi_Host->max_cmd_len
  */
-#define TL_SCSI_MAX_CMD_LEN		16
+#define TL_SCSI_MAX_CMD_LEN		32
 
 #ifdef TCM_LOOP_CDB_DEBUG
 # define TL_CDB_DEBUG(x...)		printk(KERN_INFO x)
