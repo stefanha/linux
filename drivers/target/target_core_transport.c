@@ -5401,6 +5401,7 @@ static int transport_generic_cmd_sequencer(
 	struct se_subsystem_dev *su_dev = dev->se_sub_dev;
 	int ret, sector_ret = 0;
 	u32 sectors = 0, size = 0, pr_reg_type = 0;
+	u16 service_action;
 	u8 alua_ascq = 0;
 	/*
 	 * Check for an existing UNIT ATTENTION condition
@@ -5571,6 +5572,48 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_complete_callback = &transport_xor_callback;
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
+		break;
+	case VARIABLE_LENGTH_CMD:
+		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
+		service_action = (cdb[8] << 8) | cdb[9];
+		/*
+		 * Check the additional CDB length (+ 8 bytes for header) does
+		 * not exceed our TCM_MAX_COMMAND_SIZE.
+		 */
+		if ((cdb[7] + 8) > TCM_MAX_COMMAND_SIZE) {
+			printk(KERN_INFO "Only %u-byte extended CDBs currently"
+				" supported for VARIABLE_LENGTH_CMD, received:"
+				" %d for service action: 0x%04x\n",
+				TCM_MAX_COMMAND_SIZE, cdb[7], service_action);
+			return TGCS_INVALID_CDB_FIELD;
+		}
+		switch (service_action) {
+		case 0x0007: /* XDWRITE_READ_32 */
+			sectors = transport_get_sectors_32(cdb, cmd, &sector_ret);
+			if (sector_ret)
+				return TGCS_UNSUPPORTED_CDB;
+			size = transport_get_size(sectors, cdb, cmd);
+			transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+			transport_get_maps(cmd);
+			/*
+			 * Use WRITE_32 and READ_32 opcodes for the emulated
+			 * XDWRITE_READ_32 logic.
+			 */
+			cmd->transport_split_cdb = &split_cdb_XX_32;
+			cmd->transport_get_long_lba = &transport_lba_64_ext;
+			/*
+			 * Setup BIDI XOR callback to be run during
+			 * transport_generic_complete_ok()
+			 */
+			cmd->transport_complete_callback = &transport_xor_callback;
+			T_TASK(cmd)->t_tasks_fua = (cdb[10] & 0x8);
+			ret = TGCS_DATA_SG_IO_CDB;	
+			break;
+		default:
+			printk(KERN_ERR "VARIABLE_LENGTH_CMD service action"
+				" 0x%04x not supported\n", service_action);
+			return TGCS_UNSUPPORTED_CDB;
+		}
 		break;
 	case 0xa3:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
@@ -5743,13 +5786,6 @@ static int transport_generic_cmd_sequencer(
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[10] << 24) | (cdb[11] << 16) |
 		       (cdb[12] << 8) | cdb[13];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
-		ret = TGCS_CONTROL_NONSG_IO_CDB;
-		break;
-	case VARIABLE_LENGTH_CMD:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
-		size = (cdb[10] << 8) | cdb[11];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
