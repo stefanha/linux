@@ -5582,16 +5582,17 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case VARIABLE_LENGTH_CMD:
 		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
-		service_action = (cdb[8] << 8) | cdb[9];
+		service_action = get_unaligned_be16(&cdb[8]);
 		/*
 		 * Check the additional CDB length (+ 8 bytes for header) does
 		 * not exceed our TCM_MAX_COMMAND_SIZE.
 		 */
-		if ((cdb[7] + 8) > TCM_MAX_COMMAND_SIZE) {
+		if (scsi_varlen_cdb_length(&cdb[0]) > TCM_MAX_COMMAND_SIZE) {
 			printk(KERN_INFO "Only %u-byte extended CDBs currently"
 				" supported for VARIABLE_LENGTH_CMD, received:"
 				" %d for service action: 0x%04x\n",
-				TCM_MAX_COMMAND_SIZE, cdb[7], service_action);
+				TCM_MAX_COMMAND_SIZE,
+				scsi_varlen_cdb_length(&cdb[0]), service_action);
 			return TGCS_INVALID_CDB_FIELD;
 		}
 		/*
