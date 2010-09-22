@@ -681,16 +681,6 @@ out:
 	return ret;
 }
 
-static int target_fabric_port_check_link(
-	struct config_item *lun_ci,
-	struct config_item *se_dev_ci)
-{
-	struct se_lun *lun = container_of(to_config_group(lun_ci),
-				struct se_lun, lun_group);
-
-	return atomic_read(&lun->lun_acl_count) ? -EPERM : 0;
-}
-
 static int target_fabric_port_unlink(
 	struct config_item *lun_ci,
 	struct config_item *se_dev_ci)
