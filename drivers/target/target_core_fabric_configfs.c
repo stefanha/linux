@@ -137,11 +137,20 @@ static int target_fabric_mappedlun_unlink(
 	struct config_item *lun_acl_ci,
 	struct config_item *lun_ci)
 {
-	struct se_lun *lun = container_of(to_config_group(lun_ci),
-			struct se_lun, lun_group);
+	struct se_lun *lun;
 	struct se_lun_acl *lacl = container_of(to_config_group(lun_acl_ci),
 			struct se_lun_acl, se_lun_group);
-	struct se_portal_group *se_tpg = lun->lun_sep->sep_tpg;
+	struct se_node_acl *nacl = lacl->se_lun_nacl;
+	struct se_dev_entry *deve = &nacl->device_list[lacl->mapped_lun];
+	struct se_portal_group *se_tpg;
+	/*
+	 * Determine if the underlying MappedLUN has already been released..
+	 */
+	if (!(deve->se_lun))
+		return 0;
+
+	lun = container_of(to_config_group(lun_ci), struct se_lun, lun_group);
+	se_tpg = lun->lun_sep->sep_tpg;
 
 	core_dev_del_initiator_node_lun_acl(se_tpg, lun, lacl);
 	return 0;
@@ -708,7 +717,6 @@ static struct configfs_item_operations target_fabric_port_item_ops = {
 	.show_attribute		= target_fabric_port_attr_show,
 	.store_attribute	= target_fabric_port_attr_store,
 	.allow_link		= target_fabric_port_link,
-	.check_link		= target_fabric_port_check_link,
 	.drop_link		= target_fabric_port_unlink,
 };
 

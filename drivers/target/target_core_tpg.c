@@ -817,8 +817,6 @@ int core_tpg_post_dellun(
 	struct se_portal_group *tpg,
 	struct se_lun *lun)
 {
-	struct se_lun_acl *acl, *acl_tmp;
-
 	core_tpg_shutdown_lun(tpg, lun);
 
 	core_dev_unexport(lun->lun_se_dev, tpg, lun);
@@ -826,12 +824,6 @@ int core_tpg_post_dellun(
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 	spin_unlock(&tpg->tpg_lun_lock);
-
-	spin_lock(&lun->lun_acl_lock);
-	list_for_each_entry_safe(acl, acl_tmp, &lun->lun_acl_list, lacl_list) {
-		kfree(acl);
-	}
-	spin_unlock(&lun->lun_acl_lock);
 
 	return 0;
 }

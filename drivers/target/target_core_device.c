@@ -470,6 +470,10 @@ int core_update_device_list_for_node(
 	 * core_alua_do_transition_tg_pt() depends on these being present.
 	 */
 	if (!(enable)) {
+		if (!(deve->se_lun_acl)) {
+			dump_stack();
+			return 0;
+		}
 		spin_lock_bh(&port->sep_alua_lock);
 		list_del(&deve->alua_port_list);
 		spin_unlock_bh(&port->sep_alua_lock);
