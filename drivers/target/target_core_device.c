@@ -1524,7 +1524,7 @@ int core_dev_add_initiator_node_lun_acl(
 		return -EINVAL;
 	}
 
-	nacl = core_tpg_get_initiator_node_acl(tpg, lacl->initiatorname);
+	nacl = lacl->se_lun_nacl;
 	if (!(nacl))
 		return -EINVAL;
 
@@ -1569,7 +1569,7 @@ int core_dev_del_initiator_node_lun_acl(
 {
 	struct se_node_acl *nacl;
 
-	nacl = core_tpg_get_initiator_node_acl(tpg, lacl->initiatorname);
+	nacl = lacl->se_lun_nacl;
 	if (!(nacl))
 		return -EINVAL;
 
