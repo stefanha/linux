@@ -3787,6 +3787,7 @@ write:
 		errsts = check_readiness(SCpnt, 1, devip);
 		break;
 	case XDWRITEREAD_10:
+xdwrite_read:
 		if (!scsi_bidi_cmnd(SCpnt)) {
 			mk_sense_buffer(devip, ILLEGAL_REQUEST,
 					INVALID_FIELD_IN_CDB, 0);
@@ -3824,6 +3825,10 @@ write:
 				BUG_ON(SCpnt->cmd_len < 32);
 				goto write;
 			}
+		}
+		if (cmd[9] == XDWRITEREAD_32) {
+			printk("Got XDWRITEREAD_32!!!\n");
+			goto xdwrite_read;
 		}
 
 		mk_sense_buffer(devip, ILLEGAL_REQUEST,
