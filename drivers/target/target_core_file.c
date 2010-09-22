@@ -476,12 +476,16 @@ static int fd_do_readv(struct fd_request *req, struct se_task *task)
 {
 	struct file *fd = req->fd_dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
-	struct iovec iov[req->fd_sg_count];
+	struct iovec *iov;
 	mm_segment_t old_fs;
 	loff_t pos = (req->fd_lba * DEV_ATTRIB(task->se_dev)->block_size);
 	int ret = 0, i;
 
-	memset(iov, 0, sizeof(struct iovec) * req->fd_sg_count);
+	iov = kzalloc(sizeof(struct iovec) * req->fd_sg_count, GFP_KERNEL);
+	if (!(iov)) {
+		printk(KERN_ERR "Unable to allocate fd_do_readv iov[]\n");
+		return -1;
+	}
 
 	for (i = 0; i < req->fd_sg_count; i++) {
 		iov[i].iov_len = sg[i].length;
@@ -492,6 +496,8 @@ static int fd_do_readv(struct fd_request *req, struct se_task *task)
 	set_fs(get_ds());
 	ret = vfs_readv(fd, &iov[0], req->fd_sg_count, &pos);
 	set_fs(old_fs);
+
+	kfree(iov);
 	/*
 	 * Return zeros and GOOD status even if the READ did not return
 	 * the expected virt_size for struct file w/o a backing struct
@@ -583,12 +589,16 @@ static int fd_do_writev(struct fd_request *req, struct se_task *task)
 {
 	struct file *fd = req->fd_dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
-	struct iovec iov[req->fd_sg_count];
+	struct iovec *iov;
 	mm_segment_t old_fs;
 	loff_t pos = (req->fd_lba * DEV_ATTRIB(task->se_dev)->block_size);
 	int ret, i = 0;
 
-	memset(iov, 0, sizeof(struct iovec) * req->fd_sg_count);
+	iov = kzalloc(sizeof(struct iovec) * req->fd_sg_count, GFP_KERNEL);
+	if (!(iov)) {
+		printk(KERN_ERR "Unable to allocate fd_do_writev iov[]\n");
+		return -1;
+	}
 
 	for (i = 0; i < req->fd_sg_count; i++) {
 		iov[i].iov_len = sg[i].length;
@@ -599,6 +609,8 @@ static int fd_do_writev(struct fd_request *req, struct se_task *task)
 	set_fs(get_ds());
 	ret = vfs_writev(fd, &iov[0], req->fd_sg_count, &pos);
 	set_fs(old_fs);
+
+	kfree(iov);
 
 	if (ret < 0 || ret != req->fd_size) {
 		printk(KERN_ERR "vfs_writev() returned %d\n", ret);
