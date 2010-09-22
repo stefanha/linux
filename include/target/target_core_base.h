@@ -471,6 +471,7 @@ struct se_transport_task {
 struct se_task {
 	unsigned char	task_sense;
 	struct scatterlist *task_sg;
+	struct scatterlist *task_sg_bidi;
 	void		*transport_req;
 	u8		task_scsi_status;
 	u8		task_flags;
