@@ -517,6 +517,9 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_gp(
 	struct se_lun *lun,
 	char *page)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
@@ -528,6 +531,9 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_gp(
 	const char *page,
 	size_t count)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
@@ -543,6 +549,9 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_offline(
 	struct se_lun *lun,
 	char *page)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
@@ -554,6 +563,9 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_offline(
 	const char *page,
 	size_t count)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
@@ -569,6 +581,9 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_status(
 	struct se_lun *lun,
 	char *page)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
@@ -580,6 +595,9 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_status(
 	const char *page,
 	size_t count)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
@@ -595,6 +613,9 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_write_md(
 	struct se_lun *lun,
 	char *page)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
@@ -606,6 +627,9 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_write_md(
 	const char *page,
 	size_t count)
 {
+	if (!(lun))
+		return -ENODEV;
+
 	if (!(lun->lun_sep))
 		return -ENODEV;
 
