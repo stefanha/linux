@@ -5566,6 +5566,13 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
+		passthrough = (TRANSPORT(dev)->transport_type ==
+				TRANSPORT_PLUGIN_PHBA_PDEV);
+		/*
+		 * Skip the remaining assignments for TCM/PSCSI passthrough
+		 */
+		if (passthrough)
+			break;
 		/*
 		 * Setup BIDI XOR callback to be run during transport_generic_complete_ok()
 		 */
