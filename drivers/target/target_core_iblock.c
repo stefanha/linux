@@ -221,6 +221,16 @@ static struct se_device *iblock_create_virtdevice(
 	 */
 	if (__iblock_do_sync_cache(dev) == 0)
 		ib_dev->ibd_flags |= IBDF_BDEV_ISSUE_FLUSH;
+	/*
+	 * Check if the underlying struct block_device request_queue supports
+	 * the QUEUE_FLAG_DISCARD bit for UNMAP/WRITE_SAME in SCSI + TRIM
+	 * in ATA and we need to set TPE=1
+	 */
+	if (blk_queue_discard(bdev_get_queue(bd))) {
+		DEV_ATTRIB(dev)->emulate_tpe = 1;
+		printk(KERN_INFO "IBLOCK: Enabling BLOCK Discard"
+				" and TPE=1 emulation\n");
+	}
 
 	return dev;
 
@@ -446,8 +456,10 @@ static int iblock_emulate_read_cap16(struct se_task *task)
 
 static int iblock_emulate_scsi_cdb(struct se_task *task)
 {
-	int ret;
+	struct iblock_dev *ibd = (struct iblock_dev *) task->se_dev->dev_ptr;
+	struct block_device *bd = ibd->ibd_bd;
 	struct se_cmd *cmd = TASK_CMD(task);
+	int ret;
 
 	switch (T_TASK(cmd)->t_task_cdb[0]) {
 	case INQUIRY:
@@ -487,6 +499,11 @@ static int iblock_emulate_scsi_cdb(struct se_task *task)
 	case REQUEST_SENSE:
 		ret = transport_generic_emulate_request_sense(cmd,
 				T_TASK(cmd)->t_task_cdb);
+		if (ret < 0)
+			return ret;
+		break;
+	case UNMAP:
+		ret = transport_generic_unmap(cmd, bd);
 		if (ret < 0)
 			return ret;
 		break;
