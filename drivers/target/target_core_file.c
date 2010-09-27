@@ -235,6 +235,17 @@ static struct se_device *fd_create_virtdevice(
 
 	fd_dev->fd_dev_id = fd_host->fd_host_dev_id_count++;
 	fd_dev->fd_queue_depth = dev->queue_depth;
+	/*
+	 * Check for QUEUE_FLAG_DISCARD and enable TCM TPE emulation
+	 * if present for struct block_device backend
+	 */
+	if (S_ISBLK(inode->i_mode)) {
+		if (blk_queue_discard(bdev_get_queue(inode->i_bdev))) {
+			DEV_ATTRIB(dev)->emulate_tpe = 1;
+			printk(KERN_INFO "FILEIO: Enabling BLOCK Discard"
+				" and TPE=1 emulation\n");
+		}
+	}
 
 	printk(KERN_INFO "CORE_FILE[%u] - Added TCM FILEIO Device ID: %u at %s,"
 		" %llu total bytes\n", fd_host->fd_host_id, fd_dev->fd_dev_id,
@@ -388,9 +399,13 @@ static int fd_emulate_read_cap16(struct se_task *task)
  */
 static int fd_emulate_scsi_cdb(struct se_task *task)
 {
-	int ret;
 	struct se_cmd *cmd = TASK_CMD(task);
+	struct fd_dev *fd_dev = (struct fd_dev *) task->se_dev->dev_ptr;
 	struct fd_request *fd_req = (struct fd_request *) task->transport_req;
+	struct file *f = fd_dev->fd_file;
+	struct inode *i;
+	struct block_device *bd;
+	int ret;
 
 	switch (fd_req->fd_scsi_cdb[0]) {
 	case INQUIRY:
@@ -432,6 +447,42 @@ static int fd_emulate_scsi_cdb(struct se_task *task)
 				T_TASK(cmd)->t_task_cdb);
 		if (ret < 0)
 			return ret;
+		break;
+	case UNMAP:
+		i = igrab(f->f_mapping->host);
+		if (!(i)) {
+			printk(KERN_ERR "FILEIO: Unable to locate inode for"
+					" backend for UNMAP\n");
+			return PYX_TRANSPORT_LU_COMM_FAILURE;
+		}
+		/*
+		 * Currently for struct file w/o a struct block_device
+		 * backend we return a success..
+		 */	
+		if (!(S_ISBLK(i->i_mode))) {
+			printk(KERN_WARNING "Ignoring UNMAP for non BD"
+					" backend for struct file\n");
+			iput(i);
+			return PYX_TRANSPORT_LU_COMM_FAILURE;
+		}
+		bd = I_BDEV(f->f_mapping->host);
+		if (!(bd)) {
+			printk(KERN_ERR "FILEIO: Unable to locate struct"
+					" block_device for UNMAP\n");
+			iput(i);
+			return PYX_TRANSPORT_LU_COMM_FAILURE;
+		}
+		/*
+		 * Now call the transport_generic_unmap() -> blkdev_issue_discard()
+		 * wrapper to translate SCSI UNMAP into Linux/BLOCK discards on
+		 * LBA+Range descriptors in the UNMAP write paylaod.
+		 */
+		ret = transport_generic_unmap(cmd, bd);
+		if (ret < 0) {
+			iput(i);
+			return ret;
+		}
+		iput(i);
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case ERASE:
