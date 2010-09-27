@@ -1003,9 +1003,16 @@ void se_dev_set_default_attribs(struct se_device *dev)
 	DEV_ATTRIB(dev)->emulate_write_cache = DA_EMULATE_WRITE_CACHE;
 	DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl = DA_EMULATE_UA_INTLLCK_CTRL;
 	DEV_ATTRIB(dev)->emulate_tas = DA_EMULATE_TAS;
+	DEV_ATTRIB(dev)->emulate_tpe = DA_EMULATE_TPE;
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	DEV_ATTRIB(dev)->emulate_alua = DA_EMULATE_ALUA;
 	DEV_ATTRIB(dev)->enforce_pr_isids = DA_ENFORCE_PR_ISIDS;
+	DEV_ATTRIB(dev)->max_unmap_lba_count = DA_MAX_UNMAP_LBA_COUNT;
+	DEV_ATTRIB(dev)->max_unmap_block_desc_count =
+				DA_MAX_UNMAP_BLOCK_DESC_COUNT;
+	DEV_ATTRIB(dev)->unmap_granularity = DA_UNMAP_GRANULARITY_DEFAULT;
+	DEV_ATTRIB(dev)->unmap_granularity_alignment =
+				DA_UNMAP_GRANULARITY_ALIGNMENT_DEFAULT;
 	/*
 	 * block_size is based on subsystem plugin dependent requirements.
 	 */
@@ -1016,6 +1023,11 @@ void se_dev_set_default_attribs(struct se_device *dev)
 	 */
 	DEV_ATTRIB(dev)->hw_max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
 	DEV_ATTRIB(dev)->max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
+	/*
+	 * Set optimal_sectors from max_sectors, which can be lowered via
+	 * configfs.
+	 */
+	DEV_ATTRIB(dev)->optimal_sectors = DEV_ATTRIB(dev)->max_sectors;
 	/*
 	 * queue_depth is based on subsystem plugin dependent requirements.
 	 */
@@ -1048,6 +1060,46 @@ int se_dev_set_task_timeout(struct se_device *dev, u32 task_timeout)
 			dev, task_timeout);
 	}
 
+	return 0;
+}
+
+int se_dev_set_max_unmap_lba_count(
+	struct se_device *dev,
+	u32 max_unmap_lba_count)
+{
+	DEV_ATTRIB(dev)->max_unmap_lba_count = max_unmap_lba_count;
+	printk(KERN_INFO "dev[%p]: Set max_unmap_lba_count: %u\n",
+			dev, DEV_ATTRIB(dev)->max_unmap_lba_count);
+	return 0;
+}
+
+int se_dev_set_max_unmap_block_desc_count(
+	struct se_device *dev,
+	u32 max_unmap_block_desc_count)
+{
+	DEV_ATTRIB(dev)->max_unmap_block_desc_count = max_unmap_block_desc_count;
+	printk(KERN_INFO "dev[%p]: Set max_unmap_block_desc_count: %u\n",
+			dev, DEV_ATTRIB(dev)->max_unmap_block_desc_count);
+	return 0;
+}
+
+int se_dev_set_unmap_granularity(
+	struct se_device *dev,
+	u32 unmap_granularity)
+{
+	DEV_ATTRIB(dev)->unmap_granularity = unmap_granularity;
+	printk(KERN_INFO "dev[%p]: Set unmap_granularity: %u\n",
+			dev, DEV_ATTRIB(dev)->unmap_granularity);
+	return 0;
+}
+
+int se_dev_set_unmap_granularity_alignment(
+	struct se_device *dev,
+	u32 unmap_granularity_alignment)
+{
+	DEV_ATTRIB(dev)->unmap_granularity_alignment = unmap_granularity_alignment;
+	printk(KERN_INFO "dev[%p]: Set unmap_granularity_alignment: %u\n",
+			dev, DEV_ATTRIB(dev)->unmap_granularity_alignment);
 	return 0;
 }
 
@@ -1169,6 +1221,18 @@ int se_dev_set_emulate_tas(struct se_device *dev, int flag)
 	printk(KERN_INFO "dev[%p]: SE Device TASK_ABORTED status bit: %s\n",
 		dev, (DEV_ATTRIB(dev)->emulate_tas) ? "Enabled" : "Disabled");
 
+	return 0;
+}
+
+int se_dev_set_emulate_tpe(struct se_device *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_tpe = flag;
+	printk(KERN_INFO "dev[%p]: SE Device Thin Provising Enabled bit: %d\n",
+				dev, flag);
 	return 0;
 }
 
@@ -1294,6 +1358,32 @@ int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 	DEV_ATTRIB(dev)->max_sectors = max_sectors;
 	printk("dev[%p]: SE Device max_sectors changed to %u\n",
 			dev, max_sectors);
+	return 0;
+}
+
+int se_dev_set_optimal_sectors(struct se_device *dev, u32 optimal_sectors)
+{
+	if (atomic_read(&dev->dev_export_obj.obj_access_count)) {
+		printk(KERN_ERR "dev[%p]: Unable to change SE Device"
+			" optimal_sectors while dev_export_obj: %d count exists\n",
+			dev, atomic_read(&dev->dev_export_obj.obj_access_count));
+		return -EINVAL;
+	}
+	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
+		printk(KERN_ERR "dev[%p]: Passed optimal_sectors cannot be"
+				" changed for TCM/pSCSI\n", dev);
+		return -EINVAL;
+	}
+	if (optimal_sectors > DEV_ATTRIB(dev)->max_sectors) {
+		printk(KERN_ERR "dev[%p]: Passed optimal_sectors %u cannot be"
+			" greater than max_sectors: %u\n", dev,
+			optimal_sectors, DEV_ATTRIB(dev)->max_sectors);
+		return -EINVAL;
+	}
+
+	DEV_ATTRIB(dev)->optimal_sectors = optimal_sectors;
+	printk(KERN_INFO "dev[%p]: SE Device optimal_sectors changed to %u\n",
+			dev, optimal_sectors);
 	return 0;
 }
 

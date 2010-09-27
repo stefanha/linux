@@ -136,7 +136,8 @@ enum se_cmd_flags_table {
 	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00400000,
 	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00800000,
 	SCF_EMULATE_SYNC_CACHE		= 0x01000000,
-	SCF_EMULATE_CDB_ASYNC		= 0x02000000
+	SCF_EMULATE_CDB_ASYNC		= 0x02000000,
+	SCF_EMULATE_SYNC_UNMAP		= 0x04000000
 };
 	
 /* struct se_device->type for known subsystem plugins */
@@ -748,6 +749,7 @@ struct se_dev_attrib {
 	int		emulate_write_cache;
 	int		emulate_ua_intlck_ctrl;
 	int		emulate_tas;
+	int		emulate_tpe;
 	int		emulate_reservations;
 	int		emulate_alua;
 	int		enforce_pr_isids;
@@ -755,9 +757,14 @@ struct se_dev_attrib {
 	u32		block_size;
 	u32		hw_max_sectors;
 	u32		max_sectors;
+	u32		optimal_sectors;
 	u32		hw_queue_depth;
 	u32		queue_depth;
 	u32		task_timeout;
+	u32		max_unmap_lba_count;
+	u32		max_unmap_block_desc_count;
+	u32		unmap_granularity;
+	u32		unmap_granularity_alignment;
 	struct se_subsystem_dev *da_sub_dev;
 	struct config_group da_group;
 } ____cacheline_aligned;

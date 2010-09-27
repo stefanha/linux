@@ -563,6 +563,9 @@ SE_DEV_ATTR(emulate_ua_intlck_ctrl, S_IRUGO | S_IWUSR);
 DEF_DEV_ATTRIB(emulate_tas);
 SE_DEV_ATTR(emulate_tas, S_IRUGO | S_IWUSR);
 
+DEF_DEV_ATTRIB(emulate_tpe);
+SE_DEV_ATTR(emulate_tpe, S_IRUGO | S_IWUSR);
+
 DEF_DEV_ATTRIB(enforce_pr_isids);
 SE_DEV_ATTR(enforce_pr_isids, S_IRUGO | S_IWUSR);
 
@@ -578,6 +581,9 @@ SE_DEV_ATTR_RO(hw_max_sectors);
 DEF_DEV_ATTRIB(max_sectors);
 SE_DEV_ATTR(max_sectors, S_IRUGO | S_IWUSR);
 
+DEF_DEV_ATTRIB(optimal_sectors);
+SE_DEV_ATTR(optimal_sectors, S_IRUGO | S_IWUSR);
+
 DEF_DEV_ATTRIB_RO(hw_queue_depth);
 SE_DEV_ATTR_RO(hw_queue_depth);
 
@@ -586,6 +592,18 @@ SE_DEV_ATTR(queue_depth, S_IRUGO | S_IWUSR);
 
 DEF_DEV_ATTRIB(task_timeout);
 SE_DEV_ATTR(task_timeout, S_IRUGO | S_IWUSR);
+
+DEF_DEV_ATTRIB(max_unmap_lba_count);
+SE_DEV_ATTR(max_unmap_lba_count, S_IRUGO | S_IWUSR);
+
+DEF_DEV_ATTRIB(max_unmap_block_desc_count);
+SE_DEV_ATTR(max_unmap_block_desc_count, S_IRUGO | S_IWUSR);
+
+DEF_DEV_ATTRIB(unmap_granularity);
+SE_DEV_ATTR(unmap_granularity, S_IRUGO | S_IWUSR);
+
+DEF_DEV_ATTRIB(unmap_granularity_alignment);
+SE_DEV_ATTR(unmap_granularity_alignment, S_IRUGO | S_IWUSR);
 
 CONFIGFS_EATTR_OPS(target_core_dev_attrib, se_dev_attrib, da_group);
 
@@ -596,14 +614,20 @@ static struct configfs_attribute *target_core_dev_attrib_attrs[] = {
 	&target_core_dev_attrib_emulate_write_cache.attr,
 	&target_core_dev_attrib_emulate_ua_intlck_ctrl.attr,
 	&target_core_dev_attrib_emulate_tas.attr,
+	&target_core_dev_attrib_emulate_tpe.attr,
 	&target_core_dev_attrib_enforce_pr_isids.attr,
 	&target_core_dev_attrib_hw_block_size.attr,
 	&target_core_dev_attrib_block_size.attr,
 	&target_core_dev_attrib_hw_max_sectors.attr,
 	&target_core_dev_attrib_max_sectors.attr,
+	&target_core_dev_attrib_optimal_sectors.attr,
 	&target_core_dev_attrib_hw_queue_depth.attr,
 	&target_core_dev_attrib_queue_depth.attr,
 	&target_core_dev_attrib_task_timeout.attr,
+	&target_core_dev_attrib_max_unmap_lba_count.attr,
+	&target_core_dev_attrib_max_unmap_block_desc_count.attr,
+	&target_core_dev_attrib_unmap_granularity.attr,
+	&target_core_dev_attrib_unmap_granularity_alignment.attr,
 	NULL,
 };
 

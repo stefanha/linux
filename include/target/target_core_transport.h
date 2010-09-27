@@ -87,6 +87,14 @@
 /* struct se_dev_attrib sanity values */
 /* 10 Minutes, see transport_get_default_task_timeout()  */
 #define DA_TASK_TIMEOUT_MAX			600
+/* Default max_unmap_lba_count */
+#define DA_MAX_UNMAP_LBA_COUNT			0
+/* Default max_unmap_block_desc_count */
+#define DA_MAX_UNMAP_BLOCK_DESC_COUNT		0
+/* Default unmap_granularity */
+#define DA_UNMAP_GRANULARITY_DEFAULT		0
+/* Default unmap_granularity_alignment */
+#define DA_UNMAP_GRANULARITY_ALIGNMENT_DEFAULT	0
 /* Emulation for Direct Page Out */
 #define DA_EMULATE_DPO				0
 /* Emulation for Forced Unit Access WRITEs */
@@ -99,6 +107,8 @@
 #define DA_EMULATE_UA_INTLLCK_CTRL		0
 /* Emulation for TASK_ABORTED status (TAS) by default */
 #define DA_EMULATE_TAS				1
+/* Emulation for Thin Provisioning Enabled using block/blk-lib.c:blkdev_issue_discard() */
+#define DA_EMULATE_TPE				0
 /* No Emulation for PSCSI by default */
 #define DA_EMULATE_RESERVATIONS			0
 /* No Emulation for PSCSI by default */
@@ -224,6 +234,7 @@ extern int transport_generic_emulate_modesense(struct se_cmd *,
 extern int transport_generic_emulate_request_sense(struct se_cmd *,
 						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd *);
+extern int transport_generic_unmap(struct se_cmd *, struct block_device *);
 extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32, void *);
 extern void transport_passthrough_release(struct se_cmd *);

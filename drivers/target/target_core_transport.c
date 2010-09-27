@@ -4907,6 +4907,83 @@ set_len:
 			buf[6] = 0x01;
 
 		break;
+	case 0xb0: /* Block Limits VPD page */
+		/*
+		 * Following sbc3r22 section 6.5.3 Block Limits VPD page,
+		 * when emulate_tpe=1 we will be expect a different page length
+		 */
+		if (!(DEV_ATTRIB(dev)->emulate_tpe)) {
+			if (cmd->data_length < 0x10) {
+				printk(KERN_INFO "Received data_length: %u"
+					" too small for TPE=0 EVPD 0xb0\n",
+					cmd->data_length);
+				return -1;
+			}
+			buf[0] = TRANSPORT(dev)->get_device_type(dev);
+			buf[1] = 0xb0;
+			buf[3] = 0x10; /* Set hardcoded TPE=0 length */
+			/*
+			 * Set OPTIMAL TRANSFER LENGTH GRANULARITY
+			 */
+			put_unaligned_be16(1, &buf[6]);
+			/*
+			 * Set MAXIMUM TRANSFER LENGTH
+			 */
+			put_unaligned_be32(DEV_ATTRIB(dev)->max_sectors,
+					&buf[8]);
+			/*
+			 * Set OPTIMAL TRANSFER LENGTH
+			 */
+			put_unaligned_be32(DEV_ATTRIB(dev)->optimal_sectors,
+					&buf[12]);
+			break;
+		}
+
+		if (cmd->data_length < 0x3c) {
+			printk(KERN_INFO "Received data_length: %u"
+				" too small for TPE=1 EVPD 0xb0\n",
+				cmd->data_length);
+			return -1;
+		}
+		buf[0] = TRANSPORT(dev)->get_device_type(dev);
+		buf[1] = 0xb0;
+		buf[3] = 0x3c; /* Set hardcoded TPE=1 length */
+		/*
+		 * Set OPTIMAL TRANSFER LENGTH GRANULARITY
+		 * Note that this follows what scsi_debug.c reports to SCSI ML
+		 */
+		put_unaligned_be16(1, &buf[6]);
+		/*
+		 * Set MAXIMUM TRANSFER LENGTH
+		 */	
+		put_unaligned_be32(DEV_ATTRIB(dev)->max_sectors, &buf[8]);
+		/*
+		 * Set OPTIMAL TRANSFER LENGTH
+		 */
+		put_unaligned_be32(DEV_ATTRIB(dev)->optimal_sectors, &buf[12]);
+		/*
+		 * Set MAXIMUM UNMAP LBA COUNT
+		 */
+		put_unaligned_be32(DEV_ATTRIB(dev)->max_unmap_lba_count,
+				&buf[20]);
+		/*
+		 * Set MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT
+		 */
+		put_unaligned_be32(DEV_ATTRIB(dev)->max_unmap_block_desc_count,
+				&buf[24]);
+		/*
+		 * Set OPTIMAL UNMAP GRANULARITY
+		 */
+		put_unaligned_be32(DEV_ATTRIB(dev)->unmap_granularity,
+				&buf[28]);
+		/*
+		 * UNMAP GRANULARITY ALIGNMENT
+		 */
+		put_unaligned_be32(DEV_ATTRIB(dev)->unmap_granularity_alignment,
+				&buf[32]);
+		if (DEV_ATTRIB(dev)->unmap_granularity_alignment != 0)
+			buf[32] |= 0x80; /* Set the UGAVALID bit */
+		break;
 	default:
 		printk(KERN_ERR "Unknown VPD Code: 0x%02x\n", cdb[2]);
 		return -1;
@@ -4931,6 +5008,11 @@ int transport_generic_emulate_readcapacity(
 	buf[5] = (DEV_ATTRIB(dev)->block_size >> 16) & 0xff;
 	buf[6] = (DEV_ATTRIB(dev)->block_size >> 8) & 0xff;
 	buf[7] = DEV_ATTRIB(dev)->block_size & 0xff;
+	/*
+	 * Set max 32-bit blocks to signal SERVICE ACTION READ_CAPACITY_16
+	*/
+	if (DEV_ATTRIB(dev)->emulate_tpe)
+		put_unaligned_be32(0xFFFFFFFF, &buf[0]);
 
 	return 0;
 }
@@ -4955,6 +5037,12 @@ int transport_generic_emulate_readcapacity_16(
 	buf[9] = (DEV_ATTRIB(dev)->block_size >> 16) & 0xff;
 	buf[10] = (DEV_ATTRIB(dev)->block_size >> 8) & 0xff;
 	buf[11] = DEV_ATTRIB(dev)->block_size & 0xff;
+	/*
+	 * Set Thin Provisioning Enable bit following sbc3r22 in section
+	 * READ CAPACITY (16) byte 14.
+	 */
+	if (DEV_ATTRIB(dev)->emulate_tpe)
+		buf[14] = 0x80;
 
 	return 0;
 }
@@ -5350,6 +5438,47 @@ static int transport_generic_synchronize_cache(struct se_cmd *cmd)
 					cmd->data_length);
 	return 0;
 }
+
+/*
+ * Used for TCM/IBLOCK and TCM/FILEIO for block/blk-lib.c level discard support.
+ * Note this is not used for TCM/pSCSI passthrough
+ */
+int transport_generic_unmap(struct se_cmd *cmd, struct block_device *bdev)
+{
+	struct se_device *dev = SE_DEV(cmd);
+	unsigned char *buf = T_TASK(cmd)->t_task_buf, *ptr = NULL;
+	unsigned char *cdb = &T_TASK(cmd)->t_task_cdb[0];
+	sector_t lba;
+	unsigned int size = cmd->data_length, range;
+	int barrier = 0, ret, offset = 8; /* First UNMAP block descriptor starts at 8 byte offset */
+	unsigned short dl, bd_dl;
+
+	/* Skip over UNMAP header */
+	size -= 8;
+	dl = get_unaligned_be16(&cdb[0]);
+	bd_dl = get_unaligned_be16(&cdb[2]);
+	ptr = &buf[offset];
+	printk("UNMAP: Sub: %s Using dl: %hu bd_dl: %hu size: %hu ptr: %p\n",
+		TRANSPORT(dev)->name, dl, bd_dl, size, ptr);
+
+	while (size) {
+		lba = get_unaligned_be64(&ptr[0]);
+		range = get_unaligned_be32(&ptr[8]);
+		printk("UNMAP: Using lba: %llu and range: %u\n", lba, range);
+
+		ret = blkdev_issue_discard(bdev, lba, range, GFP_KERNEL, barrier);
+		if (ret < 0) {
+			printk(KERN_ERR "blkdev_issue_discard() failed: %d\n", ret);
+			return -1;
+		}
+
+		ptr += 16;
+		size -= 16;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(transport_generic_unmap);
 
 static inline void transport_dev_get_mem_buf(
 	struct se_device *dev,
@@ -5945,6 +6074,29 @@ static int transport_generic_cmd_sequencer(
 		 */
 		if (transport_get_sectors(cmd) < 0)
 			return TGCS_INVALID_CDB_FIELD;
+		break;
+	case UNMAP:
+		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
+		cmd->transport_allocate_resources =
+				&transport_generic_allocate_buf;
+		size = get_unaligned_be16(&cdb[7]);
+		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
+		transport_get_maps(cmd);
+		passthrough = (TRANSPORT(dev)->transport_type ==
+				TRANSPORT_PLUGIN_PHBA_PDEV);
+		printk("Got UNMAP CDB for subsystem plugin: %s, pt: %hd size: %hu\n",
+				TRANSPORT(dev)->name, passthrough, size);
+		/*
+		 * Determine if the received UNMAP used to for direct passthrough
+		 * into Linux/SCSI with struct request via TCM/pSCSI or we are
+		 * signaling the use of internal transport_generic_unmap() emulation
+		 * for UNMAP -> Linux/BLOCK disbard with TCM/IBLOCK and TCM/FILEIO
+		 * subsystem plugin backstores.
+		 */
+		if (!(passthrough))
+			cmd->se_cmd_flags |= SCF_EMULATE_SYNC_UNMAP;
+
+		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case GPCMD_CLOSE_TRACK:
