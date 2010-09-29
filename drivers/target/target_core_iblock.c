@@ -227,8 +227,21 @@ static struct se_device *iblock_create_virtdevice(
 	 * in ATA and we need to set TPE=1
 	 */
 	if (blk_queue_discard(bdev_get_queue(bd))) {
+		struct request_queue *q = bdev_get_queue(bd);
+
+		DEV_ATTRIB(dev)->max_unmap_lba_count =
+				q->limits.max_discard_sectors;
+		/*
+		 * Currently hardcoded to 1 in Linux/SCSI code..
+		 */
+		DEV_ATTRIB(dev)->max_unmap_block_desc_count = 1;
+		DEV_ATTRIB(dev)->unmap_granularity =
+				q->limits.discard_granularity;
+		DEV_ATTRIB(dev)->unmap_granularity_alignment =
+				q->limits.discard_alignment;
+
 		DEV_ATTRIB(dev)->emulate_tpu = 1;
-		printk(KERN_INFO "IBLOCK: Enabling BLOCK Discard"
+		printk(KERN_INFO "IBLOCK: Enabling BLOCK Discard support"
 				" and TPU=1 emulation\n");
 	}
 
