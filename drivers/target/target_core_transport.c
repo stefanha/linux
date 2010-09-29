@@ -4910,12 +4910,12 @@ set_len:
 	case 0xb0: /* Block Limits VPD page */
 		/*
 		 * Following sbc3r22 section 6.5.3 Block Limits VPD page,
-		 * when emulate_tpe=1 we will be expect a different page length
+		 * when emulate_tpu=1 we will be expect a different page length
 		 */
-		if (!(DEV_ATTRIB(dev)->emulate_tpe)) {
+		if (!(DEV_ATTRIB(dev)->emulate_tpu)) {
 			if (cmd->data_length < (0x10 + 4)) {
 				printk(KERN_INFO "Received data_length: %u"
-					" too small for TPE=0 EVPD 0xb0\n",
+					" too small for TPE=1 EVPD 0xb0\n",
 					cmd->data_length);
 				return -1;
 			}
@@ -4984,6 +4984,38 @@ set_len:
 		if (DEV_ATTRIB(dev)->unmap_granularity_alignment != 0)
 			buf[32] |= 0x80; /* Set the UGAVALID bit */
 		break;
+	case 0xb2: /* Thin Provisioning VPD */
+		/*
+		 * From sbc3r22 section 6.5.4 Thin Provisioning VPD page:
+		 *
+		 * The PAGE LENGTH field is defined in SPC-4. If the DP bit is
+		 * set to zero, then the page length shall be set to 0004h. If the
+		 * DP bit is set to one, then the page length shall be set to the value
+		 * defined in table 162.
+		 */
+		buf[0] = TRANSPORT(dev)->get_device_type(dev);
+		buf[1] = 0xb2;
+		/*
+		 * Set Hardcoded length mentioned above for DP=0
+		 */
+		put_unaligned_be16(0x0004, &buf[2]);
+		/*
+		 * The THRESHOLD EXPONENT field indicates the threshold set size in LBAs
+		 * as a power of 2 (i.e., the threshold set size is equal to 2(threshold exponent)).
+		 *
+		 * Note that this is currently set to 0x00 as mkp says it will be
+		 * changing again.  We can enable this once it has settled in T10
+		 * and is actually used by Linux/SCSI ML code.
+		 */
+		buf[4] = 0x00;
+		/*
+		 * A TPU bit set to one indicates that the device server supports
+		 * the UNMAP command (see 5.25). A TPU bit set to zero indicates
+		 * that the device server does not support the UNMAP command.
+		 */
+		if (DEV_ATTRIB(dev)->emulate_tpu != 0)
+			buf[5] = 0x80;
+		break;
 	default:
 		printk(KERN_ERR "Unknown VPD Code: 0x%02x\n", cdb[2]);
 		return -1;
@@ -5011,7 +5043,7 @@ int transport_generic_emulate_readcapacity(
 	/*
 	 * Set max 32-bit blocks to signal SERVICE ACTION READ_CAPACITY_16
 	*/
-	if (DEV_ATTRIB(dev)->emulate_tpe)
+	if (DEV_ATTRIB(dev)->emulate_tpu)
 		put_unaligned_be32(0xFFFFFFFF, &buf[0]);
 
 	return 0;
@@ -5039,9 +5071,9 @@ int transport_generic_emulate_readcapacity_16(
 	buf[11] = DEV_ATTRIB(dev)->block_size & 0xff;
 	/*
 	 * Set Thin Provisioning Enable bit following sbc3r22 in section
-	 * READ CAPACITY (16) byte 14.
+	 * READ CAPACITY (16) byte 14 if emulate_tpu is enabled.
 	 */
-	if (DEV_ATTRIB(dev)->emulate_tpe)
+	if (DEV_ATTRIB(dev)->emulate_tpu)
 		buf[14] = 0x80;
 
 	return 0;

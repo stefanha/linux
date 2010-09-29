@@ -241,9 +241,23 @@ static struct se_device *fd_create_virtdevice(
 	 */
 	if (S_ISBLK(inode->i_mode)) {
 		if (blk_queue_discard(bdev_get_queue(inode->i_bdev))) {
-			DEV_ATTRIB(dev)->emulate_tpe = 1;
+			struct block_device *bd = inode->i_bdev;
+			struct request_queue *q = bdev_get_queue(bd);
+			
+			DEV_ATTRIB(dev)->max_unmap_lba_count =
+					q->limits.max_discard_sectors;
+			/*
+			 * Currently hardcoded to 1 in Linux/SCSI code..
+			 */
+			DEV_ATTRIB(dev)->max_unmap_block_desc_count = 1;
+			DEV_ATTRIB(dev)->unmap_granularity =
+					q->limits.discard_granularity;
+			DEV_ATTRIB(dev)->unmap_granularity_alignment =
+					q->limits.discard_alignment;
+
+			DEV_ATTRIB(dev)->emulate_tpu = 1;
 			printk(KERN_INFO "FILEIO: Enabling BLOCK Discard"
-				" and TPE=1 emulation\n");
+				" and TPU=1 emulation\n");
 		}
 	}
 
