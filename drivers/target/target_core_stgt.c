@@ -230,7 +230,7 @@ static int stgt_lld_probe(struct device *dev)
 	atomic_set(&hba->left_queue_depth, hba_depth);
 	atomic_set(&hba->max_queue_depth, hba_depth);
 
-	hba->hba_ptr = (void *) sh;
+	hba->hba_ptr = sh;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM STGT HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -264,7 +264,7 @@ static int stgt_lld_remove(struct device *dev)
  */
 static int stgt_detach_hba(struct se_hba *hba)
 {
-	struct Scsi_Host *scsi_host = (struct Scsi_Host *) hba->hba_ptr;
+	struct Scsi_Host *scsi_host = hba->hba_ptr;
 	struct stgt_hba *stgt_hba = *(struct stgt_hba **)shost_priv(scsi_host);
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached STGT HBA: %s from"
@@ -299,8 +299,8 @@ static struct se_device *stgt_create_virtdevice(
 	struct se_subsystem_dev *se_dev,
 	void *p)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *)p;
-	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
+	struct stgt_dev_virt *sdv = p;
+	struct Scsi_Host *sh = hba->hba_ptr;
 
 	if (!(sdv)) {
 		printk(KERN_ERR "Unable to locate struct stgt_dev_virt"
@@ -320,8 +320,8 @@ static struct se_device *stgt_create_virtdevice(
  */
 static int stgt_activate_device(struct se_device *dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct scsi_device *sd = sdv->sdv_sd;
 	struct Scsi_Host *sh = sd->host;
 
 	printk(KERN_INFO "CORE_STGT[%d] - Activating %s Device with TCQ: %d at"
@@ -338,8 +338,8 @@ static int stgt_activate_device(struct se_device *dev)
  */
 static void stgt_deactivate_device(struct se_device *dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct scsi_device *sd = sdv->sdv_sd;
 	struct Scsi_Host *sh = sd->host;
 
 	printk(KERN_INFO "CORE_STGT[%d] - Deactivating %s Device with TCQ: %d"
@@ -354,8 +354,8 @@ static void stgt_deactivate_device(struct se_device *dev)
  */
 static void stgt_free_device(void *p)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) p;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = p;
+	struct scsi_device *sd = sdv->sdv_sd;
 
 	if (sdv->sdv_bd)
 		sdv->sdv_bd = NULL;
@@ -376,7 +376,7 @@ static void stgt_free_device(void *p)
  */
 static int stgt_transport_complete(struct se_task *task)
 {
-	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *st = task->transport_req;
 	int result;
 
 	result = st->stgt_result;
@@ -411,7 +411,7 @@ static void *stgt_allocate_request(
  */
 static int stgt_do_task(struct se_task *task)
 {
-	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *st = task->transport_req;
 	struct Scsi_Host *sh = task->se_dev->se_hba->hba_ptr;
 	struct scsi_cmnd *sc;
 	int tag = MSG_SIMPLE_TAG;
@@ -458,8 +458,8 @@ static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 	const char *page,
 	ssize_t count)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) se_dev->se_dev_su_ptr;
-	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
+	struct stgt_dev_virt *sdv = se_dev->se_dev_su_ptr;
+	struct Scsi_Host *sh = hba->hba_ptr;
 	char *buf, *cur, *ptr, *ptr2;
 	unsigned long scsi_channel_id, scsi_target_id, scsi_lun_id;
 	int params = 0, ret;
@@ -540,7 +540,7 @@ static ssize_t stgt_check_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) se_dev->se_dev_su_ptr;
+	struct stgt_dev_virt *sdv = se_dev->se_dev_su_ptr;
 
 	if (!(sdv->sdv_flags & PDF_HAS_CHANNEL_ID) ||
 	    !(sdv->sdv_flags & PDF_HAS_TARGET_ID) ||
@@ -558,7 +558,7 @@ static ssize_t stgt_show_configfs_dev_params(
 	struct se_subsystem_dev *se_dev,
 	char *page)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) se_dev->se_dev_su_ptr;
+	struct stgt_dev_virt *sdv = se_dev->se_dev_su_ptr;
 	int bl = 0;
 
 	__stgt_get_dev_info(sdv, page, &bl);
@@ -573,7 +573,7 @@ static void stgt_get_plugin_info(void *p, char *b, int *bl)
 
 static void stgt_get_hba_info(struct se_hba *hba, char *b, int *bl)
 {
-	struct Scsi_Host *sh = (struct Scsi_Host *) hba->hba_ptr;
+	struct Scsi_Host *sh = hba->hba_ptr;
 
 	*bl += sprintf(b + *bl, "Core Host ID: %u  SCSI Host ID: %u\n",
 			 hba->hba_id, sh->host_no);
@@ -583,7 +583,7 @@ static void stgt_get_hba_info(struct se_hba *hba, char *b, int *bl)
 
 static void stgt_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
 
 	__stgt_get_dev_info(sdv, b, bl);
 }
@@ -591,7 +591,7 @@ static void stgt_get_dev_info(struct se_device *dev, char *b, int *bl)
 static void __stgt_get_dev_info(struct stgt_dev_virt *sdv, char *b, int *bl)
 {
 	int i;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct scsi_device *sd = sdv->sdv_sd;
 
 	*bl += sprintf(b + *bl, "STGT SCSI Device Bus Location:"
 		" Channel ID: %d Target ID: %d LUN: %d\n",
@@ -660,7 +660,7 @@ static int stgt_map_task_non_SG(struct se_task *task)
 
 static int stgt_CDB_none(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *st = task->transport_req;
 
 	st->stgt_direction = DMA_NONE;
 	return 0;
@@ -672,7 +672,7 @@ static int stgt_CDB_none(struct se_task *task, u32 size)
  */
 static int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *pt = task->transport_req;
 
 	pt->stgt_direction = DMA_FROM_DEVICE;
 	return stgt_map_task_non_SG(task);
@@ -684,7 +684,7 @@ static int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 static int stgt_CDB_read_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *pt = task->transport_req;
 
 	pt->stgt_direction = DMA_FROM_DEVICE;
 
@@ -700,7 +700,7 @@ static int stgt_CDB_read_SG(struct se_task *task, u32 size)
  */
 static int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *pt = task->transport_req;
 
 	pt->stgt_direction = DMA_TO_DEVICE;
 	return stgt_map_task_non_SG(task);
@@ -712,7 +712,7 @@ static int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 static int stgt_CDB_write_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *st = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *st = task->transport_req;
 
 	st->stgt_direction = DMA_TO_DEVICE;
 
@@ -746,7 +746,7 @@ static int stgt_check_for_SG(struct se_task *task)
  */
 static unsigned char *stgt_get_cdb(struct se_task *task)
 {
-	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *pt = task->transport_req;
 
 	return pt->stgt_cdb;
 }
@@ -757,7 +757,7 @@ static unsigned char *stgt_get_cdb(struct se_task *task)
  */
 static unsigned char *stgt_get_sense_buffer(struct se_task *task)
 {
-	struct stgt_plugin_task *pt = (struct stgt_plugin_task *) task->transport_req;
+	struct stgt_plugin_task *pt = task->transport_req;
 
 	return (unsigned char *)&pt->stgt_sense[0];
 }
@@ -768,8 +768,8 @@ static unsigned char *stgt_get_sense_buffer(struct se_task *task)
  */
 static u32 stgt_get_blocksize(struct se_device *dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct scsi_device *sd = sdv->sdv_sd;
 
 	return sd->sector_size;
 }
@@ -780,8 +780,8 @@ static u32 stgt_get_blocksize(struct se_device *dev)
  */
 static u32 stgt_get_device_rev(struct se_device *dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct scsi_device *sd = sdv->sdv_sd;
 
 	return (sd->scsi_level - 1) ? sd->scsi_level - 1 : 1;
 }
@@ -792,8 +792,8 @@ static u32 stgt_get_device_rev(struct se_device *dev)
  */
 static u32 stgt_get_device_type(struct se_device *dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct scsi_device *sd = sdv->sdv_sd;
 
 	return sd->type;
 }
@@ -813,8 +813,8 @@ static u32 stgt_get_dma_length(u32 task_size, struct se_device *dev)
  */
 static u32 stgt_get_max_sectors(struct se_device *dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct scsi_device *sd = sdv->sdv_sd;
 	return (sd->host->max_sectors > sd->request_queue->limits.max_sectors) ?
 		sd->request_queue->limits.max_sectors : sd->host->max_sectors;
 }
@@ -825,8 +825,8 @@ static u32 stgt_get_max_sectors(struct se_device *dev)
  */
 static u32 stgt_get_queue_depth(struct se_device *dev)
 {
-	struct stgt_dev_virt *sdv = (struct stgt_dev_virt *) dev->dev_ptr;
-	struct scsi_device *sd = (struct scsi_device *) sdv->sdv_sd;
+	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct scsi_device *sd = sdv->sdv_sd;
 
 	return sd->queue_depth;
 }

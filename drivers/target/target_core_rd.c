@@ -96,7 +96,7 @@ static int rd_detach_hba(struct se_hba *hba)
 		return -1;
 	}
 
-	rd_host = (struct rd_host *) hba->hba_ptr;
+	rd_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached Ramdisk HBA: %u from"
 		" Generic Target Core\n", hba->hba_id, rd_host->rd_host_id);
@@ -202,8 +202,7 @@ static int rd_build_device_space(struct rd_dev *rd_dev)
 						- 1;
 
 		for (j = 0; j < sg_per_table; j++) {
-			pg = (struct page *) alloc_pages(
-					GFP_KERNEL, 0);
+			pg = alloc_pages(GFP_KERNEL, 0);
 			if (!(pg)) {
 				printk(KERN_ERR "Unable to allocate scatterlist"
 					" pages for struct rd_dev_sg_table\n");
@@ -231,7 +230,7 @@ static void *rd_allocate_virtdevice(
 	int rd_direct)
 {
 	struct rd_dev *rd_dev;
-	struct rd_host *rd_host = (struct rd_host *) hba->hba_ptr;
+	struct rd_host *rd_host = hba->hba_ptr;
 
 	rd_dev = kzalloc(sizeof(struct rd_dev), GFP_KERNEL);
 	if (!(rd_dev)) {
@@ -266,8 +265,8 @@ static struct se_device *rd_create_virtdevice(
 	int rd_direct)
 {
 	struct se_device *dev;
-	struct rd_dev *rd_dev = (struct rd_dev *) p;
-	struct rd_host *rd_host = (struct rd_host *) hba->hba_ptr;
+	struct rd_dev *rd_dev = p;
+	struct rd_host *rd_host = hba->hba_ptr;
 	int dev_flags = 0;
 
 	if (rd_dev->rd_direct)
@@ -321,7 +320,7 @@ static struct se_device *rd_MEMCPY_create_virtdevice(
  */
 static int rd_activate_device(struct se_device *dev)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
+	struct rd_dev *rd_dev = dev->dev_ptr;
 	struct rd_host *rd_host = rd_dev->rd_host;
 
 	printk(KERN_INFO "CORE_RD[%u] - Activating Device with TCQ: %d at"
@@ -337,7 +336,7 @@ static int rd_activate_device(struct se_device *dev)
  */
 static void rd_deactivate_device(struct se_device *dev)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
+	struct rd_dev *rd_dev = dev->dev_ptr;
 	struct rd_host *rd_host = rd_dev->rd_host;
 
 	printk(KERN_INFO "CORE_RD[%u] - Deactivating Device with TCQ: %d at"
@@ -351,7 +350,7 @@ static void rd_deactivate_device(struct se_device *dev)
  */
 static void rd_free_device(void *p)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) p;
+	struct rd_dev *rd_dev = p;
 
 	rd_release_device_space(rd_dev);
 	kfree(rd_dev);
@@ -381,7 +380,7 @@ static void *rd_allocate_request(
 		printk(KERN_ERR "Unable to allocate struct rd_request\n");
 		return NULL;
 	}
-	rd_req->rd_dev = (struct rd_dev *) dev->dev_ptr;
+	rd_req->rd_dev = dev->dev_ptr;
 
 	return (void *)rd_req;
 }
@@ -393,7 +392,7 @@ static void *rd_allocate_request(
 static int rd_emulate_inquiry(struct se_task *task)
 {
 	unsigned char prod[64], se_location[128];
-	struct rd_dev *rd_dev = (struct rd_dev *) task->se_dev->dev_ptr;
+	struct rd_dev *rd_dev = task->se_dev->dev_ptr;
 	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_hba *hba = task->se_dev->se_hba;
 
@@ -414,7 +413,7 @@ static int rd_emulate_inquiry(struct se_task *task)
  */
 static int rd_emulate_read_cap(struct se_task *task)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) task->se_dev->dev_ptr;
+	struct rd_dev *rd_dev = task->se_dev->dev_ptr;
 	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) /
 		       DEV_ATTRIB(task->se_dev)->block_size) - 1;
 
@@ -427,7 +426,7 @@ static int rd_emulate_read_cap(struct se_task *task)
 
 static int rd_emulate_read_cap16(struct se_task *task)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) task->se_dev->dev_ptr;
+	struct rd_dev *rd_dev = task->se_dev->dev_ptr;
 	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) /
 				   DEV_ATTRIB(task->se_dev)->block_size) - 1;
 
@@ -443,7 +442,7 @@ static int rd_emulate_scsi_cdb(struct se_task *task)
 {
 	int ret;
 	struct se_cmd *cmd = TASK_CMD(task);
-	struct rd_request *rd_req = (struct rd_request *) task->transport_req;
+	struct rd_request *rd_req = task->transport_req;
 
 	switch (rd_req->rd_scsi_cdb[0]) {
 	case INQUIRY:
@@ -554,7 +553,7 @@ static int rd_MEMCPY_read(struct rd_request *req)
 		return -1;
 
 	table_sg_end = (table->page_end_offset - req->rd_page);
-	sg_d = (struct scatterlist *) req->rd_buf;
+	sg_d = req->rd_buf;
 	sg_s = &table->sg_table[req->rd_page - table->page_start_offset];
 #ifdef DEBUG_RAMDISK_MCP
 	printk(KERN_INFO "RD[%u]: Read LBA: %llu, Size: %u Page: %u, Offset:"
@@ -677,7 +676,7 @@ static int rd_MEMCPY_write(struct rd_request *req)
 
 	table_sg_end = (table->page_end_offset - req->rd_page);
 	sg_d = &table->sg_table[req->rd_page - table->page_start_offset];
-	sg_s = (struct scatterlist *) req->rd_buf;
+	sg_s = req->rd_buf;
 #ifdef DEBUG_RAMDISK_MCP
 	printk(KERN_INFO "RD[%d] Write LBA: %llu, Size: %u, Page: %u,"
 		" Offset: %u\n", dev->rd_dev_id, req->rd_lba, req->rd_size,
@@ -786,7 +785,7 @@ static int rd_MEMCPY_write(struct rd_request *req)
 static int rd_MEMCPY_do_task(struct se_task *task)
 {
 	struct se_device *dev = task->se_dev;
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 	int ret;
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
@@ -1011,7 +1010,7 @@ static int rd_DIRECT_do_se_mem_map(
 	u32 *task_offset_in)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 	u32 task_offset = *task_offset_in;
 	int ret;
 
@@ -1136,8 +1135,7 @@ static int rd_DIRECT_do_task(struct se_task *task)
  */
 static void rd_free_task(struct se_task *task)
 {
-	struct rd_request *req;
-	req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	kfree(req);
 }
@@ -1148,7 +1146,7 @@ static ssize_t rd_set_configfs_dev_params(
 	const char *page,
 	ssize_t count)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) se_dev->se_dev_su_ptr;
+	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
 	char *buf, *cur, *ptr, *ptr2;
 	unsigned long rd_pages;
 	int params = 0, ret;
@@ -1194,7 +1192,7 @@ out:
 
 static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) se_dev->se_dev_su_ptr;
+	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
 
 	if (!(rd_dev->rd_flags & RDF_HAS_PAGE_COUNT)) {
 		printk(KERN_INFO "Missing rd_pages= parameter\n");
@@ -1209,7 +1207,7 @@ static ssize_t rd_show_configfs_dev_params(
 	struct se_subsystem_dev *se_dev,
 	char *page)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) se_dev->se_dev_su_ptr;
+	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
 	int bl = 0;
 
 	 __rd_get_dev_info(rd_dev, page, &bl);
@@ -1237,7 +1235,7 @@ static void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 
 static void rd_get_dev_info(struct se_device *dev, char *b, int *bl)
 {
-	struct rd_dev *rd_dev = (struct rd_dev *) dev->dev_ptr;
+	struct rd_dev *rd_dev = dev->dev_ptr;
 
 	__rd_get_dev_info(rd_dev, b, bl);
 }
@@ -1261,7 +1259,7 @@ static void __rd_get_dev_info(struct rd_dev *rd_dev, char *b, int *bl)
 static void rd_map_task_non_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	req->rd_bufflen		= task->task_size;
 	req->rd_buf		= (void *) T_TASK(cmd)->t_task_buf;
@@ -1274,7 +1272,7 @@ static void rd_map_task_non_SG(struct se_task *task)
  */
 static void rd_map_task_SG(struct se_task *task)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	req->rd_bufflen		= task->task_size;
 	req->rd_buf		= task->task_sg;
@@ -1287,7 +1285,7 @@ static void rd_map_task_SG(struct se_task *task)
  */
 static int rd_CDB_none(struct se_task *task, u32 size)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	req->rd_data_direction	= RD_DATA_NONE;
 	req->rd_bufflen		= 0;
@@ -1303,7 +1301,7 @@ static int rd_CDB_none(struct se_task *task, u32 size)
  */
 static int rd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	req->rd_data_direction = RD_DATA_READ;
 	rd_map_task_non_SG(task);
@@ -1317,7 +1315,7 @@ static int rd_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 static int rd_CDB_read_SG(struct se_task *task, u32 size)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	req->rd_data_direction = RD_DATA_READ;
 	rd_map_task_SG(task);
@@ -1331,7 +1329,7 @@ static int rd_CDB_read_SG(struct se_task *task, u32 size)
  */
 static int rd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	req->rd_data_direction = RD_DATA_WRITE;
 	rd_map_task_non_SG(task);
@@ -1345,7 +1343,7 @@ static int rd_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 static int rd_CDB_write_SG(struct se_task *task, u32 size)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	req->rd_data_direction = RD_DATA_WRITE;
 	rd_map_task_SG(task);
@@ -1378,7 +1376,7 @@ static int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
  */
 static int rd_check_for_SG(struct se_task *task)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	return req->rd_sg_count;
 }
@@ -1389,7 +1387,7 @@ static int rd_check_for_SG(struct se_task *task)
  */
 static unsigned char *rd_get_cdb(struct se_task *task)
 {
-	struct rd_request *req = (struct rd_request *) task->transport_req;
+	struct rd_request *req = task->transport_req;
 
 	return req->rd_scsi_cdb;
 }
