@@ -4913,7 +4913,7 @@ set_len:
 		 * when emulate_tpe=1 we will be expect a different page length
 		 */
 		if (!(DEV_ATTRIB(dev)->emulate_tpe)) {
-			if (cmd->data_length < 0x10) {
+			if (cmd->data_length < (0x10 + 4)) {
 				printk(KERN_INFO "Received data_length: %u"
 					" too small for TPE=0 EVPD 0xb0\n",
 					cmd->data_length);
@@ -4939,7 +4939,7 @@ set_len:
 			break;
 		}
 
-		if (cmd->data_length < 0x3c) {
+		if (cmd->data_length < (0x3c + 4)) {
 			printk(KERN_INFO "Received data_length: %u"
 				" too small for TPE=1 EVPD 0xb0\n",
 				cmd->data_length);
