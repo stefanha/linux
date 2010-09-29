@@ -749,7 +749,7 @@ struct se_dev_attrib {
 	int		emulate_write_cache;
 	int		emulate_ua_intlck_ctrl;
 	int		emulate_tas;
-	int		emulate_tpe;
+	int		emulate_tpu;
 	int		emulate_reservations;
 	int		emulate_alua;
 	int		enforce_pr_isids;

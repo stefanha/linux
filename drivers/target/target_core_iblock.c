@@ -227,9 +227,9 @@ static struct se_device *iblock_create_virtdevice(
 	 * in ATA and we need to set TPE=1
 	 */
 	if (blk_queue_discard(bdev_get_queue(bd))) {
-		DEV_ATTRIB(dev)->emulate_tpe = 1;
+		DEV_ATTRIB(dev)->emulate_tpu = 1;
 		printk(KERN_INFO "IBLOCK: Enabling BLOCK Discard"
-				" and TPE=1 emulation\n");
+				" and TPU=1 emulation\n");
 	}
 
 	return dev;

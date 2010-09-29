@@ -241,9 +241,9 @@ static struct se_device *fd_create_virtdevice(
 	 */
 	if (S_ISBLK(inode->i_mode)) {
 		if (blk_queue_discard(bdev_get_queue(inode->i_bdev))) {
-			DEV_ATTRIB(dev)->emulate_tpe = 1;
+			DEV_ATTRIB(dev)->emulate_tpu = 1;
 			printk(KERN_INFO "FILEIO: Enabling BLOCK Discard"
-				" and TPE=1 emulation\n");
+				" and TPU=1 emulation\n");
 		}
 	}
 

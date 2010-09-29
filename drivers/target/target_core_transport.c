@@ -4910,12 +4910,12 @@ set_len:
 	case 0xb0: /* Block Limits VPD page */
 		/*
 		 * Following sbc3r22 section 6.5.3 Block Limits VPD page,
-		 * when emulate_tpe=1 we will be expect a different page length
+		 * when emulate_tpu=1 we will be expect a different page length
 		 */
-		if (!(DEV_ATTRIB(dev)->emulate_tpe)) {
+		if (!(DEV_ATTRIB(dev)->emulate_tpu)) {
 			if (cmd->data_length < (0x10 + 4)) {
 				printk(KERN_INFO "Received data_length: %u"
-					" too small for TPE=0 EVPD 0xb0\n",
+					" too small for TPE=1 EVPD 0xb0\n",
 					cmd->data_length);
 				return -1;
 			}
@@ -5011,7 +5011,7 @@ int transport_generic_emulate_readcapacity(
 	/*
 	 * Set max 32-bit blocks to signal SERVICE ACTION READ_CAPACITY_16
 	*/
-	if (DEV_ATTRIB(dev)->emulate_tpe)
+	if (DEV_ATTRIB(dev)->emulate_tpu)
 		put_unaligned_be32(0xFFFFFFFF, &buf[0]);
 
 	return 0;
@@ -5039,9 +5039,9 @@ int transport_generic_emulate_readcapacity_16(
 	buf[11] = DEV_ATTRIB(dev)->block_size & 0xff;
 	/*
 	 * Set Thin Provisioning Enable bit following sbc3r22 in section
-	 * READ CAPACITY (16) byte 14.
+	 * READ CAPACITY (16) byte 14 if emulate_tpu is enabled.
 	 */
-	if (DEV_ATTRIB(dev)->emulate_tpe)
+	if (DEV_ATTRIB(dev)->emulate_tpu)
 		buf[14] = 0x80;
 
 	return 0;
