@@ -876,8 +876,11 @@ static ssize_t fd_set_configfs_dev_params(
 	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
 	char *buf, *cur, *ptr, *ptr2;
 	int params = 0;
-
-	buf = kzalloc(count, GFP_KERNEL);
+	/*
+	 * Make sure we take into account the NULL terminator when copying
+	 * the const buffer here..
+	 */
+	buf = kzalloc(count + 1, GFP_KERNEL);
 	if (!(buf)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" temporary buffer\n");

@@ -868,8 +868,11 @@ static ssize_t pscsi_set_configfs_dev_params(struct se_hba *hba,
 	unsigned long scsi_host_id, scsi_channel_id;
 	unsigned long scsi_target_id, scsi_lun_id;
 	int params = 0, ret;
-
-	buf = kzalloc(count, GFP_KERNEL);
+	/*
+	 * Make sure we take into account the NULL terminator when copying
+	 * the const buffer here..
+	 */
+	buf = kzalloc(count + 1, GFP_KERNEL);
 	if (!(buf)) {
 		printk(KERN_ERR "Unable to allocate memory for temporary"
 				" buffer\n");
