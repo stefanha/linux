@@ -7106,9 +7106,10 @@ int transport_new_cmd_obj(
 		/*
 		 * Setup any BIDI READ tasks and memory from
 		 * T_TASK(cmd)->t_mem_bidi_list so the READ struct se_tasks
-		 * are queued first..
+		 * are queued first for the non pSCSI passthrough case.
 		 */
-		if (T_TASK(cmd)->t_mem_bidi_list != NULL) {
+		if ((T_TASK(cmd)->t_mem_bidi_list != NULL) &&
+		    (TRANSPORT(dev)->transport_type != TRANSPORT_PLUGIN_PHBA_PDEV)) {
 			rc = transport_generic_get_cdb_count(cmd, ti,
 				T_TASK(cmd)->t_task_lba,
 				T_TASK(cmd)->t_tasks_sectors,
