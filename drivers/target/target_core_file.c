@@ -1125,6 +1125,11 @@ static unsigned char *fd_get_cdb(struct se_task *task)
 	return req->fd_scsi_cdb;
 }
 
+static u32 fd_get_max_cdb_len(struct se_device *dev)
+{
+	return TCM_MAX_COMMAND_SIZE;
+}
+
 /*	fd_get_blocksize(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1224,6 +1229,7 @@ static struct se_subsystem_api fileio_template = {
 	.check_lba		= fd_check_lba,
 	.check_for_SG		= fd_check_for_SG,
 	.get_cdb		= fd_get_cdb,
+	.get_max_cdb_len	= fd_get_max_cdb_len,
 	.get_blocksize		= fd_get_blocksize,
 	.get_device_rev		= fd_get_device_rev,
 	.get_device_type	= fd_get_device_type,

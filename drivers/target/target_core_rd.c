@@ -1392,6 +1392,11 @@ static unsigned char *rd_get_cdb(struct se_task *task)
 	return req->rd_scsi_cdb;
 }
 
+static u32 rd_get_max_cdb_len(struct se_device *dev)
+{
+	return TCM_MAX_COMMAND_SIZE;
+}
+
 /*	rd_get_blocksize(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1475,6 +1480,7 @@ static struct se_subsystem_api rd_dr_template = {
 	.check_lba		= rd_DIRECT_check_lba,
 	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,
+	.get_max_cdb_len	= rd_get_max_cdb_len,
 	.get_blocksize		= rd_get_blocksize,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,

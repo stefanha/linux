@@ -751,6 +751,11 @@ static unsigned char *stgt_get_cdb(struct se_task *task)
 	return pt->stgt_cdb;
 }
 
+static u32 stgt_get_max_cdb_len(struct se_device *dev)
+{
+	return TCM_MAX_COMMAND_SIZE;
+}
+
 /*	stgt_get_sense_buffer():
  *
  *
@@ -931,6 +936,7 @@ static struct se_subsystem_api stgt_template = {
 	.check_lba		= stgt_check_lba,
 	.check_for_SG		= stgt_check_for_SG,
 	.get_cdb		= stgt_get_cdb,
+	.get_max_cdb_len	= stgt_get_max_cdb_len,
 	.get_sense_buffer	= stgt_get_sense_buffer,
 	.get_blocksize		= stgt_get_blocksize,
 	.get_device_rev		= stgt_get_device_rev,

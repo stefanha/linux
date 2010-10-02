@@ -1059,6 +1059,11 @@ static unsigned char *iblock_get_cdb(struct se_task *task)
 	return req->ib_scsi_cdb;
 }
 
+static u32 iblock_get_max_cdb_len(struct se_device *dev)
+{
+	return TCM_MAX_COMMAND_SIZE;
+}
+
 static u32 iblock_get_blocksize(struct se_device *dev)
 {
 	struct iblock_dev *ibd = dev->dev_ptr;
@@ -1167,6 +1172,7 @@ static struct se_subsystem_api iblock_template = {
 	.check_lba		= iblock_check_lba,
 	.check_for_SG		= iblock_check_for_SG,
 	.get_cdb		= iblock_get_cdb,
+	.get_max_cdb_len	= iblock_get_max_cdb_len,
 	.get_blocksize		= iblock_get_blocksize,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,

@@ -2860,6 +2860,11 @@ void transport_free_se_cmd(
 	if (se_cmd->se_tmr_req)
 		core_tmr_release_req(se_cmd->se_tmr_req);
 	/*
+	 * Check and free any extended CDB buffer that was allocated
+	 */
+	if (se_cmd->se_cmd_flags & SCF_ECDB_ALLOCATION)
+		kfree(T_TASK(se_cmd)->t_task_cdb);
+	/*
 	 * Release any optional TCM fabric dependent iovecs allocated by
 	 * transport_allocate_iovecs_for_cmd()
 	 */
@@ -2902,6 +2907,23 @@ int transport_generic_allocate_tasks(
 	non_data_cdb = transport_generic_cmd_sequencer(cmd, cdb);
 	if (non_data_cdb < 0)
 		return -1;
+	/*
+	 * If the received CDB is larger than TCM_MAX_COMMAND_SIZE,
+	 * allocate the additional extended CDB buffer now..  Otherwise
+	 * setup the pointer from __t_task_cdb to t_task_cdb.
+	 */
+	if (scsi_command_size(cdb) > TCM_MAX_COMMAND_SIZE) {
+		T_TASK(cmd)->t_task_cdb = kzalloc(scsi_command_size(cdb),
+						GFP_KERNEL);
+		if (!(T_TASK(cmd)->t_task_cdb)) {
+			printk(KERN_ERR "Unable to allocate T_TASK(cmd)->t_task_cdb"
+				" %u > TCM_MAX_COMMAND_SIZE ops\n",
+				scsi_command_size(cdb));
+			return -1;
+		}
+		cmd->se_cmd_flags |= SCF_ECDB_ALLOCATION;
+	} else
+		T_TASK(cmd)->t_task_cdb = &T_TASK(cmd)->__t_task_cdb[0];
 	/*
 	 * Copy the original CDB into T_TASK(cmd).
 	 */
@@ -5746,13 +5768,15 @@ static int transport_generic_cmd_sequencer(
 		service_action = get_unaligned_be16(&cdb[8]);
 		/*
 		 * Check the additional CDB length (+ 8 bytes for header) does
-		 * not exceed our TCM_MAX_COMMAND_SIZE.
+		 * not exceed our backsores ->get_max_cdb_len()
 		 */
-		if (scsi_varlen_cdb_length(&cdb[0]) > TCM_MAX_COMMAND_SIZE) {
+		if (scsi_varlen_cdb_length(&cdb[0]) >
+				TRANSPORT(dev)->get_max_cdb_len(dev)) {
 			printk(KERN_INFO "Only %u-byte extended CDBs currently"
-				" supported for VARIABLE_LENGTH_CMD, received:"
-				" %d for service action: 0x%04x\n",
-				TCM_MAX_COMMAND_SIZE,
+				" supported for VARIABLE_LENGTH_CMD backstore %s,"
+				" received: %d for service action: 0x%04x\n",
+				TRANSPORT(dev)->get_max_cdb_len(dev),
+				TRANSPORT(dev)->name,
 				scsi_varlen_cdb_length(&cdb[0]), service_action);
 			return TGCS_INVALID_CDB_FIELD;
 		}

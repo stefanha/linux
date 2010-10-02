@@ -519,6 +519,11 @@ struct se_subsystem_api {
 	 */
 	unsigned char *(*get_cdb)(struct se_task *);
 	/*
+	 * get_max_cdb_len(): Used by subsystems backstoers to signal the
+	 * maximum receivable SCSI CDB size.
+	 */
+	u32 (*get_max_cdb_len)(struct se_device *);
+	/*
 	 * get_blocksize():
 	 */
 	u32 (*get_blocksize)(struct se_device *);

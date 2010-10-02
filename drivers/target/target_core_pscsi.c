@@ -714,13 +714,40 @@ static void *pscsi_allocate_request(
 	struct se_task *task,
 	struct se_device *dev)
 {
+	struct se_cmd *cmd = task->task_se_cmd;
 	struct pscsi_plugin_task *pt;
+	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
 
 	pt = kzalloc(sizeof(struct pscsi_plugin_task), GFP_KERNEL);
 	if (!(pt)) {
 		printk(KERN_ERR "Unable to allocate struct pscsi_plugin_task\n");
 		return NULL;
 	}
+	/*
+	 * If TCM Core is signaling a > TCM_MAX_COMMAND_SIZE allocation,
+	 * allocate the extended CDB buffer for per struct se_task context
+	 * pt->pscsi_cdb now.
+	 */
+	if (cmd->se_cmd_flags & SCF_ECDB_ALLOCATION) {
+		/*
+		 * PSCSI_MAX_CDB_SIZE is currently set to 240 bytes which
+		 * allows the largest OSD CDB sizes again.
+		 */
+		if (scsi_command_size(cdb) > PSCSI_MAX_CDB_SIZE) {
+			printk(KERN_ERR "pSCSI: Received CDB of size: %u larger"
+				" than PSCSI_MAX_CDB_SIZE: %u\n",
+				scsi_command_size(cdb), PSCSI_MAX_CDB_SIZE);
+			return NULL;
+		}
+
+		pt->pscsi_cdb = kzalloc(scsi_command_size(cdb), GFP_KERNEL);
+		if (!(pt->pscsi_cdb)) {
+			printk(KERN_ERR "pSCSI: Unable to allocate extended"
+					" pt->pscsi_cdb\n");
+			return NULL;
+		}
+	} else
+		pt->pscsi_cdb = &pt->__pscsi_cdb[0];
 
 	return pt;
 }
@@ -817,6 +844,12 @@ static int pscsi_do_task(struct se_task *task)
 static void pscsi_free_task(struct se_task *task)
 {
 	struct pscsi_plugin_task *pt = task->transport_req;
+	/*
+	 * Release the extended CDB allocation from pscsi_allocate_request()
+	 * if one exists.
+	 */
+	if (task->task_se_cmd->se_cmd_flags & SCF_ECDB_ALLOCATION)
+		kfree(pt->pscsi_cdb);
 	/*
 	 * We do not release the bio(s) here associated with this task, as
 	 * this is handled by bio_put() and pscsi_bi_endio().
@@ -1366,6 +1399,11 @@ static unsigned char *pscsi_get_cdb(struct se_task *task)
 	return pt->pscsi_cdb;
 }
 
+static u32 pscsi_get_max_cdb_len(struct se_device *dev)
+{
+	return PSCSI_MAX_CDB_SIZE;
+}
+
 /*	pscsi_get_sense_buffer():
  *
  *
@@ -1533,6 +1571,7 @@ static struct se_subsystem_api pscsi_template = {
 	.check_lba		= pscsi_check_lba,
 	.check_for_SG		= pscsi_check_for_SG,
 	.get_cdb		= pscsi_get_cdb,
+	.get_max_cdb_len	= pscsi_get_max_cdb_len,
 	.get_sense_buffer	= pscsi_get_sense_buffer,
 	.get_blocksize		= pscsi_get_blocksize,
 	.get_device_rev		= pscsi_get_device_rev,

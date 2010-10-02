@@ -9,6 +9,9 @@
 #define INQUIRY_DATA_SIZE	0x24
 #endif
 
+/* Maximum extended CDB size for handling OSD passthrough */
+#define PSCSI_MAX_CDB_SIZE	240
+
 /* used in pscsi_add_device_to_list() */
 #define PSCSI_DEFAULT_QUEUEDEPTH	1
 
@@ -28,7 +31,8 @@ extern int linux_blockdevice_check(int, int);
 #include <linux/kobject.h>
 
 struct pscsi_plugin_task {
-	unsigned char pscsi_cdb[TCM_MAX_COMMAND_SIZE];
+	unsigned char *pscsi_cdb;
+	unsigned char __pscsi_cdb[TCM_MAX_COMMAND_SIZE];
 	unsigned char pscsi_sense[SCSI_SENSE_BUFFERSIZE];
 	int	pscsi_direction;
 	int	pscsi_result;
