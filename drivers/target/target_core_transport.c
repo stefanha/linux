@@ -5522,13 +5522,13 @@ int transport_generic_unmap(struct se_cmd *cmd, struct block_device *bdev)
 	dl = get_unaligned_be16(&cdb[0]);
 	bd_dl = get_unaligned_be16(&cdb[2]);
 	ptr = &buf[offset];
-	printk("UNMAP: Sub: %s Using dl: %hu bd_dl: %hu size: %hu ptr: %p\n",
-		TRANSPORT(dev)->name, dl, bd_dl, size, ptr);
+	printk(KERN_INFO "UNMAP: Sub: %s Using dl: %hu bd_dl: %hu size: %hu"
+		" ptr: %p\n", TRANSPORT(dev)->name, dl, bd_dl, size, ptr);
 
 	while (size) {
 		lba = get_unaligned_be64(&ptr[0]);
 		range = get_unaligned_be32(&ptr[8]);
-		printk("UNMAP: Using lba: %llu and range: %u\n", lba, range);
+		printk(KERN_INFO "UNMAP: Using lba: %llu and range: %u\n", lba, range);
 
 		ret = blkdev_issue_discard(bdev, lba, range, GFP_KERNEL, barrier);
 		if (ret < 0) {
@@ -6182,8 +6182,6 @@ static int transport_generic_cmd_sequencer(
 		transport_get_maps(cmd);
 		passthrough = (TRANSPORT(dev)->transport_type ==
 				TRANSPORT_PLUGIN_PHBA_PDEV);
-		printk("Got UNMAP CDB for subsystem plugin: %s, pt: %hd size: %hu\n",
-				TRANSPORT(dev)->name, passthrough, size);
 		/*
 		 * Determine if the received UNMAP used to for direct passthrough
 		 * into Linux/SCSI with struct request via TCM/pSCSI or we are
