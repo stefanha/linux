@@ -256,8 +256,9 @@ static struct se_device *fd_create_virtdevice(
 					q->limits.discard_alignment;
 
 			DEV_ATTRIB(dev)->emulate_tpu = 1;
+			DEV_ATTRIB(dev)->emulate_tpws = 1;
 			printk(KERN_INFO "FILEIO: Enabling BLOCK Discard"
-				" and TPU=1 emulation\n");
+				" for TPU=1 and TPWS=1 emulation\n");
 		}
 	}
 
@@ -522,6 +523,48 @@ static int fd_emulate_scsi_cdb(struct se_task *task)
 	task->task_scsi_status = GOOD;
 	transport_complete_task(task, 1);
 
+	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
+}
+
+static int fd_emulate_write_same_unmap(struct se_task *task)
+{
+	struct se_cmd *cmd = TASK_CMD(task);
+	struct fd_dev *fd_dev = task->se_dev->dev_ptr;
+	struct file *f = fd_dev->fd_file;
+	struct inode *i;
+	struct block_device *bd;
+	int ret;
+
+	i = igrab(f->f_mapping->host);
+	if (!(i)) {
+		printk(KERN_ERR "FILEIO: Unable to locate inode for"
+				" backend for WRITE_SAME\n");
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	}
+	/*
+	 * Currently for struct file w/o a struct block_device
+	 * backend we return a success..
+	 */
+	if (!(S_ISBLK(i->i_mode))) {
+		printk(KERN_WARNING "Ignoring WRITE_SAME for non BD"
+				" backend for struct file\n");
+		iput(i);
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	}
+	bd = I_BDEV(f->f_mapping->host);
+	if (!(bd)) {
+		printk(KERN_ERR "FILEIO: Unable to locate struct"
+				" block_device for WRITE_SAME\n");
+		iput(i);
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	}
+	ret = transport_generic_write_same(cmd, bd);
+	iput(i);
+	if (ret < 0)
+		return ret;
+
+	task->task_scsi_status = GOOD;
+	transport_complete_task(task, 1);
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
@@ -814,6 +857,8 @@ static int fd_do_task(struct se_task *task)
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return fd_emulate_scsi_cdb(task);
+	else if (T_TASK(cmd)->t_tasks_unmap)
+		return fd_emulate_write_same_unmap(task);
 
 	req->fd_lba = task->task_lba;
 	req->fd_size = task->task_size;

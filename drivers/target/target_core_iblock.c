@@ -241,8 +241,9 @@ static struct se_device *iblock_create_virtdevice(
 				q->limits.discard_alignment;
 
 		DEV_ATTRIB(dev)->emulate_tpu = 1;
+		DEV_ATTRIB(dev)->emulate_tpws = 1;
 		printk(KERN_INFO "IBLOCK: Enabling BLOCK Discard support"
-				" and TPU=1 emulation\n");
+				" for TPU=1 and TPWS=1 emulation\n");
 	}
 
 	return dev;
@@ -547,6 +548,22 @@ static int iblock_emulate_scsi_cdb(struct se_task *task)
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
+static int iblock_emulate_write_same_unmap(struct se_task *task)
+{
+	struct iblock_dev *ibd = task->se_dev->dev_ptr;
+	struct block_device *bd = ibd->ibd_bd;
+	struct se_cmd *cmd = TASK_CMD(task);
+	int ret;
+
+	ret = transport_generic_write_same(cmd, bd);
+	if (ret < 0)
+		return ret;
+
+	task->task_scsi_status = GOOD;
+	transport_complete_task(task, 1);
+	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
+}
+
 static int __iblock_do_sync_cache(struct se_device *dev)
 {
 	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
@@ -638,6 +655,8 @@ static int iblock_do_task(struct se_task *task)
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return iblock_emulate_scsi_cdb(task);
+	else if (T_TASK(task->task_se_cmd)->t_tasks_unmap)
+		return iblock_emulate_write_same_unmap(task);
 
 	while (bio) {
 		nbio = bio->bi_next;
