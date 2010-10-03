@@ -4932,9 +4932,11 @@ set_len:
 	case 0xb0: /* Block Limits VPD page */
 		/*
 		 * Following sbc3r22 section 6.5.3 Block Limits VPD page,
-		 * when emulate_tpu=1 we will be expect a different page length
+		 * when emulate_tpu=1 or emulate_tpws=1 we will be expect
+		 * a different page length for Thin Provisioning.
 		 */
-		if (!(DEV_ATTRIB(dev)->emulate_tpu)) {
+		if (!(DEV_ATTRIB(dev)->emulate_tpu) &&
+		    !(DEV_ATTRIB(dev)->emulate_tpws)) {
 			if (cmd->data_length < (0x10 + 4)) {
 				printk(KERN_INFO "Received data_length: %u"
 					" too small for TPE=1 EVPD 0xb0\n",
@@ -5037,6 +5039,14 @@ set_len:
 		 */
 		if (DEV_ATTRIB(dev)->emulate_tpu != 0)
 			buf[5] = 0x80;
+		/*
+		 * A TPWS bit set to one indicates that the device server supports
+		 * the use of the WRITE SAME (16) command (see 5.42) to unmap LBAs.
+		 * A TPWS bit set to zero indicates that the device server does not
+		 * support the use of the WRITE SAME (16) command to unmap LBAs.
+		 */
+		if (DEV_ATTRIB(dev)->emulate_tpws != 0)
+			buf[5] |= 0x40;
 		break;
 	default:
 		printk(KERN_ERR "Unknown VPD Code: 0x%02x\n", cdb[2]);
@@ -5065,7 +5075,7 @@ int transport_generic_emulate_readcapacity(
 	/*
 	 * Set max 32-bit blocks to signal SERVICE ACTION READ_CAPACITY_16
 	*/
-	if (DEV_ATTRIB(dev)->emulate_tpu)
+	if (DEV_ATTRIB(dev)->emulate_tpu || DEV_ATTRIB(dev)->emulate_tpws)
 		put_unaligned_be32(0xFFFFFFFF, &buf[0]);
 
 	return 0;
@@ -5093,9 +5103,9 @@ int transport_generic_emulate_readcapacity_16(
 	buf[11] = DEV_ATTRIB(dev)->block_size & 0xff;
 	/*
 	 * Set Thin Provisioning Enable bit following sbc3r22 in section
-	 * READ CAPACITY (16) byte 14 if emulate_tpu is enabled.
+	 * READ CAPACITY (16) byte 14 if emulate_tpu or emulate_tpws is enabled.
 	 */
-	if (DEV_ATTRIB(dev)->emulate_tpu)
+	if (DEV_ATTRIB(dev)->emulate_tpu || DEV_ATTRIB(dev)->emulate_tpws)
 		buf[14] = 0x80;
 
 	return 0;
@@ -5533,6 +5543,38 @@ int transport_generic_unmap(struct se_cmd *cmd, struct block_device *bdev)
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_unmap);
+
+/*
+ * Used for TCM/IBLOCK and TCM/FILEIO for block/blk-lib.c level discard support.
+ * Note this is not used for TCM/pSCSI passthrough
+ */
+int transport_generic_write_same(struct se_cmd *cmd, struct block_device *bdev)
+{
+	struct se_device *dev = SE_DEV(cmd);
+	sector_t lba;
+	unsigned int range;
+	int barrier = 0, ret;
+	/*
+	 * If the UNMAP bit was not set, we should not be calling this to being with..
+	 */
+	if (!(T_TASK(cmd)->t_tasks_unmap)) {
+		dump_stack();
+		return -1;
+	}
+
+	lba = T_TASK(cmd)->t_task_lba;
+	range = (cmd->data_length / TRANSPORT(dev)->get_blocksize(dev));
+
+	printk(KERN_INFO "WRITE_SAME UNMAP: LBA: %llu Range: %u\n", lba, range);
+
+	ret = blkdev_issue_discard(bdev, lba, range, GFP_KERNEL, barrier);
+	if (ret < 0) {
+		printk(KERN_INFO "blkdev_issue_discard() failed for WRITE_SAME\n");
+		return -1;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(transport_generic_write_same);
 
 static inline void transport_dev_get_mem_buf(
 	struct se_device *dev,
@@ -6153,6 +6195,53 @@ static int transport_generic_cmd_sequencer(
 			cmd->se_cmd_flags |= SCF_EMULATE_SYNC_UNMAP;
 
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
+		break;
+	case WRITE_SAME_16:
+		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
+		cmd->transport_allocate_resources =
+				&transport_generic_allocate_buf;
+		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
+		if (sector_ret)
+			return TGCS_UNSUPPORTED_CDB;
+		size = transport_get_size(sectors, cdb, cmd);
+		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+		transport_get_maps(cmd);
+		cmd->transport_split_cdb = &split_cdb_XX_16;
+		cmd->transport_get_long_lba = &transport_lba_64;
+		passthrough = (TRANSPORT(dev)->transport_type ==
+				TRANSPORT_PLUGIN_PHBA_PDEV);
+		/*
+		 * Determine if the received WRITE_SAME_16 is used to for direct
+		 * passthrough into Linux/SCSI with struct request via TCM/pSCSI
+		 * or we are signaling the use of internal WRITE_SAME + UNMAP=1
+		 * emulation for -> Linux/BLOCK disbard with TCM/IBLOCK and
+		 * TCM/FILEIO subsystem plugin backstores.
+		 */ 
+		if (!(passthrough)) {
+			if ((cdb[1] & 0x04) || (cdb[1] & 0x02)) {
+				printk(KERN_ERR "WRITE_SAME PBDATA and LBDATA"
+					" bits not supported for Block Discard"
+					" Emulation\n");
+				return TGCS_INVALID_CDB_FIELD;
+			}
+			/*
+			 * Currently for the emulated case we only accept
+			 * tpws with the UNMAP=1 bit set.
+			 */
+			if (!(cdb[1] & 0x08)) {
+				printk(KERN_ERR "WRITE_SAME w/ UNMAP bit not "
+					" supported for Block Discard Emulation\n");
+				return TGCS_INVALID_CDB_FIELD;
+			}
+
+			cmd->se_cmd_flags |= SCF_EMULATE_SYNC_WRITE_SAME;
+			/*
+			 * Signal to TCM IBLOCK+FILEIO subsystem plugins that WRITE
+			 * tasks will be translated to SCSI UNMAP -> Block Discard
+			 */
+			T_TASK(cmd)->t_tasks_unmap = 1;
+		}
+		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case GPCMD_CLOSE_TRACK:

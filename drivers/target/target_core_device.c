@@ -1004,6 +1004,7 @@ void se_dev_set_default_attribs(struct se_device *dev)
 	DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl = DA_EMULATE_UA_INTLLCK_CTRL;
 	DEV_ATTRIB(dev)->emulate_tas = DA_EMULATE_TAS;
 	DEV_ATTRIB(dev)->emulate_tpu = DA_EMULATE_TPU;
+	DEV_ATTRIB(dev)->emulate_tpws = DA_EMULATE_TPWS;
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	DEV_ATTRIB(dev)->emulate_alua = DA_EMULATE_ALUA;
 	DEV_ATTRIB(dev)->enforce_pr_isids = DA_ENFORCE_PR_ISIDS;
@@ -1231,7 +1232,19 @@ int se_dev_set_emulate_tpu(struct se_device *dev, int flag)
 		return -1;
 	}
 	DEV_ATTRIB(dev)->emulate_tpu = flag;
-	printk(KERN_INFO "dev[%p]: SE Device Thin Provising UNMAP bit: %d\n",
+	printk(KERN_INFO "dev[%p]: SE Device Thin Provisioning UNMAP bit: %d\n",
+				dev, flag);
+	return 0;
+}
+
+int se_dev_set_emulate_tpws(struct se_device *dev, int flag)
+{
+	if ((flag != 0) && (flag != 1)) {
+		printk(KERN_ERR "Illegal value %d\n", flag);
+		return -1;
+	}
+	DEV_ATTRIB(dev)->emulate_tpws = flag;
+	printk(KERN_INFO "dev[%p]: SE Device Thin Provisioning WRITE_SAME: %d\n",
 				dev, flag);
 	return 0;
 }

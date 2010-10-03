@@ -109,6 +109,11 @@
 #define DA_EMULATE_TAS				1
 /* Emulation for Thin Provisioning UNMAP using block/blk-lib.c:blkdev_issue_discard() */
 #define DA_EMULATE_TPU				0
+/*
+ * Emulation for Thin Provisioning WRITE_SAME w/ UNMAP=1 bit using
+ * block/blk-lib.c:blkdev_issue_discard()
+ */
+#define DA_EMULATE_TPWS				0
 /* No Emulation for PSCSI by default */
 #define DA_EMULATE_RESERVATIONS			0
 /* No Emulation for PSCSI by default */
@@ -235,6 +240,7 @@ extern int transport_generic_emulate_request_sense(struct se_cmd *,
 						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd *);
 extern int transport_generic_unmap(struct se_cmd *, struct block_device *);
+extern int transport_generic_write_same(struct se_cmd *, struct block_device *);
 extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32, void *);
 extern void transport_passthrough_release(struct se_cmd *);

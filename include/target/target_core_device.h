@@ -49,6 +49,7 @@ extern int se_dev_set_emulate_write_cache(struct se_device *, int);
 extern int se_dev_set_emulate_ua_intlck_ctrl(struct se_device *, int);
 extern int se_dev_set_emulate_tas(struct se_device *, int);
 extern int se_dev_set_emulate_tpu(struct se_device *, int);
+extern int se_dev_set_emulate_tpws(struct se_device *, int);
 extern int se_dev_set_enforce_pr_isids(struct se_device *, int);
 extern int se_dev_set_queue_depth(struct se_device *, u32);
 extern int se_dev_set_max_sectors(struct se_device *, u32);
