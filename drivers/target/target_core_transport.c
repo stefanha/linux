@@ -5856,6 +5856,46 @@ static int transport_generic_cmd_sequencer(
 			T_TASK(cmd)->t_tasks_fua = (cdb[10] & 0x8);
 			ret = TGCS_DATA_SG_IO_CDB;	
 			break;
+		case WRITE_SAME_32:
+			sectors = transport_get_sectors_32(cdb, cmd, &sector_ret);
+			if (sector_ret)
+				return TGCS_UNSUPPORTED_CDB;
+			size = transport_get_size(sectors, cdb, cmd);
+			transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
+			transport_get_maps(cmd);
+			cmd->transport_split_cdb = &split_cdb_XX_32;
+			cmd->transport_get_long_lba = &transport_lba_64_ext;
+			/*
+			 * Skip the remaining assignments for TCM/PSCSI passthrough
+			 */
+			if (passthrough) {
+				ret = TGCS_DATA_SG_IO_CDB;
+				break;
+			}
+			if ((cdb[10] & 0x04) || (cdb[10] & 0x02)) {
+				printk(KERN_ERR "WRITE_SAME PBDATA and LBDATA"
+					" bits not supported for Block Discard"
+					" Emulation\n");
+				return TGCS_INVALID_CDB_FIELD;
+			}
+			/*
+			 * Currently for the emulated case we only accept
+			 * tpws with the UNMAP=1 bit set.
+			 */
+			if (!(cdb[10] & 0x08)) {
+				printk(KERN_ERR "WRITE_SAME w/ UNMAP bit not"
+					" supported for Block Discard Emulation\n");
+				return TGCS_INVALID_CDB_FIELD;
+			}
+			
+			cmd->se_cmd_flags |= SCF_EMULATE_SYNC_WRITE_SAME;
+			/*
+			 * Signal to TCM IBLOCK+FILEIO subsystem plugins that WRITE
+			 * tasks will be translated to SCSI UNMAP -> Block Discard
+			 */
+			T_TASK(cmd)->t_tasks_unmap = 1;
+			ret = TGCS_DATA_SG_IO_CDB;	
+			break;
 		default:
 			printk(KERN_ERR "VARIABLE_LENGTH_CMD service action"
 				" 0x%04x not supported\n", service_action);
