@@ -5846,8 +5846,10 @@ static int transport_generic_cmd_sequencer(
 			/*
 			 * Skip the remaining assignments for TCM/PSCSI passthrough
 			 */
-			if (passthrough)
+			if (passthrough) {
+				ret = TGCS_DATA_SG_IO_CDB;
 				break;
+			}
 			/*
 			 * Setup BIDI XOR callback to be run during
 			 * transport_generic_complete_ok()
