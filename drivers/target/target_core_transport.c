@@ -2144,7 +2144,6 @@ static int transport_get_read_capacity(struct se_device *dev)
 
 	if (blocks != 0xFFFFFFFF) {
 		dev->dev_sectors_total = blocks;
-		dev->dev_generate_cdb = &split_cdb_RW_10;
 		return 0;
 	}
 
@@ -2174,7 +2173,6 @@ static int transport_get_read_capacity(struct se_device *dev)
 	transport_passthrough_release(cmd);
 
 	dev->dev_sectors_total = blocks_long;
-	dev->dev_generate_cdb = &split_cdb_RW_16;
 
 	return 0;
 }

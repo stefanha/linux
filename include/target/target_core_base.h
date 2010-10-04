@@ -896,8 +896,6 @@ struct se_device {
 	pid_t			process_thread_pid;
 	struct task_struct		*dev_mgmt_thread;
 	int (*write_pending)(struct se_task *);
-	void (*dev_generate_cdb)(unsigned long long, u32 *,
-					unsigned char *, int);
 	struct list_head	delayed_cmd_list;
 	struct list_head	ordered_cmd_list;
 	struct list_head	execute_task_list;
