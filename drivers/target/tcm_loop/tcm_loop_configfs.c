@@ -541,6 +541,8 @@ int tcm_loop_register_configfs(void)
 					&tcm_loop_check_demo_mode_cache;
 	fabric->tf_ops.tpg_check_demo_mode_write_protect =
 					&tcm_loop_check_demo_mode_write_protect;
+	fabric->tf_ops.tpg_check_prod_mode_write_protect =
+					&tcm_loop_check_prod_mode_write_protect;
 	/*
 	 * The TCM loopback fabric module runs in demo-mode to a local
 	 * virtual SCSI device, so fabric dependent initator ACLs are
@@ -549,9 +551,7 @@ int tcm_loop_register_configfs(void)
 	fabric->tf_ops.tpg_alloc_fabric_acl = &tcm_loop_tpg_alloc_fabric_acl;
 	fabric->tf_ops.tpg_release_fabric_acl =
 					&tcm_loop_tpg_release_fabric_acl;
-#ifdef SNMP_SUPPORT
 	fabric->tf_ops.tpg_get_inst_index = &tcm_loop_get_inst_index;
-#endif /* SNMP_SUPPORT */
 	/*
 	 * Since tcm_loop is mapping physical memory from Linux/SCSI
 	 * struct scatterlist arrays for each struct scsi_cmnd I/O,
@@ -571,9 +571,7 @@ int tcm_loop_register_configfs(void)
 	fabric->tf_ops.stop_session = &tcm_loop_stop_session;
 	fabric->tf_ops.fall_back_to_erl0 = &tcm_loop_fall_back_to_erl0;
 	fabric->tf_ops.sess_logged_in = &tcm_loop_sess_logged_in;
-#ifdef SNMP_SUPPORT
-	fabric->tf_ops.sess_get_index = &tpg_loop_sess_get_index:
-#endif /* SNMP_SUPPORT */
+	fabric->tf_ops.sess_get_index = &tcm_loop_sess_get_index;
 	fabric->tf_ops.sess_get_initiator_sid = NULL;
 	fabric->tf_ops.write_pending = &tcm_loop_write_pending;
 	fabric->tf_ops.write_pending_status = &tcm_loop_write_pending_status;
@@ -624,7 +622,7 @@ int tcm_loop_register_configfs(void)
 	ret = target_fabric_configfs_register(fabric);
 	if (ret < 0) {
 		printk(KERN_ERR "target_fabric_configfs_register() for"
-				" LIO-Target failed!\n");
+				" TCM_Loop failed!\n");
 		target_fabric_configfs_free(fabric);
 		return -1;
 	}

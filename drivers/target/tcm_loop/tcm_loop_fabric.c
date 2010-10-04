@@ -224,6 +224,16 @@ int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *se_tpg)
 	return 0;
 }
 
+/*
+ * Because TCM_Loop does not use explict ACLs and MappedLUNs, this will
+ * never be called for TCM_Loop by target_core_fabric_configfs.c code.
+ * It has been added here as a nop for target_fabric_tf_ops_check()
+ */
+int tcm_loop_check_prod_mode_write_protect(struct se_portal_group *se_tpg)
+{
+	return 0;
+}
+
 struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
 	struct se_portal_group *se_tpg)
 {
@@ -248,16 +258,10 @@ void tcm_loop_tpg_release_fabric_acl(
 	kfree(tl_nacl);
 }
 
-#ifdef SNMP_SUPPORT
-u32 tcm_loop_get_tpg_inst_index(struct se_portal_group *se_tpg)
+u32 tcm_loop_get_inst_index(struct se_portal_group *se_tpg)
 {
-	struct tcm_loop_tpg *tl_tpg =
-		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
-
-//	return tpg->tpg_tiqn->tiqn_index;
 	return 1;
 }
-#endif /* SNMP_SUPPORT */
 
 void tcm_loop_new_cmd_failure(struct se_cmd *se_cmd)
 {
@@ -285,13 +289,10 @@ int tcm_loop_sess_logged_in(struct se_session *se_sess)
 	return 1;
 }
 
-#ifdef SNMP_SUPPORT
-u32 tpg_loop_sess_get_index(struct se_session *se_sess)
+u32 tcm_loop_sess_get_index(struct se_session *se_sess)
 {
 	return 1;
 }
-#endif /* SNMP_SUPPORT */
-
 
 void tcm_loop_set_default_node_attributes(struct se_node_acl *se_acl)
 {

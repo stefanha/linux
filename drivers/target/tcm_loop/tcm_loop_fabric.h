@@ -14,18 +14,15 @@ extern char *tcm_loop_parse_pr_out_transport_id(struct se_portal_group *,
 extern int tcm_loop_check_demo_mode(struct se_portal_group *);
 extern int tcm_loop_check_demo_mode_cache(struct se_portal_group *);
 extern int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *);
+extern int tcm_loop_check_prod_mode_write_protect(struct se_portal_group *);
 extern struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
 				struct se_portal_group *);
 void tcm_loop_tpg_release_fabric_acl(struct se_portal_group *, struct se_node_acl *);
-#ifdef SNMP_SUPPORT
-extern u32 tcm_loop_tpg_get_inst_index(struct se_portal_group *);
-#endif /* SNMP_SUPPORT */
+extern u32 tcm_loop_get_inst_index(struct se_portal_group *);
 extern void tcm_loop_new_cmd_failure(struct se_cmd *);
 extern int tcm_loop_is_state_remove(struct se_cmd *);
 extern int tcm_loop_sess_logged_in(struct se_session *);
-#ifdef SNMP_SUPPORT
-extern u32 tpg_loop_sess_get_index(struct se_session *);
-#endif /* SNMP_SUPPORT */
+extern u32 tcm_loop_sess_get_index(struct se_session *);
 extern void tcm_loop_set_default_node_attributes(struct se_node_acl *);
 extern u32 tcm_loop_get_task_tag(struct se_cmd *);
 extern int tcm_loop_get_cmd_state(struct se_cmd *);
