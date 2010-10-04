@@ -50,7 +50,6 @@ struct target_core_fabric_ops {
 	void (*check_stop_free)(struct se_cmd *);
 	void (*release_cmd_to_pool)(struct se_cmd *);
 	void (*release_cmd_direct)(struct se_cmd *);
-	int (*dev_del_lun)(struct se_portal_group *, u32);
 	/*
 	 * Called with spin_lock_bh(struct se_portal_group->session_lock held.
 	 */
