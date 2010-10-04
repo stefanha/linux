@@ -386,6 +386,180 @@ struct config_item *target_fabric_configfs_find_by_name(
 }
 
 /*
+ * Perform a sanity check of the passed tf->tf_ops before completing
+ * TCM fabric module registration.
+ */
+static int target_fabric_tf_ops_check(
+	struct target_fabric_configfs *tf)
+{
+	struct target_core_fabric_ops *tfo = &tf->tf_ops;
+
+	if (!(tfo->get_fabric_name)) {
+		printk(KERN_ERR "Missing tfo->get_fabric_name()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->get_fabric_proto_ident)) {
+		printk(KERN_ERR "Missing tfo->get_fabric_proto_ident()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_get_wwn)) {
+		printk(KERN_ERR "Missing tfo->tpg_get_wwn()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_get_tag)) {
+		printk(KERN_ERR "Missing tfo->tpg_get_tag()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_get_default_depth)) {
+		printk(KERN_ERR "Missing tfo->tpg_get_default_depth()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_get_pr_transport_id)) {
+		printk(KERN_ERR "Missing tfo->tpg_get_pr_transport_id()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_get_pr_transport_id_len)) {
+		printk(KERN_ERR "Missing tfo->tpg_get_pr_transport_id_len()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_check_demo_mode)) {
+		printk(KERN_ERR "Missing tfo->tpg_check_demo_mode()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_check_demo_mode_cache)) {
+		printk(KERN_ERR "Missing tfo->tpg_check_demo_mode_cache()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_check_demo_mode_write_protect)) {
+		printk(KERN_ERR "Missing tfo->tpg_check_demo_mode_write_protect()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_check_prod_mode_write_protect)) {
+		printk(KERN_ERR "Missing tfo->tpg_check_prod_mode_write_protect()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_alloc_fabric_acl)) {
+		printk(KERN_ERR "Missing tfo->tpg_alloc_fabric_acl()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_release_fabric_acl)) {
+		printk(KERN_ERR "Missing tfo->tpg_release_fabric_acl()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->tpg_get_inst_index)) {
+		printk(KERN_ERR "Missing tfo->tpg_get_inst_index()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->release_cmd_to_pool)) {
+		printk(KERN_ERR "Missing tfo->release_cmd_to_pool()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->release_cmd_direct)) {
+		printk(KERN_ERR "Missing tfo->release_cmd_direct()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->shutdown_session)) {
+		printk(KERN_ERR "Missing tfo->shutdown_session()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->close_session)) {
+		printk(KERN_ERR "Missing tfo->close_session()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->stop_session)) {
+		printk(KERN_ERR "Missing tfo->stop_session()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->fall_back_to_erl0)) {
+		printk(KERN_ERR "Missing tfo->fall_back_to_erl0()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->sess_logged_in)) {
+		printk(KERN_ERR "Missing tfo->sess_logged_in()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->sess_get_index)) {
+		printk(KERN_ERR "Missing tfo->sess_get_index()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->write_pending)) {
+		printk(KERN_ERR "Missing tfo->write_pending()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->write_pending_status)) {
+		printk(KERN_ERR "Missing tfo->write_pending_status()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->set_default_node_attributes)) {
+		printk(KERN_ERR "Missing tfo->set_default_node_attributes()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->get_task_tag)) {
+		printk(KERN_ERR "Missing tfo->get_task_tag()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->get_cmd_state)) {
+		printk(KERN_ERR "Missing tfo->get_cmd_state()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->new_cmd_failure)) {
+		printk(KERN_ERR "Missing tfo->new_cmd_failure()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->queue_data_in)) {
+		printk(KERN_ERR "Missing tfo->queue_data_in()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->queue_status)) {
+		printk(KERN_ERR "Missing tfo->queue_status()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->queue_tm_rsp)) {
+		printk(KERN_ERR "Missing tfo->queue_tm_rsp()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->set_fabric_sense_len)) {
+		printk(KERN_ERR "Missing tfo->set_fabric_sense_len()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->get_fabric_sense_len)) {
+		printk(KERN_ERR "Missing tfo->get_fabric_sense_len()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->is_state_remove)) {
+		printk(KERN_ERR "Missing tfo->is_state_remove()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->pack_lun)) {
+		printk(KERN_ERR "Missing tfo->pack_lun()\n");
+		return -EINVAL;
+	}
+	/*
+	 * We at least require tfo->fabric_make_wwn(), tfo->fabric_drop_wwn()
+	 * tfo->fabric_make_tpg() and tfo->fabric_drop_tpg() in
+	 * target_core_fabric_configfs.c WWN+TPG group context code.
+	 */
+	if (!(tfo->fabric_make_wwn)) {
+		printk(KERN_ERR "Missing tfo->fabric_make_wwn()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->fabric_drop_wwn)) {
+		printk(KERN_ERR "Missing tfo->fabric_drop_wwn()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->fabric_make_tpg)) {
+		printk(KERN_ERR "Missing tfo->fabric_make_tpg()\n");
+		return -EINVAL;
+	}
+	if (!(tfo->fabric_drop_tpg)) {
+		printk(KERN_ERR "Missing tfo->fabric_drop_tpg()\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/*
  * Called 2nd from fabric module with returned parameter of
  * struct target_fabric_configfs * from target_fabric_configfs_init().
  *
@@ -397,6 +571,7 @@ int target_fabric_configfs_register(
 	struct target_fabric_configfs *tf)
 {
 	struct config_group *su_group;
+	int ret;
 
 	if (!(tf)) {
 		printk(KERN_ERR "Unable to locate target_fabric_configfs"
@@ -414,6 +589,10 @@ int target_fabric_configfs_register(
 			" pointer\n");
 		return -EINVAL;
 	}
+	ret = target_fabric_tf_ops_check(tf);
+	if (ret < 0)
+		return ret;
+
 	printk(KERN_INFO "<<<<<<<<<<<<<<<<<<<<<< END FABRIC API >>>>>>>>>>>>"
 		">>>>>>>>>>\n");
 	return 0;
