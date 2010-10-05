@@ -24,61 +24,71 @@ This script will create a new drivers/target/$TCM_NEW_MOD/, and will do the foll
 	*) NOP API calls for all other Data I/O path and fabric dependent attribute logic
 	   in $TCM_NEW_MOD/$TCM_NEW_MOD_fabric.c
 
-So far the generation of new functional ConfigFS skeletons supports for FC,
-SAS and iSCSI proto_idents, which is defined at the top of tcm_mod_builder.py:main().
-Once proto_ident is selected in main(), and the handful of other global variables at top
-of tcm_mod_builder.py are correct, actually running the script looks like:
+tcm_mod_builder.py depends upon the mandatory '-p $PROTO_IDENT' and '-m
+$FABRIC_MOD_name' paramters, and actually running the script looks like:
 
-target:/mnt/sdb/lio-core-2.6.git/Documentation/target# ./tcm_mod_builder.py 
+target:/mnt/sdb/lio-core-2.6.git/Documentation/target# python tcm_mod_builder.py -p iSCSI -m tcm_nab5000
+tcm_dir: /mnt/sdb/lio-core-2.6.git/Documentation/target/../../
+Set fabric_mod_name: tcm_nab5000
+Set fabric_mod_dir:
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000
+Using proto_ident: iSCSI
+Creating fabric_mod_dir:
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000
 Writing file:
-/mnt/sdb/lio-core-2.6.git/drivers/target/tcm_nab5000/tcm_nab5000_base.h
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/tcm_nab5000_base.h
 Using tcm_mod_scan_fabric_ops:
-/mnt/sdb/lio-core-2.6.git/include/target/target_core_fabric_ops.h
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../include/target/target_core_fabric_ops.h
 Writing file:
-/mnt/sdb/lio-core-2.6.git/drivers/target/tcm_nab5000/tcm_nab5000_fabric.c
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/tcm_nab5000_fabric.c
 Writing file:
-/mnt/sdb/lio-core-2.6.git/drivers/target/tcm_nab5000/tcm_nab5000_fabric.h
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/tcm_nab5000_fabric.h
 Writing file:
-/mnt/sdb/lio-core-2.6.git/drivers/target/tcm_nab5000/tcm_nab5000_configfs.c
-Writing file: /mnt/sdb/lio-core-2.6.git/drivers/target/tcm_nab5000/Kbuild
-Writing file: /mnt/sdb/lio-core-2.6.git/drivers/target/tcm_nab5000/Kconfig
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/tcm_nab5000_configfs.c
+Writing file:
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/Kbuild
+Writing file:
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/Kconfig
+Would you like to add tcm_nab5000to drivers/target/Kbuild..? [yes,no]: yes
+Would you like to add tcm_nab5000to drivers/target/Kconfig..? [yes,no]: yes
 
-*) Edit drivers/target/Kbuild and drivers/target/Kconfig before compling
-
-Add the following line to Kbuild for the newly generated fabric module:
+At the end of tcm_mod_builder.py. the script will ask to add the following
+line for to drivers/target/Kbuild:
 
 	obj-$(CONFIG_TCM_NAB5000)       += tcm_nab5000/
 
-and the same for Kconfig:
+and the same for drivers/target/Kconfig:
 
 	source "drivers/target/tcm_nab5000/Kconfig"
+
+*) Run 'make menuconfig' and select the new CONFIG_TCM_NAB5000 item:
+
+	<M>   TCM_NAB5000 fabric module                   
 
 *) Build using 'make modules', once completed you will have:
 
 target:/mnt/sdb/lio-core-2.6.git# ls -la drivers/target/tcm_nab5000/
-total 1292
-drwxr-xr-x 2 root root   4096 2010-08-24 12:49 .
-drwxr-xr-x 9 root root   4096 2010-08-24 12:10 ..
--rw-r--r-- 1 root root      8 2010-08-24 12:26 built-in.o
--rw-r--r-- 1 root root    136 2010-08-24 12:26 .built-in.o.cmd
--rw-r--r-- 1 root root    282 2010-08-24 13:06 Kbuild
--rw-r--r-- 1 root root    171 2010-08-24 13:06 Kconfig
--rw-r--r-- 1 root root     49 2010-08-24 12:49 modules.order
--rw-r--r-- 1 root root    738 2010-08-24 13:06 tcm_nab5000_base.h
--rw-r--r-- 1 root root   9096 2010-08-24 13:06 tcm_nab5000_configfs.c
--rw-r--r-- 1 root root 172584 2010-08-24 12:48 tcm_nab5000_configfs.o
--rw-r--r-- 1 root root  38842 2010-08-24 12:48 .tcm_nab5000_configfs.o.cmd
--rw-r--r-- 1 root root   5414 2010-08-24 13:06 tcm_nab5000_fabric.c
--rw-r--r-- 1 root root   2016 2010-08-24 13:06 tcm_nab5000_fabric.h
--rw-r--r-- 1 root root 187244 2010-08-24 12:48 tcm_nab5000_fabric.o
--rw-r--r-- 1 root root  40195 2010-08-24 12:48 .tcm_nab5000_fabric.o.cmd
--rw-r--r-- 1 root root 379449 2010-08-24 12:49 tcm_nab5000.ko
--rw-r--r-- 1 root root    264 2010-08-24 12:49 .tcm_nab5000.ko.cmd
--rw-r--r-- 1 root root    459 2010-08-24 12:49 tcm_nab5000.mod.c
--rw-r--r-- 1 root root  23780 2010-08-24 12:49 tcm_nab5000.mod.o
--rw-r--r-- 1 root root  22475 2010-08-24 12:49 .tcm_nab5000.mod.o.cmd
--rw-r--r-- 1 root root 356722 2010-08-24 12:48 tcm_nab5000.o
--rw-r--r-- 1 root root    211 2010-08-24 12:48 .tcm_nab5000.o.cmd
+total 1348
+drwxr-xr-x 2 root root   4096 2010-10-05 03:23 .
+drwxr-xr-x 9 root root   4096 2010-10-05 03:22 ..
+-rw-r--r-- 1 root root    282 2010-10-05 03:22 Kbuild
+-rw-r--r-- 1 root root    171 2010-10-05 03:22 Kconfig
+-rw-r--r-- 1 root root     49 2010-10-05 03:23 modules.order
+-rw-r--r-- 1 root root    738 2010-10-05 03:22 tcm_nab5000_base.h
+-rw-r--r-- 1 root root   9096 2010-10-05 03:22 tcm_nab5000_configfs.c
+-rw-r--r-- 1 root root 191200 2010-10-05 03:23 tcm_nab5000_configfs.o
+-rw-r--r-- 1 root root  40504 2010-10-05 03:23 .tcm_nab5000_configfs.o.cmd
+-rw-r--r-- 1 root root   5414 2010-10-05 03:22 tcm_nab5000_fabric.c
+-rw-r--r-- 1 root root   2016 2010-10-05 03:22 tcm_nab5000_fabric.h
+-rw-r--r-- 1 root root 190932 2010-10-05 03:23 tcm_nab5000_fabric.o
+-rw-r--r-- 1 root root  40713 2010-10-05 03:23 .tcm_nab5000_fabric.o.cmd
+-rw-r--r-- 1 root root 401861 2010-10-05 03:23 tcm_nab5000.ko
+-rw-r--r-- 1 root root    265 2010-10-05 03:23 .tcm_nab5000.ko.cmd
+-rw-r--r-- 1 root root    459 2010-10-05 03:23 tcm_nab5000.mod.c
+-rw-r--r-- 1 root root  23896 2010-10-05 03:23 tcm_nab5000.mod.o
+-rw-r--r-- 1 root root  22655 2010-10-05 03:23 .tcm_nab5000.mod.o.cmd
+-rw-r--r-- 1 root root 379022 2010-10-05 03:23 tcm_nab5000.o
+-rw-r--r-- 1 root root    211 2010-10-05 03:23 .tcm_nab5000.o.cmd
 
 *) Load the new module, create a lun_0 configfs group, and add new TCM Core
    IBLOCK backstore symlink to port:
@@ -109,30 +119,27 @@ target:/mnt/sdb/lio-core-2.6.git# tree /sys/kernel/config/target/nab5000/
 
 target:/mnt/sdb/lio-core-2.6.git# lsmod
 Module                  Size  Used by
-tcm_nab5000             3923  4 
-iscsi_target_mod      189925  1 
-tcm_loop               13173  5 
-target_core_stgt        8049  0 
-target_core_pscsi      10472  1 
-target_core_file        7175  2 
-target_core_iblock      8164  2 
-target_core_mod       209392  44
-tcm_nab5000,iscsi_target_mod,tcm_loop,target_core_stgt,target_core_pscsi,target_core_file,target_core_iblock
-scsi_debug             56768  1 
-scsi_tgt                8658  1 target_core_stgt
-configfs               20660  2 target_core_mod
+tcm_nab5000             3935  4 
+iscsi_target_mod      193211  0 
+target_core_stgt        8090  0 
+target_core_pscsi      11122  1 
+target_core_file        9172  2 
+target_core_iblock      9280  1 
+target_core_mod       228575  31
+tcm_nab5000,iscsi_target_mod,target_core_stgt,target_core_pscsi,target_core_file,target_core_iblock
+libfc                  73681  0 
+scsi_debug             56265  0 
+scsi_tgt                8666  1 target_core_stgt
+configfs               20644  2 target_core_mod
 
 ----------------------------------------------------------------------
 
 Future TODO items:
 
-	*) Make global variables in tcm_mod_builder.py accessable as parameters
 	*) Add more T10 proto_idents 
 	*) Make tcm_mod_dump_fabric_ops() smater and generate function pointer
 	   defs directly from include/target/target_core_fabric_ops.h:struct target_core_fabric_ops 
 	   structure members.
-	*) Make it optional to add drivers/target/K[build,config] lines in
-	   order to build new module
 
-August 24th, 2010
+October 5th, 2010
 Nicholas A. Bellinger <nab@linux-iscsi.org>

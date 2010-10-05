@@ -10,18 +10,12 @@ import os, sys
 import subprocess as sub
 import string
 import re
+import optparse
 
-#global tcm_dir
-#global fabric_ops_api
-#global fabric_mod_name
-#global fabric_mod_dir
+tcm_dir = ""
 
-tcm_dir = "/mnt/sdb/lio-core-2.6.git/"
-
-fabric_ops_api = tcm_dir + "include/target/target_core_fabric_ops.h"
 fabric_ops = []
-fabric_mod_name = "tcm_nab5000"
-fabric_mod_dir = tcm_dir + "drivers/target/" + fabric_mod_name
+fabric_mod_dir = ""
 fabric_mod_port = ""
 fabric_mod_init_port = ""
 
@@ -29,24 +23,24 @@ def tcm_mod_err(msg):
 	print msg
 	sys.exit(1)
 
-def tcm_mod_create_module_subdir():
+def tcm_mod_create_module_subdir(fabric_mod_dir_var):
 	
-	if os.path.isdir(fabric_mod_dir) == True:
-		return
+	if os.path.isdir(fabric_mod_dir_var) == True:
+		return 1
 
-	print "Creating fabric_mod_dir: " + fabric_mod_dir	
-	ret = os.mkdir(fabric_mod_dir)
+	print "Creating fabric_mod_dir: " + fabric_mod_dir_var
+	ret = os.mkdir(fabric_mod_dir_var)
 	if ret:
-		tcm_mod_err("Unable to mkdir " + fabric_mod_dir)
+		tcm_mod_err("Unable to mkdir " + fabric_mod_dir_var)
 
 	return
 
-def tcm_mod_build_FC_include():
+def tcm_mod_build_FC_include(fabric_mod_dir_var, fabric_mod_name):
 	global fabric_mod_port
 	global fabric_mod_init_port
 	buf = ""
 
-	f = fabric_mod_dir + "/" + fabric_mod_name + "_base.h"
+	f = fabric_mod_dir_var + "/" + fabric_mod_name + "_base.h"
 	print "Writing file: " + f
 
 	p = open(f, 'w');
@@ -96,12 +90,12 @@ def tcm_mod_build_FC_include():
 
 	return
 
-def tcm_mod_build_SAS_include():
+def tcm_mod_build_SAS_include(fabric_mod_dir_var, fabric_mod_name):
 	global fabric_mod_port
 	global fabric_mod_init_port
 	buf = ""
 
-	f = fabric_mod_dir + "/" + fabric_mod_name + "_base.h"
+	f = fabric_mod_dir_var + "/" + fabric_mod_name + "_base.h"
 	print "Writing file: " + f
 
 	p = open(f, 'w');
@@ -149,12 +143,12 @@ def tcm_mod_build_SAS_include():
 
 	return
 
-def tcm_mod_build_iSCSI_include():
+def tcm_mod_build_iSCSI_include(fabric_mod_dir_var, fabric_mod_name):
 	global fabric_mod_port
 	global fabric_mod_init_port
 	buf = ""
 
-	f = fabric_mod_dir + "/" + fabric_mod_name + "_base.h"
+	f = fabric_mod_dir_var + "/" + fabric_mod_name + "_base.h"
 	print "Writing file: " + f
 
 	p = open(f, 'w');
@@ -198,24 +192,24 @@ def tcm_mod_build_iSCSI_include():
 
 	return
 
-def tcm_mod_build_base_includes(proto_ident):
+def tcm_mod_build_base_includes(proto_ident, fabric_mod_dir_val, fabric_mod_name):
 
 	if proto_ident == "FC":
-		tcm_mod_build_FC_include()
+		tcm_mod_build_FC_include(fabric_mod_dir_val, fabric_mod_name)
 	elif proto_ident == "SAS":
-		tcm_mod_build_SAS_include()
+		tcm_mod_build_SAS_include(fabric_mod_dir_val, fabric_mod_name)
 	elif proto_ident == "iSCSI":
-		tcm_mod_build_iSCSI_include()
+		tcm_mod_build_iSCSI_include(fabric_mod_dir_val, fabric_mod_name)
 	else:
 		print "Unsupported proto_ident: " + proto_ident
 		sys.exit(1)
 
 	return
 
-def tcm_mod_build_configfs(proto_ident):
+def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf = ""
 
-	f = fabric_mod_dir + "/" + fabric_mod_name + "_configfs.c"
+	f = fabric_mod_dir_var + "/" + fabric_mod_name + "_configfs.c"
 	print "Writing file: " + f
 
         p = open(f, 'w');
@@ -517,7 +511,9 @@ def tcm_mod_build_configfs(proto_ident):
 
 	return
 
-def tcm_mod_scan_fabric_ops():
+def tcm_mod_scan_fabric_ops(tcm_dir):
+
+	fabric_ops_api = tcm_dir + "include/target/target_core_fabric_ops.h"
 	
 	print "Using tcm_mod_scan_fabric_ops: " + fabric_ops_api
 	process_fo = 0;
@@ -550,18 +546,18 @@ def tcm_mod_scan_fabric_ops():
 	p.close()
 	return
 
-def tcm_mod_dump_fabric_ops(proto_ident):
+def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf = ""
 	bufi = ""
 
-	f = fabric_mod_dir + "/" + fabric_mod_name + "_fabric.c"
+	f = fabric_mod_dir_var + "/" + fabric_mod_name + "_fabric.c"
 	print "Writing file: " + f
 
 	p = open(f, 'w')
 	if not p:
 		tcm_mod_err("Unable to open file: " + f)
 
-	fi = fabric_mod_dir + "/" + fabric_mod_name + "_fabric.h"
+	fi = fabric_mod_dir_var + "/" + fabric_mod_name + "_fabric.h"
 	print "Writing file: " + fi
 
 	pi = open(fi, 'w')
@@ -974,10 +970,10 @@ def tcm_mod_dump_fabric_ops(proto_ident):
 	pi.close()
 	return
 
-def tcm_mod_build_kbuild():
+def tcm_mod_build_kbuild(fabric_mod_dir_var, fabric_mod_name):
 
 	buf = ""
-	f = fabric_mod_dir + "/Kbuild"
+	f = fabric_mod_dir_var + "/Kbuild"
 	print "Writing file: " + f
 
 	p = open(f, 'w')
@@ -996,10 +992,10 @@ def tcm_mod_build_kbuild():
 	p.close()
 	return
 
-def tcm_mod_build_kconfig():
+def tcm_mod_build_kconfig(fabric_mod_dir_var, fabric_mod_name):
 	
 	buf = ""
-	f = fabric_mod_dir + "/Kconfig"
+	f = fabric_mod_dir_var + "/Kconfig"
 	print "Writing file: " + f
 
 	p = open(f, 'w')
@@ -1020,20 +1016,79 @@ def tcm_mod_build_kconfig():
 	p.close()
 	return
 
-def main():
+def tcm_mod_add_kbuild(tcm_dir, fabric_mod_name):
+	buf = "obj-$(CONFIG_" + fabric_mod_name.upper() + ")	+= " + fabric_mod_name.lower() + "/\n"
+	kbuild = tcm_dir + "/drivers/target/Kbuild"
+
+	f = open(kbuild, 'a')
+	f.write(buf)
+	f.close()
+	return
+
+def tcm_mod_add_kconfig(tcm_dir, fabric_mod_name):
+	buf = "source \"drivers/target/" + fabric_mod_name.lower() + "/Kconfig\"\n"
+	kconfig = tcm_dir + "/drivers/target/Kconfig"
+
+	f = open(kconfig, 'a')
+	f.write(buf)
+	f.close()
+	return
+
+def main(modname, proto_ident):
 #	proto_ident = "FC"
 #	proto_ident = "SAS"
-	proto_ident = "iSCSI"
+#	proto_ident = "iSCSI"
 
-	tcm_mod_create_module_subdir()
-	tcm_mod_build_base_includes(proto_ident)
-	tcm_mod_scan_fabric_ops()
-	tcm_mod_dump_fabric_ops(proto_ident)
-	tcm_mod_build_configfs(proto_ident)
-	tcm_mod_build_kbuild()
-	tcm_mod_build_kconfig()
+	tcm_dir = os.getcwd();
+	tcm_dir += "/../../"
+	print "tcm_dir: " + tcm_dir
+	fabric_mod_name = modname
+	fabric_mod_dir = tcm_dir + "drivers/target/" + fabric_mod_name
+	print "Set fabric_mod_name: " + fabric_mod_name
+	print "Set fabric_mod_dir: " + fabric_mod_dir
+	print "Using proto_ident: " + proto_ident
+
+	if proto_ident != "FC" and proto_ident != "SAS" and proto_ident != "iSCSI":
+		print "Unsupported proto_ident: " + proto_ident
+		sys.exit(1)
+
+	ret = tcm_mod_create_module_subdir(fabric_mod_dir)
+	if ret:
+		print "tcm_mod_create_module_subdir() failed because module already exists!"
+		sys.exit(1)
+
+	tcm_mod_build_base_includes(proto_ident, fabric_mod_dir, fabric_mod_name)
+	tcm_mod_scan_fabric_ops(tcm_dir)
+	tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir, fabric_mod_name)
+	tcm_mod_build_configfs(proto_ident, fabric_mod_dir, fabric_mod_name)
+	tcm_mod_build_kbuild(fabric_mod_dir, fabric_mod_name)
+	tcm_mod_build_kconfig(fabric_mod_dir, fabric_mod_name)
+
+	input = raw_input("Would you like to add " + fabric_mod_name + "to drivers/target/Kbuild..? [yes,no]: ")
+	if input == "yes" or input == "y":
+		tcm_mod_add_kbuild(tcm_dir, fabric_mod_name)
+
+	input = raw_input("Would you like to add " + fabric_mod_name + "to drivers/target/Kconfig..? [yes,no]: ")
+	if input == "yes" or input == "y":
+		tcm_mod_add_kconfig(tcm_dir, fabric_mod_name)
 
 	return
 
+parser = optparse.OptionParser()
+parser.add_option('-m', '--modulename', help='Module name', dest='modname',
+		action='store', nargs=1, type='string')
+parser.add_option('-p', '--protoident', help='Protocol Ident', dest='protoident',
+		action='store', nargs=1, type='string')
+
+(opts, args) = parser.parse_args()
+
+mandatories = ['modname', 'protoident']
+for m in mandatories:
+	if not opts.__dict__[m]:
+		print "mandatory option is missing\n"
+		parser.print_help()
+		exit(-1)
+
 if __name__ == "__main__":
-	main()
+
+	main(str(opts.modname), opts.protoident)
