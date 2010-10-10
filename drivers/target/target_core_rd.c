@@ -434,84 +434,6 @@ static int rd_emulate_read_cap16(struct se_task *task)
 				blocks_long);
 }
 
-/*	rd_emulate_scsi_cdb():
- *
- *
- */
-static int rd_emulate_scsi_cdb(struct se_task *task)
-{
-	int ret;
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct rd_request *rd_req = task->transport_req;
-
-	switch (rd_req->rd_scsi_cdb[0]) {
-	case INQUIRY:
-		if (rd_emulate_inquiry(task) < 0)
-			return PYX_TRANSPORT_INVALID_CDB_FIELD;
-		break;
-	case READ_CAPACITY:
-		ret = rd_emulate_read_cap(task);
-		if (ret < 0)
-			return ret;
-		break;
-	case MODE_SENSE:
-		ret = transport_generic_emulate_modesense(TASK_CMD(task),
-				rd_req->rd_scsi_cdb, rd_req->rd_buf, 0,
-				TYPE_DISK);
-		if (ret < 0)
-			return ret;
-		break;
-	case MODE_SENSE_10:
-		ret = transport_generic_emulate_modesense(TASK_CMD(task),
-				rd_req->rd_scsi_cdb, rd_req->rd_buf, 1,
-				TYPE_DISK);
-		if (ret < 0)
-			return ret;
-		break;
-	case SERVICE_ACTION_IN:
-		if ((T_TASK(cmd)->t_task_cdb[1] & 0x1f) !=
-		     SAI_READ_CAPACITY_16) {
-			printk(KERN_ERR "Unsupported SA: 0x%02x\n",
-					T_TASK(cmd)->t_task_cdb[1] & 0x1f);
-			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
-		}
-		ret = rd_emulate_read_cap16(task);
-		if (ret < 0)
-			return ret;
-		break;
-	case REQUEST_SENSE:
-		ret = transport_generic_emulate_request_sense(cmd,
-				T_TASK(cmd)->t_task_cdb);
-		if (ret < 0)
-			return ret;
-		break;
-	case ALLOW_MEDIUM_REMOVAL:
-	case ERASE:
-	case REZERO_UNIT:
-	case SEEK_10:
-	case SPACE:
-	case START_STOP:
-	case SYNCHRONIZE_CACHE:
-	case TEST_UNIT_READY:
-	case VERIFY:
-	case WRITE_FILEMARKS:
-	case RESERVE:
-	case RESERVE_10:
-	case RELEASE:
-	case RELEASE_10:
-		break;
-	default:
-		printk(KERN_ERR "Unsupported SCSI Opcode: 0x%02x for"
-			" RAMDISKs\n", rd_req->rd_scsi_cdb[0]);
-		return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
-	}
-
-	task->task_scsi_status = GOOD;
-	transport_complete_task(task, 1);
-
-	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
-}
-
 /*	rd_get_sg_table():
  *
  *
@@ -789,7 +711,7 @@ static int rd_MEMCPY_do_task(struct se_task *task)
 	int ret;
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return rd_emulate_scsi_cdb(task);
+		return transport_emulate_control_cdb(task);
 
 	req->rd_lba = task->task_lba;
 	req->rd_page = (req->rd_lba * DEV_ATTRIB(dev)->block_size) / PAGE_SIZE;
@@ -1117,7 +1039,7 @@ static int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
 static int rd_DIRECT_do_task(struct se_task *task)
 {
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return rd_emulate_scsi_cdb(task);
+		return transport_emulate_control_cdb(task);
 
 	/*
 	 * At this point the locally allocated RD tables have been mapped
@@ -1535,12 +1457,21 @@ static struct se_subsystem_api rd_mcp_template = {
 	.write_pending		= NULL,
 };
 
+static struct se_subsystem_api_cdb rd_cdb_template = {
+	.emulate_inquiry	= rd_emulate_inquiry,
+	.emulate_read_cap	= rd_emulate_read_cap,
+	.emulate_read_cap16	= rd_emulate_read_cap16,
+	.emulate_unmap		= NULL,
+};
+
 int __init rd_module_init(void)
 {
 	int ret;
 
 	INIT_LIST_HEAD(&rd_dr_template.sub_api_list);
+	rd_dr_template.sub_cdb = &rd_cdb_template;
 	INIT_LIST_HEAD(&rd_mcp_template.sub_api_list);
+	rd_mcp_template.sub_cdb = &rd_cdb_template;
 
 	ret = transport_subsystem_register(&rd_dr_template, NULL);
 	if (ret < 0)

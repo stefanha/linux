@@ -408,122 +408,47 @@ static int fd_emulate_read_cap16(struct se_task *task)
 		blocks_long);
 }
 
-/*	fd_emulate_scsi_cdb():
- *
- *
- */
-static int fd_emulate_scsi_cdb(struct se_task *task)
+static int fd_emulate_unmap(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
 	struct fd_dev *fd_dev = task->se_dev->dev_ptr;
-	struct fd_request *fd_req = task->transport_req;
 	struct file *f = fd_dev->fd_file;
 	struct inode *i;
 	struct block_device *bd;
 	int ret;
 
-	switch (fd_req->fd_scsi_cdb[0]) {
-	case INQUIRY:
-		if (fd_emulate_inquiry(task) < 0)
-			return PYX_TRANSPORT_INVALID_CDB_FIELD;
-		break;
-	case READ_CAPACITY:
-		ret = fd_emulate_read_cap(task);
-		if (ret < 0)
-			return ret;
-		break;
-	case MODE_SENSE:
-		ret = transport_generic_emulate_modesense(TASK_CMD(task),
-				fd_req->fd_scsi_cdb, fd_req->fd_buf, 0,
-				TYPE_DISK);
-		if (ret < 0)
-			return ret;
-		break;
-	case MODE_SENSE_10:
-		ret = transport_generic_emulate_modesense(TASK_CMD(task),
-				fd_req->fd_scsi_cdb, fd_req->fd_buf, 1,
-				TYPE_DISK);
-		if (ret < 0)
-			return ret;
-		break;
-	case SERVICE_ACTION_IN:
-		if ((T_TASK(cmd)->t_task_cdb[1] & 0x1f) !=
-		     SAI_READ_CAPACITY_16) {
-			printk(KERN_ERR "Unsupported SA: 0x%02x\n",
-				T_TASK(cmd)->t_task_cdb[1] & 0x1f);
-			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
-		}
-		ret = fd_emulate_read_cap16(task);
-		if (ret < 0)
-			return ret;
-		break;
-	case REQUEST_SENSE:
-		ret = transport_generic_emulate_request_sense(cmd,
-				T_TASK(cmd)->t_task_cdb);
-		if (ret < 0)
-			return ret;
-		break;
-	case UNMAP:
-		i = igrab(f->f_mapping->host);
-		if (!(i)) {
-			printk(KERN_ERR "FILEIO: Unable to locate inode for"
-					" backend for UNMAP\n");
-			return PYX_TRANSPORT_LU_COMM_FAILURE;
-		}
-		/*
-		 * Currently for struct file w/o a struct block_device
-		 * backend we return a success..
-		 */	
-		if (!(S_ISBLK(i->i_mode))) {
-			printk(KERN_WARNING "Ignoring UNMAP for non BD"
-					" backend for struct file\n");
-			iput(i);
-			return PYX_TRANSPORT_LU_COMM_FAILURE;
-		}
-		bd = I_BDEV(f->f_mapping->host);
-		if (!(bd)) {
-			printk(KERN_ERR "FILEIO: Unable to locate struct"
-					" block_device for UNMAP\n");
-			iput(i);
-			return PYX_TRANSPORT_LU_COMM_FAILURE;
-		}
-		/*
-		 * Now call the transport_generic_unmap() -> blkdev_issue_discard()
-		 * wrapper to translate SCSI UNMAP into Linux/BLOCK discards on
-		 * LBA+Range descriptors in the UNMAP write paylaod.
-		 */
-		ret = transport_generic_unmap(cmd, bd);
-		if (ret < 0) {
-			iput(i);
-			return ret;
-		}
-		iput(i);
-		break;
-	case ALLOW_MEDIUM_REMOVAL:
-	case ERASE:
-	case REZERO_UNIT:
-	case SEEK_10:
-	case SPACE:
-	case START_STOP:
-	case SYNCHRONIZE_CACHE:
-	case TEST_UNIT_READY:
-	case VERIFY:
-	case WRITE_FILEMARKS:
-	case RESERVE:
-	case RESERVE_10:
-	case RELEASE:
-	case RELEASE_10:
-		break;
-	default:
-		printk(KERN_ERR "Unsupported SCSI Opcode: 0x%02x for FILEIO\n",
-				fd_req->fd_scsi_cdb[0]);
-		return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+	i = igrab(f->f_mapping->host);
+	if (!(i)) {
+		printk(KERN_ERR "FILEIO: Unable to locate inode for"
+				" backend for UNMAP\n");
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
+	/*
+	 * Currently for struct file w/o a struct block_device
+	 * backend we return a success..
+	 */	
+	if (!(S_ISBLK(i->i_mode))) {
+		printk(KERN_WARNING "Ignoring UNMAP for non BD"
+				" backend for struct file\n");
+		iput(i);
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	}
+	bd = I_BDEV(f->f_mapping->host);
+	if (!(bd)) {
+		printk(KERN_ERR "FILEIO: Unable to locate struct"
+				" block_device for UNMAP\n");
+		iput(i);
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	}
+	/*
+	 * Now call the transport_generic_unmap() -> blkdev_issue_discard()
+	 * wrapper to translate SCSI UNMAP into Linux/BLOCK discards on
+	 * LBA+Range descriptors in the UNMAP write paylaod.
+	 */
+	ret = transport_generic_unmap(cmd, bd);
+	iput(i);
 
-	task->task_scsi_status = GOOD;
-	transport_complete_task(task, 1);
-
-	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
+	return ret;
 }
 
 static int fd_emulate_write_same_unmap(struct se_task *task)
@@ -856,7 +781,7 @@ static int fd_do_task(struct se_task *task)
 	int ret = 0;
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return fd_emulate_scsi_cdb(task);
+		return transport_emulate_control_cdb(task);
 	else if (T_TASK(cmd)->t_tasks_unmap)
 		return fd_emulate_write_same_unmap(task);
 
@@ -1288,11 +1213,19 @@ static struct se_subsystem_api fileio_template = {
 	.write_pending		= NULL,
 };
 
+static struct se_subsystem_api_cdb fileio_cdb_template = {
+	.emulate_inquiry	= fd_emulate_inquiry,
+	.emulate_read_cap	= fd_emulate_read_cap,
+	.emulate_read_cap16	= fd_emulate_read_cap16,
+	.emulate_unmap		= fd_emulate_unmap,
+};
+
 int __init fileio_module_init(void)
 {
 	int ret;
 
 	INIT_LIST_HEAD(&fileio_template.sub_api_list);
+	fileio_template.sub_cdb = &fileio_cdb_template;
 
 	ret = transport_subsystem_register(&fileio_template, THIS_MODULE);
 	if (ret < 0)
