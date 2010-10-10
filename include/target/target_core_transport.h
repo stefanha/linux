@@ -324,6 +324,7 @@ struct se_subsystem_api_cdb {
 	int (*emulate_read_cap16)(struct se_task *);
 	int (*emulate_unmap)(struct se_task *);
 	int (*emulate_write_same)(struct se_task *);
+	void (*emulate_sync_cache)(struct se_task *);
 };
 
 /*
@@ -433,13 +434,6 @@ struct se_subsystem_api {
 	 * Provided out of convenience.
 	 */
 	int (*do_tmr)(struct se_cmd *cmd);
-	/*
-	 * do_sync_cache_range():
-	 *
-	 * Notify subsystem backstore when a SYNCHRONIZE_CACHE w/ explict
-	 * LBA + Range has been received with WriteCache=1
-	 */
-	void (*do_sync_cache_range)(struct se_cmd *, unsigned long long, u32);
 	/*
 	 * dpo_emulated():
 	 */

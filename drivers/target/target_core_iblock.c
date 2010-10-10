@@ -508,11 +508,13 @@ static int __iblock_do_sync_cache(struct se_device *dev)
 	return 0;
 }
 
-void iblock_do_sync_cache_range(
-	struct se_cmd *cmd,
-	unsigned long long lba,
-	u32 size_in_bytes)
+/*
+ * Called by target_core_transport():transport_emulate_control_cdb()
+ * to emulate SYCHRONIZE_CACHE_*
+ */
+void iblock_emulate_sync_cache(struct se_task *task)
 {
+	struct se_cmd *cmd = TASK_CMD(task);
 	int ret, immed = (T_TASK(cmd)->t_task_cdb[1] & 0x2);
 	/*
 	 * If the Immediate bit is set, queue up the GOOD response
@@ -1102,7 +1104,6 @@ static struct se_subsystem_api iblock_template = {
 	.activate_device	= iblock_activate_device,
 	.deactivate_device	= iblock_deactivate_device,
 	.free_device		= iblock_free_device,
-	.do_sync_cache_range	= iblock_do_sync_cache_range,
 	.dpo_emulated		= iblock_emulated_dpo,
 	.fua_write_emulated	= iblock_emulated_fua_write,
 	.fua_read_emulated	= iblock_emulated_fua_read,
@@ -1138,6 +1139,7 @@ static struct se_subsystem_api_cdb iblock_cdb_template = {
 	.emulate_read_cap16	= iblock_emulate_read_cap16,
 	.emulate_unmap		= iblock_emulate_unmap,
 	.emulate_write_same	= iblock_emulate_write_same_unmap,
+	.emulate_sync_cache	= iblock_emulate_sync_cache,
 };
 
 int __init iblock_module_init(void)

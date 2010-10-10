@@ -1178,10 +1178,7 @@ void transport_complete_cmd(struct se_cmd *cmd, int success)
 
 /*
  * Completion function used by TCM subsystem plugins (such as FILEIO)
- * for queueing up response from a struct se_subsystem_api
- * ->do_sync_cache() and ->do_sync_cache_range().  This completion is
- * enabled by setting 'struct se_cmd->se_cmd_flags |= SCF_EMULATE_SYNC_CACHE |
- * SCF_EMULATE_CDB_ASYNC
+ * for queueing up response from struct se_subsystem_api->do_task()
  */
 void transport_complete_sync_cache(struct se_cmd *cmd, int good)
 {
@@ -5480,27 +5477,6 @@ int transport_get_sense_data(struct se_cmd *cmd)
 	return -1;
 }
 
-static int transport_generic_synchronize_cache(struct se_cmd *cmd)
-{
-	struct se_device *dev = cmd->se_dev;
-	/*
-	 * We may be flushing the entire cache or only a specific
-	 * range of LBAs.  The ->do_sync_cache_range() caller is expected
-	 * to handle any LBA -> offset conversion.
-	 */
-	if (TRANSPORT(dev)->do_sync_cache_range == NULL) {
-		printk(KERN_ERR "TRANSPORT(dev)->do_sync_cache_range is NULL\n");
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	/*
-	 * The TCM subsystem plugin is expected to handle the
-	 * completion of the SYNCHRONIZE_CACHE op emulation
-	 */
-	TRANSPORT(dev)->do_sync_cache_range(cmd, T_TASK(cmd)->t_task_lba,
-					cmd->data_length);
-	return 0;
-}
-
 /*
  * Used for TCM/IBLOCK and TCM/FILEIO for block/blk-lib.c level discard support.
  * Note this is not used for TCM/pSCSI passthrough
@@ -5661,6 +5637,15 @@ int transport_emulate_control_cdb(struct se_task *task)
 					" 0x%02x\n", service_action);
 			break;
 		}
+		break;
+	case SYNCHRONIZE_CACHE:
+	case 0x91: /* SYNCHRONIZE_CACHE_16: */
+		if (!(api_cdb->emulate_sync_cache)) {
+			printk(KERN_ERR "SYNCHRONIZE_CACHE emulation not supported"
+					" for: %s\n", TRANSPORT(dev)->name);
+			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+		}
+		api_cdb->emulate_sync_cache(task);
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case ERASE:
@@ -6303,12 +6288,10 @@ static int transport_generic_cmd_sequencer(
 		if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV)
 			break;
 		/*
-		 * Setup the transport_generic_synchronize_cache() callback
-		 * Also set SCF_EMULATE_CDB_ASYNC to ensure asynchronous operation
+		 * Set SCF_EMULATE_CDB_ASYNC to ensure asynchronous operation
 		 * for SYNCHRONIZE_CACHE* Immed=1 case in __transport_execute_tasks()
 		 */
-		cmd->transport_emulate_cdb = &transport_generic_synchronize_cache;
-		cmd->se_cmd_flags |= (SCF_EMULATE_SYNC_CACHE | SCF_EMULATE_CDB_ASYNC);
+		cmd->se_cmd_flags |= SCF_EMULATE_CDB_ASYNC;
 		/*
 		 * Check to ensure that LBA + Range does not exceed past end of
 		 * device.
@@ -7308,10 +7291,6 @@ static inline long long transport_dev_end_lba(struct se_device *dev)
 int transport_get_sectors(struct se_cmd *cmd)
 {
 	struct se_device *dev = SE_DEV(cmd);
-
-	if (!(cmd->se_cmd_flags & SCF_EMULATE_SYNC_CACHE) &&
-	    !(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return 0;
 
 	T_TASK(cmd)->t_tasks_sectors =
 		(cmd->data_length / DEV_ATTRIB(dev)->block_size);

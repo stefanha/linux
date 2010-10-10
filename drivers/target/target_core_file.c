@@ -724,12 +724,15 @@ int __fd_do_sync_cache_range(
 	return 0;
 }
 
-void fd_do_sync_cache_range(
-	struct se_cmd *cmd,
-	unsigned long long lba,
-	u32 size_in_bytes)
+/*
+ * Called by target_core_transport():transport_emulate_control_cdb()
+ * to emulate SYCHRONIZE_CACHE_*
+ */
+void fd_emulate_sync_cache(struct se_task *task)
 {
-	__fd_do_sync_cache_range(cmd, lba, size_in_bytes);	
+	struct se_cmd *cmd = TASK_CMD(task);
+
+	__fd_do_sync_cache_range(cmd, T_TASK(cmd)->t_task_lba, cmd->data_length);
 }
 
 /*
@@ -1182,7 +1185,6 @@ static struct se_subsystem_api fileio_template = {
 	.activate_device	= fd_activate_device,
 	.deactivate_device	= fd_deactivate_device,
 	.free_device		= fd_free_device,
-	.do_sync_cache_range	= fd_do_sync_cache_range,
 	.dpo_emulated		= fd_emulated_dpo,
 	.fua_write_emulated	= fd_emulated_fua_write,
 	.fua_read_emulated	= fd_emulated_fua_read,
@@ -1217,6 +1219,7 @@ static struct se_subsystem_api_cdb fileio_cdb_template = {
 	.emulate_read_cap16	= fd_emulate_read_cap16,
 	.emulate_unmap		= fd_emulate_unmap,
 	.emulate_write_same	= fd_emulate_write_same_unmap,
+	.emulate_sync_cache	= fd_emulate_sync_cache,
 };
 
 int __init fileio_module_init(void)
