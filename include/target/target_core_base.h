@@ -427,7 +427,7 @@ struct se_queue_obj {
  */
 struct se_transport_task {
 	unsigned char		*t_task_cdb;
-	unsigned char		__t_task_cdb[MAX_COMMAND_SIZE];
+	unsigned char		__t_task_cdb[TCM_MAX_COMMAND_SIZE];
 	unsigned long long	t_task_lba;
 	int			t_tasks_failed;
 	int			t_tasks_fua;
