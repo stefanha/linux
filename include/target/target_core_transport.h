@@ -323,6 +323,7 @@ struct se_subsystem_api_cdb {
 	int (*emulate_read_cap)(struct se_task *);
 	int (*emulate_read_cap16)(struct se_task *);
 	int (*emulate_unmap)(struct se_task *);
+	int (*emulate_write_same)(struct se_task *);
 };
 
 /*

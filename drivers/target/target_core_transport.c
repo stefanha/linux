@@ -5552,13 +5552,6 @@ int transport_generic_write_same(struct se_cmd *cmd, struct block_device *bdev)
 	sector_t lba;
 	unsigned int range;
 	int barrier = 0, ret;
-	/*
-	 * If the UNMAP bit was not set, we should not be calling this to being with..
-	 */
-	if (!(T_TASK(cmd)->t_tasks_unmap)) {
-		dump_stack();
-		return -1;
-	}
 
 	lba = T_TASK(cmd)->t_task_lba;
 	range = (cmd->data_length / TRANSPORT(dev)->get_blocksize(dev));
@@ -5584,6 +5577,7 @@ int transport_emulate_control_cdb(struct se_task *task)
 	struct se_device *dev = SE_DEV(cmd);
 	struct se_subsystem_api_cdb *api_cdb = TRANSPORT(dev)->sub_cdb;
 	int ret;
+	unsigned short service_action;
 
 	switch (T_TASK(cmd)->t_task_cdb[0]) {
 	case INQUIRY:
@@ -5638,6 +5632,35 @@ int transport_emulate_control_cdb(struct se_task *task)
 		ret = api_cdb->emulate_unmap(task);
 		if (ret < 0)
 			return ret;
+		break;
+	case WRITE_SAME_16:
+		if (!(api_cdb->emulate_write_same)) {
+			printk(KERN_ERR "WRITE_SAME_16 emulation not supported"
+					" for: %s\n", TRANSPORT(dev)->name);
+			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+		}
+		ret = api_cdb->emulate_write_same(task);
+		if (ret < 0)
+			return ret;
+		break;
+	case VARIABLE_LENGTH_CMD:
+		service_action = get_unaligned_be16(&T_TASK(cmd)->t_task_cdb[8]);
+		switch (service_action) {
+		case WRITE_SAME_32:
+			if (!(api_cdb->emulate_write_same)) {
+				printk(KERN_ERR "WRITE_SAME_32 SA emulation not"
+					" supported for: %s\n", TRANSPORT(dev)->name);
+				return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+			}
+			ret = api_cdb->emulate_write_same(task);
+			if (ret < 0)
+				return ret;
+			break;
+		default:
+			printk(KERN_ERR "Unsupported VARIABLE_LENGTH_CMD SA:"
+					" 0x%02x\n", service_action);
+			break;
+		}
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case ERASE:
@@ -5951,13 +5974,12 @@ static int transport_generic_cmd_sequencer(
 			size = transport_get_size(sectors, cdb, cmd);
 			transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 			transport_get_maps(cmd);
-			cmd->transport_split_cdb = &split_cdb_XX_32;
-			cmd->transport_get_long_lba = &transport_lba_64_ext;
+			T_TASK(cmd)->t_task_lba = get_unaligned_be64(&cdb[12]);
 			/*
 			 * Skip the remaining assignments for TCM/PSCSI passthrough
 			 */
 			if (passthrough) {
-				ret = TGCS_DATA_SG_IO_CDB;
+				ret = TGCS_CONTROL_SG_IO_CDB;
 				break;
 			}
 			if ((cdb[10] & 0x04) || (cdb[10] & 0x02)) {
@@ -5971,18 +5993,11 @@ static int transport_generic_cmd_sequencer(
 			 * tpws with the UNMAP=1 bit set.
 			 */
 			if (!(cdb[10] & 0x08)) {
-				printk(KERN_ERR "WRITE_SAME w/ UNMAP bit not"
+				printk(KERN_ERR "WRITE_SAME w/o UNMAP bit not"
 					" supported for Block Discard Emulation\n");
 				return TGCS_INVALID_CDB_FIELD;
 			}
-			
-			cmd->se_cmd_flags |= SCF_EMULATE_SYNC_WRITE_SAME;
-			/*
-			 * Signal to TCM IBLOCK+FILEIO subsystem plugins that WRITE
-			 * tasks will be translated to SCSI UNMAP -> Block Discard
-			 */
-			T_TASK(cmd)->t_tasks_unmap = 1;
-			ret = TGCS_DATA_SG_IO_CDB;	
+			ret = TGCS_CONTROL_SG_IO_CDB;
 			break;
 		default:
 			printk(KERN_ERR "VARIABLE_LENGTH_CMD service action"
@@ -6332,8 +6347,7 @@ static int transport_generic_cmd_sequencer(
 		size = transport_get_size(sectors, cdb, cmd);
 		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
-		cmd->transport_split_cdb = &split_cdb_XX_16;
-		cmd->transport_get_long_lba = &transport_lba_64;
+		T_TASK(cmd)->t_task_lba = get_unaligned_be16(&cdb[2]);
 		passthrough = (TRANSPORT(dev)->transport_type ==
 				TRANSPORT_PLUGIN_PHBA_PDEV);
 		/*
@@ -6355,19 +6369,12 @@ static int transport_generic_cmd_sequencer(
 			 * tpws with the UNMAP=1 bit set.
 			 */
 			if (!(cdb[1] & 0x08)) {
-				printk(KERN_ERR "WRITE_SAME w/ UNMAP bit not "
+				printk(KERN_ERR "WRITE_SAME w/o UNMAP bit not "
 					" supported for Block Discard Emulation\n");
 				return TGCS_INVALID_CDB_FIELD;
 			}
-
-			cmd->se_cmd_flags |= SCF_EMULATE_SYNC_WRITE_SAME;
-			/*
-			 * Signal to TCM IBLOCK+FILEIO subsystem plugins that WRITE
-			 * tasks will be translated to SCSI UNMAP -> Block Discard
-			 */
-			T_TASK(cmd)->t_tasks_unmap = 1;
 		}
-		ret = TGCS_DATA_SG_IO_CDB;
+		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case GPCMD_CLOSE_TRACK:

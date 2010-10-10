@@ -782,8 +782,6 @@ static int fd_do_task(struct se_task *task)
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return transport_emulate_control_cdb(task);
-	else if (T_TASK(cmd)->t_tasks_unmap)
-		return fd_emulate_write_same_unmap(task);
 
 	req->fd_lba = task->task_lba;
 	req->fd_size = task->task_size;
@@ -1218,6 +1216,7 @@ static struct se_subsystem_api_cdb fileio_cdb_template = {
 	.emulate_read_cap	= fd_emulate_read_cap,
 	.emulate_read_cap16	= fd_emulate_read_cap16,
 	.emulate_unmap		= fd_emulate_unmap,
+	.emulate_write_same	= fd_emulate_write_same_unmap,
 };
 
 int __init fileio_module_init(void)

@@ -584,8 +584,6 @@ static int iblock_do_task(struct se_task *task)
 
 	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
 		return transport_emulate_control_cdb(task);
-	else if (T_TASK(task->task_se_cmd)->t_tasks_unmap)
-		return iblock_emulate_write_same_unmap(task);
 
 	while (bio) {
 		nbio = bio->bi_next;
@@ -1139,6 +1137,7 @@ static struct se_subsystem_api_cdb iblock_cdb_template = {
 	.emulate_read_cap	= iblock_emulate_read_cap,
 	.emulate_read_cap16	= iblock_emulate_read_cap16,
 	.emulate_unmap		= iblock_emulate_unmap,
+	.emulate_write_same	= iblock_emulate_write_same_unmap,
 };
 
 int __init iblock_module_init(void)

@@ -138,8 +138,7 @@ enum se_cmd_flags_table {
 	SCF_EMULATE_SYNC_CACHE		= 0x01000000,
 	SCF_EMULATE_CDB_ASYNC		= 0x02000000,
 	SCF_EMULATE_SYNC_UNMAP		= 0x04000000,
-	SCF_ECDB_ALLOCATION		= 0x08000000,
-	SCF_EMULATE_SYNC_WRITE_SAME	= 0x10000000
+	SCF_ECDB_ALLOCATION		= 0x08000000
 };
 	
 /* struct se_device->type for known subsystem plugins */
@@ -432,7 +431,6 @@ struct se_transport_task {
 	int			t_tasks_failed;
 	int			t_tasks_fua;
 	int			t_tasks_bidi:1;
-	int			t_tasks_unmap:1;
 	u32			t_task_cdbs;
 	u32			t_tasks_check;
 	u32			t_tasks_no;
