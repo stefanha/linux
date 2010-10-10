@@ -5574,6 +5574,94 @@ int transport_generic_write_same(struct se_cmd *cmd, struct block_device *bdev)
 }
 EXPORT_SYMBOL(transport_generic_write_same);
 
+/*
+ * Used by TCM subsystem plugins IBLOCK, FILEIO, and RAMDISK as a
+ * generic non SCF_SCSI_DATA_SG_IO_CDB ops.
+ */
+int transport_emulate_control_cdb(struct se_task *task)
+{
+	struct se_cmd *cmd = TASK_CMD(task);
+	struct se_device *dev = SE_DEV(cmd);
+	struct se_subsystem_api_cdb *api_cdb = TRANSPORT(dev)->sub_cdb;
+	int ret;
+
+	switch (T_TASK(cmd)->t_task_cdb[0]) {
+	case INQUIRY:
+		if (api_cdb->emulate_inquiry(task) < 0)
+			return PYX_TRANSPORT_INVALID_CDB_FIELD;
+		break;
+	case READ_CAPACITY:
+		ret = api_cdb->emulate_read_cap(task);	
+		if (ret < 0)
+			return ret;
+		break;
+	case MODE_SENSE:
+		ret = transport_generic_emulate_modesense(TASK_CMD(task),
+				T_TASK(cmd)->t_task_cdb,
+				T_TASK(cmd)->t_task_buf, 0,
+				TRANSPORT(dev)->get_device_type(dev));
+		if (ret < 0)
+			return ret;
+		break;
+	case MODE_SENSE_10:
+		ret = transport_generic_emulate_modesense(TASK_CMD(task),
+				T_TASK(cmd)->t_task_cdb,
+				T_TASK(cmd)->t_task_buf, 1,
+				TRANSPORT(dev)->get_device_type(dev));
+		if (ret < 0)
+			return ret;
+		break;
+	case SERVICE_ACTION_IN:
+		switch (T_TASK(cmd)->t_task_cdb[1] & 0x1f) {
+		case SAI_READ_CAPACITY_16:
+			ret = api_cdb->emulate_read_cap16(task);
+			if (ret < 0)
+				return ret;
+			break;
+		default:
+			printk(KERN_ERR "Unsupported SA: 0x%02x\n",
+				T_TASK(cmd)->t_task_cdb[1] & 0x1f);
+			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+		}
+	case REQUEST_SENSE:
+		ret = transport_generic_emulate_request_sense(cmd,
+				T_TASK(cmd)->t_task_cdb);
+		if (ret < 0)
+			return ret;
+		break;
+	case UNMAP:
+		if (!(api_cdb->emulate_unmap)) {
+			printk(KERN_ERR "UNMAP emulation not supported for: %s\n",
+					TRANSPORT(dev)->name);
+			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+		}
+		ret = api_cdb->emulate_unmap(task);
+		if (ret < 0)
+			return ret;
+		break;
+	case ALLOW_MEDIUM_REMOVAL:
+	case ERASE:
+	case REZERO_UNIT:
+	case SEEK_10:
+	case SPACE:
+	case START_STOP:
+	case TEST_UNIT_READY:
+	case VERIFY:
+	case WRITE_FILEMARKS:
+		break;
+	default:
+		printk(KERN_ERR "Unsupported SCSI Opcode: 0x%02x for %s\n",
+			T_TASK(cmd)->t_task_cdb[0], TRANSPORT(dev)->name);
+		return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+	}
+	
+	task->task_scsi_status = GOOD;
+	transport_complete_task(task, 1);
+
+	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
+}
+EXPORT_SYMBOL(transport_emulate_control_cdb);
+
 static inline void transport_dev_get_mem_buf(
 	struct se_device *dev,
 	struct se_cmd *cmd)

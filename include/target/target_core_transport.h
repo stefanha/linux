@@ -241,6 +241,7 @@ extern int transport_generic_emulate_request_sense(struct se_cmd *,
 extern int transport_get_sense_data(struct se_cmd *);
 extern int transport_generic_unmap(struct se_cmd *, struct block_device *);
 extern int transport_generic_write_same(struct se_cmd *, struct block_device *);
+extern int transport_emulate_control_cdb(struct se_task *);
 extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32, void *);
 extern void transport_passthrough_release(struct se_cmd *);
@@ -314,6 +315,17 @@ struct se_mem {
 } ____cacheline_aligned;
 
 /*
+ * Used as a minimal template for per CDB specific emulation into TCM
+ * subsystem plugins.for those CDBs that cannot be emulated generically.
+ */
+struct se_subsystem_api_cdb {
+	int (*emulate_inquiry)(struct se_task *);
+	int (*emulate_read_cap)(struct se_task *);
+	int (*emulate_read_cap16)(struct se_task *);
+	int (*emulate_unmap)(struct se_task *);
+};
+
+/*
  * 	Each type of disk transport supported MUST have a template defined
  *	within its .h file.
  */
@@ -338,6 +350,11 @@ struct se_subsystem_api {
 	 * struct module for struct se_hba references
 	 */
 	struct module *sub_owner;
+	/*
+	 * Set of function pointers use for per CDB context emulation
+	 * by virtual IBLOCK, FILEIO, and RAMDISK subsystem plugins.
+	 */
+	struct se_subsystem_api_cdb *sub_cdb;
 	/*
 	 * Counter for struct se_hba reference
 	 */
