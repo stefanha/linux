@@ -5502,7 +5502,8 @@ int transport_generic_unmap(struct se_cmd *cmd, struct block_device *bdev)
 	while (size) {
 		lba = get_unaligned_be64(&ptr[0]);
 		range = get_unaligned_be32(&ptr[8]);
-		printk(KERN_INFO "UNMAP: Using lba: %llu and range: %u\n", lba, range);
+		printk(KERN_INFO "UNMAP: Using lba: %llu and range: %u\n",
+                (unsigned long long)lba, range);
 
 		ret = blkdev_issue_discard(bdev, lba, range, GFP_KERNEL, barrier);
 		if (ret < 0) {
@@ -5532,7 +5533,8 @@ int transport_generic_write_same(struct se_cmd *cmd, struct block_device *bdev)
 	lba = T_TASK(cmd)->t_task_lba;
 	range = (cmd->data_length / TRANSPORT(dev)->get_blocksize(dev));
 
-	printk(KERN_INFO "WRITE_SAME UNMAP: LBA: %llu Range: %u\n", lba, range);
+	printk(KERN_INFO "WRITE_SAME UNMAP: LBA: %llu Range: %u\n",
+                (unsigned long long)lba, range);
 
 	ret = blkdev_issue_discard(bdev, lba, range, GFP_KERNEL, barrier);
 	if (ret < 0) {
