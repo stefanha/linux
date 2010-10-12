@@ -4253,7 +4253,22 @@ check_depth:
 			transport_complete_task(task, 1);
 		}
 	} else {
-		error = TRANSPORT(dev)->do_task(task);
+		/*
+		 * Currently for all virtual TCM plugins including IBLOCK, FILEIO and
+		 * RAMDISK we use the internal transport_emulate_control_cdb() logic
+		 * with struct se_subsystem_api callers for the primary SPC-3 TYPE_DISK
+		 * LUN emulation code.
+		 *
+		 * For TCM/pSCSI and all other SCF_SCSI_DATA_SG_IO_CDB I/O tasks we
+		 * call ->do_task() directly and let the underlying TCM subsystem plugin
+		 * code handle the CDB emulation.
+		 */
+		if ((TRANSPORT(dev)->transport_type != TRANSPORT_PLUGIN_PHBA_PDEV) &&
+		    (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)))
+			error = transport_emulate_control_cdb(task);
+		else
+			error = TRANSPORT(dev)->do_task(task);
+
 		if (error != 0) {
 			cmd->transport_error_status = error;
 			atomic_set(&task->task_active, 0);

@@ -783,9 +783,6 @@ static int fd_do_task(struct se_task *task)
 	struct fd_request *req = task->transport_req;
 	int ret = 0;
 
-	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return transport_emulate_control_cdb(task);
-
 	req->fd_lba = task->task_lba;
 	req->fd_size = task->task_size;
 	/*

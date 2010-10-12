@@ -584,9 +584,6 @@ static int iblock_do_task(struct se_task *task)
 	int write = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
 	int ret;
 
-	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return transport_emulate_control_cdb(task);
-
 	while (bio) {
 		nbio = bio->bi_next;
 		bio->bi_next = NULL;

@@ -710,9 +710,6 @@ static int rd_MEMCPY_do_task(struct se_task *task)
 	struct rd_request *req = task->transport_req;
 	int ret;
 
-	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return transport_emulate_control_cdb(task);
-
 	req->rd_lba = task->task_lba;
 	req->rd_page = (req->rd_lba * DEV_ATTRIB(dev)->block_size) / PAGE_SIZE;
 	req->rd_offset = (do_div(req->rd_lba,
