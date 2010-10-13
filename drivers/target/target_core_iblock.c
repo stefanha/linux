@@ -1088,6 +1088,7 @@ static struct se_subsystem_api iblock_template = {
 	.allocate_request	= iblock_allocate_request,
 	.do_task		= iblock_do_task,
 	.do_discard		= iblock_do_discard,
+	.do_sync_cache		= iblock_emulate_sync_cache,
 	.free_task		= iblock_free_task,
 	.check_configfs_dev_params = iblock_check_configfs_dev_params,
 	.set_configfs_dev_params = iblock_set_configfs_dev_params,
@@ -1113,16 +1114,11 @@ static struct se_subsystem_api iblock_template = {
 	.write_pending		= NULL,
 };
 
-static struct se_subsystem_api_cdb iblock_cdb_template = {
-	.emulate_sync_cache	= iblock_emulate_sync_cache,
-};
-
 int __init iblock_module_init(void)
 {
 	int ret;
 
 	INIT_LIST_HEAD(&iblock_template.sub_api_list);
-	iblock_template.sub_cdb = &iblock_cdb_template;
 
 	ret = transport_subsystem_register(&iblock_template, THIS_MODULE);
 	if (ret < 0)

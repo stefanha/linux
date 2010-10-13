@@ -1173,6 +1173,7 @@ static struct se_subsystem_api fileio_template = {
 	.allocate_request	= fd_allocate_request,
 	.do_task		= fd_do_task,
 	.do_discard		= fd_do_discard,
+	.do_sync_cache		= fd_emulate_sync_cache,
 	.free_task		= fd_free_task,
 	.check_configfs_dev_params = fd_check_configfs_dev_params,
 	.set_configfs_dev_params = fd_set_configfs_dev_params,
@@ -1197,16 +1198,11 @@ static struct se_subsystem_api fileio_template = {
 	.write_pending		= NULL,
 };
 
-static struct se_subsystem_api_cdb fileio_cdb_template = {
-	.emulate_sync_cache	= fd_emulate_sync_cache,
-};
-
 int __init fileio_module_init(void)
 {
 	int ret;
 
 	INIT_LIST_HEAD(&fileio_template.sub_api_list);
-	fileio_template.sub_cdb = &fileio_cdb_template;
 
 	ret = transport_subsystem_register(&fileio_template, THIS_MODULE);
 	if (ret < 0)

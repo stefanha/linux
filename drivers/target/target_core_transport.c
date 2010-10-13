@@ -5547,7 +5547,6 @@ int transport_emulate_control_cdb(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_device *dev = SE_DEV(cmd);
-	struct se_subsystem_api_cdb *api_cdb = TRANSPORT(dev)->sub_cdb;
 	sector_t blocks_long;
 	unsigned int blocks;
 	int ret;
@@ -5646,12 +5645,12 @@ int transport_emulate_control_cdb(struct se_task *task)
 		break;
 	case SYNCHRONIZE_CACHE:
 	case 0x91: /* SYNCHRONIZE_CACHE_16: */
-		if (!(api_cdb->emulate_sync_cache)) {
+		if (!(TRANSPORT(dev)->do_sync_cache)) {
 			printk(KERN_ERR "SYNCHRONIZE_CACHE emulation not supported"
 					" for: %s\n", TRANSPORT(dev)->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
-		api_cdb->emulate_sync_cache(task);
+		TRANSPORT(dev)->do_sync_cache(task);
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
 	case ERASE:

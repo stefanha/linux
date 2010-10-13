@@ -319,14 +319,6 @@ struct se_mem {
 } ____cacheline_aligned;
 
 /*
- * Used as a minimal template for per CDB specific emulation into TCM
- * subsystem plugins.for those CDBs that cannot be emulated generically.
- */
-struct se_subsystem_api_cdb {
-	void (*emulate_sync_cache)(struct se_task *);
-};
-
-/*
  * 	Each type of disk transport supported MUST have a template defined
  *	within its .h file.
  */
@@ -351,11 +343,6 @@ struct se_subsystem_api {
 	 * struct module for struct se_hba references
 	 */
 	struct module *sub_owner;
-	/*
-	 * Set of function pointers use for per CDB context emulation
-	 * by virtual IBLOCK, FILEIO, and RAMDISK subsystem plugins.
-	 */
-	struct se_subsystem_api_cdb *sub_cdb;
 	/*
 	 * Counter for struct se_hba reference
 	 */
@@ -485,6 +472,11 @@ struct se_subsystem_api {
 	 * UNMAP and WRITE_SAME_* w/ UNMAP=1 <-> Linux/Block Discard
 	 */
 	int (*do_discard)(struct se_task *, enum blk_discard_type);
+	/*
+	 * Used  by virtual subsystem plugins IBLOCK and FILEIO to emulate
+	 * SYNCHRONIZE_CACHE_* <-> Linux/Block blkdev_issue_flush()
+	 */
+	void (*do_sync_cache)(struct se_task *);
 	/*
 	 * free_task():
 	 */
