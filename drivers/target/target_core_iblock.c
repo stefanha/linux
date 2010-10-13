@@ -419,15 +419,6 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	return blocks_long;
 }
 
-static int iblock_emulate_unmap(struct se_task *task)
-{
-	struct iblock_dev *ibd = task->se_dev->dev_ptr;
-	struct block_device *bd = ibd->ibd_bd;
-	struct se_cmd *cmd = TASK_CMD(task);
-	
-	return transport_generic_unmap(cmd, bd);
-}
-
 static int iblock_emulate_write_same_unmap(struct se_task *task)
 {
 	struct iblock_dev *ibd = task->se_dev->dev_ptr;
@@ -566,6 +557,24 @@ static int iblock_do_task(struct se_task *task)
 	}
 
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
+}
+
+static int iblock_do_discard(struct se_task *task, enum blk_discard_type type)
+{
+	struct iblock_dev *ibd = task->se_dev->dev_ptr;
+	struct block_device *bd = ibd->ibd_bd;
+	struct se_cmd *cmd = TASK_CMD(task);
+
+	if (type == DISCARD_UNMAP)
+		return transport_generic_unmap(cmd, bd);	
+	else if (type == DISCARD_WRITE_SAME_UNMAP)
+		return iblock_emulate_write_same_unmap(task);	
+	else {
+		printk(KERN_ERR "Unsupported discard_type_t: %d\n", type);
+		return -ENOSYS;
+	}
+
+	return -ENOSYS;
 }
 
 static void iblock_free_task(struct se_task *task)
@@ -1078,6 +1087,7 @@ static struct se_subsystem_api iblock_template = {
 	.transport_complete	= iblock_transport_complete,
 	.allocate_request	= iblock_allocate_request,
 	.do_task		= iblock_do_task,
+	.do_discard		= iblock_do_discard,
 	.free_task		= iblock_free_task,
 	.check_configfs_dev_params = iblock_check_configfs_dev_params,
 	.set_configfs_dev_params = iblock_set_configfs_dev_params,
@@ -1104,8 +1114,6 @@ static struct se_subsystem_api iblock_template = {
 };
 
 static struct se_subsystem_api_cdb iblock_cdb_template = {
-	.emulate_unmap		= iblock_emulate_unmap,
-	.emulate_write_same	= iblock_emulate_write_same_unmap,
 	.emulate_sync_cache	= iblock_emulate_sync_cache,
 };
 

@@ -1433,18 +1433,12 @@ static struct se_subsystem_api rd_mcp_template = {
 	.write_pending		= NULL,
 };
 
-static struct se_subsystem_api_cdb rd_cdb_template = {
-	.emulate_unmap		= NULL,
-};
-
 int __init rd_module_init(void)
 {
 	int ret;
 
 	INIT_LIST_HEAD(&rd_dr_template.sub_api_list);
-	rd_dr_template.sub_cdb = &rd_cdb_template;
 	INIT_LIST_HEAD(&rd_mcp_template.sub_api_list);
-	rd_mcp_template.sub_cdb = &rd_cdb_template;
 
 	ret = transport_subsystem_register(&rd_dr_template, NULL);
 	if (ret < 0)

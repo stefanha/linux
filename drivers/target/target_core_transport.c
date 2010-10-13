@@ -5606,22 +5606,22 @@ int transport_emulate_control_cdb(struct se_task *task)
 			return ret;
 		break;
 	case UNMAP:
-		if (!(api_cdb->emulate_unmap)) {
+		if (!(TRANSPORT(dev)->do_discard)) {
 			printk(KERN_ERR "UNMAP emulation not supported for: %s\n",
 					TRANSPORT(dev)->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
-		ret = api_cdb->emulate_unmap(task);
+		ret = TRANSPORT(dev)->do_discard(task, DISCARD_UNMAP);
 		if (ret < 0)
 			return ret;
 		break;
 	case WRITE_SAME_16:
-		if (!(api_cdb->emulate_write_same)) {
+		if (!(TRANSPORT(dev)->do_discard)) {
 			printk(KERN_ERR "WRITE_SAME_16 emulation not supported"
 					" for: %s\n", TRANSPORT(dev)->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
-		ret = api_cdb->emulate_write_same(task);
+		ret = TRANSPORT(dev)->do_discard(task, DISCARD_WRITE_SAME_UNMAP);
 		if (ret < 0)
 			return ret;
 		break;
@@ -5629,12 +5629,12 @@ int transport_emulate_control_cdb(struct se_task *task)
 		service_action = get_unaligned_be16(&T_TASK(cmd)->t_task_cdb[8]);
 		switch (service_action) {
 		case WRITE_SAME_32:
-			if (!(api_cdb->emulate_write_same)) {
+			if (!(TRANSPORT(dev)->do_discard)) {
 				printk(KERN_ERR "WRITE_SAME_32 SA emulation not"
 					" supported for: %s\n", TRANSPORT(dev)->name);
 				return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 			}
-			ret = api_cdb->emulate_write_same(task);
+			ret = TRANSPORT(dev)->do_discard(task, DISCARD_WRITE_SAME_UNMAP);
 			if (ret < 0)
 				return ret;
 			break;

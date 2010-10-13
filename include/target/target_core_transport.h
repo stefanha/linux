@@ -127,6 +127,11 @@
 
 #define MOD_MAX_SECTORS(ms, bs)			(ms % (PAGE_SIZE / bs))
 
+enum blk_discard_type {
+	DISCARD_UNMAP,
+	DISCARD_WRITE_SAME_UNMAP,
+};
+
 struct se_mem;
 struct se_subsystem_api;
 
@@ -318,8 +323,6 @@ struct se_mem {
  * subsystem plugins.for those CDBs that cannot be emulated generically.
  */
 struct se_subsystem_api_cdb {
-	int (*emulate_unmap)(struct se_task *);
-	int (*emulate_write_same)(struct se_task *);
 	void (*emulate_sync_cache)(struct se_task *);
 };
 
@@ -477,6 +480,11 @@ struct se_subsystem_api {
 	 * do_task():
 	 */
 	int (*do_task)(struct se_task *);
+	/*
+	 * Used by virtual subsystem plugins IBLOCK and FILEIO to emulate
+	 * UNMAP and WRITE_SAME_* w/ UNMAP=1 <-> Linux/Block Discard
+	 */
+	int (*do_discard)(struct se_task *, enum blk_discard_type);
 	/*
 	 * free_task():
 	 */

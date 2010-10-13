@@ -774,6 +774,20 @@ static int fd_do_task(struct se_task *task)
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
+static int fd_do_discard(struct se_task *task, enum blk_discard_type type)
+{
+	if (type == DISCARD_UNMAP)
+		return fd_emulate_unmap(task);
+	else if (type == DISCARD_WRITE_SAME_UNMAP)
+		return fd_emulate_write_same_unmap(task);
+	else {
+		printk(KERN_ERR "Unsupported discard_type_t: %d\n", type);
+		return -ENOSYS;
+	}
+
+	return -ENOSYS;
+}
+
 /*	fd_free_task(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1158,6 +1172,7 @@ static struct se_subsystem_api fileio_template = {
 	.transport_complete	= fd_transport_complete,
 	.allocate_request	= fd_allocate_request,
 	.do_task		= fd_do_task,
+	.do_discard		= fd_do_discard,
 	.free_task		= fd_free_task,
 	.check_configfs_dev_params = fd_check_configfs_dev_params,
 	.set_configfs_dev_params = fd_set_configfs_dev_params,
@@ -1183,8 +1198,6 @@ static struct se_subsystem_api fileio_template = {
 };
 
 static struct se_subsystem_api_cdb fileio_cdb_template = {
-	.emulate_unmap		= fd_emulate_unmap,
-	.emulate_write_same	= fd_emulate_write_same_unmap,
 	.emulate_sync_cache	= fd_emulate_sync_cache,
 };
 
