@@ -358,35 +358,6 @@ static void *fd_allocate_request(
 	return (void *)fd_req;
 }
 
-/*	fd_emulate_read_cap():
- *
- *
- */
-static int fd_emulate_read_cap(struct se_task *task)
-{
-	struct fd_dev *fd_dev = task->se_dev->dev_ptr;
-	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
-				DEV_ATTRIB(task->se_dev)->block_size);
-	u32 blocks;
-
-	if (blocks_long >= 0x00000000ffffffff)
-		blocks = 0xffffffff;
-	else
-		blocks = (u32)blocks_long;
-
-	return transport_generic_emulate_readcapacity(TASK_CMD(task), blocks);
-}
-
-static int fd_emulate_read_cap16(struct se_task *task)
-{
-	struct fd_dev *fd_dev = task->se_dev->dev_ptr;
-	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
-				  DEV_ATTRIB(task->se_dev)->block_size);
-
-	return transport_generic_emulate_readcapacity_16(TASK_CMD(task),
-		blocks_long);
-}
-
 static int fd_emulate_unmap(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
@@ -1137,6 +1108,15 @@ static u32 fd_get_max_sectors(struct se_device *dev)
 	return FD_MAX_SECTORS;
 }
 
+static sector_t fd_get_blocks(struct se_device *dev)
+{
+	struct fd_dev *fd_dev = dev->dev_ptr;
+	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
+			DEV_ATTRIB(dev)->block_size);
+
+	return blocks_long;
+}
+
 /*	fd_get_queue_depth(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1196,14 +1176,13 @@ static struct se_subsystem_api fileio_template = {
 	.get_inquiry_rev	= fd_get_inquiry_rev,
 	.get_dma_length		= fd_get_dma_length,
 	.get_max_sectors	= fd_get_max_sectors,
+	.get_blocks		= fd_get_blocks,
 	.get_queue_depth	= fd_get_queue_depth,
 	.get_max_queue_depth	= fd_get_max_queue_depth,
 	.write_pending		= NULL,
 };
 
 static struct se_subsystem_api_cdb fileio_cdb_template = {
-	.emulate_read_cap	= fd_emulate_read_cap,
-	.emulate_read_cap16	= fd_emulate_read_cap16,
 	.emulate_unmap		= fd_emulate_unmap,
 	.emulate_write_same	= fd_emulate_write_same_unmap,
 	.emulate_sync_cache	= fd_emulate_sync_cache,

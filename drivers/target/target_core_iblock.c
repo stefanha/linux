@@ -419,37 +419,6 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	return blocks_long;
 }
 
-static int iblock_emulate_read_cap(struct se_task *task)
-{
-	struct iblock_dev *ibd = task->se_dev->dev_ptr;
-	struct block_device *bd = ibd->ibd_bd;
-	struct request_queue *q = bdev_get_queue(bd);
-	unsigned long long blocks_long = 0;
-	u32 blocks = 0;
-
-	blocks_long = iblock_emulate_read_cap_with_block_size(
-				task->se_dev, bd, q);
-	if (blocks_long >= 0x00000000ffffffff)
-		blocks = 0xffffffff;
-	else
-		blocks = (u32)blocks_long;
-
-	return transport_generic_emulate_readcapacity(TASK_CMD(task), blocks);
-}
-
-static int iblock_emulate_read_cap16(struct se_task *task)
-{
-	struct iblock_dev *ibd = task->se_dev->dev_ptr;
-	struct block_device *bd = ibd->ibd_bd;
-	struct request_queue *q = bdev_get_queue(bd);
-	unsigned long long blocks_long;
-
-	blocks_long = iblock_emulate_read_cap_with_block_size(
-				task->se_dev, bd, q);
-	return transport_generic_emulate_readcapacity_16(
-				TASK_CMD(task), blocks_long);
-}
-
 static int iblock_emulate_unmap(struct se_task *task)
 {
 	struct iblock_dev *ibd = task->se_dev->dev_ptr;
@@ -1034,6 +1003,15 @@ static u32 iblock_get_max_sectors(struct se_device *dev)
 	return q->limits.max_sectors;
 }
 
+static sector_t iblock_get_blocks(struct se_device *dev)
+{
+	struct iblock_dev *ibd = dev->dev_ptr;
+	struct block_device *bd = ibd->ibd_bd;
+	struct request_queue *q = bdev_get_queue(bd);
+	
+	return iblock_emulate_read_cap_with_block_size(dev, bd, q);
+}
+
 static u32 iblock_get_queue_depth(struct se_device *dev)
 {
 	return IBLOCK_DEVICE_QUEUE_DEPTH;
@@ -1119,14 +1097,13 @@ static struct se_subsystem_api iblock_template = {
 	.get_inquiry_rev	= iblock_get_inquiry_rev,
 	.get_dma_length		= iblock_get_dma_length,
 	.get_max_sectors	= iblock_get_max_sectors,
+	.get_blocks		= iblock_get_blocks,
 	.get_queue_depth	= iblock_get_queue_depth,
 	.get_max_queue_depth	= iblock_get_max_queue_depth,
 	.write_pending		= NULL,
 };
 
 static struct se_subsystem_api_cdb iblock_cdb_template = {
-	.emulate_read_cap	= iblock_emulate_read_cap,
-	.emulate_read_cap16	= iblock_emulate_read_cap16,
 	.emulate_unmap		= iblock_emulate_unmap,
 	.emulate_write_same	= iblock_emulate_write_same_unmap,
 	.emulate_sync_cache	= iblock_emulate_sync_cache,

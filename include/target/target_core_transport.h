@@ -318,8 +318,6 @@ struct se_mem {
  * subsystem plugins.for those CDBs that cannot be emulated generically.
  */
 struct se_subsystem_api_cdb {
-	int (*emulate_read_cap)(struct se_task *);
-	int (*emulate_read_cap16)(struct se_task *);
 	int (*emulate_unmap)(struct se_task *);
 	int (*emulate_write_same)(struct se_task *);
 	void (*emulate_sync_cache)(struct se_task *);
@@ -571,6 +569,10 @@ struct se_subsystem_api {
 	 * get_max_sectors():
 	 */
 	 u32 (*get_max_sectors)(struct se_device *);
+	/*
+	 * Get the sector_t from a subsystem backstore..
+	 */
+	sector_t (*get_blocks)(struct se_device *);
 	/*
 	 * get_queue_depth():
 	 *

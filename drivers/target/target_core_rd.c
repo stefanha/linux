@@ -385,33 +385,6 @@ static void *rd_allocate_request(
 	return (void *)rd_req;
 }
 
-/*	rd_emulate_read_cap():
- *
- *
- */
-static int rd_emulate_read_cap(struct se_task *task)
-{
-	struct rd_dev *rd_dev = task->se_dev->dev_ptr;
-	u32 blocks = ((rd_dev->rd_page_count * PAGE_SIZE) /
-		       DEV_ATTRIB(task->se_dev)->block_size) - 1;
-
-	if ((((rd_dev->rd_page_count * PAGE_SIZE) /
-	       DEV_ATTRIB(task->se_dev)->block_size) - 1) >= 0x00000000ffffffff)
-		blocks = 0xffffffff;
-
-	return transport_generic_emulate_readcapacity(TASK_CMD(task), blocks);
-}
-
-static int rd_emulate_read_cap16(struct se_task *task)
-{
-	struct rd_dev *rd_dev = task->se_dev->dev_ptr;
-	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) /
-				   DEV_ATTRIB(task->se_dev)->block_size) - 1;
-
-	return transport_generic_emulate_readcapacity_16(TASK_CMD(task),
-				blocks_long);
-}
-
 /*	rd_get_sg_table():
  *
  *
@@ -1348,6 +1321,15 @@ static u32 rd_get_max_sectors(struct se_device *dev)
 	return RD_MAX_SECTORS;
 }
 
+static sector_t rd_get_blocks(struct se_device *dev)
+{
+	struct rd_dev *rd_dev = dev->dev_ptr;
+	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) /
+			DEV_ATTRIB(dev)->block_size) - 1;
+
+	return blocks_long;
+}
+
 /*	rd_get_queue_depth(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1402,6 +1384,7 @@ static struct se_subsystem_api rd_dr_template = {
 	.get_inquiry_rev	= rd_get_inquiry_rev,
 	.get_dma_length		= rd_get_dma_length,
 	.get_max_sectors	= rd_get_max_sectors,
+	.get_blocks		= rd_get_blocks,
 	.get_queue_depth	= rd_get_queue_depth,
 	.get_max_queue_depth	= rd_get_max_queue_depth,
 	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
@@ -1451,8 +1434,6 @@ static struct se_subsystem_api rd_mcp_template = {
 };
 
 static struct se_subsystem_api_cdb rd_cdb_template = {
-	.emulate_read_cap	= rd_emulate_read_cap,
-	.emulate_read_cap16	= rd_emulate_read_cap16,
 	.emulate_unmap		= NULL,
 };
 

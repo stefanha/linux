@@ -5548,6 +5548,8 @@ int transport_emulate_control_cdb(struct se_task *task)
 	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_device *dev = SE_DEV(cmd);
 	struct se_subsystem_api_cdb *api_cdb = TRANSPORT(dev)->sub_cdb;
+	sector_t blocks_long;
+	unsigned int blocks;
 	int ret;
 	unsigned short service_action;
 
@@ -5561,7 +5563,9 @@ int transport_emulate_control_cdb(struct se_task *task)
 			return ret;
 		break;
 	case READ_CAPACITY:
-		ret = api_cdb->emulate_read_cap(task);	
+		blocks = TRANSPORT(dev)->get_blocks(dev);
+		ret = transport_generic_emulate_readcapacity(cmd,
+					blocks);	
 		if (ret < 0)
 			return ret;
 		break;
@@ -5584,7 +5588,9 @@ int transport_emulate_control_cdb(struct se_task *task)
 	case SERVICE_ACTION_IN:
 		switch (T_TASK(cmd)->t_task_cdb[1] & 0x1f) {
 		case SAI_READ_CAPACITY_16:
-			ret = api_cdb->emulate_read_cap16(task);
+			blocks_long = TRANSPORT(dev)->get_blocks(dev);
+			ret = transport_generic_emulate_readcapacity_16(cmd,
+						blocks_long);
 			if (ret < 0)
 				return ret;
 			break;
