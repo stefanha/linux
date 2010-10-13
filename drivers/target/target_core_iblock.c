@@ -340,24 +340,6 @@ static void *iblock_allocate_request(
 	return (void *)ib_req;
 }
 
-static int iblock_emulate_inquiry(struct se_task *task)
-{
-	unsigned char prod[64], se_location[128];
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct iblock_dev *ibd = task->se_dev->dev_ptr;
-	struct se_hba *hba = task->se_dev->se_hba;
-
-	memset(prod, 0, 64);
-	memset(se_location, 0, 128);
-
-	sprintf(prod, "IBLOCK");
-	sprintf(se_location, "%u_%u_%u", hba->hba_id, ibd->ibd_major,
-		ibd->ibd_minor);
-
-	return transport_generic_emulate_inquiry(cmd, TYPE_DISK, prod,
-		IBLOCK_VERSION, se_location);
-}
-
 static unsigned long long iblock_emulate_read_cap_with_block_size(
 	struct se_device *dev,
 	struct block_device *bd,
@@ -1029,6 +1011,16 @@ static u32 iblock_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
+static char *iblock_get_inquiry_rev(struct se_device *dev)
+{
+	return IBLOCK_VERSION;
+}
+
+static char *iblock_get_inquiry_prod(struct se_device *dev)
+{
+	return "IBLOCK";
+}
+
 static u32 iblock_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
@@ -1123,6 +1115,8 @@ static struct se_subsystem_api iblock_template = {
 	.get_blocksize		= iblock_get_blocksize,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,
+	.get_inquiry_prod	= iblock_get_inquiry_prod,
+	.get_inquiry_rev	= iblock_get_inquiry_rev,
 	.get_dma_length		= iblock_get_dma_length,
 	.get_max_sectors	= iblock_get_max_sectors,
 	.get_queue_depth	= iblock_get_queue_depth,
@@ -1131,7 +1125,6 @@ static struct se_subsystem_api iblock_template = {
 };
 
 static struct se_subsystem_api_cdb iblock_cdb_template = {
-	.emulate_inquiry	= iblock_emulate_inquiry,
 	.emulate_read_cap	= iblock_emulate_read_cap,
 	.emulate_read_cap16	= iblock_emulate_read_cap16,
 	.emulate_unmap		= iblock_emulate_unmap,

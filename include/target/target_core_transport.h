@@ -228,8 +228,7 @@ extern void transport_stop_all_task_timers(struct se_cmd *);
 extern int transport_execute_tasks(struct se_cmd *);
 extern unsigned char transport_asciihex_to_binaryhex(unsigned char val[2]);
 extern int transport_generic_emulate_inquiry(struct se_cmd *, unsigned char,
-					unsigned char *, unsigned char *,
-					unsigned char *);
+					unsigned char *, unsigned char *);
 extern int transport_generic_emulate_readcapacity(struct se_cmd *, u32);
 extern int transport_generic_emulate_readcapacity_16(struct se_cmd *,
 							unsigned long long);
@@ -319,7 +318,6 @@ struct se_mem {
  * subsystem plugins.for those CDBs that cannot be emulated generically.
  */
 struct se_subsystem_api_cdb {
-	int (*emulate_inquiry)(struct se_task *);
 	int (*emulate_read_cap)(struct se_task *);
 	int (*emulate_read_cap16)(struct se_task *);
 	int (*emulate_unmap)(struct se_task *);
@@ -553,6 +551,14 @@ struct se_subsystem_api {
 	 * get_device_type():
 	 */
 	u32 (*get_device_type)(struct se_device *);
+	/*
+	 * Used to obtain INQUIRY Product field field
+	 */
+	char *(*get_inquiry_prod)(struct se_device *);
+	/*
+	 * Used to obtain INQUIRY Production revision field
+	 */
+	char *(*get_inquiry_rev)(struct se_device *);
 	/*
 	 * get_dma_length():
 	 */

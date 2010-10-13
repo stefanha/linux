@@ -385,28 +385,6 @@ static void *rd_allocate_request(
 	return (void *)rd_req;
 }
 
-/*	rd_emulate_inquiry():
- *
- *
- */
-static int rd_emulate_inquiry(struct se_task *task)
-{
-	unsigned char prod[64], se_location[128];
-	struct rd_dev *rd_dev = task->se_dev->dev_ptr;
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct se_hba *hba = task->se_dev->se_hba;
-
-	memset(prod, 0, 64);
-	memset(se_location, 0, 128);
-
-	sprintf(prod, "RAMDISK-%s", (rd_dev->rd_direct) ? "DR" : "MCP");
-	sprintf(se_location, "%u_%u", hba->hba_id, rd_dev->rd_dev_id);
-
-	return transport_generic_emulate_inquiry(cmd, TYPE_DISK, prod,
-			(hba->transport->do_se_mem_map) ? RD_DR_VERSION :
-			RD_MCP_VERSION, se_location);
-}
-
 /*	rd_emulate_read_cap():
  *
  *
@@ -1338,6 +1316,20 @@ static u32 rd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
+static char *rd_get_inquiry_prod(struct se_device *dev)
+{
+	struct rd_dev *rd_dev = dev->dev_ptr;
+
+	return (rd_dev->rd_direct) ? "RAMDISK-DR" : "RAMDISK-MCP";
+}
+
+static char *rd_get_inquiry_rev(struct se_device *dev)
+{
+	struct rd_dev *rd_dev = dev->dev_ptr;
+
+	return (rd_dev->rd_direct) ? RD_DR_VERSION : RD_MCP_VERSION;
+}
+
 /*	rd_get_dma_length(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1406,6 +1398,8 @@ static struct se_subsystem_api rd_dr_template = {
 	.get_blocksize		= rd_get_blocksize,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
+	.get_inquiry_prod	= rd_get_inquiry_prod,
+	.get_inquiry_rev	= rd_get_inquiry_rev,
 	.get_dma_length		= rd_get_dma_length,
 	.get_max_sectors	= rd_get_max_sectors,
 	.get_queue_depth	= rd_get_queue_depth,
@@ -1447,6 +1441,8 @@ static struct se_subsystem_api rd_mcp_template = {
 	.get_blocksize		= rd_get_blocksize,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
+	.get_inquiry_prod	= rd_get_inquiry_prod,
+	.get_inquiry_rev	= rd_get_inquiry_rev,
 	.get_dma_length		= rd_get_dma_length,
 	.get_max_sectors	= rd_get_max_sectors,
 	.get_queue_depth	= rd_get_queue_depth,
@@ -1455,7 +1451,6 @@ static struct se_subsystem_api rd_mcp_template = {
 };
 
 static struct se_subsystem_api_cdb rd_cdb_template = {
-	.emulate_inquiry	= rd_emulate_inquiry,
 	.emulate_read_cap	= rd_emulate_read_cap,
 	.emulate_read_cap16	= rd_emulate_read_cap16,
 	.emulate_unmap		= NULL,

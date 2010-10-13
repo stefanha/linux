@@ -358,27 +358,6 @@ static void *fd_allocate_request(
 	return (void *)fd_req;
 }
 
-/*	fd_emulate_inquiry():
- *
- *
- */
-static int fd_emulate_inquiry(struct se_task *task)
-{
-	unsigned char prod[64], se_location[128];
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct fd_dev *fdev = task->se_dev->dev_ptr;
-	struct se_hba *hba = task->se_dev->se_hba;
-
-	memset(prod, 0, 64);
-	memset(se_location, 0, 128);
-
-	sprintf(prod, "FILEIO");
-	sprintf(se_location, "%u_%u", hba->hba_id, fdev->fd_dev_id);
-
-	return transport_generic_emulate_inquiry(cmd, TYPE_DISK, prod,
-		FD_VERSION, se_location);
-}
-
 /*	fd_emulate_read_cap():
  *
  *
@@ -1130,6 +1109,16 @@ static u32 fd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
+static char *fd_get_inquiry_prod(struct se_device *dev)
+{
+	return "FILEIO";
+}
+
+static char *fd_get_inquiry_rev(struct se_device *dev)
+{
+	return FD_VERSION;
+}
+
 /*	fd_get_dma_length(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1203,6 +1192,8 @@ static struct se_subsystem_api fileio_template = {
 	.get_blocksize		= fd_get_blocksize,
 	.get_device_rev		= fd_get_device_rev,
 	.get_device_type	= fd_get_device_type,
+	.get_inquiry_prod	= fd_get_inquiry_prod,
+	.get_inquiry_rev	= fd_get_inquiry_rev,
 	.get_dma_length		= fd_get_dma_length,
 	.get_max_sectors	= fd_get_max_sectors,
 	.get_queue_depth	= fd_get_queue_depth,
@@ -1211,7 +1202,6 @@ static struct se_subsystem_api fileio_template = {
 };
 
 static struct se_subsystem_api_cdb fileio_cdb_template = {
-	.emulate_inquiry	= fd_emulate_inquiry,
 	.emulate_read_cap	= fd_emulate_read_cap,
 	.emulate_read_cap16	= fd_emulate_read_cap16,
 	.emulate_unmap		= fd_emulate_unmap,

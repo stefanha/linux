@@ -4495,8 +4495,7 @@ extern int transport_generic_emulate_inquiry(
 	struct se_cmd *cmd,
 	unsigned char type,
 	unsigned char *prod,
-	unsigned char *version,
-	unsigned char *se_location)
+	unsigned char *version)
 {
 	struct se_device *dev = SE_DEV(cmd);
 	struct se_lun *lun = SE_LUN(cmd);
@@ -4507,8 +4506,8 @@ extern int transport_generic_emulate_inquiry(
 	struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem;
 	unsigned char *buf = (unsigned char *) T_TASK(cmd)->t_task_buf;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
-	unsigned char *iqn_sn, binary, binary_new;
-	u32 prod_len, iqn_sn_len, se_location_len;
+	unsigned char binary, binary_new;
+	u32 prod_len;
 	u32 unit_serial_len, off = 0;
 	int i;
 	u16 len = 0, id_len;
@@ -4599,19 +4598,28 @@ after_tpgs:
 	switch (cdb[2]) {
 	case 0x00: /* supported vital product data pages */
 		buf[1] = 0x00;
-		buf[3] = 3;
 		if (cmd->data_length < 8)
 			return 0;
 		buf[4] = 0x0;
-		buf[5] = 0x80;
-		buf[6] = 0x83;
-		buf[7] = 0x86;
-		len = 3;
+		/*
+		 * Only report the INQUIRY EVPD=1 pages after a valid NAA
+		 * Registered Extended LUN WWN has been set via ConfigFS
+		 * during device creation/restart.
+		 */
+		if (dev->se_sub_dev->su_dev_flags &
+					SDF_EMULATED_VPD_UNIT_SERIAL) {
+			buf[3] = 3;
+			buf[5] = 0x80;
+			buf[6] = 0x83;
+			buf[7] = 0x86;
+			len = 3;
+		}
 		break;
 	case 0x80: /* unit serial number */
 		buf[1] = 0x80;
 		if (dev->se_sub_dev->su_dev_flags &
 					SDF_EMULATED_VPD_UNIT_SERIAL) {
+
 			unit_serial_len =
 				strlen(&DEV_T10_WWN(dev)->unit_serial[0]);
 			unit_serial_len++; /* For NULL Terminator */
@@ -4622,23 +4630,9 @@ after_tpgs:
 			}
 			len += sprintf((unsigned char *)&buf[4], "%s",
 				&DEV_T10_WWN(dev)->unit_serial[0]);
-		 } else {
-			iqn_sn = transport_get_iqn_sn();
-			iqn_sn_len = strlen(iqn_sn);
-			iqn_sn_len++; /* For ":" */
-			se_location_len = strlen(se_location);
-			se_location_len++; /* For NULL Terminator */
-
-			if (((len + 4) + (iqn_sn_len + se_location_len)) >
-					cmd->data_length) {
-				len += (iqn_sn_len + se_location_len);
-				goto set_len;
-			}
-			len += sprintf((unsigned char *)&buf[4], "%s:%s",
-				iqn_sn, se_location);
+			len++; /* Extra Byte for NULL Terminator */
+			buf[3] = len;
 		}
-		len++; /* Extra Byte for NULL Terminator */
-		buf[3] = len;
 		break;
 	case 0x83:
 		/*
@@ -4721,21 +4715,6 @@ check_t10_vend_desc:
 			id_len += sprintf((unsigned char *)&buf[off+12],
 					"%s:%s", prod,
 					&DEV_T10_WWN(dev)->unit_serial[0]);
-		} else {
-			iqn_sn = transport_get_iqn_sn();
-			iqn_sn_len = strlen(iqn_sn);
-			iqn_sn_len++; /* For ":" */
-			se_location_len = strlen(se_location);
-			se_location_len++; /* For NULL Terminator */
-
-			if ((len + (id_len + 4) + (prod_len + iqn_sn_len +
-					se_location_len)) > cmd->data_length) {
-				len += (prod_len + iqn_sn_len +
-						se_location_len);
-				goto check_port;
-			}
-			id_len += sprintf((unsigned char *)&buf[off+12],
-				"%s:%s:%s", prod, iqn_sn, se_location);
 		}
 		buf[off] = 0x2; /* ASCII */
 		buf[off+1] = 0x1; /* T10 Vendor ID */
@@ -5574,8 +5553,12 @@ int transport_emulate_control_cdb(struct se_task *task)
 
 	switch (T_TASK(cmd)->t_task_cdb[0]) {
 	case INQUIRY:
-		if (api_cdb->emulate_inquiry(task) < 0)
-			return PYX_TRANSPORT_INVALID_CDB_FIELD;
+		ret = transport_generic_emulate_inquiry(cmd,
+				TRANSPORT(dev)->get_device_type(dev),
+				TRANSPORT(dev)->get_inquiry_prod(dev),
+				TRANSPORT(dev)->get_inquiry_rev(dev));
+		if (ret < 0)
+			return ret;
 		break;
 	case READ_CAPACITY:
 		ret = api_cdb->emulate_read_cap(task);	
