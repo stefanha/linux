@@ -1930,48 +1930,6 @@ static struct target_core_configfs_attribute target_core_attr_dev_control = {
 	.store	= target_core_store_dev_control,
 };
 
-static ssize_t target_core_store_dev_fd(void *p, const char *page, size_t count)
-{
-	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
-	struct se_device *dev;
-	struct se_hba *hba = se_dev->se_dev_hba;
-	struct se_subsystem_api *t = hba->transport;
-
-	if (se_dev->se_dev_ptr) {
-		printk(KERN_ERR "se_dev->se_dev_ptr already set, ignoring"
-			" fd request\n");
-		return -EEXIST;
-	}
-
-	if (!(t->create_virtdevice_from_fd)) {
-		printk(KERN_ERR "struct se_subsystem_api->create_virtdevice_from"
-			"_fd() NULL for: %s\n", hba->transport->name);
-		return -EINVAL;
-	}
-	/*
-	 * The subsystem PLUGIN is responsible for calling target_core_mod
-	 * symbols to claim the underlying struct block_device for TYPE_DISK.
-	 */
-	dev = t->create_virtdevice_from_fd(se_dev, page);
-	if (!(dev) || IS_ERR(dev))
-		goto out;
-
-	se_dev->se_dev_ptr = dev;
-	printk(KERN_INFO "Target_Core_ConfigFS: Registered %s se_dev->se_dev"
-		"_ptr: %p from fd\n", hba->transport->name, se_dev->se_dev_ptr);
-	return count;
-out:
-	return -EINVAL;
-}
-
-static struct target_core_configfs_attribute target_core_attr_dev_fd = {
-	.attr	= { .ca_owner = THIS_MODULE,
-		    .ca_name = "fd",
-		    .ca_mode = S_IWUSR },
-	.show	= NULL,
-	.store	= target_core_store_dev_fd,
-};
-
 static ssize_t target_core_show_dev_alias(void *p, char *page)
 {
 	struct se_subsystem_dev *se_dev = (struct se_subsystem_dev *)p;
@@ -2252,7 +2210,6 @@ static struct target_core_configfs_attribute target_core_attr_dev_alua_lu_gp = {
 static struct configfs_attribute *lio_core_dev_attrs[] = {
 	&target_core_attr_dev_info.attr,
 	&target_core_attr_dev_control.attr,
-	&target_core_attr_dev_fd.attr,
 	&target_core_attr_dev_alias.attr,
 	&target_core_attr_dev_udev_path.attr,
 	&target_core_attr_dev_enable.attr,
@@ -2992,10 +2949,7 @@ static struct config_group *target_core_call_createdev(
 	 *
 	 * se_dev->se_dev_ptr will be set after ->create_virtdev()
 	 * has been called successfully in the next level up in the
-	 * configfs tree for device object's struct config_group.  This
-	 * pointer is set in target_core_store_dev_fd() and
-	 * target_core_store_dev_enable() above depending upon the
-	 * reference method for struct scsi_device.
+	 * configfs tree for device object's struct config_group.
 	 */
 	se_dev->se_dev_su_ptr = t->allocate_virtdevice(hba, name);
 	if (!(se_dev->se_dev_su_ptr)) {

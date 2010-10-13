@@ -156,49 +156,22 @@ static struct se_device *iblock_create_virtdevice(
 	}
 	printk(KERN_INFO "IBLOCK: Created bio_set()\n");
 	/*
-	 * Check if we have an open file descritpor passed through configfs
-	 * $TARGET/iblock_0/some_bd/fd pointing to an underlying.
-	 * struct block_device.  If so, claim it with the pointer from
-	 * iblock_create_virtdevice_from_fd()
-	 *
-	 * Otherwise, assume that parameters through 'control' attribute
-	 * have set ib_dev->ibd_[major,minor]
+	 * iblock_check_configfs_dev_params() ensures that ib_dev->ibd_udev_path
+	 * must already have been set in order for echo 1 > $HBA/$DEV/enable to run.
 	 */
-	if (ib_dev->ibd_bd) {
-		printk(KERN_INFO  "IBLOCK: Claiming struct block_device: %p\n",
-			 ib_dev->ibd_bd);
+	printk(KERN_INFO  "IBLOCK: Claiming struct block_device: %s\n",
+			ib_dev->ibd_udev_path);
 
-		ib_dev->ibd_major = MAJOR(ib_dev->ibd_bd->bd_dev);
-		ib_dev->ibd_minor = MINOR(ib_dev->ibd_bd->bd_dev);
+	bd = open_bdev_exclusive(ib_dev->ibd_udev_path,
+			FMODE_WRITE|FMODE_READ, ib_dev);
+	if (!(bd))
+		goto failed;
 
-		bd = linux_blockdevice_claim(ib_dev->ibd_major,
-				ib_dev->ibd_minor, ib_dev);
-		if (!(bd)) {
-			printk(KERN_INFO "IBLOCK: Unable to claim"
-					" struct block_device\n");
-			goto failed;
-		}
-		dev_flags = DF_CLAIMED_BLOCKDEV;
-	} else {
-		/*
-		 * iblock_check_configfs_dev_params() ensures that
-		 * ib_dev->ibd_udev_path must already have been set
-		 * in order for echo 1 > $HBA/$DEV/enable to run.
-		 */
-		printk(KERN_INFO  "IBLOCK: Claiming struct block_device: %s\n",
-				ib_dev->ibd_udev_path);
-
-		bd = open_bdev_exclusive(ib_dev->ibd_udev_path,
-				FMODE_WRITE|FMODE_READ, ib_dev);
-		if (!(bd))
-			goto failed;
-
-		dev_flags = DF_CLAIMED_BLOCKDEV;
-		ib_dev->ibd_major = MAJOR(bd->bd_dev);
-		ib_dev->ibd_minor = MINOR(bd->bd_dev);
-		ib_dev->ibd_bd = bd;
-		ib_dev->ibd_flags |= IBDF_BDEV_EXCLUSIVE;
-	}
+	dev_flags = DF_CLAIMED_BLOCKDEV;
+	ib_dev->ibd_major = MAJOR(bd->bd_dev);
+	ib_dev->ibd_minor = MINOR(bd->bd_dev);
+	ib_dev->ibd_bd = bd;
+	ib_dev->ibd_flags |= IBDF_BDEV_EXCLUSIVE;
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim() or
 	 * linux_blockdevice_claim() from the usage above.
@@ -686,66 +659,6 @@ static ssize_t iblock_show_configfs_dev_params(
 	return (ssize_t)bl;
 }
 
-static struct se_device *iblock_create_virtdevice_from_fd(
-	struct se_subsystem_dev *se_dev,
-	const char *page)
-{
-	struct iblock_dev *ibd = se_dev->se_dev_su_ptr;
-	struct se_device *dev = NULL;
-	struct file *filp;
-	struct inode *inode;
-	char *p = (char *)page;
-	unsigned long long fd;
-	int ret;
-
-	ret = strict_strtoull(p, 0, (unsigned long long *)&fd);
-	if (ret < 0) {
-		printk(KERN_ERR "strict_strtol() failed for fd\n");
-		return ERR_PTR(-EINVAL);
-	}
-	if ((fd < 3 || fd > 7)) {
-		printk(KERN_ERR "IBLOCK: Illegal value of file descriptor:"
-				" %llu\n", fd);
-		return ERR_PTR(-EINVAL);
-	}
-	filp = fget(fd);
-	if (!(filp)) {
-		printk(KERN_ERR "IBLOCK: Unable to fget() fd: %llu\n", fd);
-		return ERR_PTR(-EBADF);
-	}
-	inode = igrab(filp->f_mapping->host);
-	if (!(inode)) {
-		printk(KERN_ERR "IBLOCK: Unable to locate struct inode for"
-			" struct block_device fd\n");
-		fput(filp);
-		return ERR_PTR(-EINVAL);
-	}
-	if (!(S_ISBLK(inode->i_mode))) {
-		printk(KERN_ERR "IBLOCK: S_ISBLK(inode->i_mode) failed for file"
-				" descriptor: %llu\n", fd);
-		iput(inode);
-		fput(filp);
-		return ERR_PTR(-ENODEV);
-	}
-	ibd->ibd_bd = I_BDEV(filp->f_mapping->host);
-	if (!(ibd->ibd_bd)) {
-		printk(KERN_ERR "IBLOCK: Unable to locate struct block_device"
-				" from I_BDEV()\n");
-		iput(inode);
-		fput(filp);
-		return ERR_PTR(-EINVAL);
-	}
-	/*
-	 * iblock_create_virtdevice() will call linux_blockdevice_claim()
-	 * to claim struct block_device.
-	 */
-	dev = iblock_create_virtdevice(se_dev->se_dev_hba, se_dev, (void *)ibd);
-
-	iput(inode);
-	fput(filp);
-	return dev;
-}
-
 static void iblock_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM iBlock Plugin %s\n", IBLOCK_VERSION);
@@ -1093,7 +1006,6 @@ static struct se_subsystem_api iblock_template = {
 	.check_configfs_dev_params = iblock_check_configfs_dev_params,
 	.set_configfs_dev_params = iblock_set_configfs_dev_params,
 	.show_configfs_dev_params = iblock_show_configfs_dev_params,
-	.create_virtdevice_from_fd = iblock_create_virtdevice_from_fd,
 	.get_plugin_info	= iblock_get_plugin_info,
 	.get_hba_info		= iblock_get_hba_info,
 	.get_dev_info		= iblock_get_dev_info,

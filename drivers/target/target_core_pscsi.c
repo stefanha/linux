@@ -1567,7 +1567,6 @@ static struct se_subsystem_api pscsi_template = {
 	.check_configfs_dev_params = pscsi_check_configfs_dev_params,
 	.set_configfs_dev_params = pscsi_set_configfs_dev_params,
 	.show_configfs_dev_params = pscsi_show_configfs_dev_params,
-	.create_virtdevice_from_fd = NULL,
 	.get_plugin_info	= pscsi_get_plugin_info,
 	.get_hba_info		= pscsi_get_hba_info,
 	.get_dev_info		= pscsi_get_dev_info,

@@ -930,7 +930,6 @@ static struct se_subsystem_api stgt_template = {
 	.check_configfs_dev_params = stgt_check_configfs_dev_params,
 	.set_configfs_dev_params = stgt_set_configfs_dev_params,
 	.show_configfs_dev_params = stgt_show_configfs_dev_params,
-	.create_virtdevice_from_fd = NULL,
 	.plugin_init		= stgt_plugin_init,
 	.plugin_free		= stgt_plugin_free,
 	.get_plugin_info	= stgt_get_plugin_info,

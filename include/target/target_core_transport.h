@@ -496,11 +496,6 @@ struct se_subsystem_api {
 	ssize_t (*show_configfs_dev_params)(struct se_hba *, struct se_subsystem_dev *,
 						char *);
 	/*
-	 * create_virtdevice_from-fd():
-	 */
-	struct se_device *(*create_virtdevice_from_fd)(struct se_subsystem_dev *,
-						const char *);
-	/*
 	 * plugin_init():
 	 */
 	int (*plugin_init)(void);
