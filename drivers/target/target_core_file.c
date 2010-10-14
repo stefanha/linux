@@ -235,32 +235,6 @@ static struct se_device *fd_create_virtdevice(
 
 	fd_dev->fd_dev_id = fd_host->fd_host_dev_id_count++;
 	fd_dev->fd_queue_depth = dev->queue_depth;
-	/*
-	 * Check for QUEUE_FLAG_DISCARD and enable TCM TPE emulation
-	 * if present for struct block_device backend
-	 */
-	if (S_ISBLK(inode->i_mode)) {
-		if (blk_queue_discard(bdev_get_queue(inode->i_bdev))) {
-			struct block_device *bd = inode->i_bdev;
-			struct request_queue *q = bdev_get_queue(bd);
-			
-			DEV_ATTRIB(dev)->max_unmap_lba_count =
-					q->limits.max_discard_sectors;
-			/*
-			 * Currently hardcoded to 1 in Linux/SCSI code..
-			 */
-			DEV_ATTRIB(dev)->max_unmap_block_desc_count = 1;
-			DEV_ATTRIB(dev)->unmap_granularity =
-					q->limits.discard_granularity;
-			DEV_ATTRIB(dev)->unmap_granularity_alignment =
-					q->limits.discard_alignment;
-
-			DEV_ATTRIB(dev)->emulate_tpu = 1;
-			DEV_ATTRIB(dev)->emulate_tpws = 1;
-			printk(KERN_INFO "FILEIO: Enabling BLOCK Discard"
-				" for TPU=1 and TPWS=1 emulation\n");
-		}
-	}
 
 	printk(KERN_INFO "CORE_FILE[%u] - Added TCM FILEIO Device ID: %u at %s,"
 		" %llu total bytes\n", fd_host->fd_host_id, fd_dev->fd_dev_id,
@@ -356,91 +330,6 @@ static void *fd_allocate_request(
 	fd_req->fd_dev = dev->dev_ptr;
 
 	return (void *)fd_req;
-}
-
-static int fd_emulate_unmap(struct se_task *task)
-{
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct fd_dev *fd_dev = task->se_dev->dev_ptr;
-	struct file *f = fd_dev->fd_file;
-	struct inode *i;
-	struct block_device *bd;
-	int ret;
-
-	i = igrab(f->f_mapping->host);
-	if (!(i)) {
-		printk(KERN_ERR "FILEIO: Unable to locate inode for"
-				" backend for UNMAP\n");
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	/*
-	 * Currently for struct file w/o a struct block_device
-	 * backend we return a success..
-	 */	
-	if (!(S_ISBLK(i->i_mode))) {
-		printk(KERN_WARNING "Ignoring UNMAP for non BD"
-				" backend for struct file\n");
-		iput(i);
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	bd = I_BDEV(f->f_mapping->host);
-	if (!(bd)) {
-		printk(KERN_ERR "FILEIO: Unable to locate struct"
-				" block_device for UNMAP\n");
-		iput(i);
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	/*
-	 * Now call the transport_generic_unmap() -> blkdev_issue_discard()
-	 * wrapper to translate SCSI UNMAP into Linux/BLOCK discards on
-	 * LBA+Range descriptors in the UNMAP write paylaod.
-	 */
-	ret = transport_generic_unmap(cmd, bd);
-	iput(i);
-
-	return ret;
-}
-
-static int fd_emulate_write_same_unmap(struct se_task *task)
-{
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct fd_dev *fd_dev = task->se_dev->dev_ptr;
-	struct file *f = fd_dev->fd_file;
-	struct inode *i;
-	struct block_device *bd;
-	int ret;
-
-	i = igrab(f->f_mapping->host);
-	if (!(i)) {
-		printk(KERN_ERR "FILEIO: Unable to locate inode for"
-				" backend for WRITE_SAME\n");
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	/*
-	 * Currently for struct file w/o a struct block_device
-	 * backend we return a success..
-	 */
-	if (!(S_ISBLK(i->i_mode))) {
-		printk(KERN_WARNING "Ignoring WRITE_SAME for non BD"
-				" backend for struct file\n");
-		iput(i);
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	bd = I_BDEV(f->f_mapping->host);
-	if (!(bd)) {
-		printk(KERN_ERR "FILEIO: Unable to locate struct"
-				" block_device for WRITE_SAME\n");
-		iput(i);
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	}
-	ret = transport_generic_write_same(cmd, bd);
-	iput(i);
-	if (ret < 0)
-		return ret;
-
-	task->task_scsi_status = GOOD;
-	transport_complete_task(task, 1);
-	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
 static inline int fd_iovec_alloc(struct fd_request *req)
@@ -772,20 +661,6 @@ static int fd_do_task(struct se_task *task)
 	}
 
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
-}
-
-static int fd_do_discard(struct se_task *task, enum blk_discard_type type)
-{
-	if (type == DISCARD_UNMAP)
-		return fd_emulate_unmap(task);
-	else if (type == DISCARD_WRITE_SAME_UNMAP)
-		return fd_emulate_write_same_unmap(task);
-	else {
-		printk(KERN_ERR "Unsupported discard_type_t: %d\n", type);
-		return -ENOSYS;
-	}
-
-	return -ENOSYS;
 }
 
 /*	fd_free_task(): (Part of se_subsystem_api_t template)
@@ -1172,7 +1047,7 @@ static struct se_subsystem_api fileio_template = {
 	.transport_complete	= fd_transport_complete,
 	.allocate_request	= fd_allocate_request,
 	.do_task		= fd_do_task,
-	.do_discard		= fd_do_discard,
+	.do_discard		= NULL,
 	.do_sync_cache		= fd_emulate_sync_cache,
 	.free_task		= fd_free_task,
 	.check_configfs_dev_params = fd_check_configfs_dev_params,

@@ -5475,14 +5475,15 @@ int transport_get_sense_data(struct se_cmd *cmd)
  * Used for TCM/IBLOCK and TCM/FILEIO for block/blk-lib.c level discard support.
  * Note this is not used for TCM/pSCSI passthrough
  */
-int transport_generic_unmap(struct se_cmd *cmd, struct block_device *bdev)
+static int transport_generic_unmap(struct se_task *task)
 {
+	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_device *dev = SE_DEV(cmd);
 	unsigned char *buf = T_TASK(cmd)->t_task_buf, *ptr = NULL;
 	unsigned char *cdb = &T_TASK(cmd)->t_task_cdb[0];
 	sector_t lba;
 	unsigned int size = cmd->data_length, range;
-	int barrier = 0, ret, offset = 8; /* First UNMAP block descriptor starts at 8 byte offset */
+	int ret, offset = 8; /* First UNMAP block descriptor starts at 8 byte offset */
 	unsigned short dl, bd_dl;
 
 	/* Skip over UNMAP header */
@@ -5499,7 +5500,7 @@ int transport_generic_unmap(struct se_cmd *cmd, struct block_device *bdev)
 		printk(KERN_INFO "UNMAP: Using lba: %llu and range: %u\n",
                 (unsigned long long)lba, range);
 
-		ret = blkdev_issue_discard(bdev, lba, range, GFP_KERNEL, barrier);
+		ret = TRANSPORT(dev)->do_discard(dev, lba, range);
 		if (ret < 0) {
 			printk(KERN_ERR "blkdev_issue_discard() failed: %d\n", ret);
 			return -1;
@@ -5509,20 +5510,22 @@ int transport_generic_unmap(struct se_cmd *cmd, struct block_device *bdev)
 		size -= 16;
 	}
 
+	task->task_scsi_status = GOOD;
+	transport_complete_task(task, 1);
 	return 0;
 }
-EXPORT_SYMBOL(transport_generic_unmap);
 
 /*
  * Used for TCM/IBLOCK and TCM/FILEIO for block/blk-lib.c level discard support.
  * Note this is not used for TCM/pSCSI passthrough
  */
-int transport_generic_write_same(struct se_cmd *cmd, struct block_device *bdev)
+static int transport_generic_write_same(struct se_task *task)
 {
+	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_device *dev = SE_DEV(cmd);
 	sector_t lba;
 	unsigned int range;
-	int barrier = 0, ret;
+	int ret;
 
 	lba = T_TASK(cmd)->t_task_lba;
 	range = (cmd->data_length / TRANSPORT(dev)->get_blocksize(dev));
@@ -5530,14 +5533,16 @@ int transport_generic_write_same(struct se_cmd *cmd, struct block_device *bdev)
 	printk(KERN_INFO "WRITE_SAME UNMAP: LBA: %llu Range: %u\n",
                 (unsigned long long)lba, range);
 
-	ret = blkdev_issue_discard(bdev, lba, range, GFP_KERNEL, barrier);
+	ret = TRANSPORT(dev)->do_discard(dev, lba, range);
 	if (ret < 0) {
 		printk(KERN_INFO "blkdev_issue_discard() failed for WRITE_SAME\n");
 		return -1;
 	}
+
+	task->task_scsi_status = GOOD;
+	transport_complete_task(task, 1);
 	return 0;
 }
-EXPORT_SYMBOL(transport_generic_write_same);
 
 /*
  * Used by TCM subsystem plugins IBLOCK, FILEIO, and RAMDISK as a
@@ -5610,7 +5615,7 @@ int transport_emulate_control_cdb(struct se_task *task)
 					TRANSPORT(dev)->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
-		ret = TRANSPORT(dev)->do_discard(task, DISCARD_UNMAP);
+		ret = transport_generic_unmap(task);
 		if (ret < 0)
 			return ret;
 		break;
@@ -5620,7 +5625,7 @@ int transport_emulate_control_cdb(struct se_task *task)
 					" for: %s\n", TRANSPORT(dev)->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
-		ret = TRANSPORT(dev)->do_discard(task, DISCARD_WRITE_SAME_UNMAP);
+		ret = transport_generic_write_same(task);
 		if (ret < 0)
 			return ret;
 		break;
@@ -5633,7 +5638,7 @@ int transport_emulate_control_cdb(struct se_task *task)
 					" supported for: %s\n", TRANSPORT(dev)->name);
 				return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 			}
-			ret = TRANSPORT(dev)->do_discard(task, DISCARD_WRITE_SAME_UNMAP);
+			ret = transport_generic_write_same(task);
 			if (ret < 0)
 				return ret;
 			break;

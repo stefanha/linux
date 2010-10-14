@@ -213,10 +213,8 @@ static struct se_device *iblock_create_virtdevice(
 		DEV_ATTRIB(dev)->unmap_granularity_alignment =
 				q->limits.discard_alignment;
 
-		DEV_ATTRIB(dev)->emulate_tpu = 1;
-		DEV_ATTRIB(dev)->emulate_tpws = 1;
-		printk(KERN_INFO "IBLOCK: Enabling BLOCK Discard support"
-				" for TPU=1 and TPWS=1 emulation\n");
+		printk(KERN_INFO "IBLOCK: BLOCK Discard support available,"
+				" disabled by default\n");
 	}
 
 	return dev;
@@ -392,22 +390,6 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	return blocks_long;
 }
 
-static int iblock_emulate_write_same_unmap(struct se_task *task)
-{
-	struct iblock_dev *ibd = task->se_dev->dev_ptr;
-	struct block_device *bd = ibd->ibd_bd;
-	struct se_cmd *cmd = TASK_CMD(task);
-	int ret;
-
-	ret = transport_generic_write_same(cmd, bd);
-	if (ret < 0)
-		return ret;
-
-	task->task_scsi_status = GOOD;
-	transport_complete_task(task, 1);
-	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
-}
-
 static int __iblock_do_sync_cache(struct se_device *dev)
 {
 	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
@@ -532,22 +514,13 @@ static int iblock_do_task(struct se_task *task)
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
-static int iblock_do_discard(struct se_task *task, enum blk_discard_type type)
+static int iblock_do_discard(struct se_device *dev, sector_t lba, u32 range)
 {
-	struct iblock_dev *ibd = task->se_dev->dev_ptr;
+	struct iblock_dev *ibd = dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
-	struct se_cmd *cmd = TASK_CMD(task);
-
-	if (type == DISCARD_UNMAP)
-		return transport_generic_unmap(cmd, bd);	
-	else if (type == DISCARD_WRITE_SAME_UNMAP)
-		return iblock_emulate_write_same_unmap(task);	
-	else {
-		printk(KERN_ERR "Unsupported discard_type_t: %d\n", type);
-		return -ENOSYS;
-	}
-
-	return -ENOSYS;
+	int barrier = 0;
+	
+	return blkdev_issue_discard(bd, lba, range, GFP_KERNEL, barrier);
 }
 
 static void iblock_free_task(struct se_task *task)

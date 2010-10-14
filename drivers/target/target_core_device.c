@@ -1231,6 +1231,15 @@ int se_dev_set_emulate_tpu(struct se_device *dev, int flag)
 		printk(KERN_ERR "Illegal value %d\n", flag);
 		return -1;
 	}
+	/*
+	 * We expect this value to be non-zero when generic Block Layer
+	 * Discard supported is detected iblock_create_virtdevice().
+	 */
+	if (!(DEV_ATTRIB(dev)->max_unmap_block_desc_count)) {
+		printk(KERN_ERR "Generic Block Discard not supported\n");
+		return -ENOSYS;
+	}
+
 	DEV_ATTRIB(dev)->emulate_tpu = flag;
 	printk(KERN_INFO "dev[%p]: SE Device Thin Provisioning UNMAP bit: %d\n",
 				dev, flag);
@@ -1243,6 +1252,15 @@ int se_dev_set_emulate_tpws(struct se_device *dev, int flag)
 		printk(KERN_ERR "Illegal value %d\n", flag);
 		return -1;
 	}
+	/*
+	 * We expect this value to be non-zero when generic Block Layer
+	 * Discard supported is detected iblock_create_virtdevice().
+	 */
+	if (!(DEV_ATTRIB(dev)->max_unmap_block_desc_count)) {
+		printk(KERN_ERR "Generic Block Discard not supported\n");
+		return -ENOSYS;
+	}
+
 	DEV_ATTRIB(dev)->emulate_tpws = flag;
 	printk(KERN_INFO "dev[%p]: SE Device Thin Provisioning WRITE_SAME: %d\n",
 				dev, flag);

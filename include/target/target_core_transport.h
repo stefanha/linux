@@ -127,11 +127,6 @@
 
 #define MOD_MAX_SECTORS(ms, bs)			(ms % (PAGE_SIZE / bs))
 
-enum blk_discard_type {
-	DISCARD_UNMAP,
-	DISCARD_WRITE_SAME_UNMAP,
-};
-
 struct se_mem;
 struct se_subsystem_api;
 
@@ -243,8 +238,6 @@ extern int transport_generic_emulate_modesense(struct se_cmd *,
 extern int transport_generic_emulate_request_sense(struct se_cmd *,
 						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd *);
-extern int transport_generic_unmap(struct se_cmd *, struct block_device *);
-extern int transport_generic_write_same(struct se_cmd *, struct block_device *);
 extern int transport_emulate_control_cdb(struct se_task *);
 extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32, void *);
@@ -471,7 +464,7 @@ struct se_subsystem_api {
 	 * Used by virtual subsystem plugins IBLOCK and FILEIO to emulate
 	 * UNMAP and WRITE_SAME_* w/ UNMAP=1 <-> Linux/Block Discard
 	 */
-	int (*do_discard)(struct se_task *, enum blk_discard_type);
+	int (*do_discard)(struct se_device *, sector_t, u32);
 	/*
 	 * Used  by virtual subsystem plugins IBLOCK and FILEIO to emulate
 	 * SYNCHRONIZE_CACHE_* <-> Linux/Block blkdev_issue_flush()
