@@ -182,21 +182,17 @@ static struct se_device *fd_create_virtdevice(
 	}
 	fd_dev->fd_file = file;
 	/*
-	 * If we are claiming a blockend for this struct file, we extract
-	 * fd_dev->fd_size from struct block_device.
+	 * If using a block backend with this struct file, we extract
+	 * fd_dev->fd_[block,dev]_size from struct block_device.
 	 *
 	 * Otherwise, we use the passed fd_size= from configfs
 	 */
-	inode = igrab(file->f_mapping->host);
+	inode = file->f_mapping->host;
 	if (!(inode)) {
 		printk(KERN_ERR "FILEIO: Unable to locate struct inode from"
 			" struct file\n");
 		goto fail;
 	}
-	/*
-	 * If struct file is referencing a underlying struct block_device,
-	 * claim it now.
-	 */
 	if (S_ISBLK(inode->i_mode)) {
 		/*
 		 * Determine the number of bytes from i_size_read() minus
@@ -240,7 +236,6 @@ static struct se_device *fd_create_virtdevice(
 		" %llu total bytes\n", fd_host->fd_host_id, fd_dev->fd_dev_id,
 			fd_dev->fd_dev_name, fd_dev->fd_dev_size);
 
-	iput(inode);
 	putname(dev_p);
 	return dev;
 fail:
@@ -248,8 +243,6 @@ fail:
 		filp_close(fd_dev->fd_file, NULL);
 		fd_dev->fd_file = NULL;
 	}
-	if (inode)
-		iput(inode);
 	putname(dev_p);
 	return NULL;
 }
