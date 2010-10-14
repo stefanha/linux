@@ -181,7 +181,8 @@ static struct se_device *iblock_create_virtdevice(
 	 * call bd_release() on the referenced struct block_device.
 	 */
 	dev = transport_add_device_to_core_hba(hba,
-			&iblock_template, se_dev, dev_flags, (void *)ib_dev);
+			&iblock_template, se_dev, dev_flags, (void *)ib_dev,
+			"IBLOCK", IBLOCK_VERSION);
 	if (!(dev))
 		goto failed;
 
@@ -875,16 +876,6 @@ static u32 iblock_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-static char *iblock_get_inquiry_rev(struct se_device *dev)
-{
-	return IBLOCK_VERSION;
-}
-
-static char *iblock_get_inquiry_prod(struct se_device *dev)
-{
-	return "IBLOCK";
-}
-
 static u32 iblock_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
@@ -989,8 +980,6 @@ static struct se_subsystem_api iblock_template = {
 	.get_blocksize		= iblock_get_blocksize,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,
-	.get_inquiry_prod	= iblock_get_inquiry_prod,
-	.get_inquiry_rev	= iblock_get_inquiry_rev,
 	.get_dma_length		= iblock_get_dma_length,
 	.get_max_sectors	= iblock_get_max_sectors,
 	.get_blocks		= iblock_get_blocks,

@@ -192,7 +192,7 @@ extern int transport_rescan_evpd_device_ident(struct se_device *);
 extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_api *,
 					struct se_subsystem_dev *, u32,
-					void *);
+					void *, const char *, const char *);
 extern int transport_generic_activate_device(struct se_device *);
 extern void transport_generic_deactivate_device(struct se_device *);
 extern void transport_generic_free_device(struct se_device *);
@@ -537,14 +537,6 @@ struct se_subsystem_api {
 	 * get_device_type():
 	 */
 	u32 (*get_device_type)(struct se_device *);
-	/*
-	 * Used to obtain INQUIRY Product field field
-	 */
-	char *(*get_inquiry_prod)(struct se_device *);
-	/*
-	 * Used to obtain INQUIRY Production revision field
-	 */
-	char *(*get_inquiry_rev)(struct se_device *);
 	/*
 	 * get_dma_length():
 	 */

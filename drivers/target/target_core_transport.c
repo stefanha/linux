@@ -2206,7 +2206,9 @@ struct se_device *transport_add_device_to_core_hba(
 	struct se_subsystem_api *transport,
 	struct se_subsystem_dev *se_dev,
 	u32 device_flags,
-	void *transport_dev)
+	void *transport_dev,
+	const char *inquiry_prod,
+	const char *inquiry_rev)
 {
 	int ret = 0, force_pt;
 	struct se_device  *dev;
@@ -2301,6 +2303,24 @@ struct se_device *transport_add_device_to_core_hba(
 	 */
 	if (transport_generic_activate_device(dev) < 0)
 		goto out;
+	/*
+	 * Preload the initial INQUIRY const values if we are doing
+	 * anything virtual (IBLOCK, FILEIO, RAMDISK), but not for TCM/pSCSI
+	 * passthrough because this is being provided by the backend LLD.
+	 * This is required so that transport_get_inquiry() copies these
+	 * originals once back into DEV_T10_WWN(dev) for the virtual device
+	 * setup.
+	 */
+	if (TRANSPORT(dev)->transport_type != TRANSPORT_PLUGIN_PHBA_PDEV) {
+		if (!(inquiry_prod) || !(inquiry_prod)) {
+			printk(KERN_ERR "All non TCM/pSCSI plugins require"
+				" INQUIRY consts\n");
+			goto out;
+		}
+
+		strncpy(&DEV_T10_WWN(dev)->model[0], inquiry_prod, 16);
+		strncpy(&DEV_T10_WWN(dev)->revision[0], inquiry_rev, 4);
+	}
 
 	ret = transport_get_inquiry(DEV_T10_WWN(dev), (void *)dev);
 	if (ret < 0)
@@ -5561,8 +5581,8 @@ int transport_emulate_control_cdb(struct se_task *task)
 	case INQUIRY:
 		ret = transport_generic_emulate_inquiry(cmd,
 				TRANSPORT(dev)->get_device_type(dev),
-				TRANSPORT(dev)->get_inquiry_prod(dev),
-				TRANSPORT(dev)->get_inquiry_rev(dev));
+				&DEV_T10_WWN(dev)->model[0],
+				&DEV_T10_WWN(dev)->revision[0]);
 		if (ret < 0)
 			return ret;
 		break;

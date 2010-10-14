@@ -225,7 +225,8 @@ static struct se_device *fd_create_virtdevice(
 	 * call bd_release() on the referenced struct block_device.
 	 */
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
-				se_dev, dev_flags, (void *)fd_dev);
+				se_dev, dev_flags, (void *)fd_dev,
+				"FILEIO", FD_VERSION);
 	if (!(dev))
 		goto fail;
 
@@ -962,16 +963,6 @@ static u32 fd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-static char *fd_get_inquiry_prod(struct se_device *dev)
-{
-	return "FILEIO";
-}
-
-static char *fd_get_inquiry_rev(struct se_device *dev)
-{
-	return FD_VERSION;
-}
-
 /*	fd_get_dma_length(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1056,8 +1047,6 @@ static struct se_subsystem_api fileio_template = {
 	.get_blocksize		= fd_get_blocksize,
 	.get_device_rev		= fd_get_device_rev,
 	.get_device_type	= fd_get_device_type,
-	.get_inquiry_prod	= fd_get_inquiry_prod,
-	.get_inquiry_rev	= fd_get_inquiry_rev,
 	.get_dma_length		= fd_get_dma_length,
 	.get_max_sectors	= fd_get_max_sectors,
 	.get_blocks		= fd_get_blocks,

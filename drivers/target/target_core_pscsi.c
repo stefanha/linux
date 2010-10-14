@@ -252,7 +252,8 @@ static struct se_device *pscsi_add_device_to_list(
 	pdv->pdv_sd = sd;
 
 	dev = transport_add_device_to_core_hba(hba, &pscsi_template,
-				se_dev, dev_flags, (void *)pdv);
+				se_dev, dev_flags, (void *)pdv,
+				NULL, NULL);
 	if (!(dev)) {
 		pdv->pdv_sd = NULL;
 		return NULL;

@@ -268,6 +268,7 @@ static struct se_device *rd_create_virtdevice(
 	struct rd_dev *rd_dev = p;
 	struct rd_host *rd_host = hba->hba_ptr;
 	int dev_flags = 0;
+	char prod[16], rev[4];
 
 	if (rd_dev->rd_direct)
 		dev_flags |= DF_TRANSPORT_DMA_ALLOC;
@@ -275,9 +276,14 @@ static struct se_device *rd_create_virtdevice(
 	if (rd_build_device_space(rd_dev) < 0)
 		goto fail;
 
+	snprintf(prod, 16, "RAMDISK-%s", (rd_dev->rd_direct) ? "DR" : "MCP");
+	snprintf(rev, 4, "%s", (rd_dev->rd_direct) ? RD_DR_VERSION :
+						RD_MCP_VERSION);
+
 	dev = transport_add_device_to_core_hba(hba,
 			(rd_dev->rd_direct) ? &rd_dr_template :
-			&rd_mcp_template, se_dev, dev_flags, (void *)rd_dev);
+			&rd_mcp_template, se_dev, dev_flags, (void *)rd_dev,
+			prod, rev);
 	if (!(dev))
 		goto fail;
 
@@ -1289,20 +1295,6 @@ static u32 rd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-static char *rd_get_inquiry_prod(struct se_device *dev)
-{
-	struct rd_dev *rd_dev = dev->dev_ptr;
-
-	return (rd_dev->rd_direct) ? "RAMDISK-DR" : "RAMDISK-MCP";
-}
-
-static char *rd_get_inquiry_rev(struct se_device *dev)
-{
-	struct rd_dev *rd_dev = dev->dev_ptr;
-
-	return (rd_dev->rd_direct) ? RD_DR_VERSION : RD_MCP_VERSION;
-}
-
 /*	rd_get_dma_length(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1380,8 +1372,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.get_blocksize		= rd_get_blocksize,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
-	.get_inquiry_prod	= rd_get_inquiry_prod,
-	.get_inquiry_rev	= rd_get_inquiry_rev,
 	.get_dma_length		= rd_get_dma_length,
 	.get_max_sectors	= rd_get_max_sectors,
 	.get_blocks		= rd_get_blocks,
@@ -1424,8 +1414,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.get_blocksize		= rd_get_blocksize,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
-	.get_inquiry_prod	= rd_get_inquiry_prod,
-	.get_inquiry_rev	= rd_get_inquiry_rev,
 	.get_dma_length		= rd_get_dma_length,
 	.get_max_sectors	= rd_get_max_sectors,
 	.get_queue_depth	= rd_get_queue_depth,
