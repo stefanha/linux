@@ -188,11 +188,6 @@ static struct se_device *fd_create_virtdevice(
 	 * Otherwise, we use the passed fd_size= from configfs
 	 */
 	inode = file->f_mapping->host;
-	if (!(inode)) {
-		printk(KERN_ERR "FILEIO: Unable to locate struct inode from"
-			" struct file\n");
-		goto fail;
-	}
 	if (S_ISBLK(inode->i_mode)) {
 		/*
 		 * Determine the number of bytes from i_size_read() minus
