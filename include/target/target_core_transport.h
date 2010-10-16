@@ -192,7 +192,8 @@ extern int transport_rescan_evpd_device_ident(struct se_device *);
 extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_api *,
 					struct se_subsystem_dev *, u32,
-					void *, const char *, const char *);
+					void *, struct se_dev_limits *,
+					const char *, const char *);
 extern int transport_generic_activate_device(struct se_device *);
 extern void transport_generic_deactivate_device(struct se_device *);
 extern void transport_generic_free_device(struct se_device *);
@@ -521,15 +522,6 @@ struct se_subsystem_api {
 	 */
 	unsigned char *(*get_cdb)(struct se_task *);
 	/*
-	 * get_max_cdb_len(): Used by subsystems backstoers to signal the
-	 * maximum receivable SCSI CDB size.
-	 */
-	u32 (*get_max_cdb_len)(struct se_device *);
-	/*
-	 * get_blocksize():
-	 */
-	u32 (*get_blocksize)(struct se_device *);
-	/*
 	 * get_device_rev():
 	 */
 	u32 (*get_device_rev)(struct se_device *);
@@ -546,22 +538,9 @@ struct se_subsystem_api {
 	 */
 	u32 (*get_max_cdbs)(struct se_device *);
 	/*
-	 * get_max_sectors():
-	 */
-	 u32 (*get_max_sectors)(struct se_device *);
-	/*
 	 * Get the sector_t from a subsystem backstore..
 	 */
 	sector_t (*get_blocks)(struct se_device *);
-	/*
-	 * get_queue_depth():
-	 *
-	 */
-	u32 (*get_queue_depth)(struct se_device *);
-	/*
-	 * get_max_queue_depth():
-	 */
-	u32 (*get_max_queue_depth)(struct se_device *);
 	/*
 	 * do_se_mem_map():
 	 */

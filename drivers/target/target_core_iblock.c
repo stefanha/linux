@@ -139,13 +139,17 @@ static struct se_device *iblock_create_virtdevice(
 {
 	struct iblock_dev *ib_dev = p;
 	struct se_device *dev;
+	struct se_dev_limits dev_limits;
 	struct block_device *bd = NULL;
+	struct request_queue *q;
+	struct queue_limits *limits;
 	u32 dev_flags = 0;
 
 	if (!(ib_dev)) {
 		printk(KERN_ERR "Unable to locate struct iblock_dev parameter\n");
 		return 0;
 	}
+	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
 	/*
 	 * These settings need to be made tunable..
 	 */
@@ -166,6 +170,18 @@ static struct se_device *iblock_create_virtdevice(
 			FMODE_WRITE|FMODE_READ, ib_dev);
 	if (!(bd))
 		goto failed;
+	/*
+	 * Setup the local scope queue_limits from struct request_queue->limits
+	 * to pass into transport_add_device_to_core_hba() as struct se_dev_limits.
+	 */
+	q = bdev_get_queue(bd);
+	limits = &dev_limits.limits;
+	limits->logical_block_size = bdev_logical_block_size(bd);	
+	limits->max_hw_sectors = queue_max_hw_sectors(q);
+	limits->max_sectors = queue_max_sectors(q);
+	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
+	dev_limits.hw_queue_depth = IBLOCK_MAX_DEVICE_QUEUE_DEPTH;
+	dev_limits.queue_depth = IBLOCK_DEVICE_QUEUE_DEPTH;
 
 	dev_flags = DF_CLAIMED_BLOCKDEV;
 	ib_dev->ibd_major = MAJOR(bd->bd_dev);
@@ -182,7 +198,7 @@ static struct se_device *iblock_create_virtdevice(
 	 */
 	dev = transport_add_device_to_core_hba(hba,
 			&iblock_template, se_dev, dev_flags, (void *)ib_dev,
-			"IBLOCK", IBLOCK_VERSION);
+			&dev_limits, "IBLOCK", IBLOCK_VERSION);
 	if (!(dev))
 		goto failed;
 
@@ -854,18 +870,6 @@ static unsigned char *iblock_get_cdb(struct se_task *task)
 	return req->ib_scsi_cdb;
 }
 
-static u32 iblock_get_max_cdb_len(struct se_device *dev)
-{
-	return TCM_MAX_COMMAND_SIZE;
-}
-
-static u32 iblock_get_blocksize(struct se_device *dev)
-{
-	struct iblock_dev *ibd = dev->dev_ptr;
-
-	return bdev_logical_block_size(ibd->ibd_bd);
-}
-
 static u32 iblock_get_device_rev(struct se_device *dev)
 {
 	return SCSI_SPC_2; /* Returns SPC-3 in Initiator Data */
@@ -881,14 +885,6 @@ static u32 iblock_get_dma_length(u32 task_size, struct se_device *dev)
 	return PAGE_SIZE;
 }
 
-static u32 iblock_get_max_sectors(struct se_device *dev)
-{
-	struct iblock_dev *ibd = dev->dev_ptr;
-	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
-
-	return q->limits.max_sectors;
-}
-
 static sector_t iblock_get_blocks(struct se_device *dev)
 {
 	struct iblock_dev *ibd = dev->dev_ptr;
@@ -896,16 +892,6 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 	struct request_queue *q = bdev_get_queue(bd);
 	
 	return iblock_emulate_read_cap_with_block_size(dev, bd, q);
-}
-
-static u32 iblock_get_queue_depth(struct se_device *dev)
-{
-	return IBLOCK_DEVICE_QUEUE_DEPTH;
-}
-
-static u32 iblock_get_max_queue_depth(struct se_device *dev)
-{
-	return IBLOCK_MAX_DEVICE_QUEUE_DEPTH;
 }
 
 static void iblock_bio_done(struct bio *bio, int err)
@@ -976,15 +962,10 @@ static struct se_subsystem_api iblock_template = {
 	.check_lba		= iblock_check_lba,
 	.check_for_SG		= iblock_check_for_SG,
 	.get_cdb		= iblock_get_cdb,
-	.get_max_cdb_len	= iblock_get_max_cdb_len,
-	.get_blocksize		= iblock_get_blocksize,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,
 	.get_dma_length		= iblock_get_dma_length,
-	.get_max_sectors	= iblock_get_max_sectors,
 	.get_blocks		= iblock_get_blocks,
-	.get_queue_depth	= iblock_get_queue_depth,
-	.get_max_queue_depth	= iblock_get_max_queue_depth,
 	.write_pending		= NULL,
 };
 

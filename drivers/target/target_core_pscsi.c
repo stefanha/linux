@@ -198,7 +198,11 @@ static struct se_device *pscsi_add_device_to_list(
 	int dev_flags)
 {
 	struct se_device *dev;
+	struct se_dev_limits dev_limits;
+	struct request_queue *q;
+	struct queue_limits *limits;
 
+	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
 	/*
 	 * Some pseudo SCSI HBAs do not fill in sector_size
 	 * correctly. (See ide-scsi.c)  So go ahead and setup sane
@@ -237,6 +241,20 @@ static struct se_device *pscsi_add_device_to_list(
 				sd->lun, sd->queue_depth);
 	}
 	/*
+	 * Setup the local scope queue_limits from struct request_queue->limits
+	 * to pass into transport_add_device_to_core_hba() as struct se_dev_limits.
+	 */
+	q = sd->request_queue;
+	limits = &dev_limits.limits;
+	limits->logical_block_size = sd->sector_size;
+	limits->max_hw_sectors = (sd->host->max_sectors > queue_max_hw_sectors(q)) ?
+				  queue_max_hw_sectors(q) : sd->host->max_sectors; 
+	limits->max_sectors = (sd->host->max_sectors > queue_max_sectors(q)) ?
+				  queue_max_sectors(q) : sd->host->max_sectors;
+	dev_limits.max_cdb_len = PSCSI_MAX_CDB_SIZE;
+	dev_limits.hw_queue_depth = sd->queue_depth;
+	dev_limits.queue_depth = sd->queue_depth;
+	/*
 	 * Set the pointer pdv->pdv_sd to from passed struct scsi_device,
 	 * which has already been referenced with Linux SCSI code with
 	 * scsi_device_get() in this file's pscsi_create_virtdevice().
@@ -253,7 +271,7 @@ static struct se_device *pscsi_add_device_to_list(
 
 	dev = transport_add_device_to_core_hba(hba, &pscsi_template,
 				se_dev, dev_flags, (void *)pdv,
-				NULL, NULL);
+				&dev_limits, NULL, NULL);
 	if (!(dev)) {
 		pdv->pdv_sd = NULL;
 		return NULL;
@@ -1403,11 +1421,6 @@ static unsigned char *pscsi_get_cdb(struct se_task *task)
 	return pt->pscsi_cdb;
 }
 
-static u32 pscsi_get_max_cdb_len(struct se_device *dev)
-{
-	return PSCSI_MAX_CDB_SIZE;
-}
-
 /*	pscsi_get_sense_buffer():
  *
  *
@@ -1417,18 +1430,6 @@ static unsigned char *pscsi_get_sense_buffer(struct se_task *task)
 	struct pscsi_plugin_task *pt = task->transport_req;
 
 	return (unsigned char *)&pt->pscsi_sense[0];
-}
-
-/*	pscsi_get_blocksize():
- *
- *
- */
-static u32 pscsi_get_blocksize(struct se_device *dev)
-{
-	struct pscsi_dev_virt *pdv = dev->dev_ptr;
-	struct scsi_device *sd = pdv->pdv_sd;
-
-	return sd->sector_size;
 }
 
 /*	pscsi_get_device_rev():
@@ -1462,31 +1463,6 @@ static u32 pscsi_get_device_type(struct se_device *dev)
 static u32 pscsi_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
-}
-
-/*	pscsi_get_max_sectors():
- *
- *
- */
-static u32 pscsi_get_max_sectors(struct se_device *dev)
-{
-	struct pscsi_dev_virt *pdv = dev->dev_ptr;
-	struct scsi_device *sd = pdv->pdv_sd;
-
-	return (sd->host->max_sectors > sd->request_queue->limits.max_sectors) ?
-		sd->request_queue->limits.max_sectors : sd->host->max_sectors;
-}
-
-/*	pscsi_get_queue_depth():
- *
- *
- */
-static u32 pscsi_get_queue_depth(struct se_device *dev)
-{
-	struct pscsi_dev_virt *pdv = dev->dev_ptr;
-	struct scsi_device *sd = pdv->pdv_sd;
-
-	return sd->queue_depth;
 }
 
 /*	pscsi_handle_SAM_STATUS_failures():
@@ -1574,14 +1550,10 @@ static struct se_subsystem_api pscsi_template = {
 	.check_lba		= pscsi_check_lba,
 	.check_for_SG		= pscsi_check_for_SG,
 	.get_cdb		= pscsi_get_cdb,
-	.get_max_cdb_len	= pscsi_get_max_cdb_len,
 	.get_sense_buffer	= pscsi_get_sense_buffer,
-	.get_blocksize		= pscsi_get_blocksize,
 	.get_device_rev		= pscsi_get_device_rev,
 	.get_device_type	= pscsi_get_device_type,
 	.get_dma_length		= pscsi_get_dma_length,
-	.get_max_sectors	= pscsi_get_max_sectors,
-	.get_queue_depth	= pscsi_get_queue_depth,
 	.write_pending		= NULL,
 };
 

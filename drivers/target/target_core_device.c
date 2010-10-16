@@ -995,8 +995,12 @@ int se_dev_check_shutdown(struct se_device *dev)
 	return ret;
 }
 
-void se_dev_set_default_attribs(struct se_device *dev)
+void se_dev_set_default_attribs(
+	struct se_device *dev,
+	struct se_dev_limits *dev_limits)
 {
+	struct queue_limits *limits = &dev_limits->limits;
+
 	DEV_ATTRIB(dev)->emulate_dpo = DA_EMULATE_DPO;
 	DEV_ATTRIB(dev)->emulate_fua_write = DA_EMULATE_FUA_WRITE;
 	DEV_ATTRIB(dev)->emulate_fua_read = DA_EMULATE_FUA_READ;
@@ -1008,6 +1012,11 @@ void se_dev_set_default_attribs(struct se_device *dev)
 	DEV_ATTRIB(dev)->emulate_reservations = DA_EMULATE_RESERVATIONS;
 	DEV_ATTRIB(dev)->emulate_alua = DA_EMULATE_ALUA;
 	DEV_ATTRIB(dev)->enforce_pr_isids = DA_ENFORCE_PR_ISIDS;
+	/*
+	 * The TPU=1 and TPWS=1 settings will be set in TCM/IBLOCK
+	 * iblock_create_virtdevice() from struct queue_limits values
+	 * if blk_queue_discard()==1
+	 */
 	DEV_ATTRIB(dev)->max_unmap_lba_count = DA_MAX_UNMAP_LBA_COUNT;
 	DEV_ATTRIB(dev)->max_unmap_block_desc_count =
 				DA_MAX_UNMAP_BLOCK_DESC_COUNT;
@@ -1015,38 +1024,29 @@ void se_dev_set_default_attribs(struct se_device *dev)
 	DEV_ATTRIB(dev)->unmap_granularity_alignment =
 				DA_UNMAP_GRANULARITY_ALIGNMENT_DEFAULT;
 	/*
+	 * max_cdb_len is based on subsystem plugin dependent requirements.
+	 */
+	DEV_ATTRIB(dev)->max_cdb_len = dev_limits->max_cdb_len;
+	/*
 	 * block_size is based on subsystem plugin dependent requirements.
 	 */
-	DEV_ATTRIB(dev)->hw_block_size = TRANSPORT(dev)->get_blocksize(dev);
-	DEV_ATTRIB(dev)->block_size = TRANSPORT(dev)->get_blocksize(dev);
+	DEV_ATTRIB(dev)->hw_block_size = limits->logical_block_size;
+	DEV_ATTRIB(dev)->block_size = limits->logical_block_size;
 	/*
 	 * max_sectors is based on subsystem plugin dependent requirements.
 	 */
-	DEV_ATTRIB(dev)->hw_max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
-	DEV_ATTRIB(dev)->max_sectors = TRANSPORT(dev)->get_max_sectors(dev);
+	DEV_ATTRIB(dev)->hw_max_sectors = limits->max_hw_sectors;
+	DEV_ATTRIB(dev)->max_sectors = limits->max_sectors;
 	/*
 	 * Set optimal_sectors from max_sectors, which can be lowered via
 	 * configfs.
 	 */
-	DEV_ATTRIB(dev)->optimal_sectors = DEV_ATTRIB(dev)->max_sectors;
+	DEV_ATTRIB(dev)->optimal_sectors = limits->max_sectors;
 	/*
 	 * queue_depth is based on subsystem plugin dependent requirements.
 	 */
-	DEV_ATTRIB(dev)->hw_queue_depth = TRANSPORT(dev)->get_queue_depth(dev);
-	DEV_ATTRIB(dev)->queue_depth = TRANSPORT(dev)->get_queue_depth(dev);
-	/*
-	 * task_timeout is based on device type.
-	 */
-#if 1
-	/*
-	 * Disabled by default due to known BUG in some cases when task_timeout
-	 * fires..  task_timeout, status_thread and status_thread_tur may end
-	 * up being removed in v3.0.
-	 */
-	DEV_ATTRIB(dev)->task_timeout = 0;
-#else
-	DEV_ATTRIB(dev)->task_timeout = transport_get_default_task_timeout(dev);
-#endif
+	DEV_ATTRIB(dev)->hw_queue_depth = dev_limits->hw_queue_depth;
+	DEV_ATTRIB(dev)->queue_depth = dev_limits->queue_depth;
 }
 
 int se_dev_set_task_timeout(struct se_device *dev, u32 task_timeout)
@@ -1278,6 +1278,7 @@ int se_dev_set_enforce_pr_isids(struct se_device *dev, int flag)
 		(DEV_ATTRIB(dev)->enforce_pr_isids) ? "Enabled" : "Disabled");
 	return 0;
 }
+
 /*
  * Note, this can only be called on unexported SE Device Object.
  */
@@ -1298,28 +1299,20 @@ int se_dev_set_queue_depth(struct se_device *dev, u32 queue_depth)
 	}
 
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
-		if (queue_depth > TRANSPORT(dev)->get_queue_depth(dev)) {
+		if (queue_depth > DEV_ATTRIB(dev)->hw_queue_depth) {
 			printk(KERN_ERR "dev[%p]: Passed queue_depth: %u"
 				" exceeds TCM/SE_Device TCQ: %u\n",
 				dev, queue_depth,
-				TRANSPORT(dev)->get_queue_depth(dev));
+				DEV_ATTRIB(dev)->hw_queue_depth);
 			return -1;
 		}
 	} else {
-		if (queue_depth > TRANSPORT(dev)->get_queue_depth(dev)) {
-			if (!(TRANSPORT(dev)->get_max_queue_depth)) {
-				printk(KERN_ERR "dev[%p]: Unable to locate "
-					"get_max_queue_depth() function"
-					" pointer\n", dev);
-				return -1;
-			}
-			if (queue_depth > TRANSPORT(dev)->get_max_queue_depth(
-					dev)) {
+		if (queue_depth > DEV_ATTRIB(dev)->queue_depth) {
+			if (queue_depth > DEV_ATTRIB(dev)->hw_queue_depth) {
 				printk(KERN_ERR "dev[%p]: Passed queue_depth:"
 					" %u exceeds TCM/SE_Device MAX"
 					" TCQ: %u\n", dev, queue_depth,
-					TRANSPORT(dev)->get_max_queue_depth(
-						dev));
+					DEV_ATTRIB(dev)->hw_queue_depth);
 				return -1;
 			}
 		}
@@ -1336,8 +1329,6 @@ int se_dev_set_queue_depth(struct se_device *dev, u32 queue_depth)
 	return 0;
 }
 
-/* #warning FIXME: Forcing max_sectors greater than
-	get_max_sectors() disabled */
 int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 {
 	int force = 0; /* Force setting for VDEVS */
@@ -1360,21 +1351,20 @@ int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 		return -1;
 	}
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
-		if (max_sectors > TRANSPORT(dev)->get_max_sectors(dev)) {
+		if (max_sectors > DEV_ATTRIB(dev)->hw_max_sectors) {
 			printk(KERN_ERR "dev[%p]: Passed max_sectors: %u"
 				" greater than TCM/SE_Device max_sectors:"
 				" %u\n", dev, max_sectors,
-				TRANSPORT(dev)->get_max_sectors(dev));
+				DEV_ATTRIB(dev)->hw_max_sectors);
 			 return -1;
 		}
 	} else {
 		if (!(force) && (max_sectors >
-				 TRANSPORT(dev)->get_max_sectors(dev))) {
+				 DEV_ATTRIB(dev)->hw_max_sectors)) {
 			printk(KERN_ERR "dev[%p]: Passed max_sectors: %u"
 				" greater than TCM/SE_Device max_sectors"
 				": %u, use force=1 to override.\n", dev,
-				max_sectors,
-				TRANSPORT(dev)->get_max_sectors(dev));
+				max_sectors, DEV_ATTRIB(dev)->hw_max_sectors);
 			return -1;
 		}
 		if (max_sectors > DA_STATUS_MAX_SECTORS_MAX) {

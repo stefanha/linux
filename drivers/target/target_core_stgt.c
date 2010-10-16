@@ -754,11 +754,6 @@ static unsigned char *stgt_get_cdb(struct se_task *task)
 	return pt->stgt_cdb;
 }
 
-static u32 stgt_get_max_cdb_len(struct se_device *dev)
-{
-	return TCM_MAX_COMMAND_SIZE;
-}
-
 /*	stgt_get_sense_buffer():
  *
  *
@@ -768,18 +763,6 @@ static unsigned char *stgt_get_sense_buffer(struct se_task *task)
 	struct stgt_plugin_task *pt = task->transport_req;
 
 	return (unsigned char *)&pt->stgt_sense[0];
-}
-
-/*	stgt_get_blocksize():
- *
- *
- */
-static u32 stgt_get_blocksize(struct se_device *dev)
-{
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
-	struct scsi_device *sd = sdv->sdv_sd;
-
-	return sd->sector_size;
 }
 
 /*	stgt_get_device_rev():
@@ -813,30 +796,6 @@ static u32 stgt_get_device_type(struct se_device *dev)
 static u32 stgt_get_dma_length(u32 task_size, struct se_device *dev)
 {
 	return PAGE_SIZE;
-}
-
-/*	stgt_get_max_sectors():
- *
- *
- */
-static u32 stgt_get_max_sectors(struct se_device *dev)
-{
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
-	struct scsi_device *sd = sdv->sdv_sd;
-	return (sd->host->max_sectors > sd->request_queue->limits.max_sectors) ?
-		sd->request_queue->limits.max_sectors : sd->host->max_sectors;
-}
-
-/*	stgt_get_queue_depth():
- *
- *
- */
-static u32 stgt_get_queue_depth(struct se_device *dev)
-{
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
-	struct scsi_device *sd = sdv->sdv_sd;
-
-	return sd->queue_depth;
 }
 
 /*	stgt_handle_SAM_STATUS_failures():
@@ -938,14 +897,10 @@ static struct se_subsystem_api stgt_template = {
 	.check_lba		= stgt_check_lba,
 	.check_for_SG		= stgt_check_for_SG,
 	.get_cdb		= stgt_get_cdb,
-	.get_max_cdb_len	= stgt_get_max_cdb_len,
 	.get_sense_buffer	= stgt_get_sense_buffer,
-	.get_blocksize		= stgt_get_blocksize,
 	.get_device_rev		= stgt_get_device_rev,
 	.get_device_type	= stgt_get_device_type,
 	.get_dma_length		= stgt_get_dma_length,
-	.get_max_sectors	= stgt_get_max_sectors,
-	.get_queue_depth	= stgt_get_queue_depth,
 	.write_pending		= NULL,
 };
 

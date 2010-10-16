@@ -141,12 +141,16 @@ static struct se_device *fd_create_virtdevice(
 {
 	char *dev_p = NULL;
 	struct se_device *dev;
+	struct se_dev_limits dev_limits;
+	struct queue_limits *limits;
 	struct fd_dev *fd_dev = (struct fd_dev *) p;
 	struct fd_host *fd_host = (struct fd_host *) hba->hba_ptr;
 	mm_segment_t old_fs;
 	struct file *file;
 	struct inode *inode = NULL;
 	int dev_flags = 0, flags;
+
+	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
 
 	old_fs = get_fs();
 	set_fs(get_ds());
@@ -189,6 +193,16 @@ static struct se_device *fd_create_virtdevice(
 	 */
 	inode = file->f_mapping->host;
 	if (S_ISBLK(inode->i_mode)) {
+		struct request_queue *q;
+		/*
+		 * Setup the local scope queue_limits from struct request_queue->limits
+		 * to pass into transport_add_device_to_core_hba() as struct se_dev_limits.
+		 */
+		q = bdev_get_queue(inode->i_bdev);
+		limits = &dev_limits.limits;
+		limits->logical_block_size = bdev_logical_block_size(inode->i_bdev);
+		limits->max_hw_sectors = queue_max_hw_sectors(q);
+		limits->max_sectors = queue_max_sectors(q);
 		/*
 		 * Determine the number of bytes from i_size_read() minus
 		 * one (1) logical sector from underlying struct block_device
@@ -209,8 +223,17 @@ static struct se_device *fd_create_virtdevice(
 				" block_device\n");
 			goto fail;
 		}
+
+		limits = &dev_limits.limits;
+		limits->logical_block_size = FD_BLOCKSIZE;
+		limits->max_hw_sectors = FD_MAX_SECTORS;
+		limits->max_sectors = FD_MAX_SECTORS;
 		fd_dev->fd_block_size = FD_BLOCKSIZE;
 	}
+
+	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
+	dev_limits.hw_queue_depth = FD_MAX_DEVICE_QUEUE_DEPTH;
+	dev_limits.queue_depth = FD_DEVICE_QUEUE_DEPTH;
 	/*
 	 * Pass dev_flags for linux_blockdevice_claim_bd or
 	 * linux_blockdevice_claim() from the usage above.
@@ -221,7 +244,7 @@ static struct se_device *fd_create_virtdevice(
 	 */
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
 				se_dev, dev_flags, (void *)fd_dev,
-				"FILEIO", FD_VERSION);
+				&dev_limits, "FILEIO", FD_VERSION);
 	if (!(dev))
 		goto fail;
 
@@ -924,22 +947,6 @@ static unsigned char *fd_get_cdb(struct se_task *task)
 	return req->fd_scsi_cdb;
 }
 
-static u32 fd_get_max_cdb_len(struct se_device *dev)
-{
-	return TCM_MAX_COMMAND_SIZE;
-}
-
-/*	fd_get_blocksize(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 fd_get_blocksize(struct se_device *dev)
-{
-	struct fd_dev *fd_dev = dev->dev_ptr;
-
-	return fd_dev->fd_block_size;
-}
-
 /*	fd_get_device_rev(): (Part of se_subsystem_api_t template)
  *
  *
@@ -967,15 +974,6 @@ static u32 fd_get_dma_length(u32 task_size, struct se_device *dev)
 	return PAGE_SIZE;
 }
 
-/*	fd_get_max_sectors(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 fd_get_max_sectors(struct se_device *dev)
-{
-	return FD_MAX_SECTORS;
-}
-
 static sector_t fd_get_blocks(struct se_device *dev)
 {
 	struct fd_dev *fd_dev = dev->dev_ptr;
@@ -984,23 +982,6 @@ static sector_t fd_get_blocks(struct se_device *dev)
 
 	return blocks_long;
 }
-
-/*	fd_get_queue_depth(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 fd_get_queue_depth(struct se_device *dev)
-{
-	return FD_DEVICE_QUEUE_DEPTH;
-}
-
-static u32 fd_get_max_queue_depth(struct se_device *dev)
-{
-	return FD_MAX_DEVICE_QUEUE_DEPTH;
-}
-
-/*#warning FIXME v2.8: transport_type for FILEIO will need to change
-  with DIRECT_IO to blockdevs */
 
 static struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
@@ -1038,15 +1019,10 @@ static struct se_subsystem_api fileio_template = {
 	.check_lba		= fd_check_lba,
 	.check_for_SG		= fd_check_for_SG,
 	.get_cdb		= fd_get_cdb,
-	.get_max_cdb_len	= fd_get_max_cdb_len,
-	.get_blocksize		= fd_get_blocksize,
 	.get_device_rev		= fd_get_device_rev,
 	.get_device_type	= fd_get_device_type,
 	.get_dma_length		= fd_get_dma_length,
-	.get_max_sectors	= fd_get_max_sectors,
 	.get_blocks		= fd_get_blocks,
-	.get_queue_depth	= fd_get_queue_depth,
-	.get_max_queue_depth	= fd_get_max_queue_depth,
 	.write_pending		= NULL,
 };
 

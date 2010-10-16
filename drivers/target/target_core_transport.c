@@ -2207,6 +2207,7 @@ struct se_device *transport_add_device_to_core_hba(
 	struct se_subsystem_dev *se_dev,
 	u32 device_flags,
 	void *transport_dev,
+	struct se_dev_limits *dev_limits,
 	const char *inquiry_prod,
 	const char *inquiry_rev)
 {
@@ -2264,11 +2265,11 @@ struct se_device *transport_add_device_to_core_hba(
 	spin_lock_init(&dev->se_port_lock);
 	spin_lock_init(&dev->se_tmr_lock);
 
-	dev->queue_depth	= TRANSPORT(dev)->get_queue_depth(dev);
+	dev->queue_depth	= dev_limits->queue_depth;
 	atomic_set(&dev->depth_left, dev->queue_depth);
 	atomic_set(&dev->dev_ordered_id, 0);
 
-	se_dev_set_default_attribs(dev);
+	se_dev_set_default_attribs(dev, dev_limits);
 
 	dev->write_pending = (transport->write_pending) ?
 		transport->write_pending : &transport_dev_write_pending_nop;
@@ -2497,44 +2498,6 @@ static inline void transport_generic_prepare_cdb(
 		cdb[1] &= 0x1f; /* clear logical unit number */
 		break;
 	}
-}
-
-static inline u32 transport_dev_max_sectors(struct se_device *dev)
-{
-	/*
-	 * Always enforce the underlying max_sectors for TCM/pSCSI
-	 */
-	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV)
-		return (DEV_ATTRIB(dev)->max_sectors >
-			TRANSPORT(dev)->get_max_sectors(dev) ?
-			TRANSPORT(dev)->get_max_sectors(dev) :
-			DEV_ATTRIB(dev)->max_sectors);
-
-	return DEV_ATTRIB(dev)->max_sectors;
-}
-
-/*	transport_check_device_cdb_sector_count():
- *
- *	returns:
- *	0 on supported request sector count.
- *	1 on unsupported request sector count.
- */
-static inline int transport_check_device_cdb_sector_count(
-	void *se_obj_ptr,
-	u32 sectors)
-{
-	u32 max_sectors;
-
-	max_sectors = transport_dev_max_sectors(se_obj_ptr);
-	if (!(max_sectors)) {
-		printk(KERN_ERR "transport_dev_max_sectors returned zero!\n");
-		return 1;
-	}
-
-	if (sectors > max_sectors)
-		return -1;
-
-	return 0;
 }
 
 /*	transport_generic_get_task():
@@ -5548,7 +5511,7 @@ static int transport_generic_write_same(struct se_task *task)
 	int ret;
 
 	lba = T_TASK(cmd)->t_task_lba;
-	range = (cmd->data_length / TRANSPORT(dev)->get_blocksize(dev));
+	range = (cmd->data_length / DEV_ATTRIB(dev)->block_size);
 
 	printk(KERN_INFO "WRITE_SAME UNMAP: LBA: %llu Range: %u\n",
                 (unsigned long long)lba, range);
@@ -5934,15 +5897,14 @@ static int transport_generic_cmd_sequencer(
 		service_action = get_unaligned_be16(&cdb[8]);
 		/*
 		 * Check the additional CDB length (+ 8 bytes for header) does
-		 * not exceed our backsores ->get_max_cdb_len()
+		 * not exceed our backsores ->max_cdb_len
 		 */
 		if (scsi_varlen_cdb_length(&cdb[0]) >
-				TRANSPORT(dev)->get_max_cdb_len(dev)) {
+				DEV_ATTRIB(dev)->max_cdb_len) {
 			printk(KERN_INFO "Only %u-byte extended CDBs currently"
 				" supported for VARIABLE_LENGTH_CMD backstore %s,"
 				" received: %d for service action: 0x%04x\n",
-				TRANSPORT(dev)->get_max_cdb_len(dev),
-				TRANSPORT(dev)->name,
+				DEV_ATTRIB(dev)->max_cdb_len, TRANSPORT(dev)->name,
 				scsi_varlen_cdb_length(&cdb[0]), service_action);
 			return TGCS_INVALID_CDB_FIELD;
 		}
@@ -7632,13 +7594,13 @@ static inline int transport_set_tasks_sectors_disk(
 	if ((lba + sectors) > transport_dev_end_lba(dev)) {
 		task->task_sectors = ((transport_dev_end_lba(dev) - lba) + 1);
 
-		if (task->task_sectors > transport_dev_max_sectors(dev)) {
-			task->task_sectors = transport_dev_max_sectors(dev);
+		if (task->task_sectors > DEV_ATTRIB(dev)->max_sectors) {
+			task->task_sectors = DEV_ATTRIB(dev)->max_sectors;
 			*max_sectors_set = 1;
 		}
 	} else {
-		if (sectors > transport_dev_max_sectors(dev)) {
-			task->task_sectors = transport_dev_max_sectors(dev);
+		if (sectors > DEV_ATTRIB(dev)->max_sectors) {
+			task->task_sectors = DEV_ATTRIB(dev)->max_sectors;
 			*max_sectors_set = 1;
 		} else
 			task->task_sectors = sectors;
@@ -7654,8 +7616,8 @@ static inline int transport_set_tasks_sectors_non_disk(
 	u32 sectors,
 	int *max_sectors_set)
 {
-	if (sectors > transport_dev_max_sectors(dev)) {
-		task->task_sectors = transport_dev_max_sectors(dev);
+	if (sectors > DEV_ATTRIB(dev)->max_sectors) {
+		task->task_sectors = DEV_ATTRIB(dev)->max_sectors;
 		*max_sectors_set = 1;
 	} else
 		task->task_sectors = sectors;

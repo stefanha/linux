@@ -744,6 +744,17 @@ struct se_dev_entry {
 	struct list_head	ua_list;
 }  ____cacheline_aligned;
 
+struct se_dev_limits {
+	/* Max supported SCSI CDB length */
+	int		max_cdb_len;
+	/* Max supported HW queue depth */
+	u32		hw_queue_depth;
+	/* Max supported virtual queue depth */
+	u32		queue_depth;
+	/* From include/linux/blkdev.h for the other HW/SW limits. */
+	struct queue_limits limits;
+} ____cacheline_aligned;
+
 struct se_dev_attrib {
 	int		emulate_dpo;
 	int		emulate_fua_write;
@@ -756,6 +767,7 @@ struct se_dev_attrib {
 	int		emulate_reservations;
 	int		emulate_alua;
 	int		enforce_pr_isids;
+	int		max_cdb_len;
 	u32		hw_block_size;
 	u32		block_size;
 	u32		hw_max_sectors;

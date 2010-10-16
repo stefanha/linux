@@ -36,7 +36,7 @@ extern void se_dev_start(struct se_device *);
 extern void se_dev_stop(struct se_device *);
 extern int se_dev_check_online(struct se_device *);
 extern int se_dev_check_shutdown(struct se_device *);
-extern void se_dev_set_default_attribs(struct se_device *);
+extern void se_dev_set_default_attribs(struct se_device *, struct se_dev_limits *);
 extern int se_dev_set_task_timeout(struct se_device *, u32);
 extern int se_dev_set_max_unmap_lba_count(struct se_device *, u32);
 extern int se_dev_set_max_unmap_block_desc_count(struct se_device *, u32);

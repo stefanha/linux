@@ -265,10 +265,13 @@ static struct se_device *rd_create_virtdevice(
 	int rd_direct)
 {
 	struct se_device *dev;
+	struct se_dev_limits dev_limits;
 	struct rd_dev *rd_dev = p;
 	struct rd_host *rd_host = hba->hba_ptr;
 	int dev_flags = 0;
 	char prod[16], rev[4];
+
+	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
 
 	if (rd_dev->rd_direct)
 		dev_flags |= DF_TRANSPORT_DMA_ALLOC;
@@ -280,10 +283,17 @@ static struct se_device *rd_create_virtdevice(
 	snprintf(rev, 4, "%s", (rd_dev->rd_direct) ? RD_DR_VERSION :
 						RD_MCP_VERSION);
 
+	dev_limits.limits.logical_block_size = RD_BLOCKSIZE;
+	dev_limits.limits.max_hw_sectors = RD_MAX_SECTORS;
+	dev_limits.limits.max_sectors = RD_MAX_SECTORS;
+	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
+	dev_limits.hw_queue_depth = RD_MAX_DEVICE_QUEUE_DEPTH;
+	dev_limits.queue_depth = RD_DEVICE_QUEUE_DEPTH;
+
 	dev = transport_add_device_to_core_hba(hba,
 			(rd_dev->rd_direct) ? &rd_dr_template :
 			&rd_mcp_template, se_dev, dev_flags, (void *)rd_dev,
-			prod, rev);
+			&dev_limits, prod, rev);
 	if (!(dev))
 		goto fail;
 
@@ -1271,20 +1281,6 @@ static unsigned char *rd_get_cdb(struct se_task *task)
 	return req->rd_scsi_cdb;
 }
 
-static u32 rd_get_max_cdb_len(struct se_device *dev)
-{
-	return TCM_MAX_COMMAND_SIZE;
-}
-
-/*	rd_get_blocksize(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 rd_get_blocksize(struct se_device *dev)
-{
-	return RD_BLOCKSIZE;
-}
-
 static u32 rd_get_device_rev(struct se_device *dev)
 {
 	return SCSI_SPC_2; /* Returns SPC-3 in Initiator Data */
@@ -1304,15 +1300,6 @@ static u32 rd_get_dma_length(u32 task_size, struct se_device *dev)
 	return PAGE_SIZE;
 }
 
-/*	rd_get_max_sectors(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 rd_get_max_sectors(struct se_device *dev)
-{
-	return RD_MAX_SECTORS;
-}
-
 static sector_t rd_get_blocks(struct se_device *dev)
 {
 	struct rd_dev *rd_dev = dev->dev_ptr;
@@ -1320,20 +1307,6 @@ static sector_t rd_get_blocks(struct se_device *dev)
 			DEV_ATTRIB(dev)->block_size) - 1;
 
 	return blocks_long;
-}
-
-/*	rd_get_queue_depth(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 rd_get_queue_depth(struct se_device *dev)
-{
-	return RD_DEVICE_QUEUE_DEPTH;
-}
-
-static u32 rd_get_max_queue_depth(struct se_device *dev)
-{
-	return RD_MAX_DEVICE_QUEUE_DEPTH;
 }
 
 static struct se_subsystem_api rd_dr_template = {
@@ -1368,15 +1341,10 @@ static struct se_subsystem_api rd_dr_template = {
 	.check_lba		= rd_DIRECT_check_lba,
 	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,
-	.get_max_cdb_len	= rd_get_max_cdb_len,
-	.get_blocksize		= rd_get_blocksize,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
 	.get_dma_length		= rd_get_dma_length,
-	.get_max_sectors	= rd_get_max_sectors,
 	.get_blocks		= rd_get_blocks,
-	.get_queue_depth	= rd_get_queue_depth,
-	.get_max_queue_depth	= rd_get_max_queue_depth,
 	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
 	.write_pending		= NULL,
 };
@@ -1411,13 +1379,9 @@ static struct se_subsystem_api rd_mcp_template = {
 	.check_lba		= rd_MEMCPY_check_lba,
 	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,
-	.get_blocksize		= rd_get_blocksize,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
 	.get_dma_length		= rd_get_dma_length,
-	.get_max_sectors	= rd_get_max_sectors,
-	.get_queue_depth	= rd_get_queue_depth,
-	.get_max_queue_depth	= rd_get_max_queue_depth,
 	.write_pending		= NULL,
 };
 
