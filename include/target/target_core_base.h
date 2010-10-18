@@ -9,7 +9,7 @@
 #include <net/tcp.h>
 #include "target_core_mib.h"
 
-#define TARGET_CORE_MOD_VERSION		"v4.0.0-rc4"
+#define TARGET_CORE_MOD_VERSION		"v4.0.0-rc5"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
 /* Used by transport_generic_allocate_iovecs() */
