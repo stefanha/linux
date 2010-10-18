@@ -203,8 +203,9 @@ static int snd_soc_8_16_write(struct snd_soc_codec *codec, unsigned int reg,
 	data[1] = (value >> 8) & 0xff;
 	data[2] = value & 0xff;
 
-	if (!snd_soc_codec_volatile_register(codec, reg))
-		reg_cache[reg] = value;
+	if (!snd_soc_codec_volatile_register(codec, reg)
+		&& reg < codec->reg_cache_size)
+			reg_cache[reg] = value;
 
 	if (codec->cache_only) {
 		codec->cache_sync = 1;
@@ -340,7 +341,7 @@ static unsigned int snd_soc_16_8_read_i2c(struct snd_soc_codec *codec,
 static unsigned int snd_soc_16_8_read(struct snd_soc_codec *codec,
 				     unsigned int reg)
 {
-	u16 *cache = codec->reg_cache;
+	u8 *cache = codec->reg_cache;
 
 	reg &= 0xff;
 	if (reg >= codec->reg_cache_size)
@@ -351,7 +352,7 @@ static unsigned int snd_soc_16_8_read(struct snd_soc_codec *codec,
 static int snd_soc_16_8_write(struct snd_soc_codec *codec, unsigned int reg,
 			     unsigned int value)
 {
-	u16 *cache = codec->reg_cache;
+	u8 *cache = codec->reg_cache;
 	u8 data[3];
 	int ret;
 

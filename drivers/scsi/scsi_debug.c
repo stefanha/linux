@@ -1991,7 +1991,8 @@ static void map_region(sector_t lba, unsigned int len)
 		block = lba + alignment;
 		rem = do_div(block, granularity);
 
-		set_bit(block, map_storep);
+		if (block < map_size)
+			set_bit(block, map_storep);
 
 		lba += granularity - rem;
 	}
@@ -2011,7 +2012,8 @@ static void unmap_region(sector_t lba, unsigned int len)
 		block = lba + alignment;
 		rem = do_div(block, granularity);
 
-		if (rem == 0 && lba + granularity <= end)
+		if (rem == 0 && lba + granularity <= end &&
+		    block < map_size)
 			clear_bit(block, map_storep);
 
 		lba += granularity - rem;
@@ -3205,23 +3207,14 @@ static void do_remove_driverfs_files(void)
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 }
 
-static void pseudo_0_release(struct device *dev)
-{
-	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
-		printk(KERN_INFO "scsi_debug: pseudo_0_release() called\n");
-}
-
-static struct device pseudo_primary = {
-	.init_name	= "pseudo_0",
-	.release	= pseudo_0_release,
-};
+struct device *pseudo_primary;
 
 static int __init scsi_debug_init(void)
 {
 	unsigned long sz;
 	int host_to_add;
 	int k;
-	int ret;
+	int ret = 0;
 
 	switch (scsi_debug_sector_size) {
 	case  512:
@@ -3350,10 +3343,10 @@ static int __init scsi_debug_init(void)
 			map_region(0, 2);
 	}
 
-	ret = device_register(&pseudo_primary);
-	if (ret < 0) {
-		printk(KERN_WARNING "scsi_debug: device_register error: %d\n",
-			ret);
+	pseudo_primary = root_device_register("pseudo_0");
+	if (IS_ERR(pseudo_primary)) {
+		printk(KERN_WARNING "scsi_debug: root_device_register() error\n");
+		ret = PTR_ERR(pseudo_primary);
 		goto free_vm;
 	}
 	ret = bus_register(&pseudo_lld_bus);
@@ -3400,7 +3393,7 @@ del_files:
 bus_unreg:
 	bus_unregister(&pseudo_lld_bus);
 dev_unreg:
-	device_unregister(&pseudo_primary);
+	root_device_unregister(pseudo_primary);
 free_vm:
 	if (map_storep)
 		vfree(map_storep);
@@ -3421,7 +3414,7 @@ static void __exit scsi_debug_exit(void)
 	do_remove_driverfs_files();
 	driver_unregister(&sdebug_driverfs_driver);
 	bus_unregister(&pseudo_lld_bus);
-	device_unregister(&pseudo_primary);
+	root_device_unregister(pseudo_primary);
 
 	if (dif_storep)
 		vfree(dif_storep);
@@ -3472,7 +3465,7 @@ static int sdebug_add_adapter(void)
         spin_unlock(&sdebug_host_list_lock);
 
         sdbg_host->dev.bus = &pseudo_lld_bus;
-        sdbg_host->dev.parent = &pseudo_primary;
+        sdbg_host->dev.parent = pseudo_primary;
         sdbg_host->dev.release = &sdebug_release_adapter;
         dev_set_name(&sdbg_host->dev, "adapter%d", scsi_debug_add_host);
 
@@ -3794,6 +3787,7 @@ write:
 		errsts = check_readiness(SCpnt, 1, devip);
 		break;
 	case XDWRITEREAD_10:
+xdwrite_read:
 		if (!scsi_bidi_cmnd(SCpnt)) {
 			mk_sense_buffer(devip, ILLEGAL_REQUEST,
 					INVALID_FIELD_IN_CDB, 0);
@@ -3831,6 +3825,10 @@ write:
 				BUG_ON(SCpnt->cmd_len < 32);
 				goto write;
 			}
+		}
+		if (cmd[9] == XDWRITEREAD_32) {
+			printk("Got XDWRITEREAD_32!!!\n");
+			goto xdwrite_read;
 		}
 
 		mk_sense_buffer(devip, ILLEGAL_REQUEST,

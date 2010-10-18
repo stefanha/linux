@@ -205,19 +205,6 @@ int configfs_unlink(struct inode *dir, struct dentry *dentry)
 	parent_item = configfs_get_config_item(dentry->d_parent);
 	type = parent_item->ci_type;
 
-	/*
-	 * See if the underlying struct config_item has dependent
-	 * symlinks, and should return -EPERM here.
-	 */
-	if (type && type->ct_item_ops &&
-	    type->ct_item_ops->check_link) {
-		if (type->ct_item_ops->check_link(parent_item,
-					sl->sl_target) != 0) {
-			config_item_put(parent_item);
-			goto out;
-		}
-	}
-
 	spin_lock(&configfs_dirent_lock);
 	list_del_init(&sd->s_sibling);
 	spin_unlock(&configfs_dirent_lock);

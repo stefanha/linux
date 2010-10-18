@@ -1,13 +1,13 @@
 /*******************************************************************************
  * Filename:  tcm_loop_fabric.c
  *
- * This file contains the TCM fabric module for initiator side virtual SAS
- * using emulated target mode SAS ports
+ * This file contains the TCM loopback fabric module for initiator and target
+ * side CDB level emulation of SAS, FC and iSCSI ports to Linux/SCSI LUNs.
  *
- * Copyright (c) 2009 Rising Tide, Inc.
- * Copyright (c) 2009 Linux-iSCSI.org
+ * Copyright (c) 2009, 2010 Rising Tide, Inc.
+ * Copyright (c) 2009, 2010 Linux-iSCSI.org
  *
- * Copyright (c) 2009 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Copyright (c) 2009, 2010  Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,10 +35,10 @@
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
+#include <target/target_core_fabric_lib.h>
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 
 #include <tcm_loop_core.h>
 #include <tcm_loop_configfs.h>
@@ -51,26 +51,45 @@ char *tcm_loop_get_fabric_name(void)
 	return "loopback";
 }
 
-u8 tcm_loop_get_fabric_proto_ident(void)
+u8 tcm_loop_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 {
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 	/*
-	 * Return a SAS Serial SCSI Protocol identifier for loopback operations
-	 * This is defined in  section 7.5.1 Table 362 in spc4r17
+	 * tl_proto_id is set at tcm_loop_configfs.c:tcm_loop_make_scsi_hba()
+	 * time based on the protocol dependent prefix of the passed configfs group.
+	 *
+	 * Based upon tl_proto_id, TCM_Loop emulates the requested fabric
+	 * ProtocolID using target_core_fabric_lib.c symbols.
 	 */
-	return 0x6;
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_get_fabric_proto_ident(se_tpg);
+	case SCSI_PROTOCOL_FCP:
+		return fc_get_fabric_proto_ident(se_tpg);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_get_fabric_proto_ident(se_tpg);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
+	}
+
+	return sas_get_fabric_proto_ident(se_tpg);
 }
 
-char *tcm_loop_get_endpoint_wwn(se_portal_group_t *se_tpg)
+char *tcm_loop_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_tpg *tl_tpg =
 		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;	
 	/*
 	 * Return the passed NAA identifier for the SAS Target Port
 	 */
-	return &tl_tpg->tl_hba->naa_sas_address[0];
+	return &tl_tpg->tl_hba->tl_wwn_address[0];
 }
 
-u16 tcm_loop_get_tag(se_portal_group_t *se_tpg)
+u16 tcm_loop_get_tag(struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_tpg *tl_tpg =
 		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
@@ -81,62 +100,71 @@ u16 tcm_loop_get_tag(se_portal_group_t *se_tpg)
 	return tl_tpg->tl_tpgt;
 }
 
-u32 tcm_loop_get_default_depth(se_portal_group_t *se_tpg)
+u32 tcm_loop_get_default_depth(struct se_portal_group *se_tpg)
 {
 	return 1;
 }
 
 
 u32 tcm_loop_get_pr_transport_id(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code,
 	unsigned char *buf)
 {
-	unsigned char binary, *ptr;
-	int i;
-	u32 off = 4;
-	/*
-	 * Set PROTOCOL IDENTIFIER to 6h for SAS
-	 */
-	buf[0] = 0x06;
-	/*
-	 * From spc4r17, 7.5.4.7 TransportID for initiator ports using SCSI
-	 * over SAS Serial SCSI Protocol
-	 * 
-	 * For TCM_Loop, we use the configfs group name of INIT_SAS_ADDRESS:
-	 * and converting the 16-byte ASCII value into a 8-byte binary hex
-	 * buffer.
-	 *
-	 * target/loopback/naa.<TGT_SAS_ADDRESS>/nexus/naa.<INIt_SAS_ADDRESS>
-	 */
-	ptr = &se_nacl->initiatorname[4]; /* Skip over 'naa. prefix */
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 
-	for (i = 0; i < 16; i += 2) {
-		binary = transport_asciihex_to_binaryhex(&ptr[i]);	
-		buf[off++] = binary;
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+					format_code, buf);
+	case SCSI_PROTOCOL_FCP:
+		return fc_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+					format_code, buf);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+					format_code, buf);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
 	}
-	/*
-	 * The SAS Transport ID is a hardcoded 24-byte length
-	 */
-	return 24;
+
+	return sas_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
+			format_code, buf);
 }
 
 u32 tcm_loop_get_pr_transport_id_len(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code)
 {
-	*format_code = 0;
-	/*
-	 * From spc4r17, 7.5.4.7 TransportID for initiator ports using SCSI
-	 * over SAS Serial SCSI Protocol
-	 *
-	 * The SAS Transport ID is a hardcoded 24-byte length
-	 */
-	return 24;
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
+
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+					format_code);
+	case SCSI_PROTOCOL_FCP:
+		return fc_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+					format_code);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+					format_code);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
+	}
+
+	return sas_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
+			format_code);
 }
 
 /*
@@ -144,34 +172,45 @@ u32 tcm_loop_get_pr_transport_id_len(
  * Persistent Reservation SPEC_I_PT=1 and PROUT REGISTER_AND_MOVE operations.
  */
 char *tcm_loop_parse_pr_out_transport_id(
+	struct se_portal_group *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
 	char **port_nexus_ptr)
 {
-	/*
-	 * Assume the FORMAT CODE 00b from spc4r17, 7.5.4.7 TransportID
-	 * for initiator ports using SCSI over SAS Serial SCSI Protocol
-	 *
-	 * The TransportID for a SAS Initiator Port is of fixed size of
-	 * 24 bytes, and SAS does not contain a I_T nexus identifier,
-	 * so we return the **port_nexus_ptr set to NULL.
-	 */
-	*port_nexus_ptr = NULL;
-	*out_tid_len = 24;
+	struct tcm_loop_tpg *tl_tpg =
+			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
+	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 
-	return (char *)&buf[4];
+	switch (tl_hba->tl_proto_id) {
+	case SCSI_PROTOCOL_SAS:
+		return sas_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+					port_nexus_ptr);
+	case SCSI_PROTOCOL_FCP:
+		return fc_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+					port_nexus_ptr);
+	case SCSI_PROTOCOL_ISCSI:
+		return iscsi_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+					port_nexus_ptr);
+	default:
+		printk(KERN_ERR "Unknown tl_proto_id: 0x%02x, using"
+			" SAS emulation\n", tl_hba->tl_proto_id);
+		break;
+	}
+
+	return sas_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
+			port_nexus_ptr);
 }
 
 /*
- * Returning (1) here allows for target_core_mod se_node_acl_t to be generated
+ * Returning (1) here allows for target_core_mod struct se_node_acl to be generated
  * based upon the incoming fabric dependent SCSI Initiator Port
  */
-int tcm_loop_check_demo_mode(se_portal_group_t *se_tpg)
+int tcm_loop_check_demo_mode(struct se_portal_group *se_tpg)
 {
 	return 1;
 }
 
-int tcm_loop_check_demo_mode_cache(se_portal_group_t *se_tpg)
+int tcm_loop_check_demo_mode_cache(struct se_portal_group *se_tpg)
 {
 	return 0;
 }
@@ -180,14 +219,23 @@ int tcm_loop_check_demo_mode_cache(se_portal_group_t *se_tpg)
  * Allow I_T Nexus full READ-WRITE access without explict Initiator Node ACLs for
  * local virtual Linux/SCSI LLD passthrough into VM hypervisor guest
  */
-int tcm_loop_check_demo_mode_write_protect(se_portal_group_t *se_tpg)
+int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *se_tpg)
 {
 	return 0;
 }
 
-void *tcm_loop_tpg_alloc_fabric_acl(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl)
+/*
+ * Because TCM_Loop does not use explict ACLs and MappedLUNs, this will
+ * never be called for TCM_Loop by target_core_fabric_configfs.c code.
+ * It has been added here as a nop for target_fabric_tf_ops_check()
+ */
+int tcm_loop_check_prod_mode_write_protect(struct se_portal_group *se_tpg)
+{
+	return 0;
+}
+
+struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
+	struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_nacl *tl_nacl;
 
@@ -196,33 +244,26 @@ void *tcm_loop_tpg_alloc_fabric_acl(
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_nacl\n");
 		return NULL;
 	}
-	tl_nacl->se_nacl = se_nacl;
 
-	return (void *)tl_nacl;
+	return &tl_nacl->se_node_acl;
 }
 
 void tcm_loop_tpg_release_fabric_acl(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl)
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl)
 {
-	struct tcm_loop_nacl *tl_nacl =
-			(struct tcm_loop_nacl *)se_nacl->fabric_acl_ptr;
+	struct tcm_loop_nacl *tl_nacl = container_of(se_nacl,
+				struct tcm_loop_nacl, se_node_acl);
 
 	kfree(tl_nacl);
 }
 
-#ifdef SNMP_SUPPORT
-u32 tcm_loop_get_tpg_inst_index(se_portal_group_t *se_tpg)
+u32 tcm_loop_get_inst_index(struct se_portal_group *se_tpg)
 {
-	struct tcm_loop_tpg *tl_tpg =
-		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
-
-//	return tpg->tpg_tiqn->tiqn_index;
 	return 1;
 }
-#endif /* SNMP_SUPPORT */
 
-void tcm_loop_new_cmd_failure(se_cmd_t *se_cmd)
+void tcm_loop_new_cmd_failure(struct se_cmd *se_cmd)
 {
 	/*
 	 * Since TCM_loop is already passing struct scatterlist data from
@@ -232,7 +273,7 @@ void tcm_loop_new_cmd_failure(se_cmd_t *se_cmd)
 	return;
 }
 
-int tcm_loop_is_state_remove(se_cmd_t *se_cmd)
+int tcm_loop_is_state_remove(struct se_cmd *se_cmd)
 {
 	/*
 	 * Assume struct scsi_cmnd is not in remove state..
@@ -240,7 +281,7 @@ int tcm_loop_is_state_remove(se_cmd_t *se_cmd)
 	return 0;
 }
 
-int tcm_loop_sess_logged_in(se_session_t *se_sess)
+int tcm_loop_sess_logged_in(struct se_session *se_sess)
 {
 	/*
 	 * Assume that TL Nexus is always active
@@ -248,68 +289,60 @@ int tcm_loop_sess_logged_in(se_session_t *se_sess)
 	return 1;
 }
 
-#ifdef SNMP_SUPPORT
-u32 tpg_loop_sess_get_index(se_session_t *se_sess)
+u32 tcm_loop_sess_get_index(struct se_session *se_sess)
 {
 	return 1;
 }
-#endif /* SNMP_SUPPORT */
 
-
-void tcm_loop_set_default_node_attributes(se_node_acl_t *se_acl)
+void tcm_loop_set_default_node_attributes(struct se_node_acl *se_acl)
 {
 	return;
 }
 
-u32 tcm_loop_get_task_tag(se_cmd_t *se_cmd)
+u32 tcm_loop_get_task_tag(struct se_cmd *se_cmd)
 {
 	return 1;
 }
 
-int tcm_loop_get_cmd_state(se_cmd_t *se_cmd)
+int tcm_loop_get_cmd_state(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+			struct tcm_loop_cmd, tl_se_cmd);
 
 	return tl_cmd->sc_cmd_state;
 }
 
-#warning FIXME: tcm_loop_shutdown_session()
-int tcm_loop_shutdown_session(se_session_t *se_sess)
+int tcm_loop_shutdown_session(struct se_session *se_sess)
 {
-	BUG();
 	return 0;
 }
 
-#warning FIXME: tcm_loop_close_session()
-void tcm_loop_close_session(se_session_t *se_sess)
+void tcm_loop_close_session(struct se_session *se_sess)
 {
-	BUG();
+	return;
 };
 
 
-#warning FIXME: tcm_loop_stop_session()
 void tcm_loop_stop_session(
-	se_session_t *se_sess,
+	struct se_session *se_sess,
 	int sess_sleep,
 	int conn_sleep)
 {
-	BUG();
+	return;
 }
 
 
-#warning FIXME: tcm_loop_fall_back_to_erl0()
-void tcm_loop_fall_back_to_erl0(se_session_t *se_sess)
+void tcm_loop_fall_back_to_erl0(struct se_session *se_sess)
 {
-	BUG();
+	return;
 }
 
-int tcm_loop_write_pending(se_cmd_t *se_cmd)
+int tcm_loop_write_pending(struct se_cmd *se_cmd)
 {
 	/*
 	 * Since Linux/SCSI has already sent down a struct scsi_cmnd
 	 * sc->sc_data_direction of DMA_TO_DEVICE with struct scatterlist array
-	 * memory, and memory has already been mapped to se_cmd_t->t_mem_list
+	 * memory, and memory has already been mapped to struct se_cmd->t_mem_list
 	 * format with transport_generic_map_mem_to_cmd().
 	 *
 	 * For the TCM control CDBs using a contiguous buffer, do the memcpy
@@ -332,17 +365,16 @@ int tcm_loop_write_pending(se_cmd_t *se_cmd)
 	return 0;
 }
 
-int tcm_loop_write_pending_status(se_cmd_t *se_cmd)
+int tcm_loop_write_pending_status(struct se_cmd *se_cmd)
 {
 	return 0;
 }
 
-int tcm_loop_queue_data_in(se_cmd_t *se_cmd)
+int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
 	struct scsi_cmnd *sc = tl_cmd->sc;
-	unsigned long flags;
 
 	TL_CDB_DEBUG( "tcm_loop_queue_data_in() called for scsi_cmnd: %p"
 			" cdb: 0x%02x\n", sc, sc->cmnd[0]);
@@ -356,19 +388,15 @@ int tcm_loop_queue_data_in(se_cmd_t *se_cmd)
 	}
 
 	sc->result = host_byte(DID_OK) | SAM_STAT_GOOD;
-
-	spin_lock_irqsave(sc->device->host->host_lock, flags);
 	(*sc->scsi_done)(sc);
-	spin_unlock_irqrestore(sc->device->host->host_lock, flags);
 	return 0;
 }
 
-int tcm_loop_queue_status(se_cmd_t *se_cmd)
+int tcm_loop_queue_status(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
 	struct scsi_cmnd *sc = tl_cmd->sc;
-	unsigned long flags;
 
 	TL_CDB_DEBUG("tcm_loop_queue_status() called for scsi_cmnd: %p"
 			" cdb: 0x%02x\n", sc, sc->cmnd[0]);
@@ -384,18 +412,24 @@ int tcm_loop_queue_status(se_cmd_t *se_cmd)
 	} else
 		sc->result = host_byte(DID_OK) | se_cmd->scsi_status;
 
-	spin_lock_irqsave(sc->device->host->host_lock, flags);
 	(*sc->scsi_done)(sc);
-	spin_unlock_irqrestore(sc->device->host->host_lock, flags);
 	return 0;
 }
 
-int tcm_loop_queue_tm_rsp(se_cmd_t *se_cmd)
+int tcm_loop_queue_tm_rsp(struct se_cmd *se_cmd)
 {
+	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
+	struct tcm_loop_tmr *tl_tmr = (struct tcm_loop_tmr *)se_tmr->fabric_tmr_ptr;
+	/*
+	 * The SCSI EH thread will be sleeping on se_tmr->tl_tmr_wait, go ahead
+	 * and wake up the wait_queue_head_t in tcm_loop_device_reset()
+	 */
+	atomic_set(&tl_tmr->tmr_complete, 1);
+	wake_up(&tl_tmr->tl_tmr_wait);
 	return 0;
 }
 
-u16 tcm_loop_set_fabric_sense_len(se_cmd_t *se_cmd, u32 sense_length)
+u16 tcm_loop_set_fabric_sense_len(struct se_cmd *se_cmd, u32 sense_length)
 {
 	return 0;
 }
@@ -415,67 +449,6 @@ u64 tcm_loop_pack_lun(unsigned int lun)
 	result |= 0x40 | ((lun >> 8) & 0x3f);
 
 	return cpu_to_le64(result);
-}
-
-static se_queue_req_t *tcm_loop_get_qr_from_queue(se_queue_obj_t *qobj)
-{
-	se_queue_req_t *qr;
-	unsigned long flags;
-
-	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	if (list_empty(&qobj->qobj_list)) {
-		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-		return NULL;
-	}
-
-	qr = list_first_entry(&qobj->qobj_list, se_queue_req_t, qr_list);
-	list_del(&qr->qr_list);
-	atomic_dec(&qobj->queue_cnt);
-	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-
-	return qr;
-}
-
-int tcm_loop_processing_thread(void *p)
-{
-	struct scsi_cmnd *sc;
-	struct tcm_loop_cmd *tl_cmd;
-	struct tcm_loop_hba *tl_hba = (struct tcm_loop_hba *)p;
-	se_queue_obj_t *qobj = tl_hba->tl_hba_qobj;
-	se_queue_req_t *qr;
-	int ret;
-
-	current->policy = SCHED_NORMAL;
-	set_user_nice(current, -20);
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	complete(&qobj->thread_create_comp);
-
-	while (!(kthread_should_stop())) {
-		ret = wait_event_interruptible(qobj->thread_wq,
-			atomic_read(&qobj->queue_cnt) || kthread_should_stop());
-		if (ret < 0)
-			goto out;
-
-		qr = tcm_loop_get_qr_from_queue(qobj);
-		if (!(qr))
-			continue;
-
-		tl_cmd = (struct tcm_loop_cmd *)qr->cmd;
-		sc = tl_cmd->sc;
-		kfree(qr);
-
-		TL_CDB_DEBUG("processing_thread, calling tcm_loop_execute"
-			"_core_cmd() for tl_cmd: %p, sc: %p\n", tl_cmd, sc);
-		tcm_loop_execute_core_cmd(tl_cmd, sc);
-	}
-
-out:
-	complete(&qobj->thread_done_comp);
-	return 0;
 }
 
 static int __init tcm_loop_fabric_init(void)

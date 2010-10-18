@@ -319,7 +319,7 @@ static void ir_timer_keyup(unsigned long cookie)
 	 * a keyup event might follow immediately after the keydown.
 	 */
 	spin_lock_irqsave(&ir->keylock, flags);
-	if (time_is_after_eq_jiffies(ir->keyup_jiffies))
+	if (time_is_before_eq_jiffies(ir->keyup_jiffies))
 		ir_keyup(ir);
 	spin_unlock_irqrestore(&ir->keylock, flags);
 }
@@ -338,6 +338,8 @@ void ir_repeat(struct input_dev *dev)
 	struct ir_input_dev *ir = input_get_drvdata(dev);
 
 	spin_lock_irqsave(&ir->keylock, flags);
+
+	input_event(dev, EV_MSC, MSC_SCAN, ir->last_scancode);
 
 	if (!ir->keypressed)
 		goto out;
@@ -370,6 +372,8 @@ void ir_keydown(struct input_dev *dev, int scancode, u8 toggle)
 
 	spin_lock_irqsave(&ir->keylock, flags);
 
+	input_event(dev, EV_MSC, MSC_SCAN, scancode);
+
 	/* Repeat event? */
 	if (ir->keypressed &&
 	    ir->last_scancode == scancode &&
@@ -383,8 +387,10 @@ void ir_keydown(struct input_dev *dev, int scancode, u8 toggle)
 	ir->last_toggle = toggle;
 	ir->last_keycode = keycode;
 
+
 	if (keycode == KEY_RESERVED)
 		goto out;
+
 
 	/* Register a keypress */
 	ir->keypressed = true;
@@ -428,7 +434,7 @@ static void ir_close(struct input_dev *input_dev)
  */
 int __ir_input_register(struct input_dev *input_dev,
 		      const struct ir_scancode_table *rc_tab,
-		      const struct ir_dev_props *props,
+		      struct ir_dev_props *props,
 		      const char *driver_name)
 {
 	struct ir_input_dev *ir_dev;
@@ -480,6 +486,8 @@ int __ir_input_register(struct input_dev *input_dev,
 
 	set_bit(EV_KEY, input_dev->evbit);
 	set_bit(EV_REP, input_dev->evbit);
+	set_bit(EV_MSC, input_dev->evbit);
+	set_bit(MSC_SCAN, input_dev->mscbit);
 
 	if (ir_setkeytable(input_dev, &ir_dev->rc_tab, rc_tab)) {
 		rc = -ENOMEM;
@@ -497,8 +505,17 @@ int __ir_input_register(struct input_dev *input_dev,
 				goto out_event;
 		}
 
-	IR_dprintk(1, "Registered input device on %s for %s remote.\n",
-		   driver_name, rc_tab->name);
+	IR_dprintk(1, "Registered input device on %s for %s remote%s.\n",
+		   driver_name, rc_tab->name,
+		   (ir_dev->props && ir_dev->props->driver_type == RC_DRIVER_IR_RAW) ?
+			" in raw mode" : "");
+
+	/*
+	 * Default delay of 250ms is too short for some protocols, expecially
+	 * since the timeout is currently set to 250ms. Increase it to 500ms,
+	 * to avoid wrong repetition of the keycodes.
+	 */
+	input_dev->rep[REP_DELAY] = 500;
 
 	return 0;
 
