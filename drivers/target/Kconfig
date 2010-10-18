@@ -1,9 +1,9 @@
 config TARGET_CORE
-        tristate "Generic Target Core Mod (TCM) and ConfigFS Infrastructure"
-	select CONFIGFS_FS
-        default m
-        ---help---
-        Say Y or M here to enable the TCM Storage Engine and ConfigFS enabled control path for target_core_mod.  This includes built-in TCM RAMDISK subsystem logic for virtual LUN 0 access
+    tristate "Generic Target Core Mod (TCM) and ConfigFS Infrastructure"
+    select CONFIGFS_FS
+    default m
+    ---help---
+    Say Y or M here to enable the TCM Storage Engine and ConfigFS enabled control path for target_core_mod.  This includes built-in TCM RAMDISK subsystem logic for virtual LUN 0 access
 
 config TCM_DEBUG_DEV
 	tristate "TCM Debug device code"
