@@ -5,7 +5,7 @@ Greetings all,
 This document is intended to be a mini-HOWTO for using the tcm_mod_builder.py
 script to generate a brand new functional TCM v4 fabric .ko module of your very own,
 that once built can be immediately be loaded to start access the new TCM/ConfigFS
-fabric skeleton, by simplying using:
+fabric skeleton, by simply using:
 
 	modprobe $TCM_NEW_MOD
 	mkdir -p /sys/kernel/config/target/$TCM_NEW_MOD
@@ -25,7 +25,7 @@ This script will create a new drivers/target/$TCM_NEW_MOD/, and will do the foll
 	   in $TCM_NEW_MOD/$TCM_NEW_MOD_fabric.c
 
 tcm_mod_builder.py depends upon the mandatory '-p $PROTO_IDENT' and '-m
-$FABRIC_MOD_name' paramters, and actually running the script looks like:
+$FABRIC_MOD_name' parameters, and actually running the script looks like:
 
 target:/mnt/sdb/lio-core-2.6.git/Documentation/target# python tcm_mod_builder.py -p iSCSI -m tcm_nab5000
 tcm_dir: /mnt/sdb/lio-core-2.6.git/Documentation/target/../../
@@ -53,7 +53,7 @@ Would you like to add tcm_nab5000to drivers/target/Kbuild..? [yes,no]: yes
 Would you like to add tcm_nab5000to drivers/target/Kconfig..? [yes,no]: yes
 
 At the end of tcm_mod_builder.py. the script will ask to add the following
-line for to drivers/target/Kbuild:
+line to drivers/target/Kbuild:
 
 	obj-$(CONFIG_TCM_NAB5000)       += tcm_nab5000/
 
@@ -137,7 +137,7 @@ configfs               20644  2 target_core_mod
 Future TODO items:
 
 	*) Add more T10 proto_idents 
-	*) Make tcm_mod_dump_fabric_ops() smater and generate function pointer
+	*) Make tcm_mod_dump_fabric_ops() smarter and generate function pointer
 	   defs directly from include/target/target_core_fabric_ops.h:struct target_core_fabric_ops 
 	   structure members.
 
