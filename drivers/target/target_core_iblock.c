@@ -318,14 +318,15 @@ static void *iblock_allocate_request(
 {
 	struct iblock_req *ib_req;
 
-	ib_req = kmalloc(sizeof(struct iblock_req), GFP_KERNEL);
+	ib_req = kzalloc(sizeof(struct iblock_req), GFP_KERNEL);
 	if (!(ib_req)) {
 		printk(KERN_ERR "Unable to allocate memory for struct iblock_req\n");
 		return NULL;
 	}
 
 	ib_req->ib_dev = dev->dev_ptr;
-	return (void *)ib_req;
+	atomic_set(&ib_req->ib_bio_cnt, 0);
+	return ib_req;
 }
 
 static unsigned long long iblock_emulate_read_cap_with_block_size(
@@ -543,11 +544,17 @@ static int iblock_do_discard(struct se_device *dev, sector_t lba, u32 range)
 static void iblock_free_task(struct se_task *task)
 {
 	struct iblock_req *req = task->transport_req;
-
+	struct bio *bio, *hbio = req->ib_bio;
 	/*
-	 * We do not release the bio(s) here associated with this task, as
-	 * this is handled by bio_put() and iblock_bio_destructor().
+	 * We only release the bio(s) here if iblock_bio_done() has not called
+	 * bio_put() -> iblock_bio_destructor().
 	 */
+	while (hbio != NULL) {
+		bio = hbio;
+		hbio = hbio->bi_next;
+		bio->bi_next = NULL;
+		bio_put(bio);
+	}
 
 	kfree(req);
 	task->transport_req = NULL;
@@ -767,8 +774,6 @@ static int iblock_map_task_SG(struct se_task *task)
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 
-	atomic_set(&ib_req->ib_bio_cnt, 0);
-
 	bio = iblock_get_bio(task, ib_req, ib_dev, &ret, block_lba, sg_num);
 	if (!(bio))
 		return ret;
@@ -896,15 +901,32 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 
 static void iblock_bio_done(struct bio *bio, int err)
 {
-	struct se_task *task = (struct se_task *)bio->bi_private;
-	struct iblock_req *ibr = (struct iblock_req *)task->transport_req;
+	struct se_task *task = bio->bi_private;
+	struct iblock_req *ibr = task->transport_req;
+	/*
+	 * Set -EIO if !BIO_UPTODATE and the passed is still err=0
+	 */
+	if (!(test_bit(BIO_UPTODATE, &bio->bi_flags)) && !(err))
+		err = -EIO;
 
-	err = test_bit(BIO_UPTODATE, &bio->bi_flags) ? err : -EIO;
 	if (err != 0) {
 		printk(KERN_ERR "test_bit(BIO_UPTODATE) failed for bio: %p,"
 			" err: %d\n", bio, err);
+		/*
+		 * Bump the ib_bio_err_cnt and release bio.
+		 */
+		atomic_inc(&ibr->ib_bio_err_cnt);
+		smp_mb__after_atomic_inc();
+		bio_put(bio);
+		/*
+		 * Wait to complete the task until the last bio as completed.
+		 */
+		if (!(atomic_dec_and_test(&ibr->ib_bio_cnt)))
+			return;
+
+		ibr->ib_bio = NULL;
 		transport_complete_task(task, 0);
-		goto out;
+		return;
 	}
 	DEBUG_IBLOCK("done[%p] bio: %p task_lba: %llu bio_lba: %llu err=%d\n",
 		task, bio, task->task_lba, bio->bi_sector, err);
@@ -913,17 +935,16 @@ static void iblock_bio_done(struct bio *bio, int err)
 	 * to ibr->ib_bio_set.
 	 */
 	bio_put(bio);
-
 	/*
 	 * Wait to complete the task until the last bio as completed.
 	 */
 	if (!(atomic_dec_and_test(&ibr->ib_bio_cnt)))
-		goto out;
-
+		return;
+	/*
+	 * Return GOOD status for task if zero ib_bio_err_cnt exists.
+	 */
 	ibr->ib_bio = NULL;
-	transport_complete_task(task, (!err));
-out:
-	return;
+	transport_complete_task(task, (!atomic_read(&ibr->ib_bio_err_cnt)));
 }
 
 static struct se_subsystem_api iblock_template = {
