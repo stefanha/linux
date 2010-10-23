@@ -14,6 +14,7 @@ extern struct se_global *se_global;
 struct iblock_req {
 	unsigned char ib_scsi_cdb[TCM_MAX_COMMAND_SIZE];
 	atomic_t ib_bio_cnt;
+	atomic_t ib_bio_err_cnt;
 	u32	ib_sg_count;
 	void	*ib_buf;
 	struct bio *ib_bio;
