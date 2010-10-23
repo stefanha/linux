@@ -410,12 +410,14 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 static int __iblock_do_sync_cache(struct se_device *dev)
 {
 	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
+	sector_t error_sector;
 	int ret;
 
-	ret = blkdev_issue_flush(ib_dev->ibd_bd, GFP_KERNEL, NULL,
-				BLKDEV_IFL_WAIT);
+	ret = blkdev_issue_flush(ib_dev->ibd_bd, GFP_KERNEL, &error_sector);
 	if (ret != 0) {
-		printk(KERN_ERR "IBLOCK: block_issue_flush() failed: %d\n", ret);
+		printk(KERN_ERR "IBLOCK: block_issue_flush() failed: %d "
+			" error_sector: %llu\n", ret,
+			(unsigned long long)error_sector);
 		return -1;
 	}
 	DEBUG_IBLOCK("IBLOCK: Called block_issue_flush()\n");
