@@ -1562,9 +1562,8 @@ F:	net/ceph
 F:	include/linux/ceph
 
 CERTIFIED WIRELESS USB (WUSB) SUBSYSTEM:
-M:	David Vrabel <david.vrabel@csr.com>
 L:	linux-usb@vger.kernel.org
-S:	Supported
+S:	Orphan
 F:	Documentation/usb/WUSB-Design-overview.txt
 F:	Documentation/usb/wusb-cbaf
 F:	drivers/usb/host/hwa-hc.c
@@ -2212,6 +2211,13 @@ W:	bluesmoke.sourceforge.net
 S:	Maintained
 F:	drivers/edac/i5400_edac.c
 
+EDAC-I7300
+M:	Mauro Carvalho Chehab <mchehab@redhat.com>
+L:	linux-edac@vger.kernel.org
+W:	bluesmoke.sourceforge.net
+S:	Maintained
+F:	drivers/edac/i7300_edac.c
+
 EDAC-I7CORE
 M:	Mauro Carvalho Chehab <mchehab@redhat.com>
 L:	linux-edac@vger.kernel.org
@@ -2639,10 +2645,10 @@ F:	drivers/net/greth*
 
 HARD DRIVE ACTIVE PROTECTION SYSTEM (HDAPS) DRIVER
 M:	Frank Seidel <frank@f-seidel.de>
-L:	lm-sensors@lm-sensors.org
+L:	platform-driver-x86@vger.kernel.org
 W:	http://www.kernel.org/pub/linux/kernel/people/fseidel/hdaps/
 S:	Maintained
-F:	drivers/hwmon/hdaps.c
+F:	drivers/platform/x86/hdaps.c
 
 HWPOISON MEMORY FAILURE HANDLING
 M:	Andi Kleen <andi@firstfloor.org>
@@ -3434,7 +3440,7 @@ F:	scripts/package/
 
 KERNEL JANITORS
 L:	kernel-janitors@vger.kernel.org
-W:	http://janitor.kernelnewbies.org/
+W:	http://kernelnewbies.org/KernelJanitors
 S:	Odd Fixes
 
 KERNEL NFSD, SUNRPC, AND LOCKD SERVERS
@@ -3758,6 +3764,13 @@ M:	Matthew Wilcox <matthew@wil.cx>
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 F:	drivers/scsi/sym53c8xx_2/
+
+LTC4261 HARDWARE MONITOR DRIVER
+M:	Guenter Roeck <linux@roeck-us.net>
+L:	lm-sensors@lm-sensors.org
+S:	Maintained
+F:	Documentation/hwmon/ltc4261
+F:	drivers/hwmon/ltc4261.c
 
 LTP (Linux Test Project)
 M:	Rishikesh K Rajak <risrajak@linux.vnet.ibm.com>
@@ -4453,6 +4466,15 @@ L:	linux-i2c@vger.kernel.org
 S:	Maintained
 F:	drivers/i2c/busses/i2c-pasemi.c
 
+PADATA PARALLEL EXECUTION MECHANISM
+M:	Steffen Klassert <steffen.klassert@secunet.com>
+L:	linux-kernel@vger.kernel.org
+L:	linux-crypto@vger.kernel.org
+S:	Maintained
+F:	kernel/padata.c
+F:	include/linux/padata.h
+F:	Documentation/padata.txt
+
 PANASONIC LAPTOP ACPI EXTRAS DRIVER
 M:	Harald Welte <laforge@gnumonks.org>
 L:	platform-driver-x86@vger.kernel.org
@@ -4532,6 +4554,12 @@ S:	Maintained
 F:	drivers/leds/leds-pca9532.c
 F:	include/linux/leds-pca9532.h
 
+PCA9541 I2C BUS MASTER SELECTOR DRIVER
+M:	Guenter Roeck <guenter.roeck@ericsson.com>
+L:	linux-i2c@vger.kernel.org
+S:	Maintained
+F:	drivers/i2c/muxes/pca9541.c
+
 PCA9564/PCA9665 I2C BUS DRIVER
 M:	Wolfram Sang <w.sang@pengutronix.de>
 L:	linux-i2c@vger.kernel.org
@@ -4579,6 +4607,13 @@ M:	Don Fry <pcnet32@verizon.net>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/pcnet32.c
+
+PCRYPT PARALLEL CRYPTO ENGINE
+M:	Steffen Klassert <steffen.klassert@secunet.com>
+L:	linux-crypto@vger.kernel.org
+S:	Maintained
+F:	crypto/pcrypt.c
+F:	include/crypto/pcrypt.h
 
 PER-TASK DELAY ACCOUNTING
 M:	Balbir Singh <balbir@linux.vnet.ibm.com>
@@ -5360,8 +5395,8 @@ F:	drivers/*/*s3c2410*
 F:	drivers/*/*/*s3c2410*
 
 TI DAVINCI MACHINE SUPPORT
-P:	Kevin Hilman
-M:	davinci-linux-open-source@linux.davincidsp.com
+M:	Kevin Hilman <khilman@deeprootsystems.com>
+L:	davinci-linux-open-source@linux.davincidsp.com (subscribers-only)
 Q:	http://patchwork.kernel.org/project/linux-davinci/list/
 S:	Supported
 F:	arch/arm/mach-davinci
@@ -5962,13 +5997,9 @@ F:	Documentation/filesystems/ufs.txt
 F:	fs/ufs/
 
 ULTRA-WIDEBAND (UWB) SUBSYSTEM:
-M:	David Vrabel <david.vrabel@csr.com>
 L:	linux-usb@vger.kernel.org
-S:	Supported
+S:	Orphan
 F:	drivers/uwb/
-X:	drivers/uwb/wlp/
-X:	drivers/uwb/i1480/i1480u-wlp/
-X:	drivers/uwb/i1480/i1480-wlp.h
 F:	include/linux/uwb.h
 F:	include/linux/uwb/
 
@@ -6503,15 +6534,6 @@ F:	include/linux/wimax.h
 F:	include/linux/wimax/debug.h
 F:	include/net/wimax.h
 F:	net/wimax/
-
-WIMEDIA LLC PROTOCOL (WLP) SUBSYSTEM
-M:	David Vrabel <david.vrabel@csr.com>
-L:	netdev@vger.kernel.org
-S:	Maintained
-F:	include/linux/wlp.h
-F:	drivers/uwb/wlp/
-F:	drivers/uwb/i1480/i1480u-wlp/
-F:	drivers/uwb/i1480/i1480-wlp.h
 
 WISTRON LAPTOP BUTTON DRIVER
 M:	Miloslav Trmac <mitr@volny.cz>
