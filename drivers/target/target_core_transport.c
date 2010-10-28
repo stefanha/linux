@@ -7574,7 +7574,13 @@ next:
 	 */
 	if (task->task_padded_sg) {
 		sg_mark_end(&task->task_sg[task->task_sg_num - 1]);
-		sg_mark_end(&task->task_sg_bidi[task->task_sg_num - 1]);
+		/*
+		 * Added the 'if' check before marking end of bi-directional
+		 * scatterlist (which gets created only in case of request
+		 * (RD + WR).
+		 */
+		if (task->task_sg_bidi)
+			sg_mark_end(&task->task_sg_bidi[task->task_sg_num - 1]);
 	}
 
 	DEBUG_SC("Successfully allocated task->task_sg_num(%u),"
