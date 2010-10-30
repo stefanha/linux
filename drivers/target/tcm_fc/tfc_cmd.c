@@ -274,8 +274,8 @@ int ft_write_pending(struct se_cmd *se_cmd)
 		/* Target is 'exchange responder' and sending XFER_READY
 		 * to 'exchange initiator (initiator)'
 		 */
-		if (ep->xid <= lport->lro_xid &&
-		    fh->fh_r_ctl == FC_RCTL_DD_DATA_DESC) {
+		if ((ep->xid <= lport->lro_xid) &&
+		    (fh->fh_r_ctl == FC_RCTL_DD_DATA_DESC)) {
 			if (se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) {
 				/*
 				 * Map se_mem list to scatterlist, so that
