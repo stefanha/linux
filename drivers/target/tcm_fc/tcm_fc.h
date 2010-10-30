@@ -153,6 +153,9 @@ struct ft_cmd {
 	u32 write_data_len;		/* data received on writes */
 	struct se_queue_req se_req;
 	unsigned char ft_sense_buffer[TRANSPORT_SENSE_BUFFER]; /* Local sense buffer */
+	u32 was_ddp_setup:1;		/* Set only if ddp is setup */
+	struct scatterlist *sg;		/* Set only if DDP is setup */
+	u32 sg_cnt;			/* No. of item in scatterlist */
 };
 
 extern struct list_head ft_lport_list;

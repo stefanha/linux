@@ -72,9 +72,9 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 	printk(KERN_INFO "%s: cmd %p lun %d\n", caller, cmd, cmd->lun);
 
 	task = T_TASK(se_cmd);
-	printk(KERN_INFO "%s: cmd %p task %p se_num %u buf %p len %u\n",
+	printk(KERN_INFO "%s: cmd %p task %p se_num %u buf %p len %u se_cmd_flags <0x%x>\n",
 	       caller, cmd, task, task->t_tasks_se_num,
-	       task->t_task_buf, se_cmd->data_length);
+	       task->t_task_buf, se_cmd->data_length, se_cmd->se_cmd_flags);
 	if (task->t_mem_list)
 		list_for_each_entry(mem, task->t_mem_list, se_list)
 			printk(KERN_INFO "%s: cmd %p mem %p page %p "
@@ -247,6 +247,8 @@ int ft_write_pending(struct se_cmd *se_cmd)
 	struct fcp_txrdy *txrdy;
 	struct fc_lport *lport;
 	struct fc_exch *ep;
+	struct fc_frame_header *fh;
+	u32 f_ctl;
 
 	ft_dump_cmd(cmd, __func__);
 
@@ -264,6 +266,33 @@ int ft_write_pending(struct se_cmd *se_cmd)
 	fc_fill_fc_hdr(fp, FC_RCTL_DD_DATA_DESC, ep->did, ep->sid, FC_TYPE_FCP,
 		       FC_FC_EX_CTX | FC_FC_END_SEQ | FC_FC_SEQ_INIT, 0);
 
+	fh = fc_frame_header_get(fp);
+	f_ctl = ntoh24(fh->fh_f_ctl);
+
+	/* Only if it is 'Exchange Responder' */
+	if (f_ctl & FC_FC_EX_CTX) {
+		/* Target is 'exchange responder' and sending XFER_READY
+		 * to 'exchange initiator (initiator)'
+		 */
+		if (ep->xid <= lport->lro_xid &&
+		    fh->fh_r_ctl == FC_RCTL_DD_DATA_DESC) {
+			if (se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) {
+				/*
+				 * Map se_mem list to scatterlist, so that
+				 * DDP can be setup. DDP setup function require
+				 * scatterlist. se_mem_list is internal to
+				 * TCM/LIO target
+				 */
+				transport_do_task_sg_chain(se_cmd);
+				cmd->sg = T_TASK(se_cmd)->t_tasks_sg_chained;
+				cmd->sg_cnt =
+					T_TASK(se_cmd)->t_tasks_sg_chained_no;
+			}
+			if (cmd->sg && lport->tt.ddp_setup(lport, ep->xid,
+						    cmd->sg, cmd->sg_cnt))
+				cmd->was_ddp_setup = 1;
+		}
+	}
 	lport->tt.seq_send(lport, cmd->seq, fp);
 	return 0;
 }

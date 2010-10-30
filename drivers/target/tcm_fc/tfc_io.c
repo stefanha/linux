@@ -188,6 +188,9 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 {
 	struct se_cmd *se_cmd = &cmd->se_cmd;
+	struct fc_seq *seq = cmd->seq;
+	struct fc_exch *ep;
+	struct fc_lport *lport;
 	struct se_transport_task *task;
 	struct fc_frame_header *fh;
 	struct se_mem *mem;
@@ -200,6 +203,8 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	void *page_addr;
 	void *from;
 	void *to;
+	u32 f_ctl;
+	void *buf;
 
 	task = T_TASK(se_cmd);
 	BUG_ON(!task);
@@ -207,6 +212,64 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	fh = fc_frame_header_get(fp);
 	if (!(ntoh24(fh->fh_f_ctl) & FC_FC_REL_OFF))
 		goto drop;
+
+	/*
+	 * Doesn't expect even single byte of payload. Payload
+	 * is expected to be copied directly to user buffers
+	 * due to DDP (Large Rx offload) feature, hence
+	 * BUG_ON if BUF is non-NULL
+	 */
+	buf = fc_frame_payload_get(fp, 1);
+	if (cmd->was_ddp_setup && buf) {
+		printk(KERN_INFO "%s: When DDP was setup, not expected to"
+				 "receive frame with payload, Payload shall be"
+				 "copied directly to buffer instead of coming "
+				 "via. legacy receive queues\n", __func__);
+		BUG_ON(buf);
+	}
+
+	/*
+	 * If ft_cmd indicated 'ddp_setup', in that case only the last frame
+	 * should come with 'TSI bit being set'. If 'TSI bit is not set and if
+	 * data frame appears here, means error condition. In both the cases
+	 * release the DDP context (ddp_put) and in error case, as well
+	 * initiate error recovery mechanism.
+	 */
+	ep = fc_seq_exch(seq);
+	if (cmd->was_ddp_setup) {
+		BUG_ON(!ep);
+		lport = ep->lp;
+		BUG_ON(!lport);
+	}
+	if (cmd->was_ddp_setup && ep->xid != FC_XID_UNKNOWN) {
+		f_ctl = ntoh24(fh->fh_f_ctl);
+		/*
+		 * If TSI bit set in f_ctl, means last write data frame is
+		 * received successfully where payload is posted directly
+		 * to user buffer and only the last frame's header is posted
+		 * in legacy receive queue
+		 */
+		if (f_ctl & FC_FC_SEQ_INIT) { /* TSI bit set in FC frame */
+			cmd->write_data_len = lport->tt.ddp_done(lport,
+								ep->xid);
+			goto last_frame;
+		} else {
+			/*
+			 * Updating the write_data_len may be meaningless at
+			 * this point, but just in case if required in future
+			 * for debugging or any other purpose
+			 */
+			printk(KERN_ERR "%s: Received frame with TSI bit not"
+					" being SET, dropping the frame, "
+					"cmd->sg <%p>, cmd->sg_cnt <0x%x>\n",
+					__func__, cmd->sg, cmd->sg_cnt);
+			cmd->write_data_len = lport->tt.ddp_done(lport,
+							      ep->xid);
+			lport->tt.seq_exch_abort(cmd->seq, 0);
+			goto drop;
+		}
+	}
+
 	rel_off = ntohl(fh->fh_parm_offset);
 	frame_len = fr_len(fp);
 	if (frame_len <= sizeof(*fh))
@@ -273,6 +336,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		mem_len -= tlen;
 		cmd->write_data_len += tlen;
 	}
+last_frame:
 	if (cmd->write_data_len == se_cmd->data_length)
 		transport_generic_handle_data(se_cmd);
 drop:
