@@ -4004,7 +4004,7 @@ static int gdth_bios_param(struct scsi_device *sdev,struct block_device *bdev,se
 }
 
 
-static int gdth_queuecommand(struct scsi_cmnd *scp,
+static int gdth_queuecommand_lck(struct scsi_cmnd *scp,
 				void (*done)(struct scsi_cmnd *))
 {
     gdth_ha_str *ha = shost_priv(scp->device->host);
@@ -4021,6 +4021,8 @@ static int gdth_queuecommand(struct scsi_cmnd *scp,
 
     return __gdth_queuecommand(ha, scp, cmndinfo);
 }
+
+static DEF_SCSI_QCMD(gdth_queuecommand)
 
 static int __gdth_queuecommand(gdth_ha_str *ha, struct scsi_cmnd *scp,
 				struct gdth_cmndinfo *cmndinfo)
