@@ -16,10 +16,6 @@
 #define FD_DATA_NONE		3
 
 extern struct se_global *se_global;
-extern struct block_device *__linux_blockdevice_claim(int, int, void *, int *);
-extern struct block_device *linux_blockdevice_claim(int, int, void *);
-extern int linux_blockdevice_release(int, int, struct block_device *);
-extern int linux_blockdevice_check(int, int);
 
 #define RRF_EMULATE_CDB		0x01
 #define RRF_GOT_LBA		0x02

@@ -20,9 +20,6 @@
 #define PS_TIMEOUT_OTHER	(500*HZ)
 
 extern struct se_global *se_global;
-extern struct block_device *linux_blockdevice_claim(int, int, void *);
-extern int linux_blockdevice_release(int, int, struct block_device *);
-extern int linux_blockdevice_check(int, int);
 
 #include <linux/device.h>
 #include <scsi/scsi_driver.h>

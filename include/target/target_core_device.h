@@ -3,10 +3,6 @@
 
 extern struct se_global *se_global;
 
-extern struct block_device *__linux_blockdevice_claim(int, int, void *, int *);
-extern struct block_device *linux_blockdevice_claim(int, int, void *);
-extern int linux_blockdevice_release(int, int, struct block_device *);
-extern int linux_blockdevice_check(int, int);
 extern int transport_get_lun_for_cmd(struct se_cmd *, unsigned char *, u32);
 extern int transport_get_lun_for_tmr(struct se_cmd *, u32);
 extern struct se_dev_entry *core_get_se_deve_from_rtpi(

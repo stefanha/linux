@@ -234,14 +234,7 @@ static struct se_device *fd_create_virtdevice(
 	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
 	dev_limits.hw_queue_depth = FD_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = FD_DEVICE_QUEUE_DEPTH;
-	/*
-	 * Pass dev_flags for linux_blockdevice_claim_bd or
-	 * linux_blockdevice_claim() from the usage above.
-	 *
-	 * Note that transport_add_device_to_core_hba() will call
-	 * linux_blockdevice_release() internally on failure to
-	 * call bd_release() on the referenced struct block_device.
-	 */
+
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
 				se_dev, dev_flags, (void *)fd_dev,
 				&dev_limits, "FILEIO", FD_VERSION);

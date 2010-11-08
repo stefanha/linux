@@ -187,15 +187,7 @@ static struct se_device *iblock_create_virtdevice(
 	ib_dev->ibd_major = MAJOR(bd->bd_dev);
 	ib_dev->ibd_minor = MINOR(bd->bd_dev);
 	ib_dev->ibd_bd = bd;
-	ib_dev->ibd_flags |= IBDF_BDEV_EXCLUSIVE;
-	/*
-	 * Pass dev_flags for linux_blockdevice_claim() or
-	 * linux_blockdevice_claim() from the usage above.
-	 *
-	 * Note that transport_add_device_to_core_hba() will call
-	 * linux_blockdevice_release() internally on failure to
-	 * call bd_release() on the referenced struct block_device.
-	 */
+
 	dev = transport_add_device_to_core_hba(hba,
 			&iblock_template, se_dev, dev_flags, (void *)ib_dev,
 			&dev_limits, "IBLOCK", IBLOCK_VERSION);
@@ -251,25 +243,8 @@ static void iblock_free_device(void *p)
 {
 	struct iblock_dev *ib_dev = p;
 
-	if (ib_dev->ibd_bd) {
-		printk(KERN_INFO "IBLOCK: Releasing Major:Minor - %d:%d\n",
-			ib_dev->ibd_major, ib_dev->ibd_minor);
-
-		if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
-			close_bdev_exclusive(ib_dev->ibd_bd,
-				FMODE_WRITE|FMODE_READ);
-		else
-			linux_blockdevice_release(ib_dev->ibd_major,
-					ib_dev->ibd_minor, ib_dev->ibd_bd);
-		ib_dev->ibd_bd = NULL;
-	}
-
-	if (ib_dev->ibd_bio_set) {
-		DEBUG_IBLOCK("Calling bioset_free ib_dev->ibd_bio_set: %p\n",
-				ib_dev->ibd_bio_set);
-		bioset_free(ib_dev->ibd_bio_set);
-	}
-
+	close_bdev_exclusive(ib_dev->ibd_bd, FMODE_WRITE|FMODE_READ);
+	bioset_free(ib_dev->ibd_bio_set);
 	kfree(ib_dev);
 }
 
