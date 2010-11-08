@@ -207,6 +207,8 @@ typedef int (*map_func_t)(struct se_task *, u32);
 
 static int transport_generic_write_pending(struct se_cmd *);
 static int transport_processing_thread(void *);
+static int transport_new_cmd_obj(struct se_cmd *cmd,
+		struct se_transform_info *ti, int post_execute);
 
 static char *transport_passthrough_get_fabric_name(void)
 {
@@ -1036,9 +1038,10 @@ void transport_cmd_finish_abort_tmr(struct se_cmd *cmd)
 
 int transport_add_cmd_to_queue(
 	struct se_cmd *cmd,
-	struct se_queue_obj *qobj,
 	int t_state)
 {
+	struct se_device *dev = cmd->se_dev;
+	struct se_queue_obj *qobj = dev->dev_queue_obj;
 	struct se_queue_req *qr;
 	unsigned long flags;
 
@@ -1068,13 +1071,6 @@ int transport_add_cmd_to_queue(
 	atomic_inc(&qobj->queue_cnt);
 	wake_up_interruptible(&qobj->thread_wq);
 	return 0;
-}
-
-static int transport_add_cmd_to_dev_queue(struct se_cmd *cmd, int t_state)
-{
-	struct se_device *dev = cmd->se_dev;
-
-	return transport_add_cmd_to_queue(cmd, dev->dev_queue_obj, t_state);
 }
 
 /*
@@ -1173,7 +1169,7 @@ void transport_complete_cmd(struct se_cmd *cmd, int success)
 	atomic_set(&T_TASK(cmd)->t_transport_complete, 1);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	cmd->transport_add_cmd_to_queue(cmd, t_state);
+	transport_add_cmd_to_queue(cmd, t_state);
 }
 
 /*
@@ -1272,7 +1268,7 @@ check_task_stop:
 		t_state = TRANSPORT_COMPLETE_TIMEOUT;
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-		cmd->transport_add_cmd_to_queue(cmd, t_state);
+		transport_add_cmd_to_queue(cmd, t_state);
 		return;
 	}
 	atomic_dec(&T_TASK(cmd)->t_task_cdbs_timeout_left);
@@ -1315,7 +1311,7 @@ check_task_stop:
 	}
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	cmd->transport_add_cmd_to_queue(cmd, t_state);
+	transport_add_cmd_to_queue(cmd, t_state);
 }
 EXPORT_SYMBOL(transport_complete_task);
 
@@ -1457,7 +1453,8 @@ void transport_add_tasks_from_cmd(struct se_cmd *cmd)
  *
  *	Called with dev->execute_task_lock held.
  */
-struct se_task *transport_get_task_from_execute_queue(struct se_device *dev)
+static struct se_task *
+transport_get_task_from_execute_queue(struct se_device *dev)
 {
 	struct se_task *task;
 
@@ -2604,8 +2601,8 @@ static int transport_process_control_sg_transform(
 		return -1;
 	}
 
-	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr,
-				cmd->data_direction);
+	task = transport_generic_get_task(ti, cmd, ti->se_obj_ptr,
+					  cmd->data_direction);
 	if (!(task))
 		return -1;
 
@@ -2646,8 +2643,8 @@ static int transport_process_control_nonsg_transform(
 	unsigned char *cdb;
 	struct se_task *task;
 
-	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr,
-				cmd->data_direction);
+	task = transport_generic_get_task(ti, cmd, ti->se_obj_ptr,
+					  cmd->data_direction);
 	if (!(task))
 		return -1;
 
@@ -2682,8 +2679,8 @@ static int transport_process_non_data_transform(
 	unsigned char *cdb;
 	struct se_task *task;
 
-	task = cmd->transport_get_task(ti, cmd, ti->se_obj_ptr,
-				cmd->data_direction);
+	task = transport_generic_get_task(ti, cmd, ti->se_obj_ptr,
+					  cmd->data_direction);
 	if (!(task))
 		return -1;
 
@@ -2709,7 +2706,6 @@ static int transport_generic_cmd_sequencer(struct se_cmd *, unsigned char *);
 
 void transport_device_setup_cmd(struct se_cmd *cmd)
 {
-	cmd->transport_add_cmd_to_queue = &transport_add_cmd_to_dev_queue;
 	cmd->se_dev = SE_LUN(cmd)->lun_se_dev;
 }
 EXPORT_SYMBOL(transport_device_setup_cmd);
@@ -3018,7 +3014,7 @@ int transport_generic_handle_cdb(
 		return -1;
 	}
 
-	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD);
+	transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD);
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_handle_cdb);
@@ -3034,7 +3030,7 @@ int transport_generic_handle_data(
 	 * Make sure that the transport has been disabled by
 	 * transport_write_pending() before readding this struct se_cmd to the
 	 * processing queue.  If it has not yet been reset to zero by the
-	 * processing thread in cmd->transport_add_cmd_to_queue(), let other
+	 * processing thread in transport_add_cmd_to_queue(), let other
 	 * processes run.  If a signal was received, then we assume the
 	 * connection is being failed/shutdown, so we return a failure.
 	 */
@@ -3053,7 +3049,7 @@ int transport_generic_handle_data(
 	if (transport_check_aborted_status(cmd, 1) != 0)
 		return 0;
 
-	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_WRITE);
+	transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_WRITE);
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_handle_data);
@@ -3071,7 +3067,7 @@ int transport_generic_handle_tmr(
 	cmd->transport_wait_for_tasks = &transport_generic_wait_for_tasks;
 	transport_device_setup_cmd(cmd);
 
-	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_TMR);
+	transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_TMR);
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_handle_tmr);
@@ -3600,11 +3596,7 @@ static void iscsi_check_iovec_map(
 #define iscsi_check_iovec_map(a, b, c, d)
 #endif
 
-/*	transport_generic_set_iovec_ptrs():
- *
- *
- */
-static int transport_generic_set_iovec_ptrs(
+int transport_generic_set_iovec_ptrs(
 	struct se_map_sg *map_sg,
 	struct se_unmap_sg *unmap_sg)
 {
@@ -3732,6 +3724,7 @@ static int transport_generic_set_iovec_ptrs(
 
 	return i;
 }
+EXPORT_SYMBOL(transport_generic_set_iovec_ptrs);
 
 /*	transport_generic_allocate_buf():
  *
@@ -3914,7 +3907,7 @@ void transport_task_timeout_handler(unsigned long data)
 	cmd->t_state = TRANSPORT_COMPLETE_FAILURE;
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	cmd->transport_add_cmd_to_queue(cmd, TRANSPORT_COMPLETE_FAILURE);
+	transport_add_cmd_to_queue(cmd, TRANSPORT_COMPLETE_FAILURE);
 }
 
 u32 transport_get_default_task_timeout(struct se_device *dev)
@@ -4285,7 +4278,6 @@ void transport_new_cmd_failure(struct se_cmd *se_cmd)
 	CMD_TFO(se_cmd)->new_cmd_failure(se_cmd);
 }
 
-static int transport_generic_map_buffers_to_tasks(struct se_cmd *);
 static void transport_nop_wait_for_tasks(struct se_cmd *, int, int);
 
 static inline u32 transport_get_sectors_6(
@@ -5683,18 +5675,6 @@ static inline void transport_dev_get_mem_SG(
 		TRANSPORT(dev)->free_DMA : NULL;
 }
 
-/*
- * Generic function pointers for target_core_mod/ConfigFS
- */
-#define SET_GENERIC_TRANSPORT_FUNCTIONS(cmd)				\
-do {									\
-	cmd->transport_get_task = &transport_generic_get_task;		\
-	cmd->transport_map_buffers_to_tasks =				\
-			&transport_generic_map_buffers_to_tasks;	\
-	cmd->transport_set_iovec_ptrs =					\
-			&transport_generic_set_iovec_ptrs;		\
-} while (0)
-
 /*	transport_generic_cmd_sequencer():
  *
  *	Generic Command Sequencer that should work for most DAS transport
@@ -5767,7 +5747,6 @@ static int transport_generic_cmd_sequencer(
 
 	switch (cdb[0]) {
 	case READ_6:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_6(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5779,7 +5758,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_10:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_10(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5791,7 +5769,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_12:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_12(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5803,7 +5780,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_16:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5815,7 +5791,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_6:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_6(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5827,7 +5802,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_10:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_10(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5840,7 +5814,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_12:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_12(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5853,7 +5826,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_16:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
@@ -5866,7 +5838,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case XDWRITEREAD_10:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		if ((cmd->data_direction != DMA_TO_DEVICE) ||
 		    !(T_TASK(cmd)->t_tasks_bidi))
 			return TGCS_INVALID_CDB_FIELD;
@@ -5893,7 +5864,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case VARIABLE_LENGTH_CMD:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		service_action = get_unaligned_be16(&cdb[8]);
 		/*
 		 * Check the additional CDB length (+ 8 bytes for header) does
@@ -5983,7 +5953,6 @@ static int transport_generic_cmd_sequencer(
 		}
 		break;
 	case 0xa3:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		if (TRANSPORT(dev)->get_device_type(dev) != TYPE_ROM) {
 			/* MAINTENANCE_IN from SCC-2 */
 			/*
@@ -6007,21 +5976,18 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case MODE_SELECT:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
 		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SELECT_10:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
 		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SENSE:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6032,14 +5998,12 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_SEND_OPC:
 	case LOG_SELECT:
 	case LOG_SENSE:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_BLOCK_LIMITS:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_BLOCK_LEN;
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6049,7 +6013,6 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_READ_FORMAT_CAPACITIES:
 	case GPCMD_READ_DISC_INFO:
 	case GPCMD_READ_TRACK_RZONE_INFO:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[7] << 8) + cdb[8];
 		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6057,7 +6020,6 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case PERSISTENT_RESERVE_IN:
 	case PERSISTENT_RESERVE_OUT:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_emulate_cdb =
 			(T10_RES(su_dev)->res_type ==
 			 SPC3_PERSISTENT_RESERVATIONS) ?
@@ -6069,21 +6031,18 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case GPCMD_MECHANISM_STATUS:
 	case GPCMD_READ_DVD_STRUCTURE:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[8] << 8) + cdb[9];
 		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case READ_POSITION:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_POSITION_LEN;
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case 0xa4:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		if (TRANSPORT(dev)->get_device_type(dev) != TYPE_ROM) {
 			/* MAINTENANCE_OUT from SCC-2
 			 *
@@ -6108,7 +6067,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case INQUIRY:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[3] << 8) + cdb[4];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6121,14 +6079,12 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_BUFFER:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_CAPACITY:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = READ_CAP_LEN;
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6137,7 +6093,6 @@ static int transport_generic_cmd_sequencer(
 	case READ_MEDIA_SERIAL_NUMBER:
 	case SECURITY_PROTOCOL_IN:
 	case SECURITY_PROTOCOL_OUT:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6150,7 +6105,6 @@ static int transport_generic_cmd_sequencer(
 	case READ_ATTRIBUTE:
 	case RECEIVE_COPY_RESULTS:
 	case WRITE_ATTRIBUTE:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[10] << 24) | (cdb[11] << 16) |
 		       (cdb[12] << 8) | cdb[13];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
@@ -6159,7 +6113,6 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case RECEIVE_DIAGNOSTIC:
 	case SEND_DIAGNOSTIC:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[3] << 8) | cdb[4];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6168,7 +6121,6 @@ static int transport_generic_cmd_sequencer(
 /* #warning FIXME: Figure out correct GPCMD_READ_CD blocksize. */
 #if 0
 	case GPCMD_READ_CD:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		sectors = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		size = (2336 * sectors);
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
@@ -6177,28 +6129,24 @@ static int transport_generic_cmd_sequencer(
 		break;
 #endif
 	case READ_TOC:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[8];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case REQUEST_SENSE:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = cdb[4];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_ELEMENT_STATUS:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = 65536 * cdb[7] + 256 * cdb[8] + cdb[9];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case WRITE_BUFFER:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
 		transport_get_maps(cmd);
@@ -6215,7 +6163,6 @@ static int transport_generic_cmd_sequencer(
 		else
 			size = cmd->data_length;
 
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_none;
 		transport_get_maps(cmd);
@@ -6243,7 +6190,6 @@ static int transport_generic_cmd_sequencer(
 		else
 			size = cmd->data_length;
 
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_none;
 		transport_get_maps(cmd);
@@ -6255,7 +6201,6 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case SYNCHRONIZE_CACHE:
 	case 0x91: /* SYNCHRONIZE_CACHE_16: */
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_none;
 		transport_get_maps(cmd);
@@ -6292,7 +6237,6 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_INVALID_CDB_FIELD;
 		break;
 	case UNMAP:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_buf;
 		size = get_unaligned_be16(&cdb[7]);
@@ -6313,7 +6257,6 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case WRITE_SAME_16:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_buf;
 		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
@@ -6365,14 +6308,12 @@ static int transport_generic_cmd_sequencer(
 	case VERIFY:
 	case WRITE_FILEMARKS:
 	case MOVE_MEDIUM:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_allocate_resources =
 				&transport_generic_allocate_none;
 		transport_get_maps(cmd);
 		ret = TGCS_NON_DATA_CDB;
 		break;
 	case REPORT_LUNS:
-		SET_GENERIC_TRANSPORT_FUNCTIONS(cmd);
 		cmd->transport_emulate_cdb =
 				&transport_core_report_lun_response;
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
@@ -7258,23 +7199,6 @@ non_scsi_data:
 	return 0;
 }
 
-/*	transport_generic_do_transform():
- *
- *
- */
-int transport_generic_do_transform(struct se_cmd *cmd, struct se_transform_info *ti)
-{
-	if (!(cmd->transport_cdb_transform)) {
-		dump_stack();
-		return -1;
-	}
-	
-	if (cmd->transport_cdb_transform(cmd, ti) < 0)
-		return -1;
-
-	return 0;
-}
-
 static inline long long transport_dev_end_lba(struct se_device *dev)
 {
 	return dev->dev_sectors_total + 1;
@@ -7306,7 +7230,7 @@ int transport_get_sectors(struct se_cmd *cmd)
 	return 0;
 }
 
-int transport_new_cmd_obj(
+static int transport_new_cmd_obj(
 	struct se_cmd *cmd,
 	struct se_transform_info *ti,
 	int post_execute)
@@ -7365,7 +7289,6 @@ int transport_new_cmd_obj(
 #endif
 	}
 
-	cmd->transport_do_transform = &transport_generic_do_transform;
 	if (!post_execute) {
 		atomic_set(&T_TASK(cmd)->t_task_cdbs_left, task_cdbs);
 		atomic_set(&T_TASK(cmd)->t_task_cdbs_ex_left, task_cdbs);
@@ -8016,12 +7939,7 @@ u32 transport_generic_get_cdb_count(
 			CMD_TFO(cmd)->get_task_tag(cmd), lba, sectors,
 			transport_dev_end_lba(dev));
 
-		if (!(cmd->transport_get_task)) {
-			dump_stack();
-			goto out;
-		}
-
-		task = cmd->transport_get_task(ti, cmd, dev, data_direction);
+		task = transport_generic_get_task(ti, cmd, dev, data_direction);
 		if (!(task))
 			goto out;
 
@@ -8158,21 +8076,27 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 			}
 		}
 	}
-	/*
-	 * This is dependent upon the storage processing algorithm.
-	 */
-	if (cmd->transport_do_transform(cmd, &ti) < 0) {
+
+	if (!(cmd->transport_cdb_transform)) {
+		dump_stack();
 		ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
 		goto failure;
 	}
+
+	if (cmd->transport_cdb_transform(cmd, &ti) < 0) {
+		ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
+		goto failure;
+	}
+
 	/*
 	 * Set the correct (usually DMAable) buffer pointers from the master
 	 * buffer list in struct se_cmd to the transport task's native
 	 * buffers format.
 	 */
-	ret = cmd->transport_map_buffers_to_tasks(cmd);
+	ret = transport_generic_map_buffers_to_tasks(cmd);
 	if (ret < 0)
 		goto failure;
+
 	/*
 	 * For WRITEs, let the iSCSI Target RX Thread know its buffer is ready..
 	 * This WRITE struct se_cmd (and all of its associated struct se_task's)

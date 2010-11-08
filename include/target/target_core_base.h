@@ -608,25 +608,16 @@ struct se_cmd {
 	struct se_transport_task *t_task;
 	struct se_transport_task t_task_backstore;
 	struct target_core_fabric_ops *se_tfo;
-	int (*transport_add_cmd_to_queue)(struct se_cmd *, int);
 	int (*transport_allocate_resources)(struct se_cmd *, u32, u32);
 	int (*transport_cdb_transform)(struct se_cmd *,
-					struct se_transform_info *);
-	int (*transport_do_transform)(struct se_cmd *,
 					struct se_transform_info *);
 	int (*transport_emulate_cdb)(struct se_cmd *);
 	void (*transport_free_resources)(struct se_cmd *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	struct se_task *(*transport_get_task)(struct se_transform_info *,
-					struct se_cmd *, void *,
-					enum dma_data_direction);
-	int (*transport_map_buffers_to_tasks)(struct se_cmd *);
 	void (*transport_map_SG_segments)(struct se_unmap_sg *);
 	void (*transport_passthrough_done)(struct se_cmd *);
 	void (*transport_unmap_SG_segments)(struct se_unmap_sg *);
-	int (*transport_set_iovec_ptrs)(struct se_map_sg *,
-					struct se_unmap_sg *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
 	void (*transport_complete_callback)(struct se_cmd *);

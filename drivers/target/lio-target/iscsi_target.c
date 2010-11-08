@@ -1944,7 +1944,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 
@@ -1989,8 +1989,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		map_sg.data_length = hdr->length;
 		map_sg.data_offset = hdr->offset;
 
-		if (SE_CMD(cmd)->transport_set_iovec_ptrs(
-					&map_sg, &unmap_sg) < 0)
+		if (transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return -1;
 
 		crypto_hash_init(&conn->conn_rx_hash);
@@ -2971,7 +2970,7 @@ static int iscsi_handle_immediate_data(
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg);
 	if (iov_ret < 0)
 		return IMMEDIDATE_DATA_CANNOT_RECOVER;
 
@@ -3019,8 +3018,7 @@ static int iscsi_handle_immediate_data(
 		map_sg.data_length = length;
 		map_sg.data_offset = cmd->write_data_done;
 
-		if (SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg,
-					&unmap_sg) < 0)
+		if (transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return IMMEDIDATE_DATA_CANNOT_RECOVER;
 
 		crypto_hash_init(&conn->conn_rx_hash);
@@ -3454,7 +3452,7 @@ static inline int iscsi_send_data_in(
 	map_sg.data_length = datain.length;
 	map_sg.data_offset = datain.offset;
 
-	iov_ret = SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg, unmap_sg);
+	iov_ret = transport_generic_set_iovec_ptrs(&map_sg, unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 

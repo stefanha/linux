@@ -122,11 +122,8 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 				se_cmd->scsi_sense_reason, 0);
 		return 0;
 	}
-	/*
-	 * Make early call to setup se_cmd->transport_add_cmd_to_queue() pointer
-	 */
-	transport_device_setup_cmd(se_cmd);
 
+	transport_device_setup_cmd(se_cmd);
 	return se_cmd;
 }
 
@@ -353,7 +350,7 @@ static int tcm_loop_queuecommand(
 	/*
 	 * Queue up the newly allocated to be processed in TCM thread context.
 	*/
-	se_cmd->transport_add_cmd_to_queue(se_cmd, TRANSPORT_NEW_CMD_MAP);
+	transport_add_cmd_to_queue(se_cmd, TRANSPORT_NEW_CMD_MAP);
 	/*
 	 * Reaquire the the struct scsi_host->host_lock before returning
 	 */
