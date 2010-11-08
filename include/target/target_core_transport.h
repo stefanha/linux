@@ -221,16 +221,6 @@ extern void transport_stop_task_timer(struct se_task *);
 extern void transport_stop_all_task_timers(struct se_cmd *);
 extern int transport_execute_tasks(struct se_cmd *);
 extern unsigned char transport_asciihex_to_binaryhex(unsigned char val[2]);
-extern int transport_generic_emulate_inquiry(struct se_cmd *, unsigned char,
-					unsigned char *, unsigned char *);
-extern int transport_generic_emulate_readcapacity(struct se_cmd *, u32);
-extern int transport_generic_emulate_readcapacity_16(struct se_cmd *,
-							unsigned long long);
-extern int transport_generic_emulate_modesense(struct se_cmd *,
-						unsigned char *,
-						unsigned char *, int, int);
-extern int transport_generic_emulate_request_sense(struct se_cmd *,
-						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd *);
 extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32, void *);
