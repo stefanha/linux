@@ -209,6 +209,7 @@ static int transport_generic_write_pending(struct se_cmd *);
 static int transport_processing_thread(void *);
 static int transport_new_cmd_obj(struct se_cmd *cmd,
 		struct se_transform_info *ti, int post_execute);
+static int transport_emulate_control_cdb(struct se_task *task);
 
 static char *transport_passthrough_get_fabric_name(void)
 {
@@ -5462,7 +5463,7 @@ static int transport_generic_write_same(struct se_task *task)
  * Used by TCM subsystem plugins IBLOCK, FILEIO, and RAMDISK as a
  * generic non SCF_SCSI_DATA_SG_IO_CDB ops.
  */
-int transport_emulate_control_cdb(struct se_task *task)
+static int transport_emulate_control_cdb(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_device *dev = SE_DEV(cmd);

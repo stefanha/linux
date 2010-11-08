@@ -972,9 +972,6 @@ static int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
  */
 static int rd_DIRECT_do_task(struct se_task *task)
 {
-	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return transport_emulate_control_cdb(task);
-
 	/*
 	 * At this point the locally allocated RD tables have been mapped
 	 * to struct se_mem elements in rd_DIRECT_do_se_mem_map().
