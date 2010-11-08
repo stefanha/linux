@@ -503,8 +503,6 @@ void transport_init_queue_obj(struct se_queue_obj *qobj)
 	atomic_set(&qobj->queue_cnt, 0);
 	INIT_LIST_HEAD(&qobj->qobj_list);
 	init_waitqueue_head(&qobj->thread_wq);
-	init_completion(&qobj->thread_create_comp);
-	init_completion(&qobj->thread_done_comp);
 	spin_lock_init(&qobj->cmd_queue_lock);
 }
 EXPORT_SYMBOL(transport_init_queue_obj);
@@ -2296,11 +2294,18 @@ struct se_device *transport_add_device_to_core_hba(
 	 */
 	if (core_setup_alua(dev, force_pt) < 0)
 		goto out;
+
 	/*
 	 * Startup the struct se_device processing thread
 	 */
-	if (transport_generic_activate_device(dev) < 0)
+	dev->process_thread = kthread_run(transport_processing_thread, dev,
+					  "LIO_%s", TRANSPORT(dev)->name);
+	if (IS_ERR(dev->process_thread)) {
+		printk(KERN_ERR "Unable to create kthread: LIO_%s\n",
+			TRANSPORT(dev)->name);
 		goto out;
+	}
+
 	/*
 	 * Preload the initial INQUIRY const values if we are doing
 	 * anything virtual (IBLOCK, FILEIO, RAMDISK), but not for TCM/pSCSI
@@ -2352,10 +2357,7 @@ struct se_device *transport_add_device_to_core_hba(
 out:
 	if (!ret)
 		return dev;
-	/*
-	 * Release newly allocated state for struct se_device
-	 */
-	transport_generic_deactivate_device(dev);
+	kthread_stop(dev->process_thread);
 
 	spin_lock(&hba->device_lock);
 	list_del(&dev->dev_list);
@@ -2372,46 +2374,6 @@ out:
 }
 EXPORT_SYMBOL(transport_add_device_to_core_hba);
 
-/*	transport_generic_activate_device():
- *
- *
- */
-int transport_generic_activate_device(struct se_device *dev)
-{
-	char name[16];
-
-	if (TRANSPORT(dev)->activate_device)
-		TRANSPORT(dev)->activate_device(dev);
-
-	memset(name, 0, 16);
-	snprintf(name, 16, "LIO_%s", TRANSPORT(dev)->name);
-
-	dev->process_thread = kthread_run(transport_processing_thread,
-			(void *)dev, name);
-	if (IS_ERR(dev->process_thread)) {
-		printk(KERN_ERR "Unable to create kthread: %s\n", name);
-		return -1;
-	}
-
-	wait_for_completion(&dev->dev_queue_obj->thread_create_comp);
-
-	return 0;
-}
-
-/*	transport_generic_deactivate_device():
- *
- *
- */
-void transport_generic_deactivate_device(struct se_device *dev)
-{
-	if (TRANSPORT(dev)->deactivate_device)
-		TRANSPORT(dev)->deactivate_device(dev);
-
-	kthread_stop(dev->process_thread);
-
-	wait_for_completion(&dev->dev_queue_obj->thread_done_comp);
-}
-
 /*	transport_generic_free_device():
  *
  *
@@ -2421,7 +2383,7 @@ void transport_generic_free_device(struct se_device *dev)
 	if (!(dev->dev_ptr))
 		return;
 
-	transport_generic_deactivate_device(dev);
+	kthread_stop(dev->process_thread);
 
 	if (TRANSPORT(dev)->free_device)
 		TRANSPORT(dev)->free_device(dev->dev_ptr);
@@ -9098,8 +9060,6 @@ static int transport_processing_thread(void *param)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	complete(&dev->dev_queue_obj->thread_create_comp);
-
 	while (!(kthread_should_stop())) {
 		ret = wait_event_interruptible(dev->dev_queue_obj->thread_wq,
 				atomic_read(&dev->dev_queue_obj->queue_cnt) ||
@@ -9187,6 +9147,5 @@ get_cmd:
 out:
 	transport_release_all_cmds(dev);
 	dev->process_thread = NULL;
-	complete(&dev->dev_queue_obj->thread_done_comp);
 	return 0;
 }

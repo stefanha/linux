@@ -266,38 +266,6 @@ fail:
 	return NULL;
 }
 
-/*	fd_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_activate_device(struct se_device *dev)
-{
-	struct fd_dev *fd_dev = dev->dev_ptr;
-	struct fd_host *fd_host = fd_dev->fd_host;
-
-	printk(KERN_INFO "CORE_FILE[%u] - Activating Device with TCQ: %d at"
-		" FILEIO Device ID: %d\n", fd_host->fd_host_id,
-		fd_dev->fd_queue_depth, fd_dev->fd_dev_id);
-
-	return 0;
-}
-
-/*	fd_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void fd_deactivate_device(struct se_device *dev)
-{
-	struct fd_dev *fd_dev = dev->dev_ptr;
-	struct fd_host *fd_host = fd_dev->fd_host;
-
-	printk(KERN_INFO "CORE_FILE[%u] - Deactivating Device with TCQ: %d at"
-		" FILEIO Device ID: %d\n", fd_host->fd_host_id,
-		fd_dev->fd_queue_depth, fd_dev->fd_dev_id);
-
-	return;
-}
-
 /*	fd_free_device(): (Part of se_subsystem_api_t template)
  *
  *
@@ -997,8 +965,6 @@ static struct se_subsystem_api fileio_template = {
 	.cdb_write_SG		= fd_CDB_write_SG,
 	.allocate_virtdevice	= fd_allocate_virtdevice,
 	.create_virtdevice	= fd_create_virtdevice,
-	.activate_device	= fd_activate_device,
-	.deactivate_device	= fd_deactivate_device,
 	.free_device		= fd_free_device,
 	.dpo_emulated		= fd_emulated_dpo,
 	.fua_write_emulated	= fd_emulated_fua_write,

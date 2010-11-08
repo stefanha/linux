@@ -314,40 +314,6 @@ static struct se_device *stgt_create_virtdevice(
 	return NULL;
 }
 
-/*	stgt_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int stgt_activate_device(struct se_device *dev)
-{
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
-	struct scsi_device *sd = sdv->sdv_sd;
-	struct Scsi_Host *sh = sd->host;
-
-	printk(KERN_INFO "CORE_STGT[%d] - Activating %s Device with TCQ: %d at"
-		" SCSI Location (Channel/Target/LUN) %d/%d/%d\n", sh->host_no,
-		(sdv->sdv_legacy) ? "Legacy" : "REQ",  sd->queue_depth,
-		sd->channel, sd->id, sd->lun);
-
-	return 0;
-}
-
-/*	stgt_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void stgt_deactivate_device(struct se_device *dev)
-{
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
-	struct scsi_device *sd = sdv->sdv_sd;
-	struct Scsi_Host *sh = sd->host;
-
-	printk(KERN_INFO "CORE_STGT[%d] - Deactivating %s Device with TCQ: %d"
-		" at SCSI Location (Channel/Target/LUN) %d/%d/%d\n",
-		sh->host_no, (sdv->sdv_legacy) ? "Legacy" : "REQ",
-		sd->queue_depth, sd->channel, sd->id, sd->lun);
-}
-
 /*	stgt_free_device(): (Part of se_subsystem_api_t template)
  *
  *
@@ -877,8 +843,6 @@ static struct se_subsystem_api stgt_template = {
 	.cdb_write_SG		= stgt_CDB_write_SG,
 	.attach_hba		= stgt_attach_hba,
 	.detach_hba		= stgt_detach_hba,
-	.activate_device	= stgt_activate_device,
-	.deactivate_device	= stgt_deactivate_device,
 	.allocate_virtdevice	= stgt_allocate_virtdevice,
 	.create_virtdevice	= stgt_create_virtdevice,
 	.free_device		= stgt_free_device,

@@ -247,36 +247,6 @@ failed:
 	return NULL;
 }
 
-/*	iblock_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int iblock_activate_device(struct se_device *dev)
-{
-	struct iblock_dev *ib_dev = dev->dev_ptr;
-	struct iblock_hba *ib_hba = ib_dev->ibd_host;
-
-	printk(KERN_INFO "CORE_iBLOCK[%u] - Activating Device with TCQ: %d at"
-		" Major: %d Minor %d\n", ib_hba->iblock_host_id,
-		ib_dev->ibd_depth, ib_dev->ibd_major, ib_dev->ibd_minor);
-
-	return 0;
-}
-
-/*	iblock_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void iblock_deactivate_device(struct se_device *dev)
-{
-	struct iblock_dev *ib_dev = dev->dev_ptr;
-	struct iblock_hba *ib_hba = ib_dev->ibd_host;
-
-	printk(KERN_INFO "CORE_iBLOCK[%u] - Deactivating Device with TCQ: %d"
-		" at Major: %d Minor %d\n", ib_hba->iblock_host_id,
-		ib_dev->ibd_depth, ib_dev->ibd_major, ib_dev->ibd_minor);
-}
-
 static void iblock_free_device(void *p)
 {
 	struct iblock_dev *ib_dev = p;
@@ -963,8 +933,6 @@ static struct se_subsystem_api iblock_template = {
 	.detach_hba		= iblock_detach_hba,
 	.allocate_virtdevice	= iblock_allocate_virtdevice,
 	.create_virtdevice	= iblock_create_virtdevice,
-	.activate_device	= iblock_activate_device,
-	.deactivate_device	= iblock_deactivate_device,
 	.free_device		= iblock_free_device,
 	.dpo_emulated		= iblock_emulated_dpo,
 	.fua_write_emulated	= iblock_emulated_fua_write,

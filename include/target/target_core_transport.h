@@ -191,8 +191,6 @@ extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_dev *, u32,
 					void *, struct se_dev_limits *,
 					const char *, const char *);
-extern int transport_generic_activate_device(struct se_device *);
-extern void transport_generic_deactivate_device(struct se_device *);
 extern void transport_generic_free_device(struct se_device *);
 extern int transport_generic_allocate_iovecs(struct se_cmd *);
 extern void transport_device_setup_cmd(struct se_cmd *);
@@ -382,14 +380,6 @@ struct se_subsystem_api {
 	 */
 	struct se_device *(*create_virtdevice)(struct se_hba *,
 				struct se_subsystem_dev *, void *);
-	/*
-	 * activate_device():
-	 */
-	int (*activate_device)(struct se_device *);
-	/*
-	 * deactivate_device():
-	 */
-	void (*deactivate_device)(struct se_device *);
 	/*
 	 * free_device():
 	 */

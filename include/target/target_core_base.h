@@ -415,8 +415,6 @@ struct se_queue_obj {
 	spinlock_t		cmd_queue_lock;
 	struct list_head	qobj_list;
 	wait_queue_head_t	thread_wq;
-	struct completion	thread_create_comp;
-	struct completion	thread_done_comp;
 } ____cacheline_aligned;
 
 /*

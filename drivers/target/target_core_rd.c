@@ -330,36 +330,6 @@ static struct se_device *rd_MEMCPY_create_virtdevice(
 	return rd_create_virtdevice(hba, se_dev, p, 0);
 }
 
-/*	rd_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_activate_device(struct se_device *dev)
-{
-	struct rd_dev *rd_dev = dev->dev_ptr;
-	struct rd_host *rd_host = rd_dev->rd_host;
-
-	printk(KERN_INFO "CORE_RD[%u] - Activating Device with TCQ: %d at"
-		" Ramdisk Device ID: %d\n", rd_host->rd_host_id,
-		rd_dev->rd_queue_depth, rd_dev->rd_dev_id);
-
-	return 0;
-}
-
-/*	rd_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void rd_deactivate_device(struct se_device *dev)
-{
-	struct rd_dev *rd_dev = dev->dev_ptr;
-	struct rd_host *rd_host = rd_dev->rd_host;
-
-	printk(KERN_INFO "CORE_RD[%u] - Deactivating Device with TCQ: %d at"
-		" Ramdisk Device ID: %d\n", rd_host->rd_host_id,
-		rd_dev->rd_queue_depth, rd_dev->rd_dev_id);
-}
-
 /*	rd_free_device(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1323,8 +1293,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
 	.create_virtdevice	= rd_DIRECT_create_virtdevice,
-	.activate_device	= rd_activate_device,
-	.deactivate_device	= rd_deactivate_device,
 	.free_device		= rd_free_device,
 	.transport_complete	= rd_transport_complete,
 	.allocate_DMA		= rd_DIRECT_allocate_DMA,
@@ -1363,8 +1331,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
 	.create_virtdevice	= rd_MEMCPY_create_virtdevice,
-	.activate_device	= rd_activate_device,
-	.deactivate_device	= rd_deactivate_device,
 	.free_device		= rd_free_device,
 	.transport_complete	= rd_transport_complete,
 	.allocate_request	= rd_allocate_request,

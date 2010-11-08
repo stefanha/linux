@@ -654,8 +654,6 @@ int ft_thread(void *arg)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	complete(&qobj->thread_create_comp);
-
 	while (!(kthread_should_stop())) {
 		ret = wait_event_interruptible(qobj->thread_wq,
 			atomic_read(&qobj->queue_cnt) || kthread_should_stop());
@@ -667,6 +665,5 @@ int ft_thread(void *arg)
 	}
 
 out:
-	complete(&qobj->thread_done_comp);
 	return 0;
 }
