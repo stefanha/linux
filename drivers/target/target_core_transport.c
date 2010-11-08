@@ -9053,14 +9053,9 @@ static int transport_processing_thread(void *param)
 	struct se_device *dev = (struct se_device *) param;
 	struct se_queue_req *qr;
 
-	current->policy = SCHED_NORMAL;
 	set_user_nice(current, -20);
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
 
-	while (!(kthread_should_stop())) {
+	while (!kthread_should_stop()) {
 		ret = wait_event_interruptible(dev->dev_queue_obj->thread_wq,
 				atomic_read(&dev->dev_queue_obj->queue_cnt) ||
 				kthread_should_stop());
