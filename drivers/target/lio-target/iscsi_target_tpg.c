@@ -226,8 +226,8 @@ struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 
 	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
 	INIT_LIST_HEAD(&tpg->g_tpg_list);
 	INIT_LIST_HEAD(&tpg->tpg_list);
-	init_MUTEX(&tpg->tpg_access_sem);
-	init_MUTEX(&tpg->np_login_sem);
+	sema_init(&tpg->tpg_access_sem, 1);
+	sema_init(&tpg->np_login_sem, 1);
 	spin_lock_init(&tpg->tpg_state_lock);
 	spin_lock_init(&tpg->tpg_np_lock);
 

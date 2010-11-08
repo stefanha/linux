@@ -256,8 +256,8 @@ struct iscsi_cmd *iscsi_allocate_cmd(struct iscsi_conn *conn)
 	INIT_LIST_HEAD(&cmd->i_list);
 	INIT_LIST_HEAD(&cmd->datain_list);
 	INIT_LIST_HEAD(&cmd->cmd_r2t_list);
-	init_MUTEX_LOCKED(&cmd->reject_sem);
-	init_MUTEX_LOCKED(&cmd->unsolicited_data_sem);
+	sema_init(&cmd->reject_sem, 0);
+	sema_init(&cmd->unsolicited_data_sem, 0);
 	spin_lock_init(&cmd->datain_lock);
 	spin_lock_init(&cmd->dataout_timeout_lock);
 	spin_lock_init(&cmd->istate_lock);

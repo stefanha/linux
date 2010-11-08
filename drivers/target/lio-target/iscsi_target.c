@@ -638,10 +638,10 @@ struct iscsi_np *core_add_np(
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
 	spin_lock_init(&np->np_ex_lock);
-	init_MUTEX_LOCKED(&np->np_done_sem);
-	init_MUTEX_LOCKED(&np->np_restart_sem);
-	init_MUTEX_LOCKED(&np->np_shutdown_sem);
-	init_MUTEX_LOCKED(&np->np_start_sem);
+	sema_init(&np->np_done_sem, 0);
+	sema_init(&np->np_restart_sem, 0);
+	sema_init(&np->np_shutdown_sem, 0);
+	sema_init(&np->np_start_sem, 0);
 	INIT_LIST_HEAD(&np->np_list);
 	INIT_LIST_HEAD(&np->np_nex_list);
 
@@ -811,8 +811,8 @@ void core_release_nps(void)
 static int init_iscsi_global(struct iscsi_global *global)
 {
 	memset(global, 0, sizeof(struct iscsi_global));
-	init_MUTEX(&global->auth_sem);
-	init_MUTEX(&global->auth_id_sem);
+	sema_init(&global->auth_sem, 1);
+	sema_init(&global->auth_id_sem, 1);
 	spin_lock_init(&global->active_ts_lock);
 	spin_lock_init(&global->check_thread_lock);
 	spin_lock_init(&global->discovery_lock);
