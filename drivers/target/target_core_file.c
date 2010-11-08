@@ -953,9 +953,9 @@ static sector_t fd_get_blocks(struct se_device *dev)
 
 static struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
+	.owner			= THIS_MODULE,
 	.type			= FILEIO,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.external_submod	= 1,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
 	.cdb_none		= fd_CDB_none,
@@ -973,7 +973,6 @@ static struct se_subsystem_api fileio_template = {
 	.transport_complete	= fd_transport_complete,
 	.allocate_request	= fd_allocate_request,
 	.do_task		= fd_do_task,
-	.do_discard		= NULL,
 	.do_sync_cache		= fd_emulate_sync_cache,
 	.free_task		= fd_free_task,
 	.check_configfs_dev_params = fd_check_configfs_dev_params,
@@ -989,23 +988,14 @@ static struct se_subsystem_api fileio_template = {
 	.get_device_type	= fd_get_device_type,
 	.get_dma_length		= fd_get_dma_length,
 	.get_blocks		= fd_get_blocks,
-	.write_pending		= NULL,
 };
 
-int __init fileio_module_init(void)
+static int __init fileio_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&fileio_template.sub_api_list);
-
-	ret = transport_subsystem_register(&fileio_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&fileio_template);
 }
 
-void fileio_module_exit(void)
+static void fileio_module_exit(void)
 {
 	transport_subsystem_release(&fileio_template);
 }

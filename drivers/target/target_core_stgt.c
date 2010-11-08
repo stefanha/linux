@@ -833,9 +833,9 @@ static int stgt_transfer_response(struct scsi_cmnd *sc,
 
 static struct se_subsystem_api stgt_template = {
 	.name			= "stgt",
+	.owner			= THIS_MODULE,
 	.type			= STGT,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.external_submod	= 1,
 	.cdb_none		= stgt_CDB_none,
 	.cdb_read_non_SG	= stgt_CDB_read_non_SG,
 	.cdb_read_SG		= stgt_CDB_read_SG,
@@ -865,23 +865,14 @@ static struct se_subsystem_api stgt_template = {
 	.get_device_rev		= stgt_get_device_rev,
 	.get_device_type	= stgt_get_device_type,
 	.get_dma_length		= stgt_get_dma_length,
-	.write_pending		= NULL,
 };
 
-int __init stgt_module_init(void)
+static int __init stgt_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&stgt_template.sub_api_list);
-
-	ret = transport_subsystem_register(&stgt_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&stgt_template);
 }
 
-void stgt_module_exit(void)
+static void stgt_module_exit(void)
 {
 	transport_subsystem_release(&stgt_template);
 }

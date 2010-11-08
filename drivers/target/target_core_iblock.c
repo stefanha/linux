@@ -921,9 +921,9 @@ static void iblock_bio_done(struct bio *bio, int err)
 
 static struct se_subsystem_api iblock_template = {
 	.name			= "iblock",
+	.owner			= THIS_MODULE,
 	.type			= IBLOCK,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.external_submod	= 1,
 	.cdb_none		= iblock_CDB_none,
 	.cdb_read_non_SG	= iblock_CDB_read_non_SG,
 	.cdb_read_SG		= iblock_CDB_read_SG,
@@ -957,23 +957,14 @@ static struct se_subsystem_api iblock_template = {
 	.get_device_type	= iblock_get_device_type,
 	.get_dma_length		= iblock_get_dma_length,
 	.get_blocks		= iblock_get_blocks,
-	.write_pending		= NULL,
 };
 
-int __init iblock_module_init(void)
+static int __init iblock_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&iblock_template.sub_api_list);
-
-	ret = transport_subsystem_register(&iblock_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&iblock_template);
 }
 
-void iblock_module_exit(void)
+static void iblock_module_exit(void)
 {
 	transport_subsystem_release(&iblock_template);
 }

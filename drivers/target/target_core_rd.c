@@ -1283,7 +1283,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
 	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
-	.external_submod	= 0,
 	.cdb_none		= rd_CDB_none,
 	.cdb_read_non_SG	= rd_CDB_read_non_SG,
 	.cdb_read_SG		= rd_CDB_read_SG,
@@ -1314,14 +1313,12 @@ static struct se_subsystem_api rd_dr_template = {
 	.get_dma_length		= rd_get_dma_length,
 	.get_blocks		= rd_get_blocks,
 	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
-	.write_pending		= NULL,
 };
 
 static struct se_subsystem_api rd_mcp_template = {
 	.name			= "rd_mcp",
 	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
-	.external_submod	= 0,
 	.cdb_none		= rd_CDB_none,
 	.cdb_read_non_SG	= rd_CDB_read_non_SG,
 	.cdb_read_SG		= rd_CDB_read_SG,
@@ -1348,21 +1345,17 @@ static struct se_subsystem_api rd_mcp_template = {
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
 	.get_dma_length		= rd_get_dma_length,
-	.write_pending		= NULL,
 };
 
 int __init rd_module_init(void)
 {
 	int ret;
 
-	INIT_LIST_HEAD(&rd_dr_template.sub_api_list);
-	INIT_LIST_HEAD(&rd_mcp_template.sub_api_list);
-
-	ret = transport_subsystem_register(&rd_dr_template, NULL);
+	ret = transport_subsystem_register(&rd_dr_template);
 	if (ret < 0)
 		return ret;
 
-	ret = transport_subsystem_register(&rd_mcp_template, NULL);
+	ret = transport_subsystem_register(&rd_mcp_template);
 	if (ret < 0) {
 		transport_subsystem_release(&rd_dr_template);
 		return ret;

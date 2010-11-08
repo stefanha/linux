@@ -1485,9 +1485,9 @@ static void pscsi_req_done(struct request *req, int uptodate)
 
 static struct se_subsystem_api pscsi_template = {
 	.name			= "pscsi",
+	.owner			= THIS_MODULE,
 	.type			= PSCSI,
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,
-	.external_submod	= 1,
 	.cdb_none		= pscsi_CDB_none,
 	.cdb_read_non_SG	= pscsi_CDB_read_non_SG,
 	.cdb_read_SG		= pscsi_CDB_read_SG,
@@ -1516,23 +1516,14 @@ static struct se_subsystem_api pscsi_template = {
 	.get_device_rev		= pscsi_get_device_rev,
 	.get_device_type	= pscsi_get_device_type,
 	.get_dma_length		= pscsi_get_dma_length,
-	.write_pending		= NULL,
 };
 
-int __init pscsi_module_init(void)
+static int __init pscsi_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&pscsi_template.sub_api_list);
-
-	ret = transport_subsystem_register(&pscsi_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&pscsi_template);
 }
 
-void pscsi_module_exit(void)
+static void pscsi_module_exit(void)
 {
 	transport_subsystem_release(&pscsi_template);
 }
