@@ -190,7 +190,6 @@ extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_dev *, u32,
 					void *, struct se_dev_limits *,
 					const char *, const char *);
-extern void transport_generic_free_device(struct se_device *);
 extern int transport_generic_allocate_iovecs(struct se_cmd *);
 extern void transport_device_setup_cmd(struct se_cmd *);
 extern int transport_check_alloc_task_attr(struct se_cmd *);

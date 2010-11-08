@@ -2367,22 +2367,6 @@ out:
 }
 EXPORT_SYMBOL(transport_add_device_to_core_hba);
 
-/*	transport_generic_free_device():
- *
- *
- */
-void transport_generic_free_device(struct se_device *dev)
-{
-	if (!(dev->dev_ptr))
-		return;
-
-	kthread_stop(dev->process_thread);
-
-	if (TRANSPORT(dev)->free_device)
-		TRANSPORT(dev)->free_device(dev->dev_ptr);
-}
-EXPORT_SYMBOL(transport_generic_free_device);
-
 static inline int transport_allocate_iovecs_for_cmd(
 	struct se_cmd *cmd,
 	u32 iov_count)

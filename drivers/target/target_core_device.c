@@ -34,6 +34,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/kthread.h>
 #include <linux/in.h>
 #include <net/sock.h>
 #include <net/tcp.h>
@@ -733,7 +734,11 @@ void se_release_device_for_hba(struct se_device *dev)
 	    (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_DEACTIVATED))
 		se_dev_stop(dev);
 
-	transport_generic_free_device(dev);
+	if (dev->dev_ptr) {
+		kthread_stop(dev->process_thread);
+		if (dev->transport->free_device)
+			dev->transport->free_device(dev->dev_ptr);
+	}
 
 	spin_lock(&hba->device_lock);
 	list_del(&dev->dev_list);
