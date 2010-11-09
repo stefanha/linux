@@ -1057,7 +1057,7 @@ static int __pscsi_map_task_SG(
 	u32 data_len = task->task_size, i, len, bytes, off;
 	int nr_pages = (task->task_size + task_sg[0].offset +
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
-	int nr_vecs = 0, ret = 0;
+	int nr_vecs = 0, rc, ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
 	int rw = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
 
 	if (!task->task_size)
@@ -1119,9 +1119,9 @@ static int __pscsi_map_task_SG(
 				" bio: %p page: %p len: %d off: %d\n", i, bio,
 				page, len, off);
 
-			ret = bio_add_pc_page(pdv->pdv_sd->request_queue,
+			rc = bio_add_pc_page(pdv->pdv_sd->request_queue,
 					bio, page, bytes, off);
-			if (ret != bytes)
+			if (rc != bytes)
 				goto fail;
 
 			DEBUG_PSCSI("PSCSI: bio->bi_vcnt: %d nr_vecs: %d\n",
