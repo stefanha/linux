@@ -9,9 +9,6 @@
 #define INQUIRY_DATA_SIZE	0x24
 #endif
 
-/* Maximum extended CDB size for handling OSD passthrough */
-#define PSCSI_MAX_CDB_SIZE	240
-
 /* used in pscsi_add_device_to_list() */
 #define PSCSI_DEFAULT_QUEUEDEPTH	1
 

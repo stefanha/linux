@@ -2777,7 +2777,7 @@ void transport_free_se_cmd(
 	/*
 	 * Check and free any extended CDB buffer that was allocated
 	 */
-	if (se_cmd->se_cmd_flags & SCF_ECDB_ALLOCATION)
+	if (T_TASK(se_cmd)->t_task_cdb != T_TASK(se_cmd)->__t_task_cdb)
 		kfree(T_TASK(se_cmd)->t_task_cdb);
 	/*
 	 * Release any optional TCM fabric dependent iovecs allocated by
@@ -2823,20 +2823,29 @@ int transport_generic_allocate_tasks(
 	if (non_data_cdb < 0)
 		return -1;
 	/*
+	 * Ensure that the received CDB is less than the max (252 + 8) bytes
+	 * for VARIABLE_LENGTH_CMD
+	 */
+	if (scsi_command_size(cdb) > SCSI_MAX_VARLEN_CDB_SIZE) {
+		printk(KERN_ERR "Received SCSI CDB with command_size: %d that"
+			" exceeds SCSI_MAX_VARLEN_CDB_SIZE: %d\n",
+			scsi_command_size(cdb), SCSI_MAX_VARLEN_CDB_SIZE);
+		return -1;
+	}
+	/*
 	 * If the received CDB is larger than TCM_MAX_COMMAND_SIZE,
 	 * allocate the additional extended CDB buffer now..  Otherwise
 	 * setup the pointer from __t_task_cdb to t_task_cdb.
 	 */
-	if (scsi_command_size(cdb) > TCM_MAX_COMMAND_SIZE) {
+	if (scsi_command_size(cdb) > sizeof(T_TASK(cmd)->__t_task_cdb)) {
 		T_TASK(cmd)->t_task_cdb = kzalloc(scsi_command_size(cdb),
 						GFP_KERNEL);
 		if (!(T_TASK(cmd)->t_task_cdb)) {
 			printk(KERN_ERR "Unable to allocate T_TASK(cmd)->t_task_cdb"
-				" %u > TCM_MAX_COMMAND_SIZE ops\n",
-				scsi_command_size(cdb));
+				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %u ops\n",
+				scsi_command_size(cdb), sizeof(T_TASK(cmd)->__t_task_cdb));
 			return -1;
 		}
-		cmd->se_cmd_flags |= SCF_ECDB_ALLOCATION;
 	} else
 		T_TASK(cmd)->t_task_cdb = &T_TASK(cmd)->__t_task_cdb[0];
 	/*
@@ -4752,19 +4761,6 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case VARIABLE_LENGTH_CMD:
 		service_action = get_unaligned_be16(&cdb[8]);
-		/*
-		 * Check the additional CDB length (+ 8 bytes for header) does
-		 * not exceed our backsores ->max_cdb_len
-		 */
-		if (scsi_varlen_cdb_length(&cdb[0]) >
-				DEV_ATTRIB(dev)->max_cdb_len) {
-			printk(KERN_INFO "Only %u-byte extended CDBs currently"
-				" supported for VARIABLE_LENGTH_CMD backstore %s,"
-				" received: %d for service action: 0x%04x\n",
-				DEV_ATTRIB(dev)->max_cdb_len, TRANSPORT(dev)->name,
-				scsi_varlen_cdb_length(&cdb[0]), service_action);
-			return TGCS_INVALID_CDB_FIELD;
-		}
 		/*
 		 * Determine if this is TCM/PSCSI device and we should disable
 		 * internal emulation for this CDB.

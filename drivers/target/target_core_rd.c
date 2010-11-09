@@ -286,7 +286,6 @@ static struct se_device *rd_create_virtdevice(
 	dev_limits.limits.logical_block_size = RD_BLOCKSIZE;
 	dev_limits.limits.max_hw_sectors = RD_MAX_SECTORS;
 	dev_limits.limits.max_sectors = RD_MAX_SECTORS;
-	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
 	dev_limits.hw_queue_depth = RD_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = RD_DEVICE_QUEUE_DEPTH;
 

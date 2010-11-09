@@ -251,7 +251,6 @@ static struct se_device *pscsi_add_device_to_list(
 				  queue_max_hw_sectors(q) : sd->host->max_sectors; 
 	limits->max_sectors = (sd->host->max_sectors > queue_max_sectors(q)) ?
 				  queue_max_sectors(q) : sd->host->max_sectors;
-	dev_limits.max_cdb_len = PSCSI_MAX_CDB_SIZE;
 	dev_limits.hw_queue_depth = sd->queue_depth;
 	dev_limits.queue_depth = sd->queue_depth;
 	/*
@@ -711,17 +710,7 @@ static void *pscsi_allocate_request(
 	 * allocate the extended CDB buffer for per struct se_task context
 	 * pt->pscsi_cdb now.
 	 */
-	if (cmd->se_cmd_flags & SCF_ECDB_ALLOCATION) {
-		/*
-		 * PSCSI_MAX_CDB_SIZE is currently set to 240 bytes which
-		 * allows the largest OSD CDB sizes again.
-		 */
-		if (scsi_command_size(cdb) > PSCSI_MAX_CDB_SIZE) {
-			printk(KERN_ERR "pSCSI: Received CDB of size: %u larger"
-				" than PSCSI_MAX_CDB_SIZE: %u\n",
-				scsi_command_size(cdb), PSCSI_MAX_CDB_SIZE);
-			return NULL;
-		}
+	if (T_TASK(cmd)->t_task_cdb != T_TASK(cmd)->__t_task_cdb) {
 
 		pt->pscsi_cdb = kzalloc(scsi_command_size(cdb), GFP_KERNEL);
 		if (!(pt->pscsi_cdb)) {
@@ -827,11 +816,12 @@ static int pscsi_do_task(struct se_task *task)
 static void pscsi_free_task(struct se_task *task)
 {
 	struct pscsi_plugin_task *pt = task->transport_req;
+	struct se_cmd *cmd = task->task_se_cmd;
 	/*
 	 * Release the extended CDB allocation from pscsi_allocate_request()
 	 * if one exists.
 	 */
-	if (task->task_se_cmd->se_cmd_flags & SCF_ECDB_ALLOCATION)
+	if (T_TASK(cmd)->t_task_cdb != T_TASK(cmd)->__t_task_cdb)
 		kfree(pt->pscsi_cdb);
 	/*
 	 * We do not release the bio(s) here associated with this task, as

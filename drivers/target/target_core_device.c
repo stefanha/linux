@@ -924,10 +924,6 @@ void se_dev_set_default_attribs(
 	DEV_ATTRIB(dev)->unmap_granularity_alignment =
 				DA_UNMAP_GRANULARITY_ALIGNMENT_DEFAULT;
 	/*
-	 * max_cdb_len is based on subsystem plugin dependent requirements.
-	 */
-	DEV_ATTRIB(dev)->max_cdb_len = dev_limits->max_cdb_len;
-	/*
 	 * block_size is based on subsystem plugin dependent requirements.
 	 */
 	DEV_ATTRIB(dev)->hw_block_size = limits->logical_block_size;
