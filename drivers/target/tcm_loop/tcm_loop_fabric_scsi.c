@@ -350,7 +350,7 @@ static int tcm_loop_queuecommand(
 	/*
 	 * Queue up the newly allocated to be processed in TCM thread context.
 	*/
-	transport_add_cmd_to_queue(se_cmd, TRANSPORT_NEW_CMD_MAP);
+	transport_generic_handle_cdb_map(se_cmd);
 	/*
 	 * Reaquire the the struct scsi_host->host_lock before returning
 	 */

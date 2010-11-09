@@ -2943,14 +2943,15 @@ int transport_generic_allocate_tasks(
 }
 EXPORT_SYMBOL(transport_generic_allocate_tasks);
 
-/*	transport_generic_handle_cdb():
- *
- *
+/* 
+ * Used by fabric module frontends not defining a TFO->new_cmd_map()
+ * to queue up a newly setup se_cmd w/ TRANSPORT_NEW_CMD statis
  */
 int transport_generic_handle_cdb(
 	struct se_cmd *cmd)
 {
 	if (!SE_LUN(cmd)) {
+		dump_stack();
 		printk(KERN_ERR "SE_LUN(cmd) is NULL\n");
 		return -1;
 	}
@@ -2959,6 +2960,25 @@ int transport_generic_handle_cdb(
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_handle_cdb);
+
+/*
+ * Used by fabric module frontends defining a TFO->new_cmd_map() caller
+ * to  queue up a newly setup se_cmd w/ TRANSPORT_NEW_CMD_MAP in order to
+ * complete setup in TCM process context w/ TFO->new_cmd_map().
+ */
+int transport_generic_handle_cdb_map(
+	struct se_cmd *cmd)
+{
+	if (!SE_LUN(cmd)) {
+		dump_stack();
+		printk(KERN_ERR "SE_LUN(cmd) is NULL\n");
+		return -1;
+	}
+
+	transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD_MAP);
+	return 0;	
+}
+EXPORT_SYMBOL(transport_generic_handle_cdb_map);
 
 /*	transport_generic_handle_data():
  *

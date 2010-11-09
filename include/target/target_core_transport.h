@@ -203,6 +203,7 @@ extern void transport_init_se_cmd(struct se_cmd *,
 extern void transport_free_se_cmd(struct se_cmd *);
 extern int transport_generic_allocate_tasks(struct se_cmd *, unsigned char *);
 extern int transport_generic_handle_cdb(struct se_cmd *);
+extern int transport_generic_handle_cdb_map(struct se_cmd *);
 extern int transport_generic_handle_data(struct se_cmd *);
 extern int transport_generic_handle_tmr(struct se_cmd *);
 extern int transport_stop_tasks_for_cmd(struct se_cmd *);
