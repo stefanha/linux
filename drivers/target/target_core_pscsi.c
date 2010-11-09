@@ -41,6 +41,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_host.h>
+#include <scsi/libsas.h> /* For TASK_ATTR_* */
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
@@ -802,9 +803,12 @@ static int pscsi_do_task(struct se_task *task)
 	pt->pscsi_req->retries = PS_RETRY;
 	/*
 	 * Queue the struct request into the struct scsi_device->request_queue.
+	 * Also check for HEAD_OF_QUEUE SAM TASK attr from received se_cmd
+	 * descriptor
 	 */
-	blk_execute_rq_nowait(pdv->pdv_sd->request_queue, NULL,
-			      pt->pscsi_req, 1, pscsi_req_done);
+	blk_execute_rq_nowait(pdv->pdv_sd->request_queue, NULL, pt->pscsi_req,
+			(task->task_se_cmd->sam_task_attr == TASK_ATTR_HOQ),
+			pscsi_req_done);
 
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
