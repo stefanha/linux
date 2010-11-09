@@ -243,8 +243,8 @@ extern void transport_generic_complete_ok(struct se_cmd *);
 extern void transport_free_dev_tasks(struct se_cmd *);
 extern void transport_release_fe_cmd(struct se_cmd *);
 extern int transport_generic_remove(struct se_cmd *, int, int);
-extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, void *, u32,
-				void *, u32);
+extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *, u32,
+				struct scatterlist *, u32);
 extern int transport_lun_wait_for_tasks(struct se_cmd *, struct se_lun *);
 extern int transport_clear_lun_from_sessions(struct se_lun *);
 extern int transport_check_aborted_status(struct se_cmd *, int);
