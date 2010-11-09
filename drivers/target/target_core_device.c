@@ -34,6 +34,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/kthread.h>
 #include <linux/in.h>
 #include <net/sock.h>
 #include <net/tcp.h>
@@ -49,111 +50,6 @@
 #include "target_core_hba.h"
 #include "target_core_pr.h"
 #include "target_core_ua.h"
-
-struct block_device *__linux_blockdevice_claim(
-	int major,
-	int minor,
-	void *claim_ptr,
-	int *ret)
-{
-	dev_t dev;
-	struct block_device *bd;
-
-	dev = MKDEV(major, minor);
-
-	bd = bdget(dev);
-	if (!(bd)) {
-		*ret = -1;
-		return NULL;
-	}
-
-	if (blkdev_get(bd, FMODE_WRITE|FMODE_READ) < 0) {
-		*ret = -1;
-		return NULL;
-	}
-	/*
-	 * If no claim pointer was passed from claimee, use struct block_device.
-	 */
-	if (!claim_ptr)
-		claim_ptr = (void *)bd;
-
-	if (bd_claim(bd, claim_ptr) < 0) {
-		blkdev_put(bd, FMODE_WRITE|FMODE_READ);
-		*ret = 0;
-		return bd;
-	}
-
-	*ret = 1;
-	return bd;
-}
-
-struct block_device *linux_blockdevice_claim(
-	int major,
-	int minor,
-	void *claim_ptr)
-{
-	dev_t dev;
-	struct block_device *bd;
-
-	dev = MKDEV(major, minor);
-
-	bd = bdget(dev);
-	if (!(bd))
-		return NULL;
-
-	if (blkdev_get(bd, FMODE_WRITE|FMODE_READ) < 0)
-		return NULL;
-	/*
-	 * If no claim pointer was passed from claimee, use struct block_device.
-	 */
-	if (!claim_ptr)
-		claim_ptr = (void *)bd;
-
-	if (bd_claim(bd, claim_ptr) < 0) {
-		blkdev_put(bd, FMODE_WRITE|FMODE_READ);
-		return NULL;
-	}
-
-	return bd;
-}
-EXPORT_SYMBOL(linux_blockdevice_claim);
-
-int linux_blockdevice_release(int major, int minor, struct block_device *bd_p)
-{
-	dev_t dev;
-	struct block_device *bd;
-
-	if (!bd_p) {
-		dev = MKDEV(major, minor);
-
-		bd = bdget(dev);
-		if (!(bd))
-			return -1;
-	} else
-		bd = bd_p;
-
-	bd_release(bd);
-	blkdev_put(bd, FMODE_WRITE|FMODE_READ);
-
-	return 0;
-}
-EXPORT_SYMBOL(linux_blockdevice_release);
-
-int linux_blockdevice_check(int major, int minor)
-{
-	struct block_device *bd;
-
-	bd = linux_blockdevice_claim(major, minor, NULL);
-	if (!(bd))
-		return -1;
-	/*
-	 * Blockdevice was able to be claimed, now unclaim it and return success
-	 */
-	linux_blockdevice_release(major, minor, NULL);
-
-	return 0;
-}
-EXPORT_SYMBOL(linux_blockdevice_check);
 
 extern int __transport_get_lun_for_cmd(
 	struct se_cmd *se_cmd,
@@ -838,7 +734,11 @@ void se_release_device_for_hba(struct se_device *dev)
 	    (dev->dev_status & TRANSPORT_DEVICE_OFFLINE_DEACTIVATED))
 		se_dev_stop(dev);
 
-	transport_generic_free_device(dev);
+	if (dev->dev_ptr) {
+		kthread_stop(dev->process_thread);
+		if (dev->transport->free_device)
+			dev->transport->free_device(dev->dev_ptr);
+	}
 
 	spin_lock(&hba->device_lock);
 	list_del(&dev->dev_list);

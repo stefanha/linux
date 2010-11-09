@@ -330,36 +330,6 @@ static struct se_device *rd_MEMCPY_create_virtdevice(
 	return rd_create_virtdevice(hba, se_dev, p, 0);
 }
 
-/*	rd_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_activate_device(struct se_device *dev)
-{
-	struct rd_dev *rd_dev = dev->dev_ptr;
-	struct rd_host *rd_host = rd_dev->rd_host;
-
-	printk(KERN_INFO "CORE_RD[%u] - Activating Device with TCQ: %d at"
-		" Ramdisk Device ID: %d\n", rd_host->rd_host_id,
-		rd_dev->rd_queue_depth, rd_dev->rd_dev_id);
-
-	return 0;
-}
-
-/*	rd_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void rd_deactivate_device(struct se_device *dev)
-{
-	struct rd_dev *rd_dev = dev->dev_ptr;
-	struct rd_host *rd_host = rd_dev->rd_host;
-
-	printk(KERN_INFO "CORE_RD[%u] - Deactivating Device with TCQ: %d at"
-		" Ramdisk Device ID: %d\n", rd_host->rd_host_id,
-		rd_dev->rd_queue_depth, rd_dev->rd_dev_id);
-}
-
 /*	rd_free_device(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1002,9 +972,6 @@ static int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
  */
 static int rd_DIRECT_do_task(struct se_task *task)
 {
-	if (!(TASK_CMD(task)->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
-		return transport_emulate_control_cdb(task);
-
 	/*
 	 * At this point the locally allocated RD tables have been mapped
 	 * to struct se_mem elements in rd_DIRECT_do_se_mem_map().
@@ -1313,7 +1280,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
 	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
-	.external_submod	= 0,
 	.cdb_none		= rd_CDB_none,
 	.cdb_read_non_SG	= rd_CDB_read_non_SG,
 	.cdb_read_SG		= rd_CDB_read_SG,
@@ -1323,8 +1289,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
 	.create_virtdevice	= rd_DIRECT_create_virtdevice,
-	.activate_device	= rd_activate_device,
-	.deactivate_device	= rd_deactivate_device,
 	.free_device		= rd_free_device,
 	.transport_complete	= rd_transport_complete,
 	.allocate_DMA		= rd_DIRECT_allocate_DMA,
@@ -1346,14 +1310,12 @@ static struct se_subsystem_api rd_dr_template = {
 	.get_dma_length		= rd_get_dma_length,
 	.get_blocks		= rd_get_blocks,
 	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
-	.write_pending		= NULL,
 };
 
 static struct se_subsystem_api rd_mcp_template = {
 	.name			= "rd_mcp",
 	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
-	.external_submod	= 0,
 	.cdb_none		= rd_CDB_none,
 	.cdb_read_non_SG	= rd_CDB_read_non_SG,
 	.cdb_read_SG		= rd_CDB_read_SG,
@@ -1363,8 +1325,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
 	.create_virtdevice	= rd_MEMCPY_create_virtdevice,
-	.activate_device	= rd_activate_device,
-	.deactivate_device	= rd_deactivate_device,
 	.free_device		= rd_free_device,
 	.transport_complete	= rd_transport_complete,
 	.allocate_request	= rd_allocate_request,
@@ -1382,21 +1342,17 @@ static struct se_subsystem_api rd_mcp_template = {
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
 	.get_dma_length		= rd_get_dma_length,
-	.write_pending		= NULL,
 };
 
 int __init rd_module_init(void)
 {
 	int ret;
 
-	INIT_LIST_HEAD(&rd_dr_template.sub_api_list);
-	INIT_LIST_HEAD(&rd_mcp_template.sub_api_list);
-
-	ret = transport_subsystem_register(&rd_dr_template, NULL);
+	ret = transport_subsystem_register(&rd_dr_template);
 	if (ret < 0)
 		return ret;
 
-	ret = transport_subsystem_register(&rd_mcp_template, NULL);
+	ret = transport_subsystem_register(&rd_mcp_template);
 	if (ret < 0) {
 		transport_subsystem_release(&rd_dr_template);
 		return ret;

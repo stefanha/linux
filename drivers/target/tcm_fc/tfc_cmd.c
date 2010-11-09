@@ -678,14 +678,8 @@ int ft_thread(void *arg)
 	int ret;
 
 	set_user_nice(current, -20);
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
 
-	complete(&qobj->thread_create_comp);
-
-	while (!(kthread_should_stop())) {
+	while (!kthread_should_stop()) {
 		ret = wait_event_interruptible(qobj->thread_wq,
 			atomic_read(&qobj->queue_cnt) || kthread_should_stop());
 		if (ret < 0 || kthread_should_stop())
@@ -696,6 +690,5 @@ int ft_thread(void *arg)
 	}
 
 out:
-	complete(&qobj->thread_done_comp);
 	return 0;
 }

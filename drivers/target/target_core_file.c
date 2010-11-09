@@ -234,14 +234,7 @@ static struct se_device *fd_create_virtdevice(
 	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
 	dev_limits.hw_queue_depth = FD_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = FD_DEVICE_QUEUE_DEPTH;
-	/*
-	 * Pass dev_flags for linux_blockdevice_claim_bd or
-	 * linux_blockdevice_claim() from the usage above.
-	 *
-	 * Note that transport_add_device_to_core_hba() will call
-	 * linux_blockdevice_release() internally on failure to
-	 * call bd_release() on the referenced struct block_device.
-	 */
+
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
 				se_dev, dev_flags, (void *)fd_dev,
 				&dev_limits, "FILEIO", FD_VERSION);
@@ -264,38 +257,6 @@ fail:
 	}
 	putname(dev_p);
 	return NULL;
-}
-
-/*	fd_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_activate_device(struct se_device *dev)
-{
-	struct fd_dev *fd_dev = dev->dev_ptr;
-	struct fd_host *fd_host = fd_dev->fd_host;
-
-	printk(KERN_INFO "CORE_FILE[%u] - Activating Device with TCQ: %d at"
-		" FILEIO Device ID: %d\n", fd_host->fd_host_id,
-		fd_dev->fd_queue_depth, fd_dev->fd_dev_id);
-
-	return 0;
-}
-
-/*	fd_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void fd_deactivate_device(struct se_device *dev)
-{
-	struct fd_dev *fd_dev = dev->dev_ptr;
-	struct fd_host *fd_host = fd_dev->fd_host;
-
-	printk(KERN_INFO "CORE_FILE[%u] - Deactivating Device with TCQ: %d at"
-		" FILEIO Device ID: %d\n", fd_host->fd_host_id,
-		fd_dev->fd_queue_depth, fd_dev->fd_dev_id);
-
-	return;
 }
 
 /*	fd_free_device(): (Part of se_subsystem_api_t template)
@@ -985,9 +946,9 @@ static sector_t fd_get_blocks(struct se_device *dev)
 
 static struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
+	.owner			= THIS_MODULE,
 	.type			= FILEIO,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.external_submod	= 1,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
 	.cdb_none		= fd_CDB_none,
@@ -997,8 +958,6 @@ static struct se_subsystem_api fileio_template = {
 	.cdb_write_SG		= fd_CDB_write_SG,
 	.allocate_virtdevice	= fd_allocate_virtdevice,
 	.create_virtdevice	= fd_create_virtdevice,
-	.activate_device	= fd_activate_device,
-	.deactivate_device	= fd_deactivate_device,
 	.free_device		= fd_free_device,
 	.dpo_emulated		= fd_emulated_dpo,
 	.fua_write_emulated	= fd_emulated_fua_write,
@@ -1007,7 +966,6 @@ static struct se_subsystem_api fileio_template = {
 	.transport_complete	= fd_transport_complete,
 	.allocate_request	= fd_allocate_request,
 	.do_task		= fd_do_task,
-	.do_discard		= NULL,
 	.do_sync_cache		= fd_emulate_sync_cache,
 	.free_task		= fd_free_task,
 	.check_configfs_dev_params = fd_check_configfs_dev_params,
@@ -1023,23 +981,14 @@ static struct se_subsystem_api fileio_template = {
 	.get_device_type	= fd_get_device_type,
 	.get_dma_length		= fd_get_dma_length,
 	.get_blocks		= fd_get_blocks,
-	.write_pending		= NULL,
 };
 
-int __init fileio_module_init(void)
+static int __init fileio_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&fileio_template.sub_api_list);
-
-	ret = transport_subsystem_register(&fileio_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&fileio_template);
 }
 
-void fileio_module_exit(void)
+static void fileio_module_exit(void)
 {
 	transport_subsystem_release(&fileio_template);
 }

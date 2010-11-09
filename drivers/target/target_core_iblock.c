@@ -187,15 +187,7 @@ static struct se_device *iblock_create_virtdevice(
 	ib_dev->ibd_major = MAJOR(bd->bd_dev);
 	ib_dev->ibd_minor = MINOR(bd->bd_dev);
 	ib_dev->ibd_bd = bd;
-	ib_dev->ibd_flags |= IBDF_BDEV_EXCLUSIVE;
-	/*
-	 * Pass dev_flags for linux_blockdevice_claim() or
-	 * linux_blockdevice_claim() from the usage above.
-	 *
-	 * Note that transport_add_device_to_core_hba() will call
-	 * linux_blockdevice_release() internally on failure to
-	 * call bd_release() on the referenced struct block_device.
-	 */
+
 	dev = transport_add_device_to_core_hba(hba,
 			&iblock_template, se_dev, dev_flags, (void *)ib_dev,
 			&dev_limits, "IBLOCK", IBLOCK_VERSION);
@@ -247,59 +239,12 @@ failed:
 	return NULL;
 }
 
-/*	iblock_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int iblock_activate_device(struct se_device *dev)
-{
-	struct iblock_dev *ib_dev = dev->dev_ptr;
-	struct iblock_hba *ib_hba = ib_dev->ibd_host;
-
-	printk(KERN_INFO "CORE_iBLOCK[%u] - Activating Device with TCQ: %d at"
-		" Major: %d Minor %d\n", ib_hba->iblock_host_id,
-		ib_dev->ibd_depth, ib_dev->ibd_major, ib_dev->ibd_minor);
-
-	return 0;
-}
-
-/*	iblock_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void iblock_deactivate_device(struct se_device *dev)
-{
-	struct iblock_dev *ib_dev = dev->dev_ptr;
-	struct iblock_hba *ib_hba = ib_dev->ibd_host;
-
-	printk(KERN_INFO "CORE_iBLOCK[%u] - Deactivating Device with TCQ: %d"
-		" at Major: %d Minor %d\n", ib_hba->iblock_host_id,
-		ib_dev->ibd_depth, ib_dev->ibd_major, ib_dev->ibd_minor);
-}
-
 static void iblock_free_device(void *p)
 {
 	struct iblock_dev *ib_dev = p;
 
-	if (ib_dev->ibd_bd) {
-		printk(KERN_INFO "IBLOCK: Releasing Major:Minor - %d:%d\n",
-			ib_dev->ibd_major, ib_dev->ibd_minor);
-
-		if (ib_dev->ibd_flags & IBDF_BDEV_EXCLUSIVE)
-			close_bdev_exclusive(ib_dev->ibd_bd,
-				FMODE_WRITE|FMODE_READ);
-		else
-			linux_blockdevice_release(ib_dev->ibd_major,
-					ib_dev->ibd_minor, ib_dev->ibd_bd);
-		ib_dev->ibd_bd = NULL;
-	}
-
-	if (ib_dev->ibd_bio_set) {
-		DEBUG_IBLOCK("Calling bioset_free ib_dev->ibd_bio_set: %p\n",
-				ib_dev->ibd_bio_set);
-		bioset_free(ib_dev->ibd_bio_set);
-	}
-
+	close_bdev_exclusive(ib_dev->ibd_bd, FMODE_WRITE|FMODE_READ);
+	bioset_free(ib_dev->ibd_bio_set);
 	kfree(ib_dev);
 }
 
@@ -951,9 +896,9 @@ static void iblock_bio_done(struct bio *bio, int err)
 
 static struct se_subsystem_api iblock_template = {
 	.name			= "iblock",
+	.owner			= THIS_MODULE,
 	.type			= IBLOCK,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.external_submod	= 1,
 	.cdb_none		= iblock_CDB_none,
 	.cdb_read_non_SG	= iblock_CDB_read_non_SG,
 	.cdb_read_SG		= iblock_CDB_read_SG,
@@ -963,8 +908,6 @@ static struct se_subsystem_api iblock_template = {
 	.detach_hba		= iblock_detach_hba,
 	.allocate_virtdevice	= iblock_allocate_virtdevice,
 	.create_virtdevice	= iblock_create_virtdevice,
-	.activate_device	= iblock_activate_device,
-	.deactivate_device	= iblock_deactivate_device,
 	.free_device		= iblock_free_device,
 	.dpo_emulated		= iblock_emulated_dpo,
 	.fua_write_emulated	= iblock_emulated_fua_write,
@@ -989,23 +932,14 @@ static struct se_subsystem_api iblock_template = {
 	.get_device_type	= iblock_get_device_type,
 	.get_dma_length		= iblock_get_dma_length,
 	.get_blocks		= iblock_get_blocks,
-	.write_pending		= NULL,
 };
 
-int __init iblock_module_init(void)
+static int __init iblock_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&iblock_template.sub_api_list);
-
-	ret = transport_subsystem_register(&iblock_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&iblock_template);
 }
 
-void iblock_module_exit(void)
+static void iblock_module_exit(void)
 {
 	transport_subsystem_release(&iblock_template);
 }

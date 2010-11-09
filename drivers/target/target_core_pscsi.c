@@ -565,42 +565,6 @@ static struct se_device *pscsi_create_virtdevice(
 	return NULL;
 }
 
-/*	pscsi_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int pscsi_activate_device(struct se_device *dev)
-{
-	struct pscsi_dev_virt *pdv = dev->dev_ptr;
-	struct pscsi_hba_virt *phv = pdv->pdv_se_hba->hba_ptr;
-	struct scsi_device *sd = pdv->pdv_sd;
-	struct Scsi_Host *sh = sd->host;
-
-	printk(KERN_INFO "CORE_PSCSI[%d] - Activating Device with TCQ: %d at"
-		" SCSI Location (Host/Channel/Target/LUN) %d/%d/%d/%d\n",
-		phv->phv_host_id, sd->queue_depth, sh->host_no, sd->channel,
-		sd->id, sd->lun);
-
-	return 0;
-}
-
-/*	pscsi_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void pscsi_deactivate_device(struct se_device *dev)
-{
-	struct pscsi_dev_virt *pdv = dev->dev_ptr;
-	struct pscsi_hba_virt *phv = pdv->pdv_se_hba->hba_ptr;
-	struct scsi_device *sd = pdv->pdv_sd;
-	struct Scsi_Host *sh = sd->host;
-
-	printk(KERN_INFO "CORE_PSCSI[%d] - Deactivating Device with TCQ: %d at"
-		" SCSI Location (Host/Channel/Target/LUN) %d/%d/%d/%d\n",
-		phv->phv_host_id, sd->queue_depth, sh->host_no, sd->channel,
-		sd->id, sd->lun);
-}
-
 /*	pscsi_free_device(): (Part of se_subsystem_api_t template)
  *
  *
@@ -1521,9 +1485,9 @@ static void pscsi_req_done(struct request *req, int uptodate)
 
 static struct se_subsystem_api pscsi_template = {
 	.name			= "pscsi",
+	.owner			= THIS_MODULE,
 	.type			= PSCSI,
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,
-	.external_submod	= 1,
 	.cdb_none		= pscsi_CDB_none,
 	.cdb_read_non_SG	= pscsi_CDB_read_non_SG,
 	.cdb_read_SG		= pscsi_CDB_read_SG,
@@ -1532,8 +1496,6 @@ static struct se_subsystem_api pscsi_template = {
 	.attach_hba		= pscsi_attach_hba,
 	.detach_hba		= pscsi_detach_hba,
 	.pmode_enable_hba	= pscsi_pmode_enable_hba,
-	.activate_device	= pscsi_activate_device,
-	.deactivate_device	= pscsi_deactivate_device,
 	.allocate_virtdevice	= pscsi_allocate_virtdevice,
 	.create_virtdevice	= pscsi_create_virtdevice,
 	.free_device		= pscsi_free_device,
@@ -1554,23 +1516,14 @@ static struct se_subsystem_api pscsi_template = {
 	.get_device_rev		= pscsi_get_device_rev,
 	.get_device_type	= pscsi_get_device_type,
 	.get_dma_length		= pscsi_get_dma_length,
-	.write_pending		= NULL,
 };
 
-int __init pscsi_module_init(void)
+static int __init pscsi_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&pscsi_template.sub_api_list);
-
-	ret = transport_subsystem_register(&pscsi_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&pscsi_template);
 }
 
-void pscsi_module_exit(void)
+static void pscsi_module_exit(void)
 {
 	transport_subsystem_release(&pscsi_template);
 }

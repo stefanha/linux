@@ -342,7 +342,6 @@ static struct se_portal_group *ft_add_tpg(
 		kfree(tpg);
 		return NULL;
 	}
-	wait_for_completion(&tpg->qobj.thread_create_comp);
 
 	mutex_lock(&ft_lport_lock);
 	list_add_tail(&tpg->list, &lacl->tpg_list);
@@ -359,7 +358,6 @@ static void ft_del_tpg(struct se_portal_group *se_tpg)
 		config_item_name(&tpg->se_tpg.tpg_group.cg_item));
 	
 	kthread_stop(tpg->thread);
-	wait_for_completion(&tpg->qobj.thread_done_comp);
 
 	/* Wait for sessions to be freed thru RCU, for BUG_ON below */
 	synchronize_rcu();

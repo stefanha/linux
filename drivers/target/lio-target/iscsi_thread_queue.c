@@ -147,17 +147,17 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 		ts->status = ISCSI_THREAD_SET_FREE;
 		INIT_LIST_HEAD(&ts->ts_list);
 		spin_lock_init(&ts->ts_state_lock);
-		init_MUTEX_LOCKED(&ts->stop_active_sem);
-		init_MUTEX_LOCKED(&ts->rx_create_sem);
-		init_MUTEX_LOCKED(&ts->tx_create_sem);
-		init_MUTEX_LOCKED(&ts->rx_done_sem);
-		init_MUTEX_LOCKED(&ts->tx_done_sem);
-		init_MUTEX_LOCKED(&ts->rx_post_start_sem);
-		init_MUTEX_LOCKED(&ts->tx_post_start_sem);
-		init_MUTEX_LOCKED(&ts->rx_restart_sem);
-		init_MUTEX_LOCKED(&ts->tx_restart_sem);
-		init_MUTEX_LOCKED(&ts->rx_start_sem);
-		init_MUTEX_LOCKED(&ts->tx_start_sem);
+		sema_init(&ts->stop_active_sem, 0);
+		sema_init(&ts->rx_create_sem, 0);
+		sema_init(&ts->tx_create_sem, 0);
+		sema_init(&ts->rx_done_sem, 0);
+		sema_init(&ts->tx_done_sem, 0);
+		sema_init(&ts->rx_post_start_sem, 0);
+		sema_init(&ts->tx_post_start_sem, 0);
+		sema_init(&ts->rx_restart_sem, 0);
+		sema_init(&ts->tx_restart_sem, 0);
+		sema_init(&ts->rx_start_sem, 0);
+		sema_init(&ts->tx_start_sem, 0);
 
 		ts->create_threads = 1;
 		kernel_thread(iscsi_target_rx_thread,
@@ -332,7 +332,7 @@ get_set:
 		if (allocate_ts == 2)
 			iscsi_allocate_thread_sets(1, INITIATOR);
 
-		init_MUTEX_LOCKED(&sem);
+		sema_init(&sem, 0);
 		init_timer(&timer);
 		SETUP_TIMER(timer, 1, &sem, iscsi_get_thread_set_timeout);
 		add_timer(&timer);
@@ -346,8 +346,8 @@ get_set:
 	ts->delay_inactive = 1;
 	ts->signal_sent = ts->stop_active = 0;
 	ts->thread_count = 2;
-	init_MUTEX_LOCKED(&ts->rx_restart_sem);
-	init_MUTEX_LOCKED(&ts->tx_restart_sem);
+	sema_init(&ts->rx_restart_sem, 0);
+	sema_init(&ts->tx_restart_sem, 0);
 
 	return ts;
 }
