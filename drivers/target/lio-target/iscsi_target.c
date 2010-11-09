@@ -638,10 +638,10 @@ struct iscsi_np *core_add_np(
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
 	spin_lock_init(&np->np_ex_lock);
-	init_MUTEX_LOCKED(&np->np_done_sem);
-	init_MUTEX_LOCKED(&np->np_restart_sem);
-	init_MUTEX_LOCKED(&np->np_shutdown_sem);
-	init_MUTEX_LOCKED(&np->np_start_sem);
+	sema_init(&np->np_done_sem, 0);
+	sema_init(&np->np_restart_sem, 0);
+	sema_init(&np->np_shutdown_sem, 0);
+	sema_init(&np->np_start_sem, 0);
 	INIT_LIST_HEAD(&np->np_list);
 	INIT_LIST_HEAD(&np->np_nex_list);
 
@@ -811,8 +811,8 @@ void core_release_nps(void)
 static int init_iscsi_global(struct iscsi_global *global)
 {
 	memset(global, 0, sizeof(struct iscsi_global));
-	init_MUTEX(&global->auth_sem);
-	init_MUTEX(&global->auth_id_sem);
+	sema_init(&global->auth_sem, 1);
+	sema_init(&global->auth_id_sem, 1);
 	spin_lock_init(&global->active_ts_lock);
 	spin_lock_init(&global->check_thread_lock);
 	spin_lock_init(&global->discovery_lock);
@@ -1944,7 +1944,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 
@@ -1989,8 +1989,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		map_sg.data_length = hdr->length;
 		map_sg.data_offset = hdr->offset;
 
-		if (SE_CMD(cmd)->transport_set_iovec_ptrs(
-					&map_sg, &unmap_sg) < 0)
+		if (transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return -1;
 
 		crypto_hash_init(&conn->conn_rx_hash);
@@ -2971,7 +2970,7 @@ static int iscsi_handle_immediate_data(
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg);
 	if (iov_ret < 0)
 		return IMMEDIDATE_DATA_CANNOT_RECOVER;
 
@@ -3019,8 +3018,7 @@ static int iscsi_handle_immediate_data(
 		map_sg.data_length = length;
 		map_sg.data_offset = cmd->write_data_done;
 
-		if (SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg,
-					&unmap_sg) < 0)
+		if (transport_generic_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return IMMEDIDATE_DATA_CANNOT_RECOVER;
 
 		crypto_hash_init(&conn->conn_rx_hash);
@@ -3454,7 +3452,7 @@ static inline int iscsi_send_data_in(
 	map_sg.data_length = datain.length;
 	map_sg.data_offset = datain.offset;
 
-	iov_ret = SE_CMD(cmd)->transport_set_iovec_ptrs(&map_sg, unmap_sg);
+	iov_ret = transport_generic_set_iovec_ptrs(&map_sg, unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 

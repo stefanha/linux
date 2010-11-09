@@ -138,8 +138,7 @@ extern int __iscsi_debug_dev(struct se_device *);
 extern unsigned char *transport_get_iqn_sn(void);
 extern void transport_init_queue_obj(struct se_queue_obj *);
 extern int transport_subsystem_check_init(void);
-extern int transport_subsystem_register(struct se_subsystem_api *,
-				struct module *);
+extern int transport_subsystem_register(struct se_subsystem_api *);
 extern void transport_subsystem_release(struct se_subsystem_api *);
 extern void transport_load_plugins(void);
 extern struct se_subsystem_api *transport_core_get_sub_by_name(const char *);
@@ -159,8 +158,7 @@ extern void transport_task_dev_remove_state(struct se_task *,
 						struct se_device *);
 extern void transport_cmd_finish_abort(struct se_cmd *, int);
 extern void transport_cmd_finish_abort_tmr(struct se_cmd *);
-extern int transport_add_cmd_to_queue(struct se_cmd *,
-					struct se_queue_obj *, int);
+extern int transport_add_cmd_to_queue(struct se_cmd *, int);
 extern struct se_queue_req *__transport_get_qr_from_queue(
 					struct se_queue_obj *);
 extern void transport_remove_cmd_from_queue(struct se_cmd *,
@@ -172,8 +170,6 @@ extern void transport_add_task_to_execute_queue(struct se_task *,
 						struct se_task *,
 						struct se_device *);
 extern void transport_add_tasks_from_cmd(struct se_cmd *);
-extern struct se_task *transport_get_task_from_execute_queue(
-						struct se_device *);
 extern struct se_queue_req *transport_get_qr_from_queue(struct se_queue_obj *);
 extern int transport_check_device_tcq(struct se_device *, u32, u32);
 unsigned char *transport_dump_cmd_direction(struct se_cmd *);
@@ -194,9 +190,6 @@ extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_dev *, u32,
 					void *, struct se_dev_limits *,
 					const char *, const char *);
-extern int transport_generic_activate_device(struct se_device *);
-extern void transport_generic_deactivate_device(struct se_device *);
-extern void transport_generic_free_device(struct se_device *);
 extern int transport_generic_allocate_iovecs(struct se_cmd *);
 extern void transport_device_setup_cmd(struct se_cmd *);
 extern int transport_check_alloc_task_attr(struct se_cmd *);
@@ -210,6 +203,7 @@ extern void transport_init_se_cmd(struct se_cmd *,
 extern void transport_free_se_cmd(struct se_cmd *);
 extern int transport_generic_allocate_tasks(struct se_cmd *, unsigned char *);
 extern int transport_generic_handle_cdb(struct se_cmd *);
+extern int transport_generic_handle_cdb_map(struct se_cmd *);
 extern int transport_generic_handle_data(struct se_cmd *);
 extern int transport_generic_handle_tmr(struct se_cmd *);
 extern int transport_stop_tasks_for_cmd(struct se_cmd *);
@@ -228,18 +222,7 @@ extern void transport_stop_task_timer(struct se_task *);
 extern void transport_stop_all_task_timers(struct se_cmd *);
 extern int transport_execute_tasks(struct se_cmd *);
 extern unsigned char transport_asciihex_to_binaryhex(unsigned char val[2]);
-extern int transport_generic_emulate_inquiry(struct se_cmd *, unsigned char,
-					unsigned char *, unsigned char *);
-extern int transport_generic_emulate_readcapacity(struct se_cmd *, u32);
-extern int transport_generic_emulate_readcapacity_16(struct se_cmd *,
-							unsigned long long);
-extern int transport_generic_emulate_modesense(struct se_cmd *,
-						unsigned char *,
-						unsigned char *, int, int);
-extern int transport_generic_emulate_request_sense(struct se_cmd *,
-						   unsigned char *);
 extern int transport_get_sense_data(struct se_cmd *);
-extern int transport_emulate_control_cdb(struct se_task *);
 extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32, void *);
 extern void transport_passthrough_release(struct se_cmd *);
@@ -272,11 +255,7 @@ extern void transport_send_task_abort(struct se_cmd *);
 extern void transport_release_cmd_to_pool(struct se_cmd *);
 extern void transport_generic_free_cmd(struct se_cmd *, int, int, int);
 extern void transport_generic_wait_for_cmds(struct se_cmd *, int);
-extern int transport_generic_do_transform(struct se_cmd *,
-					struct se_transform_info *);
 extern int transport_get_sectors(struct se_cmd *);
-extern int transport_new_cmd_obj(struct se_cmd *,
-				struct se_transform_info *, int);
 extern unsigned char *transport_get_vaddr(struct se_mem *);
 extern struct list_head *transport_init_se_mem_list(void);
 extern void transport_free_se_mem_list(struct list_head *);
@@ -296,6 +275,8 @@ extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);
+extern int transport_generic_set_iovec_ptrs(struct se_map_sg *map_sg,
+	struct se_unmap_sg *unmap_sg);
 /* From target_core_alua.c */
 extern int core_alua_check_nonop_delay(struct se_cmd *);
 
@@ -330,13 +311,9 @@ struct se_subsystem_api {
 	 */
 	u8 transport_type;
 	/*
-	 * For target_core_rd.c internal usage
-	 */
-	int external_submod;
-	/*
 	 * struct module for struct se_hba references
 	 */
-	struct module *sub_owner;
+	struct module *owner;
 	/*
 	 * Counter for struct se_hba reference
 	 */
@@ -387,14 +364,6 @@ struct se_subsystem_api {
 	 */
 	struct se_device *(*create_virtdevice)(struct se_hba *,
 				struct se_subsystem_dev *, void *);
-	/*
-	 * activate_device():
-	 */
-	int (*activate_device)(struct se_device *);
-	/*
-	 * deactivate_device():
-	 */
-	void (*deactivate_device)(struct se_device *);
 	/*
 	 * free_device():
 	 */

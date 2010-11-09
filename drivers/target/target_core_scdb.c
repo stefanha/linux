@@ -51,16 +51,6 @@ void split_cdb_XX_6(
 	cdb[4] = *sectors & 0xff;
 }
 
-void split_cdb_RW_6(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	cdb[0] = (rw) ? WRITE_6 : READ_6;
-	split_cdb_XX_6(lba, sectors, &cdb[0]);
-}
-
 /*	split_cdb_XX_10():
  *
  *	32-bit LBA w/ 16-bit SECTORS
@@ -72,16 +62,6 @@ void split_cdb_XX_10(
 {
 	put_unaligned_be32(lba, &cdb[2]);
 	put_unaligned_be16(*sectors, &cdb[7]);
-}
-
-void split_cdb_RW_10(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	cdb[0] = (rw) ? WRITE_10 : READ_10;
-	split_cdb_XX_10(lba, sectors, &cdb[0]);
 }
 
 /*	split_cdb_XX_12():
@@ -97,16 +77,6 @@ void split_cdb_XX_12(
 	put_unaligned_be32(*sectors, &cdb[6]);
 }
 
-void split_cdb_RW_12(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	cdb[0] = (rw) ? WRITE_12 : READ_12;
-	split_cdb_XX_12(lba, sectors, &cdb[0]);
-}
-
 /*	split_cdb_XX_16():
  *
  *	64-bit LBA w/ 32-bit SECTORS
@@ -118,16 +88,6 @@ void split_cdb_XX_16(
 {
 	put_unaligned_be64(lba, &cdb[2]);
 	put_unaligned_be32(*sectors, &cdb[10]);
-}
-
-void split_cdb_RW_16(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	cdb[0] = (rw) ? WRITE_16 : READ_16;
-	split_cdb_XX_16(lba, sectors, &cdb[0]);
 }
 
 /*
@@ -142,17 +102,4 @@ void split_cdb_XX_32(
 {
 	put_unaligned_be64(lba, &cdb[12]);
 	put_unaligned_be32(*sectors, &cdb[28]);
-}
-
-void split_cdb_RW_32(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	/*
-	 * Set service action for VARIABLE_LENGTH_CMD
-	 */
-	cdb[9] = (rw) ? WRITE_32 : READ_32;
-	split_cdb_XX_32(lba, sectors, &cdb[0]);	
 }

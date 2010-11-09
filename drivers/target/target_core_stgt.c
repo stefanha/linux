@@ -314,40 +314,6 @@ static struct se_device *stgt_create_virtdevice(
 	return NULL;
 }
 
-/*	stgt_activate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int stgt_activate_device(struct se_device *dev)
-{
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
-	struct scsi_device *sd = sdv->sdv_sd;
-	struct Scsi_Host *sh = sd->host;
-
-	printk(KERN_INFO "CORE_STGT[%d] - Activating %s Device with TCQ: %d at"
-		" SCSI Location (Channel/Target/LUN) %d/%d/%d\n", sh->host_no,
-		(sdv->sdv_legacy) ? "Legacy" : "REQ",  sd->queue_depth,
-		sd->channel, sd->id, sd->lun);
-
-	return 0;
-}
-
-/*	stgt_deactivate_device(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void stgt_deactivate_device(struct se_device *dev)
-{
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
-	struct scsi_device *sd = sdv->sdv_sd;
-	struct Scsi_Host *sh = sd->host;
-
-	printk(KERN_INFO "CORE_STGT[%d] - Deactivating %s Device with TCQ: %d"
-		" at SCSI Location (Channel/Target/LUN) %d/%d/%d\n",
-		sh->host_no, (sdv->sdv_legacy) ? "Legacy" : "REQ",
-		sd->queue_depth, sd->channel, sd->id, sd->lun);
-}
-
 /*	stgt_free_device(): (Part of se_subsystem_api_t template)
  *
  *
@@ -867,9 +833,9 @@ static int stgt_transfer_response(struct scsi_cmnd *sc,
 
 static struct se_subsystem_api stgt_template = {
 	.name			= "stgt",
+	.owner			= THIS_MODULE,
 	.type			= STGT,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.external_submod	= 1,
 	.cdb_none		= stgt_CDB_none,
 	.cdb_read_non_SG	= stgt_CDB_read_non_SG,
 	.cdb_read_SG		= stgt_CDB_read_SG,
@@ -877,8 +843,6 @@ static struct se_subsystem_api stgt_template = {
 	.cdb_write_SG		= stgt_CDB_write_SG,
 	.attach_hba		= stgt_attach_hba,
 	.detach_hba		= stgt_detach_hba,
-	.activate_device	= stgt_activate_device,
-	.deactivate_device	= stgt_deactivate_device,
 	.allocate_virtdevice	= stgt_allocate_virtdevice,
 	.create_virtdevice	= stgt_create_virtdevice,
 	.free_device		= stgt_free_device,
@@ -901,23 +865,14 @@ static struct se_subsystem_api stgt_template = {
 	.get_device_rev		= stgt_get_device_rev,
 	.get_device_type	= stgt_get_device_type,
 	.get_dma_length		= stgt_get_dma_length,
-	.write_pending		= NULL,
 };
 
-int __init stgt_module_init(void)
+static int __init stgt_module_init(void)
 {
-	int ret;
-
-	INIT_LIST_HEAD(&stgt_template.sub_api_list);
-
-	ret = transport_subsystem_register(&stgt_template, THIS_MODULE);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return transport_subsystem_register(&stgt_template);
 }
 
-void stgt_module_exit(void)
+static void stgt_module_exit(void)
 {
 	transport_subsystem_release(&stgt_template);
 }
