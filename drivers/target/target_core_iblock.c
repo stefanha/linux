@@ -29,6 +29,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/fs.h>
 #include <linux/blkdev.h>
@@ -505,74 +506,64 @@ static void iblock_free_task(struct se_task *task)
 	task->transport_req = NULL;
 }
 
+enum {
+	Opt_udev_path, Opt_force
+};
+
+static match_table_t tokens = {
+	{Opt_udev_path, "udev_path=%s"},
+	{Opt_force, "force=%d"},
+};
+
 static ssize_t iblock_set_configfs_dev_params(struct se_hba *hba,
 					       struct se_subsystem_dev *se_dev,
 					       const char *page, ssize_t count)
 {
 	struct iblock_dev *ib_dev = se_dev->se_dev_su_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	unsigned long force;
-	int params = 0, ret = 0;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for temporary"
-			" buffer\n");
-		return 0;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
+	char *orig, *ptr, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
+	
+	orig = opts;
 
-		*ptr = '\0';
-		ptr++;
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
 
-		ptr2 = strstr(cur, "udev_path");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ptr = strstrip(ptr);
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_udev_path:
 			if (ib_dev->ibd_bd) {
 				printk(KERN_ERR "Unable to set udev_path= while"
 					" ib_dev->ibd_bd exists\n");
-				params = 0;
+				ret = -EEXIST;
 				goto out;
 			}
 
 			ret = snprintf(ib_dev->ibd_udev_path, SE_UDEV_PATH_LEN,
-				"%s", ptr);
+				"%s", match_strdup(&args[0]));
 			printk(KERN_INFO "IBLOCK: Referencing UDEV path: %s\n",
 					ib_dev->ibd_udev_path);
 			ib_dev->ibd_flags |= IBDF_HAS_UDEV_PATH;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "force");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &force);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed"
-					" for force=\n");
-				break;
-			}
-			ib_dev->ibd_force = (int)force;
+			break;
+		case Opt_force:
+			match_int(args, &arg);
+			ib_dev->ibd_force = arg;
 			printk(KERN_INFO "IBLOCK: Set force=%d\n",
 				ib_dev->ibd_force);
-			params++;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
 out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t iblock_check_configfs_dev_params(

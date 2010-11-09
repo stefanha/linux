@@ -29,6 +29,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
@@ -990,6 +991,14 @@ static void rd_free_task(struct se_task *task)
 	kfree(req);
 }
 
+enum {
+	Opt_rd_pages
+};
+
+static match_table_t tokens = {
+	{Opt_rd_pages, "rd_pages=%d"},
+};
+
 static ssize_t rd_set_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -997,50 +1006,36 @@ static ssize_t rd_set_configfs_dev_params(
 	ssize_t count)
 {
 	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	unsigned long rd_pages;
-	int params = 0, ret;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
-		return 0;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
+	char *orig, *ptr, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
 
-		*ptr = '\0';
-		ptr++;
+	orig = opts;
 
-		ptr2 = strstr(cur, "rd_pages");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &rd_pages);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed for"
-					" rd_pages=\n");
-				break;
-			}
-			rd_dev->rd_page_count = (u32)rd_pages;
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
+
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_rd_pages:
+			match_int(args, &arg);
+			rd_dev->rd_page_count = arg;
 			printk(KERN_INFO "RAMDISK: Referencing Page"
 				" Count: %u\n", rd_dev->rd_page_count);
 			rd_dev->rd_flags |= RDF_HAS_PAGE_COUNT;
-			params++;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
-out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)

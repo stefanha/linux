@@ -26,6 +26,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
@@ -418,6 +419,16 @@ static void stgt_free_task(struct se_task *task)
 	kfree(st);
 }
 
+enum {
+	Opt_scsi_channel_id, Opt_scsi_target_id, Opt_scsi_lun_id
+};
+
+static match_table_t tokens = {
+	{Opt_scsi_channel_id, "scsi_channel_id=%d"},
+	{Opt_scsi_target_id, "scsi_target_id=%d"},
+	{Opt_scsi_lun_id, "scsi_lun_id=%d"},
+};
+
 static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	const char *page,
@@ -425,83 +436,50 @@ static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 {
 	struct stgt_dev_virt *sdv = se_dev->se_dev_su_ptr;
 	struct Scsi_Host *sh = hba->hba_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	unsigned long scsi_channel_id, scsi_target_id, scsi_lun_id;
-	int params = 0, ret;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for temporary"
-				" buffer\n");
+	char *orig, *ptr, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
+
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
 		return -ENOMEM;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	orig = opts;
 
-		*ptr = '\0';
-		ptr++;
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
 
-		ptr2 = strstr(cur, "scsi_channel_id");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &scsi_channel_id);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed for"
-					" scsi_channel_id=\n");
-				break;
-			}
-			sdv->sdv_channel_id = (int)scsi_channel_id;
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_scsi_channel_id:
+			match_int(args, &arg);
+			sdv->sdv_channel_id = arg;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI Channel"
 				" ID: %d\n",  sh->host_no, sdv->sdv_channel_id);
 			sdv->sdv_flags |= PDF_HAS_CHANNEL_ID;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "scsi_target_id");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &scsi_target_id);
-			if (ret < 0) {
-				printk("strict_strtoul() failed for"
-					" strict_strtoul()\n");
-				break;
-			}
-			sdv->sdv_target_id = (int)scsi_target_id;
+			break;
+		case Opt_scsi_target_id:
+			match_int(args, &arg);
+			sdv->sdv_target_id = arg;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI Target"
 				" ID: %d\n", sh->host_no, sdv->sdv_target_id);
 			sdv->sdv_flags |= PDF_HAS_TARGET_ID;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "scsi_lun_id");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &scsi_lun_id);
-			if (ret < 0) {
-				printk("strict_strtoul() failed for"
-					" scsi_lun_id=\n");
-				break;
-			}
-			sdv->sdv_lun_id = (int)scsi_lun_id;
+			break;
+		case Opt_scsi_lun_id:
+			match_int(args, &arg);
+			sdv->sdv_lun_id = arg;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI LUN ID:"
 				" %d\n", sh->host_no, sdv->sdv_lun_id);
 			sdv->sdv_flags |= PDF_HAS_LUN_ID;
-			params++;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
-out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t stgt_check_configfs_dev_params(
