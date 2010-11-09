@@ -204,35 +204,6 @@ static struct se_device *pscsi_add_device_to_list(
 	struct queue_limits *limits;
 
 	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
-	/*
-	 * Some pseudo SCSI HBAs do not fill in sector_size
-	 * correctly. (See ide-scsi.c)  So go ahead and setup sane
-	 * values.
-	 */
-	if (!sd->sector_size) {
-		switch (sd->type) {
-		case TYPE_DISK:
-			sd->sector_size = 512;
-			break;
-		case TYPE_ROM:
-			sd->sector_size = 2048;
-			break;
-		case TYPE_TAPE: /* The Tape may not be in the drive */
-			break;
-		case TYPE_MEDIUM_CHANGER: /* Control CDBs only */
-			break;
-		default:
-			printk(KERN_ERR "Unable to set sector_size for %d\n",
-					sd->type);
-			return NULL;
-		}
-
-		if (sd->sector_size) {
-			printk(KERN_ERR "Set broken SCSI Device"
-				" %d:%d:%d sector_size to %d\n", sd->channel,
-				sd->id, sd->lun, sd->sector_size);
-		}
-	}
 
 	if (!sd->queue_depth) {
 		sd->queue_depth = PSCSI_DEFAULT_QUEUEDEPTH;
