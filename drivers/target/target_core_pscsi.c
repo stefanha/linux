@@ -54,7 +54,6 @@
 static struct se_subsystem_api pscsi_template;
 
 static void pscsi_req_done(struct request *, int);
-static void __pscsi_get_dev_info(struct pscsi_dev_virt *, char *, int *);
 
 /*	pscsi_get_sh():
  *
@@ -934,18 +933,6 @@ static ssize_t pscsi_check_configfs_dev_params(
 	return 0;
 }
 
-static ssize_t pscsi_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct pscsi_dev_virt *pdv = se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	__pscsi_get_dev_info(pdv, page, &bl);
-	return (ssize_t)bl;
-}
-
 static void pscsi_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM SCSI Plugin %s\n", PSCSI_VERSION);
@@ -964,18 +951,16 @@ static void pscsi_get_hba_info(struct se_hba *hba, char *b, int *bl)
 			(sh->hostt->name) : "Unknown");
 }
 
-static void pscsi_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t pscsi_show_configfs_dev_params(
+        struct se_hba *hba,
+        struct se_subsystem_dev *se_dev,
+        char *b)
 {
-	struct pscsi_dev_virt *pdv = dev->dev_ptr;
-
-	__pscsi_get_dev_info(pdv, b, bl);
-}
-
-static void __pscsi_get_dev_info(struct pscsi_dev_virt *pdv, char *b, int *bl)
-{
-	struct pscsi_hba_virt *phv = pdv->pdv_se_hba->hba_ptr;
+	struct pscsi_hba_virt *phv = hba->hba_ptr;
+        struct pscsi_dev_virt *pdv = se_dev->se_dev_su_ptr;
 	struct scsi_device *sd = pdv->pdv_sd;
 	unsigned char host_id[16];
+	ssize_t bl;
 	int i;
 
 	if (phv->phv_mode == PHV_VIRUTAL_HOST_ID)
@@ -983,36 +968,37 @@ static void __pscsi_get_dev_info(struct pscsi_dev_virt *pdv, char *b, int *bl)
 	else
 		snprintf(host_id, 16, "PHBA Mode");
 
-	*bl += sprintf(b + *bl, "SCSI Device Bus Location:"
+	bl = sprintf(b, "SCSI Device Bus Location:"
 		" Channel ID: %d Target ID: %d LUN: %d Host ID: %s\n",
 		pdv->pdv_channel_id, pdv->pdv_target_id, pdv->pdv_lun_id,
 		host_id);
 
 	if (sd) {
-		*bl += sprintf(b + *bl, "        ");
-		*bl += sprintf(b + *bl, "Vendor: ");
+		bl += sprintf(b + bl, "        ");
+		bl += sprintf(b + bl, "Vendor: ");
 		for (i = 0; i < 8; i++) {
 			if (ISPRINT(sd->vendor[i]))   /* printable character? */
-				*bl += sprintf(b + *bl, "%c", sd->vendor[i]);
+				bl += sprintf(b + bl, "%c", sd->vendor[i]);
 			else
-				*bl += sprintf(b + *bl, " ");
+				bl += sprintf(b + bl, " ");
 		}
-		*bl += sprintf(b + *bl, " Model: ");
+		bl += sprintf(b + bl, " Model: ");
 		for (i = 0; i < 16; i++) {
 			if (ISPRINT(sd->model[i]))   /* printable character ? */
-				*bl += sprintf(b + *bl, "%c", sd->model[i]);
+				bl += sprintf(b + bl, "%c", sd->model[i]);
 			else
-				*bl += sprintf(b + *bl, " ");
+				bl += sprintf(b + bl, " ");
 		}
-		*bl += sprintf(b + *bl, " Rev: ");
+		bl += sprintf(b + bl, " Rev: ");
 		for (i = 0; i < 4; i++) {
 			if (ISPRINT(sd->rev[i]))   /* printable character ? */
-				*bl += sprintf(b + *bl, "%c", sd->rev[i]);
+				bl += sprintf(b + bl, "%c", sd->rev[i]);
 			else
-				*bl += sprintf(b + *bl, " ");
+				bl += sprintf(b + bl, " ");
 		}
-		*bl += sprintf(b + *bl, "\n");
+		bl += sprintf(b + bl, "\n");
 	}
+	return bl;
 }
 
 static void pscsi_bi_endio(struct bio *bio, int error)
@@ -1468,7 +1454,6 @@ static struct se_subsystem_api pscsi_template = {
 	.show_configfs_dev_params = pscsi_show_configfs_dev_params,
 	.get_plugin_info	= pscsi_get_plugin_info,
 	.get_hba_info		= pscsi_get_hba_info,
-	.get_dev_info		= pscsi_get_dev_info,
 	.check_lba		= pscsi_check_lba,
 	.check_for_SG		= pscsi_check_for_SG,
 	.get_cdb		= pscsi_get_cdb,

@@ -55,7 +55,6 @@
 
 static struct se_subsystem_api iblock_template;
 
-static void __iblock_get_dev_info(struct iblock_dev *, char *, int *);
 static void iblock_bio_done(struct bio *, int);
 
 /*	iblock_attach_hba(): (Part of se_subsystem_api_t template)
@@ -590,18 +589,6 @@ static ssize_t iblock_check_configfs_dev_params(
 	return 0;
 }
 
-static ssize_t iblock_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct iblock_dev *ibd = se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	__iblock_get_dev_info(ibd, page, &bl);
-	return (ssize_t)bl;
-}
-
 static void iblock_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM iBlock Plugin %s\n", IBLOCK_VERSION);
@@ -616,37 +603,37 @@ static void iblock_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM iBlock HBA\n");
 }
 
-static void iblock_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t iblock_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct iblock_dev *ibd = dev->dev_ptr;
-
-	__iblock_get_dev_info(ibd, b, bl);
-}
-
-static void __iblock_get_dev_info(struct iblock_dev *ibd, char *b, int *bl)
-{
-	char buf[BDEVNAME_SIZE];
+	struct iblock_dev *ibd = se_dev->se_dev_su_ptr;
 	struct block_device *bd = ibd->ibd_bd;
+	char buf[BDEVNAME_SIZE];
+	ssize_t bl = 0;
 
 	if (bd)
-		*bl += sprintf(b + *bl, "iBlock device: %s",
+		bl += sprintf(b + bl, "iBlock device: %s",
 				bdevname(bd, buf));
 	if (ibd->ibd_flags & IBDF_HAS_UDEV_PATH) {
-		*bl += sprintf(b + *bl, "  UDEV PATH: %s\n",
+		bl += sprintf(b + bl, "  UDEV PATH: %s\n",
 				ibd->ibd_udev_path);
 	} else
-		*bl += sprintf(b + *bl, "\n");
+		bl += sprintf(b + bl, "\n");
 
-	*bl += sprintf(b + *bl, "        ");
+	bl += sprintf(b + bl, "        ");
 	if (bd) {
-		*bl += sprintf(b + *bl, "Major: %d Minor: %d  %s\n",
+		bl += sprintf(b + bl, "Major: %d Minor: %d  %s\n",
 			ibd->ibd_major, ibd->ibd_minor, (!bd->bd_contains) ?
 			"" : (bd->bd_holder == (struct iblock_dev *)ibd) ?
 			"CLAIMED: IBLOCK" : "CLAIMED: OS");
 	} else {
-		*bl += sprintf(b + *bl, "Major: %d Minor: %d\n",
+		bl += sprintf(b + bl, "Major: %d Minor: %d\n",
 			ibd->ibd_major, ibd->ibd_minor);
 	}
+
+	return bl;
 }
 
 static void iblock_bio_destructor(struct bio *bio)
@@ -923,7 +910,6 @@ static struct se_subsystem_api iblock_template = {
 	.show_configfs_dev_params = iblock_show_configfs_dev_params,
 	.get_plugin_info	= iblock_get_plugin_info,
 	.get_hba_info		= iblock_get_hba_info,
-	.get_dev_info		= iblock_get_dev_info,
 	.check_lba		= iblock_check_lba,
 	.check_for_SG		= iblock_check_for_SG,
 	.get_cdb		= iblock_get_cdb,

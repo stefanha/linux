@@ -47,8 +47,6 @@
 static struct se_subsystem_api rd_dr_template;
 static struct se_subsystem_api rd_mcp_template;
 
-static void __rd_get_dev_info(struct rd_dev *, char *, int *);
-
 /* #define DEBUG_RAMDISK_MCP */
 /* #define DEBUG_RAMDISK_DR */
 
@@ -1057,18 +1055,6 @@ static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	return 0;
 }
 
-static ssize_t rd_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	 __rd_get_dev_info(rd_dev, page, &bl);
-	return (ssize_t)bl;
-}
-
 static void rd_dr_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM RAMDISK_DR Plugin %s\n", RD_DR_VERSION);
@@ -1088,23 +1074,19 @@ static void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM RamDisk HBA\n");
 }
 
-static void rd_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t rd_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct rd_dev *rd_dev = dev->dev_ptr;
-
-	__rd_get_dev_info(rd_dev, b, bl);
-}
-
-static void __rd_get_dev_info(struct rd_dev *rd_dev, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM RamDisk ID: %u  RamDisk Makeup: %s\n",
+	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
+	ssize_t bl = sprintf(b, "TCM RamDisk ID: %u  RamDisk Makeup: %s\n",
 			rd_dev->rd_dev_id, (rd_dev->rd_direct) ?
 			"rd_direct" : "rd_mcp");
-	*bl += sprintf(b + *bl, "        PAGES/PAGE_SIZE: %u*%lu"
+	bl += sprintf(b + bl, "        PAGES/PAGE_SIZE: %u*%lu"
 			"  SG_table_count: %u\n", rd_dev->rd_page_count,
 			PAGE_SIZE, rd_dev->sg_table_count);
-
-	return;
+	return bl;
 }
 
 /*	rd_map_task_non_SG():
@@ -1300,7 +1282,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
 	.get_plugin_info	= rd_dr_get_plugin_info,
 	.get_hba_info		= rd_get_hba_info,
-	.get_dev_info		= rd_get_dev_info,
 	.check_lba		= rd_DIRECT_check_lba,
 	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,
@@ -1334,7 +1315,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
 	.get_plugin_info	= rd_mcp_get_plugin_info,
 	.get_hba_info		= rd_get_hba_info,
-	.get_dev_info		= rd_get_dev_info,
 	.check_lba		= rd_MEMCPY_check_lba,
 	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,

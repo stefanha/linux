@@ -475,10 +475,6 @@ struct se_subsystem_api {
 	 */
 	void (*get_hba_info)(struct se_hba *, char *, int *);
 	/*
-	 * get_dev_info():
-	 */
-	void (*get_dev_info)(struct se_device *, char *, int *);
-	/*
 	 * check_lba():
 	 */
 	int (*check_lba)(unsigned long long lba, struct se_device *);

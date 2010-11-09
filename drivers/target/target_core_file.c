@@ -56,8 +56,6 @@
 
 static struct se_subsystem_api fileio_template;
 
-static void __fd_get_dev_info(struct fd_dev *, char *, int *);
-
 /*	fd_attach_hba(): (Part of se_subsystem_api_t template)
  *
  *
@@ -735,18 +733,6 @@ static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	return 0;
 }
 
-static ssize_t fd_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	__fd_get_dev_info(fd_dev, page, &bl);
-	return (ssize_t)bl;
-}
-
 static void fd_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM FILEIO Plugin %s\n", FD_VERSION);
@@ -761,20 +747,20 @@ static void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM FILEIO HBA\n");
 }
 
-static void fd_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t fd_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct fd_dev *fd_dev = dev->dev_ptr;
+	struct fd_dev *fd_dev = se_dev->se_dev_su_ptr;
+	ssize_t bl = 0;
 
-	__fd_get_dev_info(fd_dev, b, bl);
-}
-
-static void __fd_get_dev_info(struct fd_dev *fd_dev, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
-	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  Mode: %s\n",
+	bl = sprintf(b + bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
+	bl += sprintf(b + bl, "        File: %s  Size: %llu  Mode: %s\n",
 		fd_dev->fd_dev_name, fd_dev->fd_dev_size,
 		(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO) ?
 		"Buffered" : "Synchronous");
+	return bl;
 }
 
 /*	fd_map_task_non_SG():
@@ -972,7 +958,6 @@ static struct se_subsystem_api fileio_template = {
 	.show_configfs_dev_params = fd_show_configfs_dev_params,
 	.get_plugin_info	= fd_get_plugin_info,
 	.get_hba_info		= fd_get_hba_info,
-	.get_dev_info		= fd_get_dev_info,
 	.check_lba		= fd_check_lba,
 	.check_for_SG		= fd_check_for_SG,
 	.get_cdb		= fd_get_cdb,
