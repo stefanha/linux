@@ -28,6 +28,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
@@ -55,8 +56,6 @@
 #endif
 
 static struct se_subsystem_api fileio_template;
-
-static void __fd_get_dev_info(struct fd_dev *, char *, int *);
 
 /*	fd_attach_hba(): (Part of se_subsystem_api_t template)
  *
@@ -647,80 +646,78 @@ static void fd_free_task(struct se_task *task)
 	kfree(req);
 }
 
+enum {
+	Opt_fd_dev_name, Opt_fd_dev_size, Opt_fd_buffered_io
+};
+
+static match_table_t tokens = {
+	{Opt_fd_dev_name, "fd_dev_name=%s"},
+	{Opt_fd_dev_size, "fd_dev_size=%s"},
+	{Opt_fd_buffered_io, "fd_buffered_id=%d"},
+};
+	
 static ssize_t fd_set_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	const char *page, ssize_t count)
 {
-	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	int params = 0;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" temporary buffer\n");
-		return 0;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
+	struct fd_dev *fd_dev = se_dev->se_dev_su_ptr;
+	char *orig, *ptr, *arg_p, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
 
-		*ptr = '\0';
-		ptr++;
+	orig = opts;
 
-		ptr2 = strstr(cur, "fd_dev_name");
-		if (ptr2) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ptr = strstrip(ptr);
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
+
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_fd_dev_name:
 			snprintf(fd_dev->fd_dev_name, FD_MAX_DEV_NAME,
-					"%s", ptr);
+					"%s", match_strdup(&args[0]));
 			printk(KERN_INFO "FILEIO: Referencing Path: %s\n",
 					fd_dev->fd_dev_name);
 			fd_dev->fbd_flags |= FBDF_HAS_PATH;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "fd_dev_size");
-		if (ptr2) {
-			transport_check_dev_params_delim(ptr, &cur);
-			if (strict_strtoull(ptr, 0, &fd_dev->fd_dev_size) < 0) {
+			break;
+		case Opt_fd_dev_size:
+			arg_p = match_strdup(&args[0]);
+			ret = strict_strtoull(arg_p, 0, &fd_dev->fd_dev_size);
+			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoull() failed for"
 						" fd_dev_size=\n");
-				continue;
+				goto out;
 			}
 			printk(KERN_INFO "FILEIO: Referencing Size: %llu"
 					" bytes\n", fd_dev->fd_dev_size);
 			fd_dev->fbd_flags |= FBDF_HAS_SIZE;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "fd_buffered_io");
-		if (ptr2) {
-			transport_check_dev_params_delim(ptr, &cur);
-			if (strncmp(ptr, "1", 1))
-				continue;
+			break;
+		case Opt_fd_buffered_io:
+			match_int(args, &arg);
+			if (arg != 1) {
+				printk(KERN_ERR "bogus fd_buffered_io=%d value\n", arg);
+				ret = -EINVAL;
+				goto out;
+			}
 
 			printk(KERN_INFO "FILEIO: Using buffered I/O"
 				" operations for struct fd_dev\n");
 
 			fd_dev->fbd_flags |= FDBD_USE_BUFFERED_IO;
-			params++;
-			continue;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
 out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
@@ -733,18 +730,6 @@ static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	}
 
 	return 0;
-}
-
-static ssize_t fd_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	__fd_get_dev_info(fd_dev, page, &bl);
-	return (ssize_t)bl;
 }
 
 static void fd_get_plugin_info(void *p, char *b, int *bl)
@@ -761,20 +746,20 @@ static void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM FILEIO HBA\n");
 }
 
-static void fd_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t fd_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct fd_dev *fd_dev = dev->dev_ptr;
+	struct fd_dev *fd_dev = se_dev->se_dev_su_ptr;
+	ssize_t bl = 0;
 
-	__fd_get_dev_info(fd_dev, b, bl);
-}
-
-static void __fd_get_dev_info(struct fd_dev *fd_dev, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
-	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  Mode: %s\n",
+	bl = sprintf(b + bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
+	bl += sprintf(b + bl, "        File: %s  Size: %llu  Mode: %s\n",
 		fd_dev->fd_dev_name, fd_dev->fd_dev_size,
 		(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO) ?
 		"Buffered" : "Synchronous");
+	return bl;
 }
 
 /*	fd_map_task_non_SG():
@@ -972,7 +957,6 @@ static struct se_subsystem_api fileio_template = {
 	.show_configfs_dev_params = fd_show_configfs_dev_params,
 	.get_plugin_info	= fd_get_plugin_info,
 	.get_hba_info		= fd_get_hba_info,
-	.get_dev_info		= fd_get_dev_info,
 	.check_lba		= fd_check_lba,
 	.check_for_SG		= fd_check_for_SG,
 	.get_cdb		= fd_get_cdb,

@@ -26,6 +26,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
@@ -54,7 +55,6 @@
 static int stgt_host_no_cnt;
 static struct se_subsystem_api stgt_template ;
 
-static void __stgt_get_dev_info(struct stgt_dev_virt *, char *, int *);
 static int stgt_transfer_response(struct scsi_cmnd *,
                            void (*done)(struct scsi_cmnd *));
 
@@ -419,6 +419,16 @@ static void stgt_free_task(struct se_task *task)
 	kfree(st);
 }
 
+enum {
+	Opt_scsi_channel_id, Opt_scsi_target_id, Opt_scsi_lun_id
+};
+
+static match_table_t tokens = {
+	{Opt_scsi_channel_id, "scsi_channel_id=%d"},
+	{Opt_scsi_target_id, "scsi_target_id=%d"},
+	{Opt_scsi_lun_id, "scsi_lun_id=%d"},
+};
+
 static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	const char *page,
@@ -426,83 +436,50 @@ static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 {
 	struct stgt_dev_virt *sdv = se_dev->se_dev_su_ptr;
 	struct Scsi_Host *sh = hba->hba_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	unsigned long scsi_channel_id, scsi_target_id, scsi_lun_id;
-	int params = 0, ret;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for temporary"
-				" buffer\n");
+	char *orig, *ptr, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
+
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
 		return -ENOMEM;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	orig = opts;
 
-		*ptr = '\0';
-		ptr++;
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
 
-		ptr2 = strstr(cur, "scsi_channel_id");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &scsi_channel_id);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed for"
-					" scsi_channel_id=\n");
-				break;
-			}
-			sdv->sdv_channel_id = (int)scsi_channel_id;
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_scsi_channel_id:
+			match_int(args, &arg);
+			sdv->sdv_channel_id = arg;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI Channel"
 				" ID: %d\n",  sh->host_no, sdv->sdv_channel_id);
 			sdv->sdv_flags |= PDF_HAS_CHANNEL_ID;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "scsi_target_id");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &scsi_target_id);
-			if (ret < 0) {
-				printk("strict_strtoul() failed for"
-					" strict_strtoul()\n");
-				break;
-			}
-			sdv->sdv_target_id = (int)scsi_target_id;
+			break;
+		case Opt_scsi_target_id:
+			match_int(args, &arg);
+			sdv->sdv_target_id = arg;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI Target"
 				" ID: %d\n", sh->host_no, sdv->sdv_target_id);
 			sdv->sdv_flags |= PDF_HAS_TARGET_ID;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "scsi_lun_id");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &scsi_lun_id);
-			if (ret < 0) {
-				printk("strict_strtoul() failed for"
-					" scsi_lun_id=\n");
-				break;
-			}
-			sdv->sdv_lun_id = (int)scsi_lun_id;
+			break;
+		case Opt_scsi_lun_id:
+			match_int(args, &arg);
+			sdv->sdv_lun_id = arg;
 			printk(KERN_INFO "STGT[%d]: Referencing SCSI LUN ID:"
 				" %d\n", sh->host_no, sdv->sdv_lun_id);
 			sdv->sdv_flags |= PDF_HAS_LUN_ID;
-			params++;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
-out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t stgt_check_configfs_dev_params(
@@ -522,18 +499,6 @@ static ssize_t stgt_check_configfs_dev_params(
 	return 0;
 }
 
-static ssize_t stgt_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct stgt_dev_virt *sdv = se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	__stgt_get_dev_info(sdv, page, &bl);
-	return (ssize_t)bl;
-}
-
 static void stgt_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM STGT <-> Target_Core_Mod Plugin %s\n",
@@ -550,63 +515,19 @@ static void stgt_get_hba_info(struct se_hba *hba, char *b, int *bl)
 		(sh->hostt->name) ? (sh->hostt->name) : "Unknown");
 }
 
-static void stgt_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t stgt_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct stgt_dev_virt *sdv = dev->dev_ptr;
+	struct stgt_dev_virt *sdv = se_dev->se_dev_su_ptr;
+	ssize_t bl = 0;
 
-	__stgt_get_dev_info(sdv, b, bl);
-}
-
-static void __stgt_get_dev_info(struct stgt_dev_virt *sdv, char *b, int *bl)
-{
-	int i;
-	struct scsi_device *sd = sdv->sdv_sd;
-
-	*bl += sprintf(b + *bl, "STGT SCSI Device Bus Location:"
+	bl = sprintf(b + bl, "STGT SCSI Device Bus Location:"
 		" Channel ID: %d Target ID: %d LUN: %d\n",
 		sdv->sdv_channel_id, sdv->sdv_target_id, sdv->sdv_lun_id);
 
-	if (sd) {
-		*bl += sprintf(b + *bl, "        ");
-		*bl += sprintf(b + *bl, "Vendor: ");
-		for (i = 0; i < 8; i++) {
-			if (ISPRINT(sd->vendor[i]))   /* printable character? */
-				*bl += sprintf(b + *bl, "%c", sd->vendor[i]);
-			else
-				*bl += sprintf(b + *bl, " ");
-		}
-		*bl += sprintf(b + *bl, " Model: ");
-		for (i = 0; i < 16; i++) {
-			if (ISPRINT(sd->model[i]))   /* printable character ? */
-				*bl += sprintf(b + *bl, "%c", sd->model[i]);
-			else
-				*bl += sprintf(b + *bl, " ");
-		}
-		*bl += sprintf(b + *bl, " Rev: ");
-		for (i = 0; i < 4; i++) {
-			if (ISPRINT(sd->rev[i]))   /* printable character ? */
-				*bl += sprintf(b + *bl, "%c", sd->rev[i]);
-			else
-				*bl += sprintf(b + *bl, " ");
-		}
-
-		if (sd->type == TYPE_DISK) {
-			struct scsi_disk *sdisk =
-					dev_get_drvdata(&sd->sdev_gendev);
-			struct gendisk *disk = (struct gendisk *) sdisk->disk;
-			struct block_device *bdev = bdget(MKDEV(disk->major,
-						disk->first_minor));
-
-			bdev->bd_disk = disk;
-			*bl += sprintf(b + *bl, "   %s\n", (!bdev->bd_holder) ?
-					"" : (bdev->bd_holder ==
-					(struct scsi_device *)sd) ?
-					"CLAIMED: PSCSI" : "CLAIMED: OS");
-		} else
-			*bl += sprintf(b + *bl, "\n");
-	}
-
-	return;
+	return bl;
 }
 
 /*      stgt_map_task_SG():
@@ -857,7 +778,6 @@ static struct se_subsystem_api stgt_template = {
 	.plugin_free		= stgt_plugin_free,
 	.get_plugin_info	= stgt_get_plugin_info,
 	.get_hba_info		= stgt_get_hba_info,
-	.get_dev_info		= stgt_get_dev_info,
 	.check_lba		= stgt_check_lba,
 	.check_for_SG		= stgt_check_for_SG,
 	.get_cdb		= stgt_get_cdb,

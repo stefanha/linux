@@ -29,6 +29,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
@@ -46,8 +47,6 @@
 
 static struct se_subsystem_api rd_dr_template;
 static struct se_subsystem_api rd_mcp_template;
-
-static void __rd_get_dev_info(struct rd_dev *, char *, int *);
 
 /* #define DEBUG_RAMDISK_MCP */
 /* #define DEBUG_RAMDISK_DR */
@@ -992,6 +991,14 @@ static void rd_free_task(struct se_task *task)
 	kfree(req);
 }
 
+enum {
+	Opt_rd_pages
+};
+
+static match_table_t tokens = {
+	{Opt_rd_pages, "rd_pages=%d"},
+};
+
 static ssize_t rd_set_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -999,50 +1006,36 @@ static ssize_t rd_set_configfs_dev_params(
 	ssize_t count)
 {
 	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	unsigned long rd_pages;
-	int params = 0, ret;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for temporary buffer\n");
-		return 0;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
+	char *orig, *ptr, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
 
-		*ptr = '\0';
-		ptr++;
+	orig = opts;
 
-		ptr2 = strstr(cur, "rd_pages");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &rd_pages);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed for"
-					" rd_pages=\n");
-				break;
-			}
-			rd_dev->rd_page_count = (u32)rd_pages;
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
+
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_rd_pages:
+			match_int(args, &arg);
+			rd_dev->rd_page_count = arg;
 			printk(KERN_INFO "RAMDISK: Referencing Page"
 				" Count: %u\n", rd_dev->rd_page_count);
 			rd_dev->rd_flags |= RDF_HAS_PAGE_COUNT;
-			params++;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
-out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
@@ -1055,18 +1048,6 @@ static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	}
 
 	return 0;
-}
-
-static ssize_t rd_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	 __rd_get_dev_info(rd_dev, page, &bl);
-	return (ssize_t)bl;
 }
 
 static void rd_dr_get_plugin_info(void *p, char *b, int *bl)
@@ -1088,23 +1069,19 @@ static void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM RamDisk HBA\n");
 }
 
-static void rd_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t rd_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct rd_dev *rd_dev = dev->dev_ptr;
-
-	__rd_get_dev_info(rd_dev, b, bl);
-}
-
-static void __rd_get_dev_info(struct rd_dev *rd_dev, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM RamDisk ID: %u  RamDisk Makeup: %s\n",
+	struct rd_dev *rd_dev = se_dev->se_dev_su_ptr;
+	ssize_t bl = sprintf(b, "TCM RamDisk ID: %u  RamDisk Makeup: %s\n",
 			rd_dev->rd_dev_id, (rd_dev->rd_direct) ?
 			"rd_direct" : "rd_mcp");
-	*bl += sprintf(b + *bl, "        PAGES/PAGE_SIZE: %u*%lu"
+	bl += sprintf(b + bl, "        PAGES/PAGE_SIZE: %u*%lu"
 			"  SG_table_count: %u\n", rd_dev->rd_page_count,
 			PAGE_SIZE, rd_dev->sg_table_count);
-
-	return;
+	return bl;
 }
 
 /*	rd_map_task_non_SG():
@@ -1300,7 +1277,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
 	.get_plugin_info	= rd_dr_get_plugin_info,
 	.get_hba_info		= rd_get_hba_info,
-	.get_dev_info		= rd_get_dev_info,
 	.check_lba		= rd_DIRECT_check_lba,
 	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,
@@ -1334,7 +1310,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
 	.get_plugin_info	= rd_mcp_get_plugin_info,
 	.get_hba_info		= rd_get_hba_info,
-	.get_dev_info		= rd_get_dev_info,
 	.check_lba		= rd_MEMCPY_check_lba,
 	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,

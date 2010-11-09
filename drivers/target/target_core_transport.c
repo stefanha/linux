@@ -1560,64 +1560,6 @@ void transport_dump_dev_state(
 	*bl += sprintf(b + *bl, "        ");
 }
 
-void transport_dump_dev_info(
-	struct se_device *dev,
-	struct se_lun *lun,
-	unsigned long long total_bytes,
-	char *b,        /* Pointer to info buffer */
-	int *bl)
-{
-	struct se_hba *hba = dev->se_hba;
-	struct se_subsystem_api *t = hba->transport;
-
-	t->get_dev_info(dev, b, bl);
-	*bl += sprintf(b + *bl, "        ");
-	*bl += sprintf(b + *bl, "Type: %s ",
-		scsi_device_type(TRANSPORT(dev)->get_device_type(dev)));
-	*bl += sprintf(b + *bl, "ANSI SCSI revision: %02x  ",
-		TRANSPORT(dev)->get_device_rev(dev));
-
-	if (DEV_T10_WWN(dev)) {
-		struct t10_wwn *wwn = DEV_T10_WWN(dev);
-
-		*bl += sprintf(b + *bl, "Unit Serial: %s  ",
-			((strlen(wwn->unit_serial) != 0) ?
-			(char *)wwn->unit_serial : "None"));
-	}
-	*bl += sprintf(b + *bl, "%s", "DIRECT");
-
-	if (atomic_read(&dev->dev_access_obj.obj_access_count))
-		*bl += sprintf(b + *bl, "  ACCESSED\n");
-	else if (atomic_read(&dev->dev_export_obj.obj_access_count))
-		*bl += sprintf(b + *bl, "  EXPORTED\n");
-	else
-		*bl += sprintf(b + *bl, "  FREE\n");
-
-	if (lun) {
-		*bl += sprintf(b + *bl, "        Core Host ID: %u LUN: %u",
-			dev->se_hba->hba_id, lun->unpacked_lun);
-		if (!(TRANSPORT(dev)->get_device_type(dev))) {
-			*bl += sprintf(b + *bl, "  Active Cmds: %d  Total Bytes"
-				": %llu\n", atomic_read(&dev->active_cmds),
-			total_bytes);
-		} else {
-			*bl += sprintf(b + *bl, "  Active Cmds: %d\n",
-				atomic_read(&dev->active_cmds));
-		}
-	} else {
-		if (!(TRANSPORT(dev)->get_device_type(dev))) {
-			*bl += sprintf(b + *bl, "        Core Host ID: %u"
-				"  Active Cmds: %d  Total Bytes: %llu\n",
-				dev->se_hba->hba_id,
-				atomic_read(&dev->active_cmds), total_bytes);
-		} else {
-			*bl += sprintf(b + *bl, "        CoreI Host ID: %u"
-				"  Active Cmds: %d\n", dev->se_hba->hba_id,
-				atomic_read(&dev->active_cmds));
-		}
-	}
-}
-
 /*	transport_release_all_cmds():
  *
  *
