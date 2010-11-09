@@ -179,7 +179,6 @@ static struct se_device *iblock_create_virtdevice(
 	limits->logical_block_size = bdev_logical_block_size(bd);	
 	limits->max_hw_sectors = queue_max_hw_sectors(q);
 	limits->max_sectors = queue_max_sectors(q);
-	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
 	dev_limits.hw_queue_depth = IBLOCK_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = IBLOCK_DEVICE_QUEUE_DEPTH;
 

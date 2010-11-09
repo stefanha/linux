@@ -41,6 +41,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_host.h>
+#include <scsi/libsas.h> /* For TASK_ATTR_* */
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
@@ -203,35 +204,6 @@ static struct se_device *pscsi_add_device_to_list(
 	struct queue_limits *limits;
 
 	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
-	/*
-	 * Some pseudo SCSI HBAs do not fill in sector_size
-	 * correctly. (See ide-scsi.c)  So go ahead and setup sane
-	 * values.
-	 */
-	if (!sd->sector_size) {
-		switch (sd->type) {
-		case TYPE_DISK:
-			sd->sector_size = 512;
-			break;
-		case TYPE_ROM:
-			sd->sector_size = 2048;
-			break;
-		case TYPE_TAPE: /* The Tape may not be in the drive */
-			break;
-		case TYPE_MEDIUM_CHANGER: /* Control CDBs only */
-			break;
-		default:
-			printk(KERN_ERR "Unable to set sector_size for %d\n",
-					sd->type);
-			return NULL;
-		}
-
-		if (sd->sector_size) {
-			printk(KERN_ERR "Set broken SCSI Device"
-				" %d:%d:%d sector_size to %d\n", sd->channel,
-				sd->id, sd->lun, sd->sector_size);
-		}
-	}
 
 	if (!sd->queue_depth) {
 		sd->queue_depth = PSCSI_DEFAULT_QUEUEDEPTH;
@@ -251,7 +223,6 @@ static struct se_device *pscsi_add_device_to_list(
 				  queue_max_hw_sectors(q) : sd->host->max_sectors; 
 	limits->max_sectors = (sd->host->max_sectors > queue_max_sectors(q)) ?
 				  queue_max_sectors(q) : sd->host->max_sectors;
-	dev_limits.max_cdb_len = PSCSI_MAX_CDB_SIZE;
 	dev_limits.hw_queue_depth = sd->queue_depth;
 	dev_limits.queue_depth = sd->queue_depth;
 	/*
@@ -711,17 +682,7 @@ static void *pscsi_allocate_request(
 	 * allocate the extended CDB buffer for per struct se_task context
 	 * pt->pscsi_cdb now.
 	 */
-	if (cmd->se_cmd_flags & SCF_ECDB_ALLOCATION) {
-		/*
-		 * PSCSI_MAX_CDB_SIZE is currently set to 240 bytes which
-		 * allows the largest OSD CDB sizes again.
-		 */
-		if (scsi_command_size(cdb) > PSCSI_MAX_CDB_SIZE) {
-			printk(KERN_ERR "pSCSI: Received CDB of size: %u larger"
-				" than PSCSI_MAX_CDB_SIZE: %u\n",
-				scsi_command_size(cdb), PSCSI_MAX_CDB_SIZE);
-			return NULL;
-		}
+	if (T_TASK(cmd)->t_task_cdb != T_TASK(cmd)->__t_task_cdb) {
 
 		pt->pscsi_cdb = kzalloc(scsi_command_size(cdb), GFP_KERNEL);
 		if (!(pt->pscsi_cdb)) {
@@ -813,9 +774,12 @@ static int pscsi_do_task(struct se_task *task)
 	pt->pscsi_req->retries = PS_RETRY;
 	/*
 	 * Queue the struct request into the struct scsi_device->request_queue.
+	 * Also check for HEAD_OF_QUEUE SAM TASK attr from received se_cmd
+	 * descriptor
 	 */
-	blk_execute_rq_nowait(pdv->pdv_sd->request_queue, NULL,
-			      pt->pscsi_req, 1, pscsi_req_done);
+	blk_execute_rq_nowait(pdv->pdv_sd->request_queue, NULL, pt->pscsi_req,
+			(task->task_se_cmd->sam_task_attr == TASK_ATTR_HOQ),
+			pscsi_req_done);
 
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
@@ -827,11 +791,12 @@ static int pscsi_do_task(struct se_task *task)
 static void pscsi_free_task(struct se_task *task)
 {
 	struct pscsi_plugin_task *pt = task->transport_req;
+	struct se_cmd *cmd = task->task_se_cmd;
 	/*
 	 * Release the extended CDB allocation from pscsi_allocate_request()
 	 * if one exists.
 	 */
-	if (task->task_se_cmd->se_cmd_flags & SCF_ECDB_ALLOCATION)
+	if (T_TASK(cmd)->t_task_cdb != T_TASK(cmd)->__t_task_cdb)
 		kfree(pt->pscsi_cdb);
 	/*
 	 * We do not release the bio(s) here associated with this task, as
@@ -1092,7 +1057,7 @@ static int __pscsi_map_task_SG(
 	u32 data_len = task->task_size, i, len, bytes, off;
 	int nr_pages = (task->task_size + task_sg[0].offset +
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
-	int nr_vecs = 0, ret = 0;
+	int nr_vecs = 0, rc, ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
 	int rw = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
 
 	if (!task->task_size)
@@ -1154,9 +1119,9 @@ static int __pscsi_map_task_SG(
 				" bio: %p page: %p len: %d off: %d\n", i, bio,
 				page, len, off);
 
-			ret = bio_add_pc_page(pdv->pdv_sd->request_queue,
+			rc = bio_add_pc_page(pdv->pdv_sd->request_queue,
 					bio, page, bytes, off);
-			if (ret != bytes)
+			if (rc != bytes)
 				goto fail;
 
 			DEBUG_PSCSI("PSCSI: bio->bi_vcnt: %d nr_vecs: %d\n",
@@ -1205,21 +1170,16 @@ static int __pscsi_map_task_SG(
 		return task->task_sg_num;
 	}
 	/*
-	 * Setup the secondary pt->pscsi_req_bidi used for the extra BIDI-COMMAND
+	 * Setup the secondary pt->pscsi_req->next_rq used for the extra BIDI-COMMAND
 	 * SCSI READ paylaod mapped for struct se_task->task_sg_bidi[]
 	 */
-	pt->pscsi_req_bidi = blk_make_request(pdv->pdv_sd->request_queue,
+	pt->pscsi_req->next_rq = blk_make_request(pdv->pdv_sd->request_queue,
 					hbio, GFP_KERNEL);
-	if (!(pt->pscsi_req_bidi)) {
+	if (!(pt->pscsi_req->next_rq)) {
 		printk(KERN_ERR "pSCSI: blk_make_request() failed for BIDI\n");
 		goto fail;
 	}
-	pscsi_blk_init_request(task, pt, pt->pscsi_req_bidi, 1);
-	/*
-	 * Setup the magic BIDI-COMMAND ->next_req pointer to the original
-	 * pt->pscsi_req.
-	 */	
-	pt->pscsi_req->next_rq = pt->pscsi_req_bidi;
+	pscsi_blk_init_request(task, pt, pt->pscsi_req->next_rq, 1);
 
 	return task->task_sg_num;
 fail:
@@ -1473,11 +1433,11 @@ static void pscsi_req_done(struct request *req, int uptodate)
 	pt->pscsi_resid = req->resid_len;
 
 	pscsi_process_SAM_status(task, pt);
-
-	if (req->next_rq != NULL) {
+	/*
+	 * Release BIDI-READ if present
+	 */
+	if (req->next_rq != NULL)
 		__blk_put_request(req->q, req->next_rq);
-		pt->pscsi_req_bidi = NULL;
-	}
 
 	__blk_put_request(req->q, req);
 	pt->pscsi_req = NULL;

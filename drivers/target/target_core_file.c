@@ -231,7 +231,6 @@ static struct se_device *fd_create_virtdevice(
 		fd_dev->fd_block_size = FD_BLOCKSIZE;
 	}
 
-	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
 	dev_limits.hw_queue_depth = FD_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = FD_DEVICE_QUEUE_DEPTH;
 

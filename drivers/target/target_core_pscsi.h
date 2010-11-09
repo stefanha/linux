@@ -9,9 +9,6 @@
 #define INQUIRY_DATA_SIZE	0x24
 #endif
 
-/* Maximum extended CDB size for handling OSD passthrough */
-#define PSCSI_MAX_CDB_SIZE	240
-
 /* used in pscsi_add_device_to_list() */
 #define PSCSI_DEFAULT_QUEUEDEPTH	1
 
@@ -35,7 +32,6 @@ struct pscsi_plugin_task {
 	int	pscsi_result;
 	u32	pscsi_resid;
 	struct request *pscsi_req;
-	struct request *pscsi_req_bidi;
 } ____cacheline_aligned;
 
 #define PDF_HAS_CHANNEL_ID	0x01
