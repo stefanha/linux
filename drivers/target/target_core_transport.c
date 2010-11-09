@@ -5680,6 +5680,16 @@ void transport_generic_complete_ok(struct se_cmd *cmd)
 					cmd->data_length;
 		}
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
+		/*
+		 * If enabled by TCM fabirc module pre-registered SGL
+		 * memory, perform the memcpy() from the TCM internal
+		 * contigious buffer back to the original SGL.
+		 */
+		if (cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG)
+			transport_memcpy_write_contig(cmd,
+				 T_TASK(cmd)->t_task_pt_sgl,
+				 T_TASK(cmd)->t_task_buf);
+
 		CMD_TFO(cmd)->queue_data_in(cmd);
 		break;
 	case DMA_TO_DEVICE:
@@ -5927,31 +5937,42 @@ release_cmd:
 	return 0;
 }
 
+/*
+ * transport_generic_map_mem_to_cmd - Perform SGL -> struct se_mem map
+ * @cmd:  Associated se_cmd descriptor
+ * @mem:  SGL style memory for TCM WRITE / READ
+ * @sg_mem_num: Number of SGL elements
+ * @mem_bidi_in: SGL style memory for TCM BIDI READ
+ * @sg_mem_bidi_num: Number of BIDI READ SGL elements 
+ *
+ * Return: nonzero return cmd was rejected for -ENOMEM or inproper usage
+ * of parameters.
+ */
 int transport_generic_map_mem_to_cmd(
 	struct se_cmd *cmd,
-	void *mem,
-	u32 se_mem_num,
-	void *mem_bidi_in,
-	u32 se_mem_bidi_num)
+	struct scatterlist *mem,
+	u32 sg_mem_num,
+	struct scatterlist *mem_bidi_in,
+	u32 sg_mem_bidi_num)
 {
 	u32 se_mem_cnt_out = 0;
 	int ret;
 
-	if (!(mem) || !(se_mem_num))
+	if (!(mem) || !(sg_mem_num))
 		return 0;
 	/*
 	 * Passed *mem will contain a list_head containing preformatted
 	 * struct se_mem elements...
 	 */
 	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM)) {
-		if ((mem_bidi_in) || (se_mem_bidi_num)) {
+		if ((mem_bidi_in) || (sg_mem_bidi_num)) {
 			printk(KERN_ERR "SCF_CMD_PASSTHROUGH_NOALLOC not supported"
 				" with BIDI-COMMAND\n");
 			return -ENOSYS;
 		}
 
 		T_TASK(cmd)->t_mem_list = (struct list_head *)mem;
-		T_TASK(cmd)->t_tasks_se_num = se_mem_num;
+		T_TASK(cmd)->t_tasks_se_num = sg_mem_num;
 		cmd->se_cmd_flags |= SCF_CMD_PASSTHROUGH_NOALLOC;
 		return 0;
 	}
@@ -5979,7 +6000,7 @@ int transport_generic_map_mem_to_cmd(
 		/*
 		 * Setup BIDI READ list of struct se_mem elements
 		 */
-		if ((mem_bidi_in) && (se_mem_bidi_num)) {
+		if ((mem_bidi_in) && (sg_mem_bidi_num)) {
 			T_TASK(cmd)->t_mem_bidi_list = transport_init_se_mem_list();
 			if (!(T_TASK(cmd)->t_mem_bidi_list)) {
 				kfree(T_TASK(cmd)->t_mem_list);
@@ -6000,16 +6021,22 @@ int transport_generic_map_mem_to_cmd(
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
+		if (mem_bidi_in || sg_mem_bidi_num) {
+			printk(KERN_ERR "BIDI-Commands not supported using "
+				"SCF_SCSI_CONTROL_NONSG_IO_CDB\n");
+			return -ENOSYS;
+		}
 		/*
-		 * For CDBs using a contiguous buffer, save the passed
-		 * struct scatterlist memory.  After TCM storage object
-		 * processing has completed for this struct se_cmd, the calling
-		 * TCM fabric module is expected to call 
-		 * transport_memcpy_write_contig() to copy the TCM buffer
-		 * back into the passed *mem of type struct scatterlist array.
+		 * For incoming CDBs using a contiguous buffer internall with TCM,
+		 * save the passed struct scatterlist memory.  After TCM storage object
+		 * processing has completed for this struct se_cmd, TCM core will call
+		 * transport_memcpy_[write,read]_contig() as necessary from
+		 * transport_generic_complete_ok() and transport_write_pending() in order
+		 * to copy the TCM buffer to/from the original passed *mem in SGL ->
+		 * struct scatterlist format.
 		 */
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_CONTIG_TO_SG;
-		T_TASK(cmd)->t_task_pt_buf = mem;
+		T_TASK(cmd)->t_task_pt_sgl = mem;
 	}
 
 	return 0;
@@ -7035,6 +7062,16 @@ static int transport_generic_write_pending(struct se_cmd *cmd)
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	cmd->t_state = TRANSPORT_WRITE_PENDING;
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
+	/*
+	 * For the TCM control CDBs using a contiguous buffer, do the memcpy
+	 * from the passed Linux/SCSI struct scatterlist located at
+	 * T_TASK(se_cmd)->t_task_pt_buf to the contiguous buffer at
+	 * T_TASK(se_cmd)->t_task_buf.
+	 */
+	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG)
+		transport_memcpy_read_contig(cmd,
+				T_TASK(cmd)->t_task_buf,
+				T_TASK(cmd)->t_task_pt_sgl);
 	/*
 	 * Call the fabric write_pending function here to let the
 	 * frontend know that WRITE buffers are ready.

@@ -462,7 +462,12 @@ struct se_transport_task {
 	struct scatterlist	*t_tasks_sg_chained;
 	struct scatterlist	t_tasks_sg_bounce;
 	void			*t_task_buf;
-	void			*t_task_pt_buf;
+	/*
+	 * Used for pre-registered fabric SGL passthrough WRITE and READ
+	 * with the special SCF_PASSTHROUGH_CONTIG_TO_SG case for TCM_Loop
+	 * and other HW target mode fabric modules.
+	 */
+	struct scatterlist	*t_task_pt_sgl;
 	struct list_head	*t_mem_list;
 	/* Used for BIDI READ */
 	struct list_head	*t_mem_bidi_list;

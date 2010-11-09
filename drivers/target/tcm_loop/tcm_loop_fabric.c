@@ -345,19 +345,6 @@ int tcm_loop_write_pending(struct se_cmd *se_cmd)
 	 * memory, and memory has already been mapped to struct se_cmd->t_mem_list
 	 * format with transport_generic_map_mem_to_cmd().
 	 *
-	 * For the TCM control CDBs using a contiguous buffer, do the memcpy
-	 * from the passed Linux/SCSI struct scatterlist located at
-	 * T_TASK(se_cmd)->t_task_pt_buf to the contiguous buffer at
-	 * T_TASK(se_cmd)->t_task_buf.
-	 */
-	if (se_cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG) {
-		TL_CDB_DEBUG("Calling transport_memcpy_read_contig()"
-				" for SCF_PASSTHROUGH_CONTIG_TO_SG\n");
-		transport_memcpy_read_contig(se_cmd,
-				T_TASK(se_cmd)->t_task_buf,
-				T_TASK(se_cmd)->t_task_pt_buf);
-	}
-	/*
 	 * We now tell TCM to add this WRITE CDB directly into the TCM storage
 	 * object execution queue.
 	 */
@@ -378,14 +365,6 @@ int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 
 	TL_CDB_DEBUG( "tcm_loop_queue_data_in() called for scsi_cmnd: %p"
 			" cdb: 0x%02x\n", sc, sc->cmnd[0]);
-
-	if (se_cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG) {
-		TL_CDB_DEBUG("Calling transport_memcpy_write_contig()"
-			" for SCF_PASSTHROUGH_CONTIG_TO_SG\n");
-		transport_memcpy_write_contig(se_cmd,
-			T_TASK(se_cmd)->t_task_pt_buf,
-			T_TASK(se_cmd)->t_task_buf);
-	}
 
 	sc->result = host_byte(DID_OK) | SAM_STAT_GOOD;
 	(*sc->scsi_done)(sc);
