@@ -1199,21 +1199,16 @@ static int __pscsi_map_task_SG(
 		return task->task_sg_num;
 	}
 	/*
-	 * Setup the secondary pt->pscsi_req_bidi used for the extra BIDI-COMMAND
+	 * Setup the secondary pt->pscsi_req->next_rq used for the extra BIDI-COMMAND
 	 * SCSI READ paylaod mapped for struct se_task->task_sg_bidi[]
 	 */
-	pt->pscsi_req_bidi = blk_make_request(pdv->pdv_sd->request_queue,
+	pt->pscsi_req->next_rq = blk_make_request(pdv->pdv_sd->request_queue,
 					hbio, GFP_KERNEL);
-	if (!(pt->pscsi_req_bidi)) {
+	if (!(pt->pscsi_req->next_rq)) {
 		printk(KERN_ERR "pSCSI: blk_make_request() failed for BIDI\n");
 		goto fail;
 	}
-	pscsi_blk_init_request(task, pt, pt->pscsi_req_bidi, 1);
-	/*
-	 * Setup the magic BIDI-COMMAND ->next_req pointer to the original
-	 * pt->pscsi_req.
-	 */	
-	pt->pscsi_req->next_rq = pt->pscsi_req_bidi;
+	pscsi_blk_init_request(task, pt, pt->pscsi_req->next_rq, 1);
 
 	return task->task_sg_num;
 fail:
@@ -1467,11 +1462,11 @@ static void pscsi_req_done(struct request *req, int uptodate)
 	pt->pscsi_resid = req->resid_len;
 
 	pscsi_process_SAM_status(task, pt);
-
-	if (req->next_rq != NULL) {
+	/*
+	 * Release BIDI-READ if present
+	 */
+	if (req->next_rq != NULL)
 		__blk_put_request(req->q, req->next_rq);
-		pt->pscsi_req_bidi = NULL;
-	}
 
 	__blk_put_request(req->q, req);
 	pt->pscsi_req = NULL;

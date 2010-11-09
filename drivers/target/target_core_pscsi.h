@@ -32,7 +32,6 @@ struct pscsi_plugin_task {
 	int	pscsi_result;
 	u32	pscsi_resid;
 	struct request *pscsi_req;
-	struct request *pscsi_req_bidi;
 } ____cacheline_aligned;
 
 #define PDF_HAS_CHANNEL_ID	0x01
