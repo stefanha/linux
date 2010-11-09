@@ -143,7 +143,6 @@ extern void transport_subsystem_release(struct se_subsystem_api *);
 extern void transport_load_plugins(void);
 extern struct se_subsystem_api *transport_core_get_sub_by_name(const char *);
 extern void transport_core_put_sub(struct se_subsystem_api *);
-extern void transport_check_dev_params_delim(char *, char **);
 extern struct se_session *transport_init_session(void);
 extern void __transport_register_session(struct se_portal_group *,
 					struct se_node_acl *,

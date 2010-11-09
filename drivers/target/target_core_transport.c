@@ -604,21 +604,6 @@ void transport_core_put_sub(struct se_subsystem_api *s)
 	smp_mb__after_atomic_dec();
 }
 
-void transport_check_dev_params_delim(char *ptr, char **cur)
-{
-	char *ptr2;
-
-	if (ptr) {
-		ptr2 = strstr(ptr, ",");
-		if ((ptr2)) {
-			*ptr2 = '\0';
-			*cur = (ptr2 + 1); /* Skip over comma */
-		} else
-			*cur = NULL;
-	}
-}
-EXPORT_SYMBOL(transport_check_dev_params_delim);
-
 struct se_session *transport_init_session(void)
 {
 	struct se_session *se_sess;
