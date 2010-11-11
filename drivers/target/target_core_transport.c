@@ -1983,13 +1983,6 @@ static void core_setup_task_attr_emulation(struct se_device *dev)
 		TRANSPORT(dev)->get_device_rev(dev));
 }
 
-/*	transport_add_device_to_core_hba():
- *
- *	Note that some plugins (IBLOCK) will pass device_flags ==
- *	DF_CLAIMED_BLOCKDEV signifying OS that a dependent block_device
- *	has been claimed.  In exception cases we will release said
- *	block_device ourselves.
- */
 struct se_device *transport_add_device_to_core_hba(
 	struct se_hba *hba,
 	struct se_subsystem_api *transport,
