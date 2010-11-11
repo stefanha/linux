@@ -433,7 +433,7 @@ static int uas_submit_urbs(struct scsi_cmnd *cmnd,
 	return 0;
 }
 
-static int uas_queuecommand(struct scsi_cmnd *cmnd,
+static int uas_queuecommand_lck(struct scsi_cmnd *cmnd,
 					void (*done)(struct scsi_cmnd *))
 {
 	struct scsi_device *sdev = cmnd->device;
@@ -490,6 +490,8 @@ static int uas_queuecommand(struct scsi_cmnd *cmnd,
 
 	return 0;
 }
+
+static DEF_SCSI_QCMD(uas_queuecommand)
 
 static int uas_eh_abort_handler(struct scsi_cmnd *cmnd)
 {

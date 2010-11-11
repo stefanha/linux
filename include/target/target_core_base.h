@@ -1057,9 +1057,6 @@ struct se_global {
 	spinlock_t		se_tpg_lock;
 	spinlock_t		lu_gps_lock;
 	spinlock_t		plugin_class_lock;
-#ifdef DEBUG_DEV
-	spinlock_t		debug_dev_lock;
-#endif
 } ____cacheline_aligned;
 
 #endif /* TARGET_CORE_BASE_H */

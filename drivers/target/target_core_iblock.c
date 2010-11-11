@@ -180,7 +180,6 @@ static struct se_device *iblock_create_virtdevice(
 	dev_limits.hw_queue_depth = IBLOCK_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = IBLOCK_DEVICE_QUEUE_DEPTH;
 
-	dev_flags = DF_CLAIMED_BLOCKDEV;
 	ib_dev->ibd_major = MAJOR(bd->bd_dev);
 	ib_dev->ibd_minor = MINOR(bd->bd_dev);
 	ib_dev->ibd_bd = bd;

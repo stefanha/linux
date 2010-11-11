@@ -2081,7 +2081,7 @@ static void arcmsr_handle_virtual_command(struct AdapterControlBlock *acb,
 	}
 }
 
-static int arcmsr_queue_command(struct scsi_cmnd *cmd,
+static int arcmsr_queue_command_lck(struct scsi_cmnd *cmd,
 	void (* done)(struct scsi_cmnd *))
 {
 	struct Scsi_Host *host = cmd->device->host;
@@ -2123,6 +2123,8 @@ static int arcmsr_queue_command(struct scsi_cmnd *cmd,
 	arcmsr_post_ccb(acb, ccb);
 	return 0;
 }
+
+static DEF_SCSI_QCMD(arcmsr_queue_command)
 
 static bool arcmsr_get_hba_config(struct AdapterControlBlock *acb)
 {

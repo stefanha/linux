@@ -1749,8 +1749,8 @@ NCR_700_intr(int irq, void *dev_id)
 	return IRQ_RETVAL(handled);
 }
 
-STATIC int
-NCR_700_queuecommand(struct scsi_cmnd *SCp, void (*done)(struct scsi_cmnd *))
+static int
+NCR_700_queuecommand_lck(struct scsi_cmnd *SCp, void (*done)(struct scsi_cmnd *))
 {
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SCp->device->host->hostdata[0];
@@ -1903,6 +1903,8 @@ NCR_700_queuecommand(struct scsi_cmnd *SCp, void (*done)(struct scsi_cmnd *))
 	NCR_700_start_command(SCp);
 	return 0;
 }
+
+STATIC DEF_SCSI_QCMD(NCR_700_queuecommand)
 
 STATIC int
 NCR_700_abort(struct scsi_cmnd * SCp)

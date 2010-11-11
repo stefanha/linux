@@ -413,71 +413,6 @@ void release_se_global(void)
 	se_global = NULL;
 }
 
-#ifdef DEBUG_DEV
-
-/* warning FIXME: PLUGIN API TODO */
-int __iscsi_debug_dev(struct se_device *dev)
-{
-	int fail_task = 0;
-	fd_dev_t *fd_dev;
-	iblock_dev_t *ib_dev;
-	rd_dev_t *rd_dev;
-	struct scsi_device *sd;
-
-	spin_lock(&se_global->debug_dev_lock);
-	switch (dev->se_hba->type) {
-	case PSCSI:
-		sd = (struct scsi_device *) dev->dev_ptr;
-		if (dev->dev_flags & DF_DEV_DEBUG) {
-			printk(KERN_INFO "HBA[%u] - Failing PSCSI Task for"
-				" %d/%d/%d\n", dev->se_hba->hba_id,
-				sd->channel, sd->id, sd->lun);
-			fail_task = 1;
-		}
-		break;
-	case IBLOCK:
-		ib_dev = (iblock_dev_t *) dev->dev_ptr;
-		if (dev->dev_flags & DF_DEV_DEBUG) {
-			printk(KERN_INFO "HBA[%u] - Failing IBLOCK Task for"
-				" %u/%u\n", dev->se_hba->hba_id,
-				ib_dev->ibd_major, ib_dev->ibd_minor);
-			fail_task = 1;
-		}
-		break;
-	case FILEIO:
-		fd_dev = (fd_dev_t *) dev->dev_ptr;
-		if (dev->dev_flags & DF_DEV_DEBUG) {
-			printk(KERN_INFO "HBA[%u] - Failing FILEIO Task for"
-				" %u\n", dev->se_hba->hba_id,
-				fd_dev->fd_dev_id);
-			fail_task = 1;
-		}
-		break;
-	case RAMDISK_DR:
-	case RAMDISK_MCP:
-		rd_dev = (rd_dev_t *) dev->dev_ptr;
-		if (dev->dev_flags & DF_DEV_DEBUG) {
-			printk(KERN_INFO "HBA[%u] - Failing RAMDISK Task for"
-				" %u\n", dev->se_hba->hba_id,
-				rd_dev->rd_dev_id);
-			fail_task = 1;
-		}
-		break;
-	default:
-		if (dev->dev_flags & DF_DEV_DEBUG) {
-			printk(KERN_INFO "HBA[%u] - Failing unknown Task\n",
-				dev->se_hba->hba_id);
-			fail_task = 1;
-		}
-		break;
-	}
-	spin_unlock(&se_global->debug_dev_lock);
-
-	return fail_task;
-}
-
-#endif /* DEBUG_DEV */
-
 void transport_init_queue_obj(struct se_queue_obj *qobj)
 {
 	atomic_set(&qobj->queue_cnt, 0);
@@ -1228,17 +1163,6 @@ check_task_stop:
 		return;
 	}
 	atomic_dec(&T_TASK(cmd)->t_task_cdbs_timeout_left);
-
-#ifdef DEBUG_DEV
-	if (dev) {
-		if (__iscsi_debug_dev(dev) != 0) {
-			success = 0;
-			task->task_scsi_status = 1;
-			cmd->transport_error_status =
-				PYX_TRANSPORT_LU_COMM_FAILURE;
-		}
-	}
-#endif /* DEBUG_DEV */
 
 	/*
 	 * Decrement the outstanding t_task_cdbs_left count.  The last
@@ -2059,13 +1983,6 @@ static void core_setup_task_attr_emulation(struct se_device *dev)
 		TRANSPORT(dev)->get_device_rev(dev));
 }
 
-/*	transport_add_device_to_core_hba():
- *
- *	Note that some plugins (IBLOCK) will pass device_flags ==
- *	DF_CLAIMED_BLOCKDEV signifying OS that a dependent block_device
- *	has been claimed.  In exception cases we will release said
- *	block_device ourselves.
- */
 struct se_device *transport_add_device_to_core_hba(
 	struct se_hba *hba,
 	struct se_subsystem_api *transport,

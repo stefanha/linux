@@ -59,16 +59,10 @@
 /*
  * struct se_device->dev_flags
  */
-#define DF_READAHEAD_ACTIVE                     0x00000001
-#define DF_TRANSPORT_DMA_ALLOC			0x00000002
-#define DF_TRANSPORT_BUF_ALLOC			0x00000004
-#define DF_DEV_DEBUG				0x00000008
-#define DF_CLAIMED_BLOCKDEV			0x00000010
-#define DF_PERSISTENT_CLAIMED_BLOCKDEV		0x00000020
-#define DF_READ_ONLY				0x00000040
-#define DF_SPC3_PERSISTENT_RESERVE		0x00000080
-#define DF_SPC2_RESERVATIONS			0x00000100
-#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000200
+#define DF_TRANSPORT_DMA_ALLOC			0x00000001
+#define DF_READ_ONLY				0x00000002
+#define DF_SPC2_RESERVATIONS			0x00000004
+#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000008
 
 /*
  * Used as return values from transport_generic_cmd_sequencer()
@@ -132,9 +126,6 @@ struct se_subsystem_api;
 
 extern int init_se_global(void);
 extern void release_se_global(void);
-#ifdef DEBUG_DEV
-extern int __iscsi_debug_dev(struct se_device *);
-#endif
 extern void transport_init_queue_obj(struct se_queue_obj *);
 extern int transport_subsystem_check_init(void);
 extern int transport_subsystem_register(struct se_subsystem_api *);
