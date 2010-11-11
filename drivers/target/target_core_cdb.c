@@ -497,20 +497,18 @@ target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	if (DEV_ATTRIB(dev)->emulate_tpu || DEV_ATTRIB(dev)->emulate_tpws)
 		have_tp = 1;
 
-	if (have_tp) {
-		if (cmd->data_length < (0x3c + 4)) {
-			printk(KERN_INFO "Received data_length: %u"
-				" too small for TPE=1 EVPD 0xb0\n",
-				cmd->data_length);
-			return -1;
-		}
-	} else {
-		if (cmd->data_length < (0x10 + 4)) {
-			printk(KERN_INFO "Received data_length: %u"
-				" too small for TPE=1 EVPD 0xb0\n",
-				cmd->data_length);
-			return -1;
-		}
+	if (cmd->data_length < (0x10 + 4)) {
+		printk(KERN_INFO "Received data_length: %u"
+			" too small for EVPD 0xb0\n",
+			cmd->data_length);
+		return -1;
+	}
+
+	if (have_tp && cmd->data_length < (0x3c + 4)) {
+		printk(KERN_INFO "Received data_length: %u"
+			" too small for TPE=1 EVPD 0xb0\n",
+			cmd->data_length);
+		have_tp = 0;
 	}
 
 	buf[0] = dev->transport->get_device_type(dev);
@@ -532,7 +530,11 @@ target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	 */
 	put_unaligned_be32(DEV_ATTRIB(dev)->optimal_sectors, &buf[12]);
 
-	if (!have_tp)
+	/*
+	 * Exit now if we don't support TP or the initiator sent a too
+	 * short buffer.
+	 */
+	if (!have_tp || cmd->data_length < (0x3c + 4))
 		return 0;
 
 	/*
