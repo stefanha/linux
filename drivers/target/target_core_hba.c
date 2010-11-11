@@ -69,13 +69,11 @@ struct se_hba *core_alloc_hba(void)
 
 	return hba;
 }
-EXPORT_SYMBOL(core_alloc_hba);
 
 void core_put_hba(struct se_hba *hba)
 {
 	mutex_unlock(&hba->hba_access_mutex);
 }
-EXPORT_SYMBOL(core_put_hba);
 
 /*	se_core_add_hba():
  *
@@ -139,7 +137,6 @@ int se_core_add_hba(
 
 	return 0;
 }
-EXPORT_SYMBOL(se_core_add_hba);
 
 static int se_core_shutdown_hba(
 	struct se_hba *hba)
@@ -202,4 +199,3 @@ int se_core_del_hba(
 	kmem_cache_free(se_hba_cache, hba);
 	return 0;
 }
-EXPORT_SYMBOL(se_core_del_hba);

@@ -195,7 +195,6 @@ struct kmem_cache *se_sess_cache;
 struct kmem_cache *se_hba_cache;
 struct kmem_cache *se_ua_cache;
 struct kmem_cache *se_mem_cache;
-EXPORT_SYMBOL(se_mem_cache); /* Used for target_core_rd.c */
 struct kmem_cache *t10_pr_reg_cache;
 struct kmem_cache *t10_alua_lu_gp_cache;
 struct kmem_cache *t10_alua_lu_gp_mem_cache;
@@ -488,17 +487,6 @@ int __iscsi_debug_dev(struct se_device *dev)
 }
 
 #endif /* DEBUG_DEV */
-
-/* #warning FIXME: transport_get_iqn_sn() for struct se_global */
-unsigned char *transport_get_iqn_sn(void)
-{
-	/*
-	 * Assume that for production WWN information will come through
-	 * ConfigFS at /sys/kernel/config/target/core/$HBA/$DEV/vpd_unit_serial
-	 */
-	return "1234567890";
-}
-EXPORT_SYMBOL(transport_get_iqn_sn);
 
 void transport_init_queue_obj(struct se_queue_obj *qobj)
 {
@@ -1463,36 +1451,6 @@ static void transport_remove_task_from_execute_queue(
 	atomic_dec(&dev->execute_tasks);
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 }
-
-/*	transport_check_device_tcq():
- *
- *
- */
-int transport_check_device_tcq(
-	struct se_device *dev,
-	u32 unpacked_lun,
-	u32 device_tcq)
-{
-	if (device_tcq > dev->queue_depth) {
-		printk(KERN_ERR "Attempting to set storage device queue depth"
-			" to %d while transport maximum is %d on LUN: %u,"
-			" ignoring request\n", device_tcq, dev->queue_depth,
-			unpacked_lun);
-		return -1;
-	} else if (!device_tcq) {
-		printk(KERN_ERR "Attempting to set storage device queue depth"
-			" to 0 on LUN: %u, ignoring request\n", unpacked_lun);
-		return -1;
-	}
-
-	dev->queue_depth = device_tcq;
-	atomic_set(&dev->depth_left, dev->queue_depth);
-	printk(KERN_INFO "Reset Device Queue Depth to %u for Logical Unit"
-		" Number: %u\n", dev->queue_depth, unpacked_lun);
-
-	return 0;
-}
-EXPORT_SYMBOL(transport_check_device_tcq);
 
 unsigned char *transport_dump_cmd_direction(struct se_cmd *cmd)
 {
@@ -3807,21 +3765,6 @@ void transport_task_timeout_handler(unsigned long data)
 	transport_add_cmd_to_queue(cmd, TRANSPORT_COMPLETE_FAILURE);
 }
 
-u32 transport_get_default_task_timeout(struct se_device *dev)
-{
-	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK)
-		return TRANSPORT_TIMEOUT_TYPE_DISK;
-
-	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_ROM)
-		return TRANSPORT_TIMEOUT_TYPE_ROM;
-
-	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE)
-		return TRANSPORT_TIMEOUT_TYPE_TAPE;
-
-	return TRANSPORT_TIMEOUT_TYPE_OTHER;
-}
-EXPORT_SYMBOL(transport_get_default_task_timeout);
-
 /*
  * Called with T_TASK(cmd)->t_state_lock held.
  */
@@ -5350,7 +5293,7 @@ int transport_passthrough_complete(
  * This function will copy a contiguous *src buffer into a destination
  * struct scatterlist array.
  */
-void transport_memcpy_write_contig(
+static void transport_memcpy_write_contig(
 	struct se_cmd *cmd,
 	struct scatterlist *sg_d,
 	unsigned char *src)
@@ -5375,13 +5318,12 @@ void transport_memcpy_write_contig(
 		i++;
         }
 }
-EXPORT_SYMBOL(transport_memcpy_write_contig);
 
 /*
  * This function will copy a struct scatterlist array *sg_s into a destination
  * contiguous *dst buffer.
  */
-void transport_memcpy_read_contig(
+static void transport_memcpy_read_contig(
 	struct se_cmd *cmd,
 	unsigned char *dst,
 	struct scatterlist *sg_s)
@@ -5406,7 +5348,6 @@ void transport_memcpy_read_contig(
 		i++;
 	}
 }
-EXPORT_SYMBOL(transport_memcpy_read_contig);
 
 void transport_memcpy_se_mem_read_contig(
 	struct se_cmd *cmd,
@@ -7102,7 +7043,7 @@ static void transport_nop_wait_for_tasks(
  *	Called from ConfigFS context to stop the passed struct se_cmd to allow
  *	an struct se_lun to be successfully shutdown.
  */
-int transport_lun_wait_for_tasks(struct se_cmd *cmd, struct se_lun *lun)
+static int transport_lun_wait_for_tasks(struct se_cmd *cmd, struct se_lun *lun)
 {
 	unsigned long flags;
 	int ret;
@@ -7139,7 +7080,6 @@ int transport_lun_wait_for_tasks(struct se_cmd *cmd, struct se_lun *lun)
 
 	return 0;
 }
-EXPORT_SYMBOL(transport_lun_wait_for_tasks);
 
 /* #define DEBUG_CLEAR_LUN */
 #ifdef DEBUG_CLEAR_LUN
@@ -7255,7 +7195,6 @@ check_cond:
 	}
 	spin_unlock_irqrestore(&lun->lun_cmd_lock, lun_flags);
 }
-EXPORT_SYMBOL(__transport_clear_lun_from_sessions);
 
 static int transport_clear_lun_thread(void *p)
 {
@@ -7281,7 +7220,6 @@ int transport_clear_lun_from_sessions(struct se_lun *lun)
 
 	return 0;
 }
-EXPORT_SYMBOL(transport_clear_lun_from_sessions);
 
 /*	transport_generic_wait_for_tasks():
  *
