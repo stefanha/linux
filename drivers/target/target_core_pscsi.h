@@ -25,6 +25,7 @@ extern struct se_global *se_global;
 #include <linux/kobject.h>
 
 struct pscsi_plugin_task {
+	struct se_task pscsi_task;
 	unsigned char *pscsi_cdb;
 	unsigned char __pscsi_cdb[TCM_MAX_COMMAND_SIZE];
 	unsigned char pscsi_sense[SCSI_SENSE_BUFFERSIZE];

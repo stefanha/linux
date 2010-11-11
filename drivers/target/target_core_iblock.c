@@ -243,13 +243,13 @@ static int iblock_transport_complete(struct se_task *task)
 	return 0;
 }
 
-/*	iblock_allocate_request(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void *iblock_allocate_request(
-	struct se_task *task,
-	struct se_device *dev)
+static inline struct iblock_req *IBLOCK_REQ(struct se_task *task)
+{
+	return container_of(task, struct iblock_req, ib_task);
+}
+
+static struct se_task *
+iblock_alloc_task(struct se_cmd *cmd)
 {
 	struct iblock_req *ib_req;
 
@@ -259,9 +259,9 @@ static void *iblock_allocate_request(
 		return NULL;
 	}
 
-	ib_req->ib_dev = dev->dev_ptr;
+	ib_req->ib_dev = SE_DEV(cmd)->dev_ptr;
 	atomic_set(&ib_req->ib_bio_cnt, 0);
-	return ib_req;
+	return &ib_req->ib_task;
 }
 
 static unsigned long long iblock_emulate_read_cap_with_block_size(
@@ -407,7 +407,7 @@ int iblock_emulated_fua_read(struct se_device *dev)
 static int iblock_do_task(struct se_task *task)
 {
 	struct se_device *dev = task->task_se_cmd->se_dev;
-	struct iblock_req *req = (struct iblock_req *)task->transport_req;
+	struct iblock_req *req = IBLOCK_REQ(task);
 	struct iblock_dev *ibd = (struct iblock_dev *)req->ib_dev;
 	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
 	struct bio *bio = req->ib_bio, *nbio = NULL;
@@ -454,7 +454,7 @@ static int iblock_do_discard(struct se_device *dev, sector_t lba, u32 range)
 
 static void iblock_free_task(struct se_task *task)
 {
-	struct iblock_req *req = task->transport_req;
+	struct iblock_req *req = IBLOCK_REQ(task);
 	struct bio *bio, *hbio = req->ib_bio;
 	/*
 	 * We only release the bio(s) here if iblock_bio_done() has not called
@@ -468,7 +468,6 @@ static void iblock_free_task(struct se_task *task)
 	}
 
 	kfree(req);
-	task->transport_req = NULL;
 }
 
 enum {
@@ -639,7 +638,7 @@ static int iblock_map_task_SG(struct se_task *task)
 	struct se_cmd *cmd = task->task_se_cmd;
 	struct se_device *dev = SE_DEV(cmd);
 	struct iblock_dev *ib_dev = task->se_dev->dev_ptr;
-	struct iblock_req *ib_req = task->transport_req;
+	struct iblock_req *ib_req = IBLOCK_REQ(task);
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
 	struct scatterlist *sg;
 	int ret = 0;
@@ -759,9 +758,7 @@ static int iblock_check_for_SG(struct se_task *task)
 
 static unsigned char *iblock_get_cdb(struct se_task *task)
 {
-	struct iblock_req *req = task->transport_req;
-
-	return req->ib_scsi_cdb;
+	return IBLOCK_REQ(task)->ib_scsi_cdb;
 }
 
 static u32 iblock_get_device_rev(struct se_device *dev)
@@ -791,7 +788,7 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 static void iblock_bio_done(struct bio *bio, int err)
 {
 	struct se_task *task = bio->bi_private;
-	struct iblock_req *ibr = task->transport_req;
+	struct iblock_req *ibr = IBLOCK_REQ(task);
 	/*
 	 * Set -EIO if !BIO_UPTODATE and the passed is still err=0
 	 */
@@ -856,7 +853,7 @@ static struct se_subsystem_api iblock_template = {
 	.fua_read_emulated	= iblock_emulated_fua_read,
 	.write_cache_emulated	= iblock_emulated_write_cache,
 	.transport_complete	= iblock_transport_complete,
-	.allocate_request	= iblock_allocate_request,
+	.alloc_task		= iblock_alloc_task,
 	.do_task		= iblock_do_task,
 	.do_discard		= iblock_do_discard,
 	.do_sync_cache		= iblock_emulate_sync_cache,

@@ -189,7 +189,6 @@ struct se_global *se_global;
 EXPORT_SYMBOL(se_global);
 
 struct kmem_cache *se_cmd_cache;
-struct kmem_cache *se_task_cache;
 struct kmem_cache *se_tmr_req_cache;
 struct kmem_cache *se_sess_cache;
 struct kmem_cache *se_hba_cache;
@@ -280,12 +279,6 @@ int init_se_global(void)
 		printk(KERN_ERR "kmem_cache_create for struct se_cmd failed\n");
 		goto out;
 	}
-	se_task_cache = kmem_cache_create("se_task_cache",
-			sizeof(struct se_task), __alignof__(struct se_task), 0, NULL);
-	if (!(se_task_cache)) {
-		printk(KERN_ERR "kmem_cache_create for struct se_task failed\n");
-		goto out;
-	}
 	se_tmr_req_cache = kmem_cache_create("se_tmr_cache",
 			sizeof(struct se_tmr_req), __alignof__(struct se_tmr_req),
 			0, NULL);
@@ -372,8 +365,6 @@ int init_se_global(void)
 out:
 	if (se_cmd_cache)
 		kmem_cache_destroy(se_cmd_cache);
-	if (se_task_cache)
-		kmem_cache_destroy(se_task_cache);
 	if (se_tmr_req_cache)
 		kmem_cache_destroy(se_tmr_req_cache);
 	if (se_sess_cache)
@@ -407,7 +398,6 @@ void release_se_global(void)
 		return;
 
 	kmem_cache_destroy(se_cmd_cache);
-	kmem_cache_destroy(se_task_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
 	kmem_cache_destroy(se_hba_cache);
@@ -2337,8 +2327,8 @@ static struct se_task *transport_generic_get_task(
 	struct se_device *dev = SE_DEV(cmd);
 	unsigned long flags;
 
-	task = kmem_cache_zalloc(se_task_cache, GFP_KERNEL);
-	if (!(task)) {
+	task = dev->transport->alloc_task(cmd);
+	if (!task) {
 		printk(KERN_ERR "Unable to allocate struct se_task\n");
 		return NULL;
 	}
@@ -2352,12 +2342,6 @@ static struct se_task *transport_generic_get_task(
 	task->se_dev = dev;
 
 	DEBUG_SO("se_obj_ptr: %p\n", se_obj_ptr);
-
-	task->transport_req = TRANSPORT(dev)->allocate_request(task, dev);
-	if (!(task->transport_req)) {
-		kmem_cache_free(se_task_cache, task);
-		return NULL;
-	}
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	list_add_tail(&task->t_list, &T_TASK(cmd)->t_task_list);
@@ -5599,11 +5583,10 @@ void transport_free_dev_tasks(struct se_cmd *cmd)
 		if (atomic_read(&task->task_active))
 			continue;
 
-		if (!task->transport_req)
-			continue;
-
 		kfree(task->task_sg_bidi);
 		kfree(task->task_sg);
+
+		list_del(&task->t_list);
 
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 		if (task->se_dev)
@@ -5612,9 +5595,6 @@ void transport_free_dev_tasks(struct se_cmd *cmd)
 			printk(KERN_ERR "task[%u] - task->se_dev is NULL\n",
 				task->task_no);
 		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-
-		list_del(&task->t_list);
-		kmem_cache_free(se_task_cache, task);
 	}
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 }

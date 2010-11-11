@@ -336,13 +336,19 @@ static void stgt_free_device(void *p)
 	kfree(sdv);
 }
 
+static inline struct stgt_plugin_task *STGT_TASK(struct se_task *task)
+{
+	return container_of(task, struct stgt_plugin_task, stgt_task);
+}
+
+
 /*	pscsi_transport_complete():
  *
  *
  */
 static int stgt_transport_complete(struct se_task *task)
 {
-	struct stgt_plugin_task *st = task->transport_req;
+	struct stgt_plugin_task *st = STGT_TASK(task);
 	int result;
 
 	result = st->stgt_result;
@@ -352,23 +358,18 @@ static int stgt_transport_complete(struct se_task *task)
 	return 0;
 }
 
-/*	stgt_allocate_request(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void *stgt_allocate_request(
-	struct se_task *task,
-	struct se_device *dev)
+static struct se_task *
+stgt_alloc_task(struct se_cmd *cmd)
 {
 	struct stgt_plugin_task *st;
 
 	st = kzalloc(sizeof(struct stgt_plugin_task), GFP_KERNEL);
-	if (!(st)) {
+	if (!st) {
 		printk(KERN_ERR "Unable to allocate struct stgt_plugin_task\n");
 		return NULL;
 	}
 
-	return st;
+	return &st->stgt_task;
 }
 
 /*      stgt_do_task(): (Part of se_subsystem_api_t template)
@@ -377,7 +378,7 @@ static void *stgt_allocate_request(
  */
 static int stgt_do_task(struct se_task *task)
 {
-	struct stgt_plugin_task *st = task->transport_req;
+	struct stgt_plugin_task *st = STGT_TASK(task);
 	struct Scsi_Host *sh = task->se_dev->se_hba->hba_ptr;
 	struct scsi_cmnd *sc;
 	int tag = MSG_SIMPLE_TAG;
@@ -414,7 +415,7 @@ static int stgt_do_task(struct se_task *task)
  */
 static void stgt_free_task(struct se_task *task)
 {
-	struct stgt_plugin_task *st = (struct stgt_plugin_task *)task->transport_req;
+	struct stgt_plugin_task *st = STGT_TASK(task);
 
 	kfree(st);
 }
@@ -550,9 +551,9 @@ static int stgt_map_task_non_SG(struct se_task *task)
 
 static int stgt_CDB_none(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *st = task->transport_req;
+	struct stgt_plugin_task *pt = STGT_TASK(task);
 
-	st->stgt_direction = DMA_NONE;
+	pt->stgt_direction = DMA_NONE;
 	return 0;
 }
 
@@ -562,7 +563,7 @@ static int stgt_CDB_none(struct se_task *task, u32 size)
  */
 static int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *pt = task->transport_req;
+	struct stgt_plugin_task *pt = STGT_TASK(task);
 
 	pt->stgt_direction = DMA_FROM_DEVICE;
 	return stgt_map_task_non_SG(task);
@@ -574,7 +575,7 @@ static int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 static int stgt_CDB_read_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *pt = task->transport_req;
+	struct stgt_plugin_task *pt = STGT_TASK(task);
 
 	pt->stgt_direction = DMA_FROM_DEVICE;
 
@@ -590,7 +591,7 @@ static int stgt_CDB_read_SG(struct se_task *task, u32 size)
  */
 static int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *pt = task->transport_req;
+	struct stgt_plugin_task *pt = STGT_TASK(task);
 
 	pt->stgt_direction = DMA_TO_DEVICE;
 	return stgt_map_task_non_SG(task);
@@ -602,9 +603,9 @@ static int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 static int stgt_CDB_write_SG(struct se_task *task, u32 size)
 {
-	struct stgt_plugin_task *st = task->transport_req;
+	struct stgt_plugin_task *pt = STGT_TASK(task);
 
-	st->stgt_direction = DMA_TO_DEVICE;
+	pt->stgt_direction = DMA_TO_DEVICE;
 
 	if (stgt_map_task_SG(task) < 0)
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
@@ -636,7 +637,7 @@ static int stgt_check_for_SG(struct se_task *task)
  */
 static unsigned char *stgt_get_cdb(struct se_task *task)
 {
-	struct stgt_plugin_task *pt = task->transport_req;
+	struct stgt_plugin_task *pt = STGT_TASK(task);
 
 	return pt->stgt_cdb;
 }
@@ -647,7 +648,7 @@ static unsigned char *stgt_get_cdb(struct se_task *task)
  */
 static unsigned char *stgt_get_sense_buffer(struct se_task *task)
 {
-	struct stgt_plugin_task *pt = task->transport_req;
+	struct stgt_plugin_task *pt = STGT_TASK(task);
 
 	return (unsigned char *)&pt->stgt_sense[0];
 }
@@ -729,13 +730,12 @@ static int stgt_transfer_response(struct scsi_cmnd *sc,
 			   void (*done)(struct scsi_cmnd *))
 {
 	struct se_task *task = (struct se_task *)sc->SCp.ptr;
-	struct stgt_plugin_task *st;
+	struct stgt_plugin_task *st = STGT_TASK(task);
 
 	if (!task) {
 		printk(KERN_ERR "struct se_task is NULL!\n");
 		BUG();
 	}
-	st = (struct stgt_plugin_task *)task->transport_req;
 	if (!st) {
 		printk(KERN_ERR "struct stgt_plugin_task is NULL!\n");
 		BUG();
@@ -768,7 +768,7 @@ static struct se_subsystem_api stgt_template = {
 	.create_virtdevice	= stgt_create_virtdevice,
 	.free_device		= stgt_free_device,
 	.transport_complete	= stgt_transport_complete,
-	.allocate_request	= stgt_allocate_request,
+	.alloc_task		= stgt_alloc_task,
 	.do_task		= stgt_do_task,
 	.free_task		= stgt_free_task,
 	.check_configfs_dev_params = stgt_check_configfs_dev_params,

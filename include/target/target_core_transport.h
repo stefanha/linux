@@ -397,10 +397,7 @@ struct se_subsystem_api {
 	 * drivers.  Provided out of convenience.
 	 */
 	int (*transport_complete)(struct se_task *task);
-	/*
-	 * allocate_request():
-	 */
-	void *(*allocate_request)(struct se_task *, struct se_device *);
+	struct se_task *(*alloc_task)(struct se_cmd *);
 	/*
 	 * allocate_buf():
 	 */
