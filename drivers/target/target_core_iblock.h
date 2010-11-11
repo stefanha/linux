@@ -23,7 +23,6 @@ struct iblock_req {
 
 #define IBDF_HAS_UDEV_PATH		0x01
 #define IBDF_HAS_FORCE			0x02
-#define IBDF_BDEV_ISSUE_FLUSH		0x04
 
 struct iblock_dev {
 	unsigned char ibd_udev_path[SE_UDEV_PATH_LEN];
