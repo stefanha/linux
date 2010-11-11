@@ -753,7 +753,6 @@ struct se_lun *core_tpg_pre_addlun(
 
 	return lun;
 }
-EXPORT_SYMBOL(core_tpg_pre_addlun);
 
 int core_tpg_post_addlun(
 	struct se_portal_group *tpg,
@@ -771,7 +770,6 @@ int core_tpg_post_addlun(
 
 	return 0;
 }
-EXPORT_SYMBOL(core_tpg_post_addlun);
 
 void core_tpg_shutdown_lun(
 	struct se_portal_group *tpg,
@@ -811,7 +809,6 @@ struct se_lun *core_tpg_pre_dellun(
 
 	return lun;
 }
-EXPORT_SYMBOL(core_tpg_pre_dellun);
 
 int core_tpg_post_dellun(
 	struct se_portal_group *tpg,
@@ -827,4 +824,3 @@ int core_tpg_post_dellun(
 
 	return 0;
 }
-EXPORT_SYMBOL(core_tpg_post_dellun);
