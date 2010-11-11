@@ -272,9 +272,6 @@ static struct se_device *rd_create_virtdevice(
 
 	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
 
-	if (rd_dev->rd_direct)
-		dev_flags |= DF_TRANSPORT_DMA_ALLOC;
-
 	if (rd_build_device_space(rd_dev) < 0)
 		goto fail;
 
