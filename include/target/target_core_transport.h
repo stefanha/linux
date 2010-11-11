@@ -132,9 +132,6 @@ struct se_subsystem_api;
 
 extern int init_se_global(void);
 extern void release_se_global(void);
-#ifdef DEBUG_DEV
-extern int __iscsi_debug_dev(struct se_device *);
-#endif
 extern void transport_init_queue_obj(struct se_queue_obj *);
 extern int transport_subsystem_check_init(void);
 extern int transport_subsystem_register(struct se_subsystem_api *);
