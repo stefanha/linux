@@ -573,6 +573,12 @@ static void pscsi_free_device(void *p)
 	kfree(pdv);
 }
 
+static inline struct pscsi_plugin_task *PSCSI_TASK(struct se_task *task)
+{
+	return container_of(task, struct pscsi_plugin_task, pscsi_task);
+}
+
+
 /*	pscsi_transport_complete():
  *
  *
@@ -582,7 +588,7 @@ static int pscsi_transport_complete(struct se_task *task)
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 	struct scsi_device *sd = pdv->pdv_sd;
 	int result;
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	unsigned char *cdb = &pt->pscsi_cdb[0];
 
 	result = pt->pscsi_result;
@@ -660,23 +666,18 @@ after_mode_select:
 	return 0;
 }
 
-/*	pscsi_allocate_request(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void *pscsi_allocate_request(
-	struct se_task *task,
-	struct se_device *dev)
+static struct se_task *
+pscsi_alloc_task(struct se_cmd *cmd)
 {
-	struct se_cmd *cmd = task->task_se_cmd;
 	struct pscsi_plugin_task *pt;
 	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
 
 	pt = kzalloc(sizeof(struct pscsi_plugin_task), GFP_KERNEL);
-	if (!(pt)) {
+	if (!pt) {
 		printk(KERN_ERR "Unable to allocate struct pscsi_plugin_task\n");
 		return NULL;
 	}
+
 	/*
 	 * If TCM Core is signaling a > TCM_MAX_COMMAND_SIZE allocation,
 	 * allocate the extended CDB buffer for per struct se_task context
@@ -693,7 +694,7 @@ static void *pscsi_allocate_request(
 	} else
 		pt->pscsi_cdb = &pt->__pscsi_cdb[0];
 
-	return pt;
+	return &pt->pscsi_task;
 }
 
 static inline void pscsi_blk_init_request(
@@ -736,7 +737,7 @@ static inline void pscsi_blk_init_request(
 */
 static int pscsi_blk_get_request(struct se_task *task)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 
 	pt->pscsi_req = blk_get_request(pdv->pdv_sd->request_queue,
@@ -760,7 +761,7 @@ static int pscsi_blk_get_request(struct se_task *task)
  */
 static int pscsi_do_task(struct se_task *task)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 	/*
 	 * Set the struct request->timeout value based on peripheral
@@ -784,16 +785,13 @@ static int pscsi_do_task(struct se_task *task)
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
-/*	pscsi_free_task(): (Part of se_subsystem_api_t template)
- *
- *
- */
 static void pscsi_free_task(struct se_task *task)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct se_cmd *cmd = task->task_se_cmd;
+
 	/*
-	 * Release the extended CDB allocation from pscsi_allocate_request()
+	 * Release the extended CDB allocation from pscsi_alloc_task()
 	 * if one exists.
 	 */
 	if (T_TASK(cmd)->t_task_cdb != T_TASK(cmd)->__t_task_cdb)
@@ -1006,7 +1004,7 @@ static int __pscsi_map_task_SG(
 	u32 task_sg_num,
 	int bidi_read)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
 	struct page *page;
@@ -1177,7 +1175,7 @@ static int pscsi_map_task_SG(struct se_task *task)
 static int pscsi_map_task_non_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 	int ret = 0;
 
@@ -1196,7 +1194,7 @@ static int pscsi_map_task_non_SG(struct se_task *task)
 
 static int pscsi_CDB_none(struct se_task *task, u32 size)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	pt->pscsi_direction = DMA_NONE;
 
@@ -1209,7 +1207,7 @@ static int pscsi_CDB_none(struct se_task *task, u32 size)
  */
 static int pscsi_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
 
@@ -1225,7 +1223,7 @@ static int pscsi_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 static int pscsi_CDB_read_SG(struct se_task *task, u32 size)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	pt->pscsi_direction = DMA_FROM_DEVICE;
 	/*
@@ -1244,7 +1242,7 @@ static int pscsi_CDB_read_SG(struct se_task *task, u32 size)
  */
 static int pscsi_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	pt->pscsi_direction = DMA_TO_DEVICE;
 
@@ -1260,7 +1258,7 @@ static int pscsi_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 static int pscsi_CDB_write_SG(struct se_task *task, u32 size)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	pt->pscsi_direction = DMA_TO_DEVICE;
 	/*
@@ -1297,7 +1295,7 @@ static int pscsi_check_for_SG(struct se_task *task)
  */
 static unsigned char *pscsi_get_cdb(struct se_task *task)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	return pt->pscsi_cdb;
 }
@@ -1308,7 +1306,7 @@ static unsigned char *pscsi_get_cdb(struct se_task *task)
  */
 static unsigned char *pscsi_get_sense_buffer(struct se_task *task)
 {
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	return (unsigned char *)&pt->pscsi_sense[0];
 }
@@ -1384,7 +1382,7 @@ static inline void pscsi_process_SAM_status(
 static void pscsi_req_done(struct request *req, int uptodate)
 {
 	struct se_task *task = req->end_io_data;
-	struct pscsi_plugin_task *pt = task->transport_req;
+	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 
 	pt->pscsi_result = req->errors;
 	pt->pscsi_resid = req->resid_len;
@@ -1417,7 +1415,7 @@ static struct se_subsystem_api pscsi_template = {
 	.create_virtdevice	= pscsi_create_virtdevice,
 	.free_device		= pscsi_free_device,
 	.transport_complete	= pscsi_transport_complete,
-	.allocate_request	= pscsi_allocate_request,
+	.alloc_task		= pscsi_alloc_task,
 	.do_task		= pscsi_do_task,
 	.free_task		= pscsi_free_task,
 	.check_configfs_dev_params = pscsi_check_configfs_dev_params,

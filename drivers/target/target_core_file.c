@@ -282,13 +282,14 @@ static int fd_transport_complete(struct se_task *task)
 	return 0;
 }
 
-/*	fd_allocate_request(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void *fd_allocate_request(
-	struct se_task *task,
-	struct se_device *dev)
+static inline struct fd_request *FILE_REQ(struct se_task *task)
+{
+	return container_of(task, struct fd_request, fd_task);
+}
+
+
+static struct se_task *
+fd_alloc_task(struct se_cmd *cmd)
 {
 	struct fd_request *fd_req;
 
@@ -298,9 +299,9 @@ static void *fd_allocate_request(
 		return NULL;
 	}
 
-	fd_req->fd_dev = dev->dev_ptr;
+	fd_req->fd_dev = SE_DEV(cmd)->dev_ptr;
 
-	return (void *)fd_req;
+	return &fd_req->fd_task;
 }
 
 static inline int fd_iovec_alloc(struct fd_request *req)
@@ -379,7 +380,7 @@ static static int fd_sendactor(
 {
 	unsigned long count = desc->count;
 	struct se_task *task = desc->arg.data;
-	struct fd_request *req = (struct fd_request *) task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 	struct scatterlist *sg = task->task_sg;
 
 	printk(KERN_INFO "page: %p offset: %lu size: %lu\n", page,
@@ -552,7 +553,7 @@ static int fd_do_task(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
 	struct se_device *dev = cmd->se_dev;
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 	int ret = 0;
 
 	req->fd_lba = task->task_lba;
@@ -598,7 +599,7 @@ static int fd_do_task(struct se_task *task)
  */
 static void fd_free_task(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	kfree(req->fd_iovs);
 	kfree(req);
@@ -727,7 +728,7 @@ static ssize_t fd_show_configfs_dev_params(
 static void fd_map_task_non_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_bufflen		= task->task_size;
 	req->fd_buf		= (void *) T_TASK(cmd)->t_task_buf;
@@ -740,7 +741,7 @@ static void fd_map_task_non_SG(struct se_task *task)
  */
 static void fd_map_task_SG(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_bufflen		= task->task_size;
 	req->fd_buf		= NULL;
@@ -753,7 +754,7 @@ static void fd_map_task_SG(struct se_task *task)
  */
 static int fd_CDB_none(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction	= FD_DATA_NONE;
 	req->fd_bufflen		= 0;
@@ -769,7 +770,7 @@ static int fd_CDB_none(struct se_task *task, u32 size)
  */
 static int fd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_READ;
 	fd_map_task_non_SG(task);
@@ -783,7 +784,7 @@ static int fd_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 static int fd_CDB_read_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_READ;
 	fd_map_task_SG(task);
@@ -797,7 +798,7 @@ static int fd_CDB_read_SG(struct se_task *task, u32 size)
  */
 static int fd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_WRITE;
 	fd_map_task_non_SG(task);
@@ -811,7 +812,7 @@ static int fd_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 static int fd_CDB_write_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_WRITE;
 	fd_map_task_SG(task);
@@ -834,7 +835,7 @@ static int fd_check_lba(unsigned long long lba, struct se_device *dev)
  */
 static int fd_check_for_SG(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	return req->fd_sg_count;
 }
@@ -845,7 +846,7 @@ static int fd_check_for_SG(struct se_task *task)
  */
 static unsigned char *fd_get_cdb(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	return req->fd_scsi_cdb;
 }
@@ -906,7 +907,7 @@ static struct se_subsystem_api fileio_template = {
 	.fua_read_emulated	= fd_emulated_fua_read,
 	.write_cache_emulated	= fd_emulated_write_cache,
 	.transport_complete	= fd_transport_complete,
-	.allocate_request	= fd_allocate_request,
+	.alloc_task		= fd_alloc_task,
 	.do_task		= fd_do_task,
 	.do_sync_cache		= fd_emulate_sync_cache,
 	.free_task		= fd_free_task,
