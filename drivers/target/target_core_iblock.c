@@ -470,12 +470,13 @@ static void iblock_free_task(struct se_task *task)
 }
 
 enum {
-	Opt_udev_path, Opt_force
+	Opt_udev_path, Opt_force, Opt_err
 };
 
 static match_table_t tokens = {
 	{Opt_udev_path, "udev_path=%s"},
 	{Opt_force, "force=%d"},
+	{Opt_err, NULL}
 };
 
 static ssize_t iblock_set_configfs_dev_params(struct se_hba *hba,
