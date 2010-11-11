@@ -59,10 +59,9 @@
 /*
  * struct se_device->dev_flags
  */
-#define DF_TRANSPORT_DMA_ALLOC			0x00000001
-#define DF_READ_ONLY				0x00000002
-#define DF_SPC2_RESERVATIONS			0x00000004
-#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000008
+#define DF_READ_ONLY				0x00000001
+#define DF_SPC2_RESERVATIONS			0x00000002
+#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000004
 
 /*
  * Used as return values from transport_generic_cmd_sequencer()
