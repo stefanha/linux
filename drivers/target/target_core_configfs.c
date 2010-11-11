@@ -2827,7 +2827,7 @@ static struct config_item_type target_core_alua_cit = {
 
 /* Start functions for struct config_item_type target_core_hba_cit */
 
-static struct config_group *target_core_call_createdev(
+static struct config_group *target_core_make_subdev(
 	struct config_group *group,
 	const char *name)
 {
@@ -2962,7 +2962,7 @@ out:
 	return NULL;
 }
 
-static void target_core_call_freedev(
+static void target_core_drop_subdev(
 	struct config_group *group,
 	struct config_item *item)
 {
@@ -3036,8 +3036,8 @@ out:
 }
 
 static struct configfs_group_operations target_core_hba_group_ops = {
-	.make_group		= target_core_call_createdev,
-	.drop_item		= target_core_call_freedev,
+	.make_group		= target_core_make_subdev,
+	.drop_item		= target_core_drop_subdev,
 };
 
 CONFIGFS_EATTR_STRUCT(target_core_hba, se_hba);
