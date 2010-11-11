@@ -632,15 +632,17 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
  * @cmd: command to assign serial number to
  *
  * Description: a serial number identifies a request for error recovery
- * and debugging purposes.  Protected by the Host_Lock of host.
+ * and debugging purposes.  Called directly by scsi_dispatch_cmd() for all LLDs
+ * after the great host_lock pushdown. 
  */
-void scsi_cmd_get_serial(struct Scsi_Host *host, struct scsi_cmnd *cmd)
+static inline void scsi_cmd_get_serial(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 {
-	cmd->serial_number = host->cmd_serial_number++;
-	if (cmd->serial_number == 0) 
-		cmd->serial_number = host->cmd_serial_number++;
+	/*
+	 * Increment the host->cmd_serial_number by 2 so cmd->serial_number
+	 * is always odd and wraps to 1 instead of 0.
+	 */
+	cmd->serial_number = atomic_add_return(2, &host->cmd_serial_number);
 }
-EXPORT_SYMBOL(scsi_cmd_get_serial);
 
 /**
  * scsi_dispatch_command - Dispatch a command to the low-level driver.
@@ -736,6 +738,12 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		scsi_done(cmd);
 		goto out;
 	}
+	/*
+	 * Assign a cmd->serial_number from host->cmd_serial_number that
+	 * is used by scsi_softirq_done() to signal scsi_try_to_abort_cmd()
+	 * that a outstanding cmd has been completed.
+	 */
+	scsi_cmd_get_serial(host, cmd);
 
 	if (unlikely(host->shost_state == SHOST_DEL)) {
 		cmd->result = (DID_NO_CONNECT << 16);
