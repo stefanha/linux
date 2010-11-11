@@ -606,13 +606,14 @@ static void fd_free_task(struct se_task *task)
 }
 
 enum {
-	Opt_fd_dev_name, Opt_fd_dev_size, Opt_fd_buffered_io
+	Opt_fd_dev_name, Opt_fd_dev_size, Opt_fd_buffered_io, Opt_err
 };
 
 static match_table_t tokens = {
 	{Opt_fd_dev_name, "fd_dev_name=%s"},
 	{Opt_fd_dev_size, "fd_dev_size=%s"},
 	{Opt_fd_buffered_io, "fd_buffered_id=%d"},
+	{Opt_err, NULL}
 };
 	
 static ssize_t fd_set_configfs_dev_params(

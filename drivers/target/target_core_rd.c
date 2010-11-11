@@ -990,11 +990,12 @@ static void rd_free_task(struct se_task *task)
 }
 
 enum {
-	Opt_rd_pages
+	Opt_rd_pages, Opt_err
 };
 
 static match_table_t tokens = {
 	{Opt_rd_pages, "rd_pages=%d"},
+	{Opt_err, NULL}
 };
 
 static ssize_t rd_set_configfs_dev_params(

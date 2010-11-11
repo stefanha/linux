@@ -1460,7 +1460,7 @@ enum {
 	Opt_initiator_fabric, Opt_initiator_node, Opt_initiator_sid,
 	Opt_sa_res_key, Opt_res_holder, Opt_res_type, Opt_res_scope,
 	Opt_res_all_tg_pt, Opt_mapped_lun, Opt_target_fabric,
-	Opt_target_node, Opt_tpgt, Opt_port_rtpi, Opt_target_lun
+	Opt_target_node, Opt_tpgt, Opt_port_rtpi, Opt_target_lun, Opt_err
 };
 
 static match_table_t tokens = {
@@ -1478,6 +1478,7 @@ static match_table_t tokens = {
 	{Opt_tpgt, "tpgt=%d"},
 	{Opt_port_rtpi, "port_rtpi=%d"},
 	{Opt_target_lun, "target_lun=%d"},
+	{Opt_err, NULL}
 };
 
 static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(

@@ -421,13 +421,14 @@ static void stgt_free_task(struct se_task *task)
 }
 
 enum {
-	Opt_scsi_channel_id, Opt_scsi_target_id, Opt_scsi_lun_id
+	Opt_scsi_channel_id, Opt_scsi_target_id, Opt_scsi_lun_id, Opt_err
 };
 
 static match_table_t tokens = {
 	{Opt_scsi_channel_id, "scsi_channel_id=%d"},
 	{Opt_scsi_target_id, "scsi_target_id=%d"},
 	{Opt_scsi_lun_id, "scsi_lun_id=%d"},
+	{Opt_err, NULL}
 };
 
 static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
