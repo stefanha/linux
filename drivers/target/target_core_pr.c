@@ -89,7 +89,7 @@ int core_scsi2_reservation_seq_non_holder(
 	return 1;
 }
 
-int core_scsi2_reservation_check(struct se_cmd *cmd, u32 *pr_reg_type)
+static int core_scsi2_reservation_check(struct se_cmd *cmd, u32 *pr_reg_type)
 {
 	struct se_device *dev = cmd->se_dev;
 	struct se_session *sess = cmd->se_sess;
@@ -116,9 +116,8 @@ int core_scsi2_reservation_check(struct se_cmd *cmd, u32 *pr_reg_type)
 
 	return ret;
 }
-EXPORT_SYMBOL(core_scsi2_reservation_check);
 
-int core_scsi2_reservation_release(struct se_cmd *cmd)
+static int core_scsi2_reservation_release(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
 	struct se_session *sess = cmd->se_sess;
@@ -151,9 +150,8 @@ int core_scsi2_reservation_release(struct se_cmd *cmd)
 
 	return 0;
 }
-EXPORT_SYMBOL(core_scsi2_reservation_release);
 
-int core_scsi2_reservation_reserve(struct se_cmd *cmd)
+static int core_scsi2_reservation_reserve(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
 	struct se_session *sess = cmd->se_sess;
@@ -202,7 +200,6 @@ int core_scsi2_reservation_reserve(struct se_cmd *cmd)
 
 	return 0;
 }
-EXPORT_SYMBOL(core_scsi2_reservation_reserve);
 
 static struct t10_pr_registration *core_scsi3_locate_pr_reg(struct se_device *,
 					struct se_node_acl *, struct se_session *);

@@ -341,7 +341,6 @@ void core_update_device_list_access(
 
 	return;
 }
-EXPORT_SYMBOL(core_update_device_list_access);
 
 /*      core_update_device_list_for_node():
  *
@@ -828,7 +827,6 @@ int se_free_virtual_device(struct se_device *dev, struct se_hba *hba)
 
 	return 0;
 }
-EXPORT_SYMBOL(se_free_virtual_device);
 
 void se_dev_start(struct se_device *dev)
 {
@@ -923,10 +921,6 @@ void se_dev_set_default_attribs(
 	DEV_ATTRIB(dev)->unmap_granularity = DA_UNMAP_GRANULARITY_DEFAULT;
 	DEV_ATTRIB(dev)->unmap_granularity_alignment =
 				DA_UNMAP_GRANULARITY_ALIGNMENT_DEFAULT;
-	/*
-	 * max_cdb_len is based on subsystem plugin dependent requirements.
-	 */
-	DEV_ATTRIB(dev)->max_cdb_len = dev_limits->max_cdb_len;
 	/*
 	 * block_size is based on subsystem plugin dependent requirements.
 	 */
@@ -1390,7 +1384,6 @@ struct se_lun *core_dev_add_lun(
 
 	return lun_p;
 }
-EXPORT_SYMBOL(core_dev_add_lun);
 
 /*      core_dev_del_lun():
  *
@@ -1416,7 +1409,6 @@ int core_dev_del_lun(
 
 	return 0;
 }
-EXPORT_SYMBOL(core_dev_del_lun);
 
 struct se_lun *core_get_lun_from_tpg(struct se_portal_group *tpg, u32 unpacked_lun)
 {
@@ -1446,7 +1438,6 @@ struct se_lun *core_get_lun_from_tpg(struct se_portal_group *tpg, u32 unpacked_l
 
 	return lun;
 }
-EXPORT_SYMBOL(core_get_lun_from_tpg);
 
 /*      core_dev_get_lun():
  *
@@ -1515,7 +1506,6 @@ struct se_lun_acl *core_dev_init_initiator_node_lun_acl(
 
 	return lacl;
 }
-EXPORT_SYMBOL(core_dev_init_initiator_node_lun_acl);
 
 int core_dev_add_initiator_node_lun_acl(
 	struct se_portal_group *tpg,
@@ -1567,7 +1557,6 @@ int core_dev_add_initiator_node_lun_acl(
 	core_scsi3_check_aptpl_registration(lun->lun_se_dev, tpg, lun, lacl);
 	return 0;
 }
-EXPORT_SYMBOL(core_dev_add_initiator_node_lun_acl);
 
 /*      core_dev_del_initiator_node_lun_acl():
  *
@@ -1603,7 +1592,6 @@ int core_dev_del_initiator_node_lun_acl(
 
 	return 0;
 }
-EXPORT_SYMBOL(core_dev_del_initiator_node_lun_acl);
 
 void core_dev_free_initiator_node_lun_acl(
 	struct se_portal_group *tpg,
@@ -1617,7 +1605,6 @@ void core_dev_free_initiator_node_lun_acl(
 
 	kfree(lacl);
 }
-EXPORT_SYMBOL(core_dev_free_initiator_node_lun_acl);
 
 int core_dev_setup_virtual_lun0(void)
 {

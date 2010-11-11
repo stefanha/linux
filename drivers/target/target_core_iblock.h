@@ -12,6 +12,7 @@
 extern struct se_global *se_global;
 
 struct iblock_req {
+	struct se_task ib_task;
 	unsigned char ib_scsi_cdb[TCM_MAX_COMMAND_SIZE];
 	atomic_t ib_bio_cnt;
 	atomic_t ib_bio_err_cnt;
@@ -23,7 +24,6 @@ struct iblock_req {
 
 #define IBDF_HAS_UDEV_PATH		0x01
 #define IBDF_HAS_FORCE			0x02
-#define IBDF_BDEV_ISSUE_FLUSH		0x04
 
 struct iblock_dev {
 	unsigned char ibd_udev_path[SE_UDEV_PATH_LEN];

@@ -9,9 +9,6 @@
 #define INQUIRY_DATA_SIZE	0x24
 #endif
 
-/* Maximum extended CDB size for handling OSD passthrough */
-#define PSCSI_MAX_CDB_SIZE	240
-
 /* used in pscsi_add_device_to_list() */
 #define PSCSI_DEFAULT_QUEUEDEPTH	1
 
@@ -28,6 +25,7 @@ extern struct se_global *se_global;
 #include <linux/kobject.h>
 
 struct pscsi_plugin_task {
+	struct se_task pscsi_task;
 	unsigned char *pscsi_cdb;
 	unsigned char __pscsi_cdb[TCM_MAX_COMMAND_SIZE];
 	unsigned char pscsi_sense[SCSI_SENSE_BUFFERSIZE];
@@ -35,7 +33,6 @@ struct pscsi_plugin_task {
 	int	pscsi_result;
 	u32	pscsi_resid;
 	struct request *pscsi_req;
-	struct request *pscsi_req_bidi;
 } ____cacheline_aligned;
 
 #define PDF_HAS_CHANNEL_ID	0x01

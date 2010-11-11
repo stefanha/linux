@@ -137,8 +137,7 @@ enum se_cmd_flags_table {
 	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00800000,
 	SCF_EMULATE_SYNC_CACHE		= 0x01000000,
 	SCF_EMULATE_CDB_ASYNC		= 0x02000000,
-	SCF_EMULATE_SYNC_UNMAP		= 0x04000000,
-	SCF_ECDB_ALLOCATION		= 0x08000000
+	SCF_EMULATE_SYNC_UNMAP		= 0x04000000
 };
 	
 /* struct se_device->type for known subsystem plugins */
@@ -478,7 +477,6 @@ struct se_task {
 	unsigned char	task_sense;
 	struct scatterlist *task_sg;
 	struct scatterlist *task_sg_bidi;
-	void		*transport_req;
 	u8		task_scsi_status;
 	u8		task_flags;
 	int		task_error_status;
@@ -739,8 +737,6 @@ struct se_dev_entry {
 }  ____cacheline_aligned;
 
 struct se_dev_limits {
-	/* Max supported SCSI CDB length */
-	int		max_cdb_len;
 	/* Max supported HW queue depth */
 	u32		hw_queue_depth;
 	/* Max supported virtual queue depth */
@@ -761,7 +757,6 @@ struct se_dev_attrib {
 	int		emulate_reservations;
 	int		emulate_alua;
 	int		enforce_pr_isids;
-	int		max_cdb_len;
 	u32		hw_block_size;
 	u32		block_size;
 	u32		hw_max_sectors;
@@ -1062,9 +1057,6 @@ struct se_global {
 	spinlock_t		se_tpg_lock;
 	spinlock_t		lu_gps_lock;
 	spinlock_t		plugin_class_lock;
-#ifdef DEBUG_DEV
-	spinlock_t		debug_dev_lock;
-#endif
 } ____cacheline_aligned;
 
 #endif /* TARGET_CORE_BASE_H */

@@ -505,6 +505,26 @@ struct scsi_host_template {
 };
 
 /*
+ * Temporary #define for host lock push down. Can be removed when all
+ * drivers have been updated to take advantage of unlocked
+ * queuecommand.
+ *
+ */
+#define DEF_SCSI_QCMD(func_name) \
+	int func_name(struct scsi_cmnd *cmd,				\
+		      void (*done)(struct scsi_cmnd *))			\
+	{								\
+		unsigned long irq_flags;				\
+		int rc;							\
+		struct Scsi_Host *shost = cmd->device->host;		\
+		spin_lock_irqsave(shost->host_lock, irq_flags);		\
+		rc = func_name##_lck (cmd, done);			\
+		spin_unlock_irqrestore(shost->host_lock, irq_flags);	\
+		return rc;						\
+	}
+
+
+/*
  * shost state: If you alter this, you also need to alter scsi_sysfs.c
  * (for the ascii descriptions) and the state model enforcer:
  * scsi_host_set_state()
@@ -604,10 +624,9 @@ struct Scsi_Host {
 	short unsigned int max_sectors;
 	unsigned long dma_boundary;
 	/* 
-	 * Used to assign serial numbers to the cmds.
-	 * Protected by the host lock.
+	 * Used to assign serial numbers to the cmds in scsi_cmd_get_serial()
 	 */
-	unsigned long cmd_serial_number;
+	atomic_t cmd_serial_number;
 	
 	unsigned active_mode:2;
 	unsigned unchecked_isa_dma:1;

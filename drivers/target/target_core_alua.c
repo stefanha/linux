@@ -1582,7 +1582,6 @@ ssize_t core_alua_show_tg_pt_gp_info(struct se_port *port, char *page)
 
 	return len;
 }
-EXPORT_SYMBOL(core_alua_show_tg_pt_gp_info);
 
 ssize_t core_alua_store_tg_pt_gp_info(
 	struct se_port *port,
@@ -1685,7 +1684,6 @@ ssize_t core_alua_store_tg_pt_gp_info(
 	core_alua_put_tg_pt_gp_from_name(tg_pt_gp_new);
 	return count;
 }
-EXPORT_SYMBOL(core_alua_store_tg_pt_gp_info);
 
 ssize_t core_alua_show_access_type(
 	struct t10_alua_tg_pt_gp *tg_pt_gp,
@@ -1832,7 +1830,6 @@ ssize_t core_alua_show_offline_bit(struct se_lun *lun, char *page)
 	return sprintf(page, "%d\n",
 		atomic_read(&lun->lun_sep->sep_tg_pt_secondary_offline));
 }
-EXPORT_SYMBOL(core_alua_show_offline_bit);
 
 ssize_t core_alua_store_offline_bit(
 	struct se_lun *lun,
@@ -1869,7 +1866,6 @@ ssize_t core_alua_store_offline_bit(
 
 	return count;
 }
-EXPORT_SYMBOL(core_alua_store_offline_bit);
 
 ssize_t core_alua_show_secondary_status(
 	struct se_lun *lun,
@@ -1877,7 +1873,6 @@ ssize_t core_alua_show_secondary_status(
 {
 	return sprintf(page, "%d\n", lun->lun_sep->sep_tg_pt_secondary_stat);
 }
-EXPORT_SYMBOL(core_alua_show_secondary_status);
 
 ssize_t core_alua_store_secondary_status(
 	struct se_lun *lun,
@@ -1903,7 +1898,6 @@ ssize_t core_alua_store_secondary_status(
 
 	return count;
 }
-EXPORT_SYMBOL(core_alua_store_secondary_status);
 
 ssize_t core_alua_show_secondary_write_metadata(
 	struct se_lun *lun,
@@ -1912,7 +1906,6 @@ ssize_t core_alua_show_secondary_write_metadata(
 	return sprintf(page, "%d\n",
 			lun->lun_sep->sep_tg_pt_secondary_write_md);
 }
-EXPORT_SYMBOL(core_alua_show_secondary_write_metadata);
 
 ssize_t core_alua_store_secondary_write_metadata(
 	struct se_lun *lun,
@@ -1936,7 +1929,6 @@ ssize_t core_alua_store_secondary_write_metadata(
 
 	return count;
 }
-EXPORT_SYMBOL(core_alua_store_secondary_write_metadata);
 
 int core_setup_alua(struct se_device *dev, int force_pt)
 {

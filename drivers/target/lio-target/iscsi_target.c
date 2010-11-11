@@ -939,10 +939,6 @@ static int iscsi_target_detect(void)
 	spin_lock_init(&iscsi_global->debug_erl_lock);
 #endif /* DEBUG_ERL */
 
-#ifdef DEBUG_DEV
-	spin_lock_init(&iscsi_global->debug_dev_lock);
-#endif
-
 	dir_entry = proc_mkdir("iscsi_target", 0);
 	if (!(dir_entry)) {
 		printk(KERN_ERR "proc_mkdir() failed.\n");

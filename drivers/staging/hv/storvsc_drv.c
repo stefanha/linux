@@ -595,7 +595,7 @@ static unsigned int copy_from_bounce_buffer(struct scatterlist *orig_sgl,
 /*
  * storvsc_queuecommand - Initiate command processing
  */
-static int storvsc_queuecommand(struct scsi_cmnd *scmnd,
+static int storvsc_queuecommand_lck(struct scsi_cmnd *scmnd,
 				void (*done)(struct scsi_cmnd *))
 {
 	int ret;
@@ -782,6 +782,8 @@ retry_request:
 
 	return ret;
 }
+
+static DEF_SCSI_QCMD(storvsc_queuecommand)
 
 static int storvsc_merge_bvec(struct request_queue *q,
 			      struct bvec_merge_data *bmd, struct bio_vec *bvec)

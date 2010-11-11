@@ -28,6 +28,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
@@ -55,8 +56,6 @@
 #endif
 
 static struct se_subsystem_api fileio_template;
-
-static void __fd_get_dev_info(struct fd_dev *, char *, int *);
 
 /*	fd_attach_hba(): (Part of se_subsystem_api_t template)
  *
@@ -231,7 +230,6 @@ static struct se_device *fd_create_virtdevice(
 		fd_dev->fd_block_size = FD_BLOCKSIZE;
 	}
 
-	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
 	dev_limits.hw_queue_depth = FD_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = FD_DEVICE_QUEUE_DEPTH;
 
@@ -284,13 +282,14 @@ static int fd_transport_complete(struct se_task *task)
 	return 0;
 }
 
-/*	fd_allocate_request(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void *fd_allocate_request(
-	struct se_task *task,
-	struct se_device *dev)
+static inline struct fd_request *FILE_REQ(struct se_task *task)
+{
+	return container_of(task, struct fd_request, fd_task);
+}
+
+
+static struct se_task *
+fd_alloc_task(struct se_cmd *cmd)
 {
 	struct fd_request *fd_req;
 
@@ -300,9 +299,9 @@ static void *fd_allocate_request(
 		return NULL;
 	}
 
-	fd_req->fd_dev = dev->dev_ptr;
+	fd_req->fd_dev = SE_DEV(cmd)->dev_ptr;
 
-	return (void *)fd_req;
+	return &fd_req->fd_task;
 }
 
 static inline int fd_iovec_alloc(struct fd_request *req)
@@ -381,7 +380,7 @@ static static int fd_sendactor(
 {
 	unsigned long count = desc->count;
 	struct se_task *task = desc->arg.data;
-	struct fd_request *req = (struct fd_request *) task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 	struct scatterlist *sg = task->task_sg;
 
 	printk(KERN_INFO "page: %p offset: %lu size: %lu\n", page,
@@ -465,86 +464,42 @@ static int fd_do_writev(struct fd_request *req, struct se_task *task)
 	return 1;
 }
 
-/*
- * Called from transport_generic_synchronize_cache() to flush the entire
- * struct file (and possibly backing struct block_device) using vfs_fsync().
- */
-static int fd_do_sync_cache(struct se_cmd *cmd, int immed)
+static void fd_emulate_sync_cache(struct se_task *task)
 {
-	struct fd_dev *fd_dev = cmd->se_dev->dev_ptr;
-	struct file *fd = fd_dev->fd_file;
-	int ret;
-
-	ret = vfs_fsync(fd, 0);
-	if (ret != 0) {
-		printk(KERN_ERR "FILEIO: vfs_fsync(fd, 0) returned: %d\n", ret);
-		return ret;
-	}
-	DEBUG_FD_CACHE("FILEIO: vfs_fsync(fd, 0) called, immed: %d\n", immed);
-	return ret;
-}
-
-/*
- * Called from transport_generic_synchronize_cache() to flush LBA range
- */
-int __fd_do_sync_cache_range(
-	struct se_cmd *cmd,
-	unsigned long long lba,
-	u32 size_in_bytes)
-{
+	struct se_cmd *cmd = TASK_CMD(task);
 	struct se_device *dev = cmd->se_dev;
 	struct fd_dev *fd_dev = dev->dev_ptr;
-	struct file *fd = fd_dev->fd_file;
-	loff_t start = (lba * DEV_ATTRIB(dev)->block_size);
-	loff_t bytes;
-	int ret, immed = (T_TASK(cmd)->t_task_cdb[1] & 0x2);
+	int immed = (cmd->t_task->t_task_cdb[1] & 0x2);
+	loff_t start, end;
+	int ret;
+
 	/*
 	 * If the Immediate bit is set, queue up the GOOD response
 	 * for this SYNCHRONIZE_CACHE op
 	 */
 	if (immed)
 		transport_complete_sync_cache(cmd, 1);
+
 	/*
 	 * Determine if we will be flushing the entire device.
 	 */
-	if ((T_TASK(cmd)->t_task_lba == 0) && (cmd->data_length == 0)) {
-		ret = fd_do_sync_cache(cmd, immed);		
-		if (!(immed))
-			transport_complete_sync_cache(cmd, (ret == 0) ? 1 : 0);
-		return 0;
+	if (cmd->t_task->t_task_lba == 0 && cmd->data_length == 0) {
+		start = 0;
+		end = LLONG_MAX;
+	} else {
+		start = cmd->t_task->t_task_lba * DEV_ATTRIB(dev)->block_size;
+		if (cmd->data_length)
+			end = start + cmd->data_length;
+		else
+			end = LLONG_MAX;
 	}
-	/*
-	 * If a explict number of bytes fo flush has been provied by
-	 * the initiator, use this value with vfs_sync_range().  Otherwise
-	 * bytes = LLONG_MAX (matching fs/sync.c:vfs_fsync().
-	 */
-	bytes = (size_in_bytes != 0) ? size_in_bytes : LLONG_MAX;
-	ret = vfs_fsync_range(fd, start, bytes, 0);
-	if (ret != 0) {
+
+	ret = vfs_fsync_range(fd_dev->fd_file, start, end, 1);
+	if (ret != 0)
 		printk(KERN_ERR "FILEIO: vfs_fsync_range() failed: %d\n", ret);
-		if (!(immed))
-			transport_complete_sync_cache(cmd, 0);
-		return -1;
-	}
-	DEBUG_FD_CACHE("FILEIO: vfs_fsync_range(): LBA: %llu Starting offset:"
-		" %llu, bytes: %llu, immed: %d\n", lba, (unsigned long long)start,
-		(unsigned long long)bytes, immed);
 
-	if (!(immed))
-		transport_complete_sync_cache(cmd, 1);
-
-	return 0;
-}
-
-/*
- * Called by target_core_transport():transport_emulate_control_cdb()
- * to emulate SYCHRONIZE_CACHE_*
- */
-void fd_emulate_sync_cache(struct se_task *task)
-{
-	struct se_cmd *cmd = TASK_CMD(task);
-
-	__fd_do_sync_cache_range(cmd, T_TASK(cmd)->t_task_lba, cmd->data_length);
+	if (!immed)
+		transport_complete_sync_cache(cmd, ret == 0);
 }
 
 /*
@@ -578,21 +533,27 @@ int fd_emulated_fua_read(struct se_device *dev)
  * WRITE Force Unit Access (FUA) emulation on a per struct se_task
  * LBA range basis..
  */
-static inline int fd_emulate_write_fua(
-	struct se_cmd *cmd,
-	struct se_task *task)
+static void fd_emulate_write_fua(struct se_cmd *cmd, struct se_task *task)
 {
+	struct se_device *dev = cmd->se_dev;
+	struct fd_dev *fd_dev = dev->dev_ptr;
+	loff_t start = task->task_lba * DEV_ATTRIB(dev)->block_size;
+	loff_t end = start + task->task_size;
+	int ret;
+
 	DEBUG_FD_CACHE("FILEIO: FUA WRITE LBA: %llu, bytes: %u\n",
 			task->task_lba, task->task_size);
 
-	return __fd_do_sync_cache_range(cmd, task->task_lba, task->task_size);
+	ret = vfs_fsync_range(fd_dev->fd_file, start, end, 1);
+	if (ret != 0)
+		printk(KERN_ERR "FILEIO: vfs_fsync_range() failed: %d\n", ret);
 }
 
 static int fd_do_task(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
 	struct se_device *dev = cmd->se_dev;
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 	int ret = 0;
 
 	req->fd_lba = task->task_lba;
@@ -622,11 +583,7 @@ static int fd_do_task(struct se_task *task)
 			 * and return some sense data to let the initiator
 			 * know the FUA WRITE cache sync failed..?
 			 */
-			ret = fd_emulate_write_fua(cmd, task);
-			if (ret < 0) {
-				printk(KERN_ERR "FILEIO: fd_emulate"
-					"_write_fua() failed\n");
-			}
+			fd_emulate_write_fua(cmd, task);
 		}
 
 		task->task_scsi_status = GOOD;
@@ -642,86 +599,85 @@ static int fd_do_task(struct se_task *task)
  */
 static void fd_free_task(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	kfree(req->fd_iovs);
 	kfree(req);
 }
 
+enum {
+	Opt_fd_dev_name, Opt_fd_dev_size, Opt_fd_buffered_io, Opt_err
+};
+
+static match_table_t tokens = {
+	{Opt_fd_dev_name, "fd_dev_name=%s"},
+	{Opt_fd_dev_size, "fd_dev_size=%s"},
+	{Opt_fd_buffered_io, "fd_buffered_id=%d"},
+	{Opt_err, NULL}
+};
+	
 static ssize_t fd_set_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
 	const char *page, ssize_t count)
 {
-	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	int params = 0;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" temporary buffer\n");
-		return 0;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
+	struct fd_dev *fd_dev = se_dev->se_dev_su_ptr;
+	char *orig, *ptr, *arg_p, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
 
-		*ptr = '\0';
-		ptr++;
+	orig = opts;
 
-		ptr2 = strstr(cur, "fd_dev_name");
-		if (ptr2) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ptr = strstrip(ptr);
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
+
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_fd_dev_name:
 			snprintf(fd_dev->fd_dev_name, FD_MAX_DEV_NAME,
-					"%s", ptr);
+					"%s", match_strdup(&args[0]));
 			printk(KERN_INFO "FILEIO: Referencing Path: %s\n",
 					fd_dev->fd_dev_name);
 			fd_dev->fbd_flags |= FBDF_HAS_PATH;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "fd_dev_size");
-		if (ptr2) {
-			transport_check_dev_params_delim(ptr, &cur);
-			if (strict_strtoull(ptr, 0, &fd_dev->fd_dev_size) < 0) {
+			break;
+		case Opt_fd_dev_size:
+			arg_p = match_strdup(&args[0]);
+			ret = strict_strtoull(arg_p, 0, &fd_dev->fd_dev_size);
+			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoull() failed for"
 						" fd_dev_size=\n");
-				continue;
+				goto out;
 			}
 			printk(KERN_INFO "FILEIO: Referencing Size: %llu"
 					" bytes\n", fd_dev->fd_dev_size);
 			fd_dev->fbd_flags |= FBDF_HAS_SIZE;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "fd_buffered_io");
-		if (ptr2) {
-			transport_check_dev_params_delim(ptr, &cur);
-			if (strncmp(ptr, "1", 1))
-				continue;
+			break;
+		case Opt_fd_buffered_io:
+			match_int(args, &arg);
+			if (arg != 1) {
+				printk(KERN_ERR "bogus fd_buffered_io=%d value\n", arg);
+				ret = -EINVAL;
+				goto out;
+			}
 
 			printk(KERN_INFO "FILEIO: Using buffered I/O"
 				" operations for struct fd_dev\n");
 
 			fd_dev->fbd_flags |= FDBD_USE_BUFFERED_IO;
-			params++;
-			continue;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
 out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsystem_dev *se_dev)
@@ -734,18 +690,6 @@ static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	}
 
 	return 0;
-}
-
-static ssize_t fd_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	__fd_get_dev_info(fd_dev, page, &bl);
-	return (ssize_t)bl;
 }
 
 static void fd_get_plugin_info(void *p, char *b, int *bl)
@@ -762,20 +706,20 @@ static void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM FILEIO HBA\n");
 }
 
-static void fd_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t fd_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct fd_dev *fd_dev = dev->dev_ptr;
+	struct fd_dev *fd_dev = se_dev->se_dev_su_ptr;
+	ssize_t bl = 0;
 
-	__fd_get_dev_info(fd_dev, b, bl);
-}
-
-static void __fd_get_dev_info(struct fd_dev *fd_dev, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
-	*bl += sprintf(b + *bl, "        File: %s  Size: %llu  Mode: %s\n",
+	bl = sprintf(b + bl, "TCM FILEIO ID: %u", fd_dev->fd_dev_id);
+	bl += sprintf(b + bl, "        File: %s  Size: %llu  Mode: %s\n",
 		fd_dev->fd_dev_name, fd_dev->fd_dev_size,
 		(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO) ?
 		"Buffered" : "Synchronous");
+	return bl;
 }
 
 /*	fd_map_task_non_SG():
@@ -785,7 +729,7 @@ static void __fd_get_dev_info(struct fd_dev *fd_dev, char *b, int *bl)
 static void fd_map_task_non_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = TASK_CMD(task);
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_bufflen		= task->task_size;
 	req->fd_buf		= (void *) T_TASK(cmd)->t_task_buf;
@@ -798,7 +742,7 @@ static void fd_map_task_non_SG(struct se_task *task)
  */
 static void fd_map_task_SG(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_bufflen		= task->task_size;
 	req->fd_buf		= NULL;
@@ -811,7 +755,7 @@ static void fd_map_task_SG(struct se_task *task)
  */
 static int fd_CDB_none(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction	= FD_DATA_NONE;
 	req->fd_bufflen		= 0;
@@ -827,7 +771,7 @@ static int fd_CDB_none(struct se_task *task, u32 size)
  */
 static int fd_CDB_read_non_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_READ;
 	fd_map_task_non_SG(task);
@@ -841,7 +785,7 @@ static int fd_CDB_read_non_SG(struct se_task *task, u32 size)
  */
 static int fd_CDB_read_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_READ;
 	fd_map_task_SG(task);
@@ -855,7 +799,7 @@ static int fd_CDB_read_SG(struct se_task *task, u32 size)
  */
 static int fd_CDB_write_non_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_WRITE;
 	fd_map_task_non_SG(task);
@@ -869,7 +813,7 @@ static int fd_CDB_write_non_SG(struct se_task *task, u32 size)
  */
 static int fd_CDB_write_SG(struct se_task *task, u32 size)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	req->fd_data_direction = FD_DATA_WRITE;
 	fd_map_task_SG(task);
@@ -892,7 +836,7 @@ static int fd_check_lba(unsigned long long lba, struct se_device *dev)
  */
 static int fd_check_for_SG(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	return req->fd_sg_count;
 }
@@ -903,7 +847,7 @@ static int fd_check_for_SG(struct se_task *task)
  */
 static unsigned char *fd_get_cdb(struct se_task *task)
 {
-	struct fd_request *req = task->transport_req;
+	struct fd_request *req = FILE_REQ(task);
 
 	return req->fd_scsi_cdb;
 }
@@ -964,7 +908,7 @@ static struct se_subsystem_api fileio_template = {
 	.fua_read_emulated	= fd_emulated_fua_read,
 	.write_cache_emulated	= fd_emulated_write_cache,
 	.transport_complete	= fd_transport_complete,
-	.allocate_request	= fd_allocate_request,
+	.alloc_task		= fd_alloc_task,
 	.do_task		= fd_do_task,
 	.do_sync_cache		= fd_emulate_sync_cache,
 	.free_task		= fd_free_task,
@@ -973,7 +917,6 @@ static struct se_subsystem_api fileio_template = {
 	.show_configfs_dev_params = fd_show_configfs_dev_params,
 	.get_plugin_info	= fd_get_plugin_info,
 	.get_hba_info		= fd_get_hba_info,
-	.get_dev_info		= fd_get_dev_info,
 	.check_lba		= fd_check_lba,
 	.check_for_SG		= fd_check_for_SG,
 	.get_cdb		= fd_get_cdb,

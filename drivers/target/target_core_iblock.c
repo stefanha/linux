@@ -29,6 +29,7 @@
 
 #include <linux/version.h>
 #include <linux/string.h>
+#include <linux/parser.h>
 #include <linux/timer.h>
 #include <linux/fs.h>
 #include <linux/blkdev.h>
@@ -55,7 +56,6 @@
 
 static struct se_subsystem_api iblock_template;
 
-static void __iblock_get_dev_info(struct iblock_dev *, char *, int *);
 static void iblock_bio_done(struct bio *, int);
 
 /*	iblock_attach_hba(): (Part of se_subsystem_api_t template)
@@ -130,8 +130,6 @@ static void *iblock_allocate_virtdevice(struct se_hba *hba, const char *name)
 	return ib_dev;
 }
 
-static int __iblock_do_sync_cache(struct se_device *);
-
 static struct se_device *iblock_create_virtdevice(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -179,11 +177,9 @@ static struct se_device *iblock_create_virtdevice(
 	limits->logical_block_size = bdev_logical_block_size(bd);	
 	limits->max_hw_sectors = queue_max_hw_sectors(q);
 	limits->max_sectors = queue_max_sectors(q);
-	dev_limits.max_cdb_len = TCM_MAX_COMMAND_SIZE;
 	dev_limits.hw_queue_depth = IBLOCK_MAX_DEVICE_QUEUE_DEPTH;
 	dev_limits.queue_depth = IBLOCK_DEVICE_QUEUE_DEPTH;
 
-	dev_flags = DF_CLAIMED_BLOCKDEV;
 	ib_dev->ibd_major = MAJOR(bd->bd_dev);
 	ib_dev->ibd_minor = MINOR(bd->bd_dev);
 	ib_dev->ibd_bd = bd;
@@ -195,14 +191,7 @@ static struct se_device *iblock_create_virtdevice(
 		goto failed;
 
 	ib_dev->ibd_depth = dev->queue_depth;
-	/*
-	 * Check if the underlying struct block_device supports the
-	 * block/blk-barrier.c:blkdev_issue_flush() call, depending upon
-	 * which the SCSI mode page bits for WriteCache=1 and DPOFUA=1
-	 * will be enabled by TCM Core.
-	 */
-	if (__iblock_do_sync_cache(dev) == 0)
-		ib_dev->ibd_flags |= IBDF_BDEV_ISSUE_FLUSH;
+
 	/*
 	 * Check if the underlying struct block_device request_queue supports
 	 * the QUEUE_FLAG_DISCARD bit for UNMAP/WRITE_SAME in SCSI + TRIM
@@ -253,13 +242,13 @@ static int iblock_transport_complete(struct se_task *task)
 	return 0;
 }
 
-/*	iblock_allocate_request(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static void *iblock_allocate_request(
-	struct se_task *task,
-	struct se_device *dev)
+static inline struct iblock_req *IBLOCK_REQ(struct se_task *task)
+{
+	return container_of(task, struct iblock_req, ib_task);
+}
+
+static struct se_task *
+iblock_alloc_task(struct se_cmd *cmd)
 {
 	struct iblock_req *ib_req;
 
@@ -269,9 +258,9 @@ static void *iblock_allocate_request(
 		return NULL;
 	}
 
-	ib_req->ib_dev = dev->dev_ptr;
+	ib_req->ib_dev = SE_DEV(cmd)->dev_ptr;
 	atomic_set(&ib_req->ib_bio_cnt, 0);
-	return ib_req;
+	return &ib_req->ib_task;
 }
 
 static unsigned long long iblock_emulate_read_cap_with_block_size(
@@ -353,51 +342,37 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	return blocks_long;
 }
 
-static int __iblock_do_sync_cache(struct se_device *dev)
+/*
+ * Emulate SYCHRONIZE_CACHE_*
+ */
+static void iblock_emulate_sync_cache(struct se_task *task)
 {
-	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
+	struct se_cmd *cmd = TASK_CMD(task);
+	struct iblock_dev *ib_dev = cmd->se_dev->dev_ptr;
+	int immed = (T_TASK(cmd)->t_task_cdb[1] & 0x2);
 	sector_t error_sector;
 	int ret;
 
-	ret = blkdev_issue_flush(ib_dev->ibd_bd, GFP_KERNEL, &error_sector);
-	if (ret != 0) {
-		printk(KERN_ERR "IBLOCK: block_issue_flush() failed: %d "
-			" error_sector: %llu\n", ret,
-			(unsigned long long)error_sector);
-		return -1;
-	}
-	DEBUG_IBLOCK("IBLOCK: Called block_issue_flush()\n");
-	return 0;
-}
-
-/*
- * Called by target_core_transport():transport_emulate_control_cdb()
- * to emulate SYCHRONIZE_CACHE_*
- */
-void iblock_emulate_sync_cache(struct se_task *task)
-{
-	struct se_cmd *cmd = TASK_CMD(task);
-	int ret, immed = (T_TASK(cmd)->t_task_cdb[1] & 0x2);
 	/*
 	 * If the Immediate bit is set, queue up the GOOD response
 	 * for this SYNCHRONIZE_CACHE op
 	 */
 	if (immed)
 		transport_complete_sync_cache(cmd, 1);
+
 	/*
-	 * block/blk-barrier.c:block_issue_flush() does not support a
-	 * LBA + Range synchronization method, so for this case we
-	 * have to flush the entire cache.
+	 * blkdev_issue_flush() does not support a specifying a range, so
+	 * we have to flush the entire cache.
 	 */
-	ret = __iblock_do_sync_cache(cmd->se_dev);
-	if (ret < 0) {
-		if (!(immed))
-			transport_complete_sync_cache(cmd, 0);
-		return;
+	ret = blkdev_issue_flush(ib_dev->ibd_bd, GFP_KERNEL, &error_sector);
+	if (ret != 0) {
+		printk(KERN_ERR "IBLOCK: block_issue_flush() failed: %d "
+			" error_sector: %llu\n", ret,
+			(unsigned long long)error_sector);
 	}
 
-	if (!(immed))
-		transport_complete_sync_cache(cmd, 1);
+	if (!immed)
+		transport_complete_sync_cache(cmd, ret == 0);
 }
 
 /*
@@ -406,11 +381,7 @@ void iblock_emulate_sync_cache(struct se_task *task)
  */
 int iblock_emulated_write_cache(struct se_device *dev)
 {
-	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
-	/*
-	 * Only return WCE if ISSUE_FLUSH is supported
-	 */	
-	return (ib_dev->ibd_flags & IBDF_BDEV_ISSUE_FLUSH) ? 1 : 0;
+	return 1;
 }
 
 int iblock_emulated_dpo(struct se_device *dev)
@@ -424,11 +395,7 @@ int iblock_emulated_dpo(struct se_device *dev)
  */
 int iblock_emulated_fua_write(struct se_device *dev)
 {
-	struct iblock_dev *ib_dev = (struct iblock_dev *)dev->dev_ptr;
-	/*
-	 * Only return FUA WRITE if ISSUE_FLUSH is supported
-	 */
-	return (ib_dev->ibd_flags & IBDF_BDEV_ISSUE_FLUSH) ? 1 : 0;
+	return 1;
 }
 
 int iblock_emulated_fua_read(struct se_device *dev)
@@ -439,12 +406,26 @@ int iblock_emulated_fua_read(struct se_device *dev)
 static int iblock_do_task(struct se_task *task)
 {
 	struct se_device *dev = task->task_se_cmd->se_dev;
-	struct iblock_req *req = (struct iblock_req *)task->transport_req;
+	struct iblock_req *req = IBLOCK_REQ(task);
 	struct iblock_dev *ibd = (struct iblock_dev *)req->ib_dev;
 	struct request_queue *q = bdev_get_queue(ibd->ibd_bd);
 	struct bio *bio = req->ib_bio, *nbio = NULL;
-	int write = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
-	int ret;
+	int rw;
+
+	if (TASK_CMD(task)->data_direction == DMA_TO_DEVICE) {
+		/*
+		 * Force data to disk if we pretend to not have a volatile
+		 * write cache, or the initiator set the Force Unit Access bit.
+		 */
+		if (DEV_ATTRIB(dev)->emulate_write_cache == 0 ||
+		    (DEV_ATTRIB(dev)->emulate_fua_write > 0 &&
+		     T_TASK(task->task_se_cmd)->t_tasks_fua))
+			rw = WRITE_FUA;
+		else
+			rw = WRITE;
+	} else {
+		rw = READ;
+	}
 
 	while (bio) {
 		nbio = bio->bi_next;
@@ -452,30 +433,12 @@ static int iblock_do_task(struct se_task *task)
 		DEBUG_IBLOCK("Calling submit_bio() task: %p bio: %p"
 			" bio->bi_sector: %llu\n", task, bio, bio->bi_sector);
 
-		submit_bio(write, bio);
+		submit_bio(rw, bio);
 		bio = nbio;
 	}
 
 	if (q->unplug_fn)
 		q->unplug_fn(q);
-	/*
-	 * Check for Forced Unit Access WRITE emulation
-	 */
-	if ((DEV_ATTRIB(dev)->emulate_write_cache > 0) &&
-	    (DEV_ATTRIB(dev)->emulate_fua_write > 0) &&
-	    write && T_TASK(task->task_se_cmd)->t_tasks_fua) {
-		/*
-		 * We might need to be a bit smarter here
-		 * and return some sense data to let the initiator
-		 * know the FUA WRITE cache sync failed..?
-		 */
-		ret = __iblock_do_sync_cache(dev);
-		if (ret < 0) {
-			printk(KERN_ERR "__iblock_do_sync_cache()"
-				" failed for FUA Write\n");
-		}
-	}
-
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
@@ -490,7 +453,7 @@ static int iblock_do_discard(struct se_device *dev, sector_t lba, u32 range)
 
 static void iblock_free_task(struct se_task *task)
 {
-	struct iblock_req *req = task->transport_req;
+	struct iblock_req *req = IBLOCK_REQ(task);
 	struct bio *bio, *hbio = req->ib_bio;
 	/*
 	 * We only release the bio(s) here if iblock_bio_done() has not called
@@ -504,77 +467,67 @@ static void iblock_free_task(struct se_task *task)
 	}
 
 	kfree(req);
-	task->transport_req = NULL;
 }
+
+enum {
+	Opt_udev_path, Opt_force, Opt_err
+};
+
+static match_table_t tokens = {
+	{Opt_udev_path, "udev_path=%s"},
+	{Opt_force, "force=%d"},
+	{Opt_err, NULL}
+};
 
 static ssize_t iblock_set_configfs_dev_params(struct se_hba *hba,
 					       struct se_subsystem_dev *se_dev,
 					       const char *page, ssize_t count)
 {
 	struct iblock_dev *ib_dev = se_dev->se_dev_su_ptr;
-	char *buf, *cur, *ptr, *ptr2;
-	unsigned long force;
-	int params = 0, ret = 0;
-	/*
-	 * Make sure we take into account the NULL terminator when copying
-	 * the const buffer here..
-	 */
-	buf = kzalloc(count + 1, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for temporary"
-			" buffer\n");
-		return 0;
-	}
-	memcpy(buf, page, count);
-	cur = buf;
+	char *orig, *ptr, *opts;
+	substring_t args[MAX_OPT_ARGS];
+	int ret = 0, arg, token;
 
-	while (cur) {
-		ptr = strstr(cur, "=");
-		if (!(ptr))
-			goto out;
+	opts = kstrdup(page, GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
+	
+	orig = opts;
 
-		*ptr = '\0';
-		ptr++;
+	while ((ptr = strsep(&opts, ",")) != NULL) {
+		if (!*ptr)
+			continue;
 
-		ptr2 = strstr(cur, "udev_path");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ptr = strstrip(ptr);
+		token = match_token(ptr, tokens, args);
+		switch (token) {
+		case Opt_udev_path:
 			if (ib_dev->ibd_bd) {
 				printk(KERN_ERR "Unable to set udev_path= while"
 					" ib_dev->ibd_bd exists\n");
-				params = 0;
+				ret = -EEXIST;
 				goto out;
 			}
 
 			ret = snprintf(ib_dev->ibd_udev_path, SE_UDEV_PATH_LEN,
-				"%s", ptr);
+				"%s", match_strdup(&args[0]));
 			printk(KERN_INFO "IBLOCK: Referencing UDEV path: %s\n",
 					ib_dev->ibd_udev_path);
 			ib_dev->ibd_flags |= IBDF_HAS_UDEV_PATH;
-			params++;
-			continue;
-		}
-		ptr2 = strstr(cur, "force");
-		if ((ptr2)) {
-			transport_check_dev_params_delim(ptr, &cur);
-			ret = strict_strtoul(ptr, 0, &force);
-			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoul() failed"
-					" for force=\n");
-				break;
-			}
-			ib_dev->ibd_force = (int)force;
+			break;
+		case Opt_force:
+			match_int(args, &arg);
+			ib_dev->ibd_force = arg;
 			printk(KERN_INFO "IBLOCK: Set force=%d\n",
 				ib_dev->ibd_force);
-			params++;
-		} else
-			cur = NULL;
+			break;
+		default:
+			break;
+		}
 	}
 
 out:
-	kfree(buf);
-	return (params) ? count : -EINVAL;
+	kfree(orig);
+	return (!ret) ? count : ret;
 }
 
 static ssize_t iblock_check_configfs_dev_params(
@@ -591,18 +544,6 @@ static ssize_t iblock_check_configfs_dev_params(
 	return 0;
 }
 
-static ssize_t iblock_show_configfs_dev_params(
-	struct se_hba *hba,
-	struct se_subsystem_dev *se_dev,
-	char *page)
-{
-	struct iblock_dev *ibd = se_dev->se_dev_su_ptr;
-	int bl = 0;
-
-	__iblock_get_dev_info(ibd, page, &bl);
-	return (ssize_t)bl;
-}
-
 static void iblock_get_plugin_info(void *p, char *b, int *bl)
 {
 	*bl += sprintf(b + *bl, "TCM iBlock Plugin %s\n", IBLOCK_VERSION);
@@ -617,37 +558,37 @@ static void iblock_get_hba_info(struct se_hba *hba, char *b, int *bl)
 	*bl += sprintf(b + *bl, "        TCM iBlock HBA\n");
 }
 
-static void iblock_get_dev_info(struct se_device *dev, char *b, int *bl)
+static ssize_t iblock_show_configfs_dev_params(
+	struct se_hba *hba,
+	struct se_subsystem_dev *se_dev,
+	char *b)
 {
-	struct iblock_dev *ibd = dev->dev_ptr;
-
-	__iblock_get_dev_info(ibd, b, bl);
-}
-
-static void __iblock_get_dev_info(struct iblock_dev *ibd, char *b, int *bl)
-{
-	char buf[BDEVNAME_SIZE];
+	struct iblock_dev *ibd = se_dev->se_dev_su_ptr;
 	struct block_device *bd = ibd->ibd_bd;
+	char buf[BDEVNAME_SIZE];
+	ssize_t bl = 0;
 
 	if (bd)
-		*bl += sprintf(b + *bl, "iBlock device: %s",
+		bl += sprintf(b + bl, "iBlock device: %s",
 				bdevname(bd, buf));
 	if (ibd->ibd_flags & IBDF_HAS_UDEV_PATH) {
-		*bl += sprintf(b + *bl, "  UDEV PATH: %s\n",
+		bl += sprintf(b + bl, "  UDEV PATH: %s\n",
 				ibd->ibd_udev_path);
 	} else
-		*bl += sprintf(b + *bl, "\n");
+		bl += sprintf(b + bl, "\n");
 
-	*bl += sprintf(b + *bl, "        ");
+	bl += sprintf(b + bl, "        ");
 	if (bd) {
-		*bl += sprintf(b + *bl, "Major: %d Minor: %d  %s\n",
+		bl += sprintf(b + bl, "Major: %d Minor: %d  %s\n",
 			ibd->ibd_major, ibd->ibd_minor, (!bd->bd_contains) ?
 			"" : (bd->bd_holder == (struct iblock_dev *)ibd) ?
 			"CLAIMED: IBLOCK" : "CLAIMED: OS");
 	} else {
-		*bl += sprintf(b + *bl, "Major: %d Minor: %d\n",
+		bl += sprintf(b + bl, "Major: %d Minor: %d\n",
 			ibd->ibd_major, ibd->ibd_minor);
 	}
+
+	return bl;
 }
 
 static void iblock_bio_destructor(struct bio *bio)
@@ -697,7 +638,7 @@ static int iblock_map_task_SG(struct se_task *task)
 	struct se_cmd *cmd = task->task_se_cmd;
 	struct se_device *dev = SE_DEV(cmd);
 	struct iblock_dev *ib_dev = task->se_dev->dev_ptr;
-	struct iblock_req *ib_req = task->transport_req;
+	struct iblock_req *ib_req = IBLOCK_REQ(task);
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
 	struct scatterlist *sg;
 	int ret = 0;
@@ -817,9 +758,7 @@ static int iblock_check_for_SG(struct se_task *task)
 
 static unsigned char *iblock_get_cdb(struct se_task *task)
 {
-	struct iblock_req *req = task->transport_req;
-
-	return req->ib_scsi_cdb;
+	return IBLOCK_REQ(task)->ib_scsi_cdb;
 }
 
 static u32 iblock_get_device_rev(struct se_device *dev)
@@ -849,7 +788,7 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 static void iblock_bio_done(struct bio *bio, int err)
 {
 	struct se_task *task = bio->bi_private;
-	struct iblock_req *ibr = task->transport_req;
+	struct iblock_req *ibr = IBLOCK_REQ(task);
 	/*
 	 * Set -EIO if !BIO_UPTODATE and the passed is still err=0
 	 */
@@ -914,7 +853,7 @@ static struct se_subsystem_api iblock_template = {
 	.fua_read_emulated	= iblock_emulated_fua_read,
 	.write_cache_emulated	= iblock_emulated_write_cache,
 	.transport_complete	= iblock_transport_complete,
-	.allocate_request	= iblock_allocate_request,
+	.alloc_task		= iblock_alloc_task,
 	.do_task		= iblock_do_task,
 	.do_discard		= iblock_do_discard,
 	.do_sync_cache		= iblock_emulate_sync_cache,
@@ -924,7 +863,6 @@ static struct se_subsystem_api iblock_template = {
 	.show_configfs_dev_params = iblock_show_configfs_dev_params,
 	.get_plugin_info	= iblock_get_plugin_info,
 	.get_hba_info		= iblock_get_hba_info,
-	.get_dev_info		= iblock_get_dev_info,
 	.check_lba		= iblock_check_lba,
 	.check_for_SG		= iblock_check_for_SG,
 	.get_cdb		= iblock_get_cdb,

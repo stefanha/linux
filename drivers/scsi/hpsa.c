@@ -1926,7 +1926,7 @@ sglist_finished:
 }
 
 
-static int hpsa_scsi_queue_command(struct scsi_cmnd *cmd,
+static int hpsa_scsi_queue_command_lck(struct scsi_cmnd *cmd,
 	void (*done)(struct scsi_cmnd *))
 {
 	struct ctlr_info *h;
@@ -2019,6 +2019,8 @@ static int hpsa_scsi_queue_command(struct scsi_cmnd *cmd,
 	/* the cmd'll come back via intr handler in complete_scsi_command()  */
 	return 0;
 }
+
+static DEF_SCSI_QCMD(hpsa_scsi_queue_command)
 
 static void hpsa_scan_start(struct Scsi_Host *sh)
 {

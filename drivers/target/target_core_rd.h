@@ -30,6 +30,8 @@ void rd_module_exit(void);
 #define RRF_GOT_LBA		0x02
 
 struct rd_request {
+	struct se_task	rd_task;
+
 	/* SCSI CDB from iSCSI Command PDU */
 	unsigned char	rd_scsi_cdb[TCM_MAX_COMMAND_SIZE];
 	/* Data Direction */

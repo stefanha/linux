@@ -59,16 +59,10 @@
 /*
  * struct se_device->dev_flags
  */
-#define DF_READAHEAD_ACTIVE                     0x00000001
-#define DF_TRANSPORT_DMA_ALLOC			0x00000002
-#define DF_TRANSPORT_BUF_ALLOC			0x00000004
-#define DF_DEV_DEBUG				0x00000008
-#define DF_CLAIMED_BLOCKDEV			0x00000010
-#define DF_PERSISTENT_CLAIMED_BLOCKDEV		0x00000020
-#define DF_READ_ONLY				0x00000040
-#define DF_SPC3_PERSISTENT_RESERVE		0x00000080
-#define DF_SPC2_RESERVATIONS			0x00000100
-#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000200
+#define DF_TRANSPORT_DMA_ALLOC			0x00000001
+#define DF_READ_ONLY				0x00000002
+#define DF_SPC2_RESERVATIONS			0x00000004
+#define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000008
 
 /*
  * Used as return values from transport_generic_cmd_sequencer()
@@ -85,7 +79,7 @@
 #define TGCS_CHECK_CONDITION_NOT_READY		9
 
 /* struct se_dev_attrib sanity values */
-/* 10 Minutes, see transport_get_default_task_timeout()  */
+/* 10 Minutes */
 #define DA_TASK_TIMEOUT_MAX			600
 /* Default max_unmap_lba_count */
 #define DA_MAX_UNMAP_LBA_COUNT			0
@@ -132,10 +126,6 @@ struct se_subsystem_api;
 
 extern int init_se_global(void);
 extern void release_se_global(void);
-#ifdef DEBUG_DEV
-extern int __iscsi_debug_dev(struct se_device *);
-#endif
-extern unsigned char *transport_get_iqn_sn(void);
 extern void transport_init_queue_obj(struct se_queue_obj *);
 extern int transport_subsystem_check_init(void);
 extern int transport_subsystem_register(struct se_subsystem_api *);
@@ -143,7 +133,6 @@ extern void transport_subsystem_release(struct se_subsystem_api *);
 extern void transport_load_plugins(void);
 extern struct se_subsystem_api *transport_core_get_sub_by_name(const char *);
 extern void transport_core_put_sub(struct se_subsystem_api *);
-extern void transport_check_dev_params_delim(char *, char **);
 extern struct se_session *transport_init_session(void);
 extern void __transport_register_session(struct se_portal_group *,
 					struct se_node_acl *,
@@ -171,7 +160,6 @@ extern void transport_add_task_to_execute_queue(struct se_task *,
 						struct se_device *);
 extern void transport_add_tasks_from_cmd(struct se_cmd *);
 extern struct se_queue_req *transport_get_qr_from_queue(struct se_queue_obj *);
-extern int transport_check_device_tcq(struct se_device *, u32, u32);
 unsigned char *transport_dump_cmd_direction(struct se_cmd *);
 extern void transport_dump_dev_state(struct se_device *, char *, int *);
 extern void transport_dump_dev_info(struct se_device *, struct se_lun *,
@@ -214,7 +202,6 @@ extern void transport_generic_request_timeout(struct se_cmd *);
 extern int transport_generic_allocate_buf(struct se_cmd *, u32, u32);
 extern int __transport_execute_tasks(struct se_device *);
 extern void transport_new_cmd_failure(struct se_cmd *);
-extern u32 transport_get_default_task_timeout(struct se_device *);
 extern void transport_set_supported_SAM_opcode(struct se_cmd *);
 extern void transport_start_task_timer(struct se_task *);
 extern void __transport_stop_task_timer(struct se_task *, unsigned long *);
@@ -227,10 +214,6 @@ extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
 						void *, u32, u32, void *);
 extern void transport_passthrough_release(struct se_cmd *);
 extern int transport_passthrough_complete(struct se_cmd *);
-extern void transport_memcpy_write_contig(struct se_cmd *, struct scatterlist *,
-				unsigned char *);
-extern void transport_memcpy_read_contig(struct se_cmd *, unsigned char *,
-				struct scatterlist *);
 extern void transport_memcpy_se_mem_read_contig(struct se_cmd *,
 				unsigned char *, struct list_head *);
 extern int transport_generic_passthrough_async(struct se_cmd *cmd,
@@ -245,7 +228,6 @@ extern void transport_release_fe_cmd(struct se_cmd *);
 extern int transport_generic_remove(struct se_cmd *, int, int);
 extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *, u32,
 				struct scatterlist *, u32);
-extern int transport_lun_wait_for_tasks(struct se_cmd *, struct se_lun *);
 extern int transport_clear_lun_from_sessions(struct se_lun *);
 extern int transport_check_aborted_status(struct se_cmd *, int);
 extern int transport_get_sense_codes(struct se_cmd *, u8 *, u8 *);
@@ -406,10 +388,7 @@ struct se_subsystem_api {
 	 * drivers.  Provided out of convenience.
 	 */
 	int (*transport_complete)(struct se_task *task);
-	/*
-	 * allocate_request():
-	 */
-	void *(*allocate_request)(struct se_task *, struct se_device *);
+	struct se_task *(*alloc_task)(struct se_cmd *);
 	/*
 	 * allocate_buf():
 	 */
@@ -474,10 +453,6 @@ struct se_subsystem_api {
 	 * get_hba_info():
 	 */
 	void (*get_hba_info)(struct se_hba *, char *, int *);
-	/*
-	 * get_dev_info():
-	 */
-	void (*get_dev_info)(struct se_device *, char *, int *);
 	/*
 	 * check_lba():
 	 */

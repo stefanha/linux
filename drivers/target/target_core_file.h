@@ -21,6 +21,7 @@ extern struct se_global *se_global;
 #define RRF_GOT_LBA		0x02
 
 struct fd_request {
+	struct se_task	fd_task;
 	/* SCSI CDB from iSCSI Command PDU */
 	unsigned char	fd_scsi_cdb[TCM_MAX_COMMAND_SIZE];
 	/* Data Direction */

@@ -3180,7 +3180,7 @@ static inline int __ata_scsi_queuecmd(struct scsi_cmnd *scmd,
  *	Return value from __ata_scsi_queuecmd() if @cmd can be queued,
  *	0 otherwise.
  */
-int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
+static int ata_scsi_queuecmd_lck(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct ata_port *ap;
 	struct ata_device *dev;
@@ -3207,6 +3207,8 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 	spin_lock(shost->host_lock);
 	return rc;
 }
+
+DEF_SCSI_QCMD(ata_scsi_queuecmd)
 
 /**
  *	ata_scsi_simulate - simulate SCSI command on ATA device
