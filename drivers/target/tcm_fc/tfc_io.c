@@ -78,6 +78,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	size_t frame_len = 0;
 	size_t mem_len;
 	size_t tlen;
+	size_t off_in_page;
 	struct page *page;
 	int use_sg;
 	int error;
@@ -111,7 +112,6 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 
 	/* no scatter/gather in skb for odd word length due to fc_seq_send() */
 	use_sg = !(remaining % 4);
-	use_sg = 0;	/* XXX to test the non-sg path */
 
 	while (remaining) {
 		if (!mem_len) {
@@ -123,7 +123,13 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			page = mem->se_page;
 		}
 		if (!frame_len) {
-			frame_len = cmd->sess->max_frame;
+			/*
+			 * If lport's has capability of Large Send Offload LSO)
+			 * , then allow 'frame_len' to be as big as 'lso_max'
+			 * if indicated transfer length is >= lport->lso_max
+			 */
+			frame_len = (lport->seq_offload) ? lport->lso_max :
+							  cmd->sess->max_frame;
 			frame_len = min(frame_len, remaining);
 			fp = fc_frame_alloc(lport, use_sg ? 0 : frame_len);
 			if (!fp)
@@ -131,16 +137,34 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			to = fc_frame_payload_get(fp, 0);
 			fh_off = frame_off;
 			frame_off += frame_len;
+			/*
+			 * Setup the frame's max payload which is used by base
+			 * driver to indicate HW about max frame size, so that
+			 * HW can do fragmentation appropriately based on
+			 * "gso_max_size" of underline netdev.
+			 */
+			fr_max_payload(fp) = cmd->sess->max_frame;
 		}
 		tlen = min(mem_len, frame_len);
 
 		if (use_sg) {
-			if (!mem)
-				page = virt_to_page(task->t_task_buf + mem_off);
+			if (!mem) {
+				BUG_ON(!task->t_task_buf);
+				page_addr = task->t_task_buf + mem_off;
+				/*
+				 * In this case, offset is 'offset_in_page' of
+				 * (t_task_buf + mem_off) instead of 'mem_off'.
+				 */
+				off_in_page = offset_in_page(page_addr);
+				page = virt_to_page(page_addr);
+				tlen = min(tlen, PAGE_SIZE - off_in_page);
+			} else
+				off_in_page = mem_off;
+			BUG_ON(!page);
 			get_page(page);
 			skb_fill_page_desc(fp_skb(fp),
 					   skb_shinfo(fp_skb(fp))->nr_frags,
-					   page, mem_off, tlen);
+					   page, off_in_page, tlen);
 			fr_len(fp) += tlen;
 			fp_skb(fp)->data_len += tlen;
 			fp_skb(fp)->truesize +=
@@ -167,7 +191,8 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 		frame_len -= tlen;
 		remaining -= tlen;
 
-		if (frame_len)
+		if (frame_len &&
+		    (skb_shinfo(fp_skb(fp))->nr_frags < FC_FRAME_SG_LEN))
 			continue;
 		if (!remaining)
 			f_ctl |= FC_FC_END_SEQ;
@@ -175,8 +200,13 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			       FC_TYPE_FCP, f_ctl, fh_off);
 		error = lport->tt.seq_send(lport, cmd->seq, fp);
 		if (error) {
-			WARN_ON(1);
 			/* XXX For now, initiator will retry */
+			if (printk_ratelimit())
+				printk(KERN_ERR "%s: Failed to send frame %p, "
+						"xid <0x%x>, remaining <0x%x>, "
+						"lso_max <0x%x>\n",
+						__func__, fp, ep->xid,
+						remaining, lport->lso_max);
 		}
 	}
 	return ft_queue_status(se_cmd);
