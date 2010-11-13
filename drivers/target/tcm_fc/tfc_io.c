@@ -192,10 +192,8 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 		remaining -= tlen;
 
 		if (frame_len &&
-		    (skb_shinfo(fp_skb(fp))->nr_frags < FC_FRAME_SG_LEN)) {
-			frame_len = 0;
+		    (skb_shinfo(fp_skb(fp))->nr_frags < FC_FRAME_SG_LEN))
 			continue;
-		}
 		if (!remaining)
 			f_ctl |= FC_FC_END_SEQ;
 		fc_fill_fc_hdr(fp, FC_RCTL_DD_SOL_DATA, ep->did, ep->sid,
