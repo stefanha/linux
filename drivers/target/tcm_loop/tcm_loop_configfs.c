@@ -44,9 +44,7 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 #include <target/target_core_base.h>
-#include <target/target_core_seobj.h>
 #include <target/configfs_macros.h>
 
 #include <tcm_loop_core.h>
@@ -78,8 +76,8 @@ static char *tcm_loop_dump_proto_id(struct tcm_loop_hba *tl_hba)
 /* Start items for tcm_loop_port_cit */
 
 int tcm_loop_port_link(
-	struct se_portal_group_s *se_tpg,
-	struct se_lun_s *lun)
+	struct se_portal_group *se_tpg,
+	struct se_lun *lun)
 {
 	struct tcm_loop_tpg *tl_tpg = container_of(se_tpg,
 				struct tcm_loop_tpg, tl_se_tpg);
@@ -97,8 +95,8 @@ int tcm_loop_port_link(
 }
 
 void tcm_loop_port_unlink(
-	struct se_portal_group_s *se_tpg,
-	struct se_lun_s *se_lun)
+	struct se_portal_group *se_tpg,
+	struct se_lun *se_lun)
 {
 	struct scsi_device *sd;
 	struct tcm_loop_hba *tl_hba;
@@ -134,7 +132,7 @@ static int tcm_loop_make_nexus(
 	struct tcm_loop_tpg *tl_tpg,
 	const char *name)
 {
-	se_portal_group_t *se_tpg;
+	struct se_portal_group *se_tpg;
 	struct tcm_loop_hba *tl_hba = tl_tpg->tl_hba;
 	struct tcm_loop_nexus *tl_nexus;
 
@@ -150,14 +148,14 @@ static int tcm_loop_make_nexus(
 		return -ENOMEM;
 	}
 	/*
-	 * Initialize the se_session_t pointer
+	 * Initialize the struct se_session pointer
 	 */
 	tl_nexus->se_sess = transport_init_session();
 	if (!(tl_nexus->se_sess))
 		goto out;
 	/*
 	 * Since we are running in 'demo mode' this call with generate a
-	 * se_node_acl_t for the tcm_loop se_portal_group_t with the SCSI
+	 * struct se_node_acl for the tcm_loop struct se_portal_group with the SCSI
 	 * Initiator port name of the passed configfs group 'name'.
 	 */	
 	tl_nexus->se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
@@ -186,7 +184,7 @@ out:
 static int tcm_loop_drop_nexus(
 	struct tcm_loop_tpg *tpg)
 {
-	se_session_t *se_sess;
+	struct se_session *se_sess;
 	struct tcm_loop_nexus *tl_nexus;
 	struct tcm_loop_hba *tl_hba = tpg->tl_hba;
 
@@ -220,7 +218,7 @@ static int tcm_loop_drop_nexus(
 /* End items for tcm_loop_nexus_cit */
 
 static ssize_t tcm_loop_tpg_show_nexus(
-	struct se_portal_group_s *se_tpg,
+	struct se_portal_group *se_tpg,
 	char *page)
 {
 	struct tcm_loop_tpg *tl_tpg = container_of(se_tpg,
@@ -239,7 +237,7 @@ static ssize_t tcm_loop_tpg_show_nexus(
 }
 
 static ssize_t tcm_loop_tpg_store_nexus(
-	struct se_portal_group_s *se_tpg,
+	struct se_portal_group *se_tpg,
 	const char *page,
 	size_t count)
 {
@@ -326,8 +324,8 @@ static struct configfs_attribute *tcm_loop_tpg_attrs[] = {
 
 /* Start items for tcm_loop_naa_cit */
 
-struct se_portal_group_s *tcm_loop_make_naa_tpg(
-	struct se_wwn_s *wwn,
+struct se_portal_group *tcm_loop_make_naa_tpg(
+	struct se_wwn *wwn,
 	struct config_group *group,
 	const char *name)
 {
@@ -372,9 +370,9 @@ struct se_portal_group_s *tcm_loop_make_naa_tpg(
 }
 
 void tcm_loop_drop_naa_tpg(
-	struct se_portal_group_s *se_tpg)
+	struct se_portal_group *se_tpg)
 {
-	struct se_wwn_s *wwn = se_tpg->se_tpg_wwn;
+	struct se_wwn *wwn = se_tpg->se_tpg_wwn;
 	struct tcm_loop_tpg *tl_tpg = container_of(se_tpg,
 				struct tcm_loop_tpg, tl_se_tpg);
 	struct tcm_loop_hba *tl_hba;
@@ -400,7 +398,7 @@ void tcm_loop_drop_naa_tpg(
 
 /* Start items for tcm_loop_cit */
 
-struct se_wwn_s *tcm_loop_make_scsi_hba(
+struct se_wwn *tcm_loop_make_scsi_hba(
 	struct target_fabric_configfs *tf,
 	struct config_group *group,
 	const char *name)
@@ -451,17 +449,6 @@ check_len:
 	snprintf(&tl_hba->tl_wwn_address[0], TL_WWN_ADDR_LEN, "%s", &name[off]);
 
 	/*
-	 * Setup the tl_hba->tl_hba_qobj
-	 */
-	tl_hba->tl_hba_qobj = kzalloc(sizeof(se_queue_obj_t), GFP_KERNEL);
-	if (!(tl_hba->tl_hba_qobj)) {
-		kfree(tl_hba);
-		printk("Unable to allocate tl_hba->tl_hba_qobj\n");
-		return ERR_PTR(-ENOMEM);
-	}
-	transport_init_queue_obj(tl_hba->tl_hba_qobj);
-
-	/*
 	 * Call device_register(tl_hba->dev) to register the emulated
 	 * Linux/SCSI LLD of type struct Scsi_Host at tl_hba->sh after
 	 * device_register() callbacks in tcm_loop_driver_probe()
@@ -471,19 +458,6 @@ check_len:
 		goto out;
 
 	sh = tl_hba->sh;
-	/*
-	 * Start up the per struct Scsi_Host tcm_loop processing thread
-	 */
-	tl_hba->tl_kthread = kthread_run(tcm_loop_processing_thread,
-			(void *)tl_hba, "tcm_loop_%d", sh->host_no);
-	if (IS_ERR(tl_hba->tl_kthread)) {
-		printk(KERN_ERR "Unable to start tcm_loop kthread\n");
-		device_unregister(&tl_hba->dev);
-		ret = -ENOMEM;
-		goto out;
-	}
-	wait_for_completion(&tl_hba->tl_hba_qobj->thread_create_comp);
-
 	tcm_loop_hba_no_cnt++;
 	printk(KERN_INFO "TCM_Loop_ConfigFS: Allocated emulated Target"
 		" %s Address: %s at Linux/SCSI Host ID: %d\n",
@@ -491,23 +465,16 @@ check_len:
 
 	return &tl_hba->tl_hba_wwn;
 out:
-	kfree(tl_hba->tl_hba_qobj);
 	kfree(tl_hba);
 	return ERR_PTR(ret);
 }
 
 void tcm_loop_drop_scsi_hba(
-	struct se_wwn_s *wwn)
+	struct se_wwn *wwn)
 {
 	struct tcm_loop_hba *tl_hba = container_of(wwn,
 				struct tcm_loop_hba, tl_hba_wwn);
 	int host_no = tl_hba->sh->host_no;
-
-	/*
-	 * Shutdown the per HBA tcm_loop processing kthread
-	 */
-	kthread_stop(tl_hba->tl_kthread);
-	wait_for_completion(&tl_hba->tl_hba_qobj->thread_done_comp);
 	/*
 	 * Call device_unregister() on the original tl_hba->dev.
 	 * tcm_loop_fabric_scsi.c:tcm_loop_release_adapter() will
@@ -574,6 +541,8 @@ int tcm_loop_register_configfs(void)
 					&tcm_loop_check_demo_mode_cache;
 	fabric->tf_ops.tpg_check_demo_mode_write_protect =
 					&tcm_loop_check_demo_mode_write_protect;
+	fabric->tf_ops.tpg_check_prod_mode_write_protect =
+					&tcm_loop_check_prod_mode_write_protect;
 	/*
 	 * The TCM loopback fabric module runs in demo-mode to a local
 	 * virtual SCSI device, so fabric dependent initator ACLs are
@@ -582,9 +551,7 @@ int tcm_loop_register_configfs(void)
 	fabric->tf_ops.tpg_alloc_fabric_acl = &tcm_loop_tpg_alloc_fabric_acl;
 	fabric->tf_ops.tpg_release_fabric_acl =
 					&tcm_loop_tpg_release_fabric_acl;
-#ifdef SNMP_SUPPORT
 	fabric->tf_ops.tpg_get_inst_index = &tcm_loop_get_inst_index;
-#endif /* SNMP_SUPPORT */
 	/*
 	 * Since tcm_loop is mapping physical memory from Linux/SCSI
 	 * struct scatterlist arrays for each struct scsi_cmnd I/O,
@@ -592,6 +559,10 @@ int tcm_loop_register_configfs(void)
 	 * virtual memory address mappings
 	 */
 	fabric->tf_ops.alloc_cmd_iovecs = NULL;
+	/*
+	 * Used for setting up remaining TCM resources in process context
+	 */
+	fabric->tf_ops.new_cmd_map = &tcm_loop_new_cmd_map;
 	fabric->tf_ops.check_stop_free = &tcm_loop_check_stop_free;
 	fabric->tf_ops.release_cmd_to_pool = &tcm_loop_deallocate_core_cmd;
 	fabric->tf_ops.release_cmd_direct = &tcm_loop_deallocate_core_cmd;
@@ -600,9 +571,7 @@ int tcm_loop_register_configfs(void)
 	fabric->tf_ops.stop_session = &tcm_loop_stop_session;
 	fabric->tf_ops.fall_back_to_erl0 = &tcm_loop_fall_back_to_erl0;
 	fabric->tf_ops.sess_logged_in = &tcm_loop_sess_logged_in;
-#ifdef SNMP_SUPPORT
-	fabric->tf_ops.sess_get_index = &tpg_loop_sess_get_index:
-#endif /* SNMP_SUPPORT */
+	fabric->tf_ops.sess_get_index = &tcm_loop_sess_get_index;
 	fabric->tf_ops.sess_get_initiator_sid = NULL;
 	fabric->tf_ops.write_pending = &tcm_loop_write_pending;
 	fabric->tf_ops.write_pending_status = &tcm_loop_write_pending_status;
@@ -653,7 +622,7 @@ int tcm_loop_register_configfs(void)
 	ret = target_fabric_configfs_register(fabric);
 	if (ret < 0) {
 		printk(KERN_ERR "target_fabric_configfs_register() for"
-				" LIO-Target failed!\n");
+				" TCM_Loop failed!\n");
 		target_fabric_configfs_free(fabric);
 		return -1;
 	}

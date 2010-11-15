@@ -27,9 +27,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_DEVICE_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/delay.h>
@@ -41,33 +38,26 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 
-#include <iscsi_linux_defs.h>
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
 #include <iscsi_target_device.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
 #include <iscsi_target_tpg.h>
 #include <target/target_core_transport.h>
 #include <iscsi_target_util.h>
-
-#include <target/target_core_plugin.h>
-#include <target/target_core_seobj.h>
-
-#undef ISCSI_TARGET_DEVICE_C
 
 /*	iscsi_get_lun():
  *
  *
  */
 int iscsi_get_lun_for_tmr(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u64 lun)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_portal_group_t *tpg = ISCSI_TPG_C(conn);
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
@@ -87,12 +77,12 @@ int iscsi_get_lun_for_tmr(
  * 	Returns (< 0) on failure
  */
 int iscsi_get_lun_for_cmd(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *cdb,
 	u64 lun)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_portal_group_t *tpg = ISCSI_TPG_C(conn);
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
@@ -110,9 +100,9 @@ int iscsi_get_lun_for_cmd(
  *
  *
  */
-void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
+void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
 {
-	se_node_acl_t *se_nacl;
+	struct se_node_acl *se_nacl;
 
 	/*
 	 * This is a discovery session, the single queue slot was already
@@ -127,7 +117,7 @@ void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
 
 	/*
 	 * This is a normal session, set the Session's CmdSN window to the
-	 * se_node_acl_t->queue_depth.  The value in se_node_acl_t->queue_depth
+	 * struct se_node_acl->queue_depth.  The value in struct se_node_acl->queue_depth
 	 * has already been validated as a legal value in
 	 * core_set_queue_depth_for_node().
 	 */
@@ -139,7 +129,7 @@ void iscsi_determine_maxcmdsn(iscsi_session_t *sess)
  *
  *
  */
-void iscsi_increment_maxcmdsn(iscsi_cmd_t *cmd, iscsi_session_t *sess)
+void iscsi_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess)
 {
 	if (cmd->immediate_cmd || cmd->maxcmdsn_inc)
 		return;

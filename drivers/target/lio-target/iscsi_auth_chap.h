@@ -34,17 +34,17 @@
 #define CHAP_STAGE_CLIENT_NRIC	4
 #define CHAP_STAGE_SERVER_NR	5
 
-extern int chap_gen_challenge(iscsi_conn_t *, int, char *, unsigned int *);
-extern u32 chap_main_loop(iscsi_conn_t *, iscsi_node_auth_t *, char *, char *,
+extern int chap_gen_challenge(struct iscsi_conn *, int, char *, unsigned int *);
+extern u32 chap_main_loop(struct iscsi_conn *, struct iscsi_node_auth *, char *, char *,
 				int *, int *);
 
-typedef struct iscsi_chap_s {
+struct iscsi_chap {
 	unsigned char	digest_type;
 	unsigned char	id;
 	unsigned char	challenge[CHAP_CHALLENGE_LENGTH];
 	unsigned int	challenge_len;
 	unsigned int	authenticate_target;
 	unsigned int	chap_state;
-} iscsi_chap_t;
+} ____cacheline_aligned;
 
 #endif   /*** _ISCSI_CHAP_H_ ***/

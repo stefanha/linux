@@ -46,9 +46,7 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 #include <target/target_core_base.h>
-#include <target/target_core_seobj.h>
 #include <target/configfs_macros.h>
 
 #include <scsi/libfc.h>
@@ -235,6 +233,7 @@ static struct ft_sess *ft_sess_create(struct ft_tport *tport, u32 port_id,
 		kfree(sess);
 		return NULL;
 	}
+	sess->se_sess->se_node_acl = &acl->se_node_acl;
 	sess->tport = tport;
 	sess->port_id = port_id;
 	kref_init(&sess->kref);	/* ref for table entry */
@@ -243,7 +242,7 @@ static struct ft_sess *ft_sess_create(struct ft_tport *tport, u32 port_id,
 
 	FT_SESS_DBG("port_id %x sess %p\n", port_id, sess);
 
-	__transport_register_session(&tport->tpg->se_tpg, &acl->se_node_acl,
+	transport_register_session(&tport->tpg->se_tpg, &acl->se_node_acl,
 				   sess->se_sess, sess);
 	return sess;
 }
@@ -311,7 +310,7 @@ static void ft_sess_delete_all(struct ft_tport *tport)
  * Determine whether session is allowed to be shutdown in the current context.
  * Returns non-zero if the session should be shutdown.
  */
-int ft_sess_shutdown(struct se_session_s *se_sess)
+int ft_sess_shutdown(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
@@ -323,7 +322,7 @@ int ft_sess_shutdown(struct se_session_s *se_sess)
  * Remove session and send PRLO.
  * This is called when the ACL is being deleted or queue depth is changing.
  */
-void ft_sess_close(struct se_session_s *se_sess)
+void ft_sess_close(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 	struct fc_lport *lport;
@@ -345,28 +344,28 @@ void ft_sess_close(struct se_session_s *se_sess)
 	synchronize_rcu();		/* let transport deregister happen */
 }
 
-void ft_sess_stop(struct se_session_s *se_sess, int sess_sleep, int conn_sleep)
+void ft_sess_stop(struct se_session *se_sess, int sess_sleep, int conn_sleep)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
 	FT_SESS_DBG("port_id %x\n", sess->port_id);
 }
 
-int ft_sess_logged_in(struct se_session_s *se_sess)
+int ft_sess_logged_in(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
 	return sess->port_id != -1;
 }
 
-u32 ft_sess_get_index(struct se_session_s *se_sess)
+u32 ft_sess_get_index(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
 
 	return sess->port_id;	/* XXX TBD probably not what is needed */
 }
 
-u32 ft_sess_get_port_name(struct se_session_s *se_sess,
+u32 ft_sess_get_port_name(struct se_session *se_sess,
 			  unsigned char *buf, u32 len)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
@@ -374,7 +373,7 @@ u32 ft_sess_get_port_name(struct se_session_s *se_sess,
 	return ft_format_wwn(buf, len, sess->port_name);
 }
 
-void ft_sess_set_erl0(struct se_session_s *se_sess)
+void ft_sess_set_erl0(struct se_session *se_sess)
 {
 	/* XXX TBD called when out of memory */
 }
@@ -514,27 +513,21 @@ static void ft_prlo(struct fc_rport_priv *rdata)
  * Handle incoming FCP request.
  * Caller has verified that the frame is type FCP.
  */
-static void ft_recv(struct fc_lport *lport,
-		    struct fc_seq *sp, struct fc_frame *fp)
+static void ft_recv(struct fc_lport *lport, struct fc_frame *fp)
 {
 	struct ft_sess *sess;
-	struct fc_frame_header *fh;
-	u32 sid;
-
-	fh = fc_frame_header_get(fp);
-	sid = ntoh24(fh->fh_s_id);
+	u32 sid = fc_frame_sid(fp);
 
 	FT_SESS_DBG("sid %x\n", sid);
 
 	sess = ft_sess_get(lport, sid);
 	if (!sess) {
 		FT_SESS_DBG("sid %x sess lookup failed\n", sid);
-		lport->tt.exch_done(sp);
 		/* TBD XXX - if FCP_CMND, send PRLO */
 		fc_frame_free(fp);
 		return;
 	}
-	ft_recv_req(sess, sp, fp);	/* must do ft_sess_put() */
+	ft_recv_req(sess, fp);	/* must do ft_sess_put() */
 }
 
 /*

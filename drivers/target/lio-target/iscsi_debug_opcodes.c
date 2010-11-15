@@ -29,8 +29,6 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
-
-#define __ISCSI_DEBUG_OPCODES_C
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>

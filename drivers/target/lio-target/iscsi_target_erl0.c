@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_ERL0_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -39,7 +36,6 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 
-#include <iscsi_linux_defs.h>
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
 #include <iscsi_debug.h>
@@ -53,18 +49,16 @@
 
 #include <iscsi_target.h>
 
-#undef ISCSI_TARGET_ERL0_C
-
 /*	iscsi_set_dataout_sequence_values():
  *
- *	Used to set values in iscsi_cmd_t that iscsi_dataout_check_sequence()
+ *	Used to set values in struct iscsi_cmd that iscsi_dataout_check_sequence()
  *	checks against to determine a PDU's Offset+Length is within the current
  *	DataOUT Sequence.  Used for DataSequenceInOrder=Yes only.
  */
 void iscsi_set_dataout_sequence_values(
-	iscsi_cmd_t *cmd)
+	struct iscsi_cmd *cmd)
 {
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 	/*
 	 * Still set seq_start_offset and seq_end_offset for Unsolicited
 	 * DataOUT, even if DataSequenceInOrder=No.
@@ -102,10 +96,10 @@ void iscsi_set_dataout_sequence_values(
  *
  */
 static inline int iscsi_dataout_within_command_recovery_check(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -128,13 +122,13 @@ static inline int iscsi_dataout_within_command_recovery_check(
 
 		cmd->cmd_flags &= ~ICF_WITHIN_COMMAND_RECOVERY;
 	} else {
-		iscsi_seq_t *seq;
+		struct iscsi_seq *seq;
 
 		seq = iscsi_get_seq_holder(cmd, hdr->offset, hdr->length);
 		if (!(seq))
 			return DATAOUT_CANNOT_RECOVER;
 		/*
-		 * Set the iscsi_seq_t pointer to reuse later.
+		 * Set the struct iscsi_seq pointer to reuse later.
 		 */
 		cmd->seq_ptr = seq;
 
@@ -171,11 +165,11 @@ dump:
  *
  */
 static inline int iscsi_dataout_check_unsolicited_sequence(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
 	__u32 first_burst_len;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -196,7 +190,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 			" for this Unsolicited DataOut Burst.\n",
 			first_burst_len, SESS_OPS_C(conn)->FirstBurstLength);
 		transport_send_check_condition_and_sense(SE_CMD(cmd),
-				INCORRECT_AMOUNT_OF_DATA, 0);
+				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return DATAOUT_CANNOT_RECOVER;
 	}
 
@@ -221,7 +215,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 				SESS_OPS_C(conn)->FirstBurstLength,
 				cmd->data_length);
 			transport_send_check_condition_and_sense(SE_CMD(cmd),
-					INCORRECT_AMOUNT_OF_DATA, 0);
+					TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 	} else {
@@ -249,12 +243,12 @@ out:
  *
  */
 static inline int iscsi_dataout_check_sequence(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
 	__u32 next_burst_len;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_seq_t *seq = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_seq *seq = NULL;
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -262,7 +256,7 @@ static inline int iscsi_dataout_check_sequence(
 	 * For DataSequenceInOrder=Yes: Check that the offset and offset+length
 	 * is within range as defined by iscsi_set_dataout_sequence_values().
 	 *
-	 * For DataSequenceInOrder=No: Check that an iscsi_seq_t exists for
+	 * For DataSequenceInOrder=No: Check that an struct iscsi_seq exists for
 	 * offset+length tuple.
 	 */
 	if (SESS_OPS_C(conn)->DataSequenceInOrder) {
@@ -290,7 +284,7 @@ static inline int iscsi_dataout_check_sequence(
 		if (!(seq))
 			return DATAOUT_CANNOT_RECOVER;
 		/*
-		 * Set the iscsi_seq_t pointer to reuse later.
+		 * Set the struct iscsi_seq pointer to reuse later.
 		 */
 		cmd->seq_ptr = seq;
 
@@ -379,12 +373,12 @@ out:
  *	Called from:	iscsi_check_pre_dataout()
  */
 static inline int iscsi_dataout_check_datasn(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
 	int dump = 0, recovery = 0;
 	__u32 data_sn = 0;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -399,7 +393,7 @@ static inline int iscsi_dataout_check_datasn(
 	if (SESS_OPS_C(conn)->DataSequenceInOrder)
 		data_sn = cmd->data_sn;
 	else {
-		iscsi_seq_t *seq = cmd->seq_ptr;
+		struct iscsi_seq *seq = cmd->seq_ptr;
 		data_sn = seq->data_sn;
 	}
 
@@ -438,21 +432,21 @@ dump:
  *
  */
 static inline int iscsi_dataout_pre_datapduinorder_yes(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
 	int dump = 0, recovery = 0;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
 	/*
 	 * For DataSequenceInOrder=Yes: If the offset is greater than the global
-	 * DataPDUInOrder=Yes offset counter in iscsi_cmd_t a protcol error has
+	 * DataPDUInOrder=Yes offset counter in struct iscsi_cmd a protcol error has
 	 * occured and fail the connection.
 	 *
 	 * For DataSequenceInOrder=No: If the offset is greater than the per
-	 * sequence DataPDUInOrder=Yes offset counter in iscsi_seq_t a protocol
+	 * sequence DataPDUInOrder=Yes offset counter in struct iscsi_seq a protocol
 	 * error has occured and fail the connection.
 	 */
 	if (SESS_OPS_C(conn)->DataSequenceInOrder) {
@@ -464,7 +458,7 @@ static inline int iscsi_dataout_pre_datapduinorder_yes(
 			goto recover;
 		}
 	} else {
-		iscsi_seq_t *seq = cmd->seq_ptr;
+		struct iscsi_seq *seq = cmd->seq_ptr;
 
 		if (hdr->offset > seq->offset) {
 			printk(KERN_ERR "Command ITT: 0x%08x, received offset"
@@ -503,10 +497,10 @@ dump:
  *	Called from:	iscsi_check_pre_dataout()
  */
 static inline int iscsi_dataout_pre_datapduinorder_no(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
-	iscsi_pdu_t *pdu;
+	struct iscsi_pdu *pdu;
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -537,9 +531,9 @@ static inline int iscsi_dataout_pre_datapduinorder_no(
  *
  *
  */
-static int iscsi_dataout_update_r2t(iscsi_cmd_t *cmd, u32 offset, u32 length)
+static int iscsi_dataout_update_r2t(struct iscsi_cmd *cmd, u32 offset, u32 length)
 {
-	iscsi_r2t_t *r2t;
+	struct iscsi_r2t *r2t;
 
 	if (cmd->unsolicited_data)
 		return 0;
@@ -561,12 +555,12 @@ static int iscsi_dataout_update_r2t(iscsi_cmd_t *cmd, u32 offset, u32 length)
  *
  */
 static int iscsi_dataout_update_datapduinorder_no(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	u32 data_sn,
 	int f_bit)
 {
 	int ret = 0;
-	iscsi_pdu_t *pdu = cmd->pdu_ptr;
+	struct iscsi_pdu *pdu = cmd->pdu_ptr;
 
 	pdu->data_sn = data_sn;
 
@@ -598,12 +592,12 @@ static int iscsi_dataout_update_datapduinorder_no(
  *	Called from:	iscsi_check_post_dataout()
  */
 static inline int iscsi_dataout_post_crc_passed(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
 	int ret, send_r2t = 0;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_seq_t *seq = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_seq *seq = NULL;
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -707,11 +701,11 @@ static inline int iscsi_dataout_post_crc_passed(
  *	Called from:	iscsi_check_post_dataout()
  */
 static inline int iscsi_dataout_post_crc_failed(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_pdu_t *pdu;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_pdu *pdu;
 	struct iscsi_init_scsi_data_out *hdr =
 		(struct iscsi_init_scsi_data_out *) buf;
 
@@ -746,11 +740,11 @@ recover:
  *	and CRC computed.
  */
 extern int iscsi_check_pre_dataout(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
 	int ret;
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	ret = iscsi_dataout_within_command_recovery_check(cmd, buf);
 	if ((ret == DATAOUT_WITHIN_COMMAND_RECOVERY) ||
@@ -785,11 +779,11 @@ extern int iscsi_check_pre_dataout(
  *	and CRC computed.
  */
 int iscsi_check_post_dataout(
-	iscsi_cmd_t *cmd,
+	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	__u8 data_crc_failed)
 {
-	iscsi_conn_t *conn = CONN(cmd);
+	struct iscsi_conn *conn = CONN(cmd);
 
 	cmd->dataout_timeout_retries = 0;
 
@@ -816,9 +810,9 @@ int iscsi_check_post_dataout(
  */
 static void iscsi_handle_time2retain_timeout(unsigned long data)
 {
-	iscsi_session_t *sess = (iscsi_session_t *) data;
-	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
+	struct iscsi_session *sess = (struct iscsi_session *) data;
+	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
+	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 
 	spin_lock_bh(&se_tpg->session_lock);
 	if (sess->time2retain_timer_flags & T2R_TF_STOP) {
@@ -835,9 +829,8 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 
 	printk(KERN_ERR "Time2Retain timer expired for SID: %u, cleaning up"
 			" iSCSI session.\n", sess->sid);
-#ifdef SNMP_SUPPORT
 	{
-	iscsi_tiqn_t *tiqn = tpg->tpg_tiqn;
+	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
 	if (tiqn) {
 		spin_lock(&tiqn->sess_err_stats.lock);
@@ -850,7 +843,6 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 		spin_unlock(&tiqn->sess_err_stats.lock);
 	}
 	}
-#endif /* SNMP_SUPPORT */
 
 	spin_unlock_bh(&se_tpg->session_lock);
 	iscsi_close_session(sess);
@@ -860,7 +852,7 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
  *
  *
  */
-extern void iscsi_start_time2retain_handler (iscsi_session_t *sess)
+extern void iscsi_start_time2retain_handler (struct iscsi_session *sess)
 {
 	int tpg_active;
 
@@ -893,12 +885,12 @@ extern void iscsi_start_time2retain_handler (iscsi_session_t *sess)
 
 /*	iscsi_stop_time2retain_timer():
  *
- *	Called with spin_lock_bh(&se_portal_group_t->session_lock) held
+ *	Called with spin_lock_bh(&struct se_portal_group->session_lock) held
  */
-extern int iscsi_stop_time2retain_timer(iscsi_session_t *sess)
+extern int iscsi_stop_time2retain_timer(struct iscsi_session *sess)
 {
-	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
+	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
+	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 
 	if (sess->time2retain_timer_flags & T2R_TF_EXPIRED)
 		return -1;
@@ -922,7 +914,7 @@ extern int iscsi_stop_time2retain_timer(iscsi_session_t *sess)
  *
  *
  */
-void iscsi_connection_reinstatement_rcfr(iscsi_conn_t *conn)
+void iscsi_connection_reinstatement_rcfr(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->state_lock);
 	if (atomic_read(&conn->connection_exit)) {
@@ -947,7 +939,7 @@ sleep:
  *
  *
  */
-void iscsi_cause_connection_reinstatement(iscsi_conn_t *conn, int sleep)
+void iscsi_cause_connection_reinstatement(struct iscsi_conn *conn, int sleep)
 {
 	spin_lock_bh(&conn->state_lock);
 	if (atomic_read(&conn->connection_exit)) {
@@ -987,7 +979,7 @@ void iscsi_cause_connection_reinstatement(iscsi_conn_t *conn, int sleep)
  *
  *
  */
-void iscsi_fall_back_to_erl0(iscsi_session_t *sess)
+void iscsi_fall_back_to_erl0(struct iscsi_session *sess)
 {
 	TRACE(TRACE_ERL0, "Falling back to ErrorRecoveryLevel=0 for SID:"
 			" %u\n", sess->sid);
@@ -999,9 +991,9 @@ void iscsi_fall_back_to_erl0(iscsi_session_t *sess)
  *
  *
  */
-static void iscsi_handle_connection_cleanup(iscsi_conn_t *conn)
+static void iscsi_handle_connection_cleanup(struct iscsi_conn *conn)
 {
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_session *sess = SESS(conn);
 
 	if ((SESS_OPS(sess)->ErrorRecoveryLevel == 2) &&
 	    !atomic_read(&sess->session_reinstatement) &&
@@ -1019,7 +1011,7 @@ static void iscsi_handle_connection_cleanup(iscsi_conn_t *conn)
  *
  *
  */
-extern void iscsi_take_action_for_connection_exit(iscsi_conn_t *conn)
+extern void iscsi_take_action_for_connection_exit(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->state_lock);
 	if (atomic_read(&conn->connection_exit)) {
@@ -1063,7 +1055,7 @@ extern void iscsi_take_action_for_connection_exit(iscsi_conn_t *conn)
  *	   Next byte in the TCP stream will contain the next iSCSI PDU!
  *	   Cool Huh?!
  */
-int iscsi_recover_from_unknown_opcode(iscsi_conn_t *conn)
+int iscsi_recover_from_unknown_opcode(struct iscsi_conn *conn)
 {
 	/*
 	 * Make sure the remaining bytes to next maker is a sane value.

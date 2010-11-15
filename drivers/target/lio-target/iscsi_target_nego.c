@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_NEGOTIATE_C
-
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -37,7 +34,6 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 
-#include <iscsi_linux_defs.h>
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
@@ -53,9 +49,6 @@
 #include <iscsi_target.h>
 #include <iscsi_auth_kernel.h>
 #include <iscsi_parameters.h>
-#include <iscsi_crc.h>
-
-#undef ISCSI_TARGET_NEGOTIATE_C
 
 #define MAX_LOGIN_PDUS	7
 
@@ -64,8 +57,8 @@
  *
  */
 static int iscsi_target_check_login_request(
-	iscsi_conn_t *conn,
-	iscsi_login_t *login)
+	struct iscsi_conn *conn,
+	struct iscsi_login *login)
 {
 	int req_csg, req_nsg, rsp_csg, rsp_nsg;
 	struct iscsi_init_login_cmnd *login_req;
@@ -158,11 +151,11 @@ static int iscsi_target_check_login_request(
  *
  */
 static int iscsi_target_check_first_request(
-	iscsi_conn_t *conn,
-	iscsi_login_t *login)
+	struct iscsi_conn *conn,
+	struct iscsi_login *login)
 {
-	iscsi_param_t *param = NULL;
-	se_node_acl_t *se_nacl;
+	struct iscsi_param *param = NULL;
+	struct se_node_acl *se_nacl;
 
 	login->first_request = 0;
 
@@ -194,13 +187,13 @@ static int iscsi_target_check_first_request(
 			/*
 			 * For non-leading connections, double check that the
 			 * received InitiatorName matches the existing session's
-			 * iscsi_node_acl_t.
+			 * struct iscsi_node_acl.
 			 */
 			if (!login->leading_connection) {
 				se_nacl = SESS(conn)->se_sess->se_node_acl;
 				if (!(se_nacl)) {
 					printk(KERN_ERR "Unable to locate"
-						" se_node_acl_t\n");
+						" struct se_node_acl\n");
 					iscsi_tx_login_rsp(conn,
 							STAT_CLASS_INITIATOR,
 							STAT_DETAIL_NOT_FOUND);
@@ -229,10 +222,10 @@ static int iscsi_target_check_first_request(
  *
  *
  */
-static int iscsi_target_do_tx_login_io(iscsi_conn_t *conn, iscsi_login_t *login)
+static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	__u32 padding = 0;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_session *sess = SESS(conn);
 	struct iscsi_targ_login_rsp *login_rsp;
 
 	login_rsp = (struct iscsi_targ_login_rsp *) login->rsp;
@@ -278,7 +271,7 @@ static int iscsi_target_do_tx_login_io(iscsi_conn_t *conn, iscsi_login_t *login)
  *
  *
  */
-static int iscsi_target_do_rx_login_io(iscsi_conn_t *conn, iscsi_login_t *login)
+static int iscsi_target_do_rx_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	__u32 padding = 0;
 	struct iscsi_init_login_cmnd *login_req;
@@ -319,7 +312,7 @@ static int iscsi_target_do_rx_login_io(iscsi_conn_t *conn, iscsi_login_t *login)
  *
  *
  */
-static int iscsi_target_do_login_io(iscsi_conn_t *conn, iscsi_login_t *login)
+static int iscsi_target_do_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	if (iscsi_target_do_tx_login_io(conn, login) < 0)
 		return -1;
@@ -331,8 +324,8 @@ static int iscsi_target_do_login_io(iscsi_conn_t *conn, iscsi_login_t *login)
 }
 
 static int iscsi_target_get_initial_payload(
-	iscsi_conn_t *conn,
-	iscsi_login_t *login)
+	struct iscsi_conn *conn,
+	struct iscsi_login *login)
 {
 	__u32 padding = 0;
 	struct iscsi_init_login_cmnd *login_req;
@@ -366,8 +359,8 @@ static int iscsi_target_get_initial_payload(
  *	ISID/TSIH combinations.
  */
 static int iscsi_target_check_for_existing_instances(
-	iscsi_conn_t *conn,
-	iscsi_login_t *login)
+	struct iscsi_conn *conn,
+	struct iscsi_login *login)
 {
 	if (login->checked_for_existing)
 		return 0;
@@ -386,11 +379,11 @@ static int iscsi_target_check_for_existing_instances(
  *
  */
 static int iscsi_target_do_authentication(
-	iscsi_conn_t *conn,
-	iscsi_login_t *login)
+	struct iscsi_conn *conn,
+	struct iscsi_login *login)
 {
 	int authret;
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 	struct iscsi_init_login_cmnd *login_req;
 	struct iscsi_targ_login_rsp *login_rsp;
 
@@ -447,11 +440,11 @@ static int iscsi_target_do_authentication(
  *
  */
 static int iscsi_target_handle_csg_zero(
-	iscsi_conn_t *conn,
-	iscsi_login_t *login)
+	struct iscsi_conn *conn,
+	struct iscsi_login *login)
 {
 	int ret;
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 	struct iscsi_init_login_cmnd *login_req;
 	struct iscsi_targ_login_rsp *login_rsp;
 
@@ -530,7 +523,7 @@ do_auth:
  *
  *
  */
-static int iscsi_target_handle_csg_one(iscsi_conn_t *conn, iscsi_login_t *login)
+static int iscsi_target_handle_csg_one(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	int ret;
 	struct iscsi_init_login_cmnd *login_req;
@@ -548,12 +541,12 @@ static int iscsi_target_handle_csg_one(iscsi_conn_t *conn, iscsi_login_t *login)
 	if (ret < 0)
 		return -1;
 
-	if (login->first_request) {
+	if (login->first_request)
 		if (iscsi_target_check_first_request(conn, login) < 0)
 			return -1;
-		if (iscsi_target_check_for_existing_instances(conn, login) < 0)
-			return -1;
-	}
+
+	if (iscsi_target_check_for_existing_instances(conn, login) < 0)
+		return -1;
 
 	ret = iscsi_encode_text_output(
 			PHASE_OPERATIONAL|PHASE_DECLARATIVE,
@@ -585,7 +578,7 @@ static int iscsi_target_handle_csg_one(iscsi_conn_t *conn, iscsi_login_t *login)
  *
  *
  */
-static int iscsi_target_do_login(iscsi_conn_t *conn, iscsi_login_t *login)
+static int iscsi_target_do_login(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	int pdu_count = 0;
 	struct iscsi_init_login_cmnd *login_req;
@@ -658,14 +651,14 @@ static void iscsi_initiatorname_tolower(
  * Processes the first Login Request..
  */
 static int iscsi_target_locate_portal(
-	iscsi_np_t *np,
-	iscsi_conn_t *conn,
-	iscsi_login_t *login)
+	struct iscsi_np *np,
+	struct iscsi_conn *conn,
+	struct iscsi_login *login)
 {
 	char *i_buf = NULL, *s_buf = NULL, *t_buf = NULL;
 	char *tmpbuf, *start = NULL, *end = NULL, *key, *value;
-	iscsi_session_t *sess = conn->sess;
-	iscsi_tiqn_t *tiqn;
+	struct iscsi_session *sess = conn->sess;
+	struct iscsi_tiqn *tiqn;
 	struct iscsi_init_login_cmnd *login_req;
 	struct iscsi_targ_login_rsp *login_rsp;
 	int sessiontype = 0, ret = 0;
@@ -760,7 +753,15 @@ static int iscsi_target_locate_portal(
 
 		SESS_OPS(sess)->SessionType = 1;
 		/*
-		 * Serialize access across the discovery iscsi_portal_group_t to
+ 		 * Setup crc32c modules from libcrypto
+		 */
+		if (iscsi_login_setup_crypto(conn) < 0) {
+			printk(KERN_ERR "iscsi_login_setup_crypto() failed\n");
+			ret = -1;
+			goto out;
+		}
+		/*
+		 * Serialize access across the discovery struct iscsi_portal_group to
 		 * process login attempt.
 		 */
 		if (core_access_np(np, conn->tpg) < 0) {
@@ -812,9 +813,16 @@ get_target:
 		goto out;
 	}
 	printk(KERN_INFO "Located Portal Group Object: %hu\n", conn->tpg->tpgt);
-
 	/*
-	 * Serialize access across the iscsi_portal_group_t to
+	 * Setup crc32c modules from libcrypto
+	 */
+	if (iscsi_login_setup_crypto(conn) < 0) {
+		printk(KERN_ERR "iscsi_login_setup_crypto() failed\n");
+		ret = -1;
+		goto out;
+	}
+	/*
+	 * Serialize access across the struct iscsi_portal_group to
 	 * process login attempt.
 	 */
 	if (core_access_np(np, conn->tpg) < 0) {
@@ -828,7 +836,7 @@ get_target:
 
 	/*
 	 * SESS(conn)->node_acl will be set when the referenced
-	 * iscsi_session_t is located from received ISID+TSIH in
+	 * struct iscsi_session is located from received ISID+TSIH in
 	 * iscsi_login_non_zero_tsih_s2().
 	 */
 	if (!login->leading_connection) {
@@ -866,16 +874,16 @@ out:
  *
  *
  */
-iscsi_login_t *iscsi_target_init_negotiation(
-	iscsi_np_t *np,
-	iscsi_conn_t *conn,
+struct iscsi_login *iscsi_target_init_negotiation(
+	struct iscsi_np *np,
+	struct iscsi_conn *conn,
 	char *login_pdu)
 {
-	iscsi_login_t *login;
+	struct iscsi_login *login;
 
-	login = kzalloc(sizeof(iscsi_login_t), GFP_KERNEL);
+	login = kzalloc(sizeof(struct iscsi_login), GFP_KERNEL);
 	if (!(login)) {
-		printk(KERN_ERR "Unable to allocate memory for iscsi_login_t.\n");
+		printk(KERN_ERR "Unable to allocate memory for struct iscsi_login.\n");
 		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,
 				STAT_DETAIL_OUT_OF_RESOURCE);
 		goto out;
@@ -921,8 +929,8 @@ out:
 }
 
 int iscsi_target_start_negotiation(
-	iscsi_login_t *login,
-	iscsi_conn_t *conn)
+	struct iscsi_login *login,
+	struct iscsi_conn *conn)
 {
 	int ret = -1;
 
@@ -956,8 +964,8 @@ out:
 }
 
 void iscsi_target_nego_release(
-	iscsi_login_t *login,
-	iscsi_conn_t *conn)
+	struct iscsi_login *login,
+	struct iscsi_conn *conn)
 {
 	kfree(login->req);
 	kfree(login->rsp);

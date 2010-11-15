@@ -5,8 +5,8 @@
  *
  * Copyright (c) 2004-2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007-2009 Rising Tide Software, Inc.
- * Copyright (c) 2008-2009 Linux-iSCSI.org
+ * Copyright (c) 2007-2010 Rising Tide Systems
+ * Copyright (c) 2008-2010 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,18 +26,15 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_SCDB_C
-
 #include <linux/net.h>
 #include <linux/string.h>
+#include <scsi/scsi.h>
+#include <asm/unaligned.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_scdb.h>
 
-#undef TARGET_CORE_SCDB_C
+#include "target_core_scdb.h"
 
 /*	split_cdb_XX_6():
  *
@@ -54,16 +51,6 @@ void split_cdb_XX_6(
 	cdb[4] = *sectors & 0xff;
 }
 
-void split_cdb_RW_6(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	cdb[0] = (rw) ? 0x0a : 0x08;
-	split_cdb_XX_6(lba, sectors, &cdb[0]);
-}
-
 /*	split_cdb_XX_10():
  *
  *	32-bit LBA w/ 16-bit SECTORS
@@ -73,22 +60,8 @@ void split_cdb_XX_10(
 	u32 *sectors,
 	unsigned char *cdb)
 {
-	cdb[2] = (lba >> 24) & 0xff;
-	cdb[3] = (lba >> 16) & 0xff;
-	cdb[4] = (lba >> 8) & 0xff;
-	cdb[5] = lba & 0xff;
-	cdb[7] = (*sectors >> 8) & 0xff;
-	cdb[8] = *sectors & 0xff;
-}
-
-void split_cdb_RW_10(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	cdb[0] = (rw) ? 0x2a : 0x28;
-	split_cdb_XX_10(lba, sectors, &cdb[0]);
+	put_unaligned_be32(lba, &cdb[2]);
+	put_unaligned_be16(*sectors, &cdb[7]);
 }
 
 /*	split_cdb_XX_12():
@@ -100,24 +73,8 @@ void split_cdb_XX_12(
 	u32 *sectors,
 	unsigned char *cdb)
 {
-	cdb[2] = (lba >> 24) & 0xff;
-	cdb[3] = (lba >> 16) & 0xff;
-	cdb[4] = (lba >> 8) & 0xff;
-	cdb[5] = lba & 0xff;
-	cdb[6] = (*sectors >> 24) & 0xff;
-	cdb[7] = (*sectors >> 16) & 0xff;
-	cdb[8] = (*sectors >> 8) & 0xff;
-	cdb[9] = *sectors & 0xff;
-}
-
-void split_cdb_RW_12(
-	unsigned long long lba,
-	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
-{
-	cdb[0] = (rw) ? 0xaa : 0xa8;
-	split_cdb_XX_12(lba, sectors, &cdb[0]);
+	put_unaligned_be32(lba, &cdb[2]);
+	put_unaligned_be32(*sectors, &cdb[6]);
 }
 
 /*	split_cdb_XX_16():
@@ -129,26 +86,20 @@ void split_cdb_XX_16(
 	u32 *sectors,
 	unsigned char *cdb)
 {
-	cdb[2] = (lba >> 56) & 0xff;
-	cdb[3] = (lba >> 48) & 0xff;
-	cdb[4] = (lba >> 40) & 0xff;
-	cdb[5] = (lba >> 32) & 0xff;
-	cdb[6] = (lba >> 24) & 0xff;
-	cdb[7] = (lba >> 16) & 0xff;
-	cdb[8] = (lba >> 8) & 0xff;
-	cdb[9] = lba & 0xff;
-	cdb[10] = (*sectors >> 24) & 0xff;
-	cdb[11] = (*sectors >> 16) & 0xff;
-	cdb[12] = (*sectors >> 8) & 0xff;
-	cdb[13] = *sectors & 0xff;
+	put_unaligned_be64(lba, &cdb[2]);
+	put_unaligned_be32(*sectors, &cdb[10]);
 }
 
-void split_cdb_RW_16(
+/*
+ *	split_cdb_XX_32():
+ *	
+ * 	64-bit LBA w/ 32-bit SECTORS such as READ_32, WRITE_32 and emulated XDWRITEREAD_32
+ */
+void split_cdb_XX_32(
 	unsigned long long lba,
 	u32 *sectors,
-	unsigned char *cdb,
-	int rw)
+	unsigned char *cdb)
 {
-	cdb[0] = (rw) ? 0x8a : 0x88;
-	split_cdb_XX_16(lba, sectors, &cdb[0]);
+	put_unaligned_be64(lba, &cdb[12]);
+	put_unaligned_be32(*sectors, &cdb[28]);
 }

@@ -1248,7 +1248,7 @@ static void scsi_to_dev_dir(unsigned int i, unsigned int j) {
 
 }
 
-static int u14_34f_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *)) {
+static int u14_34f_queuecommand_lck(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *)) {
    unsigned int i, j, k;
    struct mscp *cpp;
 
@@ -1328,6 +1328,8 @@ static int u14_34f_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scs
    HD(j)->cp_stat[i] = IN_USE;
    return 0;
 }
+
+static DEF_SCSI_QCMD(u14_34f_queuecommand)
 
 static int u14_34f_eh_abort(struct scsi_cmnd *SCarg) {
    unsigned int i, j;

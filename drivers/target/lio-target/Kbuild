@@ -3,7 +3,6 @@ EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/include/scsi/ -I$(srct
 EXTRA_CFLAGS+=-D_TARGET -DPYX_ISCSI_VENDOR='"Linux-iSCSI.org"'
 
 iscsi_target_mod-objs		:=	iscsi_auth_chap.o \
-				   	iscsi_crc.o \
 					iscsi_debug_opcodes.o \
 					iscsi_parameters.o \
 					iscsi_seq_and_pdu_list.o \
@@ -22,12 +21,8 @@ iscsi_target_mod-objs		:=	iscsi_auth_chap.o \
 					iscsi_target_tpg.o \
 					iscsi_target_util.o \
 					iscsi_target.o \
-					div64.o \
-					iscsi_target_configfs.o
-ifdef CONFIG_LIO_TARGET_SNMP
-iscsi_target_mod-objs		+= iscsi_target_mib.o
-EXTRA_CFLAGS			+= -DSNMP_SUPPORT
-endif
+					iscsi_target_configfs.o \
+					iscsi_target_mib.o
 
 ifdef CONFIG_LIO_TARGET_DEBUG_ERL
 iscsi_target_mod-objs		+= iscsi_target_debugerl.o

@@ -2,8 +2,8 @@
  * Filename:  target_core_mib.c
  *
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
- * Copyright (c) 2007-2009 Rising Tide Software, Inc.
- * Copyright (c) 2008-2009 Linux-iSCSI.org
+ * Copyright (c) 2007-2010 Rising Tide Systems
+ * Copyright (c) 2008-2010 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
@@ -40,16 +40,15 @@
 #include <scsi/scsi_host.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_mib.h>
-#include <target/target_core_plugin.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 
+#include "target_core_hba.h"
+#include "target_core_mib.h"
+
 /* SCSI mib table index */
-scsi_index_table_t scsi_index_table;
+struct scsi_index_table scsi_index_table;
 
 #ifndef INITIAL_JIFFIES
 #define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
@@ -119,7 +118,7 @@ static void scsi_inst_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba = list_entry(v, se_hba_t, hba_list);
+	struct se_hba *hba = list_entry(v, struct se_hba, hba_list);
 
 	if (list_is_first(&hba->hba_list, &se_global->g_hba_list))
 		seq_puts(seq, "inst sw_indx\n");
@@ -174,10 +173,10 @@ static void scsi_dev_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_dev_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba;
-	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+	struct se_hba *hba;
+	struct se_subsystem_dev *se_dev = list_entry(v, struct se_subsystem_dev,
 						g_se_dev_list);
-	se_device_t *dev = se_dev->se_dev_ptr;
+	struct se_device *dev = se_dev->se_dev_ptr;
 	char str[28];
 	int k;
 
@@ -255,11 +254,11 @@ static void scsi_port_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_port_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba;
-	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+	struct se_hba *hba;
+	struct se_subsystem_dev *se_dev = list_entry(v, struct se_subsystem_dev,
 						g_se_dev_list);
-	se_device_t *dev = se_dev->se_dev_ptr;
-	se_port_t *sep, *sep_tmp;
+	struct se_device *dev = se_dev->se_dev_ptr;
+	struct se_port *sep, *sep_tmp;
 
 	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
 		seq_puts(seq, "inst device indx role busy_count\n");
@@ -325,13 +324,13 @@ static void scsi_transport_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_transport_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba;
-	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+	struct se_hba *hba;
+	struct se_subsystem_dev *se_dev = list_entry(v, struct se_subsystem_dev,
 						g_se_dev_list);
-	se_device_t *dev = se_dev->se_dev_ptr;
-	se_port_t *se, *se_tmp;
-	se_portal_group_t *tpg;
-	t10_wwn_t *wwn;
+	struct se_device *dev = se_dev->se_dev_ptr;
+	struct se_port *se, *se_tmp;
+	struct se_portal_group *tpg;
+	struct t10_wwn *wwn;
 	char buf[64];
 
 	if (list_is_first(&se_dev->g_se_dev_list, &se_global->g_se_dev_list))
@@ -412,10 +411,10 @@ static void scsi_tgt_dev_seq_stop(struct seq_file *seq, void *v)
 #define LU_COUNT	1  /* for now */
 static int scsi_tgt_dev_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba;
-	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+	struct se_hba *hba;
+	struct se_subsystem_dev *se_dev = list_entry(v, struct se_subsystem_dev,
 						g_se_dev_list);
-	se_device_t *dev = se_dev->se_dev_ptr;
+	struct se_device *dev = se_dev->se_dev_ptr;
 	int non_accessible_lus = 0;
 	char status[16];
 
@@ -501,12 +500,12 @@ static void scsi_tgt_port_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_tgt_port_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba;
-	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+	struct se_hba *hba;
+	struct se_subsystem_dev *se_dev = list_entry(v, struct se_subsystem_dev,
 						g_se_dev_list);
-	se_device_t *dev = se_dev->se_dev_ptr;
-	se_port_t *sep, *sep_tmp;
-	se_portal_group_t *tpg;
+	struct se_device *dev = se_dev->se_dev_ptr;
+	struct se_port *sep, *sep_tmp;
+	struct se_portal_group *tpg;
 	u32 rx_mbytes, tx_mbytes;
 	unsigned long long num_cmds;
 	char buf[64];
@@ -597,11 +596,11 @@ static void scsi_auth_intr_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 {
-	se_portal_group_t *se_tpg = list_entry(v, se_portal_group_t,
+	struct se_portal_group *se_tpg = list_entry(v, struct se_portal_group,
 						se_tpg_list);
-	se_dev_entry_t *deve;
-	se_lun_t *lun;
-	se_node_acl_t *se_nacl;
+	struct se_dev_entry *deve;
+	struct se_lun *lun;
+	struct se_node_acl *se_nacl;
 	int j;
 
 	if (list_is_first(&se_tpg->se_tpg_list,
@@ -615,7 +614,12 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 
 	spin_lock(&se_tpg->acl_node_lock);
 	list_for_each_entry(se_nacl, &se_tpg->acl_node_list, acl_list) {
-		spin_lock(&se_nacl->device_list_lock);
+
+		atomic_inc(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_inc();
+		spin_unlock(&se_tpg->acl_node_lock);
+
+		spin_lock_irq(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];
 			if (!(deve->lun_flags &
@@ -623,8 +627,7 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 			    (!deve->se_lun))
 				continue;
 			lun = deve->se_lun;
-			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			if (!lun->lun_se_dev)
 				continue;
 
 			seq_printf(seq, "%u %u %u %u %u %s %u %u %u %u %u %u"
@@ -634,7 +637,7 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
 				0,
 				/* scsiDeviceIndex */
-				lun->se_dev->dev_index,
+				lun->lun_se_dev->dev_index,
 				/* scsiAuthIntrTgtPortIndex */
 				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg),
 				/* scsiAuthIntrIndex */
@@ -662,7 +665,11 @@ static int scsi_auth_intr_seq_show(struct seq_file *seq, void *v)
 				/* FIXME: scsiAuthIntrRowStatus */
 				"Ready");
 		}
-		spin_unlock(&se_nacl->device_list_lock);
+		spin_unlock_irq(&se_nacl->device_list_lock);
+
+		spin_lock(&se_tpg->acl_node_lock);
+		atomic_dec(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_dec();
 	}
 	spin_unlock(&se_tpg->acl_node_lock);
 
@@ -714,12 +721,12 @@ static void scsi_att_intr_port_seq_stop(struct seq_file *seq, void *v)
 
 static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 {
-	se_portal_group_t *se_tpg = list_entry(v, se_portal_group_t,
+	struct se_portal_group *se_tpg = list_entry(v, struct se_portal_group,
 						se_tpg_list);
-	se_dev_entry_t *deve;
-	se_lun_t *lun;
-	se_node_acl_t *se_nacl;
-	se_session_t *se_sess;
+	struct se_dev_entry *deve;
+	struct se_lun *lun;
+	struct se_node_acl *se_nacl;
+	struct se_session *se_sess;
 	unsigned char buf[64];
 	int j;
 
@@ -738,9 +745,14 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 		    (!se_sess->se_node_acl->device_list))
 			continue;
 
+		atomic_inc(&se_sess->mib_ref_count);
+		smp_mb__after_atomic_inc();
 		se_nacl = se_sess->se_node_acl;
+		atomic_inc(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_inc();
+		spin_unlock(&se_tpg->session_lock);
 
-		spin_lock(&se_nacl->device_list_lock);
+		spin_lock_irq(&se_nacl->device_list_lock);
 		for (j = 0; j < TRANSPORT_MAX_LUNS_PER_TPG; j++) {
 			deve = &se_nacl->device_list[j];
 			if (!(deve->lun_flags &
@@ -749,8 +761,7 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				continue;
 
 			lun = deve->se_lun;
-			if ((lun->lun_type != TRANSPORT_LUN_TYPE_DEVICE) ||
-			    (!lun->se_dev))
+			if (!lun->lun_se_dev)
 				continue;
 
 			memset(buf, 0, 64);
@@ -764,7 +775,7 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				TPG_TFO(se_tpg)->tpg_get_inst_index(se_tpg) :
 				0,
 				/* scsiDeviceIndex */
-				lun->se_dev->dev_index,
+				lun->lun_se_dev->dev_index,
 				/* scsiPortIndex */
 				TPG_TFO(se_tpg)->tpg_get_tag(se_tpg),
 				/* scsiAttIntrPortIndex */
@@ -779,7 +790,13 @@ static int scsi_att_intr_port_seq_show(struct seq_file *seq, void *v)
 				/* scsiAttIntrPortIdentifier */
 				buf);
 		}
-		spin_unlock(&se_nacl->device_list_lock);
+		spin_unlock_irq(&se_nacl->device_list_lock);
+
+		spin_lock(&se_tpg->session_lock);
+		atomic_dec(&se_nacl->mib_ref_count);
+		smp_mb__after_atomic_dec();
+		atomic_dec(&se_sess->mib_ref_count);
+		smp_mb__after_atomic_dec();
 	}
 	spin_unlock(&se_tpg->session_lock);
 
@@ -827,10 +844,10 @@ static void scsi_lu_seq_stop(struct seq_file *seq, void *v)
 #define SCSI_LU_INDEX		1
 static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 {
-	se_hba_t *hba;
-	se_subsystem_dev_t *se_dev = list_entry(v, se_subsystem_dev_t,
+	struct se_hba *hba;
+	struct se_subsystem_dev *se_dev = list_entry(v, struct se_subsystem_dev,
 						g_se_dev_list);
-	se_device_t *dev = se_dev->se_dev_ptr;
+	struct se_device *dev = se_dev->se_dev_ptr;
 	int j;
 	char str[28];
 
@@ -881,7 +898,7 @@ static int scsi_lu_seq_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, " %u %s %s %llu %u %u %u %u %u %u\n",
 		/* scsiLuPeripheralType */
-		   dev->dev_obj_api->get_device_type((void *)dev),
+		   TRANSPORT(dev)->get_device_type(dev),
 		   (dev->dev_status == TRANSPORT_DEVICE_ACTIVATED) ?
 		"available" : "notavailable", /* scsiLuStatus */
 		"exposed", 	/* scsiLuState */
@@ -1037,7 +1054,7 @@ error:
  */
 void init_scsi_index_table(void)
 {
-	memset(&scsi_index_table, 0, sizeof(scsi_index_table));
+	memset(&scsi_index_table, 0, sizeof(struct scsi_index_table));
 	spin_lock_init(&scsi_index_table.lock);
 }
 

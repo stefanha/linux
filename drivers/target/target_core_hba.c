@@ -5,8 +5,8 @@
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007-2009 Rising Tide Software, Inc.
- * Copyright (c) 2008-2009 Linux-iSCSI.org
+ * Copyright (c) 2007-2010 Rising Tide Systems
+ * Copyright (c) 2008-2010 Linux-iSCSI.org
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define TARGET_CORE_HBA_C
-
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -42,59 +39,52 @@
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_device.h>
-#include <target/target_core_hba.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_transport.h>
-#include <target/target_core_plugin.h>
-#include <target/target_core_seobj.h>
 
-#undef TARGET_CORE_HBA_C
+#include "target_core_hba.h"
 
-int core_get_hba(se_hba_t *hba)
+int core_get_hba(struct se_hba *hba)
 {
 	return ((mutex_lock_interruptible(&hba->hba_access_mutex) != 0) ?
 		-1 : 0);
 }
 
-se_hba_t *core_alloc_hba(int hba_type)
+struct se_hba *core_alloc_hba(void)
 {
-	se_hba_t *hba;
+	struct se_hba *hba;
 
 	hba = kmem_cache_zalloc(se_hba_cache, GFP_KERNEL);
 	if (!(hba)) {
-		printk(KERN_ERR "Unable to allocate se_hba_t\n");
+		printk(KERN_ERR "Unable to allocate struct se_hba\n");
 		return NULL;
 	}
 
 	hba->hba_status |= HBA_STATUS_FREE;
-	hba->type = hba_type;
 	INIT_LIST_HEAD(&hba->hba_dev_list);
 	spin_lock_init(&hba->device_lock);
 	spin_lock_init(&hba->hba_queue_lock);
 	mutex_init(&hba->hba_access_mutex);
-#ifdef SNMP_SUPPORT
 	hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
-#endif
 
 	return hba;
 }
-EXPORT_SYMBOL(core_alloc_hba);
 
-void core_put_hba(se_hba_t *hba)
+void core_put_hba(struct se_hba *hba)
 {
 	mutex_unlock(&hba->hba_access_mutex);
 }
-EXPORT_SYMBOL(core_put_hba);
 
 /*	se_core_add_hba():
  *
  *
  */
 int se_core_add_hba(
-	se_hba_t *hba,
+	struct se_hba *hba,
+	const char *plugin_name,
 	u32 plugin_dep_id)
 {
-	se_subsystem_api_t *t;
+	struct se_subsystem_api *t;
 	int ret = 0;
 
 	if (hba->hba_status & HBA_STATUS_ACTIVE)
@@ -103,14 +93,36 @@ int se_core_add_hba(
 	atomic_set(&hba->max_queue_depth, 0);
 	atomic_set(&hba->left_queue_depth, 0);
 
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-				hba->type, &ret);
+	t = transport_core_get_sub_by_name(plugin_name);
 	if (!(t))
 		return -EINVAL;
 
+	hba->transport = t;
+
+	/*
+	 * Get TCM subsystem api struct module reference to struct se_hba
+	 */
+	if (t->owner) {
+		/*
+		 * Grab a struct module reference count for subsystem plugin
+		 */
+		if (!try_module_get(t->owner)) {
+			printk(KERN_ERR "try_module_get() failed for %s\n",
+				t->owner->name);
+			hba->transport = NULL;
+			transport_core_put_sub(t);
+			return -EINVAL;
+		}
+	}
+
 	ret = t->attach_hba(hba, plugin_dep_id);
-	if (ret < 0)
+	if (ret < 0) {
+		hba->transport = NULL;
+		if (t->owner)
+			module_put(t->owner);
+		transport_core_put_sub(t);
 		return ret;
+	}
 
 	hba->hba_status &= ~HBA_STATUS_FREE;
 	hba->hba_status |= HBA_STATUS_ACTIVE;
@@ -125,21 +137,19 @@ int se_core_add_hba(
 
 	return 0;
 }
-EXPORT_SYMBOL(se_core_add_hba);
 
 static int se_core_shutdown_hba(
-	se_hba_t *hba)
+	struct se_hba *hba)
 {
-	int ret = 0;
-	se_subsystem_api_t *t;
-
-	t = (se_subsystem_api_t *)plugin_get_obj(PLUGIN_TYPE_TRANSPORT,
-				hba->type, &ret);
-	if (!(t))
-		return ret;
+	struct se_subsystem_api *t = hba->transport;;
 
 	if (t->detach_hba(hba) < 0)
 		return -1;
+	/*
+	 * Release TCM subsystem api struct module reference from struct se_hba
+	 */
+	if (t->owner)
+		module_put(t->owner);
 
 	return 0;
 }
@@ -149,23 +159,13 @@ static int se_core_shutdown_hba(
  *
  */
 int se_core_del_hba(
-	se_hba_t *hba)
+	struct se_hba *hba)
 {
-	se_device_t *dev, *dev_tmp;
+	struct se_device *dev, *dev_tmp;
 
 	if (!(hba->hba_status & HBA_STATUS_ACTIVE)) {
 		printk(KERN_ERR "HBA ID: %d Status: INACTIVE, ignoring"
 			" delhbafromtarget request\n", hba->hba_id);
-		return -EINVAL;
-	}
-
-	/*
-	 * Do not allow the se_hba_t to be released if references exist to
-	 * from se_device_t->se_lun_t.
-	 */
-	if (se_check_devices_access(hba) < 0) {
-		printk(KERN_ERR "CORE_HBA[%u] - **ERROR** - Unable to release"
-			" HBA with active LUNs\n", hba->hba_id);
 		return -EINVAL;
 	}
 
@@ -182,12 +182,13 @@ int se_core_del_hba(
 	spin_unlock(&hba->device_lock);
 
 	se_core_shutdown_hba(hba);
+	if (!(hba->hba_flags & HBA_FLAGS_INTERNAL_USE))
+		transport_core_put_sub(hba->transport);
 
 	spin_lock(&se_global->hba_lock);
 	list_del(&hba->hba_list);
 	spin_unlock(&se_global->hba_lock);
 
-	hba->type = 0;
 	hba->transport = NULL;
 	hba->hba_status &= ~HBA_STATUS_ACTIVE;
 	hba->hba_status |= HBA_STATUS_FREE;
@@ -198,4 +199,3 @@ int se_core_del_hba(
 	kmem_cache_free(se_hba_cache, hba);
 	return 0;
 }
-EXPORT_SYMBOL(se_core_del_hba);

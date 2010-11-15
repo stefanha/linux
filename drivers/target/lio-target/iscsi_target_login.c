@@ -26,9 +26,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_LOGIN_C
-
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -36,11 +33,11 @@
 #include <linux/smp_lock.h>
 #include <linux/in.h>
 #include <linux/inet.h>
+#include <linux/crypto.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/ipv6.h>
 
-#include <iscsi_linux_defs.h>
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
 #include <iscsi_debug.h>
@@ -57,26 +54,24 @@
 #include <iscsi_target.h>
 #include <iscsi_parameters.h>
 
-#undef ISCSI_TARGET_LOGIN_C
-
 /*	iscsi_login_init_conn():
  *
  *
  */
-static void iscsi_login_init_conn(iscsi_conn_t *conn)
+static int iscsi_login_init_conn(struct iscsi_conn *conn)
 {
 	INIT_LIST_HEAD(&conn->conn_list);
 	INIT_LIST_HEAD(&conn->conn_cmd_list);
 	INIT_LIST_HEAD(&conn->immed_queue_list);
 	INIT_LIST_HEAD(&conn->response_queue_list);
-	init_MUTEX_LOCKED(&conn->conn_post_wait_sem);
-	init_MUTEX_LOCKED(&conn->conn_wait_sem);
-	init_MUTEX_LOCKED(&conn->conn_wait_rcfr_sem);
-	init_MUTEX_LOCKED(&conn->conn_waiting_on_uc_sem);
-	init_MUTEX_LOCKED(&conn->conn_logout_sem);
-	init_MUTEX_LOCKED(&conn->rx_half_close_sem);
-	init_MUTEX_LOCKED(&conn->tx_half_close_sem);
-	init_MUTEX_LOCKED(&conn->tx_sem);
+	sema_init(&conn->conn_post_wait_sem, 0);
+	sema_init(&conn->conn_wait_sem, 0);
+	sema_init(&conn->conn_wait_rcfr_sem, 0);
+	sema_init(&conn->conn_waiting_on_uc_sem, 0);
+	sema_init(&conn->conn_logout_sem, 0);
+	sema_init(&conn->rx_half_close_sem, 0);
+	sema_init(&conn->tx_half_close_sem, 0);
+	sema_init(&conn->tx_sem, 0);
 	spin_lock_init(&conn->cmd_lock);
 	spin_lock_init(&conn->conn_usage_lock);
 	spin_lock_init(&conn->immed_queue_lock);
@@ -84,6 +79,73 @@ static void iscsi_login_init_conn(iscsi_conn_t *conn)
 	spin_lock_init(&conn->nopin_timer_lock);
 	spin_lock_init(&conn->response_queue_lock);
 	spin_lock_init(&conn->state_lock);
+
+	if (!(zalloc_cpumask_var(&conn->conn_cpumask, GFP_KERNEL))) {
+		printk(KERN_ERR "Unable to allocate conn->conn_cpumask\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+/*
+ * Used by iscsi_target_nego.c:iscsi_target_locate_portal() to setup
+ * per struct iscsi_conn libcrypto contexts for crc32c and crc32-intel
+ */
+int iscsi_login_setup_crypto(struct iscsi_conn *conn)
+{
+	struct iscsi_portal_group *tpg = conn->tpg;
+#ifdef CONFIG_X86
+	/*
+	 * Check for the Nehalem optimized crc32c-intel instructions
+	 * This is only currently available while running on bare-metal,
+	 * and is not yet available with QEMU-KVM guests.
+	 */
+	if (cpu_has_xmm4_2 && ISCSI_TPG_ATTRIB(tpg)->crc32c_x86_offload) {
+		conn->conn_rx_hash.flags = 0;
+		conn->conn_rx_hash.tfm = crypto_alloc_hash("crc32c-intel", 0,
+						CRYPTO_ALG_ASYNC);
+		if (IS_ERR(conn->conn_rx_hash.tfm)) {
+			printk(KERN_ERR "crypto_alloc_hash() failed for conn_rx_tfm\n");
+			goto check_crc32c;
+		}
+
+		conn->conn_tx_hash.flags = 0;
+		conn->conn_tx_hash.tfm = crypto_alloc_hash("crc32c-intel", 0,
+						CRYPTO_ALG_ASYNC);
+		if (IS_ERR(conn->conn_tx_hash.tfm)) {   
+			printk(KERN_ERR "crypto_alloc_hash() failed for conn_tx_tfm\n");
+			crypto_free_hash(conn->conn_rx_hash.tfm);
+			goto check_crc32c;
+		}
+
+		printk(KERN_INFO "LIO-Target[0]: Using Nehalem crc32c-intel"
+					" offload instructions\n");
+		return 0;
+	}
+check_crc32c:
+#endif /* CONFIG_X86 */
+	/*
+	 * Setup slicing by 1x CRC32C algorithm for RX and TX libcrypto contexts
+	 */
+	conn->conn_rx_hash.flags = 0;
+	conn->conn_rx_hash.tfm = crypto_alloc_hash("crc32c", 0,
+						CRYPTO_ALG_ASYNC);
+	if (IS_ERR(conn->conn_rx_hash.tfm)) {
+		printk(KERN_ERR "crypto_alloc_hash() failed for conn_rx_tfm\n");
+		return -ENOMEM;
+	}
+
+	conn->conn_tx_hash.flags = 0;
+	conn->conn_tx_hash.tfm = crypto_alloc_hash("crc32c", 0,
+						CRYPTO_ALG_ASYNC);
+	if (IS_ERR(conn->conn_tx_hash.tfm)) {	
+		printk(KERN_ERR "crypto_alloc_hash() failed for conn_tx_tfm\n");
+		crypto_free_hash(conn->conn_rx_hash.tfm);
+		return -ENOMEM;
+	}
+
+	return 0;
 }
 
 /*	iscsi_login_check_initiator_version():
@@ -91,7 +153,7 @@ static void iscsi_login_init_conn(iscsi_conn_t *conn)
  *
  */
 static int iscsi_login_check_initiator_version(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	u8 version_max,
 	u8 version_min)
 {
@@ -111,14 +173,14 @@ static int iscsi_login_check_initiator_version(
  *
  *
  */
-int iscsi_check_for_session_reinstatement(iscsi_conn_t *conn)
+int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 {
 	int sessiontype;
-	iscsi_param_t *initiatorname_param = NULL, *sessiontype_param = NULL;
-	iscsi_portal_group_t *tpg = conn->tpg;
-	iscsi_session_t *sess = NULL, *sess_p = NULL;
-	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
-	se_session_t *se_sess, *se_sess_tmp;
+	struct iscsi_param *initiatorname_param = NULL, *sessiontype_param = NULL;
+	struct iscsi_portal_group *tpg = conn->tpg;
+	struct iscsi_session *sess = NULL, *sess_p = NULL;
+	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
+	struct se_session *se_sess, *se_sess_tmp;
 
 	initiatorname_param = iscsi_find_param_from_key(
 			INITIATORNAME, conn->param_list);
@@ -136,7 +198,7 @@ int iscsi_check_for_session_reinstatement(iscsi_conn_t *conn)
 	list_for_each_entry_safe(se_sess, se_sess_tmp, &se_tpg->tpg_sess_list,
 			sess_list) {
 
-		sess_p = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess_p = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 		spin_lock(&sess_p->conn_lock);
 		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
 		    atomic_read(&sess_p->session_logout) ||
@@ -184,8 +246,8 @@ int iscsi_check_for_session_reinstatement(iscsi_conn_t *conn)
 }
 
 static void iscsi_login_set_conn_values(
-	iscsi_session_t *sess,
-	iscsi_conn_t *conn,
+	struct iscsi_session *sess,
+	struct iscsi_conn *conn,
 	u16 cid)
 {
 	conn->sess		= sess;
@@ -207,10 +269,10 @@ static void iscsi_login_set_conn_values(
  *	or session reinstatement.
  */
 static int iscsi_login_zero_tsih_s1(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
-	iscsi_session_t *sess = NULL;
+	struct iscsi_session *sess = NULL;
 	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *)buf;
 
 	sess = kmem_cache_zalloc(lio_sess_cache, GFP_KERNEL);
@@ -229,34 +291,31 @@ static int iscsi_login_zero_tsih_s1(
 	INIT_LIST_HEAD(&sess->sess_ooo_cmdsn_list);
 	INIT_LIST_HEAD(&sess->cr_active_list);
 	INIT_LIST_HEAD(&sess->cr_inactive_list);
-	init_MUTEX_LOCKED(&sess->async_msg_sem);
-	init_MUTEX_LOCKED(&sess->reinstatement_sem);
-	init_MUTEX_LOCKED(&sess->session_wait_sem);
-	init_MUTEX_LOCKED(&sess->session_waiting_on_uc_sem);
+	sema_init(&sess->async_msg_sem, 0);
+	sema_init(&sess->reinstatement_sem, 0);
+	sema_init(&sess->session_wait_sem, 0);
+	sema_init(&sess->session_waiting_on_uc_sem, 0);
 	spin_lock_init(&sess->cmdsn_lock);
 	spin_lock_init(&sess->conn_lock);
 	spin_lock_init(&sess->cr_a_lock);
 	spin_lock_init(&sess->cr_i_lock);
 	spin_lock_init(&sess->session_usage_lock);
 	spin_lock_init(&sess->ttt_lock);
-#ifdef SNMP_SUPPORT
 	sess->session_index = iscsi_get_new_index(ISCSI_SESSION_INDEX);
 	sess->creation_time = get_jiffies_64();
 	spin_lock_init(&sess->session_stats_lock);
-#endif /* SNMP_SUPPORT */
-
 	/*
 	 * The FFP CmdSN window values will be allocated from the TPG's
 	 * Initiator Node's ACL once the login has been successfully completed.
 	 */
 	sess->max_cmd_sn	= pdu->cmd_sn;
 
-	sess->sess_ops = kzalloc(sizeof(iscsi_sess_ops_t), GFP_KERNEL);
+	sess->sess_ops = kzalloc(sizeof(struct iscsi_sess_ops), GFP_KERNEL);
 	if (!(sess->sess_ops)) {
 		iscsi_tx_login_rsp(conn, STAT_CLASS_TARGET,
 				STAT_DETAIL_OUT_OF_RESOURCE);
 		printk(KERN_ERR "Unable to allocate memory for"
-				" iscsi_sess_ops_t.\n");
+				" struct iscsi_sess_ops.\n");
 		return -1;
 	}
 
@@ -271,17 +330,17 @@ static int iscsi_login_zero_tsih_s1(
 }
 
 static int iscsi_login_zero_tsih_s2 (
-	iscsi_conn_t *conn)
+	struct iscsi_conn *conn)
 {
-	iscsi_node_attrib_t *na;
-	iscsi_session_t *sess = conn->sess;
+	struct iscsi_node_attrib *na;
+	struct iscsi_session *sess = conn->sess;
 	unsigned char buf[32];
 
 	sess->tpg = conn->tpg;
 
 	/*
 	 * Assign a new TPG Session Handle.  Note this is protected with
-	 * iscsi_portal_group_t->np_login_sem from core_access_np().
+	 * struct iscsi_portal_group->np_login_sem from core_access_np().
 	 */
 	sess->tsih = ++ISCSI_TPG_S(sess)->ntsih;
 	if (!(sess->tsih))
@@ -310,7 +369,7 @@ static int iscsi_login_zero_tsih_s2 (
 	 * on any iSCSI connection where the Initiator provides TargetName.
 	 * See 5.3.1.  Login Phase Start
 	 *
-	 * In our case, we have already located the iscsi_tiqn_t at this point.
+	 * In our case, we have already located the struct iscsi_tiqn at this point.
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
@@ -344,10 +403,10 @@ static int iscsi_login_zero_tsih_s2 (
  * The Initiator node will be able to enable FIM by proposing them itself.
  */
 int iscsi_login_disable_FIM_keys(
-	iscsi_param_list_t *param_list,
-	iscsi_conn_t *conn)
+	struct iscsi_param_list *param_list,
+	struct iscsi_conn *conn)
 {
-	iscsi_param_t *param;
+	struct iscsi_param *param;
 
 	param = iscsi_find_param_from_key("OFMarker", param_list);
 	if (!(param)) {
@@ -393,7 +452,7 @@ int iscsi_login_disable_FIM_keys(
 }
 
 static int iscsi_login_non_zero_tsih_s1 (
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
 	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *)buf;
@@ -407,20 +466,20 @@ static int iscsi_login_non_zero_tsih_s1 (
  *	Add a new connection to an existing session.
  */
 static int iscsi_login_non_zero_tsih_s2(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
-	iscsi_portal_group_t *tpg = conn->tpg;
-	iscsi_session_t *sess = NULL, *sess_p = NULL;
-	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
-	se_session_t *se_sess, *se_sess_tmp;
+	struct iscsi_portal_group *tpg = conn->tpg;
+	struct iscsi_session *sess = NULL, *sess_p = NULL;
+	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
+	struct se_session *se_sess, *se_sess_tmp;
 	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *)buf;
 
 	spin_lock_bh(&se_tpg->session_lock);
 	list_for_each_entry_safe(se_sess, se_sess_tmp, &se_tpg->tpg_sess_list,
 			sess_list) {
 
-		sess_p = (iscsi_session_t *)se_sess->fabric_sess_ptr;
+		sess_p = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
 		    atomic_read(&sess_p->session_logout) ||
 		   (sess_p->time2retain_timer_flags & T2R_TF_EXPIRED))
@@ -472,7 +531,7 @@ static int iscsi_login_non_zero_tsih_s2(
 	 * on any iSCSI connection where the Initiator provides TargetName.
 	 * See 5.3.1.  Login Phase Start
 	 *
-	 * In our case, we have already located the iscsi_tiqn_t at this point.
+	 * In our case, we have already located the struct iscsi_tiqn at this point.
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
@@ -490,13 +549,13 @@ static int iscsi_login_non_zero_tsih_s2(
  *
  */
 int iscsi_login_post_auth_non_zero_tsih(
-	iscsi_conn_t *conn,
+	struct iscsi_conn *conn,
 	u16 cid,
 	u32 exp_statsn)
 {
-	iscsi_conn_t *conn_ptr = NULL;
-	iscsi_conn_recovery_t *cr = NULL;
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_conn *conn_ptr = NULL;
+	struct iscsi_conn_recovery *cr = NULL;
+	struct iscsi_session *sess = SESS(conn);
 
 	/*
 	 * By following item 5 in the login table,  if we have found
@@ -560,9 +619,9 @@ int iscsi_login_post_auth_non_zero_tsih(
  *
  *
  */
-static void iscsi_post_login_start_timers(iscsi_conn_t *conn)
+static void iscsi_post_login_start_timers(struct iscsi_conn *conn)
 {
-	iscsi_session_t *sess = SESS(conn);
+	struct iscsi_session *sess = SESS(conn);
 
 /* #warning PHY timer is disabled */
 #if 0
@@ -581,25 +640,23 @@ static void iscsi_post_login_start_timers(iscsi_conn_t *conn)
  *
  */
 static int iscsi_post_login_handler(
-	iscsi_np_t *np,
-	iscsi_conn_t *conn,
+	struct iscsi_np *np,
+	struct iscsi_conn *conn,
 	u8 zero_tsih)
 {
 	int stop_timer = 0;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
 	unsigned char *ip, *ip_np;
-	iscsi_session_t *sess = SESS(conn);
-	se_session_t *se_sess = sess->se_sess;
-	iscsi_portal_group_t *tpg = ISCSI_TPG_S(sess);
-	se_portal_group_t *se_tpg = &tpg->tpg_se_tpg;
-	se_thread_set_t *ts;
+	struct iscsi_session *sess = SESS(conn);
+	struct se_session *se_sess = sess->se_sess;
+	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
+	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
+	struct se_thread_set *ts;
 
 	iscsi_inc_conn_usage_count(conn);
 
-#ifdef SNMP_SUPPORT
 	iscsi_collect_login_stats(conn, STAT_CLASS_SUCCESS,
 			STAT_DETAIL_SUCCESS);
-#endif
 
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_LOGGED_IN.\n");
 	conn->conn_state = TARG_CONN_STATE_LOGGED_IN;
@@ -651,6 +708,14 @@ static int iscsi_post_login_handler(
 
 		iscsi_post_login_start_timers(conn);
 		iscsi_activate_thread_set(conn, ts);
+		/*
+		 * Determine CPU mask to ensure connection's RX and TX kthreads
+		 * are scheduled on the same CPU.
+		 */
+		iscsi_thread_get_cpumask(conn);
+		conn->conn_rx_reset_cpumask = 1;
+		conn->conn_tx_reset_cpumask = 1;
+
 		iscsi_dec_conn_usage_count(conn);
 		if (stop_timer) {
 			spin_lock_bh(&se_tpg->session_lock);
@@ -700,6 +765,13 @@ static int iscsi_post_login_handler(
 
 	iscsi_post_login_start_timers(conn);
 	iscsi_activate_thread_set(conn, ts);
+	/*
+	 * Determine CPU mask to ensure connection's RX and TX kthreads
+	 * are scheduled on the same CPU.
+	 */
+	iscsi_thread_get_cpumask(conn);
+	conn->conn_rx_reset_cpumask = 1;
+	conn->conn_tx_reset_cpumask = 1;
 
 	iscsi_dec_conn_usage_count(conn);
 
@@ -713,7 +785,7 @@ static int iscsi_post_login_handler(
 static void iscsi_handle_login_thread_timeout(unsigned long data)
 {
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
-	iscsi_np_t *np = (iscsi_np_t *) data;
+	struct iscsi_np *np = (struct iscsi_np *) data;
 
 	memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 	spin_lock_bh(&np->np_thread_lock);
@@ -738,7 +810,7 @@ static void iscsi_handle_login_thread_timeout(unsigned long data)
  *
  *
  */
-static void iscsi_start_login_thread_timer(iscsi_np_t *np)
+static void iscsi_start_login_thread_timer(struct iscsi_np *np)
 {
 	/*
 	 * This used the TA_LOGIN_TIMEOUT constant because at this
@@ -761,7 +833,7 @@ static void iscsi_start_login_thread_timer(iscsi_np_t *np)
  *
  *
  */
-static void iscsi_stop_login_thread_timer(iscsi_np_t *np)
+static void iscsi_stop_login_thread_timer(struct iscsi_np *np)
 {
 	spin_lock_bh(&np->np_thread_lock);
 	if (!(np->np_login_timer_flags & TPG_NP_TF_RUNNING)) {
@@ -782,7 +854,7 @@ static void iscsi_stop_login_thread_timer(iscsi_np_t *np)
  *
  *
  */
-static struct socket *iscsi_target_setup_login_socket(iscsi_np_t *np)
+static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 {
 	const char *end;
 	struct socket *sock;
@@ -929,11 +1001,11 @@ int iscsi_target_login_thread(void *arg)
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
 	int err, ret = 0, start = 1, ip_proto;
 	int sock_type, set_sctp_conn_flag = 0;
-	iscsi_conn_t *conn = NULL;
-	iscsi_login_t *login;
-	iscsi_portal_group_t *tpg = NULL;
+	struct iscsi_conn *conn = NULL;
+	struct iscsi_login *login;
+	struct iscsi_portal_group *tpg = NULL;
 	struct socket *new_sock, *sock;
-	iscsi_np_t *np = (iscsi_np_t *) arg;
+	struct iscsi_np *np = (struct iscsi_np *) arg;
 	struct iovec iov;
 	struct iscsi_init_login_cmnd *pdu;
 	struct sockaddr_in sock_in;
@@ -1067,13 +1139,17 @@ get_new_sock:
 	 * Allocate conn->conn_ops early as a failure calling
 	 * iscsi_tx_login_rsp() below will call tx_data().
 	 */
-	conn->conn_ops = kzalloc(sizeof(iscsi_conn_ops_t), GFP_KERNEL);
+	conn->conn_ops = kzalloc(sizeof(struct iscsi_conn_ops), GFP_KERNEL);
 	if (!(conn->conn_ops)) {
 		printk(KERN_ERR "Unable to allocate memory for"
-			" iscsi_conn_ops_t.\n");
+			" struct iscsi_conn_ops.\n");
 		goto new_sess_out;
 	}
-	iscsi_login_init_conn(conn);
+	/*
+	 * Perform the remaining iSCSI connection initialization items..
+	 */
+	if (iscsi_login_init_conn(conn) < 0)
+		goto new_sess_out;
 
 	memset(buffer, 0, ISCSI_HDR_LEN);
 	memset(&iov, 0, sizeof(struct iovec));
@@ -1172,11 +1248,9 @@ get_new_sock:
 	conn->network_transport = np->np_network_transport;
 	snprintf(conn->net_dev, ISCSI_NETDEV_NAME_SIZE, "%s", np->np_net_dev);
 
-#ifdef SNMP_SUPPORT
 	conn->conn_index = iscsi_get_new_index(ISCSI_CONNECTION_INDEX);
 	conn->local_ip = np->np_ipv4;
 	conn->local_port = np->np_port;
-#endif
 
 	printk(KERN_INFO "Received iSCSI login request from %s on %s Network"
 			" Portal %s:%hu\n", ip_init_buf,
@@ -1213,7 +1287,7 @@ get_new_sock:
 
 	/*
 	 * This will process the first login request, and call
-	 * iscsi_target_locate_portal(), and return a valid iscsi_login_t.
+	 * iscsi_target_locate_portal(), and return a valid struct iscsi_login.
 	 */
 	login = iscsi_target_init_negotiation(np, conn, buffer);
 	if (!(login)) {
@@ -1223,7 +1297,7 @@ get_new_sock:
 
 	tpg = conn->tpg;
 	if (!(tpg)) {
-		printk(KERN_ERR "Unable to locate iscsi_conn_t->tpg\n");
+		printk(KERN_ERR "Unable to locate struct iscsi_conn->tpg\n");
 		goto new_sess_out;
 	}
 
@@ -1243,7 +1317,7 @@ get_new_sock:
 		goto new_sess_out;
 
 	if (!SESS(conn)) {
-		printk(KERN_ERR "iscsi_conn_t session pointer is NULL!\n");
+		printk(KERN_ERR "struct iscsi_conn session pointer is NULL!\n");
 		goto new_sess_out;
 	}
 
@@ -1263,10 +1337,8 @@ get_new_sock:
 
 new_sess_out:
 	printk(KERN_ERR "iSCSI Login negotiation failed.\n");
-#ifdef SNMP_SUPPORT
 	iscsi_collect_login_stats(conn, STAT_CLASS_INITIATOR,
 				  STAT_DETAIL_INIT_ERROR);
-#endif
 	if (!zero_tsih || !SESS(conn))
 		goto old_sess_out;
 	if (SESS(conn)->se_sess)
@@ -1284,7 +1356,7 @@ old_sess_out:
 	if (!zero_tsih && SESS(conn)) {
 		spin_lock_bh(&SESS(conn)->conn_lock);
 		if (SESS(conn)->session_state == TARG_SESS_STATE_FAILED) {
-			se_portal_group_t *se_tpg =
+			struct se_portal_group *se_tpg =
 					&ISCSI_TPG_C(conn)->tpg_se_tpg;
 
 			atomic_set(&SESS(conn)->session_continuation, 0);
@@ -1296,6 +1368,14 @@ old_sess_out:
 			spin_unlock_bh(&SESS(conn)->conn_lock);
 		iscsi_dec_session_usage_count(SESS(conn));
 	}
+
+	if (conn->conn_rx_hash.tfm)
+		crypto_free_hash(conn->conn_rx_hash.tfm);
+	if (conn->conn_tx_hash.tfm)
+		crypto_free_hash(conn->conn_tx_hash.tfm);
+
+	if (conn->conn_cpumask)
+		free_cpumask_var(conn->conn_cpumask);
 
 	kfree(conn->conn_ops);
 

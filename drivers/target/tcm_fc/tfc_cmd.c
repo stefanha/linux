@@ -44,9 +44,7 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 #include <target/target_core_base.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_tmr.h>
 #include <target/configfs_macros.h>
 
@@ -59,14 +57,14 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 {
 	struct fc_exch *ep;
 	struct fc_seq *sp;
-	struct se_cmd_s *se_cmd;
-	struct se_mem_s *mem;
-	struct se_transport_task_s *task;
+	struct se_cmd *se_cmd;
+	struct se_mem *mem;
+	struct se_transport_task *task;
 
 	if (!(ft_debug_logging & FT_DEBUG_IO))
 		return;
 
-	se_cmd = cmd->se_cmd;
+	se_cmd = &cmd->se_cmd;
 	printk(KERN_INFO "%s: cmd %p state %d sess %p seq %p se_cmd %p\n",
 		caller, cmd, cmd->state, cmd->sess, cmd->seq, se_cmd);
 	printk(KERN_INFO "%s: cmd %p cdb %p\n",
@@ -75,7 +73,7 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 
 	task = T_TASK(se_cmd);
 	printk(KERN_INFO "%s: cmd %p task %p se_num %u buf %p len %u\n",
-	       caller, cmd, task, task->t_task_se_num,
+	       caller, cmd, task, task->t_tasks_se_num,
 	       task->t_task_buf, se_cmd->data_length);
 	if (task->t_mem_list)
 		list_for_each_entry(mem, task->t_mem_list, se_list)
@@ -115,12 +113,12 @@ static int ft_get_lun_for_cmd(struct ft_cmd *cmd, u8 *lunp)
 	if (lun >= TRANSPORT_MAX_LUNS_PER_TPG)
 		return -1;
 	cmd->lun = lun;
-	return transport_get_lun_for_cmd(cmd->se_cmd, NULL, lun);
+	return transport_get_lun_for_cmd(&cmd->se_cmd, NULL, lun);
 }
 
 static void ft_queue_cmd(struct ft_sess *sess, struct ft_cmd *cmd)
 {
-	struct se_queue_obj_s *qobj;
+	struct se_queue_obj *qobj;
 	unsigned long flags;
 
 	qobj = &sess->tport->tpg->qobj;
@@ -131,17 +129,17 @@ static void ft_queue_cmd(struct ft_sess *sess, struct ft_cmd *cmd)
 	wake_up_interruptible(&qobj->thread_wq);
 }
 
-static struct ft_cmd *ft_dequeue_cmd(struct se_queue_obj_s *qobj)
+static struct ft_cmd *ft_dequeue_cmd(struct se_queue_obj *qobj)
 {
 	unsigned long flags;
-	struct se_queue_req_s *qr;
+	struct se_queue_req *qr;
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
 	if (list_empty(&qobj->qobj_list)) {
 		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 		return NULL;
 	}
-	qr = list_first_entry(&qobj->qobj_list, struct se_queue_req_s, qr_list);
+	qr = list_first_entry(&qobj->qobj_list, struct se_queue_req, qr_list);
 	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
@@ -150,26 +148,38 @@ static struct ft_cmd *ft_dequeue_cmd(struct se_queue_obj_s *qobj)
 
 static void ft_free_cmd(struct ft_cmd *cmd)
 {
+	struct fc_frame *fp;
+	struct fc_lport *lport;
+
 	if (!cmd)
 		return;
-	fc_frame_free(cmd->req_frame);
+	fp = cmd->req_frame;
+	lport = fr_dev(fp);
+	if (fr_seq(fp))
+		lport->tt.seq_release(fr_seq(fp));
+	fc_frame_free(fp);
 	ft_sess_put(cmd->sess);	/* undo get from lookup at recv */
 	kfree(cmd);
 }
 
-void ft_release_cmd(struct se_cmd_s *se_cmd)
+void ft_release_cmd(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 
 	ft_free_cmd(cmd);
+}
+
+void ft_check_stop_free(struct se_cmd *se_cmd)
+{
+	transport_generic_free_cmd(se_cmd, 0, 1, 0);
 }
 
 /*
  * Send response.
  */
-int ft_queue_status(struct se_cmd_s *se_cmd)
+int ft_queue_status(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 	struct fc_frame *fp;
 	struct fcp_resp_with_ext *fcp;
 	struct fc_lport *lport;
@@ -220,9 +230,9 @@ int ft_queue_status(struct se_cmd_s *se_cmd)
 	return 0;
 }
 
-int ft_write_pending_status(struct se_cmd_s *se_cmd)
+int ft_write_pending_status(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 
 	return cmd->write_data_len != se_cmd->data_length;
 }
@@ -230,9 +240,9 @@ int ft_write_pending_status(struct se_cmd_s *se_cmd)
 /*
  * Send TX_RDY (transfer ready).
  */
-int ft_write_pending(struct se_cmd_s *se_cmd)
+int ft_write_pending(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 	struct fc_frame *fp;
 	struct fcp_txrdy *txrdy;
 	struct fc_lport *lport;
@@ -258,26 +268,26 @@ int ft_write_pending(struct se_cmd_s *se_cmd)
 	return 0;
 }
 
-u32 ft_get_task_tag(struct se_cmd_s *se_cmd)
+u32 ft_get_task_tag(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 
 	return fc_seq_exch(cmd->seq)->rxid;
 }
 
-int ft_get_cmd_state(struct se_cmd_s *se_cmd)
+int ft_get_cmd_state(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
 
 	return cmd->state;
 }
 
-int ft_is_state_remove(struct se_cmd_s *se_cmd)
+int ft_is_state_remove(struct se_cmd *se_cmd)
 {
 	return 0;	/* XXX TBD */
 }
 
-void ft_new_cmd_failure(struct se_cmd_s *se_cmd)
+void ft_new_cmd_failure(struct se_cmd *se_cmd)
 {
 	/* XXX TBD */
 	printk(KERN_INFO "%s: se_cmd %p\n", __func__, se_cmd);
@@ -293,9 +303,9 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 
 	if (IS_ERR(fp)) {
 		/* XXX need to find cmd if queued */
-		cmd->se_cmd->t_state = TRANSPORT_REMOVE;
+		cmd->se_cmd.t_state = TRANSPORT_REMOVE;
 		cmd->seq = NULL;
-		transport_generic_free_cmd(cmd->se_cmd, 0, 1, 0);
+		transport_generic_free_cmd(&cmd->se_cmd, 0, 1, 0);
 		return;
 	}
 
@@ -312,7 +322,7 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		printk(KERN_INFO "%s: unhandled frame r_ctl %x\n",
 		       __func__, fh->fh_r_ctl);
 		fc_frame_free(fp);
-		transport_generic_free_cmd(cmd->se_cmd, 0, 1, 0);
+		transport_generic_free_cmd(&cmd->se_cmd, 0, 1, 0);
 		break;
 	}
 }
@@ -322,27 +332,26 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
  * status is SAM_STAT_GOOD (zero) iff code is valid.
  * This is used in error cases, such as allocation failures.
  */
-static void ft_send_resp_status(struct fc_seq *sp, u32 status,
-				enum fcp_resp_rsp_codes code)
+static void ft_send_resp_status(struct fc_lport *lport,
+				const struct fc_frame *rx_fp,
+				u32 status, enum fcp_resp_rsp_codes code)
 {
 	struct fc_frame *fp;
+	struct fc_seq *sp;
+	const struct fc_frame_header *fh;
 	size_t len;
 	struct fcp_resp_with_ext *fcp;
 	struct fcp_resp_rsp_info *info;
-	struct fc_lport *lport;
-	struct fc_exch *ep;
 
-	ep = fc_seq_exch(sp);
-
+	fh = fc_frame_header_get(rx_fp);
 	FT_IO_DBG("FCP error response: did %x oxid %x status %x code %x\n",
-		  ep->did, ep->oxid, status, code);
-	lport = ep->lp;
+		  ntoh24(fh->fh_s_id), ntohs(fh->fh_ox_id), status, code);
 	len = sizeof(*fcp);
 	if (status == SAM_STAT_GOOD)
 		len += sizeof(*info);
 	fp = fc_frame_alloc(lport, len);
 	if (!fp)
-		goto out;
+		return;
 	fcp = fc_frame_payload_get(fp, len);
 	memset(fcp, 0, len);
 	fcp->resp.fr_status = status;
@@ -353,13 +362,12 @@ static void ft_send_resp_status(struct fc_seq *sp, u32 status,
 		info->rsp_code = code;
 	}
 
-	sp = lport->tt.seq_start_next(sp);
-	fc_fill_fc_hdr(fp, FC_RCTL_DD_CMD_STATUS, ep->did, ep->sid, FC_TYPE_FCP,
-		       FC_FC_EX_CTX | FC_FC_LAST_SEQ | FC_FC_END_SEQ, 0);
-
-	lport->tt.seq_send(lport, sp, fp);
-out:
-	lport->tt.exch_done(sp);
+	fc_fill_reply_hdr(fp, rx_fp, FC_RCTL_DD_CMD_STATUS, 0);
+	sp = fr_seq(fp);
+	if (sp)
+		lport->tt.seq_send(lport, sp, fp);
+	else
+		lport->tt.frame_send(lport, fp);
 }
 
 /*
@@ -368,7 +376,8 @@ out:
  */
 static void ft_send_resp_code(struct ft_cmd *cmd, enum fcp_resp_rsp_codes code)
 {
-	ft_send_resp_status(cmd->seq, SAM_STAT_GOOD, code);
+	ft_send_resp_status(cmd->sess->tport->lport,
+			    cmd->req_frame, SAM_STAT_GOOD, code);
 	ft_free_cmd(cmd);
 }
 
@@ -377,7 +386,7 @@ static void ft_send_resp_code(struct ft_cmd *cmd, enum fcp_resp_rsp_codes code)
  */
 static void ft_send_tm(struct ft_cmd *cmd)
 {
-	struct se_tmr_req_s *tmr;
+	struct se_tmr_req *tmr;
 	struct fcp_cmnd *fcp;
 	u8 tm_func;
 
@@ -388,8 +397,8 @@ static void ft_send_tm(struct ft_cmd *cmd)
 		tm_func = LUN_RESET;
 		if (ft_get_lun_for_cmd(cmd, fcp->fc_lun) < 0) {
 			ft_dump_cmd(cmd, __func__);
-			transport_send_check_condition_and_sense(cmd->se_cmd,
-				cmd->se_cmd->scsi_sense_reason, 0);
+			transport_send_check_condition_and_sense(&cmd->se_cmd,
+				cmd->se_cmd.scsi_sense_reason, 0);
 			ft_sess_put(cmd->sess);
 			return;
 		}
@@ -417,23 +426,23 @@ static void ft_send_tm(struct ft_cmd *cmd)
 	}
 
 	FT_TM_DBG("alloc tm cmd fn %d\n", tm_func);
-	tmr = core_tmr_alloc_req(cmd->se_cmd, cmd, tm_func);
+	tmr = core_tmr_alloc_req(&cmd->se_cmd, cmd, tm_func);
 	if (!tmr) {
 		FT_TM_DBG("alloc failed\n");
 		ft_send_resp_code(cmd, FCP_TMF_FAILED);
 		return;
 	}
-	cmd->se_cmd->se_tmr_req = tmr;
-	transport_generic_handle_tmr(cmd->se_cmd);
+	cmd->se_cmd.se_tmr_req = tmr;
+	transport_generic_handle_tmr(&cmd->se_cmd);
 }
 
 /*
  * Send status from completed task management request.
  */
-int ft_queue_tm_resp(struct se_cmd_s *se_cmd)
+int ft_queue_tm_resp(struct se_cmd *se_cmd)
 {
-	struct ft_cmd *cmd = se_cmd->se_fabric_cmd_ptr;
-	struct se_tmr_req_s *tmr = se_cmd->se_tmr_req;
+	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
+	struct se_tmr_req *tmr = se_cmd->se_tmr_req;
 	enum fcp_resp_rsp_codes code;
 
 	switch (tmr->response) {
@@ -464,23 +473,27 @@ int ft_queue_tm_resp(struct se_cmd_s *se_cmd)
 /*
  * Handle incoming FCP command.
  */
-static void ft_recv_cmd(struct ft_sess *sess,
-			struct fc_seq *sp, struct fc_frame *fp)
+static void ft_recv_cmd(struct ft_sess *sess, struct fc_frame *fp)
 {
 	struct ft_cmd *cmd;
+	struct fc_lport *lport = sess->tport->lport;
 
 	cmd = kzalloc(sizeof(*cmd), GFP_ATOMIC);
 	if (!cmd)
 		goto busy;
 	cmd->sess = sess;
-	cmd->seq = sp;
+	cmd->seq = lport->tt.seq_assign(lport, fp);
+	if (!cmd->seq) {
+		kfree(cmd);
+		goto busy;
+	}
 	cmd->req_frame = fp;		/* hold frame during cmd */
 	ft_queue_cmd(sess, cmd);
 	return;
 
 busy:
-	FT_IO_DBG("cmd allocation failure - sending BUSY\n");
-	ft_send_resp_status(sp, SAM_STAT_BUSY, 0);
+	FT_IO_DBG("cmd or seq allocation failure - sending BUSY\n");
+	ft_send_resp_status(lport, fp, SAM_STAT_BUSY, 0);
 	fc_frame_free(fp);
 	ft_sess_put(sess);		/* undo get from lookup */
 }
@@ -490,13 +503,13 @@ busy:
  * Handle incoming FCP frame.
  * Caller has verified that the frame is type FCP.
  */
-void ft_recv_req(struct ft_sess *sess, struct fc_seq *sp, struct fc_frame *fp)
+void ft_recv_req(struct ft_sess *sess, struct fc_frame *fp)
 {
 	struct fc_frame_header *fh = fc_frame_header_get(fp);
 
 	switch (fh->fh_r_ctl) {
 	case FC_RCTL_DD_UNSOL_CMD:	/* command */
-		ft_recv_cmd(sess, sp, fp);
+		ft_recv_cmd(sess, fp);
 		break;
 	case FC_RCTL_DD_SOL_DATA:	/* write data */
 	case FC_RCTL_DD_UNSOL_CTL:
@@ -518,7 +531,7 @@ void ft_recv_req(struct ft_sess *sess, struct fc_seq *sp, struct fc_frame *fp)
 static void ft_send_cmd(struct ft_cmd *cmd)
 {
 	struct fc_frame_header *fh = fc_frame_header_get(cmd->req_frame);
-	struct se_cmd_s *se_cmd;
+	struct se_cmd *se_cmd;
 	struct fcp_cmnd *fcp;
 	int data_dir;
 	u32 data_len;
@@ -534,18 +547,18 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 	if (fcp->fc_tm_flags) {
 		task_attr = FCP_PTA_SIMPLE;
-		data_dir = SE_DIRECTION_NONE;
+		data_dir = DMA_NONE;
 		data_len = 0;
 	} else {
 		switch (fcp->fc_flags & (FCP_CFL_RDDATA | FCP_CFL_WRDATA)) {
 		case 0:
-			data_dir = SE_DIRECTION_NONE;
+			data_dir = DMA_NONE;
 			break;
 		case FCP_CFL_RDDATA:
-			data_dir = SE_DIRECTION_READ;
+			data_dir = DMA_FROM_DEVICE;
 			break;
 		case FCP_CFL_WRDATA:
-			data_dir = SE_DIRECTION_WRITE;
+			data_dir = DMA_TO_DEVICE;
 			break;
 		case FCP_CFL_WRDATA | FCP_CFL_RDDATA:
 			goto err;	/* TBD not supported by tcm_fc yet */
@@ -557,19 +570,15 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 		cmd->cdb = fcp->fc_cdb;
 	}
 
-	se_cmd = transport_alloc_se_cmd(&ft_configfs->tf_ops,
-					cmd->sess->se_sess, cmd, data_len,
-					data_dir, task_attr);
-	if (!se_cmd) {
-		FT_IO_DBG("se_cmd allocation failure - sending BUSY\n");
-		ft_send_resp_status(cmd->seq, SAM_STAT_BUSY, 0);
-		fc_frame_free(cmd->req_frame);
-		ft_sess_put(cmd->sess);		/* undo get from lookup */
-		kfree(cmd);
-		return;
-	}
-	cmd->se_cmd = se_cmd;
-
+	se_cmd = &cmd->se_cmd;
+	/*
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
+	 */
+	transport_init_se_cmd(se_cmd, &ft_configfs->tf_ops, cmd->sess->se_sess,
+			data_len, data_dir, task_attr, &cmd->ft_sense_buffer[0]);
+	/*
+	 * Check for FCP task management flags
+	 */
 	if (fcp->fc_tm_flags) {
 		ft_send_tm(cmd);
 		return;
@@ -580,8 +589,8 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 	ret = ft_get_lun_for_cmd(cmd, fcp->fc_lun);
 	if (ret < 0) {
 		ft_dump_cmd(cmd, __func__);
-		transport_send_check_condition_and_sense(cmd->se_cmd,
-			cmd->se_cmd->scsi_sense_reason, 0);
+		transport_send_check_condition_and_sense(&cmd->se_cmd,
+			cmd->se_cmd.scsi_sense_reason, 0);
 		return;
 	}
 
@@ -592,7 +601,7 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 	if (ret == -1) {
 		transport_send_check_condition_and_sense(se_cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 		transport_generic_free_cmd(se_cmd, 0, 1, 0);
 		return;
 	}
@@ -635,19 +644,13 @@ static void ft_exec_req(struct ft_cmd *cmd)
 int ft_thread(void *arg)
 {
 	struct ft_tpg *tpg = arg;
-	struct se_queue_obj_s *qobj = &tpg->qobj;
+	struct se_queue_obj *qobj = &tpg->qobj;
 	struct ft_cmd *cmd;
 	int ret;
 
 	set_user_nice(current, -20);
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
 
-	complete(&qobj->thread_create_comp);
-
-	while (!(kthread_should_stop())) {
+	while (!kthread_should_stop()) {
 		ret = wait_event_interruptible(qobj->thread_wq,
 			atomic_read(&qobj->queue_cnt) || kthread_should_stop());
 		if (ret < 0 || kthread_should_stop())
@@ -658,6 +661,5 @@ int ft_thread(void *arg)
 	}
 
 out:
-	complete(&qobj->thread_done_comp);
 	return 0;
 }

@@ -25,35 +25,29 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_TARGET_DISCOVERY_C
-
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 
-#include <iscsi_linux_defs.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_discovery.h>
 
-#undef ISCSI_TARGET_DISCOVERY_C
-
 /*	iscsi_build_sendtargets_response():
  *
  *
  */
-extern int iscsi_build_sendtargets_response(iscsi_cmd_t *cmd)
+extern int iscsi_build_sendtargets_response(struct iscsi_cmd *cmd)
 {
 	char *ip, *ip_ex, *payload = NULL;
-	iscsi_conn_t *conn = CONN(cmd);
-	iscsi_np_ex_t *np_ex;
-	iscsi_portal_group_t *tpg;
-	iscsi_tiqn_t *tiqn;
-	iscsi_tpg_np_t *tpg_np;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_np_ex *np_ex;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tiqn *tiqn;
+	struct iscsi_tpg_np *tpg_np;
 	int buffer_len, end_of_buf = 0, len = 0, payload_len = 0;
 	unsigned char buf[256];
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];

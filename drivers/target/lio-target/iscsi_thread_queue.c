@@ -25,9 +25,6 @@
  *
  ******************************************************************************/
 
-
-#define ISCSI_THREAD_QUEUE_C
-
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -35,19 +32,17 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
-#include <iscsi_linux_defs.h>
+#include <linux/bitmap.h>
 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 
-#undef ISCSI_THREAD_QUEUE_C
-
 /*	iscsi_add_ts_to_active_list():
  *
  *
  */
-static void iscsi_add_ts_to_active_list(se_thread_set_t *ts)
+static void iscsi_add_ts_to_active_list(struct se_thread_set *ts)
 {
 #if 0
 	printk(KERN_INFO "Adding thread set %d to active list\n",
@@ -63,7 +58,7 @@ static void iscsi_add_ts_to_active_list(se_thread_set_t *ts)
  *
  *
  */
-extern void iscsi_add_ts_to_inactive_list(se_thread_set_t *ts)
+extern void iscsi_add_ts_to_inactive_list(struct se_thread_set *ts)
 {
 #if 0
 	printk(KERN_INFO "Adding thread set %d to inactive list\n",
@@ -79,7 +74,7 @@ extern void iscsi_add_ts_to_inactive_list(se_thread_set_t *ts)
  *
  *
  */
-static void iscsi_del_ts_from_active_list(se_thread_set_t *ts)
+static void iscsi_del_ts_from_active_list(struct se_thread_set *ts)
 {
 #if 0
 	printk(KERN_INFO "Remove thread set %d from active list\n",
@@ -98,9 +93,9 @@ static void iscsi_del_ts_from_active_list(se_thread_set_t *ts)
  *
  *
  */
-static se_thread_set_t *iscsi_get_ts_from_inactive_list(void)
+static struct se_thread_set *iscsi_get_ts_from_inactive_list(void)
 {
-	se_thread_set_t *ts;
+	struct se_thread_set *ts;
 
 	spin_lock(&iscsi_global->inactive_ts_lock);
 	if (list_empty(&iscsi_global->inactive_ts_list)) {
@@ -124,35 +119,45 @@ static se_thread_set_t *iscsi_get_ts_from_inactive_list(void)
  */
 extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 {
-	int allocated_thread_pair_count = 0, i;
-	se_thread_set_t *ts = NULL;
+	int allocated_thread_pair_count = 0, i, thread_id;
+	struct se_thread_set *ts = NULL;
 
 	for (i = 0; i < thread_pair_count; i++) {
-		ts = kzalloc(sizeof(se_thread_set_t), GFP_KERNEL);
+		ts = kzalloc(sizeof(struct se_thread_set), GFP_KERNEL);
 		if (!(ts)) {
 			printk(KERN_ERR "Unable to allocate memory for"
 					" thread set.\n");
 			return allocated_thread_pair_count;
 		}
+		/*
+		 * Locate the next available regision in the thread_set_bitmap
+		 */
+		spin_lock(&iscsi_global->ts_bitmap_lock);
+		thread_id = bitmap_find_free_region(iscsi_global->ts_bitmap,
+				iscsi_global->ts_bitmap_count, get_order(1));
+		spin_unlock(&iscsi_global->ts_bitmap_lock);
+		if (thread_id < 0) {
+			printk(KERN_ERR "bitmap_find_free_region() failed for"
+				" thread_set_bitmap\n");
+			kfree(ts);
+			return allocated_thread_pair_count;
+		}
 
+		ts->thread_id = thread_id;
 		ts->status = ISCSI_THREAD_SET_FREE;
 		INIT_LIST_HEAD(&ts->ts_list);
 		spin_lock_init(&ts->ts_state_lock);
-		init_MUTEX_LOCKED(&ts->stop_active_sem);
-		init_MUTEX_LOCKED(&ts->rx_create_sem);
-		init_MUTEX_LOCKED(&ts->tx_create_sem);
-		init_MUTEX_LOCKED(&ts->rx_done_sem);
-		init_MUTEX_LOCKED(&ts->tx_done_sem);
-		init_MUTEX_LOCKED(&ts->rx_post_start_sem);
-		init_MUTEX_LOCKED(&ts->tx_post_start_sem);
-		init_MUTEX_LOCKED(&ts->rx_restart_sem);
-		init_MUTEX_LOCKED(&ts->tx_restart_sem);
-		init_MUTEX_LOCKED(&ts->rx_start_sem);
-		init_MUTEX_LOCKED(&ts->tx_start_sem);
-
-		ts->thread_id = iscsi_global->thread_id++;
-		if (!ts->thread_id)
-			ts->thread_id = iscsi_global->thread_id++;
+		sema_init(&ts->stop_active_sem, 0);
+		sema_init(&ts->rx_create_sem, 0);
+		sema_init(&ts->tx_create_sem, 0);
+		sema_init(&ts->rx_done_sem, 0);
+		sema_init(&ts->tx_done_sem, 0);
+		sema_init(&ts->rx_post_start_sem, 0);
+		sema_init(&ts->tx_post_start_sem, 0);
+		sema_init(&ts->rx_restart_sem, 0);
+		sema_init(&ts->tx_restart_sem, 0);
+		sema_init(&ts->rx_start_sem, 0);
+		sema_init(&ts->tx_start_sem, 0);
 
 		ts->create_threads = 1;
 		kernel_thread(iscsi_target_rx_thread,
@@ -180,7 +185,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
 extern void iscsi_deallocate_thread_sets(int role)
 {
 	u32 released_count = 0;
-	se_thread_set_t *ts = NULL;
+	struct se_thread_set *ts = NULL;
 
 	while ((ts = iscsi_get_ts_from_inactive_list())) {
 #if 0
@@ -201,6 +206,14 @@ extern void iscsi_deallocate_thread_sets(int role)
 #if 0
 		printk(KERN_INFO "Deallocated THREAD_ID: %d\n", ts->thread_id);
 #endif
+		/*
+		 * Release this thread_id in the thread_set_bitmap
+		 */
+		spin_lock(&iscsi_global->ts_bitmap_lock);
+		bitmap_release_region(iscsi_global->ts_bitmap,
+				ts->thread_id, get_order(1));
+		spin_unlock(&iscsi_global->ts_bitmap_lock);
+
 		released_count++;
 		kfree(ts);
 	}
@@ -217,7 +230,7 @@ extern void iscsi_deallocate_thread_sets(int role)
 static void iscsi_deallocate_extra_thread_sets(int role)
 {
 	u32 orig_count, released_count = 0;
-	se_thread_set_t *ts = NULL;
+	struct se_thread_set *ts = NULL;
 
 	orig_count = ((role == INITIATOR) ? INITIATOR_THREAD_SET_COUNT :
 			TARGET_THREAD_SET_COUNT);
@@ -244,6 +257,14 @@ static void iscsi_deallocate_extra_thread_sets(int role)
 #if 0
 		printk(KERN_INFO "Deallocated THREAD_ID: %d\n", ts->thread_id);
 #endif
+		/*
+		 * Release this thread_id in the thread_set_bitmap
+		 */
+		spin_lock(&iscsi_global->ts_bitmap_lock);
+		bitmap_release_region(iscsi_global->ts_bitmap,
+				ts->thread_id, get_order(1));
+		spin_unlock(&iscsi_global->ts_bitmap_lock);
+
 		released_count++;
 		kfree(ts);
 	}
@@ -258,7 +279,7 @@ static void iscsi_deallocate_extra_thread_sets(int role)
  *
  *
  */
-void iscsi_activate_thread_set(iscsi_conn_t *conn, se_thread_set_t *ts)
+void iscsi_activate_thread_set(struct iscsi_conn *conn, struct se_thread_set *ts)
 {
 	iscsi_add_ts_to_active_list(ts);
 #if 0
@@ -292,12 +313,12 @@ static void iscsi_get_thread_set_timeout(unsigned long data)
  *	Parameters:	iSCSI Connection Pointer.
  *	Returns:	iSCSI Thread Set Pointer
  */
-se_thread_set_t *iscsi_get_thread_set(int role)
+struct se_thread_set *iscsi_get_thread_set(int role)
 {
 	int allocate_ts = 0;
 	struct semaphore sem;
 	struct timer_list timer;
-	se_thread_set_t *ts = NULL;
+	struct se_thread_set *ts = NULL;
 
 	/*
 	 * If no inactive thread set is available on the first call to
@@ -311,7 +332,7 @@ get_set:
 		if (allocate_ts == 2)
 			iscsi_allocate_thread_sets(1, INITIATOR);
 
-		init_MUTEX_LOCKED(&sem);
+		sema_init(&sem, 0);
 		init_timer(&timer);
 		SETUP_TIMER(timer, 1, &sem, iscsi_get_thread_set_timeout);
 		add_timer(&timer);
@@ -325,8 +346,8 @@ get_set:
 	ts->delay_inactive = 1;
 	ts->signal_sent = ts->stop_active = 0;
 	ts->thread_count = 2;
-	init_MUTEX_LOCKED(&ts->rx_restart_sem);
-	init_MUTEX_LOCKED(&ts->tx_restart_sem);
+	sema_init(&ts->rx_restart_sem, 0);
+	sema_init(&ts->tx_restart_sem, 0);
 
 	return ts;
 }
@@ -335,12 +356,12 @@ get_set:
  *
  *
  */
-void iscsi_set_thread_clear(iscsi_conn_t *conn, u8 thread_clear)
+void iscsi_set_thread_clear(struct iscsi_conn *conn, u8 thread_clear)
 {
-	se_thread_set_t *ts = NULL;
+	struct se_thread_set *ts = NULL;
 
 	if (!conn->thread_set) {
-		printk(KERN_ERR "iscsi_conn_t->thread_set is NULL\n");
+		printk(KERN_ERR "struct iscsi_conn->thread_set is NULL\n");
 		return;
 	}
 	ts = conn->thread_set;
@@ -361,12 +382,12 @@ void iscsi_set_thread_clear(iscsi_conn_t *conn, u8 thread_clear)
  *
  *
  */
-void iscsi_set_thread_set_signal(iscsi_conn_t *conn, u8 signal_sent)
+void iscsi_set_thread_set_signal(struct iscsi_conn *conn, u8 signal_sent)
 {
-	se_thread_set_t *ts = NULL;
+	struct se_thread_set *ts = NULL;
 
 	if (!conn->thread_set) {
-		printk(KERN_ERR "iscsi_conn_t->thread_set is NULL\n");
+		printk(KERN_ERR "struct iscsi_conn->thread_set is NULL\n");
 		return;
 	}
 	ts = conn->thread_set;
@@ -381,10 +402,10 @@ void iscsi_set_thread_set_signal(iscsi_conn_t *conn, u8 signal_sent)
  *	Parameters:	iSCSI Connection Pointer.
  *	Returns:	0 on success, -1 on error.
  */
-int iscsi_release_thread_set(iscsi_conn_t *conn, int role)
+int iscsi_release_thread_set(struct iscsi_conn *conn, int role)
 {
 	int thread_called = 0;
-	se_thread_set_t *ts = NULL;
+	struct se_thread_set *ts = NULL;
 
 	if (!conn || !conn->thread_set) {
 		printk(KERN_ERR "connection or thread set pointer is NULL\n");
@@ -456,9 +477,9 @@ int iscsi_release_thread_set(iscsi_conn_t *conn, int role)
  *
  *
  */
-int iscsi_thread_set_force_reinstatement(iscsi_conn_t *conn)
+int iscsi_thread_set_force_reinstatement(struct iscsi_conn *conn)
 {
-	se_thread_set_t *ts;
+	struct se_thread_set *ts;
 
 	if (!conn->thread_set)
 		return -1;
@@ -510,7 +531,7 @@ static void iscsi_check_to_add_additional_sets(int role)
  *
  *
  */
-static int iscsi_signal_thread_pre_handler(se_thread_set_t *ts)
+static int iscsi_signal_thread_pre_handler(struct se_thread_set *ts)
 {
 #if 0
 	printk(KERN_INFO "ts->thread_id: %d ts->status = %d%s\n", ts->thread_id,
@@ -530,7 +551,7 @@ static int iscsi_signal_thread_pre_handler(se_thread_set_t *ts)
  *
  *
  */
-iscsi_conn_t *iscsi_rx_thread_pre_handler(se_thread_set_t *ts, int role)
+struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *ts, int role)
 {
 	int ret;
 
@@ -573,7 +594,7 @@ sleep:
 		return NULL;
 
 	if (!ts->conn) {
-		printk(KERN_ERR "se_thread_set_t->conn is NULL for"
+		printk(KERN_ERR "struct se_thread_set->conn is NULL for"
 			" thread_id: %d, going back to sleep\n", ts->thread_id);
 		goto sleep;
 	}
@@ -592,7 +613,7 @@ sleep:
  *
  *
  */
-iscsi_conn_t *iscsi_tx_thread_pre_handler(se_thread_set_t *ts, int role)
+struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *ts, int role)
 {
 	int ret;
 
@@ -634,7 +655,7 @@ sleep:
 		return NULL;
 
 	if (!ts->conn) {
-		printk(KERN_ERR "se_thread_set_t->conn is NULL for "
+		printk(KERN_ERR "struct se_thread_set->conn is NULL for "
 			" thread_id: %d, going back to sleep\n",
 			ts->thread_id);
 		goto sleep;
@@ -657,4 +678,25 @@ sleep:
 #endif
 	spin_unlock_bh(&ts->ts_state_lock);
 	return ts->conn;
+}
+
+int iscsi_thread_set_init(void)
+{
+	int size;
+
+	iscsi_global->ts_bitmap_count = ISCSI_TS_BITMAP_BITS;
+
+	size = BITS_TO_LONGS(iscsi_global->ts_bitmap_count) * sizeof(long);
+	iscsi_global->ts_bitmap = kzalloc(size, GFP_KERNEL);
+	if (!(iscsi_global->ts_bitmap)) {
+		printk(KERN_ERR "Unable to allocate iscsi_global->ts_bitmap\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+void iscsi_thread_set_free(void)
+{
+	kfree(iscsi_global->ts_bitmap);
 }

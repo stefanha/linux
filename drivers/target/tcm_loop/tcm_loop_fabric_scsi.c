@@ -40,7 +40,6 @@
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_device.h>
-#include <target/target_core_seobj.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_tmr.h>
 
@@ -55,13 +54,13 @@
  *
  * Can be called from interrupt context in tcm_loop_queuecommand() below
  */
-static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
+static struct se_cmd *tcm_loop_allocate_core_cmd(
 	struct tcm_loop_hba *tl_hba,
-	se_portal_group_t *se_tpg,
-	struct scsi_cmnd *sc,
-	int data_direction)
+	struct se_portal_group *se_tpg,
+	struct scsi_cmnd *sc)
 {
-	se_session_t *se_sess;
+	struct se_cmd *se_cmd;
+	struct se_session *se_sess;
 	struct tcm_loop_nexus *tl_nexus = tl_hba->tl_nexus;
 	struct tcm_loop_cmd *tl_cmd;
 	int sam_task_attr;
@@ -78,11 +77,11 @@ static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_cmd\n");
 		return NULL;
 	}
+	se_cmd = &tl_cmd->tl_se_cmd;
 	/*
 	 * Save the pointer to struct scsi_cmnd *sc
 	 */
 	tl_cmd->sc = sc;
-
 	/*
 	 * Locate the SAM Task Attr from struct scsi_cmnd *
 	 */
@@ -100,63 +99,21 @@ static struct tcm_loop_cmd *tcm_loop_allocate_core_cmd(
 		}
 	} else
 		sam_task_attr = TASK_ATTR_SIMPLE;
+
 	/*
-	 * Allocate the se_cmd_t descriptor from target_core_mod infrastructure
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
-	tl_cmd->tl_se_cmd = transport_alloc_se_cmd(se_tpg->se_tpg_tfo,
-			se_sess, (void *)tl_cmd, scsi_bufflen(sc),
-			data_direction, sam_task_attr);
-	if (!(tl_cmd->tl_se_cmd)) {
-		kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
-		return NULL;
-	}
-			
-	return tl_cmd;
-}
+	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
+			scsi_bufflen(sc), sc->sc_data_direction, sam_task_attr,
+			&tl_cmd->tl_sense_buf[0]);
 
-/*
- * Queue up the newly allocated struct tcm_loop_cmd to be processed by
- * tcm_loop_fabri.c:tcm_loop_processing_thread()
- *
- * Can be called from interrupt context in tcm_loop_queuecommand() below
- */
-static int tcm_loop_queue_core_cmd(
-	se_queue_obj_t *qobj,
-	struct tcm_loop_cmd *tl_cmd)
-{
-	se_queue_req_t *qr;
-	unsigned long flags;
-
-	qr = kzalloc(sizeof(se_queue_req_t), GFP_ATOMIC);
-	if (!(qr)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" se_queue_req_t\n");
-		return -1;	
-	}
-	INIT_LIST_HEAD(&qr->qr_list);
-
-	qr->cmd = (void *)tl_cmd;
-	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	list_add_tail(&qr->qr_list, &qobj->qobj_list);
-	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-
-	atomic_inc(&qobj->queue_cnt);
-	wake_up_interruptible(&qobj->thread_wq);
-	return 0;
-}
-
-/*
- * Called by tcm_loop_processing_thread() in tcm_loop_fabric.c
- *
- * Always called in process context
- */
-int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
-{
-	se_cmd_t *se_cmd = tl_cmd->tl_se_cmd;
-	void *mem_ptr;
-	int ret;
 	/*
-	 * Locate the se_lun_t pointer and attach it to se_cmd_t
+	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
+	 */
+	if (scsi_bidi_cmnd(sc))
+		T_TASK(se_cmd)->t_tasks_bidi = 1;
+	/*
+	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
 	if (transport_get_lun_for_cmd(se_cmd, NULL,
 				tl_cmd->sc->device->lun) < 0) {
@@ -165,30 +122,43 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 				se_cmd->scsi_sense_reason, 0);
 		return 0;
 	}
+
+	transport_device_setup_cmd(se_cmd);
+	return se_cmd;
+}
+
+/*
+ * Called by struct target_core_fabric_ops->new_cmd_map()
+ *
+ * Always called in process context.  A non zero return value
+ * here will signal to handle an exception based on the return code.
+ */
+int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
+{
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
+	struct scsi_cmnd *sc = tl_cmd->sc;
+	void *mem_ptr, *mem_bidi_ptr = NULL;
+	u32 sg_no_bidi = 0;
+	int ret;
 	/*
 	 * Allocate the necessary tasks to complete the received CDB+data
 	 */
 	ret = transport_generic_allocate_tasks(se_cmd, tl_cmd->sc->cmnd);
 	if (ret == -1) {
 		/* Out of Resources */
-		transport_send_check_condition_and_sense(se_cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
-		return 0;
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	} else if (ret == -2) {
 		/*
 		 * Handle case for SAM_STAT_RESERVATION_CONFLICT
 		 */
-		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT) {
-			tcm_loop_queue_status(se_cmd);
-			return 0;
-		}
+		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
+			return PYX_TRANSPORT_RESERVATION_CONFLICT;
 		/*
 		 * Otherwise, return SAM_STAT_CHECK_CONDITION and return
 		 * sense data.
 		 */
-		transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
-		return 0;
+		return PYX_TRANSPORT_USE_SENSE_REASON;
 	}
 	/*
 	 * Setup the struct scatterlist memory from the received
@@ -197,6 +167,16 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
 	if (scsi_sg_count(sc)) {
 		se_cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM;
 		mem_ptr = (void *)scsi_sglist(sc);
+		/*
+		 * For BIDI commands, pass in the extra READ buffer
+		 * to transport_generic_map_mem_to_cmd() below..
+		 */
+		if (T_TASK(se_cmd)->t_tasks_bidi) {
+			struct scsi_data_buffer *sdb = scsi_in(sc);
+
+			mem_bidi_ptr = (void *)sdb->table.sgl;
+			sg_no_bidi = sdb->table.nents;
+		}
 	} else {
 		/*
 		 * Used for DMA_NONE
@@ -204,30 +184,31 @@ int tcm_loop_execute_core_cmd(struct tcm_loop_cmd *tl_cmd, struct scsi_cmnd *sc)
                 mem_ptr = NULL;
         }
 	/*
-	 * Map the SG memory into se_mem_t->page linked list using the same
+	 * Map the SG memory into struct se_mem->page linked list using the same
 	 * physical memory at sg->page_link.
 	 */
 	ret = transport_generic_map_mem_to_cmd(se_cmd, mem_ptr,
-				scsi_sg_count(sc));
-	if (ret < 0) {
-		transport_send_check_condition_and_sense(se_cmd,
-				LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
-		return 0;
-	}
-	/*
-	 * Queue up the se_cmd_t + tasks to be processed by the
-	 * TCM storage object.
-	 */
-	return transport_generic_handle_cdb(se_cmd);
+			scsi_sg_count(sc), mem_bidi_ptr, sg_no_bidi);
+	if (ret < 0)
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+
+	return 0;
 }
 
 /*
  * Called from struct target_core_fabric_ops->check_stop_free()
  */
-void tcm_loop_check_stop_free(se_cmd_t *se_cmd)
+void tcm_loop_check_stop_free(struct se_cmd *se_cmd)
 {
 	/*
-	 * Release the se_cmd_t, which will make a callback to release
+	 * Do not release struct se_cmd's containing a valid TMR
+	 * pointer.  These will be released directly in tcm_loop_device_reset()
+	 * with transport_generic_free_cmd().
+	 */
+	if (se_cmd->se_tmr_req)
+		return;
+	/*
+	 * Release the struct se_cmd, which will make a callback to release
 	 * struct tcm_loop_cmd * in tcm_loop_deallocate_core_cmd()
 	 */
 	transport_generic_free_cmd(se_cmd, 0, 1, 0);
@@ -236,10 +217,10 @@ void tcm_loop_check_stop_free(se_cmd_t *se_cmd)
 /*
  * Called from struct target_core_fabric_ops->release_cmd_to_pool()
  */
-void tcm_loop_deallocate_core_cmd(se_cmd_t *se_cmd)
+void tcm_loop_deallocate_core_cmd(struct se_cmd *se_cmd)
 {
-	struct tcm_loop_cmd *tl_cmd =
-			(struct tcm_loop_cmd *)se_cmd->se_fabric_cmd_ptr;
+	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
+				struct tcm_loop_cmd, tl_se_cmd);
 
 	kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
 }
@@ -285,16 +266,10 @@ static struct device_driver tcm_loop_driverfs = {
 	.name			= "tcm_loop",
 	.bus			= &tcm_loop_lld_bus,
 };
-
-static void tcm_loop_primary_release(struct device *dev)
-{
-	return;
-}
-
-static struct device tcm_loop_primary = {
-	.init_name		= "tcm_loop_0",
-	.release		= tcm_loop_primary_release,
-};
+/*
+ * Used with root_device_register() in tcm_loop_alloc_core_bus() below
+ */
+struct device *tcm_loop_primary;
 
 /*
  * Copied from drivers/scsi/libfc/fc_fcp.c:fc_change_queue_depth() and
@@ -334,11 +309,10 @@ static int tcm_loop_queuecommand(
 	struct scsi_cmnd *sc,
 	void (*done)(struct scsi_cmnd *))
 {
-	se_portal_group_t *se_tpg;
-	struct tcm_loop_cmd *tl_cmd;
+	struct se_cmd *se_cmd;
+	struct se_portal_group *se_tpg;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_tpg *tl_tpg;
-	int data_direction;
 
 	sc->scsi_done = done;
 
@@ -346,8 +320,6 @@ static int tcm_loop_queuecommand(
 		" scsi_buf_len: %u\n", sc->device->host->host_no,
 		sc->device->id, sc->device->channel, sc->device->lun,
 		sc->cmnd[0], scsi_bufflen(sc));
-
-	spin_unlock_irq(sc->device->host->host_lock);
 	/*
 	 * Locate the tcm_loop_hba_t pointer 
 	 */
@@ -361,54 +333,20 @@ static int tcm_loop_queuecommand(
 	}
 	tl_tpg = &tl_hba->tl_hba_tpgs[sc->device->id];
 	se_tpg = &tl_tpg->tl_se_tpg;
-
-	if (sc->sc_data_direction == DMA_TO_DEVICE)
-		data_direction = SE_DIRECTION_WRITE;
-	else if (sc->sc_data_direction == DMA_FROM_DEVICE)
-		data_direction = SE_DIRECTION_READ;
-	else if (sc->sc_data_direction == DMA_NONE)
-		data_direction = SE_DIRECTION_NONE;
-	else {
-		spin_lock_irq(sc->device->host->host_lock);
-		printk(KERN_ERR "Unsupported sc->sc_data_direction: %d\n",
-			sc->sc_data_direction);	
-		sc->result = host_byte(DID_ERROR);
-		(*done)(sc);
-		return 0;
-	}
 	/*
 	 * Determine the SAM Task Attribute and allocate tl_cmd and
 	 * tl_cmd->tl_se_cmd from TCM infrastructure
 	 */
-	tl_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc, data_direction);
-	if (!(tl_cmd)) {
-		spin_lock_irq(sc->device->host->host_lock);
+	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc);
+	if (!(se_cmd)) {
 		sc->result = host_byte(DID_ERROR);
 		(*done)(sc);
 		return 0;
 	}
 	/*
-	 * Queue the tl_cmd to be executed in process context by the
-	 * tcm_loop kernel thread
-	 */
-	if (tcm_loop_queue_core_cmd(tl_hba->tl_hba_qobj, tl_cmd) < 0) {
-		/*
-		 * Will free both struct tcm_loop_cmd and se_cmd_t
-		 */
-		transport_release_cmd_to_pool(tl_cmd->tl_se_cmd);
-		/*
-		 * Reaquire the struct scsi_host->host_lock, and
-		 * complete the struct scsi_cmnd
-		 */
-		spin_lock_irq(sc->device->host->host_lock);
-		sc->result = host_byte(DID_ERROR);
-		(*done)(sc);
-		return 0;
-	}
-	/*
-	 * Reaquire the the struct scsi_host->host_lock before returning
-	 */
-	spin_lock_irq(sc->device->host->host_lock);
+	 * Queue up the newly allocated to be processed in TCM thread context.
+	*/
+	transport_generic_handle_cdb_map(se_cmd);
 	return 0;
 }
 
@@ -418,9 +356,9 @@ static int tcm_loop_queuecommand(
  */
 static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 {
-	se_cmd_t *se_cmd = NULL;
-	se_portal_group_t *se_tpg;
-	se_session_t *se_sess;
+	struct se_cmd *se_cmd = NULL;
+	struct se_portal_group *se_tpg;
+	struct se_session *se_sess;
 	struct tcm_loop_cmd *tl_cmd = NULL;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_nexus *tl_nexus;
@@ -464,15 +402,14 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 		goto release;
 	}
 	init_waitqueue_head(&tl_tmr->tl_tmr_wait);
+
+	se_cmd = &tl_cmd->tl_se_cmd;
 	/*
-	 * Allocate the se_cmd_t for a LUN_RESET TMR
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
-	tl_cmd->tl_se_cmd = transport_alloc_se_cmd(se_tpg->se_tpg_tfo,
-			se_sess, (void *)tl_cmd, 0, SE_DIRECTION_NONE,
-			TASK_ATTR_SIMPLE);
-	if (!(tl_cmd->tl_se_cmd))
-		goto release;
-	se_cmd = tl_cmd->tl_se_cmd;
+	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
+				DMA_NONE, TASK_ATTR_SIMPLE,
+				&tl_cmd->tl_sense_buf[0]);
 	/*
 	 * Allocate the LUN_RESET TMR
 	 */
@@ -481,7 +418,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	if (!(se_cmd->se_tmr_req))
 		goto release;
 	/*
-	 * Locate the underlying TCM se_lun_t from sc->device->lun
+	 * Locate the underlying TCM struct se_lun from sc->device->lun
 	 */
 	if (transport_get_lun_for_tmr(se_cmd, sc->device->lun) < 0)
 		goto release;
@@ -506,6 +443,17 @@ release:
 	return ret;
 }
 
+static int tcm_loop_slave_alloc(struct scsi_device *sd)
+{
+	set_bit(QUEUE_FLAG_BIDI, &sd->request_queue->queue_flags);
+	return 0;
+}
+
+static int tcm_loop_slave_configure(struct scsi_device *sd)
+{
+	return 0;
+}
+
 static struct scsi_host_template tcm_loop_driver_template = {
 	.proc_info		= tcm_loop_proc_info,
 	.proc_name		= "tcm_loopback",
@@ -528,6 +476,8 @@ static struct scsi_host_template tcm_loop_driver_template = {
 	.cmd_per_lun		= TL_SCSI_CMD_PER_LUN,
 	.max_sectors		= TL_SCSI_MAX_SECTORS,
 	.use_clustering		= DISABLE_CLUSTERING,
+	.slave_alloc		= tcm_loop_slave_alloc,
+	.slave_configure	= tcm_loop_slave_configure,
 	.module			= THIS_MODULE,
 };
 
@@ -585,7 +535,6 @@ static void tcm_loop_release_adapter(struct device *dev)
 {
 	struct tcm_loop_hba *tl_hba = to_tcm_loop_hba(dev);
 
-	kfree(tl_hba->tl_hba_qobj);
 	kfree(tl_hba);
 }
 
@@ -597,7 +546,7 @@ int tcm_loop_setup_hba_bus(struct tcm_loop_hba *tl_hba, int tcm_loop_host_id)
 	int ret;
 
 	tl_hba->dev.bus = &tcm_loop_lld_bus;
-	tl_hba->dev.parent = &tcm_loop_primary;
+	tl_hba->dev.parent = tcm_loop_primary;
 	tl_hba->dev.release = &tcm_loop_release_adapter;
 	dev_set_name(&tl_hba->dev, "tcm_loop_adapter_%d", tcm_loop_host_id);
 
@@ -619,11 +568,10 @@ int tcm_loop_alloc_core_bus(void)
 {
 	int ret;
 
-	ret = device_register(&tcm_loop_primary);
-	if (ret) {
-		printk(KERN_ERR "device_register() failed for"
-				" tcm_loop_primary\n");
-		return ret;
+	tcm_loop_primary = root_device_register("tcm_loop_0");
+	if (IS_ERR(tcm_loop_primary)) {
+		printk(KERN_ERR "Unable to allocate tcm_loop_primary\n");
+		return PTR_ERR(tcm_loop_primary);
 	}
 	
 	ret = bus_register(&tcm_loop_lld_bus);
@@ -645,7 +593,7 @@ int tcm_loop_alloc_core_bus(void)
 bus_unreg:
 	bus_unregister(&tcm_loop_lld_bus);
 dev_unreg:
-	device_unregister(&tcm_loop_primary);
+	root_device_unregister(tcm_loop_primary);
 	return ret;
 }
 
@@ -653,7 +601,7 @@ void tcm_loop_release_core_bus(void)
 {
 	driver_unregister(&tcm_loop_driverfs);
 	bus_unregister(&tcm_loop_lld_bus);
-	device_unregister(&tcm_loop_primary);
+	root_device_unregister(tcm_loop_primary);
 
 	printk(KERN_INFO "Releasing TCM Loop Core BUS\n");
 }
