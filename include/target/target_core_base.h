@@ -518,42 +518,6 @@ struct se_transform_info {
 	struct se_device *ti_obj_ptr;
 } ____cacheline_aligned;
 
-struct se_offset_map {
-	int                     map_reset;
-	u32                     iovec_length;
-	u32                     iscsi_offset;
-	u32                     current_offset;
-	u32                     orig_offset;
-	u32                     sg_count;
-	u32                     sg_current;
-	u32                     sg_length;
-	struct page		*sg_page;
-	struct se_mem		*map_se_mem;
-	struct se_mem		*map_orig_se_mem;
-	void			*iovec_base;
-} ____cacheline_aligned;
-
-struct se_map_sg {
-	int			sg_kmap_active:1;
-	u32			data_length;
-	u32			data_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct iovec		*iov;
-} ____cacheline_aligned;
-
-struct se_unmap_sg {
-	u32			data_length;
-	u32			sg_count;
-	u32			sg_offset;
-	u32			padding;
-	u32			t_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct se_offset_map	lmap;
-	struct se_mem		*cur_se_mem;
-} ____cacheline_aligned;
-
 struct se_cmd {
 	/* SAM response code being sent to initiator */
 	u8			scsi_status;
@@ -616,9 +580,7 @@ struct se_cmd {
 	void (*transport_free_resources)(struct se_cmd *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	void (*transport_map_SG_segments)(struct se_unmap_sg *);
 	void (*transport_passthrough_done)(struct se_cmd *);
-	void (*transport_unmap_SG_segments)(struct se_unmap_sg *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
 	void (*transport_complete_callback)(struct se_cmd *);

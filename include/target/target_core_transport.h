@@ -256,8 +256,6 @@ extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);
-extern int transport_generic_set_iovec_ptrs(struct se_map_sg *map_sg,
-	struct se_unmap_sg *unmap_sg);
 /* From target_core_alua.c */
 extern int core_alua_check_nonop_delay(struct se_cmd *);
 
@@ -497,10 +495,6 @@ struct se_subsystem_api {
 	 * map_task_to_SG():
 	 */
 	void (*map_task_to_SG)(struct se_task *);
-	/*
-	 * set_iovec_ptrs():
-	 */
-	int (*set_iovec_ptrs)(struct se_map_sg *, struct se_unmap_sg *);
 	/*
 	 * write_pending():
 	 */
