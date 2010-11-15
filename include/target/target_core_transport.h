@@ -198,7 +198,6 @@ extern void transport_generic_request_failure(struct se_cmd *, struct se_device 
 						int, int);
 extern void transport_direct_request_timeout(struct se_cmd *);
 extern void transport_generic_request_timeout(struct se_cmd *);
-extern int transport_generic_allocate_buf(struct se_cmd *, u32, u32);
 extern int __transport_execute_tasks(struct se_device *);
 extern void transport_new_cmd_failure(struct se_cmd *);
 extern void transport_set_supported_SAM_opcode(struct se_cmd *);
@@ -386,22 +385,6 @@ struct se_subsystem_api {
 	 */
 	int (*transport_complete)(struct se_task *task);
 	struct se_task *(*alloc_task)(struct se_cmd *);
-	/*
-	 * allocate_buf():
-	 */
-	int (*allocate_buf)(struct se_cmd *, u32, u32);
-	/*
-	 * allocate_DMA();
-	 */
-	int (*allocate_DMA)(struct se_cmd *, u32, u32);
-	/*
-	 * free_buf():
-	 */
-	void (*free_buf)(struct se_cmd *);
-	/*
-	 * free_DMA():
-	 */
-	void (*free_DMA)(struct se_cmd *);
 	/*
 	 * do_task():
 	 */

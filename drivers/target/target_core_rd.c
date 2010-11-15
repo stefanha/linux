@@ -900,11 +900,6 @@ static int rd_DIRECT_do_se_mem_map(
 	 * we setup struct se_task->task_sg[], as it will be used by
 	 * transport_do_task_sg_chain() for creating chainged SGLs
 	 * across multiple struct se_task->task_sg[].
-	 *
-	 * Note that kfree(task->task_sg); does not need to be called
-	 * in rd_DIRECT_free_DMA(), because transport_free_dev_tasks()
-	 * will already be taking care of this for all TCM subsystem
-	 * plugins.
 	 */
 	if (!(transport_calc_sg_num(task,
 			list_entry(T_TASK(cmd)->t_mem_list->next,
@@ -916,49 +911,6 @@ static int rd_DIRECT_do_se_mem_map(
 			list_entry(T_TASK(cmd)->t_mem_list->next,
 				   struct se_mem, se_list),
 			out_se_mem, se_mem_cnt, task_offset_in);
-}
-
-/*	rd_DIRECT_free_DMA():
- *
- *
- */
-static void rd_DIRECT_free_DMA(struct se_cmd *cmd)
-{
-	struct se_mem *se_mem, *se_mem_tmp;
-
-	if (!(T_TASK(cmd)->t_mem_list))
-		return;
-	/*
-	 * The scatterlists in the RAMDISK DIRECT case are using the pages
-	 * from the rd_device_t's scatterlist table. They are referencing
-	 * valid memory that is held within the RD transport plugin, so we
-	 * only free the struct se_mem elements.
-	 */
-	list_for_each_entry_safe(se_mem, se_mem_tmp, T_TASK(cmd)->t_mem_list,
-				se_list) {
-		 list_del(&se_mem->se_list);
-		 kmem_cache_free(se_mem_cache, se_mem);
-	}
-	kfree(T_TASK(cmd)->t_mem_list);
-	T_TASK(cmd)->t_mem_list = NULL;
-	T_TASK(cmd)->t_tasks_se_num = 0;
-}
-
-/*	rd_DIRECT_allocate_DMA():
- *
- *	Note that rd_DIRECT_do_se_mem_map() actually does the real work.
- */
-static int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
-{
-	T_TASK(cmd)->t_mem_list = kzalloc(sizeof(struct list_head), GFP_KERNEL);
-	if (!(T_TASK(cmd)->t_mem_list)) {
-		printk(KERN_ERR "Unable to allocate memory for T_TASK(cmd)"
-				"->t_mem_list\n");
-		return -1;
-	}
-	INIT_LIST_HEAD(T_TASK(cmd)->t_mem_list);
-
-	return 0;
 }
 
 /*	rd_DIRECT_do_task(): (Part of se_subsystem_api_t template)
@@ -1263,8 +1215,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.create_virtdevice	= rd_DIRECT_create_virtdevice,
 	.free_device		= rd_free_device,
 	.transport_complete	= rd_transport_complete,
-	.allocate_DMA		= rd_DIRECT_allocate_DMA,
-	.free_DMA		= rd_DIRECT_free_DMA,
 	.alloc_task		= rd_alloc_task,
 	.do_task		= rd_DIRECT_do_task,
 	.free_task		= rd_free_task,
