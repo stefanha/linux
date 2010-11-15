@@ -1,29 +1,16 @@
 config LIO_TARGET
-        tristate "Linux-iSCSI.org iSCSI Target Mode Stack"
-        default m
-        depends on TARGET_CORE
-	select CONFIGFS_FS
-        ---help---
-        Say Y here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI Target Mode Stack
-
-config LIO_TARGET_SNMP
-	tristate "LIO-Target iSCSI MIBs"
-	default y
-	depends on LIO_TARGET && PROC_FS
-	---help---
-	Say Y here to enable the iSCSI MIBs via procfs for LIO-Target.
+	tristate "Linux-iSCSI.org iSCSI Target Mode Stack"
+	help
+	Say Y here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI
+	Target Mode Stack.
 
 config LIO_TARGET_DEBUG
-	tristate "LIO-Target iscsi_debug.h ring buffer messages" 
-	default n
-	depends on LIO_TARGET
-	---help---
+	bool "LIO-Target iscsi_debug.h ring buffer messages"
+	help
 	Say Y here to enable the legacy DEBUG_ISCSI macros in iscsi_debug.h
 
 config LIO_TARGET_DEBUG_ERL
-	tristate "LIO-Target ErrorRecoveryLevel debug code"
-	default n
-	depends on LIO_TARGET
-	---help---
-	Say Y here to enable the iSCSI ErrorRecoveryLevel debugging code
+	bool "LIO-Target ErrorRecoveryLevel debug code"
+	help
+	Say Y here to enable the iSCSI ErrorRecoveryLevel debugging code.
 	
