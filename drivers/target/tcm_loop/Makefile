@@ -1,6 +1,6 @@
 EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/drivers/scsi/ -I$(srctree)/include/scsi/ -I$(srctree)/drivers/target/tcm_loop/
 
-tcm_loop-objs			:= tcm_loop_fabric.o \
+tcm_loop-y			:= tcm_loop_fabric.o \
 				   tcm_loop_fabric_scsi.o \
 				   tcm_loop_configfs.o \
 

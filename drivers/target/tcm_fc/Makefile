@@ -3,8 +3,7 @@ EXTRA_CFLAGS += -I$(srctree)/drivers/target/ \
 		-I$(srctree)/include/scsi/ \
 		-I$(srctree)/drivers/target/tcm_fc/
 
-tcm_fc-objs := \
-		tfc_cmd.o \
+tcm_fc-y +=	tfc_cmd.o \
 		tfc_conf.o \
 		tfc_io.o \
 		tfc_sess.o
