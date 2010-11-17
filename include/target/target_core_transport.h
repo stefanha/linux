@@ -410,14 +410,6 @@ struct se_subsystem_api {
 	ssize_t (*show_configfs_dev_params)(struct se_hba *, struct se_subsystem_dev *,
 						char *);
 	/*
-	 * plugin_init():
-	 */
-	int (*plugin_init)(void);
-	/*
-	 * plugin_free():
-	 */
-	void (*plugin_free)(void);
-	/*
 	 * get_plugin_info():
 	 */
 	void (*get_plugin_info)(void *, char *, int *);

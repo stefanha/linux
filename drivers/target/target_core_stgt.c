@@ -113,49 +113,6 @@ static void stgt_release_adapter(struct device *dev)
 	kfree(stgt_hba);
 }
 
-static int stgt_plugin_init(void)
-{
-	int ret;
-
-	ret = device_register(&stgt_primary);
-	if (ret) {
-		printk(KERN_ERR "device_register() failed for stgt_primary\n");
-		return ret;
-	}
-
-	ret = bus_register(&stgt_lld_bus);
-	if (ret) {
-		printk(KERN_ERR "bus_register() failed for stgt_ldd_bus\n");
-		goto dev_unreg;
-	}
-
-	ret = driver_register(&stgt_driverfs_driver);
-	if (ret) {
-		printk(KERN_ERR "driver_register() failed for"
-			" stgt_driverfs_driver\n");
-		goto bus_unreg;
-	}
-	stgt_host_no_cnt = 0;
-
-	printk(KERN_INFO "CORE_STGT[0]: Bus Initalization complete\n");
-	return 0;
-
-bus_unreg:
-	bus_unregister(&stgt_lld_bus);
-dev_unreg:
-	device_unregister(&stgt_primary);
-	return ret;
-}
-
-static void stgt_plugin_free(void)
-{
-	driver_unregister(&stgt_driverfs_driver);
-	bus_unregister(&stgt_lld_bus);
-	device_unregister(&stgt_primary);
-
-	printk(KERN_INFO "CORE_STGT[0]: Bus release complete\n");
-}
-
 /*	stgt_attach_hba():
  *
  */
@@ -680,8 +637,6 @@ static struct se_subsystem_api stgt_template = {
 	.check_configfs_dev_params = stgt_check_configfs_dev_params,
 	.set_configfs_dev_params = stgt_set_configfs_dev_params,
 	.show_configfs_dev_params = stgt_show_configfs_dev_params,
-	.plugin_init		= stgt_plugin_init,
-	.plugin_free		= stgt_plugin_free,
 	.get_plugin_info	= stgt_get_plugin_info,
 	.get_hba_info		= stgt_get_hba_info,
 	.check_lba		= stgt_check_lba,
@@ -694,12 +649,48 @@ static struct se_subsystem_api stgt_template = {
 
 static int __init stgt_module_init(void)
 {
-	return transport_subsystem_register(&stgt_template);
+	int ret;
+
+	ret = device_register(&stgt_primary);
+	if (ret) {
+		printk(KERN_ERR "device_register() failed for stgt_primary\n");
+		return ret;
+	}
+
+	ret = bus_register(&stgt_lld_bus);
+	if (ret) {
+		printk(KERN_ERR "bus_register() failed for stgt_ldd_bus\n");
+		goto out_unregister_device;
+	}
+
+	ret = driver_register(&stgt_driverfs_driver);
+	if (ret) {
+		printk(KERN_ERR "driver_register() failed for"
+			" stgt_driverfs_driver\n");
+		goto out_unregister_bus;
+	}
+
+	ret = transport_subsystem_register(&stgt_template);
+	if (ret)
+		goto out_unregister_driver;
+
+	return 0;
+out_unregister_driver:
+	driver_unregister(&stgt_driverfs_driver);
+out_unregister_bus:
+	bus_unregister(&stgt_lld_bus);
+out_unregister_device:
+	device_unregister(&stgt_primary);
+	return ret;
 }
 
 static void stgt_module_exit(void)
 {
 	transport_subsystem_release(&stgt_template);
+
+	driver_unregister(&stgt_driverfs_driver);
+	bus_unregister(&stgt_lld_bus);
+	device_unregister(&stgt_primary);
 }
 
 MODULE_DESCRIPTION("TCM STGT subsystem plugin");
