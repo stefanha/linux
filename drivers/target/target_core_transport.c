@@ -2257,6 +2257,7 @@ static struct se_task *transport_generic_get_task(
 	task->task_no = T_TASK(cmd)->t_tasks_no++;
 	task->task_se_cmd = cmd;
 	task->se_dev = dev;
+	task->task_data_direction = data_direction;
 
 	DEBUG_SO("se_obj_ptr: %p\n", se_obj_ptr);
 
@@ -2267,28 +2268,6 @@ static struct se_task *transport_generic_get_task(
 	task->se_obj_ptr = se_obj_ptr;
 
 	return task;
-}
-
-static inline map_func_t transport_dev_get_map_SG(
-	struct se_device *dev,
-	int rw)
-{
-	return (rw == DMA_TO_DEVICE) ? dev->transport->cdb_write_SG :
-		dev->transport->cdb_read_SG;
-}
-
-static inline map_func_t transport_dev_get_map_non_SG(
-	struct se_device *dev,
-	int rw)
-{
-	return (rw == DMA_TO_DEVICE) ? dev->transport->cdb_write_non_SG :
-		dev->transport->cdb_read_non_SG;
-}
-
-static inline map_func_t transport_dev_get_map_none(
-	struct se_device *dev)
-{
-	return dev->transport->cdb_none;
 }
 
 static int transport_process_data_sg_transform(
@@ -2333,8 +2312,7 @@ static int transport_process_control_sg_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = transport_dev_get_map_SG(ti->se_obj_ptr,
-				cmd->data_direction);
+	task->transport_map_task = ti->se_obj_ptr->transport->map_task_SG;
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
@@ -2375,8 +2353,7 @@ static int transport_process_control_nonsg_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = transport_dev_get_map_non_SG(ti->se_obj_ptr,
-				cmd->data_direction);
+	task->transport_map_task = ti->se_obj_ptr->transport->map_task_non_SG;
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
@@ -2411,7 +2388,7 @@ static int transport_process_non_data_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = transport_dev_get_map_none(ti->se_obj_ptr);
+	task->transport_map_task = ti->se_obj_ptr->transport->cdb_none;
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
@@ -5994,8 +5971,8 @@ u32 transport_generic_get_cdb_count(
 		sectors -= task->task_sectors;
 		task->task_size = (task->task_sectors *
 				   DEV_ATTRIB(dev)->block_size);
-		task->transport_map_task = transport_dev_get_map_SG(dev,
-					data_direction);
+
+		task->transport_map_task = dev->transport->map_task_SG;
 
 		cdb = TRANSPORT(dev)->get_cdb(task);
 		if ((cdb)) {
@@ -6139,9 +6116,11 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 		if (atomic_read(&task->task_sent))
 			continue;
 
-		ret = task->transport_map_task(task, task->task_size);
-		if (ret < 0)
-			goto failure;
+		if (task->transport_map_task) {
+			ret = task->transport_map_task(task);
+			if (ret < 0)
+				goto failure;
+		}
 	}
 
 	/*

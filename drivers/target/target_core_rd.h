@@ -14,10 +14,6 @@
 #define RD_BLOCKSIZE		512
 #define RD_MAX_SECTORS		1024
 
-#define RD_DATA_READ		1
-#define RD_DATA_WRITE		2
-#define RD_DATA_NONE		3
-
 extern struct se_global *se_global;
 
 extern struct kmem_cache *se_mem_cache;
@@ -34,12 +30,6 @@ struct rd_request {
 
 	/* SCSI CDB from iSCSI Command PDU */
 	unsigned char	rd_scsi_cdb[TCM_MAX_COMMAND_SIZE];
-	/* Data Direction */
-	u8		rd_data_direction;
-	/* Total length of request */
-	u32		rd_bufflen;
-	/* RD request flags */
-	u32		rd_req_flags;
 	/* Offset from start of page */
 	u32		rd_offset;
 	/* Starting page in Ramdisk for request */
@@ -47,13 +37,7 @@ struct rd_request {
 	/* Total number of pages needed for request */
 	u32		rd_page_count;
 	/* Scatterlist count */
-	u32		rd_sg_count;
 	u32		rd_size;
-	/* Logical Block Address */
-	unsigned long long	rd_lba;
-	 /* Data buffer containing scatterlists(s) or
-	  * contiguous memory segments */
-	void		*rd_buf;
 	/* Ramdisk device */
 	struct rd_dev	*rd_dev;
 } ____cacheline_aligned;

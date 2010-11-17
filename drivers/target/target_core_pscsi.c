@@ -741,7 +741,8 @@ static int pscsi_blk_get_request(struct se_task *task)
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 
 	pt->pscsi_req = blk_get_request(pdv->pdv_sd->request_queue,
-			(pt->pscsi_direction == DMA_TO_DEVICE), GFP_KERNEL);
+			(task->task_data_direction == DMA_TO_DEVICE),
+			GFP_KERNEL);
 	if (!(pt->pscsi_req) || IS_ERR(pt->pscsi_req)) {
 		printk(KERN_ERR "PSCSI: blk_get_request() failed: %ld\n",
 				IS_ERR(pt->pscsi_req));
@@ -1015,7 +1016,7 @@ static int __pscsi_map_task_SG(
 	int nr_pages = (task->task_size + task_sg[0].offset +
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int nr_vecs = 0, rc, ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-	int rw = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
+	int rw = (task->task_data_direction == DMA_TO_DEVICE);
 
 	if (!task->task_size)
 		return 0;
@@ -1152,22 +1153,24 @@ fail:
 static int pscsi_map_task_SG(struct se_task *task)
 {
 	int ret;
+
 	/*
 	 * Setup the main struct request for the task->task_sg[] payload
 	 */
 
 	ret = __pscsi_map_task_SG(task, task->task_sg, task->task_sg_num, 0);
-	if (ret < 0)
-		return ret;
+	if (ret >= 0 && task->task_sg_bidi) {
+		/*
+		 * If present, set up the extra BIDI-COMMAND SCSI READ
+		 * struct request and payload.
+		 */
+		ret = __pscsi_map_task_SG(task, task->task_sg_bidi,
+					task->task_sg_num, 1);
+	}
 
-	if (!(task->task_sg_bidi))
-		return ret;
-	/*
-	 * If present, set up the extra BIDI-COMMAND SCSI READ
-	 * struct request and payload.
-	 */
-	return __pscsi_map_task_SG(task, task->task_sg_bidi,
-				task->task_sg_num, 1);
+	if (ret < 0)
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	return 0;
 }
 
 /*	pscsi_map_task_non_SG():
@@ -1180,6 +1183,9 @@ static int pscsi_map_task_non_SG(struct se_task *task)
 	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 	int ret = 0;
+
+	if (pscsi_blk_get_request(task) < 0)
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	if (!task->task_size)
 		return 0;
@@ -1194,83 +1200,9 @@ static int pscsi_map_task_non_SG(struct se_task *task)
 	return 0;
 }
 
-static int pscsi_CDB_none(struct se_task *task, u32 size)
+static int pscsi_CDB_none(struct se_task *task)
 {
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_NONE;
-
 	return pscsi_blk_get_request(task);
-}
-
-/*	pscsi_CDB_read_non_SG():
- *
- *
- */
-static int pscsi_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_FROM_DEVICE;
-
-	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return pscsi_map_task_non_SG(task);
-}
-
-/*	pscsi_CDB_read_SG():
- *
- *
- */
-static int pscsi_CDB_read_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_FROM_DEVICE;
-	/*
-	 * pscsi_map_task_SG() calls block/blk-core.c:blk_make_request()
-	 * for >= v2.6.31 pSCSI
-	 */
-	if (pscsi_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
-}
-
-/*	pscsi_CDB_write_non_SG():
- *
- *
- */
-static int pscsi_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_TO_DEVICE;
-
-	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return pscsi_map_task_non_SG(task);
-}
-
-/*	pscsi_CDB_write_SG():
- *
- *
- */
-static int pscsi_CDB_write_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_TO_DEVICE;
-	/*
-	 * pscsi_map_task_SG() calls block/blk-core.c:blk_make_request()
-	 * for >= v2.6.31 pSCSI
-	 */
-	if (pscsi_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
 }
 
 /*	pscsi_check_lba():
@@ -1280,15 +1212,6 @@ static int pscsi_CDB_write_SG(struct se_task *task, u32 size)
 static int pscsi_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
-}
-
-/*	pscsi_check_for_SG():
- *
- *
- */
-static int pscsi_check_for_SG(struct se_task *task)
-{
-	return task->task_sg_num;
 }
 
 /*	pscsi_get_cdb():
@@ -1406,10 +1329,8 @@ static struct se_subsystem_api pscsi_template = {
 	.type			= PSCSI,
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,
 	.cdb_none		= pscsi_CDB_none,
-	.cdb_read_non_SG	= pscsi_CDB_read_non_SG,
-	.cdb_read_SG		= pscsi_CDB_read_SG,
-	.cdb_write_non_SG	= pscsi_CDB_write_non_SG,
-	.cdb_write_SG		= pscsi_CDB_write_SG,
+	.map_task_non_SG	= pscsi_map_task_non_SG,
+	.map_task_SG		= pscsi_map_task_SG,
 	.attach_hba		= pscsi_attach_hba,
 	.detach_hba		= pscsi_detach_hba,
 	.pmode_enable_hba	= pscsi_pmode_enable_hba,
@@ -1426,7 +1347,6 @@ static struct se_subsystem_api pscsi_template = {
 	.get_plugin_info	= pscsi_get_plugin_info,
 	.get_hba_info		= pscsi_get_hba_info,
 	.check_lba		= pscsi_check_lba,
-	.check_for_SG		= pscsi_check_for_SG,
 	.get_cdb		= pscsi_get_cdb,
 	.get_sense_buffer	= pscsi_get_sense_buffer,
 	.get_device_rev		= pscsi_get_device_rev,

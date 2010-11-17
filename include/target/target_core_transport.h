@@ -303,23 +303,15 @@ struct se_subsystem_api {
 	/*
 	 * For SCF_SCSI_NON_DATA_CDB
 	 */
-	int (*cdb_none)(struct se_task *, u32);
+	int (*cdb_none)(struct se_task *);
 	/*
-	 * For READ SCF_SCSI_CONTROL_NONSG_IO_CDB
+	 * For SCF_SCSI_CONTROL_NONSG_IO_CDB
 	 */
-	int (*cdb_read_non_SG)(struct se_task *, u32);
+	int (*map_task_non_SG)(struct se_task *);
 	/*
-	 * For READ SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
+	 * For SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
 	 */
-	int (*cdb_read_SG)(struct se_task *, u32);
-	/*
-	 * For WRITE SCF_SCSI_CONTROL_NONSG_IO_CDB
-	 */
-	int (*cdb_write_non_SG)(struct se_task *, u32);
-	/*
-	 * For WRITE SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
-	 */
-	int (*cdb_write_SG)(struct se_task *, u32);
+	int (*map_task_SG)(struct se_task *);
 	/*
 	 * attach_hba():
 	 */
@@ -437,10 +429,6 @@ struct se_subsystem_api {
 	 * check_lba():
 	 */
 	int (*check_lba)(unsigned long long lba, struct se_device *);
-	/*
-	 * check_for_SG():
-	 */
-	int (*check_for_SG)(struct se_task *);
 	/*
 	 * get_cdb():
 	 */

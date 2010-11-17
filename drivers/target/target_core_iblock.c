@@ -412,7 +412,7 @@ static int iblock_do_task(struct se_task *task)
 	struct bio *bio = req->ib_bio, *nbio = NULL;
 	int rw;
 
-	if (TASK_CMD(task)->data_direction == DMA_TO_DEVICE) {
+	if (task->task_data_direction == DMA_TO_DEVICE) {
 		/*
 		 * Force data to disk if we pretend to not have a volatile
 		 * write cache, or the initiator set the Force Unit Access bit.
@@ -710,7 +710,7 @@ again:
 				" %u\n", task, bio->bi_vcnt);
 	}
 
-	return task->task_sg_num;
+	return 0;
 fail:
 	while (hbio) {
 		bio = hbio;
@@ -721,39 +721,9 @@ fail:
 	return ret;
 }
 
-static int iblock_CDB_none(struct se_task *task, u32 size)
-{
-	return 0;
-}
-
-static int iblock_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	return 0;
-}
-
-static int iblock_CDB_read_SG(struct se_task *task, u32 size)
-{
-	return iblock_map_task_SG(task);
-}
-
-static int iblock_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	return 0;
-}
-
-static int iblock_CDB_write_SG(struct se_task *task, u32 size)
-{
-	return iblock_map_task_SG(task);
-}
-
 static int iblock_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
-}
-
-static int iblock_check_for_SG(struct se_task *task)
-{
-	return task->task_sg_num;
 }
 
 static unsigned char *iblock_get_cdb(struct se_task *task)
@@ -838,11 +808,7 @@ static struct se_subsystem_api iblock_template = {
 	.owner			= THIS_MODULE,
 	.type			= IBLOCK,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.cdb_none		= iblock_CDB_none,
-	.cdb_read_non_SG	= iblock_CDB_read_non_SG,
-	.cdb_read_SG		= iblock_CDB_read_SG,
-	.cdb_write_non_SG	= iblock_CDB_write_non_SG,
-	.cdb_write_SG		= iblock_CDB_write_SG,
+	.map_task_SG		= iblock_map_task_SG,
 	.attach_hba		= iblock_attach_hba,
 	.detach_hba		= iblock_detach_hba,
 	.allocate_virtdevice	= iblock_allocate_virtdevice,
@@ -864,7 +830,6 @@ static struct se_subsystem_api iblock_template = {
 	.get_plugin_info	= iblock_get_plugin_info,
 	.get_hba_info		= iblock_get_hba_info,
 	.check_lba		= iblock_check_lba,
-	.check_for_SG		= iblock_check_for_SG,
 	.get_cdb		= iblock_get_cdb,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,

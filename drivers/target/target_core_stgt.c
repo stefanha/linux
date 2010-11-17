@@ -383,7 +383,8 @@ static int stgt_do_task(struct se_task *task)
 	struct scsi_cmnd *sc;
 	int tag = MSG_SIMPLE_TAG;
 
-	sc = scsi_host_get_command(sh, st->stgt_direction, GFP_KERNEL);
+	sc = scsi_host_get_command(sh, task->task_data_direction,
+				   GFP_KERNEL);
 	if (!sc) {
 		printk(KERN_ERR "Unable to allocate memory for struct"
 			" scsi_cmnd\n");
@@ -532,88 +533,6 @@ static ssize_t stgt_show_configfs_dev_params(
 	return bl;
 }
 
-/*      stgt_map_task_SG():
- *
- *
- */
-static int stgt_map_task_SG(struct se_task *task)
-{
-	return 0;
-}
-
-/*	stgt_map_task_non_SG():
- *
- *
- */
-static int stgt_map_task_non_SG(struct se_task *task)
-{
-	return 0;
-}
-
-static int stgt_CDB_none(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_NONE;
-	return 0;
-}
-
-/*	stgt_CDB_read_non_SG():
- *
- *
- */
-static int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_FROM_DEVICE;
-	return stgt_map_task_non_SG(task);
-}
-
-/*	stgt_CDB_read_SG():
- *
- *
- */
-static int stgt_CDB_read_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_FROM_DEVICE;
-
-	if (stgt_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
-}
-
-/*	stgt_CDB_write_non_SG():
- *
- *
- */
-static int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_TO_DEVICE;
-	return stgt_map_task_non_SG(task);
-}
-
-/*	stgt_CDB_write_SG():
- *
- *
- */
-static int stgt_CDB_write_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_TO_DEVICE;
-
-	if (stgt_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
-}
-
 /*	stgt_check_lba():
  *
  *
@@ -621,15 +540,6 @@ static int stgt_CDB_write_SG(struct se_task *task, u32 size)
 static int stgt_check_lba(unsigned long long lba, struct se_device *dev)
 {
 	return 0;
-}
-
-/*	stgt_check_for_SG():
- *
- *
- */
-static int stgt_check_for_SG(struct se_task *task)
-{
-	return task->task_sg_num;
 }
 
 /*	stgt_get_cdb():
@@ -758,11 +668,6 @@ static struct se_subsystem_api stgt_template = {
 	.owner			= THIS_MODULE,
 	.type			= STGT,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.cdb_none		= stgt_CDB_none,
-	.cdb_read_non_SG	= stgt_CDB_read_non_SG,
-	.cdb_read_SG		= stgt_CDB_read_SG,
-	.cdb_write_non_SG	= stgt_CDB_write_non_SG,
-	.cdb_write_SG		= stgt_CDB_write_SG,
 	.attach_hba		= stgt_attach_hba,
 	.detach_hba		= stgt_detach_hba,
 	.allocate_virtdevice	= stgt_allocate_virtdevice,
@@ -780,7 +685,6 @@ static struct se_subsystem_api stgt_template = {
 	.get_plugin_info	= stgt_get_plugin_info,
 	.get_hba_info		= stgt_get_hba_info,
 	.check_lba		= stgt_check_lba,
-	.check_for_SG		= stgt_check_for_SG,
 	.get_cdb		= stgt_get_cdb,
 	.get_sense_buffer	= stgt_get_sense_buffer,
 	.get_device_rev		= stgt_get_device_rev,

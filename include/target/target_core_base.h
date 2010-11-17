@@ -488,6 +488,7 @@ struct se_task {
 	u32		task_size;
 	u32		task_sg_num;
 	u32		task_sg_offset;
+	enum dma_data_direction	task_data_direction;
 	struct se_cmd *task_se_cmd;
 	struct se_device	*se_dev;
 	struct completion	task_stop_comp;
@@ -498,7 +499,7 @@ struct se_task {
 	atomic_t	task_stop;
 	atomic_t	task_state_active;
 	struct timer_list	task_timer;
-	int (*transport_map_task)(struct se_task *, u32);
+	int (*transport_map_task)(struct se_task *);
 	struct se_device *se_obj_ptr;
 	struct list_head t_list;
 	struct list_head t_execute_list;
