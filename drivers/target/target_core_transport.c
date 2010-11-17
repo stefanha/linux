@@ -2593,7 +2593,7 @@ int transport_generic_allocate_tasks(
 						GFP_KERNEL);
 		if (!(T_TASK(cmd)->t_task_cdb)) {
 			printk(KERN_ERR "Unable to allocate T_TASK(cmd)->t_task_cdb"
-				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %u ops\n",
+				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %lu ops\n",
 				scsi_command_size(cdb), sizeof(T_TASK(cmd)->__t_task_cdb));
 			return -1;
 		}
