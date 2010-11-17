@@ -338,21 +338,7 @@ struct se_subsystem_api {
 	 * free_device():
 	 */
 	void (*free_device)(void *);
-	/*
-	 * cmd_sequencer():
-	 *
-	 * Use transport_generic_cmd_sequencer() for majority of DAS transport
-	 * drivers with a scsi_transport_spc_t struct as mentioned below.
-	 * Provided out of convenience.
-	 */
-	int (*cmd_sequencer)(struct se_cmd *cmd);
-	/*
-	 * do_tmr():
-	 *
-	 * Use transport_do_tmr() for majority of DAS transport drivers.
-	 * Provided out of convenience.
-	 */
-	int (*do_tmr)(struct se_cmd *cmd);
+
 	/*
 	 * dpo_emulated():
 	 */
@@ -410,18 +396,6 @@ struct se_subsystem_api {
 	ssize_t (*show_configfs_dev_params)(struct se_hba *, struct se_subsystem_dev *,
 						char *);
 	/*
-	 * get_plugin_info():
-	 */
-	void (*get_plugin_info)(void *, char *, int *);
-	/*
-	 * get_hba_info():
-	 */
-	void (*get_hba_info)(struct se_hba *, char *, int *);
-	/*
-	 * check_lba():
-	 */
-	int (*check_lba)(unsigned long long lba, struct se_device *);
-	/*
 	 * get_cdb():
 	 */
 	unsigned char *(*get_cdb)(struct se_task *);
@@ -438,10 +412,6 @@ struct se_subsystem_api {
 	 */
 	u32 (*get_dma_length)(u32, struct se_device *);
 	/*
-	 * get_max_cdbs():
-	 */
-	u32 (*get_max_cdbs)(struct se_device *);
-	/*
 	 * Get the sector_t from a subsystem backstore..
 	 */
 	sector_t (*get_blocks)(struct se_device *);
@@ -454,14 +424,6 @@ struct se_subsystem_api {
 	 * get_sense_buffer():
 	 */
 	unsigned char *(*get_sense_buffer)(struct se_task *);
-	/*
-	 * map_task_to_SG():
-	 */
-	void (*map_task_to_SG)(struct se_task *);
-	/*
-	 * write_pending():
-	 */
-	int (*write_pending)(struct se_task *);
 } ____cacheline_aligned;
 
 #define TRANSPORT(dev)		((dev)->transport)

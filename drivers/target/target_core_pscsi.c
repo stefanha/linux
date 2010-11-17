@@ -905,24 +905,6 @@ static ssize_t pscsi_check_configfs_dev_params(
 	return 0;
 }
 
-static void pscsi_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM SCSI Plugin %s\n", PSCSI_VERSION);
-}
-
-static void pscsi_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct pscsi_hba_virt *phv = hba->hba_ptr;
-	struct Scsi_Host *sh = phv->phv_lld_host;
-
-	*bl += sprintf(b + *bl, "Core Host ID: %u  PHV Host ID: %u\n",
-		 hba->hba_id, phv->phv_host_id);
-	if (sh)
-		*bl += sprintf(b + *bl, "        SCSI HBA ID %u: %s  <local>\n",
-			sh->host_no, (sh->hostt->name) ?
-			(sh->hostt->name) : "Unknown");
-}
-
 static ssize_t pscsi_show_configfs_dev_params(
         struct se_hba *hba,
         struct se_subsystem_dev *se_dev,
@@ -1205,15 +1187,6 @@ static int pscsi_CDB_none(struct se_task *task)
 	return pscsi_blk_get_request(task);
 }
 
-/*	pscsi_check_lba():
- *
- *
- */
-static int pscsi_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
-}
-
 /*	pscsi_get_cdb():
  *
  *
@@ -1344,9 +1317,6 @@ static struct se_subsystem_api pscsi_template = {
 	.check_configfs_dev_params = pscsi_check_configfs_dev_params,
 	.set_configfs_dev_params = pscsi_set_configfs_dev_params,
 	.show_configfs_dev_params = pscsi_show_configfs_dev_params,
-	.get_plugin_info	= pscsi_get_plugin_info,
-	.get_hba_info		= pscsi_get_hba_info,
-	.check_lba		= pscsi_check_lba,
 	.get_cdb		= pscsi_get_cdb,
 	.get_sense_buffer	= pscsi_get_sense_buffer,
 	.get_device_rev		= pscsi_get_device_rev,

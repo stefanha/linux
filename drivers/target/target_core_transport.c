@@ -1458,15 +1458,6 @@ static void transport_release_all_cmds(struct se_device *dev)
 #endif
 }
 
-/*	transport_dev_write_pending_nop():
- *
- *
- */
-static int transport_dev_write_pending_nop(struct se_task *task)
-{
-	return 0;
-}
-
 static int transport_get_inquiry(
 	struct t10_wwn *wwn,
 	void *obj_ptr)
@@ -2052,9 +2043,6 @@ struct se_device *transport_add_device_to_core_hba(
 	atomic_set(&dev->dev_ordered_id, 0);
 
 	se_dev_set_default_attribs(dev, dev_limits);
-
-	dev->write_pending = (transport->write_pending) ?
-		transport->write_pending : &transport_dev_write_pending_nop;
 
 	dev->dev_index = scsi_get_new_index(SCSI_DEVICE_INDEX);
 	dev->creation_time = get_jiffies_64();

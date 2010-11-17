@@ -1003,25 +1003,6 @@ static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	return 0;
 }
 
-static void rd_dr_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM RAMDISK_DR Plugin %s\n", RD_DR_VERSION);
-}
-
-static void rd_mcp_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM RAMDISK_MCP Plugin %s\n", RD_MCP_VERSION);
-}
-
-static void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct rd_host *rd_host = (struct rd_host *)hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "SE Host ID: %u  RD Host ID: %u\n",
-		hba->hba_id, rd_host->rd_host_id);
-	*bl += sprintf(b + *bl, "        TCM RamDisk HBA\n");
-}
-
 static ssize_t rd_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -1035,25 +1016,6 @@ static ssize_t rd_show_configfs_dev_params(
 			"  SG_table_count: %u\n", rd_dev->rd_page_count,
 			PAGE_SIZE, rd_dev->sg_table_count);
 	return bl;
-}
-
-/*	rd_DIRECT_check_lba():
- *
- *
- */
-static int rd_DIRECT_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return ((do_div(lba, PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
-		 DEV_ATTRIB(dev)->block_size) ? 1 : 0;
-}
-
-/*	rd_MEMCPY_check_lba():
- *
- *
- */
-static int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
 }
 
 /*	rd_get_cdb(): (Part of se_subsystem_api_t template)
@@ -1111,9 +1073,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.check_configfs_dev_params = rd_check_configfs_dev_params,
 	.set_configfs_dev_params = rd_set_configfs_dev_params,
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
-	.get_plugin_info	= rd_dr_get_plugin_info,
-	.get_hba_info		= rd_get_hba_info,
-	.check_lba		= rd_DIRECT_check_lba,
 	.get_cdb		= rd_get_cdb,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
@@ -1138,9 +1097,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.check_configfs_dev_params = rd_check_configfs_dev_params,
 	.set_configfs_dev_params = rd_set_configfs_dev_params,
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
-	.get_plugin_info	= rd_mcp_get_plugin_info,
-	.get_hba_info		= rd_get_hba_info,
-	.check_lba		= rd_MEMCPY_check_lba,
 	.get_cdb		= rd_get_cdb,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,

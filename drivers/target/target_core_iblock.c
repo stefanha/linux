@@ -544,20 +544,6 @@ static ssize_t iblock_check_configfs_dev_params(
 	return 0;
 }
 
-static void iblock_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM iBlock Plugin %s\n", IBLOCK_VERSION);
-}
-
-static void iblock_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct iblock_hba *ib_host = (struct iblock_hba *)hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "SE Host ID: %u  iBlock Host ID: %u\n",
-		hba->hba_id, ib_host->iblock_host_id);
-	*bl += sprintf(b + *bl, "        TCM iBlock HBA\n");
-}
-
 static ssize_t iblock_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -721,11 +707,6 @@ fail:
 	return ret;
 }
 
-static int iblock_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
-}
-
 static unsigned char *iblock_get_cdb(struct se_task *task)
 {
 	return IBLOCK_REQ(task)->ib_scsi_cdb;
@@ -827,9 +808,6 @@ static struct se_subsystem_api iblock_template = {
 	.check_configfs_dev_params = iblock_check_configfs_dev_params,
 	.set_configfs_dev_params = iblock_set_configfs_dev_params,
 	.show_configfs_dev_params = iblock_show_configfs_dev_params,
-	.get_plugin_info	= iblock_get_plugin_info,
-	.get_hba_info		= iblock_get_hba_info,
-	.check_lba		= iblock_check_lba,
 	.get_cdb		= iblock_get_cdb,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,

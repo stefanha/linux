@@ -459,22 +459,6 @@ static ssize_t stgt_check_configfs_dev_params(
 	return 0;
 }
 
-static void stgt_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM STGT <-> Target_Core_Mod Plugin %s\n",
-		STGT_VERSION);
-}
-
-static void stgt_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct Scsi_Host *sh = hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "Core Host ID: %u  SCSI Host ID: %u\n",
-			 hba->hba_id, sh->host_no);
-	*bl += sprintf(b + *bl, "        SCSI HBA: %s  <local>\n",
-		(sh->hostt->name) ? (sh->hostt->name) : "Unknown");
-}
-
 static ssize_t stgt_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -488,15 +472,6 @@ static ssize_t stgt_show_configfs_dev_params(
 		sdv->sdv_channel_id, sdv->sdv_target_id, sdv->sdv_lun_id);
 
 	return bl;
-}
-
-/*	stgt_check_lba():
- *
- *
- */
-static int stgt_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
 }
 
 /*	stgt_get_cdb():
@@ -637,9 +612,6 @@ static struct se_subsystem_api stgt_template = {
 	.check_configfs_dev_params = stgt_check_configfs_dev_params,
 	.set_configfs_dev_params = stgt_set_configfs_dev_params,
 	.show_configfs_dev_params = stgt_show_configfs_dev_params,
-	.get_plugin_info	= stgt_get_plugin_info,
-	.get_hba_info		= stgt_get_hba_info,
-	.check_lba		= stgt_check_lba,
 	.get_cdb		= stgt_get_cdb,
 	.get_sense_buffer	= stgt_get_sense_buffer,
 	.get_device_rev		= stgt_get_device_rev,

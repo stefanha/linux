@@ -611,20 +611,6 @@ static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	return 0;
 }
 
-static void fd_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM FILEIO Plugin %s\n", FD_VERSION);
-}
-
-static void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct fd_host *fd_host = (struct fd_host *)hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "SE Host ID: %u  FD Host ID: %u\n",
-		 hba->hba_id, fd_host->fd_host_id);
-	*bl += sprintf(b + *bl, "        TCM FILEIO HBA\n");
-}
-
 static ssize_t fd_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -639,15 +625,6 @@ static ssize_t fd_show_configfs_dev_params(
 		(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO) ?
 		"Buffered" : "Synchronous");
 	return bl;
-}
-
-/*	fd_check_lba():
- *
- *
- */
-static int fd_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
 }
 
 /*	fd_get_cdb(): (Part of se_subsystem_api_t template)
@@ -719,9 +696,6 @@ static struct se_subsystem_api fileio_template = {
 	.check_configfs_dev_params = fd_check_configfs_dev_params,
 	.set_configfs_dev_params = fd_set_configfs_dev_params,
 	.show_configfs_dev_params = fd_show_configfs_dev_params,
-	.get_plugin_info	= fd_get_plugin_info,
-	.get_hba_info		= fd_get_hba_info,
-	.check_lba		= fd_check_lba,
 	.get_cdb		= fd_get_cdb,
 	.get_device_rev		= fd_get_device_rev,
 	.get_device_type	= fd_get_device_type,
