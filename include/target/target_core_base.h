@@ -574,8 +574,6 @@ struct se_cmd {
 	struct se_transport_task *t_task;
 	struct se_transport_task t_task_backstore;
 	struct target_core_fabric_ops *se_tfo;
-	int (*transport_cdb_transform)(struct se_cmd *,
-					struct se_transform_info *);
 	int (*transport_emulate_cdb)(struct se_cmd *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);

@@ -2258,16 +2258,6 @@ static struct se_task *transport_generic_get_task(
 	return task;
 }
 
-static int transport_process_data_sg_transform(
-	struct se_cmd *cmd,
-	struct se_transform_info *ti)
-{
-	/*
-	 * Already handled in transport_generic_get_cdb_count()
-	 */
-	return 0;
-}
-
 static int transport_do_se_mem_map(struct se_device *, struct se_task *,
 	struct list_head *, void *, struct se_mem *, struct se_mem **,
 	u32 *, u32 *);
@@ -2635,22 +2625,16 @@ int transport_generic_allocate_tasks(
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
 				" SCF_SCSI_CONTROL_SG_IO_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
-		cmd->transport_cdb_transform =
-				&transport_process_control_sg_transform;
 		break;
 	case TGCS_CONTROL_NONSG_IO_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to "
 				"SCF_SCSI_CONTROL_NONSG_IO_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
-		cmd->transport_cdb_transform =
-				&transport_process_control_nonsg_transform;
 		break;
 	case TGCS_NON_DATA_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to "
 				"SCF_SCSI_NON_DATA_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
-		cmd->transport_cdb_transform =
-				&transport_process_non_data_transform;
 		break;
 	case TGCS_UNSUPPORTED_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
@@ -5280,8 +5264,6 @@ static int transport_new_cmd_obj(
 		}
 		T_TASK(cmd)->t_task_cdbs += task_cdbs;
 
-		cmd->transport_cdb_transform =
-				&transport_process_data_sg_transform;
 #if 0
 		printk(KERN_INFO "data_length: %u, LBA: %llu t_tasks_sectors:"
 			" %u, t_task_cdbs: %u\n", obj_ptr, cmd->data_length,
@@ -6084,13 +6066,16 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 		}
 	}
 
-	if (!(cmd->transport_cdb_transform)) {
-		dump_stack();
-		ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-		goto failure;
-	}
+	if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)
+		ret = transport_process_control_sg_transform(cmd, &ti);
+	else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB)
+		ret = transport_process_control_nonsg_transform(cmd, &ti);
+	else if (cmd->se_cmd_flags & SCF_SCSI_NON_DATA_CDB)
+		ret = transport_process_non_data_transform(cmd, &ti);
+	else
+		BUG_ON(!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB));
 
-	if (cmd->transport_cdb_transform(cmd, &ti) < 0) {
+	if (ret < 0) {
 		ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
 		goto failure;
 	}
