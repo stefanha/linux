@@ -576,13 +576,9 @@ struct se_cmd {
 	int (*transport_emulate_cdb)(struct se_cmd *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	void (*transport_passthrough_done)(struct se_cmd *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
 	void (*transport_complete_callback)(struct se_cmd *);
-	void (*callback)(struct se_cmd *cmd, void *callback_arg,
-			int complete_status);
-	void *callback_arg;
 } ____cacheline_aligned;
 
 #define T_TASK(cmd)     ((struct se_transport_task *)(cmd->t_task))

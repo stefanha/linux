@@ -15,10 +15,6 @@ extern int core_update_device_list_for_node(struct se_lun *, struct se_lun_acl *
 					u32, struct se_node_acl *,
 					struct se_portal_group *, int);
 extern void core_clear_lun_from_tpg(struct se_lun *, struct se_portal_group *);
-extern struct se_port *core_alloc_port(struct se_device *);
-extern void core_export_port(struct se_device *, struct se_portal_group *,
-					struct se_port *, struct se_lun *);
-extern void core_release_port(struct se_device *, struct se_port *);
 extern int core_dev_export(struct se_device *, struct se_portal_group *,
 					struct se_lun *);
 extern void core_dev_unexport(struct se_device *, struct se_portal_group *,
@@ -28,8 +24,6 @@ extern void se_release_device_for_hba(struct se_device *);
 extern void se_release_vpd_for_dev(struct se_device *);
 extern void se_clear_dev_ports(struct se_device *);
 extern int se_free_virtual_device(struct se_device *, struct se_hba *);
-extern void se_dev_start(struct se_device *);
-extern void se_dev_stop(struct se_device *);
 extern int se_dev_check_online(struct se_device *);
 extern int se_dev_check_shutdown(struct se_device *);
 extern void se_dev_set_default_attribs(struct se_device *, struct se_dev_limits *);

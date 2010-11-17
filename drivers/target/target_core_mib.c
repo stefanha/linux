@@ -48,7 +48,7 @@
 #include "target_core_mib.h"
 
 /* SCSI mib table index */
-struct scsi_index_table scsi_index_table;
+static struct scsi_index_table scsi_index_table;
 
 #ifndef INITIAL_JIFFIES
 #define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))

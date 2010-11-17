@@ -69,23 +69,14 @@ struct se_tmr_req *core_tmr_alloc_req(
 }
 EXPORT_SYMBOL(core_tmr_alloc_req);
 
-/*
- * Called with struct se_device->se_tmr_lock held.
- */
-void __core_tmr_release_req(
-	struct se_tmr_req *tmr)
-{
-	list_del(&tmr->tmr_list);
-	kmem_cache_free(se_tmr_req_cache, tmr);
-}
-
 void core_tmr_release_req(
 	struct se_tmr_req *tmr)
 {
 	struct se_device *dev = tmr->tmr_dev;
 
 	spin_lock(&dev->se_tmr_lock);
-	__core_tmr_release_req(tmr);
+	list_del(&tmr->tmr_list);
+	kmem_cache_free(se_tmr_req_cache, tmr);
 	spin_unlock(&dev->se_tmr_lock);
 }
 

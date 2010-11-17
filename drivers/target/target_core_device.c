@@ -51,8 +51,12 @@
 #include "target_core_pr.h"
 #include "target_core_ua.h"
 
-extern int __transport_get_lun_for_cmd(
+static void se_dev_start(struct se_device *dev);
+static void se_dev_stop(struct se_device *dev);
+
+int transport_get_lun_for_cmd(
 	struct se_cmd *se_cmd,
+	unsigned char *cdb,
 	u32 unpacked_lun)
 {
 	struct se_dev_entry *deve;
@@ -171,8 +175,9 @@ out:
 
 	return 0;
 }
+EXPORT_SYMBOL(transport_get_lun_for_cmd);
 
-extern int transport_get_lun_for_tmr(
+int transport_get_lun_for_tmr(
 	struct se_cmd *se_cmd,
 	u32 unpacked_lun)
 {
@@ -484,7 +489,7 @@ void core_clear_lun_from_tpg(struct se_lun *lun, struct se_portal_group *tpg)
 	return;
 }
 
-struct se_port *core_alloc_port(struct se_device *dev)
+static struct se_port *core_alloc_port(struct se_device *dev)
 {
 	struct se_port *port, *port_tmp;
 
@@ -536,7 +541,7 @@ again:
 	return port;
 }
 
-void core_export_port(
+static void core_export_port(
 	struct se_device *dev,
 	struct se_portal_group *tpg,
 	struct se_port *port,
@@ -578,7 +583,7 @@ void core_export_port(
 /*
  *	Called with struct se_device->se_port_lock spinlock held.
  */
-void core_release_port(struct se_device *dev, struct se_port *port)
+static void core_release_port(struct se_device *dev, struct se_port *port)
 {
 	/*
 	 * Wait for any port reference for PR ALL_TG_PT=1 operation
@@ -769,15 +774,6 @@ void se_release_vpd_for_dev(struct se_device *dev)
 	return;
 }
 
-int transport_get_lun_for_cmd(
-	struct se_cmd *se_cmd,
-	unsigned char *cdb,
-	u32 unpacked_lun)
-{
-	return __transport_get_lun_for_cmd(se_cmd, unpacked_lun);
-}
-EXPORT_SYMBOL(transport_get_lun_for_cmd);
-
 /*
  * Called with struct se_hba->device_lock held.
  */
@@ -828,7 +824,7 @@ int se_free_virtual_device(struct se_device *dev, struct se_hba *hba)
 	return 0;
 }
 
-void se_dev_start(struct se_device *dev)
+static void se_dev_start(struct se_device *dev)
 {
 	struct se_hba *hba = dev->se_hba;
 
@@ -848,7 +844,7 @@ void se_dev_start(struct se_device *dev)
 	spin_unlock(&hba->device_lock);
 }
 
-void se_dev_stop(struct se_device *dev)
+static void se_dev_stop(struct se_device *dev)
 {
 	struct se_hba *hba = dev->se_hba;
 

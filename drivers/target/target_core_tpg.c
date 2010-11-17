@@ -771,7 +771,7 @@ int core_tpg_post_addlun(
 	return 0;
 }
 
-void core_tpg_shutdown_lun(
+static void core_tpg_shutdown_lun(
 	struct se_portal_group *tpg,
 	struct se_lun *lun)
 {

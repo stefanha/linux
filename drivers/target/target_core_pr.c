@@ -72,7 +72,7 @@ int core_pr_dump_initiator_port(
 static void __core_scsi3_complete_pro_release(struct se_device *, struct se_node_acl *,
 			struct t10_pr_registration *, int);
 
-int core_scsi2_reservation_seq_non_holder(
+static int core_scsi2_reservation_seq_non_holder(
 	struct se_cmd *cmd,
 	unsigned char *cdb,
 	u32 pr_reg_type)

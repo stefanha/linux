@@ -432,12 +432,12 @@ static void fd_emulate_sync_cache(struct se_task *task)
  * Tell TCM Core that we are capable of WriteCache emulation for
  * an underlying struct se_device.
  */
-int fd_emulated_write_cache(struct se_device *dev)
+static int fd_emulated_write_cache(struct se_device *dev)
 {
 	return 1;
 }
 
-int fd_emulated_dpo(struct se_device *dev)
+static int fd_emulated_dpo(struct se_device *dev)
 {
 	return 0;
 }
@@ -445,12 +445,12 @@ int fd_emulated_dpo(struct se_device *dev)
  * Tell TCM Core that we will be emulating Forced Unit Access (FUA) for WRITEs
  * for TYPE_DISK.
  */
-int fd_emulated_fua_write(struct se_device *dev)
+static int fd_emulated_fua_write(struct se_device *dev)
 {
 	return 1;
 }
 
-int fd_emulated_fua_read(struct se_device *dev)
+static int fd_emulated_fua_read(struct se_device *dev)
 {
 	return 0;
 }

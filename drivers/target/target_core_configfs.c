@@ -52,8 +52,8 @@
 #include "target_core_pr.h"
 #include "target_core_rd.h"
 
-struct list_head g_tf_list;
-struct mutex g_tf_lock;
+static struct list_head g_tf_list;
+static struct mutex g_tf_lock;
 
 struct target_core_configfs_attribute {
 	struct configfs_attribute attr;
@@ -61,7 +61,7 @@ struct target_core_configfs_attribute {
 	ssize_t (*store)(void *, const char *, size_t);
 };
 
-struct se_hba *target_core_get_hba_from_item(
+static struct se_hba *target_core_get_hba_from_item(
 	struct config_item *item)
 {
 	struct se_hba *hba = container_of(to_config_group(item),
@@ -366,25 +366,6 @@ void target_fabric_configfs_free(
 	kfree(tf);
 }
 EXPORT_SYMBOL(target_fabric_configfs_free);
-
-/*
- * Note that config_group_find_item() calls config_item_get() and grabs the
- * reference to the returned struct config_item *
- * It will be released with config_put_item() in
- * target_fabric_configfs_deregister()
- */
-struct config_item *target_fabric_configfs_find_by_name(
-	struct configfs_subsystem *target_su,
-	const char *name)
-{
-	struct config_item *fabric;
-
-	mutex_lock(&target_su->su_mutex);
-	fabric = config_group_find_item(&target_su->su_group, name);
-	mutex_unlock(&target_su->su_mutex);
-
-	return fabric;
-}
 
 /*
  * Perform a sanity check of the passed tf->tf_ops before completing
@@ -3228,7 +3209,7 @@ static struct config_item_type target_core_cit = {
 
 /* Stop functions for struct config_item_type target_core_hba_cit */
 
-int target_core_init_configfs(void)
+static int target_core_init_configfs(void)
 {
 	struct config_group *target_cg, *hba_cg = NULL, *alua_cg = NULL;
 	struct config_group *lu_gp_cg = NULL;
@@ -3372,7 +3353,7 @@ out_global:
 	return -1;
 }
 
-void target_core_exit_configfs(void)
+static void target_core_exit_configfs(void)
 {
 	struct configfs_subsystem *subsys;
 	struct config_group *hba_cg, *alua_cg, *lu_gp_cg;
