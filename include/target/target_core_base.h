@@ -488,6 +488,7 @@ struct se_task {
 	u32		task_size;
 	u32		task_sg_num;
 	u32		task_sg_offset;
+	enum dma_data_direction	task_data_direction;
 	struct se_cmd *task_se_cmd;
 	struct se_device	*se_dev;
 	struct completion	task_stop_comp;
@@ -498,7 +499,7 @@ struct se_task {
 	atomic_t	task_stop;
 	atomic_t	task_state_active;
 	struct timer_list	task_timer;
-	int (*transport_map_task)(struct se_task *, u32);
+	int (*transport_map_task)(struct se_task *);
 	struct se_device *se_obj_ptr;
 	struct list_head t_list;
 	struct list_head t_execute_list;
@@ -516,42 +517,6 @@ struct se_transform_info {
 	struct se_device *ti_dev;
 	struct se_device *se_obj_ptr;
 	struct se_device *ti_obj_ptr;
-} ____cacheline_aligned;
-
-struct se_offset_map {
-	int                     map_reset;
-	u32                     iovec_length;
-	u32                     iscsi_offset;
-	u32                     current_offset;
-	u32                     orig_offset;
-	u32                     sg_count;
-	u32                     sg_current;
-	u32                     sg_length;
-	struct page		*sg_page;
-	struct se_mem		*map_se_mem;
-	struct se_mem		*map_orig_se_mem;
-	void			*iovec_base;
-} ____cacheline_aligned;
-
-struct se_map_sg {
-	int			sg_kmap_active:1;
-	u32			data_length;
-	u32			data_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct iovec		*iov;
-} ____cacheline_aligned;
-
-struct se_unmap_sg {
-	u32			data_length;
-	u32			sg_count;
-	u32			sg_offset;
-	u32			padding;
-	u32			t_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct se_offset_map	lmap;
-	struct se_mem		*cur_se_mem;
 } ____cacheline_aligned;
 
 struct se_cmd {
@@ -609,16 +574,12 @@ struct se_cmd {
 	struct se_transport_task *t_task;
 	struct se_transport_task t_task_backstore;
 	struct target_core_fabric_ops *se_tfo;
-	int (*transport_allocate_resources)(struct se_cmd *, u32, u32);
 	int (*transport_cdb_transform)(struct se_cmd *,
 					struct se_transform_info *);
 	int (*transport_emulate_cdb)(struct se_cmd *);
-	void (*transport_free_resources)(struct se_cmd *);
 	u32 (*transport_get_lba)(unsigned char *);
 	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	void (*transport_map_SG_segments)(struct se_unmap_sg *);
 	void (*transport_passthrough_done)(struct se_cmd *);
-	void (*transport_unmap_SG_segments)(struct se_unmap_sg *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
 	void (*transport_complete_callback)(struct se_cmd *);
@@ -894,7 +855,6 @@ struct se_device {
 	struct task_struct	*process_thread;
 	pid_t			process_thread_pid;
 	struct task_struct		*dev_mgmt_thread;
-	int (*write_pending)(struct se_task *);
 	struct list_head	delayed_cmd_list;
 	struct list_head	ordered_cmd_list;
 	struct list_head	execute_task_list;

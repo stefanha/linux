@@ -1458,15 +1458,6 @@ static void transport_release_all_cmds(struct se_device *dev)
 #endif
 }
 
-/*	transport_dev_write_pending_nop():
- *
- *
- */
-static int transport_dev_write_pending_nop(struct se_task *task)
-{
-	return 0;
-}
-
 static int transport_get_inquiry(
 	struct t10_wwn *wwn,
 	void *obj_ptr)
@@ -2053,9 +2044,6 @@ struct se_device *transport_add_device_to_core_hba(
 
 	se_dev_set_default_attribs(dev, dev_limits);
 
-	dev->write_pending = (transport->write_pending) ?
-		transport->write_pending : &transport_dev_write_pending_nop;
-
 	dev->dev_index = scsi_get_new_index(SCSI_DEVICE_INDEX);
 	dev->creation_time = get_jiffies_64();
 	spin_lock_init(&dev->stats_lock);
@@ -2257,6 +2245,7 @@ static struct se_task *transport_generic_get_task(
 	task->task_no = T_TASK(cmd)->t_tasks_no++;
 	task->task_se_cmd = cmd;
 	task->se_dev = dev;
+	task->task_data_direction = data_direction;
 
 	DEBUG_SO("se_obj_ptr: %p\n", se_obj_ptr);
 
@@ -2267,28 +2256,6 @@ static struct se_task *transport_generic_get_task(
 	task->se_obj_ptr = se_obj_ptr;
 
 	return task;
-}
-
-static inline map_func_t transport_dev_get_map_SG(
-	struct se_device *dev,
-	int rw)
-{
-	return (rw == DMA_TO_DEVICE) ? dev->transport->cdb_write_SG :
-		dev->transport->cdb_read_SG;
-}
-
-static inline map_func_t transport_dev_get_map_non_SG(
-	struct se_device *dev,
-	int rw)
-{
-	return (rw == DMA_TO_DEVICE) ? dev->transport->cdb_write_non_SG :
-		dev->transport->cdb_read_non_SG;
-}
-
-static inline map_func_t transport_dev_get_map_none(
-	struct se_device *dev)
-{
-	return dev->transport->cdb_none;
 }
 
 static int transport_process_data_sg_transform(
@@ -2333,8 +2300,7 @@ static int transport_process_control_sg_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = transport_dev_get_map_SG(ti->se_obj_ptr,
-				cmd->data_direction);
+	task->transport_map_task = ti->se_obj_ptr->transport->map_task_SG;
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
@@ -2375,8 +2341,7 @@ static int transport_process_control_nonsg_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = transport_dev_get_map_non_SG(ti->se_obj_ptr,
-				cmd->data_direction);
+	task->transport_map_task = ti->se_obj_ptr->transport->map_task_non_SG;
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
@@ -2411,7 +2376,7 @@ static int transport_process_non_data_transform(
 	if (!(task))
 		return -1;
 
-	task->transport_map_task = transport_dev_get_map_none(ti->se_obj_ptr);
+	task->transport_map_task = ti->se_obj_ptr->transport->cdb_none;
 
 	cdb = TRANSPORT(dev)->get_cdb(task);
 	if (cdb)
@@ -2628,7 +2593,7 @@ int transport_generic_allocate_tasks(
 						GFP_KERNEL);
 		if (!(T_TASK(cmd)->t_task_cdb)) {
 			printk(KERN_ERR "Unable to allocate T_TASK(cmd)->t_task_cdb"
-				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %u ops\n",
+				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %lu ops\n",
 				scsi_command_size(cdb), sizeof(T_TASK(cmd)->__t_task_cdb));
 			return -1;
 		}
@@ -3080,416 +3045,8 @@ void transport_generic_request_timeout(struct se_cmd *cmd)
 	transport_generic_remove(cmd, 0, 0);
 }
 
-/* #define iscsi_linux_calculate_map_segment_DEBUG */
-#ifdef iscsi_linux_calculate_map_segment_DEBUG
-#define DEBUG_MAP_SEGMENTS(buf...) PYXPRINT(buf)
-#else
-#define DEBUG_MAP_SEGMENTS(buf...)
-#endif
-
-/*	transport_calculate_map_segment():
- *
- *
- */
-static inline void transport_calculate_map_segment(
-	u32 *data_length,
-	struct se_offset_map *lm)
-{
-	u32 sg_offset = 0;
-	struct se_mem *se_mem = lm->map_se_mem;
-
-	DEBUG_MAP_SEGMENTS(" START Mapping se_mem: %p, Length: %d"
-		"  Remaining iSCSI Data: %u\n", se_mem, se_mem->se_len,
-		*data_length);
-	/*
-	 * Still working on pages in the current struct se_mem.
-	 */
-	if (!lm->map_reset) {
-		lm->iovec_length = (lm->sg_length > PAGE_SIZE) ?
-					PAGE_SIZE : lm->sg_length;
-		if (*data_length < lm->iovec_length) {
-			DEBUG_MAP_SEGMENTS("LINUX_MAP: Reset lm->iovec_length"
-				" to %d\n", *data_length);
-
-			lm->iovec_length = *data_length;
-		}
-		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
-
-		DEBUG_MAP_SEGMENTS("LINUX_MAP: Set lm->iovec_base to %p from"
-			" lm->sg_page: %p\n", lm->iovec_base, lm->sg_page);
-		return;
-	}
-
-	/*
-	 * First run of an iscsi_linux_map_t.
-	 *
-	 * OR:
-	 *
-	 * Mapped all of the pages in the current scatterlist, move
-	 * on to the next one.
-	 */
-	lm->map_reset = 0;
-	sg_offset = se_mem->se_off;
-	lm->sg_page = se_mem->se_page;
-	lm->sg_length = se_mem->se_len;
-
-	DEBUG_MAP_SEGMENTS("LINUX_MAP1[%p]: Starting to se_mem->se_len: %u,"
-		" se_mem->se_off: %u, se_mem->se_page: %p\n", se_mem,
-		se_mem->se_len, se_mem->se_off, se_mem->se_page);;
-	/*
-	 * Get the base and length of the current page for use with the iovec.
-	 */
-recalc:
-	lm->iovec_length = (lm->sg_length > (PAGE_SIZE - sg_offset)) ?
-			   (PAGE_SIZE - sg_offset) : lm->sg_length;
-
-	DEBUG_MAP_SEGMENTS("LINUX_MAP: lm->iovec_length: %u, lm->sg_length: %u,"
-		" sg_offset: %u\n", lm->iovec_length, lm->sg_length, sg_offset);
-	/*
-	 * See if there is any iSCSI offset we need to deal with.
-	 */
-	if (!lm->current_offset) {
-		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
-
-		if (*data_length < lm->iovec_length) {
-			DEBUG_MAP_SEGMENTS("LINUX_MAP1[%p]: Reset"
-				" lm->iovec_length to %d\n", se_mem,
-				*data_length);
-			lm->iovec_length = *data_length;
-		}
-
-		DEBUG_MAP_SEGMENTS("LINUX_MAP2[%p]: No current_offset,"
-			" set iovec_base to %p and set Current Page to %p\n",
-			se_mem, lm->iovec_base, lm->sg_page);
-
-		return;
-	}
-
-	/*
-	 * We know the iSCSI offset is in the next page of the current
-	 * scatterlist.  Increase the lm->sg_page pointer and try again.
-	 */
-	if (lm->current_offset >= lm->iovec_length) {
-		DEBUG_MAP_SEGMENTS("LINUX_MAP3[%p]: Next Page:"
-			" lm->current_offset: %u, iovec_length: %u"
-			" sg_offset: %u\n", se_mem, lm->current_offset,
-			lm->iovec_length, sg_offset);
-
-		lm->current_offset -= lm->iovec_length;
-		lm->sg_length -= lm->iovec_length;
-		lm->sg_page++;
-		sg_offset = 0;
-
-		DEBUG_MAP_SEGMENTS("LINUX_MAP3[%p]: ** Skipping to Next Page,"
-			" updated values: lm->current_offset: %u\n", se_mem,
-			lm->current_offset);
-
-		goto recalc;
-	}
-
-	/*
-	 * The iSCSI offset is in the current page, increment the iovec
-	 * base and reduce iovec length.
-	 */
-	lm->iovec_base = page_address(lm->sg_page);
-
-	DEBUG_MAP_SEGMENTS("LINUX_MAP4[%p]: Set lm->iovec_base to %p\n", se_mem,
-			lm->iovec_base);
-
-	lm->iovec_base += sg_offset;
-	lm->iovec_base += lm->current_offset;
-	DEBUG_MAP_SEGMENTS("****** the OLD lm->iovec_length: %u lm->sg_length:"
-		" %u\n", lm->iovec_length, lm->sg_length);
-
-	if ((lm->iovec_length - lm->current_offset) < *data_length)
-		lm->iovec_length -= lm->current_offset;
-	else
-		lm->iovec_length = *data_length;
-
-	if ((lm->sg_length - lm->current_offset) < *data_length)
-		lm->sg_length -= lm->current_offset;
-	else
-		lm->sg_length = *data_length;
-
-	lm->current_offset = 0;
-
-	DEBUG_MAP_SEGMENTS("****** the NEW lm->iovec_length %u lm->sg_length:"
-		" %u\n", lm->iovec_length, lm->sg_length);
-}
-
-/* #define iscsi_linux_get_iscsi_offset_DEBUG */
-#ifdef iscsi_linux_get_iscsi_offset_DEBUG
-#define DEBUG_GET_ISCSI_OFFSET(buf...) PYXPRINT(buf)
-#else
-#define DEBUG_GET_ISCSI_OFFSET(buf...)
-#endif
-
-/*	transport_get_iscsi_offset():
- *
- *
- */
-static int transport_get_iscsi_offset(
-	struct se_offset_map *lmap,
-	struct se_unmap_sg *usg)
-{
-	u32 current_length = 0, current_iscsi_offset = lmap->iscsi_offset;
-	u32 total_offset = 0;
-	struct se_cmd *cmd = usg->se_cmd;
-	struct se_mem *se_mem;
-
-	list_for_each_entry(se_mem, T_TASK(cmd)->t_mem_list, se_list)
-		break;
-
-	if (!se_mem) {
-		printk(KERN_ERR "Unable to locate se_mem from"
-				" T_TASK(cmd)->t_mem_list\n");
-		return -1;
-	}
-
-	/*
-	 * Locate the current offset from the passed iSCSI Offset.
-	 */
-	while (lmap->iscsi_offset != current_length) {
-		/*
-		 * The iSCSI Offset is within the current struct se_mem.
-		 *
-		 * Or:
-		 *
-		 * The iSCSI Offset is outside of the current struct se_mem.
-		 * Recalculate the values and obtain the next struct se_mem pointer.
-		 */
-		total_offset += se_mem->se_len;
-
-		DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: current_length: %u,"
-			" total_offset: %u, sg->length: %u\n",
-			current_length, total_offset, se_mem->se_len);
-
-		if (total_offset > lmap->iscsi_offset) {
-			current_length += current_iscsi_offset;
-			lmap->orig_offset = lmap->current_offset =
-				usg->t_offset = current_iscsi_offset;
-			DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: Within Current"
-				" struct se_mem: %p, current_length incremented to"
-				" %u\n", se_mem, current_length);
-		} else {
-			current_length += se_mem->se_len;
-			current_iscsi_offset -= se_mem->se_len;
-
-			DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: Outside of"
-				" Current se_mem: %p, current_length"
-				" incremented to %u and current_iscsi_offset"
-				" decremented to %u\n", se_mem, current_length,
-				current_iscsi_offset);
-
-			list_for_each_entry_continue(se_mem,
-					T_TASK(cmd)->t_mem_list, se_list)
-				break;
-
-			if (!se_mem) {
-				printk(KERN_ERR "Unable to locate struct se_mem\n");
-				return -1;
-			}
-		}
-	}
-	lmap->map_orig_se_mem = se_mem;
-	usg->cur_se_mem = se_mem;
-
-	return 0;
-}
-
-/* #define iscsi_OS_set_SG_iovec_ptrs_DEBUG */
-#ifdef iscsi_OS_set_SG_iovec_ptrs_DEBUG
-#define DEBUG_IOVEC_SCATTERLISTS(buf...) PYXPRINT(buf)
-
-static void iscsi_check_iovec_map(
-	u32 iovec_count,
-	u32 map_length,
-	struct se_map_sg *map_sg,
-	struct se_unmap_sg *unmap_sg)
-{
-	u32 i, iovec_map_length = 0;
-	struct se_cmd *cmd = map_sg->se_cmd;
-	struct iovec *iov = map_sg->iov;
-	struct se_mem *se_mem;
-
-	for (i = 0; i < iovec_count; i++)
-		iovec_map_length += iov[i].iov_len;
-
-	if (iovec_map_length == map_length)
-		return;
-
-	printk(KERN_INFO "Calculated iovec_map_length: %u does not match passed"
-		" map_length: %u\n", iovec_map_length, map_length);
-	printk(KERN_INFO "ITT: 0x%08x data_length: %u data_direction %d\n",
-		CMD_TFO(cmd)->get_task_tag(cmd), cmd->data_length,
-		cmd->data_direction);
-
-	iovec_map_length = 0;
-
-	for (i = 0; i < iovec_count; i++) {
-		printk(KERN_INFO "iov[%d].iov_[base,len]: %p / %u bytes------"
-			"-->\n", i, iov[i].iov_base, iov[i].iov_len);
-
-		printk(KERN_INFO "iovec_map_length from %u to %u\n",
-			iovec_map_length, iovec_map_length + iov[i].iov_len);
-		iovec_map_length += iov[i].iov_len;
-
-		printk(KERN_INFO "XXXX_map_length from %u to %u\n", map_length,
-				(map_length - iov[i].iov_len));
-		map_length -= iov[i].iov_len;
-	}
-
-	list_for_each_entry(se_mem, T_TASK(cmd)->t_mem_list, se_list) {
-		printk(KERN_INFO "se_mem[%p]: offset: %u length: %u\n",
-			se_mem, se_mem->se_off, se_mem->se_len);
-	}
-
-	BUG();
-}
-
-#else
-#define DEBUG_IOVEC_SCATTERLISTS(buf...)
-#define iscsi_check_iovec_map(a, b, c, d)
-#endif
-
-int transport_generic_set_iovec_ptrs(
-	struct se_map_sg *map_sg,
-	struct se_unmap_sg *unmap_sg)
-{
-	u32 i = 0 /* For iovecs */, j = 0 /* For scatterlists */;
-#ifdef iscsi_OS_set_SG_iovec_ptrs_DEBUG
-	u32 orig_map_length = map_sg->data_length;
-#endif
-	struct se_cmd *cmd = map_sg->se_cmd;
-	struct se_offset_map *lmap = &unmap_sg->lmap;
-	struct iovec *iov = map_sg->iov;
-
-	/*
-	 * Used for non scatterlist operations, assume a single iovec.
-	 */
-	if (!T_TASK(cmd)->t_tasks_se_num) {
-		DEBUG_IOVEC_SCATTERLISTS("ITT: 0x%08x No struct se_mem elements"
-			" present\n", CMD_TFO(cmd)->get_task_tag(cmd));
-		iov[0].iov_base = (unsigned char *) T_TASK(cmd)->t_task_buf +
-							map_sg->data_offset;
-		iov[0].iov_len  = map_sg->data_length;
-		return 1;
-	}
-
-	/*
-	 * Set lmap->map_reset = 1 so the first call to
-	 * transport_calculate_map_segment() sets up the initial
-	 * values for struct se_offset_map.
-	 */
-	lmap->map_reset = 1;
-
-	DEBUG_IOVEC_SCATTERLISTS("[-------------------] ITT: 0x%08x OS"
-		" Independent Network POSIX defined iovectors to SE Memory"
-		" [-------------------]\n\n", CMD_TFO(cmd)->get_task_tag(cmd));
-
-	/*
-	 * Get a pointer to the first used scatterlist based on the passed
-	 * offset. Also set the rest of the needed values in iscsi_linux_map_t.
-	 */
-	lmap->iscsi_offset = map_sg->data_offset;
-	if (map_sg->sg_kmap_active) {
-		unmap_sg->se_cmd = map_sg->se_cmd;
-		transport_get_iscsi_offset(lmap, unmap_sg);
-		unmap_sg->data_length = map_sg->data_length;
-	} else {
-		lmap->current_offset = lmap->orig_offset;
-	}
-	lmap->map_se_mem = lmap->map_orig_se_mem;
-
-	DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Total map_sg->data_length: %d,"
-		" lmap->iscsi_offset: %d, cmd->orig_iov_data_count: %d\n",
-		map_sg->data_length, lmap->iscsi_offset,
-		cmd->orig_iov_data_count);
-
-	while (map_sg->data_length) {
-		/*
-		 * Time to get the virtual address for use with iovec pointers.
-		 * This function will return the expected iovec_base address
-		 * and iovec_length.
-		 */
-		transport_calculate_map_segment(&map_sg->data_length, lmap);
-
-		/*
-		 * Set the iov.iov_base and iov.iov_len from the current values
-		 * in iscsi_linux_map_t.
-		 */
-		iov[i].iov_base = lmap->iovec_base;
-		iov[i].iov_len = lmap->iovec_length;
-
-		/*
-		 * Subtract the final iovec length from the total length to be
-		 * mapped, and the length of the current scatterlist.  Also
-		 * perform the paranoid check to make sure we are not going to
-		 * overflow the iovecs allocated for this command in the next
-		 * pass.
-		 */
-		map_sg->data_length -= iov[i].iov_len;
-		lmap->sg_length -= iov[i].iov_len;
-
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: iov[%u].iov_len: %u\n",
-				i, iov[i].iov_len);
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: lmap->sg_length: from %u"
-			" to %u\n", lmap->sg_length + iov[i].iov_len,
-				lmap->sg_length);
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Changed total"
-			" map_sg->data_length from %u to %u\n",
-			map_sg->data_length + iov[i].iov_len,
-			map_sg->data_length);
-
-		if ((++i + 1) > cmd->orig_iov_data_count) {
-			printk(KERN_ERR "Current iovec count %u is greater than"
-				" struct se_cmd->orig_data_iov_count %u, cannot"
-				" continue.\n", i+1, cmd->orig_iov_data_count);
-			return -1;
-		}
-
-		/*
-		 * All done mapping this scatterlist's pages, move on to
-		 * the next scatterlist by setting lmap.map_reset = 1;
-		 */
-		if (!lmap->sg_length || !map_sg->data_length) {
-			list_for_each_entry(lmap->map_se_mem,
-					&lmap->map_se_mem->se_list, se_list)
-				break;
-
-			if (!lmap->map_se_mem) {
-				printk(KERN_ERR "Unable to locate next"
-					" lmap->map_struct se_mem entry\n");
-				return -1;
-			}
-			j++;
-
-			lmap->sg_page = NULL;
-			lmap->map_reset = 1;
-
-			DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Done with current"
-				" scatterlist, incremented Generic scatterlist"
-				" Counter to %d and reset = 1\n", j);
-		} else
-			lmap->sg_page++;
-	}
-
-	unmap_sg->sg_count = j;
-
-	iscsi_check_iovec_map(i, orig_map_length, map_sg, unmap_sg);
-
-	return i;
-}
-EXPORT_SYMBOL(transport_generic_set_iovec_ptrs);
-
-/*	transport_generic_allocate_buf():
- *
- *	Called from transport_generic_new_cmd() in Transport Processing Thread.
- */
-int transport_generic_allocate_buf(
-	struct se_cmd *cmd,
-	u32 data_length,
-	u32 dma_size)
+static int
+transport_generic_allocate_buf(struct se_cmd *cmd, u32 data_length)
 {
 	unsigned char *buf;
 
@@ -3503,62 +3060,6 @@ int transport_generic_allocate_buf(
 	T_TASK(cmd)->t_task_buf = buf;
 
 	return 0;
-}
-
-/*	transport_generic_allocate_none():
- *
- *
- */
-static int transport_generic_allocate_none(
-	struct se_cmd *cmd,
-	u32 data_length,
-	u32 dma_size)
-{
-	return 0;
-}
-
-/*	transport_generic_map_SG_segments():
- *
- *
- */
-static void transport_generic_map_SG_segments(struct se_unmap_sg *unmap_sg)
-{
-	u32 i = 0;
-	struct se_cmd *cmd = unmap_sg->se_cmd;
-	struct se_mem *se_mem = unmap_sg->cur_se_mem;
-
-	if (!(T_TASK(cmd)->t_tasks_se_num))
-		return;
-
-	list_for_each_entry_continue(se_mem, T_TASK(cmd)->t_mem_list, se_list) {
-		kmap(se_mem->se_page);
-
-		if (++i == unmap_sg->sg_count)
-			break;
-	}
-}
-
-/*	transport_generic_unmap_SG_segments():
- *
- *
- */
-static void transport_generic_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
-{
-	u32 i = 0;
-	struct se_cmd *cmd = unmap_sg->se_cmd;
-	struct se_mem *se_mem = unmap_sg->cur_se_mem;
-
-	if (!(T_TASK(cmd)->t_tasks_se_num))
-		return;
-
-	list_for_each_entry_continue(se_mem, T_TASK(cmd)->t_mem_list, se_list) {
-		kunmap(se_mem->se_page);
-
-		if (++i == unmap_sg->sg_count)
-			break;
-	}
-
-	return;
 }
 
 static inline u32 transport_lba_21(unsigned char *cdb)
@@ -4173,12 +3674,6 @@ static inline u32 transport_get_size(
 	return DEV_ATTRIB(dev)->block_size * sectors;
 }
 
-static inline void transport_get_maps(struct se_cmd *cmd)
-{
-	cmd->transport_map_SG_segments = &transport_generic_map_SG_segments;
-	cmd->transport_unmap_SG_segments = &transport_generic_unmap_SG_segments;
-}
-
 unsigned char transport_asciihex_to_binaryhex(unsigned char val[2])
 {
 	unsigned char result = 0;
@@ -4322,24 +3817,17 @@ int transport_get_sense_data(struct se_cmd *cmd)
 	return -1;
 }
 
-static inline void transport_dev_get_mem_buf(
-	struct se_device *dev,
-	struct se_cmd *cmd)
+static int transport_allocate_resources(struct se_cmd *cmd)
 {
-	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_buf) ?
-		TRANSPORT(dev)->allocate_buf : &transport_generic_allocate_buf;
-	cmd->transport_free_resources = (TRANSPORT(dev)->free_buf) ?
-		TRANSPORT(dev)->free_buf : NULL;
-}
+	u32 length = cmd->data_length;
 
-static inline void transport_dev_get_mem_SG(
-	struct se_device *dev,
-	struct se_cmd *cmd)
-{
-	cmd->transport_allocate_resources = (TRANSPORT(dev)->allocate_DMA) ?
-		TRANSPORT(dev)->allocate_DMA : &transport_generic_get_mem;
-	cmd->transport_free_resources = (TRANSPORT(dev)->free_DMA) ?
-		TRANSPORT(dev)->free_DMA : NULL;
+	if ((cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
+	    (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB))
+		return transport_generic_get_mem(cmd, length, PAGE_SIZE);
+	else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB)
+		return transport_generic_allocate_buf(cmd, length);
+	else
+		return 0;
 }
 
 /*	transport_generic_cmd_sequencer():
@@ -4368,7 +3856,6 @@ static int transport_generic_cmd_sequencer(
 	if (core_scsi3_ua_check(cmd, cdb) < 0) {
 		cmd->transport_wait_for_tasks =
 				&transport_nop_wait_for_tasks;
-		transport_get_maps(cmd);
 		return TGCS_CHECK_CONDITION_UNIT_ATTENTION;
 	}
 	/*
@@ -4377,7 +3864,6 @@ static int transport_generic_cmd_sequencer(
 	ret = T10_ALUA(su_dev)->alua_state_check(cmd, cdb, &alua_ascq);
 	if (ret != 0) {
 		cmd->transport_wait_for_tasks = &transport_nop_wait_for_tasks;
-		transport_get_maps(cmd);
 		/*
 		 * Set SCSI additional sense code (ASC) to 'LUN Not Accessable';
 		 * The ALUA additional sense code qualifier (ASCQ) is determined
@@ -4402,7 +3888,6 @@ static int transport_generic_cmd_sequencer(
 					cmd, cdb, pr_reg_type) != 0) {
 			cmd->transport_wait_for_tasks =
 					&transport_nop_wait_for_tasks;
-			transport_get_maps(cmd);
 			return TGCS_RESERVATION_CONFLICT;
 		}
 		/*
@@ -4418,8 +3903,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
 		ret = TGCS_DATA_SG_IO_CDB;
@@ -4429,8 +3912,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
 		ret = TGCS_DATA_SG_IO_CDB;
@@ -4440,8 +3921,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
 		ret = TGCS_DATA_SG_IO_CDB;
@@ -4451,8 +3930,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
 		ret = TGCS_DATA_SG_IO_CDB;
@@ -4462,8 +3939,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
 		cmd->transport_get_lba = &transport_lba_21;
 		ret = TGCS_DATA_SG_IO_CDB;
@@ -4473,8 +3948,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
@@ -4485,8 +3958,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
 		cmd->transport_get_lba = &transport_lba_32;
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
@@ -4497,8 +3968,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
 		cmd->transport_get_long_lba = &transport_lba_64;
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
@@ -4512,8 +3981,6 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
 		cmd->transport_get_lba = &transport_lba_32;
 		passthrough = (TRANSPORT(dev)->transport_type ==
@@ -4545,8 +4012,6 @@ static int transport_generic_cmd_sequencer(
 			if (sector_ret)
 				return TGCS_UNSUPPORTED_CDB;
 			size = transport_get_size(sectors, cdb, cmd);
-			transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-			transport_get_maps(cmd);
 			/*
 			 * Use WRITE_32 and READ_32 opcodes for the emulated
 			 * XDWRITE_READ_32 logic.
@@ -4573,8 +4038,6 @@ static int transport_generic_cmd_sequencer(
 			if (sector_ret)
 				return TGCS_UNSUPPORTED_CDB;
 			size = transport_get_size(sectors, cdb, cmd);
-			transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-			transport_get_maps(cmd);
 			T_TASK(cmd)->t_task_lba = get_unaligned_be64(&cdb[12]);
 			/*
 			 * Skip the remaining assignments for TCM/PSCSI passthrough
@@ -4625,26 +4088,18 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_SEND_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case MODE_SELECT:
 		size = cdb[4];
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SELECT_10:
 		size = (cdb[7] << 8) + cdb[8];
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SENSE:
 		size = cdb[4];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case MODE_SENSE_10:
@@ -4653,14 +4108,10 @@ static int transport_generic_cmd_sequencer(
 	case LOG_SELECT:
 	case LOG_SENSE:
 		size = (cdb[7] << 8) + cdb[8];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_BLOCK_LIMITS:
 		size = READ_BLOCK_LEN;
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case GPCMD_GET_CONFIGURATION:
@@ -4668,8 +4119,6 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_READ_DISC_INFO:
 	case GPCMD_READ_TRACK_RZONE_INFO:
 		size = (cdb[7] << 8) + cdb[8];
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case PERSISTENT_RESERVE_IN:
@@ -4679,21 +4128,15 @@ static int transport_generic_cmd_sequencer(
 			 SPC3_PERSISTENT_RESERVATIONS) ?
 			&core_scsi3_emulate_pr : NULL;
 		size = (cdb[7] << 8) + cdb[8];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case GPCMD_MECHANISM_STATUS:
 	case GPCMD_READ_DVD_STRUCTURE:
 		size = (cdb[8] << 8) + cdb[9];
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_SG_IO_CDB;
 		break;
 	case READ_POSITION:
 		size = READ_POSITION_LEN;
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case 0xa4:
@@ -4716,14 +4159,10 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_REPORT_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case INQUIRY:
 		size = (cdb[3] << 8) + cdb[4];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for INQUIRY.
 		 * See spc4r17 section 5.3
@@ -4734,22 +4173,16 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case READ_BUFFER:
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_CAPACITY:
 		size = READ_CAP_LEN;
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_MEDIA_SERIAL_NUMBER:
 	case SECURITY_PROTOCOL_IN:
 	case SECURITY_PROTOCOL_OUT:
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case SERVICE_ACTION_IN:
@@ -4761,15 +4194,11 @@ static int transport_generic_cmd_sequencer(
 	case WRITE_ATTRIBUTE:
 		size = (cdb[10] << 24) | (cdb[11] << 16) |
 		       (cdb[12] << 8) | cdb[13];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case RECEIVE_DIAGNOSTIC:
 	case SEND_DIAGNOSTIC:
 		size = (cdb[3] << 8) | cdb[4];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 /* #warning FIXME: Figure out correct GPCMD_READ_CD blocksize. */
@@ -4777,33 +4206,23 @@ static int transport_generic_cmd_sequencer(
 	case GPCMD_READ_CD:
 		sectors = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		size = (2336 * sectors);
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 #endif
 	case READ_TOC:
 		size = cdb[8];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case REQUEST_SENSE:
 		size = cdb[4];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case READ_ELEMENT_STATUS:
 		size = 65536 * cdb[7] + 256 * cdb[8] + cdb[9];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case WRITE_BUFFER:
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case RESERVE:
@@ -4817,9 +4236,6 @@ static int transport_generic_cmd_sequencer(
 		else
 			size = cmd->data_length;
 
-		cmd->transport_allocate_resources =
-				&transport_generic_allocate_none;
-		transport_get_maps(cmd);
 		/*
 		 * Setup the legacy emulated handler for SPC-2 and
 		 * >= SPC-3 compatible reservation handling (CRH=1)
@@ -4844,9 +4260,6 @@ static int transport_generic_cmd_sequencer(
 		else
 			size = cmd->data_length;
 
-		cmd->transport_allocate_resources =
-				&transport_generic_allocate_none;
-		transport_get_maps(cmd);
 		cmd->transport_emulate_cdb =
 				(T10_RES(su_dev)->res_type !=
 				 SPC_PASSTHROUGH) ?
@@ -4855,9 +4268,6 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case SYNCHRONIZE_CACHE:
 	case 0x91: /* SYNCHRONIZE_CACHE_16: */
-		cmd->transport_allocate_resources =
-				&transport_generic_allocate_none;
-		transport_get_maps(cmd);
 		/*
 		 * Extract LBA and range to be flushed for emulated SYNCHRONIZE_CACHE
 		 */
@@ -4891,11 +4301,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_INVALID_CDB_FIELD;
 		break;
 	case UNMAP:
-		cmd->transport_allocate_resources =
-				&transport_generic_allocate_buf;
 		size = get_unaligned_be16(&cdb[7]);
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		passthrough = (TRANSPORT(dev)->transport_type ==
 				TRANSPORT_PLUGIN_PHBA_PDEV);
 		/*
@@ -4911,14 +4317,10 @@ static int transport_generic_cmd_sequencer(
 		ret = TGCS_CONTROL_NONSG_IO_CDB;
 		break;
 	case WRITE_SAME_16:
-		cmd->transport_allocate_resources =
-				&transport_generic_allocate_buf;
 		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
 		if (sector_ret)
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
-		transport_dev_get_mem_SG(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		T_TASK(cmd)->t_task_lba = get_unaligned_be16(&cdb[2]);
 		passthrough = (TRANSPORT(dev)->transport_type ==
 				TRANSPORT_PLUGIN_PHBA_PDEV);
@@ -4962,17 +4364,12 @@ static int transport_generic_cmd_sequencer(
 	case VERIFY:
 	case WRITE_FILEMARKS:
 	case MOVE_MEDIUM:
-		cmd->transport_allocate_resources =
-				&transport_generic_allocate_none;
-		transport_get_maps(cmd);
 		ret = TGCS_NON_DATA_CDB;
 		break;
 	case REPORT_LUNS:
 		cmd->transport_emulate_cdb =
 				&transport_core_report_lun_response;
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
-		transport_dev_get_mem_buf(cmd->se_orig_obj_ptr, cmd);
-		transport_get_maps(cmd);
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for REPORT_LUNS
 		 * See spc4r17 section 5.3
@@ -4986,7 +4383,6 @@ static int transport_generic_cmd_sequencer(
 			" 0x%02x, sending CHECK_CONDITION.\n",
 			CMD_TFO(cmd)->get_fabric_name(), cdb[0]);
 		cmd->transport_wait_for_tasks = &transport_nop_wait_for_tasks;
-		transport_get_maps(cmd);
 		return TGCS_UNSUPPORTED_CDB;
 	}
 
@@ -5093,8 +4489,7 @@ struct se_cmd *transport_allocate_passthrough(
 	DEBUG_SO("ti.se_obj_ptr: %p\n", ti.se_obj_ptr);
 
 	if (!mem) {
-		if (cmd->transport_allocate_resources(cmd, cmd->data_length,
-					PAGE_SIZE) < 0)
+		if (transport_allocate_resources(cmd) < 0)
 			goto fail;
 	} else {
 		/*
@@ -5519,8 +4914,12 @@ void transport_free_dev_tasks(struct se_cmd *cmd)
 static inline void transport_free_pages(struct se_cmd *cmd)
 {
 	struct se_mem *se_mem, *se_mem_tmp;
-	int free_page =
-		((cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC) == 0);
+	int free_page = 1;
+
+	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC)
+		free_page = 0;
+	if (cmd->se_dev->transport->do_se_mem_map)
+		free_page = 0;
 
 	if (T_TASK(cmd)->t_task_buf) {
 		kfree(T_TASK(cmd)->t_task_buf);
@@ -5528,10 +4927,6 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 		return;
 	}
 
-	if (cmd->transport_free_resources) {
-		cmd->transport_free_resources(cmd);
-		return;
-	}
 	/*
 	 * Caller will handle releasing of struct se_mem.
 	 */
@@ -5949,6 +5344,13 @@ int transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 	T_TASK(cmd)->t_mem_list = transport_init_se_mem_list();
 	if (!(T_TASK(cmd)->t_mem_list))
 		return -ENOMEM;
+
+	/*
+	 * If the device uses memory mapping this is enough.
+	 */
+	if (cmd->se_dev->transport->do_se_mem_map)
+		return 0;
+
 	/*
 	 * Setup BIDI-COMMAND READ list of struct se_mem elements
 	 */
@@ -6557,8 +5959,8 @@ u32 transport_generic_get_cdb_count(
 		sectors -= task->task_sectors;
 		task->task_size = (task->task_sectors *
 				   DEV_ATTRIB(dev)->block_size);
-		task->transport_map_task = transport_dev_get_map_SG(dev,
-					data_direction);
+
+		task->transport_map_task = dev->transport->map_task_SG;
 
 		cdb = TRANSPORT(dev)->get_cdb(task);
 		if ((cdb)) {
@@ -6655,9 +6057,7 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 		 * T_TASK(cmd)->t_mem_list of struct se_mem->se_page
 		 */
 		if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC)) {
-			/* #warning FIXME v3.2: Enable > PAGE_SIZE usage */
-			ret = cmd->transport_allocate_resources(cmd,
-					cmd->data_length, PAGE_SIZE);
+			ret = transport_allocate_resources(cmd);
 			if (ret < 0)
 				goto failure;
 		}
@@ -6704,9 +6104,11 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 		if (atomic_read(&task->task_sent))
 			continue;
 
-		ret = task->transport_map_task(task, task->task_size);
-		if (ret < 0)
-			goto failure;
+		if (task->transport_map_task) {
+			ret = task->transport_map_task(task);
+			if (ret < 0)
+				goto failure;
+		}
 	}
 
 	/*

@@ -4,7 +4,42 @@
 #define MARKER_SIZE	8
 
 struct se_cmd;
-struct se_unmap_sg;
+
+struct se_offset_map {
+	int                     map_reset;
+	u32                     iovec_length;
+	u32                     iscsi_offset;
+	u32                     current_offset;
+	u32                     orig_offset;
+	u32                     sg_count;
+	u32                     sg_current;
+	u32                     sg_length;
+	struct page		*sg_page;
+	struct se_mem		*map_se_mem;
+	struct se_mem		*map_orig_se_mem;
+	void			*iovec_base;
+} ____cacheline_aligned;
+
+struct se_map_sg {
+	int			sg_kmap_active:1;
+	u32			data_length;
+	u32			data_offset;
+	void			*fabric_cmd;
+	struct se_cmd		*se_cmd;
+	struct iovec		*iov;
+} ____cacheline_aligned;
+
+struct se_unmap_sg {
+	u32			data_length;
+	u32			sg_count;
+	u32			sg_offset;
+	u32			padding;
+	u32			t_offset;
+	void			*fabric_cmd;
+	struct se_cmd		*se_cmd;
+	struct se_offset_map	lmap;
+	struct se_mem		*cur_se_mem;
+} ____cacheline_aligned;
 
 extern void iscsi_attach_cmd_to_queue(struct iscsi_conn *, struct iscsi_cmd *);
 extern void iscsi_remove_cmd_from_conn_list(struct iscsi_cmd *, struct iscsi_conn *);

@@ -198,7 +198,6 @@ extern void transport_generic_request_failure(struct se_cmd *, struct se_device 
 						int, int);
 extern void transport_direct_request_timeout(struct se_cmd *);
 extern void transport_generic_request_timeout(struct se_cmd *);
-extern int transport_generic_allocate_buf(struct se_cmd *, u32, u32);
 extern int __transport_execute_tasks(struct se_device *);
 extern void transport_new_cmd_failure(struct se_cmd *);
 extern void transport_set_supported_SAM_opcode(struct se_cmd *);
@@ -256,8 +255,6 @@ extern u32 transport_generic_get_cdb_count(struct se_cmd *,
 extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);
-extern int transport_generic_set_iovec_ptrs(struct se_map_sg *map_sg,
-	struct se_unmap_sg *unmap_sg);
 /* From target_core_alua.c */
 extern int core_alua_check_nonop_delay(struct se_cmd *);
 
@@ -306,23 +303,15 @@ struct se_subsystem_api {
 	/*
 	 * For SCF_SCSI_NON_DATA_CDB
 	 */
-	int (*cdb_none)(struct se_task *, u32);
+	int (*cdb_none)(struct se_task *);
 	/*
-	 * For READ SCF_SCSI_CONTROL_NONSG_IO_CDB
+	 * For SCF_SCSI_CONTROL_NONSG_IO_CDB
 	 */
-	int (*cdb_read_non_SG)(struct se_task *, u32);
+	int (*map_task_non_SG)(struct se_task *);
 	/*
-	 * For READ SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
+	 * For SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
 	 */
-	int (*cdb_read_SG)(struct se_task *, u32);
-	/*
-	 * For WRITE SCF_SCSI_CONTROL_NONSG_IO_CDB
-	 */
-	int (*cdb_write_non_SG)(struct se_task *, u32);
-	/*
-	 * For WRITE SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
-	 */
-	int (*cdb_write_SG)(struct se_task *, u32);
+	int (*map_task_SG)(struct se_task *);
 	/*
 	 * attach_hba():
 	 */
@@ -349,21 +338,7 @@ struct se_subsystem_api {
 	 * free_device():
 	 */
 	void (*free_device)(void *);
-	/*
-	 * cmd_sequencer():
-	 *
-	 * Use transport_generic_cmd_sequencer() for majority of DAS transport
-	 * drivers with a scsi_transport_spc_t struct as mentioned below.
-	 * Provided out of convenience.
-	 */
-	int (*cmd_sequencer)(struct se_cmd *cmd);
-	/*
-	 * do_tmr():
-	 *
-	 * Use transport_do_tmr() for majority of DAS transport drivers.
-	 * Provided out of convenience.
-	 */
-	int (*do_tmr)(struct se_cmd *cmd);
+
 	/*
 	 * dpo_emulated():
 	 */
@@ -388,22 +363,6 @@ struct se_subsystem_api {
 	 */
 	int (*transport_complete)(struct se_task *task);
 	struct se_task *(*alloc_task)(struct se_cmd *);
-	/*
-	 * allocate_buf():
-	 */
-	int (*allocate_buf)(struct se_cmd *, u32, u32);
-	/*
-	 * allocate_DMA();
-	 */
-	int (*allocate_DMA)(struct se_cmd *, u32, u32);
-	/*
-	 * free_buf():
-	 */
-	void (*free_buf)(struct se_cmd *);
-	/*
-	 * free_DMA():
-	 */
-	void (*free_DMA)(struct se_cmd *);
 	/*
 	 * do_task():
 	 */
@@ -437,30 +396,6 @@ struct se_subsystem_api {
 	ssize_t (*show_configfs_dev_params)(struct se_hba *, struct se_subsystem_dev *,
 						char *);
 	/*
-	 * plugin_init():
-	 */
-	int (*plugin_init)(void);
-	/*
-	 * plugin_free():
-	 */
-	void (*plugin_free)(void);
-	/*
-	 * get_plugin_info():
-	 */
-	void (*get_plugin_info)(void *, char *, int *);
-	/*
-	 * get_hba_info():
-	 */
-	void (*get_hba_info)(struct se_hba *, char *, int *);
-	/*
-	 * check_lba():
-	 */
-	int (*check_lba)(unsigned long long lba, struct se_device *);
-	/*
-	 * check_for_SG():
-	 */
-	int (*check_for_SG)(struct se_task *);
-	/*
 	 * get_cdb():
 	 */
 	unsigned char *(*get_cdb)(struct se_task *);
@@ -477,10 +412,6 @@ struct se_subsystem_api {
 	 */
 	u32 (*get_dma_length)(u32, struct se_device *);
 	/*
-	 * get_max_cdbs():
-	 */
-	u32 (*get_max_cdbs)(struct se_device *);
-	/*
 	 * Get the sector_t from a subsystem backstore..
 	 */
 	sector_t (*get_blocks)(struct se_device *);
@@ -493,18 +424,6 @@ struct se_subsystem_api {
 	 * get_sense_buffer():
 	 */
 	unsigned char *(*get_sense_buffer)(struct se_task *);
-	/*
-	 * map_task_to_SG():
-	 */
-	void (*map_task_to_SG)(struct se_task *);
-	/*
-	 * set_iovec_ptrs():
-	 */
-	int (*set_iovec_ptrs)(struct se_map_sg *, struct se_unmap_sg *);
-	/*
-	 * write_pending():
-	 */
-	int (*write_pending)(struct se_task *);
 } ____cacheline_aligned;
 
 #define TRANSPORT(dev)		((dev)->transport)

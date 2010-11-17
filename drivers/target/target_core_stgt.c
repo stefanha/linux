@@ -113,49 +113,6 @@ static void stgt_release_adapter(struct device *dev)
 	kfree(stgt_hba);
 }
 
-static int stgt_plugin_init(void)
-{
-	int ret;
-
-	ret = device_register(&stgt_primary);
-	if (ret) {
-		printk(KERN_ERR "device_register() failed for stgt_primary\n");
-		return ret;
-	}
-
-	ret = bus_register(&stgt_lld_bus);
-	if (ret) {
-		printk(KERN_ERR "bus_register() failed for stgt_ldd_bus\n");
-		goto dev_unreg;
-	}
-
-	ret = driver_register(&stgt_driverfs_driver);
-	if (ret) {
-		printk(KERN_ERR "driver_register() failed for"
-			" stgt_driverfs_driver\n");
-		goto bus_unreg;
-	}
-	stgt_host_no_cnt = 0;
-
-	printk(KERN_INFO "CORE_STGT[0]: Bus Initalization complete\n");
-	return 0;
-
-bus_unreg:
-	bus_unregister(&stgt_lld_bus);
-dev_unreg:
-	device_unregister(&stgt_primary);
-	return ret;
-}
-
-static void stgt_plugin_free(void)
-{
-	driver_unregister(&stgt_driverfs_driver);
-	bus_unregister(&stgt_lld_bus);
-	device_unregister(&stgt_primary);
-
-	printk(KERN_INFO "CORE_STGT[0]: Bus release complete\n");
-}
-
 /*	stgt_attach_hba():
  *
  */
@@ -383,7 +340,8 @@ static int stgt_do_task(struct se_task *task)
 	struct scsi_cmnd *sc;
 	int tag = MSG_SIMPLE_TAG;
 
-	sc = scsi_host_get_command(sh, st->stgt_direction, GFP_KERNEL);
+	sc = scsi_host_get_command(sh, task->task_data_direction,
+				   GFP_KERNEL);
 	if (!sc) {
 		printk(KERN_ERR "Unable to allocate memory for struct"
 			" scsi_cmnd\n");
@@ -501,22 +459,6 @@ static ssize_t stgt_check_configfs_dev_params(
 	return 0;
 }
 
-static void stgt_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM STGT <-> Target_Core_Mod Plugin %s\n",
-		STGT_VERSION);
-}
-
-static void stgt_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct Scsi_Host *sh = hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "Core Host ID: %u  SCSI Host ID: %u\n",
-			 hba->hba_id, sh->host_no);
-	*bl += sprintf(b + *bl, "        SCSI HBA: %s  <local>\n",
-		(sh->hostt->name) ? (sh->hostt->name) : "Unknown");
-}
-
 static ssize_t stgt_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -530,106 +472,6 @@ static ssize_t stgt_show_configfs_dev_params(
 		sdv->sdv_channel_id, sdv->sdv_target_id, sdv->sdv_lun_id);
 
 	return bl;
-}
-
-/*      stgt_map_task_SG():
- *
- *
- */
-static int stgt_map_task_SG(struct se_task *task)
-{
-	return 0;
-}
-
-/*	stgt_map_task_non_SG():
- *
- *
- */
-static int stgt_map_task_non_SG(struct se_task *task)
-{
-	return 0;
-}
-
-static int stgt_CDB_none(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_NONE;
-	return 0;
-}
-
-/*	stgt_CDB_read_non_SG():
- *
- *
- */
-static int stgt_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_FROM_DEVICE;
-	return stgt_map_task_non_SG(task);
-}
-
-/*	stgt_CDB_read_SG():
- *
- *
- */
-static int stgt_CDB_read_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_FROM_DEVICE;
-
-	if (stgt_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
-}
-
-/*	stgt_CDB_write_non_SG():
- *
- *
- */
-static int stgt_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_TO_DEVICE;
-	return stgt_map_task_non_SG(task);
-}
-
-/*	stgt_CDB_write_SG():
- *
- *
- */
-static int stgt_CDB_write_SG(struct se_task *task, u32 size)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	pt->stgt_direction = DMA_TO_DEVICE;
-
-	if (stgt_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
-}
-
-/*	stgt_check_lba():
- *
- *
- */
-static int stgt_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
-}
-
-/*	stgt_check_for_SG():
- *
- *
- */
-static int stgt_check_for_SG(struct se_task *task)
-{
-	return task->task_sg_num;
 }
 
 /*	stgt_get_cdb():
@@ -758,11 +600,6 @@ static struct se_subsystem_api stgt_template = {
 	.owner			= THIS_MODULE,
 	.type			= STGT,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.cdb_none		= stgt_CDB_none,
-	.cdb_read_non_SG	= stgt_CDB_read_non_SG,
-	.cdb_read_SG		= stgt_CDB_read_SG,
-	.cdb_write_non_SG	= stgt_CDB_write_non_SG,
-	.cdb_write_SG		= stgt_CDB_write_SG,
 	.attach_hba		= stgt_attach_hba,
 	.detach_hba		= stgt_detach_hba,
 	.allocate_virtdevice	= stgt_allocate_virtdevice,
@@ -775,12 +612,6 @@ static struct se_subsystem_api stgt_template = {
 	.check_configfs_dev_params = stgt_check_configfs_dev_params,
 	.set_configfs_dev_params = stgt_set_configfs_dev_params,
 	.show_configfs_dev_params = stgt_show_configfs_dev_params,
-	.plugin_init		= stgt_plugin_init,
-	.plugin_free		= stgt_plugin_free,
-	.get_plugin_info	= stgt_get_plugin_info,
-	.get_hba_info		= stgt_get_hba_info,
-	.check_lba		= stgt_check_lba,
-	.check_for_SG		= stgt_check_for_SG,
 	.get_cdb		= stgt_get_cdb,
 	.get_sense_buffer	= stgt_get_sense_buffer,
 	.get_device_rev		= stgt_get_device_rev,
@@ -790,12 +621,48 @@ static struct se_subsystem_api stgt_template = {
 
 static int __init stgt_module_init(void)
 {
-	return transport_subsystem_register(&stgt_template);
+	int ret;
+
+	ret = device_register(&stgt_primary);
+	if (ret) {
+		printk(KERN_ERR "device_register() failed for stgt_primary\n");
+		return ret;
+	}
+
+	ret = bus_register(&stgt_lld_bus);
+	if (ret) {
+		printk(KERN_ERR "bus_register() failed for stgt_ldd_bus\n");
+		goto out_unregister_device;
+	}
+
+	ret = driver_register(&stgt_driverfs_driver);
+	if (ret) {
+		printk(KERN_ERR "driver_register() failed for"
+			" stgt_driverfs_driver\n");
+		goto out_unregister_bus;
+	}
+
+	ret = transport_subsystem_register(&stgt_template);
+	if (ret)
+		goto out_unregister_driver;
+
+	return 0;
+out_unregister_driver:
+	driver_unregister(&stgt_driverfs_driver);
+out_unregister_bus:
+	bus_unregister(&stgt_lld_bus);
+out_unregister_device:
+	device_unregister(&stgt_primary);
+	return ret;
 }
 
 static void stgt_module_exit(void)
 {
 	transport_subsystem_release(&stgt_template);
+
+	driver_unregister(&stgt_driverfs_driver);
+	bus_unregister(&stgt_lld_bus);
+	device_unregister(&stgt_primary);
 }
 
 MODULE_DESCRIPTION("TCM STGT subsystem plugin");

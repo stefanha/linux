@@ -23,7 +23,6 @@ struct stgt_plugin_task {
 	struct se_task stgt_task;
 	unsigned char stgt_cdb[TCM_MAX_COMMAND_SIZE];
 	unsigned char stgt_sense[SCSI_SENSE_BUFFERSIZE];
-	int	stgt_direction;
 	int	stgt_result;
 	u32	stgt_resid;
 	struct scsi_cmnd *stgt_cmd;
