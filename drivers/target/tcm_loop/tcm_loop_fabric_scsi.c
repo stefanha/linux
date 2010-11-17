@@ -306,15 +306,13 @@ static inline struct tcm_loop_hba *tcm_loop_get_hba(struct scsi_cmnd *sc)
  * from Linux/SCSI subsystem for SCSI low level device drivers (LLDs)
  */
 static int tcm_loop_queuecommand(
-	struct scsi_cmnd *sc,
-	void (*done)(struct scsi_cmnd *))
+	struct Scsi_Host *sh,
+	struct scsi_cmnd *sc)
 {
 	struct se_cmd *se_cmd;
 	struct se_portal_group *se_tpg;
 	struct tcm_loop_hba *tl_hba;
 	struct tcm_loop_tpg *tl_tpg;
-
-	sc->scsi_done = done;
 
 	TL_CDB_DEBUG("tcm_loop_queuecommand() %d:%d:%d:%d got CDB: 0x%02x"
 		" scsi_buf_len: %u\n", sc->device->host->host_no,
@@ -328,7 +326,7 @@ static int tcm_loop_queuecommand(
 		printk(KERN_ERR "Unable to locate struct tcm_loop_hba from"
 				" struct scsi_cmnd\n");
 		sc->result = host_byte(DID_ERROR);
-		(*done)(sc);
+		sc->scsi_done(sc);
 		return 0;	
 	}
 	tl_tpg = &tl_hba->tl_hba_tpgs[sc->device->id];
@@ -340,7 +338,7 @@ static int tcm_loop_queuecommand(
 	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc);
 	if (!(se_cmd)) {
 		sc->result = host_byte(DID_ERROR);
-		(*done)(sc);
+		sc->scsi_done(sc);
 		return 0;
 	}
 	/*
