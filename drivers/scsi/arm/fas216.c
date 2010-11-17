@@ -2198,7 +2198,7 @@ no_command:
  * Returns: 0 on success, else error.
  * Notes: io_request_lock is held, interrupts are disabled.
  */
-static int fas216_queue_command_lck(struct scsi_cmnd *SCpnt,
+int fas216_queue_command(struct scsi_cmnd *SCpnt,
 			 void (*done)(struct scsi_cmnd *))
 {
 	FAS216_Info *info = (FAS216_Info *)SCpnt->device->host->hostdata;
@@ -2240,8 +2240,6 @@ static int fas216_queue_command_lck(struct scsi_cmnd *SCpnt,
 	return result;
 }
 
-DEF_SCSI_QCMD(fas216_queue_command)
-
 /**
  * fas216_internal_done - trigger restart of a waiting thread in fas216_noqueue_command
  * @SCpnt: Command to wake
@@ -2265,7 +2263,7 @@ static void fas216_internal_done(struct scsi_cmnd *SCpnt)
  * Returns: scsi result code.
  * Notes: io_request_lock is held, interrupts are disabled.
  */
-static int fas216_noqueue_command_lck(struct scsi_cmnd *SCpnt,
+int fas216_noqueue_command(struct scsi_cmnd *SCpnt,
 			   void (*done)(struct scsi_cmnd *))
 {
 	FAS216_Info *info = (FAS216_Info *)SCpnt->device->host->hostdata;
@@ -2311,8 +2309,6 @@ static int fas216_noqueue_command_lck(struct scsi_cmnd *SCpnt,
 
 	return 0;
 }
-
-DEF_SCSI_QCMD(fas216_noqueue_command)
 
 /*
  * Error handler timeout function.  Indicate that we timed out,

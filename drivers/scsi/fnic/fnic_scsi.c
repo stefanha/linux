@@ -349,7 +349,7 @@ static inline int fnic_queue_wq_copy_desc(struct fnic *fnic,
  * Routine to send a scsi cdb
  * Called with host_lock held and interrupts disabled.
  */
-static int fnic_queuecommand_lck(struct scsi_cmnd *sc, void (*done)(struct scsi_cmnd *))
+int fnic_queuecommand(struct scsi_cmnd *sc, void (*done)(struct scsi_cmnd *))
 {
 	struct fc_lport *lp;
 	struct fc_rport *rport;
@@ -456,8 +456,6 @@ out:
 	spin_lock(lp->host->host_lock);
 	return ret;
 }
-
-DEF_SCSI_QCMD(fnic_queuecommand)
 
 /*
  * fnic_fcpio_fw_reset_cmpl_handler
