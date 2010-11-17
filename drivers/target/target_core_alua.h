@@ -70,22 +70,13 @@ extern struct kmem_cache *t10_alua_tg_pt_gp_mem_cache;
 
 extern int core_emulate_report_target_port_groups(struct se_cmd *);
 extern int core_emulate_set_target_port_groups(struct se_cmd *);
-extern int core_alua_check_transition(int, int *);
 extern int core_alua_check_nonop_delay(struct se_cmd *);
-extern int core_alua_do_transition_tg_pt(struct t10_alua_tg_pt_gp *,
-				struct se_port *, struct se_node_acl *,
-				unsigned char *, int, int);
 extern int core_alua_do_port_transition(struct t10_alua_tg_pt_gp *,
 				struct se_device *, struct se_port *,
 				struct se_node_acl *, int, int);
-extern int core_alua_set_tg_pt_secondary_state(
-		struct t10_alua_tg_pt_gp_member *, struct se_port *, int, int);
-extern char *core_alua_dump_state(int);
 extern char *core_alua_dump_status(int);
 extern struct t10_alua_lu_gp *core_alua_allocate_lu_gp(const char *, int);
 extern int core_alua_set_lu_gp_id(struct t10_alua_lu_gp *, u16);
-extern struct t10_alua_lu_gp_member *core_alua_allocate_lu_gp_mem(
-					struct se_device *);
 extern void core_alua_free_lu_gp(struct t10_alua_lu_gp *);
 extern void core_alua_free_lu_gp_mem(struct se_device *);
 extern struct t10_alua_lu_gp *core_alua_get_lu_gp_by_name(const char *);
@@ -102,12 +93,7 @@ extern struct t10_alua_tg_pt_gp_member *core_alua_allocate_tg_pt_gp_mem(
 					struct se_port *);
 extern void core_alua_free_tg_pt_gp(struct t10_alua_tg_pt_gp *);
 extern void core_alua_free_tg_pt_gp_mem(struct se_port *);
-extern struct t10_alua_tg_pt_gp *core_alua_get_tg_pt_gp_by_name(
-				struct se_subsystem_dev *, const char *);
-extern void core_alua_put_tg_pt_gp_from_name(struct t10_alua_tg_pt_gp *);
 extern void __core_alua_attach_tg_pt_gp_mem(struct t10_alua_tg_pt_gp_member *,
-					struct t10_alua_tg_pt_gp *);
-extern void __core_alua_drop_tg_pt_gp_mem(struct t10_alua_tg_pt_gp_member *,
 					struct t10_alua_tg_pt_gp *);
 extern ssize_t core_alua_show_tg_pt_gp_info(struct se_port *, char *);
 extern ssize_t core_alua_store_tg_pt_gp_info(struct se_port *, const char *,
