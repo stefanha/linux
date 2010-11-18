@@ -40,6 +40,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/libfc.h>
+#include <scsi/scsi_transport_fc.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -128,7 +129,87 @@ char *tcm_qla2xxx_get_fabric_name(void)
 	return "qla2xxx";
 }
 
-u8 tcm_qla2xxx_get_fabric_proto_ident(se_portal_group_t *se_tpg)
+/*
+ * From drivers/scsi/scsi_transport_fc.c:fc_parse_wwn
+ */
+static int tcm_qla2xxx_npiv_extract_wwn(const char *ns, u64 *nm)
+{
+	unsigned int i, j, value;
+	u8 wwn[8];
+
+	memset(wwn, 0, sizeof(wwn));
+
+	/* Validate and store the new name */
+	for (i = 0, j = 0; i < 16; i++) {
+		value = hex_to_bin(*ns++);
+		if (value >= 0)
+			j = (j << 4) | value;
+		else
+			return -EINVAL;
+
+		if (i % 2) {
+			wwn[i/2] = j & 0xff;
+			j = 0;
+		}
+	}
+
+	*nm = wwn_to_u64(wwn);
+	return 0;
+}
+
+/*
+ * This parsing logic follows drivers/scsi/scsi_transport_fc.c:store_fc_host_vport_create()
+ */
+int tcm_qla2xxx_npiv_parse_wwn(
+	const char *name,
+	size_t count,
+	u64 *wwpn,
+	u64 *wwnn)
+{
+	unsigned int cnt = count;
+	int rc;
+
+	*wwpn = 0;
+	*wwnn = 0;
+
+	/* count may include a LF at end of string */
+	if (name[cnt-1] == '\n')
+		cnt--;
+
+	/* validate we have enough characters for WWPN */
+	if ((cnt != (16+1+16)) || (name[16] != ':'))
+		return -EINVAL;
+
+	rc = tcm_qla2xxx_npiv_extract_wwn(&name[0], wwpn);
+	if (rc != 0)
+		return rc;
+
+	rc = tcm_qla2xxx_npiv_extract_wwn(&name[17], wwnn);
+	if (rc != 0)
+		return rc;
+
+	return 0;
+}
+
+ssize_t tcm_qla2xxx_npiv_format_wwn(char *buf, size_t len, u64 wwpn, u64 wwnn)
+{
+	u8 b[8], b2[8];
+
+	put_unaligned_be64(wwpn, b);
+	put_unaligned_be64(wwnn, b2);
+        return snprintf(buf, len,
+                "%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x,"
+		"%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x",
+                b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+		b2[0], b2[1], b2[2], b2[3], b2[4], b2[5], b2[6], b2[7]);
+}
+
+char *tcm_qla2xxx_npiv_get_fabric_name(void)
+{
+	return "qla2xxx_npiv";
+}
+
+u8 tcm_qla2xxx_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 {
 	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
 				struct tcm_qla2xxx_tpg, se_tpg);
@@ -154,7 +235,16 @@ char *tcm_qla2xxx_get_fabric_wwn(struct se_portal_group *se_tpg)
 	return &lport->lport_name[0];
 }
 
-u16 tcm_qla2xxx_get_tag(se_portal_group_t *se_tpg)
+char *tcm_qla2xxx_npiv_get_fabric_wwn(struct se_portal_group *se_tpg)
+{
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
+				struct tcm_qla2xxx_tpg, se_tpg);
+	struct tcm_qla2xxx_lport *lport = tpg->lport;
+
+	return &lport->lport_npiv_name[0];
+}
+
+u16 tcm_qla2xxx_get_tag(struct se_portal_group *se_tpg)
 {
 	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
 				struct tcm_qla2xxx_tpg, se_tpg);
