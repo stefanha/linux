@@ -44,24 +44,25 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 #include <target/target_core_base.h>
 #include <target/configfs_macros.h>
 
 #include <tcm_qla2xxx_base.h>
 #include <tcm_qla2xxx_fabric.h>
 
+#include <qla_def.h>
+
 #undef TCM_QLA2XXX_CONFIGFS_C
 
 /* Local pointer to allocated TCM configfs fabric module */
 struct target_fabric_configfs *tcm_qla2xxx_fabric_configfs;
 
-static struct se_node_acl_s *tcm_qla2xxx_make_nodeacl(
-	struct se_portal_group_s *se_tpg,
+static struct se_node_acl *tcm_qla2xxx_make_nodeacl(
+	struct se_portal_group *se_tpg,
 	struct config_group *group,
 	const char *name)
 {
-	se_node_acl_t *se_nacl, *se_nacl_new;
+	struct se_node_acl *se_nacl, *se_nacl_new;
 	struct tcm_qla2xxx_nacl *nacl;
 	u64 wwpn;
 	u32 qla2xxx_nexus_depth;
@@ -94,15 +95,15 @@ static struct se_node_acl_s *tcm_qla2xxx_make_nodeacl(
 	return se_nacl;
 }
 
-static void tcm_qla2xxx_drop_nodeacl(struct se_node_acl_s *se_acl)
+static void tcm_qla2xxx_drop_nodeacl(struct se_node_acl *se_acl)
 {
 	struct tcm_qla2xxx_nacl *nacl = container_of(se_acl,
 				struct tcm_qla2xxx_nacl, se_node_acl);	
 	kfree(nacl);
 }
 
-static struct se_portal_group_s *tcm_qla2xxx_make_tpg(
-	struct se_wwn_s *wwn,
+static struct se_portal_group *tcm_qla2xxx_make_tpg(
+	struct se_wwn *wwn,
 	struct config_group *group,
 	const char *name)
 {
@@ -114,7 +115,7 @@ static struct se_portal_group_s *tcm_qla2xxx_make_tpg(
 
 	if (strstr(name, "tpgt_") != name)
 		return ERR_PTR(-EINVAL);
-	if (strict_strtoul(name + 5, 10, &tpgt) || tpgt > USHORT_MAX)
+	if (strict_strtoul(name + 5, 10, &tpgt) || tpgt > USHRT_MAX)
 		return ERR_PTR(-EINVAL);
 	
 	tpg = kzalloc(sizeof(struct tcm_qla2xxx_tpg), GFP_KERNEL);
@@ -135,7 +136,7 @@ static struct se_portal_group_s *tcm_qla2xxx_make_tpg(
 	return &tpg->se_tpg;
 }
 
-static void tcm_qla2xxx_drop_tpg(struct se_portal_group_s *se_tpg)
+static void tcm_qla2xxx_drop_tpg(struct se_portal_group *se_tpg)
 {
 	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
 				struct tcm_qla2xxx_tpg, se_tpg);
@@ -145,7 +146,7 @@ static void tcm_qla2xxx_drop_tpg(struct se_portal_group_s *se_tpg)
 }
 
 
-static struct se_wwn_s *tcm_qla2xxx_make_lport(
+static struct se_wwn *tcm_qla2xxx_make_lport(
 	struct target_fabric_configfs *tf,
 	struct config_group *group,
 	const char *name)
@@ -205,9 +206,7 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.tpg_check_prod_mode_write_protect = tcm_qla2xxx_check_false,
 	.tpg_alloc_fabric_acl		= tcm_qla2xxx_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= tcm_qla2xxx_release_fabric_acl,
-#ifdef SNMP_SUPPORT
 	.tpg_get_inst_index		= tcm_qla2xxx_tpg_get_inst_index,
-#endif /* SNMP_SUPPORT */
 	.release_cmd_to_pool		= tcm_qla2xxx_release_cmd,
 	.release_cmd_direct		= tcm_qla2xxx_release_cmd,
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
@@ -215,9 +214,7 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.stop_session			= tcm_qla2xxx_stop_session,
 	.fall_back_to_erl0		= tcm_qla2xxx_reset_nexus,
 	.sess_logged_in			= tcm_qla2xxx_sess_logged_in,
-#ifdef SNMP_SUPPORT
 	.sess_get_index			= tcm_qla2xxx_sess_get_index,
-#endif /* SNMP_SUPPORT */
 	.sess_get_initiator_sid		= NULL,
 	.write_pending			= tcm_qla2xxx_write_pending,
 	.write_pending_status		= tcm_qla2xxx_write_pending_status,
@@ -317,7 +314,7 @@ static int __init tcm_qla2xxx_init(void)
 	return 0;
 }
 
-static void __init tcm_qla2xxx_exit(void)
+static void __exit tcm_qla2xxx_exit(void)
 {
 	tcm_qla2xxx_deregister_configfs();
 }

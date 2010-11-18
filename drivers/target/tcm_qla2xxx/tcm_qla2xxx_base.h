@@ -1,3 +1,5 @@
+#include <target/target_core_base.h>
+
 #define TCM_QLA2XXX_VERSION	"v0.1"
 /* length of ASCII WWPNs including pad */
 #define TCM_QLA2XXX_NAMELEN	32
@@ -8,7 +10,7 @@ struct tcm_qla2xxx_nacl {
 	/* ASCII formatted WWPN for FC Initiator Nport */
 	char nport_name[TCM_QLA2XXX_NAMELEN];
 	/* Returned by tcm_qla2xxx_make_nodeacl() */
-	struct se_node_acl_s se_node_acl;
+	struct se_node_acl se_node_acl;
 };
 
 struct tcm_qla2xxx_tpg {
@@ -17,7 +19,7 @@ struct tcm_qla2xxx_tpg {
 	/* Pointer back to tcm_qla2xxx_lport */
 	struct tcm_qla2xxx_lport *lport;
 	/* Returned by tcm_qla2xxx_make_tpg() */
-	struct se_portal_group_s se_tpg;
+	struct se_portal_group se_tpg;
 };
 
 struct tcm_qla2xxx_lport {
@@ -28,5 +30,5 @@ struct tcm_qla2xxx_lport {
 	/* ASCII formatted WWPN for FC Target Lport */
 	char lport_name[TCM_QLA2XXX_NAMELEN];
 	/* Returned by tcm_qla2xxx_make_lport() */
-	struct se_wwn_s lport_wwn;
+	struct se_wwn lport_wwn;
 };

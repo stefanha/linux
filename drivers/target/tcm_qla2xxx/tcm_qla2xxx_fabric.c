@@ -48,19 +48,18 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_alua.h>
 
 #include <tcm_qla2xxx_base.h>
 #include <tcm_qla2xxx_fabric.h>
 
 #undef TCM_QLA2XXX_FABRIC_C
 
-int tcm_qla2xxx_check_true(se_portal_group_t *se_tpg)
+int tcm_qla2xxx_check_true(struct se_portal_group *se_tpg)
 {
 	return 1;
 }
 
-int tcm_qla2xxx_check_false(se_portal_group_t *se_tpg)
+int tcm_qla2xxx_check_false(struct se_portal_group *se_tpg)
 {
 	return 0;
 }
@@ -146,7 +145,7 @@ u8 tcm_qla2xxx_get_fabric_proto_ident(se_portal_group_t *se_tpg)
 	return proto_id;
 }
 
-char *tcm_qla2xxx_get_fabric_wwn(se_portal_group_t *se_tpg)
+char *tcm_qla2xxx_get_fabric_wwn(struct se_portal_group *se_tpg)
 {
 	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
 				struct tcm_qla2xxx_tpg, se_tpg);
@@ -162,15 +161,15 @@ u16 tcm_qla2xxx_get_tag(se_portal_group_t *se_tpg)
 	return tpg->lport_tpgt;
 }
 
-u32 tcm_qla2xxx_get_default_depth(se_portal_group_t *se_tpg)
+u32 tcm_qla2xxx_get_default_depth(struct se_portal_group *se_tpg)
 {
 	return 1;
 }
 
 u32 tcm_qla2xxx_get_pr_transport_id(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code,
 	unsigned char *buf)
 {
@@ -191,9 +190,9 @@ u32 tcm_qla2xxx_get_pr_transport_id(
 }		
 
 u32 tcm_qla2xxx_get_pr_transport_id_len(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl,
-	t10_pr_registration_t *pr_reg,
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl,
+	struct t10_pr_registration *pr_reg,
 	int *format_code)
 {
 	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
@@ -213,7 +212,7 @@ u32 tcm_qla2xxx_get_pr_transport_id_len(
 }
 
 char *tcm_qla2xxx_parse_pr_out_transport_id(
-	se_portal_group_t *se_tpg,
+	struct se_portal_group *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
 	char **port_nexus_ptr)
@@ -234,7 +233,7 @@ char *tcm_qla2xxx_parse_pr_out_transport_id(
 	return tid;
 }
 
-se_node_acl_t *tcm_qla2xxx_alloc_fabric_acl(se_portal_group_t *se_tpg)
+struct se_node_acl *tcm_qla2xxx_alloc_fabric_acl(struct se_portal_group *se_tpg)
 {
 	struct tcm_qla2xxx_nacl *nacl;
 
@@ -248,99 +247,98 @@ se_node_acl_t *tcm_qla2xxx_alloc_fabric_acl(se_portal_group_t *se_tpg)
 }
 
 void tcm_qla2xxx_release_fabric_acl(
-	se_portal_group_t *se_tpg,
-	se_node_acl_t *se_nacl)
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_nacl)
 {
 	struct tcm_qla2xxx_nacl *nacl = container_of(se_nacl,
 			struct tcm_qla2xxx_nacl, se_node_acl);
 	kfree(nacl);
 }
 
-#ifdef SNMP_SUPPORT
-u32 tcm_qla2xxx_tpg_get_inst_index(se_portal_group_t *se_tpg)
+u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *se_tpg)
 {
-	return 1;
-}
-#endif /* SNMP_SUPPORT */
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
+				struct tcm_qla2xxx_tpg, se_tpg);
 
-void tcm_qla2xxx_release_cmd(se_cmd_t *se_cmd)
-{
-	return;
+	return tpg->lport_tpgt;
 }
 
-int tcm_qla2xxx_shutdown_session(se_session_t *se_sess)
-{
-	return 0;
-}
-
-void tcm_qla2xxx_close_session(se_session_t *se_sess)
+void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 {
 	return;
 }
 
-void tcm_qla2xxx_stop_session(se_session_t *se_sess, int sess_sleep , int conn_sleep)
+int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
+{
+	return 0;
+}
+
+void tcm_qla2xxx_close_session(struct se_session *se_sess)
 {
 	return;
 }
 
-void tcm_qla2xxx_reset_nexus(se_session_t *se_sess)
+void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int conn_sleep)
 {
 	return;
 }
 
-int tcm_qla2xxx_sess_logged_in(se_session_t *se_sess)
-{
-	return 0;
-}
-
-#ifdef SNMP_SUPPORT
-u32 tcm_qla2xxx_sess_get_index(se_session_t *se_sess)
-{
-	return 0;
-}
-#endif /* SNMP_SUPPORT */
-
-int tcm_qla2xxx_write_pending(se_cmd_t *se_cmd)
-{
-	return 0;
-}
-
-int tcm_qla2xxx_write_pending_status(se_cmd_t *se_cmd)
-{
-	return 0;
-}
-
-void tcm_qla2xxx_set_default_node_attrs(se_node_acl_t *nacl)
+void tcm_qla2xxx_reset_nexus(struct se_session *se_sess)
 {
 	return;
 }
 
-u32 tcm_qla2xxx_get_task_tag(se_cmd_t *se_cmd)
+int tcm_qla2xxx_sess_logged_in(struct se_session *se_sess)
 {
 	return 0;
 }
 
-int tcm_qla2xxx_get_cmd_state(se_cmd_t *se_cmd)
+u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
 {
 	return 0;
 }
 
-void tcm_qla2xxx_new_cmd_failure(se_cmd_t *se_cmd)
+int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
+{
+	return 0;
+}
+
+int tcm_qla2xxx_write_pending_status(struct se_cmd *se_cmd)
+{
+	return 0;
+}
+
+void tcm_qla2xxx_set_default_node_attrs(struct se_node_acl *nacl)
 {
 	return;
 }
 
-int tcm_qla2xxx_queue_data_in(se_cmd_t *se_cmd)
+u32 tcm_qla2xxx_get_task_tag(struct se_cmd *se_cmd)
 {
 	return 0;
 }
 
-int tcm_qla2xxx_queue_status(se_cmd_t *se_cmd)
+int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
 {
 	return 0;
 }
 
-int tcm_qla2xxx_queue_tm_rsp(se_cmd_t *se_cmd)
+void tcm_qla2xxx_new_cmd_failure(struct se_cmd *se_cmd)
+{
+	return;
+}
+
+int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
+{
+	return 0;
+}
+
+int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
+{
+	return 0;
+}
+
+int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 {
 	return 0;
 }
@@ -350,12 +348,12 @@ u16 tcm_qla2xxx_get_fabric_sense_len(void)
 	return 0;
 }
 
-u16 tcm_qla2xxx_set_fabric_sense_len(se_cmd_t *se_cmd, u32 sense_length)
+u16 tcm_qla2xxx_set_fabric_sense_len(struct se_cmd *se_cmd, u32 sense_length)
 {
 	return 0;
 }
 
-int tcm_qla2xxx_is_state_remove(se_cmd_t *se_cmd)
+int tcm_qla2xxx_is_state_remove(struct se_cmd *se_cmd)
 {
 	return 0;
 }
