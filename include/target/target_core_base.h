@@ -546,17 +546,11 @@ struct se_cmd {
 	u32			cmd_spdtl;
 	u32			residual_count;
 	u32			orig_fe_lun;
-	/* Number of iovecs iovecs used for IP stack calls */
-	u32			iov_data_count;
-	/* Number of iovecs allocated for iscsi_cmd_t->iov_data */
-	u32			orig_iov_data_count;
 	/* Persistent Reservation key */
 	u64			pr_res_key;
 	atomic_t                transport_sent;
 	/* Used for sense data */
 	void			*sense_buffer;
-	/* Used with sockets based fabric plugins */
-	struct iovec		*iov_data;
 	struct list_head	se_delayed_list;
 	struct list_head	se_ordered_list;
 	struct list_head	se_lun_list;

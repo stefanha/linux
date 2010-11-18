@@ -102,6 +102,7 @@ extern void iscsi_stop_nopin_response_timer(struct iscsi_conn *);
 extern void __iscsi_start_nopin_timer(struct iscsi_conn *);
 extern void iscsi_start_nopin_timer(struct iscsi_conn *);
 extern void iscsi_stop_nopin_timer(struct iscsi_conn *);
+extern int iscsi_allocate_iovecs_for_cmd(struct se_cmd *);
 extern int iscsi_send_tx_data(struct iscsi_cmd *, struct iscsi_conn *, int);
 extern int iscsi_fe_sendpage_sg(struct se_unmap_sg *, struct iscsi_conn *);
 extern int iscsi_tx_login_rsp(struct iscsi_conn *, __u8, __u8);
