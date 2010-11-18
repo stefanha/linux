@@ -5762,7 +5762,7 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd,
 	atomic_inc(&cmd->t_task->t_se_count);
 
 	if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB) {
-		struct se_mem *se_mem, *se_mem_lout = NULL;
+		struct se_mem *se_mem = NULL, *se_mem_lout = NULL;
 		u32 se_mem_cnt = 0, task_offset = 0;
 
 		BUG_ON(list_empty(cmd->t_task->t_mem_list));
@@ -5777,11 +5777,11 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd,
 			return dev->transport->map_task_SG(task);
 		return 0;
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		if (dev->transport->map_task_non_SG(task))
+		if (dev->transport->map_task_non_SG)
 			return dev->transport->map_task_non_SG(task);
 		return 0;
 	} else if (cmd->se_cmd_flags & SCF_SCSI_NON_DATA_CDB) {
-		if (dev->transport->cdb_none(task))
+		if (dev->transport->cdb_none)
 			return dev->transport->cdb_none(task);
 		return 0;
 	} else {
