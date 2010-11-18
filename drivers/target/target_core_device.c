@@ -1647,7 +1647,6 @@ int core_dev_setup_virtual_lun0(void)
 	se_dev->t10_wwn.t10_sub_dev = se_dev;
 	se_dev->t10_alua.t10_sub_dev = se_dev;
 	se_dev->se_dev_attrib.da_sub_dev = se_dev;
-
 	se_dev->se_dev_hba = hba;
 
 	se_dev->se_dev_su_ptr = t->allocate_virtdevice(hba, "virt_lun0");

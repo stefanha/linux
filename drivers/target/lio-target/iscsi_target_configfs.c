@@ -1458,9 +1458,11 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.tpg_release_fabric_acl = &lio_tpg_release_fabric_acl;
 	fabric->tf_ops.tpg_get_inst_index = &lio_tpg_get_inst_index;
 	/*
-	 * Use transport_generic_allocate_iovecs from target_core_mod
+	 * Use our local iscsi_allocate_iovecs_for_cmd() for the extra
+	 * callback in transport_generic_new_cmd() to allocate
+	 * iscsi_cmd->iov_data[] for Linux/Net kernel sockets operations.
 	 */
-	fabric->tf_ops.alloc_cmd_iovecs = &transport_generic_allocate_iovecs;
+	fabric->tf_ops.alloc_cmd_iovecs = &iscsi_allocate_iovecs_for_cmd;
 	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd_to_pool;
 	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;

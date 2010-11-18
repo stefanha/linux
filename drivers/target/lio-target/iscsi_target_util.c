@@ -1018,6 +1018,7 @@ void iscsi_release_cmd_direct(struct iscsi_cmd *cmd)
 	kfree(cmd->pdu_list);
 	kfree(cmd->seq_list);
 	kfree(cmd->tmr_req);
+	kfree(cmd->iov_data);
 
 	kmem_cache_free(lio_cmd_cache, cmd);
 }
@@ -1044,6 +1045,7 @@ void __iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *se
 	kfree(cmd->pdu_list);
 	kfree(cmd->seq_list);
 	kfree(cmd->tmr_req);
+	kfree(cmd->iov_data);
 
 	if (conn)
 		iscsi_remove_cmd_from_tx_queues(cmd, conn);
@@ -2041,6 +2043,22 @@ void iscsi_stop_nopin_timer(struct iscsi_conn *conn)
 	spin_unlock_bh(&conn->nopin_timer_lock);
 }
 
+int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+	u32 iov_count = (T_TASK(se_cmd)->t_tasks_se_num == 0) ? 1 :
+				T_TASK(se_cmd)->t_tasks_se_num;
+	
+	iov_count += TRANSPORT_IOV_DATA_BUFFER;
+
+	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_KERNEL);
+	if (!(cmd->iov_data))
+		return -ENOMEM;
+	
+	cmd->orig_iov_data_count = iov_count;
+	return 0;
+}
+
 /*	iscsi_send_tx_data():
  *
  *
@@ -2058,8 +2076,8 @@ send_data:
 	tx_size = cmd->tx_size;
 
 	if (!use_misc) {
-		iov = &SE_CMD(cmd)->iov_data[0];
-		iov_count = SE_CMD(cmd)->iov_data_count;
+		iov = &cmd->iov_data[0];
+		iov_count = cmd->iov_data_count;
 	} else {
 		iov = &cmd->iov_misc[0];
 		iov_count = cmd->iov_misc_count;
@@ -2086,7 +2104,7 @@ int iscsi_fe_sendpage_sg(
 	struct iscsi_cmd *cmd = (struct iscsi_cmd *)u_sg->fabric_cmd;
 	struct se_cmd *se_cmd = SE_CMD(cmd);
 	u32 len = cmd->tx_size, pg_len, se_len, se_off, tx_size;
-	struct iovec *iov = &se_cmd->iov_data[0];
+	struct iovec *iov = &cmd->iov_data[0];
 	struct page *page;
 	struct se_mem *se_mem = u_sg->cur_se_mem;
 
@@ -2196,7 +2214,7 @@ send_pg:
 send_padding:
 	if (u_sg->padding) {
 		struct iovec *iov_p =
-			&se_cmd->iov_data[se_cmd->iov_data_count-2];
+			&cmd->iov_data[cmd->iov_data_count-2];
 
 		tx_sent = tx_data(conn, iov_p, 1, u_sg->padding);
 		if (u_sg->padding != tx_sent) {
@@ -2211,7 +2229,7 @@ send_padding:
 send_datacrc:
 	if (CONN_OPS(conn)->DataDigest) {
 		struct iovec *iov_d =
-			&se_cmd->iov_data[se_cmd->iov_data_count-1];
+			&cmd->iov_data[cmd->iov_data_count-1];
 
 		tx_sent = tx_data(conn, iov_d, 1, CRC_LEN);
 		if (CRC_LEN != tx_sent) {

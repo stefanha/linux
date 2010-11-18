@@ -401,6 +401,9 @@ struct iscsi_cmd {
 	u32			outstanding_r2ts;
 	/* Next R2T Offset when DataSequenceInOrder=Yes */
 	u32			r2t_offset;
+	/* Iovec current and orig count for iscsi_cmd->iov_data */
+	u32			iov_data_count;
+	u32			orig_iov_data_count;
 	/* Number of miscellaneous iovecs used for IP stack calls */
 	u32			iov_misc_count;
 	/* Bytes used for 32-bit word padding */
@@ -459,6 +462,8 @@ struct iscsi_cmd {
 	struct semaphore	unsolicited_data_sem;
 	/* Timer for DataOUT */
 	struct timer_list	dataout_timer;
+	/* Iovecs for SCSI data payload RX/TX w/ kernel level sockets */
+	struct iovec		*iov_data;
 	/* Iovecs for miscellaneous purposes */
 	struct iovec		iov_misc[ISCSI_MISC_IOVECS];
 	/* Array of struct iscsi_pdu used for DataPDUInOrder=No */

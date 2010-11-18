@@ -1652,6 +1652,7 @@ static int iscsi_set_iovec_ptrs(
 	u32 orig_map_length = map_sg->data_length;
 #endif
 	struct se_cmd *cmd = map_sg->se_cmd;
+	struct iscsi_cmd *i_cmd = container_of(cmd, struct iscsi_cmd, se_cmd);
 	struct se_offset_map *lmap = &unmap_sg->lmap;
 	struct iovec *iov = map_sg->iov;
 
@@ -1693,9 +1694,9 @@ static int iscsi_set_iovec_ptrs(
 	lmap->map_se_mem = lmap->map_orig_se_mem;
 
 	DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Total map_sg->data_length: %d,"
-		" lmap->iscsi_offset: %d, cmd->orig_iov_data_count: %d\n",
+		" lmap->iscsi_offset: %d, i_cmd->orig_iov_data_count: %d\n",
 		map_sg->data_length, lmap->iscsi_offset,
-		cmd->orig_iov_data_count);
+		i_cmd->orig_iov_data_count);
 
 	while (map_sg->data_length) {
 		/*
@@ -1732,10 +1733,10 @@ static int iscsi_set_iovec_ptrs(
 			map_sg->data_length + iov[i].iov_len,
 			map_sg->data_length);
 
-		if ((++i + 1) > cmd->orig_iov_data_count) {
+		if ((++i + 1) > i_cmd->orig_iov_data_count) {
 			printk(KERN_ERR "Current iovec count %u is greater than"
 				" struct se_cmd->orig_data_iov_count %u, cannot"
-				" continue.\n", i+1, cmd->orig_iov_data_count);
+				" continue.\n", i+1, i_cmd->orig_iov_data_count);
 			return -1;
 		}
 
@@ -2362,7 +2363,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		return -1;
 
 	rx_size += hdr->length;
-	iov = &SE_CMD(cmd)->iov_data[0];
+	iov = &cmd->iov_data[0];
 
 	memset((void *)&map_sg, 0, sizeof(struct se_map_sg));
 	memset((void *)&unmap_sg, 0, sizeof(struct se_unmap_sg));
@@ -2397,7 +2398,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 
 	iscsi_map_SG_segments(&unmap_sg);
 
-	rx_got = rx_data(conn, &SE_CMD(cmd)->iov_data[0], iov_count, rx_size);
+	rx_got = rx_data(conn, &cmd->iov_data[0], iov_count, rx_size);
 
 	iscsi_unmap_SG_segments(&unmap_sg);
 
@@ -2406,7 +2407,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 
 	if (CONN_OPS(conn)->DataDigest) {
 		__u32 counter = hdr->length, data_crc = 0;
-		struct iovec *iov_ptr = &SE_CMD(cmd)->iov_data[0];
+		struct iovec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
@@ -3395,7 +3396,7 @@ static int iscsi_handle_immediate_data(
 	map_sg.fabric_cmd = (void *)cmd;
 	map_sg.se_cmd = SE_CMD(cmd);
 	map_sg.sg_kmap_active = 1;
-	map_sg.iov = &SE_CMD(cmd)->iov_data[0];
+	map_sg.iov = &cmd->iov_data[0];
 	map_sg.data_length = length;
 	map_sg.data_offset = cmd->write_data_done;
 	unmap_sg.fabric_cmd = (void *)cmd;
@@ -3407,7 +3408,7 @@ static int iscsi_handle_immediate_data(
 
 	rx_size = length;
 	iov_count = iov_ret;
-	iov = &SE_CMD(cmd)->iov_data[0];
+	iov = &cmd->iov_data[0];
 
 	padding = ((-length) & 3);
 	if (padding != 0) {
@@ -3424,7 +3425,7 @@ static int iscsi_handle_immediate_data(
 
 	iscsi_map_SG_segments(&unmap_sg);
 
-	rx_got = rx_data(conn, &SE_CMD(cmd)->iov_data[0], iov_count, rx_size);
+	rx_got = rx_data(conn, &cmd->iov_data[0], iov_count, rx_size);
 
 	iscsi_unmap_SG_segments(&unmap_sg);
 
@@ -3435,7 +3436,7 @@ static int iscsi_handle_immediate_data(
 
 	if (CONN_OPS(conn)->DataDigest) {
 		__u32 counter = length, data_crc;
-		struct iovec *iov_ptr = &SE_CMD(cmd)->iov_data[0];
+		struct iovec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
@@ -3854,7 +3855,7 @@ static inline int iscsi_send_data_in(
 	hdr->data_sn		= cpu_to_be32(datain.data_sn);
 	hdr->offset		= cpu_to_be32(datain.offset);
 
-	iov = &SE_CMD(cmd)->iov_data[0];
+	iov = &cmd->iov_data[0];
 	iov[iov_count].iov_base	= cmd->pdu;
 	iov[iov_count++].iov_len	= ISCSI_HDR_LEN;
 	tx_size += ISCSI_HDR_LEN;
@@ -3879,7 +3880,7 @@ static inline int iscsi_send_data_in(
 	map_sg.fabric_cmd = (void *)cmd;
 	map_sg.se_cmd = SE_CMD(cmd);
 	map_sg.sg_kmap_active = 1;
-	map_sg.iov = &SE_CMD(cmd)->iov_data[1];
+	map_sg.iov = &cmd->iov_data[1];
 	map_sg.data_length = datain.length;
 	map_sg.data_offset = datain.offset;
 
@@ -3909,7 +3910,7 @@ static inline int iscsi_send_data_in(
 	}
 	if (CONN_OPS(conn)->DataDigest) {
 		__u32 counter = (datain.length + unmap_sg->padding);
-		struct iovec *iov_ptr = &SE_CMD(cmd)->iov_data[1];
+		struct iovec *iov_ptr = &cmd->iov_data[1];
 
 		crypto_hash_init(&conn->conn_tx_hash);
 
@@ -3936,7 +3937,7 @@ static inline int iscsi_send_data_in(
 			cmd->data_crc);
 	}
 
-	SE_CMD(cmd)->iov_data_count = iov_count;
+	cmd->iov_data_count = iov_count;
 	cmd->tx_size = tx_size;
 
 	TRACE(TRACE_ISCSI, "Built DataIN ITT: 0x%08x, StatSN: 0x%08x,"

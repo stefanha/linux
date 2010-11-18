@@ -2112,48 +2112,6 @@ out:
 }
 EXPORT_SYMBOL(transport_add_device_to_core_hba);
 
-static inline int transport_allocate_iovecs_for_cmd(
-	struct se_cmd *cmd,
-	u32 iov_count)
-{
-	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_KERNEL);
-	if (!(cmd->iov_data)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-			" iscsi_cmd_t->iov_data.\n");
-		return -1;
-	}
-	cmd->orig_iov_data_count = iov_count;
-
-	return 0;
-}
-
-/*	transport_generic_allocate_iovecs():
- *
- *	Attached to struct target_core_fabric_ops->alloc_cmd_iovecs()
- *	for TCM fabric modules using Linux/NET with a struct iovec array.
- *
- *	Called by TCM fabric module in transport_generic_new_cmd() in
- *	transport processing thread context.
- */
-int transport_generic_allocate_iovecs(
-	struct se_cmd *cmd)
-{
-	u32 iov_count;
-
-	iov_count = T_TASK(cmd)->t_tasks_se_num;
-	if (!(iov_count))
-		iov_count = 1;
-#if 0
-	printk(KERN_INFO "Allocated %d iovecs for ITT: 0x%08x t_tasks_se_num:"
-		" %u\n", iov_count, CMD_TFO(cmd)->get_task_tag(cmd),
-		T_TASK(cmd)->t_tasks_se_num);
-#endif
-	iov_count += TRANSPORT_IOV_DATA_BUFFER;
-
-	return transport_allocate_iovecs_for_cmd(cmd, iov_count);
-}
-EXPORT_SYMBOL(transport_generic_allocate_iovecs);
-
 /*	transport_generic_prepare_cdb():
  *
  *	Since the Initiator sees iSCSI devices as LUNs,  the SCSI CDB will
@@ -2340,11 +2298,6 @@ void transport_free_se_cmd(
 	if (T_TASK(se_cmd)->t_task_cdb != T_TASK(se_cmd)->__t_task_cdb)
 		kfree(T_TASK(se_cmd)->t_task_cdb);
 	/*
-	 * Release any optional TCM fabric dependent iovecs allocated by
-	 * transport_allocate_iovecs_for_cmd()
-	 */
-	kfree(se_cmd->iov_data);
-	/*
 	 * Only release the sense_buffer, t_task, and remaining se_cmd memory
 	 * if this descriptor was allocated with transport_alloc_se_cmd()
 	 */
@@ -2403,7 +2356,8 @@ int transport_generic_allocate_tasks(
 		if (!(T_TASK(cmd)->t_task_cdb)) {
 			printk(KERN_ERR "Unable to allocate T_TASK(cmd)->t_task_cdb"
 				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %lu ops\n",
-				scsi_command_size(cdb), sizeof(T_TASK(cmd)->__t_task_cdb));
+				scsi_command_size(cdb),
+				(unsigned long)sizeof(T_TASK(cmd)->__t_task_cdb));
 			return -1;
 		}
 	} else
@@ -5761,7 +5715,7 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd,
 	atomic_inc(&cmd->t_task->t_se_count);
 
 	if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB) {
-		struct se_mem *se_mem, *se_mem_lout = NULL;
+		struct se_mem *se_mem = NULL, *se_mem_lout = NULL;
 		u32 se_mem_cnt = 0, task_offset = 0;
 
 		BUG_ON(list_empty(cmd->t_task->t_mem_list));
@@ -5776,11 +5730,11 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd,
 			return dev->transport->map_task_SG(task);
 		return 0;
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		if (dev->transport->map_task_non_SG(task))
+		if (dev->transport->map_task_non_SG)
 			return dev->transport->map_task_non_SG(task);
 		return 0;
 	} else if (cmd->se_cmd_flags & SCF_SCSI_NON_DATA_CDB) {
-		if (dev->transport->cdb_none(task))
+		if (dev->transport->cdb_none)
 			return dev->transport->cdb_none(task);
 		return 0;
 	} else {
