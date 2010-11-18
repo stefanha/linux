@@ -2403,7 +2403,8 @@ int transport_generic_allocate_tasks(
 		if (!(T_TASK(cmd)->t_task_cdb)) {
 			printk(KERN_ERR "Unable to allocate T_TASK(cmd)->t_task_cdb"
 				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %lu ops\n",
-				scsi_command_size(cdb), sizeof(T_TASK(cmd)->__t_task_cdb));
+				scsi_command_size(cdb),
+				(unsigned long)sizeof(T_TASK(cmd)->__t_task_cdb));
 			return -1;
 		}
 	} else
