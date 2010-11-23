@@ -1057,6 +1057,7 @@ transport_emulate_control_cdb(struct se_task *task)
 				cmd->t_task->t_task_cdb[1] & 0x1f);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
+		break;
 	case REQUEST_SENSE:
 		ret = target_emulate_request_sense(cmd);
 		break;
