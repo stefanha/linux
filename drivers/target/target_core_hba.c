@@ -44,12 +44,6 @@
 
 #include "target_core_hba.h"
 
-int core_get_hba(struct se_hba *hba)
-{
-	return ((mutex_lock_interruptible(&hba->hba_access_mutex) != 0) ?
-		-1 : 0);
-}
-
 struct se_hba *core_alloc_hba(void)
 {
 	struct se_hba *hba;
@@ -68,11 +62,6 @@ struct se_hba *core_alloc_hba(void)
 	hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
 
 	return hba;
-}
-
-void core_put_hba(struct se_hba *hba)
-{
-	mutex_unlock(&hba->hba_access_mutex);
 }
 
 /*	se_core_add_hba():
