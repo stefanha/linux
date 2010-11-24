@@ -665,7 +665,6 @@ static sector_t fd_get_blocks(struct se_device *dev)
 static struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
 	.owner			= THIS_MODULE,
-	.type			= FILEIO,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,

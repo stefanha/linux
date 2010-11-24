@@ -775,7 +775,6 @@ static void iblock_bio_done(struct bio *bio, int err)
 static struct se_subsystem_api iblock_template = {
 	.name			= "iblock",
 	.owner			= THIS_MODULE,
-	.type			= IBLOCK,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.map_task_SG		= iblock_map_task_SG,
 	.attach_hba		= iblock_attach_hba,

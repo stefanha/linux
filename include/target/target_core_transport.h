@@ -224,10 +224,6 @@ struct se_subsystem_api {
 	 */
 	char name[16];
 	/*
-	 * Plugin Type.
-	 */
-	u8 type;
-	/*
 	 * Transport Type.
 	 */
 	u8 transport_type;

@@ -592,7 +592,6 @@ static int stgt_transfer_response(struct scsi_cmnd *sc,
 static struct se_subsystem_api stgt_template = {
 	.name			= "stgt",
 	.owner			= THIS_MODULE,
-	.type			= STGT,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.attach_hba		= stgt_attach_hba,
 	.detach_hba		= stgt_detach_hba,

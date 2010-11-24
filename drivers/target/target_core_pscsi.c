@@ -1293,7 +1293,6 @@ static void pscsi_req_done(struct request *req, int uptodate)
 static struct se_subsystem_api pscsi_template = {
 	.name			= "pscsi",
 	.owner			= THIS_MODULE,
-	.type			= PSCSI,
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,
 	.cdb_none		= pscsi_CDB_none,
 	.map_task_non_SG	= pscsi_map_task_non_SG,

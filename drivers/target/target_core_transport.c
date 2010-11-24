@@ -1904,7 +1904,6 @@ struct se_device *transport_add_device_to_core_hba(
 
 	dev->dev_flags		= device_flags;
 	dev->dev_status		|= TRANSPORT_DEVICE_DEACTIVATED;
-	dev->type		= transport->type;
 	dev->dev_ptr		= (void *) transport_dev;
 	dev->se_hba		= hba;
 	dev->se_sub_dev		= se_dev;

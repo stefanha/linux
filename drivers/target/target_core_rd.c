@@ -1046,7 +1046,6 @@ static sector_t rd_get_blocks(struct se_device *dev)
 
 static struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
-	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
@@ -1070,7 +1069,6 @@ static struct se_subsystem_api rd_dr_template = {
 
 static struct se_subsystem_api rd_mcp_template = {
 	.name			= "rd_mcp",
-	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,

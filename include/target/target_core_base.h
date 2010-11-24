@@ -132,20 +132,6 @@ enum se_cmd_flags_table {
 	SCF_EMULATE_SYNC_UNMAP		= 0x04000000
 };
 	
-/* struct se_device->type for known subsystem plugins */
-enum se_device_type_table {
-	PSCSI		= 1,
-	STGT		= 2,
-	PATA		= 3,
-	IBLOCK		= 4,
-	RAMDISK_DR	= 5,
-	RAMDISK_MCP	= 6,
-	FILEIO		= 7,
-	VROM		= 8,
-	VTAPE		= 9,
-	MEDIA_CHANGER	= 10,
-};
-
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
 enum transport_lunflags_table {
 	TRANSPORT_LUNFLAGS_NO_ACCESS		= 0x00,
@@ -766,8 +752,6 @@ struct se_subsystem_dev {
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
 
 struct se_device {
-	/* Type of disk transport used for device, see se_device_type_table */
-	enum se_device_type_table type;
 	/* Set to 1 if thread is NOT sleeping on thread_sem */
 	u8			thread_active;
 	u8			dev_status_timer_flags;
