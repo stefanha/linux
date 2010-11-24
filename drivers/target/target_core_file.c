@@ -88,27 +88,15 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	fd_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_detach_hba(struct se_hba *hba)
+static void fd_detach_hba(struct se_hba *hba)
 {
-	struct fd_host *fd_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-	fd_host = (struct fd_host *) hba->hba_ptr;
+	struct fd_host *fd_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached FILEIO HBA: %u from Generic"
 		" Target Core\n", hba->hba_id, fd_host->fd_host_id);
 
 	kfree(fd_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)

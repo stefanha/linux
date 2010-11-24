@@ -264,7 +264,7 @@ struct se_subsystem_api {
 	/*
 	 * detach_hba():
 	 */
-	int (*detach_hba)(struct se_hba *);
+	void (*detach_hba)(struct se_hba *);
 	/*
 	 * pmode_hba(): Used for TCM/pSCSI subsystem plugin HBA ->
 	 *		Linux/SCSI struct Scsi_Host passthrough

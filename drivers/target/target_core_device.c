@@ -1611,17 +1611,9 @@ int core_dev_setup_virtual_lun0(void)
 	char buf[16];
 	int ret;
 
-	hba = core_alloc_hba();
-	if (!(hba))
-		return -ENOMEM;
-
-	hba->hba_flags |= HBA_FLAGS_INTERNAL_USE;
-	ret = se_core_add_hba(hba, "rd_dr", 0);
-	if (ret < 0) {
-		printk("se_core_add_hba() with %d\n", ret);
-		kfree(hba);
-		return ret;
-	}
+	hba = core_alloc_hba("rd_dr", 0, HBA_FLAGS_INTERNAL_USE);
+	if (IS_ERR(hba))
+		return PTR_ERR(hba);
 
 	se_global->g_lun0_hba = hba;
 	t = hba->transport;
@@ -1675,7 +1667,7 @@ out:
 	se_global->g_lun0_su_dev = NULL;
 	kfree(se_dev);
 	if (se_global->g_lun0_hba) {
-		se_core_del_hba(se_global->g_lun0_hba);
+		core_delete_hba(se_global->g_lun0_hba);
 		se_global->g_lun0_hba = NULL;
 	}
 	return ret;
@@ -1694,5 +1686,5 @@ void core_dev_release_virtual_lun0(void)
 		se_free_virtual_device(se_global->g_lun0_dev, hba);
 
 	kfree(su_dev);
-	se_core_del_hba(hba);
+	core_delete_hba(hba);
 }

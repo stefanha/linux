@@ -3150,23 +3150,15 @@ static struct config_group *target_core_call_addhbatotarget(
 	if (transport_subsystem_check_init() < 0)
 		return ERR_PTR(-EINVAL);
 
-	hba = core_alloc_hba();
-	if (!(hba))
-		return ERR_PTR(-EINVAL);
-
-	ret = se_core_add_hba(hba, se_plugin_str, (u32)plugin_dep_id);
-	if (ret < 0)
-		goto out;
+	hba = core_alloc_hba(se_plugin_str, plugin_dep_id, 0);
+	if (IS_ERR(hba))
+		return ERR_CAST(hba);
 
 	config_group_init_type_name(&hba->hba_group, name,
 			&target_core_hba_cit);
 
 	return &hba->hba_group;
-out:
-	kfree(hba);
-	return ERR_PTR(ret);
 }
-
 
 static void target_core_call_delhbafromtarget(
 	struct config_group *group,
@@ -3175,7 +3167,7 @@ static void target_core_call_delhbafromtarget(
 	struct se_hba *hba = item_to_hba(item);
 
 	config_item_put(item);
-	se_core_del_hba(hba);
+	core_delete_hba(hba);
 }
 
 static struct configfs_group_operations target_core_group_ops = {

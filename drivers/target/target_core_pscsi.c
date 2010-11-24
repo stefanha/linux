@@ -107,13 +107,9 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	pscsi_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int pscsi_detach_hba(struct se_hba *hba)
+static void pscsi_detach_hba(struct se_hba *hba)
 {
-	struct pscsi_hba_virt *phv = (struct pscsi_hba_virt *)hba->hba_ptr;
+	struct pscsi_hba_virt *phv = hba->hba_ptr;
 	struct Scsi_Host *scsi_host = phv->phv_lld_host;
 
 	if (scsi_host) {
@@ -129,8 +125,6 @@ static int pscsi_detach_hba(struct se_hba *hba)
 
 	kfree(phv);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)

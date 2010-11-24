@@ -82,28 +82,15 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	rd_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_detach_hba(struct se_hba *hba)
+static void rd_detach_hba(struct se_hba *hba)
 {
-	struct rd_host *rd_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-
-	rd_host = hba->hba_ptr;
+	struct rd_host *rd_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached Ramdisk HBA: %u from"
 		" Generic Target Core\n", hba->hba_id, rd_host->rd_host_id);
 
 	kfree(rd_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 /*	rd_release_device_space():

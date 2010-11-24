@@ -215,11 +215,7 @@ static int stgt_lld_remove(struct device *dev)
 	return 0;
 }
 
-/*	stgt_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int stgt_detach_hba(struct se_hba *hba)
+static void stgt_detach_hba(struct se_hba *hba)
 {
 	struct Scsi_Host *scsi_host = hba->hba_ptr;
 	struct stgt_hba *stgt_hba = *(struct stgt_hba **)shost_priv(scsi_host);
@@ -231,8 +227,6 @@ static int stgt_detach_hba(struct se_hba *hba)
 
 	device_unregister(&stgt_hba->dev);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static void *stgt_allocate_virtdevice(struct se_hba *hba, const char *name)

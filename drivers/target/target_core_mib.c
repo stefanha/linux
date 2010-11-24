@@ -123,9 +123,6 @@ static int scsi_inst_seq_show(struct seq_file *seq, void *v)
 	if (list_is_first(&hba->hba_list, &se_global->g_hba_list))
 		seq_puts(seq, "inst sw_indx\n");
 
-	if (!(hba->hba_status & HBA_STATUS_ACTIVE))
-		return 0;
-
 	seq_printf(seq, "%u %u\n", hba->hba_index, SCSI_INST_SW_INDEX);
 	seq_printf(seq, "plugin: %s version: %s\n",
 			hba->transport->name, TARGET_CORE_VERSION);

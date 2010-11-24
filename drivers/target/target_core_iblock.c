@@ -90,27 +90,15 @@ static int iblock_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	iblock_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int iblock_detach_hba(struct se_hba *hba)
+static void iblock_detach_hba(struct se_hba *hba)
 {
-	struct iblock_hba *ib_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-	ib_host = hba->hba_ptr;
+	struct iblock_hba *ib_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached iBlock HBA: %u from Generic"
 		" Target Core\n", hba->hba_id, ib_host->iblock_host_id);
 
 	kfree(ib_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static void *iblock_allocate_virtdevice(struct se_hba *hba, const char *name)

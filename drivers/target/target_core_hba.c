@@ -44,47 +44,35 @@
 
 #include "target_core_hba.h"
 
-struct se_hba *core_alloc_hba(void)
+struct se_hba *
+core_alloc_hba(const char *plugin_name, u32 plugin_dep_id, u32 hba_flags)
 {
+	struct se_subsystem_api *t;
 	struct se_hba *hba;
+	int ret = 0;
 
 	hba = kzalloc(sizeof(*hba), GFP_KERNEL);
 	if (!hba) {
 		printk(KERN_ERR "Unable to allocate struct se_hba\n");
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
-	hba->hba_status |= HBA_STATUS_FREE;
 	INIT_LIST_HEAD(&hba->hba_dev_list);
 	spin_lock_init(&hba->device_lock);
 	spin_lock_init(&hba->hba_queue_lock);
 	mutex_init(&hba->hba_access_mutex);
+
 	hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
-
-	return hba;
-}
-
-/*	se_core_add_hba():
- *
- *
- */
-int se_core_add_hba(
-	struct se_hba *hba,
-	const char *plugin_name,
-	u32 plugin_dep_id)
-{
-	struct se_subsystem_api *t;
-	int ret = 0;
-
-	if (hba->hba_status & HBA_STATUS_ACTIVE)
-		return -EEXIST;
+	hba->hba_flags |= hba_flags;
 
 	atomic_set(&hba->max_queue_depth, 0);
 	atomic_set(&hba->left_queue_depth, 0);
 
 	t = transport_core_get_sub_by_name(plugin_name);
-	if (!(t))
-		return -EINVAL;
+	if (!t) {
+		ret = -EINVAL;
+		goto out_free_hba;
+	}
 
 	hba->transport = t;
 
@@ -98,23 +86,14 @@ int se_core_add_hba(
 		if (!try_module_get(t->owner)) {
 			printk(KERN_ERR "try_module_get() failed for %s\n",
 				t->owner->name);
-			hba->transport = NULL;
-			transport_core_put_sub(t);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto out_put_subsystem;
 		}
 	}
 
 	ret = t->attach_hba(hba, plugin_dep_id);
-	if (ret < 0) {
-		hba->transport = NULL;
-		if (t->owner)
-			module_put(t->owner);
-		transport_core_put_sub(t);
-		return ret;
-	}
-
-	hba->hba_status &= ~HBA_STATUS_FREE;
-	hba->hba_status |= HBA_STATUS_ACTIVE;
+	if (ret < 0)
+		goto out_module_put;
 
 	spin_lock(&se_global->hba_lock);
 	hba->hba_id = se_global->g_hba_id_counter++;
@@ -124,39 +103,23 @@ int se_core_add_hba(
 	printk(KERN_INFO "CORE_HBA[%d] - Attached HBA to Generic Target"
 			" Core\n", hba->hba_id);
 
-	return 0;
-}
+	return hba;
 
-static int se_core_shutdown_hba(
-	struct se_hba *hba)
-{
-	struct se_subsystem_api *t = hba->transport;;
-
-	if (t->detach_hba(hba) < 0)
-		return -1;
-	/*
-	 * Release TCM subsystem api struct module reference from struct se_hba
-	 */
+out_module_put:
 	if (t->owner)
 		module_put(t->owner);
-
-	return 0;
+out_put_subsystem:
+	hba->transport = NULL;
+	transport_core_put_sub(t);
+out_free_hba:
+	kfree(hba);
+	return ERR_PTR(ret);
 }
 
-/*	se_core_del_hba():
- *
- *
- */
-int se_core_del_hba(
-	struct se_hba *hba)
+int
+core_delete_hba(struct se_hba *hba)
 {
 	struct se_device *dev, *dev_tmp;
-
-	if (!(hba->hba_status & HBA_STATUS_ACTIVE)) {
-		printk(KERN_ERR "HBA ID: %d Status: INACTIVE, ignoring"
-			" delhbafromtarget request\n", hba->hba_id);
-		return -EINVAL;
-	}
 
 	spin_lock(&hba->device_lock);
 	list_for_each_entry_safe(dev, dev_tmp, &hba->hba_dev_list, dev_list) {
@@ -170,7 +133,10 @@ int se_core_del_hba(
 	}
 	spin_unlock(&hba->device_lock);
 
-	se_core_shutdown_hba(hba);
+	hba->transport->detach_hba(hba);
+	if (hba->transport->owner)
+		module_put(hba->transport->owner);
+
 	if (!(hba->hba_flags & HBA_FLAGS_INTERNAL_USE))
 		transport_core_put_sub(hba->transport);
 
@@ -179,8 +145,6 @@ int se_core_del_hba(
 	spin_unlock(&se_global->hba_lock);
 
 	hba->transport = NULL;
-	hba->hba_status &= ~HBA_STATUS_ACTIVE;
-	hba->hba_status |= HBA_STATUS_FREE;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached HBA from Generic Target"
 			" Core\n", hba->hba_id);

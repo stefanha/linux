@@ -62,14 +62,6 @@ enum hba_flags_table {
 	HBA_FLAGS_PSCSI_MODE	= 0x02,
 };
 
-/* struct se_hba->hba_status and iscsi_tpg_hba->thba_status */
-enum hba_status_table {
-	HBA_STATUS_FREE		= 0x01,
-	HBA_STATUS_ACTIVE	= 0x02,
-	HBA_STATUS_INACTIVE	= 0x04,
-	HBA_STATUS_SHUTDOWN	= 0x08,
-};
-
 /* struct se_lun->lun_status */
 enum transport_lun_status_table {
 	TRANSPORT_LUN_STATUS_FREE = 0,
@@ -865,8 +857,6 @@ struct se_device {
 
 struct se_hba {
 	u16			hba_tpgt;
-	/* See hba_status_table */
-	u32			hba_status;
 	u32			hba_id;
 	/* See hba_flags_table */
 	u32			hba_flags;
