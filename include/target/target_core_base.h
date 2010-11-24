@@ -486,16 +486,6 @@ struct se_task {
 #define TASK_CMD(task)	((struct se_cmd *)task->task_se_cmd)
 #define TASK_DEV(task)	((struct se_device *)task->se_dev)
 
-struct se_transform_info {
-	int		ti_set_counts;
-	u32		ti_data_length;
-	unsigned long long	ti_lba;
-	struct se_cmd *ti_se_cmd;
-	struct se_device *ti_dev;
-	struct se_device *se_obj_ptr;
-	struct se_device *ti_obj_ptr;
-} ____cacheline_aligned;
-
 struct se_cmd {
 	/* SAM response code being sent to initiator */
 	u8			scsi_status;
