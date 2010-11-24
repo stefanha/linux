@@ -14,8 +14,6 @@
 #define RD_BLOCKSIZE		512
 #define RD_MAX_SECTORS		1024
 
-extern struct se_global *se_global;
-
 extern struct kmem_cache *se_mem_cache;
 
 /* Used in target_core_init_configfs() for virtual LUN 0 access */

@@ -1,8 +1,6 @@
 #ifndef TARGET_CORE_TPG_H
 #define TARGET_CORE_TPG_H
 
-extern struct se_global *se_global;
- 
 extern struct se_node_acl *__core_tpg_get_initiator_node_acl(struct se_portal_group *tpg,
 						const char *);
 extern struct se_node_acl *core_tpg_get_initiator_node_acl(struct se_portal_group *tpg,

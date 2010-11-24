@@ -186,7 +186,6 @@
 #endif
 
 struct se_global *se_global;
-EXPORT_SYMBOL(se_global);
 
 static struct kmem_cache *se_cmd_cache;
 static struct kmem_cache *se_sess_cache;

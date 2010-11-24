@@ -374,5 +374,6 @@ struct se_subsystem_api {
 #define TRANSPORT(dev)		((dev)->transport)
 #define HBA_TRANSPORT(hba)	((hba)->transport)
 
-#endif /* TARGET_CORE_TRANSPORT_H */
+extern struct se_global *se_global;
 
+#endif /* TARGET_CORE_TRANSPORT_H */

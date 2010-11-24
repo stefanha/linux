@@ -1,8 +1,6 @@
 #ifndef TARGET_CORE_HBA_H
 #define TARGET_CORE_HBA_H
 
-extern struct se_global *se_global;
-
 extern struct kmem_cache *se_hba_cache;
 
 extern int core_get_hba(struct se_hba *);

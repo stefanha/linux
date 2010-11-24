@@ -9,8 +9,6 @@
 #define IBLOCK_MAX_CDBS		16
 #define IBLOCK_LBA_SHIFT	9
 
-extern struct se_global *se_global;
-
 struct iblock_req {
 	struct se_task ib_task;
 	unsigned char ib_scsi_cdb[TCM_MAX_COMMAND_SIZE];
