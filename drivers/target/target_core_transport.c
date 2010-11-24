@@ -289,13 +289,11 @@ int init_se_global(void)
 	INIT_LIST_HEAD(&global->g_se_tpg_list);
 	INIT_LIST_HEAD(&global->g_hba_list);
 	INIT_LIST_HEAD(&global->g_se_dev_list);
-	INIT_LIST_HEAD(&global->g_sub_api_list);
 	spin_lock_init(&global->g_device_lock);
 	spin_lock_init(&global->hba_lock);
 	spin_lock_init(&global->se_tpg_lock);
 	spin_lock_init(&global->lu_gps_lock);
 	spin_lock_init(&global->plugin_class_lock);
-	mutex_init(&global->g_sub_api_mutex);
 
 	se_cmd_cache = kmem_cache_create("se_cmd_cache",
 			sizeof(struct se_cmd), __alignof__(struct se_cmd), 0, NULL);
@@ -470,64 +468,6 @@ int transport_subsystem_check_init(void)
 
 	se_global->g_sub_api_initialized = 1;
 	return 0;
-}
-
-int transport_subsystem_register(
-	struct se_subsystem_api *sub_api)
-{
-	struct se_subsystem_api *s;
-
-	INIT_LIST_HEAD(&sub_api->sub_api_list);
-
-	mutex_lock(&se_global->g_sub_api_mutex);
-	list_for_each_entry(s, &se_global->g_sub_api_list, sub_api_list) {
-		if (!(strcmp(s->name, sub_api->name))) {
-			printk(KERN_ERR "%p is already registered with"
-				" duplicate name %s, unable to process"
-				" request\n", s, s->name);
-			mutex_unlock(&se_global->g_sub_api_mutex);
-			return -EEXIST;
-		}
-	}
-	list_add_tail(&sub_api->sub_api_list, &se_global->g_sub_api_list);
-	mutex_unlock(&se_global->g_sub_api_mutex);
-
-	printk(KERN_INFO "TCM: Registered subsystem plugin: %s struct module:"
-			" %p\n", sub_api->name, sub_api->owner);
-	return 0;
-}
-EXPORT_SYMBOL(transport_subsystem_register);
-
-void transport_subsystem_release(struct se_subsystem_api *sub_api)
-{
-	mutex_lock(&se_global->g_sub_api_mutex);
-	list_del(&sub_api->sub_api_list);
-	mutex_unlock(&se_global->g_sub_api_mutex);
-}
-EXPORT_SYMBOL(transport_subsystem_release);
-
-struct se_subsystem_api *transport_core_get_sub_by_name(const char *sub_name)
-{
-	struct se_subsystem_api *s;
-
-	mutex_lock(&se_global->g_sub_api_mutex);
-	list_for_each_entry(s, &se_global->g_sub_api_list, sub_api_list) {
-		if (!(strcmp(s->name, sub_name))) {
-			atomic_inc(&s->sub_api_hba_cnt);
-			smp_mb__after_atomic_inc();
-			mutex_unlock(&se_global->g_sub_api_mutex);
-			return s;
-		}
-	}
-	mutex_unlock(&se_global->g_sub_api_mutex);
-
-	return NULL;
-}
-
-void transport_core_put_sub(struct se_subsystem_api *s)
-{
-	atomic_dec(&s->sub_api_hba_cnt);
-	smp_mb__after_atomic_dec();
 }
 
 struct se_session *transport_init_session(void)

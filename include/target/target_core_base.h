@@ -983,12 +983,10 @@ struct se_global {
 	struct list_head	g_se_tpg_list;
 	struct list_head	g_hba_list;
 	struct list_head	g_se_dev_list;
-	struct list_head	g_sub_api_list;
 	struct se_hba		*g_lun0_hba;
 	struct se_subsystem_dev *g_lun0_su_dev;
 	struct se_device	*g_lun0_dev;
 	struct t10_alua_lu_gp	*default_lu_gp;
-	struct mutex		g_sub_api_mutex;
 	spinlock_t		g_device_lock;
 	spinlock_t		hba_lock;
 	spinlock_t		se_tpg_lock;
