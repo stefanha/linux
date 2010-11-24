@@ -1007,20 +1007,18 @@ void transport_complete_task(struct se_task *task, int success)
 	 * Also check for any other post completion work that needs to be
 	 * done by the plugins.
 	 */
-	if (!dev)
-		goto check_task_stop;
-
-	if (TRANSPORT(dev)->transport_complete(task) != 0) {
-		cmd->se_cmd_flags |= SCF_TRANSPORT_TASK_SENSE;
-		task->task_sense = 1;
-		success = 1;
+	if (dev && dev->transport->transport_complete) {
+		if (dev->transport->transport_complete(task) != 0) {
+			cmd->se_cmd_flags |= SCF_TRANSPORT_TASK_SENSE;
+			task->task_sense = 1;
+			success = 1;
+		}
 	}
 
 	/*
 	 * See if we are waiting for outstanding struct se_task
 	 * to complete for an exception condition
 	 */
-check_task_stop:
 	if (atomic_read(&task->task_stop)) {
 		/*
 		 * Decrement T_TASK(cmd)->t_se_count if this task had

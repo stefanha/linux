@@ -225,11 +225,6 @@ static void iblock_free_device(void *p)
 	kfree(ib_dev);
 }
 
-static int iblock_transport_complete(struct se_task *task)
-{
-	return 0;
-}
-
 static inline struct iblock_req *IBLOCK_REQ(struct se_task *task)
 {
 	return container_of(task, struct iblock_req, ib_task);
@@ -786,7 +781,6 @@ static struct se_subsystem_api iblock_template = {
 	.fua_write_emulated	= iblock_emulated_fua_write,
 	.fua_read_emulated	= iblock_emulated_fua_read,
 	.write_cache_emulated	= iblock_emulated_write_cache,
-	.transport_complete	= iblock_transport_complete,
 	.alloc_task		= iblock_alloc_task,
 	.do_task		= iblock_do_task,
 	.do_discard		= iblock_do_discard,

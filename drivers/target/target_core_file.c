@@ -261,15 +261,6 @@ static void fd_free_device(void *p)
 	kfree(fd_dev);
 }
 
-/*	fd_transport_complete(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_transport_complete(struct se_task *task)
-{
-	return 0;
-}
-
 static inline struct fd_request *FILE_REQ(struct se_task *task)
 {
 	return container_of(task, struct fd_request, fd_task);
@@ -675,7 +666,6 @@ static struct se_subsystem_api fileio_template = {
 	.fua_write_emulated	= fd_emulated_fua_write,
 	.fua_read_emulated	= fd_emulated_fua_read,
 	.write_cache_emulated	= fd_emulated_write_cache,
-	.transport_complete	= fd_transport_complete,
 	.alloc_task		= fd_alloc_task,
 	.do_task		= fd_do_task,
 	.do_sync_cache		= fd_emulate_sync_cache,

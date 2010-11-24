@@ -324,15 +324,6 @@ static void rd_free_device(void *p)
 	kfree(rd_dev);
 }
 
-/*	rd_transport_complete(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_transport_complete(struct se_task *task)
-{
-	return 0;
-}
-
 static inline struct rd_request *RD_REQ(struct se_task *task)
 {
 	return container_of(task, struct rd_request, rd_task);
@@ -1052,7 +1043,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
 	.create_virtdevice	= rd_DIRECT_create_virtdevice,
 	.free_device		= rd_free_device,
-	.transport_complete	= rd_transport_complete,
 	.alloc_task		= rd_alloc_task,
 	.do_task		= rd_DIRECT_do_task,
 	.free_task		= rd_free_task,
@@ -1075,7 +1065,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
 	.create_virtdevice	= rd_MEMCPY_create_virtdevice,
 	.free_device		= rd_free_device,
-	.transport_complete	= rd_transport_complete,
 	.alloc_task		= rd_alloc_task,
 	.do_task		= rd_MEMCPY_do_task,
 	.free_task		= rd_free_task,
