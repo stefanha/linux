@@ -48,8 +48,8 @@ struct se_hba *core_alloc_hba(void)
 {
 	struct se_hba *hba;
 
-	hba = kmem_cache_zalloc(se_hba_cache, GFP_KERNEL);
-	if (!(hba)) {
+	hba = kzalloc(sizeof(*hba), GFP_KERNEL);
+	if (!hba) {
 		printk(KERN_ERR "Unable to allocate struct se_hba\n");
 		return NULL;
 	}
@@ -185,6 +185,6 @@ int se_core_del_hba(
 	printk(KERN_INFO "CORE_HBA[%d] - Detached HBA from Generic Target"
 			" Core\n", hba->hba_id);
 
-	kmem_cache_free(se_hba_cache, hba);
+	kfree(hba);
 	return 0;
 }

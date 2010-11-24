@@ -190,7 +190,6 @@ struct se_global *se_global;
 static struct kmem_cache *se_cmd_cache;
 static struct kmem_cache *se_sess_cache;
 struct kmem_cache *se_tmr_req_cache;
-struct kmem_cache *se_hba_cache;
 struct kmem_cache *se_ua_cache;
 struct kmem_cache *se_mem_cache;
 struct kmem_cache *t10_pr_reg_cache;
@@ -320,14 +319,6 @@ int init_se_global(void)
 				" failed\n");
 		goto out;
 	}
-	se_hba_cache = kmem_cache_create("se_hba_cache",
-			sizeof(struct se_hba), __alignof__(struct se_hba),
-			0, NULL);
-	if (!(se_hba_cache)) {
-		printk(KERN_ERR "kmem_cache_create() for struct se_hba"
-				" failed\n");
-		goto out;
-	}
 	se_ua_cache = kmem_cache_create("se_ua_cache",
 			sizeof(struct se_ua), __alignof__(struct se_ua),
 			0, NULL);
@@ -394,8 +385,6 @@ out:
 		kmem_cache_destroy(se_tmr_req_cache);
 	if (se_sess_cache)
 		kmem_cache_destroy(se_sess_cache);
-	if (se_hba_cache)
-		kmem_cache_destroy(se_hba_cache);
 	if (se_ua_cache)
 		kmem_cache_destroy(se_ua_cache);
 	if (se_mem_cache)
@@ -425,7 +414,6 @@ void release_se_global(void)
 	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
-	kmem_cache_destroy(se_hba_cache);
 	kmem_cache_destroy(se_ua_cache);
 	kmem_cache_destroy(se_mem_cache);
 	kmem_cache_destroy(t10_pr_reg_cache);

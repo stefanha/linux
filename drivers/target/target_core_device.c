@@ -1619,7 +1619,7 @@ int core_dev_setup_virtual_lun0(void)
 	ret = se_core_add_hba(hba, "rd_dr", 0);
 	if (ret < 0) {
 		printk("se_core_add_hba() with %d\n", ret);
-		kmem_cache_free(se_hba_cache, hba);
+		kfree(hba);
 		return ret;
 	}
 
