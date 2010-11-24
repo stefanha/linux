@@ -88,27 +88,15 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	fd_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_detach_hba(struct se_hba *hba)
+static void fd_detach_hba(struct se_hba *hba)
 {
-	struct fd_host *fd_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-	fd_host = (struct fd_host *) hba->hba_ptr;
+	struct fd_host *fd_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached FILEIO HBA: %u from Generic"
 		" Target Core\n", hba->hba_id, fd_host->fd_host_id);
 
 	kfree(fd_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)
@@ -271,15 +259,6 @@ static void fd_free_device(void *p)
 	}
 
 	kfree(fd_dev);
-}
-
-/*	fd_transport_complete(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_transport_complete(struct se_task *task)
-{
-	return 0;
 }
 
 static inline struct fd_request *FILE_REQ(struct se_task *task)
@@ -677,7 +656,6 @@ static sector_t fd_get_blocks(struct se_device *dev)
 static struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
 	.owner			= THIS_MODULE,
-	.type			= FILEIO,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
@@ -688,7 +666,6 @@ static struct se_subsystem_api fileio_template = {
 	.fua_write_emulated	= fd_emulated_fua_write,
 	.fua_read_emulated	= fd_emulated_fua_read,
 	.write_cache_emulated	= fd_emulated_write_cache,
-	.transport_complete	= fd_transport_complete,
 	.alloc_task		= fd_alloc_task,
 	.do_task		= fd_do_task,
 	.do_sync_cache		= fd_emulate_sync_cache,

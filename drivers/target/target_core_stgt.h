@@ -11,8 +11,6 @@
 #define PS_TIMEOUT_DISK		(15*HZ)
 #define PS_TIMEOUT_OTHER	(500*HZ)
 
-extern struct se_global *se_global;
-
 #include <linux/device.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_device.h>

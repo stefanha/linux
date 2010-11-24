@@ -5,8 +5,6 @@
 #define TARGET_CORE_NAME_MAX_LEN	64
 #define TARGET_FABRIC_NAME_SIZE		32
 
-extern struct se_global *se_global;
-
 extern struct target_fabric_configfs *target_fabric_configfs_init(
 				struct module *, const char *);
 extern void target_fabric_configfs_free(struct target_fabric_configfs *);

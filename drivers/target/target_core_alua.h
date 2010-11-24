@@ -61,8 +61,6 @@
  */
 #define ALUA_SECONDARY_METADATA_WWN_LEN			256
 
-extern struct se_global *se_global;
-
 extern struct kmem_cache *t10_alua_lu_gp_cache;
 extern struct kmem_cache *t10_alua_lu_gp_mem_cache;
 extern struct kmem_cache *t10_alua_tg_pt_gp_cache;

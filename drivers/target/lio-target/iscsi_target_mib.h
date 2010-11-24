@@ -76,7 +76,6 @@ extern void remove_iscsi_target_mib(void);
 extern void init_iscsi_index_table(void);
 extern u32 iscsi_get_new_index(iscsi_index_t);
 
-extern struct se_global *se_global;
 extern struct iscsi_global *iscsi_global;
 
 #endif   /*** ISCSI_TARGET_MIB_H ***/

@@ -130,8 +130,6 @@ extern int transport_subsystem_check_init(void);
 extern int transport_subsystem_register(struct se_subsystem_api *);
 extern void transport_subsystem_release(struct se_subsystem_api *);
 extern void transport_load_plugins(void);
-extern struct se_subsystem_api *transport_core_get_sub_by_name(const char *);
-extern void transport_core_put_sub(struct se_subsystem_api *);
 extern struct se_session *transport_init_session(void);
 extern void __transport_register_session(struct se_portal_group *,
 					struct se_node_acl *,
@@ -226,10 +224,6 @@ struct se_subsystem_api {
 	 */
 	char name[16];
 	/*
-	 * Plugin Type.
-	 */
-	u8 type;
-	/*
 	 * Transport Type.
 	 */
 	u8 transport_type;
@@ -237,10 +231,6 @@ struct se_subsystem_api {
 	 * struct module for struct se_hba references
 	 */
 	struct module *owner;
-	/*
-	 * Counter for struct se_hba reference
-	 */
-	atomic_t sub_api_hba_cnt;
 	/*
 	 * Used for global se_subsystem_api list_head
 	 */
@@ -264,7 +254,7 @@ struct se_subsystem_api {
 	/*
 	 * detach_hba():
 	 */
-	int (*detach_hba)(struct se_hba *);
+	void (*detach_hba)(struct se_hba *);
 	/*
 	 * pmode_hba(): Used for TCM/pSCSI subsystem plugin HBA ->
 	 *		Linux/SCSI struct Scsi_Host passthrough
@@ -374,5 +364,6 @@ struct se_subsystem_api {
 #define TRANSPORT(dev)		((dev)->transport)
 #define HBA_TRANSPORT(hba)	((hba)->transport)
 
-#endif /* TARGET_CORE_TRANSPORT_H */
+extern struct se_global *se_global;
 
+#endif /* TARGET_CORE_TRANSPORT_H */

@@ -281,7 +281,6 @@ do {							\
 
 struct iscsi_queue_req {
 	int			state;
-	void			*queue_se_obj_ptr;
 	struct se_obj_lun_type_s *queue_se_obj_api;
 	struct iscsi_cmd	*cmd;
 	struct list_head	qr_list;

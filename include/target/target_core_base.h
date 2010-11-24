@@ -62,14 +62,6 @@ enum hba_flags_table {
 	HBA_FLAGS_PSCSI_MODE	= 0x02,
 };
 
-/* struct se_hba->hba_status and iscsi_tpg_hba->thba_status */
-enum hba_status_table {
-	HBA_STATUS_FREE		= 0x01,
-	HBA_STATUS_ACTIVE	= 0x02,
-	HBA_STATUS_INACTIVE	= 0x04,
-	HBA_STATUS_SHUTDOWN	= 0x08,
-};
-
 /* struct se_lun->lun_status */
 enum transport_lun_status_table {
 	TRANSPORT_LUN_STATUS_FREE = 0,
@@ -140,20 +132,6 @@ enum se_cmd_flags_table {
 	SCF_EMULATE_SYNC_UNMAP		= 0x04000000
 };
 	
-/* struct se_device->type for known subsystem plugins */
-enum se_device_type_table {
-	PSCSI		= 1,
-	STGT		= 2,
-	PATA		= 3,
-	IBLOCK		= 4,
-	RAMDISK_DR	= 5,
-	RAMDISK_MCP	= 6,
-	FILEIO		= 7,
-	VROM		= 8,
-	VTAPE		= 9,
-	MEDIA_CHANGER	= 10,
-};
-
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
 enum transport_lunflags_table {
 	TRANSPORT_LUNFLAGS_NO_ACCESS		= 0x00,
@@ -508,16 +486,6 @@ struct se_task {
 #define TASK_CMD(task)	((struct se_cmd *)task->task_se_cmd)
 #define TASK_DEV(task)	((struct se_device *)task->se_dev)
 
-struct se_transform_info {
-	int		ti_set_counts;
-	u32		ti_data_length;
-	unsigned long long	ti_lba;
-	struct se_cmd *ti_se_cmd;
-	struct se_device *ti_dev;
-	struct se_device *se_obj_ptr;
-	struct se_device *ti_obj_ptr;
-} ____cacheline_aligned;
-
 struct se_cmd {
 	/* SAM response code being sent to initiator */
 	u8			scsi_status;
@@ -774,8 +742,6 @@ struct se_subsystem_dev {
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
 
 struct se_device {
-	/* Type of disk transport used for device, see se_device_type_table */
-	enum se_device_type_table type;
 	/* Set to 1 if thread is NOT sleeping on thread_sem */
 	u8			thread_active;
 	u8			dev_status_timer_flags;
@@ -865,8 +831,6 @@ struct se_device {
 
 struct se_hba {
 	u16			hba_tpgt;
-	/* See hba_status_table */
-	u32			hba_status;
 	u32			hba_id;
 	/* See hba_flags_table */
 	u32			hba_flags;
@@ -993,12 +957,10 @@ struct se_global {
 	struct list_head	g_se_tpg_list;
 	struct list_head	g_hba_list;
 	struct list_head	g_se_dev_list;
-	struct list_head	g_sub_api_list;
 	struct se_hba		*g_lun0_hba;
 	struct se_subsystem_dev *g_lun0_su_dev;
 	struct se_device	*g_lun0_dev;
 	struct t10_alua_lu_gp	*default_lu_gp;
-	struct mutex		g_sub_api_mutex;
 	spinlock_t		g_device_lock;
 	spinlock_t		hba_lock;
 	spinlock_t		se_tpg_lock;

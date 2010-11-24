@@ -82,28 +82,15 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	rd_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_detach_hba(struct se_hba *hba)
+static void rd_detach_hba(struct se_hba *hba)
 {
-	struct rd_host *rd_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-
-	rd_host = hba->hba_ptr;
+	struct rd_host *rd_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached Ramdisk HBA: %u from"
 		" Generic Target Core\n", hba->hba_id, rd_host->rd_host_id);
 
 	kfree(rd_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 /*	rd_release_device_space():
@@ -335,15 +322,6 @@ static void rd_free_device(void *p)
 
 	rd_release_device_space(rd_dev);
 	kfree(rd_dev);
-}
-
-/*	rd_transport_complete(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_transport_complete(struct se_task *task)
-{
-	return 0;
 }
 
 static inline struct rd_request *RD_REQ(struct se_task *task)
@@ -1059,14 +1037,12 @@ static sector_t rd_get_blocks(struct se_device *dev)
 
 static struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
-	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
 	.create_virtdevice	= rd_DIRECT_create_virtdevice,
 	.free_device		= rd_free_device,
-	.transport_complete	= rd_transport_complete,
 	.alloc_task		= rd_alloc_task,
 	.do_task		= rd_DIRECT_do_task,
 	.free_task		= rd_free_task,
@@ -1083,14 +1059,12 @@ static struct se_subsystem_api rd_dr_template = {
 
 static struct se_subsystem_api rd_mcp_template = {
 	.name			= "rd_mcp",
-	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
 	.create_virtdevice	= rd_MEMCPY_create_virtdevice,
 	.free_device		= rd_free_device,
-	.transport_complete	= rd_transport_complete,
 	.alloc_task		= rd_alloc_task,
 	.do_task		= rd_MEMCPY_do_task,
 	.free_task		= rd_free_task,

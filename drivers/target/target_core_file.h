@@ -11,8 +11,6 @@
 #define FD_BLOCKSIZE		512
 #define FD_MAX_SECTORS		1024
 
-extern struct se_global *se_global;
-
 #define RRF_EMULATE_CDB		0x01
 #define RRF_GOT_LBA		0x02
 
