@@ -208,6 +208,129 @@ out_free:
 	kfree(buf);
 }
 
+static void
+pscsi_set_inquiry_info(struct scsi_device *sdev, struct t10_wwn *wwn)
+{
+	unsigned char *buf;
+
+	if (sdev->inquiry_len < INQUIRY_LEN)
+		return;
+
+	buf = sdev->inquiry;
+	if (!buf)
+		return;
+	/*
+	 * Use sdev->inquiry from drivers/scsi/scsi_scan.c:scsi_alloc_sdev()
+	 */
+	memcpy(&wwn->vendor[0], &buf[8], sizeof(wwn->vendor));
+	memcpy(&wwn->model[0], &buf[16], sizeof(wwn->model));
+	memcpy(&wwn->revision[0], &buf[32], sizeof(wwn->revision));
+}
+
+static int
+pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
+	int ret;
+
+	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
+	if (!buf)
+		return -1;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = INQUIRY;
+	cdb[1] = 0x01; /* Query VPD */
+	cdb[2] = 0x80; /* Unit Serial Number */
+	cdb[3] = (INQUIRY_VPD_SERIAL_LEN >> 8) & 0xff;
+	cdb[4] = (INQUIRY_VPD_SERIAL_LEN & 0xff);
+
+	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf,
+			      INQUIRY_VPD_SERIAL_LEN, NULL, HZ, 1, NULL);
+	if (ret)
+		goto out_free;
+
+	snprintf(&wwn->unit_serial[0], INQUIRY_VPD_SERIAL_LEN, "%s", &buf[4]);
+
+	wwn->t10_sub_dev->su_dev_flags |= SDF_FIRMWARE_VPD_UNIT_SERIAL;
+
+	kfree(buf);
+	return 0;
+
+out_free:
+	kfree(buf);
+	return -1;
+}
+
+static void
+pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
+		struct t10_wwn *wwn)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf, *page_83;
+	int ident_len, page_len, off = 4, ret;
+	struct t10_vpd *vpd;
+
+	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = INQUIRY;
+	cdb[1] = 0x01; /* Query VPD */
+	cdb[2] = 0x83; /* Device Identifier */
+	cdb[3] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN >> 8) & 0xff;
+	cdb[4] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN & 0xff);
+
+	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf,
+			      INQUIRY_VPD_DEVICE_IDENTIFIER_LEN,
+			      NULL, HZ, 1, NULL);
+	if (ret)
+		goto out;
+
+	page_len = (buf[2] << 8) | buf[3];
+	while (page_len > 0) {
+		/* Grab a pointer to the Identification descriptor */
+		page_83 = &buf[off];
+		ident_len = page_83[3];
+		if (!ident_len) {
+			printk(KERN_ERR "page_83[3]: identifier"
+					" length zero!\n");
+			break;
+		}
+		printk(KERN_INFO "T10 VPD Identifer Length: %d\n", ident_len);
+
+		vpd = kzalloc(sizeof(struct t10_vpd), GFP_KERNEL);
+		if (!vpd) {
+			printk(KERN_ERR "Unable to allocate memory for"
+					" struct t10_vpd\n");
+			goto out;
+		}
+		INIT_LIST_HEAD(&vpd->vpd_list);
+
+		transport_set_vpd_proto_id(vpd, page_83);
+		transport_set_vpd_assoc(vpd, page_83);
+
+		if (transport_set_vpd_ident_type(vpd, page_83) < 0) {
+			off += (ident_len + 4);
+			page_len -= (ident_len + 4);
+			kfree(vpd);
+			continue;
+		}
+		if (transport_set_vpd_ident(vpd, page_83) < 0) {
+			off += (ident_len + 4);
+			page_len -= (ident_len + 4);
+			kfree(vpd);
+			continue;
+		}
+
+		list_add_tail(&vpd->vpd_list, &wwn->t10_vpd_list);
+		off += (ident_len + 4);
+		page_len -= (ident_len + 4);
+	}
+
+out:
+	kfree(buf);
+}
+
 /*	pscsi_add_device_to_list():
  *
  *
@@ -247,6 +370,11 @@ static struct se_device *pscsi_add_device_to_list(
 	dev_limits.hw_queue_depth = sd->queue_depth;
 	dev_limits.queue_depth = sd->queue_depth;
 	/*
+	 * Setup our standard INQUIRY info into se_dev->t10_wwn
+	 */
+	pscsi_set_inquiry_info(sd, &se_dev->t10_wwn);
+
+	/*
 	 * Set the pointer pdv->pdv_sd to from passed struct scsi_device,
 	 * which has already been referenced with Linux SCSI code with
 	 * scsi_device_get() in this file's pscsi_create_virtdevice().
@@ -267,6 +395,18 @@ static struct se_device *pscsi_add_device_to_list(
 	if (!(dev)) {
 		pdv->pdv_sd = NULL;
 		return NULL;
+	}
+
+	/*
+	 * Locate VPD WWN Information used for various purposes within
+	 * the Storage Engine.
+	 */
+	if (!pscsi_get_inquiry_vpd_serial(sd, &se_dev->t10_wwn)) {
+		/*
+		 * If VPD Unit Serial returned GOOD status, try
+		 * VPD Device Identification page (0x83).
+		 */
+		pscsi_get_inquiry_vpd_device_ident(sd, &se_dev->t10_wwn);
 	}
 
 	/*

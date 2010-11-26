@@ -153,13 +153,16 @@ extern void transport_dump_dev_info(struct se_device *, struct se_lun *,
 					unsigned long long, char *, int *);
 extern void transport_dump_vpd_proto_id(struct t10_vpd *,
 					unsigned char *, int);
+extern void transport_set_vpd_proto_id(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_assoc(struct t10_vpd *,
 					unsigned char *, int);
+extern int transport_set_vpd_assoc(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_ident_type(struct t10_vpd *,
 					unsigned char *, int);
+extern int transport_set_vpd_ident_type(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_ident(struct t10_vpd *,
 					unsigned char *, int);
-extern int transport_rescan_evpd_device_ident(struct se_device *);
+extern int transport_set_vpd_ident(struct t10_vpd *, unsigned char *);
 extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_api *,
 					struct se_subsystem_dev *, u32,
