@@ -688,25 +688,6 @@ struct se_dev_attrib {
 	struct config_group da_group;
 } ____cacheline_aligned;
 
-struct se_dev_snap_attrib {
-#define SNAP_CONTACT_LEN		128
-	unsigned char	contact[SNAP_CONTACT_LEN];
-#define SNAP_GROUP_LEN			128
-	unsigned char	lv_group[SNAP_GROUP_LEN];
-#define SNAP_LVC_LEN			32
-	unsigned char	lvc_size[SNAP_LVC_LEN];
-	pid_t		pid;
-	int		enabled;
-	int		permissions;
-	int		max_snapshots;
-	int		max_warn;
-	int		check_interval;
-	int		create_interval;
-	int		usage;
-	int		usage_warn;
-	int		vgs_usage_warn;
-} ____cacheline_aligned;
-
 struct se_subsystem_dev {
 /* Used for struct se_subsystem_dev-->se_dev_alias, must be less than PAGE_SIZE */
 #define SE_DEV_ALIAS_LEN		512
@@ -718,7 +699,6 @@ struct se_subsystem_dev {
 	struct se_hba *se_dev_hba;
 	struct se_device *se_dev_ptr;
 	struct se_dev_attrib se_dev_attrib;
-	struct se_dev_snap_attrib se_snap_attrib;
 	/* T10 Asymmetric Logical Unit Assignment for Target Ports */
 	struct t10_alua	t10_alua;
 	/* T10 Inquiry and VPD WWN Information */
@@ -731,11 +711,8 @@ struct se_subsystem_dev {
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
-	/* For userspace lvm utils */
-	struct config_group se_dev_snap_group;
 } ____cacheline_aligned;
 
-#define SE_DEV_SNAP(su_dev)	(&(su_dev)->se_snap_attrib)
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
