@@ -38,7 +38,6 @@
 #define SPC_SENSE_KEY_OFFSET			2
 #define SPC_ASC_KEY_OFFSET			12
 #define SPC_ASCQ_KEY_OFFSET			13
-/* Currently same as ISCSI_IQN_LEN */
 #define TRANSPORT_IQN_LEN			224
 /* Used by target_core_store_alua_lu_gp() and target_core_alua_lu_gp_show_attr_members() */
 #define LU_GROUP_NAME_BUF			256
@@ -825,7 +824,6 @@ struct se_device {
 
 #define SE_DEV(cmd)		((struct se_device *)(cmd)->se_lun->lun_se_dev)
 #define SU_DEV(dev)		((struct se_subsystem_dev *)(dev)->se_sub_dev)
-#define ISCSI_DEV(cmd)		SE_DEV(cmd)
 #define DEV_ATTRIB(dev)		(&(dev)->se_sub_dev->se_dev_attrib)
 #define DEV_T10_WWN(dev)	(&(dev)->se_sub_dev->t10_wwn)
 
@@ -854,8 +852,6 @@ struct se_hba {
 	struct se_subsystem_api *transport;
 }  ____cacheline_aligned;
 
-#define ISCSI_HBA(d)		((struct se_hba *)(d)->se_hba)
-/* Using SE_HBA() for new code */
 #define SE_HBA(d)		((struct se_hba *)(d)->se_hba)
 
 struct se_lun {
@@ -877,7 +873,6 @@ struct se_lun {
 } ____cacheline_aligned;
 
 #define SE_LUN(c)		((struct se_lun *)(c)->se_lun)
-#define ISCSI_LUN(c)		SE_LUN(c)
 
 struct se_port {
 	/* RELATIVE TARGET PORT IDENTIFER */
