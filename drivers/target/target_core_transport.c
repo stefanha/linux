@@ -1780,66 +1780,6 @@ int transport_rescan_evpd_device_ident(
 	return 0;
 }
 
-static int transport_get_read_capacity(struct se_device *dev)
-{
-	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
-	u32 blocks, v1, v2;
-	struct se_cmd *cmd;
-	unsigned long long blocks_long;
-
-	memset(cdb, 0, MAX_COMMAND_SIZE);
-	cdb[0] = 0x25; /* READ_CAPACITY */
-
-	cmd = transport_allocate_passthrough(&cdb[0], DMA_FROM_DEVICE,
-			0, NULL, 0, READ_CAP_LEN, (void *)dev);
-	if (!(cmd))
-		return -1;
-
-	if (transport_generic_passthrough(cmd) < 0) {
-		transport_passthrough_release(cmd);
-		return -1;
-	}
-
-	buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
-	blocks = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
-
-	transport_passthrough_release(cmd);
-
-	if (blocks != 0xFFFFFFFF) {
-		dev->dev_sectors_total = blocks;
-		return 0;
-	}
-
-	printk(KERN_INFO "READ_CAPACITY returned 0xFFFFFFFF, issuing"
-			" SAI_READ_CAPACITY_16\n");
-
-	memset(cdb, 0, MAX_COMMAND_SIZE);
-	cdb[0] = 0x9e; /* SERVICE_ACTION_IN */
-	cdb[1] = 0x10; /* SAI_READ_CAPACITY_16 */
-	cdb[13] = 12;
-
-	cmd = transport_allocate_passthrough(&cdb[0], DMA_FROM_DEVICE,
-			0, NULL, 0, 12, (void *)dev);
-	if (!(cmd))
-		return -1;
-
-	if (transport_generic_passthrough(cmd) < 0) {
-		transport_passthrough_release(cmd);
-		return -1;
-	}
-
-	buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
-	v1 = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
-	v2 = (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | buf[7];
-	blocks_long = ((unsigned long long)v2 | (unsigned long long)v1 << 32);
-
-	transport_passthrough_release(cmd);
-
-	dev->dev_sectors_total = blocks_long;
-
-	return 0;
-}
-
 static void core_setup_task_attr_emulation(struct se_device *dev)
 {
 	/*
@@ -2002,18 +1942,9 @@ struct se_device *transport_add_device_to_core_hba(
 					(void *)dev);
 	}
 
-	/*
-	 * Only perform the volume scan for peripheral type TYPE_DISK
-	 */
-	if (TRANSPORT(dev)->get_device_type(dev) != 0)
-		return dev;
+	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK)
+		dev->dev_sectors_total = dev->transport->get_blocks(dev);
 
-	/*
-	 * Get the sector count via READ_CAPACITY
-	 */
-	ret = transport_get_read_capacity(dev);
-	if (ret < 0)
-		goto out;
 out:
 	if (!ret)
 		return dev;

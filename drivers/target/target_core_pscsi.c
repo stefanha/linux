@@ -1228,6 +1228,17 @@ static u32 pscsi_get_dma_length(u32 task_size, struct se_device *dev)
 	return PAGE_SIZE;
 }
 
+static sector_t pscsi_get_blocks(struct se_device *dev)
+{
+	struct pscsi_dev_virt *pdv = dev->dev_ptr;
+
+	if (pdv->pdv_bd && pdv->pdv_bd->bd_part)
+		return pdv->pdv_bd->bd_part->nr_sects;
+
+	dump_stack();
+	return 0;
+}
+
 /*	pscsi_handle_SAM_STATUS_failures():
  *
  *
@@ -1307,6 +1318,7 @@ static struct se_subsystem_api pscsi_template = {
 	.get_device_rev		= pscsi_get_device_rev,
 	.get_device_type	= pscsi_get_device_type,
 	.get_dma_length		= pscsi_get_dma_length,
+	.get_blocks		= pscsi_get_blocks,
 };
 
 static int __init pscsi_module_init(void)
