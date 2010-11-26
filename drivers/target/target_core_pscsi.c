@@ -181,6 +181,33 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 	return 1;
 }
 
+static void pscsi_tape_read_blocksize(struct se_device *dev,
+		struct scsi_device *sdev)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
+
+	buf = kzalloc(12, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = MODE_SENSE;
+	cdb[4] = 0x0c; /* 12 bytes */
+
+	if (!scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf, 12, NULL,
+			HZ, 1, NULL))
+		goto out_free;
+
+	/*
+	 * If MODE_SENSE still returns zero, set the default value to 1024.
+	 */
+	sdev->sector_size = (buf[9] << 16) | (buf[10] << 8) | (buf[11]);
+	if (!sdev->sector_size)
+		sdev->sector_size = 1024;
+out_free:
+	kfree(buf);
+}
+
 /*	pscsi_add_device_to_list():
  *
  *
@@ -245,43 +272,8 @@ static struct se_device *pscsi_add_device_to_list(
 	/*
 	 * For TYPE_TAPE, attempt to determine blocksize with MODE_SENSE.
 	 */
-	if (sd->type == TYPE_TAPE) {
-		unsigned char *buf = NULL, cdb[MAX_COMMAND_SIZE];
-		struct se_cmd *cmd;
-		u32 blocksize;
-
-		memset(cdb, 0, MAX_COMMAND_SIZE);
-		cdb[0] = MODE_SENSE;
-		cdb[4] = 0x0c; /* 12 bytes */
-
-		cmd = transport_allocate_passthrough(&cdb[0],
-				DMA_FROM_DEVICE, 0, NULL, 0, 12, dev);
-		if (!(cmd)) {
-			printk(KERN_ERR "Unable to determine blocksize for"
-				" TYPE_TAPE\n");
-			goto out;
-		}
-
-		if (transport_generic_passthrough(cmd) < 0) {
-			printk(KERN_ERR "Unable to determine blocksize for"
-				" TYPE_TAPE\n");
-			goto out;
-		}
-
-		buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
-		blocksize = (buf[9] << 16) | (buf[10] << 8) | (buf[11]);
-
-		/*
-		 * If MODE_SENSE still returns zero, set the default value
-		 * to 1024.
-		 */
-		sd->sector_size = blocksize;
-		if (!(sd->sector_size))
-			sd->sector_size = 1024;
-
-		transport_passthrough_release(cmd);
-	}
-out:
+	if (sd->type == TYPE_TAPE)
+		pscsi_tape_read_blocksize(dev, sd);
 	return dev;
 }
 
