@@ -111,24 +111,23 @@ enum se_cmd_flags_table {
 	SCF_SCSI_NON_DATA_CDB		= 0x00000040,
 	SCF_SCSI_CDB_EXCEPTION		= 0x00000080,
 	SCF_SCSI_RESERVATION_CONFLICT	= 0x00000100,
-	SCF_CMD_PASSTHROUGH		= 0x00000200,
-	SCF_CMD_PASSTHROUGH_NOALLOC	= 0x00000400,
-	SCF_SE_CMD_FAILED		= 0x00000800,
-	SCF_SE_LUN_CMD			= 0x00001000,
-	SCF_SE_ALLOW_EOO		= 0x00002000,
-	SCF_SE_DISABLE_ONLINE_CHECK	= 0x00004000,
-	SCF_SENT_CHECK_CONDITION	= 0x00008000,
-	SCF_OVERFLOW_BIT		= 0x00010000,
-	SCF_UNDERFLOW_BIT		= 0x00020000,
-	SCF_SENT_DELAYED_TAS		= 0x00040000,
-	SCF_ALUA_NON_OPTIMIZED		= 0x00080000,
-	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00100000,
-	SCF_PASSTHROUGH_SG_TO_MEM	= 0x00200000,
-	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00400000,
-	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00800000,
-	SCF_EMULATE_SYNC_CACHE		= 0x01000000,
-	SCF_EMULATE_CDB_ASYNC		= 0x02000000,
-	SCF_EMULATE_SYNC_UNMAP		= 0x04000000
+	SCF_CMD_PASSTHROUGH_NOALLOC	= 0x00000200,
+	SCF_SE_CMD_FAILED		= 0x00000400,
+	SCF_SE_LUN_CMD			= 0x00000800,
+	SCF_SE_ALLOW_EOO		= 0x00001000,
+	SCF_SE_DISABLE_ONLINE_CHECK	= 0x00002000,
+	SCF_SENT_CHECK_CONDITION	= 0x00004000,
+	SCF_OVERFLOW_BIT		= 0x00008000,
+	SCF_UNDERFLOW_BIT		= 0x00010000,
+	SCF_SENT_DELAYED_TAS		= 0x00020000,
+	SCF_ALUA_NON_OPTIMIZED		= 0x00040000,
+	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00080000,
+	SCF_PASSTHROUGH_SG_TO_MEM	= 0x00100000,
+	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00200000,
+	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00400000,
+	SCF_EMULATE_SYNC_CACHE		= 0x00800000,
+	SCF_EMULATE_CDB_ASYNC		= 0x01000000,
+	SCF_EMULATE_SYNC_UNMAP		= 0x02000000
 };
 	
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
@@ -431,8 +430,6 @@ struct se_transport_task {
 	atomic_t		transport_lun_stop;
 	spinlock_t		t_state_lock;
 	struct completion	t_transport_stop_comp;
-	struct completion	t_transport_passthrough_comp;
-	struct completion	t_transport_passthrough_wcomp;
 	struct completion	transport_lun_fe_stop_comp;
 	struct completion	transport_lun_stop_comp;
 	struct scatterlist	*t_tasks_sg_chained;
@@ -527,7 +524,6 @@ struct se_cmd {
 	struct se_device	*se_orig_obj_ptr;
 	struct se_lun		*se_lun;
 	/* Only used for internal passthrough and legacy TCM fabric modules */
-	void			*se_fabric_cmd_ptr;
 	struct se_session	*se_sess;
 	struct se_tmr_req	*se_tmr_req;
 	/* t_task is setup to t_task_backstore in transport_init_se_cmd() */
