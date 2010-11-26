@@ -731,7 +731,6 @@ struct se_device {
 	/* Used for SPC-2 reservations enforce of ISIDs */
 	u64			dev_res_bin_isid;
 	t10_task_attr_index_t	dev_task_attr_type;
-	unsigned long long	dev_sectors_total;
 	/* Pointer to transport specific device structure */
 	void 			*dev_ptr;
 	u32			dev_index;

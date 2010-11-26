@@ -1715,9 +1715,6 @@ struct se_device *transport_add_device_to_core_hba(
 	}
 	scsi_dump_inquiry(dev);
 
-	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_DISK)
-		dev->dev_sectors_total = dev->transport->get_blocks(dev);
-
 out:
 	if (!ret)
 		return dev;
@@ -4248,7 +4245,7 @@ EXPORT_SYMBOL(transport_generic_map_mem_to_cmd);
 
 static inline long long transport_dev_end_lba(struct se_device *dev)
 {
-	return dev->dev_sectors_total + 1;
+	return dev->transport->get_blocks(dev) + 1;
 }
 
 static int transport_get_sectors(struct se_cmd *cmd)
