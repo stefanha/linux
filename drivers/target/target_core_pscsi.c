@@ -185,6 +185,7 @@ static void pscsi_tape_read_blocksize(struct se_device *dev,
 		struct scsi_device *sdev)
 {
 	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
+	int ret;
 
 	buf = kzalloc(12, GFP_KERNEL);
 	if (!buf)
@@ -194,8 +195,9 @@ static void pscsi_tape_read_blocksize(struct se_device *dev,
 	cdb[0] = MODE_SENSE;
 	cdb[4] = 0x0c; /* 12 bytes */
 
-	if (!scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf, 12, NULL,
-			HZ, 1, NULL))
+	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf, 12, NULL,
+			HZ, 1, NULL);
+	if (ret)
 		goto out_free;
 
 	/*
