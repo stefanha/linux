@@ -38,7 +38,6 @@
 #define SPC_SENSE_KEY_OFFSET			2
 #define SPC_ASC_KEY_OFFSET			12
 #define SPC_ASCQ_KEY_OFFSET			13
-/* Currently same as ISCSI_IQN_LEN */
 #define TRANSPORT_IQN_LEN			224
 /* Used by target_core_store_alua_lu_gp() and target_core_alua_lu_gp_show_attr_members() */
 #define LU_GROUP_NAME_BUF			256
@@ -112,24 +111,23 @@ enum se_cmd_flags_table {
 	SCF_SCSI_NON_DATA_CDB		= 0x00000040,
 	SCF_SCSI_CDB_EXCEPTION		= 0x00000080,
 	SCF_SCSI_RESERVATION_CONFLICT	= 0x00000100,
-	SCF_CMD_PASSTHROUGH		= 0x00000200,
-	SCF_CMD_PASSTHROUGH_NOALLOC	= 0x00000400,
-	SCF_SE_CMD_FAILED		= 0x00000800,
-	SCF_SE_LUN_CMD			= 0x00001000,
-	SCF_SE_ALLOW_EOO		= 0x00002000,
-	SCF_SE_DISABLE_ONLINE_CHECK	= 0x00004000,
-	SCF_SENT_CHECK_CONDITION	= 0x00008000,
-	SCF_OVERFLOW_BIT		= 0x00010000,
-	SCF_UNDERFLOW_BIT		= 0x00020000,
-	SCF_SENT_DELAYED_TAS		= 0x00040000,
-	SCF_ALUA_NON_OPTIMIZED		= 0x00080000,
-	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00100000,
-	SCF_PASSTHROUGH_SG_TO_MEM	= 0x00200000,
-	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00400000,
-	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00800000,
-	SCF_EMULATE_SYNC_CACHE		= 0x01000000,
-	SCF_EMULATE_CDB_ASYNC		= 0x02000000,
-	SCF_EMULATE_SYNC_UNMAP		= 0x04000000
+	SCF_CMD_PASSTHROUGH_NOALLOC	= 0x00000200,
+	SCF_SE_CMD_FAILED		= 0x00000400,
+	SCF_SE_LUN_CMD			= 0x00000800,
+	SCF_SE_ALLOW_EOO		= 0x00001000,
+	SCF_SE_DISABLE_ONLINE_CHECK	= 0x00002000,
+	SCF_SENT_CHECK_CONDITION	= 0x00004000,
+	SCF_OVERFLOW_BIT		= 0x00008000,
+	SCF_UNDERFLOW_BIT		= 0x00010000,
+	SCF_SENT_DELAYED_TAS		= 0x00020000,
+	SCF_ALUA_NON_OPTIMIZED		= 0x00040000,
+	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00080000,
+	SCF_PASSTHROUGH_SG_TO_MEM	= 0x00100000,
+	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00200000,
+	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00400000,
+	SCF_EMULATE_SYNC_CACHE		= 0x00800000,
+	SCF_EMULATE_CDB_ASYNC		= 0x01000000,
+	SCF_EMULATE_SYNC_UNMAP		= 0x02000000
 };
 	
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
@@ -432,8 +430,6 @@ struct se_transport_task {
 	atomic_t		transport_lun_stop;
 	spinlock_t		t_state_lock;
 	struct completion	t_transport_stop_comp;
-	struct completion	t_transport_passthrough_comp;
-	struct completion	t_transport_passthrough_wcomp;
 	struct completion	transport_lun_fe_stop_comp;
 	struct completion	transport_lun_stop_comp;
 	struct scatterlist	*t_tasks_sg_chained;
@@ -528,7 +524,6 @@ struct se_cmd {
 	struct se_device	*se_orig_obj_ptr;
 	struct se_lun		*se_lun;
 	/* Only used for internal passthrough and legacy TCM fabric modules */
-	void			*se_fabric_cmd_ptr;
 	struct se_session	*se_sess;
 	struct se_tmr_req	*se_tmr_req;
 	/* t_task is setup to t_task_backstore in transport_init_se_cmd() */
@@ -689,25 +684,6 @@ struct se_dev_attrib {
 	struct config_group da_group;
 } ____cacheline_aligned;
 
-struct se_dev_snap_attrib {
-#define SNAP_CONTACT_LEN		128
-	unsigned char	contact[SNAP_CONTACT_LEN];
-#define SNAP_GROUP_LEN			128
-	unsigned char	lv_group[SNAP_GROUP_LEN];
-#define SNAP_LVC_LEN			32
-	unsigned char	lvc_size[SNAP_LVC_LEN];
-	pid_t		pid;
-	int		enabled;
-	int		permissions;
-	int		max_snapshots;
-	int		max_warn;
-	int		check_interval;
-	int		create_interval;
-	int		usage;
-	int		usage_warn;
-	int		vgs_usage_warn;
-} ____cacheline_aligned;
-
 struct se_subsystem_dev {
 /* Used for struct se_subsystem_dev-->se_dev_alias, must be less than PAGE_SIZE */
 #define SE_DEV_ALIAS_LEN		512
@@ -719,7 +695,6 @@ struct se_subsystem_dev {
 	struct se_hba *se_dev_hba;
 	struct se_device *se_dev_ptr;
 	struct se_dev_attrib se_dev_attrib;
-	struct se_dev_snap_attrib se_snap_attrib;
 	/* T10 Asymmetric Logical Unit Assignment for Target Ports */
 	struct t10_alua	t10_alua;
 	/* T10 Inquiry and VPD WWN Information */
@@ -732,11 +707,8 @@ struct se_subsystem_dev {
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
-	/* For userspace lvm utils */
-	struct config_group se_dev_snap_group;
 } ____cacheline_aligned;
 
-#define SE_DEV_SNAP(su_dev)	(&(su_dev)->se_snap_attrib)
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
@@ -759,7 +731,6 @@ struct se_device {
 	/* Used for SPC-2 reservations enforce of ISIDs */
 	u64			dev_res_bin_isid;
 	t10_task_attr_index_t	dev_task_attr_type;
-	unsigned long long	dev_sectors_total;
 	/* Pointer to transport specific device structure */
 	void 			*dev_ptr;
 	u32			dev_index;
@@ -825,7 +796,6 @@ struct se_device {
 
 #define SE_DEV(cmd)		((struct se_device *)(cmd)->se_lun->lun_se_dev)
 #define SU_DEV(dev)		((struct se_subsystem_dev *)(dev)->se_sub_dev)
-#define ISCSI_DEV(cmd)		SE_DEV(cmd)
 #define DEV_ATTRIB(dev)		(&(dev)->se_sub_dev->se_dev_attrib)
 #define DEV_T10_WWN(dev)	(&(dev)->se_sub_dev->t10_wwn)
 
@@ -854,8 +824,6 @@ struct se_hba {
 	struct se_subsystem_api *transport;
 }  ____cacheline_aligned;
 
-#define ISCSI_HBA(d)		((struct se_hba *)(d)->se_hba)
-/* Using SE_HBA() for new code */
 #define SE_HBA(d)		((struct se_hba *)(d)->se_hba)
 
 struct se_lun {
@@ -877,7 +845,6 @@ struct se_lun {
 } ____cacheline_aligned;
 
 #define SE_LUN(c)		((struct se_lun *)(c)->se_lun)
-#define ISCSI_LUN(c)		SE_LUN(c)
 
 struct se_port {
 	/* RELATIVE TARGET PORT IDENTIFER */

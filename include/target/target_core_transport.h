@@ -153,13 +153,16 @@ extern void transport_dump_dev_info(struct se_device *, struct se_lun *,
 					unsigned long long, char *, int *);
 extern void transport_dump_vpd_proto_id(struct t10_vpd *,
 					unsigned char *, int);
+extern void transport_set_vpd_proto_id(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_assoc(struct t10_vpd *,
 					unsigned char *, int);
+extern int transport_set_vpd_assoc(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_ident_type(struct t10_vpd *,
 					unsigned char *, int);
+extern int transport_set_vpd_ident_type(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_ident(struct t10_vpd *,
 					unsigned char *, int);
-extern int transport_rescan_evpd_device_ident(struct se_device *);
+extern int transport_set_vpd_ident(struct t10_vpd *, unsigned char *);
 extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_api *,
 					struct se_subsystem_dev *, u32,
@@ -178,10 +181,6 @@ extern int transport_generic_handle_data(struct se_cmd *);
 extern int transport_generic_handle_tmr(struct se_cmd *);
 extern void __transport_stop_task_timer(struct se_task *, unsigned long *);
 extern unsigned char transport_asciihex_to_binaryhex(unsigned char val[2]);
-extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
-						void *, u32, u32, void *);
-extern void transport_passthrough_release(struct se_cmd *);
-extern int transport_generic_passthrough(struct se_cmd *);
 extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *, u32,
 				struct scatterlist *, u32);
 extern int transport_clear_lun_from_sessions(struct se_lun *);
