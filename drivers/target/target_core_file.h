@@ -11,12 +11,6 @@
 #define FD_BLOCKSIZE		512
 #define FD_MAX_SECTORS		1024
 
-#define FD_DATA_READ		1
-#define FD_DATA_WRITE		2
-#define FD_DATA_NONE		3
-
-extern struct se_global *se_global;
-
 #define RRF_EMULATE_CDB		0x01
 #define RRF_GOT_LBA		0x02
 
@@ -24,26 +18,6 @@ struct fd_request {
 	struct se_task	fd_task;
 	/* SCSI CDB from iSCSI Command PDU */
 	unsigned char	fd_scsi_cdb[TCM_MAX_COMMAND_SIZE];
-	/* Data Direction */
-	u8		fd_data_direction;
-	/* Total length of request */
-	u32		fd_bufflen;
-	/* RD request flags */
-	u32		fd_req_flags;
-	/* Offset from start of page */
-	u32		fd_offset;
-	u32		fd_cur_size;
-	u32		fd_cur_offset;
-	/* Scatterlist count */
-	u32		fd_sg_count;
-	/* Logical Block Address */
-	unsigned long long	fd_lba;
-	u64		fd_size;
-	struct kiocb	fd_iocb;
-	struct iovec	*fd_iovs;
-	/* Data buffer containing scatterlists(s) or contingous
-	   memory segments */
-	void		*fd_buf;
 	/* FILEIO device */
 	struct fd_dev	*fd_dev;
 } ____cacheline_aligned;
@@ -65,8 +39,6 @@ struct fd_dev {
 	struct file	*fd_file;
 	/* FILEIO HBA device is connected to */
 	struct fd_host *fd_host;
-	int (*fd_do_read)(struct fd_request *, struct se_task *);
-	int (*fd_do_write)(struct fd_request *, struct se_task *);
 } ____cacheline_aligned;
 
 struct fd_host {

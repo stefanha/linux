@@ -5,16 +5,11 @@
 #define TARGET_CORE_NAME_MAX_LEN	64
 #define TARGET_FABRIC_NAME_SIZE		32
 
-extern struct se_global *se_global;
-
-extern struct se_hba *target_core_get_hba_from_item(struct config_item *);
 extern struct target_fabric_configfs *target_fabric_configfs_init(
 				struct module *, const char *);
 extern void target_fabric_configfs_free(struct target_fabric_configfs *);
 extern int target_fabric_configfs_register(struct target_fabric_configfs *);
 extern void target_fabric_configfs_deregister(struct target_fabric_configfs *);
-extern int target_core_init_configfs(void);
-extern void target_core_exit_configfs(void);
 
 struct target_fabric_configfs_template {
 	struct config_item_type tfc_discovery_cit;

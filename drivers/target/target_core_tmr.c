@@ -69,23 +69,14 @@ struct se_tmr_req *core_tmr_alloc_req(
 }
 EXPORT_SYMBOL(core_tmr_alloc_req);
 
-/*
- * Called with struct se_device->se_tmr_lock held.
- */
-void __core_tmr_release_req(
-	struct se_tmr_req *tmr)
-{
-	list_del(&tmr->tmr_list);
-	kmem_cache_free(se_tmr_req_cache, tmr);
-}
-
 void core_tmr_release_req(
 	struct se_tmr_req *tmr)
 {
 	struct se_device *dev = tmr->tmr_dev;
 
 	spin_lock(&dev->se_tmr_lock);
-	__core_tmr_release_req(tmr);
+	list_del(&tmr->tmr_list);
+	kmem_cache_free(se_tmr_req_cache, tmr);
 	spin_unlock(&dev->se_tmr_lock);
 }
 
@@ -257,11 +248,10 @@ int core_tmr_lun_reset(
 		spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 
 		spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
-		DEBUG_LR("LUN_RESET: %s cmd: %p se_fabric_cmd_ptr: %p task: %p"
+		DEBUG_LR("LUN_RESET: %s cmd: %p task: %p"
 			" ITT/CmdSN: 0x%08x/0x%08x, i_state: %d, t_state/"
 			"def_t_state: %d/%d cdb: 0x%02x\n",
-			(preempt_and_abort_list) ? "Preempt" : "", cmd,
-			cmd->se_fabric_cmd_ptr, task,
+			(preempt_and_abort_list) ? "Preempt" : "", cmd, task,
 			CMD_TFO(cmd)->get_task_tag(cmd), 0,
 			CMD_TFO(cmd)->get_cmd_state(cmd), cmd->t_state,
 			cmd->deferred_t_state, T_TASK(cmd)->t_task_cdb[0]);

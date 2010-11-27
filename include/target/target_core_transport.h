@@ -130,8 +130,6 @@ extern int transport_subsystem_check_init(void);
 extern int transport_subsystem_register(struct se_subsystem_api *);
 extern void transport_subsystem_release(struct se_subsystem_api *);
 extern void transport_load_plugins(void);
-extern struct se_subsystem_api *transport_core_get_sub_by_name(const char *);
-extern void transport_core_put_sub(struct se_subsystem_api *);
 extern struct se_session *transport_init_session(void);
 extern void __transport_register_session(struct se_portal_group *,
 					struct se_node_acl *,
@@ -142,47 +140,35 @@ extern void transport_register_session(struct se_portal_group *,
 extern void transport_free_session(struct se_session *);
 extern void transport_deregister_session_configfs(struct se_session *);
 extern void transport_deregister_session(struct se_session *);
-extern void transport_task_dev_remove_state(struct se_task *,
-						struct se_device *);
 extern void transport_cmd_finish_abort(struct se_cmd *, int);
 extern void transport_cmd_finish_abort_tmr(struct se_cmd *);
-extern int transport_add_cmd_to_queue(struct se_cmd *, int);
-extern struct se_queue_req *__transport_get_qr_from_queue(
-					struct se_queue_obj *);
-extern void transport_remove_cmd_from_queue(struct se_cmd *,
-					    struct se_queue_obj *);
 extern void transport_complete_sync_cache(struct se_cmd *, int);
-extern void transport_complete_cmd(struct se_cmd *, int);
 extern void transport_complete_task(struct se_task *, int);
 extern void transport_add_task_to_execute_queue(struct se_task *,
 						struct se_task *,
 						struct se_device *);
-extern void transport_add_tasks_from_cmd(struct se_cmd *);
-extern struct se_queue_req *transport_get_qr_from_queue(struct se_queue_obj *);
 unsigned char *transport_dump_cmd_direction(struct se_cmd *);
 extern void transport_dump_dev_state(struct se_device *, char *, int *);
 extern void transport_dump_dev_info(struct se_device *, struct se_lun *,
 					unsigned long long, char *, int *);
 extern void transport_dump_vpd_proto_id(struct t10_vpd *,
 					unsigned char *, int);
+extern void transport_set_vpd_proto_id(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_assoc(struct t10_vpd *,
 					unsigned char *, int);
+extern int transport_set_vpd_assoc(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_ident_type(struct t10_vpd *,
 					unsigned char *, int);
+extern int transport_set_vpd_ident_type(struct t10_vpd *, unsigned char *);
 extern int transport_dump_vpd_ident(struct t10_vpd *,
 					unsigned char *, int);
-extern int transport_rescan_evpd_device_ident(struct se_device *);
+extern int transport_set_vpd_ident(struct t10_vpd *, unsigned char *);
 extern struct se_device *transport_add_device_to_core_hba(struct se_hba *,
 					struct se_subsystem_api *,
 					struct se_subsystem_dev *, u32,
 					void *, struct se_dev_limits *,
 					const char *, const char *);
-extern int transport_generic_allocate_iovecs(struct se_cmd *);
 extern void transport_device_setup_cmd(struct se_cmd *);
-extern int transport_check_alloc_task_attr(struct se_cmd *);
-extern struct se_cmd *transport_alloc_se_cmd(struct target_core_fabric_ops *,
-					struct se_session *, void *,
-					u32, int, int);
 extern void transport_init_se_cmd(struct se_cmd *,
 					struct target_core_fabric_ops *,
 					struct se_session *, u32, int, int,
@@ -193,71 +179,24 @@ extern int transport_generic_handle_cdb(struct se_cmd *);
 extern int transport_generic_handle_cdb_map(struct se_cmd *);
 extern int transport_generic_handle_data(struct se_cmd *);
 extern int transport_generic_handle_tmr(struct se_cmd *);
-extern int transport_stop_tasks_for_cmd(struct se_cmd *);
-extern void transport_generic_request_failure(struct se_cmd *, struct se_device *,
-						int, int);
-extern void transport_direct_request_timeout(struct se_cmd *);
-extern void transport_generic_request_timeout(struct se_cmd *);
-extern int transport_generic_allocate_buf(struct se_cmd *, u32, u32);
-extern int __transport_execute_tasks(struct se_device *);
-extern void transport_new_cmd_failure(struct se_cmd *);
-extern void transport_set_supported_SAM_opcode(struct se_cmd *);
-extern void transport_start_task_timer(struct se_task *);
 extern void __transport_stop_task_timer(struct se_task *, unsigned long *);
-extern void transport_stop_task_timer(struct se_task *);
-extern void transport_stop_all_task_timers(struct se_cmd *);
-extern int transport_execute_tasks(struct se_cmd *);
 extern unsigned char transport_asciihex_to_binaryhex(unsigned char val[2]);
-extern int transport_get_sense_data(struct se_cmd *);
-extern struct se_cmd *transport_allocate_passthrough(unsigned char *, int, u32,
-						void *, u32, u32, void *);
-extern void transport_passthrough_release(struct se_cmd *);
-extern int transport_passthrough_complete(struct se_cmd *);
-extern void transport_memcpy_se_mem_read_contig(struct se_cmd *,
-				unsigned char *, struct list_head *);
-extern int transport_generic_passthrough_async(struct se_cmd *cmd,
-				void(*callback)(struct se_cmd *cmd,
-				void *callback_arg, int complete_status),
-				void *callback_arg);
-extern int transport_generic_passthrough(struct se_cmd *);
-extern void transport_complete_task_attr(struct se_cmd *);
-extern void transport_generic_complete_ok(struct se_cmd *);
-extern void transport_free_dev_tasks(struct se_cmd *);
-extern void transport_release_fe_cmd(struct se_cmd *);
-extern int transport_generic_remove(struct se_cmd *, int, int);
 extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *, u32,
 				struct scatterlist *, u32);
 extern int transport_clear_lun_from_sessions(struct se_lun *);
 extern int transport_check_aborted_status(struct se_cmd *, int);
-extern int transport_get_sense_codes(struct se_cmd *, u8 *, u8 *);
-extern int transport_set_sense_codes(struct se_cmd *, u8, u8);
 extern int transport_send_check_condition_and_sense(struct se_cmd *, u8, int);
 extern void transport_send_task_abort(struct se_cmd *);
 extern void transport_release_cmd_to_pool(struct se_cmd *);
 extern void transport_generic_free_cmd(struct se_cmd *, int, int, int);
 extern void transport_generic_wait_for_cmds(struct se_cmd *, int);
-extern int transport_get_sectors(struct se_cmd *);
-extern unsigned char *transport_get_vaddr(struct se_mem *);
-extern struct list_head *transport_init_se_mem_list(void);
-extern void transport_free_se_mem_list(struct list_head *);
-extern int transport_generic_get_mem(struct se_cmd *, u32, u32);
 extern u32 transport_calc_sg_num(struct se_task *, struct se_mem *, u32);
-extern int transport_map_sg_to_mem(struct se_cmd *, struct list_head *,
-					void *, u32 *);
 extern int transport_map_mem_to_sg(struct se_task *, struct list_head *,
 					void *, struct se_mem *,
 					struct se_mem **, u32 *, u32 *);
 extern void transport_do_task_sg_chain(struct se_cmd *);
-extern u32 transport_generic_get_cdb_count(struct se_cmd *,
-					struct se_transform_info *,
-					unsigned long long, u32,
-					enum dma_data_direction,
-					struct list_head *);
-extern int transport_generic_new_cmd(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);
-extern int transport_generic_set_iovec_ptrs(struct se_map_sg *map_sg,
-	struct se_unmap_sg *unmap_sg);
 /* From target_core_alua.c */
 extern int core_alua_check_nonop_delay(struct se_cmd *);
 
@@ -284,10 +223,6 @@ struct se_subsystem_api {
 	 */
 	char name[16];
 	/*
-	 * Plugin Type.
-	 */
-	u8 type;
-	/*
 	 * Transport Type.
 	 */
 	u8 transport_type;
@@ -296,33 +231,21 @@ struct se_subsystem_api {
 	 */
 	struct module *owner;
 	/*
-	 * Counter for struct se_hba reference
-	 */
-	atomic_t sub_api_hba_cnt;
-	/*
 	 * Used for global se_subsystem_api list_head
 	 */
 	struct list_head sub_api_list;
 	/*
 	 * For SCF_SCSI_NON_DATA_CDB
 	 */
-	int (*cdb_none)(struct se_task *, u32);
+	int (*cdb_none)(struct se_task *);
 	/*
-	 * For READ SCF_SCSI_CONTROL_NONSG_IO_CDB
+	 * For SCF_SCSI_CONTROL_NONSG_IO_CDB
 	 */
-	int (*cdb_read_non_SG)(struct se_task *, u32);
+	int (*map_task_non_SG)(struct se_task *);
 	/*
-	 * For READ SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
+	 * For SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
 	 */
-	int (*cdb_read_SG)(struct se_task *, u32);
-	/*
-	 * For WRITE SCF_SCSI_CONTROL_NONSG_IO_CDB
-	 */
-	int (*cdb_write_non_SG)(struct se_task *, u32);
-	/*
-	 * For WRITE SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
-	 */
-	int (*cdb_write_SG)(struct se_task *, u32);
+	int (*map_task_SG)(struct se_task *);
 	/*
 	 * attach_hba():
 	 */
@@ -330,7 +253,7 @@ struct se_subsystem_api {
 	/*
 	 * detach_hba():
 	 */
-	int (*detach_hba)(struct se_hba *);
+	void (*detach_hba)(struct se_hba *);
 	/*
 	 * pmode_hba(): Used for TCM/pSCSI subsystem plugin HBA ->
 	 *		Linux/SCSI struct Scsi_Host passthrough
@@ -349,21 +272,7 @@ struct se_subsystem_api {
 	 * free_device():
 	 */
 	void (*free_device)(void *);
-	/*
-	 * cmd_sequencer():
-	 *
-	 * Use transport_generic_cmd_sequencer() for majority of DAS transport
-	 * drivers with a scsi_transport_spc_t struct as mentioned below.
-	 * Provided out of convenience.
-	 */
-	int (*cmd_sequencer)(struct se_cmd *cmd);
-	/*
-	 * do_tmr():
-	 *
-	 * Use transport_do_tmr() for majority of DAS transport drivers.
-	 * Provided out of convenience.
-	 */
-	int (*do_tmr)(struct se_cmd *cmd);
+
 	/*
 	 * dpo_emulated():
 	 */
@@ -388,22 +297,6 @@ struct se_subsystem_api {
 	 */
 	int (*transport_complete)(struct se_task *task);
 	struct se_task *(*alloc_task)(struct se_cmd *);
-	/*
-	 * allocate_buf():
-	 */
-	int (*allocate_buf)(struct se_cmd *, u32, u32);
-	/*
-	 * allocate_DMA();
-	 */
-	int (*allocate_DMA)(struct se_cmd *, u32, u32);
-	/*
-	 * free_buf():
-	 */
-	void (*free_buf)(struct se_cmd *);
-	/*
-	 * free_DMA():
-	 */
-	void (*free_DMA)(struct se_cmd *);
 	/*
 	 * do_task():
 	 */
@@ -437,30 +330,6 @@ struct se_subsystem_api {
 	ssize_t (*show_configfs_dev_params)(struct se_hba *, struct se_subsystem_dev *,
 						char *);
 	/*
-	 * plugin_init():
-	 */
-	int (*plugin_init)(void);
-	/*
-	 * plugin_free():
-	 */
-	void (*plugin_free)(void);
-	/*
-	 * get_plugin_info():
-	 */
-	void (*get_plugin_info)(void *, char *, int *);
-	/*
-	 * get_hba_info():
-	 */
-	void (*get_hba_info)(struct se_hba *, char *, int *);
-	/*
-	 * check_lba():
-	 */
-	int (*check_lba)(unsigned long long lba, struct se_device *);
-	/*
-	 * check_for_SG():
-	 */
-	int (*check_for_SG)(struct se_task *);
-	/*
 	 * get_cdb():
 	 */
 	unsigned char *(*get_cdb)(struct se_task *);
@@ -477,10 +346,6 @@ struct se_subsystem_api {
 	 */
 	u32 (*get_dma_length)(u32, struct se_device *);
 	/*
-	 * get_max_cdbs():
-	 */
-	u32 (*get_max_cdbs)(struct se_device *);
-	/*
 	 * Get the sector_t from a subsystem backstore..
 	 */
 	sector_t (*get_blocks)(struct se_device *);
@@ -493,22 +358,11 @@ struct se_subsystem_api {
 	 * get_sense_buffer():
 	 */
 	unsigned char *(*get_sense_buffer)(struct se_task *);
-	/*
-	 * map_task_to_SG():
-	 */
-	void (*map_task_to_SG)(struct se_task *);
-	/*
-	 * set_iovec_ptrs():
-	 */
-	int (*set_iovec_ptrs)(struct se_map_sg *, struct se_unmap_sg *);
-	/*
-	 * write_pending():
-	 */
-	int (*write_pending)(struct se_task *);
 } ____cacheline_aligned;
 
 #define TRANSPORT(dev)		((dev)->transport)
 #define HBA_TRANSPORT(hba)	((hba)->transport)
 
-#endif /* TARGET_CORE_TRANSPORT_H */
+extern struct se_global *se_global;
 
+#endif /* TARGET_CORE_TRANSPORT_H */

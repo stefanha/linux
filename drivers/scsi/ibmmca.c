@@ -39,7 +39,7 @@
 #include <scsi/scsi_host.h>
 
 /* Common forward declarations for all Linux-versions: */
-static int ibmmca_queuecommand (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int ibmmca_queuecommand (struct Scsi_Host *, struct scsi_cmnd *);
 static int ibmmca_abort (Scsi_Cmnd *);
 static int ibmmca_host_reset (Scsi_Cmnd *);
 static int ibmmca_biosparam (struct scsi_device *, struct block_device *, sector_t, int *);

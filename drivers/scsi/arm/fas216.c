@@ -2279,7 +2279,7 @@ static int fas216_noqueue_command_lck(struct scsi_cmnd *SCpnt,
 	BUG_ON(info->scsi.irq != NO_IRQ);
 
 	info->internal_done = 0;
-	fas216_queue_command(SCpnt, fas216_internal_done);
+	fas216_queue_command_lck(SCpnt, fas216_internal_done);
 
 	/*
 	 * This wastes time, since we can't return until the command is

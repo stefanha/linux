@@ -11,8 +11,6 @@
 #define PS_TIMEOUT_DISK		(15*HZ)
 #define PS_TIMEOUT_OTHER	(500*HZ)
 
-extern struct se_global *se_global;
-
 #include <linux/device.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_device.h>
@@ -23,7 +21,6 @@ struct stgt_plugin_task {
 	struct se_task stgt_task;
 	unsigned char stgt_cdb[TCM_MAX_COMMAND_SIZE];
 	unsigned char stgt_sense[SCSI_SENSE_BUFFERSIZE];
-	int	stgt_direction;
 	int	stgt_result;
 	u32	stgt_resid;
 	struct scsi_cmnd *stgt_cmd;

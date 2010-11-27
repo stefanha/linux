@@ -1,8 +1,6 @@
 #ifndef TARGET_CORE_MIB_H
 #define TARGET_CORE_MIB_H
 
-extern struct se_global *se_global;
-
 typedef enum {
 	SCSI_INST_INDEX,
 	SCSI_DEVICE_INDEX,
