@@ -1075,6 +1075,7 @@ static struct se_subsystem_api rd_mcp_template = {
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
 	.get_dma_length		= rd_get_dma_length,
+	.get_blocks		= rd_get_blocks,
 };
 
 int __init rd_module_init(void)
