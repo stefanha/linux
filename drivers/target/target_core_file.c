@@ -635,15 +635,6 @@ static u32 fd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-/*	fd_get_dma_length(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 fd_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
-}
-
 static sector_t fd_get_blocks(struct se_device *dev)
 {
 	struct fd_dev *fd_dev = dev->dev_ptr;
@@ -676,7 +667,6 @@ static struct se_subsystem_api fileio_template = {
 	.get_cdb		= fd_get_cdb,
 	.get_device_rev		= fd_get_device_rev,
 	.get_device_type	= fd_get_device_type,
-	.get_dma_length		= fd_get_dma_length,
 	.get_blocks		= fd_get_blocks,
 };
 

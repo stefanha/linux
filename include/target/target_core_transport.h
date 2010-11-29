@@ -342,10 +342,6 @@ struct se_subsystem_api {
 	 */
 	u32 (*get_device_type)(struct se_device *);
 	/*
-	 * get_dma_length():
-	 */
-	u32 (*get_dma_length)(u32, struct se_device *);
-	/*
 	 * Get the sector_t from a subsystem backstore..
 	 */
 	sector_t (*get_blocks)(struct se_device *);
