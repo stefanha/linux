@@ -705,11 +705,6 @@ static u32 iblock_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-static u32 iblock_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
-}
-
 static sector_t iblock_get_blocks(struct se_device *dev)
 {
 	struct iblock_dev *ibd = dev->dev_ptr;
@@ -792,7 +787,6 @@ static struct se_subsystem_api iblock_template = {
 	.get_cdb		= iblock_get_cdb,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,
-	.get_dma_length		= iblock_get_dma_length,
 	.get_blocks		= iblock_get_blocks,
 };
 
