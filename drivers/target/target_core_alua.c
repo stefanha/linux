@@ -455,9 +455,9 @@ static int core_alua_state_check_nop(
  * Also, this function can return three different return codes to
  * signal transport_generic_cmd_sequencer()
  *
- * return 1: Is used to signal LUN not accecsable, and TGCS_CHECK_CONDITION_NOT_READY
+ * return 1: Is used to signal LUN not accecsable, and check condition/not ready
  * return 0: Used to signal success
- * reutrn -1: Used to signal failure, and TGCS_INVALID_CDB_FIELD
+ * reutrn -1: Used to signal failure, and invalid cdb field
  */
 static int core_alua_state_check(
 	struct se_cmd *cmd,
