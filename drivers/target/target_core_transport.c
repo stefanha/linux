@@ -1952,15 +1952,6 @@ int transport_generic_allocate_tasks(
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to "
 				"SCF_SCSI_DATA_SG_IO_CDB\n", cdb[0]);
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
-
-		/*
-		 * Get the initial Logical Block Address from the Original
-		 * Command Descriptor Block that arrived on the iSCSI wire.
-		 */
-		T_TASK(cmd)->t_task_lba = (cmd->transport_get_long_lba) ?
-			cmd->transport_get_long_lba(cdb) :
-			cmd->transport_get_lba(cdb);
-
 		break;
 	case TGCS_CONTROL_SG_IO_CDB:
 		DEBUG_CDB_H("Set cdb[0]: 0x%02x to"
@@ -3184,7 +3175,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
-		cmd->transport_get_lba = &transport_lba_21;
+		T_TASK(cmd)->t_task_lba = transport_lba_21(cdb);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_10:
@@ -3193,7 +3184,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
-		cmd->transport_get_lba = &transport_lba_32;
+		T_TASK(cmd)->t_task_lba = transport_lba_32(cdb);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_12:
@@ -3202,7 +3193,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
-		cmd->transport_get_lba = &transport_lba_32;
+		T_TASK(cmd)->t_task_lba = transport_lba_32(cdb);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case READ_16:
@@ -3211,7 +3202,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
-		cmd->transport_get_long_lba = &transport_lba_64;
+		T_TASK(cmd)->t_task_lba = transport_lba_64(cdb);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_6:
@@ -3220,7 +3211,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_6;
-		cmd->transport_get_lba = &transport_lba_21;
+		T_TASK(cmd)->t_task_lba = transport_lba_21(cdb);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
 	case WRITE_10:
@@ -3229,7 +3220,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
-		cmd->transport_get_lba = &transport_lba_32;
+		T_TASK(cmd)->t_task_lba = transport_lba_32(cdb);
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
@@ -3239,7 +3230,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_12;
-		cmd->transport_get_lba = &transport_lba_32;
+		T_TASK(cmd)->t_task_lba = transport_lba_32(cdb);
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
@@ -3249,7 +3240,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_16;
-		cmd->transport_get_long_lba = &transport_lba_64;
+		T_TASK(cmd)->t_task_lba = transport_lba_64(cdb);
 		T_TASK(cmd)->t_tasks_fua = (cdb[1] & 0x8);
 		ret = TGCS_DATA_SG_IO_CDB;
 		break;
@@ -3262,7 +3253,7 @@ static int transport_generic_cmd_sequencer(
 			return TGCS_UNSUPPORTED_CDB;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->transport_split_cdb = &split_cdb_XX_10;
-		cmd->transport_get_lba = &transport_lba_32;
+		T_TASK(cmd)->t_task_lba = transport_lba_32(cdb);
 		passthrough = (TRANSPORT(dev)->transport_type ==
 				TRANSPORT_PLUGIN_PHBA_PDEV);
 		/*
@@ -3297,7 +3288,7 @@ static int transport_generic_cmd_sequencer(
 			 * XDWRITE_READ_32 logic.
 			 */
 			cmd->transport_split_cdb = &split_cdb_XX_32;
-			cmd->transport_get_long_lba = &transport_lba_64_ext;
+			T_TASK(cmd)->t_task_lba = transport_lba_64_ext(cdb);
 			/*
 			 * Skip the remaining assignments for TCM/PSCSI passthrough
 			 */
