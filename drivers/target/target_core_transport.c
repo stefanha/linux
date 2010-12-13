@@ -4783,19 +4783,19 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 	T_TASK(cmd)->t_tasks_sg_chained = sg_first;
 	T_TASK(cmd)->t_tasks_sg_chained_no = sg_count;
 
-	printk("Setup T_TASK(cmd)->t_tasks_sg_chained: %p and"
+	DEBUG_CMD_M("Setup T_TASK(cmd)->t_tasks_sg_chained: %p and"
 		" t_tasks_sg_chained_no: %u\n", T_TASK(cmd)->t_tasks_sg_chained,
 		T_TASK(cmd)->t_tasks_sg_chained_no);
 
 	for_each_sg(T_TASK(cmd)->t_tasks_sg_chained, sg,
 			T_TASK(cmd)->t_tasks_sg_chained_no, i) {
 
-		printk("SG: %p page: %p length: %d offset: %d\n",
+		DEBUG_CMD_M("SG: %p page: %p length: %d offset: %d\n",
 			sg, sg_page(sg), sg->length, sg->offset);
 		if (sg_is_chain(sg))
-			printk("SG: %p sg_is_chain=1\n", sg);
+			DEBUG_CMD_M("SG: %p sg_is_chain=1\n", sg);
 		if (sg_is_last(sg))
-			printk("SG: %p sg_is_last=1\n", sg);
+			DEBUG_CMD_M("SG: %p sg_is_last=1\n", sg);
 	}
 
 }
