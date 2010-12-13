@@ -39,8 +39,6 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
-#include <scsi/libfc.h>
-#include <scsi/scsi_transport_fc.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -49,6 +47,15 @@
 #include <target/target_core_device.h>
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
+#include <target/target_core_tmr.h>
+
+#include <qla_def.h>
+#include <qla2x_tgt_def.h>
+
+//#include <scsi/libfc.h>
+//#include <scsi/scsi_transport_fc.h>
+
+#include <qla2x_target.h>
 
 #include <tcm_qla2xxx_base.h>
 #include <tcm_qla2xxx_fabric.h>
@@ -353,24 +360,47 @@ u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *se_tpg)
 	return tpg->lport_tpgt;
 }
 
-void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
+/*
+ * Called from qla_target_template->free_cmd(), and will call
+ * tcm_qla2xxx_release_cmd via normal struct target_core_fabric_ops
+ * release callback.
+ */
+void tcm_qla2xxx_free_cmd(struct q2t_cmd *cmd)
 {
-	return;
+	transport_generic_free_cmd(&cmd->se_cmd, 0, 1, 0);
 }
 
+extern void q2t_free_cmd(struct q2t_cmd *cmd);
+/*
+ * Callback from TCM Core to release underlying fabric descriptor
+ */
+void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
+{
+	struct q2t_cmd *cmd = container_of(se_cmd, struct q2t_cmd, se_cmd);
+
+	if (se_cmd->se_tmr_req != NULL)
+		return;
+
+	q2t_free_cmd(cmd);
+}
+
+#warning FIXME: tcm_qla2xxx_shutdown_session
 int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
 {
-	return 0;
+	printk("tcm_qla2xxx_shutdown_session returning TRUE\n");
+	return 1;
 }
+
+extern int tcm_qla2xxx_clear_nacl_from_fcport_map(struct se_node_acl *);
 
 void tcm_qla2xxx_close_session(struct se_session *se_sess)
 {
-	return;
+	tcm_qla2xxx_clear_nacl_from_fcport_map(se_sess->se_node_acl);
 }
 
 void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int conn_sleep)
 {
-	return;
+	tcm_qla2xxx_clear_nacl_from_fcport_map(se_sess->se_node_acl);
 }
 
 void tcm_qla2xxx_reset_nexus(struct se_session *se_sess)
@@ -388,9 +418,43 @@ u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
 	return 0;
 }
 
+extern int q2t_rdy_to_xfer(struct q2t_cmd *);
+
 int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 {
-	return 0;
+	struct q2t_cmd *cmd = container_of(se_cmd, struct q2t_cmd, se_cmd);
+
+	cmd->bufflen = se_cmd->data_length;
+	cmd->dma_data_direction = se_cmd->data_direction;
+	/*
+	 * Setup the struct se_task->task_sg[] chained SG list
+	 */
+	if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
+	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
+		transport_do_task_sg_chain(se_cmd);
+
+		cmd->sg_cnt = T_TASK(se_cmd)->t_tasks_sg_chained_no;
+		cmd->sg = T_TASK(se_cmd)->t_tasks_sg_chained;
+	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
+		/*
+		 * Use T_TASK(se_cmd)->t_tasks_sg_bounce for control CDBs
+		 * using a contigious buffer
+		 */
+		sg_init_table(&T_TASK(se_cmd)->t_tasks_sg_bounce, 1);
+		sg_set_buf(&T_TASK(se_cmd)->t_tasks_sg_bounce,
+			T_TASK(se_cmd)->t_task_buf, se_cmd->data_length);
+		cmd->sg_cnt = 1;
+		cmd->sg = &T_TASK(se_cmd)->t_tasks_sg_bounce;
+	} else {
+		printk(KERN_ERR "Unknown se_cmd_flags: 0x%08x in"
+			" tcm_qla2xxx_write_pending()\n", se_cmd->se_cmd_flags);
+		BUG();
+	}
+	/*
+	 * qla2x_target.c:q2t_rdy_to_xfer() will call pci_map_sg() to setup
+	 * the SGL mappings into PCIe memory for incoming FCP WRITE data.
+	 */
+	return q2t_rdy_to_xfer(cmd);
 }
 
 int tcm_qla2xxx_write_pending_status(struct se_cmd *se_cmd)
@@ -405,7 +469,9 @@ void tcm_qla2xxx_set_default_node_attrs(struct se_node_acl *nacl)
 
 u32 tcm_qla2xxx_get_task_tag(struct se_cmd *se_cmd)
 {
-	return 0;
+	struct q2t_cmd *cmd = container_of(se_cmd, struct q2t_cmd, se_cmd);
+
+	return cmd->tag;
 }
 
 int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
@@ -418,18 +484,262 @@ void tcm_qla2xxx_new_cmd_failure(struct se_cmd *se_cmd)
 	return;
 }
 
+/*
+ * Main entry point for incoming ATIO packets from qla2x_target.c
+ * and qla2xxx LLD code.
+ */
+int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct q2t_cmd *cmd,
+			uint32_t lun, uint32_t data_length,
+			int fcp_task_attr, int data_dir, int bidi)
+{
+	struct se_cmd *se_cmd = &cmd->se_cmd;
+	struct se_session *se_sess;
+	struct se_portal_group *se_tpg;
+	struct q2t_sess *sess;
+
+	sess = cmd->sess;
+	if (!sess) {
+		printk(KERN_ERR "Unable to locate struct q2t_sess from q2t_cmd\n");
+		return -EINVAL;
+	}
+
+	se_sess = sess->se_sess;
+	if (!se_sess) {
+		printk(KERN_ERR "Unable to locate active struct se_session\n");
+		return -EINVAL;
+	}
+	se_tpg = se_sess->se_tpg;
+
+	/*
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
+	 */
+	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
+			data_length, data_dir,
+			fcp_task_attr, &cmd->sense_buffer[0]);
+	/*
+	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
+	 */
+	if (bidi)
+		T_TASK(se_cmd)->t_tasks_bidi = 1;
+	/*
+	 * Locate the struct se_lun pointer and attach it to struct se_cmd
+	 */
+	if (transport_get_lun_for_cmd(se_cmd, NULL, lun) < 0) {
+		/* NON_EXISTENT_LUN */
+		transport_send_check_condition_and_sense(se_cmd,
+				se_cmd->scsi_sense_reason, 0);
+		return 0;
+	}
+	/*
+	 * Queue up the newly allocated to be processed in TCM thread context.
+	 */
+	transport_device_setup_cmd(se_cmd);
+	/*
+	 * Queue up the newly allocated to be processed in TCM thread context.
+	 */
+	transport_generic_handle_cdb_map(se_cmd);
+	return 0;
+}
+
+int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
+{
+	struct q2t_cmd *cmd = container_of(se_cmd, struct q2t_cmd, se_cmd);
+	scsi_qla_host_t *vha = cmd->vha;
+	struct qla_hw_data *ha = vha->hw;
+	unsigned char *cdb;
+	int ret;
+
+	if (IS_FWI2_CAPABLE(ha)) {
+		atio7_entry_t *atio = &cmd->atio.atio7;
+		cdb = &atio->fcp_cmnd.cdb[0];
+	} else {
+		atio_entry_t *atio = &cmd->atio.atio2x;
+		cdb = &atio->cdb[0];
+	}
+
+	/*
+	 * Allocate the necessary tasks to complete the received CDB+data
+	 */
+	ret = transport_generic_allocate_tasks(se_cmd, cdb);
+	if (ret == -1) {
+		/* Out of Resources */
+		transport_send_check_condition_and_sense(se_cmd,
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+		return 0;
+	} else if (ret == -2) {
+		/*
+		 * Handle case for SAM_STAT_RESERVATION_CONFLICT
+		 */
+		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT) {
+			tcm_qla2xxx_queue_status(se_cmd);
+			return 0;
+		}
+		/*
+		 * Otherwise, return SAM_STAT_CHECK_CONDITION and return
+		 * sense data.
+		 */
+		transport_send_check_condition_and_sense(se_cmd,
+				se_cmd->scsi_sense_reason, 0);
+		return 0;
+	}
+	/*
+	 * drivers/target/target_core_transport.c:transport_processing_thread()
+	 * falls through to TRANSPORT_NEW_CMD.
+	 */
+	return 0;
+}
+
+/*
+ * Called from qla2x_target.c:q2t_do_ctio_completion()
+ */
+int tcm_qla2xxx_handle_data(struct q2t_cmd *cmd)
+{
+	/*
+	 * We now tell TCM to queue this WRITE CDB with TRANSPORT_PROCESS_WRITE
+	 * status to the backstore processing thread.
+	 */
+	return transport_generic_handle_data(&cmd->se_cmd);
+}
+
+/*
+ * Called from qla2x_target.c:q2t_issue_task_mgmt()
+ */
+int tcm_qla2xxx_handle_tmr(struct q2t_mgmt_cmd *mcmd, uint32_t lun, uint8_t tmr_func)
+{
+	struct q2t_sess *sess = mcmd->sess;
+	struct se_session *se_sess = sess->se_sess;
+	struct se_portal_group *se_tpg = se_sess->se_tpg;
+	struct se_cmd *se_cmd = &mcmd->se_cmd;
+	/*
+	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
+	 */
+	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
+				DMA_NONE, 0, NULL);
+	/*
+	 * Allocate the TCM TMR
+	 */
+	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, (void *)mcmd, tmr_func);
+	if (!se_cmd->se_tmr_req)
+		return -ENOMEM;
+	/*
+	 * Save the se_tmr_req for q2t_xmit_tm_rsp() callback into LLD code
+	 */
+	mcmd->se_tmr_req = se_cmd->se_tmr_req;
+	/*
+	 * Locate the underlying TCM struct se_lun from sc->device->lun
+	 */
+	if (transport_get_lun_for_tmr(se_cmd, lun) < 0) {
+		transport_generic_free_cmd(se_cmd, 1, 1, 0);
+		return -EINVAL;
+	}
+	/*
+	 * Queue the TMR associated se_cmd into TCM Core for processing
+	 */
+	return transport_generic_handle_tmr(se_cmd);
+}
+
+/*
+ * From qla2x_target.c...
+ */
+extern int q2x_xmit_response(struct q2t_cmd *, int, uint8_t);
+
 int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 {
-	return 0;
+	struct q2t_cmd *cmd = container_of(se_cmd, struct q2t_cmd, se_cmd);
+
+	cmd->bufflen = se_cmd->data_length;
+	cmd->dma_data_direction = se_cmd->data_direction;
+	cmd->aborted = atomic_read(&T_TASK(se_cmd)->t_transport_aborted);
+	/*
+	 * Setup the struct se_task->task_sg[] chained SG list
+	 */
+	if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
+	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
+		transport_do_task_sg_chain(se_cmd);
+
+		cmd->sg_cnt = T_TASK(se_cmd)->t_tasks_sg_chained_no;
+		cmd->sg = T_TASK(se_cmd)->t_tasks_sg_chained;
+	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
+		/*
+		 * Use T_TASK(se_cmd)->t_tasks_sg_bounce for control CDBs
+		 * using a contigious buffer
+		 */
+		sg_init_table(&T_TASK(se_cmd)->t_tasks_sg_bounce, 1);
+		sg_set_buf(&T_TASK(se_cmd)->t_tasks_sg_bounce,
+			T_TASK(se_cmd)->t_task_buf, se_cmd->data_length);
+
+		cmd->sg_cnt = 1;
+		cmd->sg = &T_TASK(se_cmd)->t_tasks_sg_bounce;
+	} else {
+		cmd->sg_cnt = 0;
+		cmd->sg = NULL;
+	}
+
+	cmd->offset = 0;
+
+	/*
+	 * Now queue completed DATA_IN the qla2xxx LLD and response ring
+	 */
+	return q2x_xmit_response(cmd, Q2T_XMIT_DATA|Q2T_XMIT_STATUS,
+				se_cmd->scsi_status);
 }
 
 int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 {
-	return 0;
+	struct q2t_cmd *cmd = container_of(se_cmd, struct q2t_cmd, se_cmd);
+
+	cmd->bufflen = se_cmd->data_length;
+	cmd->sg = NULL;
+	cmd->sg_cnt = 0;
+	cmd->offset = 0;
+	cmd->dma_data_direction = se_cmd->data_direction;
+	cmd->aborted = atomic_read(&T_TASK(se_cmd)->t_transport_aborted);
+
+	/*
+	 * Now queue status response to qla2xxx LLD code and response ring
+	 */
+	return q2x_xmit_response(cmd, Q2T_XMIT_STATUS, se_cmd->scsi_status);
 }
+
+extern void q2t_xmit_tm_rsp(struct q2t_mgmt_cmd *);
 
 int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 {
+	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
+	struct q2t_mgmt_cmd *mcmd = container_of(se_cmd,
+				struct q2t_mgmt_cmd, se_cmd);
+
+	printk("queue_tm_rsp: mcmd: %p func: 0x%02x response: 0x%02x\n",
+			mcmd, se_tmr->function, se_tmr->response);
+	/*
+	 * Do translation between TCM TM response codes and
+	 * QLA2xxx FC TM response codes.
+	 */
+	switch (se_tmr->response) {
+	case TMR_FUNCTION_COMPLETE:
+		mcmd->fc_tm_rsp = FC_TM_SUCCESS;
+		break;
+	case TMR_TASK_DOES_NOT_EXIST:
+		mcmd->fc_tm_rsp = FC_TM_BAD_CMD;
+		break;
+	case TMR_FUNCTION_REJECTED:
+		mcmd->fc_tm_rsp = FC_TM_REJECT;
+		break;
+	case TMR_LUN_DOES_NOT_EXIST:
+	default:
+		mcmd->fc_tm_rsp = FC_TM_FAILED;
+		break;
+	}
+	/*
+	 * Queue the TM response to QLA2xxx LLD to build a
+	 * CTIO response packet.
+	 */
+	q2t_xmit_tm_rsp(mcmd);
+	/*
+	 * Release the associated se_cmd->se_tmr_req and se_cmd
+	 * TMR related state now.
+	 */
+	transport_generic_free_cmd(se_cmd, 1, 1, 0);
 	return 0;
 }
 

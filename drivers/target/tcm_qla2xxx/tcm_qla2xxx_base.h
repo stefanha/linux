@@ -6,15 +6,25 @@
 /* lenth of ASCII NPIV 'WWPN+WWNN' including pad */
 #define TCM_QLA2XXX_NPIV_NAMELEN 66
 
-struct tcm_qla2xxx_cmd {
-	struct se_cmd se_cmd;
-};
+#include "qla2x_target.h"
+
+#if 0
+#define DEBUG_Q2T_SESS_MAP(x...)	printk(KERN_INFO x)
+#else
+#define DEBUG_Q2T_SESS_MAP(x...)
+#endif
 
 struct tcm_qla2xxx_nacl {
-	/* Binary World Wide unique Port Name for FC Initiator Nport */
-	u64 nport_wwpn;
+	/* From libfc struct fc_rport->port_id */
+	u16 nport_id;
+	/* Binary World Wide unique Node Name for remote FC Initiator Nport */
+	u64 nport_wwnn;
 	/* ASCII formatted WWPN for FC Initiator Nport */
 	char nport_name[TCM_QLA2XXX_NAMELEN];
+	/* Pointer to q2t_sess */
+	struct q2t_sess *q2t_sess;
+	/* Pointer to TCM FC nexus */
+	struct se_session *nport_nexus;
 	/* Returned by tcm_qla2xxx_make_nodeacl() */
 	struct se_node_acl se_node_acl;
 };
@@ -22,10 +32,31 @@ struct tcm_qla2xxx_nacl {
 struct tcm_qla2xxx_tpg {
 	/* FC lport target portal group tag for TCM */
 	u16 lport_tpgt;
+	/* Atomic bit to determine TPG active status */
+	atomic_t lport_tpg_enabled;
 	/* Pointer back to tcm_qla2xxx_lport */
 	struct tcm_qla2xxx_lport *lport;
 	/* Returned by tcm_qla2xxx_make_tpg() */
 	struct se_portal_group se_tpg;
+};
+
+/*
+ * Used for the 24-bit lport->lport_fcport_map;
+ */
+struct tcm_qla2xxx_fc_al_pa {
+	struct se_node_acl *se_nacl;
+};
+
+struct tcm_qla2xxx_fc_area {
+        struct tcm_qla2xxx_fc_al_pa al_pas[256];
+};
+
+struct tcm_qla2xxx_fc_domain {
+        struct tcm_qla2xxx_fc_area areas[256];
+};
+
+struct tcm_qla2xxx_fc_loopid {
+	struct se_node_acl *se_nacl;
 };
 
 struct tcm_qla2xxx_lport {
@@ -41,12 +72,20 @@ struct tcm_qla2xxx_lport {
 	char lport_name[TCM_QLA2XXX_NAMELEN];
 	/* ASCII formatted WWPN+WWNN for NPIV FC Target Lport */
 	char lport_npiv_name[TCM_QLA2XXX_NPIV_NAMELEN];
+	/* vmalloc'ed memory for fc_port pointers in 24-bit FC Port ID space */
+	char *lport_fcport_map;
+	/* vmalloc-ed memory for fc_port pointers for 16-bit FC loop ID */
+	char *lport_loopid_map;
 	/* Pointer to struct scsi_qla_host from qla2xxx LLD */
 	struct scsi_qla_host *qla_vha;
 	/* Pointer to struct scsi_qla_host for NPIV VP from qla2xxx LLD */
 	struct scsi_qla_host *qla_npiv_vp;
+	/* Pointer to struct q2t_tgt pointer */
+	struct q2t_tgt lport_q2t_tgt;
 	/* Pointer to struct fc_vport for NPIV vport from libfc */
 	struct fc_vport *npiv_vport;
+	/* Pointer to TPG=1 for non NPIV mode */
+	struct tcm_qla2xxx_tpg *tpg_1;
 	/* Returned by tcm_qla2xxx_make_lport() */
 	struct se_wwn lport_wwn;
 };

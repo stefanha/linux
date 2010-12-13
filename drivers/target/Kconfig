@@ -37,5 +37,6 @@ config TCM_STGT
 source "drivers/target/tcm_loop/Kconfig"
 source "drivers/target/lio-target/Kconfig"
 source "drivers/target/tcm_fc/Kconfig"
+source "drivers/target/tcm_qla2xxx/Kconfig"
 
 endif
