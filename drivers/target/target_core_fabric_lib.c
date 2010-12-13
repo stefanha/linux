@@ -229,7 +229,7 @@ u32 iscsi_get_pr_transport_id(
 	u32 off = 4, padding = 0;
 	u16 len = 0;
 
-	spin_lock(&se_nacl->nacl_sess_lock);
+	spin_lock_irq(&se_nacl->nacl_sess_lock);
 	/*
 	 * Set PROTOCOL IDENTIFIER to 5h for iSCSI
 	*/
@@ -293,7 +293,7 @@ u32 iscsi_get_pr_transport_id(
 		buf[off+len] = '\0'; off++;
 		len += 7;
 	}
-	spin_unlock(&se_nacl->nacl_sess_lock);
+	spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	/*
 	 * The ADDITIONAL LENGTH field specifies the number of bytes that follow
 	 * in the TransportID. The additional length shall be at least 20 and
@@ -323,7 +323,7 @@ u32 iscsi_get_pr_transport_id_len(
 {
 	u32 len = 0, padding = 0;
 
-	spin_lock(&se_nacl->nacl_sess_lock);
+	spin_lock_irq(&se_nacl->nacl_sess_lock);
 	len = strlen(se_nacl->initiatorname);
 	/*
 	 * Add extra byte for NULL terminator
@@ -342,7 +342,7 @@ u32 iscsi_get_pr_transport_id_len(
 		*format_code = 1;
 	} else
 		*format_code = 0;
-	spin_unlock(&se_nacl->nacl_sess_lock);
+	spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	/*
 	 * The ADDITIONAL LENGTH field specifies the number of bytes that follow
 	 * in the TransportID. The additional length shall be at least 20 and

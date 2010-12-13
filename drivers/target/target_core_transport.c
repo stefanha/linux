@@ -474,7 +474,7 @@ void __transport_register_session(
 					&buf[0], PR_REG_ISID_LEN);
 			se_sess->sess_bin_isid = get_unaligned_be64(&buf[0]);
 		}
-		spin_lock_bh(&se_nacl->nacl_sess_lock);
+		spin_lock_irq(&se_nacl->nacl_sess_lock);
 		/*
 		 * The se_nacl->nacl_sess pointer will be set to the
 		 * last active I_T Nexus for each struct se_node_acl.
@@ -483,7 +483,7 @@ void __transport_register_session(
 
 		list_add_tail(&se_sess->sess_acl_list,
 			      &se_nacl->acl_sess_list);
-		spin_unlock_bh(&se_nacl->nacl_sess_lock);
+		spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	}
 	list_add_tail(&se_sess->sess_list, &se_tpg->tpg_sess_list);
 
@@ -513,7 +513,7 @@ void transport_deregister_session_configfs(struct se_session *se_sess)
 	 */
 	se_nacl = se_sess->se_node_acl;
 	if ((se_nacl)) {
-		spin_lock_bh(&se_nacl->nacl_sess_lock);
+		spin_lock_irq(&se_nacl->nacl_sess_lock);
 		list_del(&se_sess->sess_acl_list);
 		/*
 		 * If the session list is empty, then clear the pointer.
@@ -527,7 +527,7 @@ void transport_deregister_session_configfs(struct se_session *se_sess)
 					se_nacl->acl_sess_list.prev,
 					struct se_session, sess_acl_list);	
 		}
-		spin_unlock_bh(&se_nacl->nacl_sess_lock);
+		spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	}
 }
 EXPORT_SYMBOL(transport_deregister_session_configfs);
@@ -1995,18 +1995,13 @@ int transport_generic_handle_data(
 	struct se_cmd *cmd)
 {
 	/*
-	 * Make sure that the transport has been disabled by
-	 * transport_write_pending() before readding this struct se_cmd to the
-	 * processing queue.  If it has not yet been reset to zero by the
-	 * processing thread in transport_add_cmd_to_queue(), let other
-	 * processes run.  If a signal was received, then we assume the
-	 * connection is being failed/shutdown, so we return a failure.
+	 * For the software fabric case, then we assume the nexus is being
+	 * failed/shutdown when signals are pending from the kthread context
+	 * caller, so we return a failure.  For the HW target mode case running
+	 * in interrupt code, the signal_pending() check is skipped.
 	 */
-	while (atomic_read(&T_TASK(cmd)->t_transport_active)) {
-		msleep_interruptible(10);
-		if (signal_pending(current))
-			return -1;
-	}
+	if (!in_interrupt() && signal_pending(current))
+		return -1;
 	/*
 	 * If the received CDB has aleady been ABORTED by the generic
 	 * target engine, we now call transport_check_aborted_status()
@@ -4788,19 +4783,19 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 	T_TASK(cmd)->t_tasks_sg_chained = sg_first;
 	T_TASK(cmd)->t_tasks_sg_chained_no = sg_count;
 
-	printk("Setup T_TASK(cmd)->t_tasks_sg_chained: %p and"
+	DEBUG_CMD_M("Setup T_TASK(cmd)->t_tasks_sg_chained: %p and"
 		" t_tasks_sg_chained_no: %u\n", T_TASK(cmd)->t_tasks_sg_chained,
 		T_TASK(cmd)->t_tasks_sg_chained_no);
 
 	for_each_sg(T_TASK(cmd)->t_tasks_sg_chained, sg,
 			T_TASK(cmd)->t_tasks_sg_chained_no, i) {
 
-		printk("SG: %p page: %p length: %d offset: %d\n",
+		DEBUG_CMD_M("SG: %p page: %p length: %d offset: %d\n",
 			sg, sg_page(sg), sg->length, sg->offset);
 		if (sg_is_chain(sg))
-			printk("SG: %p sg_is_chain=1\n", sg);
+			DEBUG_CMD_M("SG: %p sg_is_chain=1\n", sg);
 		if (sg_is_last(sg))
-			printk("SG: %p sg_is_last=1\n", sg);
+			DEBUG_CMD_M("SG: %p sg_is_last=1\n", sg);
 	}
 
 }
@@ -5212,16 +5207,22 @@ static int transport_generic_write_pending(struct se_cmd *cmd)
 				T_TASK(cmd)->t_task_buf,
 				T_TASK(cmd)->t_task_pt_sgl);
 	/*
+	 * Clear the se_cmd for WRITE_PENDING status in order to set
+	 * T_TASK(cmd)->t_transport_active=0 so that transport_generic_handle_data
+	 * can be called from HW target mode interrupt code.  This is safe
+	 * to be called with transport_off=1 before the CMD_TFO(cmd)->write_pending
+	 * because the se_cmd->se_lun pointer is not being cleared.
+	 */
+	transport_cmd_check_stop(cmd, 1, 0);
+
+	/*
 	 * Call the fabric write_pending function here to let the
 	 * frontend know that WRITE buffers are ready.
 	 */
 	ret = CMD_TFO(cmd)->write_pending(cmd);
-	if (ret < 0) {
-		transport_cmd_check_stop(cmd, 1, 0);
+	if (ret < 0)
 		return ret;
-	}
 
-	transport_cmd_check_stop(cmd, 1, 0);
 	return PYX_TRANSPORT_WRITE_PENDING;
 }
 
