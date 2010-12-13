@@ -474,7 +474,7 @@ void __transport_register_session(
 					&buf[0], PR_REG_ISID_LEN);
 			se_sess->sess_bin_isid = get_unaligned_be64(&buf[0]);
 		}
-		spin_lock_bh(&se_nacl->nacl_sess_lock);
+		spin_lock_irq(&se_nacl->nacl_sess_lock);
 		/*
 		 * The se_nacl->nacl_sess pointer will be set to the
 		 * last active I_T Nexus for each struct se_node_acl.
@@ -483,7 +483,7 @@ void __transport_register_session(
 
 		list_add_tail(&se_sess->sess_acl_list,
 			      &se_nacl->acl_sess_list);
-		spin_unlock_bh(&se_nacl->nacl_sess_lock);
+		spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	}
 	list_add_tail(&se_sess->sess_list, &se_tpg->tpg_sess_list);
 
@@ -513,7 +513,7 @@ void transport_deregister_session_configfs(struct se_session *se_sess)
 	 */
 	se_nacl = se_sess->se_node_acl;
 	if ((se_nacl)) {
-		spin_lock_bh(&se_nacl->nacl_sess_lock);
+		spin_lock_irq(&se_nacl->nacl_sess_lock);
 		list_del(&se_sess->sess_acl_list);
 		/*
 		 * If the session list is empty, then clear the pointer.
@@ -527,7 +527,7 @@ void transport_deregister_session_configfs(struct se_session *se_sess)
 					se_nacl->acl_sess_list.prev,
 					struct se_session, sess_acl_list);	
 		}
-		spin_unlock_bh(&se_nacl->nacl_sess_lock);
+		spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	}
 }
 EXPORT_SYMBOL(transport_deregister_session_configfs);
