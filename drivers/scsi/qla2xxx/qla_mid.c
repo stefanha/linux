@@ -16,6 +16,8 @@
 #include <scsi/scsicam.h>
 #include <linux/delay.h>
 
+#include "qla2x_tgt.h"
+
 void
 qla2x00_vp_stop_timer(scsi_qla_host_t *vha)
 {
@@ -48,6 +50,7 @@ qla24xx_allocate_vp_id(scsi_qla_host_t *vha)
 
 	spin_lock_irqsave(&ha->vport_slock, flags);
 	list_add_tail(&vha->list, &ha->vp_list);
+	ha->tgt_vp_map[vp_id].vha = vha;
 	spin_unlock_irqrestore(&ha->vport_slock, flags);
 
 	mutex_unlock(&ha->vport_lock);
@@ -78,6 +81,7 @@ qla24xx_deallocate_vp_id(scsi_qla_host_t *vha)
 		spin_lock_irqsave(&ha->vport_slock, flags);
 	}
 	list_del(&vha->list);
+	ha->tgt_vp_map[vha->vp_idx].vha = NULL;
 	spin_unlock_irqrestore(&ha->vport_slock, flags);
 
 	vp_id = vha->vp_idx;
@@ -143,11 +147,15 @@ qla2x00_mark_vp_devices_dead(scsi_qla_host_t *vha)
 int
 qla24xx_disable_vp(scsi_qla_host_t *vha)
 {
+	struct qla_hw_data *ha = vha->hw;
 	int ret;
 
 	ret = qla24xx_control_vp(vha, VCE_COMMAND_DISABLE_VPS_LOGO_ALL);
 	atomic_set(&vha->loop_state, LOOP_DOWN);
 	atomic_set(&vha->loop_down_timer, LOOP_DOWN_TIME);
+
+	/* Remove port id from vp target map */
+	ha->tgt_vp_map[vha->d_id.b.al_pa].idx = 0;
 
 	qla2x00_mark_vp_devices_dead(vha);
 	atomic_set(&vha->vp_state, VP_FAILED);
@@ -266,6 +274,8 @@ qla2x00_alert_all_vps(struct rsp_que *rsp, uint16_t *mb)
 int
 qla2x00_vp_abort_isp(scsi_qla_host_t *vha)
 {
+	int ret;
+
 	/*
 	 * Physical port will do most of the abort and recovery work. We can
 	 * just treat it as a loop down
@@ -288,7 +298,17 @@ qla2x00_vp_abort_isp(scsi_qla_host_t *vha)
 
 	DEBUG15(printk("scsi(%ld): Scheduling enable of Vport %d...\n",
 	    vha->host_no, vha->vp_idx));
-	return qla24xx_enable_vp(vha);
+	ret = qla24xx_enable_vp(vha);
+	if (ret)
+		return ret;
+
+	/* Enable target response to SCSI bus. */
+	if (qla_tgt_mode_enabled(vha)) {
+		printk("qla2x00_vp_abort_isp() calling qla2x00_send_enable_lun()\n");
+		qla2x00_send_enable_lun(vha, true);
+	}
+
+	return 0;
 }
 
 static int
@@ -375,17 +395,22 @@ qla24xx_vport_create_req_sanity_check(struct fc_vport *fc_vport)
 	scsi_qla_host_t *vha;
 	uint8_t port_name[WWN_SIZE];
 
-	if (fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR)
+	if (fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR) {
+		printk("fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR\n");
 		return VPCERR_UNSUPPORTED;
+	}
 
 	/* Check up the F/W and H/W support NPIV */
-	if (!ha->flags.npiv_supported)
+	if (!ha->flags.npiv_supported) {
+		printk("!ha->flags.npiv_supported\n");
 		return VPCERR_UNSUPPORTED;
+	}
 
 	/* Check up whether npiv supported switch presented */
-	if (!(ha->switch_cap & FLOGI_MID_SUPPORT))
+	if (!(ha->switch_cap & FLOGI_MID_SUPPORT)) {
+		printk("!(ha->switch_cap & FLOGI_MID_SUPPORT))\n");
 		return VPCERR_NO_FABRIC_SUPP;
-
+	}
 	/* Check up unique WWPN */
 	u64_to_wwn(fc_vport->port_name, port_name);
 	if (!memcmp(port_name, base_vha->port_name, WWN_SIZE))

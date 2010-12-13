@@ -51,6 +51,9 @@ extern void qla2x00_update_fcport(scsi_qla_host_t *, fc_port_t *);
 extern void qla2x00_alloc_fw_dump(scsi_qla_host_t *);
 extern void qla2x00_try_to_stop_firmware(scsi_qla_host_t *);
 
+extern void qla2x00_enable_tgt_mode(struct scsi_qla_host *);
+extern void qla2x00_disable_tgt_mode(struct scsi_qla_host *);
+
 extern void qla84xx_put_chip(struct scsi_qla_host *);
 
 extern int qla2x00_async_login(struct scsi_qla_host *, fc_port_t *,
@@ -168,6 +171,11 @@ extern int  qla2x00_vp_abort_isp(scsi_qla_host_t *);
 /*
  * Global Function Prototypes in qla_iocb.c source file.
  */
+
+extern void *qla2x00_alloc_iocbs(scsi_qla_host_t *, srb_t *);
+extern void qla2x00_isp_cmd(struct scsi_qla_host *, struct req_que *);
+extern int qla2x00_issue_marker(scsi_qla_host_t *, int);
+
 extern uint16_t qla2x00_calc_iocbs_32(uint16_t);
 extern uint16_t qla2x00_calc_iocbs_64(uint16_t);
 extern void qla2x00_build_scsi_iocbs_32(srb_t *, cmd_entry_t *, uint16_t);
@@ -231,6 +239,9 @@ qla2x00_get_retry_cnt(scsi_qla_host_t *, uint8_t *, uint8_t *, uint16_t *);
 
 extern int
 qla2x00_init_firmware(scsi_qla_host_t *, uint16_t);
+
+extern int
+qla2x00_get_node_name_list(scsi_qla_host_t *, void **, int *);
 
 extern int
 qla2x00_get_port_database(scsi_qla_host_t *, fc_port_t *, uint8_t);
