@@ -364,7 +364,7 @@ static int mts_scsi_host_reset(struct scsi_cmnd *srb)
 }
 
 static int
-mts_scsi_queuecommand(struct scsi_cmnd *srb, mts_scsi_cmnd_callback callback);
+mts_scsi_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *srb);
 
 static void mts_transfer_cleanup( struct urb *transfer );
 static void mts_do_sg(struct urb * transfer);

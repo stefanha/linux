@@ -82,28 +82,15 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	rd_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_detach_hba(struct se_hba *hba)
+static void rd_detach_hba(struct se_hba *hba)
 {
-	struct rd_host *rd_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-
-	rd_host = hba->hba_ptr;
+	struct rd_host *rd_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached Ramdisk HBA: %u from"
 		" Generic Target Core\n", hba->hba_id, rd_host->rd_host_id);
 
 	kfree(rd_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 /*	rd_release_device_space():
@@ -337,15 +324,6 @@ static void rd_free_device(void *p)
 	kfree(rd_dev);
 }
 
-/*	rd_transport_complete(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_transport_complete(struct se_task *task)
-{
-	return 0;
-}
-
 static inline struct rd_request *RD_REQ(struct se_task *task)
 {
 	return container_of(task, struct rd_request, rd_task);
@@ -394,6 +372,7 @@ static struct rd_dev_sg_table *rd_get_sg_table(struct rd_dev *rd_dev, u32 page)
  */
 static int rd_MEMCPY_read(struct rd_request *req)
 {
+	struct se_task *task = &req->rd_task;
 	struct rd_dev *dev = req->rd_dev;
 	struct rd_dev_sg_table *table;
 	struct scatterlist *sg_d, *sg_s;
@@ -407,11 +386,11 @@ static int rd_MEMCPY_read(struct rd_request *req)
 		return -1;
 
 	table_sg_end = (table->page_end_offset - req->rd_page);
-	sg_d = req->rd_buf;
+	sg_d = task->task_sg;
 	sg_s = &table->sg_table[req->rd_page - table->page_start_offset];
 #ifdef DEBUG_RAMDISK_MCP
 	printk(KERN_INFO "RD[%u]: Read LBA: %llu, Size: %u Page: %u, Offset:"
-		" %u\n", dev->rd_dev_id, req->rd_lba, req->rd_size,
+		" %u\n", dev->rd_dev_id, task->task_lba, req->rd_size,
 		req->rd_page, req->rd_offset);
 #endif
 	src_offset = rd_offset;
@@ -516,6 +495,7 @@ static int rd_MEMCPY_read(struct rd_request *req)
  */
 static int rd_MEMCPY_write(struct rd_request *req)
 {
+	struct se_task *task = &req->rd_task;
 	struct rd_dev *dev = req->rd_dev;
 	struct rd_dev_sg_table *table;
 	struct scatterlist *sg_d, *sg_s;
@@ -530,10 +510,10 @@ static int rd_MEMCPY_write(struct rd_request *req)
 
 	table_sg_end = (table->page_end_offset - req->rd_page);
 	sg_d = &table->sg_table[req->rd_page - table->page_start_offset];
-	sg_s = req->rd_buf;
+	sg_s = task->task_sg;
 #ifdef DEBUG_RAMDISK_MCP
 	printk(KERN_INFO "RD[%d] Write LBA: %llu, Size: %u, Page: %u,"
-		" Offset: %u\n", dev->rd_dev_id, req->rd_lba, req->rd_size,
+		" Offset: %u\n", dev->rd_dev_id, task->task_lba, req->rd_size,
 		req->rd_page, req->rd_offset);
 #endif
 	dst_offset = rd_offset;
@@ -640,16 +620,17 @@ static int rd_MEMCPY_do_task(struct se_task *task)
 {
 	struct se_device *dev = task->se_dev;
 	struct rd_request *req = RD_REQ(task);
+	unsigned long long lba;
 	int ret;
 
-	req->rd_lba = task->task_lba;
-	req->rd_page = (req->rd_lba * DEV_ATTRIB(dev)->block_size) / PAGE_SIZE;
-	req->rd_offset = (do_div(req->rd_lba,
+	req->rd_page = (task->task_lba * DEV_ATTRIB(dev)->block_size) / PAGE_SIZE;
+	lba = task->task_lba;
+	req->rd_offset = (do_div(lba,
 			  (PAGE_SIZE / DEV_ATTRIB(dev)->block_size))) *
 			   DEV_ATTRIB(dev)->block_size;
 	req->rd_size = task->task_size;
 
-	if (req->rd_data_direction == RD_DATA_READ)
+	if (task->task_data_direction == DMA_FROM_DEVICE)
 		ret = rd_MEMCPY_read(req);
 	else
 		ret = rd_MEMCPY_write(req);
@@ -689,8 +670,9 @@ static int rd_DIRECT_with_offset(
 	sg_s = &table->sg_table[req->rd_page - table->page_start_offset];
 #ifdef DEBUG_RAMDISK_DR
 	printk(KERN_INFO "%s DIRECT LBA: %llu, Size: %u Page: %u, Offset: %u\n",
-		(req->rd_data_direction != RD_DATA_READ) ? "Write" : "Read",
-		req->rd_lba, req->rd_size, req->rd_page, req->rd_offset);
+		(task->task_data_direction == DMA_TO_DEVICE) ?
+			"Write" : "Read",
+		task->task_lba, req->rd_size, req->rd_page, req->rd_offset);
 #endif
 	while (req->rd_size) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
@@ -790,8 +772,9 @@ static int rd_DIRECT_without_offset(
 	sg_s = &table->sg_table[req->rd_page - table->page_start_offset];
 #ifdef DEBUG_RAMDISK_DR
 	printk(KERN_INFO "%s DIRECT LBA: %llu, Size: %u, Page: %u\n",
-		(req->rd_data_direction != RD_DATA_READ) ? "Write" : "Read",
-		req->rd_lba, req->rd_size, req->rd_page);
+		(task->task_data_direction == DMA_TO_DEVICE) ?
+			"Write" : "Read",
+		task->task_lba, req->rd_size, req->rd_page);
 #endif
 	while (req->rd_size) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
@@ -863,13 +846,13 @@ static int rd_DIRECT_do_se_mem_map(
 	struct se_cmd *cmd = task->task_se_cmd;
 	struct rd_request *req = RD_REQ(task);
 	u32 task_offset = *task_offset_in;
+	unsigned long long lba;
 	int ret;
 
-	req->rd_lba = task->task_lba;
-	req->rd_req_flags = RRF_GOT_LBA;
-	req->rd_page = ((req->rd_lba * DEV_ATTRIB(task->se_dev)->block_size) /
+	req->rd_page = ((task->task_lba * DEV_ATTRIB(task->se_dev)->block_size) /
 			PAGE_SIZE);
-	req->rd_offset = (do_div(req->rd_lba,
+	lba = task->task_lba;
+	req->rd_offset = (do_div(lba,
 			  (PAGE_SIZE / DEV_ATTRIB(task->se_dev)->block_size))) *
 			   DEV_ATTRIB(task->se_dev)->block_size;
 	req->rd_size = task->task_size;
@@ -900,11 +883,6 @@ static int rd_DIRECT_do_se_mem_map(
 	 * we setup struct se_task->task_sg[], as it will be used by
 	 * transport_do_task_sg_chain() for creating chainged SGLs
 	 * across multiple struct se_task->task_sg[].
-	 *
-	 * Note that kfree(task->task_sg); does not need to be called
-	 * in rd_DIRECT_free_DMA(), because transport_free_dev_tasks()
-	 * will already be taking care of this for all TCM subsystem
-	 * plugins.
 	 */
 	if (!(transport_calc_sg_num(task,
 			list_entry(T_TASK(cmd)->t_mem_list->next,
@@ -916,49 +894,6 @@ static int rd_DIRECT_do_se_mem_map(
 			list_entry(T_TASK(cmd)->t_mem_list->next,
 				   struct se_mem, se_list),
 			out_se_mem, se_mem_cnt, task_offset_in);
-}
-
-/*	rd_DIRECT_free_DMA():
- *
- *
- */
-static void rd_DIRECT_free_DMA(struct se_cmd *cmd)
-{
-	struct se_mem *se_mem, *se_mem_tmp;
-
-	if (!(T_TASK(cmd)->t_mem_list))
-		return;
-	/*
-	 * The scatterlists in the RAMDISK DIRECT case are using the pages
-	 * from the rd_device_t's scatterlist table. They are referencing
-	 * valid memory that is held within the RD transport plugin, so we
-	 * only free the struct se_mem elements.
-	 */
-	list_for_each_entry_safe(se_mem, se_mem_tmp, T_TASK(cmd)->t_mem_list,
-				se_list) {
-		 list_del(&se_mem->se_list);
-		 kmem_cache_free(se_mem_cache, se_mem);
-	}
-	kfree(T_TASK(cmd)->t_mem_list);
-	T_TASK(cmd)->t_mem_list = NULL;
-	T_TASK(cmd)->t_tasks_se_num = 0;
-}
-
-/*	rd_DIRECT_allocate_DMA():
- *
- *	Note that rd_DIRECT_do_se_mem_map() actually does the real work.
- */
-static int rd_DIRECT_allocate_DMA(struct se_cmd *cmd, u32 length, u32 dma_size)
-{
-	T_TASK(cmd)->t_mem_list = kzalloc(sizeof(struct list_head), GFP_KERNEL);
-	if (!(T_TASK(cmd)->t_mem_list)) {
-		printk(KERN_ERR "Unable to allocate memory for T_TASK(cmd)"
-				"->t_mem_list\n");
-		return -1;
-	}
-	INIT_LIST_HEAD(T_TASK(cmd)->t_mem_list);
-
-	return 0;
 }
 
 /*	rd_DIRECT_do_task(): (Part of se_subsystem_api_t template)
@@ -1046,25 +981,6 @@ static ssize_t rd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	return 0;
 }
 
-static void rd_dr_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM RAMDISK_DR Plugin %s\n", RD_DR_VERSION);
-}
-
-static void rd_mcp_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM RAMDISK_MCP Plugin %s\n", RD_MCP_VERSION);
-}
-
-static void rd_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct rd_host *rd_host = (struct rd_host *)hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "SE Host ID: %u  RD Host ID: %u\n",
-		hba->hba_id, rd_host->rd_host_id);
-	*bl += sprintf(b + *bl, "        TCM RamDisk HBA\n");
-}
-
 static ssize_t rd_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -1078,135 +994,6 @@ static ssize_t rd_show_configfs_dev_params(
 			"  SG_table_count: %u\n", rd_dev->rd_page_count,
 			PAGE_SIZE, rd_dev->sg_table_count);
 	return bl;
-}
-
-/*	rd_map_task_non_SG():
- *
- *
- */
-static void rd_map_task_non_SG(struct se_task *task)
-{
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct rd_request *req = RD_REQ(task);
-
-	req->rd_bufflen		= task->task_size;
-	req->rd_buf		= (void *) T_TASK(cmd)->t_task_buf;
-	req->rd_sg_count	= 0;
-}
-
-/*	rd_map_task_SG():
- *
- *
- */
-static void rd_map_task_SG(struct se_task *task)
-{
-	struct rd_request *req = RD_REQ(task);
-
-	req->rd_bufflen		= task->task_size;
-	req->rd_buf		= task->task_sg;
-	req->rd_sg_count	= task->task_sg_num;
-}
-
-/*      rd_CDB_none():
- *
- *
- */
-static int rd_CDB_none(struct se_task *task, u32 size)
-{
-	struct rd_request *req = RD_REQ(task);
-
-	req->rd_data_direction	= RD_DATA_NONE;
-	req->rd_bufflen		= 0;
-	req->rd_sg_count	= 0;
-	req->rd_buf		= NULL;
-
-	return 0;
-}
-
-/*	rd_CDB_read_non_SG():
- *
- *
- */
-static int rd_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	struct rd_request *req = RD_REQ(task);
-
-	req->rd_data_direction = RD_DATA_READ;
-	rd_map_task_non_SG(task);
-
-	return 0;
-}
-
-/*	rd_CDB_read_SG):
- *
- *
- */
-static int rd_CDB_read_SG(struct se_task *task, u32 size)
-{
-	struct rd_request *req = RD_REQ(task);
-
-	req->rd_data_direction = RD_DATA_READ;
-	rd_map_task_SG(task);
-
-	return req->rd_sg_count;
-}
-
-/*	rd_CDB_write_non_SG():
- *
- *
- */
-static int rd_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	struct rd_request *req = RD_REQ(task);
-
-	req->rd_data_direction = RD_DATA_WRITE;
-	rd_map_task_non_SG(task);
-
-	return 0;
-}
-
-/*	d_CDB_write_SG():
- *
- *
- */
-static int rd_CDB_write_SG(struct se_task *task, u32 size)
-{
-	struct rd_request *req = RD_REQ(task);
-
-	req->rd_data_direction = RD_DATA_WRITE;
-	rd_map_task_SG(task);
-
-	return req->rd_sg_count;
-}
-
-/*	rd_DIRECT_check_lba():
- *
- *
- */
-static int rd_DIRECT_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return ((do_div(lba, PAGE_SIZE / DEV_ATTRIB(dev)->block_size)) *
-		 DEV_ATTRIB(dev)->block_size) ? 1 : 0;
-}
-
-/*	rd_MEMCPY_check_lba():
- *
- *
- */
-static int rd_MEMCPY_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
-}
-
-/*	rd_check_for_SG(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int rd_check_for_SG(struct se_task *task)
-{
-	struct rd_request *req = RD_REQ(task);
-
-	return req->rd_sg_count;
 }
 
 /*	rd_get_cdb(): (Part of se_subsystem_api_t template)
@@ -1230,15 +1017,6 @@ static u32 rd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-/*	rd_get_dma_length(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 rd_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
-}
-
 static sector_t rd_get_blocks(struct se_device *dev)
 {
 	struct rd_dev *rd_dev = dev->dev_ptr;
@@ -1250,68 +1028,43 @@ static sector_t rd_get_blocks(struct se_device *dev)
 
 static struct se_subsystem_api rd_dr_template = {
 	.name			= "rd_dr",
-	.type			= RAMDISK_DR,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
-	.cdb_none		= rd_CDB_none,
-	.cdb_read_non_SG	= rd_CDB_read_non_SG,
-	.cdb_read_SG		= rd_CDB_read_SG,
-	.cdb_write_non_SG	= rd_CDB_write_non_SG,
-	.cdb_write_SG		= rd_CDB_write_SG,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_DIRECT_allocate_virtdevice,
 	.create_virtdevice	= rd_DIRECT_create_virtdevice,
 	.free_device		= rd_free_device,
-	.transport_complete	= rd_transport_complete,
-	.allocate_DMA		= rd_DIRECT_allocate_DMA,
-	.free_DMA		= rd_DIRECT_free_DMA,
 	.alloc_task		= rd_alloc_task,
 	.do_task		= rd_DIRECT_do_task,
 	.free_task		= rd_free_task,
 	.check_configfs_dev_params = rd_check_configfs_dev_params,
 	.set_configfs_dev_params = rd_set_configfs_dev_params,
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
-	.get_plugin_info	= rd_dr_get_plugin_info,
-	.get_hba_info		= rd_get_hba_info,
-	.check_lba		= rd_DIRECT_check_lba,
-	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
-	.get_dma_length		= rd_get_dma_length,
 	.get_blocks		= rd_get_blocks,
 	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
 };
 
 static struct se_subsystem_api rd_mcp_template = {
 	.name			= "rd_mcp",
-	.type			= RAMDISK_MCP,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_VDEV,
-	.cdb_none		= rd_CDB_none,
-	.cdb_read_non_SG	= rd_CDB_read_non_SG,
-	.cdb_read_SG		= rd_CDB_read_SG,
-	.cdb_write_non_SG	= rd_CDB_write_non_SG,
-	.cdb_write_SG		= rd_CDB_write_SG,
 	.attach_hba		= rd_attach_hba,
 	.detach_hba		= rd_detach_hba,
 	.allocate_virtdevice	= rd_MEMCPY_allocate_virtdevice,
 	.create_virtdevice	= rd_MEMCPY_create_virtdevice,
 	.free_device		= rd_free_device,
-	.transport_complete	= rd_transport_complete,
 	.alloc_task		= rd_alloc_task,
 	.do_task		= rd_MEMCPY_do_task,
 	.free_task		= rd_free_task,
 	.check_configfs_dev_params = rd_check_configfs_dev_params,
 	.set_configfs_dev_params = rd_set_configfs_dev_params,
 	.show_configfs_dev_params = rd_show_configfs_dev_params,
-	.get_plugin_info	= rd_mcp_get_plugin_info,
-	.get_hba_info		= rd_get_hba_info,
-	.check_lba		= rd_MEMCPY_check_lba,
-	.check_for_SG		= rd_check_for_SG,
 	.get_cdb		= rd_get_cdb,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
-	.get_dma_length		= rd_get_dma_length,
+	.get_blocks		= rd_get_blocks,
 };
 
 int __init rd_module_init(void)

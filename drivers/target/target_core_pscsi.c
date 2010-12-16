@@ -107,13 +107,9 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	pscsi_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int pscsi_detach_hba(struct se_hba *hba)
+static void pscsi_detach_hba(struct se_hba *hba)
 {
-	struct pscsi_hba_virt *phv = (struct pscsi_hba_virt *)hba->hba_ptr;
+	struct pscsi_hba_virt *phv = hba->hba_ptr;
 	struct Scsi_Host *scsi_host = phv->phv_lld_host;
 
 	if (scsi_host) {
@@ -129,8 +125,6 @@ static int pscsi_detach_hba(struct se_hba *hba)
 
 	kfree(phv);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
@@ -187,6 +181,158 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 	return 1;
 }
 
+static void pscsi_tape_read_blocksize(struct se_device *dev,
+		struct scsi_device *sdev)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
+	int ret;
+
+	buf = kzalloc(12, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = MODE_SENSE;
+	cdb[4] = 0x0c; /* 12 bytes */
+
+	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf, 12, NULL,
+			HZ, 1, NULL);
+	if (ret)
+		goto out_free;
+
+	/*
+	 * If MODE_SENSE still returns zero, set the default value to 1024.
+	 */
+	sdev->sector_size = (buf[9] << 16) | (buf[10] << 8) | (buf[11]);
+	if (!sdev->sector_size)
+		sdev->sector_size = 1024;
+out_free:
+	kfree(buf);
+}
+
+static void
+pscsi_set_inquiry_info(struct scsi_device *sdev, struct t10_wwn *wwn)
+{
+	unsigned char *buf;
+
+	if (sdev->inquiry_len < INQUIRY_LEN)
+		return;
+
+	buf = sdev->inquiry;
+	if (!buf)
+		return;
+	/*
+	 * Use sdev->inquiry from drivers/scsi/scsi_scan.c:scsi_alloc_sdev()
+	 */
+	memcpy(&wwn->vendor[0], &buf[8], sizeof(wwn->vendor));
+	memcpy(&wwn->model[0], &buf[16], sizeof(wwn->model));
+	memcpy(&wwn->revision[0], &buf[32], sizeof(wwn->revision));
+}
+
+static int
+pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf;
+	int ret;
+
+	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
+	if (!buf)
+		return -1;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = INQUIRY;
+	cdb[1] = 0x01; /* Query VPD */
+	cdb[2] = 0x80; /* Unit Serial Number */
+	cdb[3] = (INQUIRY_VPD_SERIAL_LEN >> 8) & 0xff;
+	cdb[4] = (INQUIRY_VPD_SERIAL_LEN & 0xff);
+
+	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf,
+			      INQUIRY_VPD_SERIAL_LEN, NULL, HZ, 1, NULL);
+	if (ret)
+		goto out_free;
+
+	snprintf(&wwn->unit_serial[0], INQUIRY_VPD_SERIAL_LEN, "%s", &buf[4]);
+
+	wwn->t10_sub_dev->su_dev_flags |= SDF_FIRMWARE_VPD_UNIT_SERIAL;
+
+	kfree(buf);
+	return 0;
+
+out_free:
+	kfree(buf);
+	return -1;
+}
+
+static void
+pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
+		struct t10_wwn *wwn)
+{
+	unsigned char cdb[MAX_COMMAND_SIZE], *buf, *page_83;
+	int ident_len, page_len, off = 4, ret;
+	struct t10_vpd *vpd;
+
+	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	memset(cdb, 0, MAX_COMMAND_SIZE);
+	cdb[0] = INQUIRY;
+	cdb[1] = 0x01; /* Query VPD */
+	cdb[2] = 0x83; /* Device Identifier */
+	cdb[3] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN >> 8) & 0xff;
+	cdb[4] = (INQUIRY_VPD_DEVICE_IDENTIFIER_LEN & 0xff);
+
+	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf,
+			      INQUIRY_VPD_DEVICE_IDENTIFIER_LEN,
+			      NULL, HZ, 1, NULL);
+	if (ret)
+		goto out;
+
+	page_len = (buf[2] << 8) | buf[3];
+	while (page_len > 0) {
+		/* Grab a pointer to the Identification descriptor */
+		page_83 = &buf[off];
+		ident_len = page_83[3];
+		if (!ident_len) {
+			printk(KERN_ERR "page_83[3]: identifier"
+					" length zero!\n");
+			break;
+		}
+		printk(KERN_INFO "T10 VPD Identifer Length: %d\n", ident_len);
+
+		vpd = kzalloc(sizeof(struct t10_vpd), GFP_KERNEL);
+		if (!vpd) {
+			printk(KERN_ERR "Unable to allocate memory for"
+					" struct t10_vpd\n");
+			goto out;
+		}
+		INIT_LIST_HEAD(&vpd->vpd_list);
+
+		transport_set_vpd_proto_id(vpd, page_83);
+		transport_set_vpd_assoc(vpd, page_83);
+
+		if (transport_set_vpd_ident_type(vpd, page_83) < 0) {
+			off += (ident_len + 4);
+			page_len -= (ident_len + 4);
+			kfree(vpd);
+			continue;
+		}
+		if (transport_set_vpd_ident(vpd, page_83) < 0) {
+			off += (ident_len + 4);
+			page_len -= (ident_len + 4);
+			kfree(vpd);
+			continue;
+		}
+
+		list_add_tail(&vpd->vpd_list, &wwn->t10_vpd_list);
+		off += (ident_len + 4);
+		page_len -= (ident_len + 4);
+	}
+
+out:
+	kfree(buf);
+}
+
 /*	pscsi_add_device_to_list():
  *
  *
@@ -226,6 +372,11 @@ static struct se_device *pscsi_add_device_to_list(
 	dev_limits.hw_queue_depth = sd->queue_depth;
 	dev_limits.queue_depth = sd->queue_depth;
 	/*
+	 * Setup our standard INQUIRY info into se_dev->t10_wwn
+	 */
+	pscsi_set_inquiry_info(sd, &se_dev->t10_wwn);
+
+	/*
 	 * Set the pointer pdv->pdv_sd to from passed struct scsi_device,
 	 * which has already been referenced with Linux SCSI code with
 	 * scsi_device_get() in this file's pscsi_create_virtdevice().
@@ -249,45 +400,22 @@ static struct se_device *pscsi_add_device_to_list(
 	}
 
 	/*
+	 * Locate VPD WWN Information used for various purposes within
+	 * the Storage Engine.
+	 */
+	if (!pscsi_get_inquiry_vpd_serial(sd, &se_dev->t10_wwn)) {
+		/*
+		 * If VPD Unit Serial returned GOOD status, try
+		 * VPD Device Identification page (0x83).
+		 */
+		pscsi_get_inquiry_vpd_device_ident(sd, &se_dev->t10_wwn);
+	}
+
+	/*
 	 * For TYPE_TAPE, attempt to determine blocksize with MODE_SENSE.
 	 */
-	if (sd->type == TYPE_TAPE) {
-		unsigned char *buf = NULL, cdb[MAX_COMMAND_SIZE];
-		struct se_cmd *cmd;
-		u32 blocksize;
-
-		memset(cdb, 0, MAX_COMMAND_SIZE);
-		cdb[0] = MODE_SENSE;
-		cdb[4] = 0x0c; /* 12 bytes */
-
-		cmd = transport_allocate_passthrough(&cdb[0],
-				DMA_FROM_DEVICE, 0, NULL, 0, 12, dev);
-		if (!(cmd)) {
-			printk(KERN_ERR "Unable to determine blocksize for"
-				" TYPE_TAPE\n");
-			goto out;
-		}
-
-		if (transport_generic_passthrough(cmd) < 0) {
-			printk(KERN_ERR "Unable to determine blocksize for"
-				" TYPE_TAPE\n");
-			goto out;
-		}
-
-		buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
-		blocksize = (buf[9] << 16) | (buf[10] << 8) | (buf[11]);
-
-		/*
-		 * If MODE_SENSE still returns zero, set the default value
-		 * to 1024.
-		 */
-		sd->sector_size = blocksize;
-		if (!(sd->sector_size))
-			sd->sector_size = 1024;
-
-		transport_passthrough_release(cmd);
-	}
-out:
+	if (sd->type == TYPE_TAPE)
+		pscsi_tape_read_blocksize(dev, sd);
 	return dev;
 }
 
@@ -741,7 +869,8 @@ static int pscsi_blk_get_request(struct se_task *task)
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 
 	pt->pscsi_req = blk_get_request(pdv->pdv_sd->request_queue,
-			(pt->pscsi_direction == DMA_TO_DEVICE), GFP_KERNEL);
+			(task->task_data_direction == DMA_TO_DEVICE),
+			GFP_KERNEL);
 	if (!(pt->pscsi_req) || IS_ERR(pt->pscsi_req)) {
 		printk(KERN_ERR "PSCSI: blk_get_request() failed: %ld\n",
 				IS_ERR(pt->pscsi_req));
@@ -904,24 +1033,6 @@ static ssize_t pscsi_check_configfs_dev_params(
 	return 0;
 }
 
-static void pscsi_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM SCSI Plugin %s\n", PSCSI_VERSION);
-}
-
-static void pscsi_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct pscsi_hba_virt *phv = hba->hba_ptr;
-	struct Scsi_Host *sh = phv->phv_lld_host;
-
-	*bl += sprintf(b + *bl, "Core Host ID: %u  PHV Host ID: %u\n",
-		 hba->hba_id, phv->phv_host_id);
-	if (sh)
-		*bl += sprintf(b + *bl, "        SCSI HBA ID %u: %s  <local>\n",
-			sh->host_no, (sh->hostt->name) ?
-			(sh->hostt->name) : "Unknown");
-}
-
 static ssize_t pscsi_show_configfs_dev_params(
         struct se_hba *hba,
         struct se_subsystem_dev *se_dev,
@@ -1015,7 +1126,7 @@ static int __pscsi_map_task_SG(
 	int nr_pages = (task->task_size + task_sg[0].offset +
 			PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int nr_vecs = 0, rc, ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-	int rw = (TASK_CMD(task)->data_direction == DMA_TO_DEVICE);
+	int rw = (task->task_data_direction == DMA_TO_DEVICE);
 
 	if (!task->task_size)
 		return 0;
@@ -1152,22 +1263,24 @@ fail:
 static int pscsi_map_task_SG(struct se_task *task)
 {
 	int ret;
+
 	/*
 	 * Setup the main struct request for the task->task_sg[] payload
 	 */
 
 	ret = __pscsi_map_task_SG(task, task->task_sg, task->task_sg_num, 0);
-	if (ret < 0)
-		return ret;
+	if (ret >= 0 && task->task_sg_bidi) {
+		/*
+		 * If present, set up the extra BIDI-COMMAND SCSI READ
+		 * struct request and payload.
+		 */
+		ret = __pscsi_map_task_SG(task, task->task_sg_bidi,
+					task->task_sg_num, 1);
+	}
 
-	if (!(task->task_sg_bidi))
-		return ret;
-	/*
-	 * If present, set up the extra BIDI-COMMAND SCSI READ
-	 * struct request and payload.
-	 */
-	return __pscsi_map_task_SG(task, task->task_sg_bidi,
-				task->task_sg_num, 1);
+	if (ret < 0)
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	return 0;
 }
 
 /*	pscsi_map_task_non_SG():
@@ -1180,6 +1293,9 @@ static int pscsi_map_task_non_SG(struct se_task *task)
 	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 	int ret = 0;
+
+	if (pscsi_blk_get_request(task) < 0)
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
 
 	if (!task->task_size)
 		return 0;
@@ -1194,101 +1310,9 @@ static int pscsi_map_task_non_SG(struct se_task *task)
 	return 0;
 }
 
-static int pscsi_CDB_none(struct se_task *task, u32 size)
+static int pscsi_CDB_none(struct se_task *task)
 {
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_NONE;
-
 	return pscsi_blk_get_request(task);
-}
-
-/*	pscsi_CDB_read_non_SG():
- *
- *
- */
-static int pscsi_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_FROM_DEVICE;
-
-	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return pscsi_map_task_non_SG(task);
-}
-
-/*	pscsi_CDB_read_SG():
- *
- *
- */
-static int pscsi_CDB_read_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_FROM_DEVICE;
-	/*
-	 * pscsi_map_task_SG() calls block/blk-core.c:blk_make_request()
-	 * for >= v2.6.31 pSCSI
-	 */
-	if (pscsi_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
-}
-
-/*	pscsi_CDB_write_non_SG():
- *
- *
- */
-static int pscsi_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_TO_DEVICE;
-
-	if (pscsi_blk_get_request(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return pscsi_map_task_non_SG(task);
-}
-
-/*	pscsi_CDB_write_SG():
- *
- *
- */
-static int pscsi_CDB_write_SG(struct se_task *task, u32 size)
-{
-	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-
-	pt->pscsi_direction = DMA_TO_DEVICE;
-	/*
-	 * pscsi_map_task_SG() calls block/blk-core.c:blk_make_request()
-	 * for >= v2.6.31 pSCSI
-	 */
-	if (pscsi_map_task_SG(task) < 0)
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-
-	return task->task_sg_num;
-}
-
-/*	pscsi_check_lba():
- *
- *
- */
-static int pscsi_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
-}
-
-/*	pscsi_check_for_SG():
- *
- *
- */
-static int pscsi_check_for_SG(struct se_task *task)
-{
-	return task->task_sg_num;
 }
 
 /*	pscsi_get_cdb():
@@ -1337,13 +1361,15 @@ static u32 pscsi_get_device_type(struct se_device *dev)
 	return sd->type;
 }
 
-/*	pscsi_get_dma_length():
- *
- *
- */
-static u32 pscsi_get_dma_length(u32 task_size, struct se_device *dev)
+static sector_t pscsi_get_blocks(struct se_device *dev)
 {
-	return PAGE_SIZE;
+	struct pscsi_dev_virt *pdv = dev->dev_ptr;
+
+	if (pdv->pdv_bd && pdv->pdv_bd->bd_part)
+		return pdv->pdv_bd->bd_part->nr_sects;
+
+	dump_stack();
+	return 0;
 }
 
 /*	pscsi_handle_SAM_STATUS_failures():
@@ -1403,13 +1429,10 @@ static void pscsi_req_done(struct request *req, int uptodate)
 static struct se_subsystem_api pscsi_template = {
 	.name			= "pscsi",
 	.owner			= THIS_MODULE,
-	.type			= PSCSI,
 	.transport_type		= TRANSPORT_PLUGIN_PHBA_PDEV,
 	.cdb_none		= pscsi_CDB_none,
-	.cdb_read_non_SG	= pscsi_CDB_read_non_SG,
-	.cdb_read_SG		= pscsi_CDB_read_SG,
-	.cdb_write_non_SG	= pscsi_CDB_write_non_SG,
-	.cdb_write_SG		= pscsi_CDB_write_SG,
+	.map_task_non_SG	= pscsi_map_task_non_SG,
+	.map_task_SG		= pscsi_map_task_SG,
 	.attach_hba		= pscsi_attach_hba,
 	.detach_hba		= pscsi_detach_hba,
 	.pmode_enable_hba	= pscsi_pmode_enable_hba,
@@ -1423,15 +1446,11 @@ static struct se_subsystem_api pscsi_template = {
 	.check_configfs_dev_params = pscsi_check_configfs_dev_params,
 	.set_configfs_dev_params = pscsi_set_configfs_dev_params,
 	.show_configfs_dev_params = pscsi_show_configfs_dev_params,
-	.get_plugin_info	= pscsi_get_plugin_info,
-	.get_hba_info		= pscsi_get_hba_info,
-	.check_lba		= pscsi_check_lba,
-	.check_for_SG		= pscsi_check_for_SG,
 	.get_cdb		= pscsi_get_cdb,
 	.get_sense_buffer	= pscsi_get_sense_buffer,
 	.get_device_rev		= pscsi_get_device_rev,
 	.get_device_type	= pscsi_get_device_type,
-	.get_dma_length		= pscsi_get_dma_length,
+	.get_blocks		= pscsi_get_blocks,
 };
 
 static int __init pscsi_module_init(void)

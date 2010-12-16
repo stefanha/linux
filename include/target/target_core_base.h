@@ -38,7 +38,6 @@
 #define SPC_SENSE_KEY_OFFSET			2
 #define SPC_ASC_KEY_OFFSET			12
 #define SPC_ASCQ_KEY_OFFSET			13
-/* Currently same as ISCSI_IQN_LEN */
 #define TRANSPORT_IQN_LEN			224
 /* Used by target_core_store_alua_lu_gp() and target_core_alua_lu_gp_show_attr_members() */
 #define LU_GROUP_NAME_BUF			256
@@ -60,14 +59,6 @@
 enum hba_flags_table {
 	HBA_FLAGS_INTERNAL_USE	= 0x01,
 	HBA_FLAGS_PSCSI_MODE	= 0x02,
-};
-
-/* struct se_hba->hba_status and iscsi_tpg_hba->thba_status */
-enum hba_status_table {
-	HBA_STATUS_FREE		= 0x01,
-	HBA_STATUS_ACTIVE	= 0x02,
-	HBA_STATUS_INACTIVE	= 0x04,
-	HBA_STATUS_SHUTDOWN	= 0x08,
 };
 
 /* struct se_lun->lun_status */
@@ -120,40 +111,25 @@ enum se_cmd_flags_table {
 	SCF_SCSI_NON_DATA_CDB		= 0x00000040,
 	SCF_SCSI_CDB_EXCEPTION		= 0x00000080,
 	SCF_SCSI_RESERVATION_CONFLICT	= 0x00000100,
-	SCF_CMD_PASSTHROUGH		= 0x00000200,
-	SCF_CMD_PASSTHROUGH_NOALLOC	= 0x00000400,
-	SCF_SE_CMD_FAILED		= 0x00000800,
-	SCF_SE_LUN_CMD			= 0x00001000,
-	SCF_SE_ALLOW_EOO		= 0x00002000,
-	SCF_SE_DISABLE_ONLINE_CHECK	= 0x00004000,
-	SCF_SENT_CHECK_CONDITION	= 0x00008000,
-	SCF_OVERFLOW_BIT		= 0x00010000,
-	SCF_UNDERFLOW_BIT		= 0x00020000,
-	SCF_SENT_DELAYED_TAS		= 0x00040000,
-	SCF_ALUA_NON_OPTIMIZED		= 0x00080000,
-	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00100000,
-	SCF_PASSTHROUGH_SG_TO_MEM	= 0x00200000,
-	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00400000,
-	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00800000,
-	SCF_EMULATE_SYNC_CACHE		= 0x01000000,
-	SCF_EMULATE_CDB_ASYNC		= 0x02000000,
-	SCF_EMULATE_SYNC_UNMAP		= 0x04000000
+	SCF_CMD_PASSTHROUGH_NOALLOC	= 0x00000200,
+	SCF_SE_CMD_FAILED		= 0x00000400,
+	SCF_SE_LUN_CMD			= 0x00000800,
+	SCF_SE_ALLOW_EOO		= 0x00001000,
+	SCF_SE_DISABLE_ONLINE_CHECK	= 0x00002000,
+	SCF_SENT_CHECK_CONDITION	= 0x00004000,
+	SCF_OVERFLOW_BIT		= 0x00008000,
+	SCF_UNDERFLOW_BIT		= 0x00010000,
+	SCF_SENT_DELAYED_TAS		= 0x00020000,
+	SCF_ALUA_NON_OPTIMIZED		= 0x00040000,
+	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00080000,
+	SCF_PASSTHROUGH_SG_TO_MEM	= 0x00100000,
+	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00200000,
+	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00400000,
+	SCF_EMULATE_SYNC_CACHE		= 0x00800000,
+	SCF_EMULATE_CDB_ASYNC		= 0x01000000,
+	SCF_EMULATE_SYNC_UNMAP		= 0x02000000
 };
 	
-/* struct se_device->type for known subsystem plugins */
-enum se_device_type_table {
-	PSCSI		= 1,
-	STGT		= 2,
-	PATA		= 3,
-	IBLOCK		= 4,
-	RAMDISK_DR	= 5,
-	RAMDISK_MCP	= 6,
-	FILEIO		= 7,
-	VROM		= 8,
-	VTAPE		= 9,
-	MEDIA_CHANGER	= 10,
-};
-
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
 enum transport_lunflags_table {
 	TRANSPORT_LUNFLAGS_NO_ACCESS		= 0x00,
@@ -454,8 +430,6 @@ struct se_transport_task {
 	atomic_t		transport_lun_stop;
 	spinlock_t		t_state_lock;
 	struct completion	t_transport_stop_comp;
-	struct completion	t_transport_passthrough_comp;
-	struct completion	t_transport_passthrough_wcomp;
 	struct completion	transport_lun_fe_stop_comp;
 	struct completion	transport_lun_stop_comp;
 	struct scatterlist	*t_tasks_sg_chained;
@@ -488,6 +462,7 @@ struct se_task {
 	u32		task_size;
 	u32		task_sg_num;
 	u32		task_sg_offset;
+	enum dma_data_direction	task_data_direction;
 	struct se_cmd *task_se_cmd;
 	struct se_device	*se_dev;
 	struct completion	task_stop_comp;
@@ -498,7 +473,6 @@ struct se_task {
 	atomic_t	task_stop;
 	atomic_t	task_state_active;
 	struct timer_list	task_timer;
-	int (*transport_map_task)(struct se_task *, u32);
 	struct se_device *se_obj_ptr;
 	struct list_head t_list;
 	struct list_head t_execute_list;
@@ -507,52 +481,6 @@ struct se_task {
 
 #define TASK_CMD(task)	((struct se_cmd *)task->task_se_cmd)
 #define TASK_DEV(task)	((struct se_device *)task->se_dev)
-
-struct se_transform_info {
-	int		ti_set_counts;
-	u32		ti_data_length;
-	unsigned long long	ti_lba;
-	struct se_cmd *ti_se_cmd;
-	struct se_device *ti_dev;
-	struct se_device *se_obj_ptr;
-	struct se_device *ti_obj_ptr;
-} ____cacheline_aligned;
-
-struct se_offset_map {
-	int                     map_reset;
-	u32                     iovec_length;
-	u32                     iscsi_offset;
-	u32                     current_offset;
-	u32                     orig_offset;
-	u32                     sg_count;
-	u32                     sg_current;
-	u32                     sg_length;
-	struct page		*sg_page;
-	struct se_mem		*map_se_mem;
-	struct se_mem		*map_orig_se_mem;
-	void			*iovec_base;
-} ____cacheline_aligned;
-
-struct se_map_sg {
-	int			sg_kmap_active:1;
-	u32			data_length;
-	u32			data_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct iovec		*iov;
-} ____cacheline_aligned;
-
-struct se_unmap_sg {
-	u32			data_length;
-	u32			sg_count;
-	u32			sg_offset;
-	u32			padding;
-	u32			t_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct se_offset_map	lmap;
-	struct se_mem		*cur_se_mem;
-} ____cacheline_aligned;
 
 struct se_cmd {
 	/* SAM response code being sent to initiator */
@@ -582,17 +510,11 @@ struct se_cmd {
 	u32			cmd_spdtl;
 	u32			residual_count;
 	u32			orig_fe_lun;
-	/* Number of iovecs iovecs used for IP stack calls */
-	u32			iov_data_count;
-	/* Number of iovecs allocated for iscsi_cmd_t->iov_data */
-	u32			orig_iov_data_count;
 	/* Persistent Reservation key */
 	u64			pr_res_key;
 	atomic_t                transport_sent;
 	/* Used for sense data */
 	void			*sense_buffer;
-	/* Used with sockets based fabric plugins */
-	struct iovec		*iov_data;
 	struct list_head	se_delayed_list;
 	struct list_head	se_ordered_list;
 	struct list_head	se_lun_list;
@@ -602,29 +524,16 @@ struct se_cmd {
 	struct se_device	*se_orig_obj_ptr;
 	struct se_lun		*se_lun;
 	/* Only used for internal passthrough and legacy TCM fabric modules */
-	void			*se_fabric_cmd_ptr;
 	struct se_session	*se_sess;
 	struct se_tmr_req	*se_tmr_req;
 	/* t_task is setup to t_task_backstore in transport_init_se_cmd() */
 	struct se_transport_task *t_task;
 	struct se_transport_task t_task_backstore;
 	struct target_core_fabric_ops *se_tfo;
-	int (*transport_allocate_resources)(struct se_cmd *, u32, u32);
-	int (*transport_cdb_transform)(struct se_cmd *,
-					struct se_transform_info *);
 	int (*transport_emulate_cdb)(struct se_cmd *);
-	void (*transport_free_resources)(struct se_cmd *);
-	u32 (*transport_get_lba)(unsigned char *);
-	unsigned long long (*transport_get_long_lba)(unsigned char *);
-	void (*transport_map_SG_segments)(struct se_unmap_sg *);
-	void (*transport_passthrough_done)(struct se_cmd *);
-	void (*transport_unmap_SG_segments)(struct se_unmap_sg *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
 	void (*transport_complete_callback)(struct se_cmd *);
-	void (*callback)(struct se_cmd *cmd, void *callback_arg,
-			int complete_status);
-	void *callback_arg;
 } ____cacheline_aligned;
 
 #define T_TASK(cmd)     ((struct se_transport_task *)(cmd->t_task))
@@ -773,25 +682,6 @@ struct se_dev_attrib {
 	struct config_group da_group;
 } ____cacheline_aligned;
 
-struct se_dev_snap_attrib {
-#define SNAP_CONTACT_LEN		128
-	unsigned char	contact[SNAP_CONTACT_LEN];
-#define SNAP_GROUP_LEN			128
-	unsigned char	lv_group[SNAP_GROUP_LEN];
-#define SNAP_LVC_LEN			32
-	unsigned char	lvc_size[SNAP_LVC_LEN];
-	pid_t		pid;
-	int		enabled;
-	int		permissions;
-	int		max_snapshots;
-	int		max_warn;
-	int		check_interval;
-	int		create_interval;
-	int		usage;
-	int		usage_warn;
-	int		vgs_usage_warn;
-} ____cacheline_aligned;
-
 struct se_subsystem_dev {
 /* Used for struct se_subsystem_dev-->se_dev_alias, must be less than PAGE_SIZE */
 #define SE_DEV_ALIAS_LEN		512
@@ -803,7 +693,6 @@ struct se_subsystem_dev {
 	struct se_hba *se_dev_hba;
 	struct se_device *se_dev_ptr;
 	struct se_dev_attrib se_dev_attrib;
-	struct se_dev_snap_attrib se_snap_attrib;
 	/* T10 Asymmetric Logical Unit Assignment for Target Ports */
 	struct t10_alua	t10_alua;
 	/* T10 Inquiry and VPD WWN Information */
@@ -816,18 +705,13 @@ struct se_subsystem_dev {
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
-	/* For userspace lvm utils */
-	struct config_group se_dev_snap_group;
 } ____cacheline_aligned;
 
-#define SE_DEV_SNAP(su_dev)	(&(su_dev)->se_snap_attrib)
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
 
 struct se_device {
-	/* Type of disk transport used for device, see se_device_type_table */
-	enum se_device_type_table type;
 	/* Set to 1 if thread is NOT sleeping on thread_sem */
 	u8			thread_active;
 	u8			dev_status_timer_flags;
@@ -845,7 +729,6 @@ struct se_device {
 	/* Used for SPC-2 reservations enforce of ISIDs */
 	u64			dev_res_bin_isid;
 	t10_task_attr_index_t	dev_task_attr_type;
-	unsigned long long	dev_sectors_total;
 	/* Pointer to transport specific device structure */
 	void 			*dev_ptr;
 	u32			dev_index;
@@ -894,7 +777,6 @@ struct se_device {
 	struct task_struct	*process_thread;
 	pid_t			process_thread_pid;
 	struct task_struct		*dev_mgmt_thread;
-	int (*write_pending)(struct se_task *);
 	struct list_head	delayed_cmd_list;
 	struct list_head	ordered_cmd_list;
 	struct list_head	execute_task_list;
@@ -912,14 +794,11 @@ struct se_device {
 
 #define SE_DEV(cmd)		((struct se_device *)(cmd)->se_lun->lun_se_dev)
 #define SU_DEV(dev)		((struct se_subsystem_dev *)(dev)->se_sub_dev)
-#define ISCSI_DEV(cmd)		SE_DEV(cmd)
 #define DEV_ATTRIB(dev)		(&(dev)->se_sub_dev->se_dev_attrib)
 #define DEV_T10_WWN(dev)	(&(dev)->se_sub_dev->t10_wwn)
 
 struct se_hba {
 	u16			hba_tpgt;
-	/* See hba_status_table */
-	u32			hba_status;
 	u32			hba_id;
 	/* See hba_flags_table */
 	u32			hba_flags;
@@ -943,8 +822,6 @@ struct se_hba {
 	struct se_subsystem_api *transport;
 }  ____cacheline_aligned;
 
-#define ISCSI_HBA(d)		((struct se_hba *)(d)->se_hba)
-/* Using SE_HBA() for new code */
 #define SE_HBA(d)		((struct se_hba *)(d)->se_hba)
 
 struct se_lun {
@@ -966,7 +843,6 @@ struct se_lun {
 } ____cacheline_aligned;
 
 #define SE_LUN(c)		((struct se_lun *)(c)->se_lun)
-#define ISCSI_LUN(c)		SE_LUN(c)
 
 struct se_port {
 	/* RELATIVE TARGET PORT IDENTIFER */
@@ -1046,12 +922,10 @@ struct se_global {
 	struct list_head	g_se_tpg_list;
 	struct list_head	g_hba_list;
 	struct list_head	g_se_dev_list;
-	struct list_head	g_sub_api_list;
 	struct se_hba		*g_lun0_hba;
 	struct se_subsystem_dev *g_lun0_su_dev;
 	struct se_device	*g_lun0_dev;
 	struct t10_alua_lu_gp	*default_lu_gp;
-	struct mutex		g_sub_api_mutex;
 	spinlock_t		g_device_lock;
 	spinlock_t		hba_lock;
 	spinlock_t		se_tpg_lock;

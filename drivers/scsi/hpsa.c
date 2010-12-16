@@ -31,7 +31,6 @@
 #include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
 #include <linux/compat.h>
 #include <linux/blktrace_api.h>
 #include <linux/uaccess.h>
@@ -143,8 +142,7 @@ static void fill_cmd(struct CommandList *c, u8 cmd, struct ctlr_info *h,
 	void *buff, size_t size, u8 page_code, unsigned char *scsi3addr,
 	int cmd_type);
 
-static int hpsa_scsi_queue_command(struct scsi_cmnd *cmd,
-		void (*done)(struct scsi_cmnd *));
+static int hpsa_scsi_queue_command(struct Scsi_Host *h, struct scsi_cmnd *cmd);
 static void hpsa_scan_start(struct Scsi_Host *);
 static int hpsa_scan_finished(struct Scsi_Host *sh,
 	unsigned long elapsed_time);

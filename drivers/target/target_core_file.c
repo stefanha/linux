@@ -88,27 +88,15 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	fd_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_detach_hba(struct se_hba *hba)
+static void fd_detach_hba(struct se_hba *hba)
 {
-	struct fd_host *fd_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-	fd_host = (struct fd_host *) hba->hba_ptr;
+	struct fd_host *fd_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached FILEIO HBA: %u from Generic"
 		" Target Core\n", hba->hba_id, fd_host->fd_host_id);
 
 	kfree(fd_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)
@@ -273,15 +261,6 @@ static void fd_free_device(void *p)
 	kfree(fd_dev);
 }
 
-/*	fd_transport_complete(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_transport_complete(struct se_task *task)
-{
-	return 0;
-}
-
 static inline struct fd_request *FILE_REQ(struct se_task *task)
 {
 	return container_of(task, struct fd_request, fd_task);
@@ -304,41 +283,30 @@ fd_alloc_task(struct se_cmd *cmd)
 	return &fd_req->fd_task;
 }
 
-static inline int fd_iovec_alloc(struct fd_request *req)
+static int fd_do_readv(struct se_task *task)
 {
-	req->fd_iovs = kzalloc(sizeof(struct iovec) * req->fd_sg_count,
-				GFP_KERNEL);
-	if (!(req->fd_iovs)) {
-		printk(KERN_ERR "Unable to allocate req->fd_iovs\n");
-		return -1;
-	}
-
-	return 0;
-}
-
-static int fd_do_readv(struct fd_request *req, struct se_task *task)
-{
+	struct fd_request *req = FILE_REQ(task);
 	struct file *fd = req->fd_dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	mm_segment_t old_fs;
-	loff_t pos = (req->fd_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	loff_t pos = (task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
 	int ret = 0, i;
 
-	iov = kzalloc(sizeof(struct iovec) * req->fd_sg_count, GFP_KERNEL);
+	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
 	if (!(iov)) {
 		printk(KERN_ERR "Unable to allocate fd_do_readv iov[]\n");
 		return -1;
 	}
 
-	for (i = 0; i < req->fd_sg_count; i++) {
+	for (i = 0; i < task->task_sg_num; i++) {
 		iov[i].iov_len = sg[i].length;
 		iov[i].iov_base = sg_virt(&sg[i]);
 	}
 
 	old_fs = get_fs();
 	set_fs(get_ds());
-	ret = vfs_readv(fd, &iov[0], req->fd_sg_count, &pos);
+	ret = vfs_readv(fd, &iov[0], task->task_sg_num, &pos);
 	set_fs(old_fs);
 
 	kfree(iov);
@@ -348,10 +316,10 @@ static int fd_do_readv(struct fd_request *req, struct se_task *task)
 	 * block_device.
 	 */
 	if (S_ISBLK(fd->f_dentry->d_inode->i_mode)) {
-		if (ret < 0 || ret != req->fd_size) {
+		if (ret < 0 || ret != task->task_size) {
 			printk(KERN_ERR "vfs_readv() returned %d,"
 				" expecting %d for S_ISBLK\n", ret,
-				(int)req->fd_size);
+				(int)task->task_size);
 			return -1;
 		}
 	} else {
@@ -365,98 +333,35 @@ static int fd_do_readv(struct fd_request *req, struct se_task *task)
 	return 1;
 }
 
-#if 0
-
-static void fd_sendfile_free_DMA(struct se_cmd *cmd)
+static int fd_do_writev(struct se_task *task)
 {
-	printk(KERN_INFO "Release reference to pages now..\n");
-}
-
-static static int fd_sendactor(
-	read_descriptor_t *desc,
-	struct page *page,
-	unsigned long offset,
-	unsigned long size)
-{
-	unsigned long count = desc->count;
-	struct se_task *task = desc->arg.data;
 	struct fd_request *req = FILE_REQ(task);
-	struct scatterlist *sg = task->task_sg;
-
-	printk(KERN_INFO "page: %p offset: %lu size: %lu\n", page,
-			offset, size);
-
-	__free_page(sg[req->fd_cur_offset].page);
-
-	printk(KERN_INFO "page_address(page): %p\n", page_address(page));
-	sg[req->fd_cur_offset].page = page;
-	sg[req->fd_cur_offset].offset = offset;
-	sg[req->fd_cur_offset].length = size;
-
-	printk(KERN_INFO "sg[%d:%p].page %p length: %d\n", req->fd_cur_offset,
-		&sg[req->fd_cur_offset], sg[req->fd_cur_offset].page,
-		sg[req->fd_cur_offset].length);
-
-	req->fd_cur_size += size;
-	printk(KERN_INFO "fd_cur_size: %u\n", req->fd_cur_size);
-
-	req->fd_cur_offset++;
-
-	desc->count--;
-	desc->written += size;
-	return size;
-}
-
-static int fd_do_sendfile(struct fd_request *req, struct se_task *task)
-{
-	int ret = 0;
-	struct file *fd = req->fd_dev->fd_file;
-
-	if (fd_seek(fd, req->fd_lba, DEV_ATTRIB(task->se_dev)->block_size) < 0)
-		return -1;
-
-	TASK_CMD(task)->transport_free_DMA = &fd_sendfile_free_DMA;
-
-	ret = fd->f_op->sendfile(fd, &fd->f_pos, req->fd_sg_count,
-			fd_sendactor, (void *)task);
-
-	if (ret < 0) {
-		printk(KERN_ERR "fd->f_op->sendfile() returned %d\n", ret);
-		return -1;
-	}
-
-	return 1;
-}
-#endif
-
-static int fd_do_writev(struct fd_request *req, struct se_task *task)
-{
 	struct file *fd = req->fd_dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	mm_segment_t old_fs;
-	loff_t pos = (req->fd_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	loff_t pos = (task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
 	int ret, i = 0;
 
-	iov = kzalloc(sizeof(struct iovec) * req->fd_sg_count, GFP_KERNEL);
+	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
 	if (!(iov)) {
 		printk(KERN_ERR "Unable to allocate fd_do_writev iov[]\n");
 		return -1;
 	}
 
-	for (i = 0; i < req->fd_sg_count; i++) {
+	for (i = 0; i < task->task_sg_num; i++) {
 		iov[i].iov_len = sg[i].length;
 		iov[i].iov_base = sg_virt(&sg[i]);
 	}
 
 	old_fs = get_fs();
 	set_fs(get_ds());
-	ret = vfs_writev(fd, &iov[0], req->fd_sg_count, &pos);
+	ret = vfs_writev(fd, &iov[0], task->task_sg_num, &pos);
 	set_fs(old_fs);
 
 	kfree(iov);
 
-	if (ret < 0 || ret != req->fd_size) {
+	if (ret < 0 || ret != task->task_size) {
 		printk(KERN_ERR "vfs_writev() returned %d\n", ret);
 		return -1;
 	}
@@ -506,12 +411,12 @@ static void fd_emulate_sync_cache(struct se_task *task)
  * Tell TCM Core that we are capable of WriteCache emulation for
  * an underlying struct se_device.
  */
-int fd_emulated_write_cache(struct se_device *dev)
+static int fd_emulated_write_cache(struct se_device *dev)
 {
 	return 1;
 }
 
-int fd_emulated_dpo(struct se_device *dev)
+static int fd_emulated_dpo(struct se_device *dev)
 {
 	return 0;
 }
@@ -519,12 +424,12 @@ int fd_emulated_dpo(struct se_device *dev)
  * Tell TCM Core that we will be emulating Forced Unit Access (FUA) for WRITEs
  * for TYPE_DISK.
  */
-int fd_emulated_fua_write(struct se_device *dev)
+static int fd_emulated_fua_write(struct se_device *dev)
 {
 	return 1;
 }
 
-int fd_emulated_fua_read(struct se_device *dev)
+static int fd_emulated_fua_read(struct se_device *dev)
 {
 	return 0;
 }
@@ -553,31 +458,21 @@ static int fd_do_task(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
 	struct se_device *dev = cmd->se_dev;
-	struct fd_request *req = FILE_REQ(task);
 	int ret = 0;
 
-	req->fd_lba = task->task_lba;
-	req->fd_size = task->task_size;
 	/*
 	 * Call vectorized fileio functions to map struct scatterlist
 	 * physical memory addresses to struct iovec virtual memory.
 	 */
-	if (req->fd_data_direction == FD_DATA_READ)
-		ret = fd_do_readv(req, task);
-	else
-		ret = fd_do_writev(req, task);
+	if (task->task_data_direction == DMA_FROM_DEVICE) {
+		ret = fd_do_readv(task);
+	} else {
+		ret = fd_do_writev(task);
 
-	if (ret < 0)
-		return ret;
-
-	if (ret) {
-		/*
-		 * Check for Forced Unit Access WRITE emulation
-		 */
-		if ((DEV_ATTRIB(dev)->emulate_write_cache > 0) &&
-		    (DEV_ATTRIB(dev)->emulate_fua_write > 0) &&
-		    (req->fd_data_direction == FD_DATA_WRITE) &&
-		    (T_TASK(cmd)->t_tasks_fua)) {
+		if (ret > 0 &&
+		    DEV_ATTRIB(dev)->emulate_write_cache > 0 &&
+		    DEV_ATTRIB(dev)->emulate_fua_write > 0 &&
+		    T_TASK(cmd)->t_tasks_fua) {
 			/*
 			 * We might need to be a bit smarter here
 			 * and return some sense data to let the initiator
@@ -586,10 +481,14 @@ static int fd_do_task(struct se_task *task)
 			fd_emulate_write_fua(cmd, task);
 		}
 
+	}
+
+	if (ret < 0)
+		return ret;
+	if (ret) {
 		task->task_scsi_status = GOOD;
 		transport_complete_task(task, 1);
 	}
-
 	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
 }
 
@@ -601,7 +500,6 @@ static void fd_free_task(struct se_task *task)
 {
 	struct fd_request *req = FILE_REQ(task);
 
-	kfree(req->fd_iovs);
 	kfree(req);
 }
 
@@ -692,20 +590,6 @@ static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	return 0;
 }
 
-static void fd_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM FILEIO Plugin %s\n", FD_VERSION);
-}
-
-static void fd_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct fd_host *fd_host = (struct fd_host *)hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "SE Host ID: %u  FD Host ID: %u\n",
-		 hba->hba_id, fd_host->fd_host_id);
-	*bl += sprintf(b + *bl, "        TCM FILEIO HBA\n");
-}
-
 static ssize_t fd_show_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
@@ -720,125 +604,6 @@ static ssize_t fd_show_configfs_dev_params(
 		(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO) ?
 		"Buffered" : "Synchronous");
 	return bl;
-}
-
-/*	fd_map_task_non_SG():
- *
- *
- */
-static void fd_map_task_non_SG(struct se_task *task)
-{
-	struct se_cmd *cmd = TASK_CMD(task);
-	struct fd_request *req = FILE_REQ(task);
-
-	req->fd_bufflen		= task->task_size;
-	req->fd_buf		= (void *) T_TASK(cmd)->t_task_buf;
-	req->fd_sg_count	= 0;
-}
-
-/*	fd_map_task_SG():
- *
- *
- */
-static void fd_map_task_SG(struct se_task *task)
-{
-	struct fd_request *req = FILE_REQ(task);
-
-	req->fd_bufflen		= task->task_size;
-	req->fd_buf		= NULL;
-	req->fd_sg_count	= task->task_sg_num;
-}
-
-/*      fd_CDB_none():
- *
- *
- */
-static int fd_CDB_none(struct se_task *task, u32 size)
-{
-	struct fd_request *req = FILE_REQ(task);
-
-	req->fd_data_direction	= FD_DATA_NONE;
-	req->fd_bufflen		= 0;
-	req->fd_sg_count	= 0;
-	req->fd_buf		= NULL;
-
-	return 0;
-}
-
-/*	fd_CDB_read_non_SG():
- *
- *
- */
-static int fd_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	struct fd_request *req = FILE_REQ(task);
-
-	req->fd_data_direction = FD_DATA_READ;
-	fd_map_task_non_SG(task);
-
-	return 0;
-}
-
-/*	fd_CDB_read_SG):
- *
- *
- */
-static int fd_CDB_read_SG(struct se_task *task, u32 size)
-{
-	struct fd_request *req = FILE_REQ(task);
-
-	req->fd_data_direction = FD_DATA_READ;
-	fd_map_task_SG(task);
-
-	return req->fd_sg_count;
-}
-
-/*	fd_CDB_write_non_SG():
- *
- *
- */
-static int fd_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	struct fd_request *req = FILE_REQ(task);
-
-	req->fd_data_direction = FD_DATA_WRITE;
-	fd_map_task_non_SG(task);
-
-	return 0;
-}
-
-/*	fd_CDB_write_SG():
- *
- *
- */
-static int fd_CDB_write_SG(struct se_task *task, u32 size)
-{
-	struct fd_request *req = FILE_REQ(task);
-
-	req->fd_data_direction = FD_DATA_WRITE;
-	fd_map_task_SG(task);
-
-	return req->fd_sg_count;
-}
-
-/*	fd_check_lba():
- *
- *
- */
-static int fd_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
-}
-
-/*	fd_check_for_SG(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int fd_check_for_SG(struct se_task *task)
-{
-	struct fd_request *req = FILE_REQ(task);
-
-	return req->fd_sg_count;
 }
 
 /*	fd_get_cdb(): (Part of se_subsystem_api_t template)
@@ -870,15 +635,6 @@ static u32 fd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-/*	fd_get_dma_length(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 fd_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
-}
-
 static sector_t fd_get_blocks(struct se_device *dev)
 {
 	struct fd_dev *fd_dev = dev->dev_ptr;
@@ -891,15 +647,9 @@ static sector_t fd_get_blocks(struct se_device *dev)
 static struct se_subsystem_api fileio_template = {
 	.name			= "fileio",
 	.owner			= THIS_MODULE,
-	.type			= FILEIO,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
 	.attach_hba		= fd_attach_hba,
 	.detach_hba		= fd_detach_hba,
-	.cdb_none		= fd_CDB_none,
-	.cdb_read_non_SG	= fd_CDB_read_non_SG,
-	.cdb_read_SG		= fd_CDB_read_SG,
-	.cdb_write_non_SG	= fd_CDB_write_non_SG,
-	.cdb_write_SG		= fd_CDB_write_SG,
 	.allocate_virtdevice	= fd_allocate_virtdevice,
 	.create_virtdevice	= fd_create_virtdevice,
 	.free_device		= fd_free_device,
@@ -907,7 +657,6 @@ static struct se_subsystem_api fileio_template = {
 	.fua_write_emulated	= fd_emulated_fua_write,
 	.fua_read_emulated	= fd_emulated_fua_read,
 	.write_cache_emulated	= fd_emulated_write_cache,
-	.transport_complete	= fd_transport_complete,
 	.alloc_task		= fd_alloc_task,
 	.do_task		= fd_do_task,
 	.do_sync_cache		= fd_emulate_sync_cache,
@@ -915,14 +664,9 @@ static struct se_subsystem_api fileio_template = {
 	.check_configfs_dev_params = fd_check_configfs_dev_params,
 	.set_configfs_dev_params = fd_set_configfs_dev_params,
 	.show_configfs_dev_params = fd_show_configfs_dev_params,
-	.get_plugin_info	= fd_get_plugin_info,
-	.get_hba_info		= fd_get_hba_info,
-	.check_lba		= fd_check_lba,
-	.check_for_SG		= fd_check_for_SG,
 	.get_cdb		= fd_get_cdb,
 	.get_device_rev		= fd_get_device_rev,
 	.get_device_type	= fd_get_device_type,
-	.get_dma_length		= fd_get_dma_length,
 	.get_blocks		= fd_get_blocks,
 };
 

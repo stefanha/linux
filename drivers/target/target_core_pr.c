@@ -72,7 +72,7 @@ int core_pr_dump_initiator_port(
 static void __core_scsi3_complete_pro_release(struct se_device *, struct se_node_acl *,
 			struct t10_pr_registration *, int);
 
-int core_scsi2_reservation_seq_non_holder(
+static int core_scsi2_reservation_seq_non_holder(
 	struct se_cmd *cmd,
 	unsigned char *cdb,
 	u32 pr_reg_type)
@@ -4042,6 +4042,10 @@ static int core_scsi3_pri_read_full_status(struct se_cmd *cmd)
 		se_nacl = pr_reg->pr_reg_nacl;
 		se_tpg = pr_reg->pr_reg_nacl->se_tpg;
 		add_desc_len = 0;
+
+		atomic_inc(&pr_reg->pr_res_holders);
+		smp_mb__after_atomic_inc();
+		spin_unlock(&pr_tmpl->registration_lock);
 		/*
 		 * Determine expected length of $FABRIC_MOD specific
 		 * TransportID full status descriptor..
@@ -4052,6 +4056,9 @@ static int core_scsi3_pri_read_full_status(struct se_cmd *cmd)
 		if ((exp_desc_len + add_len) > cmd->data_length) {
 			printk(KERN_WARNING "SPC-3 PRIN READ_FULL_STATUS ran"
 				" out of buffer: %d\n", cmd->data_length);
+			spin_lock(&pr_tmpl->registration_lock);
+			atomic_dec(&pr_reg->pr_res_holders);
+			smp_mb__after_atomic_dec();
 			break;
 		}
 		/*
@@ -4110,6 +4117,10 @@ static int core_scsi3_pri_read_full_status(struct se_cmd *cmd)
 		 */
 		desc_len = TPG_TFO(se_tpg)->tpg_get_pr_transport_id(se_tpg,
 				se_nacl, pr_reg, &format_code, &buf[off+4]);
+
+		spin_lock(&pr_tmpl->registration_lock);
+		atomic_dec(&pr_reg->pr_res_holders);
+		smp_mb__after_atomic_dec();
 		/*
 		 * Set the ADDITIONAL DESCRIPTOR LENGTH
 		 */

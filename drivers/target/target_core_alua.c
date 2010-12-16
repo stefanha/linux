@@ -41,6 +41,11 @@
 #include "target_core_hba.h"
 #include "target_core_ua.h"
 
+static int core_alua_check_transition(int state, int *primary);
+static int core_alua_set_tg_pt_secondary_state(
+		struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem,
+		struct se_port *port, int explict, int offline);
+
 /*
  * REPORT_TARGET_PORT_GROUPS
  *
@@ -434,7 +439,7 @@ static inline int core_alua_state_transition(
  * in transport_cmd_sequencer().  This function is assigned to
  * struct t10_alua *->state_check() in core_setup_alua()
  */
-int core_alua_state_check_nop(
+static int core_alua_state_check_nop(
 	struct se_cmd *cmd,
 	unsigned char *cdb,
 	u8 *alua_ascq)
@@ -450,11 +455,11 @@ int core_alua_state_check_nop(
  * Also, this function can return three different return codes to
  * signal transport_generic_cmd_sequencer()
  *
- * return 1: Is used to signal LUN not accecsable, and TGCS_CHECK_CONDITION_NOT_READY
+ * return 1: Is used to signal LUN not accecsable, and check condition/not ready
  * return 0: Used to signal success
- * reutrn -1: Used to signal failure, and TGCS_INVALID_CDB_FIELD
+ * reutrn -1: Used to signal failure, and invalid cdb field
  */
-int core_alua_state_check(
+static int core_alua_state_check(
 	struct se_cmd *cmd,
 	unsigned char *cdb,
 	u8 *alua_ascq)
@@ -526,7 +531,7 @@ int core_alua_state_check(
 /*
  * Check implict and explict ALUA state change request.
  */
-int core_alua_check_transition(int state, int *primary)
+static int core_alua_check_transition(int state, int *primary)
 {
 	switch (state) {
 	case ALUA_ACCESS_STATE_ACTIVE_OPTMIZED:
@@ -554,7 +559,7 @@ int core_alua_check_transition(int state, int *primary)
 	return 0;
 }
 
-char *core_alua_dump_state(int state)
+static char *core_alua_dump_state(int state)
 {
 	switch (state) {
 	case ALUA_ACCESS_STATE_ACTIVE_OPTMIZED:
@@ -620,7 +625,7 @@ EXPORT_SYMBOL(core_alua_check_nonop_delay);
  * Called with tg_pt_gp->tg_pt_gp_md_mutex or tg_pt_gp_mem->sep_tg_pt_md_mutex
  *
  */
-int core_alua_write_tpg_metadata(
+static int core_alua_write_tpg_metadata(
 	const char *path,
 	unsigned char *md_buf,
 	u32 md_buf_len)
@@ -660,7 +665,7 @@ int core_alua_write_tpg_metadata(
 /*
  * Called with tg_pt_gp->tg_pt_gp_md_mutex held
  */
-int core_alua_update_tpg_primary_metadata(
+static int core_alua_update_tpg_primary_metadata(
 	struct t10_alua_tg_pt_gp *tg_pt_gp,
 	int primary_state,
 	unsigned char *md_buf)
@@ -686,7 +691,7 @@ int core_alua_update_tpg_primary_metadata(
 	return core_alua_write_tpg_metadata(path, md_buf, len);
 }
 
-int core_alua_do_transition_tg_pt(
+static int core_alua_do_transition_tg_pt(
 	struct t10_alua_tg_pt_gp *tg_pt_gp,
 	struct se_port *l_port,
 	struct se_node_acl *nacl,
@@ -923,7 +928,7 @@ int core_alua_do_port_transition(
 /*
  * Called with tg_pt_gp_mem->sep_tg_pt_md_mutex held
  */
-int core_alua_update_tpg_secondary_metadata(
+static int core_alua_update_tpg_secondary_metadata(
 	struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem,
 	struct se_port *port,
 	unsigned char *md_buf,
@@ -955,7 +960,7 @@ int core_alua_update_tpg_secondary_metadata(
 	return core_alua_write_tpg_metadata(path, md_buf, len);
 }
 
-int core_alua_set_tg_pt_secondary_state(
+static int core_alua_set_tg_pt_secondary_state(
 	struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem,
 	struct se_port *port,
 	int explict,
@@ -1023,7 +1028,8 @@ int core_alua_set_tg_pt_secondary_state(
 	return 0;
 }
 
-struct t10_alua_lu_gp *core_alua_allocate_lu_gp(const char *name, int def_group)
+struct t10_alua_lu_gp *
+core_alua_allocate_lu_gp(const char *name, int def_group)
 {
 	struct t10_alua_lu_gp *lu_gp;
 
@@ -1093,8 +1099,8 @@ again:
 	return 0;
 }
 
-struct t10_alua_lu_gp_member *core_alua_allocate_lu_gp_mem(
-	struct se_device *dev)
+static struct t10_alua_lu_gp_member *
+core_alua_allocate_lu_gp_mem(struct se_device *dev)
 {
 	struct t10_alua_lu_gp_member *lu_gp_mem;
 
@@ -1480,7 +1486,7 @@ void core_alua_free_tg_pt_gp_mem(struct se_port *port)
 	kmem_cache_free(t10_alua_tg_pt_gp_mem_cache, tg_pt_gp_mem);
 }
 
-struct t10_alua_tg_pt_gp *core_alua_get_tg_pt_gp_by_name(
+static struct t10_alua_tg_pt_gp *core_alua_get_tg_pt_gp_by_name(
 	struct se_subsystem_dev *su_dev,
 	const char *name)
 {
@@ -1504,7 +1510,7 @@ struct t10_alua_tg_pt_gp *core_alua_get_tg_pt_gp_by_name(
 	return NULL;
 }
 
-void core_alua_put_tg_pt_gp_from_name(
+static void core_alua_put_tg_pt_gp_from_name(
 	struct t10_alua_tg_pt_gp *tg_pt_gp)
 {
 	struct se_subsystem_dev *su_dev = tg_pt_gp->tg_pt_gp_su_dev;
@@ -1533,7 +1539,7 @@ void __core_alua_attach_tg_pt_gp_mem(
 /*
  * Called with struct t10_alua_tg_pt_gp_member->tg_pt_gp_mem_lock held
  */
-void __core_alua_drop_tg_pt_gp_mem(
+static void __core_alua_drop_tg_pt_gp_mem(
 	struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem,
 	struct t10_alua_tg_pt_gp *tg_pt_gp)
 {

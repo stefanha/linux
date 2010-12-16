@@ -90,27 +90,15 @@ static int iblock_attach_hba(struct se_hba *hba, u32 host_id)
 	return 0;
 }
 
-/*	iblock_detach_hba(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static int iblock_detach_hba(struct se_hba *hba)
+static void iblock_detach_hba(struct se_hba *hba)
 {
-	struct iblock_hba *ib_host;
-
-	if (!hba->hba_ptr) {
-		printk(KERN_ERR "hba->hba_ptr is NULL!\n");
-		return -1;
-	}
-	ib_host = hba->hba_ptr;
+	struct iblock_hba *ib_host = hba->hba_ptr;
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached iBlock HBA: %u from Generic"
 		" Target Core\n", hba->hba_id, ib_host->iblock_host_id);
 
 	kfree(ib_host);
 	hba->hba_ptr = NULL;
-
-	return 0;
 }
 
 static void *iblock_allocate_virtdevice(struct se_hba *hba, const char *name)
@@ -235,11 +223,6 @@ static void iblock_free_device(void *p)
 	close_bdev_exclusive(ib_dev->ibd_bd, FMODE_WRITE|FMODE_READ);
 	bioset_free(ib_dev->ibd_bio_set);
 	kfree(ib_dev);
-}
-
-static int iblock_transport_complete(struct se_task *task)
-{
-	return 0;
 }
 
 static inline struct iblock_req *IBLOCK_REQ(struct se_task *task)
@@ -379,12 +362,12 @@ static void iblock_emulate_sync_cache(struct se_task *task)
  * Tell TCM Core that we are capable of WriteCache emulation for
  * an underlying struct se_device.
  */
-int iblock_emulated_write_cache(struct se_device *dev)
+static int iblock_emulated_write_cache(struct se_device *dev)
 {
 	return 1;
 }
 
-int iblock_emulated_dpo(struct se_device *dev)
+static int iblock_emulated_dpo(struct se_device *dev)
 {
 	return 0;
 }
@@ -393,12 +376,12 @@ int iblock_emulated_dpo(struct se_device *dev)
  * Tell TCM Core that we will be emulating Forced Unit Access (FUA) for WRITEs
  * for TYPE_DISK.
  */
-int iblock_emulated_fua_write(struct se_device *dev)
+static int iblock_emulated_fua_write(struct se_device *dev)
 {
 	return 1;
 }
 
-int iblock_emulated_fua_read(struct se_device *dev)
+static int iblock_emulated_fua_read(struct se_device *dev)
 {
 	return 0;
 }
@@ -412,7 +395,7 @@ static int iblock_do_task(struct se_task *task)
 	struct bio *bio = req->ib_bio, *nbio = NULL;
 	int rw;
 
-	if (TASK_CMD(task)->data_direction == DMA_TO_DEVICE) {
+	if (task->task_data_direction == DMA_TO_DEVICE) {
 		/*
 		 * Force data to disk if we pretend to not have a volatile
 		 * write cache, or the initiator set the Force Unit Access bit.
@@ -542,20 +525,6 @@ static ssize_t iblock_check_configfs_dev_params(
 	}
 
 	return 0;
-}
-
-static void iblock_get_plugin_info(void *p, char *b, int *bl)
-{
-	*bl += sprintf(b + *bl, "TCM iBlock Plugin %s\n", IBLOCK_VERSION);
-}
-
-static void iblock_get_hba_info(struct se_hba *hba, char *b, int *bl)
-{
-	struct iblock_hba *ib_host = (struct iblock_hba *)hba->hba_ptr;
-
-	*bl += sprintf(b + *bl, "SE Host ID: %u  iBlock Host ID: %u\n",
-		hba->hba_id, ib_host->iblock_host_id);
-	*bl += sprintf(b + *bl, "        TCM iBlock HBA\n");
 }
 
 static ssize_t iblock_show_configfs_dev_params(
@@ -710,7 +679,7 @@ again:
 				" %u\n", task, bio->bi_vcnt);
 	}
 
-	return task->task_sg_num;
+	return 0;
 fail:
 	while (hbio) {
 		bio = hbio;
@@ -719,41 +688,6 @@ fail:
 		bio_put(bio);
 	}
 	return ret;
-}
-
-static int iblock_CDB_none(struct se_task *task, u32 size)
-{
-	return 0;
-}
-
-static int iblock_CDB_read_non_SG(struct se_task *task, u32 size)
-{
-	return 0;
-}
-
-static int iblock_CDB_read_SG(struct se_task *task, u32 size)
-{
-	return iblock_map_task_SG(task);
-}
-
-static int iblock_CDB_write_non_SG(struct se_task *task, u32 size)
-{
-	return 0;
-}
-
-static int iblock_CDB_write_SG(struct se_task *task, u32 size)
-{
-	return iblock_map_task_SG(task);
-}
-
-static int iblock_check_lba(unsigned long long lba, struct se_device *dev)
-{
-	return 0;
-}
-
-static int iblock_check_for_SG(struct se_task *task)
-{
-	return task->task_sg_num;
 }
 
 static unsigned char *iblock_get_cdb(struct se_task *task)
@@ -769,11 +703,6 @@ static u32 iblock_get_device_rev(struct se_device *dev)
 static u32 iblock_get_device_type(struct se_device *dev)
 {
 	return TYPE_DISK;
-}
-
-static u32 iblock_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
 }
 
 static sector_t iblock_get_blocks(struct se_device *dev)
@@ -836,13 +765,8 @@ static void iblock_bio_done(struct bio *bio, int err)
 static struct se_subsystem_api iblock_template = {
 	.name			= "iblock",
 	.owner			= THIS_MODULE,
-	.type			= IBLOCK,
 	.transport_type		= TRANSPORT_PLUGIN_VHBA_PDEV,
-	.cdb_none		= iblock_CDB_none,
-	.cdb_read_non_SG	= iblock_CDB_read_non_SG,
-	.cdb_read_SG		= iblock_CDB_read_SG,
-	.cdb_write_non_SG	= iblock_CDB_write_non_SG,
-	.cdb_write_SG		= iblock_CDB_write_SG,
+	.map_task_SG		= iblock_map_task_SG,
 	.attach_hba		= iblock_attach_hba,
 	.detach_hba		= iblock_detach_hba,
 	.allocate_virtdevice	= iblock_allocate_virtdevice,
@@ -852,7 +776,6 @@ static struct se_subsystem_api iblock_template = {
 	.fua_write_emulated	= iblock_emulated_fua_write,
 	.fua_read_emulated	= iblock_emulated_fua_read,
 	.write_cache_emulated	= iblock_emulated_write_cache,
-	.transport_complete	= iblock_transport_complete,
 	.alloc_task		= iblock_alloc_task,
 	.do_task		= iblock_do_task,
 	.do_discard		= iblock_do_discard,
@@ -861,14 +784,9 @@ static struct se_subsystem_api iblock_template = {
 	.check_configfs_dev_params = iblock_check_configfs_dev_params,
 	.set_configfs_dev_params = iblock_set_configfs_dev_params,
 	.show_configfs_dev_params = iblock_show_configfs_dev_params,
-	.get_plugin_info	= iblock_get_plugin_info,
-	.get_hba_info		= iblock_get_hba_info,
-	.check_lba		= iblock_check_lba,
-	.check_for_SG		= iblock_check_for_SG,
 	.get_cdb		= iblock_get_cdb,
 	.get_device_rev		= iblock_get_device_rev,
 	.get_device_type	= iblock_get_device_type,
-	.get_dma_length		= iblock_get_dma_length,
 	.get_blocks		= iblock_get_blocks,
 };
 

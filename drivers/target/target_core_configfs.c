@@ -52,8 +52,8 @@
 #include "target_core_pr.h"
 #include "target_core_rd.h"
 
-struct list_head g_tf_list;
-struct mutex g_tf_lock;
+static struct list_head g_tf_list;
+static struct mutex g_tf_lock;
 
 struct target_core_configfs_attribute {
 	struct configfs_attribute attr;
@@ -61,18 +61,10 @@ struct target_core_configfs_attribute {
 	ssize_t (*store)(void *, const char *, size_t);
 };
 
-struct se_hba *target_core_get_hba_from_item(
-	struct config_item *item)
+static inline struct se_hba *
+item_to_hba(struct config_item *item)
 {
-	struct se_hba *hba = container_of(to_config_group(item),
-				struct se_hba, hba_group);
-	if (!(hba))
-		return NULL;
-
-	if (core_get_hba(hba) < 0)
-		return NULL;
-
-	return hba;
+	return container_of(to_config_group(item), struct se_hba, hba_group);
 }
 
 /*
@@ -366,25 +358,6 @@ void target_fabric_configfs_free(
 	kfree(tf);
 }
 EXPORT_SYMBOL(target_fabric_configfs_free);
-
-/*
- * Note that config_group_find_item() calls config_item_get() and grabs the
- * reference to the returned struct config_item *
- * It will be released with config_put_item() in
- * target_fabric_configfs_deregister()
- */
-struct config_item *target_fabric_configfs_find_by_name(
-	struct configfs_subsystem *target_su,
-	const char *name)
-{
-	struct config_item *fabric;
-
-	mutex_lock(&target_su->su_mutex);
-	fabric = config_group_find_item(&target_su->su_group, name);
-	mutex_unlock(&target_su->su_mutex);
-
-	return fabric;
-}
 
 /*
  * Perform a sanity check of the passed tf->tf_ops before completing
@@ -922,8 +895,6 @@ static ssize_t target_core_dev_wwn_store_attr_vpd_unit_serial(
 
 	printk(KERN_INFO "Target_Core_ConfigFS: Set emulated VPD Unit Serial:"
 			" %s\n", su_dev->t10_wwn.unit_serial);
-	if (dev)
-		transport_rescan_evpd_device_ident(dev);
 
 	return count;
 }
@@ -1661,162 +1632,6 @@ static struct config_item_type target_core_dev_pr_cit = {
 };
 
 /*  End functions for struct config_item_type target_core_dev_pr_cit */
-
-/* Start functions for struct config_item type target_core_dev_snap_cit */
-
-CONFIGFS_EATTR_STRUCT(target_core_dev_snap, se_subsystem_dev);
-#define SE_DEV_SNAP_ATTR(_name, _mode)					\
-static struct target_core_dev_snap_attribute				\
-			target_core_dev_snap_attr_##_name =		\
-	__CONFIGFS_EATTR(_name, _mode,					\
-	target_core_dev_snap_show_attr_##_name,				\
-	target_core_dev_snap_store_attr_##_name);
-
-#define DEF_SNAP_ATTRIB_STR_SHOW(_name)					\
-static ssize_t target_core_dev_snap_show_attr_##_name(			\
-	struct se_subsystem_dev *se_dev,				\
-	char *page)							\
-{									\
-	return snprintf(page, PAGE_SIZE, "%s\n", SE_DEV_SNAP(se_dev)->_name); \
-}
-
-#define DEF_SNAP_ATTRIB_STR_STORE(_name, _max)				\
-static ssize_t target_core_dev_snap_store_attr_##_name(			\
-	struct se_subsystem_dev *se_dev,				\
-	const char *page,						\
-	size_t count)							\
-{									\
-	if (strlen(page) > _max) {					\
-		printk(KERN_ERR "String length for attrib: %s exceeds max:" \
-			" %d\n", __stringify(_name), _max);		\
-		return -EINVAL;						\
-	}								\
-	snprintf(SE_DEV_SNAP(se_dev)->_name, PAGE_SIZE, "%s", page);	\
-	return count;							\
-}
-
-#define DEF_SNAP_ATTRIB_STR(_name, _max)				\
-DEF_SNAP_ATTRIB_STR_SHOW(_name)						\
-DEF_SNAP_ATTRIB_STR_STORE(_name, _max)
-
-#define DEF_SNAP_ATTRIB_INT_SHOW(_name)					\
-static ssize_t target_core_dev_snap_show_attr_##_name(			\
-	struct se_subsystem_dev *se_dev,				\
-	char *page)							\
-{									\
-	return snprintf(page, PAGE_SIZE, "%d\n", SE_DEV_SNAP(se_dev)->_name); \
-}
-
-#define DEF_SNAP_ATTRIB_INT_STORE(_name, _max, _min)			\
-static ssize_t target_core_dev_snap_store_attr_##_name(			\
-	struct se_subsystem_dev *se_dev,				\
-	const char *page,						\
-	size_t count)							\
-{									\
-	int ret;							\
-	unsigned long val;						\
-									\
-	ret = strict_strtoul(page, 0, &val);				\
-	if (ret < 0) {							\
-		printk(KERN_ERR "strict_strtoul() failed for %s with"	\
-			" ret: %d\n", __stringify(_name), ret);		\
-		return -EINVAL;						\
-	}								\
-	if ((_max != 0) && (val > _max)) {				\
-		printk(KERN_ERR "snap attribute: %s exceeds max: %d\n",	\
-				__stringify(_name), _max);		\
-		return -EINVAL;						\
-	}								\
-	if (val < _min) {						\
-		printk(KERN_ERR "snap attribute: %s less than min: %d\n", \
-				__stringify(_name), _min);		\
-		return -EINVAL;						\
-	}								\
-	SE_DEV_SNAP(se_dev)->_name = (int)val;				\
-	return count;							\
-}
-
-#define DEF_SNAP_ATTRIB_INT(_name, _max, _min)				\
-DEF_SNAP_ATTRIB_INT_SHOW(_name)						\
-DEF_SNAP_ATTRIB_INT_STORE(_name, _max, _min)
-
-DEF_SNAP_ATTRIB_STR(contact, SNAP_CONTACT_LEN);
-SE_DEV_SNAP_ATTR(contact, S_IRUGO | S_IWUSR);
-
-DEF_SNAP_ATTRIB_STR(lv_group, SNAP_GROUP_LEN);
-SE_DEV_SNAP_ATTR(lv_group, S_IRUGO | S_IWUSR);
-
-DEF_SNAP_ATTRIB_STR(lvc_size, SNAP_LVC_LEN);
-SE_DEV_SNAP_ATTR(lvc_size, S_IRUGO | S_IWUSR);
-
-DEF_SNAP_ATTRIB_INT(pid, 0, 0);
-SE_DEV_SNAP_ATTR(pid, S_IRUGO | S_IWUSR);
-
-DEF_SNAP_ATTRIB_INT(enabled, 1, 0);
-SE_DEV_SNAP_ATTR(enabled, S_IRUGO | S_IWUSR);
-
-DEF_SNAP_ATTRIB_INT(permissions, 1, 0);
-SE_DEV_SNAP_ATTR(permissions, S_IRUGO | S_IWUSR);
-
-/* Max number of snapshots to rotate */
-DEF_SNAP_ATTRIB_INT(max_snapshots, 256, 1);
-SE_DEV_SNAP_ATTR(max_snapshots, S_IRUGO | S_IWUSR);
-
-/* Max minutes for warning emails about usage */
-DEF_SNAP_ATTRIB_INT(max_warn, 60, 0);
-SE_DEV_SNAP_ATTR(max_warn, S_IRUGO | S_IWUSR);
-
-/* 15 Minute max, 5 second min */
-DEF_SNAP_ATTRIB_INT(check_interval, 900, 5);
-SE_DEV_SNAP_ATTR(check_interval, S_IRUGO | S_IWUSR);
-
-/* One 7-day week max, 1 minute min */
-DEF_SNAP_ATTRIB_INT(create_interval, 604800, 60);
-SE_DEV_SNAP_ATTR(create_interval, S_IRUGO | S_IWUSR);
-
-/* Snapshot usage */
-DEF_SNAP_ATTRIB_INT(usage, 100, 0);
-SE_DEV_SNAP_ATTR(usage, S_IRUGO | S_IWUSR);
-
-/* Snapshot usage before sending warning */
-DEF_SNAP_ATTRIB_INT(usage_warn, 100, 0);
-SE_DEV_SNAP_ATTR(usage_warn, S_IRUGO | S_IWUSR);
-
-/* Volume group usage before sending warning */
-DEF_SNAP_ATTRIB_INT(vgs_usage_warn, 100, 0);
-SE_DEV_SNAP_ATTR(vgs_usage_warn, S_IRUGO | S_IWUSR);
-
-CONFIGFS_EATTR_OPS(target_core_dev_snap, se_subsystem_dev, se_dev_snap_group);
-
-static struct configfs_attribute *target_core_dev_snap_attrs[] = {
-	&target_core_dev_snap_attr_contact.attr,
-	&target_core_dev_snap_attr_lv_group.attr,
-	&target_core_dev_snap_attr_lvc_size.attr,
-	&target_core_dev_snap_attr_pid.attr,
-	&target_core_dev_snap_attr_enabled.attr,
-	&target_core_dev_snap_attr_permissions.attr,
-	&target_core_dev_snap_attr_max_snapshots.attr,
-	&target_core_dev_snap_attr_max_warn.attr,
-	&target_core_dev_snap_attr_check_interval.attr,
-	&target_core_dev_snap_attr_create_interval.attr,
-	&target_core_dev_snap_attr_usage.attr,
-	&target_core_dev_snap_attr_usage_warn.attr,
-	&target_core_dev_snap_attr_vgs_usage_warn.attr,
-	NULL,
-};
-
-static struct configfs_item_operations target_core_dev_snap_ops = {
-	.show_attribute		= target_core_dev_snap_attr_show,
-	.store_attribute	= target_core_dev_snap_attr_store,
-};
-
-static struct config_item_type target_core_dev_snap_cit = {
-	.ct_item_ops		= &target_core_dev_snap_ops,
-	.ct_attrs		= target_core_dev_snap_attrs,
-	.ct_owner		= THIS_MODULE,
-};
-
-/* End functions for struct config_item type target_core_dev_snap_cit */
 
 /*  Start functions for struct config_item_type target_core_dev_cit */
 
@@ -2834,33 +2649,24 @@ static struct config_group *target_core_make_subdev(
 {
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
 	struct se_subsystem_dev *se_dev;
-	struct se_hba *hba;
 	struct se_subsystem_api *t;
-	struct config_item *hba_ci;
+	struct config_item *hba_ci = &group->cg_item;
+	struct se_hba *hba = item_to_hba(hba_ci);
 	struct config_group *dev_cg = NULL, *tg_pt_gp_cg = NULL;
 
-	hba_ci = &group->cg_item;
-	if (!(hba_ci)) {
-		printk(KERN_ERR "Unable to locate config_item hba_ci\n");
+	if (mutex_lock_interruptible(&hba->hba_access_mutex))
 		return NULL;
-	}
 
-	hba = target_core_get_hba_from_item(hba_ci);
-	if (!(hba)) {
-		printk(KERN_ERR "Unable to locate struct se_hba from struct config_item\n");
-		return NULL;
-	}
 	/*
 	 * Locate the struct se_subsystem_api from parent's struct se_hba.
 	 */
 	t = hba->transport;
 
 	se_dev = kzalloc(sizeof(struct se_subsystem_dev), GFP_KERNEL);
-	if (!(se_dev)) {
+	if (!se_dev) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" struct se_subsystem_dev\n");
-		core_put_hba(hba);
-		return NULL;
+		goto unlock;
 	}
 	INIT_LIST_HEAD(&se_dev->g_se_dev_list);
 	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_vpd_list);
@@ -2908,18 +2714,15 @@ static struct config_group *target_core_make_subdev(
 			&target_core_dev_attrib_cit);
 	config_group_init_type_name(&se_dev->se_dev_pr_group, "pr",
 			&target_core_dev_pr_cit);
-	config_group_init_type_name(&se_dev->se_dev_snap_group, "snap",
-			&target_core_dev_snap_cit);
 	config_group_init_type_name(&se_dev->t10_wwn.t10_wwn_group, "wwn",
 			&target_core_dev_wwn_cit);
 	config_group_init_type_name(&se_dev->t10_alua.alua_tg_pt_gps_group,
 			"alua", &target_core_alua_tg_pt_gps_cit);
 	dev_cg->default_groups[0] = &se_dev->se_dev_attrib.da_group;
 	dev_cg->default_groups[1] = &se_dev->se_dev_pr_group;
-	dev_cg->default_groups[2] = &se_dev->se_dev_snap_group;
-	dev_cg->default_groups[3] = &se_dev->t10_wwn.t10_wwn_group;
-	dev_cg->default_groups[4] = &se_dev->t10_alua.alua_tg_pt_gps_group;
-	dev_cg->default_groups[5] = NULL;
+	dev_cg->default_groups[2] = &se_dev->t10_wwn.t10_wwn_group;
+	dev_cg->default_groups[3] = &se_dev->t10_alua.alua_tg_pt_gps_group;
+	dev_cg->default_groups[4] = NULL;
 	/*
 	 * Add core/$HBA/$DEV/alua/tg_pt_gps/default_tg_pt_gp
 	 */
@@ -2945,7 +2748,7 @@ static struct config_group *target_core_make_subdev(
 	printk(KERN_INFO "Target_Core_ConfigFS: Allocated struct se_subsystem_dev:"
 		" %p se_dev_su_ptr: %p\n", se_dev, se_dev->se_dev_su_ptr);
 
-	core_put_hba(hba);
+	mutex_unlock(&hba->hba_access_mutex);
 	return &se_dev->se_dev_group;
 out:
 	if (T10_ALUA(se_dev)->default_tg_pt_gp) {
@@ -2959,7 +2762,8 @@ out:
 	if (se_dev->se_dev_su_ptr)
 		t->free_device(se_dev->se_dev_su_ptr);
 	kfree(se_dev);
-	core_put_hba(hba);
+unlock:
+	mutex_unlock(&hba->hba_access_mutex);
 	return NULL;
 }
 
@@ -2975,9 +2779,9 @@ static void target_core_drop_subdev(
 	struct config_group *dev_cg, *tg_pt_gp_cg;
 	int i, ret;
 
-	hba = target_core_get_hba_from_item(
-			&se_dev->se_dev_hba->hba_group.cg_item);
-	if (!(hba))
+	hba = item_to_hba(&se_dev->se_dev_hba->hba_group.cg_item);
+
+	if (mutex_lock_interruptible(&hba->hba_access_mutex))
 		goto out;
 
 	t = hba->transport;
@@ -3031,7 +2835,7 @@ static void target_core_drop_subdev(
 		"_dev_t: %p\n", se_dev);
 
 hba_out:
-	core_put_hba(hba);
+	mutex_unlock(&hba->hba_access_mutex);
 out:
 	kfree(se_dev);
 }
@@ -3185,33 +2989,24 @@ static struct config_group *target_core_call_addhbatotarget(
 	if (transport_subsystem_check_init() < 0)
 		return ERR_PTR(-EINVAL);
 
-	hba = core_alloc_hba();
-	if (!(hba))
-		return ERR_PTR(-EINVAL);
-
-	ret = se_core_add_hba(hba, se_plugin_str, (u32)plugin_dep_id);
-	if (ret < 0)
-		goto out;
+	hba = core_alloc_hba(se_plugin_str, plugin_dep_id, 0);
+	if (IS_ERR(hba))
+		return ERR_CAST(hba);
 
 	config_group_init_type_name(&hba->hba_group, name,
 			&target_core_hba_cit);
 
 	return &hba->hba_group;
-out:
-	kmem_cache_free(se_hba_cache, hba);
-	return ERR_PTR(ret);
 }
-
 
 static void target_core_call_delhbafromtarget(
 	struct config_group *group,
 	struct config_item *item)
 {
-	struct se_hba *hba = container_of(to_config_group(item), struct se_hba,
-				hba_group);
+	struct se_hba *hba = item_to_hba(item);
 
 	config_item_put(item);
-	se_core_del_hba(hba);
+	core_delete_hba(hba);
 }
 
 static struct configfs_group_operations target_core_group_ops = {
@@ -3228,7 +3023,7 @@ static struct config_item_type target_core_cit = {
 
 /* Stop functions for struct config_item_type target_core_hba_cit */
 
-int target_core_init_configfs(void)
+static int target_core_init_configfs(void)
 {
 	struct config_group *target_cg, *hba_cg = NULL, *alua_cg = NULL;
 	struct config_group *lu_gp_cg = NULL;
@@ -3372,7 +3167,7 @@ out_global:
 	return -1;
 }
 
-void target_core_exit_configfs(void)
+static void target_core_exit_configfs(void)
 {
 	struct configfs_subsystem *subsys;
 	struct config_group *hba_cg, *alua_cg, *lu_gp_cg;

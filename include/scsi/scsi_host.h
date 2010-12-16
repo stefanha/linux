@@ -127,8 +127,7 @@ struct scsi_host_template {
 	 *
 	 * STATUS: REQUIRED
 	 */
-	int (* queuecommand)(struct scsi_cmnd *,
-			     void (*done)(struct scsi_cmnd *));
+	int (* queuecommand)(struct Scsi_Host *, struct scsi_cmnd *);
 
 	/*
 	 * The transfer functions are used to queue a scsi command to
@@ -511,14 +510,13 @@ struct scsi_host_template {
  *
  */
 #define DEF_SCSI_QCMD(func_name) \
-	int func_name(struct scsi_cmnd *cmd,				\
-		      void (*done)(struct scsi_cmnd *))			\
+	int func_name(struct Scsi_Host *shost, struct scsi_cmnd *cmd)	\
 	{								\
 		unsigned long irq_flags;				\
 		int rc;							\
-		struct Scsi_Host *shost = cmd->device->host;		\
 		spin_lock_irqsave(shost->host_lock, irq_flags);		\
-		rc = func_name##_lck (cmd, done);			\
+		scsi_cmd_get_serial(shost, cmd);			\
+		rc = func_name##_lck (cmd, cmd->scsi_done);			\
 		spin_unlock_irqrestore(shost->host_lock, irq_flags);	\
 		return rc;						\
 	}
@@ -624,9 +622,10 @@ struct Scsi_Host {
 	short unsigned int max_sectors;
 	unsigned long dma_boundary;
 	/* 
-	 * Used to assign serial numbers to the cmds in scsi_cmd_get_serial()
+	 * Used to assign serial numbers to the cmds.
+	 * Protected by the host lock.
 	 */
-	atomic_t cmd_serial_number;
+	unsigned long cmd_serial_number;
 	
 	unsigned active_mode:2;
 	unsigned unchecked_isa_dma:1;
@@ -771,6 +770,7 @@ extern struct Scsi_Host *scsi_host_get(struct Scsi_Host *);
 extern void scsi_host_put(struct Scsi_Host *t);
 extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 extern const char *scsi_host_state_name(enum scsi_host_state);
+extern void scsi_cmd_get_serial(struct Scsi_Host *, struct scsi_cmnd *);
 
 extern u64 scsi_calculate_bounce_limit(struct Scsi_Host *);
 

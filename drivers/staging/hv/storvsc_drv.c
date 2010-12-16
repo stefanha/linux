@@ -72,8 +72,7 @@ struct storvsc_driver_context {
 
 /* Static decl */
 static int storvsc_probe(struct device *dev);
-static int storvsc_queuecommand(struct scsi_cmnd *scmnd,
-				void (*done)(struct scsi_cmnd *));
+static int storvsc_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd);
 static int storvsc_device_alloc(struct scsi_device *);
 static int storvsc_device_configure(struct scsi_device *);
 static int storvsc_host_reset_handler(struct scsi_cmnd *scmnd);
