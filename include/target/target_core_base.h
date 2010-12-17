@@ -9,7 +9,7 @@
 #include <net/tcp.h>
 #include "target_core_mib.h"
 
-#define TARGET_CORE_MOD_VERSION		"v4.0.0-rc5"
+#define TARGET_CORE_MOD_VERSION		"v4.0.0-rc6"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 
 /* Used by transport_generic_allocate_iovecs() */
@@ -531,8 +531,6 @@ struct se_cmd {
 	struct se_transport_task t_task_backstore;
 	struct target_core_fabric_ops *se_tfo;
 	int (*transport_emulate_cdb)(struct se_cmd *);
-	u32 (*transport_get_lba)(unsigned char *);
-	unsigned long long (*transport_get_long_lba)(unsigned char *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
 	void (*transport_complete_callback)(struct se_cmd *);

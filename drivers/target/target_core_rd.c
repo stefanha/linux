@@ -1017,15 +1017,6 @@ static u32 rd_get_device_type(struct se_device *dev)
 	return TYPE_DISK;
 }
 
-/*	rd_get_dma_length(): (Part of se_subsystem_api_t template)
- *
- *
- */
-static u32 rd_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
-}
-
 static sector_t rd_get_blocks(struct se_device *dev)
 {
 	struct rd_dev *rd_dev = dev->dev_ptr;
@@ -1052,7 +1043,6 @@ static struct se_subsystem_api rd_dr_template = {
 	.get_cdb		= rd_get_cdb,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
-	.get_dma_length		= rd_get_dma_length,
 	.get_blocks		= rd_get_blocks,
 	.do_se_mem_map		= rd_DIRECT_do_se_mem_map,
 };
@@ -1074,7 +1064,6 @@ static struct se_subsystem_api rd_mcp_template = {
 	.get_cdb		= rd_get_cdb,
 	.get_device_rev		= rd_get_device_rev,
 	.get_device_type	= rd_get_device_type,
-	.get_dma_length		= rd_get_dma_length,
 	.get_blocks		= rd_get_blocks,
 };
 

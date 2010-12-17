@@ -63,20 +63,6 @@
 #define DF_SPC2_RESERVATIONS			0x00000002
 #define DF_SPC2_RESERVATIONS_WITH_ISID		0x00000004
 
-/*
- * Used as return values from transport_generic_cmd_sequencer()
- */
-#define TGCS_DATA_SG_IO_CDB			0
-#define TGCS_CONTROL_SG_IO_CDB			1
-#define TGCS_CONTROL_NONSG_IO_CDB		2
-#define TGCS_NON_DATA_CDB			3
-#define TGCS_UNSUPPORTED_CDB			4
-#define TGCS_RESERVATION_CONFLICT		5
-#define TGCS_INVALID_CDB_FIELD			6
-#define TGCS_ILLEGAL_REQUEST			7
-#define TGCS_CHECK_CONDITION_UNIT_ATTENTION	8
-#define TGCS_CHECK_CONDITION_NOT_READY		9
-
 /* struct se_dev_attrib sanity values */
 /* 10 Minutes */
 #define DA_TASK_TIMEOUT_MAX			600
@@ -341,10 +327,6 @@ struct se_subsystem_api {
 	 * get_device_type():
 	 */
 	u32 (*get_device_type)(struct se_device *);
-	/*
-	 * get_dma_length():
-	 */
-	u32 (*get_dma_length)(u32, struct se_device *);
 	/*
 	 * Get the sector_t from a subsystem backstore..
 	 */

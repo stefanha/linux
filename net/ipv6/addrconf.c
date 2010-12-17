@@ -2758,13 +2758,13 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 			ifa->state = INET6_IFADDR_STATE_DEAD;
 			spin_unlock_bh(&ifa->state_lock);
 
-			if (state == INET6_IFADDR_STATE_DEAD) {
-				in6_ifa_put(ifa);
-			} else {
+			if (state != INET6_IFADDR_STATE_DEAD) {
 				__ipv6_ifa_notify(RTM_DELADDR, ifa);
 				atomic_notifier_call_chain(&inet6addr_chain,
 							   NETDEV_DOWN, ifa);
 			}
+
+			in6_ifa_put(ifa);
 			write_lock_bh(&idev->lock);
 		}
 	}
@@ -4021,11 +4021,11 @@ void inet6_ifinfo_notify(int event, struct inet6_dev *idev)
 		kfree_skb(skb);
 		goto errout;
 	}
-	rtnl_notify(skb, net, 0, RTNLGRP_IPV6_IFADDR, NULL, GFP_ATOMIC);
+	rtnl_notify(skb, net, 0, RTNLGRP_IPV6_IFINFO, NULL, GFP_ATOMIC);
 	return;
 errout:
 	if (err < 0)
-		rtnl_set_sk_err(net, RTNLGRP_IPV6_IFADDR, err);
+		rtnl_set_sk_err(net, RTNLGRP_IPV6_IFINFO, err);
 }
 
 static inline size_t inet6_prefix_nlmsg_size(void)

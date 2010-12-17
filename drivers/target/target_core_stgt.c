@@ -514,15 +514,6 @@ static u32 stgt_get_device_type(struct se_device *dev)
 	return sd->type;
 }
 
-/*	stgt_get_dma_length():
- *
- *
- */
-static u32 stgt_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
-}
-
 /*	stgt_handle_SAM_STATUS_failures():
  *
  *
@@ -609,7 +600,6 @@ static struct se_subsystem_api stgt_template = {
 	.get_sense_buffer	= stgt_get_sense_buffer,
 	.get_device_rev		= stgt_get_device_rev,
 	.get_device_type	= stgt_get_device_type,
-	.get_dma_length		= stgt_get_dma_length,
 };
 
 static int __init stgt_module_init(void)

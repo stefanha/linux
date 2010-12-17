@@ -1361,15 +1361,6 @@ static u32 pscsi_get_device_type(struct se_device *dev)
 	return sd->type;
 }
 
-/*	pscsi_get_dma_length():
- *
- *
- */
-static u32 pscsi_get_dma_length(u32 task_size, struct se_device *dev)
-{
-	return PAGE_SIZE;
-}
-
 static sector_t pscsi_get_blocks(struct se_device *dev)
 {
 	struct pscsi_dev_virt *pdv = dev->dev_ptr;
@@ -1459,7 +1450,6 @@ static struct se_subsystem_api pscsi_template = {
 	.get_sense_buffer	= pscsi_get_sense_buffer,
 	.get_device_rev		= pscsi_get_device_rev,
 	.get_device_type	= pscsi_get_device_type,
-	.get_dma_length		= pscsi_get_dma_length,
 	.get_blocks		= pscsi_get_blocks,
 };
 
