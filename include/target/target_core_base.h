@@ -4,6 +4,7 @@
 #include <linux/in.h>
 #include <linux/configfs.h>
 #include <linux/dma-mapping.h>
+#include <linux/blkdev.h>
 #include <scsi/scsi_cmnd.h>
 #include <net/sock.h>
 #include <net/tcp.h>
