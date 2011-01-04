@@ -117,7 +117,6 @@ static struct config_group *target_core_register_fabric(
 	struct config_group *group,
 	const char *name)
 {
-	struct config_group *fabric_cg;
 	struct target_fabric_configfs *tf;
 	int ret;
 
@@ -131,9 +130,6 @@ static struct config_group *target_core_register_fabric(
 	if (transport_subsystem_check_init() < 0)
 		return ERR_PTR(-EINVAL);
 
-	fabric_cg = kzalloc(sizeof(struct config_group), GFP_KERNEL);
-	if (!(fabric_cg))
-		return ERR_PTR(-ENOMEM);
 	/*
 	 * Below are some hardcoded request_module() calls to automatically
 	 * local fabric modules when the following is called:
@@ -155,7 +151,6 @@ static struct config_group *target_core_register_fabric(
 		if (ret < 0) {
 			printk(KERN_ERR "request_module() failed for"
 				" iscsi_target_mod.ko: %d\n", ret);
-			kfree(fabric_cg);
 			return ERR_PTR(-EINVAL);
 		}
 	} else if (!(strncmp(name, "loopback", 8))) {
@@ -169,7 +164,6 @@ static struct config_group *target_core_register_fabric(
 		if (ret < 0) {
 			printk(KERN_ERR "request_module() failed for"
 				" tcm_loop.ko: %d\n", ret);
-			kfree(fabric_cg);
 			return ERR_PTR(-EINVAL);
 		}
 	}
@@ -178,7 +172,6 @@ static struct config_group *target_core_register_fabric(
 	if (!(tf)) {
 		printk(KERN_ERR "target_core_get_fabric() failed for %s\n",
 			name);
-		kfree(fabric_cg);
 		return ERR_PTR(-EINVAL);
 	}
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> Located fabric:"
