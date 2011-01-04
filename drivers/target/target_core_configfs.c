@@ -660,6 +660,7 @@ static ssize_t target_core_dev_store_attr_##_name(			\
 	}								\
 	ret = strict_strtoul(page, 0, &val);				\
 	if (ret < 0) {							\
+		spin_unlock(&se_dev->se_dev_lock);                      \
 		printk(KERN_ERR "strict_strtoul() failed with"		\
 			" ret: %d\n", ret);				\
 		return -EINVAL;						\
