@@ -244,6 +244,12 @@ int ixgbe_fcoe_ddp_get(struct net_device *netdev, u16 xid,
 	fcbuff = (IXGBE_FCBUFF_4KB << IXGBE_FCBUFF_BUFFSIZE_SHIFT);
 	fcbuff |= ((j & 0xff) << IXGBE_FCBUFF_BUFFCNT_SHIFT);
 	fcbuff |= (firstoff << IXGBE_FCBUFF_OFFSET_SHIFT);
+
+	/*
+	 * Setup the WRCONTX bit to 1, to allow DDP (Large Rx offload)
+	 * for target.
+	 */
+	fcbuff |= (IXGBE_FCBUFF_WRCONTX);
 	fcbuff |= (IXGBE_FCBUFF_VALID);
 
 	fcdmarw = xid;
@@ -355,6 +361,25 @@ int ixgbe_fcoe_ddp(struct ixgbe_adapter *adapter,
 	}
 
 ddp_out:
+	if (fh->fh_r_ctl == FC_RCTL_DD_SOL_DATA) {
+		/*
+		 * Extending the SKB to achieve minimum length check (46)
+		 * otherwise packet gets dropped. Likewise, setting the trailer
+		 * (fcoe_eof) to be EOF_T otherwise packets gets dropped and
+		 * write reponse (good) doesn;t get sent out since packet
+		 * doesn;t reach to TCM/LIO target codepath.
+		 * NOTE: Setting CRC to known value, SW stack doesn't look at
+		 * CRC of this packets.
+		 */
+		struct fcoe_crc_eof *crc;
+
+		skb_put(skb, sizeof(*crc));
+		crc = (struct fcoe_crc *)&skb->data[sizeof(struct fcoe_hdr) +
+					  sizeof(struct fc_frame_header)];
+		crc->fcoe_eof = FC_EOF_T;
+		/* This is just for debug purpose, faking the CRC */
+		crc->fcoe_crc32 = 0xDEADC0DE;
+	}
 	return rc;
 }
 
@@ -555,6 +580,7 @@ void ixgbe_configure_fcoe(struct ixgbe_adapter *adapter)
 
 	IXGBE_WRITE_REG(hw, IXGBE_FCRXCTRL,
 			IXGBE_FCRXCTRL_FCOELLI |
+			IXGBE_FCRXCTRL_LASTSEQH |
 			IXGBE_FCRXCTRL_FCCRCBO |
 			(FC_FCOE_VER << IXGBE_FCRXCTRL_FCOEVER_SHIFT));
 #ifdef CONFIG_IXGBE_DCB

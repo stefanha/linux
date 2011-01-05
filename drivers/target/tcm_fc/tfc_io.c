@@ -78,6 +78,7 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 	size_t frame_len = 0;
 	size_t mem_len;
 	size_t tlen;
+	size_t off_in_page;
 	struct page *page;
 	int use_sg;
 	int error;
@@ -111,7 +112,6 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 
 	/* no scatter/gather in skb for odd word length due to fc_seq_send() */
 	use_sg = !(remaining % 4);
-	use_sg = 0;	/* XXX to test the non-sg path */
 
 	while (remaining) {
 		if (!mem_len) {
@@ -123,7 +123,13 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			page = mem->se_page;
 		}
 		if (!frame_len) {
-			frame_len = cmd->sess->max_frame;
+			/*
+			 * If lport's has capability of Large Send Offload LSO)
+			 * , then allow 'frame_len' to be as big as 'lso_max'
+			 * if indicated transfer length is >= lport->lso_max
+			 */
+			frame_len = (lport->seq_offload) ? lport->lso_max :
+							  cmd->sess->max_frame;
 			frame_len = min(frame_len, remaining);
 			fp = fc_frame_alloc(lport, use_sg ? 0 : frame_len);
 			if (!fp)
@@ -131,16 +137,34 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			to = fc_frame_payload_get(fp, 0);
 			fh_off = frame_off;
 			frame_off += frame_len;
+			/*
+			 * Setup the frame's max payload which is used by base
+			 * driver to indicate HW about max frame size, so that
+			 * HW can do fragmentation appropriately based on
+			 * "gso_max_size" of underline netdev.
+			 */
+			fr_max_payload(fp) = cmd->sess->max_frame;
 		}
 		tlen = min(mem_len, frame_len);
 
 		if (use_sg) {
-			if (!mem)
-				page = virt_to_page(task->t_task_buf + mem_off);
+			if (!mem) {
+				BUG_ON(!task->t_task_buf);
+				page_addr = task->t_task_buf + mem_off;
+				/*
+				 * In this case, offset is 'offset_in_page' of
+				 * (t_task_buf + mem_off) instead of 'mem_off'.
+				 */
+				off_in_page = offset_in_page(page_addr);
+				page = virt_to_page(page_addr);
+				tlen = min(tlen, PAGE_SIZE - off_in_page);
+			} else
+				off_in_page = mem_off;
+			BUG_ON(!page);
 			get_page(page);
 			skb_fill_page_desc(fp_skb(fp),
 					   skb_shinfo(fp_skb(fp))->nr_frags,
-					   page, mem_off, tlen);
+					   page, off_in_page, tlen);
 			fr_len(fp) += tlen;
 			fp_skb(fp)->data_len += tlen;
 			fp_skb(fp)->truesize +=
@@ -167,7 +191,8 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 		frame_len -= tlen;
 		remaining -= tlen;
 
-		if (frame_len)
+		if (frame_len &&
+		    (skb_shinfo(fp_skb(fp))->nr_frags < FC_FRAME_SG_LEN))
 			continue;
 		if (!remaining)
 			f_ctl |= FC_FC_END_SEQ;
@@ -175,8 +200,13 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			       FC_TYPE_FCP, f_ctl, fh_off);
 		error = lport->tt.seq_send(lport, cmd->seq, fp);
 		if (error) {
-			WARN_ON(1);
 			/* XXX For now, initiator will retry */
+			if (printk_ratelimit())
+				printk(KERN_ERR "%s: Failed to send frame %p, "
+						"xid <0x%x>, remaining <0x%x>, "
+						"lso_max <0x%x>\n",
+						__func__, fp, ep->xid,
+						remaining, lport->lso_max);
 		}
 	}
 	return ft_queue_status(se_cmd);
@@ -188,6 +218,9 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 {
 	struct se_cmd *se_cmd = &cmd->se_cmd;
+	struct fc_seq *seq = cmd->seq;
+	struct fc_exch *ep;
+	struct fc_lport *lport;
 	struct se_transport_task *task;
 	struct fc_frame_header *fh;
 	struct se_mem *mem;
@@ -200,6 +233,8 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	void *page_addr;
 	void *from;
 	void *to;
+	u32 f_ctl;
+	void *buf;
 
 	task = T_TASK(se_cmd);
 	BUG_ON(!task);
@@ -207,6 +242,64 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	fh = fc_frame_header_get(fp);
 	if (!(ntoh24(fh->fh_f_ctl) & FC_FC_REL_OFF))
 		goto drop;
+
+	/*
+	 * Doesn't expect even single byte of payload. Payload
+	 * is expected to be copied directly to user buffers
+	 * due to DDP (Large Rx offload) feature, hence
+	 * BUG_ON if BUF is non-NULL
+	 */
+	buf = fc_frame_payload_get(fp, 1);
+	if (cmd->was_ddp_setup && buf) {
+		printk(KERN_INFO "%s: When DDP was setup, not expected to"
+				 "receive frame with payload, Payload shall be"
+				 "copied directly to buffer instead of coming "
+				 "via. legacy receive queues\n", __func__);
+		BUG_ON(buf);
+	}
+
+	/*
+	 * If ft_cmd indicated 'ddp_setup', in that case only the last frame
+	 * should come with 'TSI bit being set'. If 'TSI bit is not set and if
+	 * data frame appears here, means error condition. In both the cases
+	 * release the DDP context (ddp_put) and in error case, as well
+	 * initiate error recovery mechanism.
+	 */
+	ep = fc_seq_exch(seq);
+	if (cmd->was_ddp_setup) {
+		BUG_ON(!ep);
+		lport = ep->lp;
+		BUG_ON(!lport);
+	}
+	if (cmd->was_ddp_setup && ep->xid != FC_XID_UNKNOWN) {
+		f_ctl = ntoh24(fh->fh_f_ctl);
+		/*
+		 * If TSI bit set in f_ctl, means last write data frame is
+		 * received successfully where payload is posted directly
+		 * to user buffer and only the last frame's header is posted
+		 * in legacy receive queue
+		 */
+		if (f_ctl & FC_FC_SEQ_INIT) { /* TSI bit set in FC frame */
+			cmd->write_data_len = lport->tt.ddp_done(lport,
+								ep->xid);
+			goto last_frame;
+		} else {
+			/*
+			 * Updating the write_data_len may be meaningless at
+			 * this point, but just in case if required in future
+			 * for debugging or any other purpose
+			 */
+			printk(KERN_ERR "%s: Received frame with TSI bit not"
+					" being SET, dropping the frame, "
+					"cmd->sg <%p>, cmd->sg_cnt <0x%x>\n",
+					__func__, cmd->sg, cmd->sg_cnt);
+			cmd->write_data_len = lport->tt.ddp_done(lport,
+							      ep->xid);
+			lport->tt.seq_exch_abort(cmd->seq, 0);
+			goto drop;
+		}
+	}
+
 	rel_off = ntohl(fh->fh_parm_offset);
 	frame_len = fr_len(fp);
 	if (frame_len <= sizeof(*fh))
@@ -273,6 +366,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		mem_len -= tlen;
 		cmd->write_data_len += tlen;
 	}
+last_frame:
 	if (cmd->write_data_len == se_cmd->data_length)
 		transport_generic_handle_data(se_cmd);
 drop:
