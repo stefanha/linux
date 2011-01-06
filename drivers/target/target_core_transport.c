@@ -1897,13 +1897,6 @@ int transport_generic_allocate_tasks(
 
 	transport_device_setup_cmd(cmd);
 	/*
-	 * See if this is a CDB which follows SAM, also grab a function
-	 * pointer to see if we need to do extra work.
-	 */
-	ret = transport_generic_cmd_sequencer(cmd, cdb);
-	if (ret < 0)
-		return ret;
-	/*
 	 * Ensure that the received CDB is less than the max (252 + 8) bytes
 	 * for VARIABLE_LENGTH_CMD
 	 */
@@ -1934,6 +1927,15 @@ int transport_generic_allocate_tasks(
 	 * Copy the original CDB into T_TASK(cmd).
 	 */
 	memcpy(T_TASK(cmd)->t_task_cdb, cdb, scsi_command_size(cdb));
+	/*
+	 * Setup the received CDB based on SCSI defined opcodes and
+	 * perform unit attention, persistent reservations and ALUA
+	 * checks for virtual device backends.  The T_TASK(cmd)->t_task_cdb
+	 * pointer is expected to be setup before we reach this point.
+	 */
+	ret = transport_generic_cmd_sequencer(cmd, cdb);
+	if (ret < 0)
+		return ret;
 	/*
 	 * Check for SAM Task Attribute Emulation
 	 */
