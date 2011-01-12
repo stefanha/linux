@@ -222,7 +222,6 @@ static int transport_map_sg_to_mem(struct se_cmd *cmd,
 		u32 *se_mem_cnt);
 static void transport_memcpy_se_mem_read_contig(struct se_cmd *cmd,
 		unsigned char *dst, struct list_head *se_mem_list);
-static void transport_new_cmd_failure(struct se_cmd *se_cmd);
 static void transport_release_fe_cmd(struct se_cmd *cmd);
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 		struct se_queue_obj *qobj);
@@ -2704,7 +2703,7 @@ check_depth:
 	return 0;
 }
 
-static void transport_new_cmd_failure(struct se_cmd *se_cmd)
+void transport_new_cmd_failure(struct se_cmd *se_cmd)
 {
 	unsigned long flags;
 	/*
