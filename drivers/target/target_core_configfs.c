@@ -3124,7 +3124,7 @@ static int target_core_init_configfs(void)
 	ret = rd_module_init();
 	if (ret < 0)
 		goto out;
-	
+
 	if (core_dev_setup_virtual_lun0() < 0)
 		goto out;
 
@@ -3143,7 +3143,7 @@ out:
 	configfs_unregister_subsystem(subsys);
 	if (scsi_target_proc)
 		remove_proc_entry("scsi_target", 0);
-	core_dev_release_virtual_lun0();	
+	core_dev_release_virtual_lun0();
 	rd_module_exit();
 out_global:
 	if (se_global->default_lu_gp) {

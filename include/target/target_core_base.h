@@ -99,7 +99,7 @@ enum transport_state_table {
 	TRANSPORT_REMOVE	= 14,
 	TRANSPORT_FREE		= 15,
 	TRANSPORT_NEW_CMD_MAP	= 16,
-};	
+};
 
 /* Used for struct se_cmd->se_cmd_flags */
 enum se_cmd_flags_table {
@@ -130,7 +130,7 @@ enum se_cmd_flags_table {
 	SCF_EMULATE_CDB_ASYNC		= 0x01000000,
 	SCF_EMULATE_SYNC_UNMAP		= 0x02000000
 };
-	
+
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
 enum transport_lunflags_table {
 	TRANSPORT_LUNFLAGS_NO_ACCESS		= 0x00,

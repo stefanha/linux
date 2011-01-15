@@ -203,10 +203,10 @@ static ssize_t target_fabric_mappedlun_store_write_protect(
 
 	printk(KERN_INFO "%s_ConfigFS: Changed Initiator ACL: %s"
 		" Mapped LUN: %u Write Protect bit to %s\n",
-		TPG_TFO(se_tpg)->get_fabric_name(), 
+		TPG_TFO(se_tpg)->get_fabric_name(),
 		lacl->initiatorname, lacl->mapped_lun, (op) ? "ON" : "OFF");
 
-        return count;
+	return count;
 
 }
 
@@ -320,11 +320,11 @@ static struct config_group *target_fabric_make_mappedlun(
 
 	lacl = core_dev_init_initiator_node_lun_acl(se_tpg, mapped_lun,
 			config_item_name(acl_ci), &ret);
-        if (!(lacl))
-                goto out;
+	if (!(lacl))
+		goto out;
 
 	config_group_init_type_name(&lacl->se_lun_group, name,
-			&TF_CIT_TMPL(tf)->tfc_tpg_mappedlun_cit);		
+			&TF_CIT_TMPL(tf)->tfc_tpg_mappedlun_cit);
 
 	kfree(buf);
 	return &lacl->se_lun_group;
@@ -339,7 +339,7 @@ static void target_fabric_drop_mappedlun(
 {
 	struct se_lun_acl *lacl = container_of(to_config_group(item),
 			struct se_lun_acl, se_lun_group);
-	struct se_portal_group *se_tpg = lacl->se_lun_nacl->se_tpg; 
+	struct se_portal_group *se_tpg = lacl->se_lun_nacl->se_tpg;
 
 	config_item_put(item);
 	core_dev_free_initiator_node_lun_acl(se_tpg, lacl);
@@ -379,24 +379,24 @@ static struct config_group *target_fabric_make_nodeacl(
 
 	se_nacl = tf->tf_ops.fabric_make_nodeacl(se_tpg, group, name);
 	if (IS_ERR(se_nacl))
-		return ERR_PTR(PTR_ERR(se_nacl));	
+		return ERR_PTR(PTR_ERR(se_nacl));
 
 	nacl_cg = &se_nacl->acl_group;
 	nacl_cg->default_groups = se_nacl->acl_default_groups;
 	nacl_cg->default_groups[0] = &se_nacl->acl_attrib_group;
-	nacl_cg->default_groups[1] = &se_nacl->acl_auth_group; 
+	nacl_cg->default_groups[1] = &se_nacl->acl_auth_group;
 	nacl_cg->default_groups[2] = &se_nacl->acl_param_group;
 	nacl_cg->default_groups[3] = NULL;
 
 	config_group_init_type_name(&se_nacl->acl_group, name,
-			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_base_cit);			
+			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_base_cit);
 	config_group_init_type_name(&se_nacl->acl_attrib_group, "attrib",
 			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_attrib_cit);
 	config_group_init_type_name(&se_nacl->acl_auth_group, "auth",
 			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_auth_cit);
 	config_group_init_type_name(&se_nacl->acl_param_group, "param",
 			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_param_cit);
-		
+
 	return &se_nacl->acl_group;
 }
 
@@ -421,7 +421,7 @@ static void target_fabric_drop_nodeacl(
 	}
 
 	config_item_put(item);
-	tf->tf_ops.fabric_drop_nodeacl(se_nacl);	
+	tf->tf_ops.fabric_drop_nodeacl(se_nacl);
 }
 
 static struct configfs_group_operations target_fabric_nacl_group_ops = {
@@ -467,7 +467,7 @@ static struct config_group *target_fabric_make_np(
 		return ERR_PTR(-EINVAL);
 
 	config_group_init_type_name(&se_tpg_np->tpg_np_group, name,
-			&TF_CIT_TMPL(tf)->tfc_tpg_np_base_cit);						
+			&TF_CIT_TMPL(tf)->tfc_tpg_np_base_cit);
 
 	return &se_tpg_np->tpg_np_group;
 }
@@ -668,11 +668,11 @@ static int target_fabric_port_link(
 				struct se_portal_group, tpg_group);
 	tf = se_tpg->se_tpg_wwn->wwn_tf;
 
-	if (lun->lun_se_dev!= NULL) {
+	if (lun->lun_se_dev !=  NULL) {
 		printk(KERN_ERR "Port Symlink already exists\n");
 		return -EEXIST;
 	}
-	
+
 	dev = se_dev->se_dev_ptr;
 	if (!(dev)) {
 		printk(KERN_ERR "Unable to locate struct se_device pointer from"
@@ -864,7 +864,7 @@ static struct config_group *target_fabric_make_tpg(
 			&TF_CIT_TMPL(tf)->tfc_tpg_attrib_cit);
 	config_group_init_type_name(&se_tpg->tpg_param_group, "param",
 			&TF_CIT_TMPL(tf)->tfc_tpg_param_cit);
-			
+
 	return &se_tpg->tpg_group;
 }
 
@@ -890,7 +890,7 @@ static void target_fabric_drop_tpg(
 	}
 
 	config_item_put(item);
-	tf->tf_ops.fabric_drop_tpg(se_tpg);	
+	tf->tf_ops.fabric_drop_tpg(se_tpg);
 }
 
 static struct configfs_group_operations target_fabric_tpg_group_ops = {
@@ -936,7 +936,7 @@ static void target_fabric_drop_wwn(
 				struct target_fabric_configfs, tf_group);
 	struct se_wwn *wwn = container_of(to_config_group(item),
 				struct se_wwn, wwn_group);
-	
+
 	config_item_put(item);
 	tf->tf_ops.fabric_drop_wwn(wwn);
 }
@@ -953,7 +953,7 @@ CONFIGFS_EATTR_OPS(target_fabric_wwn, target_fabric_configfs, tf_group);
 static struct configfs_item_operations target_fabric_wwn_item_ops = {
 	.show_attribute		= target_fabric_wwn_attr_show,
 	.store_attribute	= target_fabric_wwn_attr_store,
-};	
+};
 
 TF_CIT_SETUP(wwn, &target_fabric_wwn_item_ops, &target_fabric_wwn_group_ops, NULL);
 
@@ -976,7 +976,7 @@ TF_CIT_SETUP(discovery, &target_fabric_discovery_item_ops, NULL, NULL);
 int target_fabric_setup_cits(struct target_fabric_configfs *tf)
 {
 	target_fabric_setup_discovery_cit(tf);
-	target_fabric_setup_wwn_cit(tf);	
+	target_fabric_setup_wwn_cit(tf);
 	target_fabric_setup_tpg_cit(tf);
 	target_fabric_setup_tpg_base_cit(tf);
 	target_fabric_setup_tpg_port_cit(tf);

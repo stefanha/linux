@@ -152,8 +152,8 @@ static struct se_device *iblock_create_virtdevice(
 	printk(KERN_INFO  "IBLOCK: Claiming struct block_device: %s\n",
 			ib_dev->ibd_udev_path);
 
-	bd = open_bdev_exclusive(ib_dev->ibd_udev_path,
-			FMODE_WRITE|FMODE_READ, ib_dev);
+	bd = blkdev_get_by_path(ib_dev->ibd_udev_path,
+				FMODE_WRITE|FMODE_READ|FMODE_EXCL, ib_dev);
 	if (!(bd))
 		goto failed;
 	/*
@@ -162,7 +162,7 @@ static struct se_device *iblock_create_virtdevice(
 	 */
 	q = bdev_get_queue(bd);
 	limits = &dev_limits.limits;
-	limits->logical_block_size = bdev_logical_block_size(bd);	
+	limits->logical_block_size = bdev_logical_block_size(bd);
 	limits->max_hw_sectors = queue_max_hw_sectors(q);
 	limits->max_sectors = queue_max_sectors(q);
 	dev_limits.hw_queue_depth = IBLOCK_MAX_DEVICE_QUEUE_DEPTH;
@@ -220,7 +220,7 @@ static void iblock_free_device(void *p)
 {
 	struct iblock_dev *ib_dev = p;
 
-	close_bdev_exclusive(ib_dev->ibd_bd, FMODE_WRITE|FMODE_READ);
+	blkdev_put(ib_dev->ibd_bd, FMODE_WRITE|FMODE_READ|FMODE_EXCL);
 	bioset_free(ib_dev->ibd_bio_set);
 	kfree(ib_dev);
 }
@@ -251,7 +251,7 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	struct block_device *bd,
 	struct request_queue *q)
 {
-	unsigned long long blocks_long = (div_u64(i_size_read(bd->bd_inode), 
+	unsigned long long blocks_long = (div_u64(i_size_read(bd->bd_inode),
 					bdev_logical_block_size(bd)) - 1);
 	u32 block_size = bdev_logical_block_size(bd);
 
@@ -430,7 +430,7 @@ static int iblock_do_discard(struct se_device *dev, sector_t lba, u32 range)
 	struct iblock_dev *ibd = dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
 	int barrier = 0;
-	
+
 	return blkdev_issue_discard(bd, lba, range, GFP_KERNEL, barrier);
 }
 
@@ -474,7 +474,7 @@ static ssize_t iblock_set_configfs_dev_params(struct se_hba *hba,
 	opts = kstrdup(page, GFP_KERNEL);
 	if (!opts)
 		return -ENOMEM;
-	
+
 	orig = opts;
 
 	while ((ptr = strsep(&opts, ",")) != NULL) {
@@ -710,7 +710,7 @@ static sector_t iblock_get_blocks(struct se_device *dev)
 	struct iblock_dev *ibd = dev->dev_ptr;
 	struct block_device *bd = ibd->ibd_bd;
 	struct request_queue *q = bdev_get_queue(bd);
-	
+
 	return iblock_emulate_read_cap_with_block_size(dev, bd, q);
 }
 

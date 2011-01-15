@@ -3,6 +3,7 @@ menuconfig TARGET_CORE
 	tristate "Generic Target Core Mod (TCM) and ConfigFS Infrastructure"
 	depends on SCSI && BLOCK
 	select CONFIGFS_FS
+	default n
 	help
 	Say Y or M here to enable the TCM Storage Engine and ConfigFS enabled
 	control path for target_core_mod.  This includes built-in TCM RAMDISK
