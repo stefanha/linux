@@ -1369,9 +1369,9 @@ old_sess_out:
 		iscsi_dec_session_usage_count(SESS(conn));
 	}
 
-	if (conn->conn_rx_hash.tfm)
+	if (!IS_ERR(conn->conn_rx_hash.tfm))
 		crypto_free_hash(conn->conn_rx_hash.tfm);
-	if (conn->conn_tx_hash.tfm)
+	if (!IS_ERR(conn->conn_tx_hash.tfm))
 		crypto_free_hash(conn->conn_tx_hash.tfm);
 
 	if (conn->conn_cpumask)
