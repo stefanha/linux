@@ -69,21 +69,17 @@ int transport_get_lun_for_cmd(
 	deve = se_cmd->se_deve =
 			&SE_NODE_ACL(se_sess)->device_list[unpacked_lun];
 	if (deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
-		if (se_cmd) {
-			deve->total_cmds++;
-			deve->total_bytes += se_cmd->data_length;
+		deve->total_cmds++;
+		deve->total_bytes += se_cmd->data_length;
 
-			if (se_cmd->data_direction == DMA_TO_DEVICE) {
-				if (deve->lun_flags &
-						TRANSPORT_LUNFLAGS_READ_ONLY) {
-					read_only = 1;
-					goto out;
-				}
-				deve->write_bytes += se_cmd->data_length;
-			} else if (se_cmd->data_direction ==
-				   DMA_FROM_DEVICE) {
-				deve->read_bytes += se_cmd->data_length;
+		if (se_cmd->data_direction == DMA_TO_DEVICE) {
+			if (deve->lun_flags & TRANSPORT_LUNFLAGS_READ_ONLY) {
+				read_only = 1;
+				goto out;
 			}
+			deve->write_bytes += se_cmd->data_length;
+		} else if (se_cmd->data_direction == DMA_FROM_DEVICE) {
+			deve->read_bytes += se_cmd->data_length;
 		}
 		deve->deve_cmds++;
 
