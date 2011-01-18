@@ -365,6 +365,15 @@ int core_tmr_lun_reset(
 			" %d t_fe_count: %d\n", (preempt_and_abort_list) ?
 			"Preempt" : "", cmd, state,
 			atomic_read(&T_TASK(cmd)->t_fe_count));
+		/*
+		 * Signal that the command has failed via cmd->se_cmd_flags,
+		 * and call TFO->new_cmd_failure() to wakeup any fabric
+		 * dependent code used to wait for unsolicited data out
+		 * allocation to complete.  The fabric module is expected
+		 * to dump any remaining unsolicited data out for the aborted
+		 * command at this point.
+		 */
+		transport_new_cmd_failure(cmd);
 
 		core_tmr_handle_tas_abort(tmr_nacl, cmd, tas,
 				atomic_read(&T_TASK(cmd)->t_fe_count));

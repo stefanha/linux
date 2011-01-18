@@ -1857,7 +1857,7 @@ static int __core_scsi3_update_aptpl_buf(
 	struct se_portal_group *tpg;
 	struct se_subsystem_dev *su_dev = SU_DEV(dev);
 	struct t10_pr_registration *pr_reg;
-	unsigned char tmp[1024], isid_buf[32];
+	unsigned char tmp[512], isid_buf[32];
 	ssize_t len = 0;
 	int reg_count = 0;
 
@@ -1877,8 +1877,8 @@ static int __core_scsi3_update_aptpl_buf(
 	list_for_each_entry(pr_reg, &T10_RES(su_dev)->registration_list,
 			pr_reg_list) {
 
-		memset(tmp, 0, 1024);
-		memset(isid_buf, 0, 32);
+		tmp[0] = '\0';
+		isid_buf[0] = '\0';
 		tpg = pr_reg->pr_reg_nacl->se_tpg;
 		lun = pr_reg->pr_reg_tg_pt_lun;
 		/*
@@ -1893,7 +1893,7 @@ static int __core_scsi3_update_aptpl_buf(
 		 * reservation holder.
 		 */
 		if (dev->dev_pr_res_holder == pr_reg) {
-			snprintf(tmp, 1024, "PR_REG_START: %d"
+			snprintf(tmp, 512, "PR_REG_START: %d"
 				"\ninitiator_fabric=%s\n"
 				"initiator_node=%s\n%s"
 				"sa_res_key=%llu\n"
@@ -1906,7 +1906,7 @@ static int __core_scsi3_update_aptpl_buf(
 				pr_reg->pr_res_scope, pr_reg->pr_reg_all_tg_pt,
 				pr_reg->pr_res_mapped_lun);
 		} else {
-			snprintf(tmp, 1024, "PR_REG_START: %d\n"
+			snprintf(tmp, 512, "PR_REG_START: %d\n"
 				"initiator_fabric=%s\ninitiator_node=%s\n%s"
 				"sa_res_key=%llu\nres_holder=0\n"
 				"res_all_tg_pt=%d\nmapped_lun=%u\n",
@@ -1927,7 +1927,7 @@ static int __core_scsi3_update_aptpl_buf(
 		/*
 		 * Include information about the associated SCSI target port.
 		 */
-		snprintf(tmp, 1024, "target_fabric=%s\ntarget_node=%s\n"
+		snprintf(tmp, 512, "target_fabric=%s\ntarget_node=%s\n"
 			"tpgt=%hu\nport_rtpi=%hu\ntarget_lun=%u\nPR_REG_END:"
 			" %d\n", TPG_TFO(tpg)->get_fabric_name(),
 			TPG_TFO(tpg)->tpg_get_wwn(tpg),
@@ -1945,7 +1945,7 @@ static int __core_scsi3_update_aptpl_buf(
 	}
 	spin_unlock(&T10_RES(su_dev)->registration_lock);
 
-	 if (!(reg_count))
+	if (!(reg_count))
 		len += sprintf(buf+len, "No Registrations or Reservations");
 
 	return 0;
@@ -2327,6 +2327,7 @@ static int core_scsi3_emulate_pro_register(
 			if (!(aptpl)) {
 				pr_tmpl->pr_aptpl_active = 0;
 				core_scsi3_update_and_write_aptpl(dev, NULL, 0);
+				core_scsi3_put_pr_reg(pr_reg);
 				printk("SPC-3 PR: Set APTPL Bit Deactivated"
 						" for REGISTER\n");
 				return 0;

@@ -51,6 +51,7 @@
 #include "target_core_hba.h"
 #include "target_core_pr.h"
 #include "target_core_rd.h"
+#include "target_core_mib.h"
 
 static struct list_head g_tf_list;
 static struct mutex g_tf_lock;
@@ -117,7 +118,6 @@ static struct config_group *target_core_register_fabric(
 	struct config_group *group,
 	const char *name)
 {
-	struct config_group *fabric_cg;
 	struct target_fabric_configfs *tf;
 	int ret;
 
@@ -131,9 +131,6 @@ static struct config_group *target_core_register_fabric(
 	if (transport_subsystem_check_init() < 0)
 		return ERR_PTR(-EINVAL);
 
-	fabric_cg = kzalloc(sizeof(struct config_group), GFP_KERNEL);
-	if (!(fabric_cg))
-		return ERR_PTR(-ENOMEM);
 	/*
 	 * Below are some hardcoded request_module() calls to automatically
 	 * local fabric modules when the following is called:
@@ -155,7 +152,6 @@ static struct config_group *target_core_register_fabric(
 		if (ret < 0) {
 			printk(KERN_ERR "request_module() failed for"
 				" iscsi_target_mod.ko: %d\n", ret);
-			kfree(fabric_cg);
 			return ERR_PTR(-EINVAL);
 		}
 	} else if (!(strncmp(name, "loopback", 8))) {
@@ -169,7 +165,6 @@ static struct config_group *target_core_register_fabric(
 		if (ret < 0) {
 			printk(KERN_ERR "request_module() failed for"
 				" tcm_loop.ko: %d\n", ret);
-			kfree(fabric_cg);
 			return ERR_PTR(-EINVAL);
 		}
 	}
@@ -178,7 +173,6 @@ static struct config_group *target_core_register_fabric(
 	if (!(tf)) {
 		printk(KERN_ERR "target_core_get_fabric() failed for %s\n",
 			name);
-		kfree(fabric_cg);
 		return ERR_PTR(-EINVAL);
 	}
 	printk(KERN_INFO "Target_Core_ConfigFS: REGISTER -> Located fabric:"
@@ -667,6 +661,7 @@ static ssize_t target_core_dev_store_attr_##_name(			\
 	}								\
 	ret = strict_strtoul(page, 0, &val);				\
 	if (ret < 0) {							\
+		spin_unlock(&se_dev->se_dev_lock);                      \
 		printk(KERN_ERR "strict_strtoul() failed with"		\
 			" ret: %d\n", ret);				\
 		return -EINVAL;						\
@@ -1458,8 +1453,8 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 	size_t count)
 {
 	struct se_device *dev;
-	unsigned char *i_fabric, *t_fabric, *i_port = NULL, *t_port = NULL;
-	unsigned char *isid = NULL;
+	unsigned char *i_fabric = NULL, *i_port = NULL, *isid = NULL;
+	unsigned char *t_fabric = NULL, *t_port = NULL;
 	char *orig, *ptr, *arg_p, *opts;
 	substring_t args[MAX_OPT_ARGS];
 	unsigned long long tmp_ll;
@@ -1495,9 +1490,17 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 		switch (token) {
 		case Opt_initiator_fabric:
 			i_fabric = match_strdup(&args[0]);
+			if (!i_fabric) {
+				ret = -ENOMEM;
+				goto out;
+			}
 			break;
 		case Opt_initiator_node:
 			i_port = match_strdup(&args[0]);
+			if (!i_port) {
+				ret = -ENOMEM;
+				goto out;
+			}
 			if (strlen(i_port) > PR_APTPL_MAX_IPORT_LEN) {
 				printk(KERN_ERR "APTPL metadata initiator_node="
 					" exceeds PR_APTPL_MAX_IPORT_LEN: %d\n",
@@ -1508,6 +1511,10 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 			break;
 		case Opt_initiator_sid:
 			isid = match_strdup(&args[0]);
+			if (!isid) {
+				ret = -ENOMEM;
+				goto out;
+			}
 			if (strlen(isid) > PR_REG_ISID_LEN) {
 				printk(KERN_ERR "APTPL metadata initiator_isid"
 					"= exceeds PR_REG_ISID_LEN: %d\n",
@@ -1518,6 +1525,10 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 			break;
 		case Opt_sa_res_key:
 			arg_p = match_strdup(&args[0]);
+			if (!arg_p) {
+				ret = -ENOMEM;
+				goto out;
+			}
 			ret = strict_strtoull(arg_p, 0, &tmp_ll);
 			if (ret < 0) {
 				printk(KERN_ERR "strict_strtoull() failed for"
@@ -1554,9 +1565,17 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 		 */
 		case Opt_target_fabric:
 			t_fabric = match_strdup(&args[0]);
+			if (!t_fabric) {
+				ret = -ENOMEM;
+				goto out;
+			}
 			break;
 		case Opt_target_node:
 			t_port = match_strdup(&args[0]);
+			if (!t_port) {
+				ret = -ENOMEM;
+				goto out;
+			}
 			if (strlen(t_port) > PR_APTPL_MAX_TPORT_LEN) {
 				printk(KERN_ERR "APTPL metadata target_node="
 					" exceeds PR_APTPL_MAX_TPORT_LEN: %d\n",
@@ -1599,6 +1618,11 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 			i_port, isid, mapped_lun, t_port, tpgt, target_lun,
 			res_holder, all_tg_pt, type);
 out:
+	kfree(i_fabric);
+	kfree(i_port);
+	kfree(isid);
+	kfree(t_fabric);
+	kfree(t_port);
 	kfree(orig);
 	return (ret == 0) ? count : ret;
 }

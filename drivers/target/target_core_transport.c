@@ -58,6 +58,7 @@
 #include "target_core_pr.h"
 #include "target_core_scdb.h"
 #include "target_core_ua.h"
+#include "target_core_mib.h"
 
 /* #define DEBUG_CDB_HANDLER */
 #ifdef DEBUG_CDB_HANDLER
@@ -222,7 +223,6 @@ static int transport_map_sg_to_mem(struct se_cmd *cmd,
 		u32 *se_mem_cnt);
 static void transport_memcpy_se_mem_read_contig(struct se_cmd *cmd,
 		unsigned char *dst, struct list_head *se_mem_list);
-static void transport_new_cmd_failure(struct se_cmd *se_cmd);
 static void transport_release_fe_cmd(struct se_cmd *cmd);
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 		struct se_queue_obj *qobj);
@@ -1897,13 +1897,6 @@ int transport_generic_allocate_tasks(
 
 	transport_device_setup_cmd(cmd);
 	/*
-	 * See if this is a CDB which follows SAM, also grab a function
-	 * pointer to see if we need to do extra work.
-	 */
-	ret = transport_generic_cmd_sequencer(cmd, cdb);
-	if (ret < 0)
-		return ret;
-	/*
 	 * Ensure that the received CDB is less than the max (252 + 8) bytes
 	 * for VARIABLE_LENGTH_CMD
 	 */
@@ -1934,6 +1927,15 @@ int transport_generic_allocate_tasks(
 	 * Copy the original CDB into T_TASK(cmd).
 	 */
 	memcpy(T_TASK(cmd)->t_task_cdb, cdb, scsi_command_size(cdb));
+	/*
+	 * Setup the received CDB based on SCSI defined opcodes and
+	 * perform unit attention, persistent reservations and ALUA
+	 * checks for virtual device backends.  The T_TASK(cmd)->t_task_cdb
+	 * pointer is expected to be setup before we reach this point.
+	 */
+	ret = transport_generic_cmd_sequencer(cmd, cdb);
+	if (ret < 0)
+		return ret;
 	/*
 	 * Check for SAM Task Attribute Emulation
 	 */
@@ -2702,7 +2704,7 @@ check_depth:
 	return 0;
 }
 
-static void transport_new_cmd_failure(struct se_cmd *se_cmd)
+void transport_new_cmd_failure(struct se_cmd *se_cmd)
 {
 	unsigned long flags;
 	/*
