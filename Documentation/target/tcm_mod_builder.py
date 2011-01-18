@@ -973,7 +973,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 def tcm_mod_build_kbuild(fabric_mod_dir_var, fabric_mod_name):
 
 	buf = ""
-	f = fabric_mod_dir_var + "/Kbuild"
+	f = fabric_mod_dir_var + "/Makefile"
 	print "Writing file: " + f
 
 	p = open(f, 'w')
@@ -1018,7 +1018,7 @@ def tcm_mod_build_kconfig(fabric_mod_dir_var, fabric_mod_name):
 
 def tcm_mod_add_kbuild(tcm_dir, fabric_mod_name):
 	buf = "obj-$(CONFIG_" + fabric_mod_name.upper() + ")	+= " + fabric_mod_name.lower() + "/\n"
-	kbuild = tcm_dir + "/drivers/target/Kbuild"
+	kbuild = tcm_dir + "/drivers/target/Makefile"
 
 	f = open(kbuild, 'a')
 	f.write(buf)
@@ -1064,7 +1064,7 @@ def main(modname, proto_ident):
 	tcm_mod_build_kbuild(fabric_mod_dir, fabric_mod_name)
 	tcm_mod_build_kconfig(fabric_mod_dir, fabric_mod_name)
 
-	input = raw_input("Would you like to add " + fabric_mod_name + "to drivers/target/Kbuild..? [yes,no]: ")
+	input = raw_input("Would you like to add " + fabric_mod_name + "to drivers/target/Makefile..? [yes,no]: ")
 	if input == "yes" or input == "y":
 		tcm_mod_add_kbuild(tcm_dir, fabric_mod_name)
 
