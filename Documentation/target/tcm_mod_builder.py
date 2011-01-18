@@ -239,8 +239,8 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "#include <target/target_core_configfs.h>\n"
 	buf += "#include <target/target_core_base.h>\n"
 	buf += "#include <target/configfs_macros.h>\n\n"
-	buf += "#include <" + fabric_mod_name + "_base.h>\n"
-	buf += "#include <" + fabric_mod_name + "_fabric.h>\n\n"
+	buf += "#include \"" + fabric_mod_name + "_base.h\"\n"
+	buf += "#include \"" + fabric_mod_name + "_fabric.h\"\n\n"
 
 	buf += "/* Local pointer to allocated TCM configfs fabric module */\n"
 	buf += "struct target_fabric_configfs *" + fabric_mod_name + "_fabric_configfs;\n\n"
@@ -583,9 +583,9 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "#include <target/target_core_fabric_lib.h>\n"
 	buf += "#include <target/target_core_device.h>\n"
 	buf += "#include <target/target_core_tpg.h>\n"
-	buf += "#include <target/target_core_configfs.h>\n"
-	buf += "#include <" + fabric_mod_name + "_base.h>\n"
-	buf += "#include <" + fabric_mod_name + "_fabric.h>\n\n"
+	buf += "#include <target/target_core_configfs.h>\n\n"
+	buf += "#include \"" + fabric_mod_name + "_base.h\"\n"
+	buf += "#include \"" + fabric_mod_name + "_fabric.h\"\n\n"
 
 	buf += "int " + fabric_mod_name + "_check_true(struct se_portal_group *se_tpg)\n"
 	buf += "{\n"
@@ -980,7 +980,6 @@ def tcm_mod_build_kbuild(fabric_mod_dir_var, fabric_mod_name):
 	if not p:
 		tcm_mod_err("Unable to open file: " + f)
 
-	buf = "EXTRA_CFLAGS += -I$(srctree)/include/ -I$(srctree)/drivers/target/" + fabric_mod_name + "\n\n"
 	buf += fabric_mod_name + "-objs			:= " + fabric_mod_name + "_fabric.o \\\n"
 	buf += "					   " + fabric_mod_name + "_configfs.o\n"
 	buf += "obj-$(CONFIG_" + fabric_mod_name.upper() + ")		+= " + fabric_mod_name + ".o\n"
