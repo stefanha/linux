@@ -8,7 +8,6 @@
 #include <scsi/scsi_cmnd.h>
 #include <net/sock.h>
 #include <net/tcp.h>
-#include "target_core_mib.h"
 
 #define TARGET_CORE_MOD_VERSION		"v4.0.0-rc6"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
@@ -173,6 +172,13 @@ enum tcm_sense_reason_table {
 
 struct se_obj {
 	atomic_t obj_access_count;
+} ____cacheline_aligned;
+
+/* SCSI Port stats */
+struct scsi_port_stats {
+	u64	cmd_pdus;
+	u64	tx_data_octets;
+	u64	rx_data_octets;
 } ____cacheline_aligned;
 
 /*
