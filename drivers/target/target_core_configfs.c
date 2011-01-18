@@ -51,6 +51,7 @@
 #include "target_core_hba.h"
 #include "target_core_pr.h"
 #include "target_core_rd.h"
+#include "target_core_mib.h"
 
 static struct list_head g_tf_list;
 static struct mutex g_tf_lock;
