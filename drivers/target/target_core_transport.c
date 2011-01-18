@@ -58,6 +58,7 @@
 #include "target_core_pr.h"
 #include "target_core_scdb.h"
 #include "target_core_ua.h"
+#include "target_core_mib.h"
 
 /* #define DEBUG_CDB_HANDLER */
 #ifdef DEBUG_CDB_HANDLER
