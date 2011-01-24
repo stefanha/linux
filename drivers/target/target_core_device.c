@@ -796,6 +796,8 @@ void se_clear_dev_ports(struct se_device *dev)
 		spin_lock(&lun->lun_sep_lock);
 		if (lun->lun_se_dev == NULL) {
 			spin_unlock(&lun->lun_sep_lock);
+			spin_lock(&hba->device_lock);
+			spin_lock(&dev->se_port_lock);
 			continue;
 		}
 		spin_unlock(&lun->lun_sep_lock);
