@@ -391,12 +391,14 @@ int core_update_device_list_for_node(
 				printk(KERN_ERR "struct se_dev_entry->se_lun_acl"
 					" already set for demo mode -> explict"
 					" LUN ACL transition\n");
+				spin_unlock_irq(&nacl->device_list_lock);
 				return -1;
 			}
 			if (deve->se_lun != lun) {
 				printk(KERN_ERR "struct se_dev_entry->se_lun does"
 					" match passed struct se_lun for demo mode"
 					" -> explict LUN ACL transition\n");
+				spin_unlock_irq(&nacl->device_list_lock);
 				return -1;
 			}
 			deve->se_lun_acl = lun_acl;
@@ -584,6 +586,7 @@ static void core_export_port(
  *	Called with struct se_device->se_port_lock spinlock held.
  */
 static void core_release_port(struct se_device *dev, struct se_port *port)
+	__releases(&dev->se_port_lock) __acquires(&dev->se_port_lock)
 {
 	/*
 	 * Wait for any port reference for PR ALL_TG_PT=1 operation
@@ -794,6 +797,8 @@ void se_clear_dev_ports(struct se_device *dev)
 		spin_lock(&lun->lun_sep_lock);
 		if (lun->lun_se_dev == NULL) {
 			spin_unlock(&lun->lun_sep_lock);
+			spin_lock(&hba->device_lock);
+			spin_lock(&dev->se_port_lock);
 			continue;
 		}
 		spin_unlock(&lun->lun_sep_lock);
