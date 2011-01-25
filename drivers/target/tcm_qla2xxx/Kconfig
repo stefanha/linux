@@ -1,6 +1,5 @@
 config TCM_QLA2XXX
 	tristate "TCM_QLA2XXX fabric module for Qlogic 2xxx series target mode HBAs"
-	depends on TARGET_CORE && CONFIGFS_FS
 	select LIBFC
 	select SCSI_QLA_FC
 	default n
