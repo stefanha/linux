@@ -130,10 +130,11 @@ static struct se_device *iblock_create_virtdevice(
 	struct request_queue *q;
 	struct queue_limits *limits;
 	u32 dev_flags = 0;
+	int ret = -EINVAL;
 
 	if (!(ib_dev)) {
 		printk(KERN_ERR "Unable to locate struct iblock_dev parameter\n");
-		return 0;
+		return ERR_PTR(ret);
 	}
 	memset(&dev_limits, 0, sizeof(struct se_dev_limits));
 	/*
@@ -142,7 +143,7 @@ static struct se_device *iblock_create_virtdevice(
 	ib_dev->ibd_bio_set = bioset_create(32, 64);
 	if (!(ib_dev->ibd_bio_set)) {
 		printk(KERN_ERR "IBLOCK: Unable to create bioset()\n");
-		return 0;
+		return ERR_PTR(-ENOMEM);
 	}
 	printk(KERN_INFO "IBLOCK: Created bio_set()\n");
 	/*
@@ -185,9 +186,7 @@ static struct se_device *iblock_create_virtdevice(
 	 * the QUEUE_FLAG_DISCARD bit for UNMAP/WRITE_SAME in SCSI + TRIM
 	 * in ATA and we need to set TPE=1
 	 */
-	if (blk_queue_discard(bdev_get_queue(bd))) {
-		struct request_queue *q = bdev_get_queue(bd);
-
+	if (blk_queue_discard(q)) {
 		DEV_ATTRIB(dev)->max_unmap_lba_count =
 				q->limits.max_discard_sectors;
 		/*
@@ -213,7 +212,7 @@ failed:
 	ib_dev->ibd_bd = NULL;
 	ib_dev->ibd_major = 0;
 	ib_dev->ibd_minor = 0;
-	return NULL;
+	return ERR_PTR(ret);
 }
 
 static void iblock_free_device(void *p)

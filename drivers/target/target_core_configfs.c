@@ -1829,7 +1829,9 @@ static ssize_t target_core_store_dev_enable(
 		return -EINVAL;
 
 	dev = t->create_virtdevice(hba, se_dev, se_dev->se_dev_su_ptr);
-	if (!(dev) || IS_ERR(dev))
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
+	else if (!dev)
 		return -EINVAL;
 
 	se_dev->se_dev_ptr = dev;
@@ -3158,7 +3160,7 @@ static int target_core_init_configfs(void)
 	if (core_dev_setup_virtual_lun0() < 0)
 		goto out;
 
-	scsi_target_proc = proc_mkdir("scsi_target", 0);
+	scsi_target_proc = proc_mkdir("scsi_target", NULL);
 	if (!(scsi_target_proc)) {
 		printk(KERN_ERR "proc_mkdir(scsi_target, 0) failed\n");
 		goto out;
@@ -3172,8 +3174,8 @@ static int target_core_init_configfs(void)
 out:
 	configfs_unregister_subsystem(subsys);
 	if (scsi_target_proc)
-		remove_proc_entry("scsi_target", 0);
-	core_dev_release_virtual_lun0();	
+		remove_proc_entry("scsi_target", NULL);
+	core_dev_release_virtual_lun0();
 	rd_module_exit();
 out_global:
 	if (se_global->default_lu_gp) {
@@ -3239,7 +3241,7 @@ static void target_core_exit_configfs(void)
 			" Infrastructure\n");
 
 	remove_scsi_target_mib();
-	remove_proc_entry("scsi_target", 0);
+	remove_proc_entry("scsi_target", NULL);
 	core_dev_release_virtual_lun0();
 	rd_module_exit();
 	release_se_global();

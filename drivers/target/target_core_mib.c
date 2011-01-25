@@ -70,6 +70,7 @@ static inline int list_is_first(const struct list_head *list,
 static void *locate_hba_start(
 	struct seq_file *seq,
 	loff_t *pos)
+	__acquires(&se_global->g_device_lock)
 {
 	spin_lock(&se_global->g_device_lock);
 	return seq_list_start(&se_global->g_se_dev_list, *pos);
@@ -84,6 +85,7 @@ static void *locate_hba_next(
 }
 
 static void locate_hba_stop(struct seq_file *seq, void *v)
+	__releases(&se_global->g_device_lock)
 {
 	spin_unlock(&se_global->g_device_lock);
 }
@@ -98,6 +100,7 @@ static void locate_hba_stop(struct seq_file *seq, void *v)
 static void *scsi_inst_seq_start(
 	struct seq_file *seq,
 	loff_t *pos)
+	__acquires(&se_global->hba_lock)
 {
 	spin_lock(&se_global->hba_lock);
 	return seq_list_start(&se_global->g_hba_list, *pos);
@@ -112,6 +115,7 @@ static void *scsi_inst_seq_next(
 }
 
 static void scsi_inst_seq_stop(struct seq_file *seq, void *v)
+	__releases(&se_global->hba_lock)
 {
 	spin_unlock(&se_global->hba_lock);
 }
@@ -154,6 +158,7 @@ static const struct file_operations scsi_inst_seq_fops = {
  * SCSI Device Table
  */
 static void *scsi_dev_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(&se_global->se_hba_lock)
 {
 	return locate_hba_start(seq, pos);
 }
@@ -164,6 +169,7 @@ static void *scsi_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void scsi_dev_seq_stop(struct seq_file *seq, void *v)
+	 __releases(&se_global->hba_lock)
 {
 	locate_hba_stop(seq, v);
 }
@@ -235,6 +241,7 @@ static const struct file_operations scsi_dev_seq_fops = {
  * SCSI Port Table
  */
 static void *scsi_port_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(&se_global->se_hba_lock)
 {
 	return locate_hba_start(seq, pos);
 }
@@ -245,6 +252,7 @@ static void *scsi_port_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void scsi_port_seq_stop(struct seq_file *seq, void *v)
+	__releases(&se_global->se_hba_lock)
 {
 	locate_hba_stop(seq, v);
 }
@@ -305,6 +313,7 @@ static const struct file_operations scsi_port_seq_fops = {
  * SCSI Transport Table
  */
 static void *scsi_transport_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(&se_global->se_hba_lock)
 {
 	return locate_hba_start(seq, pos);
 }
@@ -315,6 +324,7 @@ static void *scsi_transport_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void scsi_transport_seq_stop(struct seq_file *seq, void *v)
+	__releases(&se_global->se_hba_lock)
 {
 	locate_hba_stop(seq, v);
 }
@@ -390,6 +400,7 @@ static const struct file_operations scsi_transport_seq_fops = {
  * SCSI Target Device Table
  */
 static void *scsi_tgt_dev_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(&se_global->se_hba_lock)
 {
 	return locate_hba_start(seq, pos);
 }
@@ -400,6 +411,7 @@ static void *scsi_tgt_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void scsi_tgt_dev_seq_stop(struct seq_file *seq, void *v)
+	__releases(&se_global->se_hba_lock)
 {
 	locate_hba_stop(seq, v);
 }
@@ -481,6 +493,7 @@ static const struct file_operations scsi_tgt_dev_seq_fops = {
  * SCSI Target Port Table
  */
 static void *scsi_tgt_port_seq_start(struct seq_file *seq, loff_t *pos)
+	 __acquires(&se_global->se_hba_lock)
 {
 	return locate_hba_start(seq, pos);
 }
@@ -491,6 +504,7 @@ static void *scsi_tgt_port_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void scsi_tgt_port_seq_stop(struct seq_file *seq, void *v)
+	 __releases(&se_global->se_hba_lock)
 {
 	locate_hba_stop(seq, v);
 }
@@ -575,6 +589,7 @@ static const struct file_operations scsi_tgt_port_seq_fops = {
  * Iterates through all active TPGs and extracts the info from the ACLs
  */
 static void *scsi_auth_intr_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(&se_global->se_tpg_lock)
 {
 	spin_lock_bh(&se_global->se_tpg_lock);
 	return seq_list_start(&se_global->g_se_tpg_list, *pos);
@@ -587,6 +602,7 @@ static void *scsi_auth_intr_seq_next(struct seq_file *seq, void *v,
 }
 
 static void scsi_auth_intr_seq_stop(struct seq_file *seq, void *v)
+	__releases(&se_global->se_tpg_lock)
 {
 	spin_unlock_bh(&se_global->se_tpg_lock);
 }
@@ -700,6 +716,7 @@ static const struct file_operations scsi_auth_intr_seq_fops = {
  * to list the info fo this table.
  */
 static void *scsi_att_intr_port_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(&se_global->se_tpg_lock)
 {
 	spin_lock_bh(&se_global->se_tpg_lock);
 	return seq_list_start(&se_global->g_se_tpg_list, *pos);
@@ -712,6 +729,7 @@ static void *scsi_att_intr_port_seq_next(struct seq_file *seq, void *v,
 }
 
 static void scsi_att_intr_port_seq_stop(struct seq_file *seq, void *v)
+	__releases(&se_global->se_tpg_lock)
 {
 	spin_unlock_bh(&se_global->se_tpg_lock);
 }
@@ -824,6 +842,7 @@ static const struct file_operations scsi_att_intr_port_seq_fops = {
  * SCSI Logical Unit Table
  */
 static void *scsi_lu_seq_start(struct seq_file *seq, loff_t *pos)
+	 __acquires(&se_global->se_hba_lock)
 {
 	return locate_hba_start(seq, pos);
 }
@@ -834,6 +853,7 @@ static void *scsi_lu_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void scsi_lu_seq_stop(struct seq_file *seq, void *v)
+	 __releases(&se_global->se_hba_lock)
 {
 	locate_hba_stop(seq, v);
 }
