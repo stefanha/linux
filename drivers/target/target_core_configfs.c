@@ -2003,12 +2003,8 @@ static void target_core_dev_release(struct config_item *item)
 {
 	struct se_subsystem_dev *se_dev = container_of(to_config_group(item),
 				struct se_subsystem_dev, se_dev_group);
-	struct config_group *dev_cg;
+	struct config_group *dev_cg = &se_dev->se_dev_group;
 
-	if (!(se_dev))
-		return;
-
-	dev_cg = &se_dev->se_dev_group;
 	kfree(dev_cg->default_groups);
 }
 
