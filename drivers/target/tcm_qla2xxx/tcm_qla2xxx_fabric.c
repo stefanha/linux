@@ -641,7 +641,7 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun, uint8_t 
 /*
  * From qla_target.c...
  */
-extern int q2x_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
+extern int qla2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 
 int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 {
@@ -680,7 +680,7 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	/*
 	 * Now queue completed DATA_IN the qla2xxx LLD and response ring
 	 */
-	return q2x_xmit_response(cmd, QLA_TGT_XMIT_DATA|QLA_TGT_XMIT_STATUS,
+	return qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_DATA|QLA_TGT_XMIT_STATUS,
 				se_cmd->scsi_status);
 }
 
@@ -698,7 +698,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	/*
 	 * Now queue status response to qla2xxx LLD code and response ring
 	 */
-	return q2x_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
+	return qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
 }
 
 extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);

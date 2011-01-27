@@ -311,7 +311,7 @@ qla81xx_idc_event(scsi_qla_host_t *vha, uint16_t aen, uint16_t descr)
 		    "IDC failed to post ACK.\n");
 }
 
-extern void q2x_ctio_completion(scsi_qla_host_t *, uint32_t);
+extern void qla2xxx_ctio_completion(scsi_qla_host_t *, uint32_t);
 extern void qla_tgt_async_event(uint16_t, scsi_qla_host_t *, uint16_t *);
 
 /**
@@ -404,7 +404,7 @@ skip_rio:
 		break;
 
 	case MBA_CTIO_COMPLETION:
-		q2x_ctio_completion(vha, handles[0]);
+		qla2xxx_ctio_completion(vha, handles[0]);
 		break;
 
 	case MBA_RESET:			/* Reset */
@@ -902,7 +902,7 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 	struct qla_hw_data *ha = vha->hw;
 
 	if (HANDLE_IS_CTIO_COMP(index)) {
-		q2x_ctio_completion(vha, index);
+		qla2xxx_ctio_completion(vha, index);
 		return;
 	}
 
@@ -2078,7 +2078,7 @@ qla24xx_mbx_completion(scsi_qla_host_t *vha, uint16_t mb0)
 #endif
 }
 
-extern void q24_atio_pkt_all_vps(struct scsi_qla_host *, atio7_entry_t *);
+extern void qla24xx_atio_pkt_all_vps(struct scsi_qla_host *, atio7_entry_t *);
 
 /*
  * qla24xx_process_atio_queue() - Process ATIO queue entries.
@@ -2102,7 +2102,7 @@ qla24xx_process_atio_queue(struct scsi_qla_host *vha)
 		DEBUG5(printk(KERN_INFO "%s(): IOCB data:\n", __func__));
 		DEBUG5(qla2x00_dump_buffer((uint8_t *)pkt, RESPONSE_ENTRY_SIZE));
 
-		q24_atio_pkt_all_vps(vha, (atio7_entry_t *)pkt);
+		qla24xx_atio_pkt_all_vps(vha, (atio7_entry_t *)pkt);
 
 		for (i = 0; i < cnt; i++) {
 			ha->atio_ring_index++;
