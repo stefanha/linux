@@ -50,12 +50,12 @@
 #include <target/target_core_tmr.h>
 
 #include <qla_def.h>
-#include <qla2x_tgt_def.h>
+#include <qla_tgt_def.h>
 
 //#include <scsi/libfc.h>
 //#include <scsi/scsi_transport_fc.h>
 
-#include <qla2x_target.h>
+#include <qla_target.h>
 
 #include <tcm_qla2xxx_base.h>
 #include <tcm_qla2xxx_fabric.h>
@@ -451,7 +451,7 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 		BUG();
 	}
 	/*
-	 * qla2x_target.c:q2t_rdy_to_xfer() will call pci_map_sg() to setup
+	 * qla_target.c:q2t_rdy_to_xfer() will call pci_map_sg() to setup
 	 * the SGL mappings into PCIe memory for incoming FCP WRITE data.
 	 */
 	return q2t_rdy_to_xfer(cmd);
@@ -485,7 +485,7 @@ void tcm_qla2xxx_new_cmd_failure(struct se_cmd *se_cmd)
 }
 
 /*
- * Main entry point for incoming ATIO packets from qla2x_target.c
+ * Main entry point for incoming ATIO packets from qla_target.c
  * and qla2xxx LLD code.
  */
 int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct q2t_cmd *cmd,
@@ -590,7 +590,7 @@ int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
 }
 
 /*
- * Called from qla2x_target.c:q2t_do_ctio_completion()
+ * Called from qla_target.c:q2t_do_ctio_completion()
  */
 int tcm_qla2xxx_handle_data(struct q2t_cmd *cmd)
 {
@@ -602,7 +602,7 @@ int tcm_qla2xxx_handle_data(struct q2t_cmd *cmd)
 }
 
 /*
- * Called from qla2x_target.c:q2t_issue_task_mgmt()
+ * Called from qla_target.c:q2t_issue_task_mgmt()
  */
 int tcm_qla2xxx_handle_tmr(struct q2t_mgmt_cmd *mcmd, uint32_t lun, uint8_t tmr_func)
 {
@@ -639,7 +639,7 @@ int tcm_qla2xxx_handle_tmr(struct q2t_mgmt_cmd *mcmd, uint32_t lun, uint8_t tmr_
 }
 
 /*
- * From qla2x_target.c...
+ * From qla_target.c...
  */
 extern int q2x_xmit_response(struct q2t_cmd *, int, uint8_t);
 

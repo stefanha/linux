@@ -5,11 +5,10 @@
  * See LICENSE.qla2xxx for copyright and licensing details.
  */
 #include "qla_def.h"
+#include "qla_tgt.h"
 
 #include <linux/delay.h>
 #include <linux/gfp.h>
-
-#include "qla2x_tgt.h"
 
 /*
  * qla2x00_mailbox_command

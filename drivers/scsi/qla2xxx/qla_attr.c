@@ -5,13 +5,12 @@
  * See LICENSE.qla2xxx for copyright and licensing details.
  */
 #include "qla_def.h"
+#include "qla_tgt.h"
 
 #include <linux/kthread.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-
-#include "qla2x_tgt.h"
 
 static int qla24xx_vport_disable(struct fc_vport *, bool);
 

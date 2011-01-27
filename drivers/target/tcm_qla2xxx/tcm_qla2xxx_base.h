@@ -6,7 +6,7 @@
 /* lenth of ASCII NPIV 'WWPN+WWNN' including pad */
 #define TCM_QLA2XXX_NPIV_NAMELEN 66
 
-#include "qla2x_target.h"
+#include "qla_target.h"
 
 #if 0
 #define DEBUG_Q2T_SESS_MAP(x...)	printk(KERN_INFO x)

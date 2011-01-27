@@ -6,6 +6,7 @@
  */
 #include "qla_def.h"
 #include "qla_gbl.h"
+#include "qla_tgt.h"
 
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
@@ -15,8 +16,6 @@
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsicam.h>
 #include <linux/delay.h>
-
-#include "qla2x_tgt.h"
 
 void
 qla2x00_vp_stop_timer(scsi_qla_host_t *vha)

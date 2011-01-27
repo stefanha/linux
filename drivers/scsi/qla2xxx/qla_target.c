@@ -1,5 +1,5 @@
 /*
- *  qla2x_target.c SCSI LLD infrastructure for QLogic 22xx/23xx/24xx/25xx
+ *  qla_target.c SCSI LLD infrastructure for QLogic 22xx/23xx/24xx/25xx
  *
  *  based on qla2x00t.c code:
  *
@@ -41,8 +41,8 @@
 #include <target/target_core_tmr.h>
 
 #include "qla_def.h"
-#include "qla2x_tgt.h"
-#include "qla2x_target.h"
+#include "qla_tgt.h"
+#include "qla_target.h"
 
 /*
  * From scsi/fc/fc_fcp.h

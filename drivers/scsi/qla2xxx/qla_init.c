@@ -19,10 +19,9 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
-
-#include "qla2x_tgt.h"
-#include "qla2x_tgt_def.h"
-#include "qla2x_target.h"
+#include "qla_tgt.h"
+#include "qla_tgt_def.h"
+#include "qla_target.h"
 
 /*
 *  QLogic ISP2x00 Hardware Support Function Prototypes.

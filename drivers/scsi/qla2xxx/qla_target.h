@@ -1,5 +1,5 @@
 /*
- *  qla2x_target.h SCSI LLD infrastructure for QLogic 22xx/23xx/24xx/25xx
+ *  qla_target.h SCSI LLD infrastructure for QLogic 22xx/23xx/24xx/25xx
  *
  *  based on qla2x00t.h code:
  *
@@ -23,10 +23,10 @@
  *  GNU General Public License for more details.
  */
 
-#ifndef __QLA2X00T_H
-#define __QLA2X00T_H
+#ifndef __QLA_TARGET_H
+#define __QLA_TARGET_H
 
-#include "qla2x_tgt_def.h"
+#include "qla_tgt_def.h"
 
 #define Q2T_TIMEOUT                 10	/* in seconds */
 
@@ -287,4 +287,4 @@ struct srr_ctio {
 #define Q2T_XMIT_STATUS		2
 #define Q2T_XMIT_ALL		(Q2T_XMIT_STATUS|Q2T_XMIT_DATA)
 
-#endif /* __QLA2X00T_H */
+#endif /* __QLA_TARGET_H */

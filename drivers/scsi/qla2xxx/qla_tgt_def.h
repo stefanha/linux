@@ -1,5 +1,5 @@
 /*
- *  qla2x_tgt_def.h
+ *  qla_tgt_def.h
  *
  *  Copyright (C) 2004 - 2010 Vladislav Bolkhovitin <vst@vlnb.net>
  *  Copyright (C) 2004 - 2005 Leonid Stoljar
@@ -27,8 +27,8 @@
  * target portion.
  */
 
-#ifndef __QLA2X_TGT_DEF_H
-#define __QLA2X_TGT_DEF_H
+#ifndef __QLA_TGT_DEF_H
+#define __QLA_TGT_DEF_H
 
 #include "qla_def.h"
 
@@ -714,4 +714,4 @@ struct qla_target_template {
 int qla2x00_wait_for_loop_ready(scsi_qla_host_t *);
 int qla2x00_wait_for_hba_online(scsi_qla_host_t *);
 
-#endif /* __QLA2X_TGT_DEF_H */
+#endif /* __QLA_TGT_DEF_H */

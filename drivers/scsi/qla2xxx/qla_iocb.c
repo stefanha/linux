@@ -5,13 +5,12 @@
  * See LICENSE.qla2xxx for copyright and licensing details.
  */
 #include "qla_def.h"
+#include "qla_tgt.h"
 
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 
 #include <scsi/scsi_tcq.h>
-
-#include "qla2x_tgt.h"
 
 static void qla25xx_set_que(srb_t *, struct rsp_que **);
 /**

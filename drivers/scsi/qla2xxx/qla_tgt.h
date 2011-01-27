@@ -1,5 +1,5 @@
 /*
- *  qla2x_tgt.h
+ *  qla_tgt.h
  *
  *  Copyright (C) 2004 - 2010 Vladislav Bolkhovitin <vst@vlnb.net>
  *  Copyright (C) 2004 - 2005 Leonid Stoljar
@@ -27,12 +27,12 @@
  */
 
 
-#ifndef __QLA2X_TGT_H
-#define __QLA2X_TGT_H
+#ifndef __QLA_TGT_H
+#define __QLA_TGT_H
 
 #include <linux/version.h>
 
-#include "qla2x_tgt_def.h"
+#include "qla_tgt_def.h"
 
 extern request_t *qla2x00_req_pkt(scsi_qla_host_t *ha);
 
@@ -137,4 +137,4 @@ extern int q2t_add_target(struct qla_hw_data *, scsi_qla_host_t *);
 extern void q2t_fc_port_added(scsi_qla_host_t *, fc_port_t *);
 extern void q2t_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);
 
-#endif /* __QLA2X_TGT_H */
+#endif /* __QLA_TGT_H */

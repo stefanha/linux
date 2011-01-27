@@ -5,6 +5,8 @@
  * See LICENSE.qla2xxx for copyright and licensing details.
  */
 #include "qla_def.h"
+#include "qla_tgt_def.h"
+#include "qla_tgt.h"
 
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
@@ -18,9 +20,6 @@
 #include <scsi/scsicam.h>
 #include <scsi/scsi_transport.h>
 #include <scsi/scsi_transport_fc.h>
-
-#include "qla2x_tgt_def.h"
-#include "qla2x_tgt.h"
 
 /*
  * List of ha's and mutex protecting it.
