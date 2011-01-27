@@ -20,7 +20,7 @@ extern char *tcm_qla2xxx_parse_pr_out_transport_id(struct se_portal_group *, con
 extern struct se_node_acl *tcm_qla2xxx_alloc_fabric_acl(struct se_portal_group *);
 extern void tcm_qla2xxx_release_fabric_acl(struct se_portal_group *, struct se_node_acl *);
 extern u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *);
-extern void tcm_qla2xxx_free_cmd(struct q2t_cmd *);
+extern void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *);
 extern void tcm_qla2xxx_release_cmd(struct se_cmd *);
 extern int tcm_qla2xxx_shutdown_session(struct se_session *);
 extern void tcm_qla2xxx_close_session(struct se_session *);
@@ -34,11 +34,11 @@ extern void tcm_qla2xxx_set_default_node_attrs(struct se_node_acl *);
 extern u32 tcm_qla2xxx_get_task_tag(struct se_cmd *);
 extern int tcm_qla2xxx_get_cmd_state(struct se_cmd *);
 extern void tcm_qla2xxx_new_cmd_failure(struct se_cmd *);
-extern int tcm_qla2xxx_handle_cmd(struct scsi_qla_host *, struct q2t_cmd *,
+extern int tcm_qla2xxx_handle_cmd(struct scsi_qla_host *, struct qla_tgt_cmd *,
                         uint32_t, uint32_t, int, int, int);
 extern int tcm_qla2xxx_new_cmd_map(struct se_cmd *);
-extern int tcm_qla2xxx_handle_data(struct q2t_cmd *);
-extern int tcm_qla2xxx_handle_tmr(struct q2t_mgmt_cmd *, uint32_t, uint8_t);
+extern int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *);
+extern int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
 extern int tcm_qla2xxx_queue_data_in(struct se_cmd *);
 extern int tcm_qla2xxx_queue_status(struct se_cmd *);
 extern int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *);

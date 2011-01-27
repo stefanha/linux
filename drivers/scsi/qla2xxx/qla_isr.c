@@ -312,7 +312,7 @@ qla81xx_idc_event(scsi_qla_host_t *vha, uint16_t aen, uint16_t descr)
 }
 
 extern void q2x_ctio_completion(scsi_qla_host_t *, uint32_t);
-extern void q2t_async_event(uint16_t, scsi_qla_host_t *, uint16_t *);
+extern void qla_tgt_async_event(uint16_t, scsi_qla_host_t *, uint16_t *);
 
 /**
  * qla2x00_async_event() - Process aynchronous events.
@@ -708,7 +708,7 @@ skip_rio:
 				ha->current_topology));
 
 			if (ha->qla2x_tmpl)
-				q2t_async_event(mb[0], vha, mb);
+				qla_tgt_async_event(mb[0], vha, mb);
 			break;
 		}
 
@@ -731,7 +731,7 @@ skip_rio:
 		set_bit(LOCAL_LOOP_UPDATE, &vha->dpc_flags);
 
 		if (ha->qla2x_tmpl)
-			q2t_async_event(mb[0], vha, mb);
+			qla_tgt_async_event(mb[0], vha, mb);
 		break;
 
 	case MBA_RSCN_UPDATE:		/* State Change Registration */
@@ -881,7 +881,7 @@ skip_rio:
 	case MBA_LIP_RESET:		/* LIP reset occurred */
 	default:
 		if (ha->qla2x_tmpl)
-			q2t_async_event(mb[0], vha, mb);
+			qla_tgt_async_event(mb[0], vha, mb);
 		break;
 	}
 
@@ -1392,7 +1392,7 @@ qla24xx_tm_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 	iocb->done(sp);
 }
 
-extern void q2t_response_pkt_all_vps(scsi_qla_host_t *, response_t *);
+extern void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *, response_t *);
 
 /**
  * qla2x00_process_response_queue() - Process response queue entries.
@@ -1460,7 +1460,7 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 				qla_target.tgt_response_pkt, pkt->entry_type););
 
 			if (vha->hw->qla2x_tmpl)
-				q2t_response_pkt_all_vps(vha, (response_t *)pkt);
+				qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
 		case STATUS_TYPE:
 			qla2x00_status_entry(vha, rsp, pkt);
@@ -2202,7 +2202,7 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 		case NOTIFY_ACK_TYPE:
 			
 			if (vha->hw->qla2x_tmpl)
-				q2t_response_pkt_all_vps(vha, (response_t *)pkt);
+				qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
 		case MARKER_TYPE:
 			break;

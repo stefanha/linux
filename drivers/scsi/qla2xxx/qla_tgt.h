@@ -132,9 +132,9 @@ qla2x00_send_enable_lun(scsi_qla_host_t *vha, bool enable)
 	}
 }
 
-extern int q2t_add_target(struct qla_hw_data *, scsi_qla_host_t *);
+extern int qla_tgt_add_target(struct qla_hw_data *, scsi_qla_host_t *);
 
-extern void q2t_fc_port_added(scsi_qla_host_t *, fc_port_t *);
-extern void q2t_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);
+extern void qla_tgt_fc_port_added(scsi_qla_host_t *, fc_port_t *);
+extern void qla_tgt_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);
 
 #endif /* __QLA_TGT_H */

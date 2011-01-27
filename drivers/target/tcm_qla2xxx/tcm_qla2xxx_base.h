@@ -9,9 +9,9 @@
 #include "qla_target.h"
 
 #if 0
-#define DEBUG_Q2T_SESS_MAP(x...)	printk(KERN_INFO x)
+#define DEBUG_QLA_TGT_SESS_MAP(x...)	printk(KERN_INFO x)
 #else
-#define DEBUG_Q2T_SESS_MAP(x...)
+#define DEBUG_QLA_TGT_SESS_MAP(x...)
 #endif
 
 struct tcm_qla2xxx_nacl {
@@ -21,8 +21,8 @@ struct tcm_qla2xxx_nacl {
 	u64 nport_wwnn;
 	/* ASCII formatted WWPN for FC Initiator Nport */
 	char nport_name[TCM_QLA2XXX_NAMELEN];
-	/* Pointer to q2t_sess */
-	struct q2t_sess *q2t_sess;
+	/* Pointer to qla_tgt_sess */
+	struct qla_tgt_sess *qla_tgt_sess;
 	/* Pointer to TCM FC nexus */
 	struct se_session *nport_nexus;
 	/* Returned by tcm_qla2xxx_make_nodeacl() */
@@ -80,8 +80,8 @@ struct tcm_qla2xxx_lport {
 	struct scsi_qla_host *qla_vha;
 	/* Pointer to struct scsi_qla_host for NPIV VP from qla2xxx LLD */
 	struct scsi_qla_host *qla_npiv_vp;
-	/* Pointer to struct q2t_tgt pointer */
-	struct q2t_tgt lport_q2t_tgt;
+	/* Pointer to struct qla_tgt pointer */
+	struct qla_tgt lport_qla_tgt;
 	/* Pointer to struct fc_vport for NPIV vport from libfc */
 	struct fc_vport *npiv_vport;
 	/* Pointer to TPG=1 for non NPIV mode */

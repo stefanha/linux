@@ -2346,8 +2346,8 @@ skip_dpc:
 	    ha->flags.enable_64bit_addressing ? '+' : '-', base_vha->host_no,
 	    ha->isp_ops->fw_version_str(base_vha, fw_str));
 
-#warning FIXME: Check for target mode enabled bit before calling q2t_add_target()
-	q2t_add_target(ha, base_vha);
+#warning FIXME: Check for target mode enabled bit before calling qla_tgt_add_target()
+	qla_tgt_add_target(ha, base_vha);
 
 	mutex_lock(&qla_ha_list_mutex);
 	list_add_tail(&ha->ha_list_entry, &qla_ha_list);
@@ -2453,7 +2453,7 @@ qla2x00_stop_dpc_thread(scsi_qla_host_t *vha)
 		kthread_stop(t);
 }
 
-extern int q2t_remove_target(struct qla_hw_data *, scsi_qla_host_t *);
+extern int qla_tgt_remove_target(struct qla_hw_data *, scsi_qla_host_t *);
 
 static void
 qla2x00_remove_one(struct pci_dev *pdev)
@@ -2470,8 +2470,8 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	mutex_unlock(&qla_ha_list_mutex);
 
 	ha->host_shutting_down = 1;
-#warning FIXME: Check for target mode enabled bit before calling q2t_remove_target()
-	q2t_remove_target(ha, base_vha);
+#warning FIXME: Check for target mode enabled bit before calling qla_tgt_remove_target()
+	qla_tgt_remove_target(ha, base_vha);
 
 	/* Necessary to prevent races with it */
 	qla2x00_stop_dpc_thread(base_vha);
@@ -4299,8 +4299,8 @@ static bool __init qla2x00_parse_ini_mode(void)
 	return true;
 }
 
-extern int q2t_init(void);
-extern int q2t_exit(void);
+extern int qla_tgt_init(void);
+extern int qla_tgt_exit(void);
 
 /**
  * qla2x00_module_init - Module initialization.
@@ -4325,7 +4325,7 @@ qla2x00_module_init(void)
 	}
 
 	/* Initialize target kmem_cache and mem_pools */
-	ret = q2t_init();
+	ret = qla_tgt_init();
 	if (ret < 0) {
 		kmem_cache_destroy(srb_cachep);
 		return ret;
@@ -4340,7 +4340,7 @@ qla2x00_module_init(void)
 	    fc_attach_transport(&qla2xxx_transport_functions);
 	if (!qla2xxx_transport_template) {
 		kmem_cache_destroy(srb_cachep);
-		q2t_exit();
+		qla_tgt_exit();
 		return -ENODEV;
 	}
 
@@ -4354,7 +4354,7 @@ qla2x00_module_init(void)
 	    fc_attach_transport(&qla2xxx_transport_vport_functions);
 	if (!qla2xxx_transport_vport_template) {
 		kmem_cache_destroy(srb_cachep);
-		q2t_exit();
+		qla_tgt_exit();
 		fc_release_transport(qla2xxx_transport_template);
 		return -ENODEV;
 	}
@@ -4364,7 +4364,7 @@ qla2x00_module_init(void)
 	ret = pci_register_driver(&qla2xxx_pci_driver);
 	if (ret) {
 		kmem_cache_destroy(srb_cachep);
-		q2t_exit();
+		qla_tgt_exit();
 		fc_release_transport(qla2xxx_transport_template);
 		fc_release_transport(qla2xxx_transport_vport_template);
 	}
@@ -4381,7 +4381,7 @@ qla2x00_module_exit(void)
 	pci_unregister_driver(&qla2xxx_pci_driver);
 	qla2x00_release_firmware();
 	kmem_cache_destroy(srb_cachep);
-	q2t_exit();
+	qla_tgt_exit();
 	if (ctx_cachep)
 		kmem_cache_destroy(ctx_cachep);
 	fc_release_transport(qla2xxx_transport_template);

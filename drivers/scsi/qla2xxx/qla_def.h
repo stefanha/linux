@@ -2846,8 +2846,8 @@ struct qla_hw_data {
 
 	void *target_lport_ptr;
 	struct qla_target_template *qla2x_tmpl;
-	struct q2t_tgt *q2t_tgt;
-	struct q2t_cmd *cmds[MAX_OUTSTANDING_COMMANDS];
+	struct qla_tgt *qla_tgt;
+	struct qla_tgt_cmd *cmds[MAX_OUTSTANDING_COMMANDS];
 	uint16_t current_handle;
 
 	struct qla_tgt_vp_map *tgt_vp_map;

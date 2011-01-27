@@ -28,9 +28,9 @@
 
 #include "qla_tgt_def.h"
 
-#define Q2T_TIMEOUT                 10	/* in seconds */
+#define QLA_TGT_TIMEOUT			10	/* in seconds */
 
-#define Q2T_MAX_HW_PENDING_TIME	    60 /* in seconds */
+#define QLA_TGT_MAX_HW_PENDING_TIME	60 /* in seconds */
 
 /* Immediate notify status constants */
 #define IMM_NTFY_LIP_RESET          0x000E
@@ -49,15 +49,15 @@
 /* Immediate notify task flags */
 #define IMM_NTFY_TASK_MGMT_SHIFT    8
 
-#define Q2T_CLEAR_ACA               0x40
-#define Q2T_TARGET_RESET            0x20
-#define Q2T_LUN_RESET               0x10
-#define Q2T_CLEAR_TS                0x04
-#define Q2T_ABORT_TS                0x02
-#define Q2T_ABORT_ALL_SESS          0xFFFF
-#define Q2T_ABORT_ALL               0xFFFE
-#define Q2T_NEXUS_LOSS_SESS         0xFFFD
-#define Q2T_NEXUS_LOSS              0xFFFC
+#define QLA_TGT_CLEAR_ACA               0x40
+#define QLA_TGT_TARGET_RESET            0x20
+#define QLA_TGT_LUN_RESET               0x10
+#define QLA_TGT_CLEAR_TS                0x04
+#define QLA_TGT_ABORT_TS                0x02
+#define QLA_TGT_ABORT_ALL_SESS          0xFFFF
+#define QLA_TGT_ABORT_ALL               0xFFFE
+#define QLA_TGT_NEXUS_LOSS_SESS         0xFFFD
+#define QLA_TGT_NEXUS_LOSS              0xFFFC
 
 /* Notify Acknowledge flags */
 #define NOTIFY_ACK_RES_COUNT        BIT_8
@@ -65,15 +65,15 @@
 #define NOTIFY_ACK_TM_RESP_CODE_VALID BIT_4
 
 /* Command's states */
-#define Q2T_STATE_NEW               0	/* New command and target processing it */
-#define Q2T_STATE_NEED_DATA         1	/* target needs data to continue */
-#define Q2T_STATE_DATA_IN           2	/* Data arrived and target is processing */
-#define Q2T_STATE_PROCESSED         3	/* target done processing */
-#define Q2T_STATE_ABORTED           4	/* Command aborted */
+#define QLA_TGT_STATE_NEW               0	/* New command and target processing it */
+#define QLA_TGT_STATE_NEED_DATA         1	/* target needs data to continue */
+#define QLA_TGT_STATE_DATA_IN           2	/* Data arrived and target is processing */
+#define QLA_TGT_STATE_PROCESSED         3	/* target done processing */
+#define QLA_TGT_STATE_ABORTED           4	/* Command aborted */
 
 /* Special handles */
-#define Q2T_NULL_HANDLE             0
-#define Q2T_SKIP_HANDLE             (0xFFFFFFFF & ~CTIO_COMPLETION_HANDLE_MARK)
+#define QLA_TGT_NULL_HANDLE             0
+#define QLA_TGT_SKIP_HANDLE             (0xFFFFFFFF & ~CTIO_COMPLETION_HANDLE_MARK)
 
 /* ATIO task_codes field */
 #define ATIO_SIMPLE_QUEUE           0
@@ -91,11 +91,11 @@
 #define FC_TM_FAILED                5
 
 /*
- * Error code of q2t_pre_xmit_response() meaning that cmd's exchange was
+ * Error code of qla_tgt_pre_xmit_response() meaning that cmd's exchange was
  * terminated, so no more actions is needed and success should be returned
  * to target.
  */
-#define Q2T_PRE_XMIT_RESP_CMD_ABORTED	0x1717
+#define QLA_TGT_PRE_XMIT_RESP_CMD_ABORTED	0x1717
 
 #if (BITS_PER_LONG > 32) || defined(CONFIG_HIGHMEM64G)
 #define pci_dma_lo32(a) (a & 0xffffffff)
@@ -105,15 +105,15 @@
 #define pci_dma_hi32(a) 0
 #endif
 
-#define Q2T_SENSE_VALID(sense)  ((sense != NULL) && \
+#define QLA_TGT_SENSE_VALID(sense)  ((sense != NULL) && \
 				(((const uint8_t *)(sense))[0] & 0x70) == 0x70)
 
-struct q2t_tgt {
+struct qla_tgt {
 	struct scsi_qla_host *vha;
 	struct qla_hw_data *ha;
 
 	/*
-	 * To sync between IRQ handlers and q2t_target_release(). Needed,
+	 * To sync between IRQ handlers and qla_tgt_target_release(). Needed,
 	 * because req_pkt() can drop/reaquire HW lock inside. Protected by
 	 * HW lock.
 	 */
@@ -134,7 +134,7 @@ struct q2t_tgt {
 	int tgt_stop; /* the target mode driver is being stopped */
 	int tgt_stopped; /* the target mode driver has been stopped */
 
-	/* Count of sessions refering q2t_tgt. Protected by hardware_lock. */
+	/* Count of sessions refering qla_tgt. Protected by hardware_lock. */
 	int sess_count;
 
 	/* Protected by hardware_lock. Addition also protected by tgt_mutex. */
@@ -169,7 +169,7 @@ struct q2t_tgt {
 /*
  * Equivilant to IT Nexus (Initiator-Target)
  */
-struct q2t_sess {
+struct qla_tgt_sess {
 	uint16_t loop_id;
 	port_id_t s_id;
 
@@ -179,7 +179,7 @@ struct q2t_sess {
 
 	struct se_session *se_sess;
 	scsi_qla_host_t *vha;
-	struct q2t_tgt *tgt;
+	struct qla_tgt *tgt;
 
 	int sess_ref; /* protected by hardware_lock */
 
@@ -190,8 +190,8 @@ struct q2t_sess {
 	uint8_t port_name[WWN_SIZE];
 };
 
-struct q2t_cmd {
-	struct q2t_sess *sess;
+struct qla_tgt_cmd {
+	struct qla_tgt_sess *sess;
 	int state;
 	struct se_cmd se_cmd;
 	/* Sense buffer that will be mapped into outgoing status */
@@ -212,7 +212,7 @@ struct q2t_cmd {
 	enum dma_data_direction dma_data_direction;
 
 	uint16_t loop_id;		    /* to save extra sess dereferences */
-	struct q2t_tgt *tgt;		    /* to save extra sess dereferences */
+	struct qla_tgt *tgt;		    /* to save extra sess dereferences */
 	scsi_qla_host_t *vha;
 
 	union {
@@ -221,26 +221,26 @@ struct q2t_cmd {
 	} __attribute__((packed)) atio;
 };
 
-struct q2t_sess_work_param {
+struct qla_tgt_sess_work_param {
 	struct list_head sess_works_list_entry;
 
-#define Q2T_SESS_WORK_CMD	0
-#define Q2T_SESS_WORK_ABORT	1
-#define Q2T_SESS_WORK_TM	2
+#define QLA_TGT_SESS_WORK_CMD	0
+#define QLA_TGT_SESS_WORK_ABORT	1
+#define QLA_TGT_SESS_WORK_TM	2
 	int type;
 
 	union {
-		struct q2t_cmd *cmd;
+		struct qla_tgt_cmd *cmd;
 		abts24_recv_entry_t abts;
 		notify_entry_t tm_iocb;
 		atio7_entry_t tm_iocb2;
 	};
 };
 
-struct q2t_mgmt_cmd {
+struct qla_tgt_mgmt_cmd {
 	uint8_t tmr_func;
 	uint8_t fc_tm_rsp;
-	struct q2t_sess *sess;
+	struct qla_tgt_sess *sess;
 	struct se_cmd se_cmd;
 	struct se_tmr_req *se_tmr_req;
 	unsigned int flags;
@@ -253,9 +253,9 @@ struct q2t_mgmt_cmd {
 	} __attribute__((packed)) orig_iocb;
 };
 
-struct q2t_prm {
-	struct q2t_cmd *cmd;
-	struct q2t_tgt *tgt;
+struct qla_tgt_prm {
+	struct qla_tgt_cmd *cmd;
+	struct qla_tgt *tgt;
 	void *pkt;
 	struct scatterlist *sg;	/* cmd data buffer SG vector */
 	int seg_cnt;
@@ -280,11 +280,11 @@ struct srr_imm {
 struct srr_ctio {
 	struct list_head srr_list_entry;
 	int srr_id;
-	struct q2t_cmd *cmd;
+	struct qla_tgt_cmd *cmd;
 };
 
-#define Q2T_XMIT_DATA		1
-#define Q2T_XMIT_STATUS		2
-#define Q2T_XMIT_ALL		(Q2T_XMIT_STATUS|Q2T_XMIT_DATA)
+#define QLA_TGT_XMIT_DATA		1
+#define QLA_TGT_XMIT_STATUS		2
+#define QLA_TGT_XMIT_ALL		(QLA_TGT_XMIT_STATUS|QLA_TGT_XMIT_DATA)
 
 #endif /* __QLA_TARGET_H */

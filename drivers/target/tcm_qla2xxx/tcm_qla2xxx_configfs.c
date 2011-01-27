@@ -84,7 +84,7 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 		if (rport_wwnn != rport->node_name)
 			continue;
 
-		DEBUG_Q2T_SESS_MAP("Located existing rport_wwpn and rport->node_name:"
+		DEBUG_QLA_TGT_SESS_MAP("Located existing rport_wwpn and rport->node_name:"
 			" 0x%016LX, port_id: 0x%04x\n", rport->node_name,
 			rport->port_id);
 		domain = (rport->port_id >> 16) & 0xff;
@@ -92,19 +92,19 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 		al_pa = rport->port_id & 0xff;
 		nacl->nport_id = rport->port_id;
 
-		DEBUG_Q2T_SESS_MAP("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
+		DEBUG_QLA_TGT_SESS_MAP("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
 				domain, area, al_pa);
 		spin_unlock_irqrestore(sh->host_lock, flags);
 
 		d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
-		DEBUG_Q2T_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+		DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 		a = &d->areas[area];
-		DEBUG_Q2T_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+		DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
 		p = &a->al_pas[al_pa];
-		DEBUG_Q2T_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+		DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 		p->se_nacl = se_nacl;
-		DEBUG_Q2T_SESS_MAP("Setting p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
+		DEBUG_QLA_TGT_SESS_MAP("Setting p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
 			" port_id: 0x%04x\n", se_nacl, rport_wwnn,
 			nacl->nport_id);
 
@@ -133,18 +133,18 @@ int tcm_qla2xxx_clear_nacl_from_fcport_map(
 	area = (nacl->nport_id >> 8) & 0xff;
 	al_pa = nacl->nport_id & 0xff;
 
-	DEBUG_Q2T_SESS_MAP("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
+	DEBUG_QLA_TGT_SESS_MAP("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
 	d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
-	DEBUG_Q2T_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
-	DEBUG_Q2T_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
 	p = &a->al_pas[al_pa];
-	DEBUG_Q2T_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+	DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 	p->se_nacl = NULL;
-	DEBUG_Q2T_SESS_MAP("Clearing p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
+	DEBUG_QLA_TGT_SESS_MAP("Clearing p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
 		" port_id: 0x%04x\n", se_nacl, nacl->nport_wwnn,
 		nacl->nport_id);
 
@@ -225,7 +225,7 @@ static ssize_t tcm_qla2xxx_tpg_show_enable(
 			atomic_read(&tpg->lport_tpg_enabled));
 }
 
-extern void q2t_target_stop(struct q2t_tgt *);
+extern void qla_tgt_target_stop(struct qla_tgt *);
 
 static ssize_t tcm_qla2xxx_tpg_store_enable(
 	struct se_portal_group *se_tpg,
@@ -252,12 +252,12 @@ static ssize_t tcm_qla2xxx_tpg_store_enable(
 		atomic_set(&tpg->lport_tpg_enabled, 1);
 		qla2x00_enable_tgt_mode(vha);
 	} else {
-		if (!ha->q2t_tgt) {
-			printk(KERN_ERR "truct qla_hw_data *ha->q2t_tgt is NULL\n");
+		if (!ha->qla_tgt) {
+			printk(KERN_ERR "truct qla_hw_data *ha->qla_tgt is NULL\n");
 			return -ENODEV;
 		}
 		atomic_set(&tpg->lport_tpg_enabled, 0);
-		q2t_target_stop(ha->q2t_tgt);
+		qla_tgt_target_stop(ha->qla_tgt);
 	}
 
 	return count;
@@ -366,7 +366,7 @@ static struct se_portal_group *tcm_qla2xxx_npiv_make_tpg(
 	return &tpg->se_tpg;
 }
 
-static struct q2t_sess *tcm_qla2xxx_find_sess_by_s_id(
+static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 	scsi_qla_host_t *vha,
 	const uint8_t *s_id)
 {
@@ -390,15 +390,15 @@ static struct q2t_sess *tcm_qla2xxx_find_sess_by_s_id(
 	area = s_id[1];
 	al_pa = s_id[2];
 
-	DEBUG_Q2T_SESS_MAP("find_sess_by_s_id: 0x%02x area: 0x%02x al_pa: %02x\n",
+	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_s_id: 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
 	d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
-	DEBUG_Q2T_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
-	DEBUG_Q2T_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
 	p = &a->al_pas[al_pa];
-	DEBUG_Q2T_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+	DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 	se_nacl = p->se_nacl;
 	if (!se_nacl) {
@@ -406,16 +406,16 @@ static struct q2t_sess *tcm_qla2xxx_find_sess_by_s_id(
 			" al_pa: %02x\n", domain, area, al_pa);
 		return NULL;
 	}
-	DEBUG_Q2T_SESS_MAP("find_sess_by_s_id: located se_nacl: %p,"
+	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_s_id: located se_nacl: %p,"
 		" initiatorname: %s\n", se_nacl, se_nacl->initiatorname);
 
 	nacl = container_of(se_nacl, struct tcm_qla2xxx_nacl, se_node_acl);
-	if (!nacl->q2t_sess) {
-		printk(KERN_ERR "Unable to locate struct q2t_sess\n");
+	if (!nacl->qla_tgt_sess) {
+		printk(KERN_ERR "Unable to locate struct qla_tgt_sess\n");
 		return NULL;
 	}
 
-	return nacl->q2t_sess;
+	return nacl->qla_tgt_sess;
 }
 
 static void tcm_qla2xxx_set_sess_by_s_id(
@@ -423,7 +423,7 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 	struct se_node_acl *new_se_nacl,
 	struct tcm_qla2xxx_nacl *nacl,
 	struct se_session *se_sess,
-	struct q2t_sess *q2t_sess,
+	struct qla_tgt_sess *qla_tgt_sess,
 	uint8_t *s_id)
 {
 	struct se_node_acl *saved_nacl;
@@ -435,59 +435,59 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 	domain = s_id[0];
 	area = s_id[1];
 	al_pa = s_id[2];
-	DEBUG_Q2T_SESS_MAP("set_sess_by_s_id: domain 0x%02x area: 0x%02x al_pa: %02x\n",
+	DEBUG_QLA_TGT_SESS_MAP("set_sess_by_s_id: domain 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
 	d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
-	DEBUG_Q2T_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
-	DEBUG_Q2T_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
 	p = &a->al_pas[al_pa];
-	DEBUG_Q2T_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+	DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 	saved_nacl = p->se_nacl;
 	if (!saved_nacl) {
-		DEBUG_Q2T_SESS_MAP("Setting up new p->se_nacl to new_se_nacl\n");
+		DEBUG_QLA_TGT_SESS_MAP("Setting up new p->se_nacl to new_se_nacl\n");
 		p->se_nacl = new_se_nacl;
-		q2t_sess->se_sess = se_sess;
-		nacl->q2t_sess = q2t_sess;
+		qla_tgt_sess->se_sess = se_sess;
+		nacl->qla_tgt_sess = qla_tgt_sess;
 		return;
 	}
 
-	if (nacl->q2t_sess) {
+	if (nacl->qla_tgt_sess) {
 		if (new_se_nacl == NULL) {
-			DEBUG_Q2T_SESS_MAP("Clearing existing nacl->q2t_sess"
+			DEBUG_QLA_TGT_SESS_MAP("Clearing existing nacl->qla_tgt_sess"
 					" and p->se_nacl\n");
 			p->se_nacl = NULL;
-			nacl->q2t_sess = NULL;
+			nacl->qla_tgt_sess = NULL;
 			return;
 		}
-		DEBUG_Q2T_SESS_MAP("Replacing existing nacl->q2t_sess and"
+		DEBUG_QLA_TGT_SESS_MAP("Replacing existing nacl->qla_tgt_sess and"
 				" p->se_nacl\n");
 		p->se_nacl = new_se_nacl;
-		q2t_sess->se_sess = se_sess;
-		nacl->q2t_sess = q2t_sess;
+		qla_tgt_sess->se_sess = se_sess;
+		nacl->qla_tgt_sess = qla_tgt_sess;
 		return;
 	}
 
 	if (new_se_nacl == NULL) {
-		DEBUG_Q2T_SESS_MAP("Clearing existing p->se_nacl\n");
+		DEBUG_QLA_TGT_SESS_MAP("Clearing existing p->se_nacl\n");
 		p->se_nacl = NULL;
 		return;
 	}
 
-	DEBUG_Q2T_SESS_MAP("Replacing existing p->se_nacl w/o active"
-				" nacl->q2t_sess\n");
+	DEBUG_QLA_TGT_SESS_MAP("Replacing existing p->se_nacl w/o active"
+				" nacl->qla_tgt_sess\n");
 	p->se_nacl = new_se_nacl;
-	q2t_sess->se_sess = se_sess;
-	nacl->q2t_sess = q2t_sess;
+	qla_tgt_sess->se_sess = se_sess;
+	nacl->qla_tgt_sess = qla_tgt_sess;
 
-	DEBUG_Q2T_SESS_MAP("Setup nacl->q2t_sess %p by s_id for se_nacl: %p,"
-		" initiatorname: %s\n", nacl->q2t_sess, new_se_nacl,
+	DEBUG_QLA_TGT_SESS_MAP("Setup nacl->qla_tgt_sess %p by s_id for se_nacl: %p,"
+		" initiatorname: %s\n", nacl->qla_tgt_sess, new_se_nacl,
 		new_se_nacl->initiatorname);
 }
 
-static struct q2t_sess *tcm_qla2xxx_find_sess_by_loop_id(
+static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 	scsi_qla_host_t *vha,
 	const uint16_t loop_id)
 {
@@ -504,7 +504,7 @@ static struct q2t_sess *tcm_qla2xxx_find_sess_by_loop_id(
 		return NULL;
 	}
 
-	DEBUG_Q2T_SESS_MAP("find_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
+	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
 
 	fc_loopid = (struct tcm_qla2xxx_fc_loopid *)&lport->lport_loopid_map[loop_id];
 
@@ -517,12 +517,12 @@ static struct q2t_sess *tcm_qla2xxx_find_sess_by_loop_id(
 
 	nacl = container_of(se_nacl, struct tcm_qla2xxx_nacl, se_node_acl);
 
-	if (!nacl->q2t_sess) {
-		printk(KERN_ERR "Unable to locate struct q2t_sess\n");
+	if (!nacl->qla_tgt_sess) {
+		printk(KERN_ERR "Unable to locate struct qla_tgt_sess\n");
 		return NULL;
 	}
 
-	return nacl->q2t_sess;
+	return nacl->qla_tgt_sess;
 }
 
 static void tcm_qla2xxx_set_sess_by_loop_id(
@@ -530,69 +530,69 @@ static void tcm_qla2xxx_set_sess_by_loop_id(
 	struct se_node_acl *new_se_nacl,
 	struct tcm_qla2xxx_nacl *nacl,
 	struct se_session *se_sess,
-	struct q2t_sess *q2t_sess,
+	struct qla_tgt_sess *qla_tgt_sess,
 	uint16_t loop_id)
 {
 	struct se_node_acl *saved_nacl;
 	struct tcm_qla2xxx_fc_loopid *fc_loopid;
 
-	DEBUG_Q2T_SESS_MAP("set_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
+	DEBUG_QLA_TGT_SESS_MAP("set_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
 
 	fc_loopid = (struct tcm_qla2xxx_fc_loopid *)&lport->lport_loopid_map[loop_id];
 
 	saved_nacl = fc_loopid->se_nacl;
 	if (!saved_nacl) {
-		DEBUG_Q2T_SESS_MAP("Setting up new fc_loopid->se_nacl"
+		DEBUG_QLA_TGT_SESS_MAP("Setting up new fc_loopid->se_nacl"
 				" to new_se_nacl\n");
 		fc_loopid->se_nacl = new_se_nacl;
-		if (q2t_sess->se_sess != se_sess)
-			q2t_sess->se_sess = se_sess;
-		if (nacl->q2t_sess != q2t_sess)
-			nacl->q2t_sess = q2t_sess;
+		if (qla_tgt_sess->se_sess != se_sess)
+			qla_tgt_sess->se_sess = se_sess;
+		if (nacl->qla_tgt_sess != qla_tgt_sess)
+			nacl->qla_tgt_sess = qla_tgt_sess;
 		return;
 	}
 
-	if (nacl->q2t_sess) {
+	if (nacl->qla_tgt_sess) {
 		if (new_se_nacl == NULL) {
-			DEBUG_Q2T_SESS_MAP("Clearing nacl->q2t_sess and"
+			DEBUG_QLA_TGT_SESS_MAP("Clearing nacl->qla_tgt_sess and"
 					" fc_loopid->se_nacl\n");
 			fc_loopid->se_nacl = NULL;
-			nacl->q2t_sess = NULL;
+			nacl->qla_tgt_sess = NULL;
 			return;
 		}
 
-		DEBUG_Q2T_SESS_MAP("Replacing existing nacl->q2t_sess and"
+		DEBUG_QLA_TGT_SESS_MAP("Replacing existing nacl->qla_tgt_sess and"
 				" fc_loopid->se_nacl\n");
 		fc_loopid->se_nacl = new_se_nacl;
-		if (q2t_sess->se_sess != se_sess)
-			q2t_sess->se_sess = se_sess;
-		if (nacl->q2t_sess != q2t_sess)
-			nacl->q2t_sess = q2t_sess;
+		if (qla_tgt_sess->se_sess != se_sess)
+			qla_tgt_sess->se_sess = se_sess;
+		if (nacl->qla_tgt_sess != qla_tgt_sess)
+			nacl->qla_tgt_sess = qla_tgt_sess;
 		return;
 	}
 
 	if (new_se_nacl == NULL) {
-		DEBUG_Q2T_SESS_MAP("Clearing fc_loopid->se_nacl\n");
+		DEBUG_QLA_TGT_SESS_MAP("Clearing fc_loopid->se_nacl\n");
 		fc_loopid->se_nacl = NULL;
 		return;
 	}
 
-	DEBUG_Q2T_SESS_MAP("Replacing existing fc_loopid->se_nacl w/o"
-			" active nacl->q2t_sess\n");
+	DEBUG_QLA_TGT_SESS_MAP("Replacing existing fc_loopid->se_nacl w/o"
+			" active nacl->qla_tgt_sess\n");
 	fc_loopid->se_nacl = new_se_nacl;
-	if (q2t_sess->se_sess != se_sess)
-		q2t_sess->se_sess = se_sess;
-	if (nacl->q2t_sess != q2t_sess)
-		nacl->q2t_sess = q2t_sess;
+	if (qla_tgt_sess->se_sess != se_sess)
+		qla_tgt_sess->se_sess = se_sess;
+	if (nacl->qla_tgt_sess != qla_tgt_sess)
+		nacl->qla_tgt_sess = qla_tgt_sess;
 
-	DEBUG_Q2T_SESS_MAP("Setup nacl->q2t_sess %p by loop_id for se_nacl: %p,"
-		" initiatorname: %s\n", nacl->q2t_sess, new_se_nacl,
+	DEBUG_QLA_TGT_SESS_MAP("Setup nacl->qla_tgt_sess %p by loop_id for se_nacl: %p,"
+		" initiatorname: %s\n", nacl->qla_tgt_sess, new_se_nacl,
 		new_se_nacl->initiatorname);
 }
 
-static void tcm_qla2xxx_free_session(struct q2t_sess *sess)
+static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 {
-	struct q2t_tgt *tgt = sess->tgt;
+	struct qla_tgt *tgt = sess->tgt;
 	struct qla_hw_data *ha = tgt->ha;
 	struct se_session *se_sess;
 	struct se_node_acl *se_nacl;
@@ -602,7 +602,7 @@ static void tcm_qla2xxx_free_session(struct q2t_sess *sess)
 
 	se_sess = sess->se_sess;
 	if (!se_sess) {
-		printk(KERN_ERR "struct q2t_sess->se_sess is NULL\n");
+		printk(KERN_ERR "struct qla_tgt_sess->se_sess is NULL\n");
 		dump_stack();
 		return;
 	}
@@ -640,12 +640,12 @@ static void tcm_qla2xxx_free_session(struct q2t_sess *sess)
 }
 
 /*
- * Called via q2t_create_sess():ha->qla2x_tmpl->check_initiator_node_acl()
+ * Called via qla_tgt_create_sess():ha->qla2x_tmpl->check_initiator_node_acl()
  * to locate struct se_node_acl
  */
 static int tcm_qla2xxx_check_initiator_node_acl(
 	scsi_qla_host_t *vha,
-	void *q2t_sess,
+	void *qla_tgt_sess,
 	uint8_t *s_id,
 	uint16_t loop_id)
 {
@@ -656,7 +656,7 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	struct se_portal_group *se_tpg;
 	struct se_node_acl *se_nacl;
 	struct se_session *se_sess;
-	struct q2t_sess *sess = q2t_sess;
+	struct qla_tgt_sess *sess = qla_tgt_sess;
 	unsigned char port_name[36];
 
 	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
@@ -705,9 +705,9 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	 * mappings for fabric S_ID and LOOP_ID.
 	 */
 	tcm_qla2xxx_set_sess_by_s_id(lport, se_nacl, nacl, se_sess,
-			q2t_sess, s_id);
+			qla_tgt_sess, s_id);
 	tcm_qla2xxx_set_sess_by_loop_id(lport, se_nacl, nacl, se_sess,
-			q2t_sess, loop_id);
+			qla_tgt_sess, loop_id);
 	/*
 	 * Finally register the new FC Nexus with TCM
 	 */
@@ -869,7 +869,7 @@ out:
 	return ERR_PTR(ret);
 }
 
-extern void q2t_target_stop(struct q2t_tgt *);
+extern void qla_tgt_target_stop(struct qla_tgt *);
 
 static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 {
@@ -882,8 +882,8 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 	 * Call into qla2x_target.c LLD logic to shutdown the active
 	 * FC Nexuses and disable target mode operation for this qla_hw_data
 	 */
-	if ((ha->q2t_tgt != NULL) && !ha->q2t_tgt->tgt_stopped)
-		q2t_target_stop(ha->q2t_tgt);
+	if ((ha->qla_tgt != NULL) && !ha->qla_tgt->tgt_stopped)
+		qla_tgt_target_stop(ha->qla_tgt);
 	/*
 	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
 	 */

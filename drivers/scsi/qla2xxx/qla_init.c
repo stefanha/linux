@@ -2659,7 +2659,7 @@ qla2x00_rport_del(void *data)
 		 * if target mod is enabled.
 		 */
 		if (vha->hw->qla2x_tmpl)
-			q2t_fc_port_deleted(vha, fcport);
+			qla_tgt_fc_port_deleted(vha, fcport);
 	}
 }
 
@@ -3065,7 +3065,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 	 * enabled..
 	 */
 	if (ha->qla2x_tmpl)
-		q2t_fc_port_added(vha, fcport);
+		qla_tgt_fc_port_added(vha, fcport);
 
 	spin_lock_irq(fcport->vha->host->host_lock);
 	*((fc_port_t **)rport->dd_data) = fcport;
@@ -5020,11 +5020,11 @@ void
 qla2x00_enable_tgt_mode(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
-	struct q2t_tgt *tgt = ha->q2t_tgt;
+	struct qla_tgt *tgt = ha->qla_tgt;
 	unsigned long flags;
 
 	if (!tgt) {
-		printk(KERN_ERR "Unable to locate q2t_tgt pointer from"
+		printk(KERN_ERR "Unable to locate qla_tgt pointer from"
 			" struct qla_hw_data\n");
 		dump_stack();
 		return;
@@ -5050,11 +5050,11 @@ void
 qla2x00_disable_tgt_mode(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
-	struct q2t_tgt *tgt = ha->q2t_tgt;
+	struct qla_tgt *tgt = ha->qla_tgt;
 	unsigned long flags;
 
 	if (!tgt) {
-		printk(KERN_ERR "Unable to locate q2t_tgt pointer from"
+		printk(KERN_ERR "Unable to locate qla_tgt pointer from"
 			" struct qla_hw_data\n");
 		dump_stack();
 		return;
