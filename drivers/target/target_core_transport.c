@@ -394,7 +394,7 @@ static int transport_subsystem_reqmods(void)
 	ret = request_module("target_core_iblock");
 	if (ret != 0)
 		printk(KERN_ERR "Unable to load target_core_iblock\n");
-		
+
 	ret = request_module("target_core_file");
 	if (ret != 0)
 		printk(KERN_ERR "Unable to load target_core_file\n");
@@ -523,7 +523,7 @@ void transport_deregister_session_configfs(struct se_session *se_sess)
 		else {
 			se_nacl->nacl_sess = container_of(
 					se_nacl->acl_sess_list.prev,
-					struct se_session, sess_acl_list);	
+					struct se_session, sess_acl_list);
 		}
 		spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	}
@@ -1573,7 +1573,7 @@ static void scsi_dump_inquiry(struct se_device *dev)
 
 	printk("  Revision: ");
 	for (i = 0; i < 4; i++)
-		if (wwn->revision[i] >= 0x20)	
+		if (wwn->revision[i] >= 0x20)
 			printk("%c", wwn->revision[i]);
 		else
 			printk(" ");
@@ -1950,7 +1950,7 @@ int transport_generic_allocate_tasks(
 }
 EXPORT_SYMBOL(transport_generic_allocate_tasks);
 
-/* 
+/*
  * Used by fabric module frontends not defining a TFO->new_cmd_map()
  * to queue up a newly setup se_cmd w/ TRANSPORT_NEW_CMD statis
  */
@@ -1983,7 +1983,7 @@ int transport_generic_handle_cdb_map(
 	}
 
 	transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD_MAP);
-	return 0;	
+	return 0;
 }
 EXPORT_SYMBOL(transport_generic_handle_cdb_map);
 
@@ -2662,7 +2662,7 @@ check_depth:
 		}
 		/*
 		 * Handle the successful completion for transport_emulate_cdb()
-		 * for synchronous operation, following SCF_EMULATE_CDB_ASYNC 
+		 * for synchronous operation, following SCF_EMULATE_CDB_ASYNC
 		 * Otherwise the caller is expected to complete the task with
 		 * proper status.
 		 */
@@ -2907,7 +2907,7 @@ static void transport_xor_callback(struct se_cmd *cmd)
 	int i;
 	/*
 	 * From sbc3r22.pdf section 5.48 XDWRITEREAD (10) command
-	 * 
+	 *
 	 * 1) read the specified logical block(s);
 	 * 2) transfer logical blocks from the data-out buffer;
 	 * 3) XOR the logical blocks transferred from the data-out buffer with
@@ -3498,10 +3498,10 @@ static int transport_generic_cmd_sequencer(
 			sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
 			T_TASK(cmd)->t_task_lba = transport_lba_64(cdb);
 		}
-                if (sector_ret)
+		if (sector_ret)
 			goto out_unsupported_cdb;
 
-                size = transport_get_size(sectors, cdb, cmd);
+		size = transport_get_size(sectors, cdb, cmd);
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 
 		/*
@@ -3551,7 +3551,7 @@ static int transport_generic_cmd_sequencer(
 		 * or we are signaling the use of internal WRITE_SAME + UNMAP=1
 		 * emulation for -> Linux/BLOCK disbard with TCM/IBLOCK and
 		 * TCM/FILEIO subsystem plugin backstores.
-		 */ 
+		 */
 		if (!(passthrough)) {
 			if ((cdb[1] & 0x04) || (cdb[1] & 0x02)) {
 				printk(KERN_ERR "WRITE_SAME PBDATA and LBDATA"
@@ -3684,7 +3684,7 @@ static void transport_memcpy_write_contig(
 
 		src += length;
 		i++;
-        }
+	}
 }
 
 /*
@@ -3728,12 +3728,12 @@ static void transport_memcpy_se_mem_read_contig(
 
 	list_for_each_entry(se_mem, se_mem_list, se_list) {
 		length = se_mem->se_len;
-		
+
 		if (length > total_length)
 			length = total_length;
 
 		src = page_address(se_mem->se_page) + se_mem->se_off;
-		
+
 		memcpy(dst, src, length);
 
 		if (!(total_length -= length))
@@ -3879,7 +3879,7 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
 		/*
 		 * Check if we need to send READ payload for BIDI-COMMAND
-		 */	
+		 */
 		if (T_TASK(cmd)->t_mem_bidi_list != NULL) {
 			spin_lock(&cmd->se_lun->lun_sep_lock);
 			if (SE_LUN(cmd)->lun_sep) {
@@ -4092,7 +4092,7 @@ release_cmd:
  * @mem:  SGL style memory for TCM WRITE / READ
  * @sg_mem_num: Number of SGL elements
  * @mem_bidi_in: SGL style memory for TCM BIDI READ
- * @sg_mem_bidi_num: Number of BIDI READ SGL elements 
+ * @sg_mem_bidi_num: Number of BIDI READ SGL elements
  *
  * Return: nonzero return cmd was rejected for -ENOMEM or inproper usage
  * of parameters.
@@ -4135,7 +4135,7 @@ int transport_generic_map_mem_to_cmd(
 		 * For CDB using TCM struct se_mem linked list scatterlist memory
 		 * processed into a TCM struct se_subsystem_dev, we do the mapping
 		 * from the passed physical memory to struct se_mem->se_page here.
-		 */ 
+		 */
 		T_TASK(cmd)->t_mem_list = transport_init_se_mem_list();
 		if (!(T_TASK(cmd)->t_mem_list))
 			return -ENOMEM;
@@ -4166,7 +4166,7 @@ int transport_generic_map_mem_to_cmd(
 			}
 
 			T_TASK(cmd)->t_tasks_se_bidi_num = se_mem_cnt_out;
-		}	
+		}
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
@@ -4191,7 +4191,7 @@ int transport_generic_map_mem_to_cmd(
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_map_mem_to_cmd);
-	
+
 
 static inline long long transport_dev_end_lba(struct se_device *dev)
 {
@@ -4664,7 +4664,7 @@ int transport_map_mem_to_sg(
 				 * into the struct se_mem on the next go around..
 				 */
 				task_size -= sg->length;
-				if (!(task_size)) 
+				if (!(task_size))
 					*task_offset += sg->length;
 
 				goto next;
@@ -4933,7 +4933,7 @@ static u32 transport_generic_get_cdb_count(
 
 		se_mem = se_mem_lout;
 		/*
-		 * Setup the T_TASK(cmd)->t_mem_bidi_list -> task->task_sg_bidi 
+		 * Setup the T_TASK(cmd)->t_mem_bidi_list -> task->task_sg_bidi
 		 * mapping for SCSI READ for BIDI-COMMAND passthrough with TCM/pSCSI
 		 *
 		 * Note that the first call to transport_do_se_mem_map() above will
@@ -5444,7 +5444,7 @@ static int transport_clear_lun_thread(void *p)
 	struct se_lun *lun = (struct se_lun *)p;
 
 	__transport_clear_lun_from_sessions(lun);
-	complete(&lun->lun_shutdown_comp);	
+	complete(&lun->lun_shutdown_comp);
 
 	return 0;
 }
@@ -5452,7 +5452,7 @@ static int transport_clear_lun_thread(void *p)
 int transport_clear_lun_from_sessions(struct se_lun *lun)
 {
 	struct task_struct *kt;
-	
+
 	kt = kthread_run(transport_clear_lun_thread, (void *)lun,
 			"tcm_cl_%u", lun->unpacked_lun);
 	if (IS_ERR(kt)) {

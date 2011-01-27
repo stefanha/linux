@@ -241,7 +241,7 @@ int core_scsi2_emulate_crh(struct se_cmd *cmd)
 		 * A RELEASE(6) or RELEASE(10) command shall complete with GOOD
 		 * status, but the persistent reservation shall not be released,
 		 * if the command is received from a) and b)
-		 * 
+		 *
 		 * a) An I_T nexus that is a persistent reservation holder; or
 		 * b) An I_T nexus that is registered if a registrants only or
 		 *    all registrants type persistent reservation is present.
@@ -274,7 +274,7 @@ int core_scsi2_emulate_crh(struct se_cmd *cmd)
 		 * regardless of initiator shall conflict and shall terminate
 		 * with a RESERVATION CONFLICT status.
 		 */
-		spin_lock(&pr_tmpl->registration_lock);	
+		spin_lock(&pr_tmpl->registration_lock);
 		conflict = (list_empty(&pr_tmpl->registration_list)) ? 0 : 1;
 		spin_unlock(&pr_tmpl->registration_lock);
 	}
@@ -292,7 +292,7 @@ after_crh:
 	else if ((cdb[0] == RELEASE) || (cdb[0] == RELEASE_10))
 		return core_scsi2_reservation_release(cmd);
 	else
-		return PYX_TRANSPORT_INVALID_CDB_FIELD;		
+		return PYX_TRANSPORT_INVALID_CDB_FIELD;
 }
 
 /*
@@ -326,7 +326,7 @@ static int core_scsi3_pr_seq_non_holder(
 	 * Determine if the registration should be ignored due to
 	 * non-matching ISIDs in core_scsi3_pr_reservation_check().
 	 */
-	ignore_reg = (pr_reg_type & 0x80000000);	
+	ignore_reg = (pr_reg_type & 0x80000000);
 	if (ignore_reg)
 		pr_reg_type &= ~0x80000000;
 
@@ -729,7 +729,7 @@ static struct t10_pr_registration *__core_scsi3_alloc_registration(
 				continue;
 			/*
 			 * Only perform PR registrations for target ports on
-			 * the same fabric module as the REGISTER w/ ALL_TG_PT=1			
+			 * the same fabric module as the REGISTER w/ ALL_TG_PT=1
 			 * arrived.
 			 */
 			if (tfo != nacl_tmp->se_tpg->se_tpg_tfo)
@@ -853,7 +853,7 @@ int core_scsi3_alloc_aptpl_registration(
 		pr_reg->pr_reg_bin_isid = get_unaligned_be64(isid);
 		snprintf(pr_reg->pr_reg_isid, PR_REG_ISID_LEN, "%s", isid);
 		pr_reg->isid_present_at_reg = 1;
-        }
+	}
 	/*
 	 * Copy the i_port and t_port information from caller.
 	 */
@@ -1161,7 +1161,7 @@ static struct t10_pr_registration *__core_scsi3_locate_pr_reg(
 			continue;
 		if (strcmp(isid, pr_reg->pr_reg_isid))
 			continue;
-			
+
 		atomic_inc(&pr_reg->pr_res_holders);
 		smp_mb__after_atomic_inc();
 		spin_unlock(&pr_tmpl->registration_lock);
@@ -1416,7 +1416,7 @@ static void core_scsi3_nodeacl_undepend_item(struct se_node_acl *nacl)
 	}
 
 	configfs_undepend_item(TPG_TFO(tpg)->tf_subsys,
-			&nacl->acl_group.cg_item);	
+			&nacl->acl_group.cg_item);
 
 	atomic_dec(&nacl->acl_pr_ref_count);
 	smp_mb__after_atomic_dec();
@@ -1451,7 +1451,7 @@ static void core_scsi3_lunacl_undepend_item(struct se_dev_entry *se_deve)
 	if (!(lun_acl)) {
 		atomic_dec(&se_deve->pr_ref_count);
 		smp_mb__after_atomic_dec();
-		return;	
+		return;
 	}
 	nacl = lun_acl->se_lun_nacl;
 	tpg = nacl->se_tpg;
@@ -1568,7 +1568,7 @@ static int core_scsi3_decode_spec_i_port(
 			 * the received TransportID
 			 */
 			tmp_proto_ident = tmp_tf_ops->get_fabric_proto_ident(tmp_tpg);
-			if (tmp_proto_ident != proto_ident) 
+			if (tmp_proto_ident != proto_ident)
 				continue;
 			dest_rtpi = tmp_port->sep_rtpi;
 
@@ -1632,7 +1632,7 @@ static int core_scsi3_decode_spec_i_port(
 			break;
 		}
 		spin_unlock(&dev->se_port_lock);
-		
+
 		if (!(dest_tpg)) {
 			printk(KERN_ERR "SPC-3 PR SPEC_I_PT: Unable to locate"
 					" dest_tpg\n");
@@ -1671,13 +1671,13 @@ static int core_scsi3_decode_spec_i_port(
 			ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 			goto out;
 		}
-		
+
 		ret = core_scsi3_lunacl_depend_item(dest_se_deve);
 		if (ret < 0) {
 			printk(KERN_ERR "core_scsi3_lunacl_depend_item()"
 					" failed\n");
 			atomic_dec(&dest_se_deve->pr_ref_count);
-			smp_mb__after_atomic_dec();	
+			smp_mb__after_atomic_dec();
 			core_scsi3_nodeacl_undepend_item(dest_node_acl);
 			core_scsi3_tpg_undepend_item(dest_tpg);
 			ret = PYX_TRANSPORT_LU_COMM_FAILURE;
@@ -1695,8 +1695,8 @@ static int core_scsi3_decode_spec_i_port(
 		 */
 		pr_reg_e = __core_scsi3_locate_pr_reg(dev, dest_node_acl,
 					iport_ptr);
-		if (pr_reg_e) { 
-			core_scsi3_put_pr_reg(pr_reg_e);	
+		if (pr_reg_e) {
+			core_scsi3_put_pr_reg(pr_reg_e);
 			core_scsi3_lunacl_undepend_item(dest_se_deve);
 			core_scsi3_nodeacl_undepend_item(dest_node_acl);
 			core_scsi3_tpg_undepend_item(dest_tpg);
@@ -1779,7 +1779,7 @@ static int core_scsi3_decode_spec_i_port(
 		dest_se_deve = tidh->dest_se_deve;
 		dest_pr_reg = tidh->dest_pr_reg;
 		dest_local_nexus = tidh->dest_local_nexus;
-		
+
 		list_del(&tidh->dest_list);
 		kfree(tidh);
 
@@ -1884,7 +1884,7 @@ static int __core_scsi3_update_aptpl_buf(
 		/*
 		 * Write out any ISID value to APTPL metadata that was included
 		 * in the original registration.
-		 */	
+		 */
 		if (pr_reg->isid_present_at_reg)
 			snprintf(isid_buf, 32, "initiator_sid=%s\n",
 					pr_reg->pr_reg_isid);
@@ -2088,7 +2088,7 @@ static int core_scsi3_emulate_pro_register(
 	}
 	se_tpg = se_sess->se_tpg;
 	se_deve = &se_sess->se_node_acl->device_list[cmd->orig_fe_lun];
-	
+
 	if (TPG_TFO(se_tpg)->sess_get_initiator_sid != NULL) {
 		memset(&isid_buf[0], 0, PR_REG_ISID_LEN);
 		TPG_TFO(se_tpg)->sess_get_initiator_sid(se_sess, &isid_buf[0],
@@ -2201,7 +2201,7 @@ static int core_scsi3_emulate_pro_register(
 				" registration exists, but ALL_TG_PT=1 bit not"
 				" present in received PROUT\n");
 			core_scsi3_put_pr_reg(pr_reg);
-			return PYX_TRANSPORT_INVALID_CDB_FIELD;	
+			return PYX_TRANSPORT_INVALID_CDB_FIELD;
 		}
 		/*
 		 * Allocate APTPL metadata buffer used for UNREGISTER ops
@@ -2578,7 +2578,7 @@ static void __core_scsi3_complete_pro_release(
 	struct target_core_fabric_ops *tfo = se_nacl->se_tpg->se_tpg_tfo;
 	char i_buf[PR_REG_ISID_ID_LEN];
 	int prf_isid;
-	
+
 	memset(i_buf, 0, PR_REG_ISID_ID_LEN);
 	prf_isid = core_pr_dump_initiator_port(pr_reg, &i_buf[0],
 				PR_REG_ISID_ID_LEN);
@@ -2734,7 +2734,7 @@ static int core_scsi3_emulate_pro_release(
 	    (type != PR_TYPE_EXCLUSIVE_ACCESS_ALLREG)) {
 		/*
 		 * If no UNIT ATTENTION conditions will be established for
-		 * PR_TYPE_WRITE_EXCLUSIVE or PR_TYPE_EXCLUSIVE_ACCESS 
+		 * PR_TYPE_WRITE_EXCLUSIVE or PR_TYPE_EXCLUSIVE_ACCESS
 		 * go ahead and check for APTPL=1 update+write below
 		 */
 		goto write_aptpl;
@@ -3523,7 +3523,7 @@ after_iport_check:
 		ret = PYX_TRANSPORT_INVALID_PARAMETER_LIST;
 		goto out;
 	}
-	
+
 	ret = core_scsi3_lunacl_depend_item(dest_se_deve);
 	if (ret < 0) {
 		printk(KERN_ERR "core_scsi3_lunacl_depend_item() failed\n");

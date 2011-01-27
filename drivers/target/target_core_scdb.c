@@ -92,7 +92,7 @@ void split_cdb_XX_16(
 
 /*
  *	split_cdb_XX_32():
- *	
+ *
  * 	64-bit LBA w/ 32-bit SECTORS such as READ_32, WRITE_32 and emulated XDWRITEREAD_32
  */
 void split_cdb_XX_32(

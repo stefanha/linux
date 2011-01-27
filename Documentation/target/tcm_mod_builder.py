@@ -24,7 +24,7 @@ def tcm_mod_err(msg):
 	sys.exit(1)
 
 def tcm_mod_create_module_subdir(fabric_mod_dir_var):
-	
+
 	if os.path.isdir(fabric_mod_dir_var) == True:
 		return 1
 
@@ -165,7 +165,7 @@ def tcm_mod_build_iSCSI_include(fabric_mod_dir_var, fabric_mod_name):
 	buf += "	struct se_node_acl se_node_acl;\n"
 	buf += "};\n\n"
 	buf += "struct " + fabric_mod_name + "_tpg {\n"
-	buf += "	/* iSCSI target portal group tag for TCM */\n" 
+	buf += "	/* iSCSI target portal group tag for TCM */\n"
 	buf += "	u16 tport_tpgt;\n"
 	buf += "	/* Pointer back to " + fabric_mod_name + "_tport */\n"
 	buf += "	struct " + fabric_mod_name + "_tport *tport;\n"
@@ -283,7 +283,7 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 		buf += "	nacl->" + fabric_mod_init_port + "_wwpn = wwpn;\n"
 
 	buf += "	/* " + fabric_mod_name + "_format_wwn(&nacl->" + fabric_mod_init_port + "_name[0], " + fabric_mod_name.upper() + "_NAMELEN, wwpn); */\n\n"
-	buf += "	return se_nacl;\n"	
+	buf += "	return se_nacl;\n"
 	buf += "}\n\n"
 	buf += "static void " + fabric_mod_name + "_drop_nodeacl(struct se_node_acl *se_acl)\n"
 	buf += "{\n"
@@ -426,7 +426,7 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "	.fabric_make_nodeacl		= " + fabric_mod_name + "_make_nodeacl,\n"
 	buf += "	.fabric_drop_nodeacl		= " + fabric_mod_name + "_drop_nodeacl,\n"
 	buf += "};\n\n"
-	
+
 	buf += "static int " + fabric_mod_name + "_register_configfs(void)\n"
 	buf += "{\n"
 	buf += "	struct target_fabric_configfs *fabric;\n"
@@ -514,7 +514,7 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 def tcm_mod_scan_fabric_ops(tcm_dir):
 
 	fabric_ops_api = tcm_dir + "include/target/target_core_fabric_ops.h"
-	
+
 	print "Using tcm_mod_scan_fabric_ops: " + fabric_ops_api
 	process_fo = 0;
 
@@ -535,7 +535,7 @@ def tcm_mod_scan_fabric_ops(tcm_dir):
 
 			fabric_ops.append(line.rstrip())
 			continue
-		
+
 		line = p.readline()
 		# Search for function pointer
 		if not re.search('\(\*', line):
@@ -599,14 +599,14 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "}\n\n"
 	bufi += "int " + fabric_mod_name + "_check_false(struct se_portal_group *);\n"
 
-	total_fabric_ops = len(fabric_ops)	
+	total_fabric_ops = len(fabric_ops)
 	i = 0
 
 	while i < total_fabric_ops:
 		fo = fabric_ops[i]
 		i += 1
 #		print "fabric_ops: " + fo
-		
+
 		if re.search('get_fabric_name', fo):
 			buf += "char *" + fabric_mod_name + "_get_fabric_name(void)\n"
 			buf += "{\n"
@@ -794,7 +794,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "	return &nacl->se_node_acl;\n"
 			buf += "}\n\n"
 			bufi += "struct se_node_acl *" + fabric_mod_name + "_alloc_fabric_acl(struct se_portal_group *);\n"
-	
+
 		if re.search('release_fabric_acl\)\(', fo):
 			buf += "void " + fabric_mod_name + "_release_fabric_acl(\n"
 			buf += "	struct se_portal_group *se_tpg,\n"
@@ -813,7 +813,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "	return 1;\n"
 			buf += "}\n\n"
 			bufi += "u32 " + fabric_mod_name + "_tpg_get_inst_index(struct se_portal_group *);\n"
-			
+
 		if re.search('release_cmd_to_pool', fo):
 			buf += "void " + fabric_mod_name + "_release_cmd(struct se_cmd *se_cmd)\n"
 			buf += "{\n"
@@ -862,7 +862,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "	return 0;\n"
 			buf += "}\n\n"
 			bufi += "u32 " + fabric_mod_name + "_sess_get_index(struct se_session *);\n"
-		
+
 		if re.search('write_pending\)\(', fo):
 			buf += "int " + fabric_mod_name + "_write_pending(struct se_cmd *se_cmd)\n"
 			buf += "{\n"
@@ -925,7 +925,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "	return 0;\n"
 			buf += "}\n\n"
 			bufi += "int " + fabric_mod_name + "_queue_tm_rsp(struct se_cmd *);\n"
-			
+
 		if re.search('get_fabric_sense_len\)\(', fo):
 			buf += "u16 " + fabric_mod_name + "_get_fabric_sense_len(void)\n"
 			buf += "{\n"
@@ -992,7 +992,7 @@ def tcm_mod_build_kbuild(fabric_mod_dir_var, fabric_mod_name):
 	return
 
 def tcm_mod_build_kconfig(fabric_mod_dir_var, fabric_mod_name):
-	
+
 	buf = ""
 	f = fabric_mod_dir_var + "/Kconfig"
 	print "Writing file: " + f
@@ -1000,7 +1000,7 @@ def tcm_mod_build_kconfig(fabric_mod_dir_var, fabric_mod_name):
 	p = open(f, 'w')
 	if not p:
 		tcm_mod_err("Unable to open file: " + f)
-		
+
 	buf = "config " + fabric_mod_name.upper() + "\n"
 	buf += "	tristate \"" + fabric_mod_name.upper() + " fabric module\"\n"
 	buf += "	depends on TARGET_CORE && CONFIGFS_FS\n"

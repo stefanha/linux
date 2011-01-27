@@ -63,7 +63,7 @@ and the same for drivers/target/Kconfig:
 
 *) Run 'make menuconfig' and select the new CONFIG_TCM_NAB5000 item:
 
-	<M>   TCM_NAB5000 fabric module                   
+	<M>   TCM_NAB5000 fabric module
 
 *) Build using 'make modules', once completed you will have:
 
@@ -119,16 +119,16 @@ target:/mnt/sdb/lio-core-2.6.git# tree /sys/kernel/config/target/nab5000/
 
 target:/mnt/sdb/lio-core-2.6.git# lsmod
 Module                  Size  Used by
-tcm_nab5000             3935  4 
-iscsi_target_mod      193211  0 
-target_core_stgt        8090  0 
-target_core_pscsi      11122  1 
-target_core_file        9172  2 
-target_core_iblock      9280  1 
+tcm_nab5000             3935  4
+iscsi_target_mod      193211  0
+target_core_stgt        8090  0
+target_core_pscsi      11122  1
+target_core_file        9172  2
+target_core_iblock      9280  1
 target_core_mod       228575  31
 tcm_nab5000,iscsi_target_mod,target_core_stgt,target_core_pscsi,target_core_file,target_core_iblock
-libfc                  73681  0 
-scsi_debug             56265  0 
+libfc                  73681  0
+scsi_debug             56265  0
 scsi_tgt                8666  1 target_core_stgt
 configfs               20644  2 target_core_mod
 
@@ -136,9 +136,9 @@ configfs               20644  2 target_core_mod
 
 Future TODO items:
 
-	*) Add more T10 proto_idents 
+	*) Add more T10 proto_idents
 	*) Make tcm_mod_dump_fabric_ops() smarter and generate function pointer
-	   defs directly from include/target/target_core_fabric_ops.h:struct target_core_fabric_ops 
+	   defs directly from include/target/target_core_fabric_ops.h:struct target_core_fabric_ops
 	   structure members.
 
 October 5th, 2010

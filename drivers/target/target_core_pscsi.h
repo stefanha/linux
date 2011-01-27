@@ -38,7 +38,7 @@ struct pscsi_plugin_task {
 #define PDF_HAS_LUN_ID		0x04
 #define PDF_HAS_VPD_UNIT_SERIAL 0x08
 #define PDF_HAS_VPD_DEV_IDENT	0x10
-#define PDF_HAS_VIRT_HOST_ID	0x20	
+#define PDF_HAS_VIRT_HOST_ID	0x20
 
 struct pscsi_dev_virt {
 	int	pdv_flags;

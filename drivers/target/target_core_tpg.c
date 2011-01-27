@@ -408,7 +408,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	acl->se_tpg = tpg;
 	acl->acl_index = scsi_get_new_index(SCSI_AUTH_INTR_INDEX);
 	spin_lock_init(&acl->stats_lock);
-	
+
 	TPG_TFO(tpg)->set_default_node_attributes(acl);
 
 	if (core_create_device_list_for_node(acl) < 0) {
@@ -612,7 +612,7 @@ static int core_tpg_setup_virtual_lun0(struct se_portal_group *se_tpg)
 	u32 lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
 	int ret;
 
-	lun->unpacked_lun = 0;	
+	lun->unpacked_lun = 0;
 	lun->lun_status = TRANSPORT_LUN_STATUS_FREE;
 	atomic_set(&lun->lun_acl_count, 0);
 	init_completion(&lun->lun_shutdown_comp);

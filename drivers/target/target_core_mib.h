@@ -19,4 +19,3 @@ extern void init_scsi_index_table(void);
 extern u32 scsi_get_new_index(scsi_index_t);
 
 #endif   /*** TARGET_CORE_MIB_H ***/
-

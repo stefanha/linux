@@ -390,8 +390,8 @@ int core_tmr_lun_reset(
 		dev->dev_reserved_node_acl = NULL;
 		dev->dev_flags &= ~DF_SPC2_RESERVATIONS;
 		spin_unlock(&dev->dev_reservation_lock);
-		printk(KERN_INFO "LUN_RESET: SCSI-2 Released reservation\n");	
-	}	
+		printk(KERN_INFO "LUN_RESET: SCSI-2 Released reservation\n");
+	}
 
 	spin_lock(&dev->stats_lock);
 	dev->num_resets++;
