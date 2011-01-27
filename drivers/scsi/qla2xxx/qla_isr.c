@@ -2352,11 +2352,9 @@ qla24xx_intr_handler(int irq, void *dev_id)
 			qla24xx_process_response_queue(vha, rsp);
 			break;
 		case 0x1C: /* ATIO queue updated */
-			printk("interrupt ATIO queue updated..\n");
 			qla24xx_process_atio_queue(vha);
 			break;
 		case 0x1D: /* ATIO and response queues updated */
-			printk("interrupt ATIO and response queues updated\n");
 			qla24xx_process_atio_queue(vha);
 			qla24xx_process_response_queue(vha, rsp);
 			break;

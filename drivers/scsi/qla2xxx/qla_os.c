@@ -2003,7 +2003,6 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto probe_out;
 	}
 	ha->pdev = pdev;
-	printk("Setting enable_class_2: %d\n", ql2xenableclass2);
 	ha->enable_class_2 = ql2xenableclass2;
 
 	/* Clear our data area */

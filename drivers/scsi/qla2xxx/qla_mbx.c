@@ -3156,12 +3156,12 @@ qla24xx_modify_vp_config(scsi_qla_host_t *vha)
 	vpmod->options_idx1 = BIT_3|BIT_4|BIT_5;
 	/* Enable target mode */
 	if (qla_tgt_mode_enabled(vha)) {
-		printk("qla24xx_modify_vp_config(), MODE_TARGET enabled, clearing BIT_5\n");
+		DEBUG11(printk("MODE_TARGET enabled, clearing BIT_5\n"));
 		vpmod->options_idx1 &= ~BIT_5;
 	}
 	/* Disable ini mode, if requested */
 	if (!qla_ini_mode_enabled(vha)) {
-		printk("qla24xx_modify_vp_config(), MODE_INITIATOR disabled, clearing BIT_4\n");
+		DEBUG11(printk("MODE_INITIATOR disabled, clearing BIT_4\n"));
 		vpmod->options_idx1 &= ~BIT_4;
 	}
 

@@ -303,7 +303,7 @@ qla2x00_vp_abort_isp(scsi_qla_host_t *vha)
 
 	/* Enable target response to SCSI bus. */
 	if (qla_tgt_mode_enabled(vha)) {
-		printk("qla2x00_vp_abort_isp() calling qla2x00_send_enable_lun()\n");
+		DEBUG15(printk("qla2x00_vp_abort_isp() calling qla2x00_send_enable_lun()\n"));
 		qla2x00_send_enable_lun(vha, true);
 	}
 
@@ -395,19 +395,19 @@ qla24xx_vport_create_req_sanity_check(struct fc_vport *fc_vport)
 	uint8_t port_name[WWN_SIZE];
 
 	if (fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR) {
-		printk("fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR\n");
+		DEBUG15(printk("fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR\n"));
 		return VPCERR_UNSUPPORTED;
 	}
 
 	/* Check up the F/W and H/W support NPIV */
 	if (!ha->flags.npiv_supported) {
-		printk("!ha->flags.npiv_supported\n");
+		DEBUG15(printk("!ha->flags.npiv_supported\n"));
 		return VPCERR_UNSUPPORTED;
 	}
 
 	/* Check up whether npiv supported switch presented */
 	if (!(ha->switch_cap & FLOGI_MID_SUPPORT)) {
-		printk("!(ha->switch_cap & FLOGI_MID_SUPPORT))\n");
+		DEBUG15(printk("!(ha->switch_cap & FLOGI_MID_SUPPORT))\n"));
 		return VPCERR_NO_FABRIC_SUPP;
 	}
 	/* Check up unique WWPN */

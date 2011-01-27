@@ -3028,7 +3028,6 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 	struct fc_rport_identifiers rport_ids;
 	struct fc_rport *rport;
 	struct qla_hw_data *ha = vha->hw;
-	int i;
 
 	qla2x00_rport_del(fcport);
 
@@ -3043,23 +3042,6 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 		    "Unable to allocate fc remote port!\n");
 		return;
 	}
-
-	printk("qla2x00_reg_remote_port() fcport->node_name: ");
-	for (i = 0; i < 8; i++)
-		printk("%02x ", fcport->node_name[i]);
-	printk("\n");
-
-	printk("qla2x00_reg_remote_port() fcport->port_name: ");
-	for (i = 0; i < 8; i++)
-		printk("%02x ", fcport->port_name[i]);
-	printk("\n");
-
-	printk("qla2x00_reg_remote_port() s_id: 0x%02x %02x %02x\n",
-		fcport->d_id.b.domain, fcport->d_id.b.area, fcport->d_id.b.al_pa);
-	printk("qla2x00_reg_remote_port() loop_id: 0x%04x\n",
-		fcport->loop_id);
-	printk("qla2x00_reg_remote_port() Using vha: %p vp_idx: 0x%04x\n",
-		vha, vha->vp_idx);
 	/*
 	 * Create target mode FC NEXUS in qla2x_target.c if target mode is
 	 * enabled..
