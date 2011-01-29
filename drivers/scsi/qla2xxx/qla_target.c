@@ -3179,31 +3179,31 @@ static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
 	case QLA_TGT_CLEAR_ACA:
 		DEBUG23(qla_printk(KERN_INFO, "qla_target(%d): CLEAR_ACA received\n",
 			sess->vha->vp_idx));
-		tmr_func = CLEAR_ACA;
+		tmr_func = TMR_CLEAR_ACA;
 		break;
 
 	case QLA_TGT_TARGET_RESET:
 		DEBUG23(qla_printk(KERN_INFO, "qla_target(%d): TARGET_RESET received\n",
 			sess->vha->vp_idx));
-		tmr_func = TARGET_WARM_RESET;
+		tmr_func = TMR_TARGET_WARM_RESET;
 		break;
 
 	case QLA_TGT_LUN_RESET:
 		DEBUG23(qla_printk(KERN_INFO, "qla_target(%d): LUN_RESET received\n",
 			sess->vha->vp_idx));
-		tmr_func = LUN_RESET;
+		tmr_func = TMR_LUN_RESET;
 		break;
 
 	case QLA_TGT_CLEAR_TS:
 		DEBUG23(qla_printk(KERN_INFO, "qla_target(%d): CLEAR_TS received\n",
 			sess->vha->vp_idx));
-		tmr_func = CLEAR_TASK_SET;
+		tmr_func = TMR_CLEAR_TASK_SET;
 		break;
 
 	case QLA_TGT_ABORT_TS:
 		DEBUG23(qla_printk(KERN_INFO, "qla_target(%d): ABORT_TS received\n",
 			sess->vha->vp_idx));
-		tmr_func = ABORT_TASK_SET;
+		tmr_func = TMR_ABORT_TASK_SET;
 		break;
 #if 0
 	case QLA_TGT_ABORT_ALL:
