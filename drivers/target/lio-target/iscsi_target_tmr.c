@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
@@ -68,13 +69,13 @@ u8 iscsi_tmr_abort_task(
 			" %hu.\n", hdr->ref_task_tag, conn->cid);
 		return ((hdr->ref_cmd_sn >= SESS(conn)->exp_cmd_sn) &&
 			(hdr->ref_cmd_sn <= SESS(conn)->max_cmd_sn)) ?
-				FUNCTION_COMPLETE : TASK_DOES_NOT_EXIST;
+			ISCSI_TMF_RSP_COMPLETE : ISCSI_TMF_RSP_NO_TASK;
 	}
 	if (ref_cmd->cmd_sn != hdr->ref_cmd_sn) {
 		printk(KERN_ERR "RefCmdSN 0x%08x does not equal"
 			" task's CmdSN 0x%08x. Rejecting ABORT_TASK.\n",
 			hdr->ref_cmd_sn, ref_cmd->cmd_sn);
-		return FUNCTION_REJECTED;
+		return ISCSI_TMF_RSP_REJECTED;
 	}
 
 	se_tmr->ref_task_tag		= hdr->ref_task_tag;
@@ -83,7 +84,7 @@ u8 iscsi_tmr_abort_task(
 	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
 	tmr_req->exp_data_sn		= hdr->exp_data_sn;
 
-	return FUNCTION_COMPLETE;
+	return ISCSI_TMF_RSP_COMPLETE;
 }
 
 /*	iscsi_tmr_task_warm_reset():
@@ -162,7 +163,7 @@ u8 iscsi_tmr_task_reassign(
 	if (SESS_OPS_C(conn)->ErrorRecoveryLevel != 2) {
 		printk(KERN_ERR "TMR TASK_REASSIGN not supported in ERL<2,"
 				" ignoring request.\n");
-		return TASK_FAILOVER_NOT_SUPPORTED;
+		return ISCSI_TMF_RSP_NOT_SUPPORTED;
 	}
 
 	ret = iscsi_find_cmd_for_recovery(SESS(conn), &ref_cmd,
@@ -170,12 +171,12 @@ u8 iscsi_tmr_task_reassign(
 	if (ret == -2) {
 		printk(KERN_ERR "Command ITT: 0x%08x is still alligent to CID:"
 			" %hu\n", ref_cmd->init_task_tag, cr->cid);
-		return TASK_STILL_ALLEGIANT;
+		return ISCSI_TMF_RSP_TASK_ALLEGIANT;
 	} else if (ret == -1) {
 		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x in"
 			" connection recovery command list.\n",
 				hdr->ref_task_tag);
-		return TASK_DOES_NOT_EXIST;
+		return ISCSI_TMF_RSP_NO_TASK;
 	}
 	/*
 	 * Temporary check to prevent connection recovery for
@@ -186,7 +187,7 @@ u8 iscsi_tmr_task_reassign(
 		printk(KERN_ERR "Unable to perform connection recovery for"
 			" differing MaxRecvDataSegmentLength, rejecting"
 			" TMR TASK_REASSIGN.\n");
-		return FUNCTION_REJECTED;
+		return ISCSI_TMF_RSP_REJECTED;
 	}
 
 	se_tmr->ref_task_tag		= hdr->ref_task_tag;
@@ -195,13 +196,13 @@ u8 iscsi_tmr_task_reassign(
 	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
 	tmr_req->exp_data_sn		= hdr->exp_data_sn;
 	tmr_req->conn_recovery		= cr;
-
+	tmr_req->task_reassign		= 1;
 	/*
 	 * Command can now be reassigned to a new connection.
 	 * The task management response must be sent before the
 	 * reassignment actually happens.  See iscsi_tmr_post_handler().
 	 */
-	return FUNCTION_COMPLETE;
+	return ISCSI_TMF_RSP_COMPLETE;
 }
 
 /*      iscsi_task_reassign_remove_cmd():
@@ -521,8 +522,8 @@ extern int iscsi_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 
-	if ((se_tmr->function == TASK_REASSIGN) &&
-	    (se_tmr->response == FUNCTION_COMPLETE))
+	if (tmr_req->task_reassign &&
+	   (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))
 		return iscsi_task_reassign_complete(tmr_req, conn);
 
 	return 0;

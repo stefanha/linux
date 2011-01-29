@@ -45,6 +45,7 @@
 #include <linux/crypto.h>
 #include <net/sock.h>
 #include <net/tcp.h>
+#include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
@@ -57,6 +58,7 @@
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_erl2.h>
 #include <iscsi_target_login.h>
+#include <target/target_core_tmr.h>
 #include <iscsi_target_tmr.h>
 #include <iscsi_target_tpg.h>
 #include <target/target_core_transport.h>
@@ -2778,20 +2780,22 @@ static inline int iscsi_handle_task_mgt_cmd(
 		" 0x%08x, CID: %hu\n", hdr->init_task_tag, hdr->cmd_sn,
 		hdr->function, hdr->ref_task_tag, hdr->ref_cmd_sn, conn->cid);
 
-	if ((hdr->function != ABORT_TASK) &&
-	    ((hdr->function != TASK_REASSIGN) &&
+	if ((hdr->function != ISCSI_TM_FUNC_ABORT_TASK) &&
+	    ((hdr->function != ISCSI_TM_FUNC_TASK_REASSIGN) &&
 	     (hdr->ref_task_tag != RESERVED))) {
 		printk(KERN_ERR "RefTaskTag should be set to 0xFFFFFFFF.\n");
 		hdr->ref_task_tag = RESERVED;
 	}
 
-	if ((hdr->function == TASK_REASSIGN) && !(hdr->opcode & I_BIT)) {
+	if ((hdr->function == ISCSI_TM_FUNC_TASK_REASSIGN) &&
+			!(hdr->opcode & I_BIT)) {
 		printk(KERN_ERR "Task Management Request TASK_REASSIGN not"
 			" issued as immediate command, bad iSCSI Initiator"
 				"implementation\n");
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
-	if ((hdr->function != ABORT_TASK) && (hdr->ref_cmd_sn != RESERVED))
+	if ((hdr->function != ISCSI_TM_FUNC_ABORT_TASK) &&
+			(hdr->ref_cmd_sn != RESERVED))
 		hdr->ref_cmd_sn = RESERVED;
 
 	cmd = iscsi_allocate_se_cmd_for_tmr(conn, hdr->function);
@@ -2810,49 +2814,49 @@ static inline int iscsi_handle_task_mgt_cmd(
 	/*
 	 * Locate the struct se_lun for all TMRs not related to ERL=2 TASK_REASSIGN
 	 */
-	if (se_tmr->function != TASK_REASSIGN) {
+	if (se_tmr->function != ISCSI_TM_FUNC_TASK_REASSIGN) {
 		ret = iscsi_get_lun_for_tmr(cmd, hdr->lun);
 		if (ret < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-			se_tmr->response = LUN_DOES_NOT_EXIST;
+			se_tmr->response = ISCSI_TMF_RSP_NO_LUN;
 			goto attach;
 		}
 	}
 
 	switch (se_tmr->function) {
-	case ABORT_TASK:
+	case ISCSI_TM_FUNC_ABORT_TASK:
 		se_tmr->response = iscsi_tmr_abort_task(cmd, buf);
-		if (se_tmr->response != FUNCTION_COMPLETE) {
+		if (se_tmr->response != ISCSI_TMF_RSP_COMPLETE) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			goto attach;
 		}
 		break;
-	case ABORT_TASK_SET:
-	case CLEAR_ACA:
-	case CLEAR_TASK_SET:
-	case LUN_RESET:
+	case ISCSI_TM_FUNC_ABORT_TASK_SET:
+	case ISCSI_TM_FUNC_CLEAR_ACA:
+	case ISCSI_TM_FUNC_CLEAR_TASK_SET:
+	case ISCSI_TM_FUNC_LOGICAL_UNIT_RESET:
 		break;
-	case TARGET_WARM_RESET:
+	case ISCSI_TM_FUNC_TARGET_WARM_RESET:
 		if (iscsi_tmr_task_warm_reset(conn, tmr_req, buf) < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-			se_tmr->response = FUNCTION_AUTHORIZATION_FAILED;
+			se_tmr->response = ISCSI_TMF_RSP_AUTH_FAILED;
 			goto attach;
 		}
 		break;
-	case TARGET_COLD_RESET:
+	case ISCSI_TM_FUNC_TARGET_COLD_RESET:
 		if (iscsi_tmr_task_cold_reset(conn, tmr_req, buf) < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-			se_tmr->response = FUNCTION_AUTHORIZATION_FAILED;
+			se_tmr->response = ISCSI_TMF_RSP_AUTH_FAILED;
 			goto attach;
 		}
 		break;
-	case TASK_REASSIGN:
+	case ISCSI_TM_FUNC_TASK_REASSIGN:
 		se_tmr->response = iscsi_tmr_task_reassign(cmd, buf);
 		/*
 		 * Perform sanity checks on the ExpDataSN only if the
 		 * TASK_REASSIGN was successful.
 		 */
-		if (se_tmr->response != FUNCTION_COMPLETE)
+		if (se_tmr->response != ISCSI_TMF_RSP_COMPLETE)
 			break;
 
 		if (iscsi_check_task_reassign_expdatasn(tmr_req, conn) < 0)
@@ -2864,12 +2868,12 @@ static inline int iscsi_handle_task_mgt_cmd(
 		printk(KERN_ERR "Unknown TMR function: 0x%02x, protocol"
 			" error.\n", hdr->function);
 		SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		se_tmr->response = TASK_MGMT_FUNCTION_NOT_SUPPORTED;
+		se_tmr->response = ISCSI_TMF_RSP_NOT_SUPPORTED;
 		goto attach;
 	}
 
-	if ((hdr->function != TASK_REASSIGN) &&
-	    (se_tmr->response == FUNCTION_COMPLETE))
+	if ((hdr->function != ISCSI_TM_FUNC_TASK_REASSIGN) &&
+	    (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))
 		se_tmr->call_transport = 1;
 attach:
 	iscsi_attach_cmd_to_queue(conn, cmd);
@@ -4606,6 +4610,25 @@ int lio_queue_tm_rsp(struct se_cmd *se_cmd)
 	return 0;
 }
 
+static inline u8 iscsi_convert_tcm_tmr_rsp(struct se_tmr_req *se_tmr)
+{
+	switch (se_tmr->response) {
+	case TMR_FUNCTION_COMPLETE:
+		return ISCSI_TMF_RSP_COMPLETE;
+	case TMR_TASK_DOES_NOT_EXIST:
+		return ISCSI_TMF_RSP_NO_TASK;
+	case TMR_LUN_DOES_NOT_EXIST:
+		return ISCSI_TMF_RSP_NO_LUN;
+	case TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED:
+		return ISCSI_TMF_RSP_NOT_SUPPORTED;
+	case TMR_FUNCTION_AUTHORIZATION_FAILED:
+		return ISCSI_TMF_RSP_AUTH_FAILED;
+	case TMR_FUNCTION_REJECTED:
+	default:
+		return ISCSI_TMF_RSP_REJECTED;
+	}
+}
+
 /*	iscsi_send_task_mgt_rsp():
  *
  *
@@ -4622,7 +4645,7 @@ static int iscsi_send_task_mgt_rsp(
 	hdr			= (struct iscsi_targ_task_mgt_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
 	hdr->opcode		= ISCSI_TARG_TASK_MGMT_RSP;
-	hdr->response		= se_tmr->response;
+	hdr->response		= iscsi_convert_tcm_tmr_rsp(se_tmr);
 	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);

@@ -39,6 +39,7 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include <scsi/libsas.h> /* For TASK_ATTR_* */
+#include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
 #include <iscsi_protocol.h>
@@ -341,7 +342,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	 * TASK_REASSIGN for ERL=2 / connection stays inside of
 	* LIO-Target $FABRIC_MOD
 	 */
-	if (function == TASK_REASSIGN)
+	if (function == ISCSI_TM_FUNC_TASK_REASSIGN)
 		return cmd;
 
 	se_cmd = &cmd->se_cmd;

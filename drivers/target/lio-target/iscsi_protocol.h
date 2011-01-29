@@ -202,38 +202,6 @@
 #define CONNRECOVERYNOTSUPPORTED		2
 #define CLEANUPFAILED				3
 
-/* task management function values */
-#ifdef ABORT_TASK
-#undef ABORT_TASK
-#endif /* ABORT_TASK */
-#define ABORT_TASK            			1
-#ifdef ABORT_TASK_SET
-#undef ABORT_TASK_SET
-#endif /* ABORT_TASK_SET */
-#define ABORT_TASK_SET        			2
-#ifdef CLEAR_ACA
-#undef CLEAR_ACA
-#endif /* CLEAR_ACA */
-#define CLEAR_ACA             			3
-#ifdef CLEAR_TASK_SET
-#undef CLEAR_TASK_SET
-#endif /* CLEAR_TASK_SET */
-#define CLEAR_TASK_SET        			4
-#define LUN_RESET             			5
-#define TARGET_WARM_RESET     			6
-#define TARGET_COLD_RESET     			7
-#define TASK_REASSIGN				8
-
-/* task management response values */
-#define FUNCTION_COMPLETE			0
-#define TASK_DOES_NOT_EXIST			1
-#define LUN_DOES_NOT_EXIST			2
-#define TASK_STILL_ALLEGIANT			3
-#define TASK_FAILOVER_NOT_SUPPORTED		4
-#define TASK_MGMT_FUNCTION_NOT_SUPPORTED	5
-#define FUNCTION_AUTHORIZATION_FAILED		6
-#define FUNCTION_REJECTED           		255
-
 /* async_event in ISCSI_TARG_ASYNC_MSG opcode */
 #define ASYNC_EVENT_SCSI_EVENT			0
 #define ASYNC_EVENT_REQUEST_LOGOUT		1
