@@ -423,7 +423,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 
 	switch (fcp->fc_tm_flags) {
 	case FCP_TMF_LUN_RESET:
-		tm_func = LUN_RESET;
+		tm_func = TMR_LUN_RESET;
 		if (ft_get_lun_for_cmd(cmd, fcp->fc_lun) < 0) {
 			ft_dump_cmd(cmd, __func__);
 			transport_send_check_condition_and_sense(&cmd->se_cmd,
@@ -433,16 +433,16 @@ static void ft_send_tm(struct ft_cmd *cmd)
 		}
 		break;
 	case FCP_TMF_TGT_RESET:
-		tm_func = TARGET_WARM_RESET;
+		tm_func = TMR_TARGET_WARM_RESET;
 		break;
 	case FCP_TMF_CLR_TASK_SET:
-		tm_func = CLEAR_TASK_SET;
+		tm_func = TMR_CLEAR_TASK_SET;
 		break;
 	case FCP_TMF_ABT_TASK_SET:
-		tm_func = ABORT_TASK_SET;
+		tm_func = TMR_ABORT_TASK_SET;
 		break;
 	case FCP_TMF_CLR_ACA:
-		tm_func = CLEAR_ACA;
+		tm_func = TMR_CLEAR_ACA;
 		break;
 	default:
 		/*
@@ -484,9 +484,9 @@ int ft_queue_tm_resp(struct se_cmd *se_cmd)
 	case TMR_FUNCTION_REJECTED:
 		code = FCP_TMF_REJECTED;
 		break;
-	case TMR_TASK_DOES_NOT_EXIST:
 	case TMR_TASK_STILL_ALLEGIANT:
 	case TMR_TASK_FAILOVER_NOT_SUPPORTED:
+	case TMR_TASK_DOES_NOT_EXIST:
 	case TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED:
 	case TMR_FUNCTION_AUTHORIZATION_FAILED:
 	default:
