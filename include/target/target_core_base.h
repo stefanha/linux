@@ -618,6 +618,12 @@ struct se_device;
 struct se_transform_info;
 struct scatterlist;
 
+struct se_ml_stat_grps {
+	struct config_group	stat_group;
+	struct config_group	scsi_auth_intr_group;
+	struct config_group	scsi_att_intr_port_group;
+};
+
 struct se_lun_acl {
 	char			initiatorname[TRANSPORT_IQN_LEN];
 	u32			mapped_lun;
@@ -625,7 +631,10 @@ struct se_lun_acl {
 	struct se_lun		*se_lun;
 	struct list_head	lacl_list;
 	struct config_group	se_lun_group;
+	struct se_ml_stat_grps	ml_stat_grps;
 }  ____cacheline_aligned;
+
+#define ML_STAT_GRPS(lacl)	(&(lacl)->ml_stat_grps)
 
 struct se_dev_entry {
 	bool			def_pr_registered;

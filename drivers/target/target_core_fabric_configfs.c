@@ -232,6 +232,32 @@ TF_CIT_SETUP(tpg_mappedlun, &target_fabric_mappedlun_item_ops, NULL,
 
 /* End of tfc_tpg_mappedlun_cit */
 
+/* Start of tfc_tpg_mappedlun_port_cit */
+
+static struct config_group *target_core_mappedlun_stat_mkdir(
+	struct config_group *group,
+	const char *name)
+{
+	return ERR_PTR(-ENOSYS);
+}
+
+static void target_core_mappedlun_stat_rmdir(
+	struct config_group *group,
+	struct config_item *item)
+{
+	return;
+}
+
+static struct configfs_group_operations target_fabric_mappedlun_stat_group_ops = {
+	.make_group		= target_core_mappedlun_stat_mkdir,
+	.drop_item		= target_core_mappedlun_stat_rmdir,
+};
+
+TF_CIT_SETUP(tpg_mappedlun_stat, NULL, &target_fabric_mappedlun_stat_group_ops,
+		NULL);
+
+/* End of tfc_tpg_mappedlun_port_cit */
+
 /* Start of tfc_tpg_nacl_attrib_cit */
 
 CONFIGFS_EATTR_OPS(target_fabric_nacl_attrib, se_node_acl, acl_attrib_group);
@@ -285,6 +311,7 @@ static struct config_group *target_fabric_make_mappedlun(
 	struct target_fabric_configfs *tf = se_tpg->se_tpg_wwn->wwn_tf;
 	struct se_lun_acl *lacl;
 	struct config_item *acl_ci;
+	struct config_group *lacl_cg = NULL, *ml_stat_grp = NULL;
 	char *buf;
 	unsigned long mapped_lun;
 	int ret = 0;
@@ -321,15 +348,42 @@ static struct config_group *target_fabric_make_mappedlun(
 
 	lacl = core_dev_init_initiator_node_lun_acl(se_tpg, mapped_lun,
 			config_item_name(acl_ci), &ret);
-	if (!(lacl))
+	if (!(lacl)) {
+		ret = -EINVAL;
 		goto out;
+	}
+
+	lacl_cg = &lacl->se_lun_group;
+	lacl_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+				GFP_KERNEL);
+	if (!lacl_cg->default_groups) {
+		printk(KERN_ERR "Unable to allocate lacl_cg->default_groups\n");
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	config_group_init_type_name(&lacl->se_lun_group, name,
 			&TF_CIT_TMPL(tf)->tfc_tpg_mappedlun_cit);
+	config_group_init_type_name(&lacl->ml_stat_grps.stat_group,
+			"statistics", &TF_CIT_TMPL(tf)->tfc_tpg_mappedlun_stat_cit);
+	lacl_cg->default_groups[0] = &lacl->ml_stat_grps.stat_group;
+	lacl_cg->default_groups[1] = NULL;
+
+	ml_stat_grp = &ML_STAT_GRPS(lacl)->stat_group;	
+	ml_stat_grp->default_groups = kzalloc(sizeof(struct config_group) * 3,
+				GFP_KERNEL);
+	if (!ml_stat_grp->default_groups) {
+		printk(KERN_ERR "Unable to allocate ml_stat_grp->default_groups\n");
+		ret = -ENOMEM;
+		goto out;
+	}
+	target_stat_setup_mappedlun_default_groups(lacl);
 
 	kfree(buf);
 	return &lacl->se_lun_group;
 out:
+	if (lacl_cg)
+		kfree(lacl_cg->default_groups);
 	kfree(buf);
 	return ERR_PTR(ret);
 }
@@ -341,6 +395,25 @@ static void target_fabric_drop_mappedlun(
 	struct se_lun_acl *lacl = container_of(to_config_group(item),
 			struct se_lun_acl, se_lun_group);
 	struct se_portal_group *se_tpg = lacl->se_lun_nacl->se_tpg;
+	struct config_item *df_item;
+	struct config_group *lacl_cg = NULL, *ml_stat_grp = NULL;
+	int i;
+
+	ml_stat_grp = &ML_STAT_GRPS(lacl)->stat_group;
+	for (i = 0; ml_stat_grp->default_groups[i]; i++) {
+		df_item = &ml_stat_grp->default_groups[i]->cg_item;
+		ml_stat_grp->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(ml_stat_grp->default_groups);
+
+	lacl_cg = &lacl->se_lun_group;
+	for (i = 0; lacl_cg->default_groups[i]; i++) {
+		df_item = &lacl_cg->default_groups[i]->cg_item;
+		lacl_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(lacl_cg->default_groups);
 
 	config_item_put(item);
 	core_dev_free_initiator_node_lun_acl(se_tpg, lacl);
@@ -1068,6 +1141,7 @@ int target_fabric_setup_cits(struct target_fabric_configfs *tf)
 	target_fabric_setup_tpg_nacl_auth_cit(tf);
 	target_fabric_setup_tpg_nacl_param_cit(tf);
 	target_fabric_setup_tpg_mappedlun_cit(tf);
+	target_fabric_setup_tpg_mappedlun_stat_cit(tf);
 
 	return 0;
 }
