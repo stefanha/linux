@@ -4,10 +4,10 @@
  * This file contains generic fabric module configfs infrastructure for
  * TCM v4.x code
  *
- * Copyright (c) 2010 Rising Tide Systems
- * Copyright (c) 2010 Linux-iSCSI.org
+ * Copyright (c) 2010,2011 Rising Tide Systems
+ * Copyright (c) 2010,2011 Linux-iSCSI.org
  *
- * Copyright (c) 2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Copyright (c) Nicholas A. Bellinger <nab@linux-iscsi.org>
 *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,6 +48,7 @@
 #include "target_core_alua.h"
 #include "target_core_hba.h"
 #include "target_core_pr.h"
+#include "target_core_stat.h"
 
 #define TF_CIT_SETUP(_name, _item_ops, _group_ops, _attrs)		\
 static void target_fabric_setup_##_name##_cit(struct target_fabric_configfs *tf) \
@@ -736,6 +737,31 @@ TF_CIT_SETUP(tpg_port, &target_fabric_port_item_ops, NULL, target_fabric_port_at
 
 /* End of tfc_tpg_port_cit */
 
+/* Start of tfc_tpg_port_stat_cit */
+
+static struct config_group *target_core_port_stat_mkdir(
+	struct config_group *group,
+	const char *name)
+{
+	return ERR_PTR(-ENOSYS);
+}
+
+static void target_core_port_stat_rmdir(
+	struct config_group *group,
+	struct config_item *item)
+{
+	return;
+}
+
+static struct configfs_group_operations target_fabric_port_stat_group_ops = {
+	.make_group		= target_core_port_stat_mkdir,
+	.drop_item		= target_core_port_stat_rmdir,
+};
+
+TF_CIT_SETUP(tpg_port_stat, NULL, &target_fabric_port_stat_group_ops, NULL);
+
+/* End of tfc_tpg_port_stat_cit */
+
 /* Start of tfc_tpg_lun_cit */
 
 static struct config_group *target_fabric_make_lun(
@@ -746,7 +772,9 @@ static struct config_group *target_fabric_make_lun(
 	struct se_portal_group *se_tpg = container_of(group,
 			struct se_portal_group, tpg_lun_group);
 	struct target_fabric_configfs *tf = se_tpg->se_tpg_wwn->wwn_tf;
+	struct config_group *lun_cg = NULL, *port_stat_grp = NULL;
 	unsigned long unpacked_lun;
+	int errno;
 
 	if (strstr(name, "lun_") != name) {
 		printk(KERN_ERR "Unable to locate \'_\" in"
@@ -760,16 +788,64 @@ static struct config_group *target_fabric_make_lun(
 	if (!(lun))
 		return ERR_PTR(-EINVAL);
 
+	lun_cg = &lun->lun_group;
+	lun_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+				GFP_KERNEL);
+	if (!lun_cg->default_groups) {
+		printk(KERN_ERR "Unable to allocate lun_cg->default_groups\n");
+		return ERR_PTR(-ENOMEM);
+	}
+
 	config_group_init_type_name(&lun->lun_group, name,
 			&TF_CIT_TMPL(tf)->tfc_tpg_port_cit);
+	config_group_init_type_name(&lun->port_stat_grps.stat_group,
+			"statistics", &TF_CIT_TMPL(tf)->tfc_tpg_port_stat_cit);
+	lun_cg->default_groups[0] = &lun->port_stat_grps.stat_group;	
+	lun_cg->default_groups[1] = NULL;
+
+	port_stat_grp = &PORT_STAT_GRP(lun)->stat_group;
+	port_stat_grp->default_groups =  kzalloc(sizeof(struct config_group) * 3,
+				GFP_KERNEL);
+	if (!port_stat_grp->default_groups) {
+		printk(KERN_ERR "Unable to allocate port_stat_grp->default_groups\n");
+		errno = -ENOMEM;
+		goto out;
+	}
+	target_stat_setup_port_default_groups(lun);
 
 	return &lun->lun_group;
+out:
+	if (lun_cg)
+		kfree(lun_cg->default_groups);
+	return ERR_PTR(errno);
 }
 
 static void target_fabric_drop_lun(
 	struct config_group *group,
 	struct config_item *item)
 {
+	struct se_lun *lun = container_of(to_config_group(item),
+				struct se_lun, lun_group);
+	struct config_item *df_item;
+	struct config_group *lun_cg, *port_stat_grp;
+	int i;
+
+	port_stat_grp = &PORT_STAT_GRP(lun)->stat_group;
+	for (i = 0; port_stat_grp->default_groups[i]; i++) {
+		df_item = &port_stat_grp->default_groups[i]->cg_item;
+		port_stat_grp->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(port_stat_grp->default_groups);
+
+	lun_cg = &lun->lun_group;
+	for (i = 0; lun_cg->default_groups[i]; i++) {
+		df_item = &lun_cg->default_groups[i]->cg_item;
+		lun_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(lun_cg->default_groups);
+
 	config_item_put(item);
 }
 
@@ -980,6 +1056,7 @@ int target_fabric_setup_cits(struct target_fabric_configfs *tf)
 	target_fabric_setup_tpg_cit(tf);
 	target_fabric_setup_tpg_base_cit(tf);
 	target_fabric_setup_tpg_port_cit(tf);
+	target_fabric_setup_tpg_port_stat_cit(tf);
 	target_fabric_setup_tpg_lun_cit(tf);
 	target_fabric_setup_tpg_np_cit(tf);
 	target_fabric_setup_tpg_np_base_cit(tf);

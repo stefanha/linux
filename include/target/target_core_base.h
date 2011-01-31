@@ -841,6 +841,13 @@ struct se_hba {
 
 #define SE_HBA(dev)		((dev)->se_hba)
 
+struct se_port_stat_grps {
+	struct config_group stat_group;
+	struct config_group scsi_port_group;
+	struct config_group scsi_tgt_port_group;
+	struct config_group scsi_transport_group;
+};
+
 struct se_lun {
 	/* See transport_lun_status_table */
 	enum transport_lun_status_table lun_status;
@@ -855,11 +862,13 @@ struct se_lun {
 	struct list_head	lun_cmd_list;
 	struct list_head	lun_acl_list;
 	struct se_device	*lun_se_dev;
+	struct se_port		*lun_sep;
 	struct config_group	lun_group;
-	struct se_port	*lun_sep;
+	struct se_port_stat_grps port_stat_grps;
 } ____cacheline_aligned;
 
 #define SE_LUN(cmd)		((cmd)->se_lun)
+#define PORT_STAT_GRP(lun)	(&(lun)->port_stat_grps)
 
 struct se_port {
 	/* RELATIVE TARGET PORT IDENTIFER */

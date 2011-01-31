@@ -11,5 +11,6 @@ typedef enum {
 #endif
 
 extern void target_stat_setup_dev_default_groups(struct se_subsystem_dev *);
+extern void target_stat_setup_port_default_groups(struct se_lun *);
 
 #endif   /*** TARGET_CORE_STAT_H ***/

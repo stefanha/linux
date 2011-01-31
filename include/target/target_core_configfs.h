@@ -18,6 +18,7 @@ struct target_fabric_configfs_template {
 	struct config_item_type tfc_tpg_base_cit;
 	struct config_item_type tfc_tpg_lun_cit;
 	struct config_item_type tfc_tpg_port_cit;
+	struct config_item_type tfc_tpg_port_stat_cit;
 	struct config_item_type tfc_tpg_np_cit;
 	struct config_item_type tfc_tpg_np_base_cit;
 	struct config_item_type tfc_tpg_attrib_cit;
