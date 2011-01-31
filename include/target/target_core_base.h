@@ -689,6 +689,13 @@ struct se_dev_attrib {
 	struct config_group da_group;
 } ____cacheline_aligned;
 
+struct se_dev_stat_grps {
+	struct config_group stat_group;
+	struct config_group scsi_dev_group;
+	struct config_group scsi_tgt_dev_group;
+	struct config_group scsi_lu_group;
+};
+
 struct se_subsystem_dev {
 /* Used for struct se_subsystem_dev-->se_dev_alias, must be less than PAGE_SIZE */
 #define SE_DEV_ALIAS_LEN		512
@@ -712,11 +719,14 @@ struct se_subsystem_dev {
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
+	/* For target_core_stat.c groups */
+	struct se_dev_stat_grps dev_stat_grps;
 } ____cacheline_aligned;
 
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
+#define DEV_STAT_GRP(dev)	(&(dev)->dev_stat_grps)
 
 struct se_device {
 	/* Set to 1 if thread is NOT sleeping on thread_sem */
