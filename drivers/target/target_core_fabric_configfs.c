@@ -1042,12 +1042,26 @@ static void target_fabric_drop_tpg(
 	tf->tf_ops.fabric_drop_tpg(se_tpg);
 }
 
+static void target_fabric_release_wwn(struct config_item *item)
+{
+	struct se_wwn *wwn = container_of(to_config_group(item),
+				struct se_wwn, wwn_group);
+	struct target_fabric_configfs *tf = wwn->wwn_tf;
+
+	tf->tf_ops.fabric_drop_wwn(wwn);
+}
+
+static struct configfs_item_operations target_fabric_tpg_item_ops = {
+	.release	= target_fabric_release_wwn,
+};
+
 static struct configfs_group_operations target_fabric_tpg_group_ops = {
 	.make_group	= target_fabric_make_tpg,
 	.drop_item	= target_fabric_drop_tpg,
 };
 
-TF_CIT_SETUP(tpg, NULL, &target_fabric_tpg_group_ops, NULL);
+TF_CIT_SETUP(tpg, &target_fabric_tpg_item_ops, &target_fabric_tpg_group_ops,
+		NULL);
 
 /* End of tfc_tpg_cit */
 
@@ -1081,13 +1095,7 @@ static void target_fabric_drop_wwn(
 	struct config_group *group,
 	struct config_item *item)
 {
-	struct target_fabric_configfs *tf = container_of(group,
-				struct target_fabric_configfs, tf_group);
-	struct se_wwn *wwn = container_of(to_config_group(item),
-				struct se_wwn, wwn_group);
-
 	config_item_put(item);
-	tf->tf_ops.fabric_drop_wwn(wwn);
 }
 
 static struct configfs_group_operations target_fabric_wwn_group_ops = {
