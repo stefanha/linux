@@ -2195,7 +2195,16 @@ static struct configfs_attribute *target_core_alua_lu_gp_attrs[] = {
 	NULL,
 };
 
+static void target_core_alua_lu_gp_release(struct config_item *item)
+{
+	struct t10_alua_lu_gp *lu_gp = container_of(to_config_group(item),
+			struct t10_alua_lu_gp, lu_gp_group);
+
+	core_alua_free_lu_gp(lu_gp);
+}
+
 static struct configfs_item_operations target_core_alua_lu_gp_ops = {
+	.release		= target_core_alua_lu_gp_release,
 	.show_attribute		= target_core_alua_lu_gp_attr_show,
 	.store_attribute	= target_core_alua_lu_gp_attr_store,
 };
@@ -2246,9 +2255,11 @@ static void target_core_alua_drop_lu_gp(
 	printk(KERN_INFO "Target_Core_ConfigFS: Releasing ALUA Logical Unit"
 		" Group: core/alua/lu_gps/%s, ID: %hu\n",
 		config_item_name(item), lu_gp->lu_gp_id);
-
+	/*
+	 * core_alua_free_lu_gp() is called from target_core_alua_lu_gp_ops->release()
+	 * -> target_core_alua_lu_gp_release()
+	 */
 	config_item_put(item);
-	core_alua_free_lu_gp(lu_gp);
 }
 
 static struct configfs_group_operations target_core_alua_lu_gps_group_ops = {
