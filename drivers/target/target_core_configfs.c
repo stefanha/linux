@@ -2998,6 +2998,13 @@ SE_HBA_ATTR(hba_mode, S_IRUGO | S_IWUSR);
 
 CONFIGFS_EATTR_OPS(target_core_hba, se_hba, hba_group);
 
+static void target_core_hba_release(struct config_item *item)
+{
+	struct se_hba *hba = container_of(to_config_group(item),
+				struct se_hba, hba_group);
+	core_delete_hba(hba);
+}
+
 static struct configfs_attribute *target_core_hba_attrs[] = {
 	&target_core_hba_hba_info.attr,
 	&target_core_hba_hba_mode.attr,
@@ -3005,6 +3012,7 @@ static struct configfs_attribute *target_core_hba_attrs[] = {
 };
 
 static struct configfs_item_operations target_core_hba_item_ops = {
+	.release		= target_core_hba_release,
 	.show_attribute		= target_core_hba_attr_show,
 	.store_attribute	= target_core_hba_attr_store,
 };
@@ -3081,10 +3089,11 @@ static void target_core_call_delhbafromtarget(
 	struct config_group *group,
 	struct config_item *item)
 {
-	struct se_hba *hba = item_to_hba(item);
-
+	/*
+	 * core_delete_hba() is called from target_core_hba_item_ops->release()
+	 * -> target_core_hba_release()
+	 */
 	config_item_put(item);
-	core_delete_hba(hba);
 }
 
 static struct configfs_group_operations target_core_group_ops = {
