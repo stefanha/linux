@@ -2004,9 +2004,35 @@ static void target_core_dev_release(struct config_item *item)
 {
 	struct se_subsystem_dev *se_dev = container_of(to_config_group(item),
 				struct se_subsystem_dev, se_dev_group);
+	struct se_hba *hba = item_to_hba(&se_dev->se_dev_hba->hba_group.cg_item);
+	struct se_subsystem_api *t = hba->transport;
 	struct config_group *dev_cg = &se_dev->se_dev_group;
 
 	kfree(dev_cg->default_groups);
+	/*
+	 * This pointer will set when the storage is enabled with:
+	 *`echo 1 > $CONFIGFS/core/$HBA/$DEV/dev_enable`
+	 */
+	if (se_dev->se_dev_ptr) {
+		printk(KERN_INFO "Target_Core_ConfigFS: Calling se_free_"
+			"virtual_device() for se_dev_ptr: %p\n",
+			se_dev->se_dev_ptr);
+
+		se_free_virtual_device(se_dev->se_dev_ptr, hba);
+	} else {
+		/*
+		 * Release struct se_subsystem_dev->se_dev_su_ptr..
+		 */
+		printk(KERN_INFO "Target_Core_ConfigFS: Calling t->free_"
+			"device() for se_dev_su_ptr: %p\n",
+			se_dev->se_dev_su_ptr);
+
+		t->free_device(se_dev->se_dev_su_ptr);
+	}
+
+	printk(KERN_INFO "Target_Core_ConfigFS: Deallocating se_subsystem"
+			"_dev_t: %p\n", se_dev);
+	kfree(se_dev);
 }
 
 static ssize_t target_core_dev_show(struct config_item *item,
@@ -2847,13 +2873,11 @@ static void target_core_drop_subdev(
 	struct se_subsystem_api *t;
 	struct config_item *df_item;
 	struct config_group *dev_cg, *tg_pt_gp_cg, *dev_stat_grp;
-	int i, ret;
+	int i;
 
 	hba = item_to_hba(&se_dev->se_dev_hba->hba_group.cg_item);
 
-	if (mutex_lock_interruptible(&hba->hba_access_mutex))
-		goto out;
-
+	mutex_lock(&hba->hba_access_mutex);
 	t = hba->transport;
 
 	spin_lock(&se_global->g_device_lock);
@@ -2884,38 +2908,12 @@ static void target_core_drop_subdev(
 		dev_cg->default_groups[i] = NULL;
 		config_item_put(df_item);
 	}
-
-	config_item_put(item);
 	/*
-	 * This pointer will set when the storage is enabled with:
-	 * `echo 1 > $CONFIGFS/core/$HBA/$DEV/dev_enable`
+	 * The releasing of se_dev and associated se_dev->se_dev_ptr is done
+	 * from target_core_dev_item_ops->release() ->target_core_dev_release().
 	 */
-	if (se_dev->se_dev_ptr) {
-		printk(KERN_INFO "Target_Core_ConfigFS: Calling se_free_"
-			"virtual_device() for se_dev_ptr: %p\n",
-				se_dev->se_dev_ptr);
-
-		ret = se_free_virtual_device(se_dev->se_dev_ptr, hba);
-		if (ret < 0)
-			goto hba_out;
-	} else {
-		/*
-		 * Release struct se_subsystem_dev->se_dev_su_ptr..
-		 */
-		printk(KERN_INFO "Target_Core_ConfigFS: Calling t->free_"
-			"device() for se_dev_su_ptr: %p\n",
-			se_dev->se_dev_su_ptr);
-
-		t->free_device(se_dev->se_dev_su_ptr);
-	}
-
-	printk(KERN_INFO "Target_Core_ConfigFS: Deallocating se_subsystem"
-		"_dev_t: %p\n", se_dev);
-
-hba_out:
+	config_item_put(item);
 	mutex_unlock(&hba->hba_access_mutex);
-out:
-	kfree(se_dev);
 }
 
 static struct configfs_group_operations target_core_hba_group_ops = {
