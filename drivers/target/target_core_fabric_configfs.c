@@ -419,7 +419,18 @@ static void target_fabric_drop_mappedlun(
 	core_dev_free_initiator_node_lun_acl(se_tpg, lacl);
 }
 
+static void target_fabric_nacl_base_release(struct config_item *item)
+{
+	struct se_node_acl *se_nacl = container_of(to_config_group(item),
+			struct se_node_acl, acl_group);
+	struct se_portal_group *se_tpg = se_nacl->se_tpg;
+	struct target_fabric_configfs *tf = se_tpg->se_tpg_wwn->wwn_tf;
+
+	tf->tf_ops.fabric_drop_nodeacl(se_nacl);
+}
+
 static struct configfs_item_operations target_fabric_nacl_base_item_ops = {
+	.release		= target_fabric_nacl_base_release,
 	.show_attribute		= target_fabric_nacl_base_attr_show,
 	.store_attribute	= target_fabric_nacl_base_attr_store,
 };
@@ -478,9 +489,6 @@ static void target_fabric_drop_nodeacl(
 	struct config_group *group,
 	struct config_item *item)
 {
-	struct se_portal_group *se_tpg = container_of(group,
-			struct se_portal_group, tpg_acl_group);
-	struct target_fabric_configfs *tf = se_tpg->se_tpg_wwn->wwn_tf;
 	struct se_node_acl *se_nacl = container_of(to_config_group(item),
 			struct se_node_acl, acl_group);
 	struct config_item *df_item;
@@ -493,9 +501,10 @@ static void target_fabric_drop_nodeacl(
 		nacl_cg->default_groups[i] = NULL;
 		config_item_put(df_item);
 	}
-
+	/*
+	 * struct se_node_acl free is done in target_fabric_nacl_base_release()
+	 */
 	config_item_put(item);
-	tf->tf_ops.fabric_drop_nodeacl(se_nacl);
 }
 
 static struct configfs_group_operations target_fabric_nacl_group_ops = {
