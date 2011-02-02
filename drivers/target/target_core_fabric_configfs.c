@@ -215,12 +215,22 @@ TCM_MAPPEDLUN_ATTR(write_protect, S_IRUGO | S_IWUSR);
 
 CONFIGFS_EATTR_OPS(target_fabric_mappedlun, se_lun_acl, se_lun_group);
 
+static void target_fabric_mappedlun_release(struct config_item *item)
+{
+	struct se_lun_acl *lacl = container_of(to_config_group(item),
+				struct se_lun_acl, se_lun_group);
+	struct se_portal_group *se_tpg = lacl->se_lun_nacl->se_tpg;
+
+	core_dev_free_initiator_node_lun_acl(se_tpg, lacl);
+}
+
 static struct configfs_attribute *target_fabric_mappedlun_attrs[] = {
 	&target_fabric_mappedlun_write_protect.attr,
 	NULL,
 };
 
 static struct configfs_item_operations target_fabric_mappedlun_item_ops = {
+	.release		= target_fabric_mappedlun_release,
 	.show_attribute		= target_fabric_mappedlun_attr_show,
 	.store_attribute	= target_fabric_mappedlun_attr_store,
 	.allow_link		= target_fabric_mappedlun_link,
@@ -394,7 +404,6 @@ static void target_fabric_drop_mappedlun(
 {
 	struct se_lun_acl *lacl = container_of(to_config_group(item),
 			struct se_lun_acl, se_lun_group);
-	struct se_portal_group *se_tpg = lacl->se_lun_nacl->se_tpg;
 	struct config_item *df_item;
 	struct config_group *lacl_cg = NULL, *ml_stat_grp = NULL;
 	int i;
@@ -414,9 +423,10 @@ static void target_fabric_drop_mappedlun(
 		config_item_put(df_item);
 	}
 	kfree(lacl_cg->default_groups);
-
+	/*
+	 * struct se_lun_acl memory is released by target_fabric_mappedlun_release()
+	 */
 	config_item_put(item);
-	core_dev_free_initiator_node_lun_acl(se_tpg, lacl);
 }
 
 static void target_fabric_nacl_base_release(struct config_item *item)
