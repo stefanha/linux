@@ -2615,7 +2615,16 @@ static struct configfs_attribute *target_core_alua_tg_pt_gp_attrs[] = {
 	NULL,
 };
 
+static void target_core_alua_tg_pt_gp_release(struct config_item *item)
+{
+	struct t10_alua_tg_pt_gp *tg_pt_gp = container_of(to_config_group(item),
+			struct t10_alua_tg_pt_gp, tg_pt_gp_group);
+
+	core_alua_free_tg_pt_gp(tg_pt_gp);
+}
+
 static struct configfs_item_operations target_core_alua_tg_pt_gp_ops = {
+	.release		= target_core_alua_tg_pt_gp_release,
 	.show_attribute		= target_core_alua_tg_pt_gp_attr_show,
 	.store_attribute	= target_core_alua_tg_pt_gp_attr_store,
 };
@@ -2668,9 +2677,11 @@ static void target_core_alua_drop_tg_pt_gp(
 	printk(KERN_INFO "Target_Core_ConfigFS: Releasing ALUA Target Port"
 		" Group: alua/tg_pt_gps/%s, ID: %hu\n",
 		config_item_name(item), tg_pt_gp->tg_pt_gp_id);
-
+	/*
+	 * core_alua_free_tg_pt_gp() is called from target_core_alua_tg_pt_gp_ops->release()
+	 * -> target_core_alua_tg_pt_gp_release().
+	 */
 	config_item_put(item);
-	core_alua_free_tg_pt_gp(tg_pt_gp);
 }
 
 static struct configfs_group_operations target_core_alua_tg_pt_gps_group_ops = {
@@ -2910,7 +2921,10 @@ static void target_core_drop_subdev(
 		config_item_put(df_item);
 	}
 	kfree(tg_pt_gp_cg->default_groups);
-	core_alua_free_tg_pt_gp(T10_ALUA(se_dev)->default_tg_pt_gp);
+	/*
+	 * core_alua_free_tg_pt_gp() is called from ->default_tg_pt_gp
+	 * directly from target_core_alua_tg_pt_gp_release().
+	 */
 	T10_ALUA(se_dev)->default_tg_pt_gp = NULL;
 
 	dev_cg = &se_dev->se_dev_group;
