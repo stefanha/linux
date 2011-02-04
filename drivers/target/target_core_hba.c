@@ -42,7 +42,7 @@
 #include <target/target_core_transport.h>
 
 #include "target_core_hba.h"
-#include "target_core_mib.h"
+#include "target_core_stat.h"
 
 static LIST_HEAD(subsystem_list);
 static DEFINE_MUTEX(subsystem_mutex);

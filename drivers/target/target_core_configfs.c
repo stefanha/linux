@@ -51,7 +51,6 @@
 #include "target_core_hba.h"
 #include "target_core_pr.h"
 #include "target_core_rd.h"
-#include "target_core_mib.h"
 #include "target_core_stat.h"
 
 static struct list_head g_tf_list;
@@ -3138,7 +3137,6 @@ static int target_core_init_configfs(void)
 	struct config_group *target_cg, *hba_cg = NULL, *alua_cg = NULL;
 	struct config_group *lu_gp_cg = NULL;
 	struct configfs_subsystem *subsys;
-	struct proc_dir_entry *scsi_target_proc = NULL;
 	struct t10_alua_lu_gp *lu_gp;
 	int ret;
 
@@ -3244,21 +3242,10 @@ static int target_core_init_configfs(void)
 	if (core_dev_setup_virtual_lun0() < 0)
 		goto out;
 
-	scsi_target_proc = proc_mkdir("scsi_target", NULL);
-	if (!(scsi_target_proc)) {
-		printk(KERN_ERR "proc_mkdir(scsi_target, 0) failed\n");
-		goto out;
-	}
-	ret = init_scsi_target_mib();
-	if (ret < 0)
-		goto out;
-
 	return 0;
 
 out:
 	configfs_unregister_subsystem(subsys);
-	if (scsi_target_proc)
-		remove_proc_entry("scsi_target", NULL);
 	core_dev_release_virtual_lun0();
 	rd_module_exit();
 out_global:
@@ -3326,8 +3313,6 @@ static void target_core_exit_configfs(void)
 	printk(KERN_INFO "TARGET_CORE[0]: Released ConfigFS Fabric"
 			" Infrastructure\n");
 
-	remove_scsi_target_mib();
-	remove_proc_entry("scsi_target", NULL);
 	core_dev_release_virtual_lun0();
 	rd_module_exit();
 	release_se_global();

@@ -50,7 +50,7 @@
 #include <target/configfs_macros.h>
 
 #include "target_core_hba.h"
-#include "target_core_mib.h"
+#include "target_core_stat.h"
 
 #ifndef INITIAL_JIFFIES
 #define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
