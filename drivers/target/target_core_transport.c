@@ -55,10 +55,10 @@
 
 #include "target_core_alua.h"
 #include "target_core_hba.h"
+#include "target_core_stat.h"
 #include "target_core_pr.h"
 #include "target_core_scdb.h"
 #include "target_core_ua.h"
-#include "target_core_mib.h"
 
 /* #define DEBUG_CDB_HANDLER */
 #ifdef DEBUG_CDB_HANDLER
@@ -378,6 +378,40 @@ void release_se_global(void)
 	se_global = NULL;
 }
 
+/* SCSI statistics table index */
+static struct scsi_index_table scsi_index_table;
+
+/*
+ * Initialize the index table for allocating unique row indexes to various mib
+ * tables
+ */
+void init_scsi_index_table(void)
+{
+	memset(&scsi_index_table, 0, sizeof(struct scsi_index_table));
+	spin_lock_init(&scsi_index_table.lock);
+}
+
+/*
+ * Allocate a new row index for the entry type specified
+ */
+u32 scsi_get_new_index(scsi_index_t type)
+{
+	u32 new_index;
+
+	if ((type < 0) || (type >= SCSI_INDEX_TYPE_MAX)) {
+		printk(KERN_ERR "Invalid index type %d\n", type);
+		return -EINVAL;
+	}
+
+	spin_lock(&scsi_index_table.lock);
+	new_index = ++scsi_index_table.scsi_mib_index[type];
+	if (new_index == 0)
+		new_index = ++scsi_index_table.scsi_mib_index[type];
+	spin_unlock(&scsi_index_table.lock);
+
+	return new_index;
+}
+
 void transport_init_queue_obj(struct se_queue_obj *qobj)
 {
 	atomic_set(&qobj->queue_cnt, 0);
@@ -436,7 +470,6 @@ struct se_session *transport_init_session(void)
 	}
 	INIT_LIST_HEAD(&se_sess->sess_list);
 	INIT_LIST_HEAD(&se_sess->sess_acl_list);
-	atomic_set(&se_sess->mib_ref_count, 0);
 
 	return se_sess;
 }
@@ -545,12 +578,6 @@ void transport_deregister_session(struct se_session *se_sess)
 		transport_free_session(se_sess);
 		return;
 	}
-	/*
-	 * Wait for possible reference in drivers/target/target_core_mib.c:
-	 * scsi_att_intr_port_seq_show()
-	 */
-	while (atomic_read(&se_sess->mib_ref_count) != 0)
-		cpu_relax();
 
 	spin_lock_bh(&se_tpg->session_lock);
 	list_del(&se_sess->sess_list);
@@ -573,7 +600,6 @@ void transport_deregister_session(struct se_session *se_sess)
 				spin_unlock_bh(&se_tpg->acl_node_lock);
 
 				core_tpg_wait_for_nacl_pr_ref(se_nacl);
-				core_tpg_wait_for_mib_ref(se_nacl);
 				core_free_device_list_for_node(se_nacl, se_tpg);
 				TPG_TFO(se_tpg)->tpg_release_fabric_acl(se_tpg,
 						se_nacl);
@@ -4333,11 +4359,9 @@ transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 			printk(KERN_ERR "Unable to allocate struct se_mem\n");
 			goto out;
 		}
-		INIT_LIST_HEAD(&se_mem->se_list);
-		se_mem->se_len = (length > dma_size) ? dma_size : length;
 
 /* #warning FIXME Allocate contigous pages for struct se_mem elements */
-		se_mem->se_page = (struct page *) alloc_pages(GFP_KERNEL, 0);
+		se_mem->se_page = alloc_pages(GFP_KERNEL, 0);
 		if (!(se_mem->se_page)) {
 			printk(KERN_ERR "alloc_pages() failed\n");
 			goto out;
@@ -4348,6 +4372,8 @@ transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 			printk(KERN_ERR "kmap_atomic() failed\n");
 			goto out;
 		}
+		INIT_LIST_HEAD(&se_mem->se_list);
+		se_mem->se_len = (length > dma_size) ? dma_size : length;
 		memset(buf, 0, se_mem->se_len);
 		kunmap_atomic(buf, KM_IRQ0);
 
@@ -4366,6 +4392,9 @@ transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 
 	return 0;
 out:
+	if (se_mem)
+		__free_pages(se_mem->se_page, 0);
+	kmem_cache_free(se_mem_cache, se_mem);
 	return -1;
 }
 

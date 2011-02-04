@@ -45,7 +45,7 @@
 #include <target/target_core_fabric_ops.h>
 
 #include "target_core_hba.h"
-#include "target_core_mib.h"
+#include "target_core_stat.h"
 
 /*	core_clear_initiator_node_from_tpg():
  *
@@ -276,7 +276,6 @@ struct se_node_acl *core_tpg_check_initiator_node_acl(
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
 	atomic_set(&acl->acl_pr_ref_count, 0);
-	atomic_set(&acl->mib_ref_count, 0);
 	acl->queue_depth = TPG_TFO(tpg)->tpg_get_default_depth(tpg);
 	snprintf(acl->initiatorname, TRANSPORT_IQN_LEN, "%s", initiatorname);
 	acl->se_tpg = tpg;
@@ -316,12 +315,6 @@ EXPORT_SYMBOL(core_tpg_check_initiator_node_acl);
 void core_tpg_wait_for_nacl_pr_ref(struct se_node_acl *nacl)
 {
 	while (atomic_read(&nacl->acl_pr_ref_count) != 0)
-		cpu_relax();
-}
-
-void core_tpg_wait_for_mib_ref(struct se_node_acl *nacl)
-{
-	while (atomic_read(&nacl->mib_ref_count) != 0)
 		cpu_relax();
 }
 
@@ -481,7 +474,6 @@ int core_tpg_del_initiator_node_acl(
 	spin_unlock_bh(&tpg->session_lock);
 
 	core_tpg_wait_for_nacl_pr_ref(acl);
-	core_tpg_wait_for_mib_ref(acl);
 	core_clear_initiator_node_from_tpg(acl, tpg);
 	core_free_device_list_for_node(acl, tpg);
 
@@ -730,7 +722,6 @@ int core_tpg_deregister(struct se_portal_group *se_tpg)
 		spin_unlock_bh(&se_tpg->acl_node_lock);
 
 		core_tpg_wait_for_nacl_pr_ref(nacl);
-		core_tpg_wait_for_mib_ref(nacl);
 		core_free_device_list_for_node(nacl, se_tpg);
 		TPG_TFO(se_tpg)->tpg_release_fabric_acl(se_tpg, nacl);
 
