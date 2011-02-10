@@ -125,11 +125,11 @@ out:
 				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 				return -1;
 			}
-#if 0				   
+#if 0
 			printk("TARGET_CORE[%s]: Using virtual LUN0! :-)\n",
 				CMD_TFO(se_cmd)->get_fabric_name());
 #endif
-			se_lun = se_cmd->se_lun = &se_sess->se_tpg->tpg_virt_lun0;	
+			se_lun = se_cmd->se_lun = &se_sess->se_tpg->tpg_virt_lun0;
 			se_cmd->orig_fe_lun = 0;
 			se_cmd->se_orig_obj_ptr = SE_LUN(se_cmd)->lun_se_dev;
 			se_cmd->se_cmd_flags |= SCF_SE_LUN_CMD;
@@ -259,7 +259,7 @@ struct se_dev_entry *core_get_se_deve_from_rtpi(
 		}
 		if (port->sep_rtpi != rtpi)
 			continue;
-		
+
 		atomic_inc(&deve->pr_ref_count);
 		smp_mb__after_atomic_inc();
 		spin_unlock_irq(&nacl->device_list_lock);
@@ -418,7 +418,7 @@ int core_update_device_list_for_node(
 			deve->lun_flags |= TRANSPORT_LUNFLAGS_READ_ONLY;
 		}
 
-		if (trans) {	
+		if (trans) {
 			spin_unlock_irq(&nacl->device_list_lock);
 			return 0;
 		}
@@ -612,7 +612,7 @@ int core_dev_export(
 	struct se_lun *lun)
 {
 	struct se_port *port;
-	
+
 	port = core_alloc_port(dev);
 	if (!(port))
 		return -1;
@@ -777,51 +777,14 @@ void se_release_vpd_for_dev(struct se_device *dev)
 	return;
 }
 
-/*
- * Called with struct se_hba->device_lock held.
- */
-void se_clear_dev_ports(struct se_device *dev)
-{
-	struct se_hba *hba = dev->se_hba;
-	struct se_lun *lun;
-	struct se_portal_group *tpg;
-	struct se_port *sep, *sep_tmp;
-
-	spin_lock(&dev->se_port_lock);
-	list_for_each_entry_safe(sep, sep_tmp, &dev->dev_sep_list, sep_list) {
-		spin_unlock(&dev->se_port_lock);
-		spin_unlock(&hba->device_lock);
-
-		lun = sep->sep_lun;
-		tpg = sep->sep_tpg;
-		spin_lock(&lun->lun_sep_lock);
-		if (lun->lun_se_dev == NULL) {
-			spin_unlock(&lun->lun_sep_lock);
-			spin_lock(&hba->device_lock);
-			spin_lock(&dev->se_port_lock);
-			continue;
-		}
-		spin_unlock(&lun->lun_sep_lock);
-
-		core_dev_del_lun(tpg, lun->unpacked_lun);
-
-		spin_lock(&hba->device_lock);
-		spin_lock(&dev->se_port_lock);
-	}
-	spin_unlock(&dev->se_port_lock);
-
-	return;
-}
-
 /*	se_free_virtual_device():
  *
  *	Used for IBLOCK, RAMDISK, and FILEIO Transport Drivers.
  */
 int se_free_virtual_device(struct se_device *dev, struct se_hba *hba)
 {
-	spin_lock(&hba->device_lock);
-	se_clear_dev_ports(dev);
-	spin_unlock(&hba->device_lock);
+	if (!list_empty(&dev->dev_sep_list))
+		dump_stack();
 
 	core_alua_free_lu_gp_mem(dev);
 	se_release_device_for_hba(dev);
@@ -866,9 +829,6 @@ static void se_dev_stop(struct se_device *dev)
 		}
 	}
 	spin_unlock(&hba->device_lock);
-
-	while (atomic_read(&hba->dev_mib_access_count))
-		cpu_relax();
 }
 
 int se_dev_check_online(struct se_device *dev)
@@ -879,7 +839,7 @@ int se_dev_check_online(struct se_device *dev)
 	ret = ((dev->dev_status & TRANSPORT_DEVICE_ACTIVATED) ||
 	       (dev->dev_status & TRANSPORT_DEVICE_DEACTIVATED)) ? 0 : 1;
 	spin_unlock_irq(&dev->dev_status_lock);
-	
+
 	return ret;
 }
 
@@ -1682,7 +1642,7 @@ out:
 void core_dev_release_virtual_lun0(void)
 {
 	struct se_hba *hba = se_global->g_lun0_hba;
-        struct se_subsystem_dev *su_dev = se_global->g_lun0_su_dev;
+	struct se_subsystem_dev *su_dev = se_global->g_lun0_su_dev;
 
 	if (!(hba))
 		return;

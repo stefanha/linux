@@ -55,10 +55,10 @@
 
 #include "target_core_alua.h"
 #include "target_core_hba.h"
+#include "target_core_stat.h"
 #include "target_core_pr.h"
 #include "target_core_scdb.h"
 #include "target_core_ua.h"
-#include "target_core_mib.h"
 
 /* #define DEBUG_CDB_HANDLER */
 #ifdef DEBUG_CDB_HANDLER
@@ -378,6 +378,40 @@ void release_se_global(void)
 	se_global = NULL;
 }
 
+/* SCSI statistics table index */
+static struct scsi_index_table scsi_index_table;
+
+/*
+ * Initialize the index table for allocating unique row indexes to various mib
+ * tables
+ */
+void init_scsi_index_table(void)
+{
+	memset(&scsi_index_table, 0, sizeof(struct scsi_index_table));
+	spin_lock_init(&scsi_index_table.lock);
+}
+
+/*
+ * Allocate a new row index for the entry type specified
+ */
+u32 scsi_get_new_index(scsi_index_t type)
+{
+	u32 new_index;
+
+	if ((type < 0) || (type >= SCSI_INDEX_TYPE_MAX)) {
+		printk(KERN_ERR "Invalid index type %d\n", type);
+		return -EINVAL;
+	}
+
+	spin_lock(&scsi_index_table.lock);
+	new_index = ++scsi_index_table.scsi_mib_index[type];
+	if (new_index == 0)
+		new_index = ++scsi_index_table.scsi_mib_index[type];
+	spin_unlock(&scsi_index_table.lock);
+
+	return new_index;
+}
+
 void transport_init_queue_obj(struct se_queue_obj *qobj)
 {
 	atomic_set(&qobj->queue_cnt, 0);
@@ -394,7 +428,7 @@ static int transport_subsystem_reqmods(void)
 	ret = request_module("target_core_iblock");
 	if (ret != 0)
 		printk(KERN_ERR "Unable to load target_core_iblock\n");
-		
+
 	ret = request_module("target_core_file");
 	if (ret != 0)
 		printk(KERN_ERR "Unable to load target_core_file\n");
@@ -436,7 +470,6 @@ struct se_session *transport_init_session(void)
 	}
 	INIT_LIST_HEAD(&se_sess->sess_list);
 	INIT_LIST_HEAD(&se_sess->sess_acl_list);
-	atomic_set(&se_sess->mib_ref_count, 0);
 
 	return se_sess;
 }
@@ -523,7 +556,7 @@ void transport_deregister_session_configfs(struct se_session *se_sess)
 		else {
 			se_nacl->nacl_sess = container_of(
 					se_nacl->acl_sess_list.prev,
-					struct se_session, sess_acl_list);	
+					struct se_session, sess_acl_list);
 		}
 		spin_unlock_irq(&se_nacl->nacl_sess_lock);
 	}
@@ -545,12 +578,6 @@ void transport_deregister_session(struct se_session *se_sess)
 		transport_free_session(se_sess);
 		return;
 	}
-	/*
-	 * Wait for possible reference in drivers/target/target_core_mib.c:
-	 * scsi_att_intr_port_seq_show()
-	 */
-	while (atomic_read(&se_sess->mib_ref_count) != 0)
-		cpu_relax();
 
 	spin_lock_bh(&se_tpg->session_lock);
 	list_del(&se_sess->sess_list);
@@ -573,7 +600,6 @@ void transport_deregister_session(struct se_session *se_sess)
 				spin_unlock_bh(&se_tpg->acl_node_lock);
 
 				core_tpg_wait_for_nacl_pr_ref(se_nacl);
-				core_tpg_wait_for_mib_ref(se_nacl);
 				core_free_device_list_for_node(se_nacl, se_tpg);
 				TPG_TFO(se_tpg)->tpg_release_fabric_acl(se_tpg,
 						se_nacl);
@@ -1573,7 +1599,7 @@ static void scsi_dump_inquiry(struct se_device *dev)
 
 	printk("  Revision: ");
 	for (i = 0; i < 4; i++)
-		if (wwn->revision[i] >= 0x20)	
+		if (wwn->revision[i] >= 0x20)
 			printk("%c", wwn->revision[i]);
 		else
 			printk(" ");
@@ -1596,7 +1622,7 @@ struct se_device *transport_add_device_to_core_hba(
 	const char *inquiry_prod,
 	const char *inquiry_rev)
 {
-	int ret = 0, force_pt;
+	int force_pt;
 	struct se_device  *dev;
 
 	dev = kzalloc(sizeof(struct se_device), GFP_KERNEL);
@@ -1713,9 +1739,8 @@ struct se_device *transport_add_device_to_core_hba(
 	}
 	scsi_dump_inquiry(dev);
 
+	return dev;
 out:
-	if (!ret)
-		return dev;
 	kthread_stop(dev->process_thread);
 
 	spin_lock(&hba->device_lock);
@@ -1950,7 +1975,7 @@ int transport_generic_allocate_tasks(
 }
 EXPORT_SYMBOL(transport_generic_allocate_tasks);
 
-/* 
+/*
  * Used by fabric module frontends not defining a TFO->new_cmd_map()
  * to queue up a newly setup se_cmd w/ TRANSPORT_NEW_CMD statis
  */
@@ -1983,7 +2008,7 @@ int transport_generic_handle_cdb_map(
 	}
 
 	transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD_MAP);
-	return 0;	
+	return 0;
 }
 EXPORT_SYMBOL(transport_generic_handle_cdb_map);
 
@@ -2662,7 +2687,7 @@ check_depth:
 		}
 		/*
 		 * Handle the successful completion for transport_emulate_cdb()
-		 * for synchronous operation, following SCF_EMULATE_CDB_ASYNC 
+		 * for synchronous operation, following SCF_EMULATE_CDB_ASYNC
 		 * Otherwise the caller is expected to complete the task with
 		 * proper status.
 		 */
@@ -2907,7 +2932,7 @@ static void transport_xor_callback(struct se_cmd *cmd)
 	int i;
 	/*
 	 * From sbc3r22.pdf section 5.48 XDWRITEREAD (10) command
-	 * 
+	 *
 	 * 1) read the specified logical block(s);
 	 * 2) transfer logical blocks from the data-out buffer;
 	 * 3) XOR the logical blocks transferred from the data-out buffer with
@@ -3498,10 +3523,10 @@ static int transport_generic_cmd_sequencer(
 			sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
 			T_TASK(cmd)->t_task_lba = transport_lba_64(cdb);
 		}
-                if (sector_ret)
+		if (sector_ret)
 			goto out_unsupported_cdb;
 
-                size = transport_get_size(sectors, cdb, cmd);
+		size = transport_get_size(sectors, cdb, cmd);
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 
 		/*
@@ -3551,7 +3576,7 @@ static int transport_generic_cmd_sequencer(
 		 * or we are signaling the use of internal WRITE_SAME + UNMAP=1
 		 * emulation for -> Linux/BLOCK disbard with TCM/IBLOCK and
 		 * TCM/FILEIO subsystem plugin backstores.
-		 */ 
+		 */
 		if (!(passthrough)) {
 			if ((cdb[1] & 0x04) || (cdb[1] & 0x02)) {
 				printk(KERN_ERR "WRITE_SAME PBDATA and LBDATA"
@@ -3684,7 +3709,7 @@ static void transport_memcpy_write_contig(
 
 		src += length;
 		i++;
-        }
+	}
 }
 
 /*
@@ -3728,12 +3753,12 @@ static void transport_memcpy_se_mem_read_contig(
 
 	list_for_each_entry(se_mem, se_mem_list, se_list) {
 		length = se_mem->se_len;
-		
+
 		if (length > total_length)
 			length = total_length;
 
 		src = page_address(se_mem->se_page) + se_mem->se_off;
-		
+
 		memcpy(dst, src, length);
 
 		if (!(total_length -= length))
@@ -3879,7 +3904,7 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
 		/*
 		 * Check if we need to send READ payload for BIDI-COMMAND
-		 */	
+		 */
 		if (T_TASK(cmd)->t_mem_bidi_list != NULL) {
 			spin_lock(&cmd->se_lun->lun_sep_lock);
 			if (SE_LUN(cmd)->lun_sep) {
@@ -4092,7 +4117,7 @@ release_cmd:
  * @mem:  SGL style memory for TCM WRITE / READ
  * @sg_mem_num: Number of SGL elements
  * @mem_bidi_in: SGL style memory for TCM BIDI READ
- * @sg_mem_bidi_num: Number of BIDI READ SGL elements 
+ * @sg_mem_bidi_num: Number of BIDI READ SGL elements
  *
  * Return: nonzero return cmd was rejected for -ENOMEM or inproper usage
  * of parameters.
@@ -4135,7 +4160,7 @@ int transport_generic_map_mem_to_cmd(
 		 * For CDB using TCM struct se_mem linked list scatterlist memory
 		 * processed into a TCM struct se_subsystem_dev, we do the mapping
 		 * from the passed physical memory to struct se_mem->se_page here.
-		 */ 
+		 */
 		T_TASK(cmd)->t_mem_list = transport_init_se_mem_list();
 		if (!(T_TASK(cmd)->t_mem_list))
 			return -ENOMEM;
@@ -4166,7 +4191,7 @@ int transport_generic_map_mem_to_cmd(
 			}
 
 			T_TASK(cmd)->t_tasks_se_bidi_num = se_mem_cnt_out;
-		}	
+		}
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
@@ -4191,7 +4216,7 @@ int transport_generic_map_mem_to_cmd(
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_map_mem_to_cmd);
-	
+
 
 static inline long long transport_dev_end_lba(struct se_device *dev)
 {
@@ -4667,7 +4692,7 @@ int transport_map_mem_to_sg(
 				 * into the struct se_mem on the next go around..
 				 */
 				task_size -= sg->length;
-				if (!(task_size)) 
+				if (!(task_size))
 					*task_offset += sg->length;
 
 				goto next;
@@ -4829,6 +4854,8 @@ static int transport_do_se_mem_map(
 
 		return ret;
 	}
+
+	BUG_ON(list_empty(se_mem_list));
 	/*
 	 * This is the normal path for all normal non BIDI and BIDI-COMMAND
 	 * WRITE payloads..  If we need to do BIDI READ passthrough for
@@ -4936,7 +4963,7 @@ static u32 transport_generic_get_cdb_count(
 
 		se_mem = se_mem_lout;
 		/*
-		 * Setup the T_TASK(cmd)->t_mem_bidi_list -> task->task_sg_bidi 
+		 * Setup the T_TASK(cmd)->t_mem_bidi_list -> task->task_sg_bidi
 		 * mapping for SCSI READ for BIDI-COMMAND passthrough with TCM/pSCSI
 		 *
 		 * Note that the first call to transport_do_se_mem_map() above will
@@ -5010,7 +5037,9 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd)
 		struct se_mem *se_mem = NULL, *se_mem_lout = NULL;
 		u32 se_mem_cnt = 0, task_offset = 0;
 
-		BUG_ON(list_empty(cmd->t_task->t_mem_list));
+		if (!list_empty(T_TASK(cmd)->t_mem_list))
+			se_mem = list_entry(T_TASK(cmd)->t_mem_list->next,
+					struct se_mem, se_list);
 
 		ret = transport_do_se_mem_map(dev, task,
 				cmd->t_task->t_mem_list, NULL, se_mem,
@@ -5447,7 +5476,7 @@ static int transport_clear_lun_thread(void *p)
 	struct se_lun *lun = (struct se_lun *)p;
 
 	__transport_clear_lun_from_sessions(lun);
-	complete(&lun->lun_shutdown_comp);	
+	complete(&lun->lun_shutdown_comp);
 
 	return 0;
 }
@@ -5455,7 +5484,7 @@ static int transport_clear_lun_thread(void *p)
 int transport_clear_lun_from_sessions(struct se_lun *lun)
 {
 	struct task_struct *kt;
-	
+
 	kt = kthread_run(transport_clear_lun_thread, (void *)lun,
 			"tcm_cl_%u", lun->unpacked_lun);
 	if (IS_ERR(kt)) {
@@ -5806,31 +5835,26 @@ int transport_generic_do_tmr(struct se_cmd *cmd)
 	int ret;
 
 	switch (tmr->function) {
-	case ABORT_TASK:
+	case TMR_ABORT_TASK:
 		ref_cmd = tmr->ref_cmd;
 		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
-	case ABORT_TASK_SET:
-	case CLEAR_ACA:
-	case CLEAR_TASK_SET:
+	case TMR_ABORT_TASK_SET:
+	case TMR_CLEAR_ACA:
+	case TMR_CLEAR_TASK_SET:
 		tmr->response = TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED;
 		break;
-	case LUN_RESET:
+	case TMR_LUN_RESET:
 		ret = core_tmr_lun_reset(dev, tmr, NULL, NULL);
 		tmr->response = (!ret) ? TMR_FUNCTION_COMPLETE :
 					 TMR_FUNCTION_REJECTED;
 		break;
-#if 0
-	case TARGET_WARM_RESET:
-		transport_generic_host_reset(dev->se_hba);
+	case TMR_TARGET_WARM_RESET:
 		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
-	case TARGET_COLD_RESET:
-		transport_generic_host_reset(dev->se_hba);
-		transport_generic_cold_reset(dev->se_hba);
+	case TMR_TARGET_COLD_RESET:
 		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
-#endif
 	default:
 		printk(KERN_ERR "Uknown TMR function: 0x%02x.\n",
 				tmr->function);

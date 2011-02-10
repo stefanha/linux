@@ -889,7 +889,7 @@ static int rd_DIRECT_do_se_mem_map(
 			list_entry(T_TASK(cmd)->t_mem_list->next,
 				   struct se_mem, se_list),
 			task_offset)))
-		return -1;	
+		return -1;
 
 	return transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
 			list_entry(T_TASK(cmd)->t_mem_list->next,

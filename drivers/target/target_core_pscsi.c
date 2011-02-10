@@ -366,7 +366,7 @@ static struct se_device *pscsi_add_device_to_list(
 	limits = &dev_limits.limits;
 	limits->logical_block_size = sd->sector_size;
 	limits->max_hw_sectors = (sd->host->max_sectors > queue_max_hw_sectors(q)) ?
-				  queue_max_hw_sectors(q) : sd->host->max_sectors; 
+				  queue_max_hw_sectors(q) : sd->host->max_sectors;
 	limits->max_sectors = (sd->host->max_sectors > queue_max_sectors(q)) ?
 				  queue_max_sectors(q) : sd->host->max_sectors;
 	dev_limits.hw_queue_depth = sd->queue_depth;
@@ -461,10 +461,10 @@ static struct se_device *pscsi_create_type_disk(
 	 * Claim exclusive struct block_device access to struct scsi_device
 	 * for TYPE_DISK using supplied udev_path
 	 */
-	bd = open_bdev_exclusive(se_dev->se_dev_udev_path,
-				FMODE_WRITE|FMODE_READ, pdv);
-	if (!(bd)) {
-		printk("pSCSI: open_bdev_exclusive() failed\n");
+	bd = blkdev_get_by_path(se_dev->se_dev_udev_path,
+				FMODE_WRITE|FMODE_READ|FMODE_EXCL, pdv);
+	if (IS_ERR(bd)) {
+		printk(KERN_ERR "pSCSI: blkdev_get_by_path() failed\n");
 		scsi_device_put(sd);
 		return NULL;
 	}
@@ -472,7 +472,7 @@ static struct se_device *pscsi_create_type_disk(
 
 	dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags);
 	if (!(dev)) {
-		close_bdev_exclusive(pdv->pdv_bd, FMODE_WRITE|FMODE_READ);
+		blkdev_put(pdv->pdv_bd, FMODE_WRITE|FMODE_READ|FMODE_EXCL);
 		scsi_device_put(sd);
 		return NULL;
 	}
@@ -683,8 +683,8 @@ static void pscsi_free_device(void *p)
 		 * struct scsi_device with TYPE_DISK from pscsi_create_type_disk()
 		 */
 		if ((sd->type == TYPE_DISK) && pdv->pdv_bd) {
-        		close_bdev_exclusive(pdv->pdv_bd,
-					FMODE_WRITE|FMODE_READ);
+			blkdev_put(pdv->pdv_bd,
+				   FMODE_WRITE|FMODE_READ|FMODE_EXCL);
 			pdv->pdv_bd = NULL;
 		}
 		/*
@@ -1037,10 +1037,9 @@ static ssize_t pscsi_check_configfs_dev_params(
 	return 0;
 }
 
-static ssize_t pscsi_show_configfs_dev_params(
-        struct se_hba *hba,
-        struct se_subsystem_dev *se_dev,
-        char *b)
+static ssize_t pscsi_show_configfs_dev_params(struct se_hba *hba,
+					      struct se_subsystem_dev *se_dev,
+					      char *b)
 {
 	struct pscsi_hba_virt *phv = hba->hba_ptr;
         struct pscsi_dev_virt *pdv = se_dev->se_dev_su_ptr;

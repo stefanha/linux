@@ -412,7 +412,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	 * Allocate the LUN_RESET TMR
 	 */
 	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, (void *)tl_tmr,
-				LUN_RESET);
+				TMR_LUN_RESET);
 	if (!(se_cmd->se_tmr_req))
 		goto release;
 	/*

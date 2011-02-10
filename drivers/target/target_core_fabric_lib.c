@@ -143,7 +143,7 @@ u32 fc_get_pr_transport_id_len(
 	struct t10_pr_registration *pr_reg,
 	int *format_code)
 {
-        *format_code = 0;
+	*format_code = 0;
 	/*
 	 * The FC Transport ID is a hardcoded 24-byte length
 	 */
@@ -163,7 +163,7 @@ u32 fc_get_pr_transport_id(
 	u32 off = 8;
 	/*
 	 * PROTOCOL IDENTIFIER is 0h for FCP-2
-	 * 
+	 *
 	 * From spc4r17, 7.5.4.2 TransportID for initiator ports using
 	 * SCSI over Fibre Channel
 	 *
@@ -178,7 +178,7 @@ u32 fc_get_pr_transport_id(
 			continue;
 		}
 		binary = transport_asciihex_to_binaryhex(&ptr[i]);
-		buf[off++] = binary;	
+		buf[off++] = binary;
 		i += 2;
 	}
 	/*

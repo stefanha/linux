@@ -98,7 +98,7 @@ enum transport_state_table {
 	TRANSPORT_REMOVE	= 14,
 	TRANSPORT_FREE		= 15,
 	TRANSPORT_NEW_CMD_MAP	= 16,
-};	
+};
 
 /* Used for struct se_cmd->se_cmd_flags */
 enum se_cmd_flags_table {
@@ -129,7 +129,7 @@ enum se_cmd_flags_table {
 	SCF_EMULATE_CDB_ASYNC		= 0x01000000,
 	SCF_EMULATE_SYNC_UNMAP		= 0x02000000
 };
-	
+
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
 enum transport_lunflags_table {
 	TRANSPORT_LUNFLAGS_NO_ACCESS		= 0x00,
@@ -201,6 +201,21 @@ typedef enum {
 	SAM_TASK_ATTR_EMULATED
 } t10_task_attr_index_t;
 
+/*
+ * Used for target SCSI statistics
+ */
+typedef enum {
+	SCSI_INST_INDEX,
+	SCSI_DEVICE_INDEX,
+	SCSI_AUTH_INTR_INDEX,
+	SCSI_INDEX_TYPE_MAX
+} scsi_index_t;
+
+struct scsi_index_table {
+	spinlock_t	lock;
+	u32		scsi_mib_index[SCSI_INDEX_TYPE_MAX];
+} ____cacheline_aligned;
+
 struct se_cmd;
 
 struct t10_alua {
@@ -231,7 +246,7 @@ struct t10_alua_lu_gp {
 } ____cacheline_aligned;
 
 struct t10_alua_lu_gp_member {
-	int lu_gp_assoc:1;
+	bool lu_gp_assoc;
 	atomic_t lu_gp_mem_ref_cnt;
 	spinlock_t lu_gp_mem_lock;
 	struct t10_alua_lu_gp *lu_gp;
@@ -263,7 +278,7 @@ struct t10_alua_tg_pt_gp {
 } ____cacheline_aligned;
 
 struct t10_alua_tg_pt_gp_member {
-	int tg_pt_gp_assoc:1;
+	bool tg_pt_gp_assoc;
 	atomic_t tg_pt_gp_mem_ref_cnt;
 	spinlock_t tg_pt_gp_mem_lock;
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
@@ -328,7 +343,7 @@ struct t10_pr_registration {
 	int pr_res_type;
 	int pr_res_scope;
 	/* Used for fabric initiator WWPNs using a ISID */
-	int isid_present_at_reg:1;
+	bool isid_present_at_reg;
 	u32 pr_res_mapped_lun;
 	u32 pr_aptpl_target_lun;
 	u32 pr_res_generation;
@@ -410,7 +425,7 @@ struct se_transport_task {
 	unsigned long long	t_task_lba;
 	int			t_tasks_failed;
 	int			t_tasks_fua;
-	int			t_tasks_bidi:1;
+	bool			t_tasks_bidi;
 	u32			t_task_cdbs;
 	u32			t_tasks_check;
 	u32			t_tasks_no;
@@ -462,7 +477,7 @@ struct se_task {
 	u8		task_flags;
 	int		task_error_status;
 	int		task_state_flags;
-	int		task_padded_sg:1;
+	bool		task_padded_sg;
 	unsigned long long	task_lba;
 	u32		task_no;
 	u32		task_sectors;
@@ -575,7 +590,7 @@ struct se_ua {
 struct se_node_acl {
 	char			initiatorname[TRANSPORT_IQN_LEN];
 	/* Used to signal demo mode created ACL, disabled by default */
-	int			dynamic_node_acl:1;
+	bool			dynamic_node_acl;
 	u32			queue_depth;
 	u32			acl_index;
 	u64			num_cmds;
@@ -584,8 +599,6 @@ struct se_node_acl {
 	spinlock_t		stats_lock;
 	/* Used for PR SPEC_I_PT=1 and REGISTER_AND_MOVE */
 	atomic_t		acl_pr_ref_count;
-	/* Used for MIB access */
-	atomic_t		mib_ref_count;
 	struct se_dev_entry	*device_list;
 	struct se_session	*nacl_sess;
 	struct se_portal_group *se_tpg;
@@ -601,8 +614,6 @@ struct se_node_acl {
 } ____cacheline_aligned;
 
 struct se_session {
-	/* Used for MIB access */
-	atomic_t		mib_ref_count;
 	u64			sess_bin_isid;
 	struct se_node_acl	*se_node_acl;
 	struct se_portal_group *se_tpg;
@@ -618,6 +629,12 @@ struct se_device;
 struct se_transform_info;
 struct scatterlist;
 
+struct se_ml_stat_grps {
+	struct config_group	stat_group;
+	struct config_group	scsi_auth_intr_group;
+	struct config_group	scsi_att_intr_port_group;
+};
+
 struct se_lun_acl {
 	char			initiatorname[TRANSPORT_IQN_LEN];
 	u32			mapped_lun;
@@ -625,10 +642,13 @@ struct se_lun_acl {
 	struct se_lun		*se_lun;
 	struct list_head	lacl_list;
 	struct config_group	se_lun_group;
+	struct se_ml_stat_grps	ml_stat_grps;
 }  ____cacheline_aligned;
 
+#define ML_STAT_GRPS(lacl)	(&(lacl)->ml_stat_grps)
+
 struct se_dev_entry {
-	int			def_pr_registered:1;
+	bool			def_pr_registered;
 	/* See transport_lunflags_table */
 	u32			lun_flags;
 	u32			deve_cmds;
@@ -689,6 +709,13 @@ struct se_dev_attrib {
 	struct config_group da_group;
 } ____cacheline_aligned;
 
+struct se_dev_stat_grps {
+	struct config_group stat_group;
+	struct config_group scsi_dev_group;
+	struct config_group scsi_tgt_dev_group;
+	struct config_group scsi_lu_group;
+};
+
 struct se_subsystem_dev {
 /* Used for struct se_subsystem_dev-->se_dev_alias, must be less than PAGE_SIZE */
 #define SE_DEV_ALIAS_LEN		512
@@ -712,11 +739,14 @@ struct se_subsystem_dev {
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
+	/* For target_core_stat.c groups */
+	struct se_dev_stat_grps dev_stat_grps;
 } ____cacheline_aligned;
 
 #define T10_ALUA(su_dev)	(&(su_dev)->t10_alua)
 #define T10_RES(su_dev)		(&(su_dev)->t10_reservation)
 #define T10_PR_OPS(su_dev)	(&(su_dev)->t10_reservation.pr_ops)
+#define DEV_STAT_GRP(dev)	(&(dev)->dev_stat_grps)
 
 struct se_device {
 	/* Set to 1 if thread is NOT sleeping on thread_sem */
@@ -812,7 +842,6 @@ struct se_hba {
 	/* Virtual iSCSI devices attached. */
 	u32			dev_count;
 	u32			hba_index;
-	atomic_t		dev_mib_access_count;
 	atomic_t		load_balance_queue;
 	atomic_t		left_queue_depth;
 	/* Maximum queue depth the HBA can handle. */
@@ -831,6 +860,13 @@ struct se_hba {
 
 #define SE_HBA(dev)		((dev)->se_hba)
 
+struct se_port_stat_grps {
+	struct config_group stat_group;
+	struct config_group scsi_port_group;
+	struct config_group scsi_tgt_port_group;
+	struct config_group scsi_transport_group;
+};
+
 struct se_lun {
 	/* See transport_lun_status_table */
 	enum transport_lun_status_table lun_status;
@@ -845,11 +881,13 @@ struct se_lun {
 	struct list_head	lun_cmd_list;
 	struct list_head	lun_acl_list;
 	struct se_device	*lun_se_dev;
+	struct se_port		*lun_sep;
 	struct config_group	lun_group;
-	struct se_port	*lun_sep;
+	struct se_port_stat_grps port_stat_grps;
 } ____cacheline_aligned;
 
 #define SE_LUN(cmd)		((cmd)->se_lun)
+#define PORT_STAT_GRP(lun)	(&(lun)->port_stat_grps)
 
 struct se_port {
 	/* RELATIVE TARGET PORT IDENTIFER */
@@ -873,6 +911,7 @@ struct se_port {
 } ____cacheline_aligned;
 
 struct se_tpg_np {
+	struct se_portal_group *tpg_np_parent;
 	struct config_group	tpg_np_group;
 } ____cacheline_aligned;
 

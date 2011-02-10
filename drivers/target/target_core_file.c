@@ -201,7 +201,7 @@ static struct se_device *fd_create_virtdevice(
 		 */
 		fd_dev->fd_block_size = bdev_logical_block_size(inode->i_bdev);
 		fd_dev->fd_dev_size = (i_size_read(file->f_mapping->host) -
-		  		       fd_dev->fd_block_size);
+				       fd_dev->fd_block_size);
 
 		printk(KERN_INFO "FILEIO: Using size: %llu bytes from struct"
 			" block_device blocks: %llu logical_block_size: %d\n",
@@ -518,7 +518,7 @@ static match_table_t tokens = {
 	{Opt_fd_buffered_io, "fd_buffered_id=%d"},
 	{Opt_err, NULL}
 };
-	
+
 static ssize_t fd_set_configfs_dev_params(
 	struct se_hba *hba,
 	struct se_subsystem_dev *se_dev,
