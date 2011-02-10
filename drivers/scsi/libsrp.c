@@ -206,7 +206,8 @@ static int srp_direct_data(struct scsi_cmnd *sc, struct srp_direct_buf *md,
 	err = rdma_io(sc, sg, nsg, md, 1, dir, len);
 
 	if (dma_map)
-		dma_unmap_sg(iue->target->dev, sg, nsg, DMA_BIDIRECTIONAL);
+		dma_unmap_sg(iue->target->dev, sg, scsi_sg_count(sc),
+			     DMA_BIDIRECTIONAL);
 
 	return err;
 }
@@ -278,7 +279,8 @@ rdma:
 	err = rdma_io(sc, sg, nsg, md, nmd, dir, len);
 
 	if (dma_map)
-		dma_unmap_sg(iue->target->dev, sg, nsg, DMA_BIDIRECTIONAL);
+		dma_unmap_sg(iue->target->dev, sg, scsi_sg_count(sc),
+			     DMA_BIDIRECTIONAL);
 
 free_mem:
 	if (token && dma_map)
