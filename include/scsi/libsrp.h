@@ -7,6 +7,13 @@
 #include <scsi/scsi_host.h>
 #include <scsi/srp.h>
 
+enum srp_task_attributes {
+	SRP_SIMPLE_TASK = 0,
+	SRP_HEAD_TASK = 1,
+	SRP_ORDERED_TASK = 2,
+	SRP_ACA_TASK = 4
+};
+
 enum iue_flags {
 	V_DIOVER,
 	V_WRITE,
@@ -64,7 +71,6 @@ extern int srp_cmd_queue(struct Scsi_Host *, struct srp_cmd *, void *, u64, u64)
 extern int srp_transfer_data(struct scsi_cmnd *, struct srp_cmd *,
 			     srp_rdma_t, int, int);
 
-
 static inline struct srp_target *host_to_srp_target(struct Scsi_Host *host)
 {
 	return (struct srp_target *) host->hostdata;
@@ -74,5 +80,7 @@ static inline int srp_cmd_direction(struct srp_cmd *cmd)
 {
 	return (cmd->buf_fmt >> 4) ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
 }
+
+extern int srp_data_length(struct srp_cmd *cmd, enum dma_data_direction dir);
 
 #endif
