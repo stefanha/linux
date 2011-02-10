@@ -41,3 +41,4 @@ source "drivers/target/lio-target/Kconfig"
 source "drivers/target/tcm_fc/Kconfig"
 
 endif
+source "drivers/target/tcm_vhost/Kconfig"

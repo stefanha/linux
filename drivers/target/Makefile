@@ -28,3 +28,4 @@ obj-$(CONFIG_LIO_TARGET)	+= lio-target/
 obj-$(CONFIG_TCM_LOOP_FABRIC)	+= tcm_loop/
 
 obj-$(CONFIG_TCM_FC)		+= tcm_fc/
+obj-$(CONFIG_TCM_VHOST)	+= tcm_vhost/
