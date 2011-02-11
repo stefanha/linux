@@ -41,8 +41,6 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi_tgt.h>
-#include <sd.h>
-#include <sr.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
