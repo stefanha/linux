@@ -16,6 +16,21 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_cmnd.h>
+
+#define VIRTIO_SCSI_DEBUG 1
+
+static void dbg(const char *fmt, ...)
+{
+	if (VIRTIO_SCSI_DEBUG) {
+		va_list args;
+
+		va_start(args, fmt);
+		vprintk(fmt, args);
+		va_end(args);
+	}
+}
 
 struct virtio_scsi {
 	/* Queue for commands and task management requests */
@@ -29,7 +44,11 @@ static void virtscsi_cmd_done(struct virtqueue *vq)
 
 static int virtscsi_queuecommand(struct Scsi_Host *sh, struct scsi_cmnd *sc)
 {
-	/* TODO */
+	dbg("%s %d:%d:%d:%d got CDB: %#02x scsi_buf_len: %u\n", __func__,
+		sc->device->host->host_no, sc->device->id,
+		sc->device->channel, sc->device->lun,
+		sc->cmnd[0], scsi_bufflen(sc));
+
 	return SCSI_MLQUEUE_HOST_BUSY;
 }
 
@@ -76,6 +95,8 @@ static int __devinit virtscsi_probe(struct virtio_device *vdev)
 	err = scsi_add_host(shost, &vdev->dev);
 	if (err)
 		goto scsi_add_host_failed;
+
+	scsi_scan_host(shost);
 
 	return 0;
 
