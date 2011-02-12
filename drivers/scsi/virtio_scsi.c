@@ -15,6 +15,7 @@
 #include <linux/virtio.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
+#include <linux/virtio_scsi.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
@@ -32,24 +33,120 @@ static void dbg(const char *fmt, ...)
 	}
 }
 
+#define VIRTIO_SCSI_MAX_SG 256 /* TODO this should come from the virtqueue */
+
+/* Command queue element */
+struct virtio_scsi_cmd {
+	struct scsi_cmnd *sc;
+	union {
+		struct virtio_scsi_cmd_header cmd;
+		struct virtio_scsi_tmr_header tmr;
+	} header;
+	struct virtio_scsi_footer footer;
+} ____cacheline_aligned_in_smp;
+
+/* Driver instance state */
 struct virtio_scsi {
+	/* Protects cmd_vq and sg[] */
+	spinlock_t cmd_vq_lock;
+
 	/* Queue for commands and task management requests */
 	struct virtqueue *cmd_vq;
+
+	/* For sglist construction when adding commands to the virtqueue */
+	struct scatterlist sg[VIRTIO_SCSI_MAX_SG];
 };
+
+static struct kmem_cache *virtscsi_cmd_cache;
 
 static void virtscsi_cmd_done(struct virtqueue *vq)
 {
 	/* TODO */
 }
 
+/**
+ * virtscsi_map_cmd - map a scsi_cmd to a virtqueue scatterlist
+ * @vscsi	: virtio_scsi state
+ * @sc		: command to be mapped
+ * @cmd		: command structure
+ * @out_num	: number of read-only elements
+ * @in_num	: number of write-only elements
+ *
+ * Called with cmd_vq_lock held.
+ */
+static void virtscsi_map_cmd(struct virtio_scsi *vscsi, struct scsi_cmnd *sc,
+				struct virtio_scsi_cmd *cmd,
+				unsigned int *out_num, unsigned int *in_num)
+{
+	struct scatterlist *sg = vscsi->sg;
+	struct scatterlist *sg_elem;
+	unsigned int idx = 0;
+	int i;
+
+	*out_num = 1 /* header */ + 1 /* CDB */;
+	*in_num = 1 /* footer */;
+
+	/* Header */
+	BUG_ON(cmd->header.cmd.header_type != VIRTIO_SCSI_TYPE_CMD);
+	sg_set_buf(&sg[idx++], &cmd->header.cmd, sizeof(cmd->header.cmd));
+
+	/* CDB */
+	sg_set_buf(&sg[idx++], sc->cmnd, sc->cmd_len);
+
+	/* Data-out/in buffer */
+	/* TODO there must be a nicer way */
+	BUG_ON(scsi_sg_count(sc) > VIRTIO_SCSI_MAX_SG - 3 /* header, CDB, footer */);
+	scsi_for_each_sg(sc, sg_elem, scsi_sg_count(sc), i) {
+		sg_set_buf(&sg[idx++], sg_virt(sg_elem), sg_elem->length);
+	}
+
+	BUG_ON(sc->sc_data_direction == DMA_BIDIRECTIONAL);
+	if (sc->sc_data_direction == DMA_TO_DEVICE)
+		*out_num += i;
+	else if (sc->sc_data_direction == DMA_FROM_DEVICE)
+		*in_num += i;
+
+	/* Footer */
+	sg_set_buf(&sg[idx++], &cmd->footer, sizeof(cmd->footer));
+}
+
 static int virtscsi_queuecommand(struct Scsi_Host *sh, struct scsi_cmnd *sc)
 {
+	struct virtio_scsi *vscsi = shost_priv(sh);
+	struct virtio_scsi_cmd *cmd;
+	unsigned long flags;
+	unsigned int out_num, in_num;
+	int ret = SCSI_MLQUEUE_HOST_BUSY;
+
 	dbg("%s %d:%d:%d:%d got CDB: %#02x scsi_buf_len: %u\n", __func__,
 		sc->device->host->host_no, sc->device->id,
 		sc->device->channel, sc->device->lun,
 		sc->cmnd[0], scsi_bufflen(sc));
 
-	return SCSI_MLQUEUE_HOST_BUSY;
+	cmd = kmem_cache_zalloc(virtscsi_cmd_cache, GFP_ATOMIC);
+	if (!cmd)
+		return SCSI_MLQUEUE_HOST_BUSY;
+
+	cmd->sc = sc; /* TODO hang cmd off sc instead of vice versa? */
+	cmd->header.cmd = (struct virtio_scsi_cmd_header){
+		.header_type = VIRTIO_SCSI_TYPE_CMD,
+		.lun = sc->device->lun, /* TODO shift? */
+		.tag = (__u64)cmd,
+		.task_attr = 0, /* TODO */
+	};
+
+	spin_lock_irqsave(&vscsi->cmd_vq_lock, flags);
+
+	virtscsi_map_cmd(vscsi, sc, cmd, &out_num, &in_num);
+
+	if (virtqueue_add_buf(vscsi->cmd_vq, vscsi->sg,
+				out_num, in_num, sc) >= 0) {
+		virtqueue_kick(vscsi->cmd_vq); /* TODO is there a way to batch commands? */
+		ret = 0;
+	}
+
+	spin_unlock_irqrestore(&vscsi->cmd_vq_lock, flags);
+	return ret;
 }
 
 static struct scsi_host_template virtscsi_host_template = {
@@ -79,6 +176,8 @@ static int __devinit virtscsi_probe(struct virtio_device *vdev)
 
 	vdev->priv = shost;
 	vscsi = shost_priv(shost);
+
+	spin_lock_init(&vscsi->cmd_vq_lock);
 
 	vscsi->cmd_vq = virtio_find_single_vq(vdev, virtscsi_cmd_done, "cmd");
 	if (IS_ERR(vscsi->cmd_vq)) {
@@ -135,13 +234,20 @@ static struct virtio_driver virtio_scsi_driver = {
 
 static int __init init(void)
 {
-	int ret = register_virtio_driver(&virtio_scsi_driver);
-	return ret;
+	virtscsi_cmd_cache = KMEM_CACHE(virtio_scsi_cmd, 0);
+	if (!virtscsi_cmd_cache) {
+		printk(KERN_ERR "kmem_cache_create() for "
+				"virtscsi_cmd_cache failed\n");
+		return -ENOMEM;
+	}
+
+	return register_virtio_driver(&virtio_scsi_driver);
 }
 
 static void __exit fini(void)
 {
 	unregister_virtio_driver(&virtio_scsi_driver);
+	kmem_cache_destroy(virtscsi_cmd_cache);
 }
 module_init(init);
 module_exit(fini);
