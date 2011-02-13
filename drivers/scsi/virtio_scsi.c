@@ -59,9 +59,49 @@ struct virtio_scsi {
 
 static struct kmem_cache *virtscsi_cmd_cache;
 
+/**
+ * virtscsi_complete_cmd - finish a scsi_cmd and invoke scsi_done
+ *
+ * Called with cmd_vq_lock held.
+ */
+static void virtscsi_complete_cmd(struct virtio_scsi_cmd *cmd)
+{
+	struct scsi_cmnd *sc = cmd->sc;
+
+	dbg("%s cmd %p status %#02x sense_len %u\n", __func__,
+		cmd, cmd->footer.status, cmd->footer.sense_len);
+
+	sc->result |= cmd->footer.status;
+	set_host_byte(sc, DID_OK);
+
+	memcpy(sc->sense_buffer, cmd->footer.sense,
+		cmd->footer.sense_len < SCSI_SENSE_BUFFERSIZE ?
+		cmd->footer.sense_len : SCSI_SENSE_BUFFERSIZE);
+
+	kmem_cache_free(virtscsi_cmd_cache, cmd);
+	cmd = NULL;
+
+	sc->scsi_done(sc);
+}
+
 static void virtscsi_cmd_done(struct virtqueue *vq)
 {
-	/* TODO */
+	struct Scsi_Host *sh = vq->vdev->priv;
+	struct virtio_scsi *vscsi = shost_priv(sh);
+	struct virtio_scsi_cmd *cmd;
+	unsigned long flags;
+	unsigned int len;
+
+	spin_lock_irqsave(&vscsi->cmd_vq_lock, flags);
+
+	do {
+		virtqueue_disable_cb(vq);
+		while ((cmd = virtqueue_get_buf(vq, &len)) != NULL) {
+			virtscsi_complete_cmd(cmd);
+		}
+	} while (!virtqueue_enable_cb(vq));
+
+	spin_unlock_irqrestore(&vscsi->cmd_vq_lock, flags);
 }
 
 /**
@@ -94,6 +134,7 @@ static void virtscsi_map_cmd(struct virtio_scsi *vscsi, struct scsi_cmnd *sc,
 	sg_set_buf(&sg[idx++], sc->cmnd, sc->cmd_len);
 
 	/* Data-out/in buffer */
+	/* TODO support bidirectional commands with scsi_in()/scsi_out() */
 	/* TODO there must be a nicer way */
 	BUG_ON(scsi_sg_count(sc) > VIRTIO_SCSI_MAX_SG - 3 /* header, CDB, footer */);
 	scsi_for_each_sg(sc, sg_elem, scsi_sg_count(sc), i) {
@@ -140,7 +181,7 @@ static int virtscsi_queuecommand(struct Scsi_Host *sh, struct scsi_cmnd *sc)
 	virtscsi_map_cmd(vscsi, sc, cmd, &out_num, &in_num);
 
 	if (virtqueue_add_buf(vscsi->cmd_vq, vscsi->sg,
-				out_num, in_num, sc) >= 0) {
+				out_num, in_num, cmd) >= 0) {
 		virtqueue_kick(vscsi->cmd_vq); /* TODO is there a way to batch commands? */
 		ret = 0;
 	}
