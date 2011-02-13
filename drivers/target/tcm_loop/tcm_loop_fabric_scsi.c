@@ -325,7 +325,7 @@ static int tcm_loop_queuecommand(
 	if (!(tl_hba)) {
 		printk(KERN_ERR "Unable to locate struct tcm_loop_hba from"
 				" struct scsi_cmnd\n");
-		sc->result = host_byte(DID_ERROR);
+		set_host_byte(sc, DID_ERROR);
 		sc->scsi_done(sc);
 		return 0;	
 	}
@@ -337,7 +337,7 @@ static int tcm_loop_queuecommand(
 	 */
 	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc);
 	if (!(se_cmd)) {
-		sc->result = host_byte(DID_ERROR);
+		set_host_byte(sc, DID_ERROR);
 		sc->scsi_done(sc);
 		return 0;
 	}
