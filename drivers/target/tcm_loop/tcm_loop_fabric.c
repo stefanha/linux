@@ -366,7 +366,8 @@ int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 	TL_CDB_DEBUG( "tcm_loop_queue_data_in() called for scsi_cmnd: %p"
 			" cdb: 0x%02x\n", sc, sc->cmnd[0]);
 
-	sc->result = host_byte(DID_OK) | SAM_STAT_GOOD;
+	sc->result = SAM_STAT_GOOD;
+	set_host_byte(sc, DID_OK);
 	(*sc->scsi_done)(sc);
 	return 0;
 }
@@ -386,11 +387,12 @@ int tcm_loop_queue_status(struct se_cmd *se_cmd)
 
 		memcpy((void *)sc->sense_buffer, (void *)se_cmd->sense_buffer,
 				SCSI_SENSE_BUFFERSIZE);	
-		sc->result = host_byte(DID_OK) | driver_byte(DRIVER_SENSE) |
-				SAM_STAT_CHECK_CONDITION;
+		sc->result = SAM_STAT_CHECK_CONDITION;
+		set_driver_byte(sc, DRIVER_SENSE);
 	} else
-		sc->result = host_byte(DID_OK) | se_cmd->scsi_status;
+		sc->result = se_cmd->scsi_status;
 
+	set_host_byte(sc, DID_OK);
 	(*sc->scsi_done)(sc);
 	return 0;
 }
