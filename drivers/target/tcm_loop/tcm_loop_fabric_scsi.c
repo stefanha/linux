@@ -68,6 +68,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	if (!(tl_nexus)) {
 		scmd_printk(KERN_ERR, sc, "TCM_Loop I_T Nexus"
 				" does not exist\n");
+		set_host_byte(sc, DID_ERROR);
 		return NULL;
 	}
 	se_sess = tl_nexus->se_sess;
@@ -75,6 +76,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	tl_cmd = kmem_cache_zalloc(tcm_loop_cmd_cache, GFP_ATOMIC);
 	if (!(tl_cmd)) {
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_cmd\n");
+		set_host_byte(sc, DID_ERROR);
 		return NULL;
 	}
 	se_cmd = &tl_cmd->tl_se_cmd;
@@ -117,10 +119,9 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	 */
 	if (transport_get_lun_for_cmd(se_cmd, NULL,
 				tl_cmd->sc->device->lun) < 0) {
-		/* NON_EXISTENT_LUN */
-		transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
-		return 0;
+		kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
+		set_host_byte(sc, DID_NO_CONNECT);
+		return NULL;
 	}
 
 	transport_device_setup_cmd(se_cmd);
@@ -337,7 +338,6 @@ static int tcm_loop_queuecommand(
 	 */
 	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc);
 	if (!(se_cmd)) {
-		set_host_byte(sc, DID_ERROR);
 		sc->scsi_done(sc);
 		return 0;
 	}
