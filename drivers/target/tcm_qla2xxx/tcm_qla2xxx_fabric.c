@@ -367,7 +367,35 @@ u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *se_tpg)
  */
 void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 {
-	transport_generic_free_cmd(&cmd->se_cmd, 0, 1, 0);
+	atomic_set(&cmd->cmd_done, 1);
+	/*
+	 * If tcm_qla2xxx_check_stop_free() has already been called, we
+	 * are safe to go ahead and call transport_generic_free_cmd()
+	 * to release the descriptor.
+	 */
+	if (atomic_read(&cmd->cmd_stop_free) != 0)
+		transport_generic_free_cmd(&cmd->se_cmd, 1, 1, 0);
+}
+
+/*
+ * Called from struct target_core_fabric_ops->check_stop_free() context
+ */
+void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
+{
+	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+
+	if (se_cmd->se_tmr_req)
+		return;
+	/*
+	 * If tcm_qla2xxx_free_cmd() has already been called from the LLD,
+	 * it's safe to call transport_generic_free_cmd() to release the
+	 * descriptor.  Otherwise set cmd->cmd_stop_free=1 and let
+	 * tcm_qla2xxx_free_cmd() call transport_generic_free_cmd().
+	 */
+	if (atomic_read(&cmd->cmd_done) != 0)
+		transport_generic_free_cmd(se_cmd, 0, 1, 0);
+	else
+		atomic_set(&cmd->cmd_stop_free, 1);
 }
 
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);

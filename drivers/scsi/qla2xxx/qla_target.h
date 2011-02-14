@@ -193,6 +193,8 @@ struct qla_tgt_sess {
 struct qla_tgt_cmd {
 	struct qla_tgt_sess *sess;
 	int state;
+	atomic_t cmd_done;
+	atomic_t cmd_stop_free;
 	struct se_cmd se_cmd;
 	/* Sense buffer that will be mapped into outgoing status */
 	unsigned char sense_buffer[TRANSPORT_SENSE_BUFFER];
