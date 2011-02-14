@@ -4786,7 +4786,6 @@ out_term:
 			qla24xx_send_term_exchange(vha, NULL, &cmd->atio.atio7, 1);
 		else
 			qla2xxx_send_term_exchange(vha, NULL, &cmd->atio.atio2x, 1);
-		qla_tgt_free_cmd(cmd);
 		break;
 	}
 	case QLA_TGT_SESS_WORK_ABORT:
