@@ -45,6 +45,7 @@
 
 #include "tcm_vhost_base.h"
 #include "tcm_vhost_fabric.h"
+#include "tcm_vhost_scsi.h"
 
 /* Local pointer to allocated TCM configfs fabric module */
 struct target_fabric_configfs *tcm_vhost_fabric_configfs;
@@ -359,6 +360,10 @@ static int __init tcm_vhost_init(void)
 {
 	int ret;
 
+	ret = vhost_scsi_register();
+	if (ret < 0)
+		return ret;
+
 	ret = tcm_vhost_register_configfs();
 	if (ret < 0)
 		return ret;
@@ -369,6 +374,7 @@ static int __init tcm_vhost_init(void)
 static void tcm_vhost_exit(void)
 {
 	tcm_vhost_deregister_configfs();
+	vhost_scsi_deregister();
 };
 
 #ifdef MODULE
