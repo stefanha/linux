@@ -1,6 +1,10 @@
 TCM/LIO target mode setup with qla2xxx
 --------------------------------------
 
+- Note the latest revision of this documentation is available on the LIO wiki here:
+
+  http://linux-iscsi.org/wiki/QLogic
+
 - If 1st time, git clone lio-core
   # git clone git://git.kernel.org/pub/scm/linux/kernel/git/nab/lio-core-2.6.git
   # cd lio-core-2.6
@@ -78,14 +82,14 @@ TCM/LIO target mode setup with qla2xxx
   ...
   <rtsadmin> create storage <myfile_name> /tmp/<tmpfile_name> <size>
     - Where <size> = 10G, say
-    - Where <myfile_name> could be madhu_file, say
+    - Where <myfile_name> could be my_file, say
     - Where <tmpfile_name> could be foo, say
     - A storage object <myfile_name> will be created
     - A 10G FILEIO Lun will be created @ /tmp/foo
   ...
   <rtsadmin> cfspath
   Current context object lives in
-  /sys/kernel/config/target/core/fileio_0/madhu_file
+  /sys/kernel/config/target/core/fileio_0/my_file
   <rtsadmin> saveconfig
   ...
   <rtsadmin> quit
@@ -94,7 +98,7 @@ TCM/LIO target mode setup with qla2xxx
   # mkdir -p /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:31:4c:48/tpgt_1/lun/lun_0/ 
     - Substitute port_name above with the actual portname of the qla2xxx ISP
       - You can cat /sys/class/fc_host/<host#>/port_name
-  # ln -s /sys/kernel/config/target/core/fileio_0/sync_fileio/ /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:31:4c:48/tpgt_1/lun/lun_0/tcm_qla2xxx_port
+  # ln -s /sys/kernel/config/target/core/fileio_0/my_file/ /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:31:4c:48/tpgt_1/lun/lun_0/tcm_qla2xxx_port
   # echo 1 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:31:4c:48/tpgt_1/enable
 
 - Further setup/Notes:
@@ -103,7 +107,7 @@ TCM/LIO target mode setup with qla2xxx
   - Also, note that you can have any number of virtual HBAs and assoicated DEVICEs. The TCM subsystem plugins (FILEIO/IBLOCK/pSCSI/RAMDISK) will report the underlying HW limitiations for things like TCQ depth, Max Sectors, TaskAbortedStatus, UA Interlocking, etc.. These values are available as attributes within the device context:
     # rtsadmin
     ...
-    fileio0/madhu_file(/tmp/foo)> ls attribute
+    fileio0/my_file(/tmp/my_file)> ls attribute
     ...
 
 <END OF DOCUMENT>
