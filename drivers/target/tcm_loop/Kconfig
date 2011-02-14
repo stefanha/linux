@@ -1,7 +1,8 @@
 config TCM_LOOP_FABRIC
 	tristate "TCM Virtual SAS target and Linux/SCSI LDD fabric loopback module"
+	depends on m
 	help
-	Say Y here to enable the TCM Virtual SAS target and Linux/SCSI LLD
+	Say M here to enable the TCM Virtual SAS target and Linux/SCSI LLD
 	fabric loopback module.
 
 config TCM_LOOP_CDB_DEBUG
