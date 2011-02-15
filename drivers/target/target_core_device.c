@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Filename:  target_core_device.c (based on iscsi_target_device.c)
  *
- * This file contains the iSCSI Virtual Device and Disk Transport
+ * This file contains the TCM Virtual Device and Disk Transport
  * agnostic related functions.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
