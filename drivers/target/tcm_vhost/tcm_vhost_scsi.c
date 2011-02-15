@@ -16,15 +16,41 @@
 #include <linux/vhost.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/vhost.h>
+#include <linux/virtio_net.h> /* TODO vhost.h currently depends on this */
+#include "../../vhost/vhost.h" /* TODO this is ugly */
+
+struct vhost_scsi {
+	struct vhost_dev dev;
+	struct vhost_virtqueue cmd_vq;
+};
 
 static int vhost_scsi_open(struct inode *inode, struct file *f)
 {
-	return -EINVAL;
+	struct vhost_scsi *s;
+	int r;
+
+	s = kmalloc(sizeof(*s), GFP_KERNEL);
+	if (!s)
+		return -ENOMEM;
+
+	r = vhost_dev_init(&s->dev, &s->cmd_vq, 1);
+	if (r < 0) {
+		kfree(s);
+		return r;
+	}
+
+	f->private_data = s;
+	return 0;
 }
 
 static int vhost_scsi_release(struct inode *inode, struct file *f)
 {
-	return -EINVAL;
+	struct vhost_scsi *s = f->private_data;
+
+	vhost_dev_cleanup(&s->dev);
+	kfree(s);
+	return 0;
 }
 
 static long vhost_scsi_ioctl(struct file *f, unsigned int ioctl,
