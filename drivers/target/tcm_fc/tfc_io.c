@@ -206,7 +206,8 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 						"xid <0x%x>, remaining <0x%x>, "
 						"lso_max <0x%x>\n",
 						__func__, fp, ep->xid,
-						remaining, lport->lso_max);
+						(unsigned int)remaining,
+						lport->lso_max);
 		}
 	}
 	return ft_queue_status(se_cmd);
