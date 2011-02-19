@@ -121,7 +121,7 @@ MODULE_PARM_DESC(srpt_service_guid,
 
 static struct ib_client srpt_client;
 static struct target_fabric_configfs *srpt_target;
-static void srpt_release_channel(struct kref *obj);
+static void srpt_release_channel(struct srpt_rdma_ch *ch);
 static int srpt_queue_status(struct se_cmd *cmd);
 
 /**
@@ -166,8 +166,7 @@ srpt_set_ch_state(struct srpt_rdma_ch *ch, enum rdma_ch_state new_state)
 
 	spin_lock_irqsave(&ch->spinlock, flags);
 	prev = ch->state;
-	if (new_state > ch->state)
-		ch->state = new_state;
+	ch->state = new_state;
 	spin_unlock_irqrestore(&ch->spinlock, flags);
 	return prev;
 }
@@ -263,7 +262,7 @@ static void srpt_qp_event(struct ib_event *event, struct srpt_rdma_ch *ch)
 	case IB_EVENT_QP_LAST_WQE_REACHED:
 		if (srpt_test_and_set_ch_state(ch, CH_DRAINING,
 					       CH_DISCONNECTING))
-			kref_put(&ch->kref, srpt_release_channel);
+			srpt_release_channel(ch);
 		else
 			pr_debug("%s: state %d - ignored LAST_WQE.\n",
 				 ch->sess_name, srpt_get_ch_state(ch));
@@ -2242,17 +2241,25 @@ static void srpt_destroy_ch_ib(struct srpt_rdma_ch *ch)
  * Note: The caller must hold ch->sport->sdev->spinlock.
  */
 static void __srpt_close_ch(struct srpt_rdma_ch *ch)
-	__acquires(&ch->sport->sdev->spinlock)
-	__releases(&ch->sport->sdev->spinlock)
 {
 	struct srpt_device *sdev;
 	enum rdma_ch_state prev_state;
-	int ret;
+	unsigned long flags;
 
 	sdev = ch->sport->sdev;
-	prev_state = srpt_set_ch_state(ch, CH_DRAINING);
-	if (prev_state == CH_DRAINING || prev_state == CH_DISCONNECTING)
-		return;
+
+	spin_lock_irqsave(&ch->spinlock, flags);
+	prev_state = ch->state;
+	switch (prev_state) {
+	case CH_CONNECTING:
+	case CH_LIVE:
+		ch->state = CH_WAITING_FOR_DREP;
+		break;
+	default:
+		break;
+	}
+	spin_unlock_irqrestore(&ch->spinlock, flags);
+
 	switch (prev_state) {
 	case CH_CONNECTING:
 		ib_send_cm_rej(ch->cm_id, IB_CM_REJ_NO_RESOURCES, NULL, 0,
@@ -2265,23 +2272,8 @@ static void __srpt_close_ch(struct srpt_rdma_ch *ch)
 		break;
 	case CH_DRAINING:
 	case CH_DISCONNECTING:
-		__WARN();
 		break;
 	}
-	kref_get(&ch->kref);
-	spin_unlock_irq(&sdev->spinlock);
-
-	/*
-	 * srpt_ch_qp_err() can sleep hence call it with interrupts enabled.
-	 * The kref_put() above protects against concurrent kref_put() calls.
-	 */
-	ret = srpt_ch_qp_err(ch);
-	kref_put(&ch->kref, srpt_release_channel);
-	if (ret < 0)
-		printk(KERN_ERR "Setting queue pair in error state failed:"
-		       " %d\n", ret);
-
-	spin_lock_irq(&sdev->spinlock);
 }
 
 /**
@@ -2313,6 +2305,7 @@ static void srpt_release_channel_by_cmid(struct ib_cm_id *cm_id)
 {
 	struct srpt_device *sdev;
 	struct srpt_rdma_ch *ch;
+	int ret;
 
 	WARN_ON_ONCE(irqs_disabled());
 
@@ -2321,11 +2314,14 @@ static void srpt_release_channel_by_cmid(struct ib_cm_id *cm_id)
 	spin_lock_irq(&sdev->spinlock);
 	list_for_each_entry(ch, &sdev->rch_list, list) {
 		if (ch->cm_id == cm_id) {
-			pr_debug("session %s: kref %d -> %d\n",
-				 ch->sess_name, atomic_read(&ch->kref.refcount),
-				 atomic_read(&ch->kref.refcount) - 1);
 			spin_unlock_irq(&sdev->spinlock);
-			kref_put(&ch->kref, srpt_release_channel);
+
+			srpt_set_ch_state(ch, CH_DRAINING);
+			ret = srpt_ch_qp_err(ch);
+			if (ret < 0)
+				printk(KERN_ERR "Setting queue pair in error"
+				       " state failed: %d\n", ret);
+
 			goto out;
 		}
 	}
@@ -2371,11 +2367,8 @@ static struct srpt_rdma_ch *srpt_find_channel(struct srpt_device *sdev,
  *   trigger a deadlock.
  * - It is not safe to call TCM transport_* functions from interrupt context.
  */
-static void srpt_release_channel(struct kref *obj)
+static void srpt_release_channel(struct srpt_rdma_ch *ch)
 {
-	struct srpt_rdma_ch *ch;
-
-	ch = container_of(obj, struct srpt_rdma_ch, kref);
 	schedule_work(&ch->release_work);
 }
 
@@ -2577,14 +2570,6 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 	ch->rq_size = SRPT_RQ_SIZE;
 	spin_lock_init(&ch->spinlock);
 	ch->state = CH_CONNECTING;
-	/*
-	 * Initialize kref to 3. The subsystems that hold a backpointer to a
-	 * channel are the IB connection manager, the IB queue pair associated
-	 * with the channel and TCM configfs (see also srpt_close_session()).
-	 */
-	kref_init(&ch->kref);
-	kref_get(&ch->kref);
-	kref_get(&ch->kref);
 	INIT_LIST_HEAD(&ch->cmd_wait_list);
 
 	ch->ioctx_ring = (struct srpt_send_ioctx **)
@@ -2818,6 +2803,7 @@ static void srpt_cm_dreq_recv(struct ib_cm_id *cm_id)
 	case CH_WAITING_FOR_DREP:
 	case CH_DRAINING:
 	case CH_DISCONNECTING:
+		__WARN();
 		break;
 	}
 
@@ -3540,8 +3526,6 @@ static void srpt_close_session(struct se_session *se_sess)
 	ch->release_done = &release_done;
 	__srpt_close_ch(ch);
 	spin_unlock_irq(&sdev->spinlock);
-
-	kref_put(&ch->kref, srpt_release_channel);
 
 	res = wait_for_completion_timeout(&release_done, 60 * HZ);
 	WARN_ON(res <= 0);
