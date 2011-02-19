@@ -2410,7 +2410,7 @@ static void srpt_release_channel_work(struct work_struct *w)
 	if (ch->release_done)
 		complete(ch->release_done);
 
-	wake_up_interruptible(&sdev->ch_releaseQ);
+	wake_up(&sdev->ch_releaseQ);
 
 	kfree(ch);
 }
@@ -3543,9 +3543,8 @@ static void srpt_close_session(struct se_session *se_sess)
 
 	kref_put(&ch->kref, srpt_release_channel);
 
-	res = wait_for_completion_interruptible(&release_done);
-	if (res)
-		printk(KERN_ERR "%s: interrupted.\n", __func__);
+	res = wait_for_completion_timeout(&release_done, 60 * HZ);
+	WARN_ON(res <= 0);
 }
 
 /**
