@@ -3066,13 +3066,17 @@ static int srpt_queue_response(struct se_cmd *cmd)
 		ioctx->state = SRPT_STATE_MGMT_RSP_SENT;
 		break;
 	default:
-		printk(KERN_ERR "Unexpected command state %d\n",
-		       srpt_get_cmd_state(ioctx));
+		printk(KERN_ERR "ch %p; cmd %d: unexpected command state %d\n",
+		       ch, ioctx->ioctx.index, ioctx->state);
+		__WARN();
 		break;
 	}
 	spin_unlock_irqrestore(&ioctx->spinlock, flags);
 
-	if (unlikely(transport_check_aborted_status(&ioctx->cmd, false))) {
+	if (unlikely(transport_check_aborted_status(&ioctx->cmd, false)
+		     || WARN_ON_ONCE(state == SRPT_STATE_CMD_RSP_SENT)
+		     || WARN_ON_ONCE(in_interrupt())
+		     || WARN_ON_ONCE(current == ch->thread))) {
 		atomic_inc(&ch->req_lim_delta);
 		srpt_abort_cmd(ioctx);
 		goto out;
