@@ -227,6 +227,7 @@ struct srpt_send_ioctx {
 	u8			n_rbuf;
 	bool			queue_status_only;
 	u8			sense_data[SCSI_SENSE_BUFFERSIZE];
+	struct work_struct	send_sense;
 };
 
 /**

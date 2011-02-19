@@ -1287,6 +1287,17 @@ free_mem:
 	return -ENOMEM;
 }
 
+static void srpt_ioctx_send_sense(struct work_struct *w)
+{
+	struct srpt_send_ioctx *ioctx;
+	struct se_cmd *cmd;
+
+	ioctx = container_of(w, struct srpt_send_ioctx, send_sense);
+	cmd = &ioctx->cmd;
+	transport_send_check_condition_and_sense(cmd, cmd->scsi_sense_reason,
+						 0);
+}
+
 /**
  * srpt_get_send_ioctx() - Obtain an I/O context for sending to the initiator.
  */
@@ -1320,6 +1331,7 @@ static struct srpt_send_ioctx *srpt_get_send_ioctx(struct srpt_rdma_ch *ch)
 	ioctx->mapped_sg_count = 0;
 	init_completion(&ioctx->tx_done);
 	ioctx->queue_status_only = false;
+	INIT_WORK(&ioctx->send_sense, srpt_ioctx_send_sense);
 	/*
 	 * transport_init_se_cmd() does not initialize all fields, so do it
 	 * here.
@@ -1782,9 +1794,9 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	if (ret) {
 		printk(KERN_ERR "0x%llx: parsing SRP descriptor table failed.\n",
 		       srp_cmd->tag);
-		transport_send_check_condition_and_sense(cmd,
-					TCM_INVALID_CDB_FIELD, 0);
-		goto err;
+		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
+		goto send_sense;
 	}
 
 	cmd->data_length = data_len;
@@ -1796,16 +1808,23 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	ret = transport_generic_allocate_tasks(cmd, srp_cmd->cdb);
 	if (cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
 		srpt_queue_status(cmd);
-	else if (ret < 0)
+	else if (cmd->se_cmd_flags & SCF_SCSI_CDB_EXCEPTION)
 		goto send_sense;
+	else
+		WARN_ON_ONCE(ret);
 
 	transport_generic_handle_cdb(cmd);
 	return 0;
 
 send_sense:
-	transport_send_check_condition_and_sense(cmd, cmd->scsi_sense_reason,
-						 0);
-err:
+	/*
+	 * Note: since srpt_handle_cmd() is invoked from inside the IB
+	 * completion handler, since that handler must not sleep and since
+	 * transport_send_check_condition_and_sense() invokes the
+	 * queue_status() callback which does sleep, schedule the call of
+	 * transport_send_check_condition_and_sense().
+	 */
+	schedule_work(&send_ioctx->send_sense);
 	return -1;
 }
 
