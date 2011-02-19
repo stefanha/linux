@@ -150,6 +150,7 @@ struct rdma_iu {
  * @SRPT_STATE_DATA_IN:       Data for the write or bidir command arrived and is
  *                            being processed.
  * @SRPT_STATE_CMD_RSP_SENT:  SRP_RSP for SRP_CMD has been sent.
+ * @SRPT_STATE_MGMT:          Processing a SCSI task management command.
  * @SRPT_STATE_MGMT_RSP_SENT: SRP_RSP for SRP_TSK_MGMT has been sent.
  * @SRPT_STATE_DONE:          Command processing finished successfully, command
  *                            processing has been aborted or command processing
@@ -160,8 +161,9 @@ enum srpt_command_state {
 	SRPT_STATE_NEED_DATA	 = 1,
 	SRPT_STATE_DATA_IN	 = 2,
 	SRPT_STATE_CMD_RSP_SENT	 = 3,
-	SRPT_STATE_MGMT_RSP_SENT = 4,
-	SRPT_STATE_DONE		 = 5,
+	SRPT_STATE_MGMT		 = 4,
+	SRPT_STATE_MGMT_RSP_SENT = 5,
+	SRPT_STATE_DONE		 = 6,
 };
 
 /**
@@ -190,7 +192,6 @@ struct srpt_recv_ioctx {
  * struct srpt_send_ioctx - SRPT send I/O context.
  * @ioctx:       See above.
  * @ch:          Channel pointer.
- * @kref:        Reference count of this data structure.
  * @free_list:   Node in srpt_rdma_ch.free_list.
  * @n_rbuf:      Number of data buffers in the received SRP command.
  * @rbufs:       Pointer to SRP data buffer array.
@@ -209,7 +210,6 @@ struct srpt_recv_ioctx {
 struct srpt_send_ioctx {
 	struct srpt_ioctx	ioctx;
 	struct srpt_rdma_ch	*ch;
-	struct kref		kref;
 	struct rdma_iu		*rdma_ius;
 	struct srp_direct_buf	*rbufs;
 	struct srp_direct_buf	single_rbuf;
@@ -225,6 +225,7 @@ struct srpt_send_ioctx {
 	u16			n_rdma_ius;
 	u8			n_rdma;
 	u8			n_rbuf;
+	bool			queue_status_only;
 	u8			sense_data[SCSI_SENSE_BUFFERSIZE];
 };
 

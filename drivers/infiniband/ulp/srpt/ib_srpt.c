@@ -1311,7 +1311,6 @@ static struct srpt_send_ioctx *srpt_get_send_ioctx(struct srpt_rdma_ch *ch)
 		return ioctx;
 
 	BUG_ON(ioctx->ch != ch);
-	kref_init(&ioctx->kref);
 	spin_lock_init(&ioctx->spinlock);
 	ioctx->state = SRPT_STATE_NEW;
 	ioctx->n_rbuf = 0;
@@ -1321,6 +1320,7 @@ static struct srpt_send_ioctx *srpt_get_send_ioctx(struct srpt_rdma_ch *ch)
 	ioctx->rdma_ius = NULL;
 	ioctx->mapped_sg_count = 0;
 	init_completion(&ioctx->tx_done);
+	ioctx->queue_status_only = false;
 	/*
 	 * transport_init_se_cmd() does not initialize all fields, so do it
 	 * here.
@@ -1361,11 +1361,6 @@ static void srpt_put_send_ioctx(struct srpt_send_ioctx *ioctx)
 	spin_lock_irqsave(&ch->spinlock, flags);
 	list_add(&ioctx->free_list, &ch->free_list);
 	spin_unlock_irqrestore(&ch->spinlock, flags);
-}
-
-static void srpt_put_send_ioctx_kref(struct kref *kref)
-{
-	srpt_put_send_ioctx(container_of(kref, struct srpt_send_ioctx, kref));
 }
 
 /**
@@ -1413,9 +1408,10 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 	switch (state) {
 	case SRPT_STATE_NEW:
 	case SRPT_STATE_DATA_IN:
+	case SRPT_STATE_MGMT:
 		/*
 		 * Do nothing - defer abort processing until
-		 * srpt_xmit_response() is invoked.
+		 * srpt_queue_response() is invoked.
 		 */
 		WARN_ON(!transport_check_aborted_status(&ioctx->cmd, false));
 		break;
@@ -1430,13 +1426,12 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 		 * not been received in time.
 		 */
 		srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
-		complete(&ioctx->tx_done);
 		atomic_set(&ioctx->cmd.t_task->transport_lun_stop, 1);
-		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
+		complete(&ioctx->tx_done);
 		break;
 	case SRPT_STATE_MGMT_RSP_SENT:
 		srpt_set_cmd_state(ioctx, SRPT_STATE_DONE);
-		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
+		complete(&ioctx->tx_done);
 		break;
 	default:
 		WARN_ON("ERROR: unexpected command state");
@@ -1494,11 +1489,8 @@ static void srpt_handle_send_comp(struct srpt_rdma_ch *ch,
 		    && state != SRPT_STATE_DONE))
 		pr_debug("state = %d\n", state);
 
-	if (state == SRPT_STATE_CMD_RSP_SENT)
-		complete(&ioctx->tx_done);
-
 	if (state != SRPT_STATE_DONE)
-		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
+		complete(&ioctx->tx_done);
 	else
 		printk(KERN_ERR "IB completion has been received too late for"
 		       " wr_id = %u.\n", ioctx->ioctx.index);
@@ -1748,7 +1740,7 @@ static void srpt_check_stop_free(struct se_cmd *cmd)
 	transport_generic_free_cmd(cmd, 0, 1, 0);
 	if (srpt_get_cmd_state(ioctx) != SRPT_STATE_MGMT_RSP_SENT)
 		srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
-	kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
+	srpt_put_send_ioctx(ioctx);
 }
 
 /**
@@ -1808,7 +1800,6 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	else if (ret < 0)
 		goto send_sense;
 
-	kref_get(&send_ioctx->kref);
 	transport_generic_handle_cdb(cmd);
 	return 0;
 
@@ -1905,6 +1896,7 @@ static void srpt_handle_tsk_mgmt(struct srpt_rdma_ch *ch,
 		 " cm_id %p sess %p\n", srp_tsk->tsk_mgmt_func,
 		 srp_tsk->task_tag, srp_tsk->tag, ch->cm_id, ch->sess);
 
+	srpt_set_cmd_state(send_ioctx, SRPT_STATE_MGMT);
 	send_ioctx->tag = srp_tsk->tag;
 	tcm_tmr = srp_tmr_to_tcm(srp_tsk->tsk_mgmt_func);
 	if (tcm_tmr < 0) {
@@ -1934,10 +1926,9 @@ static void srpt_handle_tsk_mgmt(struct srpt_rdma_ch *ch,
 		srpt_rx_mgmt_fn_tag(send_ioctx, srp_tsk->task_tag);
 
 process_tmr:
-	if (!(send_ioctx->cmd.se_cmd_flags & SCF_SCSI_CDB_EXCEPTION)) {
-		kref_get(&send_ioctx->kref);
+	if (!(send_ioctx->cmd.se_cmd_flags & SCF_SCSI_CDB_EXCEPTION))
 		transport_generic_handle_tmr(&send_ioctx->cmd);
-	} else
+	else
 		transport_send_check_condition_and_sense(cmd,
 						cmd->scsi_sense_reason, 0);
 
@@ -3045,12 +3036,23 @@ out:
 	return ret;
 }
 
+static u8 tcm_to_srp_tsk_mgmt_status(const int tcm_mgmt_status)
+{
+	switch (tcm_mgmt_status) {
+	case TMR_FUNCTION_COMPLETE:
+		return SRP_TSK_MGMT_SUCCESS;
+	case TMR_FUNCTION_REJECTED:
+		return SRP_TSK_MGMT_FUNC_NOT_SUPP;
+	}
+	return SRP_TSK_MGMT_FAILED;
+}
+
 /**
- * srpt_queue_data_in() - Transmits the response to a SCSI command.
+ * srpt_queue_response() - Transmits the response to a SCSI command.
  *
  * Callback function called by the TCM core.
  */
-static int srpt_queue_data_in(struct se_cmd *cmd)
+static int srpt_queue_response(struct se_cmd *cmd)
 {
 	struct srpt_rdma_ch *ch;
 	struct srpt_send_ioctx *ioctx;
@@ -3059,6 +3061,7 @@ static int srpt_queue_data_in(struct se_cmd *cmd)
 	int ret;
 	enum dma_data_direction dir;
 	int resp_len;
+	u8 srp_tm_status;
 
 	ret = 0;
 
@@ -3070,9 +3073,11 @@ static int srpt_queue_data_in(struct se_cmd *cmd)
 	state = ioctx->state;
 	switch (state) {
 	case SRPT_STATE_NEW:
-		ioctx->state = SRPT_STATE_CMD_RSP_SENT;
 	case SRPT_STATE_DATA_IN:
 		ioctx->state = SRPT_STATE_CMD_RSP_SENT;
+		break;
+	case SRPT_STATE_MGMT:
+		ioctx->state = SRPT_STATE_MGMT_RSP_SENT;
 		break;
 	default:
 		printk(KERN_ERR "Unexpected command state %d\n",
@@ -3090,7 +3095,8 @@ static int srpt_queue_data_in(struct se_cmd *cmd)
 	dir = ioctx->cmd.data_direction;
 
 	/* For read commands, transfer the data to the initiator. */
-	if (dir == DMA_FROM_DEVICE && ioctx->cmd.data_length) {
+	if (dir == DMA_FROM_DEVICE && ioctx->cmd.data_length &&
+	    !ioctx->queue_status_only) {
 		ret = srpt_xfer_data(ch, ioctx);
 		if (ret) {
 			printk(KERN_ERR "xfer_data failed for tag %llu\n",
@@ -3099,63 +3105,37 @@ static int srpt_queue_data_in(struct se_cmd *cmd)
 		}
 	}
 
-	resp_len = srpt_build_cmd_rsp(ch, ioctx, ioctx->tag, cmd->scsi_status);
-	ret = srpt_post_send(ch, ioctx, resp_len);
-	if (ret == 0)
-		wait_for_completion(&ioctx->tx_done);
+	if (state != SRPT_STATE_MGMT)
+		resp_len = srpt_build_cmd_rsp(ch, ioctx, ioctx->tag,
+					      cmd->scsi_status);
 	else {
+		srp_tm_status
+			= tcm_to_srp_tsk_mgmt_status(cmd->se_tmr_req->response);
+		resp_len = srpt_build_tskmgmt_rsp(ch, ioctx, srp_tm_status,
+						 ioctx->tag);
+	}
+	ret = srpt_post_send(ch, ioctx, resp_len);
+	if (ret == 0) {
+		ret = wait_for_completion_timeout(&ioctx->tx_done, 60 * HZ);
+		WARN_ON(ret <= 0);
+	} else {
 		printk(KERN_ERR "sending cmd response failed for tag %llu\n",
 		       ioctx->tag);
 		srpt_unmap_sg_to_ib_sge(ch, ioctx);
 		srpt_set_cmd_state(ioctx, SRPT_STATE_DONE);
-		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 	}
 
 out:
 	return ret;
 }
 
-static u8 tcm_to_srp_tsk_mgmt_status(const int tcm_mgmt_status)
+static int srpt_queue_status(struct se_cmd *cmd)
 {
-	switch (tcm_mgmt_status) {
-	case TMR_FUNCTION_COMPLETE:
-		return SRP_TSK_MGMT_SUCCESS;
-	case TMR_FUNCTION_REJECTED:
-		return SRP_TSK_MGMT_FUNC_NOT_SUPP;
-	}
-	return SRP_TSK_MGMT_FAILED;
-}
-
-static int srpt_queue_tm_rsp(struct se_cmd *cmd)
-{
-	struct srpt_rdma_ch *ch;
 	struct srpt_send_ioctx *ioctx;
-	enum srpt_command_state new_state;
-	int rsp_len, ret;
-	u8 srp_tm_status;
 
 	ioctx = container_of(cmd, struct srpt_send_ioctx, cmd);
-	ch = ioctx->ch;
-	BUG_ON(!ch);
-
-	pr_debug("tag 0x%llx status %d\n", ioctx->tag,
-		 cmd->se_tmr_req->response);
-
-	WARN_ON(in_irq());
-
-	new_state = srpt_set_cmd_state(ioctx, SRPT_STATE_MGMT_RSP_SENT);
-	WARN_ON(new_state == SRPT_STATE_DONE);
-
-	srp_tm_status = tcm_to_srp_tsk_mgmt_status(cmd->se_tmr_req->response);
-	rsp_len = srpt_build_tskmgmt_rsp(ch, ioctx, srp_tm_status, ioctx->tag);
-	ret = srpt_post_send(ch, ioctx, rsp_len);
-	if (ret) {
-		printk(KERN_ERR "sending tmr response failed for tag %llu.\n",
-		       ioctx->tag);
-		srpt_set_cmd_state(ioctx, SRPT_STATE_DONE);
-		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
-	}
-	return ret;
+	ioctx->queue_status_only = true;
+	return srpt_queue_response(cmd);
 }
 
 static void srpt_refresh_port_work(struct work_struct *work)
@@ -3625,34 +3605,6 @@ static void srpt_new_cmd_failure(struct se_cmd *se_cmd)
 {
 }
 
-static int srpt_queue_status(struct se_cmd *cmd)
-{
-	struct srpt_send_ioctx *ioctx;
-	struct srpt_rdma_ch *ch;
-	enum srpt_command_state state;
-	int resp_len, ret;
-
-	ioctx = container_of(cmd, struct srpt_send_ioctx, cmd);
-	ch = ioctx->ch;
-	BUG_ON(!ch);
-
-	state = srpt_set_cmd_state(ioctx, ioctx->cmd.se_tmr_req
-				   ? SRPT_STATE_MGMT_RSP_SENT
-				   : SRPT_STATE_CMD_RSP_SENT);
-	WARN_ON(state == SRPT_STATE_DONE);
-
-	resp_len = srpt_build_cmd_rsp(ch, ioctx, ioctx->tag, cmd->scsi_status);
-	ret = srpt_post_send(ch, ioctx, resp_len);
-	if (ret) {
-		srpt_unmap_sg_to_ib_sge(ch, ioctx);
-		printk(KERN_WARNING "sending response failed for tag %llu\n",
-		       ioctx->tag);
-		srpt_set_cmd_state(ioctx, SRPT_STATE_DONE);
-		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
-	}
-	return ret;
-}
-
 static u16 srpt_set_fabric_sense_len(struct se_cmd *cmd, u32 sense_length)
 {
 	return 0;
@@ -3890,9 +3842,9 @@ static struct target_core_fabric_ops srpt_template = {
 	.get_task_tag			= srpt_get_task_tag,
 	.get_cmd_state			= srpt_get_tcm_cmd_state,
 	.new_cmd_failure		= srpt_new_cmd_failure,
-	.queue_data_in			= srpt_queue_data_in,
+	.queue_data_in			= srpt_queue_response,
 	.queue_status			= srpt_queue_status,
-	.queue_tm_rsp			= srpt_queue_tm_rsp,
+	.queue_tm_rsp			= srpt_queue_response,
 	.get_fabric_sense_len		= srpt_get_fabric_sense_len,
 	.set_fabric_sense_len		= srpt_set_fabric_sense_len,
 	.is_state_remove		= srpt_is_state_remove,
