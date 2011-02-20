@@ -261,7 +261,7 @@ static void srpt_qp_event(struct ib_event *event, struct srpt_rdma_ch *ch)
 		break;
 	case IB_EVENT_QP_LAST_WQE_REACHED:
 		if (srpt_test_and_set_ch_state(ch, CH_DRAINING,
-					       CH_DISCONNECTING))
+					       CH_RELEASING))
 			srpt_release_channel(ch);
 		else
 			pr_debug("%s: state %d - ignored LAST_WQE.\n",
@@ -2272,7 +2272,7 @@ static void __srpt_close_ch(struct srpt_rdma_ch *ch)
 	switch (prev_state) {
 	case CH_CONNECTING:
 	case CH_LIVE:
-		ch->state = CH_WAITING_FOR_DREP;
+		ch->state = CH_DISCONNECTING;
 		break;
 	default:
 		break;
@@ -2285,12 +2285,13 @@ static void __srpt_close_ch(struct srpt_rdma_ch *ch)
 			       NULL, 0);
 		/* fall through */
 	case CH_LIVE:
-		ib_send_cm_dreq(ch->cm_id, NULL, 0);
+		if (ib_send_cm_dreq(ch->cm_id, NULL, 0) < 0)
+			printk(KERN_ERR "sending CM DREQ failed.\n");
 		break;
-	case CH_WAITING_FOR_DREP:
+	case CH_DISCONNECTING:
 		break;
 	case CH_DRAINING:
-	case CH_DISCONNECTING:
+	case CH_RELEASING:
 		break;
 	}
 }
@@ -2309,8 +2310,8 @@ static void srpt_close_ch(struct srpt_rdma_ch *ch)
 }
 
 /**
- * srpt_release_channel_by_cmid() - Release a channel.
- * @cm_id: Pointer to the CM ID of the channel to be released.
+ * srpt_drain_channel() - Drain a channel by resetting the IB queue pair.
+ * @cm_id: Pointer to the CM ID of the channel to be drained.
  *
  * Note: Must be called from inside srpt_cm_handler to avoid a race between
  * accessing sdev->spinlock and the call to kfree(sdev) in srpt_remove_one()
@@ -2320,11 +2321,12 @@ static void srpt_close_ch(struct srpt_rdma_ch *ch)
  * ib_destroy_cm_id(), which locks the cm_id spinlock and hence waits until
  * this function has finished).
  */
-static void srpt_release_channel_by_cmid(struct ib_cm_id *cm_id)
+static void srpt_drain_channel(struct ib_cm_id *cm_id)
 {
 	struct srpt_device *sdev;
 	struct srpt_rdma_ch *ch;
 	int ret;
+	bool do_reset = false;
 
 	WARN_ON_ONCE(irqs_disabled());
 
@@ -2333,21 +2335,23 @@ static void srpt_release_channel_by_cmid(struct ib_cm_id *cm_id)
 	spin_lock_irq(&sdev->spinlock);
 	list_for_each_entry(ch, &sdev->rch_list, list) {
 		if (ch->cm_id == cm_id) {
-			spin_unlock_irq(&sdev->spinlock);
-
-			srpt_set_ch_state(ch, CH_DRAINING);
-			ret = srpt_ch_qp_err(ch);
-			if (ret < 0)
-				printk(KERN_ERR "Setting queue pair in error"
-				       " state failed: %d\n", ret);
-
-			goto out;
+			do_reset = srpt_test_and_set_ch_state(ch,
+					CH_CONNECTING, CH_DRAINING) ||
+				   srpt_test_and_set_ch_state(ch,
+					CH_LIVE, CH_DRAINING) ||
+				   srpt_test_and_set_ch_state(ch,
+					CH_DISCONNECTING, CH_DRAINING);
+			break;
 		}
 	}
 	spin_unlock_irq(&sdev->spinlock);
 
-out:
-	;
+	if (do_reset) {
+		ret = srpt_ch_qp_err(ch);
+		if (ret < 0)
+			printk(KERN_ERR "Setting queue pair in error state"
+			       " failed: %d\n", ret);
+	}
 }
 
 /**
@@ -2707,7 +2711,7 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 	goto out;
 
 release_channel:
-	srpt_set_ch_state(ch, CH_DISCONNECTING);
+	srpt_set_ch_state(ch, CH_RELEASING);
 	transport_deregister_session_configfs(ch->sess);
 
 deregister_session:
@@ -2745,7 +2749,7 @@ out:
 static void srpt_cm_rej_recv(struct ib_cm_id *cm_id)
 {
 	printk(KERN_INFO "Received IB REJ for cm_id %p.\n", cm_id);
-	srpt_release_channel_by_cmid(cm_id);
+	srpt_drain_channel(cm_id);
 }
 
 /**
@@ -2784,15 +2788,14 @@ out:
 
 static void srpt_cm_timewait_exit(struct ib_cm_id *cm_id)
 {
-	printk(KERN_INFO "Received IB TimeWait exit for cm_id %p.\n",
-	       cm_id);
-	srpt_release_channel_by_cmid(cm_id);
+	printk(KERN_INFO "Received IB TimeWait exit for cm_id %p.\n", cm_id);
+	srpt_drain_channel(cm_id);
 }
 
 static void srpt_cm_rep_error(struct ib_cm_id *cm_id)
 {
 	printk(KERN_INFO "Received IB REP error for cm_id %p.\n", cm_id);
-	srpt_release_channel_by_cmid(cm_id);
+	srpt_drain_channel(cm_id);
 }
 
 /**
@@ -2814,14 +2817,14 @@ static void srpt_cm_dreq_recv(struct ib_cm_id *cm_id)
 	switch (srpt_get_ch_state(ch)) {
 	case CH_CONNECTING:
 	case CH_LIVE:
-		srpt_set_ch_state(ch, CH_WAITING_FOR_DREP);
+		srpt_set_ch_state(ch, CH_DISCONNECTING);
 		ib_send_cm_drep(ch->cm_id, NULL, 0);
 		printk(KERN_INFO "Received DREQ and sent DREP for session %s.\n",
 		       ch->sess_name);
 		break;
-	case CH_WAITING_FOR_DREP:
-	case CH_DRAINING:
 	case CH_DISCONNECTING:
+	case CH_DRAINING:
+	case CH_RELEASING:
 		__WARN();
 		break;
 	}
@@ -2837,7 +2840,7 @@ static void srpt_cm_drep_recv(struct ib_cm_id *cm_id)
 {
 	printk(KERN_INFO "Received InfiniBand DREP message for cm_id %p.\n",
 	       cm_id);
-	srpt_release_channel_by_cmid(cm_id);
+	srpt_drain_channel(cm_id);
 }
 
 /**
@@ -3026,9 +3029,9 @@ static int srpt_write_pending(struct se_cmd *se_cmd)
 		goto out;
 	case CH_LIVE:
 		break;
-	case CH_WAITING_FOR_DREP:
-	case CH_DRAINING:
 	case CH_DISCONNECTING:
+	case CH_DRAINING:
+	case CH_RELEASING:
 		pr_debug("cmd with tag %lld: channel disconnecting\n",
 			 ioctx->tag);
 		srpt_set_cmd_state(ioctx, SRPT_STATE_DATA_IN);
