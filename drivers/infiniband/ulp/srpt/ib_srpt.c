@@ -2764,9 +2764,7 @@ static void srpt_cm_rtu_recv(struct ib_cm_id *cm_id)
 	int ret;
 
 	ch = srpt_find_channel(cm_id->context, cm_id);
-	WARN_ON(!ch);
-	if (!ch)
-		goto out;
+	BUG_ON(!ch);
 
 	if (srpt_test_and_set_ch_state(ch, CH_CONNECTING, CH_LIVE)) {
 		struct srpt_recv_ioctx *ioctx, *ioctx_tmp;
@@ -2781,9 +2779,6 @@ static void srpt_cm_rtu_recv(struct ib_cm_id *cm_id)
 		if (ret)
 			srpt_close_ch(ch);
 	}
-
-out:
-	;
 }
 
 static void srpt_cm_timewait_exit(struct ib_cm_id *cm_id)
@@ -2804,23 +2799,20 @@ static void srpt_cm_rep_error(struct ib_cm_id *cm_id)
 static void srpt_cm_dreq_recv(struct ib_cm_id *cm_id)
 {
 	struct srpt_rdma_ch *ch;
+	unsigned long flags;
+	bool send_drep = false;
 
 	ch = srpt_find_channel(cm_id->context, cm_id);
-	if (!ch) {
-		pr_debug("Received IB DREQ for channel %p which is"
-			 " already being unregistered.\n", cm_id);
-		goto out;
-	}
+	BUG_ON(!ch);
 
 	pr_debug("cm_id= %p ch->state= %d\n", cm_id, srpt_get_ch_state(ch));
 
-	switch (srpt_get_ch_state(ch)) {
+	spin_lock_irqsave(&ch->spinlock, flags);
+	switch (ch->state) {
 	case CH_CONNECTING:
 	case CH_LIVE:
-		srpt_set_ch_state(ch, CH_DISCONNECTING);
-		ib_send_cm_drep(ch->cm_id, NULL, 0);
-		printk(KERN_INFO "Received DREQ and sent DREP for session %s.\n",
-		       ch->sess_name);
+		send_drep = true;
+		ch->state = CH_DISCONNECTING;
 		break;
 	case CH_DISCONNECTING:
 	case CH_DRAINING:
@@ -2828,9 +2820,14 @@ static void srpt_cm_dreq_recv(struct ib_cm_id *cm_id)
 		__WARN();
 		break;
 	}
+	spin_unlock_irqrestore(&ch->spinlock, flags);
 
-out:
-	;
+	if (send_drep) {
+		if (ib_send_cm_drep(ch->cm_id, NULL, 0) < 0)
+			printk(KERN_ERR "Sending IB DREP failed.\n");
+		printk(KERN_INFO "Received DREQ and sent DREP for session %s.\n",
+		       ch->sess_name);
+	}
 }
 
 /**
