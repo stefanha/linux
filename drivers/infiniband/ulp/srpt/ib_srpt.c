@@ -3143,6 +3143,10 @@ static int srpt_queue_status(struct se_cmd *cmd)
 	struct srpt_send_ioctx *ioctx;
 
 	ioctx = container_of(cmd, struct srpt_send_ioctx, cmd);
+	BUG_ON(ioctx->sense_data != cmd->sense_buffer);
+	if (cmd->se_cmd_flags &
+	    (SCF_TRANSPORT_TASK_SENSE | SCF_EMULATED_TASK_SENSE))
+		WARN_ON(cmd->scsi_status != SAM_STAT_CHECK_CONDITION);
 	ioctx->queue_status_only = true;
 	return srpt_queue_response(cmd);
 }
