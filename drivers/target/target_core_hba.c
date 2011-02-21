@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Filename:  target_core_hba.c
  *
- * This file copntains the iSCSI HBA Transport related functions.
+ * This file contains the TCM HBA Transport related functions.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
