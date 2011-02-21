@@ -1287,17 +1287,6 @@ free_mem:
 	return -ENOMEM;
 }
 
-static void srpt_ioctx_send_sense(struct work_struct *w)
-{
-	struct srpt_send_ioctx *ioctx;
-	struct se_cmd *cmd;
-
-	ioctx = container_of(w, struct srpt_send_ioctx, send_sense);
-	cmd = &ioctx->cmd;
-	transport_send_check_condition_and_sense(cmd, cmd->scsi_sense_reason,
-						 0);
-}
-
 /**
  * srpt_get_send_ioctx() - Obtain an I/O context for sending to the initiator.
  */
@@ -1321,6 +1310,7 @@ static struct srpt_send_ioctx *srpt_get_send_ioctx(struct srpt_rdma_ch *ch)
 		return ioctx;
 
 	BUG_ON(ioctx->ch != ch);
+	kref_init(&ioctx->kref);
 	spin_lock_init(&ioctx->spinlock);
 	ioctx->state = SRPT_STATE_NEW;
 	ioctx->n_rbuf = 0;
@@ -1331,7 +1321,6 @@ static struct srpt_send_ioctx *srpt_get_send_ioctx(struct srpt_rdma_ch *ch)
 	ioctx->mapped_sg_count = 0;
 	init_completion(&ioctx->tx_done);
 	ioctx->queue_status_only = false;
-	INIT_WORK(&ioctx->send_sense, srpt_ioctx_send_sense);
 	/*
 	 * transport_init_se_cmd() does not initialize all fields, so do it
 	 * here.
@@ -1356,12 +1345,8 @@ static void srpt_put_send_ioctx(struct srpt_send_ioctx *ioctx)
 
 	WARN_ON(srpt_get_cmd_state(ioctx) != SRPT_STATE_DONE);
 
-	/*
-	 * If the WARN_ON() below gets triggered this means that
-	 * srpt_unmap_sg_to_ib_sge() has not been called before
-	 * the command was freed.
-	 */
-	WARN_ON(ioctx->mapped_sg_count);
+	srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
+	transport_generic_free_cmd(&ioctx->cmd, 0, 1, 0);
 
 	if (ioctx->n_rbuf > 1) {
 		kfree(ioctx->rbufs);
@@ -1372,6 +1357,11 @@ static void srpt_put_send_ioctx(struct srpt_send_ioctx *ioctx)
 	spin_lock_irqsave(&ch->spinlock, flags);
 	list_add(&ioctx->free_list, &ch->free_list);
 	spin_unlock_irqrestore(&ch->spinlock, flags);
+}
+
+static void srpt_put_send_ioctx_kref(struct kref *kref)
+{
+	srpt_put_send_ioctx(container_of(kref, struct srpt_send_ioctx, kref));
 }
 
 /**
@@ -1438,11 +1428,11 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 		 */
 		srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
 		atomic_set(&ioctx->cmd.t_task->transport_lun_stop, 1);
-		complete(&ioctx->tx_done);
+		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 		break;
 	case SRPT_STATE_MGMT_RSP_SENT:
 		srpt_set_cmd_state(ioctx, SRPT_STATE_DONE);
-		complete(&ioctx->tx_done);
+		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 		break;
 	default:
 		WARN_ON("ERROR: unexpected command state");
@@ -1501,7 +1491,7 @@ static void srpt_handle_send_comp(struct srpt_rdma_ch *ch,
 		pr_debug("state = %d\n", state);
 
 	if (state != SRPT_STATE_DONE)
-		complete(&ioctx->tx_done);
+		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 	else
 		printk(KERN_ERR "IB completion has been received too late for"
 		       " wr_id = %u.\n", ioctx->ioctx.index);
@@ -1748,10 +1738,7 @@ static void srpt_check_stop_free(struct se_cmd *cmd)
 	struct srpt_send_ioctx *ioctx;
 
 	ioctx = container_of(cmd, struct srpt_send_ioctx, cmd);
-	transport_generic_free_cmd(cmd, 0, 1, 0);
-	if (srpt_get_cmd_state(ioctx) != SRPT_STATE_MGMT_RSP_SENT)
-		srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
-	srpt_put_send_ioctx(ioctx);
+	kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 }
 
 /**
@@ -1771,6 +1758,7 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	BUG_ON(!send_ioctx);
 
 	srp_cmd = recv_ioctx->ioctx.buf;
+	kref_get(&send_ioctx->kref);
 	cmd = &send_ioctx->cmd;
 	send_ioctx->tag = srp_cmd->tag;
 
@@ -1817,14 +1805,8 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	return 0;
 
 send_sense:
-	/*
-	 * Note: since srpt_handle_cmd() is invoked from inside the IB
-	 * completion handler, since that handler must not sleep and since
-	 * transport_send_check_condition_and_sense() invokes the
-	 * queue_status() callback which does sleep, schedule the call of
-	 * transport_send_check_condition_and_sense().
-	 */
-	schedule_work(&send_ioctx->send_sense);
+	transport_send_check_condition_and_sense(cmd, cmd->scsi_sense_reason,
+						 0);
 	return -1;
 }
 
@@ -1944,6 +1926,7 @@ static void srpt_handle_tsk_mgmt(struct srpt_rdma_ch *ch,
 		srpt_rx_mgmt_fn_tag(send_ioctx, srp_tsk->task_tag);
 
 process_tmr:
+	kref_get(&send_ioctx->kref);
 	if (!(send_ioctx->cmd.se_cmd_flags & SCF_SCSI_CDB_EXCEPTION))
 		transport_generic_handle_tmr(&send_ioctx->cmd);
 	else
@@ -3055,7 +3038,8 @@ static u8 tcm_to_srp_tsk_mgmt_status(const int tcm_mgmt_status)
 /**
  * srpt_queue_response() - Transmits the response to a SCSI command.
  *
- * Callback function called by the TCM core.
+ * Callback function called by the TCM core. Must not block since it can be
+ * invoked on the context of the IB completion handler.
  */
 static int srpt_queue_response(struct se_cmd *cmd)
 {
@@ -3093,9 +3077,7 @@ static int srpt_queue_response(struct se_cmd *cmd)
 	spin_unlock_irqrestore(&ioctx->spinlock, flags);
 
 	if (unlikely(transport_check_aborted_status(&ioctx->cmd, false)
-		     || WARN_ON_ONCE(state == SRPT_STATE_CMD_RSP_SENT)
-		     || WARN_ON_ONCE(in_interrupt())
-		     || WARN_ON_ONCE(current == ch->thread))) {
+		     || WARN_ON_ONCE(state == SRPT_STATE_CMD_RSP_SENT))) {
 		atomic_inc(&ch->req_lim_delta);
 		srpt_abort_cmd(ioctx);
 		goto out;
@@ -3124,14 +3106,12 @@ static int srpt_queue_response(struct se_cmd *cmd)
 						 ioctx->tag);
 	}
 	ret = srpt_post_send(ch, ioctx, resp_len);
-	if (ret == 0) {
-		ret = wait_for_completion_timeout(&ioctx->tx_done, 60 * HZ);
-		WARN_ON(ret <= 0);
-	} else {
+	if (ret) {
 		printk(KERN_ERR "sending cmd response failed for tag %llu\n",
 		       ioctx->tag);
 		srpt_unmap_sg_to_ib_sge(ch, ioctx);
 		srpt_set_cmd_state(ioctx, SRPT_STATE_DONE);
+		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 	}
 
 out:
