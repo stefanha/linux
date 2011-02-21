@@ -225,8 +225,6 @@ static ssize_t tcm_qla2xxx_tpg_show_enable(
 			atomic_read(&tpg->lport_tpg_enabled));
 }
 
-extern void qla_tgt_target_stop(struct qla_tgt *);
-
 static ssize_t tcm_qla2xxx_tpg_store_enable(
 	struct se_portal_group *se_tpg,
 	const char *page,
@@ -257,7 +255,7 @@ static ssize_t tcm_qla2xxx_tpg_store_enable(
 			return -ENODEV;
 		}
 		atomic_set(&tpg->lport_tpg_enabled, 0);
-		qla_tgt_target_stop(ha->qla_tgt);
+		qla_tgt_stop_phase1(ha->qla_tgt);
 	}
 
 	return count;
@@ -321,6 +319,14 @@ static void tcm_qla2xxx_drop_tpg(struct se_portal_group *se_tpg)
 	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
 			struct tcm_qla2xxx_tpg, se_tpg);
 	struct tcm_qla2xxx_lport *lport = tpg->lport;
+	struct scsi_qla_host *vha = lport->qla_vha;
+	struct qla_hw_data *ha = vha->hw;
+	/*
+	 * Call into qla2x_target.c LLD logic to shutdown the active
+	 * FC Nexuses and disable target mode operation for this qla_hw_data
+	 */
+	if ((ha->qla_tgt != NULL) && !ha->qla_tgt->tgt_stopped)
+		qla_tgt_stop_phase1(ha->qla_tgt);
 
 	core_tpg_deregister(se_tpg);
 	/*
@@ -869,8 +875,6 @@ out:
 	return ERR_PTR(ret);
 }
 
-extern void qla_tgt_target_stop(struct qla_tgt *);
-
 static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 {
 	struct tcm_qla2xxx_lport *lport = container_of(wwn,
@@ -879,11 +883,11 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 	struct qla_hw_data *ha = vha->hw;
 	struct Scsi_Host *sh = vha->host;
 	/*
-	 * Call into qla2x_target.c LLD logic to shutdown the active
-	 * FC Nexuses and disable target mode operation for this qla_hw_data
+	 * Call into qla2x_target.c LLD logic to release ha->qla_tgt which
+	 * at this point will have been stoppped via qla_tgt_stop_phase1()
+	 * from tcm_qla2xxx_drop_tpg() code above..
 	 */
-	if ((ha->qla_tgt != NULL) && !ha->qla_tgt->tgt_stopped)
-		qla_tgt_target_stop(ha->qla_tgt);
+	qla_tgt_release(ha->qla_tgt);
 	/*
 	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
 	 */
