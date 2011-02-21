@@ -28,11 +28,11 @@
 /* #define QL_DEBUG_LEVEL_16 */ /* Output ISP84XX trace msgs */
 /* #define QL_DEBUG_LEVEL_17 */ /* Output EEH trace messages */
 /* #define QL_DEBUG_LEVEL_18 */ /* Output T10 CRC trace messages */
-/* #define QL_DEBUG_LEVEL_19 */ /* Output for target */
-/* #define QL_DEBUG_LEVEL_20 */ /* Output for target management */
-/* #define QL_DEBUG_LEVEL_21 */ /* Output for target scsi packets */
-/* #define QL_DEBUG_LEVEL_22 */ /* Output for target SG lists */
-/* #define QL_DEBUG_LEVEL_23 */ /* Output for target task management */
+/* #define QL_DEBUG_LEVEL_21 */ /* Output for target */
+/* #define QL_DEBUG_LEVEL_22 */ /* Output for target management */
+/* #define QL_DEBUG_LEVEL_23 */ /* Output for target scsi packets */
+/* #define QL_DEBUG_LEVEL_24 */ /* Output for target SG lists */
+/* #define QL_DEBUG_LEVEL_25 */ /* Output for target task management */
 
 /*
 * Macros use for debugging the driver.
@@ -152,33 +152,33 @@
 #endif
 
 #if defined(QL_DEBUG_LEVEL_19)
-#define DEBUG19(x)	do {x;} while (0)
-#else
-#define DEBUG19(x)	do {} while (0)
-#endif
-
-#if defined(QL_DEBUG_LEVEL_20)
-#define DEBUG20(x)	do {x;} while (0)
-#else
-#define DEBUG20(x)	do {} while (0)
-#endif
-
-#if defined(QL_DEBUG_LEVEL_21)
 #define DEBUG21(x)	do {x;} while (0)
 #else
 #define DEBUG21(x)	do {} while (0)
 #endif
 
-#if defined(QL_DEBUG_LEVEL_22)
+#if defined(QL_DEBUG_LEVEL_20)
 #define DEBUG22(x)	do {x;} while (0)
 #else
 #define DEBUG22(x)	do {} while (0)
 #endif
 
-#if defined(QL_DEBUG_LEVEL_23)
+#if defined(QL_DEBUG_LEVEL_21)
 #define DEBUG23(x)	do {x;} while (0)
 #else
 #define DEBUG23(x)	do {} while (0)
+#endif
+
+#if defined(QL_DEBUG_LEVEL_22)
+#define DEBUG24(x)	do {x;} while (0)
+#else
+#define DEBUG24(x)	do {} while (0)
+#endif
+
+#if defined(QL_DEBUG_LEVEL_23)
+#define DEBUG25(x)	do {x;} while (0)
+#else
+#define DEBUG25(x)	do {} while (0)
 #endif
 
 /*
