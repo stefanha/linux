@@ -41,7 +41,6 @@
 #include <target/target_core_tmr.h>
 
 #include "qla_def.h"
-#include "qla_tgt.h"
 #include "qla_target.h"
 
 /*

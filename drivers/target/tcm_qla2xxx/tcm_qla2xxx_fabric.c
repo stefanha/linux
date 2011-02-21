@@ -50,7 +50,6 @@
 #include <target/target_core_tmr.h>
 
 #include <qla_def.h>
-#include <qla_tgt_def.h>
 
 //#include <scsi/libfc.h>
 //#include <scsi/scsi_transport_fc.h>

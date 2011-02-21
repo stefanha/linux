@@ -19,8 +19,6 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
-#include "qla_tgt.h"
-#include "qla_tgt_def.h"
 #include "qla_target.h"
 
 /*
