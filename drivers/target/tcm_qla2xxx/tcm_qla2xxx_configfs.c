@@ -883,12 +883,6 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 	struct qla_hw_data *ha = vha->hw;
 	struct Scsi_Host *sh = vha->host;
 	/*
-	 * Call into qla2x_target.c LLD logic to release ha->qla_tgt which
-	 * at this point will have been stoppped via qla_tgt_stop_phase1()
-	 * from tcm_qla2xxx_drop_tpg() code above..
-	 */
-	qla_tgt_release(ha->qla_tgt);
-	/*
 	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
 	 */
 	ha->target_lport_ptr = NULL;
