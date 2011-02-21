@@ -991,7 +991,7 @@ static inline int test_tgt_sess_count(struct qla_tgt *tgt)
 }
 
 /* Called by tcm_qla2xxx configfs code */
-void qla_tgt_target_stop(struct qla_tgt *tgt)
+void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 {
 	scsi_qla_host_t *vha = tgt->vha;
 	struct qla_hw_data *ha = tgt->ha;
@@ -1038,6 +1038,19 @@ void qla_tgt_target_stop(struct qla_tgt *tgt)
 
 	/* Wait for sessions to clear out (just in case) */
 	wait_event(tgt->waitQ, test_tgt_sess_count(tgt));
+}
+EXPORT_SYMBOL(qla_tgt_stop_phase1);
+
+void qla_tgt_stop_phase2(struct qla_tgt *tgt)
+{
+	scsi_qla_host_t *vha = tgt->vha;
+	struct qla_hw_data *ha = tgt->ha;
+
+	if (tgt->tgt_stopped) {
+		printk(KERN_ERR "Already in tgt->tgt_stopped state\n");
+		dump_stack();
+		return;
+	}
 
 	DEBUG20(qla_printk(KERN_INFO, "Waiting for %d IRQ commands to complete (tgt %p)",
 		tgt->irq_cmd_count, tgt));
@@ -1056,23 +1069,21 @@ void qla_tgt_target_stop(struct qla_tgt *tgt)
 
 	DEBUG20(qla_printk(KERN_INFO, "Stop of tgt %p finished", tgt));
 }
-EXPORT_SYMBOL(qla_tgt_target_stop);
 
-int qla_tgt_target_release(struct qla_tgt *tgt)
+void qla_tgt_release(struct qla_tgt *tgt)
 {
 	struct qla_hw_data *ha = tgt->ha;
 
 	if ((ha->qla_tgt != NULL) && !tgt->tgt_stopped)
-		qla_tgt_target_stop(tgt);
+		qla_tgt_stop_phase2(tgt);
 
 	ha->qla_tgt = NULL;
 
 	DEBUG20(qla_printk(KERN_INFO, "Release of tgt %p finished\n", tgt));
 
 	kfree(tgt);
-	return 0;
 }
-EXPORT_SYMBOL(qla_tgt_target_release);
+EXPORT_SYMBOL(qla_tgt_release);
 
 /* ha->hardware_lock supposed to be held on entry */
 static int qla_tgt_sched_sess_work(struct qla_tgt *tgt, int type,
@@ -4931,7 +4942,7 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, scsi_qla_host_t *vha)
 
 	DEBUG19(qla_printk(KERN_INFO, "Unregistering target for host %ld(%p)",
 			vha->host_no, ha));
-	qla_tgt_target_release(ha->qla_tgt);
+	qla_tgt_release(ha->qla_tgt);
 
 	return 0;
 }
