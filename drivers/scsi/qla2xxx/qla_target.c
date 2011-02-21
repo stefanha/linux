@@ -1041,6 +1041,7 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 }
 EXPORT_SYMBOL(qla_tgt_stop_phase1);
 
+/* Called by tcm_qla2xxx configfs code */
 void qla_tgt_stop_phase2(struct qla_tgt *tgt)
 {
 	scsi_qla_host_t *vha = tgt->vha;
@@ -1069,7 +1070,9 @@ void qla_tgt_stop_phase2(struct qla_tgt *tgt)
 
 	DEBUG20(qla_printk(KERN_INFO, "Stop of tgt %p finished", tgt));
 }
+EXPORT_SYMBOL(qla_tgt_stop_phase2);
 
+/* Called from qla_tgt_remove_target() -> qla2x00_remove_one() */
 void qla_tgt_release(struct qla_tgt *tgt)
 {
 	struct qla_hw_data *ha = tgt->ha;
@@ -1083,7 +1086,6 @@ void qla_tgt_release(struct qla_tgt *tgt)
 
 	kfree(tgt);
 }
-EXPORT_SYMBOL(qla_tgt_release);
 
 /* ha->hardware_lock supposed to be held on entry */
 static int qla_tgt_sched_sess_work(struct qla_tgt *tgt, int type,

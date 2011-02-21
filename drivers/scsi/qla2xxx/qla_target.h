@@ -290,6 +290,6 @@ struct srr_ctio {
 #define QLA_TGT_XMIT_ALL		(QLA_TGT_XMIT_STATUS|QLA_TGT_XMIT_DATA)
 
 extern void qla_tgt_stop_phase1(struct qla_tgt *);
-extern void qla_tgt_release(struct qla_tgt *);
+extern void qla_tgt_stop_phase2(struct qla_tgt *);
 
 #endif /* __QLA_TARGET_H */

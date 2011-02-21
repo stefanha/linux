@@ -883,6 +883,13 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 	struct qla_hw_data *ha = vha->hw;
 	struct Scsi_Host *sh = vha->host;
 	/*
+	 * Call into qla2x_target.c LLD logic to complete the
+	 * shutdown of struct qla_tgt after the call to
+	 * qla_tgt_stop_phase1() from tcm_qla2xxx_drop_tpg() above..
+	 */
+	if ((ha->qla_tgt != NULL) && !ha->qla_tgt->tgt_stopped)
+		qla_tgt_stop_phase2(ha->qla_tgt);
+	/*
 	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
 	 */
 	ha->target_lport_ptr = NULL;
