@@ -2110,7 +2110,7 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_prm prm;
 	ctio_common_entry_t *pkt;
-	unsigned long flags;
+	unsigned long flags = 0;
 	uint32_t full_req_cnt = 0;
 	int res;
 
@@ -2124,7 +2124,8 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 		return res;
 	}
 
-	spin_lock_irqsave(&ha->hardware_lock, flags);
+	if (cmd->locked_rsp)
+		spin_lock_irqsave(&ha->hardware_lock, flags);
 
 	/* Does F/W have an IOCBs for this request */
 	res = qla_tgt_check_reserve_free_req(vha, full_req_cnt);
@@ -2183,14 +2184,16 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 			" %p scsi_status: 0x%02x\n", pkt, scsi_status));
 
 	qla2x00_isp_cmd(vha, vha->req);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	if (cmd->locked_rsp)
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return 0;
 
 out_unmap_unlock:
 	if (cmd->sg_mapped)
 		qla_tgt_unmap_sg(vha, cmd);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	if (cmd->locked_rsp)
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return res;
 }
@@ -2354,7 +2357,7 @@ static int __qla24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 	ctio7_status0_entry_t *pkt;
 	struct qla_tgt_prm prm;
 	uint32_t full_req_cnt = 0;
-	unsigned long flags;
+	unsigned long flags = 0;
 	int res;
 
 	memset(&prm, 0, sizeof(prm));
@@ -2367,7 +2370,8 @@ static int __qla24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 		return res;
 	}
 
-	spin_lock_irqsave(&ha->hardware_lock, flags);
+	if (cmd->locked_rsp)
+		spin_lock_irqsave(&ha->hardware_lock, flags);
 
         /* Does F/W have an IOCBs for this request */
 	res = qla_tgt_check_reserve_free_req(vha, full_req_cnt);
@@ -2436,14 +2440,16 @@ static int __qla24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 			" %p scsi_status: 0x%02x\n", pkt, scsi_status));
 
 	qla2x00_isp_cmd(vha, vha->req);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	if (cmd->locked_rsp)
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return 0;
 
 out_unmap_unlock:
 	if (cmd->sg_mapped)
 		qla_tgt_unmap_sg(vha, cmd);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	if (cmd->locked_rsp)
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return res;
 }
@@ -3119,6 +3125,7 @@ static int qla_tgt_handle_cmd_for_atio(scsi_qla_host_t *vha, atio_t *atio)
 
 	memcpy(&cmd->atio.atio2x, atio, sizeof(*atio));
 	cmd->state = QLA_TGT_STATE_NEW;
+	cmd->locked_rsp = 1;
 	cmd->tgt = ha->qla_tgt;
 	cmd->vha = vha;
 
