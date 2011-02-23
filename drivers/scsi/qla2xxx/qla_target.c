@@ -3021,16 +3021,36 @@ static inline int qla_tgt_get_fcp_task_attr(uint8_t task_codes)
 	return fcp_task_attr;
 }
 
+static uint32_t qla_tgt_unpack_lun(unsigned char *p)
+{
+	uint32_t lun = 0;
+
+	lun = p[1];
+	switch (p[0] >> 6) {
+	case 0:
+		break;
+	case 1:
+		lun |= (p[0] & 0x3f) << 8;
+		break;
+	default:
+		printk(KERN_WARNING "Unsupported (extended) logical unit addressing\n");
+		break;
+	}
+
+	return lun;
+}
+
 /* ha->hardware_lock supposed to be held on entry */
 static int qla2xxx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd)
 {
 	atio_entry_t *atio = &cmd->atio.atio2x;
 	uint32_t data_length;
 	int fcp_task_attr, data_dir, bidi = 0, ret;
-	uint16_t lun;
+	uint16_t lun, unpacked_lun;
 
 	/* make it be in network byte order */
 	lun = swab16(le16_to_cpu(atio->lun));
+	unpacked_lun = qla_tgt_unpack_lun((unsigned char *)&lun);
 	cmd->tag = atio->rx_id;
 
 	if ((atio->execution_codes & (ATIO_EXEC_READ | ATIO_EXEC_WRITE)) ==
@@ -3061,11 +3081,11 @@ static int qla2xxx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *
 static int qla24xx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd)
 {
 	atio7_entry_t *atio = &cmd->atio.atio7;
-	uint32_t lun, data_length;
+	uint32_t unpacked_lun, data_length;
 	int fcp_task_attr, data_dir, bidi = 0, ret;
 
 	cmd->tag = atio->exchange_addr;
-	lun = atio->fcp_cmnd.lun;
+	unpacked_lun = qla_tgt_unpack_lun((unsigned char *)&atio->fcp_cmnd.lun);
 
 	if (atio->fcp_cmnd.rddata && atio->fcp_cmnd.wrdata) {
 		bidi = 1;
@@ -3082,11 +3102,11 @@ static int qla24xx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *
 			&atio->fcp_cmnd.add_cdb[atio->fcp_cmnd.add_cdb_len]));
 
 	DEBUG23(qla_printk(KERN_INFO, vha->hw, "qla_target: START q24 Command %p"
-		" lun: 0x%08x (tag %d)\n", cmd, lun, cmd->tag));
+		" unpacked_lun: 0x%08x (tag %d)\n", cmd, unpacked_lun, cmd->tag));
 	/*
 	 * Dispatch command to tcm_qla2xxx fabric module code
 	 */
-	ret = vha->hw->qla2x_tmpl->handle_cmd(vha, cmd, lun, data_length,
+	ret = vha->hw->qla2x_tmpl->handle_cmd(vha, cmd, unpacked_lun, data_length,
 				fcp_task_attr, data_dir, bidi);
 	return ret;
 }
