@@ -87,7 +87,7 @@ static int __qla24xx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 static void qla24xx_atio_pkt(scsi_qla_host_t *ha, atio7_entry_t *pkt);
 static void qla_tgt_response_pkt(scsi_qla_host_t *ha, response_t *pkt);
 static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
-	int lun_size, int fn, void *iocb, int flags);
+	int fn, void *iocb, int flags);
 static void qla2xxx_send_term_exchange(scsi_qla_host_t *ha, struct qla_tgt_cmd *cmd,
 	atio_entry_t *atio, int ha_locked);
 static void qla24xx_send_term_exchange(scsi_qla_host_t *ha, struct qla_tgt_cmd *cmd,
@@ -98,6 +98,8 @@ static int qla_tgt_cut_cmd_data_head(struct qla_tgt_cmd *cmd, unsigned int offse
 static void qla_tgt_clear_tgt_db(struct qla_tgt *tgt, bool local_only);
 static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess);
 
+/* Used by qla_target.c code to decode SCSI LUN to TCM unpacked_lun */
+static uint32_t qla_tgt_unpack_lun(unsigned char *p);
 
 /*
  * Global Variables
@@ -421,7 +423,8 @@ static int qla_tgt_reset(scsi_qla_host_t *vha, void *iocb, int mcmd)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess = NULL;
-	uint16_t lun = 0, loop_id;
+	uint32_t unpacked_lun, lun = 0;
+	uint16_t loop_id;
 	int res = 0;
 	uint8_t s_id[3];
 
@@ -486,7 +489,16 @@ static int qla_tgt_reset(scsi_qla_host_t *vha, void *iocb, int mcmd)
 		sess->port_name[6], sess->port_name[7],
 		mcmd, loop_id);
 
-	return qla_tgt_issue_task_mgmt(sess, lun, sizeof(lun), mcmd,
+	if (IS_FWI2_CAPABLE(ha)) {
+		atio7_entry_t *a = (atio7_entry_t *)iocb;
+		lun = a->fcp_cmnd.lun;
+	} else {
+		notify_entry_t *n = (notify_entry_t *)iocb;
+		lun = swab16(le16_to_cpu(n->lun));
+	}
+	unpacked_lun = qla_tgt_unpack_lun((unsigned char *)&lun);
+
+	return qla_tgt_issue_task_mgmt(sess, unpacked_lun, mcmd,
 				iocb, Q24_MGMT_SEND_NACK);
 }
 
@@ -1356,7 +1368,6 @@ static int __qla24xx_handle_abts(scsi_qla_host_t *vha, abts24_recv_entry_t *abts
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_mgmt_cmd *mcmd;
-	uint32_t lun;
 	int rc;
 
 	DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): task abort (tag=%d)\n",
@@ -1373,10 +1384,7 @@ static int __qla24xx_handle_abts(scsi_qla_host_t *vha, abts24_recv_entry_t *abts
 	mcmd->sess = sess;
 	memcpy(&mcmd->orig_iocb.abts, abts, sizeof(mcmd->orig_iocb.abts));
 
-#warning FIXME: Hardcoded LUN for __qla24xx_handle_abts()
-	lun = 0;
-
-	rc = ha->qla2x_tmpl->handle_tmr(mcmd, lun, ABORT_TASK);
+	rc = ha->qla2x_tmpl->handle_tmr(mcmd, 0, ABORT_TASK);
 	if (rc != 0) {
 		printk(KERN_ERR "qla_target(%d):  qla2x_tmpl->handle_tmr()"
 				" failed: %d", vha->vp_idx, rc);
@@ -3201,7 +3209,7 @@ out_sched:
 
 /* ha->hardware_lock supposed to be held on entry */
 static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
-	int lun_size, int fn, void *iocb, int flags)
+	int fn, void *iocb, int flags)
 {
 	scsi_qla_host_t *vha = sess->vha;
 	struct qla_hw_data *ha = vha->hw;
@@ -3305,7 +3313,7 @@ static int qla_tgt_handle_task_mgmt(scsi_qla_host_t *vha, void *iocb)
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt;
 	struct qla_tgt_sess *sess;
-	uint32_t lun;
+	uint32_t lun, unpacked_lun;
 	int lun_size, fn, res = 0;
 
 	tgt = ha->qla_tgt;
@@ -3326,6 +3334,7 @@ static int qla_tgt_handle_task_mgmt(scsi_qla_host_t *vha, void *iocb)
 		sess = ha->qla2x_tmpl->find_sess_by_loop_id(vha,
 					GET_TARGET_ID(ha, n));
 	}
+	unpacked_lun = qla_tgt_unpack_lun((unsigned char *)&lun);
 
 	if (!sess) {
 		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): task mgmt fn 0x%x for "
@@ -3339,7 +3348,7 @@ static int qla_tgt_handle_task_mgmt(scsi_qla_host_t *vha, void *iocb)
 		return res;
 	}
 
-	return qla_tgt_issue_task_mgmt(sess, lun, lun_size, fn, iocb, 0);
+	return qla_tgt_issue_task_mgmt(sess, unpacked_lun, fn, iocb, 0);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -3348,7 +3357,7 @@ static int __qla_tgt_abort_task(scsi_qla_host_t *vha, notify_entry_t *iocb,
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_mgmt_cmd *mcmd;
-	uint32_t lun;
+	uint32_t lun, unpacked_lun;
 	int rc;
 	uint16_t tag;
 
@@ -3365,9 +3374,17 @@ static int __qla_tgt_abort_task(scsi_qla_host_t *vha, notify_entry_t *iocb,
 		sizeof(mcmd->orig_iocb.notify_entry));
 
 	tag = le16_to_cpu(iocb->seq_id);
-#warning FIXME: Hardcoded LUN for __qla_tgt_abort_task
-	lun = 0;
-	rc = ha->qla2x_tmpl->handle_tmr(mcmd, lun, ABORT_TASK);
+
+	if (IS_FWI2_CAPABLE(ha)) {
+		atio7_entry_t *a = (atio7_entry_t *)iocb;
+		lun = a->fcp_cmnd.lun;
+	} else {
+		notify_entry_t *n = (notify_entry_t *)iocb;
+		lun = swab16(le16_to_cpu(n->lun));
+	}
+        unpacked_lun = qla_tgt_unpack_lun((unsigned char *)&lun);
+
+	rc = ha->qla2x_tmpl->handle_tmr(mcmd, unpacked_lun, ABORT_TASK);
 	if (rc != 0) {
 		printk(KERN_ERR "qla_target(%d): qla2x_tmpl->handle_tmr()"
 			" failed: %d\n", vha->vp_idx, rc);
@@ -4794,7 +4811,7 @@ send:
 		break;
 	case QLA_TGT_SESS_WORK_TM:
 	{
-		uint32_t lun;
+		uint32_t lun, unpacked_lun;
 		int lun_size, fn;
 		void *iocb;
 
@@ -4812,7 +4829,9 @@ send:
 			lun_size = sizeof(lun);
 			fn = n->task_flags >> IMM_NTFY_TASK_MGMT_SHIFT;
 		}
-		rc = qla_tgt_issue_task_mgmt(sess, lun, lun_size, fn, iocb, 0);
+		unpacked_lun = qla_tgt_unpack_lun((unsigned char *)&lun);
+
+		rc = qla_tgt_issue_task_mgmt(sess, unpacked_lun, fn, iocb, 0);
 		break;
 	}
 	default:
