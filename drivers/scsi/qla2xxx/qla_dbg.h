@@ -151,31 +151,31 @@
 #define DEBUG18(x)	do {} while (0)
 #endif
 
-#if defined(QL_DEBUG_LEVEL_19)
+#if defined(QL_DEBUG_LEVEL_21)
 #define DEBUG21(x)	do {x;} while (0)
 #else
 #define DEBUG21(x)	do {} while (0)
 #endif
 
-#if defined(QL_DEBUG_LEVEL_20)
+#if defined(QL_DEBUG_LEVEL_22)
 #define DEBUG22(x)	do {x;} while (0)
 #else
 #define DEBUG22(x)	do {} while (0)
 #endif
 
-#if defined(QL_DEBUG_LEVEL_21)
+#if defined(QL_DEBUG_LEVEL_23)
 #define DEBUG23(x)	do {x;} while (0)
 #else
 #define DEBUG23(x)	do {} while (0)
 #endif
 
-#if defined(QL_DEBUG_LEVEL_22)
+#if defined(QL_DEBUG_LEVEL_24)
 #define DEBUG24(x)	do {x;} while (0)
 #else
 #define DEBUG24(x)	do {} while (0)
 #endif
 
-#if defined(QL_DEBUG_LEVEL_23)
+#if defined(QL_DEBUG_LEVEL_25)
 #define DEBUG25(x)	do {x;} while (0)
 #else
 #define DEBUG25(x)	do {} while (0)
