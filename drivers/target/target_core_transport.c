@@ -383,7 +383,7 @@ static struct scsi_index_table scsi_index_table;
 
 /*
  * Initialize the index table for allocating unique row indexes to various mib
- * tables
+ * tables.
  */
 void init_scsi_index_table(void)
 {
@@ -3314,7 +3314,7 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 		}
 		break;
-	case 0xa3:
+	case MAINTENANCE_IN:
 		if (TRANSPORT(dev)->get_device_type(dev) != TYPE_ROM) {
 			/* MAINTENANCE_IN from SCC-2 */
 			/*
@@ -3384,7 +3384,7 @@ static int transport_generic_cmd_sequencer(
 		size = READ_POSITION_LEN;
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
 		break;
-	case 0xa4:
+	case MAINTENANCE_OUT:
 		if (TRANSPORT(dev)->get_device_type(dev) != TYPE_ROM) {
 			/* MAINTENANCE_OUT from SCC-2
 			 *

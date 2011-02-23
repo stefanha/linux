@@ -2644,12 +2644,13 @@ qla2x00_rport_del(void *data)
 {
 	fc_port_t *fcport = data;
 	struct fc_rport *rport;
-	scsi_qla_host_t *vha = fcport->vha;;
+	scsi_qla_host_t *vha = fcport->vha;
+	unsigned long flags;
 
-	spin_lock_irq(fcport->vha->host->host_lock);
+	spin_lock_irqsave(fcport->vha->host->host_lock, flags);
 	rport = fcport->drport ? fcport->drport: fcport->rport;
 	fcport->drport = NULL;
-	spin_unlock_irq(fcport->vha->host->host_lock);
+	spin_unlock_irqrestore(fcport->vha->host->host_lock, flags);
 	if (rport) {
 		fc_remote_port_delete(rport);
 		/*
@@ -3026,6 +3027,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 	struct fc_rport_identifiers rport_ids;
 	struct fc_rport *rport;
 	struct qla_hw_data *ha = vha->hw;
+	unsigned long flags;
 
 	qla2x00_rport_del(fcport);
 
@@ -3049,7 +3051,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 
 	spin_lock_irq(fcport->vha->host->host_lock);
 	*((fc_port_t **)rport->dd_data) = fcport;
-	spin_unlock_irq(fcport->vha->host->host_lock);
+	spin_unlock_irqrestore(fcport->vha->host->host_lock, flags);
 
 	rport->supported_classes = fcport->supported_classes;
 
