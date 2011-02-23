@@ -383,7 +383,7 @@ static struct scsi_index_table scsi_index_table;
 
 /*
  * Initialize the index table for allocating unique row indexes to various mib
- * tables
+ * tables.
  */
 void init_scsi_index_table(void)
 {
