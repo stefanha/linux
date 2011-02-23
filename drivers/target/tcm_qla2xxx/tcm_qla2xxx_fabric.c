@@ -381,10 +381,21 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
  */
 void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+	struct qla_tgt_cmd *cmd;
+	struct qla_tgt_mgmt_cmd *mcmd;
 
-	if (se_cmd->se_tmr_req)
+	if (se_cmd->se_tmr_req) {
+		mcmd = container_of(se_cmd, struct qla_tgt_mgmt_cmd, se_cmd);
+		/*
+		 * Release the associated se_cmd->se_tmr_req and se_cmd
+		 * TMR related state now.
+		 */
+		transport_generic_free_cmd(se_cmd, 1, 1, 0);
+		qla_tgt_free_mcmd(mcmd);
 		return;
+	}
+
+	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
 	/*
 	 * If tcm_qla2xxx_free_cmd() has already been called from the LLD,
 	 * it's safe to call transport_generic_free_cmd() to release the
@@ -397,7 +408,6 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 		atomic_set(&cmd->cmd_stop_free, 1);
 }
 
-extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
 /*
  * Callback from TCM Core to release underlying fabric descriptor
  */
@@ -444,8 +454,6 @@ u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
 {
 	return 0;
 }
-
-extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
 
 int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 {
@@ -672,11 +680,6 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun, uint8_t 
 	return transport_generic_handle_tmr(se_cmd);
 }
 
-/*
- * From qla_target.c...
- */
-extern int qla2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
-
 int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
@@ -735,8 +738,6 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	return qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
 }
 
-extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
-
 int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 {
 	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
@@ -769,11 +770,7 @@ int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 	 * CTIO response packet.
 	 */
 	qla_tgt_xmit_tm_rsp(mcmd);
-	/*
-	 * Release the associated se_cmd->se_tmr_req and se_cmd
-	 * TMR related state now.
-	 */
-	transport_generic_free_cmd(se_cmd, 1, 1, 0);
+
 	return 0;
 }
 
