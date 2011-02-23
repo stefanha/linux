@@ -1078,8 +1078,15 @@ qla2x00_send_enable_lun(scsi_qla_host_t *vha, bool enable)
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	}
 }
-
+/*
+ * Exported symbols from qla_target.c LLD logic used by tcm_qla2xxx code..
+ */
 extern int qla_tgt_add_target(struct qla_hw_data *, scsi_qla_host_t *);
+extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
+extern int qla2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
+extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
+extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
+extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
 
 extern void qla_tgt_fc_port_added(scsi_qla_host_t *, fc_port_t *);
 extern void qla_tgt_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);

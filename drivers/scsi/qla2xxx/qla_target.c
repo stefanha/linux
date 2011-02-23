@@ -1536,6 +1536,12 @@ static void qla24xx_send_notify_ack(scsi_qla_host_t *vha,
 	qla2x00_isp_cmd(vha, vha->req);
 }
 
+void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *mcmd)
+{
+	mempool_free(mcmd, qla_tgt_mgmt_cmd_mempool);
+}
+EXPORT_SYMBOL(qla_tgt_free_mcmd);
+
 /* callback from target fabric module code */
 void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 {
@@ -1567,8 +1573,6 @@ void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 			mcmd->fc_tm_rsp, 1, 0, 0, 0);
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	mempool_free(mcmd, qla_tgt_mgmt_cmd_mempool);
 }
 EXPORT_SYMBOL(qla_tgt_xmit_tm_rsp);
 
