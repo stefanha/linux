@@ -865,8 +865,8 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 	 * TPG demo mode.  If this is successful a target mode FC nexus
 	 * is created.
 	 */
-	if (ha->qla2x_tmpl->check_initiator_node_acl(vha, sess, &be_sid[0],
-				fcport->loop_id) < 0) {
+	if (ha->qla2x_tmpl->check_initiator_node_acl(vha, &fcport->port_name[0],
+				sess, &be_sid[0], fcport->loop_id) < 0) {
 		kfree(sess);
 		return NULL;
 	}

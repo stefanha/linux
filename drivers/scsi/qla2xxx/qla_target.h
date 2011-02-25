@@ -698,15 +698,19 @@ struct qla_tgt_sess;
 
 struct qla_target_template {
 
-	int (*handle_cmd)(scsi_qla_host_t *, struct qla_tgt_cmd *, uint32_t, uint32_t, int, int, int);
+	int (*handle_cmd)(scsi_qla_host_t *, struct qla_tgt_cmd *, uint32_t,
+			uint32_t, int, int, int);
 	int (*handle_data)(struct qla_tgt_cmd *);
 	int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
 	void (*free_cmd)(struct qla_tgt_cmd *);
 	void (*free_session)(struct qla_tgt_sess *);
 
-	int (*check_initiator_node_acl)(scsi_qla_host_t *, void *, uint8_t *, uint16_t);
-	struct qla_tgt_sess *(*find_sess_by_loop_id)(scsi_qla_host_t *, const uint16_t);
-	struct qla_tgt_sess *(*find_sess_by_s_id)(scsi_qla_host_t *, const uint8_t *);
+	int (*check_initiator_node_acl)(scsi_qla_host_t *, unsigned char *,
+					void *, uint8_t *, uint16_t);
+	struct qla_tgt_sess *(*find_sess_by_loop_id)(scsi_qla_host_t *,
+						const uint16_t);
+	struct qla_tgt_sess *(*find_sess_by_s_id)(scsi_qla_host_t *,
+						const uint8_t *);
 };
 
 int qla2x00_wait_for_loop_ready(scsi_qla_host_t *);
