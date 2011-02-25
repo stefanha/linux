@@ -37,7 +37,6 @@
 #include <linux/parser.h>
 #include <linux/syscalls.h>
 #include <linux/configfs.h>
-#include <linux/proc_fs.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
