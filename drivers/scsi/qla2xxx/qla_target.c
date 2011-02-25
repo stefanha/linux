@@ -946,7 +946,7 @@ void qla_tgt_fc_port_added(scsi_qla_host_t *vha, fc_port_t *fcport)
 		sess->conf_compl_supported = fcport->conf_compl_supported;
 	}
 
-	if (sess->local) {
+	if (sess && sess->local) {
 		printk(KERN_INFO "qla_target(%u): local session for "
 			"port %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
 			"(loop ID %d) became global\n", vha->vp_idx,
