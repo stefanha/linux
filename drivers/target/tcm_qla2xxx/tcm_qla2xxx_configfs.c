@@ -651,6 +651,7 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
  */
 static int tcm_qla2xxx_check_initiator_node_acl(
 	scsi_qla_host_t *vha,
+	unsigned char *fc_wwpn,
 	void *qla_tgt_sess,
 	uint8_t *s_id,
 	uint16_t loop_id)
@@ -692,9 +693,8 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	 */
 	memset(&port_name, 0, 36);
 	snprintf(port_name, 36, "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
-		sess->port_name[0], sess->port_name[1], sess->port_name[2],
-		sess->port_name[3], sess->port_name[4], sess->port_name[5],
-		sess->port_name[6], sess->port_name[7]);
+		fc_wwpn[0], fc_wwpn[1], fc_wwpn[2], fc_wwpn[3], fc_wwpn[4],
+		fc_wwpn[5], fc_wwpn[6], fc_wwpn[7]);
 	/*
 	 * Locate our struct se_node_acl either from an explict NodeACL created
 	 * via ConfigFS, or via running in TPG demo mode.
