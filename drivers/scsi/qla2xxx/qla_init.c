@@ -3049,7 +3049,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 	if (ha->qla2x_tmpl)
 		qla_tgt_fc_port_added(vha, fcport);
 
-	spin_lock_irq(fcport->vha->host->host_lock);
+	spin_lock_irqsave(fcport->vha->host->host_lock, flags);
 	*((fc_port_t **)rport->dd_data) = fcport;
 	spin_unlock_irqrestore(fcport->vha->host->host_lock, flags);
 
