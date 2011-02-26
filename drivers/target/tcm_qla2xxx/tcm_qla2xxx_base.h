@@ -29,6 +29,13 @@ struct tcm_qla2xxx_nacl {
 	struct se_node_acl se_node_acl;
 };
 
+struct tcm_qla2xxx_tpg_attrib {
+	int generate_node_acls;
+	int cache_dynamic_acls;
+	int demo_mode_write_protect;
+	int prod_mode_write_protect;
+};
+
 struct tcm_qla2xxx_tpg {
 	/* FC lport target portal group tag for TCM */
 	u16 lport_tpgt;
@@ -36,9 +43,13 @@ struct tcm_qla2xxx_tpg {
 	atomic_t lport_tpg_enabled;
 	/* Pointer back to tcm_qla2xxx_lport */
 	struct tcm_qla2xxx_lport *lport;
+	/* Used by tcm_qla2xxx_tpg_attrib_cit */
+	struct tcm_qla2xxx_tpg_attrib tpg_attrib;
 	/* Returned by tcm_qla2xxx_make_tpg() */
 	struct se_portal_group se_tpg;
 };
+
+#define QLA_TPG_ATTRIB(tpg)	(&(tpg)->tpg_attrib)
 
 /*
  * Used for the 24-bit lport->lport_fcport_map;

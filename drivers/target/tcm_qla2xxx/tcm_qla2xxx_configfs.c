@@ -214,6 +214,98 @@ static void tcm_qla2xxx_drop_nodeacl(struct se_node_acl *se_acl)
 	kfree(nacl);
 }
 
+/* Start items for tcm_qla2xxx_tpg_attrib_cit */
+
+#define DEF_QLA_TPG_ATTRIB(name)					\
+									\
+static ssize_t tcm_qla2xxx_tpg_attrib_show_##name(			\
+	struct se_portal_group *se_tpg,					\
+	char *page)							\
+{									\
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,		\
+			struct tcm_qla2xxx_tpg, se_tpg);		\
+									\
+	return sprintf(page, "%u\n", QLA_TPG_ATTRIB(tpg)->name);	\
+}									\
+									\
+static ssize_t tcm_qla2xxx_tpg_attrib_store_##name(			\
+	struct se_portal_group *se_tpg,					\
+	const char *page,						\
+	size_t count)							\
+{									\
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,		\
+			struct tcm_qla2xxx_tpg, se_tpg);		\
+	unsigned long val;						\
+	int ret;							\
+									\
+	ret = strict_strtoul(page, 0, &val);				\
+	if (ret < 0) {							\
+		printk(KERN_ERR "strict_strtoul() failed with"		\
+				" ret: %d\n", ret);			\
+		return -EINVAL;						\
+	}								\
+	ret = tcm_qla2xxx_set_attrib_##name(tpg, val);			\
+									\
+	return (!ret) ? count : -EINVAL;				\
+}
+
+#define DEF_QLA_TPG_ATTR_BOOL(_name)					\
+									\
+static int tcm_qla2xxx_set_attrib_##_name(				\
+	struct tcm_qla2xxx_tpg *tpg,					\
+	unsigned long val)						\
+{									\
+	struct tcm_qla2xxx_tpg_attrib *a = &tpg->tpg_attrib;		\
+									\
+	if ((val != 0) && (val != 1)) {					\
+		printk(KERN_ERR "Illegal boolean value %lu\n", val);	\
+                return -EINVAL;						\
+	}								\
+									\
+	a->_name = val;							\
+	return 0;							\
+}
+
+#define QLA_TPG_ATTR(_name, _mode)	TF_TPG_ATTRIB_ATTR(tcm_qla2xxx, _name, _mode);
+
+/*
+ * Define tcm_qla2xxx_tpg_attrib_s_generate_node_acls
+ */
+DEF_QLA_TPG_ATTR_BOOL(generate_node_acls);
+DEF_QLA_TPG_ATTRIB(generate_node_acls);
+QLA_TPG_ATTR(generate_node_acls, S_IRUGO | S_IWUSR);
+
+/*
+ Define tcm_qla2xxx_attrib_s_cache_dynamic_acls
+ */
+DEF_QLA_TPG_ATTR_BOOL(cache_dynamic_acls);
+DEF_QLA_TPG_ATTRIB(cache_dynamic_acls);
+QLA_TPG_ATTR(cache_dynamic_acls, S_IRUGO | S_IWUSR);
+
+/*
+ * Define tcm_qla2xxx_tpg_attrib_s_demo_mode_write_protect
+ */
+DEF_QLA_TPG_ATTR_BOOL(demo_mode_write_protect);
+DEF_QLA_TPG_ATTRIB(demo_mode_write_protect);
+QLA_TPG_ATTR(demo_mode_write_protect, S_IRUGO | S_IWUSR);
+
+/*
+ * Define tcm_qla2xxx_tpg_attrib_s_prod_mode_write_protect
+ */
+DEF_QLA_TPG_ATTR_BOOL(prod_mode_write_protect);
+DEF_QLA_TPG_ATTRIB(prod_mode_write_protect);
+QLA_TPG_ATTR(prod_mode_write_protect, S_IRUGO | S_IWUSR);
+
+static struct configfs_attribute *tcm_qla2xxx_tpg_attrib_attrs[] = {
+	&tcm_qla2xxx_tpg_attrib_generate_node_acls.attr,
+	&tcm_qla2xxx_tpg_attrib_cache_dynamic_acls.attr,
+	&tcm_qla2xxx_tpg_attrib_demo_mode_write_protect.attr,
+	&tcm_qla2xxx_tpg_attrib_prod_mode_write_protect.attr,
+	NULL,
+};
+
+/* End items for tcm_qla2xxx_tpg_attrib_cit */
+
 static ssize_t tcm_qla2xxx_tpg_show_enable(
 	struct se_portal_group *se_tpg,
 	char *page)
@@ -297,6 +389,12 @@ static struct se_portal_group *tcm_qla2xxx_make_tpg(
 	}
 	tpg->lport = lport;
 	tpg->lport_tpgt = tpgt;
+	/*
+	 * By default allow READ-ONLY TPG demo-mode access w/ cached dynamic NodeACLs
+	 */
+	QLA_TPG_ATTRIB(tpg)->generate_node_acls = 1;
+	QLA_TPG_ATTRIB(tpg)->demo_mode_write_protect = 1;
+	QLA_TPG_ATTRIB(tpg)->cache_dynamic_acls = 1;
 
 	ret = core_tpg_register(&tcm_qla2xxx_fabric_configfs->tf_ops, wwn,
 				&tpg->se_tpg, (void *)tpg,
@@ -1089,10 +1187,10 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.tpg_get_pr_transport_id	= tcm_qla2xxx_get_pr_transport_id,
 	.tpg_get_pr_transport_id_len	= tcm_qla2xxx_get_pr_transport_id_len,
 	.tpg_parse_pr_out_transport_id	= tcm_qla2xxx_parse_pr_out_transport_id,
-	.tpg_check_demo_mode		= tcm_qla2xxx_check_true,
-	.tpg_check_demo_mode_cache	= tcm_qla2xxx_check_true,
-	.tpg_check_demo_mode_write_protect = tcm_qla2xxx_check_false,
-	.tpg_check_prod_mode_write_protect = tcm_qla2xxx_check_false,
+	.tpg_check_demo_mode		= tcm_qla2xxx_check_demo_mode,
+	.tpg_check_demo_mode_cache	= tcm_qla2xxx_check_demo_mode_cache,
+	.tpg_check_demo_mode_write_protect = tcm_qla2xxx_check_demo_write_protect,
+	.tpg_check_prod_mode_write_protect = tcm_qla2xxx_check_prod_write_protect,
 	.tpg_alloc_fabric_acl		= tcm_qla2xxx_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= tcm_qla2xxx_release_fabric_acl,
 	.tpg_get_inst_index		= tcm_qla2xxx_tpg_get_inst_index,
@@ -1217,7 +1315,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	 */
 	TF_CIT_TMPL(fabric)->tfc_wwn_cit.ct_attrs = tcm_qla2xxx_wwn_attrs;
 	TF_CIT_TMPL(fabric)->tfc_tpg_base_cit.ct_attrs = tcm_qla2xxx_tpg_attrs;
-	TF_CIT_TMPL(fabric)->tfc_tpg_attrib_cit.ct_attrs = NULL;
+	TF_CIT_TMPL(fabric)->tfc_tpg_attrib_cit.ct_attrs = tcm_qla2xxx_tpg_attrib_attrs;
 	TF_CIT_TMPL(fabric)->tfc_tpg_param_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_np_base_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_nacl_base_cit.ct_attrs = NULL;

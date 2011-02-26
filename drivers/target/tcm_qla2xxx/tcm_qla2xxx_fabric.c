@@ -329,6 +329,38 @@ char *tcm_qla2xxx_parse_pr_out_transport_id(
 	return tid;
 }
 
+int tcm_qla2xxx_check_demo_mode(struct se_portal_group *se_tpg)
+{
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
+				struct tcm_qla2xxx_tpg, se_tpg);
+
+	return QLA_TPG_ATTRIB(tpg)->generate_node_acls;
+}
+
+int tcm_qla2xxx_check_demo_mode_cache(struct se_portal_group *se_tpg)
+{
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
+				struct tcm_qla2xxx_tpg, se_tpg);
+
+	return QLA_TPG_ATTRIB(tpg)->cache_dynamic_acls;
+}
+
+int tcm_qla2xxx_check_demo_write_protect(struct se_portal_group *se_tpg)
+{
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
+				struct tcm_qla2xxx_tpg, se_tpg);
+
+	return QLA_TPG_ATTRIB(tpg)->demo_mode_write_protect;
+}
+
+int tcm_qla2xxx_check_prod_write_protect(struct se_portal_group *se_tpg)
+{
+	struct tcm_qla2xxx_tpg *tpg = container_of(se_tpg,
+				struct tcm_qla2xxx_tpg, se_tpg);
+
+	return QLA_TPG_ATTRIB(tpg)->prod_mode_write_protect;
+}
+
 struct se_node_acl *tcm_qla2xxx_alloc_fabric_acl(struct se_portal_group *se_tpg)
 {
 	struct tcm_qla2xxx_nacl *nacl;
