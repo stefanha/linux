@@ -1791,7 +1791,7 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	cmd->data_direction = dir;
 	unpacked_lun = srpt_unpack_lun((uint8_t *)&srp_cmd->lun,
 				       sizeof(srp_cmd->lun));
-	if (transport_get_lun_for_cmd(cmd, NULL, unpacked_lun) < 0)
+	if (transport_get_lun_for_cmd(cmd, unpacked_lun) < 0)
 		goto send_sense;
 	ret = transport_generic_allocate_tasks(cmd, srp_cmd->cdb);
 	if (cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
@@ -1855,15 +1855,15 @@ static int srp_tmr_to_tcm(int fn)
 {
 	switch (fn) {
 	case SRP_TSK_ABORT_TASK:
-		return ABORT_TASK;
+		return TMR_ABORT_TASK;
 	case SRP_TSK_ABORT_TASK_SET:
-		return ABORT_TASK_SET;
+		return TMR_ABORT_TASK_SET;
 	case SRP_TSK_CLEAR_TASK_SET:
-		return CLEAR_TASK_SET;
+		return TMR_CLEAR_TASK_SET;
 	case SRP_TSK_LUN_RESET:
-		return LUN_RESET;
+		return TMR_LUN_RESET;
 	case SRP_TSK_CLEAR_ACA:
-		return CLEAR_ACA;
+		return TMR_CLEAR_ACA;
 	default:
 		return -1;
 	}
