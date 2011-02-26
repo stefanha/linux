@@ -4633,48 +4633,44 @@ static int iscsi_send_task_mgt_rsp(
 	struct iscsi_conn *conn)
 {
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
-	struct iscsi_targ_task_mgt_rsp *hdr;
+	struct iscsi_tm_rsp *hdr;
 	struct scatterlist sg;
 	u32 tx_size = 0;
 
-	hdr			= (struct iscsi_targ_task_mgt_rsp *) cmd->pdu;
+	hdr			= (struct iscsi_tm_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
-	hdr->opcode		= ISCSI_TARG_TASK_MGMT_RSP;
+	hdr->opcode		= ISCSI_OP_SCSI_TMFUNC_RSP;
 	hdr->response		= iscsi_convert_tcm_tmr_rsp(se_tmr);
-	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
+	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	cmd->stat_sn		= conn->stat_sn++;
-	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);
+	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
 	iscsi_increment_maxcmdsn(cmd, SESS(conn));
-	hdr->exp_cmd_sn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
 
 	cmd->iov_misc[0].iov_base	= cmd->pdu;
 	cmd->iov_misc[0].iov_len	= ISCSI_HDR_LEN;
 	tx_size += ISCSI_HDR_LEN;
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];	
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		cmd->iov_misc[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for Task"
-			" Mgmt Response PDU 0x%08x\n", hdr->header_digest);
+			" Mgmt Response PDU 0x%08x\n", *header_digest);
 	}
 
 	cmd->iov_misc_count = 1;
 	cmd->tx_size = tx_size;
-
-#ifdef DEBUG_OPCODES
-	print_targ_task_mgt_rsp(hdr);
-#endif
 
 	TRACE(TRACE_ERL2, "Built Task Management Response ITT: 0x%08x,"
 		" StatSN: 0x%08x, Response: 0x%02x, CID: %hu\n",

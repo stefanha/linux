@@ -32,8 +32,6 @@
 
 /* NOP-In */
 #define ISCSI_TARG_NOP_IN		0x20
-/* SCSI Task Managment Function Response */
-#define ISCSI_TARG_TASK_MGMT_RSP	0x22
 /* Login Response */
 #define ISCSI_TARG_LOGIN_RSP		0x23
 /* Text Response */
@@ -201,25 +199,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.6 Task Management Function Response */
-
-struct iscsi_targ_task_mgt_rsp {
-	u8	opcode;
-	u8	flags;
-	u8	response;
-	u8	reserved1;
-	u32	length;
-	u64	reserved2;
-	u32	init_task_tag;
-	u32	reserved3;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	reserved4;
-	u64	reserved5;
-	u32	header_digest;
-};
 
 /* 9.7 SCSI Data-out & SCSI Data-in */
 
