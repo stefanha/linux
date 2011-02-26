@@ -120,7 +120,7 @@ static inline void qla_tgt_sess_get(struct qla_tgt_sess *sess)
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static inline void qla_tgt_sess_put(struct qla_tgt_sess *sess)
+void qla_tgt_sess_put(struct qla_tgt_sess *sess)
 {
 	DEBUG21(qla_printk(KERN_INFO, sess->vha->hw, "sess %p, new sess_ref %d\n",
 			sess, sess->sess_ref-1));
@@ -130,6 +130,7 @@ static inline void qla_tgt_sess_put(struct qla_tgt_sess *sess)
 	if (sess->sess_ref == 0)
 		qla_tgt_unreg_sess(sess);
 }
+EXPORT_SYMBOL(qla_tgt_sess_put);
 
 /* ha->hardware_lock supposed to be held on entry (to protect tgt->sess_list) */
 static struct qla_tgt_sess *qla_tgt_find_sess_by_port_name(
@@ -854,7 +855,7 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 	sess->local = local;
 
 	DEBUG22(qla_printk(KERN_INFO, ha, "Adding sess %p to tgt %p via"
-		" ->set_sess_by_s_id()\n", sess, ha->qla_tgt));
+		" ->check_initiator_node_acl()\n", sess, ha->qla_tgt));
 
 	be_sid[0] = sess->s_id.b.domain;
 	be_sid[1] = sess->s_id.b.area;
