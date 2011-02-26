@@ -325,6 +325,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 {
 	struct iscsi_cmd *cmd;
 	struct se_cmd *se_cmd;
+	u8 tcm_function;
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
@@ -340,7 +341,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	}
 	/*
 	 * TASK_REASSIGN for ERL=2 / connection stays inside of
-	* LIO-Target $FABRIC_MOD
+	 * LIO-Target $FABRIC_MOD
 	 */
 	if (function == ISCSI_TM_FUNC_TASK_REASSIGN)
 		return cmd;
@@ -353,8 +354,36 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 				SESS(conn)->se_sess, 0, DMA_NONE,
 				TASK_ATTR_SIMPLE, &cmd->sense_buffer[0]);
 
+	switch (function) {
+	case ISCSI_TM_FUNC_ABORT_TASK:
+		tcm_function = TMR_ABORT_TASK;
+		break;
+	case ISCSI_TM_FUNC_ABORT_TASK_SET:
+		tcm_function = TMR_ABORT_TASK_SET;
+		break;
+	case ISCSI_TM_FUNC_CLEAR_ACA:
+		tcm_function = TMR_CLEAR_ACA;
+		break;
+	case ISCSI_TM_FUNC_CLEAR_TASK_SET:
+		tcm_function = TMR_CLEAR_TASK_SET;
+		break;
+	case ISCSI_TM_FUNC_LOGICAL_UNIT_RESET:
+		tcm_function = TMR_LUN_RESET;
+		break;
+	case ISCSI_TM_FUNC_TARGET_WARM_RESET:
+		tcm_function = TMR_TARGET_WARM_RESET;
+		break;
+	case ISCSI_TM_FUNC_TARGET_COLD_RESET:
+		tcm_function = TMR_TARGET_COLD_RESET;
+		break;
+	default: 
+		printk(KERN_ERR "Unknown iSCSI TMR Function:"
+			" 0x%02x\n", function);
+		goto out;
+	}
+
 	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd,
-				(void *)cmd->tmr_req, function);
+				(void *)cmd->tmr_req, tcm_function);
 	if (!(se_cmd->se_tmr_req))
 		goto out;
 

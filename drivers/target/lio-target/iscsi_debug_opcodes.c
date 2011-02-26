@@ -323,23 +323,6 @@ void print_scsicdb(u8 cdb[16])
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
 }
 
-void print_init_task_mgt_command(struct iscsi_init_task_mgt_cmnd *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_INIT_TASK_MGT_CMND PDU\n");
-	print_opcode(cmd->opcode);
-	printk(KERN_INFO "\tFunction: 0x%02x\n", cmd->function);
-	print_reserved16(1, cmd->reserved1);
-	print_dataseglength(cmd->length);
-	print_lun(cmd->lun);
-	print_itt(cmd->init_task_tag);
-	printk(KERN_INFO "\tRefTaskTag: 0x%08x\n", cmd->ref_task_tag);
-	print_cmdsn(cmd->cmd_sn);
-	print_expstatsn(cmd->exp_stat_sn);
-	printk(KERN_INFO "\tRefCmdSN: 0x%08x\n", cmd->ref_cmd_sn);
-	print_expdatasn(cmd->exp_data_sn);
-	print_reserved64(2, cmd->reserved2);
-}
-
 void print_targ_task_mgt_rsp(struct iscsi_targ_task_mgt_rsp *cmd)
 {
 	printk(KERN_INFO "Dumping ISCSI_TARG_TASK_MGT_RSP PDU\n");

@@ -2757,64 +2757,64 @@ static inline int iscsi_handle_task_mgt_cmd(
 	struct iscsi_cmd *cmd;
 	struct se_tmr_req *se_tmr;
 	struct iscsi_tmr_req *tmr_req;
-	struct iscsi_init_task_mgt_cmnd *hdr;
+	struct iscsi_tm *hdr;
+	u32 payload_length;
 	int cmdsn_ret, out_of_order_cmdsn = 0, ret;
+	u8 function;
 
-	hdr			= (struct iscsi_init_task_mgt_cmnd *) buf;
-	hdr->length		= be32_to_cpu(hdr->length);
-	hdr->init_task_tag	= be32_to_cpu(hdr->init_task_tag);
-	hdr->ref_task_tag	= be32_to_cpu(hdr->ref_task_tag);
-	hdr->cmd_sn		= be32_to_cpu(hdr->cmd_sn);
-	hdr->exp_stat_sn	= be32_to_cpu(hdr->exp_stat_sn);
-	hdr->ref_cmd_sn		= be32_to_cpu(hdr->ref_cmd_sn);
-	hdr->exp_data_sn	= be32_to_cpu(hdr->exp_data_sn);
-	hdr->function &= ~F_BIT;
-
-#ifdef DEBUG_OPCODES
-	print_init_task_mgt_command(hdr);
-#endif
+	hdr			= (struct iscsi_tm *) buf;
+	payload_length		= ntoh24(hdr->dlength);
+	hdr->itt		= be32_to_cpu(hdr->itt);
+	hdr->rtt		= be32_to_cpu(hdr->rtt);
+	hdr->cmdsn		= be32_to_cpu(hdr->cmdsn);
+	hdr->exp_statsn		= be32_to_cpu(hdr->exp_statsn);
+	hdr->refcmdsn		= be32_to_cpu(hdr->refcmdsn);
+	hdr->exp_datasn		= be32_to_cpu(hdr->exp_datasn);
+	hdr->flags &= ~ISCSI_FLAG_CMD_FINAL;
+	function = hdr->flags;
 
 	TRACE(TRACE_ISCSI, "Got Task Management Request ITT: 0x%08x, CmdSN:"
 		" 0x%08x, Function: 0x%02x, RefTaskTag: 0x%08x, RefCmdSN:"
-		" 0x%08x, CID: %hu\n", hdr->init_task_tag, hdr->cmd_sn,
-		hdr->function, hdr->ref_task_tag, hdr->ref_cmd_sn, conn->cid);
+		" 0x%08x, CID: %hu\n", hdr->itt, hdr->cmdsn, function,
+		hdr->rtt, hdr->refcmdsn, conn->cid);
 
-	if ((hdr->function != ISCSI_TM_FUNC_ABORT_TASK) &&
-	    ((hdr->function != ISCSI_TM_FUNC_TASK_REASSIGN) &&
-	     (hdr->ref_task_tag != RESERVED))) {
+	if ((function != ISCSI_TM_FUNC_ABORT_TASK) &&
+	    ((function != ISCSI_TM_FUNC_TASK_REASSIGN) &&
+	     (hdr->rtt != ISCSI_RESERVED_TAG))) {
 		printk(KERN_ERR "RefTaskTag should be set to 0xFFFFFFFF.\n");
-		hdr->ref_task_tag = RESERVED;
+		hdr->rtt = ISCSI_RESERVED_TAG;
 	}
 
-	if ((hdr->function == ISCSI_TM_FUNC_TASK_REASSIGN) &&
-			!(hdr->opcode & I_BIT)) {
+	if ((function == ISCSI_TM_FUNC_TASK_REASSIGN) &&
+			!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
 		printk(KERN_ERR "Task Management Request TASK_REASSIGN not"
 			" issued as immediate command, bad iSCSI Initiator"
 				"implementation\n");
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
-	if ((hdr->function != ISCSI_TM_FUNC_ABORT_TASK) &&
-			(hdr->ref_cmd_sn != RESERVED))
-		hdr->ref_cmd_sn = RESERVED;
+	if ((function != ISCSI_TM_FUNC_ABORT_TASK) &&
+	    (hdr->refcmdsn != ISCSI_RESERVED_TAG))
+		hdr->refcmdsn = ISCSI_RESERVED_TAG;
 
-	cmd = iscsi_allocate_se_cmd_for_tmr(conn, hdr->function);
+	cmd = iscsi_allocate_se_cmd_for_tmr(conn, function);
 	if (!(cmd))
 		return iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
 
-	cmd->iscsi_opcode	= ISCSI_INIT_TASK_MGMT_CMND;
+	cmd->iscsi_opcode	= ISCSI_OP_SCSI_TMFUNC;
 	cmd->i_state		= ISTATE_SEND_TASKMGTRSP;
-	cmd->immediate_cmd	= ((hdr->opcode & I_BIT) ? 1 : 0);
-	cmd->init_task_tag	= hdr->init_task_tag;
+	cmd->immediate_cmd	= ((hdr->opcode & ISCSI_OP_IMMEDIATE) ? 1 : 0);
+	cmd->init_task_tag	= hdr->itt;
 	cmd->targ_xfer_tag	= 0xFFFFFFFF;
-	cmd->cmd_sn		= hdr->cmd_sn;
-	cmd->exp_stat_sn	= hdr->exp_stat_sn;
+	cmd->cmd_sn		= hdr->cmdsn;
+	cmd->exp_stat_sn	= hdr->exp_statsn;
 	se_tmr			= SE_CMD(cmd)->se_tmr_req;
 	tmr_req			= cmd->tmr_req;
 	/*
 	 * Locate the struct se_lun for all TMRs not related to ERL=2 TASK_REASSIGN
 	 */
-	if (se_tmr->function != ISCSI_TM_FUNC_TASK_REASSIGN) {
-		ret = iscsi_get_lun_for_tmr(cmd, hdr->lun);
+	if (function != ISCSI_TM_FUNC_TASK_REASSIGN) {
+		ret = iscsi_get_lun_for_tmr(cmd,
+				get_unaligned_le64(&hdr->lun[0]));
 		if (ret < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			se_tmr->response = ISCSI_TMF_RSP_NO_LUN;
@@ -2822,7 +2822,7 @@ static inline int iscsi_handle_task_mgt_cmd(
 		}
 	}
 
-	switch (se_tmr->function) {
+	switch (function) {
 	case ISCSI_TM_FUNC_ABORT_TASK:
 		se_tmr->response = iscsi_tmr_abort_task(cmd, buf);
 		if (se_tmr->response != ISCSI_TMF_RSP_COMPLETE) {
@@ -2865,13 +2865,13 @@ static inline int iscsi_handle_task_mgt_cmd(
 		break;
 	default:
 		printk(KERN_ERR "Unknown TMR function: 0x%02x, protocol"
-			" error.\n", hdr->function);
+			" error.\n", function);
 		SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		se_tmr->response = ISCSI_TMF_RSP_NOT_SUPPORTED;
 		goto attach;
 	}
 
-	if ((hdr->function != ISCSI_TM_FUNC_TASK_REASSIGN) &&
+	if ((function != ISCSI_TM_FUNC_TASK_REASSIGN) &&
 	    (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))
 		se_tmr->call_transport = 1;
 attach:
@@ -2879,7 +2879,7 @@ attach:
 
 	if (!(hdr->opcode & I_BIT)) {
 		cmdsn_ret = iscsi_check_received_cmdsn(conn,
-				cmd, hdr->cmd_sn);
+				cmd, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_NORMAL_OPERATION)
 			do {} while (0);
 		else if (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)
@@ -2894,7 +2894,7 @@ attach:
 					1, 0, buf, cmd);
 		}
 	}
-	iscsi_ack_from_expstatsn(conn, hdr->exp_stat_sn);
+	iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	if (out_of_order_cmdsn)
 		return 0;
@@ -5435,7 +5435,7 @@ restart:
 			if (iscsi_handle_nop_out(conn, buffer) < 0)
 				goto transport_err;
 			break;
-		case ISCSI_INIT_TASK_MGMT_CMND:
+		case ISCSI_OP_SCSI_TMFUNC:
 			if (iscsi_handle_task_mgt_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;

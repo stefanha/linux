@@ -1086,7 +1086,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		spin_unlock_bh(&cmd->istate_lock);
 		iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
 		break;
-	case ISCSI_INIT_TASK_MGMT_CMND:
+	case ISCSI_OP_SCSI_TMFUNC:
 		if (se_cmd->se_cmd_flags & SCF_SCSI_CDB_EXCEPTION) {
 			spin_unlock_bh(&cmd->istate_lock);
 			iscsi_add_cmd_to_response_queue(cmd, CONN(cmd),

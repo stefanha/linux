@@ -19,8 +19,6 @@
 
 /* NOP-Out */
 #define ISCSI_INIT_NOP_OUT 		0x00
-/* SCSI Task Management Function Request */
-#define ISCSI_INIT_TASK_MGMT_CMND	0x02
 /* Login Command */
 #define ISCSI_INIT_LOGIN_CMND		0x03
 /* Text Request */
@@ -203,24 +201,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.5 Task Management Function Request */
-
-struct iscsi_init_task_mgt_cmnd {
-	u8	opcode;
-	u8	function;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	ref_task_tag;
-	u32	cmd_sn;
-	u32	exp_stat_sn;
-	u32	ref_cmd_sn;
-	u32	exp_data_sn;
-	u64	reserved2;
-	u32	header_digest;
-};
 
 /* 9.6 Task Management Function Response */
 

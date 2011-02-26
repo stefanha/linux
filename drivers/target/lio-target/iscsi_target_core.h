@@ -473,7 +473,7 @@ struct iscsi_cmd {
 	struct iscsi_seq	*seq_list;
 	/* Current struct iscsi_seq used for DataSequenceInOrder=No */
 	struct iscsi_seq	*seq_ptr;
-	/* TMR Request when iscsi_opcode == ISCSI_INIT_TASK_MGMT_CMND */
+	/* TMR Request when iscsi_opcode == ISCSI_OP_SCSI_TMFUNC */
 	struct iscsi_tmr_req	*tmr_req;
 	/* Connection this command is alligient to */
 	struct iscsi_conn 	*conn;

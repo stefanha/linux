@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <asm/unaligned.h>
 #include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
@@ -60,29 +61,28 @@ u8 iscsi_tmr_abort_task(
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
-	struct iscsi_init_task_mgt_cmnd *hdr =
-		(struct iscsi_init_task_mgt_cmnd *) buf;
+	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 
-	ref_cmd = iscsi_find_cmd_from_itt(conn, hdr->ref_task_tag);
+	ref_cmd = iscsi_find_cmd_from_itt(conn, hdr->rtt);
 	if (!(ref_cmd)) {
 		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x on CID:"
-			" %hu.\n", hdr->ref_task_tag, conn->cid);
-		return ((hdr->ref_cmd_sn >= SESS(conn)->exp_cmd_sn) &&
-			(hdr->ref_cmd_sn <= SESS(conn)->max_cmd_sn)) ?
+			" %hu.\n", hdr->rtt, conn->cid);
+		return ((hdr->refcmdsn >= SESS(conn)->exp_cmd_sn) &&
+			(hdr->refcmdsn <= SESS(conn)->max_cmd_sn)) ?
 			ISCSI_TMF_RSP_COMPLETE : ISCSI_TMF_RSP_NO_TASK;
 	}
-	if (ref_cmd->cmd_sn != hdr->ref_cmd_sn) {
+	if (ref_cmd->cmd_sn != hdr->refcmdsn) {
 		printk(KERN_ERR "RefCmdSN 0x%08x does not equal"
 			" task's CmdSN 0x%08x. Rejecting ABORT_TASK.\n",
-			hdr->ref_cmd_sn, ref_cmd->cmd_sn);
+			hdr->refcmdsn, ref_cmd->cmd_sn);
 		return ISCSI_TMF_RSP_REJECTED;
 	}
 
-	se_tmr->ref_task_tag		= hdr->ref_task_tag;
+	se_tmr->ref_task_tag		= hdr->rtt;
 	se_tmr->ref_cmd			= &ref_cmd->se_cmd;
-	se_tmr->ref_task_lun		= hdr->lun;
-	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
-	tmr_req->exp_data_sn		= hdr->exp_data_sn;
+	se_tmr->ref_task_lun		= get_unaligned_le64(&hdr->lun[0]);
+	tmr_req->ref_cmd_sn		= hdr->refcmdsn;
+	tmr_req->exp_data_sn		= hdr->exp_datasn;
 
 	return ISCSI_TMF_RSP_COMPLETE;
 }
@@ -151,14 +151,12 @@ u8 iscsi_tmr_task_reassign(
 	struct iscsi_conn_recovery *cr = NULL;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
-	struct iscsi_init_task_mgt_cmnd *hdr =
-		(struct iscsi_init_task_mgt_cmnd *) buf;
+	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 	int ret;
 
 	TRACE(TRACE_ERL2, "Got TASK_REASSIGN TMR ITT: 0x%08x,"
 		" RefTaskTag: 0x%08x, ExpDataSN: 0x%08x, CID: %hu\n",
-		hdr->init_task_tag, hdr->ref_task_tag, hdr->exp_data_sn,
-				conn->cid);
+		hdr->itt, hdr->rtt, hdr->exp_datasn, conn->cid);
 
 	if (SESS_OPS_C(conn)->ErrorRecoveryLevel != 2) {
 		printk(KERN_ERR "TMR TASK_REASSIGN not supported in ERL<2,"
@@ -166,16 +164,14 @@ u8 iscsi_tmr_task_reassign(
 		return ISCSI_TMF_RSP_NOT_SUPPORTED;
 	}
 
-	ret = iscsi_find_cmd_for_recovery(SESS(conn), &ref_cmd,
-			&cr, hdr->ref_task_tag);
+	ret = iscsi_find_cmd_for_recovery(SESS(conn), &ref_cmd, &cr, hdr->rtt);
 	if (ret == -2) {
 		printk(KERN_ERR "Command ITT: 0x%08x is still alligent to CID:"
 			" %hu\n", ref_cmd->init_task_tag, cr->cid);
 		return ISCSI_TMF_RSP_TASK_ALLEGIANT;
 	} else if (ret == -1) {
 		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x in"
-			" connection recovery command list.\n",
-				hdr->ref_task_tag);
+			" connection recovery command list.\n", hdr->rtt);
 		return ISCSI_TMF_RSP_NO_TASK;
 	}
 	/*
@@ -190,11 +186,11 @@ u8 iscsi_tmr_task_reassign(
 		return ISCSI_TMF_RSP_REJECTED;
 	}
 
-	se_tmr->ref_task_tag		= hdr->ref_task_tag;
+	se_tmr->ref_task_tag		= hdr->rtt;
 	se_tmr->ref_cmd			= &ref_cmd->se_cmd;
-	se_tmr->ref_task_lun		= hdr->lun;
-	tmr_req->ref_cmd_sn		= hdr->ref_cmd_sn;
-	tmr_req->exp_data_sn		= hdr->exp_data_sn;
+	se_tmr->ref_task_lun		= get_unaligned_le64(&hdr->lun[0]);
+	tmr_req->ref_cmd_sn		= hdr->refcmdsn;
+	tmr_req->exp_data_sn		= hdr->exp_datasn;
 	tmr_req->conn_recovery		= cr;
 	tmr_req->task_reassign		= 1;
 	/*
@@ -297,7 +293,7 @@ static int iscsi_task_reassign_complete_write(
 		if (!atomic_read(&cmd->transport_sent)) {
 			TRACE(TRACE_ERL2, "WRITE ITT: 0x%08x: t_state: %d"
 				" never sent to transport\n",
-				cmd->init_task_tag, cmd->se_cmd->t_state);
+				cmd->init_task_tag, cmd->se_cmd.t_state);
 			return transport_generic_handle_data(se_cmd);
 		}
 
