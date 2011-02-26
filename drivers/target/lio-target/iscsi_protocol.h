@@ -17,15 +17,8 @@
 #define ISCSI_MAX_VERSION               0x0
 #define ISCSI_MIN_VERSION               0x0
 
-#define STATUS_BYTE(byte)		(byte)
-#define MSG_BYTE(byte)			((byte) << 8)
-#define HOST_BYTE(byte)			((byte) << 16)
-#define DRIVER_BYTE(byte)		((byte) << 24)
-
 /* NOP-Out */
 #define ISCSI_INIT_NOP_OUT 		0x00
-/* SCSI Command (Encapuslates SCSI CDB) */
-#define ISCSI_INIT_SCSI_CMND		0x01
 /* SCSI Task Management Function Request */
 #define ISCSI_INIT_TASK_MGMT_CMND	0x02
 /* Login Command */
@@ -41,8 +34,6 @@
 
 /* NOP-In */
 #define ISCSI_TARG_NOP_IN		0x20
-/* SCSI Response */
-#define ISCSI_TARG_SCSI_RSP		0x21
 /* SCSI Task Managment Function Response */
 #define ISCSI_TARG_TASK_MGMT_RSP	0x22
 /* Login Response */
@@ -64,12 +55,6 @@
 #define ISCSI_OPCODE			0x3f
 /* Final Bit */
 #define F_BIT				0x80
-/* SCSI Read Bit */
-#define R_BIT				0x40
-#define READ_TYPE_CMND			R_BIT
-/* SCSI Write Bit */
-#define W_BIT				0x20
-#define WRITE_TYPE_CMND			W_BIT
 /* Transit to Next Login Phase Bit */
 #define T_BIT				0x80
 /* Used for batching text parameters */
@@ -217,49 +202,7 @@
 #define SNACK_DATA_ACK				2
 #define SNACK_RDATA				3
 
-/* Vendors */
-#define PYX_TECHNOLOGIES			1
-#define IBM					2
-#define CISCO					3
-#define INTEL					4
-
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.3 SCSI Command */
-
-struct iscsi_init_scsi_cmnd {
-	u8	opcode;
-	u8	flags;
-	u16	reserved;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	exp_xfer_len;
-	u32	cmd_sn;
-	u32	exp_stat_sn;
-	u8	cdb[16];
-	u32	header_digest;
-};
-
-/* 9.4 SCSI Response */
-
-struct iscsi_targ_scsi_rsp {
-	u8	opcode;
-	u8	flags;
-	u8	response;
-	u8	status;
-	u32	length;
-	u64	reserved1;
-	u32	init_task_tag;
-	u32	reserved2;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	exp_data_sn;
-	u32	bidi_res_count;
-	u32	res_count;
-	u32	header_digest;
-};
 
 /* 9.5 Task Management Function Request */
 

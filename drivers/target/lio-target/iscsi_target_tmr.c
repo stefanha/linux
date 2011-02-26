@@ -492,7 +492,7 @@ static int iscsi_task_reassign_complete(
 	case ISCSI_INIT_NOP_OUT:
 		ret = iscsi_task_reassign_complete_nop_out(tmr_req, conn);
 		break;
-	case ISCSI_INIT_SCSI_CMND:
+	case ISCSI_OP_SCSI_CMD:
 		ret = iscsi_task_reassign_complete_scsi_cmnd(tmr_req, conn);
 		break;
 	default:
@@ -862,7 +862,7 @@ int iscsi_check_task_reassign_expdatasn(
 	struct se_cmd *se_cmd = se_tmr->ref_cmd;
 	struct iscsi_cmd *ref_cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
-	if (ref_cmd->iscsi_opcode != ISCSI_INIT_SCSI_CMND)
+	if (ref_cmd->iscsi_opcode != ISCSI_OP_SCSI_CMD)
 		return 0;
 
 	if (se_cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION)

@@ -323,40 +323,6 @@ void print_scsicdb(u8 cdb[16])
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
 }
 
-void print_init_scsi_cmnd(struct iscsi_init_scsi_cmnd *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_INIT_SCSI_CMND PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	print_reserved16(1, cmd->reserved);
-	print_dataseglength(cmd->length);
-	print_lun(cmd->lun);
-	print_itt(cmd->init_task_tag);
-	print_expxferlen(cmd->exp_xfer_len);
-	print_cmdsn(cmd->cmd_sn);
-	print_expstatsn(cmd->exp_stat_sn);
-	print_scsicdb(cmd->cdb);
-}
-
-void print_targ_scsi_rsp(struct iscsi_targ_scsi_rsp *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_TARG_SCSI_RSP PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	printk(KERN_INFO "\tResponse: 0x%02x\n", cmd->response);
-	printk(KERN_INFO "\tStatus: 0x%02x\n", cmd->status);
-	print_dataseglength(cmd->length);
-	print_reserved64(1, cmd->reserved1);
-	print_itt(cmd->init_task_tag);
-	print_reserved32(2, cmd->reserved2);
-	print_statsn(cmd->stat_sn);
-	print_expcmdsn(cmd->exp_cmd_sn);
-	print_maxcmdsn(cmd->max_cmd_sn);
-	print_expdatasn(cmd->exp_data_sn);
-	printk(KERN_INFO "\tBidiResidualCount: 0x%08x\n", cmd->bidi_res_count);
-	printk(KERN_INFO "\tResidualCount: 0x%08x\n", cmd->res_count);
-}
-
 void print_init_task_mgt_command(struct iscsi_init_task_mgt_cmnd *cmd)
 {
 	printk(KERN_INFO "Dumping ISCSI_INIT_TASK_MGT_CMND PDU\n");

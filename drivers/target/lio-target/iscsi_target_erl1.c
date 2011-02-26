@@ -35,6 +35,7 @@
 #include <linux/list.h>
 #include <net/sock.h>
 #include <net/tcp.h>
+#include <scsi/iscsi_proto.h>
 
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
@@ -998,7 +999,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		cmd->cmd_flags &= ~ICF_OOO_CMDSN;
 
 	switch (cmd->iscsi_opcode) {
-	case ISCSI_INIT_SCSI_CMND:
+	case ISCSI_OP_SCSI_CMD:
 		/*
 		 * Go ahead and send the CHECK_CONDITION status for
 		 * any SCSI CDB exceptions that may have occurred, also

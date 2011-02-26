@@ -27,8 +27,6 @@ void print_cid(u16);
 void print_isid(u8 []);
 void print_tsih(u16);
 void print_scsicdb(u8 []);
-void print_init_scsi_cmnd(struct iscsi_init_scsi_cmnd *);
-void print_targ_scsi_rsp(struct iscsi_targ_scsi_rsp *);
 void print_init_task_mgt_command(struct iscsi_init_task_mgt_cmnd *);
 void print_targ_task_mgt_rsp(struct iscsi_targ_task_mgt_rsp *);
 void print_init_scsi_data_out(struct iscsi_init_scsi_data_out *);
