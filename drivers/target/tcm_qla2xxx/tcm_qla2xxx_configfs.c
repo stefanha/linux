@@ -96,6 +96,8 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 				domain, area, al_pa);
 		spin_unlock_irqrestore(sh->host_lock, flags);
 
+
+		spin_lock_irqsave(&vha->hw->hardware_lock, flags);
 		d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
 		DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 		a = &d->areas[area];
@@ -107,6 +109,7 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 		DEBUG_QLA_TGT_SESS_MAP("Setting p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
 			" port_id: 0x%04x\n", se_nacl, rport_wwnn,
 			nacl->nport_id);
+		spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 
 		return 1;
 	}
@@ -115,6 +118,9 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 	return 0;
 }
 
+/*
+ * Expected to be called with struct qla_hw_data->hardware_lock held
+ */
 int tcm_qla2xxx_clear_nacl_from_fcport_map(
 	struct se_node_acl *se_nacl)
 {
@@ -470,6 +476,9 @@ static struct se_portal_group *tcm_qla2xxx_npiv_make_tpg(
 	return &tpg->se_tpg;
 }
 
+/*
+ * Expected to be called with struct qla_hw_data->hardware_lock held
+ */
 static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 	scsi_qla_host_t *vha,
 	const uint8_t *s_id)
@@ -522,6 +531,9 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 	return nacl->qla_tgt_sess;
 }
 
+/*
+ * Expected to be called with struct qla_hw_data->hardware_lock held
+ */
 static void tcm_qla2xxx_set_sess_by_s_id(
 	struct tcm_qla2xxx_lport *lport,
 	struct se_node_acl *new_se_nacl,
@@ -591,6 +603,9 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 		new_se_nacl->initiatorname);
 }
 
+/*
+ * Expected to be called with struct qla_hw_data->hardware_lock held
+ */
 static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 	scsi_qla_host_t *vha,
 	const uint16_t loop_id)
@@ -629,6 +644,9 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 	return nacl->qla_tgt_sess;
 }
 
+/*
+ * Expected to be called with struct qla_hw_data->hardware_lock held
+ */
 static void tcm_qla2xxx_set_sess_by_loop_id(
 	struct tcm_qla2xxx_lport *lport,
 	struct se_node_acl *new_se_nacl,
@@ -763,6 +781,7 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	struct se_session *se_sess;
 	struct qla_tgt_sess *sess = qla_tgt_sess;
 	unsigned char port_name[36];
+	unsigned long flags;
 
 	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
 	if (!lport) {
@@ -808,10 +827,12 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	 * And now setup the new se_nacl and session pointers into our HW lport
 	 * mappings for fabric S_ID and LOOP_ID.
 	 */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
 	tcm_qla2xxx_set_sess_by_s_id(lport, se_nacl, nacl, se_sess,
 			qla_tgt_sess, s_id);
 	tcm_qla2xxx_set_sess_by_loop_id(lport, se_nacl, nacl, se_sess,
 			qla_tgt_sess, loop_id);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	/*
 	 * Finally register the new FC Nexus with TCM
 	 */

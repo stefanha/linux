@@ -453,23 +453,57 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 	qla_tgt_free_cmd(cmd);
 }
 
-#warning FIXME: tcm_qla2xxx_shutdown_session
 int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
 {
-	printk("tcm_qla2xxx_shutdown_session returning TRUE\n");
+	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
+
+	if (!sess) {
+		printk("se_sess->fabric_sess_ptr is NULL\n");
+		dump_stack();
+		return 0;
+	}
 	return 1;
 }
 
+extern void qla_tgt_sess_put(struct qla_tgt_sess *);
 extern int tcm_qla2xxx_clear_nacl_from_fcport_map(struct se_node_acl *);
 
 void tcm_qla2xxx_close_session(struct se_session *se_sess)
 {
-	tcm_qla2xxx_clear_nacl_from_fcport_map(se_sess->se_node_acl);
+	struct se_node_acl *se_nacl = se_sess->se_node_acl;
+	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
+	struct scsi_qla_host *vha;
+	unsigned long flags;
+
+	if (!sess) {
+		printk(KERN_ERR "se_sess->fabric_sess_ptr is NULL\n");
+		dump_stack();
+		return;
+	}
+	vha = sess->vha;
+
+	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
+	tcm_qla2xxx_clear_nacl_from_fcport_map(se_nacl);
+	qla_tgt_sess_put(sess);
+	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 }
 
 void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int conn_sleep)
 {
+	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
+	struct scsi_qla_host *vha;
+	unsigned long flags;
+
+	if (!sess) {
+		printk(KERN_ERR "se_sess->fabric_sess_ptr is NULL\n");
+		dump_stack();
+		return;
+	}
+	vha = sess->vha;
+
+	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
 	tcm_qla2xxx_clear_nacl_from_fcport_map(se_sess->se_node_acl);
+	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 }
 
 void tcm_qla2xxx_reset_nexus(struct se_session *se_sess)
