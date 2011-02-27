@@ -708,6 +708,7 @@ struct iscsi_login {
 	u32 cmd_sn;
 	u32 init_task_tag;
 	u32 initial_exp_statsn;
+	u32 rsp_length;
 	u16 cid;
 	u16 tsih;
 	char *req;

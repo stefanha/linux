@@ -26,8 +26,6 @@
 
 /* NOP-In */
 #define ISCSI_TARG_NOP_IN		0x20
-/* Login Response */
-#define ISCSI_TARG_LOGIN_RSP		0x23
 /* Logout Response */
 #define ISCSI_TARG_LOGOUT_RSP		0x26
 /* Reject */
@@ -118,32 +116,6 @@
 #define ISCSI_ACA				4
 #define ISCSI_STATUS				4
 
-/* status_class field in iscsi_targ_login_rsp */
-#define STAT_CLASS_SUCCESS                      0x00
-#define STAT_CLASS_REDIRECTION                  0x01
-#define STAT_CLASS_INITIATOR                    0x02
-#define STAT_CLASS_TARGET                       0x03
-
-/* status_detail field in iscsi_targ_login_rsp */
-#define STAT_DETAIL_SUCCESS			0x00
-#define STAT_DETAIL_TARG_MOVED_TEMP		0x01
-#define STAT_DETAIL_TARG_MOVED_PERM		0x02
-#define STAT_DETAIL_INIT_ERROR			0x00
-#define STAT_DETAIL_NOT_AUTH			0x01
-#define STAT_DETAIL_NOT_ALLOWED			0x02
-#define STAT_DETAIL_NOT_FOUND			0x03
-#define STAT_DETAIL_TARG_REMOVED		0x04
-#define STAT_DETAIL_VERSION_NOT_SUPPORTED	0x05
-#define STAT_DETAIL_TOO_MANY_CONNECTIONS 	0x06
-#define STAT_DETAIL_MISSING_PARAMETER 		0x07
-#define STAT_DETAIL_NOT_INCLUDED 		0x08
-#define STAT_DETAIL_SESSION_TYPE 		0x09
-#define STAT_DETAIL_SESSION_DOES_NOT_EXIST	0x0a
-#define STAT_DETAIL_INVALID_DURING_LOGIN	0x0b
-#define STAT_DETAIL_TARG_ERROR			0x00
-#define STAT_DETAIL_SERVICE_UNAVAILABLE		0x01
-#define STAT_DETAIL_OUT_OF_RESOURCE 		0x02
-
 /* reason field in iscsi_targ_rjt */
 #define REASON_FULL_BEFORE_LOGIN		0x01
 #define REASON_DATA_DIGEST_ERR			0x02
@@ -177,28 +149,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.13 Login Response */
-
-struct iscsi_targ_login_rsp {
-	u8	opcode;
-	u8	flags;
-	u8	version_max;
-	u8	version_active;
-	u32	length;
-	u8	isid[6];
-	u16	tsih;
-	u32	init_task_tag;
-	u32	reserved1;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u8	status_class;
-	u8	status_detail;
-	u16	reserved2;
-	u32	reserved3;
-	u32	header_digest;
-};
 
 /* 9.14 Logout Request */
 
