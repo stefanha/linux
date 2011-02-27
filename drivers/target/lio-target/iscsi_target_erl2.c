@@ -423,7 +423,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	spin_lock_init(&cr->conn_recovery_cmd_lock);
 	/*
 	 * Only perform connection recovery on ISCSI_OP_SCSI_CMD or
-	 * ISCSI_INIT_NOP_OUT opcodes.  For all other opcodes call
+	 * ISCSI_OP_NOOP_OUT opcodes.  For all other opcodes call
 	 * iscsi_remove_cmd_from_conn_list() to release the command to the
 	 * session pool and remove it from the connection's list.
 	 *
@@ -434,7 +434,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
 
 		if ((cmd->iscsi_opcode != ISCSI_OP_SCSI_CMD) &&
-		    (cmd->iscsi_opcode != ISCSI_INIT_NOP_OUT)) {
+		    (cmd->iscsi_opcode != ISCSI_OP_NOOP_OUT)) {
 			TRACE(TRACE_ERL2, "Not performing realligence on"
 				" Opcode: 0x%02x, ITT: 0x%08x, CmdSN: 0x%08x,"
 				" CID: %hu\n", cmd->iscsi_opcode,

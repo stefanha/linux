@@ -1260,7 +1260,7 @@ int iscsi_add_nopin(
 	if (!(cmd))
 		return -1;
 
-	cmd->iscsi_opcode = ISCSI_TARG_NOP_IN;
+	cmd->iscsi_opcode = ISCSI_OP_NOOP_IN;
 	state = (want_response) ? ISTATE_SEND_NOPIN_WANT_RESPONSE :
 			ISTATE_SEND_NOPIN_NO_RESPONSE;
 	cmd->init_task_tag = 0xFFFFFFFF;
@@ -2533,35 +2533,32 @@ static inline int iscsi_handle_nop_out(
 {
 	unsigned char *ping_data = NULL;
 	int cmdsn_ret, niov = 0, ret = 0, rx_got, rx_size;
-	__u32 checksum, data_crc, padding = 0;
+	u32 checksum, data_crc, padding = 0, payload_length;
+	u64 lun;
 	struct iscsi_cmd *cmd = NULL;
 	struct iovec *iov = NULL;
-	struct iscsi_init_nop_out *hdr;
+	struct iscsi_nopout *hdr;
 	struct scatterlist sg;
 
-	hdr			= (struct iscsi_init_nop_out *) buf;
-	hdr->length		= be32_to_cpu(hdr->length);
-	hdr->lun		= be64_to_cpu(hdr->lun);
-	hdr->init_task_tag	= be32_to_cpu(hdr->init_task_tag);
-	hdr->targ_xfer_tag	= be32_to_cpu(hdr->targ_xfer_tag);
-	hdr->cmd_sn		= be32_to_cpu(hdr->cmd_sn);
-	hdr->exp_stat_sn	= be32_to_cpu(hdr->exp_stat_sn);
+	hdr			= (struct iscsi_nopout *) buf;
+	payload_length		= ntoh24(hdr->dlength);
+	lun			= get_unaligned_le64(&hdr->lun[0]);
+	hdr->itt		= be32_to_cpu(hdr->itt);
+	hdr->ttt		= be32_to_cpu(hdr->ttt);
+	hdr->cmdsn		= be32_to_cpu(hdr->cmdsn);
+	hdr->exp_statsn		= be32_to_cpu(hdr->exp_statsn);
 
-#ifdef DEBUG_OPCODES
-	print_init_nop_out(hdr);
-#endif
-
-	if ((hdr->init_task_tag == 0xFFFFFFFF) && !(hdr->opcode & I_BIT)) {
+	if ((hdr->itt == 0xFFFFFFFF) && !(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
 		printk(KERN_ERR "NOPOUT ITT is reserved, but Immediate Bit is"
 			" not set, protocol error.\n");
 		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 
-	if (hdr->length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
+	if (payload_length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
 		printk(KERN_ERR "NOPOUT Ping Data DataSegmentLength: %u is"
 			" greater than MaxRecvDataSegmentLength: %u, protocol"
-			" error.\n", hdr->length,
+			" error.\n", payload_length,
 			CONN_OPS(conn)->MaxRecvDataSegmentLength);
 		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
@@ -2569,9 +2566,9 @@ static inline int iscsi_handle_nop_out(
 
 	TRACE(TRACE_ISCSI, "Got NOPOUT Ping %s ITT: 0x%08x, TTT: 0x%09x,"
 		" CmdSN: 0x%08x, ExpStatSN: 0x%08x, Length: %u\n",
-		(hdr->init_task_tag == 0xFFFFFFFF) ? "Response" :
-		"Request", hdr->init_task_tag, hdr->targ_xfer_tag,
-			hdr->cmd_sn, hdr->exp_stat_sn, hdr->length);
+		(hdr->itt == 0xFFFFFFFF) ? "Response" : "Request",
+		hdr->itt, hdr->ttt, hdr->cmdsn, hdr->exp_statsn,
+		payload_length);
 	/*
 	 * This is not a response to a Unsolicited NopIN, which means
 	 * it can either be a NOPOUT ping request (with a valid ITT),
@@ -2579,27 +2576,27 @@ static inline int iscsi_handle_nop_out(
 	 * Either way, make sure we allocate an struct iscsi_cmd, as both
 	 * can contain ping data.
 	 */
-	if (hdr->targ_xfer_tag == 0xFFFFFFFF) {
+	if (hdr->ttt == 0xFFFFFFFF) {
 		cmd = iscsi_allocate_cmd(conn);
 		if (!(cmd))
 			return iscsi_add_reject(
 					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, buf, conn);
 
-		cmd->iscsi_opcode	= ISCSI_INIT_NOP_OUT;
+		cmd->iscsi_opcode	= ISCSI_OP_NOOP_OUT;
 		cmd->i_state		= ISTATE_SEND_NOPIN;
-		cmd->immediate_cmd	= ((hdr->opcode & I_BIT) ? 1 : 0);
-		SESS(conn)->init_task_tag = cmd->init_task_tag =
-						hdr->init_task_tag;
+		cmd->immediate_cmd	= ((hdr->opcode & ISCSI_OP_IMMEDIATE) ?
+						1 : 0);
+		SESS(conn)->init_task_tag = cmd->init_task_tag = hdr->itt;
 		cmd->targ_xfer_tag	= 0xFFFFFFFF;
-		cmd->cmd_sn		= hdr->cmd_sn;
-		cmd->exp_stat_sn	= hdr->exp_stat_sn;
+		cmd->cmd_sn		= hdr->cmdsn;
+		cmd->exp_stat_sn	= hdr->exp_statsn;
 		cmd->data_direction	= DMA_NONE;
 	}
 
-	if (hdr->length && (hdr->targ_xfer_tag == 0xFFFFFFFF)) {
-		rx_size = hdr->length;
-		ping_data = kzalloc(hdr->length + 1, GFP_KERNEL);
+	if (payload_length && (hdr->ttt == 0xFFFFFFFF)) {
+		rx_size = payload_length;
+		ping_data = kzalloc(payload_length + 1, GFP_KERNEL);
 		if (!(ping_data)) {
 			printk(KERN_ERR "Unable to allocate memory for"
 				" NOPOUT ping data.\n");
@@ -2609,9 +2606,9 @@ static inline int iscsi_handle_nop_out(
 
 		iov = &cmd->iov_misc[0];
 		iov[niov].iov_base	= ping_data;
-		iov[niov++].iov_len	= hdr->length;
+		iov[niov++].iov_len	= payload_length;
 
-		padding = ((-hdr->length) & 3);
+		padding = ((-payload_length) & 3);
 		if (padding != 0) {
 			TRACE(TRACE_ISCSI, "Receiving %u additional bytes"
 				" for padding.\n", padding);
@@ -2634,9 +2631,9 @@ static inline int iscsi_handle_nop_out(
 		if (CONN_OPS(conn)->DataDigest) {
 			crypto_hash_init(&conn->conn_rx_hash);
 
-			sg_init_one(&sg, (u8 *)ping_data, hdr->length);
+			sg_init_one(&sg, (u8 *)ping_data, payload_length);
 			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					hdr->length);
+					payload_length);
 
 			if (padding) {
 				sg_init_one(&sg, (u8 *)&cmd->pad_bytes,
@@ -2663,30 +2660,30 @@ static inline int iscsi_handle_nop_out(
 					 */
 					TRACE(TRACE_ERL1, "Dropping NOPOUT"
 					" Command CmdSN: 0x%08x due to"
-					" DataCRC error.\n", hdr->cmd_sn);
+					" DataCRC error.\n", hdr->cmdsn);
 					ret = 0;
 					goto out;
 				}
 			} else {
 				TRACE(TRACE_DIGEST, "Got CRC32C DataDigest"
 				" 0x%08x for %u bytes of ping data.\n",
-					checksum, hdr->length);
+					checksum, payload_length);
 			}
 		}
 
-		ping_data[hdr->length] = '\0';
+		ping_data[payload_length] = '\0';
 		/*
 		 * Attach ping data to struct iscsi_cmd->buf_ptr.
 		 */
 		cmd->buf_ptr = (void *)ping_data;
-		cmd->buf_ptr_size = hdr->length;
+		cmd->buf_ptr_size = payload_length;
 
 		TRACE(TRACE_ISCSI, "Got %u bytes of NOPOUT ping"
-			" data.\n", hdr->length);
+			" data.\n", payload_length);
 		TRACE(TRACE_ISCSI, "Ping Data: \"%s\"\n", ping_data);
 	}
 
-	if (hdr->init_task_tag != 0xFFFFFFFF) {
+	if (hdr->itt != 0xFFFFFFFF) {
 		if (!cmd) {
 			printk(KERN_ERR "Checking CmdSN for NOPOUT,"
 				" but cmd is NULL!\n");
@@ -2698,15 +2695,15 @@ static inline int iscsi_handle_nop_out(
 		 */
 		iscsi_attach_cmd_to_queue(conn, cmd);
 
-		iscsi_ack_from_expstatsn(conn, hdr->exp_stat_sn);
+		iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
 
-		if (hdr->opcode & I_BIT) {
+		if (hdr->opcode & ISCSI_OP_IMMEDIATE) {
 			iscsi_add_cmd_to_response_queue(cmd, conn,
 					cmd->i_state);
 			return 0;
 		}
 
-		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmd_sn);
+		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmdsn);
 		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
 		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)) {
 			return 0;
@@ -2727,11 +2724,11 @@ static inline int iscsi_handle_nop_out(
 		return 0;
 	}
 
-	if (hdr->targ_xfer_tag != 0xFFFFFFFF) {
+	if (hdr->ttt != 0xFFFFFFFF) {
 		/*
 		 * This was a response to a unsolicited NOPIN ping.
 		 */
-		cmd = iscsi_find_cmd_from_ttt(conn, hdr->targ_xfer_tag);
+		cmd = iscsi_find_cmd_from_ttt(conn, hdr->ttt);
 		if (!(cmd))
 			return -1;
 
@@ -4102,35 +4099,33 @@ static inline int iscsi_send_unsolicited_nopin(
 	int want_response)
 {
 	int tx_size = ISCSI_HDR_LEN;
-	struct iscsi_targ_nop_in *hdr;
+	struct iscsi_nopin *hdr;
 	struct scatterlist sg;
 
-	hdr			= (struct iscsi_targ_nop_in *) cmd->pdu;
+	hdr			= (struct iscsi_nopin *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
-	hdr->opcode		= ISCSI_TARG_NOP_IN;
-	hdr->flags		|= F_BIT;
-	hdr->length		= 0;
-	hdr->lun		= iscsi_pack_lun(0);
-	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
-	hdr->targ_xfer_tag	= cpu_to_be32(cmd->targ_xfer_tag);
+	hdr->opcode		= ISCSI_OP_NOOP_IN;
+	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
+	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
+	hdr->ttt		= cpu_to_be32(cmd->targ_xfer_tag);
 	cmd->stat_sn		= conn->stat_sn;
-	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);
-	hdr->exp_cmd_sn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
+	hdr->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest to"
-			" NopIN 0x%08x\n", hdr->header_digest);
+			" NopIN 0x%08x\n", *header_digest);
 	}
 
 	cmd->iov_misc[0].iov_base	= cmd->pdu;
@@ -4139,11 +4134,8 @@ static inline int iscsi_send_unsolicited_nopin(
 	cmd->tx_size		= tx_size;
 
 	TRACE(TRACE_ISCSI, "Sending Unsolicited NOPIN TTT: 0x%08x StatSN:"
-	" 0x%08x CID: %hu\n", hdr->targ_xfer_tag, cmd->stat_sn, conn->cid);
+		" 0x%08x CID: %hu\n", hdr->ttt, cmd->stat_sn, conn->cid);
 
-#ifdef DEBUG_OPCODES
-	print_targ_nop_in(hdr);
-#endif
 	return 0;
 }
 
@@ -4158,43 +4150,43 @@ static inline int iscsi_send_nopin_response(
 	int niov = 0, tx_size;
 	__u32 padding = 0;
 	struct iovec *iov;
-	struct iscsi_targ_nop_in *hdr;
+	struct iscsi_nopin *hdr;
 	struct scatterlist sg;
 
 	tx_size = ISCSI_HDR_LEN;
-	hdr			= (struct iscsi_targ_nop_in *) cmd->pdu;
+	hdr			= (struct iscsi_nopin *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
-	hdr->opcode		= ISCSI_TARG_NOP_IN;
-	hdr->flags		|= F_BIT;
-	hdr->length		= cpu_to_be32(cmd->buf_ptr_size);
-	hdr->lun		= cpu_to_be64(0xFFFFFFFFFFFFFFFFULL);
-	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
-	hdr->targ_xfer_tag	= cpu_to_be32(cmd->targ_xfer_tag);
+	hdr->opcode		= ISCSI_OP_NOOP_IN;
+	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
+	hton24(hdr->dlength, cmd->buf_ptr_size);
+	put_unaligned_le64(0xFFFFFFFFFFFFFFFFULL, &hdr->lun[0]);
+	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
+	hdr->ttt		= cpu_to_be32(cmd->targ_xfer_tag);
 	cmd->stat_sn		= conn->stat_sn++;
-	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);
+	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
 	iscsi_increment_maxcmdsn(cmd, SESS(conn));
-	hdr->exp_cmd_sn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
 
 	iov = &cmd->iov_misc[0];
 	iov[niov].iov_base	= cmd->pdu;
 	iov[niov++].iov_len	= ISCSI_HDR_LEN;
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest"
-			" to NopIn 0x%08x\n", hdr->header_digest);
+			" to NopIn 0x%08x\n", *header_digest);
 	}
 
 	/*
@@ -4247,13 +4239,9 @@ static inline int iscsi_send_nopin_response(
 	cmd->tx_size = tx_size;
 
 	TRACE(TRACE_ISCSI, "Sending NOPIN Response ITT: 0x%08x, TTT:"
-		" 0x%08x, StatSN: 0x%08x, Length %u\n",
-		ntohl(hdr->init_task_tag), ntohl(hdr->targ_xfer_tag),
-		ntohl(hdr->stat_sn), ntohl(hdr->length));
+		" 0x%08x, StatSN: 0x%08x, Length %u\n", cmd->init_task_tag,
+		cmd->targ_xfer_tag, cmd->stat_sn, cmd->buf_ptr_size);
 
-#ifdef DEBUG_OPCODES
-	print_targ_nop_in(hdr);
-#endif
 	return 0;
 }
 
@@ -5418,7 +5406,7 @@ restart:
 			if (iscsi_handle_data_out(conn, buffer) < 0)
 				goto transport_err;
 			break;
-		case ISCSI_INIT_NOP_OUT:
+		case ISCSI_OP_NOOP_OUT:
 			if (iscsi_handle_nop_out(conn, buffer) < 0)
 				goto transport_err;
 			break;

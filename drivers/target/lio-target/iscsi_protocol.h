@@ -17,12 +17,6 @@
 #define ISCSI_MAX_VERSION               0x0
 #define ISCSI_MIN_VERSION               0x0
 
-/* NOP-Out */
-#define ISCSI_INIT_NOP_OUT 		0x00
-
-/* NOP-In */
-#define ISCSI_TARG_NOP_IN		0x20
-
 /* Flag Settings */
 #define ISCSI_OPCODE			0x3f
 /* Final Bit */
@@ -107,43 +101,6 @@
 #define ISCSI_HEAD_OF_QUEUE			3
 #define ISCSI_ACA				4
 #define ISCSI_STATUS				4
-
-/* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.18 NOP-Out */
-
-struct iscsi_init_nop_out {
-	u8	opcode;
-	u8	flags;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	targ_xfer_tag;
-	u32	cmd_sn;
-	u32	exp_stat_sn;
-	u64	reserved2;
-	u64	reserved3;
-	u32	header_digest;
-};
-
-/* 9.19 NOP-In */
-
-struct iscsi_targ_nop_in {
-	u8	opcode;
-	u8	flags;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	targ_xfer_tag;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	reserved2;
-	u64	reserved3;
-	u32	header_digest;
-};
 
 struct iscsi_conn_ops {
 	u8	HeaderDigest;			/* [0,1] == [None,CRC32C] */

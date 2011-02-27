@@ -26,7 +26,5 @@ void print_cid(u16);
 void print_isid(u8 []);
 void print_tsih(u16);
 void print_scsicdb(u8 []);
-void print_init_nop_out(struct iscsi_init_nop_out *);
-void print_targ_nop_in(struct iscsi_targ_nop_in *);
 
 #endif /* ISCSI_OPCODES_DEBUG_H */

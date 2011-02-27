@@ -1082,7 +1082,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		}
 		return transport_generic_handle_cdb(&cmd->se_cmd);
 
-	case ISCSI_INIT_NOP_OUT:
+	case ISCSI_OP_NOOP_OUT:
 	case ISCSI_OP_TEXT:
 		spin_unlock_bh(&cmd->istate_lock);
 		iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);

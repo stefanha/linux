@@ -485,7 +485,7 @@ static int iscsi_task_reassign_complete(
 	cmd->conn = conn;
 
 	switch (cmd->iscsi_opcode) {
-	case ISCSI_INIT_NOP_OUT:
+	case ISCSI_OP_NOOP_OUT:
 		ret = iscsi_task_reassign_complete_nop_out(tmr_req, conn);
 		break;
 	case ISCSI_OP_SCSI_CMD:
