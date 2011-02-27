@@ -206,23 +206,6 @@ void print_scsicdb(u8 cdb[16])
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
 }
 
-void print_init_logout_cmnd(struct iscsi_init_logout_cmnd *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_INIT_LOGOUT_CMND PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	print_reserved16(1, cmd->reserved1);
-	print_dataseglength(cmd->length);
-	print_reserved64(2, cmd->reserved2);
-	print_itt(cmd->init_task_tag);
-	print_cid(cmd->cid);
-	print_reserved8(3, cmd->reserved3);
-	print_cmdsn(cmd->cmd_sn);
-	print_expstatsn(cmd->exp_stat_sn);
-	print_reserved32(4, cmd->reserved4);
-	print_reserved64(5, cmd->reserved5);
-}
-
 void print_targ_logout_rsp(struct iscsi_targ_logout_rsp *cmd)
 {
 	printk(KERN_INFO "Dumping ISCSI_TARG_LOGOUT_RSP PDU\n");

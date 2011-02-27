@@ -1096,16 +1096,16 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		spin_unlock_bh(&cmd->istate_lock);
 
 		return transport_generic_handle_tmr(SE_CMD(cmd));
-	case ISCSI_INIT_LOGOUT_CMND:
+	case ISCSI_OP_LOGOUT:
 		spin_unlock_bh(&cmd->istate_lock);
 		switch (cmd->logout_reason) {
-		case CLOSESESSION:
+		case ISCSI_LOGOUT_REASON_CLOSE_SESSION:
 			lr = iscsi_logout_closesession(cmd, CONN(cmd));
 			break;
-		case CLOSECONNECTION:
+		case ISCSI_LOGOUT_REASON_CLOSE_CONNECTION:
 			lr = iscsi_logout_closeconnection(cmd, CONN(cmd));
 			break;
-		case REMOVECONNFORRECOVERY:
+		case ISCSI_LOGOUT_REASON_RECOVERY:
 			lr = iscsi_logout_removeconnforrecovery(cmd, CONN(cmd));
 			break;
 		default:

@@ -19,8 +19,6 @@
 
 /* NOP-Out */
 #define ISCSI_INIT_NOP_OUT 		0x00
-/* Logout Command */
-#define ISCSI_INIT_LOGOUT_CMND		0x06
 /* SNACK Request */
 #define ISCSI_INIT_SNACK		0x10
 
@@ -130,11 +128,6 @@
 #define REASON_NEGOTIATION_RESET		0x0b
 #define REASON_WAITING_FOR_LOGOUT		0x0c
 
-/* reason_code in iSCSI Logout Request */
-#define CLOSESESSION				0
-#define CLOSECONNECTION				1
-#define REMOVECONNFORRECOVERY			2
-
 /* response in iSCSI Logout Response */
 #define CONNORSESSCLOSEDSUCCESSFULLY		0
 #define CIDNOTFOUND				1
@@ -149,24 +142,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.14 Logout Request */
-
-struct iscsi_init_logout_cmnd {
-	u8	opcode;
-	u8	flags;
-	u16	reserved1;
-	u32	length;
-	u64	reserved2;
-	u32	init_task_tag;
-	u16	cid;
-	u16	reserved3;
-	u32	cmd_sn;
-	u32	exp_stat_sn;
-	u64	reserved4;
-	u64	reserved5;
-	u32	header_digest;
-};
 
 /* 9.15 Logout Reponse */
 

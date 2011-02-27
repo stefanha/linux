@@ -3099,7 +3099,7 @@ int iscsi_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 
 	atomic_set(&sess->session_logout, 1);
 	atomic_set(&conn->conn_logout_remove, 1);
-	conn->conn_logout_reason = CLOSESESSION;
+	conn->conn_logout_reason = ISCSI_LOGOUT_REASON_CLOSE_SESSION;
 
 	iscsi_inc_conn_usage_count(conn);
 	iscsi_inc_session_usage_count(sess);
@@ -3141,7 +3141,7 @@ int iscsi_logout_closeconnection(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 		conn->conn_state = TARG_CONN_STATE_IN_LOGOUT;
 
 		atomic_set(&conn->conn_logout_remove, 1);
-		conn->conn_logout_reason = CLOSECONNECTION;
+		conn->conn_logout_reason = ISCSI_LOGOUT_REASON_CLOSE_CONNECTION;
 		iscsi_inc_conn_usage_count(conn);
 
 		spin_unlock_bh(&conn->state_lock);
@@ -3215,24 +3215,21 @@ static inline int iscsi_handle_logout_cmd(
 	int cmdsn_ret, logout_remove = 0;
 	u8 reason_code = 0;
 	struct iscsi_cmd *cmd;
-	struct iscsi_init_logout_cmnd *hdr;
+	struct iscsi_logout *hdr;
 
-	hdr			= (struct iscsi_init_logout_cmnd *) buf;
+	hdr			= (struct iscsi_logout *) buf;
 	reason_code		= (hdr->flags & 0x7f);
-	hdr->init_task_tag	= be32_to_cpu(hdr->init_task_tag);
+	hdr->itt		= be32_to_cpu(hdr->itt);
 	hdr->cid		= be16_to_cpu(hdr->cid);
-	hdr->cmd_sn		= be32_to_cpu(hdr->cmd_sn);
-	hdr->exp_stat_sn	= be32_to_cpu(hdr->exp_stat_sn);
+	hdr->cmdsn		= be32_to_cpu(hdr->cmdsn);
+	hdr->exp_statsn	= be32_to_cpu(hdr->exp_statsn);
 
-#ifdef DEBUG_OPCODES
-	print_init_logout_cmnd(hdr);
-#endif
 	{
 	struct iscsi_tiqn *tiqn = iscsi_snmp_get_tiqn(conn);
 
 	if (tiqn) {
 		spin_lock(&tiqn->logout_stats.lock);
-		if (reason_code == CLOSESESSION)
+		if (reason_code == ISCSI_LOGOUT_REASON_CLOSE_SESSION)
 			tiqn->logout_stats.normal_logouts++;
 		else
 			tiqn->logout_stats.abnormal_logouts++;
@@ -3242,8 +3239,8 @@ static inline int iscsi_handle_logout_cmd(
 
 	TRACE(TRACE_ISCSI, "Got Logout Request ITT: 0x%08x CmdSN: 0x%08x"
 		" ExpStatSN: 0x%08x Reason: 0x%02x CID: %hu on CID: %hu\n",
-			hdr->init_task_tag, hdr->cmd_sn, hdr->exp_stat_sn,
-				reason_code, hdr->cid, conn->cid);
+		hdr->itt, hdr->cmdsn, hdr->exp_statsn, reason_code,
+		hdr->cid, conn->cid);
 
 	if (conn->conn_state != TARG_CONN_STATE_LOGGED_IN) {
 		printk(KERN_ERR "Received logout request on connection that"
@@ -3255,13 +3252,13 @@ static inline int iscsi_handle_logout_cmd(
 	if (!(cmd))
 		return iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
 
-	cmd->iscsi_opcode       = ISCSI_INIT_LOGOUT_CMND;
+	cmd->iscsi_opcode       = ISCSI_OP_LOGOUT;
 	cmd->i_state            = ISTATE_SEND_LOGOUTRSP;
-	cmd->immediate_cmd      = ((hdr->opcode & I_BIT) ? 1 : 0);
-	SESS(conn)->init_task_tag = cmd->init_task_tag  = hdr->init_task_tag;
+	cmd->immediate_cmd      = ((hdr->opcode & ISCSI_OP_IMMEDIATE) ? 1 : 0);
+	SESS(conn)->init_task_tag = cmd->init_task_tag  = hdr->itt;
 	cmd->targ_xfer_tag      = 0xFFFFFFFF;
-	cmd->cmd_sn             = hdr->cmd_sn;
-	cmd->exp_stat_sn        = hdr->exp_stat_sn;
+	cmd->cmd_sn             = hdr->cmdsn;
+	cmd->exp_stat_sn        = hdr->exp_statsn;
 	cmd->logout_cid         = hdr->cid;
 	cmd->logout_reason      = reason_code;
 	cmd->data_direction     = DMA_NONE;
@@ -3270,20 +3267,21 @@ static inline int iscsi_handle_logout_cmd(
 	 * We need to sleep in these cases (by returning 1) until the Logout
 	 * Response gets sent in the tx thread.
 	 */
-	if ((reason_code == CLOSESESSION) ||
-	   ((reason_code == CLOSECONNECTION) && (hdr->cid == conn->cid)))
+	if ((reason_code == ISCSI_LOGOUT_REASON_CLOSE_SESSION) ||
+	   ((reason_code == ISCSI_LOGOUT_REASON_CLOSE_CONNECTION) &&
+	    (hdr->cid == conn->cid)))
 		logout_remove = 1;
 
 	iscsi_attach_cmd_to_queue(conn, cmd);
 
-	if (reason_code != REMOVECONNFORRECOVERY)
-		iscsi_ack_from_expstatsn(conn, hdr->exp_stat_sn);
+	if (reason_code != ISCSI_LOGOUT_REASON_RECOVERY)
+		iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	/*
 	 * Non-Immediate Logout Commands are executed in CmdSN order..
 	 */
-	if (!(hdr->opcode & I_BIT)) {
-		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmd_sn);
+	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
+		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmdsn);
 		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
 		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
 			return logout_remove;
@@ -3959,12 +3957,12 @@ static inline int iscsi_send_logout_response(
 	 * is done in scsi_logout_post_handler().
 	 */
 	switch (cmd->logout_reason) {
-	case CLOSESESSION:
+	case ISCSI_LOGOUT_REASON_CLOSE_SESSION:
 		TRACE(TRACE_ISCSI, "iSCSI session logout successful, setting"
 			" logout response to CONNORSESSCLOSEDSUCCESSFULLY.\n");
 		cmd->logout_response = CONNORSESSCLOSEDSUCCESSFULLY;
 		break;
-	case CLOSECONNECTION:
+	case ISCSI_LOGOUT_REASON_CLOSE_CONNECTION:
 		if (cmd->logout_response == CIDNOTFOUND)
 			break;
 		/*
@@ -3983,7 +3981,7 @@ static inline int iscsi_send_logout_response(
 			" successful.\n", cmd->logout_cid, conn->cid);
 		cmd->logout_response = CONNORSESSCLOSEDSUCCESSFULLY;
 		break;
-	case REMOVECONNFORRECOVERY:
+	case ISCSI_LOGOUT_REASON_RECOVERY:
 		if ((cmd->logout_response == CONNRECOVERYNOTSUPPORTED) ||
 		    (cmd->logout_response == CLEANUPFAILED))
 			break;
@@ -5382,7 +5380,7 @@ restart:
 
 		if (SESS_OPS_C(conn)->SessionType &&
 		   ((!(opcode & ISCSI_OP_TEXT)) ||
-		    (!(opcode & ISCSI_INIT_LOGOUT_CMND)))) {
+		    (!(opcode & ISCSI_OP_LOGOUT)))) {
 			printk(KERN_ERR "Received illegal iSCSI Opcode: 0x%02x"
 			" while in Discovery Session, rejecting.\n", opcode);
 			iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buffer, conn);
@@ -5410,7 +5408,7 @@ restart:
 			if (iscsi_handle_text_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;
-		case ISCSI_INIT_LOGOUT_CMND:
+		case ISCSI_OP_LOGOUT:
 			ret = iscsi_handle_logout_cmd(conn, buffer);
 			if (ret > 0) {
 				down(&conn->conn_logout_sem);
@@ -5574,11 +5572,11 @@ int iscsi_close_connection(
 	 * connection failed.  Fall back to Session Recovery here.
 	 */
 	if (atomic_read(&conn->conn_logout_remove)) {
-		if (conn->conn_logout_reason == CLOSESESSION) {
+		if (conn->conn_logout_reason == ISCSI_LOGOUT_REASON_CLOSE_SESSION) {
 			iscsi_dec_conn_usage_count(conn);
 			iscsi_dec_session_usage_count(sess);
 		}
-		if (conn->conn_logout_reason == CLOSECONNECTION)
+		if (conn->conn_logout_reason == ISCSI_LOGOUT_REASON_CLOSE_CONNECTION)
 			iscsi_dec_conn_usage_count(conn);
 
 		atomic_set(&conn->conn_logout_remove, 0);
@@ -5903,7 +5901,7 @@ static int iscsi_logout_post_handler(
 	int ret = 0;
 
 	switch (cmd->logout_reason) {
-	case CLOSESESSION:
+	case ISCSI_LOGOUT_REASON_CLOSE_SESSION:
 		switch (cmd->logout_response) {
 		case CONNORSESSCLOSEDSUCCESSFULLY:
 		case CLEANUPFAILED:
@@ -5913,7 +5911,7 @@ static int iscsi_logout_post_handler(
 		}
 		ret = 0;
 		break;
-	case CLOSECONNECTION:
+	case ISCSI_LOGOUT_REASON_CLOSE_CONNECTION:
 		if (conn->cid == cmd->logout_cid) {
 			switch (cmd->logout_response) {
 			case CONNORSESSCLOSEDSUCCESSFULLY:
@@ -5937,7 +5935,7 @@ static int iscsi_logout_post_handler(
 			ret = 1;
 		}
 		break;
-	case REMOVECONNFORRECOVERY:
+	case ISCSI_LOGOUT_REASON_RECOVERY:
 		switch (cmd->logout_response) {
 		case CONNORSESSCLOSEDSUCCESSFULLY:
 		case CIDNOTFOUND:
