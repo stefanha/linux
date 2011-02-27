@@ -19,8 +19,6 @@
 
 /* NOP-Out */
 #define ISCSI_INIT_NOP_OUT 		0x00
-/* Login Command */
-#define ISCSI_INIT_LOGIN_CMND		0x03
 /* Logout Command */
 #define ISCSI_INIT_LOGOUT_CMND		0x06
 /* SNACK Request */
@@ -179,26 +177,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.12 Login Request */
-
-struct iscsi_init_login_cmnd {
-	u8	opcode;
-	u8	flags;
-	u8	version_max;
-	u8	version_min;
-	u32	length;
-	u8	isid[6];
-	u16	tsih;
-	u32	init_task_tag;
-	u16	cid;
-	u16	reserved1;
-	u32	cmd_sn;
-	u32	exp_stat_sn;
-	u64	reserved2;
-	u64	reserved3;
-	u32	header_digest;
-};
 
 /* 9.13 Login Response */
 

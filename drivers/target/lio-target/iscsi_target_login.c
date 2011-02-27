@@ -37,6 +37,7 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/ipv6.h>
+#include <scsi/iscsi_proto.h>
 
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
@@ -273,7 +274,7 @@ static int iscsi_login_zero_tsih_s1(
 	unsigned char *buf)
 {
 	struct iscsi_session *sess = NULL;
-	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *)buf;
+	struct iscsi_login_req *pdu = (struct iscsi_login_req *)buf;
 
 	sess = kmem_cache_zalloc(lio_sess_cache, GFP_KERNEL);
 	if (!(sess)) {
@@ -284,9 +285,9 @@ static int iscsi_login_zero_tsih_s1(
 	}
 
 	iscsi_login_set_conn_values(sess, conn, pdu->cid);
-	sess->init_task_tag	= pdu->init_task_tag;
+	sess->init_task_tag	= pdu->itt;
 	memcpy((void *)&sess->isid, (void *)pdu->isid, 6);
-	sess->exp_cmd_sn	= pdu->cmd_sn;
+	sess->exp_cmd_sn	= pdu->cmdsn;
 	INIT_LIST_HEAD(&sess->sess_conn_list);
 	INIT_LIST_HEAD(&sess->sess_ooo_cmdsn_list);
 	INIT_LIST_HEAD(&sess->cr_active_list);
@@ -308,7 +309,7 @@ static int iscsi_login_zero_tsih_s1(
 	 * The FFP CmdSN window values will be allocated from the TPG's
 	 * Initiator Node's ACL once the login has been successfully completed.
 	 */
-	sess->max_cmd_sn	= pdu->cmd_sn;
+	sess->max_cmd_sn	= pdu->cmdsn;
 
 	sess->sess_ops = kzalloc(sizeof(struct iscsi_sess_ops), GFP_KERNEL);
 	if (!(sess->sess_ops)) {
@@ -455,7 +456,7 @@ static int iscsi_login_non_zero_tsih_s1 (
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
-	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *)buf;
+	struct iscsi_login_req *pdu = (struct iscsi_login_req *)buf;
 
 	iscsi_login_set_conn_values(NULL, conn, pdu->cid);
 	return 0;
@@ -473,7 +474,7 @@ static int iscsi_login_non_zero_tsih_s2(
 	struct iscsi_session *sess = NULL, *sess_p = NULL;
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 	struct se_session *se_sess, *se_sess_tmp;
-	struct iscsi_init_login_cmnd *pdu = (struct iscsi_init_login_cmnd *)buf;
+	struct iscsi_login_req *pdu = (struct iscsi_login_req *)buf;
 
 	spin_lock_bh(&se_tpg->session_lock);
 	list_for_each_entry_safe(se_sess, se_sess_tmp, &se_tpg->tpg_sess_list,
@@ -1007,7 +1008,7 @@ int iscsi_target_login_thread(void *arg)
 	struct socket *new_sock, *sock;
 	struct iscsi_np *np = (struct iscsi_np *) arg;
 	struct iovec iov;
-	struct iscsi_init_login_cmnd *pdu;
+	struct iscsi_login_req *pdu;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 
@@ -1162,28 +1163,24 @@ get_new_sock:
 	}
 
 	iscsi_opcode = (buffer[0] & ISCSI_OPCODE);
-	if (!(iscsi_opcode & ISCSI_INIT_LOGIN_CMND)) {
+	if (!(iscsi_opcode & ISCSI_OP_LOGIN)) {
 		printk(KERN_ERR "First opcode is not login request,"
 			" failing login request.\n");
 		goto new_sess_out;
 	}
 
-	pdu			= (struct iscsi_init_login_cmnd *) buffer;
-	pdu->length		= be32_to_cpu(pdu->length);
+	pdu			= (struct iscsi_login_req *) buffer;
 	pdu->cid		= be16_to_cpu(pdu->cid);
 	pdu->tsih		= be16_to_cpu(pdu->tsih);
-	pdu->init_task_tag	= be32_to_cpu(pdu->init_task_tag);
-	pdu->cmd_sn		= be32_to_cpu(pdu->cmd_sn);
-	pdu->exp_stat_sn	= be32_to_cpu(pdu->exp_stat_sn);
+	pdu->itt		= be32_to_cpu(pdu->itt);
+	pdu->cmdsn		= be32_to_cpu(pdu->cmdsn);
+	pdu->exp_statsn		= be32_to_cpu(pdu->exp_statsn);
 	/*
 	 * Used by iscsi_tx_login_rsp() for Login Resonses PDUs
 	 * when Status-Class != 0.
 	*/
-	conn->login_itt		= pdu->init_task_tag;
+	conn->login_itt		= pdu->itt;
 
-#ifdef DEBUG_OPCODES
-	print_init_login_cmnd(pdu);
-#endif
 	if (np->np_net_size == IPV6_ADDRESS_SPACE)
 		ip = &np->np_ipv6[0];
 	else {
@@ -1260,8 +1257,8 @@ get_new_sock:
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_IN_LOGIN.\n");
 	conn->conn_state	= TARG_CONN_STATE_IN_LOGIN;
 
-	if (iscsi_login_check_initiator_version(conn, pdu->version_max,
-			pdu->version_min) < 0)
+	if (iscsi_login_check_initiator_version(conn, pdu->max_version,
+			pdu->min_version) < 0)
 		goto new_sess_out;
 
 	zero_tsih = (pdu->tsih == 0x0000);

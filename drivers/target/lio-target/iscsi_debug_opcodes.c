@@ -323,28 +323,6 @@ void print_scsicdb(u8 cdb[16])
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
 }
 
-void print_init_login_cmnd(struct iscsi_init_login_cmnd *cmd)
-{
-	printk(KERN_INFO "\tDumping ISCSI_INIT_LOGIN_CMND PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	printk(KERN_INFO "\tT_BIT: %d\n", (cmd->flags & T_BIT) ? 1 : 0);
-	printk(KERN_INFO "\tCSG: %d, NSG: %d\n", ((cmd->flags & CSG) >> 2),
-					cmd->flags & NSG);
-	printk(KERN_INFO "\tVersionMax: 0x%02x\n", cmd->version_max);
-	printk(KERN_INFO "\tVersionMin: 0x%02x\n", cmd->version_min);
-	print_dataseglength(cmd->length);
-	print_isid(cmd->isid);
-	print_tsih(cmd->tsih);
-	print_itt(cmd->init_task_tag);
-	print_cid(cmd->cid);
-	print_reserved16(1, cmd->reserved1);
-	print_cmdsn(cmd->cmd_sn);
-	print_expstatsn(cmd->exp_stat_sn);
-	print_reserved64(2, cmd->reserved2);
-	print_reserved64(3, cmd->reserved3);
-}
-
 void print_targ_login_rsp(struct iscsi_targ_login_rsp *cmd)
 {
 	printk(KERN_INFO "Dumping ISCSI_TARG_LOGIN_RSP PDU\n");
