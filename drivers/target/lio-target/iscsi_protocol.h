@@ -30,8 +30,6 @@
 #define ISCSI_TARG_NOP_IN		0x20
 /* Login Response */
 #define ISCSI_TARG_LOGIN_RSP		0x23
-/* Text Response */
-#define ISCSI_TARG_TEXT_RSP		0x24
 /* Logout Response */
 #define ISCSI_TARG_LOGOUT_RSP		0x26
 /* Reject */
@@ -181,24 +179,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.11 Text Response */
-
-struct iscsi_targ_text_rsp {
-	u8	opcode;
-	u8	flags;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	targ_xfer_tag;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	reserved2;
-	u64	reserved3;
-	u32	header_digest;
-};
 
 /* 9.12 Login Request */
 

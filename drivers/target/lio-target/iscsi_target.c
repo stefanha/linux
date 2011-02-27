@@ -4664,9 +4664,9 @@ static int iscsi_send_text_rsp(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	__u8 iov_count = 0;
-	__u32 padding = 0, text_length = 0, tx_size = 0;
-	struct iscsi_targ_text_rsp *hdr;
+	u8 iov_count = 0;
+	u32 padding = 0, text_length = 0, tx_size = 0;
+	struct iscsi_text_rsp *hdr;
 	struct iovec *iov;
 	struct scatterlist sg;
 
@@ -4679,19 +4679,19 @@ static int iscsi_send_text_rsp(
 			" padding.\n", padding);
 	}
 
-	hdr			= (struct iscsi_targ_text_rsp *) cmd->pdu;
+	hdr			= (struct iscsi_text_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
-	hdr->opcode		= ISCSI_TARG_TEXT_RSP;
-	hdr->flags		|= F_BIT;
-	hdr->length		= cpu_to_be32(text_length);
-	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
-	hdr->targ_xfer_tag	= cpu_to_be32(cmd->targ_xfer_tag);
+	hdr->opcode		= ISCSI_OP_TEXT_RSP;
+	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
+	hton24(hdr->dlength, text_length);
+	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
+	hdr->ttt		= cpu_to_be32(cmd->targ_xfer_tag);
 	cmd->stat_sn		= conn->stat_sn++;
-	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);
+	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
 	iscsi_increment_maxcmdsn(cmd, SESS(conn));
-	hdr->exp_cmd_sn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
 
 	iov = &cmd->iov_misc[0];
 
@@ -4703,19 +4703,19 @@ static int iscsi_send_text_rsp(
 	tx_size += (ISCSI_HDR_LEN + text_length + padding);
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for"
-			" Text Response PDU 0x%08x\n", hdr->header_digest);
+			" Text Response PDU 0x%08x\n", *header_digest);
 	}
 
 	if (CONN_OPS(conn)->DataDigest) {
@@ -4743,10 +4743,6 @@ static int iscsi_send_text_rsp(
 	TRACE(TRACE_ISCSI, "Built Text Response: ITT: 0x%08x, StatSN: 0x%08x,"
 		" Length: %u, CID: %hu\n", cmd->init_task_tag, cmd->stat_sn,
 			text_length, conn->cid);
-
-#ifdef DEBUG_OPCODES
-	print_targ_text_rsp(hdr);
-#endif
 	return 0;
 }
 
