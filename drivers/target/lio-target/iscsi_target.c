@@ -3525,67 +3525,63 @@ static int iscsi_handle_immediate_data(
  */
 int iscsi_send_async_msg(
 	struct iscsi_conn *conn,
-	__u16 cid,
-	__u8 async_event,
-	__u8 async_vcode)
+	u16 cid,
+	u8 async_event,
+	u8 async_vcode)
 {
-	__u8 iscsi_hdr[ISCSI_HDR_LEN+CRC_LEN];
-	__u32 tx_send = ISCSI_HDR_LEN, tx_sent = 0;
+	u8 iscsi_hdr[ISCSI_HDR_LEN+CRC_LEN];
+	u32 tx_send = ISCSI_HDR_LEN, tx_sent = 0;
 	struct timer_list async_msg_timer;
-	struct iscsi_targ_async_msg *hdr;
+	struct iscsi_async *hdr;
 	struct iovec iov;
 	struct scatterlist sg;
 
 	memset((void *)&iov, 0, sizeof(struct iovec));
-	memset((void *)&iscsi_hdr, 0, ISCSI_HDR_LEN);
+	memset((void *)&iscsi_hdr, 0, ISCSI_HDR_LEN+CRC_LEN);
 
-	hdr		= (struct iscsi_targ_async_msg *)&iscsi_hdr;
-	hdr->opcode	= ISCSI_TARG_ASYNC_MSG;
-	hdr->flags	|= F_BIT;
-	hdr->length	= 0;
-	hdr->lun	= 0;
-	hdr->reserved2	= 0xffffffff;
-	hdr->stat_sn	= cpu_to_be32(conn->stat_sn++);
+	hdr		= (struct iscsi_async *)&iscsi_hdr;
+	hdr->opcode	= ISCSI_OP_ASYNC_EVENT;
+	hdr->flags	|= ISCSI_FLAG_CMD_FINAL;
+	hton24(hdr->dlength, 0);
+	put_unaligned_le64(0, &hdr->lun[0]);
+	put_unaligned_be64(0xffffffffffffffff, &hdr->rsvd4[0]);
+	hdr->statsn	= cpu_to_be32(conn->stat_sn++);
 	spin_lock(&SESS(conn)->cmdsn_lock);
-	hdr->exp_cmd_sn	= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn	= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->exp_cmdsn	= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn	= cpu_to_be32(SESS(conn)->max_cmd_sn);
 	spin_unlock(&SESS(conn)->cmdsn_lock);
 	hdr->async_event = async_event;
 	hdr->async_vcode = async_vcode;
 
 	switch (async_event) {
-	case ASYNC_EVENT_SCSI_EVENT:
-		printk(KERN_ERR "ASYNC_EVENT_SCSI_EVENT not supported yet.\n");
+	case ISCSI_ASYNC_MSG_SCSI_EVENT:
+		printk(KERN_ERR "ISCSI_ASYNC_MSG_SCSI_EVENT: not supported yet.\n");
 		return -1;
-	case ASYNC_EVENT_REQUEST_LOGOUT:
+	case ISCSI_ASYNC_MSG_REQUEST_LOGOUT:
 		TRACE(TRACE_STATE, "Moving to"
 				" TARG_CONN_STATE_LOGOUT_REQUESTED.\n");
 		conn->conn_state = TARG_CONN_STATE_LOGOUT_REQUESTED;
-		hdr->parameter1 = 0;
-		hdr->parameter2 = 0;
-		hdr->parameter3 = cpu_to_be16(SECONDS_FOR_ASYNC_LOGOUT);
+		hdr->param1 = 0;
+		hdr->param2 = 0;
+		hdr->param3 = cpu_to_be16(SECONDS_FOR_ASYNC_LOGOUT);
 		break;
-	case ASYNC_EVENT_DROP_CONNECTION:
-		hdr->parameter1 = cpu_to_be16(cid);
-		hdr->parameter2 =
-			cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Wait);
-		hdr->parameter3 =
-			cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Retain);
+	case ISCSI_ASYNC_MSG_DROPPING_CONNECTION:
+		hdr->param1 = cpu_to_be16(cid);
+		hdr->param2 = cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Wait);
+		hdr->param3 = cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Retain);
 		break;
-	case ASYNC_EVENT_DROP_SESSION:
-		hdr->parameter1 = 0;
-		hdr->parameter2 =
-			cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Wait);
-		hdr->parameter3 =
-			cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Retain);
+	case ISCSI_ASYNC_MSG_DROPPING_ALL_CONNECTIONS:
+		hdr->param1 = 0;
+		hdr->param2 = cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Wait);
+		hdr->param3 = cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Retain);
 		break;
-	case ASYNC_EVENT_REQUEST_TEXT:
-		hdr->parameter1 = 0;
-		hdr->parameter2 = 0;
-		hdr->parameter3 = cpu_to_be16(SECONDS_FOR_ASYNC_TEXT);
+	case ISCSI_ASYNC_MSG_PARAM_NEGOTIATION:
+		hdr->param1 = 0;
+		hdr->param2 = 0;
+		hdr->param3 = cpu_to_be16(SECONDS_FOR_ASYNC_TEXT);
 		break;
-	case ASYNC_EVENT_VENDOR_SPECIFIC:
-		printk(KERN_ERR "ASYNC_EVENT_VENDOR_SPECIFIC not"
+	case ISCSI_ASYNC_MSG_VENDOR_SPECIFIC:
+		printk(KERN_ERR "ISCSI_ASYNC_MSG_VENDOR_SPECIFIC not"
 			" supported yet.\n");
 		return -1;
 	default:
@@ -3598,29 +3594,25 @@ int iscsi_send_async_msg(
 	iov.iov_len	= ISCSI_HDR_LEN;
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&iscsi_hdr[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 		
 		sg_init_one(&sg, (u8 *)&iscsi_hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN);
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		iov.iov_len += CRC_LEN;
 		tx_send += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for Async"
-			" Msg PDU 0x%08x\n", hdr->header_digest);
+			" Msg PDU 0x%08x\n", *header_digest);
 	}
 
 	TRACE(TRACE_ISCSI, "Built Async Message StatSN: 0x%08x, AsyncEvent:"
 		" 0x%02x, P1: 0x%04x, P2: 0x%04x, P3: 0x%04x\n",
-		ntohl(hdr->stat_sn), hdr->async_event, ntohs(hdr->parameter1),
-		ntohs(hdr->parameter2), ntohs(hdr->parameter3));
-
-#ifdef DEBUG_OPCODES
-	print_targ_async_msg(hdr);
-#endif
+		ntohl(hdr->statsn), hdr->async_event, ntohs(hdr->param1),
+		ntohs(hdr->param2), ntohs(hdr->param3));
 
 	tx_sent = tx_data(conn, &iov, 1, tx_send);
 	if (tx_sent != tx_send) {
@@ -3629,7 +3621,7 @@ int iscsi_send_async_msg(
 		return -1;
 	}
 
-	if (async_event == ASYNC_EVENT_REQUEST_LOGOUT) {
+	if (async_event == ISCSI_ASYNC_MSG_REQUEST_LOGOUT) {
 		init_timer(&async_msg_timer);
 		SETUP_TIMER(async_msg_timer, SECONDS_FOR_ASYNC_LOGOUT,
 				&SESS(conn)->async_msg_sem,
@@ -3643,7 +3635,7 @@ int iscsi_send_async_msg(
 				" without receiving a logout request,  dropping"
 				" iSCSI session.\n");
 			iscsi_send_async_msg(conn, 0,
-					ASYNC_EVENT_DROP_SESSION, 0);
+				ISCSI_ASYNC_MSG_DROPPING_ALL_CONNECTIONS, 0);
 			iscsi_free_session(SESS(conn));
 		}
 	}
@@ -3683,7 +3675,7 @@ static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
 	}
 
 	cmd->logout_cid = conn->cid;
-	cmd->iscsi_opcode = ISCSI_TARG_ASYNC_MSG;
+	cmd->iscsi_opcode = ISCSI_OP_ASYNC_EVENT;
 	cmd->i_state = ISTATE_SEND_ASYNCMSG;
 
 	iscsi_attach_cmd_to_queue(conn_p, cmd);
@@ -3700,42 +3692,40 @@ static int iscsi_send_conn_drop_async_message(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	struct iscsi_targ_async_msg *hdr;
+	struct iscsi_async *hdr;
 	struct scatterlist sg;
 
 	cmd->tx_size = ISCSI_HDR_LEN;
-	cmd->iscsi_opcode = ISCSI_TARG_ASYNC_MSG;
+	cmd->iscsi_opcode = ISCSI_OP_ASYNC_EVENT;
 
-	hdr			= (struct iscsi_targ_async_msg *) cmd->pdu;
-	hdr->opcode		= ISCSI_TARG_ASYNC_MSG;
-	hdr->flags		= F_BIT;
+	hdr			= (struct iscsi_async *) cmd->pdu;
+	hdr->opcode		= ISCSI_OP_ASYNC_EVENT;
+	hdr->flags		= ISCSI_FLAG_CMD_FINAL;
 	cmd->init_task_tag	= 0xFFFFFFFF;
 	cmd->targ_xfer_tag	= 0xFFFFFFFF;
-	hdr->reserved2		= 0xFFFFFFFF;
+	put_unaligned_be64(0xffffffffffffffff, &hdr->rsvd4[0]);
 	cmd->stat_sn		= conn->stat_sn++;
-	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);
-	hdr->exp_cmd_sn 	= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
-	hdr->async_event 	= ASYNC_EVENT_DROP_CONNECTION;
-	hdr->parameter1		= cpu_to_be16(cmd->logout_cid);
-	hdr->parameter2		=
-			cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Wait);
-	hdr->parameter3		=
-			cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Retain);
+	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
+	hdr->exp_cmdsn 		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->async_event 	= ISCSI_ASYNC_MSG_DROPPING_CONNECTION;
+	hdr->param1		= cpu_to_be16(cmd->logout_cid);
+	hdr->param2		= cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Wait);
+	hdr->param3		= cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Retain);
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 		
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN);
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		cmd->tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest to"
-			" Async Message 0x%08x\n", hdr->header_digest);
+			" Async Message 0x%08x\n", *header_digest);
 	}
 
 	cmd->iov_misc[0].iov_base	= cmd->pdu;
@@ -3745,10 +3735,6 @@ static int iscsi_send_conn_drop_async_message(
 	TRACE(TRACE_ERL2, "Sending Connection Dropped Async Message StatSN:"
 		" 0x%08x, for CID: %hu on CID: %hu\n", cmd->stat_sn,
 			cmd->logout_cid, conn->cid);
-
-#ifdef DEBUG_OPCODES
-	print_targ_async_msg(hdr);
-#endif
 	return 0;
 }
 

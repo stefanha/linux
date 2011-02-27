@@ -36,8 +36,6 @@
 #define ISCSI_TARG_TEXT_RSP		0x24
 /* Logout Response */
 #define ISCSI_TARG_LOGOUT_RSP		0x26
-/* Asynchronous Message */
-#define ISCSI_TARG_ASYNC_MSG		0x32
 /* Reject */
 #define ISCSI_TARG_RJT			0x3f
 
@@ -177,14 +175,6 @@
 #define CONNRECOVERYNOTSUPPORTED		2
 #define CLEANUPFAILED				3
 
-/* async_event in ISCSI_TARG_ASYNC_MSG opcode */
-#define ASYNC_EVENT_SCSI_EVENT			0
-#define ASYNC_EVENT_REQUEST_LOGOUT		1
-#define ASYNC_EVENT_DROP_CONNECTION		2
-#define ASYNC_EVENT_DROP_SESSION		3
-#define ASYNC_EVENT_REQUEST_TEXT		4
-#define ASYNC_EVENT_VENDOR_SPECIFIC		255
-
 /* SNACK type */
 #define SNACK_DATA				0
 #define SNACK_R2T				0
@@ -193,28 +183,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.9 Asynchronous Message */
-
-struct iscsi_targ_async_msg {
-	u8	opcode;
-	u8	flags;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	reserved2;
-	u32	reserved3;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u8	async_event;
-	u8	async_vcode;
-	u16	parameter1;
-	u16	parameter2;
-	u16	parameter3;
-	u32	reserved4;
-	u32	header_digest;
-};
 
 /* 9.10 Text Request */
 

@@ -27,7 +27,6 @@ void print_cid(u16);
 void print_isid(u8 []);
 void print_tsih(u16);
 void print_scsicdb(u8 []);
-void print_targ_async_msg(struct iscsi_targ_async_msg *);
 void print_init_text_cmnd(struct iscsi_init_text_cmnd *);
 void print_targ_text_rsp(struct iscsi_targ_text_rsp *);
 void print_init_login_cmnd(struct iscsi_init_login_cmnd *);
