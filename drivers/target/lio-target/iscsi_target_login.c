@@ -39,8 +39,6 @@
 #include <net/ipv6.h>
 #include <scsi/iscsi_proto.h>
 
-#include <iscsi_protocol.h>
-#include <iscsi_debug_opcodes.h>
 #include <iscsi_debug.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -1162,7 +1160,7 @@ get_new_sock:
 		goto new_sess_out;
 	}
 
-	iscsi_opcode = (buffer[0] & ISCSI_OPCODE);
+	iscsi_opcode = (buffer[0] & ISCSI_OPCODE_MASK);
 	if (!(iscsi_opcode & ISCSI_OP_LOGIN)) {
 		printk(KERN_ERR "First opcode is not login request,"
 			" failing login request.\n");

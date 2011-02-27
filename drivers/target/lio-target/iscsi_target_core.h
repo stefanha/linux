@@ -43,8 +43,48 @@
 #define ISCSI_IWARP_SCTP		4
 #define ISCSI_INFINIBAND		5
 
-#define ISCSI_TCP_VERSION		"v3.0"
-#define ISCSI_SCTP_VERSION		"v3.0"
+#define ISCSI_HDR_LEN			48
+#define CRC_LEN				4
+#define MAX_KEY_NAME_LENGTH		63
+#define MAX_KEY_VALUE_LENGTH		255
+#define INITIATOR			1
+#define TARGET				2
+#define WHITE_SPACE			" \t\v\f\n\r"
+
+/* RFC-3720 7.1.3  Standard Connection State Diagram for an Initiator */
+#define INIT_CONN_STATE_FREE			0x1
+#define INIT_CONN_STATE_XPT_WAIT		0x2
+#define INIT_CONN_STATE_IN_LOGIN		0x4
+#define INIT_CONN_STATE_LOGGED_IN		0x5
+#define INIT_CONN_STATE_IN_LOGOUT		0x6
+#define INIT_CONN_STATE_LOGOUT_REQUESTED	0x7
+#define INIT_CONN_STATE_CLEANUP_WAIT		0x8
+
+/* RFC-3720 7.1.4  Standard Connection State Diagram for a Target */
+#define TARG_CONN_STATE_FREE			0x1
+#define TARG_CONN_STATE_XPT_UP			0x3
+#define TARG_CONN_STATE_IN_LOGIN		0x4
+#define TARG_CONN_STATE_LOGGED_IN		0x5
+#define TARG_CONN_STATE_IN_LOGOUT		0x6
+#define TARG_CONN_STATE_LOGOUT_REQUESTED	0x7
+#define TARG_CONN_STATE_CLEANUP_WAIT		0x8
+
+/* RFC-3720 7.2 Connection Cleanup State Diagram for Initiators and Targets */
+#define CLEANUP_STATE_CLEANUP_WAIT		0x1
+#define CLEANUP_STATE_IN_CLEANUP		0x2
+#define CLEANUP_STATE_CLEANUP_FREE		0x3
+
+/* RFC-3720 7.3.1  Session State Diagram for an Initiator */
+#define INIT_SESS_STATE_FREE			0x1
+#define INIT_SESS_STATE_LOGGED_IN		0x3
+#define INIT_SESS_STATE_FAILED			0x4
+
+/* RFC-3720 7.3.2  Session State Diagram for a Target */
+#define TARG_SESS_STATE_FREE			0x1
+#define TARG_SESS_STATE_ACTIVE			0x2
+#define TARG_SESS_STATE_LOGGED_IN		0x3
+#define TARG_SESS_STATE_FAILED			0x4
+#define TARG_SESS_STATE_IN_CONTINUE		0x5
 
 /* struct iscsi_node_attrib sanity values */
 #define NA_DATAOUT_TIMEOUT		3
@@ -279,6 +319,37 @@ do {							\
 	timer.data	= (unsigned long) d;		\
 	timer.function	= func;
 
+struct iscsi_conn_ops {
+	u8	HeaderDigest;			/* [0,1] == [None,CRC32C] */
+	u8	DataDigest;			/* [0,1] == [None,CRC32C] */
+	u32	MaxRecvDataSegmentLength;	/* [512..2**24-1] */
+	u8	OFMarker;			/* [0,1] == [No,Yes] */
+	u8	IFMarker;			/* [0,1] == [No,Yes] */
+	u32	OFMarkInt;			/* [1..65535] */
+	u32	IFMarkInt;			/* [1..65535] */
+};
+
+struct iscsi_sess_ops {
+	char	InitiatorName[224];
+	char	InitiatorAlias[256];
+	char	TargetName[224];
+	char	TargetAlias[256];
+	char	TargetAddress[256];
+	u16	TargetPortalGroupTag;		/* [0..65535] */
+	u16	MaxConnections;			/* [1..65535] */
+	u8	InitialR2T;			/* [0,1] == [No,Yes] */
+	u8	ImmediateData;			/* [0,1] == [No,Yes] */
+	u32	MaxBurstLength;			/* [512..2**24-1] */
+	u32	FirstBurstLength;		/* [512..2**24-1] */
+	u16	DefaultTime2Wait;		/* [0..3600] */
+	u16	DefaultTime2Retain;		/* [0..3600] */
+	u16	MaxOutstandingR2T;		/* [1..65535] */
+	u8	DataPDUInOrder;			/* [0,1] == [No,Yes] */
+	u8	DataSequenceInOrder;		/* [0,1] == [No,Yes] */
+	u8	ErrorRecoveryLevel;		/* [0..2] */
+	u8	SessionType;			/* [0,1] == [Normal,Discovery]*/
+};
+
 struct iscsi_queue_req {
 	int			state;
 	struct se_obj_lun_type_s *queue_se_obj_api;
@@ -354,7 +425,7 @@ struct iscsi_cmd {
 	u8			deferred_i_state;
 	/* iSCSI dependent state */
 	u8			i_state;
-	/* Command is an immediate command (I_BIT set) */
+	/* Command is an immediate command (ISCSI_OP_IMMEDIATE set) */
 	u8			immediate_cmd;
 	/* Immediate data present */
 	u8			immediate_data;

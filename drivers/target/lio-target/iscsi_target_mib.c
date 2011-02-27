@@ -38,10 +38,10 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+#include <scsi/iscsi_proto.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_device.h>
 #include <iscsi_target_tpg.h>
@@ -135,9 +135,9 @@ static int inst_attr_seq_show(struct seq_file *seq, void *v)
 			" fail_sess fail_type fail_rem_name disc_time\n");
 
 	seq_printf(seq, "%u %u %u %u %u %u ",
-		   tiqn->tiqn_index, ISCSI_MIN_VERSION, ISCSI_MAX_VERSION,
-		   get_num_portals(tiqn), ISCSI_INST_NUM_NODES,
-		   get_num_sessions(tiqn));
+		   tiqn->tiqn_index, ISCSI_DRAFT20_VERSION,
+		   ISCSI_DRAFT20_VERSION, get_num_portals(tiqn),
+		   ISCSI_INST_NUM_NODES, get_num_sessions(tiqn));
 
 	sess_err = &tiqn->sess_err_stats;
 
@@ -1075,7 +1075,7 @@ static int conn_attr_seq_show(struct seq_file *seq, void *v)
 				   conn_ops->DataDigest ? "CRC32C" : "None",
 				   conn_ops->OFMarker ? "Yes" : "No",
 				   conn_ops->IFMarker ? "Yes" : "No",
-				   ISCSI_MAX_VERSION);
+				   ISCSI_DRAFT20_VERSION);
 		}
 		spin_unlock(&sess->conn_lock);
 	}

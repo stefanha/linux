@@ -3,7 +3,6 @@ EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/include/scsi/ -I$(srct
 EXTRA_CFLAGS+=-D_TARGET -DPYX_ISCSI_VENDOR='"Linux-iSCSI.org"'
 
 iscsi_target_mod-y +=		iscsi_auth_chap.o \
-				iscsi_debug_opcodes.o \
 				iscsi_parameters.o \
 				iscsi_seq_and_pdu_list.o \
 				iscsi_serial.o \

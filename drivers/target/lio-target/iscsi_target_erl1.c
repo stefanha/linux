@@ -37,8 +37,6 @@
 #include <net/tcp.h>
 #include <scsi/iscsi_proto.h>
 
-#include <iscsi_protocol.h>
-#include <iscsi_debug_opcodes.h>
 #include <iscsi_debug.h>
 
 #include <target/target_core_base.h>
@@ -1020,8 +1018,8 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 			 * Determine if delayed TASK_ABORTED status for WRITEs
 			 * should be sent now if no unsolicited data out
 			 * payloads are expected, or if the delayed status
-			 * should be sent after unsolicited data out with F_BIT
-			 * set in iscsi_handle_data_out()
+			 * should be sent after unsolicited data out with
+			 * ISCSI_FLAG_CMD_FINAL set in iscsi_handle_data_out()
 			 */
 			if (transport_check_aborted_status(se_cmd,
 					(cmd->unsolicited_data == 0)) != 0)

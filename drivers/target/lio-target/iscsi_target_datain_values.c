@@ -33,9 +33,9 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/in.h>
+#include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_erl1.h>
 #include <iscsi_target_util.h>
@@ -140,9 +140,9 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 	     next_burst_len))) {
 		datain->length = read_data_left;
 
-		datain->flags |= (F_BIT | S_BIT);
+		datain->flags |= (ISCSI_FLAG_CMD_FINAL | ISCSI_FLAG_DATA_STATUS);
 		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
-			datain->flags |= A_BIT;
+			datain->flags |= ISCSI_FLAG_DATA_ACK;
 	} else {
 		if ((next_burst_len +
 		     CONN_OPS(conn)->MaxRecvDataSegmentLength) <
@@ -155,9 +155,9 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 					  next_burst_len);
 			next_burst_len = 0;
 
-			datain->flags |= F_BIT;
+			datain->flags |= ISCSI_FLAG_CMD_FINAL;
 			if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
-				datain->flags |= A_BIT;
+				datain->flags |= ISCSI_FLAG_DATA_ACK;
 		}
 	}
 
@@ -173,14 +173,14 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 	}
 
 	if (!dr->recovery) {
-		if (datain->flags & S_BIT)
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
 
 		return dr;
 	}
 
 	if (!dr->runlength) {
-		if (datain->flags & S_BIT) {
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS) {
 			dr->dr_complete =
 			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
@@ -251,9 +251,9 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 		datain->length = (cmd->data_length - offset);
 		datain->offset = offset;
 
-		datain->flags |= F_BIT;
+		datain->flags |= ISCSI_FLAG_CMD_FINAL;
 		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
-			datain->flags |= A_BIT;
+			datain->flags |= ISCSI_FLAG_DATA_ACK;
 
 		seq->next_burst_len = 0;
 		seq_send_order++;
@@ -271,9 +271,9 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 					  seq->next_burst_len);
 			datain->offset = (seq->offset + seq->next_burst_len);
 
-			datain->flags |= F_BIT;
+			datain->flags |= ISCSI_FLAG_CMD_FINAL;
 			if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
-				datain->flags |= A_BIT;
+				datain->flags |= ISCSI_FLAG_DATA_ACK;
 
 			seq->next_burst_len = 0;
 			seq_send_order++;
@@ -281,7 +281,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 	}
 
 	if ((read_data_done + datain->length) == cmd->data_length)
-		datain->flags |= S_BIT;
+		datain->flags |= ISCSI_FLAG_DATA_STATUS;
 
 	datain->data_sn = (!dr->recovery) ? cmd->data_sn++ : dr->data_sn++;
 	if (!dr->recovery) {
@@ -293,16 +293,16 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 	}
 
 	if (!dr->recovery) {
-		if (datain->flags & F_BIT)
+		if (datain->flags & ISCSI_FLAG_CMD_FINAL)
 			seq->last_datasn = datain->data_sn;
-		if (datain->flags & S_BIT)
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
 
 		return dr;
 	}
 
 	if (!dr->runlength) {
-		if (datain->flags & S_BIT) {
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS) {
 			dr->dr_complete =
 			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
@@ -362,9 +362,9 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 		return dr;
 
 	if ((read_data_done + pdu->length) == cmd->data_length) {
-		pdu->flags |= (F_BIT | S_BIT);
+		pdu->flags |= (ISCSI_FLAG_CMD_FINAL | ISCSI_FLAG_DATA_STATUS);
 		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
-			pdu->flags |= A_BIT;
+			pdu->flags |= ISCSI_FLAG_DATA_ACK;
 
 		next_burst_len = 0;
 	} else {
@@ -372,9 +372,9 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 		     SESS_OPS_C(conn)->MaxBurstLength)
 			next_burst_len += pdu->length;
 		else {
-			pdu->flags |= F_BIT;
+			pdu->flags |= ISCSI_FLAG_CMD_FINAL;
 			if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
-				pdu->flags |= A_BIT;
+				pdu->flags |= ISCSI_FLAG_DATA_ACK;
 
 			next_burst_len = 0;
 		}
@@ -395,14 +395,14 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 	datain->data_sn = pdu->data_sn;
 
 	if (!dr->recovery) {
-		if (datain->flags & S_BIT)
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
 
 		return dr;
 	}
 
 	if (!dr->runlength) {
-		if (datain->flags & S_BIT) {
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS) {
 			dr->dr_complete =
 			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :
@@ -472,9 +472,9 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 		return NULL;
 
 	if (seq->pdu_send_order == seq->pdu_count) {
-		pdu->flags |= F_BIT;
+		pdu->flags |= ISCSI_FLAG_CMD_FINAL;
 		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
-			pdu->flags |= A_BIT;
+			pdu->flags |= ISCSI_FLAG_DATA_ACK;
 
 		seq->next_burst_len = 0;
 		seq_send_order++;
@@ -482,7 +482,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 		seq->next_burst_len += pdu->length;
 
 	if ((read_data_done + pdu->length) == cmd->data_length)
-		pdu->flags |= S_BIT;
+		pdu->flags |= ISCSI_FLAG_DATA_STATUS;
 
 	pdu->data_sn = (!dr->recovery) ? cmd->data_sn++ : dr->data_sn++;
 	if (!dr->recovery) {
@@ -499,16 +499,16 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 	datain->data_sn = pdu->data_sn;
 
 	if (!dr->recovery) {
-		if (datain->flags & F_BIT)
+		if (datain->flags & ISCSI_FLAG_CMD_FINAL)
 			seq->last_datasn = datain->data_sn;
-		if (datain->flags & S_BIT)
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS)
 			dr->dr_complete = DATAIN_COMPLETE_NORMAL;
 
 		return dr;
 	}
 
 	if (!dr->runlength) {
-		if (datain->flags & S_BIT) {
+		if (datain->flags & ISCSI_FLAG_DATA_STATUS) {
 			dr->dr_complete =
 			    (dr->recovery == DATAIN_WITHIN_COMMAND_RECOVERY) ?
 				DATAIN_COMPLETE_WITHIN_COMMAND_RECOVERY :

@@ -37,8 +37,6 @@
 #include <net/tcp.h>
 #include <scsi/iscsi_proto.h>
 
-#include <iscsi_protocol.h>
-#include <iscsi_debug_opcodes.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
@@ -202,7 +200,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 	 */
 	if (hdr->flags & ISCSI_FLAG_CMD_FINAL) {
 		/*
-		 * Ignore F_BIT checks while DataPDUInOrder=No, end of
+		 * Ignore ISCSI_FLAG_CMD_FINAL checks while DataPDUInOrder=No, end of
 		 * sequence checks are handled in
 		 * iscsi_dataout_datapduinorder_no_fbit().
 		 */
@@ -223,14 +221,14 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 	} else {
 		if (first_burst_len == SESS_OPS_C(conn)->FirstBurstLength) {
 			printk(KERN_ERR "Command ITT: 0x%08x reached"
-			" FirstBurstLength: %u, but F_BIT is not set. protocol"
+			" FirstBurstLength: %u, but ISCSI_FLAG_CMD_FINAL is not set. protocol"
 				" error.\n", cmd->init_task_tag,
 				SESS_OPS_C(conn)->FirstBurstLength);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 		if (first_burst_len == cmd->data_length) {
 			printk(KERN_ERR "Command ITT: 0x%08x reached"
-			" ExpXferLen: %u, but F_BIT is not set. protocol"
+			" ExpXferLen: %u, but ISCSI_FLAG_CMD_FINAL is not set. protocol"
 			" error.\n", cmd->init_task_tag, cmd->data_length);
 			return DATAOUT_CANNOT_RECOVER;
 		}
@@ -314,7 +312,7 @@ static inline int iscsi_dataout_check_sequence(
 	 */
 	if (hdr->flags & ISCSI_FLAG_CMD_FINAL) {
 		/*
-		 * Ignore F_BIT checks while DataPDUInOrder=No, end of
+		 * Ignore ISCSI_FLAG_CMD_FINAL checks while DataPDUInOrder=No, end of
 		 * sequence checks are handled in
 		 * iscsi_dataout_datapduinorder_no_fbit().
 		 */
@@ -326,14 +324,14 @@ static inline int iscsi_dataout_check_sequence(
 			     SESS_OPS_C(conn)->MaxBurstLength) &&
 			   ((cmd->write_data_done + payload_length) <
 			     cmd->data_length)) {
-				printk(KERN_ERR "Command ITT: 0x%08x set F_BIT"
+				printk(KERN_ERR "Command ITT: 0x%08x set ISCSI_FLAG_CMD_FINAL"
 				" before end of DataOUT sequence, protocol"
 				" error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		} else {
 			if (next_burst_len < seq->xfer_len) {
-				printk(KERN_ERR "Command ITT: 0x%08x set F_BIT"
+				printk(KERN_ERR "Command ITT: 0x%08x set ISCSI_FLAG_CMD_FINAL"
 				" before end of DataOUT sequence, protocol"
 				" error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;

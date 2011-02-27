@@ -42,7 +42,6 @@
 #include <target/target_core_configfs.h>
 #include <target/configfs_macros.h>
 
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
 #include <iscsi_target_device.h>

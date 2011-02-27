@@ -35,7 +35,6 @@
 #include <linux/bitmap.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 
 /*	iscsi_add_ts_to_active_list():
@@ -117,7 +116,7 @@ static struct se_thread_set *iscsi_get_ts_from_inactive_list(void)
  *
  *
  */
-extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
+extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 {
 	int allocated_thread_pair_count = 0, i, thread_id;
 	struct se_thread_set *ts = NULL;
@@ -182,7 +181,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count, int role)
  *
  *
  */
-extern void iscsi_deallocate_thread_sets(int role)
+extern void iscsi_deallocate_thread_sets(void)
 {
 	u32 released_count = 0;
 	struct se_thread_set *ts = NULL;
@@ -227,13 +226,12 @@ extern void iscsi_deallocate_thread_sets(int role)
  *
  *
  */
-static void iscsi_deallocate_extra_thread_sets(int role)
+static void iscsi_deallocate_extra_thread_sets(void)
 {
 	u32 orig_count, released_count = 0;
 	struct se_thread_set *ts = NULL;
 
-	orig_count = ((role == INITIATOR) ? INITIATOR_THREAD_SET_COUNT :
-			TARGET_THREAD_SET_COUNT);
+	orig_count = TARGET_THREAD_SET_COUNT;
 
 	while ((iscsi_global->inactive_ts + 1) > orig_count) {
 		ts = iscsi_get_ts_from_inactive_list();
@@ -330,7 +328,7 @@ get_set:
 	ts = iscsi_get_ts_from_inactive_list();
 	if (!(ts)) {
 		if (allocate_ts == 2)
-			iscsi_allocate_thread_sets(1, INITIATOR);
+			iscsi_allocate_thread_sets(1);
 
 		sema_init(&sem, 0);
 		init_timer(&timer);
@@ -516,7 +514,7 @@ int iscsi_thread_set_force_reinstatement(struct iscsi_conn *conn)
  *
  *
  */
-static void iscsi_check_to_add_additional_sets(int role)
+static void iscsi_check_to_add_additional_sets(void)
 {
 	int thread_sets_add;
 
@@ -524,7 +522,7 @@ static void iscsi_check_to_add_additional_sets(int role)
 	thread_sets_add = iscsi_global->inactive_ts;
 	spin_unlock(&iscsi_global->inactive_ts_lock);
 	if (thread_sets_add == 1)
-		iscsi_allocate_thread_sets(1, role);
+		iscsi_allocate_thread_sets(1);
 }
 
 /*	iscsi_signal_thread_pre_handler():
@@ -573,7 +571,7 @@ struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *ts, int rol
 		iscsi_del_ts_from_active_list(ts);
 
 		if (!iscsi_global->in_shutdown)
-			iscsi_deallocate_extra_thread_sets(INITIATOR);
+			iscsi_deallocate_extra_thread_sets();
 
 		iscsi_add_ts_to_inactive_list(ts);
 		spin_lock_bh(&ts->ts_state_lock);
@@ -598,7 +596,7 @@ sleep:
 			" thread_id: %d, going back to sleep\n", ts->thread_id);
 		goto sleep;
 	}
-	iscsi_check_to_add_additional_sets(role);
+	iscsi_check_to_add_additional_sets();
 	/*
 	 * The RX Thread starts up the TX Thread and sleeps.
 	 */
@@ -635,7 +633,7 @@ struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *ts, int rol
 		iscsi_del_ts_from_active_list(ts);
 
 		if (!iscsi_global->in_shutdown)
-			iscsi_deallocate_extra_thread_sets(INITIATOR);
+			iscsi_deallocate_extra_thread_sets();
 
 		iscsi_add_ts_to_inactive_list(ts);
 		spin_lock_bh(&ts->ts_state_lock);
@@ -661,7 +659,7 @@ sleep:
 		goto sleep;
 	}
 
-	iscsi_check_to_add_additional_sets(role);
+	iscsi_check_to_add_additional_sets();
 	/*
 	 * From the TX thread, up the tx_post_start_sem that the RX Thread is
 	 * sleeping on in iscsi_rx_thread_pre_handler(), then up the

@@ -36,8 +36,6 @@
 #include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
-#include <iscsi_debug_opcodes.h>
 #include <target/target_core_base.h>
 #include <target/target_core_tpg.h>
 
@@ -70,12 +68,12 @@ static int iscsi_target_check_login_request(
 	login_rsp = (struct iscsi_login_rsp *) login->rsp;
 	payload_length = ntoh24(login_req->dlength);
 
-	switch (login_req->opcode & ISCSI_OPCODE) {
+	switch (login_req->opcode & ISCSI_OPCODE_MASK) {
 	case ISCSI_OP_LOGIN:
 		break;
 	default:
 		printk(KERN_ERR "Received unknown opcode 0x%02x.\n",
-				login_req->opcode & ISCSI_OPCODE);
+				login_req->opcode & ISCSI_OPCODE_MASK);
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
@@ -141,10 +139,10 @@ static int iscsi_target_check_login_request(
 		return -1;
 	}
 
-	if (payload_length > MAX_TEXT_LEN) {
+	if (payload_length > MAX_KEY_VALUE_PAIRS) {
 		printk(KERN_ERR "Login request payload exceeds default"
 			" MaxRecvDataSegmentLength: %u, protocol error.\n",
-				MAX_TEXT_LEN);
+				MAX_KEY_VALUE_PAIRS);
 		return -1;
 	}
 
@@ -301,7 +299,7 @@ static int iscsi_target_do_rx_login_io(struct iscsi_conn *conn, struct iscsi_log
 		return -1;
 
 	padding = ((-payload_length) & 3);
-	memset(login->req_buf, 0, MAX_TEXT_LEN);
+	memset(login->req_buf, 0, MAX_KEY_VALUE_PAIRS);
 
 	if (iscsi_login_rx_data(
 			conn,
@@ -919,7 +917,7 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	}
 	memcpy(login->req, login_pdu, ISCSI_HDR_LEN);
 
-	login->req_buf = kzalloc(MAX_TEXT_LEN, GFP_KERNEL);
+	login->req_buf = kzalloc(MAX_KEY_VALUE_PAIRS, GFP_KERNEL);
 	if (!(login->req_buf)) {
 		printk(KERN_ERR "Unable to allocate memory for response buffer.\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
@@ -965,7 +963,7 @@ int iscsi_target_start_negotiation(
 		goto out;
 	}
 
-	login->rsp_buf = kzalloc(MAX_TEXT_LEN, GFP_KERNEL);
+	login->rsp_buf = kzalloc(MAX_KEY_VALUE_PAIRS, GFP_KERNEL);
 	if (!(login->rsp_buf)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" request buffer.\n");

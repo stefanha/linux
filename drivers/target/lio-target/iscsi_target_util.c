@@ -42,7 +42,6 @@
 #include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 #include <iscsi_serial.h>
 
 #include <target/target_core_base.h>
@@ -290,14 +289,14 @@ struct iscsi_cmd *iscsi_allocate_se_cmd(
 	/*
 	 * Figure out the SAM Task Attribute for the incoming SCSI CDB
 	 */
-	if ((iscsi_task_attr == ISCSI_UNTAGGED) ||
-	    (iscsi_task_attr == ISCSI_SIMPLE))
+	if ((iscsi_task_attr == ISCSI_ATTR_UNTAGGED) ||
+	    (iscsi_task_attr == ISCSI_ATTR_SIMPLE))
 		sam_task_attr = TASK_ATTR_SIMPLE;
-	else if (iscsi_task_attr == ISCSI_ORDERED)
+	else if (iscsi_task_attr == ISCSI_ATTR_ORDERED)
 		sam_task_attr = TASK_ATTR_ORDERED;
-	else if (iscsi_task_attr == ISCSI_HEAD_OF_QUEUE)
+	else if (iscsi_task_attr == ISCSI_ATTR_HEAD_OF_QUEUE)
 		sam_task_attr = TASK_ATTR_HOQ;
-	else if (iscsi_task_attr == ISCSI_ACA)
+	else if (iscsi_task_attr == ISCSI_ATTR_ACA)
 		sam_task_attr = TASK_ATTR_ACA;
 	else {
 		printk(KERN_INFO "Unknown iSCSI Task Attribute: 0x%02x, using"

@@ -49,8 +49,6 @@
 #include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
-#include <iscsi_debug_opcodes.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
 #include <iscsi_target_datain_values.h>
@@ -971,7 +969,7 @@ static int iscsi_target_detect(void)
 
 	iscsi_thread_set_init();
 
-	if (iscsi_allocate_thread_sets(TARGET_THREAD_SET_COUNT, TARGET) !=
+	if (iscsi_allocate_thread_sets(TARGET_THREAD_SET_COUNT) !=
 			TARGET_THREAD_SET_COUNT) {
 		printk(KERN_ERR "iscsi_allocate_thread_sets() returned"
 			" unexpected value!\n");
@@ -1075,7 +1073,7 @@ out:
 		kmem_cache_destroy(lio_r2t_cache);
 	if (lio_tpg_cache)
 		kmem_cache_destroy(lio_tpg_cache);
-	iscsi_deallocate_thread_sets(TARGET);
+	iscsi_deallocate_thread_sets();
 	iscsi_thread_set_free();
 	iscsi_target_deregister_configfs();
 
@@ -1119,7 +1117,7 @@ void iscsi_target_release_phase2(void)
 {
 	core_reset_nps();
 	iscsi_disable_all_tpgs();
-	iscsi_deallocate_thread_sets(TARGET);
+	iscsi_deallocate_thread_sets();
 	iscsi_thread_set_free();
 	iscsi_remove_all_tpgs();
 	core_release_nps();
@@ -2334,8 +2332,8 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		if (dump_unsolicited_data) {
 			/*
 			 * Check if a delayed TASK_ABORTED status needs to
-			 * be sent now if the F_BIT has been received with
-			 * the unsolicitied data out.
+			 * be sent now if the ISCSI_FLAG_CMD_FINAL has been
+			 * received with the unsolicitied data out.
 			 */
 			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
 				iscsi_stop_dataout_timer(cmd);
@@ -2350,8 +2348,8 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		 *
 		 * Check for a delayed TASK_ABORTED status and dump any
 		 * incoming data out payload if one exists.  Also, when the
-		 * F_BIT is set to denote the end of the current data out
-		 * sequence, we decrement outstanding_r2ts.  Once
+		 * ISCSI_FLAG_CMD_FINAL is set to denote the end of the current
+		 * data out sequence, we decrement outstanding_r2ts.  Once
 		 * outstanding_r2ts reaches zero, go ahead and send the delayed
 		 * TASK_ABORTED status.
 		 */
@@ -2893,7 +2891,7 @@ static inline int iscsi_handle_task_mgt_cmd(
 attach:
 	iscsi_attach_cmd_to_queue(conn, cmd);
 
-	if (!(hdr->opcode & I_BIT)) {
+	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
 		cmdsn_ret = iscsi_check_received_cmdsn(conn,
 				cmd, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_NORMAL_OPERATION)
@@ -3819,9 +3817,9 @@ static inline int iscsi_send_data_in(
 	 * Special case for successfully execution w/ both DATAIN
 	 * and Sense Data.
 	 */
-	if ((datain.flags & S_BIT) &&
+	if ((datain.flags & ISCSI_FLAG_DATA_STATUS) &&
 	    (SE_CMD(cmd)->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE))
-		datain.flags &= ~S_BIT;
+		datain.flags &= ~ISCSI_FLAG_DATA_STATUS;
 	else {
 		if ((dr->dr_complete == DATAIN_COMPLETE_NORMAL) ||
 		    (dr->dr_complete == DATAIN_COMPLETE_CONNECTION_RECOVERY)) {
@@ -5385,7 +5383,7 @@ restart:
 		if (conn->conn_state == TARG_CONN_STATE_IN_LOGOUT)
 			goto transport_err;
 
-		opcode = buffer[0] & ISCSI_OPCODE;
+		opcode = buffer[0] & ISCSI_OPCODE_MASK;
 
 		if (SESS_OPS_C(conn)->SessionType &&
 		   ((!(opcode & ISCSI_OP_TEXT)) ||
