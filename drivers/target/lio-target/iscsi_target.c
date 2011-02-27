@@ -1290,18 +1290,18 @@ int iscsi_add_reject(
 	struct iscsi_conn *conn)
 {
 	struct iscsi_cmd *cmd;
-	struct iscsi_targ_rjt *hdr;
+	struct iscsi_reject *hdr;
 	int ret;
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
 		return -1;
 
-	cmd->iscsi_opcode = ISCSI_TARG_RJT;
+	cmd->iscsi_opcode = ISCSI_OP_REJECT;
 	if (fail_conn)
 		cmd->cmd_flags |= ICF_REJECT_FAIL_CONN;
 
-	hdr	= (struct iscsi_targ_rjt *) cmd->pdu;
+	hdr	= (struct iscsi_reject *) cmd->pdu;
 	hdr->reason = reason;
 
 	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
@@ -1336,7 +1336,7 @@ int iscsi_add_reject_from_cmd(
 	struct iscsi_cmd *cmd)
 {
 	struct iscsi_conn *conn;
-	struct iscsi_targ_rjt *hdr;
+	struct iscsi_reject *hdr;
 	int ret;
 
 	if (!CONN(cmd)) {
@@ -1346,11 +1346,11 @@ int iscsi_add_reject_from_cmd(
 	}
 	conn = CONN(cmd);
 
-	cmd->iscsi_opcode = ISCSI_TARG_RJT;
+	cmd->iscsi_opcode = ISCSI_OP_REJECT;
 	if (fail_conn)
 		cmd->cmd_flags |= ICF_REJECT_FAIL_CONN;
 
-	hdr	= (struct iscsi_targ_rjt *) cmd->pdu;
+	hdr	= (struct iscsi_reject *) cmd->pdu;
 	hdr->reason = reason;
 
 	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
@@ -1845,7 +1845,7 @@ static inline int iscsi_handle_scsi_cmd(
 	    !(hdr->flags & ISCSI_FLAG_CMD_FINAL)) {
 		printk(KERN_ERR "ISCSI_FLAG_CMD_WRITE & ISCSI_FLAG_CMD_FINAL"
 				" not set. Bad iSCSI Initiator.\n");
-		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1,
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 				buf, conn);
 	}
 
@@ -1866,7 +1866,7 @@ static inline int iscsi_handle_scsi_cmd(
 		printk(KERN_ERR "ISCSI_FLAG_CMD_READ or ISCSI_FLAG_CMD_WRITE"
 			" set when Expected Data Transfer Length is 0 for"
 			" CDB: 0x%02x. Bad iSCSI Initiator.\n", hdr->cdb[0]);
-		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1,
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 				buf, conn);
 	}
 done:
@@ -1876,25 +1876,29 @@ done:
 		printk(KERN_ERR "ISCSI_FLAG_CMD_READ and/or ISCSI_FLAG_CMD_WRITE"
 			" MUST be set if Expected Data Transfer Length is not 0."
 			" Bad iSCSI Initiator\n");
-		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+				buf, conn);
 	}
 
 	if ((hdr->flags & ISCSI_FLAG_CMD_READ) &&
 	    (hdr->flags & ISCSI_FLAG_CMD_WRITE)) {
 		printk(KERN_ERR "Bidirectional operations not supported!\n");
-		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+				buf, conn);
 	}
 
 	if (hdr->opcode & ISCSI_OP_IMMEDIATE) {
 		printk(KERN_ERR "Illegally set Immediate Bit in iSCSI Initiator"
 				" Scsi Command PDU.\n");
-		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+				buf, conn);
 	}
 
 	if (payload_length && !SESS_OPS_C(conn)->ImmediateData) {
 		printk(KERN_ERR "ImmediateData=No but DataSegmentLength=%u,"
 			" protocol error.\n", payload_length);
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+				buf, conn);
 	}
 #if 0
 	if (!(hdr->flags & ISCSI_FLAG_CMD_FINAL) &&
@@ -1902,7 +1906,8 @@ done:
 		printk(KERN_ERR "ISCSI_FLAG_CMD_FINAL is not Set and"
 			" ISCSI_FLAG_CMD_WRITE Bit and InitialR2T=Yes,"
 			" protocol error\n");
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+				buf, conn);
 	}
 #endif
 	if ((hdr->data_length == payload_length) &&
@@ -1910,28 +1915,32 @@ done:
 		printk(KERN_ERR "Expected Data Transfer Length and Length of"
 			" Immediate Data are the same, but ISCSI_FLAG_CMD_FINAL"
 			" bit is not set protocol error\n");
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+				buf, conn);
 	}
 
 	if (payload_length > hdr->data_length) {
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" EDTL: %u, protocol error.\n", payload_length,
 				hdr->data_length);
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+				buf, conn);
 	}
 
 	if (payload_length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" MaxRecvDataSegmentLength: %u, protocol error.\n",
 			payload_length, CONN_OPS(conn)->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+				buf, conn);
 	}
 
 	if (payload_length > SESS_OPS_C(conn)->FirstBurstLength) {
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" FirstBurstLength: %u, protocol error.\n",
 			payload_length, SESS_OPS_C(conn)->FirstBurstLength);
-		return iscsi_add_reject(REASON_INVALID_PDU_FIELD, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+					buf, conn);
 	}
 
 	data_direction = (hdr->flags & ISCSI_FLAG_CMD_WRITE) ? DMA_TO_DEVICE :
@@ -1941,7 +1950,8 @@ done:
 	cmd = iscsi_allocate_se_cmd(conn, hdr->data_length, data_direction,
 				(hdr->flags & ISCSI_FLAG_CMD_ATTR_MASK));
 	if (!(cmd))
-		return iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES, 1,
+					buf, conn);
 
 	TRACE(TRACE_ISCSI, "Got SCSI Command, ITT: 0x%08x, CmdSN: 0x%08x,"
 		" ExpXferLen: %u, Length: %u, CID: %hu\n", hdr->itt,
@@ -1975,7 +1985,8 @@ done:
 		dr = iscsi_allocate_datain_req();
 		if (!(dr))
 			return iscsi_add_reject_from_cmd(
-				REASON_OUT_OF_RESOURCES, 1, 1, buf, cmd);
+					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
+					1, 1, buf, cmd);
 
 		iscsi_attach_datain_req(cmd, dr);
 	}
@@ -1993,7 +2004,7 @@ done:
 		}
 		if (ret == PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES)
 			return iscsi_add_reject_from_cmd(
-					REASON_OUT_OF_RESOURCES,
+					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, 1, buf, cmd);
 
 		send_check_condition = 1;
@@ -2010,7 +2021,8 @@ done:
 		goto build_list;
 
 	if (transport_ret == -1) {
-		return iscsi_add_reject_from_cmd(REASON_OUT_OF_RESOURCES,
+		return iscsi_add_reject_from_cmd(
+				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
 	} else if (transport_ret == -2) {
 		/*
@@ -2024,7 +2036,8 @@ done:
 
 build_list:
 	if (iscsi_decide_list_to_build(cmd, payload_length) < 0)
-		return iscsi_add_reject_from_cmd(REASON_OUT_OF_RESOURCES,
+		return iscsi_add_reject_from_cmd(
+				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
 attach_cmd:
 	iscsi_attach_cmd_to_queue(conn, cmd);
@@ -2055,7 +2068,8 @@ attach_cmd:
 					conn, cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
 	}
@@ -2140,7 +2154,8 @@ after_immediate_data:
 					conn, cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
 	} else if (immed_ret == IMMEDIDATE_DATA_ERL1_CRC_FAILURE) {
@@ -2191,7 +2206,8 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 
 	if (!payload_length) {
 		printk(KERN_ERR "DataOUT payload is ZERO, protocol error.\n");
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 
 	/* iSCSI write */
@@ -2208,7 +2224,8 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" MaxRecvDataSegmentLength: %u\n", payload_length,
 			CONN_OPS(conn)->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 
 	cmd = iscsi_find_cmd_from_itt_or_dump(conn, hdr->itt,
@@ -2231,7 +2248,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	if (cmd->data_direction != DMA_TO_DEVICE) {
 		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT for a"
 			" NON-WRITE command.\n", cmd->init_task_tag);
-		return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_PROTOCOL_ERROR,
 				1, 0, buf, cmd);
 	}
 	se_cmd = SE_CMD(cmd);
@@ -2241,7 +2258,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		printk(KERN_ERR "DataOut Offset: %u, Length %u greater than"
 			" iSCSI Command EDTL %u, protocol error.\n",
 			hdr->offset, payload_length, cmd->data_length);
-		return iscsi_add_reject_from_cmd(REASON_INVALID_PDU_FIELD,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
 				1, 0, buf, cmd);
 	}
 
@@ -2257,7 +2274,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 			printk(KERN_ERR "Received LUN: %u does not match iSCSI"
 				" LUN: %u\n", lun, SE_CMD(cmd)->orig_fe_lun);
 			return iscsi_add_reject_from_cmd(
-					REASON_INVALID_PDU_FIELD,
+					ISCSI_REASON_BOOKMARK_INVALID,
 					1, 0, buf, cmd);
 		}
 	}
@@ -2537,7 +2554,8 @@ static inline int iscsi_handle_nop_out(
 	if ((hdr->init_task_tag == 0xFFFFFFFF) && !(hdr->opcode & I_BIT)) {
 		printk(KERN_ERR "NOPOUT ITT is reserved, but Immediate Bit is"
 			" not set, protocol error.\n");
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 
 	if (hdr->length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
@@ -2545,7 +2563,8 @@ static inline int iscsi_handle_nop_out(
 			" greater than MaxRecvDataSegmentLength: %u, protocol"
 			" error.\n", hdr->length,
 			CONN_OPS(conn)->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 
 	TRACE(TRACE_ISCSI, "Got NOPOUT Ping %s ITT: 0x%08x, TTT: 0x%09x,"
@@ -2563,7 +2582,8 @@ static inline int iscsi_handle_nop_out(
 	if (hdr->targ_xfer_tag == 0xFFFFFFFF) {
 		cmd = iscsi_allocate_cmd(conn);
 		if (!(cmd))
-			return iscsi_add_reject(REASON_OUT_OF_RESOURCES,
+			return iscsi_add_reject(
+					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, buf, conn);
 
 		cmd->iscsi_opcode	= ISCSI_INIT_NOP_OUT;
@@ -2697,7 +2717,8 @@ static inline int iscsi_handle_nop_out(
 			ret = 0;
 			goto ping_out;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 			ret = -1;
 			goto ping_out;
@@ -2786,7 +2807,8 @@ static inline int iscsi_handle_task_mgt_cmd(
 		printk(KERN_ERR "Task Management Request TASK_REASSIGN not"
 			" issued as immediate command, bad iSCSI Initiator"
 				"implementation\n");
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 	if ((function != ISCSI_TM_FUNC_ABORT_TASK) &&
 	    (hdr->refcmdsn != ISCSI_RESERVED_TAG))
@@ -2794,7 +2816,8 @@ static inline int iscsi_handle_task_mgt_cmd(
 
 	cmd = iscsi_allocate_se_cmd_for_tmr(conn, function);
 	if (!(cmd))
-		return iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
+					1, buf, conn);
 
 	cmd->iscsi_opcode	= ISCSI_OP_SCSI_TMFUNC;
 	cmd->i_state		= ISTATE_SEND_TASKMGTRSP;
@@ -2856,7 +2879,7 @@ static inline int iscsi_handle_task_mgt_cmd(
 
 		if (iscsi_check_task_reassign_expdatasn(tmr_req, conn) < 0)
 			return iscsi_add_reject_from_cmd(
-					REASON_INVALID_PDU_FIELD, 1, 1,
+					ISCSI_REASON_BOOKMARK_INVALID, 1, 1,
 					buf, cmd);
 		break;
 	default:
@@ -2886,7 +2909,8 @@ attach:
 					cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
 	}
@@ -2941,7 +2965,8 @@ static inline int iscsi_handle_text_cmd(
 		printk(KERN_ERR "Unable to accept text parameter length: %u"
 			"greater than MaxRecvDataSegmentLength %u.\n",
 		       payload_length, CONN_OPS(conn)->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 
 	TRACE(TRACE_ISCSI, "Got Text Request: ITT: 0x%08x, CmdSN: 0x%08x,"
@@ -3051,7 +3076,8 @@ static inline int iscsi_handle_text_cmd(
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
-		return iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
+					1, buf, conn);
 
 	cmd->iscsi_opcode	= ISCSI_OP_TEXT;
 	cmd->i_state		= ISTATE_SEND_TEXTRSP;
@@ -3075,7 +3101,8 @@ static inline int iscsi_handle_text_cmd(
 						ISTATE_REMOVE);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
 
@@ -3250,7 +3277,8 @@ static inline int iscsi_handle_logout_cmd(
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
-		return iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES, 1,
+					buf, conn);
 
 	cmd->iscsi_opcode       = ISCSI_OP_LOGOUT;
 	cmd->i_state            = ISTATE_SEND_LOGOUTRSP;
@@ -3291,7 +3319,8 @@ static inline int iscsi_handle_logout_cmd(
 					cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
 	}
@@ -3312,57 +3341,57 @@ static inline int iscsi_handle_snack(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
-	__u32 debug_type;
-	struct iscsi_init_snack *hdr;
+	u32 debug_type, unpacked_lun;
+	u64 lun;
+	struct iscsi_snack *hdr;
 
-	hdr			= (struct iscsi_init_snack *) buf;
-	hdr->type		&= ~F_BIT;
-	hdr->lun		= be64_to_cpu(hdr->lun);
-	hdr->init_task_tag	= be32_to_cpu(hdr->init_task_tag);
-	hdr->targ_xfer_tag	= be32_to_cpu(hdr->targ_xfer_tag);
-	hdr->exp_stat_sn	= be32_to_cpu(hdr->exp_stat_sn);
+	hdr			= (struct iscsi_snack *) buf;
+	hdr->flags		&= ~ISCSI_FLAG_CMD_FINAL;
+	lun			= get_unaligned_le64(&hdr->lun[0]);
+	unpacked_lun		= iscsi_unpack_lun((unsigned char *)&lun);
+	hdr->itt		= be32_to_cpu(hdr->itt);
+	hdr->ttt		= be32_to_cpu(hdr->ttt);
+	hdr->exp_statsn		= be32_to_cpu(hdr->exp_statsn);
 	hdr->begrun		= be32_to_cpu(hdr->begrun);
 	hdr->runlength		= be32_to_cpu(hdr->runlength);
 
-#ifdef DEBUG_OPCODES
-	print_init_snack(hdr);
-#endif
-	debug_type = (hdr->type & 0x02) ? TRACE_ISCSI : TRACE_ERL1;
+	debug_type = (hdr->flags & 0x02) ? TRACE_ISCSI : TRACE_ERL1;
 	TRACE(debug_type, "Got ISCSI_INIT_SNACK, ITT: 0x%08x, ExpStatSN:"
 		" 0x%08x, Type: 0x%02x, BegRun: 0x%08x, RunLength: 0x%08x,"
-		" CID: %hu\n", hdr->init_task_tag, hdr->exp_stat_sn, hdr->type,
+		" CID: %hu\n", hdr->itt, hdr->exp_statsn, hdr->flags,
 			hdr->begrun, hdr->runlength, conn->cid);
 
 	if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
 		printk(KERN_ERR "Initiator sent SNACK request while in"
 			" ErrorRecoveryLevel=0.\n");
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 	/*
 	 * SNACK_DATA and SNACK_R2T are both 0,  so check which function to
 	 * call from inside iscsi_send_recovery_datain_or_r2t().
 	 */
-	switch (hdr->type & 0x0f) {
+	switch (hdr->flags & ISCSI_FLAG_SNACK_TYPE_MASK) {
 	case 0:
 		return iscsi_handle_recovery_datain_or_r2t(conn, buf,
-			hdr->init_task_tag, hdr->targ_xfer_tag,
-			hdr->begrun, hdr->runlength);
+			hdr->itt, hdr->ttt, hdr->begrun, hdr->runlength);
 		return 0;
-	case SNACK_STATUS:
-		return iscsi_handle_status_snack(conn,
-			hdr->init_task_tag, hdr->targ_xfer_tag,
-				hdr->begrun, hdr->runlength);
-	case SNACK_DATA_ACK:
-		return iscsi_handle_data_ack(conn, hdr->targ_xfer_tag,
-				hdr->begrun, hdr->runlength);
-	case SNACK_RDATA:
+	case ISCSI_FLAG_SNACK_TYPE_STATUS:
+		return iscsi_handle_status_snack(conn, hdr->itt, hdr->ttt,
+			hdr->begrun, hdr->runlength);
+	case ISCSI_FLAG_SNACK_TYPE_DATA_ACK:
+		return iscsi_handle_data_ack(conn, hdr->ttt, hdr->begrun,
+			hdr->runlength);
+	case ISCSI_FLAG_SNACK_TYPE_RDATA:
 		/* FIXME: Support R-Data SNACK */
 		printk(KERN_ERR "R-Data SNACK Not Supported.\n");
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	default:
 		printk(KERN_ERR "Unknown SNACK type 0x%02x, protocol"
-			" error.\n", hdr->type & 0x0f);
-		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
+			" error.\n", hdr->flags & 0x0f);
+		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buf, conn);
 	}
 
 	return 0;
@@ -3485,12 +3514,12 @@ static int iscsi_handle_immediate_data(
 					" Immediate Data digest failure while"
 					" in ERL=0.\n");
 				iscsi_add_reject_from_cmd(
-						REASON_DATA_DIGEST_ERR,
+						ISCSI_REASON_DATA_DIGEST_ERROR,
 						1, 0, buf, cmd);
 				return IMMEDIDATE_DATA_CANNOT_RECOVER;
 			} else {
 				iscsi_add_reject_from_cmd(
-						REASON_DATA_DIGEST_ERR,
+						ISCSI_REASON_DATA_DIGEST_ERROR,
 						0, 0, buf, cmd);
 				return IMMEDIDATE_DATA_ERL1_CRC_FAILURE;
 			}
@@ -4751,19 +4780,18 @@ static int iscsi_send_reject(
 	struct iscsi_conn *conn)
 {
 	__u32 iov_count = 0, tx_size = 0;
-	struct iscsi_targ_rjt *hdr;
+	struct iscsi_reject *hdr;
 	struct iovec *iov;
 	struct scatterlist sg;
 
-	hdr			= (struct iscsi_targ_rjt *) cmd->pdu;
-	hdr->opcode		= ISCSI_TARG_RJT;
-	hdr->reserved1		|= F_BIT;
-	hdr->length		= cpu_to_be32(ISCSI_HDR_LEN);
-	hdr->reserved3		= 0xffffffff;
+	hdr			= (struct iscsi_reject *) cmd->pdu;
+	hdr->opcode		= ISCSI_OP_REJECT;
+	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
+	hton24(hdr->dlength, ISCSI_HDR_LEN);
 	cmd->stat_sn		= conn->stat_sn++;
-	hdr->stat_sn		= cpu_to_be32(cmd->stat_sn);
-	hdr->exp_cmd_sn	= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn	= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
+	hdr->exp_cmdsn	= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn	= cpu_to_be32(SESS(conn)->max_cmd_sn);
 
 	iov = &cmd->iov_misc[0];
 
@@ -4775,19 +4803,19 @@ static int iscsi_send_reject(
 	tx_size = (ISCSI_HDR_LEN + ISCSI_HDR_LEN);
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for"
-			" REJECT PDU 0x%08x\n", hdr->header_digest);
+			" REJECT PDU 0x%08x\n", *header_digest);
 	}
 
 	if (CONN_OPS(conn)->DataDigest) {
@@ -4811,13 +4839,8 @@ static int iscsi_send_reject(
 	cmd->tx_size = tx_size;
 
 	TRACE(TRACE_ISCSI, "Built Reject PDU StatSN: 0x%08x, Reason: 0x%02x,"
-		" CID: %hu\n", ntohl(hdr->stat_sn), hdr->reason, conn->cid);
-#if 0
-	print_reject_reason(hdr->reason);
-#endif
-#ifdef DEBUG_OPCODES
-	print_targ_rjt(hdr);
-#endif
+		" CID: %hu\n", ntohl(hdr->statsn), hdr->reason, conn->cid);
+
 	return 0;
 }
 
@@ -5381,7 +5404,8 @@ restart:
 		    (!(opcode & ISCSI_OP_LOGOUT)))) {
 			printk(KERN_ERR "Received illegal iSCSI Opcode: 0x%02x"
 			" while in Discovery Session, rejecting.\n", opcode);
-			iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buffer, conn);
+			iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+					buffer, conn);
 			goto transport_err;
 		}
 
@@ -5414,7 +5438,7 @@ restart:
 			} else if (ret < 0)
 				goto transport_err;
 			break;
-		case ISCSI_INIT_SNACK:
+		case ISCSI_OP_SNACK:
 			if (iscsi_handle_snack(conn, buffer) < 0)
 				goto transport_err;
 			break;

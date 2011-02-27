@@ -797,12 +797,12 @@ int iscsi_check_post_dataout(
 		if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
 			printk(KERN_ERR "Unable to recover from DataOUT CRC"
 				" failure while ERL=0, closing session.\n");
-			iscsi_add_reject_from_cmd(REASON_DATA_DIGEST_ERR,
+			iscsi_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
 					1, 0, buf, cmd);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 
-		iscsi_add_reject_from_cmd(REASON_DATA_DIGEST_ERR,
+		iscsi_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
 				0, 0, buf, cmd);
 		return iscsi_dataout_post_crc_failed(cmd, buf);
 	}

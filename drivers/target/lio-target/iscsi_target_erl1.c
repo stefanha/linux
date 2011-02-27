@@ -182,7 +182,8 @@ static int iscsi_handle_r2t_snack(
 			" protocol error.\n", cmd->init_task_tag, begrun,
 			(begrun + runlength), cmd->acked_data_sn);
 
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 	}
 
@@ -193,7 +194,7 @@ static int iscsi_handle_r2t_snack(
 			" current R2TSN: 0x%08x, protocol error.\n",
 			cmd->init_task_tag, begrun, runlength, cmd->r2t_sn);
 			return iscsi_add_reject_from_cmd(
-				REASON_INVALID_PDU_FIELD, 1, 0, buf, cmd);
+				ISCSI_REASON_BOOKMARK_INVALID, 1, 0, buf, cmd);
 		}
 		last_r2tsn = (begrun + runlength);
 	} else
@@ -463,7 +464,7 @@ static inline int iscsi_handle_recovery_datain(
 			" protocol error.\n", cmd->init_task_tag, begrun,
 			(begrun + runlength), cmd->acked_data_sn);
 
-		return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_PROTOCOL_ERROR,
 				1, 0, buf, cmd);
 	}
 
@@ -475,13 +476,13 @@ static inline int iscsi_handle_recovery_datain(
 		printk(KERN_ERR "Initiator requesting BegRun: 0x%08x, RunLength"
 			": 0x%08x greater than maximum DataSN: 0x%08x.\n",
 				begrun, runlength, (cmd->data_sn - 1));
-		return iscsi_add_reject_from_cmd(REASON_INVALID_PDU_FIELD,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
 				1, 0, buf, cmd);
 	}
 
 	dr = iscsi_allocate_datain_req();
 	if (!(dr))
-		return iscsi_add_reject_from_cmd(REASON_OUT_OF_RESOURCES,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 0, buf, cmd);
 
 	dr->data_sn = dr->begrun = begrun;

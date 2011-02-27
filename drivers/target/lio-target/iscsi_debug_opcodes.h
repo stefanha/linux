@@ -2,7 +2,6 @@
 #define ISCSI_OPCODES_DEBUG_H
 
 void print_status_class_and_detail(u8, u8);
-void print_reject_reason(u8);
 void print_reserved8(int, unsigned char);
 void print_reserved16(int, u16);
 void print_reserved32(int, u32);
@@ -27,8 +26,6 @@ void print_cid(u16);
 void print_isid(u8 []);
 void print_tsih(u16);
 void print_scsicdb(u8 []);
-void print_init_snack(struct iscsi_init_snack *);
-void print_targ_rjt(struct iscsi_targ_rjt *);
 void print_init_nop_out(struct iscsi_init_nop_out *);
 void print_targ_nop_in(struct iscsi_targ_nop_in *);
 

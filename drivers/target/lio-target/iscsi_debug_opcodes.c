@@ -33,53 +33,6 @@
 #include <iscsi_protocol.h>
 #include <iscsi_debug_opcodes.h>
 
-void print_reject_reason(u8 reason)
-{
-	printk(KERN_INFO "Reject Reason: ");
-	switch (reason) {
-	case REASON_FULL_BEFORE_LOGIN:
-		printk(KERN_INFO "REASON_FULL_BEFORE_LOGIN");
-		break;
-	case REASON_DATA_DIGEST_ERR:
-		printk(KERN_INFO "REASON_DATA_DIGEST_ERR");
-		break;
-	case REASON_DATA_SNACK:
-		printk(KERN_INFO "REASON_DATA_SNACK");
-		break;
-	case REASON_PROTOCOL_ERR:
-		printk(KERN_INFO "REASON_PROTOCOL_ERR");
-		break;
-	case REASON_COMMAND_NOT_SUPPORTED:
-		printk(KERN_INFO "REASON_COMMAND_NOT_SUPPORTED");
-		break;
-	case REASON_TOO_MANY_IMMEDIATE_COMMANDS:
-		printk(KERN_INFO "REASON_TOO_MANY_IMMEDIATE_COMMANDS");
-		break;
-	case REASON_TASK_IN_PROGRESS:
-		printk(KERN_INFO "REASON_TASK_IN_PROGRESS");
-		break;
-	case REASON_INVALID_DATA_ACK:
-		printk(KERN_INFO "REASON_INVALID_DATA_ACK");
-		break;
-	case REASON_INVALID_PDU_FIELD:
-		printk(KERN_INFO "REASON_INVALID_PDU_FIELD");
-		break;
-	case REASON_OUT_OF_RESOURCES:
-		printk(KERN_INFO "REASON_OUT_OF_RESOURCES");
-		break;
-	case REASON_NEGOTIATION_RESET:
-		printk(KERN_INFO "REASON_NEGOTIATION_RESET");
-		break;
-	case REASON_WAITING_FOR_LOGOUT:
-		printk(KERN_INFO "REASON_WAITING_FOR_LOGOUT");
-		break;
-	default:
-		printk(KERN_INFO "ERROR: Unknown Reject Reason!");
-		break;
-	}
-	printk(KERN_INFO "\n");
-}
-
 #ifdef DEBUG_OPCODES
 
 void print_reserved8(int n, unsigned char reserved)
@@ -204,40 +157,6 @@ void print_scsicdb(u8 cdb[16])
 		" %02x %02x %02x %02x %02x %02x %02x %02x\n", cdb[0], cdb[1],
 		cdb[2], cdb[3], cdb[4], cdb[5], cdb[6], cdb[7], cdb[8], cdb[9],
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
-}
-
-void print_init_snack(struct iscsi_init_snack *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_INIT_SNACK PDU\n");
-	print_opcode(cmd->opcode);
-	printk(KERN_INFO "\tType: 0x%02x\n", cmd->type);
-	print_reserved16(1, cmd->reserved1);
-	print_dataseglength(cmd->length);
-	print_lun(cmd->lun);
-	print_itt(cmd->init_task_tag);
-	print_ttt(cmd->targ_xfer_tag);
-	print_reserved32(2, cmd->reserved2);
-	print_expstatsn(cmd->exp_stat_sn);
-	print_reserved64(3, cmd->reserved3);
-	printk(KERN_INFO "\tBegRun: 0x%08x\n", cmd->begrun);
-	printk(KERN_INFO "\tRunLength: 0x%08x\n", cmd->runlength);
-}
-
-void print_targ_rjt(struct iscsi_targ_rjt *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_TARG_RJT PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	printk(KERN_INFO "\tReason: 0x%02x\n", cmd->reason);
-	print_reserved8(1, cmd->reserved1);
-	print_dataseglength(cmd->length);
-	print_reserved64(2, cmd->reserved2);
-	print_reserved32(3, cmd->reserved3);
-	print_statsn(cmd->stat_sn);
-	print_expcmdsn(cmd->exp_cmd_sn);
-	print_maxcmdsn(cmd->max_cmd_sn);
-	print_datasn(cmd->data_sn);
-	print_reserved64(4, cmd->reserved4);
 }
 
 void print_init_nop_out(struct iscsi_init_nop_out *cmd)

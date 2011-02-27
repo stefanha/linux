@@ -19,13 +19,9 @@
 
 /* NOP-Out */
 #define ISCSI_INIT_NOP_OUT 		0x00
-/* SNACK Request */
-#define ISCSI_INIT_SNACK		0x10
 
 /* NOP-In */
 #define ISCSI_TARG_NOP_IN		0x20
-/* Reject */
-#define ISCSI_TARG_RJT			0x3f
 
 /* Flag Settings */
 #define ISCSI_OPCODE			0x3f
@@ -112,65 +108,7 @@
 #define ISCSI_ACA				4
 #define ISCSI_STATUS				4
 
-/* reason field in iscsi_targ_rjt */
-#define REASON_FULL_BEFORE_LOGIN		0x01
-#define REASON_DATA_DIGEST_ERR			0x02
-#define REASON_DATA_SNACK			0x03
-#define REASON_PROTOCOL_ERR			0x04
-#define REASON_COMMAND_NOT_SUPPORTED		0x05
-#define REASON_TOO_MANY_IMMEDIATE_COMMANDS	0x06
-#define REASON_TASK_IN_PROGRESS			0x07
-#define REASON_INVALID_DATA_ACK			0x08
-#define REASON_INVALID_PDU_FIELD		0x09
-#define REASON_OUT_OF_RESOURCES			0x0a
-#define REASON_NEGOTIATION_RESET		0x0b
-#define REASON_WAITING_FOR_LOGOUT		0x0c
-
-/* SNACK type */
-#define SNACK_DATA				0
-#define SNACK_R2T				0
-#define SNACK_STATUS				1
-#define SNACK_DATA_ACK				2
-#define SNACK_RDATA				3
-
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.16 SNACK Request */
-
-struct iscsi_init_snack {
-	u8	opcode;
-	u8	type;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	targ_xfer_tag;
-	u32	reserved2;
-	u32	exp_stat_sn;
-	u64	reserved3;
-	u32	begrun;
-	u32	runlength;
-	u32	header_digest;
-};
-
-/* 9.17 Reject */
-
-struct iscsi_targ_rjt {
-	u8	opcode;
-	u8	flags;
-	u8	reason;
-	u8	reserved1;
-	u32	length;
-	u64	reserved2;
-	u32	reserved3;
-	u32	reserved4;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	data_sn;
-	u64	reserved5;
-	u32	header_digest;
-};
 
 /* 9.18 NOP-Out */
 
