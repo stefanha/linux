@@ -4259,62 +4259,61 @@ int iscsi_send_r2t(
 	struct iscsi_conn *conn)
 {
 	int tx_size = 0;
-	__u32 trace_type;
+	u32 trace_type;
+	u64 lun;
 	struct iscsi_r2t *r2t;
-	struct iscsi_targ_r2t *hdr;
+	struct iscsi_r2t_rsp *hdr;
 	struct scatterlist sg;
 
 	r2t = iscsi_get_r2t_from_list(cmd);
 	if (!(r2t))
 		return -1;
 
-	hdr			= (struct iscsi_targ_r2t *) cmd->pdu;
+	hdr			= (struct iscsi_r2t_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
-	hdr->opcode		= ISCSI_TARG_R2T;
-	hdr->flags		|= F_BIT;
-	hdr->lun		= iscsi_pack_lun(SE_CMD(cmd)->orig_fe_lun);
-	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
+	hdr->opcode		= ISCSI_OP_R2T;
+	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
+	lun			= iscsi_pack_lun(SE_CMD(cmd)->orig_fe_lun);
+	put_unaligned_le64(lun, &hdr->lun[0]);
+	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	spin_lock_bh(&SESS(conn)->ttt_lock);
 	r2t->targ_xfer_tag	= SESS(conn)->targ_xfer_tag++;
 	if (r2t->targ_xfer_tag == 0xFFFFFFFF)
 		r2t->targ_xfer_tag = SESS(conn)->targ_xfer_tag++;
 	spin_unlock_bh(&SESS(conn)->ttt_lock);
-	hdr->targ_xfer_tag	= cpu_to_be32(r2t->targ_xfer_tag);
-	hdr->stat_sn		= cpu_to_be32(conn->stat_sn);
-	hdr->exp_cmd_sn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
-	hdr->r2t_sn		= cpu_to_be32(r2t->r2t_sn);
-	hdr->offset		= cpu_to_be32(r2t->offset);
-	hdr->xfer_len		= cpu_to_be32(r2t->xfer_len);
+	hdr->ttt		= cpu_to_be32(r2t->targ_xfer_tag);
+	hdr->statsn		= cpu_to_be32(conn->stat_sn);
+	hdr->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->r2tsn		= cpu_to_be32(r2t->r2t_sn);
+	hdr->data_offset	= cpu_to_be32(r2t->offset);
+	hdr->data_length	= cpu_to_be32(r2t->xfer_len);
 
 	cmd->iov_misc[0].iov_base	= cmd->pdu;
 	cmd->iov_misc[0].iov_len	= ISCSI_HDR_LEN;
 	tx_size += ISCSI_HDR_LEN;
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
 
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		cmd->iov_misc[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for R2T"
-			" PDU 0x%08x\n", hdr->header_digest);
+			" PDU 0x%08x\n", *header_digest);
 	}
-
-#ifdef DEBUG_OPCODES
-	print_targ_r2t(hdr);
-#endif
 
 	trace_type = (!r2t->recovery_r2t) ? TRACE_ISCSI : TRACE_ERL1;
 	TRACE(trace_type, "Built %sR2T, ITT: 0x%08x, TTT: 0x%08x, StatSN:"
 		" 0x%08x, R2TSN: 0x%08x, Offset: %u, DDTL: %u, CID: %hu\n",
 		(!r2t->recovery_r2t) ? "" : "Recovery ", cmd->init_task_tag,
-		r2t->targ_xfer_tag, ntohl(hdr->stat_sn), r2t->r2t_sn,
+		r2t->targ_xfer_tag, ntohl(hdr->statsn), r2t->r2t_sn,
 			r2t->offset, r2t->xfer_len, conn->cid);
 
 	cmd->iov_misc_count = 1;

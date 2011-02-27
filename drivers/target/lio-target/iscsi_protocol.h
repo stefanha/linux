@@ -36,8 +36,6 @@
 #define ISCSI_TARG_TEXT_RSP		0x24
 /* Logout Response */
 #define ISCSI_TARG_LOGOUT_RSP		0x26
-/* Ready to Transfer */
-#define ISCSI_TARG_R2T			0x31
 /* Asynchronous Message */
 #define ISCSI_TARG_ASYNC_MSG		0x32
 /* Reject */
@@ -195,25 +193,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.8 Ready To Transfer (R2T) */
-
-struct iscsi_targ_r2t {
-	u8	opcode;
-	u8	flags;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	targ_xfer_tag;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	r2t_sn;
-	u32	offset;
-	u32	xfer_len;
-	u32	header_digest;
-};
 
 /* 9.9 Asynchronous Message */
 

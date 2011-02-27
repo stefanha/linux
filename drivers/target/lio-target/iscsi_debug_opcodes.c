@@ -323,24 +323,6 @@ void print_scsicdb(u8 cdb[16])
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
 }
 
-void print_targ_r2t(struct iscsi_targ_r2t *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_TARG_R2T PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	print_reserved16(1, cmd->reserved1);
-	print_dataseglength(cmd->length);
-	print_lun(cmd->lun);
-	print_itt(cmd->init_task_tag);
-	print_ttt(cmd->targ_xfer_tag);
-	print_statsn(cmd->stat_sn);
-	print_expcmdsn(cmd->exp_cmd_sn);
-	print_maxcmdsn(cmd->max_cmd_sn);
-	print_r2tsn(cmd->r2t_sn);
-	print_offset(cmd->offset);
-	printk(KERN_INFO "\tDDTL: 0x%08x\n", cmd->xfer_len);
-}
-
 void print_targ_async_msg(struct iscsi_targ_async_msg *cmd)
 {
 	printk(KERN_INFO "Dumping ISCSI_TARG_ASYNC_MSG PDU\n");
