@@ -23,8 +23,6 @@
 #define ISCSI_INIT_LOGIN_CMND		0x03
 /* Text Request */
 #define ISCSI_INIT_TEXT_CMND		0x04
-/* SCSI Data-Out (for WRITE operations */
-#define ISCSI_INIT_SCSI_DATA_OUT	0x05
 /* Logout Command */
 #define ISCSI_INIT_LOGOUT_CMND		0x06
 /* SNACK Request */
@@ -199,25 +197,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.7 SCSI Data-out & SCSI Data-in */
-
-struct iscsi_init_scsi_data_out {
-	u8	opcode;
-	u8	flags;
-	u16	reserved1;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	targ_xfer_tag;
-	u32	reserved2;
-	u32	exp_stat_sn;
-	u32	reserved3;
-	u32	data_sn;
-	u32	offset;
-	u32	reserved4;
-	u32	header_digest;
-};
 
 struct iscsi_targ_scsi_data_in {
 	u8	opcode;

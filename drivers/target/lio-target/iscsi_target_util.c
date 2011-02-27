@@ -630,8 +630,8 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 {
 	struct iscsi_conn *conn = CONN(cmd);
 	struct se_cmd *se_cmd = SE_CMD(cmd);
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	if (SESS_OPS_C(conn)->InitialR2T) {
 		printk(KERN_ERR "Received unexpected unsolicited data"
@@ -641,27 +641,27 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 		return -1;
 	}
 
-	if ((cmd->first_burst_len + hdr->length) >
+	if ((cmd->first_burst_len + payload_length) >
 	     SESS_OPS_C(conn)->FirstBurstLength) {
 		printk(KERN_ERR "Total %u bytes exceeds FirstBurstLength: %u"
 			" for this Unsolicited DataOut Burst.\n",
-			(cmd->first_burst_len + hdr->length),
+			(cmd->first_burst_len + payload_length),
 				SESS_OPS_C(conn)->FirstBurstLength);
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return -1;
 	}
 
-	if (!(hdr->flags & F_BIT))
+	if (!(hdr->flags & ISCSI_FLAG_CMD_FINAL))
 		return 0;
 
-	if (((cmd->first_burst_len + hdr->length) != cmd->data_length) &&
-	    ((cmd->first_burst_len + hdr->length) !=
+	if (((cmd->first_burst_len + payload_length) != cmd->data_length) &&
+	    ((cmd->first_burst_len + payload_length) !=
 	      SESS_OPS_C(conn)->FirstBurstLength)) {
 		printk(KERN_ERR "Unsolicited non-immediate data received %u"
 			" does not equal FirstBurstLength: %u, and does"
 			" not equal ExpXferLen %u.\n",
-			(cmd->first_burst_len + hdr->length),
+			(cmd->first_burst_len + payload_length),
 			SESS_OPS_C(conn)->FirstBurstLength, cmd->data_length);
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_INCORRECT_AMOUNT_OF_DATA, 0);

@@ -2170,66 +2170,62 @@ after_immediate_data:
 static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 {
 	int iov_ret, ooo_cmdsn = 0, ret;
-	__u8 data_crc_failed = 0, *pad_bytes[4];
-	__u32 checksum, iov_count = 0, padding = 0, rx_got = 0, rx_size = 0;
+	u8 data_crc_failed = 0, *pad_bytes[4];
+	u32 checksum, iov_count = 0, padding = 0, rx_got = 0;
+	u32 rx_size = 0, payload_length;
 	struct iscsi_cmd *cmd = NULL;
 	struct se_cmd *se_cmd;
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
-	struct iscsi_init_scsi_data_out	*hdr;
+	struct iscsi_data *hdr;
 	struct iovec *iov;
 	unsigned long flags;
 
-	hdr			= (struct iscsi_init_scsi_data_out *) buf;
-	hdr->length		= be32_to_cpu(hdr->length);
-	hdr->lun		= be64_to_cpu(hdr->lun);
-	hdr->init_task_tag	= be32_to_cpu(hdr->init_task_tag);
-	hdr->targ_xfer_tag	= be32_to_cpu(hdr->targ_xfer_tag);
-	hdr->exp_stat_sn	= be32_to_cpu(hdr->exp_stat_sn);
-	hdr->data_sn		= be32_to_cpu(hdr->data_sn);
+	hdr			= (struct iscsi_data *) buf;
+	payload_length		= ntoh24(hdr->dlength);
+	hdr->itt		= be32_to_cpu(hdr->itt);
+	hdr->ttt		= be32_to_cpu(hdr->ttt);
+	hdr->exp_statsn		= be32_to_cpu(hdr->exp_statsn);
+	hdr->datasn		= be32_to_cpu(hdr->datasn);
 	hdr->offset		= be32_to_cpu(hdr->offset);
 
-#ifdef DEBUG_OPCODES
-	print_init_scsi_data_out(hdr);
-#endif
-
-	if (!hdr->length) {
+	if (!payload_length) {
 		printk(KERN_ERR "DataOUT payload is ZERO, protocol error.\n");
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
 
 	/* iSCSI write */
 	spin_lock_bh(&SESS(conn)->session_stats_lock);
-	SESS(conn)->rx_data_octets += hdr->length;
+	SESS(conn)->rx_data_octets += payload_length;
 	if (SESS_NODE_ACL(SESS(conn))) {
 		spin_lock(&SESS_NODE_ACL(SESS(conn))->stats_lock);
-		SESS_NODE_ACL(SESS(conn))->write_bytes += hdr->length;
+		SESS_NODE_ACL(SESS(conn))->write_bytes += payload_length;
 		spin_unlock(&SESS_NODE_ACL(SESS(conn))->stats_lock);
 	}
 	spin_unlock_bh(&SESS(conn)->session_stats_lock);
 
-	if (hdr->length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
+	if (payload_length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
-			" MaxRecvDataSegmentLength: %u\n",
-			hdr->length, CONN_OPS(conn)->MaxRecvDataSegmentLength);
+			" MaxRecvDataSegmentLength: %u\n", payload_length,
+			CONN_OPS(conn)->MaxRecvDataSegmentLength);
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
 
-	cmd = iscsi_find_cmd_from_itt_or_dump(conn, hdr->init_task_tag,
-			hdr->length);
+	cmd = iscsi_find_cmd_from_itt_or_dump(conn, hdr->itt,
+			payload_length);
 	if (!(cmd))
 		return 0;
 
 	TRACE(TRACE_ISCSI, "Got DataOut ITT: 0x%08x, TTT: 0x%08x,"
 		" DataSN: 0x%08x, Offset: %u, Length: %u, CID: %hu\n",
-		hdr->init_task_tag, hdr->targ_xfer_tag, hdr->data_sn,
-			hdr->offset, hdr->length, conn->cid);
+		hdr->itt, hdr->ttt, hdr->datasn, hdr->offset,
+		payload_length, conn->cid);
 
 	if (cmd->cmd_flags & ICF_GOT_LAST_DATAOUT) {
 		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT after"
 			" last DataOUT received, dumping payload\n",
 			cmd->init_task_tag);
-		return iscsi_dump_data_payload(conn, hdr->length, 1);
+		return iscsi_dump_data_payload(conn, payload_length, 1);
 	}
 
 	if (cmd->data_direction != DMA_TO_DEVICE) {
@@ -2241,10 +2237,10 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	se_cmd = SE_CMD(cmd);
 	iscsi_mod_dataout_timer(cmd);
 
-	if ((hdr->offset + hdr->length) > cmd->data_length) {
+	if ((hdr->offset + payload_length) > cmd->data_length) {
 		printk(KERN_ERR "DataOut Offset: %u, Length %u greater than"
 			" iSCSI Command EDTL %u, protocol error.\n",
-			hdr->offset, hdr->length, cmd->data_length);
+			hdr->offset, payload_length, cmd->data_length);
 		return iscsi_add_reject_from_cmd(REASON_INVALID_PDU_FIELD,
 				1, 0, buf, cmd);
 	}
@@ -2255,8 +2251,8 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	 * Cisco cannot figure this out.
 	 */
 #if 0
-	if (hdr->targ_xfer_tag != 0xFFFFFFFF) {
-		int lun = iscsi_unpack_lun((unsigned char *)&hdr->lun);
+	if (hdr->ttt != 0xFFFFFFFF) {
+		int lun = iscsi_unpack_lun(get_unaligned_le64(&hdr->lun[0]));
 		if (lun != SE_CMD(cmd)->orig_fe_lun) {
 			printk(KERN_ERR "Received LUN: %u does not match iSCSI"
 				" LUN: %u\n", lun, SE_CMD(cmd)->orig_fe_lun);
@@ -2324,12 +2320,12 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 			 * be sent now if the F_BIT has been received with
 			 * the unsolicitied data out.
 			 */
-			if (hdr->flags & F_BIT)
+			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
 				iscsi_stop_dataout_timer(cmd);
 
 			transport_check_aborted_status(se_cmd,
-					(hdr->flags & F_BIT));
-			return iscsi_dump_data_payload(conn, hdr->length, 1);
+					(hdr->flags & ISCSI_FLAG_CMD_FINAL));
+			return iscsi_dump_data_payload(conn, payload_length, 1);
 		}
 	} else {
 		/*
@@ -2343,14 +2339,14 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		 * TASK_ABORTED status.
 		 */
 		if (atomic_read(&T_TASK(se_cmd)->t_transport_aborted) != 0) {
-			if (hdr->flags & F_BIT)
+			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
 				if (--cmd->outstanding_r2ts < 1) {
 					iscsi_stop_dataout_timer(cmd);
 					transport_check_aborted_status(
 							se_cmd, 1);
 				}
 
-			return iscsi_dump_data_payload(conn, hdr->length, 1);
+			return iscsi_dump_data_payload(conn, payload_length, 1);
 		}
 	}
 	/*
@@ -2363,7 +2359,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	else if (ret == DATAOUT_CANNOT_RECOVER)
 		return -1;
 
-	rx_size += hdr->length;
+	rx_size += payload_length;
 	iov = &cmd->iov_data[0];
 
 	memset((void *)&map_sg, 0, sizeof(struct se_map_sg));
@@ -2372,7 +2368,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	map_sg.se_cmd = SE_CMD(cmd);
 	map_sg.iov = iov;
 	map_sg.sg_kmap_active = 1;
-	map_sg.data_length = hdr->length;
+	map_sg.data_length = payload_length;
 	map_sg.data_offset = hdr->offset;
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
@@ -2383,7 +2379,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 
 	iov_count += iov_ret;
 
-	padding = ((-hdr->length) & 3);
+	padding = ((-payload_length) & 3);
 	if (padding != 0) {
 		iov[iov_count].iov_base	= &pad_bytes;
 		iov[iov_count++].iov_len = padding;
@@ -2407,7 +2403,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		return -1;
 
 	if (CONN_OPS(conn)->DataDigest) {
-		__u32 counter = hdr->length, data_crc = 0;
+		__u32 counter = payload_length, data_crc = 0;
 		struct iovec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
@@ -2419,7 +2415,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		map_sg.fabric_cmd = (void *)cmd;
 		map_sg.se_cmd = SE_CMD(cmd);
 		map_sg.iov = iov_ptr;
-		map_sg.data_length = hdr->length;
+		map_sg.data_length = payload_length;
 		map_sg.data_offset = hdr->offset;
 
 		if (iscsi_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
@@ -2459,13 +2455,13 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 			printk(KERN_ERR "ITT: 0x%08x, Offset: %u, Length: %u,"
 				" DataSN: 0x%08x, CRC32C DataDigest 0x%08x"
 				" does not match computed 0x%08x\n",
-				hdr->init_task_tag, hdr->offset, hdr->length,
-				hdr->data_sn, checksum, data_crc);
+				hdr->itt, hdr->offset, payload_length,
+				hdr->datasn, checksum, data_crc);
 			data_crc_failed = 1;
 		} else {
 			TRACE(TRACE_DIGEST, "Got CRC32C DataDigest 0x%08x for"
 				" %u bytes of Data Out\n", checksum,
-				hdr->length);
+				payload_length);
 		}
 	}
 
@@ -5423,7 +5419,7 @@ restart:
 			if (iscsi_handle_scsi_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;
-		case ISCSI_INIT_SCSI_DATA_OUT:
+		case ISCSI_OP_SCSI_DATA_OUT:
 			if (iscsi_handle_data_out(conn, buffer) < 0)
 				goto transport_err;
 			break;

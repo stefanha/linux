@@ -323,24 +323,6 @@ void print_scsicdb(u8 cdb[16])
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
 }
 
-void print_init_scsi_data_out(struct iscsi_init_scsi_data_out *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_INIT_SCSI_DATA_OUT PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	print_reserved16(1, cmd->reserved1);
-	print_dataseglength(cmd->length);
-	print_lun(cmd->lun);
-	print_itt(cmd->init_task_tag);
-	print_ttt(cmd->targ_xfer_tag);
-	print_reserved32(2, cmd->reserved2);
-	print_expstatsn(cmd->exp_stat_sn);
-	print_reserved32(3, cmd->reserved3);
-	print_datasn(cmd->data_sn);
-	print_offset(cmd->offset);
-	print_reserved32(4, cmd->reserved4);
-}
-
 void print_targ_scsi_data_in(struct iscsi_targ_scsi_data_in *cmd)
 {
 	printk(KERN_INFO "Dumping ISCSI_TARG_SCSI_DATA_IN PDU\n");
