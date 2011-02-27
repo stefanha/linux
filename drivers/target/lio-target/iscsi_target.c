@@ -2923,36 +2923,32 @@ static inline int iscsi_handle_text_cmd(
 {
 	char *text_ptr, *text_in;
 	int cmdsn_ret, niov = 0, rx_got, rx_size;
-	__u32 checksum = 0, data_crc = 0;
-	__u32 padding = 0, pad_bytes = 0, text_length = 0;
+	u32 checksum = 0, data_crc = 0, payload_length;
+	u32 padding = 0, pad_bytes = 0, text_length = 0;
 	struct iscsi_cmd *cmd;
 	struct iovec iov[3];
-	struct iscsi_init_text_cmnd *hdr;
+	struct iscsi_text *hdr;
 	struct scatterlist sg;
 
-	hdr			= (struct iscsi_init_text_cmnd *) buf;
-	hdr->length		= be32_to_cpu(hdr->length);
-	hdr->init_task_tag	= be32_to_cpu(hdr->init_task_tag);
-	hdr->targ_xfer_tag	= be32_to_cpu(hdr->targ_xfer_tag);
-	hdr->cmd_sn		= be32_to_cpu(hdr->cmd_sn);
-	hdr->exp_stat_sn	= be32_to_cpu(hdr->exp_stat_sn);
+	hdr			= (struct iscsi_text *) buf;
+	payload_length		= ntoh24(hdr->dlength);
+	hdr->itt		= be32_to_cpu(hdr->itt);
+	hdr->ttt		= be32_to_cpu(hdr->ttt);
+	hdr->cmdsn		= be32_to_cpu(hdr->cmdsn);
+	hdr->exp_statsn		= be32_to_cpu(hdr->exp_statsn);
 
-#ifdef DEBUG_OPCODES
-	print_init_text_cmnd(hdr);
-#endif
-
-	if (hdr->length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
+	if (payload_length > CONN_OPS(conn)->MaxRecvDataSegmentLength) {
 		printk(KERN_ERR "Unable to accept text parameter length: %u"
 			"greater than MaxRecvDataSegmentLength %u.\n",
-		       hdr->length, CONN_OPS(conn)->MaxRecvDataSegmentLength);
+		       payload_length, CONN_OPS(conn)->MaxRecvDataSegmentLength);
 		return iscsi_add_reject(REASON_PROTOCOL_ERR, 1, buf, conn);
 	}
 
 	TRACE(TRACE_ISCSI, "Got Text Request: ITT: 0x%08x, CmdSN: 0x%08x,"
-		" ExpStatSN: 0x%08x, Length: %u\n", hdr->init_task_tag,
-			hdr->cmd_sn, hdr->exp_stat_sn, hdr->length);
+		" ExpStatSN: 0x%08x, Length: %u\n", hdr->itt, hdr->cmdsn,
+		hdr->exp_statsn, payload_length);
 
-	rx_size = text_length = hdr->length;
+	rx_size = text_length = payload_length;
 	if (text_length) {
 		text_in = kzalloc(text_length, GFP_KERNEL);
 		if (!(text_in)) {
@@ -2965,7 +2961,7 @@ static inline int iscsi_handle_text_cmd(
 		iov[niov].iov_base	= text_in;
 		iov[niov++].iov_len	= text_length;
 
-		padding = ((-hdr->length) & 3);
+		padding = ((-payload_length) & 3);
 		if (padding != 0) {
 			iov[niov].iov_base = &pad_bytes;
 			iov[niov++].iov_len  = padding;
@@ -3016,7 +3012,7 @@ static inline int iscsi_handle_text_cmd(
 					 */
 					TRACE(TRACE_ERL1, "Dropping Text"
 					" Command CmdSN: 0x%08x due to"
-					" DataCRC error.\n", hdr->cmd_sn);
+					" DataCRC error.\n", hdr->cmdsn);
 					kfree(text_in);
 					return 0;
 				}
@@ -3057,20 +3053,20 @@ static inline int iscsi_handle_text_cmd(
 	if (!(cmd))
 		return iscsi_add_reject(REASON_OUT_OF_RESOURCES, 1, buf, conn);
 
-	cmd->iscsi_opcode	= ISCSI_INIT_TEXT_CMND;
+	cmd->iscsi_opcode	= ISCSI_OP_TEXT;
 	cmd->i_state		= ISTATE_SEND_TEXTRSP;
-	cmd->immediate_cmd	= ((hdr->opcode & I_BIT) ? 1 : 0);
-	SESS(conn)->init_task_tag = cmd->init_task_tag	= hdr->init_task_tag;
+	cmd->immediate_cmd	= ((hdr->opcode & ISCSI_OP_IMMEDIATE) ? 1 : 0);
+	SESS(conn)->init_task_tag = cmd->init_task_tag	= hdr->itt;
 	cmd->targ_xfer_tag	= 0xFFFFFFFF;
-	cmd->cmd_sn		= hdr->cmd_sn;
-	cmd->exp_stat_sn	= hdr->exp_stat_sn;
+	cmd->cmd_sn		= hdr->cmdsn;
+	cmd->exp_stat_sn	= hdr->exp_statsn;
 	cmd->data_direction	= DMA_NONE;
 
 	iscsi_attach_cmd_to_queue(conn, cmd);
-	iscsi_ack_from_expstatsn(conn, hdr->exp_stat_sn);
+	iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
 
-	if (!(hdr->opcode & I_BIT)) {
-		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmd_sn);
+	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
+		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmdsn);
 		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
 		     (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
 			return 0;
@@ -5389,7 +5385,7 @@ restart:
 		opcode = buffer[0] & ISCSI_OPCODE;
 
 		if (SESS_OPS_C(conn)->SessionType &&
-		   ((!(opcode & ISCSI_INIT_TEXT_CMND)) ||
+		   ((!(opcode & ISCSI_OP_TEXT)) ||
 		    (!(opcode & ISCSI_INIT_LOGOUT_CMND)))) {
 			printk(KERN_ERR "Received illegal iSCSI Opcode: 0x%02x"
 			" while in Discovery Session, rejecting.\n", opcode);
@@ -5414,7 +5410,7 @@ restart:
 			if (iscsi_handle_task_mgt_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;
-		case ISCSI_INIT_TEXT_CMND:
+		case ISCSI_OP_TEXT:
 			if (iscsi_handle_text_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;
