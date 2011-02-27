@@ -34,8 +34,6 @@
 #define ISCSI_TARG_LOGIN_RSP		0x23
 /* Text Response */
 #define ISCSI_TARG_TEXT_RSP		0x24
-/* SCSI Data-In (for READ Operations) */
-#define ISCSI_TARG_SCSI_DATA_IN		0x25
 /* Logout Response */
 #define ISCSI_TARG_LOGOUT_RSP		0x26
 /* Ready to Transfer */
@@ -197,24 +195,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-struct iscsi_targ_scsi_data_in {
-	u8	opcode;
-	u8	flags;
-	u8	reserved1;
-	u8	status;
-	u32	length;
-	u64	lun;
-	u32	init_task_tag;
-	u32	targ_xfer_tag;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	data_sn;
-	u32	offset;
-	u32	res_count;
-	u32	header_digest;
-};
 
 /* 9.8 Ready To Transfer (R2T) */
 

@@ -3772,12 +3772,13 @@ static inline int iscsi_send_data_in(
 	int *eodr)
 {
 	int iov_ret = 0, set_statsn = 0;
-	__u8 *pad_bytes;
-	__u32 iov_count = 0, tx_size = 0;
+	u8 *pad_bytes;
+	u32 iov_count = 0, tx_size = 0;
+	u64 lun;	
 	struct iscsi_datain datain;
 	struct iscsi_datain_req *dr;
 	struct se_map_sg map_sg;
-	struct iscsi_targ_scsi_data_in *hdr;
+	struct iscsi_data_rsp *hdr;
 	struct iovec *iov;
 	struct scatterlist sg;
 
@@ -3826,32 +3827,33 @@ static inline int iscsi_send_data_in(
 			set_statsn = 1;
 	}
 
-	hdr	= (struct iscsi_targ_scsi_data_in *) cmd->pdu;
+	hdr	= (struct iscsi_data_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
-	hdr->opcode 		= ISCSI_TARG_SCSI_DATA_IN;
+	hdr->opcode 		= ISCSI_OP_SCSI_DATA_IN;
 	hdr->flags		= datain.flags;
-	if (hdr->flags & S_BIT) {
+	if (hdr->flags & ISCSI_FLAG_DATA_STATUS) {
 		if (SE_CMD(cmd)->se_cmd_flags & SCF_OVERFLOW_BIT) {
-			hdr->flags |= O_BIT;
-			hdr->res_count = cpu_to_be32(cmd->residual_count);
+			hdr->flags |= ISCSI_FLAG_DATA_OVERFLOW;
+			hdr->residual_count = cpu_to_be32(cmd->residual_count);
 		} else if (SE_CMD(cmd)->se_cmd_flags & SCF_UNDERFLOW_BIT) {
-			hdr->flags |= U_BIT;
-			hdr->res_count = cpu_to_be32(cmd->residual_count);
+			hdr->flags |= ISCSI_FLAG_DATA_UNDERFLOW;
+			hdr->residual_count = cpu_to_be32(cmd->residual_count);
 		}
 	}
-	hdr->length		= cpu_to_be32(datain.length);
-	hdr->lun		= (hdr->flags & A_BIT) ?
+	hton24(hdr->dlength, datain.length);
+	lun			= (hdr->flags & ISCSI_FLAG_DATA_ACK) ?
 				   iscsi_pack_lun(SE_CMD(cmd)->orig_fe_lun) :
 				   0xFFFFFFFFFFFFFFFFULL;
-	hdr->init_task_tag	= cpu_to_be32(cmd->init_task_tag);
-	hdr->targ_xfer_tag	= (hdr->flags & A_BIT) ?
+	put_unaligned_le64(lun, &hdr->lun[0]);
+	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
+	hdr->ttt		= (hdr->flags & ISCSI_FLAG_DATA_ACK) ?
 				   cpu_to_be32(cmd->targ_xfer_tag) :
 				   0xFFFFFFFF;
-	hdr->stat_sn		= (set_statsn) ? cpu_to_be32(cmd->stat_sn) :
+	hdr->statsn		= (set_statsn) ? cpu_to_be32(cmd->stat_sn) :
 						0xFFFFFFFF;
-	hdr->exp_cmd_sn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	hdr->max_cmd_sn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
-	hdr->data_sn		= cpu_to_be32(datain.data_sn);
+	hdr->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	hdr->datasn		= cpu_to_be32(datain.data_sn);
 	hdr->offset		= cpu_to_be32(datain.offset);
 
 	iov = &cmd->iov_data[0];
@@ -3860,20 +3862,20 @@ static inline int iscsi_send_data_in(
 	tx_size += ISCSI_HDR_LEN;
 
 	if (CONN_OPS(conn)->HeaderDigest) {
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN);	
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&hdr->header_digest);
+		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
 
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest"
-			" for DataIN PDU 0x%08x\n", hdr->header_digest);
+			" for DataIN PDU 0x%08x\n", *header_digest);
 	}
 
 	memset((void *)&map_sg, 0, sizeof(struct se_map_sg));
@@ -3942,9 +3944,8 @@ static inline int iscsi_send_data_in(
 
 	TRACE(TRACE_ISCSI, "Built DataIN ITT: 0x%08x, StatSN: 0x%08x,"
 		" DataSN: 0x%08x, Offset: %u, Length: %u, CID: %hu\n",
-		cmd->init_task_tag, ntohl(hdr->stat_sn),
-		ntohl(hdr->data_sn), ntohl(hdr->offset),
-			ntohl(hdr->length), conn->cid);
+		cmd->init_task_tag, ntohl(hdr->statsn), ntohl(hdr->datasn),
+		ntohl(hdr->offset), datain.length, conn->cid);
 
 	if (dr->dr_complete) {
 		*eodr = (SE_CMD(cmd)->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE) ?
@@ -3952,9 +3953,6 @@ static inline int iscsi_send_data_in(
 		iscsi_free_datain_req(cmd, dr);
 	}
 
-#ifdef DEBUG_OPCODES
-	print_targ_scsi_data_in(hdr);
-#endif
 	return 0;
 }
 

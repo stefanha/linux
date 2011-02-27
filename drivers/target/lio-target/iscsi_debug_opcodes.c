@@ -323,25 +323,6 @@ void print_scsicdb(u8 cdb[16])
 		cdb[10], cdb[11], cdb[12], cdb[13], cdb[14], cdb[15]);
 }
 
-void print_targ_scsi_data_in(struct iscsi_targ_scsi_data_in *cmd)
-{
-	printk(KERN_INFO "Dumping ISCSI_TARG_SCSI_DATA_IN PDU\n");
-	print_opcode(cmd->opcode);
-	print_flags(cmd->flags);
-	print_reserved8(1, cmd->reserved1);
-	printk(KERN_INFO "\tstatus: 0x%02x\n", cmd->status);
-	print_dataseglength(cmd->length);
-	print_lun(cmd->lun);
-	print_itt(cmd->init_task_tag);
-	print_ttt(cmd->targ_xfer_tag);
-	print_statsn(cmd->stat_sn);
-	print_expcmdsn(cmd->exp_cmd_sn);
-	print_maxcmdsn(cmd->max_cmd_sn);
-	print_datasn(cmd->data_sn);
-	print_offset(cmd->offset);
-	printk(KERN_INFO "\tResidualCount: 0x%08x\n", cmd->res_count);
-}
-
 void print_targ_r2t(struct iscsi_targ_r2t *cmd)
 {
 	printk(KERN_INFO "Dumping ISCSI_TARG_R2T PDU\n");
