@@ -24,8 +24,6 @@
 
 /* NOP-In */
 #define ISCSI_TARG_NOP_IN		0x20
-/* Logout Response */
-#define ISCSI_TARG_LOGOUT_RSP		0x26
 /* Reject */
 #define ISCSI_TARG_RJT			0x3f
 
@@ -128,12 +126,6 @@
 #define REASON_NEGOTIATION_RESET		0x0b
 #define REASON_WAITING_FOR_LOGOUT		0x0c
 
-/* response in iSCSI Logout Response */
-#define CONNORSESSCLOSEDSUCCESSFULLY		0
-#define CIDNOTFOUND				1
-#define CONNRECOVERYNOTSUPPORTED		2
-#define CLEANUPFAILED				3
-
 /* SNACK type */
 #define SNACK_DATA				0
 #define SNACK_R2T				0
@@ -142,27 +134,6 @@
 #define SNACK_RDATA				3
 
 /* iSCSI message formats based on v12 of the IETF iSCSI Draft. */
-
-/* 9.15 Logout Reponse */
-
-struct iscsi_targ_logout_rsp {
-	u8	opcode;
-	u8	flags;
-	u8	response;
-	u8	reserved1;
-	u32	length;
-	u64	reserved2;
-	u32	init_task_tag;
-	u32	reserved3;
-	u32	stat_sn;
-	u32	exp_cmd_sn;
-	u32	max_cmd_sn;
-	u32	reserved4;
-	u16	time_2_wait;
-	u16	time_2_retain;
-	u32	reserved5;
-	u32	header_digest;
-};
 
 /* 9.16 SNACK Request */
 

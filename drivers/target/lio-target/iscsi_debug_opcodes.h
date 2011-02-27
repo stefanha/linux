@@ -27,7 +27,6 @@ void print_cid(u16);
 void print_isid(u8 []);
 void print_tsih(u16);
 void print_scsicdb(u8 []);
-void print_targ_logout_rsp(struct iscsi_targ_logout_rsp *);
 void print_init_snack(struct iscsi_init_snack *);
 void print_targ_rjt(struct iscsi_targ_rjt *);
 void print_init_nop_out(struct iscsi_init_nop_out *);
