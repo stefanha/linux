@@ -556,17 +556,25 @@ struct iscsi_logout_rsp {
 struct iscsi_snack {
 	uint8_t opcode;
 	uint8_t flags;
-	uint8_t rsvd2[14];
+	uint8_t rsvd2[2];
+	uint8_t hlength;
+	uint8_t dlength[3];
+	uint8_t lun[8];	
 	itt_t	 itt;
+	__be32  ttt;
+	uint8_t rsvd3[4];
+	__be32  exp_statsn;
+	uint8_t rsvd4[8];
 	__be32	begrun;
 	__be32	runlength;
-	__be32	exp_statsn;
-	__be32	rsvd3;
-	__be32	exp_datasn;
-	uint8_t rsvd6[8];
 };
 
 /* SNACK PDU flags */
+#define ISCSI_FLAG_SNACK_TYPE_DATA		0
+#define ISCSI_FLAG_SNACK_TYPE_R2T		0
+#define ISCSI_FLAG_SNACK_TYPE_STATUS		1
+#define ISCSI_FLAG_SNACK_TYPE_DATA_ACK		2
+#define ISCSI_FLAG_SNACK_TYPE_RDATA		3
 #define ISCSI_FLAG_SNACK_TYPE_MASK	0x0F	/* 4 bits */
 
 /* Reject Message Header */
