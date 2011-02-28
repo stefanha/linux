@@ -24,7 +24,7 @@ obj-$(CONFIG_TCM_PSCSI)		+= target_core_pscsi.o
 obj-$(CONFIG_TCM_STGT)		+= target_core_stgt.o
 
 # Fabric modules
-obj-$(CONFIG_LIO_TARGET)	+= lio-target/
+obj-$(CONFIG_LIO_TARGET)	+= iscsi/
 obj-$(CONFIG_TCM_LOOP_FABRIC)	+= tcm_loop/
 
 obj-$(CONFIG_TCM_FC)		+= tcm_fc/

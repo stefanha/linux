@@ -1,4 +1,4 @@
-EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/include/scsi/ -I$(srctree)/drivers/target/lio-target
+EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/include/scsi/ -I$(srctree)/drivers/target/iscsi
 
 EXTRA_CFLAGS+=-D_TARGET -DPYX_ISCSI_VENDOR='"Linux-iSCSI.org"'
 
