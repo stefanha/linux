@@ -1266,7 +1266,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	 */
 	stats_cg = &tiqn->tiqn_wwn.fabric_stat_group;
 
-	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 3,
 				GFP_KERNEL);
 	if (!stats_cg->default_groups) {
 		printk(KERN_ERR "Unable to allocate memory for"
@@ -1276,9 +1276,12 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	}
 	
 	stats_cg->default_groups[0] = &WWN_STAT_GRPS(tiqn)->iscsi_instance_group;
-	stats_cg->default_groups[1] = NULL;
+	stats_cg->default_groups[1] = &WWN_STAT_GRPS(tiqn)->iscsi_sess_err_group;
+	stats_cg->default_groups[2] = NULL;
 	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_instance_group,
 			"iscsi_instance", &iscsi_stat_instance_cit);
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_sess_err_group,
+			"iscsi_sess_err", &iscsi_stat_sess_err_cit);
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> Allocated Node:"

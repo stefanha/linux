@@ -2,6 +2,7 @@
 #define ISCSI_TARGET_STAT_H
 
 extern struct config_item_type iscsi_stat_instance_cit;
+extern struct config_item_type iscsi_stat_sess_err_cit;
 
 #if 0
 

@@ -952,6 +952,7 @@ struct iscsi_portal_group {
 struct iscsi_wwn_stat_grps {
 	struct config_group	iscsi_stat_group;
 	struct config_group	iscsi_instance_group;
+	struct config_group	iscsi_sess_err_group;
 };
 
 struct iscsi_tiqn {

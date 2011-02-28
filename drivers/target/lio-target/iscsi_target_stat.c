@@ -238,3 +238,85 @@ struct config_item_type iscsi_stat_instance_cit = {
 	.ct_attrs		= iscsi_stat_instance_attrs,
 	.ct_owner		= THIS_MODULE,
 };
+
+/*
+ * Instance Session Failure Stats Table
+ */
+CONFIGFS_EATTR_STRUCT(iscsi_stat_sess_err, iscsi_wwn_stat_grps);
+#define ISCSI_STAT_SESS_ERR_ATTR(_name, _mode)			\
+static struct iscsi_stat_sess_err_attribute			\
+			iscsi_stat_sess_err_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,				\
+	iscsi_stat_sess_err_show_attr_##_name,			\
+	iscsi_stat_sess_err_store_attr_##_name);
+
+#define ISCSI_STAT_SESS_ERR_ATTR_RO(_name)			\
+static struct iscsi_stat_sess_err_attribute			\
+			iscsi_stat_sess_err_##_name =		\
+	__CONFIGFS_EATTR_RO(_name,				\
+	iscsi_stat_sess_err_show_attr_##_name);
+
+static ssize_t iscsi_stat_sess_err_show_attr_inst(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	
+	return snprintf(page, PAGE_SIZE, "%u\n", tiqn->tiqn_index);
+}
+ISCSI_STAT_SESS_ERR_ATTR_RO(inst);
+
+static ssize_t iscsi_stat_sess_err_show_attr_digest_errors(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_sess_err_stats *sess_err = &tiqn->sess_err_stats;
+
+	return snprintf(page, PAGE_SIZE, "%u\n", sess_err->digest_errors);
+}
+ISCSI_STAT_SESS_ERR_ATTR_RO(digest_errors);
+
+static ssize_t iscsi_stat_sess_err_show_attr_cxn_errors(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_sess_err_stats *sess_err = &tiqn->sess_err_stats;
+
+	return snprintf(page, PAGE_SIZE, "%u\n", sess_err->cxn_timeout_errors);
+}
+ISCSI_STAT_SESS_ERR_ATTR_RO(cxn_errors);
+
+static ssize_t iscsi_stat_sess_err_show_attr_format_errors(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_sess_err_stats *sess_err = &tiqn->sess_err_stats;
+
+	return snprintf(page, PAGE_SIZE, "%u\n", sess_err->pdu_format_errors);
+}
+ISCSI_STAT_SESS_ERR_ATTR_RO(format_errors);
+
+CONFIGFS_EATTR_OPS(iscsi_stat_sess_err, iscsi_wwn_stat_grps,
+		iscsi_sess_err_group);
+
+static struct configfs_attribute *iscsi_stat_sess_err_attrs[] = {
+	&iscsi_stat_sess_err_inst.attr,
+	&iscsi_stat_sess_err_digest_errors.attr,
+	&iscsi_stat_sess_err_cxn_errors.attr,
+	&iscsi_stat_sess_err_format_errors.attr,
+	NULL,
+};
+
+static struct configfs_item_operations iscsi_stat_sess_err_item_ops = {
+	.show_attribute		= iscsi_stat_sess_err_attr_show,
+	.store_attribute	= iscsi_stat_sess_err_attr_store,
+};
+
+struct config_item_type iscsi_stat_sess_err_cit = {
+	.ct_item_ops		= &iscsi_stat_sess_err_item_ops,
+	.ct_attrs		= iscsi_stat_sess_err_attrs,
+	.ct_owner		= THIS_MODULE,
+};
