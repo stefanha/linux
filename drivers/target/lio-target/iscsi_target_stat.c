@@ -320,3 +320,168 @@ struct config_item_type iscsi_stat_sess_err_cit = {
 	.ct_attrs		= iscsi_stat_sess_err_attrs,
 	.ct_owner		= THIS_MODULE,
 };
+
+/*
+ * Target Attributes Table
+ */
+CONFIGFS_EATTR_STRUCT(iscsi_stat_tgt_attr, iscsi_wwn_stat_grps);
+#define ISCSI_STAT_TGT_ATTR(_name, _mode)			\
+static struct iscsi_stat_tgt_attr_attribute			\
+			iscsi_stat_tgt_attr_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,				\
+	iscsi_stat_tgt-attr_show_attr_##_name,			\
+	iscsi_stat_tgt_attr_store_attr_##_name);
+
+#define ISCSI_STAT_TGT_ATTR_RO(_name)				\
+static struct iscsi_stat_tgt_attr_attribute			\
+			iscsi_stat_tgt_attr_##_name =		\
+	__CONFIGFS_EATTR_RO(_name,				\
+	iscsi_stat_tgt_attr_show_attr_##_name);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_inst(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+
+	return snprintf(page, PAGE_SIZE, "%u\n", tiqn->tiqn_index);
+}
+ISCSI_STAT_TGT_ATTR_RO(inst);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_indx(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	return snprintf(page, PAGE_SIZE, "%u\n", ISCSI_NODE_INDEX);
+}
+ISCSI_STAT_TGT_ATTR_RO(indx);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_login_fails(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	u32 fail_count;
+
+	spin_lock(&lstat->lock);
+	fail_count = (lstat->redirects + lstat->authorize_fails +
+			lstat->authenticate_fails + lstat->negotiate_fails +
+			lstat->other_fails);
+	spin_unlock(&lstat->lock);
+
+	return snprintf(page, PAGE_SIZE, "%u\n", fail_count);
+}
+ISCSI_STAT_TGT_ATTR_RO(login_fails);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_last_fail_time(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	u32 last_fail_time;
+
+	spin_lock(&lstat->lock);
+	last_fail_time = lstat->last_fail_time ?
+			(u32)(((u32)lstat->last_fail_time -
+				INITIAL_JIFFIES) * 100 / HZ) : 0;
+	spin_unlock(&lstat->lock);
+
+	return snprintf(page, PAGE_SIZE, "%u\n", last_fail_time);
+}
+ISCSI_STAT_TGT_ATTR_RO(last_fail_time);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_last_fail_type(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	u32 last_fail_type;
+
+	spin_lock(&lstat->lock);
+	last_fail_type = lstat->last_fail_type;
+	spin_unlock(&lstat->lock);
+
+	return snprintf(page, PAGE_SIZE, "%u\n", last_fail_type);
+}
+ISCSI_STAT_TGT_ATTR_RO(last_fail_type);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_fail_intr_name(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	unsigned char buf[224];
+
+	spin_lock(&lstat->lock);
+	snprintf(buf, 224, "%s", lstat->last_intr_fail_name[0] ?
+				lstat->last_intr_fail_name : NONE);
+	spin_unlock(&lstat->lock);
+
+	return snprintf(page, PAGE_SIZE, "%s\n", buf);
+}
+ISCSI_STAT_TGT_ATTR_RO(fail_intr_name);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_fail_intr_addr_type(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+			struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	unsigned char buf[8];
+
+	spin_lock(&lstat->lock);
+	snprintf(buf, 8, "%s", (lstat->last_intr_fail_ip6_addr != NULL) ?
+				"ipv6" : "ipv4");
+	spin_unlock(&lstat->lock);
+
+	return snprintf(page, PAGE_SIZE, "%s\n", buf);
+}
+ISCSI_STAT_TGT_ATTR_RO(fail_intr_addr_type);
+
+static ssize_t iscsi_stat_tgt_attr_show_attr_fail_intr_addr(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+			struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	unsigned char buf[32];
+
+	spin_lock(&lstat->lock);
+	if (lstat->last_intr_fail_ip6_addr != NULL)
+		snprintf(buf, 32, "[%s]", lstat->last_intr_fail_ip6_addr);
+	else
+		snprintf(buf, 32, "%08X", lstat->last_intr_fail_addr);
+	spin_unlock(&lstat->lock);
+
+	return snprintf(page, PAGE_SIZE, "%s\n", buf);
+}
+ISCSI_STAT_TGT_ATTR_RO(fail_intr_addr);
+
+CONFIGFS_EATTR_OPS(iscsi_stat_tgt_attr, iscsi_wwn_stat_grps,
+		iscsi_tgt_attr_group);
+
+static struct configfs_attribute *iscsi_stat_tgt_attr_attrs[] = {
+	&iscsi_stat_tgt_attr_inst.attr,
+	&iscsi_stat_tgt_attr_indx.attr,
+	&iscsi_stat_tgt_attr_login_fails.attr,
+	&iscsi_stat_tgt_attr_last_fail_time.attr,
+	&iscsi_stat_tgt_attr_last_fail_type.attr,
+	&iscsi_stat_tgt_attr_fail_intr_name.attr,
+	&iscsi_stat_tgt_attr_fail_intr_addr_type.attr,
+	&iscsi_stat_tgt_attr_fail_intr_addr.attr,
+	NULL,
+};
+
+static struct configfs_item_operations iscsi_stat_tgt_attr_item_ops = {
+	.show_attribute		= iscsi_stat_tgt_attr_attr_show,
+	.store_attribute	= iscsi_stat_tgt_attr_attr_store,
+};
+
+struct config_item_type iscsi_stat_tgt_attr_cit = {
+	.ct_item_ops		= &iscsi_stat_tgt_attr_item_ops,
+	.ct_attrs		= iscsi_stat_tgt_attr_attrs,
+	.ct_owner		= THIS_MODULE,
+};
