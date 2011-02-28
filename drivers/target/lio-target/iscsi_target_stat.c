@@ -485,3 +485,159 @@ struct config_item_type iscsi_stat_tgt_attr_cit = {
 	.ct_attrs		= iscsi_stat_tgt_attr_attrs,
 	.ct_owner		= THIS_MODULE,
 };
+
+/*
+ * Target Login Stats Table
+ */
+CONFIGFS_EATTR_STRUCT(iscsi_stat_login, iscsi_wwn_stat_grps);
+#define ISCSI_STAT_LOGIN(_name, _mode)				\
+static struct iscsi_stat_login_attribute			\
+			iscsi_stat_login_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,				\
+	iscsi_stat_login_show_attr_##_name,			\
+	iscsi_stat_login_store_attr_##_name);	
+
+#define ISCSI_STAT_LOGIN_RO(_name)				\
+static struct iscsi_stat_login_attribute			\
+			iscsi_stat_login_##_name =		\
+	__CONFIGFS_EATTR_RO(_name,				\
+	iscsi_stat_login_show_attr_##_name);
+
+static ssize_t iscsi_stat_login_show_attr_inst(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+
+	return snprintf(page, PAGE_SIZE, "%u\n", tiqn->tiqn_index);
+}
+ISCSI_STAT_LOGIN_RO(inst);
+
+static ssize_t iscsi_stat_login_show_attr_indx(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	return snprintf(page, PAGE_SIZE, "%u\n", ISCSI_NODE_INDEX);
+}
+ISCSI_STAT_LOGIN_RO(indx);
+
+static ssize_t iscsi_stat_login_show_attr_accepts(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	ssize_t ret;
+
+	spin_lock(&lstat->lock);
+	ret = snprintf(page, PAGE_SIZE, "%u\n", lstat->accepts);
+	spin_unlock(&lstat->lock);
+
+	return ret;
+}
+ISCSI_STAT_LOGIN_RO(accepts);
+
+static ssize_t iscsi_stat_login_show_attr_other_fails(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	ssize_t ret;
+
+	spin_lock(&lstat->lock);
+	ret = snprintf(page, PAGE_SIZE, "%u\n", lstat->other_fails);
+	spin_unlock(&lstat->lock);
+
+	return ret;
+}
+ISCSI_STAT_LOGIN_RO(other_fails);
+
+static ssize_t iscsi_stat_login_show_attr_redirects(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	ssize_t ret;
+
+	spin_lock(&lstat->lock);
+	ret = snprintf(page, PAGE_SIZE, "%u\n", lstat->redirects);
+	spin_unlock(&lstat->lock);
+
+	return ret;
+}
+ISCSI_STAT_LOGIN_RO(redirects);
+
+static ssize_t iscsi_stat_login_show_attr_authorize_fails(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	ssize_t ret;
+
+	spin_lock(&lstat->lock);
+	ret = snprintf(page, PAGE_SIZE, "%u\n", lstat->authorize_fails);
+	spin_unlock(&lstat->lock);
+
+	return ret;
+}
+ISCSI_STAT_LOGIN_RO(authorize_fails);
+
+static ssize_t iscsi_stat_login_show_attr_authenticate_fails(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	ssize_t ret;
+
+	spin_lock(&lstat->lock);
+	ret = snprintf(page, PAGE_SIZE, "%u\n", lstat->authenticate_fails);
+	spin_unlock(&lstat->lock);
+
+	return ret;
+}
+ISCSI_STAT_LOGIN_RO(authenticate_fails);
+
+static ssize_t iscsi_stat_login_show_attr_negotiate_fails(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+				struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_login_stats *lstat = &tiqn->login_stats;
+	ssize_t ret;
+
+	spin_lock(&lstat->lock);
+	ret = snprintf(page, PAGE_SIZE, "%u\n", lstat->negotiate_fails);
+	spin_unlock(&lstat->lock);
+
+	return ret;
+}
+ISCSI_STAT_LOGIN_RO(negotiate_fails);
+
+CONFIGFS_EATTR_OPS(iscsi_stat_login, iscsi_wwn_stat_grps,
+		iscsi_login_stats_group);
+
+static struct configfs_attribute *iscsi_stat_login_stats_attrs[] = {
+	&iscsi_stat_login_inst.attr,
+	&iscsi_stat_login_indx.attr,
+	&iscsi_stat_login_accepts.attr,
+	&iscsi_stat_login_other_fails.attr,
+	&iscsi_stat_login_redirects.attr,
+	&iscsi_stat_login_authorize_fails.attr,
+	&iscsi_stat_login_authenticate_fails.attr,
+	&iscsi_stat_login_negotiate_fails.attr,
+	NULL,
+};
+
+static struct configfs_item_operations iscsi_stat_login_stats_item_ops = {
+	.show_attribute		= iscsi_stat_login_attr_show,
+	.store_attribute	= iscsi_stat_login_attr_store,
+};
+
+struct config_item_type iscsi_stat_login_cit = {
+	.ct_item_ops		= &iscsi_stat_login_stats_item_ops,
+	.ct_attrs		= iscsi_stat_login_stats_attrs,
+	.ct_owner		= THIS_MODULE,
+};

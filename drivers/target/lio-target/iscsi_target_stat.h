@@ -4,6 +4,7 @@
 extern struct config_item_type iscsi_stat_instance_cit;
 extern struct config_item_type iscsi_stat_sess_err_cit;
 extern struct config_item_type iscsi_stat_tgt_attr_cit;
+extern struct config_item_type iscsi_stat_login_cit;
 
 #if 0
 
