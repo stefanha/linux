@@ -29,6 +29,7 @@ struct target_fabric_configfs_template {
 	struct config_item_type tfc_tpg_nacl_attrib_cit;
 	struct config_item_type tfc_tpg_nacl_auth_cit;
 	struct config_item_type tfc_tpg_nacl_param_cit;
+	struct config_item_type tfc_tpg_nacl_stat_cit;
 	struct config_item_type tfc_tpg_mappedlun_cit;
 	struct config_item_type tfc_tpg_mappedlun_stat_cit;
 };

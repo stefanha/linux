@@ -601,7 +601,8 @@ struct se_node_acl {
 	struct config_group	acl_attrib_group;
 	struct config_group	acl_auth_group;
 	struct config_group	acl_param_group;
-	struct config_group	*acl_default_groups[4];
+	struct config_group	acl_fabric_stat_group;
+	struct config_group	*acl_default_groups[5];
 	struct list_head	acl_list;
 	struct list_head	acl_sess_list;
 } ____cacheline_aligned;

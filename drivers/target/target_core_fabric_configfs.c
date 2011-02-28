@@ -455,6 +455,15 @@ TF_CIT_SETUP(tpg_nacl_base, &target_fabric_nacl_base_item_ops,
 
 /* End of tfc_tpg_nacl_base_cit */
 
+/* Start of tfc_node_fabric_stats_cit */
+/*
+ * This is used as a placeholder for struct se_node_acl->acl_fabric_stat_group
+ * to allow fabrics access to ->acl_fabric_stat_group->default_groups[]
+ */
+TF_CIT_SETUP(tpg_nacl_stat, NULL, NULL, NULL);
+
+/* End of tfc_wwn_fabric_stats_cit */
+
 /* Start of tfc_tpg_nacl_cit */
 
 static struct config_group *target_fabric_make_nodeacl(
@@ -481,7 +490,8 @@ static struct config_group *target_fabric_make_nodeacl(
 	nacl_cg->default_groups[0] = &se_nacl->acl_attrib_group;
 	nacl_cg->default_groups[1] = &se_nacl->acl_auth_group;
 	nacl_cg->default_groups[2] = &se_nacl->acl_param_group;
-	nacl_cg->default_groups[3] = NULL;
+	nacl_cg->default_groups[3] = &se_nacl->acl_fabric_stat_group;
+	nacl_cg->default_groups[4] = NULL;
 
 	config_group_init_type_name(&se_nacl->acl_group, name,
 			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_base_cit);
@@ -491,6 +501,9 @@ static struct config_group *target_fabric_make_nodeacl(
 			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_auth_cit);
 	config_group_init_type_name(&se_nacl->acl_param_group, "param",
 			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_param_cit);
+	config_group_init_type_name(&se_nacl->acl_fabric_stat_group,
+			"fabric_statistics",
+			&TF_CIT_TMPL(tf)->tfc_tpg_nacl_stat_cit);
 
 	return &se_nacl->acl_group;
 }
@@ -1214,6 +1227,7 @@ int target_fabric_setup_cits(struct target_fabric_configfs *tf)
 	target_fabric_setup_tpg_nacl_attrib_cit(tf);
 	target_fabric_setup_tpg_nacl_auth_cit(tf);
 	target_fabric_setup_tpg_nacl_param_cit(tf);
+	target_fabric_setup_tpg_nacl_stat_cit(tf);
 	target_fabric_setup_tpg_mappedlun_cit(tf);
 	target_fabric_setup_tpg_mappedlun_stat_cit(tf);
 
