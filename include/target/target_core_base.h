@@ -952,6 +952,8 @@ struct se_portal_group {
 struct se_wwn {
 	struct target_fabric_configfs *wwn_tf;
 	struct config_group	wwn_group;
+	struct config_group	*wwn_default_groups[2];
+	struct config_group	fabric_stat_group;
 } ____cacheline_aligned;
 
 struct se_global {
