@@ -50,7 +50,6 @@
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target.h>
-#include <iscsi_target_mib.h>
 #include <iscsi_target_stat.h>
 #include <iscsi_target_configfs.h>
 

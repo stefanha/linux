@@ -74,7 +74,7 @@
 #include <iscsi_target_debugerl.h>
 #endif /* DEBUG_ERL */
 
-#include <iscsi_target_mib.h>
+#include <iscsi_target_stat.h>
 
 #include <iscsi_target_configfs.h>
 
@@ -805,6 +805,40 @@ void core_release_nps(void)
 	spin_unlock(&iscsi_global->np_lock);
 }
 
+/* iSCSI mib table index for iscsi_target_stat.c */
+struct iscsi_index_table iscsi_index_table;
+
+/*
+ * Initialize the index table for allocating unique row indexes to various mib
+ * tables
+ */
+static void init_iscsi_index_table(void)
+{
+	memset(&iscsi_index_table, 0, sizeof(iscsi_index_table));
+	spin_lock_init(&iscsi_index_table.lock);
+}
+
+/*
+ * Allocate a new row index for the entry type specified
+ */
+u32 iscsi_get_new_index(iscsi_index_t type)
+{
+	u32 new_index;
+	
+	if ((type < 0) || (type >= INDEX_TYPE_MAX)) {
+		printk(KERN_ERR "Invalid index type %d\n", type);
+		return -1;
+	}
+
+	spin_lock(&iscsi_index_table.lock);
+	new_index = ++iscsi_index_table.iscsi_mib_index[type];
+	if (new_index == 0)
+		new_index = ++iscsi_index_table.iscsi_mib_index[type];
+	spin_unlock(&iscsi_index_table.lock);
+
+	return new_index;
+}
+
 /* init_iscsi_target():
  *
  * This function is called during module initialization to setup struct iscsi_global.
@@ -899,7 +933,6 @@ static const struct file_operations version_info = {
 static int iscsi_target_detect(void)
 {
 	int ret = 0;
-	struct proc_dir_entry *dir_entry, *name_entry, *ver_entry;
 
 	printk(KERN_INFO "%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on"
 		" %s/%s on "UTS_RELEASE"\n", PYX_ISCSI_VENDOR,
@@ -940,33 +973,7 @@ static int iscsi_target_detect(void)
 	spin_lock_init(&iscsi_global->debug_erl_lock);
 #endif /* DEBUG_ERL */
 
-	dir_entry = proc_mkdir("iscsi_target", 0);
-	if (!(dir_entry)) {
-		printk(KERN_ERR "proc_mkdir() failed.\n");
-		ret = -1;
-		goto out;
-	}
-	name_entry = proc_create("target_nodename", 0,
-			dir_entry, &default_targetname);
-	if (!(name_entry)) {
-		printk(KERN_ERR "create_proc() failed.\n");
-		remove_proc_entry("iscsi_target", 0);
-		ret = -1;
-		goto out;
-	}
-	ver_entry = proc_create("version_info", 0,
-			dir_entry, &version_info);
-	if (!(ver_entry)) {
-		printk(KERN_ERR "create_proc() failed.\n");
-		remove_proc_entry("iscsi_target/target_node_name", 0);
-		remove_proc_entry("iscsi_target", 0);
-		ret = -1;
-		goto out;
-	}
-
-	init_iscsi_target_mib();
 	iscsi_target_register_configfs();
-
 	iscsi_thread_set_init();
 
 	if (iscsi_allocate_thread_sets(TARGET_THREAD_SET_COUNT) !=
@@ -1077,10 +1084,6 @@ out:
 	iscsi_thread_set_free();
 	iscsi_target_deregister_configfs();
 
-	remove_iscsi_target_mib();
-	remove_proc_entry("iscsi_target/version_info", 0);
-	remove_proc_entry("iscsi_target/target_nodename", 0);
-	remove_proc_entry("iscsi_target", 0);
 #ifdef DEBUG_ERL
 	kfree(iscsi_global->debug_erl);
 #endif /* DEBUG_ERL */
@@ -1134,11 +1137,6 @@ void iscsi_target_release_phase2(void)
 
 	iscsi_global->ti_forcechanoffline = NULL;
 	iscsi_target_deregister_configfs();
-
-	remove_iscsi_target_mib();
-	remove_proc_entry("iscsi_target/version_info", 0);
-	remove_proc_entry("iscsi_target/target_nodename", 0);
-	remove_proc_entry("iscsi_target", 0);
 }
 
 /*	iscsi_target_release():

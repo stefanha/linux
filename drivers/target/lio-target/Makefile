@@ -21,8 +21,7 @@ iscsi_target_mod-y +=		iscsi_auth_chap.o \
 				iscsi_target_util.o \
 				iscsi_target.o \
 				iscsi_target_configfs.o \
-				iscsi_target_stat.o \
-				iscsi_target_mib.o
+				iscsi_target_stat.o
 
 ifdef CONFIG_LIO_TARGET_DEBUG_ERL
 iscsi_target_mod-y		+= iscsi_target_debugerl.o

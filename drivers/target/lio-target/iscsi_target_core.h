@@ -33,8 +33,6 @@
 /* Size of iSCSI specific sense buffer */
 #define ISCSI_SENSE_BUFFER_LEN		TRANSPORT_SENSE_BUFFER + 2
 
-#include <iscsi_target_mib.h>
-
 /* struct iscsi_tpg_np->tpg_np_network_transport */
 #define ISCSI_TCP			0
 #define ISCSI_SCTP_TCP			1
@@ -349,6 +347,8 @@ struct iscsi_sess_ops {
 	u8	ErrorRecoveryLevel;		/* [0..2] */
 	u8	SessionType;			/* [0,1] == [Normal,Discovery]*/
 };
+
+#include <iscsi_target_stat.h>
 
 struct iscsi_queue_req {
 	int			state;

@@ -15,8 +15,6 @@ extern struct config_item_type iscsi_stat_logout_cit;
  */
 extern struct config_item_type iscsi_stat_sess_cit;
 
-#if 0
-
 /* iSCSI session error types */
 #define ISCSI_SESS_ERR_UNKNOWN		0
 #define ISCSI_SESS_ERR_DIGEST		1
@@ -77,7 +75,5 @@ struct iscsi_index_table {
 	spinlock_t	lock;
 	u32 		iscsi_mib_index[INDEX_TYPE_MAX];
 } ____cacheline_aligned;
-#endif
 
 #endif   /*** ISCSI_TARGET_STAT_H ***/
-
