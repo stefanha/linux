@@ -22,9 +22,6 @@
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
-#include <linux/version.h>
-#include <generated/utsrelease.h>
-#include <linux/utsname.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -43,9 +40,7 @@
 #include <target/target_core_tpg.h>
 #include <target/target_core_tmr.h>
 
-#include <tcm_loop_core.h>
-#include <tcm_loop_fabric.h>
-#include <tcm_loop_fabric_scsi.h>
+#include "tcm_loop_core.h"
 
 #define to_tcm_loop_hba(hba)	container_of(hba, struct tcm_loop_hba, dev)
 
@@ -65,7 +60,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	struct tcm_loop_cmd *tl_cmd;
 	int sam_task_attr;
 
-	if (!(tl_nexus)) {
+	if (!tl_nexus) {
 		scmd_printk(KERN_ERR, sc, "TCM_Loop I_T Nexus"
 				" does not exist\n");
 		set_host_byte(sc, DID_ERROR);
@@ -74,7 +69,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	se_sess = tl_nexus->se_sess;
 
 	tl_cmd = kmem_cache_zalloc(tcm_loop_cmd_cache, GFP_ATOMIC);
-	if (!(tl_cmd)) {
+	if (!tl_cmd) {
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_cmd\n");
 		set_host_byte(sc, DID_ERROR);
 		return NULL;
@@ -296,11 +291,6 @@ static int tcm_loop_change_queue_depth(
 	return sdev->queue_depth;
 }
 
-static inline struct tcm_loop_hba *tcm_loop_get_hba(struct scsi_cmnd *sc)
-{
-	return (struct tcm_loop_hba *)sc->device->host->hostdata[0];
-}
-
 /*
  * Main entry point from struct scsi_host_template for incoming SCSI CDB+Data
  * from Linux/SCSI subsystem for SCSI low level device drivers (LLDs)
@@ -321,14 +311,7 @@ static int tcm_loop_queuecommand(
 	/*
 	 * Locate the tcm_loop_hba_t pointer 
 	 */
-	tl_hba = tcm_loop_get_hba(sc);
-	if (!(tl_hba)) {
-		printk(KERN_ERR "Unable to locate struct tcm_loop_hba from"
-				" struct scsi_cmnd\n");
-		set_host_byte(sc, DID_ERROR);
-		sc->scsi_done(sc);
-		return 0;	
-	}
+	tl_hba = *(struct tcm_loop_hba **)shost_priv(sc->device->host);
 	tl_tpg = &tl_hba->tl_hba_tpgs[sc->device->id];
 	se_tpg = &tl_tpg->tl_se_tpg;
 	/*
@@ -336,7 +319,7 @@ static int tcm_loop_queuecommand(
 	 * tl_cmd->tl_se_cmd from TCM infrastructure
 	 */
 	se_cmd = tcm_loop_allocate_core_cmd(tl_hba, se_tpg, sc);
-	if (!(se_cmd)) {
+	if (!se_cmd) {
 		sc->scsi_done(sc);
 		return 0;
 	}
@@ -365,17 +348,12 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	/*
 	 * Locate the tcm_loop_hba_t pointer 
 	 */
-	tl_hba = tcm_loop_get_hba(sc);
-	if (!(tl_hba)) {
-		printk(KERN_ERR "Unable to locate struct tcm_loop_hba from"
-				" struct scsi_cmnd\n");
-		return FAILED;
-	}
+	tl_hba = *(struct tcm_loop_hba **)shost_priv(sc->device->host);
 	/*
 	 * Locate the tl_nexus and se_sess pointers
 	 */
 	tl_nexus = tl_hba->tl_nexus;
-	if (!(tl_nexus)) {
+	if (!tl_nexus) {
 		printk(KERN_ERR "Unable to perform device reset without"
 				" active I_T Nexus\n");
 		return FAILED;
@@ -388,13 +366,13 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	se_tpg = &tl_tpg->tl_se_tpg;
 
 	tl_cmd = kmem_cache_zalloc(tcm_loop_cmd_cache, GFP_KERNEL);
-	if (!(tl_cmd)) {
+	if (!tl_cmd) {
 		printk(KERN_ERR "Unable to allocate memory for tl_cmd\n");
 		return FAILED;
 	}
 
 	tl_tmr = kzalloc(sizeof(struct tcm_loop_tmr), GFP_KERNEL);
-	if (!(tl_tmr)) {
+	if (!tl_tmr) {
 		printk(KERN_ERR "Unable to allocate memory for tl_tmr\n");
 		goto release;
 	}
@@ -412,7 +390,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	 */
 	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, (void *)tl_tmr,
 				TMR_LUN_RESET);
-	if (!(se_cmd->se_tmr_req))
+	if (!se_cmd->se_tmr_req)
 		goto release;
 	/*
 	 * Locate the underlying TCM struct se_lun from sc->device->lun
@@ -455,18 +433,9 @@ static struct scsi_host_template tcm_loop_driver_template = {
 	.proc_info		= tcm_loop_proc_info,
 	.proc_name		= "tcm_loopback",
 	.name			= "TCM_Loopback",
-	.info			= NULL,
-	.slave_alloc		= NULL,
-	.slave_configure	= NULL,
-	.slave_destroy		= NULL,
-	.ioctl			= NULL,
 	.queuecommand		= tcm_loop_queuecommand,
 	.change_queue_depth	= tcm_loop_change_queue_depth,
-	.eh_abort_handler	= NULL,
-	.eh_bus_reset_handler	= NULL,
 	.eh_device_reset_handler = tcm_loop_device_reset,
-	.eh_host_reset_handler	= NULL,
-	.bios_param		= NULL,
 	.can_queue		= TL_SCSI_CAN_QUEUE,
 	.this_id		= -1,
 	.sg_tablesize		= TL_SCSI_SG_TABLESIZE,
@@ -488,7 +457,7 @@ static int tcm_loop_driver_probe(struct device *dev)
 
 	sh = scsi_host_alloc(&tcm_loop_driver_template,
 			sizeof(struct tcm_loop_hba));
-	if (!(sh)) {
+	if (!sh) {
 		printk(KERN_ERR "Unable to allocate struct scsi_host\n");
 		return -ENODEV;
 	}
@@ -497,7 +466,7 @@ static int tcm_loop_driver_probe(struct device *dev)
 	/*
 	 * Assign the struct tcm_loop_hba pointer to struct Scsi_Host->hostdata
 	 */
-	sh->hostdata[0] = (unsigned long)tl_hba;
+	*((struct tcm_loop_hba **)sh->hostdata) = tl_hba;
 	/*
 	 * Setup single ID, Channel and LUN for now..
 	 */

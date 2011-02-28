@@ -24,7 +24,6 @@
 #include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/kthread.h>
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/string.h>
@@ -40,9 +39,7 @@
 #include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
 
-#include <tcm_loop_core.h>
-#include <tcm_loop_configfs.h>
-#include <tcm_loop_fabric_scsi.h>
+#include "tcm_loop_core.h"
 
 struct kmem_cache *tcm_loop_cmd_cache;
 
@@ -240,7 +237,7 @@ struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
 	struct tcm_loop_nacl *tl_nacl;
 
 	tl_nacl = kzalloc(sizeof( struct tcm_loop_nacl), GFP_KERNEL);
-	if (!(tl_nacl)) {
+	if (!tl_nacl) {
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_nacl\n");
 		return NULL;
 	}
@@ -368,7 +365,7 @@ int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 
 	sc->result = SAM_STAT_GOOD;
 	set_host_byte(sc, DID_OK);
-	(*sc->scsi_done)(sc);
+	sc->scsi_done(sc);
 	return 0;
 }
 
@@ -393,7 +390,7 @@ int tcm_loop_queue_status(struct se_cmd *se_cmd)
 		sc->result = se_cmd->scsi_status;
 
 	set_host_byte(sc, DID_OK);
-	(*sc->scsi_done)(sc);
+	sc->scsi_done(sc);
 	return 0;
 }
 
@@ -440,7 +437,7 @@ static int __init tcm_loop_fabric_init(void)
 				sizeof(struct tcm_loop_cmd),
 				__alignof__(struct tcm_loop_cmd),
 				0, NULL);
-	if (!(tcm_loop_cmd_cache)) {
+	if (!tcm_loop_cmd_cache) {
 		printk(KERN_ERR "kmem_cache_create() for"
 				" tcm_loop_cmd_cache failed\n");
 		return -1;

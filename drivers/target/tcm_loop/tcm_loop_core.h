@@ -16,7 +16,7 @@
  */
 #define TL_SCSI_MAX_CMD_LEN		32
 
-#ifdef TCM_LOOP_CDB_DEBUG
+#ifdef CONFIG_TCM_LOOP_CDB_DEBUG
 # define TL_CDB_DEBUG(x...)		printk(KERN_INFO x)
 #else
 # define TL_CDB_DEBUG(x...)
@@ -75,3 +75,67 @@ struct tcm_loop_hba {
 	struct tcm_loop_tpg tl_hba_tpgs[TL_TPGS_PER_HBA];
 	struct se_wwn tl_hba_wwn;
 };
+
+/*
+ * From tcm_loop_configfs.c
+ */
+extern int tcm_loop_register_configfs(void);
+extern void tcm_loop_deregister_configfs(void);
+
+/*
+ * From tcm_loop_fabric.c
+ */
+extern char *tcm_loop_get_fabric_name(void);
+extern u8 tcm_loop_get_fabric_proto_ident(struct se_portal_group *);
+extern char *tcm_loop_get_endpoint_wwn(struct se_portal_group *);
+extern u16 tcm_loop_get_tag(struct se_portal_group *);
+extern u32 tcm_loop_get_default_depth(struct se_portal_group *);
+extern u32 tcm_loop_get_pr_transport_id(struct se_portal_group *, struct se_node_acl *,
+				struct t10_pr_registration *, int *,
+				unsigned char *);
+extern u32 tcm_loop_get_pr_transport_id_len(struct se_portal_group *,
+				struct se_node_acl *, struct t10_pr_registration *,
+				int *);
+extern char *tcm_loop_parse_pr_out_transport_id(struct se_portal_group *,
+				const char *, u32 *, char **);
+extern int tcm_loop_check_demo_mode(struct se_portal_group *);
+extern int tcm_loop_check_demo_mode_cache(struct se_portal_group *);
+extern int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *);
+extern int tcm_loop_check_prod_mode_write_protect(struct se_portal_group *);
+extern struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
+				struct se_portal_group *);
+void tcm_loop_tpg_release_fabric_acl(struct se_portal_group *, struct se_node_acl *);
+extern u32 tcm_loop_get_inst_index(struct se_portal_group *);
+extern void tcm_loop_new_cmd_failure(struct se_cmd *);
+extern int tcm_loop_is_state_remove(struct se_cmd *);
+extern int tcm_loop_sess_logged_in(struct se_session *);
+extern u32 tcm_loop_sess_get_index(struct se_session *);
+extern void tcm_loop_set_default_node_attributes(struct se_node_acl *);
+extern u32 tcm_loop_get_task_tag(struct se_cmd *);
+extern int tcm_loop_get_cmd_state(struct se_cmd *);
+extern int tcm_loop_shutdown_session(struct se_session *);
+extern void tcm_loop_close_session(struct se_session *);
+extern void tcm_loop_stop_session(struct se_session *, int, int);
+extern void tcm_loop_fall_back_to_erl0(struct se_session *);
+extern int tcm_loop_write_pending(struct se_cmd *);
+extern int tcm_loop_write_pending_status(struct se_cmd *);
+extern int tcm_loop_queue_data_in(struct se_cmd *);
+extern int tcm_loop_queue_status(struct se_cmd *);
+extern int tcm_loop_queue_tm_rsp(struct se_cmd *);
+extern u16 tcm_loop_set_fabric_sense_len(struct se_cmd *, u32);
+extern u16 tcm_loop_get_fabric_sense_len(void);
+extern u64 tcm_loop_pack_lun(unsigned int);
+
+/*
+ * From tcm_loop_fabric_scsi.c
+ */
+extern struct kmem_cache *tcm_loop_cmd_cache;
+
+extern int tcm_loop_new_cmd_map(struct se_cmd *);
+extern void tcm_loop_check_stop_free(struct se_cmd *);
+extern void tcm_loop_deallocate_core_cmd(struct se_cmd *);
+extern void tcm_loop_scsi_forget_host(struct Scsi_Host *);
+extern void tcm_loop_deallocate_core_cmd(struct se_cmd *);
+extern int tcm_loop_setup_hba_bus(struct tcm_loop_hba *, int);
+extern int tcm_loop_alloc_core_bus(void);
+extern void tcm_loop_release_core_bus(void);

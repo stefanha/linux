@@ -1,11 +1,5 @@
-EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/drivers/scsi/ -I$(srctree)/include/scsi/ -I$(srctree)/drivers/target/tcm_loop/
-
 tcm_loop-y			:= tcm_loop_fabric.o \
 				   tcm_loop_fabric_scsi.o \
 				   tcm_loop_configfs.o \
 
 obj-$(CONFIG_TCM_LOOP_FABRIC)	+= tcm_loop.o
-
-ifdef CONFIG_TCM_LOOP_CDB_DEBUG
-EXTRA_CFLAGS			+= -DTCM_LOOP_CDB_DEBUG
-endif

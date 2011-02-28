@@ -27,7 +27,6 @@
 #include <linux/utsname.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/kthread.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/configfs.h>
@@ -47,10 +46,7 @@
 #include <target/target_core_base.h>
 #include <target/configfs_macros.h>
 
-#include <tcm_loop_core.h>
-#include <tcm_loop_configfs.h>
-#include <tcm_loop_fabric.h>
-#include <tcm_loop_fabric_scsi.h>
+#include "tcm_loop_core.h"
 
 /* Local pointer to allocated TCM configfs fabric module */
 struct target_fabric_configfs *tcm_loop_fabric_configfs;
@@ -107,7 +103,7 @@ void tcm_loop_port_unlink(
 
 	sd = scsi_device_lookup(tl_hba->sh, 0, tl_tpg->tl_tpgt,
 				se_lun->unpacked_lun);
-	if (!(sd)) {
+	if (!sd) {
 		printk(KERN_ERR "Unable to locate struct scsi_device for %d:%d:"
 			"%d\n", 0, tl_tpg->tl_tpgt, se_lun->unpacked_lun);
 		return;
@@ -143,7 +139,7 @@ static int tcm_loop_make_nexus(
 	se_tpg = &tl_tpg->tl_se_tpg;
 
 	tl_nexus = kzalloc(sizeof(struct tcm_loop_nexus), GFP_KERNEL);
-	if (!(tl_nexus)) {
+	if (!tl_nexus) {
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_nexus\n");
 		return -ENOMEM;
 	}
@@ -151,7 +147,7 @@ static int tcm_loop_make_nexus(
 	 * Initialize the struct se_session pointer
 	 */
 	tl_nexus->se_sess = transport_init_session();
-	if (!(tl_nexus->se_sess))
+	if (!tl_nexus->se_sess)
 		goto out;
 	/*
 	 * Since we are running in 'demo mode' this call with generate a
@@ -160,7 +156,7 @@ static int tcm_loop_make_nexus(
 	 */	
 	tl_nexus->se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
 				se_tpg, (unsigned char *)name);
-	if (!(tl_nexus->se_sess->se_node_acl)) {
+	if (!tl_nexus->se_sess->se_node_acl) {
 		transport_free_session(tl_nexus->se_sess);
 		goto out;
 	}
@@ -189,11 +185,11 @@ static int tcm_loop_drop_nexus(
 	struct tcm_loop_hba *tl_hba = tpg->tl_hba;
 
 	tl_nexus = tpg->tl_hba->tl_nexus;
-	if (!(tl_nexus))
+	if (!tl_nexus)
 		return -ENODEV;
 
 	se_sess = tl_nexus->se_sess;
-	if (!(se_sess))
+	if (!se_sess)
 		return -ENODEV;
 
 	if (atomic_read(&tpg->tl_tpg_port_count)) {
@@ -227,7 +223,7 @@ static ssize_t tcm_loop_tpg_show_nexus(
 	ssize_t ret;
 
 	tl_nexus = tl_tpg->tl_hba->tl_nexus;
-	if (!(tl_nexus))
+	if (!tl_nexus)
 		return -ENODEV;
 
 	ret = snprintf(page, PAGE_SIZE, "%s\n",
@@ -249,7 +245,7 @@ static ssize_t tcm_loop_tpg_store_nexus(
 	/*
 	 * Shutdown the active I_T nexus if 'NULL' is passed..
 	 */
-	if (!(strncmp(page, "NULL", 4))) {
+	if (!strncmp(page, "NULL", 4)) {
 		ret = tcm_loop_drop_nexus(tl_tpg);
 		return (!ret) ? count : ret;
 	}
@@ -337,7 +333,7 @@ struct se_portal_group *tcm_loop_make_naa_tpg(
 	unsigned short int tpgt;
 
 	tpgt_str = strstr(name, "tpgt_");
-	if (!(tpgt_str)) {
+	if (!tpgt_str) {
 		printk(KERN_ERR "Unable to locate \"tpgt_#\" directory"
 				" group\n");
 		return ERR_PTR(-EINVAL);
@@ -409,7 +405,7 @@ struct se_wwn *tcm_loop_make_scsi_hba(
 	int ret, off = 0;
 
 	tl_hba = kzalloc(sizeof(struct tcm_loop_hba), GFP_KERNEL);
-	if (!(tl_hba)) {
+	if (!tl_hba) {
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_hba\n");
                 return ERR_PTR(-ENOMEM);
         }
@@ -519,7 +515,7 @@ int tcm_loop_register_configfs(void)
 	 * Register the top level struct config_item_type with TCM core
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "loopback");
-	if (!(fabric)) {
+	if (!fabric) {
 		printk(KERN_ERR "tcm_loop_register_configfs() failed!\n");
 		return -1;
 	}
@@ -637,7 +633,7 @@ int tcm_loop_register_configfs(void)
 
 void tcm_loop_deregister_configfs(void)
 {
-	if (!(tcm_loop_fabric_configfs))
+	if (!tcm_loop_fabric_configfs)
 		return;
 
 	target_fabric_configfs_deregister(tcm_loop_fabric_configfs);
