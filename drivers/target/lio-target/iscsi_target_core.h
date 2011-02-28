@@ -955,6 +955,7 @@ struct iscsi_wwn_stat_grps {
 	struct config_group	iscsi_sess_err_group;
 	struct config_group	iscsi_tgt_attr_group;
 	struct config_group	iscsi_login_stats_group;
+	struct config_group	iscsi_logout_stats_group;
 };
 
 struct iscsi_tiqn {

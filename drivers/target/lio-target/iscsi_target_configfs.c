@@ -1266,7 +1266,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	 */
 	stats_cg = &tiqn->tiqn_wwn.fabric_stat_group;
 
-	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 5,
+	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 6,
 				GFP_KERNEL);
 	if (!stats_cg->default_groups) {
 		printk(KERN_ERR "Unable to allocate memory for"
@@ -1279,7 +1279,8 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	stats_cg->default_groups[1] = &WWN_STAT_GRPS(tiqn)->iscsi_sess_err_group;
 	stats_cg->default_groups[2] = &WWN_STAT_GRPS(tiqn)->iscsi_tgt_attr_group;
 	stats_cg->default_groups[3] = &WWN_STAT_GRPS(tiqn)->iscsi_login_stats_group;
-	stats_cg->default_groups[4] = NULL;
+	stats_cg->default_groups[4] = &WWN_STAT_GRPS(tiqn)->iscsi_logout_stats_group;
+	stats_cg->default_groups[5] = NULL;
 	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_instance_group,
 			"iscsi_instance", &iscsi_stat_instance_cit);
 	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_sess_err_group,
@@ -1288,6 +1289,8 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 			"iscsi_tgt_attr", &iscsi_stat_tgt_attr_cit);
 	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_login_stats_group,
 			"iscsi_login_stats", &iscsi_stat_login_cit);
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_logout_stats_group,
+			"iscsi_logout_stats", &iscsi_stat_logout_cit);
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> Allocated Node:"

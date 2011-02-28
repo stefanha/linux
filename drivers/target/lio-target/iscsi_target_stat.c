@@ -641,3 +641,83 @@ struct config_item_type iscsi_stat_login_cit = {
 	.ct_attrs		= iscsi_stat_login_stats_attrs,
 	.ct_owner		= THIS_MODULE,
 };
+
+/*
+ * Target Logout Stats Table
+ */
+
+CONFIGFS_EATTR_STRUCT(iscsi_stat_logout, iscsi_wwn_stat_grps);
+#define ISCSI_STAT_LOGOUT(_name, _mode)				\
+static struct iscsi_stat_logout_attribute			\
+			iscsi_stat_logout_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,				\
+	iscsi_stat_logout_show_attr_##_name,			\
+	iscsi_stat_logout_store_attr_##_name);   
+
+#define ISCSI_STAT_LOGOUT_RO(_name)				\
+static struct iscsi_stat_logout_attribute			\
+			iscsi_stat_logout_##_name =		\
+	__CONFIGFS_EATTR_RO(_name,				\
+	iscsi_stat_logout_show_attr_##_name);
+
+static ssize_t iscsi_stat_logout_show_attr_inst(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+			struct iscsi_tiqn, tiqn_stat_grps);
+
+	return snprintf(page, PAGE_SIZE, "%u\n", tiqn->tiqn_index);
+}
+ISCSI_STAT_LOGOUT_RO(inst);
+
+static ssize_t iscsi_stat_logout_show_attr_indx(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	return snprintf(page, PAGE_SIZE, "%u\n", ISCSI_NODE_INDEX);
+}
+ISCSI_STAT_LOGOUT_RO(indx);
+
+static ssize_t iscsi_stat_logout_show_attr_normal_logouts(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+			struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_logout_stats *lstats = &tiqn->logout_stats;
+	
+	return snprintf(page, PAGE_SIZE, "%u\n", lstats->normal_logouts);
+}
+ISCSI_STAT_LOGOUT_RO(normal_logouts);
+
+static ssize_t iscsi_stat_logout_show_attr_abnormal_logouts(
+	struct iscsi_wwn_stat_grps *igrps, char *page)
+{
+	struct iscsi_tiqn *tiqn = container_of(igrps,
+			struct iscsi_tiqn, tiqn_stat_grps);
+	struct iscsi_logout_stats *lstats = &tiqn->logout_stats;
+
+	return snprintf(page, PAGE_SIZE, "%u\n", lstats->abnormal_logouts);
+}
+ISCSI_STAT_LOGOUT_RO(abnormal_logouts);
+
+CONFIGFS_EATTR_OPS(iscsi_stat_logout, iscsi_wwn_stat_grps,
+		iscsi_logout_stats_group);
+
+static struct configfs_attribute *iscsi_stat_logout_stats_attrs[] = {
+	&iscsi_stat_logout_inst.attr,
+	&iscsi_stat_logout_indx.attr,
+	&iscsi_stat_logout_normal_logouts.attr,
+	&iscsi_stat_logout_abnormal_logouts.attr,
+	NULL,
+};
+
+static struct configfs_item_operations iscsi_stat_logout_stats_item_ops = {
+	.show_attribute		= iscsi_stat_logout_attr_show,
+	.store_attribute	= iscsi_stat_logout_attr_store,
+};
+
+struct config_item_type iscsi_stat_logout_cit = {
+	.ct_item_ops		= &iscsi_stat_logout_stats_item_ops,
+	.ct_attrs		= iscsi_stat_logout_stats_attrs,
+	.ct_owner		= THIS_MODULE,
+};
+
