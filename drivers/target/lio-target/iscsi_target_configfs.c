@@ -51,6 +51,7 @@
 #include <iscsi_target_util.h>
 #include <iscsi_target.h>
 #include <iscsi_target_mib.h>
+#include <iscsi_target_stat.h>
 #include <iscsi_target_configfs.h>
 
 struct target_fabric_configfs *lio_target_fabric_configfs;
@@ -1253,12 +1254,31 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	struct config_group *group,
 	const char *name)
 {
+	struct config_group *stats_cg;
 	struct iscsi_tiqn *tiqn;
 	int ret = 0;
 
 	tiqn = core_add_tiqn((unsigned char *)name, &ret);
 	if (!(tiqn))
 		return NULL;
+	/*
+	 * Setup struct iscsi_wwn_stat_grps for se_wwn->fabric_stat_group.
+	 */
+	stats_cg = &tiqn->tiqn_wwn.fabric_stat_group;
+
+	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+				GFP_KERNEL);
+	if (!stats_cg->default_groups) {
+		printk(KERN_ERR "Unable to allocate memory for"
+				" stats_cg->default_groups\n");		
+		core_del_tiqn(tiqn);
+		return ERR_PTR(-ENOMEM);
+	}
+	
+	stats_cg->default_groups[0] = &WWN_STAT_GRPS(tiqn)->iscsi_instance_group;
+	stats_cg->default_groups[1] = NULL;
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_instance_group,
+			"iscsi_instance", &iscsi_stat_instance_cit);
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> Allocated Node:"
@@ -1270,7 +1290,18 @@ void lio_target_call_coredeltiqn(
 	struct se_wwn *wwn)
 {
 	struct iscsi_tiqn *tiqn = container_of(wwn, struct iscsi_tiqn, tiqn_wwn);
+	struct config_item *df_item;
+	struct config_group *stats_cg;
+	int i;
 	
+	stats_cg = &tiqn->tiqn_wwn.fabric_stat_group;
+	for (i = 0; stats_cg->default_groups[i]; i++) {
+		df_item = &stats_cg->default_groups[i]->cg_item;
+		stats_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(stats_cg->default_groups);
+
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s\n",
 			tiqn->tiqn);
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> Releasing"

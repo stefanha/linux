@@ -949,6 +949,11 @@ struct iscsi_portal_group {
 #define ISCSI_TPG_ATTRIB(t)	(&(t)->tpg_attrib)
 #define SE_TPG(tpg)		(&(tpg)->tpg_se_tpg)
 
+struct iscsi_wwn_stat_grps {
+	struct config_group	iscsi_stat_group;
+	struct config_group	iscsi_instance_group;
+};
+
 struct iscsi_tiqn {
 	unsigned char		tiqn[ISCSI_TIQN_LEN];
 	int			tiqn_state;
@@ -962,11 +967,14 @@ struct iscsi_tiqn {
 	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
 	struct se_wwn		tiqn_wwn;
+	struct iscsi_wwn_stat_grps tiqn_stat_grps;
 	u32			tiqn_index;
 	struct iscsi_sess_err_stats  sess_err_stats;
 	struct iscsi_login_stats     login_stats;
 	struct iscsi_logout_stats    logout_stats;
 } ____cacheline_aligned;
+
+#define WWN_STAT_GRPS(tiqn)	(&(tiqn)->tiqn_stat_grps)
 
 struct iscsi_global {
 	/* iSCSI Node Name */
