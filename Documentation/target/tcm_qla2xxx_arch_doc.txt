@@ -1,0 +1,365 @@
+QLA2XXX Target / tcm_qla2xxx
+
+This is intended to be an architecture document to describe the design
+and necessary changes to the mainline qla2xxx LLD in order to support target
+mode operation using the mainline >= .38 target infrastructure.
+
+This includes and seperate tcm_qla2xxx.ko module that drives qla2xxx LLD
+target mode configuration via the TCM v4 generic fabric control plane
+with drivers/target/target_core_fabric_configfs.c
+
+I) Design of QLA2xxx LLD target mode and tcm_qla2xxx fabric module
+
+The design for qla2xxx target mode / tcm_qla2xxx involves building
+qla2xxx specific target logic directly into the qla2xxx.ko LLD driver
+via qla_target.c.  This logic is disabled by default within the LLD,
+and is explictly enabled by tcm_qlaxxx code via configfs on a individual
+per struct scsi_qla_host basis.
+
+Interaction with the external tcm_qla2xxx is done via a set of
+callbacks defined in drivers/scsi/qla2xxx/qla_target.h:
+
+struct qla_target_template {
+
+        int (*handle_cmd)(scsi_qla_host_t *, struct qla_tgt_cmd *, uint32_t,
+                        uint32_t, int, int, int);
+        int (*handle_data)(struct qla_tgt_cmd *);
+        int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
+        void (*free_cmd)(struct qla_tgt_cmd *);
+        void (*free_session)(struct qla_tgt_sess *);
+
+        int (*check_initiator_node_acl)(scsi_qla_host_t *, unsigned char *,
+                                        void *, uint8_t *, uint16_t);
+        struct qla_tgt_sess *(*find_sess_by_loop_id)(scsi_qla_host_t *,
+                                                const uint16_t);
+        struct qla_tgt_sess *(*find_sess_by_s_id)(scsi_qla_host_t *,
+                                                const uint8_t *);
+};
+
+These callbacks are attached to struct qla_hw_data->qla2x_tmpl when
+target mode is enabled for each physical HW port.  Note that these callbacks
+called both from within existing qla2xxx LLD code, as well as from
+qla_target.c.  The tcm_qla2xxx.ko fabric module provides a set of
+struct qla_target_template callbacks in order to manage control plane
+and I/O path interaction with qla2xxx LLD target mode.
+
+Note that non NPIV and NPIV modes of operation are seperated into
+/sys/kernel/config/target/qla2xxx and /sys/kernel/config/target/core/qla2xxx_npiv
+respectively.  Currently NPIV support is a WIP, but will be appearing
+as a seperate top-level TCM fabric module group with specific $FABRIC_WWN
+naming for FC NPIV operation.
+
+II) struct qla_hw_data target mode additions:
+
+The current design involves adding target mode specific structure
+members into struct qla_hw_data.  This includes the following additions:
+
+       /* Protected by hw lock */
+       uint32_t enable_class_2:1;
+       uint32_t enable_explicit_conf:1;
+       uint32_t host_shutting_down:1;
+       uint32_t ini_mode_force_reverse:1;
+       uint32_t node_name_set:1;
+
+       dma_addr_t atio_dma;    /* Physical address. */
+       atio_t  *atio_ring;     /* Base virtual address */
+       atio_t  *atio_ring_ptr; /* Current address. */
+       uint16_t atio_ring_index; /* Current index. */
+       uint16_t atio_q_length;
+
+       void *target_lport_ptr;
+       struct qla_target_template *qla2x_tmpl;
+       struct qla_tgt *qla_tgt;
+       struct qla_tgt_cmd *cmds[MAX_OUTSTANDING_COMMANDS];
+       uint16_t current_handle;
+
+       struct qla_tgt_vp_map *tgt_vp_map;
+       struct mutex tgt_mutex;
+       struct mutex tgt_host_action_mutex;
+
+       struct list_head ha_list_entry;
+       int saved_set;
+       uint16_t saved_exchange_count;
+       uint32_t saved_firmware_options_1;
+       uint32_t saved_firmware_options_2;
+       uint32_t saved_firmware_options_3;
+       uint8_t saved_firmware_options[2];
+       uint8_t saved_add_firmware_options[2];
+
+       uint8_t tgt_node_name[WWN_SIZE];
+
+III) qla2xxx LLD target mode control plane modifications
+
+On the LLD control plane size, the following are the main functions that
+require modifications in order to interact with tcm_qla2xxx's ConfigFS driven
+control plane:
+
+*) qla2x00_probe_one():
+
+   This will call qla_tgt_add_target() to setup the target mode assoication
+   for struct qla_hw_data *ha and struct scsi_qla_host base_vha.  This function
+   with also add struct qla_hw_data->ha_list_entry to the global qla_ha_list.
+
+*) qla2x00_remove_one():
+
+   This will call qla_tgt_remove_target() to release the target association
+   and drop struct qla_hw_data->ha_list_entry from qla_ha_list.
+
+*) qla2x00_mem_alloc():
+
+   This function has been modified to allocation struct qla_hw_data->tgt_vp_map
+   and struct qla_hw_data->atio_ring necessary for target mode operation.
+
+*) qla2x00_mem_free():
+
+   This function has been modified to release struct qla_hw_data->tgt_vp_map
+   and struct qla_hw_data->atio_ring.
+
+*) qla2x00_module_init()
+
+   This function has been modified to call qla_tgt_init() to setup the initial
+   qla_tgt_cmd_cachep, qla_tgt_mgmt_cmd_cachep and qla_tgt_mgmt_cmd_mempool
+   kmem_caches and mempool.
+
+*) qla2x00_reg_remote_port()
+
+   This function has been modified to call qla_tgt_fc_port_added() upon the
+   presence of a valid struct qla_hw_data->qla2x_tmpl pointer to handle the
+   new creation or reestablishment of the struct qla_tgt_sess (FC I_T Nexus).
+
+*) qla2x00_rport_del():
+
+   This function has been modified to call qla_tgt_fc_port_deleted() upon the
+   presence of a valid struct qla_hw_data->qla2x_tmpl pointer to schedule an
+   existing struct qla_tgt_sess (FC I_T Nexus) for deletion within qla_target.c
+   code.
+
+*) qla2x00_get_port_database()
+
+   This function has been modified to set the necessary fc_port_t *fcport
+   ->port_type and ->supported_classes for target mode operation.
+
+*) qla24xx_modify_vp_config()
+
+   This function has been modified to strip the necessary vpmod->options_idx1
+   bits for target and/or initiator mode operation.
+
+*) qla24xx_allocate_vp_id()
+
+   This funtion has been modified to save the ha->tgt_vp_map[vp_id].vha
+   specific for qla2xxx LLD target mode operation.
+
+*) qla24xx_deallocate_vp_id():
+
+   This function has been modified to clear the ha->tgt_vp_map[vp_id].vha
+   specific for qla2xxx LLD target mode operation.
+
+*) qla24xx_vport_create()
+
+   This function has been modified to call qla_clear_tgt_mode() and
+   qla2x00_send_enable_lun() to perform target mode specific setup for
+   an individual struct scsi_qla_host *vha.
+
+*) qla2x00_get_node_name_list()
+
+   This function has been added to issue a 'get node name list' mailbox
+   command for use with qla_target.c:qla_tgt_check_fcport_exist() code.
+
+III) qla2xxx LLD target mode initialization modifications
+
+The following functions have been updated to handle qla2xxx LLD target mode
+initialization:
+
+*) qla2x00_initialize_adapter()
+
+   This function has been modified to call qla2x00_send_enable_lun()
+   to enable target or initiator mode operation.
+
+*) qla2x00_vp_abort_isp()
+
+   This function has been modified to call qla2x00_send_enable_lun() when
+   target mode is requested for the individual struct scsi_qla_host *vha.
+   This is done in order to issue the necessary iocb of type ENABLE_LUN_TYPE
+   to enable target mode for the individual struct scsi_qla_host.
+
+*) qla24xx_nvram_config()
+
+   This function has been modified to setup the necessary struct qla_hw_data
+   *ha and struct nvram_24xx to set target mode specific firmware bits for
+   target mode operation.
+
+IV) qla2xxx LLD target mode data I/O path modifications
+
+For the primary data I/O path, a ATIO packet ring has been added to for
+target mode operation.  The special ring is used to handle incoming and
+outgoing packets and the following functions have been modified and/or
+changed to function with target mode:
+
+*) qla2x00_async_event():
+
+   This function has been modified to call qla_tgt_async_event() to handle
+   target mode specific asynchronous events.  These are primarily
+   informational in nature, and MBA_LOOP_UP is the only event that may call
+   qla24xx_send_notify_ack().
+
+*) qla2x00_process_completed_request();
+
+   This function has been modified to call qla2xxx_ctio_completion() to handle
+   CTIO_COMP type completions specific to target mode operation.
+
+*) qla24xx_process_atio_queue()
+
+   This function has been added to call qla24xx_atio_pkt_all_vps() for
+   individually recieved atio_t *pkt.  This includes walking the atio
+   ring and updating the ring index once complete.
+
+*) qla2x00_process_response_queue():
+
+   This function has been modified to call qla_tgt_response_pkt_all_vps() or
+   qla24xx_process_atio_queue() to propigate target mode specific ATIO specific
+   packet responses to a specific scsi_qla_host_t *host via qla_target.c and
+   into tcm_qla2xxx.ko fabric code:
+
+   For the direct qla_tgt_response_pkt_all_vps() call this looks like:
+
+	qla_tgt_response_pkt_all_vps() -> 
+		qla_tgt_response_pkt() ->
+			qla_tgt_handle_cmd_for_atio() ->
+				qla_tgt_send_cmd_to_target() ->
+					qla2*xx_send_cmd_to_target() ->
+						struct qla_tgt_template->handle_cmd()
+
+   For the qla24xx_process_atio_queue() call this looks like:
+
+	qla24xx_process_atio_queue() ->
+		qla_tgt_response_pkt_all_vps() ->
+			qla_tgt_response_pkt() ->
+				qla_tgt_handle_cmd_for_atio() ->
+					qla_tgt_send_cmd_to_target() ->
+						qla2*xx_send_cmd_to_target() ->
+							struct qla_tgt_template->handle_cmd()
+
+*) qla2x00_issue_marker()
+
+   This function has been added to act as a wrapper for __qla2x00_marker() and
+   qla2x00_marker() for tcm_qla2xxx operation.
+
+*) qla2x00_req_pkt()
+
+   This function has been added as a method for qla_target.c code to retrieve a
+   request_t packet from the ring reserved for qla2xxx LLD target mode operation.
+
+V) qla2xxx LLD target mode additions in qla_target.c providing struct qla_tgt_template 
+    callbacks into tcm_qla2xxx.ko code
+
+The main interaction between qla_target.c LLD code and tcm_qla2xxx.ko fabric
+module code is done using struct qla_tgt_template callbacks.  This section
+describes the qla_target.c functions containing callbacks into tcm_qla2xxx.ko
+code.
+
+*) qla_tgt_free_session_done()
+
+   This function has been added as the main callback to drop an individual
+   struct qla_tgt_session representing the FC I_T Nexus.  This includes a call
+   into struct qla_hw_data->free_session() to release the TCM session from
+   within tcm_qla2xxx.ko code.
+
+*) qla_tgt_reset()
+
+   This function has been added to handle incoming ELS events within
+   qla2*xx_handle_els(), which calls struct qla_hw_data->find_sess_by_loop_id()
+   in order to locate an existing struct qla_tgt_session from the received
+   uint16_t loop_id.
+
+*) qla_tgt_create_sess()
+
+   This function is used to create qla2xxx LLD local struct qla_tgt_sess
+   allocations representing the FC I_T Nexus, and makes a call into
+   struct qla_tgt_template->check_initiator_node_acl() ->tcm_qla2xxx.ko
+   code to call target_core_tpg.c:core_tpg_check_initiator_node_acl()
+   to handle Explict NodeACLs and TPG demo-mode operation from TCM level.
+
+*) __qla24xx_handle_abts()
+
+   This function is used to issue a struct qla_tgt_template->handle_tmr()
+   for ABORT_TASK into tcm_qla2xxx.ko -> tcm_qla2xxx_handle_tmr()
+
+*) qla24xx_handle_abts()
+
+   This function is the wrapper prefix to __qla24xx_handle_abts() and calls
+   struct qla_tgt_template->find_sess_by_s_id() to locate struct qla_tgt_sess
+   from abts->fcp_hdr_le.s_id[].
+
+*) qla2*xx_send_term_exchange()
+
+   This function calls struct qla_tgt_template->free_command() to release
+   the individual struct qla_tgt_cmd descriptor and associated TCM
+   qla_tgt_cmd->se_cmd for 2xxx and 24xx series.
+
+*) qla_tgt_ctio_to_cmd()
+
+   This function is called from CTIO completion context in order to locate
+   an associated struct qla_tgt_cmd descriptor from the passed 'uint32_t
+   handle' and 'void ctio' CTIO packet payload.  This function is called
+   directly from qla_tgt_do_ctio_completion().
+
+*) qla_tgt_do_ctio_completion()
+
+   This function is called from CTIO completion context in order to handle
+   struct qla_tgt_cmd->state, and call qla_tgt_template->handle_data() for
+   QLA_TGT_STATE_NEED_DATA or qla_tgt_template->free_cmd() for ->state of
+   QLA_TGT_STATE_PROCESSED.
+
+*) qla2*xx_send_cmd_to_target()
+
+   These 2xxx and 24xx specific functions are the main struct qla_tgt_cmd
+   and qla_tgt_cmd->se_cmd dispatcher functions from qla2xxx LLD target
+   logic into tcm_qla2xxx.ko code.  These functions call qla_tgt_unpack_lun()
+   to obtain the unpacked_lun for TCM struct se_lun association, and pass
+   data_dir/bidi, fcp_task_attr and data_length for the call down into
+   tcm_qla2xxx via qla_tgt_template->handle_cmd().
+
+*) qla_tgt_handle_cmd_for_atio()
+
+   This function handles processing of ATIO packet data from qla2*xx_atio_pkt()
+   in order to locate an active struct qla_tgt_sess / FC I_T Nexus descriptor
+   using struct qla_tgt_template->find_sess_by_s_id() for 24xx series or
+   struct qla_tgt_template->find_sess_by_loop_id() for 2xxx.
+
+*) qla_tgt_issue_task_mgmt()
+
+   This function handles processing of SCSI task management requests, and will
+   make the call into tcm_qla2xxx.ko code using qla_tgt_template->handle_tmr(). 
+
+*) qla_tgt_handle_task_mgmt()
+
+   This function handles process of SCSI task management requests, and will
+   attempt to locate an active struct qla_tgt_sess / FC I_T Nexus descriptor
+   using struct qla_tgt_template->find_sess_by_s_id() for 24xx series or
+   struct qla_tgt_template->find_sess_by_loop_id() for 2xxx.
+
+*) __qla_tgt_abort_task()
+
+   This function handles processing of SCSI task management request ABORT_TASK,
+   and calls struct qla_tgt_template->handle_tmr() into tcm_qla2xxx.ko code.
+   This code is called directly from qla_tgt_abort_task() with the active
+   struct qla_tgt_sess / FC I_T Nexus descriptor once it has has been located.
+
+*) qla_tgt_abort_task()
+
+   This function handles processing of SCSI task management request ABORT_TASK,
+   and calls struct qla_tgt_template->find_sess_by_loop_id() to locate a
+   an active struct qla_tgt_sess / FC I_T Nexus descriptor.
+
+*) qla2*xx_send_busy()
+
+   These 24xx and 2xxx specific functions handle processing of SAM_STAT_BUSY
+   for the main qla_tgt_handle_cmd_for_atio() allocation path.  It calls
+   struct qla_tgt_template->find_sess_by_s_id() to locate an active struct
+   qla_tgt_sess / FC I_T Nexus descriptor.
+
+*) qla_tgt_exec_sess_work()
+
+   This function is the delayed session worker thread and will call struct
+   qla_tgt_template->find_sess_by_s_id() or ->find_sess_by_loop_id() depending
+   upon qla_tgt_sess_work_param->type and 24xx / 2xxx series hardware.
