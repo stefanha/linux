@@ -835,11 +835,19 @@ struct iscsi_node_auth {
 	char			password_mutual[MAX_PASS_LEN];
 } ____cacheline_aligned;
 
+struct iscsi_node_stat_grps {
+	struct config_group	iscsi_sess_stats_group;
+        struct config_group	iscsi_conn_stats_group;
+};
+
 struct iscsi_node_acl {
 	struct iscsi_node_attrib node_attrib;
 	struct iscsi_node_auth	node_auth;
+	struct iscsi_node_stat_grps node_stat_grps;
 	struct se_node_acl	se_node_acl;
 } ____cacheline_aligned;
+
+#define NODE_STAT_GRPS(nacl)	(&(nacl)->node_stat_grps)
 
 #define ISCSI_NODE_ATTRIB(t)	(&(t)->node_attrib)
 #define ISCSI_NODE_AUTH(t)	(&(t)->node_auth)

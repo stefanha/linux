@@ -802,6 +802,7 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	struct config_group *group,
 	const char *name)
 {
+	struct config_group *stats_cg;
 	struct iscsi_node_acl *acl;
 	struct se_node_acl *se_nacl_new, *se_nacl;
 	struct iscsi_portal_group *tpg = container_of(se_tpg,
@@ -823,6 +824,23 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	if (IS_ERR(se_nacl))
 		return ERR_PTR(PTR_ERR(se_nacl));
 
+	stats_cg = &acl->se_node_acl.acl_fabric_stat_group;
+
+	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+				GFP_KERNEL);
+	if (!stats_cg->default_groups) {
+		printk(KERN_ERR "Unable to allocate memory for"
+				" stats_cg->default_groups\n");
+		core_tpg_del_initiator_node_acl(se_tpg, se_nacl, 1);
+		kfree(acl);	
+		return ERR_PTR(-ENOMEM);
+	}
+
+	stats_cg->default_groups[0] = &NODE_STAT_GRPS(acl)->iscsi_sess_stats_group;
+	stats_cg->default_groups[1] = NULL;
+	config_group_init_type_name(&NODE_STAT_GRPS(acl)->iscsi_sess_stats_group,
+			"iscsi_sess_stats", &iscsi_stat_sess_cit);
+
 	return se_nacl;
 }
 
@@ -832,6 +850,17 @@ static void lio_target_drop_nodeacl(
 	struct se_portal_group *se_tpg = se_nacl->se_tpg;
 	struct iscsi_node_acl *acl = container_of(se_nacl,
 			struct iscsi_node_acl, se_node_acl);
+	struct config_item *df_item;
+	struct config_group *stats_cg;
+	int i;
+
+	stats_cg = &acl->se_node_acl.acl_fabric_stat_group;
+	for (i = 0; stats_cg->default_groups[i]; i++) {
+		df_item = &stats_cg->default_groups[i]->cg_item;
+		stats_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(stats_cg->default_groups);
 
 	core_tpg_del_initiator_node_acl(se_tpg, se_nacl, 1);
 	kfree(acl);

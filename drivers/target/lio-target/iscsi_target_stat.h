@@ -1,11 +1,19 @@
 #ifndef ISCSI_TARGET_STAT_H
 #define ISCSI_TARGET_STAT_H
 
+/*
+ * For struct iscsi_tiqn->tiqn_wwn default groups
+ */
 extern struct config_item_type iscsi_stat_instance_cit;
 extern struct config_item_type iscsi_stat_sess_err_cit;
 extern struct config_item_type iscsi_stat_tgt_attr_cit;
 extern struct config_item_type iscsi_stat_login_cit;
 extern struct config_item_type iscsi_stat_logout_cit;
+
+/*
+ * For struct iscsi_session->se_sess default groups
+ */
+extern struct config_item_type iscsi_stat_sess_cit;
 
 #if 0
 

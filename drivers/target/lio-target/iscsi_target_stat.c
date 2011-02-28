@@ -721,3 +721,250 @@ struct config_item_type iscsi_stat_logout_cit = {
 	.ct_owner		= THIS_MODULE,
 };
 
+/*
+ * Session Stats Table
+ */
+
+CONFIGFS_EATTR_STRUCT(iscsi_stat_sess, iscsi_node_stat_grps);
+#define ISCSI_STAT_SESS(_name, _mode)				\
+static struct iscsi_stat_sess_attribute				\
+			iscsi_stat_sess_##_name =		\
+	__CONFIGFS_EATTR(_name, _mode,				\
+	iscsi_stat_sess_show_attr_##_name,			\
+	iscsi_stat_sess_store_attr_##_name);
+
+#define ISCSI_STAT_SESS_RO(_name)				\
+static struct iscsi_stat_sess_attribute				\
+			iscsi_stat_sess_##_name =		\
+	__CONFIGFS_EATTR_RO(_name,				\
+	iscsi_stat_sess_show_attr_##_name);
+
+static ssize_t iscsi_stat_sess_show_attr_inst(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_wwn *wwn = acl->se_node_acl.se_tpg->se_tpg_wwn;
+	struct iscsi_tiqn *tiqn = container_of(wwn,
+			struct iscsi_tiqn, tiqn_wwn);
+
+	return snprintf(page, PAGE_SIZE, "%u\n", tiqn->tiqn_index);
+}
+ISCSI_STAT_SESS_RO(inst);
+
+static ssize_t iscsi_stat_sess_show_attr_node(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%u\n",
+				sess->sess_ops->SessionType ? 0 : ISCSI_NODE_INDEX);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(node);
+
+static ssize_t iscsi_stat_sess_show_attr_indx(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%u\n",
+					sess->session_index);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(indx);
+
+static ssize_t iscsi_stat_sess_show_attr_cmd_pdus(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%u\n", sess->cmd_pdus);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(cmd_pdus);
+
+static ssize_t iscsi_stat_sess_show_attr_rsp_pdus(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%u\n", sess->rsp_pdus);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(rsp_pdus);
+
+static ssize_t iscsi_stat_sess_show_attr_txdata_octs(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%llu\n",
+				(unsigned long long)sess->tx_data_octets);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(txdata_octs);
+
+static ssize_t iscsi_stat_sess_show_attr_rxdata_octs(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%llu\n",
+				(unsigned long long)sess->rx_data_octets);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(rxdata_octs);
+
+static ssize_t iscsi_stat_sess_show_attr_conn_digest_errors(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%u\n",
+					sess->conn_digest_errors);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(conn_digest_errors);
+
+static ssize_t iscsi_stat_sess_show_attr_conn_timeout_errors(
+	struct iscsi_node_stat_grps *igrps, char *page)
+{
+	struct iscsi_node_acl *acl = container_of(igrps,
+			struct iscsi_node_acl, node_stat_grps);
+	struct se_node_acl *se_nacl = &acl->se_node_acl;
+	struct iscsi_session *sess;
+	struct se_session *se_sess;
+	ssize_t ret = 0;
+
+	spin_lock_bh(&se_nacl->nacl_sess_lock);
+	se_sess = se_nacl->nacl_sess;
+	if (se_sess) {
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		if (sess)
+			ret = snprintf(page, PAGE_SIZE, "%u\n",
+					sess->conn_timeout_errors);
+	}
+	spin_unlock_bh(&se_nacl->nacl_sess_lock);
+
+	return ret;
+}
+ISCSI_STAT_SESS_RO(conn_timeout_errors);
+
+CONFIGFS_EATTR_OPS(iscsi_stat_sess, iscsi_node_stat_grps,
+		iscsi_sess_stats_group);
+
+static struct configfs_attribute *iscsi_stat_sess_stats_attrs[] = {
+	&iscsi_stat_sess_inst.attr,
+	&iscsi_stat_sess_node.attr,
+	&iscsi_stat_sess_indx.attr,
+	&iscsi_stat_sess_cmd_pdus.attr,
+	&iscsi_stat_sess_rsp_pdus.attr,
+	&iscsi_stat_sess_txdata_octs.attr,
+	&iscsi_stat_sess_rxdata_octs.attr,
+	&iscsi_stat_sess_conn_digest_errors.attr,
+	&iscsi_stat_sess_conn_timeout_errors.attr,
+	NULL,
+};
+
+static struct configfs_item_operations iscsi_stat_sess_stats_item_ops = {
+	.show_attribute		= iscsi_stat_sess_attr_show,	
+	.store_attribute	= iscsi_stat_sess_attr_store,
+};
+
+struct config_item_type iscsi_stat_sess_cit = {
+	.ct_item_ops		= &iscsi_stat_sess_stats_item_ops,
+	.ct_attrs		= iscsi_stat_sess_stats_attrs,
+	.ct_owner		= THIS_MODULE,
+};
