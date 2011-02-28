@@ -1,13 +1,13 @@
 /*******************************************************************************
- * Filename:  tcm_loop_configfs.c
  *
  * This file contains configfs implemenation for initiator and target
  * side CDB level emulation of SAS, FC and iSCSI ports to Linux/SCSI LUNs.
  *
- * Copyright (c) 2009, 2010 Rising Tide, Inc.
- * Copyright (c) 2009, 2010 Linux-iSCSI.org
+* © Copyright 2011 RisingTide Systems LLC.
  *
- * Copyright (c) 2009, 2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2. 
+ * 
+ * Author: Nicholas A. Bellinger <nab@risingtidesystems.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

@@ -1,13 +1,13 @@
 /*******************************************************************************
- * Filename:  tcm_loop_fabric_scsi.c
  *
  * This file contains the Linux/SCSI LLD virtual SCSI initiator driver
  * for emulated SAS initiator ports
  *
- * Copyright (c) 2009-2010 Rising Tide, Inc.
- * Copyright (c) 2009-2010 Linux-iSCSI.org
+ * © Copyright 2011 RisingTide Systems LLC.
  *
- * Copyright (c) 2009-2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2. 
+ * 
+ * Author: Nicholas A. Bellinger <nab@risingtidesystems.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
