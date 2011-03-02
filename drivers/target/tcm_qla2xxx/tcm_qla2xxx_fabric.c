@@ -1,13 +1,12 @@
 /*******************************************************************************
- * Filename:  tcm_qla2xxx_fabric.c
- *
  * This file contains TCM_QLA2XXX functions for struct target_core_fabrib_ops
  * for Qlogic 2xxx series target mode HBAs
  *
- * Copyright (c) 2010 Rising Tide Systems, Inc
- * Copyright (c) 2010 Linux-iSCSI.org
+ * © Copyright 2010-2011 RisingTide Systems LLC.
  *
- * Copyright (c) 2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@risingtidesystems.com>
  *
  * tcm_qla2xxx_parse_wwn() and tcm_qla2xxx_format_wwn() contains code from
  * the TCM_FC / Open-FCoE.org fabric module.
@@ -24,8 +23,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  ****************************************************************************/
-
-#define TCM_QLA2XXX_FABRIC_C
 
 #include <linux/slab.h>
 #include <linux/kthread.h>
@@ -50,16 +47,10 @@
 #include <target/target_core_tmr.h>
 
 #include <qla_def.h>
-
-//#include <scsi/libfc.h>
-//#include <scsi/scsi_transport_fc.h>
-
 #include <qla_target.h>
 
-#include <tcm_qla2xxx_base.h>
-#include <tcm_qla2xxx_fabric.h>
-
-#undef TCM_QLA2XXX_FABRIC_C
+#include "tcm_qla2xxx_base.h"
+#include "tcm_qla2xxx_fabric.h"
 
 int tcm_qla2xxx_check_true(struct se_portal_group *se_tpg)
 {

@@ -10,7 +10,7 @@
  *
  *  Forward port and refactoring to modern qla2xxx and target/configfs
  *
- *  Copyright (C) 2010 Nicholas A. Bellinger <nab@kernel.org>
+ *  Copyright (C) 2010-2011 Nicholas A. Bellinger <nab@kernel.org>
  *
  *  This program is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -29,12 +29,12 @@
 #include <linux/version.h>
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
-#include <scsi/scsi.h>
-#include <scsi/scsi_host.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/list.h>
 #include <asm/unaligned.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_host.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
@@ -906,11 +906,12 @@ void qla_tgt_fc_port_added(scsi_qla_host_t *vha, fc_port_t *fcport)
 
 	if (!tgt || (fcport->port_type != FCT_INITIATOR))
 		return;
-#warning FIXME: Convert to atomic_t
-	if (tgt->tgt_stop)
-		return;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
+	if (tgt->tgt_stop) {
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+		return;
+	}
 	sess = qla_tgt_find_sess_by_port_name(tgt, fcport->port_name);
 	if (!sess) {
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -970,11 +971,12 @@ void qla_tgt_fc_port_deleted(scsi_qla_host_t *vha, fc_port_t *fcport)
 
 	if (!tgt || (fcport->port_type != FCT_INITIATOR))
 		return;
-#warning FIXME: Convert to atomic_t
-	if (tgt->tgt_stop)
-		return;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
+	if (tgt->tgt_stop) {
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+		return;
+	}
 	sess = qla_tgt_find_sess_by_port_name(tgt, fcport->port_name);
 	if (!sess) {
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -1061,7 +1063,6 @@ EXPORT_SYMBOL(qla_tgt_stop_phase1);
 /* Called by tcm_qla2xxx configfs code */
 void qla_tgt_stop_phase2(struct qla_tgt *tgt)
 {
-	scsi_qla_host_t *vha = tgt->vha;
 	struct qla_hw_data *ha = tgt->ha;
 	unsigned long flags;
 
@@ -4270,10 +4271,7 @@ static void qla24xx_atio_pkt(scsi_qla_host_t *vha, atio7_entry_t *atio)
 				&atio->fcp_cmnd.add_cdb[atio->fcp_cmnd.add_cdb_len])),
 			atio->fcp_hdr.s_id[0], atio->fcp_hdr.s_id[1],
 			atio->fcp_hdr.s_id[2]));
-#if 0
-		DEBUG23(qla_printk(KERN_INFO, ha, "FCP CDB", atio->fcp_cmnd.cdb,
-				sizeof(atio->fcp_cmnd.cdb)));
-#endif
+
 		if (unlikely(atio->exchange_addr ==
 				ATIO_EXCHANGE_ADDRESS_UNKNOWN)) {
 			printk(KERN_INFO "qla_target(%d): ATIO_TYPE7 "

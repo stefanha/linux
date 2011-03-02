@@ -1,13 +1,12 @@
 /*******************************************************************************
- * Filename:  tcm_qla2xxx_configfs.c
- *
  * This file contains TCM QLA2XXX fabric module implementation using
  * v4 configfs fabric infrastructure for QLogic target mode HBAs
  *
- * Copyright (c) 2010 Rising Tide, Inc.
- * Copyright (c) 2010 Linux-iSCSI.org
+ * © Copyright 2010-2011 RisingTide Systems LLC.
  *
- * Copyright (c) 2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@risingtidesystems.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +18,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  ****************************************************************************/
-
-#define TCM_QLA2XXX_CONFIGFS_C
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -47,12 +44,10 @@
 #include <target/target_core_base.h>
 #include <target/configfs_macros.h>
 
-#include <tcm_qla2xxx_base.h>
-#include <tcm_qla2xxx_fabric.h>
+#include "tcm_qla2xxx_base.h"
+#include "tcm_qla2xxx_fabric.h"
 
 #include <qla_def.h>
-
-#undef TCM_QLA2XXX_CONFIGFS_C
 
 /* Local pointer to allocated TCM configfs fabric module */
 struct target_fabric_configfs *tcm_qla2xxx_fabric_configfs;

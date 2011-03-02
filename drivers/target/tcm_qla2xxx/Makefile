@@ -1,4 +1,4 @@
-EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/drivers/scsi/ -I$(srctree)/drivers/scsi/qla2xxx/ -I$(srctree)/include/scsi/ -I$(srctree)/drivers/target/tcm_qla2xxx/
+EXTRA_CFLAGS += -I$(srctree)/drivers/scsi/qla2xxx/ 
 
 tcm_qla2xxx-objs		:= tcm_qla2xxx_fabric.o \
 				   tcm_qla2xxx_configfs.o \

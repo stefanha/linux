@@ -6,7 +6,7 @@
  *
  *  Forward port and refactoring to modern qla2xxx and target/configfs
  *
- *  Copyright (C) 2010 Nicholas A. Bellinger <nab@kernel.org>
+ *  Copyright (C) 2010-2011 Nicholas A. Bellinger <nab@kernel.org>
  *
  *  Additional file for the target driver support.
  *
