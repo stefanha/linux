@@ -1,11 +1,6 @@
-EXTRA_CFLAGS += -I$(srctree)/drivers/target/ -I$(srctree)/include/scsi/ -I$(srctree)/drivers/target/iscsi
-
-EXTRA_CFLAGS+=-D_TARGET -DPYX_ISCSI_VENDOR='"Linux-iSCSI.org"'
-
 iscsi_target_mod-y +=		iscsi_auth_chap.o \
 				iscsi_parameters.o \
 				iscsi_seq_and_pdu_list.o \
-				iscsi_serial.o \
 				iscsi_thread_queue.o \
 				iscsi_target_datain_values.o \
 				iscsi_target_device.o \
@@ -23,13 +18,4 @@ iscsi_target_mod-y +=		iscsi_auth_chap.o \
 				iscsi_target_configfs.o \
 				iscsi_target_stat.o
 
-ifdef CONFIG_LIO_TARGET_DEBUG_ERL
-iscsi_target_mod-y		+= iscsi_target_debugerl.o
-EXTRA_CFLAGS			+= -DDEBUG_ERL
-endif
-
-ifdef CONFIG_LIO_TARGET_DEBUG
-EXTRA_CFLAGS			+= -DCONFIG_ISCSI_DEBUG=1
-endif
-
-obj-$(CONFIG_LIO_TARGET)	+= iscsi_target_mod.o
+obj-$(CONFIG_ISCSI_TARGET)	+= iscsi_target_mod.o

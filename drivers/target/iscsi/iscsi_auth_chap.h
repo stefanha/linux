@@ -1,20 +1,3 @@
-/*******************************************************************************
- * Filename:  iscsi_auth_chap.h
- *
- * This file contains definitions related to iSCSI CHAP Authenication.
- *
- * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
- * Copyright (c) 2007-2009 Linux-iSCSI.org
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- *
- * For further information, contact via email: support@sbei.com
- * SBE, Inc.  San Ramon, California  U.S.A.
- ******************************************************************************/
-
-
 #ifndef _ISCSI_CHAP_H_
 #define _ISCSI_CHAP_H_
 

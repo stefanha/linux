@@ -1,13 +1,14 @@
 /*******************************************************************************
- * Filename:  iscsi_target_configfs.c
- *
  * This file contains the configfs implementation for iSCSI Target mode
  * from the LIO-Target Project.
  *
  * Copyright (c) 2008, 2009, 2010 Rising Tide, Inc.
  * Copyright (c) 2008, 2009, 2010 Linux-iSCSI.org
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Copyright (c) 2008, 2009, 2010 Nicholas A. Bellinger <nab@linux-iscsi.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,16 +43,16 @@
 #include <target/target_core_configfs.h>
 #include <target/configfs_macros.h>
 
-#include <iscsi_target_core.h>
-#include <target/target_core_base.h>
-#include <iscsi_target_device.h>
-#include <iscsi_target_erl0.h>
-#include <iscsi_target_nodeattrib.h>
-#include <iscsi_target_tpg.h>
-#include <iscsi_target_util.h>
-#include <iscsi_target.h>
-#include <iscsi_target_stat.h>
-#include <iscsi_target_configfs.h>
+#include "iscsi_target_core.h"
+#include "iscsi_parameters.h"
+#include "iscsi_target_device.h"
+#include "iscsi_target_erl0.h"
+#include "iscsi_target_nodeattrib.h"
+#include "iscsi_target_tpg.h"
+#include "iscsi_target_util.h"
+#include "iscsi_target.h"
+#include "iscsi_target_stat.h"
+#include "iscsi_target_configfs.h"
 
 struct target_fabric_configfs *lio_target_fabric_configfs;
 
@@ -1265,7 +1266,7 @@ static ssize_t lio_target_wwn_show_attr_lio_version(
 	struct target_fabric_configfs *tf,
 	char *page)
 {
-	return sprintf(page, "Linux-iSCSI.org Target "PYX_ISCSI_VERSION""
+	return sprintf(page, "Linux-iSCSI.org Target "ISCSI_VERSION""
 		" on %s/%s on "UTS_RELEASE"\n", utsname()->sysname,
 		utsname()->machine);
 }

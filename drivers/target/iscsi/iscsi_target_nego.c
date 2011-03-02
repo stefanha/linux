@@ -1,14 +1,13 @@
 /*******************************************************************************
- * Filename:  iscsi_target_nego.c
- *
  * This file contains main functions related to iSCSI Parameter negotiation.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007 Rising Tide Software, Inc.
- * Copyright (c) 2008 Linux-iSCSI.org
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,37 +18,161 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
-#include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
 #include <linux/ctype.h>
-#include <net/sock.h>
-#include <net/tcp.h>
 #include <scsi/iscsi_proto.h>
-
-#include <iscsi_debug.h>
 #include <target/target_core_base.h>
 #include <target/target_core_tpg.h>
 
-#include <iscsi_target_core.h>
-#include <iscsi_target_device.h>
-#include <iscsi_target_login.h>
-#include <iscsi_target_nego.h>
-#include <iscsi_target_tpg.h>
-#include <iscsi_target_util.h>
-#include <iscsi_target.h>
-#include <iscsi_auth_kernel.h>
-#include <iscsi_parameters.h>
+#include "iscsi_debug.h"
+#include "iscsi_target_core.h"
+#include "iscsi_parameters.h"
+#include "iscsi_target_login.h"
+#include "iscsi_target_nego.h"
+#include "iscsi_target_tpg.h"
+#include "iscsi_target_util.h"
+#include "iscsi_target.h"
+#include "iscsi_auth_chap.h"
 
-#define MAX_LOGIN_PDUS	7
+#define MAX_LOGIN_PDUS  7
+#define TEXT_LEN	4096
+
+void convert_null_to_semi(char *buf, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++)
+		if (buf[i] == '\0')
+			buf[i] = ';';
+}
+
+int strlen_semi(char *buf)
+{
+	int i = 0;
+
+	while (buf[i] != '\0') {
+		if (buf[i] == ';')
+			return i;
+		i++;
+	}
+
+	return -1;
+}
+
+int extract_param(
+	const char *in_buf,
+	const char *pattern,
+	unsigned int max_length,
+	char *out_buf,
+	unsigned char *type)
+{
+	char *ptr;
+	int len;
+
+	if (!in_buf || !pattern || !out_buf || !type)
+		return -1;
+
+	ptr = strstr(in_buf, pattern);
+	if (!ptr)
+		return -1;
+
+	ptr = strstr(ptr, "=");
+	if (!ptr)
+		return -1;
+
+	ptr += 1;
+	if (*ptr == '0' && (*(ptr+1) == 'x' || *(ptr+1) == 'X')) {
+		ptr += 2; /* skip 0x */
+		*type = HEX;
+	} else
+		*type = DECIMAL;
+
+	len = strlen_semi(ptr);
+	if (len < 0)
+		return -1;
+
+	if (len > max_length) {
+		printk(KERN_ERR "Length of input: %d exeeds max_length:"
+			" %d\n", len, max_length);
+		return -1;
+	}
+	memcpy(out_buf, ptr, len);
+	out_buf[len] = '\0';
+
+	return 0;
+}
+
+static u32 iscsi_handle_authentication(
+	struct iscsi_conn *conn,
+	char *in_buf,
+	char *out_buf,
+	int in_length,
+	int *out_length,
+	unsigned char *authtype)
+{
+	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_node_auth *auth;
+	struct iscsi_node_acl *iscsi_nacl;
+	struct se_node_acl *se_nacl;
+
+	if (!(SESS_OPS(sess)->SessionType)) {
+		/*
+		 * For SessionType=Normal
+		 */
+		se_nacl = SESS(conn)->se_sess->se_node_acl;
+		if (!(se_nacl)) {
+			printk(KERN_ERR "Unable to locate struct se_node_acl for"
+					" CHAP auth\n");
+			return -1;
+		}
+		iscsi_nacl = container_of(se_nacl, struct iscsi_node_acl,
+				se_node_acl);
+		if (!(iscsi_nacl)) {
+			printk(KERN_ERR "Unable to locate struct iscsi_node_acl for"
+					" CHAP auth\n");
+			return -1;
+		}
+
+		auth = ISCSI_NODE_AUTH(iscsi_nacl);
+	} else {
+		/*
+		 * For SessionType=Discovery
+		 */
+		auth = &iscsi_global->discovery_acl.node_auth;	
+	}
+
+	if (strstr("CHAP", authtype))
+		strcpy(SESS(conn)->auth_type, "CHAP");
+	else
+		strcpy(SESS(conn)->auth_type, NONE);
+
+	if (strstr("None", authtype))
+		return 1;
+#ifdef CANSRP
+	else if (strstr("SRP", authtype))
+		return srp_main_loop(conn, auth, in_buf, out_buf,
+				&in_length, out_length);
+#endif
+	else if (strstr("CHAP", authtype))
+		return chap_main_loop(conn, auth, in_buf, out_buf,
+				&in_length, out_length);
+	else if (strstr("SPKM1", authtype))
+		return 2;
+	else if (strstr("SPKM2", authtype))
+		return 2;
+	else if (strstr("KRB5", authtype))
+		return 2;
+	else
+		return 2;
+}
+
+static void iscsi_remove_failed_auth_entry(struct iscsi_conn *conn)
+{
+	kfree(conn->auth_protocol);
+}
 
 /*	iscsi_target_check_login_request():
  *
@@ -406,8 +529,7 @@ static int iscsi_target_do_authentication(
 			login->rsp_buf,
 			payload_length,
 			&login->rsp_length,
-			param->value,
-			AUTH_SERVER);
+			param->value);
 	switch (authret) {
 	case 0:
 		printk(KERN_INFO "Received OK response"
@@ -976,7 +1098,7 @@ int iscsi_target_start_negotiation(
 	ret = iscsi_target_do_login(conn, login);
 out:
 	if (ret != 0)
-		iscsi_remove_failed_auth_entry(conn, AUTH_SERVER);
+		iscsi_remove_failed_auth_entry(conn);
 
 	iscsi_target_nego_release(login, conn);
 	return ret;

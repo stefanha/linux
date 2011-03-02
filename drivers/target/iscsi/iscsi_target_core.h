@@ -6,10 +6,10 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi_cmnd.h>
-#include <iscsi_target_version.h>	    /* get version definition */
-
 #include <target/target_core_base.h>
 
+#define ISCSI_VENDOR			"Linux-iSCSI.org"
+#define ISCSI_VERSION			"v4.1.0-rc1"
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 #define ISCSI_MISC_IOVECS		5
 #define ISCSI_MAX_DATASN_MISSING_COUNT	16
@@ -348,8 +348,6 @@ struct iscsi_sess_ops {
 	u8	SessionType;			/* [0,1] == [Normal,Discovery]*/
 };
 
-#include <iscsi_target_stat.h>
-
 struct iscsi_queue_req {
 	int			state;
 	struct se_obj_lun_type_s *queue_se_obj_api;
@@ -568,8 +566,6 @@ struct iscsi_cmd {
 
 #define SE_CMD(cmd)		(&(cmd)->se_cmd)
 
-#include <iscsi_seq_and_pdu_list.h>
-
 struct iscsi_tmr_req {
 	bool			task_reassign:1;
 	u32			ref_cmd_sn;
@@ -679,7 +675,6 @@ struct iscsi_conn {
 	struct list_head	conn_list;
 } ____cacheline_aligned;
 
-#include <iscsi_parameters.h>
 #define CONN(cmd)		((struct iscsi_conn *)(cmd)->conn)
 #define CONN_OPS(conn)		((struct iscsi_conn_ops *)(conn)->conn_ops)
 
@@ -788,25 +783,6 @@ struct iscsi_login {
 	char *rsp_buf;
 } ____cacheline_aligned;
 
-#include <iscsi_thread_queue.h>
-
-#ifdef DEBUG_ERL
-struct iscsi_debug_erl {
-	u8		counter;
-	u8		state;
-	u8		debug_erl;
-	u8		debug_type;
-	u16		cid;
-	u16		tpgt;
-	u32		cmd_sn;
-	u32		count;
-	u32		data_offset;
-	u32		data_sn;
-	u32		init_task_tag;
-	u32		sid;
-}  ____cacheline_aligned;
-#endif /* DEBUG_ERL */
-
 struct iscsi_node_attrib {
 	u32			dataout_timeout;
 	u32			dataout_timeout_retries;
@@ -834,6 +810,8 @@ struct iscsi_node_auth {
 	char			userid_mutual[MAX_USER_LEN];
 	char			password_mutual[MAX_PASS_LEN];
 } ____cacheline_aligned;
+
+#include "iscsi_target_stat.h"
 
 struct iscsi_node_stat_grps {
 	struct config_group	iscsi_sess_stats_group;
@@ -1034,14 +1012,8 @@ struct iscsi_global {
 	/* Used for iSCSI discovery session authentication */
 	struct iscsi_node_acl	discovery_acl;
 	struct iscsi_portal_group	*discovery_tpg;
-#ifdef DEBUG_ERL
-	struct iscsi_debug_erl	*debug_erl;
-	spinlock_t		debug_erl_lock;
-#endif /* DEBUG_ERL */
 	struct list_head	active_ts_list;
 	struct list_head	inactive_ts_list;
 } ____cacheline_aligned;
-
-#define ISCSI_DEBUG_ERL(g)	((struct iscsi_debug_erl *)(g)->debug_erl)
 
 #endif /* ISCSI_TARGET_CORE_H */

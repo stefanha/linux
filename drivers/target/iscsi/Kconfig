@@ -1,4 +1,4 @@
-config LIO_TARGET
+config ISCSI_TARGET
 	tristate "Linux-iSCSI.org iSCSI Target Mode Stack"
 	select CRYPTO
 	select CRYPTO_CRC32C
@@ -7,13 +7,11 @@ config LIO_TARGET
 	Say Y here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI
 	Target Mode Stack.
 
-config LIO_TARGET_DEBUG
+if ISCSI_TARGET
+
+config ISCSI_TARGET_DEBUG
 	bool "LIO-Target iscsi_debug.h ring buffer messages"
 	help
 	Say Y here to enable the legacy DEBUG_ISCSI macros in iscsi_debug.h
 
-config LIO_TARGET_DEBUG_ERL
-	bool "LIO-Target ErrorRecoveryLevel debug code"
-	help
-	Say Y here to enable the iSCSI ErrorRecoveryLevel debugging code.
-	
+endif

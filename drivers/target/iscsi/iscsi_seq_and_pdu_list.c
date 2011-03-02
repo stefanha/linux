@@ -1,14 +1,14 @@
 /*******************************************************************************
- * Filename:  iscsi_seq_and_pdu_list.c
- *
  * This file contains main functions related to iSCSI DataSequenceInOrder=No
  * and DataPDUInOrder=No.
  *
  * Copyright (c) 2003 PyX Technologies, Inc.
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
- * Copyright (c) 2007 Rising Tide Software, Inc.
+ © Copyright 2007-2011 RisingTide Systems LLC.
+ * 
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,20 +19,15 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
-
 
 #include <linux/slab.h>
 #include <linux/random.h>
 
-#include <iscsi_debug.h>
-#include <iscsi_target_core.h>
-#include <iscsi_target_util.h>
+#include "iscsi_debug.h"
+#include "iscsi_target_core.h"
+#include "iscsi_target_util.h"
+#include "iscsi_seq_and_pdu_list.h"
 
 #define OFFLOAD_BUF_SIZE	32768
 

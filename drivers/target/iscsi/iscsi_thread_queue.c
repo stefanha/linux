@@ -1,13 +1,13 @@
 /*******************************************************************************
- * Filename:  iscsi_thread_queue.c
- *
  * This file contains the iSCSI Login Thread and Thread Queue functions.
  *
  * Copyright (c) 2003 PyX Technologies, Inc.
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
- * Copyright (c) 2007 Rising Tide Software, Inc.
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,11 +18,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
 #include <linux/string.h>
@@ -34,8 +29,9 @@
 #include <linux/list.h>
 #include <linux/bitmap.h>
 
-#include <iscsi_debug.h>
-#include <iscsi_target_core.h>
+#include "iscsi_debug.h"
+#include "iscsi_target_core.h"
+#include "iscsi_thread_queue.h"
 
 /*	iscsi_add_ts_to_active_list():
  *
@@ -43,10 +39,6 @@
  */
 static void iscsi_add_ts_to_active_list(struct se_thread_set *ts)
 {
-#if 0
-	printk(KERN_INFO "Adding thread set %d to active list\n",
-			ts->thread_id);
-#endif
 	spin_lock(&iscsi_global->active_ts_lock);
 	list_add_tail(&ts->ts_list, &iscsi_global->active_ts_list);
 	iscsi_global->active_ts++;
@@ -59,10 +51,6 @@ static void iscsi_add_ts_to_active_list(struct se_thread_set *ts)
  */
 extern void iscsi_add_ts_to_inactive_list(struct se_thread_set *ts)
 {
-#if 0
-	printk(KERN_INFO "Adding thread set %d to inactive list\n",
-			ts->thread_id);
-#endif
 	spin_lock(&iscsi_global->inactive_ts_lock);
 	list_add_tail(&ts->ts_list, &iscsi_global->inactive_ts_list);
 	iscsi_global->inactive_ts++;
@@ -75,10 +63,6 @@ extern void iscsi_add_ts_to_inactive_list(struct se_thread_set *ts)
  */
 static void iscsi_del_ts_from_active_list(struct se_thread_set *ts)
 {
-#if 0
-	printk(KERN_INFO "Remove thread set %d from active list\n",
-			ts->thread_id);
-#endif
 	spin_lock(&iscsi_global->active_ts_lock);
 	list_del(&ts->ts_list);
 	iscsi_global->active_ts--;
@@ -187,9 +171,7 @@ extern void iscsi_deallocate_thread_sets(void)
 	struct se_thread_set *ts = NULL;
 
 	while ((ts = iscsi_get_ts_from_inactive_list())) {
-#if 0
-		printk(KERN_INFO "Deallocating THREAD_ID: %d\n", ts->thread_id);
-#endif
+
 		spin_lock_bh(&ts->ts_state_lock);
 		ts->status = ISCSI_THREAD_SET_DIE;
 		spin_unlock_bh(&ts->ts_state_lock);
@@ -202,9 +184,6 @@ extern void iscsi_deallocate_thread_sets(void)
 			send_sig(SIGKILL, ts->tx_thread, 1);
 			down(&ts->tx_done_sem);
 		}
-#if 0
-		printk(KERN_INFO "Deallocated THREAD_ID: %d\n", ts->thread_id);
-#endif
 		/*
 		 * Release this thread_id in the thread_set_bitmap
 		 */
@@ -237,9 +216,7 @@ static void iscsi_deallocate_extra_thread_sets(void)
 		ts = iscsi_get_ts_from_inactive_list();
 		if (!(ts))
 			break;
-#if 0
-		printk(KERN_INFO "Deallocating THREAD_ID: %d\n", ts->thread_id);
-#endif
+
 		spin_lock_bh(&ts->ts_state_lock);
 		ts->status = ISCSI_THREAD_SET_DIE;
 		spin_unlock_bh(&ts->ts_state_lock);
@@ -252,9 +229,6 @@ static void iscsi_deallocate_extra_thread_sets(void)
 			send_sig(SIGKILL, ts->tx_thread, 1);
 			down(&ts->tx_done_sem);
 		}
-#if 0
-		printk(KERN_INFO "Deallocated THREAD_ID: %d\n", ts->thread_id);
-#endif
 		/*
 		 * Release this thread_id in the thread_set_bitmap
 		 */
@@ -280,9 +254,7 @@ static void iscsi_deallocate_extra_thread_sets(void)
 void iscsi_activate_thread_set(struct iscsi_conn *conn, struct se_thread_set *ts)
 {
 	iscsi_add_ts_to_active_list(ts);
-#if 0
-	printk(KERN_ERR "Activating Thread Set ID: %u\n", ts->thread_id);
-#endif
+
 	spin_lock_bh(&ts->ts_state_lock);
 	conn->thread_set = ts;
 	ts->conn = conn;
@@ -410,11 +382,7 @@ int iscsi_release_thread_set(struct iscsi_conn *conn, int role)
 		BUG();
 	}
 	ts = conn->thread_set;
-#if 0
-	printk(KERN_ERR "Releasing thread set ID: %u for CID: %hu in SID:"
-		" %u from %s:%d.\n", ts->thread_id, conn->cid,
-			SESS(conn)->sid, current->comm, current->pid);
-#endif
+
 	spin_lock_bh(&ts->ts_state_lock);
 	ts->status = ISCSI_THREAD_SET_RESET;
 
@@ -427,10 +395,7 @@ int iscsi_release_thread_set(struct iscsi_conn *conn, int role)
 
 	if (ts->rx_thread && (thread_called == ISCSI_TX_THREAD) &&
 	   (ts->thread_clear & ISCSI_CLEAR_RX_THREAD)) {
-#if 0
-		printk(KERN_ERR "Stopping RX_THREAD for TS ID: %u\n",
-				ts->thread_id);
-#endif
+
 		if (!(ts->signal_sent & ISCSI_SIGNAL_RX_THREAD)) {
 			send_sig(SIGABRT, ts->rx_thread, 1);
 			ts->signal_sent |= ISCSI_SIGNAL_RX_THREAD;
@@ -443,10 +408,7 @@ int iscsi_release_thread_set(struct iscsi_conn *conn, int role)
 	}
 	if (ts->tx_thread && (thread_called == ISCSI_RX_THREAD) &&
 	   (ts->thread_clear & ISCSI_CLEAR_TX_THREAD)) {
-#if 0
-		printk(KERN_ERR "Stopping TX_THREAD for TS ID: %u\n",
-				ts->thread_id);
-#endif
+
 		if (!(ts->signal_sent & ISCSI_SIGNAL_TX_THREAD)) {
 			send_sig(SIGABRT, ts->tx_thread, 1);
 			ts->signal_sent |= ISCSI_SIGNAL_TX_THREAD;
@@ -457,11 +419,6 @@ int iscsi_release_thread_set(struct iscsi_conn *conn, int role)
 		spin_lock_bh(&ts->ts_state_lock);
 		ts->blocked_threads &= ~ISCSI_BLOCK_TX_THREAD;
 	}
-
-#if 0
-	printk(KERN_ERR "Released thread set ID: %u for CID: %hu in SID:"
-		" %u.\n", ts->thread_id, conn->cid, SESS(conn)->sid);
-#endif
 
 	conn->thread_set = NULL;
 	ts->conn = NULL;
@@ -490,18 +447,10 @@ int iscsi_thread_set_force_reinstatement(struct iscsi_conn *conn)
 	}
 
 	if (ts->tx_thread && (!(ts->signal_sent & ISCSI_SIGNAL_TX_THREAD))) {
-#if 0
-		printk(KERN_ERR "Sending SIGABRT to TX_THREAD for thread id: %u\n",
-				ts->thread_id);
-#endif
 		send_sig(SIGABRT, ts->tx_thread, 1);
 		ts->signal_sent |= ISCSI_SIGNAL_TX_THREAD;
 	}
 	if (ts->rx_thread && (!(ts->signal_sent & ISCSI_SIGNAL_RX_THREAD))) {
-#if 0
-		printk(KERN_ERR "Sending SIGABRT to RX_THREAD for thread id: %u\n",
-				ts->thread_id);
-#endif
 		send_sig(SIGABRT, ts->rx_thread, 1);
 		ts->signal_sent |= ISCSI_SIGNAL_RX_THREAD;
 	}
@@ -531,10 +480,6 @@ static void iscsi_check_to_add_additional_sets(void)
  */
 static int iscsi_signal_thread_pre_handler(struct se_thread_set *ts)
 {
-#if 0
-	printk(KERN_INFO "ts->thread_id: %d ts->status = %d%s\n", ts->thread_id,
-		ts->status, (signal_pending(current)) ? " GOT_SIGNAL" : "");
-#endif
 	spin_lock_bh(&ts->ts_state_lock);
 	if ((ts->status == ISCSI_THREAD_SET_DIE) || signal_pending(current)) {
 		spin_unlock_bh(&ts->ts_state_lock);
@@ -564,10 +509,6 @@ struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *ts, int rol
 
 	if (ts->delay_inactive && (--ts->thread_count == 0)) {
 		spin_unlock_bh(&ts->ts_state_lock);
-#if 0
-		printk(KERN_ERR "Releasing delayed inactive TS %u from RX pre"
-			" handler\n", ts->thread_id);
-#endif
 		iscsi_del_ts_from_active_list(ts);
 
 		if (!iscsi_global->in_shutdown)
@@ -626,10 +567,6 @@ struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *ts, int rol
 
 	if (ts->delay_inactive && (--ts->thread_count == 0)) {
 		spin_unlock_bh(&ts->ts_state_lock);
-#if 0
-		printk(KERN_ERR "Releasing delayed inactive TS %u from TX pre"
-			" handler\n", ts->thread_id);
-#endif
 		iscsi_del_ts_from_active_list(ts);
 
 		if (!iscsi_global->in_shutdown)
@@ -671,10 +608,8 @@ sleep:
 
 	spin_lock_bh(&ts->ts_state_lock);
 	ts->status = ISCSI_THREAD_SET_ACTIVE;
-#if 0
-	printk(KERN_ERR "Activated Thread Set ID: %u\n", ts->thread_id);
-#endif
 	spin_unlock_bh(&ts->ts_state_lock);
+
 	return ts->conn;
 }
 

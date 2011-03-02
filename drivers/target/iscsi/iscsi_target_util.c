@@ -1,13 +1,13 @@
 /*******************************************************************************
- * Filename:  iscsi_target_util.c
- *
  * This file contains the iSCSI Target specific utility functions.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007 Rising Tide Software, Inc.
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,52 +18,32 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
-#include <linux/string.h>
-#include <linux/version.h>
 #include <linux/timer.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
-#include <linux/in.h>
 #include <linux/list.h>
-#include <net/sock.h>
-#include <net/tcp.h>
-#include <scsi/scsi.h>
-#include <scsi/scsi_host.h>
 #include <scsi/libsas.h> /* For TASK_ATTR_* */
 #include <scsi/iscsi_proto.h>
-
-#include <iscsi_debug.h>
-#include <iscsi_serial.h>
-
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_tmr.h>
-
-#include <iscsi_target_core.h>
-#include <iscsi_target_datain_values.h>
-#include <iscsi_target_erl0.h>
-#include <iscsi_target_erl1.h>
-#include <iscsi_target_erl2.h>
-#include <iscsi_target_tpg.h>
-#include <iscsi_target_util.h>
-#include <iscsi_target.h>
-#include <iscsi_parameters.h>
-
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 
-#ifdef DEBUG_ERL
-#include <iscsi_target_debugerl.h>
-#endif /* DEBUG_ERL */
+#include "iscsi_debug.h"
+#include "iscsi_target_core.h"
+#include "iscsi_parameters.h"
+#include "iscsi_seq_and_pdu_list.h"
+#include "iscsi_target_datain_values.h"
+#include "iscsi_target_erl0.h"
+#include "iscsi_target_erl1.h"
+#include "iscsi_target_erl2.h"
+#include "iscsi_target_tpg.h"
+#include "iscsi_target_util.h"
+#include "iscsi_target.h"
 
 /*	iscsi_attach_cmd_to_queue():
  *
@@ -507,6 +487,31 @@ struct iscsi_r2t *iscsi_get_holder_for_r2tsn(
 	return (r2t) ? r2t : NULL;
 }
 
+#define SERIAL_BITS	31
+#define MAX_BOUND	(u32)2147483647UL
+
+int serial_lt(u32 x, u32 y)
+{
+	return (x != y) && (((x < y) && ((y - x) < MAX_BOUND)) ||
+		((x > y) && ((x - y) > MAX_BOUND)));
+}
+
+int serial_lte(u32 x, u32 y)
+{
+	return (x == y) ? 1 : serial_lt(x, y);
+}
+
+int serial_gt(u32 x, u32 y)
+{
+	return (x != y) && (((x < y) && ((y - x) > MAX_BOUND)) ||
+		((x > y) && ((x - y) < MAX_BOUND)));
+}
+
+int serial_gte(u32 x, u32 y)
+{
+	return (x == y) ? 1 : serial_gt(x, y);
+}
+
 /*	iscsi_check_received_cmdsn():
  *
  *
@@ -517,12 +522,6 @@ inline int iscsi_check_received_cmdsn(
 	u32 cmdsn)
 {
 	int ret;
-
-#ifdef DEBUG_ERL
-	if (iscsi_target_debugerl_cmdsn(conn, cmdsn) < 0)
-		return CMDSN_LOWER_THAN_EXP;
-#endif /* DEBUG_ERL */
-
 	/*
 	 * This is the proper method of checking received CmdSN against
 	 * ExpCmdSN and MaxCmdSN values, as well as accounting for out
@@ -837,10 +836,6 @@ void iscsi_add_cmd_to_immediate_queue(
 		return;
 	}
 	INIT_LIST_HEAD(&qr->qr_list);
-#if 0
-	printk(KERN_INFO "Adding ITT: 0x%08x state: %d to immediate queue\n",
-			cmd->init_task_tag, state);
-#endif
 	qr->cmd = cmd;
 	qr->state = state;
 
@@ -924,10 +919,6 @@ void iscsi_add_cmd_to_response_queue(
 		return;
 	}
 	INIT_LIST_HEAD(&qr->qr_list);
-#if 0
-	printk(KERN_INFO "Adding ITT: 0x%08x state: %d to response queue\n",
-			cmd->init_task_tag, state);
-#endif
 	qr->cmd = cmd;
 	qr->state = state;
 
@@ -1085,13 +1076,6 @@ void __iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *se
 void iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd)
 {
 	if (!CONN(cmd) && !cmd->sess) {
-#if 0
-		printk(KERN_INFO "Releasing cmd: %p ITT: 0x%08x i_state:"
-			" 0x%02x, deferred_i_state: 0x%02x directly\n", cmd,
-			CMD_TFO(se_cmd)->get_task_tag(se_cmd),
-			CMD_TFO(se_cmd)->get_cmd_state(se_cmd),
-			cmd->deferred_i_state);
-#endif
 		iscsi_release_cmd_direct(cmd);
 	} else {
 		__iscsi_release_cmd_to_pool(cmd, (CONN(cmd)) ?
@@ -1188,23 +1172,12 @@ int iscsi_check_session_usage_count(struct iscsi_session *sess)
 {
 	spin_lock_bh(&sess->session_usage_lock);
 	if (atomic_read(&sess->session_usage_count)) {
-#if 0
-		printk(KERN_INFO "atomic_read(&sess->session_usage_count):"
-			" %d\n", atomic_read(&sess->session_usage_count));
-#endif
 		atomic_set(&sess->session_waiting_on_uc, 1);
 		spin_unlock_bh(&sess->session_usage_lock);
 		if (in_interrupt())
 			return 2;
-#if 0
-		printk(KERN_INFO "Before"
-				" down(&sess->session_waiting_on_uc_sem);\n");
-#endif
+
 		down(&sess->session_waiting_on_uc_sem);
-#if 0
-		printk(KERN_INFO "After"
-			" down(&sess->session_waiting_on_uc_sem);\n");
-#endif
 		return 1;
 	}
 	spin_unlock_bh(&sess->session_usage_lock);
@@ -1220,10 +1193,7 @@ void iscsi_dec_session_usage_count(struct iscsi_session *sess)
 {
 	spin_lock_bh(&sess->session_usage_lock);
 	atomic_dec(&sess->session_usage_count);
-#if 0
-	printk(KERN_INFO "Decremented session_usage_count to %d\n",
-		atomic_read(&sess->session_usage_count));
-#endif
+
 	if (!atomic_read(&sess->session_usage_count) &&
 	     atomic_read(&sess->session_waiting_on_uc))
 		up(&sess->session_waiting_on_uc_sem);
@@ -1237,12 +1207,9 @@ void iscsi_dec_session_usage_count(struct iscsi_session *sess)
  */
 void iscsi_inc_session_usage_count(struct iscsi_session *sess)
 {
+
 	spin_lock_bh(&sess->session_usage_lock);
 	atomic_inc(&sess->session_usage_count);
-#if 0
-	printk(KERN_INFO "Incremented session_usage_count to %d\n",
-		atomic_read(&sess->session_usage_count));
-#endif
 	spin_unlock_bh(&sess->session_usage_lock);
 }
 
@@ -1679,22 +1646,11 @@ struct iscsi_conn *iscsi_get_conn_from_cid_rcfr(struct iscsi_session *sess, u16 
 void iscsi_check_conn_usage_count(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->conn_usage_lock);
-#if 0
-	printk(KERN_INFO "atomic_read(&conn->conn_usage_count): %d for CID:"
-		" %hu\n", atomic_read(&conn->conn_usage_count), conn->cid);
-#endif
 	if (atomic_read(&conn->conn_usage_count)) {
 		atomic_set(&conn->conn_waiting_on_uc, 1);
 		spin_unlock_bh(&conn->conn_usage_lock);
-#if 0
-		printk(KERN_INFO "Before down(&conn->conn_waiting_on_uc_sem);"
-				" for CID: %hu\n", conn->cid);
-#endif
+
 		down(&conn->conn_waiting_on_uc_sem);
-#if 0
-		printk(KERN_INFO "After down(&conn->conn_waiting_on_uc_sem);"
-				" for CID: %hu\n", conn->cid);
-#endif
 		return;
 	}
 	spin_unlock_bh(&conn->conn_usage_lock);
@@ -1708,10 +1664,7 @@ void iscsi_dec_conn_usage_count(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->conn_usage_lock);
 	atomic_dec(&conn->conn_usage_count);
-#if 0
-	printk(KERN_INFO "Decremented conn_usage_count to %d for CID: %hu\n",
-		atomic_read(&conn->conn_usage_count), conn->cid);
-#endif
+
 	if (!atomic_read(&conn->conn_usage_count) &&
 	     atomic_read(&conn->conn_waiting_on_uc))
 		up(&conn->conn_waiting_on_uc_sem);
@@ -1727,10 +1680,6 @@ void iscsi_inc_conn_usage_count(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->conn_usage_lock);
 	atomic_inc(&conn->conn_usage_count);
-#if 0
-	printk(KERN_INFO "Incremented conn_usage_count to %d for CID: %hu\n",
-		atomic_read(&conn->conn_usage_count), conn->cid);
-#endif
 	spin_unlock_bh(&conn->conn_usage_lock);
 }
 

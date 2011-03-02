@@ -1,13 +1,13 @@
 /*******************************************************************************
- * Filename:  iscsi_target_discovery.c
- *
  * This file contains iSCSI Target discovery specific functions.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007 Rising Tide Software, Inc.
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,11 +18,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
 #include <linux/delay.h>
@@ -31,9 +26,9 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 
-#include <iscsi_target_core.h>
-#include <iscsi_debug.h>
-#include <iscsi_target_discovery.h>
+#include "iscsi_target_core.h"
+#include "iscsi_debug.h"
+#include "iscsi_target_discovery.h"
 
 /*	iscsi_build_sendtargets_response():
  *

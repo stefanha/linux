@@ -35,7 +35,7 @@
 #define TRACE_ALL		0xffffffff	/* Turn on all flags */
 #define TRACE_ENDING		0x00000000	/* foo */
 
-#ifdef CONFIG_ISCSI_DEBUG
+#ifdef CONFIG_ISCSI_TARGET_DEBUG
 /*
  * TRACE_VANITY, is always last!
  */
@@ -105,9 +105,9 @@ if (iscsi_trace & TRACE_BUFF) {					\
 		printk(KERN_INFO "\n");				\
 }
 
-#else /* !CONFIG_ISCSI_DEBUG */
+#else /* !CONFIG_ISCSI_TARGET_DEBUG */
 #define TRACE(trace, args...)
 #define PRINT_BUFF(buff, len)
-#endif /* CONFIG_ISCSI_DEBUG */
+#endif /* CONFIG_ISCSI_TARGET_DEBUG */
 
 #endif   /*** ISCSI_DEBUG_H ***/

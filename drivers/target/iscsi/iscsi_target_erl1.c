@@ -1,13 +1,13 @@
 /*******************************************************************************
- * Filename:  iscsi_target_erl1.c
- *
  * This file contains error recovery level one used by the iSCSI Target driver.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
- * Copyright (c) 2007 Rising Tide Software, Inc.
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,37 +18,26 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
-#include <linux/net.h>
-#include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
-#include <linux/in.h>
 #include <linux/list.h>
-#include <net/sock.h>
-#include <net/tcp.h>
 #include <scsi/iscsi_proto.h>
-
-#include <iscsi_debug.h>
-
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
-#include <iscsi_target_core.h>
-#include <iscsi_target_datain_values.h>
-#include <iscsi_target_device.h>
-#include <iscsi_target_tpg.h>
-#include <iscsi_target_util.h>
-#include <iscsi_target_erl0.h>
-#include <iscsi_target_erl1.h>
-#include <iscsi_target_erl2.h>
+
+#include "iscsi_debug.h"
+#include "iscsi_target_core.h"
+#include "iscsi_seq_and_pdu_list.h"
+#include "iscsi_target_datain_values.h"
+#include "iscsi_target_device.h"
+#include "iscsi_target_tpg.h"
+#include "iscsi_target_util.h"
+#include "iscsi_target_erl0.h"
+#include "iscsi_target_erl1.h"
+#include "iscsi_target_erl2.h"
 
 #define OFFLOAD_BUF_SIZE	32768
 

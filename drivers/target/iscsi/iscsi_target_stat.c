@@ -1,12 +1,12 @@
 /*******************************************************************************
- * Copyright (c) 2011 Rising Tide Systems
- *
  * Modern ConfigFS group context specific iSCSI statistics based on original
  * iscsi_target_mib.c code
  *
- * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
+ * Copyright (c) 2011 Rising Tide Systems
+ * 
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
- * Nicholas A. Bellinger <nab@risingtidesystems.com>
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,38 +17,24 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
 #include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/delay.h>
-#include <linux/timer.h>
-#include <linux/string.h>
 #include <linux/version.h>
 #include <generated/utsrelease.h>
 #include <linux/utsname.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/blkdev.h>
 #include <linux/configfs.h>
-#include <scsi/scsi.h>
-#include <scsi/scsi_device.h>
-#include <scsi/scsi_host.h>
 #include <scsi/iscsi_proto.h>
-
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/configfs_macros.h>
-#include <iscsi_target_core.h>
-#include <iscsi_target_device.h>
-#include <iscsi_target_tpg.h>
-#include <iscsi_target_util.h>
-#include <iscsi_target_stat.h>
+
+#include "iscsi_target_core.h"
+#include "iscsi_parameters.h"
+#include "iscsi_target_device.h"
+#include "iscsi_target_tpg.h"
+#include "iscsi_target_util.h"
+#include "iscsi_target_stat.h"
 
 #ifndef INITIAL_JIFFIES
 #define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
@@ -57,7 +43,6 @@
 /* Instance Attributes Table */
 #define ISCSI_INST_NUM_NODES		1
 #define ISCSI_INST_DESCR		"Storage Engine Target"
-#define ISCSI_VENDOR			"Linux-iSCSI.org"
 #define ISCSI_INST_LAST_FAILURE_TYPE	0
 #define ISCSI_DISCONTINUITY_TIME	0
 
@@ -203,7 +188,7 @@ ISCSI_STAT_INSTANCE_ATTR_RO(vendor);
 static ssize_t iscsi_stat_instance_show_attr_version(
 	struct iscsi_wwn_stat_grps *igrps, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "%s on %s/%s\n", PYX_ISCSI_VERSION,
+	return snprintf(page, PAGE_SIZE, "%s on %s/%s\n", ISCSI_VERSION,
 			utsname()->sysname, utsname()->machine);
 }
 ISCSI_STAT_INSTANCE_ATTR_RO(version);

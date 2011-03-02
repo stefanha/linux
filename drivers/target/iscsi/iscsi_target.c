@@ -1,13 +1,13 @@
 /*******************************************************************************
- * Filename:  iscsi_target.c
- *
  * This file contains main functions related to the iSCSI Target Core Driver.
  *
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007, 2008, 2009 Rising Tide Software, Inc.
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,65 +18,44 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/version.h>
 #include <generated/utsrelease.h>
-#include <linux/init.h>
+#include <linux/utsname.h>
 #include <linux/kmod.h>
-#include <linux/net.h>
-#include <linux/miscdevice.h>
-#include <linux/string.h>
 #include <linux/timer.h>
-#include <linux/blkdev.h>
-#include <linux/proc_fs.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
-#include <linux/in.h>
-#include <linux/utsname.h>
 #include <linux/crypto.h>
 #include <asm/unaligned.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/iscsi_proto.h>
-
-#include <iscsi_debug.h>
-#include <iscsi_target_core.h>
 #include <target/target_core_base.h>
-#include <iscsi_target_datain_values.h>
-#include <iscsi_target_discovery.h>
-#include <iscsi_target_erl0.h>
-#include <iscsi_target_erl1.h>
-#include <iscsi_target_erl2.h>
-#include <iscsi_target_login.h>
 #include <target/target_core_tmr.h>
-#include <iscsi_target_tmr.h>
-#include <iscsi_target_tpg.h>
 #include <target/target_core_transport.h>
-#include <iscsi_target_util.h>
 
-
-#include <iscsi_target.h>
-#include <iscsi_target_device.h>
-
-#include <iscsi_parameters.h>
-#include <iscsi_thread_queue.h>
-
-#ifdef DEBUG_ERL
-#include <iscsi_target_debugerl.h>
-#endif /* DEBUG_ERL */
-
-#include <iscsi_target_stat.h>
-
-#include <iscsi_target_configfs.h>
+#include "iscsi_debug.h"
+#include "iscsi_target_core.h"
+#include "iscsi_parameters.h"
+#include "iscsi_seq_and_pdu_list.h"
+#include "iscsi_thread_queue.h"
+#include "iscsi_target_configfs.h"
+#include "iscsi_target_datain_values.h"
+#include "iscsi_target_discovery.h"
+#include "iscsi_target_erl0.h"
+#include "iscsi_target_erl1.h"
+#include "iscsi_target_erl2.h"
+#include "iscsi_target_login.h"
+#include "iscsi_target_tmr.h"
+#include "iscsi_target_tpg.h"
+#include "iscsi_target_util.h"
+#include "iscsi_target.h"
+#include "iscsi_target_device.h"
+#include "iscsi_target_stat.h"
 
 struct iscsi_global *iscsi_global;
 
@@ -878,8 +857,8 @@ static int default_targetname_seq_show(struct seq_file *m, void *p)
 
 static int version_info_seq_show(struct seq_file *m, void *p)
 {
-	seq_printf(m, "%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on"
-		" %s/%s on "UTS_RELEASE"\n", PYX_ISCSI_VENDOR,
+	seq_printf(m, "%s iSCSI Target Core Stack "ISCSI_VERSION" on"
+		" %s/%s on "UTS_RELEASE"\n", ISCSI_VENDOR,
 		utsname()->sysname, utsname()->machine);
 
 	return 0;
@@ -934,8 +913,8 @@ static int iscsi_target_detect(void)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "%s iSCSI Target Core Stack "PYX_ISCSI_VERSION" on"
-		" %s/%s on "UTS_RELEASE"\n", PYX_ISCSI_VENDOR,
+	printk(KERN_INFO "%s iSCSI Target Core Stack "ISCSI_VERSION" on"
+		" %s/%s on "UTS_RELEASE"\n", ISCSI_VENDOR,
 		utsname()->sysname, utsname()->machine);
 	/*
 	 * Clear out the struct kmem_cache pointers
@@ -960,18 +939,6 @@ static int iscsi_target_detect(void)
 		kfree(iscsi_global);
 		return -1;
 	}
-
-#ifdef DEBUG_ERL
-	iscsi_global->debug_erl = kzalloc(sizeof(struct iscsi_debug_erl),
-			GFP_KERNEL);
-	if (!(iscsi_global->debug_erl)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" struct iscsi_debug_erl\n");
-		ret = -1;
-		goto out;
-	}
-	spin_lock_init(&iscsi_global->debug_erl_lock);
-#endif /* DEBUG_ERL */
 
 	iscsi_target_register_configfs();
 	iscsi_thread_set_init();
@@ -1083,10 +1050,6 @@ out:
 	iscsi_deallocate_thread_sets();
 	iscsi_thread_set_free();
 	iscsi_target_deregister_configfs();
-
-#ifdef DEBUG_ERL
-	kfree(iscsi_global->debug_erl);
-#endif /* DEBUG_ERL */
 	kfree(iscsi_global);
 	iscsi_global = NULL;
 
@@ -1153,9 +1116,6 @@ static int iscsi_target_release(void)
 	iscsi_target_release_phase1(1);
 	iscsi_target_release_phase2();
 
-#ifdef DEBUG_ERL
-	kfree(iscsi_global->debug_erl);
-#endif /* DEBUG_ERL */
 	kfree(iscsi_global);
 
 	printk(KERN_INFO "Unloading Complete.\n");
@@ -2442,7 +2402,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 			crypto_hash_update(&conn->conn_rx_hash, &sg,
 					iov_ptr->iov_len);
 
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %d"
+			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %zu"
 				" bytes, CRC 0x%08x\n", iov_ptr->iov_len,
 				data_crc);
 			counter -= iov_ptr->iov_len;
@@ -2459,11 +2419,6 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		}
 		crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);
 
-#ifdef DEBUG_ERL
-		if (iscsi_target_debugerl_data_out_0(conn, buf) < 0)
-			data_crc = 0;
-#endif /* DEBUG_ERL */
-
 		if (checksum != data_crc) {
 			printk(KERN_ERR "ITT: 0x%08x, Offset: %u, Length: %u,"
 				" DataSN: 0x%08x, CRC32C DataDigest 0x%08x"
@@ -2477,18 +2432,6 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 				payload_length);
 		}
 	}
-
-#ifdef DEBUG_ERL
-	{
-	int ret;
-	ret = iscsi_target_debugerl_data_out_1(conn, buf);
-	if (ret == -1)
-		return 0;
-	else if (ret == -2)
-		return -1;
-	}
-#endif /* DEBUG_ERL */
-
 	/*
 	 * Increment post receive data and CRC values or perform
 	 * within-command recovery.
@@ -3476,7 +3419,7 @@ static int iscsi_handle_immediate_data(
 			crypto_hash_update(&conn->conn_rx_hash, &sg,
 					iov_ptr->iov_len);
 
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %d"
+			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %zu"
 			" bytes, CRC 0x%08x\n", iov_ptr->iov_len, data_crc);
 			counter -= iov_ptr->iov_len;
 			iov_ptr++;
@@ -3490,12 +3433,6 @@ static int iscsi_handle_immediate_data(
 			" bytes of padding, CRC 0x%08x\n", padding, data_crc);
 		}
 		crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);
-
-#ifdef DEBUG_ERL
-		if (iscsi_target_debugerl_immeidate_data(conn,
-				cmd->init_task_tag) < 0)
-			data_crc = 0;
-#endif /* DEBUG_ERL */
 
 		if (checksum != data_crc) {
 			printk(KERN_ERR "ImmediateData CRC32C DataDigest 0x%08x"
@@ -3924,7 +3861,7 @@ static inline int iscsi_send_data_in(
 			crypto_hash_update(&conn->conn_tx_hash, &sg,
 					iov_ptr->iov_len);
 
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %u"
+			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %zu"
 				" bytes, crc 0x%08x\n", iov_ptr->iov_len,
 					cmd->data_crc);
 			counter -= iov_ptr->iov_len;
@@ -4972,11 +4909,6 @@ restart:
 		     (ret != 0) || signal_pending(current))
 			goto transport_err;
 
-#ifdef DEBUG_ERL
-		if (iscsi_target_debugerl_tx_thread(conn) < 0)
-			goto transport_err;
-#endif /* DEBUG_ERL */
-
 get_immediate:
 		qr = iscsi_get_cmd_from_immediate_queue(conn);
 		if ((qr)) {
@@ -5329,11 +5261,6 @@ restart:
 			goto transport_err;
 		}
 
-#ifdef DEBUG_ERL
-		if (iscsi_target_debugerl_rx_thread0(conn) < 0)
-			goto transport_err;
-#endif /* DEBUG_ERL */
-
 		/*
 		 * Set conn->bad_hdr for use with REJECT PDUs.
 		 */
@@ -5348,10 +5275,6 @@ restart:
 				iscsi_rx_thread_wait_for_TCP(conn);
 				goto transport_err;
 			}
-#ifdef DEBUG_ERL
-			if (iscsi_target_debugerl_rx_thread1(conn) < 0)
-				digest = 0;
-#endif /* DEBUG_ERL */
 			crypto_hash_init(&conn->conn_rx_hash);
 
 			sg_init_one(&sg, (u8 *)buffer, ISCSI_HDR_LEN);

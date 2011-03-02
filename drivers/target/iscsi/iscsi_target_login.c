@@ -1,14 +1,13 @@
 /*******************************************************************************
- * Filename:  iscsi_target_login.c
- *
  * This file contains the login functions used by the iSCSI Target driver.
  *
  * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
- * Copyright (c) 2007 Rising Tide Software, Inc.
- * Copyright (c) 2008 Linux-iSCSI.org
+ * © Copyright 2007-2011 RisingTide Systems LLC.
  *
- * Nicholas A. Bellinger <nab@kernel.org>
+ * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
+ *
+ * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,40 +18,33 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *
  ******************************************************************************/
 
-#include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
-#include <linux/in.h>
 #include <linux/inet.h>
 #include <linux/crypto.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/ipv6.h>
 #include <scsi/iscsi_proto.h>
-
-#include <iscsi_debug.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
-#include <iscsi_target_core.h>
-#include <iscsi_target_device.h>
-#include <iscsi_target_nego.h>
-#include <iscsi_target_erl0.h>
-#include <iscsi_target_erl2.h>
-#include <iscsi_target_login.h>
-#include <iscsi_target_stat.h>
-#include <iscsi_target_tpg.h>
-#include <iscsi_target_util.h>
-#include <iscsi_target.h>
-#include <iscsi_parameters.h>
+
+#include "iscsi_debug.h"
+#include "iscsi_target_core.h"
+#include "iscsi_thread_queue.h"
+#include "iscsi_target_device.h"
+#include "iscsi_target_nego.h"
+#include "iscsi_target_erl0.h"
+#include "iscsi_target_erl2.h"
+#include "iscsi_target_login.h"
+#include "iscsi_target_stat.h"
+#include "iscsi_target_tpg.h"
+#include "iscsi_target_util.h"
+#include "iscsi_target.h"
+#include "iscsi_parameters.h"
 
 /*	iscsi_login_init_conn():
  *
