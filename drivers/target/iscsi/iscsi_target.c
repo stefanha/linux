@@ -846,48 +846,6 @@ static int init_iscsi_global(struct iscsi_global *global)
 	return 0;
 }
 
-static int default_targetname_seq_show(struct seq_file *m, void *p)
-{
-	if (iscsi_global->targetname_set)
-		seq_printf(m, "iSCSI TargetName: %s\n",
-				iscsi_global->targetname);
-
-	return 0;
-}
-
-static int version_info_seq_show(struct seq_file *m, void *p)
-{
-	seq_printf(m, "%s iSCSI Target Core Stack "ISCSI_VERSION" on"
-		" %s/%s on "UTS_RELEASE"\n", ISCSI_VENDOR,
-		utsname()->sysname, utsname()->machine);
-
-	return 0;
-}
-
-static int default_targetname_seq_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, default_targetname_seq_show, PDE(inode)->data);
-}
-
-static const struct file_operations default_targetname = {
-	.open		= default_targetname_seq_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-static int version_info_seq_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, version_info_seq_show, PDE(inode)->data);
-}
-
-static const struct file_operations version_info = {
-	.open		= version_info_seq_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
 /*	iscsi_target_detect():
  *
  *	This function is called upon module_init and does the following
