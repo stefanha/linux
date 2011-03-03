@@ -985,8 +985,6 @@ extern void qla_tgt_stop_phase2(struct qla_tgt *);
 
 #include <linux/version.h>
 
-extern request_t *qla2x00_req_pkt(scsi_qla_host_t *ha);
-
 extern struct qla_tgt_data qla_target;
 
 void qla_set_tgt_mode(scsi_qla_host_t *ha);

@@ -104,12 +104,16 @@ static uint32_t qla_tgt_unpack_lun(unsigned char *p);
 /*
  * Global Variables
  */
-
 static struct kmem_cache *qla_tgt_cmd_cachep;
 static struct kmem_cache *qla_tgt_mgmt_cmd_cachep;
 static mempool_t *qla_tgt_mgmt_cmd_mempool;
 
 static DECLARE_RWSEM(qla_tgt_unreg_rwsem);
+
+/*
+ * From qla2xxx/qla_iobc.c and used by various qla_target.c logic
+ */
+extern request_t *qla2x00_req_pkt(scsi_qla_host_t *);
 
 /* ha->hardware_lock supposed to be held on entry */
 static inline void qla_tgt_sess_get(struct qla_tgt_sess *sess)
@@ -152,13 +156,6 @@ static struct qla_tgt_sess *qla_tgt_find_sess_by_port_name(
 	}
 
 	return NULL;
-}
-
-
-/* ha->hardware_lock supposed to be held on entry */
-static inline request_t *qla_tgt_req_pkt(scsi_qla_host_t *vha)
-{
-	return qla2x00_req_pkt(vha);
 }
 
 /* Might release hw lock, then reaquire!! */
@@ -1156,7 +1153,7 @@ static void qla_tgt_modify_command_count(scsi_qla_host_t *vha, int cmd_count,
 
 	/* Sending marker isn't necessary, since we called from ISR */
 
-	pkt = (modify_lun_entry_t *)qla_tgt_req_pkt(vha);
+	pkt = (modify_lun_entry_t *)qla2x00_req_pkt(vha);
 	if (!pkt) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
@@ -1204,7 +1201,7 @@ static void qla2xxx_send_notify_ack(scsi_qla_host_t *vha, notify_entry_t *iocb,
 	if (qla_tgt_issue_marker(vha, 1) != QLA_SUCCESS)
 		return;
 
-	ntfy = (nack_entry_t *)qla_tgt_req_pkt(vha);
+	ntfy = (nack_entry_t *)qla2x00_req_pkt(vha);
 	if (!ntfy) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
@@ -1263,7 +1260,7 @@ static void qla24xx_send_abts_resp(scsi_qla_host_t *vha,
 	if (qla_tgt_issue_marker(vha, 1) != QLA_SUCCESS)
 		return;
 
-	resp = (abts24_resp_entry_t *)qla_tgt_req_pkt(vha);
+	resp = (abts24_resp_entry_t *)qla2x00_req_pkt(vha);
 	if (!resp) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet", vha->vp_idx, __func__);
@@ -1333,7 +1330,7 @@ static void qla24xx_retry_term_exchange(scsi_qla_host_t *vha,
 	if (qla_tgt_issue_marker(vha, 1) != QLA_SUCCESS)
 		return;
 
-	ctio = (ctio7_status1_entry_t *)qla_tgt_req_pkt(vha);
+	ctio = (ctio7_status1_entry_t *)qla2x00_req_pkt(vha);
 	if (ctio == NULL) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
@@ -1468,7 +1465,7 @@ static void qla24xx_send_task_mgmt_ctio(scsi_qla_host_t *ha,
 	if (qla_tgt_issue_marker(ha, 1) != QLA_SUCCESS)
 		return;
 
-	ctio = (ctio7_status1_entry_t *)qla_tgt_req_pkt(ha);
+	ctio = (ctio7_status1_entry_t *)qla2x00_req_pkt(ha);
 	if (ctio == NULL) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", ha->vp_idx, __func__);
@@ -1514,7 +1511,7 @@ static void qla24xx_send_notify_ack(scsi_qla_host_t *vha,
 	if (ha->qla_tgt != NULL)
 		ha->qla_tgt->notify_ack_expected++;
 
-	nack = (nack24xx_entry_t *)qla_tgt_req_pkt(vha);
+	nack = (nack24xx_entry_t *)qla2x00_req_pkt(vha);
 	if (!nack) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
@@ -2554,7 +2551,7 @@ static void qla2xxx_send_term_exchange(scsi_qla_host_t *vha, struct qla_tgt_cmd 
 	if (!ha_locked)
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 
-	ctio = (ctio_ret_entry_t *)qla_tgt_req_pkt(vha);
+	ctio = (ctio_ret_entry_t *)qla2x00_req_pkt(vha);
 	if (ctio == NULL) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
@@ -2618,7 +2615,7 @@ static void qla24xx_send_term_exchange(scsi_qla_host_t *vha, struct qla_tgt_cmd 
 	if (!ha_locked)
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 
-	ctio = (ctio7_status1_entry_t *)qla_tgt_req_pkt(vha);
+	ctio = (ctio7_status1_entry_t *)qla2x00_req_pkt(vha);
 	if (ctio == NULL) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
@@ -4156,7 +4153,7 @@ static void qla2xxx_send_busy(scsi_qla_host_t *vha, atio_entry_t *atio)
 
 	/* Sending marker isn't necessary, since we called from ISR */
 
-	ctio = (ctio_ret_entry_t *)qla_tgt_req_pkt(vha);
+	ctio = (ctio_ret_entry_t *)qla2x00_req_pkt(vha);
 	if (!ctio) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet", vha->vp_idx, __func__);
@@ -4203,7 +4200,7 @@ static void qla24xx_send_busy(scsi_qla_host_t *vha, atio7_entry_t *atio,
 
 	/* Sending marker isn't necessary, since we called from ISR */
 
-	ctio = (ctio7_status1_entry_t *)qla_tgt_req_pkt(vha);
+	ctio = (ctio7_status1_entry_t *)qla2x00_req_pkt(vha);
 	if (!ctio) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet", vha->vp_idx, __func__);
