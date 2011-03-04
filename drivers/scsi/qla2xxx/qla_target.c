@@ -43,6 +43,18 @@
 #include "qla_def.h"
 #include "qla_target.h"
 
+static char *qlini_mode = QLA2X_INI_MODE_STR_EXCLUSIVE;
+module_param(qlini_mode, charp, S_IRUGO);
+MODULE_PARM_DESC(qlini_mode,
+	"Determines when initiator mode will be enabled. Possible values: "
+	"\"exclusive\" (default) - initiator mode will be enabled on load, "
+	"disabled on enabling target mode and then on disabling target mode "
+	"enabled back; "
+	"\"disabled\" - initiator mode will never be enabled; "
+	"\"enabled\" - initiator mode will always stay enabled.");
+
+static int ql2x_ini_mode = QLA2X_INI_MODE_EXCLUSIVE;
+
 /*
  * From scsi/fc/fc_fcp.h
  */
@@ -5007,6 +5019,64 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, scsi_qla_host_t *vha)
 	qla_tgt_release(ha->qla_tgt);
 
 	return 0;
+}
+
+/* Must be called under HW lock */
+void qla_tgt_set_mode(scsi_qla_host_t *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+
+	switch (ql2x_ini_mode) {
+	case QLA2X_INI_MODE_DISABLED:
+	case QLA2X_INI_MODE_EXCLUSIVE:
+		vha->host->active_mode = MODE_TARGET;
+		break;
+	case QLA2X_INI_MODE_ENABLED:
+		vha->host->active_mode |= MODE_TARGET;
+		break;
+	default:
+		break;
+	}
+
+	if (ha->ini_mode_force_reverse)
+		qla_reverse_ini_mode(vha);
+}
+
+/* Must be called under HW lock */
+void qla_tgt_clear_mode(scsi_qla_host_t *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+
+	switch (ql2x_ini_mode) {
+	case QLA2X_INI_MODE_DISABLED:
+		vha->host->active_mode = MODE_UNKNOWN;
+		break;
+	case QLA2X_INI_MODE_EXCLUSIVE:
+		vha->host->active_mode = MODE_INITIATOR;
+		break;
+	case QLA2X_INI_MODE_ENABLED:
+		vha->host->active_mode &= ~MODE_TARGET;
+		break;
+	default:
+		break;
+	}
+
+	if (ha->ini_mode_force_reverse)
+		qla_reverse_ini_mode(vha);
+}
+
+bool __init qla_tgt_parse_ini_mode(void)
+{
+	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
+		ql2x_ini_mode = QLA2X_INI_MODE_EXCLUSIVE;
+	else if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_DISABLED) == 0)
+		ql2x_ini_mode = QLA2X_INI_MODE_DISABLED;
+	else if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_ENABLED) == 0)
+		ql2x_ini_mode = QLA2X_INI_MODE_ENABLED;
+	else
+		return false;
+
+	return true;
 }
 
 int qla_tgt_init(void)

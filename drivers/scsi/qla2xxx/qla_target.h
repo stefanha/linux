@@ -987,8 +987,11 @@ extern void qla_tgt_stop_phase2(struct qla_tgt *);
 
 extern struct qla_tgt_data qla_target;
 
-void qla_tgt_set_mode(scsi_qla_host_t *ha);
-void qla_tgt_clear_mode(scsi_qla_host_t *ha);
+extern void qla_tgt_set_mode(scsi_qla_host_t *ha);
+extern void qla_tgt_clear_mode(scsi_qla_host_t *ha);
+extern bool __init qla_tgt_parse_ini_mode(void);
+extern int qla_tgt_init(void);
+extern void qla_tgt_exit(void);
 
 static inline bool qla_tgt_mode_enabled(scsi_qla_host_t *ha)
 {
