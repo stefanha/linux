@@ -987,8 +987,8 @@ extern void qla_tgt_stop_phase2(struct qla_tgt *);
 
 extern struct qla_tgt_data qla_target;
 
-void qla_set_tgt_mode(scsi_qla_host_t *ha);
-void qla_clear_tgt_mode(scsi_qla_host_t *ha);
+void qla_tgt_set_mode(scsi_qla_host_t *ha);
+void qla_tgt_clear_mode(scsi_qla_host_t *ha);
 
 static inline bool qla_tgt_mode_enabled(scsi_qla_host_t *ha)
 {
@@ -1051,7 +1051,7 @@ __qla2x00_send_enable_lun(scsi_qla_host_t *vha, int enable)
 		qla2x00_isp_cmd(vha, vha->req);
 
 	} else
-		qla_clear_tgt_mode(vha);
+		qla_tgt_clear_mode(vha);
 #if defined(QL_DEBUG_LEVEL_2) || defined(QL_DEBUG_LEVEL_3)
 	if (!pkt)
 		printk(KERN_ERR "%s: **** FAILED ****\n", __func__);

@@ -1950,8 +1950,6 @@ qla2xxx_scan_finished(struct Scsi_Host *shost, unsigned long time)
 	return atomic_read(&vha->loop_state) == LOOP_READY;
 }
 
-void qla_clear_tgt_mode(scsi_qla_host_t *ha);
-
 /*
  * PCI driver interface
  */
@@ -2200,7 +2198,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
         /* Set target mode init */
 	mutex_init(&ha->tgt_mutex);
 	mutex_init(&ha->tgt_host_action_mutex);
-	qla_clear_tgt_mode(base_vha);
+	qla_tgt_clear_mode(base_vha);
 
 	/* Set up the irqs */
 	ret = qla2x00_request_irqs(ha, rsp);
@@ -4240,7 +4238,7 @@ static struct file_operations apidev_fops = {
 };
 
 /* Must be called under HW lock */
-void qla_set_tgt_mode(scsi_qla_host_t *vha)
+void qla_tgt_set_mode(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -4259,10 +4257,9 @@ void qla_set_tgt_mode(scsi_qla_host_t *vha)
 	if (ha->ini_mode_force_reverse)
 		qla_reverse_ini_mode(vha);
 }
-EXPORT_SYMBOL(qla_set_tgt_mode);
 
 /* Must be called under HW lock */
-void qla_clear_tgt_mode(scsi_qla_host_t *vha)
+void qla_tgt_clear_mode(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -4283,7 +4280,6 @@ void qla_clear_tgt_mode(scsi_qla_host_t *vha)
 	if (ha->ini_mode_force_reverse)
 		qla_reverse_ini_mode(vha);
 }
-EXPORT_SYMBOL(qla_clear_tgt_mode);
 
 static bool __init qla2x00_parse_ini_mode(void)
 {

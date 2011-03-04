@@ -4534,7 +4534,7 @@ static void qla_tgt_response_pkt(scsi_qla_host_t *vha, response_t *pkt)
 		} else if (entry->status != ENABLE_LUN_SUCCESS) {
 			printk(KERN_ERR "qla_target(%d): ENABLE_LUN "
 				"failed %x\n", vha->vp_idx, entry->status);
-			qla_clear_tgt_mode(vha);
+			qla_tgt_clear_mode(vha);
 		} /* else success */
 		break;
 	}

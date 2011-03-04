@@ -1819,7 +1819,7 @@ qla24xx_vport_create(struct fc_vport *fc_vport, bool disable)
 
 	mutex_init(&ha->tgt_mutex);
 	mutex_init(&ha->tgt_host_action_mutex);
-	qla_clear_tgt_mode(vha);
+	qla_tgt_clear_mode(vha);
 	qla2x00_send_enable_lun(vha, false);
 	if (IS_QLA24XX_TYPE(ha))
 		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;

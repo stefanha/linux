@@ -5014,7 +5014,7 @@ qla2x00_enable_tgt_mode(scsi_qla_host_t *vha)
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	tgt->tgt_stopped = 0;
-	qla_set_tgt_mode(vha);
+	qla_tgt_set_mode(vha);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
@@ -5043,7 +5043,7 @@ qla2x00_disable_tgt_mode(scsi_qla_host_t *vha)
 	}
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	qla_clear_tgt_mode(vha);
+	qla_tgt_clear_mode(vha);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
