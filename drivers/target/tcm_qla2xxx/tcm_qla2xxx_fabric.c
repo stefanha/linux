@@ -456,7 +456,6 @@ int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
 	return 1;
 }
 
-extern void qla_tgt_sess_put(struct qla_tgt_sess *);
 extern int tcm_qla2xxx_clear_nacl_from_fcport_map(struct se_node_acl *);
 
 void tcm_qla2xxx_close_session(struct se_session *se_sess)

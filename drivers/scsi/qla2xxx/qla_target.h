@@ -980,13 +980,16 @@ struct srr_ctio {
 #define QLA_TGT_XMIT_STATUS		2
 #define QLA_TGT_XMIT_ALL		(QLA_TGT_XMIT_STATUS|QLA_TGT_XMIT_DATA)
 
-extern void qla_tgt_stop_phase1(struct qla_tgt *);
-extern void qla_tgt_stop_phase2(struct qla_tgt *);
-
 #include <linux/version.h>
 
 extern struct qla_tgt_data qla_target;
-
+/*
+ * Function prototypes for qla_target.c logic used by qla2xxx LLD code.
+ */
+extern int qla_tgt_add_target(struct qla_hw_data *, scsi_qla_host_t *);
+extern int qla_tgt_remove_target(struct qla_hw_data *, scsi_qla_host_t *);
+extern void qla_tgt_fc_port_added(scsi_qla_host_t *, fc_port_t *);
+extern void qla_tgt_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);
 extern void qla_tgt_set_mode(scsi_qla_host_t *ha);
 extern void qla_tgt_clear_mode(scsi_qla_host_t *ha);
 extern bool __init qla_tgt_parse_ini_mode(void);
@@ -1086,14 +1089,13 @@ qla2x00_send_enable_lun(scsi_qla_host_t *vha, bool enable)
 /*
  * Exported symbols from qla_target.c LLD logic used by tcm_qla2xxx code..
  */
-extern int qla_tgt_add_target(struct qla_hw_data *, scsi_qla_host_t *);
 extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
 extern int qla2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
-extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
+extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
-
-extern void qla_tgt_fc_port_added(scsi_qla_host_t *, fc_port_t *);
-extern void qla_tgt_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);
+extern void qla_tgt_sess_put(struct qla_tgt_sess *);
+extern void qla_tgt_stop_phase1(struct qla_tgt *);
+extern void qla_tgt_stop_phase2(struct qla_tgt *);
 
 #endif /* __QLA_TARGET_H */

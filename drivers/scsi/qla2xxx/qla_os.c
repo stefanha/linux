@@ -2436,8 +2436,6 @@ qla2x00_stop_dpc_thread(scsi_qla_host_t *vha)
 		kthread_stop(t);
 }
 
-extern int qla_tgt_remove_target(struct qla_hw_data *, scsi_qla_host_t *);
-
 static void
 qla2x00_remove_one(struct pci_dev *pdev)
 {

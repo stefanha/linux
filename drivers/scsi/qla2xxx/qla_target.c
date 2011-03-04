@@ -95,7 +95,7 @@ enum fcp_resp_rsp_codes {
 
 static int __qla24xx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 
-/* Predefs for callbacks handed to qla2xxx(target) */
+/* Predefs for callbacks handed to qla2xxx LLD */
 static void qla24xx_atio_pkt(scsi_qla_host_t *ha, atio7_entry_t *pkt);
 static void qla_tgt_response_pkt(scsi_qla_host_t *ha, response_t *pkt);
 static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
