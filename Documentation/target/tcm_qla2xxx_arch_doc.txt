@@ -156,7 +156,7 @@ control plane:
 
 *) qla24xx_vport_create()
 
-   This function has been modified to call qla_clear_tgt_mode() and
+   This function has been modified to call qla_tgt_clear_mode() and
    qla2x00_send_enable_lun() to perform target mode specific setup for
    an individual struct scsi_qla_host *vha.
 
@@ -248,6 +248,7 @@ changed to function with target mode:
 
    This function has been added as a method for qla_target.c code to retrieve a
    request_t packet from the ring reserved for qla2xxx LLD target mode operation.
+   qla_target.c uses this directly to obtain a new request_t packet.
 
 V) qla2xxx LLD target mode additions in qla_target.c providing struct qla_tgt_template 
     callbacks into tcm_qla2xxx.ko code
