@@ -4993,65 +4993,6 @@ fail_fw_integrity:
 	return QLA_FUNCTION_FAILED;
 }
 
-/*
- * qla2x00_enable_tgt_mode - NO LOCK HELD
- *
- * host_reset, bring up w/ Target Mode Enabled
- */
-void
-qla2x00_enable_tgt_mode(scsi_qla_host_t *vha)
-{
-	struct qla_hw_data *ha = vha->hw;
-	struct qla_tgt *tgt = ha->qla_tgt;
-	unsigned long flags;
-
-	if (!tgt) {
-		printk(KERN_ERR "Unable to locate qla_tgt pointer from"
-			" struct qla_hw_data\n");
-		dump_stack();
-		return;
-	}
-
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	tgt->tgt_stopped = 0;
-	qla_tgt_set_mode(vha);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
-	qla2xxx_wake_dpc(vha);
-	qla2x00_wait_for_hba_online(vha);
-}
-EXPORT_SYMBOL(qla2x00_enable_tgt_mode);
-
-/*
- * qla2x00_disable_tgt_mode - NO LOCK HELD
- *
- * Disable Target Mode and reset the adapter
- */
-void
-qla2x00_disable_tgt_mode(scsi_qla_host_t *vha)
-{
-	struct qla_hw_data *ha = vha->hw;
-	struct qla_tgt *tgt = ha->qla_tgt;
-	unsigned long flags;
-
-	if (!tgt) {
-		printk(KERN_ERR "Unable to locate qla_tgt pointer from"
-			" struct qla_hw_data\n");
-		dump_stack();
-		return;
-	}
-
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	qla_tgt_clear_mode(vha);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
-	qla2xxx_wake_dpc(vha);
-	qla2x00_wait_for_hba_online(vha);
-}
-EXPORT_SYMBOL(qla2x00_disable_tgt_mode);
-
 static int
 qla24xx_load_risc_blob(scsi_qla_host_t *vha, uint32_t *srisc_addr)
 {

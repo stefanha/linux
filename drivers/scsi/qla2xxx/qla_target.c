@@ -1062,7 +1062,7 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 
 	/* Big hammer */
 	if (!ha->host_shutting_down && qla_tgt_mode_enabled(vha))
-		qla2x00_disable_tgt_mode(vha);
+		qla_tgt_disable_vha(vha);
 
 	/* Wait for sessions to clear out (just in case) */
 	wait_event(tgt->waitQ, test_tgt_sess_count(tgt));
@@ -5063,6 +5063,64 @@ void qla_tgt_clear_mode(scsi_qla_host_t *vha)
 
 	if (ha->ini_mode_force_reverse)
 		qla_reverse_ini_mode(vha);
+}
+
+/*
+ * qla_tgt_enable_vha - NO LOCK HELD
+ *
+ * host_reset, bring up w/ Target Mode Enabled
+ */
+void
+qla_tgt_enable_vha(scsi_qla_host_t *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	struct qla_tgt *tgt = ha->qla_tgt;
+	unsigned long flags;
+
+	if (!tgt) {
+		printk(KERN_ERR "Unable to locate qla_tgt pointer from"
+				" struct qla_hw_data\n");
+		dump_stack();
+		return;
+	}
+
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	tgt->tgt_stopped = 0;
+	qla_tgt_set_mode(vha);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+	qla2xxx_wake_dpc(vha);
+	qla2x00_wait_for_hba_online(vha);
+}
+EXPORT_SYMBOL(qla_tgt_enable_vha);
+
+/*
+ * qla_tgt_disable_vha - NO LOCK HELD
+ *
+ * Disable Target Mode and reset the adapter
+ */
+void
+qla_tgt_disable_vha(scsi_qla_host_t *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	struct qla_tgt *tgt = ha->qla_tgt;
+	unsigned long flags;
+
+	if (!tgt) {
+		printk(KERN_ERR "Unable to locate qla_tgt pointer from"
+				" struct qla_hw_data\n");
+		dump_stack();
+		return;
+	}
+
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	qla_tgt_clear_mode(vha);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+	qla2xxx_wake_dpc(vha);
+	qla2x00_wait_for_hba_online(vha);
 }
 
 bool __init qla_tgt_parse_ini_mode(void)

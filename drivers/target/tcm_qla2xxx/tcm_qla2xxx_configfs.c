@@ -341,7 +341,7 @@ static ssize_t tcm_qla2xxx_tpg_store_enable(
 
 	if (op) {
 		atomic_set(&tpg->lport_tpg_enabled, 1);
-		qla2x00_enable_tgt_mode(vha);
+		qla_tgt_enable_vha(vha);
 	} else {
 		if (!ha->qla_tgt) {
 			printk(KERN_ERR "truct qla_hw_data *ha->qla_tgt is NULL\n");

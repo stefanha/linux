@@ -984,6 +984,11 @@ struct srr_ctio {
 
 extern struct qla_tgt_data qla_target;
 /*
+ * Internal function prototypes
+ */
+void qla_tgt_disable_vha(scsi_qla_host_t *);
+
+/*
  * Function prototypes for qla_target.c logic used by qla2xxx LLD code.
  */
 extern int qla_tgt_add_target(struct qla_hw_data *, scsi_qla_host_t *);
@@ -1095,6 +1100,7 @@ extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
 extern void qla_tgt_sess_put(struct qla_tgt_sess *);
+extern void qla_tgt_enable_vha(scsi_qla_host_t *);
 extern void qla_tgt_stop_phase1(struct qla_tgt *);
 extern void qla_tgt_stop_phase2(struct qla_tgt *);
 
