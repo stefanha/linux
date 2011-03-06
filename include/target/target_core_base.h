@@ -174,13 +174,6 @@ struct se_obj {
 	atomic_t obj_access_count;
 } ____cacheline_aligned;
 
-/* SCSI Port stats */
-struct scsi_port_stats {
-	u64	cmd_pdus;
-	u64	tx_data_octets;
-	u64	rx_data_octets;
-} ____cacheline_aligned;
-
 /*
  * Used by TCM Core internally to signal if ALUA emulation is enabled or
  * disabled, or running in with TCM/pSCSI passthrough mode
@@ -888,6 +881,12 @@ struct se_lun {
 
 #define SE_LUN(cmd)		((cmd)->se_lun)
 #define PORT_STAT_GRP(lun)	(&(lun)->port_stat_grps)
+
+struct scsi_port_stats {
+       u64     cmd_pdus;
+       u64     tx_data_octets;
+       u64     rx_data_octets;
+} ____cacheline_aligned;
 
 struct se_port {
 	/* RELATIVE TARGET PORT IDENTIFER */

@@ -3,7 +3,7 @@ config LIO_TARGET
 	depends on m
 	select CRYPTO
 	select CRYPTO_CRC32C
-	select CRYPTO_CRC32C_INTEL
+	select CRYPTO_CRC32C_INTEL if X86
 	help
 	Say M here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI
 	Target Mode Stack.
