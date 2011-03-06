@@ -537,7 +537,6 @@ static int target_fabric_tf_ops_check(
 int target_fabric_configfs_register(
 	struct target_fabric_configfs *tf)
 {
-	struct config_group *su_group;
 	int ret;
 
 	if (!(tf)) {
@@ -547,12 +546,6 @@ int target_fabric_configfs_register(
 	}
 	if (!(tf->tf_subsys)) {
 		printk(KERN_ERR "Unable to target struct config_subsystem"
-			" pointer\n");
-		return -EINVAL;
-	}
-	su_group = &tf->tf_subsys->su_group;
-	if (!(su_group)) {
-		printk(KERN_ERR "Unable to locate target struct config_group"
 			" pointer\n");
 		return -EINVAL;
 	}
@@ -569,7 +562,6 @@ EXPORT_SYMBOL(target_fabric_configfs_register);
 void target_fabric_configfs_deregister(
 	struct target_fabric_configfs *tf)
 {
-	struct config_group *su_group;
 	struct configfs_subsystem *su;
 
 	if (!(tf)) {
@@ -583,13 +575,6 @@ void target_fabric_configfs_deregister(
 			" pointer\n");
 		return;
 	}
-	su_group = &tf->tf_subsys->su_group;
-	if (!(su_group)) {
-		printk(KERN_ERR "Unable to locate target struct config_group"
-			" pointer\n");
-		return;
-	}
-
 	printk(KERN_INFO "<<<<<<<<<<<<<<<<<<<<<< BEGIN FABRIC API >>>>>>>>>>"
 			">>>>>>>>>>>>\n");
 	mutex_lock(&g_tf_lock);
