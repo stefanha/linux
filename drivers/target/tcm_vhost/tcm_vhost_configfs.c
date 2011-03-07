@@ -260,6 +260,7 @@ static struct target_core_fabric_ops tcm_vhost_ops = {
 	.tpg_alloc_fabric_acl		= tcm_vhost_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= tcm_vhost_release_fabric_acl,
 	.tpg_get_inst_index		= tcm_vhost_tpg_get_inst_index,
+	.new_cmd_map			= tcm_vhost_new_cmd_map,
 	.release_cmd_to_pool		= tcm_vhost_release_cmd,
 	.release_cmd_direct		= tcm_vhost_release_cmd,
 	.shutdown_session		= tcm_vhost_shutdown_session,

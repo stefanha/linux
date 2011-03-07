@@ -1,5 +1,26 @@
 #define TCM_VHOST_VERSION  "v0.1"
 #define TCM_VHOST_NAMELEN 256
+#define TCM_VHOST_MAX_CDB_SIZE 32
+
+struct tcm_vhost_cmd {
+	/* The Tag from include/linux/virtio_scsi.h:struct virtio_scsi_cmd_header */
+	u32 tvc_tag;
+	/* The number of scatterlista associated with this cmd */
+	u32 tvc_sgl_count;
+	/* Pointer to the SGL formatted memory from virtio-scsi */
+	struct scatterlist *tvc_sgl;
+	 /* The TCM I/O descriptor that is accessed via container_of() */
+	struct se_cmd tvc_se_cmd;
+	/* Copy of the incoming SCSI command descriptor block (CDB) */
+	unsigned char tvc_cdb[TCM_VHOST_MAX_CDB_SIZE];
+	/* Sense buffer that will be mapped into outgoing status */
+	unsigned char tvc_sense_buf[TRANSPORT_SENSE_BUFFER];
+};
+
+struct tcm_vhost_nexus {
+	/* Pointer to TCM session for I_T Nexus */
+	struct se_session *tvn_se_sess;
+};
 
 struct tcm_vhost_nacl {
 	/* Binary World Wide unique Port Name for Vhost Initiator port */
@@ -13,6 +34,10 @@ struct tcm_vhost_nacl {
 struct tcm_vhost_tpg {
 	/* Vhost port target portal group tag for TCM */
 	u16 tport_tpgt;
+	/* Used to track number of TPG Port/Lun Links wrt to explict I_T Nexus shutdown */
+	atomic_t tv_tpg_port_count;
+	/* Pointer to the TCM VHost I_T Nexus for this TPG endpoint */
+	struct tcm_vhost_nexus *tpg_nexus;
 	/* Pointer back to tcm_vhost_tport */
 	struct tcm_vhost_tport *tport;
 	/* Returned by tcm_vhost_make_tpg() */

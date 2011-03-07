@@ -218,6 +218,75 @@ u32 tcm_vhost_tpg_get_inst_index(struct se_portal_group *se_tpg)
 	return 1;
 }
 
+/*
+ * Called by struct target_core_fabric_ops->new_cmd_map()
+ *
+ * Always called in process context.  A non zero return value
+ * here will signal to handle an exception based on the return code.
+ */
+int tcm_vhost_new_cmd_map(struct se_cmd *se_cmd)
+{
+	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
+				struct tcm_vhost_cmd, tvc_se_cmd);
+	void *mem_ptr, *mem_bidi_ptr = NULL;
+	u32 sg_no_bidi = 0;
+	int ret;
+	/*
+	 * Allocate the necessary tasks to complete the received CDB+data
+	 */
+	ret = transport_generic_allocate_tasks(se_cmd, tv_cmd->tvc_cdb);
+	if (ret == -1) {
+		/* Out of Resources */
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+	} else if (ret == -2) {
+		/*
+		 * Handle case for SAM_STAT_RESERVATION_CONFLICT
+		 */
+		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
+			return PYX_TRANSPORT_RESERVATION_CONFLICT;
+		/*
+		 * Otherwise, return SAM_STAT_CHECK_CONDITION and return
+		 * sense data.
+		 */
+		return PYX_TRANSPORT_USE_SENSE_REASON;
+	}
+	/*
+	 * Setup the struct scatterlist memory from the received
+	 * struct tcm_vhost_cmd..
+	 */
+	if (tv_cmd->tvc_sgl_count) {
+		se_cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM;
+		mem_ptr = (void *)tv_cmd->tvc_sgl;
+		/*
+		 * For BIDI commands, pass in the extra READ buffer
+		 * to transport_generic_map_mem_to_cmd() below..
+		 */
+#warning FIXME: Fix BIDI operation in tcm_vhost_new_cmd_map()
+#if 0
+		if (T_TASK(se_cmd)->t_tasks_bidi) {
+			mem_bidi_ptr = NULL;
+			sg_no_bidi = 0;
+		}
+#endif
+	} else {
+		/*
+		 * Used for DMA_NONE
+		 */
+		mem_ptr = NULL;
+	}
+	/*
+	 * Map the SG memory into struct se_mem->page linked list using the same
+	 * physical memory at sg->page_link.
+	 */
+	ret = transport_generic_map_mem_to_cmd(se_cmd, mem_ptr,
+				tv_cmd->tvc_sgl_count, mem_bidi_ptr,
+				sg_no_bidi);
+	if (ret < 0)
+		return PYX_TRANSPORT_LU_COMM_FAILURE;
+
+	return 0;
+}
+
 void tcm_vhost_release_cmd(struct se_cmd *se_cmd)
 {
 	return;

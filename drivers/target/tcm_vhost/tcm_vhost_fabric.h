@@ -17,6 +17,7 @@ struct se_node_acl *tcm_vhost_alloc_fabric_acl(struct se_portal_group *);
 void tcm_vhost_release_fabric_acl(struct se_portal_group *,
 			struct se_node_acl *);
 u32 tcm_vhost_tpg_get_inst_index(struct se_portal_group *);
+int tcm_vhost_new_cmd_map(struct se_cmd *);
 void tcm_vhost_release_cmd(struct se_cmd *);
 int tcm_vhost_shutdown_session(struct se_session *);
 void tcm_vhost_close_session(struct se_session *);
