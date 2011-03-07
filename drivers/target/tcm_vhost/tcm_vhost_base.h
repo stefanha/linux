@@ -18,6 +18,8 @@ struct tcm_vhost_cmd {
 };
 
 struct tcm_vhost_nexus {
+	/* Index reference for the vhost_scsi device */
+	u32 tvn_dev_index;
 	/* Pointer to TCM session for I_T Nexus */
 	struct se_session *tvn_se_sess;
 };
@@ -36,6 +38,8 @@ struct tcm_vhost_tpg {
 	u16 tport_tpgt;
 	/* Used to track number of TPG Port/Lun Links wrt to explict I_T Nexus shutdown */
 	atomic_t tv_tpg_port_count;
+	/* Used for vhost_scsi device reference to tpg_nexus */
+	atomic_t tv_tpg_vhost_count;
 	/* Used to protect access for tpg_nexus */
 	struct mutex tv_tpg_mutex;
 	/* Pointer to the TCM VHost I_T Nexus for this TPG endpoint */
