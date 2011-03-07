@@ -66,6 +66,30 @@ static char *tcm_vhost_dump_proto_id(struct tcm_vhost_tport *tport)
 	return "Unknown";
 }
 
+static int tcm_vhost_port_link(
+	struct se_portal_group *se_tpg,
+	struct se_lun *lun)
+{
+	struct tcm_vhost_tpg *tv_tpg = container_of(se_tpg,
+				struct tcm_vhost_tpg, se_tpg);
+
+	atomic_inc(&tv_tpg->tv_tpg_port_count);
+	smp_mb__after_atomic_inc();
+
+	return 0;
+}
+
+static void tcm_vhost_port_unlink(
+	struct se_portal_group *se_tpg,
+	struct se_lun *se_lun)
+{
+	struct tcm_vhost_tpg *tv_tpg = container_of(se_tpg,
+				struct tcm_vhost_tpg, se_tpg);
+
+	atomic_dec(&tv_tpg->tv_tpg_port_count);
+	smp_mb__after_atomic_dec();
+}
+
 static struct se_node_acl *tcm_vhost_make_nodeacl(
 	struct se_portal_group *se_tpg,
 	struct config_group *group,
@@ -111,6 +135,212 @@ static void tcm_vhost_drop_nodeacl(struct se_node_acl *se_acl)
 	kfree(nacl);
 }
 
+static int tcm_vhost_make_nexus(
+	struct tcm_vhost_tpg *tv_tpg,
+	const char *name)
+{
+	struct se_portal_group *se_tpg;
+	struct tcm_vhost_nexus *tv_nexus;
+
+	mutex_lock(&tv_tpg->tv_tpg_mutex);
+	if (tv_tpg->tpg_nexus) {
+		mutex_unlock(&tv_tpg->tv_tpg_mutex);
+		printk(KERN_INFO "tv_tpg->tpg_nexus already exists\n");
+		return -EEXIST;
+	}
+	se_tpg = &tv_tpg->se_tpg;
+
+	tv_nexus = kzalloc(sizeof(struct tcm_vhost_nexus), GFP_KERNEL);
+	if (!tv_nexus) {
+		mutex_unlock(&tv_tpg->tv_tpg_mutex);
+		printk(KERN_ERR "Unable to allocate struct tcm_vhost_nexus\n");
+		return -ENOMEM;
+	}
+	/*
+	 *  Initialize the struct se_session pointer
+	 */
+	tv_nexus->tvn_se_sess = transport_init_session();
+	if (!tv_nexus->tvn_se_sess) {
+		mutex_unlock(&tv_tpg->tv_tpg_mutex);
+		kfree(tv_nexus);
+		return -ENOMEM;
+	}
+	/*
+	 * Since we are running in 'demo mode' this call with generate a
+	 * struct se_node_acl for the tcm_vhost struct se_portal_group with
+	 * the SCSI Initiator port name of the passed configfs group 'name'.
+	 */
+	tv_nexus->tvn_se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
+				se_tpg, (unsigned char *)name);
+	if (!tv_nexus->tvn_se_sess->se_node_acl) {
+		mutex_unlock(&tv_tpg->tv_tpg_mutex);
+		printk(KERN_INFO "core_tpg_check_initiator_node_acl() failed"
+				" for %s\n", name);
+		transport_free_session(tv_nexus->tvn_se_sess);
+		kfree(tv_nexus);
+		return -ENOMEM;
+	}
+	/*
+	 * Now register the TCM vHost virtual I_T Nexus as active with the
+	 * call to __transport_register_session()
+	 */
+	__transport_register_session(se_tpg, tv_nexus->tvn_se_sess->se_node_acl,
+			tv_nexus->tvn_se_sess, (void *)tv_nexus);
+	tv_tpg->tpg_nexus = tv_nexus;
+
+	mutex_unlock(&tv_tpg->tv_tpg_mutex);
+	return 0;
+}
+
+static int tcm_vhost_drop_nexus(
+	struct tcm_vhost_tpg *tpg)
+{
+	struct se_session *se_sess;
+	struct tcm_vhost_nexus *tv_nexus;
+
+	mutex_lock(&tpg->tv_tpg_mutex);
+	tv_nexus = tpg->tpg_nexus;
+	if (!tv_nexus) {
+		mutex_unlock(&tpg->tv_tpg_mutex);
+		return -ENODEV;
+	}
+
+	se_sess = tv_nexus->tvn_se_sess;
+	if (!se_sess) {
+		mutex_unlock(&tpg->tv_tpg_mutex);
+		return -ENODEV;
+	}
+
+	if (atomic_read(&tpg->tv_tpg_port_count)) {
+		mutex_unlock(&tpg->tv_tpg_mutex);
+		printk(KERN_ERR "Unable to remove TCM_vHost I_T Nexus with"
+			" active TPG port count: %d\n",
+			atomic_read(&tpg->tv_tpg_port_count));
+		return -EPERM;
+	}
+
+	printk(KERN_INFO "TCM_vHost_ConfigFS: Removing I_T Nexus to emulated"
+		" %s Initiator Port: %s\n", tcm_vhost_dump_proto_id(tpg->tport),
+		tv_nexus->tvn_se_sess->se_node_acl->initiatorname);
+	/*
+	 * Release the SCSI I_T Nexus to the emulated vHost Target Port
+	 */
+	transport_deregister_session(tv_nexus->tvn_se_sess);
+	tpg->tpg_nexus = NULL;
+	mutex_unlock(&tpg->tv_tpg_mutex);
+
+	kfree(tv_nexus);
+	return 0;
+}
+
+static ssize_t tcm_vhost_tpg_show_nexus(
+	struct se_portal_group *se_tpg,
+	char *page)
+{
+	struct tcm_vhost_tpg *tv_tpg = container_of(se_tpg,
+				struct tcm_vhost_tpg, se_tpg);
+	struct tcm_vhost_nexus *tv_nexus;
+	ssize_t ret;
+
+	mutex_lock(&tv_tpg->tv_tpg_mutex);
+	tv_nexus = tv_tpg->tpg_nexus;
+	if (!tv_nexus) {
+		mutex_unlock(&tv_tpg->tv_tpg_mutex);
+		return -ENODEV;
+	}
+	ret = snprintf(page, PAGE_SIZE, "%s\n",
+			tv_nexus->tvn_se_sess->se_node_acl->initiatorname);
+	mutex_unlock(&tv_tpg->tv_tpg_mutex);
+
+	return ret;
+}
+
+static ssize_t tcm_vhost_tpg_store_nexus(
+	struct se_portal_group *se_tpg,
+	const char *page,
+	size_t count)
+{
+	struct tcm_vhost_tpg *tv_tpg = container_of(se_tpg,
+				struct tcm_vhost_tpg, se_tpg);
+	struct tcm_vhost_tport *tport_wwn = tv_tpg->tport;
+	unsigned char i_port[TCM_VHOST_NAMELEN], *ptr, *port_ptr;
+	int ret;
+	/*
+	 * Shutdown the active I_T nexus if 'NULL' is passed..
+	 */
+	if (!(strncmp(page, "NULL", 4))) {
+		ret = tcm_vhost_drop_nexus(tv_tpg);
+		return (!ret) ? count : ret;
+	}
+	/*
+	 * Otherwise make sure the passed virtual Initiator port WWN matches
+	 * the fabric protocol_id set in tcm_vhost_make_tport(), and call
+	 * tcm_vhost_make_nexus().
+	 */
+	if (strlen(page) > TCM_VHOST_NAMELEN) {
+		printk(KERN_ERR "Emulated NAA Sas Address: %s, exceeds"
+				" max: %d\n", page, TCM_VHOST_NAMELEN);
+		return -EINVAL;
+	}
+	snprintf(&i_port[0], TCM_VHOST_NAMELEN, "%s", page);
+
+	ptr = strstr(i_port, "naa.");
+	if (ptr) {
+		if (tport_wwn->tport_proto_id != SCSI_PROTOCOL_SAS) {
+			printk(KERN_ERR "Passed SAS Initiator Port %s does not"
+				" match target port protoid: %s\n", i_port,
+				tcm_vhost_dump_proto_id(tport_wwn));
+			return -EINVAL;
+		}
+		port_ptr = &i_port[0];
+		goto check_newline;
+	}
+	ptr = strstr(i_port, "fc.");
+	if (ptr) {
+		if (tport_wwn->tport_proto_id != SCSI_PROTOCOL_FCP) {
+			printk(KERN_ERR "Passed FCP Initiator Port %s does not"
+				" match target port protoid: %s\n", i_port,
+				tcm_vhost_dump_proto_id(tport_wwn));
+			return -EINVAL;
+		}
+		port_ptr = &i_port[3]; /* Skip over "fc." */
+		goto check_newline;
+	}
+	ptr = strstr(i_port, "iqn.");
+	if (ptr) {
+		if (tport_wwn->tport_proto_id != SCSI_PROTOCOL_ISCSI) {
+			printk(KERN_ERR "Passed iSCSI Initiator Port %s does not"
+				" match target port protoid: %s\n", i_port,
+				tcm_vhost_dump_proto_id(tport_wwn));
+			return -EINVAL;
+		}
+		port_ptr = &i_port[0];
+		goto check_newline;
+	}
+	printk(KERN_ERR "Unable to locate prefix for emulated Initiator Port:"
+			" %s\n", i_port);
+	return -EINVAL;
+	/*
+	 * Clear any trailing newline for the NAA WWN
+	 */
+check_newline:
+	if (i_port[strlen(i_port)-1] == '\n')
+		i_port[strlen(i_port)-1] = '\0';
+
+	ret = tcm_vhost_make_nexus(tv_tpg, port_ptr);
+	if (ret < 0)
+		return ret;
+
+	return count;
+}
+
+TF_TPG_BASE_ATTR(tcm_vhost, nexus, S_IRUGO | S_IWUSR);
+
+static struct configfs_attribute *tcm_vhost_tpg_attrs[] = {
+	&tcm_vhost_tpg_nexus.attr,
+	NULL,
+};
+
 static struct se_portal_group *tcm_vhost_make_tpg(
 	struct se_wwn *wwn,
 	struct config_group *group,
@@ -133,6 +363,7 @@ static struct se_portal_group *tcm_vhost_make_tpg(
 		printk(KERN_ERR "Unable to allocate struct tcm_vhost_tpg");
 		return ERR_PTR(-ENOMEM);
 	}
+	mutex_init(&tpg->tv_tpg_mutex);
 	tpg->tport = tport;
 	tpg->tport_tpgt = tpgt;
 
@@ -150,7 +381,13 @@ static void tcm_vhost_drop_tpg(struct se_portal_group *se_tpg)
 {
 	struct tcm_vhost_tpg *tpg = container_of(se_tpg,
 				struct tcm_vhost_tpg, se_tpg);
-
+	/*
+	 * Release the virtual I_T Nexus for this vHost TPG
+	 */
+	tcm_vhost_drop_nexus(tpg);
+	/*
+	 * Deregister the se_tpg from TCM..
+	 */
 	core_tpg_deregister(se_tpg);
 	kfree(tpg);
 }
@@ -253,9 +490,9 @@ static struct target_core_fabric_ops tcm_vhost_ops = {
 	.tpg_get_pr_transport_id	= tcm_vhost_get_pr_transport_id,
 	.tpg_get_pr_transport_id_len	= tcm_vhost_get_pr_transport_id_len,
 	.tpg_parse_pr_out_transport_id	= tcm_vhost_parse_pr_out_transport_id,
-	.tpg_check_demo_mode		= tcm_vhost_check_false,
+	.tpg_check_demo_mode		= tcm_vhost_check_true,
 	.tpg_check_demo_mode_cache	= tcm_vhost_check_true,
-	.tpg_check_demo_mode_write_protect = tcm_vhost_check_true,
+	.tpg_check_demo_mode_write_protect = tcm_vhost_check_false,
 	.tpg_check_prod_mode_write_protect = tcm_vhost_check_false,
 	.tpg_alloc_fabric_acl		= tcm_vhost_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= tcm_vhost_release_fabric_acl,
@@ -290,8 +527,8 @@ static struct target_core_fabric_ops tcm_vhost_ops = {
 	.fabric_drop_wwn		= tcm_vhost_drop_tport,
 	.fabric_make_tpg		= tcm_vhost_make_tpg,
 	.fabric_drop_tpg		= tcm_vhost_drop_tpg,
-	.fabric_post_link		= NULL,
-	.fabric_pre_unlink		= NULL,
+	.fabric_post_link		= tcm_vhost_port_link,
+	.fabric_pre_unlink		= tcm_vhost_port_unlink,
 	.fabric_make_np			= NULL,
 	.fabric_drop_np			= NULL,
 	.fabric_make_nodeacl		= tcm_vhost_make_nodeacl,
@@ -322,7 +559,7 @@ static int tcm_vhost_register_configfs(void)
 	 * Setup default attribute lists for various fabric->tf_cit_tmpl
 	 */
 	TF_CIT_TMPL(fabric)->tfc_wwn_cit.ct_attrs = tcm_vhost_wwn_attrs;
-	TF_CIT_TMPL(fabric)->tfc_tpg_base_cit.ct_attrs = NULL;
+	TF_CIT_TMPL(fabric)->tfc_tpg_base_cit.ct_attrs = tcm_vhost_tpg_attrs;
 	TF_CIT_TMPL(fabric)->tfc_tpg_attrib_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_param_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_np_base_cit.ct_attrs = NULL;

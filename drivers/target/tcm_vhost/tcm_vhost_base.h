@@ -36,6 +36,8 @@ struct tcm_vhost_tpg {
 	u16 tport_tpgt;
 	/* Used to track number of TPG Port/Lun Links wrt to explict I_T Nexus shutdown */
 	atomic_t tv_tpg_port_count;
+	/* Used to protect access for tpg_nexus */
+	struct mutex tv_tpg_mutex;
 	/* Pointer to the TCM VHost I_T Nexus for this TPG endpoint */
 	struct tcm_vhost_nexus *tpg_nexus;
 	/* Pointer back to tcm_vhost_tport */
