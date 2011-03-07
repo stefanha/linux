@@ -30,13 +30,6 @@
 #include <scsi/srp.h>
 #include <scsi/libsrp.h>
 
-enum srp_task_attributes {
-	SRP_SIMPLE_TASK = 0,
-	SRP_HEAD_TASK = 1,
-	SRP_ORDERED_TASK = 2,
-	SRP_ACA_TASK = 4
-};
-
 /* tmp - will replace with SCSI logging stuff */
 #define eprintk(fmt, args...)					\
 do {								\
@@ -213,7 +206,8 @@ static int srp_direct_data(struct scsi_cmnd *sc, struct srp_direct_buf *md,
 	err = rdma_io(sc, sg, nsg, md, 1, dir, len);
 
 	if (dma_map)
-		dma_unmap_sg(iue->target->dev, sg, nsg, DMA_BIDIRECTIONAL);
+		dma_unmap_sg(iue->target->dev, sg, scsi_sg_count(sc),
+			     DMA_BIDIRECTIONAL);
 
 	return err;
 }
@@ -285,7 +279,8 @@ rdma:
 	err = rdma_io(sc, sg, nsg, md, nmd, dir, len);
 
 	if (dma_map)
-		dma_unmap_sg(iue->target->dev, sg, nsg, DMA_BIDIRECTIONAL);
+		dma_unmap_sg(iue->target->dev, sg, scsi_sg_count(sc),
+			     DMA_BIDIRECTIONAL);
 
 free_mem:
 	if (token && dma_map)
@@ -363,7 +358,7 @@ int srp_transfer_data(struct scsi_cmnd *sc, struct srp_cmd *cmd,
 }
 EXPORT_SYMBOL_GPL(srp_transfer_data);
 
-static int vscsis_data_length(struct srp_cmd *cmd, enum dma_data_direction dir)
+int srp_data_length(struct srp_cmd *cmd, enum dma_data_direction dir)
 {
 	struct srp_direct_buf *md;
 	struct srp_indirect_buf *id;
@@ -394,6 +389,7 @@ static int vscsis_data_length(struct srp_cmd *cmd, enum dma_data_direction dir)
 	}
 	return len;
 }
+EXPORT_SYMBOL_GPL(srp_data_length);
 
 int srp_cmd_queue(struct Scsi_Host *shost, struct srp_cmd *cmd, void *info,
 		  u64 itn_id, u64 addr)
@@ -418,7 +414,7 @@ int srp_cmd_queue(struct Scsi_Host *shost, struct srp_cmd *cmd, void *info,
 	}
 
 	dir = srp_cmd_direction(cmd);
-	len = vscsis_data_length(cmd, dir);
+	len = srp_data_length(cmd, dir);
 
 	dprintk("%p %x %lx %d %d %d %llx\n", info, cmd->cdb[0],
 		cmd->lun, dir, len, tag, (unsigned long long) cmd->tag);
