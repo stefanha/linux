@@ -54,6 +54,10 @@
 /* Local pointer to allocated TCM configfs fabric module */
 struct target_fabric_configfs *tcm_vhost_fabric_configfs;
 
+/* Global spinlock to protect tcm_vhost TPG list for vhost IOCTL access */
+struct mutex tcm_vhost_mutex;
+struct list_head tcm_vhost_list;
+
 static char *tcm_vhost_dump_proto_id(struct tcm_vhost_tport *tport)
 {
 	switch (tport->tport_proto_id) {
@@ -468,6 +472,7 @@ static struct se_portal_group *tcm_vhost_make_tpg(
 		return ERR_PTR(-ENOMEM);
 	}
 	mutex_init(&tpg->tv_tpg_mutex);
+	INIT_LIST_HEAD(&tpg->tv_tpg_list);
 	tpg->tport = tport;
 	tpg->tport_tpgt = tpgt;
 
@@ -478,6 +483,10 @@ static struct se_portal_group *tcm_vhost_make_tpg(
 		kfree(tpg);
 		return NULL;
 	}
+	mutex_lock(&tcm_vhost_mutex);
+	list_add_tail(&tpg->tv_tpg_list, &tcm_vhost_list);
+	mutex_unlock(&tcm_vhost_mutex);
+
 	return &tpg->se_tpg;
 }
 
@@ -485,6 +494,10 @@ static void tcm_vhost_drop_tpg(struct se_portal_group *se_tpg)
 {
 	struct tcm_vhost_tpg *tpg = container_of(se_tpg,
 				struct tcm_vhost_tpg, se_tpg);
+
+	mutex_lock(&tcm_vhost_mutex);
+	list_del(&tpg->tv_tpg_list);
+	mutex_unlock(&tcm_vhost_mutex);
 	/*
 	 * Release the virtual I_T Nexus for this vHost TPG
 	 */

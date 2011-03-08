@@ -11,6 +11,8 @@ struct tcm_vhost_cmd {
 	u32 tvc_sgl_count;
 	/* Pointer to the SGL formatted memory from virtio-scsi */
 	struct scatterlist *tvc_sgl;
+	/* Pointer to vhost_scsi for our device */
+	struct vhost_scsi *tvc_vhost;
 	 /* The TCM I/O descriptor that is accessed via container_of() */
 	struct se_cmd tvc_se_cmd;
 	/* Copy of the incoming SCSI command descriptor block (CDB) */
@@ -42,6 +44,8 @@ struct tcm_vhost_tpg {
 	atomic_t tv_tpg_port_count;
 	/* Used for vhost_scsi device reference to tpg_nexus */
 	atomic_t tv_tpg_vhost_count;
+	/* list for tcm_vhost_list */
+	struct list_head tv_tpg_list;
 	/* Used to protect access for tpg_nexus */
 	struct mutex tv_tpg_mutex;
 	/* Pointer to the TCM VHost I_T Nexus for this TPG endpoint */

@@ -33,6 +33,10 @@
 #include "tcm_vhost_base.h"
 #include "tcm_vhost_scsi.h"
 
+/* From tcm_vhost_configfs.c */
+/* Global spinlock to protect tcm_vhost TPG list for vhost IOCTL access */
+extern struct mutex tcm_vhost_mutex;
+extern struct list_head tcm_vhost_list;
 
 static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 	struct tcm_vhost_tpg *tv_tpg,
@@ -148,8 +152,8 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 			}
 			break;
 		}
-#warning FIXME: Locate tv_tpg, v_header, cdb, exp_data_len and data_direction for vhost_scsi_allocate_cmd()
-		tv_tpg = NULL;
+#warning FIXME: Locate v_header, cdb, exp_data_len and data_direction for vhost_scsi_allocate_cmd()
+		tv_tpg = vs->vs_tpg;
 		v_header = NULL;
 		cdb = NULL;
 		exp_data_len = 0;
@@ -232,6 +236,112 @@ int vhost_scsi_dev_index_release(struct tcm_vhost_tpg *tv_tpg, u32 dev_index)
 	return -ENOSYS;
 }
 
+static void vhost_scsi_disable_vq(struct vhost_scsi *vs)
+{
+	struct vhost_virtqueue *vq = &vs->cmd_vq;
+
+	vhost_poll_stop(&vq->poll);
+}
+
+static void vhost_scsi_enable_vq(struct vhost_scsi *vs)
+{
+	struct vhost_virtqueue *vq = &vs->cmd_vq;
+
+	vhost_poll_start(&vq->poll, vq->kick);
+}
+
+/*
+ * Called from vhost_scsi_ioctl() context to walk the list of available tcm_vhost_tpg
+ * with an active struct tcm_vhost_nexus
+ */
+static int vhost_scsi_set_endpoint(
+	struct vhost_scsi *vs,
+	struct vhost_vring_target *t)
+{
+	struct tcm_vhost_tport *tv_tport;
+	struct tcm_vhost_tpg *tv_tpg;
+	struct vhost_virtqueue *vq = &vs->cmd_vq;
+
+	mutex_lock(&vq->mutex);
+	/* Verify that ring has been setup correctly. */
+	if (!vhost_vq_access_ok(vq)) {
+		mutex_unlock(&vq->mutex);
+		return -EFAULT;
+	}
+	if (vs->vs_tpg) {
+		mutex_unlock(&vq->mutex);
+		return -EEXIST;
+	}
+	mutex_unlock(&vq->mutex);
+
+	mutex_lock(&tcm_vhost_mutex);
+	list_for_each_entry(tv_tpg, &tcm_vhost_list, tv_tpg_list) {
+		mutex_lock(&tv_tpg->tv_tpg_mutex);
+		if (!tv_tpg->tpg_nexus) {
+			mutex_unlock(&tv_tpg->tv_tpg_mutex);
+			continue;
+		}
+		if (atomic_read(&tv_tpg->tv_tpg_vhost_count)) {
+			mutex_unlock(&tv_tpg->tv_tpg_mutex);
+			continue;
+		}
+		tv_tport = tv_tpg->tport;
+
+		if (!strcmp(tv_tport->tport_name, t->vhost_wwpn) &&
+		    (tv_tpg->tport_tpgt == t->vhost_tpgt)) {
+			atomic_inc(&tv_tpg->tv_tpg_vhost_count);
+			smp_mb__after_atomic_inc();
+			mutex_unlock(&tv_tpg->tv_tpg_mutex);
+			mutex_unlock(&tcm_vhost_mutex);
+
+			mutex_lock(&vq->mutex);
+			vs->vs_tpg = tv_tpg;
+			atomic_inc(&vs->vhost_ref_cnt);
+			smp_mb__after_atomic_inc();
+			mutex_unlock(&vq->mutex);
+			return 0;
+		}
+		mutex_unlock(&tv_tpg->tv_tpg_mutex);
+	}
+	mutex_unlock(&tcm_vhost_mutex);
+
+	return -EINVAL;
+}
+
+static int vhost_scsi_clear_endpoint(
+	struct vhost_scsi *vs,
+	struct vhost_vring_target *t)
+{
+	struct tcm_vhost_tport *tv_tport;
+	struct tcm_vhost_tpg *tv_tpg;
+	struct vhost_virtqueue *vq = &vs->cmd_vq;
+
+	mutex_lock(&vq->mutex);
+	/* Verify that ring has been setup correctly. */
+	if (!vhost_vq_access_ok(vq)) {
+		mutex_unlock(&vq->mutex);
+		return -EFAULT;
+	}
+	if (!vs->vs_tpg) {
+		mutex_unlock(&vq->mutex);
+		return -ENODEV;
+	}
+	tv_tpg = vs->vs_tpg;
+	tv_tport = tv_tpg->tport;
+
+	if (strcmp(tv_tport->tport_name, t->vhost_wwpn) ||
+	    (tv_tpg->tport_tpgt != t->vhost_tpgt)) {
+		mutex_unlock(&vq->mutex);
+		printk(KERN_WARNING "tv_tport->tport_name: %s, tv_tpg->tport_tpgt: %hu"
+			" does not match t->vhost_wwpn: %s, t->vhost_tpgt: %hu\n");
+		return -EINVAL;
+	}
+	vs->vs_tpg = NULL;
+	mutex_unlock(&vq->mutex);
+
+	return 0;
+}
+
 static int vhost_scsi_open(struct inode *inode, struct file *f)
 {
 	struct vhost_scsi *s;
@@ -263,7 +373,29 @@ static int vhost_scsi_release(struct inode *inode, struct file *f)
 static long vhost_scsi_ioctl(struct file *f, unsigned int ioctl,
 				unsigned long arg)
 {
-	return -EINVAL;
+	struct vhost_scsi *vs = f->private_data;
+	struct vhost_vring_target backend;
+	void __user *argp = (void __user *)arg;
+	u64 __user *featurep = argp;
+	u64 features;
+	int r;
+
+	switch (ioctl) {
+	case VHOST_SCSI_SET_ENDPOINT:
+		if (copy_from_user(&backend, argp, sizeof backend))
+			return -EFAULT;
+
+		return vhost_scsi_set_endpoint(vs, &backend);
+	case VHOST_SCSI_CLEAR_ENDPOINT:
+		if (copy_from_user(&backend, argp, sizeof backend))
+			return -EFAULT;
+
+		return vhost_scsi_clear_endpoint(vs, &backend);
+	default:
+		return -ENOSYS;
+	}
+
+	return 0;
 }
 
 static const struct file_operations vhost_scsi_fops = {
