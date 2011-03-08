@@ -147,7 +147,7 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 		if (head == vq->num) {
 			if (unlikely(vhost_enable_notify(vq))) {
 				vhost_disable_notify(vq);
-				break;
+				continue;
 			}
 			break;
 		}
