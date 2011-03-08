@@ -31,6 +31,10 @@
 #include <linux/ctype.h>
 #include <asm/unaligned.h>
 #include <scsi/scsi.h>
+#include <linux/vhost.h>
+#include <linux/virtio_net.h> /* TODO vhost.h currently depends on this */
+#include <linux/virtio_scsi.h>
+#include "../../vhost/vhost.h" /* TODO this is ugly */
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>

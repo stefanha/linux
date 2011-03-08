@@ -3,6 +3,8 @@
 #define TCM_VHOST_MAX_CDB_SIZE 32
 
 struct tcm_vhost_cmd {
+	/* Descriptor from vhost_get_vq_desc() for virt_queue segment */
+	int tvc_vq_desc;
 	/* The Tag from include/linux/virtio_scsi.h:struct virtio_scsi_cmd_header */
 	u32 tvc_tag;
 	/* The number of scatterlista associated with this cmd */

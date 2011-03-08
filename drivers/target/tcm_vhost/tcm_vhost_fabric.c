@@ -30,6 +30,10 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/libfc.h>
+#include <linux/vhost.h>
+#include <linux/virtio_net.h> /* TODO vhost.h currently depends on this */
+#include <linux/virtio_scsi.h>
+#include "../../vhost/vhost.h" /* TODO this is ugly */
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -41,6 +45,7 @@
 
 #include "tcm_vhost_base.h"
 #include "tcm_vhost_fabric.h"
+#include "tcm_vhost_scsi.h"
 
 int tcm_vhost_check_true(struct se_portal_group *se_tpg)
 {
@@ -354,11 +359,27 @@ void tcm_vhost_new_cmd_failure(struct se_cmd *se_cmd)
 
 int tcm_vhost_queue_data_in(struct se_cmd *se_cmd)
 {
+	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
+				struct tcm_vhost_cmd, tvc_se_cmd);
+	struct vhost_scsi *vs = tv_cmd->tvc_vhost;
+	/*
+	 * Signal to vhost that we are done processing this ring descriptor
+	 */
+	vhost_add_used_and_signal(&vs->dev, &vs->cmd_vq, tv_cmd->tvc_vq_desc, 0);
+
 	return 0;
 }
 
 int tcm_vhost_queue_status(struct se_cmd *se_cmd)
 {
+	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
+				struct tcm_vhost_cmd, tvc_se_cmd);
+	struct vhost_scsi *vs = tv_cmd->tvc_vhost;
+	/*
+	 * Signal to vhost that we are done processing this ring descriptor
+	 */
+	vhost_add_used_and_signal(&vs->dev, &vs->cmd_vq, tv_cmd->tvc_vq_desc, 0);
+
 	return 0;
 }
 

@@ -31,11 +31,8 @@
 #include <target/target_core_transport.h>
 
 #include "tcm_vhost_base.h"
+#include "tcm_vhost_scsi.h"
 
-struct vhost_scsi {
-	struct vhost_dev dev;
-	struct vhost_virtqueue cmd_vq;
-};
 
 static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 	struct tcm_vhost_tpg *tv_tpg,
@@ -188,15 +185,17 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 		tv_cmd->tvc_sgl = NULL;
 		tv_cmd->tvc_sgl_count = 0;
 		/*
+		 * Save the descriptor from vhost_get_vq_desc() to be used to
+		 * complete the virtio-scsi request in TCM callback context via
+		 * tcm_vhost_queue_data_in() and tcm_vhost_queue_status()
+		 */
+		tv_cmd->tvc_vq_desc = head;
+		/*
 		 * Now queue up the newly allocated se_cmd to be processed
 		 * within TCM thread context to finish the setup and dispatched
 		 * into a TCM backend struct se_device.
 		 */
 		transport_generic_handle_cdb_map(&tv_cmd->tvc_se_cmd);
-		/*
-		 * Signal to vhost that we are done processing this ring descriptor
-		 */
-		vhost_add_used_and_signal(&vs->dev, vq, head, 0);
 	}
 
 	mutex_unlock(&vq->mutex);
