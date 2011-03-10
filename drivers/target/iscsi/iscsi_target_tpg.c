@@ -449,7 +449,6 @@ static void iscsi_set_default_tpg_attribs(struct iscsi_portal_group *tpg)
 	a->cache_dynamic_acls = TA_CACHE_DYNAMIC_ACLS;
 	a->demo_mode_write_protect = TA_DEMO_MODE_WRITE_PROTECT;
 	a->prod_mode_write_protect = TA_PROD_MODE_WRITE_PROTECT;
-	a->crc32c_x86_offload = TA_CRC32C_X86_OFFLOAD;
 	a->cache_core_nps = TA_CACHE_CORE_NPS;
 }
 
@@ -1083,24 +1082,6 @@ int iscsi_ta_prod_mode_write_protect(
 	printk(KERN_INFO "iSCSI_TPG[%hu] - Production Mode Write Protect bit:"
 		" %s\n", tpg->tpgt, (a->prod_mode_write_protect) ?
 		"ON" : "OFF");
-
-	return 0;
-}
-
-int iscsi_ta_crc32c_x86_offload(
-	struct iscsi_portal_group *tpg,
-	u32 flag)
-{
-	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
-
-	if ((flag != 0) && (flag != 1)) {
-		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -EINVAL;
-	}
-
-	a->crc32c_x86_offload = flag;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - CRC32C x86 Offload: %s\n",
-		tpg->tpgt, (a->crc32c_x86_offload) ? "ON" : "OFF");
 
 	return 0;
 }

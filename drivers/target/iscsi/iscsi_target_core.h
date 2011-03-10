@@ -121,8 +121,6 @@
 #define TA_DEMO_MODE_WRITE_PROTECT	1
 /* Disabled by default in production mode w/ explict ACLs */
 #define TA_PROD_MODE_WRITE_PROTECT	0
-/* Enabled by default with x86 supporting SSE v4.2 */
-#define TA_CRC32C_X86_OFFLOAD		1
 #define TA_CACHE_CORE_NPS		0
 
 /* struct iscsi_data_count->type */
@@ -839,8 +837,6 @@ struct iscsi_tpg_attrib {
 	u32			default_cmdsn_depth;
 	u32			demo_mode_write_protect;
 	u32			prod_mode_write_protect;
-	/* Used to signal libcrypto crc32-intel offload instruction usage */
-	u32			crc32c_x86_offload;
 	u32			cache_core_nps;
 	struct iscsi_portal_group *tpg;
 }  ____cacheline_aligned;

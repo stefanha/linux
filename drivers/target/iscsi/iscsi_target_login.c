@@ -86,39 +86,10 @@ static int iscsi_login_init_conn(struct iscsi_conn *conn)
  */
 int iscsi_login_setup_crypto(struct iscsi_conn *conn)
 {
-	struct iscsi_portal_group *tpg = conn->tpg;
-#ifdef CONFIG_X86
 	/*
-	 * Check for the Nehalem optimized crc32c-intel instructions
-	 * This is only currently available while running on bare-metal,
-	 * and is not yet available with QEMU-KVM guests.
-	 */
-	if (cpu_has_xmm4_2 && ISCSI_TPG_ATTRIB(tpg)->crc32c_x86_offload) {
-		conn->conn_rx_hash.flags = 0;
-		conn->conn_rx_hash.tfm = crypto_alloc_hash("crc32c-intel", 0,
-						CRYPTO_ALG_ASYNC);
-		if (IS_ERR(conn->conn_rx_hash.tfm)) {
-			printk(KERN_ERR "crypto_alloc_hash() failed for conn_rx_tfm\n");
-			goto check_crc32c;
-		}
-
-		conn->conn_tx_hash.flags = 0;
-		conn->conn_tx_hash.tfm = crypto_alloc_hash("crc32c-intel", 0,
-						CRYPTO_ALG_ASYNC);
-		if (IS_ERR(conn->conn_tx_hash.tfm)) {   
-			printk(KERN_ERR "crypto_alloc_hash() failed for conn_tx_tfm\n");
-			crypto_free_hash(conn->conn_rx_hash.tfm);
-			goto check_crc32c;
-		}
-
-		printk(KERN_INFO "LIO-Target[0]: Using Nehalem crc32c-intel"
-					" offload instructions\n");
-		return 0;
-	}
-check_crc32c:
-#endif /* CONFIG_X86 */
-	/*
-	 * Setup slicing by 1x CRC32C algorithm for RX and TX libcrypto contexts
+	 * Setup slicing by CRC32C algorithm for RX and TX libcrypto contexts
+	 * which will default to crc32c_intel.ko for cpu_has_xmm4_2, or fallback
+	 * to software 1x8 byte slicing from crc32c.ko
 	 */
 	conn->conn_rx_hash.flags = 0;
 	conn->conn_rx_hash.tfm = crypto_alloc_hash("crc32c", 0,

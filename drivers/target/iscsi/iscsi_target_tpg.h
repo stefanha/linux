@@ -53,7 +53,6 @@ extern int iscsi_ta_default_cmdsn_depth(struct iscsi_portal_group *, u32);
 extern int iscsi_ta_cache_dynamic_acls(struct iscsi_portal_group *, u32);
 extern int iscsi_ta_demo_mode_write_protect(struct iscsi_portal_group *, u32);
 extern int iscsi_ta_prod_mode_write_protect(struct iscsi_portal_group *, u32);
-extern int iscsi_ta_crc32c_x86_offload(struct iscsi_portal_group *, u32);
 extern void iscsi_disable_tpgs(struct iscsi_tiqn *);
 extern void iscsi_disable_all_tpgs(void);
 extern void iscsi_remove_tpgs(struct iscsi_tiqn *);
