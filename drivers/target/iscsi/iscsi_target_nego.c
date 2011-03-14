@@ -371,7 +371,7 @@ static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_log
 		ntohl(login_rsp->exp_cmdsn), ntohl(login_rsp->max_cmdsn),
 		ntohl(login_rsp->statsn), login->rsp_length);
 
-	padding = ((-ntohl(login->rsp_length)) & 3);
+	padding = ((-login->rsp_length) & 3);
 
 	if (iscsi_login_tx_data(
 			conn,
