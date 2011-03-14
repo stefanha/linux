@@ -102,7 +102,7 @@ int iscsi_login_setup_crypto(struct iscsi_conn *conn)
 	conn->conn_tx_hash.flags = 0;
 	conn->conn_tx_hash.tfm = crypto_alloc_hash("crc32c", 0,
 						CRYPTO_ALG_ASYNC);
-	if (IS_ERR(conn->conn_tx_hash.tfm)) {	
+	if (IS_ERR(conn->conn_tx_hash.tfm)) {
 		printk(KERN_ERR "crypto_alloc_hash() failed for conn_tx_tfm\n");
 		crypto_free_hash(conn->conn_rx_hash.tfm);
 		return -ENOMEM;
@@ -214,7 +214,7 @@ static void iscsi_login_set_conn_values(
 	u16 cid)
 {
 	conn->sess		= sess;
-	conn->cid 		= cid;
+	conn->cid		= cid;
 	/*
 	 * Generate a random Status sequence number (statsn) for the new
 	 * iSCSI connection.
@@ -292,7 +292,7 @@ static int iscsi_login_zero_tsih_s1(
 	return 0;
 }
 
-static int iscsi_login_zero_tsih_s2 (
+static int iscsi_login_zero_tsih_s2(
 	struct iscsi_conn *conn)
 {
 	struct iscsi_node_attrib *na;
@@ -414,7 +414,7 @@ int iscsi_login_disable_FIM_keys(
 	return 0;
 }
 
-static int iscsi_login_non_zero_tsih_s1 (
+static int iscsi_login_non_zero_tsih_s1(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {

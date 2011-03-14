@@ -803,7 +803,7 @@ static void init_iscsi_index_table(void)
 u32 iscsi_get_new_index(iscsi_index_t type)
 {
 	u32 new_index;
-	
+
 	if ((type < 0) || (type >= INDEX_TYPE_MAX)) {
 		printk(KERN_ERR "Invalid index type %d\n", type);
 		return -1;
@@ -1157,10 +1157,6 @@ int iscsi_add_nopin(
 	return 0;
 }
 
-/*	iscsi_add_reject():
- *
- *
- */
 int iscsi_add_reject(
 	u8 reason,
 	int fail_conn,
@@ -1259,10 +1255,6 @@ int iscsi_add_reject_from_cmd(
 #define DEBUG_MAP_SEGMENTS(buf...)
 #endif
 
-/*	iscsi_calculate_map_segment():
- *
- *
- */
 static inline void iscsi_calculate_map_segment(
 	u32 *data_length,
 	struct se_offset_map *lm)
@@ -1307,7 +1299,7 @@ static inline void iscsi_calculate_map_segment(
 
 	DEBUG_MAP_SEGMENTS("LINUX_MAP1[%p]: Starting to se_mem->se_len: %u,"
 		" se_mem->se_off: %u, se_mem->se_page: %p\n", se_mem,
-		se_mem->se_len, se_mem->se_off, se_mem->se_page);;
+		se_mem->se_len, se_mem->se_off, se_mem->se_page);
 	/*
 	 * Get the base and length of the current page for use with the iovec.
 	 */
@@ -1396,10 +1388,6 @@ recalc:
 #define DEBUG_GET_ISCSI_OFFSET(buf...)
 #endif
 
-/*	get_iscsi_offset():
- *
- *
- */
 static int get_iscsi_offset(
 	struct se_offset_map *lmap,
 	struct se_unmap_sg *usg)
@@ -1688,10 +1676,6 @@ static void iscsi_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 	}
 }
 
-/*	iscsi_handle_scsi_cmd():
- *
- *
- */
 static inline int iscsi_handle_scsi_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
@@ -2056,10 +2040,6 @@ after_immediate_data:
 	return 0;
 }
 
-/*	iscsi_handle_data_out():
- *
- *
- */
 static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 {
 	int iov_ret, ooo_cmdsn = 0, ret;
@@ -2384,10 +2364,6 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	return 0;
 }
 
-/*	iscsi_handle_nop_out():
- *
- *
- */
 static inline int iscsi_handle_nop_out(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
@@ -2621,10 +2597,6 @@ ping_out:
 	return ret;
 }
 
-/*	iscsi_handle_task_mgt_cmd():
- *
- *
- */
 static inline int iscsi_handle_task_mgt_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
@@ -2794,10 +2766,6 @@ attach:
 	return 0;
 }
 
-/* 	iscsi_handle_text_cmd():
- *
- *
- */
 /* #warning FIXME: Support Text Command parameters besides SendTargets */
 static inline int iscsi_handle_text_cmd(
 	struct iscsi_conn *conn,
@@ -2876,7 +2844,7 @@ static inline int iscsi_handle_text_cmd(
 				crypto_hash_update(&conn->conn_rx_hash, &sg,
 						padding);
 			}
-			crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);	
+			crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);
 
 			if (checksum != data_crc) {
 				printk(KERN_ERR "Text data CRC32C DataDigest"
@@ -3004,10 +2972,6 @@ int iscsi_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 	return 0;
 }
 
-/*	iscsi_logout_closeconnection():
- *
- *
- */
 int iscsi_logout_closeconnection(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_conn *l_conn;
@@ -3056,10 +3020,6 @@ int iscsi_logout_closeconnection(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 	return 0;
 }
 
-/*	iscsi_logout_removeconnforrecovery():
- *
- *
- */
 int iscsi_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = SESS(conn);
@@ -3089,10 +3049,6 @@ int iscsi_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn 
 	return 0;
 }
 
-/*	iscsi_handle_logout_cmd():
- *
- *
- */
 static inline int iscsi_handle_logout_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
@@ -3191,10 +3147,6 @@ static inline int iscsi_handle_logout_cmd(
 	return logout_remove;
 }
 
-/*	iscsi_handle_snack():
- *
- *
- */
 static inline int iscsi_handle_snack(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
@@ -3255,10 +3207,6 @@ static inline int iscsi_handle_snack(
 	return 0;
 }
 
-/*	iscsi_handle_immediate_data():
- *
- *
- */
 static int iscsi_handle_immediate_data(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
@@ -3298,8 +3246,8 @@ static int iscsi_handle_immediate_data(
 	}
 
 	if (CONN_OPS(conn)->DataDigest) {
-		iov[iov_count].iov_base 	= &checksum;
-		iov[iov_count++].iov_len 	= CRC_LEN;
+		iov[iov_count].iov_base		= &checksum;
+		iov[iov_count++].iov_len	= CRC_LEN;
 		rx_size += CRC_LEN;
 	}
 
@@ -3472,7 +3420,7 @@ int iscsi_send_async_msg(
 		u32 *header_digest = (u32 *)&iscsi_hdr[ISCSI_HDR_LEN];
 
 		crypto_hash_init(&conn->conn_tx_hash);
-		
+
 		sg_init_one(&sg, (u8 *)&iscsi_hdr, ISCSI_HDR_LEN);
 		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
@@ -3559,10 +3507,6 @@ static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
 	iscsi_dec_conn_usage_count(conn_p);
 }
 
-/*	iscsi_send_conn_drop_async_message():
- *
- *
- */
 static int iscsi_send_conn_drop_async_message(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -3581,9 +3525,9 @@ static int iscsi_send_conn_drop_async_message(
 	put_unaligned_be64(0xffffffffffffffff, &hdr->rsvd4[0]);
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
-	hdr->exp_cmdsn 		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
+	hdr->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
-	hdr->async_event 	= ISCSI_ASYNC_MSG_DROPPING_CONNECTION;
+	hdr->async_event	= ISCSI_ASYNC_MSG_DROPPING_CONNECTION;
 	hdr->param1		= cpu_to_be16(cmd->logout_cid);
 	hdr->param2		= cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Wait);
 	hdr->param3		= cpu_to_be16(SESS_OPS_C(conn)->DefaultTime2Retain);
@@ -3592,7 +3536,7 @@ static int iscsi_send_conn_drop_async_message(
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
 		crypto_hash_init(&conn->conn_tx_hash);
-		
+
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
 		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
@@ -3622,10 +3566,6 @@ int lio_queue_data_in(struct se_cmd *se_cmd)
 	return 0;
 }
 
-/*	iscsi_send_data_in():
- *
- *
- */
 static inline int iscsi_send_data_in(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn,
@@ -3635,7 +3575,7 @@ static inline int iscsi_send_data_in(
 	int iov_ret = 0, set_statsn = 0;
 	u8 *pad_bytes;
 	u32 iov_count = 0, tx_size = 0;
-	u64 lun;	
+	u64 lun;
 	struct iscsi_datain datain;
 	struct iscsi_datain_req *dr;
 	struct se_map_sg map_sg;
@@ -3690,7 +3630,7 @@ static inline int iscsi_send_data_in(
 
 	hdr	= (struct iscsi_data_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
-	hdr->opcode 		= ISCSI_OP_SCSI_DATA_IN;
+	hdr->opcode		= ISCSI_OP_SCSI_DATA_IN;
 	hdr->flags		= datain.flags;
 	if (hdr->flags & ISCSI_FLAG_DATA_STATUS) {
 		if (SE_CMD(cmd)->se_cmd_flags & SCF_OVERFLOW_BIT) {
@@ -3764,8 +3704,8 @@ static inline int iscsi_send_data_in(
 			return -1;
 		}
 		cmd->buf_ptr = pad_bytes;
-		iov[iov_count].iov_base 	= pad_bytes;
-		iov[iov_count++].iov_len 	= unmap_sg->padding;
+		iov[iov_count].iov_base		= pad_bytes;
+		iov[iov_count++].iov_len	= unmap_sg->padding;
 		tx_size += unmap_sg->padding;
 
 		TRACE(TRACE_ISCSI, "Attaching %u padding bytes\n",
@@ -3817,10 +3757,6 @@ static inline int iscsi_send_data_in(
 	return 0;
 }
 
-/*	iscsi_send_logout_response():
- *
- *
- */
 static inline int iscsi_send_logout_response(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -3924,7 +3860,7 @@ static inline int iscsi_send_logout_response(
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -3974,7 +3910,7 @@ static inline int iscsi_send_unsolicited_nopin(
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -3985,7 +3921,7 @@ static inline int iscsi_send_unsolicited_nopin(
 
 	cmd->iov_misc[0].iov_base	= cmd->pdu;
 	cmd->iov_misc[0].iov_len	= tx_size;
-	cmd->iov_misc_count 	= 1;
+	cmd->iov_misc_count	= 1;
 	cmd->tx_size		= tx_size;
 
 	TRACE(TRACE_ISCSI, "Sending Unsolicited NOPIN TTT: 0x%08x StatSN:"
@@ -3994,10 +3930,6 @@ static inline int iscsi_send_unsolicited_nopin(
 	return 0;
 }
 
-/*	iscsi_send_nopin_response():
- *
- *
- */
 static inline int iscsi_send_nopin_response(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -4034,7 +3966,7 @@ static inline int iscsi_send_nopin_response(
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -4075,7 +4007,7 @@ static inline int iscsi_send_nopin_response(
 			if (padding) {
 				sg_init_one(&sg, (u8 *)&cmd->pad_bytes, padding);
 				crypto_hash_update(&conn->conn_tx_hash, &sg,
-						padding);	
+						padding);
 			}
 
 			crypto_hash_final(&conn->conn_tx_hash,
@@ -4100,10 +4032,6 @@ static inline int iscsi_send_nopin_response(
 	return 0;
 }
 
-/*	iscsi_send_r2t():
- *
- *
- */
 int iscsi_send_r2t(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -4149,7 +4077,7 @@ int iscsi_send_r2t(
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -4316,10 +4244,6 @@ u16 lio_get_fabric_sense_len(void)
 	return 2;
 }
 
-/*	iscsi_send_status():
- *
- *
- */
 static inline int iscsi_send_status(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -4412,11 +4336,11 @@ static inline int iscsi_send_status(
 
 	if (CONN_OPS(conn)->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
-	
+
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -4467,10 +4391,6 @@ static inline u8 iscsi_convert_tcm_tmr_rsp(struct se_tmr_req *se_tmr)
 	}
 }
 
-/*	iscsi_send_task_mgt_rsp():
- *
- *
- */
 static int iscsi_send_task_mgt_rsp(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -4497,12 +4417,12 @@ static int iscsi_send_task_mgt_rsp(
 	tx_size += ISCSI_HDR_LEN;
 
 	if (CONN_OPS(conn)->HeaderDigest) {
-		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];	
+		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -4523,7 +4443,6 @@ static int iscsi_send_task_mgt_rsp(
 }
 
 /*	iscsi_send_text_rsp():
- *
  *
  *	FIXME: Add support for F_BIT and C_BIT when the length is longer than
  *	MaxRecvDataSegmentLength.
@@ -4576,7 +4495,7 @@ static int iscsi_send_text_rsp(
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -4651,7 +4570,7 @@ static int iscsi_send_reject(
 		crypto_hash_init(&conn->conn_tx_hash);
 
 		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN); 
+		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
 
 		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
 
@@ -4734,8 +4653,8 @@ void iscsi_thread_get_cpumask(struct iscsi_conn *conn)
 	 */
 	ord = ts->thread_id % cpumask_weight(cpu_online_mask);
 #if 0
-	printk(">>>>>>>>>>>>>>>>>>>> Generated ord: %d from thread_id: %d\n",
-			ord, ts->thread_id);
+	printk(KERN_INFO ">>>>>>>>>>>>>>>>>>>> Generated ord: %d from"
+			" thread_id: %d\n", ord, ts->thread_id);
 #endif
 	for_each_online_cpu(cpu) {
 		if (ord-- == 0) {
@@ -4777,8 +4696,8 @@ static inline void iscsi_thread_check_cpumask(
 	memset(buf, 0, 128);
 	cpumask_scnprintf(buf, 128, conn->conn_cpumask);
 #if 0
-	printk(">>>>>>>>>>>>>> Calling set_cpus_allowed_ptr(): %s for %s\n",
-			buf, p->comm);
+	printk(KERN_INFO ">>>>>>>>>>>>>> Calling set_cpus_allowed_ptr():"
+			" %s for %s\n", buf, p->comm);
 #endif
 	set_cpus_allowed_ptr(p, conn->conn_cpumask);
 }
@@ -4788,10 +4707,6 @@ static inline void iscsi_thread_check_cpumask(
 #define iscsi_thread_check_cpumask(X, Y, Z) ({})
 #endif /* CONFIG_SMP */
 
-/*	iscsi_target_tx_thread():
- *
- *
- */
 int iscsi_target_tx_thread(void *arg)
 {
 	u8 state;
@@ -5137,10 +5052,6 @@ static void iscsi_rx_thread_wait_for_TCP(struct iscsi_conn *conn)
 	}
 }
 
-/*	iscsi_target_rx_thread():
- *
- *
- */
 int iscsi_target_rx_thread(void *arg)
 {
 	int ret;
@@ -5371,10 +5282,6 @@ static void iscsi_stop_timers_for_cmds(
 	spin_unlock_bh(&conn->cmd_lock);
 }
 
-/*	iscsi_close_connection():
- *
- *
- */
 int iscsi_close_connection(
 	struct iscsi_conn *conn)
 {
@@ -5589,10 +5496,6 @@ int iscsi_close_connection(
 	return 0;
 }
 
-/*	iscsi_close_session():
- *
- *
- */
 int iscsi_close_session(struct iscsi_session *sess)
 {
 	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
@@ -5665,10 +5568,6 @@ int iscsi_close_session(struct iscsi_session *sess)
 	return 0;
 }
 
-/*	iscsi_logout_post_handler_closesession():
- *
- *
- */
 static void iscsi_logout_post_handler_closesession(
 	struct iscsi_conn *conn)
 {
@@ -5686,10 +5585,6 @@ static void iscsi_logout_post_handler_closesession(
 	iscsi_close_session(sess);
 }
 
-/*	iscsi_logout_post_handler_samecid():
- *
- *
- */
 static void iscsi_logout_post_handler_samecid(
 	struct iscsi_conn *conn)
 {
@@ -5703,10 +5598,6 @@ static void iscsi_logout_post_handler_samecid(
 	iscsi_dec_conn_usage_count(conn);
 }
 
-/*	iscsi_logout_post_handler_diffcid():
- *
- *
- */
 static void iscsi_logout_post_handler_diffcid(
 	struct iscsi_conn *conn,
 	u16 cid)
@@ -5804,10 +5695,6 @@ static int iscsi_logout_post_handler(
 	return ret;
 }
 
-/*	iscsi_fail_session():
- *
- *
- */
 void iscsi_fail_session(struct iscsi_session *sess)
 {
 	struct iscsi_conn *conn;
@@ -5823,10 +5710,6 @@ void iscsi_fail_session(struct iscsi_session *sess)
 	sess->session_state = TARG_SESS_STATE_FAILED;
 }
 
-/*	iscsi_free_session():
- *
- *
- */
 int iscsi_free_session(struct iscsi_session *sess)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
@@ -5859,10 +5742,6 @@ int iscsi_free_session(struct iscsi_session *sess)
 	return 0;
 }
 
-/*	iscsi_stop_session():
- *
- *
- */
 void iscsi_stop_session(
 	struct iscsi_session *sess,
 	int session_sleep,
@@ -5945,7 +5824,7 @@ int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
 	return 0;
 }
 
-static int iscsi_target_init_module(void)
+static int __init iscsi_target_init_module(void)
 {
 	if (!(iscsi_target_detect()))
 		return 0;
@@ -5953,13 +5832,13 @@ static int iscsi_target_init_module(void)
 	return -1;
 }
 
-static void iscsi_target_cleanup_module(void)
+static void __exit iscsi_target_cleanup_module(void)
 {
 	iscsi_target_release();
 }
 
 #ifdef MODULE
-MODULE_DESCRIPTION("LIO Target Driver Core 3.x.x Release");
+MODULE_DESCRIPTION("LIO Target Driver Core 4.x.x Release");
 MODULE_LICENSE("GPL");
 module_init(iscsi_target_init_module);
 module_exit(iscsi_target_cleanup_module);

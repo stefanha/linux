@@ -7,7 +7,7 @@
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
- * 
+ *
  * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -493,8 +493,8 @@ static inline int iscsi_dataout_pre_datapduinorder_no(
 	unsigned char *buf)
 {
 	struct iscsi_pdu *pdu;
-        struct iscsi_data *hdr = (struct iscsi_data *) buf;
-        u32 payload_length = ntoh24(hdr->dlength);
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	pdu = iscsi_get_pdu_holder(cmd, hdr->offset, payload_length);
 	if (!(pdu))

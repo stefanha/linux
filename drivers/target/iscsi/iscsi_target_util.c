@@ -355,7 +355,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	case ISCSI_TM_FUNC_TARGET_COLD_RESET:
 		tcm_function = TMR_TARGET_COLD_RESET;
 		break;
-	default: 
+	default:
 		printk(KERN_ERR "Unknown iSCSI TMR Function:"
 			" 0x%02x\n", function);
 		goto out;
@@ -1250,8 +1250,8 @@ static inline int iscsi_determine_sync_and_steering_counts(
 
 /*	iscsi_set_sync_and_steering_values():
  *
- * 	Setup conn->if_marker and conn->of_marker values based upon
- * 	the initial marker-less interval. (see iSCSI v19 A.2)
+ *	Setup conn->if_marker and conn->of_marker values based upon
+ *	the initial marker-less interval. (see iSCSI v19 A.2)
  */
 int iscsi_set_sync_and_steering_values(struct iscsi_conn *conn)
 {
@@ -2026,13 +2026,13 @@ int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 	u32 iov_count = (T_TASK(se_cmd)->t_tasks_se_num == 0) ? 1 :
 				T_TASK(se_cmd)->t_tasks_se_num;
-	
+
 	iov_count += TRANSPORT_IOV_DATA_BUFFER;
 
 	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_KERNEL);
 	if (!(cmd->iov_data))
 		return -ENOMEM;
-	
+
 	cmd->orig_iov_data_count = iov_count;
 	return 0;
 }

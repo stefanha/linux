@@ -66,14 +66,14 @@
  */
 #define iscsi_daemon(thread, name, sigs)		\
 do {							\
-        daemonize(name);				\
-        current->policy = SCHED_NORMAL;			\
-        set_user_nice(current, -20);			\
-        spin_lock_irq(&current->sighand->siglock);	\
-        siginitsetinv(&current->blocked, (sigs));	\
-        recalc_sigpending();				\
-        (thread) = current;				\
-        spin_unlock_irq(&current->sighand->siglock);	\
+	daemonize(name);				\
+	current->policy = SCHED_NORMAL;			\
+	set_user_nice(current, -20);			\
+	spin_lock_irq(&current->sighand->siglock);	\
+	siginitsetinv(&current->blocked, (sigs));	\
+	recalc_sigpending();				\
+	(thread) = current;				\
+	spin_unlock_irq(&current->sighand->siglock);	\
 } while (0);
 
 #define MOD_TIMER(t, exp) mod_timer(t, (get_jiffies_64() + exp * HZ))
@@ -387,7 +387,7 @@ struct iscsi_cmd {
 	/* Command flags */
 	enum cmd_flags_table	cmd_flags;
 	/* Initiator Task Tag assigned from Initiator */
-	u32 			init_task_tag;
+	u32			init_task_tag;
 	/* Target Transfer Tag assigned from Target */
 	u32			targ_xfer_tag;
 	/* CmdSN assigned from Initiator */
@@ -489,7 +489,7 @@ struct iscsi_cmd {
 	/* TMR Request when iscsi_opcode == ISCSI_OP_SCSI_TMFUNC */
 	struct iscsi_tmr_req	*tmr_req;
 	/* Connection this command is alligient to */
-	struct iscsi_conn 	*conn;
+	struct iscsi_conn	*conn;
 	/* Pointer to connection recovery entry */
 	struct iscsi_conn_recovery *cr;
 	/* Session the command is part of,  used for connection recovery */
@@ -505,7 +505,7 @@ struct iscsi_cmd {
 	/* The TCM I/O descriptor that is accessed via container_of() */
 	struct se_cmd		se_cmd;
 	/* Sense buffer that will be mapped into outgoing status */
-#define ISCSI_SENSE_BUFFER_LEN          TRANSPORT_SENSE_BUFFER + 2
+#define ISCSI_SENSE_BUFFER_LEN          (TRANSPORT_SENSE_BUFFER + 2)
 	unsigned char		sense_buffer[ISCSI_SENSE_BUFFER_LEN];
 }  ____cacheline_aligned;
 
@@ -589,7 +589,7 @@ struct iscsi_conn {
 	struct socket		*sock;
 	struct timer_list	nopin_timer;
 	struct timer_list	nopin_response_timer;
-	struct timer_list	transport_timer;;
+	struct timer_list	transport_timer;
 	/* Spinlock used for add/deleting cmd's from conn_cmd_list */
 	spinlock_t		cmd_lock;
 	spinlock_t		conn_usage_lock;
@@ -765,7 +765,7 @@ struct iscsi_node_auth {
 
 struct iscsi_node_stat_grps {
 	struct config_group	iscsi_sess_stats_group;
-        struct config_group	iscsi_conn_stats_group;
+	struct config_group	iscsi_conn_stats_group;
 };
 
 struct iscsi_node_acl {
@@ -872,7 +872,7 @@ struct iscsi_portal_group {
 	/* Pointer to default list of iSCSI parameters for TPG */
 	struct iscsi_param_list	*param_list;
 	struct iscsi_tiqn	*tpg_tiqn;
-	struct list_head 	tpg_gnp_list;
+	struct list_head	tpg_gnp_list;
 	struct list_head	tpg_list;
 	struct list_head	g_tpg_list;
 } ____cacheline_aligned;

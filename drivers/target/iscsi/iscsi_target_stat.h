@@ -73,7 +73,7 @@ typedef enum {
 
 struct iscsi_index_table {
 	spinlock_t	lock;
-	u32 		iscsi_mib_index[INDEX_TYPE_MAX];
+	u32		iscsi_mib_index[INDEX_TYPE_MAX];
 } ____cacheline_aligned;
 
 #endif   /*** ISCSI_TARGET_STAT_H ***/

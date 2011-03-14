@@ -77,7 +77,7 @@ extern void iscsi_set_session_parameters(struct iscsi_sess_ops *,
 #define DEFAULTTIME2WAIT		"DefaultTime2Wait"
 #define DEFAULTTIME2RETAIN		"DefaultTime2Retain"
 #define MAXOUTSTANDINGR2T		"MaxOutstandingR2T"
-#define DATAPDUINORDER  		"DataPDUInOrder"
+#define DATAPDUINORDER			"DataPDUInOrder"
 #define DATASEQUENCEINORDER		"DataSequenceInOrder"
 #define ERRORRECOVERYLEVEL		"ErrorRecoveryLevel"
 #define SESSIONTYPE			"SessionType"

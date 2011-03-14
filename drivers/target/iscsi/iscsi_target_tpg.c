@@ -4,7 +4,7 @@
  * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
  * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
- * 
+ *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
  * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
@@ -529,7 +529,6 @@ int iscsi_tpg_del_portal_group(
 	}
 
 	core_tpg_deregister(&tpg->tpg_se_tpg);
-//	tpg->tpg_se_tpg = NULL;
 
 	spin_lock(&tpg->tpg_state_lock);
 	tpg->tpg_state = TPG_STATE_FREE;

@@ -5,7 +5,7 @@
  * Copyright (c) 2003 PyX Technologies, Inc.
  * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  © Copyright 2007-2011 RisingTide Systems LLC.
- * 
+ *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
  * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>

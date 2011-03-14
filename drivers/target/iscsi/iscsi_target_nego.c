@@ -141,7 +141,7 @@ static u32 iscsi_handle_authentication(
 		/*
 		 * For SessionType=Discovery
 		 */
-		auth = &iscsi_global->discovery_acl.node_auth;	
+		auth = &iscsi_global->discovery_acl.node_auth;
 	}
 
 	if (strstr("CHAP", authtype))
@@ -891,7 +891,7 @@ static int iscsi_target_locate_portal(
 
 		SESS_OPS(sess)->SessionType = 1;
 		/*
- 		 * Setup crc32c modules from libcrypto
+		 * Setup crc32c modules from libcrypto
 		 */
 		if (iscsi_login_setup_crypto(conn) < 0) {
 			printk(KERN_ERR "iscsi_login_setup_crypto() failed\n");
@@ -1046,11 +1046,11 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	/*
 	 * SessionType: Discovery
 	 *
-	 * 	Locates Default Portal
+	 *	Locates Default Portal
 	 *
 	 * SessionType: Normal
 	 *
-	 * 	Locates Target Portal from NP -> Target IQN
+	 *	Locates Target Portal from NP -> Target IQN
 	 */
 	if (iscsi_target_locate_portal(np, conn, login) < 0) {
 		printk(KERN_ERR "iSCSI Login negotiation failed.\n");

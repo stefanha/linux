@@ -47,9 +47,9 @@ static unsigned int iscsi_trace =
 /*		TRACE_BUFF | */
 /*		TRACE_FILE | */
 /*		TRACE_LINE | */
-/*       	TRACE_FUNCTION | */
+/*		TRACE_FUNCTION | */
 /*		TRACE_SEM | */
-/*		TRACE_ENTER_LEAVE | */
+
 /*		TRACE_DIGEST | */
 /*		TRACE_PARAM | */
 /*		TRACE_LOGIN | */
@@ -92,7 +92,7 @@ if (iscsi_trace & trace) {					\
 if (iscsi_trace & TRACE_BUFF) {					\
 	int zzz;						\
 								\
-	printk(KERN_INFO "%d: \n", __LINE__);			\
+	printk(KERN_INFO "%d:\n", __LINE__);			\
 	for (zzz = 0; zzz < len; zzz++) {			\
 		if (zzz % 16 == 0) {				\
 			if (zzz)				\

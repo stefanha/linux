@@ -832,7 +832,7 @@ static struct se_node_acl *lio_target_make_nodeacl(
 		printk(KERN_ERR "Unable to allocate memory for"
 				" stats_cg->default_groups\n");
 		core_tpg_del_initiator_node_acl(se_tpg, se_nacl, 1);
-		kfree(acl);	
+		kfree(acl);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -1229,7 +1229,7 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> Allocated TPG: %s\n",
-			name);	
+			name);
 	return &tpg->tpg_se_tpg;
 out:
 	core_tpg_deregister(&tpg->tpg_se_tpg);
@@ -1292,11 +1292,11 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 				GFP_KERNEL);
 	if (!stats_cg->default_groups) {
 		printk(KERN_ERR "Unable to allocate memory for"
-				" stats_cg->default_groups\n");		
+				" stats_cg->default_groups\n");
 		core_del_tiqn(tiqn);
 		return ERR_PTR(-ENOMEM);
 	}
-	
+
 	stats_cg->default_groups[0] = &WWN_STAT_GRPS(tiqn)->iscsi_instance_group;
 	stats_cg->default_groups[1] = &WWN_STAT_GRPS(tiqn)->iscsi_sess_err_group;
 	stats_cg->default_groups[2] = &WWN_STAT_GRPS(tiqn)->iscsi_tgt_attr_group;
@@ -1327,7 +1327,7 @@ void lio_target_call_coredeltiqn(
 	struct config_item *df_item;
 	struct config_group *stats_cg;
 	int i;
-	
+
 	stats_cg = &tiqn->tiqn_wwn.fabric_stat_group;
 	for (i = 0; stats_cg->default_groups[i]; i++) {
 		df_item = &stats_cg->default_groups[i]->cg_item;
@@ -1368,10 +1368,10 @@ static ssize_t iscsi_disc_store_##name(					\
 #define DEF_DISC_AUTH_INT(name)						\
 	__DEF_NACL_AUTH_INT(disc, name)					\
 static ssize_t iscsi_disc_show_##name(					\
-        struct target_fabric_configfs *tf,				\
-        char *page)							\
+	struct target_fabric_configfs *tf,				\
+	char *page)							\
 {									\
-	return __iscsi_disc_show_##name(&iscsi_global->discovery_acl, 	\
+	return __iscsi_disc_show_##name(&iscsi_global->discovery_acl,	\
 			page);						\
 }
 
