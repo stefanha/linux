@@ -157,7 +157,7 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
-	__u32 first_burst_len;
+	u32 first_burst_len;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_data *hdr = (struct iscsi_data *) buf;
 	u32 payload_length = ntoh24(hdr->dlength);
@@ -236,7 +236,7 @@ static inline int iscsi_dataout_check_sequence(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
-	__u32 next_burst_len;
+	u32 next_burst_len;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_seq *seq = NULL;
 	struct iscsi_data *hdr = (struct iscsi_data *) buf;
@@ -369,7 +369,7 @@ static inline int iscsi_dataout_check_datasn(
 	unsigned char *buf)
 {
 	int dump = 0, recovery = 0;
-	__u32 data_sn = 0;
+	u32 data_sn = 0;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_data *hdr = (struct iscsi_data *) buf;
 	u32 payload_length = ntoh24(hdr->dlength);
@@ -773,7 +773,7 @@ extern int iscsi_check_pre_dataout(
 int iscsi_check_post_dataout(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
-	__u8 data_crc_failed)
+	u8 data_crc_failed)
 {
 	struct iscsi_conn *conn = CONN(cmd);
 
@@ -1038,7 +1038,7 @@ extern void iscsi_take_action_for_connection_exit(struct iscsi_conn *conn)
  *	0) Receive conn->of_marker (bytes left until next OFMarker)
  *	   bytes into an offload buffer.  When we pass the exact number
  *	   of bytes in conn->of_marker, iscsi_dump_data_payload() and hence
- *	   rx_data() will automatically receive the identical __u32 marker
+ *	   rx_data() will automatically receive the identical u32 marker
  *	   values and store it in conn->of_marker_offset;
  *	1) Now conn->of_marker_offset will contain the offset to the start
  *	   of the next iSCSI PDU.  Dump these remaining bytes into another

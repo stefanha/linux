@@ -350,7 +350,7 @@ static int iscsi_target_check_first_request(
  */
 static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
-	__u32 padding = 0;
+	u32 padding = 0;
 	struct iscsi_session *sess = SESS(conn);
 	struct iscsi_login_rsp *login_rsp;
 

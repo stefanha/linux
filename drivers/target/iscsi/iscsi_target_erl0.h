@@ -3,7 +3,7 @@
 
 extern void iscsi_set_dataout_sequence_values(struct iscsi_cmd *);
 extern int iscsi_check_pre_dataout(struct iscsi_cmd *, unsigned char *);
-extern int iscsi_check_post_dataout(struct iscsi_cmd *, unsigned char *, __u8);
+extern int iscsi_check_post_dataout(struct iscsi_cmd *, unsigned char *, u8);
 extern void iscsi_start_time2retain_handler(struct iscsi_session *);
 extern int iscsi_stop_time2retain_timer(struct iscsi_session *);
 extern void iscsi_connection_reinstatement_rcfr(struct iscsi_conn *);

@@ -65,6 +65,6 @@ extern struct kmem_cache *lio_tpg_cache;
 extern int iscsi_close_session(struct iscsi_session *);
 extern int iscsi_free_session(struct iscsi_session *);
 extern int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *, int);
-extern int iscsi_ta_authentication(struct iscsi_portal_group *, __u32);
+extern int iscsi_ta_authentication(struct iscsi_portal_group *, u32);
 
 #endif /* ISCSI_TARGET_TPG_H */

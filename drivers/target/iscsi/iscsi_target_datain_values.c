@@ -103,7 +103,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 next_burst_len, read_data_done, read_data_left;
+	u32 next_burst_len, read_data_done, read_data_left;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_datain_req *dr;
 
@@ -202,7 +202,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 offset, read_data_done, read_data_left, seq_send_order;
+	u32 offset, read_data_done, read_data_left, seq_send_order;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_datain_req *dr;
 	struct iscsi_seq *seq;
@@ -324,7 +324,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 next_burst_len, read_data_done, read_data_left;
+	u32 next_burst_len, read_data_done, read_data_left;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_datain_req *dr;
 	struct iscsi_pdu *pdu;
@@ -424,7 +424,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 read_data_done, read_data_left, seq_send_order;
+	u32 read_data_done, read_data_left, seq_send_order;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_datain_req *dr;
 	struct iscsi_pdu *pdu;

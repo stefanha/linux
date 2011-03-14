@@ -73,7 +73,7 @@ static void iscsi_rx_thread_wait_for_TCP(struct iscsi_conn *);
 static int iscsi_target_detect(void);
 static int iscsi_target_release(void);
 static int iscsi_handle_immediate_data(struct iscsi_cmd *,
-			unsigned char *buf, __u32);
+			unsigned char *buf, u32);
 static inline int iscsi_send_data_in(struct iscsi_cmd *, struct iscsi_conn *,
 			struct se_unmap_sg *, int *);
 static inline int iscsi_send_logout_response(struct iscsi_cmd *, struct iscsi_conn *);
@@ -2334,7 +2334,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		return -1;
 
 	if (CONN_OPS(conn)->DataDigest) {
-		__u32 counter = payload_length, data_crc = 0;
+		u32 counter = payload_length, data_crc = 0;
 		struct iovec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
@@ -2368,7 +2368,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		}
 
 		if (padding) {
-			sg_init_one(&sg, (__u8 *)&pad_bytes, padding);
+			sg_init_one(&sg, (u8 *)&pad_bytes, padding);
 			crypto_hash_update(&conn->conn_rx_hash, &sg,
 					padding);
 			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %d"
@@ -3298,10 +3298,10 @@ static inline int iscsi_handle_snack(
 static int iscsi_handle_immediate_data(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
-	__u32 length)
+	u32 length)
 {
 	int iov_ret, rx_got = 0, rx_size = 0;
-	__u32 checksum, iov_count = 0, padding = 0, pad_bytes = 0;
+	u32 checksum, iov_count = 0, padding = 0, pad_bytes = 0;
 	struct iscsi_conn *conn = cmd->conn;
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
@@ -3351,7 +3351,7 @@ static int iscsi_handle_immediate_data(
 	}
 
 	if (CONN_OPS(conn)->DataDigest) {
-		__u32 counter = length, data_crc;
+		u32 counter = length, data_crc;
 		struct iovec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
@@ -3384,7 +3384,7 @@ static int iscsi_handle_immediate_data(
 		}
 
 		if (padding) {
-			sg_init_one(&sg, (__u8 *)&pad_bytes, padding);
+			sg_init_one(&sg, (u8 *)&pad_bytes, padding);
 			crypto_hash_update(&conn->conn_rx_hash, &sg,
 					padding);
 			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %d"
@@ -3792,7 +3792,7 @@ static inline int iscsi_send_data_in(
 
 	unmap_sg->padding = ((-datain.length) & 3);
 	if (unmap_sg->padding != 0) {
-		pad_bytes = kzalloc(unmap_sg->padding * sizeof(__u8),
+		pad_bytes = kzalloc(unmap_sg->padding * sizeof(u8),
 					GFP_KERNEL);
 		if (!(pad_bytes)) {
 			printk(KERN_ERR "Unable to allocate memory for"
@@ -3808,7 +3808,7 @@ static inline int iscsi_send_data_in(
 				unmap_sg->padding);
 	}
 	if (CONN_OPS(conn)->DataDigest) {
-		__u32 counter = (datain.length + unmap_sg->padding);
+		u32 counter = (datain.length + unmap_sg->padding);
 		struct iovec *iov_ptr = &cmd->iov_data[1];
 
 		crypto_hash_init(&conn->conn_tx_hash);
@@ -4039,7 +4039,7 @@ static inline int iscsi_send_nopin_response(
 	struct iscsi_conn *conn)
 {
 	int niov = 0, tx_size;
-	__u32 padding = 0;
+	u32 padding = 0;
 	struct iovec *iov;
 	struct iscsi_nopin *hdr;
 	struct scatterlist sg;
@@ -4225,7 +4225,7 @@ int iscsi_build_r2ts_for_cmd(
 	int type)
 {
 	int first_r2t = 1;
-	__u32 offset = 0, xfer_len = 0;
+	u32 offset = 0, xfer_len = 0;
 
 	spin_lock_bh(&cmd->r2t_lock);
 	if (cmd->cmd_flags & ICF_SENT_LAST_R2T) {
@@ -4360,8 +4360,8 @@ static inline int iscsi_send_status(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	__u8 iov_count = 0, recovery;
-	__u32 padding = 0, trace_type, tx_size = 0;
+	u8 iov_count = 0, recovery;
+	u32 padding = 0, trace_type, tx_size = 0;
 	struct iscsi_scsi_cmd_rsp *hdr;
 	struct iovec *iov;
 	struct scatterlist sg;
@@ -4658,7 +4658,7 @@ static int iscsi_send_reject(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	__u32 iov_count = 0, tx_size = 0;
+	u32 iov_count = 0, tx_size = 0;
 	struct iscsi_reject *hdr;
 	struct iovec *iov;
 	struct scatterlist sg;
@@ -5180,8 +5180,8 @@ static void iscsi_rx_thread_wait_for_TCP(struct iscsi_conn *conn)
 int iscsi_target_rx_thread(void *arg)
 {
 	int ret;
-	__u8 buffer[ISCSI_HDR_LEN], opcode;
-	__u32 checksum = 0, digest = 0;
+	u8 buffer[ISCSI_HDR_LEN], opcode;
+	u32 checksum = 0, digest = 0;
 	struct iscsi_conn *conn = NULL;
 	struct se_thread_set *ts = (struct se_thread_set *) arg;
 	struct iovec iov;
@@ -5745,7 +5745,7 @@ static void iscsi_logout_post_handler_samecid(
  */
 static void iscsi_logout_post_handler_diffcid(
 	struct iscsi_conn *conn,
-	__u16 cid)
+	u16 cid)
 {
 	struct iscsi_conn *l_conn;
 	struct iscsi_session *sess = SESS(conn);
