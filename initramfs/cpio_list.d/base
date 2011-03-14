@@ -1,0 +1,197 @@
+dir /sys 0755 0 0
+dir /proc 0755 0 0
+dir /mnt 0755 0 0
+dir /tmp 01777 0 0
+dir /dev 0755 0 0
+nod /dev/console 0600 0 0 c 5 1
+nod /dev/null 0666 0 0 c 1 3
+nod /dev/random 0666 0 0 c 1 8
+nod /dev/urandom 0666 0 0 c 1 9
+nod /dev/zero 0666 0 0 c 1 5
+dir /lib 0755 0 0
+slink /lib64 /lib 0755 0 0
+file /lib/libm-2.11.2.so /lib/libm-2.11.2.so 0644 0 0
+slink /lib/libm.so.6 libm-2.11.2.so 0644 0 0
+file /lib/libc-2.11.2.so /lib/libc-2.11.2.so 0755 0 0
+slink /lib/libc.so.6 libc-2.11.2.so 0755 0 0
+file /lib/ld-2.11.2.so /lib/ld-2.11.2.so 0755 0 0
+slink /lib/ld-linux-x86-64.so.2 ld-2.11.2.so 0755 0 0
+dir /lib/modules 0755 0 0
+dir /lib/modules/KERNELRELEASE 0755 0 0
+dir /sbin 0755 0 0
+file /sbin/insmod /sbin/insmod 0755 0 0
+file /sbin/rmmod /sbin/rmmod 0755 0 0
+file /sbin/modinfo /sbin/modinfo 0755 0 0
+dir /bin 0755 0 0
+file /bin/busybox /bin/busybox 0755 0 0
+slink /bin/[ /bin/busybox 0755 0 0
+slink /bin/[[ /bin/busybox 0755 0 0
+slink /bin/adjtimex /bin/busybox 0755 0 0
+slink /bin/arping /bin/busybox 0755 0 0
+slink /bin/ash /bin/busybox 0755 0 0
+slink /bin/awk /bin/busybox 0755 0 0
+slink /bin/basename /bin/busybox 0755 0 0
+slink /bin/blockdev /bin/busybox 0755 0 0
+slink /bin/brctl /bin/busybox 0755 0 0
+slink /bin/bunzip2 /bin/busybox 0755 0 0
+slink /bin/bzcat /bin/busybox 0755 0 0
+slink /bin/bzip2 /bin/busybox 0755 0 0
+slink /bin/cal /bin/busybox 0755 0 0
+slink /bin/cat /bin/busybox 0755 0 0
+slink /bin/chgrp /bin/busybox 0755 0 0
+slink /bin/chmod /bin/busybox 0755 0 0
+slink /bin/chown /bin/busybox 0755 0 0
+slink /bin/chroot /bin/busybox 0755 0 0
+slink /bin/chvt /bin/busybox 0755 0 0
+slink /bin/clear /bin/busybox 0755 0 0
+slink /bin/cmp /bin/busybox 0755 0 0
+slink /bin/cp /bin/busybox 0755 0 0
+slink /bin/cpio /bin/busybox 0755 0 0
+slink /bin/cut /bin/busybox 0755 0 0
+slink /bin/date /bin/busybox 0755 0 0
+slink /bin/dc /bin/busybox 0755 0 0
+slink /bin/dd /bin/busybox 0755 0 0
+slink /bin/deallocvt /bin/busybox 0755 0 0
+slink /bin/df /bin/busybox 0755 0 0
+slink /bin/dirname /bin/busybox 0755 0 0
+slink /bin/dmesg /bin/busybox 0755 0 0
+slink /bin/dnsdomainname /bin/busybox 0755 0 0
+slink /bin/dos2unix /bin/busybox 0755 0 0
+slink /bin/du /bin/busybox 0755 0 0
+slink /bin/dumpkmap /bin/busybox 0755 0 0
+slink /bin/dumpleases /bin/busybox 0755 0 0
+slink /bin/echo /bin/busybox 0755 0 0
+slink /bin/egrep /bin/busybox 0755 0 0
+slink /bin/env /bin/busybox 0755 0 0
+slink /bin/expr /bin/busybox 0755 0 0
+slink /bin/false /bin/busybox 0755 0 0
+slink /bin/fgrep /bin/busybox 0755 0 0
+slink /bin/find /bin/busybox 0755 0 0
+slink /bin/fold /bin/busybox 0755 0 0
+slink /bin/free /bin/busybox 0755 0 0
+slink /bin/ftpget /bin/busybox 0755 0 0
+slink /bin/ftpput /bin/busybox 0755 0 0
+slink /bin/getopt /bin/busybox 0755 0 0
+slink /bin/grep /bin/busybox 0755 0 0
+slink /bin/gunzip /bin/busybox 0755 0 0
+slink /bin/gzip /bin/busybox 0755 0 0
+slink /bin/head /bin/busybox 0755 0 0
+slink /bin/hexdump /bin/busybox 0755 0 0
+slink /bin/hostid /bin/busybox 0755 0 0
+slink /bin/hostname /bin/busybox 0755 0 0
+slink /bin/httpd /bin/busybox 0755 0 0
+slink /bin/id /bin/busybox 0755 0 0
+slink /bin/ifconfig /bin/busybox 0755 0 0
+slink /bin/ionice /bin/busybox 0755 0 0
+slink /bin/ip /bin/busybox 0755 0 0
+slink /bin/ipcalc /bin/busybox 0755 0 0
+slink /bin/kill /bin/busybox 0755 0 0
+slink /bin/killall /bin/busybox 0755 0 0
+slink /bin/klogd /bin/busybox 0755 0 0
+slink /bin/last /bin/busybox 0755 0 0
+slink /bin/length /bin/busybox 0755 0 0
+slink /bin/ln /bin/busybox 0755 0 0
+slink /bin/loadfont /bin/busybox 0755 0 0
+slink /bin/loadkmap /bin/busybox 0755 0 0
+slink /bin/logger /bin/busybox 0755 0 0
+slink /bin/logname /bin/busybox 0755 0 0
+slink /bin/logread /bin/busybox 0755 0 0
+slink /bin/losetup /bin/busybox 0755 0 0
+slink /bin/ls /bin/busybox 0755 0 0
+slink /bin/lzcat /bin/busybox 0755 0 0
+slink /bin/lzma /bin/busybox 0755 0 0
+slink /bin/md5sum /bin/busybox 0755 0 0
+slink /bin/mkdir /bin/busybox 0755 0 0
+slink /bin/mkfifo /bin/busybox 0755 0 0
+slink /bin/mknod /bin/busybox 0755 0 0
+slink /bin/mktemp /bin/busybox 0755 0 0
+slink /bin/more /bin/busybox 0755 0 0
+slink /bin/mount /bin/busybox 0755 0 0
+slink /bin/mt /bin/busybox 0755 0 0
+slink /bin/mv /bin/busybox 0755 0 0
+slink /bin/nameif /bin/busybox 0755 0 0
+slink /bin/nc /bin/busybox 0755 0 0
+slink /bin/netstat /bin/busybox 0755 0 0
+slink /bin/nslookup /bin/busybox 0755 0 0
+slink /bin/od /bin/busybox 0755 0 0
+slink /bin/openvt /bin/busybox 0755 0 0
+slink /bin/patch /bin/busybox 0755 0 0
+slink /bin/pidof /bin/busybox 0755 0 0
+slink /bin/ping /bin/busybox 0755 0 0
+slink /bin/ping6 /bin/busybox 0755 0 0
+slink /bin/printf /bin/busybox 0755 0 0
+slink /bin/ps /bin/busybox 0755 0 0
+slink /bin/pwd /bin/busybox 0755 0 0
+slink /bin/rdate /bin/busybox 0755 0 0
+slink /bin/readlink /bin/busybox 0755 0 0
+slink /bin/realpath /bin/busybox 0755 0 0
+slink /bin/renice /bin/busybox 0755 0 0
+slink /bin/reset /bin/busybox 0755 0 0
+slink /bin/rev /bin/busybox 0755 0 0
+slink /bin/rm /bin/busybox 0755 0 0
+slink /bin/rmdir /bin/busybox 0755 0 0
+slink /bin/route /bin/busybox 0755 0 0
+slink /bin/rpm /bin/busybox 0755 0 0
+slink /bin/rpm2cpio /bin/busybox 0755 0 0
+slink /bin/run-parts /bin/busybox 0755 0 0
+slink /bin/sed /bin/busybox 0755 0 0
+slink /bin/setkeycodes /bin/busybox 0755 0 0
+slink /bin/sh /bin/busybox 0755 0 0
+slink /bin/sha1sum /bin/busybox 0755 0 0
+slink /bin/sha256sum /bin/busybox 0755 0 0
+slink /bin/sha512sum /bin/busybox 0755 0 0
+slink /bin/sleep /bin/busybox 0755 0 0
+slink /bin/sort /bin/busybox 0755 0 0
+slink /bin/start-stop-daemon /bin/busybox 0755 0 0
+slink /bin/strings /bin/busybox 0755 0 0
+slink /bin/stty /bin/busybox 0755 0 0
+slink /bin/swapoff /bin/busybox 0755 0 0
+slink /bin/swapon /bin/busybox 0755 0 0
+slink /bin/sync /bin/busybox 0755 0 0
+slink /bin/sysctl /bin/busybox 0755 0 0
+slink /bin/syslogd /bin/busybox 0755 0 0
+slink /bin/tac /bin/busybox 0755 0 0
+slink /bin/tail /bin/busybox 0755 0 0
+slink /bin/tar /bin/busybox 0755 0 0
+slink /bin/tee /bin/busybox 0755 0 0
+slink /bin/telnet /bin/busybox 0755 0 0
+slink /bin/test /bin/busybox 0755 0 0
+slink /bin/tftp /bin/busybox 0755 0 0
+slink /bin/time /bin/busybox 0755 0 0
+slink /bin/top /bin/busybox 0755 0 0
+slink /bin/touch /bin/busybox 0755 0 0
+slink /bin/tr /bin/busybox 0755 0 0
+slink /bin/traceroute /bin/busybox 0755 0 0
+slink /bin/traceroute6 /bin/busybox 0755 0 0
+slink /bin/true /bin/busybox 0755 0 0
+slink /bin/tty /bin/busybox 0755 0 0
+slink /bin/udhcpc /bin/busybox 0755 0 0
+slink /bin/udhcpd /bin/busybox 0755 0 0
+slink /bin/umount /bin/busybox 0755 0 0
+slink /bin/uname /bin/busybox 0755 0 0
+slink /bin/uncompress /bin/busybox 0755 0 0
+slink /bin/uniq /bin/busybox 0755 0 0
+slink /bin/unix2dos /bin/busybox 0755 0 0
+slink /bin/unlzma /bin/busybox 0755 0 0
+slink /bin/unxz /bin/busybox 0755 0 0
+slink /bin/unzip /bin/busybox 0755 0 0
+slink /bin/uptime /bin/busybox 0755 0 0
+slink /bin/usleep /bin/busybox 0755 0 0
+slink /bin/uudecode /bin/busybox 0755 0 0
+slink /bin/uuencode /bin/busybox 0755 0 0
+slink /bin/vi /bin/busybox 0755 0 0
+slink /bin/watch /bin/busybox 0755 0 0
+slink /bin/watchdog /bin/busybox 0755 0 0
+slink /bin/wc /bin/busybox 0755 0 0
+slink /bin/wget /bin/busybox 0755 0 0
+slink /bin/which /bin/busybox 0755 0 0
+slink /bin/who /bin/busybox 0755 0 0
+slink /bin/whoami /bin/busybox 0755 0 0
+slink /bin/xargs /bin/busybox 0755 0 0
+slink /bin/xz /bin/busybox 0755 0 0
+slink /bin/xzcat /bin/busybox 0755 0 0
+slink /bin/yes /bin/busybox 0755 0 0
+slink /bin/zcat /bin/busybox 0755 0 0
+dir /usr 0755 0 0
+dir /usr/lib 0755 0 0
+dir /usr/bin 0755 0 0

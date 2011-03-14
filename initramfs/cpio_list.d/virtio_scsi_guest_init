@@ -1,0 +1,1 @@
+file /init initramfs/virtio_scsi_guest_init.sh 0755 0 0

@@ -1,0 +1,1 @@
+file /init initramfs/tcm_host_init.sh 0755 0 0

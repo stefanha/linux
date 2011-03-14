@@ -1,0 +1,10 @@
+#!/bin/bash
+target=$1
+
+cd $(dirname "$0")
+initramfs_dir=$PWD
+cd ".." &>/dev/null
+
+kernelrelease=$(make kernelrelease 2>/dev/null)
+
+sed "s%KERNELRELEASE%$kernelrelease%" "$initramfs_dir/$target.d/"* | usr/gen_init_cpio - | gzip -9
