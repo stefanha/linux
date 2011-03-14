@@ -2714,3 +2714,139 @@ struct iscsi_tiqn *iscsi_snmp_get_tiqn(struct iscsi_conn *conn)
 
 	return tpg->tpg_tiqn;
 }
+
+extern int iscsi_build_sendtargets_response(struct iscsi_cmd *cmd)
+{
+	char *ip, *ip_ex, *payload = NULL;
+	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_np_ex *np_ex;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tiqn *tiqn;
+	struct iscsi_tpg_np *tpg_np;
+	int buffer_len, end_of_buf = 0, len = 0, payload_len = 0;
+	unsigned char buf[256];
+	unsigned char buf_ipv4[IPV4_BUF_SIZE];
+
+	buffer_len = (CONN_OPS(conn)->MaxRecvDataSegmentLength > 32768) ?
+			32768 : CONN_OPS(conn)->MaxRecvDataSegmentLength;
+
+	payload = kzalloc(buffer_len, GFP_KERNEL);
+	if (!(payload)) {
+		printk(KERN_ERR "Unable to allocate memory for sendtargets"
+			" response.\n");
+		return -1;
+	}
+
+	spin_lock(&iscsi_global->tiqn_lock);
+	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+		memset((void *)buf, 0, 256);
+
+		len = sprintf(buf, "TargetName=%s", tiqn->tiqn);
+		len += 1;
+
+		if ((len + payload_len) > buffer_len) {
+			spin_unlock(&tiqn->tiqn_tpg_lock);
+			end_of_buf = 1;
+			goto eob;
+		}
+		memcpy((void *)payload + payload_len, buf, len);
+		payload_len += len;
+
+		spin_lock(&tiqn->tiqn_tpg_lock);
+		list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
+
+			spin_lock(&tpg->tpg_state_lock);
+			if ((tpg->tpg_state == TPG_STATE_FREE) ||
+			    (tpg->tpg_state == TPG_STATE_INACTIVE)) {
+				spin_unlock(&tpg->tpg_state_lock);
+				continue;
+			}
+			spin_unlock(&tpg->tpg_state_lock);
+
+			spin_lock(&tpg->tpg_np_lock);
+			list_for_each_entry(tpg_np, &tpg->tpg_gnp_list,
+					tpg_np_list) {
+				memset((void *)buf, 0, 256);
+
+				if (tpg_np->tpg_np->np_flags & NPF_NET_IPV6)
+					ip = &tpg_np->tpg_np->np_ipv6[0];
+				else {
+					memset(buf_ipv4, 0, IPV4_BUF_SIZE);
+					iscsi_ntoa2(buf_ipv4,
+						tpg_np->tpg_np->np_ipv4);
+					ip = &buf_ipv4[0];
+				}
+
+				len = sprintf(buf, "TargetAddress="
+					"%s%s%s:%hu,%hu",
+					(tpg_np->tpg_np->np_flags &
+						NPF_NET_IPV6) ?
+					"[" : "", ip,
+					(tpg_np->tpg_np->np_flags &
+						NPF_NET_IPV6) ?
+					"]" : "", tpg_np->tpg_np->np_port,
+					tpg->tpgt);
+				len += 1;
+
+				if ((len + payload_len) > buffer_len) {
+					spin_unlock(&tpg->tpg_np_lock);
+					spin_unlock(&tiqn->tiqn_tpg_lock);
+					end_of_buf = 1;
+					goto eob;
+				}
+
+				memcpy((void *)payload + payload_len, buf, len);
+				payload_len += len;
+
+				spin_lock(&tpg_np->tpg_np->np_ex_lock);
+				list_for_each_entry(np_ex,
+						&tpg_np->tpg_np->np_nex_list,
+						np_ex_list) {
+					if (tpg_np->tpg_np->np_flags &
+							NPF_NET_IPV6)
+						ip_ex = &np_ex->np_ex_ipv6[0];
+					else {
+						memset(buf_ipv4, 0,
+							IPV4_BUF_SIZE);
+						iscsi_ntoa2(buf_ipv4,
+							np_ex->np_ex_ipv4);
+						ip_ex = &buf_ipv4[0];
+					}
+					len = sprintf(buf, "TargetAddress="
+							"%s%s%s:%hu,%hu",
+						(tpg_np->tpg_np->np_flags &
+							NPF_NET_IPV6) ?
+						"[" : "", ip_ex,
+						(tpg_np->tpg_np->np_flags &
+							NPF_NET_IPV6) ?
+						"]" : "", np_ex->np_ex_port,
+						tpg->tpgt);
+					len += 1;
+
+					if ((len + payload_len) > buffer_len) {
+						spin_unlock(&tpg_np->tpg_np->np_ex_lock);
+						spin_unlock(&tpg->tpg_np_lock);
+						spin_unlock(&tiqn->tiqn_tpg_lock);
+						end_of_buf = 1;
+						goto eob;
+					}
+
+					memcpy((void *)payload + payload_len,
+							buf, len);
+					payload_len += len;
+				}
+				spin_unlock(&tpg_np->tpg_np->np_ex_lock);
+			}
+			spin_unlock(&tpg->tpg_np_lock);
+		}
+		spin_unlock(&tiqn->tiqn_tpg_lock);
+eob:
+		if (end_of_buf)
+			break;
+	}
+	spin_unlock(&iscsi_global->tiqn_lock);
+
+	cmd->buf_ptr = payload;
+
+	return payload_len;
+}

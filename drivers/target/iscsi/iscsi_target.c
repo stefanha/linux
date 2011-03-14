@@ -45,7 +45,6 @@
 #include "iscsi_thread_queue.h"
 #include "iscsi_target_configfs.h"
 #include "iscsi_target_datain_values.h"
-#include "iscsi_target_discovery.h"
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_erl2.h"

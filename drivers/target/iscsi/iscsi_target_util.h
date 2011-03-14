@@ -114,6 +114,7 @@ extern int rx_data(struct iscsi_conn *, struct iovec *, int, int);
 extern int tx_data(struct iscsi_conn *, struct iovec *, int, int);
 extern void iscsi_collect_login_stats(struct iscsi_conn *, u8, u8);
 extern struct iscsi_tiqn *iscsi_snmp_get_tiqn(struct iscsi_conn *);
+extern int iscsi_build_sendtargets_response(struct iscsi_cmd *);
 
 extern struct target_fabric_configfs *lio_target_fabric_configfs;
 extern struct iscsi_global *iscsi_global;
