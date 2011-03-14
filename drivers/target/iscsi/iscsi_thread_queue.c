@@ -283,7 +283,7 @@ static void iscsi_get_thread_set_timeout(unsigned long data)
  *	Parameters:	iSCSI Connection Pointer.
  *	Returns:	iSCSI Thread Set Pointer
  */
-struct se_thread_set *iscsi_get_thread_set(int role)
+struct se_thread_set *iscsi_get_thread_set(void)
 {
 	int allocate_ts = 0;
 	struct semaphore sem;
@@ -372,7 +372,7 @@ void iscsi_set_thread_set_signal(struct iscsi_conn *conn, u8 signal_sent)
  *	Parameters:	iSCSI Connection Pointer.
  *	Returns:	0 on success, -1 on error.
  */
-int iscsi_release_thread_set(struct iscsi_conn *conn, int role)
+int iscsi_release_thread_set(struct iscsi_conn *conn)
 {
 	int thread_called = 0;
 	struct se_thread_set *ts = NULL;
@@ -494,7 +494,7 @@ static int iscsi_signal_thread_pre_handler(struct se_thread_set *ts)
  *
  *
  */
-struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *ts, int role)
+struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *ts)
 {
 	int ret;
 
@@ -552,7 +552,7 @@ sleep:
  *
  *
  */
-struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *ts, int role)
+struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *ts)
 {
 	int ret;
 

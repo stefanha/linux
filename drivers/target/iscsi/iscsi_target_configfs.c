@@ -1016,8 +1016,7 @@ static ssize_t iscsi_tpg_param_store_##name(				\
 	if (iscsi_get_tpg(tpg) < 0)					\
 		return -EINVAL;						\
 									\
-	ret = iscsi_change_param_value(buf, SENDER_TARGET,		\
-				tpg->param_list, 1);			\
+	ret = iscsi_change_param_value(buf, tpg->param_list, 1);	\
 	if (ret < 0)							\
 		goto out;						\
 									\

@@ -1239,12 +1239,12 @@ static void iscsi_handle_dataout_timeout(unsigned long data)
 	iscsi_inc_conn_usage_count(conn);
 
 	spin_lock_bh(&cmd->dataout_timeout_lock);
-	if (cmd->dataout_timer_flags & DATAOUT_TF_STOP) {
+	if (cmd->dataout_timer_flags & ISCSI_TF_STOP) {
 		spin_unlock_bh(&cmd->dataout_timeout_lock);
 		iscsi_dec_conn_usage_count(conn);
 		return;
 	}
-	cmd->dataout_timer_flags &= ~DATAOUT_TF_RUNNING;
+	cmd->dataout_timer_flags &= ~ISCSI_TF_RUNNING;
 	sess = SESS(conn);
 	na = iscsi_tpg_get_node_attrib(sess);
 
@@ -1321,7 +1321,7 @@ void iscsi_mod_dataout_timer(struct iscsi_cmd *cmd)
 	struct iscsi_node_attrib *na = na = iscsi_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&cmd->dataout_timeout_lock);
-	if (!(cmd->dataout_timer_flags & DATAOUT_TF_RUNNING)) {
+	if (!(cmd->dataout_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&cmd->dataout_timeout_lock);
 		return;
 	}
@@ -1343,7 +1343,7 @@ void iscsi_start_dataout_timer(
 	struct iscsi_session *sess = SESS(conn);
 	struct iscsi_node_attrib *na = na = iscsi_tpg_get_node_attrib(sess);
 
-	if (cmd->dataout_timer_flags & DATAOUT_TF_RUNNING)
+	if (cmd->dataout_timer_flags & ISCSI_TF_RUNNING)
 		return;
 
 	TRACE(TRACE_TIMER, "Starting DataOUT timer for ITT: 0x%08x on"
@@ -1352,8 +1352,8 @@ void iscsi_start_dataout_timer(
 	init_timer(&cmd->dataout_timer);
 	SETUP_TIMER(cmd->dataout_timer, na->dataout_timeout, cmd,
 			iscsi_handle_dataout_timeout);
-	cmd->dataout_timer_flags &= ~DATAOUT_TF_STOP;
-	cmd->dataout_timer_flags |= DATAOUT_TF_RUNNING;
+	cmd->dataout_timer_flags &= ~ISCSI_TF_STOP;
+	cmd->dataout_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&cmd->dataout_timer);
 }
 
@@ -1364,17 +1364,17 @@ void iscsi_start_dataout_timer(
 void iscsi_stop_dataout_timer(struct iscsi_cmd *cmd)
 {
 	spin_lock_bh(&cmd->dataout_timeout_lock);
-	if (!(cmd->dataout_timer_flags & DATAOUT_TF_RUNNING)) {
+	if (!(cmd->dataout_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&cmd->dataout_timeout_lock);
 		return;
 	}
-	cmd->dataout_timer_flags |= DATAOUT_TF_STOP;
+	cmd->dataout_timer_flags |= ISCSI_TF_STOP;
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
 
 	del_timer_sync(&cmd->dataout_timer);
 
 	spin_lock_bh(&cmd->dataout_timeout_lock);
-	cmd->dataout_timer_flags &= ~DATAOUT_TF_RUNNING;
+	cmd->dataout_timer_flags &= ~ISCSI_TF_RUNNING;
 	TRACE(TRACE_TIMER, "Stopped DataOUT Timer for ITT: 0x%08x\n",
 			cmd->init_task_tag);
 	spin_unlock_bh(&cmd->dataout_timeout_lock);

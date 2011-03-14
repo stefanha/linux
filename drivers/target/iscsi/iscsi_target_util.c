@@ -1721,12 +1721,12 @@ static void iscsi_handle_netif_timeout(unsigned long data)
 	iscsi_inc_conn_usage_count(conn);
 
 	spin_lock_bh(&conn->netif_lock);
-	if (conn->netif_timer_flags & NETIF_TF_STOP) {
+	if (conn->netif_timer_flags & ISCSI_TF_STOP) {
 		spin_unlock_bh(&conn->netif_lock);
 		iscsi_dec_conn_usage_count(conn);
 		return;
 	}
-	conn->netif_timer_flags &= ~NETIF_TF_RUNNING;
+	conn->netif_timer_flags &= ~ISCSI_TF_RUNNING;
 
 	if (iscsi_check_for_active_network_device((void *)conn)) {
 		iscsi_start_netif_timer(conn);
@@ -1776,14 +1776,14 @@ void iscsi_start_netif_timer(struct iscsi_conn *conn)
 	if (!conn->net_if)
 		return;
 
-	if (conn->netif_timer_flags & NETIF_TF_RUNNING)
+	if (conn->netif_timer_flags & ISCSI_TF_RUNNING)
 		return;
 
 	init_timer(&conn->transport_timer);
 	SETUP_TIMER(conn->transport_timer, ISCSI_TPG_ATTRIB(tpg)->netif_timeout,
 		conn, iscsi_handle_netif_timeout);
-	conn->netif_timer_flags &= ~NETIF_TF_STOP;
-	conn->netif_timer_flags |= NETIF_TF_RUNNING;
+	conn->netif_timer_flags &= ~ISCSI_TF_STOP;
+	conn->netif_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->transport_timer);
 }
 
@@ -1794,17 +1794,17 @@ void iscsi_start_netif_timer(struct iscsi_conn *conn)
 void iscsi_stop_netif_timer(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->netif_lock);
-	if (!(conn->netif_timer_flags & NETIF_TF_RUNNING)) {
+	if (!(conn->netif_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&conn->netif_lock);
 		return;
 	}
-	conn->netif_timer_flags |= NETIF_TF_STOP;
+	conn->netif_timer_flags |= ISCSI_TF_STOP;
 	spin_unlock_bh(&conn->netif_lock);
 
 	del_timer_sync(&conn->transport_timer);
 
 	spin_lock_bh(&conn->netif_lock);
-	conn->netif_timer_flags &= ~NETIF_TF_RUNNING;
+	conn->netif_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&conn->netif_lock);
 }
 
@@ -1819,7 +1819,7 @@ static void iscsi_handle_nopin_response_timeout(unsigned long data)
 	iscsi_inc_conn_usage_count(conn);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
-	if (conn->nopin_response_timer_flags & NOPIN_RESPONSE_TF_STOP) {
+	if (conn->nopin_response_timer_flags & ISCSI_TF_STOP) {
 		spin_unlock_bh(&conn->nopin_timer_lock);
 		iscsi_dec_conn_usage_count(conn);
 		return;
@@ -1828,7 +1828,7 @@ static void iscsi_handle_nopin_response_timeout(unsigned long data)
 	TRACE(TRACE_TIMER, "Did not receive response to NOPIN on CID: %hu on"
 		" SID: %u, failing connection.\n", conn->cid,
 			SESS(conn)->sid);
-	conn->nopin_response_timer_flags &= ~NOPIN_RESPONSE_TF_RUNNING;
+	conn->nopin_response_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 
 	{
@@ -1861,7 +1861,7 @@ void iscsi_mod_nopin_response_timer(struct iscsi_conn *conn)
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
-	if (!(conn->nopin_response_timer_flags & NOPIN_RESPONSE_TF_RUNNING)) {
+	if (!(conn->nopin_response_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&conn->nopin_timer_lock);
 		return;
 	}
@@ -1880,7 +1880,7 @@ void iscsi_start_nopin_response_timer(struct iscsi_conn *conn)
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
-	if (conn->nopin_response_timer_flags & NOPIN_RESPONSE_TF_RUNNING) {
+	if (conn->nopin_response_timer_flags & ISCSI_TF_RUNNING) {
 		spin_unlock_bh(&conn->nopin_timer_lock);
 		return;
 	}
@@ -1888,8 +1888,8 @@ void iscsi_start_nopin_response_timer(struct iscsi_conn *conn)
 	init_timer(&conn->nopin_response_timer);
 	SETUP_TIMER(conn->nopin_response_timer, na->nopin_response_timeout,
 		conn, iscsi_handle_nopin_response_timeout);
-	conn->nopin_response_timer_flags &= ~NOPIN_RESPONSE_TF_STOP;
-	conn->nopin_response_timer_flags |= NOPIN_RESPONSE_TF_RUNNING;
+	conn->nopin_response_timer_flags &= ~ISCSI_TF_STOP;
+	conn->nopin_response_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_response_timer);
 
 	TRACE(TRACE_TIMER, "Started NOPIN Response Timer on CID: %d to %u"
@@ -1904,17 +1904,17 @@ void iscsi_start_nopin_response_timer(struct iscsi_conn *conn)
 void iscsi_stop_nopin_response_timer(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->nopin_timer_lock);
-	if (!(conn->nopin_response_timer_flags & NOPIN_RESPONSE_TF_RUNNING)) {
+	if (!(conn->nopin_response_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&conn->nopin_timer_lock);
 		return;
 	}
-	conn->nopin_response_timer_flags |= NOPIN_RESPONSE_TF_STOP;
+	conn->nopin_response_timer_flags |= ISCSI_TF_STOP;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 
 	del_timer_sync(&conn->nopin_response_timer);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
-	conn->nopin_response_timer_flags &= ~NOPIN_RESPONSE_TF_RUNNING;
+	conn->nopin_response_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 }
 
@@ -1929,12 +1929,12 @@ static void iscsi_handle_nopin_timeout(unsigned long data)
 	iscsi_inc_conn_usage_count(conn);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
-	if (conn->nopin_timer_flags & NOPIN_TF_STOP) {
+	if (conn->nopin_timer_flags & ISCSI_TF_STOP) {
 		spin_unlock_bh(&conn->nopin_timer_lock);
 		iscsi_dec_conn_usage_count(conn);
 		return;
 	}
-	conn->nopin_timer_flags &= ~NOPIN_TF_RUNNING;
+	conn->nopin_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 
 	iscsi_add_nopin(conn, 1);
@@ -1954,14 +1954,14 @@ void __iscsi_start_nopin_timer(struct iscsi_conn *conn)
 	if (!(na->nopin_timeout))
 		return;
 
-	if (conn->nopin_timer_flags & NOPIN_TF_RUNNING)
+	if (conn->nopin_timer_flags & ISCSI_TF_RUNNING)
 		return;
 
 	init_timer(&conn->nopin_timer);
 	SETUP_TIMER(conn->nopin_timer, na->nopin_timeout, conn,
 		iscsi_handle_nopin_timeout);
-	conn->nopin_timer_flags &= ~NOPIN_TF_STOP;
-	conn->nopin_timer_flags |= NOPIN_TF_RUNNING;
+	conn->nopin_timer_flags &= ~ISCSI_TF_STOP;
+	conn->nopin_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_timer);
 
 	TRACE(TRACE_TIMER, "Started NOPIN Timer on CID: %d at %u second"
@@ -1983,7 +1983,7 @@ void iscsi_start_nopin_timer(struct iscsi_conn *conn)
 		return;
 
 	spin_lock_bh(&conn->nopin_timer_lock);
-	if (conn->nopin_timer_flags & NOPIN_TF_RUNNING) {
+	if (conn->nopin_timer_flags & ISCSI_TF_RUNNING) {
 		spin_unlock_bh(&conn->nopin_timer_lock);
 		return;
 	}
@@ -1991,8 +1991,8 @@ void iscsi_start_nopin_timer(struct iscsi_conn *conn)
 	init_timer(&conn->nopin_timer);
 	SETUP_TIMER(conn->nopin_timer, na->nopin_timeout, conn,
 			iscsi_handle_nopin_timeout);
-	conn->nopin_timer_flags &= ~NOPIN_TF_STOP;
-	conn->nopin_timer_flags |= NOPIN_TF_RUNNING;
+	conn->nopin_timer_flags &= ~ISCSI_TF_STOP;
+	conn->nopin_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_timer);
 
 	TRACE(TRACE_TIMER, "Started NOPIN Timer on CID: %d at %u second"
@@ -2007,17 +2007,17 @@ void iscsi_start_nopin_timer(struct iscsi_conn *conn)
 void iscsi_stop_nopin_timer(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->nopin_timer_lock);
-	if (!(conn->nopin_timer_flags & NOPIN_TF_RUNNING)) {
+	if (!(conn->nopin_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&conn->nopin_timer_lock);
 		return;
 	}
-	conn->nopin_timer_flags |= NOPIN_TF_STOP;
+	conn->nopin_timer_flags |= ISCSI_TF_STOP;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 
 	del_timer_sync(&conn->nopin_timer);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
-	conn->nopin_timer_flags &= ~NOPIN_TF_RUNNING;
+	conn->nopin_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 }
 

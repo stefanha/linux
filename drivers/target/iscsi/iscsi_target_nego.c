@@ -377,8 +377,7 @@ static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_log
 			conn,
 			login->rsp,
 			login->rsp_buf,
-			login->rsp_length + padding,
-			TARGET) < 0)
+			login->rsp_length + padding) < 0)
 		return -1;
 
 	login->rsp_length		= 0;
@@ -402,7 +401,7 @@ static int iscsi_target_do_rx_login_io(struct iscsi_conn *conn, struct iscsi_log
 	u32 padding = 0, payload_length;
 	struct iscsi_login_req *login_req;
 
-	if (iscsi_login_rx_data(conn, login->req, ISCSI_HDR_LEN, TARGET) < 0)
+	if (iscsi_login_rx_data(conn, login->req, ISCSI_HDR_LEN) < 0)
 		return -1;
 
 	login_req = (struct iscsi_login_req *) login->req;
@@ -427,8 +426,7 @@ static int iscsi_target_do_rx_login_io(struct iscsi_conn *conn, struct iscsi_log
 	if (iscsi_login_rx_data(
 			conn,
 			login->req_buf,
-			payload_length + padding,
-			TARGET) < 0)
+			payload_length + padding) < 0)
 		return -1;
 
 	return 0;
@@ -472,8 +470,7 @@ static int iscsi_target_get_initial_payload(
 	if (iscsi_login_rx_data(
 			conn,
 			login->req_buf,
-			payload_length + padding,
-			TARGET) < 0)
+			payload_length + padding) < 0)
 		return -1;
 
 	return 0;

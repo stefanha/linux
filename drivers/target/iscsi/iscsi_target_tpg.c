@@ -134,7 +134,7 @@ int lio_tpg_shutdown_session(struct se_session *se_sess)
 	spin_lock(&sess->conn_lock);
 	if (atomic_read(&sess->session_fall_back_to_erl0) ||
 	    atomic_read(&sess->session_logout) ||
-	    (sess->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+	    (sess->time2retain_timer_flags & ISCSI_TF_EXPIRED)) {
 		spin_unlock(&sess->conn_lock);
 		return 0;
 	}

@@ -181,7 +181,7 @@ ISCSI_STAT_INSTANCE_ATTR_RO(description);
 static ssize_t iscsi_stat_instance_show_attr_vendor(
 	struct iscsi_wwn_stat_grps *igrps, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "%s\n", ISCSI_VENDOR);
+	return snprintf(page, PAGE_SIZE, "Linux-iSCSI.org\n");
 }
 ISCSI_STAT_INSTANCE_ATTR_RO(vendor);
 

@@ -136,9 +136,9 @@ struct iscsi_tiqn *core_add_tiqn(unsigned char *buf, int *ret)
 {
 	struct iscsi_tiqn *tiqn = NULL;
 
-	if (strlen(buf) > ISCSI_TIQN_LEN) {
+	if (strlen(buf) > ISCSI_IQN_LEN) {
 		printk(KERN_ERR "Target IQN exceeds %d bytes\n",
-				ISCSI_TIQN_LEN);
+				ISCSI_IQN_LEN);
 		*ret = -1;
 		return NULL;
 	}
@@ -833,7 +833,6 @@ static int init_iscsi_global(struct iscsi_global *global)
 	spin_lock_init(&global->inactive_ts_lock);
 	spin_lock_init(&global->login_thread_lock);
 	spin_lock_init(&global->np_lock);
-	spin_lock_init(&global->shutdown_lock);
 	spin_lock_init(&global->tiqn_lock);
 	spin_lock_init(&global->ts_bitmap_lock);
 	spin_lock_init(&global->g_tpg_lock);
@@ -871,9 +870,9 @@ static int iscsi_target_detect(void)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "%s iSCSI Target Core Stack "ISCSI_VERSION" on"
-		" %s/%s on "UTS_RELEASE"\n", ISCSI_VENDOR,
-		utsname()->sysname, utsname()->machine);
+	printk(KERN_INFO "RTS Linux-iSCSI fabric module "ISCSI_VERSION" on"
+		" %s/%s on "UTS_RELEASE"\n", utsname()->sysname,
+		utsname()->machine);
 	/*
 	 * Clear out the struct kmem_cache pointers
 	 */
@@ -1014,31 +1013,13 @@ out:
 	return -1;
 }
 
-int iscsi_target_release_phase1(int rmmod)
+static int iscsi_target_release(void)
 {
-	spin_lock(&iscsi_global->shutdown_lock);
-	if (!rmmod) {
-		if (iscsi_global->in_shutdown) {
-			printk(KERN_ERR "Module already in shutdown, aborting\n");
-			spin_unlock(&iscsi_global->shutdown_lock);
-			return -1;
-		}
+	int ret = 0;
 
-		if (iscsi_global->in_rmmod) {
-			printk(KERN_ERR "Module already in rmmod, aborting\n");
-			spin_unlock(&iscsi_global->shutdown_lock);
-			return -1;
-		}
-	} else
-		iscsi_global->in_rmmod = 1;
-	iscsi_global->in_shutdown = 1;
-	spin_unlock(&iscsi_global->shutdown_lock);
+	if (!iscsi_global)
+		return ret;
 
-	return 0;
-}
-
-void iscsi_target_release_phase2(void)
-{
 	core_reset_nps();
 	iscsi_disable_all_tpgs();
 	iscsi_deallocate_thread_sets();
@@ -1056,26 +1037,9 @@ void iscsi_target_release_phase2(void)
 	kmem_cache_destroy(lio_r2t_cache);
 	kmem_cache_destroy(lio_tpg_cache);
 
-	iscsi_global->ti_forcechanoffline = NULL;
 	iscsi_target_deregister_configfs();
-}
-
-/*	iscsi_target_release():
- *
- *
- */
-static int iscsi_target_release(void)
-{
-	int ret = 0;
-
-	if (!iscsi_global)
-		return ret;
-
-	iscsi_target_release_phase1(1);
-	iscsi_target_release_phase2();
 
 	kfree(iscsi_global);
-
 	printk(KERN_INFO "Unloading Complete.\n");
 
 	return ret;
@@ -4848,7 +4812,7 @@ int iscsi_target_tx_thread(void *arg)
 	}
 
 restart:
-	conn = iscsi_tx_thread_pre_handler(ts, TARGET);
+	conn = iscsi_tx_thread_pre_handler(ts);
 	if (!(conn))
 		goto out;
 
@@ -5196,7 +5160,7 @@ int iscsi_target_rx_thread(void *arg)
 	}
 
 restart:
-	conn = iscsi_rx_thread_pre_handler(ts, TARGET);
+	conn = iscsi_rx_thread_pre_handler(ts);
 	if (!(conn))
 		goto out;
 
@@ -5429,7 +5393,7 @@ int iscsi_close_connection(
 	 */
 	up(&conn->conn_logout_sem);
 
-	iscsi_release_thread_set(conn, TARGET);
+	iscsi_release_thread_set(conn);
 
 	iscsi_stop_timers_for_cmds(conn);
 	iscsi_stop_nopin_response_timer(conn);
@@ -5961,7 +5925,7 @@ int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
 		spin_lock(&sess->conn_lock);
 		if (atomic_read(&sess->session_fall_back_to_erl0) ||
 		    atomic_read(&sess->session_logout) ||
-		    (sess->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+		    (sess->time2retain_timer_flags & ISCSI_TF_EXPIRED)) {
 			spin_unlock(&sess->conn_lock);
 			continue;
 		}

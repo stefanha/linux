@@ -165,7 +165,7 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 		spin_lock(&sess_p->conn_lock);
 		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
 		    atomic_read(&sess_p->session_logout) ||
-		    (sess_p->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+		    (sess_p->time2retain_timer_flags & ISCSI_TF_EXPIRED)) {
 			spin_unlock(&sess_p->conn_lock);
 			continue;
 		}
@@ -319,7 +319,7 @@ static int iscsi_login_zero_tsih_s2 (
 		return -1;
 	}
 
-	iscsi_set_keys_to_negotiate(TARGET, 0, conn->param_list);
+	iscsi_set_keys_to_negotiate(0, conn->param_list);
 
 	if (SESS_OPS(sess)->SessionType)
 		return iscsi_set_keys_irrelevant_for_discovery(
@@ -336,7 +336,7 @@ static int iscsi_login_zero_tsih_s2 (
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
-	if (iscsi_change_param_value(buf, TARGET, conn->param_list, 0) < 0) {
+	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
@@ -349,7 +349,7 @@ static int iscsi_login_zero_tsih_s2 (
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "ErrorRecoveryLevel=%d", na->default_erl);
-	if (iscsi_change_param_value(buf, TARGET, conn->param_list, 0) < 0) {
+	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
@@ -445,7 +445,7 @@ static int iscsi_login_non_zero_tsih_s2(
 		sess_p = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
 		    atomic_read(&sess_p->session_logout) ||
-		   (sess_p->time2retain_timer_flags & T2R_TF_EXPIRED))
+		   (sess_p->time2retain_timer_flags & ISCSI_TF_EXPIRED))
 			continue;
 		if (!(memcmp((const void *)sess_p->isid,
 		     (const void *)pdu->isid, 6)) &&
@@ -487,8 +487,7 @@ static int iscsi_login_non_zero_tsih_s2(
 		return -1;
 	}
 
-	iscsi_set_keys_to_negotiate(TARGET, 0, conn->param_list);
-
+	iscsi_set_keys_to_negotiate(0, conn->param_list);
 	/*
 	 * Need to send TargetPortalGroupTag back in first login response
 	 * on any iSCSI connection where the Initiator provides TargetName.
@@ -498,7 +497,7 @@ static int iscsi_login_non_zero_tsih_s2(
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
-	if (iscsi_change_param_value(buf, TARGET, conn->param_list, 0) < 0) {
+	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
@@ -642,7 +641,7 @@ static int iscsi_post_login_handler(
 	/*
 	 * SCSI Initiator -> SCSI Target Port Mapping
 	 */
-	ts = iscsi_get_thread_set(TARGET);
+	ts = iscsi_get_thread_set();
 	if (!zero_tsih) {
 		iscsi_set_session_parameters(sess->sess_ops,
 				conn->param_list, 0);
@@ -757,7 +756,7 @@ static void iscsi_handle_login_thread_timeout(unsigned long data)
 	printk(KERN_ERR "iSCSI Login timeout on Network Portal %s:%hu\n",
 			buf_ipv4, np->np_port);
 
-	if (np->np_login_timer_flags & TPG_NP_TF_STOP) {
+	if (np->np_login_timer_flags & ISCSI_TF_STOP) {
 		spin_unlock_bh(&np->np_thread_lock);
 		return;
 	}
@@ -765,7 +764,7 @@ static void iscsi_handle_login_thread_timeout(unsigned long data)
 	if (np->np_thread)
 		send_sig(SIGKILL, np->np_thread, 1);
 
-	np->np_login_timer_flags &= ~TPG_NP_TF_RUNNING;
+	np->np_login_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&np->np_thread_lock);
 }
 
@@ -783,8 +782,8 @@ static void iscsi_start_login_thread_timer(struct iscsi_np *np)
 	init_timer(&np->np_login_timer);
 	SETUP_TIMER(np->np_login_timer, TA_LOGIN_TIMEOUT, np,
 			iscsi_handle_login_thread_timeout);
-	np->np_login_timer_flags &= ~TPG_NP_TF_STOP;
-	np->np_login_timer_flags |= TPG_NP_TF_RUNNING;
+	np->np_login_timer_flags &= ~ISCSI_TF_STOP;
+	np->np_login_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&np->np_login_timer);
 
 	TRACE(TRACE_LOGIN, "Added timeout timer to iSCSI login request for"
@@ -799,17 +798,17 @@ static void iscsi_start_login_thread_timer(struct iscsi_np *np)
 static void iscsi_stop_login_thread_timer(struct iscsi_np *np)
 {
 	spin_lock_bh(&np->np_thread_lock);
-	if (!(np->np_login_timer_flags & TPG_NP_TF_RUNNING)) {
+	if (!(np->np_login_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&np->np_thread_lock);
 		return;
 	}
-	np->np_login_timer_flags |= TPG_NP_TF_STOP;
+	np->np_login_timer_flags |= ISCSI_TF_STOP;
 	spin_unlock_bh(&np->np_thread_lock);
 
 	del_timer_sync(&np->np_login_timer);
 
 	spin_lock_bh(&np->np_thread_lock);
-	np->np_login_timer_flags &= ~TPG_NP_TF_RUNNING;
+	np->np_login_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&np->np_thread_lock);
 }
 

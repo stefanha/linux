@@ -9,12 +9,12 @@ extern void iscsi_add_ts_to_inactive_list(struct se_thread_set *);
 extern int iscsi_allocate_thread_sets(u32);
 extern void iscsi_deallocate_thread_sets(void);
 extern void iscsi_activate_thread_set(struct iscsi_conn *, struct se_thread_set *);
-extern struct se_thread_set *iscsi_get_thread_set(int);
+extern struct se_thread_set *iscsi_get_thread_set(void);
 extern void iscsi_set_thread_clear(struct iscsi_conn *, u8);
 extern void iscsi_set_thread_set_signal(struct iscsi_conn *, u8);
-extern int iscsi_release_thread_set(struct iscsi_conn *, int);
-extern struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *, int);
-extern struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *, int);
+extern int iscsi_release_thread_set(struct iscsi_conn *);
+extern struct iscsi_conn *iscsi_rx_thread_pre_handler(struct se_thread_set *);
+extern struct iscsi_conn *iscsi_tx_thread_pre_handler(struct se_thread_set *);
 extern int iscsi_thread_set_init(void);
 extern void iscsi_thread_set_free(void);
 
