@@ -663,7 +663,6 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 				" struct iscsi_tpg_np.\n");
 		return ERR_PTR(-ENOMEM);
 	}
-	tpg_np->tpg_np_index	= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_child_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_parent_list);

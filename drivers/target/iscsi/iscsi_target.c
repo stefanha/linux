@@ -77,7 +77,7 @@ struct iscsi_tiqn *core_get_tiqn_for_login(unsigned char *buf)
 
 			spin_lock(&tiqn->tiqn_state_lock);
 			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
-				atomic_inc(&tiqn->tiqn_access_count);
+				tiqn->tiqn_access_count++;
 				spin_unlock(&tiqn->tiqn_state_lock);
 				spin_unlock(&iscsi_global->tiqn_lock);
 				return tiqn;
@@ -106,7 +106,7 @@ static int core_set_tiqn_shutdown(struct iscsi_tiqn *tiqn)
 void core_put_tiqn_for_login(struct iscsi_tiqn *tiqn)
 {
 	spin_lock(&tiqn->tiqn_state_lock);
-	atomic_dec(&tiqn->tiqn_access_count);
+	tiqn->tiqn_access_count--;
 	spin_unlock(&tiqn->tiqn_state_lock);
 }
 
@@ -185,7 +185,7 @@ static void core_wait_for_tiqn(struct iscsi_tiqn *tiqn)
 	 * Wait for accesses to said struct iscsi_tiqn to end.
 	 */
 	spin_lock(&tiqn->tiqn_state_lock);
-	while (atomic_read(&tiqn->tiqn_access_count)) {
+	while (tiqn->tiqn_access_count != 0) {
 		spin_unlock(&tiqn->tiqn_state_lock);
 		msleep(10);
 		spin_lock(&tiqn->tiqn_state_lock);
@@ -593,7 +593,6 @@ struct iscsi_np *core_add_np(
 	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
 	np->np_net_size		= net_size;
-	np->np_index		= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
 	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
@@ -823,9 +822,7 @@ static int __init iscsi_target_init_module(void)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "RTS Linux-iSCSI fabric module "ISCSI_VERSION" on"
-		" %s/%s on "UTS_RELEASE"\n", utsname()->sysname,
-		utsname()->machine);
+	printk(KERN_INFO "RisingTide Linux-iSCSI target "ISCSI_VERSION"\n");
 
 	iscsi_global = kzalloc(sizeof(struct iscsi_global), GFP_KERNEL);
 	if (!iscsi_global) {
@@ -4634,7 +4631,7 @@ restart:
 
 get_immediate:
 		qr = iscsi_get_cmd_from_immediate_queue(conn);
-		if ((qr)) {
+		if (qr) {
 			atomic_set(&conn->check_immediate_queue, 0);
 			cmd = qr->cmd;
 			state = qr->state;
@@ -4726,7 +4723,7 @@ get_immediate:
 
 get_response:
 		qr = iscsi_get_cmd_from_response_queue(conn);
-		if ((qr)) {
+		if (qr) {
 			cmd = qr->cmd;
 			state = qr->state;
 			kmem_cache_free(lio_qr_cache, qr);

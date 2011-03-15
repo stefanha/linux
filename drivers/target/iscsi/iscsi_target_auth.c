@@ -27,7 +27,7 @@
 
 #include "iscsi_target_core.h"
 #include "iscsi_target_nego.h"
-#include "iscsi_auth_chap.h"
+#include "iscsi_target_auth.h"
 
 #ifdef DEBUG_CHAP
 #define PRINT(x...)		printk(KERN_INFO x)

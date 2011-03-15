@@ -33,7 +33,7 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
-#include "iscsi_auth_chap.h"
+#include "iscsi_target_auth.h"
 
 #define MAX_LOGIN_PDUS  7
 #define TEXT_LEN	4096

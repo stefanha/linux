@@ -1,7 +1,7 @@
-iscsi_target_mod-y +=		iscsi_auth_chap.o \
-				iscsi_parameters.o \
+iscsi_target_mod-y +=		iscsi_parameters.o \
 				iscsi_seq_and_pdu_list.o \
 				iscsi_thread_queue.o \
+				iscsi_target_auth.o \
 				iscsi_target_datain_values.o \
 				iscsi_target_device.o \
 				iscsi_target_erl0.o \

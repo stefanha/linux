@@ -84,7 +84,7 @@ static ssize_t lio_target_np_show_sctp(
 	ssize_t rb;
 
 	tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP);
-	if ((tpg_np_sctp))
+	if (tpg_np_sctp)
 		rb = sprintf(page, "1\n");
 	else
 		rb = sprintf(page, "0\n");
@@ -108,7 +108,7 @@ static ssize_t lio_target_np_store_sctp(
 	int ret;
 
 	op = simple_strtoul(page, &endptr, 0);
-	 if ((op != 1) && (op != 0)) {
+	if ((op != 1) && (op != 0)) {
 		printk(KERN_ERR "Illegal value for tpg_enable: %u\n", op);
 		return -EINVAL;
 	}
@@ -178,7 +178,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	struct iscsi_np_addr np_addr;
 	u32 ipv4 = 0;
 	int ret;
-	char buf[MAX_PORTAL_LEN];
+	char buf[MAX_PORTAL_LEN + 1];
 
 	if (strlen(name) > MAX_PORTAL_LEN) {
 		printk(KERN_ERR "strlen(name): %d exceeds MAX_PORTAL_LEN: %d\n",
@@ -191,7 +191,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
 
 	str = strstr(buf, "[");
-	if ((str)) {
+	if (str) {
 		str2 = strstr(str, "]");
 		if (!str2) {
 			printk(KERN_ERR "Unable to locate trailing \"]\""
@@ -200,7 +200,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		}
 		str++; /* Skip over leading "[" */
 		*str2 = '\0'; /* Terminate the IPv6 address */
-		str2 += 1; /* Skip over the "]" */
+		str2++; /* Skip over the "]" */
 		port_str = strstr(str2, ":");
 		if (!port_str) {
 			printk(KERN_ERR "Unable to locate \":port\""
@@ -208,7 +208,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 			return ERR_PTR(-EINVAL);
 		}
 		*port_str = '\0'; /* Terminate string for IP */
-		port_str += 1; /* Skip over ":" */
+		port_str++; /* Skip over ":" */
 		np_addr.np_port = simple_strtoul(port_str, &end_ptr, 0);
 
 		snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE, "%s", str);
@@ -222,7 +222,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 			return ERR_PTR(-EINVAL);
 		}
 		*port_str = '\0'; /* Terminate string for IP */
-		port_str += 1; /* Skip over ":" */
+		port_str++; /* Skip over ":" */
 		np_addr.np_port = simple_strtoul(port_str, &end_ptr, 0);
 
 		ipv4 = in_aton(ip_str);
@@ -268,7 +268,7 @@ static void lio_target_call_delnpfromtpg(
 	struct iscsi_portal_group *tpg;
 	struct iscsi_tpg_np *tpg_np;
 	struct se_portal_group *se_tpg;
-	int ret = 0;
+	int ret;
 
 	tpg_np = container_of(se_tpg_np, struct iscsi_tpg_np, se_tpg_np);
 	tpg = tpg_np->tpg;
@@ -598,10 +598,10 @@ static ssize_t lio_target_nacl_show_info(
 
 	spin_lock_bh(&se_nacl->nacl_sess_lock);
 	se_sess = se_nacl->nacl_sess;
-	if (!se_sess)
+	if (!se_sess) {
 		rb += sprintf(page+rb, "No active iSCSI Session for Initiator"
 			" Endpoint: %s\n", se_nacl->initiatorname);
-	else {
+	} else {
 		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
 		if (SESS_OPS(sess)->InitiatorName)
@@ -695,9 +695,9 @@ static ssize_t lio_target_nacl_show_info(
 				break;
 			}
 
-			if (conn->net_size == IPV6_ADDRESS_SPACE)
+			if (conn->net_size == IPV6_ADDRESS_SPACE) {
 				ip = &conn->ipv6_login_ip[0];
-			else {
+			} else {
 				iscsi_ntoa2(buf_ipv4, conn->login_ip);
 				ip = &buf_ipv4[0];
 			}
@@ -734,7 +734,7 @@ static ssize_t lio_target_nacl_store_cmdsn_depth(
 	struct config_item *acl_ci, *tpg_ci, *wwn_ci;
 	char *endptr;
 	u32 cmdsn_depth = 0;
-	int ret = 0;
+	int ret;
 
 	cmdsn_depth = simple_strtoul(page, &endptr, 0);
 	if (cmdsn_depth > TA_DEFAULT_CMDSN_DEPTH_MAX) {
@@ -1112,7 +1112,7 @@ static ssize_t lio_target_tpg_show_enable(
 {
 	struct iscsi_portal_group *tpg = container_of(se_tpg,
 			struct iscsi_portal_group, tpg_se_tpg);
-	ssize_t len = 0;
+	ssize_t len;
 
 	spin_lock(&tpg->tpg_state_lock);
 	len = sprintf(page, "%d\n",
@@ -1246,9 +1246,7 @@ static ssize_t lio_target_wwn_show_attr_lio_version(
 	struct target_fabric_configfs *tf,
 	char *page)
 {
-	return sprintf(page, "Linux-iSCSI.org Target "ISCSI_VERSION""
-		" on %s/%s on "UTS_RELEASE"\n", utsname()->sysname,
-		utsname()->machine);
+	return sprintf(page, "RisingTide Systems Linux-iSCSI Target "ISCSI_VERSION"\n");
 }
 
 TF_WWN_ATTR_RO(lio_target, lio_version);

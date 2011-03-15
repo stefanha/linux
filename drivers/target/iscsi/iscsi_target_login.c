@@ -1155,7 +1155,6 @@ get_new_sock:
 	conn->network_transport = np->np_network_transport;
 	snprintf(conn->net_dev, ISCSI_NETDEV_NAME_SIZE, "%s", np->np_net_dev);
 
-	conn->conn_index = iscsi_get_new_index(ISCSI_CONNECTION_INDEX);
 	conn->local_ip = np->np_ipv4;
 	conn->local_port = np->np_port;
 

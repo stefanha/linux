@@ -184,8 +184,7 @@ ISCSI_STAT_INSTANCE_ATTR_RO(vendor);
 static ssize_t iscsi_stat_instance_show_attr_version(
 	struct iscsi_wwn_stat_grps *igrps, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "%s on %s/%s\n", ISCSI_VERSION,
-			utsname()->sysname, utsname()->machine);
+	return snprintf(page, PAGE_SIZE, "%s\n", ISCSI_VERSION);
 }
 ISCSI_STAT_INSTANCE_ATTR_RO(version);
 

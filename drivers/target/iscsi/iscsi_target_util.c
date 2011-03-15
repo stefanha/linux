@@ -46,12 +46,9 @@ inline void iscsi_attach_cmd_to_queue(struct iscsi_conn *conn, struct iscsi_cmd 
 	spin_lock_bh(&conn->cmd_lock);
 	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
 	spin_unlock_bh(&conn->cmd_lock);
-
-	atomic_inc(&conn->active_cmds);
 }
 
 /*
- *
  *	MUST be called with conn->cmd_lock held.
  */
 inline void iscsi_remove_cmd_from_conn_list(
@@ -59,9 +56,7 @@ inline void iscsi_remove_cmd_from_conn_list(
 	struct iscsi_conn *conn)
 {
 	list_del(&cmd->i_list);
-	atomic_dec(&conn->active_cmds);
 }
-
 
 inline void iscsi_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 {

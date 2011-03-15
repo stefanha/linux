@@ -64,10 +64,8 @@ struct iscsi_logout_stats {
 /* Structures for table index support */
 typedef enum {
 	ISCSI_INST_INDEX,
-	ISCSI_PORTAL_INDEX,
 	ISCSI_TARGET_AUTH_INDEX,
 	ISCSI_SESSION_INDEX,
-	ISCSI_CONNECTION_INDEX,
 	INDEX_TYPE_MAX
 } iscsi_index_t;
 

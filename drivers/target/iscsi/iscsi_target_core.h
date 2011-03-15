@@ -3,9 +3,6 @@
 
 #include <linux/in.h>
 #include <linux/configfs.h>
-#include <linux/version.h>
-#include <generated/utsrelease.h>
-#include <linux/utsname.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi_cmnd.h>
@@ -565,8 +562,6 @@ struct iscsi_conn {
 	unsigned char		ipv6_login_ip[IPV6_ADDRESS_SPACE];
 	u16			local_port;
 	u32			local_ip;
-	u32			conn_index;
-	atomic_t		active_cmds;
 	atomic_t		check_immediate_queue;
 	atomic_t		conn_logout_remove;
 	atomic_t		conn_usage_count;
@@ -814,7 +809,6 @@ struct iscsi_np {
 	enum np_flags_table	np_flags;
 	u32			np_ipv4;
 	unsigned char		np_ipv6[IPV6_ADDRESS_SPACE];
-	u32			np_index;
 	u16			np_port;
 	atomic_t		np_shutdown;
 	spinlock_t		np_ex_lock;
@@ -833,7 +827,6 @@ struct iscsi_np {
 } ____cacheline_aligned;
 
 struct iscsi_tpg_np {
-	u32			tpg_np_index;
 	struct iscsi_np		*tpg_np;
 	struct iscsi_portal_group *tpg;
 	struct iscsi_tpg_np	*tpg_np_parent;
@@ -898,13 +891,13 @@ struct iscsi_tiqn {
 #define ISCSI_IQN_LEN				224
 	unsigned char		tiqn[ISCSI_IQN_LEN];
 	enum tiqn_state_table	tiqn_state;
+	int			tiqn_access_count;
 	u32			tiqn_active_tpgs;
 	u32			tiqn_ntpgs;
 	u32			tiqn_num_tpg_nps;
 	u32			tiqn_nsessions;
 	struct list_head	tiqn_list;
 	struct list_head	tiqn_tpg_list;
-	atomic_t		tiqn_access_count;
 	spinlock_t		tiqn_state_lock;
 	spinlock_t		tiqn_tpg_lock;
 	struct se_wwn		tiqn_wwn;
