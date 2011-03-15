@@ -20,8 +20,6 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/timer.h>
-#include <linux/slab.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 
@@ -40,10 +38,6 @@ static inline char *iscsi_na_get_initiatorname(
 	return &se_nacl->initiatorname[0];
 }
 
-/*	iscsi_set_default_node_attribues():
- *
- *
- */
 void iscsi_set_default_node_attribues(
 	struct iscsi_node_acl *acl)
 {
@@ -59,10 +53,6 @@ void iscsi_set_default_node_attribues(
 	a->default_erl = NA_DEFAULT_ERL;
 }
 
-/*	iscsi_na_dataout_timeout():
- *
- *
- */
 extern int iscsi_na_dataout_timeout(
 	struct iscsi_node_acl *acl,
 	u32 dataout_timeout)
@@ -88,10 +78,6 @@ extern int iscsi_na_dataout_timeout(
 	return 0;
 }
 
-/*	iscsi_na_dataout_timeout_retries():
- *
- *
- */
 extern int iscsi_na_dataout_timeout_retries(
 	struct iscsi_node_acl *acl,
 	u32 dataout_timeout_retries)
@@ -118,10 +104,6 @@ extern int iscsi_na_dataout_timeout_retries(
 	return 0;
 }
 
-/*	iscsi_na_nopin_timeout():
- *
- *
- */
 extern int iscsi_na_nopin_timeout(
 	struct iscsi_node_acl *acl,
 	u32 nopin_timeout)
@@ -152,7 +134,7 @@ extern int iscsi_na_nopin_timeout(
 	/*
 	 * Reenable disabled nopin_timeout timer for all iSCSI connections.
 	 */
-	if (!(orig_nopin_timeout)) {
+	if (!orig_nopin_timeout) {
 		spin_lock_bh(&se_nacl->nacl_sess_lock);
 		se_sess = se_nacl->nacl_sess;
 		if (se_sess) {
@@ -177,10 +159,6 @@ extern int iscsi_na_nopin_timeout(
 	return 0;
 }
 
-/*	iscsi_na_nopin_response_timeout():
- *
- *
- */
 extern int iscsi_na_nopin_response_timeout(
 	struct iscsi_node_acl *acl,
 	u32 nopin_response_timeout)
@@ -207,10 +185,6 @@ extern int iscsi_na_nopin_response_timeout(
 	return 0;
 }
 
-/*	iscsi_na_random_datain_pdu_offsets():
- *
- *
- */
 extern int iscsi_na_random_datain_pdu_offsets(
 	struct iscsi_node_acl *acl,
 	u32 random_datain_pdu_offsets)
@@ -231,10 +205,6 @@ extern int iscsi_na_random_datain_pdu_offsets(
 	return 0;
 }
 
-/*	iscsi_na_random_datain_seq_offsets():
- *
- *
- */
 extern int iscsi_na_random_datain_seq_offsets(
 	struct iscsi_node_acl *acl,
 	u32 random_datain_seq_offsets)
@@ -255,10 +225,6 @@ extern int iscsi_na_random_datain_seq_offsets(
 	return 0;
 }
 
-/*	iscsi_na_random_r2t_offsets():
- *
- *
- */
 extern int iscsi_na_random_r2t_offsets(
 	struct iscsi_node_acl *acl,
 	u32 random_r2t_offsets)

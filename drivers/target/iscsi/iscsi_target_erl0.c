@@ -21,9 +21,6 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -114,7 +111,7 @@ static inline int iscsi_dataout_within_command_recovery_check(
 		struct iscsi_seq *seq;
 
 		seq = iscsi_get_seq_holder(cmd, hdr->offset, payload_length);
-		if (!(seq))
+		if (!seq)
 			return DATAOUT_CANNOT_RECOVER;
 		/*
 		 * Set the struct iscsi_seq pointer to reuse later.
@@ -271,7 +268,7 @@ static inline int iscsi_dataout_check_sequence(
 		next_burst_len = (cmd->next_burst_len + payload_length);
 	} else {
 		seq = iscsi_get_seq_holder(cmd, hdr->offset, payload_length);
-		if (!(seq))
+		if (!seq)
 			return DATAOUT_CANNOT_RECOVER;
 		/*
 		 * Set the struct iscsi_seq pointer to reuse later.
@@ -497,7 +494,7 @@ static inline int iscsi_dataout_pre_datapduinorder_no(
 	u32 payload_length = ntoh24(hdr->dlength);
 
 	pdu = iscsi_get_pdu_holder(cmd, hdr->offset, payload_length);
-	if (!(pdu))
+	if (!pdu)
 		return DATAOUT_CANNOT_RECOVER;
 
 	cmd->pdu_ptr = pdu;
@@ -531,7 +528,7 @@ static int iscsi_dataout_update_r2t(struct iscsi_cmd *cmd, u32 offset, u32 lengt
 		return 0;
 
 	r2t = iscsi_get_r2t_for_eos(cmd, offset, length);
-	if (!(r2t))
+	if (!r2t)
 		return -1;
 
 	spin_lock_bh(&cmd->r2t_lock);
@@ -856,7 +853,7 @@ extern void iscsi_start_time2retain_handler (struct iscsi_session *sess)
 	tpg_active = (ISCSI_TPG_S(sess)->tpg_state == TPG_STATE_ACTIVE);
 	spin_unlock(&ISCSI_TPG_S(sess)->tpg_state_lock);
 
-	if (!(tpg_active))
+	if (!tpg_active)
 		return;
 
 	if (sess->time2retain_timer_flags & ISCSI_TF_RUNNING)

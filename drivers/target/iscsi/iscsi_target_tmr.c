@@ -20,8 +20,6 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <asm/unaligned.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
@@ -54,7 +52,7 @@ u8 iscsi_tmr_abort_task(
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 
 	ref_cmd = iscsi_find_cmd_from_itt(conn, hdr->rtt);
-	if (!(ref_cmd)) {
+	if (!ref_cmd) {
 		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x on CID:"
 			" %hu.\n", hdr->rtt, conn->cid);
 		return ((hdr->refcmdsn >= SESS(conn)->exp_cmd_sn) &&
@@ -70,7 +68,6 @@ u8 iscsi_tmr_abort_task(
 
 	se_tmr->ref_task_tag		= hdr->rtt;
 	se_tmr->ref_cmd			= &ref_cmd->se_cmd;
-	se_tmr->ref_task_lun		= get_unaligned_le64(&hdr->lun[0]);
 	tmr_req->ref_cmd_sn		= hdr->refcmdsn;
 	tmr_req->exp_data_sn		= hdr->exp_datasn;
 
@@ -92,7 +89,7 @@ int iscsi_tmr_task_warm_reset(
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
 #endif
-	if (!(na->tmr_warm_reset)) {
+	if (!na->tmr_warm_reset) {
 		printk(KERN_ERR "TMR Opcode TARGET_WARM_RESET authorization"
 			" failed for Initiator Node: %s\n",
 			SESS_NODE_ACL(sess)->initiatorname);
@@ -116,7 +113,7 @@ int iscsi_tmr_task_cold_reset(
 	struct iscsi_session *sess = SESS(conn);
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 
-	if (!(na->tmr_cold_reset)) {
+	if (!na->tmr_cold_reset) {
 		printk(KERN_ERR "TMR Opcode TARGET_COLD_RESET authorization"
 			" failed for Initiator Node: %s\n",
 			SESS_NODE_ACL(sess)->initiatorname);
@@ -191,10 +188,6 @@ u8 iscsi_tmr_task_reassign(
 	return ISCSI_TMF_RSP_COMPLETE;
 }
 
-/*      iscsi_task_reassign_remove_cmd():
- *
- *
- */
 static void iscsi_task_reassign_remove_cmd(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn_recovery *cr,
@@ -214,10 +207,6 @@ static void iscsi_task_reassign_remove_cmd(
 	return;
 }
 
-/*	iscsi_task_reassign_complete_nop_out():
- *
- *
- */
 static int iscsi_task_reassign_complete_nop_out(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
@@ -250,10 +239,6 @@ static int iscsi_task_reassign_complete_nop_out(
 	return 0;
 }
 
-/*	iscsi_task_reassign_complete_write():
- *
- *
- */
 static int iscsi_task_reassign_complete_write(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
@@ -319,17 +304,12 @@ static int iscsi_task_reassign_complete_write(
 		if (no_build_r2ts)
 			return 0;
 	}
-
 	/*
 	 * iscsi_build_r2ts_for_cmd() can handle the rest from here.
 	 */
 	return iscsi_build_r2ts_for_cmd(cmd, conn, 2);
 }
 
-/*	iscsi_task_reassign_complete_read():
- *
- *
- */
 static int iscsi_task_reassign_complete_read(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
@@ -337,7 +317,6 @@ static int iscsi_task_reassign_complete_read(
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_datain_req *dr;
 	struct se_cmd *se_cmd = SE_CMD(cmd);
-
 	/*
 	 * The Initiator must not send a Data SNACK with a BegRun less than
 	 * the TMR TASK_REASSIGN's ExpDataSN.
@@ -358,7 +337,7 @@ static int iscsi_task_reassign_complete_read(
 		return 0;
 	}
 
-	if (!(atomic_read(&T_TASK(se_cmd)->t_transport_complete))) {
+	if (!atomic_read(&T_TASK(se_cmd)->t_transport_complete)) {
 		printk(KERN_ERR "READ ITT: 0x%08x: t_state: %d, never returned"
 			" from transport\n", cmd->init_task_tag,
 			SE_CMD(cmd)->t_state);
@@ -366,9 +345,8 @@ static int iscsi_task_reassign_complete_read(
 	}
 
 	dr = iscsi_allocate_datain_req();
-	if (!(dr))
+	if (!dr)
 		return -1;
-
 	/*
 	 * The TMR TASK_REASSIGN's ExpDataSN contains the next DataSN the
 	 * Initiator is expecting.
@@ -385,10 +363,6 @@ static int iscsi_task_reassign_complete_read(
 	return 0;
 }
 
-/*	iscsi_task_reassign_complete_none():
- *
- *
- */
 static int iscsi_task_reassign_complete_none(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
@@ -400,10 +374,6 @@ static int iscsi_task_reassign_complete_none(
 	return 0;
 }
 
-/*	iscsi_task_reassign_complete_scsi_cmnd():
- *
- *
- */
 static int iscsi_task_reassign_complete_scsi_cmnd(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
@@ -526,10 +496,6 @@ int iscsi_task_reassign_prepare_read(
 	return 0;
 }
 
-/*	iscsi_task_reassign_prepare_unsolicited_dataout():
- *
- *
- */
 static void iscsi_task_reassign_prepare_unsolicited_dataout(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -600,10 +566,6 @@ static void iscsi_task_reassign_prepare_unsolicited_dataout(
 	return;
 }
 
-/*	iscsi_task_reassign_prepare_write():
- *
- *
- */
 int iscsi_task_reassign_prepare_write(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
@@ -734,7 +696,7 @@ int iscsi_task_reassign_prepare_write(
 
 			seq = iscsi_get_seq_holder(cmd, r2t->offset,
 					r2t->xfer_len);
-			if (!(seq)) {
+			if (!seq) {
 				spin_unlock_bh(&cmd->r2t_lock);
 				return -1;
 			}

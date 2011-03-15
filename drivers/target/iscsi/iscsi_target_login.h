@@ -8,8 +8,6 @@ extern int iscsi_target_login_thread(void *);
 extern int iscsi_login_disable_FIM_keys(struct iscsi_param_list *, struct iscsi_conn *);
 
 extern struct iscsi_global *iscsi_global;
-extern struct kmem_cache *lio_sess_cache;
-extern struct kmem_cache *lio_conn_cache;
 
 #endif   /*** ISCSI_TARGET_LOGIN_H ***/
 

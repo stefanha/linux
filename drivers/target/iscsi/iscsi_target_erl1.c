@@ -20,9 +20,6 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <linux/list.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
@@ -62,7 +59,7 @@ int iscsi_dump_data_payload(
 	length = (buf_len > OFFLOAD_BUF_SIZE) ? OFFLOAD_BUF_SIZE : buf_len;
 
 	buf = kzalloc(length, GFP_ATOMIC);
-	if (!(buf)) {
+	if (!buf) {
 		printk(KERN_ERR "Unable to allocate %u bytes for offload"
 				" buffer.\n", length);
 		return -1;
@@ -189,7 +186,7 @@ static int iscsi_handle_r2t_snack(
 
 	while (begrun < last_r2tsn) {
 		r2t = iscsi_get_holder_for_r2tsn(cmd, begrun);
-		if (!(r2t))
+		if (!r2t)
 			return -1;
 		if (iscsi_send_recovery_r2t_for_snack(cmd, r2t) < 0)
 			return -1;
@@ -433,7 +430,7 @@ static inline int iscsi_handle_recovery_datain(
 	struct iscsi_datain_req *dr;
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 
-	if (!(atomic_read(&T_TASK(se_cmd)->t_transport_complete))) {
+	if (!atomic_read(&T_TASK(se_cmd)->t_transport_complete)) {
 		printk(KERN_ERR "Ignoring ITT: 0x%08x Data SNACK\n",
 				cmd->init_task_tag);
 		return 0;
@@ -468,7 +465,7 @@ static inline int iscsi_handle_recovery_datain(
 	}
 
 	dr = iscsi_allocate_datain_req();
-	if (!(dr))
+	if (!dr)
 		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 0, buf, cmd);
 
@@ -500,7 +497,7 @@ int iscsi_handle_recovery_datain_or_r2t(
 	struct iscsi_cmd *cmd;
 
 	cmd = iscsi_find_cmd_from_itt(conn, init_task_tag);
-	if (!(cmd))
+	if (!cmd)
 		return 0;
 
 	/*
@@ -596,7 +593,7 @@ int iscsi_handle_data_ack(
 	struct iscsi_cmd *cmd = NULL;
 
 	cmd = iscsi_find_cmd_from_ttt(conn, targ_xfer_tag);
-	if (!(cmd)) {
+	if (!cmd) {
 		printk(KERN_ERR "Data ACK SNACK for TTT: 0x%08x is"
 			" invalid.\n", targ_xfer_tag);
 		return -1;
@@ -771,7 +768,7 @@ static int iscsi_recalculate_dataout_values(
 		struct iscsi_seq *seq = NULL;
 
 		seq = iscsi_get_seq_holder(cmd, pdu_offset, pdu_length);
-		if (!(seq))
+		if (!seq)
 			return -1;
 
 		*r2t_offset = seq->orig_offset;
@@ -835,7 +832,7 @@ static inline struct iscsi_ooo_cmdsn *iscsi_allocate_ooo_cmdsn(void)
 	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL;
 
 	ooo_cmdsn = kmem_cache_zalloc(lio_ooo_cache, GFP_ATOMIC);
-	if (!(ooo_cmdsn)) {
+	if (!ooo_cmdsn) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" struct iscsi_ooo_cmdsn.\n");
 		return NULL;
@@ -1159,7 +1156,7 @@ int iscsi_handle_ooo_cmdsn(
 	}
 
 	ooo_cmdsn = iscsi_allocate_ooo_cmdsn();
-	if (!(ooo_cmdsn))
+	if (!ooo_cmdsn)
 		return CMDSN_ERROR_CANNOT_RECOVER;
 
 	ooo_cmdsn->cmd			= cmd;

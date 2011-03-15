@@ -3,6 +3,9 @@
 
 #include <linux/in.h>
 #include <linux/configfs.h>
+#include <linux/version.h>
+#include <generated/utsrelease.h>
+#include <linux/utsname.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi_cmnd.h>
@@ -874,7 +877,6 @@ struct iscsi_portal_group {
 	struct iscsi_tiqn	*tpg_tiqn;
 	struct list_head	tpg_gnp_list;
 	struct list_head	tpg_list;
-	struct list_head	g_tpg_list;
 } ____cacheline_aligned;
 
 #define ISCSI_TPG_C(c)		((struct iscsi_portal_group *)(c)->tpg)
@@ -929,23 +931,17 @@ struct iscsi_global {
 	/* Thread Set bitmap pointer */
 	unsigned long		*ts_bitmap;
 	struct list_head	g_tiqn_list;
-	struct list_head	g_tpg_list;
 	struct list_head	tpg_list;
 	struct list_head	g_np_list;
 	spinlock_t		active_ts_lock;
-	spinlock_t		check_thread_lock;
 	/* Spinlock for adding/removing discovery entries */
-	spinlock_t		discovery_lock;
 	spinlock_t		inactive_ts_lock;
-	/* Spinlock for adding/removing login threads */
-	spinlock_t		login_thread_lock;
 	/* Spinlock for adding/removing thread sets */
 	spinlock_t		thread_set_lock;
 	/* Spinlock for iscsi_global->ts_bitmap */
 	spinlock_t		ts_bitmap_lock;
 	/* Spinlock for struct iscsi_tiqn */
 	spinlock_t		tiqn_lock;
-	spinlock_t		g_tpg_lock;
 	/* Spinlock g_np_list */
 	spinlock_t		np_lock;
 	/* Semaphore used for communication to authentication daemon */

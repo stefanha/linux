@@ -2,8 +2,6 @@
  * This file contains the configfs implementation for iSCSI Target mode
  * from the LIO-Target Project.
  *
- * Copyright (c) 2008, 2009, 2010 Rising Tide, Inc.
- * Copyright (c) 2008, 2009, 2010 Linux-iSCSI.org
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
@@ -21,18 +19,7 @@
  * GNU General Public License for more details.
  ****************************************************************************/
 
-#include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/version.h>
-#include <generated/utsrelease.h>
-#include <linux/utsname.h>
-#include <linux/init.h>
-#include <linux/slab.h>
-#include <linux/types.h>
-#include <linux/string.h>
 #include <linux/configfs.h>
-#include <linux/inet.h>
-
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
@@ -72,7 +59,7 @@ struct iscsi_portal_group *lio_get_tpg_from_tpg_item(
 			(struct iscsi_portal_group *)se_tpg->se_tpg_fabric_ptr;
 	int ret;
 
-	if (!(tpg)) {
+	if (!tpg) {
 		printk(KERN_ERR "Unable to locate struct iscsi_portal_group "
 			"pointer\n");
 		return NULL;
@@ -126,7 +113,7 @@ static ssize_t lio_target_np_store_sctp(
 		return -EINVAL;
 	}
 	np = tpg_np->tpg_np;
-	if (!(np)) {
+	if (!np) {
 		printk(KERN_ERR "Unable to locate struct iscsi_np from"
 				" struct iscsi_tpg_np\n");
 		return -EINVAL;
@@ -137,7 +124,7 @@ static ssize_t lio_target_np_store_sctp(
 		return -EINVAL;
 
 	if (op) {
-		memset((void *)&np_addr, 0, sizeof(struct iscsi_np_addr));
+		memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
 		if (np->np_flags & NPF_NET_IPV6)
 			snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE,
 				"%s", np->np_ipv6);
@@ -148,11 +135,11 @@ static ssize_t lio_target_np_store_sctp(
 
 		tpg_np_sctp = iscsi_tpg_add_network_portal(tpg, &np_addr,
 					tpg_np, ISCSI_SCTP_TCP);
-		if (!(tpg_np_sctp) || IS_ERR(tpg_np_sctp))
+		if (!tpg_np_sctp || IS_ERR(tpg_np_sctp))
 			goto out;
 	} else {
 		tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP);
-		if (!(tpg_np_sctp))
+		if (!tpg_np_sctp)
 			goto out;
 
 		ret = iscsi_tpg_del_network_portal(tpg, tpg_np_sctp);
@@ -201,12 +188,12 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	memset(buf, 0, MAX_PORTAL_LEN);
 	snprintf(buf, MAX_PORTAL_LEN, "%s", name);
 
-	memset((void *)&np_addr, 0, sizeof(struct iscsi_np_addr));
+	memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
 
 	str = strstr(buf, "[");
 	if ((str)) {
 		str2 = strstr(str, "]");
-		if (!(str2)) {
+		if (!str2) {
 			printk(KERN_ERR "Unable to locate trailing \"]\""
 				" in IPv6 iSCSI network portal address\n");
 			return ERR_PTR(-EINVAL);
@@ -215,7 +202,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		*str2 = '\0'; /* Terminate the IPv6 address */
 		str2 += 1; /* Skip over the "]" */
 		port_str = strstr(str2, ":");
-		if (!(port_str)) {
+		if (!port_str) {
 			printk(KERN_ERR "Unable to locate \":port\""
 				" in IPv6 iSCSI network portal address\n");
 			return ERR_PTR(-EINVAL);
@@ -229,7 +216,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	} else {
 		ip_str = &buf[0];
 		port_str = strstr(ip_str, ":");
-		if (!(port_str)) {
+		if (!port_str) {
 			printk(KERN_ERR "Unable to locate \":port\""
 				" in IPv4 iSCSI network portal address\n");
 			return ERR_PTR(-EINVAL);
@@ -422,7 +409,7 @@ static ssize_t __iscsi_##prefix##_store_##name(				\
 		return -EPERM;						\
 									\
 	snprintf(auth->name, PAGE_SIZE, "%s", page);			\
-	if (!(strncmp("NULL", auth->name, 4)))				\
+	if (!strncmp("NULL", auth->name, 4))				\
 		auth->naf_flags &= ~flags;				\
 	else								\
 		auth->naf_flags |= flags;				\
@@ -526,17 +513,17 @@ static ssize_t iscsi_nacl_param_show_##name(				\
 	struct se_node_acl *se_nacl,					\
 	char *page)							\
 {									\
-	struct iscsi_session *sess;						\
-	struct se_session *se_sess;						\
+	struct iscsi_session *sess;					\
+	struct se_session *se_sess;					\
 	ssize_t rb;							\
 									\
 	spin_lock_bh(&se_nacl->nacl_sess_lock);				\
 	se_sess = se_nacl->nacl_sess;					\
-	if (!(se_sess)) {						\
+	if (!se_sess) {							\
 		rb = snprintf(page, PAGE_SIZE,				\
 			"No Active iSCSI Session\n");			\
 	} else {							\
-		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;	\
+		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr; \
 		rb = snprintf(page, PAGE_SIZE, "%u\n",			\
 			(u32)SESS_OPS(sess)->name);			\
 	}								\
@@ -611,7 +598,7 @@ static ssize_t lio_target_nacl_show_info(
 
 	spin_lock_bh(&se_nacl->nacl_sess_lock);
 	se_sess = se_nacl->nacl_sess;
-	if (!(se_sess))
+	if (!se_sess)
 		rb += sprintf(page+rb, "No active iSCSI Session for Initiator"
 			" Endpoint: %s\n", se_nacl->initiatorname);
 	else {
@@ -757,17 +744,17 @@ static ssize_t lio_target_nacl_store_cmdsn_depth(
 		return -EINVAL;
 	}
 	acl_ci = &se_nacl->acl_group.cg_item;
-	if (!(acl_ci)) {
+	if (!acl_ci) {
 		printk(KERN_ERR "Unable to locatel acl_ci\n");
 		return -EINVAL;
 	}
 	tpg_ci = &acl_ci->ci_parent->ci_group->cg_item;
-	if (!(tpg_ci)) {
+	if (!tpg_ci) {
 		printk(KERN_ERR "Unable to locate tpg_ci\n");
 		return -EINVAL;
 	}
 	wwn_ci = &tpg_ci->ci_group->cg_item;
-	if (!(wwn_ci)) {
+	if (!wwn_ci) {
 		printk(KERN_ERR "Unable to locate config_item wwn_ci\n");
 		return -EINVAL;
 	}
@@ -975,12 +962,12 @@ static struct configfs_attribute *lio_target_tpg_attrib_attrs[] = {
 
 #define DEF_TPG_PARAM(name)						\
 static ssize_t iscsi_tpg_param_show_##name(				\
-	struct se_portal_group *se_tpg,				\
+	struct se_portal_group *se_tpg,					\
 	char *page)							\
 {									\
 	struct iscsi_portal_group *tpg = container_of(se_tpg,		\
-			struct iscsi_portal_group, tpg_se_tpg);	\
-	struct iscsi_param *param;						\
+			struct iscsi_portal_group, tpg_se_tpg);		\
+	struct iscsi_param *param;					\
 	ssize_t rb;							\
 									\
 	if (iscsi_get_tpg(tpg) < 0)					\
@@ -988,7 +975,7 @@ static ssize_t iscsi_tpg_param_show_##name(				\
 									\
 	param = iscsi_find_param_from_key(__stringify(name),		\
 				tpg->param_list);			\
-	if (!(param)) {							\
+	if (!param) {							\
 		iscsi_put_tpg(tpg);					\
 		return -EINVAL;						\
 	}								\
@@ -1003,12 +990,12 @@ static ssize_t iscsi_tpg_param_store_##name(				\
 	size_t count)							\
 {									\
 	struct iscsi_portal_group *tpg = container_of(se_tpg,		\
-			struct iscsi_portal_group, tpg_se_tpg);	\
+			struct iscsi_portal_group, tpg_se_tpg);		\
 	char *buf;							\
 	int ret;							\
 									\
 	buf = kzalloc(PAGE_SIZE, GFP_KERNEL);				\
-	if (!(buf))							\
+	if (!buf)							\
 		return -ENOMEM;						\
 	snprintf(buf, PAGE_SIZE, "%s=%s", __stringify(name), page);	\
 	buf[strlen(buf)-1] = '\0'; /* Kill newline */			\
@@ -1204,7 +1191,7 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	 * target/iscsi/iqn.superturodiskarry/
 	*/
 	tpgt_str = strstr(name, "tpgt_");
-	if (!(tpgt_str)) {
+	if (!tpgt_str) {
 		printk(KERN_ERR "Unable to locate \"tpgt_#\" directory"
 				" group\n");
 		return NULL;
@@ -1213,7 +1200,7 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	tpgt = (unsigned short int) simple_strtoul(tpgt_str, &end_ptr, 0);
 
 	tpg = core_alloc_portal_group(tiqn, tpgt);
-	if (!(tpg))
+	if (!tpg)
 		return NULL;
 
 	ret = core_tpg_register(
@@ -1233,7 +1220,7 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	return &tpg->tpg_se_tpg;
 out:
 	core_tpg_deregister(&tpg->tpg_se_tpg);
-	kmem_cache_free(lio_tpg_cache, tpg);
+	kfree(tpg);
 	return NULL;
 }
 
@@ -1281,7 +1268,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	int ret = 0;
 
 	tiqn = core_add_tiqn((unsigned char *)name, &ret);
-	if (!(tiqn))
+	if (!tiqn)
 		return NULL;
 	/*
 	 * Setup struct iscsi_wwn_stat_grps for se_wwn->fabric_stat_group.
@@ -1433,14 +1420,14 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 		return -EINVAL;
 	}
 
-	if (!(discovery_tpg)) {
+	if (!discovery_tpg) {
 		printk(KERN_ERR "iscsi_global->discovery_tpg is NULL\n");
 		return -EINVAL;
 	}
 
 	param = iscsi_find_param_from_key(AUTHMETHOD,
 				discovery_tpg->param_list);
-	if (!(param))
+	if (!param)
 		return -EINVAL;
 
 	if (op) {
@@ -1493,7 +1480,7 @@ int iscsi_target_register_configfs(void)
 
 	lio_target_fabric_configfs = NULL;
 	fabric = target_fabric_configfs_init(THIS_MODULE, "iscsi");
-	if (!(fabric)) {
+	if (!fabric) {
 		printk(KERN_ERR "target_fabric_configfs_init() for"
 				" LIO-Target failed!\n");
 		return -1;
@@ -1595,7 +1582,7 @@ int iscsi_target_register_configfs(void)
 
 void iscsi_target_deregister_configfs(void)
 {
-	if (!(lio_target_fabric_configfs))
+	if (!lio_target_fabric_configfs)
 		return;
 	/*
 	 * Shutdown discovery sessions and disable discovery TPG

@@ -5,7 +5,7 @@ extern struct iscsi_tiqn *core_get_tiqn_for_login(unsigned char *);
 extern struct iscsi_tiqn *core_get_tiqn(unsigned char *, int);
 extern void core_put_tiqn_for_login(struct iscsi_tiqn *);
 extern struct iscsi_tiqn *core_add_tiqn(unsigned char *, int *);
-extern int core_del_tiqn(struct iscsi_tiqn *);
+extern void core_del_tiqn(struct iscsi_tiqn *);
 extern int core_access_np(struct iscsi_np *, struct iscsi_portal_group *);
 extern int core_deaccess_np(struct iscsi_np *, struct iscsi_portal_group *);
 extern void *core_get_np_ip(struct iscsi_np *np);

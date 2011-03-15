@@ -21,9 +21,6 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -400,7 +397,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	 * connection's command list for connection recovery.
 	 */
 	cr = kzalloc(sizeof(struct iscsi_conn_recovery), GFP_KERNEL);
-	if (!(cr)) {
+	if (!cr) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" struct iscsi_conn_recovery.\n");
 		return -1;

@@ -20,8 +20,6 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <linux/ctype.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
@@ -118,19 +116,19 @@ static u32 iscsi_handle_authentication(
 	struct iscsi_node_acl *iscsi_nacl;
 	struct se_node_acl *se_nacl;
 
-	if (!(SESS_OPS(sess)->SessionType)) {
+	if (!SESS_OPS(sess)->SessionType) {
 		/*
 		 * For SessionType=Normal
 		 */
 		se_nacl = SESS(conn)->se_sess->se_node_acl;
-		if (!(se_nacl)) {
+		if (!se_nacl) {
 			printk(KERN_ERR "Unable to locate struct se_node_acl for"
 					" CHAP auth\n");
 			return -1;
 		}
 		iscsi_nacl = container_of(se_nacl, struct iscsi_node_acl,
 				se_node_acl);
-		if (!(iscsi_nacl)) {
+		if (!iscsi_nacl) {
 			printk(KERN_ERR "Unable to locate struct iscsi_node_acl for"
 					" CHAP auth\n");
 			return -1;
@@ -174,10 +172,6 @@ static void iscsi_remove_failed_auth_entry(struct iscsi_conn *conn)
 	kfree(conn->auth_protocol);
 }
 
-/*	iscsi_target_check_login_request():
- *
- *
- */
 static int iscsi_target_check_login_request(
 	struct iscsi_conn *conn,
 	struct iscsi_login *login)
@@ -272,10 +266,6 @@ static int iscsi_target_check_login_request(
 	return 0;
 }
 
-/*	iscsi_target_check_first_request():
- *
- *
- */
 static int iscsi_target_check_first_request(
 	struct iscsi_conn *conn,
 	struct iscsi_login *login)
@@ -294,7 +284,7 @@ static int iscsi_target_check_first_request(
 					ISCSI_LOGIN_STATUS_MISSING_FIELDS);
 				return -1;
 			}
-			if (!(strncmp(param->value, DISCOVERY, 9)))
+			if (!strncmp(param->value, DISCOVERY, 9))
 				return 0;
 		}
 
@@ -317,7 +307,7 @@ static int iscsi_target_check_first_request(
 			 */
 			if (!login->leading_connection) {
 				se_nacl = SESS(conn)->se_sess->se_node_acl;
-				if (!(se_nacl)) {
+				if (!se_nacl) {
 					printk(KERN_ERR "Unable to locate"
 						" struct se_node_acl\n");
 					iscsi_tx_login_rsp(conn,
@@ -344,10 +334,6 @@ static int iscsi_target_check_first_request(
 	return 0;
 }
 
-/*	iscsi_target_do_tx_login_io():
- *
- *
- */
 static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	u32 padding = 0;
@@ -392,10 +378,6 @@ static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_log
 	return 0;
 }
 
-/*	iscsi_target_do_rx_login_io():
- *
- *
- */
 static int iscsi_target_do_rx_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	u32 padding = 0, payload_length;
@@ -432,10 +414,6 @@ static int iscsi_target_do_rx_login_io(struct iscsi_conn *conn, struct iscsi_log
 	return 0;
 }
 
-/*      iscsi_target_do_login_io():
- *
- *
- */
 static int iscsi_target_do_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	if (iscsi_target_do_tx_login_io(conn, login) < 0)
@@ -498,10 +476,6 @@ static int iscsi_target_check_for_existing_instances(
 				login->initial_exp_statsn);
 }
 
-/*	iscsi_target_do_authentication():
- *
- *
- */
 static int iscsi_target_do_authentication(
 	struct iscsi_conn *conn,
 	struct iscsi_login *login)
@@ -517,7 +491,7 @@ static int iscsi_target_do_authentication(
 	payload_length = ntoh24(login_req->dlength);
 
 	param = iscsi_find_param_from_key(AUTHMETHOD, conn->param_list);
-	if (!(param))
+	if (!param)
 		return -1;
 
 	authret = iscsi_handle_authentication(
@@ -561,10 +535,6 @@ static int iscsi_target_do_authentication(
 	return 0;
 }
 
-/*	iscsi_target_handle_csg_zero():
- *
- *
- */
 static int iscsi_target_handle_csg_zero(
 	struct iscsi_conn *conn,
 	struct iscsi_login *login)
@@ -580,7 +550,7 @@ static int iscsi_target_handle_csg_zero(
 	payload_length = ntoh24(login_req->dlength);
 
 	param = iscsi_find_param_from_key(AUTHMETHOD, conn->param_list);
-	if (!(param))
+	if (!param)
 		return -1;
 
 	ret = iscsi_decode_text_input(
@@ -618,7 +588,7 @@ static int iscsi_target_handle_csg_zero(
 	if (ret < 0)
 		return -1;
 
-	if (!(iscsi_check_negotiated_keys(conn->param_list))) {
+	if (!iscsi_check_negotiated_keys(conn->param_list)) {
 		if (ISCSI_TPG_ATTRIB(ISCSI_TPG_C(conn))->authentication &&
 		    !strncmp(param->value, NONE, 4)) {
 			printk(KERN_ERR "Initiator sent AuthMethod=None but"
@@ -649,10 +619,6 @@ do_auth:
 	return iscsi_target_do_authentication(conn, login);
 }
 
-/*	iscsi_target_handle_csg_one():
- *
- *
- */
 static int iscsi_target_handle_csg_one(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	int ret;
@@ -689,8 +655,8 @@ static int iscsi_target_handle_csg_one(struct iscsi_conn *conn, struct iscsi_log
 	if (ret < 0)
 		return -1;
 
-	if (!(login->auth_complete) &&
-	      ISCSI_TPG_ATTRIB(ISCSI_TPG_C(conn))->authentication) {
+	if (!login->auth_complete &&
+	     ISCSI_TPG_ATTRIB(ISCSI_TPG_C(conn))->authentication) {
 		printk(KERN_ERR "Initiator is requesting CSG: 1, has not been"
 			 " successfully authenticated, and the Target is"
 			" enforcing iSCSI Authentication, login failed.\n");
@@ -699,7 +665,7 @@ static int iscsi_target_handle_csg_one(struct iscsi_conn *conn, struct iscsi_log
 		return -1;
 	}
 
-	if (!(iscsi_check_negotiated_keys(conn->param_list)))
+	if (!iscsi_check_negotiated_keys(conn->param_list))
 		if ((login_req->flags & ISCSI_FLAG_LOGIN_NEXT_STAGE3) &&
 		    (login_req->flags & ISCSI_FLAG_LOGIN_TRANSIT))
 			login_rsp->flags |= ISCSI_FLAG_LOGIN_NEXT_STAGE3 |
@@ -708,10 +674,6 @@ static int iscsi_target_handle_csg_one(struct iscsi_conn *conn, struct iscsi_log
 	return 0;
 }
 
-/*	iscsi_target_do_login():
- *
- *
- */
 static int iscsi_target_do_login(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	int pdu_count = 0;
@@ -775,7 +737,7 @@ static void iscsi_initiatorname_tolower(
 
 	for (i = 0; i < iqn_size; i++) {
 		c = (char *)&param_buf[i];
-		if (!(isupper(*c)))
+		if (!isupper(*c))
 			continue;
 
 		*c = tolower(*c);
@@ -820,7 +782,7 @@ static int iscsi_target_locate_portal(
 		return -1;
 
 	tmpbuf = kzalloc(payload_length + 1, GFP_KERNEL);
-	if (!(tmpbuf)) {
+	if (!tmpbuf) {
 		printk(KERN_ERR "Unable to allocate memory for tmpbuf.\n");
 		return -1;
 	}
@@ -840,11 +802,11 @@ static int iscsi_target_locate_portal(
 			goto out;
 		}
 
-		if (!(strncmp(key, "InitiatorName", 13)))
+		if (!strncmp(key, "InitiatorName", 13))
 			i_buf = value;
-		else if (!(strncmp(key, "SessionType", 11)))
+		else if (!strncmp(key, "SessionType", 11))
 			s_buf = value;
-		else if (!(strncmp(key, "TargetName", 10)))
+		else if (!strncmp(key, "TargetName", 10))
 			t_buf = value;
 
 		start += strlen(key) + strlen(value) + 2;
@@ -884,7 +846,7 @@ static int iscsi_target_locate_portal(
 	 * Use default portal group for discovery sessions.
 	 */
 	sessiontype = strncmp(s_buf, DISCOVERY, 9);
-	if (!(sessiontype)) {
+	if (!sessiontype) {
 		conn->tpg = iscsi_global->discovery_tpg;
 		if (!login->leading_connection)
 			goto get_target;
@@ -927,7 +889,7 @@ get_target:
 	 * Locate Target IQN from Storage Node.
 	 */
 	tiqn = core_get_tiqn_for_login(t_buf);
-	if (!(tiqn)) {
+	if (!tiqn) {
 		printk(KERN_ERR "Unable to locate Target IQN: %s in"
 			" Storage Node\n", t_buf);
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
@@ -941,7 +903,7 @@ get_target:
 	 * Locate Target Portal Group from Storage Node.
 	 */
 	conn->tpg = core_get_tpg_from_np(tiqn, np);
-	if (!(conn->tpg)) {
+	if (!conn->tpg) {
 		printk(KERN_ERR "Unable to locate Target Portal Group"
 				" on %s\n", tiqn->tiqn);
 		core_put_tiqn_for_login(tiqn);
@@ -992,7 +954,7 @@ get_target:
 	 */
 	sess->se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
 			&conn->tpg->tpg_se_tpg, i_buf);
-	if (!(sess->se_sess->se_node_acl)) {
+	if (!sess->se_sess->se_node_acl) {
 		printk(KERN_ERR "iSCSI Initiator Node: %s is not authorized to"
 			" access iSCSI target portal group: %hu.\n",
 				i_buf, conn->tpg->tpgt);
@@ -1008,10 +970,6 @@ out:
 	return ret;
 }
 
-/*	iscsi_target_init_negotiation():
- *
- *
- */
 struct iscsi_login *iscsi_target_init_negotiation(
 	struct iscsi_np *np,
 	struct iscsi_conn *conn,
@@ -1020,7 +978,7 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	struct iscsi_login *login;
 
 	login = kzalloc(sizeof(struct iscsi_login), GFP_KERNEL);
-	if (!(login)) {
+	if (!login) {
 		printk(KERN_ERR "Unable to allocate memory for struct iscsi_login.\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
@@ -1028,7 +986,7 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	}
 
 	login->req = kzalloc(ISCSI_HDR_LEN, GFP_KERNEL);
-	if (!(login->req)) {
+	if (!login->req) {
 		printk(KERN_ERR "Unable to allocate memory for Login Request.\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
@@ -1037,7 +995,7 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	memcpy(login->req, login_pdu, ISCSI_HDR_LEN);
 
 	login->req_buf = kzalloc(MAX_KEY_VALUE_PAIRS, GFP_KERNEL);
-	if (!(login->req_buf)) {
+	if (!login->req_buf) {
 		printk(KERN_ERR "Unable to allocate memory for response buffer.\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
@@ -1073,7 +1031,7 @@ int iscsi_target_start_negotiation(
 	int ret = -1;
 
 	login->rsp = kzalloc(ISCSI_HDR_LEN, GFP_KERNEL);
-	if (!(login->rsp)) {
+	if (!login->rsp) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" Login Response.\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
@@ -1083,7 +1041,7 @@ int iscsi_target_start_negotiation(
 	}
 
 	login->rsp_buf = kzalloc(MAX_KEY_VALUE_PAIRS, GFP_KERNEL);
-	if (!(login->rsp_buf)) {
+	if (!login->rsp_buf) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" request buffer.\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,

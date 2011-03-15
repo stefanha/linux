@@ -60,7 +60,6 @@ extern void iscsi_remove_all_tpgs(void);
 
 extern struct iscsi_global *iscsi_global;
 extern struct target_fabric_configfs *lio_target_fabric_configfs;
-extern struct kmem_cache *lio_tpg_cache;
 
 extern int iscsi_close_session(struct iscsi_session *);
 extern int iscsi_free_session(struct iscsi_session *);

@@ -19,10 +19,6 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/kernel.h>
-#include <linux/version.h>
-#include <generated/utsrelease.h>
-#include <linux/utsname.h>
 #include <linux/configfs.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
