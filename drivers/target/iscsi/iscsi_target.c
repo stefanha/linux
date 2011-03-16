@@ -167,9 +167,6 @@ struct iscsi_tiqn *core_add_tiqn(unsigned char *buf, int *ret)
 
 void __core_del_tiqn(struct iscsi_tiqn *tiqn)
 {
-	iscsi_disable_tpgs(tiqn);
-	iscsi_remove_tpgs(tiqn);
-
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_del(&tiqn->tiqn_list);
 	spin_unlock(&iscsi_global->tiqn_lock);
@@ -208,35 +205,6 @@ void core_del_tiqn(struct iscsi_tiqn *tiqn)
 
 	core_wait_for_tiqn(tiqn);
 	__core_del_tiqn(tiqn);
-}
-
-int core_release_tiqns(void)
-{
-	struct iscsi_tiqn *tiqn, *t_tiqn;
-
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry_safe(tiqn, t_tiqn,
-			&iscsi_global->g_tiqn_list, tiqn_list) {
-
-		spin_lock(&tiqn->tiqn_state_lock);
-		if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
-			tiqn->tiqn_state = TIQN_STATE_SHUTDOWN;
-			spin_unlock(&tiqn->tiqn_state_lock);
-			spin_unlock(&iscsi_global->tiqn_lock);
-
-			core_wait_for_tiqn(tiqn);
-			__core_del_tiqn(tiqn);
-
-			spin_lock(&iscsi_global->tiqn_lock);
-			continue;
-		}
-		spin_unlock(&tiqn->tiqn_state_lock);
-
-		spin_lock(&iscsi_global->tiqn_lock);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-
-	return 0;
 }
 
 int core_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
@@ -928,13 +896,10 @@ out:
 static void __exit iscsi_target_cleanup_module(void)
 {
 	core_reset_nps();
-	iscsi_disable_all_tpgs();
 	iscsi_deallocate_thread_sets();
 	iscsi_thread_set_free();
-	iscsi_remove_all_tpgs();
 	core_release_nps();
 	core_release_discovery_tpg();
-	core_release_tiqns();
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_qr_cache);
 	kmem_cache_destroy(lio_dr_cache);
