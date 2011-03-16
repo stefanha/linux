@@ -46,6 +46,13 @@
 #include "iscsi_target_device.h"
 #include "iscsi_target_stat.h"
 
+LIST_HEAD(g_tiqn_list);
+LIST_HEAD(g_np_list);
+DEFINE_SPINLOCK(tiqn_lock);
+DEFINE_SPINLOCK(np_lock);
+
+struct mutex auth_id_lock;
+
 struct iscsi_global *iscsi_global;
 
 struct kmem_cache *lio_cmd_cache;
@@ -72,21 +79,21 @@ struct iscsi_tiqn *iscsit_get_tiqn_for_login(unsigned char *buf)
 {
 	struct iscsi_tiqn *tiqn = NULL;
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	spin_lock(&tiqn_lock);
+	list_for_each_entry(tiqn, &g_tiqn_list, tiqn_list) {
 		if (!strcmp(tiqn->tiqn, buf)) {
 
 			spin_lock(&tiqn->tiqn_state_lock);
 			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
 				tiqn->tiqn_access_count++;
 				spin_unlock(&tiqn->tiqn_state_lock);
-				spin_unlock(&iscsi_global->tiqn_lock);
+				spin_unlock(&tiqn_lock);
 				return tiqn;
 			}
 			spin_unlock(&tiqn->tiqn_state_lock);
 		}
 	}
-	spin_unlock(&iscsi_global->tiqn_lock);
+	spin_unlock(&tiqn_lock);
 
 	return NULL;
 }
@@ -126,17 +133,17 @@ struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
 		return NULL;
 	}
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	spin_lock(&tiqn_lock);
+	list_for_each_entry(tiqn, &g_tiqn_list, tiqn_list) {
 		if (!strcmp(tiqn->tiqn, buf)) {
 			printk(KERN_ERR "Target IQN: %s already exists in Core\n",
 				tiqn->tiqn);
-			spin_unlock(&iscsi_global->tiqn_lock);
+			spin_unlock(&tiqn_lock);
 			*ret = -1;
 			return NULL;
 		}
 	}
-	spin_unlock(&iscsi_global->tiqn_lock);
+	spin_unlock(&tiqn_lock);
 
 	tiqn = kzalloc(sizeof(struct iscsi_tiqn), GFP_KERNEL);
 	if (!tiqn) {
@@ -156,9 +163,9 @@ struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
 	tiqn->tiqn_index = iscsi_get_new_index(ISCSI_INST_INDEX);
 	tiqn->tiqn_state = TIQN_STATE_ACTIVE;
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_add_tail(&tiqn->tiqn_list, &iscsi_global->g_tiqn_list);
-	spin_unlock(&iscsi_global->tiqn_lock);
+	spin_lock(&tiqn_lock);
+	list_add_tail(&tiqn->tiqn_list, &g_tiqn_list);
+	spin_unlock(&tiqn_lock);
 
 	printk(KERN_INFO "CORE[0] - Added iSCSI Target IQN: %s\n", tiqn->tiqn);
 
@@ -168,9 +175,9 @@ struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
 
 void __iscsit_del_tiqn(struct iscsi_tiqn *tiqn)
 {
-	spin_lock(&iscsi_global->tiqn_lock);
+	spin_lock(&tiqn_lock);
 	list_del(&tiqn->tiqn_list);
-	spin_unlock(&iscsi_global->tiqn_lock);
+	spin_unlock(&tiqn_lock);
 
 	printk(KERN_INFO "CORE[0] - Deleted iSCSI Target IQN: %s\n",
 			tiqn->tiqn);
@@ -282,8 +289,8 @@ static struct iscsi_np *iscsit_get_np(
 	void *p, *ip;
 	int net_size;
 
-	spin_lock(&iscsi_global->np_lock);
-	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) {
+	spin_lock(&np_lock);
+	list_for_each_entry(np, &g_np_list, np_list) {
 		spin_lock(&np->np_state_lock);
 		if (atomic_read(&np->np_shutdown)) {
 			spin_unlock(&np->np_state_lock);
@@ -303,11 +310,11 @@ static struct iscsi_np *iscsit_get_np(
 			
 		if (!memcmp(p, ip, net_size) && (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
-			spin_unlock(&iscsi_global->np_lock);
+			spin_unlock(&np_lock);
 			return np;
 		}
 	}
-	spin_unlock(&iscsi_global->np_lock);
+	spin_unlock(&np_lock);
 
 	return NULL;
 }
@@ -379,9 +386,9 @@ struct iscsi_np *iscsit_add_np(
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
-	spin_lock(&iscsi_global->np_lock);
-	list_add_tail(&np->np_list, &iscsi_global->g_np_list);
-	spin_unlock(&iscsi_global->np_lock);
+	spin_lock(&np_lock);
+	list_add_tail(&np->np_list, &g_np_list);
+	spin_unlock(&np_lock);
 
 	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on"
 		" network device: %s\n", ip_buf, np->np_port,
@@ -474,9 +481,9 @@ int iscsit_del_np(struct iscsi_np *np)
 	iscsit_del_np_thread(np);
 	iscsit_del_np_comm(np);
 
-	spin_lock(&iscsi_global->np_lock);
+	spin_lock(&np_lock);
 	list_del(&np->np_list);
-	spin_unlock(&iscsi_global->np_lock);
+	spin_unlock(&np_lock);
 
 	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &np->np_ipv6[0];
@@ -500,26 +507,26 @@ void iscsit_reset_nps(void)
 {
 	struct iscsi_np *np, *t_np;
 
-	spin_lock(&iscsi_global->np_lock);
-	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
-		spin_unlock(&iscsi_global->np_lock);
+	spin_lock(&np_lock);
+	list_for_each_entry_safe(np, t_np, &g_np_list, np_list) {
+		spin_unlock(&np_lock);
 		iscsit_reset_np_thread(np, NULL, NULL, 1);
-		spin_lock(&iscsi_global->np_lock);
+		spin_lock(&np_lock);
 	}
-	spin_unlock(&iscsi_global->np_lock);
+	spin_unlock(&np_lock);
 }
 
 void iscsit_release_nps(void)
 {
 	struct iscsi_np *np, *t_np;
 
-	spin_lock(&iscsi_global->np_lock);
-	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
-		spin_unlock(&iscsi_global->np_lock);
+	spin_lock(&np_lock);
+	list_for_each_entry_safe(np, t_np, &g_np_list, np_list) {
+		spin_unlock(&np_lock);
 		iscsit_del_np(np);
-		spin_lock(&iscsi_global->np_lock);
+		spin_lock(&np_lock);
 	}
-	spin_unlock(&iscsi_global->np_lock);
+	spin_unlock(&np_lock);
 }
 
 /* iSCSI mib table index for iscsi_target_stat.c */
@@ -556,26 +563,6 @@ u32 iscsi_get_new_index(iscsi_index_t type)
 	return new_index;
 }
 
-/* init_iscsi_target():
- *
- * This function is called during module initialization to setup struct iscsi_global.
- */
-static int init_iscsi_global(struct iscsi_global *global)
-{
-	mutex_init(&global->auth_id_lock);
-	spin_lock_init(&global->active_ts_lock);
-	spin_lock_init(&global->inactive_ts_lock);
-	spin_lock_init(&global->np_lock);
-	spin_lock_init(&global->tiqn_lock);
-	spin_lock_init(&global->ts_bitmap_lock);
-	INIT_LIST_HEAD(&global->g_tiqn_list);
-	INIT_LIST_HEAD(&global->g_np_list);
-	INIT_LIST_HEAD(&global->active_ts_list);
-	INIT_LIST_HEAD(&global->inactive_ts_list);
-
-	return 0;
-}
-
 static int __init iscsi_target_init_module(void)
 {
 	int ret = 0;
@@ -589,10 +576,7 @@ static int __init iscsi_target_init_module(void)
 	}
 	init_iscsi_index_table();
 
-	if (init_iscsi_global(iscsi_global) < 0) {
-		kfree(iscsi_global);
-		return -1;
-	}
+	mutex_init(&auth_id_lock);
 
 	ret = iscsi_target_register_configfs();
 	if (ret < 0)

@@ -902,8 +902,6 @@ struct iscsi_tiqn {
 struct iscsi_global {
 	/* In core shutdown */
 	u32			in_shutdown;
-	/* Is the iSCSI Node name set? */
-	u32			targetname_set;
 	u32			active_ts;
 	/* Unique identifier used for the authentication daemon */
 	u32			auth_id;
@@ -912,24 +910,6 @@ struct iscsi_global {
 	int			ts_bitmap_count;
 	/* Thread Set bitmap pointer */
 	unsigned long		*ts_bitmap;
-	struct list_head	g_tiqn_list;
-	struct list_head	tpg_list;
-	struct list_head	g_np_list;
-	struct list_head	active_ts_list;
-	struct list_head	inactive_ts_list;
-	spinlock_t		active_ts_lock;
-	/* Spinlock for adding/removing discovery entries */
-	spinlock_t		inactive_ts_lock;
-	/* Spinlock for adding/removing thread sets */
-	spinlock_t		thread_set_lock;
-	/* Spinlock for iscsi_global->ts_bitmap */
-	spinlock_t		ts_bitmap_lock;
-	/* Spinlock for struct iscsi_tiqn */
-	spinlock_t		tiqn_lock;
-	/* Spinlock g_np_list */
-	spinlock_t		np_lock;
-	/* Semaphore used for allocate of struct iscsi_conn->auth_id */
-	struct mutex		auth_id_lock;
 	/* Used for iSCSI discovery session authentication */
 	struct iscsi_node_acl	discovery_acl;
 	struct iscsi_portal_group	*discovery_tpg;

@@ -39,6 +39,8 @@
 #include "iscsi_target.h"
 #include "iscsi_parameters.h"
 
+extern struct mutex auth_id_lock;
+
 static int iscsi_login_init_conn(struct iscsi_conn *conn)
 {
 	INIT_LIST_HEAD(&conn->conn_list);
@@ -202,9 +204,9 @@ static void iscsi_login_set_conn_values(
 	 */
 	get_random_bytes(&conn->stat_sn, sizeof(u32));
 
-	mutex_lock(&iscsi_global->auth_id_lock);
+	mutex_lock(&auth_id_lock);
 	conn->auth_id		= iscsi_global->auth_id++;
-	mutex_unlock(&iscsi_global->auth_id_lock);
+	mutex_unlock(&auth_id_lock);
 }
 
 /*	iscsi_login_zero_tsih():

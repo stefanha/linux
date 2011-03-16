@@ -33,16 +33,22 @@
 #include "iscsi_target_core.h"
 #include "iscsi_thread_queue.h"
 
+LIST_HEAD(active_ts_list);
+LIST_HEAD(inactive_ts_list);
+DEFINE_SPINLOCK(active_ts_lock);
+DEFINE_SPINLOCK(inactive_ts_lock);
+DEFINE_SPINLOCK(ts_bitmap_lock);
+
 /*	iscsi_add_ts_to_active_list():
  *
  *
  */
 static void iscsi_add_ts_to_active_list(struct se_thread_set *ts)
 {
-	spin_lock(&iscsi_global->active_ts_lock);
-	list_add_tail(&ts->ts_list, &iscsi_global->active_ts_list);
+	spin_lock(&active_ts_lock);
+	list_add_tail(&ts->ts_list, &active_ts_list);
 	iscsi_global->active_ts++;
-	spin_unlock(&iscsi_global->active_ts_lock);
+	spin_unlock(&active_ts_lock);
 }
 
 /*	iscsi_add_ts_to_inactive_list():
@@ -51,10 +57,10 @@ static void iscsi_add_ts_to_active_list(struct se_thread_set *ts)
  */
 extern void iscsi_add_ts_to_inactive_list(struct se_thread_set *ts)
 {
-	spin_lock(&iscsi_global->inactive_ts_lock);
-	list_add_tail(&ts->ts_list, &iscsi_global->inactive_ts_list);
+	spin_lock(&inactive_ts_lock);
+	list_add_tail(&ts->ts_list, &inactive_ts_list);
 	iscsi_global->inactive_ts++;
-	spin_unlock(&iscsi_global->inactive_ts_lock);
+	spin_unlock(&inactive_ts_lock);
 }
 
 /*	iscsi_del_ts_from_active_list():
@@ -63,10 +69,10 @@ extern void iscsi_add_ts_to_inactive_list(struct se_thread_set *ts)
  */
 static void iscsi_del_ts_from_active_list(struct se_thread_set *ts)
 {
-	spin_lock(&iscsi_global->active_ts_lock);
+	spin_lock(&active_ts_lock);
 	list_del(&ts->ts_list);
 	iscsi_global->active_ts--;
-	spin_unlock(&iscsi_global->active_ts_lock);
+	spin_unlock(&active_ts_lock);
 
 	if (ts->stop_active)
 		up(&ts->stop_active_sem);
@@ -80,18 +86,18 @@ static struct se_thread_set *iscsi_get_ts_from_inactive_list(void)
 {
 	struct se_thread_set *ts;
 
-	spin_lock(&iscsi_global->inactive_ts_lock);
-	if (list_empty(&iscsi_global->inactive_ts_list)) {
-		spin_unlock(&iscsi_global->inactive_ts_lock);
+	spin_lock(&inactive_ts_lock);
+	if (list_empty(&inactive_ts_list)) {
+		spin_unlock(&inactive_ts_lock);
 		return NULL;
 	}
 
-	list_for_each_entry(ts, &iscsi_global->inactive_ts_list, ts_list)
+	list_for_each_entry(ts, &inactive_ts_list, ts_list)
 		break;
 
 	list_del(&ts->ts_list);
 	iscsi_global->inactive_ts--;
-	spin_unlock(&iscsi_global->inactive_ts_lock);
+	spin_unlock(&inactive_ts_lock);
 
 	return ts;
 }
@@ -115,10 +121,10 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 		/*
 		 * Locate the next available regision in the thread_set_bitmap
 		 */
-		spin_lock(&iscsi_global->ts_bitmap_lock);
+		spin_lock(&ts_bitmap_lock);
 		thread_id = bitmap_find_free_region(iscsi_global->ts_bitmap,
 				iscsi_global->ts_bitmap_count, get_order(1));
-		spin_unlock(&iscsi_global->ts_bitmap_lock);
+		spin_unlock(&ts_bitmap_lock);
 		if (thread_id < 0) {
 			printk(KERN_ERR "bitmap_find_free_region() failed for"
 				" thread_set_bitmap\n");
@@ -187,10 +193,10 @@ extern void iscsi_deallocate_thread_sets(void)
 		/*
 		 * Release this thread_id in the thread_set_bitmap
 		 */
-		spin_lock(&iscsi_global->ts_bitmap_lock);
+		spin_lock(&ts_bitmap_lock);
 		bitmap_release_region(iscsi_global->ts_bitmap,
 				ts->thread_id, get_order(1));
-		spin_unlock(&iscsi_global->ts_bitmap_lock);
+		spin_unlock(&ts_bitmap_lock);
 
 		released_count++;
 		kfree(ts);
@@ -232,10 +238,10 @@ static void iscsi_deallocate_extra_thread_sets(void)
 		/*
 		 * Release this thread_id in the thread_set_bitmap
 		 */
-		spin_lock(&iscsi_global->ts_bitmap_lock);
+		spin_lock(&ts_bitmap_lock);
 		bitmap_release_region(iscsi_global->ts_bitmap,
 				ts->thread_id, get_order(1));
-		spin_unlock(&iscsi_global->ts_bitmap_lock);
+		spin_unlock(&ts_bitmap_lock);
 
 		released_count++;
 		kfree(ts);
@@ -467,9 +473,9 @@ static void iscsi_check_to_add_additional_sets(void)
 {
 	int thread_sets_add;
 
-	spin_lock(&iscsi_global->inactive_ts_lock);
+	spin_lock(&inactive_ts_lock);
 	thread_sets_add = iscsi_global->inactive_ts;
-	spin_unlock(&iscsi_global->inactive_ts_lock);
+	spin_unlock(&inactive_ts_lock);
 	if (thread_sets_add == 1)
 		iscsi_allocate_thread_sets(1);
 }
@@ -625,6 +631,12 @@ int iscsi_thread_set_init(void)
 		printk(KERN_ERR "Unable to allocate iscsi_global->ts_bitmap\n");
 		return -ENOMEM;
 	}
+
+	spin_lock_init(&active_ts_lock);
+	spin_lock_init(&inactive_ts_lock);
+	spin_lock_init(&ts_bitmap_lock);
+	INIT_LIST_HEAD(&active_ts_list);
+	INIT_LIST_HEAD(&inactive_ts_list);
 
 	return 0;
 }

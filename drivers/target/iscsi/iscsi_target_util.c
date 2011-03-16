@@ -41,6 +41,9 @@
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
 
+extern struct list_head g_tiqn_list;
+extern spinlock_t tiqn_lock;
+
 inline void iscsi_attach_cmd_to_queue(struct iscsi_conn *conn, struct iscsi_cmd *cmd)
 {
 	spin_lock_bh(&conn->cmd_lock);
@@ -2527,8 +2530,8 @@ extern int iscsi_build_sendtargets_response(struct iscsi_cmd *cmd)
 		return -1;
 	}
 
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
+	spin_lock(&tiqn_lock);
+	list_for_each_entry(tiqn, &g_tiqn_list, tiqn_list) {
 		memset(buf, 0, 256);
 
 		len = sprintf(buf, "TargetName=%s", tiqn->tiqn);
@@ -2595,7 +2598,7 @@ eob:
 		if (end_of_buf)
 			break;
 	}
-	spin_unlock(&iscsi_global->tiqn_lock);
+	spin_unlock(&tiqn_lock);
 
 	cmd->buf_ptr = payload;
 
