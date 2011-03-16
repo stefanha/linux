@@ -380,9 +380,9 @@ static void iscsi_tpg_free_network_portals(struct iscsi_portal_group *tpg)
 		tpg->num_tpg_nps--;
 		tpg->tpg_tiqn->tiqn_num_tpg_nps--;
 
-		if (np->np_net_size == IPV6_ADDRESS_SPACE)
+		if (np->np_flags & NPF_NET_IPV6) {
 			ip = &np->np_ipv6[0];
-		else {
+		} else {
 			memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 			iscsi_ntoa2(buf_ipv4, np->np_ipv4);
 			ip = &buf_ipv4[0];
@@ -470,8 +470,6 @@ int iscsi_tpg_del_portal_group(
 	spin_lock(&tpg->tpg_state_lock);
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
-
-	iscsi_clear_tpg_np_login_threads(tpg, 1);
 
 	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
 		printk(KERN_ERR "Unable to delete iSCSI Target Portal Group:"
@@ -633,29 +631,21 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 {
 	struct iscsi_np *np;
 	struct iscsi_tpg_np *tpg_np;
-	char *ip_buf;
-	void *ip;
+	unsigned char *ip_buf;
 	int ret = 0;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
 	if (np_addr->np_flags & NPF_NET_IPV6) {
 		ip_buf = (char *)&np_addr->np_ipv6[0];
-		ip = (void *)&np_addr->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		iscsi_ntoa2(buf_ipv4, np_addr->np_ipv4);
 		ip_buf = &buf_ipv4[0];
-		ip = (void *)&np_addr->np_ipv4;
 	}
-	/*
-	 * If the Network Portal does not currently exist, start it up now.
-	 */
-	np = core_get_np(ip, np_addr->np_port, network_transport);
-	if (!np) {
-		np = core_add_np(np_addr, network_transport, &ret);
-		if (!np)
-			return ERR_PTR(ret);
-	}
+
+	np = core_add_np(np_addr, network_transport, &ret);
+	if (!np)
+		return ERR_PTR(ret);
 
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
 	if (!tpg_np) {
@@ -709,9 +699,9 @@ static int iscsi_tpg_release_np(
 	char *ip;
 	char buf_ipv4[IPV4_BUF_SIZE];
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE)
+	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &np->np_ipv6[0];
-	else {
+	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
 		ip = &buf_ipv4[0];

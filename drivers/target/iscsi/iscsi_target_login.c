@@ -595,7 +595,7 @@ static int iscsi_post_login_handler(
 	iscsi_set_connection_parameters(conn->conn_ops, conn->param_list);
 	iscsi_set_sync_and_steering_values(conn);
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
+	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &conn->ipv6_login_ip[0];
 		ip_np = &np->np_ipv6[0];
 	} else {
@@ -1091,9 +1091,9 @@ get_new_sock:
 	*/
 	conn->login_itt		= pdu->itt;
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE)
+	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &np->np_ipv6[0];
-	else {
+	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
 		ip = &buf_ipv4[0];
@@ -1111,7 +1111,7 @@ get_new_sock:
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
+	if (np->np_flags & NPF_NET_IPV6) {
 		memset(&sock_in6, 0, sizeof(struct sockaddr_in6));
 
 		if (conn->sock->ops->getname(conn->sock,

@@ -796,7 +796,6 @@ struct iscsi_np {
 	int			np_network_transport;
 	enum np_thread_state_table np_thread_state;
 	enum iscsi_timer_flags_table np_login_timer_flags;
-	int			np_net_size;
 	u32			np_exports;
 	enum np_flags_table	np_flags;
 	u32			np_ipv4;

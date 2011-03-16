@@ -73,7 +73,7 @@ struct iscsi_tiqn *core_get_tiqn_for_login(unsigned char *buf)
 
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		if (!(strcmp(tiqn->tiqn, buf))) {
+		if (!strcmp(tiqn->tiqn, buf)) {
 
 			spin_lock(&tiqn->tiqn_state_lock);
 			if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
@@ -271,19 +271,15 @@ int core_deaccess_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 	return 0;
 }
 
-void *core_get_np_ip(struct iscsi_np *np)
-{
-	return (np->np_flags & NPF_NET_IPV6) ?
-	       (void *)&np->np_ipv6[0] :
-	       (void *)&np->np_ipv4;
-}
-
-struct iscsi_np *core_get_np(
-	void *ip,
+static struct iscsi_np *core_get_np(
+	unsigned char *ipv6,
+	u32 ipv4,
 	u16 port,
 	int network_transport)
 {
 	struct iscsi_np *np;
+	void *p, *ip;
+	int net_size;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) {
@@ -294,8 +290,17 @@ struct iscsi_np *core_get_np(
 		}
 		spin_unlock(&np->np_state_lock);
 
-		if (!(memcmp(core_get_np_ip(np), ip, np->np_net_size)) &&
-		    (np->np_port == port) &&
+		if (ipv6 != NULL) {
+			p = (void *)&np->np_ipv6[0];
+			ip = (void *)ipv6;
+			net_size = IPV6_ADDRESS_SPACE;
+		} else {
+			p = (void *)&np->np_ipv4;
+			ip = (void *)&ipv4;
+			net_size = IPV4_ADDRESS_SPACE;
+		}
+			
+		if (!memcmp(p, ip, net_size) && (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
 			spin_unlock(&iscsi_global->np_lock);
 			return np;
@@ -306,66 +311,34 @@ struct iscsi_np *core_get_np(
 	return NULL;
 }
 
-static struct iscsi_np *core_add_np_locate(
-	void *ip,
-	unsigned char *ip_buf,
-	u16 port,
-	int network_transport,
-	int net_size)
-{
-	struct iscsi_np *np;
-
-	spin_lock(&iscsi_global->np_lock);
-	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) {
-		spin_lock(&np->np_state_lock);
-		if (atomic_read(&np->np_shutdown)) {
-			spin_unlock(&np->np_state_lock);
-			continue;
-		}
-		spin_unlock(&np->np_state_lock);
-
-		if (!(memcmp(core_get_np_ip(np), ip, np->np_net_size)) &&
-		    (np->np_port == port) &&
-		    (np->np_network_transport == network_transport)) {
-			spin_unlock(&iscsi_global->np_lock);
-			return np;
-		}
-	}
-	spin_unlock(&iscsi_global->np_lock);
-
-	return ERR_PTR(-EINVAL);
-}
-
 struct iscsi_np *core_add_np(
 	struct iscsi_np_addr *np_addr,
 	int network_transport,
 	int *ret)
 {
 	struct iscsi_np *np;
-	char *ip_buf = NULL;
-	void *ip;
+	char *ip_buf = NULL, *ipv6 = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
-	int net_size;
+	u32 ipv4 = 0;
 
 	if (np_addr->np_flags & NPF_NET_IPV6) {
 		ip_buf = &np_addr->np_ipv6[0];
-		ip = (void *)&np_addr->np_ipv6[0];
-		net_size = IPV6_ADDRESS_SPACE;
+		ipv6 = &np_addr->np_ipv6[0];
 	} else {
-		ip = (void *)&np_addr->np_ipv4;
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		iscsi_ntoa2(buf_ipv4, np_addr->np_ipv4);
 		ip_buf = &buf_ipv4[0];
-		net_size = IPV4_ADDRESS_SPACE;
+		ipv4 = np_addr->np_ipv4;
 	}
-
-	np = core_add_np_locate(ip, ip_buf, np_addr->np_port,
-				network_transport, net_size);
-	if (!IS_ERR(np))
+	/*
+	 * Locate the existing struct iscsi_np if already active..
+	 */
+	np = core_get_np(ipv6, ipv4, np_addr->np_port, network_transport);
+	if (np)
 		return np;
 
 	np = kzalloc(sizeof(struct iscsi_np), GFP_KERNEL);
-	if (!(np)) {
+	if (!np) {
 		printk(KERN_ERR "Unable to allocate memory for struct iscsi_np\n");
 		*ret = -ENOMEM;
 		return NULL;
@@ -381,7 +354,6 @@ struct iscsi_np *core_add_np(
 	}
 	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
-	np->np_net_size		= net_size;
 	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
@@ -505,7 +477,7 @@ int core_del_np(struct iscsi_np *np)
 	list_del(&np->np_list);
 	spin_unlock(&iscsi_global->np_lock);
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
+	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &np->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
