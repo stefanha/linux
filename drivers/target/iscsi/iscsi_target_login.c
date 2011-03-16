@@ -20,6 +20,7 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
+#include <linux/kthread.h>
 #include <linux/crypto.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
@@ -770,26 +771,26 @@ static void iscsi_stop_login_thread_timer(struct iscsi_np *np)
 	spin_unlock_bh(&np->np_thread_lock);
 }
 
-static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
+int iscsi_target_setup_login_socket(struct iscsi_np *np)
 {
 	const char *end;
 	struct socket *sock;
-	int backlog = 5, ip_proto, sock_type, ret, opt = 0;
+	int backlog = 5, ret, opt = 0;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 
 	switch (np->np_network_transport) {
 	case ISCSI_TCP:
-		ip_proto = IPPROTO_TCP;
-		sock_type = SOCK_STREAM;
+		np->np_ip_proto = IPPROTO_TCP;
+		np->np_sock_type = SOCK_STREAM;
 		break;
 	case ISCSI_SCTP_TCP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_STREAM;
+		np->np_ip_proto = IPPROTO_SCTP;
+		np->np_sock_type = SOCK_STREAM;
 		break;
 	case ISCSI_SCTP_UDP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_SEQPACKET;
+		np->np_ip_proto = IPPROTO_SCTP;
+		np->np_sock_type = SOCK_SEQPACKET;
 		break;
 	case ISCSI_IWARP_TCP:
 	case ISCSI_IWARP_SCTP:
@@ -797,13 +798,14 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 	default:
 		printk(KERN_ERR "Unsupported network_transport: %d\n",
 				np->np_network_transport);
-		goto fail;
+		return -EINVAL;
 	}
 
-	if (sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
-			sock_type, ip_proto, &sock) < 0) {
+	ret = sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
+			np->np_sock_type, np->np_ip_proto, &sock);
+	if (ret < 0) {
 		printk(KERN_ERR "sock_create() failed.\n");
-		goto fail;
+		return ret;
 	}
 	np->np_socket = sock;
 
@@ -817,6 +819,7 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 			if (!sock->file) {
 				printk(KERN_ERR "Unable to allocate struct"
 						" file for SCTP\n");
+				ret = -ENOMEM;
 				goto fail;
 			}
 			np->np_flags |= NPF_SCTP_STRUCT_FILE;
@@ -832,6 +835,7 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 				(void *)&sock_in6.sin6_addr.in6_u, -1, &end);
 		if (ret <= 0) {
 			printk(KERN_ERR "in6_pton returned: %d\n", ret);
+			ret = -EINVAL;
 			goto fail;
 		}
 	} else {
@@ -878,12 +882,13 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 		}
 	}
 
-	if (kernel_listen(sock, backlog)) {
-		printk(KERN_ERR "kernel_listen() failed.\n");
+	ret = kernel_listen(sock, backlog);
+	if (ret != 0) {
+		printk(KERN_ERR "kernel_listen() failed: %d\n", ret);
 		goto fail;
 	}
 
-	return sock;
+	return 0;
 
 fail:
 	np->np_socket = NULL;
@@ -895,106 +900,49 @@ fail:
 
 		sock_release(sock);
 	}
-	return NULL;
+	return ret;
 }
 
-int iscsi_target_login_thread(void *arg)
+static int __iscsi_target_login_thread(struct iscsi_np *np)
 {
 	u8 buffer[ISCSI_HDR_LEN], iscsi_opcode, zero_tsih = 0;
 	unsigned char *ip = NULL, *ip_init_buf = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
-	int err, ret = 0, start = 1, ip_proto;
-	int sock_type, set_sctp_conn_flag = 0;
+	int err, ret = 0, ip_proto, sock_type, set_sctp_conn_flag;
 	struct iscsi_conn *conn = NULL;
 	struct iscsi_login *login;
 	struct iscsi_portal_group *tpg = NULL;
 	struct socket *new_sock, *sock;
-	struct iscsi_np *np = (struct iscsi_np *) arg;
 	struct iovec iov;
 	struct iscsi_login_req *pdu;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 
-	{
-	char name[16];
-	memset(name, 0, 16);
-	sprintf(name, "iscsi_np");
-	iscsi_daemon(np->np_thread, name, SHUTDOWN_SIGS);
-	}
-
-	sock = iscsi_target_setup_login_socket(np);
-	if (!sock) {
-		complete(&np->np_start_comp);
-		return -1;
-	}
-
-get_new_sock:
 	flush_signals(current);
-	ip_proto = sock_type = set_sctp_conn_flag = 0;
-
-	switch (np->np_network_transport) {
-	case ISCSI_TCP:
-		ip_proto = IPPROTO_TCP;
-		sock_type = SOCK_STREAM;
-		break;
-	case ISCSI_SCTP_TCP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_STREAM;
-		break;
-	case ISCSI_SCTP_UDP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_SEQPACKET;
-		break;
-	case ISCSI_IWARP_TCP:
-	case ISCSI_IWARP_SCTP:
-	case ISCSI_INFINIBAND:
-	default:
-		printk(KERN_ERR "Unsupported network_transport: %d\n",
-			np->np_network_transport);
-		if (start)
-			complete(&np->np_start_comp);
-		return -1;
-	}
+	set_sctp_conn_flag = 0;
+	sock = np->np_socket;
+	ip_proto = np->np_ip_proto;
+	sock_type = np->np_sock_type;
 
 	spin_lock_bh(&np->np_thread_lock);
-	if (np->np_thread_state == ISCSI_NP_THREAD_SHUTDOWN)
-		goto out;
-	else if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
-		if (atomic_read(&np->np_shutdown)) {
-			spin_unlock_bh(&np->np_thread_lock);
-			complete(&np->np_restart_comp);
-			wait_for_completion(&np->np_shutdown_comp);
-			goto out;
-		}
+	if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
 		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
 		complete(&np->np_restart_comp);
 	} else {
 		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
-
-		if (start) {
-			start = 0;
-			complete(&np->np_start_comp);
-		}
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
 	if (kernel_accept(sock, &new_sock, 0) < 0) {
-		if (signal_pending(current)) {
-			spin_lock_bh(&np->np_thread_lock);
-			if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
-				if (atomic_read(&np->np_shutdown)) {
-					spin_unlock_bh(&np->np_thread_lock);
-					complete(&np->np_restart_comp);
-					wait_for_completion(&np->np_shutdown_comp);
-					goto out;
-				}
-				spin_unlock_bh(&np->np_thread_lock);
-				goto get_new_sock;
-			}
+		spin_lock_bh(&np->np_thread_lock);
+		if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
 			spin_unlock_bh(&np->np_thread_lock);
-			goto out;
+			complete(&np->np_restart_comp);
+			/* Get another socket */
+			return 1;
 		}
-		goto get_new_sock;
+		spin_unlock_bh(&np->np_thread_lock);
+		goto out;
 	}
 	/*
 	 * The SCTP stack needs struct socket->file.
@@ -1008,7 +956,8 @@ get_new_sock:
 				printk(KERN_ERR "Unable to allocate struct"
 						" file for SCTP\n");
 				sock_release(new_sock);
-				goto get_new_sock;
+				/* Get another socket */
+				return 1;
 			}
 			set_sctp_conn_flag = 1;
 		}
@@ -1025,8 +974,8 @@ get_new_sock:
 			new_sock->file = NULL;
 		}
 		sock_release(new_sock);
-
-		goto get_new_sock;
+		/* Get another socket */
+		return 1;
 	}
 
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_FREE.\n");
@@ -1232,7 +1181,8 @@ get_new_sock:
 
 	iscsit_deaccess_np(np, tpg);
 	tpg = NULL;
-	goto get_new_sock;
+	/* Get another socket */
+	return 1;
 
 new_sess_out:
 	printk(KERN_ERR "iSCSI Login negotiation failed.\n");
@@ -1296,27 +1246,35 @@ old_sess_out:
 		tpg = NULL;
 	}
 
-	if (!(signal_pending(current)))
-		goto get_new_sock;
-
-	spin_lock_bh(&np->np_thread_lock);
-	if (atomic_read(&np->np_shutdown)) {
-		spin_unlock_bh(&np->np_thread_lock);
-		complete(&np->np_restart_comp);
-		wait_for_completion(&np->np_shutdown_comp);
-		goto out;
-	}
-	if (np->np_thread_state != ISCSI_NP_THREAD_SHUTDOWN) {
-		spin_unlock_bh(&np->np_thread_lock);
-		goto get_new_sock;
-	}
-	spin_unlock_bh(&np->np_thread_lock);
 out:
+	/* Wait for another socket.. */
+	if (!signal_pending(current) || !kthread_should_stop())
+		return 1;
+
 	iscsi_stop_login_thread_timer(np);
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_thread_state = ISCSI_NP_THREAD_EXIT;
-	np->np_thread = NULL;
 	spin_unlock_bh(&np->np_thread_lock);
-	complete(&np->np_done_comp);
+	return 0;
+}
+
+int iscsi_target_login_thread(void *arg)
+{
+	struct iscsi_np *np = (struct iscsi_np *)arg;
+	int ret;
+
+	set_user_nice(current, -20);
+	allow_signal(SIGINT);
+
+	while (!kthread_should_stop()) {
+		ret = __iscsi_target_login_thread(np);
+		/*
+		 * We break and exit here unless another sock_accept() call
+		 * is expected.
+		 */
+		if (ret != 1)
+			break;
+	}
+
 	return 0;
 }

@@ -794,6 +794,8 @@ struct iscsi_tpg_attrib {
 struct iscsi_np {
 	unsigned char		np_net_dev[ISCSI_NETDEV_NAME_SIZE];
 	int			np_network_transport;
+	int			np_ip_proto;
+	int			np_sock_type;
 	enum np_thread_state_table np_thread_state;
 	enum iscsi_timer_flags_table np_login_timer_flags;
 	u32			np_exports;
@@ -804,10 +806,7 @@ struct iscsi_np {
 	atomic_t		np_shutdown;
 	spinlock_t		np_state_lock;
 	spinlock_t		np_thread_lock;
-	struct completion	np_done_comp;
 	struct completion	np_restart_comp;
-	struct completion	np_shutdown_comp;
-	struct completion	np_start_comp;
 	struct socket		*np_socket;
 	struct task_struct	*np_thread;
 	struct timer_list	np_login_timer;

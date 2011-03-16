@@ -25,7 +25,7 @@ extern struct iscsi_portal_group *iscsit_get_tpg_from_np(struct iscsi_tiqn *,
 			struct iscsi_np *);
 extern int iscsi_get_tpg(struct iscsi_portal_group *);
 extern void iscsi_put_tpg(struct iscsi_portal_group *);
-extern void iscsi_clear_tpg_np_login_threads(struct iscsi_portal_group *, int);
+extern void iscsi_clear_tpg_np_login_threads(struct iscsi_portal_group *);
 extern void iscsi_tpg_dump_params(struct iscsi_portal_group *);
 extern int iscsi_tpg_add_portal_group(struct iscsi_tiqn *, struct iscsi_portal_group *);
 extern int iscsi_tpg_del_portal_group(struct iscsi_tiqn *, struct iscsi_portal_group *,

@@ -8,9 +8,9 @@ extern struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *, int *);
 extern void iscsit_del_tiqn(struct iscsi_tiqn *);
 extern int iscsit_access_np(struct iscsi_np *, struct iscsi_portal_group *);
 extern int iscsit_deaccess_np(struct iscsi_np *, struct iscsi_portal_group *);
-extern struct iscsi_np *iscsit_add_np(struct iscsi_np_addr *, int, int *);
+extern struct iscsi_np *iscsit_add_np(struct iscsi_np_addr *, int);
 extern int iscsit_reset_np_thread(struct iscsi_np *, struct iscsi_tpg_np *,
-				struct iscsi_portal_group *, int);
+				struct iscsi_portal_group *);
 extern int iscsit_del_np(struct iscsi_np *);
 extern u32 iscsi_get_new_index(iscsi_index_t);
 extern char *iscsi_get_fabric_name(void);

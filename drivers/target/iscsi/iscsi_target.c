@@ -20,6 +20,7 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
+#include <linux/kthread.h>
 #include <linux/crypto.h>
 #include <linux/completion.h>
 #include <asm/unaligned.h>
@@ -321,13 +322,13 @@ static struct iscsi_np *iscsit_get_np(
 
 struct iscsi_np *iscsit_add_np(
 	struct iscsi_np_addr *np_addr,
-	int network_transport,
-	int *ret)
+	int network_transport)
 {
 	struct iscsi_np *np;
 	char *ip_buf = NULL, *ipv6 = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 	u32 ipv4 = 0;
+	int ret;
 
 	if (np_addr->np_flags & NPF_NET_IPV6) {
 		ip_buf = &np_addr->np_ipv6[0];
@@ -348,8 +349,7 @@ struct iscsi_np *iscsit_add_np(
 	np = kzalloc(sizeof(struct iscsi_np), GFP_KERNEL);
 	if (!np) {
 		printk(KERN_ERR "Unable to allocate memory for struct iscsi_np\n");
-		*ret = -ENOMEM;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	np->np_flags |= NPF_IP_NETWORK;
@@ -365,27 +365,22 @@ struct iscsi_np *iscsit_add_np(
 	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
-	init_completion(&np->np_done_comp);
 	init_completion(&np->np_restart_comp);
-	init_completion(&np->np_shutdown_comp);
-	init_completion(&np->np_start_comp);
 	INIT_LIST_HEAD(&np->np_list);
 
-	kernel_thread(iscsi_target_login_thread, np, 0);
-
-	wait_for_completion(&np->np_start_comp);
-
-	spin_lock_bh(&np->np_thread_lock);
-	if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {
-		spin_unlock_bh(&np->np_thread_lock);
-		printk(KERN_ERR "Unable to start login thread for iSCSI Network"
-			" Portal %s:%hu\n", ip_buf, np->np_port);
+	ret = iscsi_target_setup_login_socket(np);
+	if (ret != 0) {
 		kfree(np);
-		*ret = -EADDRINUSE;
-		return NULL;
+		return ERR_PTR(ret);
 	}
-	spin_unlock_bh(&np->np_thread_lock);
 
+	np->np_thread = kthread_run(iscsi_target_login_thread, np, "iscsi_np");
+	if (IS_ERR(np->np_thread)) {
+		printk(KERN_ERR "Unable to create kthread: iscsi_np\n");
+		ret = PTR_ERR(np->np_thread);
+		kfree(np);
+		return ERR_PTR(ret);
+	}
 	spin_lock(&np_lock);
 	list_add_tail(&np->np_list, &g_np_list);
 	spin_unlock(&np_lock);
@@ -396,15 +391,13 @@ struct iscsi_np *iscsit_add_np(
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
 
-	*ret = 0;
 	return np;
 }
 
 int iscsit_reset_np_thread(
 	struct iscsi_np *np,
 	struct iscsi_tpg_np *tpg_np,
-	struct iscsi_portal_group *tpg,
-	int shutdown)
+	struct iscsi_portal_group *tpg)
 {
 	spin_lock_bh(&np->np_thread_lock);
 	if (tpg && tpg_np) {
@@ -422,14 +415,11 @@ int iscsit_reset_np_thread(
 		spin_unlock_bh(&np->np_thread_lock);
 		return 0;
 	}
-
 	np->np_thread_state = ISCSI_NP_THREAD_RESET;
-	if (shutdown)
-		atomic_set(&np->np_shutdown, 1);
 
 	if (np->np_thread) {
 		spin_unlock_bh(&np->np_thread_lock);
-		send_sig(SIGKILL, np->np_thread, 1);
+		send_sig(SIGINT, np->np_thread, 1);
 		wait_for_completion(&np->np_restart_comp);
 		spin_lock_bh(&np->np_thread_lock);
 	}
@@ -443,14 +433,16 @@ int iscsit_del_np_thread(struct iscsi_np *np)
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
 	atomic_set(&np->np_shutdown, 1);
-	if (np->np_thread) {
-		send_sig(SIGKILL, np->np_thread, 1);
-		spin_unlock_bh(&np->np_thread_lock);
-		complete(&np->np_shutdown_comp);
-		wait_for_completion(&np->np_done_comp);
-		return 0;
-	}
 	spin_unlock_bh(&np->np_thread_lock);
+
+	if (np->np_thread) {
+		/*
+		 * We need to send the signal to wakeup Linux/Net
+		 * sock_accept()..
+		 */
+		send_sig(SIGINT, np->np_thread, 1);
+		kthread_stop(np->np_thread);
+	}
 
 	return 0;
 }
@@ -501,32 +493,6 @@ int iscsit_del_np(struct iscsi_np *np)
 
 	kfree(np);
 	return 0;
-}
-
-void iscsit_reset_nps(void)
-{
-	struct iscsi_np *np, *t_np;
-
-	spin_lock(&np_lock);
-	list_for_each_entry_safe(np, t_np, &g_np_list, np_list) {
-		spin_unlock(&np_lock);
-		iscsit_reset_np_thread(np, NULL, NULL, 1);
-		spin_lock(&np_lock);
-	}
-	spin_unlock(&np_lock);
-}
-
-void iscsit_release_nps(void)
-{
-	struct iscsi_np *np, *t_np;
-
-	spin_lock(&np_lock);
-	list_for_each_entry_safe(np, t_np, &g_np_list, np_list) {
-		spin_unlock(&np_lock);
-		iscsit_del_np(np);
-		spin_lock(&np_lock);
-	}
-	spin_unlock(&np_lock);
 }
 
 /* iSCSI mib table index for iscsi_target_stat.c */
@@ -669,10 +635,8 @@ out:
 
 static void __exit iscsi_target_cleanup_module(void)
 {
-	iscsit_reset_nps();
 	iscsi_deallocate_thread_sets();
 	iscsi_thread_set_free();
-	iscsit_release_nps();
 	iscsit_release_discovery_tpg();
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_qr_cache);

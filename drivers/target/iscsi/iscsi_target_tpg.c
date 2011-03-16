@@ -330,21 +330,19 @@ void iscsi_put_tpg(struct iscsi_portal_group *tpg)
 
 static void iscsi_clear_tpg_np_login_thread(
 	struct iscsi_tpg_np *tpg_np,
-	struct iscsi_portal_group *tpg,
-	int shutdown)
+	struct iscsi_portal_group *tpg)
 {
 	if (!tpg_np->tpg_np) {
 		printk(KERN_ERR "struct iscsi_tpg_np->tpg_np is NULL!\n");
 		return;
 	}
 
-	iscsit_reset_np_thread(tpg_np->tpg_np, tpg_np, tpg, shutdown);
+	iscsit_reset_np_thread(tpg_np->tpg_np, tpg_np, tpg);
 	return;
 }
 
 void iscsi_clear_tpg_np_login_threads(
-	struct iscsi_portal_group *tpg,
-	int shutdown)
+	struct iscsi_portal_group *tpg)
 {
 	struct iscsi_tpg_np *tpg_np;
 
@@ -355,7 +353,7 @@ void iscsi_clear_tpg_np_login_threads(
 			continue;
 		}
 		spin_unlock(&tpg->tpg_np_lock);
-		iscsi_clear_tpg_np_login_thread(tpg_np, tpg, shutdown);
+		iscsi_clear_tpg_np_login_thread(tpg_np, tpg);
 		spin_lock(&tpg->tpg_np_lock);
 	}
 	spin_unlock(&tpg->tpg_np_lock);
@@ -567,7 +565,7 @@ int iscsi_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 
-	iscsi_clear_tpg_np_login_threads(tpg, 0);
+	iscsi_clear_tpg_np_login_threads(tpg);
 
 	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
 		spin_lock(&tpg->tpg_state_lock);
@@ -632,7 +630,6 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 	struct iscsi_np *np;
 	struct iscsi_tpg_np *tpg_np;
 	unsigned char *ip_buf;
-	int ret = 0;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
 	if (np_addr->np_flags & NPF_NET_IPV6) {
@@ -643,9 +640,9 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 		ip_buf = &buf_ipv4[0];
 	}
 
-	np = iscsit_add_np(np_addr, network_transport, &ret);
-	if (!np)
-		return ERR_PTR(ret);
+	np = iscsit_add_np(np_addr, network_transport);
+	if (IS_ERR(np))
+		return ERR_CAST(np);
 
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
 	if (!tpg_np) {
@@ -707,7 +704,7 @@ static int iscsi_tpg_release_np(
 		ip = &buf_ipv4[0];
 	}
 
-	iscsi_clear_tpg_np_login_thread(tpg_np, tpg, 1);
+	iscsi_clear_tpg_np_login_thread(tpg_np, tpg);
 
 	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s"
 		" on network device: %s\n", tpg->tpg_tiqn->tiqn, ip,
