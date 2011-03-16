@@ -468,9 +468,9 @@ struct iscsi_cmd {
 	struct list_head	datain_list;
 	/* R2T List */
 	struct list_head	cmd_r2t_list;
-	struct semaphore	reject_sem;
+	struct completion	reject_comp;
 	/* Semaphore used for allocating buffer */
-	struct semaphore	unsolicited_data_sem;
+	struct completion	unsolicited_data_comp;
 	/* Timer for DataOUT */
 	struct timer_list	dataout_timer;
 	/* Iovecs for SCSI data payload RX/TX w/ kernel level sockets */
@@ -571,18 +571,18 @@ struct iscsi_conn {
 	atomic_t		connection_reinstatement;
 	atomic_t		connection_wait;
 	atomic_t		connection_wait_rcfr;
-	atomic_t		sleep_on_conn_wait_sem;
+	atomic_t		sleep_on_conn_wait_comp;
 	atomic_t		transport_failed;
 	struct net_device	*net_if;
-	struct semaphore	conn_post_wait_sem;
-	struct semaphore	conn_wait_sem;
-	struct semaphore	conn_wait_rcfr_sem;
-	struct semaphore	conn_waiting_on_uc_sem;
-	struct semaphore	conn_logout_sem;
-	struct semaphore	rx_half_close_sem;
-	struct semaphore	tx_half_close_sem;
+	struct completion	conn_post_wait_comp;
+	struct completion	conn_wait_comp;
+	struct completion	conn_wait_rcfr_comp;
+	struct completion	conn_waiting_on_uc_comp;
+	struct completion	conn_logout_comp;
+	struct completion	tx_half_close_comp;
+	struct completion	rx_half_close_comp;
 	/* Semaphore for conn's tx_thread to sleep on */
-	struct semaphore	tx_sem;
+	struct completion	tx_comp;
 	/* socket used by this connection */
 	struct socket		*sock;
 	struct timer_list	nopin_timer;
@@ -631,8 +631,8 @@ struct iscsi_conn_recovery {
 	int			ready_for_reallegiance;
 	struct list_head	conn_recovery_cmd_list;
 	spinlock_t		conn_recovery_cmd_lock;
-	struct semaphore		time2wait_sem;
-	struct timer_list		time2retain_timer;
+	struct completion	time2wait_comp;
+	struct timer_list	time2retain_timer;
 	struct iscsi_session	*sess;
 	struct list_head	cr_list;
 }  ____cacheline_aligned;
@@ -680,7 +680,7 @@ struct iscsi_session {
 	atomic_t		session_stop_active;
 	atomic_t		session_usage_count;
 	atomic_t		session_waiting_on_uc;
-	atomic_t		sleep_on_sess_wait_sem;
+	atomic_t		sleep_on_sess_wait_comp;
 	atomic_t		transport_wait_cmds;
 	/* connection list */
 	struct list_head	sess_conn_list;
@@ -693,10 +693,10 @@ struct iscsi_session {
 	spinlock_t		session_usage_lock;
 	spinlock_t		ttt_lock;
 	struct list_head	sess_ooo_cmdsn_list;
-	struct semaphore	async_msg_sem;
-	struct semaphore	reinstatement_sem;
-	struct semaphore	session_wait_sem;
-	struct semaphore	session_waiting_on_uc_sem;
+	struct completion	async_msg_comp;
+	struct completion	reinstatement_comp;
+	struct completion	session_wait_comp;
+	struct completion	session_waiting_on_uc_comp;
 	struct timer_list	time2retain_timer;
 	struct iscsi_sess_ops	*sess_ops;
 	struct se_session	*se_sess;
@@ -804,13 +804,13 @@ struct iscsi_np {
 	atomic_t		np_shutdown;
 	spinlock_t		np_state_lock;
 	spinlock_t		np_thread_lock;
-	struct semaphore		np_done_sem;
-	struct semaphore		np_restart_sem;
-	struct semaphore		np_shutdown_sem;
-	struct semaphore		np_start_sem;
+	struct completion	np_done_comp;
+	struct completion	np_restart_comp;
+	struct completion	np_shutdown_comp;
+	struct completion	np_start_comp;
 	struct socket		*np_socket;
-	struct task_struct		*np_thread;
-	struct timer_list		np_login_timer;
+	struct task_struct	*np_thread;
+	struct timer_list	np_login_timer;
 	struct iscsi_portal_group *np_login_tpg;
 	struct list_head	np_list;
 } ____cacheline_aligned;
@@ -851,8 +851,8 @@ struct iscsi_portal_group {
 	spinlock_t		tpg_np_lock;
 	spinlock_t		tpg_state_lock;
 	struct se_portal_group tpg_se_tpg;
-	struct semaphore	tpg_access_sem;
-	struct semaphore	np_login_sem;
+	struct mutex		tpg_access_lock;
+	struct mutex		np_login_lock;
 	struct iscsi_tpg_attrib	tpg_attrib;
 	/* Pointer to default list of iSCSI parameters for TPG */
 	struct iscsi_param_list	*param_list;
@@ -915,6 +915,8 @@ struct iscsi_global {
 	struct list_head	g_tiqn_list;
 	struct list_head	tpg_list;
 	struct list_head	g_np_list;
+	struct list_head	active_ts_list;
+	struct list_head	inactive_ts_list;
 	spinlock_t		active_ts_lock;
 	/* Spinlock for adding/removing discovery entries */
 	spinlock_t		inactive_ts_lock;
@@ -926,15 +928,11 @@ struct iscsi_global {
 	spinlock_t		tiqn_lock;
 	/* Spinlock g_np_list */
 	spinlock_t		np_lock;
-	/* Semaphore used for communication to authentication daemon */
-	struct semaphore	auth_sem;
 	/* Semaphore used for allocate of struct iscsi_conn->auth_id */
-	struct semaphore	auth_id_sem;
+	struct mutex		auth_id_lock;
 	/* Used for iSCSI discovery session authentication */
 	struct iscsi_node_acl	discovery_acl;
 	struct iscsi_portal_group	*discovery_tpg;
-	struct list_head	active_ts_list;
-	struct list_head	inactive_ts_list;
 } ____cacheline_aligned;
 
 #endif /* ISCSI_TARGET_CORE_H */

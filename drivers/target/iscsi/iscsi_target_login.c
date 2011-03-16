@@ -45,14 +45,14 @@ static int iscsi_login_init_conn(struct iscsi_conn *conn)
 	INIT_LIST_HEAD(&conn->conn_cmd_list);
 	INIT_LIST_HEAD(&conn->immed_queue_list);
 	INIT_LIST_HEAD(&conn->response_queue_list);
-	sema_init(&conn->conn_post_wait_sem, 0);
-	sema_init(&conn->conn_wait_sem, 0);
-	sema_init(&conn->conn_wait_rcfr_sem, 0);
-	sema_init(&conn->conn_waiting_on_uc_sem, 0);
-	sema_init(&conn->conn_logout_sem, 0);
-	sema_init(&conn->rx_half_close_sem, 0);
-	sema_init(&conn->tx_half_close_sem, 0);
-	sema_init(&conn->tx_sem, 0);
+	init_completion(&conn->conn_post_wait_comp);
+	init_completion(&conn->conn_wait_comp);
+	init_completion(&conn->conn_wait_rcfr_comp);
+	init_completion(&conn->conn_waiting_on_uc_comp);
+	init_completion(&conn->conn_logout_comp);
+	init_completion(&conn->rx_half_close_comp);
+	init_completion(&conn->tx_half_close_comp);
+	init_completion(&conn->tx_comp);
 	spin_lock_init(&conn->cmd_lock);
 	spin_lock_init(&conn->conn_usage_lock);
 	spin_lock_init(&conn->immed_queue_lock);
@@ -202,9 +202,9 @@ static void iscsi_login_set_conn_values(
 	 */
 	get_random_bytes(&conn->stat_sn, sizeof(u32));
 
-	down(&iscsi_global->auth_id_sem);
+	mutex_lock(&iscsi_global->auth_id_lock);
 	conn->auth_id		= iscsi_global->auth_id++;
-	up(&iscsi_global->auth_id_sem);
+	mutex_unlock(&iscsi_global->auth_id_lock);
 }
 
 /*	iscsi_login_zero_tsih():
@@ -235,10 +235,9 @@ static int iscsi_login_zero_tsih_s1(
 	INIT_LIST_HEAD(&sess->sess_ooo_cmdsn_list);
 	INIT_LIST_HEAD(&sess->cr_active_list);
 	INIT_LIST_HEAD(&sess->cr_inactive_list);
-	sema_init(&sess->async_msg_sem, 0);
-	sema_init(&sess->reinstatement_sem, 0);
-	sema_init(&sess->session_wait_sem, 0);
-	sema_init(&sess->session_waiting_on_uc_sem, 0);
+	init_completion(&sess->async_msg_comp);
+	init_completion(&sess->reinstatement_comp);
+	init_completion(&sess->session_wait_comp);
 	spin_lock_init(&sess->cmdsn_lock);
 	spin_lock_init(&sess->conn_lock);
 	spin_lock_init(&sess->cr_a_lock);
@@ -826,21 +825,13 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 		memset(&sock_in6, 0, sizeof(struct sockaddr_in6));
 		sock_in6.sin6_family = AF_INET6;
 		sock_in6.sin6_port = htons(np->np_port);
-#if 1
+
 		ret = in6_pton(&np->np_ipv6[0], IPV6_ADDRESS_SPACE,
 				(void *)&sock_in6.sin6_addr.in6_u, -1, &end);
 		if (ret <= 0) {
 			printk(KERN_ERR "in6_pton returned: %d\n", ret);
 			goto fail;
 		}
-#else
-		ret = iscsi_pton6(&np->np_ipv6[0],
-				(unsigned char *)&sock_in6.sin6_addr.in6_u);
-		if (ret <= 0) {
-			printk(KERN_ERR "iscsi_pton6() returned: %d\n", ret);
-			goto fail;
-		}
-#endif
 	} else {
 		memset(&sock_in, 0, sizeof(struct sockaddr_in));
 		sock_in.sin_family = AF_INET;
@@ -931,7 +922,7 @@ int iscsi_target_login_thread(void *arg)
 
 	sock = iscsi_target_setup_login_socket(np);
 	if (!sock) {
-		up(&np->np_start_sem);
+		complete(&np->np_start_comp);
 		return -1;
 	}
 
@@ -959,7 +950,7 @@ get_new_sock:
 		printk(KERN_ERR "Unsupported network_transport: %d\n",
 			np->np_network_transport);
 		if (start)
-			up(&np->np_start_sem);
+			complete(&np->np_start_comp);
 		return -1;
 	}
 
@@ -969,18 +960,18 @@ get_new_sock:
 	else if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
 		if (atomic_read(&np->np_shutdown)) {
 			spin_unlock_bh(&np->np_thread_lock);
-			up(&np->np_restart_sem);
-			down(&np->np_shutdown_sem);
+			complete(&np->np_restart_comp);
+			wait_for_completion(&np->np_shutdown_comp);
 			goto out;
 		}
 		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
-		up(&np->np_restart_sem);
+		complete(&np->np_restart_comp);
 	} else {
 		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
 
 		if (start) {
 			start = 0;
-			up(&np->np_start_sem);
+			complete(&np->np_start_comp);
 		}
 	}
 	spin_unlock_bh(&np->np_thread_lock);
@@ -991,8 +982,8 @@ get_new_sock:
 			if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
 				if (atomic_read(&np->np_shutdown)) {
 					spin_unlock_bh(&np->np_thread_lock);
-					up(&np->np_restart_sem);
-					down(&np->np_shutdown_sem);
+					complete(&np->np_restart_comp);
+					wait_for_completion(&np->np_shutdown_comp);
 					goto out;
 				}
 				spin_unlock_bh(&np->np_thread_lock);
@@ -1309,8 +1300,8 @@ old_sess_out:
 	spin_lock_bh(&np->np_thread_lock);
 	if (atomic_read(&np->np_shutdown)) {
 		spin_unlock_bh(&np->np_thread_lock);
-		up(&np->np_restart_sem);
-		down(&np->np_shutdown_sem);
+		complete(&np->np_restart_comp);
+		wait_for_completion(&np->np_shutdown_comp);
 		goto out;
 	}
 	if (np->np_thread_state != ISCSI_NP_THREAD_SHUTDOWN) {
@@ -1324,6 +1315,6 @@ out:
 	np->np_thread_state = ISCSI_NP_THREAD_EXIT;
 	np->np_thread = NULL;
 	spin_unlock_bh(&np->np_thread_lock);
-	up(&np->np_done_sem);
+	complete(&np->np_done_comp);
 	return 0;
 }

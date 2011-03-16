@@ -21,6 +21,7 @@
  ******************************************************************************/
 
 #include <linux/crypto.h>
+#include <linux/completion.h>
 #include <asm/unaligned.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
@@ -237,7 +238,7 @@ int iscsit_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 	/*
 	 * Here we serialize access across the TIQN+TPG Tuple.
 	 */
-	ret = down_interruptible(&tpg->np_login_sem);
+	ret = mutex_lock_interruptible(&tpg->np_login_lock);
 	if ((ret != 0) || signal_pending(current))
 		return -1;
 
@@ -263,7 +264,7 @@ int iscsit_deaccess_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 	np->np_login_tpg = NULL;
 	spin_unlock_bh(&np->np_thread_lock);
 
-	up(&tpg->np_login_sem);
+	mutex_unlock(&tpg->np_login_lock);
 
 	if (tiqn)
 		iscsit_put_tiqn_for_login(tiqn);
@@ -357,15 +358,15 @@ struct iscsi_np *iscsit_add_np(
 	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
-	sema_init(&np->np_done_sem, 0);
-	sema_init(&np->np_restart_sem, 0);
-	sema_init(&np->np_shutdown_sem, 0);
-	sema_init(&np->np_start_sem, 0);
+	init_completion(&np->np_done_comp);
+	init_completion(&np->np_restart_comp);
+	init_completion(&np->np_shutdown_comp);
+	init_completion(&np->np_start_comp);
 	INIT_LIST_HEAD(&np->np_list);
 
 	kernel_thread(iscsi_target_login_thread, np, 0);
 
-	down(&np->np_start_sem);
+	wait_for_completion(&np->np_start_comp);
 
 	spin_lock_bh(&np->np_thread_lock);
 	if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {
@@ -422,7 +423,7 @@ int iscsit_reset_np_thread(
 	if (np->np_thread) {
 		spin_unlock_bh(&np->np_thread_lock);
 		send_sig(SIGKILL, np->np_thread, 1);
-		down(&np->np_restart_sem);
+		wait_for_completion(&np->np_restart_comp);
 		spin_lock_bh(&np->np_thread_lock);
 	}
 	spin_unlock_bh(&np->np_thread_lock);
@@ -438,8 +439,8 @@ int iscsit_del_np_thread(struct iscsi_np *np)
 	if (np->np_thread) {
 		send_sig(SIGKILL, np->np_thread, 1);
 		spin_unlock_bh(&np->np_thread_lock);
-		up(&np->np_shutdown_sem);
-		down(&np->np_done_sem);
+		complete(&np->np_shutdown_comp);
+		wait_for_completion(&np->np_done_comp);
 		return 0;
 	}
 	spin_unlock_bh(&np->np_thread_lock);
@@ -561,8 +562,7 @@ u32 iscsi_get_new_index(iscsi_index_t type)
  */
 static int init_iscsi_global(struct iscsi_global *global)
 {
-	sema_init(&global->auth_sem, 1);
-	sema_init(&global->auth_id_sem, 1);
+	mutex_init(&global->auth_id_lock);
 	spin_lock_init(&global->active_ts_lock);
 	spin_lock_init(&global->inactive_ts_lock);
 	spin_lock_init(&global->np_lock);
@@ -733,7 +733,7 @@ void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
 	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	if (cmd->immediate_data || cmd->unsolicited_data)
-		up(&cmd->unsolicited_data_sem);
+		complete(&cmd->unsolicited_data_comp);
 }
 
 int iscsi_is_state_remove(struct se_cmd *se_cmd)
@@ -844,7 +844,7 @@ int iscsi_add_reject(
 	cmd->i_state = ISTATE_SEND_REJECT;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
-	ret = down_interruptible(&cmd->reject_sem);
+	ret = wait_for_completion_interruptible(&cmd->reject_comp);
 	if (ret != 0)
 		return -1;
 
@@ -894,7 +894,7 @@ int iscsi_add_reject_from_cmd(
 	cmd->i_state = ISTATE_SEND_REJECT;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
-	ret = down_interruptible(&cmd->reject_sem);
+	ret = wait_for_completion_interruptible(&cmd->reject_comp);
 	if (ret != 0)
 		return -1;
 
@@ -1626,7 +1626,7 @@ attach_cmd:
 	 */
 	transport_generic_handle_cdb(SE_CMD(cmd));
 
-	down(&cmd->unsolicited_data_sem);
+	wait_for_completion(&cmd->unsolicited_data_comp);
 
 	if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_CMD_FAILED) {
 		immed_ret = IMMEDIDATE_DATA_NORMAL_OPERATION;
@@ -1808,7 +1808,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		spin_lock_irqsave(&T_TASK(se_cmd)->t_state_lock, flags);
 		/*
 		 * Handle cases where we do or do not want to sleep on
-		 * unsolicited_data_sem
+		 * unsolicited_data_comp
 		 *
 		 * First, if TRANSPORT_WRITE_PENDING state has not been reached,
 		 * we need assume we need to wait and sleep..
@@ -1834,7 +1834,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		spin_unlock_irqrestore(&T_TASK(se_cmd)->t_state_lock, flags);
 
 		if (wait_for_transport)
-			down(&cmd->unsolicited_data_sem);
+			wait_for_completion(&cmd->unsolicited_data_comp);
 
 		spin_lock_irqsave(&T_TASK(se_cmd)->t_state_lock, flags);
 		if (!(se_cmd->se_cmd_flags & SCF_SUPPORTED_SAM_OPCODE) ||
@@ -3097,10 +3097,10 @@ int iscsi_send_async_msg(
 	if (async_event == ISCSI_ASYNC_MSG_REQUEST_LOGOUT) {
 		init_timer(&async_msg_timer);
 		SETUP_TIMER(async_msg_timer, SECONDS_FOR_ASYNC_LOGOUT,
-				&SESS(conn)->async_msg_sem,
+				&SESS(conn)->async_msg_comp,
 				iscsi_async_msg_timer_function);
 		add_timer(&async_msg_timer);
-		down(&SESS(conn)->async_msg_sem);
+		wait_for_completion(&SESS(conn)->async_msg_comp);
 		del_timer_sync(&async_msg_timer);
 
 		if (conn->conn_state == TARG_CONN_STATE_LOGOUT_REQUESTED) {
@@ -3839,7 +3839,7 @@ int lio_write_pending(
 	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
 
 	if (cmd->immediate_data || cmd->unsolicited_data)
-		up(&cmd->unsolicited_data_sem);
+		complete(&cmd->unsolicited_data_comp);
 	else {
 		if (iscsi_build_r2ts_for_cmd(cmd, CONN(cmd), 1) < 0)
 			return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
@@ -4266,10 +4266,10 @@ static void iscsi_tx_thread_wait_for_tcp(struct iscsi_conn *conn)
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
 		init_timer(&tx_TCP_timer);
 		SETUP_TIMER(tx_TCP_timer, ISCSI_TX_THREAD_TCP_TIMEOUT,
-			&conn->tx_half_close_sem, iscsi_tx_thread_TCP_timeout);
+			&conn->tx_half_close_comp, iscsi_tx_thread_TCP_timeout);
 		add_timer(&tx_TCP_timer);
 
-		ret = down_interruptible(&conn->tx_half_close_sem);
+		ret = wait_for_completion_interruptible(&conn->tx_half_close_comp);
 
 		del_timer_sync(&tx_TCP_timer);
 	}
@@ -4378,7 +4378,7 @@ restart:
 		 */
 		iscsi_thread_check_cpumask(conn, current, 1);
 
-		ret = down_interruptible(&conn->tx_sem);
+		ret = wait_for_completion_interruptible(&conn->tx_comp);
 
 		if ((ts->status == ISCSI_THREAD_SET_RESET) ||
 		     (ret != 0) || signal_pending(current))
@@ -4614,10 +4614,10 @@ check_rsp_state:
 				if (cmd->cmd_flags & ICF_REJECT_FAIL_CONN) {
 					cmd->cmd_flags &= ~ICF_REJECT_FAIL_CONN;
 					spin_unlock_bh(&cmd->istate_lock);
-					up(&cmd->reject_sem);
+					complete(&cmd->reject_comp);
 					goto transport_err;
 				}
-				up(&cmd->reject_sem);
+				complete(&cmd->reject_comp);
 				break;
 			case ISTATE_SEND_TASKMGTRSP:
 				use_misc = 0;
@@ -4677,10 +4677,10 @@ static void iscsi_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
 		init_timer(&rx_TCP_timer);
 		SETUP_TIMER(rx_TCP_timer, ISCSI_RX_THREAD_TCP_TIMEOUT,
-			&conn->rx_half_close_sem, iscsi_rx_thread_TCP_timeout);
+			&conn->rx_half_close_comp, iscsi_rx_thread_TCP_timeout);
 		add_timer(&rx_TCP_timer);
 
-		ret = down_interruptible(&conn->rx_half_close_sem);
+		ret = wait_for_completion_interruptible(&conn->rx_half_close_comp);
 
 		del_timer_sync(&rx_TCP_timer);
 	}
@@ -4807,7 +4807,7 @@ restart:
 		case ISCSI_OP_LOGOUT:
 			ret = iscsi_handle_logout_cmd(conn, buffer);
 			if (ret > 0) {
-				down(&conn->conn_logout_sem);
+				wait_for_completion(&conn->conn_logout_comp);
 				goto transport_err;
 			} else if (ret < 0)
 				goto transport_err;
@@ -4920,11 +4920,11 @@ int iscsi_close_connection(
 	iscsi_stop_netif_timer(conn);
 
 	/*
-	 * Always up conn_logout_sem just in case the RX Thread is sleeping
+	 * Always up conn_logout_comp just in case the RX Thread is sleeping
 	 * and the logout response never got sent because the connection
 	 * failed.
 	 */
-	up(&conn->conn_logout_sem);
+	complete(&conn->conn_logout_comp);
 
 	iscsi_release_thread_set(conn);
 
@@ -4987,10 +4987,10 @@ int iscsi_close_connection(
 	 * in iscsi_cause_connection_reinstatement().
 	 */
 	spin_lock_bh(&conn->state_lock);
-	if (atomic_read(&conn->sleep_on_conn_wait_sem)) {
+	if (atomic_read(&conn->sleep_on_conn_wait_comp)) {
 		spin_unlock_bh(&conn->state_lock);
-		up(&conn->conn_wait_sem);
-		down(&conn->conn_post_wait_sem);
+		complete(&conn->conn_wait_comp);
+		wait_for_completion(&conn->conn_post_wait_comp);
 		spin_lock_bh(&conn->state_lock);
 	}
 
@@ -5002,8 +5002,8 @@ int iscsi_close_connection(
 	 */
 	if (atomic_read(&conn->connection_wait_rcfr)) {
 		spin_unlock_bh(&conn->state_lock);
-		up(&conn->conn_wait_rcfr_sem);
-		down(&conn->conn_post_wait_sem);
+		complete(&conn->conn_wait_rcfr_comp);
+		wait_for_completion(&conn->conn_post_wait_comp);
 		spin_lock_bh(&conn->state_lock);
 	}
 	atomic_set(&conn->connection_reinstatement, 1);
@@ -5097,8 +5097,8 @@ int iscsi_close_connection(
 		sess->session_state = TARG_SESS_STATE_FREE;
 		spin_unlock_bh(&sess->conn_lock);
 
-		if (atomic_read(&sess->sleep_on_sess_wait_sem))
-			up(&sess->session_wait_sem);
+		if (atomic_read(&sess->sleep_on_sess_wait_comp))
+			complete(&sess->session_wait_comp);
 
 		return 0;
 	} else {
@@ -5111,8 +5111,8 @@ int iscsi_close_connection(
 		} else
 			spin_unlock_bh(&sess->conn_lock);
 
-		if (atomic_read(&sess->sleep_on_sess_wait_sem))
-			up(&sess->session_wait_sem);
+		if (atomic_read(&sess->sleep_on_sess_wait_comp))
+			complete(&sess->session_wait_comp);
 
 		return 0;
 	}
@@ -5201,7 +5201,7 @@ static void iscsi_logout_post_handler_closesession(
 	iscsi_set_thread_set_signal(conn, ISCSI_SIGNAL_TX_THREAD);
 
 	atomic_set(&conn->conn_logout_remove, 0);
-	up(&conn->conn_logout_sem);
+	complete(&conn->conn_logout_comp);
 
 	iscsi_dec_conn_usage_count(conn);
 	iscsi_stop_session(sess, 1, 1);
@@ -5216,7 +5216,7 @@ static void iscsi_logout_post_handler_samecid(
 	iscsi_set_thread_set_signal(conn, ISCSI_SIGNAL_TX_THREAD);
 
 	atomic_set(&conn->conn_logout_remove, 0);
-	up(&conn->conn_logout_sem);
+	complete(&conn->conn_logout_comp);
 
 	iscsi_cause_connection_reinstatement(conn, 1);
 	iscsi_dec_conn_usage_count(conn);
@@ -5340,7 +5340,7 @@ int iscsi_free_session(struct iscsi_session *sess)
 	struct iscsi_conn *conn, *conn_tmp;
 
 	spin_lock_bh(&sess->conn_lock);
-	atomic_set(&sess->sleep_on_sess_wait_sem, 1);
+	atomic_set(&sess->sleep_on_sess_wait_comp, 1);
 
 	list_for_each_entry_safe(conn, conn_tmp, &sess->sess_conn_list,
 			conn_list) {
@@ -5358,7 +5358,7 @@ int iscsi_free_session(struct iscsi_session *sess)
 
 	if (atomic_read(&sess->nconn)) {
 		spin_unlock_bh(&sess->conn_lock);
-		down(&sess->session_wait_sem);
+		wait_for_completion(&sess->session_wait_comp);
 	} else
 		spin_unlock_bh(&sess->conn_lock);
 
@@ -5376,7 +5376,7 @@ void iscsi_stop_session(
 
 	spin_lock_bh(&sess->conn_lock);
 	if (session_sleep)
-		atomic_set(&sess->sleep_on_sess_wait_sem, 1);
+		atomic_set(&sess->sleep_on_sess_wait_comp, 1);
 
 	if (connection_sleep) {
 		list_for_each_entry_safe(conn, conn_tmp, &sess->sess_conn_list,
@@ -5399,7 +5399,7 @@ void iscsi_stop_session(
 
 	if (session_sleep && atomic_read(&sess->nconn)) {
 		spin_unlock_bh(&sess->conn_lock);
-		down(&sess->session_wait_sem);
+		wait_for_completion(&sess->session_wait_comp);
 	} else
 		spin_unlock_bh(&sess->conn_lock);
 }

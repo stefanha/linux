@@ -203,8 +203,8 @@ struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *tiqn, u1
 	tpg->tpg_tiqn = tiqn;
 	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
 	INIT_LIST_HEAD(&tpg->tpg_list);
-	sema_init(&tpg->tpg_access_sem, 1);
-	sema_init(&tpg->np_login_sem, 1);
+	mutex_init(&tpg->tpg_access_lock);
+	mutex_init(&tpg->np_login_lock);
 	spin_lock_init(&tpg->tpg_state_lock);
 	spin_lock_init(&tpg->tpg_np_lock);
 
@@ -319,13 +319,13 @@ int iscsi_get_tpg(
 {
 	int ret;
 
-	ret = down_interruptible(&tpg->tpg_access_sem);
+	ret = mutex_lock_interruptible(&tpg->tpg_access_lock);
 	return ((ret != 0) || signal_pending(current)) ? -1 : 0;
 }
 
 void iscsi_put_tpg(struct iscsi_portal_group *tpg)
 {
-	up(&tpg->tpg_access_sem);
+	mutex_unlock(&tpg->tpg_access_lock);
 }
 
 static void iscsi_clear_tpg_np_login_thread(

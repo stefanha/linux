@@ -920,8 +920,8 @@ void iscsi_connection_reinstatement_rcfr(struct iscsi_conn *conn)
 	iscsi_thread_set_force_reinstatement(conn);
 
 sleep:
-	down(&conn->conn_wait_rcfr_sem);
-	up(&conn->conn_post_wait_sem);
+	wait_for_completion(&conn->conn_wait_rcfr_comp);
+	complete(&conn->conn_post_wait_comp);
 }
 
 /*	iscsi_cause_connection_reinstatement():
@@ -957,11 +957,11 @@ void iscsi_cause_connection_reinstatement(struct iscsi_conn *conn, int sleep)
 		return;
 	}
 
-	atomic_set(&conn->sleep_on_conn_wait_sem, 1);
+	atomic_set(&conn->sleep_on_conn_wait_comp, 1);
 	spin_unlock_bh(&conn->state_lock);
 
-	down(&conn->conn_wait_sem);
-	up(&conn->conn_post_wait_sem);
+	wait_for_completion(&conn->conn_wait_comp);
+	complete(&conn->conn_post_wait_comp);
 }
 
 /*	iscsi_fall_back_to_erl0():

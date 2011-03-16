@@ -204,8 +204,8 @@ struct iscsi_cmd *iscsi_allocate_cmd(struct iscsi_conn *conn)
 	INIT_LIST_HEAD(&cmd->i_list);
 	INIT_LIST_HEAD(&cmd->datain_list);
 	INIT_LIST_HEAD(&cmd->cmd_r2t_list);
-	sema_init(&cmd->reject_sem, 0);
-	sema_init(&cmd->unsolicited_data_sem, 0);
+	init_completion(&cmd->reject_comp);
+	init_completion(&cmd->unsolicited_data_comp);
 	spin_lock_init(&cmd->datain_lock);
 	spin_lock_init(&cmd->dataout_timeout_lock);
 	spin_lock_init(&cmd->istate_lock);
@@ -765,7 +765,7 @@ void iscsi_add_cmd_to_immediate_queue(
 	atomic_set(&conn->check_immediate_queue, 1);
 	spin_unlock_bh(&conn->immed_queue_lock);
 
-	up(&conn->tx_sem);
+	complete(&conn->tx_comp);
 }
 
 struct iscsi_queue_req *iscsi_get_cmd_from_immediate_queue(struct iscsi_conn *conn)
@@ -839,7 +839,7 @@ void iscsi_add_cmd_to_response_queue(
 	atomic_inc(&cmd->response_queue_count);
 	spin_unlock_bh(&conn->response_queue_lock);
 
-	up(&conn->tx_sem);
+	complete(&conn->tx_comp);
 }
 
 struct iscsi_queue_req *iscsi_get_cmd_from_response_queue(struct iscsi_conn *conn)
@@ -1065,7 +1065,7 @@ int iscsi_check_session_usage_count(struct iscsi_session *sess)
 		if (in_interrupt())
 			return 2;
 
-		down(&sess->session_waiting_on_uc_sem);
+		wait_for_completion(&sess->session_waiting_on_uc_comp);
 		return 1;
 	}
 	spin_unlock_bh(&sess->session_usage_lock);
@@ -1080,7 +1080,7 @@ void iscsi_dec_session_usage_count(struct iscsi_session *sess)
 
 	if (!atomic_read(&sess->session_usage_count) &&
 	     atomic_read(&sess->session_waiting_on_uc))
-		up(&sess->session_waiting_on_uc_sem);
+		complete(&sess->session_waiting_on_uc_comp);
 
 	spin_unlock_bh(&sess->session_usage_lock);
 }
@@ -1522,7 +1522,7 @@ void iscsi_check_conn_usage_count(struct iscsi_conn *conn)
 		atomic_set(&conn->conn_waiting_on_uc, 1);
 		spin_unlock_bh(&conn->conn_usage_lock);
 
-		down(&conn->conn_waiting_on_uc_sem);
+		wait_for_completion(&conn->conn_waiting_on_uc_comp);
 		return;
 	}
 	spin_unlock_bh(&conn->conn_usage_lock);
@@ -1535,7 +1535,7 @@ void iscsi_dec_conn_usage_count(struct iscsi_conn *conn)
 
 	if (!atomic_read(&conn->conn_usage_count) &&
 	     atomic_read(&conn->conn_waiting_on_uc))
-		up(&conn->conn_waiting_on_uc_sem);
+		complete(&conn->conn_waiting_on_uc_comp);
 
 	spin_unlock_bh(&conn->conn_usage_lock);
 }
