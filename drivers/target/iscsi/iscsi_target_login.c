@@ -284,7 +284,7 @@ static int iscsi_login_zero_tsih_s2(
 
 	/*
 	 * Assign a new TPG Session Handle.  Note this is protected with
-	 * struct iscsi_portal_group->np_login_sem from core_access_np().
+	 * struct iscsi_portal_group->np_login_sem from iscsit_access_np().
 	 */
 	sess->tsih = ++ISCSI_TPG_S(sess)->ntsih;
 	if (!sess->tsih)
@@ -1237,7 +1237,7 @@ get_new_sock:
 	if (ret < 0)
 		goto new_sess_out;
 
-	core_deaccess_np(np, tpg);
+	iscsit_deaccess_np(np, tpg);
 	tpg = NULL;
 	goto get_new_sock;
 
@@ -1299,7 +1299,7 @@ old_sess_out:
 	kfree(conn);
 
 	if (tpg) {
-		core_deaccess_np(np, tpg);
+		iscsit_deaccess_np(np, tpg);
 		tpg = NULL;
 	}
 

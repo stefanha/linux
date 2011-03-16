@@ -18,10 +18,10 @@ extern void lio_tpg_fall_back_to_erl0(struct se_session *);
 extern u32 lio_tpg_get_inst_index(struct se_portal_group *);
 extern void lio_set_default_node_attributes(struct se_node_acl *);
 
-extern struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *, u16);
-extern int core_load_discovery_tpg(void);
-extern void core_release_discovery_tpg(void);
-extern struct iscsi_portal_group *core_get_tpg_from_np(struct iscsi_tiqn *,
+extern struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *, u16);
+extern int iscsit_load_discovery_tpg(void);
+extern void iscsit_release_discovery_tpg(void);
+extern struct iscsi_portal_group *iscsit_get_tpg_from_np(struct iscsi_tiqn *,
 			struct iscsi_np *);
 extern int iscsi_get_tpg(struct iscsi_portal_group *);
 extern void iscsi_put_tpg(struct iscsi_portal_group *);

@@ -1199,7 +1199,7 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	tpgt_str += 5; /* Skip ahead of "tpgt_" */
 	tpgt = (unsigned short int) simple_strtoul(tpgt_str, &end_ptr, 0);
 
-	tpg = core_alloc_portal_group(tiqn, tpgt);
+	tpg = iscsit_alloc_portal_group(tiqn, tpgt);
 	if (!tpg)
 		return NULL;
 
@@ -1265,7 +1265,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	struct iscsi_tiqn *tiqn;
 	int ret = 0;
 
-	tiqn = core_add_tiqn((unsigned char *)name, &ret);
+	tiqn = iscsit_add_tiqn((unsigned char *)name, &ret);
 	if (!tiqn)
 		return NULL;
 	/*
@@ -1278,7 +1278,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	if (!stats_cg->default_groups) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" stats_cg->default_groups\n");
-		core_del_tiqn(tiqn);
+		iscsit_del_tiqn(tiqn);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -1323,9 +1323,7 @@ void lio_target_call_coredeltiqn(
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s\n",
 			tiqn->tiqn);
-	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> Releasing"
-			" core_del_tiqn()\n");
-	core_del_tiqn(tiqn);
+	iscsit_del_tiqn(tiqn);
 }
 
 /* End LIO-Target TIQN struct contig_lio_target_cit */

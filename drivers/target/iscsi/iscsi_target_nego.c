@@ -864,7 +864,7 @@ static int iscsi_target_locate_portal(
 		 * Serialize access across the discovery struct iscsi_portal_group to
 		 * process login attempt.
 		 */
-		if (core_access_np(np, conn->tpg) < 0) {
+		if (iscsit_access_np(np, conn->tpg) < 0) {
 			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 			ret = -1;
@@ -888,7 +888,7 @@ get_target:
 	/*
 	 * Locate Target IQN from Storage Node.
 	 */
-	tiqn = core_get_tiqn_for_login(t_buf);
+	tiqn = iscsit_get_tiqn_for_login(t_buf);
 	if (!tiqn) {
 		printk(KERN_ERR "Unable to locate Target IQN: %s in"
 			" Storage Node\n", t_buf);
@@ -902,11 +902,11 @@ get_target:
 	/*
 	 * Locate Target Portal Group from Storage Node.
 	 */
-	conn->tpg = core_get_tpg_from_np(tiqn, np);
+	conn->tpg = iscsit_get_tpg_from_np(tiqn, np);
 	if (!conn->tpg) {
 		printk(KERN_ERR "Unable to locate Target Portal Group"
 				" on %s\n", tiqn->tiqn);
-		core_put_tiqn_for_login(tiqn);
+		iscsit_put_tiqn_for_login(tiqn);
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 		ret = -1;
@@ -925,8 +925,8 @@ get_target:
 	 * Serialize access across the struct iscsi_portal_group to
 	 * process login attempt.
 	 */
-	if (core_access_np(np, conn->tpg) < 0) {
-		core_put_tiqn_for_login(tiqn);
+	if (iscsit_access_np(np, conn->tpg) < 0) {
+		iscsit_put_tiqn_for_login(tiqn);
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 		ret = -1;

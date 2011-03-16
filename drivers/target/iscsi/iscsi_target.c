@@ -67,7 +67,7 @@ static int iscsi_send_text_rsp(struct iscsi_cmd *, struct iscsi_conn *);
 static int iscsi_send_reject(struct iscsi_cmd *, struct iscsi_conn *);
 static int iscsi_logout_post_handler(struct iscsi_cmd *, struct iscsi_conn *);
 
-struct iscsi_tiqn *core_get_tiqn_for_login(unsigned char *buf)
+struct iscsi_tiqn *iscsit_get_tiqn_for_login(unsigned char *buf)
 {
 	struct iscsi_tiqn *tiqn = NULL;
 
@@ -90,7 +90,7 @@ struct iscsi_tiqn *core_get_tiqn_for_login(unsigned char *buf)
 	return NULL;
 }
 
-static int core_set_tiqn_shutdown(struct iscsi_tiqn *tiqn)
+static int iscsit_set_tiqn_shutdown(struct iscsi_tiqn *tiqn)
 {
 	spin_lock(&tiqn->tiqn_state_lock);
 	if (tiqn->tiqn_state == TIQN_STATE_ACTIVE) {
@@ -103,7 +103,7 @@ static int core_set_tiqn_shutdown(struct iscsi_tiqn *tiqn)
 	return -1;
 }
 
-void core_put_tiqn_for_login(struct iscsi_tiqn *tiqn)
+void iscsit_put_tiqn_for_login(struct iscsi_tiqn *tiqn)
 {
 	spin_lock(&tiqn->tiqn_state_lock);
 	tiqn->tiqn_access_count--;
@@ -114,7 +114,7 @@ void core_put_tiqn_for_login(struct iscsi_tiqn *tiqn)
  * Note that IQN formatting is expected to be done in userspace, and
  * no explict IQN format checks are done here.
  */
-struct iscsi_tiqn *core_add_tiqn(unsigned char *buf, int *ret)
+struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
 {
 	struct iscsi_tiqn *tiqn = NULL;
 
@@ -165,7 +165,7 @@ struct iscsi_tiqn *core_add_tiqn(unsigned char *buf, int *ret)
 
 }
 
-void __core_del_tiqn(struct iscsi_tiqn *tiqn)
+void __iscsit_del_tiqn(struct iscsi_tiqn *tiqn)
 {
 	spin_lock(&iscsi_global->tiqn_lock);
 	list_del(&tiqn->tiqn_list);
@@ -176,7 +176,7 @@ void __core_del_tiqn(struct iscsi_tiqn *tiqn)
 	kfree(tiqn);
 }
 
-static void core_wait_for_tiqn(struct iscsi_tiqn *tiqn)
+static void iscsit_wait_for_tiqn(struct iscsi_tiqn *tiqn)
 {
 	/*
 	 * Wait for accesses to said struct iscsi_tiqn to end.
@@ -190,24 +190,24 @@ static void core_wait_for_tiqn(struct iscsi_tiqn *tiqn)
 	spin_unlock(&tiqn->tiqn_state_lock);
 }
 
-void core_del_tiqn(struct iscsi_tiqn *tiqn)
+void iscsit_del_tiqn(struct iscsi_tiqn *tiqn)
 {
 	/*
-	 * core_set_tiqn_shutdown sets tiqn->tiqn_state = TIQN_STATE_SHUTDOWN
+	 * iscsit_set_tiqn_shutdown sets tiqn->tiqn_state = TIQN_STATE_SHUTDOWN
 	 * while holding tiqn->tiqn_state_lock.  This means that all subsequent
 	 * attempts to access this struct iscsi_tiqn will fail from both transport
 	 * fabric and control code paths.
 	 */
-	if (core_set_tiqn_shutdown(tiqn) < 0) {
-		printk(KERN_ERR "core_set_tiqn_shutdown() failed\n");
+	if (iscsit_set_tiqn_shutdown(tiqn) < 0) {
+		printk(KERN_ERR "iscsit_set_tiqn_shutdown() failed\n");
 		return;
 	}
 
-	core_wait_for_tiqn(tiqn);
-	__core_del_tiqn(tiqn);
+	iscsit_wait_for_tiqn(tiqn);
+	__iscsit_del_tiqn(tiqn);
 }
 
-int core_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
+int iscsit_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 {
 	int ret;
 	/*
@@ -255,7 +255,7 @@ int core_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 	return 0;
 }
 
-int core_deaccess_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
+int iscsit_deaccess_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 {
 	struct iscsi_tiqn *tiqn = tpg->tpg_tiqn;
 
@@ -266,12 +266,12 @@ int core_deaccess_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 	up(&tpg->np_login_sem);
 
 	if (tiqn)
-		core_put_tiqn_for_login(tiqn);
+		iscsit_put_tiqn_for_login(tiqn);
 
 	return 0;
 }
 
-static struct iscsi_np *core_get_np(
+static struct iscsi_np *iscsit_get_np(
 	unsigned char *ipv6,
 	u32 ipv4,
 	u16 port,
@@ -311,7 +311,7 @@ static struct iscsi_np *core_get_np(
 	return NULL;
 }
 
-struct iscsi_np *core_add_np(
+struct iscsi_np *iscsit_add_np(
 	struct iscsi_np_addr *np_addr,
 	int network_transport,
 	int *ret)
@@ -333,7 +333,7 @@ struct iscsi_np *core_add_np(
 	/*
 	 * Locate the existing struct iscsi_np if already active..
 	 */
-	np = core_get_np(ipv6, ipv4, np_addr->np_port, network_transport);
+	np = iscsit_get_np(ipv6, ipv4, np_addr->np_port, network_transport);
 	if (np)
 		return np;
 
@@ -392,7 +392,7 @@ struct iscsi_np *core_add_np(
 	return np;
 }
 
-int core_reset_np_thread(
+int iscsit_reset_np_thread(
 	struct iscsi_np *np,
 	struct iscsi_tpg_np *tpg_np,
 	struct iscsi_portal_group *tpg,
@@ -430,7 +430,7 @@ int core_reset_np_thread(
 	return 0;
 }
 
-int core_del_np_thread(struct iscsi_np *np)
+int iscsit_del_np_thread(struct iscsi_np *np)
 {
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
@@ -447,7 +447,7 @@ int core_del_np_thread(struct iscsi_np *np)
 	return 0;
 }
 
-int core_del_np_comm(struct iscsi_np *np)
+int iscsit_del_np_comm(struct iscsi_np *np)
 {
 	if (!np->np_socket)
 		return 0;
@@ -465,13 +465,13 @@ int core_del_np_comm(struct iscsi_np *np)
 	return 0;
 }
 
-int core_del_np(struct iscsi_np *np)
+int iscsit_del_np(struct iscsi_np *np)
 {
 	unsigned char *ip = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
-	core_del_np_thread(np);
-	core_del_np_comm(np);
+	iscsit_del_np_thread(np);
+	iscsit_del_np_comm(np);
 
 	spin_lock(&iscsi_global->np_lock);
 	list_del(&np->np_list);
@@ -495,27 +495,27 @@ int core_del_np(struct iscsi_np *np)
 	return 0;
 }
 
-void core_reset_nps(void)
+void iscsit_reset_nps(void)
 {
 	struct iscsi_np *np, *t_np;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
 		spin_unlock(&iscsi_global->np_lock);
-		core_reset_np_thread(np, NULL, NULL, 1);
+		iscsit_reset_np_thread(np, NULL, NULL, 1);
 		spin_lock(&iscsi_global->np_lock);
 	}
 	spin_unlock(&iscsi_global->np_lock);
 }
 
-void core_release_nps(void)
+void iscsit_release_nps(void)
 {
 	struct iscsi_np *np, *t_np;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry_safe(np, t_np, &iscsi_global->g_np_list, np_list) {
 		spin_unlock(&iscsi_global->np_lock);
-		core_del_np(np);
+		iscsit_del_np(np);
 		spin_lock(&iscsi_global->np_lock);
 	}
 	spin_unlock(&iscsi_global->np_lock);
@@ -654,7 +654,7 @@ static int __init iscsi_target_init_module(void)
 		goto ooo_out;
 	}
 
-	if (core_load_discovery_tpg() < 0)
+	if (iscsit_load_discovery_tpg() < 0)
 		goto r2t_out;
 
 	printk("Loading Complete.\n");
@@ -685,11 +685,11 @@ out:
 
 static void __exit iscsi_target_cleanup_module(void)
 {
-	core_reset_nps();
+	iscsit_reset_nps();
 	iscsi_deallocate_thread_sets();
 	iscsi_thread_set_free();
-	core_release_nps();
-	core_release_discovery_tpg();
+	iscsit_release_nps();
+	iscsit_release_discovery_tpg();
 	kmem_cache_destroy(lio_cmd_cache);
 	kmem_cache_destroy(lio_qr_cache);
 	kmem_cache_destroy(lio_dr_cache);

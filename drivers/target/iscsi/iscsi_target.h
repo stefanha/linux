@@ -1,17 +1,17 @@
 #ifndef ISCSI_TARGET_H
 #define ISCSI_TARGET_H
 
-extern struct iscsi_tiqn *core_get_tiqn_for_login(unsigned char *);
-extern struct iscsi_tiqn *core_get_tiqn(unsigned char *, int);
-extern void core_put_tiqn_for_login(struct iscsi_tiqn *);
-extern struct iscsi_tiqn *core_add_tiqn(unsigned char *, int *);
-extern void core_del_tiqn(struct iscsi_tiqn *);
-extern int core_access_np(struct iscsi_np *, struct iscsi_portal_group *);
-extern int core_deaccess_np(struct iscsi_np *, struct iscsi_portal_group *);
-extern struct iscsi_np *core_add_np(struct iscsi_np_addr *, int, int *);
-extern int core_reset_np_thread(struct iscsi_np *, struct iscsi_tpg_np *,
+extern struct iscsi_tiqn *iscsit_get_tiqn_for_login(unsigned char *);
+extern struct iscsi_tiqn *iscsit_get_tiqn(unsigned char *, int);
+extern void iscsit_put_tiqn_for_login(struct iscsi_tiqn *);
+extern struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *, int *);
+extern void iscsit_del_tiqn(struct iscsi_tiqn *);
+extern int iscsit_access_np(struct iscsi_np *, struct iscsi_portal_group *);
+extern int iscsit_deaccess_np(struct iscsi_np *, struct iscsi_portal_group *);
+extern struct iscsi_np *iscsit_add_np(struct iscsi_np_addr *, int, int *);
+extern int iscsit_reset_np_thread(struct iscsi_np *, struct iscsi_tpg_np *,
 				struct iscsi_portal_group *, int);
-extern int core_del_np(struct iscsi_np *);
+extern int iscsit_del_np(struct iscsi_np *);
 extern u32 iscsi_get_new_index(iscsi_index_t);
 extern char *iscsi_get_fabric_name(void);
 extern struct iscsi_cmd *iscsi_get_cmd(struct se_cmd *);

@@ -188,7 +188,7 @@ void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 	iscsi_set_default_node_attribues(acl);
 }
 
-struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 tpgt)
+struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 tpgt)
 {
 	struct iscsi_portal_group *tpg;
 
@@ -213,13 +213,13 @@ struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 
 
 static void iscsi_set_default_tpg_attribs(struct iscsi_portal_group *);
 
-int core_load_discovery_tpg(void)
+int iscsit_load_discovery_tpg(void)
 {
 	struct iscsi_param *param;
 	struct iscsi_portal_group *tpg;
 	int ret;
 
-	tpg = core_alloc_portal_group(NULL, 1);
+	tpg = iscsit_alloc_portal_group(NULL, 1);
 	if (!tpg) {
 		printk(KERN_ERR "Unable to allocate struct iscsi_portal_group\n");
 		return -1;
@@ -269,7 +269,7 @@ out:
 	return -1;
 }
 
-void core_release_discovery_tpg(void)
+void iscsit_release_discovery_tpg(void)
 {
 	struct iscsi_portal_group *tpg = iscsi_global->discovery_tpg;
 
@@ -282,7 +282,7 @@ void core_release_discovery_tpg(void)
 	iscsi_global->discovery_tpg = NULL;
 }
 
-struct iscsi_portal_group *core_get_tpg_from_np(
+struct iscsi_portal_group *iscsit_get_tpg_from_np(
 	struct iscsi_tiqn *tiqn,
 	struct iscsi_np *np)
 {
@@ -338,7 +338,7 @@ static void iscsi_clear_tpg_np_login_thread(
 		return;
 	}
 
-	core_reset_np_thread(tpg_np->tpg_np, tpg_np, tpg, shutdown);
+	iscsit_reset_np_thread(tpg_np->tpg_np, tpg_np, tpg, shutdown);
 	return;
 }
 
@@ -643,7 +643,7 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 		ip_buf = &buf_ipv4[0];
 	}
 
-	np = core_add_np(np_addr, network_transport, &ret);
+	np = iscsit_add_np(np_addr, network_transport, &ret);
 	if (!np)
 		return ERR_PTR(ret);
 
@@ -731,7 +731,7 @@ static int iscsi_tpg_release_np(
 	spin_unlock(&np->np_state_lock);
 
 	if (atomic_read(&np->np_shutdown))
-		core_del_np(np);
+		iscsit_del_np(np);
 
 	return 0;
 }
