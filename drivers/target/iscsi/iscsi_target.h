@@ -10,7 +10,6 @@ extern int core_access_np(struct iscsi_np *, struct iscsi_portal_group *);
 extern int core_deaccess_np(struct iscsi_np *, struct iscsi_portal_group *);
 extern void *core_get_np_ip(struct iscsi_np *np);
 extern struct iscsi_np *core_get_np(void *, u16, int);
-extern int __core_del_np_ex(struct iscsi_np *, struct iscsi_np_ex *);
 extern struct iscsi_np *core_add_np(struct iscsi_np_addr *, int, int *);
 extern int core_reset_np_thread(struct iscsi_np *, struct iscsi_tpg_np *,
 				struct iscsi_portal_group *, int);

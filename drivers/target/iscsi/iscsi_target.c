@@ -306,148 +306,14 @@ struct iscsi_np *core_get_np(
 	return NULL;
 }
 
-void *core_get_np_ex_ip(struct iscsi_np_ex *np_ex)
-{
-	return (np_ex->np_ex_net_size == IPV6_ADDRESS_SPACE) ?
-	       (void *)&np_ex->np_ex_ipv6 :
-	       (void *)&np_ex->np_ex_ipv4;
-}
-
-int core_del_np_ex(
-	struct iscsi_np *np,
-	void *ip_ex,
-	u16 port_ex,
-	int network_transport)
-{
-	struct iscsi_np_ex *np_ex, *np_ex_t;
-
-	spin_lock(&np->np_ex_lock);
-	list_for_each_entry_safe(np_ex, np_ex_t, &np->np_nex_list, np_ex_list) {
-		if (!(memcmp(core_get_np_ex_ip(np_ex), ip_ex,
-				np_ex->np_ex_net_size)) &&
-				(np_ex->np_ex_port == port_ex)) {
-			__core_del_np_ex(np, np_ex);
-			spin_unlock(&np->np_ex_lock);
-			return 0;
-		}
-	}
-	spin_unlock(&np->np_ex_lock);
-
-	return -1;
-}
-
-int core_add_np_ex(
-	struct iscsi_np *np,
-	void *ip_ex,
-	u16 port_ex,
-	int net_size)
-{
-	struct iscsi_np_ex *np_ex;
-	unsigned char *ip_buf = NULL, *ip_ex_buf = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf_ipv4_ex[IPV4_BUF_SIZE];
-	u32 ip_ex_ipv4;
-
-	np_ex = kzalloc(sizeof(struct iscsi_np_ex), GFP_KERNEL);
-	if (!np_ex) {
-		printk(KERN_ERR "struct iscsi_np_ex memory allocate failed!\n");
-		return -1;
-	}
-
-	if (net_size == IPV6_ADDRESS_SPACE) {
-		ip_buf = (unsigned char *)&np->np_ipv6[0];
-		ip_ex_buf = ip_ex;
-		snprintf(np_ex->np_ex_ipv6, IPV6_ADDRESS_SPACE,
-				"%s", ip_ex_buf);
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		memset(buf_ipv4_ex, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
-		memcpy((void *)&ip_ex_ipv4, ip_ex, 4);
-		iscsi_ntoa2(buf_ipv4_ex, ip_ex_ipv4);
-		ip_buf = &buf_ipv4[0];
-		ip_ex_buf = &buf_ipv4_ex[0];
-
-		memcpy((void *)&np_ex->np_ex_ipv4, ip_ex, IPV4_ADDRESS_SPACE);
-	}
-
-	np_ex->np_ex_port = port_ex;
-	np_ex->np_ex_net_size = net_size;
-	INIT_LIST_HEAD(&np_ex->np_ex_list);
-	spin_lock_init(&np->np_ex_lock);
-
-	spin_lock(&np->np_ex_lock);
-	list_add_tail(&np_ex->np_ex_list, &np->np_nex_list);
-	spin_unlock(&np->np_ex_lock);
-
-	printk(KERN_INFO "CORE[0] - Added Network Portal: Internal %s:%hu"
-		" External %s:%hu on %s on network device: %s\n", ip_buf,
-		np->np_port, ip_ex_buf, port_ex,
-		(np->np_network_transport == ISCSI_TCP) ?
-		"TCP" : "SCTP", strlen(np->np_net_dev) ?
-			(char *)np->np_net_dev : "None");
-
-	return 0;
-}
-
-/*
- * Called with struct iscsi_np->np_ex_lock held.
- */
-int __core_del_np_ex(
-	struct iscsi_np *np,
-	struct iscsi_np_ex *np_ex)
-{
-	unsigned char *ip_buf = NULL, *ip_ex_buf = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf_ipv4_ex[IPV4_BUF_SIZE];
-
-	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
-		ip_buf = (unsigned char *)&np->np_ipv6[0];
-		ip_ex_buf = (unsigned char *)&np_ex->np_ex_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		memset(buf_ipv4_ex, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
-		iscsi_ntoa2(buf_ipv4_ex, np_ex->np_ex_ipv4);
-		ip_buf = &buf_ipv4[0];
-		ip_ex_buf = &buf_ipv4_ex[0];
-	}
-
-	list_del(&np_ex->np_ex_list);
-
-	printk(KERN_INFO "CORE[0] - Removed Network Portal: Internal %s:%hu"
-		" External %s:%hu on %s on network device: %s\n",
-		ip_buf, np->np_port, ip_ex_buf, np_ex->np_ex_port,
-		(np->np_network_transport == ISCSI_TCP) ?
-		"TCP" : "SCTP", strlen(np->np_net_dev) ?
-			(char *)np->np_net_dev : "None");
-	kfree(np_ex);
-
-	return 0;
-}
-
-void core_del_np_all_ex(
-	struct iscsi_np *np)
-{
-	struct iscsi_np_ex *np_ex, *np_ex_t;
-
-	spin_lock(&np->np_ex_lock);
-	list_for_each_entry_safe(np_ex, np_ex_t, &np->np_nex_list, np_ex_list)
-		__core_del_np_ex(np, np_ex);
-	spin_unlock(&np->np_ex_lock);
-}
-
 static struct iscsi_np *core_add_np_locate(
 	void *ip,
-	void *ip_ex,
 	unsigned char *ip_buf,
-	unsigned char *ip_ex_buf,
 	u16 port,
-	u16 port_ex,
 	int network_transport,
-	int net_size,
-	int *ret)
+	int net_size)
 {
 	struct iscsi_np *np;
-	struct iscsi_np_ex *np_ex;
 
 	spin_lock(&iscsi_global->np_lock);
 	list_for_each_entry(np, &iscsi_global->g_np_list, np_list) {
@@ -461,53 +327,13 @@ static struct iscsi_np *core_add_np_locate(
 		if (!(memcmp(core_get_np_ip(np), ip, np->np_net_size)) &&
 		    (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
-			if (!ip_ex && !port_ex) {
-				printk(KERN_ERR "Network Portal %s:%hu on %s"
-					" already exists, ignoring request.\n",
-					ip_buf, port,
-					(network_transport == ISCSI_TCP) ?
-					"TCP" : "SCTP");
-				spin_unlock(&iscsi_global->np_lock);
-				*ret = -EEXIST;
-				return NULL;
-			}
-
-			spin_lock(&np->np_ex_lock);
-			list_for_each_entry(np_ex, &np->np_nex_list,
-					np_ex_list) {
-				if (!(memcmp(core_get_np_ex_ip(np_ex), ip_ex,
-				     np_ex->np_ex_net_size)) &&
-				    (np_ex->np_ex_port == port_ex)) {
-					printk(KERN_ERR "Network Portal Inter"
-						"nal: %s:%hu External: %s:%hu"
-						" on %s, ignoring request.\n",
-						ip_buf, port,
-						ip_ex_buf, port_ex,
-						(network_transport == ISCSI_TCP)
-							? "TCP" : "SCTP");
-					spin_unlock(&np->np_ex_lock);
-					spin_unlock(&iscsi_global->np_lock);
-					*ret = -EEXIST;
-					return NULL;
-				}
-			}
-			spin_unlock(&np->np_ex_lock);
 			spin_unlock(&iscsi_global->np_lock);
-
-			*ret = core_add_np_ex(np, ip_ex, port_ex,
-						net_size);
-			if (*ret < 0)
-				return NULL;
-
-			*ret = 0;
 			return np;
 		}
 	}
 	spin_unlock(&iscsi_global->np_lock);
 
-	*ret = 0;
-
-	return NULL;
+	return ERR_PTR(-EINVAL);
 }
 
 struct iscsi_np *core_add_np(
@@ -533,15 +359,10 @@ struct iscsi_np *core_add_np(
 		net_size = IPV4_ADDRESS_SPACE;
 	}
 
-	np = core_add_np_locate(ip, NULL, ip_buf, NULL, np_addr->np_port,
-			0, network_transport, net_size, ret);
-	if ((np))
+	np = core_add_np_locate(ip, ip_buf, np_addr->np_port,
+				network_transport, net_size);
+	if (!IS_ERR(np))
 		return np;
-
-	if (*ret != 0) {
-		*ret = -EINVAL;
-		return NULL;
-	}
 
 	np = kzalloc(sizeof(struct iscsi_np), GFP_KERNEL);
 	if (!(np)) {
@@ -564,13 +385,11 @@ struct iscsi_np *core_add_np(
 	atomic_set(&np->np_shutdown, 0);
 	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
-	spin_lock_init(&np->np_ex_lock);
 	sema_init(&np->np_done_sem, 0);
 	sema_init(&np->np_restart_sem, 0);
 	sema_init(&np->np_shutdown_sem, 0);
 	sema_init(&np->np_start_sem, 0);
 	INIT_LIST_HEAD(&np->np_list);
-	INIT_LIST_HEAD(&np->np_nex_list);
 
 	kernel_thread(iscsi_target_login_thread, np, 0);
 
@@ -681,7 +500,6 @@ int core_del_np(struct iscsi_np *np)
 
 	core_del_np_thread(np);
 	core_del_np_comm(np);
-	core_del_np_all_ex(np);
 
 	spin_lock(&iscsi_global->np_lock);
 	list_del(&np->np_list);

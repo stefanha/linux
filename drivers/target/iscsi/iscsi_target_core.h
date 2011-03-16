@@ -791,14 +791,6 @@ struct iscsi_tpg_attrib {
 	struct iscsi_portal_group *tpg;
 }  ____cacheline_aligned;
 
-struct iscsi_np_ex {
-	int			np_ex_net_size;
-	u16			np_ex_port;
-	u32			np_ex_ipv4;
-	unsigned char		np_ex_ipv6[IPV6_ADDRESS_SPACE];
-	struct list_head	np_ex_list;
-} ____cacheline_aligned;
-
 struct iscsi_np {
 	unsigned char		np_net_dev[ISCSI_NETDEV_NAME_SIZE];
 	int			np_network_transport;
@@ -811,7 +803,6 @@ struct iscsi_np {
 	unsigned char		np_ipv6[IPV6_ADDRESS_SPACE];
 	u16			np_port;
 	atomic_t		np_shutdown;
-	spinlock_t		np_ex_lock;
 	spinlock_t		np_state_lock;
 	spinlock_t		np_thread_lock;
 	struct semaphore		np_done_sem;
@@ -823,7 +814,6 @@ struct iscsi_np {
 	struct timer_list		np_login_timer;
 	struct iscsi_portal_group *np_login_tpg;
 	struct list_head	np_list;
-	struct list_head	np_nex_list;
 } ____cacheline_aligned;
 
 struct iscsi_tpg_np {

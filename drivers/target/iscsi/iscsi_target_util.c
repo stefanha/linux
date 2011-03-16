@@ -2508,9 +2508,8 @@ struct iscsi_tiqn *iscsi_snmp_get_tiqn(struct iscsi_conn *conn)
 
 extern int iscsi_build_sendtargets_response(struct iscsi_cmd *cmd)
 {
-	char *ip, *ip_ex, *payload = NULL;
+	char *ip, *payload = NULL;
 	struct iscsi_conn *conn = CONN(cmd);
-	struct iscsi_np_ex *np_ex;
 	struct iscsi_portal_group *tpg;
 	struct iscsi_tiqn *tiqn;
 	struct iscsi_tpg_np *tpg_np;
@@ -2588,45 +2587,6 @@ extern int iscsi_build_sendtargets_response(struct iscsi_cmd *cmd)
 
 				memcpy((void *)payload + payload_len, buf, len);
 				payload_len += len;
-
-				spin_lock(&tpg_np->tpg_np->np_ex_lock);
-				list_for_each_entry(np_ex,
-						&tpg_np->tpg_np->np_nex_list,
-						np_ex_list) {
-					if (tpg_np->tpg_np->np_flags &
-							NPF_NET_IPV6)
-						ip_ex = &np_ex->np_ex_ipv6[0];
-					else {
-						memset(buf_ipv4, 0,
-							IPV4_BUF_SIZE);
-						iscsi_ntoa2(buf_ipv4,
-							np_ex->np_ex_ipv4);
-						ip_ex = &buf_ipv4[0];
-					}
-					len = sprintf(buf, "TargetAddress="
-							"%s%s%s:%hu,%hu",
-						(tpg_np->tpg_np->np_flags &
-							NPF_NET_IPV6) ?
-						"[" : "", ip_ex,
-						(tpg_np->tpg_np->np_flags &
-							NPF_NET_IPV6) ?
-						"]" : "", np_ex->np_ex_port,
-						tpg->tpgt);
-					len += 1;
-
-					if ((len + payload_len) > buffer_len) {
-						spin_unlock(&tpg_np->tpg_np->np_ex_lock);
-						spin_unlock(&tpg->tpg_np_lock);
-						spin_unlock(&tiqn->tiqn_tpg_lock);
-						end_of_buf = 1;
-						goto eob;
-					}
-
-					memcpy((void *)payload + payload_len,
-							buf, len);
-					payload_len += len;
-				}
-				spin_unlock(&tpg_np->tpg_np->np_ex_lock);
 			}
 			spin_unlock(&tpg->tpg_np_lock);
 		}
