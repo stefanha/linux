@@ -1,6 +1,6 @@
-iscsi_target_mod-y +=		iscsi_parameters.o \
-				iscsi_seq_and_pdu_list.o \
-				iscsi_thread_queue.o \
+iscsi_target_mod-y +=		iscsi_target_parameters.o \
+				iscsi_target_seq_pdu_list.o \
+				iscsi_target_tq.o \
 				iscsi_target_auth.o \
 				iscsi_target_datain_values.o \
 				iscsi_target_device.o \

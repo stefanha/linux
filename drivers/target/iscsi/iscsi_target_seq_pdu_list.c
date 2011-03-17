@@ -22,10 +22,10 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_util.h"
-#include "iscsi_seq_and_pdu_list.h"
+#include "iscsi_target_seq_pdu_list.h"
 
 #define OFFLOAD_BUF_SIZE	32768
 

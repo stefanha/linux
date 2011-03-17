@@ -20,9 +20,9 @@
 
 #include <scsi/iscsi_proto.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
-#include "iscsi_seq_and_pdu_list.h"
+#include "iscsi_target_seq_pdu_list.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target_datain_values.h"

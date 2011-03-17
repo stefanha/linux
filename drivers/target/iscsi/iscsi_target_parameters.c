@@ -20,10 +20,10 @@
 
 #include <linux/slab.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_util.h"
-#include "iscsi_parameters.h"
+#include "iscsi_target_parameters.h"
 
 /*	iscsi_login_rx_data():
  *

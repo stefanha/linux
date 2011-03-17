@@ -31,7 +31,7 @@
 #include <target/configfs_macros.h>
 
 #include "iscsi_target_core.h"
-#include "iscsi_parameters.h"
+#include "iscsi_target_parameters.h"
 #include "iscsi_target_device.h"
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_nodeattrib.h"

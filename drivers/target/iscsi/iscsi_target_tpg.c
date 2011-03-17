@@ -24,7 +24,7 @@
 #include <target/target_core_configfs.h>
 #include <target/target_core_tpg.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_login.h"
@@ -32,7 +32,7 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
-#include "iscsi_parameters.h"
+#include "iscsi_target_parameters.h"
 
 char *lio_tpg_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {

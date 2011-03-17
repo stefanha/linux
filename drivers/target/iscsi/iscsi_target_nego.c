@@ -23,9 +23,9 @@
 #include <target/target_core_base.h>
 #include <target/target_core_tpg.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
-#include "iscsi_parameters.h"
+#include "iscsi_target_parameters.h"
 #include "iscsi_target_login.h"
 #include "iscsi_target_nego.h"
 #include "iscsi_target_tpg.h"

@@ -22,9 +22,9 @@
 #include <linux/list.h>
 #include <linux/bitmap.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
-#include "iscsi_thread_queue.h"
+#include "iscsi_target_tq.h"
 
 LIST_HEAD(active_ts_list);
 LIST_HEAD(inactive_ts_list);
