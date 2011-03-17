@@ -1288,7 +1288,7 @@ static int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
 	struct bnx2i_cmd_response *resp_cqe;
 	struct bnx2i_cmd *bnx2i_cmd;
 	struct iscsi_task *task;
-	struct iscsi_scsi_cmd_rsp *hdr;
+	struct iscsi_scsi_rsp *hdr;
 	u32 datalen = 0;
 
 	resp_cqe = (struct bnx2i_cmd_response *)cqe;
@@ -1315,7 +1315,7 @@ static int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
 	}
 	bnx2i_iscsi_unmap_sg_list(bnx2i_cmd);
 
-	hdr = (struct iscsi_scsi_cmd_rsp *)task->hdr;
+	hdr = (struct iscsi_scsi_rsp *)task->hdr;
 	resp_cqe = (struct bnx2i_cmd_response *)cqe;
 	hdr->opcode = resp_cqe->op_code;
 	hdr->max_cmdsn = cpu_to_be32(resp_cqe->max_cmd_sn);

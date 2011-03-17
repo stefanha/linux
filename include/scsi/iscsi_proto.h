@@ -116,7 +116,7 @@ struct iscsi_ahs_hdr {
 #define ISCSI_CDB_SIZE			16
 
 /* iSCSI PDU Header */
-struct iscsi_scsi_cmd {
+struct iscsi_scsi_req {
 	uint8_t opcode;
 	uint8_t flags;
 	__be16 rsvd2;
@@ -161,7 +161,7 @@ struct iscsi_ecdb_ahdr {
 };
 
 /* SCSI Response Header */
-struct iscsi_scsi_cmd_rsp {
+struct iscsi_scsi_rsp {
 	uint8_t opcode;
 	uint8_t flags;
 	uint8_t response;

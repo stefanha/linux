@@ -1260,7 +1260,7 @@ static inline int iscsi_handle_scsi_cmd(
 	int	data_direction, cmdsn_ret = 0, immed_ret, ret, transport_ret;
 	int	dump_immediate_data = 0, send_check_condition = 0, payload_length;
 	struct iscsi_cmd	*cmd = NULL;
-	struct iscsi_scsi_cmd *hdr;
+	struct iscsi_scsi_req *hdr;
 
 	spin_lock_bh(&conn->sess->session_stats_lock);
 	conn->sess->cmd_pdus++;
@@ -1271,7 +1271,7 @@ static inline int iscsi_handle_scsi_cmd(
 	}
 	spin_unlock_bh(&conn->sess->session_stats_lock);
 
-	hdr			= (struct iscsi_scsi_cmd *) buf;
+	hdr			= (struct iscsi_scsi_req *) buf;
 	payload_length		= ntoh24(hdr->dlength);
 	hdr->itt		= be32_to_cpu(hdr->itt);
 	hdr->data_length	= be32_to_cpu(hdr->data_length);
@@ -3827,7 +3827,7 @@ static inline int iscsi_send_status(
 {
 	u8 iov_count = 0, recovery;
 	u32 padding = 0, trace_type, tx_size = 0;
-	struct iscsi_scsi_cmd_rsp *hdr;
+	struct iscsi_scsi_rsp *hdr;
 	struct iovec *iov;
 	struct scatterlist sg;
 
@@ -3839,7 +3839,7 @@ static inline int iscsi_send_status(
 	conn->sess->rsp_pdus++;
 	spin_unlock_bh(&conn->sess->session_stats_lock);
 
-	hdr			= (struct iscsi_scsi_cmd_rsp *) cmd->pdu;
+	hdr			= (struct iscsi_scsi_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
 	hdr->opcode		= ISCSI_OP_SCSI_CMD_RSP;
 	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
