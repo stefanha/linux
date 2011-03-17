@@ -1,8 +1,6 @@
 /*******************************************************************************
  * This file contains main functions related to the iSCSI Target Core Driver.
  *
- * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
@@ -510,7 +508,7 @@ static int __init iscsi_target_init_module(void)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "RisingTide Linux-iSCSI target "ISCSI_VERSION"\n");
+	printk(KERN_INFO "RisingTide Systems iSCSI-Target "ISCSI_VERSION"\n");
 
 	iscsi_global = kzalloc(sizeof(struct iscsi_global), GFP_KERNEL);
 	if (!iscsi_global) {
@@ -5365,7 +5363,7 @@ int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
 	return 0;
 }
 
-MODULE_DESCRIPTION("LIO Target Driver Core 4.x.x Release");
+MODULE_DESCRIPTION("RisingTide Systems iSCSI-Target Driver 4.x.x Release");
 MODULE_AUTHOR("nab@Linux-iSCSI.org");
 MODULE_LICENSE("GPL");
 

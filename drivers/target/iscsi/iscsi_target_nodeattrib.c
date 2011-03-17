@@ -1,8 +1,6 @@
 /*******************************************************************************
  * This file contains the main functions related to Initiator Node Attributes.
  *
- * Copyright (c) 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2006-2007 SBE, Inc.  All Rights Reserved.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.

@@ -177,7 +177,7 @@ ISCSI_STAT_INSTANCE_ATTR_RO(description);
 static ssize_t iscsi_stat_instance_show_attr_vendor(
 	struct iscsi_wwn_stat_grps *igrps, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "Linux-iSCSI.org\n");
+	return snprintf(page, PAGE_SIZE, "RisingTide Systems iSCSI-Target\n");
 }
 ISCSI_STAT_INSTANCE_ATTR_RO(vendor);
 

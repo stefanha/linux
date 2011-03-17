@@ -2,8 +2,6 @@
  * This file contains error recovery level zero functions used by
  * the iSCSI Target driver.
  *
- * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
