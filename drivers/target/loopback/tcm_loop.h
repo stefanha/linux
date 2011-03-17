@@ -16,7 +16,7 @@
  */
 #define TL_SCSI_MAX_CMD_LEN		32
 
-#ifdef CONFIG_TCM_LOOP_CDB_DEBUG
+#ifdef CONFIG_LOOPBACK_TARGET_CDB_DEBUG
 # define TL_CDB_DEBUG(x...)		printk(KERN_INFO x)
 #else
 # define TL_CDB_DEBUG(x...)

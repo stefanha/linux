@@ -1,12 +1,10 @@
 /*******************************************************************************
  * This file houses the main functions for the iSCSI CHAP support
  *
- * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
- * 
+ *
  * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -27,7 +25,7 @@
 
 #include "iscsi_target_core.h"
 #include "iscsi_target_nego.h"
-#include "iscsi_auth_chap.h"
+#include "iscsi_target_auth.h"
 
 #ifdef DEBUG_CHAP
 #define PRINT(x...)		printk(KERN_INFO x)

@@ -1,12 +1,10 @@
 /*******************************************************************************
  * This file contains main functions related to iSCSI Parameter negotiation.
  *
- * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
- * 
+ *
  * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -22,10 +20,10 @@
 
 #include <linux/slab.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_util.h"
-#include "iscsi_parameters.h"
+#include "iscsi_target_parameters.h"
 
 /*	iscsi_login_rx_data():
  *
@@ -34,8 +32,7 @@
 int iscsi_login_rx_data(
 	struct iscsi_conn *conn,
 	char *buf,
-	int length,
-	int role)
+	int length)
 {
 	int rx_got;
 	struct iovec iov;
@@ -49,14 +46,7 @@ int iscsi_login_rx_data(
 	 * Add the values regardless of IFMarker/OFMarker, considering
 	 * it may not be negoitated yet.
 	 */
-	if (role == INITIATOR)
-		conn->if_marker += length;
-	else if (role == TARGET)
-		conn->of_marker += length;
-	else {
-		printk(KERN_ERR "Unknown role: 0x%02x.\n", role);
-		return -1;
-	}
+	conn->of_marker += length;
 
 	rx_got = rx_data(conn, &iov, 1, length);
 	if (rx_got != length) {
@@ -76,8 +66,7 @@ int iscsi_login_tx_data(
 	struct iscsi_conn *conn,
 	char *pdu_buf,
 	char *text_buf,
-	int text_length,
-	int role)
+	int text_length)
 {
 	int length, tx_sent;
 	struct iovec iov[2];
@@ -95,14 +84,7 @@ int iscsi_login_tx_data(
 	 * Add the values regardless of IFMarker/OFMarker, considering
 	 * it may not be negoitated yet.
 	 */
-	if (role == INITIATOR)
-		conn->of_marker += length;
-	else if (role == TARGET)
-		conn->if_marker += length;
-	else {
-		printk(KERN_ERR "Unknown role: 0x%02x.\n", role);
-		return -1;
-	}
+	conn->if_marker += length;
 
 	tx_sent = tx_data(conn, &iov[0], 2, length);
 	if (tx_sent != length) {
@@ -486,7 +468,6 @@ out:
  *
  */
 int iscsi_set_keys_to_negotiate(
-	int role,
 	int sessiontype,
 	struct iscsi_param_list *param_list)
 {
@@ -503,22 +484,16 @@ int iscsi_set_keys_to_negotiate(
 		} else if (!strcmp(param->name, MAXCONNECTIONS)) {
 			SET_PSTATE_NEGOTIATE(param);
 		} else if (!strcmp(param->name, TARGETNAME)) {
-			if ((role == INITIATOR) && (sessiontype)) {
-				SET_PSTATE_NEGOTIATE(param);
-				SET_USE_INITIAL_ONLY(param);
-			}
+			continue;
 		} else if (!strcmp(param->name, INITIATORNAME)) {
-			if (role == INITIATOR)
-				SET_PSTATE_NEGOTIATE(param);
+			continue;
 		} else if (!strcmp(param->name, TARGETALIAS)) {
-			if ((role == TARGET) && (param->value))
+			if (param->value)
 				SET_PSTATE_NEGOTIATE(param);
 		} else if (!strcmp(param->name, INITIATORALIAS)) {
-			if ((role == INITIATOR) && (param->value))
-				SET_PSTATE_NEGOTIATE(param);
+			continue;
 		} else if (!strcmp(param->name, TARGETPORTALGROUPTAG)) {
-			if (role == TARGET)
-				SET_PSTATE_NEGOTIATE(param);
+			SET_PSTATE_NEGOTIATE(param);
 		} else if (!strcmp(param->name, INITIALR2T)) {
 			SET_PSTATE_NEGOTIATE(param);
 		} else if (!strcmp(param->name, IMMEDIATEDATA)) {
@@ -1870,12 +1845,12 @@ int iscsi_check_negotiated_keys(struct iscsi_param_list *param_list)
  */
 int iscsi_change_param_value(
 	char *keyvalue,
-	int sender,
 	struct iscsi_param_list *param_list,
 	int check_key)
 {
 	char *key = NULL, *value = NULL;
 	struct iscsi_param *param;
+	int sender = 0;
 
 	if (iscsi_extract_key_value(keyvalue, &key, &value) < 0)
 		return -1;

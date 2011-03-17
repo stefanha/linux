@@ -1,8 +1,6 @@
 /*******************************************************************************
  * This file contains the iSCSI Target DataIN value generation functions.
  *
- * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2006 SBE, Inc.  All Rights Reserved.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
@@ -20,19 +18,11 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/delay.h>
-#include <linux/string.h>
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/init.h>
-#include <linux/spinlock.h>
-#include <linux/smp_lock.h>
-#include <linux/in.h>
 #include <scsi/iscsi_proto.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
-#include "iscsi_seq_and_pdu_list.h"
+#include "iscsi_target_seq_pdu_list.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target_datain_values.h"
@@ -42,7 +32,7 @@ struct iscsi_datain_req *iscsi_allocate_datain_req(void)
 	struct iscsi_datain_req *dr;
 
 	dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC);
-	if (!(dr)) {
+	if (!dr) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" struct iscsi_datain_req\n");
 		return NULL;
@@ -103,12 +93,12 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 next_burst_len, read_data_done, read_data_left;
-	struct iscsi_conn *conn = CONN(cmd);
+	u32 next_burst_len, read_data_done, read_data_left;
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
 
 	dr = iscsi_get_datain_req(cmd);
-	if (!(dr))
+	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
@@ -125,34 +115,34 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 			cmd->read_data_done : dr->read_data_done;
 
 	read_data_left = (cmd->data_length - read_data_done);
-	if (!(read_data_left)) {
+	if (!read_data_left) {
 		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
 
-	if ((read_data_left <= CONN_OPS(conn)->MaxRecvDataSegmentLength) &&
-	    (read_data_left <= (SESS_OPS_C(conn)->MaxBurstLength -
+	if ((read_data_left <= conn->conn_ops->MaxRecvDataSegmentLength) &&
+	    (read_data_left <= (conn->sess->sess_ops->MaxBurstLength -
 	     next_burst_len))) {
 		datain->length = read_data_left;
 
 		datain->flags |= (ISCSI_FLAG_CMD_FINAL | ISCSI_FLAG_DATA_STATUS);
-		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
+		if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 			datain->flags |= ISCSI_FLAG_DATA_ACK;
 	} else {
 		if ((next_burst_len +
-		     CONN_OPS(conn)->MaxRecvDataSegmentLength) <
-		     SESS_OPS_C(conn)->MaxBurstLength) {
+		     conn->conn_ops->MaxRecvDataSegmentLength) <
+		     conn->sess->sess_ops->MaxBurstLength) {
 			datain->length =
-				CONN_OPS(conn)->MaxRecvDataSegmentLength;
+				conn->conn_ops->MaxRecvDataSegmentLength;
 			next_burst_len += datain->length;
 		} else {
-			datain->length = (SESS_OPS_C(conn)->MaxBurstLength -
+			datain->length = (conn->sess->sess_ops->MaxBurstLength -
 					  next_burst_len);
 			next_burst_len = 0;
 
 			datain->flags |= ISCSI_FLAG_CMD_FINAL;
-			if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
+			if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 				datain->flags |= ISCSI_FLAG_DATA_ACK;
 		}
 	}
@@ -202,13 +192,13 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 offset, read_data_done, read_data_left, seq_send_order;
-	struct iscsi_conn *conn = CONN(cmd);
+	u32 offset, read_data_done, read_data_left, seq_send_order;
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
 	struct iscsi_seq *seq;
 
 	dr = iscsi_get_datain_req(cmd);
-	if (!(dr))
+	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
@@ -225,14 +215,14 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 			cmd->seq_send_order : dr->seq_send_order;
 
 	read_data_left = (cmd->data_length - read_data_done);
-	if (!(read_data_left)) {
+	if (!read_data_left) {
 		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
 
 	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
-	if (!(seq))
+	if (!seq)
 		return NULL;
 
 	seq->sent = 1;
@@ -242,33 +232,33 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 
 	offset = (seq->offset + seq->next_burst_len);
 
-	if ((offset + CONN_OPS(conn)->MaxRecvDataSegmentLength) >=
+	if ((offset + conn->conn_ops->MaxRecvDataSegmentLength) >=
 	     cmd->data_length) {
 		datain->length = (cmd->data_length - offset);
 		datain->offset = offset;
 
 		datain->flags |= ISCSI_FLAG_CMD_FINAL;
-		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
+		if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 			datain->flags |= ISCSI_FLAG_DATA_ACK;
 
 		seq->next_burst_len = 0;
 		seq_send_order++;
 	} else {
 		if ((seq->next_burst_len +
-		     CONN_OPS(conn)->MaxRecvDataSegmentLength) <
-		     SESS_OPS_C(conn)->MaxBurstLength) {
+		     conn->conn_ops->MaxRecvDataSegmentLength) <
+		     conn->sess->sess_ops->MaxBurstLength) {
 			datain->length =
-				CONN_OPS(conn)->MaxRecvDataSegmentLength;
+				conn->conn_ops->MaxRecvDataSegmentLength;
 			datain->offset = (seq->offset + seq->next_burst_len);
 
 			seq->next_burst_len += datain->length;
 		} else {
-			datain->length = (SESS_OPS_C(conn)->MaxBurstLength -
+			datain->length = (conn->sess->sess_ops->MaxBurstLength -
 					  seq->next_burst_len);
 			datain->offset = (seq->offset + seq->next_burst_len);
 
 			datain->flags |= ISCSI_FLAG_CMD_FINAL;
-			if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
+			if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 				datain->flags |= ISCSI_FLAG_DATA_ACK;
 
 			seq->next_burst_len = 0;
@@ -324,13 +314,13 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 next_burst_len, read_data_done, read_data_left;
-	struct iscsi_conn *conn = CONN(cmd);
+	u32 next_burst_len, read_data_done, read_data_left;
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
 	struct iscsi_pdu *pdu;
 
 	dr = iscsi_get_datain_req(cmd);
-	if (!(dr))
+	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
@@ -347,29 +337,29 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 			cmd->read_data_done : dr->read_data_done;
 
 	read_data_left = (cmd->data_length - read_data_done);
-	if (!(read_data_left)) {
+	if (!read_data_left) {
 		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return dr;
 	}
 
 	pdu = iscsi_get_pdu_holder_for_seq(cmd, NULL);
-	if (!(pdu))
+	if (!pdu)
 		return dr;
 
 	if ((read_data_done + pdu->length) == cmd->data_length) {
 		pdu->flags |= (ISCSI_FLAG_CMD_FINAL | ISCSI_FLAG_DATA_STATUS);
-		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
+		if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 			pdu->flags |= ISCSI_FLAG_DATA_ACK;
 
 		next_burst_len = 0;
 	} else {
-		if ((next_burst_len + CONN_OPS(conn)->MaxRecvDataSegmentLength) <
-		     SESS_OPS_C(conn)->MaxBurstLength)
+		if ((next_burst_len + conn->conn_ops->MaxRecvDataSegmentLength) <
+		     conn->sess->sess_ops->MaxBurstLength)
 			next_burst_len += pdu->length;
 		else {
 			pdu->flags |= ISCSI_FLAG_CMD_FINAL;
-			if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
+			if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 				pdu->flags |= ISCSI_FLAG_DATA_ACK;
 
 			next_burst_len = 0;
@@ -424,14 +414,14 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	__u32 read_data_done, read_data_left, seq_send_order;
-	struct iscsi_conn *conn = CONN(cmd);
+	u32 read_data_done, read_data_left, seq_send_order;
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
 	struct iscsi_pdu *pdu;
 	struct iscsi_seq *seq = NULL;
 
 	dr = iscsi_get_datain_req(cmd);
-	if (!(dr))
+	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
@@ -448,14 +438,14 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 			cmd->seq_send_order : dr->seq_send_order;
 
 	read_data_left = (cmd->data_length - read_data_done);
-	if (!(read_data_left)) {
+	if (!read_data_left) {
 		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
 
 	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
-	if (!(seq))
+	if (!seq)
 		return NULL;
 
 	seq->sent = 1;
@@ -464,12 +454,12 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 		seq->first_datasn = cmd->data_sn;
 
 	pdu = iscsi_get_pdu_holder_for_seq(cmd, seq);
-	if (!(pdu))
+	if (!pdu)
 		return NULL;
 
 	if (seq->pdu_send_order == seq->pdu_count) {
 		pdu->flags |= ISCSI_FLAG_CMD_FINAL;
-		if (SESS_OPS_C(conn)->ErrorRecoveryLevel > 0)
+		if (conn->sess->sess_ops->ErrorRecoveryLevel > 0)
 			pdu->flags |= ISCSI_FLAG_DATA_ACK;
 
 		seq->next_burst_len = 0;
@@ -530,19 +520,19 @@ struct iscsi_datain_req *iscsi_get_datain_values(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 
-	if (SESS_OPS_C(conn)->DataSequenceInOrder &&
-	    SESS_OPS_C(conn)->DataPDUInOrder)
+	if (conn->sess->sess_ops->DataSequenceInOrder &&
+	    conn->sess->sess_ops->DataPDUInOrder)
 		return iscsi_set_datain_values_yes_and_yes(cmd, datain);
-	else if (!SESS_OPS_C(conn)->DataSequenceInOrder &&
-		  SESS_OPS_C(conn)->DataPDUInOrder)
+	else if (!conn->sess->sess_ops->DataSequenceInOrder &&
+		  conn->sess->sess_ops->DataPDUInOrder)
 		return iscsi_set_datain_values_no_and_yes(cmd, datain);
-	else if (SESS_OPS_C(conn)->DataSequenceInOrder &&
-		 !SESS_OPS_C(conn)->DataPDUInOrder)
+	else if (conn->sess->sess_ops->DataSequenceInOrder &&
+		 !conn->sess->sess_ops->DataPDUInOrder)
 		return iscsi_set_datain_values_yes_and_no(cmd, datain);
-	else if (!SESS_OPS_C(conn)->DataSequenceInOrder &&
-		   !SESS_OPS_C(conn)->DataPDUInOrder)
+	else if (!conn->sess->sess_ops->DataSequenceInOrder &&
+		   !conn->sess->sess_ops->DataPDUInOrder)
 		return iscsi_set_datain_values_no_and_no(cmd, datain);
 
 	return NULL;

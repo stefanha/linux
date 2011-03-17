@@ -61,19 +61,4 @@ struct iscsi_logout_stats {
 	u32		abnormal_logouts;
 } ____cacheline_aligned;
 
-/* Structures for table index support */
-typedef enum {
-	ISCSI_INST_INDEX,
-	ISCSI_PORTAL_INDEX,
-	ISCSI_TARGET_AUTH_INDEX,
-	ISCSI_SESSION_INDEX,
-	ISCSI_CONNECTION_INDEX,
-	INDEX_TYPE_MAX
-} iscsi_index_t;
-
-struct iscsi_index_table {
-	spinlock_t	lock;
-	u32 		iscsi_mib_index[INDEX_TYPE_MAX];
-} ____cacheline_aligned;
-
 #endif   /*** ISCSI_TARGET_STAT_H ***/

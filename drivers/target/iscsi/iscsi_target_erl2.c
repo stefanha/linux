@@ -2,8 +2,6 @@
  * This file contains error recovery level two functions used by
  * the iSCSI Target driver.
  *
- * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
@@ -21,14 +19,11 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_datain_values.h"
 #include "iscsi_target_util.h"
@@ -45,22 +40,22 @@ void iscsi_create_conn_recovery_datain_values(
 	u32 exp_data_sn)
 {
 	u32 data_sn = 0;
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 
 	cmd->next_burst_len = 0;
 	cmd->read_data_done = 0;
 
 	while (exp_data_sn > data_sn) {
 		if ((cmd->next_burst_len +
-		     CONN_OPS(conn)->MaxRecvDataSegmentLength) <
-		     SESS_OPS_C(conn)->MaxBurstLength) {
+		     conn->conn_ops->MaxRecvDataSegmentLength) <
+		     conn->sess->sess_ops->MaxBurstLength) {
 			cmd->read_data_done +=
-			       CONN_OPS(conn)->MaxRecvDataSegmentLength;
+			       conn->conn_ops->MaxRecvDataSegmentLength;
 			cmd->next_burst_len +=
-			       CONN_OPS(conn)->MaxRecvDataSegmentLength;
+			       conn->conn_ops->MaxRecvDataSegmentLength;
 		} else {
 			cmd->read_data_done +=
-				(SESS_OPS_C(conn)->MaxBurstLength -
+				(conn->sess->sess_ops->MaxBurstLength -
 				cmd->next_burst_len);
 			cmd->next_burst_len = 0;
 		}
@@ -76,15 +71,15 @@ void iscsi_create_conn_recovery_dataout_values(
 	struct iscsi_cmd *cmd)
 {
 	u32 write_data_done = 0;
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 
 	cmd->data_sn = 0;
 	cmd->next_burst_len = 0;
 
 	while (cmd->write_data_done > write_data_done) {
-		if ((write_data_done + SESS_OPS_C(conn)->MaxBurstLength) <=
+		if ((write_data_done + conn->sess->sess_ops->MaxBurstLength) <=
 		     cmd->write_data_done)
-			write_data_done += SESS_OPS_C(conn)->MaxBurstLength;
+			write_data_done += conn->sess->sess_ops->MaxBurstLength;
 		else
 			break;
 	}
@@ -340,7 +335,7 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 	u32 dropped_count = 0;
 	struct iscsi_cmd *cmd, *cmd_tmp;
 	struct iscsi_ooo_cmdsn *ooo_cmdsn, *ooo_cmdsn_tmp;
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 
 	spin_lock(&sess->cmdsn_lock);
 	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
@@ -355,7 +350,7 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 			ooo_cmdsn->cmdsn, conn->cid);
 		iscsi_remove_ooo_cmdsn(sess, ooo_cmdsn);
 	}
-	SESS(conn)->ooo_cmdsn_count -= dropped_count;
+	conn->sess->ooo_cmdsn_count -= dropped_count;
 	spin_unlock(&sess->cmdsn_lock);
 
 	spin_lock_bh(&conn->cmd_lock);
@@ -400,7 +395,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	 * connection's command list for connection recovery.
 	 */
 	cr = kzalloc(sizeof(struct iscsi_conn_recovery), GFP_KERNEL);
-	if (!(cr)) {
+	if (!cr) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" struct iscsi_conn_recovery.\n");
 		return -1;
@@ -433,7 +428,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, SESS(conn));
+				__iscsi_release_cmd_to_pool(cmd, conn->sess);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 0);
@@ -453,14 +448,14 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		 * made generic here.
 		 */
 		if (!(cmd->cmd_flags & ICF_OOO_CMDSN) && !cmd->immediate_cmd &&
-		     (cmd->cmd_sn >= SESS(conn)->exp_cmd_sn)) {
+		     (cmd->cmd_sn >= conn->sess->exp_cmd_sn)) {
 			iscsi_remove_cmd_from_conn_list(cmd, conn);
 
 			spin_unlock_bh(&conn->cmd_lock);
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, SESS(conn));
+				__iscsi_release_cmd_to_pool(cmd, conn->sess);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
@@ -481,7 +476,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		if (cmd->data_direction == DMA_TO_DEVICE)
 			iscsi_stop_dataout_timer(cmd);
 
-		cmd->sess = SESS(conn);
+		cmd->sess = conn->sess;
 
 		iscsi_remove_cmd_from_conn_list(cmd, conn);
 		spin_unlock_bh(&conn->cmd_lock);
@@ -511,10 +506,10 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	 */
 	cr->cid = conn->cid;
 	cr->cmd_count = cmd_count;
-	cr->maxrecvdatasegmentlength = CONN_OPS(conn)->MaxRecvDataSegmentLength;
-	cr->sess = SESS(conn);
+	cr->maxrecvdatasegmentlength = conn->conn_ops->MaxRecvDataSegmentLength;
+	cr->sess = conn->sess;
 
-	iscsi_attach_inactive_connection_recovery_entry(SESS(conn), cr);
+	iscsi_attach_inactive_connection_recovery_entry(conn->sess, cr);
 
 	return 0;
 }

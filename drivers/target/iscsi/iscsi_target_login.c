@@ -1,8 +1,6 @@
 /*******************************************************************************
  * This file contains the login functions used by the iSCSI Target driver.
  *
- * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
@@ -20,21 +18,15 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
-#include <linux/inet.h>
+#include <linux/kthread.h>
 #include <linux/crypto.h>
-#include <net/sock.h>
-#include <net/tcp.h>
-#include <net/ipv6.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
-#include "iscsi_thread_queue.h"
+#include "iscsi_target_tq.h"
 #include "iscsi_target_device.h"
 #include "iscsi_target_nego.h"
 #include "iscsi_target_erl0.h"
@@ -44,26 +36,26 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
-#include "iscsi_parameters.h"
+#include "iscsi_target_parameters.h"
 
-/*	iscsi_login_init_conn():
- *
- *
- */
+extern struct idr sess_idr;
+extern struct mutex auth_id_lock;
+extern spinlock_t sess_idr_lock;
+
 static int iscsi_login_init_conn(struct iscsi_conn *conn)
 {
 	INIT_LIST_HEAD(&conn->conn_list);
 	INIT_LIST_HEAD(&conn->conn_cmd_list);
 	INIT_LIST_HEAD(&conn->immed_queue_list);
 	INIT_LIST_HEAD(&conn->response_queue_list);
-	sema_init(&conn->conn_post_wait_sem, 0);
-	sema_init(&conn->conn_wait_sem, 0);
-	sema_init(&conn->conn_wait_rcfr_sem, 0);
-	sema_init(&conn->conn_waiting_on_uc_sem, 0);
-	sema_init(&conn->conn_logout_sem, 0);
-	sema_init(&conn->rx_half_close_sem, 0);
-	sema_init(&conn->tx_half_close_sem, 0);
-	sema_init(&conn->tx_sem, 0);
+	init_completion(&conn->conn_post_wait_comp);
+	init_completion(&conn->conn_wait_comp);
+	init_completion(&conn->conn_wait_rcfr_comp);
+	init_completion(&conn->conn_waiting_on_uc_comp);
+	init_completion(&conn->conn_logout_comp);
+	init_completion(&conn->rx_half_close_comp);
+	init_completion(&conn->tx_half_close_comp);
+	init_completion(&conn->tx_comp);
 	spin_lock_init(&conn->cmd_lock);
 	spin_lock_init(&conn->conn_usage_lock);
 	spin_lock_init(&conn->immed_queue_lock);
@@ -102,7 +94,7 @@ int iscsi_login_setup_crypto(struct iscsi_conn *conn)
 	conn->conn_tx_hash.flags = 0;
 	conn->conn_tx_hash.tfm = crypto_alloc_hash("crc32c", 0,
 						CRYPTO_ALG_ASYNC);
-	if (IS_ERR(conn->conn_tx_hash.tfm)) {	
+	if (IS_ERR(conn->conn_tx_hash.tfm)) {
 		printk(KERN_ERR "crypto_alloc_hash() failed for conn_tx_tfm\n");
 		crypto_free_hash(conn->conn_rx_hash.tfm);
 		return -ENOMEM;
@@ -111,10 +103,6 @@ int iscsi_login_setup_crypto(struct iscsi_conn *conn)
 	return 0;
 }
 
-/*	iscsi_login_check_initiator_version():
- *
- *
- */
 static int iscsi_login_check_initiator_version(
 	struct iscsi_conn *conn,
 	u8 version_max,
@@ -132,10 +120,6 @@ static int iscsi_login_check_initiator_version(
 	return 0;
 }
 
-/*	iscsi_check_for_session_reinstatement():
- *
- *
- */
 int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 {
 	int sessiontype;
@@ -147,12 +131,12 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 
 	initiatorname_param = iscsi_find_param_from_key(
 			INITIATORNAME, conn->param_list);
-	if (!(initiatorname_param))
+	if (!initiatorname_param)
 		return -1;
 
 	sessiontype_param = iscsi_find_param_from_key(
 			SESSIONTYPE, conn->param_list);
-	if (!(sessiontype_param))
+	if (!sessiontype_param)
 		return -1;
 
 	sessiontype = (strncmp(sessiontype_param->value, NORMAL, 6)) ? 1 : 0;
@@ -165,14 +149,14 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 		spin_lock(&sess_p->conn_lock);
 		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
 		    atomic_read(&sess_p->session_logout) ||
-		    (sess_p->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+		    (sess_p->time2retain_timer_flags & ISCSI_TF_EXPIRED)) {
 			spin_unlock(&sess_p->conn_lock);
 			continue;
 		}
-		if (!memcmp((void *)sess_p->isid, (void *)SESS(conn)->isid, 6) &&
-		   (!strcmp((void *)SESS_OPS(sess_p)->InitiatorName,
+		if (!memcmp((void *)sess_p->isid, (void *)conn->sess->isid, 6) &&
+		   (!strcmp((void *)sess_p->sess_ops->InitiatorName,
 			    (void *)initiatorname_param->value) &&
-		   (SESS_OPS(sess_p)->SessionType == sessiontype))) {
+		   (sess_p->sess_ops->SessionType == sessiontype))) {
 			atomic_set(&sess_p->session_reinstatement, 1);
 			spin_unlock(&sess_p->conn_lock);
 			iscsi_inc_session_usage_count(sess_p);
@@ -192,7 +176,7 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 	TRACE(TRACE_ERL0, "%s iSCSI Session SID %u is still active for %s,"
 		" preforming session reinstatement.\n", (sessiontype) ?
 		"Discovery" : "Normal", sess->sid,
-		SESS_OPS(sess)->InitiatorName);
+		sess->sess_ops->InitiatorName);
 
 	spin_lock_bh(&sess->conn_lock);
 	if (sess->session_state == TARG_SESS_STATE_FAILED) {
@@ -214,16 +198,16 @@ static void iscsi_login_set_conn_values(
 	u16 cid)
 {
 	conn->sess		= sess;
-	conn->cid 		= cid;
+	conn->cid		= cid;
 	/*
 	 * Generate a random Status sequence number (statsn) for the new
 	 * iSCSI connection.
 	 */
 	get_random_bytes(&conn->stat_sn, sizeof(u32));
 
-	down(&iscsi_global->auth_id_sem);
+	mutex_lock(&auth_id_lock);
 	conn->auth_id		= iscsi_global->auth_id++;
-	up(&iscsi_global->auth_id_sem);
+	mutex_unlock(&auth_id_lock);
 }
 
 /*	iscsi_login_zero_tsih():
@@ -238,8 +222,8 @@ static int iscsi_login_zero_tsih_s1(
 	struct iscsi_session *sess = NULL;
 	struct iscsi_login_req *pdu = (struct iscsi_login_req *)buf;
 
-	sess = kmem_cache_zalloc(lio_sess_cache, GFP_KERNEL);
-	if (!(sess)) {
+	sess = kzalloc(sizeof(struct iscsi_session), GFP_KERNEL);
+	if (!sess) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		printk(KERN_ERR "Could not allocate memory for session\n");
@@ -254,17 +238,26 @@ static int iscsi_login_zero_tsih_s1(
 	INIT_LIST_HEAD(&sess->sess_ooo_cmdsn_list);
 	INIT_LIST_HEAD(&sess->cr_active_list);
 	INIT_LIST_HEAD(&sess->cr_inactive_list);
-	sema_init(&sess->async_msg_sem, 0);
-	sema_init(&sess->reinstatement_sem, 0);
-	sema_init(&sess->session_wait_sem, 0);
-	sema_init(&sess->session_waiting_on_uc_sem, 0);
+	init_completion(&sess->async_msg_comp);
+	init_completion(&sess->reinstatement_comp);
+	init_completion(&sess->session_wait_comp);
 	spin_lock_init(&sess->cmdsn_lock);
 	spin_lock_init(&sess->conn_lock);
 	spin_lock_init(&sess->cr_a_lock);
 	spin_lock_init(&sess->cr_i_lock);
 	spin_lock_init(&sess->session_usage_lock);
 	spin_lock_init(&sess->ttt_lock);
-	sess->session_index = iscsi_get_new_index(ISCSI_SESSION_INDEX);
+
+	if (!idr_pre_get(&sess_idr, GFP_KERNEL)) {
+		printk(KERN_ERR "idr_pre_get() for sess_idr failed\n");
+		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+				ISCSI_LOGIN_STATUS_NO_RESOURCES);
+		return -1;	
+	}
+	spin_lock(&sess_idr_lock);
+	idr_get_new(&sess_idr, NULL, &sess->session_index);
+	spin_unlock(&sess_idr_lock);
+
 	sess->creation_time = get_jiffies_64();
 	spin_lock_init(&sess->session_stats_lock);
 	/*
@@ -274,7 +267,7 @@ static int iscsi_login_zero_tsih_s1(
 	sess->max_cmd_sn	= pdu->cmdsn;
 
 	sess->sess_ops = kzalloc(sizeof(struct iscsi_sess_ops), GFP_KERNEL);
-	if (!(sess->sess_ops)) {
+	if (!sess->sess_ops) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		printk(KERN_ERR "Unable to allocate memory for"
@@ -283,7 +276,7 @@ static int iscsi_login_zero_tsih_s1(
 	}
 
 	sess->se_sess = transport_init_session();
-	if (!(sess->se_sess)) {
+	if (!sess->se_sess) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
@@ -292,7 +285,7 @@ static int iscsi_login_zero_tsih_s1(
 	return 0;
 }
 
-static int iscsi_login_zero_tsih_s2 (
+static int iscsi_login_zero_tsih_s2(
 	struct iscsi_conn *conn)
 {
 	struct iscsi_node_attrib *na;
@@ -303,10 +296,10 @@ static int iscsi_login_zero_tsih_s2 (
 
 	/*
 	 * Assign a new TPG Session Handle.  Note this is protected with
-	 * struct iscsi_portal_group->np_login_sem from core_access_np().
+	 * struct iscsi_portal_group->np_login_sem from iscsit_access_np().
 	 */
 	sess->tsih = ++ISCSI_TPG_S(sess)->ntsih;
-	if (!(sess->tsih))
+	if (!sess->tsih)
 		sess->tsih = ++ISCSI_TPG_S(sess)->ntsih;
 
 	/*
@@ -319,9 +312,9 @@ static int iscsi_login_zero_tsih_s2 (
 		return -1;
 	}
 
-	iscsi_set_keys_to_negotiate(TARGET, 0, conn->param_list);
+	iscsi_set_keys_to_negotiate(0, conn->param_list);
 
-	if (SESS_OPS(sess)->SessionType)
+	if (sess->sess_ops->SessionType)
 		return iscsi_set_keys_irrelevant_for_discovery(
 				conn->param_list);
 
@@ -336,7 +329,7 @@ static int iscsi_login_zero_tsih_s2 (
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
-	if (iscsi_change_param_value(buf, TARGET, conn->param_list, 0) < 0) {
+	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
@@ -349,7 +342,7 @@ static int iscsi_login_zero_tsih_s2 (
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "ErrorRecoveryLevel=%d", na->default_erl);
-	if (iscsi_change_param_value(buf, TARGET, conn->param_list, 0) < 0) {
+	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
@@ -372,7 +365,7 @@ int iscsi_login_disable_FIM_keys(
 	struct iscsi_param *param;
 
 	param = iscsi_find_param_from_key("OFMarker", param_list);
-	if (!(param)) {
+	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" OFMarker failed\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
@@ -382,7 +375,7 @@ int iscsi_login_disable_FIM_keys(
 	param->state &= ~PSTATE_NEGOTIATE;
 
 	param = iscsi_find_param_from_key("OFMarkInt", param_list);
-	if (!(param)) {
+	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" IFMarker failed\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
@@ -392,7 +385,7 @@ int iscsi_login_disable_FIM_keys(
 	param->state &= ~PSTATE_NEGOTIATE;
 
 	param = iscsi_find_param_from_key("IFMarker", param_list);
-	if (!(param)) {
+	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" IFMarker failed\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
@@ -402,7 +395,7 @@ int iscsi_login_disable_FIM_keys(
 	param->state &= ~PSTATE_NEGOTIATE;
 
 	param = iscsi_find_param_from_key("IFMarkInt", param_list);
-	if (!(param)) {
+	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" IFMarker failed\n");
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
@@ -414,7 +407,7 @@ int iscsi_login_disable_FIM_keys(
 	return 0;
 }
 
-static int iscsi_login_non_zero_tsih_s1 (
+static int iscsi_login_non_zero_tsih_s1(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -445,7 +438,7 @@ static int iscsi_login_non_zero_tsih_s2(
 		sess_p = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 		if (atomic_read(&sess_p->session_fall_back_to_erl0) ||
 		    atomic_read(&sess_p->session_logout) ||
-		   (sess_p->time2retain_timer_flags & T2R_TF_EXPIRED))
+		   (sess_p->time2retain_timer_flags & ISCSI_TF_EXPIRED))
 			continue;
 		if (!(memcmp((const void *)sess_p->isid,
 		     (const void *)pdu->isid, 6)) &&
@@ -487,8 +480,7 @@ static int iscsi_login_non_zero_tsih_s2(
 		return -1;
 	}
 
-	iscsi_set_keys_to_negotiate(TARGET, 0, conn->param_list);
-
+	iscsi_set_keys_to_negotiate(0, conn->param_list);
 	/*
 	 * Need to send TargetPortalGroupTag back in first login response
 	 * on any iSCSI connection where the Initiator provides TargetName.
@@ -498,7 +490,7 @@ static int iscsi_login_non_zero_tsih_s2(
 	 */
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
-	if (iscsi_change_param_value(buf, TARGET, conn->param_list, 0) < 0) {
+	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
@@ -507,10 +499,6 @@ static int iscsi_login_non_zero_tsih_s2(
 	return iscsi_login_disable_FIM_keys(conn->param_list, conn);
 }
 
-/*	iscsi_login_post_auth_non_zero_tsih():
- *
- *
- */
 int iscsi_login_post_auth_non_zero_tsih(
 	struct iscsi_conn *conn,
 	u16 cid,
@@ -518,7 +506,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 {
 	struct iscsi_conn *conn_ptr = NULL;
 	struct iscsi_conn_recovery *cr = NULL;
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 
 	/*
 	 * By following item 5 in the login table,  if we have found
@@ -531,7 +519,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 	if ((conn_ptr)) {
 		printk(KERN_ERR "Connection exists with CID %hu for %s,"
 			" performing connection reinstatement.\n",
-			conn_ptr->cid, SESS_OPS(sess)->InitiatorName);
+			conn_ptr->cid, sess->sess_ops->InitiatorName);
 
 		iscsi_connection_reinstatement_rcfr(conn_ptr);
 		iscsi_dec_conn_usage_count(conn_ptr);
@@ -546,7 +534,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 	 * but the response may not be sent due to additional connection
 	 * loss.
 	 */
-	if (SESS_OPS(sess)->ErrorRecoveryLevel == 2) {
+	if (sess->sess_ops->ErrorRecoveryLevel == 2) {
 		cr = iscsi_get_inactive_connection_recovery_entry(
 				sess, cid);
 		if ((cr)) {
@@ -564,12 +552,12 @@ int iscsi_login_post_auth_non_zero_tsih(
 	 * session.
 	 */
 	TRACE(TRACE_LOGIN, "Adding CID %hu to existing session for %s.\n",
-			cid, SESS_OPS(sess)->InitiatorName);
+			cid, sess->sess_ops->InitiatorName);
 
-	if ((atomic_read(&sess->nconn) + 1) > SESS_OPS(sess)->MaxConnections) {
+	if ((atomic_read(&sess->nconn) + 1) > sess->sess_ops->MaxConnections) {
 		printk(KERN_ERR "Adding additional connection to this session"
 			" would exceed MaxConnections %d, login failed.\n",
-				SESS_OPS(sess)->MaxConnections);
+				sess->sess_ops->MaxConnections);
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_ISID_ERROR);
 		return -1;
@@ -578,13 +566,9 @@ int iscsi_login_post_auth_non_zero_tsih(
 	return 0;
 }
 
-/*	iscsi_post_login_start_timers():
- *
- *
- */
 static void iscsi_post_login_start_timers(struct iscsi_conn *conn)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 
 /* #warning PHY timer is disabled */
 #if 0
@@ -594,14 +578,10 @@ static void iscsi_post_login_start_timers(struct iscsi_conn *conn)
 	iscsi_start_netif_timer(conn);
 	spin_unlock_bh(&conn->netif_lock);
 #endif
-	if (!SESS_OPS(sess)->SessionType)
+	if (!sess->sess_ops->SessionType)
 		iscsi_start_nopin_timer(conn);
 }
 
-/*	iscsi_post_login_handler():
- *
- *
- */
 static int iscsi_post_login_handler(
 	struct iscsi_np *np,
 	struct iscsi_conn *conn,
@@ -610,11 +590,11 @@ static int iscsi_post_login_handler(
 	int stop_timer = 0;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
 	unsigned char *ip, *ip_np;
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct se_session *se_sess = sess->se_sess;
 	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
-	struct se_thread_set *ts;
+	struct iscsi_thread_set *ts;
 
 	iscsi_inc_conn_usage_count(conn);
 
@@ -627,7 +607,7 @@ static int iscsi_post_login_handler(
 	iscsi_set_connection_parameters(conn->conn_ops, conn->param_list);
 	iscsi_set_sync_and_steering_values(conn);
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
+	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &conn->ipv6_login_ip[0];
 		ip_np = &np->np_ipv6[0];
 	} else {
@@ -642,7 +622,7 @@ static int iscsi_post_login_handler(
 	/*
 	 * SCSI Initiator -> SCSI Target Port Mapping
 	 */
-	ts = iscsi_get_thread_set(TARGET);
+	ts = iscsi_get_thread_set();
 	if (!zero_tsih) {
 		iscsi_set_session_parameters(sess->sess_ops,
 				conn->param_list, 0);
@@ -666,7 +646,7 @@ static int iscsi_post_login_handler(
 		atomic_inc(&sess->nconn);
 		printk(KERN_INFO "Incremented iSCSI Connection count to %hu"
 			" from node: %s\n", atomic_read(&sess->nconn),
-			SESS_OPS(sess)->InitiatorName);
+			sess->sess_ops->InitiatorName);
 		spin_unlock_bh(&sess->conn_lock);
 
 		iscsi_post_login_start_timers(conn);
@@ -709,14 +689,14 @@ static int iscsi_post_login_handler(
 	atomic_inc(&sess->nconn);
 	printk(KERN_INFO "Incremented iSCSI Connection count to %hu from node:"
 		" %s\n", atomic_read(&sess->nconn),
-		SESS_OPS(sess)->InitiatorName);
+		sess->sess_ops->InitiatorName);
 	spin_unlock_bh(&sess->conn_lock);
 
 	sess->sid = tpg->sid++;
 	if (!sess->sid)
 		sess->sid = tpg->sid++;
 	printk(KERN_INFO "Established iSCSI session from node: %s\n",
-			SESS_OPS(sess)->InitiatorName);
+			sess->sess_ops->InitiatorName);
 
 	tpg->nsessions++;
 	if (tpg->tpg_tiqn)
@@ -741,10 +721,6 @@ static int iscsi_post_login_handler(
 	return 0;
 }
 
-/*	iscsi_handle_login_thread_timeout():
- *
- *
- */
 static void iscsi_handle_login_thread_timeout(unsigned long data)
 {
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
@@ -757,22 +733,18 @@ static void iscsi_handle_login_thread_timeout(unsigned long data)
 	printk(KERN_ERR "iSCSI Login timeout on Network Portal %s:%hu\n",
 			buf_ipv4, np->np_port);
 
-	if (np->np_login_timer_flags & TPG_NP_TF_STOP) {
+	if (np->np_login_timer_flags & ISCSI_TF_STOP) {
 		spin_unlock_bh(&np->np_thread_lock);
 		return;
 	}
 
 	if (np->np_thread)
-		send_sig(SIGKILL, np->np_thread, 1);
+		send_sig(SIGINT, np->np_thread, 1);
 
-	np->np_login_timer_flags &= ~TPG_NP_TF_RUNNING;
+	np->np_login_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&np->np_thread_lock);
 }
 
-/*	iscsi_start_login_thread_timer():
- *
- *
- */
 static void iscsi_start_login_thread_timer(struct iscsi_np *np)
 {
 	/*
@@ -781,10 +753,11 @@ static void iscsi_start_login_thread_timer(struct iscsi_np *np)
 	 */
 	spin_lock_bh(&np->np_thread_lock);
 	init_timer(&np->np_login_timer);
-	SETUP_TIMER(np->np_login_timer, TA_LOGIN_TIMEOUT, np,
-			iscsi_handle_login_thread_timeout);
-	np->np_login_timer_flags &= ~TPG_NP_TF_STOP;
-	np->np_login_timer_flags |= TPG_NP_TF_RUNNING;
+	np->np_login_timer.expires = (get_jiffies_64() + TA_LOGIN_TIMEOUT * HZ);
+	np->np_login_timer.data = (unsigned long)np;
+	np->np_login_timer.function = iscsi_handle_login_thread_timeout;
+	np->np_login_timer_flags &= ~ISCSI_TF_STOP;
+	np->np_login_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&np->np_login_timer);
 
 	TRACE(TRACE_LOGIN, "Added timeout timer to iSCSI login request for"
@@ -792,51 +765,43 @@ static void iscsi_start_login_thread_timer(struct iscsi_np *np)
 	spin_unlock_bh(&np->np_thread_lock);
 }
 
-/*	iscsi_stop_login_thread_timer():
- *
- *
- */
 static void iscsi_stop_login_thread_timer(struct iscsi_np *np)
 {
 	spin_lock_bh(&np->np_thread_lock);
-	if (!(np->np_login_timer_flags & TPG_NP_TF_RUNNING)) {
+	if (!(np->np_login_timer_flags & ISCSI_TF_RUNNING)) {
 		spin_unlock_bh(&np->np_thread_lock);
 		return;
 	}
-	np->np_login_timer_flags |= TPG_NP_TF_STOP;
+	np->np_login_timer_flags |= ISCSI_TF_STOP;
 	spin_unlock_bh(&np->np_thread_lock);
 
 	del_timer_sync(&np->np_login_timer);
 
 	spin_lock_bh(&np->np_thread_lock);
-	np->np_login_timer_flags &= ~TPG_NP_TF_RUNNING;
+	np->np_login_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&np->np_thread_lock);
 }
 
-/*	iscsi_target_setup_login_socket():
- *
- *
- */
-static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
+int iscsi_target_setup_login_socket(struct iscsi_np *np)
 {
 	const char *end;
 	struct socket *sock;
-	int backlog = 5, ip_proto, sock_type, ret, opt = 0;
+	int backlog = 5, ret, opt = 0;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 
 	switch (np->np_network_transport) {
 	case ISCSI_TCP:
-		ip_proto = IPPROTO_TCP;
-		sock_type = SOCK_STREAM;
+		np->np_ip_proto = IPPROTO_TCP;
+		np->np_sock_type = SOCK_STREAM;
 		break;
 	case ISCSI_SCTP_TCP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_STREAM;
+		np->np_ip_proto = IPPROTO_SCTP;
+		np->np_sock_type = SOCK_STREAM;
 		break;
 	case ISCSI_SCTP_UDP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_SEQPACKET;
+		np->np_ip_proto = IPPROTO_SCTP;
+		np->np_sock_type = SOCK_SEQPACKET;
 		break;
 	case ISCSI_IWARP_TCP:
 	case ISCSI_IWARP_SCTP:
@@ -844,13 +809,14 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 	default:
 		printk(KERN_ERR "Unsupported network_transport: %d\n",
 				np->np_network_transport);
-		goto fail;
+		return -EINVAL;
 	}
 
-	if (sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
-			sock_type, ip_proto, &sock) < 0) {
+	ret = sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
+			np->np_sock_type, np->np_ip_proto, &sock);
+	if (ret < 0) {
 		printk(KERN_ERR "sock_create() failed.\n");
-		goto fail;
+		return ret;
 	}
 	np->np_socket = sock;
 
@@ -861,9 +827,10 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 	    (np->np_network_transport == ISCSI_SCTP_UDP)) {
 		if (!sock->file) {
 			sock->file = kzalloc(sizeof(struct file), GFP_KERNEL);
-			if (!(sock->file)) {
+			if (!sock->file) {
 				printk(KERN_ERR "Unable to allocate struct"
 						" file for SCTP\n");
+				ret = -ENOMEM;
 				goto fail;
 			}
 			np->np_flags |= NPF_SCTP_STRUCT_FILE;
@@ -874,21 +841,14 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 		memset(&sock_in6, 0, sizeof(struct sockaddr_in6));
 		sock_in6.sin6_family = AF_INET6;
 		sock_in6.sin6_port = htons(np->np_port);
-#if 1
+
 		ret = in6_pton(&np->np_ipv6[0], IPV6_ADDRESS_SPACE,
 				(void *)&sock_in6.sin6_addr.in6_u, -1, &end);
 		if (ret <= 0) {
 			printk(KERN_ERR "in6_pton returned: %d\n", ret);
+			ret = -EINVAL;
 			goto fail;
 		}
-#else
-		ret = iscsi_pton6(&np->np_ipv6[0],
-				(unsigned char *)&sock_in6.sin6_addr.in6_u);
-		if (ret <= 0) {
-			printk(KERN_ERR "iscsi_pton6() returned: %d\n", ret);
-			goto fail;
-		}
-#endif
 	} else {
 		memset(&sock_in, 0, sizeof(struct sockaddr_in));
 		sock_in.sin_family = AF_INET;
@@ -933,12 +893,13 @@ static struct socket *iscsi_target_setup_login_socket(struct iscsi_np *np)
 		}
 	}
 
-	if (kernel_listen(sock, backlog)) {
-		printk(KERN_ERR "kernel_listen() failed.\n");
+	ret = kernel_listen(sock, backlog);
+	if (ret != 0) {
+		printk(KERN_ERR "kernel_listen() failed: %d\n", ret);
 		goto fail;
 	}
 
-	return sock;
+	return 0;
 
 fail:
 	np->np_socket = NULL;
@@ -950,110 +911,49 @@ fail:
 
 		sock_release(sock);
 	}
-	return NULL;
+	return ret;
 }
 
-/*	iscsi_target_login_thread():
- *
- *
- */
-int iscsi_target_login_thread(void *arg)
+static int __iscsi_target_login_thread(struct iscsi_np *np)
 {
 	u8 buffer[ISCSI_HDR_LEN], iscsi_opcode, zero_tsih = 0;
 	unsigned char *ip = NULL, *ip_init_buf = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
-	int err, ret = 0, start = 1, ip_proto;
-	int sock_type, set_sctp_conn_flag = 0;
+	int err, ret = 0, ip_proto, sock_type, set_sctp_conn_flag;
 	struct iscsi_conn *conn = NULL;
 	struct iscsi_login *login;
 	struct iscsi_portal_group *tpg = NULL;
 	struct socket *new_sock, *sock;
-	struct iscsi_np *np = (struct iscsi_np *) arg;
 	struct iovec iov;
 	struct iscsi_login_req *pdu;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
 
-	{
-	char name[16];
-	memset(name, 0, 16);
-	sprintf(name, "iscsi_np");
-	iscsi_daemon(np->np_thread, name, SHUTDOWN_SIGS);
-	}
-
-	sock = iscsi_target_setup_login_socket(np);
-	if (!(sock)) {
-		up(&np->np_start_sem);
-		return -1;
-	}
-
-get_new_sock:
 	flush_signals(current);
-	ip_proto = sock_type = set_sctp_conn_flag = 0;
-
-	switch (np->np_network_transport) {
-	case ISCSI_TCP:
-		ip_proto = IPPROTO_TCP;
-		sock_type = SOCK_STREAM;
-		break;
-	case ISCSI_SCTP_TCP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_STREAM;
-		break;
-	case ISCSI_SCTP_UDP:
-		ip_proto = IPPROTO_SCTP;
-		sock_type = SOCK_SEQPACKET;
-		break;
-	case ISCSI_IWARP_TCP:
-	case ISCSI_IWARP_SCTP:
-	case ISCSI_INFINIBAND:
-	default:
-		printk(KERN_ERR "Unsupported network_transport: %d\n",
-			np->np_network_transport);
-		if (start)
-			up(&np->np_start_sem);
-		return -1;
-	}
+	set_sctp_conn_flag = 0;
+	sock = np->np_socket;
+	ip_proto = np->np_ip_proto;
+	sock_type = np->np_sock_type;
 
 	spin_lock_bh(&np->np_thread_lock);
-	if (np->np_thread_state == ISCSI_NP_THREAD_SHUTDOWN)
-		goto out;
-	else if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
-		if (atomic_read(&np->np_shutdown)) {
-			spin_unlock_bh(&np->np_thread_lock);
-			up(&np->np_restart_sem);
-			down(&np->np_shutdown_sem);
-			goto out;
-		}
+	if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
 		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
-		up(&np->np_restart_sem);
+		complete(&np->np_restart_comp);
 	} else {
 		np->np_thread_state = ISCSI_NP_THREAD_ACTIVE;
-
-		if (start) {
-			start = 0;
-			up(&np->np_start_sem);
-		}
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
 	if (kernel_accept(sock, &new_sock, 0) < 0) {
-		if (signal_pending(current)) {
-			spin_lock_bh(&np->np_thread_lock);
-			if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
-				if (atomic_read(&np->np_shutdown)) {
-					spin_unlock_bh(&np->np_thread_lock);
-					up(&np->np_restart_sem);
-					down(&np->np_shutdown_sem);
-					goto out;
-				}
-				spin_unlock_bh(&np->np_thread_lock);
-				goto get_new_sock;
-			}
+		spin_lock_bh(&np->np_thread_lock);
+		if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
 			spin_unlock_bh(&np->np_thread_lock);
-			goto out;
+			complete(&np->np_restart_comp);
+			/* Get another socket */
+			return 1;
 		}
-		goto get_new_sock;
+		spin_unlock_bh(&np->np_thread_lock);
+		goto out;
 	}
 	/*
 	 * The SCTP stack needs struct socket->file.
@@ -1063,11 +963,12 @@ get_new_sock:
 		if (!new_sock->file) {
 			new_sock->file = kzalloc(
 					sizeof(struct file), GFP_KERNEL);
-			if (!(new_sock->file)) {
+			if (!new_sock->file) {
 				printk(KERN_ERR "Unable to allocate struct"
 						" file for SCTP\n");
 				sock_release(new_sock);
-				goto get_new_sock;
+				/* Get another socket */
+				return 1;
 			}
 			set_sctp_conn_flag = 1;
 		}
@@ -1075,8 +976,8 @@ get_new_sock:
 
 	iscsi_start_login_thread_timer(np);
 
-	conn = kmem_cache_zalloc(lio_conn_cache, GFP_KERNEL);
-	if (!(conn)) {
+	conn = kzalloc(sizeof(struct iscsi_conn), GFP_KERNEL);
+	if (!conn) {
 		printk(KERN_ERR "Could not allocate memory for"
 			" new connection\n");
 		if (set_sctp_conn_flag) {
@@ -1084,8 +985,8 @@ get_new_sock:
 			new_sock->file = NULL;
 		}
 		sock_release(new_sock);
-
-		goto get_new_sock;
+		/* Get another socket */
+		return 1;
 	}
 
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_FREE.\n");
@@ -1103,7 +1004,7 @@ get_new_sock:
 	 * iscsi_tx_login_rsp() below will call tx_data().
 	 */
 	conn->conn_ops = kzalloc(sizeof(struct iscsi_conn_ops), GFP_KERNEL);
-	if (!(conn->conn_ops)) {
+	if (!conn->conn_ops) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" struct iscsi_conn_ops.\n");
 		goto new_sess_out;
@@ -1143,9 +1044,9 @@ get_new_sock:
 	*/
 	conn->login_itt		= pdu->itt;
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE)
+	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &np->np_ipv6[0];
-	else {
+	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
 		ip = &buf_ipv4[0];
@@ -1163,7 +1064,7 @@ get_new_sock:
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE) {
+	if (np->np_flags & NPF_NET_IPV6) {
 		memset(&sock_in6, 0, sizeof(struct sockaddr_in6));
 
 		if (conn->sock->ops->getname(conn->sock,
@@ -1207,7 +1108,6 @@ get_new_sock:
 	conn->network_transport = np->np_network_transport;
 	snprintf(conn->net_dev, ISCSI_NETDEV_NAME_SIZE, "%s", np->np_net_dev);
 
-	conn->conn_index = iscsi_get_new_index(ISCSI_CONNECTION_INDEX);
 	conn->local_ip = np->np_ipv4;
 	conn->local_port = np->np_port;
 
@@ -1249,13 +1149,13 @@ get_new_sock:
 	 * iscsi_target_locate_portal(), and return a valid struct iscsi_login.
 	 */
 	login = iscsi_target_init_negotiation(np, conn, buffer);
-	if (!(login)) {
+	if (!login) {
 		tpg = conn->tpg;
 		goto new_sess_out;
 	}
 
 	tpg = conn->tpg;
-	if (!(tpg)) {
+	if (!tpg) {
 		printk(KERN_ERR "Unable to locate struct iscsi_conn->tpg\n");
 		goto new_sess_out;
 	}
@@ -1275,7 +1175,7 @@ get_new_sock:
 	if (iscsi_target_start_negotiation(login, conn) < 0)
 		goto new_sess_out;
 
-	if (!SESS(conn)) {
+	if (!conn->sess) {
 		printk(KERN_ERR "struct iscsi_conn session pointer is NULL!\n");
 		goto new_sess_out;
 	}
@@ -1290,42 +1190,48 @@ get_new_sock:
 	if (ret < 0)
 		goto new_sess_out;
 
-	core_deaccess_np(np, tpg);
+	iscsit_deaccess_np(np, tpg);
 	tpg = NULL;
-	goto get_new_sock;
+	/* Get another socket */
+	return 1;
 
 new_sess_out:
 	printk(KERN_ERR "iSCSI Login negotiation failed.\n");
 	iscsi_collect_login_stats(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				  ISCSI_LOGIN_STATUS_INIT_ERR);
-	if (!zero_tsih || !SESS(conn))
+	if (!zero_tsih || !conn->sess)
 		goto old_sess_out;
-	if (SESS(conn)->se_sess)
-		transport_free_session(SESS(conn)->se_sess);
-	if (SESS(conn)->sess_ops)
-		kfree(SESS(conn)->sess_ops);
-	if (SESS(conn))
-		kmem_cache_free(lio_sess_cache, SESS(conn));
+	if (conn->sess->se_sess)
+		transport_free_session(conn->sess->se_sess);
+	if (conn->sess->session_index != 0) {
+		spin_lock_bh(&sess_idr_lock);
+		idr_remove(&sess_idr, conn->sess->session_index);
+		spin_unlock_bh(&sess_idr_lock);
+	}
+	if (conn->sess->sess_ops)
+		kfree(conn->sess->sess_ops);
+	if (conn->sess)
+		kfree(conn->sess);
 old_sess_out:
 	iscsi_stop_login_thread_timer(np);
 	/*
 	 * If login negotiation fails check if the Time2Retain timer
 	 * needs to be restarted.
 	 */
-	if (!zero_tsih && SESS(conn)) {
-		spin_lock_bh(&SESS(conn)->conn_lock);
-		if (SESS(conn)->session_state == TARG_SESS_STATE_FAILED) {
+	if (!zero_tsih && conn->sess) {
+		spin_lock_bh(&conn->sess->conn_lock);
+		if (conn->sess->session_state == TARG_SESS_STATE_FAILED) {
 			struct se_portal_group *se_tpg =
 					&ISCSI_TPG_C(conn)->tpg_se_tpg;
 
-			atomic_set(&SESS(conn)->session_continuation, 0);
-			spin_unlock_bh(&SESS(conn)->conn_lock);
+			atomic_set(&conn->sess->session_continuation, 0);
+			spin_unlock_bh(&conn->sess->conn_lock);
 			spin_lock_bh(&se_tpg->session_lock);
-			iscsi_start_time2retain_handler(SESS(conn));
+			iscsi_start_time2retain_handler(conn->sess);
 			spin_unlock_bh(&se_tpg->session_lock);
 		} else
-			spin_unlock_bh(&SESS(conn)->conn_lock);
-		iscsi_dec_session_usage_count(SESS(conn));
+			spin_unlock_bh(&conn->sess->conn_lock);
+		iscsi_dec_session_usage_count(conn->sess);
 	}
 
 	if (!IS_ERR(conn->conn_rx_hash.tfm))
@@ -1349,34 +1255,42 @@ old_sess_out:
 		}
 		sock_release(conn->sock);
 	}
-	kmem_cache_free(lio_conn_cache, conn);
+	kfree(conn);
 
 	if (tpg) {
-		core_deaccess_np(np, tpg);
+		iscsit_deaccess_np(np, tpg);
 		tpg = NULL;
 	}
 
-	if (!(signal_pending(current)))
-		goto get_new_sock;
-
-	spin_lock_bh(&np->np_thread_lock);
-	if (atomic_read(&np->np_shutdown)) {
-		spin_unlock_bh(&np->np_thread_lock);
-		up(&np->np_restart_sem);
-		down(&np->np_shutdown_sem);
-		goto out;
-	}
-	if (np->np_thread_state != ISCSI_NP_THREAD_SHUTDOWN) {
-		spin_unlock_bh(&np->np_thread_lock);
-		goto get_new_sock;
-	}
-	spin_unlock_bh(&np->np_thread_lock);
 out:
+	/* Wait for another socket.. */
+	if (!signal_pending(current) || !kthread_should_stop())
+		return 1;
+
 	iscsi_stop_login_thread_timer(np);
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_thread_state = ISCSI_NP_THREAD_EXIT;
-	np->np_thread = NULL;
 	spin_unlock_bh(&np->np_thread_lock);
-	up(&np->np_done_sem);
+	return 0;
+}
+
+int iscsi_target_login_thread(void *arg)
+{
+	struct iscsi_np *np = (struct iscsi_np *)arg;
+	int ret;
+
+	set_user_nice(current, -20);
+	allow_signal(SIGINT);
+
+	while (!kthread_should_stop()) {
+		ret = __iscsi_target_login_thread(np);
+		/*
+		 * We break and exit here unless another sock_accept() call
+		 * is expected.
+		 */
+		if (ret != 1)
+			break;
+	}
+
 	return 0;
 }

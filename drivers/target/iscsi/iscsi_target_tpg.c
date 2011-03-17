@@ -1,10 +1,8 @@
 /*******************************************************************************
  * This file contains iSCSI Target Portal Group related functions.
  *
- * Copyright (c) 2002, 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005, 2006, 2007 SBE, Inc.
  * © Copyright 2007-2011 RisingTide Systems LLC.
- * 
+ *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
  * Author: Nicholas A. Bellinger <nab@linux-iscsi.org>
@@ -20,19 +18,13 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
-#include <linux/ctype.h>
-#include <scsi/scsi.h>
-#include <scsi/scsi_cmnd.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 #include <target/target_core_tpg.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_login.h"
@@ -40,7 +32,7 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
-#include "iscsi_parameters.h"
+#include "iscsi_target_parameters.h"
 
 char *lio_tpg_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {
@@ -104,7 +96,7 @@ struct se_node_acl *lio_tpg_alloc_fabric_acl(
 	struct iscsi_node_acl *acl;
 
 	acl = kzalloc(sizeof(struct iscsi_node_acl), GFP_KERNEL);
-	if (!(acl)) {
+	if (!acl) {
 		printk(KERN_ERR "Unable to allocate memory for struct iscsi_node_acl\n");
 		return NULL;
 	}
@@ -134,7 +126,7 @@ int lio_tpg_shutdown_session(struct se_session *se_sess)
 	spin_lock(&sess->conn_lock);
 	if (atomic_read(&sess->session_fall_back_to_erl0) ||
 	    atomic_read(&sess->session_logout) ||
-	    (sess->time2retain_timer_flags & T2R_TF_EXPIRED)) {
+	    (sess->time2retain_timer_flags & ISCSI_TF_EXPIRED)) {
 		spin_unlock(&sess->conn_lock);
 		return 0;
 	}
@@ -194,13 +186,13 @@ void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 	iscsi_set_default_node_attribues(acl);
 }
 
-struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 tpgt)
+struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 tpgt)
 {
 	struct iscsi_portal_group *tpg;
 
-	tpg = kmem_cache_zalloc(lio_tpg_cache, GFP_KERNEL);
-	if (!(tpg)) {
-		printk(KERN_ERR "Unable to get tpg from lio_tpg_cache\n");
+	tpg = kzalloc(sizeof(struct iscsi_portal_group), GFP_KERNEL);
+	if (!tpg) {
+		printk(KERN_ERR "Unable to allocate struct iscsi_portal_group\n");
 		return NULL;
 	}
 
@@ -208,10 +200,9 @@ struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 
 	tpg->tpg_state = TPG_STATE_FREE;
 	tpg->tpg_tiqn = tiqn;
 	INIT_LIST_HEAD(&tpg->tpg_gnp_list);
-	INIT_LIST_HEAD(&tpg->g_tpg_list);
 	INIT_LIST_HEAD(&tpg->tpg_list);
-	sema_init(&tpg->tpg_access_sem, 1);
-	sema_init(&tpg->np_login_sem, 1);
+	mutex_init(&tpg->tpg_access_lock);
+	mutex_init(&tpg->np_login_lock);
 	spin_lock_init(&tpg->tpg_state_lock);
 	spin_lock_init(&tpg->tpg_np_lock);
 
@@ -220,14 +211,14 @@ struct iscsi_portal_group *core_alloc_portal_group(struct iscsi_tiqn *tiqn, u16 
 
 static void iscsi_set_default_tpg_attribs(struct iscsi_portal_group *);
 
-int core_load_discovery_tpg(void)
+int iscsit_load_discovery_tpg(void)
 {
 	struct iscsi_param *param;
 	struct iscsi_portal_group *tpg;
 	int ret;
 
-	tpg = core_alloc_portal_group(NULL, 1);
-	if (!(tpg)) {
+	tpg = iscsit_alloc_portal_group(NULL, 1);
+	if (!tpg) {
 		printk(KERN_ERR "Unable to allocate struct iscsi_portal_group\n");
 		return -1;
 	}
@@ -253,7 +244,7 @@ int core_load_discovery_tpg(void)
 	 * /sys/kernel/config/target/iscsi/discovery_auth/enforce_discovery_auth
 	 */
 	param = iscsi_find_param_from_key(AUTHMETHOD, tpg->param_list);
-	if (!(param))
+	if (!param)
 		goto out;
 
 	if (iscsi_update_param_value(param, "CHAP,None") < 0)
@@ -276,20 +267,20 @@ out:
 	return -1;
 }
 
-void core_release_discovery_tpg(void)
+void iscsit_release_discovery_tpg(void)
 {
 	struct iscsi_portal_group *tpg = iscsi_global->discovery_tpg;
 
-	if (!(tpg))
+	if (!tpg)
 		return;
 
 	core_tpg_deregister(&tpg->tpg_se_tpg);
 
-	kmem_cache_free(lio_tpg_cache, tpg);
+	kfree(tpg);
 	iscsi_global->discovery_tpg = NULL;
 }
 
-struct iscsi_portal_group *core_get_tpg_from_np(
+struct iscsi_portal_group *iscsit_get_tpg_from_np(
 	struct iscsi_tiqn *tiqn,
 	struct iscsi_np *np)
 {
@@ -326,40 +317,30 @@ int iscsi_get_tpg(
 {
 	int ret;
 
-	ret = down_interruptible(&tpg->tpg_access_sem);
+	ret = mutex_lock_interruptible(&tpg->tpg_access_lock);
 	return ((ret != 0) || signal_pending(current)) ? -1 : 0;
 }
 
-/*	iscsi_put_tpg():
- *
- *
- */
 void iscsi_put_tpg(struct iscsi_portal_group *tpg)
 {
-	up(&tpg->tpg_access_sem);
+	mutex_unlock(&tpg->tpg_access_lock);
 }
 
 static void iscsi_clear_tpg_np_login_thread(
 	struct iscsi_tpg_np *tpg_np,
-	struct iscsi_portal_group *tpg,
-	int shutdown)
+	struct iscsi_portal_group *tpg)
 {
 	if (!tpg_np->tpg_np) {
 		printk(KERN_ERR "struct iscsi_tpg_np->tpg_np is NULL!\n");
 		return;
 	}
 
-	core_reset_np_thread(tpg_np->tpg_np, tpg_np, tpg, shutdown);
+	iscsit_reset_np_thread(tpg_np->tpg_np, tpg_np, tpg);
 	return;
 }
 
-/*	iscsi_clear_tpg_np_login_threads():
- *
- *
- */
 void iscsi_clear_tpg_np_login_threads(
-	struct iscsi_portal_group *tpg,
-	int shutdown)
+	struct iscsi_portal_group *tpg)
 {
 	struct iscsi_tpg_np *tpg_np;
 
@@ -370,25 +351,17 @@ void iscsi_clear_tpg_np_login_threads(
 			continue;
 		}
 		spin_unlock(&tpg->tpg_np_lock);
-		iscsi_clear_tpg_np_login_thread(tpg_np, tpg, shutdown);
+		iscsi_clear_tpg_np_login_thread(tpg_np, tpg);
 		spin_lock(&tpg->tpg_np_lock);
 	}
 	spin_unlock(&tpg->tpg_np_lock);
 }
 
-/*	iscsi_tpg_dump_params():
- *
- *
- */
 void iscsi_tpg_dump_params(struct iscsi_portal_group *tpg)
 {
 	iscsi_print_params(tpg->param_list);
 }
 
-/*	iscsi_tpg_free_network_portals():
- *
- *
- */
 static void iscsi_tpg_free_network_portals(struct iscsi_portal_group *tpg)
 {
 	struct iscsi_np *np;
@@ -403,9 +376,9 @@ static void iscsi_tpg_free_network_portals(struct iscsi_portal_group *tpg)
 		tpg->num_tpg_nps--;
 		tpg->tpg_tiqn->tiqn_num_tpg_nps--;
 
-		if (np->np_net_size == IPV6_ADDRESS_SPACE)
+		if (np->np_flags & NPF_NET_IPV6) {
 			ip = &np->np_ipv6[0];
-		else {
+		} else {
 			memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 			iscsi_ntoa2(buf_ipv4, np->np_ipv4);
 			ip = &buf_ipv4[0];
@@ -433,10 +406,6 @@ static void iscsi_tpg_free_network_portals(struct iscsi_portal_group *tpg)
 	spin_unlock(&tpg->tpg_np_lock);
 }
 
-/*	iscsi_set_default_tpg_attribs():
- *
- *
- */
 static void iscsi_set_default_tpg_attribs(struct iscsi_portal_group *tpg)
 {
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
@@ -452,10 +421,6 @@ static void iscsi_set_default_tpg_attribs(struct iscsi_portal_group *tpg)
 	a->cache_core_nps = TA_CACHE_CORE_NPS;
 }
 
-/*	iscsi_tpg_add_portal_group():
- *
- *
- */
 int iscsi_tpg_add_portal_group(struct iscsi_tiqn *tiqn, struct iscsi_portal_group *tpg)
 {
 	if (tpg->tpg_state != TPG_STATE_FREE) {
@@ -481,10 +446,6 @@ int iscsi_tpg_add_portal_group(struct iscsi_tiqn *tiqn, struct iscsi_portal_grou
 			tiqn->tiqn, tpg->tpgt);
 	spin_unlock(&tiqn->tiqn_tpg_lock);
 
-	spin_lock_bh(&iscsi_global->g_tpg_lock);
-	list_add_tail(&tpg->g_tpg_list, &iscsi_global->g_tpg_list);
-	spin_unlock_bh(&iscsi_global->g_tpg_lock);
-
 	return 0;
 err_out:
 	if (tpg->param_list) {
@@ -506,8 +467,6 @@ int iscsi_tpg_del_portal_group(
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 
-	iscsi_clear_tpg_np_login_threads(tpg, 1);
-
 	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
 		printk(KERN_ERR "Unable to delete iSCSI Target Portal Group:"
 			" %hu while active sessions exist, and force=0\n",
@@ -519,17 +478,12 @@ int iscsi_tpg_del_portal_group(
 	core_tpg_clear_object_luns(&tpg->tpg_se_tpg);
 	iscsi_tpg_free_network_portals(tpg);
 
-	spin_lock_bh(&iscsi_global->g_tpg_lock);
-	list_del(&tpg->g_tpg_list);
-	spin_unlock_bh(&iscsi_global->g_tpg_lock);
-
 	if (tpg->param_list) {
 		iscsi_release_param_list(tpg->param_list);
 		tpg->param_list = NULL;
 	}
 
 	core_tpg_deregister(&tpg->tpg_se_tpg);
-//	tpg->tpg_se_tpg = NULL;
 
 	spin_lock(&tpg->tpg_state_lock);
 	tpg->tpg_state = TPG_STATE_FREE;
@@ -543,14 +497,10 @@ int iscsi_tpg_del_portal_group(
 	printk(KERN_INFO "CORE[%s]_TPG[%hu] - Deleted iSCSI Target Portal Group\n",
 			tiqn->tiqn, tpg->tpgt);
 
-	kmem_cache_free(lio_tpg_cache, tpg);
+	kfree(tpg);
 	return 0;
 }
 
-/*	iscsi_tpg_enable_portal_group():
- *
- *
- */
 int iscsi_tpg_enable_portal_group(struct iscsi_portal_group *tpg)
 {
 	struct iscsi_param *param;
@@ -569,7 +519,7 @@ int iscsi_tpg_enable_portal_group(struct iscsi_portal_group *tpg)
 	 * is enforced (as per default), and remove the NONE option.
 	 */
 	param = iscsi_find_param_from_key(AUTHMETHOD, tpg->param_list);
-	if (!(param)) {
+	if (!param) {
 		spin_unlock(&tpg->tpg_state_lock);
 		return -ENOMEM;
 	}
@@ -598,10 +548,6 @@ int iscsi_tpg_enable_portal_group(struct iscsi_portal_group *tpg)
 	return 0;
 }
 
-/*	iscsi_tpg_disable_portal_group():
- *
- *
- */
 int iscsi_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 {
 	struct iscsi_tiqn *tiqn;
@@ -617,7 +563,7 @@ int iscsi_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 
-	iscsi_clear_tpg_np_login_threads(tpg, 0);
+	iscsi_clear_tpg_np_login_threads(tpg);
 
 	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
 		spin_lock(&tpg->tpg_state_lock);
@@ -630,7 +576,7 @@ int iscsi_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 	}
 
 	tiqn = tpg->tpg_tiqn;
-	if (!(tiqn) || (tpg == iscsi_global->discovery_tpg))
+	if (!tiqn || (tpg == iscsi_global->discovery_tpg))
 		return 0;
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
@@ -673,10 +619,6 @@ struct iscsi_tpg_np *iscsi_tpg_locate_child_np(
 	return NULL;
 }
 
-/*	iscsi_tpg_add_network_portal():
- *
- *
- */
 struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 	struct iscsi_portal_group *tpg,
 	struct iscsi_np_addr *np_addr,
@@ -685,37 +627,27 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 {
 	struct iscsi_np *np;
 	struct iscsi_tpg_np *tpg_np;
-	char *ip_buf;
-	void *ip;
-	int ret = 0;
+	unsigned char *ip_buf;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
 	if (np_addr->np_flags & NPF_NET_IPV6) {
 		ip_buf = (char *)&np_addr->np_ipv6[0];
-		ip = (void *)&np_addr->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		iscsi_ntoa2(buf_ipv4, np_addr->np_ipv4);
 		ip_buf = &buf_ipv4[0];
-		ip = (void *)&np_addr->np_ipv4;
-	}
-	/*
-	 * If the Network Portal does not currently exist, start it up now.
-	 */
-	np = core_get_np(ip, np_addr->np_port, network_transport);
-	if (!(np)) {
-		np = core_add_np(np_addr, network_transport, &ret);
-		if (!(np))
-			return ERR_PTR(ret);
 	}
 
+	np = iscsit_add_np(np_addr, network_transport);
+	if (IS_ERR(np))
+		return ERR_CAST(np);
+
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
-	if (!(tpg_np)) {
+	if (!tpg_np) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" struct iscsi_tpg_np.\n");
 		return ERR_PTR(-ENOMEM);
 	}
-	tpg_np->tpg_np_index	= iscsi_get_new_index(ISCSI_PORTAL_INDEX);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_child_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_parent_list);
@@ -762,15 +694,15 @@ static int iscsi_tpg_release_np(
 	char *ip;
 	char buf_ipv4[IPV4_BUF_SIZE];
 
-	if (np->np_net_size == IPV6_ADDRESS_SPACE)
+	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &np->np_ipv6[0];
-	else {
+	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
 		ip = &buf_ipv4[0];
 	}
 
-	iscsi_clear_tpg_np_login_thread(tpg_np, tpg, 1);
+	iscsi_clear_tpg_np_login_thread(tpg_np, tpg);
 
 	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s"
 		" on network device: %s\n", tpg->tpg_tiqn->tiqn, ip,
@@ -794,15 +726,11 @@ static int iscsi_tpg_release_np(
 	spin_unlock(&np->np_state_lock);
 
 	if (atomic_read(&np->np_shutdown))
-		core_del_np(np);
+		iscsit_del_np(np);
 
 	return 0;
 }
 
-/*	iscsi_tpg_del_network_portal():
- *
- *
- */
 int iscsi_tpg_del_network_portal(
 	struct iscsi_portal_group *tpg,
 	struct iscsi_tpg_np *tpg_np)
@@ -812,7 +740,7 @@ int iscsi_tpg_del_network_portal(
 	int ret = 0;
 
 	np = tpg_np->tpg_np;
-	if (!(np)) {
+	if (!np) {
 		printk(KERN_ERR "Unable to locate struct iscsi_np from"
 				" struct iscsi_tpg_np\n");
 		return -EINVAL;
@@ -852,10 +780,6 @@ int iscsi_tpg_del_network_portal(
 	return iscsi_tpg_release_np(tpg_np, tpg, np);
 }
 
-/*	iscsi_tpg_set_initiator_node_queue_depth():
- *
- *
- */
 int iscsi_tpg_set_initiator_node_queue_depth(
 	struct iscsi_portal_group *tpg,
 	unsigned char *initiatorname,
@@ -866,10 +790,6 @@ int iscsi_tpg_set_initiator_node_queue_depth(
 		initiatorname, queue_depth, force);
 }
 
-/*	iscsi_ta_authentication():
- *
- *
- */
 int iscsi_ta_authentication(struct iscsi_portal_group *tpg, u32 authentication)
 {
 	unsigned char buf1[256], buf2[256], *none = NULL;
@@ -887,13 +807,13 @@ int iscsi_ta_authentication(struct iscsi_portal_group *tpg, u32 authentication)
 	memset(buf2, 0, sizeof(buf2));
 
 	param = iscsi_find_param_from_key(AUTHMETHOD, tpg->param_list);
-	if (!(param))
+	if (!param)
 		return -EINVAL;
 
 	if (authentication) {
 		snprintf(buf1, sizeof(buf1), "%s", param->value);
 		none = strstr(buf1, NONE);
-		if (!(none))
+		if (!none)
 			goto out;
 		if (!strncmp(none + 4, ",", 1)) {
 			if (!strcmp(buf1, none))
@@ -931,10 +851,6 @@ out:
 	return 0;
 }
 
-/*	iscsi_ta_login_timeout():
- *
- *
- */
 int iscsi_ta_login_timeout(
 	struct iscsi_portal_group *tpg,
 	u32 login_timeout)
@@ -958,10 +874,6 @@ int iscsi_ta_login_timeout(
 	return 0;
 }
 
-/*	iscsi_ta_netif_timeout():
- *
- *
- */
 int iscsi_ta_netif_timeout(
 	struct iscsi_portal_group *tpg,
 	u32 netif_timeout)
@@ -1084,83 +996,4 @@ int iscsi_ta_prod_mode_write_protect(
 		"ON" : "OFF");
 
 	return 0;
-}
-
-void iscsi_disable_tpgs(struct iscsi_tiqn *tiqn)
-{
-	struct iscsi_portal_group *tpg;
-
-	spin_lock(&tiqn->tiqn_tpg_lock);
-	list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
-
-		spin_lock(&tpg->tpg_state_lock);
-		if ((tpg->tpg_state == TPG_STATE_FREE) ||
-		    (tpg->tpg_state == TPG_STATE_INACTIVE)) {
-			spin_unlock(&tpg->tpg_state_lock);
-			continue;
-		}
-		spin_unlock(&tpg->tpg_state_lock);
-		spin_unlock(&tiqn->tiqn_tpg_lock);
-
-		iscsi_tpg_disable_portal_group(tpg, 1);
-
-		spin_lock(&tiqn->tiqn_tpg_lock);
-	}
-	spin_unlock(&tiqn->tiqn_tpg_lock);
-}
-
-/*	iscsi_disable_all_tpgs():
- *
- *
- */
-void iscsi_disable_all_tpgs(void)
-{
-	struct iscsi_tiqn *tiqn;
-
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		spin_unlock(&iscsi_global->tiqn_lock);
-		iscsi_disable_tpgs(tiqn);
-		spin_lock(&iscsi_global->tiqn_lock);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
-}
-
-void iscsi_remove_tpgs(struct iscsi_tiqn *tiqn)
-{
-	struct iscsi_portal_group *tpg, *tpg_tmp;
-
-	spin_lock(&tiqn->tiqn_tpg_lock);
-	list_for_each_entry_safe(tpg, tpg_tmp, &tiqn->tiqn_tpg_list, tpg_list) {
-
-		spin_lock(&tpg->tpg_state_lock);
-		if (tpg->tpg_state == TPG_STATE_FREE) {
-			spin_unlock(&tpg->tpg_state_lock);
-			continue;
-		}
-		spin_unlock(&tpg->tpg_state_lock);
-		spin_unlock(&tiqn->tiqn_tpg_lock);
-
-		iscsi_tpg_del_portal_group(tiqn, tpg, 1);
-
-		spin_lock(&tiqn->tiqn_tpg_lock);
-	}
-	spin_unlock(&tiqn->tiqn_tpg_lock);
-}
-
-/*	iscsi_remove_all_tpgs():
- *
- *
- */
-void iscsi_remove_all_tpgs(void)
-{
-	struct iscsi_tiqn *tiqn;
-
-	spin_lock(&iscsi_global->tiqn_lock);
-	list_for_each_entry(tiqn, &iscsi_global->g_tiqn_list, tiqn_list) {
-		spin_unlock(&iscsi_global->tiqn_lock);
-		iscsi_remove_tpgs(tiqn);
-		spin_lock(&iscsi_global->tiqn_lock);
-	}
-	spin_unlock(&iscsi_global->tiqn_lock);
 }

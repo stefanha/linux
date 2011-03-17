@@ -23,17 +23,17 @@ struct iscsi_param {
 
 extern struct iscsi_global *iscsi_global;
 
-extern int iscsi_login_rx_data(struct iscsi_conn *, char *, int, int);
-extern int iscsi_login_tx_data(struct iscsi_conn *, char *, char *, int, int);
+extern int iscsi_login_rx_data(struct iscsi_conn *, char *, int);
+extern int iscsi_login_tx_data(struct iscsi_conn *, char *, char *, int);
 extern void iscsi_dump_conn_ops(struct iscsi_conn_ops *);
 extern void iscsi_dump_sess_ops(struct iscsi_sess_ops *);
 extern void iscsi_print_params(struct iscsi_param_list *);
 extern int iscsi_create_default_params(struct iscsi_param_list **);
-extern int iscsi_set_keys_to_negotiate(int, int, struct iscsi_param_list *);
+extern int iscsi_set_keys_to_negotiate(int, struct iscsi_param_list *);
 extern int iscsi_set_keys_irrelevant_for_discovery(struct iscsi_param_list *);
 extern int iscsi_copy_param_list(struct iscsi_param_list **,
 			struct iscsi_param_list *, int);
-extern int iscsi_change_param_value(char *, int, struct iscsi_param_list *, int);
+extern int iscsi_change_param_value(char *, struct iscsi_param_list *, int);
 extern void iscsi_release_param_list(struct iscsi_param_list *);
 extern struct iscsi_param *iscsi_find_param_from_key(char *, struct iscsi_param_list *);
 extern int iscsi_extract_key_value(char *, char **, char **);
@@ -77,7 +77,7 @@ extern void iscsi_set_session_parameters(struct iscsi_sess_ops *,
 #define DEFAULTTIME2WAIT		"DefaultTime2Wait"
 #define DEFAULTTIME2RETAIN		"DefaultTime2Retain"
 #define MAXOUTSTANDINGR2T		"MaxOutstandingR2T"
-#define DATAPDUINORDER  		"DataPDUInOrder"
+#define DATAPDUINORDER			"DataPDUInOrder"
 #define DATASEQUENCEINORDER		"DataSequenceInOrder"
 #define ERRORRECOVERYLEVEL		"ErrorRecoveryLevel"
 #define SESSIONTYPE			"SessionType"

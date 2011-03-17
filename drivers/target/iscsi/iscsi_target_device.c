@@ -2,8 +2,6 @@
  * This file contains the iSCSI Virtual Device and Disk Transport
  * agnostic related functions.
  *
- * Copyright (c) 2003, 2004, 2005 PyX Technologies, Inc.
- * Copyright (c) 2005-2006 SBE, Inc.  All Rights Reserved.
  © Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
@@ -21,13 +19,11 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
-#include <linux/slab.h>
-#include <linux/spinlock.h>
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_debug.h"
+#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_device.h"
 #include "iscsi_target_tpg.h"
@@ -41,15 +37,15 @@ int iscsi_get_lun_for_tmr(
 	struct iscsi_cmd *cmd,
 	u64 lun)
 {
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
-	if (unpacked_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG"
+	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
+		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
-			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
+			TRANSPORT_MAX_LUNS_PER_TPG-1, tpg->tpgt);
 		return -1;
 	}
 
@@ -66,15 +62,15 @@ int iscsi_get_lun_for_cmd(
 	unsigned char *cdb,
 	u64 lun)
 {
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
 	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
-	if (unpacked_lun > (ISCSI_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "iSCSI LUN: %u exceeds ISCSI_MAX_LUNS_PER_TPG"
+	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
+		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
-			ISCSI_MAX_LUNS_PER_TPG-1, tpg->tpgt);
+			TRANSPORT_MAX_LUNS_PER_TPG-1, tpg->tpgt);
 		return -1;
 	}
 
@@ -95,7 +91,7 @@ void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
 	 * Text Opcodes are allowed during discovery we do not have to worry
 	 * about the HBA's queue depth here.
 	 */
-	if (SESS_OPS(sess)->SessionType)
+	if (sess->sess_ops->SessionType)
 		return;
 
 	se_nacl = sess->se_sess->se_node_acl;
