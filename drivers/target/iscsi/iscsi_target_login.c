@@ -584,7 +584,7 @@ static int iscsi_post_login_handler(
 	struct se_session *se_sess = sess->se_sess;
 	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
-	struct se_thread_set *ts;
+	struct iscsi_thread_set *ts;
 
 	iscsi_inc_conn_usage_count(conn);
 

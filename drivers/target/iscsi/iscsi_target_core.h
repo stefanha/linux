@@ -9,7 +9,6 @@
 #include <target/target_core_base.h>
 
 #define ISCSI_VERSION			"v4.1.0-rc1"
-#define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGABRT))
 #define ISCSI_MAX_DATASN_MISSING_COUNT	16
 #define ISCSI_TX_THREAD_TCP_TIMEOUT	2
 #define ISCSI_RX_THREAD_TCP_TIMEOUT	2
@@ -61,20 +60,6 @@
 /* Disabled by default in production mode w/ explict ACLs */
 #define TA_PROD_MODE_WRITE_PROTECT	0
 #define TA_CACHE_CORE_NPS		0
-/*
- * Handy macros for threads and timers
- */
-#define iscsi_daemon(thread, name, sigs)		\
-do {							\
-	daemonize(name);				\
-	current->policy = SCHED_NORMAL;			\
-	set_user_nice(current, -20);			\
-	spin_lock_irq(&current->sighand->siglock);	\
-	siginitsetinv(&current->blocked, (sigs));	\
-	recalc_sigpending();				\
-	(thread) = current;				\
-	spin_unlock_irq(&current->sighand->siglock);	\
-} while (0);
 
 #define MOD_TIMER(t, exp) mod_timer(t, (get_jiffies_64() + exp * HZ))
 #define SETUP_TIMER(timer, t, d, func)			\
@@ -616,7 +601,7 @@ struct iscsi_conn {
 	/* Pointer to parent session */
 	struct iscsi_session	*sess;
 	/* Pointer to thread_set in use for this conn's threads */
-	struct se_thread_set	*thread_set;
+	struct iscsi_thread_set	*thread_set;
 	/* list_head for session connection list */
 	struct list_head	conn_list;
 } ____cacheline_aligned;

@@ -4227,14 +4227,14 @@ static void iscsi_tx_thread_wait_for_tcp(struct iscsi_conn *conn)
 
 void iscsi_thread_get_cpumask(struct iscsi_conn *conn)
 {
-	struct se_thread_set *ts = conn->thread_set;
+	struct iscsi_thread_set *ts = conn->thread_set;
 	int ord, cpu;
 	/*
 	 * thread_id is assigned from iscsi_global->ts_bitmap from
 	 * within iscsi_thread_set.c:iscsi_allocate_thread_sets()
 	 *
 	 * Here we use thread_id to determine which CPU that this
-	 * iSCSI connection's se_thread_set will be scheduled to
+	 * iSCSI connection's iscsi_thread_set will be scheduled to
 	 * execute upon.
 	 */
 	ord = ts->thread_id % cpumask_weight(cpu_online_mask);
@@ -4301,16 +4301,11 @@ int iscsi_target_tx_thread(void *arg)
 	struct iscsi_conn *conn;
 	struct iscsi_queue_req *qr = NULL;
 	struct se_cmd *se_cmd;
-	struct se_thread_set *ts = (struct se_thread_set *) arg;
+	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct se_unmap_sg unmap_sg;
 
-	{
-	    char name[20];
-
-	    memset(name, 0, 20);
-	    sprintf(name, "%s/%u", ISCSI_TX_THREAD_NAME, ts->thread_id);
-	    iscsi_daemon(ts->tx_thread, name, SHUTDOWN_SIGS);
-	}
+	set_user_nice(current, -20);
+	allow_signal(SIGINT);
 
 restart:
 	conn = iscsi_tx_thread_pre_handler(ts);
@@ -4319,7 +4314,7 @@ restart:
 
 	eodr = map_sg = ret = sent_status = use_misc = 0;
 
-	while (1) {
+	while (!kthread_should_stop()) {
 		/*
 		 * Ensure that both TX and RX per connection kthreads
 		 * are scheduled to run on the same CPU.
@@ -4606,8 +4601,6 @@ transport_err:
 	iscsi_take_action_for_connection_exit(conn);
 	goto restart;
 out:
-	ts->tx_thread = NULL;
-	up(&ts->tx_done_sem);
 	return 0;
 }
 
@@ -4640,24 +4633,19 @@ int iscsi_target_rx_thread(void *arg)
 	u8 buffer[ISCSI_HDR_LEN], opcode;
 	u32 checksum = 0, digest = 0;
 	struct iscsi_conn *conn = NULL;
-	struct se_thread_set *ts = (struct se_thread_set *) arg;
+	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct iovec iov;
 	struct scatterlist sg;
 
-	{
-	    char name[20];
-
-	    memset(name, 0, 20);
-	    sprintf(name, "%s/%u", ISCSI_RX_THREAD_NAME, ts->thread_id);
-	    iscsi_daemon(ts->rx_thread, name, SHUTDOWN_SIGS);
-	}
+	set_user_nice(current, -20);
+	allow_signal(SIGINT);
 
 restart:
 	conn = iscsi_rx_thread_pre_handler(ts);
 	if (!conn)
 		goto out;
 
-	while (1) {
+	while (!kthread_should_stop()) {
 		/*
 		 * Ensure that both TX and RX per connection kthreads
 		 * are scheduled to run on the same CPU.
@@ -4794,8 +4782,6 @@ transport_err:
 	iscsi_take_action_for_connection_exit(conn);
 	goto restart;
 out:
-	ts->rx_thread = NULL;
-	up(&ts->rx_done_sem);
 	return 0;
 }
 
