@@ -12,7 +12,6 @@ extern struct iscsi_np *iscsit_add_np(struct iscsi_np_addr *, int);
 extern int iscsit_reset_np_thread(struct iscsi_np *, struct iscsi_tpg_np *,
 				struct iscsi_portal_group *);
 extern int iscsit_del_np(struct iscsi_np *);
-extern u32 iscsi_get_new_index(iscsi_index_t);
 extern char *iscsi_get_fabric_name(void);
 extern struct iscsi_cmd *iscsi_get_cmd(struct se_cmd *);
 extern u32 iscsi_get_task_tag(struct se_cmd *);

@@ -641,7 +641,7 @@ struct iscsi_session {
 	u32			sid;
 	char			auth_type[8];
 	/* unique within the target */
-	u32			session_index;
+	int			session_index;
 	u32			cmd_pdus;
 	u32			rsp_pdus;
 	u64			tx_data_octets;
@@ -869,7 +869,7 @@ struct iscsi_tiqn {
 	spinlock_t		tiqn_tpg_lock;
 	struct se_wwn		tiqn_wwn;
 	struct iscsi_wwn_stat_grps tiqn_stat_grps;
-	u32			tiqn_index;
+	int			tiqn_index;
 	struct iscsi_sess_err_stats  sess_err_stats;
 	struct iscsi_login_stats     login_stats;
 	struct iscsi_logout_stats    logout_stats;

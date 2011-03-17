@@ -52,7 +52,10 @@ LIST_HEAD(g_np_list);
 DEFINE_SPINLOCK(tiqn_lock);
 DEFINE_SPINLOCK(np_lock);
 
+static struct idr tiqn_idr;
+struct idr sess_idr;
 struct mutex auth_id_lock;
+spinlock_t sess_idr_lock;
 
 struct iscsi_global *iscsi_global;
 
@@ -161,10 +164,17 @@ struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
 	spin_lock_init(&tiqn->sess_err_stats.lock);
 	spin_lock_init(&tiqn->login_stats.lock);
 	spin_lock_init(&tiqn->logout_stats.lock);
-	tiqn->tiqn_index = iscsi_get_new_index(ISCSI_INST_INDEX);
+
+	if (!idr_pre_get(&tiqn_idr, GFP_KERNEL)) {
+		printk(KERN_ERR "idr_pre_get() for tiqn_idr failed\n");
+		kfree(tiqn);
+		*ret = -1;
+		return NULL;
+	}
 	tiqn->tiqn_state = TIQN_STATE_ACTIVE;
 
 	spin_lock(&tiqn_lock);
+	idr_get_new(&tiqn_idr, NULL, &tiqn->tiqn_index);
 	list_add_tail(&tiqn->tiqn_list, &g_tiqn_list);
 	spin_unlock(&tiqn_lock);
 
@@ -178,6 +188,7 @@ void __iscsit_del_tiqn(struct iscsi_tiqn *tiqn)
 {
 	spin_lock(&tiqn_lock);
 	list_del(&tiqn->tiqn_list);
+	idr_remove(&tiqn_idr, tiqn->tiqn_index);
 	spin_unlock(&tiqn_lock);
 
 	printk(KERN_INFO "CORE[0] - Deleted iSCSI Target IQN: %s\n",
@@ -495,40 +506,6 @@ int iscsit_del_np(struct iscsi_np *np)
 	return 0;
 }
 
-/* iSCSI mib table index for iscsi_target_stat.c */
-struct iscsi_index_table iscsi_index_table;
-
-/*
- * Initialize the index table for allocating unique row indexes to various mib
- * tables
- */
-static void init_iscsi_index_table(void)
-{
-	memset(&iscsi_index_table, 0, sizeof(iscsi_index_table));
-	spin_lock_init(&iscsi_index_table.lock);
-}
-
-/*
- * Allocate a new row index for the entry type specified
- */
-u32 iscsi_get_new_index(iscsi_index_t type)
-{
-	u32 new_index;
-
-	if ((type < 0) || (type >= INDEX_TYPE_MAX)) {
-		printk(KERN_ERR "Invalid index type %d\n", type);
-		return -1;
-	}
-
-	spin_lock(&iscsi_index_table.lock);
-	new_index = ++iscsi_index_table.iscsi_mib_index[type];
-	if (new_index == 0)
-		new_index = ++iscsi_index_table.iscsi_mib_index[type];
-	spin_unlock(&iscsi_index_table.lock);
-
-	return new_index;
-}
-
 static int __init iscsi_target_init_module(void)
 {
 	int ret = 0;
@@ -540,9 +517,10 @@ static int __init iscsi_target_init_module(void)
 		printk(KERN_ERR "Unable to allocate memory for iscsi_global\n");
 		return -1;
 	}
-	init_iscsi_index_table();
-
 	mutex_init(&auth_id_lock);
+	spin_lock_init(&sess_idr_lock);
+	idr_init(&tiqn_idr);
+	idr_init(&sess_idr);
 
 	ret = iscsi_target_register_configfs();
 	if (ret < 0)
@@ -5122,6 +5100,10 @@ int iscsi_close_session(struct iscsi_session *sess)
 
 	printk(KERN_INFO "Decremented number of active iSCSI Sessions on"
 		" iSCSI TPG: %hu to %u\n", tpg->tpgt, tpg->nsessions);
+
+	spin_lock(&sess_idr_lock);
+	idr_remove(&sess_idr, sess->session_index);
+	spin_unlock(&sess_idr_lock);
 
 	kfree(sess->sess_ops);
 	sess->sess_ops = NULL;

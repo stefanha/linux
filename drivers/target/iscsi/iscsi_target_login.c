@@ -40,7 +40,9 @@
 #include "iscsi_target.h"
 #include "iscsi_parameters.h"
 
+extern struct idr sess_idr;
 extern struct mutex auth_id_lock;
+extern spinlock_t sess_idr_lock;
 
 static int iscsi_login_init_conn(struct iscsi_conn *conn)
 {
@@ -247,7 +249,17 @@ static int iscsi_login_zero_tsih_s1(
 	spin_lock_init(&sess->cr_i_lock);
 	spin_lock_init(&sess->session_usage_lock);
 	spin_lock_init(&sess->ttt_lock);
-	sess->session_index = iscsi_get_new_index(ISCSI_SESSION_INDEX);
+
+	if (!idr_pre_get(&sess_idr, GFP_KERNEL)) {
+		printk(KERN_ERR "idr_pre_get() for sess_idr failed\n");
+		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+				ISCSI_LOGIN_STATUS_NO_RESOURCES);
+		return -1;	
+	}
+	spin_lock(&sess_idr_lock);
+	idr_get_new(&sess_idr, NULL, &sess->session_index);
+	spin_unlock(&sess_idr_lock);
+
 	sess->creation_time = get_jiffies_64();
 	spin_lock_init(&sess->session_stats_lock);
 	/*
@@ -1193,6 +1205,11 @@ new_sess_out:
 		goto old_sess_out;
 	if (SESS(conn)->se_sess)
 		transport_free_session(SESS(conn)->se_sess);
+	if (SESS(conn)->session_index != 0) {
+		spin_lock_bh(&sess_idr_lock);
+		idr_remove(&sess_idr, SESS(conn)->session_index);
+		spin_unlock_bh(&sess_idr_lock);
+	}
 	if (SESS(conn)->sess_ops)
 		kfree(SESS(conn)->sess_ops);
 	if (SESS(conn))
