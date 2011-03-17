@@ -305,7 +305,9 @@ get_set:
 
 		init_completion(&comp);
 		init_timer(&timer);
-		SETUP_TIMER(timer, 1, &comp, iscsi_get_thread_set_timeout);
+		timer.expires = (get_jiffies_64() + 1 * HZ);
+		timer.data = (unsigned long)&comp;
+		timer.function = iscsi_get_thread_set_timeout;
 		add_timer(&timer);
 
 		wait_for_completion(&comp);

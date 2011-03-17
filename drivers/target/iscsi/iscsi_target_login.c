@@ -743,8 +743,9 @@ static void iscsi_start_login_thread_timer(struct iscsi_np *np)
 	 */
 	spin_lock_bh(&np->np_thread_lock);
 	init_timer(&np->np_login_timer);
-	SETUP_TIMER(np->np_login_timer, TA_LOGIN_TIMEOUT, np,
-			iscsi_handle_login_thread_timeout);
+	np->np_login_timer.expires = (get_jiffies_64() + TA_LOGIN_TIMEOUT * HZ);
+	np->np_login_timer.data = (unsigned long)np;
+	np->np_login_timer.function = iscsi_handle_login_thread_timeout;
 	np->np_login_timer_flags &= ~ISCSI_TF_STOP;
 	np->np_login_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&np->np_login_timer);

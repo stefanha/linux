@@ -3044,9 +3044,12 @@ int iscsi_send_async_msg(
 
 	if (async_event == ISCSI_ASYNC_MSG_REQUEST_LOGOUT) {
 		init_timer(&async_msg_timer);
-		SETUP_TIMER(async_msg_timer, SECONDS_FOR_ASYNC_LOGOUT,
-				&SESS(conn)->async_msg_comp,
-				iscsi_async_msg_timer_function);
+		async_msg_timer.expires =
+			(get_jiffies_64() + SECONDS_FOR_ASYNC_LOGOUT * HZ);
+		async_msg_timer.data =
+			(unsigned long)&SESS(conn)->async_msg_comp;
+		async_msg_timer.function = iscsi_async_msg_timer_function;
+
 		add_timer(&async_msg_timer);
 		wait_for_completion(&SESS(conn)->async_msg_comp);
 		del_timer_sync(&async_msg_timer);
@@ -4213,12 +4216,13 @@ static void iscsi_tx_thread_wait_for_tcp(struct iscsi_conn *conn)
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
 		init_timer(&tx_TCP_timer);
-		SETUP_TIMER(tx_TCP_timer, ISCSI_TX_THREAD_TCP_TIMEOUT,
-			&conn->tx_half_close_comp, iscsi_tx_thread_TCP_timeout);
+		tx_TCP_timer.expires =
+			(get_jiffies_64() + ISCSI_TX_THREAD_TCP_TIMEOUT * HZ);
+		tx_TCP_timer.data = (unsigned long)&conn->tx_half_close_comp;
+		tx_TCP_timer.function = iscsi_tx_thread_TCP_timeout;
+
 		add_timer(&tx_TCP_timer);
-
 		ret = wait_for_completion_interruptible(&conn->tx_half_close_comp);
-
 		del_timer_sync(&tx_TCP_timer);
 	}
 }
@@ -4617,12 +4621,13 @@ static void iscsi_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
 		init_timer(&rx_TCP_timer);
-		SETUP_TIMER(rx_TCP_timer, ISCSI_RX_THREAD_TCP_TIMEOUT,
-			&conn->rx_half_close_comp, iscsi_rx_thread_TCP_timeout);
+		rx_TCP_timer.expires =
+			(get_jiffies_64() + ISCSI_RX_THREAD_TCP_TIMEOUT * HZ);
+		rx_TCP_timer.data = (unsigned long)&conn->rx_half_close_comp;
+		rx_TCP_timer.function = iscsi_rx_thread_TCP_timeout;
+
 		add_timer(&rx_TCP_timer);
-
 		ret = wait_for_completion_interruptible(&conn->rx_half_close_comp);
-
 		del_timer_sync(&rx_TCP_timer);
 	}
 }

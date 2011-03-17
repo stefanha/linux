@@ -863,13 +863,13 @@ extern void iscsi_start_time2retain_handler (struct iscsi_session *sess)
 		" SID: %u\n", SESS_OPS(sess)->DefaultTime2Retain, sess->sid);
 
 	init_timer(&sess->time2retain_timer);
-	SETUP_TIMER(sess->time2retain_timer, SESS_OPS(sess)->DefaultTime2Retain,
-			sess, iscsi_handle_time2retain_timeout);
+	sess->time2retain_timer.expires =
+		(get_jiffies_64() + SESS_OPS(sess)->DefaultTime2Retain * HZ);
+	sess->time2retain_timer.data = (unsigned long)sess;
+	sess->time2retain_timer.function = iscsi_handle_time2retain_timeout;
 	sess->time2retain_timer_flags &= ~ISCSI_TF_STOP;
 	sess->time2retain_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&sess->time2retain_timer);
-
-	return;
 }
 
 /*	iscsi_stop_time2retain_timer():

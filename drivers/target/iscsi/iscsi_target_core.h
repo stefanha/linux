@@ -61,12 +61,6 @@
 #define TA_PROD_MODE_WRITE_PROTECT	0
 #define TA_CACHE_CORE_NPS		0
 
-#define MOD_TIMER(t, exp) mod_timer(t, (get_jiffies_64() + exp * HZ))
-#define SETUP_TIMER(timer, t, d, func)			\
-	timer.expires	= (get_jiffies_64() + t * HZ);	\
-	timer.data	= (unsigned long) d;		\
-	timer.function	= func;
-
 enum tpg_np_network_transport_table {
 	ISCSI_TCP				= 0,
 	ISCSI_SCTP_TCP				= 1,

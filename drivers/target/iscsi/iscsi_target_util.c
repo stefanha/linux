@@ -1631,8 +1631,10 @@ void iscsi_start_netif_timer(struct iscsi_conn *conn)
 		return;
 
 	init_timer(&conn->transport_timer);
-	SETUP_TIMER(conn->transport_timer, ISCSI_TPG_ATTRIB(tpg)->netif_timeout,
-		conn, iscsi_handle_netif_timeout);
+	conn->transport_timer.expires =
+		(get_jiffies_64() + ISCSI_TPG_ATTRIB(tpg)->netif_timeout * HZ);
+	conn->transport_timer.data = (unsigned long)conn;
+	conn->transport_timer.function = iscsi_handle_netif_timeout;
 	conn->netif_timer_flags &= ~ISCSI_TF_STOP;
 	conn->netif_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->transport_timer);
@@ -1705,7 +1707,8 @@ void iscsi_mod_nopin_response_timer(struct iscsi_conn *conn)
 		return;
 	}
 
-	MOD_TIMER(&conn->nopin_response_timer, na->nopin_response_timeout);
+	mod_timer(&conn->nopin_response_timer,
+		(get_jiffies_64() + na->nopin_response_timeout * HZ));
 	spin_unlock_bh(&conn->nopin_timer_lock);
 }
 
@@ -1725,8 +1728,10 @@ void iscsi_start_nopin_response_timer(struct iscsi_conn *conn)
 	}
 
 	init_timer(&conn->nopin_response_timer);
-	SETUP_TIMER(conn->nopin_response_timer, na->nopin_response_timeout,
-		conn, iscsi_handle_nopin_response_timeout);
+	conn->nopin_response_timer.expires =
+		(get_jiffies_64() + na->nopin_response_timeout * HZ);
+	conn->nopin_response_timer.data = (unsigned long)conn;
+	conn->nopin_response_timer.function = iscsi_handle_nopin_response_timeout;
 	conn->nopin_response_timer_flags &= ~ISCSI_TF_STOP;
 	conn->nopin_response_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_response_timer);
@@ -1789,8 +1794,9 @@ void __iscsi_start_nopin_timer(struct iscsi_conn *conn)
 		return;
 
 	init_timer(&conn->nopin_timer);
-	SETUP_TIMER(conn->nopin_timer, na->nopin_timeout, conn,
-		iscsi_handle_nopin_timeout);
+	conn->nopin_timer.expires = (get_jiffies_64() + na->nopin_timeout * HZ);
+	conn->nopin_timer.data = (unsigned long)conn;
+	conn->nopin_timer.function = iscsi_handle_nopin_timeout;
 	conn->nopin_timer_flags &= ~ISCSI_TF_STOP;
 	conn->nopin_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_timer);
@@ -1816,8 +1822,9 @@ void iscsi_start_nopin_timer(struct iscsi_conn *conn)
 	}
 
 	init_timer(&conn->nopin_timer);
-	SETUP_TIMER(conn->nopin_timer, na->nopin_timeout, conn,
-			iscsi_handle_nopin_timeout);
+	conn->nopin_timer.expires = (get_jiffies_64() + na->nopin_timeout * HZ);
+	conn->nopin_timer.data = (unsigned long)conn;
+	conn->nopin_timer.function = iscsi_handle_nopin_timeout;
 	conn->nopin_timer_flags &= ~ISCSI_TF_STOP;
 	conn->nopin_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_timer);

@@ -1323,7 +1323,8 @@ void iscsi_mod_dataout_timer(struct iscsi_cmd *cmd)
 		return;
 	}
 
-	MOD_TIMER(&cmd->dataout_timer, na->dataout_timeout);
+	mod_timer(&cmd->dataout_timer,
+		(get_jiffies_64() + na->dataout_timeout * HZ));
 	TRACE(TRACE_TIMER, "Updated DataOUT timer for ITT: 0x%08x",
 			cmd->init_task_tag);
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
@@ -1347,8 +1348,9 @@ void iscsi_start_dataout_timer(
 		" CID: %hu.\n", cmd->init_task_tag, conn->cid);
 
 	init_timer(&cmd->dataout_timer);
-	SETUP_TIMER(cmd->dataout_timer, na->dataout_timeout, cmd,
-			iscsi_handle_dataout_timeout);
+	cmd->dataout_timer.expires = (get_jiffies_64() + na->dataout_timeout * HZ);
+	cmd->dataout_timer.data = (unsigned long)cmd;
+	cmd->dataout_timer.function = iscsi_handle_dataout_timeout;
 	cmd->dataout_timer_flags &= ~ISCSI_TF_STOP;
 	cmd->dataout_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&cmd->dataout_timer);
