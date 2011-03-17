@@ -729,7 +729,7 @@ static void iscsi_handle_login_thread_timeout(unsigned long data)
 	}
 
 	if (np->np_thread)
-		send_sig(SIGKILL, np->np_thread, 1);
+		send_sig(SIGINT, np->np_thread, 1);
 
 	np->np_login_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&np->np_thread_lock);
