@@ -46,7 +46,7 @@ u8 iscsi_tmr_abort_task(
 	unsigned char *buf)
 {
 	struct iscsi_cmd *ref_cmd;
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
@@ -55,8 +55,8 @@ u8 iscsi_tmr_abort_task(
 	if (!ref_cmd) {
 		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x on CID:"
 			" %hu.\n", hdr->rtt, conn->cid);
-		return ((hdr->refcmdsn >= SESS(conn)->exp_cmd_sn) &&
-			(hdr->refcmdsn <= SESS(conn)->max_cmd_sn)) ?
+		return ((hdr->refcmdsn >= conn->sess->exp_cmd_sn) &&
+			(hdr->refcmdsn <= conn->sess->max_cmd_sn)) ?
 			ISCSI_TMF_RSP_COMPLETE : ISCSI_TMF_RSP_NO_TASK;
 	}
 	if (ref_cmd->cmd_sn != hdr->refcmdsn) {
@@ -83,7 +83,7 @@ int iscsi_tmr_task_warm_reset(
 	struct iscsi_tmr_req *tmr_req,
 	unsigned char *buf)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 #if 0
 	struct iscsi_init_task_mgt_cmnd *hdr =
@@ -92,7 +92,7 @@ int iscsi_tmr_task_warm_reset(
 	if (!na->tmr_warm_reset) {
 		printk(KERN_ERR "TMR Opcode TARGET_WARM_RESET authorization"
 			" failed for Initiator Node: %s\n",
-			SESS_NODE_ACL(sess)->initiatorname);
+			sess->se_sess->se_node_acl->initiatorname);
 		 return -1;
 	}
 	/*
@@ -110,13 +110,13 @@ int iscsi_tmr_task_cold_reset(
 	struct iscsi_tmr_req *tmr_req,
 	unsigned char *buf)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 
 	if (!na->tmr_cold_reset) {
 		printk(KERN_ERR "TMR Opcode TARGET_COLD_RESET authorization"
 			" failed for Initiator Node: %s\n",
-			SESS_NODE_ACL(sess)->initiatorname);
+			sess->se_sess->se_node_acl->initiatorname);
 		return -1;
 	}
 	/*
@@ -134,7 +134,7 @@ u8 iscsi_tmr_task_reassign(
 	unsigned char *buf)
 {
 	struct iscsi_cmd *ref_cmd = NULL;
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_conn_recovery *cr = NULL;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
@@ -145,13 +145,13 @@ u8 iscsi_tmr_task_reassign(
 		" RefTaskTag: 0x%08x, ExpDataSN: 0x%08x, CID: %hu\n",
 		hdr->itt, hdr->rtt, hdr->exp_datasn, conn->cid);
 
-	if (SESS_OPS_C(conn)->ErrorRecoveryLevel != 2) {
+	if (conn->sess->sess_ops->ErrorRecoveryLevel != 2) {
 		printk(KERN_ERR "TMR TASK_REASSIGN not supported in ERL<2,"
 				" ignoring request.\n");
 		return ISCSI_TMF_RSP_NOT_SUPPORTED;
 	}
 
-	ret = iscsi_find_cmd_for_recovery(SESS(conn), &ref_cmd, &cr, hdr->rtt);
+	ret = iscsi_find_cmd_for_recovery(conn->sess, &ref_cmd, &cr, hdr->rtt);
 	if (ret == -2) {
 		printk(KERN_ERR "Command ITT: 0x%08x is still alligent to CID:"
 			" %hu\n", ref_cmd->init_task_tag, cr->cid);
@@ -166,7 +166,7 @@ u8 iscsi_tmr_task_reassign(
 	 * connections with a differing MaxRecvDataSegmentLength.
 	 */
 	if (cr->maxrecvdatasegmentlength !=
-	    CONN_OPS(conn)->MaxRecvDataSegmentLength) {
+	    conn->conn_ops->MaxRecvDataSegmentLength) {
 		printk(KERN_ERR "Unable to perform connection recovery for"
 			" differing MaxRecvDataSegmentLength, rejecting"
 			" TMR TASK_REASSIGN.\n");
@@ -230,7 +230,7 @@ static int iscsi_task_reassign_complete_nop_out(
 	 */
 	cmd->stat_sn = cmd->exp_stat_sn = 0;
 
-	iscsi_task_reassign_remove_cmd(cmd, cr, SESS(conn));
+	iscsi_task_reassign_remove_cmd(cmd, cr, conn->sess);
 
 	iscsi_attach_cmd_to_queue(conn, cmd);
 
@@ -245,7 +245,7 @@ static int iscsi_task_reassign_complete_write(
 {
 	int no_build_r2ts = 0;
 	u32 length = 0, offset = 0;
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct se_cmd *se_cmd = SE_CMD(cmd);
 	/*
 	 * The Initiator must not send a R2T SNACK with a Begrun less than
@@ -286,12 +286,12 @@ static int iscsi_task_reassign_complete_write(
 
 		offset = cmd->next_burst_len = cmd->write_data_done;
 
-		if ((SESS_OPS_C(conn)->FirstBurstLength - offset) >=
+		if ((conn->sess->sess_ops->FirstBurstLength - offset) >=
 		     cmd->data_length) {
 			no_build_r2ts = 1;
 			length = (cmd->data_length - offset);
 		} else
-			length = (SESS_OPS_C(conn)->FirstBurstLength - offset);
+			length = (conn->sess->sess_ops->FirstBurstLength - offset);
 
 		spin_lock_bh(&cmd->r2t_lock);
 		if (iscsi_add_r2t_to_list(cmd, offset, length, 0, 0) < 0) {
@@ -314,7 +314,7 @@ static int iscsi_task_reassign_complete_read(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
 {
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
 	struct se_cmd *se_cmd = SE_CMD(cmd);
 	/*
@@ -367,7 +367,7 @@ static int iscsi_task_reassign_complete_none(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
 {
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 
 	cmd->i_state = ISTATE_SEND_STATUS;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
@@ -397,7 +397,7 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
 	 */
 	cmd->stat_sn = cmd->exp_stat_sn = 0;
 
-	iscsi_task_reassign_remove_cmd(cmd, cr, SESS(conn));
+	iscsi_task_reassign_remove_cmd(cmd, cr, conn->sess);
 	iscsi_attach_cmd_to_queue(conn, cmd);
 
 	if (se_cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
@@ -504,14 +504,14 @@ static void iscsi_task_reassign_prepare_unsolicited_dataout(
 	struct iscsi_pdu *pdu = NULL;
 	struct iscsi_seq *seq = NULL;
 
-	if (SESS_OPS_C(conn)->DataSequenceInOrder) {
+	if (conn->sess->sess_ops->DataSequenceInOrder) {
 		cmd->data_sn = 0;
 
 		if (cmd->immediate_data)
 			cmd->r2t_offset += (cmd->first_burst_len -
 				cmd->seq_start_offset);
 
-		if (SESS_OPS_C(conn)->DataPDUInOrder) {
+		if (conn->sess->sess_ops->DataPDUInOrder) {
 			cmd->write_data_done -= (cmd->immediate_data) ?
 						(cmd->first_burst_len -
 						 cmd->seq_start_offset) :
@@ -549,7 +549,7 @@ static void iscsi_task_reassign_prepare_unsolicited_dataout(
 			seq->next_burst_len = 0;
 			seq->status = DATAOUT_SEQUENCE_WITHIN_COMMAND_RECOVERY;
 
-			if (SESS_OPS_C(conn)->DataPDUInOrder)
+			if (conn->sess->sess_ops->DataPDUInOrder)
 				continue;
 
 			for (j = 0; j < seq->pdu_count; j++) {
@@ -658,13 +658,13 @@ int iscsi_task_reassign_prepare_write(
 		 * PDU offset in the current sequence after TASK_REASSIGN
 		 * has completed.
 		 */
-		if (SESS_OPS_C(conn)->DataSequenceInOrder) {
+		if (conn->sess->sess_ops->DataSequenceInOrder) {
 			if (!first_incomplete_r2t) {
 				cmd->r2t_offset -= r2t->xfer_len;
 				goto next;
 			}
 
-			if (SESS_OPS_C(conn)->DataPDUInOrder) {
+			if (conn->sess->sess_ops->DataPDUInOrder) {
 				cmd->data_sn = 0;
 				cmd->r2t_offset -= (r2t->xfer_len -
 					cmd->next_burst_len);
@@ -710,7 +710,7 @@ int iscsi_task_reassign_prepare_write(
 
 			cmd->seq_send_order--;
 
-			if (SESS_OPS_C(conn)->DataPDUInOrder)
+			if (conn->sess->sess_ops->DataPDUInOrder)
 				goto next;
 
 			for (i = 0; i < seq->pdu_count; i++) {
@@ -784,7 +784,7 @@ drop_unacknowledged_r2ts:
 		 * burst length,  to make sure we re-request the entire DataOUT
 		 * sequence.
 		 */
-		if (SESS_OPS_C(conn)->DataSequenceInOrder)
+		if (conn->sess->sess_ops->DataSequenceInOrder)
 			cmd->r2t_offset -= r2t->xfer_len;
 		else
 			cmd->seq_send_order--;

@@ -118,7 +118,7 @@ int iscsi_add_r2t_to_list(
 	list_add_tail(&r2t->r2t_list, &cmd->cmd_r2t_list);
 	spin_unlock_bh(&cmd->r2t_lock);
 
-	iscsi_add_cmd_to_immediate_queue(cmd, CONN(cmd), ISTATE_SEND_R2T);
+	iscsi_add_cmd_to_immediate_queue(cmd, cmd->conn, ISTATE_SEND_R2T);
 
 	spin_lock_bh(&cmd->r2t_lock);
 	return 0;
@@ -260,7 +260,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd(
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	transport_init_se_cmd(se_cmd, &lio_target_fabric_configfs->tf_ops,
-			SESS(conn)->se_sess, data_length, data_direction,
+			conn->sess->se_sess, data_length, data_direction,
 			sam_task_attr, &cmd->sense_buffer[0]);
 	return cmd;
 }
@@ -297,7 +297,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	transport_init_se_cmd(se_cmd, &lio_target_fabric_configfs->tf_ops,
-				SESS(conn)->se_sess, 0, DMA_NONE,
+				conn->sess->se_sess, 0, DMA_NONE,
 				TASK_ATTR_SIMPLE, &cmd->sense_buffer[0]);
 
 	switch (function) {
@@ -348,12 +348,12 @@ int iscsi_decide_list_to_build(
 	u32 immediate_data_length)
 {
 	struct iscsi_build_list bl;
-	struct iscsi_conn *conn = CONN(cmd);
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_conn *conn = cmd->conn;
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_attrib *na;
 
-	if (SESS_OPS(sess)->DataSequenceInOrder &&
-	    SESS_OPS(sess)->DataPDUInOrder)
+	if (sess->sess_ops->DataSequenceInOrder &&
+	    sess->sess_ops->DataPDUInOrder)
 		return 0;
 
 	if (cmd->data_direction == DMA_NONE)
@@ -475,106 +475,106 @@ inline int iscsi_check_received_cmdsn(
 	 * or order CmdSNs due to multiple connection sessions and/or
 	 * CRC failures.
 	 */
-	spin_lock(&SESS(conn)->cmdsn_lock);
-	if (serial_gt(cmdsn, SESS(conn)->max_cmd_sn)) {
+	spin_lock(&conn->sess->cmdsn_lock);
+	if (serial_gt(cmdsn, conn->sess->max_cmd_sn)) {
 		printk(KERN_ERR "Received CmdSN: 0x%08x is greater than"
 			" MaxCmdSN: 0x%08x, protocol error.\n", cmdsn,
-				SESS(conn)->max_cmd_sn);
-		spin_unlock(&SESS(conn)->cmdsn_lock);
+				conn->sess->max_cmd_sn);
+		spin_unlock(&conn->sess->cmdsn_lock);
 		return CMDSN_ERROR_CANNOT_RECOVER;
 	}
 
-	if (!SESS(conn)->cmdsn_outoforder) {
-		if (cmdsn == SESS(conn)->exp_cmd_sn) {
-			SESS(conn)->exp_cmd_sn++;
+	if (!conn->sess->cmdsn_outoforder) {
+		if (cmdsn == conn->sess->exp_cmd_sn) {
+			conn->sess->exp_cmd_sn++;
 			TRACE(TRACE_CMDSN, "Received CmdSN matches ExpCmdSN,"
 				" incremented ExpCmdSN to: 0x%08x\n",
-					SESS(conn)->exp_cmd_sn);
+					conn->sess->exp_cmd_sn);
 			ret = iscsi_execute_cmd(cmd, 0);
-			spin_unlock(&SESS(conn)->cmdsn_lock);
+			spin_unlock(&conn->sess->cmdsn_lock);
 
 			return (!ret) ? CMDSN_NORMAL_OPERATION :
 					CMDSN_ERROR_CANNOT_RECOVER;
-		} else if (serial_gt(cmdsn, SESS(conn)->exp_cmd_sn)) {
+		} else if (serial_gt(cmdsn, conn->sess->exp_cmd_sn)) {
 			TRACE(TRACE_CMDSN, "Received CmdSN: 0x%08x is greater"
 				" than ExpCmdSN: 0x%08x, not acknowledging.\n",
-				cmdsn, SESS(conn)->exp_cmd_sn);
+				cmdsn, conn->sess->exp_cmd_sn);
 			goto ooo_cmdsn;
 		} else {
 			printk(KERN_ERR "Received CmdSN: 0x%08x is less than"
 				" ExpCmdSN: 0x%08x, ignoring.\n", cmdsn,
-					SESS(conn)->exp_cmd_sn);
-			spin_unlock(&SESS(conn)->cmdsn_lock);
+					conn->sess->exp_cmd_sn);
+			spin_unlock(&conn->sess->cmdsn_lock);
 			return CMDSN_LOWER_THAN_EXP;
 		}
 	} else {
 		int counter = 0;
 		u32 old_expcmdsn = 0;
-		if (cmdsn == SESS(conn)->exp_cmd_sn) {
-			old_expcmdsn = SESS(conn)->exp_cmd_sn++;
+		if (cmdsn == conn->sess->exp_cmd_sn) {
+			old_expcmdsn = conn->sess->exp_cmd_sn++;
 			TRACE(TRACE_CMDSN, "Got missing CmdSN: 0x%08x matches"
 				" ExpCmdSN, incremented ExpCmdSN to 0x%08x.\n",
-					cmdsn, SESS(conn)->exp_cmd_sn);
+					cmdsn, conn->sess->exp_cmd_sn);
 
 			if (iscsi_execute_cmd(cmd, 0) < 0) {
-				spin_unlock(&SESS(conn)->cmdsn_lock);
+				spin_unlock(&conn->sess->cmdsn_lock);
 				return CMDSN_ERROR_CANNOT_RECOVER;
 			}
-		} else if (serial_gt(cmdsn, SESS(conn)->exp_cmd_sn)) {
+		} else if (serial_gt(cmdsn, conn->sess->exp_cmd_sn)) {
 			TRACE(TRACE_CMDSN, "CmdSN: 0x%08x greater than"
 				" ExpCmdSN: 0x%08x, not acknowledging.\n",
-				cmdsn, SESS(conn)->exp_cmd_sn);
+				cmdsn, conn->sess->exp_cmd_sn);
 			goto ooo_cmdsn;
 		} else {
 			printk(KERN_ERR "CmdSN: 0x%08x less than ExpCmdSN:"
 				" 0x%08x, ignoring.\n", cmdsn,
-				SESS(conn)->exp_cmd_sn);
-			spin_unlock(&SESS(conn)->cmdsn_lock);
+				conn->sess->exp_cmd_sn);
+			spin_unlock(&conn->sess->cmdsn_lock);
 			return CMDSN_LOWER_THAN_EXP;
 		}
 
-		counter = iscsi_execute_ooo_cmdsns(SESS(conn));
+		counter = iscsi_execute_ooo_cmdsns(conn->sess);
 		if (counter < 0) {
-			spin_unlock(&SESS(conn)->cmdsn_lock);
+			spin_unlock(&conn->sess->cmdsn_lock);
 			return CMDSN_ERROR_CANNOT_RECOVER;
 		}
 
-		if (counter == SESS(conn)->ooo_cmdsn_count) {
-			if (SESS(conn)->ooo_cmdsn_count == 1) {
+		if (counter == conn->sess->ooo_cmdsn_count) {
+			if (conn->sess->ooo_cmdsn_count == 1) {
 				TRACE(TRACE_CMDSN, "Received final missing"
 					" CmdSN: 0x%08x.\n", old_expcmdsn);
 			} else {
 				TRACE(TRACE_CMDSN, "Received final missing"
 					" CmdSNs: 0x%08x->0x%08x.\n",
-				old_expcmdsn, (SESS(conn)->exp_cmd_sn - 1));
+				old_expcmdsn, (conn->sess->exp_cmd_sn - 1));
 			}
 
-			SESS(conn)->ooo_cmdsn_count = 0;
-			SESS(conn)->cmdsn_outoforder = 0;
+			conn->sess->ooo_cmdsn_count = 0;
+			conn->sess->cmdsn_outoforder = 0;
 		} else {
-			SESS(conn)->ooo_cmdsn_count -= counter;
+			conn->sess->ooo_cmdsn_count -= counter;
 			TRACE(TRACE_CMDSN, "Still missing %hu CmdSN(s),"
 				" continuing out of order operation.\n",
-				SESS(conn)->ooo_cmdsn_count);
+				conn->sess->ooo_cmdsn_count);
 		}
-		spin_unlock(&SESS(conn)->cmdsn_lock);
+		spin_unlock(&conn->sess->cmdsn_lock);
 		return CMDSN_NORMAL_OPERATION;
 	}
 
 ooo_cmdsn:
-	ret = iscsi_handle_ooo_cmdsn(SESS(conn), cmd, cmdsn);
-	spin_unlock(&SESS(conn)->cmdsn_lock);
+	ret = iscsi_handle_ooo_cmdsn(conn->sess, cmd, cmdsn);
+	spin_unlock(&conn->sess->cmdsn_lock);
 	return ret;
 }
 
 int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 {
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct se_cmd *se_cmd = SE_CMD(cmd);
 	struct iscsi_data *hdr = (struct iscsi_data *) buf;
 	u32 payload_length = ntoh24(hdr->dlength);
 
-	if (SESS_OPS_C(conn)->InitialR2T) {
+	if (conn->sess->sess_ops->InitialR2T) {
 		printk(KERN_ERR "Received unexpected unsolicited data"
 			" while InitialR2T=Yes, protocol error.\n");
 		transport_send_check_condition_and_sense(se_cmd,
@@ -583,11 +583,11 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 	}
 
 	if ((cmd->first_burst_len + payload_length) >
-	     SESS_OPS_C(conn)->FirstBurstLength) {
+	     conn->sess->sess_ops->FirstBurstLength) {
 		printk(KERN_ERR "Total %u bytes exceeds FirstBurstLength: %u"
 			" for this Unsolicited DataOut Burst.\n",
 			(cmd->first_burst_len + payload_length),
-				SESS_OPS_C(conn)->FirstBurstLength);
+				conn->sess->sess_ops->FirstBurstLength);
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return -1;
@@ -598,12 +598,12 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 
 	if (((cmd->first_burst_len + payload_length) != cmd->data_length) &&
 	    ((cmd->first_burst_len + payload_length) !=
-	      SESS_OPS_C(conn)->FirstBurstLength)) {
+	      conn->sess->sess_ops->FirstBurstLength)) {
 		printk(KERN_ERR "Unsolicited non-immediate data received %u"
 			" does not equal FirstBurstLength: %u, and does"
 			" not equal ExpXferLen %u.\n",
 			(cmd->first_burst_len + payload_length),
-			SESS_OPS_C(conn)->FirstBurstLength, cmd->data_length);
+			conn->sess->sess_ops->FirstBurstLength, cmd->data_length);
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return -1;
@@ -951,7 +951,7 @@ void lio_release_cmd_direct(struct se_cmd *se_cmd)
 
 void __iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *sess)
 {
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 
 	iscsi_free_r2ts_from_list(cmd);
 	iscsi_free_all_datain_reqs(cmd);
@@ -970,11 +970,11 @@ void __iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *se
 
 void iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd)
 {
-	if (!CONN(cmd) && !cmd->sess) {
+	if (!cmd->conn && !cmd->sess) {
 		iscsi_release_cmd_direct(cmd);
 	} else {
-		__iscsi_release_cmd_to_pool(cmd, (CONN(cmd)) ?
-			CONN(cmd)->sess : cmd->sess);
+		__iscsi_release_cmd_to_pool(cmd, (cmd->conn) ?
+			cmd->conn->sess : cmd->sess);
 	}
 }
 
@@ -1117,8 +1117,8 @@ static inline int iscsi_determine_sync_and_steering_counts(
 	marker = (count->type == ISCSI_RX_DATA) ?
 			conn->of_marker : conn->if_marker;
 	markint = (count->type == ISCSI_RX_DATA) ?
-			(CONN_OPS(conn)->OFMarkInt * 4) :
-			(CONN_OPS(conn)->IFMarkInt * 4);
+			(conn->conn_ops->OFMarkInt * 4) :
+			(conn->conn_ops->IFMarkInt * 4);
 	count->ss_iov_count = count->iov_count;
 
 	while (length > 0) {
@@ -1146,10 +1146,10 @@ int iscsi_set_sync_and_steering_values(struct iscsi_conn *conn)
 	/*
 	 * IFMarkInt and OFMarkInt are negotiated as 32-bit words.
 	 */
-	u32 IFMarkInt = (CONN_OPS(conn)->IFMarkInt * 4);
-	u32 OFMarkInt = (CONN_OPS(conn)->OFMarkInt * 4);
+	u32 IFMarkInt = (conn->conn_ops->IFMarkInt * 4);
+	u32 OFMarkInt = (conn->conn_ops->OFMarkInt * 4);
 
-	if (CONN_OPS(conn)->OFMarker) {
+	if (conn->conn_ops->OFMarker) {
 		/*
 		 * Account for the first Login Command received not
 		 * via iscsi_recv_msg().
@@ -1168,7 +1168,7 @@ int iscsi_set_sync_and_steering_values(struct iscsi_conn *conn)
 			" Markerless Interval.\n", conn->of_marker);
 	}
 
-	if (CONN_OPS(conn)->IFMarker) {
+	if (conn->conn_ops->IFMarker) {
 		if (conn->if_marker <= IFMarkInt) {
 			conn->if_marker = (IFMarkInt - conn->if_marker);
 		} else {
@@ -1592,7 +1592,7 @@ static void iscsi_handle_netif_timeout(unsigned long data)
 
 	printk(KERN_ERR "Detected PHY loss on Network Interface: %s for iSCSI"
 		" CID: %hu on SID: %u\n", conn->net_dev, conn->cid,
-			SESS(conn)->sid);
+			conn->sess->sid);
 
 	spin_unlock_bh(&conn->netif_lock);
 
@@ -1672,7 +1672,7 @@ static void iscsi_handle_nopin_response_timeout(unsigned long data)
 
 	TRACE(TRACE_TIMER, "Did not receive response to NOPIN on CID: %hu on"
 		" SID: %u, failing connection.\n", conn->cid,
-			SESS(conn)->sid);
+			conn->sess->sid);
 	conn->nopin_response_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&conn->nopin_timer_lock);
 
@@ -1683,11 +1683,11 @@ static void iscsi_handle_nopin_response_timeout(unsigned long data)
 	if (tiqn) {
 		spin_lock_bh(&tiqn->sess_err_stats.lock);
 		strcpy(tiqn->sess_err_stats.last_sess_fail_rem_name,
-				(void *)SESS_OPS_C(conn)->InitiatorName);
+				(void *)conn->sess->sess_ops->InitiatorName);
 		tiqn->sess_err_stats.last_sess_failure_type =
 				ISCSI_SESS_ERR_CXN_TIMEOUT;
 		tiqn->sess_err_stats.cxn_timeout_errors++;
-		SESS(conn)->conn_timeout_errors++;
+		conn->sess->conn_timeout_errors++;
 		spin_unlock_bh(&tiqn->sess_err_stats.lock);
 	}
 	}
@@ -1698,7 +1698,7 @@ static void iscsi_handle_nopin_response_timeout(unsigned long data)
 
 void iscsi_mod_nopin_response_timer(struct iscsi_conn *conn)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
@@ -1718,7 +1718,7 @@ void iscsi_mod_nopin_response_timer(struct iscsi_conn *conn)
  */
 void iscsi_start_nopin_response_timer(struct iscsi_conn *conn)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
@@ -1782,7 +1782,7 @@ static void iscsi_handle_nopin_timeout(unsigned long data)
  */
 void __iscsi_start_nopin_timer(struct iscsi_conn *conn)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 	/*
 	* NOPIN timeout is disabled.
@@ -1807,7 +1807,7 @@ void __iscsi_start_nopin_timer(struct iscsi_conn *conn)
 
 void iscsi_start_nopin_timer(struct iscsi_conn *conn)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
 	/*
 	 * NOPIN timeout is disabled..
@@ -1913,7 +1913,7 @@ int iscsi_fe_sendpage_sg(
 	struct se_mem *se_mem = u_sg->cur_se_mem;
 
 send_hdr:
-	tx_size = (CONN_OPS(conn)->HeaderDigest) ? ISCSI_HDR_LEN + CRC_LEN :
+	tx_size = (conn->conn_ops->HeaderDigest) ? ISCSI_HDR_LEN + CRC_LEN :
 			ISCSI_HDR_LEN;
 	tx_sent = tx_data(conn, iov, 1, tx_size);
 	if (tx_size != tx_sent) {
@@ -1926,7 +1926,7 @@ send_hdr:
 
 	len -= tx_size;
 	len -= u_sg->padding;
-	if (CONN_OPS(conn)->DataDigest)
+	if (conn->conn_ops->DataDigest)
 		len -= CRC_LEN;
 
 	/*
@@ -2031,7 +2031,7 @@ send_padding:
 	}
 
 send_datacrc:
-	if (CONN_OPS(conn)->DataDigest) {
+	if (conn->conn_ops->DataDigest) {
 		struct iovec *iov_d =
 			&cmd->iov_data[cmd->iov_data_count-1];
 
@@ -2113,7 +2113,7 @@ static inline int iscsi_do_rx_data(
 	mm_segment_t oldfs;
 	struct msghdr msg;
 
-	if (!conn || !conn->sock || !CONN_OPS(conn))
+	if (!conn || !conn->sock || !conn->conn_ops)
 		return -1;
 
 	memset(&msg, 0, sizeof(struct msghdr));
@@ -2160,7 +2160,7 @@ static inline int iscsi_do_rx_data(
 				/*
 				 * OFMarkInt is in 32-bit words.
 				 */
-				*rx_marker = (CONN_OPS(conn)->OFMarkInt * 4);
+				*rx_marker = (conn->conn_ops->OFMarkInt * 4);
 				size -= old_rx_marker;
 				orig_iov_len -= old_rx_marker;
 				per_iov_bytes += old_rx_marker;
@@ -2249,7 +2249,7 @@ static inline int iscsi_do_tx_data(
 	mm_segment_t oldfs;
 	struct msghdr msg;
 
-	if (!conn || !conn->sock || !CONN_OPS(conn))
+	if (!conn || !conn->sock || !conn->conn_ops)
 		return -1;
 
 	if (data <= 0) {
@@ -2303,7 +2303,7 @@ static inline int iscsi_do_tx_data(
 				/*
 				 * IFMarkInt is in 32-bit words.
 				 */
-				*tx_marker = (CONN_OPS(conn)->IFMarkInt * 4);
+				*tx_marker = (conn->conn_ops->IFMarkInt * 4);
 				size -= old_tx_marker;
 				orig_iov_len -= old_tx_marker;
 				per_iov_bytes += old_tx_marker;
@@ -2385,7 +2385,7 @@ int rx_data(
 {
 	struct iscsi_data_count c;
 
-	if (!conn || !conn->sock || !CONN_OPS(conn))
+	if (!conn || !conn->sock || !conn->conn_ops)
 		return -1;
 
 	memset(&c, 0, sizeof(struct iscsi_data_count));
@@ -2394,7 +2394,7 @@ int rx_data(
 	c.data_length = data;
 	c.type = ISCSI_RX_DATA;
 
-	if (CONN_OPS(conn)->OFMarker &&
+	if (conn->conn_ops->OFMarker &&
 	   (conn->conn_state >= TARG_CONN_STATE_LOGGED_IN)) {
 		if (iscsi_determine_sync_and_steering_counts(conn, &c) < 0)
 			return -1;
@@ -2411,7 +2411,7 @@ int tx_data(
 {
 	struct iscsi_data_count c;
 
-	if (!conn || !conn->sock || !CONN_OPS(conn))
+	if (!conn || !conn->sock || !conn->conn_ops)
 		return -1;
 
 	memset(&c, 0, sizeof(struct iscsi_data_count));
@@ -2420,7 +2420,7 @@ int tx_data(
 	c.data_length = data;
 	c.type = ISCSI_TX_DATA;
 
-	if (CONN_OPS(conn)->IFMarker &&
+	if (conn->conn_ops->IFMarker &&
 	   (conn->conn_state >= TARG_CONN_STATE_LOGGED_IN)) {
 		if (iscsi_determine_sync_and_steering_counts(conn, &c) < 0)
 			return -1;
@@ -2519,7 +2519,7 @@ struct iscsi_tiqn *iscsi_snmp_get_tiqn(struct iscsi_conn *conn)
 extern int iscsi_build_sendtargets_response(struct iscsi_cmd *cmd)
 {
 	char *ip, *payload = NULL;
-	struct iscsi_conn *conn = CONN(cmd);
+	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_portal_group *tpg;
 	struct iscsi_tiqn *tiqn;
 	struct iscsi_tpg_np *tpg_np;
@@ -2527,8 +2527,8 @@ extern int iscsi_build_sendtargets_response(struct iscsi_cmd *cmd)
 	unsigned char buf[256];
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
-	buffer_len = (CONN_OPS(conn)->MaxRecvDataSegmentLength > 32768) ?
-			32768 : CONN_OPS(conn)->MaxRecvDataSegmentLength;
+	buffer_len = (conn->conn_ops->MaxRecvDataSegmentLength > 32768) ?
+			32768 : conn->conn_ops->MaxRecvDataSegmentLength;
 
 	payload = kzalloc(buffer_len, GFP_KERNEL);
 	if (!payload) {

@@ -600,9 +600,6 @@ struct iscsi_conn {
 	struct list_head	conn_list;
 } ____cacheline_aligned;
 
-#define CONN(cmd)		((struct iscsi_conn *)(cmd)->conn)
-#define CONN_OPS(conn)		((struct iscsi_conn_ops *)(conn)->conn_ops)
-
 struct iscsi_conn_recovery {
 	u16			cid;
 	u32			cmd_count;
@@ -681,11 +678,6 @@ struct iscsi_session {
 	struct se_session	*se_sess;
 	struct iscsi_portal_group *tpg;
 } ____cacheline_aligned;
-
-#define SESS(conn)		((struct iscsi_session *)(conn)->sess)
-#define SESS_OPS(sess)		((struct iscsi_sess_ops *)(sess)->sess_ops)
-#define SESS_OPS_C(conn)	((struct iscsi_sess_ops *)(conn)->sess->sess_ops)
-#define SESS_NODE_ACL(sess)	((struct se_node_acl *)(sess)->se_sess->se_node_acl)
 
 struct iscsi_login {
 	u8 auth_complete;

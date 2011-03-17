@@ -155,10 +155,10 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 			spin_unlock(&sess_p->conn_lock);
 			continue;
 		}
-		if (!memcmp((void *)sess_p->isid, (void *)SESS(conn)->isid, 6) &&
-		   (!strcmp((void *)SESS_OPS(sess_p)->InitiatorName,
+		if (!memcmp((void *)sess_p->isid, (void *)conn->sess->isid, 6) &&
+		   (!strcmp((void *)sess_p->sess_ops->InitiatorName,
 			    (void *)initiatorname_param->value) &&
-		   (SESS_OPS(sess_p)->SessionType == sessiontype))) {
+		   (sess_p->sess_ops->SessionType == sessiontype))) {
 			atomic_set(&sess_p->session_reinstatement, 1);
 			spin_unlock(&sess_p->conn_lock);
 			iscsi_inc_session_usage_count(sess_p);
@@ -178,7 +178,7 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 	TRACE(TRACE_ERL0, "%s iSCSI Session SID %u is still active for %s,"
 		" preforming session reinstatement.\n", (sessiontype) ?
 		"Discovery" : "Normal", sess->sid,
-		SESS_OPS(sess)->InitiatorName);
+		sess->sess_ops->InitiatorName);
 
 	spin_lock_bh(&sess->conn_lock);
 	if (sess->session_state == TARG_SESS_STATE_FAILED) {
@@ -316,7 +316,7 @@ static int iscsi_login_zero_tsih_s2(
 
 	iscsi_set_keys_to_negotiate(0, conn->param_list);
 
-	if (SESS_OPS(sess)->SessionType)
+	if (sess->sess_ops->SessionType)
 		return iscsi_set_keys_irrelevant_for_discovery(
 				conn->param_list);
 
@@ -508,7 +508,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 {
 	struct iscsi_conn *conn_ptr = NULL;
 	struct iscsi_conn_recovery *cr = NULL;
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 
 	/*
 	 * By following item 5 in the login table,  if we have found
@@ -521,7 +521,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 	if ((conn_ptr)) {
 		printk(KERN_ERR "Connection exists with CID %hu for %s,"
 			" performing connection reinstatement.\n",
-			conn_ptr->cid, SESS_OPS(sess)->InitiatorName);
+			conn_ptr->cid, sess->sess_ops->InitiatorName);
 
 		iscsi_connection_reinstatement_rcfr(conn_ptr);
 		iscsi_dec_conn_usage_count(conn_ptr);
@@ -536,7 +536,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 	 * but the response may not be sent due to additional connection
 	 * loss.
 	 */
-	if (SESS_OPS(sess)->ErrorRecoveryLevel == 2) {
+	if (sess->sess_ops->ErrorRecoveryLevel == 2) {
 		cr = iscsi_get_inactive_connection_recovery_entry(
 				sess, cid);
 		if ((cr)) {
@@ -554,12 +554,12 @@ int iscsi_login_post_auth_non_zero_tsih(
 	 * session.
 	 */
 	TRACE(TRACE_LOGIN, "Adding CID %hu to existing session for %s.\n",
-			cid, SESS_OPS(sess)->InitiatorName);
+			cid, sess->sess_ops->InitiatorName);
 
-	if ((atomic_read(&sess->nconn) + 1) > SESS_OPS(sess)->MaxConnections) {
+	if ((atomic_read(&sess->nconn) + 1) > sess->sess_ops->MaxConnections) {
 		printk(KERN_ERR "Adding additional connection to this session"
 			" would exceed MaxConnections %d, login failed.\n",
-				SESS_OPS(sess)->MaxConnections);
+				sess->sess_ops->MaxConnections);
 		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_ISID_ERROR);
 		return -1;
@@ -570,7 +570,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 
 static void iscsi_post_login_start_timers(struct iscsi_conn *conn)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 
 /* #warning PHY timer is disabled */
 #if 0
@@ -580,7 +580,7 @@ static void iscsi_post_login_start_timers(struct iscsi_conn *conn)
 	iscsi_start_netif_timer(conn);
 	spin_unlock_bh(&conn->netif_lock);
 #endif
-	if (!SESS_OPS(sess)->SessionType)
+	if (!sess->sess_ops->SessionType)
 		iscsi_start_nopin_timer(conn);
 }
 
@@ -592,7 +592,7 @@ static int iscsi_post_login_handler(
 	int stop_timer = 0;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
 	unsigned char *ip, *ip_np;
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct se_session *se_sess = sess->se_sess;
 	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
@@ -648,7 +648,7 @@ static int iscsi_post_login_handler(
 		atomic_inc(&sess->nconn);
 		printk(KERN_INFO "Incremented iSCSI Connection count to %hu"
 			" from node: %s\n", atomic_read(&sess->nconn),
-			SESS_OPS(sess)->InitiatorName);
+			sess->sess_ops->InitiatorName);
 		spin_unlock_bh(&sess->conn_lock);
 
 		iscsi_post_login_start_timers(conn);
@@ -691,14 +691,14 @@ static int iscsi_post_login_handler(
 	atomic_inc(&sess->nconn);
 	printk(KERN_INFO "Incremented iSCSI Connection count to %hu from node:"
 		" %s\n", atomic_read(&sess->nconn),
-		SESS_OPS(sess)->InitiatorName);
+		sess->sess_ops->InitiatorName);
 	spin_unlock_bh(&sess->conn_lock);
 
 	sess->sid = tpg->sid++;
 	if (!sess->sid)
 		sess->sid = tpg->sid++;
 	printk(KERN_INFO "Established iSCSI session from node: %s\n",
-			SESS_OPS(sess)->InitiatorName);
+			sess->sess_ops->InitiatorName);
 
 	tpg->nsessions++;
 	if (tpg->tpg_tiqn)
@@ -1177,7 +1177,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	if (iscsi_target_start_negotiation(login, conn) < 0)
 		goto new_sess_out;
 
-	if (!SESS(conn)) {
+	if (!conn->sess) {
 		printk(KERN_ERR "struct iscsi_conn session pointer is NULL!\n");
 		goto new_sess_out;
 	}
@@ -1201,39 +1201,39 @@ new_sess_out:
 	printk(KERN_ERR "iSCSI Login negotiation failed.\n");
 	iscsi_collect_login_stats(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				  ISCSI_LOGIN_STATUS_INIT_ERR);
-	if (!zero_tsih || !SESS(conn))
+	if (!zero_tsih || !conn->sess)
 		goto old_sess_out;
-	if (SESS(conn)->se_sess)
-		transport_free_session(SESS(conn)->se_sess);
-	if (SESS(conn)->session_index != 0) {
+	if (conn->sess->se_sess)
+		transport_free_session(conn->sess->se_sess);
+	if (conn->sess->session_index != 0) {
 		spin_lock_bh(&sess_idr_lock);
-		idr_remove(&sess_idr, SESS(conn)->session_index);
+		idr_remove(&sess_idr, conn->sess->session_index);
 		spin_unlock_bh(&sess_idr_lock);
 	}
-	if (SESS(conn)->sess_ops)
-		kfree(SESS(conn)->sess_ops);
-	if (SESS(conn))
-		kfree(SESS(conn));
+	if (conn->sess->sess_ops)
+		kfree(conn->sess->sess_ops);
+	if (conn->sess)
+		kfree(conn->sess);
 old_sess_out:
 	iscsi_stop_login_thread_timer(np);
 	/*
 	 * If login negotiation fails check if the Time2Retain timer
 	 * needs to be restarted.
 	 */
-	if (!zero_tsih && SESS(conn)) {
-		spin_lock_bh(&SESS(conn)->conn_lock);
-		if (SESS(conn)->session_state == TARG_SESS_STATE_FAILED) {
+	if (!zero_tsih && conn->sess) {
+		spin_lock_bh(&conn->sess->conn_lock);
+		if (conn->sess->session_state == TARG_SESS_STATE_FAILED) {
 			struct se_portal_group *se_tpg =
 					&ISCSI_TPG_C(conn)->tpg_se_tpg;
 
-			atomic_set(&SESS(conn)->session_continuation, 0);
-			spin_unlock_bh(&SESS(conn)->conn_lock);
+			atomic_set(&conn->sess->session_continuation, 0);
+			spin_unlock_bh(&conn->sess->conn_lock);
 			spin_lock_bh(&se_tpg->session_lock);
-			iscsi_start_time2retain_handler(SESS(conn));
+			iscsi_start_time2retain_handler(conn->sess);
 			spin_unlock_bh(&se_tpg->session_lock);
 		} else
-			spin_unlock_bh(&SESS(conn)->conn_lock);
-		iscsi_dec_session_usage_count(SESS(conn));
+			spin_unlock_bh(&conn->sess->conn_lock);
+		iscsi_dec_session_usage_count(conn->sess);
 	}
 
 	if (!IS_ERR(conn->conn_rx_hash.tfm))

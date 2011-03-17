@@ -525,7 +525,7 @@ static ssize_t iscsi_nacl_param_show_##name(				\
 	} else {							\
 		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr; \
 		rb = snprintf(page, PAGE_SIZE, "%u\n",			\
-			(u32)SESS_OPS(sess)->name);			\
+			(u32)sess->sess_ops->name);			\
 	}								\
 	spin_unlock_bh(&se_nacl->nacl_sess_lock);			\
 									\
@@ -604,12 +604,12 @@ static ssize_t lio_target_nacl_show_info(
 	} else {
 		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
 
-		if (SESS_OPS(sess)->InitiatorName)
+		if (sess->sess_ops->InitiatorName)
 			rb += sprintf(page+rb, "InitiatorName: %s\n",
-				SESS_OPS(sess)->InitiatorName);
-		if (SESS_OPS(sess)->InitiatorAlias)
+				sess->sess_ops->InitiatorName);
+		if (sess->sess_ops->InitiatorAlias)
 			rb += sprintf(page+rb, "InitiatorAlias: %s\n",
-				SESS_OPS(sess)->InitiatorAlias);
+				sess->sess_ops->InitiatorAlias);
 
 		rb += sprintf(page+rb, "LIO Session ID: %u   "
 			"ISID: 0x%02x %02x %02x %02x %02x %02x  "
@@ -618,7 +618,7 @@ static ssize_t lio_target_nacl_show_info(
 			sess->isid[3], sess->isid[4], sess->isid[5],
 			sess->tsih);
 		rb += sprintf(page+rb, "SessionType: %s\n",
-				(SESS_OPS(sess)->SessionType) ?
+				(sess->sess_ops->SessionType) ?
 				"Discovery" : "Normal");
 		rb += sprintf(page+rb, "Session State: ");
 		switch (sess->session_state) {

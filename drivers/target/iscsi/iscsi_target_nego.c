@@ -111,16 +111,16 @@ static u32 iscsi_handle_authentication(
 	int *out_length,
 	unsigned char *authtype)
 {
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_node_auth *auth;
 	struct iscsi_node_acl *iscsi_nacl;
 	struct se_node_acl *se_nacl;
 
-	if (!SESS_OPS(sess)->SessionType) {
+	if (!sess->sess_ops->SessionType) {
 		/*
 		 * For SessionType=Normal
 		 */
-		se_nacl = SESS(conn)->se_sess->se_node_acl;
+		se_nacl = conn->sess->se_sess->se_node_acl;
 		if (!se_nacl) {
 			printk(KERN_ERR "Unable to locate struct se_node_acl for"
 					" CHAP auth\n");
@@ -143,9 +143,9 @@ static u32 iscsi_handle_authentication(
 	}
 
 	if (strstr("CHAP", authtype))
-		strcpy(SESS(conn)->auth_type, "CHAP");
+		strcpy(conn->sess->auth_type, "CHAP");
 	else
-		strcpy(SESS(conn)->auth_type, NONE);
+		strcpy(conn->sess->auth_type, NONE);
 
 	if (strstr("None", authtype))
 		return 1;
@@ -306,7 +306,7 @@ static int iscsi_target_check_first_request(
 			 * struct iscsi_node_acl.
 			 */
 			if (!login->leading_connection) {
-				se_nacl = SESS(conn)->se_sess->se_node_acl;
+				se_nacl = conn->sess->se_sess->se_node_acl;
 				if (!se_nacl) {
 					printk(KERN_ERR "Unable to locate"
 						" struct se_node_acl\n");
@@ -337,7 +337,7 @@ static int iscsi_target_check_first_request(
 static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_login *login)
 {
 	u32 padding = 0;
-	struct iscsi_session *sess = SESS(conn);
+	struct iscsi_session *sess = conn->sess;
 	struct iscsi_login_rsp *login_rsp;
 
 	login_rsp = (struct iscsi_login_rsp *) login->rsp;
@@ -348,8 +348,8 @@ static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_log
 	login_rsp->tsih			= cpu_to_be16(login->tsih);
 	login_rsp->itt			= cpu_to_be32(login->init_task_tag);
 	login_rsp->statsn		= cpu_to_be32(conn->stat_sn++);
-	login_rsp->exp_cmdsn		= cpu_to_be32(SESS(conn)->exp_cmd_sn);
-	login_rsp->max_cmdsn		= cpu_to_be32(SESS(conn)->max_cmd_sn);
+	login_rsp->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
+	login_rsp->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
 	TRACE(TRACE_LOGIN, "Sending Login Response, Flags: 0x%02x, ITT: 0x%08x,"
 		" ExpCmdSN; 0x%08x, MaxCmdSN: 0x%08x, StatSN: 0x%08x, Length:"
@@ -702,7 +702,7 @@ static int iscsi_target_do_login(struct iscsi_conn *conn, struct iscsi_login *lo
 			if (iscsi_target_handle_csg_one(conn, login) < 0)
 				return -1;
 			if (login_rsp->flags & ISCSI_FLAG_LOGIN_TRANSIT) {
-				login->tsih = SESS(conn)->tsih;
+				login->tsih = conn->sess->tsih;
 				if (iscsi_target_do_tx_login_io(conn,
 						login) < 0)
 					return -1;
@@ -851,7 +851,7 @@ static int iscsi_target_locate_portal(
 		if (!login->leading_connection)
 			goto get_target;
 
-		SESS_OPS(sess)->SessionType = 1;
+		sess->sess_ops->SessionType = 1;
 		/*
 		 * Setup crc32c modules from libcrypto
 		 */
@@ -935,7 +935,7 @@ get_target:
 	}
 
 	/*
-	 * SESS(conn)->node_acl will be set when the referenced
+	 * conn->sess->node_acl will be set when the referenced
 	 * struct iscsi_session is located from received ISID+TSIH in
 	 * iscsi_login_non_zero_tsih_s2().
 	 */
@@ -947,7 +947,7 @@ get_target:
 	/*
 	 * This value is required in iscsi_login_zero_tsih_s2()
 	 */
-	SESS_OPS(sess)->SessionType = 0;
+	sess->sess_ops->SessionType = 0;
 
 	/*
 	 * Locate incoming Initiator IQN reference from Storage Node.
