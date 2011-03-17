@@ -4181,7 +4181,7 @@ static int iscsi_send_reject(
 
 static void iscsi_tx_thread_TCP_timeout(unsigned long data)
 {
-	up((struct semaphore *)data);
+	complete((struct completion *)data);
 }
 
 static void iscsi_tx_thread_wait_for_tcp(struct iscsi_conn *conn)
@@ -4586,7 +4586,7 @@ out:
 
 static void iscsi_rx_thread_TCP_timeout(unsigned long data)
 {
-	up((struct semaphore *)data);
+	complete((struct completion *)data);
 }
 
 static void iscsi_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
