@@ -48,7 +48,9 @@
 #define to_tcm_loop_hba(hba)	container_of(hba, struct tcm_loop_hba, dev)
 
 /* Local pointer to allocated TCM configfs fabric module */
-struct target_fabric_configfs *tcm_loop_fabric_configfs;
+static struct target_fabric_configfs *tcm_loop_fabric_configfs;
+
+static struct kmem_cache *tcm_loop_cmd_cache;
 
 static int tcm_loop_hba_no_cnt;
 
@@ -136,7 +138,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
  * Always called in process context.  A non zero return value
  * here will signal to handle an exception based on the return code.
  */
-int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
+static int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 {
 	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
 				struct tcm_loop_cmd, tl_se_cmd);
@@ -201,7 +203,7 @@ int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 /*
  * Called from struct target_core_fabric_ops->check_stop_free()
  */
-void tcm_loop_check_stop_free(struct se_cmd *se_cmd)
+static void tcm_loop_check_stop_free(struct se_cmd *se_cmd)
 {
 	/*
 	 * Do not release struct se_cmd's containing a valid TMR
@@ -220,26 +222,12 @@ void tcm_loop_check_stop_free(struct se_cmd *se_cmd)
 /*
  * Called from struct target_core_fabric_ops->release_cmd_to_pool()
  */
-void tcm_loop_deallocate_core_cmd(struct se_cmd *se_cmd)
+static void tcm_loop_deallocate_core_cmd(struct se_cmd *se_cmd)
 {
 	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
 				struct tcm_loop_cmd, tl_se_cmd);
 
 	kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
-}
-
-void tcm_loop_scsi_forget_host(struct Scsi_Host *shost)
-{
-        struct scsi_device *sdev, *tmp;
-        unsigned long flags;
-
-        spin_lock_irqsave(shost->host_lock, flags);
-        list_for_each_entry_safe(sdev, tmp, &shost->__devices, siblings) {
-                spin_unlock_irqrestore(shost->host_lock, flags);
-                scsi_remove_device(sdev);
-                spin_lock_irqsave(shost->host_lock, flags);
-        }
-        spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 static int tcm_loop_proc_info(struct Scsi_Host *host, char *buffer,
@@ -515,7 +503,7 @@ static void tcm_loop_release_adapter(struct device *dev)
 /*
  * Called from tcm_loop_make_scsi_hba() in tcm_loop_configfs.c
  */
-int tcm_loop_setup_hba_bus(struct tcm_loop_hba *tl_hba, int tcm_loop_host_id)
+static int tcm_loop_setup_hba_bus(struct tcm_loop_hba *tl_hba, int tcm_loop_host_id)
 {
 	int ret;
 
@@ -538,7 +526,7 @@ int tcm_loop_setup_hba_bus(struct tcm_loop_hba *tl_hba, int tcm_loop_host_id)
  * Called from tcm_loop_fabric_init() in tcl_loop_fabric.c to load the emulated
  * tcm_loop SCSI bus.
  */
-int tcm_loop_alloc_core_bus(void)
+static int tcm_loop_alloc_core_bus(void)
 {
 	int ret;
 
@@ -571,7 +559,7 @@ dev_unreg:
 	return ret;
 }
 
-void tcm_loop_release_core_bus(void)
+static void tcm_loop_release_core_bus(void)
 {
 	driver_unregister(&tcm_loop_driverfs);
 	bus_unregister(&tcm_loop_lld_bus);
@@ -580,14 +568,12 @@ void tcm_loop_release_core_bus(void)
 	printk(KERN_INFO "Releasing TCM Loop Core BUS\n");
 }
 
-struct kmem_cache *tcm_loop_cmd_cache;
-
-char *tcm_loop_get_fabric_name(void)
+static char *tcm_loop_get_fabric_name(void)
 {
 	return "loopback";
 }
 
-u8 tcm_loop_get_fabric_proto_ident(struct se_portal_group *se_tpg)
+static u8 tcm_loop_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_tpg *tl_tpg =
 			(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
@@ -615,7 +601,7 @@ u8 tcm_loop_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 	return sas_get_fabric_proto_ident(se_tpg);
 }
 
-char *tcm_loop_get_endpoint_wwn(struct se_portal_group *se_tpg)
+static char *tcm_loop_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_tpg *tl_tpg =
 		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;	
@@ -625,7 +611,7 @@ char *tcm_loop_get_endpoint_wwn(struct se_portal_group *se_tpg)
 	return &tl_tpg->tl_hba->tl_wwn_address[0];
 }
 
-u16 tcm_loop_get_tag(struct se_portal_group *se_tpg)
+static u16 tcm_loop_get_tag(struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_tpg *tl_tpg =
 		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
@@ -636,13 +622,12 @@ u16 tcm_loop_get_tag(struct se_portal_group *se_tpg)
 	return tl_tpg->tl_tpgt;
 }
 
-u32 tcm_loop_get_default_depth(struct se_portal_group *se_tpg)
+static u32 tcm_loop_get_default_depth(struct se_portal_group *se_tpg)
 {
 	return 1;
 }
 
-
-u32 tcm_loop_get_pr_transport_id(
+static u32 tcm_loop_get_pr_transport_id(
 	struct se_portal_group *se_tpg,
 	struct se_node_acl *se_nacl,
 	struct t10_pr_registration *pr_reg,
@@ -673,7 +658,7 @@ u32 tcm_loop_get_pr_transport_id(
 			format_code, buf);
 }
 
-u32 tcm_loop_get_pr_transport_id_len(
+static u32 tcm_loop_get_pr_transport_id_len(
 	struct se_portal_group *se_tpg,
 	struct se_node_acl *se_nacl,
 	struct t10_pr_registration *pr_reg,
@@ -707,7 +692,7 @@ u32 tcm_loop_get_pr_transport_id_len(
  * Used for handling SCSI fabric dependent TransportIDs in SPC-3 and above
  * Persistent Reservation SPEC_I_PT=1 and PROUT REGISTER_AND_MOVE operations.
  */
-char *tcm_loop_parse_pr_out_transport_id(
+static char *tcm_loop_parse_pr_out_transport_id(
 	struct se_portal_group *se_tpg,
 	const char *buf,
 	u32 *out_tid_len,
@@ -741,12 +726,12 @@ char *tcm_loop_parse_pr_out_transport_id(
  * Returning (1) here allows for target_core_mod struct se_node_acl to be generated
  * based upon the incoming fabric dependent SCSI Initiator Port
  */
-int tcm_loop_check_demo_mode(struct se_portal_group *se_tpg)
+static int tcm_loop_check_demo_mode(struct se_portal_group *se_tpg)
 {
 	return 1;
 }
 
-int tcm_loop_check_demo_mode_cache(struct se_portal_group *se_tpg)
+static int tcm_loop_check_demo_mode_cache(struct se_portal_group *se_tpg)
 {
 	return 0;
 }
@@ -755,7 +740,7 @@ int tcm_loop_check_demo_mode_cache(struct se_portal_group *se_tpg)
  * Allow I_T Nexus full READ-WRITE access without explict Initiator Node ACLs for
  * local virtual Linux/SCSI LLD passthrough into VM hypervisor guest
  */
-int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *se_tpg)
+static int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *se_tpg)
 {
 	return 0;
 }
@@ -765,12 +750,12 @@ int tcm_loop_check_demo_mode_write_protect(struct se_portal_group *se_tpg)
  * never be called for TCM_Loop by target_core_fabric_configfs.c code.
  * It has been added here as a nop for target_fabric_tf_ops_check()
  */
-int tcm_loop_check_prod_mode_write_protect(struct se_portal_group *se_tpg)
+static int tcm_loop_check_prod_mode_write_protect(struct se_portal_group *se_tpg)
 {
 	return 0;
 }
 
-struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
+static struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
 	struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_nacl *tl_nacl;
@@ -784,7 +769,7 @@ struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
 	return &tl_nacl->se_node_acl;
 }
 
-void tcm_loop_tpg_release_fabric_acl(
+static void tcm_loop_tpg_release_fabric_acl(
 	struct se_portal_group *se_tpg,
 	struct se_node_acl *se_nacl)
 {
@@ -794,12 +779,12 @@ void tcm_loop_tpg_release_fabric_acl(
 	kfree(tl_nacl);
 }
 
-u32 tcm_loop_get_inst_index(struct se_portal_group *se_tpg)
+static u32 tcm_loop_get_inst_index(struct se_portal_group *se_tpg)
 {
 	return 1;
 }
 
-void tcm_loop_new_cmd_failure(struct se_cmd *se_cmd)
+static void tcm_loop_new_cmd_failure(struct se_cmd *se_cmd)
 {
 	/*
 	 * Since TCM_loop is already passing struct scatterlist data from
@@ -809,7 +794,7 @@ void tcm_loop_new_cmd_failure(struct se_cmd *se_cmd)
 	return;
 }
 
-int tcm_loop_is_state_remove(struct se_cmd *se_cmd)
+static int tcm_loop_is_state_remove(struct se_cmd *se_cmd)
 {
 	/*
 	 * Assume struct scsi_cmnd is not in remove state..
@@ -817,7 +802,7 @@ int tcm_loop_is_state_remove(struct se_cmd *se_cmd)
 	return 0;
 }
 
-int tcm_loop_sess_logged_in(struct se_session *se_sess)
+static int tcm_loop_sess_logged_in(struct se_session *se_sess)
 {
 	/*
 	 * Assume that TL Nexus is always active
@@ -825,22 +810,22 @@ int tcm_loop_sess_logged_in(struct se_session *se_sess)
 	return 1;
 }
 
-u32 tcm_loop_sess_get_index(struct se_session *se_sess)
+static u32 tcm_loop_sess_get_index(struct se_session *se_sess)
 {
 	return 1;
 }
 
-void tcm_loop_set_default_node_attributes(struct se_node_acl *se_acl)
+static void tcm_loop_set_default_node_attributes(struct se_node_acl *se_acl)
 {
 	return;
 }
 
-u32 tcm_loop_get_task_tag(struct se_cmd *se_cmd)
+static u32 tcm_loop_get_task_tag(struct se_cmd *se_cmd)
 {
 	return 1;
 }
 
-int tcm_loop_get_cmd_state(struct se_cmd *se_cmd)
+static int tcm_loop_get_cmd_state(struct se_cmd *se_cmd)
 {
 	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
 			struct tcm_loop_cmd, tl_se_cmd);
@@ -848,18 +833,17 @@ int tcm_loop_get_cmd_state(struct se_cmd *se_cmd)
 	return tl_cmd->sc_cmd_state;
 }
 
-int tcm_loop_shutdown_session(struct se_session *se_sess)
+static int tcm_loop_shutdown_session(struct se_session *se_sess)
 {
 	return 0;
 }
 
-void tcm_loop_close_session(struct se_session *se_sess)
+static void tcm_loop_close_session(struct se_session *se_sess)
 {
 	return;
 };
 
-
-void tcm_loop_stop_session(
+static void tcm_loop_stop_session(
 	struct se_session *se_sess,
 	int sess_sleep,
 	int conn_sleep)
@@ -867,13 +851,12 @@ void tcm_loop_stop_session(
 	return;
 }
 
-
-void tcm_loop_fall_back_to_erl0(struct se_session *se_sess)
+static void tcm_loop_fall_back_to_erl0(struct se_session *se_sess)
 {
 	return;
 }
 
-int tcm_loop_write_pending(struct se_cmd *se_cmd)
+static int tcm_loop_write_pending(struct se_cmd *se_cmd)
 {
 	/*
 	 * Since Linux/SCSI has already sent down a struct scsi_cmnd
@@ -888,12 +871,12 @@ int tcm_loop_write_pending(struct se_cmd *se_cmd)
 	return 0;
 }
 
-int tcm_loop_write_pending_status(struct se_cmd *se_cmd)
+static int tcm_loop_write_pending_status(struct se_cmd *se_cmd)
 {
 	return 0;
 }
 
-int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
+static int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 {
 	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
 				struct tcm_loop_cmd, tl_se_cmd);
@@ -908,7 +891,7 @@ int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 	return 0;
 }
 
-int tcm_loop_queue_status(struct se_cmd *se_cmd)
+static int tcm_loop_queue_status(struct se_cmd *se_cmd)
 {
 	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
 				struct tcm_loop_cmd, tl_se_cmd);
@@ -933,7 +916,7 @@ int tcm_loop_queue_status(struct se_cmd *se_cmd)
 	return 0;
 }
 
-int tcm_loop_queue_tm_rsp(struct se_cmd *se_cmd)
+static int tcm_loop_queue_tm_rsp(struct se_cmd *se_cmd)
 {
 	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
 	struct tcm_loop_tmr *tl_tmr = (struct tcm_loop_tmr *)se_tmr->fabric_tmr_ptr;
@@ -946,17 +929,17 @@ int tcm_loop_queue_tm_rsp(struct se_cmd *se_cmd)
 	return 0;
 }
 
-u16 tcm_loop_set_fabric_sense_len(struct se_cmd *se_cmd, u32 sense_length)
+static u16 tcm_loop_set_fabric_sense_len(struct se_cmd *se_cmd, u32 sense_length)
 {
 	return 0;
 }
 
-u16 tcm_loop_get_fabric_sense_len(void)
+static u16 tcm_loop_get_fabric_sense_len(void)
 {
 	return 0;
 }
 
-u64 tcm_loop_pack_lun(unsigned int lun)
+static u64 tcm_loop_pack_lun(unsigned int lun)
 {
 	u64 result;
 
@@ -986,7 +969,7 @@ static char *tcm_loop_dump_proto_id(struct tcm_loop_hba *tl_hba)
 
 /* Start items for tcm_loop_port_cit */
 
-int tcm_loop_port_link(
+static int tcm_loop_port_link(
 	struct se_portal_group *se_tpg,
 	struct se_lun *lun)
 {
@@ -1005,7 +988,7 @@ int tcm_loop_port_link(
 	return 0;
 }
 
-void tcm_loop_port_unlink(
+static void tcm_loop_port_unlink(
 	struct se_portal_group *se_tpg,
 	struct se_lun *se_lun)
 {
@@ -1415,7 +1398,7 @@ static struct configfs_attribute *tcm_loop_wwn_attrs[] = {
 
 /* End items for tcm_loop_cit */
 
-int tcm_loop_register_configfs(void)
+static int tcm_loop_register_configfs(void)
 {
 	struct target_fabric_configfs *fabric;
 	struct config_group *tf_cg;
@@ -1544,7 +1527,7 @@ int tcm_loop_register_configfs(void)
 	return 0;
 }
 
-void tcm_loop_deregister_configfs(void)
+static void tcm_loop_deregister_configfs(void)
 {
 	if (!tcm_loop_fabric_configfs)
 		return;
