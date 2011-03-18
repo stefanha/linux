@@ -185,7 +185,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 			(int)strlen(name), MAX_PORTAL_LEN);
 		return ERR_PTR(-EOVERFLOW);
 	}
-	memset(buf, 0, MAX_PORTAL_LEN);
+	memset(buf, 0, MAX_PORTAL_LEN + 1);
 	snprintf(buf, MAX_PORTAL_LEN, "%s", name);
 
 	memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
@@ -301,10 +301,8 @@ static ssize_t iscsi_nacl_attrib_show_##name(				\
 {									\
 	struct iscsi_node_acl *nacl = container_of(se_nacl, struct iscsi_node_acl, \
 					se_node_acl);			\
-	ssize_t rb;							\
 									\
-	rb = sprintf(page, "%u\n", ISCSI_NODE_ATTRIB(nacl)->name);	\
-	return rb;							\
+	return sprintf(page, "%u\n", ISCSI_NODE_ATTRIB(nacl)->name);	\
 }									\
 									\
 static ssize_t iscsi_nacl_attrib_store_##name(				\
@@ -390,12 +388,10 @@ static ssize_t __iscsi_##prefix##_show_##name(				\
 	char *page)							\
 {									\
 	struct iscsi_node_auth *auth = &nacl->node_auth;		\
-	ssize_t rb;							\
 									\
 	if (!capable(CAP_SYS_ADMIN))					\
 		return -EPERM;						\
-	rb = snprintf(page, PAGE_SIZE, "%s\n", auth->name);		\
-	return rb;							\
+	return snprintf(page, PAGE_SIZE, "%s\n", auth->name);		\
 }									\
 									\
 static ssize_t __iscsi_##prefix##_store_##name(				\
@@ -429,13 +425,11 @@ static ssize_t __iscsi_##prefix##_show_##name(				\
 	char *page)							\
 {									\
 	struct iscsi_node_auth *auth = &nacl->node_auth;		\
-	ssize_t rb;							\
 									\
 	if (!capable(CAP_SYS_ADMIN))					\
 		return -EPERM;						\
 									\
-	rb = snprintf(page, PAGE_SIZE, "%d\n", auth->name);		\
-	return rb;							\
+	return snprintf(page, PAGE_SIZE, "%d\n", auth->name);		\
 }
 
 #define DEF_NACL_AUTH_STR(name, flags)					\
@@ -523,7 +517,7 @@ static ssize_t iscsi_nacl_param_show_##name(				\
 		rb = snprintf(page, PAGE_SIZE,				\
 			"No Active iSCSI Session\n");			\
 	} else {							\
-		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr; \
+		sess = se_sess->fabric_sess_ptr;			\
 		rb = snprintf(page, PAGE_SIZE, "%u\n",			\
 			(u32)sess->sess_ops->name);			\
 	}								\
@@ -602,7 +596,7 @@ static ssize_t lio_target_nacl_show_info(
 		rb += sprintf(page+rb, "No active iSCSI Session for Initiator"
 			" Endpoint: %s\n", se_nacl->initiatorname);
 	} else {
-		sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
+		sess = se_sess->fabric_sess_ptr;
 
 		if (sess->sess_ops->InitiatorName)
 			rb += sprintf(page+rb, "InitiatorName: %s\n",
@@ -1000,8 +994,10 @@ static ssize_t iscsi_tpg_param_store_##name(				\
 	snprintf(buf, PAGE_SIZE, "%s=%s", __stringify(name), page);	\
 	buf[strlen(buf)-1] = '\0'; /* Kill newline */			\
 									\
-	if (iscsi_get_tpg(tpg) < 0)					\
+	if (iscsi_get_tpg(tpg) < 0) {					\
+		kfree(buf);						\
 		return -EINVAL;						\
+	}								\
 									\
 	ret = iscsi_change_param_value(buf, tpg->param_list, 1);	\
 	if (ret < 0)							\
