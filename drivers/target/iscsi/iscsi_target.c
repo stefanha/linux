@@ -825,39 +825,22 @@ int iscsi_add_reject_from_cmd(
 	return (!fail_conn) ? 0 : -1;
 }
 
-/* #define iscsi_calculate_map_segment_DEBUG */
-#ifdef iscsi_calculate_map_segment_DEBUG
-#define DEBUG_MAP_SEGMENTS(buf...) PYXPRINT(buf)
-#else
-#define DEBUG_MAP_SEGMENTS(buf...)
-#endif
-
 static inline void iscsi_calculate_map_segment(
 	u32 *data_length,
 	struct se_offset_map *lm)
 {
 	u32 sg_offset = 0;
 	struct se_mem *se_mem = lm->map_se_mem;
-
-	DEBUG_MAP_SEGMENTS(" START Mapping se_mem: %p, Length: %d"
-		"  Remaining iSCSI Data: %u\n", se_mem, se_mem->se_len,
-		*data_length);
 	/*
 	 * Still working on pages in the current struct se_mem.
 	 */
 	if (!lm->map_reset) {
 		lm->iovec_length = (lm->sg_length > PAGE_SIZE) ?
 					PAGE_SIZE : lm->sg_length;
-		if (*data_length < lm->iovec_length) {
-			DEBUG_MAP_SEGMENTS("LINUX_MAP: Reset lm->iovec_length"
-				" to %d\n", *data_length);
-
+		if (*data_length < lm->iovec_length)
 			lm->iovec_length = *data_length;
-		}
-		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 
-		DEBUG_MAP_SEGMENTS("LINUX_MAP: Set lm->iovec_base to %p from"
-			" lm->sg_page: %p\n", lm->iovec_base, lm->sg_page);
+		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 		return;
 	}
 
@@ -873,35 +856,20 @@ static inline void iscsi_calculate_map_segment(
 	sg_offset = se_mem->se_off;
 	lm->sg_page = se_mem->se_page;
 	lm->sg_length = se_mem->se_len;
-
-	DEBUG_MAP_SEGMENTS("LINUX_MAP1[%p]: Starting to se_mem->se_len: %u,"
-		" se_mem->se_off: %u, se_mem->se_page: %p\n", se_mem,
-		se_mem->se_len, se_mem->se_off, se_mem->se_page);
 	/*
 	 * Get the base and length of the current page for use with the iovec.
 	 */
 recalc:
 	lm->iovec_length = (lm->sg_length > (PAGE_SIZE - sg_offset)) ?
 			   (PAGE_SIZE - sg_offset) : lm->sg_length;
-
-	DEBUG_MAP_SEGMENTS("LINUX_MAP: lm->iovec_length: %u, lm->sg_length: %u,"
-		" sg_offset: %u\n", lm->iovec_length, lm->sg_length, sg_offset);
 	/*
 	 * See if there is any iSCSI offset we need to deal with.
 	 */
 	if (!lm->current_offset) {
 		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 
-		if (*data_length < lm->iovec_length) {
-			DEBUG_MAP_SEGMENTS("LINUX_MAP1[%p]: Reset"
-				" lm->iovec_length to %d\n", se_mem,
-				*data_length);
+		if (*data_length < lm->iovec_length)
 			lm->iovec_length = *data_length;
-		}
-
-		DEBUG_MAP_SEGMENTS("LINUX_MAP2[%p]: No current_offset,"
-			" set iovec_base to %p and set Current Page to %p\n",
-			se_mem, lm->iovec_base, lm->sg_page);
 
 		return;
 	}
@@ -911,19 +879,10 @@ recalc:
 	 * scatterlist.  Increase the lm->sg_page pointer and try again.
 	 */
 	if (lm->current_offset >= lm->iovec_length) {
-		DEBUG_MAP_SEGMENTS("LINUX_MAP3[%p]: Next Page:"
-			" lm->current_offset: %u, iovec_length: %u"
-			" sg_offset: %u\n", se_mem, lm->current_offset,
-			lm->iovec_length, sg_offset);
-
 		lm->current_offset -= lm->iovec_length;
 		lm->sg_length -= lm->iovec_length;
 		lm->sg_page++;
 		sg_offset = 0;
-
-		DEBUG_MAP_SEGMENTS("LINUX_MAP3[%p]: ** Skipping to Next Page,"
-			" updated values: lm->current_offset: %u\n", se_mem,
-			lm->current_offset);
 
 		goto recalc;
 	}
@@ -934,13 +893,8 @@ recalc:
 	 */
 	lm->iovec_base = page_address(lm->sg_page);
 
-	DEBUG_MAP_SEGMENTS("LINUX_MAP4[%p]: Set lm->iovec_base to %p\n", se_mem,
-			lm->iovec_base);
-
 	lm->iovec_base += sg_offset;
 	lm->iovec_base += lm->current_offset;
-	DEBUG_MAP_SEGMENTS("****** the OLD lm->iovec_length: %u lm->sg_length:"
-		" %u\n", lm->iovec_length, lm->sg_length);
 
 	if ((lm->iovec_length - lm->current_offset) < *data_length)
 		lm->iovec_length -= lm->current_offset;
@@ -953,17 +907,7 @@ recalc:
 		lm->sg_length = *data_length;
 
 	lm->current_offset = 0;
-
-	DEBUG_MAP_SEGMENTS("****** the NEW lm->iovec_length %u lm->sg_length:"
-		" %u\n", lm->iovec_length, lm->sg_length);
 }
-
-/* #define iscsi_linux_get_iscsi_offset_DEBUG */
-#ifdef iscsi_linux_get_iscsi_offset_DEBUG
-#define DEBUG_GET_ISCSI_OFFSET(buf...) PYXPRINT(buf)
-#else
-#define DEBUG_GET_ISCSI_OFFSET(buf...)
-#endif
 
 static int get_iscsi_offset(
 	struct se_offset_map *lmap,
@@ -997,26 +941,13 @@ static int get_iscsi_offset(
 		 */
 		total_offset += se_mem->se_len;
 
-		DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: current_length: %u,"
-			" total_offset: %u, sg->length: %u\n",
-			current_length, total_offset, se_mem->se_len);
-
 		if (total_offset > lmap->iscsi_offset) {
 			current_length += current_iscsi_offset;
 			lmap->orig_offset = lmap->current_offset =
 				usg->t_offset = current_iscsi_offset;
-			DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: Within Current"
-				" struct se_mem: %p, current_length incremented to"
-				" %u\n", se_mem, current_length);
 		} else {
 			current_length += se_mem->se_len;
 			current_iscsi_offset -= se_mem->se_len;
-
-			DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: Outside of"
-				" Current se_mem: %p, current_length"
-				" incremented to %u and current_iscsi_offset"
-				" decremented to %u\n", se_mem, current_length,
-				current_iscsi_offset);
 
 			list_for_each_entry_continue(se_mem,
 					T_TASK(cmd)->t_mem_list, se_list)
@@ -1034,69 +965,11 @@ static int get_iscsi_offset(
 	return 0;
 }
 
-/* #define iscsi_OS_set_SG_iovec_ptrs_DEBUG */
-#ifdef iscsi_OS_set_SG_iovec_ptrs_DEBUG
-#define DEBUG_IOVEC_SCATTERLISTS(buf...) PYXPRINT(buf)
-
-static void iscsi_check_iovec_map(
-	u32 iovec_count,
-	u32 map_length,
-	struct se_map_sg *map_sg,
-	struct se_unmap_sg *unmap_sg)
-{
-	u32 i, iovec_map_length = 0;
-	struct se_cmd *cmd = map_sg->se_cmd;
-	struct iovec *iov = map_sg->iov;
-	struct se_mem *se_mem;
-
-	for (i = 0; i < iovec_count; i++)
-		iovec_map_length += iov[i].iov_len;
-
-	if (iovec_map_length == map_length)
-		return;
-
-	printk(KERN_INFO "Calculated iovec_map_length: %u does not match passed"
-		" map_length: %u\n", iovec_map_length, map_length);
-	printk(KERN_INFO "ITT: 0x%08x data_length: %u data_direction %d\n",
-		CMD_TFO(cmd)->get_task_tag(cmd), cmd->data_length,
-		cmd->data_direction);
-
-	iovec_map_length = 0;
-
-	for (i = 0; i < iovec_count; i++) {
-		printk(KERN_INFO "iov[%d].iov_[base,len]: %p / %u bytes------"
-			"-->\n", i, iov[i].iov_base, iov[i].iov_len);
-
-		printk(KERN_INFO "iovec_map_length from %u to %u\n",
-			iovec_map_length, iovec_map_length + iov[i].iov_len);
-		iovec_map_length += iov[i].iov_len;
-
-		printk(KERN_INFO "XXXX_map_length from %u to %u\n", map_length,
-				(map_length - iov[i].iov_len));
-		map_length -= iov[i].iov_len;
-	}
-
-	list_for_each_entry(se_mem, T_TASK(cmd)->t_mem_list, se_list) {
-		printk(KERN_INFO "se_mem[%p]: offset: %u length: %u\n",
-			se_mem, se_mem->se_off, se_mem->se_len);
-	}
-
-	BUG();
-}
-
-#else
-#define DEBUG_IOVEC_SCATTERLISTS(buf...)
-#define iscsi_check_iovec_map(a, b, c, d)
-#endif
-
 static int iscsi_set_iovec_ptrs(
 	struct se_map_sg *map_sg,
 	struct se_unmap_sg *unmap_sg)
 {
 	u32 i = 0 /* For iovecs */, j = 0 /* For scatterlists */;
-#ifdef iscsi_OS_set_SG_iovec_ptrs_DEBUG
-	u32 orig_map_length = map_sg->data_length;
-#endif
 	struct se_cmd *cmd = map_sg->se_cmd;
 	struct iscsi_cmd *i_cmd = container_of(cmd, struct iscsi_cmd, se_cmd);
 	struct se_offset_map *lmap = &unmap_sg->lmap;
@@ -1106,8 +979,6 @@ static int iscsi_set_iovec_ptrs(
 	 * Used for non scatterlist operations, assume a single iovec.
 	 */
 	if (!T_TASK(cmd)->t_tasks_se_num) {
-		DEBUG_IOVEC_SCATTERLISTS("ITT: 0x%08x No struct se_mem elements"
-			" present\n", CMD_TFO(cmd)->get_task_tag(cmd));
 		iov[0].iov_base = (unsigned char *) T_TASK(cmd)->t_task_buf +
 							map_sg->data_offset;
 		iov[0].iov_len  = map_sg->data_length;
@@ -1120,11 +991,6 @@ static int iscsi_set_iovec_ptrs(
 	 * values for struct se_offset_map.
 	 */
 	lmap->map_reset = 1;
-
-	DEBUG_IOVEC_SCATTERLISTS("[-------------------] ITT: 0x%08x OS"
-		" Independent Network POSIX defined iovectors to SE Memory"
-		" [-------------------]\n\n", CMD_TFO(cmd)->get_task_tag(cmd));
-
 	/*
 	 * Get a pointer to the first used scatterlist based on the passed
 	 * offset. Also set the rest of the needed values in iscsi_linux_map_t.
@@ -1138,11 +1004,6 @@ static int iscsi_set_iovec_ptrs(
 		lmap->current_offset = lmap->orig_offset;
 	}
 	lmap->map_se_mem = lmap->map_orig_se_mem;
-
-	DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Total map_sg->data_length: %d,"
-		" lmap->iscsi_offset: %d, i_cmd->orig_iov_data_count: %d\n",
-		map_sg->data_length, lmap->iscsi_offset,
-		i_cmd->orig_iov_data_count);
 
 	while (map_sg->data_length) {
 		/*
@@ -1169,16 +1030,6 @@ static int iscsi_set_iovec_ptrs(
 		map_sg->data_length -= iov[i].iov_len;
 		lmap->sg_length -= iov[i].iov_len;
 
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: iov[%u].iov_len: %u\n",
-				i, iov[i].iov_len);
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: lmap->sg_length: from %u"
-			" to %u\n", lmap->sg_length + iov[i].iov_len,
-				lmap->sg_length);
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Changed total"
-			" map_sg->data_length from %u to %u\n",
-			map_sg->data_length + iov[i].iov_len,
-			map_sg->data_length);
-
 		if ((++i + 1) > i_cmd->orig_iov_data_count) {
 			printk(KERN_ERR "Current iovec count %u is greater than"
 				" struct se_cmd->orig_data_iov_count %u, cannot"
@@ -1204,17 +1055,11 @@ static int iscsi_set_iovec_ptrs(
 
 			lmap->sg_page = NULL;
 			lmap->map_reset = 1;
-
-			DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Done with current"
-				" scatterlist, incremented Generic scatterlist"
-				" Counter to %d and reset = 1\n", j);
 		} else
 			lmap->sg_page++;
 	}
 
 	unmap_sg->sg_count = j;
-
-	iscsi_check_iovec_map(i, orig_map_length, map_sg, unmap_sg);
 
 	return i;
 }
