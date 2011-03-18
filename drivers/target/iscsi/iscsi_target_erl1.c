@@ -35,9 +35,8 @@
 #include <linux/list.h>
 #include <net/sock.h>
 #include <net/tcp.h>
+#include <scsi/iscsi_proto.h>
 
-#include <iscsi_protocol.h>
-#include <iscsi_debug_opcodes.h>
 #include <iscsi_debug.h>
 
 #include <target/target_core_base.h>
@@ -181,7 +180,8 @@ static int iscsi_handle_r2t_snack(
 			" protocol error.\n", cmd->init_task_tag, begrun,
 			(begrun + runlength), cmd->acked_data_sn);
 
-			return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+			return iscsi_add_reject_from_cmd(
+					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 	}
 
@@ -192,7 +192,7 @@ static int iscsi_handle_r2t_snack(
 			" current R2TSN: 0x%08x, protocol error.\n",
 			cmd->init_task_tag, begrun, runlength, cmd->r2t_sn);
 			return iscsi_add_reject_from_cmd(
-				REASON_INVALID_PDU_FIELD, 1, 0, buf, cmd);
+				ISCSI_REASON_BOOKMARK_INVALID, 1, 0, buf, cmd);
 		}
 		last_r2tsn = (begrun + runlength);
 	} else
@@ -462,7 +462,7 @@ static inline int iscsi_handle_recovery_datain(
 			" protocol error.\n", cmd->init_task_tag, begrun,
 			(begrun + runlength), cmd->acked_data_sn);
 
-		return iscsi_add_reject_from_cmd(REASON_PROTOCOL_ERR,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_PROTOCOL_ERROR,
 				1, 0, buf, cmd);
 	}
 
@@ -474,13 +474,13 @@ static inline int iscsi_handle_recovery_datain(
 		printk(KERN_ERR "Initiator requesting BegRun: 0x%08x, RunLength"
 			": 0x%08x greater than maximum DataSN: 0x%08x.\n",
 				begrun, runlength, (cmd->data_sn - 1));
-		return iscsi_add_reject_from_cmd(REASON_INVALID_PDU_FIELD,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
 				1, 0, buf, cmd);
 	}
 
 	dr = iscsi_allocate_datain_req();
 	if (!(dr))
-		return iscsi_add_reject_from_cmd(REASON_OUT_OF_RESOURCES,
+		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 0, buf, cmd);
 
 	dr->data_sn = dr->begrun = begrun;
@@ -998,7 +998,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		cmd->cmd_flags &= ~ICF_OOO_CMDSN;
 
 	switch (cmd->iscsi_opcode) {
-	case ISCSI_INIT_SCSI_CMND:
+	case ISCSI_OP_SCSI_CMD:
 		/*
 		 * Go ahead and send the CHECK_CONDITION status for
 		 * any SCSI CDB exceptions that may have occurred, also
@@ -1018,8 +1018,8 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 			 * Determine if delayed TASK_ABORTED status for WRITEs
 			 * should be sent now if no unsolicited data out
 			 * payloads are expected, or if the delayed status
-			 * should be sent after unsolicited data out with F_BIT
-			 * set in iscsi_handle_data_out()
+			 * should be sent after unsolicited data out with
+			 * ISCSI_FLAG_CMD_FINAL set in iscsi_handle_data_out()
 			 */
 			if (transport_check_aborted_status(se_cmd,
 					(cmd->unsolicited_data == 0)) != 0)
@@ -1080,12 +1080,12 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		}
 		return transport_generic_handle_cdb(&cmd->se_cmd);
 
-	case ISCSI_INIT_NOP_OUT:
-	case ISCSI_INIT_TEXT_CMND:
+	case ISCSI_OP_NOOP_OUT:
+	case ISCSI_OP_TEXT:
 		spin_unlock_bh(&cmd->istate_lock);
 		iscsi_add_cmd_to_response_queue(cmd, CONN(cmd), cmd->i_state);
 		break;
-	case ISCSI_INIT_TASK_MGMT_CMND:
+	case ISCSI_OP_SCSI_TMFUNC:
 		if (se_cmd->se_cmd_flags & SCF_SCSI_CDB_EXCEPTION) {
 			spin_unlock_bh(&cmd->istate_lock);
 			iscsi_add_cmd_to_response_queue(cmd, CONN(cmd),
@@ -1095,16 +1095,16 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		spin_unlock_bh(&cmd->istate_lock);
 
 		return transport_generic_handle_tmr(SE_CMD(cmd));
-	case ISCSI_INIT_LOGOUT_CMND:
+	case ISCSI_OP_LOGOUT:
 		spin_unlock_bh(&cmd->istate_lock);
 		switch (cmd->logout_reason) {
-		case CLOSESESSION:
+		case ISCSI_LOGOUT_REASON_CLOSE_SESSION:
 			lr = iscsi_logout_closesession(cmd, CONN(cmd));
 			break;
-		case CLOSECONNECTION:
+		case ISCSI_LOGOUT_REASON_CLOSE_CONNECTION:
 			lr = iscsi_logout_closeconnection(cmd, CONN(cmd));
 			break;
-		case REMOVECONNFORRECOVERY:
+		case ISCSI_LOGOUT_REASON_RECOVERY:
 			lr = iscsi_logout_removeconnforrecovery(cmd, CONN(cmd));
 			break;
 		default:

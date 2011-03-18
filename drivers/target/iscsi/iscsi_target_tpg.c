@@ -40,7 +40,6 @@
 #include <scsi/scsi_cmnd.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>

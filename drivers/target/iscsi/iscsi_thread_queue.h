@@ -6,8 +6,8 @@
  */
 extern int iscsi_thread_set_force_reinstatement(struct iscsi_conn *);
 extern void iscsi_add_ts_to_inactive_list(struct se_thread_set *);
-extern int iscsi_allocate_thread_sets(u32, int);
-extern void iscsi_deallocate_thread_sets(int);
+extern int iscsi_allocate_thread_sets(u32);
+extern void iscsi_deallocate_thread_sets(void);
 extern void iscsi_activate_thread_set(struct iscsi_conn *, struct se_thread_set *);
 extern struct se_thread_set *iscsi_get_thread_set(int);
 extern void iscsi_set_thread_clear(struct iscsi_conn *, u8);

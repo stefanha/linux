@@ -35,9 +35,8 @@
 #include <linux/in.h>
 #include <net/sock.h>
 #include <net/tcp.h>
+#include <scsi/iscsi_proto.h>
 
-#include <iscsi_protocol.h>
-#include <iscsi_debug_opcodes.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
@@ -100,8 +99,8 @@ static inline int iscsi_dataout_within_command_recovery_check(
 	unsigned char *buf)
 {
 	struct iscsi_conn *conn = CONN(cmd);
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	/*
 	 * We do the within-command recovery checks here as it is
@@ -124,7 +123,7 @@ static inline int iscsi_dataout_within_command_recovery_check(
 	} else {
 		struct iscsi_seq *seq;
 
-		seq = iscsi_get_seq_holder(cmd, hdr->offset, hdr->length);
+		seq = iscsi_get_seq_holder(cmd, hdr->offset, payload_length);
 		if (!(seq))
 			return DATAOUT_CANNOT_RECOVER;
 		/*
@@ -136,12 +135,12 @@ static inline int iscsi_dataout_within_command_recovery_check(
 			if ((seq->status ==
 			     DATAOUT_SEQUENCE_WITHIN_COMMAND_RECOVERY) &&
 			   ((seq->offset != hdr->offset) ||
-			    (seq->data_sn != hdr->data_sn)))
+			    (seq->data_sn != hdr->datasn)))
 				goto dump;
 		} else {
 			if ((seq->status ==
 			     DATAOUT_SEQUENCE_WITHIN_COMMAND_RECOVERY) &&
-			    (seq->data_sn != hdr->data_sn))
+			    (seq->data_sn != hdr->datasn))
 				goto dump;
 		}
 
@@ -156,8 +155,8 @@ static inline int iscsi_dataout_within_command_recovery_check(
 
 dump:
 	printk(KERN_ERR "Dumping DataOUT PDU Offset: %u Length: %d DataSN:"
-		" 0x%08x\n", hdr->offset, hdr->length, hdr->data_sn);
-	return iscsi_dump_data_payload(conn, hdr->length, 1);
+		" 0x%08x\n", hdr->offset, payload_length, hdr->datasn);
+	return iscsi_dump_data_payload(conn, payload_length, 1);
 }
 
 /*	iscsi_dataout_check_unsolicited_sequence():
@@ -170,20 +169,21 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 {
 	__u32 first_burst_len;
 	struct iscsi_conn *conn = CONN(cmd);
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
+
 
 	if ((hdr->offset < cmd->seq_start_offset) ||
-	   ((hdr->offset + hdr->length) > cmd->seq_end_offset)) {
+	   ((hdr->offset + payload_length) > cmd->seq_end_offset)) {
 		printk(KERN_ERR "Command ITT: 0x%08x with Offset: %u,"
 		" Length: %u outside of Unsolicited Sequence %u:%u while"
 		" DataSequenceInOrder=Yes.\n", cmd->init_task_tag,
-		hdr->offset, hdr->length, cmd->seq_start_offset,
+		hdr->offset, payload_length, cmd->seq_start_offset,
 			cmd->seq_end_offset);
 		return DATAOUT_CANNOT_RECOVER;
 	}
 
-	first_burst_len = (cmd->first_burst_len + hdr->length);
+	first_burst_len = (cmd->first_burst_len + payload_length);
 
 	if (first_burst_len > SESS_OPS_C(conn)->FirstBurstLength) {
 		printk(KERN_ERR "Total %u bytes exceeds FirstBurstLength: %u"
@@ -195,12 +195,12 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 	}
 
 	/*
-	 * Perform various MaxBurstLength and F_BIT sanity checks for the
-	 * current Unsolicited DataOUT Sequence.
+	 * Perform various MaxBurstLength and ISCSI_FLAG_CMD_FINAL sanity
+	 * checks for the current Unsolicited DataOUT Sequence.
 	 */
-	if (hdr->flags & F_BIT) {
+	if (hdr->flags & ISCSI_FLAG_CMD_FINAL) {
 		/*
-		 * Ignore F_BIT checks while DataPDUInOrder=No, end of
+		 * Ignore ISCSI_FLAG_CMD_FINAL checks while DataPDUInOrder=No, end of
 		 * sequence checks are handled in
 		 * iscsi_dataout_datapduinorder_no_fbit().
 		 */
@@ -221,14 +221,14 @@ static inline int iscsi_dataout_check_unsolicited_sequence(
 	} else {
 		if (first_burst_len == SESS_OPS_C(conn)->FirstBurstLength) {
 			printk(KERN_ERR "Command ITT: 0x%08x reached"
-			" FirstBurstLength: %u, but F_BIT is not set. protocol"
+			" FirstBurstLength: %u, but ISCSI_FLAG_CMD_FINAL is not set. protocol"
 				" error.\n", cmd->init_task_tag,
 				SESS_OPS_C(conn)->FirstBurstLength);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 		if (first_burst_len == cmd->data_length) {
 			printk(KERN_ERR "Command ITT: 0x%08x reached"
-			" ExpXferLen: %u, but F_BIT is not set. protocol"
+			" ExpXferLen: %u, but ISCSI_FLAG_CMD_FINAL is not set. protocol"
 			" error.\n", cmd->init_task_tag, cmd->data_length);
 			return DATAOUT_CANNOT_RECOVER;
 		}
@@ -249,8 +249,8 @@ static inline int iscsi_dataout_check_sequence(
 	__u32 next_burst_len;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_seq *seq = NULL;
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	/*
 	 * For DataSequenceInOrder=Yes: Check that the offset and offset+length
@@ -266,21 +266,21 @@ static inline int iscsi_dataout_check_sequence(
 		 * payload here, instead of erroring out.
 		 */
 		if ((hdr->offset < cmd->seq_start_offset) ||
-		   ((hdr->offset + hdr->length) > cmd->seq_end_offset)) {
+		   ((hdr->offset + payload_length) > cmd->seq_end_offset)) {
 			printk(KERN_ERR "Command ITT: 0x%08x with Offset: %u,"
 			" Length: %u outside of Sequence %u:%u while"
 			" DataSequenceInOrder=Yes.\n", cmd->init_task_tag,
-			hdr->offset, hdr->length, cmd->seq_start_offset,
+			hdr->offset, payload_length, cmd->seq_start_offset,
 				cmd->seq_end_offset);
 
-			if (iscsi_dump_data_payload(conn, hdr->length, 1) < 0)
+			if (iscsi_dump_data_payload(conn, payload_length, 1) < 0)
 				return DATAOUT_CANNOT_RECOVER;
 			return DATAOUT_WITHIN_COMMAND_RECOVERY;
 		}
 
-		next_burst_len = (cmd->next_burst_len + hdr->length);
+		next_burst_len = (cmd->next_burst_len + payload_length);
 	} else {
-		seq = iscsi_get_seq_holder(cmd, hdr->offset, hdr->length);
+		seq = iscsi_get_seq_holder(cmd, hdr->offset, payload_length);
 		if (!(seq))
 			return DATAOUT_CANNOT_RECOVER;
 		/*
@@ -289,30 +289,30 @@ static inline int iscsi_dataout_check_sequence(
 		cmd->seq_ptr = seq;
 
 		if (seq->status == DATAOUT_SEQUENCE_COMPLETE) {
-			if (iscsi_dump_data_payload(conn, hdr->length, 1) < 0)
+			if (iscsi_dump_data_payload(conn, payload_length, 1) < 0)
 				return DATAOUT_CANNOT_RECOVER;
 			return DATAOUT_WITHIN_COMMAND_RECOVERY;
 		}
 
-		next_burst_len = (seq->next_burst_len + hdr->length);
+		next_burst_len = (seq->next_burst_len + payload_length);
 	}
 
 	if (next_burst_len > SESS_OPS_C(conn)->MaxBurstLength) {
 		printk(KERN_ERR "Command ITT: 0x%08x, NextBurstLength: %u and"
 			" Length: %u exceeds MaxBurstLength: %u. protocol"
 			" error.\n", cmd->init_task_tag,
-			(next_burst_len - hdr->length),
-			hdr->length, SESS_OPS_C(conn)->MaxBurstLength);
+			(next_burst_len - payload_length),
+			payload_length, SESS_OPS_C(conn)->MaxBurstLength);
 		return DATAOUT_CANNOT_RECOVER;
 	}
 
 	/*
-	 * Perform various MaxBurstLength and F_BIT sanity checks for the
-	 * current DataOUT Sequence.
+	 * Perform various MaxBurstLength and ISCSI_FLAG_CMD_FINAL sanity
+	 * checks for the current DataOUT Sequence.
 	 */
-	if (hdr->flags & F_BIT) {
+	if (hdr->flags & ISCSI_FLAG_CMD_FINAL) {
 		/*
-		 * Ignore F_BIT checks while DataPDUInOrder=No, end of
+		 * Ignore ISCSI_FLAG_CMD_FINAL checks while DataPDUInOrder=No, end of
 		 * sequence checks are handled in
 		 * iscsi_dataout_datapduinorder_no_fbit().
 		 */
@@ -322,16 +322,16 @@ static inline int iscsi_dataout_check_sequence(
 		if (SESS_OPS_C(conn)->DataSequenceInOrder) {
 			if ((next_burst_len <
 			     SESS_OPS_C(conn)->MaxBurstLength) &&
-			   ((cmd->write_data_done + hdr->length) <
+			   ((cmd->write_data_done + payload_length) <
 			     cmd->data_length)) {
-				printk(KERN_ERR "Command ITT: 0x%08x set F_BIT"
+				printk(KERN_ERR "Command ITT: 0x%08x set ISCSI_FLAG_CMD_FINAL"
 				" before end of DataOUT sequence, protocol"
 				" error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		} else {
 			if (next_burst_len < seq->xfer_len) {
-				printk(KERN_ERR "Command ITT: 0x%08x set F_BIT"
+				printk(KERN_ERR "Command ITT: 0x%08x set ISCSI_FLAG_CMD_FINAL"
 				" before end of DataOUT sequence, protocol"
 				" error.\n", cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
@@ -342,23 +342,25 @@ static inline int iscsi_dataout_check_sequence(
 			if (next_burst_len ==
 					SESS_OPS_C(conn)->MaxBurstLength) {
 				printk(KERN_ERR "Command ITT: 0x%08x reached"
-				" MaxBurstLength: %u, but F_BIT is not set,"
-				" protocol error.", cmd->init_task_tag,
-				SESS_OPS_C(conn)->MaxBurstLength);
+				" MaxBurstLength: %u, but ISCSI_FLAG_CMD_FINAL is"
+				" not set, protocol error.", cmd->init_task_tag,
+					SESS_OPS_C(conn)->MaxBurstLength);
 				return DATAOUT_CANNOT_RECOVER;
 			}
-			if ((cmd->write_data_done + hdr->length) ==
+			if ((cmd->write_data_done + payload_length) ==
 					cmd->data_length) {
 				printk(KERN_ERR "Command ITT: 0x%08x reached"
-				" last DataOUT PDU in sequence but F_BIT not"
-				" set, protocol error.\n", cmd->init_task_tag);
+				" last DataOUT PDU in sequence but ISCSI_FLAG_"
+				"CMD_FINAL is not set, protocol error.\n",
+					cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		} else {
 			if (next_burst_len == seq->xfer_len) {
 				printk(KERN_ERR "Command ITT: 0x%08x reached"
-				" last DataOUT PDU in sequence but F_BIT not"
-				" set, protocol error.\n", cmd->init_task_tag);
+				" last DataOUT PDU in sequence but ISCSI_FLAG_"
+				"CMD_FINAL is not set, protocol error.\n",
+					cmd->init_task_tag);
 				return DATAOUT_CANNOT_RECOVER;
 			}
 		}
@@ -379,8 +381,8 @@ static inline int iscsi_dataout_check_datasn(
 	int dump = 0, recovery = 0;
 	__u32 data_sn = 0;
 	struct iscsi_conn *conn = CONN(cmd);
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	/*
 	 * Considering the target has no method of re-requesting DataOUT
@@ -397,16 +399,16 @@ static inline int iscsi_dataout_check_datasn(
 		data_sn = seq->data_sn;
 	}
 
-	if (hdr->data_sn > data_sn) {
+	if (hdr->datasn > data_sn) {
 		printk(KERN_ERR "Command ITT: 0x%08x, received DataSN: 0x%08x"
 			" higher than expected 0x%08x.\n", cmd->init_task_tag,
-				hdr->data_sn, data_sn);
+				hdr->datasn, data_sn);
 		recovery = 1;
 		goto recover;
-	} else if (hdr->data_sn < data_sn) {
+	} else if (hdr->datasn < data_sn) {
 		printk(KERN_ERR "Command ITT: 0x%08x, received DataSN: 0x%08x"
 			" lower than expected 0x%08x, discarding payload.\n",
-			cmd->init_task_tag, hdr->data_sn, data_sn);
+			cmd->init_task_tag, hdr->datasn, data_sn);
 		dump = 1;
 		goto dump;
 	}
@@ -420,7 +422,7 @@ recover:
 		return DATAOUT_CANNOT_RECOVER;
 	}
 dump:
-	if (iscsi_dump_data_payload(conn, hdr->length, 1) < 0)
+	if (iscsi_dump_data_payload(conn, payload_length, 1) < 0)
 		return DATAOUT_CANNOT_RECOVER;
 
 	return (recovery || dump) ? DATAOUT_WITHIN_COMMAND_RECOVERY :
@@ -437,8 +439,8 @@ static inline int iscsi_dataout_pre_datapduinorder_yes(
 {
 	int dump = 0, recovery = 0;
 	struct iscsi_conn *conn = CONN(cmd);
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	/*
 	 * For DataSequenceInOrder=Yes: If the offset is greater than the global
@@ -484,11 +486,11 @@ recover:
 		return DATAOUT_CANNOT_RECOVER;
 	}
 dump:
-	if (iscsi_dump_data_payload(conn, hdr->length, 1) < 0)
+	if (iscsi_dump_data_payload(conn, payload_length, 1) < 0)
 		return DATAOUT_CANNOT_RECOVER;
 
 	return (recovery) ? iscsi_recover_dataout_sequence(cmd,
-		hdr->offset, hdr->length) :
+		hdr->offset, payload_length) :
 	       (dump) ? DATAOUT_WITHIN_COMMAND_RECOVERY : DATAOUT_NORMAL;
 }
 
@@ -501,10 +503,10 @@ static inline int iscsi_dataout_pre_datapduinorder_no(
 	unsigned char *buf)
 {
 	struct iscsi_pdu *pdu;
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+        struct iscsi_data *hdr = (struct iscsi_data *) buf;
+        u32 payload_length = ntoh24(hdr->dlength);
 
-	pdu = iscsi_get_pdu_holder(cmd, hdr->offset, hdr->length);
+	pdu = iscsi_get_pdu_holder(cmd, hdr->offset, payload_length);
 	if (!(pdu))
 		return DATAOUT_CANNOT_RECOVER;
 
@@ -518,8 +520,8 @@ static inline int iscsi_dataout_pre_datapduinorder_no(
 	case ISCSI_PDU_RECEIVED_OK:
 		printk(KERN_ERR "Command ITT: 0x%08x received already gotten"
 			" Offset: %u, Length: %u\n", cmd->init_task_tag,
-				hdr->offset, hdr->length);
-		return iscsi_dump_data_payload(CONN(cmd), hdr->length, 1);
+				hdr->offset, payload_length);
+		return iscsi_dump_data_payload(CONN(cmd), payload_length, 1);
 	default:
 		return DATAOUT_CANNOT_RECOVER;
 	}
@@ -598,33 +600,33 @@ static inline int iscsi_dataout_post_crc_passed(
 	int ret, send_r2t = 0;
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_seq *seq = NULL;
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	if (cmd->unsolicited_data) {
-		if ((cmd->first_burst_len + hdr->length) ==
+		if ((cmd->first_burst_len + payload_length) ==
 		     SESS_OPS_C(conn)->FirstBurstLength) {
 			if (iscsi_dataout_update_r2t(cmd, hdr->offset,
-					hdr->length) < 0)
+					payload_length) < 0)
 				return DATAOUT_CANNOT_RECOVER;
 			send_r2t = 1;
 		}
 
 		if (!SESS_OPS_C(conn)->DataPDUInOrder) {
 			ret = iscsi_dataout_update_datapduinorder_no(cmd,
-				hdr->data_sn, (hdr->flags & F_BIT));
+				hdr->datasn, (hdr->flags & ISCSI_FLAG_CMD_FINAL));
 			if (ret == DATAOUT_CANNOT_RECOVER)
 				return ret;
 		}
 
-		cmd->first_burst_len += hdr->length;
+		cmd->first_burst_len += payload_length;
 
 		if (SESS_OPS_C(conn)->DataSequenceInOrder)
 			cmd->data_sn++;
 		else {
 			seq = cmd->seq_ptr;
 			seq->data_sn++;
-			seq->offset += hdr->length;
+			seq->offset += payload_length;
 		}
 
 		if (send_r2t) {
@@ -635,23 +637,23 @@ static inline int iscsi_dataout_post_crc_passed(
 		}
 	} else {
 		if (SESS_OPS_C(conn)->DataSequenceInOrder) {
-			if ((cmd->next_burst_len + hdr->length) ==
+			if ((cmd->next_burst_len + payload_length) ==
 			     SESS_OPS_C(conn)->MaxBurstLength) {
 				if (iscsi_dataout_update_r2t(cmd, hdr->offset,
-						hdr->length) < 0)
+						payload_length) < 0)
 					return DATAOUT_CANNOT_RECOVER;
 				send_r2t = 1;
 			}
 
 			if (!SESS_OPS_C(conn)->DataPDUInOrder) {
 				ret = iscsi_dataout_update_datapduinorder_no(
-						cmd, hdr->data_sn,
-						(hdr->flags & F_BIT));
+						cmd, hdr->datasn,
+						(hdr->flags & ISCSI_FLAG_CMD_FINAL));
 				if (ret == DATAOUT_CANNOT_RECOVER)
 					return ret;
 			}
 
-			cmd->next_burst_len += hdr->length;
+			cmd->next_burst_len += payload_length;
 			cmd->data_sn++;
 
 			if (send_r2t)
@@ -659,25 +661,25 @@ static inline int iscsi_dataout_post_crc_passed(
 		} else {
 			seq = cmd->seq_ptr;
 
-			if ((seq->next_burst_len + hdr->length) ==
+			if ((seq->next_burst_len + payload_length) ==
 			     seq->xfer_len) {
 				if (iscsi_dataout_update_r2t(cmd, hdr->offset,
-						hdr->length) < 0)
+						payload_length) < 0)
 					return DATAOUT_CANNOT_RECOVER;
 				send_r2t = 1;
 			}
 
 			if (!SESS_OPS_C(conn)->DataPDUInOrder) {
 				ret = iscsi_dataout_update_datapduinorder_no(
-						cmd, hdr->data_sn,
-						(hdr->flags & F_BIT));
+						cmd, hdr->datasn,
+						(hdr->flags & ISCSI_FLAG_CMD_FINAL));
 				if (ret == DATAOUT_CANNOT_RECOVER)
 					return ret;
 			}
 
 			seq->data_sn++;
-			seq->offset += hdr->length;
-			seq->next_burst_len += hdr->length;
+			seq->offset += payload_length;
+			seq->next_burst_len += payload_length;
 
 			if (send_r2t) {
 				seq->next_burst_len = 0;
@@ -689,7 +691,7 @@ static inline int iscsi_dataout_post_crc_passed(
 	if (send_r2t && SESS_OPS_C(conn)->DataSequenceInOrder)
 		cmd->data_sn = 0;
 
-	cmd->write_data_done += hdr->length;
+	cmd->write_data_done += payload_length;
 
 	return (cmd->write_data_done == cmd->data_length) ?
 		DATAOUT_SEND_TO_TRANSPORT : (send_r2t) ?
@@ -706,8 +708,8 @@ static inline int iscsi_dataout_post_crc_failed(
 {
 	struct iscsi_conn *conn = CONN(cmd);
 	struct iscsi_pdu *pdu;
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	if (SESS_OPS_C(conn)->DataPDUInOrder)
 		goto recover;
@@ -731,7 +733,7 @@ static inline int iscsi_dataout_post_crc_failed(
 	}
 
 recover:
-	return iscsi_recover_dataout_sequence(cmd, hdr->offset, hdr->length);
+	return iscsi_recover_dataout_sequence(cmd, hdr->offset, payload_length);
 }
 
 /*	iscsi_check_pre_dataout():
@@ -793,12 +795,12 @@ int iscsi_check_post_dataout(
 		if (!SESS_OPS_C(conn)->ErrorRecoveryLevel) {
 			printk(KERN_ERR "Unable to recover from DataOUT CRC"
 				" failure while ERL=0, closing session.\n");
-			iscsi_add_reject_from_cmd(REASON_DATA_DIGEST_ERR,
+			iscsi_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
 					1, 0, buf, cmd);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 
-		iscsi_add_reject_from_cmd(REASON_DATA_DIGEST_ERR,
+		iscsi_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
 				0, 0, buf, cmd);
 		return iscsi_dataout_post_crc_failed(cmd, buf);
 	}

@@ -42,7 +42,6 @@
 #include <scsi/iscsi_proto.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 #include <iscsi_serial.h>
 
 #include <target/target_core_base.h>
@@ -290,14 +289,14 @@ struct iscsi_cmd *iscsi_allocate_se_cmd(
 	/*
 	 * Figure out the SAM Task Attribute for the incoming SCSI CDB
 	 */
-	if ((iscsi_task_attr == ISCSI_UNTAGGED) ||
-	    (iscsi_task_attr == ISCSI_SIMPLE))
+	if ((iscsi_task_attr == ISCSI_ATTR_UNTAGGED) ||
+	    (iscsi_task_attr == ISCSI_ATTR_SIMPLE))
 		sam_task_attr = TASK_ATTR_SIMPLE;
-	else if (iscsi_task_attr == ISCSI_ORDERED)
+	else if (iscsi_task_attr == ISCSI_ATTR_ORDERED)
 		sam_task_attr = TASK_ATTR_ORDERED;
-	else if (iscsi_task_attr == ISCSI_HEAD_OF_QUEUE)
+	else if (iscsi_task_attr == ISCSI_ATTR_HEAD_OF_QUEUE)
 		sam_task_attr = TASK_ATTR_HOQ;
-	else if (iscsi_task_attr == ISCSI_ACA)
+	else if (iscsi_task_attr == ISCSI_ATTR_ACA)
 		sam_task_attr = TASK_ATTR_ACA;
 	else {
 		printk(KERN_INFO "Unknown iSCSI Task Attribute: 0x%02x, using"
@@ -325,6 +324,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 {
 	struct iscsi_cmd *cmd;
 	struct se_cmd *se_cmd;
+	u8 tcm_function;
 
 	cmd = iscsi_allocate_cmd(conn);
 	if (!(cmd))
@@ -340,7 +340,7 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 	}
 	/*
 	 * TASK_REASSIGN for ERL=2 / connection stays inside of
-	* LIO-Target $FABRIC_MOD
+	 * LIO-Target $FABRIC_MOD
 	 */
 	if (function == ISCSI_TM_FUNC_TASK_REASSIGN)
 		return cmd;
@@ -353,8 +353,36 @@ struct iscsi_cmd *iscsi_allocate_se_cmd_for_tmr(
 				SESS(conn)->se_sess, 0, DMA_NONE,
 				TASK_ATTR_SIMPLE, &cmd->sense_buffer[0]);
 
+	switch (function) {
+	case ISCSI_TM_FUNC_ABORT_TASK:
+		tcm_function = TMR_ABORT_TASK;
+		break;
+	case ISCSI_TM_FUNC_ABORT_TASK_SET:
+		tcm_function = TMR_ABORT_TASK_SET;
+		break;
+	case ISCSI_TM_FUNC_CLEAR_ACA:
+		tcm_function = TMR_CLEAR_ACA;
+		break;
+	case ISCSI_TM_FUNC_CLEAR_TASK_SET:
+		tcm_function = TMR_CLEAR_TASK_SET;
+		break;
+	case ISCSI_TM_FUNC_LOGICAL_UNIT_RESET:
+		tcm_function = TMR_LUN_RESET;
+		break;
+	case ISCSI_TM_FUNC_TARGET_WARM_RESET:
+		tcm_function = TMR_TARGET_WARM_RESET;
+		break;
+	case ISCSI_TM_FUNC_TARGET_COLD_RESET:
+		tcm_function = TMR_TARGET_COLD_RESET;
+		break;
+	default: 
+		printk(KERN_ERR "Unknown iSCSI TMR Function:"
+			" 0x%02x\n", function);
+		goto out;
+	}
+
 	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd,
-				(void *)cmd->tmr_req, function);
+				(void *)cmd->tmr_req, tcm_function);
 	if (!(se_cmd->se_tmr_req))
 		goto out;
 
@@ -601,8 +629,8 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 {
 	struct iscsi_conn *conn = CONN(cmd);
 	struct se_cmd *se_cmd = SE_CMD(cmd);
-	struct iscsi_init_scsi_data_out *hdr =
-		(struct iscsi_init_scsi_data_out *) buf;
+	struct iscsi_data *hdr = (struct iscsi_data *) buf;
+	u32 payload_length = ntoh24(hdr->dlength);
 
 	if (SESS_OPS_C(conn)->InitialR2T) {
 		printk(KERN_ERR "Received unexpected unsolicited data"
@@ -612,27 +640,27 @@ int iscsi_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 		return -1;
 	}
 
-	if ((cmd->first_burst_len + hdr->length) >
+	if ((cmd->first_burst_len + payload_length) >
 	     SESS_OPS_C(conn)->FirstBurstLength) {
 		printk(KERN_ERR "Total %u bytes exceeds FirstBurstLength: %u"
 			" for this Unsolicited DataOut Burst.\n",
-			(cmd->first_burst_len + hdr->length),
+			(cmd->first_burst_len + payload_length),
 				SESS_OPS_C(conn)->FirstBurstLength);
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return -1;
 	}
 
-	if (!(hdr->flags & F_BIT))
+	if (!(hdr->flags & ISCSI_FLAG_CMD_FINAL))
 		return 0;
 
-	if (((cmd->first_burst_len + hdr->length) != cmd->data_length) &&
-	    ((cmd->first_burst_len + hdr->length) !=
+	if (((cmd->first_burst_len + payload_length) != cmd->data_length) &&
+	    ((cmd->first_burst_len + payload_length) !=
 	      SESS_OPS_C(conn)->FirstBurstLength)) {
 		printk(KERN_ERR "Unsolicited non-immediate data received %u"
 			" does not equal FirstBurstLength: %u, and does"
 			" not equal ExpXferLen %u.\n",
-			(cmd->first_burst_len + hdr->length),
+			(cmd->first_burst_len + payload_length),
 			SESS_OPS_C(conn)->FirstBurstLength, cmd->data_length);
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
@@ -2259,18 +2287,18 @@ int iscsi_tx_login_rsp(struct iscsi_conn *conn, u8 status_class, u8 status_detai
 	u8 iscsi_hdr[ISCSI_HDR_LEN];
 	int err;
 	struct iovec iov;
-	struct iscsi_targ_login_rsp *hdr;
+	struct iscsi_login_rsp *hdr;
 
 	iscsi_collect_login_stats(conn, status_class, status_detail);
 
 	memset((void *)&iov, 0, sizeof(struct iovec));
 	memset((void *)&iscsi_hdr, 0x0, ISCSI_HDR_LEN);
 
-	hdr	= (struct iscsi_targ_login_rsp *)&iscsi_hdr;
-	hdr->opcode		= ISCSI_TARG_LOGIN_RSP;
+	hdr	= (struct iscsi_login_rsp *)&iscsi_hdr;
+	hdr->opcode		= ISCSI_OP_LOGIN_RSP;
 	hdr->status_class	= status_class;
 	hdr->status_detail	= status_detail;
-	hdr->init_task_tag	= cpu_to_be32(conn->login_itt);
+	hdr->itt		= cpu_to_be32(conn->login_itt);
 
 	iov.iov_base		= &iscsi_hdr;
 	iov.iov_len		= ISCSI_HDR_LEN;
@@ -2676,21 +2704,21 @@ void iscsi_collect_login_stats(
 		return;
 	}
 
-	if (status_class == STAT_CLASS_SUCCESS)
+	if (status_class == ISCSI_STATUS_CLS_SUCCESS)
 		ls->accepts++;
-	else if (status_class == STAT_CLASS_REDIRECTION) {
+	else if (status_class == ISCSI_STATUS_CLS_REDIRECT) {
 		ls->redirects++;
 		ls->last_fail_type = ISCSI_LOGIN_FAIL_REDIRECT;
-	} else if ((status_class == STAT_CLASS_INITIATOR)  &&
-		 (status_detail == STAT_DETAIL_NOT_AUTH)) {
+	} else if ((status_class == ISCSI_STATUS_CLS_INITIATOR_ERR)  &&
+		 (status_detail == ISCSI_LOGIN_STATUS_AUTH_FAILED)) {
 		ls->authenticate_fails++;
 		ls->last_fail_type =  ISCSI_LOGIN_FAIL_AUTHENTICATE;
-	} else if ((status_class == STAT_CLASS_INITIATOR)  &&
-		 (status_detail == STAT_DETAIL_NOT_ALLOWED)) {
+	} else if ((status_class == ISCSI_STATUS_CLS_INITIATOR_ERR)  &&
+		 (status_detail == ISCSI_LOGIN_STATUS_TGT_FORBIDDEN)) {
 		ls->authorize_fails++;
 		ls->last_fail_type = ISCSI_LOGIN_FAIL_AUTHORIZE;
-	} else if ((status_class == STAT_CLASS_INITIATOR)  &&
-		 (status_detail == STAT_DETAIL_INIT_ERROR)) {
+	} else if ((status_class == ISCSI_STATUS_CLS_INITIATOR_ERR) &&
+		 (status_detail == ISCSI_LOGIN_STATUS_INIT_ERR)) {
 		ls->negotiate_fails++;
 		ls->last_fail_type = ISCSI_LOGIN_FAIL_NEGOTIATE;
 	} else {
@@ -2699,7 +2727,7 @@ void iscsi_collect_login_stats(
 	}
 
 	/* Save initiator name, ip address and time, if it is a failed login */
-	if (status_class != STAT_CLASS_SUCCESS) {
+	if (status_class != ISCSI_STATUS_CLS_SUCCESS) {
 		if (conn->param_list)
 			intrname = iscsi_find_param_from_key(INITIATORNAME,
 							     conn->param_list);

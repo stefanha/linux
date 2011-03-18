@@ -28,9 +28,7 @@
 
 #include <linux/slab.h>
 
-#include <iscsi_protocol.h>
 #include <iscsi_debug.h>
-#include <iscsi_debug_opcodes.h>
 #include <iscsi_target_core.h>
 #include <iscsi_target_util.h>
 #include <iscsi_parameters.h>

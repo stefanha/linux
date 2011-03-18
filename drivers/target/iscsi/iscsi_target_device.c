@@ -39,7 +39,6 @@
 #include <net/tcp.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
 #include <iscsi_target_device.h>
@@ -93,7 +92,7 @@ int iscsi_get_lun_for_cmd(
 		return -1;
 	}
 
-	return transport_get_lun_for_cmd(SE_CMD(cmd), cdb, unpacked_lun);
+	return transport_get_lun_for_cmd(SE_CMD(cmd), unpacked_lun);
 }
 
 /*	iscsi_determine_maxcmdsn():

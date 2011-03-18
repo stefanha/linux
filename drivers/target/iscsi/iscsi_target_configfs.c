@@ -42,7 +42,6 @@
 #include <target/target_core_configfs.h>
 #include <target/configfs_macros.h>
 
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
 #include <iscsi_target_device.h>
@@ -51,7 +50,7 @@
 #include <iscsi_target_tpg.h>
 #include <iscsi_target_util.h>
 #include <iscsi_target.h>
-#include <iscsi_target_mib.h>
+#include <iscsi_target_stat.h>
 #include <iscsi_target_configfs.h>
 
 struct target_fabric_configfs *lio_target_fabric_configfs;
@@ -802,6 +801,7 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	struct config_group *group,
 	const char *name)
 {
+	struct config_group *stats_cg;
 	struct iscsi_node_acl *acl;
 	struct se_node_acl *se_nacl_new, *se_nacl;
 	struct iscsi_portal_group *tpg = container_of(se_tpg,
@@ -823,6 +823,23 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	if (IS_ERR(se_nacl))
 		return ERR_PTR(PTR_ERR(se_nacl));
 
+	stats_cg = &acl->se_node_acl.acl_fabric_stat_group;
+
+	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
+				GFP_KERNEL);
+	if (!stats_cg->default_groups) {
+		printk(KERN_ERR "Unable to allocate memory for"
+				" stats_cg->default_groups\n");
+		core_tpg_del_initiator_node_acl(se_tpg, se_nacl, 1);
+		kfree(acl);	
+		return ERR_PTR(-ENOMEM);
+	}
+
+	stats_cg->default_groups[0] = &NODE_STAT_GRPS(acl)->iscsi_sess_stats_group;
+	stats_cg->default_groups[1] = NULL;
+	config_group_init_type_name(&NODE_STAT_GRPS(acl)->iscsi_sess_stats_group,
+			"iscsi_sess_stats", &iscsi_stat_sess_cit);
+
 	return se_nacl;
 }
 
@@ -832,6 +849,17 @@ static void lio_target_drop_nodeacl(
 	struct se_portal_group *se_tpg = se_nacl->se_tpg;
 	struct iscsi_node_acl *acl = container_of(se_nacl,
 			struct iscsi_node_acl, se_node_acl);
+	struct config_item *df_item;
+	struct config_group *stats_cg;
+	int i;
+
+	stats_cg = &acl->se_node_acl.acl_fabric_stat_group;
+	for (i = 0; stats_cg->default_groups[i]; i++) {
+		df_item = &stats_cg->default_groups[i]->cg_item;
+		stats_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(stats_cg->default_groups);
 
 	core_tpg_del_initiator_node_acl(se_tpg, se_nacl, 1);
 	kfree(acl);
@@ -1254,12 +1282,43 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	struct config_group *group,
 	const char *name)
 {
+	struct config_group *stats_cg;
 	struct iscsi_tiqn *tiqn;
 	int ret = 0;
 
 	tiqn = core_add_tiqn((unsigned char *)name, &ret);
 	if (!(tiqn))
 		return NULL;
+	/*
+	 * Setup struct iscsi_wwn_stat_grps for se_wwn->fabric_stat_group.
+	 */
+	stats_cg = &tiqn->tiqn_wwn.fabric_stat_group;
+
+	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 6,
+				GFP_KERNEL);
+	if (!stats_cg->default_groups) {
+		printk(KERN_ERR "Unable to allocate memory for"
+				" stats_cg->default_groups\n");		
+		core_del_tiqn(tiqn);
+		return ERR_PTR(-ENOMEM);
+	}
+	
+	stats_cg->default_groups[0] = &WWN_STAT_GRPS(tiqn)->iscsi_instance_group;
+	stats_cg->default_groups[1] = &WWN_STAT_GRPS(tiqn)->iscsi_sess_err_group;
+	stats_cg->default_groups[2] = &WWN_STAT_GRPS(tiqn)->iscsi_tgt_attr_group;
+	stats_cg->default_groups[3] = &WWN_STAT_GRPS(tiqn)->iscsi_login_stats_group;
+	stats_cg->default_groups[4] = &WWN_STAT_GRPS(tiqn)->iscsi_logout_stats_group;
+	stats_cg->default_groups[5] = NULL;
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_instance_group,
+			"iscsi_instance", &iscsi_stat_instance_cit);
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_sess_err_group,
+			"iscsi_sess_err", &iscsi_stat_sess_err_cit);
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_tgt_attr_group,
+			"iscsi_tgt_attr", &iscsi_stat_tgt_attr_cit);
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_login_stats_group,
+			"iscsi_login_stats", &iscsi_stat_login_cit);
+	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_logout_stats_group,
+			"iscsi_logout_stats", &iscsi_stat_logout_cit);
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
 	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> Allocated Node:"
@@ -1271,7 +1330,18 @@ void lio_target_call_coredeltiqn(
 	struct se_wwn *wwn)
 {
 	struct iscsi_tiqn *tiqn = container_of(wwn, struct iscsi_tiqn, tiqn_wwn);
+	struct config_item *df_item;
+	struct config_group *stats_cg;
+	int i;
 	
+	stats_cg = &tiqn->tiqn_wwn.fabric_stat_group;
+	for (i = 0; stats_cg->default_groups[i]; i++) {
+		df_item = &stats_cg->default_groups[i]->cg_item;
+		stats_cg->default_groups[i] = NULL;
+		config_item_put(df_item);
+	}
+	kfree(stats_cg->default_groups);
+
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s\n",
 			tiqn->tiqn);
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> Releasing"

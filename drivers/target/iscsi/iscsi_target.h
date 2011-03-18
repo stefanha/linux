@@ -15,6 +15,7 @@ extern struct iscsi_np *core_add_np(struct iscsi_np_addr *, int, int *);
 extern int core_reset_np_thread(struct iscsi_np *, struct iscsi_tpg_np *,
 				struct iscsi_portal_group *, int);
 extern int core_del_np(struct iscsi_np *);
+extern u32 iscsi_get_new_index(iscsi_index_t);
 extern char *iscsi_get_fabric_name(void);
 extern struct iscsi_cmd *iscsi_get_cmd(struct se_cmd *);
 extern u32 iscsi_get_task_tag(struct se_cmd *);
@@ -25,7 +26,7 @@ extern int lio_sess_logged_in(struct se_session *);
 extern u32 lio_sess_get_index(struct se_session *);
 extern u32 lio_sess_get_initiator_sid(struct se_session *,
 				unsigned char *, u32);
-extern int iscsi_send_async_msg(struct iscsi_conn *, __u16, __u8, __u8);
+extern int iscsi_send_async_msg(struct iscsi_conn *, u16, u8, u8);
 extern int lio_queue_data_in(struct se_cmd *);
 extern int iscsi_send_r2t(struct iscsi_cmd *, struct iscsi_conn *);
 extern int iscsi_build_r2ts_for_cmd(struct iscsi_cmd *, struct iscsi_conn *, int);

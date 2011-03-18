@@ -31,7 +31,6 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <iscsi_debug.h>
 #include <iscsi_target_discovery.h>

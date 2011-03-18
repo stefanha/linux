@@ -1,5 +1,19 @@
-#ifndef ISCSI_TARGET_MIB_H
-#define ISCSI_TARGET_MIB_H
+#ifndef ISCSI_TARGET_STAT_H
+#define ISCSI_TARGET_STAT_H
+
+/*
+ * For struct iscsi_tiqn->tiqn_wwn default groups
+ */
+extern struct config_item_type iscsi_stat_instance_cit;
+extern struct config_item_type iscsi_stat_sess_err_cit;
+extern struct config_item_type iscsi_stat_tgt_attr_cit;
+extern struct config_item_type iscsi_stat_login_cit;
+extern struct config_item_type iscsi_stat_logout_cit;
+
+/*
+ * For struct iscsi_session->se_sess default groups
+ */
+extern struct config_item_type iscsi_stat_sess_cit;
 
 /* iSCSI session error types */
 #define ISCSI_SESS_ERR_UNKNOWN		0
@@ -62,21 +76,4 @@ struct iscsi_index_table {
 	u32 		iscsi_mib_index[INDEX_TYPE_MAX];
 } ____cacheline_aligned;
 
-extern void *lio_scsi_auth_intr_seq_start(struct seq_file *, loff_t *);
-extern void *lio_scsi_auth_intr_seq_next(struct seq_file *, void *, loff_t *);
-extern int lio_scsi_auth_intr_seq_show(struct seq_file *, void *);
-extern void lio_scsi_auth_intr_seq_stop(struct seq_file *, void *);
-extern void *lio_scsi_att_intr_port_seq_start(struct seq_file *, loff_t *);
-extern void *lio_scsi_att_intr_port_seq_next(struct seq_file *, void *,
-			loff_t *);
-extern int lio_scsi_att_intr_port_seq_show(struct seq_file *, void *);
-extern void lio_scsi_att_intr_port_seq_stop(struct seq_file *, void *);
-extern int init_iscsi_target_mib(void);
-extern void remove_iscsi_target_mib(void);
-extern void init_iscsi_index_table(void);
-extern u32 iscsi_get_new_index(iscsi_index_t);
-
-extern struct iscsi_global *iscsi_global;
-
-#endif   /*** ISCSI_TARGET_MIB_H ***/
-
+#endif   /*** ISCSI_TARGET_STAT_H ***/

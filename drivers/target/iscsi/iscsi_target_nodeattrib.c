@@ -32,7 +32,6 @@
 #include <linux/smp_lock.h>
 
 #include <iscsi_debug.h>
-#include <iscsi_protocol.h>
 #include <iscsi_target_core.h>
 #include <target/target_core_base.h>
 #include <iscsi_target_device.h>
