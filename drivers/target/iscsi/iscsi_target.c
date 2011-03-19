@@ -4099,7 +4099,11 @@ int iscsi_target_tx_thread(void *arg)
 	struct se_cmd *se_cmd;
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct se_unmap_sg unmap_sg;
-
+	/*
+	 * Bump up the task_struct priority for RX/TX thread set pairs,
+	 * and allow ourselves to be interrupted by SIGINT so that a
+	 * connection recovery / failure event can be triggered externally.
+	 */
 	set_user_nice(current, -20);
 	allow_signal(SIGINT);
 
@@ -4419,7 +4423,11 @@ int iscsi_target_rx_thread(void *arg)
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct iovec iov;
 	struct scatterlist sg;
-
+	/*
+	 * Bump up the task_struct priority for RX/TX thread set pairs,
+	 * and allow ourselves to be interrupted by SIGINT so that a
+	 * connection recovery / failure event can be triggered externally.
+	 */
 	set_user_nice(current, -20);
 	allow_signal(SIGINT);
 
@@ -4573,7 +4581,11 @@ static void iscsi_release_commands_from_conn(struct iscsi_conn *conn)
 	struct iscsi_cmd *cmd = NULL, *cmd_tmp = NULL;
 	struct iscsi_session *sess = conn->sess;
 	struct se_cmd *se_cmd;
-
+	/*
+	 * We expect this function to only ever be called from either RX or TX
+	 * thread context via iscsi_close_connection() once the other context
+	 * has been reset -> returned sleeping pre-handler state.
+	 */
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
 		if (!(SE_CMD(cmd)) ||
