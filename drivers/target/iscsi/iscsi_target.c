@@ -299,14 +299,14 @@ static struct iscsi_np *iscsit_get_np(
 	void *p, *ip;
 	int net_size;
 
-	spin_lock(&np_lock);
+	spin_lock_bh(&np_lock);
 	list_for_each_entry(np, &g_np_list, np_list) {
-		spin_lock(&np->np_state_lock);
-		if (atomic_read(&np->np_shutdown)) {
-			spin_unlock(&np->np_state_lock);
+		spin_lock(&np->np_thread_lock);
+		if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {
+			spin_unlock(&np->np_thread_lock);
 			continue;
 		}
-		spin_unlock(&np->np_state_lock);
+		spin_unlock(&np->np_thread_lock);
 
 		if (ipv6 != NULL) {
 			p = (void *)&np->np_ipv6[0];
@@ -320,11 +320,11 @@ static struct iscsi_np *iscsit_get_np(
 			
 		if (!memcmp(p, ip, net_size) && (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
-			spin_unlock(&np_lock);
+			spin_unlock_bh(&np_lock);
 			return np;
 		}
 	}
-	spin_unlock(&np_lock);
+	spin_unlock_bh(&np_lock);
 
 	return NULL;
 }
@@ -371,8 +371,6 @@ struct iscsi_np *iscsit_add_np(
 	}
 	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
-	atomic_set(&np->np_shutdown, 0);
-	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
 	init_completion(&np->np_restart_comp);
 	INIT_LIST_HEAD(&np->np_list);
@@ -390,9 +388,9 @@ struct iscsi_np *iscsit_add_np(
 		kfree(np);
 		return ERR_PTR(ret);
 	}
-	spin_lock(&np_lock);
+	spin_lock_bh(&np_lock);
 	list_add_tail(&np->np_list, &g_np_list);
-	spin_unlock(&np_lock);
+	spin_unlock_bh(&np_lock);
 
 	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on"
 		" network device: %s\n", ip_buf, np->np_port,
@@ -437,25 +435,6 @@ int iscsit_reset_np_thread(
 	return 0;
 }
 
-int iscsit_del_np_thread(struct iscsi_np *np)
-{
-	spin_lock_bh(&np->np_thread_lock);
-	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
-	atomic_set(&np->np_shutdown, 1);
-	spin_unlock_bh(&np->np_thread_lock);
-
-	if (np->np_thread) {
-		/*
-		 * We need to send the signal to wakeup Linux/Net
-		 * sock_accept()..
-		 */
-		send_sig(SIGINT, np->np_thread, 1);
-		kthread_stop(np->np_thread);
-	}
-
-	return 0;
-}
-
 int iscsit_del_np_comm(struct iscsi_np *np)
 {
 	if (!np->np_socket)
@@ -479,12 +458,27 @@ int iscsit_del_np(struct iscsi_np *np)
 	unsigned char *ip = NULL;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
-	iscsit_del_np_thread(np);
+	spin_lock_bh(&np->np_thread_lock);
+	if (!(--np->np_exports == 0)) {
+		spin_unlock_bh(&np->np_thread_lock);
+		return 0;
+	}
+	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
+	spin_unlock_bh(&np->np_thread_lock);
+
+	if (np->np_thread) {
+		/*
+		 * We need to send the signal to wakeup Linux/Net
+		 * which may be sleeping in sock_accept()..
+		 */
+		send_sig(SIGINT, np->np_thread, 1);
+		kthread_stop(np->np_thread);
+	}
 	iscsit_del_np_comm(np);
 
-	spin_lock(&np_lock);
+	spin_lock_bh(&np_lock);
 	list_del(&np->np_list);
-	spin_unlock(&np_lock);
+	spin_unlock_bh(&np_lock);
 
 	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &np->np_ipv6[0];

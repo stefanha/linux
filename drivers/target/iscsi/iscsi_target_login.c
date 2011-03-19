@@ -1051,8 +1051,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	}
 
 	spin_lock_bh(&np->np_thread_lock);
-	if ((atomic_read(&np->np_shutdown)) ||
-	    (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE)) {
+	if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {
 		spin_unlock_bh(&np->np_thread_lock);
 		printk(KERN_ERR "iSCSI Network Portal on %s:%hu currently not"
 			" active.\n", ip, np->np_port);

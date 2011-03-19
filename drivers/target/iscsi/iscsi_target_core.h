@@ -758,7 +758,6 @@ struct iscsi_tpg_attrib {
 	u32			default_cmdsn_depth;
 	u32			demo_mode_write_protect;
 	u32			prod_mode_write_protect;
-	u32			cache_core_nps;
 	struct iscsi_portal_group *tpg;
 }  ____cacheline_aligned;
 
@@ -774,8 +773,6 @@ struct iscsi_np {
 	u32			np_ipv4;
 	unsigned char		np_ipv6[IPV6_ADDRESS_SPACE];
 	u16			np_port;
-	atomic_t		np_shutdown;
-	spinlock_t		np_state_lock;
 	spinlock_t		np_thread_lock;
 	struct completion	np_restart_comp;
 	struct socket		*np_socket;

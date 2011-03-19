@@ -374,7 +374,6 @@ static void iscsi_set_default_tpg_attribs(struct iscsi_portal_group *tpg)
 	a->cache_dynamic_acls = TA_CACHE_DYNAMIC_ACLS;
 	a->demo_mode_write_protect = TA_DEMO_MODE_WRITE_PROTECT;
 	a->prod_mode_write_protect = TA_PROD_MODE_WRITE_PROTECT;
-	a->cache_core_nps = TA_CACHE_CORE_NPS;
 }
 
 int iscsi_tpg_add_portal_group(struct iscsi_tiqn *tiqn, struct iscsi_portal_group *tpg)
@@ -632,11 +631,11 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
 
-	spin_lock(&np->np_state_lock);
+	spin_lock_bh(&np->np_thread_lock);
 	np->np_exports++;
 	printk(KERN_INFO "CORE[%s]_TPG[%hu] - Incremented np_exports to %u\n",
 		tpg->tpg_tiqn->tiqn, tpg->tpgt, np->np_exports);
-	spin_unlock(&np->np_state_lock);
+	spin_unlock_bh(&np->np_thread_lock);
 
 	return tpg_np;
 }
@@ -669,21 +668,10 @@ static int iscsi_tpg_release_np(
 	tpg_np->tpg_np = NULL;
 	tpg_np->tpg = NULL;
 	kfree(tpg_np);
-
 	/*
-	 * Shutdown Network Portal when last TPG reference is released.
+	 * iscsit_del_np() will shutdown struct iscsi_np when last TPG reference is released.
 	 */
-	spin_lock(&np->np_state_lock);
-	if ((--np->np_exports == 0) && !(ISCSI_TPG_ATTRIB(tpg)->cache_core_nps))
-		atomic_set(&np->np_shutdown, 1);
-	printk(KERN_INFO "CORE[%s]_TPG[%hu] - Decremented np_exports to %u\n",
-		tpg->tpg_tiqn->tiqn, tpg->tpgt, np->np_exports);
-	spin_unlock(&np->np_state_lock);
-
-	if (atomic_read(&np->np_shutdown))
-		iscsit_del_np(np);
-
-	return 0;
+	return iscsit_del_np(np);
 }
 
 int iscsi_tpg_del_network_portal(
