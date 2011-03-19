@@ -41,7 +41,6 @@ struct se_unmap_sg {
 	struct se_mem		*cur_se_mem;
 } ____cacheline_aligned;
 
-extern void iscsi_ack_from_expstatsn(struct iscsi_conn *, u32);
 extern int iscsi_add_r2t_to_list(struct iscsi_cmd *, u32, u32, int, u32);
 extern struct iscsi_r2t *iscsi_get_r2t_for_eos(struct iscsi_cmd *, u32, u32);
 extern struct iscsi_r2t *iscsi_get_r2t_from_list(struct iscsi_cmd *);

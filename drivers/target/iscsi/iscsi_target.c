@@ -1033,6 +1033,28 @@ static void iscsi_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 	}
 }
 
+static inline void iscsi_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
+{
+	struct iscsi_cmd *cmd;
+
+	conn->exp_statsn = exp_statsn;
+
+	spin_lock_bh(&conn->cmd_lock);
+	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
+		spin_lock(&cmd->istate_lock);
+		if ((cmd->i_state == ISTATE_SENT_STATUS) &&
+		    (cmd->stat_sn < exp_statsn)) {
+			cmd->i_state = ISTATE_REMOVE;
+			spin_unlock(&cmd->istate_lock);
+			iscsi_add_cmd_to_immediate_queue(cmd, conn,
+						cmd->i_state);
+			continue;
+		}
+		spin_unlock(&cmd->istate_lock);
+	}
+	spin_unlock_bh(&conn->cmd_lock);
+}
+
 static inline int iscsi_handle_scsi_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
