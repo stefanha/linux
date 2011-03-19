@@ -362,50 +362,6 @@ void iscsi_tpg_dump_params(struct iscsi_portal_group *tpg)
 	iscsi_print_params(tpg->param_list);
 }
 
-static void iscsi_tpg_free_network_portals(struct iscsi_portal_group *tpg)
-{
-	struct iscsi_np *np;
-	struct iscsi_tpg_np *tpg_np, *tpg_np_t;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE], *ip;
-
-	spin_lock(&tpg->tpg_np_lock);
-	list_for_each_entry_safe(tpg_np, tpg_np_t, &tpg->tpg_gnp_list,
-				tpg_np_list) {
-		np = tpg_np->tpg_np;
-		list_del(&tpg_np->tpg_np_list);
-		tpg->num_tpg_nps--;
-		tpg->tpg_tiqn->tiqn_num_tpg_nps--;
-
-		if (np->np_flags & NPF_NET_IPV6) {
-			ip = &np->np_ipv6[0];
-		} else {
-			memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-			iscsi_ntoa2(buf_ipv4, np->np_ipv4);
-			ip = &buf_ipv4[0];
-		}
-
-		printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu"
-			" on %s on network device: %s\n", tpg->tpg_tiqn->tiqn,
-			ip, np->np_port, tpg->tpgt,
-			(np->np_network_transport == ISCSI_TCP) ?
-			"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
-			(char *)np->np_net_dev : "None");
-
-		tpg_np->tpg_np = NULL;
-		kfree(tpg_np);
-		spin_unlock(&tpg->tpg_np_lock);
-
-		spin_lock(&np->np_state_lock);
-		np->np_exports--;
-		printk(KERN_INFO "CORE[%s]_TPG[%hu] - Decremented np_exports to %u\n",
-			tpg->tpg_tiqn->tiqn, tpg->tpgt, np->np_exports);
-		spin_unlock(&np->np_state_lock);
-
-		spin_lock(&tpg->tpg_np_lock);
-	}
-	spin_unlock(&tpg->tpg_np_lock);
-}
-
 static void iscsi_set_default_tpg_attribs(struct iscsi_portal_group *tpg)
 {
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
@@ -476,7 +432,6 @@ int iscsi_tpg_del_portal_group(
 	}
 
 	core_tpg_clear_object_luns(&tpg->tpg_se_tpg);
-	iscsi_tpg_free_network_portals(tpg);
 
 	if (tpg->param_list) {
 		iscsi_release_param_list(tpg->param_list);
