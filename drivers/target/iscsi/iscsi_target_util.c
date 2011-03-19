@@ -1578,6 +1578,37 @@ void iscsi_stop_netif_timer(struct iscsi_conn *conn)
 	spin_unlock_bh(&conn->netif_lock);
 }
 
+static int iscsi_add_nopin(struct iscsi_conn *conn, int want_response)
+{
+	u8 state;
+	struct iscsi_cmd *cmd;
+
+	cmd = iscsi_allocate_cmd(conn);
+	if (!cmd)
+		return -1;
+
+	cmd->iscsi_opcode = ISCSI_OP_NOOP_IN;
+	state = (want_response) ? ISTATE_SEND_NOPIN_WANT_RESPONSE :
+				ISTATE_SEND_NOPIN_NO_RESPONSE;
+	cmd->init_task_tag = 0xFFFFFFFF;
+	spin_lock_bh(&conn->sess->ttt_lock);
+	cmd->targ_xfer_tag = (want_response) ? conn->sess->targ_xfer_tag++ :
+			0xFFFFFFFF;
+	if (want_response && (cmd->targ_xfer_tag == 0xFFFFFFFF))
+		cmd->targ_xfer_tag = conn->sess->targ_xfer_tag++;
+	spin_unlock_bh(&conn->sess->ttt_lock);
+
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
+
+	if (want_response)
+		iscsi_start_nopin_response_timer(conn);
+	iscsi_add_cmd_to_immediate_queue(cmd, conn, state);
+
+	return 0;
+}
+
 static void iscsi_handle_nopin_response_timeout(unsigned long data)
 {
 	struct iscsi_conn *conn = (struct iscsi_conn *) data;
