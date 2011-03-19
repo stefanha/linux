@@ -5068,9 +5068,13 @@ int iscsi_free_session(struct iscsi_session *sess)
 			break;
 
 		iscsi_inc_conn_usage_count(conn);
+		if (conn_tmp != NULL)
+			iscsi_inc_conn_usage_count(conn_tmp);
 		spin_unlock_bh(&sess->conn_lock);
 		iscsi_cause_connection_reinstatement(conn, 1);
 		spin_lock_bh(&sess->conn_lock);
+		if (conn_tmp != NULL)
+			iscsi_dec_conn_usage_count(conn_tmp);
 
 		iscsi_dec_conn_usage_count(conn);
 		conn_count--;
@@ -5105,9 +5109,14 @@ void iscsi_stop_session(
 				break;
 
 			iscsi_inc_conn_usage_count(conn);
+			if (conn_tmp != NULL)
+				iscsi_inc_conn_usage_count(conn_tmp);
+
 			spin_unlock_bh(&sess->conn_lock);
 			iscsi_cause_connection_reinstatement(conn, 1);
 			spin_lock_bh(&sess->conn_lock);
+			if (conn_tmp != NULL)
+				iscsi_dec_conn_usage_count(conn_tmp);
 
 			iscsi_dec_conn_usage_count(conn);
 			conn_count--;
