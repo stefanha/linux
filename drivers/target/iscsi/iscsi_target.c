@@ -2773,7 +2773,6 @@ int iscsi_send_async_msg(
 {
 	u8 iscsi_hdr[ISCSI_HDR_LEN+CRC_LEN];
 	u32 tx_send = ISCSI_HDR_LEN, tx_sent = 0;
-	struct timer_list async_msg_timer;
 	struct iscsi_async *hdr;
 	struct iovec iov;
 	struct scatterlist sg;
@@ -2864,16 +2863,8 @@ int iscsi_send_async_msg(
 	}
 
 	if (async_event == ISCSI_ASYNC_MSG_REQUEST_LOGOUT) {
-		init_timer(&async_msg_timer);
-		async_msg_timer.expires =
-			(get_jiffies_64() + SECONDS_FOR_ASYNC_LOGOUT * HZ);
-		async_msg_timer.data =
-			(unsigned long)&conn->sess->async_msg_comp;
-		async_msg_timer.function = iscsi_async_msg_timer_function;
-
-		add_timer(&async_msg_timer);
-		wait_for_completion(&conn->sess->async_msg_comp);
-		del_timer_sync(&async_msg_timer);
+		wait_for_completion_timeout(&conn->sess->async_msg_comp,
+					SECONDS_FOR_ASYNC_LOGOUT * HZ);
 
 		if (conn->conn_state == TARG_CONN_STATE_LOGOUT_REQUESTED) {
 			printk(KERN_ERR "Asynchronous message timer expired"
@@ -4024,27 +4015,13 @@ static int iscsi_send_reject(
 	return 0;
 }
 
-static void iscsi_tx_thread_TCP_timeout(unsigned long data)
-{
-	complete((struct completion *)data);
-}
-
 static void iscsi_tx_thread_wait_for_tcp(struct iscsi_conn *conn)
 {
-	struct timer_list tx_TCP_timer;
-	int ret;
-
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
-		init_timer(&tx_TCP_timer);
-		tx_TCP_timer.expires =
-			(get_jiffies_64() + ISCSI_TX_THREAD_TCP_TIMEOUT * HZ);
-		tx_TCP_timer.data = (unsigned long)&conn->tx_half_close_comp;
-		tx_TCP_timer.function = iscsi_tx_thread_TCP_timeout;
-
-		add_timer(&tx_TCP_timer);
-		ret = wait_for_completion_interruptible(&conn->tx_half_close_comp);
-		del_timer_sync(&tx_TCP_timer);
+		wait_for_completion_interruptible_timeout(
+					&conn->tx_half_close_comp,
+					ISCSI_TX_THREAD_TCP_TIMEOUT * HZ);
 	}
 }
 
@@ -4429,27 +4406,13 @@ out:
 	return 0;
 }
 
-static void iscsi_rx_thread_TCP_timeout(unsigned long data)
-{
-	complete((struct completion *)data);
-}
-
 static void iscsi_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
 {
-	struct timer_list rx_TCP_timer;
-	int ret;
-
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
-		init_timer(&rx_TCP_timer);
-		rx_TCP_timer.expires =
-			(get_jiffies_64() + ISCSI_RX_THREAD_TCP_TIMEOUT * HZ);
-		rx_TCP_timer.data = (unsigned long)&conn->rx_half_close_comp;
-		rx_TCP_timer.function = iscsi_rx_thread_TCP_timeout;
-
-		add_timer(&rx_TCP_timer);
-		ret = wait_for_completion_interruptible(&conn->rx_half_close_comp);
-		del_timer_sync(&rx_TCP_timer);
+		wait_for_completion_interruptible_timeout(
+					&conn->rx_half_close_comp,
+					ISCSI_RX_THREAD_TCP_TIMEOUT * HZ);
 	}
 }
 

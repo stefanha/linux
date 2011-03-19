@@ -1548,11 +1548,6 @@ void iscsi_inc_conn_usage_count(struct iscsi_conn *conn)
 	spin_unlock_bh(&conn->conn_usage_lock);
 }
 
-void iscsi_async_msg_timer_function(unsigned long data)
-{
-	complete((struct completion *) data);
-}
-
 int iscsi_check_for_active_network_device(struct iscsi_conn *conn)
 {
 	struct net_device *net_dev;

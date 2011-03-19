@@ -268,15 +268,6 @@ void iscsi_activate_thread_set(struct iscsi_conn *conn, struct iscsi_thread_set 
 	wait_for_completion(&ts->rx_post_start_comp);
 }
 
-/*	iscsi_get_thread_set_timeout():
- *
- *
- */
-static void iscsi_get_thread_set_timeout(unsigned long data)
-{
-	complete((struct completion *)data);
-}
-
 /*	iscsi_get_thread_set():
  *
  *	Parameters:	iSCSI Connection Pointer.
@@ -286,9 +277,7 @@ struct iscsi_thread_set *iscsi_get_thread_set(void)
 {
 	int allocate_ts = 0;
 	struct completion comp;
-	struct timer_list timer;
 	struct iscsi_thread_set *ts = NULL;
-
 	/*
 	 * If no inactive thread set is available on the first call to
 	 * iscsi_get_ts_from_inactive_list(), sleep for a second and
@@ -302,14 +291,8 @@ get_set:
 			iscsi_allocate_thread_sets(1);
 
 		init_completion(&comp);
-		init_timer(&timer);
-		timer.expires = (get_jiffies_64() + 1 * HZ);
-		timer.data = (unsigned long)&comp;
-		timer.function = iscsi_get_thread_set_timeout;
-		add_timer(&timer);
+		wait_for_completion_timeout(&comp, 1 * HZ);
 
-		wait_for_completion(&comp);
-		del_timer_sync(&timer);
 		allocate_ts++;
 		goto get_set;
 	}

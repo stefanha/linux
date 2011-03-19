@@ -91,7 +91,6 @@ extern struct iscsi_conn *iscsi_get_conn_from_cid_rcfr(struct iscsi_session *, u
 extern void iscsi_check_conn_usage_count(struct iscsi_conn *);
 extern void iscsi_dec_conn_usage_count(struct iscsi_conn *);
 extern void iscsi_inc_conn_usage_count(struct iscsi_conn *);
-extern void iscsi_async_msg_timer_function(unsigned long);
 extern int iscsi_check_for_active_network_device(struct iscsi_conn *);
 extern void iscsi_get_network_interface_from_conn(struct iscsi_conn *);
 extern void iscsi_start_netif_timer(struct iscsi_conn *);
