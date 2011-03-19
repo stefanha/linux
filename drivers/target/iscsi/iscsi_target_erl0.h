@@ -13,7 +13,5 @@ extern void iscsi_take_action_for_connection_exit(struct iscsi_conn *);
 extern int iscsi_recover_from_unknown_opcode(struct iscsi_conn *);
 
 extern struct iscsi_global *iscsi_global;
-extern int iscsi_add_reject_from_cmd(u8, int, int, unsigned char *,
-			struct iscsi_cmd *);
 
 #endif   /*** ISCSI_TARGET_ERL0_H ***/

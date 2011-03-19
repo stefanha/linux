@@ -40,9 +40,4 @@ extern int iscsi_ta_prod_mode_write_protect(struct iscsi_portal_group *, u32);
 extern struct iscsi_global *iscsi_global;
 extern struct target_fabric_configfs *lio_target_fabric_configfs;
 
-extern int iscsi_close_session(struct iscsi_session *);
-extern int iscsi_free_session(struct iscsi_session *);
-extern int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *, int);
-extern int iscsi_ta_authentication(struct iscsi_portal_group *, u32);
-
 #endif /* ISCSI_TARGET_TPG_H */

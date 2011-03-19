@@ -34,6 +34,7 @@
 #include "iscsi_target_tmr.h"
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
+#include "iscsi_target.h"
 
 u8 iscsi_tmr_abort_task(
 	struct iscsi_cmd *cmd,
@@ -292,9 +293,9 @@ static int iscsi_task_reassign_complete_write(
 			return 0;
 	}
 	/*
-	 * iscsi_build_r2ts_for_cmd() can handle the rest from here.
+	 * iscsit_build_r2ts_for_cmd() can handle the rest from here.
 	 */
-	return iscsi_build_r2ts_for_cmd(cmd, conn, 2);
+	return iscsit_build_r2ts_for_cmd(cmd, conn, 2);
 }
 
 static int iscsi_task_reassign_complete_read(
@@ -586,7 +587,7 @@ int iscsi_task_reassign_prepare_write(
 	 * If we have not received all DataOUT in question,  we must
 	 * make sure to make the appropriate changes to values in
 	 * struct iscsi_cmd (and elsewhere depending on session parameters)
-	 * so iscsi_build_r2ts_for_cmd() in iscsi_task_reassign_complete_write()
+	 * so iscsit_build_r2ts_for_cmd() in iscsi_task_reassign_complete_write()
 	 * will resend a new R2T for the DataOUT sequences in question.
 	 */
 	spin_lock_bh(&cmd->r2t_lock);
@@ -719,7 +720,7 @@ next:
 	 * sequences it has already completed.
 	 *
 	 * Free each R2T in question and adjust values in struct iscsi_cmd
-	 * accordingly so iscsi_build_r2ts_for_cmd() do the rest of
+	 * accordingly so iscsit_build_r2ts_for_cmd() do the rest of
 	 * the work after the TMR TASK_REASSIGN Response is sent.
 	 */
 drop_unacknowledged_r2ts:

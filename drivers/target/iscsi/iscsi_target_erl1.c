@@ -33,6 +33,7 @@
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_erl2.h"
+#include "iscsi_target.h"
 
 #define OFFLOAD_BUF_SIZE	32768
 
@@ -158,7 +159,7 @@ static int iscsi_handle_r2t_snack(
 			" protocol error.\n", cmd->init_task_tag, begrun,
 			(begrun + runlength), cmd->acked_data_sn);
 
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 	}
@@ -169,7 +170,7 @@ static int iscsi_handle_r2t_snack(
 			" with BegRun: 0x%08x, RunLength: 0x%08x, exceeds"
 			" current R2TSN: 0x%08x, protocol error.\n",
 			cmd->init_task_tag, begrun, runlength, cmd->r2t_sn);
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 				ISCSI_REASON_BOOKMARK_INVALID, 1, 0, buf, cmd);
 		}
 		last_r2tsn = (begrun + runlength);
@@ -434,7 +435,7 @@ static inline int iscsi_handle_recovery_datain(
 			" protocol error.\n", cmd->init_task_tag, begrun,
 			(begrun + runlength), cmd->acked_data_sn);
 
-		return iscsi_add_reject_from_cmd(ISCSI_REASON_PROTOCOL_ERROR,
+		return iscsit_add_reject_from_cmd(ISCSI_REASON_PROTOCOL_ERROR,
 				1, 0, buf, cmd);
 	}
 
@@ -446,13 +447,13 @@ static inline int iscsi_handle_recovery_datain(
 		printk(KERN_ERR "Initiator requesting BegRun: 0x%08x, RunLength"
 			": 0x%08x greater than maximum DataSN: 0x%08x.\n",
 				begrun, runlength, (cmd->data_sn - 1));
-		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
+		return iscsit_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
 				1, 0, buf, cmd);
 	}
 
 	dr = iscsi_allocate_datain_req();
 	if (!dr)
-		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
+		return iscsit_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 0, buf, cmd);
 
 	dr->data_sn = dr->begrun = begrun;
@@ -987,7 +988,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 					return 0;
 
 				iscsi_set_dataout_sequence_values(cmd);
-				iscsi_build_r2ts_for_cmd(cmd, cmd->conn, 0);
+				iscsit_build_r2ts_for_cmd(cmd, cmd->conn, 0);
 			}
 			return 0;
 		}
@@ -1031,13 +1032,13 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		spin_unlock_bh(&cmd->istate_lock);
 		switch (cmd->logout_reason) {
 		case ISCSI_LOGOUT_REASON_CLOSE_SESSION:
-			lr = iscsi_logout_closesession(cmd, cmd->conn);
+			lr = iscsit_logout_closesession(cmd, cmd->conn);
 			break;
 		case ISCSI_LOGOUT_REASON_CLOSE_CONNECTION:
-			lr = iscsi_logout_closeconnection(cmd, cmd->conn);
+			lr = iscsit_logout_closeconnection(cmd, cmd->conn);
 			break;
 		case ISCSI_LOGOUT_REASON_RECOVERY:
-			lr = iscsi_logout_removeconnforrecovery(cmd, cmd->conn);
+			lr = iscsit_logout_removeconnforrecovery(cmd, cmd->conn);
 			break;
 		default:
 			printk(KERN_ERR "Unknown iSCSI Logout Request Code:"

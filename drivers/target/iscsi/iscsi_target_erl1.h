@@ -25,11 +25,4 @@ extern void iscsi_stop_dataout_timer(struct iscsi_cmd *);
 
 extern struct kmem_cache *lio_ooo_cache;
 
-extern int iscsi_add_reject_from_cmd(u8, int, int, unsigned char *,
-			struct iscsi_cmd *);
-extern int iscsi_build_r2ts_for_cmd(struct iscsi_cmd *, struct iscsi_conn *, int);
-extern int iscsi_logout_closesession(struct iscsi_cmd *, struct iscsi_conn *);
-extern int iscsi_logout_closeconnection(struct iscsi_cmd *, struct iscsi_conn *);
-extern int iscsi_logout_removeconnforrecovery(struct iscsi_cmd *, struct iscsi_conn *);
-
 #endif /* ISCSI_TARGET_ERL1_H */

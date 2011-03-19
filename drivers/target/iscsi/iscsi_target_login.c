@@ -181,14 +181,14 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 	if (sess->session_state == TARG_SESS_STATE_FAILED) {
 		spin_unlock_bh(&sess->conn_lock);
 		iscsi_dec_session_usage_count(sess);
-		return iscsi_close_session(sess);
+		return iscsit_close_session(sess);
 	}
 	spin_unlock_bh(&sess->conn_lock);
 
-	iscsi_stop_session(sess, 1, 1);
+	iscsit_stop_session(sess, 1, 1);
 	iscsi_dec_session_usage_count(sess);
 
-	return iscsi_close_session(sess);
+	return iscsit_close_session(sess);
 }
 
 static void iscsi_login_set_conn_values(
@@ -652,7 +652,7 @@ static int iscsi_post_login_handler(
 		 * Determine CPU mask to ensure connection's RX and TX kthreads
 		 * are scheduled on the same CPU.
 		 */
-		iscsi_thread_get_cpumask(conn);
+		iscsit_thread_get_cpumask(conn);
 		conn->conn_rx_reset_cpumask = 1;
 		conn->conn_tx_reset_cpumask = 1;
 
@@ -709,7 +709,7 @@ static int iscsi_post_login_handler(
 	 * Determine CPU mask to ensure connection's RX and TX kthreads
 	 * are scheduled on the same CPU.
 	 */
-	iscsi_thread_get_cpumask(conn);
+	iscsit_thread_get_cpumask(conn);
 	conn->conn_rx_reset_cpumask = 1;
 	conn->conn_tx_reset_cpumask = 1;
 

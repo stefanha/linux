@@ -736,12 +736,12 @@ int iscsi_check_post_dataout(
 		if (!conn->sess->sess_ops->ErrorRecoveryLevel) {
 			printk(KERN_ERR "Unable to recover from DataOUT CRC"
 				" failure while ERL=0, closing session.\n");
-			iscsi_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
+			iscsit_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
 					1, 0, buf, cmd);
 			return DATAOUT_CANNOT_RECOVER;
 		}
 
-		iscsi_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
+		iscsit_add_reject_from_cmd(ISCSI_REASON_DATA_DIGEST_ERROR,
 				0, 0, buf, cmd);
 		return iscsi_dataout_post_crc_failed(cmd, buf);
 	}
@@ -784,7 +784,7 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 	}
 
 	spin_unlock_bh(&se_tpg->session_lock);
-	iscsi_close_session(sess);
+	iscsit_close_session(sess);
 }
 
 extern void iscsi_start_time2retain_handler (struct iscsi_session *sess)
@@ -920,7 +920,7 @@ static void iscsi_handle_connection_cleanup(struct iscsi_conn *conn)
 		TRACE(TRACE_ERL0, "Performing cleanup for failed iSCSI"
 			" Connection ID: %hu from %s\n", conn->cid,
 			sess->sess_ops->InitiatorName);
-		iscsi_close_connection(conn);
+		iscsit_close_connection(conn);
 	}
 }
 
@@ -935,7 +935,7 @@ extern void iscsi_take_action_for_connection_exit(struct iscsi_conn *conn)
 
 	if (conn->conn_state == TARG_CONN_STATE_IN_LOGOUT) {
 		spin_unlock_bh(&conn->state_lock);
-		iscsi_close_connection(conn);
+		iscsit_close_connection(conn);
 		return;
 	}
 

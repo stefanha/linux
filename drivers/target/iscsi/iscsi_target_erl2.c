@@ -30,6 +30,7 @@
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_erl2.h"
+#include "iscsi_target.h"
 
 /*
  *	FIXME: Does RData SNACK apply here as well?
@@ -475,7 +476,7 @@ int iscsi_connection_recovery_transport_reset(struct iscsi_conn *conn)
 {
 	atomic_set(&conn->connection_recovery, 1);
 
-	if (iscsi_close_connection(conn) < 0)
+	if (iscsit_close_connection(conn) < 0)
 		return -1;
 
 	return 0;

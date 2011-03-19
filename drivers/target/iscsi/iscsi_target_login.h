@@ -11,4 +11,3 @@ extern int iscsi_login_disable_FIM_keys(struct iscsi_param_list *, struct iscsi_
 extern struct iscsi_global *iscsi_global;
 
 #endif   /*** ISCSI_TARGET_LOGIN_H ***/
-

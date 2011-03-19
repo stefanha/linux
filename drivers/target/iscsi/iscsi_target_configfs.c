@@ -1569,7 +1569,7 @@ static int lio_write_pending(struct se_cmd *se_cmd)
 	if (cmd->immediate_data || cmd->unsolicited_data)
 		complete(&cmd->unsolicited_data_comp);
 	else {
-		if (iscsi_build_r2ts_for_cmd(cmd, cmd->conn, 1) < 0)
+		if (iscsit_build_r2ts_for_cmd(cmd, cmd->conn, 1) < 0)
 			return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
 	}
 
@@ -1726,9 +1726,9 @@ static void lio_tpg_close_session(struct se_session *se_sess)
 	 * If the iSCSI Session for the iSCSI Initiator Node exists,
 	 * forcefully shutdown the iSCSI NEXUS.
 	 */
-	iscsi_stop_session(sess, 1, 1);
+	iscsit_stop_session(sess, 1, 1);
 	iscsi_dec_session_usage_count(sess);
-	iscsi_close_session(sess);
+	iscsit_close_session(sess);
 }
 
 static void lio_tpg_stop_session(
@@ -1738,7 +1738,7 @@ static void lio_tpg_stop_session(
 {
 	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
 
-	iscsi_stop_session(sess, sess_sleep, conn_sleep);
+	iscsit_stop_session(sess, sess_sleep, conn_sleep);
 }
 
 static void lio_tpg_fall_back_to_erl0(struct se_session *se_sess)

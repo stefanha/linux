@@ -270,7 +270,7 @@ int iscsi_tpg_del_portal_group(
 	tpg->tpg_state = TPG_STATE_INACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 
-	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
+	if (iscsit_release_sessions_for_tpg(tpg, force) < 0) {
 		printk(KERN_ERR "Unable to delete iSCSI Target Portal Group:"
 			" %hu while active sessions exist, and force=0\n",
 			tpg->tpgt);
@@ -367,7 +367,7 @@ int iscsi_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 
 	iscsi_clear_tpg_np_login_threads(tpg);
 
-	if (iscsi_release_sessions_for_tpg(tpg, force) < 0) {
+	if (iscsit_release_sessions_for_tpg(tpg, force) < 0) {
 		spin_lock(&tpg->tpg_state_lock);
 		tpg->tpg_state = old_state;
 		spin_unlock(&tpg->tpg_state_lock);
