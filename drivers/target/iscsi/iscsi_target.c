@@ -775,10 +775,6 @@ int iscsi_add_reject(
 	return (!fail_conn) ? 0 : -1;
 }
 
-/*	iscsi_add_reject_from_cmd():
- *
- *
- */
 int iscsi_add_reject_from_cmd(
 	u8 reason,
 	int fail_conn,
@@ -2360,10 +2356,6 @@ static inline int iscsi_handle_text_cmd(
 	return iscsi_execute_cmd(cmd, 0);
 }
 
-/*	iscsi_logout_closesession():
- *
- *
- */
 int iscsi_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_conn *conn_p;
@@ -2761,10 +2753,6 @@ static int iscsi_handle_immediate_data(
 	return IMMEDIDATE_DATA_NORMAL_OPERATION;
 }
 
-/*	iscsi_send_async_msg():
- *
- *	FIXME: Support SCSI AEN.
- */
 int iscsi_send_async_msg(
 	struct iscsi_conn *conn,
 	u16 cid,
@@ -2878,8 +2866,7 @@ int iscsi_send_async_msg(
 	return 0;
 }
 
-/*	iscsi_build_conn_drop_async_message():
- *
+/*
  *	Called with sess->conn_lock held.
  */
 /* #warning iscsi_build_conn_drop_async_message() only sends out on connections
@@ -3293,8 +3280,7 @@ static inline int iscsi_send_logout_response(
 	return 0;
 }
 
-/*	iscsi_send_nopin():
- *
+/*
  *	Unsolicited NOPIN, either requesting a response or not.
  */
 static inline int iscsi_send_unsolicited_nopin(
@@ -3517,8 +3503,7 @@ int iscsi_send_r2t(
 	return 0;
 }
 
-/*	iscsi_build_r2ts_for_cmd():
- *
+/*
  *	type 0: Normal Operation.
  *	type 1: Called from Storage Transport.
  *	type 2: Called from iscsi_task_reassign_complete_write() for
@@ -3855,7 +3840,7 @@ static int iscsi_send_task_mgt_rsp(
 	return 0;
 }
 
-/*	iscsi_send_text_rsp():
+/*
  *
  *	FIXME: Add support for F_BIT and C_BIT when the length is longer than
  *	MaxRecvDataSegmentLength.
@@ -4983,8 +4968,7 @@ static void iscsi_logout_post_handler_diffcid(
 	iscsi_dec_conn_usage_count(l_conn);
 }
 
-/*	iscsi_logout_post_handler():
- *
+/*
  *	Return of 0 causes the TX thread to restart.
  */
 static int iscsi_logout_post_handler(

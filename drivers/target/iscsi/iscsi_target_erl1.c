@@ -36,8 +36,7 @@
 
 #define OFFLOAD_BUF_SIZE	32768
 
-/*	iscsi_dump_data_payload():
- *
+/*
  *	Used to dump excess datain payload for certain error recovery
  *	situations.  Receive in OFFLOAD_BUF_SIZE max of datain per rx_data().
  *
@@ -113,8 +112,7 @@ out:
 	return ret;
 }
 
-/*	iscsi_send_recovery_r2t_for_snack():
- *
+/*
  *	Used for retransmitting R2Ts from a R2T SNACK request.
  */
 static int iscsi_send_recovery_r2t_for_snack(
@@ -139,10 +137,6 @@ static int iscsi_send_recovery_r2t_for_snack(
 	return 0;
 }
 
-/*	iscsi_handle_r2t_snack():
- *
- *
- */
 static int iscsi_handle_r2t_snack(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
@@ -195,8 +189,7 @@ static int iscsi_handle_r2t_snack(
 	return 0;
 }
 
-/*	iscsi_create_recovery_datain_values_datasequenceinorder_yes():
- *
+/*
  *	Generates Offsets and NextBurstLength based on Begrun and Runlength
  *	carried in a Data SNACK or ExpDataSN in TMR TASK_REASSIGN.
  *
@@ -242,8 +235,7 @@ int iscsi_create_recovery_datain_values_datasequenceinorder_yes(
 	return 0;
 }
 
-/*	iscsi_create_recovery_datain_values_datasequenceinorder_no():
- *
+/*
  *	Generates Offsets and NextBurstLength based on Begrun and Runlength
  *	carried in a Data SNACK or ExpDataSN in TMR TASK_REASSIGN.
  *
@@ -414,10 +406,6 @@ done:
 	return 0;
 }
 
-/*	iscsi_handle_recovery_datain():
- *
- *
- */
 static inline int iscsi_handle_recovery_datain(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
@@ -480,10 +468,6 @@ static inline int iscsi_handle_recovery_datain(
 	return 0;
 }
 
-/*	iscsi_handle_recovery_datain_or_r2t():
- *
- *
- */
 int iscsi_handle_recovery_datain_or_r2t(
 	struct iscsi_conn *conn,
 	unsigned char *buf,
@@ -516,10 +500,6 @@ int iscsi_handle_recovery_datain_or_r2t(
 	return 0;
 }
 
-/*	iscsi_send_recovery_status():
- *
- *
- */
 /* #warning FIXME: Status SNACK needs to be dependent on OPCODE!!! */
 int iscsi_handle_status_snack(
 	struct iscsi_conn *conn,
@@ -578,10 +558,6 @@ int iscsi_handle_status_snack(
 	return 0;
 }
 
-/*	iscsi_handle_data_ack():
- *
- *
- */
 int iscsi_handle_data_ack(
 	struct iscsi_conn *conn,
 	u32 targ_xfer_tag,
@@ -618,10 +594,6 @@ int iscsi_handle_data_ack(
 	return 0;
 }
 
-/*	iscsi_send_recovery_r2t():
- *
- *
- */
 static int iscsi_send_recovery_r2t(
 	struct iscsi_cmd *cmd,
 	u32 offset,
@@ -636,10 +608,6 @@ static int iscsi_send_recovery_r2t(
 	return ret;
 }
 
-/*	iscsi_dataout_datapduinorder_no_fbit():
- *
- *
- */
 int iscsi_dataout_datapduinorder_no_fbit(
 	struct iscsi_cmd *cmd,
 	struct iscsi_pdu *pdu)
@@ -716,10 +684,6 @@ int iscsi_dataout_datapduinorder_no_fbit(
 	return (!recovery) ? DATAOUT_NORMAL : DATAOUT_WITHIN_COMMAND_RECOVERY;
 }
 
-/*	iscsi_recalculate_dataout_values():
- *
- *
- */
 static int iscsi_recalculate_dataout_values(
 	struct iscsi_cmd *cmd,
 	u32 pdu_offset,
@@ -797,10 +761,6 @@ static int iscsi_recalculate_dataout_values(
 	return 0;
 }
 
-/*	iscsi_recover_dataout_crc_sequence():
- *
- *
- */
 int iscsi_recover_dataout_sequence(
 	struct iscsi_cmd *cmd,
 	u32 pdu_offset,
@@ -821,10 +781,6 @@ int iscsi_recover_dataout_sequence(
 	return DATAOUT_WITHIN_COMMAND_RECOVERY;
 }
 
-/*	iscsi_allocate_ooo_cmdsn():
- *
- *
- */
 static inline struct iscsi_ooo_cmdsn *iscsi_allocate_ooo_cmdsn(void)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL;
@@ -840,8 +796,7 @@ static inline struct iscsi_ooo_cmdsn *iscsi_allocate_ooo_cmdsn(void)
 	return ooo_cmdsn;
 }
 
-/*	iscsi_attach_ooo_cmdsn():
- *
+/*
  *	Called with sess->cmdsn_lock held.
  */
 static inline int iscsi_attach_ooo_cmdsn(
@@ -891,8 +846,7 @@ static inline int iscsi_attach_ooo_cmdsn(
 	return 0;
 }
 
-/*	iscsi_remove_ooo_cmdsn()
- *
+/*
  *	Removes an struct iscsi_ooo_cmdsn from a session's list,
  *	called with struct iscsi_session->cmdsn_lock held.
  */
@@ -904,10 +858,6 @@ void iscsi_remove_ooo_cmdsn(
 	kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 }
 
-/*	iscsi_clear_ooo_cmdsns_for_conn():
- *
- *
- */
 void iscsi_clear_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn;
@@ -923,8 +873,7 @@ void iscsi_clear_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 	spin_unlock(&sess->cmdsn_lock);
 }
 
-/*	iscsi_execute_ooo_cmdsns():
- *
+/*
  *	Called with sess->cmdsn_lock held.
  */
 int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
@@ -963,8 +912,7 @@ int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
 	return ooo_count;
 }
 
-/*	iscsi_execute_cmd():
- *
+/*
  *	Called either:
  *
  *	1. With sess->cmdsn_lock held from iscsi_execute_ooo_cmdsns()
@@ -1108,10 +1056,6 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 	return 0;
 }
 
-/*	iscsi_free_all_ooo_cmdsns():
- *
- *
- */
 void iscsi_free_all_ooo_cmdsns(struct iscsi_session *sess)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn, *ooo_cmdsn_tmp;
@@ -1126,10 +1070,6 @@ void iscsi_free_all_ooo_cmdsns(struct iscsi_session *sess)
 	spin_unlock(&sess->cmdsn_lock);
 }
 
-/*	iscsi_handle_ooo_cmdsn():
- *
- *
- */
 int iscsi_handle_ooo_cmdsn(
 	struct iscsi_session *sess,
 	struct iscsi_cmd *cmd,
@@ -1172,10 +1112,6 @@ int iscsi_handle_ooo_cmdsn(
 	return CMDSN_HIGHER_THAN_EXP;
 }
 
-/*	 iscsi_set_dataout_timeout_values():
- *
- *
- */
 static int iscsi_set_dataout_timeout_values(
 	struct iscsi_cmd *cmd,
 	u32 *offset,
@@ -1217,9 +1153,8 @@ static int iscsi_set_dataout_timeout_values(
 	spin_unlock_bh(&cmd->r2t_lock);
 	return 0;
 }
-
-/*	iscsi_handle_dataout_timeout():
- *
+ 
+/*
  *	NOTE: Called from interrupt (timer) context.
  */
 static void iscsi_handle_dataout_timeout(unsigned long data)
@@ -1305,10 +1240,6 @@ failure:
 	return;
 }
 
-/*	iscsi_mod_dataout_timer():
- *
- *
- */
 void iscsi_mod_dataout_timer(struct iscsi_cmd *cmd)
 {
 	struct iscsi_conn *conn = cmd->conn;
@@ -1328,8 +1259,7 @@ void iscsi_mod_dataout_timer(struct iscsi_cmd *cmd)
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
 }
 
-/*	iscsi_start_dataout_timer():
- *
+/*
  *	Called with cmd->dataout_timeout_lock held.
  */
 void iscsi_start_dataout_timer(
@@ -1354,10 +1284,6 @@ void iscsi_start_dataout_timer(
 	add_timer(&cmd->dataout_timer);
 }
 
-/*	iscsi_stop_dataout_timer():
- *
- *
- */
 void iscsi_stop_dataout_timer(struct iscsi_cmd *cmd)
 {
 	spin_lock_bh(&cmd->dataout_timeout_lock);
@@ -1376,4 +1302,3 @@ void iscsi_stop_dataout_timer(struct iscsi_cmd *cmd)
 			cmd->init_task_tag);
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
 }
-

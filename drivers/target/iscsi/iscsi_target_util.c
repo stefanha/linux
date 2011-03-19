@@ -187,8 +187,7 @@ void iscsi_free_r2ts_from_list(struct iscsi_cmd *cmd)
 	spin_unlock_bh(&cmd->r2t_lock);
 }
 
-/*	iscsi_allocate_cmd():
- *
+/*
  *	May be called from interrupt context.
  */
 struct iscsi_cmd *iscsi_allocate_cmd(struct iscsi_conn *conn)
@@ -983,8 +982,7 @@ void lio_release_cmd_to_pool(struct se_cmd *se_cmd)
 	iscsi_release_cmd_to_pool(cmd);
 }
 
-/*	iscsi_pack_lun():
- *
+/*
  *	Routine to pack an ordinary (LINUX) LUN 32-bit number
  *		into an 8-byte LUN structure
  *	(see SAM-2, Section 4.12.3 page 39)
@@ -1015,8 +1013,7 @@ inline u64 iscsi_pack_lun(unsigned int lun)
 	return cpu_to_le64(result);
 }
 
-/*	iscsi_unpack_lun():
- *
+/*
  *	Routine to pack an 8-byte LUN structure into a ordinary (LINUX) 32-bit
  *	LUN number (see SAM-2, Section 4.12.3 page 39)
  *	Thanks to UNH for help with this :-).
@@ -1086,10 +1083,6 @@ void iscsi_dec_session_usage_count(struct iscsi_session *sess)
 	spin_unlock_bh(&sess->session_usage_lock);
 }
 
-/*	iscsi_inc_session_usage_count():
- *
- *
- */
 void iscsi_inc_session_usage_count(struct iscsi_session *sess)
 {
 
@@ -1098,8 +1091,7 @@ void iscsi_inc_session_usage_count(struct iscsi_session *sess)
 	spin_unlock_bh(&sess->session_usage_lock);
 }
 
-/*	iscsi_determine_sync_and_steering_counts():
- *
+/*
  *	Used before iscsi_do[rx,tx]_data() to determine iov and [rx,tx]_marker
  *	array counts needed for sync and steering.
  */
@@ -1133,8 +1125,7 @@ static inline int iscsi_determine_sync_and_steering_counts(
 	return 0;
 }
 
-/*	iscsi_set_sync_and_steering_values():
- *
+/*
  *	Setup conn->if_marker and conn->of_marker values based upon
  *	the initial marker-less interval. (see iSCSI v19 A.2)
  */
@@ -1609,8 +1600,7 @@ void iscsi_get_network_interface_from_conn(struct iscsi_conn *conn)
 	conn->net_if = net_dev;
 }
 
-/*      iscsi_start_netif_timer():
- *
+/*
  *	Called with conn->netif_lock held.
  */
 void iscsi_start_netif_timer(struct iscsi_conn *conn)
@@ -1705,8 +1695,7 @@ void iscsi_mod_nopin_response_timer(struct iscsi_conn *conn)
 	spin_unlock_bh(&conn->nopin_timer_lock);
 }
 
-/*	iscsi_start_nopin_response_timer():
- *
+/*
  *	Called with conn->nopin_timer_lock held.
  */
 void iscsi_start_nopin_response_timer(struct iscsi_conn *conn)
@@ -2041,8 +2030,7 @@ send_datacrc:
 	return 0;
 }
 
-/*      iscsi_tx_login_rsp():
- *
+/*
  *      This function is used for mainly sending a ISCSI_TARG_LOGIN_RSP PDU
  *      back to the Initiator when an expection condition occurs with the
  *      errors set in status_class and status_detail.

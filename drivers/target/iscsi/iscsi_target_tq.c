@@ -32,10 +32,6 @@ DEFINE_SPINLOCK(active_ts_lock);
 DEFINE_SPINLOCK(inactive_ts_lock);
 DEFINE_SPINLOCK(ts_bitmap_lock);
 
-/*	iscsi_add_ts_to_active_list():
- *
- *
- */
 static void iscsi_add_ts_to_active_list(struct iscsi_thread_set *ts)
 {
 	spin_lock(&active_ts_lock);
@@ -44,10 +40,6 @@ static void iscsi_add_ts_to_active_list(struct iscsi_thread_set *ts)
 	spin_unlock(&active_ts_lock);
 }
 
-/*	iscsi_add_ts_to_inactive_list():
- *
- *
- */
 extern void iscsi_add_ts_to_inactive_list(struct iscsi_thread_set *ts)
 {
 	spin_lock(&inactive_ts_lock);
@@ -56,10 +48,6 @@ extern void iscsi_add_ts_to_inactive_list(struct iscsi_thread_set *ts)
 	spin_unlock(&inactive_ts_lock);
 }
 
-/*	iscsi_del_ts_from_active_list():
- *
- *
- */
 static void iscsi_del_ts_from_active_list(struct iscsi_thread_set *ts)
 {
 	spin_lock(&active_ts_lock);
@@ -68,10 +56,6 @@ static void iscsi_del_ts_from_active_list(struct iscsi_thread_set *ts)
 	spin_unlock(&active_ts_lock);
 }
 
-/*	iscsi_get_ts_from_inactive_list():
- *
- *
- */
 static struct iscsi_thread_set *iscsi_get_ts_from_inactive_list(void)
 {
 	struct iscsi_thread_set *ts;
@@ -92,10 +76,6 @@ static struct iscsi_thread_set *iscsi_get_ts_from_inactive_list(void)
 	return ts;
 }
 
-/*	iscsi_allocate_thread_sets():
- *
- *
- */
 extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 {
 	int allocated_thread_pair_count = 0, i, thread_id;
@@ -160,10 +140,6 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 	return allocated_thread_pair_count;
 }
 
-/*	iscsi_deallocate_thread_sets():
- *
- *
- */
 extern void iscsi_deallocate_thread_sets(void)
 {
 	u32 released_count = 0;
@@ -200,10 +176,6 @@ extern void iscsi_deallocate_thread_sets(void)
 			"\n", released_count, released_count * 2);
 }
 
-/*	iscsi_deallocate_extra_thread_sets():
- *
- *
- */
 static void iscsi_deallocate_extra_thread_sets(void)
 {
 	u32 orig_count, released_count = 0;
@@ -246,10 +218,6 @@ static void iscsi_deallocate_extra_thread_sets(void)
 	}
 }
 
-/*	iscsi_activate_thread_set():
- *
- *
- */
 void iscsi_activate_thread_set(struct iscsi_conn *conn, struct iscsi_thread_set *ts)
 {
 	iscsi_add_ts_to_active_list(ts);
@@ -258,7 +226,6 @@ void iscsi_activate_thread_set(struct iscsi_conn *conn, struct iscsi_thread_set 
 	conn->thread_set = ts;
 	ts->conn = conn;
 	spin_unlock_bh(&ts->ts_state_lock);
-
 	/*
 	 * Start up the RX thread and wait on rx_post_start_comp.  The RX
 	 * Thread will then do the same for the TX Thread in
@@ -268,11 +235,6 @@ void iscsi_activate_thread_set(struct iscsi_conn *conn, struct iscsi_thread_set 
 	wait_for_completion(&ts->rx_post_start_comp);
 }
 
-/*	iscsi_get_thread_set():
- *
- *	Parameters:	iSCSI Connection Pointer.
- *	Returns:	iSCSI Thread Set Pointer
- */
 struct iscsi_thread_set *iscsi_get_thread_set(void)
 {
 	int allocate_ts = 0;
@@ -306,10 +268,6 @@ get_set:
 	return ts;
 }
 
-/*	iscsi_set_thread_clear():
- *
- *
- */
 void iscsi_set_thread_clear(struct iscsi_conn *conn, u8 thread_clear)
 {
 	struct iscsi_thread_set *ts = NULL;
@@ -332,10 +290,6 @@ void iscsi_set_thread_clear(struct iscsi_conn *conn, u8 thread_clear)
 	spin_unlock_bh(&ts->ts_state_lock);
 }
 
-/*	iscsi_set_thread_set_signal():
- *
- *
- */
 void iscsi_set_thread_set_signal(struct iscsi_conn *conn, u8 signal_sent)
 {
 	struct iscsi_thread_set *ts = NULL;
@@ -351,11 +305,6 @@ void iscsi_set_thread_set_signal(struct iscsi_conn *conn, u8 signal_sent)
 	spin_unlock_bh(&ts->ts_state_lock);
 }
 
-/*	iscsi_release_thread_set():
- *
- *	Parameters:	iSCSI Connection Pointer.
- *	Returns:	0 on success, -1 on error.
- */
 int iscsi_release_thread_set(struct iscsi_conn *conn)
 {
 	int thread_called = 0;
@@ -412,10 +361,6 @@ int iscsi_release_thread_set(struct iscsi_conn *conn)
 	return 0;
 }
 
-/*	iscsi_thread_set_force_reinstatement():
- *
- *
- */
 int iscsi_thread_set_force_reinstatement(struct iscsi_conn *conn)
 {
 	struct iscsi_thread_set *ts;
@@ -443,10 +388,6 @@ int iscsi_thread_set_force_reinstatement(struct iscsi_conn *conn)
 	return 0;
 }
 
-/*	iscsi_check_to_add_additional_sets():
- *
- *
- */
 static void iscsi_check_to_add_additional_sets(void)
 {
 	int thread_sets_add;
@@ -458,10 +399,6 @@ static void iscsi_check_to_add_additional_sets(void)
 		iscsi_allocate_thread_sets(1);
 }
 
-/*	iscsi_signal_thread_pre_handler():
- *
- *
- */
 static int iscsi_signal_thread_pre_handler(struct iscsi_thread_set *ts)
 {
 	spin_lock_bh(&ts->ts_state_lock);
@@ -474,10 +411,6 @@ static int iscsi_signal_thread_pre_handler(struct iscsi_thread_set *ts)
 	return 0;
 }
 
-/*	iscsi_rx_thread_pre_handler():
- *
- *
- */
 struct iscsi_conn *iscsi_rx_thread_pre_handler(struct iscsi_thread_set *ts)
 {
 	int ret;
@@ -531,10 +464,6 @@ sleep:
 	return ts->conn;
 }
 
-/*	iscsi_tx_thread_pre_handler():
- *
- *
- */
 struct iscsi_conn *iscsi_tx_thread_pre_handler(struct iscsi_thread_set *ts)
 {
 	int ret;

@@ -210,8 +210,7 @@ static void iscsi_login_set_conn_values(
 	mutex_unlock(&auth_id_lock);
 }
 
-/*	iscsi_login_zero_tsih():
- *
+/*
  *	This is the leading connection of a new session,
  *	or session reinstatement.
  */
@@ -417,8 +416,7 @@ static int iscsi_login_non_zero_tsih_s1(
 	return 0;
 }
 
-/*	iscsi_login_non_zero_tsih_s2():
- *
+/*
  *	Add a new connection to an existing session.
  */
 static int iscsi_login_non_zero_tsih_s2(

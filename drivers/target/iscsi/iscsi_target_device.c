@@ -29,10 +29,6 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 
-/*	iscsi_get_lun():
- *
- *
- */
 int iscsi_get_lun_for_tmr(
 	struct iscsi_cmd *cmd,
 	u64 lun)
@@ -52,11 +48,6 @@ int iscsi_get_lun_for_tmr(
 	return transport_get_lun_for_tmr(SE_CMD(cmd), unpacked_lun);
 }
 
-/*	iscsi_get_lun_for_cmd():
- *
- *	Returns (0) on success
- * 	Returns (< 0) on failure
- */
 int iscsi_get_lun_for_cmd(
 	struct iscsi_cmd *cmd,
 	unsigned char *cdb,
@@ -77,10 +68,6 @@ int iscsi_get_lun_for_cmd(
 	return transport_get_lun_for_cmd(SE_CMD(cmd), unpacked_lun);
 }
 
-/*	iscsi_determine_maxcmdsn():
- *
- *
- */
 void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
 {
 	struct se_node_acl *se_nacl;

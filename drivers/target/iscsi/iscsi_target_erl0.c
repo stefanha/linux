@@ -33,8 +33,7 @@
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
 
-/*	iscsi_set_dataout_sequence_values():
- *
+/*
  *	Used to set values in struct iscsi_cmd that iscsi_dataout_check_sequence()
  *	checks against to determine a PDU's Offset+Length is within the current
  *	DataOUT Sequence.  Used for DataSequenceInOrder=Yes only.
@@ -75,10 +74,6 @@ void iscsi_set_dataout_sequence_values(
 	}
 }
 
-/*	iscsi_dataout_within_command_recovery_check():
- *
- *
- */
 static inline int iscsi_dataout_within_command_recovery_check(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -144,10 +139,6 @@ dump:
 	return iscsi_dump_data_payload(conn, payload_length, 1);
 }
 
-/*	iscsi_dataout_check_unsolicited_sequence():
- *
- *
- */
 static inline int iscsi_dataout_check_unsolicited_sequence(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -223,10 +214,6 @@ out:
 	return DATAOUT_NORMAL;
 }
 
-/*	iscsi_dataout_check_sequence():
- *
- *
- */
 static inline int iscsi_dataout_check_sequence(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -355,10 +342,6 @@ out:
 	return DATAOUT_NORMAL;
 }
 
-/*	iscsi_dataout_check_datasn():
- *
- *	Called from:	iscsi_check_pre_dataout()
- */
 static inline int iscsi_dataout_check_datasn(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -414,10 +397,6 @@ dump:
 				DATAOUT_NORMAL;
 }
 
-/*	iscsi_dataout_pre_datapduinorder_yes():
- *
- *
- */
 static inline int iscsi_dataout_pre_datapduinorder_yes(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -479,10 +458,6 @@ dump:
 	       (dump) ? DATAOUT_WITHIN_COMMAND_RECOVERY : DATAOUT_NORMAL;
 }
 
-/*	iscsi_dataout_pre_datapduinorder_no():
- *
- *	Called from:	iscsi_check_pre_dataout()
- */
 static inline int iscsi_dataout_pre_datapduinorder_no(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -514,10 +489,6 @@ static inline int iscsi_dataout_pre_datapduinorder_no(
 	return DATAOUT_NORMAL;
 }
 
-/*	iscsi_dataout_update_r2t():
- *
- *
- */
 static int iscsi_dataout_update_r2t(struct iscsi_cmd *cmd, u32 offset, u32 length)
 {
 	struct iscsi_r2t *r2t;
@@ -537,10 +508,6 @@ static int iscsi_dataout_update_r2t(struct iscsi_cmd *cmd, u32 offset, u32 lengt
 	return 0;
 }
 
-/*	iscsi_dataout_update_datapduinorder_no():
- *
- *
- */
 static int iscsi_dataout_update_datapduinorder_no(
 	struct iscsi_cmd *cmd,
 	u32 data_sn,
@@ -574,10 +541,6 @@ static int iscsi_dataout_update_datapduinorder_no(
 	return DATAOUT_NORMAL;
 }
 
-/*	iscsi_dataout_post_crc_passed():
- *
- *	Called from:	iscsi_check_post_dataout()
- */
 static inline int iscsi_dataout_post_crc_passed(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -683,10 +646,6 @@ static inline int iscsi_dataout_post_crc_passed(
 		DATAOUT_SEND_R2T : DATAOUT_NORMAL;
 }
 
-/*	iscsi_dataout_post_crc_failed():
- *
- *	Called from:	iscsi_check_post_dataout()
- */
 static inline int iscsi_dataout_post_crc_failed(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -698,7 +657,6 @@ static inline int iscsi_dataout_post_crc_failed(
 
 	if (conn->sess->sess_ops->DataPDUInOrder)
 		goto recover;
-
 	/*
 	 * The rest of this function is only called when DataPDUInOrder=No.
 	 */
@@ -721,8 +679,7 @@ recover:
 	return iscsi_recover_dataout_sequence(cmd, hdr->offset, payload_length);
 }
 
-/*	iscsi_check_pre_dataout():
- *
+/*
  *	Called from iscsi_handle_data_out() before DataOUT Payload is received
  *	and CRC computed.
  */
@@ -760,8 +717,7 @@ extern int iscsi_check_pre_dataout(
 		iscsi_dataout_pre_datapduinorder_no(cmd, buf);
 }
 
-/*	iscsi_check_post_dataout():
- *
+/*
  *	Called from iscsi_handle_data_out() after DataOUT Payload is received
  *	and CRC computed.
  */
@@ -791,10 +747,6 @@ int iscsi_check_post_dataout(
 	}
 }
 
-/*	iscsi_handle_time2retain_timeout():
- *
- *
- */
 static void iscsi_handle_time2retain_timeout(unsigned long data)
 {
 	struct iscsi_session *sess = (struct iscsi_session *) data;
@@ -835,14 +787,9 @@ static void iscsi_handle_time2retain_timeout(unsigned long data)
 	iscsi_close_session(sess);
 }
 
-/*	iscsi_start_session_cleanup_handler():
- *
- *
- */
 extern void iscsi_start_time2retain_handler (struct iscsi_session *sess)
 {
 	int tpg_active;
-
 	/*
 	 * Only start Time2Retain timer when the assoicated TPG is still in
 	 * an ACTIVE (eg: not disabled or shutdown) state.
@@ -870,8 +817,7 @@ extern void iscsi_start_time2retain_handler (struct iscsi_session *sess)
 	add_timer(&sess->time2retain_timer);
 }
 
-/*	iscsi_stop_time2retain_timer():
- *
+/*
  *	Called with spin_lock_bh(&struct se_portal_group->session_lock) held
  */
 extern int iscsi_stop_time2retain_timer(struct iscsi_session *sess)
@@ -897,10 +843,6 @@ extern int iscsi_stop_time2retain_timer(struct iscsi_session *sess)
 	return 0;
 }
 
-/*	iscsi_connection_reinstatement_rcfr():
- *
- *
- */
 void iscsi_connection_reinstatement_rcfr(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->state_lock);
@@ -922,10 +864,6 @@ sleep:
 	complete(&conn->conn_post_wait_comp);
 }
 
-/*	iscsi_cause_connection_reinstatement():
- *
- *
- */
 void iscsi_cause_connection_reinstatement(struct iscsi_conn *conn, int sleep)
 {
 	spin_lock_bh(&conn->state_lock);
@@ -962,10 +900,6 @@ void iscsi_cause_connection_reinstatement(struct iscsi_conn *conn, int sleep)
 	complete(&conn->conn_post_wait_comp);
 }
 
-/*	iscsi_fall_back_to_erl0():
- *
- *
- */
 void iscsi_fall_back_to_erl0(struct iscsi_session *sess)
 {
 	TRACE(TRACE_ERL0, "Falling back to ErrorRecoveryLevel=0 for SID:"
@@ -974,10 +908,6 @@ void iscsi_fall_back_to_erl0(struct iscsi_session *sess)
 	atomic_set(&sess->session_fall_back_to_erl0, 1);
 }
 
-/*	iscsi_handle_connection_cleanup():
- *
- *
- */
 static void iscsi_handle_connection_cleanup(struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
@@ -994,10 +924,6 @@ static void iscsi_handle_connection_cleanup(struct iscsi_conn *conn)
 	}
 }
 
-/*	iscsi_take_action_for_connection_exit():
- *
- *
- */
 extern void iscsi_take_action_for_connection_exit(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->state_lock);
@@ -1025,8 +951,7 @@ extern void iscsi_take_action_for_connection_exit(struct iscsi_conn *conn)
 	iscsi_handle_connection_cleanup(conn);
 }
 
-/*	iscsi_recover_from_unknown_opcode():
- *
+/*
  *	This is the simple function that makes the magic of
  *	sync and steering happen in the follow paradoxical order:
  *
@@ -1078,4 +1003,3 @@ int iscsi_recover_from_unknown_opcode(struct iscsi_conn *conn)
 
 	return 0;
 }
-

@@ -452,8 +452,7 @@ static int iscsi_target_get_initial_payload(
 	return 0;
 }
 
-/*	iscsi_target_check_for_existing_instances():
- *
+/*
  *	NOTE: We check for existing sessions or connections AFTER the initiator
  *	has been successfully authenticated in order to protect against faked
  *	ISID/TSIH combinations.

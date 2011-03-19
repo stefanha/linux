@@ -35,10 +35,6 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 
-/*	iscsi_tmr_abort_task():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
 u8 iscsi_tmr_abort_task(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -72,8 +68,7 @@ u8 iscsi_tmr_abort_task(
 	return ISCSI_TMF_RSP_COMPLETE;
 }
 
-/*	iscsi_tmr_task_warm_reset():
- *
+/*
  *	Called from iscsi_handle_task_mgt_cmd().
  */
 int iscsi_tmr_task_warm_reset(
@@ -99,10 +94,6 @@ int iscsi_tmr_task_warm_reset(
 	return 0;
 }
 
-/*	iscsi_tmr_task_cold_reset():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
 int iscsi_tmr_task_cold_reset(
 	struct iscsi_conn *conn,
 	struct iscsi_tmr_req *tmr_req,
@@ -123,10 +114,6 @@ int iscsi_tmr_task_cold_reset(
 	return 0;
 }
 
-/*	iscsi_tmr_task_reassign():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
 u8 iscsi_tmr_task_reassign(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
@@ -420,10 +407,6 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
 	return 0;
 }
 
-/*	iscsi_task_reassign_complete():
- *
- *	Called from iscsi_tmr_post_handler().
- */
 static int iscsi_task_reassign_complete(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
@@ -465,8 +448,7 @@ static int iscsi_task_reassign_complete(
 	return 0;
 }
 
-/*	iscsi_tmr_post_handler():
- *
+/*
  *	Handles special after-the-fact actions related to TMRs.
  *	Right now the only one that its really needed for is
  *	connection recovery releated TASK_REASSIGN.
@@ -483,8 +465,7 @@ extern int iscsi_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn
 	return 0;
 }
 
-/*	iscsi_task_reassign_prepare_read():
- *
+/*
  *	Nothing to do here, but leave it for good measure. :-)
  */
 int iscsi_task_reassign_prepare_read(
@@ -795,8 +776,7 @@ drop_unacknowledged_r2ts:
 	return 0;
 }
 
-/*	iscsi_check_task_reassign_expdatasn():
- *
+/*
  *	Performs sanity checks TMR TASK_REASSIGN's ExpDataSN for
  *	a given struct iscsi_cmd.
  */
