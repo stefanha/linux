@@ -657,7 +657,10 @@ int iscsi_add_nopin(
 		cmd->targ_xfer_tag = conn->sess->targ_xfer_tag++;
 	spin_unlock_bh(&conn->sess->ttt_lock);
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
+
 	if (want_response)
 		iscsi_start_nopin_response_timer(conn);
 	iscsi_add_cmd_to_immediate_queue(cmd, conn, state);
@@ -694,7 +697,9 @@ int iscsi_add_reject(
 	}
 	memcpy(cmd->buf_ptr, buf, ISCSI_HDR_LEN);
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	cmd->i_state = ISTATE_SEND_REJECT;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
@@ -739,8 +744,11 @@ int iscsi_add_reject_from_cmd(
 	}
 	memcpy(cmd->buf_ptr, buf, ISCSI_HDR_LEN);
 
-	if (add_to_conn)
-		iscsi_attach_cmd_to_queue(conn, cmd);
+	if (add_to_conn) {
+		spin_lock_bh(&conn->cmd_lock);
+		list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+		spin_unlock_bh(&conn->cmd_lock);
+	}
 
 	cmd->i_state = ISTATE_SEND_REJECT;
 	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
@@ -1251,7 +1259,9 @@ build_list:
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
 attach_cmd:
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 	/*
 	 * Check if we need to delay processing because of ALUA
 	 * Active/NonOptimized primary access state..
@@ -1875,11 +1885,12 @@ static inline int iscsi_handle_nop_out(
 				" but cmd is NULL!\n");
 			return -1;
 		}
-
 		/*
 		 * Initiator is expecting a NopIN ping reply,
 		 */
-		iscsi_attach_cmd_to_queue(conn, cmd);
+		spin_lock_bh(&conn->cmd_lock);
+		list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+		spin_unlock_bh(&conn->cmd_lock);
 
 		iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
 
@@ -2073,7 +2084,9 @@ static inline int iscsi_handle_task_mgt_cmd(
 	    (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))
 		se_tmr->call_transport = 1;
 attach:
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
 		cmdsn_ret = iscsi_check_received_cmdsn(conn,
@@ -2263,7 +2276,10 @@ static inline int iscsi_handle_text_cmd(
 	cmd->exp_stat_sn	= hdr->exp_statsn;
 	cmd->data_direction	= DMA_NONE;
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
+
 	iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
@@ -2456,7 +2472,9 @@ static inline int iscsi_handle_logout_cmd(
 	    (hdr->cid == conn->cid)))
 		logout_remove = 1;
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	if (reason_code != ISCSI_LOGOUT_REASON_RECOVERY)
 		iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
@@ -2832,9 +2850,11 @@ static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
 	cmd->iscsi_opcode = ISCSI_OP_ASYNC_EVENT;
 	cmd->i_state = ISTATE_SEND_ASYNCMSG;
 
-	iscsi_attach_cmd_to_queue(conn_p, cmd);
-	iscsi_add_cmd_to_response_queue(cmd, conn_p, cmd->i_state);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn_p->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
+	iscsi_add_cmd_to_response_queue(cmd, conn_p, cmd->i_state);
 	iscsi_dec_conn_usage_count(conn_p);
 }
 
@@ -3990,7 +4010,7 @@ get_immediate:
 					iscsi_stop_dataout_timer(cmd);
 
 				spin_lock_bh(&conn->cmd_lock);
-				iscsi_remove_cmd_from_conn_list(cmd, conn);
+				list_del(&cmd->i_list);
 				spin_unlock_bh(&conn->cmd_lock);
 				/*
 				 * Determine if a struct se_cmd is assoicated with
@@ -4540,7 +4560,7 @@ int iscsi_close_connection(
 	}
 
 	spin_lock_bh(&sess->conn_lock);
-	iscsi_remove_conn_from_list(sess, conn);
+	list_del(&conn->conn_list);
 
 	/*
 	 * Attempt to let the Initiator know this connection failed by

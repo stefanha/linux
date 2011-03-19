@@ -43,23 +43,6 @@
 extern struct list_head g_tiqn_list;
 extern spinlock_t tiqn_lock;
 
-inline void iscsi_attach_cmd_to_queue(struct iscsi_conn *conn, struct iscsi_cmd *cmd)
-{
-	spin_lock_bh(&conn->cmd_lock);
-	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
-	spin_unlock_bh(&conn->cmd_lock);
-}
-
-/*
- *	MUST be called with conn->cmd_lock held.
- */
-inline void iscsi_remove_cmd_from_conn_list(
-	struct iscsi_cmd *cmd,
-	struct iscsi_conn *conn)
-{
-	list_del(&cmd->i_list);
-}
-
 inline void iscsi_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 {
 	struct iscsi_cmd *cmd;
@@ -81,14 +64,6 @@ inline void iscsi_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 		spin_unlock(&cmd->istate_lock);
 	}
 	spin_unlock_bh(&conn->cmd_lock);
-}
-
-/*
- *	Called with sess->conn_lock held.
- */
-void iscsi_remove_conn_from_list(struct iscsi_session *sess, struct iscsi_conn *conn)
-{
-	list_del(&conn->conn_list);
 }
 
 /*
@@ -1072,7 +1047,6 @@ void iscsi_dec_session_usage_count(struct iscsi_session *sess)
 
 void iscsi_inc_session_usage_count(struct iscsi_session *sess)
 {
-
 	spin_lock_bh(&sess->session_usage_lock);
 	atomic_inc(&sess->session_usage_count);
 	spin_unlock_bh(&sess->session_usage_lock);
@@ -1881,7 +1855,6 @@ send_hdr:
 	len -= u_sg->padding;
 	if (conn->conn_ops->DataDigest)
 		len -= CRC_LEN;
-
 	/*
 	 * Start calculating from the first page of current struct se_mem.
 	 */
@@ -1891,20 +1864,11 @@ send_hdr:
 	if (se_len < pg_len)
 		pg_len = se_len;
 	se_off = se_mem->se_off;
-#if 0
-	printk(KERN_INFO "se: %p page: %p se_len: %d se_off: %d pg_len: %d\n",
-		se_mem, page, se_len, se_off, pg_len);
-#endif
 	/*
 	 * Calucate new se_len and se_off based upon u_sg->t_offset into
 	 * the current struct se_mem and possibily a different page.
 	 */
 	while (u_sg->t_offset) {
-#if 0
-		printk(KERN_INFO "u_sg->t_offset: %d, page: %p se_len: %d"
-			" se_off: %d pg_len: %d\n", u_sg->t_offset, page,
-			se_len, se_off, pg_len);
-#endif
 		if (u_sg->t_offset >= pg_len) {
 			u_sg->t_offset -= pg_len;
 			se_len -= pg_len;
@@ -1917,15 +1881,10 @@ send_hdr:
 			u_sg->t_offset = 0;
 		}
 	}
-
 	/*
 	 * Perform sendpage() for each page in the struct se_mem
 	 */
 	while (len) {
-#if 0
-		printk(KERN_INFO "len: %d page: %p se_len: %d se_off: %d\n",
-			len, page, se_len, se_off);
-#endif
 		if (se_len > len)
 			se_len = len;
 send_pg:

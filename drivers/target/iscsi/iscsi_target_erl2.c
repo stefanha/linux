@@ -320,7 +320,7 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 		if (!(cmd->cmd_flags & ICF_OOO_CMDSN))
 			continue;
 
-		iscsi_remove_cmd_from_conn_list(cmd, conn);
+		list_del(&cmd->i_list);
 
 		spin_unlock_bh(&conn->cmd_lock);
 		if (!(SE_CMD(cmd)) ||
@@ -364,7 +364,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	/*
 	 * Only perform connection recovery on ISCSI_OP_SCSI_CMD or
 	 * ISCSI_OP_NOOP_OUT opcodes.  For all other opcodes call
-	 * iscsi_remove_cmd_from_conn_list() to release the command to the
+	 * list_del(&cmd->i_list); to release the command to the
 	 * session pool and remove it from the connection's list.
 	 *
 	 * Also stop the DataOUT timer, which will be restarted after
@@ -380,9 +380,9 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 				" CID: %hu\n", cmd->iscsi_opcode,
 				cmd->init_task_tag, cmd->cmd_sn, conn->cid);
 
-			iscsi_remove_cmd_from_conn_list(cmd, conn);
-
+			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
+
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
@@ -407,9 +407,9 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		 */
 		if (!(cmd->cmd_flags & ICF_OOO_CMDSN) && !cmd->immediate_cmd &&
 		     (cmd->cmd_sn >= conn->sess->exp_cmd_sn)) {
-			iscsi_remove_cmd_from_conn_list(cmd, conn);
-
+			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
+
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
@@ -436,7 +436,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 
 		cmd->sess = conn->sess;
 
-		iscsi_remove_cmd_from_conn_list(cmd, conn);
+		list_del(&cmd->i_list);
 		spin_unlock_bh(&conn->cmd_lock);
 
 		iscsi_free_all_datain_reqs(cmd);
