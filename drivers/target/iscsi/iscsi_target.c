@@ -306,7 +306,6 @@ static struct iscsi_np *iscsit_get_np(
 			spin_unlock(&np->np_thread_lock);
 			continue;
 		}
-		spin_unlock(&np->np_thread_lock);
 
 		if (ipv6 != NULL) {
 			p = (void *)&np->np_ipv6[0];
@@ -320,6 +319,13 @@ static struct iscsi_np *iscsit_get_np(
 			
 		if (!memcmp(p, ip, net_size) && (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
+			/*
+			 * Increment the np_exports reference count now to
+			 * prevent iscsit_del_np() below from being called
+			 * while iscsi_tpg_add_network_portal() is called.
+			 */
+			np->np_exports++;
+			spin_unlock(&np->np_thread_lock);
 			spin_unlock_bh(&np_lock);
 			return np;
 		}
@@ -388,6 +394,15 @@ struct iscsi_np *iscsit_add_np(
 		kfree(np);
 		return ERR_PTR(ret);
 	}
+	/*
+	 * Increment the np_exports reference count now to prevent
+	 * iscsit_del_np() below from being run while a new call to
+	 * iscsi_tpg_add_network_portal() for a matching iscsi_np is
+	 * active.  We don't need to hold np->np_thread_lock at this
+	 * point because iscsi_np has not been added to g_np_list yet.
+	 */
+	np->np_exports = 1;
+
 	spin_lock_bh(&np_lock);
 	list_add_tail(&np->np_list, &g_np_list);
 	spin_unlock_bh(&np_lock);

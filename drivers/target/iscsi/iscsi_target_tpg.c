@@ -592,16 +592,19 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 		ip_buf = &buf_ipv4[0];
 	}
 
-	np = iscsit_add_np(np_addr, network_transport);
-	if (IS_ERR(np))
-		return ERR_CAST(np);
-
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
 	if (!tpg_np) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" struct iscsi_tpg_np.\n");
 		return ERR_PTR(-ENOMEM);
 	}
+
+	np = iscsit_add_np(np_addr, network_transport);
+	if (IS_ERR(np)) {
+		kfree(tpg_np);
+		return ERR_CAST(np);
+	}
+
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_child_list);
 	INIT_LIST_HEAD(&tpg_np->tpg_np_parent_list);
@@ -630,12 +633,6 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
-
-	spin_lock_bh(&np->np_thread_lock);
-	np->np_exports++;
-	printk(KERN_INFO "CORE[%s]_TPG[%hu] - Incremented np_exports to %u\n",
-		tpg->tpg_tiqn->tiqn, tpg->tpgt, np->np_exports);
-	spin_unlock_bh(&np->np_thread_lock);
 
 	return tpg_np;
 }
