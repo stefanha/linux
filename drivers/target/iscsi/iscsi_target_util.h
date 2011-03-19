@@ -72,10 +72,8 @@ extern struct iscsi_queue_req *iscsi_get_cmd_from_response_queue(struct iscsi_co
 extern void iscsi_remove_cmd_from_tx_queues(struct iscsi_cmd *, struct iscsi_conn *);
 extern void iscsi_free_queue_reqs_for_conn(struct iscsi_conn *);
 extern void iscsi_release_cmd_direct(struct iscsi_cmd *);
-extern void lio_release_cmd_direct(struct se_cmd *);
 extern void __iscsi_release_cmd_to_pool(struct iscsi_cmd *, struct iscsi_session *);
 extern void iscsi_release_cmd_to_pool(struct iscsi_cmd *);
-extern void lio_release_cmd_to_pool(struct se_cmd *);
 extern u64 iscsi_pack_lun(unsigned int);
 extern u32 iscsi_unpack_lun(unsigned char *);
 extern int iscsi_check_session_usage_count(struct iscsi_session *);
@@ -101,7 +99,6 @@ extern void iscsi_stop_nopin_response_timer(struct iscsi_conn *);
 extern void __iscsi_start_nopin_timer(struct iscsi_conn *);
 extern void iscsi_start_nopin_timer(struct iscsi_conn *);
 extern void iscsi_stop_nopin_timer(struct iscsi_conn *);
-extern int iscsi_allocate_iovecs_for_cmd(struct se_cmd *);
 extern int iscsi_send_tx_data(struct iscsi_cmd *, struct iscsi_conn *, int);
 extern int iscsi_fe_sendpage_sg(struct se_unmap_sg *, struct iscsi_conn *);
 extern int iscsi_tx_login_rsp(struct iscsi_conn *, u8, u8);

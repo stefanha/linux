@@ -635,84 +635,6 @@ static void __exit iscsi_target_cleanup_module(void)
 	printk(KERN_INFO "Unloading Complete.\n");
 }
 
-char *iscsi_get_fabric_name(void)
-{
-	return "iSCSI";
-}
-
-struct iscsi_cmd *iscsi_get_cmd(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	return cmd;
-}
-
-u32 iscsi_get_task_tag(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	return cmd->init_task_tag;
-}
-
-int iscsi_get_cmd_state(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	return cmd->i_state;
-}
-
-void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	if (cmd->immediate_data || cmd->unsolicited_data)
-		complete(&cmd->unsolicited_data_comp);
-}
-
-int iscsi_is_state_remove(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	return (cmd->i_state == ISTATE_REMOVE);
-}
-
-int lio_sess_logged_in(struct se_session *se_sess)
-{
-	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
-	int ret;
-
-	/*
-	 * Called with spin_lock_bh(&se_global->se_tpg_lock); and
-	 * spin_lock(&se_tpg->session_lock); held.
-	 */
-	spin_lock(&sess->conn_lock);
-	ret = (sess->session_state != TARG_SESS_STATE_LOGGED_IN);
-	spin_unlock(&sess->conn_lock);
-
-	return ret;
-}
-
-u32 lio_sess_get_index(struct se_session *se_sess)
-{
-	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
-
-	return sess->session_index;
-}
-
-u32 lio_sess_get_initiator_sid(
-	struct se_session *se_sess,
-	unsigned char *buf,
-	u32 size)
-{
-	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
-	/*
-	 * iSCSI Initiator Session Identifier from RFC-3720.
-	 */
-	return snprintf(buf, size, "%02x%02x%02x%02x%02x%02x",
-		sess->isid[0], sess->isid[1], sess->isid[2],
-		sess->isid[3], sess->isid[4], sess->isid[5]);
-}
-
 int iscsi_add_nopin(
 	struct iscsi_conn *conn,
 	int want_response)
@@ -2966,15 +2888,6 @@ static int iscsi_send_conn_drop_async_message(
 	return 0;
 }
 
-int lio_queue_data_in(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	cmd->i_state = ISTATE_SEND_DATAIN;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
-	return 0;
-}
-
 static inline int iscsi_send_data_in(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn,
@@ -3590,67 +3503,6 @@ int iscsi_build_r2ts_for_cmd(
 	return 0;
 }
 
-int lio_write_pending(
-	struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	if (cmd->immediate_data || cmd->unsolicited_data)
-		complete(&cmd->unsolicited_data_comp);
-	else {
-		if (iscsi_build_r2ts_for_cmd(cmd, cmd->conn, 1) < 0)
-			return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-	}
-
-	return 0;
-}
-
-int lio_write_pending_status(
-	struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-	int ret;
-
-	spin_lock_bh(&cmd->istate_lock);
-	ret = !(cmd->cmd_flags & ICF_GOT_LAST_DATAOUT);
-	spin_unlock_bh(&cmd->istate_lock);
-
-	return ret;
-}
-
-int lio_queue_status(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	cmd->i_state = ISTATE_SEND_STATUS;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
-
-	return 0;
-}
-
-u16 lio_set_fabric_sense_len(struct se_cmd *se_cmd, u32 sense_length)
-{
-	unsigned char *buffer = se_cmd->sense_buffer;
-	/*
-	 * From RFC-3720 10.4.7.  Data Segment - Sense and Response Data Segment
-	 * 16-bit SenseLength.
-	 */
-	buffer[0] = ((sense_length >> 8) & 0xff);
-	buffer[1] = (sense_length & 0xff);
-	/*
-	 * Return two byte offset into allocated sense_buffer.
-	 */
-	return 2;
-}
-
-u16 lio_get_fabric_sense_len(void)
-{
-	/*
-	 * Return two byte offset into allocated sense_buffer.
-	 */
-	return 2;
-}
-
 static inline int iscsi_send_status(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
@@ -3765,16 +3617,6 @@ static inline int iscsi_send_status(
 		" Response: 0x%02x, SAM Status: 0x%02x, CID: %hu\n",
 		(!recovery) ? "" : "Recovery ", cmd->init_task_tag,
 		cmd->stat_sn, 0x00, cmd->se_cmd.scsi_status, conn->cid);
-
-	return 0;
-}
-
-int lio_queue_tm_rsp(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	cmd->i_state = ISTATE_SEND_TASKMGTRSP;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
 
 	return 0;
 }

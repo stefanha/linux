@@ -940,13 +940,6 @@ void iscsi_release_cmd_direct(struct iscsi_cmd *cmd)
 	kmem_cache_free(lio_cmd_cache, cmd);
 }
 
-void lio_release_cmd_direct(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	iscsi_release_cmd_direct(cmd);
-}
-
 void __iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *sess)
 {
 	struct iscsi_conn *conn = cmd->conn;
@@ -974,13 +967,6 @@ void iscsi_release_cmd_to_pool(struct iscsi_cmd *cmd)
 		__iscsi_release_cmd_to_pool(cmd, (cmd->conn) ?
 			cmd->conn->sess : cmd->sess);
 	}
-}
-
-void lio_release_cmd_to_pool(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	iscsi_release_cmd_to_pool(cmd);
 }
 
 /*
@@ -1832,22 +1818,6 @@ void iscsi_stop_nopin_timer(struct iscsi_conn *conn)
 	spin_lock_bh(&conn->nopin_timer_lock);
 	conn->nopin_timer_flags &= ~ISCSI_TF_RUNNING;
 	spin_unlock_bh(&conn->nopin_timer_lock);
-}
-
-int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-	u32 iov_count = (T_TASK(se_cmd)->t_tasks_se_num == 0) ? 1 :
-				T_TASK(se_cmd)->t_tasks_se_num;
-
-	iov_count += TRANSPORT_IOV_DATA_BUFFER;
-
-	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_KERNEL);
-	if (!cmd->iov_data)
-		return -ENOMEM;
-
-	cmd->orig_iov_data_count = iov_count;
-	return 0;
 }
 
 int iscsi_send_tx_data(

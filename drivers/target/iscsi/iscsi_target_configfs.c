@@ -778,6 +778,20 @@ static struct configfs_attribute *lio_target_initiator_attrs[] = {
 	NULL,
 };
 
+static struct se_node_acl *lio_tpg_alloc_fabric_acl(
+	struct se_portal_group *se_tpg)
+{
+	struct iscsi_node_acl *acl;
+
+	acl = kzalloc(sizeof(struct iscsi_node_acl), GFP_KERNEL);
+	if (!acl) {
+		printk(KERN_ERR "Unable to allocate memory for struct iscsi_node_acl\n");
+		return NULL;
+	}
+
+	return &acl->se_node_acl;
+}
+
 static struct se_node_acl *lio_target_make_nodeacl(
 	struct se_portal_group *se_tpg,
 	struct config_group *group,
@@ -791,6 +805,8 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	u32 cmdsn_depth;
 
 	se_nacl_new = lio_tpg_alloc_fabric_acl(se_tpg);
+	if (!se_nacl_new)
+		return ERR_PTR(-ENOMEM);
 
 	acl = container_of(se_nacl_new, struct iscsi_node_acl,
 				se_node_acl);
@@ -1464,6 +1480,321 @@ static struct configfs_attribute *lio_target_discovery_auth_attrs[] = {
 };
 
 /* End lio_target_discovery_auth_cit */
+
+/* Start functions for target_core_fabric_ops */
+
+static char *iscsi_get_fabric_name(void)
+{
+	return "iSCSI";
+}
+
+static u32 iscsi_get_task_tag(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	return cmd->init_task_tag;
+}
+
+static int iscsi_get_cmd_state(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	return cmd->i_state;
+}
+
+static void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	if (cmd->immediate_data || cmd->unsolicited_data)
+		complete(&cmd->unsolicited_data_comp);
+}
+
+static int iscsi_is_state_remove(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	return (cmd->i_state == ISTATE_REMOVE);
+}
+
+static int lio_sess_logged_in(struct se_session *se_sess)
+{
+	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
+	int ret;
+	/*
+	 * Called with spin_lock_bh(&se_global->se_tpg_lock); and
+	 * spin_lock(&se_tpg->session_lock); held.
+	 */
+	spin_lock(&sess->conn_lock);
+	ret = (sess->session_state != TARG_SESS_STATE_LOGGED_IN);
+	spin_unlock(&sess->conn_lock);
+
+	return ret;
+}
+
+static u32 lio_sess_get_index(struct se_session *se_sess)
+{
+	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
+
+	return sess->session_index;
+}
+
+static u32 lio_sess_get_initiator_sid(
+	struct se_session *se_sess,
+	unsigned char *buf,
+	u32 size)
+{
+	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
+	/*
+	 * iSCSI Initiator Session Identifier from RFC-3720.
+	 */
+	return snprintf(buf, size, "%02x%02x%02x%02x%02x%02x",
+		sess->isid[0], sess->isid[1], sess->isid[2],
+		sess->isid[3], sess->isid[4], sess->isid[5]);
+}
+
+static int lio_queue_data_in(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	cmd->i_state = ISTATE_SEND_DATAIN;
+	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
+	return 0;
+}
+
+static int lio_write_pending(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	if (cmd->immediate_data || cmd->unsolicited_data)
+		complete(&cmd->unsolicited_data_comp);
+	else {
+		if (iscsi_build_r2ts_for_cmd(cmd, cmd->conn, 1) < 0)
+			return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
+	}
+
+	return 0;
+}
+
+static int lio_write_pending_status(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+	int ret;
+
+	spin_lock_bh(&cmd->istate_lock);
+	ret = !(cmd->cmd_flags & ICF_GOT_LAST_DATAOUT);
+	spin_unlock_bh(&cmd->istate_lock);
+
+	return ret;
+}
+
+static int lio_queue_status(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	cmd->i_state = ISTATE_SEND_STATUS;
+	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
+	return 0;
+}
+
+static u16 lio_set_fabric_sense_len(struct se_cmd *se_cmd, u32 sense_length)
+{
+	unsigned char *buffer = se_cmd->sense_buffer;
+	/*
+	 * From RFC-3720 10.4.7.  Data Segment - Sense and Response Data Segment
+	 * 16-bit SenseLength.
+	 */
+	buffer[0] = ((sense_length >> 8) & 0xff);
+	buffer[1] = (sense_length & 0xff);
+	/*
+	 * Return two byte offset into allocated sense_buffer.
+	 */
+	return 2;
+}
+
+static u16 lio_get_fabric_sense_len(void)
+{
+	/*
+	 * Return two byte offset into allocated sense_buffer.
+	 */
+	return 2;
+}
+
+static int lio_queue_tm_rsp(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	cmd->i_state = ISTATE_SEND_TASKMGTRSP;
+	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
+	return 0;
+}
+
+static char *lio_tpg_get_endpoint_wwn(struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return &tpg->tpg_tiqn->tiqn[0];
+}
+
+static u16 lio_tpg_get_tag(struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return tpg->tpgt;
+}
+
+static u32 lio_tpg_get_default_depth(struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return ISCSI_TPG_ATTRIB(tpg)->default_cmdsn_depth;
+}
+
+static int lio_tpg_check_demo_mode(struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return ISCSI_TPG_ATTRIB(tpg)->generate_node_acls;
+}
+
+static int lio_tpg_check_demo_mode_cache(struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return ISCSI_TPG_ATTRIB(tpg)->cache_dynamic_acls;
+}
+
+static int lio_tpg_check_demo_mode_write_protect(
+	struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return ISCSI_TPG_ATTRIB(tpg)->demo_mode_write_protect;
+}
+
+static int lio_tpg_check_prod_mode_write_protect(
+	struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return ISCSI_TPG_ATTRIB(tpg)->prod_mode_write_protect;
+}
+
+static void lio_tpg_release_fabric_acl(
+	struct se_portal_group *se_tpg,
+	struct se_node_acl *se_acl)
+{
+	struct iscsi_node_acl *acl = container_of(se_acl,
+				struct iscsi_node_acl, se_node_acl);
+	kfree(acl);
+}
+
+/*
+ * Called with spin_lock_bh(struct se_portal_group->session_lock) held..
+ *
+ * Also, this function calls iscsi_inc_session_usage_count() on the
+ * struct iscsi_session in question.
+ */
+static int lio_tpg_shutdown_session(struct se_session *se_sess)
+{
+	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
+
+	spin_lock(&sess->conn_lock);
+	if (atomic_read(&sess->session_fall_back_to_erl0) ||
+	    atomic_read(&sess->session_logout) ||
+	    (sess->time2retain_timer_flags & ISCSI_TF_EXPIRED)) {
+		spin_unlock(&sess->conn_lock);
+		return 0;
+	}
+	atomic_set(&sess->session_reinstatement, 1);
+	spin_unlock(&sess->conn_lock);
+
+	iscsi_inc_session_usage_count(sess);
+	iscsi_stop_time2retain_timer(sess);
+
+	return 1;
+}
+
+/*
+ * Calls iscsi_dec_session_usage_count() as inverse of
+ * lio_tpg_shutdown_session()
+ */
+static void lio_tpg_close_session(struct se_session *se_sess)
+{
+	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
+	/*
+	 * If the iSCSI Session for the iSCSI Initiator Node exists,
+	 * forcefully shutdown the iSCSI NEXUS.
+	 */
+	iscsi_stop_session(sess, 1, 1);
+	iscsi_dec_session_usage_count(sess);
+	iscsi_close_session(sess);
+}
+
+static void lio_tpg_stop_session(
+	struct se_session *se_sess,
+	int sess_sleep,
+	int conn_sleep)
+{
+	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
+
+	iscsi_stop_session(sess, sess_sleep, conn_sleep);
+}
+
+static void lio_tpg_fall_back_to_erl0(struct se_session *se_sess)
+{
+	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
+
+	iscsi_fall_back_to_erl0(sess);
+}
+
+static u32 lio_tpg_get_inst_index(struct se_portal_group *se_tpg)
+{
+	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
+
+	return tpg->tpg_tiqn->tiqn_index;
+}
+
+static void lio_set_default_node_attributes(struct se_node_acl *se_acl)
+{
+	struct iscsi_node_acl *acl = container_of(se_acl, struct iscsi_node_acl,
+				se_node_acl);
+
+	ISCSI_NODE_ATTRIB(acl)->nacl = acl;
+	iscsi_set_default_node_attribues(acl);
+}
+
+static int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+	u32 iov_count = (T_TASK(se_cmd)->t_tasks_se_num == 0) ? 1 :
+				T_TASK(se_cmd)->t_tasks_se_num;
+
+	iov_count += TRANSPORT_IOV_DATA_BUFFER;
+
+	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_KERNEL);
+	if (!cmd->iov_data)
+		return -ENOMEM;
+
+	cmd->orig_iov_data_count = iov_count;
+	return 0;
+}
+
+static void lio_release_cmd_direct(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	iscsi_release_cmd_direct(cmd);
+}
+
+static void lio_release_cmd_to_pool(struct se_cmd *se_cmd)
+{
+	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
+
+	iscsi_release_cmd_to_pool(cmd);
+}
+
+/* End functions for target_core_fabric_ops */
 
 int iscsi_target_register_configfs(void)
 {

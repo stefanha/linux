@@ -1,23 +1,6 @@
 #ifndef ISCSI_TARGET_TPG_H
 #define ISCSI_TARGET_TPG_H
 
-extern char *lio_tpg_get_endpoint_wwn(struct se_portal_group *);
-extern u16 lio_tpg_get_tag(struct se_portal_group *);
-extern u32 lio_tpg_get_default_depth(struct se_portal_group *);
-extern int lio_tpg_check_demo_mode(struct se_portal_group *);
-extern int lio_tpg_check_demo_mode_cache(struct se_portal_group *);
-extern int lio_tpg_check_demo_mode_write_protect(struct se_portal_group *);
-extern int lio_tpg_check_prod_mode_write_protect(struct se_portal_group *);
-extern struct se_node_acl *lio_tpg_alloc_fabric_acl(struct se_portal_group *);
-extern void lio_tpg_release_fabric_acl(struct se_portal_group *,
-			struct se_node_acl *);
-extern int lio_tpg_shutdown_session(struct se_session *);
-extern void lio_tpg_close_session(struct se_session *);
-extern void lio_tpg_stop_session(struct se_session *, int, int);
-extern void lio_tpg_fall_back_to_erl0(struct se_session *);
-extern u32 lio_tpg_get_inst_index(struct se_portal_group *);
-extern void lio_set_default_node_attributes(struct se_node_acl *);
-
 extern struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *, u16);
 extern int iscsit_load_discovery_tpg(void);
 extern void iscsit_release_discovery_tpg(void);
