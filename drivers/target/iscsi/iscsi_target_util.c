@@ -36,6 +36,7 @@
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_erl2.h"
 #include "iscsi_target_tpg.h"
+#include "iscsi_target_tq.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
 
@@ -765,7 +766,7 @@ void iscsi_add_cmd_to_immediate_queue(
 	atomic_set(&conn->check_immediate_queue, 1);
 	spin_unlock_bh(&conn->immed_queue_lock);
 
-	complete(&conn->tx_comp);
+	wake_up_process(conn->thread_set->tx_thread);
 }
 
 struct iscsi_queue_req *iscsi_get_cmd_from_immediate_queue(struct iscsi_conn *conn)
@@ -839,7 +840,7 @@ void iscsi_add_cmd_to_response_queue(
 	atomic_inc(&cmd->response_queue_count);
 	spin_unlock_bh(&conn->response_queue_lock);
 
-	complete(&conn->tx_comp);
+	wake_up_process(conn->thread_set->tx_thread);
 }
 
 struct iscsi_queue_req *iscsi_get_cmd_from_response_queue(struct iscsi_conn *conn)

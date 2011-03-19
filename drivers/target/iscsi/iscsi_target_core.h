@@ -560,8 +560,6 @@ struct iscsi_conn {
 	struct completion	conn_logout_comp;
 	struct completion	tx_half_close_comp;
 	struct completion	rx_half_close_comp;
-	/* Semaphore for conn's tx_thread to sleep on */
-	struct completion	tx_comp;
 	/* socket used by this connection */
 	struct socket		*sock;
 	struct timer_list	nopin_timer;

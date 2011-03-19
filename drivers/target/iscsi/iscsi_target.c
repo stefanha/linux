@@ -4117,10 +4117,10 @@ restart:
 		 */
 		iscsi_thread_check_cpumask(conn, current, 1);
 
-		ret = wait_for_completion_interruptible(&conn->tx_comp);
+		schedule_timeout_interruptible(MAX_SCHEDULE_TIMEOUT);
 
 		if ((ts->status == ISCSI_THREAD_SET_RESET) ||
-		     (ret != 0) || signal_pending(current))
+		     signal_pending(current))
 			goto transport_err;
 
 get_immediate:
