@@ -332,7 +332,7 @@ static int iscsit_task_reassign_complete_read(
 		return -1;
 	}
 
-	dr = iscsi_allocate_datain_req();
+	dr = iscsit_allocate_datain_req();
 	if (!dr)
 		return -1;
 	/*
@@ -344,7 +344,7 @@ static int iscsit_task_reassign_complete_read(
 	dr->generate_recovery_values = 1;
 	dr->recovery = DATAIN_CONNECTION_RECOVERY;
 
-	iscsi_attach_datain_req(cmd, dr);
+	iscsit_attach_datain_req(cmd, dr);
 
 	cmd->i_state = ISTATE_SEND_DATAIN;
 	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);

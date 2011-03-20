@@ -451,7 +451,7 @@ static inline int iscsit_handle_recovery_datain(
 				1, 0, buf, cmd);
 	}
 
-	dr = iscsi_allocate_datain_req();
+	dr = iscsit_allocate_datain_req();
 	if (!dr)
 		return iscsit_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 0, buf, cmd);
@@ -461,7 +461,7 @@ static inline int iscsit_handle_recovery_datain(
 	dr->generate_recovery_values = 1;
 	dr->recovery = DATAIN_WITHIN_COMMAND_RECOVERY;
 
-	iscsi_attach_datain_req(cmd, dr);
+	iscsit_attach_datain_req(cmd, dr);
 
 	cmd->i_state = ISTATE_SEND_DATAIN;
 	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);

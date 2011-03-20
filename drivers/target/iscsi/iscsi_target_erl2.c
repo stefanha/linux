@@ -440,7 +440,7 @@ int iscsit_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		list_del(&cmd->i_list);
 		spin_unlock_bh(&conn->cmd_lock);
 
-		iscsi_free_all_datain_reqs(cmd);
+		iscsit_free_all_datain_reqs(cmd);
 
 		if ((SE_CMD(cmd)) &&
 		    (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) &&

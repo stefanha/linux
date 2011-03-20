@@ -1190,13 +1190,13 @@ done:
 	if (cmd->data_direction == DMA_FROM_DEVICE) {
 		struct iscsi_datain_req *dr;
 
-		dr = iscsi_allocate_datain_req();
+		dr = iscsit_allocate_datain_req();
 		if (!dr)
 			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, 1, buf, cmd);
 
-		iscsi_attach_datain_req(cmd, dr);
+		iscsit_attach_datain_req(cmd, dr);
 	}
 
 	/*
@@ -2915,9 +2915,9 @@ static inline int iscsit_send_data_in(
 	struct scatterlist sg;
 
 	memset(&datain, 0, sizeof(struct iscsi_datain));
-	dr = iscsi_get_datain_values(cmd, &datain);
+	dr = iscsit_get_datain_values(cmd, &datain);
 	if (!dr) {
-		printk(KERN_ERR "iscsi_get_datain_values failed for ITT: 0x%08x\n",
+		printk(KERN_ERR "iscsit_get_datain_values failed for ITT: 0x%08x\n",
 				cmd->init_task_tag);
 		return -1;
 	}
@@ -3082,7 +3082,7 @@ static inline int iscsit_send_data_in(
 	if (dr->dr_complete) {
 		*eodr = (SE_CMD(cmd)->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE) ?
 				2 : 1;
-		iscsi_free_datain_req(cmd, dr);
+		iscsit_free_datain_req(cmd, dr);
 	}
 
 	return 0;

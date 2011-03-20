@@ -875,7 +875,7 @@ void iscsit_free_queue_reqs_for_conn(struct iscsi_conn *conn)
 void iscsit_release_cmd_direct(struct iscsi_cmd *cmd)
 {
 	iscsit_free_r2ts_from_list(cmd);
-	iscsi_free_all_datain_reqs(cmd);
+	iscsit_free_all_datain_reqs(cmd);
 
 	kfree(cmd->buf_ptr);
 	kfree(cmd->pdu_list);
@@ -891,7 +891,7 @@ void __iscsit_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *s
 	struct iscsi_conn *conn = cmd->conn;
 
 	iscsit_free_r2ts_from_list(cmd);
-	iscsi_free_all_datain_reqs(cmd);
+	iscsit_free_all_datain_reqs(cmd);
 
 	kfree(cmd->buf_ptr);
 	kfree(cmd->pdu_list);
