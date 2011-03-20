@@ -317,7 +317,7 @@ static ssize_t iscsi_nacl_attrib_store_##name(				\
 	int ret;							\
 									\
 	val = simple_strtoul(page, &endptr, 0);				\
-	ret = iscsi_na_##name(nacl, val);				\
+	ret = iscsit_na_##name(nacl, val);				\
 	if (ret < 0)							\
 		return ret;						\
 									\
@@ -1761,7 +1761,7 @@ static void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 				se_node_acl);
 
 	ISCSI_NODE_ATTRIB(acl)->nacl = acl;
-	iscsi_set_default_node_attribues(acl);
+	iscsit_set_default_node_attribues(acl);
 }
 
 static int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
