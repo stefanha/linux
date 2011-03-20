@@ -125,7 +125,7 @@ static ssize_t lio_target_np_store_sctp(
 
 	if (op) {
 		memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
-		if (np->np_flags & NPF_NET_IPV6)
+		if (np->np_sockaddr.ss_family == AF_INET6)
 			snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE,
 				"%s", np->np_ipv6);
 		else
@@ -134,7 +134,8 @@ static ssize_t lio_target_np_store_sctp(
 		np_addr.np_port = np->np_port;
 
 		tpg_np_sctp = iscsit_tpg_add_network_portal(tpg, &np_addr,
-					tpg_np, ISCSI_SCTP_TCP);
+					tpg_np, ISCSI_SCTP_TCP,
+					np->np_sockaddr.ss_family);
 		if (!tpg_np_sctp || IS_ERR(tpg_np_sctp))
 			goto out;
 	} else {
@@ -177,7 +178,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	char *str, *str2, *end_ptr, *ip_str, *port_str;
 	struct iscsi_np_addr np_addr;
 	u32 ipv4 = 0;
-	int ret;
+	int ret, af_inet;
 	char buf[MAX_PORTAL_LEN + 1];
 
 	if (strlen(name) > MAX_PORTAL_LEN) {
@@ -212,7 +213,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		np_addr.np_port = simple_strtoul(port_str, &end_ptr, 0);
 
 		snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE, "%s", str);
-		np_addr.np_flags |= NPF_NET_IPV6;
+		af_inet = AF_INET6;
 	} else {
 		ip_str = &buf[0];
 		port_str = strstr(ip_str, ":");
@@ -227,7 +228,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 
 		ipv4 = in_aton(ip_str);
 		np_addr.np_ipv4 = htonl(ipv4);
-		np_addr.np_flags |= NPF_NET_IPV4;
+		af_inet = AF_INET;
 	}
 	tpg = container_of(se_tpg, struct iscsi_portal_group, tpg_se_tpg);
 	ret = iscsit_get_tpg(tpg);
@@ -251,7 +252,8 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	 * sys/kernel/config/iscsi/$IQN/$TPG/np/$IP:$PORT/
 	 *
 	 */
-	tpg_np = iscsit_tpg_add_network_portal(tpg, &np_addr, NULL, ISCSI_TCP);
+	tpg_np = iscsit_tpg_add_network_portal(tpg, &np_addr, NULL,
+				ISCSI_TCP, af_inet);
 	if (IS_ERR(tpg_np)) {
 		iscsit_put_tpg(tpg);
 		return ERR_PTR(PTR_ERR(tpg_np));

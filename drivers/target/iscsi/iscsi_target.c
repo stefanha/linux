@@ -338,7 +338,8 @@ static struct iscsi_np *iscsit_get_np(
 
 struct iscsi_np *iscsit_add_np(
 	struct iscsi_np_addr *np_addr,
-	int network_transport)
+	int network_transport,
+	int af_inet)
 {
 	struct iscsi_np *np;
 	char *ip_buf = NULL, *ipv6 = NULL;
@@ -346,7 +347,7 @@ struct iscsi_np *iscsit_add_np(
 	u32 ipv4 = 0;
 	int ret;
 
-	if (np_addr->np_flags & NPF_NET_IPV6) {
+	if (af_inet == AF_INET6) {
 		ip_buf = &np_addr->np_ipv6[0];
 		ipv6 = &np_addr->np_ipv6[0];
 	} else {
@@ -369,11 +370,9 @@ struct iscsi_np *iscsit_add_np(
 	}
 
 	np->np_flags |= NPF_IP_NETWORK;
-	if (np_addr->np_flags & NPF_NET_IPV6) {
-		np->np_flags |= NPF_NET_IPV6;
+	if (af_inet == AF_INET6) {
 		memcpy(np->np_ipv6, np_addr->np_ipv6, IPV6_ADDRESS_SPACE);
 	} else {
-		np->np_flags |= NPF_NET_IPV4;
 		np->np_ipv4 = np_addr->np_ipv4;
 	}
 	np->np_port		= np_addr->np_port;
@@ -382,7 +381,7 @@ struct iscsi_np *iscsit_add_np(
 	init_completion(&np->np_restart_comp);
 	INIT_LIST_HEAD(&np->np_list);
 
-	ret = iscsi_target_setup_login_socket(np);
+	ret = iscsi_target_setup_login_socket(np, af_inet);
 	if (ret != 0) {
 		kfree(np);
 		return ERR_PTR(ret);
@@ -496,7 +495,7 @@ int iscsit_del_np(struct iscsi_np *np)
 	list_del(&np->np_list);
 	spin_unlock_bh(&np_lock);
 
-	if (np->np_flags & NPF_NET_IPV6) {
+	if (np->np_sockaddr.ss_family == AF_INET6) {
 		ip = &np->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);

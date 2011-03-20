@@ -604,7 +604,7 @@ static int iscsi_post_login_handler(
 	iscsi_set_connection_parameters(conn->conn_ops, conn->param_list);
 	iscsit_set_sync_and_steering_values(conn);
 
-	if (np->np_flags & NPF_NET_IPV6) {
+	if (np->np_sockaddr.ss_family == AF_INET6) {
 		ip = &conn->ipv6_login_ip[0];
 		ip_np = &np->np_ipv6[0];
 	} else {
@@ -779,13 +779,13 @@ static void iscsi_stop_login_thread_timer(struct iscsi_np *np)
 	spin_unlock_bh(&np->np_thread_lock);
 }
 
-int iscsi_target_setup_login_socket(struct iscsi_np *np)
+int iscsi_target_setup_login_socket(struct iscsi_np *np, int af_inet)
 {
 	const char *end;
 	struct socket *sock;
-	int backlog = 5, ret, opt = 0;
-	struct sockaddr_in sock_in;
-	struct sockaddr_in6 sock_in6;
+	int backlog = 5, ret, opt = 0, len;
+	struct sockaddr_in *sock_in;
+	struct sockaddr_in6 *sock_in6;
 
 	switch (np->np_network_transport) {
 	case ISCSI_TCP:
@@ -809,14 +809,12 @@ int iscsi_target_setup_login_socket(struct iscsi_np *np)
 		return -EINVAL;
 	}
 
-	ret = sock_create((np->np_flags & NPF_NET_IPV6) ? AF_INET6 : AF_INET,
-			np->np_sock_type, np->np_ip_proto, &sock);
+	ret = sock_create(af_inet, np->np_sock_type, np->np_ip_proto, &sock);
 	if (ret < 0) {
 		printk(KERN_ERR "sock_create() failed.\n");
 		return ret;
 	}
 	np->np_socket = sock;
-
 	/*
 	 * The SCTP stack needs struct socket->file.
 	 */
@@ -834,25 +832,26 @@ int iscsi_target_setup_login_socket(struct iscsi_np *np)
 		}
 	}
 
-	if (np->np_flags & NPF_NET_IPV6) {
-		memset(&sock_in6, 0, sizeof(struct sockaddr_in6));
-		sock_in6.sin6_family = AF_INET6;
-		sock_in6.sin6_port = htons(np->np_port);
+	if (af_inet == AF_INET6) {
+		sock_in6 = (struct sockaddr_in6 *)&np->np_sockaddr;
+		sock_in6->sin6_family = AF_INET6;
+		sock_in6->sin6_port = htons(np->np_port);
+		len = sizeof(struct sockaddr_in6);
 
 		ret = in6_pton(&np->np_ipv6[0], IPV6_ADDRESS_SPACE,
-				(void *)&sock_in6.sin6_addr.in6_u, -1, &end);
+				(void *)&sock_in6->sin6_addr.in6_u, -1, &end);
 		if (ret <= 0) {
 			printk(KERN_ERR "in6_pton returned: %d\n", ret);
 			ret = -EINVAL;
 			goto fail;
 		}
 	} else {
-		memset(&sock_in, 0, sizeof(struct sockaddr_in));
-		sock_in.sin_family = AF_INET;
-		sock_in.sin_port = htons(np->np_port);
-		sock_in.sin_addr.s_addr = htonl(np->np_ipv4);
+		sock_in = (struct sockaddr_in *)&np->np_sockaddr;
+		sock_in->sin_family = AF_INET;
+		sock_in->sin_port = htons(np->np_port);
+		sock_in->sin_addr.s_addr = htonl(np->np_ipv4);
+		len = sizeof(struct sockaddr);
 	}
-
 	/*
 	 * Set SO_REUSEADDR, and disable Nagel Algorithm with TCP_NODELAY.
 	 */
@@ -866,6 +865,7 @@ int iscsi_target_setup_login_socket(struct iscsi_np *np)
 			goto fail;
 		}
 	}
+
 	ret = kernel_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 			(char *)&opt, sizeof(opt));
 	if (ret < 0) {
@@ -874,20 +874,10 @@ int iscsi_target_setup_login_socket(struct iscsi_np *np)
 		goto fail;
 	}
 
-	if (np->np_flags & NPF_NET_IPV6) {
-		ret = kernel_bind(sock, (struct sockaddr *)&sock_in6,
-				sizeof(struct sockaddr_in6));
-		if (ret < 0) {
-			printk(KERN_ERR "kernel_bind() failed: %d\n", ret);
-			goto fail;
-		}
-	} else {
-		ret = kernel_bind(sock, (struct sockaddr *)&sock_in,
-				sizeof(struct sockaddr));
-		if (ret < 0) {
-			printk(KERN_ERR "kernel_bind() failed: %d\n", ret);
-			goto fail;
-		}
+	ret = kernel_bind(sock, (struct sockaddr *)&np->np_sockaddr, len);
+	if (ret < 0) {
+		printk(KERN_ERR "kernel_bind() failed: %d\n", ret);
+		goto fail;
 	}
 
 	ret = kernel_listen(sock, backlog);
@@ -1041,7 +1031,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	*/
 	conn->login_itt		= pdu->itt;
 
-	if (np->np_flags & NPF_NET_IPV6) {
+	if (np->np_sockaddr.ss_family == AF_INET6) {
 		ip = &np->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
@@ -1060,7 +1050,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
-	if (np->np_flags & NPF_NET_IPV6) {
+	if (np->np_sockaddr.ss_family == AF_INET6) {
 		memset(&sock_in6, 0, sizeof(struct sockaddr_in6));
 
 		if (conn->sock->ops->getname(conn->sock,

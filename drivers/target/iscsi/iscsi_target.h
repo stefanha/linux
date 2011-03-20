@@ -8,7 +8,7 @@ extern struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *, int *);
 extern void iscsit_del_tiqn(struct iscsi_tiqn *);
 extern int iscsit_access_np(struct iscsi_np *, struct iscsi_portal_group *);
 extern int iscsit_deaccess_np(struct iscsi_np *, struct iscsi_portal_group *);
-extern struct iscsi_np *iscsit_add_np(struct iscsi_np_addr *, int);
+extern struct iscsi_np *iscsit_add_np(struct iscsi_np_addr *, int, int);
 extern int iscsit_reset_np_thread(struct iscsi_np *, struct iscsi_tpg_np *,
 				struct iscsi_portal_group *);
 extern int iscsit_del_np(struct iscsi_np *);

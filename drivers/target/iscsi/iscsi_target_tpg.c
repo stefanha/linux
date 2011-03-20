@@ -425,20 +425,13 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 	struct iscsi_portal_group *tpg,
 	struct iscsi_np_addr *np_addr,
 	struct iscsi_tpg_np *tpg_np_parent,
-	int network_transport)
+	int network_transport,
+	int af_inet)
 {
 	struct iscsi_np *np;
 	struct iscsi_tpg_np *tpg_np;
 	unsigned char *ip_buf;
 	unsigned char buf_ipv4[IPV4_BUF_SIZE];
-
-	if (np_addr->np_flags & NPF_NET_IPV6) {
-		ip_buf = (char *)&np_addr->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsit_ntoa2(buf_ipv4, np_addr->np_ipv4);
-		ip_buf = &buf_ipv4[0];
-	}
 
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
 	if (!tpg_np) {
@@ -447,10 +440,18 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 		return ERR_PTR(-ENOMEM);
 	}
 
-	np = iscsit_add_np(np_addr, network_transport);
+	np = iscsit_add_np(np_addr, network_transport, af_inet);
 	if (IS_ERR(np)) {
 		kfree(tpg_np);
 		return ERR_CAST(np);
+	}
+
+	if (np->np_sockaddr.ss_family == AF_INET6) {
+		ip_buf = (char *)&np_addr->np_ipv6[0];
+	} else {
+		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
+		iscsit_ntoa2(buf_ipv4, np_addr->np_ipv4);
+		ip_buf = &buf_ipv4[0];
 	}
 
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
@@ -493,7 +494,7 @@ static int iscsit_tpg_release_np(
 	char *ip;
 	char buf_ipv4[IPV4_BUF_SIZE];
 
-	if (np->np_flags & NPF_NET_IPV6) {
+	if (np->np_sockaddr.ss_family == AF_INET6) {
 		ip = &np->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);

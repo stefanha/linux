@@ -2483,9 +2483,9 @@ extern int iscsit_build_sendtargets_response(struct iscsi_cmd *cmd)
 					tpg_np_list) {
 				memset(buf, 0, 256);
 
-				if (tpg_np->tpg_np->np_flags & NPF_NET_IPV6)
+				if (tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) {
 					ip = &tpg_np->tpg_np->np_ipv6[0];
-				else {
+				} else {
 					memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 					iscsit_ntoa2(buf_ipv4,
 						tpg_np->tpg_np->np_ipv4);
@@ -2494,11 +2494,9 @@ extern int iscsit_build_sendtargets_response(struct iscsi_cmd *cmd)
 
 				len = sprintf(buf, "TargetAddress="
 					"%s%s%s:%hu,%hu",
-					(tpg_np->tpg_np->np_flags &
-						NPF_NET_IPV6) ?
+					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
 					"[" : "", ip,
-					(tpg_np->tpg_np->np_flags &
-						NPF_NET_IPV6) ?
+					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
 					"]" : "", tpg_np->tpg_np->np_port,
 					tpg->tpgt);
 				len += 1;
