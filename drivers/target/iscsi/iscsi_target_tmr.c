@@ -182,12 +182,12 @@ static void iscsi_task_reassign_remove_cmd(
 	int ret;
 
 	spin_lock(&cr->conn_recovery_cmd_lock);
-	ret = iscsi_remove_cmd_from_connection_recovery(cmd, sess);
+	ret = iscsit_remove_cmd_from_connection_recovery(cmd, sess);
 	spin_unlock(&cr->conn_recovery_cmd_lock);
 	if (!ret) {
 		printk(KERN_INFO "iSCSI connection recovery successful for CID:"
 			" %hu on SID: %u\n", cr->cid, sess->sid);
-		iscsi_remove_active_connection_recovery_entry(cr, sess);
+		iscsit_remove_active_connection_recovery_entry(cr, sess);
 	}
 
 	return;

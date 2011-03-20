@@ -440,7 +440,7 @@ inline int iscsit_check_received_cmdsn(
 			TRACE(TRACE_CMDSN, "Received CmdSN matches ExpCmdSN,"
 				" incremented ExpCmdSN to: 0x%08x\n",
 					conn->sess->exp_cmd_sn);
-			ret = iscsi_execute_cmd(cmd, 0);
+			ret = iscsit_execute_cmd(cmd, 0);
 			spin_unlock(&conn->sess->cmdsn_lock);
 
 			return (!ret) ? CMDSN_NORMAL_OPERATION :
@@ -466,7 +466,7 @@ inline int iscsit_check_received_cmdsn(
 				" ExpCmdSN, incremented ExpCmdSN to 0x%08x.\n",
 					cmdsn, conn->sess->exp_cmd_sn);
 
-			if (iscsi_execute_cmd(cmd, 0) < 0) {
+			if (iscsit_execute_cmd(cmd, 0) < 0) {
 				spin_unlock(&conn->sess->cmdsn_lock);
 				return CMDSN_ERROR_CANNOT_RECOVER;
 			}
@@ -483,7 +483,7 @@ inline int iscsit_check_received_cmdsn(
 			return CMDSN_LOWER_THAN_EXP;
 		}
 
-		counter = iscsi_execute_ooo_cmdsns(conn->sess);
+		counter = iscsit_execute_ooo_cmdsns(conn->sess);
 		if (counter < 0) {
 			spin_unlock(&conn->sess->cmdsn_lock);
 			return CMDSN_ERROR_CANNOT_RECOVER;
@@ -512,7 +512,7 @@ inline int iscsit_check_received_cmdsn(
 	}
 
 ooo_cmdsn:
-	ret = iscsi_handle_ooo_cmdsn(conn->sess, cmd, cmdsn);
+	ret = iscsit_handle_ooo_cmdsn(conn->sess, cmd, cmdsn);
 	spin_unlock(&conn->sess->cmdsn_lock);
 	return ret;
 }
@@ -601,7 +601,7 @@ struct iscsi_cmd *iscsit_find_cmd_from_itt_or_dump(
 		printk(KERN_ERR "Unable to locate ITT: 0x%08x on CID: %hu,"
 			" dumping payload\n", init_task_tag, conn->cid);
 		if (length)
-			iscsi_dump_data_payload(conn, length, 1);
+			iscsit_dump_data_payload(conn, length, 1);
 		return NULL;
 	}
 
@@ -1514,7 +1514,7 @@ static void iscsit_handle_netif_timeout(unsigned long data)
 
 	spin_unlock_bh(&conn->netif_lock);
 
-	iscsi_cause_connection_reinstatement(conn, 0);
+	iscsit_cause_connection_reinstatement(conn, 0);
 	iscsit_dec_conn_usage_count(conn);
 }
 
@@ -1640,7 +1640,7 @@ static void iscsit_handle_nopin_response_timeout(unsigned long data)
 	}
 	}
 
-	iscsi_cause_connection_reinstatement(conn, 0);
+	iscsit_cause_connection_reinstatement(conn, 0);
 	iscsit_dec_conn_usage_count(conn);
 }
 

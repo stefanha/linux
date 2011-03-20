@@ -101,7 +101,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_yes(
 					cmd, dr) < 0)
 			return NULL;
 
@@ -200,7 +200,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_no(
 					cmd, dr) < 0)
 			return NULL;
 
@@ -321,7 +321,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_yes(
 					cmd, dr) < 0)
 			return NULL;
 
@@ -421,7 +421,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_no(
 					cmd, dr) < 0)
 			return NULL;
 

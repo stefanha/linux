@@ -159,7 +159,7 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 			atomic_set(&sess_p->session_reinstatement, 1);
 			spin_unlock(&sess_p->conn_lock);
 			iscsit_inc_session_usage_count(sess_p);
-			iscsi_stop_time2retain_timer(sess_p);
+			iscsit_stop_time2retain_timer(sess_p);
 			sess = sess_p;
 			break;
 		}
@@ -441,7 +441,7 @@ static int iscsi_login_non_zero_tsih_s2(
 		     (const void *)pdu->isid, 6)) &&
 		     (sess_p->tsih == pdu->tsih)) {
 			iscsit_inc_session_usage_count(sess_p);
-			iscsi_stop_time2retain_timer(sess_p);
+			iscsit_stop_time2retain_timer(sess_p);
 			sess = sess_p;
 			break;
 		}
@@ -518,7 +518,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 			" performing connection reinstatement.\n",
 			conn_ptr->cid, sess->sess_ops->InitiatorName);
 
-		iscsi_connection_reinstatement_rcfr(conn_ptr);
+		iscsit_connection_reinstatement_rcfr(conn_ptr);
 		iscsit_dec_conn_usage_count(conn_ptr);
 	}
 
@@ -532,13 +532,13 @@ int iscsi_login_post_auth_non_zero_tsih(
 	 * loss.
 	 */
 	if (sess->sess_ops->ErrorRecoveryLevel == 2) {
-		cr = iscsi_get_inactive_connection_recovery_entry(
+		cr = iscsit_get_inactive_connection_recovery_entry(
 				sess, cid);
 		if ((cr)) {
 			TRACE(TRACE_ERL2, "Performing implicit logout"
 				" for connection recovery on CID: %hu\n",
 					conn->cid);
-			iscsi_discard_cr_cmds_by_expstatsn(cr, exp_statsn);
+			iscsit_discard_cr_cmds_by_expstatsn(cr, exp_statsn);
 		}
 	}
 
@@ -659,7 +659,7 @@ static int iscsi_post_login_handler(
 		iscsit_dec_conn_usage_count(conn);
 		if (stop_timer) {
 			spin_lock_bh(&se_tpg->session_lock);
-			iscsi_stop_time2retain_timer(sess);
+			iscsit_stop_time2retain_timer(sess);
 			spin_unlock_bh(&se_tpg->session_lock);
 		}
 		iscsit_dec_session_usage_count(sess);
@@ -1223,7 +1223,7 @@ old_sess_out:
 			atomic_set(&conn->sess->session_continuation, 0);
 			spin_unlock_bh(&conn->sess->conn_lock);
 			spin_lock_bh(&se_tpg->session_lock);
-			iscsi_start_time2retain_handler(conn->sess);
+			iscsit_start_time2retain_handler(conn->sess);
 			spin_unlock_bh(&se_tpg->session_lock);
 		} else
 			spin_unlock_bh(&conn->sess->conn_lock);

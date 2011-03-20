@@ -44,7 +44,7 @@
  *	dump_padding_digest denotes if padding and data digests need
  *	to be dumped.
  */
-int iscsi_dump_data_payload(
+int iscsit_dump_data_payload(
 	struct iscsi_conn *conn,
 	u32 buf_len,
 	int dump_padding_digest)
@@ -116,7 +116,7 @@ out:
 /*
  *	Used for retransmitting R2Ts from a R2T SNACK request.
  */
-static int iscsi_send_recovery_r2t_for_snack(
+static int iscsit_send_recovery_r2t_for_snack(
 	struct iscsi_cmd *cmd,
 	struct iscsi_r2t *r2t)
 {
@@ -138,7 +138,7 @@ static int iscsi_send_recovery_r2t_for_snack(
 	return 0;
 }
 
-static int iscsi_handle_r2t_snack(
+static int iscsit_handle_r2t_snack(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	u32 begrun,
@@ -181,7 +181,7 @@ static int iscsi_handle_r2t_snack(
 		r2t = iscsit_get_holder_for_r2tsn(cmd, begrun);
 		if (!r2t)
 			return -1;
-		if (iscsi_send_recovery_r2t_for_snack(cmd, r2t) < 0)
+		if (iscsit_send_recovery_r2t_for_snack(cmd, r2t) < 0)
 			return -1;
 
 		begrun++;
@@ -198,7 +198,7 @@ static int iscsi_handle_r2t_snack(
  *
  *	FIXME: How is this handled for a RData SNACK?
  */
-int iscsi_create_recovery_datain_values_datasequenceinorder_yes(
+int iscsit_create_recovery_datain_values_datasequenceinorder_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain_req *dr)
 {
@@ -244,7 +244,7 @@ int iscsi_create_recovery_datain_values_datasequenceinorder_yes(
  *
  *	FIXME: How is this handled for a RData SNACK?
  */
-int iscsi_create_recovery_datain_values_datasequenceinorder_no(
+int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain_req *dr)
 {
@@ -407,7 +407,7 @@ done:
 	return 0;
 }
 
-static inline int iscsi_handle_recovery_datain(
+static inline int iscsit_handle_recovery_datain(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	u32 begrun,
@@ -469,7 +469,7 @@ static inline int iscsi_handle_recovery_datain(
 	return 0;
 }
 
-int iscsi_handle_recovery_datain_or_r2t(
+int iscsit_handle_recovery_datain_or_r2t(
 	struct iscsi_conn *conn,
 	unsigned char *buf,
 	u32 init_task_tag,
@@ -488,9 +488,9 @@ int iscsi_handle_recovery_datain_or_r2t(
 	 */
 	switch (cmd->data_direction) {
 	case DMA_TO_DEVICE:
-		return iscsi_handle_r2t_snack(cmd, buf, begrun, runlength);
+		return iscsit_handle_r2t_snack(cmd, buf, begrun, runlength);
 	case DMA_FROM_DEVICE:
-		return iscsi_handle_recovery_datain(cmd, buf, begrun,
+		return iscsit_handle_recovery_datain(cmd, buf, begrun,
 				runlength);
 	default:
 		printk(KERN_ERR "Unknown cmd->data_direction: 0x%02x\n",
@@ -502,7 +502,7 @@ int iscsi_handle_recovery_datain_or_r2t(
 }
 
 /* #warning FIXME: Status SNACK needs to be dependent on OPCODE!!! */
-int iscsi_handle_status_snack(
+int iscsit_handle_status_snack(
 	struct iscsi_conn *conn,
 	u32 init_task_tag,
 	u32 targ_xfer_tag,
@@ -559,7 +559,7 @@ int iscsi_handle_status_snack(
 	return 0;
 }
 
-int iscsi_handle_data_ack(
+int iscsit_handle_data_ack(
 	struct iscsi_conn *conn,
 	u32 targ_xfer_tag,
 	u32 begrun,
@@ -595,7 +595,7 @@ int iscsi_handle_data_ack(
 	return 0;
 }
 
-static int iscsi_send_recovery_r2t(
+static int iscsit_send_recovery_r2t(
 	struct iscsi_cmd *cmd,
 	u32 offset,
 	u32 xfer_len)
@@ -609,7 +609,7 @@ static int iscsi_send_recovery_r2t(
 	return ret;
 }
 
-int iscsi_dataout_datapduinorder_no_fbit(
+int iscsit_dataout_datapduinorder_no_fbit(
 	struct iscsi_cmd *cmd,
 	struct iscsi_pdu *pdu)
 {
@@ -651,7 +651,7 @@ int iscsi_dataout_datapduinorder_no_fbit(
 			if (!send_recovery_r2t)
 				continue;
 
-			if (iscsi_send_recovery_r2t(cmd, offset, length) < 0)
+			if (iscsit_send_recovery_r2t(cmd, offset, length) < 0)
 				return DATAOUT_CANNOT_RECOVER;
 
 			send_recovery_r2t = length = offset = 0;
@@ -679,13 +679,13 @@ int iscsi_dataout_datapduinorder_no_fbit(
 	}
 
 	if (send_recovery_r2t)
-		if (iscsi_send_recovery_r2t(cmd, offset, length) < 0)
+		if (iscsit_send_recovery_r2t(cmd, offset, length) < 0)
 			return DATAOUT_CANNOT_RECOVER;
 
 	return (!recovery) ? DATAOUT_NORMAL : DATAOUT_WITHIN_COMMAND_RECOVERY;
 }
 
-static int iscsi_recalculate_dataout_values(
+static int iscsit_recalculate_dataout_values(
 	struct iscsi_cmd *cmd,
 	u32 pdu_offset,
 	u32 pdu_length,
@@ -762,7 +762,7 @@ static int iscsi_recalculate_dataout_values(
 	return 0;
 }
 
-int iscsi_recover_dataout_sequence(
+int iscsit_recover_dataout_sequence(
 	struct iscsi_cmd *cmd,
 	u32 pdu_offset,
 	u32 pdu_length)
@@ -773,16 +773,16 @@ int iscsi_recover_dataout_sequence(
 	cmd->cmd_flags |= ICF_WITHIN_COMMAND_RECOVERY;
 	spin_unlock_bh(&cmd->istate_lock);
 
-	if (iscsi_recalculate_dataout_values(cmd, pdu_offset, pdu_length,
+	if (iscsit_recalculate_dataout_values(cmd, pdu_offset, pdu_length,
 			&r2t_offset, &r2t_length) < 0)
 		return DATAOUT_CANNOT_RECOVER;
 
-	iscsi_send_recovery_r2t(cmd, r2t_offset, r2t_length);
+	iscsit_send_recovery_r2t(cmd, r2t_offset, r2t_length);
 
 	return DATAOUT_WITHIN_COMMAND_RECOVERY;
 }
 
-static inline struct iscsi_ooo_cmdsn *iscsi_allocate_ooo_cmdsn(void)
+static inline struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL;
 
@@ -800,7 +800,7 @@ static inline struct iscsi_ooo_cmdsn *iscsi_allocate_ooo_cmdsn(void)
 /*
  *	Called with sess->cmdsn_lock held.
  */
-static inline int iscsi_attach_ooo_cmdsn(
+static inline int iscsit_attach_ooo_cmdsn(
 	struct iscsi_session *sess,
 	struct iscsi_ooo_cmdsn *ooo_cmdsn)
 {
@@ -851,7 +851,7 @@ static inline int iscsi_attach_ooo_cmdsn(
  *	Removes an struct iscsi_ooo_cmdsn from a session's list,
  *	called with struct iscsi_session->cmdsn_lock held.
  */
-void iscsi_remove_ooo_cmdsn(
+void iscsit_remove_ooo_cmdsn(
 	struct iscsi_session *sess,
 	struct iscsi_ooo_cmdsn *ooo_cmdsn)
 {
@@ -859,7 +859,7 @@ void iscsi_remove_ooo_cmdsn(
 	kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 }
 
-void iscsi_clear_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
+void iscsit_clear_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn;
 	struct iscsi_session *sess = conn->sess;
@@ -877,7 +877,7 @@ void iscsi_clear_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 /*
  *	Called with sess->cmdsn_lock held.
  */
-int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
+int iscsit_execute_ooo_cmdsns(struct iscsi_session *sess)
 {
 	int ooo_count = 0;
 	struct iscsi_cmd *cmd = NULL;
@@ -890,7 +890,7 @@ int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
 
 		if (!ooo_cmdsn->cmd) {
 			sess->exp_cmd_sn++;
-			iscsi_remove_ooo_cmdsn(sess, ooo_cmdsn);
+			iscsit_remove_ooo_cmdsn(sess, ooo_cmdsn);
 			continue;
 		}
 
@@ -902,9 +902,9 @@ int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
 			" incremented ExpCmdSN to 0x%08x.\n",
 			cmd->cmd_sn, sess->exp_cmd_sn);
 
-		iscsi_remove_ooo_cmdsn(sess, ooo_cmdsn);
+		iscsit_remove_ooo_cmdsn(sess, ooo_cmdsn);
 
-		if (iscsi_execute_cmd(cmd, 1) < 0)
+		if (iscsit_execute_cmd(cmd, 1) < 0)
 			return -1;
 
 		continue;
@@ -921,7 +921,7 @@ int iscsi_execute_ooo_cmdsns(struct iscsi_session *sess)
  *	2. With no locks held directly from iscsi_handle_XXX_pdu() functions
  *	for immediate commands.
  */
-int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
+int iscsit_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 {
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	int lr = 0;
@@ -987,7 +987,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 						!= 0)
 					return 0;
 
-				iscsi_set_dataout_sequence_values(cmd);
+				iscsit_set_dataout_sequence_values(cmd);
 				iscsit_build_r2ts_for_cmd(cmd, cmd->conn, 0);
 			}
 			return 0;
@@ -1006,9 +1006,9 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 			if (transport_check_aborted_status(se_cmd, 1) != 0)
 				return 0;
 
-			iscsi_set_dataout_sequence_values(cmd);
+			iscsit_set_dataout_sequence_values(cmd);
 			spin_lock_bh(&cmd->dataout_timeout_lock);
-			iscsi_start_dataout_timer(cmd, cmd->conn);
+			iscsit_start_dataout_timer(cmd, cmd->conn);
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
 		return transport_generic_handle_cdb(&cmd->se_cmd);
@@ -1057,7 +1057,7 @@ int iscsi_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 	return 0;
 }
 
-void iscsi_free_all_ooo_cmdsns(struct iscsi_session *sess)
+void iscsit_free_all_ooo_cmdsns(struct iscsi_session *sess)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn, *ooo_cmdsn_tmp;
 
@@ -1071,7 +1071,7 @@ void iscsi_free_all_ooo_cmdsns(struct iscsi_session *sess)
 	spin_unlock(&sess->cmdsn_lock);
 }
 
-int iscsi_handle_ooo_cmdsn(
+int iscsit_handle_ooo_cmdsn(
 	struct iscsi_session *sess,
 	struct iscsi_cmd *cmd,
 	u32 cmdsn)
@@ -1094,7 +1094,7 @@ int iscsi_handle_ooo_cmdsn(
 			batch = 1;
 	}
 
-	ooo_cmdsn = iscsi_allocate_ooo_cmdsn();
+	ooo_cmdsn = iscsit_allocate_ooo_cmdsn();
 	if (!ooo_cmdsn)
 		return CMDSN_ERROR_CANNOT_RECOVER;
 
@@ -1105,7 +1105,7 @@ int iscsi_handle_ooo_cmdsn(
 	ooo_cmdsn->exp_cmdsn		= sess->exp_cmd_sn;
 	ooo_cmdsn->cmdsn		= cmdsn;
 
-	if (iscsi_attach_ooo_cmdsn(sess, ooo_cmdsn) < 0) {
+	if (iscsit_attach_ooo_cmdsn(sess, ooo_cmdsn) < 0) {
 		kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 		return CMDSN_ERROR_CANNOT_RECOVER;
 	}
@@ -1113,7 +1113,7 @@ int iscsi_handle_ooo_cmdsn(
 	return CMDSN_HIGHER_THAN_EXP;
 }
 
-static int iscsi_set_dataout_timeout_values(
+static int iscsit_set_dataout_timeout_values(
 	struct iscsi_cmd *cmd,
 	u32 *offset,
 	u32 *length)
@@ -1158,7 +1158,7 @@ static int iscsi_set_dataout_timeout_values(
 /*
  *	NOTE: Called from interrupt (timer) context.
  */
-static void iscsi_handle_dataout_timeout(unsigned long data)
+static void iscsit_handle_dataout_timeout(unsigned long data)
 {
 	u32 pdu_length = 0, pdu_offset = 0;
 	u32 r2t_length = 0, r2t_offset = 0;
@@ -1210,12 +1210,12 @@ static void iscsi_handle_dataout_timeout(unsigned long data)
 				cmd->seq_start_offset);
 		}
 	} else {
-		if (iscsi_set_dataout_timeout_values(cmd, &pdu_offset,
+		if (iscsit_set_dataout_timeout_values(cmd, &pdu_offset,
 				&pdu_length) < 0)
 			goto failure;
 	}
 
-	if (iscsi_recalculate_dataout_values(cmd, pdu_offset, pdu_length,
+	if (iscsit_recalculate_dataout_values(cmd, pdu_offset, pdu_length,
 			&r2t_offset, &r2t_length) < 0)
 		goto failure;
 
@@ -1224,10 +1224,10 @@ static void iscsi_handle_dataout_timeout(unsigned long data)
 		cmd->init_task_tag, (cmd->unsolicited_data) ? "Unsolicited " :
 		"", r2t_offset, r2t_length);
 
-	if (iscsi_send_recovery_r2t(cmd, r2t_offset, r2t_length) < 0)
+	if (iscsit_send_recovery_r2t(cmd, r2t_offset, r2t_length) < 0)
 		goto failure;
 
-	iscsi_start_dataout_timer(cmd, conn);
+	iscsit_start_dataout_timer(cmd, conn);
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
 	iscsit_dec_conn_usage_count(conn);
 
@@ -1235,13 +1235,13 @@ static void iscsi_handle_dataout_timeout(unsigned long data)
 
 failure:
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
-	iscsi_cause_connection_reinstatement(conn, 0);
+	iscsit_cause_connection_reinstatement(conn, 0);
 	iscsit_dec_conn_usage_count(conn);
 
 	return;
 }
 
-void iscsi_mod_dataout_timer(struct iscsi_cmd *cmd)
+void iscsit_mod_dataout_timer(struct iscsi_cmd *cmd)
 {
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_session *sess = conn->sess;
@@ -1263,7 +1263,7 @@ void iscsi_mod_dataout_timer(struct iscsi_cmd *cmd)
 /*
  *	Called with cmd->dataout_timeout_lock held.
  */
-void iscsi_start_dataout_timer(
+void iscsit_start_dataout_timer(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -1279,13 +1279,13 @@ void iscsi_start_dataout_timer(
 	init_timer(&cmd->dataout_timer);
 	cmd->dataout_timer.expires = (get_jiffies_64() + na->dataout_timeout * HZ);
 	cmd->dataout_timer.data = (unsigned long)cmd;
-	cmd->dataout_timer.function = iscsi_handle_dataout_timeout;
+	cmd->dataout_timer.function = iscsit_handle_dataout_timeout;
 	cmd->dataout_timer_flags &= ~ISCSI_TF_STOP;
 	cmd->dataout_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&cmd->dataout_timer);
 }
 
-void iscsi_stop_dataout_timer(struct iscsi_cmd *cmd)
+void iscsit_stop_dataout_timer(struct iscsi_cmd *cmd)
 {
 	spin_lock_bh(&cmd->dataout_timeout_lock);
 	if (!(cmd->dataout_timer_flags & ISCSI_TF_RUNNING)) {

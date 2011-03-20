@@ -1710,7 +1710,7 @@ static int lio_tpg_shutdown_session(struct se_session *se_sess)
 	spin_unlock(&sess->conn_lock);
 
 	iscsit_inc_session_usage_count(sess);
-	iscsi_stop_time2retain_timer(sess);
+	iscsit_stop_time2retain_timer(sess);
 
 	return 1;
 }
@@ -1745,7 +1745,7 @@ static void lio_tpg_fall_back_to_erl0(struct se_session *se_sess)
 {
 	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
 
-	iscsi_fall_back_to_erl0(sess);
+	iscsit_fall_back_to_erl0(sess);
 }
 
 static u32 lio_tpg_get_inst_index(struct se_portal_group *se_tpg)

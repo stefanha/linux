@@ -1235,7 +1235,7 @@ done:
 	} else if (transport_ret == -2) {
 		/*
 		 * Unsupported SAM Opcode.  CHECK_CONDITION will be sent
-		 * in iscsi_execute_cmd() during the CmdSN OOO Execution
+		 * in iscsit_execute_cmd() during the CmdSN OOO Execution
 		 * Mechinism.
 		 */
 		send_check_condition = 1;
@@ -1293,10 +1293,10 @@ attach_cmd:
 			return 0;
 
 		if (cmd->unsolicited_data) {
-			iscsi_set_dataout_sequence_values(cmd);
+			iscsit_set_dataout_sequence_values(cmd);
 
 			spin_lock_bh(&cmd->dataout_timeout_lock);
-			iscsi_start_dataout_timer(cmd, cmd->conn);
+			iscsit_start_dataout_timer(cmd, cmd->conn);
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
 
@@ -1344,13 +1344,13 @@ after_immediate_data:
 		 * and ImmediateData=Yes.
 		 */
 		if (dump_immediate_data) {
-			if (iscsi_dump_data_payload(conn, payload_length, 1) < 0)
+			if (iscsit_dump_data_payload(conn, payload_length, 1) < 0)
 				return -1;
 		} else if (cmd->unsolicited_data) {
-			iscsi_set_dataout_sequence_values(cmd);
+			iscsit_set_dataout_sequence_values(cmd);
 
 			spin_lock_bh(&cmd->dataout_timeout_lock);
-			iscsi_start_dataout_timer(cmd, cmd->conn);
+			iscsit_start_dataout_timer(cmd, cmd->conn);
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
 
@@ -1448,7 +1448,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT after"
 			" last DataOUT received, dumping payload\n",
 			cmd->init_task_tag);
-		return iscsi_dump_data_payload(conn, payload_length, 1);
+		return iscsit_dump_data_payload(conn, payload_length, 1);
 	}
 
 	if (cmd->data_direction != DMA_TO_DEVICE) {
@@ -1458,7 +1458,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 				1, 0, buf, cmd);
 	}
 	se_cmd = SE_CMD(cmd);
-	iscsi_mod_dataout_timer(cmd);
+	iscsit_mod_dataout_timer(cmd);
 
 	if ((hdr->offset + payload_length) > cmd->data_length) {
 		printk(KERN_ERR "DataOut Offset: %u, Length %u greater than"
@@ -1544,11 +1544,11 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 			 * received with the unsolicitied data out.
 			 */
 			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
-				iscsi_stop_dataout_timer(cmd);
+				iscsit_stop_dataout_timer(cmd);
 
 			transport_check_aborted_status(se_cmd,
 					(hdr->flags & ISCSI_FLAG_CMD_FINAL));
-			return iscsi_dump_data_payload(conn, payload_length, 1);
+			return iscsit_dump_data_payload(conn, payload_length, 1);
 		}
 	} else {
 		/*
@@ -1564,19 +1564,19 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 		if (atomic_read(&T_TASK(se_cmd)->t_transport_aborted) != 0) {
 			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
 				if (--cmd->outstanding_r2ts < 1) {
-					iscsi_stop_dataout_timer(cmd);
+					iscsit_stop_dataout_timer(cmd);
 					transport_check_aborted_status(
 							se_cmd, 1);
 				}
 
-			return iscsi_dump_data_payload(conn, payload_length, 1);
+			return iscsit_dump_data_payload(conn, payload_length, 1);
 		}
 	}
 	/*
 	 * Preform DataSN, DataSequenceInOrder, DataPDUInOrder, and
 	 * within-command recovery checks before receiving the payload.
 	 */
-	ret = iscsi_check_pre_dataout(cmd, buf);
+	ret = iscsit_check_pre_dataout(cmd, buf);
 	if (ret == DATAOUT_WITHIN_COMMAND_RECOVERY)
 		return 0;
 	else if (ret == DATAOUT_CANNOT_RECOVER)
@@ -1686,11 +1686,11 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 	 * Increment post receive data and CRC values or perform
 	 * within-command recovery.
 	 */
-	ret = iscsi_check_post_dataout(cmd, buf, data_crc_failed);
+	ret = iscsit_check_post_dataout(cmd, buf, data_crc_failed);
 	if ((ret == DATAOUT_NORMAL) || (ret == DATAOUT_WITHIN_COMMAND_RECOVERY))
 		return 0;
 	else if (ret == DATAOUT_SEND_R2T) {
-		iscsi_set_dataout_sequence_values(cmd);
+		iscsit_set_dataout_sequence_values(cmd);
 		iscsit_build_r2ts_for_cmd(cmd, conn, 0);
 	} else if (ret == DATAOUT_SEND_TO_TRANSPORT) {
 		/*
@@ -1703,7 +1703,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 		cmd->i_state = ISTATE_RECEIVED_LAST_DATAOUT;
 		spin_unlock_bh(&cmd->istate_lock);
 
-		iscsi_stop_dataout_timer(cmd);
+		iscsit_stop_dataout_timer(cmd);
 		return (!ooo_cmdsn) ? transport_generic_handle_data(
 					SE_CMD(cmd)) : 0;
 	} else /* DATAOUT_CANNOT_RECOVER */
@@ -2289,7 +2289,7 @@ static inline int iscsit_handle_text_cmd(
 		return 0;
 	}
 
-	return iscsi_execute_cmd(cmd, 0);
+	return iscsit_execute_cmd(cmd, 0);
 }
 
 int iscsit_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
@@ -2490,7 +2490,7 @@ static inline int iscsit_handle_logout_cmd(
 	/*
 	 * Immediate Logout Commands are executed, well, Immediately.
 	 */
-	if (iscsi_execute_cmd(cmd, 0) < 0)
+	if (iscsit_execute_cmd(cmd, 0) < 0)
 		return -1;
 
 	return logout_remove;
@@ -2532,14 +2532,14 @@ static inline int iscsit_handle_snack(
 	 */
 	switch (hdr->flags & ISCSI_FLAG_SNACK_TYPE_MASK) {
 	case 0:
-		return iscsi_handle_recovery_datain_or_r2t(conn, buf,
+		return iscsit_handle_recovery_datain_or_r2t(conn, buf,
 			hdr->itt, hdr->ttt, hdr->begrun, hdr->runlength);
 		return 0;
 	case ISCSI_FLAG_SNACK_TYPE_STATUS:
-		return iscsi_handle_status_snack(conn, hdr->itt, hdr->ttt,
+		return iscsit_handle_status_snack(conn, hdr->itt, hdr->ttt,
 			hdr->begrun, hdr->runlength);
 	case ISCSI_FLAG_SNACK_TYPE_DATA_ACK:
-		return iscsi_handle_data_ack(conn, hdr->ttt, hdr->begrun,
+		return iscsit_handle_data_ack(conn, hdr->ttt, hdr->begrun,
 			hdr->runlength);
 	case ISCSI_FLAG_SNACK_TYPE_RDATA:
 		/* FIXME: Support R-Data SNACK */
@@ -3140,11 +3140,11 @@ static inline int iscsit_send_logout_response(
 		logout_conn = iscsit_get_conn_from_cid_rcfr(sess,
 				cmd->logout_cid);
 		if ((logout_conn)) {
-			iscsi_connection_reinstatement_rcfr(logout_conn);
+			iscsit_connection_reinstatement_rcfr(logout_conn);
 			iscsit_dec_conn_usage_count(logout_conn);
 		}
 
-		cr = iscsi_get_inactive_connection_recovery_entry(
+		cr = iscsit_get_inactive_connection_recovery_entry(
 				conn->sess, cmd->logout_cid);
 		if (!cr) {
 			printk(KERN_ERR "Unable to locate CID: %hu for"
@@ -3154,7 +3154,7 @@ static inline int iscsit_send_logout_response(
 			break;
 		}
 
-		iscsi_discard_cr_cmds_by_expstatsn(cr, cmd->exp_stat_sn);
+		iscsit_discard_cr_cmds_by_expstatsn(cr, cmd->exp_stat_sn);
 
 		TRACE(TRACE_ERL2, "iSCSI REMOVECONNFORRECOVERY logout"
 			" for recovery for CID: %hu on CID: %hu successful.\n",
@@ -3996,7 +3996,7 @@ get_immediate:
 				spin_unlock_bh(&cmd->istate_lock);
 
 				if (cmd->data_direction == DMA_TO_DEVICE)
-					iscsi_stop_dataout_timer(cmd);
+					iscsit_stop_dataout_timer(cmd);
 
 				spin_lock_bh(&conn->cmd_lock);
 				list_del(&cmd->i_list);
@@ -4047,7 +4047,7 @@ get_immediate:
 			case ISTATE_SEND_R2T:
 				spin_unlock_bh(&cmd->istate_lock);
 				spin_lock_bh(&cmd->dataout_timeout_lock);
-				iscsi_start_dataout_timer(cmd, conn);
+				iscsit_start_dataout_timer(cmd, conn);
 				spin_unlock_bh(&cmd->dataout_timeout_lock);
 				break;
 			case ISTATE_SEND_NOPIN_WANT_RESPONSE:
@@ -4125,7 +4125,7 @@ check_rsp_state:
 					break;
 				ret = iscsi_tmr_post_handler(cmd, conn);
 				if (ret != 0)
-					iscsi_fall_back_to_erl0(conn->sess);
+					iscsit_fall_back_to_erl0(conn->sess);
 				break;
 			case ISTATE_SEND_TEXTRSP:
 				spin_unlock_bh(&cmd->istate_lock);
@@ -4249,7 +4249,7 @@ check_rsp_state:
 	}
 
 transport_err:
-	iscsi_take_action_for_connection_exit(conn);
+	iscsit_take_action_for_connection_exit(conn);
 	goto restart;
 out:
 	return 0;
@@ -4409,7 +4409,7 @@ restart:
 					" connection.\n");
 				goto transport_err;
 			}
-			if (iscsi_recover_from_unknown_opcode(conn) < 0) {
+			if (iscsit_recover_from_unknown_opcode(conn) < 0) {
 				printk(KERN_ERR "Unable to recover from unknown"
 					" opcode, closing iSCSI connection.\n");
 				goto transport_err;
@@ -4421,7 +4421,7 @@ restart:
 transport_err:
 	if (!signal_pending(current))
 		atomic_set(&conn->transport_failed, 1);
-	iscsi_take_action_for_connection_exit(conn);
+	iscsit_take_action_for_connection_exit(conn);
 	goto restart;
 out:
 	return 0;
@@ -4483,7 +4483,7 @@ static void iscsit_stop_timers_for_cmds(
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 		if (cmd->data_direction == DMA_TO_DEVICE)
-			iscsi_stop_dataout_timer(cmd);
+			iscsit_stop_dataout_timer(cmd);
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 }
@@ -4523,10 +4523,10 @@ int iscsit_close_connection(
 	 * struct iscsi_cmds.
 	 */
 	if (atomic_read(&conn->connection_recovery)) {
-		iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(conn);
-		iscsi_prepare_cmds_for_realligance(conn);
+		iscsit_discard_unacknowledged_ooo_cmdsns_for_conn(conn);
+		iscsit_prepare_cmds_for_realligance(conn);
 	} else {
-		iscsi_clear_ooo_cmdsns_for_conn(conn);
+		iscsit_clear_ooo_cmdsns_for_conn(conn);
 		iscsit_release_commands_from_conn(conn);
 	}
 
@@ -4564,7 +4564,7 @@ int iscsit_close_connection(
 	/*
 	 * If connection reinstatement is being performed on this connection,
 	 * up the connection reinstatement semaphore that is being blocked on
-	 * in iscsi_cause_connection_reinstatement().
+	 * in iscsit_cause_connection_reinstatement().
 	 */
 	spin_lock_bh(&conn->state_lock);
 	if (atomic_read(&conn->sleep_on_conn_wait_comp)) {
@@ -4578,7 +4578,7 @@ int iscsit_close_connection(
 	 * If connection reinstatement is being performed on this connection
 	 * by receiving a REMOVECONNFORRECOVERY logout request, up the
 	 * connection wait rcfr semaphore that is being blocked on
-	 * an iscsi_connection_reinstatement_rcfr().
+	 * an iscsit_connection_reinstatement_rcfr().
 	 */
 	if (atomic_read(&conn->connection_wait_rcfr)) {
 		spin_unlock_bh(&conn->state_lock);
@@ -4687,7 +4687,7 @@ int iscsit_close_connection(
 
 		if (!atomic_read(&sess->session_continuation)) {
 			spin_unlock_bh(&sess->conn_lock);
-			iscsi_start_time2retain_handler(sess);
+			iscsit_start_time2retain_handler(sess);
 		} else
 			spin_unlock_bh(&sess->conn_lock);
 
@@ -4716,7 +4716,7 @@ int iscsit_close_session(struct iscsi_session *sess)
 	spin_lock_bh(&se_tpg->session_lock);
 	atomic_set(&sess->session_logout, 1);
 	atomic_set(&sess->session_reinstatement, 1);
-	iscsi_stop_time2retain_timer(sess);
+	iscsit_stop_time2retain_timer(sess);
 	spin_unlock_bh(&se_tpg->session_lock);
 
 	/*
@@ -4740,7 +4740,7 @@ int iscsit_close_session(struct iscsi_session *sess)
 	} else {
 		if (iscsit_check_session_usage_count(sess) == 2) {
 			atomic_set(&sess->session_logout, 0);
-			iscsi_start_time2retain_handler(sess);
+			iscsit_start_time2retain_handler(sess);
 			return 0;
 		}
 	}
@@ -4748,9 +4748,9 @@ int iscsit_close_session(struct iscsi_session *sess)
 	transport_deregister_session(sess->se_sess);
 
 	if (sess->sess_ops->ErrorRecoveryLevel == 2)
-		iscsi_free_connection_recovery_entires(sess);
+		iscsit_free_connection_recovery_entires(sess);
 
-	iscsi_free_all_ooo_cmdsns(sess);
+	iscsit_free_all_ooo_cmdsns(sess);
 
 	spin_lock_bh(&se_tpg->session_lock);
 	TRACE(TRACE_STATE, "Moving to TARG_SESS_STATE_FREE.\n");
@@ -4802,7 +4802,7 @@ static void iscsit_logout_post_handler_samecid(
 	atomic_set(&conn->conn_logout_remove, 0);
 	complete(&conn->conn_logout_comp);
 
-	iscsi_cause_connection_reinstatement(conn, 1);
+	iscsit_cause_connection_reinstatement(conn, 1);
 	iscsit_dec_conn_usage_count(conn);
 }
 
@@ -4836,7 +4836,7 @@ static void iscsit_logout_post_handler_diffcid(
 	l_conn->conn_state = TARG_CONN_STATE_IN_LOGOUT;
 	spin_unlock_bh(&l_conn->state_lock);
 
-	iscsi_cause_connection_reinstatement(l_conn, 1);
+	iscsit_cause_connection_reinstatement(l_conn, 1);
 	iscsit_dec_conn_usage_count(l_conn);
 }
 
@@ -4934,7 +4934,7 @@ int iscsit_free_session(struct iscsi_session *sess)
 		if (conn_tmp != NULL)
 			iscsit_inc_conn_usage_count(conn_tmp);
 		spin_unlock_bh(&sess->conn_lock);
-		iscsi_cause_connection_reinstatement(conn, 1);
+		iscsit_cause_connection_reinstatement(conn, 1);
 		spin_lock_bh(&sess->conn_lock);
 		if (conn_tmp != NULL)
 			iscsit_dec_conn_usage_count(conn_tmp);
@@ -4976,7 +4976,7 @@ void iscsit_stop_session(
 				iscsit_inc_conn_usage_count(conn_tmp);
 
 			spin_unlock_bh(&sess->conn_lock);
-			iscsi_cause_connection_reinstatement(conn, 1);
+			iscsit_cause_connection_reinstatement(conn, 1);
 			spin_lock_bh(&sess->conn_lock);
 			if (conn_tmp != NULL)
 				iscsit_dec_conn_usage_count(conn_tmp);
@@ -4986,7 +4986,7 @@ void iscsit_stop_session(
 		}
 	} else {
 		list_for_each_entry(conn, &sess->sess_conn_list, conn_list)
-			iscsi_cause_connection_reinstatement(conn, 0);
+			iscsit_cause_connection_reinstatement(conn, 0);
 	}
 
 	if (session_sleep && atomic_read(&sess->nconn)) {
