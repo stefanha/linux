@@ -316,7 +316,7 @@ static int iscsi_login_zero_tsih_s2(
 		return iscsi_set_keys_irrelevant_for_discovery(
 				conn->param_list);
 
-	na = iscsi_tpg_get_node_attrib(sess);
+	na = iscsit_tpg_get_node_attrib(sess);
 
 	/*
 	 * Need to send TargetPortalGroupTag back in first login response

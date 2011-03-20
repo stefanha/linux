@@ -64,7 +64,7 @@ struct iscsi_portal_group *lio_get_tpg_from_tpg_item(
 			"pointer\n");
 		return NULL;
 	}
-	ret = iscsi_get_tpg(tpg);
+	ret = iscsit_get_tpg(tpg);
 	if (ret < 0)
 		return NULL;
 
@@ -83,7 +83,7 @@ static ssize_t lio_target_np_show_sctp(
 	struct iscsi_tpg_np *tpg_np_sctp;
 	ssize_t rb;
 
-	tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP);
+	tpg_np_sctp = iscsit_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP);
 	if (tpg_np_sctp)
 		rb = sprintf(page, "1\n");
 	else
@@ -120,7 +120,7 @@ static ssize_t lio_target_np_store_sctp(
 	}
 
 	tpg = tpg_np->tpg;
-	if (iscsi_get_tpg(tpg) < 0)
+	if (iscsit_get_tpg(tpg) < 0)
 		return -EINVAL;
 
 	if (op) {
@@ -133,24 +133,24 @@ static ssize_t lio_target_np_store_sctp(
 		np_addr.np_flags = np->np_flags;
 		np_addr.np_port = np->np_port;
 
-		tpg_np_sctp = iscsi_tpg_add_network_portal(tpg, &np_addr,
+		tpg_np_sctp = iscsit_tpg_add_network_portal(tpg, &np_addr,
 					tpg_np, ISCSI_SCTP_TCP);
 		if (!tpg_np_sctp || IS_ERR(tpg_np_sctp))
 			goto out;
 	} else {
-		tpg_np_sctp = iscsi_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP);
+		tpg_np_sctp = iscsit_tpg_locate_child_np(tpg_np, ISCSI_SCTP_TCP);
 		if (!tpg_np_sctp)
 			goto out;
 
-		ret = iscsi_tpg_del_network_portal(tpg, tpg_np_sctp);
+		ret = iscsit_tpg_del_network_portal(tpg, tpg_np_sctp);
 		if (ret < 0)
 			goto out;
 	}
 
-	iscsi_put_tpg(tpg);
+	iscsit_put_tpg(tpg);
 	return count;
 out:
-	iscsi_put_tpg(tpg);
+	iscsit_put_tpg(tpg);
 	return -EINVAL;
 }
 
@@ -230,7 +230,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		np_addr.np_flags |= NPF_NET_IPV4;
 	}
 	tpg = container_of(se_tpg, struct iscsi_portal_group, tpg_se_tpg);
-	ret = iscsi_get_tpg(tpg);
+	ret = iscsit_get_tpg(tpg);
 	if (ret < 0)
 		return ERR_PTR(-EINVAL);
 
@@ -251,14 +251,14 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	 * sys/kernel/config/iscsi/$IQN/$TPG/np/$IP:$PORT/
 	 *
 	 */
-	tpg_np = iscsi_tpg_add_network_portal(tpg, &np_addr, NULL, ISCSI_TCP);
+	tpg_np = iscsit_tpg_add_network_portal(tpg, &np_addr, NULL, ISCSI_TCP);
 	if (IS_ERR(tpg_np)) {
-		iscsi_put_tpg(tpg);
+		iscsit_put_tpg(tpg);
 		return ERR_PTR(PTR_ERR(tpg_np));
 	}
 	printk(KERN_INFO "LIO_Target_ConfigFS: addnptotpg done!\n");
 
-	iscsi_put_tpg(tpg);
+	iscsit_put_tpg(tpg);
 	return &tpg_np->se_tpg_np;
 }
 
@@ -272,7 +272,7 @@ static void lio_target_call_delnpfromtpg(
 
 	tpg_np = container_of(se_tpg_np, struct iscsi_tpg_np, se_tpg_np);
 	tpg = tpg_np->tpg;
-	ret = iscsi_get_tpg(tpg);
+	ret = iscsit_get_tpg(tpg);
 	if (ret < 0)
 		return;
 
@@ -281,13 +281,13 @@ static void lio_target_call_delnpfromtpg(
 		" PORTAL: %s\n", config_item_name(&se_tpg->se_tpg_wwn->wwn_group.cg_item),
 		tpg->tpgt, config_item_name(&se_tpg_np->tpg_np_group.cg_item));
 
-	ret = iscsi_tpg_del_network_portal(tpg, tpg_np);
+	ret = iscsit_tpg_del_network_portal(tpg, tpg_np);
 	if (ret < 0)
 		goto out;
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: delnpfromtpg done!\n");
 out:
-	iscsi_put_tpg(tpg);
+	iscsit_put_tpg(tpg);
 }
 
 /* End items for lio_target_np_cit */
@@ -753,12 +753,12 @@ static ssize_t lio_target_nacl_store_cmdsn_depth(
 		return -EINVAL;
 	}
 
-	if (iscsi_get_tpg(tpg) < 0)
+	if (iscsit_get_tpg(tpg) < 0)
 		return -EINVAL;
 	/*
-	 * iscsi_tpg_set_initiator_node_queue_depth() assumes force=1
+	 * iscsit_tpg_set_initiator_node_queue_depth() assumes force=1
 	 */
-	ret = iscsi_tpg_set_initiator_node_queue_depth(tpg,
+	ret = iscsit_tpg_set_initiator_node_queue_depth(tpg,
 				config_item_name(acl_ci), cmdsn_depth, 1);
 
 	printk(KERN_INFO "LIO_Target_ConfigFS: %s/%s Set CmdSN Window: %u for"
@@ -766,7 +766,7 @@ static ssize_t lio_target_nacl_store_cmdsn_depth(
 		config_item_name(tpg_ci), cmdsn_depth,
 		config_item_name(acl_ci));
 
-	iscsi_put_tpg(tpg);
+	iscsit_put_tpg(tpg);
 	return (!ret) ? count : (ssize_t)ret;
 }
 
@@ -819,7 +819,7 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	se_nacl = core_tpg_add_initiator_node_acl(se_tpg, se_nacl_new,
 				name, cmdsn_depth);
 	if (IS_ERR(se_nacl))
-		return ERR_PTR(PTR_ERR(se_nacl));
+		return se_nacl;
 
 	stats_cg = &acl->se_node_acl.acl_fabric_stat_group;
 
@@ -877,11 +877,11 @@ static ssize_t iscsi_tpg_attrib_show_##name(				\
 			struct iscsi_portal_group, tpg_se_tpg);	\
 	ssize_t rb;							\
 									\
-	if (iscsi_get_tpg(tpg) < 0)					\
+	if (iscsit_get_tpg(tpg) < 0)					\
 		return -EINVAL;						\
 									\
 	rb = sprintf(page, "%u\n", ISCSI_TPG_ATTRIB(tpg)->name);	\
-	iscsi_put_tpg(tpg);						\
+	iscsit_put_tpg(tpg);						\
 	return rb;							\
 }									\
 									\
@@ -896,18 +896,18 @@ static ssize_t iscsi_tpg_attrib_store_##name(				\
 	u32 val;							\
 	int ret;							\
 									\
-	if (iscsi_get_tpg(tpg) < 0)					\
+	if (iscsit_get_tpg(tpg) < 0)					\
 		return -EINVAL;						\
 									\
 	val = simple_strtoul(page, &endptr, 0);				\
-	ret = iscsi_ta_##name(tpg, val);				\
+	ret = iscsit_ta_##name(tpg, val);				\
 	if (ret < 0)							\
 		goto out;						\
 									\
-	iscsi_put_tpg(tpg);						\
+	iscsit_put_tpg(tpg);						\
 	return count;							\
 out:									\
-	iscsi_put_tpg(tpg);						\
+	iscsit_put_tpg(tpg);						\
 	return ret;							\
 }
 
@@ -980,18 +980,18 @@ static ssize_t iscsi_tpg_param_show_##name(				\
 	struct iscsi_param *param;					\
 	ssize_t rb;							\
 									\
-	if (iscsi_get_tpg(tpg) < 0)					\
+	if (iscsit_get_tpg(tpg) < 0)					\
 		return -EINVAL;						\
 									\
 	param = iscsi_find_param_from_key(__stringify(name),		\
 				tpg->param_list);			\
 	if (!param) {							\
-		iscsi_put_tpg(tpg);					\
+		iscsit_put_tpg(tpg);					\
 		return -EINVAL;						\
 	}								\
 	rb = snprintf(page, PAGE_SIZE, "%s\n", param->value);		\
 									\
-	iscsi_put_tpg(tpg);						\
+	iscsit_put_tpg(tpg);						\
 	return rb;							\
 }									\
 static ssize_t iscsi_tpg_param_store_##name(				\
@@ -1010,7 +1010,7 @@ static ssize_t iscsi_tpg_param_store_##name(				\
 	snprintf(buf, PAGE_SIZE, "%s=%s", __stringify(name), page);	\
 	buf[strlen(buf)-1] = '\0'; /* Kill newline */			\
 									\
-	if (iscsi_get_tpg(tpg) < 0) {					\
+	if (iscsit_get_tpg(tpg) < 0) {					\
 		kfree(buf);						\
 		return -EINVAL;						\
 	}								\
@@ -1020,11 +1020,11 @@ static ssize_t iscsi_tpg_param_store_##name(				\
 		goto out;						\
 									\
 	kfree(buf);							\
-	iscsi_put_tpg(tpg);						\
+	iscsit_put_tpg(tpg);						\
 	return count;							\
 out:									\
 	kfree(buf);							\
-	iscsi_put_tpg(tpg);						\
+	iscsit_put_tpg(tpg);						\
 	return -EINVAL;						\
 }
 
@@ -1151,27 +1151,27 @@ static ssize_t lio_target_tpg_store_enable(
 		return -EINVAL;
 	}
 
-	ret = iscsi_get_tpg(tpg);
+	ret = iscsit_get_tpg(tpg);
 	if (ret < 0)
 		return -EINVAL;
 
 	if (op) {
-		ret = iscsi_tpg_enable_portal_group(tpg);
+		ret = iscsit_tpg_enable_portal_group(tpg);
 		if (ret < 0)
 			goto out;
 	} else {
 		/*
-		 * iscsi_tpg_disable_portal_group() assumes force=1
+		 * iscsit_tpg_disable_portal_group() assumes force=1
 		 */
-		ret = iscsi_tpg_disable_portal_group(tpg, 1);
+		ret = iscsit_tpg_disable_portal_group(tpg, 1);
 		if (ret < 0)
 			goto out;
 	}
 
-	iscsi_put_tpg(tpg);
+	iscsit_put_tpg(tpg);
 	return count;
 out:
-	iscsi_put_tpg(tpg);
+	iscsit_put_tpg(tpg);
 	return -EINVAL;
 }
 
@@ -1222,7 +1222,7 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	if (ret < 0)
 		return NULL;
 
-	ret = iscsi_tpg_add_portal_group(tiqn, tpg);
+	ret = iscsit_tpg_add_portal_group(tiqn, tpg);
 	if (ret != 0)
 		goto out;
 
@@ -1244,10 +1244,10 @@ void lio_target_tiqn_deltpg(struct se_portal_group *se_tpg)
 	tpg = container_of(se_tpg, struct iscsi_portal_group, tpg_se_tpg);
 	tiqn = tpg->tpg_tiqn;
 	/*
-	 * iscsi_tpg_del_portal_group() assumes force=1
+	 * iscsit_tpg_del_portal_group() assumes force=1
 	 */
 	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> Releasing TPG\n");
-	iscsi_tpg_del_portal_group(tiqn, tpg, 1);
+	iscsit_tpg_del_portal_group(tiqn, tpg, 1);
 }
 
 /* End items for lio_target_tiqn_cit */
@@ -1911,7 +1911,7 @@ void iscsi_target_deregister_configfs(void)
 	 * Shutdown discovery sessions and disable discovery TPG
 	 */
 	if (iscsi_global->discovery_tpg)
-		iscsi_tpg_disable_portal_group(iscsi_global->discovery_tpg, 1);
+		iscsit_tpg_disable_portal_group(iscsi_global->discovery_tpg, 1);
 
 	target_fabric_configfs_deregister(lio_target_fabric_configfs);
 	lio_target_fabric_configfs = NULL;

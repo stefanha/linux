@@ -78,7 +78,7 @@ int iscsit_tmr_task_warm_reset(
 	unsigned char *buf)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 #if 0
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
@@ -101,7 +101,7 @@ int iscsit_tmr_task_cold_reset(
 	unsigned char *buf)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 
 	if (!na->tmr_cold_reset) {
 		printk(KERN_ERR "TMR Opcode TARGET_COLD_RESET authorization"

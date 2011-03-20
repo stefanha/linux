@@ -309,7 +309,7 @@ int iscsit_decide_list_to_build(
 	if (cmd->data_direction == DMA_NONE)
 		return 0;
 
-	na = iscsi_tpg_get_node_attrib(sess);
+	na = iscsit_tpg_get_node_attrib(sess);
 	memset(&bl, 0, sizeof(struct iscsi_build_list));
 
 	if (cmd->data_direction == DMA_FROM_DEVICE) {
@@ -1647,7 +1647,7 @@ static void iscsit_handle_nopin_response_timeout(unsigned long data)
 void iscsit_mod_nopin_response_timer(struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
 	if (!(conn->nopin_response_timer_flags & ISCSI_TF_RUNNING)) {
@@ -1666,7 +1666,7 @@ void iscsit_mod_nopin_response_timer(struct iscsi_conn *conn)
 void iscsit_start_nopin_response_timer(struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 
 	spin_lock_bh(&conn->nopin_timer_lock);
 	if (conn->nopin_response_timer_flags & ISCSI_TF_RUNNING) {
@@ -1730,7 +1730,7 @@ static void iscsit_handle_nopin_timeout(unsigned long data)
 void __iscsit_start_nopin_timer(struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 	/*
 	* NOPIN timeout is disabled.
 	 */
@@ -1755,7 +1755,7 @@ void __iscsit_start_nopin_timer(struct iscsi_conn *conn)
 void iscsit_start_nopin_timer(struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 	/*
 	 * NOPIN timeout is disabled..
 	 */
