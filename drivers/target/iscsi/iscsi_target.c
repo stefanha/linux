@@ -329,6 +329,7 @@ static struct iscsi_np *iscsit_get_np(
 			spin_unlock_bh(&np_lock);
 			return np;
 		}
+		spin_unlock(&np->np_thread_lock);
 	}
 	spin_unlock_bh(&np_lock);
 
