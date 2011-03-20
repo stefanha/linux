@@ -2022,7 +2022,7 @@ static inline int iscsit_handle_task_mgt_cmd(
 
 	switch (function) {
 	case ISCSI_TM_FUNC_ABORT_TASK:
-		se_tmr->response = iscsi_tmr_abort_task(cmd, buf);
+		se_tmr->response = iscsit_tmr_abort_task(cmd, buf);
 		if (se_tmr->response != ISCSI_TMF_RSP_COMPLETE) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			goto attach;
@@ -2034,21 +2034,21 @@ static inline int iscsit_handle_task_mgt_cmd(
 	case ISCSI_TM_FUNC_LOGICAL_UNIT_RESET:
 		break;
 	case ISCSI_TM_FUNC_TARGET_WARM_RESET:
-		if (iscsi_tmr_task_warm_reset(conn, tmr_req, buf) < 0) {
+		if (iscsit_tmr_task_warm_reset(conn, tmr_req, buf) < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			se_tmr->response = ISCSI_TMF_RSP_AUTH_FAILED;
 			goto attach;
 		}
 		break;
 	case ISCSI_TM_FUNC_TARGET_COLD_RESET:
-		if (iscsi_tmr_task_cold_reset(conn, tmr_req, buf) < 0) {
+		if (iscsit_tmr_task_cold_reset(conn, tmr_req, buf) < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			se_tmr->response = ISCSI_TMF_RSP_AUTH_FAILED;
 			goto attach;
 		}
 		break;
 	case ISCSI_TM_FUNC_TASK_REASSIGN:
-		se_tmr->response = iscsi_tmr_task_reassign(cmd, buf);
+		se_tmr->response = iscsit_tmr_task_reassign(cmd, buf);
 		/*
 		 * Perform sanity checks on the ExpDataSN only if the
 		 * TASK_REASSIGN was successful.
@@ -2056,7 +2056,7 @@ static inline int iscsit_handle_task_mgt_cmd(
 		if (se_tmr->response != ISCSI_TMF_RSP_COMPLETE)
 			break;
 
-		if (iscsi_check_task_reassign_expdatasn(tmr_req, conn) < 0)
+		if (iscsit_check_task_reassign_expdatasn(tmr_req, conn) < 0)
 			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_BOOKMARK_INVALID, 1, 1,
 					buf, cmd);
@@ -4123,7 +4123,7 @@ check_rsp_state:
 				ret = iscsit_send_task_mgt_rsp(cmd, conn);
 				if (ret != 0)
 					break;
-				ret = iscsi_tmr_post_handler(cmd, conn);
+				ret = iscsit_tmr_post_handler(cmd, conn);
 				if (ret != 0)
 					iscsit_fall_back_to_erl0(conn->sess);
 				break;
