@@ -46,7 +46,7 @@ u8 iscsi_tmr_abort_task(
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 
-	ref_cmd = iscsi_find_cmd_from_itt(conn, hdr->rtt);
+	ref_cmd = iscsit_find_cmd_from_itt(conn, hdr->rtt);
 	if (!ref_cmd) {
 		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x on CID:"
 			" %hu.\n", hdr->rtt, conn->cid);
@@ -137,7 +137,7 @@ u8 iscsi_tmr_task_reassign(
 		return ISCSI_TMF_RSP_NOT_SUPPORTED;
 	}
 
-	ret = iscsi_find_cmd_for_recovery(conn->sess, &ref_cmd, &cr, hdr->rtt);
+	ret = iscsit_find_cmd_for_recovery(conn->sess, &ref_cmd, &cr, hdr->rtt);
 	if (ret == -2) {
 		printk(KERN_ERR "Command ITT: 0x%08x is still alligent to CID:"
 			" %hu\n", ref_cmd->init_task_tag, cr->cid);
@@ -223,7 +223,7 @@ static int iscsi_task_reassign_complete_nop_out(
 	spin_unlock_bh(&conn->cmd_lock);
 
 	cmd->i_state = ISTATE_SEND_NOPIN;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 	return 0;
 }
 
@@ -261,7 +261,7 @@ static int iscsi_task_reassign_complete_write(
 		}
 
 		cmd->i_state = ISTATE_SEND_STATUS;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 		return 0;
 	}
 
@@ -282,7 +282,7 @@ static int iscsi_task_reassign_complete_write(
 			length = (conn->sess->sess_ops->FirstBurstLength - offset);
 
 		spin_lock_bh(&cmd->r2t_lock);
-		if (iscsi_add_r2t_to_list(cmd, offset, length, 0, 0) < 0) {
+		if (iscsit_add_r2t_to_list(cmd, offset, length, 0, 0) < 0) {
 			spin_unlock_bh(&cmd->r2t_lock);
 			return -1;
 		}
@@ -347,7 +347,7 @@ static int iscsi_task_reassign_complete_read(
 	iscsi_attach_datain_req(cmd, dr);
 
 	cmd->i_state = ISTATE_SEND_DATAIN;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 	return 0;
 }
 
@@ -358,7 +358,7 @@ static int iscsi_task_reassign_complete_none(
 	struct iscsi_conn *conn = cmd->conn;
 
 	cmd->i_state = ISTATE_SEND_STATUS;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 	return 0;
 }
 
@@ -393,7 +393,7 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
 
 	if (se_cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
 		cmd->i_state = ISTATE_SEND_STATUS;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 		return 0;
 	}
 
@@ -749,7 +749,7 @@ drop_unacknowledged_r2ts:
 		}
 
 		if (r2t->recovery_r2t) {
-			iscsi_free_r2t(r2t, cmd);
+			iscsit_free_r2t(r2t, cmd);
 			continue;
 		}
 
@@ -775,7 +775,7 @@ drop_unacknowledged_r2ts:
 			cmd->seq_send_order--;
 
 		cmd->outstanding_r2ts--;
-		iscsi_free_r2t(r2t, cmd);
+		iscsit_free_r2t(r2t, cmd);
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 

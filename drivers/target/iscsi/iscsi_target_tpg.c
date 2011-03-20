@@ -436,7 +436,7 @@ struct iscsi_tpg_np *iscsi_tpg_add_network_portal(
 		ip_buf = (char *)&np_addr->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, np_addr->np_ipv4);
+		iscsit_ntoa2(buf_ipv4, np_addr->np_ipv4);
 		ip_buf = &buf_ipv4[0];
 	}
 
@@ -497,7 +497,7 @@ static int iscsi_tpg_release_np(
 		ip = &np->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
+		iscsit_ntoa2(buf_ipv4, np->np_ipv4);
 		ip = &buf_ipv4[0];
 	}
 

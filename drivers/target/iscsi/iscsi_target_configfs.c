@@ -692,7 +692,7 @@ static ssize_t lio_target_nacl_show_info(
 			if (conn->net_size == IPV6_ADDRESS_SPACE) {
 				ip = &conn->ipv6_login_ip[0];
 			} else {
-				iscsi_ntoa2(buf_ipv4, conn->login_ip);
+				iscsit_ntoa2(buf_ipv4, conn->login_ip);
 				ip = &buf_ipv4[0];
 			}
 			rb += sprintf(page+rb, "   Address %s %s", ip,
@@ -1558,7 +1558,7 @@ static int lio_queue_data_in(struct se_cmd *se_cmd)
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
 	cmd->i_state = ISTATE_SEND_DATAIN;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
 	return 0;
 }
 
@@ -1593,7 +1593,7 @@ static int lio_queue_status(struct se_cmd *se_cmd)
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
 	cmd->i_state = ISTATE_SEND_STATUS;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
 	return 0;
 }
 
@@ -1625,7 +1625,7 @@ static int lio_queue_tm_rsp(struct se_cmd *se_cmd)
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
 	cmd->i_state = ISTATE_SEND_TASKMGTRSP;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
 	return 0;
 }
 
@@ -1692,7 +1692,7 @@ static void lio_tpg_release_fabric_acl(
 /*
  * Called with spin_lock_bh(struct se_portal_group->session_lock) held..
  *
- * Also, this function calls iscsi_inc_session_usage_count() on the
+ * Also, this function calls iscsit_inc_session_usage_count() on the
  * struct iscsi_session in question.
  */
 static int lio_tpg_shutdown_session(struct se_session *se_sess)
@@ -1709,14 +1709,14 @@ static int lio_tpg_shutdown_session(struct se_session *se_sess)
 	atomic_set(&sess->session_reinstatement, 1);
 	spin_unlock(&sess->conn_lock);
 
-	iscsi_inc_session_usage_count(sess);
+	iscsit_inc_session_usage_count(sess);
 	iscsi_stop_time2retain_timer(sess);
 
 	return 1;
 }
 
 /*
- * Calls iscsi_dec_session_usage_count() as inverse of
+ * Calls iscsit_dec_session_usage_count() as inverse of
  * lio_tpg_shutdown_session()
  */
 static void lio_tpg_close_session(struct se_session *se_sess)
@@ -1727,7 +1727,7 @@ static void lio_tpg_close_session(struct se_session *se_sess)
 	 * forcefully shutdown the iSCSI NEXUS.
 	 */
 	iscsit_stop_session(sess, 1, 1);
-	iscsi_dec_session_usage_count(sess);
+	iscsit_dec_session_usage_count(sess);
 	iscsit_close_session(sess);
 }
 
@@ -1784,14 +1784,14 @@ static void lio_release_cmd_direct(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
-	iscsi_release_cmd_direct(cmd);
+	iscsit_release_cmd_direct(cmd);
 }
 
 static void lio_release_cmd_to_pool(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
-	iscsi_release_cmd_to_pool(cmd);
+	iscsit_release_cmd_to_pool(cmd);
 }
 
 /* End functions for target_core_fabric_ops */
@@ -1859,7 +1859,7 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.set_fabric_sense_len = &lio_set_fabric_sense_len;
 	fabric->tf_ops.get_fabric_sense_len = &lio_get_fabric_sense_len;
 	fabric->tf_ops.is_state_remove = &iscsi_is_state_remove;
-	fabric->tf_ops.pack_lun = &iscsi_pack_lun;
+	fabric->tf_ops.pack_lun = &iscsit_pack_lun;
 	/*
 	 * Setup function pointers for generic logic in target_core_fabric_configfs.c
 	 */

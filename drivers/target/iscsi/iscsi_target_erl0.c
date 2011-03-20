@@ -496,7 +496,7 @@ static int iscsi_dataout_update_r2t(struct iscsi_cmd *cmd, u32 offset, u32 lengt
 	if (cmd->unsolicited_data)
 		return 0;
 
-	r2t = iscsi_get_r2t_for_eos(cmd, offset, length);
+	r2t = iscsit_get_r2t_for_eos(cmd, offset, length);
 	if (!r2t)
 		return -1;
 

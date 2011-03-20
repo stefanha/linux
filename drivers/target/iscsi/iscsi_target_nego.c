@@ -189,7 +189,7 @@ static int iscsi_target_check_login_request(
 	default:
 		printk(KERN_ERR "Received unknown opcode 0x%02x.\n",
 				login_req->opcode & ISCSI_OPCODE_MASK);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
 	}
@@ -198,7 +198,7 @@ static int iscsi_target_check_login_request(
 	    (login_req->flags & ISCSI_FLAG_LOGIN_TRANSIT)) {
 		printk(KERN_ERR "Login request has both ISCSI_FLAG_LOGIN_CONTINUE"
 			" and ISCSI_FLAG_LOGIN_TRANSIT set, protocol error.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
 	}
@@ -212,7 +212,7 @@ static int iscsi_target_check_login_request(
 		printk(KERN_ERR "Initiator unexpectedly changed login stage"
 			" from %d to %d, login failed.\n", login->current_stage,
 			req_csg);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
 	}
@@ -223,7 +223,7 @@ static int iscsi_target_check_login_request(
 		printk(KERN_ERR "Illegal login_req->flags Combination, CSG: %d,"
 			" NSG: %d, ISCSI_FLAG_LOGIN_TRANSIT: %d.\n", req_csg,
 			req_nsg, (login_req->flags & ISCSI_FLAG_LOGIN_TRANSIT));
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
 	}
@@ -233,7 +233,7 @@ static int iscsi_target_check_login_request(
 		printk(KERN_ERR "Login request changed Version Max/Nin"
 			" unexpectedly to 0x%02x/0x%02x, protocol error\n",
 			login_req->max_version, login_req->min_version);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
 	}
@@ -241,7 +241,7 @@ static int iscsi_target_check_login_request(
 	if (memcmp(login_req->isid, login->isid, 6) != 0) {
 		printk(KERN_ERR "Login request changed ISID unexpectedly,"
 				" protocol error.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
 	}
@@ -249,7 +249,7 @@ static int iscsi_target_check_login_request(
 	if (login_req->itt != login->init_task_tag) {
 		printk(KERN_ERR "Login request changed ITT unexpectedly to"
 			" 0x%08x, protocol error.\n", login_req->itt);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_INIT_ERR);
 		return -1;
 	}
@@ -278,7 +278,7 @@ static int iscsi_target_check_first_request(
 			if (!IS_PSTATE_ACCEPTOR(param)) {
 				printk(KERN_ERR "SessionType key not received"
 					" in first login request.\n");
-				iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+				iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 					ISCSI_LOGIN_STATUS_MISSING_FIELDS);
 				return -1;
 			}
@@ -293,7 +293,7 @@ static int iscsi_target_check_first_request(
 
 				printk(KERN_ERR "InitiatorName key not received"
 					" in first login request.\n");
-				iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+				iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 					ISCSI_LOGIN_STATUS_MISSING_FIELDS);
 				return -1;
 			}
@@ -308,7 +308,7 @@ static int iscsi_target_check_first_request(
 				if (!se_nacl) {
 					printk(KERN_ERR "Unable to locate"
 						" struct se_node_acl\n");
-					iscsi_tx_login_rsp(conn,
+					iscsit_tx_login_rsp(conn,
 							ISCSI_STATUS_CLS_INITIATOR_ERR,
 							ISCSI_LOGIN_STATUS_TGT_NOT_FOUND);
 					return -1;
@@ -320,7 +320,7 @@ static int iscsi_target_check_first_request(
 						" InitiatorName: %s for this"
 						" iSCSI Initiator Node.\n",
 						param->value);
-					iscsi_tx_login_rsp(conn,
+					iscsit_tx_login_rsp(conn,
 							ISCSI_STATUS_CLS_INITIATOR_ERR,
 							ISCSI_LOGIN_STATUS_TGT_NOT_FOUND);
 					return -1;
@@ -518,13 +518,13 @@ static int iscsi_target_do_authentication(
 	case 2:
 		printk(KERN_ERR "Security negotiation"
 			" failed.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_AUTH_FAILED);
 		return -1;
 	default:
 		printk(KERN_ERR "Received unknown error %d from LIO"
 				" Authentication\n", authret);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_TARGET_ERROR);
 		return -1;
 	}
@@ -564,7 +564,7 @@ static int iscsi_target_handle_csg_zero(
 			printk(KERN_ERR "Initiator has already been"
 				" successfully authenticated, but is still"
 				" sending %s keys.\n", param->value);
-			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 					ISCSI_LOGIN_STATUS_INIT_ERR);
 			return -1;
 		}
@@ -591,7 +591,7 @@ static int iscsi_target_handle_csg_zero(
 			printk(KERN_ERR "Initiator sent AuthMethod=None but"
 				" Target is enforcing iSCSI Authentication,"
 					" login failed.\n");
-			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 					ISCSI_LOGIN_STATUS_AUTH_FAILED);
 			return -1;
 		}
@@ -657,7 +657,7 @@ static int iscsi_target_handle_csg_one(struct iscsi_conn *conn, struct iscsi_log
 		printk(KERN_ERR "Initiator is requesting CSG: 1, has not been"
 			 " successfully authenticated, and the Target is"
 			" enforcing iSCSI Authentication, login failed.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_AUTH_FAILED);
 		return -1;
 	}
@@ -683,7 +683,7 @@ static int iscsi_target_do_login(struct iscsi_conn *conn, struct iscsi_login *lo
 	while (1) {
 		if (++pdu_count > MAX_LOGIN_PDUS) {
 			printk(KERN_ERR "MAX_LOGIN_PDUS count reached.\n");
-			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 					ISCSI_LOGIN_STATUS_TARGET_ERROR);
 			return -1;
 		}
@@ -815,7 +815,7 @@ static int iscsi_target_locate_portal(
 	if (!i_buf) {
 		printk(KERN_ERR "InitiatorName key not received"
 			" in first login request.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 			ISCSI_LOGIN_STATUS_MISSING_FIELDS);
 		ret = -1;
 		goto out;
@@ -833,7 +833,7 @@ static int iscsi_target_locate_portal(
 
 		printk(KERN_ERR "SessionType key not received"
 			" in first login request.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 			ISCSI_LOGIN_STATUS_MISSING_FIELDS);
 		ret = -1;
 		goto out;
@@ -862,7 +862,7 @@ static int iscsi_target_locate_portal(
 		 * process login attempt.
 		 */
 		if (iscsit_access_np(np, conn->tpg) < 0) {
-			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 			ret = -1;
 			goto out;
@@ -876,7 +876,7 @@ get_target:
 		printk(KERN_ERR "TargetName key not received"
 			" in first login request while"
 			" SessionType=Normal.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 			ISCSI_LOGIN_STATUS_MISSING_FIELDS);
 		ret = -1;
 		goto out;
@@ -889,7 +889,7 @@ get_target:
 	if (!tiqn) {
 		printk(KERN_ERR "Unable to locate Target IQN: %s in"
 			" Storage Node\n", t_buf);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 		ret = -1;
 		goto out;
@@ -904,7 +904,7 @@ get_target:
 		printk(KERN_ERR "Unable to locate Target Portal Group"
 				" on %s\n", tiqn->tiqn);
 		iscsit_put_tiqn_for_login(tiqn);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 		ret = -1;
 		goto out;
@@ -924,7 +924,7 @@ get_target:
 	 */
 	if (iscsit_access_np(np, conn->tpg) < 0) {
 		iscsit_put_tiqn_for_login(tiqn);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 		ret = -1;
 		conn->tpg = NULL;
@@ -955,7 +955,7 @@ get_target:
 		printk(KERN_ERR "iSCSI Initiator Node: %s is not authorized to"
 			" access iSCSI target portal group: %hu.\n",
 				i_buf, conn->tpg->tpgt);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_TGT_FORBIDDEN);
 		ret = -1;
 		goto out;
@@ -977,7 +977,7 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	login = kzalloc(sizeof(struct iscsi_login), GFP_KERNEL);
 	if (!login) {
 		printk(KERN_ERR "Unable to allocate memory for struct iscsi_login.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		goto out;
 	}
@@ -985,7 +985,7 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	login->req = kzalloc(ISCSI_HDR_LEN, GFP_KERNEL);
 	if (!login->req) {
 		printk(KERN_ERR "Unable to allocate memory for Login Request.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		goto out;
 	}
@@ -994,7 +994,7 @@ struct iscsi_login *iscsi_target_init_negotiation(
 	login->req_buf = kzalloc(MAX_KEY_VALUE_PAIRS, GFP_KERNEL);
 	if (!login->req_buf) {
 		printk(KERN_ERR "Unable to allocate memory for response buffer.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		goto out;
 	}
@@ -1031,7 +1031,7 @@ int iscsi_target_start_negotiation(
 	if (!login->rsp) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" Login Response.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		ret = -1;
 		goto out;
@@ -1041,7 +1041,7 @@ int iscsi_target_start_negotiation(
 	if (!login->rsp_buf) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" request buffer.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		ret = -1;
 		goto out;

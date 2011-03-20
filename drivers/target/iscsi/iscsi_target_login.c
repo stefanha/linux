@@ -111,7 +111,7 @@ static int iscsi_login_check_initiator_version(
 		printk(KERN_ERR "Unsupported iSCSI IETF Pre-RFC Revision,"
 			" version Min/Max 0x%02x/0x%02x, rejecting login.\n",
 			version_min, version_max);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_NO_VERSION);
 		return -1;
 	}
@@ -158,7 +158,7 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 		   (sess_p->sess_ops->SessionType == sessiontype))) {
 			atomic_set(&sess_p->session_reinstatement, 1);
 			spin_unlock(&sess_p->conn_lock);
-			iscsi_inc_session_usage_count(sess_p);
+			iscsit_inc_session_usage_count(sess_p);
 			iscsi_stop_time2retain_timer(sess_p);
 			sess = sess_p;
 			break;
@@ -180,13 +180,13 @@ int iscsi_check_for_session_reinstatement(struct iscsi_conn *conn)
 	spin_lock_bh(&sess->conn_lock);
 	if (sess->session_state == TARG_SESS_STATE_FAILED) {
 		spin_unlock_bh(&sess->conn_lock);
-		iscsi_dec_session_usage_count(sess);
+		iscsit_dec_session_usage_count(sess);
 		return iscsit_close_session(sess);
 	}
 	spin_unlock_bh(&sess->conn_lock);
 
 	iscsit_stop_session(sess, 1, 1);
-	iscsi_dec_session_usage_count(sess);
+	iscsit_dec_session_usage_count(sess);
 
 	return iscsit_close_session(sess);
 }
@@ -222,7 +222,7 @@ static int iscsi_login_zero_tsih_s1(
 
 	sess = kzalloc(sizeof(struct iscsi_session), GFP_KERNEL);
 	if (!sess) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		printk(KERN_ERR "Could not allocate memory for session\n");
 		return -1;
@@ -248,7 +248,7 @@ static int iscsi_login_zero_tsih_s1(
 
 	if (!idr_pre_get(&sess_idr, GFP_KERNEL)) {
 		printk(KERN_ERR "idr_pre_get() for sess_idr failed\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;	
 	}
@@ -266,7 +266,7 @@ static int iscsi_login_zero_tsih_s1(
 
 	sess->sess_ops = kzalloc(sizeof(struct iscsi_sess_ops), GFP_KERNEL);
 	if (!sess->sess_ops) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		printk(KERN_ERR "Unable to allocate memory for"
 				" struct iscsi_sess_ops.\n");
@@ -275,7 +275,7 @@ static int iscsi_login_zero_tsih_s1(
 
 	sess->se_sess = transport_init_session();
 	if (!sess->se_sess) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -305,7 +305,7 @@ static int iscsi_login_zero_tsih_s2(
 	 */
 	if (iscsi_copy_param_list(&conn->param_list,
 				ISCSI_TPG_C(conn)->param_list, 1) < 0) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -328,7 +328,7 @@ static int iscsi_login_zero_tsih_s2(
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
 	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -341,7 +341,7 @@ static int iscsi_login_zero_tsih_s2(
 	memset(buf, 0, 32);
 	sprintf(buf, "ErrorRecoveryLevel=%d", na->default_erl);
 	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -366,7 +366,7 @@ int iscsi_login_disable_FIM_keys(
 	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" OFMarker failed\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -376,7 +376,7 @@ int iscsi_login_disable_FIM_keys(
 	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" IFMarker failed\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -386,7 +386,7 @@ int iscsi_login_disable_FIM_keys(
 	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" IFMarker failed\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -396,7 +396,7 @@ int iscsi_login_disable_FIM_keys(
 	if (!param) {
 		printk(KERN_ERR "iscsi_find_param_from_key() for"
 				" IFMarker failed\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -440,7 +440,7 @@ static int iscsi_login_non_zero_tsih_s2(
 		if (!(memcmp((const void *)sess_p->isid,
 		     (const void *)pdu->isid, 6)) &&
 		     (sess_p->tsih == pdu->tsih)) {
-			iscsi_inc_session_usage_count(sess_p);
+			iscsit_inc_session_usage_count(sess_p);
 			iscsi_stop_time2retain_timer(sess_p);
 			sess = sess_p;
 			break;
@@ -454,7 +454,7 @@ static int iscsi_login_non_zero_tsih_s2(
 	if (!sess) {
 		printk(KERN_ERR "Initiator attempting to add a connection to"
 			" a non-existent session, rejecting iSCSI Login.\n");
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_NO_SESSION);
 		return -1;
 	}
@@ -472,7 +472,7 @@ static int iscsi_login_non_zero_tsih_s2(
 
 	if (iscsi_copy_param_list(&conn->param_list,
 			ISCSI_TPG_C(conn)->param_list, 0) < 0) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -488,7 +488,7 @@ static int iscsi_login_non_zero_tsih_s2(
 	memset(buf, 0, 32);
 	sprintf(buf, "TargetPortalGroupTag=%hu", ISCSI_TPG_S(sess)->tpgt);
 	if (iscsi_change_param_value(buf, conn->param_list, 0) < 0) {
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
 		return -1;
 	}
@@ -512,14 +512,14 @@ int iscsi_login_post_auth_non_zero_tsih(
 	 * support it so we send back an non-zero status class to the
 	 * initiator and release the new connection.
 	 */
-	conn_ptr = iscsi_get_conn_from_cid_rcfr(sess, cid);
+	conn_ptr = iscsit_get_conn_from_cid_rcfr(sess, cid);
 	if ((conn_ptr)) {
 		printk(KERN_ERR "Connection exists with CID %hu for %s,"
 			" performing connection reinstatement.\n",
 			conn_ptr->cid, sess->sess_ops->InitiatorName);
 
 		iscsi_connection_reinstatement_rcfr(conn_ptr);
-		iscsi_dec_conn_usage_count(conn_ptr);
+		iscsit_dec_conn_usage_count(conn_ptr);
 	}
 
 	/*
@@ -555,7 +555,7 @@ int iscsi_login_post_auth_non_zero_tsih(
 		printk(KERN_ERR "Adding additional connection to this session"
 			" would exceed MaxConnections %d, login failed.\n",
 				sess->sess_ops->MaxConnections);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				ISCSI_LOGIN_STATUS_ISID_ERROR);
 		return -1;
 	}
@@ -576,7 +576,7 @@ static void iscsi_post_login_start_timers(struct iscsi_conn *conn)
 	spin_unlock_bh(&conn->netif_lock);
 #endif
 	if (!sess->sess_ops->SessionType)
-		iscsi_start_nopin_timer(conn);
+		iscsit_start_nopin_timer(conn);
 }
 
 static int iscsi_post_login_handler(
@@ -593,16 +593,16 @@ static int iscsi_post_login_handler(
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
 	struct iscsi_thread_set *ts;
 
-	iscsi_inc_conn_usage_count(conn);
+	iscsit_inc_conn_usage_count(conn);
 
-	iscsi_collect_login_stats(conn, ISCSI_STATUS_CLS_SUCCESS,
+	iscsit_collect_login_stats(conn, ISCSI_STATUS_CLS_SUCCESS,
 			ISCSI_LOGIN_STATUS_ACCEPT);
 
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_LOGGED_IN.\n");
 	conn->conn_state = TARG_CONN_STATE_LOGGED_IN;
 
 	iscsi_set_connection_parameters(conn->conn_ops, conn->param_list);
-	iscsi_set_sync_and_steering_values(conn);
+	iscsit_set_sync_and_steering_values(conn);
 
 	if (np->np_flags & NPF_NET_IPV6) {
 		ip = &conn->ipv6_login_ip[0];
@@ -610,8 +610,8 @@ static int iscsi_post_login_handler(
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 		memset(buf1_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, conn->login_ip);
-		iscsi_ntoa2(buf1_ipv4, np->np_ipv4);
+		iscsit_ntoa2(buf_ipv4, conn->login_ip);
+		iscsit_ntoa2(buf1_ipv4, np->np_ipv4);
 		ip = &buf_ipv4[0];
 		ip_np = &buf1_ipv4[0];
 	}
@@ -656,13 +656,13 @@ static int iscsi_post_login_handler(
 		conn->conn_rx_reset_cpumask = 1;
 		conn->conn_tx_reset_cpumask = 1;
 
-		iscsi_dec_conn_usage_count(conn);
+		iscsit_dec_conn_usage_count(conn);
 		if (stop_timer) {
 			spin_lock_bh(&se_tpg->session_lock);
 			iscsi_stop_time2retain_timer(sess);
 			spin_unlock_bh(&se_tpg->session_lock);
 		}
-		iscsi_dec_session_usage_count(sess);
+		iscsit_dec_session_usage_count(sess);
 		return 0;
 	}
 
@@ -713,7 +713,7 @@ static int iscsi_post_login_handler(
 	conn->conn_rx_reset_cpumask = 1;
 	conn->conn_tx_reset_cpumask = 1;
 
-	iscsi_dec_conn_usage_count(conn);
+	iscsit_dec_conn_usage_count(conn);
 
 	return 0;
 }
@@ -725,7 +725,7 @@ static void iscsi_handle_login_thread_timeout(unsigned long data)
 
 	memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 	spin_lock_bh(&np->np_thread_lock);
-	iscsi_ntoa2(buf_ipv4, np->np_ipv4);
+	iscsit_ntoa2(buf_ipv4, np->np_ipv4);
 
 	printk(KERN_ERR "iSCSI Login timeout on Network Portal %s:%hu\n",
 			buf_ipv4, np->np_port);
@@ -998,7 +998,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 
 	/*
 	 * Allocate conn->conn_ops early as a failure calling
-	 * iscsi_tx_login_rsp() below will call tx_data().
+	 * iscsit_tx_login_rsp() below will call tx_data().
 	 */
 	conn->conn_ops = kzalloc(sizeof(struct iscsi_conn_ops), GFP_KERNEL);
 	if (!conn->conn_ops) {
@@ -1036,7 +1036,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	pdu->cmdsn		= be32_to_cpu(pdu->cmdsn);
 	pdu->exp_statsn		= be32_to_cpu(pdu->exp_statsn);
 	/*
-	 * Used by iscsi_tx_login_rsp() for Login Resonses PDUs
+	 * Used by iscsit_tx_login_rsp() for Login Resonses PDUs
 	 * when Status-Class != 0.
 	*/
 	conn->login_itt		= pdu->itt;
@@ -1045,7 +1045,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 		ip = &np->np_ipv6[0];
 	} else {
 		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
+		iscsit_ntoa2(buf_ipv4, np->np_ipv4);
 		ip = &buf_ipv4[0];
 	}
 
@@ -1054,7 +1054,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 		spin_unlock_bh(&np->np_thread_lock);
 		printk(KERN_ERR "iSCSI Network Portal on %s:%hu currently not"
 			" active.\n", ip, np->np_port);
-		iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 		goto new_sess_out;
 	}
@@ -1066,7 +1066,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 		if (conn->sock->ops->getname(conn->sock,
 				(struct sockaddr *)&sock_in6, &err, 1) < 0) {
 			printk(KERN_ERR "sock_ops->getname() failed.\n");
-			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 					ISCSI_LOGIN_STATUS_TARGET_ERROR);
 			goto new_sess_out;
 		}
@@ -1076,7 +1076,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 				(char *)&conn->ipv6_login_ip[0],
 				IPV6_ADDRESS_SPACE))) {
 			printk(KERN_ERR "iscsi_ntop6() failed\n");
-			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 					ISCSI_LOGIN_STATUS_TARGET_ERROR);
 			goto new_sess_out;
 		}
@@ -1090,14 +1090,14 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 		if (conn->sock->ops->getname(conn->sock,
 				(struct sockaddr *)&sock_in, &err, 1) < 0) {
 			printk(KERN_ERR "sock_ops->getname() failed.\n");
-			iscsi_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
+			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 					ISCSI_LOGIN_STATUS_TARGET_ERROR);
 			goto new_sess_out;
 		}
 		memset(buf1_ipv4, 0, IPV4_BUF_SIZE);
 		conn->login_ip = ntohl(sock_in.sin_addr.s_addr);
 		conn->login_port = ntohs(sock_in.sin_port);
-		iscsi_ntoa2(buf1_ipv4, conn->login_ip);
+		iscsit_ntoa2(buf1_ipv4, conn->login_ip);
 		ip_init_buf = &buf1_ipv4[0];
 	}
 
@@ -1193,7 +1193,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 
 new_sess_out:
 	printk(KERN_ERR "iSCSI Login negotiation failed.\n");
-	iscsi_collect_login_stats(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
+	iscsit_collect_login_stats(conn, ISCSI_STATUS_CLS_INITIATOR_ERR,
 				  ISCSI_LOGIN_STATUS_INIT_ERR);
 	if (!zero_tsih || !conn->sess)
 		goto old_sess_out;
@@ -1227,7 +1227,7 @@ old_sess_out:
 			spin_unlock_bh(&se_tpg->session_lock);
 		} else
 			spin_unlock_bh(&conn->sess->conn_lock);
-		iscsi_dec_session_usage_count(conn->sess);
+		iscsit_dec_session_usage_count(conn->sess);
 	}
 
 	if (!IS_ERR(conn->conn_rx_hash.tfm))

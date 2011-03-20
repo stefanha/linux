@@ -146,7 +146,7 @@ extern int iscsi_na_nopin_timeout(
 					continue;
 
 				spin_lock(&conn->nopin_timer_lock);
-				__iscsi_start_nopin_timer(conn);
+				__iscsit_start_nopin_timer(conn);
 				spin_unlock(&conn->nopin_timer_lock);
 			}
 			spin_unlock(&sess->conn_lock);

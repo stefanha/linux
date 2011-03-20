@@ -145,7 +145,7 @@ void iscsi_free_connection_recovery_entires(struct iscsi_session *sess)
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, sess);
+				__iscsit_release_cmd_to_pool(cmd, sess);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
@@ -173,7 +173,7 @@ void iscsi_free_connection_recovery_entires(struct iscsi_session *sess)
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, sess);
+				__iscsit_release_cmd_to_pool(cmd, sess);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
@@ -264,7 +264,7 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 		if (!(SE_CMD(cmd)) ||
 		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 		    !(SE_CMD(cmd)->transport_wait_for_tasks))
-			__iscsi_release_cmd_to_pool(cmd, sess);
+			__iscsit_release_cmd_to_pool(cmd, sess);
 		else
 			SE_CMD(cmd)->transport_wait_for_tasks(
 					SE_CMD(cmd), 1, 0);
@@ -327,7 +327,7 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 		if (!(SE_CMD(cmd)) ||
 		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 		    !(SE_CMD(cmd)->transport_wait_for_tasks))
-			__iscsi_release_cmd_to_pool(cmd, sess);
+			__iscsit_release_cmd_to_pool(cmd, sess);
 		else
 			SE_CMD(cmd)->transport_wait_for_tasks(
 					SE_CMD(cmd), 1, 1);
@@ -387,7 +387,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, conn->sess);
+				__iscsit_release_cmd_to_pool(cmd, conn->sess);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 0);
@@ -414,7 +414,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, conn->sess);
+				__iscsit_release_cmd_to_pool(cmd, conn->sess);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);

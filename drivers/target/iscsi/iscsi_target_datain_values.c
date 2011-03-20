@@ -219,7 +219,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 		return NULL;
 	}
 
-	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
+	seq = iscsit_get_seq_holder_for_datain(cmd, seq_send_order);
 	if (!seq)
 		return NULL;
 
@@ -440,7 +440,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 		return NULL;
 	}
 
-	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
+	seq = iscsit_get_seq_holder_for_datain(cmd, seq_send_order);
 	if (!seq)
 		return NULL;
 
