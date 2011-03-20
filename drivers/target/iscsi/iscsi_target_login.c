@@ -670,7 +670,7 @@ static int iscsi_post_login_handler(
 	iscsi_release_param_list(conn->param_list);
 	conn->param_list = NULL;
 
-	iscsi_determine_maxcmdsn(sess);
+	iscsit_determine_maxcmdsn(sess);
 
 	spin_lock_bh(&se_tpg->session_lock);
 	__transport_register_session(&sess->tpg->tpg_se_tpg,

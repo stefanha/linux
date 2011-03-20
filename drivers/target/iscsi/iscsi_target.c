@@ -1202,7 +1202,7 @@ done:
 	/*
 	 * The CDB is going to an se_device_t.
 	 */
-	ret = iscsi_get_lun_for_cmd(cmd, hdr->cdb,
+	ret = iscsit_get_lun_for_cmd(cmd, hdr->cdb,
 				get_unaligned_le64(&hdr->lun[0]));
 	if (ret < 0) {
 		if (SE_CMD(cmd)->scsi_sense_reason == TCM_NON_EXISTENT_LUN) {
@@ -1220,7 +1220,7 @@ done:
 	}
 	/*
 	 * The Initiator Node has access to the LUN (the addressing method
-	 * is handled inside of iscsi_get_lun_for_cmd()).  Now it's time to
+	 * is handled inside of iscsit_get_lun_for_cmd()).  Now it's time to
 	 * allocate 1->N transport tasks (depending on sector count and
 	 * maximum request size the physical HBA(s) can handle.
 	 */
@@ -2011,7 +2011,7 @@ static inline int iscsit_handle_task_mgt_cmd(
 	 * Locate the struct se_lun for all TMRs not related to ERL=2 TASK_REASSIGN
 	 */
 	if (function != ISCSI_TM_FUNC_TASK_REASSIGN) {
-		ret = iscsi_get_lun_for_tmr(cmd,
+		ret = iscsit_get_lun_for_tmr(cmd,
 				get_unaligned_le64(&hdr->lun[0]));
 		if (ret < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -2951,7 +2951,7 @@ static inline int iscsit_send_data_in(
 	else {
 		if ((dr->dr_complete == DATAIN_COMPLETE_NORMAL) ||
 		    (dr->dr_complete == DATAIN_COMPLETE_CONNECTION_RECOVERY)) {
-			iscsi_increment_maxcmdsn(cmd, conn->sess);
+			iscsit_increment_maxcmdsn(cmd, conn->sess);
 			cmd->stat_sn = conn->stat_sn++;
 			set_statsn = 1;
 		} else if (dr->dr_complete ==
@@ -3177,7 +3177,7 @@ static inline int iscsit_send_logout_response(
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -3282,7 +3282,7 @@ static inline int iscsit_send_nopin_response(
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -3546,7 +3546,7 @@ static inline int iscsit_send_status(
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -3666,7 +3666,7 @@ static int iscsit_send_task_mgt_rsp(
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -3734,7 +3734,7 @@ static int iscsit_send_text_rsp(
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -4444,12 +4444,12 @@ static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 
 			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
-			iscsi_increment_maxcmdsn(cmd, sess);
+			iscsit_increment_maxcmdsn(cmd, sess);
 			se_cmd = SE_CMD(cmd);
 			/*
 			 * Special cases for active iSCSI TMR, and
 			 * transport_get_lun_for_cmd() failing from
-			 * iscsi_get_lun_for_cmd() in iscsit_handle_scsi_cmd().
+			 * iscsit_get_lun_for_cmd() in iscsit_handle_scsi_cmd().
 			 */
 			if (cmd->tmr_req && se_cmd->transport_wait_for_tasks)
 				se_cmd->transport_wait_for_tasks(se_cmd, 1, 1);
@@ -4464,7 +4464,7 @@ static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 		list_del(&cmd->i_list);
 		spin_unlock_bh(&conn->cmd_lock);
 
-		iscsi_increment_maxcmdsn(cmd, sess);
+		iscsit_increment_maxcmdsn(cmd, sess);
 		se_cmd = SE_CMD(cmd);
 
 		if (se_cmd->transport_wait_for_tasks)

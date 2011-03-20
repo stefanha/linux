@@ -29,7 +29,7 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 
-int iscsi_get_lun_for_tmr(
+int iscsit_get_lun_for_tmr(
 	struct iscsi_cmd *cmd,
 	u64 lun)
 {
@@ -48,7 +48,7 @@ int iscsi_get_lun_for_tmr(
 	return transport_get_lun_for_tmr(SE_CMD(cmd), unpacked_lun);
 }
 
-int iscsi_get_lun_for_cmd(
+int iscsit_get_lun_for_cmd(
 	struct iscsi_cmd *cmd,
 	unsigned char *cdb,
 	u64 lun)
@@ -68,7 +68,7 @@ int iscsi_get_lun_for_cmd(
 	return transport_get_lun_for_cmd(SE_CMD(cmd), unpacked_lun);
 }
 
-void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
+void iscsit_determine_maxcmdsn(struct iscsi_session *sess)
 {
 	struct se_node_acl *se_nacl;
 
@@ -93,11 +93,7 @@ void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
 	sess->max_cmd_sn = (sess->max_cmd_sn + se_nacl->queue_depth) - 1;
 }
 
-/*	iscsi_increment_maxcmdsn();
- *
- *
- */
-void iscsi_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess)
+void iscsit_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess)
 {
 	if (cmd->immediate_cmd || cmd->maxcmdsn_inc)
 		return;
