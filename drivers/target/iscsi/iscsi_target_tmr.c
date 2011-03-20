@@ -679,7 +679,7 @@ int iscsit_task_reassign_prepare_write(
 		} else {
 			struct iscsi_seq *seq;
 
-			seq = iscsi_get_seq_holder(cmd, r2t->offset,
+			seq = iscsit_get_seq_holder(cmd, r2t->offset,
 					r2t->xfer_len);
 			if (!seq) {
 				spin_unlock_bh(&cmd->r2t_lock);

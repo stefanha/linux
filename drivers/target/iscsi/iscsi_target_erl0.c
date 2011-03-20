@@ -103,7 +103,7 @@ static inline int iscsit_dataout_within_command_recovery_check(
 	} else {
 		struct iscsi_seq *seq;
 
-		seq = iscsi_get_seq_holder(cmd, hdr->offset, payload_length);
+		seq = iscsit_get_seq_holder(cmd, hdr->offset, payload_length);
 		if (!seq)
 			return DATAOUT_CANNOT_RECOVER;
 		/*
@@ -252,7 +252,7 @@ static inline int iscsit_dataout_check_sequence(
 
 		next_burst_len = (cmd->next_burst_len + payload_length);
 	} else {
-		seq = iscsi_get_seq_holder(cmd, hdr->offset, payload_length);
+		seq = iscsit_get_seq_holder(cmd, hdr->offset, payload_length);
 		if (!seq)
 			return DATAOUT_CANNOT_RECOVER;
 		/*
@@ -466,7 +466,7 @@ static inline int iscsit_dataout_pre_datapduinorder_no(
 	struct iscsi_data *hdr = (struct iscsi_data *) buf;
 	u32 payload_length = ntoh24(hdr->dlength);
 
-	pdu = iscsi_get_pdu_holder(cmd, hdr->offset, payload_length);
+	pdu = iscsit_get_pdu_holder(cmd, hdr->offset, payload_length);
 	if (!pdu)
 		return DATAOUT_CANNOT_RECOVER;
 

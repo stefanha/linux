@@ -730,7 +730,7 @@ static int iscsit_recalculate_dataout_values(
 	} else {
 		struct iscsi_seq *seq = NULL;
 
-		seq = iscsi_get_seq_holder(cmd, pdu_offset, pdu_length);
+		seq = iscsit_get_seq_holder(cmd, pdu_offset, pdu_length);
 		if (!seq)
 			return -1;
 

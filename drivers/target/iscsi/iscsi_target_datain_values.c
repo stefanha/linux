@@ -340,7 +340,7 @@ static inline struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
 		return dr;
 	}
 
-	pdu = iscsi_get_pdu_holder_for_seq(cmd, NULL);
+	pdu = iscsit_get_pdu_holder_for_seq(cmd, NULL);
 	if (!pdu)
 		return dr;
 
@@ -449,7 +449,7 @@ static inline struct iscsi_datain_req *iscsit_set_datain_values_no_and_no(
 	if (!dr->recovery && !seq->next_burst_len)
 		seq->first_datasn = cmd->data_sn;
 
-	pdu = iscsi_get_pdu_holder_for_seq(cmd, seq);
+	pdu = iscsit_get_pdu_holder_for_seq(cmd, seq);
 	if (!pdu)
 		return NULL;
 

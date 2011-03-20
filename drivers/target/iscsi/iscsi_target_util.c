@@ -335,7 +335,7 @@ int iscsit_decide_list_to_build(
 			bl.type = PDULIST_IMMEDIATE_AND_UNSOLICITED;
 	}
 
-	return iscsi_do_build_list(cmd, &bl);
+	return iscsit_do_build_list(cmd, &bl);
 }
 
 struct iscsi_seq *iscsit_get_seq_holder_for_datain(
