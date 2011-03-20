@@ -4920,7 +4920,7 @@ void iscsit_fail_session(struct iscsi_session *sess)
 int iscsit_free_session(struct iscsi_session *sess)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
-	struct iscsi_conn *conn, *conn_tmp;
+	struct iscsi_conn *conn, *conn_tmp = NULL;
 
 	spin_lock_bh(&sess->conn_lock);
 	atomic_set(&sess->sleep_on_sess_wait_comp, 1);
@@ -4930,16 +4930,19 @@ int iscsit_free_session(struct iscsi_session *sess)
 		if (conn_count == 0)
 			break;
 
-		iscsit_inc_conn_usage_count(conn);
 		if (conn_tmp != NULL)
 			iscsit_inc_conn_usage_count(conn_tmp);
+
+		iscsit_inc_conn_usage_count(conn);
+
 		spin_unlock_bh(&sess->conn_lock);
 		iscsit_cause_connection_reinstatement(conn, 1);
 		spin_lock_bh(&sess->conn_lock);
-		if (conn_tmp != NULL)
-			iscsit_dec_conn_usage_count(conn_tmp);
 
 		iscsit_dec_conn_usage_count(conn);
+		if (conn_tmp != NULL)
+			iscsit_dec_conn_usage_count(conn_tmp);
+	
 		conn_count--;
 	}
 
@@ -4971,17 +4974,17 @@ void iscsit_stop_session(
 			if (conn_count == 0)
 				break;
 
-			iscsit_inc_conn_usage_count(conn);
 			if (conn_tmp != NULL)
 				iscsit_inc_conn_usage_count(conn_tmp);
+			iscsit_inc_conn_usage_count(conn);
 
 			spin_unlock_bh(&sess->conn_lock);
 			iscsit_cause_connection_reinstatement(conn, 1);
 			spin_lock_bh(&sess->conn_lock);
-			if (conn_tmp != NULL)
-				iscsit_dec_conn_usage_count(conn_tmp);
 
 			iscsit_dec_conn_usage_count(conn);
+			if (conn_tmp != NULL)
+				iscsit_dec_conn_usage_count(conn_tmp);
 			conn_count--;
 		}
 	} else {
