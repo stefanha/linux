@@ -635,6 +635,9 @@ struct iscsi_session {
 	char			auth_type[8];
 	/* unique within the target */
 	int			session_index;
+	/* Used for session reference counting */
+	int			session_usage_count;
+	int			session_waiting_on_uc;
 	u32			cmd_pdus;
 	u32			rsp_pdus;
 	u64			tx_data_octets;
@@ -650,8 +653,6 @@ struct iscsi_session {
 	atomic_t		session_logout;
 	atomic_t		session_reinstatement;
 	atomic_t		session_stop_active;
-	atomic_t		session_usage_count;
-	atomic_t		session_waiting_on_uc;
 	atomic_t		sleep_on_sess_wait_comp;
 	atomic_t		transport_wait_cmds;
 	/* connection list */

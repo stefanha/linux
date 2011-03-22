@@ -899,8 +899,8 @@ void iscsit_release_cmd(struct iscsi_cmd *cmd)
 int iscsit_check_session_usage_count(struct iscsi_session *sess)
 {
 	spin_lock_bh(&sess->session_usage_lock);
-	if (atomic_read(&sess->session_usage_count)) {
-		atomic_set(&sess->session_waiting_on_uc, 1);
+	if (sess->session_usage_count != 0) {
+		sess->session_waiting_on_uc = 1;
 		spin_unlock_bh(&sess->session_usage_lock);
 		if (in_interrupt())
 			return 2;
@@ -916,10 +916,9 @@ int iscsit_check_session_usage_count(struct iscsi_session *sess)
 void iscsit_dec_session_usage_count(struct iscsi_session *sess)
 {
 	spin_lock_bh(&sess->session_usage_lock);
-	atomic_dec(&sess->session_usage_count);
+	sess->session_usage_count--;
 
-	if (!atomic_read(&sess->session_usage_count) &&
-	     atomic_read(&sess->session_waiting_on_uc))
+	if (!sess->session_usage_count && sess->session_waiting_on_uc)
 		complete(&sess->session_waiting_on_uc_comp);
 
 	spin_unlock_bh(&sess->session_usage_lock);
@@ -928,7 +927,7 @@ void iscsit_dec_session_usage_count(struct iscsi_session *sess)
 void iscsit_inc_session_usage_count(struct iscsi_session *sess)
 {
 	spin_lock_bh(&sess->session_usage_lock);
-	atomic_inc(&sess->session_usage_count);
+	sess->session_usage_count--;
 	spin_unlock_bh(&sess->session_usage_lock);
 }
 
