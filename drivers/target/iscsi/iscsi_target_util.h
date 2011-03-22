@@ -72,7 +72,6 @@ extern int iscsit_check_session_usage_count(struct iscsi_session *);
 extern void iscsit_dec_session_usage_count(struct iscsi_session *);
 extern void iscsit_inc_session_usage_count(struct iscsi_session *);
 extern int iscsit_set_sync_and_steering_values(struct iscsi_conn *);
-extern unsigned char *iscsit_ntoa(u32);
 extern void iscsit_ntoa2(unsigned char *, u32);
 extern const char *iscsit_ntop6(const unsigned char *, char *, size_t);
 extern int iscsit_pton6(const char *, unsigned char *);

@@ -988,17 +988,6 @@ int iscsit_set_sync_and_steering_values(struct iscsi_conn *conn)
 	return 0;
 }
 
-unsigned char *iscsit_ntoa(u32 ip)
-{
-	static unsigned char buf[18];
-
-	memset(buf, 0, 18);
-	sprintf(buf, "%u.%u.%u.%u", ((ip >> 24) & 0xff), ((ip >> 16) & 0xff),
-			((ip >> 8) & 0xff), (ip & 0xff));
-
-	return buf;
-}
-
 void iscsit_ntoa2(unsigned char *buf, u32 ip)
 {
 	memset(buf, 0, 18);
