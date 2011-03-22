@@ -273,7 +273,7 @@ struct iscsi_queue_req {
 	struct se_obj_lun_type_s *queue_se_obj_api;
 	struct iscsi_cmd	*cmd;
 	struct list_head	qr_list;
-} ____cacheline_aligned;
+};
 
 struct iscsi_data_count {
 	int			data_length;
@@ -283,12 +283,12 @@ struct iscsi_data_count {
 	u32			ss_iov_count;
 	u32			ss_marker_count;
 	struct iovec		*iov;
-} ____cacheline_aligned;
+};
 
 struct iscsi_param_list {
 	struct list_head	param_list;
 	struct list_head	extra_response_list;
-} ____cacheline_aligned;
+};
 
 struct iscsi_datain_req {
 	enum datain_req_comp_table dr_complete;
@@ -494,7 +494,7 @@ struct iscsi_tmr_req {
 	u32			exp_data_sn;
 	struct iscsi_conn_recovery *conn_recovery;
 	struct se_tmr_req	*se_tmr_req;
-} ____cacheline_aligned;
+};
 
 struct iscsi_conn {
 #define ISCSI_NETDEV_NAME_SIZE				12
@@ -708,7 +708,7 @@ struct iscsi_node_attrib {
 	u32			tmr_cold_reset;
 	u32			tmr_warm_reset;
 	struct iscsi_node_acl *nacl;
-} ____cacheline_aligned;
+};
 
 struct se_dev_entry_s;
 
@@ -724,7 +724,7 @@ struct iscsi_node_auth {
 	char			password[MAX_PASS_LEN];
 	char			userid_mutual[MAX_USER_LEN];
 	char			password_mutual[MAX_PASS_LEN];
-} ____cacheline_aligned;
+};
 
 #include "iscsi_target_stat.h"
 
@@ -738,7 +738,7 @@ struct iscsi_node_acl {
 	struct iscsi_node_auth	node_auth;
 	struct iscsi_node_stat_grps node_stat_grps;
 	struct se_node_acl	se_node_acl;
-} ____cacheline_aligned;
+};
 
 #define NODE_STAT_GRPS(nacl)	(&(nacl)->node_stat_grps)
 
@@ -755,7 +755,7 @@ struct iscsi_tpg_attrib {
 	u32			demo_mode_write_protect;
 	u32			prod_mode_write_protect;
 	struct iscsi_portal_group *tpg;
-}  ____cacheline_aligned;
+};
 
 struct iscsi_np {
 	unsigned char		np_net_dev[ISCSI_NETDEV_NAME_SIZE];
@@ -788,7 +788,7 @@ struct iscsi_tpg_np {
 	struct list_head	tpg_np_parent_list;
 	struct se_tpg_np	se_tpg_np;
 	spinlock_t		tpg_np_parent_lock;
-} ____cacheline_aligned;
+};
 
 struct iscsi_np_addr {
 	u16		np_port;
@@ -877,6 +877,6 @@ struct iscsi_global {
 	/* Used for iSCSI discovery session authentication */
 	struct iscsi_node_acl	discovery_acl;
 	struct iscsi_portal_group	*discovery_tpg;
-} ____cacheline_aligned;
+};
 
 #endif /* ISCSI_TARGET_CORE_H */

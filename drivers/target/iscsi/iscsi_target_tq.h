@@ -47,19 +47,19 @@ extern struct iscsi_global *iscsi_global;
 
 struct iscsi_thread_set {
 	/* flags used for blocking and restarting sets */
-	u8	blocked_threads;
+	int	blocked_threads;
 	/* flag for creating threads */
-	u8	create_threads;
+	int	create_threads;
 	/* flag for delaying readding to inactive list */
-	u8	delay_inactive;
+	int	delay_inactive;
 	/* status for thread set */
-	u8	status;
+	int	status;
 	/* which threads have had signals sent */
-	u8	signal_sent;
+	int	signal_sent;
 	/* flag for which threads exited first */
-	u8	thread_clear;
+	int	thread_clear;
 	/* Active threads in the thread set */
-	u8	thread_count;
+	int	thread_count;
 	/* Unique thread ID */
 	u32	thread_id;
 	/* pointer to connection if set is active */
@@ -84,7 +84,7 @@ struct iscsi_thread_set {
 	struct task_struct	*tx_thread;
 	/* struct iscsi_thread_set in list list head*/
 	struct list_head	ts_list;
-} ____cacheline_aligned;
+};
 
 #endif   /*** ISCSI_THREAD_QUEUE_H ***/
 

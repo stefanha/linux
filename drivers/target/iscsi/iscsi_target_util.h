@@ -18,7 +18,7 @@ struct se_offset_map {
 	struct se_mem		*map_se_mem;
 	struct se_mem		*map_orig_se_mem;
 	void			*iovec_base;
-} ____cacheline_aligned;
+};
 
 struct se_map_sg {
 	int			sg_kmap_active:1;
@@ -27,7 +27,7 @@ struct se_map_sg {
 	void			*fabric_cmd;
 	struct se_cmd		*se_cmd;
 	struct iovec		*iov;
-} ____cacheline_aligned;
+};
 
 struct se_unmap_sg {
 	u32			data_length;
@@ -39,7 +39,7 @@ struct se_unmap_sg {
 	struct se_cmd		*se_cmd;
 	struct se_offset_map	lmap;
 	struct se_mem		*cur_se_mem;
-} ____cacheline_aligned;
+};
 
 extern int iscsit_add_r2t_to_list(struct iscsi_cmd *, u32, u32, int, u32);
 extern struct iscsi_r2t *iscsit_get_r2t_for_eos(struct iscsi_cmd *, u32, u32);

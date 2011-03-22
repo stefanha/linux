@@ -42,11 +42,11 @@
 #define ISCSI_PDU_WRITE				0x02
 
 struct iscsi_build_list {
-	u8		data_direction;
-	u8		randomize;
-	u8		type;
-	u32		immediate_data_length;
-} ____cacheline_aligned;
+	int		data_direction;
+	int		randomize;
+	int		type;
+	int		immediate_data_length;
+};
 
 struct iscsi_pdu {
 	int		status;
