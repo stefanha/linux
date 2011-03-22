@@ -110,8 +110,8 @@ static void chap_set_random(char *data, int length)
 static void chap_gen_challenge(
 	struct iscsi_conn *conn,
 	int caller,
-	char *C_str,
-	unsigned int *C_len)
+	char *c_str,
+	unsigned int *c_len)
 {
 	unsigned char challenge_asciihex[CHAP_CHALLENGE_LENGTH * 2 + 1];
 	struct iscsi_chap *chap = (struct iscsi_chap *) conn->auth_protocol;
@@ -122,10 +122,10 @@ static void chap_gen_challenge(
 	chap_binaryhex_to_asciihex(challenge_asciihex, chap->challenge,
 				CHAP_CHALLENGE_LENGTH);
 	/*
-	 * Set CHAP_C, and copy the generated challenge into C_str.
+	 * Set CHAP_C, and copy the generated challenge into c_str.
 	 */
-	*C_len += sprintf(C_str + *C_len, "CHAP_C=0x%s", challenge_asciihex);
-	*C_len += 1;
+	*c_len += sprintf(c_str + *c_len, "CHAP_C=0x%s", challenge_asciihex);
+	*c_len += 1;
 
 	PRINT("[%s] Sending CHAP_C=0x%s\n\n", (caller) ? "server" : "client",
 			challenge_asciihex);
@@ -136,8 +136,8 @@ static struct iscsi_chap *chap_server_open(
 	struct iscsi_conn *conn,
 	struct iscsi_node_auth *auth,
 	const char *A_str,
-	char *AIC_str,
-	unsigned int *AIC_len)
+	char *aic_str,
+	unsigned int *aic_len)
 {
 	struct iscsi_chap *chap;
 
@@ -164,21 +164,21 @@ static struct iscsi_chap *chap_server_open(
 	/*
 	 * Send back CHAP_A set to MD5.
 	 */
-	*AIC_len = sprintf(AIC_str, "CHAP_A=5");
-	*AIC_len += 1;
+	*aic_len = sprintf(aic_str, "CHAP_A=5");
+	*aic_len += 1;
 	chap->digest_type = CHAP_DIGEST_MD5;
 	PRINT("[server] Sending CHAP_A=%d\n", chap->digest_type);
 	/*
 	 * Set Identifier.
 	 */
 	chap->id = ISCSI_TPG_C(conn)->tpg_chap_id++;
-	*AIC_len += sprintf(AIC_str + *AIC_len, "CHAP_I=%d", chap->id);
-	*AIC_len += 1;
+	*aic_len += sprintf(aic_str + *aic_len, "CHAP_I=%d", chap->id);
+	*aic_len += 1;
 	PRINT("[server] Sending CHAP_I=%d\n", chap->id);
 	/*
 	 * Generate Challenge.
 	 */
-	chap_gen_challenge(conn, 1, AIC_str, AIC_len);
+	chap_gen_challenge(conn, 1, aic_str, aic_len);
 
 	return chap;
 }
@@ -192,9 +192,9 @@ static void chap_close(struct iscsi_conn *conn)
 static int chap_server_compute_md5(
 	struct iscsi_conn *conn,
 	struct iscsi_node_auth *auth,
-	char *NR_in_ptr,
-	char *NR_out_ptr,
-	unsigned int *NR_out_len)
+	char *nr_in_ptr,
+	char *nr_out_ptr,
+	unsigned int *nr_out_len)
 {
 	char *endptr;
 	unsigned char id, digest[MD5_SIGNATURE_SIZE];
@@ -232,7 +232,7 @@ static int chap_server_compute_md5(
 	/*
 	 * Extract CHAP_N.
 	 */
-	if (extract_param(NR_in_ptr, "CHAP_N", MAX_CHAP_N_SIZE, chap_n,
+	if (extract_param(nr_in_ptr, "CHAP_N", MAX_CHAP_N_SIZE, chap_n,
 				&type) < 0) {
 		printk(KERN_ERR "Could not find CHAP_N.\n");
 		goto out;
@@ -250,7 +250,7 @@ static int chap_server_compute_md5(
 	/*
 	 * Extract CHAP_R.
 	 */
-	if (extract_param(NR_in_ptr, "CHAP_R", MAX_RESPONSE_LENGTH, chap_r,
+	if (extract_param(nr_in_ptr, "CHAP_R", MAX_RESPONSE_LENGTH, chap_r,
 				&type) < 0) {
 		printk(KERN_ERR "Could not find CHAP_R.\n");
 		goto out;
@@ -331,7 +331,7 @@ static int chap_server_compute_md5(
 	/*
 	 * Get CHAP_I.
 	 */
-	if (extract_param(NR_in_ptr, "CHAP_I", 10, identifier, &type) < 0) {
+	if (extract_param(nr_in_ptr, "CHAP_I", 10, identifier, &type) < 0) {
 		printk(KERN_ERR "Could not find CHAP_I.\n");
 		goto out;
 	}
@@ -348,7 +348,7 @@ static int chap_server_compute_md5(
 	/*
 	 * Get CHAP_C.
 	 */
-	if (extract_param(NR_in_ptr, "CHAP_C", CHAP_CHALLENGE_STR_LEN,
+	if (extract_param(nr_in_ptr, "CHAP_C", CHAP_CHALLENGE_STR_LEN,
 			challenge, &type) < 0) {
 		printk(KERN_ERR "Could not find CHAP_C.\n");
 		goto out;
@@ -421,16 +421,16 @@ static int chap_server_compute_md5(
 	/*
 	 * Generate CHAP_N and CHAP_R.
 	 */
-	*NR_out_len = sprintf(NR_out_ptr, "CHAP_N=%s", auth->userid_mutual);
-	*NR_out_len += 1;
+	*nr_out_len = sprintf(nr_out_ptr, "CHAP_N=%s", auth->userid_mutual);
+	*nr_out_len += 1;
 	PRINT("[server] Sending CHAP_N=%s\n", auth->userid_mutual);
 	/*
 	 * Convert response from binary hex to ascii hext.
 	 */
 	chap_binaryhex_to_asciihex(response, digest, MD5_SIGNATURE_SIZE);
-	*NR_out_len += sprintf(NR_out_ptr + *NR_out_len, "CHAP_R=0x%s",
+	*nr_out_len += sprintf(nr_out_ptr + *nr_out_len, "CHAP_R=0x%s",
 			response);
-	*NR_out_len += 1;
+	*nr_out_len += 1;
 	PRINT("[server] Sending CHAP_R=0x%s\n", response);
 	auth_ret = 0;
 out:
@@ -442,16 +442,16 @@ out:
 static int chap_got_response(
 	struct iscsi_conn *conn,
 	struct iscsi_node_auth *auth,
-	char *NR_in_ptr,
-	char *NR_out_ptr,
-	unsigned int *NR_out_len)
+	char *nr_in_ptr,
+	char *nr_out_ptr,
+	unsigned int *nr_out_len)
 {
 	struct iscsi_chap *chap = (struct iscsi_chap *) conn->auth_protocol;
 
 	switch (chap->digest_type) {
 	case CHAP_DIGEST_MD5:
-		if (chap_server_compute_md5(conn, auth, NR_in_ptr,
-				NR_out_ptr, NR_out_len) < 0)
+		if (chap_server_compute_md5(conn, auth, nr_in_ptr,
+				nr_out_ptr, nr_out_len) < 0)
 			return -1;
 		return 0;
 	default:
