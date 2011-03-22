@@ -505,7 +505,6 @@ struct iscsi_conn {
 	u8			conn_state;
 	u8			conn_logout_reason;
 	u8			network_transport;
-	enum iscsi_timer_flags_table netif_timer_flags;
 	enum iscsi_timer_flags_table nopin_timer_flags;
 	enum iscsi_timer_flags_table nopin_response_timer_flags;
 	u8			tx_immediate_queue;
@@ -567,7 +566,6 @@ struct iscsi_conn {
 	spinlock_t		cmd_lock;
 	spinlock_t		conn_usage_lock;
 	spinlock_t		immed_queue_lock;
-	spinlock_t		netif_lock;
 	spinlock_t		nopin_timer_lock;
 	spinlock_t		response_queue_lock;
 	spinlock_t		state_lock;

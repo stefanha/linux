@@ -2803,8 +2803,7 @@ static void iscsit_build_conn_drop_async_message(struct iscsi_conn *conn)
 	 * interface is still functional.
 	 */
 	list_for_each_entry(conn_p, &conn->sess->sess_conn_list, conn_list) {
-		if ((conn_p->conn_state == TARG_CONN_STATE_LOGGED_IN) &&
-		    (iscsit_check_for_active_network_device(conn_p))) {
+		if (conn_p->conn_state == TARG_CONN_STATE_LOGGED_IN) {
 			iscsit_inc_conn_usage_count(conn_p);
 			break;
 		}
@@ -4480,9 +4479,6 @@ int iscsit_close_connection(
 
 	TRACE(TRACE_ISCSI, "Closing iSCSI connection CID %hu on SID:"
 		" %u\n", conn->cid, sess->sid);
-
-	iscsit_stop_netif_timer(conn);
-
 	/*
 	 * Always up conn_logout_comp just in case the RX Thread is sleeping
 	 * and the logout response never got sent because the connection

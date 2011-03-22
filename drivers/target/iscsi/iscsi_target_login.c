@@ -58,7 +58,6 @@ static int iscsi_login_init_conn(struct iscsi_conn *conn)
 	spin_lock_init(&conn->cmd_lock);
 	spin_lock_init(&conn->conn_usage_lock);
 	spin_lock_init(&conn->immed_queue_lock);
-	spin_lock_init(&conn->netif_lock);
 	spin_lock_init(&conn->nopin_timer_lock);
 	spin_lock_init(&conn->response_queue_lock);
 	spin_lock_init(&conn->state_lock);
@@ -567,14 +566,6 @@ static void iscsi_post_login_start_timers(struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
 
-/* #warning PHY timer is disabled */
-#if 0
-	iscsi_get_network_interface_from_conn(conn);
-
-	spin_lock_bh(&conn->netif_lock);
-	iscsi_start_netif_timer(conn);
-	spin_unlock_bh(&conn->netif_lock);
-#endif
 	if (!sess->sess_ops->SessionType)
 		iscsit_start_nopin_timer(conn);
 }
