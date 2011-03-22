@@ -19,6 +19,7 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
+#include <scsi/scsi_device.h>
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
@@ -37,7 +38,7 @@ int iscsit_get_lun_for_tmr(
 	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
-	unpacked_lun = iscsit_unpack_lun((unsigned char *)&lun);
+	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
 		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
@@ -57,7 +58,7 @@ int iscsit_get_lun_for_cmd(
 	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
-	unpacked_lun = iscsit_unpack_lun((unsigned char *)&lun);
+	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
 		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,

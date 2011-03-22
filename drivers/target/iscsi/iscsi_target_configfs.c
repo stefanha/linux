@@ -1861,7 +1861,6 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.set_fabric_sense_len = &lio_set_fabric_sense_len;
 	fabric->tf_ops.get_fabric_sense_len = &lio_get_fabric_sense_len;
 	fabric->tf_ops.is_state_remove = &iscsi_is_state_remove;
-	fabric->tf_ops.pack_lun = &iscsit_pack_lun;
 	/*
 	 * Setup function pointers for generic logic in target_core_fabric_configfs.c
 	 */

@@ -22,6 +22,7 @@
 #include <linux/crypto.h>
 #include <linux/completion.h>
 #include <asm/unaligned.h>
+#include <scsi/scsi_device.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 #include <target/target_core_tmr.h>
@@ -1468,23 +1469,6 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 				1, 0, buf, cmd);
 	}
 
-	/*
-	 * Whenever a DataOUT or DataIN PDU contains a valid TTT, the
-	 * iSCSI LUN field must be set. iSCSI v20 10.7.4.  Of course,
-	 * Cisco cannot figure this out.
-	 */
-#if 0
-	if (hdr->ttt != 0xFFFFFFFF) {
-		int lun = iscsit_unpack_lun(get_unaligned_le64(&hdr->lun[0]));
-		if (lun != SE_CMD(cmd)->orig_fe_lun) {
-			printk(KERN_ERR "Received LUN: %u does not match iSCSI"
-				" LUN: %u\n", lun, SE_CMD(cmd)->orig_fe_lun);
-			return iscsit_add_reject_from_cmd(
-					ISCSI_REASON_BOOKMARK_INVALID,
-					1, 0, buf, cmd);
-		}
-	}
-#endif
 	if (cmd->unsolicited_data) {
 		int dump_unsolicited_data = 0, wait_for_transport = 0;
 
@@ -2507,7 +2491,7 @@ static inline int iscsit_handle_snack(
 	hdr			= (struct iscsi_snack *) buf;
 	hdr->flags		&= ~ISCSI_FLAG_CMD_FINAL;
 	lun			= get_unaligned_le64(&hdr->lun[0]);
-	unpacked_lun		= iscsit_unpack_lun((unsigned char *)&lun);
+	unpacked_lun		= scsilun_to_int((struct scsi_lun *)&lun);
 	hdr->itt		= be32_to_cpu(hdr->itt);
 	hdr->ttt		= be32_to_cpu(hdr->ttt);
 	hdr->exp_statsn		= be32_to_cpu(hdr->exp_statsn);
@@ -2906,7 +2890,6 @@ static inline int iscsit_send_data_in(
 	int iov_ret = 0, set_statsn = 0;
 	u8 *pad_bytes;
 	u32 iov_count = 0, tx_size = 0;
-	u64 lun;
 	struct iscsi_datain datain;
 	struct iscsi_datain_req *dr;
 	struct se_map_sg map_sg;
@@ -2973,10 +2956,12 @@ static inline int iscsit_send_data_in(
 		}
 	}
 	hton24(hdr->dlength, datain.length);
-	lun			= (hdr->flags & ISCSI_FLAG_DATA_ACK) ?
-				   iscsit_pack_lun(SE_CMD(cmd)->orig_fe_lun) :
-				   0xFFFFFFFFFFFFFFFFULL;
-	put_unaligned_le64(lun, &hdr->lun[0]);
+	if (hdr->flags & ISCSI_FLAG_DATA_ACK)
+		int_to_scsilun(SE_CMD(cmd)->orig_fe_lun,
+				(struct scsi_lun *)&hdr->lun[0]);
+	else
+		put_unaligned_le64(0xFFFFFFFFFFFFFFFFULL, &hdr->lun[0]);
+
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	hdr->ttt		= (hdr->flags & ISCSI_FLAG_DATA_ACK) ?
 				   cpu_to_be32(cmd->targ_xfer_tag) :
@@ -3368,7 +3353,6 @@ int iscsit_send_r2t(
 {
 	int tx_size = 0;
 	u32 trace_type;
-	u64 lun;
 	struct iscsi_r2t *r2t;
 	struct iscsi_r2t_rsp *hdr;
 	struct scatterlist sg;
@@ -3381,8 +3365,8 @@ int iscsit_send_r2t(
 	memset(hdr, 0, ISCSI_HDR_LEN);
 	hdr->opcode		= ISCSI_OP_R2T;
 	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
-	lun			= iscsit_pack_lun(SE_CMD(cmd)->orig_fe_lun);
-	put_unaligned_le64(lun, &hdr->lun[0]);
+	int_to_scsilun(SE_CMD(cmd)->orig_fe_lun,
+			(struct scsi_lun *)&hdr->lun[0]);
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	spin_lock_bh(&conn->sess->ttt_lock);
 	r2t->targ_xfer_tag	= conn->sess->targ_xfer_tag++;
