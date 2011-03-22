@@ -391,31 +391,6 @@ struct iscsi_r2t *iscsit_get_holder_for_r2tsn(
 	return NULL;
 }
 
-#define SERIAL_BITS	31
-#define MAX_BOUND	(u32)2147483647UL
-
-static inline int serial_lt(u32 x, u32 y)
-{
-	return (x != y) && (((x < y) && ((y - x) < MAX_BOUND)) ||
-		((x > y) && ((x - y) > MAX_BOUND)));
-}
-
-static inline int serial_lte(u32 x, u32 y)
-{
-	return (x == y) ? 1 : serial_lt(x, y);
-}
-
-static inline int serial_gt(u32 x, u32 y)
-{
-	return (x != y) && (((x < y) && ((y - x) > MAX_BOUND)) ||
-		((x > y) && ((x - y) < MAX_BOUND)));
-}
-
-static inline int serial_gte(u32 x, u32 y)
-{
-	return (x == y) ? 1 : serial_gt(x, y);
-}
-
 inline int iscsit_check_received_cmdsn(
 	struct iscsi_conn *conn,
 	struct iscsi_cmd *cmd,
@@ -429,7 +404,7 @@ inline int iscsit_check_received_cmdsn(
 	 * CRC failures.
 	 */
 	spin_lock(&conn->sess->cmdsn_lock);
-	if (serial_gt(cmdsn, conn->sess->max_cmd_sn)) {
+	if (iscsi_sna_gt(cmdsn, conn->sess->max_cmd_sn)) {
 		printk(KERN_ERR "Received CmdSN: 0x%08x is greater than"
 			" MaxCmdSN: 0x%08x, protocol error.\n", cmdsn,
 				conn->sess->max_cmd_sn);
@@ -448,7 +423,7 @@ inline int iscsit_check_received_cmdsn(
 
 			return (!ret) ? CMDSN_NORMAL_OPERATION :
 					CMDSN_ERROR_CANNOT_RECOVER;
-		} else if (serial_gt(cmdsn, conn->sess->exp_cmd_sn)) {
+		} else if (iscsi_sna_gt(cmdsn, conn->sess->exp_cmd_sn)) {
 			TRACE(TRACE_CMDSN, "Received CmdSN: 0x%08x is greater"
 				" than ExpCmdSN: 0x%08x, not acknowledging.\n",
 				cmdsn, conn->sess->exp_cmd_sn);
@@ -473,7 +448,7 @@ inline int iscsit_check_received_cmdsn(
 				spin_unlock(&conn->sess->cmdsn_lock);
 				return CMDSN_ERROR_CANNOT_RECOVER;
 			}
-		} else if (serial_gt(cmdsn, conn->sess->exp_cmd_sn)) {
+		} else if (iscsi_sna_gt(cmdsn, conn->sess->exp_cmd_sn)) {
 			TRACE(TRACE_CMDSN, "CmdSN: 0x%08x greater than"
 				" ExpCmdSN: 0x%08x, not acknowledging.\n",
 				cmdsn, conn->sess->exp_cmd_sn);
