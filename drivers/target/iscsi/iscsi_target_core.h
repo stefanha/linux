@@ -539,10 +539,10 @@ struct iscsi_conn {
 	unsigned char		ipv6_login_ip[IPV6_ADDRESS_SPACE];
 	u16			local_port;
 	u32			local_ip;
+	int			conn_usage_count;
+	int			conn_waiting_on_uc;
 	atomic_t		check_immediate_queue;
 	atomic_t		conn_logout_remove;
-	atomic_t		conn_usage_count;
-	atomic_t		conn_waiting_on_uc;
 	atomic_t		connection_exit;
 	atomic_t		connection_recovery;
 	atomic_t		connection_reinstatement;

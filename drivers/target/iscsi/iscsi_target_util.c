@@ -1350,8 +1350,8 @@ struct iscsi_conn *iscsit_get_conn_from_cid_rcfr(struct iscsi_session *sess, u16
 void iscsit_check_conn_usage_count(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->conn_usage_lock);
-	if (atomic_read(&conn->conn_usage_count)) {
-		atomic_set(&conn->conn_waiting_on_uc, 1);
+	if (conn->conn_usage_count != 0) {
+		conn->conn_waiting_on_uc = 1;
 		spin_unlock_bh(&conn->conn_usage_lock);
 
 		wait_for_completion(&conn->conn_waiting_on_uc_comp);
@@ -1363,10 +1363,9 @@ void iscsit_check_conn_usage_count(struct iscsi_conn *conn)
 void iscsit_dec_conn_usage_count(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->conn_usage_lock);
-	atomic_dec(&conn->conn_usage_count);
+	conn->conn_usage_count--;
 
-	if (!atomic_read(&conn->conn_usage_count) &&
-	     atomic_read(&conn->conn_waiting_on_uc))
+	if (!conn->conn_usage_count && conn->conn_waiting_on_uc)
 		complete(&conn->conn_waiting_on_uc_comp);
 
 	spin_unlock_bh(&conn->conn_usage_lock);
@@ -1375,7 +1374,7 @@ void iscsit_dec_conn_usage_count(struct iscsi_conn *conn)
 void iscsit_inc_conn_usage_count(struct iscsi_conn *conn)
 {
 	spin_lock_bh(&conn->conn_usage_lock);
-	atomic_inc(&conn->conn_usage_count);
+	conn->conn_usage_count++;
 	spin_unlock_bh(&conn->conn_usage_lock);
 }
 
