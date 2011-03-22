@@ -141,7 +141,8 @@ void iscsit_free_r2ts_from_list(struct iscsi_cmd *cmd)
 }
 
 /*
- *	May be called from interrupt context.
+ * May be called from software interrupt (timer) context for allocating
+ * iSCSI NopINs.
  */
 struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *conn)
 {
@@ -287,7 +288,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(
 
 	return cmd;
 out:
-	iscsit_release_cmd_to_pool(cmd);
+	iscsit_release_cmd(cmd);
 	if (se_cmd)
 		transport_free_se_cmd(se_cmd);
 	return NULL;
@@ -380,12 +381,14 @@ struct iscsi_r2t *iscsit_get_holder_for_r2tsn(
 
 	spin_lock_bh(&cmd->r2t_lock);
 	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
-		if (r2t->r2t_sn == r2t_sn)
-			break;
+		if (r2t->r2t_sn == r2t_sn) {
+			spin_unlock_bh(&cmd->r2t_lock);
+			return r2t;
+		}
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
-	return (r2t) ? r2t : NULL;
+	return NULL;
 }
 
 #define SERIAL_BITS	31
@@ -872,21 +875,7 @@ void iscsit_free_queue_reqs_for_conn(struct iscsi_conn *conn)
 	spin_unlock_bh(&conn->response_queue_lock);
 }
 
-void iscsit_release_cmd_direct(struct iscsi_cmd *cmd)
-{
-	iscsit_free_r2ts_from_list(cmd);
-	iscsit_free_all_datain_reqs(cmd);
-
-	kfree(cmd->buf_ptr);
-	kfree(cmd->pdu_list);
-	kfree(cmd->seq_list);
-	kfree(cmd->tmr_req);
-	kfree(cmd->iov_data);
-
-	kmem_cache_free(lio_cmd_cache, cmd);
-}
-
-void __iscsit_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *sess)
+void iscsit_release_cmd(struct iscsi_cmd *cmd)
 {
 	struct iscsi_conn *conn = cmd->conn;
 
@@ -905,16 +894,6 @@ void __iscsit_release_cmd_to_pool(struct iscsi_cmd *cmd, struct iscsi_session *s
 	}
 
 	kmem_cache_free(lio_cmd_cache, cmd);
-}
-
-void iscsit_release_cmd_to_pool(struct iscsi_cmd *cmd)
-{
-	if (!cmd->conn && !cmd->sess) {
-		iscsit_release_cmd_direct(cmd);
-	} else {
-		__iscsit_release_cmd_to_pool(cmd, (cmd->conn) ?
-			cmd->conn->sess : cmd->sess);
-	}
 }
 
 /*

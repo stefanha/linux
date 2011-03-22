@@ -1786,14 +1786,14 @@ static void lio_release_cmd_direct(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
-	iscsit_release_cmd_direct(cmd);
+	iscsit_release_cmd(cmd);
 }
 
-static void lio_release_cmd_to_pool(struct se_cmd *se_cmd)
+static void lio_release_cmd(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
-	iscsit_release_cmd_to_pool(cmd);
+	iscsit_release_cmd(cmd);
 }
 
 /* End functions for target_core_fabric_ops */
@@ -1839,7 +1839,7 @@ int iscsi_target_register_configfs(void)
 	 * iscsi_cmd->iov_data[] for Linux/Net kernel sockets operations.
 	 */
 	fabric->tf_ops.alloc_cmd_iovecs = &iscsi_allocate_iovecs_for_cmd;
-	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd_to_pool;
+	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd;
 	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;
 	fabric->tf_ops.close_session = &lio_tpg_close_session;

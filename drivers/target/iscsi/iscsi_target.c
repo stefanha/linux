@@ -659,7 +659,7 @@ int iscsit_add_reject(
 	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
 	if (!cmd->buf_ptr) {
 		printk(KERN_ERR "Unable to allocate memory for cmd->buf_ptr\n");
-		__iscsit_release_cmd_to_pool(cmd, conn->sess);
+		iscsit_release_cmd(cmd);
 		return -1;
 	}
 	memcpy(cmd->buf_ptr, buf, ISCSI_HDR_LEN);
@@ -706,7 +706,7 @@ int iscsit_add_reject_from_cmd(
 	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
 	if (!cmd->buf_ptr) {
 		printk(KERN_ERR "Unable to allocate memory for cmd->buf_ptr\n");
-		__iscsit_release_cmd_to_pool(cmd, conn->sess);
+		iscsit_release_cmd(cmd);
 		return -1;
 	}
 	memcpy(cmd->buf_ptr, buf, ISCSI_HDR_LEN);
@@ -1940,7 +1940,7 @@ static inline int iscsit_handle_nop_out(
 	return 0;
 out:
 	if (cmd)
-		__iscsit_release_cmd_to_pool(cmd, conn->sess);
+		iscsit_release_cmd(cmd);
 ping_out:
 	kfree(ping_data);
 	return ret;
@@ -4007,7 +4007,7 @@ get_immediate:
 				 */
 				if (!(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) &&
 				    !(cmd->tmr_req))
-					iscsit_release_cmd_to_pool(cmd);
+					iscsit_release_cmd(cmd);
 				else
 					transport_generic_free_cmd(SE_CMD(cmd),
 								1, 1, 0);
@@ -4456,7 +4456,7 @@ static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 			else if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD)
 				transport_release_cmd_to_pool(se_cmd);
 			else
-				__iscsit_release_cmd_to_pool(cmd, sess);
+				iscsit_release_cmd(cmd);
 
 			spin_lock_bh(&conn->cmd_lock);
 			continue;
