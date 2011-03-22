@@ -876,7 +876,7 @@ static int iscsit_set_iovec_ptrs(
 	struct se_cmd *cmd = map_sg->se_cmd;
 	struct iscsi_cmd *i_cmd = container_of(cmd, struct iscsi_cmd, se_cmd);
 	struct se_offset_map *lmap = &unmap_sg->lmap;
-	struct iovec *iov = map_sg->iov;
+	struct kvec *iov = map_sg->iov;
 
 	/*
 	 * Used for non scatterlist operations, assume a single iovec.
@@ -1400,7 +1400,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
 	struct iscsi_data *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	unsigned long flags;
 
 	hdr			= (struct iscsi_data *) buf;
@@ -1611,7 +1611,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = payload_length, data_crc = 0;
-		struct iovec *iov_ptr = &cmd->iov_data[0];
+		struct kvec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
@@ -1705,7 +1705,7 @@ static inline int iscsit_handle_nop_out(
 	u32 checksum, data_crc, padding = 0, payload_length;
 	u64 lun;
 	struct iscsi_cmd *cmd = NULL;
-	struct iovec *iov = NULL;
+	struct kvec *iov = NULL;
 	struct iscsi_nopout *hdr;
 	struct scatterlist sg;
 
@@ -2111,7 +2111,7 @@ static inline int iscsit_handle_text_cmd(
 	u32 checksum = 0, data_crc = 0, payload_length;
 	u32 padding = 0, pad_bytes = 0, text_length = 0;
 	struct iscsi_cmd *cmd;
-	struct iovec iov[3];
+	struct kvec iov[3];
 	struct iscsi_text *hdr;
 	struct scatterlist sg;
 
@@ -2143,7 +2143,7 @@ static inline int iscsit_handle_text_cmd(
 			return -1;
 		}
 
-		memset(iov, 0, 3 * sizeof(struct iovec));
+		memset(iov, 0, 3 * sizeof(struct kvec));
 		iov[niov].iov_base	= text_in;
 		iov[niov++].iov_len	= text_length;
 
@@ -2550,7 +2550,7 @@ static int iscsit_handle_immediate_data(
 	struct iscsi_conn *conn = cmd->conn;
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
-	struct iovec *iov;
+	struct kvec *iov;
 
 	memset(&map_sg, 0, sizeof(struct se_map_sg));
 	memset(&unmap_sg, 0, sizeof(struct se_unmap_sg));
@@ -2597,7 +2597,7 @@ static int iscsit_handle_immediate_data(
 
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = length, data_crc;
-		struct iovec *iov_ptr = &cmd->iov_data[0];
+		struct kvec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
@@ -2684,10 +2684,10 @@ int iscsit_send_async_msg(
 	u8 iscsi_hdr[ISCSI_HDR_LEN+CRC_LEN];
 	u32 tx_send = ISCSI_HDR_LEN, tx_sent = 0;
 	struct iscsi_async *hdr;
-	struct iovec iov;
+	struct kvec iov;
 	struct scatterlist sg;
 
-	memset(&iov, 0, sizeof(struct iovec));
+	memset(&iov, 0, sizeof(struct kvec));
 	memset(&iscsi_hdr, 0, ISCSI_HDR_LEN+CRC_LEN);
 
 	hdr		= (struct iscsi_async *)&iscsi_hdr;
@@ -2893,7 +2893,7 @@ static inline int iscsit_send_data_in(
 	struct iscsi_datain_req *dr;
 	struct se_map_sg map_sg;
 	struct iscsi_data_rsp *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
 	memset(&datain, 0, sizeof(struct iscsi_datain));
@@ -3028,7 +3028,7 @@ static inline int iscsit_send_data_in(
 	}
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = (datain.length + unmap_sg->padding);
-		struct iovec *iov_ptr = &cmd->iov_data[1];
+		struct kvec *iov_ptr = &cmd->iov_data[1];
 
 		crypto_hash_init(&conn->conn_tx_hash);
 
@@ -3080,7 +3080,7 @@ static inline int iscsit_send_logout_response(
 	struct iscsi_conn *logout_conn = NULL;
 	struct iscsi_conn_recovery *cr = NULL;
 	struct iscsi_session *sess = conn->sess;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct iscsi_logout_rsp *hdr;
 	struct scatterlist sg;
 	/*
@@ -3250,7 +3250,7 @@ static inline int iscsit_send_nopin_response(
 {
 	int niov = 0, tx_size;
 	u32 padding = 0;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct iscsi_nopin *hdr;
 	struct scatterlist sg;
 
@@ -3502,7 +3502,7 @@ static inline int iscsit_send_status(
 	u8 iov_count = 0, recovery;
 	u32 padding = 0, trace_type, tx_size = 0;
 	struct iscsi_scsi_rsp *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
 	recovery = (cmd->i_state != ISTATE_SEND_STATUS);
@@ -3695,7 +3695,7 @@ static int iscsit_send_text_rsp(
 	u8 iov_count = 0;
 	u32 padding = 0, text_length = 0, tx_size = 0;
 	struct iscsi_text_rsp *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
 	text_length = iscsit_build_sendtargets_response(cmd);
@@ -3780,7 +3780,7 @@ static int iscsit_send_reject(
 {
 	u32 iov_count = 0, tx_size = 0;
 	struct iscsi_reject *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
 	hdr			= (struct iscsi_reject *) cmd->pdu;
@@ -4255,7 +4255,7 @@ int iscsi_target_rx_thread(void *arg)
 	u32 checksum = 0, digest = 0;
 	struct iscsi_conn *conn = NULL;
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
-	struct iovec iov;
+	struct kvec iov;
 	struct scatterlist sg;
 	/*
 	 * Bump up the task_struct priority for RX/TX thread set pairs,
@@ -4278,7 +4278,7 @@ restart:
 		iscsit_thread_check_cpumask(conn, current, 0);
 
 		memset(buffer, 0, ISCSI_HDR_LEN);
-		memset(&iov, 0, sizeof(struct iovec));
+		memset(&iov, 0, sizeof(struct kvec));
 
 		iov.iov_base	= buffer;
 		iov.iov_len	= ISCSI_HDR_LEN;

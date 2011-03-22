@@ -52,7 +52,7 @@ int iscsit_dump_data_payload(
 	char *buf, pad_bytes[4];
 	int ret = DATAOUT_WITHIN_COMMAND_RECOVERY, rx_got;
 	u32 length, padding, offset = 0, size;
-	struct iovec iov;
+	struct kvec iov;
 
 	length = (buf_len > OFFLOAD_BUF_SIZE) ? OFFLOAD_BUF_SIZE : buf_len;
 
@@ -62,7 +62,7 @@ int iscsit_dump_data_payload(
 				" buffer.\n", length);
 		return -1;
 	}
-	memset(&iov, 0, sizeof(struct iovec));
+	memset(&iov, 0, sizeof(struct kvec));
 
 	while (offset < buf_len) {
 		size = ((offset + length) > buf_len) ?

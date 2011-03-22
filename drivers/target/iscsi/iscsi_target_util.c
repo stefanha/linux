@@ -1295,7 +1295,7 @@ int iscsit_send_tx_data(
 {
 	int tx_sent, tx_size;
 	u32 iov_count;
-	struct iovec *iov;
+	struct kvec *iov;
 
 send_data:
 	tx_size = cmd->tx_size;
@@ -1329,7 +1329,7 @@ int iscsit_fe_sendpage_sg(
 	struct iscsi_cmd *cmd = (struct iscsi_cmd *)u_sg->fabric_cmd;
 	struct se_cmd *se_cmd = SE_CMD(cmd);
 	u32 len = cmd->tx_size, pg_len, se_len, se_off, tx_size;
-	struct iovec *iov = &cmd->iov_data[0];
+	struct kvec *iov = &cmd->iov_data[0];
 	struct page *page;
 	struct se_mem *se_mem = u_sg->cur_se_mem;
 
@@ -1423,7 +1423,7 @@ send_pg:
 
 send_padding:
 	if (u_sg->padding) {
-		struct iovec *iov_p =
+		struct kvec *iov_p =
 			&cmd->iov_data[cmd->iov_data_count-2];
 
 		tx_sent = tx_data(conn, iov_p, 1, u_sg->padding);
@@ -1438,7 +1438,7 @@ send_padding:
 
 send_datacrc:
 	if (conn->conn_ops->DataDigest) {
-		struct iovec *iov_d =
+		struct kvec *iov_d =
 			&cmd->iov_data[cmd->iov_data_count-1];
 
 		tx_sent = tx_data(conn, iov_d, 1, CRC_LEN);
@@ -1466,12 +1466,12 @@ int iscsit_tx_login_rsp(struct iscsi_conn *conn, u8 status_class, u8 status_deta
 {
 	u8 iscsi_hdr[ISCSI_HDR_LEN];
 	int err;
-	struct iovec iov;
+	struct kvec iov;
 	struct iscsi_login_rsp *hdr;
 
 	iscsit_collect_login_stats(conn, status_class, status_detail);
 
-	memset(&iov, 0, sizeof(struct iovec));
+	memset(&iov, 0, sizeof(struct kvec));
 	memset(&iscsi_hdr, 0x0, ISCSI_HDR_LEN);
 
 	hdr	= (struct iscsi_login_rsp *)&iscsi_hdr;
@@ -1512,10 +1512,9 @@ static inline int iscsit_do_rx_data(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {
-	int data = count->data_length, rx_loop = 0, total_rx = 0;
+	int data = count->data_length, rx_loop = 0, total_rx = 0, iov_len;
 	u32 rx_marker_val[count->ss_marker_count], rx_marker_iov = 0;
-	struct iovec iov[count->ss_iov_count];
-	mm_segment_t oldfs;
+	struct kvec iov[count->ss_iov_count], *iov_p;
 	struct msghdr msg;
 
 	if (!conn || !conn->sock || !conn->conn_ops)
@@ -1529,11 +1528,11 @@ static inline int iscsit_do_rx_data(
 		u32 orig_iov_len = 0, orig_iov_loc = 0;
 		u32 iov_count = 0, per_iov_bytes = 0;
 		u32 *rx_marker, old_rx_marker = 0;
-		struct iovec *iov_record;
+		struct kvec *iov_record;
 
 		memset(&rx_marker_val, 0,
 				count->ss_marker_count * sizeof(u32));
-		memset(&iov, 0, count->ss_iov_count * sizeof(struct iovec));
+		memset(&iov, 0, count->ss_iov_count * sizeof(struct kvec));
 
 		iov_record = count->iov;
 		orig_iov_count = count->iov_count;
@@ -1592,8 +1591,8 @@ static inline int iscsit_do_rx_data(
 		}
 		data += (rx_marker_iov * (MARKER_SIZE / 2));
 
-		msg.msg_iov	= &iov[0];
-		msg.msg_iovlen	= iov_count;
+		iov_p	= &iov[0];
+		iov_len	= iov_count;
 
 		if (iov_count > count->ss_iov_count) {
 			printk(KERN_ERR "iov_count: %d, count->ss_iov_count:"
@@ -1607,20 +1606,13 @@ static inline int iscsit_do_rx_data(
 			return -1;
 		}
 	} else {
-		msg.msg_iov	= count->iov;
-		msg.msg_iovlen	= count->iov_count;
+		iov_p = count->iov;
+		iov_len	= count->iov_count;
 	}
 
 	while (total_rx < data) {
-		oldfs = get_fs();
-		set_fs(get_ds());
-
-		conn->sock->sk->sk_allocation = GFP_ATOMIC;
-		rx_loop = sock_recvmsg(conn->sock, &msg,
-				(data - total_rx), MSG_WAITALL);
-
-		set_fs(oldfs);
-
+		rx_loop = kernel_recvmsg(conn->sock, &msg, iov_p, iov_len,
+					(data - total_rx), MSG_WAITALL);
 		if (rx_loop <= 0) {
 			TRACE(TRACE_NET, "rx_loop: %d total_rx: %d\n",
 				rx_loop, total_rx);
@@ -1648,10 +1640,9 @@ static inline int iscsit_do_tx_data(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {
-	int data = count->data_length, total_tx = 0, tx_loop = 0;
+	int data = count->data_length, total_tx = 0, tx_loop = 0, iov_len;
 	u32 tx_marker_val[count->ss_marker_count], tx_marker_iov = 0;
-	struct iovec iov[count->ss_iov_count];
-	mm_segment_t oldfs;
+	struct kvec iov[count->ss_iov_count], *iov_p;
 	struct msghdr msg;
 
 	if (!conn || !conn->sock || !conn->conn_ops)
@@ -1670,11 +1661,11 @@ static inline int iscsit_do_tx_data(
 		u32 orig_iov_len = 0, orig_iov_loc = 0;
 		u32 iov_count = 0, per_iov_bytes = 0;
 		u32 *tx_marker, old_tx_marker = 0;
-		struct iovec *iov_record;
+		struct kvec *iov_record;
 
 		memset(&tx_marker_val, 0,
 			count->ss_marker_count * sizeof(u32));
-		memset(&iov, 0, count->ss_iov_count * sizeof(struct iovec));
+		memset(&iov, 0, count->ss_iov_count * sizeof(struct kvec));
 
 		iov_record = count->iov;
 		orig_iov_count = count->iov_count;
@@ -1738,8 +1729,8 @@ static inline int iscsit_do_tx_data(
 
 		data += (tx_marker_iov * (MARKER_SIZE / 2));
 
-		msg.msg_iov	= &iov[0];
-		msg.msg_iovlen = iov_count;
+		iov_p = &iov[0];
+		iov_len = iov_count;
 
 		if (iov_count > count->ss_iov_count) {
 			printk(KERN_ERR "iov_count: %d, count->ss_iov_count:"
@@ -1753,19 +1744,13 @@ static inline int iscsit_do_tx_data(
 			return -1;
 		}
 	} else {
-		msg.msg_iov	= count->iov;
-		msg.msg_iovlen	= count->iov_count;
+		iov_p = count->iov;
+		iov_len = count->iov_count;
 	}
 
 	while (total_tx < data) {
-		oldfs = get_fs();
-		set_fs(get_ds());
-
-		conn->sock->sk->sk_allocation = GFP_ATOMIC;
-		tx_loop = sock_sendmsg(conn->sock, &msg, (data - total_tx));
-
-		set_fs(oldfs);
-
+		tx_loop = kernel_sendmsg(conn->sock, &msg, iov_p, iov_len,
+					(data - total_tx));
 		if (tx_loop <= 0) {
 			TRACE(TRACE_NET, "tx_loop: %d total_tx %d\n",
 				tx_loop, total_tx);
@@ -1784,7 +1769,7 @@ static inline int iscsit_do_tx_data(
 
 int rx_data(
 	struct iscsi_conn *conn,
-	struct iovec *iov,
+	struct kvec *iov,
 	int iov_count,
 	int data)
 {
@@ -1810,7 +1795,7 @@ int rx_data(
 
 int tx_data(
 	struct iscsi_conn *conn,
-	struct iovec *iov,
+	struct kvec *iov,
 	int iov_count,
 	int data)
 {

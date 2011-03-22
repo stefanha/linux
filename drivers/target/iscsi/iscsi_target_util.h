@@ -26,7 +26,7 @@ struct se_map_sg {
 	u32			data_offset;
 	void			*fabric_cmd;
 	struct se_cmd		*se_cmd;
-	struct iovec		*iov;
+	struct kvec		*iov;
 };
 
 struct se_unmap_sg {
@@ -91,8 +91,8 @@ extern void iscsit_print_session_params(struct iscsi_session *);
 extern int iscsit_print_dev_to_proc(char *, char **, off_t, int);
 extern int iscsit_print_sessions_to_proc(char *, char **, off_t, int);
 extern int iscsit_print_tpg_to_proc(char *, char **, off_t, int);
-extern int rx_data(struct iscsi_conn *, struct iovec *, int, int);
-extern int tx_data(struct iscsi_conn *, struct iovec *, int, int);
+extern int rx_data(struct iscsi_conn *, struct kvec *, int, int);
+extern int tx_data(struct iscsi_conn *, struct kvec *, int, int);
 extern void iscsit_collect_login_stats(struct iscsi_conn *, u8, u8);
 extern struct iscsi_tiqn *iscsit_snmp_get_tiqn(struct iscsi_conn *);
 extern int iscsit_build_sendtargets_response(struct iscsi_cmd *);

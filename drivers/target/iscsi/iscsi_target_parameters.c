@@ -31,9 +31,9 @@ int iscsi_login_rx_data(
 	int length)
 {
 	int rx_got;
-	struct iovec iov;
+	struct kvec iov;
 
-	memset(&iov, 0, sizeof(struct iovec));
+	memset(&iov, 0, sizeof(struct kvec));
 	iov.iov_len	= length;
 	iov.iov_base	= buf;
 
@@ -61,11 +61,11 @@ int iscsi_login_tx_data(
 	int text_length)
 {
 	int length, tx_sent;
-	struct iovec iov[2];
+	struct kvec iov[2];
 
 	length = (ISCSI_HDR_LEN + text_length);
 
-	memset(&iov[0], 0, 2 * sizeof(struct iovec));
+	memset(&iov[0], 0, 2 * sizeof(struct kvec));
 	iov[0].iov_len		= ISCSI_HDR_LEN;
 	iov[0].iov_base		= pdu_buf;
 	iov[1].iov_len		= text_length;

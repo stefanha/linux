@@ -902,7 +902,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	struct iscsi_login *login;
 	struct iscsi_portal_group *tpg = NULL;
 	struct socket *new_sock, *sock;
-	struct iovec iov;
+	struct kvec iov;
 	struct iscsi_login_req *pdu;
 	struct sockaddr_in sock_in;
 	struct sockaddr_in6 sock_in6;
@@ -994,7 +994,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 		goto new_sess_out;
 
 	memset(buffer, 0, ISCSI_HDR_LEN);
-	memset(&iov, 0, sizeof(struct iovec));
+	memset(&iov, 0, sizeof(struct kvec));
 	iov.iov_base	= buffer;
 	iov.iov_len	= ISCSI_HDR_LEN;
 

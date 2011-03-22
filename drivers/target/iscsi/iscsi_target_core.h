@@ -282,7 +282,7 @@ struct iscsi_data_count {
 	u32			iov_count;
 	u32			ss_iov_count;
 	u32			ss_marker_count;
-	struct iovec		*iov;
+	struct kvec		*iov;
 };
 
 struct iscsi_param_list {
@@ -451,10 +451,10 @@ struct iscsi_cmd {
 	/* Timer for DataOUT */
 	struct timer_list	dataout_timer;
 	/* Iovecs for SCSI data payload RX/TX w/ kernel level sockets */
-	struct iovec		*iov_data;
+	struct kvec		*iov_data;
 	/* Iovecs for miscellaneous purposes */
 #define ISCSI_MISC_IOVECS			5
-	struct iovec		iov_misc[ISCSI_MISC_IOVECS];
+	struct kvec		iov_misc[ISCSI_MISC_IOVECS];
 	/* Array of struct iscsi_pdu used for DataPDUInOrder=No */
 	struct iscsi_pdu	*pdu_list;
 	/* Current struct iscsi_pdu used for DataPDUInOrder=No */

@@ -1774,7 +1774,7 @@ static int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
 
 	iov_count += TRANSPORT_IOV_DATA_BUFFER;
 
-	cmd->iov_data = kzalloc(iov_count * sizeof(struct iovec), GFP_KERNEL);
+	cmd->iov_data = kzalloc(iov_count * sizeof(struct kvec), GFP_KERNEL);
 	if (!cmd->iov_data)
 		return -ENOMEM;
 
