@@ -133,10 +133,8 @@ void iscsit_free_r2ts_from_list(struct iscsi_cmd *cmd)
 	struct iscsi_r2t *r2t, *r2t_tmp;
 
 	spin_lock_bh(&cmd->r2t_lock);
-	list_for_each_entry_safe(r2t, r2t_tmp, &cmd->cmd_r2t_list, r2t_list) {
-		list_del(&r2t->r2t_list);
-		kmem_cache_free(lio_r2t_cache, r2t);
-	}
+	list_for_each_entry_safe(r2t, r2t_tmp, &cmd->cmd_r2t_list, r2t_list)
+		iscsit_free_r2t(r2t, cmd);
 	spin_unlock_bh(&cmd->r2t_lock);
 }
 
