@@ -25,19 +25,15 @@
 #include "iscsi_target_util.h"
 #include "iscsi_target_parameters.h"
 
-/*	iscsi_login_rx_data():
- *
- *
- */
 int iscsi_login_rx_data(
 	struct iscsi_conn *conn,
 	char *buf,
 	int length)
 {
 	int rx_got;
-	struct iovec iov;
+	struct kvec iov;
 
-	memset(&iov, 0, sizeof(struct iovec));
+	memset(&iov, 0, sizeof(struct kvec));
 	iov.iov_len	= length;
 	iov.iov_base	= buf;
 
@@ -58,10 +54,6 @@ int iscsi_login_rx_data(
 	return 0 ;
 }
 
-/*	iscsi_login_tx_data():
- *
- *
- */
 int iscsi_login_tx_data(
 	struct iscsi_conn *conn,
 	char *pdu_buf,
@@ -69,11 +61,11 @@ int iscsi_login_tx_data(
 	int text_length)
 {
 	int length, tx_sent;
-	struct iovec iov[2];
+	struct kvec iov[2];
 
 	length = (ISCSI_HDR_LEN + text_length);
 
-	memset(&iov[0], 0, 2 * sizeof(struct iovec));
+	memset(&iov[0], 0, 2 * sizeof(struct kvec));
 	iov[0].iov_len		= ISCSI_HDR_LEN;
 	iov[0].iov_base		= pdu_buf;
 	iov[1].iov_len		= text_length;
@@ -96,10 +88,6 @@ int iscsi_login_tx_data(
 	return 0;
 }
 
-/*	iscsi_dump_connection_ops():
- *
- *
- */
 void iscsi_dump_conn_ops(struct iscsi_conn_ops *conn_ops)
 {
 	printk(KERN_INFO "HeaderDigest: %s\n", (conn_ops->HeaderDigest) ?
@@ -116,10 +104,6 @@ void iscsi_dump_conn_ops(struct iscsi_conn_ops *conn_ops)
 		printk(KERN_INFO "IFMarkInt: %u\n", conn_ops->IFMarkInt);
 }
 
-/*	iscsi_dump_session_ops():
- *
- *
- */
 void iscsi_dump_sess_ops(struct iscsi_sess_ops *sess_ops)
 {
 	printk(KERN_INFO "InitiatorName: %s\n", sess_ops->InitiatorName);
@@ -150,10 +134,6 @@ void iscsi_dump_sess_ops(struct iscsi_sess_ops *sess_ops)
 			"Discovery" : "Normal");
 }
 
-/*	iscsi_print_params():
- *
- *
- */
 void iscsi_print_params(struct iscsi_param_list *param_list)
 {
 	struct iscsi_param *param;
@@ -162,10 +142,6 @@ void iscsi_print_params(struct iscsi_param_list *param_list)
 		printk(KERN_INFO "%s: %s\n", param->name, param->value);
 }
 
-/*	iscsi_set_default_param():
- *
- *
- */
 static struct iscsi_param *iscsi_set_default_param(struct iscsi_param_list *param_list,
 		char *name, char *value, u8 phase, u8 scope, u8 sender,
 		u16 type_range, u8 use)
@@ -249,10 +225,6 @@ out:
 	return NULL;
 }
 
-/*	iscsi_set_default_params():
- *
- *
- */
 /* #warning Add extension keys */
 int iscsi_create_default_params(struct iscsi_param_list **param_list_ptr)
 {
@@ -463,10 +435,6 @@ out:
 	return -1;
 }
 
-/*	iscsi_set_keys_to_negotiate():
- *
- *
- */
 int iscsi_set_keys_to_negotiate(
 	int sessiontype,
 	struct iscsi_param_list *param_list)
@@ -532,10 +500,6 @@ int iscsi_set_keys_to_negotiate(
 	return 0;
 }
 
-/*	iscsi_set_keys_irrelevant_for_discovery():
- *
- *
- */
 int iscsi_set_keys_irrelevant_for_discovery(
 	struct iscsi_param_list *param_list)
 {
@@ -577,10 +541,6 @@ int iscsi_set_keys_irrelevant_for_discovery(
 	return 0;
 }
 
-/*	iscsi_copy_param_list():
- *
- *
- */
 int iscsi_copy_param_list(
 	struct iscsi_param_list **dst_param_list,
 	struct iscsi_param_list *src_param_list,
@@ -658,10 +618,6 @@ err_out:
 	return -1;
 }
 
-/*	iscsi_release_extra_responses():
- *
- *
- */
 static void iscsi_release_extra_responses(struct iscsi_param_list *param_list)
 {
 	struct iscsi_extra_response *er, *er_tmp;
@@ -673,10 +629,6 @@ static void iscsi_release_extra_responses(struct iscsi_param_list *param_list)
 	}
 }
 
-/*	iscsi_release_param_list():
- *
- *
- */
 void iscsi_release_param_list(struct iscsi_param_list *param_list)
 {
 	struct iscsi_param *param, *param_tmp;
@@ -698,10 +650,6 @@ void iscsi_release_param_list(struct iscsi_param_list *param_list)
 	kfree(param_list);
 }
 
-/*	iscsi_find_param_from_key():
- *
- *
- */
 struct iscsi_param *iscsi_find_param_from_key(
 	char *key,
 	struct iscsi_param_list *param_list)
@@ -726,10 +674,6 @@ struct iscsi_param *iscsi_find_param_from_key(
 	return param;
 }
 
-/*	iscsi_extract_key_value():
- *
- *
- */
 int iscsi_extract_key_value(char *textbuf, char **key, char **value)
 {
 	*value = strchr(textbuf, '=');
@@ -746,10 +690,6 @@ int iscsi_extract_key_value(char *textbuf, char **key, char **value)
 	return 0;
 }
 
-/*	iscsi_update_param_value():
- *
- *
- */
 int iscsi_update_param_value(struct iscsi_param *param, char *value)
 {
 	kfree(param->value);
@@ -768,10 +708,6 @@ int iscsi_update_param_value(struct iscsi_param *param, char *value)
 	return 0;
 }
 
-/*	iscsi_add_notunderstood_response():
- *
- *
- */
 static int iscsi_add_notunderstood_response(
 	char *key,
 	char *value,
@@ -802,10 +738,6 @@ static int iscsi_add_notunderstood_response(
 	return 0;
 }
 
-/*	iscsi_check_for_auth_key():
- *
- *
- */
 static int iscsi_check_for_auth_key(char *key)
 {
 	/*
@@ -828,10 +760,6 @@ static int iscsi_check_for_auth_key(char *key)
 	return 0;
 }
 
-/*	iscsi_check_proposer_for_optional_reply():
- *
- *
- */
 static void iscsi_check_proposer_for_optional_reply(struct iscsi_param *param)
 {
 	if (IS_TYPE_BOOL_AND(param)) {
@@ -873,10 +801,6 @@ static void iscsi_check_proposer_for_optional_reply(struct iscsi_param *param)
 		SET_PSTATE_REPLY_OPTIONAL(param);
 }
 
-/*	iscsi_check_boolean_value():
- *
- *
- */
 static int iscsi_check_boolean_value(struct iscsi_param *param, char *value)
 {
 	if (strcmp(value, YES) && strcmp(value, NO)) {
@@ -888,10 +812,6 @@ static int iscsi_check_boolean_value(struct iscsi_param *param, char *value)
 	return 0;
 }
 
-/*	iscsi_check_numerical_value():
- *
- *
- */
 static int iscsi_check_numerical_value(struct iscsi_param *param, char *value_ptr)
 {
 	char *tmpptr;
@@ -967,10 +887,6 @@ static int iscsi_check_numerical_value(struct iscsi_param *param, char *value_pt
 	return 0;
 }
 
-/*	iscsi_check_numerical_range_value():
- *
- *
- */
 static int iscsi_check_numerical_range_value(struct iscsi_param *param, char *value)
 {
 	char *left_val_ptr = NULL, *right_val_ptr = NULL;
@@ -1057,10 +973,6 @@ static int iscsi_check_numerical_range_value(struct iscsi_param *param, char *va
 	return 0;
 }
 
-/*	iscsi_check_string_or_list_value():
- *
- *
- */
 static int iscsi_check_string_or_list_value(struct iscsi_param *param, char *value)
 {
 	if (IS_PSTATE_PROPOSER(param))
@@ -1097,8 +1009,7 @@ static int iscsi_check_string_or_list_value(struct iscsi_param *param, char *val
 	return 0;
 }
 
-/*	iscsi_get_value_from_number_range():
- *
+/*
  *	This function is used to pick a value range number,  currently just
  *	returns the lesser of both right values.
  */
@@ -1125,10 +1036,6 @@ static char *iscsi_get_value_from_number_range(
 		tilde_ptr1 : tilde_ptr2;
 }
 
-/*	iscsi_check_valuelist_for_support():
- *
- *
- */
 static char *iscsi_check_valuelist_for_support(
 	struct iscsi_param *param,
 	char *value)
@@ -1183,10 +1090,6 @@ out:
 	return proposer_values;
 }
 
-/*	iscsi_check_acceptor_state():
- *
- *
- */
 static int iscsi_check_acceptor_state(struct iscsi_param *param, char *value)
 {
 	u8 acceptor_boolean_value = 0, proposer_boolean_value = 0;
@@ -1291,10 +1194,6 @@ static int iscsi_check_acceptor_state(struct iscsi_param *param, char *value)
 	return 0;
 }
 
-/*	iscsi_check_proposer_state():
- *
- *
- */
 static int iscsi_check_proposer_state(struct iscsi_param *param, char *value)
 {
 	if (IS_PSTATE_RESPONSE_GOT(param)) {
@@ -1364,10 +1263,6 @@ static int iscsi_check_proposer_state(struct iscsi_param *param, char *value)
 	return 0;
 }
 
-/*	iscsi_check_value():
- *
- *
- */
 static int iscsi_check_value(struct iscsi_param *param, char *value)
 {
 	char *comma_ptr = NULL;
@@ -1449,10 +1344,6 @@ static int iscsi_check_value(struct iscsi_param *param, char *value)
 	return 0;
 }
 
-/*	__iscsi_check_key()
- *
- *
- */
 static struct iscsi_param *__iscsi_check_key(
 	char *key,
 	int sender,
@@ -1487,10 +1378,6 @@ static struct iscsi_param *__iscsi_check_key(
 	return param;
 }
 
-/*	iscsi_check_key():
- *
- *
- */
 static struct iscsi_param *iscsi_check_key(
 	char *key,
 	int phase,
@@ -1498,7 +1385,6 @@ static struct iscsi_param *iscsi_check_key(
 	struct iscsi_param_list *param_list)
 {
 	struct iscsi_param *param;
-
 	/*
 	 * Key name length must not exceed 63 bytes. (See iSCSI v20 5.1)
 	 */
@@ -1552,10 +1438,6 @@ static struct iscsi_param *iscsi_check_key(
 	return param;
 }
 
-/*	iscsi_enforce_integrity_rules():
- *
- *
- */
 static int iscsi_enforce_integrity_rules(
 	u8 phase,
 	struct iscsi_param_list *param_list)
@@ -1673,10 +1555,6 @@ static int iscsi_enforce_integrity_rules(
 	return 0;
 }
 
-/*	iscsi_decode_text_input():
- *
- *
- */
 int iscsi_decode_text_input(
 	u8 phase,
 	u8 sender,
@@ -1753,10 +1631,6 @@ int iscsi_decode_text_input(
 	return 0;
 }
 
-/*	iscsi_encode_text_output():
- *
- *
- */
 int iscsi_encode_text_output(
 	u8 phase,
 	u8 sender,
@@ -1815,10 +1689,6 @@ int iscsi_encode_text_output(
 	return 0;
 }
 
-/*	iscsi_check_negotiated_keys():
- *
- *
- */
 int iscsi_check_negotiated_keys(struct iscsi_param_list *param_list)
 {
 	int ret = 0;
@@ -1839,10 +1709,6 @@ int iscsi_check_negotiated_keys(struct iscsi_param_list *param_list)
 	return ret;
 }
 
-/*	iscsi_set_param_value():
- *
- *
- */
 int iscsi_change_param_value(
 	char *keyvalue,
 	struct iscsi_param_list *param_list,
@@ -1878,10 +1744,6 @@ int iscsi_change_param_value(
 	return 0;
 }
 
-/*	iscsi_set_connection_parameters():
- *
- *
- */
 void iscsi_set_connection_parameters(
 	struct iscsi_conn_ops *ops,
 	struct iscsi_param_list *param_list)
@@ -1934,10 +1796,6 @@ void iscsi_set_connection_parameters(
 			"--------------\n");
 }
 
-/*	iscsi_set_session_parameters():
- *
- *
- */
 void iscsi_set_session_parameters(
 	struct iscsi_sess_ops *ops,
 	struct iscsi_param_list *param_list,
@@ -2050,4 +1908,3 @@ void iscsi_set_session_parameters(
 			"--------------\n");
 
 }
-

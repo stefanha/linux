@@ -27,7 +27,7 @@
 #include "iscsi_target_util.h"
 #include "iscsi_target_datain_values.h"
 
-struct iscsi_datain_req *iscsi_allocate_datain_req(void)
+struct iscsi_datain_req *iscsit_allocate_datain_req(void)
 {
 	struct iscsi_datain_req *dr;
 
@@ -42,14 +42,14 @@ struct iscsi_datain_req *iscsi_allocate_datain_req(void)
 	return dr;
 }
 
-void iscsi_attach_datain_req(struct iscsi_cmd *cmd, struct iscsi_datain_req *dr)
+void iscsit_attach_datain_req(struct iscsi_cmd *cmd, struct iscsi_datain_req *dr)
 {
 	spin_lock(&cmd->datain_lock);
 	list_add_tail(&dr->dr_list, &cmd->datain_list);
 	spin_unlock(&cmd->datain_lock);
 }
 
-void iscsi_free_datain_req(struct iscsi_cmd *cmd, struct iscsi_datain_req *dr)
+void iscsit_free_datain_req(struct iscsi_cmd *cmd, struct iscsi_datain_req *dr)
 {
 	spin_lock(&cmd->datain_lock);
 	list_del(&dr->dr_list);
@@ -58,7 +58,7 @@ void iscsi_free_datain_req(struct iscsi_cmd *cmd, struct iscsi_datain_req *dr)
 	kmem_cache_free(lio_dr_cache, dr);
 }
 
-void iscsi_free_all_datain_reqs(struct iscsi_cmd *cmd)
+void iscsit_free_all_datain_reqs(struct iscsi_cmd *cmd)
 {
 	struct iscsi_datain_req *dr, *dr_tmp;
 
@@ -70,7 +70,7 @@ void iscsi_free_all_datain_reqs(struct iscsi_cmd *cmd)
 	spin_unlock(&cmd->datain_lock);
 }
 
-struct iscsi_datain_req *iscsi_get_datain_req(struct iscsi_cmd *cmd)
+struct iscsi_datain_req *iscsit_get_datain_req(struct iscsi_cmd *cmd)
 {
 	struct iscsi_datain_req *dr;
 
@@ -85,11 +85,10 @@ struct iscsi_datain_req *iscsi_get_datain_req(struct iscsi_cmd *cmd)
 	return dr;
 }
 
-/*	iscsi_set_datain_values_yes_and_yes():
- *
+/*
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=Yes.
  */
-static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
+static inline struct iscsi_datain_req *iscsit_set_datain_values_yes_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -97,12 +96,12 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
 
-	dr = iscsi_get_datain_req(cmd);
+	dr = iscsit_get_datain_req(cmd);
 	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_yes(
 					cmd, dr) < 0)
 			return NULL;
 
@@ -184,11 +183,10 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_yes(
 	return dr;
 }
 
-/*	iscsi_set_datain_values_no_and_yes():
- *
+/*
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=Yes.
  */
-static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
+static inline struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -197,12 +195,12 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 	struct iscsi_datain_req *dr;
 	struct iscsi_seq *seq;
 
-	dr = iscsi_get_datain_req(cmd);
+	dr = iscsit_get_datain_req(cmd);
 	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_no(
 					cmd, dr) < 0)
 			return NULL;
 
@@ -221,7 +219,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 		return NULL;
 	}
 
-	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
+	seq = iscsit_get_seq_holder_for_datain(cmd, seq_send_order);
 	if (!seq)
 		return NULL;
 
@@ -306,11 +304,10 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_yes(
 	return dr;
 }
 
-/*	iscsi_set_datain_values_yes_and_no():
- *
+/*
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=No.
  */
-static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
+static inline struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -319,12 +316,12 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 	struct iscsi_datain_req *dr;
 	struct iscsi_pdu *pdu;
 
-	dr = iscsi_get_datain_req(cmd);
+	dr = iscsit_get_datain_req(cmd);
 	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_yes(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_yes(
 					cmd, dr) < 0)
 			return NULL;
 
@@ -343,7 +340,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 		return dr;
 	}
 
-	pdu = iscsi_get_pdu_holder_for_seq(cmd, NULL);
+	pdu = iscsit_get_pdu_holder_for_seq(cmd, NULL);
 	if (!pdu)
 		return dr;
 
@@ -406,11 +403,10 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_yes_and_no(
 	return dr;
 }
 
-/*	iscsi_set_datain_values_no_and_no():
- *
+/*
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=No.
  */
-static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
+static inline struct iscsi_datain_req *iscsit_set_datain_values_no_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -420,12 +416,12 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 	struct iscsi_pdu *pdu;
 	struct iscsi_seq *seq = NULL;
 
-	dr = iscsi_get_datain_req(cmd);
+	dr = iscsit_get_datain_req(cmd);
 	if (!dr)
 		return NULL;
 
 	if (dr->recovery && dr->generate_recovery_values) {
-		if (iscsi_create_recovery_datain_values_datasequenceinorder_no(
+		if (iscsit_create_recovery_datain_values_datasequenceinorder_no(
 					cmd, dr) < 0)
 			return NULL;
 
@@ -444,7 +440,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 		return NULL;
 	}
 
-	seq = iscsi_get_seq_holder_for_datain(cmd, seq_send_order);
+	seq = iscsit_get_seq_holder_for_datain(cmd, seq_send_order);
 	if (!seq)
 		return NULL;
 
@@ -453,7 +449,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 	if (!dr->recovery && !seq->next_burst_len)
 		seq->first_datasn = cmd->data_sn;
 
-	pdu = iscsi_get_pdu_holder_for_seq(cmd, seq);
+	pdu = iscsit_get_pdu_holder_for_seq(cmd, seq);
 	if (!pdu)
 		return NULL;
 
@@ -512,11 +508,7 @@ static inline struct iscsi_datain_req *iscsi_set_datain_values_no_and_no(
 	return dr;
 }
 
-/*	iscsi_get_datain_values():
- *
- *
- */
-struct iscsi_datain_req *iscsi_get_datain_values(
+struct iscsi_datain_req *iscsit_get_datain_values(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -524,16 +516,16 @@ struct iscsi_datain_req *iscsi_get_datain_values(
 
 	if (conn->sess->sess_ops->DataSequenceInOrder &&
 	    conn->sess->sess_ops->DataPDUInOrder)
-		return iscsi_set_datain_values_yes_and_yes(cmd, datain);
+		return iscsit_set_datain_values_yes_and_yes(cmd, datain);
 	else if (!conn->sess->sess_ops->DataSequenceInOrder &&
 		  conn->sess->sess_ops->DataPDUInOrder)
-		return iscsi_set_datain_values_no_and_yes(cmd, datain);
+		return iscsit_set_datain_values_no_and_yes(cmd, datain);
 	else if (conn->sess->sess_ops->DataSequenceInOrder &&
 		 !conn->sess->sess_ops->DataPDUInOrder)
-		return iscsi_set_datain_values_yes_and_no(cmd, datain);
+		return iscsit_set_datain_values_yes_and_no(cmd, datain);
 	else if (!conn->sess->sess_ops->DataSequenceInOrder &&
 		   !conn->sess->sess_ops->DataPDUInOrder)
-		return iscsi_set_datain_values_no_and_no(cmd, datain);
+		return iscsit_set_datain_values_no_and_no(cmd, datain);
 
 	return NULL;
 }

@@ -22,6 +22,7 @@
 #include <linux/crypto.h>
 #include <linux/completion.h>
 #include <asm/unaligned.h>
+#include <scsi/scsi_device.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 #include <target/target_core_tmr.h>
@@ -63,19 +64,19 @@ struct kmem_cache *lio_dr_cache;
 struct kmem_cache *lio_ooo_cache;
 struct kmem_cache *lio_r2t_cache;
 
-static void iscsi_rx_thread_wait_for_tcp(struct iscsi_conn *);
+static void iscsit_rx_thread_wait_for_tcp(struct iscsi_conn *);
 
-static int iscsi_handle_immediate_data(struct iscsi_cmd *,
+static int iscsit_handle_immediate_data(struct iscsi_cmd *,
 			unsigned char *buf, u32);
-static inline int iscsi_send_data_in(struct iscsi_cmd *, struct iscsi_conn *,
+static inline int iscsit_send_data_in(struct iscsi_cmd *, struct iscsi_conn *,
 			struct se_unmap_sg *, int *);
-static inline int iscsi_send_logout_response(struct iscsi_cmd *, struct iscsi_conn *);
-static inline int iscsi_send_nopin_response(struct iscsi_cmd *, struct iscsi_conn *);
-static inline int iscsi_send_status(struct iscsi_cmd *, struct iscsi_conn *);
-static int iscsi_send_task_mgt_rsp(struct iscsi_cmd *, struct iscsi_conn *);
-static int iscsi_send_text_rsp(struct iscsi_cmd *, struct iscsi_conn *);
-static int iscsi_send_reject(struct iscsi_cmd *, struct iscsi_conn *);
-static int iscsi_logout_post_handler(struct iscsi_cmd *, struct iscsi_conn *);
+static inline int iscsit_send_logout_response(struct iscsi_cmd *, struct iscsi_conn *);
+static inline int iscsit_send_nopin_response(struct iscsi_cmd *, struct iscsi_conn *);
+static inline int iscsit_send_status(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsit_send_task_mgt_rsp(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsit_send_text_rsp(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsit_send_reject(struct iscsi_cmd *, struct iscsi_conn *);
+static int iscsit_logout_post_handler(struct iscsi_cmd *, struct iscsi_conn *);
 
 struct iscsi_tiqn *iscsit_get_tiqn_for_login(unsigned char *buf)
 {
@@ -293,65 +294,59 @@ static struct iscsi_np *iscsit_get_np(
 	unsigned char *ipv6,
 	u32 ipv4,
 	u16 port,
+	int af_inet,
 	int network_transport)
 {
 	struct iscsi_np *np;
-	void *p, *ip;
-	int net_size;
+	int ip_match = 0;
 
-	spin_lock(&np_lock);
+	spin_lock_bh(&np_lock);
 	list_for_each_entry(np, &g_np_list, np_list) {
-		spin_lock(&np->np_state_lock);
-		if (atomic_read(&np->np_shutdown)) {
-			spin_unlock(&np->np_state_lock);
+		spin_lock(&np->np_thread_lock);
+		if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {
+			spin_unlock(&np->np_thread_lock);
 			continue;
 		}
-		spin_unlock(&np->np_state_lock);
 
-		if (ipv6 != NULL) {
-			p = (void *)&np->np_ipv6[0];
-			ip = (void *)ipv6;
-			net_size = IPV6_ADDRESS_SPACE;
+		if (af_inet == AF_INET6) {
+			if (!strcmp(&np->np_ip[0], &ipv6[0]))
+				ip_match = 1;
 		} else {
-			p = (void *)&np->np_ipv4;
-			ip = (void *)&ipv4;
-			net_size = IPV4_ADDRESS_SPACE;
+			if (np->np_ipv4 == ipv4)
+				ip_match = 1;
 		}
 			
-		if (!memcmp(p, ip, net_size) && (np->np_port == port) &&
+		if ((ip_match == 1) && (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
-			spin_unlock(&np_lock);
+			/*
+			 * Increment the np_exports reference count now to
+			 * prevent iscsit_del_np() below from being called
+			 * while iscsi_tpg_add_network_portal() is called.
+			 */
+			np->np_exports++;
+			spin_unlock(&np->np_thread_lock);
+			spin_unlock_bh(&np_lock);
 			return np;
 		}
+		spin_unlock(&np->np_thread_lock);
 	}
-	spin_unlock(&np_lock);
+	spin_unlock_bh(&np_lock);
 
 	return NULL;
 }
 
 struct iscsi_np *iscsit_add_np(
 	struct iscsi_np_addr *np_addr,
-	int network_transport)
+	int network_transport,
+	int af_inet)
 {
 	struct iscsi_np *np;
-	char *ip_buf = NULL, *ipv6 = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
-	u32 ipv4 = 0;
 	int ret;
-
-	if (np_addr->np_flags & NPF_NET_IPV6) {
-		ip_buf = &np_addr->np_ipv6[0];
-		ipv6 = &np_addr->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, np_addr->np_ipv4);
-		ip_buf = &buf_ipv4[0];
-		ipv4 = np_addr->np_ipv4;
-	}
 	/*
 	 * Locate the existing struct iscsi_np if already active..
 	 */
-	np = iscsit_get_np(ipv6, ipv4, np_addr->np_port, network_transport);
+	np = iscsit_get_np(np_addr->np_ipv6, np_addr->np_ipv4,
+			   np_addr->np_port, af_inet, network_transport);
 	if (np)
 		return np;
 
@@ -362,22 +357,24 @@ struct iscsi_np *iscsit_add_np(
 	}
 
 	np->np_flags |= NPF_IP_NETWORK;
-	if (np_addr->np_flags & NPF_NET_IPV6) {
-		np->np_flags |= NPF_NET_IPV6;
-		memcpy(np->np_ipv6, np_addr->np_ipv6, IPV6_ADDRESS_SPACE);
+	if (af_inet == AF_INET6) {
+		snprintf(np->np_ip, IPV6_ADDRESS_SPACE, "%s", np_addr->np_ipv6);
 	} else {
-		np->np_flags |= NPF_NET_IPV4;
+		sprintf(np->np_ip, "%u.%u.%u.%u",
+			((np_addr->np_ipv4 >> 24) & 0xff),
+			((np_addr->np_ipv4 >> 16) & 0xff),
+			((np_addr->np_ipv4 >> 8) & 0xff),
+			  np_addr->np_ipv4 & 0xff);
 		np->np_ipv4 = np_addr->np_ipv4;
 	}
+
 	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
-	atomic_set(&np->np_shutdown, 0);
-	spin_lock_init(&np->np_state_lock);
 	spin_lock_init(&np->np_thread_lock);
 	init_completion(&np->np_restart_comp);
 	INIT_LIST_HEAD(&np->np_list);
 
-	ret = iscsi_target_setup_login_socket(np);
+	ret = iscsi_target_setup_login_socket(np, af_inet);
 	if (ret != 0) {
 		kfree(np);
 		return ERR_PTR(ret);
@@ -390,12 +387,21 @@ struct iscsi_np *iscsit_add_np(
 		kfree(np);
 		return ERR_PTR(ret);
 	}
-	spin_lock(&np_lock);
+	/*
+	 * Increment the np_exports reference count now to prevent
+	 * iscsit_del_np() below from being run while a new call to
+	 * iscsi_tpg_add_network_portal() for a matching iscsi_np is
+	 * active.  We don't need to hold np->np_thread_lock at this
+	 * point because iscsi_np has not been added to g_np_list yet.
+	 */
+	np->np_exports = 1;
+
+	spin_lock_bh(&np_lock);
 	list_add_tail(&np->np_list, &g_np_list);
-	spin_unlock(&np_lock);
+	spin_unlock_bh(&np_lock);
 
 	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on"
-		" network device: %s\n", ip_buf, np->np_port,
+		" network device: %s\n", np->np_ip, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
@@ -437,25 +443,6 @@ int iscsit_reset_np_thread(
 	return 0;
 }
 
-int iscsit_del_np_thread(struct iscsi_np *np)
-{
-	spin_lock_bh(&np->np_thread_lock);
-	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
-	atomic_set(&np->np_shutdown, 1);
-	spin_unlock_bh(&np->np_thread_lock);
-
-	if (np->np_thread) {
-		/*
-		 * We need to send the signal to wakeup Linux/Net
-		 * sock_accept()..
-		 */
-		send_sig(SIGINT, np->np_thread, 1);
-		kthread_stop(np->np_thread);
-	}
-
-	return 0;
-}
-
 int iscsit_del_np_comm(struct iscsi_np *np)
 {
 	if (!np->np_socket)
@@ -476,26 +463,30 @@ int iscsit_del_np_comm(struct iscsi_np *np)
 
 int iscsit_del_np(struct iscsi_np *np)
 {
-	unsigned char *ip = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
+	spin_lock_bh(&np->np_thread_lock);
+	if (!(--np->np_exports == 0)) {
+		spin_unlock_bh(&np->np_thread_lock);
+		return 0;
+	}
+	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
+	spin_unlock_bh(&np->np_thread_lock);
 
-	iscsit_del_np_thread(np);
+	if (np->np_thread) {
+		/*
+		 * We need to send the signal to wakeup Linux/Net
+		 * which may be sleeping in sock_accept()..
+		 */
+		send_sig(SIGINT, np->np_thread, 1);
+		kthread_stop(np->np_thread);
+	}
 	iscsit_del_np_comm(np);
 
-	spin_lock(&np_lock);
+	spin_lock_bh(&np_lock);
 	list_del(&np->np_list);
-	spin_unlock(&np_lock);
-
-	if (np->np_flags & NPF_NET_IPV6) {
-		ip = &np->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsi_ntoa2(buf_ipv4, np->np_ipv4);
-		ip = &buf_ipv4[0];
-	}
+	spin_unlock_bh(&np_lock);
 
 	printk(KERN_INFO "CORE[0] - Removed Network Portal: %s:%hu on %s on"
-		" network device: %s\n", ip, np->np_port,
+		" network device: %s\n", np->np_ip, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
@@ -626,115 +617,7 @@ static void __exit iscsi_target_cleanup_module(void)
 	printk(KERN_INFO "Unloading Complete.\n");
 }
 
-char *iscsi_get_fabric_name(void)
-{
-	return "iSCSI";
-}
-
-struct iscsi_cmd *iscsi_get_cmd(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	return cmd;
-}
-
-u32 iscsi_get_task_tag(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	return cmd->init_task_tag;
-}
-
-int iscsi_get_cmd_state(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	return cmd->i_state;
-}
-
-void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	if (cmd->immediate_data || cmd->unsolicited_data)
-		complete(&cmd->unsolicited_data_comp);
-}
-
-int iscsi_is_state_remove(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	return (cmd->i_state == ISTATE_REMOVE);
-}
-
-int lio_sess_logged_in(struct se_session *se_sess)
-{
-	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
-	int ret;
-
-	/*
-	 * Called with spin_lock_bh(&se_global->se_tpg_lock); and
-	 * spin_lock(&se_tpg->session_lock); held.
-	 */
-	spin_lock(&sess->conn_lock);
-	ret = (sess->session_state != TARG_SESS_STATE_LOGGED_IN);
-	spin_unlock(&sess->conn_lock);
-
-	return ret;
-}
-
-u32 lio_sess_get_index(struct se_session *se_sess)
-{
-	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
-
-	return sess->session_index;
-}
-
-u32 lio_sess_get_initiator_sid(
-	struct se_session *se_sess,
-	unsigned char *buf,
-	u32 size)
-{
-	struct iscsi_session *sess = (struct iscsi_session *)se_sess->fabric_sess_ptr;
-	/*
-	 * iSCSI Initiator Session Identifier from RFC-3720.
-	 */
-	return snprintf(buf, size, "%02x%02x%02x%02x%02x%02x",
-		sess->isid[0], sess->isid[1], sess->isid[2],
-		sess->isid[3], sess->isid[4], sess->isid[5]);
-}
-
-int iscsi_add_nopin(
-	struct iscsi_conn *conn,
-	int want_response)
-{
-	u8 state;
-	struct iscsi_cmd *cmd;
-
-	cmd = iscsi_allocate_cmd(conn);
-	if (!cmd)
-		return -1;
-
-	cmd->iscsi_opcode = ISCSI_OP_NOOP_IN;
-	state = (want_response) ? ISTATE_SEND_NOPIN_WANT_RESPONSE :
-			ISTATE_SEND_NOPIN_NO_RESPONSE;
-	cmd->init_task_tag = 0xFFFFFFFF;
-	spin_lock_bh(&conn->sess->ttt_lock);
-	cmd->targ_xfer_tag = (want_response) ? conn->sess->targ_xfer_tag++ :
-			0xFFFFFFFF;
-	if (want_response && (cmd->targ_xfer_tag == 0xFFFFFFFF))
-		cmd->targ_xfer_tag = conn->sess->targ_xfer_tag++;
-	spin_unlock_bh(&conn->sess->ttt_lock);
-
-	iscsi_attach_cmd_to_queue(conn, cmd);
-	if (want_response)
-		iscsi_start_nopin_response_timer(conn);
-	iscsi_add_cmd_to_immediate_queue(cmd, conn, state);
-
-	return 0;
-}
-
-int iscsi_add_reject(
+int iscsit_add_reject(
 	u8 reason,
 	int fail_conn,
 	unsigned char *buf,
@@ -744,7 +627,7 @@ int iscsi_add_reject(
 	struct iscsi_reject *hdr;
 	int ret;
 
-	cmd = iscsi_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn);
 	if (!cmd)
 		return -1;
 
@@ -758,15 +641,17 @@ int iscsi_add_reject(
 	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
 	if (!cmd->buf_ptr) {
 		printk(KERN_ERR "Unable to allocate memory for cmd->buf_ptr\n");
-		__iscsi_release_cmd_to_pool(cmd, conn->sess);
+		iscsit_release_cmd(cmd);
 		return -1;
 	}
 	memcpy(cmd->buf_ptr, buf, ISCSI_HDR_LEN);
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	cmd->i_state = ISTATE_SEND_REJECT;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
 	ret = wait_for_completion_interruptible(&cmd->reject_comp);
 	if (ret != 0)
@@ -775,11 +660,7 @@ int iscsi_add_reject(
 	return (!fail_conn) ? 0 : -1;
 }
 
-/*	iscsi_add_reject_from_cmd():
- *
- *
- */
-int iscsi_add_reject_from_cmd(
+int iscsit_add_reject_from_cmd(
 	u8 reason,
 	int fail_conn,
 	int add_to_conn,
@@ -807,16 +688,19 @@ int iscsi_add_reject_from_cmd(
 	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
 	if (!cmd->buf_ptr) {
 		printk(KERN_ERR "Unable to allocate memory for cmd->buf_ptr\n");
-		__iscsi_release_cmd_to_pool(cmd, conn->sess);
+		iscsit_release_cmd(cmd);
 		return -1;
 	}
 	memcpy(cmd->buf_ptr, buf, ISCSI_HDR_LEN);
 
-	if (add_to_conn)
-		iscsi_attach_cmd_to_queue(conn, cmd);
+	if (add_to_conn) {
+		spin_lock_bh(&conn->cmd_lock);
+		list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+		spin_unlock_bh(&conn->cmd_lock);
+	}
 
 	cmd->i_state = ISTATE_SEND_REJECT;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
 	ret = wait_for_completion_interruptible(&cmd->reject_comp);
 	if (ret != 0)
@@ -825,39 +709,22 @@ int iscsi_add_reject_from_cmd(
 	return (!fail_conn) ? 0 : -1;
 }
 
-/* #define iscsi_calculate_map_segment_DEBUG */
-#ifdef iscsi_calculate_map_segment_DEBUG
-#define DEBUG_MAP_SEGMENTS(buf...) PYXPRINT(buf)
-#else
-#define DEBUG_MAP_SEGMENTS(buf...)
-#endif
-
-static inline void iscsi_calculate_map_segment(
+static inline void iscsit_calculate_map_segment(
 	u32 *data_length,
 	struct se_offset_map *lm)
 {
 	u32 sg_offset = 0;
 	struct se_mem *se_mem = lm->map_se_mem;
-
-	DEBUG_MAP_SEGMENTS(" START Mapping se_mem: %p, Length: %d"
-		"  Remaining iSCSI Data: %u\n", se_mem, se_mem->se_len,
-		*data_length);
 	/*
 	 * Still working on pages in the current struct se_mem.
 	 */
 	if (!lm->map_reset) {
 		lm->iovec_length = (lm->sg_length > PAGE_SIZE) ?
 					PAGE_SIZE : lm->sg_length;
-		if (*data_length < lm->iovec_length) {
-			DEBUG_MAP_SEGMENTS("LINUX_MAP: Reset lm->iovec_length"
-				" to %d\n", *data_length);
-
+		if (*data_length < lm->iovec_length)
 			lm->iovec_length = *data_length;
-		}
-		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 
-		DEBUG_MAP_SEGMENTS("LINUX_MAP: Set lm->iovec_base to %p from"
-			" lm->sg_page: %p\n", lm->iovec_base, lm->sg_page);
+		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 		return;
 	}
 
@@ -873,35 +740,20 @@ static inline void iscsi_calculate_map_segment(
 	sg_offset = se_mem->se_off;
 	lm->sg_page = se_mem->se_page;
 	lm->sg_length = se_mem->se_len;
-
-	DEBUG_MAP_SEGMENTS("LINUX_MAP1[%p]: Starting to se_mem->se_len: %u,"
-		" se_mem->se_off: %u, se_mem->se_page: %p\n", se_mem,
-		se_mem->se_len, se_mem->se_off, se_mem->se_page);
 	/*
 	 * Get the base and length of the current page for use with the iovec.
 	 */
 recalc:
 	lm->iovec_length = (lm->sg_length > (PAGE_SIZE - sg_offset)) ?
 			   (PAGE_SIZE - sg_offset) : lm->sg_length;
-
-	DEBUG_MAP_SEGMENTS("LINUX_MAP: lm->iovec_length: %u, lm->sg_length: %u,"
-		" sg_offset: %u\n", lm->iovec_length, lm->sg_length, sg_offset);
 	/*
 	 * See if there is any iSCSI offset we need to deal with.
 	 */
 	if (!lm->current_offset) {
 		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 
-		if (*data_length < lm->iovec_length) {
-			DEBUG_MAP_SEGMENTS("LINUX_MAP1[%p]: Reset"
-				" lm->iovec_length to %d\n", se_mem,
-				*data_length);
+		if (*data_length < lm->iovec_length)
 			lm->iovec_length = *data_length;
-		}
-
-		DEBUG_MAP_SEGMENTS("LINUX_MAP2[%p]: No current_offset,"
-			" set iovec_base to %p and set Current Page to %p\n",
-			se_mem, lm->iovec_base, lm->sg_page);
 
 		return;
 	}
@@ -911,19 +763,10 @@ recalc:
 	 * scatterlist.  Increase the lm->sg_page pointer and try again.
 	 */
 	if (lm->current_offset >= lm->iovec_length) {
-		DEBUG_MAP_SEGMENTS("LINUX_MAP3[%p]: Next Page:"
-			" lm->current_offset: %u, iovec_length: %u"
-			" sg_offset: %u\n", se_mem, lm->current_offset,
-			lm->iovec_length, sg_offset);
-
 		lm->current_offset -= lm->iovec_length;
 		lm->sg_length -= lm->iovec_length;
 		lm->sg_page++;
 		sg_offset = 0;
-
-		DEBUG_MAP_SEGMENTS("LINUX_MAP3[%p]: ** Skipping to Next Page,"
-			" updated values: lm->current_offset: %u\n", se_mem,
-			lm->current_offset);
 
 		goto recalc;
 	}
@@ -934,13 +777,8 @@ recalc:
 	 */
 	lm->iovec_base = page_address(lm->sg_page);
 
-	DEBUG_MAP_SEGMENTS("LINUX_MAP4[%p]: Set lm->iovec_base to %p\n", se_mem,
-			lm->iovec_base);
-
 	lm->iovec_base += sg_offset;
 	lm->iovec_base += lm->current_offset;
-	DEBUG_MAP_SEGMENTS("****** the OLD lm->iovec_length: %u lm->sg_length:"
-		" %u\n", lm->iovec_length, lm->sg_length);
 
 	if ((lm->iovec_length - lm->current_offset) < *data_length)
 		lm->iovec_length -= lm->current_offset;
@@ -953,19 +791,9 @@ recalc:
 		lm->sg_length = *data_length;
 
 	lm->current_offset = 0;
-
-	DEBUG_MAP_SEGMENTS("****** the NEW lm->iovec_length %u lm->sg_length:"
-		" %u\n", lm->iovec_length, lm->sg_length);
 }
 
-/* #define iscsi_linux_get_iscsi_offset_DEBUG */
-#ifdef iscsi_linux_get_iscsi_offset_DEBUG
-#define DEBUG_GET_ISCSI_OFFSET(buf...) PYXPRINT(buf)
-#else
-#define DEBUG_GET_ISCSI_OFFSET(buf...)
-#endif
-
-static int get_iscsi_offset(
+static int iscsit_get_offset(
 	struct se_offset_map *lmap,
 	struct se_unmap_sg *usg)
 {
@@ -997,26 +825,13 @@ static int get_iscsi_offset(
 		 */
 		total_offset += se_mem->se_len;
 
-		DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: current_length: %u,"
-			" total_offset: %u, sg->length: %u\n",
-			current_length, total_offset, se_mem->se_len);
-
 		if (total_offset > lmap->iscsi_offset) {
 			current_length += current_iscsi_offset;
 			lmap->orig_offset = lmap->current_offset =
 				usg->t_offset = current_iscsi_offset;
-			DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: Within Current"
-				" struct se_mem: %p, current_length incremented to"
-				" %u\n", se_mem, current_length);
 		} else {
 			current_length += se_mem->se_len;
 			current_iscsi_offset -= se_mem->se_len;
-
-			DEBUG_GET_ISCSI_OFFSET("ISCSI_OFFSET: Outside of"
-				" Current se_mem: %p, current_length"
-				" incremented to %u and current_iscsi_offset"
-				" decremented to %u\n", se_mem, current_length,
-				current_iscsi_offset);
 
 			list_for_each_entry_continue(se_mem,
 					T_TASK(cmd)->t_mem_list, se_list)
@@ -1034,80 +849,20 @@ static int get_iscsi_offset(
 	return 0;
 }
 
-/* #define iscsi_OS_set_SG_iovec_ptrs_DEBUG */
-#ifdef iscsi_OS_set_SG_iovec_ptrs_DEBUG
-#define DEBUG_IOVEC_SCATTERLISTS(buf...) PYXPRINT(buf)
-
-static void iscsi_check_iovec_map(
-	u32 iovec_count,
-	u32 map_length,
-	struct se_map_sg *map_sg,
-	struct se_unmap_sg *unmap_sg)
-{
-	u32 i, iovec_map_length = 0;
-	struct se_cmd *cmd = map_sg->se_cmd;
-	struct iovec *iov = map_sg->iov;
-	struct se_mem *se_mem;
-
-	for (i = 0; i < iovec_count; i++)
-		iovec_map_length += iov[i].iov_len;
-
-	if (iovec_map_length == map_length)
-		return;
-
-	printk(KERN_INFO "Calculated iovec_map_length: %u does not match passed"
-		" map_length: %u\n", iovec_map_length, map_length);
-	printk(KERN_INFO "ITT: 0x%08x data_length: %u data_direction %d\n",
-		CMD_TFO(cmd)->get_task_tag(cmd), cmd->data_length,
-		cmd->data_direction);
-
-	iovec_map_length = 0;
-
-	for (i = 0; i < iovec_count; i++) {
-		printk(KERN_INFO "iov[%d].iov_[base,len]: %p / %u bytes------"
-			"-->\n", i, iov[i].iov_base, iov[i].iov_len);
-
-		printk(KERN_INFO "iovec_map_length from %u to %u\n",
-			iovec_map_length, iovec_map_length + iov[i].iov_len);
-		iovec_map_length += iov[i].iov_len;
-
-		printk(KERN_INFO "XXXX_map_length from %u to %u\n", map_length,
-				(map_length - iov[i].iov_len));
-		map_length -= iov[i].iov_len;
-	}
-
-	list_for_each_entry(se_mem, T_TASK(cmd)->t_mem_list, se_list) {
-		printk(KERN_INFO "se_mem[%p]: offset: %u length: %u\n",
-			se_mem, se_mem->se_off, se_mem->se_len);
-	}
-
-	BUG();
-}
-
-#else
-#define DEBUG_IOVEC_SCATTERLISTS(buf...)
-#define iscsi_check_iovec_map(a, b, c, d)
-#endif
-
-static int iscsi_set_iovec_ptrs(
+static int iscsit_set_iovec_ptrs(
 	struct se_map_sg *map_sg,
 	struct se_unmap_sg *unmap_sg)
 {
 	u32 i = 0 /* For iovecs */, j = 0 /* For scatterlists */;
-#ifdef iscsi_OS_set_SG_iovec_ptrs_DEBUG
-	u32 orig_map_length = map_sg->data_length;
-#endif
 	struct se_cmd *cmd = map_sg->se_cmd;
 	struct iscsi_cmd *i_cmd = container_of(cmd, struct iscsi_cmd, se_cmd);
 	struct se_offset_map *lmap = &unmap_sg->lmap;
-	struct iovec *iov = map_sg->iov;
+	struct kvec *iov = map_sg->iov;
 
 	/*
 	 * Used for non scatterlist operations, assume a single iovec.
 	 */
 	if (!T_TASK(cmd)->t_tasks_se_num) {
-		DEBUG_IOVEC_SCATTERLISTS("ITT: 0x%08x No struct se_mem elements"
-			" present\n", CMD_TFO(cmd)->get_task_tag(cmd));
 		iov[0].iov_base = (unsigned char *) T_TASK(cmd)->t_task_buf +
 							map_sg->data_offset;
 		iov[0].iov_len  = map_sg->data_length;
@@ -1116,15 +871,10 @@ static int iscsi_set_iovec_ptrs(
 
 	/*
 	 * Set lmap->map_reset = 1 so the first call to
-	 * iscsi_calculate_map_segment() sets up the initial
+	 * iscsit_calculate_map_segment() sets up the initial
 	 * values for struct se_offset_map.
 	 */
 	lmap->map_reset = 1;
-
-	DEBUG_IOVEC_SCATTERLISTS("[-------------------] ITT: 0x%08x OS"
-		" Independent Network POSIX defined iovectors to SE Memory"
-		" [-------------------]\n\n", CMD_TFO(cmd)->get_task_tag(cmd));
-
 	/*
 	 * Get a pointer to the first used scatterlist based on the passed
 	 * offset. Also set the rest of the needed values in iscsi_linux_map_t.
@@ -1132,17 +882,12 @@ static int iscsi_set_iovec_ptrs(
 	lmap->iscsi_offset = map_sg->data_offset;
 	if (map_sg->sg_kmap_active) {
 		unmap_sg->se_cmd = map_sg->se_cmd;
-		get_iscsi_offset(lmap, unmap_sg);
+		iscsit_get_offset(lmap, unmap_sg);
 		unmap_sg->data_length = map_sg->data_length;
 	} else {
 		lmap->current_offset = lmap->orig_offset;
 	}
 	lmap->map_se_mem = lmap->map_orig_se_mem;
-
-	DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Total map_sg->data_length: %d,"
-		" lmap->iscsi_offset: %d, i_cmd->orig_iov_data_count: %d\n",
-		map_sg->data_length, lmap->iscsi_offset,
-		i_cmd->orig_iov_data_count);
 
 	while (map_sg->data_length) {
 		/*
@@ -1150,7 +895,7 @@ static int iscsi_set_iovec_ptrs(
 		 * This function will return the expected iovec_base address
 		 * and iovec_length.
 		 */
-		iscsi_calculate_map_segment(&map_sg->data_length, lmap);
+		iscsit_calculate_map_segment(&map_sg->data_length, lmap);
 
 		/*
 		 * Set the iov.iov_base and iov.iov_len from the current values
@@ -1168,16 +913,6 @@ static int iscsi_set_iovec_ptrs(
 		 */
 		map_sg->data_length -= iov[i].iov_len;
 		lmap->sg_length -= iov[i].iov_len;
-
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: iov[%u].iov_len: %u\n",
-				i, iov[i].iov_len);
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: lmap->sg_length: from %u"
-			" to %u\n", lmap->sg_length + iov[i].iov_len,
-				lmap->sg_length);
-		DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Changed total"
-			" map_sg->data_length from %u to %u\n",
-			map_sg->data_length + iov[i].iov_len,
-			map_sg->data_length);
 
 		if ((++i + 1) > i_cmd->orig_iov_data_count) {
 			printk(KERN_ERR "Current iovec count %u is greater than"
@@ -1204,22 +939,16 @@ static int iscsi_set_iovec_ptrs(
 
 			lmap->sg_page = NULL;
 			lmap->map_reset = 1;
-
-			DEBUG_IOVEC_SCATTERLISTS("OS_IOVEC: Done with current"
-				" scatterlist, incremented Generic scatterlist"
-				" Counter to %d and reset = 1\n", j);
 		} else
 			lmap->sg_page++;
 	}
 
 	unmap_sg->sg_count = j;
 
-	iscsi_check_iovec_map(i, orig_map_length, map_sg, unmap_sg);
-
 	return i;
 }
 
-static void iscsi_map_SG_segments(struct se_unmap_sg *unmap_sg)
+static void iscsit_map_SG_segments(struct se_unmap_sg *unmap_sg)
 {
 	u32 i = 0;
 	struct se_cmd *cmd = unmap_sg->se_cmd;
@@ -1236,7 +965,7 @@ static void iscsi_map_SG_segments(struct se_unmap_sg *unmap_sg)
 	}
 }
 
-static void iscsi_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
+static void iscsit_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 {
 	u32 i = 0;
 	struct se_cmd *cmd = unmap_sg->se_cmd;
@@ -1253,7 +982,29 @@ static void iscsi_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 	}
 }
 
-static inline int iscsi_handle_scsi_cmd(
+static inline void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
+{
+	struct iscsi_cmd *cmd;
+
+	conn->exp_statsn = exp_statsn;
+
+	spin_lock_bh(&conn->cmd_lock);
+	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
+		spin_lock(&cmd->istate_lock);
+		if ((cmd->i_state == ISTATE_SENT_STATUS) &&
+		    (cmd->stat_sn < exp_statsn)) {
+			cmd->i_state = ISTATE_REMOVE;
+			spin_unlock(&cmd->istate_lock);
+			iscsit_add_cmd_to_immediate_queue(cmd, conn,
+						cmd->i_state);
+			continue;
+		}
+		spin_unlock(&cmd->istate_lock);
+	}
+	spin_unlock_bh(&conn->cmd_lock);
+}
+
+static inline int iscsit_handle_scsi_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -1284,7 +1035,7 @@ static inline int iscsi_handle_scsi_cmd(
 	    !(hdr->flags & ISCSI_FLAG_CMD_FINAL)) {
 		printk(KERN_ERR "ISCSI_FLAG_CMD_WRITE & ISCSI_FLAG_CMD_FINAL"
 				" not set. Bad iSCSI Initiator.\n");
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 				buf, conn);
 	}
 
@@ -1305,7 +1056,7 @@ static inline int iscsi_handle_scsi_cmd(
 		printk(KERN_ERR "ISCSI_FLAG_CMD_READ or ISCSI_FLAG_CMD_WRITE"
 			" set when Expected Data Transfer Length is 0 for"
 			" CDB: 0x%02x. Bad iSCSI Initiator.\n", hdr->cdb[0]);
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 				buf, conn);
 	}
 done:
@@ -1315,28 +1066,28 @@ done:
 		printk(KERN_ERR "ISCSI_FLAG_CMD_READ and/or ISCSI_FLAG_CMD_WRITE"
 			" MUST be set if Expected Data Transfer Length is not 0."
 			" Bad iSCSI Initiator\n");
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 				buf, conn);
 	}
 
 	if ((hdr->flags & ISCSI_FLAG_CMD_READ) &&
 	    (hdr->flags & ISCSI_FLAG_CMD_WRITE)) {
 		printk(KERN_ERR "Bidirectional operations not supported!\n");
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 				buf, conn);
 	}
 
 	if (hdr->opcode & ISCSI_OP_IMMEDIATE) {
 		printk(KERN_ERR "Illegally set Immediate Bit in iSCSI Initiator"
 				" Scsi Command PDU.\n");
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 				buf, conn);
 	}
 
 	if (payload_length && !conn->sess->sess_ops->ImmediateData) {
 		printk(KERN_ERR "ImmediateData=No but DataSegmentLength=%u,"
 			" protocol error.\n", payload_length);
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 				buf, conn);
 	}
 #if 0
@@ -1345,7 +1096,7 @@ done:
 		printk(KERN_ERR "ISCSI_FLAG_CMD_FINAL is not Set and"
 			" ISCSI_FLAG_CMD_WRITE Bit and InitialR2T=Yes,"
 			" protocol error\n");
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 				buf, conn);
 	}
 #endif
@@ -1354,7 +1105,7 @@ done:
 		printk(KERN_ERR "Expected Data Transfer Length and Length of"
 			" Immediate Data are the same, but ISCSI_FLAG_CMD_FINAL"
 			" bit is not set protocol error\n");
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 				buf, conn);
 	}
 
@@ -1362,7 +1113,7 @@ done:
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" EDTL: %u, protocol error.\n", payload_length,
 				hdr->data_length);
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 				buf, conn);
 	}
 
@@ -1370,7 +1121,7 @@ done:
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" MaxRecvDataSegmentLength: %u, protocol error.\n",
 			payload_length, conn->conn_ops->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 				buf, conn);
 	}
 
@@ -1378,7 +1129,7 @@ done:
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" FirstBurstLength: %u, protocol error.\n",
 			payload_length, conn->sess->sess_ops->FirstBurstLength);
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_INVALID, 1,
 					buf, conn);
 	}
 
@@ -1386,10 +1137,10 @@ done:
 			 (hdr->flags & ISCSI_FLAG_CMD_READ) ? DMA_FROM_DEVICE :
 			  DMA_NONE;
 
-	cmd = iscsi_allocate_se_cmd(conn, hdr->data_length, data_direction,
+	cmd = iscsit_allocate_se_cmd(conn, hdr->data_length, data_direction,
 				(hdr->flags & ISCSI_FLAG_CMD_ATTR_MASK));
 	if (!cmd)
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES, 1,
 					buf, conn);
 
 	TRACE(TRACE_ISCSI, "Got SCSI Command, ITT: 0x%08x, CmdSN: 0x%08x,"
@@ -1421,19 +1172,19 @@ done:
 	if (cmd->data_direction == DMA_FROM_DEVICE) {
 		struct iscsi_datain_req *dr;
 
-		dr = iscsi_allocate_datain_req();
+		dr = iscsit_allocate_datain_req();
 		if (!dr)
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, 1, buf, cmd);
 
-		iscsi_attach_datain_req(cmd, dr);
+		iscsit_attach_datain_req(cmd, dr);
 	}
 
 	/*
 	 * The CDB is going to an se_device_t.
 	 */
-	ret = iscsi_get_lun_for_cmd(cmd, hdr->cdb,
+	ret = iscsit_get_lun_for_cmd(cmd, hdr->cdb,
 				get_unaligned_le64(&hdr->lun[0]));
 	if (ret < 0) {
 		if (SE_CMD(cmd)->scsi_sense_reason == TCM_NON_EXISTENT_LUN) {
@@ -1442,7 +1193,7 @@ done:
 				" 0x%016Lx\n", get_unaligned_le64(&hdr->lun[0]));
 		}
 		if (ret == PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES)
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, 1, buf, cmd);
 
@@ -1451,7 +1202,7 @@ done:
 	}
 	/*
 	 * The Initiator Node has access to the LUN (the addressing method
-	 * is handled inside of iscsi_get_lun_for_cmd()).  Now it's time to
+	 * is handled inside of iscsit_get_lun_for_cmd()).  Now it's time to
 	 * allocate 1->N transport tasks (depending on sector count and
 	 * maximum request size the physical HBA(s) can handle.
 	 */
@@ -1460,13 +1211,13 @@ done:
 		goto build_list;
 
 	if (transport_ret == -1) {
-		return iscsi_add_reject_from_cmd(
+		return iscsit_add_reject_from_cmd(
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
 	} else if (transport_ret == -2) {
 		/*
 		 * Unsupported SAM Opcode.  CHECK_CONDITION will be sent
-		 * in iscsi_execute_cmd() during the CmdSN OOO Execution
+		 * in iscsit_execute_cmd() during the CmdSN OOO Execution
 		 * Mechinism.
 		 */
 		send_check_condition = 1;
@@ -1474,12 +1225,14 @@ done:
 	}
 
 build_list:
-	if (iscsi_decide_list_to_build(cmd, payload_length) < 0)
-		return iscsi_add_reject_from_cmd(
+	if (iscsit_decide_list_to_build(cmd, payload_length) < 0)
+		return iscsit_add_reject_from_cmd(
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
 attach_cmd:
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 	/*
 	 * Check if we need to delay processing because of ALUA
 	 * Active/NonOptimized primary access state..
@@ -1496,23 +1249,23 @@ attach_cmd:
 	 * be acknowledged. (See below)
 	 */
 	if (!cmd->immediate_data) {
-		cmdsn_ret = iscsi_check_received_cmdsn(conn,
+		cmdsn_ret = iscsit_check_received_cmdsn(conn,
 				cmd, hdr->cmdsn);
 		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
 		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
 			do {} while (0);
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
 			cmd->i_state = ISTATE_REMOVE;
-			iscsi_add_cmd_to_immediate_queue(cmd,
+			iscsit_add_cmd_to_immediate_queue(cmd,
 					conn, cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
 	}
-	iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
+	iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	/*
 	 * If no Immediate Data is attached, it's OK to return now.
@@ -1522,10 +1275,10 @@ attach_cmd:
 			return 0;
 
 		if (cmd->unsolicited_data) {
-			iscsi_set_dataout_sequence_values(cmd);
+			iscsit_set_dataout_sequence_values(cmd);
 
 			spin_lock_bh(&cmd->dataout_timeout_lock);
-			iscsi_start_dataout_timer(cmd, cmd->conn);
+			iscsit_start_dataout_timer(cmd, cmd->conn);
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
 
@@ -1535,7 +1288,7 @@ attach_cmd:
 	/*
 	 * Early CHECK_CONDITIONs never make it to the transport processing
 	 * thread.  They are processed in CmdSN order by
-	 * iscsi_check_received_cmdsn() below.
+	 * iscsit_check_received_cmdsn() below.
 	 */
 	if (send_check_condition) {
 		immed_ret = IMMEDIDATE_DATA_NORMAL_OPERATION;
@@ -1558,7 +1311,7 @@ attach_cmd:
 		goto after_immediate_data;
 	}
 
-	immed_ret = iscsi_handle_immediate_data(cmd, buf, payload_length);
+	immed_ret = iscsit_handle_immediate_data(cmd, buf, payload_length);
 after_immediate_data:
 	if (immed_ret == IMMEDIDATE_DATA_NORMAL_OPERATION) {
 		/*
@@ -1566,20 +1319,20 @@ after_immediate_data:
 		 * DataCRC, check against ExpCmdSN/MaxCmdSN if
 		 * Immediate Bit is not set.
 		 */
-		cmdsn_ret = iscsi_check_received_cmdsn(conn,
+		cmdsn_ret = iscsit_check_received_cmdsn(conn,
 				cmd, hdr->cmdsn);
 		/*
 		 * Special case for Unsupported SAM WRITE Opcodes
 		 * and ImmediateData=Yes.
 		 */
 		if (dump_immediate_data) {
-			if (iscsi_dump_data_payload(conn, payload_length, 1) < 0)
+			if (iscsit_dump_data_payload(conn, payload_length, 1) < 0)
 				return -1;
 		} else if (cmd->unsolicited_data) {
-			iscsi_set_dataout_sequence_values(cmd);
+			iscsit_set_dataout_sequence_values(cmd);
 
 			spin_lock_bh(&cmd->dataout_timeout_lock);
-			iscsi_start_dataout_timer(cmd, cmd->conn);
+			iscsit_start_dataout_timer(cmd, cmd->conn);
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
 
@@ -1589,11 +1342,11 @@ after_immediate_data:
 			return 0;
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
 			cmd->i_state = ISTATE_REMOVE;
-			iscsi_add_cmd_to_immediate_queue(cmd,
+			iscsit_add_cmd_to_immediate_queue(cmd,
 					conn, cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
@@ -1610,14 +1363,14 @@ after_immediate_data:
 		 * CmdSN and issue a retry to plug the sequence.
 		 */
 		cmd->i_state = ISTATE_REMOVE;
-		iscsi_add_cmd_to_immediate_queue(cmd, conn, cmd->i_state);
+		iscsit_add_cmd_to_immediate_queue(cmd, conn, cmd->i_state);
 	} else /* immed_ret == IMMEDIDATE_DATA_CANNOT_RECOVER */
 		return -1;
 
 	return 0;
 }
 
-static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
+static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 {
 	int iov_ret, ooo_cmdsn = 0, ret;
 	u8 data_crc_failed = 0, *pad_bytes[4];
@@ -1628,7 +1381,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
 	struct iscsi_data *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	unsigned long flags;
 
 	hdr			= (struct iscsi_data *) buf;
@@ -1641,7 +1394,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 
 	if (!payload_length) {
 		printk(KERN_ERR "DataOUT payload is ZERO, protocol error.\n");
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 
@@ -1659,11 +1412,11 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		printk(KERN_ERR "DataSegmentLength: %u is greater than"
 			" MaxRecvDataSegmentLength: %u\n", payload_length,
 			conn->conn_ops->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 
-	cmd = iscsi_find_cmd_from_itt_or_dump(conn, hdr->itt,
+	cmd = iscsit_find_cmd_from_itt_or_dump(conn, hdr->itt,
 			payload_length);
 	if (!cmd)
 		return 0;
@@ -1677,43 +1430,26 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT after"
 			" last DataOUT received, dumping payload\n",
 			cmd->init_task_tag);
-		return iscsi_dump_data_payload(conn, payload_length, 1);
+		return iscsit_dump_data_payload(conn, payload_length, 1);
 	}
 
 	if (cmd->data_direction != DMA_TO_DEVICE) {
 		printk(KERN_ERR "Command ITT: 0x%08x received DataOUT for a"
 			" NON-WRITE command.\n", cmd->init_task_tag);
-		return iscsi_add_reject_from_cmd(ISCSI_REASON_PROTOCOL_ERROR,
+		return iscsit_add_reject_from_cmd(ISCSI_REASON_PROTOCOL_ERROR,
 				1, 0, buf, cmd);
 	}
 	se_cmd = SE_CMD(cmd);
-	iscsi_mod_dataout_timer(cmd);
+	iscsit_mod_dataout_timer(cmd);
 
 	if ((hdr->offset + payload_length) > cmd->data_length) {
 		printk(KERN_ERR "DataOut Offset: %u, Length %u greater than"
 			" iSCSI Command EDTL %u, protocol error.\n",
 			hdr->offset, payload_length, cmd->data_length);
-		return iscsi_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
+		return iscsit_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
 				1, 0, buf, cmd);
 	}
 
-	/*
-	 * Whenever a DataOUT or DataIN PDU contains a valid TTT, the
-	 * iSCSI LUN field must be set. iSCSI v20 10.7.4.  Of course,
-	 * Cisco cannot figure this out.
-	 */
-#if 0
-	if (hdr->ttt != 0xFFFFFFFF) {
-		int lun = iscsi_unpack_lun(get_unaligned_le64(&hdr->lun[0]));
-		if (lun != SE_CMD(cmd)->orig_fe_lun) {
-			printk(KERN_ERR "Received LUN: %u does not match iSCSI"
-				" LUN: %u\n", lun, SE_CMD(cmd)->orig_fe_lun);
-			return iscsi_add_reject_from_cmd(
-					ISCSI_REASON_BOOKMARK_INVALID,
-					1, 0, buf, cmd);
-		}
-	}
-#endif
 	if (cmd->unsolicited_data) {
 		int dump_unsolicited_data = 0, wait_for_transport = 0;
 
@@ -1773,11 +1509,11 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 			 * received with the unsolicitied data out.
 			 */
 			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
-				iscsi_stop_dataout_timer(cmd);
+				iscsit_stop_dataout_timer(cmd);
 
 			transport_check_aborted_status(se_cmd,
 					(hdr->flags & ISCSI_FLAG_CMD_FINAL));
-			return iscsi_dump_data_payload(conn, payload_length, 1);
+			return iscsit_dump_data_payload(conn, payload_length, 1);
 		}
 	} else {
 		/*
@@ -1793,19 +1529,19 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		if (atomic_read(&T_TASK(se_cmd)->t_transport_aborted) != 0) {
 			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
 				if (--cmd->outstanding_r2ts < 1) {
-					iscsi_stop_dataout_timer(cmd);
+					iscsit_stop_dataout_timer(cmd);
 					transport_check_aborted_status(
 							se_cmd, 1);
 				}
 
-			return iscsi_dump_data_payload(conn, payload_length, 1);
+			return iscsit_dump_data_payload(conn, payload_length, 1);
 		}
 	}
 	/*
 	 * Preform DataSN, DataSequenceInOrder, DataPDUInOrder, and
 	 * within-command recovery checks before receiving the payload.
 	 */
-	ret = iscsi_check_pre_dataout(cmd, buf);
+	ret = iscsit_check_pre_dataout(cmd, buf);
 	if (ret == DATAOUT_WITHIN_COMMAND_RECOVERY)
 		return 0;
 	else if (ret == DATAOUT_CANNOT_RECOVER)
@@ -1825,7 +1561,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = iscsi_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = iscsit_set_iovec_ptrs(&map_sg, &unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 
@@ -1845,18 +1581,18 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		rx_size += CRC_LEN;
 	}
 
-	iscsi_map_SG_segments(&unmap_sg);
+	iscsit_map_SG_segments(&unmap_sg);
 
 	rx_got = rx_data(conn, &cmd->iov_data[0], iov_count, rx_size);
 
-	iscsi_unmap_SG_segments(&unmap_sg);
+	iscsit_unmap_SG_segments(&unmap_sg);
 
 	if (rx_got != rx_size)
 		return -1;
 
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = payload_length, data_crc = 0;
-		struct iovec *iov_ptr = &cmd->iov_data[0];
+		struct kvec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
@@ -1870,7 +1606,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		map_sg.data_length = payload_length;
 		map_sg.data_offset = hdr->offset;
 
-		if (iscsi_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
+		if (iscsit_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return -1;
 
 		crypto_hash_init(&conn->conn_rx_hash);
@@ -1915,12 +1651,12 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	 * Increment post receive data and CRC values or perform
 	 * within-command recovery.
 	 */
-	ret = iscsi_check_post_dataout(cmd, buf, data_crc_failed);
+	ret = iscsit_check_post_dataout(cmd, buf, data_crc_failed);
 	if ((ret == DATAOUT_NORMAL) || (ret == DATAOUT_WITHIN_COMMAND_RECOVERY))
 		return 0;
 	else if (ret == DATAOUT_SEND_R2T) {
-		iscsi_set_dataout_sequence_values(cmd);
-		iscsi_build_r2ts_for_cmd(cmd, conn, 0);
+		iscsit_set_dataout_sequence_values(cmd);
+		iscsit_build_r2ts_for_cmd(cmd, conn, 0);
 	} else if (ret == DATAOUT_SEND_TO_TRANSPORT) {
 		/*
 		 * Handle extra special case for out of order
@@ -1932,7 +1668,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 		cmd->i_state = ISTATE_RECEIVED_LAST_DATAOUT;
 		spin_unlock_bh(&cmd->istate_lock);
 
-		iscsi_stop_dataout_timer(cmd);
+		iscsit_stop_dataout_timer(cmd);
 		return (!ooo_cmdsn) ? transport_generic_handle_data(
 					SE_CMD(cmd)) : 0;
 	} else /* DATAOUT_CANNOT_RECOVER */
@@ -1941,7 +1677,7 @@ static inline int iscsi_handle_data_out(struct iscsi_conn *conn, unsigned char *
 	return 0;
 }
 
-static inline int iscsi_handle_nop_out(
+static inline int iscsit_handle_nop_out(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -1950,7 +1686,7 @@ static inline int iscsi_handle_nop_out(
 	u32 checksum, data_crc, padding = 0, payload_length;
 	u64 lun;
 	struct iscsi_cmd *cmd = NULL;
-	struct iovec *iov = NULL;
+	struct kvec *iov = NULL;
 	struct iscsi_nopout *hdr;
 	struct scatterlist sg;
 
@@ -1965,7 +1701,7 @@ static inline int iscsi_handle_nop_out(
 	if ((hdr->itt == 0xFFFFFFFF) && !(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
 		printk(KERN_ERR "NOPOUT ITT is reserved, but Immediate Bit is"
 			" not set, protocol error.\n");
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 
@@ -1974,7 +1710,7 @@ static inline int iscsi_handle_nop_out(
 			" greater than MaxRecvDataSegmentLength: %u, protocol"
 			" error.\n", payload_length,
 			conn->conn_ops->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 
@@ -1991,9 +1727,9 @@ static inline int iscsi_handle_nop_out(
 	 * can contain ping data.
 	 */
 	if (hdr->ttt == 0xFFFFFFFF) {
-		cmd = iscsi_allocate_cmd(conn);
+		cmd = iscsit_allocate_cmd(conn);
 		if (!cmd)
-			return iscsi_add_reject(
+			return iscsit_add_reject(
 					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, buf, conn);
 
@@ -2103,32 +1839,33 @@ static inline int iscsi_handle_nop_out(
 				" but cmd is NULL!\n");
 			return -1;
 		}
-
 		/*
 		 * Initiator is expecting a NopIN ping reply,
 		 */
-		iscsi_attach_cmd_to_queue(conn, cmd);
+		spin_lock_bh(&conn->cmd_lock);
+		list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+		spin_unlock_bh(&conn->cmd_lock);
 
-		iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
+		iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 		if (hdr->opcode & ISCSI_OP_IMMEDIATE) {
-			iscsi_add_cmd_to_response_queue(cmd, conn,
+			iscsit_add_cmd_to_response_queue(cmd, conn,
 					cmd->i_state);
 			return 0;
 		}
 
-		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmdsn);
+		cmdsn_ret = iscsit_check_received_cmdsn(conn, cmd, hdr->cmdsn);
 		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
 		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)) {
 			return 0;
 		} else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
 			cmd->i_state = ISTATE_REMOVE;
-			iscsi_add_cmd_to_immediate_queue(cmd, conn,
+			iscsit_add_cmd_to_immediate_queue(cmd, conn,
 					cmd->i_state);
 			ret = 0;
 			goto ping_out;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 			ret = -1;
@@ -2142,15 +1879,15 @@ static inline int iscsi_handle_nop_out(
 		/*
 		 * This was a response to a unsolicited NOPIN ping.
 		 */
-		cmd = iscsi_find_cmd_from_ttt(conn, hdr->ttt);
+		cmd = iscsit_find_cmd_from_ttt(conn, hdr->ttt);
 		if (!cmd)
 			return -1;
 
-		iscsi_stop_nopin_response_timer(conn);
+		iscsit_stop_nopin_response_timer(conn);
 
 		cmd->i_state = ISTATE_REMOVE;
-		iscsi_add_cmd_to_immediate_queue(cmd, conn, cmd->i_state);
-		iscsi_start_nopin_timer(conn);
+		iscsit_add_cmd_to_immediate_queue(cmd, conn, cmd->i_state);
+		iscsit_start_nopin_timer(conn);
 	} else {
 		/*
 		 * Initiator is not expecting a NOPIN is response.
@@ -2168,13 +1905,13 @@ static inline int iscsi_handle_nop_out(
 	return 0;
 out:
 	if (cmd)
-		__iscsi_release_cmd_to_pool(cmd, conn->sess);
+		iscsit_release_cmd(cmd);
 ping_out:
 	kfree(ping_data);
 	return ret;
 }
 
-static inline int iscsi_handle_task_mgt_cmd(
+static inline int iscsit_handle_task_mgt_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2214,16 +1951,16 @@ static inline int iscsi_handle_task_mgt_cmd(
 		printk(KERN_ERR "Task Management Request TASK_REASSIGN not"
 			" issued as immediate command, bad iSCSI Initiator"
 				"implementation\n");
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 	if ((function != ISCSI_TM_FUNC_ABORT_TASK) &&
 	    (hdr->refcmdsn != ISCSI_RESERVED_TAG))
 		hdr->refcmdsn = ISCSI_RESERVED_TAG;
 
-	cmd = iscsi_allocate_se_cmd_for_tmr(conn, function);
+	cmd = iscsit_allocate_se_cmd_for_tmr(conn, function);
 	if (!cmd)
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, buf, conn);
 
 	cmd->iscsi_opcode	= ISCSI_OP_SCSI_TMFUNC;
@@ -2239,7 +1976,7 @@ static inline int iscsi_handle_task_mgt_cmd(
 	 * Locate the struct se_lun for all TMRs not related to ERL=2 TASK_REASSIGN
 	 */
 	if (function != ISCSI_TM_FUNC_TASK_REASSIGN) {
-		ret = iscsi_get_lun_for_tmr(cmd,
+		ret = iscsit_get_lun_for_tmr(cmd,
 				get_unaligned_le64(&hdr->lun[0]));
 		if (ret < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -2250,7 +1987,7 @@ static inline int iscsi_handle_task_mgt_cmd(
 
 	switch (function) {
 	case ISCSI_TM_FUNC_ABORT_TASK:
-		se_tmr->response = iscsi_tmr_abort_task(cmd, buf);
+		se_tmr->response = iscsit_tmr_abort_task(cmd, buf);
 		if (se_tmr->response != ISCSI_TMF_RSP_COMPLETE) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			goto attach;
@@ -2262,21 +1999,21 @@ static inline int iscsi_handle_task_mgt_cmd(
 	case ISCSI_TM_FUNC_LOGICAL_UNIT_RESET:
 		break;
 	case ISCSI_TM_FUNC_TARGET_WARM_RESET:
-		if (iscsi_tmr_task_warm_reset(conn, tmr_req, buf) < 0) {
+		if (iscsit_tmr_task_warm_reset(conn, tmr_req, buf) < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			se_tmr->response = ISCSI_TMF_RSP_AUTH_FAILED;
 			goto attach;
 		}
 		break;
 	case ISCSI_TM_FUNC_TARGET_COLD_RESET:
-		if (iscsi_tmr_task_cold_reset(conn, tmr_req, buf) < 0) {
+		if (iscsit_tmr_task_cold_reset(conn, tmr_req, buf) < 0) {
 			SE_CMD(cmd)->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			se_tmr->response = ISCSI_TMF_RSP_AUTH_FAILED;
 			goto attach;
 		}
 		break;
 	case ISCSI_TM_FUNC_TASK_REASSIGN:
-		se_tmr->response = iscsi_tmr_task_reassign(cmd, buf);
+		se_tmr->response = iscsit_tmr_task_reassign(cmd, buf);
 		/*
 		 * Perform sanity checks on the ExpDataSN only if the
 		 * TASK_REASSIGN was successful.
@@ -2284,8 +2021,8 @@ static inline int iscsi_handle_task_mgt_cmd(
 		if (se_tmr->response != ISCSI_TMF_RSP_COMPLETE)
 			break;
 
-		if (iscsi_check_task_reassign_expdatasn(tmr_req, conn) < 0)
-			return iscsi_add_reject_from_cmd(
+		if (iscsit_check_task_reassign_expdatasn(tmr_req, conn) < 0)
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_BOOKMARK_INVALID, 1, 1,
 					buf, cmd);
 		break;
@@ -2301,10 +2038,12 @@ static inline int iscsi_handle_task_mgt_cmd(
 	    (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))
 		se_tmr->call_transport = 1;
 attach:
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		cmdsn_ret = iscsi_check_received_cmdsn(conn,
+		cmdsn_ret = iscsit_check_received_cmdsn(conn,
 				cmd, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_NORMAL_OPERATION)
 			do {} while (0);
@@ -2312,16 +2051,16 @@ attach:
 			out_of_order_cmdsn = 1;
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
 			cmd->i_state = ISTATE_REMOVE;
-			iscsi_add_cmd_to_immediate_queue(cmd, conn,
+			iscsit_add_cmd_to_immediate_queue(cmd, conn,
 					cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
 	}
-	iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
+	iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	if (out_of_order_cmdsn)
 		return 0;
@@ -2339,12 +2078,12 @@ attach:
 	 * For connection recovery, this is also the default action for
 	 * TMR TASK_REASSIGN.
 	 */
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 	return 0;
 }
 
 /* #warning FIXME: Support Text Command parameters besides SendTargets */
-static inline int iscsi_handle_text_cmd(
+static inline int iscsit_handle_text_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2353,7 +2092,7 @@ static inline int iscsi_handle_text_cmd(
 	u32 checksum = 0, data_crc = 0, payload_length;
 	u32 padding = 0, pad_bytes = 0, text_length = 0;
 	struct iscsi_cmd *cmd;
-	struct iovec iov[3];
+	struct kvec iov[3];
 	struct iscsi_text *hdr;
 	struct scatterlist sg;
 
@@ -2368,7 +2107,7 @@ static inline int iscsi_handle_text_cmd(
 		printk(KERN_ERR "Unable to accept text parameter length: %u"
 			"greater than MaxRecvDataSegmentLength %u.\n",
 		       payload_length, conn->conn_ops->MaxRecvDataSegmentLength);
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 
@@ -2385,7 +2124,7 @@ static inline int iscsi_handle_text_cmd(
 			return -1;
 		}
 
-		memset(iov, 0, 3 * sizeof(struct iovec));
+		memset(iov, 0, 3 * sizeof(struct kvec));
 		iov[niov].iov_base	= text_in;
 		iov[niov++].iov_len	= text_length;
 
@@ -2477,9 +2216,9 @@ static inline int iscsi_handle_text_cmd(
 		kfree(text_in);
 	}
 
-	cmd = iscsi_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn);
 	if (!cmd)
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, buf, conn);
 
 	cmd->iscsi_opcode	= ISCSI_OP_TEXT;
@@ -2491,20 +2230,23 @@ static inline int iscsi_handle_text_cmd(
 	cmd->exp_stat_sn	= hdr->exp_statsn;
 	cmd->data_direction	= DMA_NONE;
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
-	iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
+
+	iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmdsn);
+		cmdsn_ret = iscsit_check_received_cmdsn(conn, cmd, hdr->cmdsn);
 		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
 		     (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
 			return 0;
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			iscsi_add_cmd_to_immediate_queue(cmd, conn,
+			iscsit_add_cmd_to_immediate_queue(cmd, conn,
 						ISTATE_REMOVE);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
@@ -2512,14 +2254,10 @@ static inline int iscsi_handle_text_cmd(
 		return 0;
 	}
 
-	return iscsi_execute_cmd(cmd, 0);
+	return iscsit_execute_cmd(cmd, 0);
 }
 
-/*	iscsi_logout_closesession():
- *
- *
- */
-int iscsi_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
+int iscsit_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_conn *conn_p;
 	struct iscsi_session *sess = conn->sess;
@@ -2531,8 +2269,8 @@ int iscsi_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 	atomic_set(&conn->conn_logout_remove, 1);
 	conn->conn_logout_reason = ISCSI_LOGOUT_REASON_CLOSE_SESSION;
 
-	iscsi_inc_conn_usage_count(conn);
-	iscsi_inc_session_usage_count(sess);
+	iscsit_inc_conn_usage_count(conn);
+	iscsit_inc_session_usage_count(sess);
 
 	spin_lock_bh(&sess->conn_lock);
 	list_for_each_entry(conn_p, &sess->sess_conn_list, conn_list) {
@@ -2544,12 +2282,12 @@ int iscsi_logout_closesession(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 	}
 	spin_unlock_bh(&sess->conn_lock);
 
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
 	return 0;
 }
 
-int iscsi_logout_closeconnection(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
+int iscsit_logout_closeconnection(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_conn *l_conn;
 	struct iscsi_session *sess = conn->sess;
@@ -2568,36 +2306,36 @@ int iscsi_logout_closeconnection(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 
 		atomic_set(&conn->conn_logout_remove, 1);
 		conn->conn_logout_reason = ISCSI_LOGOUT_REASON_CLOSE_CONNECTION;
-		iscsi_inc_conn_usage_count(conn);
+		iscsit_inc_conn_usage_count(conn);
 
 		spin_unlock_bh(&conn->state_lock);
 	} else {
 		/*
 		 * Handle all different cid CLOSECONNECTION requests in
-		 * iscsi_logout_post_handler_diffcid() as to give enough
+		 * iscsit_logout_post_handler_diffcid() as to give enough
 		 * time for any non immediate command's CmdSN to be
 		 * acknowledged on the connection in question.
 		 *
 		 * Here we simply make sure the CID is still around.
 		 */
-		l_conn = iscsi_get_conn_from_cid(sess,
+		l_conn = iscsit_get_conn_from_cid(sess,
 				cmd->logout_cid);
 		if (!l_conn) {
 			cmd->logout_response = ISCSI_LOGOUT_CID_NOT_FOUND;
-			iscsi_add_cmd_to_response_queue(cmd, conn,
+			iscsit_add_cmd_to_response_queue(cmd, conn,
 					cmd->i_state);
 			return 0;
 		}
 
-		iscsi_dec_conn_usage_count(l_conn);
+		iscsit_dec_conn_usage_count(l_conn);
 	}
 
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
 	return 0;
 }
 
-int iscsi_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
+int iscsit_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
 
@@ -2608,7 +2346,7 @@ int iscsi_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn 
 		printk(KERN_ERR "Received Logout Request REMOVECONNFORRECOVERY"
 			" while ERL!=2.\n");
 		cmd->logout_response = ISCSI_LOGOUT_RECOVERY_UNSUPPORTED;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 		return 0;
 	}
 
@@ -2617,16 +2355,16 @@ int iscsi_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn 
 			" with CID: %hu on CID: %hu, implementation error.\n",
 				cmd->logout_cid, conn->cid);
 		cmd->logout_response = ISCSI_LOGOUT_CLEANUP_FAILED;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 		return 0;
 	}
 
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 
 	return 0;
 }
 
-static inline int iscsi_handle_logout_cmd(
+static inline int iscsit_handle_logout_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2634,7 +2372,7 @@ static inline int iscsi_handle_logout_cmd(
 	u8 reason_code = 0;
 	struct iscsi_cmd *cmd;
 	struct iscsi_logout *hdr;
-	struct iscsi_tiqn *tiqn = iscsi_snmp_get_tiqn(conn);
+	struct iscsi_tiqn *tiqn = iscsit_snmp_get_tiqn(conn);
 
 	hdr			= (struct iscsi_logout *) buf;
 	reason_code		= (hdr->flags & 0x7f);
@@ -2663,9 +2401,9 @@ static inline int iscsi_handle_logout_cmd(
 		return 0;
 	}
 
-	cmd = iscsi_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn);
 	if (!cmd)
-		return iscsi_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES, 1,
+		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES, 1,
 					buf, conn);
 
 	cmd->iscsi_opcode       = ISCSI_OP_LOGOUT;
@@ -2688,26 +2426,28 @@ static inline int iscsi_handle_logout_cmd(
 	    (hdr->cid == conn->cid)))
 		logout_remove = 1;
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	if (reason_code != ISCSI_LOGOUT_REASON_RECOVERY)
-		iscsi_ack_from_expstatsn(conn, hdr->exp_statsn);
+		iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	/*
 	 * Non-Immediate Logout Commands are executed in CmdSN order..
 	 */
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		cmdsn_ret = iscsi_check_received_cmdsn(conn, cmd, hdr->cmdsn);
+		cmdsn_ret = iscsit_check_received_cmdsn(conn, cmd, hdr->cmdsn);
 		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
 		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
 			return logout_remove;
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
 			cmd->i_state = ISTATE_REMOVE;
-			iscsi_add_cmd_to_immediate_queue(cmd, conn,
+			iscsit_add_cmd_to_immediate_queue(cmd, conn,
 					cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
-			return iscsi_add_reject_from_cmd(
+			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
@@ -2715,13 +2455,13 @@ static inline int iscsi_handle_logout_cmd(
 	/*
 	 * Immediate Logout Commands are executed, well, Immediately.
 	 */
-	if (iscsi_execute_cmd(cmd, 0) < 0)
+	if (iscsit_execute_cmd(cmd, 0) < 0)
 		return -1;
 
 	return logout_remove;
 }
 
-static inline int iscsi_handle_snack(
+static inline int iscsit_handle_snack(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2732,7 +2472,7 @@ static inline int iscsi_handle_snack(
 	hdr			= (struct iscsi_snack *) buf;
 	hdr->flags		&= ~ISCSI_FLAG_CMD_FINAL;
 	lun			= get_unaligned_le64(&hdr->lun[0]);
-	unpacked_lun		= iscsi_unpack_lun((unsigned char *)&lun);
+	unpacked_lun		= scsilun_to_int((struct scsi_lun *)&lun);
 	hdr->itt		= be32_to_cpu(hdr->itt);
 	hdr->ttt		= be32_to_cpu(hdr->ttt);
 	hdr->exp_statsn		= be32_to_cpu(hdr->exp_statsn);
@@ -2748,7 +2488,7 @@ static inline int iscsi_handle_snack(
 	if (!conn->sess->sess_ops->ErrorRecoveryLevel) {
 		printk(KERN_ERR "Initiator sent SNACK request while in"
 			" ErrorRecoveryLevel=0.\n");
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 	/*
@@ -2757,31 +2497,31 @@ static inline int iscsi_handle_snack(
 	 */
 	switch (hdr->flags & ISCSI_FLAG_SNACK_TYPE_MASK) {
 	case 0:
-		return iscsi_handle_recovery_datain_or_r2t(conn, buf,
+		return iscsit_handle_recovery_datain_or_r2t(conn, buf,
 			hdr->itt, hdr->ttt, hdr->begrun, hdr->runlength);
 		return 0;
 	case ISCSI_FLAG_SNACK_TYPE_STATUS:
-		return iscsi_handle_status_snack(conn, hdr->itt, hdr->ttt,
+		return iscsit_handle_status_snack(conn, hdr->itt, hdr->ttt,
 			hdr->begrun, hdr->runlength);
 	case ISCSI_FLAG_SNACK_TYPE_DATA_ACK:
-		return iscsi_handle_data_ack(conn, hdr->ttt, hdr->begrun,
+		return iscsit_handle_data_ack(conn, hdr->ttt, hdr->begrun,
 			hdr->runlength);
 	case ISCSI_FLAG_SNACK_TYPE_RDATA:
 		/* FIXME: Support R-Data SNACK */
 		printk(KERN_ERR "R-Data SNACK Not Supported.\n");
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	default:
 		printk(KERN_ERR "Unknown SNACK type 0x%02x, protocol"
 			" error.\n", hdr->flags & 0x0f);
-		return iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buf, conn);
 	}
 
 	return 0;
 }
 
-static int iscsi_handle_immediate_data(
+static int iscsit_handle_immediate_data(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	u32 length)
@@ -2791,7 +2531,7 @@ static int iscsi_handle_immediate_data(
 	struct iscsi_conn *conn = cmd->conn;
 	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
-	struct iovec *iov;
+	struct kvec *iov;
 
 	memset(&map_sg, 0, sizeof(struct se_map_sg));
 	memset(&unmap_sg, 0, sizeof(struct se_unmap_sg));
@@ -2804,7 +2544,7 @@ static int iscsi_handle_immediate_data(
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = iscsi_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = iscsit_set_iovec_ptrs(&map_sg, &unmap_sg);
 	if (iov_ret < 0)
 		return IMMEDIDATE_DATA_CANNOT_RECOVER;
 
@@ -2825,20 +2565,20 @@ static int iscsi_handle_immediate_data(
 		rx_size += CRC_LEN;
 	}
 
-	iscsi_map_SG_segments(&unmap_sg);
+	iscsit_map_SG_segments(&unmap_sg);
 
 	rx_got = rx_data(conn, &cmd->iov_data[0], iov_count, rx_size);
 
-	iscsi_unmap_SG_segments(&unmap_sg);
+	iscsit_unmap_SG_segments(&unmap_sg);
 
 	if (rx_got != rx_size) {
-		iscsi_rx_thread_wait_for_tcp(conn);
+		iscsit_rx_thread_wait_for_tcp(conn);
 		return IMMEDIDATE_DATA_CANNOT_RECOVER;
 	}
 
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = length, data_crc;
-		struct iovec *iov_ptr = &cmd->iov_data[0];
+		struct kvec *iov_ptr = &cmd->iov_data[0];
 		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
@@ -2852,7 +2592,7 @@ static int iscsi_handle_immediate_data(
 		map_sg.data_length = length;
 		map_sg.data_offset = cmd->write_data_done;
 
-		if (iscsi_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
+		if (iscsit_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return IMMEDIDATE_DATA_CANNOT_RECOVER;
 
 		crypto_hash_init(&conn->conn_rx_hash);
@@ -2887,12 +2627,12 @@ static int iscsi_handle_immediate_data(
 				printk(KERN_ERR "Unable to recover from"
 					" Immediate Data digest failure while"
 					" in ERL=0.\n");
-				iscsi_add_reject_from_cmd(
+				iscsit_add_reject_from_cmd(
 						ISCSI_REASON_DATA_DIGEST_ERROR,
 						1, 0, buf, cmd);
 				return IMMEDIDATE_DATA_CANNOT_RECOVER;
 			} else {
-				iscsi_add_reject_from_cmd(
+				iscsit_add_reject_from_cmd(
 						ISCSI_REASON_DATA_DIGEST_ERROR,
 						0, 0, buf, cmd);
 				return IMMEDIDATE_DATA_ERL1_CRC_FAILURE;
@@ -2916,11 +2656,7 @@ static int iscsi_handle_immediate_data(
 	return IMMEDIDATE_DATA_NORMAL_OPERATION;
 }
 
-/*	iscsi_send_async_msg():
- *
- *	FIXME: Support SCSI AEN.
- */
-int iscsi_send_async_msg(
+int iscsit_send_async_msg(
 	struct iscsi_conn *conn,
 	u16 cid,
 	u8 async_event,
@@ -2928,12 +2664,11 @@ int iscsi_send_async_msg(
 {
 	u8 iscsi_hdr[ISCSI_HDR_LEN+CRC_LEN];
 	u32 tx_send = ISCSI_HDR_LEN, tx_sent = 0;
-	struct timer_list async_msg_timer;
 	struct iscsi_async *hdr;
-	struct iovec iov;
+	struct kvec iov;
 	struct scatterlist sg;
 
-	memset(&iov, 0, sizeof(struct iovec));
+	memset(&iov, 0, sizeof(struct kvec));
 	memset(&iscsi_hdr, 0, ISCSI_HDR_LEN+CRC_LEN);
 
 	hdr		= (struct iscsi_async *)&iscsi_hdr;
@@ -3019,36 +2754,27 @@ int iscsi_send_async_msg(
 	}
 
 	if (async_event == ISCSI_ASYNC_MSG_REQUEST_LOGOUT) {
-		init_timer(&async_msg_timer);
-		async_msg_timer.expires =
-			(get_jiffies_64() + SECONDS_FOR_ASYNC_LOGOUT * HZ);
-		async_msg_timer.data =
-			(unsigned long)&conn->sess->async_msg_comp;
-		async_msg_timer.function = iscsi_async_msg_timer_function;
-
-		add_timer(&async_msg_timer);
-		wait_for_completion(&conn->sess->async_msg_comp);
-		del_timer_sync(&async_msg_timer);
+		wait_for_completion_timeout(&conn->sess->async_msg_comp,
+					SECONDS_FOR_ASYNC_LOGOUT * HZ);
 
 		if (conn->conn_state == TARG_CONN_STATE_LOGOUT_REQUESTED) {
 			printk(KERN_ERR "Asynchronous message timer expired"
 				" without receiving a logout request,  dropping"
 				" iSCSI session.\n");
-			iscsi_send_async_msg(conn, 0,
+			iscsit_send_async_msg(conn, 0,
 				ISCSI_ASYNC_MSG_DROPPING_ALL_CONNECTIONS, 0);
-			iscsi_free_session(conn->sess);
+			iscsit_free_session(conn->sess);
 		}
 	}
 	return 0;
 }
 
-/*	iscsi_build_conn_drop_async_message():
- *
+/*
  *	Called with sess->conn_lock held.
  */
 /* #warning iscsi_build_conn_drop_async_message() only sends out on connections
 	with active network interface */
-static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
+static void iscsit_build_conn_drop_async_message(struct iscsi_conn *conn)
 {
 	struct iscsi_cmd *cmd;
 	struct iscsi_conn *conn_p;
@@ -3058,9 +2784,8 @@ static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
 	 * interface is still functional.
 	 */
 	list_for_each_entry(conn_p, &conn->sess->sess_conn_list, conn_list) {
-		if ((conn_p->conn_state == TARG_CONN_STATE_LOGGED_IN) &&
-		    (iscsi_check_for_active_network_device(conn_p))) {
-			iscsi_inc_conn_usage_count(conn_p);
+		if (conn_p->conn_state == TARG_CONN_STATE_LOGGED_IN) {
+			iscsit_inc_conn_usage_count(conn_p);
 			break;
 		}
 	}
@@ -3068,9 +2793,9 @@ static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
 	if (!conn_p)
 		return;
 
-	cmd = iscsi_allocate_cmd(conn_p);
+	cmd = iscsit_allocate_cmd(conn_p);
 	if (!cmd) {
-		iscsi_dec_conn_usage_count(conn_p);
+		iscsit_dec_conn_usage_count(conn_p);
 		return;
 	}
 
@@ -3078,13 +2803,15 @@ static void iscsi_build_conn_drop_async_message(struct iscsi_conn *conn)
 	cmd->iscsi_opcode = ISCSI_OP_ASYNC_EVENT;
 	cmd->i_state = ISTATE_SEND_ASYNCMSG;
 
-	iscsi_attach_cmd_to_queue(conn_p, cmd);
-	iscsi_add_cmd_to_response_queue(cmd, conn_p, cmd->i_state);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn_p->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
-	iscsi_dec_conn_usage_count(conn_p);
+	iscsit_add_cmd_to_response_queue(cmd, conn_p, cmd->i_state);
+	iscsit_dec_conn_usage_count(conn_p);
 }
 
-static int iscsi_send_conn_drop_async_message(
+static int iscsit_send_conn_drop_async_message(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -3134,16 +2861,7 @@ static int iscsi_send_conn_drop_async_message(
 	return 0;
 }
 
-int lio_queue_data_in(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	cmd->i_state = ISTATE_SEND_DATAIN;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
-	return 0;
-}
-
-static inline int iscsi_send_data_in(
+static inline int iscsit_send_data_in(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn,
 	struct se_unmap_sg *unmap_sg,
@@ -3152,18 +2870,17 @@ static inline int iscsi_send_data_in(
 	int iov_ret = 0, set_statsn = 0;
 	u8 *pad_bytes;
 	u32 iov_count = 0, tx_size = 0;
-	u64 lun;
 	struct iscsi_datain datain;
 	struct iscsi_datain_req *dr;
 	struct se_map_sg map_sg;
 	struct iscsi_data_rsp *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
 	memset(&datain, 0, sizeof(struct iscsi_datain));
-	dr = iscsi_get_datain_values(cmd, &datain);
+	dr = iscsit_get_datain_values(cmd, &datain);
 	if (!dr) {
-		printk(KERN_ERR "iscsi_get_datain_values failed for ITT: 0x%08x\n",
+		printk(KERN_ERR "iscsit_get_datain_values failed for ITT: 0x%08x\n",
 				cmd->init_task_tag);
 		return -1;
 	}
@@ -3197,7 +2914,7 @@ static inline int iscsi_send_data_in(
 	else {
 		if ((dr->dr_complete == DATAIN_COMPLETE_NORMAL) ||
 		    (dr->dr_complete == DATAIN_COMPLETE_CONNECTION_RECOVERY)) {
-			iscsi_increment_maxcmdsn(cmd, conn->sess);
+			iscsit_increment_maxcmdsn(cmd, conn->sess);
 			cmd->stat_sn = conn->stat_sn++;
 			set_statsn = 1;
 		} else if (dr->dr_complete ==
@@ -3219,10 +2936,12 @@ static inline int iscsi_send_data_in(
 		}
 	}
 	hton24(hdr->dlength, datain.length);
-	lun			= (hdr->flags & ISCSI_FLAG_DATA_ACK) ?
-				   iscsi_pack_lun(SE_CMD(cmd)->orig_fe_lun) :
-				   0xFFFFFFFFFFFFFFFFULL;
-	put_unaligned_le64(lun, &hdr->lun[0]);
+	if (hdr->flags & ISCSI_FLAG_DATA_ACK)
+		int_to_scsilun(SE_CMD(cmd)->orig_fe_lun,
+				(struct scsi_lun *)&hdr->lun[0]);
+	else
+		put_unaligned_le64(0xFFFFFFFFFFFFFFFFULL, &hdr->lun[0]);
+
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	hdr->ttt		= (hdr->flags & ISCSI_FLAG_DATA_ACK) ?
 				   cpu_to_be32(cmd->targ_xfer_tag) :
@@ -3264,7 +2983,7 @@ static inline int iscsi_send_data_in(
 	map_sg.data_length = datain.length;
 	map_sg.data_offset = datain.offset;
 
-	iov_ret = iscsi_set_iovec_ptrs(&map_sg, unmap_sg);
+	iov_ret = iscsit_set_iovec_ptrs(&map_sg, unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 
@@ -3290,7 +3009,7 @@ static inline int iscsi_send_data_in(
 	}
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = (datain.length + unmap_sg->padding);
-		struct iovec *iov_ptr = &cmd->iov_data[1];
+		struct kvec *iov_ptr = &cmd->iov_data[1];
 
 		crypto_hash_init(&conn->conn_tx_hash);
 
@@ -3328,13 +3047,13 @@ static inline int iscsi_send_data_in(
 	if (dr->dr_complete) {
 		*eodr = (SE_CMD(cmd)->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE) ?
 				2 : 1;
-		iscsi_free_datain_req(cmd, dr);
+		iscsit_free_datain_req(cmd, dr);
 	}
 
 	return 0;
 }
 
-static inline int iscsi_send_logout_response(
+static inline int iscsit_send_logout_response(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -3342,7 +3061,7 @@ static inline int iscsi_send_logout_response(
 	struct iscsi_conn *logout_conn = NULL;
 	struct iscsi_conn_recovery *cr = NULL;
 	struct iscsi_session *sess = conn->sess;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct iscsi_logout_rsp *hdr;
 	struct scatterlist sg;
 	/*
@@ -3368,7 +3087,7 @@ static inline int iscsi_send_logout_response(
 		 * For CLOSECONNECTION logout requests carrying
 		 * a different CID than the connection it arrived
 		 * on, the connection responding to cmd->logout_cid
-		 * is stopped in iscsi_logout_post_handler_diffcid().
+		 * is stopped in iscsit_logout_post_handler_diffcid().
 		 */
 
 		TRACE(TRACE_ISCSI, "iSCSI CID: %hu logout on CID: %hu"
@@ -3383,14 +3102,14 @@ static inline int iscsi_send_logout_response(
 		 * If the connection is still active from our point of view
 		 * force connection recovery to occur.
 		 */
-		logout_conn = iscsi_get_conn_from_cid_rcfr(sess,
+		logout_conn = iscsit_get_conn_from_cid_rcfr(sess,
 				cmd->logout_cid);
 		if ((logout_conn)) {
-			iscsi_connection_reinstatement_rcfr(logout_conn);
-			iscsi_dec_conn_usage_count(logout_conn);
+			iscsit_connection_reinstatement_rcfr(logout_conn);
+			iscsit_dec_conn_usage_count(logout_conn);
 		}
 
-		cr = iscsi_get_inactive_connection_recovery_entry(
+		cr = iscsit_get_inactive_connection_recovery_entry(
 				conn->sess, cmd->logout_cid);
 		if (!cr) {
 			printk(KERN_ERR "Unable to locate CID: %hu for"
@@ -3400,7 +3119,7 @@ static inline int iscsi_send_logout_response(
 			break;
 		}
 
-		iscsi_discard_cr_cmds_by_expstatsn(cr, cmd->exp_stat_sn);
+		iscsit_discard_cr_cmds_by_expstatsn(cr, cmd->exp_stat_sn);
 
 		TRACE(TRACE_ERL2, "iSCSI REMOVECONNFORRECOVERY logout"
 			" for recovery for CID: %hu on CID: %hu successful.\n",
@@ -3423,7 +3142,7 @@ static inline int iscsi_send_logout_response(
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -3457,11 +3176,10 @@ static inline int iscsi_send_logout_response(
 	return 0;
 }
 
-/*	iscsi_send_nopin():
- *
+/*
  *	Unsolicited NOPIN, either requesting a response or not.
  */
-static inline int iscsi_send_unsolicited_nopin(
+static inline int iscsit_send_unsolicited_nopin(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn,
 	int want_response)
@@ -3507,13 +3225,13 @@ static inline int iscsi_send_unsolicited_nopin(
 	return 0;
 }
 
-static inline int iscsi_send_nopin_response(
+static inline int iscsit_send_nopin_response(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
 	int niov = 0, tx_size;
 	u32 padding = 0;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct iscsi_nopin *hdr;
 	struct scatterlist sg;
 
@@ -3529,7 +3247,7 @@ static inline int iscsi_send_nopin_response(
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -3609,18 +3327,17 @@ static inline int iscsi_send_nopin_response(
 	return 0;
 }
 
-int iscsi_send_r2t(
+int iscsit_send_r2t(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
 	int tx_size = 0;
 	u32 trace_type;
-	u64 lun;
 	struct iscsi_r2t *r2t;
 	struct iscsi_r2t_rsp *hdr;
 	struct scatterlist sg;
 
-	r2t = iscsi_get_r2t_from_list(cmd);
+	r2t = iscsit_get_r2t_from_list(cmd);
 	if (!r2t)
 		return -1;
 
@@ -3628,8 +3345,8 @@ int iscsi_send_r2t(
 	memset(hdr, 0, ISCSI_HDR_LEN);
 	hdr->opcode		= ISCSI_OP_R2T;
 	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
-	lun			= iscsi_pack_lun(SE_CMD(cmd)->orig_fe_lun);
-	put_unaligned_le64(lun, &hdr->lun[0]);
+	int_to_scsilun(SE_CMD(cmd)->orig_fe_lun,
+			(struct scsi_lun *)&hdr->lun[0]);
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	spin_lock_bh(&conn->sess->ttt_lock);
 	r2t->targ_xfer_tag	= conn->sess->targ_xfer_tag++;
@@ -3681,14 +3398,13 @@ int iscsi_send_r2t(
 	return 0;
 }
 
-/*	iscsi_build_r2ts_for_cmd():
- *
+/*
  *	type 0: Normal Operation.
  *	type 1: Called from Storage Transport.
  *	type 2: Called from iscsi_task_reassign_complete_write() for
  *	        connection recovery.
  */
-int iscsi_build_r2ts_for_cmd(
+int iscsit_build_r2ts_for_cmd(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn,
 	int type)
@@ -3732,7 +3448,7 @@ int iscsi_build_r2ts_for_cmd(
 		} else {
 			struct iscsi_seq *seq;
 
-			seq = iscsi_get_seq_holder_for_r2t(cmd);
+			seq = iscsit_get_seq_holder_for_r2t(cmd);
 			if (!seq) {
 				spin_unlock_bh(&cmd->r2t_lock);
 				return -1;
@@ -3747,7 +3463,7 @@ int iscsi_build_r2ts_for_cmd(
 		cmd->outstanding_r2ts++;
 		first_r2t = 0;
 
-		if (iscsi_add_r2t_to_list(cmd, offset, xfer_len, 0, 0) < 0) {
+		if (iscsit_add_r2t_to_list(cmd, offset, xfer_len, 0, 0) < 0) {
 			spin_unlock_bh(&cmd->r2t_lock);
 			return -1;
 		}
@@ -3760,75 +3476,14 @@ int iscsi_build_r2ts_for_cmd(
 	return 0;
 }
 
-int lio_write_pending(
-	struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	if (cmd->immediate_data || cmd->unsolicited_data)
-		complete(&cmd->unsolicited_data_comp);
-	else {
-		if (iscsi_build_r2ts_for_cmd(cmd, cmd->conn, 1) < 0)
-			return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-	}
-
-	return 0;
-}
-
-int lio_write_pending_status(
-	struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-	int ret;
-
-	spin_lock_bh(&cmd->istate_lock);
-	ret = !(cmd->cmd_flags & ICF_GOT_LAST_DATAOUT);
-	spin_unlock_bh(&cmd->istate_lock);
-
-	return ret;
-}
-
-int lio_queue_status(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	cmd->i_state = ISTATE_SEND_STATUS;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
-
-	return 0;
-}
-
-u16 lio_set_fabric_sense_len(struct se_cmd *se_cmd, u32 sense_length)
-{
-	unsigned char *buffer = se_cmd->sense_buffer;
-	/*
-	 * From RFC-3720 10.4.7.  Data Segment - Sense and Response Data Segment
-	 * 16-bit SenseLength.
-	 */
-	buffer[0] = ((sense_length >> 8) & 0xff);
-	buffer[1] = (sense_length & 0xff);
-	/*
-	 * Return two byte offset into allocated sense_buffer.
-	 */
-	return 2;
-}
-
-u16 lio_get_fabric_sense_len(void)
-{
-	/*
-	 * Return two byte offset into allocated sense_buffer.
-	 */
-	return 2;
-}
-
-static inline int iscsi_send_status(
+static inline int iscsit_send_status(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
 	u8 iov_count = 0, recovery;
 	u32 padding = 0, trace_type, tx_size = 0;
 	struct iscsi_scsi_rsp *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
 	recovery = (cmd->i_state != ISTATE_SEND_STATUS);
@@ -3855,7 +3510,7 @@ static inline int iscsi_send_status(
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -3939,17 +3594,7 @@ static inline int iscsi_send_status(
 	return 0;
 }
 
-int lio_queue_tm_rsp(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = iscsi_get_cmd(se_cmd);
-
-	cmd->i_state = ISTATE_SEND_TASKMGTRSP;
-	iscsi_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
-
-	return 0;
-}
-
-static inline u8 iscsi_convert_tcm_tmr_rsp(struct se_tmr_req *se_tmr)
+static inline u8 iscsit_convert_tcm_tmr_rsp(struct se_tmr_req *se_tmr)
 {
 	switch (se_tmr->response) {
 	case TMR_FUNCTION_COMPLETE:
@@ -3968,7 +3613,7 @@ static inline u8 iscsi_convert_tcm_tmr_rsp(struct se_tmr_req *se_tmr)
 	}
 }
 
-static int iscsi_send_task_mgt_rsp(
+static int iscsit_send_task_mgt_rsp(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -3980,12 +3625,12 @@ static int iscsi_send_task_mgt_rsp(
 	hdr			= (struct iscsi_tm_rsp *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
 	hdr->opcode		= ISCSI_OP_SCSI_TMFUNC_RSP;
-	hdr->response		= iscsi_convert_tcm_tmr_rsp(se_tmr);
+	hdr->response		= iscsit_convert_tcm_tmr_rsp(se_tmr);
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -4019,22 +3664,22 @@ static int iscsi_send_task_mgt_rsp(
 	return 0;
 }
 
-/*	iscsi_send_text_rsp():
+/*
  *
  *	FIXME: Add support for F_BIT and C_BIT when the length is longer than
  *	MaxRecvDataSegmentLength.
  */
-static int iscsi_send_text_rsp(
+static int iscsit_send_text_rsp(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
 	u8 iov_count = 0;
 	u32 padding = 0, text_length = 0, tx_size = 0;
 	struct iscsi_text_rsp *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
-	text_length = iscsi_build_sendtargets_response(cmd);
+	text_length = iscsit_build_sendtargets_response(cmd);
 
 	padding = ((-text_length) & 3);
 	if (padding != 0) {
@@ -4053,7 +3698,7 @@ static int iscsi_send_text_rsp(
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 
-	iscsi_increment_maxcmdsn(cmd, conn->sess);
+	iscsit_increment_maxcmdsn(cmd, conn->sess);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
 	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
 
@@ -4110,13 +3755,13 @@ static int iscsi_send_text_rsp(
 	return 0;
 }
 
-static int iscsi_send_reject(
+static int iscsit_send_reject(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
 	u32 iov_count = 0, tx_size = 0;
 	struct iscsi_reject *hdr;
-	struct iovec *iov;
+	struct kvec *iov;
 	struct scatterlist sg;
 
 	hdr			= (struct iscsi_reject *) cmd->pdu;
@@ -4179,33 +3824,19 @@ static int iscsi_send_reject(
 	return 0;
 }
 
-static void iscsi_tx_thread_TCP_timeout(unsigned long data)
+static void iscsit_tx_thread_wait_for_tcp(struct iscsi_conn *conn)
 {
-	complete((struct completion *)data);
-}
-
-static void iscsi_tx_thread_wait_for_tcp(struct iscsi_conn *conn)
-{
-	struct timer_list tx_TCP_timer;
-	int ret;
-
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
-		init_timer(&tx_TCP_timer);
-		tx_TCP_timer.expires =
-			(get_jiffies_64() + ISCSI_TX_THREAD_TCP_TIMEOUT * HZ);
-		tx_TCP_timer.data = (unsigned long)&conn->tx_half_close_comp;
-		tx_TCP_timer.function = iscsi_tx_thread_TCP_timeout;
-
-		add_timer(&tx_TCP_timer);
-		ret = wait_for_completion_interruptible(&conn->tx_half_close_comp);
-		del_timer_sync(&tx_TCP_timer);
+		wait_for_completion_interruptible_timeout(
+					&conn->tx_half_close_comp,
+					ISCSI_TX_THREAD_TCP_TIMEOUT * HZ);
 	}
 }
 
 #ifdef CONFIG_SMP
 
-void iscsi_thread_get_cpumask(struct iscsi_conn *conn)
+void iscsit_thread_get_cpumask(struct iscsi_conn *conn)
 {
 	struct iscsi_thread_set *ts = conn->thread_set;
 	int ord, cpu;
@@ -4235,7 +3866,7 @@ void iscsi_thread_get_cpumask(struct iscsi_conn *conn)
 	cpumask_setall(conn->conn_cpumask);
 }
 
-static inline void iscsi_thread_check_cpumask(
+static inline void iscsit_thread_check_cpumask(
 	struct iscsi_conn *conn,
 	struct task_struct *p,
 	int mode)
@@ -4269,8 +3900,8 @@ static inline void iscsi_thread_check_cpumask(
 }
 
 #else
-#define iscsi_thread_get_cpumask(X) ({})
-#define iscsi_thread_check_cpumask(X, Y, Z) ({})
+#define iscsit_thread_get_cpumask(X) ({})
+#define iscsit_thread_check_cpumask(X, Y, Z) ({})
 #endif /* CONFIG_SMP */
 
 int iscsi_target_tx_thread(void *arg)
@@ -4283,7 +3914,11 @@ int iscsi_target_tx_thread(void *arg)
 	struct se_cmd *se_cmd;
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct se_unmap_sg unmap_sg;
-
+	/*
+	 * Bump up the task_struct priority for RX/TX thread set pairs,
+	 * and allow ourselves to be interrupted by SIGINT so that a
+	 * connection recovery / failure event can be triggered externally.
+	 */
 	set_user_nice(current, -20);
 	allow_signal(SIGINT);
 
@@ -4299,16 +3934,16 @@ restart:
 		 * Ensure that both TX and RX per connection kthreads
 		 * are scheduled to run on the same CPU.
 		 */
-		iscsi_thread_check_cpumask(conn, current, 1);
+		iscsit_thread_check_cpumask(conn, current, 1);
 
-		ret = wait_for_completion_interruptible(&conn->tx_comp);
+		schedule_timeout_interruptible(MAX_SCHEDULE_TIMEOUT);
 
 		if ((ts->status == ISCSI_THREAD_SET_RESET) ||
-		     (ret != 0) || signal_pending(current))
+		     signal_pending(current))
 			goto transport_err;
 
 get_immediate:
-		qr = iscsi_get_cmd_from_immediate_queue(conn);
+		qr = iscsit_get_cmd_from_immediate_queue(conn);
 		if (qr) {
 			atomic_set(&conn->check_immediate_queue, 0);
 			cmd = qr->cmd;
@@ -4319,16 +3954,16 @@ get_immediate:
 			switch (state) {
 			case ISTATE_SEND_R2T:
 				spin_unlock_bh(&cmd->istate_lock);
-				ret = iscsi_send_r2t(cmd, conn);
+				ret = iscsit_send_r2t(cmd, conn);
 				break;
 			case ISTATE_REMOVE:
 				spin_unlock_bh(&cmd->istate_lock);
 
 				if (cmd->data_direction == DMA_TO_DEVICE)
-					iscsi_stop_dataout_timer(cmd);
+					iscsit_stop_dataout_timer(cmd);
 
 				spin_lock_bh(&conn->cmd_lock);
-				iscsi_remove_cmd_from_conn_list(cmd, conn);
+				list_del(&cmd->i_list);
 				spin_unlock_bh(&conn->cmd_lock);
 				/*
 				 * Determine if a struct se_cmd is assoicated with
@@ -4336,20 +3971,20 @@ get_immediate:
 				 */
 				if (!(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) &&
 				    !(cmd->tmr_req))
-					iscsi_release_cmd_to_pool(cmd);
+					iscsit_release_cmd(cmd);
 				else
 					transport_generic_free_cmd(SE_CMD(cmd),
 								1, 1, 0);
 				goto get_immediate;
 			case ISTATE_SEND_NOPIN_WANT_RESPONSE:
 				spin_unlock_bh(&cmd->istate_lock);
-				iscsi_mod_nopin_response_timer(conn);
-				ret = iscsi_send_unsolicited_nopin(cmd,
+				iscsit_mod_nopin_response_timer(conn);
+				ret = iscsit_send_unsolicited_nopin(cmd,
 						conn, 1);
 				break;
 			case ISTATE_SEND_NOPIN_NO_RESPONSE:
 				spin_unlock_bh(&cmd->istate_lock);
-				ret = iscsi_send_unsolicited_nopin(cmd,
+				ret = iscsit_send_unsolicited_nopin(cmd,
 						conn, 0);
 				break;
 			default:
@@ -4365,9 +4000,9 @@ get_immediate:
 				goto transport_err;
 			}
 
-			if (iscsi_send_tx_data(cmd, conn, 1) < 0) {
+			if (iscsit_send_tx_data(cmd, conn, 1) < 0) {
 				conn->tx_immediate_queue = 0;
-				iscsi_tx_thread_wait_for_tcp(conn);
+				iscsit_tx_thread_wait_for_tcp(conn);
 				goto transport_err;
 			}
 
@@ -4376,7 +4011,7 @@ get_immediate:
 			case ISTATE_SEND_R2T:
 				spin_unlock_bh(&cmd->istate_lock);
 				spin_lock_bh(&cmd->dataout_timeout_lock);
-				iscsi_start_dataout_timer(cmd, conn);
+				iscsit_start_dataout_timer(cmd, conn);
 				spin_unlock_bh(&cmd->dataout_timeout_lock);
 				break;
 			case ISTATE_SEND_NOPIN_WANT_RESPONSE:
@@ -4400,7 +4035,7 @@ get_immediate:
 			conn->tx_immediate_queue = 0;
 
 get_response:
-		qr = iscsi_get_cmd_from_response_queue(conn);
+		qr = iscsit_get_cmd_from_response_queue(conn);
 		if (qr) {
 			cmd = qr->cmd;
 			state = qr->state;
@@ -4416,50 +4051,50 @@ check_rsp_state:
 				unmap_sg.fabric_cmd = (void *)cmd;
 				unmap_sg.se_cmd = SE_CMD(cmd);
 				map_sg = 1;
-				ret = iscsi_send_data_in(cmd, conn,
+				ret = iscsit_send_data_in(cmd, conn,
 						&unmap_sg, &eodr);
 				break;
 			case ISTATE_SEND_STATUS:
 			case ISTATE_SEND_STATUS_RECOVERY:
 				spin_unlock_bh(&cmd->istate_lock);
 				use_misc = 1;
-				ret = iscsi_send_status(cmd, conn);
+				ret = iscsit_send_status(cmd, conn);
 				break;
 			case ISTATE_SEND_LOGOUTRSP:
 				spin_unlock_bh(&cmd->istate_lock);
 				use_misc = 1;
-				ret = iscsi_send_logout_response(cmd, conn);
+				ret = iscsit_send_logout_response(cmd, conn);
 				break;
 			case ISTATE_SEND_ASYNCMSG:
 				spin_unlock_bh(&cmd->istate_lock);
 				use_misc = 1;
-				ret = iscsi_send_conn_drop_async_message(
+				ret = iscsit_send_conn_drop_async_message(
 						cmd, conn);
 				break;
 			case ISTATE_SEND_NOPIN:
 				spin_unlock_bh(&cmd->istate_lock);
 				use_misc = 1;
-				ret = iscsi_send_nopin_response(cmd, conn);
+				ret = iscsit_send_nopin_response(cmd, conn);
 				break;
 			case ISTATE_SEND_REJECT:
 				spin_unlock_bh(&cmd->istate_lock);
 				use_misc = 1;
-				ret = iscsi_send_reject(cmd, conn);
+				ret = iscsit_send_reject(cmd, conn);
 				break;
 			case ISTATE_SEND_TASKMGTRSP:
 				spin_unlock_bh(&cmd->istate_lock);
 				use_misc = 1;
-				ret = iscsi_send_task_mgt_rsp(cmd, conn);
+				ret = iscsit_send_task_mgt_rsp(cmd, conn);
 				if (ret != 0)
 					break;
-				ret = iscsi_tmr_post_handler(cmd, conn);
+				ret = iscsit_tmr_post_handler(cmd, conn);
 				if (ret != 0)
-					iscsi_fall_back_to_erl0(conn->sess);
+					iscsit_fall_back_to_erl0(conn->sess);
 				break;
 			case ISTATE_SEND_TEXTRSP:
 				spin_unlock_bh(&cmd->istate_lock);
 				use_misc = 1;
-				ret = iscsi_send_text_rsp(cmd, conn);
+				ret = iscsit_send_text_rsp(cmd, conn);
 				break;
 			default:
 				printk(KERN_ERR "Unknown Opcode: 0x%02x ITT:"
@@ -4478,27 +4113,27 @@ check_rsp_state:
 
 			if (map_sg && !conn->conn_ops->IFMarker &&
 			    T_TASK(se_cmd)->t_tasks_se_num) {
-				iscsi_map_SG_segments(&unmap_sg);
-				if (iscsi_fe_sendpage_sg(&unmap_sg, conn) < 0) {
+				iscsit_map_SG_segments(&unmap_sg);
+				if (iscsit_fe_sendpage_sg(&unmap_sg, conn) < 0) {
 					conn->tx_response_queue = 0;
-					iscsi_tx_thread_wait_for_tcp(conn);
-					iscsi_unmap_SG_segments(&unmap_sg);
+					iscsit_tx_thread_wait_for_tcp(conn);
+					iscsit_unmap_SG_segments(&unmap_sg);
 					goto transport_err;
 				}
-				iscsi_unmap_SG_segments(&unmap_sg);
+				iscsit_unmap_SG_segments(&unmap_sg);
 				map_sg = 0;
 			} else {
 				if (map_sg)
-					iscsi_map_SG_segments(&unmap_sg);
-				if (iscsi_send_tx_data(cmd, conn, use_misc) < 0) {
+					iscsit_map_SG_segments(&unmap_sg);
+				if (iscsit_send_tx_data(cmd, conn, use_misc) < 0) {
 					conn->tx_response_queue = 0;
-					iscsi_tx_thread_wait_for_tcp(conn);
+					iscsit_tx_thread_wait_for_tcp(conn);
 					if (map_sg)
-						iscsi_unmap_SG_segments(&unmap_sg);
+						iscsit_unmap_SG_segments(&unmap_sg);
 					goto transport_err;
 				}
 				if (map_sg) {
-					iscsi_unmap_SG_segments(&unmap_sg);
+					iscsit_unmap_SG_segments(&unmap_sg);
 					map_sg = 0;
 				}
 			}
@@ -4548,7 +4183,7 @@ check_rsp_state:
 				break;
 			case ISTATE_SEND_LOGOUTRSP:
 				spin_unlock_bh(&cmd->istate_lock);
-				if (!(iscsi_logout_post_handler(cmd, conn)))
+				if (!(iscsit_logout_post_handler(cmd, conn)))
 					goto restart;
 				spin_lock_bh(&cmd->istate_lock);
 				use_misc = 0;
@@ -4578,33 +4213,19 @@ check_rsp_state:
 	}
 
 transport_err:
-	iscsi_take_action_for_connection_exit(conn);
+	iscsit_take_action_for_connection_exit(conn);
 	goto restart;
 out:
 	return 0;
 }
 
-static void iscsi_rx_thread_TCP_timeout(unsigned long data)
+static void iscsit_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
 {
-	complete((struct completion *)data);
-}
-
-static void iscsi_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
-{
-	struct timer_list rx_TCP_timer;
-	int ret;
-
 	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
 	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
-		init_timer(&rx_TCP_timer);
-		rx_TCP_timer.expires =
-			(get_jiffies_64() + ISCSI_RX_THREAD_TCP_TIMEOUT * HZ);
-		rx_TCP_timer.data = (unsigned long)&conn->rx_half_close_comp;
-		rx_TCP_timer.function = iscsi_rx_thread_TCP_timeout;
-
-		add_timer(&rx_TCP_timer);
-		ret = wait_for_completion_interruptible(&conn->rx_half_close_comp);
-		del_timer_sync(&rx_TCP_timer);
+		wait_for_completion_interruptible_timeout(
+					&conn->rx_half_close_comp,
+					ISCSI_RX_THREAD_TCP_TIMEOUT * HZ);
 	}
 }
 
@@ -4615,9 +4236,13 @@ int iscsi_target_rx_thread(void *arg)
 	u32 checksum = 0, digest = 0;
 	struct iscsi_conn *conn = NULL;
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
-	struct iovec iov;
+	struct kvec iov;
 	struct scatterlist sg;
-
+	/*
+	 * Bump up the task_struct priority for RX/TX thread set pairs,
+	 * and allow ourselves to be interrupted by SIGINT so that a
+	 * connection recovery / failure event can be triggered externally.
+	 */
 	set_user_nice(current, -20);
 	allow_signal(SIGINT);
 
@@ -4631,17 +4256,17 @@ restart:
 		 * Ensure that both TX and RX per connection kthreads
 		 * are scheduled to run on the same CPU.
 		 */
-		iscsi_thread_check_cpumask(conn, current, 0);
+		iscsit_thread_check_cpumask(conn, current, 0);
 
 		memset(buffer, 0, ISCSI_HDR_LEN);
-		memset(&iov, 0, sizeof(struct iovec));
+		memset(&iov, 0, sizeof(struct kvec));
 
 		iov.iov_base	= buffer;
 		iov.iov_len	= ISCSI_HDR_LEN;
 
 		ret = rx_data(conn, &iov, 1, ISCSI_HDR_LEN);
 		if (ret != ISCSI_HDR_LEN) {
-			iscsi_rx_thread_wait_for_tcp(conn);
+			iscsit_rx_thread_wait_for_tcp(conn);
 			goto transport_err;
 		}
 
@@ -4656,7 +4281,7 @@ restart:
 
 			ret = rx_data(conn, &iov, 1, CRC_LEN);
 			if (ret != CRC_LEN) {
-				iscsi_rx_thread_wait_for_tcp(conn);
+				iscsit_rx_thread_wait_for_tcp(conn);
 				goto transport_err;
 			}
 			crypto_hash_init(&conn->conn_rx_hash);
@@ -4695,34 +4320,34 @@ restart:
 		    (!(opcode & ISCSI_OP_LOGOUT)))) {
 			printk(KERN_ERR "Received illegal iSCSI Opcode: 0x%02x"
 			" while in Discovery Session, rejecting.\n", opcode);
-			iscsi_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
+			iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 					buffer, conn);
 			goto transport_err;
 		}
 
 		switch (opcode) {
 		case ISCSI_OP_SCSI_CMD:
-			if (iscsi_handle_scsi_cmd(conn, buffer) < 0)
+			if (iscsit_handle_scsi_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;
 		case ISCSI_OP_SCSI_DATA_OUT:
-			if (iscsi_handle_data_out(conn, buffer) < 0)
+			if (iscsit_handle_data_out(conn, buffer) < 0)
 				goto transport_err;
 			break;
 		case ISCSI_OP_NOOP_OUT:
-			if (iscsi_handle_nop_out(conn, buffer) < 0)
+			if (iscsit_handle_nop_out(conn, buffer) < 0)
 				goto transport_err;
 			break;
 		case ISCSI_OP_SCSI_TMFUNC:
-			if (iscsi_handle_task_mgt_cmd(conn, buffer) < 0)
+			if (iscsit_handle_task_mgt_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;
 		case ISCSI_OP_TEXT:
-			if (iscsi_handle_text_cmd(conn, buffer) < 0)
+			if (iscsit_handle_text_cmd(conn, buffer) < 0)
 				goto transport_err;
 			break;
 		case ISCSI_OP_LOGOUT:
-			ret = iscsi_handle_logout_cmd(conn, buffer);
+			ret = iscsit_handle_logout_cmd(conn, buffer);
 			if (ret > 0) {
 				wait_for_completion(&conn->conn_logout_comp);
 				goto transport_err;
@@ -4730,7 +4355,7 @@ restart:
 				goto transport_err;
 			break;
 		case ISCSI_OP_SNACK:
-			if (iscsi_handle_snack(conn, buffer) < 0)
+			if (iscsit_handle_snack(conn, buffer) < 0)
 				goto transport_err;
 			break;
 		default:
@@ -4748,7 +4373,7 @@ restart:
 					" connection.\n");
 				goto transport_err;
 			}
-			if (iscsi_recover_from_unknown_opcode(conn) < 0) {
+			if (iscsit_recover_from_unknown_opcode(conn) < 0) {
 				printk(KERN_ERR "Unable to recover from unknown"
 					" opcode, closing iSCSI connection.\n");
 				goto transport_err;
@@ -4760,18 +4385,22 @@ restart:
 transport_err:
 	if (!signal_pending(current))
 		atomic_set(&conn->transport_failed, 1);
-	iscsi_take_action_for_connection_exit(conn);
+	iscsit_take_action_for_connection_exit(conn);
 	goto restart;
 out:
 	return 0;
 }
 
-static void iscsi_release_commands_from_conn(struct iscsi_conn *conn)
+static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 {
 	struct iscsi_cmd *cmd = NULL, *cmd_tmp = NULL;
 	struct iscsi_session *sess = conn->sess;
 	struct se_cmd *se_cmd;
-
+	/*
+	 * We expect this function to only ever be called from either RX or TX
+	 * thread context via iscsit_close_connection() once the other context
+	 * has been reset -> returned sleeping pre-handler state.
+	 */
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
 		if (!(SE_CMD(cmd)) ||
@@ -4779,19 +4408,19 @@ static void iscsi_release_commands_from_conn(struct iscsi_conn *conn)
 
 			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
-			iscsi_increment_maxcmdsn(cmd, sess);
+			iscsit_increment_maxcmdsn(cmd, sess);
 			se_cmd = SE_CMD(cmd);
 			/*
 			 * Special cases for active iSCSI TMR, and
 			 * transport_get_lun_for_cmd() failing from
-			 * iscsi_get_lun_for_cmd() in iscsi_handle_scsi_cmd().
+			 * iscsit_get_lun_for_cmd() in iscsit_handle_scsi_cmd().
 			 */
 			if (cmd->tmr_req && se_cmd->transport_wait_for_tasks)
 				se_cmd->transport_wait_for_tasks(se_cmd, 1, 1);
 			else if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD)
 				transport_release_cmd_to_pool(se_cmd);
 			else
-				__iscsi_release_cmd_to_pool(cmd, sess);
+				iscsit_release_cmd(cmd);
 
 			spin_lock_bh(&conn->cmd_lock);
 			continue;
@@ -4799,7 +4428,7 @@ static void iscsi_release_commands_from_conn(struct iscsi_conn *conn)
 		list_del(&cmd->i_list);
 		spin_unlock_bh(&conn->cmd_lock);
 
-		iscsi_increment_maxcmdsn(cmd, sess);
+		iscsit_increment_maxcmdsn(cmd, sess);
 		se_cmd = SE_CMD(cmd);
 
 		if (se_cmd->transport_wait_for_tasks)
@@ -4810,7 +4439,7 @@ static void iscsi_release_commands_from_conn(struct iscsi_conn *conn)
 	spin_unlock_bh(&conn->cmd_lock);
 }
 
-static void iscsi_stop_timers_for_cmds(
+static void iscsit_stop_timers_for_cmds(
 	struct iscsi_conn *conn)
 {
 	struct iscsi_cmd *cmd;
@@ -4818,12 +4447,12 @@ static void iscsi_stop_timers_for_cmds(
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
 		if (cmd->data_direction == DMA_TO_DEVICE)
-			iscsi_stop_dataout_timer(cmd);
+			iscsit_stop_dataout_timer(cmd);
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 }
 
-int iscsi_close_connection(
+int iscsit_close_connection(
 	struct iscsi_conn *conn)
 {
 	int conn_logout = (conn->conn_state == TARG_CONN_STATE_IN_LOGOUT);
@@ -4831,9 +4460,6 @@ int iscsi_close_connection(
 
 	TRACE(TRACE_ISCSI, "Closing iSCSI connection CID %hu on SID:"
 		" %u\n", conn->cid, sess->sid);
-
-	iscsi_stop_netif_timer(conn);
-
 	/*
 	 * Always up conn_logout_comp just in case the RX Thread is sleeping
 	 * and the logout response never got sent because the connection
@@ -4843,10 +4469,10 @@ int iscsi_close_connection(
 
 	iscsi_release_thread_set(conn);
 
-	iscsi_stop_timers_for_cmds(conn);
-	iscsi_stop_nopin_response_timer(conn);
-	iscsi_stop_nopin_timer(conn);
-	iscsi_free_queue_reqs_for_conn(conn);
+	iscsit_stop_timers_for_cmds(conn);
+	iscsit_stop_nopin_response_timer(conn);
+	iscsit_stop_nopin_timer(conn);
+	iscsit_free_queue_reqs_for_conn(conn);
 
 	/*
 	 * During Connection recovery drop unacknowledged out of order
@@ -4858,11 +4484,11 @@ int iscsi_close_connection(
 	 * struct iscsi_cmds.
 	 */
 	if (atomic_read(&conn->connection_recovery)) {
-		iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(conn);
-		iscsi_prepare_cmds_for_realligance(conn);
+		iscsit_discard_unacknowledged_ooo_cmdsns_for_conn(conn);
+		iscsit_prepare_cmds_for_realligance(conn);
 	} else {
-		iscsi_clear_ooo_cmdsns_for_conn(conn);
-		iscsi_release_commands_from_conn(conn);
+		iscsit_clear_ooo_cmdsns_for_conn(conn);
+		iscsit_release_commands_from_conn(conn);
 	}
 
 	/*
@@ -4872,11 +4498,11 @@ int iscsi_close_connection(
 	 */
 	if (atomic_read(&conn->conn_logout_remove)) {
 		if (conn->conn_logout_reason == ISCSI_LOGOUT_REASON_CLOSE_SESSION) {
-			iscsi_dec_conn_usage_count(conn);
-			iscsi_dec_session_usage_count(sess);
+			iscsit_dec_conn_usage_count(conn);
+			iscsit_dec_session_usage_count(sess);
 		}
 		if (conn->conn_logout_reason == ISCSI_LOGOUT_REASON_CLOSE_CONNECTION)
-			iscsi_dec_conn_usage_count(conn);
+			iscsit_dec_conn_usage_count(conn);
 
 		atomic_set(&conn->conn_logout_remove, 0);
 		atomic_set(&sess->session_reinstatement, 0);
@@ -4884,7 +4510,7 @@ int iscsi_close_connection(
 	}
 
 	spin_lock_bh(&sess->conn_lock);
-	iscsi_remove_conn_from_list(sess, conn);
+	list_del(&conn->conn_list);
 
 	/*
 	 * Attempt to let the Initiator know this connection failed by
@@ -4892,14 +4518,14 @@ int iscsi_close_connection(
 	 * active connection.
 	 */
 	if (atomic_read(&conn->connection_recovery))
-		iscsi_build_conn_drop_async_message(conn);
+		iscsit_build_conn_drop_async_message(conn);
 
 	spin_unlock_bh(&sess->conn_lock);
 
 	/*
 	 * If connection reinstatement is being performed on this connection,
 	 * up the connection reinstatement semaphore that is being blocked on
-	 * in iscsi_cause_connection_reinstatement().
+	 * in iscsit_cause_connection_reinstatement().
 	 */
 	spin_lock_bh(&conn->state_lock);
 	if (atomic_read(&conn->sleep_on_conn_wait_comp)) {
@@ -4913,7 +4539,7 @@ int iscsi_close_connection(
 	 * If connection reinstatement is being performed on this connection
 	 * by receiving a REMOVECONNFORRECOVERY logout request, up the
 	 * connection wait rcfr semaphore that is being blocked on
-	 * an iscsi_connection_reinstatement_rcfr().
+	 * an iscsit_connection_reinstatement_rcfr().
 	 */
 	if (atomic_read(&conn->connection_wait_rcfr)) {
 		spin_unlock_bh(&conn->state_lock);
@@ -4928,7 +4554,7 @@ int iscsi_close_connection(
 	 * If any other processes are accessing this connection pointer we
 	 * must wait until they have completed.
 	 */
-	iscsi_check_conn_usage_count(conn);
+	iscsit_check_conn_usage_count(conn);
 
 	if (conn->conn_rx_hash.tfm)
 		crypto_free_hash(conn->conn_rx_hash.tfm);
@@ -4969,7 +4595,7 @@ int iscsi_close_connection(
 	/*
 	 * If this was not the last connection in the session, and we are
 	 * performing session reinstatement or falling back to ERL=0, call
-	 * iscsi_stop_session() without sleeping to shutdown the other
+	 * iscsit_stop_session() without sleeping to shutdown the other
 	 * active connections.
 	 */
 	if (atomic_read(&sess->nconn)) {
@@ -4981,7 +4607,7 @@ int iscsi_close_connection(
 		if (!atomic_read(&sess->session_stop_active)) {
 			atomic_set(&sess->session_stop_active, 1);
 			spin_unlock_bh(&sess->conn_lock);
-			iscsi_stop_session(sess, 0, 0);
+			iscsit_stop_session(sess, 0, 0);
 			return 0;
 		}
 		spin_unlock_bh(&sess->conn_lock);
@@ -4993,9 +4619,9 @@ int iscsi_close_connection(
 	 * following is occurring:
 	 *
 	 * Session Reinstatement is not being performed, and are falling back
-	 * to ERL=0 call iscsi_close_session().
+	 * to ERL=0 call iscsit_close_session().
 	 *
-	 * Session Logout was requested.  iscsi_close_session() will be called
+	 * Session Logout was requested.  iscsit_close_session() will be called
 	 * elsewhere.
 	 *
 	 * Session Continuation is not being performed, start the Time2Retain
@@ -5004,7 +4630,7 @@ int iscsi_close_connection(
 	if (!atomic_read(&sess->session_reinstatement) &&
 	     atomic_read(&sess->session_fall_back_to_erl0)) {
 		spin_unlock_bh(&sess->conn_lock);
-		iscsi_close_session(sess);
+		iscsit_close_session(sess);
 
 		return 0;
 	} else if (atomic_read(&sess->session_logout)) {
@@ -5022,7 +4648,7 @@ int iscsi_close_connection(
 
 		if (!atomic_read(&sess->session_continuation)) {
 			spin_unlock_bh(&sess->conn_lock);
-			iscsi_start_time2retain_handler(sess);
+			iscsit_start_time2retain_handler(sess);
 		} else
 			spin_unlock_bh(&sess->conn_lock);
 
@@ -5036,7 +4662,7 @@ int iscsi_close_connection(
 	return 0;
 }
 
-int iscsi_close_session(struct iscsi_session *sess)
+int iscsit_close_session(struct iscsi_session *sess)
 {
 	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
@@ -5051,14 +4677,14 @@ int iscsi_close_session(struct iscsi_session *sess)
 	spin_lock_bh(&se_tpg->session_lock);
 	atomic_set(&sess->session_logout, 1);
 	atomic_set(&sess->session_reinstatement, 1);
-	iscsi_stop_time2retain_timer(sess);
+	iscsit_stop_time2retain_timer(sess);
 	spin_unlock_bh(&se_tpg->session_lock);
 
 	/*
 	 * transport_deregister_session_configfs() will clear the
 	 * struct se_node_acl->nacl_sess pointer now as a iscsi_np process context
 	 * can be setting it again with __transport_register_session() in
-	 * iscsi_post_login_handler() again after the iscsi_stop_session()
+	 * iscsi_post_login_handler() again after the iscsit_stop_session()
 	 * completes in iscsi_np context.
 	 */
 	transport_deregister_session_configfs(sess->se_sess);
@@ -5070,12 +4696,12 @@ int iscsi_close_session(struct iscsi_session *sess)
 	 * restart the timer and exit.
 	 */
 	if (!in_interrupt()) {
-		if (iscsi_check_session_usage_count(sess) == 1)
-			iscsi_stop_session(sess, 1, 1);
+		if (iscsit_check_session_usage_count(sess) == 1)
+			iscsit_stop_session(sess, 1, 1);
 	} else {
-		if (iscsi_check_session_usage_count(sess) == 2) {
+		if (iscsit_check_session_usage_count(sess) == 2) {
 			atomic_set(&sess->session_logout, 0);
-			iscsi_start_time2retain_handler(sess);
+			iscsit_start_time2retain_handler(sess);
 			return 0;
 		}
 	}
@@ -5083,9 +4709,9 @@ int iscsi_close_session(struct iscsi_session *sess)
 	transport_deregister_session(sess->se_sess);
 
 	if (sess->sess_ops->ErrorRecoveryLevel == 2)
-		iscsi_free_connection_recovery_entires(sess);
+		iscsit_free_connection_recovery_entires(sess);
 
-	iscsi_free_all_ooo_cmdsns(sess);
+	iscsit_free_all_ooo_cmdsns(sess);
 
 	spin_lock_bh(&se_tpg->session_lock);
 	TRACE(TRACE_STATE, "Moving to TARG_SESS_STATE_FREE.\n");
@@ -5111,7 +4737,7 @@ int iscsi_close_session(struct iscsi_session *sess)
 	return 0;
 }
 
-static void iscsi_logout_post_handler_closesession(
+static void iscsit_logout_post_handler_closesession(
 	struct iscsi_conn *conn)
 {
 	struct iscsi_session *sess = conn->sess;
@@ -5122,13 +4748,13 @@ static void iscsi_logout_post_handler_closesession(
 	atomic_set(&conn->conn_logout_remove, 0);
 	complete(&conn->conn_logout_comp);
 
-	iscsi_dec_conn_usage_count(conn);
-	iscsi_stop_session(sess, 1, 1);
-	iscsi_dec_session_usage_count(sess);
-	iscsi_close_session(sess);
+	iscsit_dec_conn_usage_count(conn);
+	iscsit_stop_session(sess, 1, 1);
+	iscsit_dec_session_usage_count(sess);
+	iscsit_close_session(sess);
 }
 
-static void iscsi_logout_post_handler_samecid(
+static void iscsit_logout_post_handler_samecid(
 	struct iscsi_conn *conn)
 {
 	iscsi_set_thread_clear(conn, ISCSI_CLEAR_TX_THREAD);
@@ -5137,11 +4763,11 @@ static void iscsi_logout_post_handler_samecid(
 	atomic_set(&conn->conn_logout_remove, 0);
 	complete(&conn->conn_logout_comp);
 
-	iscsi_cause_connection_reinstatement(conn, 1);
-	iscsi_dec_conn_usage_count(conn);
+	iscsit_cause_connection_reinstatement(conn, 1);
+	iscsit_dec_conn_usage_count(conn);
 }
 
-static void iscsi_logout_post_handler_diffcid(
+static void iscsit_logout_post_handler_diffcid(
 	struct iscsi_conn *conn,
 	u16 cid)
 {
@@ -5154,7 +4780,7 @@ static void iscsi_logout_post_handler_diffcid(
 	spin_lock_bh(&sess->conn_lock);
 	list_for_each_entry(l_conn, &sess->sess_conn_list, conn_list) {
 		if (l_conn->cid == cid) {
-			iscsi_inc_conn_usage_count(l_conn);
+			iscsit_inc_conn_usage_count(l_conn);
 			break;
 		}
 	}
@@ -5171,15 +4797,14 @@ static void iscsi_logout_post_handler_diffcid(
 	l_conn->conn_state = TARG_CONN_STATE_IN_LOGOUT;
 	spin_unlock_bh(&l_conn->state_lock);
 
-	iscsi_cause_connection_reinstatement(l_conn, 1);
-	iscsi_dec_conn_usage_count(l_conn);
+	iscsit_cause_connection_reinstatement(l_conn, 1);
+	iscsit_dec_conn_usage_count(l_conn);
 }
 
-/*	iscsi_logout_post_handler():
- *
+/*
  *	Return of 0 causes the TX thread to restart.
  */
-static int iscsi_logout_post_handler(
+static int iscsit_logout_post_handler(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -5191,7 +4816,7 @@ static int iscsi_logout_post_handler(
 		case ISCSI_LOGOUT_SUCCESS:
 		case ISCSI_LOGOUT_CLEANUP_FAILED:
 		default:
-			iscsi_logout_post_handler_closesession(conn);
+			iscsit_logout_post_handler_closesession(conn);
 			break;
 		}
 		ret = 0;
@@ -5202,14 +4827,14 @@ static int iscsi_logout_post_handler(
 			case ISCSI_LOGOUT_SUCCESS:
 			case ISCSI_LOGOUT_CLEANUP_FAILED:
 			default:
-				iscsi_logout_post_handler_samecid(conn);
+				iscsit_logout_post_handler_samecid(conn);
 				break;
 			}
 			ret = 0;
 		} else {
 			switch (cmd->logout_response) {
 			case ISCSI_LOGOUT_SUCCESS:
-				iscsi_logout_post_handler_diffcid(conn,
+				iscsit_logout_post_handler_diffcid(conn,
 					cmd->logout_cid);
 				break;
 			case ISCSI_LOGOUT_CID_NOT_FOUND:
@@ -5238,7 +4863,7 @@ static int iscsi_logout_post_handler(
 	return ret;
 }
 
-void iscsi_fail_session(struct iscsi_session *sess)
+void iscsit_fail_session(struct iscsi_session *sess)
 {
 	struct iscsi_conn *conn;
 
@@ -5253,10 +4878,11 @@ void iscsi_fail_session(struct iscsi_session *sess)
 	sess->session_state = TARG_SESS_STATE_FAILED;
 }
 
-int iscsi_free_session(struct iscsi_session *sess)
+int iscsit_free_session(struct iscsi_session *sess)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
-	struct iscsi_conn *conn, *conn_tmp;
+	struct iscsi_conn *conn, *conn_tmp = NULL;
+	int is_last;
 
 	spin_lock_bh(&sess->conn_lock);
 	atomic_set(&sess->sleep_on_sess_wait_comp, 1);
@@ -5266,12 +4892,22 @@ int iscsi_free_session(struct iscsi_session *sess)
 		if (conn_count == 0)
 			break;
 
-		iscsi_inc_conn_usage_count(conn);
+		if (list_is_last(&conn->conn_list, &sess->sess_conn_list)) {
+			is_last = 1;
+		} else {
+			iscsit_inc_conn_usage_count(conn_tmp);
+			is_last = 0;
+		}
+		iscsit_inc_conn_usage_count(conn);
+
 		spin_unlock_bh(&sess->conn_lock);
-		iscsi_cause_connection_reinstatement(conn, 1);
+		iscsit_cause_connection_reinstatement(conn, 1);
 		spin_lock_bh(&sess->conn_lock);
 
-		iscsi_dec_conn_usage_count(conn);
+		iscsit_dec_conn_usage_count(conn);
+		if (is_last == 0)
+			iscsit_dec_conn_usage_count(conn_tmp);
+	
 		conn_count--;
 	}
 
@@ -5281,17 +4917,18 @@ int iscsi_free_session(struct iscsi_session *sess)
 	} else
 		spin_unlock_bh(&sess->conn_lock);
 
-	iscsi_close_session(sess);
+	iscsit_close_session(sess);
 	return 0;
 }
 
-void iscsi_stop_session(
+void iscsit_stop_session(
 	struct iscsi_session *sess,
 	int session_sleep,
 	int connection_sleep)
 {
 	u16 conn_count = atomic_read(&sess->nconn);
 	struct iscsi_conn *conn, *conn_tmp = NULL;
+	int is_last;
 
 	spin_lock_bh(&sess->conn_lock);
 	if (session_sleep)
@@ -5303,17 +4940,26 @@ void iscsi_stop_session(
 			if (conn_count == 0)
 				break;
 
-			iscsi_inc_conn_usage_count(conn);
+			if (list_is_last(&conn->conn_list, &sess->sess_conn_list)) {
+				is_last = 1;
+			} else {
+				iscsit_inc_conn_usage_count(conn_tmp);
+				is_last = 0;
+			}
+			iscsit_inc_conn_usage_count(conn);
+
 			spin_unlock_bh(&sess->conn_lock);
-			iscsi_cause_connection_reinstatement(conn, 1);
+			iscsit_cause_connection_reinstatement(conn, 1);
 			spin_lock_bh(&sess->conn_lock);
 
-			iscsi_dec_conn_usage_count(conn);
+			iscsit_dec_conn_usage_count(conn);
+			if (is_last == 0)
+				iscsit_dec_conn_usage_count(conn_tmp);
 			conn_count--;
 		}
 	} else {
 		list_for_each_entry(conn, &sess->sess_conn_list, conn_list)
-			iscsi_cause_connection_reinstatement(conn, 0);
+			iscsit_cause_connection_reinstatement(conn, 0);
 	}
 
 	if (session_sleep && atomic_read(&sess->nconn)) {
@@ -5323,7 +4969,7 @@ void iscsi_stop_session(
 		spin_unlock_bh(&sess->conn_lock);
 }
 
-int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
+int iscsit_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
 {
 	struct iscsi_session *sess;
 	struct se_portal_group *se_tpg = &tpg->tpg_se_tpg;
@@ -5351,7 +4997,7 @@ int iscsi_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
 		spin_unlock(&sess->conn_lock);
 		spin_unlock_bh(&se_tpg->session_lock);
 
-		iscsi_free_session(sess);
+		iscsit_free_session(sess);
 		spin_lock_bh(&se_tpg->session_lock);
 
 		session_count++;

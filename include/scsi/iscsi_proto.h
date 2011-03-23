@@ -33,6 +33,35 @@
 #define ISCSI_PAD_LEN		4
 
 /*
+ * Serial Number Arithmetic, 32 bits, RFC1982
+ */
+#define SNA32_CHECK 2147483648UL
+
+static inline int iscsi_sna_lt(u32 n1, u32 n2)
+{
+	return n1 != n2 && ((n1 < n2 && (n2 - n1 < SNA32_CHECK)) ||
+			(n1 > n2 && (n2 - n1 < SNA32_CHECK)));
+}
+
+static inline int iscsi_sna_lte(u32 n1, u32 n2)
+{
+	return n1 == n2 || ((n1 < n2 && (n2 - n1 < SNA32_CHECK)) ||
+			(n1 > n2 && (n2 - n1 < SNA32_CHECK)));
+}
+
+static inline int iscsi_sna_gt(u32 n1, u32 n2)
+{
+	return n1 != n2 && (((n1 < n2) && ((n2 - n1) > SNA32_CHECK)) ||
+			((n1 > n2) && ((n1 - n2) < SNA32_CHECK)));
+}
+
+static inline int iscsi_sna_gte(u32 n1, u32 n2)
+{
+	return n1 == n2 || (((n1 < n2) && ((n2 - n1) > SNA32_CHECK)) ||
+			((n1 > n2) && ((n1 - n2) < SNA32_CHECK)));
+}
+
+/*
  * useful common(control and data pathes) macro
  */
 #define ntoh24(p) (((p)[0] << 16) | ((p)[1] << 8) | ((p)[2]))

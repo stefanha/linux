@@ -30,12 +30,12 @@
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_erl2.h"
+#include "iscsi_target.h"
 
-/*	iscsi_create_conn_recovery_datain_values():
- *
+/*
  *	FIXME: Does RData SNACK apply here as well?
  */
-void iscsi_create_conn_recovery_datain_values(
+void iscsit_create_conn_recovery_datain_values(
 	struct iscsi_cmd *cmd,
 	u32 exp_data_sn)
 {
@@ -63,11 +63,7 @@ void iscsi_create_conn_recovery_datain_values(
 	}
 }
 
-/*	iscsi_create_conn_recovery_dataout_values():
- *
- *
- */
-void iscsi_create_conn_recovery_dataout_values(
+void iscsit_create_conn_recovery_dataout_values(
 	struct iscsi_cmd *cmd)
 {
 	u32 write_data_done = 0;
@@ -87,11 +83,7 @@ void iscsi_create_conn_recovery_dataout_values(
 	cmd->write_data_done = write_data_done;
 }
 
-/*	iscsi_attach_active_connection_recovery_entry():
- *
- *
- */
-static int iscsi_attach_active_connection_recovery_entry(
+static int iscsit_attach_active_connection_recovery_entry(
 	struct iscsi_session *sess,
 	struct iscsi_conn_recovery *cr)
 {
@@ -102,11 +94,7 @@ static int iscsi_attach_active_connection_recovery_entry(
 	return 0;
 }
 
-/*	iscsi_attach_inactive_connection_recovery():
- *
- *
- */
-static int iscsi_attach_inactive_connection_recovery_entry(
+static int iscsit_attach_inactive_connection_recovery_entry(
 	struct iscsi_session *sess,
 	struct iscsi_conn_recovery *cr)
 {
@@ -121,11 +109,7 @@ static int iscsi_attach_inactive_connection_recovery_entry(
 	return 0;
 }
 
-/*	iscsi_get_inactive_connection_recovery_entry():
- *
- *
- */
-struct iscsi_conn_recovery *iscsi_get_inactive_connection_recovery_entry(
+struct iscsi_conn_recovery *iscsit_get_inactive_connection_recovery_entry(
 	struct iscsi_session *sess,
 	u16 cid)
 {
@@ -141,11 +125,7 @@ struct iscsi_conn_recovery *iscsi_get_inactive_connection_recovery_entry(
 	return (cr) ? cr : NULL;
 }
 
-/*	iscsi_free_connection_recovery_entires():
- *
- *
- */
-void iscsi_free_connection_recovery_entires(struct iscsi_session *sess)
+void iscsit_free_connection_recovery_entires(struct iscsi_session *sess)
 {
 	struct iscsi_cmd *cmd, *cmd_tmp;
 	struct iscsi_conn_recovery *cr, *cr_tmp;
@@ -165,7 +145,7 @@ void iscsi_free_connection_recovery_entires(struct iscsi_session *sess)
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, sess);
+				iscsit_release_cmd(cmd);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
@@ -193,7 +173,7 @@ void iscsi_free_connection_recovery_entires(struct iscsi_session *sess)
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, sess);
+				iscsit_release_cmd(cmd);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
@@ -207,11 +187,7 @@ void iscsi_free_connection_recovery_entires(struct iscsi_session *sess)
 	spin_unlock(&sess->cr_i_lock);
 }
 
-/*	iscsi_remove_active_connection_recovery_entry():
- *
- *
- */
-int iscsi_remove_active_connection_recovery_entry(
+int iscsit_remove_active_connection_recovery_entry(
 	struct iscsi_conn_recovery *cr,
 	struct iscsi_session *sess)
 {
@@ -228,11 +204,7 @@ int iscsi_remove_active_connection_recovery_entry(
 	return 0;
 }
 
-/*	iscsi_remove_inactive_connection_recovery_entry():
- *
- *
- */
-int iscsi_remove_inactive_connection_recovery_entry(
+int iscsit_remove_inactive_connection_recovery_entry(
 	struct iscsi_conn_recovery *cr,
 	struct iscsi_session *sess)
 {
@@ -243,11 +215,10 @@ int iscsi_remove_inactive_connection_recovery_entry(
 	return 0;
 }
 
-/*	iscsi_remove_cmd_from_connection_recovery():
- *
+/*
  *	Called with cr->conn_recovery_cmd_lock help.
  */
-int iscsi_remove_cmd_from_connection_recovery(
+int iscsit_remove_cmd_from_connection_recovery(
 	struct iscsi_cmd *cmd,
 	struct iscsi_session *sess)
 {
@@ -264,11 +235,7 @@ int iscsi_remove_cmd_from_connection_recovery(
 	return --cr->cmd_count;
 }
 
-/*	iscsi_discard_cr_cmds_by_expstatsn():
- *
- *
- */
-void iscsi_discard_cr_cmds_by_expstatsn(
+void iscsit_discard_cr_cmds_by_expstatsn(
 	struct iscsi_conn_recovery *cr,
 	u32 exp_statsn)
 {
@@ -291,13 +258,13 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 			" 0x%08x, CID: %hu.\n", cmd->init_task_tag,
 				cmd->stat_sn, cr->cid);
 
-		iscsi_remove_cmd_from_connection_recovery(cmd, sess);
+		iscsit_remove_cmd_from_connection_recovery(cmd, sess);
 
 		spin_unlock(&cr->conn_recovery_cmd_lock);
 		if (!(SE_CMD(cmd)) ||
 		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 		    !(SE_CMD(cmd)->transport_wait_for_tasks))
-			__iscsi_release_cmd_to_pool(cmd, sess);
+			iscsit_release_cmd(cmd);
 		else
 			SE_CMD(cmd)->transport_wait_for_tasks(
 					SE_CMD(cmd), 1, 0);
@@ -313,24 +280,20 @@ void iscsi_discard_cr_cmds_by_expstatsn(
 		TRACE(TRACE_ERL2, "No commands to be reassigned for failed"
 			" connection CID: %hu on SID: %u\n",
 			cr->cid, sess->sid);
-		iscsi_remove_inactive_connection_recovery_entry(cr, sess);
-		iscsi_attach_active_connection_recovery_entry(sess, cr);
+		iscsit_remove_inactive_connection_recovery_entry(cr, sess);
+		iscsit_attach_active_connection_recovery_entry(sess, cr);
 		printk(KERN_INFO "iSCSI connection recovery successful for CID:"
 			" %hu on SID: %u\n", cr->cid, sess->sid);
-		iscsi_remove_active_connection_recovery_entry(cr, sess);
+		iscsit_remove_active_connection_recovery_entry(cr, sess);
 	} else {
-		iscsi_remove_inactive_connection_recovery_entry(cr, sess);
-		iscsi_attach_active_connection_recovery_entry(sess, cr);
+		iscsit_remove_inactive_connection_recovery_entry(cr, sess);
+		iscsit_attach_active_connection_recovery_entry(sess, cr);
 	}
 
 	return;
 }
 
-/*	iscsi_discard_unacknowledged_ooo_cmdsns_for_conn():
- *
- *
- */
-int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
+int iscsit_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 {
 	u32 dropped_count = 0;
 	struct iscsi_cmd *cmd, *cmd_tmp;
@@ -348,7 +311,7 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 		TRACE(TRACE_ERL2, "Dropping unacknowledged CmdSN:"
 		" 0x%08x during connection recovery on CID: %hu\n",
 			ooo_cmdsn->cmdsn, conn->cid);
-		iscsi_remove_ooo_cmdsn(sess, ooo_cmdsn);
+		iscsit_remove_ooo_cmdsn(sess, ooo_cmdsn);
 	}
 	conn->sess->ooo_cmdsn_count -= dropped_count;
 	spin_unlock(&sess->cmdsn_lock);
@@ -358,13 +321,13 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 		if (!(cmd->cmd_flags & ICF_OOO_CMDSN))
 			continue;
 
-		iscsi_remove_cmd_from_conn_list(cmd, conn);
+		list_del(&cmd->i_list);
 
 		spin_unlock_bh(&conn->cmd_lock);
 		if (!(SE_CMD(cmd)) ||
 		    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 		    !(SE_CMD(cmd)->transport_wait_for_tasks))
-			__iscsi_release_cmd_to_pool(cmd, sess);
+			iscsit_release_cmd(cmd);
 		else
 			SE_CMD(cmd)->transport_wait_for_tasks(
 					SE_CMD(cmd), 1, 1);
@@ -378,11 +341,7 @@ int iscsi_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 	return 0;
 }
 
-/*	iscsi_prepare_cmds_for_realligance():
- *
- *
- */
-int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
+int iscsit_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 {
 	u32 cmd_count = 0;
 	struct iscsi_cmd *cmd, *cmd_tmp;
@@ -406,7 +365,7 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	/*
 	 * Only perform connection recovery on ISCSI_OP_SCSI_CMD or
 	 * ISCSI_OP_NOOP_OUT opcodes.  For all other opcodes call
-	 * iscsi_remove_cmd_from_conn_list() to release the command to the
+	 * list_del(&cmd->i_list); to release the command to the
 	 * session pool and remove it from the connection's list.
 	 *
 	 * Also stop the DataOUT timer, which will be restarted after
@@ -422,13 +381,13 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 				" CID: %hu\n", cmd->iscsi_opcode,
 				cmd->init_task_tag, cmd->cmd_sn, conn->cid);
 
-			iscsi_remove_cmd_from_conn_list(cmd, conn);
-
+			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
+
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, conn->sess);
+				iscsit_release_cmd(cmd);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 0);
@@ -449,13 +408,13 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		 */
 		if (!(cmd->cmd_flags & ICF_OOO_CMDSN) && !cmd->immediate_cmd &&
 		     (cmd->cmd_sn >= conn->sess->exp_cmd_sn)) {
-			iscsi_remove_cmd_from_conn_list(cmd, conn);
-
+			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
+
 			if (!(SE_CMD(cmd)) ||
 			    !(SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) ||
 			    !(SE_CMD(cmd)->transport_wait_for_tasks))
-				__iscsi_release_cmd_to_pool(cmd, conn->sess);
+				iscsit_release_cmd(cmd);
 			else
 				SE_CMD(cmd)->transport_wait_for_tasks(
 						SE_CMD(cmd), 1, 1);
@@ -474,14 +433,14 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		cmd->i_state = ISTATE_IN_CONNECTION_RECOVERY;
 
 		if (cmd->data_direction == DMA_TO_DEVICE)
-			iscsi_stop_dataout_timer(cmd);
+			iscsit_stop_dataout_timer(cmd);
 
 		cmd->sess = conn->sess;
 
-		iscsi_remove_cmd_from_conn_list(cmd, conn);
+		list_del(&cmd->i_list);
 		spin_unlock_bh(&conn->cmd_lock);
 
-		iscsi_free_all_datain_reqs(cmd);
+		iscsit_free_all_datain_reqs(cmd);
 
 		if ((SE_CMD(cmd)) &&
 		    (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD) &&
@@ -500,7 +459,6 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		cmd->conn = NULL;
 	}
 	spin_unlock_bh(&conn->cmd_lock);
-
 	/*
 	 * Fill in the various values in the preallocated struct iscsi_conn_recovery.
 	 */
@@ -509,22 +467,17 @@ int iscsi_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	cr->maxrecvdatasegmentlength = conn->conn_ops->MaxRecvDataSegmentLength;
 	cr->sess = conn->sess;
 
-	iscsi_attach_inactive_connection_recovery_entry(conn->sess, cr);
+	iscsit_attach_inactive_connection_recovery_entry(conn->sess, cr);
 
 	return 0;
 }
 
-/*	iscsi_connection_recovery_transport_reset():
- *
- *
- */
-int iscsi_connection_recovery_transport_reset(struct iscsi_conn *conn)
+int iscsit_connection_recovery_transport_reset(struct iscsi_conn *conn)
 {
 	atomic_set(&conn->connection_recovery, 1);
 
-	if (iscsi_close_connection(conn) < 0)
+	if (iscsit_close_connection(conn) < 0)
 		return -1;
 
 	return 0;
 }
-

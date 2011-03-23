@@ -17,7 +17,6 @@
 #define CHAP_STAGE_CLIENT_NRIC	4
 #define CHAP_STAGE_SERVER_NR	5
 
-extern int chap_gen_challenge(struct iscsi_conn *, int, char *, unsigned int *);
 extern u32 chap_main_loop(struct iscsi_conn *, struct iscsi_node_auth *, char *, char *,
 				int *, int *);
 

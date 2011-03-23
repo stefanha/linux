@@ -225,9 +225,7 @@ enum iscsi_timer_flags_table {
 /* Used for struct iscsi_np->np_flags */
 enum np_flags_table {
 	NPF_IP_NETWORK		= 0x00,
-	NPF_NET_IPV4		= 0x01,
-	NPF_NET_IPV6		= 0x02,
-	NPF_SCTP_STRUCT_FILE	= 0x20 /* Bugfix */
+	NPF_SCTP_STRUCT_FILE	= 0x01 /* Bugfix */
 };
 
 /* Used for struct iscsi_np->np_thread_state */
@@ -275,7 +273,7 @@ struct iscsi_queue_req {
 	struct se_obj_lun_type_s *queue_se_obj_api;
 	struct iscsi_cmd	*cmd;
 	struct list_head	qr_list;
-} ____cacheline_aligned;
+};
 
 struct iscsi_data_count {
 	int			data_length;
@@ -284,13 +282,13 @@ struct iscsi_data_count {
 	u32			iov_count;
 	u32			ss_iov_count;
 	u32			ss_marker_count;
-	struct iovec		*iov;
-} ____cacheline_aligned;
+	struct kvec		*iov;
+};
 
 struct iscsi_param_list {
 	struct list_head	param_list;
 	struct list_head	extra_response_list;
-} ____cacheline_aligned;
+};
 
 struct iscsi_datain_req {
 	enum datain_req_comp_table dr_complete;
@@ -453,10 +451,10 @@ struct iscsi_cmd {
 	/* Timer for DataOUT */
 	struct timer_list	dataout_timer;
 	/* Iovecs for SCSI data payload RX/TX w/ kernel level sockets */
-	struct iovec		*iov_data;
+	struct kvec		*iov_data;
 	/* Iovecs for miscellaneous purposes */
 #define ISCSI_MISC_IOVECS			5
-	struct iovec		iov_misc[ISCSI_MISC_IOVECS];
+	struct kvec		iov_misc[ISCSI_MISC_IOVECS];
 	/* Array of struct iscsi_pdu used for DataPDUInOrder=No */
 	struct iscsi_pdu	*pdu_list;
 	/* Current struct iscsi_pdu used for DataPDUInOrder=No */
@@ -496,7 +494,7 @@ struct iscsi_tmr_req {
 	u32			exp_data_sn;
 	struct iscsi_conn_recovery *conn_recovery;
 	struct se_tmr_req	*se_tmr_req;
-} ____cacheline_aligned;
+};
 
 struct iscsi_conn {
 #define ISCSI_NETDEV_NAME_SIZE				12
@@ -507,7 +505,6 @@ struct iscsi_conn {
 	u8			conn_state;
 	u8			conn_logout_reason;
 	u8			network_transport;
-	enum iscsi_timer_flags_table netif_timer_flags;
 	enum iscsi_timer_flags_table nopin_timer_flags;
 	enum iscsi_timer_flags_table nopin_response_timer_flags;
 	u8			tx_immediate_queue;
@@ -522,8 +519,8 @@ struct iscsi_conn {
 	u32			auth_id;
 #define CONNFLAG_SCTP_STRUCT_FILE			0x01
 	u32			conn_flags;
-	/* Remote TCP IP address */
-	u32			login_ip;
+	/* Remote TCP IPv4 address */
+	u32			login_ipv4;
 	/* Used for iscsi_tx_login_rsp() */
 	u32			login_itt;
 	u32			exp_statsn;
@@ -538,13 +535,13 @@ struct iscsi_conn {
 	/* Complete Bad PDU for sending reject */
 	unsigned char		bad_hdr[ISCSI_HDR_LEN];
 #define IPV6_ADDRESS_SPACE				48
-	unsigned char		ipv6_login_ip[IPV6_ADDRESS_SPACE];
+	unsigned char		login_ip[IPV6_ADDRESS_SPACE];
 	u16			local_port;
 	u32			local_ip;
+	int			conn_usage_count;
+	int			conn_waiting_on_uc;
 	atomic_t		check_immediate_queue;
 	atomic_t		conn_logout_remove;
-	atomic_t		conn_usage_count;
-	atomic_t		conn_waiting_on_uc;
 	atomic_t		connection_exit;
 	atomic_t		connection_recovery;
 	atomic_t		connection_reinstatement;
@@ -560,8 +557,6 @@ struct iscsi_conn {
 	struct completion	conn_logout_comp;
 	struct completion	tx_half_close_comp;
 	struct completion	rx_half_close_comp;
-	/* Semaphore for conn's tx_thread to sleep on */
-	struct completion	tx_comp;
 	/* socket used by this connection */
 	struct socket		*sock;
 	struct timer_list	nopin_timer;
@@ -571,7 +566,6 @@ struct iscsi_conn {
 	spinlock_t		cmd_lock;
 	spinlock_t		conn_usage_lock;
 	spinlock_t		immed_queue_lock;
-	spinlock_t		netif_lock;
 	spinlock_t		nopin_timer_lock;
 	spinlock_t		response_queue_lock;
 	spinlock_t		state_lock;
@@ -639,6 +633,9 @@ struct iscsi_session {
 	char			auth_type[8];
 	/* unique within the target */
 	int			session_index;
+	/* Used for session reference counting */
+	int			session_usage_count;
+	int			session_waiting_on_uc;
 	u32			cmd_pdus;
 	u32			rsp_pdus;
 	u64			tx_data_octets;
@@ -654,8 +651,6 @@ struct iscsi_session {
 	atomic_t		session_logout;
 	atomic_t		session_reinstatement;
 	atomic_t		session_stop_active;
-	atomic_t		session_usage_count;
-	atomic_t		session_waiting_on_uc;
 	atomic_t		sleep_on_sess_wait_comp;
 	atomic_t		transport_wait_cmds;
 	/* connection list */
@@ -712,7 +707,7 @@ struct iscsi_node_attrib {
 	u32			tmr_cold_reset;
 	u32			tmr_warm_reset;
 	struct iscsi_node_acl *nacl;
-} ____cacheline_aligned;
+};
 
 struct se_dev_entry_s;
 
@@ -728,7 +723,7 @@ struct iscsi_node_auth {
 	char			password[MAX_PASS_LEN];
 	char			userid_mutual[MAX_USER_LEN];
 	char			password_mutual[MAX_PASS_LEN];
-} ____cacheline_aligned;
+};
 
 #include "iscsi_target_stat.h"
 
@@ -742,7 +737,7 @@ struct iscsi_node_acl {
 	struct iscsi_node_auth	node_auth;
 	struct iscsi_node_stat_grps node_stat_grps;
 	struct se_node_acl	se_node_acl;
-} ____cacheline_aligned;
+};
 
 #define NODE_STAT_GRPS(nacl)	(&(nacl)->node_stat_grps)
 
@@ -758,9 +753,8 @@ struct iscsi_tpg_attrib {
 	u32			default_cmdsn_depth;
 	u32			demo_mode_write_protect;
 	u32			prod_mode_write_protect;
-	u32			cache_core_nps;
 	struct iscsi_portal_group *tpg;
-}  ____cacheline_aligned;
+};
 
 struct iscsi_np {
 	unsigned char		np_net_dev[ISCSI_NETDEV_NAME_SIZE];
@@ -772,13 +766,12 @@ struct iscsi_np {
 	u32			np_exports;
 	enum np_flags_table	np_flags;
 	u32			np_ipv4;
-	unsigned char		np_ipv6[IPV6_ADDRESS_SPACE];
+	unsigned char		np_ip[IPV6_ADDRESS_SPACE];
 	u16			np_port;
-	atomic_t		np_shutdown;
-	spinlock_t		np_state_lock;
 	spinlock_t		np_thread_lock;
 	struct completion	np_restart_comp;
 	struct socket		*np_socket;
+	struct __kernel_sockaddr_storage np_sockaddr;
 	struct task_struct	*np_thread;
 	struct timer_list	np_login_timer;
 	struct iscsi_portal_group *np_login_tpg;
@@ -794,7 +787,7 @@ struct iscsi_tpg_np {
 	struct list_head	tpg_np_parent_list;
 	struct se_tpg_np	se_tpg_np;
 	spinlock_t		tpg_np_parent_lock;
-} ____cacheline_aligned;
+};
 
 struct iscsi_np_addr {
 	u16		np_port;
@@ -883,6 +876,6 @@ struct iscsi_global {
 	/* Used for iSCSI discovery session authentication */
 	struct iscsi_node_acl	discovery_acl;
 	struct iscsi_portal_group	*discovery_tpg;
-} ____cacheline_aligned;
+};
 
 #endif /* ISCSI_TARGET_CORE_H */

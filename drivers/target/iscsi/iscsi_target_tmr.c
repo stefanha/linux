@@ -34,12 +34,9 @@
 #include "iscsi_target_tmr.h"
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
+#include "iscsi_target.h"
 
-/*	iscsi_tmr_abort_task():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
-u8 iscsi_tmr_abort_task(
+u8 iscsit_tmr_abort_task(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -49,7 +46,7 @@ u8 iscsi_tmr_abort_task(
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 
-	ref_cmd = iscsi_find_cmd_from_itt(conn, hdr->rtt);
+	ref_cmd = iscsit_find_cmd_from_itt(conn, hdr->rtt);
 	if (!ref_cmd) {
 		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x on CID:"
 			" %hu.\n", hdr->rtt, conn->cid);
@@ -72,17 +69,16 @@ u8 iscsi_tmr_abort_task(
 	return ISCSI_TMF_RSP_COMPLETE;
 }
 
-/*	iscsi_tmr_task_warm_reset():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
+/*
+ *	Called from iscsit_handle_task_mgt_cmd().
  */
-int iscsi_tmr_task_warm_reset(
+int iscsit_tmr_task_warm_reset(
 	struct iscsi_conn *conn,
 	struct iscsi_tmr_req *tmr_req,
 	unsigned char *buf)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 #if 0
 	struct iscsi_init_task_mgt_cmnd *hdr =
 		(struct iscsi_init_task_mgt_cmnd *) buf;
@@ -99,17 +95,13 @@ int iscsi_tmr_task_warm_reset(
 	return 0;
 }
 
-/*	iscsi_tmr_task_cold_reset():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
-int iscsi_tmr_task_cold_reset(
+int iscsit_tmr_task_cold_reset(
 	struct iscsi_conn *conn,
 	struct iscsi_tmr_req *tmr_req,
 	unsigned char *buf)
 {
 	struct iscsi_session *sess = conn->sess;
-	struct iscsi_node_attrib *na = iscsi_tpg_get_node_attrib(sess);
+	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 
 	if (!na->tmr_cold_reset) {
 		printk(KERN_ERR "TMR Opcode TARGET_COLD_RESET authorization"
@@ -123,11 +115,7 @@ int iscsi_tmr_task_cold_reset(
 	return 0;
 }
 
-/*	iscsi_tmr_task_reassign():
- *
- *	Called from iscsi_handle_task_mgt_cmd().
- */
-u8 iscsi_tmr_task_reassign(
+u8 iscsit_tmr_task_reassign(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -149,7 +137,7 @@ u8 iscsi_tmr_task_reassign(
 		return ISCSI_TMF_RSP_NOT_SUPPORTED;
 	}
 
-	ret = iscsi_find_cmd_for_recovery(conn->sess, &ref_cmd, &cr, hdr->rtt);
+	ret = iscsit_find_cmd_for_recovery(conn->sess, &ref_cmd, &cr, hdr->rtt);
 	if (ret == -2) {
 		printk(KERN_ERR "Command ITT: 0x%08x is still alligent to CID:"
 			" %hu\n", ref_cmd->init_task_tag, cr->cid);
@@ -186,7 +174,7 @@ u8 iscsi_tmr_task_reassign(
 	return ISCSI_TMF_RSP_COMPLETE;
 }
 
-static void iscsi_task_reassign_remove_cmd(
+static void iscsit_task_reassign_remove_cmd(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn_recovery *cr,
 	struct iscsi_session *sess)
@@ -194,18 +182,18 @@ static void iscsi_task_reassign_remove_cmd(
 	int ret;
 
 	spin_lock(&cr->conn_recovery_cmd_lock);
-	ret = iscsi_remove_cmd_from_connection_recovery(cmd, sess);
+	ret = iscsit_remove_cmd_from_connection_recovery(cmd, sess);
 	spin_unlock(&cr->conn_recovery_cmd_lock);
 	if (!ret) {
 		printk(KERN_INFO "iSCSI connection recovery successful for CID:"
 			" %hu on SID: %u\n", cr->cid, sess->sid);
-		iscsi_remove_active_connection_recovery_entry(cr, sess);
+		iscsit_remove_active_connection_recovery_entry(cr, sess);
 	}
 
 	return;
 }
 
-static int iscsi_task_reassign_complete_nop_out(
+static int iscsit_task_reassign_complete_nop_out(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
 {
@@ -228,16 +216,18 @@ static int iscsi_task_reassign_complete_nop_out(
 	 */
 	cmd->stat_sn = cmd->exp_stat_sn = 0;
 
-	iscsi_task_reassign_remove_cmd(cmd, cr, conn->sess);
+	iscsit_task_reassign_remove_cmd(cmd, cr, conn->sess);
 
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	cmd->i_state = ISTATE_SEND_NOPIN;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 	return 0;
 }
 
-static int iscsi_task_reassign_complete_write(
+static int iscsit_task_reassign_complete_write(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
 {
@@ -271,7 +261,7 @@ static int iscsi_task_reassign_complete_write(
 		}
 
 		cmd->i_state = ISTATE_SEND_STATUS;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 		return 0;
 	}
 
@@ -292,7 +282,7 @@ static int iscsi_task_reassign_complete_write(
 			length = (conn->sess->sess_ops->FirstBurstLength - offset);
 
 		spin_lock_bh(&cmd->r2t_lock);
-		if (iscsi_add_r2t_to_list(cmd, offset, length, 0, 0) < 0) {
+		if (iscsit_add_r2t_to_list(cmd, offset, length, 0, 0) < 0) {
 			spin_unlock_bh(&cmd->r2t_lock);
 			return -1;
 		}
@@ -303,12 +293,12 @@ static int iscsi_task_reassign_complete_write(
 			return 0;
 	}
 	/*
-	 * iscsi_build_r2ts_for_cmd() can handle the rest from here.
+	 * iscsit_build_r2ts_for_cmd() can handle the rest from here.
 	 */
-	return iscsi_build_r2ts_for_cmd(cmd, conn, 2);
+	return iscsit_build_r2ts_for_cmd(cmd, conn, 2);
 }
 
-static int iscsi_task_reassign_complete_read(
+static int iscsit_task_reassign_complete_read(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
 {
@@ -342,7 +332,7 @@ static int iscsi_task_reassign_complete_read(
 		return -1;
 	}
 
-	dr = iscsi_allocate_datain_req();
+	dr = iscsit_allocate_datain_req();
 	if (!dr)
 		return -1;
 	/*
@@ -354,25 +344,25 @@ static int iscsi_task_reassign_complete_read(
 	dr->generate_recovery_values = 1;
 	dr->recovery = DATAIN_CONNECTION_RECOVERY;
 
-	iscsi_attach_datain_req(cmd, dr);
+	iscsit_attach_datain_req(cmd, dr);
 
 	cmd->i_state = ISTATE_SEND_DATAIN;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 	return 0;
 }
 
-static int iscsi_task_reassign_complete_none(
+static int iscsit_task_reassign_complete_none(
 	struct iscsi_cmd *cmd,
 	struct iscsi_tmr_req *tmr_req)
 {
 	struct iscsi_conn *conn = cmd->conn;
 
 	cmd->i_state = ISTATE_SEND_STATUS;
-	iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 	return 0;
 }
 
-static int iscsi_task_reassign_complete_scsi_cmnd(
+static int iscsit_task_reassign_complete_scsi_cmnd(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
 {
@@ -395,22 +385,25 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
 	 */
 	cmd->stat_sn = cmd->exp_stat_sn = 0;
 
-	iscsi_task_reassign_remove_cmd(cmd, cr, conn->sess);
-	iscsi_attach_cmd_to_queue(conn, cmd);
+	iscsit_task_reassign_remove_cmd(cmd, cr, conn->sess);
+
+	spin_lock_bh(&conn->cmd_lock);
+	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
+	spin_unlock_bh(&conn->cmd_lock);
 
 	if (se_cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
 		cmd->i_state = ISTATE_SEND_STATUS;
-		iscsi_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
+		iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
 		return 0;
 	}
 
 	switch (cmd->data_direction) {
 	case DMA_TO_DEVICE:
-		return iscsi_task_reassign_complete_write(cmd, tmr_req);
+		return iscsit_task_reassign_complete_write(cmd, tmr_req);
 	case DMA_FROM_DEVICE:
-		return iscsi_task_reassign_complete_read(cmd, tmr_req);
+		return iscsit_task_reassign_complete_read(cmd, tmr_req);
 	case DMA_NONE:
-		return iscsi_task_reassign_complete_none(cmd, tmr_req);
+		return iscsit_task_reassign_complete_none(cmd, tmr_req);
 	default:
 		printk(KERN_ERR "Unknown cmd->data_direction: 0x%02x\n",
 				cmd->data_direction);
@@ -420,11 +413,7 @@ static int iscsi_task_reassign_complete_scsi_cmnd(
 	return 0;
 }
 
-/*	iscsi_task_reassign_complete():
- *
- *	Called from iscsi_tmr_post_handler().
- */
-static int iscsi_task_reassign_complete(
+static int iscsit_task_reassign_complete(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
 {
@@ -444,10 +433,10 @@ static int iscsi_task_reassign_complete(
 
 	switch (cmd->iscsi_opcode) {
 	case ISCSI_OP_NOOP_OUT:
-		ret = iscsi_task_reassign_complete_nop_out(tmr_req, conn);
+		ret = iscsit_task_reassign_complete_nop_out(tmr_req, conn);
 		break;
 	case ISCSI_OP_SCSI_CMD:
-		ret = iscsi_task_reassign_complete_scsi_cmnd(tmr_req, conn);
+		ret = iscsit_task_reassign_complete_scsi_cmnd(tmr_req, conn);
 		break;
 	default:
 		 printk(KERN_ERR "Illegal iSCSI Opcode 0x%02x during"
@@ -465,36 +454,34 @@ static int iscsi_task_reassign_complete(
 	return 0;
 }
 
-/*	iscsi_tmr_post_handler():
- *
+/*
  *	Handles special after-the-fact actions related to TMRs.
  *	Right now the only one that its really needed for is
  *	connection recovery releated TASK_REASSIGN.
  */
-extern int iscsi_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
+extern int iscsit_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 
 	if (tmr_req->task_reassign &&
 	   (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))
-		return iscsi_task_reassign_complete(tmr_req, conn);
+		return iscsit_task_reassign_complete(tmr_req, conn);
 
 	return 0;
 }
 
-/*	iscsi_task_reassign_prepare_read():
- *
+/*
  *	Nothing to do here, but leave it for good measure. :-)
  */
-int iscsi_task_reassign_prepare_read(
+int iscsit_task_reassign_prepare_read(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
 {
 	return 0;
 }
 
-static void iscsi_task_reassign_prepare_unsolicited_dataout(
+static void iscsit_task_reassign_prepare_unsolicited_dataout(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -564,7 +551,7 @@ static void iscsi_task_reassign_prepare_unsolicited_dataout(
 	return;
 }
 
-int iscsi_task_reassign_prepare_write(
+int iscsit_task_reassign_prepare_write(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
 {
@@ -580,7 +567,7 @@ int iscsi_task_reassign_prepare_write(
 	 * the connection failed.
 	 */
 	if (cmd->unsolicited_data)
-		iscsi_task_reassign_prepare_unsolicited_dataout(cmd, conn);
+		iscsit_task_reassign_prepare_unsolicited_dataout(cmd, conn);
 
 	/*
 	 * The Initiator is requesting R2Ts starting from zero,  skip
@@ -600,7 +587,7 @@ int iscsi_task_reassign_prepare_write(
 	 * If we have not received all DataOUT in question,  we must
 	 * make sure to make the appropriate changes to values in
 	 * struct iscsi_cmd (and elsewhere depending on session parameters)
-	 * so iscsi_build_r2ts_for_cmd() in iscsi_task_reassign_complete_write()
+	 * so iscsit_build_r2ts_for_cmd() in iscsit_task_reassign_complete_write()
 	 * will resend a new R2T for the DataOUT sequences in question.
 	 */
 	spin_lock_bh(&cmd->r2t_lock);
@@ -692,7 +679,7 @@ int iscsi_task_reassign_prepare_write(
 		} else {
 			struct iscsi_seq *seq;
 
-			seq = iscsi_get_seq_holder(cmd, r2t->offset,
+			seq = iscsit_get_seq_holder(cmd, r2t->offset,
 					r2t->xfer_len);
 			if (!seq) {
 				spin_unlock_bh(&cmd->r2t_lock);
@@ -733,7 +720,7 @@ next:
 	 * sequences it has already completed.
 	 *
 	 * Free each R2T in question and adjust values in struct iscsi_cmd
-	 * accordingly so iscsi_build_r2ts_for_cmd() do the rest of
+	 * accordingly so iscsit_build_r2ts_for_cmd() do the rest of
 	 * the work after the TMR TASK_REASSIGN Response is sent.
 	 */
 drop_unacknowledged_r2ts:
@@ -762,7 +749,7 @@ drop_unacknowledged_r2ts:
 		}
 
 		if (r2t->recovery_r2t) {
-			iscsi_free_r2t(r2t, cmd);
+			iscsit_free_r2t(r2t, cmd);
 			continue;
 		}
 
@@ -788,19 +775,18 @@ drop_unacknowledged_r2ts:
 			cmd->seq_send_order--;
 
 		cmd->outstanding_r2ts--;
-		iscsi_free_r2t(r2t, cmd);
+		iscsit_free_r2t(r2t, cmd);
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
 	return 0;
 }
 
-/*	iscsi_check_task_reassign_expdatasn():
- *
+/*
  *	Performs sanity checks TMR TASK_REASSIGN's ExpDataSN for
  *	a given struct iscsi_cmd.
  */
-int iscsi_check_task_reassign_expdatasn(
+int iscsit_check_task_reassign_expdatasn(
 	struct iscsi_tmr_req *tmr_req,
 	struct iscsi_conn *conn)
 {
@@ -841,14 +827,14 @@ int iscsi_check_task_reassign_expdatasn(
 				ref_cmd->acked_data_sn);
 			return -1;
 		}
-		return iscsi_task_reassign_prepare_read(tmr_req, conn);
+		return iscsit_task_reassign_prepare_read(tmr_req, conn);
 	}
 
 	/*
 	 * For WRITEs the TMR TASK_REASSIGNs ExpDataSN contains the next R2TSN
 	 * for R2Ts the Initiator is expecting.
 	 *
-	 * Do the magic in iscsi_task_reassign_prepare_write().
+	 * Do the magic in iscsit_task_reassign_prepare_write().
 	 */
 	if (ref_cmd->data_direction == DMA_TO_DEVICE) {
 		if (tmr_req->exp_data_sn > ref_cmd->r2t_sn) {
@@ -858,7 +844,7 @@ int iscsi_check_task_reassign_expdatasn(
 					ref_cmd->r2t_sn);
 			return -1;
 		}
-		return iscsi_task_reassign_prepare_write(tmr_req, conn);
+		return iscsit_task_reassign_prepare_write(tmr_req, conn);
 	}
 
 	printk(KERN_ERR "Unknown iSCSI data_direction: 0x%02x\n",

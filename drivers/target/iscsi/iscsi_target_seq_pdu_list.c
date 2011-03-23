@@ -29,11 +29,7 @@
 
 #define OFFLOAD_BUF_SIZE	32768
 
-/*	iscsi_dump_seq_list():
- *
- *
- */
-void iscsi_dump_seq_list(struct iscsi_cmd *cmd)
+void iscsit_dump_seq_list(struct iscsi_cmd *cmd)
 {
 	int i;
 	struct iscsi_seq *seq;
@@ -51,11 +47,7 @@ void iscsi_dump_seq_list(struct iscsi_cmd *cmd)
 	}
 }
 
-/*	iscsi_dump_pdu_list():
- *
- *
- */
-void iscsi_dump_pdu_list(struct iscsi_cmd *cmd)
+void iscsit_dump_pdu_list(struct iscsi_cmd *cmd)
 {
 	int i;
 	struct iscsi_pdu *pdu;
@@ -71,11 +63,7 @@ void iscsi_dump_pdu_list(struct iscsi_cmd *cmd)
 	}
 }
 
-/*	iscsi_ordered_seq_lists():
- *
- *
- */
-static inline void iscsi_ordered_seq_lists(
+static inline void iscsit_ordered_seq_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -88,11 +76,7 @@ static inline void iscsi_ordered_seq_lists(
 	}
 }
 
-/*	iscsi_ordered_pdu_lists():
- *
- *
- */
-static inline void iscsi_ordered_pdu_lists(
+static inline void iscsit_ordered_pdu_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -110,12 +94,11 @@ redo:
 	}
 }
 
-/*	iscsi_create_random_array():
- *
+/*
  *	Generate count random values into array.
  *	Use 0x80000000 to mark generates valued in array[].
  */
-static inline void iscsi_create_random_array(u32 *array, u32 count)
+static inline void iscsit_create_random_array(u32 *array, u32 count)
 {
 	int i, j, k;
 
@@ -142,11 +125,7 @@ redo:
 	return;
 }
 
-/*	iscsi_randomize_pdu_lists():
- *
- *
- */
-static inline int iscsi_randomize_pdu_lists(
+static inline int iscsit_randomize_pdu_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -165,7 +144,7 @@ redo:
 				" for random array.\n");
 			return -1;
 		}
-		iscsi_create_random_array(array, seq_count);
+		iscsit_create_random_array(array, seq_count);
 
 		for (i = 0; i < seq_count; i++)
 			cmd->pdu_list[seq_offset+i].pdu_send_order = array[i];
@@ -185,7 +164,7 @@ redo:
 				" random array.\n");
 			return -1;
 		}
-		iscsi_create_random_array(array, seq_count);
+		iscsit_create_random_array(array, seq_count);
 
 		for (i = 0; i < seq_count; i++)
 			cmd->pdu_list[seq_offset+i].pdu_send_order = array[i];
@@ -196,11 +175,7 @@ redo:
 	return 0;
 }
 
-/*	iscsi_randomize_seq_lists():
- *
- *
- */
-static inline int iscsi_randomize_seq_lists(
+static inline int iscsit_randomize_seq_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -220,7 +195,7 @@ static inline int iscsi_randomize_seq_lists(
 		printk(KERN_ERR "Unable to allocate memory for random array.\n");
 		return -1;
 	}
-	iscsi_create_random_array(array, seq_count);
+	iscsit_create_random_array(array, seq_count);
 
 	for (i = 0; i < cmd->seq_count; i++) {
 		if (cmd->seq_list[i].type != SEQTYPE_NORMAL)
@@ -232,11 +207,7 @@ static inline int iscsi_randomize_seq_lists(
 	return 0;
 }
 
-/*	iscsi_determine_counts_for_list():
- *
- *
- */
-static inline void iscsi_determine_counts_for_list(
+static inline void iscsit_determine_counts_for_list(
 	struct iscsi_cmd *cmd,
 	struct iscsi_build_list *bl,
 	u32 *seq_count,
@@ -314,12 +285,11 @@ static inline void iscsi_determine_counts_for_list(
 }
 
 
-/*	iscsi_build_pdu_and_seq_list():
- *
+/*
  *	Builds PDU and/or Sequence list,  called while DataSequenceInOrder=No
  *	and DataPDUInOrder=No.
  */
-static inline int iscsi_build_pdu_and_seq_list(
+static inline int iscsit_build_pdu_and_seq_list(
 	struct iscsi_cmd *cmd,
 	struct iscsi_build_list *bl)
 {
@@ -484,52 +454,51 @@ static inline int iscsi_build_pdu_and_seq_list(
 	if (!datasequenceinorder) {
 		if (bl->data_direction & ISCSI_PDU_WRITE) {
 			if (bl->randomize & RANDOM_R2T_OFFSETS) {
-				if (iscsi_randomize_seq_lists(cmd, bl->type)
+				if (iscsit_randomize_seq_lists(cmd, bl->type)
 						< 0)
 					return -1;
 			} else
-				iscsi_ordered_seq_lists(cmd, bl->type);
+				iscsit_ordered_seq_lists(cmd, bl->type);
 		} else if (bl->data_direction & ISCSI_PDU_READ) {
 			if (bl->randomize & RANDOM_DATAIN_SEQ_OFFSETS) {
-				if (iscsi_randomize_seq_lists(cmd, bl->type)
+				if (iscsit_randomize_seq_lists(cmd, bl->type)
 						< 0)
 					return -1;
 			} else
-				iscsi_ordered_seq_lists(cmd, bl->type);
+				iscsit_ordered_seq_lists(cmd, bl->type);
 		}
 #if 0
-		iscsi_dump_seq_list(cmd);
+		iscsit_dump_seq_list(cmd);
 #endif
 	}
 	if (!datapduinorder) {
 		if (bl->data_direction & ISCSI_PDU_WRITE) {
 			if (bl->randomize & RANDOM_DATAOUT_PDU_OFFSETS) {
-				if (iscsi_randomize_pdu_lists(cmd, bl->type)
+				if (iscsit_randomize_pdu_lists(cmd, bl->type)
 						< 0)
 					return -1;
 			} else
-				iscsi_ordered_pdu_lists(cmd, bl->type);
+				iscsit_ordered_pdu_lists(cmd, bl->type);
 		} else if (bl->data_direction & ISCSI_PDU_READ) {
 			if (bl->randomize & RANDOM_DATAIN_PDU_OFFSETS) {
-				if (iscsi_randomize_pdu_lists(cmd, bl->type)
+				if (iscsit_randomize_pdu_lists(cmd, bl->type)
 						< 0)
 					return -1;
 			} else
-				iscsi_ordered_pdu_lists(cmd, bl->type);
+				iscsit_ordered_pdu_lists(cmd, bl->type);
 		}
 #if 0
-		iscsi_dump_pdu_list(cmd);
+		iscsit_dump_pdu_list(cmd);
 #endif
 	}
 
 	return 0;
 }
 
-/*	iscsi_do_build_list():
- *
+/*
  *	Only called while DataSequenceInOrder=No or DataPDUInOrder=No.
  */
-int iscsi_do_build_list(
+int iscsit_do_build_list(
 	struct iscsi_cmd *cmd,
 	struct iscsi_build_list *bl)
 {
@@ -538,7 +507,7 @@ int iscsi_do_build_list(
 	struct iscsi_pdu *pdu = NULL;
 	struct iscsi_seq *seq = NULL;
 
-	iscsi_determine_counts_for_list(cmd, bl, &seq_count, &pdu_count);
+	iscsit_determine_counts_for_list(cmd, bl, &seq_count, &pdu_count);
 
 	if (!conn->sess->sess_ops->DataSequenceInOrder) {
 		seq = kzalloc(seq_count * sizeof(struct iscsi_seq), GFP_ATOMIC);
@@ -561,14 +530,10 @@ int iscsi_do_build_list(
 		cmd->pdu_count = pdu_count;
 	}
 
-	return iscsi_build_pdu_and_seq_list(cmd, bl);
+	return iscsit_build_pdu_and_seq_list(cmd, bl);
 }
 
-/*	iscsi_get_pdu_holder():
- *
- *
- */
-struct iscsi_pdu *iscsi_get_pdu_holder(
+struct iscsi_pdu *iscsit_get_pdu_holder(
 	struct iscsi_cmd *cmd,
 	u32 offset,
 	u32 length)
@@ -592,11 +557,7 @@ struct iscsi_pdu *iscsi_get_pdu_holder(
 	return NULL;
 }
 
-/*	iscsi_get_pdu_holder_for_seq():
- *
- *
- */
-struct iscsi_pdu *iscsi_get_pdu_holder_for_seq(
+struct iscsi_pdu *iscsit_get_pdu_holder_for_seq(
 	struct iscsi_cmd *cmd,
 	struct iscsi_seq *seq)
 {
@@ -674,11 +635,7 @@ redo:
 	return NULL;
 }
 
-/*	iscsi_get_seq_holder():
- *
- *
- */
-struct iscsi_seq *iscsi_get_seq_holder(
+struct iscsi_seq *iscsit_get_seq_holder(
 	struct iscsi_cmd *cmd,
 	u32 offset,
 	u32 length)

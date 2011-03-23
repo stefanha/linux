@@ -19,6 +19,7 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
+#include <scsi/scsi_device.h>
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
@@ -29,11 +30,7 @@
 #include "iscsi_target_tpg.h"
 #include "iscsi_target_util.h"
 
-/*	iscsi_get_lun():
- *
- *
- */
-int iscsi_get_lun_for_tmr(
+int iscsit_get_lun_for_tmr(
 	struct iscsi_cmd *cmd,
 	u64 lun)
 {
@@ -41,7 +38,7 @@ int iscsi_get_lun_for_tmr(
 	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
-	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
+	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
 		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
@@ -52,12 +49,7 @@ int iscsi_get_lun_for_tmr(
 	return transport_get_lun_for_tmr(SE_CMD(cmd), unpacked_lun);
 }
 
-/*	iscsi_get_lun_for_cmd():
- *
- *	Returns (0) on success
- * 	Returns (< 0) on failure
- */
-int iscsi_get_lun_for_cmd(
+int iscsit_get_lun_for_cmd(
 	struct iscsi_cmd *cmd,
 	unsigned char *cdb,
 	u64 lun)
@@ -66,7 +58,7 @@ int iscsi_get_lun_for_cmd(
 	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
 	u32 unpacked_lun;
 
-	unpacked_lun = iscsi_unpack_lun((unsigned char *)&lun);
+	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
 		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
@@ -77,11 +69,7 @@ int iscsi_get_lun_for_cmd(
 	return transport_get_lun_for_cmd(SE_CMD(cmd), unpacked_lun);
 }
 
-/*	iscsi_determine_maxcmdsn():
- *
- *
- */
-void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
+void iscsit_determine_maxcmdsn(struct iscsi_session *sess)
 {
 	struct se_node_acl *se_nacl;
 
@@ -106,11 +94,7 @@ void iscsi_determine_maxcmdsn(struct iscsi_session *sess)
 	sess->max_cmd_sn = (sess->max_cmd_sn + se_nacl->queue_depth) - 1;
 }
 
-/*	iscsi_increment_maxcmdsn();
- *
- *
- */
-void iscsi_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess)
+void iscsit_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess)
 {
 	if (cmd->immediate_cmd || cmd->maxcmdsn_inc)
 		return;

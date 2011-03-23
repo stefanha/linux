@@ -42,11 +42,11 @@
 #define ISCSI_PDU_WRITE				0x02
 
 struct iscsi_build_list {
-	u8		data_direction;
-	u8		randomize;
-	u8		type;
-	u32		immediate_data_length;
-} ____cacheline_aligned;
+	int		data_direction;
+	int		randomize;
+	int		type;
+	int		immediate_data_length;
+};
 
 struct iscsi_pdu {
 	int		status;
@@ -80,9 +80,9 @@ struct iscsi_seq {
 
 extern struct iscsi_global *iscsi_global;
 
-extern int iscsi_do_build_list(struct iscsi_cmd *, struct iscsi_build_list *);
-extern struct iscsi_pdu *iscsi_get_pdu_holder(struct iscsi_cmd *, u32, u32);
-extern struct iscsi_pdu *iscsi_get_pdu_holder_for_seq(struct iscsi_cmd *, struct iscsi_seq *);
-extern struct iscsi_seq *iscsi_get_seq_holder(struct iscsi_cmd *, u32, u32);
+extern int iscsit_do_build_list(struct iscsi_cmd *, struct iscsi_build_list *);
+extern struct iscsi_pdu *iscsit_get_pdu_holder(struct iscsi_cmd *, u32, u32);
+extern struct iscsi_pdu *iscsit_get_pdu_holder_for_seq(struct iscsi_cmd *, struct iscsi_seq *);
+extern struct iscsi_seq *iscsit_get_seq_holder(struct iscsi_cmd *, u32, u32);
 
 #endif /* ISCSI_SEQ_AND_PDU_LIST_H */
