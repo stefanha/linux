@@ -135,7 +135,7 @@ static void chap_gen_challenge(
 static struct iscsi_chap *chap_server_open(
 	struct iscsi_conn *conn,
 	struct iscsi_node_auth *auth,
-	const char *A_str,
+	const char *a_str,
 	char *aic_str,
 	unsigned int *aic_len)
 {
@@ -156,7 +156,7 @@ static struct iscsi_chap *chap_server_open(
 	/*
 	 * We only support MD5 MDA presently.
 	 */
-	if (strncmp(A_str, "CHAP_A=5", 8)) {
+	if (strncmp(a_str, "CHAP_A=5", 8)) {
 		printk(KERN_ERR "CHAP_A is not MD5.\n");
 		return NULL;
 	}
