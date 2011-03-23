@@ -127,7 +127,7 @@ static ssize_t lio_target_np_store_sctp(
 		memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
 		if (np->np_sockaddr.ss_family == AF_INET6)
 			snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE,
-				"%s", np->np_ipv6);
+				"%s", np->np_ip);
 		else
 			np_addr.np_ipv4 = np->np_ipv4;
 		np_addr.np_flags = np->np_flags;
@@ -589,7 +589,6 @@ static ssize_t lio_target_nacl_show_info(
 	struct iscsi_session *sess;
 	struct iscsi_conn *conn;
 	struct se_session *se_sess;
-	unsigned char *ip, buf_ipv4[IPV4_BUF_SIZE];
 	ssize_t rb = 0;
 
 	spin_lock_bh(&se_nacl->nacl_sess_lock);
@@ -691,13 +690,7 @@ static ssize_t lio_target_nacl_show_info(
 				break;
 			}
 
-			if (conn->net_size == IPV6_ADDRESS_SPACE) {
-				ip = &conn->ipv6_login_ip[0];
-			} else {
-				iscsit_ntoa2(buf_ipv4, conn->login_ip);
-				ip = &buf_ipv4[0];
-			}
-			rb += sprintf(page+rb, "   Address %s %s", ip,
+			rb += sprintf(page+rb, "   Address %s %s", conn->login_ip,
 				(conn->network_transport == ISCSI_TCP) ?
 				"TCP" : "SCTP");
 			rb += sprintf(page+rb, "  StatSN: 0x%08x\n",

@@ -988,13 +988,6 @@ int iscsit_set_sync_and_steering_values(struct iscsi_conn *conn)
 	return 0;
 }
 
-void iscsit_ntoa2(unsigned char *buf, u32 ip)
-{
-	memset(buf, 0, 18);
-	sprintf(buf, "%u.%u.%u.%u", ((ip >> 24) & 0xff), ((ip >> 16) & 0xff),
-			((ip >> 8) & 0xff), (ip & 0xff));
-}
-
 struct iscsi_conn *iscsit_get_conn_from_cid(struct iscsi_session *sess, u16 cid)
 {
 	struct iscsi_conn *conn;
@@ -1835,9 +1828,7 @@ void iscsit_collect_login_stats(
 	ls = &tiqn->login_stats;
 
 	spin_lock(&ls->lock);
-	if (((conn->login_ip == ls->last_intr_fail_addr) ||
-	    !(memcmp(conn->ipv6_login_ip, ls->last_intr_fail_ip6_addr,
-		IPV6_ADDRESS_SPACE))) &&
+	if (!strcmp(conn->login_ip, ls->last_intr_fail_ip_addr) &&
 	    ((get_jiffies_64() - ls->last_fail_time) < 10)) {
 		/* We already have the failure info for this login */
 		spin_unlock(&ls->lock);
@@ -1874,15 +1865,9 @@ void iscsit_collect_login_stats(
 		strcpy(ls->last_intr_fail_name,
 		       (intrname ? intrname->value : "Unknown"));
 
-		if (conn->ipv6_login_ip != NULL) {
-			memcpy(ls->last_intr_fail_ip6_addr,
-				conn->ipv6_login_ip, IPV6_ADDRESS_SPACE);
-			ls->last_intr_fail_addr = 0;
-		} else {
-			memset(ls->last_intr_fail_ip6_addr, 0,
-				IPV6_ADDRESS_SPACE);
-			ls->last_intr_fail_addr = conn->login_ip;
-		}
+		ls->last_intr_fail_ip_family = conn->sock->sk->sk_family;
+		snprintf(ls->last_intr_fail_ip_addr, IPV6_ADDRESS_SPACE,
+				"%s", conn->login_ip);
 		ls->last_fail_time = get_jiffies_64();
 	}
 
@@ -1908,14 +1893,13 @@ struct iscsi_tiqn *iscsit_snmp_get_tiqn(struct iscsi_conn *conn)
 
 extern int iscsit_build_sendtargets_response(struct iscsi_cmd *cmd)
 {
-	char *ip, *payload = NULL;
+	char *payload = NULL;
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_portal_group *tpg;
 	struct iscsi_tiqn *tiqn;
 	struct iscsi_tpg_np *tpg_np;
 	int buffer_len, end_of_buf = 0, len = 0, payload_len = 0;
 	unsigned char buf[256];
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
 	buffer_len = (conn->conn_ops->MaxRecvDataSegmentLength > 32768) ?
 			32768 : conn->conn_ops->MaxRecvDataSegmentLength;
@@ -1958,19 +1942,10 @@ extern int iscsit_build_sendtargets_response(struct iscsi_cmd *cmd)
 					tpg_np_list) {
 				memset(buf, 0, 256);
 
-				if (tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) {
-					ip = &tpg_np->tpg_np->np_ipv6[0];
-				} else {
-					memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-					iscsit_ntoa2(buf_ipv4,
-						tpg_np->tpg_np->np_ipv4);
-					ip = &buf_ipv4[0];
-				}
-
 				len = sprintf(buf, "TargetAddress="
 					"%s%s%s:%hu,%hu",
 					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
-					"[" : "", ip,
+					"[" : "", tpg_np->tpg_np->np_ip,
 					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
 					"]" : "", tpg_np->tpg_np->np_port,
 					tpg->tpgt);

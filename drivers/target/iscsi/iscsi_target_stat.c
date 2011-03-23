@@ -413,7 +413,7 @@ static ssize_t iscsi_stat_tgt_attr_show_attr_fail_intr_addr_type(
 	unsigned char buf[8];
 
 	spin_lock(&lstat->lock);
-	snprintf(buf, 8, "%s", (lstat->last_intr_fail_ip6_addr != NULL) ?
+	snprintf(buf, 8, "%s", (lstat->last_intr_fail_ip_addr != NULL) ?
 				"ipv6" : "ipv4");
 	spin_unlock(&lstat->lock);
 
@@ -430,10 +430,10 @@ static ssize_t iscsi_stat_tgt_attr_show_attr_fail_intr_addr(
 	unsigned char buf[32];
 
 	spin_lock(&lstat->lock);
-	if (lstat->last_intr_fail_ip6_addr != NULL)
-		snprintf(buf, 32, "[%s]", lstat->last_intr_fail_ip6_addr);
+	if (lstat->last_intr_fail_ip_family == AF_INET6)
+		snprintf(buf, 32, "[%s]", lstat->last_intr_fail_ip_addr);
 	else
-		snprintf(buf, 32, "%08X", lstat->last_intr_fail_addr);
+		snprintf(buf, 32, "%s", lstat->last_intr_fail_ip_addr);
 	spin_unlock(&lstat->lock);
 
 	return snprintf(page, PAGE_SIZE, "%s\n", buf);

@@ -49,8 +49,8 @@ struct iscsi_login_stats {
 	u32		negotiate_fails;	/* used for notifications */
 	u64		last_fail_time;		/* time stamp (jiffies) */
 	u32		last_fail_type;
-	u32		last_intr_fail_addr;
-	unsigned char	last_intr_fail_ip6_addr[IPV6_ADDRESS_SPACE];
+	int		last_intr_fail_ip_family;
+	unsigned char	last_intr_fail_ip_addr[IPV6_ADDRESS_SPACE];
 	char		last_intr_fail_name[224];
 } ____cacheline_aligned;
 

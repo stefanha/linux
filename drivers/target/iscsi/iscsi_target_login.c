@@ -576,8 +576,6 @@ static int iscsi_post_login_handler(
 	u8 zero_tsih)
 {
 	int stop_timer = 0;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
-	unsigned char *ip, *ip_np;
 	struct iscsi_session *sess = conn->sess;
 	struct se_session *se_sess = sess->se_sess;
 	struct iscsi_portal_group *tpg = ISCSI_TPG_S(sess);
@@ -594,19 +592,6 @@ static int iscsi_post_login_handler(
 
 	iscsi_set_connection_parameters(conn->conn_ops, conn->param_list);
 	iscsit_set_sync_and_steering_values(conn);
-
-	if (np->np_sockaddr.ss_family == AF_INET6) {
-		ip = &conn->ipv6_login_ip[0];
-		ip_np = &np->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		memset(buf1_ipv4, 0, IPV4_BUF_SIZE);
-		iscsit_ntoa2(buf_ipv4, conn->login_ip);
-		iscsit_ntoa2(buf1_ipv4, np->np_ipv4);
-		ip = &buf_ipv4[0];
-		ip_np = &buf1_ipv4[0];
-	}
-
 	/*
 	 * SCSI Initiator -> SCSI Target Port Mapping
 	 */
@@ -627,7 +612,7 @@ static int iscsi_post_login_handler(
 		}
 
 		printk(KERN_INFO "iSCSI Login successful on CID: %hu from %s to"
-			" %s:%hu,%hu\n", conn->cid, ip, ip_np,
+			" %s:%hu,%hu\n", conn->cid, conn->login_ip, np->np_ip,
 				np->np_port, tpg->tpgt);
 
 		list_add_tail(&conn->conn_list, &sess->sess_conn_list);
@@ -670,7 +655,7 @@ static int iscsi_post_login_handler(
 	sess->session_state = TARG_SESS_STATE_LOGGED_IN;
 
 	printk(KERN_INFO "iSCSI Login successful on CID: %hu from %s to %s:%hu,%hu\n",
-		conn->cid, ip, ip_np, np->np_port, tpg->tpgt);
+		conn->cid, conn->login_ip, np->np_ip, np->np_port, tpg->tpgt);
 
 	spin_lock_bh(&sess->conn_lock);
 	list_add_tail(&conn->conn_list, &sess->sess_conn_list);
@@ -711,15 +696,11 @@ static int iscsi_post_login_handler(
 
 static void iscsi_handle_login_thread_timeout(unsigned long data)
 {
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 	struct iscsi_np *np = (struct iscsi_np *) data;
 
-	memset(buf_ipv4, 0, IPV4_BUF_SIZE);
 	spin_lock_bh(&np->np_thread_lock);
-	iscsit_ntoa2(buf_ipv4, np->np_ipv4);
-
 	printk(KERN_ERR "iSCSI Login timeout on Network Portal %s:%hu\n",
-			buf_ipv4, np->np_port);
+			np->np_ip, np->np_port);
 
 	if (np->np_login_timer_flags & ISCSI_TF_STOP) {
 		spin_unlock_bh(&np->np_thread_lock);
@@ -829,7 +810,7 @@ int iscsi_target_setup_login_socket(struct iscsi_np *np, int af_inet)
 		sock_in6->sin6_port = htons(np->np_port);
 		len = sizeof(struct sockaddr_in6);
 
-		ret = in6_pton(&np->np_ipv6[0], IPV6_ADDRESS_SPACE,
+		ret = in6_pton(&np->np_ip[0], IPV6_ADDRESS_SPACE,
 				(void *)&sock_in6->sin6_addr.in6_u, -1, &end);
 		if (ret <= 0) {
 			printk(KERN_ERR "in6_pton returned: %d\n", ret);
@@ -895,8 +876,6 @@ fail:
 static int __iscsi_target_login_thread(struct iscsi_np *np)
 {
 	u8 buffer[ISCSI_HDR_LEN], iscsi_opcode, zero_tsih = 0;
-	unsigned char *ip = NULL, *ip_init_buf = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE], buf1_ipv4[IPV4_BUF_SIZE];
 	int err, ret = 0, ip_proto, sock_type, set_sctp_conn_flag;
 	struct iscsi_conn *conn = NULL;
 	struct iscsi_login *login;
@@ -1022,19 +1001,11 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	*/
 	conn->login_itt		= pdu->itt;
 
-	if (np->np_sockaddr.ss_family == AF_INET6) {
-		ip = &np->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsit_ntoa2(buf_ipv4, np->np_ipv4);
-		ip = &buf_ipv4[0];
-	}
-
 	spin_lock_bh(&np->np_thread_lock);
 	if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {
 		spin_unlock_bh(&np->np_thread_lock);
 		printk(KERN_ERR "iSCSI Network Portal on %s:%hu currently not"
-			" active.\n", ip, np->np_port);
+			" active.\n", np->np_ip, np->np_port);
 		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 		goto new_sess_out;
@@ -1064,8 +1035,8 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 #else
 		printk(KERN_INFO "Skipping iscsi_ntop6()\n");
 #endif
-		ip_init_buf = &conn->ipv6_login_ip[0];
 	} else {
+		u32 ipv4;
 		memset(&sock_in, 0, sizeof(struct sockaddr_in));
 
 		if (conn->sock->ops->getname(conn->sock,
@@ -1075,11 +1046,12 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 					ISCSI_LOGIN_STATUS_TARGET_ERROR);
 			goto new_sess_out;
 		}
-		memset(buf1_ipv4, 0, IPV4_BUF_SIZE);
-		conn->login_ip = ntohl(sock_in.sin_addr.s_addr);
+		ipv4 = ntohl(sock_in.sin_addr.s_addr);
+		sprintf(conn->login_ip, "%u.%u.%u.%u", ((ipv4 >> 24) & 0xff),
+			((ipv4 >> 16) & 0xff), ((ipv4 >> 8) & 0xff),
+			ipv4 & 0xff);
+		conn->login_ipv4 = ipv4;
 		conn->login_port = ntohs(sock_in.sin_port);
-		iscsit_ntoa2(buf1_ipv4, conn->login_ip);
-		ip_init_buf = &buf1_ipv4[0];
 	}
 
 	conn->network_transport = np->np_network_transport;
@@ -1089,9 +1061,9 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	conn->local_port = np->np_port;
 
 	printk(KERN_INFO "Received iSCSI login request from %s on %s Network"
-			" Portal %s:%hu\n", ip_init_buf,
+			" Portal %s:%hu\n", conn->login_ip,
 		(conn->network_transport == ISCSI_TCP) ? "TCP" : "SCTP",
-			ip, np->np_port);
+			np->np_ip, np->np_port);
 
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_IN_LOGIN.\n");
 	conn->conn_state	= TARG_CONN_STATE_IN_LOGIN;

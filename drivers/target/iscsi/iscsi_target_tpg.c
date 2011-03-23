@@ -430,8 +430,6 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 {
 	struct iscsi_np *np;
 	struct iscsi_tpg_np *tpg_np;
-	unsigned char *ip_buf;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
 
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
 	if (!tpg_np) {
@@ -444,14 +442,6 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 	if (IS_ERR(np)) {
 		kfree(tpg_np);
 		return ERR_CAST(np);
-	}
-
-	if (np->np_sockaddr.ss_family == AF_INET6) {
-		ip_buf = (char *)&np_addr->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsit_ntoa2(buf_ipv4, np_addr->np_ipv4);
-		ip_buf = &buf_ipv4[0];
 	}
 
 	INIT_LIST_HEAD(&tpg_np->tpg_np_list);
@@ -477,7 +467,7 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 	}
 
 	printk(KERN_INFO "CORE[%s] - Added Network Portal: %s:%hu,%hu on %s on"
-		" network device: %s\n", tpg->tpg_tiqn->tiqn, ip_buf,
+		" network device: %s\n", tpg->tpg_tiqn->tiqn, np->np_ip,
 		np->np_port, tpg->tpgt,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
@@ -491,21 +481,10 @@ static int iscsit_tpg_release_np(
 	struct iscsi_portal_group *tpg,
 	struct iscsi_np *np)
 {
-	char *ip;
-	char buf_ipv4[IPV4_BUF_SIZE];
-
-	if (np->np_sockaddr.ss_family == AF_INET6) {
-		ip = &np->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsit_ntoa2(buf_ipv4, np->np_ipv4);
-		ip = &buf_ipv4[0];
-	}
-
 	iscsit_clear_tpg_np_login_thread(tpg_np, tpg);
 
 	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s"
-		" on network device: %s\n", tpg->tpg_tiqn->tiqn, ip,
+		" on network device: %s\n", tpg->tpg_tiqn->tiqn, np->np_ip,
 		np->np_port, tpg->tpgt,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?

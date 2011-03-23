@@ -294,11 +294,11 @@ static struct iscsi_np *iscsit_get_np(
 	unsigned char *ipv6,
 	u32 ipv4,
 	u16 port,
+	int af_inet,
 	int network_transport)
 {
 	struct iscsi_np *np;
-	void *p, *ip;
-	int net_size;
+	int ip_match = 0;
 
 	spin_lock_bh(&np_lock);
 	list_for_each_entry(np, &g_np_list, np_list) {
@@ -308,17 +308,15 @@ static struct iscsi_np *iscsit_get_np(
 			continue;
 		}
 
-		if (ipv6 != NULL) {
-			p = (void *)&np->np_ipv6[0];
-			ip = (void *)ipv6;
-			net_size = IPV6_ADDRESS_SPACE;
+		if (af_inet == AF_INET6) {
+			if (!strcmp(&np->np_ip[0], &ipv6[0]))
+				ip_match = 1;
 		} else {
-			p = (void *)&np->np_ipv4;
-			ip = (void *)&ipv4;
-			net_size = IPV4_ADDRESS_SPACE;
+			if (np->np_ipv4 == ipv4)
+				ip_match = 1;
 		}
 			
-		if (!memcmp(p, ip, net_size) && (np->np_port == port) &&
+		if ((ip_match == 1) && (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
 			/*
 			 * Increment the np_exports reference count now to
@@ -343,24 +341,12 @@ struct iscsi_np *iscsit_add_np(
 	int af_inet)
 {
 	struct iscsi_np *np;
-	char *ip_buf = NULL, *ipv6 = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
-	u32 ipv4 = 0;
 	int ret;
-
-	if (af_inet == AF_INET6) {
-		ip_buf = &np_addr->np_ipv6[0];
-		ipv6 = &np_addr->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsit_ntoa2(buf_ipv4, np_addr->np_ipv4);
-		ip_buf = &buf_ipv4[0];
-		ipv4 = np_addr->np_ipv4;
-	}
 	/*
 	 * Locate the existing struct iscsi_np if already active..
 	 */
-	np = iscsit_get_np(ipv6, ipv4, np_addr->np_port, network_transport);
+	np = iscsit_get_np(np_addr->np_ipv6, np_addr->np_ipv4,
+			   np_addr->np_port, af_inet, network_transport);
 	if (np)
 		return np;
 
@@ -372,10 +358,16 @@ struct iscsi_np *iscsit_add_np(
 
 	np->np_flags |= NPF_IP_NETWORK;
 	if (af_inet == AF_INET6) {
-		memcpy(np->np_ipv6, np_addr->np_ipv6, IPV6_ADDRESS_SPACE);
+		snprintf(np->np_ip, IPV6_ADDRESS_SPACE, "%s", np_addr->np_ipv6);
 	} else {
+		sprintf(np->np_ip, "%u.%u.%u.%u",
+			((np_addr->np_ipv4 >> 24) & 0xff),
+			((np_addr->np_ipv4 >> 16) & 0xff),
+			((np_addr->np_ipv4 >> 8) & 0xff),
+			  np_addr->np_ipv4 & 0xff);
 		np->np_ipv4 = np_addr->np_ipv4;
 	}
+
 	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
 	spin_lock_init(&np->np_thread_lock);
@@ -409,7 +401,7 @@ struct iscsi_np *iscsit_add_np(
 	spin_unlock_bh(&np_lock);
 
 	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on"
-		" network device: %s\n", ip_buf, np->np_port,
+		" network device: %s\n", np->np_ip, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
@@ -471,9 +463,6 @@ int iscsit_del_np_comm(struct iscsi_np *np)
 
 int iscsit_del_np(struct iscsi_np *np)
 {
-	unsigned char *ip = NULL;
-	unsigned char buf_ipv4[IPV4_BUF_SIZE];
-
 	spin_lock_bh(&np->np_thread_lock);
 	if (!(--np->np_exports == 0)) {
 		spin_unlock_bh(&np->np_thread_lock);
@@ -496,16 +485,8 @@ int iscsit_del_np(struct iscsi_np *np)
 	list_del(&np->np_list);
 	spin_unlock_bh(&np_lock);
 
-	if (np->np_sockaddr.ss_family == AF_INET6) {
-		ip = &np->np_ipv6[0];
-	} else {
-		memset(buf_ipv4, 0, IPV4_BUF_SIZE);
-		iscsit_ntoa2(buf_ipv4, np->np_ipv4);
-		ip = &buf_ipv4[0];
-	}
-
 	printk(KERN_INFO "CORE[0] - Removed Network Portal: %s:%hu on %s on"
-		" network device: %s\n", ip, np->np_port,
+		" network device: %s\n", np->np_ip, np->np_port,
 		(np->np_network_transport == ISCSI_TCP) ?
 		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
 		(char *)np->np_net_dev : "None");
