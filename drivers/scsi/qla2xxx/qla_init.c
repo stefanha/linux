@@ -2229,13 +2229,6 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 
 	rval = QLA_SUCCESS;
 
-	if (unlikely(nv == NULL)) {
-		qla_printk(KERN_ERR, ha, "request_ring pointer is NULL\n");
-		dump_stack();
-		rval = 1;
-		goto out;
-	}
-
 	/* Determine NVRAM starting address. */
 	ha->nvram_size = sizeof(nvram_t);
 	ha->nvram_base = 0;
