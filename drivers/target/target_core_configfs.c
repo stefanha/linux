@@ -2800,7 +2800,7 @@ static struct config_group *target_core_make_subdev(
 			"alua", &target_core_alua_tg_pt_gps_cit);
 	config_group_init_type_name(&se_dev->dev_stat_grps.stat_group,
 			"statistics", &target_core_stat_cit);
-			
+
 	dev_cg->default_groups[0] = &se_dev->se_dev_attrib.da_group;
 	dev_cg->default_groups[1] = &se_dev->se_dev_pr_group;
 	dev_cg->default_groups[2] = &se_dev->t10_wwn.t10_wwn_group;

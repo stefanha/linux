@@ -862,8 +862,8 @@ out:
  */
 static void fc_lport_recv_els_req(struct fc_lport *lport, struct fc_frame *fp)
 {
-    struct fc_frame_header *fh = fc_frame_header_get(fp);
-    void (*recv)(struct fc_lport *, struct fc_frame *);
+	struct fc_frame_header *fh = fc_frame_header_get(fp);
+	void (*recv)(struct fc_lport *, struct fc_frame *);
 
 	mutex_lock(&lport->lp_mutex);
 
@@ -904,11 +904,11 @@ static void fc_lport_recv_els_req(struct fc_lport *lport, struct fc_frame *fp)
 		}
 
 		recv(lport, fp);
-    } else {
-        FC_LPORT_DBG(lport, "dropping invalid frame (eof %x)\n",
-                    fr_eof(fp));
-        fc_frame_free(fp);
-    }
+	} else {
+		FC_LPORT_DBG(lport, "dropping invalid frame (eof %x)\n",
+				fr_eof(fp));
+			fc_frame_free(fp);
+	}
 	mutex_unlock(&lport->lp_mutex);
 }
 
@@ -935,6 +935,7 @@ struct fc4_prov fc_lport_els_prov = {
 static void fc_lport_recv_req(struct fc_lport *lport, struct fc_frame *fp)
 {
 	struct fc_frame_header *fh = fc_frame_header_get(fp);
+	struct fc_seq *sp = fr_seq(fp);
 	struct fc4_prov *prov;
 
 	/*
@@ -958,6 +959,7 @@ drop:
 	rcu_read_unlock();
 	FC_LPORT_DBG(lport, "dropping unexpected frame type %x\n", fh->fh_type);
 	fc_frame_free(fp);
+	lport->tt.exch_done(sp);
 }
 
 /**
@@ -1591,6 +1593,7 @@ void fc_lport_enter_flogi(struct fc_lport *lport)
  */
 int fc_lport_config(struct fc_lport *lport)
 {
+	INIT_LIST_HEAD(&lport->ema_list);
 	INIT_DELAYED_WORK(&lport->retry_work, fc_lport_timeout);
 	mutex_init(&lport->lp_mutex);
 

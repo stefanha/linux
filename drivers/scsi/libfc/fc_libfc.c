@@ -155,86 +155,6 @@ u32 fc_copy_buffer_to_sglist(void *buf, size_t len,
 	return copy_len;
 }
 
-void fc_lport_iterate(void (*notify)(struct fc_lport *, void *), void *arg)
-{
-	struct fc_lport *lport;
-
-	mutex_lock(&fc_prov_mutex);
-	list_for_each_entry(lport, &fc_local_ports, lport_list)
-		notify(lport, arg);
-	mutex_unlock(&fc_prov_mutex);
-}
-EXPORT_SYMBOL(fc_lport_iterate);
-
-/**
- * fc_fc4_register_provider() - register FC-4 upper-level provider.
- * @type: FC-4 type, such as FC_TYPE_FCP
- * @prov: structure describing provider including ops vector.
- *
- * Returns 0 on success, negative error otherwise.
- */
-int fc_fc4_register_provider(enum fc_fh_type type, struct fc4_prov *prov)
-{
-	struct fc4_prov **prov_entry;
-	int ret = 0;
-
-	if (type >= FC_FC4_PROV_SIZE)
-		return -EINVAL;
-	mutex_lock(&fc_prov_mutex);
-	prov_entry = (prov->recv ? fc_passive_prov : fc_active_prov) + type;
-	if (*prov_entry)
-		ret = -EBUSY;
-	else
-		*prov_entry = prov;
-	mutex_unlock(&fc_prov_mutex);
-	return ret;
-}
-EXPORT_SYMBOL(fc_fc4_register_provider);
-
-/**
- * fc_fc4_deregister_provider() - deregister FC-4 upper-level provider.
- * @type: FC-4 type, such as FC_TYPE_FCP
- * @prov: structure describing provider including ops vector.
- */
-void fc_fc4_deregister_provider(enum fc_fh_type type, struct fc4_prov *prov)
-{
-	BUG_ON(type >= FC_FC4_PROV_SIZE);
-	mutex_lock(&fc_prov_mutex);
-	if (prov->recv)
-		rcu_assign_pointer(fc_passive_prov[type], NULL);
-	else
-		rcu_assign_pointer(fc_active_prov[type], NULL);
-	mutex_unlock(&fc_prov_mutex);
-	synchronize_rcu();
-}
-EXPORT_SYMBOL(fc_fc4_deregister_provider);
-
-/**
- * fc_fc4_add_lport() - add new local port to list and run notifiers.
- * @lport:  The new local port.
- */
-void fc_fc4_add_lport(struct fc_lport *lport)
-{
-	mutex_lock(&fc_prov_mutex);
-	list_add_tail(&lport->lport_list, &fc_local_ports);
-	blocking_notifier_call_chain(&fc_lport_notifier_head,
-				     FC_LPORT_EV_ADD, lport);
-	mutex_unlock(&fc_prov_mutex);
-}
-
-/**
- * fc_fc4_del_lport() - remove local port from list and run notifiers.
- * @lport:  The new local port.
- */
-void fc_fc4_del_lport(struct fc_lport *lport)
-{
-	mutex_lock(&fc_prov_mutex);
-	list_del(&lport->lport_list);
-	blocking_notifier_call_chain(&fc_lport_notifier_head,
-				     FC_LPORT_EV_DEL, lport);
-	mutex_unlock(&fc_prov_mutex);
-}
-
 /**
  * fc_fill_hdr() -  fill FC header fields based on request
  * @fp: reply frame containing header to be filled in
@@ -329,4 +249,84 @@ void fc_fc4_conf_lport_params(struct fc_lport *lport, enum fc_fh_type type)
 		if (prov_entry && prov_entry->recv)
 			lport->service_params |= FCP_SPPF_TARG_FCN;
 	}
+}
+
+void fc_lport_iterate(void (*notify)(struct fc_lport *, void *), void *arg)
+{
+	struct fc_lport *lport;
+
+	mutex_lock(&fc_prov_mutex);
+	list_for_each_entry(lport, &fc_local_ports, lport_list)
+		notify(lport, arg);
+	mutex_unlock(&fc_prov_mutex);
+}
+EXPORT_SYMBOL(fc_lport_iterate);
+
+/**
+ * fc_fc4_register_provider() - register FC-4 upper-level provider.
+ * @type: FC-4 type, such as FC_TYPE_FCP
+ * @prov: structure describing provider including ops vector.
+ *
+ * Returns 0 on success, negative error otherwise.
+ */
+int fc_fc4_register_provider(enum fc_fh_type type, struct fc4_prov *prov)
+{
+	struct fc4_prov **prov_entry;
+	int ret = 0;
+
+	if (type >= FC_FC4_PROV_SIZE)
+		return -EINVAL;
+	mutex_lock(&fc_prov_mutex);
+	prov_entry = (prov->recv ? fc_passive_prov : fc_active_prov) + type;
+	if (*prov_entry)
+		ret = -EBUSY;
+	else
+		*prov_entry = prov;
+	mutex_unlock(&fc_prov_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(fc_fc4_register_provider);
+
+/**
+ * fc_fc4_deregister_provider() - deregister FC-4 upper-level provider.
+ * @type: FC-4 type, such as FC_TYPE_FCP
+ * @prov: structure describing provider including ops vector.
+ */
+void fc_fc4_deregister_provider(enum fc_fh_type type, struct fc4_prov *prov)
+{
+	BUG_ON(type >= FC_FC4_PROV_SIZE);
+	mutex_lock(&fc_prov_mutex);
+	if (prov->recv)
+		rcu_assign_pointer(fc_passive_prov[type], NULL);
+	else
+		rcu_assign_pointer(fc_active_prov[type], NULL);
+	mutex_unlock(&fc_prov_mutex);
+	synchronize_rcu();
+}
+EXPORT_SYMBOL(fc_fc4_deregister_provider);
+
+/**
+ * fc_fc4_add_lport() - add new local port to list and run notifiers.
+ * @lport:  The new local port.
+ */
+void fc_fc4_add_lport(struct fc_lport *lport)
+{
+	mutex_lock(&fc_prov_mutex);
+	list_add_tail(&lport->lport_list, &fc_local_ports);
+	blocking_notifier_call_chain(&fc_lport_notifier_head,
+				     FC_LPORT_EV_ADD, lport);
+	mutex_unlock(&fc_prov_mutex);
+}
+
+/**
+ * fc_fc4_del_lport() - remove local port from list and run notifiers.
+ * @lport:  The new local port.
+ */
+void fc_fc4_del_lport(struct fc_lport *lport)
+{
+	mutex_lock(&fc_prov_mutex);
+	list_del(&lport->lport_list);
+	blocking_notifier_call_chain(&fc_lport_notifier_head,
+				     FC_LPORT_EV_DEL, lport);
+	mutex_unlock(&fc_prov_mutex);
 }
