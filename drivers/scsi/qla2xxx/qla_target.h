@@ -798,6 +798,17 @@ int qla2x00_wait_for_hba_online(scsi_qla_host_t *);
 #define QLA_TGT_SENSE_VALID(sense)  ((sense != NULL) && \
 				(((const uint8_t *)(sense))[0] & 0x70) == 0x70)
 
+struct qla_port23_data {
+	uint8_t port_name[WWN_SIZE];
+	uint16_t loop_id;
+};
+
+struct qla_port24_data {
+	uint8_t port_name[WWN_SIZE];
+	uint16_t loop_id;
+	uint16_t reserved;
+};
+
 struct qla_tgt {
 	struct scsi_qla_host *vha;
 	struct qla_hw_data *ha;
