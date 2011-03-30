@@ -1588,30 +1588,6 @@ qla2x00_init_response_q_entries(struct rsp_que *rsp)
 	}
 }
 
-/*
- * qla2x00_init_atio_q_entries() - Initializes ATIO queue entries.
- * @ha: HA context
- *
- * Beginning of ATIO ring has initialization control block already built
- * by nvram config routine.
- *
- * Returns 0 on success.
- */
-static void
-qla2x00_init_atio_q_entries(scsi_qla_host_t *vha)
-{
-	struct qla_hw_data *ha = vha->hw;
-	uint16_t cnt;
-	atio_t *pkt;
-
-	pkt = ha->atio_ring;
-	for (cnt = 0; cnt < ha->atio_q_length; cnt++) {
-		pkt->signature = ATIO_PROCESSED;
-		pkt++;
-	}
-
-}
-
 /**
  * qla2x00_update_fw_options() - Read and process firmware options.
  * @ha: HA context
@@ -1887,7 +1863,7 @@ qla2x00_init_rings(scsi_qla_host_t *vha)
 	ha->atio_ring_ptr = ha->atio_ring;
 	ha->atio_ring_index = 0;
 	/* Initialize ATIO queue entries */
-	qla2x00_init_atio_q_entries(vha);
+	qla_tgt_init_atio_q_entries(vha);
 
 	ha->isp_ops->config_rings(vha);
 

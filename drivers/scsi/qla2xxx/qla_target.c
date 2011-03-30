@@ -5172,6 +5172,30 @@ qla_tgt_initialize_adapter(scsi_qla_host_t *vha, struct qla_hw_data *ha)
 	}
 }
 
+/*
+ * qla_tgt_init_atio_q_entries() - Initializes ATIO queue entries.
+ * @ha: HA context
+ *
+ * Beginning of ATIO ring has initialization control block already built
+ * by nvram config routine.
+ *
+ * Returns 0 on success.
+ */
+void
+qla_tgt_init_atio_q_entries(scsi_qla_host_t *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	uint16_t cnt;
+	atio_t *pkt;
+
+	pkt = ha->atio_ring;
+	for (cnt = 0; cnt < ha->atio_q_length; cnt++) {
+		pkt->signature = ATIO_PROCESSED;
+		pkt++;
+	}
+
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
