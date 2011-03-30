@@ -615,7 +615,7 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
-	if (transport_get_lun_for_cmd(se_cmd, NULL, lun) < 0) {
+	if (transport_get_lun_for_cmd(se_cmd, lun) < 0) {
 		/*
 		 * Clear qla_tgt_cmd->locked_rsp as ha->hardware_lock
 		 * is already held here..
