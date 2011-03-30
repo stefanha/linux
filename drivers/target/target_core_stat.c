@@ -50,7 +50,6 @@
 #include <target/configfs_macros.h>
 
 #include "target_core_hba.h"
-#include "target_core_stat.h"
 
 #ifndef INITIAL_JIFFIES
 #define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
@@ -287,14 +286,13 @@ static ssize_t target_stat_scsi_tgt_dev_show_attr_resets(
 	struct se_subsystem_dev *se_subdev = container_of(sgrps,
 			struct se_subsystem_dev, dev_stat_grps);
 	struct se_device *dev = se_subdev->se_dev_ptr;
-	
+
 	if (!dev)
 		return -ENODEV;
 
 	return snprintf(page, PAGE_SIZE, "%u\n", dev->num_resets);
 }
 DEV_STAT_SCSI_TGT_DEV_ATTR_RO(resets);
-	
 
 CONFIGFS_EATTR_OPS(target_stat_scsi_tgt_dev, se_dev_stat_grps, scsi_tgt_dev_group);
 
@@ -426,7 +424,7 @@ static ssize_t target_stat_scsi_lu_show_attr_vend(
 				DEV_T10_WWN(dev)->vendor[j] : 0x20;
 	str[8] = 0;
 	return snprintf(page, PAGE_SIZE, "%s\n", str);
-}	
+}
 DEV_STAT_SCSI_LU_ATTR_RO(vend);
 
 static ssize_t target_stat_scsi_lu_show_attr_prod(
@@ -859,7 +857,7 @@ static ssize_t target_stat_scsi_tgt_port_show_attr_inst(
 	if (!sep) {
 		spin_unlock(&lun->lun_sep_lock);
 		return -ENODEV;
-	}	
+	}
 	hba = dev->se_hba;
 	ret = snprintf(page, PAGE_SIZE, "%u\n", hba->hba_index);
 	spin_unlock(&lun->lun_sep_lock);
@@ -896,9 +894,9 @@ static ssize_t target_stat_scsi_tgt_port_show_attr_indx(
 
 	spin_lock(&lun->lun_sep_lock);
 	sep = lun->lun_sep;
-	if (!sep) { 
+	if (!sep) {
 		spin_unlock(&lun->lun_sep_lock);
-		return -ENODEV; 
+		return -ENODEV;
 	}
 	ret = snprintf(page, PAGE_SIZE, "%u\n", sep->sep_index);
 	spin_unlock(&lun->lun_sep_lock);
@@ -968,7 +966,7 @@ static ssize_t target_stat_scsi_tgt_port_show_attr_in_cmds(
 		return -ENODEV;
 	}
 	tpg = sep->sep_tpg;
-	
+
 	ret = snprintf(page, PAGE_SIZE, "%llu\n", sep->sep_stats.cmd_pdus);
 	spin_unlock(&lun->lun_sep_lock);
 	return ret;
@@ -1105,7 +1103,7 @@ static ssize_t target_stat_scsi_transport_show_attr_inst(
 		return -ENODEV;
 	}
 
-	hba = dev->se_hba; 
+	hba = dev->se_hba;
 	ret = snprintf(page, PAGE_SIZE, "%u\n", hba->hba_index);
 	spin_unlock(&lun->lun_sep_lock);
 	return ret;
@@ -1401,7 +1399,7 @@ static ssize_t target_stat_scsi_auth_intr_show_attr_map_indx(
 	if (!deve->se_lun || !deve->se_lun_acl) {
 		spin_unlock_irq(&nacl->device_list_lock);
 		return -ENODEV;
-	}	
+	}
 	/* FIXME: scsiAuthIntrLunMapIndex */
 	ret = snprintf(page, PAGE_SIZE, "%u\n", 0);
 	spin_unlock_irq(&nacl->device_list_lock);

@@ -84,22 +84,6 @@ MODULE_PARM_DESC(debug_libiscsi_eh,
 					     __func__, ##arg);		\
 	} while (0);
 
-/* Serial Number Arithmetic, 32 bits, less than, RFC1982 */
-#define SNA32_CHECK 2147483648UL
-
-static int iscsi_sna_lt(u32 n1, u32 n2)
-{
-	return n1 != n2 && ((n1 < n2 && (n2 - n1 < SNA32_CHECK)) ||
-			    (n1 > n2 && (n2 - n1 < SNA32_CHECK)));
-}
-
-/* Serial Number Arithmetic, 32 bits, less than, RFC1982 */
-static int iscsi_sna_lte(u32 n1, u32 n2)
-{
-	return n1 == n2 || ((n1 < n2 && (n2 - n1 < SNA32_CHECK)) ||
-			    (n1 > n2 && (n2 - n1 < SNA32_CHECK)));
-}
-
 inline void iscsi_conn_queue_work(struct iscsi_conn *conn)
 {
 	struct Scsi_Host *shost = conn->session->host;
@@ -360,7 +344,7 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_task *task)
 	struct iscsi_conn *conn = task->conn;
 	struct iscsi_session *session = conn->session;
 	struct scsi_cmnd *sc = task->sc;
-	struct iscsi_scsi_cmd *hdr;
+	struct iscsi_scsi_req *hdr;
 	unsigned hdrlength, cmd_len;
 	itt_t itt;
 	int rc;
@@ -374,7 +358,7 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_task *task)
 		if (rc)
 			return rc;
 	}
-	hdr = (struct iscsi_scsi_cmd *) task->hdr;
+	hdr = (struct iscsi_scsi_req *) task->hdr;
 	itt = hdr->itt;
 	memset(hdr, 0, sizeof(*hdr));
 
@@ -830,7 +814,7 @@ static void iscsi_scsi_cmd_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 			       struct iscsi_task *task, char *data,
 			       int datalen)
 {
-	struct iscsi_scsi_cmd_rsp *rhdr = (struct iscsi_scsi_cmd_rsp *)hdr;
+	struct iscsi_scsi_rsp *rhdr = (struct iscsi_scsi_rsp *)hdr;
 	struct iscsi_session *session = conn->session;
 	struct scsi_cmnd *sc = task->sc;
 
@@ -3352,6 +3336,47 @@ int iscsi_session_get_param(struct iscsi_cls_session *cls_session,
 }
 EXPORT_SYMBOL_GPL(iscsi_session_get_param);
 
+int iscsi_conn_get_addr_param(struct sockaddr_storage *addr,
+			      enum iscsi_param param, char *buf)
+{
+	struct sockaddr_in6 *sin6 = NULL;
+	struct sockaddr_in *sin = NULL;
+	int len;
+
+	switch (addr->ss_family) {
+	case AF_INET:
+		sin = (struct sockaddr_in *)addr;
+		break;
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)addr;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	switch (param) {
+	case ISCSI_PARAM_CONN_ADDRESS:
+	case ISCSI_HOST_PARAM_IPADDRESS:
+		if (sin)
+			len = sprintf(buf, "%pI4\n", &sin->sin_addr.s_addr);
+		else
+			len = sprintf(buf, "%pI6\n", &sin6->sin6_addr);
+		break;
+	case ISCSI_PARAM_CONN_PORT:
+		if (sin)
+			len = sprintf(buf, "%hu\n", be16_to_cpu(sin->sin_port));
+		else
+			len = sprintf(buf, "%hu\n",
+				      be16_to_cpu(sin6->sin6_port));
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return len;
+}
+EXPORT_SYMBOL_GPL(iscsi_conn_get_addr_param);
+
 int iscsi_conn_get_param(struct iscsi_cls_conn *cls_conn,
 			 enum iscsi_param param, char *buf)
 {
@@ -3415,9 +3440,6 @@ int iscsi_host_get_param(struct Scsi_Host *shost, enum iscsi_host_param param,
 		break;
 	case ISCSI_HOST_PARAM_INITIATOR_NAME:
 		len = sprintf(buf, "%s\n", ihost->initiatorname);
-		break;
-	case ISCSI_HOST_PARAM_IPADDRESS:
-		len = sprintf(buf, "%s\n", ihost->local_address);
 		break;
 	default:
 		return -ENOSYS;

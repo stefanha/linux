@@ -58,7 +58,7 @@
 
 #include "fc_libfc.h"
 
-struct workqueue_struct *rport_event_queue;
+static struct workqueue_struct *rport_event_queue;
 
 static void fc_rport_enter_flogi(struct fc_rport_priv *);
 static void fc_rport_enter_plogi(struct fc_rport_priv *);
@@ -145,8 +145,10 @@ static struct fc_rport_priv *fc_rport_create(struct fc_lport *lport,
 	rdata->maxframe_size = FC_MIN_MAX_PAYLOAD;
 	INIT_DELAYED_WORK(&rdata->retry_work, fc_rport_timeout);
 	INIT_WORK(&rdata->event_work, fc_rport_work);
-	if (port_id != FC_FID_DIR_SERV)
+	if (port_id != FC_FID_DIR_SERV) {
+		rdata->lld_event_callback = lport->tt.rport_event_callback;
 		list_add_rcu(&rdata->peers, &lport->disc.rports);
+	}
 	return rdata;
 }
 
@@ -302,6 +304,10 @@ static void fc_rport_work(struct work_struct *work)
 			FC_RPORT_DBG(rdata, "callback ev %d\n", event);
 			rport_ops->event_callback(lport, rdata, event);
 		}
+		if (rdata->lld_event_callback) {
+			FC_RPORT_DBG(rdata, "lld callback ev %d\n", event);
+			rdata->lld_event_callback(lport, rdata, event);
+		}
 		kref_put(&rdata->kref, lport->tt.rport_destroy);
 		break;
 
@@ -323,6 +329,10 @@ static void fc_rport_work(struct work_struct *work)
 		if (rport_ops && rport_ops->event_callback) {
 			FC_RPORT_DBG(rdata, "callback ev %d\n", event);
 			rport_ops->event_callback(lport, rdata, event);
+		}
+		if (rdata->lld_event_callback) {
+			FC_RPORT_DBG(rdata, "lld callback ev %d\n", event);
+			rdata->lld_event_callback(lport, rdata, event);
 		}
 		cancel_delayed_work_sync(&rdata->retry_work);
 
@@ -347,6 +357,7 @@ static void fc_rport_work(struct work_struct *work)
 			if (port_id == FC_FID_DIR_SERV) {
 				rdata->event = RPORT_EV_NONE;
 				mutex_unlock(&rdata->rp_mutex);
+				kref_put(&rdata->kref, lport->tt.rport_destroy);
 			} else if ((rdata->flags & FC_RP_STARTED) &&
 				   rdata->major_retries <
 				   lport->max_rport_retry_count) {
@@ -586,7 +597,7 @@ static void fc_rport_error_retry(struct fc_rport_priv *rdata,
 
 	/* make sure this isn't an FC_EX_CLOSED error, never retry those */
 	if (PTR_ERR(fp) == -FC_EX_CLOSED)
-		return fc_rport_error(rdata, fp);
+		goto out;
 
 	if (rdata->retries < rdata->local_port->max_rport_retry_count) {
 		FC_RPORT_DBG(rdata, "Error %ld in state %s, retrying\n",
@@ -599,7 +610,8 @@ static void fc_rport_error_retry(struct fc_rport_priv *rdata,
 		return;
 	}
 
-	return fc_rport_error(rdata, fp);
+out:
+	fc_rport_error(rdata, fp);
 }
 
 /**
@@ -889,6 +901,9 @@ static void fc_rport_plogi_resp(struct fc_seq *sp, struct fc_frame *fp,
 		rdata->ids.port_name = get_unaligned_be64(&plp->fl_wwpn);
 		rdata->ids.node_name = get_unaligned_be64(&plp->fl_wwnn);
 
+		/* save plogi response sp_features for further reference */
+		rdata->sp_features = ntohs(plp->fl_csp.sp_features);
+
 		if (lport->point_to_multipoint)
 			fc_rport_login_complete(rdata, fp);
 		csp_seq = ntohs(plp->fl_csp.sp_tot_seq);
@@ -996,6 +1011,7 @@ static void fc_rport_prli_resp(struct fc_seq *sp, struct fc_frame *fp,
 		resp_code = (pp->spp.spp_flags & FC_SPP_RESP_MASK);
 		FC_RPORT_DBG(rdata, "PRLI spp_flags = 0x%x\n",
 			     pp->spp.spp_flags);
+		rdata->spp_type = pp->spp.spp_type;
 		if (resp_code != FC_SPP_RESP_ACK) {
 			if (resp_code == FC_SPP_RESP_CONF)
 				fc_rport_error(rdata, fp);
@@ -1009,6 +1025,15 @@ static void fc_rport_prli_resp(struct fc_seq *sp, struct fc_frame *fp,
 		fcp_parm = ntohl(pp->spp.spp_params);
 		if (fcp_parm & FCP_SPPF_RETRY)
 			rdata->flags |= FC_RP_FLAGS_RETRY;
+		if (fcp_parm & FCP_SPPF_CONF_COMPL)
+			rdata->flags |= FC_RP_FLAGS_CONF_REQ;
+
+		prov = fc_passive_prov[FC_TYPE_FCP];
+		if (prov) {
+			memset(&temp_spp, 0, sizeof(temp_spp));
+			prov->prli(rdata, pp->prli.prli_spp_len,
+				   &pp->spp, &temp_spp);
+		}
 
         prov = fc_passive_prov[FC_TYPE_FCP];
         if (prov) {
@@ -1665,7 +1690,6 @@ static void fc_rport_recv_prli_req(struct fc_rport_priv *rdata,
 {
 	struct fc_lport *lport = rdata->local_port;
 	struct fc_frame *fp;
-	struct fc4_prov *prov;
 	struct {
 		struct fc_els_prli prli;
 		struct fc_els_spp spp;
@@ -1677,6 +1701,7 @@ static void fc_rport_recv_prli_req(struct fc_rport_priv *rdata,
 	enum fc_els_spp_resp resp;
 	enum fc_els_spp_resp passive;
 	struct fc_seq_els_data rjt_data;
+	struct fc4_prov *prov;
 
 	FC_RPORT_DBG(rdata, "Received PRLI request while in state %s\n",
 		     fc_rport_state(rdata));
@@ -1710,9 +1735,6 @@ static void fc_rport_recv_prli_req(struct fc_rport_priv *rdata,
 	pp->prli.prli_len = htons(len);
 	len -= sizeof(struct fc_els_prli);
 
-	/* reinitialize remote port roles */
-	rdata->ids.roles = FC_RPORT_ROLE_UNKNOWN;
-
 	/*
 	 * Go through all the service parameter pages and build
 	 * response.  If plen indicates longer SPP than standard,
@@ -1721,6 +1743,7 @@ static void fc_rport_recv_prli_req(struct fc_rport_priv *rdata,
 	spp = &pp->spp;
 	mutex_lock(&fc_prov_mutex);
 	while (len >= plen) {
+		rdata->spp_type = rspp->spp_type;
 		spp->spp_type = rspp->spp_type;
 		spp->spp_type_ext = rspp->spp_type_ext;
 		resp = 0;
@@ -1992,7 +2015,7 @@ struct fc4_prov fc_rport_t0_prov = {
 /**
  * fc_setup_rport() - Initialize the rport_event_queue
  */
-int fc_setup_rport()
+int fc_setup_rport(void)
 {
 	rport_event_queue = create_singlethread_workqueue("fc_rport_eq");
 	if (!rport_event_queue)
@@ -2003,7 +2026,7 @@ int fc_setup_rport()
 /**
  * fc_destroy_rport() - Destroy the rport_event_queue
  */
-void fc_destroy_rport()
+void fc_destroy_rport(void)
 {
 	destroy_workqueue(rport_event_queue);
 }

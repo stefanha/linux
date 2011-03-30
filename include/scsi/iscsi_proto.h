@@ -33,6 +33,35 @@
 #define ISCSI_PAD_LEN		4
 
 /*
+ * Serial Number Arithmetic, 32 bits, RFC1982
+ */
+#define SNA32_CHECK 2147483648UL
+
+static inline int iscsi_sna_lt(u32 n1, u32 n2)
+{
+	return n1 != n2 && ((n1 < n2 && (n2 - n1 < SNA32_CHECK)) ||
+			(n1 > n2 && (n2 - n1 < SNA32_CHECK)));
+}
+
+static inline int iscsi_sna_lte(u32 n1, u32 n2)
+{
+	return n1 == n2 || ((n1 < n2 && (n2 - n1 < SNA32_CHECK)) ||
+			(n1 > n2 && (n2 - n1 < SNA32_CHECK)));
+}
+
+static inline int iscsi_sna_gt(u32 n1, u32 n2)
+{
+	return n1 != n2 && (((n1 < n2) && ((n2 - n1) > SNA32_CHECK)) ||
+			((n1 > n2) && ((n1 - n2) < SNA32_CHECK)));
+}
+
+static inline int iscsi_sna_gte(u32 n1, u32 n2)
+{
+	return n1 == n2 || (((n1 < n2) && ((n2 - n1) > SNA32_CHECK)) ||
+			((n1 > n2) && ((n1 - n2) < SNA32_CHECK)));
+}
+
+/*
  * useful common(control and data pathes) macro
  */
 #define ntoh24(p) (((p)[0] << 16) | ((p)[1] << 8) | ((p)[2]))
@@ -116,7 +145,7 @@ struct iscsi_ahs_hdr {
 #define ISCSI_CDB_SIZE			16
 
 /* iSCSI PDU Header */
-struct iscsi_scsi_cmd {
+struct iscsi_scsi_req {
 	uint8_t opcode;
 	uint8_t flags;
 	__be16 rsvd2;
@@ -161,7 +190,7 @@ struct iscsi_ecdb_ahdr {
 };
 
 /* SCSI Response Header */
-struct iscsi_scsi_cmd_rsp {
+struct iscsi_scsi_rsp {
 	uint8_t opcode;
 	uint8_t flags;
 	uint8_t response;
@@ -427,7 +456,13 @@ struct iscsi_login_req {
 #define ISCSI_FLAG_LOGIN_TRANSIT		0x80
 #define ISCSI_FLAG_LOGIN_CONTINUE		0x40
 #define ISCSI_FLAG_LOGIN_CURRENT_STAGE_MASK	0x0C	/* 2 bits */
+#define ISCSI_FLAG_LOGIN_CURRENT_STAGE1		0x04
+#define ISCSI_FLAG_LOGIN_CURRENT_STAGE2		0x08
+#define ISCSI_FLAG_LOGIN_CURRENT_STAGE3		0x0C
 #define ISCSI_FLAG_LOGIN_NEXT_STAGE_MASK	0x03	/* 2 bits */
+#define ISCSI_FLAG_LOGIN_NEXT_STAGE1		0x01
+#define ISCSI_FLAG_LOGIN_NEXT_STAGE2		0x02
+#define ISCSI_FLAG_LOGIN_NEXT_STAGE3		0x03
 
 #define ISCSI_LOGIN_CURRENT_STAGE(flags) \
 	((flags & ISCSI_FLAG_LOGIN_CURRENT_STAGE_MASK) >> 2)
@@ -550,17 +585,25 @@ struct iscsi_logout_rsp {
 struct iscsi_snack {
 	uint8_t opcode;
 	uint8_t flags;
-	uint8_t rsvd2[14];
+	uint8_t rsvd2[2];
+	uint8_t hlength;
+	uint8_t dlength[3];
+	uint8_t lun[8];	
 	itt_t	 itt;
+	__be32  ttt;
+	uint8_t rsvd3[4];
+	__be32  exp_statsn;
+	uint8_t rsvd4[8];
 	__be32	begrun;
 	__be32	runlength;
-	__be32	exp_statsn;
-	__be32	rsvd3;
-	__be32	exp_datasn;
-	uint8_t rsvd6[8];
 };
 
 /* SNACK PDU flags */
+#define ISCSI_FLAG_SNACK_TYPE_DATA		0
+#define ISCSI_FLAG_SNACK_TYPE_R2T		0
+#define ISCSI_FLAG_SNACK_TYPE_STATUS		1
+#define ISCSI_FLAG_SNACK_TYPE_DATA_ACK		2
+#define ISCSI_FLAG_SNACK_TYPE_RDATA		3
 #define ISCSI_FLAG_SNACK_TYPE_MASK	0x0F	/* 4 bits */
 
 /* Reject Message Header */

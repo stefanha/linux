@@ -326,11 +326,11 @@ int bnx2i_send_iscsi_login(struct bnx2i_conn *bnx2i_conn,
 {
 	struct bnx2i_cmd *bnx2i_cmd;
 	struct bnx2i_login_request *login_wqe;
-	struct iscsi_login *login_hdr;
+	struct iscsi_login_req *login_hdr;
 	u32 dword;
 
 	bnx2i_cmd = (struct bnx2i_cmd *)task->dd_data;
-	login_hdr = (struct iscsi_login *)task->hdr;
+	login_hdr = (struct iscsi_login_req *)task->hdr;
 	login_wqe = (struct bnx2i_login_request *)
 						bnx2i_conn->ep->qp.sq_prod_qe;
 
@@ -445,6 +445,56 @@ int bnx2i_send_iscsi_tmf(struct bnx2i_conn *bnx2i_conn,
 }
 
 /**
+ * bnx2i_send_iscsi_text - post iSCSI text WQE to hardware
+ * @conn:	iscsi connection
+ * @mtask:	driver command structure which is requesting
+ *		a WQE to sent to chip for further processing
+ *
+ * prepare and post an iSCSI Text request WQE to CNIC firmware
+ */
+int bnx2i_send_iscsi_text(struct bnx2i_conn *bnx2i_conn,
+			  struct iscsi_task *mtask)
+{
+	struct bnx2i_cmd *bnx2i_cmd;
+	struct bnx2i_text_request *text_wqe;
+	struct iscsi_text *text_hdr;
+	u32 dword;
+
+	bnx2i_cmd = (struct bnx2i_cmd *)mtask->dd_data;
+	text_hdr = (struct iscsi_text *)mtask->hdr;
+	text_wqe = (struct bnx2i_text_request *) bnx2i_conn->ep->qp.sq_prod_qe;
+
+	memset(text_wqe, 0, sizeof(struct bnx2i_text_request));
+
+	text_wqe->op_code = text_hdr->opcode;
+	text_wqe->op_attr = text_hdr->flags;
+	text_wqe->data_length = ntoh24(text_hdr->dlength);
+	text_wqe->itt = mtask->itt |
+		(ISCSI_TASK_TYPE_MPATH << ISCSI_TEXT_REQUEST_TYPE_SHIFT);
+	text_wqe->ttt = be32_to_cpu(text_hdr->ttt);
+
+	text_wqe->cmd_sn = be32_to_cpu(text_hdr->cmdsn);
+
+	text_wqe->resp_bd_list_addr_lo = (u32) bnx2i_conn->gen_pdu.resp_bd_dma;
+	text_wqe->resp_bd_list_addr_hi =
+			(u32) ((u64) bnx2i_conn->gen_pdu.resp_bd_dma >> 32);
+
+	dword = ((1 << ISCSI_TEXT_REQUEST_NUM_RESP_BDS_SHIFT) |
+		 (bnx2i_conn->gen_pdu.resp_buf_size <<
+		  ISCSI_TEXT_REQUEST_RESP_BUFFER_LENGTH_SHIFT));
+	text_wqe->resp_buffer = dword;
+	text_wqe->bd_list_addr_lo = (u32) bnx2i_conn->gen_pdu.req_bd_dma;
+	text_wqe->bd_list_addr_hi =
+			(u32) ((u64) bnx2i_conn->gen_pdu.req_bd_dma >> 32);
+	text_wqe->num_bds = 1;
+	text_wqe->cq_index = 0; /* CQ# used for completion, 5771x only */
+
+	bnx2i_ring_dbell_update_sq_params(bnx2i_conn, 1);
+	return 0;
+}
+
+
+/**
  * bnx2i_send_iscsi_scsicmd - post iSCSI scsicmd request WQE to hardware
  * @conn:	iscsi connection
  * @cmd:	driver command structure which is requesting
@@ -490,15 +540,18 @@ int bnx2i_send_iscsi_nopout(struct bnx2i_conn *bnx2i_conn,
 	bnx2i_cmd = (struct bnx2i_cmd *)task->dd_data;
 	nopout_hdr = (struct iscsi_nopout *)task->hdr;
 	nopout_wqe = (struct bnx2i_nop_out_request *)ep->qp.sq_prod_qe;
+
+	memset(nopout_wqe, 0x00, sizeof(struct bnx2i_nop_out_request));
+
 	nopout_wqe->op_code = nopout_hdr->opcode;
 	nopout_wqe->op_attr = ISCSI_FLAG_CMD_FINAL;
 	memcpy(nopout_wqe->lun, nopout_hdr->lun, 8);
 
 	if (test_bit(BNX2I_NX2_DEV_57710, &ep->hba->cnic_dev_type)) {
-		u32 tmp = nopout_hdr->lun[0];
+		u32 tmp = nopout_wqe->lun[0];
 		/* 57710 requires LUN field to be swapped */
-		nopout_hdr->lun[0] = nopout_hdr->lun[1];
-		nopout_hdr->lun[1] = tmp;
+		nopout_wqe->lun[0] = nopout_wqe->lun[1];
+		nopout_wqe->lun[1] = tmp;
 	}
 
 	nopout_wqe->itt = ((u16)task->itt |
@@ -1288,7 +1341,7 @@ static int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
 	struct bnx2i_cmd_response *resp_cqe;
 	struct bnx2i_cmd *bnx2i_cmd;
 	struct iscsi_task *task;
-	struct iscsi_cmd_rsp *hdr;
+	struct iscsi_scsi_rsp *hdr;
 	u32 datalen = 0;
 
 	resp_cqe = (struct bnx2i_cmd_response *)cqe;
@@ -1315,7 +1368,7 @@ static int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
 	}
 	bnx2i_iscsi_unmap_sg_list(bnx2i_cmd);
 
-	hdr = (struct iscsi_cmd_rsp *)task->hdr;
+	hdr = (struct iscsi_scsi_rsp *)task->hdr;
 	resp_cqe = (struct bnx2i_cmd_response *)cqe;
 	hdr->opcode = resp_cqe->op_code;
 	hdr->max_cmdsn = cpu_to_be32(resp_cqe->max_cmd_sn);
@@ -1424,6 +1477,68 @@ done:
 	spin_unlock(&session->lock);
 	return 0;
 }
+
+
+/**
+ * bnx2i_process_text_resp - this function handles iscsi text response
+ * @session:	iscsi session pointer
+ * @bnx2i_conn:	iscsi connection pointer
+ * @cqe:	pointer to newly DMA'ed CQE entry for processing
+ *
+ * process iSCSI Text Response CQE&  complete it to open-iscsi user daemon
+ */
+static int bnx2i_process_text_resp(struct iscsi_session *session,
+				   struct bnx2i_conn *bnx2i_conn,
+				   struct cqe *cqe)
+{
+	struct iscsi_conn *conn = bnx2i_conn->cls_conn->dd_data;
+	struct iscsi_task *task;
+	struct bnx2i_text_response *text;
+	struct iscsi_text_rsp *resp_hdr;
+	int pld_len;
+	int pad_len;
+
+	text = (struct bnx2i_text_response *) cqe;
+	spin_lock(&session->lock);
+	task = iscsi_itt_to_task(conn, text->itt & ISCSI_LOGIN_RESPONSE_INDEX);
+	if (!task)
+		goto done;
+
+	resp_hdr = (struct iscsi_text_rsp *)&bnx2i_conn->gen_pdu.resp_hdr;
+	memset(resp_hdr, 0, sizeof(struct iscsi_hdr));
+	resp_hdr->opcode = text->op_code;
+	resp_hdr->flags = text->response_flags;
+	resp_hdr->hlength = 0;
+
+	hton24(resp_hdr->dlength, text->data_length);
+	resp_hdr->itt = task->hdr->itt;
+	resp_hdr->ttt = cpu_to_be32(text->ttt);
+	resp_hdr->statsn = task->hdr->exp_statsn;
+	resp_hdr->exp_cmdsn = cpu_to_be32(text->exp_cmd_sn);
+	resp_hdr->max_cmdsn = cpu_to_be32(text->max_cmd_sn);
+	pld_len = text->data_length;
+	bnx2i_conn->gen_pdu.resp_wr_ptr = bnx2i_conn->gen_pdu.resp_buf +
+					  pld_len;
+	pad_len = 0;
+	if (pld_len & 0x3)
+		pad_len = 4 - (pld_len % 4);
+
+	if (pad_len) {
+		int i = 0;
+		for (i = 0; i < pad_len; i++) {
+			bnx2i_conn->gen_pdu.resp_wr_ptr[0] = 0;
+			bnx2i_conn->gen_pdu.resp_wr_ptr++;
+		}
+	}
+	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr,
+			     bnx2i_conn->gen_pdu.resp_buf,
+			     bnx2i_conn->gen_pdu.resp_wr_ptr -
+			     bnx2i_conn->gen_pdu.resp_buf);
+done:
+	spin_unlock(&session->lock);
+	return 0;
+}
+
 
 /**
  * bnx2i_process_tmf_resp - this function handles iscsi TMF response
@@ -1765,6 +1880,10 @@ static void bnx2i_process_new_cqes(struct bnx2i_conn *bnx2i_conn)
 		case ISCSI_OP_SCSI_TMFUNC_RSP:
 			bnx2i_process_tmf_resp(session, bnx2i_conn,
 					       qp->cq_cons_qe);
+			break;
+		case ISCSI_OP_TEXT_RSP:
+			bnx2i_process_text_resp(session, bnx2i_conn,
+						qp->cq_cons_qe);
 			break;
 		case ISCSI_OP_LOGOUT_RSP:
 			bnx2i_process_logout_resp(session, bnx2i_conn,

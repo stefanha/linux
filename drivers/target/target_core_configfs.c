@@ -497,10 +497,6 @@ static int target_fabric_tf_ops_check(
 		printk(KERN_ERR "Missing tfo->is_state_remove()\n");
 		return -EINVAL;
 	}
-	if (!(tfo->pack_lun)) {
-		printk(KERN_ERR "Missing tfo->pack_lun()\n");
-		return -EINVAL;
-	}
 	/*
 	 * We at least require tfo->fabric_make_wwn(), tfo->fabric_drop_wwn()
 	 * tfo->fabric_make_tpg() and tfo->fabric_drop_tpg() in
@@ -537,7 +533,6 @@ static int target_fabric_tf_ops_check(
 int target_fabric_configfs_register(
 	struct target_fabric_configfs *tf)
 {
-	struct config_group *su_group;
 	int ret;
 
 	if (!(tf)) {
@@ -547,12 +542,6 @@ int target_fabric_configfs_register(
 	}
 	if (!(tf->tf_subsys)) {
 		printk(KERN_ERR "Unable to target struct config_subsystem"
-			" pointer\n");
-		return -EINVAL;
-	}
-	su_group = &tf->tf_subsys->su_group;
-	if (!(su_group)) {
-		printk(KERN_ERR "Unable to locate target struct config_group"
 			" pointer\n");
 		return -EINVAL;
 	}
@@ -569,7 +558,6 @@ EXPORT_SYMBOL(target_fabric_configfs_register);
 void target_fabric_configfs_deregister(
 	struct target_fabric_configfs *tf)
 {
-	struct config_group *su_group;
 	struct configfs_subsystem *su;
 
 	if (!(tf)) {
@@ -583,13 +571,6 @@ void target_fabric_configfs_deregister(
 			" pointer\n");
 		return;
 	}
-	su_group = &tf->tf_subsys->su_group;
-	if (!(su_group)) {
-		printk(KERN_ERR "Unable to locate target struct config_group"
-			" pointer\n");
-		return;
-	}
-
 	printk(KERN_INFO "<<<<<<<<<<<<<<<<<<<<<< BEGIN FABRIC API >>>>>>>>>>"
 			">>>>>>>>>>>>\n");
 	mutex_lock(&g_tf_lock);
@@ -2819,7 +2800,7 @@ static struct config_group *target_core_make_subdev(
 			"alua", &target_core_alua_tg_pt_gps_cit);
 	config_group_init_type_name(&se_dev->dev_stat_grps.stat_group,
 			"statistics", &target_core_stat_cit);
-			
+
 	dev_cg->default_groups[0] = &se_dev->se_dev_attrib.da_group;
 	dev_cg->default_groups[1] = &se_dev->se_dev_pr_group;
 	dev_cg->default_groups[2] = &se_dev->t10_wwn.t10_wwn_group;
@@ -3131,7 +3112,7 @@ static struct config_item_type target_core_cit = {
 
 /* Stop functions for struct config_item_type target_core_hba_cit */
 
-static int target_core_init_configfs(void)
+static int __init target_core_init_configfs(void)
 {
 	struct config_group *target_cg, *hba_cg = NULL, *alua_cg = NULL;
 	struct config_group *lu_gp_cg = NULL;
@@ -3263,7 +3244,7 @@ out_global:
 	return -1;
 }
 
-static void target_core_exit_configfs(void)
+static void __exit target_core_exit_configfs(void)
 {
 	struct configfs_subsystem *subsys;
 	struct config_group *hba_cg, *alua_cg, *lu_gp_cg;

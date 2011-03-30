@@ -38,7 +38,7 @@ u16	fc_cpu_mask;		/* cpu mask for possible cpus */
 EXPORT_SYMBOL(fc_cpu_mask);
 static u16	fc_cpu_order;	/* 2's power to represent total possible cpus */
 static struct kmem_cache *fc_em_cachep;	       /* cache for exchanges */
-struct workqueue_struct *fc_exch_workqueue;
+static struct workqueue_struct *fc_exch_workqueue;
 
 /*
  * Structure and function definitions for managing Fibre Channel Exchanges
@@ -666,13 +666,10 @@ static void fc_exch_timeout(struct work_struct *work)
 		if (e_stat & ESB_ST_ABNORMAL)
 			rc = fc_exch_done_locked(ep);
 		spin_unlock_bh(&ep->ex_lock);
+		if (!rc)
+			fc_exch_delete(ep);
 		if (resp)
 			resp(sp, ERR_PTR(-FC_EX_TIMEOUT), arg);
-		if (!rc) {
-			/* delete the exchange if it's already being aborted */
-			fc_exch_delete(ep);
-			return;
-		}
 		fc_seq_exch_abort(sp, 2 * ep->r_a_tov);
 		goto done;
 	}
@@ -2178,6 +2175,7 @@ err:
 		fc_exch_mgr_del(ema);
 	return -ENOMEM;
 }
+EXPORT_SYMBOL(fc_exch_mgr_list_clone);
 
 /**
  * fc_exch_mgr_alloc() - Allocate an exchange manager
@@ -2412,7 +2410,7 @@ EXPORT_SYMBOL(fc_exch_init);
 /**
  * fc_setup_exch_mgr() - Setup an exchange manager
  */
-int fc_setup_exch_mgr()
+int fc_setup_exch_mgr(void)
 {
 	fc_em_cachep = kmem_cache_create("libfc_em", sizeof(struct fc_exch),
 					 0, SLAB_HWCACHE_ALIGN, NULL);
@@ -2450,7 +2448,7 @@ int fc_setup_exch_mgr()
 /**
  * fc_destroy_exch_mgr() - Destroy an exchange manager
  */
-void fc_destroy_exch_mgr()
+void fc_destroy_exch_mgr(void)
 {
 	destroy_workqueue(fc_exch_workqueue);
 	kmem_cache_destroy(fc_em_cachep);
