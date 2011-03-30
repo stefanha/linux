@@ -584,15 +584,8 @@ qla2x00_initialize_adapter(scsi_qla_host_t *vha)
 	if (IS_QLA24XX_TYPE(ha) || IS_QLA25XX(ha))
 		qla24xx_read_fcp_prio_cfg(vha);
 
-	if (rval == QLA_SUCCESS &&
-	   (IS_QLA24XX_TYPE(ha) || IS_QLA25XX(ha))) {
-		/* Enable target response to SCSI bus. */
-		if (qla_tgt_mode_enabled(vha)) {
-			qla2x00_send_enable_lun(vha, true);
-		} else if (qla_ini_mode_enabled(vha)) {
-			qla2x00_send_enable_lun(vha, false);
-		}
-	}
+	if (rval == QLA_SUCCESS)
+		qla_tgt_initialize_adapter(vha, ha);
 
 	return (rval);
 }

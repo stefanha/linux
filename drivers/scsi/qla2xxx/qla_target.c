@@ -5157,6 +5157,21 @@ qla_tgt_rff_id(scsi_qla_host_t *vha, struct ct_sns_req *ct_req)
 	}
 }
 
+/*
+ * Called from qla_init.c:qla2x00_initialize_adapter()
+ */
+void
+qla_tgt_initialize_adapter(scsi_qla_host_t *vha, struct qla_hw_data *ha)
+{
+	if (IS_QLA24XX_TYPE(ha) || IS_QLA25XX(ha)) {
+		/* Enable target response to SCSI bus. */
+		if (qla_tgt_mode_enabled(vha))
+			qla2x00_send_enable_lun(vha, true);
+		else if (qla_ini_mode_enabled(vha))
+			qla2x00_send_enable_lun(vha, false);
+	}
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
