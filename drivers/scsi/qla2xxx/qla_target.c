@@ -5141,6 +5141,22 @@ qla_tgt_vport_create(scsi_qla_host_t *vha, struct qla_hw_data *ha)
 		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
 }
 
+void
+qla_tgt_rff_id(scsi_qla_host_t *vha, struct ct_sns_req *ct_req)
+{
+	/*
+	 * FC-4 Feature bit 0 indicates target functionality to the name server.
+	 */
+	if (qla_tgt_mode_enabled(vha)) {
+		if (qla_ini_mode_enabled(vha))
+			ct_req->req.rff_id.fc4_feature = BIT_0 | BIT_1;
+		else
+			ct_req->req.rff_id.fc4_feature = BIT_0;
+	} else if (qla_ini_mode_enabled(vha)) {
+		ct_req->req.rff_id.fc4_feature = BIT_1;
+	}
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
