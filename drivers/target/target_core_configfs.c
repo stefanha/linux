@@ -304,7 +304,7 @@ struct target_fabric_configfs *target_fabric_configfs_init(
 		printk(KERN_ERR "Unable to locate passed fabric name\n");
 		return NULL;
 	}
-	if (strlen(name) > TARGET_FABRIC_NAME_SIZE) {
+	if (strlen(name) > TARGET_FABRIC_NAME_SIZE-1) {
 		printk(KERN_ERR "Passed name: %s exceeds TARGET_FABRIC"
 			"_NAME_SIZE\n", name);
 		return NULL;
