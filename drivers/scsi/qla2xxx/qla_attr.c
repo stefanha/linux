@@ -1817,15 +1817,7 @@ qla24xx_vport_create(struct fc_vport *fc_vport, bool disable)
 	fc_host_supported_speeds(vha->host) =
 		fc_host_supported_speeds(base_vha->host);
 
-	mutex_init(&ha->tgt_mutex);
-	mutex_init(&ha->tgt_host_action_mutex);
-	qla_tgt_clear_mode(vha);
-	qla2x00_send_enable_lun(vha, false);
-	if (IS_QLA24XX_TYPE(ha))
-		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
-	else if (IS_QLA25XX(ha))
-		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
-
+	qla_tgt_vport_create(vha, ha);
 	qla24xx_vport_disable(fc_vport, disable);
 
 	if (ha->flags.cpu_affinity_enabled) {

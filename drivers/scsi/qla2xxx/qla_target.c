@@ -5123,6 +5123,24 @@ qla_tgt_disable_vha(scsi_qla_host_t *vha)
 	qla2x00_wait_for_hba_online(vha);
 }
 
+/*
+ * Called from qla_init.c:qla24xx_vport_create() contex to setup
+ * the target mode specific scsi_qla_host_t and struct qla_hw_data
+ * members.
+ */
+void
+qla_tgt_vport_create(scsi_qla_host_t *vha, struct qla_hw_data *ha)
+{
+	mutex_init(&ha->tgt_mutex);
+	mutex_init(&ha->tgt_host_action_mutex);
+	qla_tgt_clear_mode(vha);
+	qla2x00_send_enable_lun(vha, false);
+	if (IS_QLA24XX_TYPE(ha))
+		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
+	else if (IS_QLA25XX(ha))
+		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
