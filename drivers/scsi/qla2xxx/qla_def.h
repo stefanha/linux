@@ -1702,8 +1702,6 @@ typedef struct fc_port {
 
 	uint8_t node_name[WWN_SIZE];
 	uint8_t port_name[WWN_SIZE];
-	/* True, if confirmed completion is supported */
-	uint8_t conf_compl_supported:1;
 	port_id_t d_id;
 	uint16_t loop_id;
 	uint16_t old_loop_id;
@@ -1725,6 +1723,9 @@ typedef struct fc_port {
 
 	uint16_t vp_idx;
 	uint8_t fc4_type;
+
+	/* True, if confirmed completion is supported */
+	uint8_t conf_compl_supported:1;
 } fc_port_t;
 
 /*
@@ -2637,7 +2638,6 @@ struct qla_hw_data {
 	void		*dcbx_tlv;
 	dma_addr_t	dcbx_tlv_dma;
 
-	spinlock_t	dpc_lock;
 	struct task_struct	*dpc_thread;
 	uint8_t dpc_active;                  /* DPC routine is active */
 
@@ -2714,8 +2714,6 @@ struct qla_hw_data {
 	struct mutex	fce_mutex;
 
 	uint32_t	pci_attr;
-#define HA_HOST_STR_SIZE 16
-	uint8_t		host_str[HA_HOST_STR_SIZE];
 	uint16_t	chip_revision;
 
 	uint16_t	product_id[4];
@@ -2991,7 +2989,6 @@ typedef struct scsi_qla_host {
 	int		seconds_since_last_heartbeat;
 
 	atomic_t	vref_count;
-
 } scsi_qla_host_t;
 
 struct qla_tgt_vp_map {
@@ -3021,8 +3018,6 @@ struct qla_tgt_vp_map {
 #define QLA_VHA_MARK_NOT_BUSY(__vha) do {		     \
 	atomic_dec(&__vha->vref_count);			     \
 } while (0)
-
-#define to_qla_host(x)	((scsi_qla_host_t *) (x)->hostdata)
 
 #define qla_printk(level, ha, format, arg...) \
 	dev_printk(level , &((ha)->pdev->dev) , format , ## arg)

@@ -2116,8 +2116,6 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		ha->nvram_data_off = FARX_ACCESS_NVRAM_DATA;
 	}
 
-	spin_lock_init(&ha->dpc_lock);
-
 	mutex_init(&ha->vport_lock);
 	init_completion(&ha->mbx_cmd_comp);
 	complete(&ha->mbx_cmd_comp);
@@ -2419,22 +2417,17 @@ qla2x00_shutdown(struct pci_dev *pdev)
 static void
 qla2x00_stop_dpc_thread(scsi_qla_host_t *vha)
 {
-	struct task_struct *t = NULL;
 	struct qla_hw_data *ha = vha->hw;
+	struct task_struct *t = ha->dpc_thread;
 
-	spin_lock_irq(&ha->dpc_lock);
-	if (ha->dpc_thread != NULL) {
-		t = ha->dpc_thread;
-		/*
-		 * qla2xxx_wake_dpc checks for ->dpc_thread
-		 * so we need to zero it out.
-		 */
-		ha->dpc_thread = NULL;
-	}
-	spin_unlock_irq(&ha->dpc_lock);
-
-	if (t != NULL)
-		kthread_stop(t);
+	if (ha->dpc_thread == NULL)
+		return;
+	/*
+	 * qla2xxx_wake_dpc checks for ->dpc_thread
+	 * so we need to zero it out.
+	 */
+	ha->dpc_thread = NULL;
+	kthread_stop(t);
 }
 
 static void
