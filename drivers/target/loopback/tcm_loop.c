@@ -6,7 +6,7 @@
  * © Copyright 2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2. 
- * 
+ *
  * Author: Nicholas A. Bellinger <nab@risingtidesystems.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -54,7 +54,7 @@ static struct kmem_cache *tcm_loop_cmd_cache;
 
 static int tcm_loop_hba_no_cnt;
 
-/* 
+/*
  * Allocate a tcm_loop cmd descriptor from target_core_mod code
  *
  * Can be called from interrupt context in tcm_loop_queuecommand() below
@@ -186,8 +186,8 @@ static int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 		/*
 		 * Used for DMA_NONE
 		 */
-                mem_ptr = NULL;
-        }
+		mem_ptr = NULL;
+	}
 	/*
 	 * Map the SG memory into struct se_mem->page linked list using the same
 	 * physical memory at sg->page_link.
@@ -305,7 +305,7 @@ static int tcm_loop_queuecommand(
 		sc->device->id, sc->device->channel, sc->device->lun,
 		sc->cmnd[0], scsi_bufflen(sc));
 	/*
-	 * Locate the tcm_loop_hba_t pointer 
+	 * Locate the tcm_loop_hba_t pointer
 	 */
 	tl_hba = *(struct tcm_loop_hba **)shost_priv(sc->device->host);
 	tl_tpg = &tl_hba->tl_hba_tpgs[sc->device->id];
@@ -342,7 +342,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	struct tcm_loop_tpg *tl_tpg;
 	int ret = FAILED;
 	/*
-	 * Locate the tcm_loop_hba_t pointer 
+	 * Locate the tcm_loop_hba_t pointer
 	 */
 	tl_hba = *(struct tcm_loop_hba **)shost_priv(sc->device->host);
 	/*
@@ -397,7 +397,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	 * Queue the TMR to TCM Core and sleep waiting for tcm_loop_queue_tm_rsp()
 	 * to wake us up.
 	 */
-	transport_generic_handle_tmr(se_cmd);	
+	transport_generic_handle_tmr(se_cmd);
 	wait_event(tl_tmr->tl_tmr_wait, atomic_read(&tl_tmr->tmr_complete));
 	/*
 	 * The TMR LUN_RESET has completed, check the response status and
@@ -535,7 +535,7 @@ static int tcm_loop_alloc_core_bus(void)
 		printk(KERN_ERR "Unable to allocate tcm_loop_primary\n");
 		return PTR_ERR(tcm_loop_primary);
 	}
-	
+
 	ret = bus_register(&tcm_loop_lld_bus);
 	if (ret) {
 		printk(KERN_ERR "bus_register() failed for tcm_loop_lld_bus\n");
@@ -604,7 +604,7 @@ static u8 tcm_loop_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 static char *tcm_loop_get_endpoint_wwn(struct se_portal_group *se_tpg)
 {
 	struct tcm_loop_tpg *tl_tpg =
-		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;	
+		(struct tcm_loop_tpg *)se_tpg->se_tpg_fabric_ptr;
 	/*
 	 * Return the passed NAA identifier for the SAS Target Port
 	 */
@@ -760,7 +760,7 @@ static struct se_node_acl *tcm_loop_tpg_alloc_fabric_acl(
 {
 	struct tcm_loop_nacl *tl_nacl;
 
-	tl_nacl = kzalloc(sizeof( struct tcm_loop_nacl), GFP_KERNEL);
+	tl_nacl = kzalloc(sizeof(struct tcm_loop_nacl), GFP_KERNEL);
 	if (!tl_nacl) {
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_nacl\n");
 		return NULL;
@@ -882,8 +882,8 @@ static int tcm_loop_queue_data_in(struct se_cmd *se_cmd)
 				struct tcm_loop_cmd, tl_se_cmd);
 	struct scsi_cmnd *sc = tl_cmd->sc;
 
-	TL_CDB_DEBUG( "tcm_loop_queue_data_in() called for scsi_cmnd: %p"
-			" cdb: 0x%02x\n", sc, sc->cmnd[0]);
+	TL_CDB_DEBUG("tcm_loop_queue_data_in() called for scsi_cmnd: %p"
+		     " cdb: 0x%02x\n", sc, sc->cmnd[0]);
 
 	sc->result = SAM_STAT_GOOD;
 	set_host_byte(sc, DID_OK);
@@ -905,7 +905,7 @@ static int tcm_loop_queue_status(struct se_cmd *se_cmd)
 	    (se_cmd->se_cmd_flags & SCF_EMULATED_TASK_SENSE))) {
 
 		memcpy((void *)sc->sense_buffer, (void *)se_cmd->sense_buffer,
-				SCSI_SENSE_BUFFERSIZE);	
+				SCSI_SENSE_BUFFERSIZE);
 		sc->result = SAM_STAT_CHECK_CONDITION;
 		set_driver_byte(sc, DRIVER_SENSE);
 	} else
@@ -919,7 +919,7 @@ static int tcm_loop_queue_status(struct se_cmd *se_cmd)
 static int tcm_loop_queue_tm_rsp(struct se_cmd *se_cmd)
 {
 	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
-	struct tcm_loop_tmr *tl_tmr = (struct tcm_loop_tmr *)se_tmr->fabric_tmr_ptr;
+	struct tcm_loop_tmr *tl_tmr = se_tmr->fabric_tmr_ptr;
 	/*
 	 * The SCSI EH thread will be sleeping on se_tmr->tl_tmr_wait, go ahead
 	 * and wake up the wait_queue_head_t in tcm_loop_device_reset()
@@ -985,7 +985,7 @@ static void tcm_loop_port_unlink(
 	struct tcm_loop_tpg *tl_tpg;
 
 	tl_tpg = container_of(se_tpg, struct tcm_loop_tpg, tl_se_tpg);
-	tl_hba = tl_tpg->tl_hba;	
+	tl_hba = tl_tpg->tl_hba;
 
 	sd = scsi_device_lookup(tl_hba->sh, 0, tl_tpg->tl_tpgt,
 				se_lun->unpacked_lun);
@@ -997,9 +997,9 @@ static void tcm_loop_port_unlink(
 	/*
 	 * Remove Linux/SCSI struct scsi_device by HCTL
 	 */
-	scsi_remove_device(sd);	
+	scsi_remove_device(sd);
 	scsi_device_put(sd);
-	
+
 	atomic_dec(&tl_tpg->tl_tpg_port_count);
 	smp_mb__after_atomic_dec();
 
@@ -1039,7 +1039,7 @@ static int tcm_loop_make_nexus(
 	 * Since we are running in 'demo mode' this call with generate a
 	 * struct se_node_acl for the tcm_loop struct se_portal_group with the SCSI
 	 * Initiator port name of the passed configfs group 'name'.
-	 */	
+	 */
 	tl_nexus->se_sess->se_node_acl = core_tpg_check_initiator_node_acl(
 				se_tpg, (unsigned char *)name);
 	if (!tl_nexus->se_sess->se_node_acl) {
@@ -1059,7 +1059,7 @@ static int tcm_loop_make_nexus(
 	return 0;
 
 out:
-	kfree(tl_nexus);	
+	kfree(tl_nexus);
 	return -ENOMEM;
 }
 
@@ -1189,7 +1189,7 @@ static ssize_t tcm_loop_tpg_store_nexus(
 check_newline:
 	if (i_port[strlen(i_port)-1] == '\n')
 		i_port[strlen(i_port)-1] = '\0';
-		
+
 	ret = tcm_loop_make_nexus(tl_tpg, port_ptr);
 	if (ret < 0)
 		return ret;
@@ -1293,8 +1293,8 @@ struct se_wwn *tcm_loop_make_scsi_hba(
 	tl_hba = kzalloc(sizeof(struct tcm_loop_hba), GFP_KERNEL);
 	if (!tl_hba) {
 		printk(KERN_ERR "Unable to allocate struct tcm_loop_hba\n");
-                return ERR_PTR(-ENOMEM);
-        }
+		return ERR_PTR(-ENOMEM);
+	}
 	/*
 	 * Determine the emulated Protocol Identifier and Target Port Name
 	 * based on the incoming configfs directory name.
@@ -1304,7 +1304,7 @@ struct se_wwn *tcm_loop_make_scsi_hba(
 		tl_hba->tl_proto_id = SCSI_PROTOCOL_SAS;
 		goto check_len;
 	}
-	ptr = strstr(name, "fc.");      
+	ptr = strstr(name, "fc.");
 	if (ptr) {
 		tl_hba->tl_proto_id = SCSI_PROTOCOL_FCP;
 		off = 3; /* Skip over "fc." */
@@ -1336,7 +1336,7 @@ check_len:
 	 * device_register() callbacks in tcm_loop_driver_probe()
 	 */
 	ret = tcm_loop_setup_hba_bus(tl_hba, tcm_loop_hba_no_cnt);
-	if (ret) 
+	if (ret)
 		goto out;
 
 	sh = tl_hba->sh;
@@ -1446,7 +1446,7 @@ static int tcm_loop_register_configfs(void)
 	fabric->tf_ops.check_stop_free = &tcm_loop_check_stop_free;
 	fabric->tf_ops.release_cmd_to_pool = &tcm_loop_deallocate_core_cmd;
 	fabric->tf_ops.release_cmd_direct = &tcm_loop_deallocate_core_cmd;
-	fabric->tf_ops.shutdown_session = &tcm_loop_shutdown_session; 
+	fabric->tf_ops.shutdown_session = &tcm_loop_shutdown_session;
 	fabric->tf_ops.close_session = &tcm_loop_close_session;
 	fabric->tf_ops.stop_session = &tcm_loop_stop_session;
 	fabric->tf_ops.fall_back_to_erl0 = &tcm_loop_fall_back_to_erl0;
@@ -1523,7 +1523,7 @@ static void tcm_loop_deregister_configfs(void)
 	tcm_loop_fabric_configfs = NULL;
 	printk(KERN_INFO "TCM_LOOP[0] - Cleared"
 				" tcm_loop_fabric_configfs\n");
-}	
+}
 
 static int __init tcm_loop_fabric_init(void)
 {
@@ -1564,4 +1564,3 @@ MODULE_AUTHOR("Nicholas A. Bellinger <nab@risingtidesystems.com>");
 MODULE_LICENSE("GPL");
 module_init(tcm_loop_fabric_init);
 module_exit(tcm_loop_fabric_exit);
-

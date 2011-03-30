@@ -158,6 +158,7 @@ struct fc_rport_libfc_priv {
 	#define FC_RP_FLAGS_REC_SUPPORTED	(1 << 0)
 	#define FC_RP_FLAGS_RETRY		(1 << 1)
 	#define FC_RP_STARTED			(1 << 2)
+	#define FC_RP_FLAGS_CONF_REQ		(1 << 3)
 	unsigned int	           e_d_tov;
 	unsigned int	           r_a_tov;
 };
@@ -205,8 +206,13 @@ struct fc_rport_priv {
 	struct list_head            peers;
 	struct work_struct          event_work;
 	u32			    supported_classes;
-	u16			    prli_count;
+	u16                         prli_count;
 	struct rcu_head		    rcu;
+	u16			    sp_features;
+	u8			    spp_type;
+	void			    (*lld_event_callback)(struct fc_lport *,
+						      struct fc_rport_priv *,
+						      enum fc_rport_event);
 };
 
 /**
@@ -563,7 +569,9 @@ struct libfc_function_template {
 			     void (*resp)(struct fc_seq *, struct fc_frame *,
 					  void *),
 			     void *arg);
-    /*
+
+	/*
+>>>>>>> 0ce790e7d736cedc563e1fb4e998babf5a4dbc3d
 	 * Assign a sequence for an incoming request frame.
 	 *
 	 * STATUS: OPTIONAL
@@ -674,6 +682,15 @@ struct libfc_function_template {
 	 * The argument is a pointer to the kref inside the fc_rport_priv.
 	 */
 	void (*rport_destroy)(struct kref *);
+
+	/*
+	 * Callback routine after the remote port is logged in
+	 *
+	 * STATUS: OPTIONAL
+	 */
+	void (*rport_event_callback)(struct fc_lport *,
+				     struct fc_rport_priv *,
+				     enum fc_rport_event);
 
 	/*
 	 * Send a fcp cmd from fsp pkt.
@@ -820,8 +837,8 @@ enum fc_lport_event {
  * @lp_mutex:              Mutex to protect the local port
  * @list:                  Linkage on list of vport peers
  * @retry_work:            Handle to local port for delayed retry context
- * @lport_list:            Linkage on module-wide list of local ports
  * @prov:		   Pointers available for use by passive FC-4 providers
+ * @lport_list:            Linkage on module-wide list of local ports
  */
 struct fc_lport {
 	/* Associations */
@@ -877,14 +894,14 @@ struct fc_lport {
 	struct mutex                   lp_mutex;
 	struct list_head               list;
 	struct delayed_work	       retry_work;
-	struct list_head               lport_list;
 	void			       *prov[FC_FC4_PROV_SIZE];
+	struct list_head               lport_list;
 };
 
 /**
  * struct fc4_prov - FC-4 provider registration
- * @prli: 		Handler for incoming PRLI
- * @prlo: 		Handler for session reset
+ * @prli:               Handler for incoming PRLI
+ * @prlo:               Handler for session reset
  * @recv:		Handler for incoming request
  * @module:		Pointer to module.  May be NULL.
  */
@@ -896,6 +913,12 @@ struct fc4_prov {
 	void (*recv)(struct fc_lport *, struct fc_frame *);
 	struct module *module;
 };
+
+/*
+ * Register FC-4 provider with libfc.
+ */
+int fc_fc4_register_provider(enum fc_fh_type type, struct fc4_prov *);
+void fc_fc4_deregister_provider(enum fc_fh_type type, struct fc4_prov *);
 
 /*
  * Register FC-4 provider with libfc.
@@ -1034,6 +1057,7 @@ struct fc_lport *fc_vport_id_lookup(struct fc_lport *, u32 port_id);
 int fc_lport_bsg_request(struct fc_bsg_job *);
 void fc_lport_iterate(void (*func)(struct fc_lport *, void *), void *);
 void fc_lport_set_local_id(struct fc_lport *, u32 port_id);
+void fc_lport_iterate(void (*func)(struct fc_lport *, void *), void *);
 
 /*
  * REMOTE PORT LAYER
