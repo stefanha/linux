@@ -5196,6 +5196,26 @@ qla_tgt_init_atio_q_entries(scsi_qla_host_t *vha)
 
 }
 
+void
+qla_tgt_24xx_config_rings(scsi_qla_host_t *vha, device_reg_t __iomem *reg)
+{
+	struct qla_hw_data *ha = vha->hw;
+
+#warning FIXME: atio_q in/out for ha->mqenable=1..?
+	if (ha->mqenable) {
+#if 0
+                WRT_REG_DWORD(&reg->isp25mq.atio_q_in, 0);
+                WRT_REG_DWORD(&reg->isp25mq.atio_q_out, 0);
+                RD_REG_DWORD(&reg->isp25mq.atio_q_out);
+#endif
+	} else {
+		/* Setup APTIO registers for target mode */
+		WRT_REG_DWORD(&reg->isp24.atio_q_in, 0);
+		WRT_REG_DWORD(&reg->isp24.atio_q_out, 0);
+		RD_REG_DWORD(&reg->isp24.atio_q_out);
+	}
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)

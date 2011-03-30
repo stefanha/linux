@@ -1781,23 +1781,13 @@ qla24xx_config_rings(struct scsi_qla_host *vha)
 		WRT_REG_DWORD(&reg->isp25mq.req_q_out, 0);
 		WRT_REG_DWORD(&reg->isp25mq.rsp_q_in, 0);
 		WRT_REG_DWORD(&reg->isp25mq.rsp_q_out, 0);
-#warning FIXME: atio_q in/out for ha->mqueue=1..?
-#if 0
-		WRT_REG_DWORD(&reg->isp25mq.atio_q_in, 0);
-		WRT_REG_DWORD(&reg->isp25mq.atio_q_out, 0);
-		RD_REG_DWORD(&reg->isp25mq.atio_q_out);
-#endif
 	} else {
 		WRT_REG_DWORD(&reg->isp24.req_q_in, 0);
 		WRT_REG_DWORD(&reg->isp24.req_q_out, 0);
 		WRT_REG_DWORD(&reg->isp24.rsp_q_in, 0);
 		WRT_REG_DWORD(&reg->isp24.rsp_q_out, 0);
-
-		/* Setup APTIO registers for target mode */
-		WRT_REG_DWORD(&reg->isp24.atio_q_in, 0);
-		WRT_REG_DWORD(&reg->isp24.atio_q_out, 0);
-		RD_REG_DWORD(&reg->isp24.atio_q_out);
 	}
+	qla_tgt_24xx_config_rings(vha, reg);
 
 	/* PCI posting */
 	RD_REG_DWORD(&ioreg->hccr);
