@@ -2985,10 +2985,8 @@ static int transport_get_sense_data(struct se_cmd *cmd)
 	unsigned long flags;
 	u32 offset = 0;
 
-	if (!SE_LUN(cmd)) {
-		printk(KERN_ERR "SE_LUN(cmd) is NULL\n");
-		return -1;
-	}
+	WARN_ON(!SE_LUN(cmd));
+
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	if (cmd->se_cmd_flags & SCF_SENT_CHECK_CONDITION) {
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
@@ -4583,10 +4581,8 @@ static int transport_map_sg_to_mem(
 	struct scatterlist *sg;
 	u32 sg_count = 1, cmd_size = cmd->data_length;
 
-	if (!in_mem) {
-		printk(KERN_ERR "No source scatterlist\n");
-		return -1;
-	}
+	WARN_ON(!in_mem);
+
 	sg = (struct scatterlist *)in_mem;
 
 	while (cmd_size) {
