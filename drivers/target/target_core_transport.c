@@ -4487,6 +4487,8 @@ next:
 		task->task_sg_bidi = kzalloc(task_sg_num_padded *
 				sizeof(struct scatterlist), GFP_KERNEL);
 		if (!(task->task_sg_bidi)) {
+			kfree(task->task_sg);
+			task->task_sg = NULL;
 			printk(KERN_ERR "Unable to allocate memory for"
 				" task->task_sg_bidi\n");
 			return -ENOMEM;
