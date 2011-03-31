@@ -884,11 +884,12 @@ static int rd_DIRECT_do_se_mem_map(
 	 * transport_do_task_sg_chain() for creating chainged SGLs
 	 * across multiple struct se_task->task_sg[].
 	 */
-	if (!(transport_calc_sg_num(task,
+	ret = transport_init_task_sg(task,
 			list_entry(T_TASK(cmd)->t_mem_list->next,
 				   struct se_mem, se_list),
-			task_offset)))
-		return -1;
+			task_offset);
+	if (ret <= 0)
+		return ret;
 
 	return transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
 			list_entry(T_TASK(cmd)->t_mem_list->next,

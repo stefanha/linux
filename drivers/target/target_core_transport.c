@@ -4399,7 +4399,7 @@ out:
 	return -ENOMEM;
 }
 
-u32 transport_calc_sg_num(
+int transport_init_task_sg(
 	struct se_task *task,
 	struct se_mem *in_se_mem,
 	u32 task_offset)
@@ -4774,7 +4774,7 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 					&T_TASK(cmd)->t_task_list))) {
 				/*
 				 * Clear existing SGL termination bit set in
-				 * transport_calc_sg_num(), see sg_mark_end()
+				 * transport_init_task_sg(), see sg_mark_end()
 				 */
 				sg_end_cur = &task->task_sg[task->task_sg_num - 1];
 				sg_end_cur->page_link &= ~0x02;
@@ -4798,7 +4798,7 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 		if (!(list_is_last(&task->t_list, &T_TASK(cmd)->t_task_list))) {
 			/*
 			 * Clear existing SGL termination bit set in
-			 * transport_calc_sg_num(), see sg_mark_end()
+			 * transport_init_task_sg(), see sg_mark_end()
 			 */
 			sg_end = &task->task_sg[task->task_sg_num - 1];
 			sg_end->page_link &= ~0x02;
@@ -4862,7 +4862,7 @@ static int transport_do_se_mem_map(
 	 * This is the normal path for all normal non BIDI and BIDI-COMMAND
 	 * WRITE payloads..  If we need to do BIDI READ passthrough for
 	 * TCM/pSCSI the first call to transport_do_se_mem_map ->
-	 * transport_calc_sg_num() -> transport_map_mem_to_sg() will do the
+	 * transport_init_task_sg() -> transport_map_mem_to_sg() will do the
 	 * allocation for task->task_sg_bidi, and the subsequent call to
 	 * transport_do_se_mem_map() from transport_generic_get_cdb_count()
 	 */
@@ -4871,8 +4871,9 @@ static int transport_do_se_mem_map(
 		 * Assume default that transport plugin speaks preallocated
 		 * scatterlists.
 		 */
-		if (!(transport_calc_sg_num(task, in_se_mem, task_offset)))
-			return -1;
+		ret = transport_init_task_sg(task, in_se_mem, task_offset);
+		if (ret <= 0)
+			return ret;
 		/*
 		 * struct se_task->task_sg now contains the struct scatterlist array.
 		 */
@@ -4970,7 +4971,7 @@ static u32 transport_generic_get_cdb_count(
 		 *
 		 * Note that the first call to transport_do_se_mem_map() above will
 		 * allocate struct se_task->task_sg_bidi in transport_do_se_mem_map()
-		 * -> transport_calc_sg_num(), and the second here will do the
+		 * -> transport_init_task_sg(), and the second here will do the
 		 * mapping for SCSI READ for BIDI-COMMAND passthrough with TCM/pSCSI.
 		 */
 		if (task->task_sg_bidi != NULL) {
