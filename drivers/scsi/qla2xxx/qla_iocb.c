@@ -555,7 +555,6 @@ int qla2x00_issue_marker(scsi_qla_host_t *vha, int ha_locked)
 
 	return QLA_SUCCESS;
 }
-EXPORT_SYMBOL(qla2x00_issue_marker);
 
 /**
  * qla2x00_req_pkt() - Retrieve a request packet from the request ring.
