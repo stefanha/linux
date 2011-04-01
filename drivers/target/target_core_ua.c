@@ -80,10 +80,10 @@ int core_scsi3_ua_check(
 	case REQUEST_SENSE:
 		return 0;
 	default:
-		return -1;
+		return -EINVAL;
 	}
 
-	return -1;
+	return -EINVAL;
 }
 
 int core_scsi3_ua_allocate(
@@ -98,12 +98,12 @@ int core_scsi3_ua_allocate(
 	 * PASSTHROUGH OPS
 	 */
 	if (!(nacl))
-		return -1;
+		return -EINVAL;
 
 	ua = kmem_cache_zalloc(se_ua_cache, GFP_ATOMIC);
 	if (!(ua)) {
 		printk(KERN_ERR "Unable to allocate struct se_ua\n");
-		return -1;
+		return -ENOMEM;
 	}
 	INIT_LIST_HEAD(&ua->ua_dev_list);
 	INIT_LIST_HEAD(&ua->ua_nacl_list);
@@ -285,17 +285,17 @@ int core_scsi3_ua_clear_for_request_sense(
 	int head = 1;
 
 	if (!(sess))
-		return -1;
+		return -EINVAL;
 
 	nacl = sess->se_node_acl;
 	if (!(nacl))
-		return -1;
+		return -EINVAL;
 
 	spin_lock_irq(&nacl->device_list_lock);
 	deve = &nacl->device_list[cmd->orig_fe_lun];
 	if (!(atomic_read(&deve->ua_count))) {
 		spin_unlock_irq(&nacl->device_list_lock);
-		return -1;
+		return -EPERM;
 	}
 	/*
 	 * The highest priority Unit Attentions are placed at the head of the
@@ -328,5 +328,5 @@ int core_scsi3_ua_clear_for_request_sense(
 		" ASCQ: 0x%02x\n", TPG_TFO(nacl->se_tpg)->get_fabric_name(),
 		cmd->orig_fe_lun, *asc, *ascq);
 
-	return (head) ? -1 : 0;
+	return (head) ? -EPERM : 0;
 }

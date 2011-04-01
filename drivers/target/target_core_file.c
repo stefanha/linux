@@ -67,7 +67,7 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 	fd_host = kzalloc(sizeof(struct fd_host), GFP_KERNEL);
 	if (!(fd_host)) {
 		printk(KERN_ERR "Unable to allocate memory for struct fd_host\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	fd_host->fd_host_id = host_id;
@@ -300,7 +300,7 @@ static int fd_do_readv(struct se_task *task)
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
 	if (!(iov)) {
 		printk(KERN_ERR "Unable to allocate fd_do_readv iov[]\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	for (i = 0; i < task->task_sg_num; i++) {
@@ -324,13 +324,13 @@ static int fd_do_readv(struct se_task *task)
 			printk(KERN_ERR "vfs_readv() returned %d,"
 				" expecting %d for S_ISBLK\n", ret,
 				(int)task->task_size);
-			return -1;
+			return (ret < 0 ? ret : -EINVAL);
 		}
 	} else {
 		if (ret < 0) {
 			printk(KERN_ERR "vfs_readv() returned %d for non"
 				" S_ISBLK\n", ret);
-			return -1;
+			return ret;
 		}
 	}
 
@@ -350,7 +350,7 @@ static int fd_do_writev(struct se_task *task)
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
 	if (!(iov)) {
 		printk(KERN_ERR "Unable to allocate fd_do_writev iov[]\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	for (i = 0; i < task->task_sg_num; i++) {
@@ -367,7 +367,7 @@ static int fd_do_writev(struct se_task *task)
 
 	if (ret < 0 || ret != task->task_size) {
 		printk(KERN_ERR "vfs_writev() returned %d\n", ret);
-		return -1;
+		return (ret < 0 ? ret : -EINVAL);
 	}
 
 	return 1;
@@ -599,7 +599,7 @@ static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 
 	if (!(fd_dev->fbd_flags & FBDF_HAS_PATH)) {
 		printk(KERN_ERR "Missing fd_dev_name=\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;

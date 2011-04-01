@@ -75,7 +75,7 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 	if (cmd->data_length < 6) {
 		printk(KERN_ERR "SCSI Inquiry payload length: %u"
 			" too small for EVPD=0\n", cmd->data_length);
-		return -1;
+		return -EINVAL;
 	}
 
 	buf[0] = dev->transport->get_device_type(dev);
@@ -501,7 +501,7 @@ target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 		printk(KERN_INFO "Received data_length: %u"
 			" too small for EVPD 0xb0\n",
 			cmd->data_length);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (have_tp && cmd->data_length < (0x3c + 4)) {
@@ -637,7 +637,7 @@ target_emulate_inquiry(struct se_cmd *cmd)
 	if (cmd->data_length < 4) {
 		printk(KERN_ERR "SCSI Inquiry payload length: %u"
 			" too small for EVPD=1\n", cmd->data_length);
-		return -1;
+		return -EINVAL;
 	}
 	buf[0] = dev->transport->get_device_type(dev);
 
@@ -656,7 +656,7 @@ target_emulate_inquiry(struct se_cmd *cmd)
 		return target_emulate_evpd_b2(cmd, buf);
 	default:
 		printk(KERN_ERR "Unknown VPD Code: 0x%02x\n", cdb[2]);
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -991,7 +991,7 @@ target_emulate_unmap(struct se_task *task)
 		if (ret < 0) {
 			printk(KERN_ERR "blkdev_issue_discard() failed: %d\n",
 					ret);
-			return -1;
+			return ret;
 		}
 
 		ptr += 16;
@@ -1024,7 +1024,7 @@ target_emulate_write_same(struct se_task *task)
 	ret = dev->transport->do_discard(dev, lba, range);
 	if (ret < 0) {
 		printk(KERN_INFO "blkdev_issue_discard() failed for WRITE_SAME\n");
-		return -1;
+		return ret;
 	}
 
 	task->task_scsi_status = GOOD;

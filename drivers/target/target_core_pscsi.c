@@ -86,7 +86,7 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	phv = kzalloc(sizeof(struct pscsi_hba_virt), GFP_KERNEL);
 	if (!(phv)) {
 		printk(KERN_ERR "Unable to allocate struct pscsi_hba_virt\n");
-		return -1;
+		return -ENOMEM;
 	}
 	phv->phv_host_id = host_id;
 	phv->phv_mode = PHV_VIRUTAL_HOST_ID;
@@ -236,7 +236,7 @@ pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
 
 	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
 	if (!buf)
-		return -1;
+		return -ENOMEM;
 
 	memset(cdb, 0, MAX_COMMAND_SIZE);
 	cdb[0] = INQUIRY;
@@ -259,7 +259,7 @@ pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
 
 out_free:
 	kfree(buf);
-	return -1;
+	return -EPERM;
 }
 
 static void
@@ -1030,7 +1030,7 @@ static ssize_t pscsi_check_configfs_dev_params(
 	    !(pdv->pdv_flags & PDF_HAS_LUN_ID)) {
 		printk(KERN_ERR "Missing scsi_channel_id=, scsi_target_id= and"
 			" scsi_lun_id= parameters\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;

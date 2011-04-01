@@ -235,7 +235,7 @@ int init_se_global(void)
 	global = kzalloc(sizeof(struct se_global), GFP_KERNEL);
 	if (!(global)) {
 		printk(KERN_ERR "Unable to allocate memory for struct se_global\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	INIT_LIST_HEAD(&global->g_lu_gps_list);
@@ -351,7 +351,7 @@ out:
 	if (t10_alua_tg_pt_gp_mem_cache)
 		kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
 	kfree(global);
-	return -1;
+	return -ENOMEM;
 }
 
 void release_se_global(void)
@@ -445,13 +445,16 @@ static int transport_subsystem_reqmods(void)
 
 int transport_subsystem_check_init(void)
 {
+	int ret;
+
 	if (se_global->g_sub_api_initialized)
 		return 0;
 	/*
 	 * Request the loading of known TCM subsystem plugins..
 	 */
-	if (transport_subsystem_reqmods() < 0)
-		return -1;
+	ret = transport_subsystem_reqmods();
+	if (ret < 0)
+		return ret;
 
 	se_global->g_sub_api_initialized = 1;
 	return 0;
@@ -812,7 +815,7 @@ static int transport_add_cmd_to_queue(
 	if (!(qr)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" struct se_queue_req\n");
-		return -1;
+		return -ENOMEM;
 	}
 	INIT_LIST_HEAD(&qr->qr_list);
 
@@ -1399,7 +1402,7 @@ int transport_dump_vpd_assoc(
 		break;
 	default:
 		sprintf(buf+len, "Unknown 0x%02x\n", vpd->association);
-		ret = -1;
+		ret = -EINVAL;
 		break;
 	}
 
@@ -1456,7 +1459,7 @@ int transport_dump_vpd_ident_type(
 	default:
 		sprintf(buf+len, "Unsupported: 0x%02x\n",
 				vpd->device_identifier_type);
-		ret = -1;
+		ret = -EINVAL;
 		break;
 	}
 
@@ -1506,7 +1509,7 @@ int transport_dump_vpd_ident(
 	default:
 		sprintf(buf, "T10 VPD Device Identifier encoding unsupported:"
 			" 0x%02x", vpd->device_identifier_code_set);
-		ret = -1;
+		ret = -EINVAL;
 		break;
 	}
 
@@ -1871,7 +1874,7 @@ static int transport_check_alloc_task_attr(struct se_cmd *cmd)
 	if (cmd->sam_task_attr == TASK_ATTR_ACA) {
 		DEBUG_STA("SAM Task Attribute ACA"
 			" emulation is not supported\n");
-		return -1;
+		return -EINVAL;
 	}
 	/*
 	 * Used to determine when ORDERED commands should go from
@@ -1926,7 +1929,7 @@ int transport_generic_allocate_tasks(
 		printk(KERN_ERR "Received SCSI CDB with command_size: %d that"
 			" exceeds SCSI_MAX_VARLEN_CDB_SIZE: %d\n",
 			scsi_command_size(cdb), SCSI_MAX_VARLEN_CDB_SIZE);
-		return -1;
+		return -EINVAL;
 	}
 	/*
 	 * If the received CDB is larger than TCM_MAX_COMMAND_SIZE,
@@ -1941,7 +1944,7 @@ int transport_generic_allocate_tasks(
 				" %u > sizeof(T_TASK(cmd)->__t_task_cdb): %lu ops\n",
 				scsi_command_size(cdb),
 				(unsigned long)sizeof(T_TASK(cmd)->__t_task_cdb));
-			return -1;
+			return -ENOMEM;
 		}
 	} else
 		T_TASK(cmd)->t_task_cdb = &T_TASK(cmd)->__t_task_cdb[0];
@@ -1984,7 +1987,7 @@ int transport_generic_handle_cdb(
 	if (!SE_LUN(cmd)) {
 		dump_stack();
 		printk(KERN_ERR "SE_LUN(cmd) is NULL\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD);
@@ -2003,7 +2006,7 @@ int transport_generic_handle_cdb_map(
 	if (!SE_LUN(cmd)) {
 		dump_stack();
 		printk(KERN_ERR "SE_LUN(cmd) is NULL\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD_MAP);
@@ -2025,7 +2028,7 @@ int transport_generic_handle_data(
 	 * in interrupt code, the signal_pending() check is skipped.
 	 */
 	if (!in_interrupt() && signal_pending(current))
-		return -1;
+		return -EPERM;
 	/*
 	 * If the received CDB has aleady been ABORTED by the generic
 	 * target engine, we now call transport_check_aborted_status()
@@ -2306,7 +2309,7 @@ transport_generic_allocate_buf(struct se_cmd *cmd, u32 data_length)
 	buf = kzalloc(data_length, GFP_KERNEL);
 	if (!(buf)) {
 		printk(KERN_ERR "Unable to allocate memory for buffer\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	T_TASK(cmd)->t_tasks_se_num = 0;
@@ -2789,7 +2792,7 @@ static inline u32 transport_get_sectors_10(
 	 * XXX_10 is not defined in SSC, throw an exception
 	 */
 	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE) {
-		*ret = -1;
+		*ret = -EINVAL;
 		return 0;
 	}
 
@@ -2819,7 +2822,7 @@ static inline u32 transport_get_sectors_12(
 	 * XXX_12 is not defined in SSC, throw an exception
 	 */
 	if (TRANSPORT(dev)->get_device_type(dev) == TYPE_TAPE) {
-		*ret = -1;
+		*ret = -EINVAL;
 		return 0;
 	}
 
@@ -4393,7 +4396,7 @@ out:
 	if (se_mem)
 		__free_pages(se_mem->se_page, 0);
 	kmem_cache_free(se_mem_cache, se_mem);
-	return -1;
+	return -ENOMEM;
 }
 
 u32 transport_calc_sg_num(
@@ -4472,7 +4475,7 @@ next:
 	if (!(task->task_sg)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 				" task->task_sg\n");
-		return 0;
+		return -ENOMEM;
 	}
 	sg_init_table(&task->task_sg[0], task_sg_num_padded);
 	/*
@@ -4486,7 +4489,7 @@ next:
 		if (!(task->task_sg_bidi)) {
 			printk(KERN_ERR "Unable to allocate memory for"
 				" task->task_sg_bidi\n");
-			return 0;
+			return -ENOMEM;
 		}
 		sg_init_table(&task->task_sg_bidi[0], task_sg_num_padded);
 	}
@@ -4588,7 +4591,7 @@ static int transport_map_sg_to_mem(
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
 			printk(KERN_ERR "Unable to allocate struct se_mem\n");
-			return -1;
+			return -ENOMEM;
 		}
 		INIT_LIST_HEAD(&se_mem->se_list);
 		DEBUG_MEM("sg_to_mem: Starting loop with cmd_size: %u"
@@ -4646,7 +4649,7 @@ int transport_map_mem_to_sg(
 	if (!sg) {
 		printk(KERN_ERR "Unable to locate valid struct"
 				" scatterlist pointer\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	while (task_size != 0) {
@@ -5332,7 +5335,7 @@ static int transport_lun_wait_for_tasks(struct se_cmd *cmd, struct se_lun *lun)
 			" TRUE, skipping\n", CMD_TFO(cmd)->get_task_tag(cmd));
 		spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 		transport_cmd_check_stop(cmd, 1, 0);
-		return -1;
+		return -EPERM;
 	}
 	atomic_set(&T_TASK(cmd)->transport_lun_fe_stop, 1);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
@@ -5488,7 +5491,7 @@ int transport_clear_lun_from_sessions(struct se_lun *lun)
 			"tcm_cl_%u", lun->unpacked_lun);
 	if (IS_ERR(kt)) {
 		printk(KERN_ERR "Unable to start clear_lun thread\n");
-		return -1;
+		return PTR_ERR(kt);
 	}
 	wait_for_completion(&lun->lun_shutdown_comp);
 

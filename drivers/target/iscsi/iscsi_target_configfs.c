@@ -1798,10 +1798,10 @@ int iscsi_target_register_configfs(void)
 
 	lio_target_fabric_configfs = NULL;
 	fabric = target_fabric_configfs_init(THIS_MODULE, "iscsi");
-	if (!fabric) {
+	if (IS_ERR(fabric)) {
 		printk(KERN_ERR "target_fabric_configfs_init() for"
 				" LIO-Target failed!\n");
-		return -1;
+		return PTR_ERR(fabric);
 	}
 	/*
 	 * Setup the fabric API of function pointers used by target_core_mod..
@@ -1887,7 +1887,7 @@ int iscsi_target_register_configfs(void)
 		printk(KERN_ERR "target_fabric_configfs_register() for"
 				" LIO-Target failed!\n");
 		target_fabric_configfs_free(fabric);
-		return -1;
+		return ret;
 	}
 
 	lio_target_fabric_configfs = fabric;

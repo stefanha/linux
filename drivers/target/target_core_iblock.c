@@ -527,7 +527,7 @@ static ssize_t iblock_check_configfs_dev_params(
 
 	if (!(ibd->ibd_flags & IBDF_HAS_UDEV_PATH)) {
 		printk(KERN_ERR "Missing udev_path= parameters for IBLOCK\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
