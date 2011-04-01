@@ -4588,6 +4588,9 @@ void qla_tgt_async_event(uint16_t code, scsi_qla_host_t *vha, uint16_t *mailbox)
 		return;
 	}
 
+	if (((code == MBA_POINT_TO_POINT) || (code == MBA_CHG_IN_CONNECTION)) &&
+	     IS_QLA2100(ha))
+		return;
 	/*
 	 * In tgt_stop mode we also should allow all requests to pass.
 	 * Otherwise, some commands can stuck.

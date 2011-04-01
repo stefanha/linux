@@ -837,25 +837,7 @@ skip_rio:
 		break;
 	}
 
-	switch (mb[0]) {
-	case MBA_POINT_TO_POINT:	/* Point-to-Point */
-	case MBA_CHG_IN_CONNECTION:	/* Change in connection mode */
-		if (IS_QLA2100(ha))
-			break;
-		/* else go through */
-	case MBA_RESET:			/* Reset */
-	case MBA_SYSTEM_ERR:		/* System Error */
-	case MBA_REQ_TRANSFER_ERR:	/* Request Transfer Error */
-	case MBA_RSP_TRANSFER_ERR:	/* Response Transfer Error */
-	case MBA_WAKEUP_THRES:		/* Request Queue Wake-up. */
-	case MBA_LIP_OCCURRED:		/* Loop Initialization Procedure */
-	case MBA_LOOP_UP:		/* Loop Up Event */
-	case MBA_LOOP_DOWN:		/* Loop Down Event */
-	case MBA_LIP_RESET:		/* LIP reset occurred */
-	default:
-		qla_tgt_async_event(mb[0], vha, mb);
-		break;
-	}
+	qla_tgt_async_event(mb[0], vha, mb);
 
 	if (!vha->vp_idx && ha->num_vhosts)
 		qla2x00_alert_all_vps(rsp, mb);
