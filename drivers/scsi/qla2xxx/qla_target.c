@@ -3000,7 +3000,7 @@ static void qla_tgt_do_ctio_completion(scsi_qla_host_t *vha, uint32_t handle,
 
 /* ha->hardware_lock supposed to be held on entry */
 /* called via callback from qla2xxx */
-void qla2xxx_ctio_completion(scsi_qla_host_t *vha, uint32_t handle)
+void qla_tgt_ctio_completion(scsi_qla_host_t *vha, uint32_t handle)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;

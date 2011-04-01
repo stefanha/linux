@@ -311,7 +311,6 @@ qla81xx_idc_event(scsi_qla_host_t *vha, uint16_t aen, uint16_t descr)
 		    "IDC failed to post ACK.\n");
 }
 
-extern void qla2xxx_ctio_completion(scsi_qla_host_t *, uint32_t);
 extern void qla_tgt_async_event(uint16_t, scsi_qla_host_t *, uint16_t *);
 
 /**
@@ -404,7 +403,7 @@ skip_rio:
 		break;
 
 	case MBA_CTIO_COMPLETION:
-		qla2xxx_ctio_completion(vha, handles[0]);
+		qla_tgt_ctio_completion(vha, handles[0]);
 		break;
 
 	case MBA_RESET:			/* Reset */
@@ -902,7 +901,7 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 	struct qla_hw_data *ha = vha->hw;
 
 	if (HANDLE_IS_CTIO_COMP(index)) {
-		qla2xxx_ctio_completion(vha, index);
+		qla_tgt_ctio_completion(vha, index);
 		return;
 	}
 
