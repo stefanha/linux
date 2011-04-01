@@ -835,15 +835,6 @@ skip_rio:
 	case MBA_IDC_TIME_EXT:
 		qla81xx_idc_event(vha, mb[0], mb[1]);
 		break;
-	case MBA_LOOP_INIT_ERR:
-		printk(KERN_INFO "scsi(%ld): Loop init error received -- "
-			"%04x %04x %04x.\n", vha->host_no, mb[1], mb[2], mb[3]);
-		break;
-	default:
-		printk(KERN_INFO "scsi(%ld): Unhandled async event %d "
-			"received -- %04x %04x %04x.\n", vha->host_no,
-			mb[0], mb[1], mb[2], mb[3]);
-		break;
 	}
 
 	switch (mb[0]) {
