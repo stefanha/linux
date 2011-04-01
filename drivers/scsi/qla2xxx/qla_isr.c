@@ -311,8 +311,6 @@ qla81xx_idc_event(scsi_qla_host_t *vha, uint16_t aen, uint16_t descr)
 		    "IDC failed to post ACK.\n");
 }
 
-extern void qla_tgt_async_event(uint16_t, scsi_qla_host_t *, uint16_t *);
-
 /**
  * qla2x00_async_event() - Process aynchronous events.
  * @ha: SCSI driver HA context
@@ -460,20 +458,13 @@ skip_rio:
 
 		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 		break;
-#if 0
 	case MBA_WAKEUP_THRES:		/* Request Queue Wake-up */
 		DEBUG2(printk("scsi(%ld): Asynchronous WAKEUP_THRES.\n",
 		    vha->host_no));
-		break;
-#else
-	case MBA_ATIO_TRANSFER_ERR:	/* ATIO Queue Transfer Error */
-		DEBUG2(printk(KERN_INFO "scsi(%ld): ATIO Transfer Error.\n",
-					vha->host_no));
-		qla_printk(KERN_WARNING, ha, "ATIO Transfer Error.\n");
 
-		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+		if (qla_tgt_mode_enabled(vha))
+			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 		break;
-#endif
 	case MBA_LIP_OCCURRED:		/* Loop Initialization Procedure */
 		DEBUG2(printk("scsi(%ld): LIP occurred (%x).\n", vha->host_no,
 		    mb[1]));
@@ -729,8 +720,7 @@ skip_rio:
 		set_bit(LOOP_RESYNC_NEEDED, &vha->dpc_flags);
 		set_bit(LOCAL_LOOP_UPDATE, &vha->dpc_flags);
 
-		if (ha->qla2x_tmpl)
-			qla_tgt_async_event(mb[0], vha, mb);
+		qla_tgt_async_event(mb[0], vha, mb);
 		break;
 
 	case MBA_RSCN_UPDATE:		/* State Change Registration */
@@ -873,14 +863,13 @@ skip_rio:
 	case MBA_SYSTEM_ERR:		/* System Error */
 	case MBA_REQ_TRANSFER_ERR:	/* Request Transfer Error */
 	case MBA_RSP_TRANSFER_ERR:	/* Response Transfer Error */
-	case MBA_ATIO_TRANSFER_ERR:	/* ATIO Queue Transfer Error */
+	case MBA_WAKEUP_THRES:		/* Request Queue Wake-up. */
 	case MBA_LIP_OCCURRED:		/* Loop Initialization Procedure */
 	case MBA_LOOP_UP:		/* Loop Up Event */
 	case MBA_LOOP_DOWN:		/* Loop Down Event */
 	case MBA_LIP_RESET:		/* LIP reset occurred */
 	default:
-		if (ha->qla2x_tmpl)
-			qla_tgt_async_event(mb[0], vha, mb);
+		qla_tgt_async_event(mb[0], vha, mb);
 		break;
 	}
 

@@ -1112,6 +1112,7 @@ extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
 extern void qla_tgt_sess_put(struct qla_tgt_sess *);
 extern void qla_tgt_ctio_completion(scsi_qla_host_t *, uint32_t);
+extern void qla_tgt_async_event(uint16_t, scsi_qla_host_t *, uint16_t *);
 extern void qla_tgt_enable_vha(scsi_qla_host_t *);
 extern void qla_tgt_vport_create(scsi_qla_host_t *, struct qla_hw_data *);
 extern void qla_tgt_rff_id(scsi_qla_host_t *, struct ct_sns_req *);

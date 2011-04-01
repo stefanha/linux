@@ -4593,7 +4593,7 @@ void qla_tgt_async_event(uint16_t code, scsi_qla_host_t *vha, uint16_t *mailbox)
 	case MBA_SYSTEM_ERR:		/* System Error */
 	case MBA_REQ_TRANSFER_ERR:	/* Request Transfer Error */
 	case MBA_RSP_TRANSFER_ERR:	/* Response Transfer Error */
-	case MBA_ATIO_TRANSFER_ERR:	/* ATIO Queue Transfer Error */
+	case MBA_WAKEUP_THRES:		/* Request Queue Wake-up. */
 		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): System error async event %#x "
 			"occured", vha->vp_idx, code));
 		break;
