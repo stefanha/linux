@@ -867,7 +867,6 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 		qla_printk(KERN_WARNING, ha,
 		    "Invalid SCSI completion handle %d.\n", index);
 
-		DEBUG2(dump_stack());
 		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 		return;
 	}
@@ -886,7 +885,6 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 		qla_printk(KERN_WARNING, ha,
 		    "Invalid ISP SCSI completion handle\n");
 
-		DEBUG2(dump_stack());
 		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 	}
 }
@@ -2053,9 +2051,6 @@ qla24xx_process_atio_queue(struct scsi_qla_host *vha)
 		pkt = ha->atio_ring_ptr;
 		cnt = pkt->entry_count;
 
-		DEBUG5(printk(KERN_INFO "%s(): IOCB data:\n", __func__));
-		DEBUG5(qla2x00_dump_buffer((uint8_t *)pkt, RESPONSE_ENTRY_SIZE));
-
 		qla24xx_atio_pkt_all_vps(vha, (atio7_entry_t *)pkt);
 
 		for (i = 0; i < cnt; i++) {
@@ -2091,9 +2086,6 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 
 	while (rsp->ring_ptr->signature != RESPONSE_PROCESSED) {
 		pkt = (struct sts_entry_24xx *)rsp->ring_ptr;
-
-		DEBUG5(printk(KERN_INFO "%s(): IOCB data:\n", __func__));
-		DEBUG5(qla2x00_dump_buffer((uint8_t *)pkt, RESPONSE_ENTRY_SIZE));
 
 		rsp->ring_index++;
 		if (rsp->ring_index == rsp->length) {
