@@ -913,6 +913,9 @@ void qla_tgt_fc_port_added(scsi_qla_host_t *vha, fc_port_t *fcport)
 	unsigned long flags;
 	unsigned char s_id[3];
 
+	if (!vha->hw->qla2x_tmpl)
+		return;
+
 	if (!tgt || (fcport->port_type != FCT_INITIATOR))
 		return;
 
@@ -977,6 +980,9 @@ void qla_tgt_fc_port_deleted(scsi_qla_host_t *vha, fc_port_t *fcport)
 	struct qla_tgt *tgt = ha->qla_tgt;
 	struct qla_tgt_sess *sess;
 	unsigned long flags;
+
+	if (!vha->hw->qla2x_tmpl)
+		return;
 
 	if (!tgt || (fcport->port_type != FCT_INITIATOR))
 		return;
@@ -5214,6 +5220,151 @@ qla_tgt_24xx_config_rings(scsi_qla_host_t *vha, device_reg_t __iomem *reg)
 		WRT_REG_DWORD(&reg->isp24.atio_q_out, 0);
 		RD_REG_DWORD(&reg->isp24.atio_q_out);
 	}
+}
+
+void
+qla_tgt_2x00_config_nvram_stage1(scsi_qla_host_t *vha, nvram_t *nv)
+{
+	struct qla_hw_data *ha = vha->hw;
+	/*
+	 * Setup driver NVRAM options.
+	 */
+	if (!IS_QLA2100(ha)) {
+		/* Check if target mode enabled */
+		if (qla_tgt_mode_enabled(vha)) {
+			if (!ha->saved_set) {
+				/* We save only once */
+				ha->saved_firmware_options[0] = nv->firmware_options[0];
+				ha->saved_firmware_options[1] = nv->firmware_options[1];
+				ha->saved_add_firmware_options[0] = nv->add_firmware_options[0];
+				ha->saved_add_firmware_options[1] = nv->add_firmware_options[1];
+				ha->saved_set = 1;
+			}
+			/* Enable target mode */
+			nv->firmware_options[0] |= BIT_4;
+			/* Disable ini mode, if requested */
+			if (!qla_ini_mode_enabled(vha))
+				nv->firmware_options[0] |= BIT_5;
+
+			/* Disable Full Login after LIP */
+			nv->firmware_options[1] &= ~BIT_5;
+			/* Enable initial LIP */
+			nv->firmware_options[1] &= BIT_1;
+			/* Enable FC tapes support */
+			nv->add_firmware_options[1] |= BIT_4;
+			/* Enable Command Queuing in Target Mode */
+			nv->add_firmware_options[1] |= BIT_6;
+		} else {
+			if (ha->saved_set) {
+				nv->firmware_options[0] = ha->saved_firmware_options[0];
+				nv->firmware_options[1] = ha->saved_firmware_options[1];
+				nv->add_firmware_options[0] = ha->saved_add_firmware_options[0];
+				nv->add_firmware_options[1] = ha->saved_add_firmware_options[1];
+			}
+		}
+	}
+
+	if (!IS_QLA2100(ha)) {
+		if (ha->enable_class_2) {
+			if (vha->flags.init_done) {
+				fc_host_supported_classes(vha->host) =
+					FC_COS_CLASS2 | FC_COS_CLASS3;
+			}
+			nv->add_firmware_options[1] |= BIT_0;
+		} else {
+			if (vha->flags.init_done) {
+				fc_host_supported_classes(vha->host) =
+					FC_COS_CLASS3;
+			}
+			nv->add_firmware_options[1] &= BIT_0;
+		}
+	}
+}
+
+void
+qla_tgt_2x00_config_nvram_stage2(scsi_qla_host_t *vha, init_cb_t *icb)
+{
+	struct qla_hw_data *ha = vha->hw;
+
+	if (ha->node_name_set) {
+		memcpy(icb->node_name, ha->tgt_node_name, WWN_SIZE);
+		icb->firmware_options[1] |= BIT_6;
+	}
+}
+
+void
+qla_tgt_24xx_config_nvram_stage1(scsi_qla_host_t *vha, struct nvram_24xx *nv)
+{
+	struct qla_hw_data *ha = vha->hw;
+
+	if (qla_tgt_mode_enabled(vha)) {
+		if (!ha->saved_set) {
+			/* We save only once */
+			ha->saved_exchange_count = nv->exchange_count;
+			ha->saved_firmware_options_1 = nv->firmware_options_1;
+			ha->saved_firmware_options_2 = nv->firmware_options_2;
+			ha->saved_firmware_options_3 = nv->firmware_options_3;
+			ha->saved_set = 1;
+		}
+
+		nv->exchange_count = __constant_cpu_to_le16(0xFFFF);
+
+		/* Enable target mode */
+		nv->firmware_options_1 |= __constant_cpu_to_le32(BIT_4);
+
+		/* Disable ini mode, if requested */
+		if (!qla_ini_mode_enabled(vha))
+			nv->firmware_options_1 |= __constant_cpu_to_le32(BIT_5);
+
+		/* Disable Full Login after LIP */
+		nv->firmware_options_1 &= __constant_cpu_to_le32(~BIT_13);
+		/* Enable initial LIP */
+		nv->firmware_options_1 &= __constant_cpu_to_le32(~BIT_9);
+		/* Enable FC tapes support */
+		nv->firmware_options_2 |= __constant_cpu_to_le32(BIT_12);
+	} else {
+		if (ha->saved_set) {
+			nv->exchange_count = ha->saved_exchange_count;
+			nv->firmware_options_1 = ha->saved_firmware_options_1;
+			nv->firmware_options_2 = ha->saved_firmware_options_2;
+			nv->firmware_options_3 = ha->saved_firmware_options_3;
+		}
+	}
+
+	/* out-of-order frames reassembly */
+	nv->firmware_options_3 |= BIT_6|BIT_9;
+
+	if (ha->enable_class_2) {
+		if (vha->flags.init_done)
+			fc_host_supported_classes(vha->host) =
+				FC_COS_CLASS2 | FC_COS_CLASS3;
+
+		nv->firmware_options_2 |= __constant_cpu_to_le32(BIT_8);
+	} else {
+		if (vha->flags.init_done)
+			fc_host_supported_classes(vha->host) = FC_COS_CLASS3;
+
+		nv->firmware_options_2 &= ~__constant_cpu_to_le32(BIT_8);
+	}
+}
+
+void
+qla_tgt_24xx_config_nvram_stage2(scsi_qla_host_t *vha, struct init_cb_24xx *icb)
+{
+	struct qla_hw_data *ha = vha->hw;
+
+	if (ha->node_name_set) {
+		memcpy(icb->node_name, ha->tgt_node_name, WWN_SIZE);
+		icb->firmware_options_1 |= __constant_cpu_to_le32(BIT_14);
+	}
+}
+
+void
+qla_tgt_abort_isp(scsi_qla_host_t *vha)
+{
+	/* Enable target response to SCSI bus. */
+	if (qla_tgt_mode_enabled(vha))
+		qla2x00_send_enable_lun(vha, true);
 }
 
 bool __init qla_tgt_parse_ini_mode(void)

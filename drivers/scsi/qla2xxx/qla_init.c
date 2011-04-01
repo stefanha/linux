@@ -2318,62 +2318,10 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 	}
 #endif
 
+	qla_tgt_2x00_config_nvram_stage1(vha, nv);
+
 	/* Reset Initialization control block */
 	memset(icb, 0, ha->init_cb_size);
-
-	/*
-	 * Setup driver NVRAM options.
-	 */
-	if (!IS_QLA2100(ha)) {
-		/* Check if target mode enabled */
-		if (qla_tgt_mode_enabled(vha)) {
-			if (!ha->saved_set) {
-				/* We save only once */
-				ha->saved_firmware_options[0] = nv->firmware_options[0];
-				ha->saved_firmware_options[1] = nv->firmware_options[1];
-				ha->saved_add_firmware_options[0] = nv->add_firmware_options[0];
-				ha->saved_add_firmware_options[1] = nv->add_firmware_options[1];
-				ha->saved_set = 1;
-			}
-			/* Enable target mode */
-			nv->firmware_options[0] |= BIT_4;
-			/* Disable ini mode, if requested */
-			if (!qla_ini_mode_enabled(vha))
-				nv->firmware_options[0] |= BIT_5;
-
-			/* Disable Full Login after LIP */
-			nv->firmware_options[1] &= ~BIT_5;
-			/* Enable initial LIP */
-			nv->firmware_options[1] &= BIT_1;
-			/* Enable FC tapes support */
-			nv->add_firmware_options[1] |= BIT_4;
-			/* Enable Command Queuing in Target Mode */
-			nv->add_firmware_options[1] |= BIT_6;
-		} else {
-			if (ha->saved_set) {
-				nv->firmware_options[0] = ha->saved_firmware_options[0];
-				nv->firmware_options[1] = ha->saved_firmware_options[1];
-				nv->add_firmware_options[0] = ha->saved_add_firmware_options[0];
-				nv->add_firmware_options[1] = ha->saved_add_firmware_options[1];
-			}
-		}
-	}
-
-	if (!IS_QLA2100(ha)) {
-		if (ha->enable_class_2) {
-			if (vha->flags.init_done) {
-				fc_host_supported_classes(vha->host) =
-					FC_COS_CLASS2 | FC_COS_CLASS3;
-			}
-			nv->add_firmware_options[1] |= BIT_0;
-		} else {
-			if (vha->flags.init_done) {
-				fc_host_supported_classes(vha->host) =
-					FC_COS_CLASS3;
-			}
-			nv->add_firmware_options[1] &= BIT_0;
-		}
-	}
 
 	/* Enable ADISC and fairness */
 	nv->firmware_options[0] |= (BIT_6 | BIT_1);
@@ -2389,12 +2337,8 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 		nv->firmware_options[0] |= BIT_2;
 		/* Disable Fast Status Posting */
 		nv->firmware_options[0] &= ~BIT_3;
-#if 0
-		nv->firmware_options[0] &= ~BIT_6;
-#else
 		/* out-of-order frames rassembly */
 		nv->special_options[0] |= BIT_6;
-#endif
 		/* P2P preferred, otherwise loop */
 		nv->add_firmware_options[1] |= BIT_5 | BIT_4;
 
@@ -2441,15 +2385,13 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 	while (cnt--)
 		*dptr1++ = *dptr2++;
 
-	/* For target mode.. */
-	if (ha->node_name_set) {
-		memcpy(icb->node_name, ha->tgt_node_name, WWN_SIZE);
-		icb->firmware_options[1] |= BIT_6;
-	} else if (nv->host_p[1] & BIT_7) {
+	if (nv->host_p[1] & BIT_7) {
 		/* Use alternate WWN? */
 		memcpy(icb->node_name, nv->alternate_node_name, WWN_SIZE);
 		memcpy(icb->port_name, nv->alternate_port_name, WWN_SIZE);
 	}
+
+	qla_tgt_2x00_config_nvram_stage2(vha, icb);
 
 	/* Prepare nodename */
 	if ((icb->firmware_options[1] & BIT_6) == 0) {
@@ -2583,7 +2525,6 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 		}
 	}
 
-out:
 	if (rval) {
 		DEBUG2_3(printk(KERN_WARNING
 		    "scsi(%ld): NVRAM configuration failed!\n", vha->host_no));
@@ -2609,8 +2550,7 @@ qla2x00_rport_del(void *data)
 		 * Release the target mode FC NEXUS in qla2x_target.c code
 		 * if target mod is enabled.
 		 */
-		if (vha->hw->qla2x_tmpl)
-			qla_tgt_fc_port_deleted(vha, fcport);
+		qla_tgt_fc_port_deleted(vha, fcport);
 	}
 }
 
@@ -2998,8 +2938,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 	 * Create target mode FC NEXUS in qla2x_target.c if target mode is
 	 * enabled..
 	 */
-	if (ha->qla2x_tmpl)
-		qla_tgt_fc_port_added(vha, fcport);
+	qla_tgt_fc_port_added(vha, fcport);
 
 	spin_lock_irqsave(fcport->vha->host->host_lock, flags);
 	*((fc_port_t **)rport->dd_data) = fcport;
@@ -3268,7 +3207,6 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *vha,
 	struct scsi_qla_host *tvp;
 
 	rval = QLA_SUCCESS;
-	wrap.b24 = 0; /* undefined */
 
 	/* Try GID_PT to get device list, else GAN. */
 	swl = kcalloc(MAX_FIBRE_DEVICES, sizeof(sw_info_t), GFP_KERNEL);
@@ -4183,9 +4121,7 @@ qla2x00_abort_isp(scsi_qla_host_t *vha)
 
 			vha->flags.online = 1;
 
-			/* Enable target response to SCSI bus. */
-			if (qla_tgt_mode_enabled(vha))
-				qla2x00_send_enable_lun(vha, true);
+			qla_tgt_abort_isp(vha);
 
 			ha->isp_ops->enable_intrs(ha);
 
@@ -4568,63 +4504,7 @@ qla24xx_nvram_config(scsi_qla_host_t *vha)
 		rval = 1;
 	}
 
-	/* Check if target mode enabled */
-	if (qla_tgt_mode_enabled(vha)) {
-		if (!ha->saved_set) {
-			/* We save only once */
-			ha->saved_exchange_count = nv->exchange_count;
-			ha->saved_firmware_options_1 = nv->firmware_options_1;
-			ha->saved_firmware_options_2 = nv->firmware_options_2;
-			ha->saved_firmware_options_3 = nv->firmware_options_3;
-			ha->saved_set = 1;
-		}
-
-		nv->exchange_count = __constant_cpu_to_le16(0xFFFF);
-
-		/* Enable target mode */
-		nv->firmware_options_1 |= __constant_cpu_to_le32(BIT_4);
-
-		/* Disable ini mode, if requested */
-		if (!qla_ini_mode_enabled(vha))
-			nv->firmware_options_1 |= __constant_cpu_to_le32(BIT_5);
-
-		/* Disable Full Login after LIP */
-		nv->firmware_options_1 &= __constant_cpu_to_le32(~BIT_13);
-		/* Enable initial LIP */
-		nv->firmware_options_1 &= __constant_cpu_to_le32(~BIT_9);
-		/* Enable FC tapes support */
-		nv->firmware_options_2 |= __constant_cpu_to_le32(BIT_12);
-	} else {
-		if (ha->saved_set) {
-			nv->exchange_count = ha->saved_exchange_count;
-			nv->firmware_options_1 = ha->saved_firmware_options_1;
-			nv->firmware_options_2 = ha->saved_firmware_options_2;
-			nv->firmware_options_3 = ha->saved_firmware_options_3;
-		}
-	}
-
-	/* out-of-order frames reassembly */
-	nv->firmware_options_3 |= BIT_6|BIT_9;
-
-	if (ha->enable_class_2) {
-		if (vha->flags.init_done)
-			fc_host_supported_classes(vha->host) =
-				FC_COS_CLASS2 | FC_COS_CLASS3;
-
-		nv->firmware_options_2 |= __constant_cpu_to_le32(BIT_8);
-	} else {
-		if (vha->flags.init_done)
-			fc_host_supported_classes(vha->host) = FC_COS_CLASS3;
-
-		nv->firmware_options_2 &= ~__constant_cpu_to_le32(BIT_8);
-	}
-#if 0
-	/*
-	 * firmware_options_3 bits 3-2 are reserved, but for some reason
-	 * sometimes set by BIOS. Let's explicitly reset them.
-	 */
-	nv->firmware_options_3 &= ~__constant_cpu_to_le32(BIT_3|BIT_2);
-#endif
+	qla_tgt_24xx_config_nvram_stage1(vha, nv);
 
 	/* Reset Initialization control block */
 	memset(icb, 0, ha->init_cb_size);
@@ -4653,10 +4533,9 @@ qla24xx_nvram_config(scsi_qla_host_t *vha)
 	qla2x00_set_model_info(vha, nv->model_name, sizeof(nv->model_name),
 	    "QLA2462");
 
-	if (ha->node_name_set) {
-		memcpy(icb->node_name, ha->tgt_node_name, WWN_SIZE);
-		icb->firmware_options_1 |= __constant_cpu_to_le32(BIT_14);
-	} else if (nv->host_p & __constant_cpu_to_le32(BIT_15)) {
+	qla_tgt_24xx_config_nvram_stage2(vha, icb);
+
+	if (nv->host_p & __constant_cpu_to_le32(BIT_15)) {
 		/* Use alternate WWN? */
 		memcpy(icb->node_name, nv->alternate_node_name, WWN_SIZE);
 		memcpy(icb->port_name, nv->alternate_port_name, WWN_SIZE);
