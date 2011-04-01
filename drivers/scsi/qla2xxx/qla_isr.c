@@ -691,14 +691,7 @@ skip_rio:
 			    "ignored %04x/%04x/%04x.\n", vha->host_no, mb[1],
 			    mb[2], mb[3]));
 
-			DEBUG2(printk(KERN_INFO "scsi(%ld): ha state %d "
-				"init_done %d oper_mode %d topo %d\n",
-				vha->host_no, atomic_read(&vha->loop_state),
-				vha->flags.init_done, ha->operating_mode,
-				ha->current_topology));
-
-			if (ha->qla2x_tmpl)
-				qla_tgt_async_event(mb[0], vha, mb);
+			qla_tgt_async_event(mb[0], vha, mb);
 			break;
 		}
 

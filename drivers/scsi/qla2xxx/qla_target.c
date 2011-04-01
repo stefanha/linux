@@ -4575,6 +4575,13 @@ void qla_tgt_async_event(uint16_t code, scsi_qla_host_t *vha, uint16_t *mailbox)
 	struct qla_tgt *tgt = ha->qla_tgt;
 	int reason_code;
 
+	DEBUG2(printk(KERN_INFO "scsi(%ld): ha state %d init_done %d oper_mode %d"
+		" topo %d\n", vha->host_no, atomic_read(&vha->loop_state),
+		vha->flags.init_done, ha->operating_mode, ha->current_topology));
+
+	if (!ha->qla2x_tmpl)
+		return;
+
 	if (unlikely(tgt == NULL)) {
 		DEBUG21(qla_printk(KERN_INFO, ha, "ASYNC EVENT %#x, but no tgt"
 				" (ha %p)", code, ha));
