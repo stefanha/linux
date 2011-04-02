@@ -1125,6 +1125,8 @@ extern void qla_tgt_2x00_config_nvram_stage2(scsi_qla_host_t *, init_cb_t *);
 extern void qla_tgt_24xx_config_nvram_stage1(scsi_qla_host_t *, struct nvram_24xx *);
 extern void qla_tgt_24xx_config_nvram_stage2(scsi_qla_host_t *, struct init_cb_24xx *);
 extern void qla_tgt_abort_isp(scsi_qla_host_t *);
+extern int qla_tgt_2x00_process_response_error(scsi_qla_host_t *, sts_entry_t *);
+extern int qla_tgt_24xx_process_response_error(scsi_qla_host_t *, struct sts_entry_24xx *);
 extern void qla_tgt_stop_phase1(struct qla_tgt *);
 extern void qla_tgt_stop_phase2(struct qla_tgt *);
 

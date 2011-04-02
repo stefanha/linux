@@ -1383,20 +1383,12 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 
 			qla2x00_error_entry(vha, rsp, pkt);
 
-			switch (pkt->entry_type) {
-			case ACCEPT_TGT_IO_TYPE:
-			case CONTINUE_TGT_IO_TYPE:
-			case CTIO_A64_TYPE:
-			case IMMED_NOTIFY_TYPE:
-			case NOTIFY_ACK_TYPE:
-			case ENABLE_LUN_TYPE:
-			case MODIFY_LUN_TYPE:
+			if (qla_tgt_2x00_process_response_error(vha, pkt) == 1)
 				break;
-			default:
-				((response_t *)pkt)->signature = RESPONSE_PROCESSED;
-				wmb();
-				continue;
-			}
+
+			((response_t *)pkt)->signature = RESPONSE_PROCESSED;
+			wmb();
+			continue;
 		}
 
 		switch (pkt->entry_type) {
@@ -2100,17 +2092,12 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 
 			qla2x00_error_entry(vha, rsp, (sts_entry_t *) pkt);
 
-			switch (pkt->entry_type) {
-			case ABTS_RECV_24XX:
-			case ABTS_RESP_24XX:
-			case CTIO_TYPE7:
-			case NOTIFY_ACK_TYPE:
+			if (qla_tgt_24xx_process_response_error(vha, pkt) == 1)
 				break;
-			default:
-				((response_t *)pkt)->signature = RESPONSE_PROCESSED;
-				wmb();
-				continue;
-			}
+
+			((response_t *)pkt)->signature = RESPONSE_PROCESSED;
+			wmb();
+			continue;
 		}
 
 		switch (pkt->entry_type) {

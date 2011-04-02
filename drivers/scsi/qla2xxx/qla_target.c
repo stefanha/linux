@@ -5380,6 +5380,40 @@ qla_tgt_abort_isp(scsi_qla_host_t *vha)
 		qla2x00_send_enable_lun(vha, true);
 }
 
+int
+qla_tgt_2x00_process_response_error(scsi_qla_host_t *vha, sts_entry_t *pkt)
+{
+	if (!qla_tgt_mode_enabled(vha))
+		return 0;
+
+	switch (pkt->entry_type) {
+	case ACCEPT_TGT_IO_TYPE:
+	case CONTINUE_TGT_IO_TYPE:
+	case CTIO_A64_TYPE:
+	case IMMED_NOTIFY_TYPE:
+	case NOTIFY_ACK_TYPE:
+	case ENABLE_LUN_TYPE:
+	case MODIFY_LUN_TYPE:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+int
+qla_tgt_24xx_process_response_error(scsi_qla_host_t *vha, struct sts_entry_24xx *pkt)
+{
+	switch (pkt->entry_type) {
+	case ABTS_RECV_24XX:
+	case ABTS_RESP_24XX:
+	case CTIO_TYPE7:
+	case NOTIFY_ACK_TYPE:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
