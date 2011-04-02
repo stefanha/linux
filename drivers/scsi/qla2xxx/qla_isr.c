@@ -1432,9 +1432,6 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 		case CT_IOCB_TYPE:
 			qla2x00_ct_entry(vha, rsp->req, pkt, CT_IOCB_TYPE);
 			break;
-		case MARKER_TYPE:
-			printk("Got MARKER_TYPE response packet!!\n");
-			break;
 		default:
 			/* Type Not Supported. */
 			DEBUG4(printk(KERN_WARNING
@@ -1594,16 +1591,6 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 
 	/* Fast path completion. */
 	if (comp_status == CS_COMPLETE && scsi_status == 0) {
-		DEBUG3(printk(KERN_WARNING "scsi(%ld): Status Type %#x:\n"
-			"  entry_count\t%d\n  entry_status\t%#x\n"
-			"  handle:\t%#x\n  scsi_status:\t%#x\n"
-			"  comp_status:\t%#x\n  state_flags:\t%#x\n"
-			"  status_flags:\t%#x\n", vha->host_no,
-			sts->entry_type, sts->entry_count,
-			sts->entry_status, sts->handle,
-			sts->scsi_status, sts->comp_status,
-			sts->state_flags, sts->status_flags));
-
 		qla2x00_process_completed_request(vha, req, handle);
 
 		return;
@@ -1927,12 +1914,9 @@ qla2x00_error_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, sts_entry_t *pkt)
 	uint16_t que = MSW(pkt->handle);
 	struct req_que *req = ha->req_q_map[que];
 #if defined(QL_DEBUG_LEVEL_2)
-	qla_printk(KERN_ERR, ha, "%s: Error entry with type %x:\n", __func__,
-		pkt->entry_type);
-	if (pkt->entry_status & RF_INV_E_ORDER) {
+	if (pkt->entry_status & RF_INV_E_ORDER)
 		qla_printk(KERN_ERR, ha, "%s: Invalid Entry Order\n", __func__);
-		qla2x00_dump_buffer((void *)pkt, sizeof(*pkt));
-	} else if (pkt->entry_status & RF_INV_E_COUNT)
+	else if (pkt->entry_status & RF_INV_E_COUNT)
 		qla_printk(KERN_ERR, ha, "%s: Invalid Entry Count\n", __func__);
 	else if (pkt->entry_status & RF_INV_E_PARAM)
 		qla_printk(KERN_ERR, ha,
