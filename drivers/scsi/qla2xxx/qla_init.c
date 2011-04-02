@@ -2065,7 +2065,7 @@ qla2x00_configure_hba(scsi_qla_host_t *vha)
 	vha->loop_id = loop_id;
 
 	/* initialize */
-	ha->min_external_loopid = SNS_FIRST_LOOP_ID + 1;
+	ha->min_external_loopid = SNS_FIRST_LOOP_ID;
 	ha->operating_mode = LOOP;
 	ha->switch_cap = 0;
 
