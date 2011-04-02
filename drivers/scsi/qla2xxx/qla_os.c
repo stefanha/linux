@@ -684,7 +684,6 @@ qla2x00_wait_for_hba_online(scsi_qla_host_t *vha)
 
 	return (return_status);
 }
-EXPORT_SYMBOL(qla2x00_wait_for_hba_online);
 
 /*
  * qla2x00_wait_for_reset_ready

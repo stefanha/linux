@@ -1278,7 +1278,6 @@ out_free:
 	dma_free_coherent(&ha->pdev->dev, dma_size, pmap, pmap_dma);
 	return rval;
 }
-EXPORT_SYMBOL(qla2x00_get_node_name_list);
 
 /*
  * qla2x00_get_port_database
@@ -2185,7 +2184,6 @@ qla2x00_get_id_list(scsi_qla_host_t *vha, void *id_list, dma_addr_t id_list_dma,
 
 	return rval;
 }
-EXPORT_SYMBOL(qla2x00_get_id_list);
 
 /*
  * qla2x00_get_resource_cnts
