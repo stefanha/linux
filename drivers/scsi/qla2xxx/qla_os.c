@@ -4178,11 +4178,6 @@ qla2x00_module_init(void)
 {
 	int ret = 0;
 
-	if (!qla_tgt_parse_ini_mode()) {
-		printk(KERN_ERR "qla_tgt_parse_ini_mode() failed\n");
-		return -EINVAL;
-	}
-
 	/* Allocate cache for SRBs. */
 	srb_cachep = kmem_cache_create("qla2xxx_srbs", sizeof(srb_t), 0,
 	    SLAB_HWCACHE_ALIGN, NULL);

@@ -5450,7 +5450,7 @@ qla_tgt_mem_free(struct qla_hw_data *ha)
 	kfree(ha->tgt_vp_map);
 }
 
-bool __init qla_tgt_parse_ini_mode(void)
+static __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
 		ql2x_ini_mode = QLA2X_INI_MODE_EXCLUSIVE;
@@ -5464,13 +5464,18 @@ bool __init qla_tgt_parse_ini_mode(void)
 	return true;
 }
 
-int qla_tgt_init(void)
+int __init qla_tgt_init(void)
 {
 	BUILD_BUG_ON(sizeof(atio7_entry_t) != sizeof(atio_entry_t));
 
 	qla_tgt_cmd_cachep = NULL;
 	qla_tgt_mgmt_cmd_cachep = NULL;
 	qla_tgt_mgmt_cmd_mempool = NULL;
+
+	if (!qla_tgt_parse_ini_mode()) {
+		printk(KERN_ERR "qla_tgt_parse_ini_mode() failed\n");
+		return -EINVAL;
+	}
 
 	qla_tgt_cmd_cachep = kmem_cache_create("qla_tgt_cmd_cachep",
 			sizeof(struct qla_tgt_cmd), __alignof__(struct qla_tgt_cmd),

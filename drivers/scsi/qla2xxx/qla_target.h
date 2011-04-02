@@ -1008,8 +1008,7 @@ extern void qla_tgt_fc_port_added(scsi_qla_host_t *, fc_port_t *);
 extern void qla_tgt_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);
 extern void qla_tgt_set_mode(scsi_qla_host_t *ha);
 extern void qla_tgt_clear_mode(scsi_qla_host_t *ha);
-extern bool __init qla_tgt_parse_ini_mode(void);
-extern int qla_tgt_init(void);
+extern int __init qla_tgt_init(void);
 extern void qla_tgt_exit(void);
 
 static inline bool qla_tgt_mode_enabled(scsi_qla_host_t *ha)
