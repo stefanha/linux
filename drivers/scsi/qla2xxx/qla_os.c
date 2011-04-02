@@ -43,6 +43,12 @@ static struct kmem_cache *srb_cachep;
  */
 static struct kmem_cache *ctx_cachep;
 
+int ql2xenableclass2;
+module_param(ql2xenableclass2, int, S_IRUGO|S_IRUSR);
+MODULE_PARM_DESC(ql2xenableclass2,
+		"Specify if Class 2 operations are supported from the very "
+		"beginning.");
+
 int ql2xlogintimeout = 20;
 module_param(ql2xlogintimeout, int, S_IRUGO);
 MODULE_PARM_DESC(ql2xlogintimeout,
@@ -65,12 +71,6 @@ int ql2xloginretrycount = 0;
 module_param(ql2xloginretrycount, int, S_IRUGO);
 MODULE_PARM_DESC(ql2xloginretrycount,
 		"Specify an alternate value for the NVRAM login retry count.");
-
-int ql2xenableclass2;
-module_param(ql2xenableclass2, int, S_IRUGO|S_IRUSR);
-MODULE_PARM_DESC(ql2xenableclass2,
-		"Specify if Class 2 operations are supported from the very "
-		"beginning.");
 
 int ql2xallocfwdump = 1;
 module_param(ql2xallocfwdump, int, S_IRUGO);
