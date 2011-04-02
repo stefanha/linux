@@ -2116,8 +2116,6 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 		case NOTIFY_ACK_TYPE:
 			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
-		case MARKER_TYPE:
-			break;
 		default:
 			/* Type Not Supported. */
 			DEBUG4(printk(KERN_WARNING
