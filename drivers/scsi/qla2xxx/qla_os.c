@@ -2425,11 +2425,6 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	ha = base_vha->hw;
 
 	ha->host_shutting_down = 1;
-#warning FIXME: Check for target mode enabled bit before calling qla_tgt_remove_target()
-	qla_tgt_remove_target(ha, base_vha);
-
-	/* Necessary to prevent races with it */
-	qla2x00_stop_dpc_thread(base_vha);
 
 	spin_lock_irqsave(&ha->vport_slock, flags);
 	list_for_each_entry(vha, &ha->vp_list, list) {
@@ -2479,6 +2474,7 @@ qla2x00_remove_one(struct pci_dev *pdev)
 		ha->dpc_thread = NULL;
 		kthread_stop(t);
 	}
+	qla_tgt_remove_target(ha, base_vha);
 
 	qla2x00_free_sysfs_attr(base_vha);
 
