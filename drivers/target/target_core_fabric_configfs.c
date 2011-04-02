@@ -379,7 +379,7 @@ static struct config_group *target_fabric_make_mappedlun(
 	lacl_cg->default_groups[0] = &lacl->ml_stat_grps.stat_group;
 	lacl_cg->default_groups[1] = NULL;
 
-	ml_stat_grp = &ML_STAT_GRPS(lacl)->stat_group;	
+	ml_stat_grp = &ML_STAT_GRPS(lacl)->stat_group;
 	ml_stat_grp->default_groups = kzalloc(sizeof(struct config_group) * 3,
 				GFP_KERNEL);
 	if (!ml_stat_grp->default_groups) {
@@ -913,7 +913,7 @@ static struct config_group *target_fabric_make_lun(
 			&TF_CIT_TMPL(tf)->tfc_tpg_port_cit);
 	config_group_init_type_name(&lun->port_stat_grps.stat_group,
 			"statistics", &TF_CIT_TMPL(tf)->tfc_tpg_port_stat_cit);
-	lun_cg->default_groups[0] = &lun->port_stat_grps.stat_group;	
+	lun_cg->default_groups[0] = &lun->port_stat_grps.stat_group;
 	lun_cg->default_groups[1] = NULL;
 
 	port_stat_grp = &PORT_STAT_GRP(lun)->stat_group;
