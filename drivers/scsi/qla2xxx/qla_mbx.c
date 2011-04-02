@@ -1142,27 +1142,6 @@ qla2x00_init_firmware(scsi_qla_host_t *vha, uint16_t size)
 	DEBUG11(printk("qla2x00_init_firmware(%ld): entered.\n",
 	    vha->host_no));
 
-#ifdef QL_DEBUG_LEVEL_5
-	if (IS_FWI2_CAPABLE(ha)) {
-		struct init_cb_24xx *icb = (struct init_cb_24xx *)vha->init_cb;
-		DEBUG5(printk(KERN_INFO "%s(): firmware_options_1 %x, "
-			"firmware_options_2 %x, firmware_options_3 %x\n",
-			__func__, icb->firmware_options_1,
-			icb->firmware_options_2, icb->firmware_options_3));
-		DEBUG5(printk(KERN_INFO "%s(): Control Block:\n", __func__));
-		DEBUG5(qla2x00_dump_buffer((uint8_t *)icb, sizeof(*icb)));
-	} else {
-		init_cb_t *icb = (init_cb_t *)vha->init_cb;
-		DEBUG5(printk(KERN_INFO "%s(): firmware_options[0] %x, "
-			"firmware_options[1] %x, add_firmware_options[0] %x, "
-			"add_firmware_options[1] %x\n", __func__,
-			icb->firmware_options[0], icb->firmware_options[1],
-			icb->add_firmware_options[0],
-			icb->add_firmware_options[1]));
-		DEBUG5(printk(KERN_INFO "%s(): Control Block:\n", __func__));
-		DEBUG5(qla2x00_dump_buffer((uint8_t *)icb, sizeof(*icb)));
-	}
-#endif
 	if (IS_QLA82XX(ha) && ql2xdbwr)
 		qla82xx_wr_32(ha, ha->nxdb_wr_ptr,
 			(0x04 | (ha->portnum << 5) | (0 << 8) | (0 << 16)));
