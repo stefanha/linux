@@ -2021,8 +2021,6 @@ qla24xx_mbx_completion(scsi_qla_host_t *vha, uint16_t mb0)
 #endif
 }
 
-extern void qla24xx_atio_pkt_all_vps(struct scsi_qla_host *, atio7_entry_t *);
-
 /*
  * qla24xx_process_atio_queue() - Process ATIO queue entries.
  * @ha: SCSI driver HA context

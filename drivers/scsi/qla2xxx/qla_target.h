@@ -1105,6 +1105,7 @@ qla2x00_send_enable_lun(scsi_qla_host_t *vha, bool enable)
 /*
  * Exported symbols from qla_target.c LLD logic used by tcm_qla2xxx code..
  */
+extern void qla24xx_atio_pkt_all_vps(scsi_qla_host_t *, atio7_entry_t *);
 extern void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *, response_t *);
 extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
 extern int qla2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
