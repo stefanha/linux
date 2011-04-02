@@ -2141,7 +2141,6 @@ qla2x00_get_id_list(scsi_qla_host_t *vha, void *id_list, dma_addr_t id_list_dma,
     uint16_t *entries)
 {
 
-	struct qla_hw_data *ha = vha->hw;
 	int rval;
 	mbx_cmd_t mc;
 	mbx_cmd_t *mcp = &mc;
@@ -2170,14 +2169,7 @@ qla2x00_get_id_list(scsi_qla_host_t *vha, void *id_list, dma_addr_t id_list_dma,
 		mcp->out_mb |= MBX_6|MBX_3|MBX_2|MBX_1;
 	}
 	mcp->in_mb = MBX_1|MBX_0;
-
-	if (ha->qla2x_tmpl == NULL)
-		mcp->tov = MBX_TOV_SECONDS;
-	else {
-		mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
-		DEBUG11(printk("Using target mode mcp->tiov: %d\n", mcp->tov));
-	}
-
+	mcp->tov = MBX_TOV_SECONDS;
 	mcp->flags = 0;
 	rval = qla2x00_mailbox_command(vha, mcp);
 
