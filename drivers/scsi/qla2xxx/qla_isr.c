@@ -1383,6 +1383,8 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 			DEBUG3(printk(KERN_INFO
 			    "scsi(%ld): Process error entry.\n", vha->host_no));
 
+			qla2x00_error_entry(vha, rsp, pkt);
+
 			switch (pkt->entry_type) {
 			case ACCEPT_TGT_IO_TYPE:
 			case CONTINUE_TGT_IO_TYPE:
