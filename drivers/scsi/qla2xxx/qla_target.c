@@ -5419,6 +5419,37 @@ qla_tgt_probe_one_stage1(scsi_qla_host_t *base_vha, struct qla_hw_data *ha)
 	qla_tgt_clear_mode(base_vha);
 }
 
+int
+qla_tgt_mem_alloc(struct qla_hw_data *ha)
+{
+	if (IS_FWI2_CAPABLE(ha)) {
+		ha->tgt_vp_map = kzalloc(sizeof(struct qla_tgt_vp_map) *
+					MAX_MULTI_ID_FABRIC, GFP_KERNEL);
+		if (!ha->tgt_vp_map)
+			return -ENOMEM;
+
+		ha->atio_ring = dma_alloc_coherent(&ha->pdev->dev,
+				(ha->atio_q_length + 1) * sizeof(atio_t),
+				&ha->atio_dma, GFP_KERNEL);
+		if (!ha->atio_ring) {
+			kfree(ha->tgt_vp_map);
+			return -ENOMEM;
+		}
+	}
+
+	return 0;
+}
+
+void
+qla_tgt_mem_free(struct qla_hw_data *ha)
+{
+	if (ha->atio_ring) {
+		dma_free_coherent(&ha->pdev->dev, (ha->atio_q_length + 1) *
+				sizeof(atio_t), ha->atio_ring, ha->atio_dma);
+	}
+	kfree(ha->tgt_vp_map);
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)

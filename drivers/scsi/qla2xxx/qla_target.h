@@ -1130,6 +1130,8 @@ extern int qla_tgt_2x00_process_response_error(scsi_qla_host_t *, sts_entry_t *)
 extern int qla_tgt_24xx_process_response_error(scsi_qla_host_t *, struct sts_entry_24xx *);
 extern void qla_tgt_modify_vp_config(scsi_qla_host_t *, struct vp_config_entry_24xx *);
 extern void qla_tgt_probe_one_stage1(scsi_qla_host_t *, struct qla_hw_data *);
+extern int qla_tgt_mem_alloc(struct qla_hw_data *);
+extern void qla_tgt_mem_free(struct qla_hw_data *);
 extern void qla_tgt_stop_phase1(struct qla_tgt *);
 extern void qla_tgt_stop_phase2(struct qla_tgt *);
 

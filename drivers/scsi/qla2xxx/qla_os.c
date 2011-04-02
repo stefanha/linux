@@ -2692,26 +2692,13 @@ qla2x00_mem_alloc(struct qla_hw_data *ha, uint16_t req_len, uint16_t rsp_len,
 	if (!ha->init_cb)
 		goto fail;
 
-	/*
-	 * Setup qla_hw_data->tgt_vp_map
-	 */
-	if (IS_FWI2_CAPABLE(ha)) {
-		ha->tgt_vp_map = kzalloc(sizeof(struct qla_tgt_vp_map) *
-					MAX_MULTI_ID_FABRIC, GFP_KERNEL);
-		if (!ha->tgt_vp_map)
-			goto fail_free_init_cb;
-
-		ha->atio_ring = dma_alloc_coherent(&ha->pdev->dev,
-				(ha->atio_q_length + 1) * sizeof(atio_t),
-				&ha->atio_dma, GFP_KERNEL);
-		if (!ha->atio_ring)
-			goto fail_free_vp_map;
-	}
+	if (qla_tgt_mem_alloc(ha) < 0)
+		goto fail_free_init_cb;
 
 	ha->gid_list = dma_alloc_coherent(&ha->pdev->dev, GID_LIST_SIZE,
 		&ha->gid_list_dma, GFP_KERNEL);
 	if (!ha->gid_list)
-		goto fail_free_atio_ring;
+		goto fail_free_tgt_mem;
 
 	ha->srb_mempool = mempool_create_slab_pool(SRB_MIN_REQ, srb_cachep);
 	if (!ha->srb_mempool)
@@ -2902,14 +2889,8 @@ fail_free_gid_list:
 	ha->gid_list_dma);
 	ha->gid_list = NULL;
 	ha->gid_list_dma = 0;
-fail_free_atio_ring:
-	dma_free_coherent(&ha->pdev->dev, (ha->atio_q_length + 1) *
-			sizeof(response_t), ha->atio_ring, ha->atio_dma);
-	ha->atio_ring = NULL;
-	ha->atio_dma = 0;
-fail_free_vp_map:
-	kfree(ha->tgt_vp_map);
-	ha->tgt_vp_map = NULL;
+fail_free_tgt_mem:
+	qla_tgt_mem_free(ha);
 fail_free_init_cb:
 	dma_free_coherent(&ha->pdev->dev, ha->init_cb_size, ha->init_cb,
 	ha->init_cb_dma);
@@ -3027,11 +3008,7 @@ qla2x00_mem_free(struct qla_hw_data *ha)
 	if (ha->ctx_mempool)
 		mempool_destroy(ha->ctx_mempool);
 
-	if (ha->atio_ring) {
-		dma_free_coherent(&ha->pdev->dev, (ha->atio_q_length + 1) * sizeof(atio_t),
-				ha->atio_ring, ha->atio_dma);
-	}
-	kfree(ha->tgt_vp_map);
+	qla_tgt_mem_free(ha);
 
 	if (ha->init_cb)
 		dma_free_coherent(&ha->pdev->dev, ha->init_cb_size,
