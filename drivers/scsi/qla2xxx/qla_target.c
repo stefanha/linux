@@ -279,9 +279,6 @@ void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
 {
 	struct qla_hw_data *ha = vha->hw;
 
-	if (!ha->qla2x_tmpl)
-		return;
-
 	switch (pkt->entry_type) {
 	case CTIO_TYPE7:
 	{
