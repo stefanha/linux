@@ -2005,45 +2005,6 @@ qla24xx_mbx_completion(scsi_qla_host_t *vha, uint16_t mb0)
 #endif
 }
 
-/*
- * qla24xx_process_atio_queue() - Process ATIO queue entries.
- * @ha: SCSI driver HA context
- */
-static void
-qla24xx_process_atio_queue(struct scsi_qla_host *vha)
-{
-	struct qla_hw_data *ha = vha->hw;
-	struct device_reg_24xx __iomem *reg = &ha->iobase->isp24;
-	atio_t *pkt;
-	int cnt, i;
-
-	if (!vha->flags.online)
-		return;
-
-	while (ha->atio_ring_ptr->signature != ATIO_PROCESSED) {
-		pkt = ha->atio_ring_ptr;
-		cnt = pkt->entry_count;
-
-		qla24xx_atio_pkt_all_vps(vha, (atio7_entry_t *)pkt);
-
-		for (i = 0; i < cnt; i++) {
-			ha->atio_ring_index++;
-			if (ha->atio_ring_index == ha->atio_q_length) {
-				ha->atio_ring_index = 0;
-				ha->atio_ring_ptr = ha->atio_ring;
-			} else
-				ha->atio_ring_ptr++;
-
-			pkt->signature = ATIO_PROCESSED;
-			pkt = ha->atio_ring_ptr;
-		}
-		wmb();
-	}
-
-	/* Adjust ring index */
-	WRT_REG_DWORD(&reg->atio_q_out, ha->atio_ring_index);
-}
-
 /**
  * qla24xx_process_response_queue() - Process response queue entries.
  * @ha: SCSI driver HA context
@@ -2110,7 +2071,7 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 			break;
 		case ABTS_RECV_24XX:
 			/* ensure that the ATIO queue is empty */
-			qla24xx_process_atio_queue(vha);
+			qla_tgt_24xx_process_atio_queue(vha);
 		case ABTS_RESP_24XX:
 		case CTIO_TYPE7:
 		case NOTIFY_ACK_TYPE:
@@ -2262,10 +2223,10 @@ qla24xx_intr_handler(int irq, void *dev_id)
 			qla24xx_process_response_queue(vha, rsp);
 			break;
 		case 0x1C: /* ATIO queue updated */
-			qla24xx_process_atio_queue(vha);
+			qla_tgt_24xx_process_atio_queue(vha);
 			break;
 		case 0x1D: /* ATIO and response queues updated */
-			qla24xx_process_atio_queue(vha);
+			qla_tgt_24xx_process_atio_queue(vha);
 			qla24xx_process_response_queue(vha, rsp);
 			break;
 		default:
@@ -2413,10 +2374,10 @@ qla24xx_msix_default(int irq, void *dev_id)
 			qla24xx_process_response_queue(vha, rsp);
 			break;
 		case 0x1C: /* ATIO queue updated */
-			qla24xx_process_atio_queue(vha);
+			qla_tgt_24xx_process_atio_queue(vha);
 			break;
 		case 0x1D: /* ATIO and response queues updated */
-			qla24xx_process_atio_queue(vha);
+			qla_tgt_24xx_process_atio_queue(vha);
 			qla24xx_process_response_queue(vha, rsp);
 			break;
 		default:

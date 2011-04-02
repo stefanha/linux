@@ -5198,6 +5198,45 @@ qla_tgt_init_atio_q_entries(scsi_qla_host_t *vha)
 
 }
 
+/*
+ * qla_tgt_24xx_process_atio_queue() - Process ATIO queue entries.
+ * @ha: SCSI driver HA context
+ */
+void
+qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	struct device_reg_24xx __iomem *reg = &ha->iobase->isp24;
+	atio_t *pkt;
+	int cnt, i;
+
+	if (!vha->flags.online)
+		return;
+
+	while (ha->atio_ring_ptr->signature != ATIO_PROCESSED) {
+		pkt = ha->atio_ring_ptr;
+		cnt = pkt->entry_count;
+
+		qla24xx_atio_pkt_all_vps(vha, (atio7_entry_t *)pkt);
+
+		for (i = 0; i < cnt; i++) {
+			ha->atio_ring_index++;
+			if (ha->atio_ring_index == ha->atio_q_length) {
+				ha->atio_ring_index = 0;
+				ha->atio_ring_ptr = ha->atio_ring;
+			} else
+				ha->atio_ring_ptr++;
+
+			pkt->signature = ATIO_PROCESSED;
+			pkt = ha->atio_ring_ptr;
+		}
+		wmb();
+	}
+
+	/* Adjust ring index */
+	WRT_REG_DWORD(&reg->atio_q_out, ha->atio_ring_index);
+}
+
 void
 qla_tgt_24xx_config_rings(scsi_qla_host_t *vha, device_reg_t __iomem *reg)
 {

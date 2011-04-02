@@ -1119,6 +1119,7 @@ extern void qla_tgt_vport_create(scsi_qla_host_t *, struct qla_hw_data *);
 extern void qla_tgt_rff_id(scsi_qla_host_t *, struct ct_sns_req *);
 extern void qla_tgt_initialize_adapter(scsi_qla_host_t *, struct qla_hw_data *);
 extern void qla_tgt_init_atio_q_entries(scsi_qla_host_t *);
+extern void qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *);
 extern void qla_tgt_24xx_config_rings(scsi_qla_host_t *, device_reg_t __iomem *);
 extern void qla_tgt_2x00_config_nvram_stage1(scsi_qla_host_t *, nvram_t *);
 extern void qla_tgt_2x00_config_nvram_stage2(scsi_qla_host_t *, init_cb_t *);
