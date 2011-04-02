@@ -5506,7 +5506,7 @@ int __init qla_tgt_init(void)
 	return 0;
 }
 
-void qla_tgt_exit(void)
+void __exit qla_tgt_exit(void)
 {
 	if (qla_tgt_mgmt_cmd_mempool != NULL)
 		mempool_destroy(qla_tgt_mgmt_cmd_mempool);
