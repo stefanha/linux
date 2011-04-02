@@ -394,22 +394,16 @@ qla24xx_vport_create_req_sanity_check(struct fc_vport *fc_vport)
 	scsi_qla_host_t *vha;
 	uint8_t port_name[WWN_SIZE];
 
-	if (fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR) {
-		DEBUG15(printk("fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR\n"));
+	if (fc_vport->roles != FC_PORT_ROLE_FCP_INITIATOR)
 		return VPCERR_UNSUPPORTED;
-	}
 
 	/* Check up the F/W and H/W support NPIV */
-	if (!ha->flags.npiv_supported) {
-		DEBUG15(printk("!ha->flags.npiv_supported\n"));
+	if (!ha->flags.npiv_supported)
 		return VPCERR_UNSUPPORTED;
-	}
 
 	/* Check up whether npiv supported switch presented */
-	if (!(ha->switch_cap & FLOGI_MID_SUPPORT)) {
-		DEBUG15(printk("!(ha->switch_cap & FLOGI_MID_SUPPORT))\n"));
+	if (!(ha->switch_cap & FLOGI_MID_SUPPORT))
 		return VPCERR_NO_FABRIC_SUPP;
-	}
 	/* Check up unique WWPN */
 	u64_to_wwn(fc_vport->port_name, port_name);
 	if (!memcmp(port_name, base_vha->port_name, WWN_SIZE))
