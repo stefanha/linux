@@ -698,23 +698,23 @@ struct qla_tgt_sess;
 
 struct qla_target_template {
 
-	int (*handle_cmd)(scsi_qla_host_t *, struct qla_tgt_cmd *, uint32_t,
+	int (*handle_cmd)(struct scsi_qla_host *, struct qla_tgt_cmd *, uint32_t,
 			uint32_t, int, int, int);
 	int (*handle_data)(struct qla_tgt_cmd *);
 	int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
 	void (*free_cmd)(struct qla_tgt_cmd *);
 	void (*free_session)(struct qla_tgt_sess *);
 
-	int (*check_initiator_node_acl)(scsi_qla_host_t *, unsigned char *,
+	int (*check_initiator_node_acl)(struct scsi_qla_host *, unsigned char *,
 					void *, uint8_t *, uint16_t);
-	struct qla_tgt_sess *(*find_sess_by_loop_id)(scsi_qla_host_t *,
+	struct qla_tgt_sess *(*find_sess_by_loop_id)(struct scsi_qla_host *,
 						const uint16_t);
-	struct qla_tgt_sess *(*find_sess_by_s_id)(scsi_qla_host_t *,
+	struct qla_tgt_sess *(*find_sess_by_s_id)(struct scsi_qla_host *,
 						const uint8_t *);
 };
 
-int qla2x00_wait_for_loop_ready(scsi_qla_host_t *);
-int qla2x00_wait_for_hba_online(scsi_qla_host_t *);
+int qla2x00_wait_for_loop_ready(struct scsi_qla_host *);
+int qla2x00_wait_for_hba_online(struct scsi_qla_host *);
 
 #include <target/target_core_base.h>
 
@@ -879,7 +879,7 @@ struct qla_tgt_sess {
 	unsigned int local:1;
 
 	struct se_session *se_sess;
-	scsi_qla_host_t *vha;
+	struct scsi_qla_host *vha;
 	struct qla_tgt *tgt;
 
 	int sess_ref; /* protected by hardware_lock */
@@ -917,7 +917,7 @@ struct qla_tgt_cmd {
 
 	uint16_t loop_id;		    /* to save extra sess dereferences */
 	struct qla_tgt *tgt;		    /* to save extra sess dereferences */
-	scsi_qla_host_t *vha;
+	struct scsi_qla_host *vha;
 
 	union {
 		atio7_entry_t atio7;
@@ -997,31 +997,31 @@ extern struct qla_tgt_data qla_target;
 /*
  * Internal function prototypes
  */
-void qla_tgt_disable_vha(scsi_qla_host_t *);
+void qla_tgt_disable_vha(struct scsi_qla_host *);
 
 /*
  * Function prototypes for qla_target.c logic used by qla2xxx LLD code.
  */
-extern int qla_tgt_add_target(struct qla_hw_data *, scsi_qla_host_t *);
-extern int qla_tgt_remove_target(struct qla_hw_data *, scsi_qla_host_t *);
-extern void qla_tgt_fc_port_added(scsi_qla_host_t *, fc_port_t *);
-extern void qla_tgt_fc_port_deleted(scsi_qla_host_t *, fc_port_t *);
-extern void qla_tgt_set_mode(scsi_qla_host_t *ha);
-extern void qla_tgt_clear_mode(scsi_qla_host_t *ha);
+extern int qla_tgt_add_target(struct qla_hw_data *, struct scsi_qla_host *);
+extern int qla_tgt_remove_target(struct qla_hw_data *, struct scsi_qla_host *);
+extern void qla_tgt_fc_port_added(struct scsi_qla_host *, fc_port_t *);
+extern void qla_tgt_fc_port_deleted(struct scsi_qla_host *, fc_port_t *);
+extern void qla_tgt_set_mode(struct scsi_qla_host *ha);
+extern void qla_tgt_clear_mode(struct scsi_qla_host *ha);
 extern int __init qla_tgt_init(void);
 extern void __exit qla_tgt_exit(void);
 
-static inline bool qla_tgt_mode_enabled(scsi_qla_host_t *ha)
+static inline bool qla_tgt_mode_enabled(struct scsi_qla_host *ha)
 {
 	return ha->host->active_mode & MODE_TARGET;
 }
 
-static inline bool qla_ini_mode_enabled(scsi_qla_host_t *ha)
+static inline bool qla_ini_mode_enabled(struct scsi_qla_host *ha)
 {
 	return ha->host->active_mode & MODE_INITIATOR;
 }
 
-static inline void qla_reverse_ini_mode(scsi_qla_host_t *ha)
+static inline void qla_reverse_ini_mode(struct scsi_qla_host *ha)
 {
 	if (ha->host->active_mode & MODE_INITIATOR)
 		ha->host->active_mode &= ~MODE_INITIATOR;
@@ -1044,7 +1044,7 @@ static inline void qla_reverse_ini_mode(scsi_qla_host_t *ha)
  * then reaquire.
  */
 static inline void
-__qla2x00_send_enable_lun(scsi_qla_host_t *vha, int enable)
+__qla2x00_send_enable_lun(struct scsi_qla_host *vha, int enable)
 {
 	elun_entry_t *pkt;
 	struct qla_hw_data *ha = vha->hw;
@@ -1090,7 +1090,7 @@ __qla2x00_send_enable_lun(scsi_qla_host_t *vha, int enable)
  *	enable = enable/disable flag.
  */
 static inline void
-qla2x00_send_enable_lun(scsi_qla_host_t *vha, bool enable)
+qla2x00_send_enable_lun(struct scsi_qla_host *vha, bool enable)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -1104,32 +1104,32 @@ qla2x00_send_enable_lun(scsi_qla_host_t *vha, bool enable)
 /*
  * Exported symbols from qla_target.c LLD logic used by tcm_qla2xxx code..
  */
-extern void qla24xx_atio_pkt_all_vps(scsi_qla_host_t *, atio7_entry_t *);
-extern void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *, response_t *);
+extern void qla24xx_atio_pkt_all_vps(struct scsi_qla_host *, atio7_entry_t *);
+extern void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *, response_t *);
 extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
 extern int qla2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
 extern void qla_tgt_sess_put(struct qla_tgt_sess *);
-extern void qla_tgt_ctio_completion(scsi_qla_host_t *, uint32_t);
-extern void qla_tgt_async_event(uint16_t, scsi_qla_host_t *, uint16_t *);
-extern void qla_tgt_enable_vha(scsi_qla_host_t *);
-extern void qla_tgt_vport_create(scsi_qla_host_t *, struct qla_hw_data *);
-extern void qla_tgt_rff_id(scsi_qla_host_t *, struct ct_sns_req *);
-extern void qla_tgt_initialize_adapter(scsi_qla_host_t *, struct qla_hw_data *);
-extern void qla_tgt_init_atio_q_entries(scsi_qla_host_t *);
+extern void qla_tgt_ctio_completion(struct scsi_qla_host *, uint32_t);
+extern void qla_tgt_async_event(uint16_t, struct scsi_qla_host *, uint16_t *);
+extern void qla_tgt_enable_vha(struct scsi_qla_host *);
+extern void qla_tgt_vport_create(struct scsi_qla_host *, struct qla_hw_data *);
+extern void qla_tgt_rff_id(struct scsi_qla_host *, struct ct_sns_req *);
+extern void qla_tgt_initialize_adapter(struct scsi_qla_host *, struct qla_hw_data *);
+extern void qla_tgt_init_atio_q_entries(struct scsi_qla_host *);
 extern void qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *);
-extern void qla_tgt_24xx_config_rings(scsi_qla_host_t *, device_reg_t __iomem *);
-extern void qla_tgt_2x00_config_nvram_stage1(scsi_qla_host_t *, nvram_t *);
-extern void qla_tgt_2x00_config_nvram_stage2(scsi_qla_host_t *, init_cb_t *);
-extern void qla_tgt_24xx_config_nvram_stage1(scsi_qla_host_t *, struct nvram_24xx *);
-extern void qla_tgt_24xx_config_nvram_stage2(scsi_qla_host_t *, struct init_cb_24xx *);
-extern void qla_tgt_abort_isp(scsi_qla_host_t *);
-extern int qla_tgt_2x00_process_response_error(scsi_qla_host_t *, sts_entry_t *);
-extern int qla_tgt_24xx_process_response_error(scsi_qla_host_t *, struct sts_entry_24xx *);
-extern void qla_tgt_modify_vp_config(scsi_qla_host_t *, struct vp_config_entry_24xx *);
-extern void qla_tgt_probe_one_stage1(scsi_qla_host_t *, struct qla_hw_data *);
+extern void qla_tgt_24xx_config_rings(struct scsi_qla_host *, device_reg_t __iomem *);
+extern void qla_tgt_2x00_config_nvram_stage1(struct scsi_qla_host *, nvram_t *);
+extern void qla_tgt_2x00_config_nvram_stage2(struct scsi_qla_host *, init_cb_t *);
+extern void qla_tgt_24xx_config_nvram_stage1(struct scsi_qla_host *, struct nvram_24xx *);
+extern void qla_tgt_24xx_config_nvram_stage2(struct scsi_qla_host *, struct init_cb_24xx *);
+extern void qla_tgt_abort_isp(struct scsi_qla_host *);
+extern int qla_tgt_2x00_process_response_error(struct scsi_qla_host *, sts_entry_t *);
+extern int qla_tgt_24xx_process_response_error(struct scsi_qla_host *, struct sts_entry_24xx *);
+extern void qla_tgt_modify_vp_config(struct scsi_qla_host *, struct vp_config_entry_24xx *);
+extern void qla_tgt_probe_one_stage1(struct scsi_qla_host *, struct qla_hw_data *);
 extern int qla_tgt_mem_alloc(struct qla_hw_data *);
 extern void qla_tgt_mem_free(struct qla_hw_data *);
 extern void qla_tgt_stop_phase1(struct qla_tgt *);

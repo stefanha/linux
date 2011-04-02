@@ -96,15 +96,15 @@ enum fcp_resp_rsp_codes {
 static int __qla24xx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 
 /* Predefs for callbacks handed to qla2xxx LLD */
-static void qla24xx_atio_pkt(scsi_qla_host_t *ha, atio7_entry_t *pkt);
-static void qla_tgt_response_pkt(scsi_qla_host_t *ha, response_t *pkt);
+static void qla24xx_atio_pkt(struct scsi_qla_host *ha, atio7_entry_t *pkt);
+static void qla_tgt_response_pkt(struct scsi_qla_host *ha, response_t *pkt);
 static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
 	int fn, void *iocb, int flags);
-static void qla2xxx_send_term_exchange(scsi_qla_host_t *ha, struct qla_tgt_cmd *cmd,
+static void qla2xxx_send_term_exchange(struct scsi_qla_host *ha, struct qla_tgt_cmd *cmd,
 	atio_entry_t *atio, int ha_locked);
-static void qla24xx_send_term_exchange(scsi_qla_host_t *ha, struct qla_tgt_cmd *cmd,
+static void qla24xx_send_term_exchange(struct scsi_qla_host *ha, struct qla_tgt_cmd *cmd,
 	atio7_entry_t *atio, int ha_locked);
-static void qla_tgt_reject_free_srr_imm(scsi_qla_host_t *ha, struct srr_imm *imm,
+static void qla_tgt_reject_free_srr_imm(struct scsi_qla_host *ha, struct srr_imm *imm,
 	int ha_lock);
 static int qla_tgt_cut_cmd_data_head(struct qla_tgt_cmd *cmd, unsigned int offset);
 static void qla_tgt_clear_tgt_db(struct qla_tgt *tgt, bool local_only);
@@ -125,7 +125,7 @@ static DECLARE_RWSEM(qla_tgt_unreg_rwsem);
 /*
  * From qla2xxx/qla_iobc.c and used by various qla_target.c logic
  */
-extern request_t *qla2x00_req_pkt(scsi_qla_host_t *);
+extern request_t *qla2x00_req_pkt(struct scsi_qla_host *);
 
 /* ha->hardware_lock supposed to be held on entry */
 static inline void qla_tgt_sess_get(struct qla_tgt_sess *sess)
@@ -171,7 +171,7 @@ static struct qla_tgt_sess *qla_tgt_find_sess_by_port_name(
 }
 
 /* Might release hw lock, then reaquire!! */
-static inline int qla_tgt_issue_marker(scsi_qla_host_t *vha, int vha_locked)
+static inline int qla_tgt_issue_marker(struct scsi_qla_host *vha, int vha_locked)
 {
 	/* Send marker if required */
 	if (unlikely(vha->marker_needed != 0)) {
@@ -186,7 +186,7 @@ static inline int qla_tgt_issue_marker(scsi_qla_host_t *vha, int vha_locked)
 }
 
 static inline
-scsi_qla_host_t *qla_tgt_find_host_by_d_id(scsi_qla_host_t *vha, uint8_t *d_id)
+struct scsi_qla_host *qla_tgt_find_host_by_d_id(struct scsi_qla_host *vha, uint8_t *d_id)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -208,7 +208,7 @@ scsi_qla_host_t *qla_tgt_find_host_by_d_id(scsi_qla_host_t *vha, uint8_t *d_id)
 }
 
 static inline
-scsi_qla_host_t *qla_tgt_find_host_by_vp_idx(scsi_qla_host_t *vha, uint16_t vp_idx)
+struct scsi_qla_host *qla_tgt_find_host_by_vp_idx(struct scsi_qla_host *vha, uint16_t vp_idx)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -224,14 +224,14 @@ scsi_qla_host_t *qla_tgt_find_host_by_vp_idx(scsi_qla_host_t *vha, uint16_t vp_i
 	return NULL;
 }
 
-void qla24xx_atio_pkt_all_vps(scsi_qla_host_t *vha, atio7_entry_t *atio)
+void qla24xx_atio_pkt_all_vps(struct scsi_qla_host *vha, atio7_entry_t *atio)
 {
 	struct qla_hw_data *ha = vha->hw;
 
 	switch (atio->entry_type) {
 	case ATIO_TYPE7:
 	{
-		scsi_qla_host_t *host = qla_tgt_find_host_by_d_id(vha, atio->fcp_hdr.d_id);
+		struct scsi_qla_host *host = qla_tgt_find_host_by_d_id(vha, atio->fcp_hdr.d_id);
 		if (unlikely(NULL == host)) {
 			printk(KERN_ERR "qla_target(%d): Received ATIO_TYPE7 "
 				"with unknown d_id %x:%x:%x\n", vha->vp_idx,
@@ -245,7 +245,7 @@ void qla24xx_atio_pkt_all_vps(scsi_qla_host_t *vha, atio7_entry_t *atio)
 
 	case IMMED_NOTIFY_TYPE:
 	{
-		scsi_qla_host_t *host = vha;
+		struct scsi_qla_host *host = vha;
 
 		if (IS_FWI2_CAPABLE(ha)) {
 			notify24xx_entry_t *entry = (notify24xx_entry_t *)atio;
@@ -275,7 +275,7 @@ void qla24xx_atio_pkt_all_vps(scsi_qla_host_t *vha, atio7_entry_t *atio)
 	return;
 }
 
-void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
+void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *vha, response_t *pkt)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -283,7 +283,7 @@ void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
 	case CTIO_TYPE7:
 	{
 		ctio7_fw_entry_t *entry = (ctio7_fw_entry_t *)pkt;
-		scsi_qla_host_t *host = qla_tgt_find_host_by_vp_idx(vha,
+		struct scsi_qla_host *host = qla_tgt_find_host_by_vp_idx(vha,
 						entry->vp_index);
 		if (unlikely(!host)) {
 			printk(KERN_ERR "qla_target(%d): Response pkt (CTIO_TYPE7) "
@@ -297,7 +297,7 @@ void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
 
 	case IMMED_NOTIFY_TYPE:
 	{
-		scsi_qla_host_t *host = vha;
+		struct scsi_qla_host *host = vha;
 		if (IS_FWI2_CAPABLE(ha)) {
 			notify24xx_entry_t *entry = (notify24xx_entry_t *)pkt;
 			host = qla_tgt_find_host_by_vp_idx(vha, entry->vp_index);
@@ -315,7 +315,7 @@ void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
 
 	case NOTIFY_ACK_TYPE:
 	{
-		scsi_qla_host_t *host = vha;
+		struct scsi_qla_host *host = vha;
 		if (IS_FWI2_CAPABLE(ha)) {
 			nack24xx_entry_t *entry = (nack24xx_entry_t *)pkt;
 			if (0xFF != entry->vp_index) {
@@ -338,7 +338,7 @@ void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
 	case ABTS_RECV_24XX:
 	{
 		abts24_recv_entry_t *entry = (abts24_recv_entry_t *)pkt;
-		scsi_qla_host_t *host = qla_tgt_find_host_by_vp_idx(vha,
+		struct scsi_qla_host *host = qla_tgt_find_host_by_vp_idx(vha,
 						entry->vp_index);
 		if (unlikely(!host)) {
 			printk(KERN_ERR "qla_target(%d): Response pkt "
@@ -353,7 +353,7 @@ void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
 	case ABTS_RESP_24XX:
 	{
 		abts24_resp_entry_t *entry = (abts24_resp_entry_t *)pkt;
-		scsi_qla_host_t *host = qla_tgt_find_host_by_vp_idx(vha,
+		struct scsi_qla_host *host = qla_tgt_find_host_by_vp_idx(vha,
 						entry->vp_index);
 		if (unlikely(!host)) {
 			printk(KERN_ERR "qla_target(%d): Response pkt "
@@ -377,7 +377,7 @@ void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *vha, response_t *pkt)
 static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
 {
 	struct qla_tgt *tgt;
-	scsi_qla_host_t *vha = sess->vha;
+	struct scsi_qla_host *vha = sess->vha;
 	struct qla_hw_data *ha = vha->hw;
 
 	tgt = sess->tgt;
@@ -429,7 +429,7 @@ static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess)
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_reset(scsi_qla_host_t *vha, void *iocb, int mcmd)
+static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess = NULL;
@@ -565,7 +565,7 @@ static void qla_tgt_clear_tgt_db(struct qla_tgt *tgt, bool local_only)
 	/* At this point tgt could be already dead */
 }
 
-static int qla24xx_get_loop_id(scsi_qla_host_t *vha, const uint8_t *s_id,
+static int qla24xx_get_loop_id(struct scsi_qla_host *vha, const uint8_t *s_id,
 	uint16_t *loop_id)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -612,7 +612,7 @@ out_free_id_list:
 	return res;
 }
 
-static bool qla_tgt_check_fcport_exist(scsi_qla_host_t *vha, struct qla_tgt_sess *sess)
+static bool qla_tgt_check_fcport_exist(struct scsi_qla_host *vha, struct qla_tgt_sess *sess)
 {
 	struct qla_hw_data *ha = vha->hw;
 	bool res, found = false;
@@ -741,7 +741,7 @@ static void qla_tgt_del_sess_work_fn(struct delayed_work *work)
 {
 	struct qla_tgt *tgt = container_of(work, struct qla_tgt,
 					sess_del_work);
-	scsi_qla_host_t *vha = tgt->vha;
+	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess;
 	unsigned long flags;
@@ -796,7 +796,7 @@ static void qla_tgt_del_sess_work_fn(struct delayed_work *work)
  * Caller must put it.
  */
 static struct qla_tgt_sess *qla_tgt_create_sess(
-	scsi_qla_host_t *vha,
+	struct scsi_qla_host *vha,
 	fc_port_t *fcport,
 	bool local)
 {
@@ -905,7 +905,7 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 /*
  * Called from drivers/scsi/qla2xxx/qla_init.c:qla2x00_reg_remote_port()
  */
-void qla_tgt_fc_port_added(scsi_qla_host_t *vha, fc_port_t *fcport)
+void qla_tgt_fc_port_added(struct scsi_qla_host *vha, fc_port_t *fcport)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -974,7 +974,7 @@ void qla_tgt_fc_port_added(scsi_qla_host_t *vha, fc_port_t *fcport)
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
-void qla_tgt_fc_port_deleted(scsi_qla_host_t *vha, fc_port_t *fcport)
+void qla_tgt_fc_port_deleted(struct scsi_qla_host *vha, fc_port_t *fcport)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -1026,7 +1026,7 @@ static inline int test_tgt_sess_count(struct qla_tgt *tgt)
 /* Called by tcm_qla2xxx configfs code */
 void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 {
-	scsi_qla_host_t *vha = tgt->vha;
+	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_hw_data *ha = tgt->ha;
 	unsigned long flags;
 
@@ -1160,7 +1160,7 @@ static int qla_tgt_sched_sess_work(struct qla_tgt *tgt, int type,
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla_tgt_modify_command_count(scsi_qla_host_t *vha, int cmd_count,
+static void qla_tgt_modify_command_count(struct scsi_qla_host *vha, int cmd_count,
 	int imm_count)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -1206,7 +1206,7 @@ static void qla_tgt_modify_command_count(scsi_qla_host_t *vha, int cmd_count,
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla2xxx_send_notify_ack(scsi_qla_host_t *vha, notify_entry_t *iocb,
+static void qla2xxx_send_notify_ack(struct scsi_qla_host *vha, notify_entry_t *iocb,
 	uint32_t add_flags, uint16_t resp_code, int resp_code_valid,
 	uint16_t srr_flags, uint16_t srr_reject_code, uint8_t srr_explan)
 {
@@ -1263,7 +1263,7 @@ static void qla2xxx_send_notify_ack(scsi_qla_host_t *vha, notify_entry_t *iocb,
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla24xx_send_abts_resp(scsi_qla_host_t *vha,
+static void qla24xx_send_abts_resp(struct scsi_qla_host *vha,
 	const abts24_recv_entry_t *abts, uint32_t status, bool ids_reversed)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -1337,7 +1337,7 @@ static void qla24xx_send_abts_resp(scsi_qla_host_t *vha,
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla24xx_retry_term_exchange(scsi_qla_host_t *vha,
+static void qla24xx_retry_term_exchange(struct scsi_qla_host *vha,
 	abts24_resp_fw_entry_t *entry)
 {
 	ctio7_status1_entry_t *ctio;
@@ -1380,7 +1380,7 @@ static void qla24xx_retry_term_exchange(scsi_qla_host_t *vha,
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int __qla24xx_handle_abts(scsi_qla_host_t *vha, abts24_recv_entry_t *abts,
+static int __qla24xx_handle_abts(struct scsi_qla_host *vha, abts24_recv_entry_t *abts,
 	struct qla_tgt_sess *sess)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -1415,7 +1415,7 @@ static int __qla24xx_handle_abts(scsi_qla_host_t *vha, abts24_recv_entry_t *abts
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla24xx_handle_abts(scsi_qla_host_t *vha, abts24_recv_entry_t *abts)
+static void qla24xx_handle_abts(struct scsi_qla_host *vha, abts24_recv_entry_t *abts)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess;
@@ -1470,7 +1470,7 @@ static void qla24xx_handle_abts(scsi_qla_host_t *vha, abts24_recv_entry_t *abts)
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla24xx_send_task_mgmt_ctio(scsi_qla_host_t *ha,
+static void qla24xx_send_task_mgmt_ctio(struct scsi_qla_host *ha,
 	struct qla_tgt_mgmt_cmd *mcmd, uint32_t resp_code)
 {
 	const atio7_entry_t *atio = &mcmd->orig_iocb.atio7;
@@ -1513,7 +1513,7 @@ static void qla24xx_send_task_mgmt_ctio(scsi_qla_host_t *ha,
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla24xx_send_notify_ack(scsi_qla_host_t *vha,
+static void qla24xx_send_notify_ack(struct scsi_qla_host *vha,
 	notify24xx_entry_t *iocb, uint16_t srr_flags,
 	uint8_t srr_reject_code, uint8_t srr_explan)
 {
@@ -1570,7 +1570,7 @@ EXPORT_SYMBOL(qla_tgt_free_mcmd);
 /* callback from target fabric module code */
 void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 {
-	scsi_qla_host_t *vha;
+	struct scsi_qla_host *vha;
 	struct qla_hw_data *ha;
 	unsigned long flags;
 
@@ -1637,7 +1637,7 @@ out_err:
 	return -1;
 }
 
-static inline void qla_tgt_unmap_sg(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd)
+static inline void qla_tgt_unmap_sg(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -1646,7 +1646,7 @@ static inline void qla_tgt_unmap_sg(scsi_qla_host_t *vha, struct qla_tgt_cmd *cm
 	cmd->sg_mapped = 0;
 }
 
-static int qla_tgt_check_reserve_free_req(scsi_qla_host_t *vha, uint32_t req_cnt)
+static int qla_tgt_check_reserve_free_req(struct scsi_qla_host *vha, uint32_t req_cnt)
 {
 	struct qla_hw_data *ha = vha->hw;
 	device_reg_t __iomem *reg = ha->iobase;
@@ -1684,7 +1684,7 @@ static int qla_tgt_check_reserve_free_req(scsi_qla_host_t *vha, uint32_t req_cnt
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static inline void *qla_tgt_get_req_pkt(scsi_qla_host_t *vha)
+static inline void *qla_tgt_get_req_pkt(struct scsi_qla_host *vha)
 {
 	/* Adjust ring index. */
 	vha->req->ring_index++;
@@ -1698,7 +1698,7 @@ static inline void *qla_tgt_get_req_pkt(scsi_qla_host_t *vha)
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static inline uint32_t qla_tgt_make_handle(scsi_qla_host_t *vha)
+static inline uint32_t qla_tgt_make_handle(struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 	uint32_t h;
@@ -1726,7 +1726,7 @@ static inline uint32_t qla_tgt_make_handle(scsi_qla_host_t *vha)
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static void qla2xxx_build_ctio_pkt(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
+static void qla2xxx_build_ctio_pkt(struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	uint32_t h;
 	ctio_entry_t *pkt;
@@ -1765,7 +1765,7 @@ static void qla2xxx_build_ctio_pkt(struct qla_tgt_prm *prm, scsi_qla_host_t *vha
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla24xx_build_ctio_pkt(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
+static int qla24xx_build_ctio_pkt(struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	uint32_t h;
 	ctio7_status0_entry_t *pkt;
@@ -1813,7 +1813,7 @@ static int qla24xx_build_ctio_pkt(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
  * ha->hardware_lock supposed to be held on entry. We have already made sure
  * that there is sufficient amount of request entries to not drop it.
  */
-static void qla_tgt_load_cont_data_segments(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
+static void qla_tgt_load_cont_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	int cnt;
 	uint32_t *dword_ptr;
@@ -1876,7 +1876,7 @@ static void qla_tgt_load_cont_data_segments(struct qla_tgt_prm *prm, scsi_qla_ho
  * ha->hardware_lock supposed to be held on entry. We have already made sure
  * that there is sufficient amount of request entries to not drop it.
  */
-static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
+static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	int cnt;
 	uint32_t *dword_ptr;
@@ -1931,7 +1931,7 @@ static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, scsi_qla_host_t 
  * ha->hardware_lock supposed to be held on entry. We have already made sure
  * that there is sufficient amount of request entries to not drop it.
  */
-static void qla24xx_load_data_segments(struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
+static void qla24xx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	int cnt;
 	uint32_t *dword_ptr;
@@ -1996,7 +1996,7 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 			int xmit_type, uint8_t scsi_status, uint32_t *full_req_cnt)
 {
 	struct qla_tgt *tgt = cmd->tgt;
-	scsi_qla_host_t *vha = tgt->vha;
+	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 
@@ -2097,7 +2097,7 @@ static inline int qla_tgt_need_explicit_conf(struct qla_hw_data *ha,
 }
 
 static void qla_tgt_init_ctio_ret_entry(ctio_ret_entry_t *ctio_m1,
-	struct qla_tgt_prm *prm, scsi_qla_host_t *vha)
+	struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -2135,7 +2135,7 @@ static void qla_tgt_init_ctio_ret_entry(ctio_ret_entry_t *ctio_m1,
 
 static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_status)
 {
-	scsi_qla_host_t *vha = cmd->vha;
+	struct scsi_qla_host *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_prm prm;
 	ctio_common_entry_t *pkt;
@@ -2381,7 +2381,7 @@ static void qla24xx_init_ctio_ret_entry(ctio7_status0_entry_t *ctio,
  */
 static int __qla24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_status)
 {
-	scsi_qla_host_t *vha = cmd->vha;
+	struct scsi_qla_host *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	ctio7_status0_entry_t *pkt;
 	struct qla_tgt_prm prm;
@@ -2485,7 +2485,7 @@ out_unmap_unlock:
 
 int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 {
-	scsi_qla_host_t *vha = cmd->vha;
+	struct scsi_qla_host *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = cmd->tgt;
 	struct qla_tgt_prm prm;
@@ -2552,7 +2552,7 @@ out_unlock_free_unmap:
 EXPORT_SYMBOL(qla_tgt_rdy_to_xfer);
 
 /* If hardware_lock held on entry, might drop it, then reaquire */
-static void qla2xxx_send_term_exchange(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
+static void qla2xxx_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	atio_entry_t *atio, int ha_locked)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -2616,7 +2616,7 @@ out_unlock:
 }
 
 /* If hardware_lock held on entry, might drop it, then reaquire */
-static void qla24xx_send_term_exchange(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
+static void qla24xx_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	atio7_entry_t *atio, int ha_locked)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -2694,7 +2694,7 @@ void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd)
 EXPORT_SYMBOL(qla_tgt_free_cmd);
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_prepare_srr_ctio(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
+static int qla_tgt_prepare_srr_ctio(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
 	void *ctio)
 {
 	struct srr_ctio *sc;
@@ -2777,7 +2777,7 @@ static int qla_tgt_prepare_srr_ctio(scsi_qla_host_t *vha, struct qla_tgt_cmd *cm
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static int qla_tgt_term_ctio_exchange(scsi_qla_host_t *vha, void *ctio,
+static int qla_tgt_term_ctio_exchange(struct scsi_qla_host *vha, void *ctio,
 	struct qla_tgt_cmd *cmd, uint32_t status)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -2815,7 +2815,7 @@ static int qla_tgt_term_ctio_exchange(scsi_qla_host_t *vha, void *ctio,
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static inline struct qla_tgt_cmd *qla_tgt_get_cmd(scsi_qla_host_t *vha, uint32_t handle)
+static inline struct qla_tgt_cmd *qla_tgt_get_cmd(struct scsi_qla_host *vha, uint32_t handle)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -2829,7 +2829,7 @@ static inline struct qla_tgt_cmd *qla_tgt_get_cmd(scsi_qla_host_t *vha, uint32_t
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static struct qla_tgt_cmd *qla_tgt_ctio_to_cmd(scsi_qla_host_t *vha, uint32_t handle,
+static struct qla_tgt_cmd *qla_tgt_ctio_to_cmd(struct scsi_qla_host *vha, uint32_t handle,
 	void *ctio)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -2889,7 +2889,7 @@ static struct qla_tgt_cmd *qla_tgt_ctio_to_cmd(scsi_qla_host_t *vha, uint32_t ha
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla_tgt_do_ctio_completion(scsi_qla_host_t *vha, uint32_t handle,
+static void qla_tgt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
 	uint32_t status, void *ctio)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -3000,7 +3000,7 @@ static void qla_tgt_do_ctio_completion(scsi_qla_host_t *vha, uint32_t handle,
 
 /* ha->hardware_lock supposed to be held on entry */
 /* called via callback from qla2xxx */
-void qla_tgt_ctio_completion(scsi_qla_host_t *vha, uint32_t handle)
+void qla_tgt_ctio_completion(struct scsi_qla_host *vha, uint32_t handle)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -3066,7 +3066,7 @@ static uint32_t qla_tgt_unpack_lun(unsigned char *p)
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla2xxx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd)
+static int qla2xxx_send_cmd_to_target(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 {
 	atio_entry_t *atio = &cmd->atio.atio2x;
 	uint32_t data_length;
@@ -3103,7 +3103,7 @@ static int qla2xxx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla24xx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd)
+static int qla24xx_send_cmd_to_target(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 {
 	atio7_entry_t *atio = &cmd->atio.atio7;
 	uint32_t unpacked_lun, data_length;
@@ -3137,7 +3137,7 @@ static int qla24xx_send_cmd_to_target(scsi_qla_host_t *vha, struct qla_tgt_cmd *
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_send_cmd_to_target(scsi_qla_host_t *vha,
+static int qla_tgt_send_cmd_to_target(struct scsi_qla_host *vha,
 	struct qla_tgt_cmd *cmd, struct qla_tgt_sess *sess)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -3151,7 +3151,7 @@ static int qla_tgt_send_cmd_to_target(scsi_qla_host_t *vha,
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_handle_cmd_for_atio(scsi_qla_host_t *vha, atio_t *atio)
+static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -3228,7 +3228,7 @@ out_sched:
 static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
 	int fn, void *iocb, int flags)
 {
-	scsi_qla_host_t *vha = sess->vha;
+	struct scsi_qla_host *vha = sess->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_mgmt_cmd *mcmd;
 	int res;
@@ -3325,7 +3325,7 @@ static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_handle_task_mgmt(scsi_qla_host_t *vha, void *iocb)
+static int qla_tgt_handle_task_mgmt(struct scsi_qla_host *vha, void *iocb)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt;
@@ -3369,7 +3369,7 @@ static int qla_tgt_handle_task_mgmt(scsi_qla_host_t *vha, void *iocb)
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int __qla_tgt_abort_task(scsi_qla_host_t *vha, notify_entry_t *iocb,
+static int __qla_tgt_abort_task(struct scsi_qla_host *vha, notify_entry_t *iocb,
 	struct qla_tgt_sess *sess)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -3413,7 +3413,7 @@ static int __qla_tgt_abort_task(scsi_qla_host_t *vha, notify_entry_t *iocb,
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_abort_task(scsi_qla_host_t *vha, notify_entry_t *iocb)
+static int qla_tgt_abort_task(struct scsi_qla_host *vha, notify_entry_t *iocb)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess;
@@ -3439,7 +3439,7 @@ static int qla_tgt_abort_task(scsi_qla_host_t *vha, notify_entry_t *iocb)
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static int qla24xx_handle_els(scsi_qla_host_t *vha, notify24xx_entry_t *iocb)
+static int qla24xx_handle_els(struct scsi_qla_host *vha, notify24xx_entry_t *iocb)
 {
 	struct qla_hw_data *ha = vha->hw;
 	int res = 0;
@@ -3619,7 +3619,7 @@ static inline int qla_tgt_srr_adjust_data(struct qla_tgt_cmd *cmd,
 
 /* No locks, thread context */
 #warning FIXME: qla24xx_handle_srr
-static void qla24xx_handle_srr(scsi_qla_host_t *vha, struct srr_ctio *sctio,
+static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio,
 	struct srr_imm *imm)
 {
 	notify24xx_entry_t *ntfy = &imm->imm.notify_entry24;
@@ -3718,7 +3718,7 @@ out_reject:
 }
 
 /* No locks, thread context */
-static void qla2xxx_handle_srr(scsi_qla_host_t *vha, struct srr_ctio *sctio,
+static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio,
 	struct srr_imm *imm)
 {
 	notify_entry_t *ntfy = &imm->imm.notify_entry;
@@ -3814,7 +3814,7 @@ out_reject:
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
-static void qla_tgt_reject_free_srr_imm(scsi_qla_host_t *vha, struct srr_imm *imm,
+static void qla_tgt_reject_free_srr_imm(struct scsi_qla_host *vha, struct srr_imm *imm,
 	int ha_locked)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -3845,7 +3845,7 @@ static void qla_tgt_reject_free_srr_imm(scsi_qla_host_t *vha, struct srr_imm *im
 static void qla_tgt_handle_srr_work(struct work_struct *work)
 {
 	struct qla_tgt *tgt = container_of(work, struct qla_tgt, srr_work);
-	scsi_qla_host_t *vha = NULL;
+	struct scsi_qla_host *vha = NULL;
 	struct qla_hw_data *ha = tgt->ha;
 	struct srr_ctio *sctio;
 	unsigned long flags;
@@ -3921,7 +3921,7 @@ restart:
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static void qla_tgt_prepare_srr_imm(scsi_qla_host_t *vha, void *iocb)
+static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
 {
 	struct srr_imm *imm;
 	struct qla_hw_data *ha = vha->hw;
@@ -4021,7 +4021,7 @@ out_reject:
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla_tgt_handle_imm_notify(scsi_qla_host_t *vha, void *iocb)
+static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 {
 	struct qla_hw_data *ha = vha->hw;
 	notify_entry_t *iocb2x = (notify_entry_t *)iocb;
@@ -4164,7 +4164,7 @@ static void qla_tgt_handle_imm_notify(scsi_qla_host_t *vha, void *iocb)
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla2xxx_send_busy(scsi_qla_host_t *vha, atio_entry_t *atio)
+static void qla2xxx_send_busy(struct scsi_qla_host *vha, atio_entry_t *atio)
 {
 	struct qla_hw_data *ha = vha->hw;
 	ctio_ret_entry_t *ctio;
@@ -4203,7 +4203,7 @@ static void qla2xxx_send_busy(scsi_qla_host_t *vha, atio_entry_t *atio)
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla24xx_send_busy(scsi_qla_host_t *vha, atio7_entry_t *atio,
+static void qla24xx_send_busy(struct scsi_qla_host *vha, atio7_entry_t *atio,
 	uint16_t status)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -4254,7 +4254,7 @@ static void qla24xx_send_busy(scsi_qla_host_t *vha, atio7_entry_t *atio,
 
 /* ha->hardware_lock supposed to be held on entry */
 /* called via callback from qla2xxx */
-static void qla24xx_atio_pkt(scsi_qla_host_t *vha, atio7_entry_t *atio)
+static void qla24xx_atio_pkt(struct scsi_qla_host *vha, atio7_entry_t *atio)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -4340,7 +4340,7 @@ static void qla24xx_atio_pkt(scsi_qla_host_t *vha, atio7_entry_t *atio)
 
 /* ha->hardware_lock supposed to be held on entry */
 /* called via callback from qla2xxx */
-static void qla_tgt_response_pkt(scsi_qla_host_t *vha, response_t *pkt)
+static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -4555,7 +4555,7 @@ static void qla_tgt_response_pkt(scsi_qla_host_t *vha, response_t *pkt)
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-void qla_tgt_async_event(uint16_t code, scsi_qla_host_t *vha, uint16_t *mailbox)
+void qla_tgt_async_event(uint16_t code, struct scsi_qla_host *vha, uint16_t *mailbox)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -4642,7 +4642,7 @@ void qla_tgt_async_event(uint16_t code, scsi_qla_host_t *vha, uint16_t *mailbox)
 	tgt->irq_cmd_count--;
 }
 
-static fc_port_t *qla_tgt_get_port_database(scsi_qla_host_t *vha,
+static fc_port_t *qla_tgt_get_port_database(struct scsi_qla_host *vha,
 	const uint8_t *s_id, uint16_t loop_id)
 {
 	fc_port_t *fcport;
@@ -4672,7 +4672,7 @@ static fc_port_t *qla_tgt_get_port_database(scsi_qla_host_t *vha,
 }
 
 /* Must be called under tgt_mutex */
-static struct qla_tgt_sess *qla_tgt_make_local_sess(scsi_qla_host_t *vha,
+static struct qla_tgt_sess *qla_tgt_make_local_sess(struct scsi_qla_host *vha,
 	uint8_t *s_id, uint16_t loop_id)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -4725,7 +4725,7 @@ retry:
 static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
 	struct qla_tgt_sess_work_param *prm)
 {
-	scsi_qla_host_t *vha = tgt->vha;
+	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess = NULL;
 	unsigned long flags;
@@ -4902,7 +4902,7 @@ out_term:
 static void qla_tgt_sess_work_fn(struct work_struct *work)
 {
 	struct qla_tgt *tgt = container_of(work, struct qla_tgt, sess_work);
-	scsi_qla_host_t *vha = tgt->vha;
+	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_hw_data *ha = vha->hw;
 	unsigned long flags;
 
@@ -4941,7 +4941,7 @@ static void qla_tgt_sess_work_fn(struct work_struct *work)
 }
 
 /* Must be called under tgt_host_action_mutex */
-int qla_tgt_add_target(struct qla_hw_data *ha, scsi_qla_host_t *base_vha)
+int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 {
 	struct qla_tgt *tgt;
 	int sg_tablesize;
@@ -5008,7 +5008,7 @@ int qla_tgt_add_target(struct qla_hw_data *ha, scsi_qla_host_t *base_vha)
 }
 
 /* Must be called under tgt_host_action_mutex */
-int qla_tgt_remove_target(struct qla_hw_data *ha, scsi_qla_host_t *vha)
+int qla_tgt_remove_target(struct qla_hw_data *ha, struct scsi_qla_host *vha)
 {
 	if (!ha->qla_tgt) {
 		printk(KERN_ERR "qla_target(%d): Can't remove "
@@ -5024,7 +5024,7 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, scsi_qla_host_t *vha)
 }
 
 /* Must be called under HW lock */
-void qla_tgt_set_mode(scsi_qla_host_t *vha)
+void qla_tgt_set_mode(struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -5045,7 +5045,7 @@ void qla_tgt_set_mode(scsi_qla_host_t *vha)
 }
 
 /* Must be called under HW lock */
-void qla_tgt_clear_mode(scsi_qla_host_t *vha)
+void qla_tgt_clear_mode(struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -5073,7 +5073,7 @@ void qla_tgt_clear_mode(scsi_qla_host_t *vha)
  * host_reset, bring up w/ Target Mode Enabled
  */
 void
-qla_tgt_enable_vha(scsi_qla_host_t *vha)
+qla_tgt_enable_vha(struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -5103,7 +5103,7 @@ EXPORT_SYMBOL(qla_tgt_enable_vha);
  * Disable Target Mode and reset the adapter
  */
 void
-qla_tgt_disable_vha(scsi_qla_host_t *vha)
+qla_tgt_disable_vha(struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
@@ -5127,11 +5127,11 @@ qla_tgt_disable_vha(scsi_qla_host_t *vha)
 
 /*
  * Called from qla_init.c:qla24xx_vport_create() contex to setup
- * the target mode specific scsi_qla_host_t and struct qla_hw_data
+ * the target mode specific struct scsi_qla_host and struct qla_hw_data
  * members.
  */
 void
-qla_tgt_vport_create(scsi_qla_host_t *vha, struct qla_hw_data *ha)
+qla_tgt_vport_create(struct scsi_qla_host *vha, struct qla_hw_data *ha)
 {
 	mutex_init(&ha->tgt_mutex);
 	mutex_init(&ha->tgt_host_action_mutex);
@@ -5144,7 +5144,7 @@ qla_tgt_vport_create(scsi_qla_host_t *vha, struct qla_hw_data *ha)
 }
 
 void
-qla_tgt_rff_id(scsi_qla_host_t *vha, struct ct_sns_req *ct_req)
+qla_tgt_rff_id(struct scsi_qla_host *vha, struct ct_sns_req *ct_req)
 {
 	/*
 	 * FC-4 Feature bit 0 indicates target functionality to the name server.
@@ -5163,7 +5163,7 @@ qla_tgt_rff_id(scsi_qla_host_t *vha, struct ct_sns_req *ct_req)
  * Called from qla_init.c:qla2x00_initialize_adapter()
  */
 void
-qla_tgt_initialize_adapter(scsi_qla_host_t *vha, struct qla_hw_data *ha)
+qla_tgt_initialize_adapter(struct scsi_qla_host *vha, struct qla_hw_data *ha)
 {
 	if (IS_QLA24XX_TYPE(ha) || IS_QLA25XX(ha)) {
 		/* Enable target response to SCSI bus. */
@@ -5184,7 +5184,7 @@ qla_tgt_initialize_adapter(scsi_qla_host_t *vha, struct qla_hw_data *ha)
  * Returns 0 on success.
  */
 void
-qla_tgt_init_atio_q_entries(scsi_qla_host_t *vha)
+qla_tgt_init_atio_q_entries(struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 	uint16_t cnt;
@@ -5238,7 +5238,7 @@ qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *vha)
 }
 
 void
-qla_tgt_24xx_config_rings(scsi_qla_host_t *vha, device_reg_t __iomem *reg)
+qla_tgt_24xx_config_rings(struct scsi_qla_host *vha, device_reg_t __iomem *reg)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -5258,7 +5258,7 @@ qla_tgt_24xx_config_rings(scsi_qla_host_t *vha, device_reg_t __iomem *reg)
 }
 
 void
-qla_tgt_2x00_config_nvram_stage1(scsi_qla_host_t *vha, nvram_t *nv)
+qla_tgt_2x00_config_nvram_stage1(struct scsi_qla_host *vha, nvram_t *nv)
 {
 	struct qla_hw_data *ha = vha->hw;
 	/*
@@ -5317,7 +5317,7 @@ qla_tgt_2x00_config_nvram_stage1(scsi_qla_host_t *vha, nvram_t *nv)
 }
 
 void
-qla_tgt_2x00_config_nvram_stage2(scsi_qla_host_t *vha, init_cb_t *icb)
+qla_tgt_2x00_config_nvram_stage2(struct scsi_qla_host *vha, init_cb_t *icb)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -5328,7 +5328,7 @@ qla_tgt_2x00_config_nvram_stage2(scsi_qla_host_t *vha, init_cb_t *icb)
 }
 
 void
-qla_tgt_24xx_config_nvram_stage1(scsi_qla_host_t *vha, struct nvram_24xx *nv)
+qla_tgt_24xx_config_nvram_stage1(struct scsi_qla_host *vha, struct nvram_24xx *nv)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -5384,7 +5384,7 @@ qla_tgt_24xx_config_nvram_stage1(scsi_qla_host_t *vha, struct nvram_24xx *nv)
 }
 
 void
-qla_tgt_24xx_config_nvram_stage2(scsi_qla_host_t *vha, struct init_cb_24xx *icb)
+qla_tgt_24xx_config_nvram_stage2(struct scsi_qla_host *vha, struct init_cb_24xx *icb)
 {
 	struct qla_hw_data *ha = vha->hw;
 
@@ -5395,7 +5395,7 @@ qla_tgt_24xx_config_nvram_stage2(scsi_qla_host_t *vha, struct init_cb_24xx *icb)
 }
 
 void
-qla_tgt_abort_isp(scsi_qla_host_t *vha)
+qla_tgt_abort_isp(struct scsi_qla_host *vha)
 {
 	/* Enable target response to SCSI bus. */
 	if (qla_tgt_mode_enabled(vha))
@@ -5403,7 +5403,7 @@ qla_tgt_abort_isp(scsi_qla_host_t *vha)
 }
 
 int
-qla_tgt_2x00_process_response_error(scsi_qla_host_t *vha, sts_entry_t *pkt)
+qla_tgt_2x00_process_response_error(struct scsi_qla_host *vha, sts_entry_t *pkt)
 {
 	if (!qla_tgt_mode_enabled(vha))
 		return 0;
@@ -5423,7 +5423,7 @@ qla_tgt_2x00_process_response_error(scsi_qla_host_t *vha, sts_entry_t *pkt)
 }
 
 int
-qla_tgt_24xx_process_response_error(scsi_qla_host_t *vha, struct sts_entry_24xx *pkt)
+qla_tgt_24xx_process_response_error(struct scsi_qla_host *vha, struct sts_entry_24xx *pkt)
 {
 	switch (pkt->entry_type) {
 	case ABTS_RECV_24XX:
@@ -5437,7 +5437,7 @@ qla_tgt_24xx_process_response_error(scsi_qla_host_t *vha, struct sts_entry_24xx 
 }
 
 void
-qla_tgt_modify_vp_config(scsi_qla_host_t *vha, struct vp_config_entry_24xx *vpmod)
+qla_tgt_modify_vp_config(struct scsi_qla_host *vha, struct vp_config_entry_24xx *vpmod)
 {
 	if (qla_tgt_mode_enabled(vha)) {
 		DEBUG11(printk("MODE_TARGET enabled, clearing BIT_5\n"));
@@ -5451,7 +5451,7 @@ qla_tgt_modify_vp_config(scsi_qla_host_t *vha, struct vp_config_entry_24xx *vpmo
 }
 
 void
-qla_tgt_probe_one_stage1(scsi_qla_host_t *base_vha, struct qla_hw_data *ha)
+qla_tgt_probe_one_stage1(struct scsi_qla_host *base_vha, struct qla_hw_data *ha)
 {
 	mutex_init(&ha->tgt_mutex);
 	mutex_init(&ha->tgt_host_action_mutex);
