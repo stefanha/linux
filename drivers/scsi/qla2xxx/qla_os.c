@@ -2305,8 +2305,6 @@ skip_dpc:
 	base_vha->flags.init_done = 1;
 	base_vha->flags.online = 1;
 
-	ha->isp_ops->enable_intrs(ha);
-
 	scsi_scan_host(host);
 
 	qla2x00_alloc_sysfs_attr(base_vha);
