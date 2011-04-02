@@ -5397,6 +5397,20 @@ qla_tgt_24xx_process_response_error(scsi_qla_host_t *vha, struct sts_entry_24xx 
 	}
 }
 
+void
+qla_tgt_modify_vp_config(scsi_qla_host_t *vha, struct vp_config_entry_24xx *vpmod)
+{
+	if (qla_tgt_mode_enabled(vha)) {
+		DEBUG11(printk("MODE_TARGET enabled, clearing BIT_5\n"));
+		vpmod->options_idx1 &= ~BIT_5;
+	}
+	/* Disable ini mode, if requested */
+	if (!qla_ini_mode_enabled(vha)) {
+		DEBUG11(printk("MODE_INITIATOR disabled, clearing BIT_4\n"));
+		vpmod->options_idx1 &= ~BIT_4;
+	}
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
