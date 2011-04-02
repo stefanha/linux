@@ -1344,8 +1344,6 @@ qla24xx_tm_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 	iocb->done(sp);
 }
 
-extern void qla_tgt_response_pkt_all_vps(scsi_qla_host_t *, response_t *);
-
 /**
  * qla2x00_process_response_queue() - Process response queue entries.
  * @ha: SCSI driver HA context
@@ -1413,8 +1411,7 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 				" tgt_response_pkt %p (type %02X)\n",
 				qla_target.tgt_response_pkt, pkt->entry_type););
 
-			if (vha->hw->qla2x_tmpl)
-				qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
+			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
 		case STATUS_TYPE:
 			qla2x00_status_entry(vha, rsp, pkt);
@@ -2148,9 +2145,7 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 		case ABTS_RESP_24XX:
 		case CTIO_TYPE7:
 		case NOTIFY_ACK_TYPE:
-			
-			if (vha->hw->qla2x_tmpl)
-				qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
+			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
 		case MARKER_TYPE:
 			break;
