@@ -105,13 +105,13 @@ static int core_scsi2_reservation_check(struct se_cmd *cmd, u32 *pr_reg_type)
 	}
 	if (dev->dev_reserved_node_acl != sess->se_node_acl) {
 		spin_unlock(&dev->dev_reservation_lock);
-		return -1;
+		return -EINVAL;
 	}
 	if (!(dev->dev_flags & DF_SPC2_RESERVATIONS_WITH_ISID)) {
 		spin_unlock(&dev->dev_reservation_lock);
 		return 0;
 	}
-	ret = (dev->dev_res_bin_isid == sess->sess_bin_isid) ? 0 : -1;
+	ret = (dev->dev_res_bin_isid == sess->sess_bin_isid) ? 0 : -EINVAL;
 	spin_unlock(&dev->dev_reservation_lock);
 
 	return ret;
@@ -362,7 +362,7 @@ static int core_scsi3_pr_seq_non_holder(
 			registered_nexus = 1;
 		break;
 	default:
-		return -1;
+		return -EINVAL;
 	}
 	/*
 	 * Referenced from spc4r17 table 45 for *NON* PR holder access
@@ -414,7 +414,7 @@ static int core_scsi3_pr_seq_non_holder(
 		default:
 			printk(KERN_ERR "Unknown PERSISTENT_RESERVE_OUT service"
 				" action: 0x%02x\n", cdb[1] & 0x1f);
-			return -1;
+			return -EINVAL;
 		}
 		break;
 	case RELEASE:
@@ -461,7 +461,7 @@ static int core_scsi3_pr_seq_non_holder(
 		default:
 			printk(KERN_ERR "Unknown MI Service Action: 0x%02x\n",
 				(cdb[1] & 0x1f));
-			return -1;
+			return -EINVAL;
 		}
 		break;
 	case ACCESS_CONTROL_IN:
@@ -592,14 +592,14 @@ static int core_scsi3_pr_reservation_check(
 	cmd->pr_res_key = dev->dev_pr_res_holder->pr_res_key;
 	if (dev->dev_pr_res_holder->pr_reg_nacl != sess->se_node_acl) {
 		spin_unlock(&dev->dev_reservation_lock);
-		return -1;
+		return -EINVAL;
 	}
 	if (!(dev->dev_pr_res_holder->isid_present_at_reg)) {
 		spin_unlock(&dev->dev_reservation_lock);
 		return 0;
 	}
 	ret = (dev->dev_pr_res_holder->pr_reg_bin_isid ==
-	       sess->sess_bin_isid) ? 0 : -1;
+	       sess->sess_bin_isid) ? 0 : -EINVAL;
 	/*
 	 * Use bit in *pr_reg_type to notify ISID mismatch in
 	 * core_scsi3_pr_seq_non_holder().
@@ -819,13 +819,13 @@ int core_scsi3_alloc_aptpl_registration(
 
 	if (!(i_port) || !(t_port) || !(sa_res_key)) {
 		printk(KERN_ERR "Illegal parameters for APTPL registration\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	pr_reg = kmem_cache_zalloc(t10_pr_reg_cache, GFP_KERNEL);
 	if (!(pr_reg)) {
 		printk(KERN_ERR "Unable to allocate struct t10_pr_registration\n");
-		return -1;
+		return -ENOMEM;
 	}
 	pr_reg->pr_aptpl_buf = kzalloc(pr_tmpl->pr_aptpl_buf_len, GFP_KERNEL);
 
@@ -1107,7 +1107,7 @@ static int core_scsi3_alloc_registration(
 	pr_reg = __core_scsi3_alloc_registration(dev, nacl, deve, isid,
 			sa_res_key, all_tg_pt, aptpl);
 	if (!(pr_reg))
-		return -1;
+		return -EPERM;
 
 	__core_scsi3_add_registration(dev, nacl, pr_reg,
 			register_type, register_move);
@@ -1240,7 +1240,7 @@ static int core_scsi3_check_implict_release(
 			" UNREGISTER while existing reservation with matching"
 			" key 0x%016Lx is present from another SCSI Initiator"
 			" Port\n", pr_reg->pr_res_key);
-		ret = -1;
+		ret = -EPERM;
 	}
 	spin_unlock(&dev->dev_reservation_lock);
 
@@ -1920,7 +1920,7 @@ static int __core_scsi3_update_aptpl_buf(
 			printk(KERN_ERR "Unable to update renaming"
 				" APTPL metadata\n");
 			spin_unlock(&T10_RES(su_dev)->registration_lock);
-			return -1;
+			return -EMSGSIZE;
 		}
 		len += sprintf(buf+len, "%s", tmp);
 
@@ -1938,7 +1938,7 @@ static int __core_scsi3_update_aptpl_buf(
 			printk(KERN_ERR "Unable to update renaming"
 				" APTPL metadata\n");
 			spin_unlock(&T10_RES(su_dev)->registration_lock);
-			return -1;
+			return -EMSGSIZE;
 		}
 		len += sprintf(buf+len, "%s", tmp);
 		reg_count++;
@@ -1989,7 +1989,7 @@ static int __core_scsi3_write_aptpl_to_file(
 	if (strlen(&wwn->unit_serial[0]) > 512) {
 		printk(KERN_ERR "WWN value for struct se_device does not fit"
 			" into path buffer\n");
-		return -1;
+		return -EMSGSIZE;
 	}
 
 	snprintf(path, 512, "/var/target/pr/aptpl_%s", &wwn->unit_serial[0]);
@@ -1997,7 +1997,7 @@ static int __core_scsi3_write_aptpl_to_file(
 	if (IS_ERR(file) || !file || !file->f_dentry) {
 		printk(KERN_ERR "filp_open(%s) for APTPL metadata"
 			" failed\n", path);
-		return -1;
+		return (PTR_ERR(file) < 0 ? PTR_ERR(file) : -ENOENT);
 	}
 
 	iov[0].iov_base = &buf[0];
@@ -2014,7 +2014,7 @@ static int __core_scsi3_write_aptpl_to_file(
 	if (ret < 0) {
 		printk("Error writing APTPL metadata file: %s\n", path);
 		filp_close(file, NULL);
-		return -1;
+		return -EIO;
 	}
 	filp_close(file, NULL);
 
@@ -2049,14 +2049,14 @@ static int core_scsi3_update_and_write_aptpl(
 	ret = core_scsi3_update_aptpl_buf(dev, buf, pr_aptpl_buf_len,
 				clear_aptpl_metadata);
 	if (ret != 0)
-		return -1;
+		return ret;
 	/*
 	 * __core_scsi3_write_aptpl_to_file() will call strlen()
 	 * on the passed buf to determine pr_aptpl_buf_len.
 	 */
 	ret = __core_scsi3_write_aptpl_to_file(dev, buf, 0);
 	if (ret != 0)
-		return -1;
+		return ret;
 
 	return ret;
 }

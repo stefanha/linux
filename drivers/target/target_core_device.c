@@ -67,7 +67,7 @@ int transport_get_lun_for_cmd(
 	if (unpacked_lun >= TRANSPORT_MAX_LUNS_PER_TPG) {
 		se_cmd->scsi_sense_reason = TCM_NON_EXISTENT_LUN;
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		return -1;
+		return -ENODEV;
 	}
 
 	spin_lock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
@@ -105,7 +105,7 @@ out:
 				" Access for 0x%08x\n",
 				CMD_TFO(se_cmd)->get_fabric_name(),
 				unpacked_lun);
-			return -1;
+			return -EACCES;
 		} else {
 			/*
 			 * Use the se_portal_group->tpg_virt_lun0 to allow for
@@ -119,7 +119,7 @@ out:
 					" Access for 0x%08x\n",
 					CMD_TFO(se_cmd)->get_fabric_name(),
 					unpacked_lun);
-				return -1;
+				return -ENODEV;
 			}
 			/*
 			 * Force WRITE PROTECT for virtual LUN 0
@@ -128,7 +128,7 @@ out:
 			    (se_cmd->data_direction != DMA_NONE)) {
 				se_cmd->scsi_sense_reason = TCM_WRITE_PROTECTED;
 				se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-				return -1;
+				return -EACCES;
 			}
 #if 0
 			printk("TARGET_CORE[%s]: Using virtual LUN0! :-)\n",
@@ -147,7 +147,7 @@ out:
 	if (se_dev_check_online(se_lun->lun_se_dev) != 0) {
 		se_cmd->scsi_sense_reason = TCM_NON_EXISTENT_LUN;
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		return -1;
+		return -ENODEV;
 	}
 
 	{
@@ -191,7 +191,7 @@ int transport_get_lun_for_tmr(
 	if (unpacked_lun >= TRANSPORT_MAX_LUNS_PER_TPG) {
 		se_cmd->scsi_sense_reason = TCM_NON_EXISTENT_LUN;
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		return -1;
+		return -ENODEV;
 	}
 
 	spin_lock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
@@ -213,7 +213,7 @@ int transport_get_lun_for_tmr(
 			CMD_TFO(se_cmd)->get_fabric_name(),
 			unpacked_lun);
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		return -1;
+		return -ENODEV;
 	}
 	/*
 	 * Determine if the struct se_lun is online.
@@ -221,7 +221,7 @@ int transport_get_lun_for_tmr(
 /* #warning FIXME: Check for LUN_RESET + UNIT Attention */
 	if (se_dev_check_online(se_lun->lun_se_dev) != 0) {
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		return -1;
+		return -ENODEV;
 	}
 
 	spin_lock(&dev->se_tmr_lock);
@@ -403,14 +403,14 @@ int core_update_device_list_for_node(
 					" already set for demo mode -> explict"
 					" LUN ACL transition\n");
 				spin_unlock_irq(&nacl->device_list_lock);
-				return -1;
+				return -EINVAL;
 			}
 			if (deve->se_lun != lun) {
 				printk(KERN_ERR "struct se_dev_entry->se_lun does"
 					" match passed struct se_lun for demo mode"
 					" -> explict LUN ACL transition\n");
 				spin_unlock_irq(&nacl->device_list_lock);
-				return -1;
+				return -EINVAL;
 			}
 			deve->se_lun_acl = lun_acl;
 			trans = 1;
@@ -509,7 +509,7 @@ static struct se_port *core_alloc_port(struct se_device *dev)
 	port = kzalloc(sizeof(struct se_port), GFP_KERNEL);
 	if (!(port)) {
 		printk(KERN_ERR "Unable to allocate struct se_port\n");
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 	INIT_LIST_HEAD(&port->sep_alua_list);
 	INIT_LIST_HEAD(&port->sep_list);
@@ -522,7 +522,7 @@ static struct se_port *core_alloc_port(struct se_device *dev)
 		printk(KERN_WARNING "Reached dev->dev_port_count =="
 				" 0x0000ffff\n");
 		spin_unlock(&dev->se_port_lock);
-		return NULL;
+		return ERR_PTR(-ENOSPC);
 	}
 again:
 	/*
@@ -625,8 +625,8 @@ int core_dev_export(
 	struct se_port *port;
 
 	port = core_alloc_port(dev);
-	if (!(port))
-		return -1;
+	if (IS_ERR(port))
+		return PTR_ERR(port);
 
 	lun->lun_se_dev = dev;
 	se_dev_start(dev);
@@ -903,7 +903,7 @@ int se_dev_set_task_timeout(struct se_device *dev, u32 task_timeout)
 	if (task_timeout > DA_TASK_TIMEOUT_MAX) {
 		printk(KERN_ERR "dev[%p]: Passed task_timeout: %u larger then"
 			" DA_TASK_TIMEOUT_MAX\n", dev, task_timeout);
-		return -1;
+		return -EINVAL;
 	} else {
 		DEV_ATTRIB(dev)->task_timeout = task_timeout;
 		printk(KERN_INFO "dev[%p]: Set SE Device task_timeout: %u\n",
@@ -957,15 +957,15 @@ int se_dev_set_emulate_dpo(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->dpo_emulated == NULL) {
 		printk(KERN_ERR "TRANSPORT(dev)->dpo_emulated is NULL\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->dpo_emulated(dev) == 0) {
 		printk(KERN_ERR "TRANSPORT(dev)->dpo_emulated not supported\n");
-		return -1;
+		return -EINVAL;
 	}
 	DEV_ATTRIB(dev)->emulate_dpo = flag;
 	printk(KERN_INFO "dev[%p]: SE Device Page Out (DPO) Emulation"
@@ -977,15 +977,15 @@ int se_dev_set_emulate_fua_write(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->fua_write_emulated == NULL) {
 		printk(KERN_ERR "TRANSPORT(dev)->fua_write_emulated is NULL\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->fua_write_emulated(dev) == 0) {
 		printk(KERN_ERR "TRANSPORT(dev)->fua_write_emulated not supported\n");
-		return -1;
+		return -EINVAL;
 	}
 	DEV_ATTRIB(dev)->emulate_fua_write = flag;
 	printk(KERN_INFO "dev[%p]: SE Device Forced Unit Access WRITEs: %d\n",
@@ -997,15 +997,15 @@ int se_dev_set_emulate_fua_read(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->fua_read_emulated == NULL) {
 		printk(KERN_ERR "TRANSPORT(dev)->fua_read_emulated is NULL\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->fua_read_emulated(dev) == 0) {
 		printk(KERN_ERR "TRANSPORT(dev)->fua_read_emulated not supported\n");
-		return -1;
+		return -EINVAL;
 	}
 	DEV_ATTRIB(dev)->emulate_fua_read = flag;
 	printk(KERN_INFO "dev[%p]: SE Device Forced Unit Access READs: %d\n",
@@ -1017,15 +1017,15 @@ int se_dev_set_emulate_write_cache(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->write_cache_emulated == NULL) {
 		printk(KERN_ERR "TRANSPORT(dev)->write_cache_emulated is NULL\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->write_cache_emulated(dev) == 0) {
 		printk(KERN_ERR "TRANSPORT(dev)->write_cache_emulated not supported\n");
-		return -1;
+		return -EINVAL;
 	}
 	DEV_ATTRIB(dev)->emulate_write_cache = flag;
 	printk(KERN_INFO "dev[%p]: SE Device WRITE_CACHE_EMULATION flag: %d\n",
@@ -1037,7 +1037,7 @@ int se_dev_set_emulate_ua_intlck_ctrl(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1) && (flag != 2)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (atomic_read(&dev->dev_export_obj.obj_access_count)) {
@@ -1045,7 +1045,7 @@ int se_dev_set_emulate_ua_intlck_ctrl(struct se_device *dev, int flag)
 			" UA_INTRLCK_CTRL while dev_export_obj: %d count"
 			" exists\n", dev,
 			atomic_read(&dev->dev_export_obj.obj_access_count));
-		return -1;
+		return -EINVAL;
 	}
 	DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl = flag;
 	printk(KERN_INFO "dev[%p]: SE Device UA_INTRLCK_CTRL flag: %d\n",
@@ -1058,14 +1058,14 @@ int se_dev_set_emulate_tas(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (atomic_read(&dev->dev_export_obj.obj_access_count)) {
 		printk(KERN_ERR "dev[%p]: Unable to change SE Device TAS while"
 			" dev_export_obj: %d count exists\n", dev,
 			atomic_read(&dev->dev_export_obj.obj_access_count));
-		return -1;
+		return -EINVAL;
 	}
 	DEV_ATTRIB(dev)->emulate_tas = flag;
 	printk(KERN_INFO "dev[%p]: SE Device TASK_ABORTED status bit: %s\n",
@@ -1078,7 +1078,7 @@ int se_dev_set_emulate_tpu(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 	/*
 	 * We expect this value to be non-zero when generic Block Layer
@@ -1099,7 +1099,7 @@ int se_dev_set_emulate_tpws(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 	/*
 	 * We expect this value to be non-zero when generic Block Layer
@@ -1120,7 +1120,7 @@ int se_dev_set_enforce_pr_isids(struct se_device *dev, int flag)
 {
 	if ((flag != 0) && (flag != 1)) {
 		printk(KERN_ERR "Illegal value %d\n", flag);
-		return -1;
+		return -EINVAL;
 	}
 	DEV_ATTRIB(dev)->enforce_pr_isids = flag;
 	printk(KERN_INFO "dev[%p]: SE Device enforce_pr_isids bit: %s\n", dev,
@@ -1139,12 +1139,12 @@ int se_dev_set_queue_depth(struct se_device *dev, u32 queue_depth)
 		printk(KERN_ERR "dev[%p]: Unable to change SE Device TCQ while"
 			" dev_export_obj: %d count exists\n", dev,
 			atomic_read(&dev->dev_export_obj.obj_access_count));
-		return -1;
+		return -EINVAL;
 	}
 	if (!(queue_depth)) {
 		printk(KERN_ERR "dev[%p]: Illegal ZERO value for queue"
 			"_depth\n", dev);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
@@ -1153,7 +1153,7 @@ int se_dev_set_queue_depth(struct se_device *dev, u32 queue_depth)
 				" exceeds TCM/SE_Device TCQ: %u\n",
 				dev, queue_depth,
 				DEV_ATTRIB(dev)->hw_queue_depth);
-			return -1;
+			return -EINVAL;
 		}
 	} else {
 		if (queue_depth > DEV_ATTRIB(dev)->queue_depth) {
@@ -1162,7 +1162,7 @@ int se_dev_set_queue_depth(struct se_device *dev, u32 queue_depth)
 					" %u exceeds TCM/SE_Device MAX"
 					" TCQ: %u\n", dev, queue_depth,
 					DEV_ATTRIB(dev)->hw_queue_depth);
-				return -1;
+				return -EINVAL;
 			}
 		}
 	}
@@ -1186,18 +1186,18 @@ int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 		printk(KERN_ERR "dev[%p]: Unable to change SE Device"
 			" max_sectors while dev_export_obj: %d count exists\n",
 			dev, atomic_read(&dev->dev_export_obj.obj_access_count));
-		return -1;
+		return -EINVAL;
 	}
 	if (!(max_sectors)) {
 		printk(KERN_ERR "dev[%p]: Illegal ZERO value for"
 			" max_sectors\n", dev);
-		return -1;
+		return -EINVAL;
 	}
 	if (max_sectors < DA_STATUS_MAX_SECTORS_MIN) {
 		printk(KERN_ERR "dev[%p]: Passed max_sectors: %u less than"
 			" DA_STATUS_MAX_SECTORS_MIN: %u\n", dev, max_sectors,
 				DA_STATUS_MAX_SECTORS_MIN);
-		return -1;
+		return -EINVAL;
 	}
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
 		if (max_sectors > DEV_ATTRIB(dev)->hw_max_sectors) {
@@ -1205,7 +1205,7 @@ int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 				" greater than TCM/SE_Device max_sectors:"
 				" %u\n", dev, max_sectors,
 				DEV_ATTRIB(dev)->hw_max_sectors);
-			 return -1;
+			 return -EINVAL;
 		}
 	} else {
 		if (!(force) && (max_sectors >
@@ -1214,14 +1214,14 @@ int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 				" greater than TCM/SE_Device max_sectors"
 				": %u, use force=1 to override.\n", dev,
 				max_sectors, DEV_ATTRIB(dev)->hw_max_sectors);
-			return -1;
+			return -EINVAL;
 		}
 		if (max_sectors > DA_STATUS_MAX_SECTORS_MAX) {
 			printk(KERN_ERR "dev[%p]: Passed max_sectors: %u"
 				" greater than DA_STATUS_MAX_SECTORS_MAX:"
 				" %u\n", dev, max_sectors,
 				DA_STATUS_MAX_SECTORS_MAX);
-			return -1;
+			return -EINVAL;
 		}
 	}
 
@@ -1263,7 +1263,7 @@ int se_dev_set_block_size(struct se_device *dev, u32 block_size)
 		printk(KERN_ERR "dev[%p]: Unable to change SE Device block_size"
 			" while dev_export_obj: %d count exists\n", dev,
 			atomic_read(&dev->dev_export_obj.obj_access_count));
-		return -1;
+		return -EINVAL;
 	}
 
 	if ((block_size != 512) &&
@@ -1273,14 +1273,14 @@ int se_dev_set_block_size(struct se_device *dev, u32 block_size)
 		printk(KERN_ERR "dev[%p]: Illegal value for block_device: %u"
 			" for SE device, must be 512, 1024, 2048 or 4096\n",
 			dev, block_size);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (TRANSPORT(dev)->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV) {
 		printk(KERN_ERR "dev[%p]: Not allowed to change block_size for"
 			" Physical Device, use for Linux/SCSI to change"
 			" block_size for underlying hardware\n", dev);
-		return -1;
+		return -EINVAL;
 	}
 
 	DEV_ATTRIB(dev)->block_size = block_size;
@@ -1614,8 +1614,8 @@ int core_dev_setup_virtual_lun0(void)
 	t->set_configfs_dev_params(hba, se_dev, buf, sizeof(buf));
 
 	dev = t->create_virtdevice(hba, se_dev, se_dev->se_dev_su_ptr);
-	if (!(dev) || IS_ERR(dev)) {
-		ret = -ENOMEM;
+	if (IS_ERR(dev)) {
+		ret = PTR_ERR(dev);
 		goto out;
 	}
 	se_dev->se_dev_ptr = dev;

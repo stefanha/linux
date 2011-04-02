@@ -298,16 +298,16 @@ struct target_fabric_configfs *target_fabric_configfs_init(
 
 	if (!(fabric_mod)) {
 		printk(KERN_ERR "Missing struct module *fabric_mod pointer\n");
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 	if (!(name)) {
 		printk(KERN_ERR "Unable to locate passed fabric name\n");
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
-	if (strlen(name) > TARGET_FABRIC_NAME_SIZE) {
+	if (strlen(name) > TARGET_FABRIC_NAME_SIZE-1) {
 		printk(KERN_ERR "Passed name: %s exceeds TARGET_FABRIC"
 			"_NAME_SIZE\n", name);
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 
 	tf = kzalloc(sizeof(struct target_fabric_configfs), GFP_KERNEL);
@@ -3133,7 +3133,7 @@ static int __init target_core_init_configfs(void)
 	init_scsi_index_table();
 	ret = init_se_global();
 	if (ret < 0)
-		return -1;
+		return ret;
 	/*
 	 * Create $CONFIGFS/target/core default group for HBA <-> Storage Object
 	 * and ALUA Logical Unit Group and Target Port Group infrastructure.
@@ -3241,7 +3241,7 @@ out_global:
 		kfree(hba_cg->default_groups);
 	kfree(target_cg->default_groups);
 	release_se_global();
-	return -1;
+	return ret;
 }
 
 static void __exit target_core_exit_configfs(void)

@@ -234,7 +234,7 @@ static int core_create_device_list_for_node(struct se_node_acl *nacl)
 	if (!(nacl->device_list)) {
 		printk(KERN_ERR "Unable to allocate memory for"
 			" struct se_node_acl->device_list\n");
-		return -1;
+		return -ENOMEM;
 	}
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
 		deve = &nacl->device_list[i];
@@ -615,7 +615,7 @@ static int core_tpg_setup_virtual_lun0(struct se_portal_group *se_tpg)
 
 	ret = core_tpg_post_addlun(se_tpg, lun, lun_access, dev);
 	if (ret < 0)
-		return -1;
+		return ret;
 
 	return 0;
 }
@@ -773,8 +773,11 @@ int core_tpg_post_addlun(
 	u32 lun_access,
 	void *lun_ptr)
 {
-	if (core_dev_export(lun_ptr, tpg, lun) < 0)
-		return -1;
+	int ret;
+
+	ret = core_dev_export(lun_ptr, tpg, lun);
+	if (ret < 0)
+		return ret;
 
 	spin_lock(&tpg->tpg_lun_lock);
 	lun->lun_access = lun_access;

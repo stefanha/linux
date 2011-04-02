@@ -55,24 +55,6 @@ static struct se_subsystem_api pscsi_template;
 
 static void pscsi_req_done(struct request *, int);
 
-/*	pscsi_get_sh():
- *
- *
- */
-static struct Scsi_Host *pscsi_get_sh(u32 host_no)
-{
-	struct Scsi_Host *sh = NULL;
-
-	sh = scsi_host_lookup(host_no);
-	if (IS_ERR(sh)) {
-		printk(KERN_ERR "Unable to locate SCSI HBA with Host ID:"
-				" %u\n", host_no);
-		return NULL;
-	}
-
-	return sh;
-}
-
 /*	pscsi_attach_hba():
  *
  * 	pscsi_get_sh() used scsi_host_lookup() to locate struct Scsi_Host.
@@ -86,7 +68,7 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	phv = kzalloc(sizeof(struct pscsi_hba_virt), GFP_KERNEL);
 	if (!(phv)) {
 		printk(KERN_ERR "Unable to allocate struct pscsi_hba_virt\n");
-		return -1;
+		return -ENOMEM;
 	}
 	phv->phv_host_id = host_id;
 	phv->phv_mode = PHV_VIRUTAL_HOST_ID;
@@ -154,11 +136,11 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 	 * Otherwise, locate struct Scsi_Host from the original passed
 	 * pSCSI Host ID and enable for phba mode
 	 */
-	sh = pscsi_get_sh(phv->phv_host_id);
-	if (!(sh)) {
+	sh = scsi_host_lookup(phv->phv_host_id);
+	if (IS_ERR(sh)) {
 		printk(KERN_ERR "pSCSI: Unable to locate SCSI Host for"
 			" phv_host_id: %d\n", phv->phv_host_id);
-		return -1;
+		return PTR_ERR(sh);
 	}
 	/*
 	 * Usually the SCSI LLD will use the hostt->can_queue value to define
@@ -236,7 +218,7 @@ pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
 
 	buf = kzalloc(INQUIRY_VPD_SERIAL_LEN, GFP_KERNEL);
 	if (!buf)
-		return -1;
+		return -ENOMEM;
 
 	memset(cdb, 0, MAX_COMMAND_SIZE);
 	cdb[0] = INQUIRY;
@@ -259,7 +241,7 @@ pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
 
 out_free:
 	kfree(buf);
-	return -1;
+	return -EPERM;
 }
 
 static void
@@ -601,11 +583,11 @@ static struct se_device *pscsi_create_virtdevice(
 			hba->hba_flags |= HBA_FLAGS_PSCSI_MODE;
 			sh = phv->phv_lld_host;
 		} else {
-			sh = pscsi_get_sh(pdv->pdv_host_id);
-			if (!(sh)) {
+			sh = scsi_host_lookup(phv->phv_host_id);
+			if (IS_ERR(sh)) {
 				printk(KERN_ERR "pSCSI: Unable to locate"
 					" pdv_host_id: %d\n", pdv->pdv_host_id);
-				return ERR_PTR(-ENODEV);
+				return (struct se_device *) sh;
 			}
 		}
 	} else {
@@ -1030,7 +1012,7 @@ static ssize_t pscsi_check_configfs_dev_params(
 	    !(pdv->pdv_flags & PDF_HAS_LUN_ID)) {
 		printk(KERN_ERR "Missing scsi_channel_id=, scsi_target_id= and"
 			" scsi_lun_id= parameters\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;

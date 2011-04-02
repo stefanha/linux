@@ -522,7 +522,7 @@ static int core_alua_state_check(
 	default:
 		printk(KERN_ERR "Unknown ALUA access state: 0x%02x\n",
 				out_alua_state);
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -553,7 +553,7 @@ static int core_alua_check_transition(int state, int *primary)
 		break;
 	default:
 		printk(KERN_ERR "Unknown ALUA access state: 0x%02x\n", state);
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -977,7 +977,7 @@ static int core_alua_set_tg_pt_secondary_state(
 		spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 		printk(KERN_ERR "Unable to complete secondary state"
 				" transition\n");
-		return -1;
+		return -EINVAL;
 	}
 	trans_delay_msecs = tg_pt_gp->tg_pt_gp_trans_delay_msecs;
 	/*
@@ -1015,7 +1015,7 @@ static int core_alua_set_tg_pt_secondary_state(
 		if (!(md_buf)) {
 			printk(KERN_ERR "Unable to allocate md_buf for"
 				" secondary ALUA access metadata\n");
-			return -1;
+			return -ENOMEM;
 		}
 		mutex_lock(&port->sep_tg_pt_md_mutex);
 		core_alua_update_tpg_secondary_metadata(tg_pt_gp_mem, port,
@@ -1062,7 +1062,7 @@ int core_alua_set_lu_gp_id(struct t10_alua_lu_gp *lu_gp, u16 lu_gp_id)
 	if (lu_gp->lu_gp_valid_id) {
 		printk(KERN_WARNING "ALUA LU Group already has a valid ID,"
 			" ignoring request\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	spin_lock(&se_global->lu_gps_lock);
@@ -1071,7 +1071,7 @@ int core_alua_set_lu_gp_id(struct t10_alua_lu_gp *lu_gp, u16 lu_gp_id)
 				" 0x0000ffff reached\n");
 		spin_unlock(&se_global->lu_gps_lock);
 		kmem_cache_free(t10_alua_lu_gp_cache, lu_gp);
-		return -1;
+		return -ENOSPC;
 	}
 again:
 	lu_gp_id_tmp = (lu_gp_id != 0) ? lu_gp_id :
@@ -1086,7 +1086,7 @@ again:
 				" already exists, ignoring request\n",
 				lu_gp_id);
 			spin_unlock(&se_global->lu_gps_lock);
-			return -1;
+			return -EINVAL;
 		}
 	}
 
@@ -1330,7 +1330,7 @@ int core_alua_set_tg_pt_gp_id(
 	if (tg_pt_gp->tg_pt_gp_valid_id) {
 		printk(KERN_WARNING "ALUA TG PT Group already has a valid ID,"
 			" ignoring request\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	spin_lock(&T10_ALUA(su_dev)->tg_pt_gps_lock);
@@ -1339,7 +1339,7 @@ int core_alua_set_tg_pt_gp_id(
 			" 0x0000ffff reached\n");
 		spin_unlock(&T10_ALUA(su_dev)->tg_pt_gps_lock);
 		kmem_cache_free(t10_alua_tg_pt_gp_cache, tg_pt_gp);
-		return -1;
+		return -ENOSPC;
 	}
 again:
 	tg_pt_gp_id_tmp = (tg_pt_gp_id != 0) ? tg_pt_gp_id :
@@ -1354,7 +1354,7 @@ again:
 			printk(KERN_ERR "ALUA Target Port Group ID: %hu already"
 				" exists, ignoring request\n", tg_pt_gp_id);
 			spin_unlock(&T10_ALUA(su_dev)->tg_pt_gps_lock);
-			return -1;
+			return -EINVAL;
 		}
 	}
 
@@ -1967,8 +1967,8 @@ int core_setup_alua(struct se_device *dev, int force_pt)
 		 * LUN Group.
 		 */
 		lu_gp_mem = core_alua_allocate_lu_gp_mem(dev);
-		if (IS_ERR(lu_gp_mem) || !lu_gp_mem)
-			return -1;
+		if (IS_ERR(lu_gp_mem))
+			return PTR_ERR(lu_gp_mem);
 
 		alua->alua_type = SPC3_ALUA_EMULATED;
 		alua->alua_state_check = &core_alua_state_check;

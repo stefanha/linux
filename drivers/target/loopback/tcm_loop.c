@@ -1227,7 +1227,7 @@ struct se_portal_group *tcm_loop_make_naa_tpg(
 	tpgt_str += 5; /* Skip ahead of "tpgt_" */
 	tpgt = (unsigned short int) simple_strtoul(tpgt_str, &end_ptr, 0);
 
-	if (tpgt > TL_TPGS_PER_HBA) {
+	if (tpgt >= TL_TPGS_PER_HBA) {
 		printk(KERN_ERR "Passed tpgt: %hu exceeds TL_TPGS_PER_HBA:"
 				" %u\n", tpgt, TL_TPGS_PER_HBA);
 		return ERR_PTR(-EINVAL);
@@ -1399,9 +1399,9 @@ static int tcm_loop_register_configfs(void)
 	 * Register the top level struct config_item_type with TCM core
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "loopback");
-	if (!fabric) {
+	if (IS_ERR(fabric)) {
 		printk(KERN_ERR "tcm_loop_register_configfs() failed!\n");
-		return -1;
+		return PTR_ERR(fabric);
 	}
 	/*
 	 * Setup the fabric API of function pointers used by target_core_mod
