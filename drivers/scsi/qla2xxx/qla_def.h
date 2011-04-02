@@ -2855,7 +2855,6 @@ struct qla_hw_data {
 	struct mutex tgt_mutex;
 	struct mutex tgt_host_action_mutex;
 
-	struct list_head ha_list_entry;
 	int saved_set;
 	uint16_t saved_exchange_count;
 	uint32_t saved_firmware_options_1;

@@ -21,12 +21,6 @@
 #include <scsi/scsi_transport_fc.h>
 
 /*
- * List of ha's and mutex protecting it.
- */
-static LIST_HEAD(qla_ha_list);
-static DEFINE_MUTEX(qla_ha_list_mutex);
-
-/*
  * Driver version
  */
 char qla2x00_version_str[40];
@@ -2323,12 +2317,7 @@ skip_dpc:
 	    ha->flags.enable_64bit_addressing ? '+' : '-', base_vha->host_no,
 	    ha->isp_ops->fw_version_str(base_vha, fw_str));
 
-#warning FIXME: Check for target mode enabled bit before calling qla_tgt_add_target()
 	qla_tgt_add_target(ha, base_vha);
-
-	mutex_lock(&qla_ha_list_mutex);
-	list_add_tail(&ha->ha_list_entry, &qla_ha_list);
-	mutex_unlock(&qla_ha_list_mutex);
 
 	return 0;
 
@@ -2434,10 +2423,6 @@ qla2x00_remove_one(struct pci_dev *pdev)
 
 	base_vha = pci_get_drvdata(pdev);
 	ha = base_vha->hw;
-
-	mutex_lock(&qla_ha_list_mutex);
-	list_del(&ha->ha_list_entry);
-	mutex_unlock(&qla_ha_list_mutex);
 
 	ha->host_shutting_down = 1;
 #warning FIXME: Check for target mode enabled bit before calling qla_tgt_remove_target()
