@@ -2182,10 +2182,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	host->transportt = qla2xxx_transport_template;
 	sht->vendor_id = (SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_QLOGIC);
 
-        /* Set target mode init */
-	mutex_init(&ha->tgt_mutex);
-	mutex_init(&ha->tgt_host_action_mutex);
-	qla_tgt_clear_mode(base_vha);
+	qla_tgt_probe_one_stage1(base_vha, ha);
 
 	/* Set up the irqs */
 	ret = qla2x00_request_irqs(ha, rsp);

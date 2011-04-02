@@ -5411,6 +5411,14 @@ qla_tgt_modify_vp_config(scsi_qla_host_t *vha, struct vp_config_entry_24xx *vpmo
 	}
 }
 
+void
+qla_tgt_probe_one_stage1(scsi_qla_host_t *base_vha, struct qla_hw_data *ha)
+{
+	mutex_init(&ha->tgt_mutex);
+	mutex_init(&ha->tgt_host_action_mutex);
+	qla_tgt_clear_mode(base_vha);
+}
+
 bool __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
