@@ -4363,20 +4363,6 @@ static void qla_tgt_response_pkt(scsi_qla_host_t *vha, response_t *pkt)
 	 * Otherwise, some commands can stuck.
 	 */
 
-	if (unlikely(pkt->entry_status != 0)) {
-		printk(KERN_ERR "qla_target(%d): Received response packet %x "
-		     "with error status %x\n", vha->vp_idx, pkt->entry_type,
-		     pkt->entry_status);
-		switch (pkt->entry_type) {
-		case ACCEPT_TGT_IO_TYPE:
-		case IMMED_NOTIFY_TYPE:
-		case ABTS_RECV_24XX:
-			return;
-		default:
-			break;
-		}
-	}
-
 	tgt->irq_cmd_count++;
 
 	switch (pkt->entry_type) {
