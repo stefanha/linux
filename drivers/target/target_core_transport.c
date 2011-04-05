@@ -1637,17 +1637,6 @@ struct se_device *transport_add_device_to_core_hba(
 	}
 	transport_init_queue_obj(dev->dev_queue_obj);
 
-	dev->dev_status_queue_obj = kzalloc(sizeof(struct se_queue_obj),
-					GFP_KERNEL);
-	if (!(dev->dev_status_queue_obj)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" dev->dev_status_queue_obj\n");
-		kfree(dev->dev_queue_obj);
-		kfree(dev);
-		return NULL;
-	}
-	transport_init_queue_obj(dev->dev_status_queue_obj);
-
 	dev->dev_flags		= device_flags;
 	dev->dev_status		|= TRANSPORT_DEVICE_DEACTIVATED;
 	dev->dev_ptr		= (void *) transport_dev;
@@ -1748,7 +1737,6 @@ out:
 
 	se_release_vpd_for_dev(dev);
 
-	kfree(dev->dev_status_queue_obj);
 	kfree(dev->dev_queue_obj);
 	kfree(dev);
 

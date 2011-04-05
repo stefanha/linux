@@ -749,7 +749,6 @@ void se_release_device_for_hba(struct se_device *dev)
 	core_scsi3_free_all_registrations(dev);
 	se_release_vpd_for_dev(dev);
 
-	kfree(dev->dev_status_queue_obj);
 	kfree(dev->dev_queue_obj);
 	kfree(dev);
 
