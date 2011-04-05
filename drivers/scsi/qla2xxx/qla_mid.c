@@ -404,6 +404,7 @@ qla24xx_vport_create_req_sanity_check(struct fc_vport *fc_vport)
 	/* Check up whether npiv supported switch presented */
 	if (!(ha->switch_cap & FLOGI_MID_SUPPORT))
 		return VPCERR_NO_FABRIC_SUPP;
+
 	/* Check up unique WWPN */
 	u64_to_wwn(fc_vport->port_name, port_name);
 	if (!memcmp(port_name, base_vha->port_name, WWN_SIZE))

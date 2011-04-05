@@ -26,6 +26,7 @@
 #define PDO_FORCE_ADISC		BIT_1
 #define PDO_FORCE_PLOGI		BIT_0
 
+
 #define	PORT_DATABASE_24XX_SIZE		64
 struct port_database_24xx {
 	uint16_t flags;

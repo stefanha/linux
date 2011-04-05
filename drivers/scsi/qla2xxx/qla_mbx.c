@@ -10,6 +10,7 @@
 #include <linux/delay.h>
 #include <linux/gfp.h>
 
+
 /*
  * qla2x00_mailbox_command
  *	Issue mailbox command and waits for completion.
@@ -2139,7 +2140,6 @@ int
 qla2x00_get_id_list(scsi_qla_host_t *vha, void *id_list, dma_addr_t id_list_dma,
     uint16_t *entries)
 {
-
 	int rval;
 	mbx_cmd_t mc;
 	mbx_cmd_t *mcp = &mc;

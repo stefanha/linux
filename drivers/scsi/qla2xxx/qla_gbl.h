@@ -173,10 +173,6 @@ extern int  qla2x00_vp_abort_isp(scsi_qla_host_t *);
  * Global Function Prototypes in qla_iocb.c source file.
  */
 
-extern void *qla2x00_alloc_iocbs(scsi_qla_host_t *, srb_t *);
-extern void qla2x00_isp_cmd(struct scsi_qla_host *, struct req_que *);
-extern int qla2x00_issue_marker(scsi_qla_host_t *, int);
-
 extern uint16_t qla2x00_calc_iocbs_32(uint16_t);
 extern uint16_t qla2x00_calc_iocbs_64(uint16_t);
 extern void qla2x00_build_scsi_iocbs_32(srb_t *, cmd_entry_t *, uint16_t);
@@ -190,6 +186,9 @@ extern uint16_t qla24xx_calc_iocbs(uint16_t);
 extern void qla24xx_build_scsi_iocbs(srb_t *, struct cmd_type_7 *, uint16_t);
 extern int qla24xx_dif_start_scsi(srb_t *);
 
+extern void *qla2x00_alloc_iocbs(scsi_qla_host_t *, srb_t *);
+extern void qla2x00_isp_cmd(struct scsi_qla_host *, struct req_que *);
+extern int qla2x00_issue_marker(scsi_qla_host_t *, int);
 
 /*
  * Global Function Prototypes in qla_mbx.c source file.

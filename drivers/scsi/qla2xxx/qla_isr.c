@@ -458,6 +458,7 @@ skip_rio:
 
 		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 		break;
+
 	case MBA_WAKEUP_THRES:		/* Request Queue Wake-up */
 		DEBUG2(printk("scsi(%ld): Asynchronous WAKEUP_THRES.\n",
 		    vha->host_no));

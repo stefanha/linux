@@ -547,7 +547,7 @@ typedef struct {
 #define MBA_SYSTEM_ERR		0x8002	/* System Error. */
 #define MBA_REQ_TRANSFER_ERR	0x8003	/* Request Transfer Error. */
 #define MBA_RSP_TRANSFER_ERR	0x8004	/* Response Transfer Error. */
-#define MBA_WAKEUP_THRES	0x8005  /* Request Queue Wake-up. */
+#define MBA_WAKEUP_THRES       0x8005  /* Request Queue Wake-up. */
 #define MBA_LIP_OCCURRED	0x8010	/* Loop Initialization Procedure */
 					/* occurred. */
 #define MBA_LOOP_UP		0x8011	/* FC Loop UP. */
@@ -887,6 +887,7 @@ typedef struct {
 	uint16_t response_q_length;
 	uint32_t request_q_address[2];
 	uint32_t response_q_address[2];
+
 	uint16_t lun_enables;
 	uint8_t  command_resource_count;
 	uint8_t  immediate_notify_resource_count;

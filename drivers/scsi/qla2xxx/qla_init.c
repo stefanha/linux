@@ -2323,6 +2323,9 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 	/* Reset Initialization control block */
 	memset(icb, 0, ha->init_cb_size);
 
+	/*
+	 * Setup driver NVRAM options.
+	 */
 	/* Enable ADISC and fairness */
 	nv->firmware_options[0] |= (BIT_6 | BIT_1);
 	nv->firmware_options[0] &= ~(BIT_5 | BIT_4);

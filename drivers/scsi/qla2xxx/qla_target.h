@@ -713,7 +713,6 @@ struct qla_target_template {
 						const uint8_t *);
 };
 
-int qla2x00_wait_for_loop_ready(struct scsi_qla_host *);
 int qla2x00_wait_for_hba_online(struct scsi_qla_host *);
 
 #include <target/target_core_base.h>

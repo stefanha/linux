@@ -767,7 +767,7 @@ qla2x00_wait_for_chip_reset(scsi_qla_host_t *vha)
  *    Success (LOOP_READY) : 0
  *    Failed  (LOOP_NOT_READY) : 1
  */
-int
+static int
 qla2x00_wait_for_loop_ready(scsi_qla_host_t *vha)
 {
 	int 	 return_status = QLA_SUCCESS;

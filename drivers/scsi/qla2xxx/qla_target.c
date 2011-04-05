@@ -5489,7 +5489,7 @@ qla_tgt_mem_free(struct qla_hw_data *ha)
 	kfree(ha->tgt_vp_map);
 }
 
-static __init qla_tgt_parse_ini_mode(void)
+static int __init qla_tgt_parse_ini_mode(void)
 {
 	if (strcasecmp(qlini_mode, QLA2X_INI_MODE_STR_EXCLUSIVE) == 0)
 		ql2x_ini_mode = QLA2X_INI_MODE_EXCLUSIVE;
