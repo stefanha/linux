@@ -843,26 +843,6 @@ static int transport_add_cmd_to_queue(
  * Called with struct se_queue_obj->cmd_queue_lock held.
  */
 static struct se_queue_req *
-__transport_get_qr_from_queue(struct se_queue_obj *qobj)
-{
-	struct se_queue_req *qr = NULL;
-
-	if (list_empty(&qobj->qobj_list))
-		return NULL;
-
-	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
-		break;
-
-	if (qr->cmd)
-		atomic_dec(&T_TASK(qr->cmd)->t_transport_queue_active);
-
-	list_del(&qr->qr_list);
-	atomic_dec(&qobj->queue_cnt);
-
-	return qr;
-}
-
-static struct se_queue_req *
 transport_get_qr_from_queue(struct se_queue_obj *qobj)
 {
 	struct se_queue_req *qr;
@@ -5995,10 +5975,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 	/*
 	 * Empty the struct se_device's struct se_cmd list.
 	 */
-	spin_lock_irqsave(&dev->dev_queue_obj->cmd_queue_lock, flags);
-	while ((qr = __transport_get_qr_from_queue(dev->dev_queue_obj))) {
-		spin_unlock_irqrestore(
-				&dev->dev_queue_obj->cmd_queue_lock, flags);
+	while ((qr = transport_get_qr_from_queue(dev->dev_queue_obj))) {
 		cmd = qr->cmd;
 		state = qr->state;
 		kfree(qr);
@@ -6017,9 +5994,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 			if (transport_cmd_check_stop(cmd, 1, 0))
 				transport_generic_remove(cmd, 0, 0);
 		}
-		spin_lock_irqsave(&dev->dev_queue_obj->cmd_queue_lock, flags);
 	}
-	spin_unlock_irqrestore(&dev->dev_queue_obj->cmd_queue_lock, flags);
 }
 
 /*	transport_processing_thread():
