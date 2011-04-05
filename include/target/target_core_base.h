@@ -396,7 +396,7 @@ struct t10_reservation_template {
 
 struct se_queue_req {
 	int			state;
-	void			*cmd;
+	struct se_cmd		*cmd;
 	struct list_head	qr_list;
 } ____cacheline_aligned;
 

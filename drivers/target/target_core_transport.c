@@ -819,7 +819,7 @@ static int transport_add_cmd_to_queue(
 	}
 	INIT_LIST_HEAD(&qr->qr_list);
 
-	qr->cmd = (void *)cmd;
+	qr->cmd = cmd;
 	qr->state = t_state;
 
 	if (t_state) {
@@ -845,7 +845,6 @@ static int transport_add_cmd_to_queue(
 static struct se_queue_req *
 __transport_get_qr_from_queue(struct se_queue_obj *qobj)
 {
-	struct se_cmd *cmd;
 	struct se_queue_req *qr = NULL;
 
 	if (list_empty(&qobj->qobj_list))
@@ -854,10 +853,9 @@ __transport_get_qr_from_queue(struct se_queue_obj *qobj)
 	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
 		break;
 
-	if (qr->cmd) {
-		cmd = (struct se_cmd *)qr->cmd;
-		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
-	}
+	if (qr->cmd)
+		atomic_dec(&T_TASK(qr->cmd)->t_transport_queue_active);
+
 	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
 
@@ -867,7 +865,6 @@ __transport_get_qr_from_queue(struct se_queue_obj *qobj)
 static struct se_queue_req *
 transport_get_qr_from_queue(struct se_queue_obj *qobj)
 {
-	struct se_cmd *cmd;
 	struct se_queue_req *qr;
 	unsigned long flags;
 
@@ -880,10 +877,9 @@ transport_get_qr_from_queue(struct se_queue_obj *qobj)
 	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
 		break;
 
-	if (qr->cmd) {
-		cmd = (struct se_cmd *)qr->cmd;
-		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
-	}
+	if (qr->cmd)
+		atomic_dec(&T_TASK(qr->cmd)->t_transport_queue_active);
+
 	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
@@ -894,7 +890,6 @@ transport_get_qr_from_queue(struct se_queue_obj *qobj)
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 		struct se_queue_obj *qobj)
 {
-	struct se_cmd *q_cmd;
 	struct se_queue_req *qr = NULL, *qr_p = NULL;
 	unsigned long flags;
 
@@ -905,11 +900,10 @@ static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 	}
 
 	list_for_each_entry_safe(qr, qr_p, &qobj->qobj_list, qr_list) {
-		q_cmd = (struct se_cmd *)qr->cmd;
-		if (q_cmd != cmd)
+		if (qr->cmd != cmd)
 			continue;
 
-		atomic_dec(&T_TASK(q_cmd)->t_transport_queue_active);
+		atomic_dec(&T_TASK(qr->cmd)->t_transport_queue_active);
 		atomic_dec(&qobj->queue_cnt);
 		list_del(&qr->qr_list);
 		kfree(qr);
@@ -1282,7 +1276,7 @@ static void transport_release_all_cmds(struct se_device *dev)
 	list_for_each_entry_safe(qr, qr_p, &dev->dev_queue_obj->qobj_list,
 				qr_list) {
 
-		cmd = (struct se_cmd *)qr->cmd;
+		cmd = qr->cmd;
 		t_state = qr->state;
 		list_del(&qr->qr_list);
 		kfree(qr);
@@ -6005,7 +5999,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 	while ((qr = __transport_get_qr_from_queue(dev->dev_queue_obj))) {
 		spin_unlock_irqrestore(
 				&dev->dev_queue_obj->cmd_queue_lock, flags);
-		cmd = (struct se_cmd *)qr->cmd;
+		cmd = qr->cmd;
 		state = qr->state;
 		kfree(qr);
 
@@ -6063,7 +6057,7 @@ get_cmd:
 		if (!(qr))
 			continue;
 
-		cmd = (struct se_cmd *)qr->cmd;
+		cmd = qr->cmd;
 		t_state = qr->state;
 		kfree(qr);
 
