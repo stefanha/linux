@@ -74,17 +74,14 @@ static int iblock_attach_hba(struct se_hba *hba, u32 host_id)
 
 	ib_host->iblock_host_id = host_id;
 
-	atomic_set(&hba->left_queue_depth, IBLOCK_HBA_QUEUE_DEPTH);
-	atomic_set(&hba->max_queue_depth, IBLOCK_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) ib_host;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM iBlock HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
 		IBLOCK_VERSION, TARGET_CORE_MOD_VERSION);
 
-	printk(KERN_INFO "CORE_HBA[%d] - Attached iBlock HBA: %u to Generic"
-		" Target Core TCQ Depth: %d\n", hba->hba_id,
-		ib_host->iblock_host_id, atomic_read(&hba->max_queue_depth));
+	printk(KERN_INFO "CORE_HBA[%d] - Attached iBlock HBA: %u to Generic\n",
+		hba->hba_id, ib_host->iblock_host_id);
 
 	return 0;
 }

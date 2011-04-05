@@ -836,17 +836,12 @@ struct se_hba {
 	/* Virtual iSCSI devices attached. */
 	u32			dev_count;
 	u32			hba_index;
-	atomic_t		load_balance_queue;
-	atomic_t		left_queue_depth;
-	/* Maximum queue depth the HBA can handle. */
-	atomic_t		max_queue_depth;
 	/* Pointer to transport specific host structure. */
 	void			*hba_ptr;
 	/* Linked list for struct se_device */
 	struct list_head	hba_dev_list;
 	struct list_head	hba_list;
 	spinlock_t		device_lock;
-	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
 	struct mutex		hba_access_mutex;
 	struct se_subsystem_api *transport;

@@ -111,14 +111,10 @@ core_alloc_hba(const char *plugin_name, u32 plugin_dep_id, u32 hba_flags)
 
 	INIT_LIST_HEAD(&hba->hba_dev_list);
 	spin_lock_init(&hba->device_lock);
-	spin_lock_init(&hba->hba_queue_lock);
 	mutex_init(&hba->hba_access_mutex);
 
 	hba->hba_index = scsi_get_new_index(SCSI_INST_INDEX);
 	hba->hba_flags |= hba_flags;
-
-	atomic_set(&hba->max_queue_depth, 0);
-	atomic_set(&hba->left_queue_depth, 0);
 
 	hba->transport = core_get_backend(plugin_name);
 	if (!hba->transport) {

@@ -62,7 +62,6 @@ static void pscsi_req_done(struct request *, int);
  */
 static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 {
-	int hba_depth;
 	struct pscsi_hba_virt *phv;
 
 	phv = kzalloc(sizeof(struct pscsi_hba_virt), GFP_KERNEL);
@@ -72,18 +71,14 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	}
 	phv->phv_host_id = host_id;
 	phv->phv_mode = PHV_VIRUTAL_HOST_ID;
-	hba_depth = PSCSI_VIRTUAL_HBA_DEPTH;
-	atomic_set(&hba->left_queue_depth, hba_depth);
-	atomic_set(&hba->max_queue_depth, hba_depth);
 
 	hba->hba_ptr = (void *)phv;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM SCSI HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
 		PSCSI_VERSION, TARGET_CORE_MOD_VERSION);
-	printk(KERN_INFO "CORE_HBA[%d] - Attached SCSI HBA to Generic"
-		" Target Core with TCQ Depth: %d\n", hba->hba_id,
-		atomic_read(&hba->max_queue_depth));
+	printk(KERN_INFO "CORE_HBA[%d] - Attached SCSI HBA to Generic\n",
+	       hba->hba_id);
 
 	return 0;
 }
@@ -112,7 +107,6 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 {
 	struct pscsi_hba_virt *phv = (struct pscsi_hba_virt *)hba->hba_ptr;
 	struct Scsi_Host *sh = phv->phv_lld_host;
-	int hba_depth = PSCSI_VIRTUAL_HBA_DEPTH;
 	/*
 	 * Release the struct Scsi_Host
 	 */
@@ -122,8 +116,6 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 
 		phv->phv_lld_host = NULL;
 		phv->phv_mode = PHV_VIRUTAL_HOST_ID;
-		atomic_set(&hba->left_queue_depth, hba_depth);
-		atomic_set(&hba->max_queue_depth, hba_depth);
 
 		printk(KERN_INFO "CORE_HBA[%d] - Disabled pSCSI HBA Passthrough"
 			" %s\n", hba->hba_id, (sh->hostt->name) ?
@@ -142,16 +134,6 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 			" phv_host_id: %d\n", phv->phv_host_id);
 		return PTR_ERR(sh);
 	}
-	/*
-	 * Usually the SCSI LLD will use the hostt->can_queue value to define
-	 * its HBA TCQ depth.  Some other drivers (like 2.6 megaraid) don't set
-	 * this at all and set sh->can_queue at runtime.
-	 */
-	hba_depth = (sh->hostt->can_queue > sh->can_queue) ?
-		sh->hostt->can_queue : sh->can_queue;
-
-	atomic_set(&hba->left_queue_depth, hba_depth);
-	atomic_set(&hba->max_queue_depth, hba_depth);
 
 	phv->phv_lld_host = sh;
 	phv->phv_mode = PHV_LLD_SCSI_HOST_NO;

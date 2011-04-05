@@ -961,12 +961,8 @@ void transport_complete_task(struct se_task *task, int success)
 	printk(KERN_INFO "task: %p CDB: 0x%02x obj_ptr: %p\n", task,
 			T_TASK(cmd)->t_task_cdb[0], dev);
 #endif
-	if (dev) {
-		spin_lock_irqsave(&SE_HBA(dev)->hba_queue_lock, flags);
+	if (dev)
 		atomic_inc(&dev->depth_left);
-		atomic_inc(&SE_HBA(dev)->left_queue_depth);
-		spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
-	}
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	atomic_set(&task->task_active, 0);
@@ -2128,16 +2124,6 @@ static int transport_stop_tasks_for_cmd(struct se_cmd *cmd)
 	return ret;
 }
 
-static void transport_failure_reset_queue_depth(struct se_device *dev)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&SE_HBA(dev)->hba_queue_lock, flags);;
-	atomic_inc(&dev->depth_left);
-	atomic_inc(&SE_HBA(dev)->left_queue_depth);
-	spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
-}
-
 /*
  * Handle SAM-esque emulation for generic transport request failures.
  */
@@ -2169,7 +2155,7 @@ static void transport_generic_request_failure(
 	transport_stop_all_task_timers(cmd);
 
 	if (dev)
-		transport_failure_reset_queue_depth(dev);
+		atomic_inc(&dev->depth_left);
 	/*
 	 * For SAM Task Attribute emulation for failed struct se_cmd
 	 */
@@ -2638,26 +2624,19 @@ static int __transport_execute_tasks(struct se_device *dev)
 	 * struct se_transport_task's to the selected transport.
 	 */
 check_depth:
-	spin_lock_irqsave(&SE_HBA(dev)->hba_queue_lock, flags);
-	if (!(atomic_read(&dev->depth_left)) ||
-	    !(atomic_read(&SE_HBA(dev)->left_queue_depth))) {
-		spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
+	if (atomic_dec_and_test(&dev->depth_left))
 		return transport_tcq_window_closed(dev);
-	}
+
 	dev->dev_tcq_window_closed = 0;
 
 	spin_lock(&dev->execute_task_lock);
 	task = transport_get_task_from_execute_queue(dev);
 	spin_unlock(&dev->execute_task_lock);
 
-	if (!task) {
-		spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
+	if (!task)
 		return 0;
-	}
 
 	atomic_dec(&dev->depth_left);
-	atomic_dec(&SE_HBA(dev)->left_queue_depth);
-	spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
 
 	cmd = TASK_CMD(task);
 
