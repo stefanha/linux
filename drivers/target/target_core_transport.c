@@ -185,7 +185,7 @@
 #define DEBUG_STA(x...)
 #endif
 
-struct se_global *se_global;
+static int sub_api_initialized;
 
 static struct kmem_cache *se_cmd_cache;
 static struct kmem_cache *se_sess_cache;
@@ -228,26 +228,8 @@ static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 static int transport_set_sense_codes(struct se_cmd *cmd, u8 asc, u8 ascq);
 static void transport_stop_all_task_timers(struct se_cmd *cmd);
 
-int init_se_global(void)
+int init_se_kmem_caches(void)
 {
-	struct se_global *global;
-
-	global = kzalloc(sizeof(struct se_global), GFP_KERNEL);
-	if (!(global)) {
-		printk(KERN_ERR "Unable to allocate memory for struct se_global\n");
-		return -ENOMEM;
-	}
-
-	INIT_LIST_HEAD(&global->g_lu_gps_list);
-	INIT_LIST_HEAD(&global->g_se_tpg_list);
-	INIT_LIST_HEAD(&global->g_hba_list);
-	INIT_LIST_HEAD(&global->g_se_dev_list);
-	spin_lock_init(&global->g_device_lock);
-	spin_lock_init(&global->hba_lock);
-	spin_lock_init(&global->se_tpg_lock);
-	spin_lock_init(&global->lu_gps_lock);
-	spin_lock_init(&global->plugin_class_lock);
-
 	se_cmd_cache = kmem_cache_create("se_cmd_cache",
 			sizeof(struct se_cmd), __alignof__(struct se_cmd), 0, NULL);
 	if (!(se_cmd_cache)) {
@@ -326,8 +308,6 @@ int init_se_global(void)
 		goto out;
 	}
 
-	se_global = global;
-
 	return 0;
 out:
 	if (se_cmd_cache)
@@ -350,18 +330,11 @@ out:
 		kmem_cache_destroy(t10_alua_tg_pt_gp_cache);
 	if (t10_alua_tg_pt_gp_mem_cache)
 		kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
-	kfree(global);
 	return -ENOMEM;
 }
 
-void release_se_global(void)
+void release_se_kmem_caches(void)
 {
-	struct se_global *global;
-
-	global = se_global;
-	if (!(global))
-		return;
-
 	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
@@ -372,9 +345,6 @@ void release_se_global(void)
 	kmem_cache_destroy(t10_alua_lu_gp_mem_cache);
 	kmem_cache_destroy(t10_alua_tg_pt_gp_cache);
 	kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
-	kfree(global);
-
-	se_global = NULL;
 }
 
 /* SCSI statistics table index */
@@ -447,7 +417,7 @@ int transport_subsystem_check_init(void)
 {
 	int ret;
 
-	if (se_global->g_sub_api_initialized)
+	if (sub_api_initialized)
 		return 0;
 	/*
 	 * Request the loading of known TCM subsystem plugins..
@@ -456,7 +426,7 @@ int transport_subsystem_check_init(void)
 	if (ret < 0)
 		return ret;
 
-	se_global->g_sub_api_initialized = 1;
+	sub_api_initialized = 1;
 	return 0;
 }
 

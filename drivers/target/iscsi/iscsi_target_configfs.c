@@ -1517,7 +1517,7 @@ static int lio_sess_logged_in(struct se_session *se_sess)
 	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
 	int ret;
 	/*
-	 * Called with spin_lock_bh(&se_global->se_tpg_lock); and
+	 * Called with spin_lock_bh(&tpg_lock); and
 	 * spin_lock(&se_tpg->session_lock); held.
 	 */
 	spin_lock(&sess->conn_lock);

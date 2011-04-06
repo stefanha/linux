@@ -54,6 +54,11 @@
 static void se_dev_start(struct se_device *dev);
 static void se_dev_stop(struct se_device *dev);
 
+static struct se_hba *lun0_hba;
+static struct se_subsystem_dev *lun0_su_dev;
+/* not static, needed by tpg.c */
+struct se_device *g_lun0_dev;
+
 int transport_get_lun_for_cmd(
 	struct se_cmd *se_cmd,
 	u32 unpacked_lun)
@@ -1573,7 +1578,7 @@ int core_dev_setup_virtual_lun0(void)
 	if (IS_ERR(hba))
 		return PTR_ERR(hba);
 
-	se_global->g_lun0_hba = hba;
+	lun0_hba = hba;
 	t = hba->transport;
 
 	se_dev = kzalloc(sizeof(struct se_subsystem_dev), GFP_KERNEL);
@@ -1606,7 +1611,7 @@ int core_dev_setup_virtual_lun0(void)
 		ret = -ENOMEM;
 		goto out;
 	}
-	se_global->g_lun0_su_dev = se_dev;
+	lun0_su_dev = se_dev;
 
 	memset(buf, 0, 16);
 	sprintf(buf, "rd_pages=8");
@@ -1618,15 +1623,15 @@ int core_dev_setup_virtual_lun0(void)
 		goto out;
 	}
 	se_dev->se_dev_ptr = dev;
-	se_global->g_lun0_dev = dev;
+	g_lun0_dev = dev;
 
 	return 0;
 out:
-	se_global->g_lun0_su_dev = NULL;
+	lun0_su_dev = NULL;
 	kfree(se_dev);
-	if (se_global->g_lun0_hba) {
-		core_delete_hba(se_global->g_lun0_hba);
-		se_global->g_lun0_hba = NULL;
+	if (lun0_hba) {
+		core_delete_hba(lun0_hba);
+		lun0_hba = NULL;
 	}
 	return ret;
 }
@@ -1634,14 +1639,14 @@ out:
 
 void core_dev_release_virtual_lun0(void)
 {
-	struct se_hba *hba = se_global->g_lun0_hba;
-	struct se_subsystem_dev *su_dev = se_global->g_lun0_su_dev;
+	struct se_hba *hba = lun0_hba;
+	struct se_subsystem_dev *su_dev = lun0_su_dev;
 
 	if (!(hba))
 		return;
 
-	if (se_global->g_lun0_dev)
-		se_free_virtual_device(se_global->g_lun0_dev, hba);
+	if (g_lun0_dev)
+		se_free_virtual_device(g_lun0_dev, hba);
 
 	kfree(su_dev);
 	core_delete_hba(hba);

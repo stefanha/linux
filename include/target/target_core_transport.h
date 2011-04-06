@@ -111,8 +111,8 @@ struct se_subsystem_api;
 
 extern struct kmem_cache *se_mem_cache;
 
-extern int init_se_global(void);
-extern void release_se_global(void);
+extern int init_se_kmem_caches(void);
+extern void release_se_kmem_caches(void);
 extern void init_scsi_index_table(void);
 extern u32 scsi_get_new_index(scsi_index_t);
 extern void transport_init_queue_obj(struct se_queue_obj *);
@@ -353,7 +353,5 @@ struct se_subsystem_api {
 
 #define TRANSPORT(dev)		((dev)->transport)
 #define HBA_TRANSPORT(hba)	((hba)->transport)
-
-extern struct se_global *se_global;
 
 #endif /* TARGET_CORE_TRANSPORT_H */

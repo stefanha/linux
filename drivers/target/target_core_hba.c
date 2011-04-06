@@ -46,6 +46,11 @@
 static LIST_HEAD(subsystem_list);
 static DEFINE_MUTEX(subsystem_mutex);
 
+static u32 hba_id_counter;
+
+static DEFINE_SPINLOCK(hba_lock);
+static LIST_HEAD(hba_list);
+
 int transport_subsystem_register(struct se_subsystem_api *sub_api)
 {
 	struct se_subsystem_api *s;
@@ -126,10 +131,10 @@ core_alloc_hba(const char *plugin_name, u32 plugin_dep_id, u32 hba_flags)
 	if (ret < 0)
 		goto out_module_put;
 
-	spin_lock(&se_global->hba_lock);
-	hba->hba_id = se_global->g_hba_id_counter++;
-	list_add_tail(&hba->hba_list, &se_global->g_hba_list);
-	spin_unlock(&se_global->hba_lock);
+	spin_lock(&hba_lock);
+	hba->hba_id = hba_id_counter++;
+	list_add_tail(&hba->hba_node, &hba_list);
+	spin_unlock(&hba_lock);
 
 	printk(KERN_INFO "CORE_HBA[%d] - Attached HBA to Generic Target"
 			" Core\n", hba->hba_id);
@@ -153,9 +158,9 @@ core_delete_hba(struct se_hba *hba)
 
 	hba->transport->detach_hba(hba);
 
-	spin_lock(&se_global->hba_lock);
-	list_del(&hba->hba_list);
-	spin_unlock(&se_global->hba_lock);
+	spin_lock(&hba_lock);
+	list_del(&hba->hba_node);
+	spin_unlock(&hba_lock);
 
 	printk(KERN_INFO "CORE_HBA[%d] - Detached HBA from Generic Target"
 			" Core\n", hba->hba_id);

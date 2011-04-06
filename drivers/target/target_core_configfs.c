@@ -37,6 +37,7 @@
 #include <linux/parser.h>
 #include <linux/syscalls.h>
 #include <linux/configfs.h>
+#include <linux/spinlock.h>
 
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
@@ -52,6 +53,8 @@
 #include "target_core_rd.h"
 #include "target_core_stat.h"
 
+extern struct t10_alua_lu_gp *default_lu_gp;
+
 static struct list_head g_tf_list;
 static struct mutex g_tf_lock;
 
@@ -60,6 +63,13 @@ struct target_core_configfs_attribute {
 	ssize_t (*show)(void *, char *);
 	ssize_t (*store)(void *, const char *, size_t);
 };
+
+static struct config_group target_core_hbagroup;
+static struct config_group alua_group;
+static struct config_group alua_lu_gps_group;
+
+static DEFINE_SPINLOCK(se_device_lock);
+static LIST_HEAD(se_dev_list);
 
 static inline struct se_hba *
 item_to_hba(struct config_item *item)
@@ -2784,9 +2794,9 @@ static struct config_group *target_core_make_subdev(
 			" from allocate_virtdevice()\n");
 		goto out;
 	}
-	spin_lock(&se_global->g_device_lock);
-	list_add_tail(&se_dev->se_dev_node, &se_global->g_se_dev_list);
-	spin_unlock(&se_global->g_device_lock);
+	spin_lock(&se_device_lock);
+	list_add_tail(&se_dev->se_dev_node, &se_dev_list);
+	spin_unlock(&se_device_lock);
 
 	config_group_init_type_name(&se_dev->se_dev_group, name,
 			&target_core_dev_cit);
@@ -2881,9 +2891,9 @@ static void target_core_drop_subdev(
 	mutex_lock(&hba->hba_access_mutex);
 	t = hba->transport;
 
-	spin_lock(&se_global->g_device_lock);
+	spin_lock(&se_device_lock);
 	list_del(&se_dev->se_dev_node);
-	spin_unlock(&se_global->g_device_lock);
+	spin_unlock(&se_device_lock);
 
 	dev_stat_grp = &DEV_STAT_GRP(se_dev)->stat_group;
 	for (i = 0; dev_stat_grp->default_groups[i]; i++) {
@@ -3131,7 +3141,7 @@ static int __init target_core_init_configfs(void)
 	INIT_LIST_HEAD(&g_tf_list);
 	mutex_init(&g_tf_lock);
 	init_scsi_index_table();
-	ret = init_se_global();
+	ret = init_se_kmem_caches();
 	if (ret < 0)
 		return ret;
 	/*
@@ -3146,29 +3156,29 @@ static int __init target_core_init_configfs(void)
 		goto out_global;
 	}
 
-	config_group_init_type_name(&se_global->target_core_hbagroup,
+	config_group_init_type_name(&target_core_hbagroup,
 			"core", &target_core_cit);
-	target_cg->default_groups[0] = &se_global->target_core_hbagroup;
+	target_cg->default_groups[0] = &target_core_hbagroup;
 	target_cg->default_groups[1] = NULL;
 	/*
 	 * Create ALUA infrastructure under /sys/kernel/config/target/core/alua/
 	 */
-	hba_cg = &se_global->target_core_hbagroup;
+	hba_cg = &target_core_hbagroup;
 	hba_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
 				GFP_KERNEL);
 	if (!(hba_cg->default_groups)) {
 		printk(KERN_ERR "Unable to allocate hba_cg->default_groups\n");
 		goto out_global;
 	}
-	config_group_init_type_name(&se_global->alua_group,
+	config_group_init_type_name(&alua_group,
 			"alua", &target_core_alua_cit);
-	hba_cg->default_groups[0] = &se_global->alua_group;
+	hba_cg->default_groups[0] = &alua_group;
 	hba_cg->default_groups[1] = NULL;
 	/*
 	 * Add ALUA Logical Unit Group and Target Port Group ConfigFS
 	 * groups under /sys/kernel/config/target/core/alua/
 	 */
-	alua_cg = &se_global->alua_group;
+	alua_cg = &alua_group;
 	alua_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
 			GFP_KERNEL);
 	if (!(alua_cg->default_groups)) {
@@ -3176,9 +3186,9 @@ static int __init target_core_init_configfs(void)
 		goto out_global;
 	}
 
-	config_group_init_type_name(&se_global->alua_lu_gps_group,
+	config_group_init_type_name(&alua_lu_gps_group,
 			"lu_gps", &target_core_alua_lu_gps_cit);
-	alua_cg->default_groups[0] = &se_global->alua_lu_gps_group;
+	alua_cg->default_groups[0] = &alua_lu_gps_group;
 	alua_cg->default_groups[1] = NULL;
 	/*
 	 * Add core/alua/lu_gps/default_lu_gp
@@ -3187,7 +3197,7 @@ static int __init target_core_init_configfs(void)
 	if (IS_ERR(lu_gp))
 		goto out_global;
 
-	lu_gp_cg = &se_global->alua_lu_gps_group;
+	lu_gp_cg = &alua_lu_gps_group;
 	lu_gp_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
 			GFP_KERNEL);
 	if (!(lu_gp_cg->default_groups)) {
@@ -3199,7 +3209,7 @@ static int __init target_core_init_configfs(void)
 				&target_core_alua_lu_gp_cit);
 	lu_gp_cg->default_groups[0] = &lu_gp->lu_gp_group;
 	lu_gp_cg->default_groups[1] = NULL;
-	se_global->default_lu_gp = lu_gp;
+	default_lu_gp = lu_gp;
 	/*
 	 * Register the target_core_mod subsystem with configfs.
 	 */
@@ -3229,9 +3239,9 @@ out:
 	core_dev_release_virtual_lun0();
 	rd_module_exit();
 out_global:
-	if (se_global->default_lu_gp) {
-		core_alua_free_lu_gp(se_global->default_lu_gp);
-		se_global->default_lu_gp = NULL;
+	if (default_lu_gp) {
+		core_alua_free_lu_gp(default_lu_gp);
+		default_lu_gp = NULL;
 	}
 	if (lu_gp_cg)
 		kfree(lu_gp_cg->default_groups);
@@ -3240,7 +3250,7 @@ out_global:
 	if (hba_cg)
 		kfree(hba_cg->default_groups);
 	kfree(target_cg->default_groups);
-	release_se_global();
+	release_se_kmem_caches();
 	return ret;
 }
 
@@ -3251,10 +3261,9 @@ static void __exit target_core_exit_configfs(void)
 	struct config_item *item;
 	int i;
 
-	se_global->in_shutdown = 1;
 	subsys = target_core_subsystem[0];
 
-	lu_gp_cg = &se_global->alua_lu_gps_group;
+	lu_gp_cg = &alua_lu_gps_group;
 	for (i = 0; lu_gp_cg->default_groups[i]; i++) {
 		item = &lu_gp_cg->default_groups[i]->cg_item;
 		lu_gp_cg->default_groups[i] = NULL;
@@ -3263,7 +3272,7 @@ static void __exit target_core_exit_configfs(void)
 	kfree(lu_gp_cg->default_groups);
 	lu_gp_cg->default_groups = NULL;
 
-	alua_cg = &se_global->alua_group;
+	alua_cg = &alua_group;
 	for (i = 0; alua_cg->default_groups[i]; i++) {
 		item = &alua_cg->default_groups[i]->cg_item;
 		alua_cg->default_groups[i] = NULL;
@@ -3272,7 +3281,7 @@ static void __exit target_core_exit_configfs(void)
 	kfree(alua_cg->default_groups);
 	alua_cg->default_groups = NULL;
 
-	hba_cg = &se_global->target_core_hbagroup;
+	hba_cg = &target_core_hbagroup;
 	for (i = 0; hba_cg->default_groups[i]; i++) {
 		item = &hba_cg->default_groups[i]->cg_item;
 		hba_cg->default_groups[i] = NULL;
@@ -3287,15 +3296,15 @@ static void __exit target_core_exit_configfs(void)
 	configfs_unregister_subsystem(subsys);
 	kfree(subsys->su_group.default_groups);
 
-	core_alua_free_lu_gp(se_global->default_lu_gp);
-	se_global->default_lu_gp = NULL;
+	core_alua_free_lu_gp(default_lu_gp);
+	default_lu_gp = NULL;
 
 	printk(KERN_INFO "TARGET_CORE[0]: Released ConfigFS Fabric"
 			" Infrastructure\n");
 
 	core_dev_release_virtual_lun0();
 	rd_module_exit();
-	release_se_global();
+	release_se_kmem_caches();
 
 	return;
 }

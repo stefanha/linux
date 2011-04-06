@@ -234,7 +234,7 @@ struct t10_alua_lu_gp {
 	atomic_t lu_gp_ref_cnt;
 	spinlock_t lu_gp_lock;
 	struct config_group lu_gp_group;
-	struct list_head lu_gp_list;
+	struct list_head lu_gp_node;
 	struct list_head lu_gp_mem_list;
 } ____cacheline_aligned;
 
@@ -839,7 +839,7 @@ struct se_hba {
 	void			*hba_ptr;
 	/* Linked list for struct se_device */
 	struct list_head	hba_dev_list;
-	struct list_head	hba_list;
+	struct list_head	hba_node;
 	spinlock_t		device_lock;
 	struct config_group	hba_group;
 	struct mutex		hba_access_mutex;
@@ -923,7 +923,7 @@ struct se_portal_group {
 	spinlock_t		tpg_lun_lock;
 	/* Pointer to $FABRIC_MOD portal group */
 	void			*se_tpg_fabric_ptr;
-	struct list_head	se_tpg_list;
+	struct list_head	se_tpg_node;
 	/* linked list for initiator ACL list */
 	struct list_head	acl_node_list;
 	struct se_lun		*tpg_lun_list;
@@ -949,30 +949,6 @@ struct se_wwn {
 	struct config_group	wwn_group;
 	struct config_group	*wwn_default_groups[2];
 	struct config_group	fabric_stat_group;
-} ____cacheline_aligned;
-
-struct se_global {
-	u16			alua_lu_gps_counter;
-	int			g_sub_api_initialized;
-	u32			in_shutdown;
-	u32			alua_lu_gps_count;
-	u32			g_hba_id_counter;
-	struct config_group	target_core_hbagroup;
-	struct config_group	alua_group;
-	struct config_group	alua_lu_gps_group;
-	struct list_head	g_lu_gps_list;
-	struct list_head	g_se_tpg_list;
-	struct list_head	g_hba_list;
-	struct list_head	g_se_dev_list;
-	struct se_hba		*g_lun0_hba;
-	struct se_subsystem_dev *g_lun0_su_dev;
-	struct se_device	*g_lun0_dev;
-	struct t10_alua_lu_gp	*default_lu_gp;
-	spinlock_t		g_device_lock;
-	spinlock_t		hba_lock;
-	spinlock_t		se_tpg_lock;
-	spinlock_t		lu_gps_lock;
-	spinlock_t		plugin_class_lock;
 } ____cacheline_aligned;
 
 #endif /* TARGET_CORE_BASE_H */
