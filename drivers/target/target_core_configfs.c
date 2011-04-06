@@ -2748,7 +2748,7 @@ static struct config_group *target_core_make_subdev(
 				" struct se_subsystem_dev\n");
 		goto unlock;
 	}
-	INIT_LIST_HEAD(&se_dev->g_se_dev_list);
+	INIT_LIST_HEAD(&se_dev->se_dev_node);
 	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_vpd_list);
 	spin_lock_init(&se_dev->t10_wwn.t10_vpd_lock);
 	INIT_LIST_HEAD(&se_dev->t10_reservation.registration_list);
@@ -2785,7 +2785,7 @@ static struct config_group *target_core_make_subdev(
 		goto out;
 	}
 	spin_lock(&se_global->g_device_lock);
-	list_add_tail(&se_dev->g_se_dev_list, &se_global->g_se_dev_list);
+	list_add_tail(&se_dev->se_dev_node, &se_global->g_se_dev_list);
 	spin_unlock(&se_global->g_device_lock);
 
 	config_group_init_type_name(&se_dev->se_dev_group, name,
@@ -2882,7 +2882,7 @@ static void target_core_drop_subdev(
 	t = hba->transport;
 
 	spin_lock(&se_global->g_device_lock);
-	list_del(&se_dev->g_se_dev_list);
+	list_del(&se_dev->se_dev_node);
 	spin_unlock(&se_global->g_device_lock);
 
 	dev_stat_grp = &DEV_STAT_GRP(se_dev)->stat_group;
