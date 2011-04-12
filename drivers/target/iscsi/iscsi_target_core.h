@@ -601,7 +601,6 @@ struct iscsi_conn_recovery {
 	int			ready_for_reallegiance;
 	struct list_head	conn_recovery_cmd_list;
 	spinlock_t		conn_recovery_cmd_lock;
-	struct completion	time2wait_comp;
 	struct timer_list	time2retain_timer;
 	struct iscsi_session	*sess;
 	struct list_head	cr_list;
