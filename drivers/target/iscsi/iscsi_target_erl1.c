@@ -1237,8 +1237,6 @@ failure:
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
 	iscsit_cause_connection_reinstatement(conn, 0);
 	iscsit_dec_conn_usage_count(conn);
-
-	return;
 }
 
 void iscsit_mod_dataout_timer(struct iscsi_cmd *cmd)

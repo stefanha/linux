@@ -1105,8 +1105,6 @@ static void transport_add_tasks_from_cmd(struct se_cmd *cmd)
 		task_prev = task;
 	}
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
-
-	return;
 }
 
 /*	transport_remove_task_from_execute_queue():

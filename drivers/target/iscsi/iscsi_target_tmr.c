@@ -189,8 +189,6 @@ static void iscsit_task_reassign_remove_cmd(
 			" %hu on SID: %u\n", cr->cid, sess->sid);
 		iscsit_remove_active_connection_recovery_entry(cr, sess);
 	}
-
-	return;
 }
 
 static int iscsit_task_reassign_complete_nop_out(
@@ -547,8 +545,6 @@ static void iscsit_task_reassign_prepare_unsolicited_dataout(
 			}
 		}
 	}
-
-	return;
 }
 
 int iscsit_task_reassign_prepare_write(

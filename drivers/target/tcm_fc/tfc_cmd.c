@@ -648,7 +648,6 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 err:
 	ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
-	return;
 }
 
 /*

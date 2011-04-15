@@ -334,8 +334,6 @@ void core_dec_lacl_count(struct se_node_acl *se_nacl, struct se_cmd *se_cmd)
 	deve = &se_nacl->device_list[se_cmd->orig_fe_lun];
 	deve->deve_cmds--;
 	spin_unlock_irq(&se_nacl->device_list_lock);
-
-	return;
 }
 
 void core_update_device_list_access(
@@ -355,8 +353,6 @@ void core_update_device_list_access(
 		deve->lun_flags |= TRANSPORT_LUNFLAGS_READ_ONLY;
 	}
 	spin_unlock_irq(&nacl->device_list_lock);
-
-	return;
 }
 
 /*      core_update_device_list_for_node():
@@ -503,8 +499,6 @@ void core_clear_lun_from_tpg(struct se_lun *lun, struct se_portal_group *tpg)
 		spin_lock_bh(&tpg->acl_node_lock);
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);
-
-	return;
 }
 
 static struct se_port *core_alloc_port(struct se_device *dev)
@@ -618,8 +612,6 @@ static void core_release_port(struct se_device *dev, struct se_port *port)
 	list_del(&port->sep_list);
 	dev->dev_port_count--;
 	kfree(port);
-
-	return;
 }
 
 int core_dev_export(
@@ -755,8 +747,6 @@ void se_release_device_for_hba(struct se_device *dev)
 	se_release_vpd_for_dev(dev);
 
 	kfree(dev);
-
-	return;
 }
 
 void se_release_vpd_for_dev(struct se_device *dev)
@@ -770,8 +760,6 @@ void se_release_vpd_for_dev(struct se_device *dev)
 		kfree(vpd);
 	}
 	spin_unlock(&DEV_T10_WWN(dev)->t10_vpd_lock);
-
-	return;
 }
 
 /*	se_free_virtual_device():

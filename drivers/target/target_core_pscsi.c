@@ -1369,8 +1369,6 @@ static inline void pscsi_process_SAM_status(
 		transport_complete_task(task, 0);
 		break;
 	}
-
-	return;
 }
 
 static void pscsi_req_done(struct request *req, int uptodate)

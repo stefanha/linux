@@ -601,7 +601,6 @@ void target_fabric_configfs_deregister(
 
 	printk("<<<<<<<<<<<<<<<<<<<<<< END FABRIC API >>>>>>>>>>>>>>>>>"
 			">>>>>\n");
-	return;
 }
 EXPORT_SYMBOL(target_fabric_configfs_deregister);
 
@@ -3304,8 +3303,6 @@ static void __exit target_core_exit_configfs(void)
 	core_dev_release_virtual_lun0();
 	rd_module_exit();
 	release_se_kmem_caches();
-
-	return;
 }
 
 MODULE_DESCRIPTION("Target_Core_Mod/ConfigFS");
