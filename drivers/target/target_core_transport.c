@@ -1366,10 +1366,13 @@ int transport_dump_vpd_ident_type(
 		break;
 	}
 
-	if (p_buf)
+	if (p_buf) {
+		if (p_buf_len < strlen(buf)+1)
+			return -EINVAL;
 		strncpy(p_buf, buf, p_buf_len);
-	else
+	} else {
 		printk("%s", buf);
+	}
 
 	return ret;
 }
