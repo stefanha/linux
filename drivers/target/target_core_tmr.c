@@ -110,7 +110,7 @@ int core_tmr_lun_reset(
 	struct se_queue_req *qr, *qr_tmp;
 	struct se_node_acl *tmr_nacl = NULL;
 	struct se_portal_group *tmr_tpg = NULL;
-	struct se_queue_obj *qobj = dev->dev_queue_obj;
+	struct se_queue_obj *qobj = &dev->dev_queue_obj;
 	struct se_tmr_req *tmr_p, *tmr_pp;
 	struct se_task *task, *task_tmp;
 	unsigned long flags;

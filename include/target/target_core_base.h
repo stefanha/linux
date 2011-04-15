@@ -777,7 +777,7 @@ struct se_device {
 	struct se_obj		dev_obj;
 	struct se_obj		dev_access_obj;
 	struct se_obj		dev_export_obj;
-	struct se_queue_obj	*dev_queue_obj;
+	struct se_queue_obj	dev_queue_obj;
 	spinlock_t		delayed_cmd_lock;
 	spinlock_t		ordered_cmd_lock;
 	spinlock_t		execute_task_lock;
