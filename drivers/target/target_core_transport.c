@@ -2549,7 +2549,7 @@ check_depth:
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 	/*
 	 * The struct se_cmd->transport_emulate_cdb() function pointer is used
-	 * to grab REPORT_LUNS CDBs before they hit the
+	 * to grab REPORT_LUNS and other CDBs we want to handle before they hit the
 	 * struct se_subsystem_api->do_task() caller below.
 	 */
 	if (cmd->transport_emulate_cdb) {
