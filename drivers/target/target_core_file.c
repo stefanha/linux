@@ -72,7 +72,7 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 
 	fd_host->fd_host_id = host_id;
 
-	hba->hba_ptr = (void *) fd_host;
+	hba->hba_ptr = fd_host;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM FILEIO HBA Driver %s on Generic"
 		" Target Core Stack %s\n", hba->hba_id, FD_VERSION,
@@ -279,7 +279,7 @@ fd_alloc_task(struct se_cmd *cmd)
 		return NULL;
 	}
 
-	fd_req->fd_dev = SE_DEV(cmd)->dev_ptr;
+	fd_req->fd_dev = cmd->se_lun->lun_se_dev->dev_ptr;
 
 	return &fd_req->fd_task;
 }
@@ -291,7 +291,8 @@ static int fd_do_readv(struct se_task *task)
 	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	mm_segment_t old_fs;
-	loff_t pos = (task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	loff_t pos = (task->task_lba *
+		      task->se_dev->se_sub_dev->se_dev_attrib.block_size);
 	int ret = 0, i;
 
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
@@ -341,7 +342,8 @@ static int fd_do_writev(struct se_task *task)
 	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	mm_segment_t old_fs;
-	loff_t pos = (task->task_lba * DEV_ATTRIB(task->se_dev)->block_size);
+	loff_t pos = (task->task_lba *
+		      task->se_dev->se_sub_dev->se_dev_attrib.block_size);
 	int ret, i = 0;
 
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
@@ -372,7 +374,7 @@ static int fd_do_writev(struct se_task *task)
 
 static void fd_emulate_sync_cache(struct se_task *task)
 {
-	struct se_cmd *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = task->task_se_cmd;
 	struct se_device *dev = cmd->se_dev;
 	struct fd_dev *fd_dev = dev->dev_ptr;
 	int immed = (cmd->t_task->t_task_cdb[1] & 0x2);
@@ -393,7 +395,7 @@ static void fd_emulate_sync_cache(struct se_task *task)
 		start = 0;
 		end = LLONG_MAX;
 	} else {
-		start = cmd->t_task->t_task_lba * DEV_ATTRIB(dev)->block_size;
+		start = cmd->t_task->t_task_lba * dev->se_sub_dev->se_dev_attrib.block_size;
 		if (cmd->data_length)
 			end = start + cmd->data_length;
 		else
@@ -443,7 +445,7 @@ static void fd_emulate_write_fua(struct se_cmd *cmd, struct se_task *task)
 {
 	struct se_device *dev = cmd->se_dev;
 	struct fd_dev *fd_dev = dev->dev_ptr;
-	loff_t start = task->task_lba * DEV_ATTRIB(dev)->block_size;
+	loff_t start = task->task_lba * dev->se_sub_dev->se_dev_attrib.block_size;
 	loff_t end = start + task->task_size;
 	int ret;
 
@@ -471,9 +473,9 @@ static int fd_do_task(struct se_task *task)
 		ret = fd_do_writev(task);
 
 		if (ret > 0 &&
-		    DEV_ATTRIB(dev)->emulate_write_cache > 0 &&
-		    DEV_ATTRIB(dev)->emulate_fua_write > 0 &&
-		    T_TASK(cmd)->t_tasks_fua) {
+		    dev->se_sub_dev->se_dev_attrib.emulate_write_cache > 0 &&
+		    dev->se_sub_dev->se_dev_attrib.emulate_fua_write > 0 &&
+		    cmd->t_task->t_tasks_fua) {
 			/*
 			 * We might need to be a bit smarter here
 			 * and return some sense data to let the initiator
@@ -651,7 +653,7 @@ static sector_t fd_get_blocks(struct se_device *dev)
 {
 	struct fd_dev *fd_dev = dev->dev_ptr;
 	unsigned long long blocks_long = div_u64(fd_dev->fd_dev_size,
-			DEV_ATTRIB(dev)->block_size);
+			dev->se_sub_dev->se_dev_attrib.block_size);
 
 	return blocks_long;
 }

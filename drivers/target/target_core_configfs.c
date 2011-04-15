@@ -625,7 +625,8 @@ static ssize_t target_core_dev_show_attr_##_name(			\
 		spin_unlock(&se_dev->se_dev_lock); 			\
 		return -ENODEV;						\
 	}								\
-	rb = snprintf(page, PAGE_SIZE, "%u\n", (u32)DEV_ATTRIB(dev)->_name); \
+	rb = snprintf(page, PAGE_SIZE, "%u\n",				\
+		(u32)dev->se_sub_dev->se_dev_attrib._name);		\
 	spin_unlock(&se_dev->se_dev_lock);				\
 									\
 	return rb;							\
@@ -1087,7 +1088,7 @@ static ssize_t target_core_dev_pr_show_spc3_res(
 				PR_REG_ISID_ID_LEN);
 
 	*len += sprintf(page + *len, "SPC-3 Reservation: %s Initiator: %s%s\n",
-		TPG_TFO(se_nacl->se_tpg)->get_fabric_name(),
+		se_nacl->se_tpg->se_tpg_tfo->get_fabric_name(),
 		se_nacl->initiatorname, (prf_isid) ? &i_buf[0] : "");
 	spin_unlock(&dev->dev_reservation_lock);
 
@@ -1109,7 +1110,7 @@ static ssize_t target_core_dev_pr_show_spc2_res(
 		return *len;
 	}
 	*len += sprintf(page + *len, "SPC-2 Reservation: %s Initiator: %s\n",
-		TPG_TFO(se_nacl->se_tpg)->get_fabric_name(),
+		se_nacl->se_tpg->se_tpg_tfo->get_fabric_name(),
 		se_nacl->initiatorname);
 	spin_unlock(&dev->dev_reservation_lock);
 
@@ -1125,7 +1126,7 @@ static ssize_t target_core_dev_pr_show_attr_res_holder(
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
 
-	switch (T10_RES(su_dev)->res_type) {
+	switch (su_dev->t10_pr.res_type) {
 	case SPC3_PERSISTENT_RESERVATIONS:
 		target_core_dev_pr_show_spc3_res(su_dev->se_dev_ptr,
 				page, &len);
@@ -1162,7 +1163,7 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_all_tgt_pts(
 	if (!(dev))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return len;
 
 	spin_lock(&dev->dev_reservation_lock);
@@ -1199,10 +1200,10 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_generation(
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return 0;
 
-	return sprintf(page, "0x%08x\n", T10_RES(su_dev)->pr_generation);
+	return sprintf(page, "0x%08x\n", su_dev->t10_pr.pr_generation);
 }
 
 SE_DEV_PR_ATTR_RO(res_pr_generation);
@@ -1226,7 +1227,7 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_holder_tg_port(
 	if (!(dev))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return len;
 
 	spin_lock(&dev->dev_reservation_lock);
@@ -1239,7 +1240,7 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_holder_tg_port(
 	se_nacl = pr_reg->pr_reg_nacl;
 	se_tpg = se_nacl->se_tpg;
 	lun = pr_reg->pr_reg_tg_pt_lun;
-	tfo = TPG_TFO(se_tpg);
+	tfo = se_tpg->se_tpg_tfo;
 
 	len += sprintf(page+len, "SPC-3 Reservation: %s"
 		" Target Node Endpoint: %s\n", tfo->get_fabric_name(),
@@ -1273,13 +1274,13 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts(
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return len;
 
 	len += sprintf(page+len, "SPC-3 PR Registrations:\n");
 
-	spin_lock(&T10_RES(su_dev)->registration_lock);
-	list_for_each_entry(pr_reg, &T10_RES(su_dev)->registration_list,
+	spin_lock(&su_dev->t10_pr.registration_lock);
+	list_for_each_entry(pr_reg, &su_dev->t10_pr.registration_list,
 			pr_reg_list) {
 
 		memset(buf, 0, 384);
@@ -1299,7 +1300,7 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_registered_i_pts(
 		len += sprintf(page+len, "%s", buf);
 		reg_count++;
 	}
-	spin_unlock(&T10_RES(su_dev)->registration_lock);
+	spin_unlock(&su_dev->t10_pr.registration_lock);
 
 	if (!(reg_count))
 		len += sprintf(page+len, "None\n");
@@ -1324,7 +1325,7 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_type(
 	if (!(dev))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return len;
 
 	spin_lock(&dev->dev_reservation_lock);
@@ -1355,7 +1356,7 @@ static ssize_t target_core_dev_pr_show_attr_res_type(
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
 
-	switch (T10_RES(su_dev)->res_type) {
+	switch (su_dev->t10_pr.res_type) {
 	case SPC3_PERSISTENT_RESERVATIONS:
 		len = sprintf(page, "SPC3_PERSISTENT_RESERVATIONS\n");
 		break;
@@ -1386,11 +1387,11 @@ static ssize_t target_core_dev_pr_show_attr_res_aptpl_active(
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return 0;
 
 	return sprintf(page, "APTPL Bit Status: %s\n",
-		(T10_RES(su_dev)->pr_aptpl_active) ? "Activated" : "Disabled");
+		(su_dev->t10_pr.pr_aptpl_active) ? "Activated" : "Disabled");
 }
 
 SE_DEV_PR_ATTR_RO(res_aptpl_active);
@@ -1405,7 +1406,7 @@ static ssize_t target_core_dev_pr_show_attr_res_aptpl_metadata(
 	if (!(su_dev->se_dev_ptr))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return 0;
 
 	return sprintf(page, "Ready to process PR APTPL metadata..\n");
@@ -1457,7 +1458,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 	if (!(dev))
 		return -ENODEV;
 
-	if (T10_RES(su_dev)->res_type != SPC3_PERSISTENT_RESERVATIONS)
+	if (su_dev->t10_pr.res_type != SPC3_PERSISTENT_RESERVATIONS)
 		return 0;
 
 	if (atomic_read(&dev->dev_export_obj.obj_access_count)) {
@@ -1603,7 +1604,7 @@ static ssize_t target_core_dev_pr_store_attr_res_aptpl_metadata(
 		goto out;
 	}
 
-	ret = core_scsi3_alloc_aptpl_registration(T10_RES(su_dev), sa_res_key,
+	ret = core_scsi3_alloc_aptpl_registration(&su_dev->t10_pr, sa_res_key,
 			i_port, isid, mapped_lun, t_port, tpgt, target_lun,
 			res_holder, all_tg_pt, type);
 out:
@@ -1851,7 +1852,7 @@ static ssize_t target_core_show_alua_lu_gp(void *p, char *page)
 	if (!(dev))
 		return -ENODEV;
 
-	if (T10_ALUA(su_dev)->alua_type != SPC3_ALUA_EMULATED)
+	if (su_dev->t10_alua.alua_type != SPC3_ALUA_EMULATED)
 		return len;
 
 	lu_gp_mem = dev->dev_alua_lu_gp_mem;
@@ -1890,7 +1891,7 @@ static ssize_t target_core_store_alua_lu_gp(
 	if (!(dev))
 		return -ENODEV;
 
-	if (T10_ALUA(su_dev)->alua_type != SPC3_ALUA_EMULATED) {
+	if (su_dev->t10_alua.alua_type != SPC3_ALUA_EMULATED) {
 		printk(KERN_WARNING "SPC3_ALUA_EMULATED not enabled for %s/%s\n",
 			config_item_name(&hba->hba_group.cg_item),
 			config_item_name(&su_dev->se_dev_group.cg_item));
@@ -2566,9 +2567,9 @@ static ssize_t target_core_alua_tg_pt_gp_show_attr_members(
 		lun = port->sep_lun;
 
 		cur_len = snprintf(buf, TG_PT_GROUP_NAME_BUF, "%s/%s/tpgt_%hu"
-			"/%s\n", TPG_TFO(tpg)->get_fabric_name(),
-			TPG_TFO(tpg)->tpg_get_wwn(tpg),
-			TPG_TFO(tpg)->tpg_get_tag(tpg),
+			"/%s\n", tpg->se_tpg_tfo->get_fabric_name(),
+			tpg->se_tpg_tfo->tpg_get_wwn(tpg),
+			tpg->se_tpg_tfo->tpg_get_tag(tpg),
 			config_item_name(&lun->lun_group.cg_item));
 		cur_len++; /* Extra byte for NULL terminator */
 
@@ -2760,14 +2761,14 @@ static struct config_group *target_core_make_subdev(
 	INIT_LIST_HEAD(&se_dev->se_dev_node);
 	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_vpd_list);
 	spin_lock_init(&se_dev->t10_wwn.t10_vpd_lock);
-	INIT_LIST_HEAD(&se_dev->t10_reservation.registration_list);
-	INIT_LIST_HEAD(&se_dev->t10_reservation.aptpl_reg_list);
-	spin_lock_init(&se_dev->t10_reservation.registration_lock);
-	spin_lock_init(&se_dev->t10_reservation.aptpl_reg_lock);
+	INIT_LIST_HEAD(&se_dev->t10_pr.registration_list);
+	INIT_LIST_HEAD(&se_dev->t10_pr.aptpl_reg_list);
+	spin_lock_init(&se_dev->t10_pr.registration_lock);
+	spin_lock_init(&se_dev->t10_pr.aptpl_reg_lock);
 	INIT_LIST_HEAD(&se_dev->t10_alua.tg_pt_gps_list);
 	spin_lock_init(&se_dev->t10_alua.tg_pt_gps_lock);
 	spin_lock_init(&se_dev->se_dev_lock);
-	se_dev->t10_reservation.pr_aptpl_buf_len = PR_APTPL_BUF_LEN;
+	se_dev->t10_pr.pr_aptpl_buf_len = PR_APTPL_BUF_LEN;
 	se_dev->t10_wwn.t10_sub_dev = se_dev;
 	se_dev->t10_alua.t10_sub_dev = se_dev;
 	se_dev->se_dev_attrib.da_sub_dev = se_dev;
@@ -2823,7 +2824,7 @@ static struct config_group *target_core_make_subdev(
 	if (!(tg_pt_gp))
 		goto out;
 
-	tg_pt_gp_cg = &T10_ALUA(se_dev)->alua_tg_pt_gps_group;
+	tg_pt_gp_cg = &se_dev->t10_alua.alua_tg_pt_gps_group;
 	tg_pt_gp_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
 				GFP_KERNEL);
 	if (!(tg_pt_gp_cg->default_groups)) {
@@ -2836,11 +2837,11 @@ static struct config_group *target_core_make_subdev(
 			"default_tg_pt_gp", &target_core_alua_tg_pt_gp_cit);
 	tg_pt_gp_cg->default_groups[0] = &tg_pt_gp->tg_pt_gp_group;
 	tg_pt_gp_cg->default_groups[1] = NULL;
-	T10_ALUA(se_dev)->default_tg_pt_gp = tg_pt_gp;
+	se_dev->t10_alua.default_tg_pt_gp = tg_pt_gp;
 	/*
 	 * Add core/$HBA/$DEV/statistics/ default groups
 	 */
-	dev_stat_grp = &DEV_STAT_GRP(se_dev)->stat_group;
+	dev_stat_grp = &se_dev->dev_stat_grps.stat_group;
 	dev_stat_grp->default_groups = kzalloc(sizeof(struct config_group) * 4,
 				GFP_KERNEL);
 	if (!dev_stat_grp->default_groups) {
@@ -2855,9 +2856,9 @@ static struct config_group *target_core_make_subdev(
 	mutex_unlock(&hba->hba_access_mutex);
 	return &se_dev->se_dev_group;
 out:
-	if (T10_ALUA(se_dev)->default_tg_pt_gp) {
-		core_alua_free_tg_pt_gp(T10_ALUA(se_dev)->default_tg_pt_gp);
-		T10_ALUA(se_dev)->default_tg_pt_gp = NULL;
+	if (se_dev->t10_alua.default_tg_pt_gp) {
+		core_alua_free_tg_pt_gp(se_dev->t10_alua.default_tg_pt_gp);
+		se_dev->t10_alua.default_tg_pt_gp = NULL;
 	}
 	if (dev_stat_grp)
 		kfree(dev_stat_grp->default_groups);
@@ -2894,7 +2895,7 @@ static void target_core_drop_subdev(
 	list_del(&se_dev->se_dev_node);
 	spin_unlock(&se_device_lock);
 
-	dev_stat_grp = &DEV_STAT_GRP(se_dev)->stat_group;
+	dev_stat_grp = &se_dev->dev_stat_grps.stat_group;
 	for (i = 0; dev_stat_grp->default_groups[i]; i++) {
 		df_item = &dev_stat_grp->default_groups[i]->cg_item;
 		dev_stat_grp->default_groups[i] = NULL;
@@ -2902,7 +2903,7 @@ static void target_core_drop_subdev(
 	}
 	kfree(dev_stat_grp->default_groups);
 
-	tg_pt_gp_cg = &T10_ALUA(se_dev)->alua_tg_pt_gps_group;
+	tg_pt_gp_cg = &se_dev->t10_alua.alua_tg_pt_gps_group;
 	for (i = 0; tg_pt_gp_cg->default_groups[i]; i++) {
 		df_item = &tg_pt_gp_cg->default_groups[i]->cg_item;
 		tg_pt_gp_cg->default_groups[i] = NULL;
@@ -2913,7 +2914,7 @@ static void target_core_drop_subdev(
 	 * core_alua_free_tg_pt_gp() is called from ->default_tg_pt_gp
 	 * directly from target_core_alua_tg_pt_gp_release().
 	 */
-	T10_ALUA(se_dev)->default_tg_pt_gp = NULL;
+	se_dev->t10_alua.default_tg_pt_gp = NULL;
 
 	dev_cg = &se_dev->se_dev_group;
 	for (i = 0; dev_cg->default_groups[i]; i++) {

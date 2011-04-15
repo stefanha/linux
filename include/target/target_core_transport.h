@@ -350,7 +350,4 @@ struct se_subsystem_api {
 	unsigned char *(*get_sense_buffer)(struct se_task *);
 } ____cacheline_aligned;
 
-#define TRANSPORT(dev)		((dev)->transport)
-#define HBA_TRANSPORT(hba)	((hba)->transport)
-
 #endif /* TARGET_CORE_TRANSPORT_H */
