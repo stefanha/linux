@@ -645,7 +645,7 @@ static int transport_cmd_check_stop(
 	}
 	/*
 	 * Determine if frontend context caller is requesting the stopping of
-	 * this command for frontend excpections.
+	 * this command for frontend exceptions.
 	 */
 	if (atomic_read(&T_TASK(cmd)->t_transport_stop)) {
 		DEBUG_CS("%s:%d atomic_read(&T_TASK(cmd)->t_transport_stop) =="
@@ -1288,7 +1288,8 @@ int transport_dump_vpd_assoc(
 	int p_buf_len)
 {
 	unsigned char buf[VPD_TMP_BUF_SIZE];
-	int ret = 0, len;
+	int ret = 0;
+	int len;
 
 	memset(buf, 0, VPD_TMP_BUF_SIZE);
 	len = sprintf(buf, "T10 VPD Identifier Association: ");
@@ -1335,7 +1336,8 @@ int transport_dump_vpd_ident_type(
 	int p_buf_len)
 {
 	unsigned char buf[VPD_TMP_BUF_SIZE];
-	int ret = 0, len;
+	int ret = 0;
+	int len;
 
 	memset(buf, 0, VPD_TMP_BUF_SIZE);
 	len = sprintf(buf, "T10 VPD Identifier Type: ");
@@ -2477,7 +2479,7 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 		 * attribute for the tasks of the received struct se_cmd CDB
 		 */
 		add_tasks = transport_execute_task_attr(cmd);
-		if (add_tasks == 0)
+		if (!add_tasks)
 			goto execute_tasks;
 		/*
 		 * This calls transport_add_tasks_from_cmd() to handle
