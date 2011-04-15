@@ -204,11 +204,6 @@ typedef enum {
 	SCSI_INDEX_TYPE_MAX
 } scsi_index_t;
 
-struct scsi_index_table {
-	spinlock_t	lock;
-	u32		scsi_mib_index[SCSI_INDEX_TYPE_MAX];
-} ____cacheline_aligned;
-
 struct se_cmd;
 
 struct t10_alua {

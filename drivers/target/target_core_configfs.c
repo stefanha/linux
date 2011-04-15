@@ -3140,7 +3140,6 @@ static int __init target_core_init_configfs(void)
 
 	INIT_LIST_HEAD(&g_tf_list);
 	mutex_init(&g_tf_lock);
-	init_scsi_index_table();
 	ret = init_se_kmem_caches();
 	if (ret < 0)
 		return ret;

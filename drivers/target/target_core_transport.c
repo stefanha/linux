@@ -347,18 +347,9 @@ void release_se_kmem_caches(void)
 	kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
 }
 
-/* SCSI statistics table index */
-static struct scsi_index_table scsi_index_table;
-
-/*
- * Initialize the index table for allocating unique row indexes to various mib
- * tables.
- */
-void init_scsi_index_table(void)
-{
-	memset(&scsi_index_table, 0, sizeof(struct scsi_index_table));
-	spin_lock_init(&scsi_index_table.lock);
-}
+/* This code ensures unique mib indexes are handed out. */
+static DEFINE_SPINLOCK(scsi_mib_index_lock);
+static u32 scsi_mib_index[SCSI_INDEX_TYPE_MAX];
 
 /*
  * Allocate a new row index for the entry type specified
@@ -367,16 +358,11 @@ u32 scsi_get_new_index(scsi_index_t type)
 {
 	u32 new_index;
 
-	if ((type < 0) || (type >= SCSI_INDEX_TYPE_MAX)) {
-		printk(KERN_ERR "Invalid index type %d\n", type);
-		return -EINVAL;
-	}
+	BUG_ON((type < 0) || (type >= SCSI_INDEX_TYPE_MAX));
 
-	spin_lock(&scsi_index_table.lock);
-	new_index = ++scsi_index_table.scsi_mib_index[type];
-	if (new_index == 0)
-		new_index = ++scsi_index_table.scsi_mib_index[type];
-	spin_unlock(&scsi_index_table.lock);
+	spin_lock(&scsi_mib_index_lock);
+	new_index = ++scsi_mib_index[type];
+	spin_unlock(&scsi_mib_index_lock);
 
 	return new_index;
 }
