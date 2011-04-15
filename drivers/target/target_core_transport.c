@@ -1109,27 +1109,6 @@ static void transport_add_tasks_from_cmd(struct se_cmd *cmd)
 	return;
 }
 
-/*	transport_get_task_from_execute_queue():
- *
- *	Called with dev->execute_task_lock held.
- */
-static struct se_task *
-transport_get_task_from_execute_queue(struct se_device *dev)
-{
-	struct se_task *task;
-
-	if (list_empty(&dev->execute_task_list))
-		return NULL;
-
-	list_for_each_entry(task, &dev->execute_task_list, t_execute_list)
-		break;
-
-	list_del(&task->t_execute_list);
-	atomic_dec(&dev->execute_tasks);
-
-	return task;
-}
-
 /*	transport_remove_task_from_execute_queue():
  *
  *
@@ -2534,7 +2513,7 @@ static int __transport_execute_tasks(struct se_device *dev)
 {
 	int error;
 	struct se_cmd *cmd = NULL;
-	struct se_task *task;
+	struct se_task *task = NULL;
 	unsigned long flags;
 
 	/*
@@ -2547,8 +2526,14 @@ check_depth:
 
 	dev->dev_tcq_window_closed = 0;
 
+	/* Get a task */
 	spin_lock(&dev->execute_task_lock);
-	task = transport_get_task_from_execute_queue(dev);
+	if (!list_empty(&dev->execute_task_list)) {
+		task = list_first_entry(&dev->execute_task_list,
+					struct se_task, t_execute_list);
+		list_del(&task->t_execute_list);
+		atomic_dec(&dev->execute_tasks);
+	}
 	spin_unlock(&dev->execute_task_lock);
 
 	if (!task)
