@@ -3199,7 +3199,7 @@ static int transport_generic_cmd_sequencer(
 				cmd->transport_emulate_cdb =
 				(T10_ALUA(su_dev)->alua_type ==
 				 SPC3_ALUA_EMULATED) ?
-				&core_emulate_report_target_port_groups :
+				core_emulate_report_target_port_groups :
 				NULL;
 			}
 			size = (cdb[6] << 24) | (cdb[7] << 16) |
@@ -3246,7 +3246,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_emulate_cdb =
 			(T10_RES(su_dev)->res_type ==
 			 SPC3_PERSISTENT_RESERVATIONS) ?
-			&core_scsi3_emulate_pr : NULL;
+			core_scsi3_emulate_pr : NULL;
 		size = (cdb[7] << 8) + cdb[8];
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
 		break;
@@ -3269,7 +3269,7 @@ static int transport_generic_cmd_sequencer(
 				cmd->transport_emulate_cdb =
 				(T10_ALUA(su_dev)->alua_type ==
 					SPC3_ALUA_EMULATED) ?
-				&core_emulate_set_target_port_groups :
+				core_emulate_set_target_port_groups :
 				NULL;
 			}
 
@@ -3366,7 +3366,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_emulate_cdb =
 				(T10_RES(su_dev)->res_type !=
 				 SPC_PASSTHROUGH) ?
-				&core_scsi2_emulate_crh : NULL;
+				core_scsi2_emulate_crh : NULL;
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 		break;
 	case RELEASE:
@@ -3383,7 +3383,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->transport_emulate_cdb =
 				(T10_RES(su_dev)->res_type !=
 				 SPC_PASSTHROUGH) ?
-				&core_scsi2_emulate_crh : NULL;
+				core_scsi2_emulate_crh : NULL;
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 		break;
 	case SYNCHRONIZE_CACHE:
@@ -3489,7 +3489,7 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case REPORT_LUNS:
 		cmd->transport_emulate_cdb =
-				&transport_core_report_lun_response;
+				transport_core_report_lun_response;
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for REPORT_LUNS
