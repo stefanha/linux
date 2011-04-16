@@ -360,13 +360,13 @@ struct t10_reservation_ops {
 	int (*t10_pr_clear)(struct se_cmd *);
 };
 
-struct t10_reservation_template {
+struct t10_reservation {
 	/* Reservation effects all target ports */
 	int pr_all_tg_pt;
 	/* Activate Persistence across Target Power Loss enabled
 	 * for SCSI device */
 	int pr_aptpl_active;
-	/* Used by struct t10_reservation_template->pr_aptpl_buf_len */
+	/* Used by struct t10_reservation->pr_aptpl_buf_len */
 #define PR_APTPL_BUF_LEN			8192
 	u32 pr_aptpl_buf_len;
 	u32 pr_generation;
@@ -721,7 +721,7 @@ struct se_subsystem_dev {
 	/* T10 Inquiry and VPD WWN Information */
 	struct t10_wwn	t10_wwn;
 	/* T10 SPC-2 + SPC-3 Reservations */
-	struct t10_reservation_template t10_reservation;
+	struct t10_reservation t10_reservation;
 	spinlock_t      se_dev_lock;
 	void            *se_dev_su_ptr;
 	struct list_head se_dev_node;

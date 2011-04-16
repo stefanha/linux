@@ -4019,7 +4019,7 @@ static int core_scsi3_pri_read_full_status(struct se_cmd *cmd)
 	struct se_subsystem_dev *su_dev = SU_DEV(se_dev);
 	struct se_portal_group *se_tpg;
 	struct t10_pr_registration *pr_reg, *pr_reg_tmp;
-	struct t10_reservation_template *pr_tmpl = &SU_DEV(se_dev)->t10_reservation;
+	struct t10_reservation *pr_tmpl = &SU_DEV(se_dev)->t10_reservation;
 	unsigned char *buf = (unsigned char *)T_TASK(cmd)->t_task_buf;
 	u32 add_desc_len = 0, add_len = 0, desc_len, exp_desc_len;
 	u32 off = 8; /* off into first Full Status descriptor */
@@ -4213,7 +4213,7 @@ static int core_pt_seq_non_holder(
 int core_setup_reservations(struct se_device *dev, int force_pt)
 {
 	struct se_subsystem_dev *su_dev = dev->se_sub_dev;
-	struct t10_reservation_template *rest = &su_dev->t10_reservation;
+	struct t10_reservation *rest = &su_dev->t10_reservation;
 	/*
 	 * If this device is from Target_Core_Mod/pSCSI, use the reservations
 	 * of the Underlying SCSI hardware.  In Linux/SCSI terms, this can
