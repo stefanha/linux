@@ -74,7 +74,7 @@ static int iblock_attach_hba(struct se_hba *hba, u32 host_id)
 
 	ib_host->iblock_host_id = host_id;
 
-	hba->hba_ptr = (void *) ib_host;
+	hba->hba_ptr = ib_host;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM iBlock HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -172,7 +172,7 @@ static struct se_device *iblock_create_virtdevice(
 	ib_dev->ibd_bd = bd;
 
 	dev = transport_add_device_to_core_hba(hba,
-			&iblock_template, se_dev, dev_flags, (void *)ib_dev,
+			&iblock_template, se_dev, dev_flags, ib_dev,
 			&dev_limits, "IBLOCK", IBLOCK_VERSION);
 	if (!(dev))
 		goto failed;
@@ -593,7 +593,7 @@ static struct bio *iblock_get_bio(
 	DEBUG_IBLOCK("Allocated bio: %p task_size: %u\n", bio, task->task_size);
 
 	bio->bi_bdev = ib_dev->ibd_bd;
-	bio->bi_private = (void *) task;
+	bio->bi_private = task;
 	bio->bi_destructor = iblock_bio_destructor;
 	bio->bi_end_io = &iblock_bio_done;
 	bio->bi_sector = lba;

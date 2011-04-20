@@ -202,7 +202,7 @@ struct kmem_cache *t10_alua_tg_pt_gp_mem_cache;
 typedef int (*map_func_t)(struct se_task *, u32);
 
 static int transport_generic_write_pending(struct se_cmd *);
-static int transport_processing_thread(void *);
+static int transport_processing_thread(void *param);
 static int __transport_execute_tasks(struct se_device *dev);
 static void transport_complete_task_attr(struct se_cmd *cmd);
 static void transport_direct_request_timeout(struct se_cmd *cmd);
@@ -1543,7 +1543,7 @@ struct se_device *transport_add_device_to_core_hba(
 	transport_init_queue_obj(&dev->dev_queue_obj);
 	dev->dev_flags		= device_flags;
 	dev->dev_status		|= TRANSPORT_DEVICE_DEACTIVATED;
-	dev->dev_ptr		= (void *) transport_dev;
+	dev->dev_ptr		= transport_dev;
 	dev->se_hba		= hba;
 	dev->se_sub_dev		= se_dev;
 	dev->transport		= transport;
@@ -2903,7 +2903,7 @@ static int transport_get_sense_data(struct se_cmd *cmd)
 		offset = cmd->se_tfo->set_fabric_sense_len(cmd,
 				TRANSPORT_SENSE_BUFFER);
 
-		memcpy((void *)&buffer[offset], (void *)sense_buffer,
+		memcpy(&buffer[offset], sense_buffer,
 				TRANSPORT_SENSE_BUFFER);
 		cmd->scsi_status = task->task_scsi_status;
 		/* Automatically padded */
@@ -5374,7 +5374,7 @@ int transport_clear_lun_from_sessions(struct se_lun *lun)
 {
 	struct task_struct *kt;
 
-	kt = kthread_run(transport_clear_lun_thread, (void *)lun,
+	kt = kthread_run(transport_clear_lun_thread, lun,
 			"tcm_cl_%u", lun->unpacked_lun);
 	if (IS_ERR(kt)) {
 		printk(KERN_ERR "Unable to start clear_lun thread\n");

@@ -66,7 +66,7 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 
 	rd_host->rd_host_id = host_id;
 
-	hba->hba_ptr = (void *) rd_host;
+	hba->hba_ptr = rd_host;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM Ramdisk HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -271,7 +271,7 @@ static struct se_device *rd_create_virtdevice(
 
 	dev = transport_add_device_to_core_hba(hba,
 			(rd_dev->rd_direct) ? &rd_dr_template :
-			&rd_mcp_template, se_dev, dev_flags, (void *)rd_dev,
+			&rd_mcp_template, se_dev, dev_flags, rd_dev,
 			&dev_limits, prod, rev);
 	if (!(dev))
 		goto fail;

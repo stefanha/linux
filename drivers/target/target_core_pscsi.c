@@ -72,7 +72,7 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	phv->phv_host_id = host_id;
 	phv->phv_mode = PHV_VIRUTAL_HOST_ID;
 
-	hba->hba_ptr = (void *)phv;
+	hba->hba_ptr = phv;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM SCSI HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
@@ -355,7 +355,7 @@ static struct se_device *pscsi_add_device_to_list(
 	pdv->pdv_sd = sd;
 
 	dev = transport_add_device_to_core_hba(hba, &pscsi_template,
-				se_dev, dev_flags, (void *)pdv,
+				se_dev, dev_flags, pdv,
 				&dev_limits, NULL, NULL);
 	if (!(dev)) {
 		pdv->pdv_sd = NULL;
@@ -394,7 +394,7 @@ static void *pscsi_allocate_virtdevice(struct se_hba *hba, const char *name)
 	pdv->pdv_se_hba = hba;
 
 	printk(KERN_INFO "PSCSI: Allocated pdv: %p for %s\n", pdv, name);
-	return (void *)pdv;
+	return pdv;
 }
 
 /*
@@ -812,7 +812,7 @@ static inline void pscsi_blk_init_request(
 	 * also set the end_io_data pointer.to struct se_task.
 	 */
 	req->end_io = pscsi_req_done;
-	req->end_io_data = (void *)task;
+	req->end_io_data = task;
 	/*
 	 * Load the referenced struct se_task's SCSI CDB into
 	 * include/linux/blkdev.h:struct request->cmd
@@ -822,7 +822,7 @@ static inline void pscsi_blk_init_request(
 	/*
 	 * Setup pointer for outgoing sense data.
 	 */
-	req->sense = (void *)&pt->pscsi_sense[0];
+	req->sense = &pt->pscsi_sense[0];
 	req->sense_len = 0;
 }
 

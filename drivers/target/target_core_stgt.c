@@ -236,7 +236,7 @@ static void *stgt_allocate_virtdevice(struct se_hba *hba, const char *name)
 	sdv->sdv_se_hba = hba;
 
 	printk(KERN_INFO "STGT: Allocated sdv: %p for %s\n", sdv, name);
-	return (void *)sdv;
+	return sdv;
 }
 
 #warning FIXME: implement stgt_create_virtdevice()

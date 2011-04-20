@@ -171,7 +171,7 @@ static int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 	 */
 	if (scsi_sg_count(sc)) {
 		se_cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM;
-		mem_ptr = (void *)scsi_sglist(sc);
+		mem_ptr = scsi_sglist(sc);
 		/*
 		 * For BIDI commands, pass in the extra READ buffer
 		 * to transport_generic_map_mem_to_cmd() below..
@@ -179,7 +179,7 @@ static int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 		if (se_cmd->t_task->t_tasks_bidi) {
 			struct scsi_data_buffer *sdb = scsi_in(sc);
 
-			mem_bidi_ptr = (void *)sdb->table.sgl;
+			mem_bidi_ptr = sdb->table.sgl;
 			sg_no_bidi = sdb->table.nents;
 		}
 	} else {
@@ -384,7 +384,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	/*
 	 * Allocate the LUN_RESET TMR
 	 */
-	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, (void *)tl_tmr,
+	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, tl_tmr,
 				TMR_LUN_RESET);
 	if (!se_cmd->se_tmr_req)
 		goto release;
@@ -904,7 +904,7 @@ static int tcm_loop_queue_status(struct se_cmd *se_cmd)
 	   ((se_cmd->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE) ||
 	    (se_cmd->se_cmd_flags & SCF_EMULATED_TASK_SENSE))) {
 
-		memcpy((void *)sc->sense_buffer, (void *)se_cmd->sense_buffer,
+		memcpy(sc->sense_buffer, se_cmd->sense_buffer,
 				SCSI_SENSE_BUFFERSIZE);
 		sc->result = SAM_STAT_CHECK_CONDITION;
 		set_driver_byte(sc, DRIVER_SENSE);
@@ -1051,7 +1051,7 @@ static int tcm_loop_make_nexus(
 	 * transport_register_session()
 	 */
 	__transport_register_session(se_tpg, tl_nexus->se_sess->se_node_acl,
-			tl_nexus->se_sess, (void *)tl_nexus);
+			tl_nexus->se_sess, tl_nexus);
 	tl_tpg->tl_hba->tl_nexus = tl_nexus;
 	printk(KERN_INFO "TCM_Loop_ConfigFS: Established I_T Nexus to emulated"
 		" %s Initiator Port: %s\n", tcm_loop_dump_proto_id(tl_hba),
@@ -1239,7 +1239,7 @@ struct se_portal_group *tcm_loop_make_naa_tpg(
 	 * Register the tl_tpg as a emulated SAS TCM Target Endpoint
 	 */
 	ret = core_tpg_register(&tcm_loop_fabric_configfs->tf_ops,
-			wwn, &tl_tpg->tl_se_tpg, (void *)tl_tpg,
+			wwn, &tl_tpg->tl_se_tpg, tl_tpg,
 			TRANSPORT_TPG_TYPE_NORMAL);
 	if (ret < 0)
 		return ERR_PTR(-ENOMEM);

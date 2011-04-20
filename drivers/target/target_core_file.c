@@ -223,7 +223,7 @@ static struct se_device *fd_create_virtdevice(
 	dev_limits.queue_depth = FD_DEVICE_QUEUE_DEPTH;
 
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
-				se_dev, dev_flags, (void *)fd_dev,
+				se_dev, dev_flags, fd_dev,
 				&dev_limits, "FILEIO", FD_VERSION);
 	if (!(dev))
 		goto fail;
