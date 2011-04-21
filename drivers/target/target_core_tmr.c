@@ -55,7 +55,8 @@ struct se_tmr_req *core_tmr_alloc_req(
 {
 	struct se_tmr_req *tmr;
 
-	tmr = kmem_cache_zalloc(se_tmr_req_cache, GFP_KERNEL);
+	tmr = kmem_cache_zalloc(se_tmr_req_cache, (in_interrupt()) ?
+					GFP_ATOMIC : GFP_KERNEL);
 	if (!(tmr)) {
 		printk(KERN_ERR "Unable to allocate struct se_tmr_req\n");
 		return ERR_PTR(-ENOMEM);
