@@ -181,8 +181,6 @@ static int stgt_lld_probe(struct device *dev)
 	 */
 	hba_depth = (sh->hostt->can_queue > sh->can_queue) ?
 		sh->hostt->can_queue : sh->can_queue;
-	atomic_set(&hba->left_queue_depth, hba_depth);
-	atomic_set(&hba->max_queue_depth, hba_depth);
 
 	hba->hba_ptr = sh;
 
@@ -192,8 +190,8 @@ static int stgt_lld_probe(struct device *dev)
 	printk(KERN_INFO "CORE_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
 			(sh->hostt->name) : "Unknown");
 	printk(KERN_INFO "CORE_HBA[%d] - Attached STGT HBA to Generic"
-		" Target Core with TCQ Depth: %d MaxSectors: %hu\n",
-		hba->hba_id, atomic_read(&hba->max_queue_depth), max_sectors);
+		" MaxSectors: %hu\n",
+		hba->hba_id, max_sectors);
 
 	return 0;
 }

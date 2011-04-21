@@ -185,7 +185,7 @@
 #define DEBUG_STA(x...)
 #endif
 
-struct se_global *se_global;
+static int sub_api_initialized;
 
 static struct kmem_cache *se_cmd_cache;
 static struct kmem_cache *se_sess_cache;
@@ -228,26 +228,8 @@ static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 static int transport_set_sense_codes(struct se_cmd *cmd, u8 asc, u8 ascq);
 static void transport_stop_all_task_timers(struct se_cmd *cmd);
 
-int init_se_global(void)
+int init_se_kmem_caches(void)
 {
-	struct se_global *global;
-
-	global = kzalloc(sizeof(struct se_global), GFP_KERNEL);
-	if (!(global)) {
-		printk(KERN_ERR "Unable to allocate memory for struct se_global\n");
-		return -ENOMEM;
-	}
-
-	INIT_LIST_HEAD(&global->g_lu_gps_list);
-	INIT_LIST_HEAD(&global->g_se_tpg_list);
-	INIT_LIST_HEAD(&global->g_hba_list);
-	INIT_LIST_HEAD(&global->g_se_dev_list);
-	spin_lock_init(&global->g_device_lock);
-	spin_lock_init(&global->hba_lock);
-	spin_lock_init(&global->se_tpg_lock);
-	spin_lock_init(&global->lu_gps_lock);
-	spin_lock_init(&global->plugin_class_lock);
-
 	se_cmd_cache = kmem_cache_create("se_cmd_cache",
 			sizeof(struct se_cmd), __alignof__(struct se_cmd), 0, NULL);
 	if (!(se_cmd_cache)) {
@@ -326,8 +308,6 @@ int init_se_global(void)
 		goto out;
 	}
 
-	se_global = global;
-
 	return 0;
 out:
 	if (se_cmd_cache)
@@ -350,18 +330,11 @@ out:
 		kmem_cache_destroy(t10_alua_tg_pt_gp_cache);
 	if (t10_alua_tg_pt_gp_mem_cache)
 		kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
-	kfree(global);
 	return -ENOMEM;
 }
 
-void release_se_global(void)
+void release_se_kmem_caches(void)
 {
-	struct se_global *global;
-
-	global = se_global;
-	if (!(global))
-		return;
-
 	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
@@ -372,9 +345,6 @@ void release_se_global(void)
 	kmem_cache_destroy(t10_alua_lu_gp_mem_cache);
 	kmem_cache_destroy(t10_alua_tg_pt_gp_cache);
 	kmem_cache_destroy(t10_alua_tg_pt_gp_mem_cache);
-	kfree(global);
-
-	se_global = NULL;
 }
 
 /* SCSI statistics table index */
@@ -447,7 +417,7 @@ int transport_subsystem_check_init(void)
 {
 	int ret;
 
-	if (se_global->g_sub_api_initialized)
+	if (sub_api_initialized)
 		return 0;
 	/*
 	 * Request the loading of known TCM subsystem plugins..
@@ -456,7 +426,7 @@ int transport_subsystem_check_init(void)
 	if (ret < 0)
 		return ret;
 
-	se_global->g_sub_api_initialized = 1;
+	sub_api_initialized = 1;
 	return 0;
 }
 
@@ -723,7 +693,7 @@ static int transport_cmd_check_stop(
 			cmd->se_lun = NULL;
 			/*
 			 * Some fabric modules like tcm_loop can release
-			 * their internally allocated I/O refrence now and
+			 * their internally allocated I/O reference now and
 			 * struct se_cmd now.
 			 */
 			if (CMD_TFO(cmd)->check_stop_free != NULL) {
@@ -766,7 +736,6 @@ static void transport_lun_remove_cmd(struct se_cmd *cmd)
 	transport_all_task_dev_remove_state(cmd);
 	spin_unlock_irqrestore(&T_TASK(cmd)->t_state_lock, flags);
 
-	transport_free_dev_tasks(cmd);
 
 check_lun:
 	spin_lock_irqsave(&lun->lun_cmd_lock, flags);
@@ -819,7 +788,7 @@ static int transport_add_cmd_to_queue(
 	}
 	INIT_LIST_HEAD(&qr->qr_list);
 
-	qr->cmd = (void *)cmd;
+	qr->cmd = cmd;
 	qr->state = t_state;
 
 	if (t_state) {
@@ -843,31 +812,8 @@ static int transport_add_cmd_to_queue(
  * Called with struct se_queue_obj->cmd_queue_lock held.
  */
 static struct se_queue_req *
-__transport_get_qr_from_queue(struct se_queue_obj *qobj)
-{
-	struct se_cmd *cmd;
-	struct se_queue_req *qr = NULL;
-
-	if (list_empty(&qobj->qobj_list))
-		return NULL;
-
-	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
-		break;
-
-	if (qr->cmd) {
-		cmd = (struct se_cmd *)qr->cmd;
-		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
-	}
-	list_del(&qr->qr_list);
-	atomic_dec(&qobj->queue_cnt);
-
-	return qr;
-}
-
-static struct se_queue_req *
 transport_get_qr_from_queue(struct se_queue_obj *qobj)
 {
-	struct se_cmd *cmd;
 	struct se_queue_req *qr;
 	unsigned long flags;
 
@@ -880,10 +826,9 @@ transport_get_qr_from_queue(struct se_queue_obj *qobj)
 	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
 		break;
 
-	if (qr->cmd) {
-		cmd = (struct se_cmd *)qr->cmd;
-		atomic_dec(&T_TASK(cmd)->t_transport_queue_active);
-	}
+	if (qr->cmd)
+		atomic_dec(&T_TASK(qr->cmd)->t_transport_queue_active);
+
 	list_del(&qr->qr_list);
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
@@ -894,7 +839,6 @@ transport_get_qr_from_queue(struct se_queue_obj *qobj)
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 		struct se_queue_obj *qobj)
 {
-	struct se_cmd *q_cmd;
 	struct se_queue_req *qr = NULL, *qr_p = NULL;
 	unsigned long flags;
 
@@ -905,11 +849,10 @@ static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 	}
 
 	list_for_each_entry_safe(qr, qr_p, &qobj->qobj_list, qr_list) {
-		q_cmd = (struct se_cmd *)qr->cmd;
-		if (q_cmd != cmd)
+		if (qr->cmd != cmd)
 			continue;
 
-		atomic_dec(&T_TASK(q_cmd)->t_transport_queue_active);
+		atomic_dec(&T_TASK(qr->cmd)->t_transport_queue_active);
 		atomic_dec(&qobj->queue_cnt);
 		list_del(&qr->qr_list);
 		kfree(qr);
@@ -961,12 +904,8 @@ void transport_complete_task(struct se_task *task, int success)
 	printk(KERN_INFO "task: %p CDB: 0x%02x obj_ptr: %p\n", task,
 			T_TASK(cmd)->t_task_cdb[0], dev);
 #endif
-	if (dev) {
-		spin_lock_irqsave(&SE_HBA(dev)->hba_queue_lock, flags);
+	if (dev)
 		atomic_inc(&dev->depth_left);
-		atomic_inc(&SE_HBA(dev)->left_queue_depth);
-		spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
-	}
 
 	spin_lock_irqsave(&T_TASK(cmd)->t_state_lock, flags);
 	atomic_set(&task->task_active, 0);
@@ -1286,7 +1225,7 @@ static void transport_release_all_cmds(struct se_device *dev)
 	list_for_each_entry_safe(qr, qr_p, &dev->dev_queue_obj->qobj_list,
 				qr_list) {
 
-		cmd = (struct se_cmd *)qr->cmd;
+		cmd = qr->cmd;
 		t_state = qr->state;
 		list_del(&qr->qr_list);
 		kfree(qr);
@@ -1641,17 +1580,6 @@ struct se_device *transport_add_device_to_core_hba(
 	}
 	transport_init_queue_obj(dev->dev_queue_obj);
 
-	dev->dev_status_queue_obj = kzalloc(sizeof(struct se_queue_obj),
-					GFP_KERNEL);
-	if (!(dev->dev_status_queue_obj)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" dev->dev_status_queue_obj\n");
-		kfree(dev->dev_queue_obj);
-		kfree(dev);
-		return NULL;
-	}
-	transport_init_queue_obj(dev->dev_status_queue_obj);
-
 	dev->dev_flags		= device_flags;
 	dev->dev_status		|= TRANSPORT_DEVICE_DEACTIVATED;
 	dev->dev_ptr		= (void *) transport_dev;
@@ -1752,7 +1680,6 @@ out:
 
 	se_release_vpd_for_dev(dev);
 
-	kfree(dev->dev_status_queue_obj);
 	kfree(dev->dev_queue_obj);
 	kfree(dev);
 
@@ -2033,7 +1960,7 @@ int transport_generic_handle_data(
 	 * If the received CDB has aleady been ABORTED by the generic
 	 * target engine, we now call transport_check_aborted_status()
 	 * to queue any delated TASK_ABORTED status for the received CDB to the
-	 * fabric module as we are expecting no futher incoming DATA OUT
+	 * fabric module as we are expecting no further incoming DATA OUT
 	 * sequences at this point.
 	 */
 	if (transport_check_aborted_status(cmd, 1) != 0)
@@ -2061,6 +1988,13 @@ int transport_generic_handle_tmr(
 	return 0;
 }
 EXPORT_SYMBOL(transport_generic_handle_tmr);
+
+void transport_generic_free_cmd_intr(
+	struct se_cmd *cmd)
+{
+	transport_add_cmd_to_queue(cmd, TRANSPORT_FREE_CMD_INTR);
+}
+EXPORT_SYMBOL(transport_generic_free_cmd_intr);
 
 static int transport_stop_tasks_for_cmd(struct se_cmd *cmd)
 {
@@ -2128,16 +2062,6 @@ static int transport_stop_tasks_for_cmd(struct se_cmd *cmd)
 	return ret;
 }
 
-static void transport_failure_reset_queue_depth(struct se_device *dev)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&SE_HBA(dev)->hba_queue_lock, flags);;
-	atomic_inc(&dev->depth_left);
-	atomic_inc(&SE_HBA(dev)->left_queue_depth);
-	spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
-}
-
 /*
  * Handle SAM-esque emulation for generic transport request failures.
  */
@@ -2169,7 +2093,7 @@ static void transport_generic_request_failure(
 	transport_stop_all_task_timers(cmd);
 
 	if (dev)
-		transport_failure_reset_queue_depth(dev);
+		atomic_inc(&dev->depth_left);
 	/*
 	 * For SAM Task Attribute emulation for failed struct se_cmd
 	 */
@@ -2505,7 +2429,7 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 	if (SE_DEV(cmd)->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
 		return 1;
 	/*
-	 * Check for the existance of HEAD_OF_QUEUE, and if true return 1
+	 * Check for the existence of HEAD_OF_QUEUE, and if true return 1
 	 * to allow the passed struct se_cmd list of tasks to the front of the list.
 	 */
 	 if (cmd->sam_task_attr == TASK_ATTR_HOQ) {
@@ -2551,7 +2475,7 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 	if (atomic_read(&SE_DEV(cmd)->dev_ordered_sync) != 0) {
 		/*
 		 * Otherwise, add cmd w/ tasks to delayed cmd queue that
-		 * will be drained upon competion of HEAD_OF_QUEUE task.
+		 * will be drained upon completion of HEAD_OF_QUEUE task.
 		 */
 		spin_lock(&SE_DEV(cmd)->delayed_cmd_lock);
 		cmd->se_cmd_flags |= SCF_DELAYED_CMD_FROM_SAM_ATTR;
@@ -2593,7 +2517,7 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 	}
 	/*
 	 * Call transport_cmd_check_stop() to see if a fabric exception
-	 * has occured that prevents execution.
+	 * has occurred that prevents execution.
 	 */
 	if (!(transport_cmd_check_stop(cmd, 0, TRANSPORT_PROCESSING))) {
 		/*
@@ -2638,26 +2562,19 @@ static int __transport_execute_tasks(struct se_device *dev)
 	 * struct se_transport_task's to the selected transport.
 	 */
 check_depth:
-	spin_lock_irqsave(&SE_HBA(dev)->hba_queue_lock, flags);
-	if (!(atomic_read(&dev->depth_left)) ||
-	    !(atomic_read(&SE_HBA(dev)->left_queue_depth))) {
-		spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
+	if (atomic_dec_and_test(&dev->depth_left))
 		return transport_tcq_window_closed(dev);
-	}
+
 	dev->dev_tcq_window_closed = 0;
 
 	spin_lock(&dev->execute_task_lock);
 	task = transport_get_task_from_execute_queue(dev);
 	spin_unlock(&dev->execute_task_lock);
 
-	if (!task) {
-		spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
+	if (!task)
 		return 0;
-	}
 
 	atomic_dec(&dev->depth_left);
-	atomic_dec(&SE_HBA(dev)->left_queue_depth);
-	spin_unlock_irqrestore(&SE_HBA(dev)->hba_queue_lock, flags);
 
 	cmd = TASK_CMD(task);
 
@@ -3111,7 +3028,7 @@ static int transport_generic_cmd_sequencer(
 	if (ret != 0) {
 		cmd->transport_wait_for_tasks = &transport_nop_wait_for_tasks;
 		/*
-		 * Set SCSI additional sense code (ASC) to 'LUN Not Accessable';
+		 * Set SCSI additional sense code (ASC) to 'LUN Not Accessible';
 		 * The ALUA additional sense code qualifier (ASCQ) is determined
 		 * by the ALUA primary or secondary access state..
 		 */
@@ -3869,7 +3786,7 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 		}
 	}
 	/*
-	 * Check for a callback, used by amoungst other things
+	 * Check for a callback, used by amongst other things
 	 * XDWRITE_READ_10 emulation.
 	 */
 	if (cmd->transport_complete_callback)
@@ -4778,18 +4695,20 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 				sg_end_cur->page_link &= ~0x02;
 
 				sg_chain(sg_head, task_sg_num, sg_head_cur);
-				sg_count += (task->task_sg_num + 1);
-			} else
 				sg_count += task->task_sg_num;
+				task_sg_num = (task->task_sg_num + 1);
+			} else {
+				sg_chain(sg_head, task_sg_num, sg_head_cur);
+				sg_count += task->task_sg_num;
+				task_sg_num = task->task_sg_num;
+			}
 
 			sg_head = sg_head_cur;
 			sg_link = sg_link_cur;
-			task_sg_num = task->task_sg_num;
 			continue;
 		}
 		sg_head = sg_first = &task->task_sg[0];
 		sg_link = &task->task_sg[task->task_sg_num];
-		task_sg_num = task->task_sg_num;
 		/*
 		 * Check for single task..
 		 */
@@ -4800,9 +4719,12 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 			 */
 			sg_end = &task->task_sg[task->task_sg_num - 1];
 			sg_end->page_link &= ~0x02;
-			sg_count += (task->task_sg_num + 1);
-		} else
 			sg_count += task->task_sg_num;
+			task_sg_num = (task->task_sg_num + 1);
+		} else {
+			sg_count += task->task_sg_num;
+			task_sg_num = task->task_sg_num;
+		}
 	}
 	/*
 	 * Setup the starting pointer and total t_tasks_sg_linked_no including
@@ -4811,21 +4733,20 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 	T_TASK(cmd)->t_tasks_sg_chained = sg_first;
 	T_TASK(cmd)->t_tasks_sg_chained_no = sg_count;
 
-	DEBUG_CMD_M("Setup T_TASK(cmd)->t_tasks_sg_chained: %p and"
-		" t_tasks_sg_chained_no: %u\n", T_TASK(cmd)->t_tasks_sg_chained,
+	DEBUG_CMD_M("Setup cmd: %p T_TASK(cmd)->t_tasks_sg_chained: %p and"
+		" t_tasks_sg_chained_no: %u\n", cmd, T_TASK(cmd)->t_tasks_sg_chained,
 		T_TASK(cmd)->t_tasks_sg_chained_no);
 
 	for_each_sg(T_TASK(cmd)->t_tasks_sg_chained, sg,
 			T_TASK(cmd)->t_tasks_sg_chained_no, i) {
 
-		DEBUG_CMD_M("SG: %p page: %p length: %d offset: %d\n",
-			sg, sg_page(sg), sg->length, sg->offset);
+		DEBUG_CMD_M("SG[%d]: %p page: %p length: %d offset: %d, magic: 0x%08x\n",
+			i, sg, sg_page(sg), sg->length, sg->offset, sg->sg_magic);
 		if (sg_is_chain(sg))
 			DEBUG_CMD_M("SG: %p sg_is_chain=1\n", sg);
 		if (sg_is_last(sg))
 			DEBUG_CMD_M("SG: %p sg_is_last=1\n", sg);
 	}
-
 }
 EXPORT_SYMBOL(transport_do_task_sg_chain);
 
@@ -5299,6 +5220,8 @@ void transport_generic_free_cmd(
 
 		if (wait_for_tasks && cmd->transport_wait_for_tasks)
 			cmd->transport_wait_for_tasks(cmd, 0, 0);
+
+		transport_free_dev_tasks(cmd);
 
 		transport_generic_remove(cmd, release_to_pool,
 				session_reinstatement);
@@ -6034,11 +5957,8 @@ static void transport_processing_shutdown(struct se_device *dev)
 	/*
 	 * Empty the struct se_device's struct se_cmd list.
 	 */
-	spin_lock_irqsave(&dev->dev_queue_obj->cmd_queue_lock, flags);
-	while ((qr = __transport_get_qr_from_queue(dev->dev_queue_obj))) {
-		spin_unlock_irqrestore(
-				&dev->dev_queue_obj->cmd_queue_lock, flags);
-		cmd = (struct se_cmd *)qr->cmd;
+	while ((qr = transport_get_qr_from_queue(dev->dev_queue_obj))) {
+		cmd = qr->cmd;
 		state = qr->state;
 		kfree(qr);
 
@@ -6056,9 +5976,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 			if (transport_cmd_check_stop(cmd, 1, 0))
 				transport_generic_remove(cmd, 0, 0);
 		}
-		spin_lock_irqsave(&dev->dev_queue_obj->cmd_queue_lock, flags);
 	}
-	spin_unlock_irqrestore(&dev->dev_queue_obj->cmd_queue_lock, flags);
 }
 
 /*	transport_processing_thread():
@@ -6096,7 +6014,7 @@ get_cmd:
 		if (!(qr))
 			continue;
 
-		cmd = (struct se_cmd *)qr->cmd;
+		cmd = qr->cmd;
 		t_state = qr->state;
 		kfree(qr);
 
@@ -6134,6 +6052,9 @@ get_cmd:
 			break;
 		case TRANSPORT_REMOVE:
 			transport_generic_remove(cmd, 1, 0);
+			break;
+		case TRANSPORT_FREE_CMD_INTR:
+			transport_generic_free_cmd(cmd, 0, 1, 0);
 			break;
 		case TRANSPORT_PROCESS_TMR:
 			transport_generic_do_tmr(cmd);

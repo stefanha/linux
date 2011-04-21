@@ -54,6 +54,11 @@
 static void se_dev_start(struct se_device *dev);
 static void se_dev_stop(struct se_device *dev);
 
+static struct se_hba *lun0_hba;
+static struct se_subsystem_dev *lun0_su_dev;
+/* not static, needed by tpg.c */
+struct se_device *g_lun0_dev;
+
 int transport_get_lun_for_cmd(
 	struct se_cmd *se_cmd,
 	u32 unpacked_lun)
@@ -152,13 +157,13 @@ out:
 
 	{
 	struct se_device *dev = se_lun->lun_se_dev;
-	spin_lock(&dev->stats_lock);
+	spin_lock_irq(&dev->stats_lock);
 	dev->num_cmds++;
 	if (se_cmd->data_direction == DMA_TO_DEVICE)
 		dev->write_bytes += se_cmd->data_length;
 	else if (se_cmd->data_direction == DMA_FROM_DEVICE)
 		dev->read_bytes += se_cmd->data_length;
-	spin_unlock(&dev->stats_lock);
+	spin_unlock_irq(&dev->stats_lock);
 	}
 
 	/*
@@ -379,7 +384,7 @@ int core_update_device_list_for_node(
 	if (!(enable)) {
 		/*
 		 * deve->se_lun_acl will be NULL for demo-mode created LUNs
-		 * that have not been explictly concerted to MappedLUNs ->
+		 * that have not been explicitly concerted to MappedLUNs ->
 		 * struct se_lun_acl, but we remove deve->alua_port_list from
 		 * port->sep_alua_list. This also means that active UAs and
 		 * NodeACL context specific PR metadata for demo-mode
@@ -749,7 +754,6 @@ void se_release_device_for_hba(struct se_device *dev)
 	core_scsi3_free_all_registrations(dev);
 	se_release_vpd_for_dev(dev);
 
-	kfree(dev->dev_status_queue_obj);
 	kfree(dev->dev_queue_obj);
 	kfree(dev);
 
@@ -1574,7 +1578,7 @@ int core_dev_setup_virtual_lun0(void)
 	if (IS_ERR(hba))
 		return PTR_ERR(hba);
 
-	se_global->g_lun0_hba = hba;
+	lun0_hba = hba;
 	t = hba->transport;
 
 	se_dev = kzalloc(sizeof(struct se_subsystem_dev), GFP_KERNEL);
@@ -1584,7 +1588,7 @@ int core_dev_setup_virtual_lun0(void)
 		ret = -ENOMEM;
 		goto out;
 	}
-	INIT_LIST_HEAD(&se_dev->g_se_dev_list);
+	INIT_LIST_HEAD(&se_dev->se_dev_node);
 	INIT_LIST_HEAD(&se_dev->t10_wwn.t10_vpd_list);
 	spin_lock_init(&se_dev->t10_wwn.t10_vpd_lock);
 	INIT_LIST_HEAD(&se_dev->t10_reservation.registration_list);
@@ -1607,7 +1611,7 @@ int core_dev_setup_virtual_lun0(void)
 		ret = -ENOMEM;
 		goto out;
 	}
-	se_global->g_lun0_su_dev = se_dev;
+	lun0_su_dev = se_dev;
 
 	memset(buf, 0, 16);
 	sprintf(buf, "rd_pages=8");
@@ -1619,15 +1623,15 @@ int core_dev_setup_virtual_lun0(void)
 		goto out;
 	}
 	se_dev->se_dev_ptr = dev;
-	se_global->g_lun0_dev = dev;
+	g_lun0_dev = dev;
 
 	return 0;
 out:
-	se_global->g_lun0_su_dev = NULL;
+	lun0_su_dev = NULL;
 	kfree(se_dev);
-	if (se_global->g_lun0_hba) {
-		core_delete_hba(se_global->g_lun0_hba);
-		se_global->g_lun0_hba = NULL;
+	if (lun0_hba) {
+		core_delete_hba(lun0_hba);
+		lun0_hba = NULL;
 	}
 	return ret;
 }
@@ -1635,14 +1639,14 @@ out:
 
 void core_dev_release_virtual_lun0(void)
 {
-	struct se_hba *hba = se_global->g_lun0_hba;
-	struct se_subsystem_dev *su_dev = se_global->g_lun0_su_dev;
+	struct se_hba *hba = lun0_hba;
+	struct se_subsystem_dev *su_dev = lun0_su_dev;
 
 	if (!(hba))
 		return;
 
-	if (se_global->g_lun0_dev)
-		se_free_virtual_device(se_global->g_lun0_dev, hba);
+	if (g_lun0_dev)
+		se_free_virtual_device(g_lun0_dev, hba);
 
 	kfree(su_dev);
 	core_delete_hba(hba);

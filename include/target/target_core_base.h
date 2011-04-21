@@ -22,7 +22,7 @@
  * Note that both include/scsi/scsi_cmnd.h:MAX_COMMAND_SIZE and
  * include/linux/blkdev.h:BLOCK_MAX_CDB as of v2.6.36-rc4 still use
  * 16-byte CDBs by default and require an extra allocation for
- * 32-byte CDBs to becasue of legacy issues.
+ * 32-byte CDBs to because of legacy issues.
  *
  * Within TCM Core there are no such legacy limitiations, so we go ahead
  * use 32-byte CDBs by default and use include/scsi/scsi.h:scsi_command_size()
@@ -98,6 +98,7 @@ enum transport_state_table {
 	TRANSPORT_REMOVE	= 14,
 	TRANSPORT_FREE		= 15,
 	TRANSPORT_NEW_CMD_MAP	= 16,
+	TRANSPORT_FREE_CMD_INTR = 17,
 };
 
 /* Used for struct se_cmd->se_cmd_flags */
@@ -234,7 +235,7 @@ struct t10_alua_lu_gp {
 	atomic_t lu_gp_ref_cnt;
 	spinlock_t lu_gp_lock;
 	struct config_group lu_gp_group;
-	struct list_head lu_gp_list;
+	struct list_head lu_gp_node;
 	struct list_head lu_gp_mem_list;
 } ____cacheline_aligned;
 
@@ -302,7 +303,7 @@ struct t10_wwn {
 
 
 /*
- * Used by TCM Core internally to signal if >= SPC-3 peristent reservations
+ * Used by TCM Core internally to signal if >= SPC-3 persistent reservations
  * emulation is enabled or disabled, or running in with TCM/pSCSI passthrough
  * mode
  */
@@ -396,7 +397,7 @@ struct t10_reservation_template {
 
 struct se_queue_req {
 	int			state;
-	void			*cmd;
+	struct se_cmd		*cmd;
 	struct list_head	qr_list;
 } ____cacheline_aligned;
 
@@ -729,7 +730,7 @@ struct se_subsystem_dev {
 	struct t10_reservation_template t10_reservation;
 	spinlock_t      se_dev_lock;
 	void            *se_dev_su_ptr;
-	struct list_head g_se_dev_list;
+	struct list_head se_dev_node;
 	struct config_group se_dev_group;
 	/* For T10 Reservations */
 	struct config_group se_dev_pr_group;
@@ -783,7 +784,6 @@ struct se_device {
 	struct se_obj		dev_access_obj;
 	struct se_obj		dev_export_obj;
 	struct se_queue_obj	*dev_queue_obj;
-	struct se_queue_obj	*dev_status_queue_obj;
 	spinlock_t		delayed_cmd_lock;
 	spinlock_t		ordered_cmd_lock;
 	spinlock_t		execute_task_lock;
@@ -836,17 +836,12 @@ struct se_hba {
 	/* Virtual iSCSI devices attached. */
 	u32			dev_count;
 	u32			hba_index;
-	atomic_t		load_balance_queue;
-	atomic_t		left_queue_depth;
-	/* Maximum queue depth the HBA can handle. */
-	atomic_t		max_queue_depth;
 	/* Pointer to transport specific host structure. */
 	void			*hba_ptr;
 	/* Linked list for struct se_device */
 	struct list_head	hba_dev_list;
-	struct list_head	hba_list;
+	struct list_head	hba_node;
 	spinlock_t		device_lock;
-	spinlock_t		hba_queue_lock;
 	struct config_group	hba_group;
 	struct mutex		hba_access_mutex;
 	struct se_subsystem_api *transport;
@@ -929,12 +924,12 @@ struct se_portal_group {
 	spinlock_t		tpg_lun_lock;
 	/* Pointer to $FABRIC_MOD portal group */
 	void			*se_tpg_fabric_ptr;
-	struct list_head	se_tpg_list;
+	struct list_head	se_tpg_node;
 	/* linked list for initiator ACL list */
 	struct list_head	acl_node_list;
 	struct se_lun		*tpg_lun_list;
 	struct se_lun		tpg_virt_lun0;
-	/* List of TCM sessions assoicated wth this TPG */
+	/* List of TCM sessions associated wth this TPG */
 	struct list_head	tpg_sess_list;
 	/* Pointer to $FABRIC_MOD dependent code */
 	struct target_core_fabric_ops *se_tpg_tfo;
@@ -955,30 +950,6 @@ struct se_wwn {
 	struct config_group	wwn_group;
 	struct config_group	*wwn_default_groups[2];
 	struct config_group	fabric_stat_group;
-} ____cacheline_aligned;
-
-struct se_global {
-	u16			alua_lu_gps_counter;
-	int			g_sub_api_initialized;
-	u32			in_shutdown;
-	u32			alua_lu_gps_count;
-	u32			g_hba_id_counter;
-	struct config_group	target_core_hbagroup;
-	struct config_group	alua_group;
-	struct config_group	alua_lu_gps_group;
-	struct list_head	g_lu_gps_list;
-	struct list_head	g_se_tpg_list;
-	struct list_head	g_hba_list;
-	struct list_head	g_se_dev_list;
-	struct se_hba		*g_lun0_hba;
-	struct se_subsystem_dev *g_lun0_su_dev;
-	struct se_device	*g_lun0_dev;
-	struct t10_alua_lu_gp	*default_lu_gp;
-	spinlock_t		g_device_lock;
-	spinlock_t		hba_lock;
-	spinlock_t		se_tpg_lock;
-	spinlock_t		lu_gps_lock;
-	spinlock_t		plugin_class_lock;
 } ____cacheline_aligned;
 
 #endif /* TARGET_CORE_BASE_H */

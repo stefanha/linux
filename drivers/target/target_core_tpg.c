@@ -46,6 +46,11 @@
 #include "target_core_hba.h"
 #include "target_core_stat.h"
 
+extern struct se_device *g_lun0_dev;
+
+static DEFINE_SPINLOCK(tpg_lock);
+static LIST_HEAD(tpg_list);
+
 /*	core_clear_initiator_node_from_tpg():
  *
  *
@@ -598,7 +603,7 @@ EXPORT_SYMBOL(core_tpg_set_initiator_node_queue_depth);
 static int core_tpg_setup_virtual_lun0(struct se_portal_group *se_tpg)
 {
 	/* Set in core_dev_setup_virtual_lun0() */
-	struct se_device *dev = se_global->g_lun0_dev;
+	struct se_device *dev = g_lun0_dev;
 	struct se_lun *lun = &se_tpg->tpg_virt_lun0;
 	u32 lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
 	int ret;
@@ -664,7 +669,7 @@ int core_tpg_register(
 	se_tpg->se_tpg_wwn = se_wwn;
 	atomic_set(&se_tpg->tpg_pr_ref_count, 0);
 	INIT_LIST_HEAD(&se_tpg->acl_node_list);
-	INIT_LIST_HEAD(&se_tpg->se_tpg_list);
+	INIT_LIST_HEAD(&se_tpg->se_tpg_node);
 	INIT_LIST_HEAD(&se_tpg->tpg_sess_list);
 	spin_lock_init(&se_tpg->acl_node_lock);
 	spin_lock_init(&se_tpg->session_lock);
@@ -677,9 +682,9 @@ int core_tpg_register(
 		}
 	}
 
-	spin_lock_bh(&se_global->se_tpg_lock);
-	list_add_tail(&se_tpg->se_tpg_list, &se_global->g_se_tpg_list);
-	spin_unlock_bh(&se_global->se_tpg_lock);
+	spin_lock_bh(&tpg_lock);
+	list_add_tail(&se_tpg->se_tpg_node, &tpg_list);
+	spin_unlock_bh(&tpg_lock);
 
 	printk(KERN_INFO "TARGET_CORE[%s]: Allocated %s struct se_portal_group for"
 		" endpoint: %s, Portal Tag: %u\n", tfo->get_fabric_name(),
@@ -702,9 +707,9 @@ int core_tpg_deregister(struct se_portal_group *se_tpg)
 		TPG_TFO(se_tpg)->tpg_get_wwn(se_tpg),
 		TPG_TFO(se_tpg)->tpg_get_tag(se_tpg));
 
-	spin_lock_bh(&se_global->se_tpg_lock);
-	list_del(&se_tpg->se_tpg_list);
-	spin_unlock_bh(&se_global->se_tpg_lock);
+	spin_lock_bh(&tpg_lock);
+	list_del(&se_tpg->se_tpg_node);
+	spin_unlock_bh(&tpg_lock);
 
 	while (atomic_read(&se_tpg->tpg_pr_ref_count) != 0)
 		cpu_relax();

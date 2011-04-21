@@ -72,17 +72,14 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 
 	fd_host->fd_host_id = host_id;
 
-	atomic_set(&hba->left_queue_depth, FD_HBA_QUEUE_DEPTH);
-	atomic_set(&hba->max_queue_depth, FD_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) fd_host;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM FILEIO HBA Driver %s on Generic"
 		" Target Core Stack %s\n", hba->hba_id, FD_VERSION,
 		TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - Attached FILEIO HBA: %u to Generic"
-		" Target Core with TCQ Depth: %d MaxSectors: %u\n",
-		hba->hba_id, fd_host->fd_host_id,
-		atomic_read(&hba->max_queue_depth), FD_MAX_SECTORS);
+		" MaxSectors: %u\n",
+		hba->hba_id, fd_host->fd_host_id, FD_MAX_SECTORS);
 
 	return 0;
 }
@@ -159,7 +156,7 @@ static struct se_device *fd_create_virtdevice(
 #endif
 /*	flags |= O_DIRECT; */
 	/*
-	 * If fd_buffered_io=1 has not been set explictly (the default),
+	 * If fd_buffered_io=1 has not been set explicitly (the default),
 	 * use O_SYNC to force FILEIO writes to disk.
 	 */
 	if (!(fd_dev->fbd_flags & FDBD_USE_BUFFERED_IO))

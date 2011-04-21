@@ -46,6 +46,14 @@ static int core_alua_set_tg_pt_secondary_state(
 		struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem,
 		struct se_port *port, int explict, int offline);
 
+static u16 alua_lu_gps_counter;
+static u32 alua_lu_gps_count;
+
+static DEFINE_SPINLOCK(lu_gps_lock);
+static LIST_HEAD(lu_gps_list);
+
+struct t10_alua_lu_gp *default_lu_gp;
+
 /*
  * REPORT_TARGET_PORT_GROUPS
  *
@@ -496,8 +504,8 @@ static int core_alua_state_check(
 	nonop_delay_msecs = tg_pt_gp->tg_pt_gp_nonop_delay_msecs;
 	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 	/*
-	 * Process ALUA_ACCESS_STATE_ACTIVE_OPTMIZED in a seperate conditional
-	 * statement so the complier knows explictly to check this case first.
+	 * Process ALUA_ACCESS_STATE_ACTIVE_OPTMIZED in a separate conditional
+	 * statement so the compiler knows explicitly to check this case first.
 	 * For the Optimized ALUA access state case, we want to process the
 	 * incoming fabric cmd ASAP..
 	 */
@@ -1038,15 +1046,15 @@ core_alua_allocate_lu_gp(const char *name, int def_group)
 		printk(KERN_ERR "Unable to allocate struct t10_alua_lu_gp\n");
 		return ERR_PTR(-ENOMEM);;
 	}
-	INIT_LIST_HEAD(&lu_gp->lu_gp_list);
+	INIT_LIST_HEAD(&lu_gp->lu_gp_node);
 	INIT_LIST_HEAD(&lu_gp->lu_gp_mem_list);
 	spin_lock_init(&lu_gp->lu_gp_lock);
 	atomic_set(&lu_gp->lu_gp_ref_cnt, 0);
 
 	if (def_group) {
-		lu_gp->lu_gp_id = se_global->alua_lu_gps_counter++;;
+		lu_gp->lu_gp_id = alua_lu_gps_counter++;;
 		lu_gp->lu_gp_valid_id = 1;
-		se_global->alua_lu_gps_count++;
+		alua_lu_gps_count++;
 	}
 
 	return lu_gp;
@@ -1065,19 +1073,19 @@ int core_alua_set_lu_gp_id(struct t10_alua_lu_gp *lu_gp, u16 lu_gp_id)
 		return -EINVAL;
 	}
 
-	spin_lock(&se_global->lu_gps_lock);
-	if (se_global->alua_lu_gps_count == 0x0000ffff) {
-		printk(KERN_ERR "Maximum ALUA se_global->alua_lu_gps_count:"
+	spin_lock(&lu_gps_lock);
+	if (alua_lu_gps_count == 0x0000ffff) {
+		printk(KERN_ERR "Maximum ALUA alua_lu_gps_count:"
 				" 0x0000ffff reached\n");
-		spin_unlock(&se_global->lu_gps_lock);
+		spin_unlock(&lu_gps_lock);
 		kmem_cache_free(t10_alua_lu_gp_cache, lu_gp);
 		return -ENOSPC;
 	}
 again:
 	lu_gp_id_tmp = (lu_gp_id != 0) ? lu_gp_id :
-				se_global->alua_lu_gps_counter++;
+				alua_lu_gps_counter++;
 
-	list_for_each_entry(lu_gp_tmp, &se_global->g_lu_gps_list, lu_gp_list) {
+	list_for_each_entry(lu_gp_tmp, &lu_gps_list, lu_gp_node) {
 		if (lu_gp_tmp->lu_gp_id == lu_gp_id_tmp) {
 			if (!(lu_gp_id))
 				goto again;
@@ -1085,16 +1093,16 @@ again:
 			printk(KERN_WARNING "ALUA Logical Unit Group ID: %hu"
 				" already exists, ignoring request\n",
 				lu_gp_id);
-			spin_unlock(&se_global->lu_gps_lock);
+			spin_unlock(&lu_gps_lock);
 			return -EINVAL;
 		}
 	}
 
 	lu_gp->lu_gp_id = lu_gp_id_tmp;
 	lu_gp->lu_gp_valid_id = 1;
-	list_add_tail(&lu_gp->lu_gp_list, &se_global->g_lu_gps_list);
-	se_global->alua_lu_gps_count++;
-	spin_unlock(&se_global->lu_gps_lock);
+	list_add_tail(&lu_gp->lu_gp_node, &lu_gps_list);
+	alua_lu_gps_count++;
+	spin_unlock(&lu_gps_lock);
 
 	return 0;
 }
@@ -1130,11 +1138,11 @@ void core_alua_free_lu_gp(struct t10_alua_lu_gp *lu_gp)
 	 * no associations can be made while we are releasing
 	 * struct t10_alua_lu_gp.
 	 */
-	spin_lock(&se_global->lu_gps_lock);
+	spin_lock(&lu_gps_lock);
 	atomic_set(&lu_gp->lu_gp_shutdown, 1);
-	list_del(&lu_gp->lu_gp_list);
-	se_global->alua_lu_gps_count--;
-	spin_unlock(&se_global->lu_gps_lock);
+	list_del(&lu_gp->lu_gp_node);
+	alua_lu_gps_count--;
+	spin_unlock(&lu_gps_lock);
 	/*
 	 * Allow struct t10_alua_lu_gp * referenced by core_alua_get_lu_gp_by_name()
 	 * in target_core_configfs.c:target_core_store_alua_lu_gp() to be
@@ -1157,7 +1165,7 @@ void core_alua_free_lu_gp(struct t10_alua_lu_gp *lu_gp)
 		spin_unlock(&lu_gp->lu_gp_lock);
 		/*
 		 *
-		 * lu_gp_mem is assoicated with a single
+		 * lu_gp_mem is associated with a single
 		 * struct se_device->dev_alua_lu_gp_mem, and is released when
 		 * struct se_device is released via core_alua_free_lu_gp_mem().
 		 *
@@ -1165,9 +1173,9 @@ void core_alua_free_lu_gp(struct t10_alua_lu_gp *lu_gp)
 		 * we want to re-assocate a given lu_gp_mem with default_lu_gp.
 		 */
 		spin_lock(&lu_gp_mem->lu_gp_mem_lock);
-		if (lu_gp != se_global->default_lu_gp)
+		if (lu_gp != default_lu_gp)
 			__core_alua_attach_lu_gp_mem(lu_gp_mem,
-					se_global->default_lu_gp);
+					default_lu_gp);
 		else
 			lu_gp_mem->lu_gp = NULL;
 		spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
@@ -1218,27 +1226,27 @@ struct t10_alua_lu_gp *core_alua_get_lu_gp_by_name(const char *name)
 	struct t10_alua_lu_gp *lu_gp;
 	struct config_item *ci;
 
-	spin_lock(&se_global->lu_gps_lock);
-	list_for_each_entry(lu_gp, &se_global->g_lu_gps_list, lu_gp_list) {
+	spin_lock(&lu_gps_lock);
+	list_for_each_entry(lu_gp, &lu_gps_list, lu_gp_node) {
 		if (!(lu_gp->lu_gp_valid_id))
 			continue;
 		ci = &lu_gp->lu_gp_group.cg_item;
 		if (!(strcmp(config_item_name(ci), name))) {
 			atomic_inc(&lu_gp->lu_gp_ref_cnt);
-			spin_unlock(&se_global->lu_gps_lock);
+			spin_unlock(&lu_gps_lock);
 			return lu_gp;
 		}
 	}
-	spin_unlock(&se_global->lu_gps_lock);
+	spin_unlock(&lu_gps_lock);
 
 	return NULL;
 }
 
 void core_alua_put_lu_gp_from_name(struct t10_alua_lu_gp *lu_gp)
 {
-	spin_lock(&se_global->lu_gps_lock);
+	spin_lock(&lu_gps_lock);
 	atomic_dec(&lu_gp->lu_gp_ref_cnt);
-	spin_unlock(&se_global->lu_gps_lock);
+	spin_unlock(&lu_gps_lock);
 }
 
 /*
@@ -1429,7 +1437,7 @@ void core_alua_free_tg_pt_gp(
 		}
 		spin_unlock(&tg_pt_gp->tg_pt_gp_lock);
 		/*
-		 * tg_pt_gp_mem is assoicated with a single
+		 * tg_pt_gp_mem is associated with a single
 		 * se_port->sep_alua_tg_pt_gp_mem, and is released via
 		 * core_alua_free_tg_pt_gp_mem().
 		 *
@@ -1963,7 +1971,7 @@ int core_setup_alua(struct se_device *dev, int force_pt)
 		printk(KERN_INFO "%s: Enabling ALUA Emulation for SPC-3"
 			" device\n", TRANSPORT(dev)->name);
 		/*
-		 * Assoicate this struct se_device with the default ALUA
+		 * Associate this struct se_device with the default ALUA
 		 * LUN Group.
 		 */
 		lu_gp_mem = core_alua_allocate_lu_gp_mem(dev);
@@ -1974,7 +1982,7 @@ int core_setup_alua(struct se_device *dev, int force_pt)
 		alua->alua_state_check = &core_alua_state_check;
 		spin_lock(&lu_gp_mem->lu_gp_mem_lock);
 		__core_alua_attach_lu_gp_mem(lu_gp_mem,
-				se_global->default_lu_gp);
+				default_lu_gp);
 		spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 
 		printk(KERN_INFO "%s: Adding to default ALUA LU Group:"

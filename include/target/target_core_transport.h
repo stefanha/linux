@@ -111,8 +111,8 @@ struct se_subsystem_api;
 
 extern struct kmem_cache *se_mem_cache;
 
-extern int init_se_global(void);
-extern void release_se_global(void);
+extern int init_se_kmem_caches(void);
+extern void release_se_kmem_caches(void);
 extern void init_scsi_index_table(void);
 extern u32 scsi_get_new_index(scsi_index_t);
 extern void transport_init_queue_obj(struct se_queue_obj *);
@@ -172,6 +172,7 @@ extern int transport_generic_handle_cdb_map(struct se_cmd *);
 extern int transport_generic_handle_data(struct se_cmd *);
 extern void transport_new_cmd_failure(struct se_cmd *);
 extern int transport_generic_handle_tmr(struct se_cmd *);
+extern void transport_generic_free_cmd_intr(struct se_cmd *);
 extern void __transport_stop_task_timer(struct se_task *, unsigned long *);
 extern unsigned char transport_asciihex_to_binaryhex(unsigned char val[2]);
 extern int transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *, u32,
@@ -353,7 +354,5 @@ struct se_subsystem_api {
 
 #define TRANSPORT(dev)		((dev)->transport)
 #define HBA_TRANSPORT(hba)	((hba)->transport)
-
-extern struct se_global *se_global;
 
 #endif /* TARGET_CORE_TRANSPORT_H */

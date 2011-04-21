@@ -66,17 +66,14 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 
 	rd_host->rd_host_id = host_id;
 
-	atomic_set(&hba->left_queue_depth, RD_HBA_QUEUE_DEPTH);
-	atomic_set(&hba->max_queue_depth, RD_HBA_QUEUE_DEPTH);
 	hba->hba_ptr = (void *) rd_host;
 
 	printk(KERN_INFO "CORE_HBA[%d] - TCM Ramdisk HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
 		RD_HBA_VERSION, TARGET_CORE_MOD_VERSION);
 	printk(KERN_INFO "CORE_HBA[%d] - Attached Ramdisk HBA: %u to Generic"
-		" Target Core TCQ Depth: %d MaxSectors: %u\n", hba->hba_id,
-		rd_host->rd_host_id, atomic_read(&hba->max_queue_depth),
-		RD_MAX_SECTORS);
+		" MaxSectors: %u\n", hba->hba_id,
+		rd_host->rd_host_id, RD_MAX_SECTORS);
 
 	return 0;
 }
