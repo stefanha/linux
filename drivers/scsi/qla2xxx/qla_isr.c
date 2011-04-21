@@ -5,6 +5,7 @@
  * See LICENSE.qla2xxx for copyright and licensing details.
  */
 #include "qla_def.h"
+#include "qla_target.h"
 
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -212,6 +213,12 @@ qla2300_intr_handler(int irq, void *dev_id)
 			mb[2] = RD_MAILBOX_REG(ha, reg, 2);
 			qla2x00_async_event(vha, rsp, mb);
 			break;
+		case 0x17: /* FAST_CTIO_COMP */
+			mb[0] = MBA_CTIO_COMPLETION;
+			mb[1] = MSW(stat);
+			mb[2] = RD_MAILBOX_REG(ha, reg, 2);
+			qla2x00_async_event(vha, rsp, mb);
+			break;
 		default:
 			DEBUG2(printk("scsi(%ld): Unrecognized interrupt type "
 			    "(%d).\n",
@@ -331,6 +338,7 @@ qla2x00_async_event(scsi_qla_host_t *vha, struct rsp_que *rsp, uint16_t *mb)
 	if (IS_QLA8XXX_TYPE(ha))
 		goto skip_rio;
 	switch (mb[0]) {
+	case MBA_CTIO_COMPLETION:
 	case MBA_SCSI_COMPLETION:
 		handles[0] = le32_to_cpu((uint32_t)((mb[2] << 16) | mb[1]));
 		handle_cnt = 1;
@@ -392,6 +400,10 @@ skip_rio:
 				handles[cnt]);
 		break;
 
+	case MBA_CTIO_COMPLETION:
+		qla_tgt_ctio_completion(vha, handles[0]);
+		break;
+
 	case MBA_RESET:			/* Reset */
 		DEBUG2(printk("scsi(%ld): Asynchronous RESET.\n",
 			vha->host_no));
@@ -450,8 +462,10 @@ skip_rio:
 	case MBA_WAKEUP_THRES:		/* Request Queue Wake-up */
 		DEBUG2(printk("scsi(%ld): Asynchronous WAKEUP_THRES.\n",
 		    vha->host_no));
-		break;
 
+		if (qla_tgt_mode_enabled(vha))
+			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+		break;
 	case MBA_LIP_OCCURRED:		/* Loop Initialization Procedure */
 		DEBUG2(printk("scsi(%ld): LIP occurred (%x).\n", vha->host_no,
 		    mb[1]));
@@ -677,6 +691,8 @@ skip_rio:
 			DEBUG2(printk("scsi(%ld): Asynchronous PORT UPDATE "
 			    "ignored %04x/%04x/%04x.\n", vha->host_no, mb[1],
 			    mb[2], mb[3]));
+
+			qla_tgt_async_event(mb[0], vha, mb);
 			break;
 		}
 
@@ -697,6 +713,8 @@ skip_rio:
 
 		set_bit(LOOP_RESYNC_NEEDED, &vha->dpc_flags);
 		set_bit(LOCAL_LOOP_UPDATE, &vha->dpc_flags);
+
+		qla_tgt_async_event(mb[0], vha, mb);
 		break;
 
 	case MBA_RSCN_UPDATE:		/* State Change Registration */
@@ -820,6 +838,8 @@ skip_rio:
 		break;
 	}
 
+	qla_tgt_async_event(mb[0], vha, mb);
+
 	if (!vha->vp_idx && ha->num_vhosts)
 		qla2x00_alert_all_vps(rsp, mb);
 }
@@ -835,6 +855,11 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 {
 	srb_t *sp;
 	struct qla_hw_data *ha = vha->hw;
+
+	if (HANDLE_IS_CTIO_COMP(index)) {
+		qla_tgt_ctio_completion(vha, index);
+		return;
+	}
 
 	/* Validate handle. */
 	if (index >= MAX_OUTSTANDING_COMMANDS) {
@@ -1342,6 +1367,9 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 	while (rsp->ring_ptr->signature != RESPONSE_PROCESSED) {
 		pkt = (sts_entry_t *)rsp->ring_ptr;
 
+		DEBUG5(printk(KERN_INFO "%s(): IOCB data:\n", __func__));
+		DEBUG5(qla2x00_dump_buffer((uint8_t *)pkt, RESPONSE_ENTRY_SIZE));
+
 		rsp->ring_index++;
 		if (rsp->ring_index == rsp->length) {
 			rsp->ring_index = 0;
@@ -1355,12 +1383,29 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 			    "scsi(%ld): Process error entry.\n", vha->host_no));
 
 			qla2x00_error_entry(vha, rsp, pkt);
+
+			if (qla_tgt_2x00_process_response_error(vha, pkt) == 1)
+				break;
+
 			((response_t *)pkt)->signature = RESPONSE_PROCESSED;
 			wmb();
 			continue;
 		}
 
 		switch (pkt->entry_type) {
+		case ACCEPT_TGT_IO_TYPE:
+		case CONTINUE_TGT_IO_TYPE:
+		case CTIO_A64_TYPE:
+		case IMMED_NOTIFY_TYPE:
+		case NOTIFY_ACK_TYPE:
+		case ENABLE_LUN_TYPE:
+		case MODIFY_LUN_TYPE:
+			DEBUG5(printk(KERN_WARNING "qla2x00_response_pkt: calling"
+				" tgt_response_pkt %p (type %02X)\n",
+				qla_target.tgt_response_pkt, pkt->entry_type););
+
+			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
+			break;
 		case STATUS_TYPE:
 			qla2x00_status_entry(vha, rsp, pkt);
 			break;
@@ -1949,6 +1994,16 @@ qla24xx_mbx_completion(scsi_qla_host_t *vha, uint16_t mb0)
 		DEBUG2_3(printk("%s(%ld): MBX pointer ERROR!\n",
 		    __func__, vha->host_no));
 	}
+
+#if defined(QL_DEBUG_LEVEL_1)
+	printk(KERN_INFO "scsi(%ld): Mailbox registers:", vha->host_no);
+	for (cnt = 0; cnt < vha->mbx_count; cnt++) {
+		if ((cnt % 4) == 0)
+			printk(KERN_CONT "\n");
+		printk("mbox %02d: 0x%04x   ", cnt, ha->mailbox_out[cnt]);
+	}
+	printk(KERN_CONT "\n");
+#endif
 }
 
 /**
@@ -1980,6 +2035,10 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 			    "scsi(%ld): Process error entry.\n", vha->host_no));
 
 			qla2x00_error_entry(vha, rsp, (sts_entry_t *) pkt);
+
+			if (qla_tgt_24xx_process_response_error(vha, pkt) == 1)
+				break;
+
 			((response_t *)pkt)->signature = RESPONSE_PROCESSED;
 			wmb();
 			continue;
@@ -2010,6 +2069,14 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 			break;
                 case ELS_IOCB_TYPE:
 			qla24xx_els_ct_entry(vha, rsp->req, pkt, ELS_IOCB_TYPE);
+			break;
+		case ABTS_RECV_24XX:
+			/* ensure that the ATIO queue is empty */
+			qla_tgt_24xx_process_atio_queue(vha);
+		case ABTS_RESP_24XX:
+		case CTIO_TYPE7:
+		case NOTIFY_ACK_TYPE:
+			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
 		default:
 			/* Type Not Supported. */
@@ -2156,6 +2223,13 @@ qla24xx_intr_handler(int irq, void *dev_id)
 		case 0x14:
 			qla24xx_process_response_queue(vha, rsp);
 			break;
+		case 0x1C: /* ATIO queue updated */
+			qla_tgt_24xx_process_atio_queue(vha);
+			break;
+		case 0x1D: /* ATIO and response queues updated */
+			qla_tgt_24xx_process_atio_queue(vha);
+			qla24xx_process_response_queue(vha, rsp);
+			break;
 		default:
 			DEBUG2(printk("scsi(%ld): Unrecognized interrupt type "
 			    "(%d).\n",
@@ -2298,6 +2372,13 @@ qla24xx_msix_default(int irq, void *dev_id)
 			break;
 		case 0x13:
 		case 0x14:
+			qla24xx_process_response_queue(vha, rsp);
+			break;
+		case 0x1C: /* ATIO queue updated */
+			qla_tgt_24xx_process_atio_queue(vha);
+			break;
+		case 0x1D: /* ATIO and response queues updated */
+			qla_tgt_24xx_process_atio_queue(vha);
 			qla24xx_process_response_queue(vha, rsp);
 			break;
 		default:

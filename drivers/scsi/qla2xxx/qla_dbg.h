@@ -28,6 +28,11 @@
 /* #define QL_DEBUG_LEVEL_16 */ /* Output ISP84XX trace msgs */
 /* #define QL_DEBUG_LEVEL_17 */ /* Output EEH trace messages */
 /* #define QL_DEBUG_LEVEL_18 */ /* Output T10 CRC trace messages */
+/* #define QL_DEBUG_LEVEL_21 */ /* Output for target */
+/* #define QL_DEBUG_LEVEL_22 */ /* Output for target management */
+/* #define QL_DEBUG_LEVEL_23 */ /* Output for target scsi packets */
+/* #define QL_DEBUG_LEVEL_24 */ /* Output for target SG lists */
+/* #define QL_DEBUG_LEVEL_25 */ /* Output for target task management */
 
 /*
 * Macros use for debugging the driver.
@@ -146,6 +151,35 @@
 #define DEBUG18(x)	do {} while (0)
 #endif
 
+#if defined(QL_DEBUG_LEVEL_21)
+#define DEBUG21(x)	do {x;} while (0)
+#else
+#define DEBUG21(x)	do {} while (0)
+#endif
+
+#if defined(QL_DEBUG_LEVEL_22)
+#define DEBUG22(x)	do {x;} while (0)
+#else
+#define DEBUG22(x)	do {} while (0)
+#endif
+
+#if defined(QL_DEBUG_LEVEL_23)
+#define DEBUG23(x)	do {x;} while (0)
+#else
+#define DEBUG23(x)	do {} while (0)
+#endif
+
+#if defined(QL_DEBUG_LEVEL_24)
+#define DEBUG24(x)	do {x;} while (0)
+#else
+#define DEBUG24(x)	do {} while (0)
+#endif
+
+#if defined(QL_DEBUG_LEVEL_25)
+#define DEBUG25(x)	do {x;} while (0)
+#else
+#define DEBUG25(x)	do {} while (0)
+#endif
 
 /*
  * Firmware Dump structure definition

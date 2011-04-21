@@ -1,0 +1,7 @@
+config TCM_QLA2XXX
+	tristate "TCM_QLA2XXX fabric module for Qlogic 2xxx series target mode HBAs"
+	select LIBFC
+	select SCSI_QLA_FC
+	default n
+	---help---
+	Say Y here to enable the TCM_QLA2XXX fabric module for Qlogic 2xxx series target mode HBAs 

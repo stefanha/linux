@@ -1,0 +1,125 @@
+TCM/LIO target mode setup with qla2xxx
+--------------------------------------
+
+- Note the latest revision of this documentation is available on the LIO wiki here:
+
+  http://linux-iscsi.org/wiki/QLogic
+
+- If 1st time, git clone lio-core
+  # git clone git://git.kernel.org/pub/scm/linux/kernel/git/nab/lio-core-2.6.git
+  # cd lio-core-2.6
+  # git checkout --track -b tcm_qla2xxx origin/tcm_qla2xxx
+  # git pull origin tcm_qla2xxx
+  # cp <your_working_config_file> .config
+  # make menuconfig or make oldconfig
+    - Select device drivers
+    - Select TCM as module
+    - select FILEIO, IBLOCK, PSCSI, Linux-iSCSI, tcm_qla2xxx as modules
+    - Save and return
+  # Verify the following in .config (Change it as follows if required)
+    - Need CONFIG_INET=y, CONFIG_SCSI_FC_ATTRS=m
+    - Need CONFIGFS_FS=m
+      - If CONFIGFS_FS=y is set
+        - After kernel boots, a mount is required as follows
+          # mount -t configfs configfs /sys/kernel/config
+
+  - Else, go to where the lio-core kernel is located 
+    # cd lio-core-2.6
+    # git pull origin tcm_qla2xxx
+    # make clean
+    # make oldconfig
+
+- Build kernel and modules
+  # make
+  # make modules
+  # make modules_install
+  # make install
+
+- Use lio-core-2.6 kernel
+  - Change /boot/grub/menu.lst to select lio-core-2.6 kernel
+    - also in menu.lst, make sure vmalloc=256m in the kernel line
+      - Normally this may not be not required, but if /proc/meminfo shows vmalloc <128K
+        - Fixes an issue with fcport_lport_map allocation seen via dmesg or /var/log/messages
+      - 128m may be ok, but may not work. 512m may be too high.
+  # reboot
+  - Verify lio-core kernel is running after system comes up.
+    - uname -a 
+
+- Install appropriate TCM/LIO tools/utils
+  - lio-util and rtsadmin-frozen packages
+    - As a minimum, lio-util is required
+    - rtsadmin is propreitary
+    - rtsadmin requires libreadline6 package to be installed as well
+    - You should also be able to build lio-utils.git in-house
+      - install rpmbuild and a libsnmp*-dev package
+      # make user_rpms
+      - The 32-bit package should be built in /usr/src/packages/RPMS/
+
+- Verify following modules needed and load them if required
+  - tcm_qla2xxx, target_core_mod, qla2xxx, iscsi_target_mod, configfs
+  - Normally they all should be loaded, and all you have to do is the following:
+    # modprobe tcm_qla2xxx
+  - Otherwise,
+    # insmod fs/configfs/configfs.ko
+      - Or do the mount command as shown above (if .config file has CONFIGFS_FS=y)
+    # insmod /drivers/target/target_core_mod.ko
+    # insmod /drivers/target/iscsi_target_mod.ko
+    # modprobe tcm_qla2xxx
+
+- Start target
+  # /etc/init.d/target start
+  - target will be automatically started if lio-util/rtsadmin-frozen is installed
+  - to stop target if required ...
+    # /etc/init.d/target stop
+  - To check for status
+    # /etc/init.d/target status
+    
+
+- If rtsadmin is installed ...
+  # rtsadmin
+  ...
+  <rtsadmin> create hba fileio
+  ...
+  <rtsadmin> create storage <myfile_name> /tmp/<tmpfile_name> <size>
+    - Where <size> = 10G, say
+    - Where <myfile_name> could be my_file, say
+    - Where <tmpfile_name> could be foo, say
+    - A storage object <myfile_name> will be created
+    - A 10G FILEIO Lun will be created @ /tmp/foo
+  ...
+  <rtsadmin> cfspath
+  Current context object lives in
+  /sys/kernel/config/target/core/fileio_0/my_file
+  <rtsadmin> saveconfig
+  ...
+  <rtsadmin> quit
+- tcm_qla2xxx specific setup
+  # modprobe tcm_qla2xxx (if not already done earlier)
+  # mkdir -p /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:31:4c:48/tpgt_1/lun/lun_0/ 
+    - Substitute port_name above with the actual portname of the qla2xxx ISP
+      - You can cat /sys/class/fc_host/<host#>/port_name
+  # ln -s /sys/kernel/config/target/core/fileio_0/my_file/ /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:31:4c:48/tpgt_1/lun/lun_0/tcm_qla2xxx_port
+  # echo 1 > /sys/kernel/config/target/qla2xxx/21:00:00:24:ff:31:4c:48/tpgt_1/enable
+
+- Further setup/Notes:
+  - default TCM/FILEIO is using O_SYNC, and can be used for both a file on a mounted filesystem, as well as a raw block device.
+  - From there you can setup any other TCM/IBLOCK, TCM/pSCSI and TCM/RAMDISK backends in the same manner using rtsadmin, then determine the 'cfspath', and use this as the symlink <source> when creating the configfs symlink in your qla2xxx/$FC_WWPN/tpgt_$TPGT/lun/lun_$ID/<dest>
+  - Also, note that you can have any number of virtual HBAs and assoicated DEVICEs. The TCM subsystem plugins (FILEIO/IBLOCK/pSCSI/RAMDISK) will report the underlying HW limitiations for things like TCQ depth, Max Sectors, TaskAbortedStatus, UA Interlocking, etc.. These values are available as attributes within the device context:
+    # rtsadmin
+    ...
+    fileio0/my_file(/tmp/my_file)> ls attribute
+    ...
+
+<END OF DOCUMENT>
+
+
+
+
+
+
+
+
+
+
+
+
