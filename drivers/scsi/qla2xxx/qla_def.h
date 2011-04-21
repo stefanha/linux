@@ -176,7 +176,7 @@
 #define	LOOP_DOWN_RESET			(LOOP_DOWN_TIME - 30)
 
 /* Maximum outstanding commands in ISP queues (1-65535) */
-#define MAX_OUTSTANDING_COMMANDS	1024
+#define MAX_OUTSTANDING_COMMANDS	4096
 
 /* ISP request and response entry counts (37-65535) */
 #define REQUEST_ENTRY_CNT_2100		128	/* Number of request entries. */
