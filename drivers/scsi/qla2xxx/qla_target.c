@@ -1862,12 +1862,12 @@ static void qla_tgt_load_cont_data_segments(struct qla_tgt_prm *prm, struct scsi
 			}
 			*dword_ptr++ = cpu_to_le32(sg_dma_len(prm->sg));
 
-			DEBUG24(qla_printk(KERN_INFO, vha->hw, "S/G Segment Cont. phys_addr=%llx:%llx, len=%d",
+			DEBUG24(qla_printk(KERN_INFO, vha->hw, "S/G Segment Cont. phys_addr=%llx:%llx, len=%d\n",
 			      (long long unsigned int)pci_dma_hi32(sg_dma_address(prm->sg)),
 			      (long long unsigned int)pci_dma_lo32(sg_dma_address(prm->sg)),
 			      (int)sg_dma_len(prm->sg)));
 
-			prm->sg++;
+			prm->sg = sg_next(prm->sg);
 		}
 	}
 }
@@ -1921,7 +1921,7 @@ static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 		      (long long unsigned int)pci_dma_lo32(sg_dma_address(prm->sg)),
 		      (int)sg_dma_len(prm->sg)));
 
-		prm->sg++;
+		prm->sg = sg_next(prm->sg);
 	}
 
 	qla_tgt_load_cont_data_segments(prm, vha);
@@ -1978,7 +1978,7 @@ static void qla24xx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 								prm->sg)),
 		      (int)sg_dma_len(prm->sg)));
 
-		prm->sg++;
+		prm->sg = sg_next(prm->sg);
 	}
 
 	qla_tgt_load_cont_data_segments(prm, vha);
