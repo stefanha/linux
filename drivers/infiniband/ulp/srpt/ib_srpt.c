@@ -1127,7 +1127,7 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	cmd = &ioctx->cmd;
 	dir = cmd->data_direction;
 	BUG_ON(dir == DMA_NONE);
-	task = cmd->t_task;
+	task = &cmd->t_task;
 	if (cmd->se_cmd_flags & (SCF_SCSI_DATA_SG_IO_CDB
 				 | SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(cmd);
@@ -1421,7 +1421,7 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 		break;
 	case SRPT_STATE_NEED_DATA:
 		/* DMA_TO_DEVICE (write) - RDMA read error. */
-		atomic_set(&ioctx->cmd.t_task->transport_lun_stop, 1);
+		atomic_set(&ioctx->cmd.t_task.transport_lun_stop, 1);
 		transport_generic_handle_data(&ioctx->cmd);
 		break;
 	case SRPT_STATE_CMD_RSP_SENT:
@@ -1430,7 +1430,7 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 		 * not been received in time.
 		 */
 		srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
-		atomic_set(&ioctx->cmd.t_task->transport_lun_stop, 1);
+		atomic_set(&ioctx->cmd.t_task.transport_lun_stop, 1);
 		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 		break;
 	case SRPT_STATE_MGMT_RSP_SENT:
@@ -1549,7 +1549,7 @@ static void srpt_handle_rdma_err_comp(struct srpt_rdma_ch *ch,
 			       __func__, __LINE__, state);
 		break;
 	case IB_WC_RDMA_WRITE:
-		atomic_set(&ioctx->cmd.t_task->transport_lun_stop,
+		atomic_set(&ioctx->cmd.t_task.transport_lun_stop,
 			   1);
 		break;
 	default:

@@ -515,18 +515,18 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(se_cmd);
 
-		cmd->sg_cnt = se_cmd->t_task->t_tasks_sg_chained_no;
-		cmd->sg = se_cmd->t_task->t_tasks_sg_chained;
+		cmd->sg_cnt = se_cmd->t_task.t_tasks_sg_chained_no;
+		cmd->sg = se_cmd->t_task.t_tasks_sg_chained;
 	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/*
 		 * Use se_cmd->t_task->t_tasks_sg_bounce for control CDBs
 		 * using a contigious buffer
 		 */
-		sg_init_table(&se_cmd->t_task->t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_task->t_tasks_sg_bounce,
-			se_cmd->t_task->t_task_buf, se_cmd->data_length);
+		sg_init_table(&se_cmd->t_task.t_tasks_sg_bounce, 1);
+		sg_set_buf(&se_cmd->t_task.t_tasks_sg_bounce,
+			se_cmd->t_task.t_task_buf, se_cmd->data_length);
 		cmd->sg_cnt = 1;
-		cmd->sg = &se_cmd->t_task->t_tasks_sg_bounce;
+		cmd->sg = &se_cmd->t_task.t_tasks_sg_bounce;
 	} else {
 		printk(KERN_ERR "Unknown se_cmd_flags: 0x%08x in"
 			" tcm_qla2xxx_write_pending()\n", se_cmd->se_cmd_flags);
@@ -602,7 +602,7 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
 	 */
 	if (bidi)
-		se_cmd->t_task->t_tasks_bidi = 1;
+		se_cmd->t_task.t_tasks_bidi = 1;
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
@@ -733,7 +733,7 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 
 	cmd->bufflen = se_cmd->data_length;
 	cmd->dma_data_direction = se_cmd->data_direction;
-	cmd->aborted = atomic_read(&se_cmd->t_task->t_transport_aborted);
+	cmd->aborted = atomic_read(&se_cmd->t_task.t_transport_aborted);
 	/*
 	 * Setup the struct se_task->task_sg[] chained SG list
 	 */
@@ -741,19 +741,19 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(se_cmd);
 
-		cmd->sg_cnt = se_cmd->t_task->t_tasks_sg_chained_no;
-		cmd->sg = se_cmd->t_task->t_tasks_sg_chained;
+		cmd->sg_cnt = se_cmd->t_task.t_tasks_sg_chained_no;
+		cmd->sg = se_cmd->t_task.t_tasks_sg_chained;
 	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/*
 		 * Use se_cmd->t_task->t_tasks_sg_bounce for control CDBs
 		 * using a contigious buffer
 		 */
-		sg_init_table(&se_cmd->t_task->t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_task->t_tasks_sg_bounce,
-			se_cmd->t_task->t_task_buf, se_cmd->data_length);
+		sg_init_table(&se_cmd->t_task.t_tasks_sg_bounce, 1);
+		sg_set_buf(&se_cmd->t_task.t_tasks_sg_bounce,
+			se_cmd->t_task.t_task_buf, se_cmd->data_length);
 
 		cmd->sg_cnt = 1;
-		cmd->sg = &se_cmd->t_task->t_tasks_sg_bounce;
+		cmd->sg = &se_cmd->t_task.t_tasks_sg_bounce;
 	} else {
 		cmd->sg_cnt = 0;
 		cmd->sg = NULL;
@@ -777,7 +777,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	cmd->sg_cnt = 0;
 	cmd->offset = 0;
 	cmd->dma_data_direction = se_cmd->data_direction;
-	cmd->aborted = atomic_read(&se_cmd->t_task->t_transport_aborted);
+	cmd->aborted = atomic_read(&se_cmd->t_task.t_transport_aborted);
 
 	/*
 	 * Now queue status response to qla2xxx LLD code and response ring

@@ -534,9 +534,7 @@ struct se_cmd {
 	/* Only used for internal passthrough and legacy TCM fabric modules */
 	struct se_session	*se_sess;
 	struct se_tmr_req	*se_tmr_req;
-	/* t_task is setup to t_task_backstore in transport_init_se_cmd() */
-	struct se_transport_task *t_task;
-	struct se_transport_task t_task_backstore;
+	struct se_transport_task t_task;
 	struct target_core_fabric_ops *se_tfo;
 	int (*transport_emulate_cdb)(struct se_cmd *);
 	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);

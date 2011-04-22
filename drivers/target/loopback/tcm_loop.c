@@ -118,7 +118,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
 	 */
 	if (scsi_bidi_cmnd(sc))
-		se_cmd->t_task->t_tasks_bidi = 1;
+		se_cmd->t_task.t_tasks_bidi = 1;
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
@@ -176,7 +176,7 @@ static int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 		 * For BIDI commands, pass in the extra READ buffer
 		 * to transport_generic_map_mem_to_cmd() below..
 		 */
-		if (se_cmd->t_task->t_tasks_bidi) {
+		if (se_cmd->t_task.t_tasks_bidi) {
 			struct scsi_data_buffer *sdb = scsi_in(sc);
 
 			mem_bidi_ptr = sdb->table.sgl;

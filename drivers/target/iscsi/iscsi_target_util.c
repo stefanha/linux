@@ -1394,7 +1394,7 @@ send_pg:
 		se_len -= tx_sent;
 		if (!(se_len)) {
 			list_for_each_entry_continue(se_mem,
-					se_cmd->t_task->t_mem_list, se_list)
+					se_cmd->t_task.t_mem_list, se_list)
 				break;
 
 			if (!se_mem) {
