@@ -150,10 +150,10 @@ static int tcm_loop_new_cmd_map(struct se_cmd *se_cmd)
 	 * Allocate the necessary tasks to complete the received CDB+data
 	 */
 	ret = transport_generic_allocate_tasks(se_cmd, tl_cmd->sc->cmnd);
-	if (ret == -1) {
+	if (ret == -ENOMEM) {
 		/* Out of Resources */
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	} else if (ret == -2) {
+	} else if (ret == -EINVAL) {
 		/*
 		 * Handle case for SAM_STAT_RESERVATION_CONFLICT
 		 */

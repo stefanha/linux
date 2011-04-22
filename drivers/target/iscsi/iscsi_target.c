@@ -1207,28 +1207,24 @@ done:
 	 * maximum request size the physical HBA(s) can handle.
 	 */
 	transport_ret = transport_generic_allocate_tasks(SE_CMD(cmd), hdr->cdb);
-	if (!transport_ret)
-		goto build_list;
-
-	if (transport_ret == -1) {
+	if (transport_ret == -ENOMEM) {
 		return iscsit_add_reject_from_cmd(
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
-	} else if (transport_ret == -2) {
+	} else if (transport_ret == -EINVAL) {
 		/*
 		 * Unsupported SAM Opcode.  CHECK_CONDITION will be sent
 		 * in iscsit_execute_cmd() during the CmdSN OOO Execution
 		 * Mechinism.
 		 */
 		send_check_condition = 1;
-		goto attach_cmd;
-	}
-
-build_list:
-	if (iscsit_decide_list_to_build(cmd, payload_length) < 0)
-		return iscsit_add_reject_from_cmd(
+	} else {
+		if (iscsit_decide_list_to_build(cmd, payload_length) < 0)
+			return iscsit_add_reject_from_cmd(
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
+	}
+
 attach_cmd:
 	spin_lock_bh(&conn->cmd_lock);
 	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);

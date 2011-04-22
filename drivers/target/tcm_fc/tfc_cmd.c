@@ -627,13 +627,13 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 	FT_IO_DBG("r_ctl %x alloc task ret %d\n", fh->fh_r_ctl, ret);
 	ft_dump_cmd(cmd, __func__);
 
-	if (ret == -1) {
+	if (ret == -ENOMEM) {
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 		transport_generic_free_cmd(se_cmd, 0, 1, 0);
 		return;
 	}
-	if (ret == -2) {
+	if (ret == -EINVAL) {
 		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
 			ft_queue_status(se_cmd);
 		else

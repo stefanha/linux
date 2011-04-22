@@ -1847,7 +1847,7 @@ int transport_generic_allocate_tasks(
 	if (transport_check_alloc_task_attr(cmd) < 0) {
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
-		return -2;
+		return -EINVAL;
 	}
 	spin_lock(&cmd->se_lun->lun_sep_lock);
 	if (cmd->se_lun->lun_sep)
@@ -2946,7 +2946,7 @@ transport_handle_reservation_conflict(struct se_cmd *cmd)
 		core_scsi3_ua_allocate(cmd->se_sess->se_node_acl,
 			cmd->orig_fe_lun, 0x2C,
 			ASCQ_2CH_PREVIOUS_RESERVATION_CONFLICT_STATUS);
-	return -2;
+	return -EINVAL;
 }
 
 /*	transport_generic_cmd_sequencer():
@@ -2977,7 +2977,7 @@ static int transport_generic_cmd_sequencer(
 				&transport_nop_wait_for_tasks;
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason = TCM_CHECK_CONDITION_UNIT_ATTENTION;
-		return -2;
+		return -EINVAL;
 	}
 	/*
 	 * Check status of Asymmetric Logical Unit Assignment port
@@ -2999,7 +2999,7 @@ static int transport_generic_cmd_sequencer(
 			transport_set_sense_codes(cmd, 0x04, alua_ascq);
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			cmd->scsi_sense_reason = TCM_CHECK_CONDITION_NOT_READY;
-			return -2;
+			return -EINVAL;
 		}
 		goto out_invalid_cdb_field;
 	}
@@ -3548,11 +3548,11 @@ static int transport_generic_cmd_sequencer(
 out_unsupported_cdb:
 	cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 	cmd->scsi_sense_reason = TCM_UNSUPPORTED_SCSI_OPCODE;
-	return -2;
+	return -EINVAL;
 out_invalid_cdb_field:
 	cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 	cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
-	return -2;
+	return -EINVAL;
 }
 
 static inline void transport_release_tasks(struct se_cmd *);
