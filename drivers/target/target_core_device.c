@@ -708,7 +708,8 @@ int transport_core_report_lun_response(struct se_cmd *se_cmd)
 			continue;
 
 		int_to_scsilun(deve->mapped_lun, (struct scsi_lun *)&buf[offset]);
-		cdb_offset += 16;
+		offset += 8;
+		cdb_offset += 8;
 	}
 	spin_unlock_irq(&SE_NODE_ACL(se_sess)->device_list_lock);
 
