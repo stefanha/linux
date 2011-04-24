@@ -189,8 +189,6 @@ static void iscsit_task_reassign_remove_cmd(
 			" %hu on SID: %u\n", cr->cid, sess->sid);
 		iscsit_remove_active_connection_recovery_entry(cr, sess);
 	}
-
-	return;
 }
 
 static int iscsit_task_reassign_complete_nop_out(
@@ -325,7 +323,7 @@ static int iscsit_task_reassign_complete_read(
 		return 0;
 	}
 
-	if (!atomic_read(&T_TASK(se_cmd)->t_transport_complete)) {
+	if (!atomic_read(&se_cmd->t_task->t_transport_complete)) {
 		printk(KERN_ERR "READ ITT: 0x%08x: t_state: %d, never returned"
 			" from transport\n", cmd->init_task_tag,
 			SE_CMD(cmd)->t_state);
@@ -547,8 +545,6 @@ static void iscsit_task_reassign_prepare_unsolicited_dataout(
 			}
 		}
 	}
-
-	return;
 }
 
 int iscsit_task_reassign_prepare_write(

@@ -336,7 +336,7 @@ rd_alloc_task(struct se_cmd *cmd)
 		printk(KERN_ERR "Unable to allocate struct rd_request\n");
 		return NULL;
 	}
-	rd_req->rd_dev = SE_DEV(cmd)->dev_ptr;
+	rd_req->rd_dev = cmd->se_lun->lun_se_dev->dev_ptr;
 
 	return &rd_req->rd_task;
 }
@@ -620,11 +620,11 @@ static int rd_MEMCPY_do_task(struct se_task *task)
 	unsigned long long lba;
 	int ret;
 
-	req->rd_page = (task->task_lba * DEV_ATTRIB(dev)->block_size) / PAGE_SIZE;
+	req->rd_page = (task->task_lba * dev->se_sub_dev->se_dev_attrib.block_size) / PAGE_SIZE;
 	lba = task->task_lba;
 	req->rd_offset = (do_div(lba,
-			  (PAGE_SIZE / DEV_ATTRIB(dev)->block_size))) *
-			   DEV_ATTRIB(dev)->block_size;
+			  (PAGE_SIZE / dev->se_sub_dev->se_dev_attrib.block_size))) *
+			   dev->se_sub_dev->se_dev_attrib.block_size;
 	req->rd_size = task->task_size;
 
 	if (task->task_data_direction == DMA_FROM_DEVICE)
@@ -737,7 +737,7 @@ check_eot:
 	}
 
 out:
-	T_TASK(task->task_se_cmd)->t_tasks_se_num += *se_mem_cnt;
+	task->task_se_cmd->t_task->t_tasks_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
 	printk(KERN_INFO "RD_DR - Allocated %u struct se_mem segments for task\n",
 			*se_mem_cnt);
@@ -819,7 +819,7 @@ static int rd_DIRECT_without_offset(
 	}
 
 out:
-	T_TASK(task->task_se_cmd)->t_tasks_se_num += *se_mem_cnt;
+	task->task_se_cmd->t_task->t_tasks_se_num += *se_mem_cnt;
 #ifdef DEBUG_RAMDISK_DR
 	printk(KERN_INFO "RD_DR - Allocated %u struct se_mem segments for task\n",
 			*se_mem_cnt);
@@ -845,13 +845,11 @@ static int rd_DIRECT_do_se_mem_map(
 	u32 task_offset = *task_offset_in;
 	unsigned long long lba;
 	int ret;
+	int block_size = task->se_dev->se_sub_dev->se_dev_attrib.block_size;
 
-	req->rd_page = ((task->task_lba * DEV_ATTRIB(task->se_dev)->block_size) /
-			PAGE_SIZE);
 	lba = task->task_lba;
-	req->rd_offset = (do_div(lba,
-			  (PAGE_SIZE / DEV_ATTRIB(task->se_dev)->block_size))) *
-			   DEV_ATTRIB(task->se_dev)->block_size;
+	req->rd_page = ((task->task_lba * block_size) /	PAGE_SIZE);
+	req->rd_offset = (do_div(lba, (PAGE_SIZE / block_size))) * block_size;
 	req->rd_size = task->task_size;
 
 	if (req->rd_offset)
@@ -864,7 +862,7 @@ static int rd_DIRECT_do_se_mem_map(
 	if (ret < 0)
 		return ret;
 
-	if (CMD_TFO(cmd)->task_sg_chaining == 0)
+	if (cmd->se_tfo->task_sg_chaining == 0)
 		return 0;
 	/*
 	 * Currently prevent writers from multiple HW fabrics doing
@@ -882,14 +880,14 @@ static int rd_DIRECT_do_se_mem_map(
 	 * across multiple struct se_task->task_sg[].
 	 */
 	ret = transport_init_task_sg(task,
-			list_entry(T_TASK(cmd)->t_mem_list->next,
+			list_entry(cmd->t_task->t_mem_list->next,
 				   struct se_mem, se_list),
 			task_offset);
 	if (ret <= 0)
 		return ret;
 
 	return transport_map_mem_to_sg(task, se_mem_list, task->task_sg,
-			list_entry(T_TASK(cmd)->t_mem_list->next,
+			list_entry(cmd->t_task->t_mem_list->next,
 				   struct se_mem, se_list),
 			out_se_mem, se_mem_cnt, task_offset_in);
 }
@@ -1019,7 +1017,7 @@ static sector_t rd_get_blocks(struct se_device *dev)
 {
 	struct rd_dev *rd_dev = dev->dev_ptr;
 	unsigned long long blocks_long = ((rd_dev->rd_page_count * PAGE_SIZE) /
-			DEV_ATTRIB(dev)->block_size) - 1;
+			dev->se_sub_dev->se_dev_attrib.block_size) - 1;
 
 	return blocks_long;
 }

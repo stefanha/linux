@@ -535,7 +535,7 @@ static inline void stgt_process_SAM_status(
 			st->stgt_result);
 		task->task_scsi_status = SAM_STAT_CHECK_CONDITION;
 		task->task_error_status = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
-		TASK_CMD(task)->transport_error_status =
+		task->task_se_cmd->transport_error_status =
 					PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		transport_complete_task(task, 0);
 		break;

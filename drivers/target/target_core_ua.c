@@ -179,7 +179,7 @@ int core_scsi3_ua_allocate(
 
 	printk(KERN_INFO "[%s]: Allocated UNIT ATTENTION, mapped LUN: %u, ASC:"
 		" 0x%02x, ASCQ: 0x%02x\n",
-		TPG_TFO(nacl->se_tpg)->get_fabric_name(), unpacked_lun,
+		nacl->se_tpg->se_tpg_tfo->get_fabric_name(), unpacked_lun,
 		asc, ascq);
 
 	atomic_inc(&deve->ua_count);
@@ -208,7 +208,7 @@ void core_scsi3_ua_for_check_condition(
 	u8 *asc,
 	u8 *ascq)
 {
-	struct se_device *dev = SE_DEV(cmd);
+	struct se_device *dev = cmd->se_lun->lun_se_dev;
 	struct se_dev_entry *deve;
 	struct se_session *sess = cmd->se_sess;
 	struct se_node_acl *nacl;
@@ -240,7 +240,7 @@ void core_scsi3_ua_for_check_condition(
 		 * highest priority UNIT_ATTENTION and ASC/ASCQ without
 		 * clearing it.
 		 */
-		if (DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl != 0) {
+		if (dev->se_sub_dev->se_dev_attrib.emulate_ua_intlck_ctrl != 0) {
 			*asc = ua->ua_asc;
 			*ascq = ua->ua_ascq;
 			break;
@@ -267,10 +267,10 @@ void core_scsi3_ua_for_check_condition(
 	printk(KERN_INFO "[%s]: %s UNIT ATTENTION condition with"
 		" INTLCK_CTRL: %d, mapped LUN: %u, got CDB: 0x%02x"
 		" reported ASC: 0x%02x, ASCQ: 0x%02x\n",
-		TPG_TFO(nacl->se_tpg)->get_fabric_name(),
-		(DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl != 0) ? "Reporting" :
-		"Releasing", DEV_ATTRIB(dev)->emulate_ua_intlck_ctrl,
-		cmd->orig_fe_lun, T_TASK(cmd)->t_task_cdb[0], *asc, *ascq);
+		nacl->se_tpg->se_tpg_tfo->get_fabric_name(),
+		(dev->se_sub_dev->se_dev_attrib.emulate_ua_intlck_ctrl != 0) ? "Reporting" :
+		"Releasing", dev->se_sub_dev->se_dev_attrib.emulate_ua_intlck_ctrl,
+		cmd->orig_fe_lun, cmd->t_task->t_task_cdb[0], *asc, *ascq);
 }
 
 int core_scsi3_ua_clear_for_request_sense(
@@ -325,7 +325,7 @@ int core_scsi3_ua_clear_for_request_sense(
 
 	printk(KERN_INFO "[%s]: Released UNIT ATTENTION condition, mapped"
 		" LUN: %u, got REQUEST_SENSE reported ASC: 0x%02x,"
-		" ASCQ: 0x%02x\n", TPG_TFO(nacl->se_tpg)->get_fabric_name(),
+		" ASCQ: 0x%02x\n", nacl->se_tpg->se_tpg_tfo->get_fabric_name(),
 		cmd->orig_fe_lun, *asc, *ascq);
 
 	return (head) ? -EPERM : 0;

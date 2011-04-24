@@ -121,8 +121,6 @@ redo:
 
 	for (i = 0; i < count; i++)
 		array[i] &= ~0x80000000;
-
-	return;
 }
 
 static inline int iscsit_randomize_pdu_lists(

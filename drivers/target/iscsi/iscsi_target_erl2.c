@@ -289,8 +289,6 @@ void iscsit_discard_cr_cmds_by_expstatsn(
 		iscsit_remove_inactive_connection_recovery_entry(cr, sess);
 		iscsit_attach_active_connection_recovery_entry(sess, cr);
 	}
-
-	return;
 }
 
 int iscsit_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)

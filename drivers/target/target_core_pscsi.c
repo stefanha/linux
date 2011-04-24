@@ -692,13 +692,12 @@ static int pscsi_transport_complete(struct se_task *task)
 	 */
 	if (((cdb[0] == MODE_SENSE) || (cdb[0] == MODE_SENSE_10)) &&
 	     (status_byte(result) << 1) == SAM_STAT_GOOD) {
-		if (!TASK_CMD(task)->se_deve)
+		if (!task->task_se_cmd->se_deve)
 			goto after_mode_sense;
 
-		if (TASK_CMD(task)->se_deve->lun_flags &
+		if (task->task_se_cmd->se_deve->lun_flags &
 				TRANSPORT_LUNFLAGS_READ_ONLY) {
-			unsigned char *buf = (unsigned char *)
-				T_TASK(task->task_se_cmd)->t_task_buf;
+			unsigned char *buf = task->task_se_cmd->t_task->t_task_buf;
 
 			if (cdb[0] == MODE_SENSE_10) {
 				if (!(buf[3] & 0x80))
@@ -764,7 +763,7 @@ static struct se_task *
 pscsi_alloc_task(struct se_cmd *cmd)
 {
 	struct pscsi_plugin_task *pt;
-	unsigned char *cdb = T_TASK(cmd)->t_task_cdb;
+	unsigned char *cdb = cmd->t_task->t_task_cdb;
 
 	pt = kzalloc(sizeof(struct pscsi_plugin_task), GFP_KERNEL);
 	if (!pt) {
@@ -777,7 +776,7 @@ pscsi_alloc_task(struct se_cmd *cmd)
 	 * allocate the extended CDB buffer for per struct se_task context
 	 * pt->pscsi_cdb now.
 	 */
-	if (T_TASK(cmd)->t_task_cdb != T_TASK(cmd)->__t_task_cdb) {
+	if (cmd->t_task->t_task_cdb != cmd->t_task->__t_task_cdb) {
 
 		pt->pscsi_cdb = kzalloc(scsi_command_size(cdb), GFP_KERNEL);
 		if (!(pt->pscsi_cdb)) {
@@ -890,7 +889,7 @@ static void pscsi_free_task(struct se_task *task)
 	 * Release the extended CDB allocation from pscsi_alloc_task()
 	 * if one exists.
 	 */
-	if (T_TASK(cmd)->t_task_cdb != T_TASK(cmd)->__t_task_cdb)
+	if (cmd->t_task->t_task_cdb != cmd->t_task->__t_task_cdb)
 		kfree(pt->pscsi_cdb);
 	/*
 	 * We do not release the bio(s) here associated with this task, as
@@ -1255,7 +1254,7 @@ static int pscsi_map_task_SG(struct se_task *task)
  */
 static int pscsi_map_task_non_SG(struct se_task *task)
 {
-	struct se_cmd *cmd = TASK_CMD(task);
+	struct se_cmd *cmd = task->task_se_cmd;
 	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
 	struct pscsi_dev_virt *pdv = task->se_dev->dev_ptr;
 	int ret = 0;
@@ -1267,7 +1266,7 @@ static int pscsi_map_task_non_SG(struct se_task *task)
 		return 0;
 
 	ret = blk_rq_map_kern(pdv->pdv_sd->request_queue,
-			pt->pscsi_req, T_TASK(cmd)->t_task_buf,
+			pt->pscsi_req, cmd->t_task->t_task_buf,
 			task->task_size, GFP_KERNEL);
 	if (ret < 0) {
 		printk(KERN_ERR "PSCSI: blk_rq_map_kern() failed: %d\n", ret);
@@ -1364,13 +1363,11 @@ static inline void pscsi_process_SAM_status(
 			pt->pscsi_result);
 		task->task_scsi_status = SAM_STAT_CHECK_CONDITION;
 		task->task_error_status = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
-		TASK_CMD(task)->transport_error_status =
+		task->task_se_cmd->transport_error_status =
 					PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		transport_complete_task(task, 0);
 		break;
 	}
-
-	return;
 }
 
 static void pscsi_req_done(struct request *req, int uptodate)
