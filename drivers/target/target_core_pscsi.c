@@ -565,7 +565,7 @@ static struct se_device *pscsi_create_virtdevice(
 			hba->hba_flags |= HBA_FLAGS_PSCSI_MODE;
 			sh = phv->phv_lld_host;
 		} else {
-			sh = scsi_host_lookup(phv->phv_host_id);
+			sh = scsi_host_lookup(pdv->pdv_host_id);
 			if (IS_ERR(sh)) {
 				printk(KERN_ERR "pSCSI: Unable to locate"
 					" pdv_host_id: %d\n", pdv->pdv_host_id);
