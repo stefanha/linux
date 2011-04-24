@@ -2567,9 +2567,9 @@ check_depth:
 
 	dev->dev_tcq_window_closed = 0;
 
-	spin_lock(&dev->execute_task_lock);
+	spin_lock_irq(&dev->execute_task_lock);
 	task = transport_get_task_from_execute_queue(dev);
-	spin_unlock(&dev->execute_task_lock);
+	spin_unlock_irq(&dev->execute_task_lock);
 
 	if (!task)
 		return 0;
