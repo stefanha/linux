@@ -353,7 +353,6 @@ int iscsi_release_thread_set(struct iscsi_conn *conn)
 		ts->blocked_threads &= ~ISCSI_BLOCK_TX_THREAD;
 	}
 
-	conn->thread_set = NULL;
 	ts->conn = NULL;
 	ts->status = ISCSI_THREAD_SET_FREE;
 	spin_unlock_bh(&ts->ts_state_lock);

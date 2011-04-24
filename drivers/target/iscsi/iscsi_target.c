@@ -4574,6 +4574,7 @@ int iscsit_close_connection(
 		}
 		sock_release(conn->sock);
 	}
+	conn->thread_set = NULL;
 
 	TRACE(TRACE_STATE, "Moving to TARG_CONN_STATE_FREE.\n");
 	conn->conn_state = TARG_CONN_STATE_FREE;
