@@ -2522,23 +2522,22 @@ static int __transport_execute_tasks(struct se_device *dev)
 	 * struct se_transport_task's to the selected transport.
 	 */
 check_depth:
-	if (atomic_dec_and_test(&dev->depth_left))
+	if (!atomic_read(&dev->depth_left))
 		return transport_tcq_window_closed(dev);
 
 	dev->dev_tcq_window_closed = 0;
 
 	/* Get a task */
 	spin_lock_irq(&dev->execute_task_lock);
-	if (!list_empty(&dev->execute_task_list)) {
-		task = list_first_entry(&dev->execute_task_list,
-					struct se_task, t_execute_list);
-		list_del(&task->t_execute_list);
-		atomic_dec(&dev->execute_tasks);
-	}
-	spin_unlock_irq(&dev->execute_task_lock);
-
-	if (!task)
+	if (list_empty(&dev->execute_task_list)) {
+		spin_unlock_irq(&dev->execute_task_lock);
 		return 0;
+	}
+	task = list_first_entry(&dev->execute_task_list,
+				struct se_task, t_execute_list);
+	list_del(&task->t_execute_list);
+	atomic_dec(&dev->execute_tasks);
+	spin_unlock_irq(&dev->execute_task_lock);
 
 	atomic_dec(&dev->depth_left);
 
