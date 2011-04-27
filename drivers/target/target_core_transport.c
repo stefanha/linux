@@ -762,10 +762,7 @@ static void transport_add_cmd_to_queue(
 	struct se_queue_obj *qobj = &dev->dev_queue_obj;
 	unsigned long flags;
 
-	INIT_LIST_HEAD(&cmd->se_qr.qr_list);
-
-	cmd->se_qr.cmd = cmd;
-	cmd->se_qr.state = t_state;
+	INIT_LIST_HEAD(&cmd->se_queue_node);
 
 	if (t_state) {
 		spin_lock_irqsave(&cmd->t_task.t_state_lock, flags);
@@ -775,7 +772,7 @@ static void transport_add_cmd_to_queue(
 	}
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	list_add_tail(&cmd->se_qr.qr_list, &qobj->qobj_list);
+	list_add_tail(&cmd->se_queue_node, &qobj->qobj_list);
 	atomic_inc(&cmd->t_task.t_transport_queue_active);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
@@ -783,10 +780,10 @@ static void transport_add_cmd_to_queue(
 	wake_up_interruptible(&qobj->thread_wq);
 }
 
-static struct se_queue_req *
-transport_get_qr_from_queue(struct se_queue_obj *qobj)
+static struct se_cmd *
+transport_get_cmd_from_queue(struct se_queue_obj *qobj)
 {
-	struct se_queue_req *qr;
+	struct se_cmd *cmd;
 	unsigned long flags;
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
@@ -794,18 +791,15 @@ transport_get_qr_from_queue(struct se_queue_obj *qobj)
 		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 		return NULL;
 	}
+	cmd = list_first_entry(&qobj->qobj_list, struct se_cmd, se_queue_node);
 
-	list_for_each_entry(qr, &qobj->qobj_list, qr_list)
-		break;
+	atomic_dec(&cmd->t_task.t_transport_queue_active);
 
-	if (qr->cmd)
-		atomic_dec(&qr->cmd->t_task.t_transport_queue_active);
-
-	list_del(&qr->qr_list);
+	list_del(&cmd->se_queue_node);
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
-	return qr;
+	return cmd;
 }
 
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
@@ -5752,9 +5746,7 @@ transport_get_task_from_state_list(struct se_device *dev)
 static void transport_processing_shutdown(struct se_device *dev)
 {
 	struct se_cmd *cmd;
-	struct se_queue_req *qr;
 	struct se_task *task;
-	u8 state;
 	unsigned long flags;
 	/*
 	 * Empty the struct se_device's struct se_task state list.
@@ -5885,12 +5877,10 @@ static void transport_processing_shutdown(struct se_device *dev)
 	/*
 	 * Empty the struct se_device's struct se_cmd list.
 	 */
-	while ((qr = transport_get_qr_from_queue(&dev->dev_queue_obj))) {
-		cmd = qr->cmd;
-		state = qr->state;
+	while ((cmd = transport_get_cmd_from_queue(&dev->dev_queue_obj))) {
 
 		DEBUG_DO("From Device Queue: cmd: %p t_state: %d\n",
-				cmd, state);
+				cmd, cmd->t_state);
 
 		if (atomic_read(&cmd->t_task.t_fe_count)) {
 			transport_send_check_condition_and_sense(cmd,
@@ -5912,10 +5902,9 @@ static void transport_processing_shutdown(struct se_device *dev)
  */
 static int transport_processing_thread(void *param)
 {
-	int ret, t_state;
+	int ret;
 	struct se_cmd *cmd;
 	struct se_device *dev = (struct se_device *) param;
-	struct se_queue_req *qr;
 
 	set_user_nice(current, -20);
 
@@ -5937,14 +5926,11 @@ static int transport_processing_thread(void *param)
 get_cmd:
 		__transport_execute_tasks(dev);
 
-		qr = transport_get_qr_from_queue(&dev->dev_queue_obj);
-		if (!(qr))
+		cmd = transport_get_cmd_from_queue(&dev->dev_queue_obj);
+		if (!cmd)
 			continue;
 
-		cmd = qr->cmd;
-		t_state = qr->state;
-
-		switch (t_state) {
+		switch (cmd->t_state) {
 		case TRANSPORT_NEW_CMD_MAP:
 			if (!(cmd->se_tfo->new_cmd_map)) {
 				printk(KERN_ERR "cmd->se_tfo->new_cmd_map is"
@@ -5995,7 +5981,7 @@ get_cmd:
 		default:
 			printk(KERN_ERR "Unknown t_state: %d deferred_t_state:"
 				" %d for ITT: 0x%08x i_state: %d on SE LUN:"
-				" %u\n", t_state, cmd->deferred_t_state,
+				" %u\n", cmd->t_state, cmd->deferred_t_state,
 				cmd->se_tfo->get_task_tag(cmd),
 				cmd->se_tfo->get_cmd_state(cmd),
 				cmd->se_lun->unpacked_lun);
