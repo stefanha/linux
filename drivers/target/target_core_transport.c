@@ -754,25 +754,18 @@ void transport_cmd_finish_abort_tmr(struct se_cmd *cmd)
 	transport_generic_remove(cmd, 0, 0);
 }
 
-static int transport_add_cmd_to_queue(
+static void transport_add_cmd_to_queue(
 	struct se_cmd *cmd,
 	int t_state)
 {
 	struct se_device *dev = cmd->se_dev;
 	struct se_queue_obj *qobj = &dev->dev_queue_obj;
-	struct se_queue_req *qr;
 	unsigned long flags;
 
-	qr = kzalloc(sizeof(struct se_queue_req), GFP_ATOMIC);
-	if (!(qr)) {
-		printk(KERN_ERR "Unable to allocate memory for"
-				" struct se_queue_req\n");
-		return -ENOMEM;
-	}
-	INIT_LIST_HEAD(&qr->qr_list);
+	INIT_LIST_HEAD(&cmd->se_qr.qr_list);
 
-	qr->cmd = cmd;
-	qr->state = t_state;
+	cmd->se_qr.cmd = cmd;
+	cmd->se_qr.state = t_state;
 
 	if (t_state) {
 		spin_lock_irqsave(&cmd->t_task.t_state_lock, flags);
@@ -782,18 +775,14 @@ static int transport_add_cmd_to_queue(
 	}
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	list_add_tail(&qr->qr_list, &qobj->qobj_list);
+	list_add_tail(&cmd->se_qr.qr_list, &qobj->qobj_list);
 	atomic_inc(&cmd->t_task.t_transport_queue_active);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
 	atomic_inc(&qobj->queue_cnt);
 	wake_up_interruptible(&qobj->thread_wq);
-	return 0;
 }
 
-/*
- * Called with struct se_queue_obj->cmd_queue_lock held.
- */
 static struct se_queue_req *
 transport_get_qr_from_queue(struct se_queue_obj *qobj)
 {
@@ -838,7 +827,6 @@ static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 		atomic_dec(&qr->cmd->t_task.t_transport_queue_active);
 		atomic_dec(&qobj->queue_cnt);
 		list_del(&qr->qr_list);
-		kfree(qr);
 	}
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
@@ -1188,7 +1176,6 @@ static void transport_release_all_cmds(struct se_device *dev)
 		cmd = qr->cmd;
 		t_state = qr->state;
 		list_del(&qr->qr_list);
-		kfree(qr);
 		spin_unlock_irqrestore(&dev->dev_queue_obj.cmd_queue_lock,
 				flags);
 
@@ -5901,7 +5888,6 @@ static void transport_processing_shutdown(struct se_device *dev)
 	while ((qr = transport_get_qr_from_queue(&dev->dev_queue_obj))) {
 		cmd = qr->cmd;
 		state = qr->state;
-		kfree(qr);
 
 		DEBUG_DO("From Device Queue: cmd: %p t_state: %d\n",
 				cmd, state);
@@ -5957,7 +5943,6 @@ get_cmd:
 
 		cmd = qr->cmd;
 		t_state = qr->state;
-		kfree(qr);
 
 		switch (t_state) {
 		case TRANSPORT_NEW_CMD_MAP:
