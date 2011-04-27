@@ -523,9 +523,9 @@ struct se_cmd {
 	atomic_t                transport_sent;
 	/* Used for sense data */
 	void			*sense_buffer;
-	struct list_head	se_delayed_list;
-	struct list_head	se_ordered_list;
-	struct list_head	se_lun_list;
+	struct list_head	se_delayed_node;
+	struct list_head	se_ordered_node;
+	struct list_head	se_lun_node;
 	struct se_device      *se_dev;
 	struct se_dev_entry   *se_deve;
 	struct se_device	*se_obj_ptr;

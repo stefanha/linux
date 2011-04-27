@@ -723,7 +723,7 @@ static void transport_lun_remove_cmd(struct se_cmd *cmd)
 check_lun:
 	spin_lock_irqsave(&lun->lun_cmd_lock, flags);
 	if (atomic_read(&cmd->t_task.transport_lun_active)) {
-		list_del(&cmd->se_lun_list);
+		list_del(&cmd->se_lun_node);
 		atomic_set(&cmd->t_task.transport_lun_active, 0);
 #if 0
 		printk(KERN_INFO "Removed ITT: 0x%08x from LUN LIST[%d]\n"
@@ -1703,9 +1703,9 @@ void transport_init_se_cmd(
 	int task_attr,
 	unsigned char *sense_buffer)
 {
-	INIT_LIST_HEAD(&cmd->se_lun_list);
-	INIT_LIST_HEAD(&cmd->se_delayed_list);
-	INIT_LIST_HEAD(&cmd->se_ordered_list);
+	INIT_LIST_HEAD(&cmd->se_lun_node);
+	INIT_LIST_HEAD(&cmd->se_delayed_node);
+	INIT_LIST_HEAD(&cmd->se_ordered_node);
 
 	INIT_LIST_HEAD(&cmd->t_task.t_task_list);
 	init_completion(&cmd->t_task.transport_lun_fe_stop_comp);
@@ -2376,7 +2376,7 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 		return 1;
 	} else if (cmd->sam_task_attr == TASK_ATTR_ORDERED) {
 		spin_lock(&cmd->se_dev->ordered_cmd_lock);
-		list_add_tail(&cmd->se_ordered_list,
+		list_add_tail(&cmd->se_ordered_node,
 				&cmd->se_dev->ordered_cmd_list);
 		spin_unlock(&cmd->se_dev->ordered_cmd_lock);
 
@@ -2413,7 +2413,7 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 		 */
 		spin_lock(&cmd->se_dev->delayed_cmd_lock);
 		cmd->se_cmd_flags |= SCF_DELAYED_CMD_FROM_SAM_ATTR;
-		list_add_tail(&cmd->se_delayed_list,
+		list_add_tail(&cmd->se_delayed_node,
 				&cmd->se_dev->delayed_cmd_list);
 		spin_unlock(&cmd->se_dev->delayed_cmd_lock);
 
@@ -3651,7 +3651,7 @@ static void transport_complete_task_attr(struct se_cmd *cmd)
 			cmd->se_ordered_id);
 	} else if (cmd->sam_task_attr == TASK_ATTR_ORDERED) {
 		spin_lock(&dev->ordered_cmd_lock);
-		list_del(&cmd->se_ordered_list);
+		list_del(&cmd->se_ordered_node);
 		atomic_dec(&dev->dev_ordered_sync);
 		smp_mb__after_atomic_dec();
 		spin_unlock(&dev->ordered_cmd_lock);
@@ -3667,9 +3667,9 @@ static void transport_complete_task_attr(struct se_cmd *cmd)
 	 */
 	spin_lock(&dev->delayed_cmd_lock);
 	list_for_each_entry_safe(cmd_p, cmd_tmp,
-			&dev->delayed_cmd_list, se_delayed_list) {
+			&dev->delayed_cmd_list, se_delayed_node) {
 
-		list_del(&cmd_p->se_delayed_list);
+		list_del(&cmd_p->se_delayed_node);
 		spin_unlock(&dev->delayed_cmd_lock);
 
 		DEBUG_STA("Calling add_tasks() for"
@@ -5231,10 +5231,10 @@ static void __transport_clear_lun_from_sessions(struct se_lun *lun)
 	 * Initiator Port.
 	 */
 	spin_lock_irqsave(&lun->lun_cmd_lock, lun_flags);
-	while (!list_empty_careful(&lun->lun_cmd_list)) {
-		cmd = list_entry(lun->lun_cmd_list.next,
-			struct se_cmd, se_lun_list);
-		list_del(&cmd->se_lun_list);
+	while (!list_empty(&lun->lun_cmd_list)) {
+		cmd = list_first_entry(&lun->lun_cmd_list,
+		       struct se_cmd, se_lun_node);
+		list_del(&cmd->se_lun_node);
 
 		atomic_set(&cmd->t_task.transport_lun_active, 0);
 		/*
