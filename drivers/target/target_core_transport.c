@@ -735,7 +735,7 @@ check_lun:
 
 void transport_cmd_finish_abort(struct se_cmd *cmd, int remove)
 {
-	transport_remove_cmd_from_queue(cmd, &cmd->se_lun->lun_se_dev->dev_queue_obj);
+	transport_remove_cmd_from_queue(cmd, &cmd->se_dev->dev_queue_obj);
 	transport_lun_remove_cmd(cmd);
 
 	if (transport_cmd_check_stop_to_fabric(cmd))
@@ -746,7 +746,7 @@ void transport_cmd_finish_abort(struct se_cmd *cmd, int remove)
 
 void transport_cmd_finish_abort_tmr(struct se_cmd *cmd)
 {
-	transport_remove_cmd_from_queue(cmd, &cmd->se_lun->lun_se_dev->dev_queue_obj);
+	transport_remove_cmd_from_queue(cmd, &cmd->se_dev->dev_queue_obj);
 
 	if (transport_cmd_check_stop_to_fabric(cmd))
 		return;
@@ -1084,7 +1084,7 @@ static void transport_add_tasks_to_state_queue(struct se_cmd *cmd)
 
 static void transport_add_tasks_from_cmd(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct se_task *task, *task_prev = NULL;
 	unsigned long flags;
 
@@ -1676,7 +1676,7 @@ transport_generic_get_task(struct se_cmd *cmd,
 		enum dma_data_direction data_direction)
 {
 	struct se_task *task;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned long flags;
 
 	task = dev->transport->alloc_task(cmd);
@@ -1748,7 +1748,7 @@ static int transport_check_alloc_task_attr(struct se_cmd *cmd)
 	 * Check if SAM Task Attribute emulation is enabled for this
 	 * struct se_device storage object
 	 */
-	if (cmd->se_lun->lun_se_dev->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
+	if (cmd->se_dev->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
 		return 0;
 
 	if (cmd->sam_task_attr == TASK_ATTR_ACA) {
@@ -1760,7 +1760,7 @@ static int transport_check_alloc_task_attr(struct se_cmd *cmd)
 	 * Used to determine when ORDERED commands should go from
 	 * Dormant to Active status.
 	 */
-	cmd->se_ordered_id = atomic_inc_return(&cmd->se_lun->lun_se_dev->dev_ordered_id);
+	cmd->se_ordered_id = atomic_inc_return(&cmd->se_dev->dev_ordered_id);
 	smp_mb__after_atomic_inc();
 	DEBUG_STA("Allocated se_ordered_id: %u for Task Attr: 0x%02x on %s\n",
 			cmd->se_ordered_id, cmd->sam_task_attr,
@@ -2379,14 +2379,14 @@ static inline int transport_tcq_window_closed(struct se_device *dev)
  */
 static inline int transport_execute_task_attr(struct se_cmd *cmd)
 {
-	if (cmd->se_lun->lun_se_dev->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
+	if (cmd->se_dev->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
 		return 1;
 	/*
 	 * Check for the existence of HEAD_OF_QUEUE, and if true return 1
 	 * to allow the passed struct se_cmd list of tasks to the front of the list.
 	 */
 	 if (cmd->sam_task_attr == TASK_ATTR_HOQ) {
-		atomic_inc(&cmd->se_lun->lun_se_dev->dev_hoq_count);
+		atomic_inc(&cmd->se_dev->dev_hoq_count);
 		smp_mb__after_atomic_inc();
 		DEBUG_STA("Added HEAD_OF_QUEUE for CDB:"
 			" 0x%02x, se_ordered_id: %u\n",
@@ -2394,12 +2394,12 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 			cmd->se_ordered_id);
 		return 1;
 	} else if (cmd->sam_task_attr == TASK_ATTR_ORDERED) {
-		spin_lock(&cmd->se_lun->lun_se_dev->ordered_cmd_lock);
+		spin_lock(&cmd->se_dev->ordered_cmd_lock);
 		list_add_tail(&cmd->se_ordered_list,
-				&cmd->se_lun->lun_se_dev->ordered_cmd_list);
-		spin_unlock(&cmd->se_lun->lun_se_dev->ordered_cmd_lock);
+				&cmd->se_dev->ordered_cmd_list);
+		spin_unlock(&cmd->se_dev->ordered_cmd_lock);
 
-		atomic_inc(&cmd->se_lun->lun_se_dev->dev_ordered_sync);
+		atomic_inc(&cmd->se_dev->dev_ordered_sync);
 		smp_mb__after_atomic_inc();
 
 		DEBUG_STA("Added ORDERED for CDB: 0x%02x to ordered"
@@ -2411,13 +2411,13 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 		 * no other older commands exist that need to be
 		 * completed first.
 		 */
-		if (!(atomic_read(&cmd->se_lun->lun_se_dev->simple_cmds)))
+		if (!(atomic_read(&cmd->se_dev->simple_cmds)))
 			return 1;
 	} else {
 		/*
 		 * For SIMPLE and UNTAGGED Task Attribute commands
 		 */
-		atomic_inc(&cmd->se_lun->lun_se_dev->simple_cmds);
+		atomic_inc(&cmd->se_dev->simple_cmds);
 		smp_mb__after_atomic_inc();
 	}
 	/*
@@ -2425,16 +2425,16 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 	 * add the dormant task(s) built for the passed struct se_cmd to the
 	 * execution queue and become in Active state for this struct se_device.
 	 */
-	if (atomic_read(&cmd->se_lun->lun_se_dev->dev_ordered_sync) != 0) {
+	if (atomic_read(&cmd->se_dev->dev_ordered_sync) != 0) {
 		/*
 		 * Otherwise, add cmd w/ tasks to delayed cmd queue that
 		 * will be drained upon completion of HEAD_OF_QUEUE task.
 		 */
-		spin_lock(&cmd->se_lun->lun_se_dev->delayed_cmd_lock);
+		spin_lock(&cmd->se_dev->delayed_cmd_lock);
 		cmd->se_cmd_flags |= SCF_DELAYED_CMD_FROM_SAM_ATTR;
 		list_add_tail(&cmd->se_delayed_list,
-				&cmd->se_lun->lun_se_dev->delayed_cmd_list);
-		spin_unlock(&cmd->se_lun->lun_se_dev->delayed_cmd_lock);
+				&cmd->se_dev->delayed_cmd_list);
+		spin_unlock(&cmd->se_dev->delayed_cmd_lock);
 
 		DEBUG_STA("Added CDB: 0x%02x Task Attr: 0x%02x to"
 			" delayed CMD list, se_ordered_id: %u\n",
@@ -2493,7 +2493,7 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 	 * storage object.
 	 */
 execute_tasks:
-	__transport_execute_tasks(cmd->se_lun->lun_se_dev);
+	__transport_execute_tasks(cmd->se_dev);
 	return 0;
 }
 
@@ -2626,7 +2626,7 @@ static inline u32 transport_get_sectors_6(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -2654,7 +2654,7 @@ static inline u32 transport_get_sectors_10(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -2684,7 +2684,7 @@ static inline u32 transport_get_sectors_12(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -2714,7 +2714,7 @@ static inline u32 transport_get_sectors_16(
 	struct se_cmd *cmd,
 	int *ret)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 
 	/*
 	 * Assume TYPE_DISK for non struct se_device objects.
@@ -2756,7 +2756,7 @@ static inline u32 transport_get_size(
 	unsigned char *cdb,
 	struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 
 	if (dev->transport->get_device_type(dev) == TYPE_TAPE) {
 		if (cdb[1] & 1) { /* sectors */
@@ -2963,7 +2963,7 @@ static int transport_generic_cmd_sequencer(
 	struct se_cmd *cmd,
 	unsigned char *cdb)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct se_subsystem_dev *su_dev = dev->se_sub_dev;
 	int ret = 0, sector_ret = 0, passthrough;
 	u32 sectors = 0, size = 0, pr_reg_type = 0;
@@ -3287,7 +3287,7 @@ static int transport_generic_cmd_sequencer(
 		 * Do implict HEAD_OF_QUEUE processing for INQUIRY.
 		 * See spc4r17 section 5.3
 		 */
-		if (cmd->se_lun->lun_se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+		if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 			cmd->sam_task_attr = TASK_ATTR_HOQ;
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
 		break;
@@ -3495,7 +3495,7 @@ static int transport_generic_cmd_sequencer(
 		 * Do implict HEAD_OF_QUEUE processing for REPORT_LUNS
 		 * See spc4r17 section 5.3
 		 */
-		if (cmd->se_lun->lun_se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+		if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 			cmd->sam_task_attr = TASK_ATTR_HOQ;
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
 		break;
@@ -3650,7 +3650,7 @@ static void transport_memcpy_se_mem_read_contig(
  */
 static void transport_complete_task_attr(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct se_cmd *cmd_p, *cmd_tmp;
 	int new_active_tasks = 0;
 
@@ -3721,7 +3721,7 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 	 * delayed execution list after a HEAD_OF_QUEUE or ORDERED Task
 	 * Attribute.
 	 */
-	if (cmd->se_lun->lun_se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+	if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 		transport_complete_task_attr(cmd);
 	/*
 	 * Check if we need to retrieve a sense buffer from
@@ -4097,7 +4097,7 @@ static inline long long transport_dev_end_lba(struct se_device *dev)
 
 static int transport_get_sectors(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 
 	cmd->t_task.t_tasks_sectors =
 		(cmd->data_length / dev->se_sub_dev->se_dev_attrib.block_size);
@@ -4123,7 +4123,7 @@ static int transport_get_sectors(struct se_cmd *cmd)
 
 static int transport_new_cmd_obj(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	u32 task_cdbs = 0, rc;
 
 	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)) {
@@ -4275,7 +4275,7 @@ int transport_init_task_sg(
 	u32 task_offset)
 {
 	struct se_cmd *se_cmd = task->task_se_cmd;
-	struct se_device *se_dev = se_cmd->se_lun->lun_se_dev;
+	struct se_device *se_dev = se_cmd->se_dev;
 	struct se_mem *se_mem = in_se_mem;
 	struct target_core_fabric_ops *tfo = se_cmd->se_tfo;
 	u32 sg_length, task_size = task->task_size, task_sg_num_padded;
@@ -4776,7 +4776,7 @@ static u32 transport_generic_get_cdb_count(
 	struct se_task *task;
 	struct se_mem *se_mem = NULL, *se_mem_lout = NULL;
 	struct se_mem *se_mem_bidi = NULL, *se_mem_bidi_lout = NULL;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	int max_sectors_set = 0, ret;
 	u32 task_offset_in = 0, se_mem_cnt = 0, se_mem_bidi_cnt = 0, task_cdbs = 0;
 
@@ -4889,7 +4889,7 @@ out:
 static int
 transport_map_control_cmd_to_task(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned char *cdb;
 	struct se_task *task;
 	int ret;
@@ -4954,7 +4954,7 @@ static int transport_generic_new_cmd(struct se_cmd *cmd)
 {
 	struct se_portal_group *se_tpg;
 	struct se_task *task;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	int ret = 0;
 
 	/*
@@ -5216,7 +5216,7 @@ static int transport_lun_wait_for_tasks(struct se_cmd *cmd, struct se_lun *lun)
 	atomic_set(&cmd->t_task.transport_lun_fe_stop, 1);
 	spin_unlock_irqrestore(&cmd->t_task.t_state_lock, flags);
 
-	wake_up_interruptible(&cmd->se_lun->lun_se_dev->dev_queue_obj.thread_wq);
+	wake_up_interruptible(&cmd->se_dev->dev_queue_obj.thread_wq);
 
 	ret = transport_stop_tasks_for_cmd(cmd);
 
@@ -5229,7 +5229,7 @@ static int transport_lun_wait_for_tasks(struct se_cmd *cmd, struct se_lun *lun)
 		DEBUG_TRANSPORT_S("ConfigFS: ITT[0x%08x] - stopped cmd....\n",
 				cmd->se_tfo->get_task_tag(cmd));
 	}
-	transport_remove_cmd_from_queue(cmd, &cmd->se_lun->lun_se_dev->dev_queue_obj);
+	transport_remove_cmd_from_queue(cmd, &cmd->se_dev->dev_queue_obj);
 
 	return 0;
 }
@@ -5435,7 +5435,7 @@ static void transport_generic_wait_for_tasks(
 
 	spin_unlock_irqrestore(&cmd->t_task.t_state_lock, flags);
 
-	wake_up_interruptible(&cmd->se_lun->lun_se_dev->dev_queue_obj.thread_wq);
+	wake_up_interruptible(&cmd->se_dev->dev_queue_obj.thread_wq);
 
 	wait_for_completion(&cmd->t_task.t_transport_stop_comp);
 
@@ -5702,7 +5702,7 @@ void transport_send_task_abort(struct se_cmd *cmd)
 int transport_generic_do_tmr(struct se_cmd *cmd)
 {
 	struct se_cmd *ref_cmd;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct se_tmr_req *tmr = cmd->se_tmr_req;
 	int ret;
 
@@ -5847,7 +5847,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 					cmd, TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE,
 					0);
 				transport_remove_cmd_from_queue(cmd,
-					&cmd->se_lun->lun_se_dev->dev_queue_obj);
+					&cmd->se_dev->dev_queue_obj);
 
 				transport_lun_remove_cmd(cmd);
 				transport_cmd_check_stop(cmd, 1, 0);
@@ -5856,7 +5856,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 					&cmd->t_task.t_state_lock, flags);
 
 				transport_remove_cmd_from_queue(cmd,
-					&cmd->se_lun->lun_se_dev->dev_queue_obj);
+					&cmd->se_dev->dev_queue_obj);
 
 				transport_lun_remove_cmd(cmd);
 
@@ -5876,7 +5876,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 			transport_send_check_condition_and_sense(cmd,
 				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
 			transport_remove_cmd_from_queue(cmd,
-				&cmd->se_lun->lun_se_dev->dev_queue_obj);
+				&cmd->se_dev->dev_queue_obj);
 
 			transport_lun_remove_cmd(cmd);
 			transport_cmd_check_stop(cmd, 1, 0);
@@ -5885,7 +5885,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 				&cmd->t_task.t_state_lock, flags);
 
 			transport_remove_cmd_from_queue(cmd,
-				&cmd->se_lun->lun_se_dev->dev_queue_obj);
+				&cmd->se_dev->dev_queue_obj);
 			transport_lun_remove_cmd(cmd);
 
 			if (transport_cmd_check_stop(cmd, 1, 0))

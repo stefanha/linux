@@ -208,7 +208,7 @@ void core_scsi3_ua_for_check_condition(
 	u8 *asc,
 	u8 *ascq)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct se_dev_entry *deve;
 	struct se_session *sess = cmd->se_sess;
 	struct se_node_acl *nacl;

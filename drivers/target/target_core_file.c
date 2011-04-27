@@ -279,7 +279,7 @@ fd_alloc_task(struct se_cmd *cmd)
 		return NULL;
 	}
 
-	fd_req->fd_dev = cmd->se_lun->lun_se_dev->dev_ptr;
+	fd_req->fd_dev = cmd->se_dev->dev_ptr;
 
 	return &fd_req->fd_task;
 }

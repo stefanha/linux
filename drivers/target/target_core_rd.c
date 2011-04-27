@@ -336,7 +336,7 @@ rd_alloc_task(struct se_cmd *cmd)
 		printk(KERN_ERR "Unable to allocate struct rd_request\n");
 		return NULL;
 	}
-	rd_req->rd_dev = cmd->se_lun->lun_se_dev->dev_ptr;
+	rd_req->rd_dev = cmd->se_dev->dev_ptr;
 
 	return &rd_req->rd_task;
 }

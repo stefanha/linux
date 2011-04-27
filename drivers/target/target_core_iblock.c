@@ -240,7 +240,7 @@ iblock_alloc_task(struct se_cmd *cmd)
 		return NULL;
 	}
 
-	ib_req->ib_dev = cmd->se_lun->lun_se_dev->dev_ptr;
+	ib_req->ib_dev = cmd->se_dev->dev_ptr;
 	atomic_set(&ib_req->ib_bio_cnt, 0);
 	return &ib_req->ib_task;
 }
@@ -608,7 +608,7 @@ static struct bio *iblock_get_bio(
 static int iblock_map_task_SG(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct iblock_dev *ib_dev = task->se_dev->dev_ptr;
 	struct iblock_req *ib_req = IBLOCK_REQ(task);
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;

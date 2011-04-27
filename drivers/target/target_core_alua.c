@@ -61,7 +61,7 @@ struct t10_alua_lu_gp *default_lu_gp;
  */
 int core_emulate_report_target_port_groups(struct se_cmd *cmd)
 {
-	struct se_subsystem_dev *su_dev = cmd->se_lun->lun_se_dev->se_sub_dev;
+	struct se_subsystem_dev *su_dev = cmd->se_dev->se_sub_dev;
 	struct se_port *port;
 	struct t10_alua_tg_pt_gp *tg_pt_gp;
 	struct t10_alua_tg_pt_gp_member *tg_pt_gp_mem;
@@ -151,7 +151,7 @@ int core_emulate_report_target_port_groups(struct se_cmd *cmd)
  */
 int core_emulate_set_target_port_groups(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct se_subsystem_dev *su_dev = dev->se_sub_dev;
 	struct se_port *port, *l_port = cmd->se_lun->lun_sep;
 	struct se_node_acl *nacl = cmd->se_sess->se_node_acl;

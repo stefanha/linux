@@ -65,7 +65,7 @@ static int
 target_emulate_inquiry_std(struct se_cmd *cmd)
 {
 	struct se_lun *lun = cmd->se_lun;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf = cmd->t_task.t_task_buf;
 
 	/*
@@ -128,7 +128,7 @@ target_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf)
 	 * Registered Extended LUN WWN has been set via ConfigFS
 	 * during device creation/restart.
 	 */
-	if (cmd->se_lun->lun_se_dev->se_sub_dev->su_dev_flags &
+	if (cmd->se_dev->se_sub_dev->su_dev_flags &
 			SDF_EMULATED_VPD_UNIT_SERIAL) {
 		buf[3] = 3;
 		buf[5] = 0x80;
@@ -143,7 +143,7 @@ target_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf)
 static int
 target_emulate_evpd_80(struct se_cmd *cmd, unsigned char *buf)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	u16 len = 0;
 
 	buf[1] = 0x80;
@@ -176,7 +176,7 @@ target_emulate_evpd_80(struct se_cmd *cmd, unsigned char *buf)
 static int
 target_emulate_evpd_83(struct se_cmd *cmd, unsigned char *buf)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	struct se_lun *lun = cmd->se_lun;
 	struct se_port *port = NULL;
 	struct se_portal_group *tpg = NULL;
@@ -477,7 +477,7 @@ target_emulate_evpd_86(struct se_cmd *cmd, unsigned char *buf)
 	buf[5] = 0x07;
 
 	/* If WriteCache emulation is enabled, set V_SUP */
-	if (cmd->se_lun->lun_se_dev->se_sub_dev->se_dev_attrib.emulate_write_cache > 0)
+	if (cmd->se_dev->se_sub_dev->se_dev_attrib.emulate_write_cache > 0)
 		buf[6] = 0x01;
 	return 0;
 }
@@ -486,7 +486,7 @@ target_emulate_evpd_86(struct se_cmd *cmd, unsigned char *buf)
 static int
 target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	int have_tp = 0;
 
 	/*
@@ -568,7 +568,7 @@ target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 static int
 target_emulate_evpd_b2(struct se_cmd *cmd, unsigned char *buf)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 
 	/*
 	 * From sbc3r22 section 6.5.4 Thin Provisioning VPD page:
@@ -620,7 +620,7 @@ target_emulate_evpd_b2(struct se_cmd *cmd, unsigned char *buf)
 static int
 target_emulate_inquiry(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf = cmd->t_task.t_task_buf;
 	unsigned char *cdb = cmd->t_task.t_task_cdb;
 
@@ -665,7 +665,7 @@ target_emulate_inquiry(struct se_cmd *cmd)
 static int
 target_emulate_readcapacity(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf = cmd->t_task.t_task_buf;
 	unsigned long long blocks_long = dev->transport->get_blocks(dev);
 	u32 blocks;
@@ -695,7 +695,7 @@ target_emulate_readcapacity(struct se_cmd *cmd)
 static int
 target_emulate_readcapacity_16(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf = cmd->t_task.t_task_buf;
 	unsigned long long blocks = dev->transport->get_blocks(dev);
 
@@ -830,7 +830,7 @@ target_modesense_dpofua(unsigned char *buf, int type)
 static int
 target_emulate_modesense(struct se_cmd *cmd, int ten)
 {
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	char *cdb = cmd->t_task.t_task_cdb;
 	unsigned char *rbuf = cmd->t_task.t_task_buf;
 	int type = dev->transport->get_device_type(dev);
@@ -964,7 +964,7 @@ static int
 target_emulate_unmap(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf = cmd->t_task.t_task_buf, *ptr = NULL;
 	unsigned char *cdb = &cmd->t_task.t_task_cdb[0];
 	sector_t lba;
@@ -1011,7 +1011,7 @@ static int
 target_emulate_write_same(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	sector_t lba = cmd->t_task.t_task_lba;
 	unsigned int range;
 	int ret;
@@ -1036,7 +1036,7 @@ int
 transport_emulate_control_cdb(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
-	struct se_device *dev = cmd->se_lun->lun_se_dev;
+	struct se_device *dev = cmd->se_dev;
 	unsigned short service_action;
 	int ret = 0;
 
