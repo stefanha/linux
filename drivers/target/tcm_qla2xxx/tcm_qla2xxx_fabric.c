@@ -622,10 +622,6 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	/*
 	 * Queue up the newly allocated to be processed in TCM thread context.
 	 */
-	transport_device_setup_cmd(se_cmd);
-	/*
-	 * Queue up the newly allocated to be processed in TCM thread context.
-	 */
 	transport_generic_handle_cdb_map(se_cmd);
 	return 0;
 }

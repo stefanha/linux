@@ -151,6 +151,9 @@ int transport_lookup_cmd_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 		return -ENODEV;
 	}
 
+	/* Directly associate cmd with se_dev */
+	se_cmd->se_dev = se_lun->lun_se_dev;
+
 	/* TODO: get rid of this and use atomics for stats */
 	dev = se_lun->lun_se_dev;
 	spin_lock_irq(&dev->stats_lock);
@@ -218,6 +221,9 @@ int transport_lookup_tmr_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 		se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		return -ENODEV;
 	}
+
+	/* Directly associate cmd with se_dev */
+	se_cmd->se_dev = se_lun->lun_se_dev;
 
 	spin_lock(&se_tmr->tmr_dev->se_tmr_lock);
 	list_add_tail(&se_tmr->tmr_list, &se_tmr->tmr_dev->dev_tmr_list);

@@ -1684,12 +1684,6 @@ transport_generic_get_task(struct se_cmd *cmd,
 
 static int transport_generic_cmd_sequencer(struct se_cmd *, unsigned char *);
 
-void transport_device_setup_cmd(struct se_cmd *cmd)
-{
-	cmd->se_dev = cmd->se_lun->lun_se_dev;
-}
-EXPORT_SYMBOL(transport_device_setup_cmd);
-
 /*
  * Used by fabric modules containing a local struct se_cmd within their
  * fabric dependent per I/O descriptor.
@@ -1781,7 +1775,6 @@ int transport_generic_allocate_tasks(
 	 */
 	cmd->transport_wait_for_tasks = &transport_generic_wait_for_tasks;
 
-	transport_device_setup_cmd(cmd);
 	/*
 	 * Ensure that the received CDB is less than the max (252 + 8) bytes
 	 * for VARIABLE_LENGTH_CMD
@@ -1916,7 +1909,6 @@ int transport_generic_handle_tmr(
 	 * This is needed for early exceptions.
 	 */
 	cmd->transport_wait_for_tasks = &transport_generic_wait_for_tasks;
-	transport_device_setup_cmd(cmd);
 
 	transport_add_cmd_to_queue(cmd, TRANSPORT_PROCESS_TMR);
 	return 0;

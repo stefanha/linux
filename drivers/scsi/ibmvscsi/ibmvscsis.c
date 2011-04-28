@@ -889,7 +889,6 @@ static int tcm_queuecommand(struct ibmvscsis_adapter *adapter,
 		return ret;
 	}
 
-	transport_device_setup_cmd(se_cmd);
 	transport_generic_handle_cdb_map(se_cmd);
 
 	return 0;

@@ -128,7 +128,6 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 		return NULL;
 	}
 
-	transport_device_setup_cmd(se_cmd);
 	return se_cmd;
 }
 
