@@ -122,7 +122,7 @@ static struct se_cmd *tcm_loop_allocate_core_cmd(
 	/*
 	 * Locate the struct se_lun pointer and attach it to struct se_cmd
 	 */
-	if (transport_get_lun_for_cmd(se_cmd, tl_cmd->sc->device->lun) < 0) {
+	if (transport_lookup_cmd_lun(se_cmd, tl_cmd->sc->device->lun) < 0) {
 		kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
 		set_host_byte(sc, DID_NO_CONNECT);
 		return NULL;
@@ -391,7 +391,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	/*
 	 * Locate the underlying TCM struct se_lun from sc->device->lun
 	 */
-	if (transport_get_lun_for_tmr(se_cmd, sc->device->lun) < 0)
+	if (transport_lookup_tmr_lun(se_cmd, sc->device->lun) < 0)
 		goto release;
 	/*
 	 * Queue the TMR to TCM Core and sleep waiting for tcm_loop_queue_tm_rsp()

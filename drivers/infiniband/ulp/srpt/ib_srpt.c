@@ -1794,7 +1794,7 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	cmd->data_direction = dir;
 	unpacked_lun = srpt_unpack_lun((uint8_t *)&srp_cmd->lun,
 				       sizeof(srp_cmd->lun));
-	if (transport_get_lun_for_cmd(cmd, unpacked_lun) < 0)
+	if (transport_lookup_cmd_lun(cmd, unpacked_lun) < 0)
 		goto send_sense;
 	ret = transport_generic_allocate_tasks(cmd, srp_cmd->cdb);
 	if (cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
@@ -1917,7 +1917,7 @@ static void srpt_handle_tsk_mgmt(struct srpt_rdma_ch *ch,
 
 	unpacked_lun = srpt_unpack_lun((uint8_t *)&srp_tsk->lun,
 				       sizeof(srp_tsk->lun));
-	res = transport_get_lun_for_tmr(&send_ioctx->cmd, unpacked_lun);
+	res = transport_lookup_tmr_lun(&send_ioctx->cmd, unpacked_lun);
 	if (res) {
 		pr_debug("rejecting TMR for LUN %lld\n", unpacked_lun);
 		send_ioctx->cmd.se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;

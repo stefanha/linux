@@ -59,9 +59,7 @@ static struct se_subsystem_dev *lun0_su_dev;
 /* not static, needed by tpg.c */
 struct se_device *g_lun0_dev;
 
-int transport_get_lun_for_cmd(
-	struct se_cmd *se_cmd,
-	u32 unpacked_lun)
+int transport_lookup_cmd_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 {
 	struct se_dev_entry *deve;
 	struct se_lun *se_lun = NULL;
@@ -181,11 +179,9 @@ out:
 
 	return 0;
 }
-EXPORT_SYMBOL(transport_get_lun_for_cmd);
+EXPORT_SYMBOL(transport_lookup_cmd_lun);
 
-int transport_get_lun_for_tmr(
-	struct se_cmd *se_cmd,
-	u32 unpacked_lun)
+int transport_lookup_tmr_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 {
 	struct se_device *dev = NULL;
 	struct se_dev_entry *deve;
@@ -235,7 +231,7 @@ int transport_get_lun_for_tmr(
 
 	return 0;
 }
-EXPORT_SYMBOL(transport_get_lun_for_tmr);
+EXPORT_SYMBOL(transport_lookup_tmr_lun);
 
 /*
  * This function is called from core_scsi3_emulate_pro_register_and_move()

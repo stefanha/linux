@@ -113,7 +113,7 @@ static int ft_get_lun_for_cmd(struct ft_cmd *cmd, u8 *lunp)
 	if (lun >= TRANSPORT_MAX_LUNS_PER_TPG)
 		return -1;
 	cmd->lun = lun;
-	return transport_get_lun_for_cmd(&cmd->se_cmd, lun);
+	return transport_lookup_cmd_lun(&cmd->se_cmd, lun);
 }
 
 static void ft_queue_cmd(struct ft_sess *sess, struct ft_cmd *cmd)

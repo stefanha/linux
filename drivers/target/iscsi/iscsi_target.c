@@ -4412,7 +4412,7 @@ static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 			se_cmd = SE_CMD(cmd);
 			/*
 			 * Special cases for active iSCSI TMR, and
-			 * transport_get_lun_for_cmd() failing from
+			 * transport_lookup_cmd_lun() failing from
 			 * iscsit_get_lun_for_cmd() in iscsit_handle_scsi_cmd().
 			 */
 			if (cmd->tmr_req && se_cmd->transport_wait_for_tasks)
