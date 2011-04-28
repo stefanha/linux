@@ -94,9 +94,9 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 }
 
 /*
- * Get LUN from CDB.
+ * Verify LUN is valid.
  */
-static int ft_get_lun_for_cmd(struct ft_cmd *cmd, u8 *lunp)
+static int ft_lookup_cmd_lun(struct ft_cmd *cmd, u8 *lunp)
 {
 	u64 lun;
 
@@ -110,8 +110,7 @@ static int ft_get_lun_for_cmd(struct ft_cmd *cmd, u8 *lunp)
 	default:
 		return -1;
 	}
-	if (lun >= TRANSPORT_MAX_LUNS_PER_TPG)
-		return -1;
+
 	cmd->lun = lun;
 	return transport_lookup_cmd_lun(&cmd->se_cmd, lun);
 }
@@ -424,7 +423,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 	switch (fcp->fc_tm_flags) {
 	case FCP_TMF_LUN_RESET:
 		tm_func = TMR_LUN_RESET;
-		if (ft_get_lun_for_cmd(cmd, fcp->fc_lun) < 0) {
+		if (ft_lookup_cmd_lun(cmd, fcp->fc_lun) < 0) {
 			ft_dump_cmd(cmd, __func__);
 			transport_send_check_condition_and_sense(&cmd->se_cmd,
 				cmd->se_cmd.scsi_sense_reason, 0);
@@ -615,7 +614,7 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 	fc_seq_exch(cmd->seq)->lp->tt.seq_set_resp(cmd->seq, ft_recv_seq, cmd);
 
-	ret = ft_get_lun_for_cmd(cmd, fcp->fc_lun);
+	ret = ft_lookup_cmd_lun(cmd, fcp->fc_lun);
 	if (ret < 0) {
 		ft_dump_cmd(cmd, __func__);
 		transport_send_check_condition_and_sense(&cmd->se_cmd,
