@@ -3825,9 +3825,6 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC)
 		return;
 
-	if (!(cmd->t_task.t_tasks_se_num))
-		return;
-
 	list_for_each_entry_safe(se_mem, se_mem_tmp,
 			&cmd->t_task.t_mem_list, se_list) {
 		/*
@@ -3840,23 +3837,21 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 		list_del(&se_mem->se_list);
 		kmem_cache_free(se_mem_cache, se_mem);
 	}
-
-	if (!list_empty(&cmd->t_task.t_mem_bidi_list) && cmd->t_task.t_tasks_se_bidi_num) {
-		list_for_each_entry_safe(se_mem, se_mem_tmp,
-				&cmd->t_task.t_mem_bidi_list, se_list) {
-			/*
-			 * We only release call __free_page(struct se_mem->se_page) when
-			 * SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC is NOT in use,
-			 */
-			if (free_page)
-				__free_page(se_mem->se_page);
-
-			list_del(&se_mem->se_list);
-			kmem_cache_free(se_mem_cache, se_mem);
-		}
-	}
-
 	cmd->t_task.t_tasks_se_num = 0;
+
+	list_for_each_entry_safe(se_mem, se_mem_tmp,
+				 &cmd->t_task.t_mem_bidi_list, se_list) {
+		/*
+		 * We only release call __free_page(struct se_mem->se_page) when
+		 * SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC is NOT in use,
+		 */
+		if (free_page)
+			__free_page(se_mem->se_page);
+
+		list_del(&se_mem->se_list);
+		kmem_cache_free(se_mem_cache, se_mem);
+	}
+	cmd->t_task.t_tasks_se_bidi_num = 0;
 }
 
 static inline void transport_release_tasks(struct se_cmd *cmd)
