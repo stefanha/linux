@@ -4364,14 +4364,19 @@ static int transport_map_sg_to_mem(
 	struct se_cmd *cmd,
 	struct list_head *se_mem_list,
 	struct scatterlist *sg,
-	u32 *se_mem_cnt)
+	u32 *sg_count)
 {
 	struct se_mem *se_mem;
-	u32 sg_count = 1, cmd_size = cmd->data_length;
+	u32 cmd_size = cmd->data_length;
 
 	WARN_ON(!sg);
 
 	while (cmd_size) {
+		/*
+		 * NOTE: it is safe to return -ENOMEM at any time in creating this
+		 * list because transport_free_pages() will eventually be called, and is
+		 * smart enough to deallocate all list items for sg and sg_bidi lists.
+		 */
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
 			printk(KERN_ERR "Unable to allocate struct se_mem\n");
@@ -4388,26 +4393,22 @@ static int transport_map_sg_to_mem(
 		if (cmd_size > sg->length) {
 			se_mem->se_len = sg->length;
 			sg = sg_next(sg);
-			sg_count++;
 		} else
 			se_mem->se_len = cmd_size;
 
 		cmd_size -= se_mem->se_len;
+		(*sg_count)++;
 
-		DEBUG_MEM("sg_to_mem: *se_mem_cnt: %u cmd_size: %u\n",
-				*se_mem_cnt, cmd_size);
+		DEBUG_MEM("sg_to_mem: *sg_count: %u cmd_size: %u\n",
+				*sg_count, cmd_size);
 		DEBUG_MEM("sg_to_mem: Final se_page: %p se_off: %d se_len: %d\n",
 				se_mem->se_page, se_mem->se_off, se_mem->se_len);
 
 		list_add_tail(&se_mem->se_list, se_mem_list);
-		(*se_mem_cnt)++;
 	}
 
 	DEBUG_MEM("task[0] - Mapped(%u) struct scatterlist segments to(%u)"
 		" struct se_mem\n", sg_count, *se_mem_cnt);
-
-	if (sg_count != *se_mem_cnt)
-		BUG();
 
 	return 0;
 }
