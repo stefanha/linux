@@ -123,7 +123,7 @@ enum se_cmd_flags_table {
 	SCF_SENT_DELAYED_TAS		= 0x00020000,
 	SCF_ALUA_NON_OPTIMIZED		= 0x00040000,
 	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00080000,
-	SCF_PASSTHROUGH_SG_TO_MEM	= 0x00100000,
+	SCF_UNUSED			= 0x00100000,
 	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00200000,
 	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00400000,
 	SCF_EMULATE_SYNC_CACHE		= 0x00800000,
@@ -452,9 +452,9 @@ struct se_transport_task {
 	 * and other HW target mode fabric modules.
 	 */
 	struct scatterlist	*t_task_pt_sgl;
-	struct list_head	*t_mem_list;
+	struct list_head	t_mem_list;
 	/* Used for BIDI READ */
-	struct list_head	*t_mem_bidi_list;
+	struct list_head	t_mem_bidi_list;
 	struct list_head	t_task_list;
 } ____cacheline_aligned;
 

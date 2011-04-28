@@ -75,12 +75,12 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 	printk(KERN_INFO "%s: cmd %p task %p se_num %u buf %p len %u se_cmd_flags <0x%x>\n",
 	       caller, cmd, task, task->t_tasks_se_num,
 	       task->t_task_buf, se_cmd->data_length, se_cmd->se_cmd_flags);
-	if (task->t_mem_list)
-		list_for_each_entry(mem, task->t_mem_list, se_list)
-			printk(KERN_INFO "%s: cmd %p mem %p page %p "
-			       "len 0x%x off 0x%x\n",
-			       caller, cmd, mem,
-			       mem->se_page, mem->se_len, mem->se_off);
+
+	list_for_each_entry(mem, &task->t_mem_list, se_list)
+		printk(KERN_INFO "%s: cmd %p mem %p page %p "
+		       "len 0x%x off 0x%x\n",
+		       caller, cmd, mem,
+		       mem->se_page, mem->se_len, mem->se_off);
 	sp = cmd->seq;
 	if (sp) {
 		ep = fc_seq_exch(sp);

@@ -802,7 +802,7 @@ static int iscsit_get_offset(
 	struct se_cmd *cmd = usg->se_cmd;
 	struct se_mem *se_mem;
 
-	list_for_each_entry(se_mem, cmd->t_task.t_mem_list, se_list)
+	list_for_each_entry(se_mem, &cmd->t_task.t_mem_list, se_list)
 		break;
 
 	if (!se_mem) {
@@ -834,7 +834,7 @@ static int iscsit_get_offset(
 			current_iscsi_offset -= se_mem->se_len;
 
 			list_for_each_entry_continue(se_mem,
-					cmd->t_task.t_mem_list, se_list)
+					&cmd->t_task.t_mem_list, se_list)
 				break;
 
 			if (!se_mem) {
@@ -957,7 +957,7 @@ static void iscsit_map_SG_segments(struct se_unmap_sg *unmap_sg)
 	if (!cmd->t_task.t_tasks_se_num)
 		return;
 
-	list_for_each_entry_continue(se_mem, cmd->t_task.t_mem_list, se_list) {
+	list_for_each_entry_continue(se_mem, &cmd->t_task.t_mem_list, se_list) {
 		kmap(se_mem->se_page);
 
 		if (++i == unmap_sg->sg_count)
@@ -974,7 +974,7 @@ static void iscsit_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 	if (!cmd->t_task.t_tasks_se_num)
 		return;
 
-	list_for_each_entry_continue(se_mem, cmd->t_task.t_mem_list, se_list) {
+	list_for_each_entry_continue(se_mem, &cmd->t_task.t_mem_list, se_list) {
 		kunmap(se_mem->se_page);
 
 		if (++i == unmap_sg->sg_count)
