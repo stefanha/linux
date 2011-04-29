@@ -311,20 +311,32 @@ struct srpt_rdma_ch {
  * struct srpt_port - Information associated by SRPT with a single IB port.
  * @sdev:      backpointer to the HCA information.
  * @mad_agent: per-port management datagram processing information.
+ * @enabled:   Whether or not this target port is enabled.
+ * @port_guid: ASCII representation of Port GUID
  * @port:      one-based port number.
  * @sm_lid:    cached value of the port's sm_lid.
  * @lid:       cached value of the port's lid.
  * @gid:       cached value of the port's gid.
+ * @port_acl_lock spinlock for port_acl_list:
  * @work:      work structure for refreshing the aforementioned cached values.
+ * @port_tpg_1 Target portal group = 1 data.
+ * @port_wwn:  Target core WWN data.
+ * @port_acl_list: Head of the list with all node ACLs for this port.
  */
 struct srpt_port {
 	struct srpt_device	*sdev;
 	struct ib_mad_agent	*mad_agent;
+	bool			enabled;
+	u8			port_guid[64];
 	u8			port;
 	u16			sm_lid;
 	u16			lid;
 	union ib_gid		gid;
+	spinlock_t		port_acl_lock;
 	struct work_struct	work;
+	struct se_portal_group	port_tpg_1;
+	struct se_wwn		port_wwn;
+	struct list_head	port_acl_list;
 };
 
 /**
@@ -343,13 +355,7 @@ struct srpt_port {
  * @spinlock:      Protects rch_list and tpg.
  * @port:          Information about the ports owned by this HCA.
  * @event_handler: Per-HCA asynchronous IB event handler.
- * @enabled:       Whether or not this target is enabled.
  * @list:          Node in srpt_dev_list.
- * @hca_guid:      ASCII representation of the HCA node GUID.
- * @wwn:           Target core HCA data.
- * @tpg:           Target portal group data.
- * @tpgt:          Target portal group tag.
- * @node_acl_list: Head of the list with all node ACLs for this HCA.
  */
 struct srpt_device {
 	struct ib_device	*device;
@@ -365,25 +371,19 @@ struct srpt_device {
 	spinlock_t		spinlock;
 	struct srpt_port	port[2];
 	struct ib_event_handler	event_handler;
-	bool			enabled;
 	struct list_head	list;
-	char			hca_guid[19];
-	struct se_wwn		wwn;
-	struct se_portal_group	tpg;
-	u16			tpgt;
-	struct list_head	node_acl_list;
 };
 
 /**
  * struct srpt_node_acl - Per-initiator ACL data (managed via configfs).
  * @i_port_id: 128-bit SRP initiator port ID.
- * @sdev:      HCA information.
+ * @sport:     port information.
  * @nacl:      Target core node ACL information.
  * @list:      Element of the per-HCA ACL list.
  */
 struct srpt_node_acl {
 	u8			i_port_id[16];
-	struct srpt_device	*sdev;
+	struct srpt_port	*sport;
 	struct se_node_acl	nacl;
 	struct list_head	list;
 };
