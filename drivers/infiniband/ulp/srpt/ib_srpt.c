@@ -1108,7 +1108,7 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 {
 	struct se_cmd *cmd;
 	struct se_transport_task *task;
-	struct scatterlist *sg;
+	struct scatterlist *sg, *sg_orig;
 	int sg_cnt;
 	enum dma_data_direction dir;
 	struct rdma_iu *riu;
@@ -1131,14 +1131,14 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	if (cmd->se_cmd_flags & (SCF_SCSI_DATA_SG_IO_CDB
 				 | SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(cmd);
-		sg = task->t_tasks_sg_chained;
+		sg = sg_orig = task->t_tasks_sg_chained;
 		sg_cnt = task->t_tasks_sg_chained_no;
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/* Use task->t_tasks_sg_bounce for control CDBs. */
 		sg_init_table(&task->t_tasks_sg_bounce, 1);
 		sg_set_buf(&task->t_tasks_sg_bounce, task->t_task_buf,
 			   cmd->data_length);
-		sg = &task->t_tasks_sg_bounce;
+		sg = sg_orig = &task->t_tasks_sg_bounce;
 		sg_cnt = 1;
 	} else {
 		pr_debug("?? sg == NULL\n");
@@ -1197,8 +1197,10 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 
 				if (tsize > 0) {
 					++j;
-					if (j < count)
-						dma_len = sg_dma_len(&sg[j]);
+					if (j < count) {
+						sg = sg_next(sg);
+						dma_len = sg_dma_len(sg);
+					}
 				}
 			} else {
 				tsize -= rsize;
@@ -1233,6 +1235,7 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	db = ioctx->rbufs;
 	tsize = cmd->data_length;
 	riu = ioctx->rdma_ius;
+	sg = sg_orig;
 	dma_len = sg_dma_len(&sg[0]);
 	dma_addr = sg_dma_address(&sg[0]);
 
@@ -1256,9 +1259,9 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 				if (tsize > 0) {
 					++j;
 					if (j < count) {
-						dma_len = sg_dma_len(&sg[j]);
-						dma_addr =
-						    sg_dma_address(&sg[j]);
+						sg = sg_next(sg);
+						dma_len = sg_dma_len(sg);
+						dma_addr = sg_dma_address(sg);
 					}
 				}
 			} else {
