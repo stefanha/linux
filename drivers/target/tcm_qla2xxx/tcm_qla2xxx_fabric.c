@@ -520,7 +520,7 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/*
 		 * Use se_cmd->t_task->t_tasks_sg_bounce for control CDBs
-		 * using a contigious buffer
+		 * using a contiguous buffer
 		 */
 		sg_init_table(&se_cmd->t_tasks_sg_bounce, 1);
 		sg_set_buf(&se_cmd->t_tasks_sg_bounce,

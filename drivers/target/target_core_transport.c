@@ -3961,7 +3961,7 @@ int transport_generic_map_mem_to_cmd(
 			return -ENOSYS;
 		}
 		/*
-		 * For incoming CDBs using a contiguous buffer internall with TCM,
+		 * For incoming CDBs using a contiguous buffer internal with TCM,
 		 * save the passed struct scatterlist memory.  After TCM storage object
 		 * processing has completed for this struct se_cmd, TCM core will call
 		 * transport_memcpy_[write,read]_contig() as necessary from
@@ -4087,7 +4087,7 @@ transport_generic_get_mem(struct se_cmd *cmd, u32 length)
 			goto out;
 		}
 
-/* #warning FIXME Allocate contigous pages for struct se_mem elements */
+/* #warning FIXME Allocate contiguous pages for struct se_mem elements */
 		se_mem->se_page = alloc_pages(GFP_KERNEL, 0);
 		if (!(se_mem->se_page)) {
 			printk(KERN_ERR "alloc_pages() failed\n");
@@ -4332,7 +4332,7 @@ int transport_map_mem_to_sg(
 
 	while (task_size != 0) {
 		/*
-		 * Setup the contigious array of scatterlists for
+		 * Setup the contiguous array of scatterlists for
 		 * this struct se_task.
 		 */
 		sg_assign_page(sg, se_mem->se_page);
@@ -4436,7 +4436,7 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 	}
 	/*
 	 * Walk the struct se_task list and setup scatterlist chains
-	 * for each contiguosly allocated struct se_task->task_sg[].
+	 * for each contiguously allocated struct se_task->task_sg[].
 	 */
 	list_for_each_entry(task, &cmd->t_task_list, t_list) {
 		if (!(task->task_sg) || !(task->task_padded_sg))
@@ -4914,7 +4914,7 @@ static int transport_generic_write_pending(struct se_cmd *cmd)
 	/*
 	 * For the TCM control CDBs using a contiguous buffer, do the memcpy
 	 * from the passed Linux/SCSI struct scatterlist located at
-	 * se_cmd->t_task_pt_buf to the contiguous buffer at
+	 * se_cmd->t_task_pt_sgl to the contiguous buffer at
 	 * se_cmd->t_task_buf.
 	 */
 	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG)
