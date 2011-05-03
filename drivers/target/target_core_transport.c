@@ -219,8 +219,8 @@ static int transport_get_sectors(struct se_cmd *cmd);
 static int transport_map_sg_to_mem(struct se_cmd *cmd,
 		struct list_head *se_mem_list, struct scatterlist *sgl,
 		u32 *se_mem_cnt);
-static void transport_memcpy_se_mem_read_contig(struct se_cmd *cmd,
-		unsigned char *dst, struct list_head *se_mem_list);
+static void transport_memcpy_se_mem_read_contig(unsigned char *dst,
+		struct list_head *se_mem_list, u32 len);
 static void transport_release_fe_cmd(struct se_cmd *cmd);
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 		struct se_queue_obj *qobj);
@@ -2808,7 +2808,8 @@ static void transport_xor_callback(struct se_cmd *cmd)
 	 * Copy the scatterlist WRITE buffer located at cmd->t_task.t_mem_list
 	 * into the locally allocated *buf
 	 */
-	transport_memcpy_se_mem_read_contig(cmd, buf, &cmd->t_task.t_mem_list);
+	transport_memcpy_se_mem_read_contig(buf, &cmd->t_task.t_mem_list,
+					    cmd->data_length);
 	/*
 	 * Now perform the XOR against the BIDI read memory located at
 	 * cmd->t_task.t_mem_bidi_list
@@ -3549,27 +3550,21 @@ out_invalid_cdb_field:
 static inline void transport_release_tasks(struct se_cmd *);
 
 static void transport_memcpy_se_mem_read_contig(
-	struct se_cmd *cmd,
 	unsigned char *dst,
-	struct list_head *se_mem_list)
+	struct list_head *se_mem_list,
+	u32 tot_len)
 {
 	struct se_mem *se_mem;
 	void *src;
-	u32 length = 0, total_length = cmd->data_length;
+	u32 length;
 
 	list_for_each_entry(se_mem, se_mem_list, se_list) {
-		length = se_mem->se_len;
-
-		if (length > total_length)
-			length = total_length;
-
+		length = min_t(u32, se_mem->se_len, tot_len);
 		src = page_address(se_mem->se_page) + se_mem->se_off;
-
 		memcpy(dst, src, length);
-
-		if (!(total_length -= length))
-			return;
-
+		tot_len -= length;
+		if (!tot_len)
+			break;
 		dst += length;
 	}
 }
