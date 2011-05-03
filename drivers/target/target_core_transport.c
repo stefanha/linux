@@ -4255,59 +4255,19 @@ next:
 	return task->task_sg_num;
 }
 
-static inline int transport_set_tasks_sectors_disk(
-	struct se_task *task,
+/* Reduce sectors if they are too long for the device */
+static inline sector_t transport_limit_task_sectors(
 	struct se_device *dev,
 	unsigned long long lba,
-	u32 sectors,
-	int *max_sectors_set)
+	sector_t sectors)
 {
-	if ((lba + sectors) > transport_dev_end_lba(dev)) {
-		task->task_sectors = ((transport_dev_end_lba(dev) - lba) + 1);
+	sectors = min_t(sector_t, sectors, dev->se_sub_dev->se_dev_attrib.max_sectors);
 
-		if (task->task_sectors > dev->se_sub_dev->se_dev_attrib.max_sectors) {
-			task->task_sectors = dev->se_sub_dev->se_dev_attrib.max_sectors;
-			*max_sectors_set = 1;
-		}
-	} else {
-		if (sectors > dev->se_sub_dev->se_dev_attrib.max_sectors) {
-			task->task_sectors = dev->se_sub_dev->se_dev_attrib.max_sectors;
-			*max_sectors_set = 1;
-		} else
-			task->task_sectors = sectors;
-	}
+	if (dev->transport->get_device_type(dev) == TYPE_DISK)
+		if ((lba + sectors) > transport_dev_end_lba(dev))
+			sectors = ((transport_dev_end_lba(dev) - lba) + 1);
 
-	return 0;
-}
-
-static inline int transport_set_tasks_sectors_non_disk(
-	struct se_task *task,
-	struct se_device *dev,
-	unsigned long long lba,
-	u32 sectors,
-	int *max_sectors_set)
-{
-	if (sectors > dev->se_sub_dev->se_dev_attrib.max_sectors) {
-		task->task_sectors = dev->se_sub_dev->se_dev_attrib.max_sectors;
-		*max_sectors_set = 1;
-	} else
-		task->task_sectors = sectors;
-
-	return 0;
-}
-
-static inline int transport_set_tasks_sectors(
-	struct se_task *task,
-	struct se_device *dev,
-	unsigned long long lba,
-	u32 sectors,
-	int *max_sectors_set)
-{
-	return (dev->transport->get_device_type(dev) == TYPE_DISK) ?
-		transport_set_tasks_sectors_disk(task, dev, lba, sectors,
-				max_sectors_set) :
-		transport_set_tasks_sectors_non_disk(task, dev, lba, sectors,
-				max_sectors_set);
+	return sectors;
 }
 
 /*
@@ -4632,6 +4592,9 @@ static int transport_do_se_mem_map(
 				task_offset_in);
 }
 
+/*
+ * Break up cmd into chunks transport can handle
+ */
 static u32 transport_generic_get_cdb_count(
 	struct se_cmd *cmd,
 	unsigned long long lba,
@@ -4642,17 +4605,18 @@ static u32 transport_generic_get_cdb_count(
 {
 	unsigned char *cdb = NULL;
 	struct se_task *task;
-	struct se_mem *se_mem = NULL, *se_mem_lout = NULL;
-	struct se_mem *se_mem_bidi = NULL, *se_mem_bidi_lout = NULL;
+	struct se_mem *se_mem = NULL;
+	struct se_mem *se_mem_lout = NULL;
+	struct se_mem *se_mem_bidi = NULL;
+	struct se_mem *se_mem_bidi_lout = NULL;
 	struct se_device *dev = cmd->se_dev;
-	int max_sectors_set = 0, ret;
-	u32 task_offset_in = 0, se_mem_cnt = 0, se_mem_bidi_cnt = 0, task_cdbs = 0;
+	int ret;
+	u32 task_offset_in = 0;
+	u32 se_mem_cnt = 0;
+	u32 se_mem_bidi_cnt = 0;
+	u32 task_cdbs = 0;
 
-	if (!mem_list) {
-		printk(KERN_ERR "mem_list is NULL in transport_generic_get"
-				"_cdb_count()\n");
-		return 0;
-	}
+	BUG_ON(!mem_list);
 	/*
 	 * While using RAMDISK_DR backstores is the only case where
 	 * mem_list will ever be empty at this point.
@@ -4669,18 +4633,22 @@ static u32 transport_generic_get_cdb_count(
 					struct se_mem, se_list);
 
 	while (sectors) {
+		sector_t limited_sectors;
+
 		DEBUG_VOL("ITT[0x%08x] LBA(%llu) SectorsLeft(%u) EOBJ(%llu)\n",
 			cmd->se_tfo->get_task_tag(cmd), lba, sectors,
 			transport_dev_end_lba(dev));
 
+		limited_sectors = transport_limit_task_sectors(dev, lba, sectors);
+		if (!limited_sectors)
+			break;
+
 		task = transport_generic_get_task(cmd, data_direction);
-		if (!(task))
+		if (!task)
 			goto out;
 
-		transport_set_tasks_sectors(task, dev, lba, sectors,
-				&max_sectors_set);
-
 		task->task_lba = lba;
+		task->task_sectors = limited_sectors;
 		lba += task->task_sectors;
 		sectors -= task->task_sectors;
 		task->task_size = (task->task_sectors *
@@ -4729,14 +4697,6 @@ static u32 transport_generic_get_cdb_count(
 
 		DEBUG_VOL("Incremented task_cdbs(%u) task->task_sg_num(%u)\n",
 				task_cdbs, task->task_sg_num);
-
-		if (max_sectors_set) {
-			max_sectors_set = 0;
-			continue;
-		}
-
-		if (!sectors)
-			break;
 	}
 
 	if (set_counts) {
