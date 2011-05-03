@@ -4655,12 +4655,15 @@ static u32 transport_generic_get_cdb_count(
 				   dev->se_sub_dev->se_dev_attrib.block_size);
 
 		cdb = dev->transport->get_cdb(task);
-		if ((cdb)) {
-			memcpy(cdb, cmd->t_task.t_task_cdb,
-				scsi_command_size(cmd->t_task.t_task_cdb));
-			cmd->transport_split_cdb(task->task_lba,
-					&task->task_sectors, cdb);
-		}
+		/* Should be part of task, can't fail */
+		BUG_ON(!cdb);
+
+		memcpy(cdb, cmd->t_task.t_task_cdb,
+		       scsi_command_size(cmd->t_task.t_task_cdb));
+
+		/* Update new cdb with updated lba/sectors */
+		cmd->transport_split_cdb(task->task_lba,
+					 &task->task_sectors, cdb);
 
 		/*
 		 * Perform the SE OBJ plugin and/or Transport plugin specific
@@ -4726,9 +4729,9 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd)
 		return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
 
 	cdb = dev->transport->get_cdb(task);
-	if (cdb)
-		memcpy(cdb, cmd->t_task.t_task_cdb,
-			scsi_command_size(cmd->t_task.t_task_cdb));
+	BUG_ON(!cdb);
+	memcpy(cdb, cmd->t_task.t_task_cdb,
+	       scsi_command_size(cmd->t_task.t_task_cdb));
 
 	task->task_size = cmd->data_length;
 	task->task_sg_num =
