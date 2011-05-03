@@ -462,6 +462,7 @@ struct se_transport_task {
 struct se_task {
 	unsigned char	task_sense;
 	struct scatterlist *task_sg;
+	u32		task_sg_num;
 	struct scatterlist *task_sg_bidi;
 	u8		task_scsi_status;
 	u8		task_flags;
@@ -472,8 +473,6 @@ struct se_task {
 	u32		task_no;
 	u32		task_sectors;
 	u32		task_size;
-	u32		task_sg_num;
-	u32		task_sg_offset;
 	enum dma_data_direction	task_data_direction;
 	struct se_cmd *task_se_cmd;
 	struct se_device	*se_dev;
