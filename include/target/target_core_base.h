@@ -452,6 +452,7 @@ struct se_transport_task {
 	 * and other HW target mode fabric modules.
 	 */
 	struct scatterlist	*t_task_pt_sgl;
+	u32			t_task_pt_sgl_num;
 	struct list_head	t_mem_list;
 	/* Used for BIDI READ */
 	struct list_head	t_mem_bidi_list;

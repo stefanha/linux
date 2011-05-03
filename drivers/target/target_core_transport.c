@@ -3548,66 +3548,6 @@ out_invalid_cdb_field:
 
 static inline void transport_release_tasks(struct se_cmd *);
 
-/*
- * This function will copy a contiguous *src buffer into a destination
- * struct scatterlist array.
- */
-static void transport_memcpy_write_contig(
-	struct se_cmd *cmd,
-	struct scatterlist *sg_d,
-	unsigned char *src)
-{
-	u32 i = 0, length = 0, total_length = cmd->data_length;
-	void *dst;
-
-	while (total_length) {
-		length = sg_d[i].length;
-
-		if (length > total_length)
-			length = total_length;
-
-		dst = sg_virt(&sg_d[i]);
-
-		memcpy(dst, src, length);
-
-		if (!(total_length -= length))
-			return;
-
-		src += length;
-		i++;
-	}
-}
-
-/*
- * This function will copy a struct scatterlist array *sg_s into a destination
- * contiguous *dst buffer.
- */
-static void transport_memcpy_read_contig(
-	struct se_cmd *cmd,
-	unsigned char *dst,
-	struct scatterlist *sg_s)
-{
-	u32 i = 0, length = 0, total_length = cmd->data_length;
-	void *src;
-
-	while (total_length) {
-		length = sg_s[i].length;
-
-		if (length > total_length)
-			length = total_length;
-
-		src = sg_virt(&sg_s[i]);
-
-		memcpy(dst, src, length);
-
-		if (!(total_length -= length))
-			return;
-
-		dst += length;
-		i++;
-	}
-}
-
 static void transport_memcpy_se_mem_read_contig(
 	struct se_cmd *cmd,
 	unsigned char *dst,
@@ -3750,14 +3690,15 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 		}
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
 		/*
-		 * If enabled by TCM fabirc module pre-registered SGL
+		 * If enabled by TCM fabric module pre-registered SGL
 		 * memory, perform the memcpy() from the TCM internal
-		 * contigious buffer back to the original SGL.
+		 * contiguous buffer back to the original SGL.
 		 */
 		if (cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG)
-			transport_memcpy_write_contig(cmd,
-				 cmd->t_task.t_task_pt_sgl,
-				 cmd->t_task.t_task_buf);
+			sg_copy_from_buffer(cmd->t_task.t_task_pt_sgl,
+					    cmd->t_task.t_task_pt_sgl_num,
+					    cmd->t_task.t_task_buf,
+					    cmd->data_length);
 
 		cmd->se_tfo->queue_data_in(cmd);
 		break;
@@ -4037,7 +3978,7 @@ int transport_generic_map_mem_to_cmd(
 		 */
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_CONTIG_TO_SG;
 		cmd->t_task.t_task_pt_sgl = sgl;
-		/* don't need sgl count? We assume it contains cmd->data_length data */
+		cmd->t_task.t_task_pt_sgl_num = sgl_count;
 	}
 
 	return 0;
@@ -5038,9 +4979,10 @@ static int transport_generic_write_pending(struct se_cmd *cmd)
 	 * se_cmd->t_task.t_task_buf.
 	 */
 	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG)
-		transport_memcpy_read_contig(cmd,
-				cmd->t_task.t_task_buf,
-				cmd->t_task.t_task_pt_sgl);
+		sg_copy_to_buffer(cmd->t_task.t_task_pt_sgl,
+				    cmd->t_task.t_task_pt_sgl_num,
+				    cmd->t_task.t_task_buf,
+				    cmd->data_length);
 	/*
 	 * Clear the se_cmd for WRITE_PENDING status in order to set
 	 * cmd->t_task.t_transport_active=0 so that transport_generic_handle_data
