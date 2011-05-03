@@ -93,28 +93,6 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 		16, 4, cmd->cdb, MAX_COMMAND_SIZE, 0);
 }
 
-/*
- * Verify LUN is valid.
- */
-static int ft_lookup_cmd_lun(struct ft_cmd *cmd, u8 *lunp)
-{
-	u64 lun;
-
-	lun = lunp[1];
-	switch (lunp[0] >> 6) {
-	case 0:
-		break;
-	case 1:
-		lun |= (lunp[0] & 0x3f) << 8;
-		break;
-	default:
-		return -1;
-	}
-
-	cmd->lun = lun;
-	return transport_lookup_cmd_lun(&cmd->se_cmd, lun);
-}
-
 static void ft_queue_cmd(struct ft_sess *sess, struct ft_cmd *cmd)
 {
 	struct se_queue_obj *qobj;
@@ -423,7 +401,8 @@ static void ft_send_tm(struct ft_cmd *cmd)
 	switch (fcp->fc_tm_flags) {
 	case FCP_TMF_LUN_RESET:
 		tm_func = TMR_LUN_RESET;
-		if (ft_lookup_cmd_lun(cmd, fcp->fc_lun) < 0) {
+		cmd->lun = scsilun_to_int((struct scsi_lun *)fcp->fc_lun);
+		if (transport_lookup_tmr_lun(&cmd->se_cmd, cmd->lun) < 0) {
 			ft_dump_cmd(cmd, __func__);
 			transport_send_check_condition_and_sense(&cmd->se_cmd,
 				cmd->se_cmd.scsi_sense_reason, 0);
@@ -614,7 +593,8 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 	fc_seq_exch(cmd->seq)->lp->tt.seq_set_resp(cmd->seq, ft_recv_seq, cmd);
 
-	ret = ft_lookup_cmd_lun(cmd, fcp->fc_lun);
+	cmd->lun = scsilun_to_int((struct scsi_lun *)fcp->fc_lun);
+	ret = transport_lookup_cmd_lun(&cmd->se_cmd, cmd->lun);
 	if (ret < 0) {
 		ft_dump_cmd(cmd, __func__);
 		transport_send_check_condition_and_sense(&cmd->se_cmd,
