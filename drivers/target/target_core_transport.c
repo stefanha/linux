@@ -4319,7 +4319,7 @@ static int transport_map_sg_to_mem(
 int transport_map_mem_to_sg(
 	struct se_task *task,
 	struct list_head *se_mem_list,
-	void *in_mem,
+	struct scatterlist *sg,
 	struct se_mem *in_se_mem,
 	struct se_mem **out_se_mem,
 	u32 *se_mem_cnt,
@@ -4327,7 +4327,6 @@ int transport_map_mem_to_sg(
 {
 	struct se_cmd *se_cmd = task->task_se_cmd;
 	struct se_mem *se_mem = in_se_mem;
-	struct scatterlist *sg = (struct scatterlist *)in_mem;
 	u32 task_size = task->task_size, sg_no = 0;
 
 	if (!sg) {
