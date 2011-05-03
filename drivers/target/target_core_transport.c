@@ -3754,7 +3754,7 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 		/*
 		 * Check if we need to send READ payload for BIDI-COMMAND
 		 */
-		if (list_empty(&cmd->t_task.t_mem_bidi_list)) {
+		if (!list_empty(&cmd->t_task.t_mem_bidi_list)) {
 			spin_lock(&cmd->se_lun->lun_sep_lock);
 			if (cmd->se_lun->lun_sep) {
 				cmd->se_lun->lun_sep->sep_stats.tx_data_octets +=
@@ -4075,7 +4075,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 		 * cmd->t_task.t_mem_bidi_list so the READ struct se_tasks
 		 * are queued first for the non pSCSI passthrough case.
 		 */
-		if (list_empty(&cmd->t_task.t_mem_bidi_list) &&
+		if (!list_empty(&cmd->t_task.t_mem_bidi_list) &&
 		    (dev->transport->transport_type != TRANSPORT_PLUGIN_PHBA_PDEV)) {
 			rc = transport_generic_get_cdb_count(cmd,
 				cmd->t_task.t_task_lba,
@@ -4261,7 +4261,7 @@ next:
 	 * Setup task->task_sg_bidi for SCSI READ payload for
 	 * TCM/pSCSI passthrough if present for BIDI-COMMAND
 	 */
-	if (list_empty(&se_cmd->t_task.t_mem_bidi_list) &&
+	if (!list_empty(&se_cmd->t_task.t_mem_bidi_list) &&
 	    (se_dev->transport->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV)) {
 		task->task_sg_bidi = kzalloc(task_sg_num_padded *
 				sizeof(struct scatterlist), GFP_KERNEL);
