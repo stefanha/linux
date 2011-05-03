@@ -211,8 +211,7 @@ static u32 transport_generic_get_cdb_count(struct se_cmd *cmd,
 		unsigned long long starting_lba, u32 sectors,
 		enum dma_data_direction data_direction,
 		struct list_head *mem_list, int set_counts);
-static int transport_generic_get_mem(struct se_cmd *cmd, u32 length,
-		u32 dma_size);
+static int transport_generic_get_mem(struct se_cmd *cmd, u32 length);
 static int transport_generic_remove(struct se_cmd *cmd,
 		int release_to_pool, int session_reinstatement);
 static int transport_get_sectors(struct se_cmd *cmd);
@@ -2902,7 +2901,7 @@ static int transport_allocate_resources(struct se_cmd *cmd)
 
 	if ((cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
 	    (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB))
-		return transport_generic_get_mem(cmd, length, PAGE_SIZE);
+		return transport_generic_get_mem(cmd, length);
 	else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB)
 		return transport_generic_allocate_buf(cmd, length);
 	else
@@ -4076,9 +4075,8 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 }
 
 static int
-transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
+transport_generic_get_mem(struct se_cmd *cmd, u32 length)
 {
-	unsigned char *buf;
 	struct se_mem *se_mem;
 
 	/*
@@ -4101,16 +4099,8 @@ transport_generic_get_mem(struct se_cmd *cmd, u32 length, u32 dma_size)
 			goto out;
 		}
 
-		buf = kmap_atomic(se_mem->se_page, KM_IRQ0);
-		if (!(buf)) {
-			printk(KERN_ERR "kmap_atomic() failed\n");
-			goto out;
-		}
 		INIT_LIST_HEAD(&se_mem->se_list);
-		se_mem->se_len = (length > dma_size) ? dma_size : length;
-		memset(buf, 0, se_mem->se_len);
-		kunmap_atomic(buf, KM_IRQ0);
-
+		se_mem->se_len = min_t(u32, length, PAGE_SIZE);
 		list_add_tail(&se_mem->se_list, &cmd->t_task.t_mem_list);
 		cmd->t_task.t_tasks_se_num++;
 
