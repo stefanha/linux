@@ -4015,11 +4015,12 @@ static int transport_get_sectors(struct se_cmd *cmd)
 static int transport_new_cmd_obj(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	u32 task_cdbs = 0, rc;
+	u32 task_cdbs;
+	u32 rc;
 
 	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)) {
-		task_cdbs++;
-		cmd->t_task.t_task_cdbs++;
+		task_cdbs = 1;
+		cmd->t_task.t_task_cdbs = 1;
 	} else {
 		int set_counts = 1;
 
@@ -4058,7 +4059,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 					TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 			return PYX_TRANSPORT_LU_COMM_FAILURE;
 		}
-		cmd->t_task.t_task_cdbs += task_cdbs;
+		cmd->t_task.t_task_cdbs = task_cdbs;
 
 #if 0
 		printk(KERN_INFO "data_length: %u, LBA: %llu t_tasks_sectors:"
