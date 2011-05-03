@@ -34,19 +34,9 @@ int iscsit_get_lun_for_tmr(
 	struct iscsi_cmd *cmd,
 	u64 lun)
 {
-	struct iscsi_conn *conn = cmd->conn;
-	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
-	u32 unpacked_lun;
+	u32 unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
-	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
-	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
-			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
-			TRANSPORT_MAX_LUNS_PER_TPG-1, tpg->tpgt);
-		return -1;
-	}
-
-	return transport_get_lun_for_tmr(SE_CMD(cmd), unpacked_lun);
+	return transport_lookup_tmr_lun(SE_CMD(cmd), unpacked_lun);
 }
 
 int iscsit_get_lun_for_cmd(
@@ -54,19 +44,9 @@ int iscsit_get_lun_for_cmd(
 	unsigned char *cdb,
 	u64 lun)
 {
-	struct iscsi_conn *conn = cmd->conn;
-	struct iscsi_portal_group *tpg = ISCSI_TPG_C(conn);
-	u32 unpacked_lun;
+	u32 unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
-	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
-	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "iSCSI LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
-			"-1: %u for Target Portal Group: %hu\n", unpacked_lun,
-			TRANSPORT_MAX_LUNS_PER_TPG-1, tpg->tpgt);
-		return -1;
-	}
-
-	return transport_get_lun_for_cmd(SE_CMD(cmd), unpacked_lun);
+	return transport_lookup_cmd_lun(SE_CMD(cmd), unpacked_lun);
 }
 
 void iscsit_determine_maxcmdsn(struct iscsi_session *sess)

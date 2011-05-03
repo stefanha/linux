@@ -294,8 +294,8 @@ static int chap_server_compute_md5(
 		goto out;
 	}
 
-	sg_init_one(&sg, (void *)chap->challenge, strlen(chap->challenge));
-	ret = crypto_hash_update(&desc, &sg, strlen(chap->challenge));
+	sg_init_one(&sg, (void *)chap->challenge, CHAP_CHALLENGE_LENGTH);
+	ret = crypto_hash_update(&desc, &sg, CHAP_CHALLENGE_LENGTH);
 	if (ret < 0) {
 		printk(KERN_ERR "crypto_hash_update() failed for challenge\n");
 		crypto_free_hash(tfm);

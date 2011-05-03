@@ -802,12 +802,12 @@ static int iscsit_get_offset(
 	struct se_cmd *cmd = usg->se_cmd;
 	struct se_mem *se_mem;
 
-	list_for_each_entry(se_mem, cmd->t_task->t_mem_list, se_list)
+	list_for_each_entry(se_mem, &cmd->t_task.t_mem_list, se_list)
 		break;
 
 	if (!se_mem) {
 		printk(KERN_ERR "Unable to locate se_mem from"
-				" cmd->t_task->t_mem_list\n");
+				" cmd->t_task.t_mem_list\n");
 		return -1;
 	}
 
@@ -834,7 +834,7 @@ static int iscsit_get_offset(
 			current_iscsi_offset -= se_mem->se_len;
 
 			list_for_each_entry_continue(se_mem,
-					cmd->t_task->t_mem_list, se_list)
+					&cmd->t_task.t_mem_list, se_list)
 				break;
 
 			if (!se_mem) {
@@ -862,8 +862,8 @@ static int iscsit_set_iovec_ptrs(
 	/*
 	 * Used for non scatterlist operations, assume a single iovec.
 	 */
-	if (!cmd->t_task->t_tasks_se_num) {
-		iov[0].iov_base = (unsigned char *) cmd->t_task->t_task_buf +
+	if (!cmd->t_task.t_tasks_se_num) {
+		iov[0].iov_base = (unsigned char *) cmd->t_task.t_task_buf +
 							map_sg->data_offset;
 		iov[0].iov_len  = map_sg->data_length;
 		return 1;
@@ -954,10 +954,10 @@ static void iscsit_map_SG_segments(struct se_unmap_sg *unmap_sg)
 	struct se_cmd *cmd = unmap_sg->se_cmd;
 	struct se_mem *se_mem = unmap_sg->cur_se_mem;
 
-	if (!cmd->t_task->t_tasks_se_num)
+	if (!cmd->t_task.t_tasks_se_num)
 		return;
 
-	list_for_each_entry_continue(se_mem, cmd->t_task->t_mem_list, se_list) {
+	list_for_each_entry_continue(se_mem, &cmd->t_task.t_mem_list, se_list) {
 		kmap(se_mem->se_page);
 
 		if (++i == unmap_sg->sg_count)
@@ -971,10 +971,10 @@ static void iscsit_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 	struct se_cmd *cmd = unmap_sg->se_cmd;
 	struct se_mem *se_mem = unmap_sg->cur_se_mem;
 
-	if (!cmd->t_task->t_tasks_se_num)
+	if (!cmd->t_task.t_tasks_se_num)
 		return;
 
-	list_for_each_entry_continue(se_mem, cmd->t_task->t_mem_list, se_list) {
+	list_for_each_entry_continue(se_mem, &cmd->t_task.t_mem_list, se_list) {
 		kunmap(se_mem->se_page);
 
 		if (++i == unmap_sg->sg_count)
@@ -1207,28 +1207,24 @@ done:
 	 * maximum request size the physical HBA(s) can handle.
 	 */
 	transport_ret = transport_generic_allocate_tasks(SE_CMD(cmd), hdr->cdb);
-	if (!transport_ret)
-		goto build_list;
-
-	if (transport_ret == -1) {
+	if (transport_ret == -ENOMEM) {
 		return iscsit_add_reject_from_cmd(
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
-	} else if (transport_ret == -2) {
+	} else if (transport_ret == -EINVAL) {
 		/*
 		 * Unsupported SAM Opcode.  CHECK_CONDITION will be sent
 		 * in iscsit_execute_cmd() during the CmdSN OOO Execution
 		 * Mechinism.
 		 */
 		send_check_condition = 1;
-		goto attach_cmd;
-	}
-
-build_list:
-	if (iscsit_decide_list_to_build(cmd, payload_length) < 0)
-		return iscsit_add_reject_from_cmd(
+	} else {
+		if (iscsit_decide_list_to_build(cmd, payload_length) < 0)
+			return iscsit_add_reject_from_cmd(
 				ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 				1, 1, buf, cmd);
+	}
+
 attach_cmd:
 	spin_lock_bh(&conn->cmd_lock);
 	list_add_tail(&cmd->i_list, &conn->conn_cmd_list);
@@ -1465,7 +1461,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 		 * and Unsupported SAM WRITE Opcodes and SE resource allocation
 		 * failures;
 		 */
-		spin_lock_irqsave(&se_cmd->t_task->t_state_lock, flags);
+		spin_lock_irqsave(&se_cmd->t_task.t_state_lock, flags);
 		/*
 		 * Handle cases where we do or do not want to sleep on
 		 * unsolicited_data_comp
@@ -1489,18 +1485,18 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 		wait_for_transport =
 				(se_cmd->t_state != TRANSPORT_WRITE_PENDING);
 		if ((cmd->immediate_data != 0) ||
-		    (atomic_read(&se_cmd->t_task->t_transport_aborted) != 0))
+		    (atomic_read(&se_cmd->t_task.t_transport_aborted) != 0))
 			wait_for_transport = 0;
-		spin_unlock_irqrestore(&se_cmd->t_task->t_state_lock, flags);
+		spin_unlock_irqrestore(&se_cmd->t_task.t_state_lock, flags);
 
 		if (wait_for_transport)
 			wait_for_completion(&cmd->unsolicited_data_comp);
 
-		spin_lock_irqsave(&se_cmd->t_task->t_state_lock, flags);
+		spin_lock_irqsave(&se_cmd->t_task.t_state_lock, flags);
 		if (!(se_cmd->se_cmd_flags & SCF_SUPPORTED_SAM_OPCODE) ||
 		     (se_cmd->se_cmd_flags & SCF_SE_CMD_FAILED))
 			dump_unsolicited_data = 1;
-		spin_unlock_irqrestore(&se_cmd->t_task->t_state_lock, flags);
+		spin_unlock_irqrestore(&se_cmd->t_task.t_state_lock, flags);
 
 		if (dump_unsolicited_data) {
 			/*
@@ -1526,7 +1522,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 		 * outstanding_r2ts reaches zero, go ahead and send the delayed
 		 * TASK_ABORTED status.
 		 */
-		if (atomic_read(&se_cmd->t_task->t_transport_aborted) != 0) {
+		if (atomic_read(&se_cmd->t_task.t_transport_aborted) != 0) {
 			if (hdr->flags & ISCSI_FLAG_CMD_FINAL)
 				if (--cmd->outstanding_r2ts < 1) {
 					iscsit_stop_dataout_timer(cmd);
@@ -4112,7 +4108,7 @@ check_rsp_state:
 			se_cmd = &cmd->se_cmd;
 
 			if (map_sg && !conn->conn_ops->IFMarker &&
-			    se_cmd->t_task->t_tasks_se_num) {
+			    se_cmd->t_task.t_tasks_se_num) {
 				iscsit_map_SG_segments(&unmap_sg);
 				if (iscsit_fe_sendpage_sg(&unmap_sg, conn) < 0) {
 					conn->tx_response_queue = 0;
@@ -4412,7 +4408,7 @@ static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 			se_cmd = SE_CMD(cmd);
 			/*
 			 * Special cases for active iSCSI TMR, and
-			 * transport_get_lun_for_cmd() failing from
+			 * transport_lookup_cmd_lun() failing from
 			 * iscsit_get_lun_for_cmd() in iscsit_handle_scsi_cmd().
 			 */
 			if (cmd->tmr_req && se_cmd->transport_wait_for_tasks)

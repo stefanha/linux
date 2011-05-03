@@ -24,7 +24,6 @@ struct iscsi_chap {
 	unsigned char	digest_type;
 	unsigned char	id;
 	unsigned char	challenge[CHAP_CHALLENGE_LENGTH];
-	unsigned int	challenge_len;
 	unsigned int	authenticate_target;
 	unsigned int	chap_state;
 } ____cacheline_aligned;

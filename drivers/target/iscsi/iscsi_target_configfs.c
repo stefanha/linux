@@ -1762,8 +1762,8 @@ static void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 static int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-	u32 iov_count = (se_cmd->t_task->t_tasks_se_num == 0) ? 1 :
-				se_cmd->t_task->t_tasks_se_num;
+	u32 iov_count = (se_cmd->t_task.t_tasks_se_num == 0) ? 1 :
+				se_cmd->t_task.t_tasks_se_num;
 
 	iov_count += TRANSPORT_IOV_DATA_BUFFER;
 

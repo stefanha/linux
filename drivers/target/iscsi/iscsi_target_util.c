@@ -900,7 +900,7 @@ void iscsit_dec_session_usage_count(struct iscsi_session *sess)
 void iscsit_inc_session_usage_count(struct iscsi_session *sess)
 {
 	spin_lock_bh(&sess->session_usage_lock);
-	sess->session_usage_count--;
+	sess->session_usage_count++;
 	spin_unlock_bh(&sess->session_usage_lock);
 }
 
@@ -1394,7 +1394,7 @@ send_pg:
 		se_len -= tx_sent;
 		if (!(se_len)) {
 			list_for_each_entry_continue(se_mem,
-					se_cmd->t_task->t_mem_list, se_list)
+					&se_cmd->t_task.t_mem_list, se_list)
 				break;
 
 			if (!se_mem) {

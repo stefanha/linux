@@ -880,7 +880,7 @@ static int tcm_queuecommand(struct ibmvscsis_adapter *adapter,
 			      srp_cmd_direction(cmd),
 			      attr, vsc->sense_buf);
 
-	ret = transport_get_lun_for_cmd(se_cmd, cmd->lun);
+	ret = transport_lookup_cmd_lun(se_cmd, cmd->lun);
 	if (ret) {
 		printk(KERN_ERR "invalid lun %u\n", GETLUN(cmd->lun));
 		transport_send_check_condition_and_sense(se_cmd,
@@ -889,7 +889,6 @@ static int tcm_queuecommand(struct ibmvscsis_adapter *adapter,
 		return ret;
 	}
 
-	transport_device_setup_cmd(se_cmd);
 	transport_generic_handle_cdb_map(se_cmd);
 
 	return 0;

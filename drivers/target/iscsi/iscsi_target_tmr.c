@@ -323,7 +323,7 @@ static int iscsit_task_reassign_complete_read(
 		return 0;
 	}
 
-	if (!atomic_read(&se_cmd->t_task->t_transport_complete)) {
+	if (!atomic_read(&se_cmd->t_task.t_transport_complete)) {
 		printk(KERN_ERR "READ ITT: 0x%08x: t_state: %d, never returned"
 			" from transport\n", cmd->init_task_tag,
 			SE_CMD(cmd)->t_state);
