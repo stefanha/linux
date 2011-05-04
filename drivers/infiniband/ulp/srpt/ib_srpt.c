@@ -1107,7 +1107,6 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 				 struct srpt_send_ioctx *ioctx)
 {
 	struct se_cmd *cmd;
-	struct se_transport_task *task;
 	struct scatterlist *sg, *sg_orig;
 	int sg_cnt;
 	enum dma_data_direction dir;
@@ -1127,18 +1126,17 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	cmd = &ioctx->cmd;
 	dir = cmd->data_direction;
 	BUG_ON(dir == DMA_NONE);
-	task = &cmd->t_task;
 	if (cmd->se_cmd_flags & (SCF_SCSI_DATA_SG_IO_CDB
 				 | SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(cmd);
-		sg = sg_orig = task->t_tasks_sg_chained;
-		sg_cnt = task->t_tasks_sg_chained_no;
+		sg = sg_orig = cmd->t_tasks_sg_chained;
+		sg_cnt = cmd->t_tasks_sg_chained_no;
 	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/* Use task->t_tasks_sg_bounce for control CDBs. */
-		sg_init_table(&task->t_tasks_sg_bounce, 1);
-		sg_set_buf(&task->t_tasks_sg_bounce, task->t_task_buf,
+		sg_init_table(&cmd->t_tasks_sg_bounce, 1);
+		sg_set_buf(&cmd->t_tasks_sg_bounce, cmd->t_task_buf,
 			   cmd->data_length);
-		sg = sg_orig = &task->t_tasks_sg_bounce;
+		sg = sg_orig = &cmd->t_tasks_sg_bounce;
 		sg_cnt = 1;
 	} else {
 		pr_debug("?? sg == NULL\n");
@@ -1421,7 +1419,7 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 		break;
 	case SRPT_STATE_NEED_DATA:
 		/* DMA_TO_DEVICE (write) - RDMA read error. */
-		atomic_set(&ioctx->cmd.t_task.transport_lun_stop, 1);
+		atomic_set(&ioctx->cmd.transport_lun_stop, 1);
 		transport_generic_handle_data(&ioctx->cmd);
 		break;
 	case SRPT_STATE_CMD_RSP_SENT:
@@ -1430,7 +1428,7 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 		 * not been received in time.
 		 */
 		srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
-		atomic_set(&ioctx->cmd.t_task.transport_lun_stop, 1);
+		atomic_set(&ioctx->cmd.transport_lun_stop, 1);
 		kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 		break;
 	case SRPT_STATE_MGMT_RSP_SENT:
@@ -1549,7 +1547,7 @@ static void srpt_handle_rdma_err_comp(struct srpt_rdma_ch *ch,
 			       __func__, __LINE__, state);
 		break;
 	case IB_WC_RDMA_WRITE:
-		atomic_set(&ioctx->cmd.t_task.transport_lun_stop,
+		atomic_set(&ioctx->cmd.transport_lun_stop,
 			   1);
 		break;
 	default:
