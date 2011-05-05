@@ -214,7 +214,7 @@ static u32 transport_generic_get_cdb_count(struct se_cmd *cmd,
 static int transport_generic_get_mem(struct se_cmd *cmd, u32 length);
 static int transport_generic_remove(struct se_cmd *cmd,
 		int release_to_pool, int session_reinstatement);
-static int transport_get_sectors(struct se_cmd *cmd);
+static int transport_cmd_get_valid_sectors(struct se_cmd *cmd);
 static int transport_map_sg_to_mem(struct se_cmd *cmd,
 		struct list_head *se_mem_list, struct scatterlist *sgl,
 		u32 *se_mem_cnt);
@@ -3404,7 +3404,7 @@ static int transport_generic_cmd_sequencer(
 		 * Check to ensure that LBA + Range does not exceed past end of
 		 * device.
 		 */
-		if (transport_get_sectors(cmd) < 0)
+		if (!transport_cmd_get_valid_sectors(cmd))
 			goto out_invalid_cdb_field;
 		break;
 	case UNMAP:
@@ -3985,30 +3985,26 @@ static inline long long transport_dev_end_lba(struct se_device *dev)
 	return dev->transport->get_blocks(dev) + 1;
 }
 
-static int transport_get_sectors(struct se_cmd *cmd)
+static int transport_cmd_get_valid_sectors(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-
-	cmd->t_tasks_sectors =
-		(cmd->data_length / dev->se_sub_dev->se_dev_attrib.block_size);
-	if (!(cmd->t_tasks_sectors))
-		cmd->t_tasks_sectors = 1;
+	u32 sectors;
 
 	if (dev->transport->get_device_type(dev) != TYPE_DISK)
 		return 0;
 
-	if ((cmd->t_task_lba + cmd->t_tasks_sectors) >
+	sectors = (cmd->data_length / dev->se_sub_dev->se_dev_attrib.block_size);
+
+	if ((cmd->t_task_lba + sectors) >
 	     transport_dev_end_lba(dev)) {
 		printk(KERN_ERR "LBA: %llu Sectors: %u exceeds"
 			" transport_dev_end_lba(): %llu\n",
-			cmd->t_task_lba, cmd->t_tasks_sectors,
+			cmd->t_task_lba, sectors,
 			transport_dev_end_lba(dev));
-		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		cmd->scsi_sense_reason = TCM_SECTOR_COUNT_TOO_MANY;
-		return PYX_TRANSPORT_REQ_TOO_MANY_SECTORS;
+		return 0;
 	}
 
-	return 0;
+	return sectors;
 }
 
 static int transport_new_cmd_obj(struct se_cmd *cmd)
@@ -4032,7 +4028,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 		    (dev->transport->transport_type != TRANSPORT_PLUGIN_PHBA_PDEV)) {
 			rc = transport_generic_get_cdb_count(cmd,
 				cmd->t_task_lba,
-				cmd->t_tasks_sectors,
+				transport_cmd_get_valid_sectors(cmd),
 				DMA_FROM_DEVICE, &cmd->t_mem_bidi_list,
 				set_counts);
 			if (!(rc)) {
@@ -4049,7 +4045,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 		 */
 		task_cdbs = transport_generic_get_cdb_count(cmd,
 				cmd->t_task_lba,
-				cmd->t_tasks_sectors,
+				transport_cmd_get_valid_sectors(cmd),
 				cmd->data_direction, &cmd->t_mem_list,
 				set_counts);
 		if (!(task_cdbs)) {
@@ -4783,10 +4779,6 @@ static int transport_generic_new_cmd(struct se_cmd *cmd)
 		if (ret < 0)
 			return ret;
 	}
-
-	ret = transport_get_sectors(cmd);
-	if (ret < 0)
-		return ret;
 
 	ret = transport_new_cmd_obj(cmd);
 	if (ret < 0)

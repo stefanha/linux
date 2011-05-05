@@ -493,7 +493,6 @@ struct se_cmd {
 	u32			t_task_cdbs;
 	u32			t_tasks_check;
 	u32			t_tasks_no;
-	u32			t_tasks_sectors;
 	u32			t_tasks_se_num;
 	u32			t_tasks_se_bidi_num;
 	u32			t_tasks_sg_chained_no;
