@@ -490,7 +490,6 @@ struct se_cmd {
 	int			t_tasks_failed;
 	int			t_tasks_fua;
 	bool			t_tasks_bidi;
-	u32			t_task_cdbs;
 	u32			t_tasks_se_num;
 	u32			t_tasks_se_bidi_num;
 	u32			t_tasks_sg_chained_no;
@@ -529,6 +528,7 @@ struct se_cmd {
 	/* Used for BIDI READ */
 	struct list_head	t_mem_bidi_list;
 	struct list_head	t_task_list;
+	u32			t_task_list_num;
 
 } ____cacheline_aligned;
 

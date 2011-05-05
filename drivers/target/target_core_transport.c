@@ -2521,7 +2521,7 @@ check_depth:
 	atomic_inc(&cmd->t_task_cdbs_sent);
 
 	if (atomic_read(&cmd->t_task_cdbs_sent) ==
-	    cmd->t_task_cdbs)
+	    cmd->t_task_list_num)
 		atomic_set(&cmd->transport_sent, 1);
 
 	transport_start_task_timer(task);
@@ -4014,7 +4014,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 
 	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)) {
 		task_cdbs = 1;
-		cmd->t_task_cdbs = 1;
+		cmd->t_task_list_num = 1;
 	} else {
 		int set_counts = 1;
 
@@ -4053,7 +4053,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 					TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 			return PYX_TRANSPORT_LU_COMM_FAILURE;
 		}
-		cmd->t_task_cdbs = task_cdbs;
+		cmd->t_task_list_num = task_cdbs;
 
 #if 0
 		printk(KERN_INFO "data_length: %u, LBA: %llu t_tasks_sectors:"
