@@ -491,8 +491,6 @@ struct se_cmd {
 	int			t_tasks_fua;
 	bool			t_tasks_bidi;
 	u32			t_task_cdbs;
-	u32			t_tasks_check;
-	u32			t_tasks_no;
 	u32			t_tasks_se_num;
 	u32			t_tasks_se_bidi_num;
 	u32			t_tasks_sg_chained_no;
