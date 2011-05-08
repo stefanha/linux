@@ -1,5 +1,11 @@
 dir /lib/modules/KERNELRELEASE/kernel 0755 0 0
+dir /lib/modules/KERNELRELEASE/kernel/fs 0755 0 0
+dir /lib/modules/KERNELRELEASE/kernel/fs/configfs 0755 0 0
+file /lib/modules/KERNELRELEASE/kernel/fs/configfs/configfs.ko fs/configfs/configfs.ko 0644 0 0
 dir /lib/modules/KERNELRELEASE/kernel/drivers 0755 0 0
 dir /lib/modules/KERNELRELEASE/kernel/drivers/target 0755 0 0
+file /lib/modules/KERNELRELEASE/kernel/drivers/target/target_core_mod.ko drivers/target/target_core_mod.ko 0644 0 0
+file /lib/modules/KERNELRELEASE/kernel/drivers/target/target_core_file.ko drivers/target/target_core_file.ko 0644 0 0
+file /lib/modules/KERNELRELEASE/kernel/drivers/target/target_core_iblock.ko drivers/target/target_core_iblock.ko 0644 0 0
 dir /lib/modules/KERNELRELEASE/kernel/drivers/target/tcm_vhost 0755 0 0
 file /lib/modules/KERNELRELEASE/kernel/drivers/target/tcm_vhost/tcm_vhost.ko drivers/target/tcm_vhost/tcm_vhost.ko 0644 0 0
