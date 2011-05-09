@@ -102,7 +102,6 @@ static ssize_t lio_target_np_store_sctp(
 	struct iscsi_tpg_np *tpg_np = container_of(se_tpg_np,
 				struct iscsi_tpg_np, se_tpg_np);
 	struct iscsi_tpg_np *tpg_np_sctp = NULL;
-	struct iscsi_np_addr np_addr;
 	char *endptr;
 	u32 op;
 	int ret;
@@ -124,18 +123,11 @@ static ssize_t lio_target_np_store_sctp(
 		return -EINVAL;
 
 	if (op) {
-		memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
-		if (np->np_sockaddr.ss_family == AF_INET6)
-			snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE,
-				"%s", np->np_ip);
-		else
-			np_addr.np_ipv4 = np->np_ipv4;
-		np_addr.np_flags = np->np_flags;
-		np_addr.np_port = np->np_port;
-
-		tpg_np_sctp = iscsit_tpg_add_network_portal(tpg, &np_addr,
-					tpg_np, ISCSI_SCTP_TCP,
-					np->np_sockaddr.ss_family);
+		/*
+		 * Use existing np->np_sockaddr for SCTP network portal reference
+		 */
+		tpg_np_sctp = iscsit_tpg_add_network_portal(tpg, &np->np_sockaddr,
+					np->np_ip, tpg_np, ISCSI_SCTP_TCP);
 		if (!tpg_np_sctp || IS_ERR(tpg_np_sctp))
 			goto out;
 	} else {
@@ -175,10 +167,12 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 {
 	struct iscsi_portal_group *tpg;
 	struct iscsi_tpg_np *tpg_np;
-	char *str, *str2, *end_ptr, *ip_str, *port_str;
-	struct iscsi_np_addr np_addr;
-	u32 ipv4 = 0;
-	int ret, af_inet;
+	char *str, *str2, *ip_str, *port_str;
+	struct __kernel_sockaddr_storage sockaddr; 
+	struct sockaddr_in *sock_in;
+	struct sockaddr_in6 *sock_in6;
+	unsigned long port;
+	int ret;
 	char buf[MAX_PORTAL_LEN + 1];
 
 	if (strlen(name) > MAX_PORTAL_LEN) {
@@ -189,10 +183,12 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	memset(buf, 0, MAX_PORTAL_LEN + 1);
 	snprintf(buf, MAX_PORTAL_LEN, "%s", name);
 
-	memset(&np_addr, 0, sizeof(struct iscsi_np_addr));
+	memset(&sockaddr, 0, sizeof(struct __kernel_sockaddr_storage));
 
 	str = strstr(buf, "[");
 	if (str) {
+		const char *end;
+
 		str2 = strstr(str, "]");
 		if (!str2) {
 			printk(KERN_ERR "Unable to locate trailing \"]\""
@@ -210,12 +206,23 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		}
 		*port_str = '\0'; /* Terminate string for IP */
 		port_str++; /* Skip over ":" */
-		np_addr.np_port = simple_strtoul(port_str, &end_ptr, 0);
 
-		snprintf(np_addr.np_ipv6, IPV6_ADDRESS_SPACE, "%s", str);
-		af_inet = AF_INET6;
+		ret = strict_strtoul(port_str, 0, &port);
+		if (ret < 0) {
+			printk("strict_strtoul() failed for port_str: %d\n", ret);
+			return ERR_PTR(ret);
+		}
+		sock_in6 = (struct sockaddr_in6 *)&sockaddr;
+		sock_in6->sin6_family = AF_INET6;
+		sock_in6->sin6_port = htons((unsigned short)port);
+		ret = in6_pton(str, IPV6_ADDRESS_SPACE,
+				(void *)&sock_in6->sin6_addr.in6_u, -1, &end);	
+		if (ret <= 0) {
+			printk(KERN_ERR "in6_pton returned: %d\n", ret);
+			return ERR_PTR(-EINVAL);
+		}
 	} else {
-		ip_str = &buf[0];
+		str = ip_str = &buf[0];
 		port_str = strstr(ip_str, ":");
 		if (!port_str) {
 			printk(KERN_ERR "Unable to locate \":port\""
@@ -224,11 +231,16 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		}
 		*port_str = '\0'; /* Terminate string for IP */
 		port_str++; /* Skip over ":" */
-		np_addr.np_port = simple_strtoul(port_str, &end_ptr, 0);
 
-		ipv4 = in_aton(ip_str);
-		np_addr.np_ipv4 = htonl(ipv4);
-		af_inet = AF_INET;
+		ret = strict_strtoul(port_str, 0, &port);
+		if (ret < 0) {
+			printk("strict_strtoul() failed for port_str: %d\n", ret);
+			return ERR_PTR(ret);
+		}
+		sock_in = (struct sockaddr_in *)&sockaddr;
+		sock_in->sin_family = AF_INET;
+		sock_in->sin_port = htons((unsigned short)port);
+		sock_in->sin_addr.s_addr = in_aton(ip_str);
 	}
 	tpg = container_of(se_tpg, struct iscsi_portal_group, tpg_se_tpg);
 	ret = iscsit_get_tpg(tpg);
@@ -252,8 +264,8 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	 * sys/kernel/config/iscsi/$IQN/$TPG/np/$IP:$PORT/
 	 *
 	 */
-	tpg_np = iscsit_tpg_add_network_portal(tpg, &np_addr, NULL,
-				ISCSI_TCP, af_inet);
+	tpg_np = iscsit_tpg_add_network_portal(tpg, &sockaddr, str, NULL,
+				ISCSI_TCP);
 	if (IS_ERR(tpg_np)) {
 		iscsit_put_tpg(tpg);
 		return ERR_PTR(PTR_ERR(tpg_np));

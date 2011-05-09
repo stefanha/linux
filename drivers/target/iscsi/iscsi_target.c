@@ -263,14 +263,14 @@ int iscsit_deaccess_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 }
 
 static struct iscsi_np *iscsit_get_np(
-	unsigned char *ipv6,
-	u32 ipv4,
-	u16 port,
-	int af_inet,
+	struct __kernel_sockaddr_storage *sockaddr,
 	int network_transport)
 {
+	struct sockaddr_in *sock_in, *sock_in_e;
+	struct sockaddr_in6 *sock_in6, *sock_in6_e;
 	struct iscsi_np *np;
 	int ip_match = 0;
+	u16 port;
 
 	spin_lock_bh(&np_lock);
 	list_for_each_entry(np, &g_np_list, np_list) {
@@ -280,12 +280,25 @@ static struct iscsi_np *iscsit_get_np(
 			continue;
 		}
 
-		if (af_inet == AF_INET6) {
-			if (!strcmp(&np->np_ip[0], &ipv6[0]))
+		if (sockaddr->ss_family == AF_INET6) {
+			sock_in6 = (struct sockaddr_in6 *)sockaddr;
+			sock_in6_e = (struct sockaddr_in6 *)&np->np_sockaddr;
+
+			if (!memcmp((void *)&sock_in6->sin6_addr.in6_u,
+				    (void *)&sock_in6_e->sin6_addr.in6_u,
+				    sizeof(struct in6_addr)))
 				ip_match = 1;
+
+			port = ntohs(sock_in6->sin6_port);
 		} else {
-			if (np->np_ipv4 == ipv4)
+			sock_in = (struct sockaddr_in *)sockaddr;
+			sock_in_e = (struct sockaddr_in *)&np->np_sockaddr;
+
+			if (sock_in->sin_addr.s_addr ==
+			    sock_in_e->sin_addr.s_addr)
 				ip_match = 1;
+
+			port = ntohs(sock_in->sin_port);
 		}
 			
 		if ((ip_match == 1) && (np->np_port == port) &&
@@ -308,17 +321,18 @@ static struct iscsi_np *iscsit_get_np(
 }
 
 struct iscsi_np *iscsit_add_np(
-	struct iscsi_np_addr *np_addr,
-	int network_transport,
-	int af_inet)
+	struct __kernel_sockaddr_storage *sockaddr,
+	char *ip_str,
+	int network_transport)
 {
+	struct sockaddr_in *sock_in;
+	struct sockaddr_in6 *sock_in6;
 	struct iscsi_np *np;
 	int ret;
 	/*
 	 * Locate the existing struct iscsi_np if already active..
 	 */
-	np = iscsit_get_np(np_addr->np_ipv6, np_addr->np_ipv4,
-			   np_addr->np_port, af_inet, network_transport);
+	np = iscsit_get_np(sockaddr, network_transport);
 	if (np)
 		return np;
 
@@ -329,20 +343,22 @@ struct iscsi_np *iscsit_add_np(
 	}
 
 	np->np_flags |= NPF_IP_NETWORK;
-	if (af_inet == AF_INET6) {
-		snprintf(np->np_ip, IPV6_ADDRESS_SPACE, "%s", np_addr->np_ipv6);
+	if (sockaddr->ss_family == AF_INET6) {
+		sock_in6 = (struct sockaddr_in6 *)sockaddr;
+		snprintf(np->np_ip, IPV6_ADDRESS_SPACE, "%s", ip_str);
+		np->np_port = ntohs(sock_in6->sin6_port);
 	} else {
-		sprintf(np->np_ip, "%pI4", &np_addr->np_ipv4);
-		np->np_ipv4 = np_addr->np_ipv4;
+		sock_in = (struct sockaddr_in *)sockaddr;
+		sprintf(np->np_ip, "%s", ip_str);
+		np->np_port = ntohs(sock_in->sin_port);
 	}
 
-	np->np_port		= np_addr->np_port;
 	np->np_network_transport = network_transport;
 	spin_lock_init(&np->np_thread_lock);
 	init_completion(&np->np_restart_comp);
 	INIT_LIST_HEAD(&np->np_list);
 
-	ret = iscsi_target_setup_login_socket(np, af_inet);
+	ret = iscsi_target_setup_login_socket(np, sockaddr);
 	if (ret != 0) {
 		kfree(np);
 		return ERR_PTR(ret);

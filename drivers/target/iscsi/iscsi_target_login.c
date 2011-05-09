@@ -753,13 +753,12 @@ static void iscsi_stop_login_thread_timer(struct iscsi_np *np)
 	spin_unlock_bh(&np->np_thread_lock);
 }
 
-int iscsi_target_setup_login_socket(struct iscsi_np *np, int af_inet)
+int iscsi_target_setup_login_socket(
+	struct iscsi_np *np,
+	struct __kernel_sockaddr_storage *sockaddr)
 {
-	const char *end;
 	struct socket *sock;
 	int backlog = 5, ret, opt = 0, len;
-	struct sockaddr_in *sock_in;
-	struct sockaddr_in6 *sock_in6;
 
 	switch (np->np_network_transport) {
 	case ISCSI_TCP:
@@ -783,7 +782,8 @@ int iscsi_target_setup_login_socket(struct iscsi_np *np, int af_inet)
 		return -EINVAL;
 	}
 
-	ret = sock_create(af_inet, np->np_sock_type, np->np_ip_proto, &sock);
+	ret = sock_create(sockaddr->ss_family, np->np_sock_type,
+			np->np_ip_proto, &sock);
 	if (ret < 0) {
 		printk(KERN_ERR "sock_create() failed.\n");
 		return ret;
@@ -805,27 +805,17 @@ int iscsi_target_setup_login_socket(struct iscsi_np *np, int af_inet)
 			np->np_flags |= NPF_SCTP_STRUCT_FILE;
 		}
 	}
+	/*
+	 * Setup the np->np_sockaddr from the passed sockaddr setup
+	 * in iscsi_target_configfs.c code..
+	 */
+	memcpy((void *)&np->np_sockaddr, (void *)sockaddr,
+			sizeof(struct __kernel_sockaddr_storage));
 
-	if (af_inet == AF_INET6) {
-		sock_in6 = (struct sockaddr_in6 *)&np->np_sockaddr;
-		sock_in6->sin6_family = AF_INET6;
-		sock_in6->sin6_port = htons(np->np_port);
+	if (sockaddr->ss_family == AF_INET6)
 		len = sizeof(struct sockaddr_in6);
-
-		ret = in6_pton(&np->np_ip[0], IPV6_ADDRESS_SPACE,
-				(void *)&sock_in6->sin6_addr.in6_u, -1, &end);
-		if (ret <= 0) {
-			printk(KERN_ERR "in6_pton returned: %d\n", ret);
-			ret = -EINVAL;
-			goto fail;
-		}
-	} else {
-		sock_in = (struct sockaddr_in *)&np->np_sockaddr;
-		sock_in->sin_family = AF_INET;
-		sock_in->sin_port = htons(np->np_port);
-		sock_in->sin_addr.s_addr = htonl(np->np_ipv4);
-		len = sizeof(struct sockaddr);
-	}
+	else
+		len = sizeof(struct sockaddr_in);
 	/*
 	 * Set SO_REUSEADDR, and disable Nagel Algorithm with TCP_NODELAY.
 	 */
@@ -1038,7 +1028,6 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 		printk(KERN_INFO "Skipping iscsi_ntop6()\n");
 #endif
 	} else {
-		u32 ipv4;
 		memset(&sock_in, 0, sizeof(struct sockaddr_in));
 
 		if (conn->sock->ops->getname(conn->sock,
@@ -1048,16 +1037,11 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 					ISCSI_LOGIN_STATUS_TARGET_ERROR);
 			goto new_sess_out;
 		}
-		ipv4 = ntohl(sock_in.sin_addr.s_addr);
-		sprintf(conn->login_ip, "%pI4", &ipv4);
-		conn->login_ipv4 = ipv4;
+		sprintf(conn->login_ip, "%pI4", &sock_in.sin_addr.s_addr);
 		conn->login_port = ntohs(sock_in.sin_port);
 	}
 
 	conn->network_transport = np->np_network_transport;
-
-	conn->local_ip = np->np_ipv4;
-	conn->local_port = np->np_port;
 
 	printk(KERN_INFO "Received iSCSI login request from %s on %s Network"
 			" Portal %s:%hu\n", conn->login_ip,

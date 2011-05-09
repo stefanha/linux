@@ -422,10 +422,10 @@ struct iscsi_tpg_np *iscsit_tpg_locate_child_np(
 
 struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 	struct iscsi_portal_group *tpg,
-	struct iscsi_np_addr *np_addr,
+	struct __kernel_sockaddr_storage *sockaddr,
+	char *ip_str,
 	struct iscsi_tpg_np *tpg_np_parent,
-	int network_transport,
-	int af_inet)
+	int network_transport)
 {
 	struct iscsi_np *np;
 	struct iscsi_tpg_np *tpg_np;
@@ -437,7 +437,7 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 		return ERR_PTR(-ENOMEM);
 	}
 
-	np = iscsit_add_np(np_addr, network_transport, af_inet);
+	np = iscsit_add_np(sockaddr, ip_str, network_transport);
 	if (IS_ERR(np)) {
 		kfree(tpg_np);
 		return ERR_CAST(np);

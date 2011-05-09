@@ -515,8 +515,6 @@ struct iscsi_conn {
 	u32			auth_id;
 #define CONNFLAG_SCTP_STRUCT_FILE			0x01
 	u32			conn_flags;
-	/* Remote TCP IPv4 address */
-	u32			login_ipv4;
 	/* Used for iscsi_tx_login_rsp() */
 	u32			login_itt;
 	u32			exp_statsn;
@@ -532,8 +530,6 @@ struct iscsi_conn {
 	unsigned char		bad_hdr[ISCSI_HDR_LEN];
 #define IPV6_ADDRESS_SPACE				48
 	unsigned char		login_ip[IPV6_ADDRESS_SPACE];
-	u16			local_port;
-	u32			local_ip;
 	int			conn_usage_count;
 	int			conn_waiting_on_uc;
 	atomic_t		check_immediate_queue;
@@ -758,7 +754,6 @@ struct iscsi_np {
 	enum iscsi_timer_flags_table np_login_timer_flags;
 	u32			np_exports;
 	enum np_flags_table	np_flags;
-	u32			np_ipv4;
 	unsigned char		np_ip[IPV6_ADDRESS_SPACE];
 	u16			np_port;
 	spinlock_t		np_thread_lock;
@@ -781,13 +776,6 @@ struct iscsi_tpg_np {
 	struct se_tpg_np	se_tpg_np;
 	spinlock_t		tpg_np_parent_lock;
 };
-
-struct iscsi_np_addr {
-	u16		np_port;
-	u32		np_flags;
-	u32		np_ipv4;
-	unsigned char	np_ipv6[IPV6_ADDRESS_SPACE];
-} ____cacheline_aligned;
 
 struct iscsi_portal_group {
 	unsigned char		tpg_chap_id;
