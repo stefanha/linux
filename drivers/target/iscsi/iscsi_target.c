@@ -1332,6 +1332,57 @@ after_immediate_data:
 	return 0;
 }
 
+static void iscsit_do_crypto_hash_iovec(
+	struct hash_desc *hash,
+	struct kvec *iov,
+	u32 counter,
+	u32 padding,
+	u8 *pad_bytes,
+	u8 *data_crc)
+{
+	struct scatterlist sg;
+	struct kvec *iov_ptr = iov;
+
+	crypto_hash_init(hash);
+
+	while (counter > 0) {
+		sg_init_one(&sg, iov_ptr->iov_base,
+				iov_ptr->iov_len);
+		crypto_hash_update(hash, &sg, iov_ptr->iov_len);
+		
+		counter -= iov_ptr->iov_len;
+		iov_ptr++;
+	}
+
+	if (padding) {
+		sg_init_one(&sg, pad_bytes, padding);
+		crypto_hash_update(hash, &sg, padding);
+	}
+	crypto_hash_final(hash, data_crc);
+}
+
+static void iscsit_do_crypto_hash_buf(
+	struct hash_desc *hash,
+	unsigned char *buf,
+	u32 payload_length,
+	u32 padding,
+	u8 *pad_bytes,
+	u8 *data_crc)
+{
+	struct scatterlist sg;
+
+	crypto_hash_init(hash);
+
+	sg_init_one(&sg, (u8 *)buf, payload_length);
+	crypto_hash_update(hash, &sg, payload_length);
+
+	if (padding) {
+		sg_init_one(&sg, pad_bytes, padding);
+		crypto_hash_update(hash, &sg, padding);
+	}
+	crypto_hash_final(hash, data_crc);
+}
+
 static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 {
 	int iov_ret, ooo_cmdsn = 0, ret;
@@ -1555,7 +1606,6 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = payload_length, data_crc = 0;
 		struct kvec *iov_ptr = &cmd->iov_data[0];
-		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
 		 * call set_iovec_data_ptrs() again in order to have a iMD/PSCSI
@@ -1571,30 +1621,9 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 		if (iscsit_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return -1;
 
-		crypto_hash_init(&conn->conn_rx_hash);
-
-		while (counter > 0) {
-			sg_init_one(&sg, iov_ptr->iov_base,
-					iov_ptr->iov_len);
-			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					iov_ptr->iov_len);
-
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %zu"
-				" bytes, CRC 0x%08x\n", iov_ptr->iov_len,
-				data_crc);
-			counter -= iov_ptr->iov_len;
-			iov_ptr++;
-		}
-
-		if (padding) {
-			sg_init_one(&sg, (u8 *)&pad_bytes, padding);
-			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					padding);
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %d"
-				" bytes of padding, CRC 0x%08x\n",
-				padding, data_crc);
-		}
-		crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);
+		iscsit_do_crypto_hash_iovec(&conn->conn_rx_hash,
+				iov_ptr, counter, padding,
+				(u8 *)&pad_bytes, (u8 *)&data_crc);
 
 		if (checksum != data_crc) {
 			printk(KERN_ERR "ITT: 0x%08x, Offset: %u, Length: %u,"
@@ -1650,7 +1679,6 @@ static int iscsit_handle_nop_out(
 	struct iscsi_cmd *cmd = NULL;
 	struct kvec *iov = NULL;
 	struct iscsi_nopout *hdr;
-	struct scatterlist sg;
 
 	hdr			= (struct iscsi_nopout *) buf;
 	payload_length		= ntoh24(hdr->dlength);
@@ -1741,19 +1769,10 @@ static int iscsit_handle_nop_out(
 		}
 
 		if (conn->conn_ops->DataDigest) {
-			crypto_hash_init(&conn->conn_rx_hash);
-
-			sg_init_one(&sg, (u8 *)ping_data, payload_length);
-			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					payload_length);
-
-			if (padding) {
-				sg_init_one(&sg, (u8 *)&cmd->pad_bytes,
-					padding);
-				crypto_hash_update(&conn->conn_rx_hash, &sg,
-					padding);
-			}
-			crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);
+			iscsit_do_crypto_hash_buf(&conn->conn_rx_hash,
+					ping_data, payload_length,
+					padding, (u8 *)&cmd->pad_bytes,
+					(u8 *)&data_crc);
 
 			if (checksum != data_crc) {
 				printk(KERN_ERR "Ping data CRC32C DataDigest"
@@ -2056,7 +2075,6 @@ static int iscsit_handle_text_cmd(
 	struct iscsi_cmd *cmd;
 	struct kvec iov[3];
 	struct iscsi_text *hdr;
-	struct scatterlist sg;
 
 	hdr			= (struct iscsi_text *) buf;
 	payload_length		= ntoh24(hdr->dlength);
@@ -2111,18 +2129,10 @@ static int iscsit_handle_text_cmd(
 		}
 
 		if (conn->conn_ops->DataDigest) {
-			crypto_hash_init(&conn->conn_rx_hash);
-
-			sg_init_one(&sg, (u8 *)text_in, text_length);
-			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					text_length);
-
-			if (padding) {
-				sg_init_one(&sg, (u8 *)&pad_bytes, padding);
-				crypto_hash_update(&conn->conn_rx_hash, &sg,
-						padding);
-			}
-			crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);
+			iscsit_do_crypto_hash_buf(&conn->conn_rx_hash,
+					text_in, text_length,
+					padding, (u8 *)&pad_bytes,
+					(u8 *)&data_crc);
 
 			if (checksum != data_crc) {
 				printk(KERN_ERR "Text data CRC32C DataDigest"
@@ -2551,7 +2561,6 @@ static int iscsit_handle_immediate_data(
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = length, data_crc;
 		struct kvec *iov_ptr = &cmd->iov_data[0];
-		struct scatterlist sg;
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
 		 * call set_iovec_data_ptrs again in order to have a iMD/PSCSI
@@ -2567,28 +2576,9 @@ static int iscsit_handle_immediate_data(
 		if (iscsit_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
 			return IMMEDIDATE_DATA_CANNOT_RECOVER;
 
-		crypto_hash_init(&conn->conn_rx_hash);
-
-		while (counter > 0) {
-			sg_init_one(&sg, iov_ptr->iov_base,
-					iov_ptr->iov_len);
-			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					iov_ptr->iov_len);
-
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %zu"
-			" bytes, CRC 0x%08x\n", iov_ptr->iov_len, data_crc);
-			counter -= iov_ptr->iov_len;
-			iov_ptr++;
-		}
-
-		if (padding) {
-			sg_init_one(&sg, (u8 *)&pad_bytes, padding);
-			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					padding);
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %d"
-			" bytes of padding, CRC 0x%08x\n", padding, data_crc);
-		}
-		crypto_hash_final(&conn->conn_rx_hash, (u8 *)&data_crc);
+		iscsit_do_crypto_hash_iovec(&conn->conn_rx_hash, iov_ptr,
+					counter, padding,
+					(u8 *)&pad_bytes, (u8 *)&data_crc);
 
 		if (checksum != data_crc) {
 			printk(KERN_ERR "ImmediateData CRC32C DataDigest 0x%08x"
@@ -2638,7 +2628,6 @@ int iscsit_send_async_msg(
 	u32 tx_send = ISCSI_HDR_LEN, tx_sent = 0;
 	struct iscsi_async *hdr;
 	struct kvec iov;
-	struct scatterlist sg;
 
 	memset(&iov, 0, sizeof(struct kvec));
 	memset(&iscsi_hdr, 0, ISCSI_HDR_LEN+CRC_LEN);
@@ -2700,13 +2689,10 @@ int iscsit_send_async_msg(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&iscsi_hdr[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)&iscsi_hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
-
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)&iscsi_hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
+				
 		iov.iov_len += CRC_LEN;
 		tx_send += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for Async"
@@ -2788,7 +2774,6 @@ static int iscsit_send_conn_drop_async_message(
 	struct iscsi_conn *conn)
 {
 	struct iscsi_async *hdr;
-	struct scatterlist sg;
 
 	cmd->tx_size = ISCSI_HDR_LEN;
 	cmd->iscsi_opcode = ISCSI_OP_ASYNC_EVENT;
@@ -2811,12 +2796,9 @@ static int iscsit_send_conn_drop_async_message(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		cmd->tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest to"
@@ -2847,7 +2829,6 @@ static int iscsit_send_data_in(
 	struct se_map_sg map_sg;
 	struct iscsi_data_rsp *hdr;
 	struct kvec *iov;
-	struct scatterlist sg;
 
 	memset(&datain, 0, sizeof(struct iscsi_datain));
 	dr = iscsit_get_datain_values(cmd, &datain);
@@ -2933,12 +2914,9 @@ static int iscsit_send_data_in(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);	
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
@@ -2983,21 +2961,8 @@ static int iscsit_send_data_in(
 		u32 counter = (datain.length + unmap_sg->padding);
 		struct kvec *iov_ptr = &cmd->iov_data[1];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		while (counter > 0) {
-			sg_init_one(&sg, iov_ptr->iov_base,
-					iov_ptr->iov_len);
-			crypto_hash_update(&conn->conn_tx_hash, &sg,
-					iov_ptr->iov_len);
-
-			TRACE(TRACE_DIGEST, "Computed CRC32C DataDigest %zu"
-				" bytes, crc 0x%08x\n", iov_ptr->iov_len,
-					cmd->data_crc);
-			counter -= iov_ptr->iov_len;
-			iov_ptr++;
-		}
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)&cmd->data_crc);
+		iscsit_do_crypto_hash_iovec(&conn->conn_tx_hash, iov_ptr,
+				counter, 0, NULL, (u8 *)&cmd->data_crc);
 
 		iov[iov_count].iov_base	= &cmd->data_crc;
 		iov[iov_count++].iov_len = CRC_LEN;
@@ -3035,7 +3000,6 @@ static int iscsit_send_logout_response(
 	struct iscsi_session *sess = conn->sess;
 	struct kvec *iov;
 	struct iscsi_logout_rsp *hdr;
-	struct scatterlist sg;
 	/*
 	 * The actual shutting down of Sessions and/or Connections
 	 * for CLOSESESSION and CLOSECONNECTION Logout Requests
@@ -3125,12 +3089,9 @@ static int iscsit_send_logout_response(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
@@ -3158,7 +3119,6 @@ static int iscsit_send_unsolicited_nopin(
 {
 	int tx_size = ISCSI_HDR_LEN;
 	struct iscsi_nopin *hdr;
-	struct scatterlist sg;
 
 	hdr			= (struct iscsi_nopin *) cmd->pdu;
 	memset(hdr, 0, ISCSI_HDR_LEN);
@@ -3174,12 +3134,9 @@ static int iscsit_send_unsolicited_nopin(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest to"
@@ -3205,7 +3162,6 @@ static int iscsit_send_nopin_response(
 	u32 padding = 0;
 	struct kvec *iov;
 	struct iscsi_nopin *hdr;
-	struct scatterlist sg;
 
 	tx_size = ISCSI_HDR_LEN;
 	hdr			= (struct iscsi_nopin *) cmd->pdu;
@@ -3230,13 +3186,10 @@ static int iscsit_send_nopin_response(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
-
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
+					
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest"
@@ -3264,22 +3217,11 @@ static int iscsit_send_nopin_response(
 				" padding bytes.\n", padding);
 		}
 		if (conn->conn_ops->DataDigest) {
-			crypto_hash_init(&conn->conn_tx_hash);
-
-			sg_init_one(&sg, (u8 *)cmd->buf_ptr,
-					cmd->buf_ptr_size);
-			crypto_hash_update(&conn->conn_tx_hash, &sg,
-					cmd->buf_ptr_size);
-
-			if (padding) {
-				sg_init_one(&sg, (u8 *)&cmd->pad_bytes, padding);
-				crypto_hash_update(&conn->conn_tx_hash, &sg,
-						padding);
-			}
-
-			crypto_hash_final(&conn->conn_tx_hash,
-					(u8 *)&cmd->data_crc);
-
+			iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				cmd->buf_ptr, cmd->buf_ptr_size,
+				padding, (u8 *)&cmd->pad_bytes,
+				(u8 *)&cmd->data_crc);
+			
 			iov[niov].iov_base = &cmd->data_crc;
 			iov[niov++].iov_len = CRC_LEN;
 			tx_size += CRC_LEN;
@@ -3307,7 +3249,6 @@ int iscsit_send_r2t(
 	u32 trace_type;
 	struct iscsi_r2t *r2t;
 	struct iscsi_r2t_rsp *hdr;
-	struct scatterlist sg;
 
 	r2t = iscsit_get_r2t_from_list(cmd);
 	if (!r2t)
@@ -3340,12 +3281,9 @@ int iscsit_send_r2t(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		cmd->iov_misc[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
@@ -3456,7 +3394,6 @@ static int iscsit_send_status(
 	u32 padding = 0, trace_type, tx_size = 0;
 	struct iscsi_scsi_rsp *hdr;
 	struct kvec *iov;
-	struct scatterlist sg;
 
 	recovery = (cmd->i_state != ISTATE_SEND_STATUS);
 	if (!recovery)
@@ -3513,15 +3450,10 @@ static int iscsit_send_status(
 		}
 
 		if (conn->conn_ops->DataDigest) {
-			crypto_hash_init(&conn->conn_tx_hash);
-
-			sg_init_one(&sg, (u8 *)SE_CMD(cmd)->sense_buffer,
-				(SE_CMD(cmd)->scsi_sense_length + padding));
-			crypto_hash_update(&conn->conn_tx_hash, &sg,
-				(SE_CMD(cmd)->scsi_sense_length + padding));
-
-			crypto_hash_final(&conn->conn_tx_hash,
-					(u8 *)&cmd->data_crc);
+			iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				SE_CMD(cmd)->sense_buffer,
+				(SE_CMD(cmd)->scsi_sense_length + padding),
+				0, NULL, (u8 *)&cmd->data_crc);
 
 			iov[iov_count].iov_base    = &cmd->data_crc;
 			iov[iov_count++].iov_len     = CRC_LEN;
@@ -3541,12 +3473,9 @@ static int iscsit_send_status(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
@@ -3591,7 +3520,6 @@ static int iscsit_send_task_mgt_rsp(
 {
 	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
 	struct iscsi_tm_rsp *hdr;
-	struct scatterlist sg;
 	u32 tx_size = 0;
 
 	hdr			= (struct iscsi_tm_rsp *) cmd->pdu;
@@ -3613,12 +3541,9 @@ static int iscsit_send_task_mgt_rsp(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		cmd->iov_misc[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
@@ -3727,7 +3652,6 @@ static int iscsit_send_text_rsp(
 {
 	struct iscsi_text_rsp *hdr;
 	struct kvec *iov;
-	struct scatterlist sg;
 	u32 padding = 0, tx_size = 0;
 	int text_length, iov_count = 0;
 
@@ -3768,12 +3692,9 @@ static int iscsit_send_text_rsp(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
@@ -3782,14 +3703,9 @@ static int iscsit_send_text_rsp(
 	}
 
 	if (conn->conn_ops->DataDigest) {
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)cmd->buf_ptr, (text_length + padding));
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				(text_length + padding));
-
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&cmd->data_crc);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				cmd->buf_ptr, (text_length + padding),
+				0, NULL, (u8 *)&cmd->data_crc);
 
 		iov[iov_count].iov_base	= &cmd->data_crc;
 		iov[iov_count++].iov_len = CRC_LEN;
@@ -3816,7 +3732,6 @@ static int iscsit_send_reject(
 	u32 iov_count = 0, tx_size = 0;
 	struct iscsi_reject *hdr;
 	struct kvec *iov;
-	struct scatterlist sg;
 
 	hdr			= (struct iscsi_reject *) cmd->pdu;
 	hdr->opcode		= ISCSI_OP_REJECT;
@@ -3839,12 +3754,9 @@ static int iscsit_send_reject(
 	if (conn->conn_ops->HeaderDigest) {
 		u32 *header_digest = (u32 *)&cmd->pdu[ISCSI_HDR_LEN];
 
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)hdr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg, ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash, (u8 *)header_digest);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)hdr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)header_digest);
 
 		iov[0].iov_len += CRC_LEN;
 		tx_size += CRC_LEN;
@@ -3853,14 +3765,9 @@ static int iscsit_send_reject(
 	}
 
 	if (conn->conn_ops->DataDigest) {
-		crypto_hash_init(&conn->conn_tx_hash);
-
-		sg_init_one(&sg, (u8 *)cmd->buf_ptr, ISCSI_HDR_LEN);
-		crypto_hash_update(&conn->conn_tx_hash, &sg,
-				ISCSI_HDR_LEN);
-
-		crypto_hash_final(&conn->conn_tx_hash,
-				(u8 *)&cmd->data_crc);
+		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
+				(unsigned char *)cmd->buf_ptr, ISCSI_HDR_LEN,
+				0, NULL, (u8 *)&cmd->data_crc);
 
 		iov[iov_count].iov_base = &cmd->data_crc;
 		iov[iov_count++].iov_len  = CRC_LEN;
@@ -4281,7 +4188,6 @@ int iscsi_target_rx_thread(void *arg)
 	struct iscsi_conn *conn = NULL;
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct kvec iov;
-	struct scatterlist sg;
 	/*
 	 * Bump up the task_struct priority for RX/TX thread set pairs,
 	 * and allow ourselves to be interrupted by SIGINT so that a
@@ -4328,13 +4234,10 @@ restart:
 				iscsit_rx_thread_wait_for_tcp(conn);
 				goto transport_err;
 			}
-			crypto_hash_init(&conn->conn_rx_hash);
 
-			sg_init_one(&sg, (u8 *)buffer, ISCSI_HDR_LEN);
-			crypto_hash_update(&conn->conn_rx_hash, &sg,
-					ISCSI_HDR_LEN);
-
-			crypto_hash_final(&conn->conn_rx_hash, (u8 *)&checksum);
+			iscsit_do_crypto_hash_buf(&conn->conn_rx_hash,
+					buffer, ISCSI_HDR_LEN,
+					0, NULL, (u8 *)&checksum);
 
 			if (digest != checksum) {
 				printk(KERN_ERR "HeaderDigest CRC32C failed,"
