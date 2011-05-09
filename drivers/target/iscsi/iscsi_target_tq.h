@@ -20,7 +20,6 @@ extern void iscsi_thread_set_free(void);
 
 extern int iscsi_target_tx_thread(void *);
 extern int iscsi_target_rx_thread(void *);
-extern struct iscsi_global *iscsi_global;
 
 #define TARGET_THREAD_SET_COUNT			4
 

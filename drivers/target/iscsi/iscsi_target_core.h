@@ -6,20 +6,15 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 
-#define ISCSI_VERSION			"v4.1.0-rc1"
+#define ISCSIT_VERSION			"v4.1.0-rc1"
 #define ISCSI_MAX_DATASN_MISSING_COUNT	16
 #define ISCSI_TX_THREAD_TCP_TIMEOUT	2
 #define ISCSI_RX_THREAD_TCP_TIMEOUT	2
 #define SECONDS_FOR_ASYNC_LOGOUT	10
 #define SECONDS_FOR_ASYNC_TEXT		10
-#define IPV4_ADDRESS_SPACE		4
-#define IPV4_BUF_SIZE			18
-#define ISCSI_HDR_LEN			48
-#define CRC_LEN				4
-#define MAX_KEY_NAME_LENGTH		63
-#define MAX_KEY_VALUE_LENGTH		255
 #define WHITE_SPACE			" \t\v\f\n\r"
 
 /* struct iscsi_node_attrib sanity values */
@@ -428,7 +423,7 @@ struct iscsi_cmd {
 	/* See include/linux/dma-mapping.h */
 	enum dma_data_direction	data_direction;
 	/* iSCSI PDU Header + CRC */
-	unsigned char		pdu[ISCSI_HDR_LEN + CRC_LEN];
+	unsigned char		pdu[ISCSI_HDR_LEN + ISCSI_CRC_LEN];
 	/* Number of times struct iscsi_cmd is present in immediate queue */
 	atomic_t		immed_queue_count;
 	atomic_t		response_queue_count;
@@ -497,8 +492,6 @@ struct iscsi_tmr_req {
 };
 
 struct iscsi_conn {
-#define ISCSI_NETDEV_NAME_SIZE				12
-	char			net_dev[ISCSI_NETDEV_NAME_SIZE];
 	/* Authentication Successful for this connection */
 	u8			auth_complete;
 	/* State connection is currently in */
@@ -519,8 +512,6 @@ struct iscsi_conn {
 	u32			auth_id;
 #define CONNFLAG_SCTP_STRUCT_FILE			0x01
 	u32			conn_flags;
-	/* Remote TCP IPv4 address */
-	u32			login_ipv4;
 	/* Used for iscsi_tx_login_rsp() */
 	u32			login_itt;
 	u32			exp_statsn;
@@ -536,8 +527,6 @@ struct iscsi_conn {
 	unsigned char		bad_hdr[ISCSI_HDR_LEN];
 #define IPV6_ADDRESS_SPACE				48
 	unsigned char		login_ip[IPV6_ADDRESS_SPACE];
-	u16			local_port;
-	u32			local_ip;
 	int			conn_usage_count;
 	int			conn_waiting_on_uc;
 	atomic_t		check_immediate_queue;
@@ -549,7 +538,6 @@ struct iscsi_conn {
 	atomic_t		connection_wait_rcfr;
 	atomic_t		sleep_on_conn_wait_comp;
 	atomic_t		transport_failed;
-	struct net_device	*net_if;
 	struct completion	conn_post_wait_comp;
 	struct completion	conn_wait_comp;
 	struct completion	conn_wait_rcfr_comp;
@@ -713,7 +701,7 @@ struct se_dev_entry_s;
 struct iscsi_node_auth {
 	enum naf_flags_table	naf_flags;
 	int			authenticate_target;
-	/* Used for iscsi_global->discovery_auth,
+	/* Used for iscsit_global->discovery_auth,
 	 * set to zero (auth disabled) by default */
 	int			enforce_discovery_auth;
 #define MAX_USER_LEN				256
@@ -756,7 +744,6 @@ struct iscsi_tpg_attrib {
 };
 
 struct iscsi_np {
-	unsigned char		np_net_dev[ISCSI_NETDEV_NAME_SIZE];
 	int			np_network_transport;
 	int			np_ip_proto;
 	int			np_sock_type;
@@ -764,7 +751,6 @@ struct iscsi_np {
 	enum iscsi_timer_flags_table np_login_timer_flags;
 	u32			np_exports;
 	enum np_flags_table	np_flags;
-	u32			np_ipv4;
 	unsigned char		np_ip[IPV6_ADDRESS_SPACE];
 	u16			np_port;
 	spinlock_t		np_thread_lock;
@@ -787,13 +773,6 @@ struct iscsi_tpg_np {
 	struct se_tpg_np	se_tpg_np;
 	spinlock_t		tpg_np_parent_lock;
 };
-
-struct iscsi_np_addr {
-	u16		np_port;
-	u32		np_flags;
-	u32		np_ipv4;
-	unsigned char	np_ipv6[IPV6_ADDRESS_SPACE];
-} ____cacheline_aligned;
 
 struct iscsi_portal_group {
 	unsigned char		tpg_chap_id;
@@ -861,7 +840,7 @@ struct iscsi_tiqn {
 
 #define WWN_STAT_GRPS(tiqn)	(&(tiqn)->tiqn_stat_grps)
 
-struct iscsi_global {
+struct iscsit_global {
 	/* In core shutdown */
 	u32			in_shutdown;
 	u32			active_ts;

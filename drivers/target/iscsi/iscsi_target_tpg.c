@@ -104,7 +104,7 @@ int iscsit_load_discovery_tpg(void)
 	tpg->tpg_state  = TPG_STATE_ACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 
-	iscsi_global->discovery_tpg = tpg;
+	iscsit_global->discovery_tpg = tpg;
 	printk(KERN_INFO "CORE[0] - Allocated Discovery TPG\n");
 
 	return 0;
@@ -117,7 +117,7 @@ out:
 
 void iscsit_release_discovery_tpg(void)
 {
-	struct iscsi_portal_group *tpg = iscsi_global->discovery_tpg;
+	struct iscsi_portal_group *tpg = iscsit_global->discovery_tpg;
 
 	if (!tpg)
 		return;
@@ -125,7 +125,7 @@ void iscsit_release_discovery_tpg(void)
 	core_tpg_deregister(&tpg->tpg_se_tpg);
 
 	kfree(tpg);
-	iscsi_global->discovery_tpg = NULL;
+	iscsit_global->discovery_tpg = NULL;
 }
 
 struct iscsi_portal_group *iscsit_get_tpg_from_np(
@@ -377,7 +377,7 @@ int iscsit_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 	}
 
 	tiqn = tpg->tpg_tiqn;
-	if (!tiqn || (tpg == iscsi_global->discovery_tpg))
+	if (!tiqn || (tpg == iscsit_global->discovery_tpg))
 		return 0;
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
@@ -422,10 +422,10 @@ struct iscsi_tpg_np *iscsit_tpg_locate_child_np(
 
 struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 	struct iscsi_portal_group *tpg,
-	struct iscsi_np_addr *np_addr,
+	struct __kernel_sockaddr_storage *sockaddr,
+	char *ip_str,
 	struct iscsi_tpg_np *tpg_np_parent,
-	int network_transport,
-	int af_inet)
+	int network_transport)
 {
 	struct iscsi_np *np;
 	struct iscsi_tpg_np *tpg_np;
@@ -437,7 +437,7 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 		return ERR_PTR(-ENOMEM);
 	}
 
-	np = iscsit_add_np(np_addr, network_transport, af_inet);
+	np = iscsit_add_np(sockaddr, ip_str, network_transport);
 	if (IS_ERR(np)) {
 		kfree(tpg_np);
 		return ERR_CAST(np);
@@ -465,12 +465,9 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 		spin_unlock(&tpg_np_parent->tpg_np_parent_lock);
 	}
 
-	printk(KERN_INFO "CORE[%s] - Added Network Portal: %s:%hu,%hu on %s on"
-		" network device: %s\n", tpg->tpg_tiqn->tiqn, np->np_ip,
-		np->np_port, tpg->tpgt,
-		(np->np_network_transport == ISCSI_TCP) ?
-		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
-		(char *)np->np_net_dev : "None");
+	printk(KERN_INFO "CORE[%s] - Added Network Portal: %s:%hu,%hu on %s\n",
+		tpg->tpg_tiqn->tiqn, np->np_ip, np->np_port, tpg->tpgt,
+		(np->np_network_transport == ISCSI_TCP) ? "TCP" : "SCTP");
 
 	return tpg_np;
 }
@@ -482,12 +479,9 @@ static int iscsit_tpg_release_np(
 {
 	iscsit_clear_tpg_np_login_thread(tpg_np, tpg);
 
-	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s"
-		" on network device: %s\n", tpg->tpg_tiqn->tiqn, np->np_ip,
-		np->np_port, tpg->tpgt,
-		(np->np_network_transport == ISCSI_TCP) ?
-		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
-		(char *)np->np_net_dev : "None");
+	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s\n",
+		tpg->tpg_tiqn->tiqn, np->np_ip, np->np_port, tpg->tpgt,
+		(np->np_network_transport == ISCSI_TCP) ? "TCP" : "SCTP");
 
 	tpg_np->tpg_np = NULL;
 	tpg_np->tpg = NULL;

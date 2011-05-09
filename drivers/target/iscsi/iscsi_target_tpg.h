@@ -23,7 +23,8 @@ extern struct iscsi_node_attrib *iscsit_tpg_get_node_attrib(struct iscsi_session
 extern void iscsit_tpg_del_external_nps(struct iscsi_tpg_np *);
 extern struct iscsi_tpg_np *iscsit_tpg_locate_child_np(struct iscsi_tpg_np *, int);
 extern struct iscsi_tpg_np *iscsit_tpg_add_network_portal(struct iscsi_portal_group *,
-			struct iscsi_np_addr *, struct iscsi_tpg_np *, int, int);
+			struct __kernel_sockaddr_storage *, char *, struct iscsi_tpg_np *,
+			int);
 extern int iscsit_tpg_del_network_portal(struct iscsi_portal_group *,
 			struct iscsi_tpg_np *);
 extern int iscsit_tpg_set_initiator_node_queue_depth(struct iscsi_portal_group *,
@@ -36,8 +37,5 @@ extern int iscsit_ta_default_cmdsn_depth(struct iscsi_portal_group *, u32);
 extern int iscsit_ta_cache_dynamic_acls(struct iscsi_portal_group *, u32);
 extern int iscsit_ta_demo_mode_write_protect(struct iscsi_portal_group *, u32);
 extern int iscsit_ta_prod_mode_write_protect(struct iscsi_portal_group *, u32);
-
-extern struct iscsi_global *iscsi_global;
-extern struct target_fabric_configfs *lio_target_fabric_configfs;
 
 #endif /* ISCSI_TARGET_TPG_H */

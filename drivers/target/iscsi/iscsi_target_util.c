@@ -142,11 +142,11 @@ void iscsit_free_r2ts_from_list(struct iscsi_cmd *cmd)
  * May be called from software interrupt (timer) context for allocating
  * iSCSI NopINs.
  */
-struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *conn)
+struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *conn, gfp_t gfp_mask)
 {
 	struct iscsi_cmd *cmd;
 
-	cmd = kmem_cache_zalloc(lio_cmd_cache, GFP_ATOMIC);
+	cmd = kmem_cache_zalloc(lio_cmd_cache, gfp_mask);
 	if (!cmd) {
 		printk(KERN_ERR "Unable to allocate memory for struct iscsi_cmd.\n");
 		return NULL;
@@ -180,7 +180,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd(
 	struct se_cmd *se_cmd;
 	int sam_task_attr;
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 	if (!cmd)
 		return NULL;
 
@@ -222,7 +222,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(
 	struct se_cmd *se_cmd;
 	u8 tcm_function;
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 	if (!cmd)
 		return NULL;
 
@@ -908,7 +908,7 @@ void iscsit_inc_session_usage_count(struct iscsi_session *sess)
  *	Used before iscsi_do[rx,tx]_data() to determine iov and [rx,tx]_marker
  *	array counts needed for sync and steering.
  */
-static inline int iscsit_determine_sync_and_steering_counts(
+static int iscsit_determine_sync_and_steering_counts(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {
@@ -1060,7 +1060,7 @@ static int iscsit_add_nopin(struct iscsi_conn *conn, int want_response)
 	u8 state;
 	struct iscsi_cmd *cmd;
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_ATOMIC);
 	if (!cmd)
 		return -1;
 
@@ -1325,7 +1325,7 @@ int iscsit_fe_sendpage_sg(
 	struct se_mem *se_mem = u_sg->cur_se_mem;
 
 send_hdr:
-	tx_size = (conn->conn_ops->HeaderDigest) ? ISCSI_HDR_LEN + CRC_LEN :
+	tx_size = (conn->conn_ops->HeaderDigest) ? ISCSI_HDR_LEN + ISCSI_CRC_LEN :
 			ISCSI_HDR_LEN;
 	tx_sent = tx_data(conn, iov, 1, tx_size);
 	if (tx_size != tx_sent) {
@@ -1339,7 +1339,7 @@ send_hdr:
 	len -= tx_size;
 	len -= u_sg->padding;
 	if (conn->conn_ops->DataDigest)
-		len -= CRC_LEN;
+		len -= ISCSI_CRC_LEN;
 	/*
 	 * Start calculating from the first page of current struct se_mem.
 	 */
@@ -1432,8 +1432,8 @@ send_datacrc:
 		struct kvec *iov_d =
 			&cmd->iov_data[cmd->iov_data_count-1];
 
-		tx_sent = tx_data(conn, iov_d, 1, CRC_LEN);
-		if (CRC_LEN != tx_sent) {
+		tx_sent = tx_data(conn, iov_d, 1, ISCSI_CRC_LEN);
+		if (ISCSI_CRC_LEN != tx_sent) {
 			if (tx_sent == -EAGAIN) {
 				printk(KERN_ERR "tx_data() returned -EAGAIN\n");
 				goto send_datacrc;
@@ -1499,7 +1499,7 @@ void iscsit_print_session_params(struct iscsi_session *sess)
 	iscsi_dump_sess_ops(sess->sess_ops);
 }
 
-static inline int iscsit_do_rx_data(
+static int iscsit_do_rx_data(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {
@@ -1627,7 +1627,7 @@ static inline int iscsit_do_rx_data(
 	return total_rx;
 }
 
-static inline int iscsit_do_tx_data(
+static int iscsit_do_tx_data(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {
@@ -1887,88 +1887,4 @@ struct iscsi_tiqn *iscsit_snmp_get_tiqn(struct iscsi_conn *conn)
 		return NULL;
 
 	return tpg->tpg_tiqn;
-}
-
-extern int iscsit_build_sendtargets_response(struct iscsi_cmd *cmd)
-{
-	char *payload = NULL;
-	struct iscsi_conn *conn = cmd->conn;
-	struct iscsi_portal_group *tpg;
-	struct iscsi_tiqn *tiqn;
-	struct iscsi_tpg_np *tpg_np;
-	int buffer_len, end_of_buf = 0, len = 0, payload_len = 0;
-	unsigned char buf[256];
-
-	buffer_len = (conn->conn_ops->MaxRecvDataSegmentLength > 32768) ?
-			32768 : conn->conn_ops->MaxRecvDataSegmentLength;
-
-	payload = kzalloc(buffer_len, GFP_KERNEL);
-	if (!payload) {
-		printk(KERN_ERR "Unable to allocate memory for sendtargets"
-			" response.\n");
-		return -1;
-	}
-
-	spin_lock(&tiqn_lock);
-	list_for_each_entry(tiqn, &g_tiqn_list, tiqn_list) {
-		memset(buf, 0, 256);
-
-		len = sprintf(buf, "TargetName=%s", tiqn->tiqn);
-		len += 1;
-
-		if ((len + payload_len) > buffer_len) {
-			spin_unlock(&tiqn->tiqn_tpg_lock);
-			end_of_buf = 1;
-			goto eob;
-		}
-		memcpy((void *)payload + payload_len, buf, len);
-		payload_len += len;
-
-		spin_lock(&tiqn->tiqn_tpg_lock);
-		list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
-
-			spin_lock(&tpg->tpg_state_lock);
-			if ((tpg->tpg_state == TPG_STATE_FREE) ||
-			    (tpg->tpg_state == TPG_STATE_INACTIVE)) {
-				spin_unlock(&tpg->tpg_state_lock);
-				continue;
-			}
-			spin_unlock(&tpg->tpg_state_lock);
-
-			spin_lock(&tpg->tpg_np_lock);
-			list_for_each_entry(tpg_np, &tpg->tpg_gnp_list,
-					tpg_np_list) {
-				memset(buf, 0, 256);
-
-				len = sprintf(buf, "TargetAddress="
-					"%s%s%s:%hu,%hu",
-					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
-					"[" : "", tpg_np->tpg_np->np_ip,
-					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
-					"]" : "", tpg_np->tpg_np->np_port,
-					tpg->tpgt);
-				len += 1;
-
-				if ((len + payload_len) > buffer_len) {
-					spin_unlock(&tpg->tpg_np_lock);
-					spin_unlock(&tiqn->tiqn_tpg_lock);
-					end_of_buf = 1;
-					goto eob;
-				}
-
-				memcpy((void *)payload + payload_len, buf, len);
-				payload_len += len;
-			}
-			spin_unlock(&tpg->tpg_np_lock);
-		}
-		spin_unlock(&tiqn->tiqn_tpg_lock);
-eob:
-		if (end_of_buf)
-			break;
-	}
-	spin_unlock(&tiqn_lock);
-
-	cmd->buf_ptr = payload;
-
-	return payload_len;
 }

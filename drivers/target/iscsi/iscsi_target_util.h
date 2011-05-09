@@ -46,7 +46,7 @@ extern struct iscsi_r2t *iscsit_get_r2t_for_eos(struct iscsi_cmd *, u32, u32);
 extern struct iscsi_r2t *iscsit_get_r2t_from_list(struct iscsi_cmd *);
 extern void iscsit_free_r2t(struct iscsi_r2t *, struct iscsi_cmd *);
 extern void iscsit_free_r2ts_from_list(struct iscsi_cmd *);
-extern struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *);
+extern struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *, gfp_t);
 extern struct iscsi_cmd *iscsit_allocate_se_cmd(struct iscsi_conn *, u32, int, int);
 extern struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(struct iscsi_conn *, u8);
 extern int iscsit_decide_list_to_build(struct iscsi_cmd *, u32);
@@ -94,13 +94,5 @@ extern int rx_data(struct iscsi_conn *, struct kvec *, int, int);
 extern int tx_data(struct iscsi_conn *, struct kvec *, int, int);
 extern void iscsit_collect_login_stats(struct iscsi_conn *, u8, u8);
 extern struct iscsi_tiqn *iscsit_snmp_get_tiqn(struct iscsi_conn *);
-extern int iscsit_build_sendtargets_response(struct iscsi_cmd *);
-
-extern struct target_fabric_configfs *lio_target_fabric_configfs;
-extern struct iscsi_global *iscsi_global;
-extern struct kmem_cache *lio_cmd_cache;
-extern struct kmem_cache *lio_qr_cache;
-extern struct kmem_cache *lio_r2t_cache;
 
 #endif /*** ISCSI_TARGET_UTIL_H ***/
-

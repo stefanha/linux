@@ -25,6 +25,7 @@
 #include "iscsi_target_seq_pdu_list.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_util.h"
+#include "iscsi_target.h"
 #include "iscsi_target_datain_values.h"
 
 struct iscsi_datain_req *iscsit_allocate_datain_req(void)
@@ -88,7 +89,7 @@ struct iscsi_datain_req *iscsit_get_datain_req(struct iscsi_cmd *cmd)
 /*
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=Yes.
  */
-static inline struct iscsi_datain_req *iscsit_set_datain_values_yes_and_yes(
+static struct iscsi_datain_req *iscsit_set_datain_values_yes_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -186,7 +187,7 @@ static inline struct iscsi_datain_req *iscsit_set_datain_values_yes_and_yes(
 /*
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=Yes.
  */
-static inline struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
+static struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -307,7 +308,7 @@ static inline struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
 /*
  *	For Normal and Recovery DataSequenceInOrder=Yes and DataPDUInOrder=No.
  */
-static inline struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
+static struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {
@@ -406,7 +407,7 @@ static inline struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
 /*
  *	For Normal and Recovery DataSequenceInOrder=No and DataPDUInOrder=No.
  */
-static inline struct iscsi_datain_req *iscsit_set_datain_values_no_and_no(
+static struct iscsi_datain_req *iscsit_set_datain_values_no_and_no(
 	struct iscsi_cmd *cmd,
 	struct iscsi_datain *datain)
 {

@@ -23,6 +23,4 @@ extern void iscsit_mod_dataout_timer(struct iscsi_cmd *);
 extern void iscsit_start_dataout_timer(struct iscsi_cmd *, struct iscsi_conn *);
 extern void iscsit_stop_dataout_timer(struct iscsi_cmd *);
 
-extern struct kmem_cache *lio_ooo_cache;
-
 #endif /* ISCSI_TARGET_ERL1_H */

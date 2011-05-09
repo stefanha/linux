@@ -21,8 +21,6 @@ struct iscsi_param {
 	struct list_head p_list;
 } ____cacheline_aligned;
 
-extern struct iscsi_global *iscsi_global;
-
 extern int iscsi_login_rx_data(struct iscsi_conn *, char *, int);
 extern int iscsi_login_tx_data(struct iscsi_conn *, char *, char *, int);
 extern void iscsi_dump_conn_ops(struct iscsi_conn_ops *);
