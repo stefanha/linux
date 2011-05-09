@@ -63,7 +63,7 @@ void iscsit_dump_pdu_list(struct iscsi_cmd *cmd)
 	}
 }
 
-static inline void iscsit_ordered_seq_lists(
+static void iscsit_ordered_seq_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -76,7 +76,7 @@ static inline void iscsit_ordered_seq_lists(
 	}
 }
 
-static inline void iscsit_ordered_pdu_lists(
+static void iscsit_ordered_pdu_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -98,7 +98,7 @@ redo:
  *	Generate count random values into array.
  *	Use 0x80000000 to mark generates valued in array[].
  */
-static inline void iscsit_create_random_array(u32 *array, u32 count)
+static void iscsit_create_random_array(u32 *array, u32 count)
 {
 	int i, j, k;
 
@@ -123,7 +123,7 @@ redo:
 		array[i] &= ~0x80000000;
 }
 
-static inline int iscsit_randomize_pdu_lists(
+static int iscsit_randomize_pdu_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -173,7 +173,7 @@ redo:
 	return 0;
 }
 
-static inline int iscsit_randomize_seq_lists(
+static int iscsit_randomize_seq_lists(
 	struct iscsi_cmd *cmd,
 	u8 type)
 {
@@ -205,7 +205,7 @@ static inline int iscsit_randomize_seq_lists(
 	return 0;
 }
 
-static inline void iscsit_determine_counts_for_list(
+static void iscsit_determine_counts_for_list(
 	struct iscsi_cmd *cmd,
 	struct iscsi_build_list *bl,
 	u32 *seq_count,
@@ -287,7 +287,7 @@ static inline void iscsit_determine_counts_for_list(
  *	Builds PDU and/or Sequence list,  called while DataSequenceInOrder=No
  *	and DataPDUInOrder=No.
  */
-static inline int iscsit_build_pdu_and_seq_list(
+static int iscsit_build_pdu_and_seq_list(
 	struct iscsi_cmd *cmd,
 	struct iscsi_build_list *bl)
 {

@@ -1055,7 +1055,6 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	}
 
 	conn->network_transport = np->np_network_transport;
-	snprintf(conn->net_dev, ISCSI_NETDEV_NAME_SIZE, "%s", np->np_net_dev);
 
 	conn->local_ip = np->np_ipv4;
 	conn->local_port = np->np_port;

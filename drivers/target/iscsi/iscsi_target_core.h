@@ -8,14 +8,12 @@
 #include <scsi/scsi_cmnd.h>
 #include <target/target_core_base.h>
 
-#define ISCSI_VERSION			"v4.1.0-rc1"
+#define ISCSIT_VERSION			"v4.1.0-rc1"
 #define ISCSI_MAX_DATASN_MISSING_COUNT	16
 #define ISCSI_TX_THREAD_TCP_TIMEOUT	2
 #define ISCSI_RX_THREAD_TCP_TIMEOUT	2
 #define SECONDS_FOR_ASYNC_LOGOUT	10
 #define SECONDS_FOR_ASYNC_TEXT		10
-#define IPV4_ADDRESS_SPACE		4
-#define IPV4_BUF_SIZE			18
 #define ISCSI_HDR_LEN			48
 #define CRC_LEN				4
 #define MAX_KEY_NAME_LENGTH		63
@@ -497,8 +495,6 @@ struct iscsi_tmr_req {
 };
 
 struct iscsi_conn {
-#define ISCSI_NETDEV_NAME_SIZE				12
-	char			net_dev[ISCSI_NETDEV_NAME_SIZE];
 	/* Authentication Successful for this connection */
 	u8			auth_complete;
 	/* State connection is currently in */
@@ -549,7 +545,6 @@ struct iscsi_conn {
 	atomic_t		connection_wait_rcfr;
 	atomic_t		sleep_on_conn_wait_comp;
 	atomic_t		transport_failed;
-	struct net_device	*net_if;
 	struct completion	conn_post_wait_comp;
 	struct completion	conn_wait_comp;
 	struct completion	conn_wait_rcfr_comp;
@@ -756,7 +751,6 @@ struct iscsi_tpg_attrib {
 };
 
 struct iscsi_np {
-	unsigned char		np_net_dev[ISCSI_NETDEV_NAME_SIZE];
 	int			np_network_transport;
 	int			np_ip_proto;
 	int			np_sock_type;

@@ -407,7 +407,7 @@ done:
 	return 0;
 }
 
-static inline int iscsit_handle_recovery_datain(
+static int iscsit_handle_recovery_datain(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
 	u32 begrun,
@@ -782,7 +782,7 @@ int iscsit_recover_dataout_sequence(
 	return DATAOUT_WITHIN_COMMAND_RECOVERY;
 }
 
-static inline struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
+static struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL;
 
@@ -800,7 +800,7 @@ static inline struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
 /*
  *	Called with sess->cmdsn_lock held.
  */
-static inline int iscsit_attach_ooo_cmdsn(
+static int iscsit_attach_ooo_cmdsn(
 	struct iscsi_session *sess,
 	struct iscsi_ooo_cmdsn *ooo_cmdsn)
 {

@@ -368,11 +368,9 @@ struct iscsi_np *iscsit_add_np(
 	list_add_tail(&np->np_list, &g_np_list);
 	spin_unlock_bh(&np_lock);
 
-	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s on"
-		" network device: %s\n", np->np_ip, np->np_port,
-		(np->np_network_transport == ISCSI_TCP) ?
-		"TCP" : "SCTP", (strlen(np->np_net_dev)) ?
-		(char *)np->np_net_dev : "None");
+	printk(KERN_INFO "CORE[0] - Added Network Portal: %s:%hu on %s\n",
+		np->np_ip, np->np_port, (np->np_network_transport == ISCSI_TCP) ?
+		"TCP" : "SCTP");
 
 	return np;
 }
@@ -453,11 +451,9 @@ int iscsit_del_np(struct iscsi_np *np)
 	list_del(&np->np_list);
 	spin_unlock_bh(&np_lock);
 
-	printk(KERN_INFO "CORE[0] - Removed Network Portal: %s:%hu on %s on"
-		" network device: %s\n", np->np_ip, np->np_port,
-		(np->np_network_transport == ISCSI_TCP) ?
-		"TCP" : "SCTP",  (strlen(np->np_net_dev)) ?
-		(char *)np->np_net_dev : "None");
+	printk(KERN_INFO "CORE[0] - Removed Network Portal: %s:%hu on %s\n",
+		np->np_ip, np->np_port, (np->np_network_transport == ISCSI_TCP) ?
+		"TCP" : "SCTP");
 
 	kfree(np);
 	return 0;
@@ -467,7 +463,7 @@ static int __init iscsi_target_init_module(void)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "iSCSI-Target "ISCSI_VERSION"\n");
+	printk(KERN_INFO "iSCSI-Target "ISCSIT_VERSION"\n");
 
 	iscsit_global = kzalloc(sizeof(struct iscsit_global), GFP_KERNEL);
 	if (!iscsit_global) {
@@ -590,7 +586,7 @@ int iscsit_add_reject(
 	struct iscsi_reject *hdr;
 	int ret;
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 	if (!cmd)
 		return -1;
 
@@ -601,7 +597,7 @@ int iscsit_add_reject(
 	hdr	= (struct iscsi_reject *) cmd->pdu;
 	hdr->reason = reason;
 
-	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
+	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_KERNEL);
 	if (!cmd->buf_ptr) {
 		printk(KERN_ERR "Unable to allocate memory for cmd->buf_ptr\n");
 		iscsit_release_cmd(cmd);
@@ -648,7 +644,7 @@ int iscsit_add_reject_from_cmd(
 	hdr	= (struct iscsi_reject *) cmd->pdu;
 	hdr->reason = reason;
 
-	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_ATOMIC);
+	cmd->buf_ptr = kzalloc(ISCSI_HDR_LEN, GFP_KERNEL);
 	if (!cmd->buf_ptr) {
 		printk(KERN_ERR "Unable to allocate memory for cmd->buf_ptr\n");
 		iscsit_release_cmd(cmd);
@@ -672,7 +668,7 @@ int iscsit_add_reject_from_cmd(
 	return (!fail_conn) ? 0 : -1;
 }
 
-static inline void iscsit_calculate_map_segment(
+static void iscsit_calculate_map_segment(
 	u32 *data_length,
 	struct se_offset_map *lm)
 {
@@ -945,7 +941,7 @@ static void iscsit_unmap_SG_segments(struct se_unmap_sg *unmap_sg)
 	}
 }
 
-static inline void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
+static void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 {
 	struct iscsi_cmd *cmd;
 
@@ -967,7 +963,7 @@ static inline void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_st
 	spin_unlock_bh(&conn->cmd_lock);
 }
 
-static inline int iscsit_handle_scsi_cmd(
+static int iscsit_handle_scsi_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -1053,16 +1049,7 @@ done:
 		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
 				buf, conn);
 	}
-#if 0
-	if (!(hdr->flags & ISCSI_FLAG_CMD_FINAL) &&
-	     (hdr->flags & ISCSI_FLAG_CMD_WRITE) && conn->sess->sess_ops->InitialR2T) {
-		printk(KERN_ERR "ISCSI_FLAG_CMD_FINAL is not Set and"
-			" ISCSI_FLAG_CMD_WRITE Bit and InitialR2T=Yes,"
-			" protocol error\n");
-		return iscsit_add_reject(ISCSI_REASON_PROTOCOL_ERROR, 1,
-				buf, conn);
-	}
-#endif
+
 	if ((hdr->data_length == payload_length) &&
 	    (!(hdr->flags & ISCSI_FLAG_CMD_FINAL))) {
 		printk(KERN_ERR "Expected Data Transfer Length and Length of"
@@ -1329,7 +1316,7 @@ after_immediate_data:
 	return 0;
 }
 
-static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
+static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 {
 	int iov_ret, ooo_cmdsn = 0, ret;
 	u8 data_crc_failed = 0, *pad_bytes[4];
@@ -1636,7 +1623,7 @@ static inline int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char 
 	return 0;
 }
 
-static inline int iscsit_handle_nop_out(
+static int iscsit_handle_nop_out(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -1686,7 +1673,7 @@ static inline int iscsit_handle_nop_out(
 	 * can contain ping data.
 	 */
 	if (hdr->ttt == 0xFFFFFFFF) {
-		cmd = iscsit_allocate_cmd(conn);
+		cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 		if (!cmd)
 			return iscsit_add_reject(
 					ISCSI_REASON_BOOKMARK_NO_RESOURCES,
@@ -1870,7 +1857,7 @@ ping_out:
 	return ret;
 }
 
-static inline int iscsit_handle_task_mgt_cmd(
+static int iscsit_handle_task_mgt_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2042,7 +2029,7 @@ attach:
 }
 
 /* #warning FIXME: Support Text Command parameters besides SendTargets */
-static inline int iscsit_handle_text_cmd(
+static int iscsit_handle_text_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2175,7 +2162,7 @@ static inline int iscsit_handle_text_cmd(
 		kfree(text_in);
 	}
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 	if (!cmd)
 		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES,
 					1, buf, conn);
@@ -2323,7 +2310,7 @@ int iscsit_logout_removeconnforrecovery(struct iscsi_cmd *cmd, struct iscsi_conn
 	return 0;
 }
 
-static inline int iscsit_handle_logout_cmd(
+static int iscsit_handle_logout_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2360,7 +2347,7 @@ static inline int iscsit_handle_logout_cmd(
 		return 0;
 	}
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 	if (!cmd)
 		return iscsit_add_reject(ISCSI_REASON_BOOKMARK_NO_RESOURCES, 1,
 					buf, conn);
@@ -2420,7 +2407,7 @@ static inline int iscsit_handle_logout_cmd(
 	return logout_remove;
 }
 
-static inline int iscsit_handle_snack(
+static int iscsit_handle_snack(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
 {
@@ -2762,7 +2749,7 @@ static void iscsit_build_conn_drop_async_message(struct iscsi_conn *conn)
 	if (!conn_p)
 		return;
 
-	cmd = iscsit_allocate_cmd(conn_p);
+	cmd = iscsit_allocate_cmd(conn_p, GFP_KERNEL);
 	if (!cmd) {
 		iscsit_dec_conn_usage_count(conn_p);
 		return;
@@ -2772,9 +2759,9 @@ static void iscsit_build_conn_drop_async_message(struct iscsi_conn *conn)
 	cmd->iscsi_opcode = ISCSI_OP_ASYNC_EVENT;
 	cmd->i_state = ISTATE_SEND_ASYNCMSG;
 
-	spin_lock_bh(&conn->cmd_lock);
+	spin_lock_bh(&conn_p->cmd_lock);
 	list_add_tail(&cmd->i_list, &conn_p->conn_cmd_list);
-	spin_unlock_bh(&conn->cmd_lock);
+	spin_unlock_bh(&conn_p->cmd_lock);
 
 	iscsit_add_cmd_to_response_queue(cmd, conn_p, cmd->i_state);
 	iscsit_dec_conn_usage_count(conn_p);
@@ -2830,7 +2817,7 @@ static int iscsit_send_conn_drop_async_message(
 	return 0;
 }
 
-static inline int iscsit_send_data_in(
+static int iscsit_send_data_in(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn,
 	struct se_unmap_sg *unmap_sg,
@@ -3022,7 +3009,7 @@ static inline int iscsit_send_data_in(
 	return 0;
 }
 
-static inline int iscsit_send_logout_response(
+static int iscsit_send_logout_response(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -3148,7 +3135,7 @@ static inline int iscsit_send_logout_response(
 /*
  *	Unsolicited NOPIN, either requesting a response or not.
  */
-static inline int iscsit_send_unsolicited_nopin(
+static int iscsit_send_unsolicited_nopin(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn,
 	int want_response)
@@ -3194,7 +3181,7 @@ static inline int iscsit_send_unsolicited_nopin(
 	return 0;
 }
 
-static inline int iscsit_send_nopin_response(
+static int iscsit_send_nopin_response(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -3445,7 +3432,7 @@ int iscsit_build_r2ts_for_cmd(
 	return 0;
 }
 
-static inline int iscsit_send_status(
+static int iscsit_send_status(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
@@ -3563,7 +3550,7 @@ static inline int iscsit_send_status(
 	return 0;
 }
 
-static inline u8 iscsit_convert_tcm_tmr_rsp(struct se_tmr_req *se_tmr)
+static u8 iscsit_convert_tcm_tmr_rsp(struct se_tmr_req *se_tmr)
 {
 	switch (se_tmr->response) {
 	case TMR_FUNCTION_COMPLETE:

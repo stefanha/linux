@@ -142,11 +142,11 @@ void iscsit_free_r2ts_from_list(struct iscsi_cmd *cmd)
  * May be called from software interrupt (timer) context for allocating
  * iSCSI NopINs.
  */
-struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *conn)
+struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *conn, gfp_t gfp_mask)
 {
 	struct iscsi_cmd *cmd;
 
-	cmd = kmem_cache_zalloc(lio_cmd_cache, GFP_ATOMIC);
+	cmd = kmem_cache_zalloc(lio_cmd_cache, gfp_mask);
 	if (!cmd) {
 		printk(KERN_ERR "Unable to allocate memory for struct iscsi_cmd.\n");
 		return NULL;
@@ -180,7 +180,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd(
 	struct se_cmd *se_cmd;
 	int sam_task_attr;
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 	if (!cmd)
 		return NULL;
 
@@ -222,7 +222,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(
 	struct se_cmd *se_cmd;
 	u8 tcm_function;
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_KERNEL);
 	if (!cmd)
 		return NULL;
 
@@ -908,7 +908,7 @@ void iscsit_inc_session_usage_count(struct iscsi_session *sess)
  *	Used before iscsi_do[rx,tx]_data() to determine iov and [rx,tx]_marker
  *	array counts needed for sync and steering.
  */
-static inline int iscsit_determine_sync_and_steering_counts(
+static int iscsit_determine_sync_and_steering_counts(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {
@@ -1060,7 +1060,7 @@ static int iscsit_add_nopin(struct iscsi_conn *conn, int want_response)
 	u8 state;
 	struct iscsi_cmd *cmd;
 
-	cmd = iscsit_allocate_cmd(conn);
+	cmd = iscsit_allocate_cmd(conn, GFP_ATOMIC);
 	if (!cmd)
 		return -1;
 
@@ -1499,7 +1499,7 @@ void iscsit_print_session_params(struct iscsi_session *sess)
 	iscsi_dump_sess_ops(sess->sess_ops);
 }
 
-static inline int iscsit_do_rx_data(
+static int iscsit_do_rx_data(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {
@@ -1627,7 +1627,7 @@ static inline int iscsit_do_rx_data(
 	return total_rx;
 }
 
-static inline int iscsit_do_tx_data(
+static int iscsit_do_tx_data(
 	struct iscsi_conn *conn,
 	struct iscsi_data_count *count)
 {

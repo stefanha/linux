@@ -1253,7 +1253,7 @@ static ssize_t lio_target_wwn_show_attr_lio_version(
 	struct target_fabric_configfs *tf,
 	char *page)
 {
-	return sprintf(page, "RisingTide Systems Linux-iSCSI Target "ISCSI_VERSION"\n");
+	return sprintf(page, "RisingTide Systems Linux-iSCSI Target "ISCSIT_VERSION"\n");
 }
 
 TF_WWN_ATTR_RO(lio_target, lio_version);

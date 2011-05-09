@@ -74,7 +74,7 @@ void iscsit_set_dataout_sequence_values(
 	}
 }
 
-static inline int iscsit_dataout_within_command_recovery_check(
+static int iscsit_dataout_within_command_recovery_check(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -139,7 +139,7 @@ dump:
 	return iscsit_dump_data_payload(conn, payload_length, 1);
 }
 
-static inline int iscsit_dataout_check_unsolicited_sequence(
+static int iscsit_dataout_check_unsolicited_sequence(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -214,7 +214,7 @@ out:
 	return DATAOUT_NORMAL;
 }
 
-static inline int iscsit_dataout_check_sequence(
+static int iscsit_dataout_check_sequence(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -342,7 +342,7 @@ out:
 	return DATAOUT_NORMAL;
 }
 
-static inline int iscsit_dataout_check_datasn(
+static int iscsit_dataout_check_datasn(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -397,7 +397,7 @@ dump:
 				DATAOUT_NORMAL;
 }
 
-static inline int iscsit_dataout_pre_datapduinorder_yes(
+static int iscsit_dataout_pre_datapduinorder_yes(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -458,7 +458,7 @@ dump:
 	       (dump) ? DATAOUT_WITHIN_COMMAND_RECOVERY : DATAOUT_NORMAL;
 }
 
-static inline int iscsit_dataout_pre_datapduinorder_no(
+static int iscsit_dataout_pre_datapduinorder_no(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -541,7 +541,7 @@ static int iscsit_dataout_update_datapduinorder_no(
 	return DATAOUT_NORMAL;
 }
 
-static inline int iscsit_dataout_post_crc_passed(
+static int iscsit_dataout_post_crc_passed(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
@@ -646,7 +646,7 @@ static inline int iscsit_dataout_post_crc_passed(
 		DATAOUT_SEND_R2T : DATAOUT_NORMAL;
 }
 
-static inline int iscsit_dataout_post_crc_failed(
+static int iscsit_dataout_post_crc_failed(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf)
 {
