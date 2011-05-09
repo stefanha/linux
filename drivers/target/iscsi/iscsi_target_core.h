@@ -6,6 +6,7 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 
 #define ISCSIT_VERSION			"v4.1.0-rc1"
@@ -14,10 +15,6 @@
 #define ISCSI_RX_THREAD_TCP_TIMEOUT	2
 #define SECONDS_FOR_ASYNC_LOGOUT	10
 #define SECONDS_FOR_ASYNC_TEXT		10
-#define ISCSI_HDR_LEN			48
-#define CRC_LEN				4
-#define MAX_KEY_NAME_LENGTH		63
-#define MAX_KEY_VALUE_LENGTH		255
 #define WHITE_SPACE			" \t\v\f\n\r"
 
 /* struct iscsi_node_attrib sanity values */
@@ -426,7 +423,7 @@ struct iscsi_cmd {
 	/* See include/linux/dma-mapping.h */
 	enum dma_data_direction	data_direction;
 	/* iSCSI PDU Header + CRC */
-	unsigned char		pdu[ISCSI_HDR_LEN + CRC_LEN];
+	unsigned char		pdu[ISCSI_HDR_LEN + ISCSI_CRC_LEN];
 	/* Number of times struct iscsi_cmd is present in immediate queue */
 	atomic_t		immed_queue_count;
 	atomic_t		response_queue_count;

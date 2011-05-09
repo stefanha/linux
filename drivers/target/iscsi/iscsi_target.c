@@ -1590,8 +1590,8 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 
 	if (conn->conn_ops->DataDigest) {
 		iov[iov_count].iov_base = &checksum;
-		iov[iov_count++].iov_len = CRC_LEN;
-		rx_size += CRC_LEN;
+		iov[iov_count++].iov_len = ISCSI_CRC_LEN;
+		rx_size += ISCSI_CRC_LEN;
 	}
 
 	iscsit_map_SG_segments(&unmap_sg);
@@ -1758,8 +1758,8 @@ static int iscsit_handle_nop_out(
 		}
 		if (conn->conn_ops->DataDigest) {
 			iov[niov].iov_base	= &checksum;
-			iov[niov++].iov_len	= CRC_LEN;
-			rx_size += CRC_LEN;
+			iov[niov++].iov_len	= ISCSI_CRC_LEN;
+			rx_size += ISCSI_CRC_LEN;
 		}
 
 		rx_got = rx_data(conn, &cmd->iov_misc[0], niov, rx_size);
@@ -2118,8 +2118,8 @@ static int iscsit_handle_text_cmd(
 		}
 		if (conn->conn_ops->DataDigest) {
 			iov[niov].iov_base	= &checksum;
-			iov[niov++].iov_len	= CRC_LEN;
-			rx_size += CRC_LEN;
+			iov[niov++].iov_len	= ISCSI_CRC_LEN;
+			rx_size += ISCSI_CRC_LEN;
 		}
 
 		rx_got = rx_data(conn, &iov[0], niov, rx_size);
@@ -2543,8 +2543,8 @@ static int iscsit_handle_immediate_data(
 
 	if (conn->conn_ops->DataDigest) {
 		iov[iov_count].iov_base		= &checksum;
-		iov[iov_count++].iov_len	= CRC_LEN;
-		rx_size += CRC_LEN;
+		iov[iov_count++].iov_len	= ISCSI_CRC_LEN;
+		rx_size += ISCSI_CRC_LEN;
 	}
 
 	iscsit_map_SG_segments(&unmap_sg);
@@ -2624,13 +2624,13 @@ int iscsit_send_async_msg(
 	u8 async_event,
 	u8 async_vcode)
 {
-	u8 iscsi_hdr[ISCSI_HDR_LEN+CRC_LEN];
+	u8 iscsi_hdr[ISCSI_HDR_LEN+ISCSI_CRC_LEN];
 	u32 tx_send = ISCSI_HDR_LEN, tx_sent = 0;
 	struct iscsi_async *hdr;
 	struct kvec iov;
 
 	memset(&iov, 0, sizeof(struct kvec));
-	memset(&iscsi_hdr, 0, ISCSI_HDR_LEN+CRC_LEN);
+	memset(&iscsi_hdr, 0, ISCSI_HDR_LEN+ISCSI_CRC_LEN);
 
 	hdr		= (struct iscsi_async *)&iscsi_hdr;
 	hdr->opcode	= ISCSI_OP_ASYNC_EVENT;
@@ -2693,8 +2693,8 @@ int iscsit_send_async_msg(
 				(unsigned char *)&iscsi_hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 				
-		iov.iov_len += CRC_LEN;
-		tx_send += CRC_LEN;
+		iov.iov_len += ISCSI_CRC_LEN;
+		tx_send += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for Async"
 			" Msg PDU 0x%08x\n", *header_digest);
 	}
@@ -2800,7 +2800,7 @@ static int iscsit_send_conn_drop_async_message(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		cmd->tx_size += CRC_LEN;
+		cmd->tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest to"
 			" Async Message 0x%08x\n", *header_digest);
 	}
@@ -2918,8 +2918,8 @@ static int iscsit_send_data_in(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);	
 
-		iov[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest"
 			" for DataIN PDU 0x%08x\n", *header_digest);
@@ -2965,8 +2965,8 @@ static int iscsit_send_data_in(
 				counter, 0, NULL, (u8 *)&cmd->data_crc);
 
 		iov[iov_count].iov_base	= &cmd->data_crc;
-		iov[iov_count++].iov_len = CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[iov_count++].iov_len = ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 
 		TRACE(TRACE_DIGEST, "Attached CRC32C DataDigest %d bytes, crc"
 			" 0x%08x\n", datain.length+unmap_sg->padding,
@@ -3093,8 +3093,8 @@ static int iscsit_send_logout_response(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		iov[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest to"
 			" Logout Response 0x%08x\n", *header_digest);
 	}
@@ -3138,7 +3138,7 @@ static int iscsit_send_unsolicited_nopin(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		tx_size += CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest to"
 			" NopIN 0x%08x\n", *header_digest);
 	}
@@ -3190,8 +3190,8 @@ static int iscsit_send_nopin_response(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 					
-		iov[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32C HeaderDigest"
 			" to NopIn 0x%08x\n", *header_digest);
 	}
@@ -3223,8 +3223,8 @@ static int iscsit_send_nopin_response(
 				(u8 *)&cmd->data_crc);
 			
 			iov[niov].iov_base = &cmd->data_crc;
-			iov[niov++].iov_len = CRC_LEN;
-			tx_size += CRC_LEN;
+			iov[niov++].iov_len = ISCSI_CRC_LEN;
+			tx_size += ISCSI_CRC_LEN;
 			TRACE(TRACE_DIGEST, "Attached DataDigest for %u"
 				" bytes of ping data, CRC 0x%08x\n",
 				cmd->buf_ptr_size, cmd->data_crc);
@@ -3285,8 +3285,8 @@ int iscsit_send_r2t(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		cmd->iov_misc[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		cmd->iov_misc[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for R2T"
 			" PDU 0x%08x\n", *header_digest);
 	}
@@ -3456,8 +3456,8 @@ static int iscsit_send_status(
 				0, NULL, (u8 *)&cmd->data_crc);
 
 			iov[iov_count].iov_base    = &cmd->data_crc;
-			iov[iov_count++].iov_len     = CRC_LEN;
-			tx_size += CRC_LEN;
+			iov[iov_count++].iov_len     = ISCSI_CRC_LEN;
+			tx_size += ISCSI_CRC_LEN;
 
 			TRACE(TRACE_DIGEST, "Attaching CRC32 DataDigest for"
 				" SENSE, %u bytes CRC 0x%08x\n",
@@ -3477,8 +3477,8 @@ static int iscsit_send_status(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		iov[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for Response"
 				" PDU 0x%08x\n", *header_digest);
 	}
@@ -3545,8 +3545,8 @@ static int iscsit_send_task_mgt_rsp(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		cmd->iov_misc[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		cmd->iov_misc[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for Task"
 			" Mgmt Response PDU 0x%08x\n", *header_digest);
 	}
@@ -3696,8 +3696,8 @@ static int iscsit_send_text_rsp(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		iov[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for"
 			" Text Response PDU 0x%08x\n", *header_digest);
 	}
@@ -3708,8 +3708,8 @@ static int iscsit_send_text_rsp(
 				0, NULL, (u8 *)&cmd->data_crc);
 
 		iov[iov_count].iov_base	= &cmd->data_crc;
-		iov[iov_count++].iov_len = CRC_LEN;
-		tx_size	+= CRC_LEN;
+		iov[iov_count++].iov_len = ISCSI_CRC_LEN;
+		tx_size	+= ISCSI_CRC_LEN;
 
 		TRACE(TRACE_DIGEST, "Attaching DataDigest for %u bytes of text"
 			" data, CRC 0x%08x\n", (text_length + padding),
@@ -3758,8 +3758,8 @@ static int iscsit_send_reject(
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
 
-		iov[0].iov_len += CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[0].iov_len += ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 HeaderDigest for"
 			" REJECT PDU 0x%08x\n", *header_digest);
 	}
@@ -3770,8 +3770,8 @@ static int iscsit_send_reject(
 				0, NULL, (u8 *)&cmd->data_crc);
 
 		iov[iov_count].iov_base = &cmd->data_crc;
-		iov[iov_count++].iov_len  = CRC_LEN;
-		tx_size += CRC_LEN;
+		iov[iov_count++].iov_len  = ISCSI_CRC_LEN;
+		tx_size += ISCSI_CRC_LEN;
 		TRACE(TRACE_DIGEST, "Attaching CRC32 DataDigest for REJECT"
 				" PDU 0x%08x\n", cmd->data_crc);
 	}
@@ -4223,10 +4223,10 @@ restart:
 
 		if (conn->conn_ops->HeaderDigest) {
 			iov.iov_base	= &digest;
-			iov.iov_len	= CRC_LEN;
+			iov.iov_len	= ISCSI_CRC_LEN;
 
-			ret = rx_data(conn, &iov, 1, CRC_LEN);
-			if (ret != CRC_LEN) {
+			ret = rx_data(conn, &iov, 1, ISCSI_CRC_LEN);
+			if (ret != ISCSI_CRC_LEN) {
 				iscsit_rx_thread_wait_for_tcp(conn);
 				goto transport_err;
 			}

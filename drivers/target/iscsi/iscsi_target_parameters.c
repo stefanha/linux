@@ -715,9 +715,9 @@ static int iscsi_add_notunderstood_response(
 {
 	struct iscsi_extra_response *extra_response;
 
-	if (strlen(value) > MAX_KEY_VALUE_LENGTH) {
+	if (strlen(value) > VALUE_MAXLEN) {
 		printk(KERN_ERR "Value for notunderstood key \"%s\" exceeds %d,"
-			" protocol error.\n", key, MAX_KEY_VALUE_LENGTH);
+			" protocol error.\n", key, VALUE_MAXLEN);
 		return -1;
 	}
 
@@ -1311,10 +1311,10 @@ static int iscsi_check_value(struct iscsi_param *param, char *value)
 		if (comma_ptr)
 			*comma_ptr = '\0';
 
-		if (strlen(value) > MAX_KEY_VALUE_LENGTH) {
+		if (strlen(value) > VALUE_MAXLEN) {
 			printk(KERN_ERR "Value for key \"%s\" exceeds %d,"
 				" protocol error.\n", param->name,
-				MAX_KEY_VALUE_LENGTH);
+				VALUE_MAXLEN);
 			return -1;
 		}
 
@@ -1351,9 +1351,9 @@ static struct iscsi_param *__iscsi_check_key(
 {
 	struct iscsi_param *param;
 
-	if (strlen(key) > MAX_KEY_NAME_LENGTH) {
+	if (strlen(key) > KEY_MAXLEN) {
 		printk(KERN_ERR "Length of key name \"%s\" exceeds %d.\n",
-			key, MAX_KEY_NAME_LENGTH);
+			key, KEY_MAXLEN);
 		return NULL;
 	}
 
@@ -1388,9 +1388,9 @@ static struct iscsi_param *iscsi_check_key(
 	/*
 	 * Key name length must not exceed 63 bytes. (See iSCSI v20 5.1)
 	 */
-	if (strlen(key) > MAX_KEY_NAME_LENGTH) {
+	if (strlen(key) > KEY_MAXLEN) {
 		printk(KERN_ERR "Length of key name \"%s\" exceeds %d.\n",
-			key, MAX_KEY_NAME_LENGTH);
+			key, KEY_MAXLEN);
 		return NULL;
 	}
 

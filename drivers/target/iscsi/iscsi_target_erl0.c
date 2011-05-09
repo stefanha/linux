@@ -988,7 +988,7 @@ int iscsit_recover_from_unknown_opcode(struct iscsi_conn *conn)
 	/*
 	 * Make sure the offset marker we retrived is a valid value.
 	 */
-	if (conn->of_marker_offset > (ISCSI_HDR_LEN + (CRC_LEN * 2) +
+	if (conn->of_marker_offset > (ISCSI_HDR_LEN + (ISCSI_CRC_LEN * 2) +
 	    conn->conn_ops->MaxRecvDataSegmentLength)) {
 		printk(KERN_ERR "OfMarker offset value: %u exceeds limit.\n",
 			conn->of_marker_offset);

@@ -1325,7 +1325,7 @@ int iscsit_fe_sendpage_sg(
 	struct se_mem *se_mem = u_sg->cur_se_mem;
 
 send_hdr:
-	tx_size = (conn->conn_ops->HeaderDigest) ? ISCSI_HDR_LEN + CRC_LEN :
+	tx_size = (conn->conn_ops->HeaderDigest) ? ISCSI_HDR_LEN + ISCSI_CRC_LEN :
 			ISCSI_HDR_LEN;
 	tx_sent = tx_data(conn, iov, 1, tx_size);
 	if (tx_size != tx_sent) {
@@ -1339,7 +1339,7 @@ send_hdr:
 	len -= tx_size;
 	len -= u_sg->padding;
 	if (conn->conn_ops->DataDigest)
-		len -= CRC_LEN;
+		len -= ISCSI_CRC_LEN;
 	/*
 	 * Start calculating from the first page of current struct se_mem.
 	 */
@@ -1432,8 +1432,8 @@ send_datacrc:
 		struct kvec *iov_d =
 			&cmd->iov_data[cmd->iov_data_count-1];
 
-		tx_sent = tx_data(conn, iov_d, 1, CRC_LEN);
-		if (CRC_LEN != tx_sent) {
+		tx_sent = tx_data(conn, iov_d, 1, ISCSI_CRC_LEN);
+		if (ISCSI_CRC_LEN != tx_sent) {
 			if (tx_sent == -EAGAIN) {
 				printk(KERN_ERR "tx_data() returned -EAGAIN\n");
 				goto send_datacrc;
