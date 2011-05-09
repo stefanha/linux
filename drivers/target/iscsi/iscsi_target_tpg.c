@@ -104,7 +104,7 @@ int iscsit_load_discovery_tpg(void)
 	tpg->tpg_state  = TPG_STATE_ACTIVE;
 	spin_unlock(&tpg->tpg_state_lock);
 
-	iscsi_global->discovery_tpg = tpg;
+	iscsit_global->discovery_tpg = tpg;
 	printk(KERN_INFO "CORE[0] - Allocated Discovery TPG\n");
 
 	return 0;
@@ -117,7 +117,7 @@ out:
 
 void iscsit_release_discovery_tpg(void)
 {
-	struct iscsi_portal_group *tpg = iscsi_global->discovery_tpg;
+	struct iscsi_portal_group *tpg = iscsit_global->discovery_tpg;
 
 	if (!tpg)
 		return;
@@ -125,7 +125,7 @@ void iscsit_release_discovery_tpg(void)
 	core_tpg_deregister(&tpg->tpg_se_tpg);
 
 	kfree(tpg);
-	iscsi_global->discovery_tpg = NULL;
+	iscsit_global->discovery_tpg = NULL;
 }
 
 struct iscsi_portal_group *iscsit_get_tpg_from_np(
@@ -377,7 +377,7 @@ int iscsit_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 	}
 
 	tiqn = tpg->tpg_tiqn;
-	if (!tiqn || (tpg == iscsi_global->discovery_tpg))
+	if (!tiqn || (tpg == iscsit_global->discovery_tpg))
 		return 0;
 
 	spin_lock(&tiqn->tiqn_tpg_lock);

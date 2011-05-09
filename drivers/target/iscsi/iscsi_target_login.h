@@ -8,6 +8,4 @@ extern int iscsi_target_setup_login_socket(struct iscsi_np *, int);
 extern int iscsi_target_login_thread(void *);
 extern int iscsi_login_disable_FIM_keys(struct iscsi_param_list *, struct iscsi_conn *);
 
-extern struct iscsi_global *iscsi_global;
-
 #endif   /*** ISCSI_TARGET_LOGIN_H ***/

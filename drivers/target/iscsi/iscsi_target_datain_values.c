@@ -25,6 +25,7 @@
 #include "iscsi_target_seq_pdu_list.h"
 #include "iscsi_target_erl1.h"
 #include "iscsi_target_util.h"
+#include "iscsi_target.h"
 #include "iscsi_target_datain_values.h"
 
 struct iscsi_datain_req *iscsit_allocate_datain_req(void)

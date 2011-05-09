@@ -18,6 +18,7 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
+#include <linux/string.h>
 #include <linux/kthread.h>
 #include <linux/crypto.h>
 #include <linux/completion.h>
@@ -46,17 +47,17 @@
 #include "iscsi_target_device.h"
 #include "iscsi_target_stat.h"
 
-LIST_HEAD(g_tiqn_list);
-LIST_HEAD(g_np_list);
-DEFINE_SPINLOCK(tiqn_lock);
-DEFINE_SPINLOCK(np_lock);
+static LIST_HEAD(g_tiqn_list);
+static LIST_HEAD(g_np_list);
+static DEFINE_SPINLOCK(tiqn_lock);
+static DEFINE_SPINLOCK(np_lock);
 
 static struct idr tiqn_idr;
 struct idr sess_idr;
 struct mutex auth_id_lock;
 spinlock_t sess_idr_lock;
 
-struct iscsi_global *iscsi_global;
+struct iscsit_global *iscsit_global;
 
 struct kmem_cache *lio_cmd_cache;
 struct kmem_cache *lio_qr_cache;
@@ -64,18 +65,8 @@ struct kmem_cache *lio_dr_cache;
 struct kmem_cache *lio_ooo_cache;
 struct kmem_cache *lio_r2t_cache;
 
-static void iscsit_rx_thread_wait_for_tcp(struct iscsi_conn *);
-
 static int iscsit_handle_immediate_data(struct iscsi_cmd *,
 			unsigned char *buf, u32);
-static inline int iscsit_send_data_in(struct iscsi_cmd *, struct iscsi_conn *,
-			struct se_unmap_sg *, int *);
-static inline int iscsit_send_logout_response(struct iscsi_cmd *, struct iscsi_conn *);
-static inline int iscsit_send_nopin_response(struct iscsi_cmd *, struct iscsi_conn *);
-static inline int iscsit_send_status(struct iscsi_cmd *, struct iscsi_conn *);
-static int iscsit_send_task_mgt_rsp(struct iscsi_cmd *, struct iscsi_conn *);
-static int iscsit_send_text_rsp(struct iscsi_cmd *, struct iscsi_conn *);
-static int iscsit_send_reject(struct iscsi_cmd *, struct iscsi_conn *);
 static int iscsit_logout_post_handler(struct iscsi_cmd *, struct iscsi_conn *);
 
 struct iscsi_tiqn *iscsit_get_tiqn_for_login(unsigned char *buf)
@@ -125,34 +116,21 @@ void iscsit_put_tiqn_for_login(struct iscsi_tiqn *tiqn)
  * Note that IQN formatting is expected to be done in userspace, and
  * no explict IQN format checks are done here.
  */
-struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
+struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf)
 {
 	struct iscsi_tiqn *tiqn = NULL;
+	int ret;
 
 	if (strlen(buf) > ISCSI_IQN_LEN) {
 		printk(KERN_ERR "Target IQN exceeds %d bytes\n",
 				ISCSI_IQN_LEN);
-		*ret = -1;
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
-
-	spin_lock(&tiqn_lock);
-	list_for_each_entry(tiqn, &g_tiqn_list, tiqn_list) {
-		if (!strcmp(tiqn->tiqn, buf)) {
-			printk(KERN_ERR "Target IQN: %s already exists in Core\n",
-				tiqn->tiqn);
-			spin_unlock(&tiqn_lock);
-			*ret = -1;
-			return NULL;
-		}
-	}
-	spin_unlock(&tiqn_lock);
 
 	tiqn = kzalloc(sizeof(struct iscsi_tiqn), GFP_KERNEL);
 	if (!tiqn) {
 		printk(KERN_ERR "Unable to allocate struct iscsi_tiqn\n");
-		*ret = -1;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	sprintf(tiqn->tiqn, "%s", buf);
@@ -167,13 +145,18 @@ struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
 	if (!idr_pre_get(&tiqn_idr, GFP_KERNEL)) {
 		printk(KERN_ERR "idr_pre_get() for tiqn_idr failed\n");
 		kfree(tiqn);
-		*ret = -1;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 	tiqn->tiqn_state = TIQN_STATE_ACTIVE;
 
 	spin_lock(&tiqn_lock);
-	idr_get_new(&tiqn_idr, NULL, &tiqn->tiqn_index);
+	ret = idr_get_new(&tiqn_idr, NULL, &tiqn->tiqn_index);
+	if (ret < 0) {
+		printk("idr_get_new() failed for tiqn->tiqn_index\n");
+		spin_unlock(&tiqn_lock);
+		kfree(tiqn);
+		return ERR_PTR(ret);
+	}
 	list_add_tail(&tiqn->tiqn_list, &g_tiqn_list);
 	spin_unlock(&tiqn_lock);
 
@@ -181,18 +164,6 @@ struct iscsi_tiqn *iscsit_add_tiqn(unsigned char *buf, int *ret)
 
 	return tiqn;
 
-}
-
-void __iscsit_del_tiqn(struct iscsi_tiqn *tiqn)
-{
-	spin_lock(&tiqn_lock);
-	list_del(&tiqn->tiqn_list);
-	idr_remove(&tiqn_idr, tiqn->tiqn_index);
-	spin_unlock(&tiqn_lock);
-
-	printk(KERN_INFO "CORE[0] - Deleted iSCSI Target IQN: %s\n",
-			tiqn->tiqn);
-	kfree(tiqn);
 }
 
 static void iscsit_wait_for_tiqn(struct iscsi_tiqn *tiqn)
@@ -223,7 +194,15 @@ void iscsit_del_tiqn(struct iscsi_tiqn *tiqn)
 	}
 
 	iscsit_wait_for_tiqn(tiqn);
-	__iscsit_del_tiqn(tiqn);
+
+	spin_lock(&tiqn_lock);
+	list_del(&tiqn->tiqn_list);
+	idr_remove(&tiqn_idr, tiqn->tiqn_index);
+	spin_unlock(&tiqn_lock);
+
+	printk(KERN_INFO "CORE[0] - Deleted iSCSI Target IQN: %s\n",
+			tiqn->tiqn);
+	kfree(tiqn);
 }
 
 int iscsit_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
@@ -259,13 +238,6 @@ int iscsit_access_np(struct iscsi_np *np, struct iscsi_portal_group *tpg)
 	ret = mutex_lock_interruptible(&tpg->np_login_lock);
 	if ((ret != 0) || signal_pending(current))
 		return -1;
-
-	spin_lock_bh(&tpg->tpg_state_lock);
-	if (tpg->tpg_state != TPG_STATE_ACTIVE) {
-		spin_unlock_bh(&tpg->tpg_state_lock);
-		return -1;
-	}
-	spin_unlock_bh(&tpg->tpg_state_lock);
 
 	spin_lock_bh(&np->np_thread_lock);
 	np->np_login_tpg = tpg;
@@ -360,11 +332,7 @@ struct iscsi_np *iscsit_add_np(
 	if (af_inet == AF_INET6) {
 		snprintf(np->np_ip, IPV6_ADDRESS_SPACE, "%s", np_addr->np_ipv6);
 	} else {
-		sprintf(np->np_ip, "%u.%u.%u.%u",
-			((np_addr->np_ipv4 >> 24) & 0xff),
-			((np_addr->np_ipv4 >> 16) & 0xff),
-			((np_addr->np_ipv4 >> 8) & 0xff),
-			  np_addr->np_ipv4 & 0xff);
+		sprintf(np->np_ip, "%pI4", &np_addr->np_ipv4);
 		np->np_ipv4 = np_addr->np_ipv4;
 	}
 
@@ -499,11 +467,11 @@ static int __init iscsi_target_init_module(void)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "RisingTide Systems iSCSI-Target "ISCSI_VERSION"\n");
+	printk(KERN_INFO "iSCSI-Target "ISCSI_VERSION"\n");
 
-	iscsi_global = kzalloc(sizeof(struct iscsi_global), GFP_KERNEL);
-	if (!iscsi_global) {
-		printk(KERN_ERR "Unable to allocate memory for iscsi_global\n");
+	iscsit_global = kzalloc(sizeof(struct iscsit_global), GFP_KERNEL);
+	if (!iscsit_global) {
+		printk(KERN_ERR "Unable to allocate memory for iscsit_global\n");
 		return -1;
 	}
 	mutex_init(&auth_id_lock);
@@ -574,8 +542,6 @@ static int __init iscsi_target_init_module(void)
 	if (iscsit_load_discovery_tpg() < 0)
 		goto r2t_out;
 
-	printk("Loading Complete.\n");
-
 	return ret;
 r2t_out:
 	kmem_cache_destroy(lio_r2t_cache);
@@ -594,10 +560,8 @@ ts_out1:
 configfs_out:
 	iscsi_target_deregister_configfs();
 out:
-	kfree(iscsi_global);
-	iscsi_global = NULL;
-
-	return -1;
+	kfree(iscsit_global);
+	return -ENOMEM;
 }
 
 static void __exit iscsi_target_cleanup_module(void)
@@ -613,8 +577,7 @@ static void __exit iscsi_target_cleanup_module(void)
 
 	iscsi_target_deregister_configfs();
 
-	kfree(iscsi_global);
-	printk(KERN_INFO "Unloading Complete.\n");
+	kfree(iscsit_global);
 }
 
 int iscsit_add_reject(
@@ -2517,6 +2480,16 @@ static inline int iscsit_handle_snack(
 	return 0;
 }
 
+static void iscsit_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
+{
+	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
+	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
+		wait_for_completion_interruptible_timeout(
+					&conn->rx_half_close_comp,
+					ISCSI_RX_THREAD_TCP_TIMEOUT * HZ);
+	}
+}
+
 static int iscsit_handle_immediate_data(
 	struct iscsi_cmd *cmd,
 	unsigned char *buf,
@@ -3660,8 +3633,88 @@ static int iscsit_send_task_mgt_rsp(
 	return 0;
 }
 
+static int iscsit_build_sendtargets_response(struct iscsi_cmd *cmd)
+{
+	char *payload = NULL;
+	struct iscsi_conn *conn = cmd->conn;
+	struct iscsi_portal_group *tpg;
+	struct iscsi_tiqn *tiqn;
+	struct iscsi_tpg_np *tpg_np;
+	int buffer_len, end_of_buf = 0, len = 0, payload_len = 0;
+	unsigned char buf[256];
+
+	buffer_len = (conn->conn_ops->MaxRecvDataSegmentLength > 32768) ?
+			32768 : conn->conn_ops->MaxRecvDataSegmentLength;
+
+	memset(buf, 0, 256);
+
+	payload = kzalloc(buffer_len, GFP_KERNEL);
+	if (!payload) {
+		printk(KERN_ERR "Unable to allocate memory for sendtargets"
+				" response.\n");
+		return -ENOMEM;
+	}
+
+	spin_lock(&tiqn_lock);
+	list_for_each_entry(tiqn, &g_tiqn_list, tiqn_list) {
+		len = sprintf(buf, "TargetName=%s", tiqn->tiqn);
+		len += 1;
+
+		if ((len + payload_len) > buffer_len) {
+			spin_unlock(&tiqn->tiqn_tpg_lock);
+			end_of_buf = 1;
+			goto eob;
+		}
+		memcpy((void *)payload + payload_len, buf, len);
+		payload_len += len;
+
+		spin_lock(&tiqn->tiqn_tpg_lock);
+		list_for_each_entry(tpg, &tiqn->tiqn_tpg_list, tpg_list) {
+
+			spin_lock(&tpg->tpg_state_lock);
+			if ((tpg->tpg_state == TPG_STATE_FREE) ||
+			    (tpg->tpg_state == TPG_STATE_INACTIVE)) {
+				spin_unlock(&tpg->tpg_state_lock);
+				continue;
+			}
+			spin_unlock(&tpg->tpg_state_lock);
+
+			spin_lock(&tpg->tpg_np_lock);
+			list_for_each_entry(tpg_np, &tpg->tpg_gnp_list,
+						tpg_np_list) {
+				len = sprintf(buf, "TargetAddress="
+					"%s%s%s:%hu,%hu",
+					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
+					"[" : "", tpg_np->tpg_np->np_ip,
+					(tpg_np->tpg_np->np_sockaddr.ss_family == AF_INET6) ?
+					"]" : "", tpg_np->tpg_np->np_port,
+					tpg->tpgt);
+				len += 1;
+
+				if ((len + payload_len) > buffer_len) {
+					spin_unlock(&tpg->tpg_np_lock);
+					spin_unlock(&tiqn->tiqn_tpg_lock);
+					end_of_buf = 1;
+					goto eob;
+				}
+				memcpy((void *)payload + payload_len, buf, len);
+				payload_len += len;
+			}
+			spin_unlock(&tpg->tpg_np_lock);
+		}
+		spin_unlock(&tiqn->tiqn_tpg_lock);
+eob:
+		if (end_of_buf)
+			break;
+	}
+	spin_unlock(&tiqn_lock);
+
+	cmd->buf_ptr = payload;
+
+	return payload_len;
+}
+
 /*
- *
  *	FIXME: Add support for F_BIT and C_BIT when the length is longer than
  *	MaxRecvDataSegmentLength.
  */
@@ -3669,13 +3722,15 @@ static int iscsit_send_text_rsp(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	u8 iov_count = 0;
-	u32 padding = 0, text_length = 0, tx_size = 0;
 	struct iscsi_text_rsp *hdr;
 	struct kvec *iov;
 	struct scatterlist sg;
+	u32 padding = 0, tx_size = 0;
+	int text_length, iov_count = 0;
 
 	text_length = iscsit_build_sendtargets_response(cmd);
+	if (text_length < 0)
+		return text_length;
 
 	padding = ((-text_length) & 3);
 	if (padding != 0) {
@@ -3837,7 +3892,7 @@ void iscsit_thread_get_cpumask(struct iscsi_conn *conn)
 	struct iscsi_thread_set *ts = conn->thread_set;
 	int ord, cpu;
 	/*
-	 * thread_id is assigned from iscsi_global->ts_bitmap from
+	 * thread_id is assigned from iscsit_global->ts_bitmap from
 	 * within iscsi_thread_set.c:iscsi_allocate_thread_sets()
 	 *
 	 * Here we use thread_id to determine which CPU that this
@@ -4213,16 +4268,6 @@ transport_err:
 	goto restart;
 out:
 	return 0;
-}
-
-static void iscsit_rx_thread_wait_for_tcp(struct iscsi_conn *conn)
-{
-	if ((conn->sock->sk->sk_shutdown & SEND_SHUTDOWN) ||
-	    (conn->sock->sk->sk_shutdown & RCV_SHUTDOWN)) {
-		wait_for_completion_interruptible_timeout(
-					&conn->rx_half_close_comp,
-					ISCSI_RX_THREAD_TCP_TIMEOUT * HZ);
-	}
 }
 
 int iscsi_target_rx_thread(void *arg)
@@ -5006,7 +5051,8 @@ int iscsit_release_sessions_for_tpg(struct iscsi_portal_group *tpg, int force)
 	return 0;
 }
 
-MODULE_DESCRIPTION("RisingTide Systems iSCSI-Target Driver 4.x.x Release");
+MODULE_DESCRIPTION("iSCSI-Target Driver for mainline target infrastructure");
+MODULE_VERSION("4.1.x");
 MODULE_AUTHOR("nab@Linux-iSCSI.org");
 MODULE_LICENSE("GPL");
 

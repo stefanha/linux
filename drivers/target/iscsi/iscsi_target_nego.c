@@ -137,7 +137,7 @@ static u32 iscsi_handle_authentication(
 		/*
 		 * For SessionType=Discovery
 		 */
-		auth = &iscsi_global->discovery_acl.node_auth;
+		auth = &iscsit_global->discovery_acl.node_auth;
 	}
 
 	if (strstr("CHAP", authtype))
@@ -844,7 +844,7 @@ static int iscsi_target_locate_portal(
 	 */
 	sessiontype = strncmp(s_buf, DISCOVERY, 9);
 	if (!sessiontype) {
-		conn->tpg = iscsi_global->discovery_tpg;
+		conn->tpg = iscsit_global->discovery_tpg;
 		if (!login->leading_connection)
 			goto get_target;
 

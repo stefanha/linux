@@ -94,13 +94,5 @@ extern int rx_data(struct iscsi_conn *, struct kvec *, int, int);
 extern int tx_data(struct iscsi_conn *, struct kvec *, int, int);
 extern void iscsit_collect_login_stats(struct iscsi_conn *, u8, u8);
 extern struct iscsi_tiqn *iscsit_snmp_get_tiqn(struct iscsi_conn *);
-extern int iscsit_build_sendtargets_response(struct iscsi_cmd *);
-
-extern struct target_fabric_configfs *lio_target_fabric_configfs;
-extern struct iscsi_global *iscsi_global;
-extern struct kmem_cache *lio_cmd_cache;
-extern struct kmem_cache *lio_qr_cache;
-extern struct kmem_cache *lio_r2t_cache;
 
 #endif /*** ISCSI_TARGET_UTIL_H ***/
-

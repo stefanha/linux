@@ -1270,11 +1270,10 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 {
 	struct config_group *stats_cg;
 	struct iscsi_tiqn *tiqn;
-	int ret = 0;
 
-	tiqn = iscsit_add_tiqn((unsigned char *)name, &ret);
-	if (!tiqn)
-		return NULL;
+	tiqn = iscsit_add_tiqn((unsigned char *)name);
+	if (IS_ERR(tiqn))
+		return ERR_PTR(PTR_ERR(tiqn));
 	/*
 	 * Setup struct iscsi_wwn_stat_grps for se_wwn->fabric_stat_group.
 	 */
@@ -1343,7 +1342,7 @@ static ssize_t iscsi_disc_show_##name(					\
 	struct target_fabric_configfs *tf,				\
 	char *page)							\
 {									\
-	return __iscsi_disc_show_##name(&iscsi_global->discovery_acl,	\
+	return __iscsi_disc_show_##name(&iscsit_global->discovery_acl,	\
 		page);							\
 }									\
 static ssize_t iscsi_disc_store_##name(					\
@@ -1351,7 +1350,7 @@ static ssize_t iscsi_disc_store_##name(					\
 	const char *page,						\
 	size_t count)							\
 {									\
-	return __iscsi_disc_store_##name(&iscsi_global->discovery_acl,	\
+	return __iscsi_disc_store_##name(&iscsit_global->discovery_acl,	\
 		page, count);						\
 }
 
@@ -1361,7 +1360,7 @@ static ssize_t iscsi_disc_show_##name(					\
 	struct target_fabric_configfs *tf,				\
 	char *page)							\
 {									\
-	return __iscsi_disc_show_##name(&iscsi_global->discovery_acl,	\
+	return __iscsi_disc_show_##name(&iscsit_global->discovery_acl,	\
 			page);						\
 }
 
@@ -1401,7 +1400,7 @@ static ssize_t iscsi_disc_show_enforce_discovery_auth(
 	struct target_fabric_configfs *tf,
 	char *page)
 {
-	struct iscsi_node_auth *discovery_auth = &iscsi_global->discovery_acl.node_auth;
+	struct iscsi_node_auth *discovery_auth = &iscsit_global->discovery_acl.node_auth;
 
 	return sprintf(page, "%d\n", discovery_auth->enforce_discovery_auth);
 }
@@ -1412,7 +1411,7 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 	size_t count)
 {
 	struct iscsi_param *param;
-	struct iscsi_portal_group *discovery_tpg = iscsi_global->discovery_tpg;
+	struct iscsi_portal_group *discovery_tpg = iscsit_global->discovery_tpg;
 	char *endptr;
 	u32 op;
 
@@ -1424,7 +1423,7 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 	}
 
 	if (!discovery_tpg) {
-		printk(KERN_ERR "iscsi_global->discovery_tpg is NULL\n");
+		printk(KERN_ERR "iscsit_global->discovery_tpg is NULL\n");
 		return -EINVAL;
 	}
 
@@ -1441,7 +1440,7 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 			return -EINVAL;
 
 		discovery_tpg->tpg_attrib.authentication = 1;
-		iscsi_global->discovery_acl.node_auth.enforce_discovery_auth = 1;
+		iscsit_global->discovery_acl.node_auth.enforce_discovery_auth = 1;
 		printk(KERN_INFO "LIO-CORE[0] Successfully enabled"
 			" authentication enforcement for iSCSI"
 			" Discovery TPG\n");
@@ -1453,7 +1452,7 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 			return -EINVAL;
 
 		discovery_tpg->tpg_attrib.authentication = 0;
-		iscsi_global->discovery_acl.node_auth.enforce_discovery_auth = 0;
+		iscsit_global->discovery_acl.node_auth.enforce_discovery_auth = 0;
 		printk(KERN_INFO "LIO-CORE[0] Successfully disabled"
 			" authentication enforcement for iSCSI"
 			" Discovery TPG\n");
@@ -1904,8 +1903,8 @@ void iscsi_target_deregister_configfs(void)
 	/*
 	 * Shutdown discovery sessions and disable discovery TPG
 	 */
-	if (iscsi_global->discovery_tpg)
-		iscsit_tpg_disable_portal_group(iscsi_global->discovery_tpg, 1);
+	if (iscsit_global->discovery_tpg)
+		iscsit_tpg_disable_portal_group(iscsit_global->discovery_tpg, 1);
 
 	target_fabric_configfs_deregister(lio_target_fabric_configfs);
 	lio_target_fabric_configfs = NULL;

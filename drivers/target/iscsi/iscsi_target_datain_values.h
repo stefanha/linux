@@ -9,8 +9,4 @@ extern struct iscsi_datain_req *iscsit_get_datain_req(struct iscsi_cmd *);
 extern struct iscsi_datain_req *iscsit_get_datain_values(struct iscsi_cmd *,
 			struct iscsi_datain *);
 
-extern struct iscsi_global *iscsi_global;
-extern struct kmem_cache *lio_dr_cache;
-
 #endif   /*** ISCSI_TARGET_DATAIN_VALUES_H ***/
-

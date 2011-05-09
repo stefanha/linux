@@ -18,6 +18,7 @@
  * GNU General Public License for more details.
  ******************************************************************************/
 
+#include <linux/string.h>
 #include <linux/kthread.h>
 #include <linux/crypto.h>
 #include <scsi/iscsi_proto.h>
@@ -204,7 +205,7 @@ static void iscsi_login_set_conn_values(
 	get_random_bytes(&conn->stat_sn, sizeof(u32));
 
 	mutex_lock(&auth_id_lock);
-	conn->auth_id		= iscsi_global->auth_id++;
+	conn->auth_id		= iscsit_global->auth_id++;
 	mutex_unlock(&auth_id_lock);
 }
 
@@ -1048,9 +1049,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 			goto new_sess_out;
 		}
 		ipv4 = ntohl(sock_in.sin_addr.s_addr);
-		sprintf(conn->login_ip, "%u.%u.%u.%u", ((ipv4 >> 24) & 0xff),
-			((ipv4 >> 16) & 0xff), ((ipv4 >> 8) & 0xff),
-			ipv4 & 0xff);
+		sprintf(conn->login_ip, "%pI4", &ipv4);
 		conn->login_ipv4 = ipv4;
 		conn->login_port = ntohs(sock_in.sin_port);
 	}

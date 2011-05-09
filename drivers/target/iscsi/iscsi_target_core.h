@@ -713,7 +713,7 @@ struct se_dev_entry_s;
 struct iscsi_node_auth {
 	enum naf_flags_table	naf_flags;
 	int			authenticate_target;
-	/* Used for iscsi_global->discovery_auth,
+	/* Used for iscsit_global->discovery_auth,
 	 * set to zero (auth disabled) by default */
 	int			enforce_discovery_auth;
 #define MAX_USER_LEN				256
@@ -861,7 +861,7 @@ struct iscsi_tiqn {
 
 #define WWN_STAT_GRPS(tiqn)	(&(tiqn)->tiqn_stat_grps)
 
-struct iscsi_global {
+struct iscsit_global {
 	/* In core shutdown */
 	u32			in_shutdown;
 	u32			active_ts;

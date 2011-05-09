@@ -78,8 +78,6 @@ struct iscsi_seq {
 	u32		xfer_len;
 } ____cacheline_aligned;
 
-extern struct iscsi_global *iscsi_global;
-
 extern int iscsit_do_build_list(struct iscsi_cmd *, struct iscsi_build_list *);
 extern struct iscsi_pdu *iscsit_get_pdu_holder(struct iscsi_cmd *, u32, u32);
 extern struct iscsi_pdu *iscsit_get_pdu_holder_for_seq(struct iscsi_cmd *, struct iscsi_seq *);

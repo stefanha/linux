@@ -37,7 +37,4 @@ extern int iscsit_ta_cache_dynamic_acls(struct iscsi_portal_group *, u32);
 extern int iscsit_ta_demo_mode_write_protect(struct iscsi_portal_group *, u32);
 extern int iscsit_ta_prod_mode_write_protect(struct iscsi_portal_group *, u32);
 
-extern struct iscsi_global *iscsi_global;
-extern struct target_fabric_configfs *lio_target_fabric_configfs;
-
 #endif /* ISCSI_TARGET_TPG_H */

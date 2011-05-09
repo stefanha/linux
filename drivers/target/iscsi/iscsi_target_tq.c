@@ -25,18 +25,19 @@
 #include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_tq.h"
+#include "iscsi_target.h"
 
-LIST_HEAD(active_ts_list);
-LIST_HEAD(inactive_ts_list);
-DEFINE_SPINLOCK(active_ts_lock);
-DEFINE_SPINLOCK(inactive_ts_lock);
-DEFINE_SPINLOCK(ts_bitmap_lock);
+static LIST_HEAD(active_ts_list);
+static LIST_HEAD(inactive_ts_list);
+static DEFINE_SPINLOCK(active_ts_lock);
+static DEFINE_SPINLOCK(inactive_ts_lock);
+static DEFINE_SPINLOCK(ts_bitmap_lock);
 
 static void iscsi_add_ts_to_active_list(struct iscsi_thread_set *ts)
 {
 	spin_lock(&active_ts_lock);
 	list_add_tail(&ts->ts_list, &active_ts_list);
-	iscsi_global->active_ts++;
+	iscsit_global->active_ts++;
 	spin_unlock(&active_ts_lock);
 }
 
@@ -44,7 +45,7 @@ extern void iscsi_add_ts_to_inactive_list(struct iscsi_thread_set *ts)
 {
 	spin_lock(&inactive_ts_lock);
 	list_add_tail(&ts->ts_list, &inactive_ts_list);
-	iscsi_global->inactive_ts++;
+	iscsit_global->inactive_ts++;
 	spin_unlock(&inactive_ts_lock);
 }
 
@@ -52,7 +53,7 @@ static void iscsi_del_ts_from_active_list(struct iscsi_thread_set *ts)
 {
 	spin_lock(&active_ts_lock);
 	list_del(&ts->ts_list);
-	iscsi_global->active_ts--;
+	iscsit_global->active_ts--;
 	spin_unlock(&active_ts_lock);
 }
 
@@ -70,7 +71,7 @@ static struct iscsi_thread_set *iscsi_get_ts_from_inactive_list(void)
 		break;
 
 	list_del(&ts->ts_list);
-	iscsi_global->inactive_ts--;
+	iscsit_global->inactive_ts--;
 	spin_unlock(&inactive_ts_lock);
 
 	return ts;
@@ -92,8 +93,8 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 		 * Locate the next available regision in the thread_set_bitmap
 		 */
 		spin_lock(&ts_bitmap_lock);
-		thread_id = bitmap_find_free_region(iscsi_global->ts_bitmap,
-				iscsi_global->ts_bitmap_count, get_order(1));
+		thread_id = bitmap_find_free_region(iscsit_global->ts_bitmap,
+				iscsit_global->ts_bitmap_count, get_order(1));
 		spin_unlock(&ts_bitmap_lock);
 		if (thread_id < 0) {
 			printk(KERN_ERR "bitmap_find_free_region() failed for"
@@ -163,7 +164,7 @@ extern void iscsi_deallocate_thread_sets(void)
 		 * Release this thread_id in the thread_set_bitmap
 		 */
 		spin_lock(&ts_bitmap_lock);
-		bitmap_release_region(iscsi_global->ts_bitmap,
+		bitmap_release_region(iscsit_global->ts_bitmap,
 				ts->thread_id, get_order(1));
 		spin_unlock(&ts_bitmap_lock);
 
@@ -183,7 +184,7 @@ static void iscsi_deallocate_extra_thread_sets(void)
 
 	orig_count = TARGET_THREAD_SET_COUNT;
 
-	while ((iscsi_global->inactive_ts + 1) > orig_count) {
+	while ((iscsit_global->inactive_ts + 1) > orig_count) {
 		ts = iscsi_get_ts_from_inactive_list();
 		if (!(ts))
 			break;
@@ -204,7 +205,7 @@ static void iscsi_deallocate_extra_thread_sets(void)
 		 * Release this thread_id in the thread_set_bitmap
 		 */
 		spin_lock(&ts_bitmap_lock);
-		bitmap_release_region(iscsi_global->ts_bitmap,
+		bitmap_release_region(iscsit_global->ts_bitmap,
 				ts->thread_id, get_order(1));
 		spin_unlock(&ts_bitmap_lock);
 
@@ -392,7 +393,7 @@ static void iscsi_check_to_add_additional_sets(void)
 	int thread_sets_add;
 
 	spin_lock(&inactive_ts_lock);
-	thread_sets_add = iscsi_global->inactive_ts;
+	thread_sets_add = iscsit_global->inactive_ts;
 	spin_unlock(&inactive_ts_lock);
 	if (thread_sets_add == 1)
 		iscsi_allocate_thread_sets(1);
@@ -426,7 +427,7 @@ struct iscsi_conn *iscsi_rx_thread_pre_handler(struct iscsi_thread_set *ts)
 		spin_unlock_bh(&ts->ts_state_lock);
 		iscsi_del_ts_from_active_list(ts);
 
-		if (!iscsi_global->in_shutdown)
+		if (!iscsit_global->in_shutdown)
 			iscsi_deallocate_extra_thread_sets();
 
 		iscsi_add_ts_to_inactive_list(ts);
@@ -479,7 +480,7 @@ struct iscsi_conn *iscsi_tx_thread_pre_handler(struct iscsi_thread_set *ts)
 		spin_unlock_bh(&ts->ts_state_lock);
 		iscsi_del_ts_from_active_list(ts);
 
-		if (!iscsi_global->in_shutdown)
+		if (!iscsit_global->in_shutdown)
 			iscsi_deallocate_extra_thread_sets();
 
 		iscsi_add_ts_to_inactive_list(ts);
@@ -527,12 +528,12 @@ int iscsi_thread_set_init(void)
 {
 	int size;
 
-	iscsi_global->ts_bitmap_count = ISCSI_TS_BITMAP_BITS;
+	iscsit_global->ts_bitmap_count = ISCSI_TS_BITMAP_BITS;
 
-	size = BITS_TO_LONGS(iscsi_global->ts_bitmap_count) * sizeof(long);
-	iscsi_global->ts_bitmap = kzalloc(size, GFP_KERNEL);
-	if (!(iscsi_global->ts_bitmap)) {
-		printk(KERN_ERR "Unable to allocate iscsi_global->ts_bitmap\n");
+	size = BITS_TO_LONGS(iscsit_global->ts_bitmap_count) * sizeof(long);
+	iscsit_global->ts_bitmap = kzalloc(size, GFP_KERNEL);
+	if (!(iscsit_global->ts_bitmap)) {
+		printk(KERN_ERR "Unable to allocate iscsit_global->ts_bitmap\n");
 		return -ENOMEM;
 	}
 
@@ -547,5 +548,5 @@ int iscsi_thread_set_init(void)
 
 void iscsi_thread_set_free(void)
 {
-	kfree(iscsi_global->ts_bitmap);
+	kfree(iscsit_global->ts_bitmap);
 }
