@@ -3876,11 +3876,9 @@ int iscsi_target_tx_thread(void *arg)
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct se_unmap_sg unmap_sg;
 	/*
-	 * Bump up the task_struct priority for RX/TX thread set pairs,
-	 * and allow ourselves to be interrupted by SIGINT so that a
+	 * Allow ourselves to be interrupted by SIGINT so that a
 	 * connection recovery / failure event can be triggered externally.
 	 */
-	set_user_nice(current, -20);
 	allow_signal(SIGINT);
 
 restart:
@@ -4189,11 +4187,9 @@ int iscsi_target_rx_thread(void *arg)
 	struct iscsi_thread_set *ts = (struct iscsi_thread_set *)arg;
 	struct kvec iov;
 	/*
-	 * Bump up the task_struct priority for RX/TX thread set pairs,
-	 * and allow ourselves to be interrupted by SIGINT so that a
+	 * Allow ourselves to be interrupted by SIGINT so that a
 	 * connection recovery / failure event can be triggered externally.
 	 */
-	set_user_nice(current, -20);
 	allow_signal(SIGINT);
 
 restart:

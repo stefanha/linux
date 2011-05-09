@@ -1211,7 +1211,6 @@ int iscsi_target_login_thread(void *arg)
 	struct iscsi_np *np = (struct iscsi_np *)arg;
 	int ret;
 
-	set_user_nice(current, -20);
 	allow_signal(SIGINT);
 
 	while (!kthread_should_stop()) {
