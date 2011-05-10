@@ -189,9 +189,9 @@ enum recover_cmdsn_ret_table {
 
 /* Used for iscsi_handle_immediate_data() return values */
 enum immedate_data_ret_table {
-	IMMEDIDATE_DATA_CANNOT_RECOVER	= -1,
-	IMMEDIDATE_DATA_NORMAL_OPERATION = 0,
-	IMMEDIDATE_DATA_ERL1_CRC_FAILURE = 1,
+	IMMEDIATE_DATA_CANNOT_RECOVER	= -1,
+	IMMEDIATE_DATA_NORMAL_OPERATION = 0,
+	IMMEDIATE_DATA_ERL1_CRC_FAILURE = 1,
 };
 
 /* Used for iscsi_decide_dataout_action() return values */

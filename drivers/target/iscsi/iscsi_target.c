@@ -1253,7 +1253,7 @@ attach_cmd:
 	 * iscsit_check_received_cmdsn() below.
 	 */
 	if (send_check_condition) {
-		immed_ret = IMMEDIDATE_DATA_NORMAL_OPERATION;
+		immed_ret = IMMEDIATE_DATA_NORMAL_OPERATION;
 		dump_immediate_data = 1;
 		goto after_immediate_data;
 	}
@@ -1268,14 +1268,14 @@ attach_cmd:
 	wait_for_completion(&cmd->unsolicited_data_comp);
 
 	if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_CMD_FAILED) {
-		immed_ret = IMMEDIDATE_DATA_NORMAL_OPERATION;
+		immed_ret = IMMEDIATE_DATA_NORMAL_OPERATION;
 		dump_immediate_data = 1;
 		goto after_immediate_data;
 	}
 
 	immed_ret = iscsit_handle_immediate_data(cmd, buf, payload_length);
 after_immediate_data:
-	if (immed_ret == IMMEDIDATE_DATA_NORMAL_OPERATION) {
+	if (immed_ret == IMMEDIATE_DATA_NORMAL_OPERATION) {
 		/*
 		 * A PDU/CmdSN carrying Immediate Data passed
 		 * DataCRC, check against ExpCmdSN/MaxCmdSN if
@@ -1312,7 +1312,7 @@ after_immediate_data:
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
 		}
-	} else if (immed_ret == IMMEDIDATE_DATA_ERL1_CRC_FAILURE) {
+	} else if (immed_ret == IMMEDIATE_DATA_ERL1_CRC_FAILURE) {
 		/*
 		 * Immediate Data failed DataCRC and ERL>=1,
 		 * silently drop this PDU and let the initiator
@@ -1326,7 +1326,7 @@ after_immediate_data:
 		 */
 		cmd->i_state = ISTATE_REMOVE;
 		iscsit_add_cmd_to_immediate_queue(cmd, conn, cmd->i_state);
-	} else /* immed_ret == IMMEDIDATE_DATA_CANNOT_RECOVER */
+	} else /* immed_ret == IMMEDIATE_DATA_CANNOT_RECOVER */
 		return -1;
 
 	return 0;
@@ -2528,7 +2528,7 @@ static int iscsit_handle_immediate_data(
 
 	iov_ret = iscsit_set_iovec_ptrs(&map_sg, &unmap_sg);
 	if (iov_ret < 0)
-		return IMMEDIDATE_DATA_CANNOT_RECOVER;
+		return IMMEDIATE_DATA_CANNOT_RECOVER;
 
 	rx_size = length;
 	iov_count = iov_ret;
@@ -2555,7 +2555,7 @@ static int iscsit_handle_immediate_data(
 
 	if (rx_got != rx_size) {
 		iscsit_rx_thread_wait_for_tcp(conn);
-		return IMMEDIDATE_DATA_CANNOT_RECOVER;
+		return IMMEDIATE_DATA_CANNOT_RECOVER;
 	}
 
 	if (conn->conn_ops->DataDigest) {
@@ -2574,7 +2574,7 @@ static int iscsit_handle_immediate_data(
 		map_sg.data_offset = cmd->write_data_done;
 
 		if (iscsit_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
-			return IMMEDIDATE_DATA_CANNOT_RECOVER;
+			return IMMEDIATE_DATA_CANNOT_RECOVER;
 
 		iscsit_do_crypto_hash_iovec(&conn->conn_rx_hash, iov_ptr,
 					counter, padding,
@@ -2592,12 +2592,12 @@ static int iscsit_handle_immediate_data(
 				iscsit_add_reject_from_cmd(
 						ISCSI_REASON_DATA_DIGEST_ERROR,
 						1, 0, buf, cmd);
-				return IMMEDIDATE_DATA_CANNOT_RECOVER;
+				return IMMEDIATE_DATA_CANNOT_RECOVER;
 			} else {
 				iscsit_add_reject_from_cmd(
 						ISCSI_REASON_DATA_DIGEST_ERROR,
 						0, 0, buf, cmd);
-				return IMMEDIDATE_DATA_ERL1_CRC_FAILURE;
+				return IMMEDIATE_DATA_ERL1_CRC_FAILURE;
 			}
 		} else {
 			TRACE(TRACE_DIGEST, "Got CRC32C DataDigest 0x%08x for"
@@ -2615,7 +2615,7 @@ static int iscsit_handle_immediate_data(
 		spin_unlock_bh(&cmd->istate_lock);
 	}
 
-	return IMMEDIDATE_DATA_NORMAL_OPERATION;
+	return IMMEDIATE_DATA_NORMAL_OPERATION;
 }
 
 int iscsit_send_async_msg(
