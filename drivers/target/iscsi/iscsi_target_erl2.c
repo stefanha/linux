@@ -313,7 +313,6 @@ int iscsit_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 			ooo_cmdsn->cmdsn, conn->cid);
 		iscsit_remove_ooo_cmdsn(sess, ooo_cmdsn);
 	}
-	conn->sess->ooo_cmdsn_count -= dropped_count;
 	spin_unlock(&sess->cmdsn_lock);
 
 	spin_lock_bh(&conn->cmd_lock);

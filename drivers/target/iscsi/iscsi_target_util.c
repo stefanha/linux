@@ -461,23 +461,17 @@ inline int iscsit_check_received_cmdsn(
 			return CMDSN_ERROR_CANNOT_RECOVER;
 		}
 
-		if (counter == conn->sess->ooo_cmdsn_count) {
-			if (conn->sess->ooo_cmdsn_count == 1) {
-				TRACE(TRACE_CMDSN, "Received final missing"
-					" CmdSN: 0x%08x.\n", old_expcmdsn);
-			} else {
-				TRACE(TRACE_CMDSN, "Received final missing"
-					" CmdSNs: 0x%08x->0x%08x.\n",
-				old_expcmdsn, (conn->sess->exp_cmd_sn - 1));
-			}
-
-			conn->sess->ooo_cmdsn_count = 0;
+#ifdef CONFIG_ISCSI_TARGET_DEBUG
+		if (list_empty(&conn->sess->sess_ooo_cmdsn_list)) {
+			TRACE(TRACE_CMDSN, "Received final missing"
+			      " CmdSNs: 0x%08x->0x%08x.\n",
+			      old_expcmdsn, (conn->sess->exp_cmd_sn - 1));
 		} else {
-			conn->sess->ooo_cmdsn_count -= counter;
-			TRACE(TRACE_CMDSN, "Still missing %hu CmdSN(s),"
-				" continuing out of order operation.\n",
-				conn->sess->ooo_cmdsn_count);
+			TRACE(TRACE_CMDSN, "Still missing CmdSN(s),"
+				" continuing out of order operation.\n");
 		}
+#endif
+
 		spin_unlock(&conn->sess->cmdsn_lock);
 		return CMDSN_NORMAL_OPERATION;
 	}

@@ -612,7 +612,6 @@ struct iscsi_session {
 	u32			max_cmd_sn;
 	struct list_head	sess_ooo_cmdsn_list;
 
-	u32			ooo_cmdsn_count;
 	/* LIO specific session ID */
 	u32			sid;
 	char			auth_type[8];

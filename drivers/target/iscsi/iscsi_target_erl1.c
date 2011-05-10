@@ -844,10 +844,6 @@ static int iscsit_attach_ooo_cmdsn(
 			}
 		}
 	}
-	sess->ooo_cmdsn_count++;
-
-	TRACE(TRACE_CMDSN, "Set out of order CmdSN count for SID:"
-		" %u to %hu.\n", sess->sid, sess->ooo_cmdsn_count);
 
 	return 0;
 }
