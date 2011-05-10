@@ -611,10 +611,15 @@ struct iscsi_session {
 	/* session wide counter: target assigned task tag */
 	u32			targ_xfer_tag;
 	u32			cmdsn_window;
+
+	/* protects cmdsn values */
+	spinlock_t		cmdsn_lock;
 	/* session wide counter: expected command sequence number */
 	u32			exp_cmd_sn;
 	/* session wide counter: maximum allowed command sequence number */
 	u32			max_cmd_sn;
+	struct list_head	sess_ooo_cmdsn_list;
+
 	u32			ooo_cmdsn_count;
 	/* LIO specific session ID */
 	u32			sid;
@@ -645,13 +650,11 @@ struct iscsi_session {
 	struct list_head	sess_conn_list;
 	struct list_head	cr_active_list;
 	struct list_head	cr_inactive_list;
-	spinlock_t		cmdsn_lock;
 	spinlock_t		conn_lock;
 	spinlock_t		cr_a_lock;
 	spinlock_t		cr_i_lock;
 	spinlock_t		session_usage_lock;
 	spinlock_t		ttt_lock;
-	struct list_head	sess_ooo_cmdsn_list;
 	struct completion	async_msg_comp;
 	struct completion	reinstatement_comp;
 	struct completion	session_wait_comp;
