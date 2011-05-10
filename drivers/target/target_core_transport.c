@@ -5508,14 +5508,12 @@ void transport_send_task_abort(struct se_cmd *cmd)
  */
 int transport_generic_do_tmr(struct se_cmd *cmd)
 {
-	struct se_cmd *ref_cmd;
 	struct se_device *dev = cmd->se_dev;
 	struct se_tmr_req *tmr = cmd->se_tmr_req;
 	int ret;
 
 	switch (tmr->function) {
 	case TMR_ABORT_TASK:
-		ref_cmd = tmr->ref_cmd;
 		tmr->response = TMR_FUNCTION_REJECTED;
 		break;
 	case TMR_ABORT_TASK_SET:
