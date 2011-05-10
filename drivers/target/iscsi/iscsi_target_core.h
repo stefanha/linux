@@ -266,7 +266,6 @@ struct iscsi_sess_ops {
 
 struct iscsi_queue_req {
 	int			state;
-	struct se_obj_lun_type_s *queue_se_obj_api;
 	struct iscsi_cmd	*cmd;
 	struct list_head	qr_list;
 };
@@ -467,14 +466,8 @@ struct iscsi_cmd {
 	struct iscsi_conn_recovery *cr;
 	/* Session the command is part of,  used for connection recovery */
 	struct iscsi_session	*sess;
-	/* Next command in the session pool */
-	struct iscsi_cmd	*next;
 	/* list_head for connection list */
 	struct list_head	i_list;
-	/* Next command in DAS transport list */
-	struct iscsi_cmd	*t_next;
-	/* Previous command in DAS transport list */
-	struct iscsi_cmd	*t_prev;
 	/* The TCM I/O descriptor that is accessed via container_of() */
 	struct se_cmd		se_cmd;
 	/* Sense buffer that will be mapped into outgoing status */
