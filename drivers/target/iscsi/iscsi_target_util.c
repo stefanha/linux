@@ -406,7 +406,7 @@ inline int iscsit_check_received_cmdsn(
 		return CMDSN_ERROR_CANNOT_RECOVER;
 	}
 
-	if (!conn->sess->cmdsn_outoforder) {
+	if (list_empty(&conn->sess->sess_ooo_cmdsn_list)) {
 		if (cmdsn == conn->sess->exp_cmd_sn) {
 			conn->sess->exp_cmd_sn++;
 			TRACE(TRACE_CMDSN, "Received CmdSN matches ExpCmdSN,"
@@ -472,7 +472,6 @@ inline int iscsit_check_received_cmdsn(
 			}
 
 			conn->sess->ooo_cmdsn_count = 0;
-			conn->sess->cmdsn_outoforder = 0;
 		} else {
 			conn->sess->ooo_cmdsn_count -= counter;
 			TRACE(TRACE_CMDSN, "Still missing %hu CmdSN(s),"

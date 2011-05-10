@@ -1084,8 +1084,6 @@ int iscsit_handle_ooo_cmdsn(
 	int batch = 0;
 	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL, *ooo_tail = NULL;
 
-	sess->cmdsn_outoforder = 1;
-
 	cmd->deferred_i_state		= cmd->i_state;
 	cmd->i_state			= ISTATE_DEFERRED_CMD;
 	cmd->cmd_flags			|= ICF_OOO_CMDSN;

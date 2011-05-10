@@ -589,7 +589,6 @@ struct iscsi_conn_recovery {
 }  ____cacheline_aligned;
 
 struct iscsi_session {
-	u8			cmdsn_outoforder;
 	u8			initiator_vendor;
 	u8			isid[6];
 	enum iscsi_timer_flags_table time2retain_timer_flags;
