@@ -1211,22 +1211,13 @@ attach_cmd:
 	 * be acknowledged. (See below)
 	 */
 	if (!cmd->immediate_data) {
-		cmdsn_ret = iscsit_check_received_cmdsn(conn,
-				cmd, hdr->cmdsn);
-		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
-		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
-			do {} while (0);
-		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			cmd->i_state = ISTATE_REMOVE;
-			iscsit_add_cmd_to_immediate_queue(cmd,
-					conn, cmd->i_state);
-			return 0;
-		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
+		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
 			return iscsit_add_reject_from_cmd(
-					ISCSI_REASON_PROTOCOL_ERROR,
-					1, 0, buf, cmd);
-		}
+				ISCSI_REASON_PROTOCOL_ERROR,
+				1, 0, buf, cmd);
 	}
+
 	iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	/*
@@ -1281,8 +1272,7 @@ after_immediate_data:
 		 * DataCRC, check against ExpCmdSN/MaxCmdSN if
 		 * Immediate Bit is not set.
 		 */
-		cmdsn_ret = iscsit_check_received_cmdsn(conn,
-				cmd, hdr->cmdsn);
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
 		/*
 		 * Special case for Unsupported SAM WRITE Opcodes
 		 * and ImmediateData=Yes.
@@ -1298,20 +1288,11 @@ after_immediate_data:
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
 
-		if (cmdsn_ret == CMDSN_NORMAL_OPERATION)
-			return 0;
-		else if (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)
-			return 0;
-		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			cmd->i_state = ISTATE_REMOVE;
-			iscsit_add_cmd_to_immediate_queue(cmd,
-					conn, cmd->i_state);
-			return 0;
-		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
+		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
 			return iscsit_add_reject_from_cmd(
-					ISCSI_REASON_PROTOCOL_ERROR,
-					1, 0, buf, cmd);
-		}
+				ISCSI_REASON_PROTOCOL_ERROR,
+				1, 0, buf, cmd);
+
 	} else if (immed_ret == IMMEDIATE_DATA_ERL1_CRC_FAILURE) {
 		/*
 		 * Immediate Data failed DataCRC and ERL>=1,
@@ -1835,23 +1816,15 @@ static int iscsit_handle_nop_out(
 			return 0;
 		}
 
-		cmdsn_ret = iscsit_check_received_cmdsn(conn, cmd, hdr->cmdsn);
-		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
-		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)) {
-			return 0;
-		} else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			cmd->i_state = ISTATE_REMOVE;
-			iscsit_add_cmd_to_immediate_queue(cmd, conn,
-					cmd->i_state);
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
+		if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
 			ret = 0;
 			goto ping_out;
-		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
+		}
+		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
 			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
-			ret = -1;
-			goto ping_out;
-		}
 
 		return 0;
 	}
@@ -1901,7 +1874,8 @@ static int iscsit_handle_task_mgt_cmd(
 	struct iscsi_tmr_req *tmr_req;
 	struct iscsi_tm *hdr;
 	u32 payload_length;
-	int cmdsn_ret, out_of_order_cmdsn = 0, ret;
+	int out_of_order_cmdsn = 0;
+	int ret;
 	u8 function;
 
 	hdr			= (struct iscsi_tm *) buf;
@@ -2024,16 +1998,10 @@ attach:
 	spin_unlock_bh(&conn->cmd_lock);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		cmdsn_ret = iscsit_check_received_cmdsn(conn,
-				cmd, hdr->cmdsn);
-		if (cmdsn_ret == CMDSN_NORMAL_OPERATION)
-			do {} while (0);
-		else if (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)
+		int cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
+		if (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)
 			out_of_order_cmdsn = 1;
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			cmd->i_state = ISTATE_REMOVE;
-			iscsit_add_cmd_to_immediate_queue(cmd, conn,
-					cmd->i_state);
 			return 0;
 		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
 			return iscsit_add_reject_from_cmd(
@@ -2209,19 +2177,11 @@ static int iscsit_handle_text_cmd(
 	iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		cmdsn_ret = iscsit_check_received_cmdsn(conn, cmd, hdr->cmdsn);
-		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
-		     (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
-			return 0;
-		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			iscsit_add_cmd_to_immediate_queue(cmd, conn,
-						ISTATE_REMOVE);
-			return 0;
-		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
+		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
 			return iscsit_add_reject_from_cmd(
 					ISCSI_REASON_PROTOCOL_ERROR,
 					1, 0, buf, cmd);
-		}
 
 		return 0;
 	}
@@ -2406,29 +2366,24 @@ static int iscsit_handle_logout_cmd(
 		iscsit_ack_from_expstatsn(conn, hdr->exp_statsn);
 
 	/*
-	 * Non-Immediate Logout Commands are executed in CmdSN order..
+	 * Immediate commands are executed, well, immediately.
+	 * Non-Immediate Logout Commands are executed in CmdSN order.
 	 */
-	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		cmdsn_ret = iscsit_check_received_cmdsn(conn, cmd, hdr->cmdsn);
-		if ((cmdsn_ret == CMDSN_NORMAL_OPERATION) ||
-		    (cmdsn_ret == CMDSN_HIGHER_THAN_EXP))
-			return logout_remove;
-		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			cmd->i_state = ISTATE_REMOVE;
-			iscsit_add_cmd_to_immediate_queue(cmd, conn,
-					cmd->i_state);
-			return 0;
-		} else { /* (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) */
+	if (hdr->opcode & ISCSI_OP_IMMEDIATE) {
+		int ret = iscsit_execute_cmd(cmd, 0);
+
+		if (ret < 0)
+			return ret;
+	} else {
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
+		if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
+			logout_remove = 0;
+		} else if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) {
 			return iscsit_add_reject_from_cmd(
-					ISCSI_REASON_PROTOCOL_ERROR,
-					1, 0, buf, cmd);
+				ISCSI_REASON_PROTOCOL_ERROR,
+				1, 0, buf, cmd);
 		}
 	}
-	/*
-	 * Immediate Logout Commands are executed, well, Immediately.
-	 */
-	if (iscsit_execute_cmd(cmd, 0) < 0)
-		return -1;
 
 	return logout_remove;
 }

@@ -385,100 +385,80 @@ struct iscsi_r2t *iscsit_get_holder_for_r2tsn(
 	return NULL;
 }
 
-inline int iscsit_check_received_cmdsn(
-	struct iscsi_conn *conn,
-	struct iscsi_cmd *cmd,
-	u32 cmdsn)
+static inline int iscsit_check_received_cmdsn(struct iscsi_session *sess, u32 cmdsn)
 {
 	int ret;
+
 	/*
 	 * This is the proper method of checking received CmdSN against
 	 * ExpCmdSN and MaxCmdSN values, as well as accounting for out
 	 * or order CmdSNs due to multiple connection sessions and/or
 	 * CRC failures.
 	 */
-	spin_lock(&conn->sess->cmdsn_lock);
-	if (iscsi_sna_gt(cmdsn, conn->sess->max_cmd_sn)) {
+	if (iscsi_sna_gt(cmdsn, sess->max_cmd_sn)) {
 		printk(KERN_ERR "Received CmdSN: 0x%08x is greater than"
-			" MaxCmdSN: 0x%08x, protocol error.\n", cmdsn,
-				conn->sess->max_cmd_sn);
-		spin_unlock(&conn->sess->cmdsn_lock);
-		return CMDSN_ERROR_CANNOT_RECOVER;
-	}
+		       " MaxCmdSN: 0x%08x, protocol error.\n", cmdsn,
+		       sess->max_cmd_sn);
+		ret = CMDSN_ERROR_CANNOT_RECOVER;
 
-	if (list_empty(&conn->sess->sess_ooo_cmdsn_list)) {
-		if (cmdsn == conn->sess->exp_cmd_sn) {
-			conn->sess->exp_cmd_sn++;
-			TRACE(TRACE_CMDSN, "Received CmdSN matches ExpCmdSN,"
-				" incremented ExpCmdSN to: 0x%08x\n",
-					conn->sess->exp_cmd_sn);
-			ret = iscsit_execute_cmd(cmd, 0);
-			spin_unlock(&conn->sess->cmdsn_lock);
+	} else if (cmdsn == sess->exp_cmd_sn) {
+		sess->exp_cmd_sn++;
+		TRACE(TRACE_CMDSN, "Received CmdSN matches ExpCmdSN,"
+		      " incremented ExpCmdSN to: 0x%08x\n",
+		      sess->exp_cmd_sn);
+		ret = CMDSN_NORMAL_OPERATION;
 
-			return (!ret) ? CMDSN_NORMAL_OPERATION :
-					CMDSN_ERROR_CANNOT_RECOVER;
-		} else if (iscsi_sna_gt(cmdsn, conn->sess->exp_cmd_sn)) {
-			TRACE(TRACE_CMDSN, "Received CmdSN: 0x%08x is greater"
-				" than ExpCmdSN: 0x%08x, not acknowledging.\n",
-				cmdsn, conn->sess->exp_cmd_sn);
-			goto ooo_cmdsn;
-		} else {
-			printk(KERN_ERR "Received CmdSN: 0x%08x is less than"
-				" ExpCmdSN: 0x%08x, ignoring.\n", cmdsn,
-					conn->sess->exp_cmd_sn);
-			spin_unlock(&conn->sess->cmdsn_lock);
-			return CMDSN_LOWER_THAN_EXP;
-		}
+	} else if (iscsi_sna_gt(cmdsn, sess->exp_cmd_sn)) {
+		TRACE(TRACE_CMDSN, "Received CmdSN: 0x%08x is greater"
+		      " than ExpCmdSN: 0x%08x, not acknowledging.\n",
+		      cmdsn, sess->exp_cmd_sn);
+		ret = CMDSN_HIGHER_THAN_EXP;
+
 	} else {
-		int counter = 0;
-		u32 old_expcmdsn = 0;
-		if (cmdsn == conn->sess->exp_cmd_sn) {
-			old_expcmdsn = conn->sess->exp_cmd_sn++;
-			TRACE(TRACE_CMDSN, "Got missing CmdSN: 0x%08x matches"
-				" ExpCmdSN, incremented ExpCmdSN to 0x%08x.\n",
-					cmdsn, conn->sess->exp_cmd_sn);
-
-			if (iscsit_execute_cmd(cmd, 0) < 0) {
-				spin_unlock(&conn->sess->cmdsn_lock);
-				return CMDSN_ERROR_CANNOT_RECOVER;
-			}
-		} else if (iscsi_sna_gt(cmdsn, conn->sess->exp_cmd_sn)) {
-			TRACE(TRACE_CMDSN, "CmdSN: 0x%08x greater than"
-				" ExpCmdSN: 0x%08x, not acknowledging.\n",
-				cmdsn, conn->sess->exp_cmd_sn);
-			goto ooo_cmdsn;
-		} else {
-			printk(KERN_ERR "CmdSN: 0x%08x less than ExpCmdSN:"
-				" 0x%08x, ignoring.\n", cmdsn,
-				conn->sess->exp_cmd_sn);
-			spin_unlock(&conn->sess->cmdsn_lock);
-			return CMDSN_LOWER_THAN_EXP;
-		}
-
-		counter = iscsit_execute_ooo_cmdsns(conn->sess);
-		if (counter < 0) {
-			spin_unlock(&conn->sess->cmdsn_lock);
-			return CMDSN_ERROR_CANNOT_RECOVER;
-		}
-
-#ifdef CONFIG_ISCSI_TARGET_DEBUG
-		if (list_empty(&conn->sess->sess_ooo_cmdsn_list)) {
-			TRACE(TRACE_CMDSN, "Received final missing"
-			      " CmdSNs: 0x%08x->0x%08x.\n",
-			      old_expcmdsn, (conn->sess->exp_cmd_sn - 1));
-		} else {
-			TRACE(TRACE_CMDSN, "Still missing CmdSN(s),"
-				" continuing out of order operation.\n");
-		}
-#endif
-
-		spin_unlock(&conn->sess->cmdsn_lock);
-		return CMDSN_NORMAL_OPERATION;
+		printk(KERN_ERR "Received CmdSN: 0x%08x is less than"
+		       " ExpCmdSN: 0x%08x, ignoring.\n", cmdsn,
+		       sess->exp_cmd_sn);
+		ret = CMDSN_LOWER_THAN_EXP;
 	}
 
-ooo_cmdsn:
-	ret = iscsit_handle_ooo_cmdsn(conn->sess, cmd, cmdsn);
+	return ret;
+}
+
+/*
+ * Commands may be received out of order if MC/S is in use.
+ * Ensure they are executed in CmdSN order.
+ */
+int iscsit_sequence_cmd(
+	struct iscsi_conn *conn,
+	struct iscsi_cmd *cmd,
+	u32 cmdsn)
+{
+	int ret;
+	int cmdsn_ret;
+
+	spin_lock(&conn->sess->cmdsn_lock);
+
+	cmdsn_ret = iscsit_check_received_cmdsn(conn->sess, cmdsn);
+	switch (cmdsn_ret) {
+	case CMDSN_NORMAL_OPERATION:
+		ret = iscsit_execute_cmd(cmd, 0);
+		if ((ret >= 0) && !list_empty(&conn->sess->sess_ooo_cmdsn_list))
+			iscsit_execute_ooo_cmdsns(conn->sess);
+		break;
+	case CMDSN_HIGHER_THAN_EXP:
+		ret = iscsit_handle_ooo_cmdsn(conn->sess, cmd, cmdsn);
+		break;
+	case CMDSN_LOWER_THAN_EXP:
+		cmd->i_state = ISTATE_REMOVE;
+		iscsit_add_cmd_to_immediate_queue(cmd, conn, cmd->i_state);
+		ret = cmdsn_ret;
+		break;
+	default:
+		ret = cmdsn_ret;
+		break;
+	}
 	spin_unlock(&conn->sess->cmdsn_lock);
+
 	return ret;
 }
 
