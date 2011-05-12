@@ -103,12 +103,10 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 	 *
 	 * Note this currently assumes v_header->lun has already been unpacked.
 	 */
-	if (transport_get_lun_for_cmd(se_cmd, NULL, v_header->lun) < 0) {
+	if (transport_lookup_cmd_lun(se_cmd, v_header->lun) < 0) {
 		kfree(tv_cmd);
 		return ERR_PTR(-ENODEV);
 	}
-
-	transport_device_setup_cmd(se_cmd);
 	/*
 	 * From here the rest of the se_cmd will be setup and dispatched
 	 * via tcm_vhost_new_cmd_map() from TCM backend thread context
