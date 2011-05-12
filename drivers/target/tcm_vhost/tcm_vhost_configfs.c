@@ -55,8 +55,8 @@
 struct target_fabric_configfs *tcm_vhost_fabric_configfs;
 
 /* Global spinlock to protect tcm_vhost TPG list for vhost IOCTL access */
-struct mutex tcm_vhost_mutex;
-struct list_head tcm_vhost_list;
+DEFINE_MUTEX(tcm_vhost_mutex);
+LIST_HEAD(tcm_vhost_list);
 
 static char *tcm_vhost_dump_proto_id(struct tcm_vhost_tport *tport)
 {
