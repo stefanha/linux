@@ -1,0 +1,6 @@
+config TCM_VHOST
+	tristate "TCM_VHOST fabric module (EXPERIMENTAL)"
+	depends on TARGET_CORE && CONFIGFS_FS && EVENTFD && EXPERIMENTAL && m
+	default n
+	---help---
+	Say Y here to enable the TCM_VHOST fabric module

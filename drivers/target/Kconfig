@@ -42,3 +42,4 @@ source "drivers/target/tcm_fc/Kconfig"
 source "drivers/target/tcm_qla2xxx/Kconfig"
 
 endif
+source "drivers/target/tcm_vhost/Kconfig"

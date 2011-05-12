@@ -1,10 +1,11 @@
 config ISCSI_TARGET
 	tristate "Linux-iSCSI.org iSCSI Target Mode Stack"
+	depends on m
 	select CRYPTO
 	select CRYPTO_CRC32C
 	select CRYPTO_CRC32C_INTEL if X86
 	help
-	Say Y here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI
+	Say M here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI
 	Target Mode Stack.
 
 if ISCSI_TARGET

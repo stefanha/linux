@@ -1896,6 +1896,16 @@ config SCSI_BFA_FC
 	  To compile this driver as a module, choose M here. The module will
 	  be called bfa.
 
+config VIRTIO_SCSI
+	tristate "Virtio SCSI HBA driver (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && VIRTIO
+	help
+	  This driver supports the virtio SCSI HBA available on QEMU based
+	  VMMs (like KVM).
+
+	  To compile this driver as a module, choose M here. The module will
+	  be called virtio_scsi.
+
 endif # SCSI_LOWLEVEL
 
 source "drivers/scsi/pcmcia/Kconfig"
