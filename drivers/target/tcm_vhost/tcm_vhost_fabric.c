@@ -233,7 +233,7 @@ int tcm_vhost_new_cmd_map(struct se_cmd *se_cmd)
 {
 	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
 				struct tcm_vhost_cmd, tvc_se_cmd);
-	void *mem_ptr, *mem_bidi_ptr = NULL;
+	struct scatterlist *sg_ptr, *sg_bidi_ptr = NULL;
 	u32 sg_no_bidi = 0;
 	int ret;
 	/*
@@ -260,8 +260,7 @@ int tcm_vhost_new_cmd_map(struct se_cmd *se_cmd)
 	 * struct tcm_vhost_cmd..
 	 */
 	if (tv_cmd->tvc_sgl_count) {
-		se_cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM;
-		mem_ptr = (void *)tv_cmd->tvc_sgl;
+		sg_ptr = tv_cmd->tvc_sgl;
 		/*
 		 * For BIDI commands, pass in the extra READ buffer
 		 * to transport_generic_map_mem_to_cmd() below..
@@ -277,14 +276,14 @@ int tcm_vhost_new_cmd_map(struct se_cmd *se_cmd)
 		/*
 		 * Used for DMA_NONE
 		 */
-		mem_ptr = NULL;
+		sg_ptr = NULL;
 	}
 	/*
 	 * Map the SG memory into struct se_mem->page linked list using the same
 	 * physical memory at sg->page_link.
 	 */
-	ret = transport_generic_map_mem_to_cmd(se_cmd, mem_ptr,
-				tv_cmd->tvc_sgl_count, mem_bidi_ptr,
+	ret = transport_generic_map_mem_to_cmd(se_cmd, sg_ptr,
+				tv_cmd->tvc_sgl_count, sg_bidi_ptr,
 				sg_no_bidi);
 	if (ret < 0)
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
