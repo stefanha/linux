@@ -663,15 +663,11 @@ struct iscsi_param *iscsi_find_param_from_key(
 
 	list_for_each_entry(param, &param_list->param_list, p_list) {
 		if (!strcmp(key, param->name))
-			break;
+			return param;
 	}
 
-	if (!param) {
-		printk(KERN_ERR "Unable to locate key \"%s\".\n", key);
-		return NULL;
-	}
-
-	return param;
+	printk(KERN_ERR "Unable to locate key \"%s\".\n", key);
+	return NULL;
 }
 
 int iscsi_extract_key_value(char *textbuf, char **key, char **value)

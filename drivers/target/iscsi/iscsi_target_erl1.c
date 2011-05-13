@@ -509,8 +509,9 @@ int iscsit_handle_status_snack(
 	u32 begrun,
 	u32 runlength)
 {
-	u32 last_statsn;
 	struct iscsi_cmd *cmd = NULL;
+	u32 last_statsn;
+	int found_cmd;
 
 	if (conn->exp_statsn > begrun) {
 		printk(KERN_ERR "Got Status SNACK Begrun: 0x%08x, RunLength:"
@@ -523,14 +524,18 @@ int iscsit_handle_status_snack(
 	last_statsn = (!runlength) ? conn->stat_sn : (begrun + runlength);
 
 	while (begrun < last_statsn) {
+		found_cmd = 0;
+
 		spin_lock_bh(&conn->cmd_lock);
 		list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
-			if (cmd->stat_sn == begrun)
+			if (cmd->stat_sn == begrun) {
+				found_cmd = 1;
 				break;
+			}	
 		}
 		spin_unlock_bh(&conn->cmd_lock);
 
-		if (!cmd) {
+		if (!found_cmd) {
 			printk(KERN_ERR "Unable to find StatSN: 0x%08x for"
 				" a Status SNACK, assuming this was a"
 				" protactic SNACK for an untransmitted"
@@ -1137,22 +1142,20 @@ static int iscsit_set_dataout_timeout_values(
 		return -1;
 	}
 
-	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list)
-		if (r2t->sent_r2t && !r2t->recovery_r2t && !r2t->seq_complete)
-			break;
-
-	if (!r2t) {
-		printk(KERN_ERR "Unable to locate any incomplete DataOUT"
-			" sequences for ITT: 0x%08x.\n", cmd->init_task_tag);
-		spin_unlock_bh(&cmd->r2t_lock);
-		return -1;
+	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
+		if (r2t->sent_r2t && !r2t->recovery_r2t && !r2t->seq_complete) {
+			*offset = r2t->offset;
+			*length = r2t->xfer_len;
+			spin_unlock_bh(&cmd->r2t_lock);
+			return 0;
+		}
 	}
-
-	*offset = r2t->offset;
-	*length = r2t->xfer_len;
-
 	spin_unlock_bh(&cmd->r2t_lock);
-	return 0;
+
+	printk(KERN_ERR "Unable to locate any incomplete DataOUT"
+		" sequences for ITT: 0x%08x.\n", cmd->init_task_tag);
+
+	return -1;
 }
  
 /*

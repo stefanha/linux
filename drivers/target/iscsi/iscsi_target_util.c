@@ -85,18 +85,16 @@ struct iscsi_r2t *iscsit_get_r2t_for_eos(
 	spin_lock_bh(&cmd->r2t_lock);
 	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
 		if ((r2t->offset <= offset) &&
-		    (r2t->offset + r2t->xfer_len) >= (offset + length))
-			break;
+		    (r2t->offset + r2t->xfer_len) >= (offset + length)) {
+			spin_unlock_bh(&cmd->r2t_lock);
+			return r2t;
+		}
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
-	if (!r2t) {
-		printk(KERN_ERR "Unable to locate R2T for Offset: %u, Length:"
-				" %u\n", offset, length);
-		return NULL;
-	}
-
-	return r2t;
+	printk(KERN_ERR "Unable to locate R2T for Offset: %u, Length:"
+			" %u\n", offset, length);
+	return NULL;
 }
 
 struct iscsi_r2t *iscsit_get_r2t_from_list(struct iscsi_cmd *cmd)
@@ -105,18 +103,16 @@ struct iscsi_r2t *iscsit_get_r2t_from_list(struct iscsi_cmd *cmd)
 
 	spin_lock_bh(&cmd->r2t_lock);
 	list_for_each_entry(r2t, &cmd->cmd_r2t_list, r2t_list) {
-		if (!r2t->sent_r2t)
-			break;
+		if (!r2t->sent_r2t) {
+			spin_unlock_bh(&cmd->r2t_lock);
+			return r2t;
+		}
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
-	if (!r2t) {
-		printk(KERN_ERR "Unable to locate next R2T to send for ITT:"
+	printk(KERN_ERR "Unable to locate next R2T to send for ITT:"
 			" 0x%08x.\n", cmd->init_task_tag);
-		return NULL;
-	}
-
-	return r2t;
+	return NULL;
 }
 
 /*
@@ -545,18 +541,16 @@ struct iscsi_cmd *iscsit_find_cmd_from_itt(
 
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
-		if (cmd->init_task_tag == init_task_tag)
-			break;
+		if (cmd->init_task_tag == init_task_tag) {
+			spin_unlock_bh(&conn->cmd_lock);
+			return cmd;
+		}
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
-	if (!cmd) {
-		printk(KERN_ERR "Unable to locate ITT: 0x%08x on CID: %hu",
+	printk(KERN_ERR "Unable to locate ITT: 0x%08x on CID: %hu",
 			init_task_tag, conn->cid);
-		return NULL;
-	}
-
-	return cmd;
+	return NULL;
 }
 
 struct iscsi_cmd *iscsit_find_cmd_from_itt_or_dump(
@@ -568,20 +562,19 @@ struct iscsi_cmd *iscsit_find_cmd_from_itt_or_dump(
 
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
-		if (cmd->init_task_tag == init_task_tag)
-			break;
+		if (cmd->init_task_tag == init_task_tag) {
+			spin_unlock_bh(&conn->cmd_lock);
+			return cmd;
+		}
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
-	if (!cmd) {
-		printk(KERN_ERR "Unable to locate ITT: 0x%08x on CID: %hu,"
+	printk(KERN_ERR "Unable to locate ITT: 0x%08x on CID: %hu,"
 			" dumping payload\n", init_task_tag, conn->cid);
-		if (length)
-			iscsit_dump_data_payload(conn, length, 1);
-		return NULL;
-	}
+	if (length)
+		iscsit_dump_data_payload(conn, length, 1);
 
-	return cmd;
+	return NULL;
 }
 
 struct iscsi_cmd *iscsit_find_cmd_from_ttt(
@@ -592,18 +585,16 @@ struct iscsi_cmd *iscsit_find_cmd_from_ttt(
 
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry(cmd, &conn->conn_cmd_list, i_list) {
-		if (cmd->targ_xfer_tag == targ_xfer_tag)
-			break;
+		if (cmd->targ_xfer_tag == targ_xfer_tag) {
+			spin_unlock_bh(&conn->cmd_lock);
+			return cmd;
+		}
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
-	if (!cmd) {
-		printk(KERN_ERR "Unable to locate TTT: 0x%08x on CID: %hu\n",
+	printk(KERN_ERR "Unable to locate TTT: 0x%08x on CID: %hu\n",
 			targ_xfer_tag, conn->cid);
-		return NULL;
-	}
-
-	return cmd;
+	return NULL;
 }
 
 int iscsit_find_cmd_for_recovery(
@@ -612,10 +603,8 @@ int iscsit_find_cmd_for_recovery(
 	struct iscsi_conn_recovery **cr_ptr,
 	u32 init_task_tag)
 {
-	int found_itt = 0;
 	struct iscsi_cmd *cmd = NULL;
 	struct iscsi_conn_recovery *cr;
-
 	/*
 	 * Scan through the inactive connection recovery list's command list.
 	 * If init_task_tag matches the command is still alligent.
@@ -625,24 +614,17 @@ int iscsit_find_cmd_for_recovery(
 		spin_lock(&cr->conn_recovery_cmd_lock);
 		list_for_each_entry(cmd, &cr->conn_recovery_cmd_list, i_list) {
 			if (cmd->init_task_tag == init_task_tag) {
-				found_itt = 1;
-				break;
+				spin_unlock(&cr->conn_recovery_cmd_lock);
+				spin_unlock(&sess->cr_i_lock);
+
+				*cr_ptr = cr;
+				*cmd_ptr = cmd;
+				return -2;
 			}
 		}
 		spin_unlock(&cr->conn_recovery_cmd_lock);
-		if (found_itt)
-			break;
 	}
 	spin_unlock(&sess->cr_i_lock);
-
-	if (cmd) {
-		*cr_ptr = cr;
-		*cmd_ptr = cmd;
-		return -2;
-	}
-
-	found_itt = 0;
-
 	/*
 	 * Scan through the active connection recovery list's command list.
 	 * If init_task_tag matches the command is ready to be reassigned.
@@ -652,23 +634,19 @@ int iscsit_find_cmd_for_recovery(
 		spin_lock(&cr->conn_recovery_cmd_lock);
 		list_for_each_entry(cmd, &cr->conn_recovery_cmd_list, i_list) {
 			if (cmd->init_task_tag == init_task_tag) {
-				found_itt = 1;
-				break;
+				spin_unlock(&cr->conn_recovery_cmd_lock);
+				spin_unlock(&sess->cr_a_lock);
+
+				*cr_ptr = cr;
+				*cmd_ptr = cmd;
+				return 0;
 			}
 		}
 		spin_unlock(&cr->conn_recovery_cmd_lock);
-		if (found_itt)
-			break;
 	}
 	spin_unlock(&sess->cr_a_lock);
 
-	if (!cmd || !cr)
-		return -1;
-
-	*cr_ptr = cr;
-	*cmd_ptr = cmd;
-
-	return 0;
+	return -1;
 }
 
 void iscsit_add_cmd_to_immediate_queue(
