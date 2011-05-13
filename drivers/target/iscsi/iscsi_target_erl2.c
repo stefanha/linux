@@ -117,12 +117,14 @@ struct iscsi_conn_recovery *iscsit_get_inactive_connection_recovery_entry(
 
 	spin_lock(&sess->cr_i_lock);
 	list_for_each_entry(cr, &sess->cr_inactive_list, cr_list) {
-		if (cr->cid == cid)
-			break;
+		if (cr->cid == cid) {
+			spin_unlock(&sess->cr_i_lock);
+			return cr;
+		}
 	}
 	spin_unlock(&sess->cr_i_lock);
 
-	return (cr) ? cr : NULL;
+	return NULL;
 }
 
 void iscsit_free_connection_recovery_entires(struct iscsi_session *sess)
