@@ -347,7 +347,7 @@ static int vhost_scsi_open(struct inode *inode, struct file *f)
 	struct vhost_scsi *s;
 	int r;
 
-	s = kmalloc(sizeof(*s), GFP_KERNEL);
+	s = kzalloc(sizeof(*s), GFP_KERNEL);
 	if (!s)
 		return -ENOMEM;
 
