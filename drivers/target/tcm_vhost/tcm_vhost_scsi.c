@@ -393,10 +393,11 @@ static long vhost_scsi_ioctl(struct file *f, unsigned int ioctl,
 
 		return vhost_scsi_clear_endpoint(vs, &backend);
 	default:
-		return -ENOSYS;
+		mutex_lock(&vs->dev.mutex);
+		r = vhost_dev_ioctl(&vs->dev, ioctl, arg);
+		mutex_unlock(&vs->dev.mutex);
+		return r;
 	}
-
-	return 0;
 }
 
 static const struct file_operations vhost_scsi_fops = {
