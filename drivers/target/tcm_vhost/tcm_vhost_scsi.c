@@ -371,6 +371,23 @@ static int vhost_scsi_release(struct inode *inode, struct file *f)
 	return 0;
 }
 
+static int vhost_scsi_set_features(struct vhost_scsi *vs, u64 features)
+{
+	if (features & ~VHOST_FEATURES)
+		return -EOPNOTSUPP;
+
+	mutex_lock(&vs->dev.mutex);
+	if ((features & (1 << VHOST_F_LOG_ALL)) &&
+	    !vhost_log_access_ok(&vs->dev)) {
+		mutex_unlock(&vs->dev.mutex);
+		return -EFAULT;
+	}
+	vs->dev.acked_features = features;
+	/* TODO possibly smp_wmb() and flush vqs */
+	mutex_unlock(&vs->dev.mutex);
+	return 0;
+}
+
 static long vhost_scsi_ioctl(struct file *f, unsigned int ioctl,
 				unsigned long arg)
 {
@@ -392,6 +409,15 @@ static long vhost_scsi_ioctl(struct file *f, unsigned int ioctl,
 			return -EFAULT;
 
 		return vhost_scsi_clear_endpoint(vs, &backend);
+	case VHOST_GET_FEATURES:
+		features = VHOST_FEATURES;
+		if (copy_to_user(featurep, &features, sizeof features))
+			return -EFAULT;
+		return 0;
+	case VHOST_SET_FEATURES:
+		if (copy_from_user(&features, featurep, sizeof features))
+			return -EFAULT;
+		return vhost_scsi_set_features(vs, features);
 	default:
 		mutex_lock(&vs->dev.mutex);
 		r = vhost_dev_ioctl(&vs->dev, ioctl, arg);
