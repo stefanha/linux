@@ -349,6 +349,7 @@ static int vhost_scsi_open(struct inode *inode, struct file *f)
 	if (!s)
 		return -ENOMEM;
 
+	s->cmd_vq.handle_kick = vhost_scsi_handle_kick;
 	r = vhost_dev_init(&s->dev, &s->cmd_vq, 1);
 	if (r < 0) {
 		kfree(s);
