@@ -164,7 +164,8 @@ int vhost_log_write(struct vhost_virtqueue *vq, struct vhost_log *log,
 enum {
 	VHOST_FEATURES = (1 << VIRTIO_F_NOTIFY_ON_EMPTY) |
 			 (1 << VIRTIO_RING_F_INDIRECT_DESC) |
-			 (1 << VHOST_F_LOG_ALL) |
+			 (1 << VHOST_F_LOG_ALL),
+	VHOST_NET_FEATURES = VHOST_FEATURES |
 			 (1 << VHOST_NET_F_VIRTIO_NET_HDR) |
 			 (1 << VIRTIO_NET_F_MRG_RXBUF),
 };
