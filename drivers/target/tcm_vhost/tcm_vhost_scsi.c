@@ -331,7 +331,9 @@ static int vhost_scsi_clear_endpoint(
 	    (tv_tpg->tport_tpgt != t->vhost_tpgt)) {
 		mutex_unlock(&vq->mutex);
 		printk(KERN_WARNING "tv_tport->tport_name: %s, tv_tpg->tport_tpgt: %hu"
-			" does not match t->vhost_wwpn: %s, t->vhost_tpgt: %hu\n");
+			" does not match t->vhost_wwpn: %s, t->vhost_tpgt: %hu\n",
+			tv_tport->tport_name, tv_tpg->tport_tpgt,
+			t->vhost_wwpn, t->vhost_tpgt);
 		return -EINVAL;
 	}
 	vs->vs_tpg = NULL;
