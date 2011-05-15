@@ -123,14 +123,10 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 	struct tcm_vhost_tpg *tv_tpg;
 	struct tcm_vhost_cmd *tv_cmd;
 	unsigned char *cdb;
-	void *private;
 	u32 exp_data_len, data_direction;
 	unsigned out, in;
 	int head;
 
-	private = rcu_dereference_check(vq->private_data, 1);
-	if (!private)
-		return;
 
 	mutex_lock(&vq->mutex);
 	vhost_disable_notify(vq);
