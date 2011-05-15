@@ -10,12 +10,12 @@ nod /dev/urandom 0666 0 0 c 1 9
 nod /dev/zero 0666 0 0 c 1 5
 dir /lib 0755 0 0
 slink /lib64 /lib 0755 0 0
-file /lib/libm-2.11.2.so /lib/libm-2.11.2.so 0644 0 0
-slink /lib/libm.so.6 libm-2.11.2.so 0644 0 0
-file /lib/libc-2.11.2.so /lib/libc-2.11.2.so 0755 0 0
-slink /lib/libc.so.6 libc-2.11.2.so 0755 0 0
-file /lib/ld-2.11.2.so /lib/ld-2.11.2.so 0755 0 0
-slink /lib/ld-linux-x86-64.so.2 ld-2.11.2.so 0755 0 0
+file /lib/libm-2.13.so /lib/libm-2.13.so 0644 0 0
+slink /lib/libm.so.6 libm-2.13.so 0644 0 0
+file /lib/libc-2.13.so /lib/libc-2.13.so 0755 0 0
+slink /lib/libc.so.6 libc-2.13.so 0755 0 0
+file /lib/ld-2.13.so /lib/ld-2.13.so 0755 0 0
+slink /lib/ld-linux-x86-64.so.2 ld-2.13.so 0755 0 0
 dir /lib/modules 0755 0 0
 dir /lib/modules/KERNELRELEASE 0755 0 0
 dir /sbin 0755 0 0

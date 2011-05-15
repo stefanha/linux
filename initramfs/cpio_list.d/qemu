@@ -1,9 +1,9 @@
-file /lib/librt-2.11.2.so /lib/librt-2.11.2.so 0644 0 0
-slink /lib/librt.so.1 librt-2.11.2.so 0644 0 0
-file /lib/libpthread-2.11.2.so /lib/libpthread-2.11.2.so 0644 0 0
-slink /lib/libpthread.so.0 libpthread-2.11.2.so  0644 0 0
-file /lib/libutil-2.11.2.so /lib/libutil-2.11.2.so 0644 0 0
-slink /lib/libutil.so.1 libutil-2.11.2.so 0644 0 0
+file /lib/librt-2.13.so /lib/librt-2.13.so 0644 0 0
+slink /lib/librt.so.1 librt-2.13.so 0644 0 0
+file /lib/libpthread-2.13.so /lib/libpthread-2.13.so 0644 0 0
+slink /lib/libpthread.so.0 libpthread-2.13.so  0644 0 0
+file /lib/libutil-2.13.so /lib/libutil-2.13.so 0644 0 0
+slink /lib/libutil.so.1 libutil-2.13.so 0644 0 0
 file /usr/lib/libz.so.1.2.3.4 /usr/lib/libz.so.1.2.3.4 0644 0 0
 slink /usr/lib/libz.so libz.so.1.2.3.4 0644 0 0
 slink /usr/lib/libz.so.1 libz.so.1.2.3.4 0644 0 0
