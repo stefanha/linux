@@ -230,20 +230,6 @@ int vhost_scsi_dev_index_release(struct tcm_vhost_tpg *tv_tpg, u32 dev_index)
 	return -ENOSYS;
 }
 
-static void vhost_scsi_disable_vq(struct vhost_scsi *vs)
-{
-	struct vhost_virtqueue *vq = &vs->cmd_vq;
-
-	vhost_poll_stop(&vq->poll);
-}
-
-static void vhost_scsi_enable_vq(struct vhost_scsi *vs)
-{
-	struct vhost_virtqueue *vq = &vs->cmd_vq;
-
-	vhost_poll_start(&vq->poll, vq->kick);
-}
-
 /*
  * Called from vhost_scsi_ioctl() context to walk the list of available tcm_vhost_tpg
  * with an active struct tcm_vhost_nexus
