@@ -868,7 +868,7 @@ fail:
 static int __iscsi_target_login_thread(struct iscsi_np *np)
 {
 	u8 buffer[ISCSI_HDR_LEN], iscsi_opcode, zero_tsih = 0;
-	int err, ret = 0, ip_proto, sock_type, set_sctp_conn_flag;
+	int err, ret = 0, ip_proto, sock_type, set_sctp_conn_flag, stop;
 	struct iscsi_conn *conn = NULL;
 	struct iscsi_login *login;
 	struct iscsi_portal_group *tpg = NULL;
@@ -1195,8 +1195,14 @@ old_sess_out:
 	}
 
 out:
+	stop = kthread_should_stop();
+	if (!stop && signal_pending(current)) {
+		spin_lock_bh(&np->np_thread_lock);
+		stop = (np->np_thread_state == ISCSI_NP_THREAD_SHUTDOWN);
+		spin_unlock_bh(&np->np_thread_lock);
+	}
 	/* Wait for another socket.. */
-	if (!signal_pending(current) || !kthread_should_stop())
+	if (!stop)
 		return 1;
 
 	iscsi_stop_login_thread_timer(np);
