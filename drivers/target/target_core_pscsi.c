@@ -1051,7 +1051,7 @@ static void pscsi_bi_endio(struct bio *bio, int error)
 	bio_put(bio);
 }
 
-static inline struct bio *pscsi_get_bio(struct pscsi_dev_virt *pdv, int sg_num)
+static inline struct bio *pscsi_get_bio(int sg_num)
 {
 	struct bio *bio;
 	/*
@@ -1124,7 +1124,7 @@ static int __pscsi_map_task_SG(
 				/*
 				 * Calls bio_kmalloc() and sets bio->bi_end_io()
 				 */
-				bio = pscsi_get_bio(pdv, nr_vecs);
+				bio = pscsi_get_bio(nr_vecs);
 				if (!(bio))
 					goto fail;
 
