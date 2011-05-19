@@ -25,7 +25,6 @@
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_tcq.h>
-#include <scsi/libsas.h> /* For TASK_ATTR_* */
 #include <target/target_core_base.h>
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
@@ -69,19 +68,7 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 	/*
 	 * Locate the SAM Task Attr from virtio_scsi_cmd_header
 	 */
-	switch (v_header->task_attr) {
-	case MSG_HEAD_TAG:
-		sam_task_attr = TASK_ATTR_HOQ;
-		break;
-	case MSG_ORDERED_TAG:
-		sam_task_attr = TASK_ATTR_ORDERED;
-		break;
-	case MSG_SIMPLE_TAG:
-		/* Fall through */
-	default:
-		sam_task_attr = TASK_ATTR_SIMPLE;
-		break;
-	}
+	sam_task_attr = v_header->task_attr;
 	/*
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */

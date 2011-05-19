@@ -19,7 +19,7 @@
  ******************************************************************************/
 
 #include <linux/list.h>
-#include <scsi/libsas.h> /* For TASK_ATTR_* */
+#include <scsi/scsi_tcq.h>
 #include <scsi/iscsi_proto.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
@@ -187,17 +187,17 @@ struct iscsi_cmd *iscsit_allocate_se_cmd(
 	 */
 	if ((iscsi_task_attr == ISCSI_ATTR_UNTAGGED) ||
 	    (iscsi_task_attr == ISCSI_ATTR_SIMPLE))
-		sam_task_attr = TASK_ATTR_SIMPLE;
+		sam_task_attr = MSG_SIMPLE_TAG;
 	else if (iscsi_task_attr == ISCSI_ATTR_ORDERED)
-		sam_task_attr = TASK_ATTR_ORDERED;
+		sam_task_attr = MSG_ORDERED_TAG;
 	else if (iscsi_task_attr == ISCSI_ATTR_HEAD_OF_QUEUE)
-		sam_task_attr = TASK_ATTR_HOQ;
+		sam_task_attr = MSG_HEAD_TAG;
 	else if (iscsi_task_attr == ISCSI_ATTR_ACA)
-		sam_task_attr = TASK_ATTR_ACA;
+		sam_task_attr = MSG_ACA_TAG;
 	else {
 		printk(KERN_INFO "Unknown iSCSI Task Attribute: 0x%02x, using"
-			" TASK_ATTR_SIMPLE\n", iscsi_task_attr);
-		sam_task_attr = TASK_ATTR_SIMPLE;
+			" MSG_SIMPLE_TAG\n", iscsi_task_attr);
+		sam_task_attr = MSG_SIMPLE_TAG;
 	}
 
 	se_cmd = &cmd->se_cmd;
@@ -243,7 +243,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(
 	 */
 	transport_init_se_cmd(se_cmd, &lio_target_fabric_configfs->tf_ops,
 				conn->sess->se_sess, 0, DMA_NONE,
-				TASK_ATTR_SIMPLE, &cmd->sense_buffer[0]);
+				MSG_SIMPLE_TAG, &cmd->sense_buffer[0]);
 
 	switch (function) {
 	case ISCSI_TM_FUNC_ABORT_TASK:

@@ -35,6 +35,7 @@
 #include <asm/unaligned.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_tcq.h>
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 #include <target/target_core_fabric_ops.h>
@@ -3022,24 +3023,24 @@ static inline int qla_tgt_get_fcp_task_attr(uint8_t task_codes)
 
 	switch (task_codes) {
         case ATIO_SIMPLE_QUEUE:
-                fcp_task_attr = FCP_PTA_SIMPLE;
+                fcp_task_attr = MSG_SIMPLE_TAG;
                 break;
         case ATIO_HEAD_OF_QUEUE:
-                fcp_task_attr = FCP_PTA_HEADQ;
+                fcp_task_attr = MSG_HEAD_TAG;
                 break;
         case ATIO_ORDERED_QUEUE:
-                fcp_task_attr = FCP_PTA_ORDERED;
+                fcp_task_attr = MSG_ORDERED_TAG;
                 break;
         case ATIO_ACA_QUEUE:
-		fcp_task_attr = FCP_PTA_ACA;
+		fcp_task_attr = MSG_ACA_TAG;
 		break;
         case ATIO_UNTAGGED:
-                fcp_task_attr = FCP_PTA_SIMPLE;
+                fcp_task_attr = MSG_SIMPLE_TAG;
                 break;
         default:
                 printk(KERN_WARNING "qla_target: unknown task code %x, use "
                         "ORDERED instead\n", task_codes);
-                fcp_task_attr = FCP_PTA_ORDERED;
+                fcp_task_attr = MSG_ORDERED_TAG;
                 break;
         }
 
