@@ -216,8 +216,7 @@ static int transport_generic_remove(struct se_cmd *cmd,
 		int release_to_pool, int session_reinstatement);
 static int transport_cmd_get_valid_sectors(struct se_cmd *cmd);
 static int transport_map_sg_to_mem(struct se_cmd *cmd,
-		struct list_head *se_mem_list, struct scatterlist *sgl,
-		u32 *se_mem_cnt);
+		struct list_head *se_mem_list, struct scatterlist *sgl);
 static void transport_memcpy_se_mem_read_contig(unsigned char *dst,
 		struct list_head *se_mem_list, u32 len);
 static void transport_release_fe_cmd(struct se_cmd *cmd);
@@ -3917,7 +3916,6 @@ int transport_generic_map_mem_to_cmd(
 	struct scatterlist *sgl_bidi,
 	u32 sgl_bidi_count)
 {
-	u32 mapped_sg_count = 0;
 	int ret;
 
 	if (!sgl || !sgl_count)
@@ -3933,24 +3931,20 @@ int transport_generic_map_mem_to_cmd(
 		 * processed into a TCM struct se_subsystem_dev, we do the mapping
 		 * from the passed physical memory to struct se_mem->se_page here.
 		 */
-		ret = transport_map_sg_to_mem(cmd,
-			&cmd->t_mem_list, sgl, &mapped_sg_count);
+		ret = transport_map_sg_to_mem(cmd, &cmd->t_mem_list, sgl);
 		if (ret < 0)
 			return -ENOMEM;
 
-		cmd->t_tasks_se_num = mapped_sg_count;
+		cmd->t_tasks_se_num = ret;
 		/*
 		 * Setup BIDI READ list of struct se_mem elements
 		 */
 		if (sgl_bidi && sgl_bidi_count) {
-			mapped_sg_count = 0;
-			ret = transport_map_sg_to_mem(cmd,
-				&cmd->t_mem_bidi_list, sgl_bidi,
-				&mapped_sg_count);
+			ret = transport_map_sg_to_mem(cmd, &cmd->t_mem_bidi_list, sgl_bidi);
 			if (ret < 0)
 				return -ENOMEM;
 
-			cmd->t_tasks_se_bidi_num = mapped_sg_count;
+			cmd->t_tasks_se_bidi_num = ret;
 		}
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
 
@@ -4257,11 +4251,11 @@ static inline sector_t transport_limit_task_sectors(
 static int transport_map_sg_to_mem(
 	struct se_cmd *cmd,
 	struct list_head *se_mem_list,
-	struct scatterlist *sg,
-	u32 *sg_count)
+	struct scatterlist *sg)
 {
 	struct se_mem *se_mem;
 	u32 cmd_size = cmd->data_length;
+	int sg_count = 0;
 
 	WARN_ON(!sg);
 
@@ -4291,7 +4285,7 @@ static int transport_map_sg_to_mem(
 			se_mem->se_len = cmd_size;
 
 		cmd_size -= se_mem->se_len;
-		(*sg_count)++;
+		sg_count++;
 
 		DEBUG_MEM("sg_to_mem: *sg_count: %u cmd_size: %u\n",
 				*sg_count, cmd_size);
@@ -4304,7 +4298,7 @@ static int transport_map_sg_to_mem(
 	DEBUG_MEM("task[0] - Mapped(%u) struct scatterlist segments to(%u)"
 		" struct se_mem\n", sg_count, *se_mem_cnt);
 
-	return 0;
+	return sg_count;
 }
 
 /*	transport_map_mem_to_sg():
