@@ -41,7 +41,7 @@
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/atomic.h>
-#include <scsi/libsas.h> /* TASK_ATTR_* */
+#include <scsi/scsi_tcq.h>
 #include <target/configfs_macros.h>
 #include <target/target_core_base.h>
 #include <target/target_core_base.h>
@@ -1767,17 +1767,17 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 
 	switch (srp_cmd->task_attr) {
 	case SRP_CMD_SIMPLE_Q:
-		cmd->sam_task_attr = TASK_ATTR_SIMPLE;
+		cmd->sam_task_attr = MSG_SIMPLE_TAG;
 		break;
 	case SRP_CMD_ORDERED_Q:
 	default:
-		cmd->sam_task_attr = TASK_ATTR_ORDERED;
+		cmd->sam_task_attr = MSG_ORDERED_TAG;
 		break;
 	case SRP_CMD_HEAD_OF_Q:
-		cmd->sam_task_attr = TASK_ATTR_HOQ;
+		cmd->sam_task_attr = MSG_HEAD_TAG;
 		break;
 	case SRP_CMD_ACA:
-		cmd->sam_task_attr = TASK_ATTR_ACA;
+		cmd->sam_task_attr = MSG_ACA_TAG;
 		break;
 	}
 
@@ -1978,7 +1978,7 @@ static void srpt_handle_new_iu(struct srpt_rdma_ch *ch,
 	}
 
 	transport_init_se_cmd(&send_ioctx->cmd, &srpt_target->tf_ops, ch->sess,
-			      0, DMA_NONE, TASK_ATTR_SIMPLE,
+			      0, DMA_NONE, MSG_SIMPLE_TAG,
 			      send_ioctx->sense_data);
 
 	switch (srp_cmd->opcode) {
