@@ -328,10 +328,8 @@ static struct se_device *pscsi_add_device_to_list(
 	q = sd->request_queue;
 	limits = &dev_limits.limits;
 	limits->logical_block_size = sd->sector_size;
-	limits->max_hw_sectors = (sd->host->max_sectors > queue_max_hw_sectors(q)) ?
-				  queue_max_hw_sectors(q) : sd->host->max_sectors;
-	limits->max_sectors = (sd->host->max_sectors > queue_max_sectors(q)) ?
-				  queue_max_sectors(q) : sd->host->max_sectors;
+	limits->max_hw_sectors = min_t(int, sd->host->max_sectors, queue_max_hw_sectors(q));
+	limits->max_sectors = min_t(int, sd->host->max_sectors, queue_max_sectors(q));
 	dev_limits.hw_queue_depth = sd->queue_depth;
 	dev_limits.queue_depth = sd->queue_depth;
 	/*
