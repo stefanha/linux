@@ -207,7 +207,7 @@ static int __transport_execute_tasks(struct se_device *dev);
 static void transport_complete_task_attr(struct se_cmd *cmd);
 static void transport_direct_request_timeout(struct se_cmd *cmd);
 static void transport_free_dev_tasks(struct se_cmd *cmd);
-static u32 transport_generic_get_cdb_count(struct se_cmd *cmd,
+static u32 transport_allocate_tasks(struct se_cmd *cmd,
 		unsigned long long starting_lba, u32 sectors,
 		enum dma_data_direction data_direction,
 		struct list_head *mem_list, int set_counts);
@@ -4019,7 +4019,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 		 */
 		if (!list_empty(&cmd->t_mem_bidi_list) &&
 		    (dev->transport->transport_type != TRANSPORT_PLUGIN_PHBA_PDEV)) {
-			rc = transport_generic_get_cdb_count(cmd,
+			rc = transport_allocate_tasks(cmd,
 				cmd->t_task_lba,
 				transport_cmd_get_valid_sectors(cmd),
 				DMA_FROM_DEVICE, &cmd->t_mem_bidi_list,
@@ -4036,7 +4036,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 		 * Setup the tasks and memory from cmd->t_mem_list
 		 * Note for BIDI transfers this will contain the WRITE payload
 		 */
-		task_cdbs = transport_generic_get_cdb_count(cmd,
+		task_cdbs = transport_allocate_tasks(cmd,
 				cmd->t_task_lba,
 				transport_cmd_get_valid_sectors(cmd),
 				cmd->data_direction, &cmd->t_mem_list,
@@ -4569,7 +4569,7 @@ static int transport_do_se_mem_map(
 /*
  * Break up cmd into chunks transport can handle
  */
-static u32 transport_generic_get_cdb_count(
+static u32 transport_allocate_tasks(
 	struct se_cmd *cmd,
 	unsigned long long lba,
 	u32 sectors,
