@@ -37,7 +37,6 @@
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/libsrp.h>
-#include <scsi/libsas.h> /* For TASK_ATTR_* */
 #include <generated/utsrelease.h>
 
 #include <target/target_core_base.h>
@@ -856,18 +855,18 @@ static int tcm_queuecommand(struct ibmvscsis_adapter *adapter,
 
 	switch (cmd->task_attr) {
 	case SRP_SIMPLE_TASK:
-		attr = TASK_ATTR_SIMPLE;
+		attr = MSG_SIMPLE_TAG;
 		break;
 	case SRP_ORDERED_TASK:
-		attr = TASK_ATTR_ORDERED;
+		attr = MSG_ORDERED_TAG;
 		break;
 	case SRP_HEAD_TASK:
-		attr = TASK_ATTR_HOQ;
+		attr = MSG_HEAD_TAG;
 		break;
 	default:
 		printk(KERN_WARNING "Task attribute %d not supported\n",
 		       cmd->task_attr);
-		attr = TASK_ATTR_SIMPLE;
+		attr = MSG_SIMPLE_TAG;
 	}
 
 	data_len = srp_data_length(cmd, srp_cmd_direction(cmd));
