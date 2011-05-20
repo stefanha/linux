@@ -1151,20 +1151,21 @@ static int ibmvscsis_rdma(struct scsi_cmnd *sc, struct scatterlist *sg, int nsg,
 	struct iu_entry *iue = (struct iu_entry *) sc->SCp.ptr;
 	struct srp_target *target = iue->target;
 	struct ibmvscsis_adapter *adapter = target->ldata;
+	struct scatterlist *sgp = sg;
 	dma_addr_t token;
 	long err;
 	unsigned int done = 0;
 	int i, sidx, soff;
 
 	sidx = soff = 0;
-	token = sg_dma_address(sg + sidx);
+	token = sg_dma_address(sgp);
 
 	for (i = 0; i < nmd && rest; i++) {
 		unsigned int mdone, mlen;
 
 		mlen = min(rest, md[i].len);
 		for (mdone = 0; mlen;) {
-			int slen = min(sg_dma_len(sg + sidx) - soff, mlen);
+			int slen = min(sg_dma_len(sgp) - soff, mlen);
 
 			if (dir == DMA_TO_DEVICE)
 				err = h_copy_rdma(slen,
@@ -1190,14 +1191,15 @@ static int ibmvscsis_rdma(struct scsi_cmnd *sc, struct scatterlist *sg, int nsg,
 			soff += slen;
 			done += slen;
 
-			if (soff == sg_dma_len(sg + sidx)) {
+			if (soff == sg_dma_len(sgp)) {
 				sidx++;
+				sgp = sg_next(sgp);
 				soff = 0;
-				token = sg_dma_address(sg + sidx);
+				token = sg_dma_address(sgp);
 
 				if (sidx > nsg) {
-					printk(KERN_ERR "out of sg %p %d %d\n",
-						iue, sidx, nsg);
+					printk(KERN_ERR "out of iue %p sgp %p %d %d\n",
+						iue, sgp, sidx, nsg);
 					return -EIO;
 				}
 			}
