@@ -768,60 +768,40 @@ recalc:
 	lm->current_offset = 0;
 }
 
-static int iscsit_get_offset(
-	struct se_unmap_sg *usg)
+/*
+ * Find the first se_mem we should be using, based on the offset used so far.
+ * Update lmap to look at first se_mem with room, and the offset of unused room
+ * in it.
+ */
+static void iscsit_get_offset(struct se_unmap_sg *usg)
 {
 	struct se_offset_map *lmap = &usg->lmap;
-	u32 current_length = 0, current_iscsi_offset = lmap->iscsi_offset;
-	u32 total_offset = 0;
-	struct se_cmd *cmd = usg->se_cmd;
-	struct se_mem *se_mem;
+	struct se_mem *se_mem = NULL;
 
-	list_for_each_entry(se_mem, &cmd->t_mem_list, se_list)
-		break;
+	int offset = 0;
+	int found = 0;
+	int cur_se_mem_offset;
 
-	if (!se_mem) {
-		printk(KERN_ERR "Unable to locate se_mem from"
-				" cmd->t_mem_list\n");
-		return -1;
-	}
+	/* Burn through se_mems until the offset is consumed */
+	list_for_each_entry(se_mem, &usg->se_cmd->t_mem_list, se_list) {
 
-	/*
-	 * Locate the current offset from the passed iSCSI Offset.
-	 */
-	while (lmap->iscsi_offset != current_length) {
-		/*
-		 * The iSCSI Offset is within the current struct se_mem.
-		 *
-		 * Or:
-		 *
-		 * The iSCSI Offset is outside of the current struct se_mem.
-		 * Recalculate the values and obtain the next struct se_mem pointer.
-		 */
-		total_offset += se_mem->se_len;
-
-		if (total_offset > lmap->iscsi_offset) {
-			current_length += current_iscsi_offset;
-			lmap->orig_offset = lmap->current_offset =
-				usg->t_offset = current_iscsi_offset;
-		} else {
-			current_length += se_mem->se_len;
-			current_iscsi_offset -= se_mem->se_len;
-
-			list_for_each_entry_continue(se_mem,
-					&cmd->t_mem_list, se_list)
-				break;
-
-			if (!se_mem) {
-				printk(KERN_ERR "Unable to locate struct se_mem\n");
-				return -1;
-			}
+		if ((offset + se_mem->se_len) < lmap->iscsi_offset) {
+			found = 1;
+			break;
 		}
+
+		offset += se_mem->se_len;
 	}
+
+	BUG_ON(!found);
+
 	lmap->map_orig_se_mem = se_mem;
 	usg->cur_se_mem = se_mem;
 
-	return 0;
+	cur_se_mem_offset = (lmap->iscsi_offset - offset);
+	usg->t_offset = cur_se_mem_offset;
+	lmap->orig_offset = cur_se_mem_offset;
+	lmap->current_offset = cur_se_mem_offset;
 }
 
 static int iscsit_set_iovec_ptrs(
