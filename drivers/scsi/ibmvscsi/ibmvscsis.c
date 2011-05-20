@@ -1041,7 +1041,7 @@ static int ibmvscsis_inquiry(struct ibmvscsis_adapter *adapter,
 static int ibmvscsis_mode_sense(struct ibmvscsis_adapter *adapter,
 				struct srp_cmd *cmd, char *mode)
 {
-	int bytes;
+	int bytes = 0;
 	struct se_portal_group *se_tpg = &adapter->se_tpg;
 	u64 unpacked_lun;
 	struct se_lun *lun;
@@ -1053,7 +1053,7 @@ static int ibmvscsis_mode_sense(struct ibmvscsis_adapter *adapter,
 
 	lun = &se_tpg->tpg_lun_list[unpacked_lun];
 
-	blocks = TRANSPORT(lun->lun_se_dev)->get_blocks(lun->lun_se_dev);
+	blocks = lun->lun_se_dev->transport->get_blocks(lun->lun_se_dev);
 
 	spin_unlock(&se_tpg->tpg_lun_lock);
 
@@ -1258,19 +1258,19 @@ static int ibmvscsis_write_pending(struct se_cmd *se_cmd)
 	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(se_cmd);
 
-		sc->sdb.table.nents = T_TASK(se_cmd)->t_tasks_sg_chained_no;
-		sc->sdb.table.sgl = T_TASK(se_cmd)->t_tasks_sg_chained;
+		sc->sdb.table.nents = se_cmd->t_task.t_tasks_sg_chained_no;
+		sc->sdb.table.sgl = se_cmd->t_task.t_tasks_sg_chained;
 	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/*
 		 * Use T_TASK(se_cmd)->t_tasks_sg_bounce for control CDBs
 		 * using a contigious buffer
 		 */
-		sg_init_table(&T_TASK(se_cmd)->t_tasks_sg_bounce, 1);
-		sg_set_buf(&T_TASK(se_cmd)->t_tasks_sg_bounce,
-			T_TASK(se_cmd)->t_task_buf, se_cmd->data_length);
+		sg_init_table(&se_cmd->t_task.t_tasks_sg_bounce, 1);
+		sg_set_buf(&se_cmd->t_task.t_tasks_sg_bounce,
+			se_cmd->t_task.t_task_buf, se_cmd->data_length);
 
 		sc->sdb.table.nents = 1;
-		sc->sdb.table.sgl = &T_TASK(se_cmd)->t_tasks_sg_bounce;
+		sc->sdb.table.sgl = &se_cmd->t_task.t_tasks_sg_bounce;
 	}
 
 	ret = srp_transfer_data(sc, &vio_iu(iue)->srp.cmd,
@@ -1307,19 +1307,19 @@ static int ibmvscsis_queue_data_in(struct se_cmd *se_cmd)
 	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(se_cmd);
 
-		sc->sdb.table.nents = T_TASK(se_cmd)->t_tasks_sg_chained_no;
-		sc->sdb.table.sgl = T_TASK(se_cmd)->t_tasks_sg_chained;
+		sc->sdb.table.nents = se_cmd->t_task.t_tasks_sg_chained_no;
+		sc->sdb.table.sgl = se_cmd->t_task.t_tasks_sg_chained;
 	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
 		/*
 		 * Use T_TASK(se_cmd)->t_tasks_sg_bounce for control CDBs
 		 * using a contigious buffer
 		 */
-		sg_init_table(&T_TASK(se_cmd)->t_tasks_sg_bounce, 1);
-		sg_set_buf(&T_TASK(se_cmd)->t_tasks_sg_bounce,
-			T_TASK(se_cmd)->t_task_buf, se_cmd->data_length);
+		sg_init_table(&se_cmd->t_task.t_tasks_sg_bounce, 1);
+		sg_set_buf(&se_cmd->t_task.t_tasks_sg_bounce,
+			se_cmd->t_task.t_task_buf, se_cmd->data_length);
 
 		sc->sdb.table.nents = 1;
-		sc->sdb.table.sgl = &T_TASK(se_cmd)->t_tasks_sg_bounce;
+		sc->sdb.table.sgl = &se_cmd->t_task.t_tasks_sg_bounce;
 	}
 	/*
 	 * This will call srp_transfer_data() and post the response
@@ -1419,7 +1419,6 @@ static void handle_cmd_queue(struct ibmvscsis_adapter *adapter)
 {
 	struct srp_target *target = &adapter->srpt;
 	struct iu_entry *iue;
-	struct srp_cmd *cmd;
 	unsigned long flags;
 	int err;
 
@@ -1431,8 +1430,8 @@ retry:
 			spin_unlock_irqrestore(&target->lock, flags);
 			err = ibmvscsis_queuecommand(adapter, iue);
 			if (err) {
-				printk(KERN_ERR "cannot queue cmd %p %d\n",
-				       cmd, err);
+				printk(KERN_ERR "cannot queue iue %p %d\n",
+				       iue, err);
 				srp_iu_put(iue);
 			}
 			goto retry;
