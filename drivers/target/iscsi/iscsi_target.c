@@ -769,9 +769,9 @@ recalc:
 }
 
 static int iscsit_get_offset(
-	struct se_offset_map *lmap,
 	struct se_unmap_sg *usg)
 {
+	struct se_offset_map *lmap = &usg->lmap;
 	u32 current_length = 0, current_iscsi_offset = lmap->iscsi_offset;
 	u32 total_offset = 0;
 	struct se_cmd *cmd = usg->se_cmd;
@@ -859,7 +859,7 @@ static int iscsit_set_iovec_ptrs(
 	lmap->iscsi_offset = data_offset;
 	if (sg_kmap_active) {
 		unmap_sg->se_cmd = se_cmd;
-		iscsit_get_offset(lmap, unmap_sg);
+		iscsit_get_offset(unmap_sg);
 		unmap_sg->data_length = data_length;
 	} else {
 		lmap->current_offset = lmap->orig_offset;
