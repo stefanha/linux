@@ -685,7 +685,7 @@ int iscsit_add_reject_from_cmd(
 }
 
 static void iscsit_calculate_map_segment(
-	u32 *data_length,
+	u32 data_length,
 	struct se_offset_map *lm)
 {
 	u32 sg_offset = 0;
@@ -696,8 +696,8 @@ static void iscsit_calculate_map_segment(
 	if (!lm->map_reset) {
 		lm->iovec_length = (lm->sg_length > PAGE_SIZE) ?
 					PAGE_SIZE : lm->sg_length;
-		if (*data_length < lm->iovec_length)
-			lm->iovec_length = *data_length;
+		if (data_length < lm->iovec_length)
+			lm->iovec_length = data_length;
 
 		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 		return;
@@ -727,8 +727,8 @@ recalc:
 	if (!lm->current_offset) {
 		lm->iovec_base = page_address(lm->sg_page) + sg_offset;
 
-		if (*data_length < lm->iovec_length)
-			lm->iovec_length = *data_length;
+		if (data_length < lm->iovec_length)
+			lm->iovec_length = data_length;
 
 		return;
 	}
@@ -755,15 +755,15 @@ recalc:
 	lm->iovec_base += sg_offset;
 	lm->iovec_base += lm->current_offset;
 
-	if ((lm->iovec_length - lm->current_offset) < *data_length)
+	if ((lm->iovec_length - lm->current_offset) < data_length)
 		lm->iovec_length -= lm->current_offset;
 	else
-		lm->iovec_length = *data_length;
+		lm->iovec_length = data_length;
 
-	if ((lm->sg_length - lm->current_offset) < *data_length)
+	if ((lm->sg_length - lm->current_offset) < data_length)
 		lm->sg_length -= lm->current_offset;
 	else
-		lm->sg_length = *data_length;
+		lm->sg_length = data_length;
 
 	lm->current_offset = 0;
 }
@@ -872,7 +872,7 @@ static int iscsit_set_iovec_ptrs(
 		 * This function will return the expected iovec_base address
 		 * and iovec_length.
 		 */
-		iscsit_calculate_map_segment(&data_length, lmap);
+		iscsit_calculate_map_segment(data_length, lmap);
 
 		/*
 		 * Set the iov.iov_base and iov.iov_len from the current values
