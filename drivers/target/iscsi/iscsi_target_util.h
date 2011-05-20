@@ -20,15 +20,6 @@ struct se_offset_map {
 	void			*iovec_base;
 };
 
-struct se_map_sg {
-	int			sg_kmap_active:1;
-	u32			data_length;
-	u32			data_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct kvec		*iov;
-};
-
 struct se_unmap_sg {
 	u32			data_length;
 	u32			sg_count;

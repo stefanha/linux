@@ -825,22 +825,24 @@ static int iscsit_get_offset(
 }
 
 static int iscsit_set_iovec_ptrs(
-	struct se_map_sg *map_sg,
+	struct iscsi_cmd *cmd,
+	struct kvec *iov,
+	u32 data_offset,
+	u32 data_length,
+	int sg_kmap_active,
 	struct se_unmap_sg *unmap_sg)
 {
-	u32 i = 0 /* For iovecs */, j = 0 /* For scatterlists */;
-	struct se_cmd *cmd = map_sg->se_cmd;
-	struct iscsi_cmd *i_cmd = container_of(cmd, struct iscsi_cmd, se_cmd);
+	u32 i = 0; /* For iovecs */
+	u32 j = 0; /* For scatterlists */
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	struct se_offset_map *lmap = &unmap_sg->lmap;
-	struct kvec *iov = map_sg->iov;
 
 	/*
 	 * Used for non scatterlist operations, assume a single iovec.
 	 */
-	if (!cmd->t_tasks_se_num) {
-		iov[0].iov_base = (unsigned char *) cmd->t_task_buf +
-							map_sg->data_offset;
-		iov[0].iov_len  = map_sg->data_length;
+	if (!se_cmd->t_tasks_se_num) {
+		iov[0].iov_base = se_cmd->t_task_buf + data_offset;
+		iov[0].iov_len  = data_length;
 		return 1;
 	}
 
@@ -854,23 +856,23 @@ static int iscsit_set_iovec_ptrs(
 	 * Get a pointer to the first used scatterlist based on the passed
 	 * offset. Also set the rest of the needed values in iscsi_linux_map_t.
 	 */
-	lmap->iscsi_offset = map_sg->data_offset;
-	if (map_sg->sg_kmap_active) {
-		unmap_sg->se_cmd = map_sg->se_cmd;
+	lmap->iscsi_offset = data_offset;
+	if (sg_kmap_active) {
+		unmap_sg->se_cmd = se_cmd;
 		iscsit_get_offset(lmap, unmap_sg);
-		unmap_sg->data_length = map_sg->data_length;
+		unmap_sg->data_length = data_length;
 	} else {
 		lmap->current_offset = lmap->orig_offset;
 	}
 	lmap->map_se_mem = lmap->map_orig_se_mem;
 
-	while (map_sg->data_length) {
+	while (data_length) {
 		/*
 		 * Time to get the virtual address for use with iovec pointers.
 		 * This function will return the expected iovec_base address
 		 * and iovec_length.
 		 */
-		iscsit_calculate_map_segment(&map_sg->data_length, lmap);
+		iscsit_calculate_map_segment(&data_length, lmap);
 
 		/*
 		 * Set the iov.iov_base and iov.iov_len from the current values
@@ -886,13 +888,13 @@ static int iscsit_set_iovec_ptrs(
 		 * overflow the iovecs allocated for this command in the next
 		 * pass.
 		 */
-		map_sg->data_length -= iov[i].iov_len;
+		data_length -= iov[i].iov_len;
 		lmap->sg_length -= iov[i].iov_len;
 
-		if ((++i + 1) > i_cmd->orig_iov_data_count) {
+		if ((++i + 1) > cmd->orig_iov_data_count) {
 			printk(KERN_ERR "Current iovec count %u is greater than"
 				" struct se_cmd->orig_data_iov_count %u, cannot"
-				" continue.\n", i+1, i_cmd->orig_iov_data_count);
+				" continue.\n", i+1, cmd->orig_iov_data_count);
 			return -1;
 		}
 
@@ -900,7 +902,7 @@ static int iscsit_set_iovec_ptrs(
 		 * All done mapping this scatterlist's pages, move on to
 		 * the next scatterlist by setting lmap.map_reset = 1;
 		 */
-		if (!lmap->sg_length || !map_sg->data_length) {
+		if (!lmap->sg_length || !data_length) {
 			list_for_each_entry(lmap->map_se_mem,
 					&lmap->map_se_mem->se_list, se_list)
 				break;
@@ -1450,7 +1452,6 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 	u32 rx_size = 0, payload_length;
 	struct iscsi_cmd *cmd = NULL;
 	struct se_cmd *se_cmd;
-	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
 	struct iscsi_data *hdr;
 	struct kvec *iov;
@@ -1622,18 +1623,11 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 	rx_size += payload_length;
 	iov = &cmd->iov_data[0];
 
-	memset(&map_sg, 0, sizeof(struct se_map_sg));
 	memset(&unmap_sg, 0, sizeof(struct se_unmap_sg));
-	map_sg.fabric_cmd = (void *)cmd;
-	map_sg.se_cmd = SE_CMD(cmd);
-	map_sg.iov = iov;
-	map_sg.sg_kmap_active = 1;
-	map_sg.data_length = payload_length;
-	map_sg.data_offset = hdr->offset;
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = iscsit_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = iscsit_set_iovec_ptrs(cmd, iov, hdr->offset, payload_length, 1, &unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 
@@ -1665,19 +1659,13 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 	if (conn->conn_ops->DataDigest) {
 		u32 counter = payload_length, data_crc = 0;
 		struct kvec *iov_ptr = &cmd->iov_data[0];
+
 		/*
 		 * Thanks to the IP stack shitting on passed iovecs,  we have to
 		 * call set_iovec_data_ptrs() again in order to have a iMD/PSCSI
 		 * agnostic way of doing datadigests computations.
 		 */
-		memset(&map_sg, 0, sizeof(struct se_map_sg));
-		map_sg.fabric_cmd = (void *)cmd;
-		map_sg.se_cmd = SE_CMD(cmd);
-		map_sg.iov = iov_ptr;
-		map_sg.data_length = payload_length;
-		map_sg.data_offset = hdr->offset;
-
-		if (iscsit_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
+		if (iscsit_set_iovec_ptrs(cmd, iov_ptr, hdr->offset, payload_length, 0, &unmap_sg) < 0)
 			return -1;
 
 		iscsit_do_crypto_hash_iovec(&conn->conn_rx_hash,
@@ -2544,22 +2532,15 @@ static int iscsit_handle_immediate_data(
 	int iov_ret, rx_got = 0, rx_size = 0;
 	u32 checksum, iov_count = 0, padding = 0, pad_bytes = 0;
 	struct iscsi_conn *conn = cmd->conn;
-	struct se_map_sg map_sg;
 	struct se_unmap_sg unmap_sg;
 	struct kvec *iov;
 
-	memset(&map_sg, 0, sizeof(struct se_map_sg));
 	memset(&unmap_sg, 0, sizeof(struct se_unmap_sg));
-	map_sg.fabric_cmd = (void *)cmd;
-	map_sg.se_cmd = SE_CMD(cmd);
-	map_sg.sg_kmap_active = 1;
-	map_sg.iov = &cmd->iov_data[0];
-	map_sg.data_length = length;
-	map_sg.data_offset = cmd->write_data_done;
 	unmap_sg.fabric_cmd = (void *)cmd;
 	unmap_sg.se_cmd = SE_CMD(cmd);
 
-	iov_ret = iscsit_set_iovec_ptrs(&map_sg, &unmap_sg);
+	iov_ret = iscsit_set_iovec_ptrs(cmd, cmd->iov_data, cmd->write_data_done,
+					length, 1, &unmap_sg);
 	if (iov_ret < 0)
 		return IMMEDIATE_DATA_CANNOT_RECOVER;
 
@@ -2599,14 +2580,7 @@ static int iscsit_handle_immediate_data(
 		 * call set_iovec_data_ptrs again in order to have a iMD/PSCSI
 		 * agnostic way of doing datadigests computations.
 		 */
-		memset(&map_sg, 0, sizeof(struct se_map_sg));
-		map_sg.fabric_cmd = (void *)cmd;
-		map_sg.se_cmd = SE_CMD(cmd);
-		map_sg.iov = iov_ptr;
-		map_sg.data_length = length;
-		map_sg.data_offset = cmd->write_data_done;
-
-		if (iscsit_set_iovec_ptrs(&map_sg, &unmap_sg) < 0)
+		if (iscsit_set_iovec_ptrs(cmd, iov_ptr, cmd->write_data_done, length, 0, &unmap_sg) < 0)
 			return IMMEDIATE_DATA_CANNOT_RECOVER;
 
 		iscsit_do_crypto_hash_iovec(&conn->conn_rx_hash, iov_ptr,
@@ -2859,7 +2833,6 @@ static int iscsit_send_data_in(
 	u32 iov_count = 0, tx_size = 0;
 	struct iscsi_datain datain;
 	struct iscsi_datain_req *dr;
-	struct se_map_sg map_sg;
 	struct iscsi_data_rsp *hdr;
 	struct kvec *iov;
 
@@ -2958,15 +2931,8 @@ static int iscsit_send_data_in(
 			" for DataIN PDU 0x%08x\n", *header_digest);
 	}
 
-	memset(&map_sg, 0, sizeof(struct se_map_sg));
-	map_sg.fabric_cmd = (void *)cmd;
-	map_sg.se_cmd = SE_CMD(cmd);
-	map_sg.sg_kmap_active = 1;
-	map_sg.iov = &cmd->iov_data[1];
-	map_sg.data_length = datain.length;
-	map_sg.data_offset = datain.offset;
-
-	iov_ret = iscsit_set_iovec_ptrs(&map_sg, unmap_sg);
+	iov_ret = iscsit_set_iovec_ptrs(cmd, &cmd->iov_data[iov_count], datain.offset,
+					datain.length, 1, unmap_sg);
 	if (iov_ret < 0)
 		return -1;
 
