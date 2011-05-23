@@ -4292,7 +4292,8 @@ restart:
 		case ISCSI_OP_LOGOUT:
 			ret = iscsit_handle_logout_cmd(conn, buffer);
 			if (ret > 0) {
-				wait_for_completion(&conn->conn_logout_comp);
+				wait_for_completion_timeout(&conn->conn_logout_comp,
+						SECONDS_FOR_LOGOUT_COMP * HZ);
 				goto transport_err;
 			} else if (ret < 0)
 				goto transport_err;
