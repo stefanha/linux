@@ -1031,7 +1031,7 @@ target_emulate_write_same(struct se_task *task, int write_same32)
 		range = (dev->transport->get_blocks(dev) - lba);
 
 	printk(KERN_INFO "WRITE_SAME UNMAP: LBA: %llu Range: %llu\n",
-			 (unsigned long long)lba, range);
+		 (unsigned long long)lba, (unsigned long long)range);
 
 	ret = dev->transport->do_discard(dev, lba, range);
 	if (ret < 0) {
