@@ -979,6 +979,79 @@ static void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 	spin_unlock_bh(&conn->cmd_lock);
 }
 
+static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
+{
+	u32 length = cmd->se_cmd.data_length;
+	struct scatterlist *sgl;
+	int nents = DIV_ROUND_UP(length, PAGE_SIZE);
+	int i = 0;
+	void *buf;
+	void *cur;
+	struct page *page;
+
+	sgl = kzalloc(sizeof(*sgl) * nents, GFP_KERNEL);
+	if (!sgl)
+		return -ENOMEM;
+
+	/*
+	 * Allocate from slab if nonsg, but sgl should point
+	 * to the malloced mem.
+	 * We know we have to kfree it if t_task_buf is set.
+	 * Alloc pages if sg.
+	 */
+	if (cmd->se_cmd.se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
+
+		buf = kmalloc(length, GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+
+		cur = buf;
+		while (length) {
+			int buf_size = min_t(int, length, PAGE_SIZE);
+
+			sg_set_buf(&sgl[i], cur, buf_size);
+
+			length -= buf_size;
+			cur += buf_size;
+			i++;
+		}
+		cmd->se_cmd.t_task_buf = buf;
+		cmd->t_mem = buf;
+
+	} else {
+
+		while (length) {
+			int buf_size = min_t(int, length, PAGE_SIZE);
+
+			page = alloc_page(GFP_KERNEL);
+			if (!page)
+				goto page_alloc_failed;
+
+			sg_set_page(&sgl[i], page, buf_size, 0);
+
+			length -= buf_size;
+			i++;
+		}
+	}
+
+	cmd->t_mem_sg = sgl;
+	cmd->t_mem_sg_nents = nents;
+
+	/* BIDI ops not supported */
+
+	/* make se_mem list from the memory */
+	transport_generic_map_mem_to_cmd(&cmd->se_cmd, sgl, nents, NULL, 0);
+
+	return 0;
+
+page_alloc_failed:
+	while (i >= 0) {
+		__free_page(sg_page(&sgl[i]));
+		i--;
+	}
+	return -ENOMEM;
+}
+
 static int iscsit_handle_scsi_cmd(
 	struct iscsi_conn *conn,
 	unsigned char *buf)
@@ -1247,6 +1320,11 @@ attach_cmd:
 		immed_ret = IMMEDIATE_DATA_NORMAL_OPERATION;
 		dump_immediate_data = 1;
 		goto after_immediate_data;
+	}
+
+	ret = iscsit_alloc_buffs(cmd);
+	if (ret < 0) {
+		return ret;
 	}
 
 	/*

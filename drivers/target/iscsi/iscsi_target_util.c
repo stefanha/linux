@@ -812,6 +812,17 @@ void iscsit_release_cmd(struct iscsi_cmd *cmd)
 	kfree(cmd->tmr_req);
 	kfree(cmd->iov_data);
 
+	/* see iscsit_alloc_buffs */
+	if (cmd->t_mem) {
+		kfree(cmd->t_mem);
+	} else {
+		int i;
+
+		for (i = 0; i < cmd->t_mem_sg_nents; i++)
+			__free_page(sg_page(&cmd->t_mem_sg[i]));
+	}
+	kfree(cmd->t_mem_sg);
+
 	if (conn) {
 		iscsit_remove_cmd_from_immediate_queue(cmd, conn);
 		iscsit_remove_cmd_from_response_queue(cmd, conn);

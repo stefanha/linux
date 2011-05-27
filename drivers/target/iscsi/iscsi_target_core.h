@@ -473,6 +473,11 @@ struct iscsi_cmd {
 	/* Sense buffer that will be mapped into outgoing status */
 #define ISCSI_SENSE_BUFFER_LEN          (TRANSPORT_SENSE_BUFFER + 2)
 	unsigned char		sense_buffer[ISCSI_SENSE_BUFFER_LEN];
+
+	void			*t_mem;
+	struct scatterlist	*t_mem_sg;
+	u32			t_mem_sg_nents;
+
 }  ____cacheline_aligned;
 
 #define SE_CMD(cmd)		(&(cmd)->se_cmd)
