@@ -202,11 +202,10 @@ int ft_queue_data_in(struct se_cmd *se_cmd)
 			/* XXX For now, initiator will retry */
 			if (printk_ratelimit())
 				printk(KERN_ERR "%s: Failed to send frame %p, "
-						"xid <0x%x>, remaining <0x%x>, "
+						"xid <0x%x>, remaining <0x%zx>, "
 						"lso_max <0x%x>\n",
 						__func__, fp, ep->xid,
-						(unsigned int)remaining,
-						lport->lso_max);
+						remaining, lport->lso_max);
 		}
 	}
 	return ft_queue_status(se_cmd);

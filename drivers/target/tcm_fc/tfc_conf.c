@@ -356,7 +356,7 @@ static void ft_del_tpg(struct se_portal_group *se_tpg)
 
 	FT_CONF_DBG("del tpg %s\n",
 		config_item_name(&tpg->se_tpg.tpg_group.cg_item));
-	
+
 	kthread_stop(tpg->thread);
 
 	/* Wait for sessions to be freed thru RCU, for BUG_ON below */
@@ -534,12 +534,12 @@ static struct target_core_fabric_ops ft_fabric_ops = {
 	.tpg_check_prod_mode_write_protect = ft_check_false,
 	.tpg_alloc_fabric_acl =		ft_tpg_alloc_fabric_acl,
 	.tpg_release_fabric_acl =	ft_tpg_release_fabric_acl,
-	.tpg_get_inst_index = 		ft_tpg_get_inst_index,
+	.tpg_get_inst_index =		ft_tpg_get_inst_index,
 	.check_stop_free =		ft_check_stop_free,
 	.release_cmd_to_pool =		ft_release_cmd,
 	.release_cmd_direct =		ft_release_cmd,
-	.shutdown_session = 		ft_sess_shutdown,
-	.close_session = 		ft_sess_close,
+	.shutdown_session =		ft_sess_shutdown,
+	.close_session =		ft_sess_close,
 	.stop_session =			ft_sess_stop,
 	.fall_back_to_erl0 =		ft_sess_set_erl0,
 	.sess_logged_in =		ft_sess_logged_in,
@@ -570,7 +570,6 @@ static struct target_core_fabric_ops ft_fabric_ops = {
 	.fabric_drop_np =		NULL,
 	.fabric_make_nodeacl =		&ft_add_acl,
 	.fabric_drop_nodeacl =		&ft_del_acl,
-	
 };
 
 int ft_register_configfs(void)
@@ -600,7 +599,8 @@ int ft_register_configfs(void)
 	TF_CIT_TMPL(fabric)->tfc_tpg_attrib_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_param_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_np_base_cit.ct_attrs = NULL;
-	TF_CIT_TMPL(fabric)->tfc_tpg_nacl_base_cit.ct_attrs = ft_nacl_base_attrs;
+	TF_CIT_TMPL(fabric)->tfc_tpg_nacl_base_cit.ct_attrs =
+						    ft_nacl_base_attrs;
 	TF_CIT_TMPL(fabric)->tfc_tpg_nacl_attrib_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_nacl_auth_cit.ct_attrs = NULL;
 	TF_CIT_TMPL(fabric)->tfc_tpg_nacl_param_cit.ct_attrs = NULL;
