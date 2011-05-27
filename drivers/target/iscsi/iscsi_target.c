@@ -1242,7 +1242,7 @@ static void iscsit_do_crypto_hash_buf(
 static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 {
 	int iov_ret, ooo_cmdsn = 0, ret;
-	u8 data_crc_failed = 0, *pad_bytes[4];
+	u8 data_crc_failed = 0;
 	u32 checksum, iov_count = 0, padding = 0, rx_got = 0;
 	u32 rx_size = 0, payload_length;
 	struct iscsi_cmd *cmd = NULL;
@@ -1425,7 +1425,7 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 
 	padding = ((-payload_length) & 3);
 	if (padding != 0) {
-		iov[iov_count].iov_base	= &pad_bytes;
+		iov[iov_count].iov_base	= cmd->pad_bytes;
 		iov[iov_count++].iov_len = padding;
 		rx_size += padding;
 		TRACE(TRACE_ISCSI, "Receiving %u padding bytes.\n", padding);
@@ -1449,7 +1449,7 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 
 		data_crc = iscsit_do_crypto_hash_sg(&conn->conn_rx_hash, cmd,
 						    hdr->offset, payload_length, padding,
-						    (u8 *)&pad_bytes);
+						    cmd->pad_bytes);
 
 		if (checksum != data_crc) {
 			printk(KERN_ERR "ITT: 0x%08x, Offset: %u, Length: %u,"
@@ -1597,7 +1597,7 @@ static int iscsit_handle_nop_out(
 		if (conn->conn_ops->DataDigest) {
 			iscsit_do_crypto_hash_buf(&conn->conn_rx_hash,
 					ping_data, payload_length,
-					padding, (u8 *)&cmd->pad_bytes,
+					padding, cmd->pad_bytes,
 					(u8 *)&data_crc);
 
 			if (checksum != data_crc) {
@@ -1884,7 +1884,7 @@ static int iscsit_handle_text_cmd(
 	char *text_ptr, *text_in;
 	int cmdsn_ret, niov = 0, rx_got, rx_size;
 	u32 checksum = 0, data_crc = 0, payload_length;
-	u32 padding = 0, pad_bytes = 0, text_length = 0;
+	u32 padding = 0, text_length = 0;
 	struct iscsi_cmd *cmd;
 	struct kvec iov[3];
 	struct iscsi_text *hdr;
@@ -1923,7 +1923,7 @@ static int iscsit_handle_text_cmd(
 
 		padding = ((-payload_length) & 3);
 		if (padding != 0) {
-			iov[niov].iov_base = &pad_bytes;
+			iov[niov].iov_base = cmd->pad_bytes;
 			iov[niov++].iov_len  = padding;
 			rx_size += padding;
 			TRACE(TRACE_ISCSI, "Receiving %u additional bytes"
@@ -1944,7 +1944,7 @@ static int iscsit_handle_text_cmd(
 		if (conn->conn_ops->DataDigest) {
 			iscsit_do_crypto_hash_buf(&conn->conn_rx_hash,
 					text_in, text_length,
-					padding, (u8 *)&pad_bytes,
+					padding, cmd->pad_bytes,
 					(u8 *)&data_crc);
 
 			if (checksum != data_crc) {
@@ -2309,7 +2309,7 @@ static int iscsit_handle_immediate_data(
 	u32 length)
 {
 	int iov_ret, rx_got = 0, rx_size = 0;
-	u32 checksum, iov_count = 0, padding = 0, pad_bytes = 0;
+	u32 checksum, iov_count = 0, padding = 0;
 	struct iscsi_conn *conn = cmd->conn;
 	struct kvec *iov;
 
@@ -2323,7 +2323,7 @@ static int iscsit_handle_immediate_data(
 
 	padding = ((-length) & 3);
 	if (padding != 0) {
-		iov[iov_count].iov_base	= &pad_bytes;
+		iov[iov_count].iov_base	= cmd->pad_bytes;
 		iov[iov_count++].iov_len = padding;
 		rx_size += padding;
 	}
@@ -2348,7 +2348,7 @@ static int iscsit_handle_immediate_data(
 
 		data_crc = iscsit_do_crypto_hash_sg(&conn->conn_rx_hash, cmd,
 						    cmd->write_data_done, length, padding,
-						    (u8 *)&pad_bytes);
+						    cmd->pad_bytes);
 
 		if (checksum != data_crc) {
 			printk(KERN_ERR "ImmediateData CRC32C DataDigest 0x%08x"
@@ -2482,7 +2482,6 @@ static int iscsit_send_data_in(
 	int *eodr)
 {
 	int iov_ret = 0, set_statsn = 0;
-	u8 *pad_bytes;
 	u32 iov_count = 0, tx_size = 0;
 	struct iscsi_datain datain;
 	struct iscsi_datain_req *dr;
@@ -2594,8 +2593,7 @@ static int iscsit_send_data_in(
 
 	padding = ((-datain.length) & 3);
 	if (padding) {
-		pad_bytes = cmd->pad_bytes;
-		iov[iov_count].iov_base		= pad_bytes;
+		iov[iov_count].iov_base		= cmd->pad_bytes;
 		iov[iov_count++].iov_len	= cmd->padding;
 		tx_size += cmd->padding;
 
