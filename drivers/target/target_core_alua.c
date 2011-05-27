@@ -1044,7 +1044,7 @@ core_alua_allocate_lu_gp(const char *name, int def_group)
 	lu_gp = kmem_cache_zalloc(t10_alua_lu_gp_cache, GFP_KERNEL);
 	if (!(lu_gp)) {
 		printk(KERN_ERR "Unable to allocate struct t10_alua_lu_gp\n");
-		return ERR_PTR(-ENOMEM);;
+		return ERR_PTR(-ENOMEM);
 	}
 	INIT_LIST_HEAD(&lu_gp->lu_gp_node);
 	INIT_LIST_HEAD(&lu_gp->lu_gp_mem_list);

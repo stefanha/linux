@@ -82,6 +82,7 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 		       "len 0x%x off 0x%x\n",
 		       caller, cmd, mem,
 		       mem->se_page, mem->se_len, mem->se_off);
+
 	sp = cmd->seq;
 	if (sp) {
 		ep = fc_seq_exch(sp);
@@ -463,9 +464,9 @@ int ft_queue_tm_resp(struct se_cmd *se_cmd)
 	case TMR_FUNCTION_REJECTED:
 		code = FCP_TMF_REJECTED;
 		break;
+	case TMR_TASK_DOES_NOT_EXIST:
 	case TMR_TASK_STILL_ALLEGIANT:
 	case TMR_TASK_FAILOVER_NOT_SUPPORTED:
-	case TMR_TASK_DOES_NOT_EXIST:
 	case TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED:
 	case TMR_FUNCTION_AUTHORIZATION_FAILED:
 	default:
@@ -589,8 +590,6 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 			task_attr = MSG_SIMPLE_TAG;
 		}
 		
-		
-		task_attr = fcp->fc_pri_ta & FCP_PTA_MASK;
 		data_len = ntohl(fcp->fc_dl);
 		cmd->cdb = fcp->fc_cdb;
 	}
@@ -645,6 +644,7 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 err:
 	ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
+	return;
 }
 
 /*

@@ -37,8 +37,8 @@ config TCM_STGT
 	Say Y here to enable the WIP TCM/STGT subsystem plugin for accessing STGT device
 
 source "drivers/target/loopback/Kconfig"
-source "drivers/target/iscsi/Kconfig"
 source "drivers/target/tcm_fc/Kconfig"
+source "drivers/target/iscsi/Kconfig"
 source "drivers/target/tcm_qla2xxx/Kconfig"
 source "drivers/target/tcm_vhost/Kconfig"
 
