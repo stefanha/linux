@@ -1275,22 +1275,26 @@ send_data:
 }
 
 int iscsit_fe_sendpage_sg(
-	struct se_unmap_sg *u_sg,
+	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
 	int tx_sent;
-	struct iscsi_cmd *cmd = (struct iscsi_cmd *)u_sg->fabric_cmd;
-	struct se_cmd *se_cmd = SE_CMD(cmd);
-	u32 len = cmd->tx_size, pg_len, se_len, se_off, tx_size;
-	struct kvec *iov = &cmd->iov_data[0];
-	struct page *page;
-	struct se_mem *se_mem = u_sg->cur_se_mem;
+	u32 tx_hdr_size;
+	u32 data_len;
+	struct kvec iov;
+	struct scatterlist *sg = cmd->first_data_sg;
+	u32 offset = cmd->first_data_sg_off;
 
 send_hdr:
-	tx_size = (conn->conn_ops->HeaderDigest) ? ISCSI_HDR_LEN + ISCSI_CRC_LEN :
-			ISCSI_HDR_LEN;
-	tx_sent = tx_data(conn, iov, 1, tx_size);
-	if (tx_size != tx_sent) {
+	tx_hdr_size = ISCSI_HDR_LEN;
+	if (conn->conn_ops->HeaderDigest)
+		tx_hdr_size += ISCSI_CRC_LEN;
+
+	iov.iov_base = cmd->pdu;
+	iov.iov_len = tx_hdr_size;
+
+	tx_sent = tx_data(conn, &iov, 1, tx_hdr_size);
+	if (tx_hdr_size != tx_sent) {
 		if (tx_sent == -EAGAIN) {
 			printk(KERN_ERR "tx_data() returned -EAGAIN\n");
 			goto send_hdr;
@@ -1298,46 +1302,20 @@ send_hdr:
 		return -1;
 	}
 
-	len -= tx_size;
-	len -= u_sg->padding;
+	data_len = cmd->tx_size - tx_hdr_size - cmd->padding;
 	if (conn->conn_ops->DataDigest)
-		len -= ISCSI_CRC_LEN;
+		data_len -= ISCSI_CRC_LEN;
+
 	/*
-	 * Start calculating from the first page of current struct se_mem.
+	 * Perform sendpage() for each page in the scatterlist
 	 */
-	page = se_mem->se_page;
-	pg_len = (PAGE_SIZE - se_mem->se_off);
-	se_len = se_mem->se_len;
-	if (se_len < pg_len)
-		pg_len = se_len;
-	se_off = se_mem->se_off;
-	/*
-	 * Calucate new se_len and se_off based upon u_sg->t_offset into
-	 * the current struct se_mem and possibily a different page.
-	 */
-	while (u_sg->t_offset) {
-		if (u_sg->t_offset >= pg_len) {
-			u_sg->t_offset -= pg_len;
-			se_len -= pg_len;
-			se_off = 0;
-			pg_len = PAGE_SIZE;
-			page++;
-		} else {
-			se_off += u_sg->t_offset;
-			se_len -= u_sg->t_offset;
-			u_sg->t_offset = 0;
-		}
-	}
-	/*
-	 * Perform sendpage() for each page in the struct se_mem
-	 */
-	while (len) {
-		if (se_len > len)
-			se_len = len;
+	while (data_len) {
+		u32 space = (sg->length - offset);
+		u32 sub_len = min_t(u32, data_len, space);
 send_pg:
 		tx_sent = conn->sock->ops->sendpage(conn->sock,
-				page, se_off, se_len, 0);
-		if (tx_sent != se_len) {
+						    sg_page(sg), offset, sub_len, 0);
+		if (tx_sent != sub_len) {
 			if (tx_sent == -EAGAIN) {
 				printk(KERN_ERR "tcp_sendpage() returned"
 						" -EAGAIN\n");
@@ -1349,38 +1327,18 @@ send_pg:
 			return -1;
 		}
 
-		len -= se_len;
-		if (!(len))
-			break;
-
-		se_len -= tx_sent;
-		if (!(se_len)) {
-			list_for_each_entry_continue(se_mem,
-					&se_cmd->t_mem_list, se_list)
-				break;
-
-			if (!se_mem) {
-				printk(KERN_ERR "Unable to locate next struct se_mem\n");
-				return -1;
-			}
-
-			se_len = se_mem->se_len;
-			se_off = se_mem->se_off;
-			page = se_mem->se_page;
-		} else {
-			se_len = PAGE_SIZE;
-			se_off = 0;
-			page++;
-		}
+		data_len -= sub_len;
+		offset = 0;
+		sg++;
 	}
 
 send_padding:
-	if (u_sg->padding) {
+	if (cmd->padding) {
 		struct kvec *iov_p =
 			&cmd->iov_data[cmd->iov_data_count-2];
 
-		tx_sent = tx_data(conn, iov_p, 1, u_sg->padding);
-		if (u_sg->padding != tx_sent) {
+		tx_sent = tx_data(conn, iov_p, 1, cmd->padding);
+		if (cmd->padding != tx_sent) {
 			if (tx_sent == -EAGAIN) {
 				printk(KERN_ERR "tx_data() returned -EAGAIN\n");
 				goto send_padding;

@@ -389,8 +389,6 @@ struct iscsi_cmd {
 	u32			orig_iov_data_count;
 	/* Number of miscellaneous iovecs used for IP stack calls */
 	u32			iov_misc_count;
-	/* Bytes used for 32-bit word padding */
-	u32			pad_bytes;
 	/* Number of struct iscsi_pdu in struct iscsi_cmd->pdu_list */
 	u32			pdu_count;
 	/* Next struct iscsi_pdu to send in struct iscsi_cmd->pdu_list */
@@ -477,6 +475,13 @@ struct iscsi_cmd {
 	void			*t_mem;
 	struct scatterlist	*t_mem_sg;
 	u32			t_mem_sg_nents;
+
+	u32			padding;
+	u8			pad_bytes[4];
+
+	struct scatterlist	*first_data_sg;
+	u32			first_data_sg_off;
+	u32			kmapped_nents;
 
 }  ____cacheline_aligned;
 

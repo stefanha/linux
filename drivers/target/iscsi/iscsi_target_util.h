@@ -3,35 +3,6 @@
 
 #define MARKER_SIZE	8
 
-struct se_cmd;
-
-struct se_offset_map {
-	int                     map_reset;
-	u32                     iovec_length;
-	u32                     iscsi_offset;
-	u32                     current_offset;
-	u32                     orig_offset;
-	u32                     sg_count;
-	u32                     sg_current;
-	u32                     sg_length;
-	struct page		*sg_page;
-	struct se_mem		*map_se_mem;
-	struct se_mem		*map_orig_se_mem;
-	void			*iovec_base;
-};
-
-struct se_unmap_sg {
-	u32			data_length;
-	u32			sg_count;
-	u32			sg_offset;
-	u32			padding;
-	u32			t_offset;
-	void			*fabric_cmd;
-	struct se_cmd		*se_cmd;
-	struct se_offset_map	lmap;
-	struct se_mem		*cur_se_mem;
-};
-
 extern int iscsit_add_r2t_to_list(struct iscsi_cmd *, u32, u32, int, u32);
 extern struct iscsi_r2t *iscsit_get_r2t_for_eos(struct iscsi_cmd *, u32, u32);
 extern struct iscsi_r2t *iscsit_get_r2t_from_list(struct iscsi_cmd *);
@@ -75,7 +46,7 @@ extern void __iscsit_start_nopin_timer(struct iscsi_conn *);
 extern void iscsit_start_nopin_timer(struct iscsi_conn *);
 extern void iscsit_stop_nopin_timer(struct iscsi_conn *);
 extern int iscsit_send_tx_data(struct iscsi_cmd *, struct iscsi_conn *, int);
-extern int iscsit_fe_sendpage_sg(struct se_unmap_sg *, struct iscsi_conn *);
+extern int iscsit_fe_sendpage_sg(struct iscsi_cmd *, struct iscsi_conn *);
 extern int iscsit_tx_login_rsp(struct iscsi_conn *, u8, u8);
 extern void iscsit_print_session_params(struct iscsi_session *);
 extern int iscsit_print_dev_to_proc(char *, char **, off_t, int);
