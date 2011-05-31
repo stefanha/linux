@@ -3764,12 +3764,6 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 		return;
 	}
 
-	/*
-	 * Caller will handle releasing of struct se_mem.
-	 */
-	if (cmd->se_cmd_flags & SCF_CMD_PASSTHROUGH_NOALLOC)
-		return;
-
 	list_for_each_entry_safe(se_mem, se_mem_tmp,
 			&cmd->t_mem_list, se_list) {
 		/*
