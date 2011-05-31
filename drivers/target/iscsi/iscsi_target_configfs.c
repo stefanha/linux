@@ -1510,10 +1510,7 @@ static int iscsi_get_cmd_state(struct se_cmd *se_cmd)
 
 static void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
 {
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	if (cmd->immediate_data || cmd->unsolicited_data)
-		complete(&cmd->unsolicited_data_comp);
+	/* We no longer sleep while core allocs (we do alloc), so we can ignore this */
 }
 
 static int iscsi_is_state_remove(struct se_cmd *se_cmd)
@@ -1572,12 +1569,8 @@ static int lio_write_pending(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
 
-	if (cmd->immediate_data || cmd->unsolicited_data)
-		complete(&cmd->unsolicited_data_comp);
-	else {
-		if (iscsit_build_r2ts_for_cmd(cmd, cmd->conn, 1) < 0)
-			return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-	}
+	if (!cmd->immediate_data && !cmd->unsolicited_data)
+		return iscsit_build_r2ts_for_cmd(cmd, cmd->conn, 1);
 
 	return 0;
 }

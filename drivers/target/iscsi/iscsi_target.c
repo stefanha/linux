@@ -1135,15 +1135,12 @@ attach_cmd:
 		dump_immediate_data = 1;
 		goto after_immediate_data;
 	}
-
 	/*
-	 * Immediate Data is present, send to the transport and block until
-	 * the underlying transport plugin has allocated the buffer to
-	 * receive the Immediate Write Data into.
+	 * Call into transport_generic_handle_cdb() that now translates
+	 * into a direct transport_generic_new_cmd() call with a NULL
+	 * se_cmd->se_tfo->new_cmd_map() pointer.
 	 */
 	transport_generic_new_cmd(SE_CMD(cmd));
-
-	wait_for_completion(&cmd->unsolicited_data_comp);
 
 	if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_CMD_FAILED) {
 		immed_ret = IMMEDIATE_DATA_NORMAL_OPERATION;
@@ -1341,7 +1338,7 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 	}
 
 	if (cmd->unsolicited_data) {
-		int dump_unsolicited_data = 0, wait_for_transport = 0;
+		int dump_unsolicited_data = 0;
 
 		if (conn->sess->sess_ops->InitialR2T) {
 			printk(KERN_ERR "Received unexpected unsolicited data"
@@ -1355,36 +1352,11 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 		 * and Unsupported SAM WRITE Opcodes and SE resource allocation
 		 * failures;
 		 */
-		spin_lock_irqsave(&se_cmd->t_state_lock, flags);
-		/*
-		 * Handle cases where we do or do not want to sleep on
-		 * unsolicited_data_comp
-		 *
-		 * First, if TRANSPORT_WRITE_PENDING state has not been reached,
-		 * we need assume we need to wait and sleep..
-		 */
-		 wait_for_transport =
-				(se_cmd->t_state != TRANSPORT_WRITE_PENDING);
-		/*
-		 * For the ImmediateData=Yes cases, there will already be
-		 * generic target memory allocated with the original
-		 * ISCSI_OP_SCSI_CMD PDU, so do not sleep for that case.
-		 *
-		 * The last is a check for a delayed TASK_ABORTED status that
-		 * means the data payload will be dropped because
-		 * SCF_SE_CMD_FAILED has been set to indicate that an exception
-		 * condition for this struct sse_cmd has occured in generic target
-		 * code that requires us to drop payload.
-		 */
-		wait_for_transport =
-				(se_cmd->t_state != TRANSPORT_WRITE_PENDING);
-		if ((cmd->immediate_data != 0) ||
-		    (atomic_read(&se_cmd->t_transport_aborted) != 0))
-			wait_for_transport = 0;
-		spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
 
-		if (wait_for_transport)
-			wait_for_completion(&cmd->unsolicited_data_comp);
+		/* Something's amiss if we're not in WRITE_PENDING state... */
+		spin_lock_irqsave(&se_cmd->t_state_lock, flags);
+		WARN_ON(se_cmd->t_state != TRANSPORT_WRITE_PENDING);
+		spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
 
 		spin_lock_irqsave(&se_cmd->t_state_lock, flags);
 		if (!(se_cmd->se_cmd_flags & SCF_SUPPORTED_SAM_OPCODE) ||

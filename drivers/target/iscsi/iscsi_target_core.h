@@ -439,8 +439,6 @@ struct iscsi_cmd {
 	/* R2T List */
 	struct list_head	cmd_r2t_list;
 	struct completion	reject_comp;
-	/* Semaphore used for allocating buffer */
-	struct completion	unsolicited_data_comp;
 	/* Timer for DataOUT */
 	struct timer_list	dataout_timer;
 	/* Iovecs for SCSI data payload RX/TX w/ kernel level sockets */

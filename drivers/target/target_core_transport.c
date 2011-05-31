@@ -4793,7 +4793,7 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 	}
 
 	/*
-	 * For WRITEs, let the iSCSI Target RX Thread know its buffer is ready..
+	 * For WRITEs, let the fabric know its buffer is ready..
 	 * This WRITE struct se_cmd (and all of its associated struct se_task's)
 	 * will be added to the struct se_device execution queue after its WRITE
 	 * data has arrived. (ie: It gets handled by the transport processing
