@@ -1847,7 +1847,6 @@ int transport_generic_handle_cdb(
 		printk(KERN_ERR "cmd->se_lun is NULL\n");
 		return -EINVAL;
 	}
-
 	transport_add_cmd_to_queue(cmd, TRANSPORT_NEW_CMD);
 	return 0;
 }
@@ -4754,7 +4753,7 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd)
 	/*
 	 * Generate struct se_task(s) and/or their payloads for this CDB.
 	 */
-static int transport_generic_new_cmd(struct se_cmd *cmd)
+int transport_generic_new_cmd(struct se_cmd *cmd)
 {
 	struct se_portal_group *se_tpg;
 	struct se_task *task;
@@ -4824,6 +4823,7 @@ static int transport_generic_new_cmd(struct se_cmd *cmd)
 	transport_execute_tasks(cmd);
 	return 0;
 }
+EXPORT_SYMBOL(transport_generic_new_cmd);
 
 /*	transport_generic_process_write():
  *

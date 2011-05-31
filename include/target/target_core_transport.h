@@ -188,6 +188,7 @@ extern int transport_map_mem_to_sg(struct se_task *, struct list_head *,
 					struct se_mem **, u32 *, u32 *);
 extern void transport_do_task_sg_chain(struct se_cmd *);
 extern void transport_generic_process_write(struct se_cmd *);
+extern int transport_generic_new_cmd(struct se_cmd *);
 extern int transport_generic_do_tmr(struct se_cmd *);
 /* From target_core_alua.c */
 extern int core_alua_check_nonop_delay(struct se_cmd *);

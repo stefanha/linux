@@ -1118,7 +1118,7 @@ attach_cmd:
 	 * the underlying transport plugin has allocated the buffer to
 	 * receive the Immediate Write Data into.
 	 */
-	transport_generic_handle_cdb(SE_CMD(cmd));
+	transport_generic_new_cmd(SE_CMD(cmd));
 
 	wait_for_completion(&cmd->unsolicited_data_comp);
 
