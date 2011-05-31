@@ -3615,13 +3615,6 @@ static int srpt_is_state_remove(struct se_cmd *se_cmd)
 	return 0;
 }
 
-static u64 srpt_pack_lun(unsigned int lun)
-{
-	WARN_ON(lun >= 256);
-	/* Caller wants this byte-swapped */
-	return cpu_to_le64((lun & 0xff) << 8);
-}
-
 /**
  * srpt_parse_i_port_id() - Parse an initiator port ID.
  * @name: ASCII representation of a 128-bit initiator port ID.
@@ -3878,7 +3871,6 @@ static struct target_core_fabric_ops srpt_template = {
 	.get_fabric_sense_len		= srpt_get_fabric_sense_len,
 	.set_fabric_sense_len		= srpt_set_fabric_sense_len,
 	.is_state_remove		= srpt_is_state_remove,
-	.pack_lun			= srpt_pack_lun,
 	/*
 	 * Setup function pointers for generic logic in
 	 * target_core_fabric_configfs.c
