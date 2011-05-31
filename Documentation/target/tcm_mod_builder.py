@@ -405,7 +405,6 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "	.set_default_node_attributes	= " + fabric_mod_name + "_set_default_node_attrs,\n"
 	buf += "	.get_task_tag			= " + fabric_mod_name + "_get_task_tag,\n"
 	buf += "	.get_cmd_state			= " + fabric_mod_name + "_get_cmd_state,\n"
-	buf += "	.new_cmd_failure		= " + fabric_mod_name + "_new_cmd_failure,\n"
 	buf += "	.queue_data_in			= " + fabric_mod_name + "_queue_data_in,\n"
 	buf += "	.queue_status			= " + fabric_mod_name + "_queue_status,\n"
 	buf += "	.queue_tm_rsp			= " + fabric_mod_name + "_queue_tm_rsp,\n"
@@ -898,13 +897,6 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "	return 0;\n"
 			buf += "}\n\n"
 			bufi += "int " + fabric_mod_name + "_get_cmd_state(struct se_cmd *);\n"
-
-		if re.search('new_cmd_failure\)\(', fo):
-			buf += "void " + fabric_mod_name + "_new_cmd_failure(struct se_cmd *se_cmd)\n"
-			buf += "{\n"
-			buf += "	return;\n"
-			buf += "}\n\n"
-			bufi += "void " + fabric_mod_name + "_new_cmd_failure(struct se_cmd *);\n"
 
 		if re.search('queue_data_in\)\(', fo):
 			buf += "int " + fabric_mod_name + "_queue_data_in(struct se_cmd *se_cmd)\n"

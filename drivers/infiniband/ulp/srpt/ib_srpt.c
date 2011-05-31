@@ -3596,10 +3596,6 @@ static int srpt_get_tcm_cmd_state(struct se_cmd *se_cmd)
 	return srpt_get_cmd_state(ioctx);
 }
 
-static void srpt_new_cmd_failure(struct se_cmd *se_cmd)
-{
-}
-
 static u16 srpt_set_fabric_sense_len(struct se_cmd *cmd, u32 sense_length)
 {
 	return 0;
@@ -3864,7 +3860,6 @@ static struct target_core_fabric_ops srpt_template = {
 	.set_default_node_attributes	= srpt_set_default_node_attrs,
 	.get_task_tag			= srpt_get_task_tag,
 	.get_cmd_state			= srpt_get_tcm_cmd_state,
-	.new_cmd_failure		= srpt_new_cmd_failure,
 	.queue_data_in			= srpt_queue_response,
 	.queue_status			= srpt_queue_status,
 	.queue_tm_rsp			= srpt_queue_response,

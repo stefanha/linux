@@ -561,11 +561,6 @@ int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
 	return 0;
 }
 
-void tcm_qla2xxx_new_cmd_failure(struct se_cmd *se_cmd)
-{
-	return;
-}
-
 /*
  * Main entry point for incoming ATIO packets from qla_target.c
  * and qla2xxx LLD code.

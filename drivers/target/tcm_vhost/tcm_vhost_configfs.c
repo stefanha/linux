@@ -629,7 +629,6 @@ static struct target_core_fabric_ops tcm_vhost_ops = {
 	.set_default_node_attributes	= tcm_vhost_set_default_node_attrs,
 	.get_task_tag			= tcm_vhost_get_task_tag,
 	.get_cmd_state			= tcm_vhost_get_cmd_state,
-	.new_cmd_failure		= tcm_vhost_new_cmd_failure,
 	.queue_data_in			= tcm_vhost_queue_data_in,
 	.queue_status			= tcm_vhost_queue_status,
 	.queue_tm_rsp			= tcm_vhost_queue_tm_rsp,

@@ -351,11 +351,6 @@ int tcm_vhost_get_cmd_state(struct se_cmd *se_cmd)
 	return 0;
 }
 
-void tcm_vhost_new_cmd_failure(struct se_cmd *se_cmd)
-{
-	return;
-}
-
 int tcm_vhost_queue_data_in(struct se_cmd *se_cmd)
 {
 	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,

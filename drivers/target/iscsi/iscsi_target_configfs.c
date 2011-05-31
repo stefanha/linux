@@ -1508,11 +1508,6 @@ static int iscsi_get_cmd_state(struct se_cmd *se_cmd)
 	return cmd->i_state;
 }
 
-static void iscsi_new_cmd_failure(struct se_cmd *se_cmd)
-{
-	/* We no longer sleep while core allocs (we do alloc), so we can ignore this */
-}
-
 static int iscsi_is_state_remove(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
@@ -1829,7 +1824,6 @@ int iscsi_target_register_configfs(void)
 				&lio_set_default_node_attributes;
 	fabric->tf_ops.get_task_tag = &iscsi_get_task_tag;
 	fabric->tf_ops.get_cmd_state = &iscsi_get_cmd_state;
-	fabric->tf_ops.new_cmd_failure = &iscsi_new_cmd_failure;
 	fabric->tf_ops.queue_data_in = &lio_queue_data_in;
 	fabric->tf_ops.queue_status = &lio_queue_status;
 	fabric->tf_ops.queue_tm_rsp = &lio_queue_tm_rsp;

@@ -30,7 +30,6 @@ int tcm_vhost_write_pending_status(struct se_cmd *);
 void tcm_vhost_set_default_node_attrs(struct se_node_acl *);
 u32 tcm_vhost_get_task_tag(struct se_cmd *);
 int tcm_vhost_get_cmd_state(struct se_cmd *);
-void tcm_vhost_new_cmd_failure(struct se_cmd *);
 int tcm_vhost_queue_data_in(struct se_cmd *);
 int tcm_vhost_queue_status(struct se_cmd *);
 int tcm_vhost_queue_tm_rsp(struct se_cmd *);

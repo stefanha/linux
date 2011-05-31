@@ -291,11 +291,6 @@ static int ibmvscsis_get_cmd_state(struct se_cmd *se_cmd)
 	return 0;
 }
 
-static void ibmvscsis_new_cmd_failure(struct se_cmd *se_cmd)
-{
-	return;
-}
-
 static int ibmvscsis_queue_tm_rsp(struct se_cmd *se_cmd)
 {
 	return 0;
@@ -465,7 +460,6 @@ static struct target_core_fabric_ops ibmvscsis_ops = {
 	.set_default_node_attributes	= ibmvscsis_set_default_node_attrs,
 	.get_task_tag			= ibmvscsis_get_task_tag,
 	.get_cmd_state			= ibmvscsis_get_cmd_state,
-	.new_cmd_failure		= ibmvscsis_new_cmd_failure,
 	.queue_data_in			= ibmvscsis_queue_data_in,
 	.queue_status			= ibmvscsis_queue_status,
 	.queue_tm_rsp			= ibmvscsis_queue_tm_rsp,
