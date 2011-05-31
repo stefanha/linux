@@ -2436,14 +2436,12 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 {
 	int add_tasks;
 
-	if (!(cmd->se_cmd_flags & SCF_SE_DISABLE_ONLINE_CHECK)) {
-		if (se_dev_check_online(cmd->se_orig_obj_ptr) != 0) {
-			cmd->transport_error_status =
-				PYX_TRANSPORT_LU_COMM_FAILURE;
-			transport_generic_request_failure(cmd, NULL, 0, 1);
-			return 0;
-		}
+	if (se_dev_check_online(cmd->se_orig_obj_ptr) != 0) {
+		cmd->transport_error_status = PYX_TRANSPORT_LU_COMM_FAILURE;
+		transport_generic_request_failure(cmd, NULL, 0, 1);
+		return 0;
 	}
+
 	/*
 	 * Call transport_cmd_check_stop() to see if a fabric exception
 	 * has occurred that prevents execution.
