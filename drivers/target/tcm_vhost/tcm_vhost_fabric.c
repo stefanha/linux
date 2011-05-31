@@ -401,11 +401,3 @@ int tcm_vhost_is_state_remove(struct se_cmd *se_cmd)
 {
 	return 0;
 }
-
-u64 tcm_vhost_pack_lun(unsigned int lun)
-{
-	WARN_ON(lun >= 256);
-	/* Caller wants this byte-swapped */
-	return cpu_to_le64((lun & 0xff) << 8);
-}
-
