@@ -1233,7 +1233,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.get_fabric_sense_len		= tcm_qla2xxx_get_fabric_sense_len,
 	.set_fabric_sense_len		= tcm_qla2xxx_set_fabric_sense_len,
 	.is_state_remove		= tcm_qla2xxx_is_state_remove,
-	.pack_lun			= tcm_qla2xxx_pack_lun,
 	/*
 	 * Setup function pointers for generic logic in target_core_fabric_configfs.c
 	 */
@@ -1286,7 +1285,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_npiv_ops = {
 	.get_fabric_sense_len		= tcm_qla2xxx_get_fabric_sense_len,
 	.set_fabric_sense_len		= tcm_qla2xxx_set_fabric_sense_len,
 	.is_state_remove		= tcm_qla2xxx_is_state_remove,
-	.pack_lun			= tcm_qla2xxx_pack_lun,
 	/*
 	 * Setup function pointers for generic logic in target_core_fabric_configfs.c
 	 */

@@ -50,4 +50,3 @@ extern int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *);
 extern u16 tcm_qla2xxx_get_fabric_sense_len(void);
 extern u16 tcm_qla2xxx_set_fabric_sense_len(struct se_cmd *, u32);
 extern int tcm_qla2xxx_is_state_remove(struct se_cmd *);
-extern u64 tcm_qla2xxx_pack_lun(unsigned int);
