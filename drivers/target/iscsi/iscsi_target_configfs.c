@@ -1770,22 +1770,6 @@ static void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 	iscsit_set_default_node_attribues(acl);
 }
 
-static int iscsi_allocate_iovecs_for_cmd(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-	u32 iov_count = (se_cmd->t_tasks_se_num == 0) ? 1 :
-				se_cmd->t_tasks_se_num;
-
-	iov_count += TRANSPORT_IOV_DATA_BUFFER;
-
-	cmd->iov_data = kzalloc(iov_count * sizeof(struct kvec), GFP_KERNEL);
-	if (!cmd->iov_data)
-		return -ENOMEM;
-
-	cmd->orig_iov_data_count = iov_count;
-	return 0;
-}
-
 static void lio_release_cmd_direct(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
@@ -1837,12 +1821,6 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.tpg_alloc_fabric_acl = &lio_tpg_alloc_fabric_acl;
 	fabric->tf_ops.tpg_release_fabric_acl = &lio_tpg_release_fabric_acl;
 	fabric->tf_ops.tpg_get_inst_index = &lio_tpg_get_inst_index;
-	/*
-	 * Use our local iscsi_allocate_iovecs_for_cmd() for the extra
-	 * callback in transport_generic_new_cmd() to allocate
-	 * iscsi_cmd->iov_data[] for Linux/Net kernel sockets operations.
-	 */
-	fabric->tf_ops.alloc_cmd_iovecs = &iscsi_allocate_iovecs_for_cmd;
 	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd;
 	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;

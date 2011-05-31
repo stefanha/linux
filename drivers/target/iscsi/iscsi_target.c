@@ -760,6 +760,23 @@ static void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 	spin_unlock_bh(&conn->cmd_lock);
 }
 
+static int iscsit_allocate_iovecs(struct iscsi_cmd *cmd)
+{
+	u32 iov_count = (cmd->se_cmd.t_tasks_se_num == 0) ? 1 :
+				cmd->se_cmd.t_tasks_se_num;
+
+	iov_count += TRANSPORT_IOV_DATA_BUFFER;
+
+	cmd->iov_data = kzalloc(iov_count * sizeof(struct kvec), GFP_KERNEL);
+	if (!cmd->iov_data) {
+		printk(KERN_ERR "Unable to allocate cmd->iov_data\n");
+		return -ENOMEM;
+	}
+
+	cmd->orig_iov_data_count = iov_count;
+	return 0;
+}
+
 static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 {
 	u32 length = cmd->se_cmd.data_length;
@@ -768,7 +785,12 @@ static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 	int i;
 	void *buf;
 	void *cur;
-	struct page *page;
+	int ret;
+
+	/* Even no-length cmds need some iovecs, apparently? */
+	ret = iscsit_allocate_iovecs(cmd);
+	if (ret < 0)
+		return ret;
 
 	if (!length)
 		return 0;
@@ -807,6 +829,7 @@ static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 		i = 0;
 		while (length) {
 			int buf_size = min_t(int, length, PAGE_SIZE);
+			struct page *page;
 
 			page = alloc_page(GFP_KERNEL);
 			if (!page)

@@ -4755,7 +4755,6 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd)
 	 */
 int transport_generic_new_cmd(struct se_cmd *cmd)
 {
-	struct se_portal_group *se_tpg;
 	struct se_task *task;
 	struct se_device *dev = cmd->se_dev;
 	int ret = 0;
@@ -4775,18 +4774,6 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 	ret = transport_new_cmd_obj(cmd);
 	if (ret < 0)
 		return ret;
-
-	/*
-	 * Determine if the calling TCM fabric module is talking to
-	 * Linux/NET via kernel sockets and needs to allocate a
-	 * struct iovec array to complete the struct se_cmd
-	 */
-	se_tpg = cmd->se_lun->lun_sep->sep_tpg;
-	if (se_tpg->se_tpg_tfo->alloc_cmd_iovecs != NULL) {
-		ret = se_tpg->se_tpg_tfo->alloc_cmd_iovecs(cmd);
-		if (ret < 0)
-			return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-	}
 
 	if (cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) {
 		list_for_each_entry(task, &cmd->t_task_list, t_list) {

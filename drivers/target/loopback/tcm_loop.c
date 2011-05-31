@@ -1421,13 +1421,6 @@ static int tcm_loop_register_configfs(void)
 					&tcm_loop_tpg_release_fabric_acl;
 	fabric->tf_ops.tpg_get_inst_index = &tcm_loop_get_inst_index;
 	/*
-	 * Since tcm_loop is mapping physical memory from Linux/SCSI
-	 * struct scatterlist arrays for each struct scsi_cmnd I/O,
-	 * we do not need TCM to allocate a iovec array for
-	 * virtual memory address mappings
-	 */
-	fabric->tf_ops.alloc_cmd_iovecs = NULL;
-	/*
 	 * Used for setting up remaining TCM resources in process context
 	 */
 	fabric->tf_ops.new_cmd_map = &tcm_loop_new_cmd_map;
