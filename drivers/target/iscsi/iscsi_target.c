@@ -3593,7 +3593,7 @@ get_immediate:
 					iscsit_release_cmd(cmd);
 				else
 					transport_generic_free_cmd(SE_CMD(cmd),
-								1, 1, 0);
+								1, 0);
 				goto get_immediate;
 			case ISTATE_SEND_NOPIN_WANT_RESPONSE:
 				spin_unlock_bh(&cmd->istate_lock);
@@ -4009,7 +4009,7 @@ static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 			if (cmd->tmr_req && se_cmd->transport_wait_for_tasks)
 				se_cmd->transport_wait_for_tasks(se_cmd, 1, 1);
 			else if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_LUN_CMD)
-				transport_release_cmd_to_pool(se_cmd);
+				transport_release_cmd(se_cmd);
 			else
 				iscsit_release_cmd(cmd);
 

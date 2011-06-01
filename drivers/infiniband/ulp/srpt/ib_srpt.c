@@ -1347,7 +1347,7 @@ static void srpt_put_send_ioctx(struct srpt_send_ioctx *ioctx)
 	WARN_ON(srpt_get_cmd_state(ioctx) != SRPT_STATE_DONE);
 
 	srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
-	transport_generic_free_cmd(&ioctx->cmd, 0, 1, 0);
+	transport_generic_free_cmd(&ioctx->cmd, 0, 0);
 
 	if (ioctx->n_rbuf > 1) {
 		kfree(ioctx->rbufs);
@@ -3845,8 +3845,7 @@ static struct target_core_fabric_ops srpt_template = {
 	.tpg_alloc_fabric_acl		= srpt_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= srpt_release_fabric_acl,
 	.tpg_get_inst_index		= srpt_tpg_get_inst_index,
-	.release_cmd_to_pool		= srpt_release_cmd,
-	.release_cmd_direct		= srpt_release_cmd,
+	.release_cmd			= srpt_release_cmd,
 	.check_stop_free		= srpt_check_stop_free,
 	.shutdown_session		= srpt_shutdown_session,
 	.close_session			= srpt_close_session,

@@ -1758,13 +1758,6 @@ static void lio_set_default_node_attributes(struct se_node_acl *se_acl)
 	iscsit_set_default_node_attribues(acl);
 }
 
-static void lio_release_cmd_direct(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	iscsit_release_cmd(cmd);
-}
-
 static void lio_release_cmd(struct se_cmd *se_cmd)
 {
 	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
@@ -1809,8 +1802,7 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.tpg_alloc_fabric_acl = &lio_tpg_alloc_fabric_acl;
 	fabric->tf_ops.tpg_release_fabric_acl = &lio_tpg_release_fabric_acl;
 	fabric->tf_ops.tpg_get_inst_index = &lio_tpg_get_inst_index;
-	fabric->tf_ops.release_cmd_to_pool = &lio_release_cmd;
-	fabric->tf_ops.release_cmd_direct = &lio_release_cmd_direct;
+	fabric->tf_ops.release_cmd = &lio_release_cmd;
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;
 	fabric->tf_ops.close_session = &lio_tpg_close_session;
 	fabric->tf_ops.stop_session = &lio_tpg_stop_session;

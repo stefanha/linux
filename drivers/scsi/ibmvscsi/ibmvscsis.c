@@ -446,8 +446,7 @@ static struct target_core_fabric_ops ibmvscsis_ops = {
 	.tpg_get_inst_index		= ibmvscsis_tpg_get_inst_index,
 	.new_cmd_map			= ibmvscsis_new_cmd_map,
 	.check_stop_free		= ibmvscsis_check_stop_free,
-	.release_cmd_to_pool		= ibmvscsis_release_cmd,
-	.release_cmd_direct		= ibmvscsis_release_cmd,
+	.release_cmd			= ibmvscsis_release_cmd,
 	.shutdown_session		= ibmvscsis_shutdown_session,
 	.close_session			= ibmvscsis_close_session,
 	.stop_session			= ibmvscsis_stop_session,
@@ -923,7 +922,7 @@ static void ibmvscsis_check_stop_free(struct se_cmd *se_cmd)
 {
 	if (se_cmd->se_tmr_req)
 		return;
-	transport_generic_free_cmd(se_cmd, 0, 1, 0);
+	transport_generic_free_cmd(se_cmd, 0, 0);
 }
 
 static u64 scsi_lun_to_int(u64 lun)

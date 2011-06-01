@@ -407,7 +407,7 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 		 * Release the associated se_cmd->se_tmr_req and se_cmd
 		 * TMR related state now.
 		 */
-		transport_generic_free_cmd(se_cmd, 1, 1, 0);
+		transport_generic_free_cmd(se_cmd, 1, 0);
 		qla_tgt_free_mcmd(mcmd);
 		return;
 	}
@@ -709,7 +709,7 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun, uint8_t 
 	 * Locate the underlying TCM struct se_lun from sc->device->lun
 	 */
 	if (transport_lookup_tmr_lun(se_cmd, lun) < 0) {
-		transport_generic_free_cmd(se_cmd, 1, 1, 0);
+		transport_generic_free_cmd(se_cmd, 1, 0);
 		return -EINVAL;
 	}
 	/*

@@ -391,8 +391,7 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "	.tpg_alloc_fabric_acl		= " + fabric_mod_name + "_alloc_fabric_acl,\n"
 	buf += "	.tpg_release_fabric_acl		= " + fabric_mod_name + "_release_fabric_acl,\n"
 	buf += "	.tpg_get_inst_index		= " + fabric_mod_name + "_tpg_get_inst_index,\n"
-	buf += "	.release_cmd_to_pool		= " + fabric_mod_name + "_release_cmd,\n"
-	buf += "	.release_cmd_direct		= " + fabric_mod_name + "_release_cmd,\n"
+	buf += "	.release_cmd			= " + fabric_mod_name + "_release_cmd,\n"
 	buf += "	.shutdown_session		= " + fabric_mod_name + "_shutdown_session,\n"
 	buf += "	.close_session			= " + fabric_mod_name + "_close_session,\n"
 	buf += "	.stop_session			= " + fabric_mod_name + "_stop_session,\n"
@@ -814,7 +813,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "}\n\n"
 			bufi += "u32 " + fabric_mod_name + "_tpg_get_inst_index(struct se_portal_group *);\n"
 
-		if re.search('release_cmd_to_pool', fo):
+		if re.search('release_cmd', fo):
 			buf += "void " + fabric_mod_name + "_release_cmd(struct se_cmd *se_cmd)\n"
 			buf += "{\n"
 			buf += "	return;\n"

@@ -150,7 +150,7 @@ void ft_release_cmd(struct se_cmd *se_cmd)
 
 void ft_check_stop_free(struct se_cmd *se_cmd)
 {
-	transport_generic_free_cmd(se_cmd, 0, 1, 0);
+	transport_generic_free_cmd(se_cmd, 0, 0);
 }
 
 /*
@@ -307,7 +307,7 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		/* XXX need to find cmd if queued */
 		cmd->se_cmd.t_state = TRANSPORT_REMOVE;
 		cmd->seq = NULL;
-		transport_generic_free_cmd(&cmd->se_cmd, 0, 1, 0);
+		transport_generic_free_cmd(&cmd->se_cmd, 0, 0);
 		return;
 	}
 
@@ -324,7 +324,7 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		printk(KERN_INFO "%s: unhandled frame r_ctl %x\n",
 		       __func__, fh->fh_r_ctl);
 		fc_frame_free(fp);
-		transport_generic_free_cmd(&cmd->se_cmd, 0, 1, 0);
+		transport_generic_free_cmd(&cmd->se_cmd, 0, 0);
 		break;
 	}
 }
@@ -621,7 +621,7 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 	if (ret == -ENOMEM) {
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
-		transport_generic_free_cmd(se_cmd, 0, 1, 0);
+		transport_generic_free_cmd(se_cmd, 0, 0);
 		return;
 	}
 	if (ret == -EINVAL) {
@@ -630,7 +630,7 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 		else
 			transport_send_check_condition_and_sense(se_cmd,
 					se_cmd->scsi_sense_reason, 0);
-		transport_generic_free_cmd(se_cmd, 0, 1, 0);
+		transport_generic_free_cmd(se_cmd, 0, 0);
 		return;
 	}
 	transport_generic_handle_cdb(se_cmd);
