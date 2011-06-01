@@ -2604,8 +2604,7 @@ static int iscsit_send_data_in(
 		tx_size += ISCSI_CRC_LEN;
 
 		TRACE(TRACE_DIGEST, "Attached CRC32C DataDigest %d bytes, crc"
-			" 0x%08x\n", datain.length+unmap_sg->padding,
-			cmd->data_crc);
+			" 0x%08x\n", datain.length+cmd->padding, cmd->data_crc);
 	}
 
 	cmd->iov_data_count = iov_count;
