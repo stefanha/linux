@@ -4264,16 +4264,15 @@ static int transport_map_sg_to_mem(
 		cmd_size -= se_mem->se_len;
 		sg_count++;
 
-		DEBUG_MEM("sg_to_mem: *sg_count: %u cmd_size: %u\n",
-				*sg_count, cmd_size);
+		DEBUG_MEM("sg_to_mem: sg_count: %u cmd_size: %u\n",
+				sg_count, cmd_size);
 		DEBUG_MEM("sg_to_mem: Final se_page: %p se_off: %d se_len: %d\n",
 				se_mem->se_page, se_mem->se_off, se_mem->se_len);
 
 		list_add_tail(&se_mem->se_list, se_mem_list);
 	}
 
-	DEBUG_MEM("task[0] - Mapped(%u) struct scatterlist segments to(%u)"
-		" struct se_mem\n", sg_count, *se_mem_cnt);
+	DEBUG_MEM("task[0] - Mapped(%u) struct scatterlist segments\n", sg_count);
 
 	return sg_count;
 }
@@ -4474,8 +4473,8 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 	for_each_sg(cmd->t_tasks_sg_chained, sg,
 			cmd->t_tasks_sg_chained_no, i) {
 
-		DEBUG_CMD_M("SG[%d]: %p page: %p length: %d offset: %d, magic: 0x%08x\n",
-			i, sg, sg_page(sg), sg->length, sg->offset, sg->sg_magic);
+		DEBUG_CMD_M("SG[%d]: %p page: %p length: %d offset: %d\n",
+			i, sg, sg_page(sg), sg->length, sg->offset);
 		if (sg_is_chain(sg))
 			DEBUG_CMD_M("SG: %p sg_is_chain=1\n", sg);
 		if (sg_is_last(sg))
