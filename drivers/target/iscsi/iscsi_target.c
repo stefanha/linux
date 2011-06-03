@@ -3743,6 +3743,7 @@ check_rsp_state:
 					goto transport_err;
 				}
 			}
+			map_sg = 0;
 			iscsit_unmap_iovec(cmd);
 
 			spin_lock_bh(&cmd->istate_lock);
