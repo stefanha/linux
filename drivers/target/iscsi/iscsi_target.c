@@ -2508,7 +2508,6 @@ static int iscsit_send_data_in(
 	struct iscsi_datain_req *dr;
 	struct iscsi_data_rsp *hdr;
 	struct kvec *iov;
-	u32 padding;
 
 	memset(&datain, 0, sizeof(struct iscsi_datain));
 	dr = iscsit_get_datain_values(cmd, &datain);
@@ -2612,8 +2611,8 @@ static int iscsit_send_data_in(
 	iov_count += iov_ret;
 	tx_size += datain.length;
 
-	padding = ((-datain.length) & 3);
-	if (padding) {
+	cmd->padding = ((-datain.length) & 3);
+	if (cmd->padding) {
 		iov[iov_count].iov_base		= cmd->pad_bytes;
 		iov[iov_count++].iov_len	= cmd->padding;
 		tx_size += cmd->padding;
