@@ -1243,7 +1243,7 @@ static u32 iscsit_do_crypto_hash_sg(
 	while (data_length) {
 		u32 cur_len = min_t(u32, data_length, (sg[i].length - page_off));
 
-		crypto_hash_update(hash, sg, cur_len);
+		crypto_hash_update(hash, &sg[i], cur_len);
 
 		data_length -= cur_len;
 		page_off = 0;
