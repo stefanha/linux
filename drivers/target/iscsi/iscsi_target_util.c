@@ -1277,12 +1277,11 @@ int iscsit_fe_sendpage_sg(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	int tx_sent;
-	u32 tx_hdr_size;
-	u32 data_len;
-	struct kvec iov;
 	struct scatterlist *sg = cmd->first_data_sg;
+	struct kvec iov;
+	u32 tx_hdr_size, data_len;
 	u32 offset = cmd->first_data_sg_off;
+	int tx_sent;
 
 send_hdr:
 	tx_hdr_size = ISCSI_HDR_LEN;
@@ -1313,7 +1312,7 @@ send_hdr:
 		u32 sub_len = min_t(u32, data_len, space);
 send_pg:
 		tx_sent = conn->sock->ops->sendpage(conn->sock,
-						    sg_page(sg), offset, sub_len, 0);
+					sg_page(sg), sg->offset + offset, sub_len, 0);
 		if (tx_sent != sub_len) {
 			if (tx_sent == -EAGAIN) {
 				printk(KERN_ERR "tcp_sendpage() returned"
@@ -1328,13 +1327,13 @@ send_pg:
 
 		data_len -= sub_len;
 		offset = 0;
-		sg++;
+		sg = sg_next(sg);
 	}
 
 send_padding:
 	if (cmd->padding) {
 		struct kvec *iov_p =
-			&cmd->iov_data[cmd->iov_data_count-2];
+			&cmd->iov_data[cmd->iov_data_count-1];
 
 		tx_sent = tx_data(conn, iov_p, 1, cmd->padding);
 		if (cmd->padding != tx_sent) {
@@ -1349,7 +1348,7 @@ send_padding:
 send_datacrc:
 	if (conn->conn_ops->DataDigest) {
 		struct kvec *iov_d =
-			&cmd->iov_data[cmd->iov_data_count-1];
+			&cmd->iov_data[cmd->iov_data_count];
 
 		tx_sent = tx_data(conn, iov_d, 1, ISCSI_CRC_LEN);
 		if (ISCSI_CRC_LEN != tx_sent) {
