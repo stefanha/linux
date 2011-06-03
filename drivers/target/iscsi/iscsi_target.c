@@ -696,7 +696,7 @@ static int iscsit_map_iovec(
 	u32 data_offset,
 	u32 data_length)
 {
-	u32 i;
+	u32 i = 0;
 	struct scatterlist *sg;
 	unsigned int page_off;
 
@@ -705,20 +705,20 @@ static int iscsit_map_iovec(
 	 * At this point, we also know each contains a page.
 	 */
 	sg = &cmd->t_mem_sg[data_offset / PAGE_SIZE];
-	page_off = (data_offset % PAGE_SIZE) + sg->offset;
+	page_off = (data_offset % PAGE_SIZE);
 
 	cmd->first_data_sg = sg;
 	cmd->first_data_sg_off = page_off;
 
-	i = 0;
 	while (data_length) {
-		u32 cur_len = min_t(u32, data_length, (sg[i].length - page_off));
+		u32 cur_len = min_t(u32, data_length, sg->length - page_off);
 
-		iov[i].iov_base = kmap(sg_page(&sg[i]));
+		iov[i].iov_base = kmap(sg_page(sg)) + sg->offset + page_off;
 		iov[i].iov_len = cur_len;
 
 		data_length -= cur_len;
 		page_off = 0;
+		sg = sg_next(sg);
 		i++;
 	}
 
