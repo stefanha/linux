@@ -1162,13 +1162,11 @@ attach_cmd:
 		goto after_immediate_data;
 	}
 	/*
-	 * Call into transport_generic_handle_cdb() that now translates
-	 * into a direct transport_generic_new_cmd() call with a NULL
-	 * se_cmd->se_tfo->new_cmd_map() pointer.
+	 * Call directly into transport_generic_new_cmd() to perform
+	 * the backend memory allocation.
 	 */
-	transport_generic_new_cmd(SE_CMD(cmd));
-
-	if (SE_CMD(cmd)->se_cmd_flags & SCF_SE_CMD_FAILED) {
+	ret = transport_generic_new_cmd(&cmd->se_cmd);
+	if ((ret < 0) || (SE_CMD(cmd)->se_cmd_flags & SCF_SE_CMD_FAILED)) {
 		immed_ret = IMMEDIATE_DATA_NORMAL_OPERATION;
 		dump_immediate_data = 1;
 		goto after_immediate_data;
