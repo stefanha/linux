@@ -240,7 +240,7 @@ static int iscsi_login_zero_tsih_s1(
 	init_completion(&sess->reinstatement_comp);
 	init_completion(&sess->session_wait_comp);
 	init_completion(&sess->session_waiting_on_uc_comp);
-	spin_lock_init(&sess->cmdsn_lock);
+	mutex_init(&sess->cmdsn_mutex);
 	spin_lock_init(&sess->conn_lock);
 	spin_lock_init(&sess->cr_a_lock);
 	spin_lock_init(&sess->cr_i_lock);

@@ -803,7 +803,7 @@ static struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
 }
 
 /*
- *	Called with sess->cmdsn_lock held.
+ *	Called with sess->cmdsn_mutex held.
  */
 static int iscsit_attach_ooo_cmdsn(
 	struct iscsi_session *sess,
@@ -850,7 +850,7 @@ static int iscsit_attach_ooo_cmdsn(
 
 /*
  *	Removes an struct iscsi_ooo_cmdsn from a session's list,
- *	called with struct iscsi_session->cmdsn_lock held.
+ *	called with struct iscsi_session->cmdsn_mutex held.
  */
 void iscsit_remove_ooo_cmdsn(
 	struct iscsi_session *sess,
@@ -865,18 +865,18 @@ void iscsit_clear_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 	struct iscsi_ooo_cmdsn *ooo_cmdsn;
 	struct iscsi_session *sess = conn->sess;
 
-	spin_lock(&sess->cmdsn_lock);
+	mutex_lock(&sess->cmdsn_mutex);
 	list_for_each_entry(ooo_cmdsn, &sess->sess_ooo_cmdsn_list, ooo_list) {
 		if (ooo_cmdsn->cid != conn->cid)
 			continue;
 
 		ooo_cmdsn->cmd = NULL;
 	}
-	spin_unlock(&sess->cmdsn_lock);
+	mutex_unlock(&sess->cmdsn_mutex);
 }
 
 /*
- *	Called with sess->cmdsn_lock held.
+ *	Called with sess->cmdsn_mutex held.
  */
 int iscsit_execute_ooo_cmdsns(struct iscsi_session *sess)
 {
@@ -917,7 +917,7 @@ int iscsit_execute_ooo_cmdsns(struct iscsi_session *sess)
 /*
  *	Called either:
  *
- *	1. With sess->cmdsn_lock held from iscsi_execute_ooo_cmdsns()
+ *	1. With sess->cmdsn_mutex held from iscsi_execute_ooo_cmdsns()
  *	or iscsi_check_received_cmdsn().
  *	2. With no locks held directly from iscsi_handle_XXX_pdu() functions
  *	for immediate commands.
@@ -1012,7 +1012,7 @@ int iscsit_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 			iscsit_start_dataout_timer(cmd, cmd->conn);
 			spin_unlock_bh(&cmd->dataout_timeout_lock);
 		}
-		return transport_generic_handle_cdb(&cmd->se_cmd);
+		return transport_handle_cdb_direct(&cmd->se_cmd);
 
 	case ISCSI_OP_NOOP_OUT:
 	case ISCSI_OP_TEXT:
@@ -1062,14 +1062,14 @@ void iscsit_free_all_ooo_cmdsns(struct iscsi_session *sess)
 {
 	struct iscsi_ooo_cmdsn *ooo_cmdsn, *ooo_cmdsn_tmp;
 
-	spin_lock(&sess->cmdsn_lock);
+	mutex_lock(&sess->cmdsn_mutex);
 	list_for_each_entry_safe(ooo_cmdsn, ooo_cmdsn_tmp,
 			&sess->sess_ooo_cmdsn_list, ooo_list) {
 
 		list_del(&ooo_cmdsn->ooo_list);
 		kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
 	}
-	spin_unlock(&sess->cmdsn_lock);
+	mutex_unlock(&sess->cmdsn_mutex);
 }
 
 int iscsit_handle_ooo_cmdsn(

@@ -613,7 +613,7 @@ struct iscsi_session {
 	u32			cmdsn_window;
 
 	/* protects cmdsn values */
-	spinlock_t		cmdsn_lock;
+	struct mutex		cmdsn_mutex;
 	/* session wide counter: expected command sequence number */
 	u32			exp_cmd_sn;
 	/* session wide counter: maximum allowed command sequence number */

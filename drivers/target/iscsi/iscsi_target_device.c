@@ -81,8 +81,8 @@ void iscsit_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess
 
 	cmd->maxcmdsn_inc = 1;
 
-	spin_lock(&sess->cmdsn_lock);
+	mutex_lock(&sess->cmdsn_mutex);
 	sess->max_cmd_sn += 1;
 	TRACE(TRACE_ISCSI, "Updated MaxCmdSN to 0x%08x\n", sess->max_cmd_sn);
-	spin_unlock(&sess->cmdsn_lock);
+	mutex_unlock(&sess->cmdsn_mutex);
 }

@@ -368,10 +368,10 @@ static int iscsi_target_do_tx_login_io(struct iscsi_conn *conn, struct iscsi_log
 	login_rsp->tsih			= be16_to_cpu(login_rsp->tsih);
 	login_rsp->itt			= be32_to_cpu(login_rsp->itt);
 	login_rsp->statsn		= be32_to_cpu(login_rsp->statsn);
-	spin_lock(&sess->cmdsn_lock);
+	mutex_lock(&sess->cmdsn_mutex);
 	login_rsp->exp_cmdsn		= be32_to_cpu(sess->exp_cmd_sn);
 	login_rsp->max_cmdsn		= be32_to_cpu(sess->max_cmd_sn);
-	spin_unlock(&sess->cmdsn_lock);
+	mutex_unlock(&sess->cmdsn_mutex);
 
 	return 0;
 }

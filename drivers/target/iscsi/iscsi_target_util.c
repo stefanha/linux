@@ -435,7 +435,7 @@ int iscsit_sequence_cmd(
 	int ret;
 	int cmdsn_ret;
 
-	spin_lock(&conn->sess->cmdsn_lock);
+	mutex_lock(&conn->sess->cmdsn_mutex);
 
 	cmdsn_ret = iscsit_check_received_cmdsn(conn->sess, cmdsn);
 	switch (cmdsn_ret) {
@@ -456,7 +456,7 @@ int iscsit_sequence_cmd(
 		ret = cmdsn_ret;
 		break;
 	}
-	spin_unlock(&conn->sess->cmdsn_lock);
+	mutex_unlock(&conn->sess->cmdsn_mutex);
 
 	return ret;
 }
