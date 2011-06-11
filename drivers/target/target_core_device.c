@@ -198,7 +198,6 @@ int transport_lookup_tmr_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 		se_tmr->tmr_lun = deve->se_lun;
 		se_cmd->se_lun = deve->se_lun;
 		se_lun = deve->se_lun;
-		se_tmr->tmr_dev = se_lun->lun_se_dev;
 		se_cmd->pr_res_key = deve->pr_res_key;
 		se_cmd->orig_fe_lun = unpacked_lun;
 		se_cmd->se_orig_obj_ptr = se_cmd->se_dev;
@@ -224,6 +223,7 @@ int transport_lookup_tmr_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 
 	/* Directly associate cmd with se_dev */
 	se_cmd->se_dev = se_lun->lun_se_dev;
+	se_tmr->tmr_dev = se_lun->lun_se_dev;
 
 	spin_lock(&se_tmr->tmr_dev->se_tmr_lock);
 	list_add_tail(&se_tmr->tmr_list, &se_tmr->tmr_dev->dev_tmr_list);
