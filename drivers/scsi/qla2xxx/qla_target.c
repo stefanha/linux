@@ -107,7 +107,7 @@ static void qla24xx_send_term_exchange(struct scsi_qla_host *ha, struct qla_tgt_
 	atio7_entry_t *atio, int ha_locked);
 static void qla_tgt_reject_free_srr_imm(struct scsi_qla_host *ha, struct srr_imm *imm,
 	int ha_lock);
-static int qla_tgt_cut_cmd_data_head(struct qla_tgt_cmd *cmd, unsigned int offset);
+static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset);
 static void qla_tgt_clear_tgt_db(struct qla_tgt *tgt, bool local_only);
 static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess);
 /*
@@ -1601,13 +1601,45 @@ EXPORT_SYMBOL(qla_tgt_xmit_tm_rsp);
 /* No locks */
 static int qla_tgt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 {
-	BUG_ON(prm->cmd->sg_cnt == 0);
+	struct qla_tgt_cmd *cmd = prm->cmd;
+	struct scatterlist *sg;
+	int initial_off = cmd->sg_srr_off, i = 0, j;
 
-	prm->sg = (struct scatterlist *)prm->cmd->sg;
-	prm->seg_cnt = pci_map_sg(prm->tgt->ha->pdev, prm->cmd->sg,
-		prm->cmd->sg_cnt, prm->cmd->dma_data_direction);
-	if (unlikely(prm->seg_cnt == 0))
-		goto out_err;
+	BUG_ON(cmd->sg_cnt == 0);
+
+	prm->sg = (struct scatterlist *)cmd->sg;
+	/*
+	 * Use pci_map_sg() for non SRR payloads, otherwise use pci_map_page()
+	 * from cmd->sg_srr_start with sg_srr_off -> initial_off
+	 */
+	if (!cmd->sg_srr_start) {
+		prm->seg_cnt = pci_map_sg(prm->tgt->ha->pdev, cmd->sg,
+					cmd->sg_cnt, cmd->dma_data_direction);
+		if (unlikely(prm->seg_cnt == 0))
+			goto out_err;
+	} else {
+		u64 dma_pointer;
+
+		for_each_sg(cmd->sg_srr_start, sg, cmd->sg_cnt, i) {
+			DEBUG22(qla_printk(KERN_INFO, cmd->vha->hw, "Calling pci_map_page:"
+				" sg[%d]: %p, page: %p, offset: %d , init_off: %d"
+				" length: %d\n", i, sg, sg_page(sg), sg->offset,
+				initial_off, (sg->length - initial_off)));
+
+			dma_pointer = pci_map_page(prm->tgt->ha->pdev,
+						sg_page(sg), initial_off,
+						(sg->length - initial_off),
+						prm->cmd->dma_data_direction);
+			if (unlikely(pci_dma_mapping_error(prm->tgt->ha->pdev,
+							dma_pointer)))
+				goto out_err;
+
+			cmd->srr_dma_buffer[i] = dma_pointer;
+			initial_off = 0;
+		}
+
+		prm->seg_cnt += i;
+	}
 
 	prm->cmd->sg_mapped = 1;
 
@@ -1629,6 +1661,19 @@ static int qla_tgt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 	return 0;
 
 out_err:
+	if (!cmd->sg_srr_start)
+		goto out;
+	j = i;
+	i = 0;
+	initial_off = cmd->sg_srr_off;
+
+	for_each_sg(cmd->sg_srr_start, sg, j, i) {
+		pci_unmap_page(prm->tgt->ha->pdev, cmd->srr_dma_buffer[i],
+				(sg->length - initial_off),
+				cmd->dma_data_direction);
+		initial_off = 0;
+	}
+out:
 	printk(KERN_ERR "qla_target(%d): PCI mapping failed: sg_cnt=%d",
 		0, prm->cmd->sg_cnt);
 	return -1;
@@ -1639,7 +1684,22 @@ static inline void qla_tgt_unmap_sg(struct scsi_qla_host *vha, struct qla_tgt_cm
 	struct qla_hw_data *ha = vha->hw;
 
 	BUG_ON(!cmd->sg_mapped);
-	pci_unmap_sg(ha->pdev, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction);
+	if (!cmd->sg_srr_start)
+		pci_unmap_sg(ha->pdev, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction);
+	else {
+		struct scatterlist *sg;
+		int i, initial_off = cmd->sg_srr_off;
+
+		for_each_sg(cmd->sg_srr_start, sg, cmd->sg_cnt, i) {
+			pci_unmap_page(ha->pdev, cmd->srr_dma_buffer[i],
+					(sg->length - initial_off),
+					cmd->dma_data_direction);
+			initial_off = 0;
+		}
+
+		cmd->sg_srr_start = NULL;
+		cmd->sg_srr_off = 0;
+	}
 	cmd->sg_mapped = 0;
 }
 
@@ -2264,6 +2324,12 @@ static void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_type)
 			cmd->tag));
 	}
 #endif
+	/*
+	 * It's currently not possible to simulate SRRs for FCP_WRITE without
+	 * a physical link layer failure, so don't even try here..
+	 */
+	if (cmd->dma_data_direction != DMA_FROM_DEVICE)
+		return;
 
 	if (qla_tgt_has_data(cmd) && (cmd->sg_cnt > 1) &&
 	    ((qla_tgt_srr_random() % 100) == 20)) {
@@ -2292,9 +2358,9 @@ static void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_type)
 			offset, cmd->bufflen));
 		if (offset == 0)
 			*xmit_type &= ~QLA_TGT_XMIT_DATA;
-		else if (qla_tgt_cut_cmd_data_head(cmd, offset)) {
-			DEBUG22(qla_printk(KERN_INFO, "qla_tgt_cut_cmd_data_head() failed (tag %d)",
-				cmd->tag));
+		else if (qla_tgt_set_data_offset(cmd, offset)) {
+			DEBUG22(qla_printk(KERN_INFO, cmd->vha->hw, "qla_tgt_set_data_offset()"
+				" failed (tag %d)", cmd->tag));
 		}
 	}
 }
@@ -2304,9 +2370,7 @@ static inline void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_ty
 
 int qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_status)
 {
-#if 0
 	qla_tgt_check_srr_debug(cmd, &xmit_type);
-#endif
 
 	DEBUG21(qla_printk(KERN_INFO, cmd->vha->hw, "is_send_status=%d,"
 		" cmd->bufflen=%d, cmd->sg_cnt=%d, cmd->dma_data_direction=%d",
@@ -2684,8 +2748,8 @@ void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd)
 {
 	BUG_ON(cmd->sg_mapped);
 
-	if (unlikely(cmd->free_sg))
-		kfree(cmd->sg);
+	if (unlikely(cmd->srr_dma_buffer))
+		kfree(cmd->srr_dma_buffer);
 	kmem_cache_free(qla_tgt_cmd_cachep, cmd);
 }
 EXPORT_SYMBOL(qla_tgt_free_cmd);
@@ -2709,8 +2773,6 @@ static int qla_tgt_prepare_srr_ctio(struct scsi_qla_host *vha, struct qla_tgt_cm
 			"but ctio is NULL\n", vha->vp_idx);
 		return EINVAL;
 	}
-
-	dump_stack();
 
 	sc = kzalloc(sizeof(*sc), GFP_ATOMIC);
 	if (sc != NULL) {
@@ -3458,126 +3520,77 @@ static int qla24xx_handle_els(struct scsi_qla_host *vha, notify24xx_entry_t *ioc
 	return res;
 }
 
-static int qla_tgt_cut_cmd_data_head(struct qla_tgt_cmd *cmd, unsigned int offset)
+static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 {
-	int res = 0;
-	int cnt, first_sg, first_page = 0, first_page_offs = 0, i;
-	unsigned int l;
-	int cur_dst, cur_src;
-	struct scatterlist *sg;
-	size_t bufflen = 0;
+	struct scatterlist *sg = NULL, *sg_srr_start = NULL;
+	size_t first_offset = 0, rem_offset = offset, tmp = 0;
+	int i;
 
-	first_sg = -1;
-	cnt = 0;
-	l = 0;
-	for (i = 0; i < cmd->sg_cnt; i++) {
-		l += cmd->sg[i].length;
-		if (l > offset) {
-			int sg_offs = l - cmd->sg[i].length;
-			first_sg = i;
-			if (cmd->sg[i].offset == 0) {
-				first_page_offs = offset % PAGE_SIZE;
-				first_page = (offset - sg_offs) >> PAGE_SHIFT;
-			} else {
-				DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "i=%d, sg[i]."
-					"offset=%d, sg_offs=%d", i, cmd->sg[i].offset,
-					sg_offs));
-				if ((cmd->sg[i].offset + sg_offs) > offset) {
-					first_page_offs = offset - sg_offs;
-					first_page = 0;
-				} else {
-					int sec_page_offs = sg_offs +
-						(PAGE_SIZE - cmd->sg[i].offset);
-					first_page_offs = sec_page_offs % PAGE_SIZE;
-					first_page = 1 +
-						((offset - sec_page_offs) >>
-							PAGE_SHIFT);
-				}
-			}
-			cnt = cmd->sg_cnt - i + (first_page_offs != 0);
+	DEBUG24(qla_printk(cmd->vha->hw, "Entering qla_tgt_set_data_offset:"
+		" cmd: %p, cmd->sg: %p, cmd->sg_cnt: %u, direction: %d\n",
+		cmd, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction));
+
+	if (!cmd->sg || !cmd->sg_cnt) {
+		printk(KERN_ERR "Missing cmd->sg or zero cmd->sg_cnt in"
+				" qla_tgt_set_data_offset\n");
+		return -EINVAL;
+	}
+	/*
+	 * Walk the current cmd->sg list until we locate the new sg_srr_start
+	 */
+	for_each_sg(cmd->sg, sg, cmd->sg_cnt, i) {
+		DEBUG24(qla_printk(cmd->vha->hw, "sg[%d]: %p page: %p,"
+			" length: %d, offset: %d\n", i, sg, sg_page(sg),
+			sg->length, sg->offset));
+
+		if ((sg->length + tmp) > offset) {
+			first_offset = rem_offset;
+			sg_srr_start = sg;
+			DEBUG24(qla_printk(cmd->vha->hw, "Found matching sg[%d],"
+				" using %p as sg_srr_start, and using first_offset:"
+				" %lu\n", i, sg, first_offset));
 			break;
 		}
+		tmp += sg->length;
+		rem_offset -= sg->length;
 	}
-	if (first_sg == -1) {
-		printk(KERN_ERR "qla_target(%d): Wrong offset %d, buf length %d",
-			cmd->vha->vp_idx, offset, cmd->bufflen);
+
+	if (!sg_srr_start) {
+		printk(KERN_ERR "Unable to locate sg_srr_start for offset: %u\n", offset);
 		return -EINVAL;
 	}
 
-	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "offset=%d, first_sg=%d, first_page=%d, "
-		"first_page_offs=%d, cmd->bufflen=%d, cmd->sg_cnt=%d", offset,
-		first_sg, first_page, first_page_offs, cmd->bufflen,
-		cmd->sg_cnt));
-
-	sg = kzalloc(cnt * sizeof(sg[0]), GFP_KERNEL);
-	if (sg == NULL) {
-		printk(KERN_ERR "qla_target(%d): Unable to allocate cut "
-			"SG (len %zd)", cmd->vha->vp_idx,
-			cnt * sizeof(sg[0]));
+	cmd->srr_dma_buffer = kzalloc(sizeof(dma_addr_t) * cmd->tgt->sg_tablesize,
+					GFP_KERNEL);
+	if (!cmd->srr_dma_buffer)
 		return -ENOMEM;
-	}
-	sg_init_table(sg, cnt);
 
-	cur_dst = 0;
-	cur_src = first_sg;
-	if (first_page_offs != 0) {
-		int fpgs;
-		sg_set_page(&sg[cur_dst], &sg_page(&cmd->sg[cur_src])[first_page],
-			PAGE_SIZE - first_page_offs, first_page_offs);
-		bufflen += sg[cur_dst].length;
-		DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "cur_dst=%d, cur_src=%d,"
-			" sg[].page=%p, sg[].offset=%d, sg[].length=%d, bufflen=%zu",
-			cur_dst, cur_src, sg_page(&sg[cur_dst]), sg[cur_dst].offset,
-			sg[cur_dst].length, bufflen));
-		cur_dst++;
-
-		fpgs = (cmd->sg[cur_src].length >> PAGE_SHIFT) +
-			((cmd->sg[cur_src].length & ~PAGE_MASK) != 0);
-		first_page++;
-		if (fpgs > first_page) {
-			sg_set_page(&sg[cur_dst],
-				&sg_page(&cmd->sg[cur_src])[first_page],
-				cmd->sg[cur_src].length - PAGE_SIZE*first_page,
-				0);
-			DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "fpgs=%d, cur_dst=%d,"
-				" cur_src=%d, sg[].page=%p, sg[].length=%d, bufflen=%zu",
-				fpgs, cur_dst, cur_src, sg_page(&sg[cur_dst]),
-				sg[cur_dst].length, bufflen));
-			bufflen += sg[cur_dst].length;
-			cur_dst++;
-		}
-		cur_src++;
-	}
-
-	while (cur_src < cmd->sg_cnt) {
-		sg_set_page(&sg[cur_dst], sg_page(&cmd->sg[cur_src]),
-			cmd->sg[cur_src].length, cmd->sg[cur_src].offset);
-		DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "cur_dst=%d, cur_src=%d, "
-			"sg[].page=%p, sg[].length=%d, sg[].offset=%d, "
-			"bufflen=%zu", cur_dst, cur_src, sg_page(&sg[cur_dst]),
-			sg[cur_dst].length, sg[cur_dst].offset, bufflen));
-		bufflen += sg[cur_dst].length;
-		cur_dst++;
-		cur_src++;
-	}
-
-	if (cmd->free_sg)
-		kfree(cmd->sg);
-
-	cmd->sg = sg;
-	cmd->free_sg = 1;
-	cmd->sg_cnt = cur_dst;
-	cmd->bufflen = bufflen;
+	cmd->sg_srr_start = sg_srr_start;
+	cmd->sg_cnt -= i;
+	cmd->sg_srr_off = first_offset;
+	cmd->bufflen -= offset;
 	cmd->offset += offset;
 
-	return res;
+	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg: %p\n", cmd->sg));
+	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg_cnt: %u\n", cmd->sg_cnt));
+	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off));
+	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->bufflen: %u\n", cmd->bufflen));
+	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->offset: %u\n", cmd->offset));
+
+	if (cmd->sg_cnt < 0)
+		BUG();
+
+	if (cmd->bufflen < 0)
+		BUG();
+
+	return 0;
 }
 
 static inline int qla_tgt_srr_adjust_data(struct qla_tgt_cmd *cmd,
 	uint32_t srr_rel_offs, int *xmit_type)
 {
 	int res = 0;
-	int rel_offs;
+	uint32_t rel_offs;
 
 	rel_offs = srr_rel_offs - cmd->offset;
 	DEBUG22(qla_printk(KERN_INFO, cmd->vha->hw, "srr_rel_offs=%d, rel_offs=%d",
@@ -3592,13 +3605,12 @@ static inline int qla_tgt_srr_adjust_data(struct qla_tgt_cmd *cmd,
 	} else if (rel_offs == cmd->bufflen)
 		*xmit_type = QLA_TGT_XMIT_STATUS;
 	else if (rel_offs > 0)
-		res = qla_tgt_cut_cmd_data_head(cmd, rel_offs);
+		res = qla_tgt_set_data_offset(cmd, rel_offs);
 
 	return res;
 }
 
 /* No locks, thread context */
-#warning FIXME: qla24xx_handle_srr
 static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio,
 	struct srr_imm *imm)
 {
@@ -3620,8 +3632,8 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 		__qla24xx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
 		break;
 	case SRR_IU_DATA_IN:
-#if 0
-		cmd->bufflen = 0;
+		cmd->bufflen = se_cmd->data_length;
+
 		if (qla_tgt_has_data(cmd)) {
 			uint32_t offset;
 			int xmit_type;
@@ -3640,17 +3652,16 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 				cmd->se_cmd.scsi_status);
 			goto out_reject;
 		}
-#else
-		printk("q24 SRR_IU_DATA_IN, rejecting\n");
-		dump_stack();
-		goto out_reject;
-#endif
 		break;
 	case SRR_IU_DATA_OUT:
-#if 0
-		cmd->bufflen = 0;
-		cmd->sg = NULL;
-		cmd->sg_cnt = 0;
+		if (!cmd->sg || !cmd->sg_cnt) {
+			printk(KERN_ERR "Unable to process SRR_IU_DATA_OUT due to"
+				" missing cmd->sg\n");
+			dump_stack();
+			goto out_reject;
+		}
+		cmd->bufflen = se_cmd->data_length;
+
 		if (qla_tgt_has_data(cmd)) {
 			uint32_t offset;
 			int xmit_type;
@@ -3660,9 +3671,9 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			spin_lock_irqsave(&ha->hardware_lock, flags);
 			qla24xx_send_notify_ack(vha, ntfy,
 				NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
-			spin_unlock_irqrestore(&ha->hardware_lock. flags);
+			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 			if (xmit_type & QLA_TGT_XMIT_DATA)
-				__qla_tgt_rdy_to_xfer(cmd);
+				qla_tgt_rdy_to_xfer(cmd);
 		} else {
 			printk(KERN_ERR "qla_target(%d): SRR for out data for cmd "
 				"without them (tag %d, SCSI status %d), "
@@ -3670,11 +3681,6 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 				cmd->se_cmd.scsi_status);
 			goto out_reject;
 		}
-#else
-		printk("q24 SRR_IU_DATA_OUT, rejecting\n");
-		dump_stack();
-		goto out_reject;
-#endif
 		break;
 	default:
 		printk(KERN_ERR "qla_target(%d): Unknown srr_ui value %x",
@@ -3719,8 +3725,7 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 		__qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
 		break;
 	case SRR_IU_DATA_IN:
-#if 0
-		cmd->bufflen = 0;
+		cmd->bufflen = se_cmd->data_length;
 		if (qla_tgt_has_data(cmd)) {
 			uint32_t offset;
 			int xmit_type;
@@ -3731,7 +3736,7 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			qla2xxx_send_notify_ack(vha, ntfy, 0, 0, 0,
 				NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			__qla2xxx_xmit_response(cmd, xmit_type);
+			__qla2xxx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
 		} else {
 			printk(KERN_ERR "qla_target(%d): SRR for in data for cmd "
 				"without them (tag %d, SCSI status %d), "
@@ -3739,16 +3744,15 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 				cmd->se_cmd.scsi_status);
 			goto out_reject;
 		}
-#else
-		printk("q2x SRR_IU_DATA_IN:\n");
-		dump_stack();
-#endif
 		break;
 	case SRR_IU_DATA_OUT:
-#if 0
-		cmd->bufflen = 0;
-		cmd->sg = NULL;
-		cmd->sg_cnt = 0;
+		if (!cmd->sg || !cmd->sg_cnt) {
+			printk(KERN_ERR "Unable to process SRR_IU_DATA_OUT due to"
+					" missing cmd->sg\n");
+			goto out_reject;
+		}
+		cmd->bufflen = se_cmd->data_length;
+
 		if (qla_tgt_has_data(cmd)) {
 			uint32_t offset;
 			int xmit_type;
@@ -3760,7 +3764,7 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 				NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 			if (xmit_type & QLA_TGT_XMIT_DATA)
-				__qla_tgt_rdy_to_xfer(cmd);
+				qla_tgt_rdy_to_xfer(cmd);
 		} else {
 			printk(KERN_ERR "qla_target(%d): SRR for out data for cmd "
 				"without them (tag %d, SCSI status %d), "
@@ -3768,10 +3772,6 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 				cmd->se_cmd.scsi_status);
 			goto out_reject;
 		}
-#else
-		printk("q2x SRR_IU_DATA_OUT:\n");
-		dump_stack();
-#endif
 		break;
 	default:
 		printk(KERN_ERR "qla_target(%d): Unknown srr_ui value %x",
@@ -3821,7 +3821,6 @@ static void qla_tgt_reject_free_srr_imm(struct scsi_qla_host *vha, struct srr_im
 	kfree(imm);
 }
 
-#warning FIXME: qla_tgt_handle_srr_work()
 static void qla_tgt_handle_srr_work(struct work_struct *work)
 {
 	struct qla_tgt *tgt = container_of(work, struct qla_tgt, srr_work);
@@ -3869,25 +3868,33 @@ restart:
 
 		cmd = sctio->cmd;
 		vha = cmd->vha;
-#if 0
-		/* Restore the originals, except bufflen */
+		/*
+		 * Reset qla_tgt_cmd SRR values and SGL pointer+count to follow
+		 * tcm_qla2xxx_write_pending() and tcm_qla2xxx_queue_data_in()
+		 * logic..
+		 */
 		cmd->offset = 0;
-		if (cmd->free_sg) {
-			kfree(cmd->sg);
-			cmd->free_sg = 0;
+		if (cmd->sg_srr_start) {
+			cmd->sg_srr_start = NULL;
+			cmd->sg_srr_off = 0;
+			kfree(cmd->srr_dma_buffer);
 		}
-		cmd->sg = NULL;
-		cmd->sg_cnt = 0;
-
 		se_cmd = &cmd->se_cmd;
+
+		if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
+		    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
+			cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
+			cmd->sg = se_cmd->t_tasks_sg_chained;
+		} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
+			cmd->sg_cnt = 1;
+			cmd->sg = &se_cmd->t_tasks_sg_bounce;
+		}
 
 		DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p (se_cmd %p, tag %d, op %x), "
 			"sg_cnt=%d, offset=%d", cmd, &cmd->se_cmd,
 			cmd->tag, T_TASK(se_cmd)->t_task_cdb[0], cmd->sg_cnt,
 			cmd->offset));
-#else
-		dump_stack();
-#endif
+
 		if (IS_FWI2_CAPABLE(ha))
 			qla24xx_handle_srr(vha, sctio, imm);
 		else
@@ -4924,7 +4931,6 @@ static void qla_tgt_sess_work_fn(struct work_struct *work)
 int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 {
 	struct qla_tgt *tgt;
-	int sg_tablesize;
 
 	DEBUG21(qla_printk(KERN_INFO, ha, "Registering target for host %ld(%p)",
 			base_vha->host_no, ha));
@@ -4960,7 +4966,7 @@ int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 			   "addressing", base_vha->vp_idx);
 			tgt->tgt_enable_64bit_addr = 1;
 			/* 3 is reserved */
-			sg_tablesize =
+			tgt->sg_tablesize =
 			    QLA_MAX_SG_24XX(base_vha->req->length - 3);
 			tgt->datasegs_per_cmd = DATASEGS_PER_COMMAND_24XX;
 			tgt->datasegs_per_cont = DATASEGS_PER_CONT_24XX;
@@ -4970,14 +4976,14 @@ int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 				   "addressing enabled", base_vha->vp_idx);
 			tgt->tgt_enable_64bit_addr = 1;
 			/* 3 is reserved */
-			sg_tablesize =
+			tgt->sg_tablesize =
 				QLA_MAX_SG64(base_vha->req->length - 3);
 			tgt->datasegs_per_cmd = DATASEGS_PER_COMMAND64;
 			tgt->datasegs_per_cont = DATASEGS_PER_CONT64;
 		} else {
 			printk(KERN_INFO "qla_target(%d): Using 32 Bit "
 				   "PCI addressing", base_vha->vp_idx);
-			sg_tablesize =
+			tgt->sg_tablesize =
 				QLA_MAX_SG32(base_vha->req->length - 3);
 			tgt->datasegs_per_cmd = DATASEGS_PER_COMMAND32;
 			tgt->datasegs_per_cont = DATASEGS_PER_CONT32;
