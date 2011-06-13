@@ -1731,7 +1731,7 @@ static int qla_tgt_check_reserve_free_req(struct scsi_qla_host *vha, uint32_t re
 			"request ring: vha->req->ring_index=%d, vha->req->cnt=%d, "
 			"req_cnt=%d\n", vha->vp_idx, vha->req->ring_index,
 			vha->req->cnt, req_cnt);
-		return -ENOMEM;
+		return -EAGAIN;
 	}
 	vha->req->cnt -= req_cnt;
 
@@ -1844,8 +1844,7 @@ static int qla24xx_build_ctio_pkt(struct qla_tgt_prm *prm, struct scsi_qla_host 
 		 * know the initiator's LOOP ID, hence we can't find
 		 * the session and, so, the command.
 		 */
-		dump_stack();
-		return -ENOMEM;
+		return -EAGAIN;
 	} else
 		ha->cmds[h-1] = prm->cmd;
 
@@ -2568,7 +2567,7 @@ int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 
 	/* Calculate number of entries and segments required */
 	if (qla_tgt_pci_map_calc_cnt(&prm) != 0)
-		return -ENOMEM;
+		return -EAGAIN;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
