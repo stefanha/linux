@@ -116,7 +116,7 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 
 
 	mutex_lock(&vq->mutex);
-	vhost_disable_notify(vq);
+	vhost_disable_notify(&vs->dev, vq);
 
 	for (;;) {
 		head = vhost_get_vq_desc(&vs->dev, vq, vq->iov,
@@ -127,8 +127,8 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 			break;
 		/* Nothing new?  Wait for eventfd to tell us they refilled. */
 		if (head == vq->num) {
-			if (unlikely(vhost_enable_notify(vq))) {
-				vhost_disable_notify(vq);
+			if (unlikely(vhost_enable_notify(&vs->dev, vq))) {
+				vhost_disable_notify(&vs->dev, vq);
 				continue;
 			}
 			break;
