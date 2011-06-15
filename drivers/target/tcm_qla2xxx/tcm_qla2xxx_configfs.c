@@ -510,7 +510,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 
 	se_nacl = p->se_nacl;
 	if (!se_nacl) {
-		printk(KERN_ERR "Unable to locate s_id: 0x%02x area: 0x%02x"
+		DEBUG_QLA_TGT_SESS_MAP("Unable to locate s_id: 0x%02x area: 0x%02x"
 			" al_pa: %02x\n", domain, area, al_pa);
 		return NULL;
 	}
@@ -624,7 +624,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 
 	se_nacl = fc_loopid->se_nacl;
 	if (!se_nacl) {
-		printk(KERN_ERR "Unable to locate se_nacl by loop_id:"
+		DEBUG_QLA_TGT_SESS_MAP("Unable to locate se_nacl by loop_id:"
 				" 0x%04x\n", loop_id);
 		return NULL;
 	}
