@@ -207,8 +207,14 @@ static void do_virtblk_request(struct request_queue *q)
 		issued++;
 	}
 
-	if (issued)
-		virtqueue_kick(vblk->vq);
+	if (!issued)
+		return;
+
+	if (virtqueue_kick_prepare(vblk->vq)) {
+		spin_unlock(&vblk->lock);
+		virtqueue_notify(vblk->vq);
+		spin_lock(&vblk->lock);
+	}
 }
 
 /* return id (s/n) string for *disk to *id_str
