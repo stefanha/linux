@@ -73,7 +73,7 @@ static void vhost_scsi_complete_cmd_work(struct vhost_work *work)
 		struct se_cmd *se_cmd = &tv_cmd->tvc_se_cmd;
 		int ret;
 
-		printk("%s tv_cmd %p resid %u status %#02x\n", __func__,
+		pr_err("%s tv_cmd %p resid %u status %#02x\n", __func__,
 			tv_cmd, se_cmd->residual_count, se_cmd->scsi_status);
 
 		list_del(&tv_cmd->tvc_completion_list);
@@ -102,7 +102,7 @@ void vhost_scsi_complete_cmd(struct tcm_vhost_cmd *tv_cmd)
 {
 	struct vhost_scsi *vs = tv_cmd->tvc_vhost;
 
-	printk("%s tv_cmd %p\n", __func__, tv_cmd);
+	pr_err("%s tv_cmd %p\n", __func__, tv_cmd);
 
 	/* TODO lock tvc_completion_list? */
 	list_add_tail(&tv_cmd->tvc_completion_list, &vs->vs_completion_list);
@@ -230,14 +230,14 @@ static int vhost_scsi_map_iov_to_sgl(struct tcm_vhost_cmd *tv_cmd,
 	sg = kmalloc(sizeof(tv_cmd->tvc_sgl[0]) * sgl_count, GFP_ATOMIC);
 	if (!sg)
 		return -ENOMEM;
-	printk("%s sg %p sgl_count %u is_err %ld\n", __func__,
+	pr_err("%s sg %p sgl_count %u is_err %ld\n", __func__,
 	       sg, sgl_count, IS_ERR(sg));
 	sg_init_table(sg, sgl_count);
 
 	tv_cmd->tvc_sgl = sg;
 	tv_cmd->tvc_sgl_count = sgl_count;
 
-	printk("Mapping %u iovecs for %u pages\n", niov, sgl_count);
+	pr_err("Mapping %u iovecs for %u pages\n", niov, sgl_count);
 	for (i = 0; i < niov; i++) {
 		ret = vhost_scsi_map_to_sgl(sg, sgl_count, iov[i].iov_base,
 		                            iov[i].iov_len, write);
@@ -365,6 +365,7 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 			pr_err("Faulted on CDB\n");
 			break; /* TODO should all breaks be continues? */
 		}
+
 		/*
 		 * Check that the recieved CDB size does not exceeded our
 		 * hardcoded max for tcm_vhost
@@ -377,8 +378,8 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 			break; /* TODO */
 		}
 
-		printk("vhost_scsi got command opcode: %#02x, lun: %#llx\n",
-			tv_cmd->tvc_cdb[0], v_header.lun);
+		pr_err("vhost_scsi got command opcode: %#02x, lun: %#llx\n",
+		       tv_cmd->tvc_cdb[0], v_header.lun);
 
 		if (data_direction != DMA_NONE) {
 			ret = vhost_scsi_map_iov_to_sgl(tv_cmd, &vq->iov[2],
