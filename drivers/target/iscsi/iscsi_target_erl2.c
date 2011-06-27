@@ -23,7 +23,6 @@
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_datain_values.h"
 #include "iscsi_target_util.h"
@@ -102,7 +101,7 @@ static int iscsit_attach_inactive_connection_recovery_entry(
 	list_add_tail(&cr->cr_list, &sess->cr_inactive_list);
 
 	sess->conn_recovery_count++;
-	TRACE(TRACE_ERL2, "Incremented connection recovery count to %u for"
+	pr_debug("Incremented connection recovery count to %u for"
 		" SID: %u\n", sess->conn_recovery_count, sess->sid);
 	spin_unlock(&sess->cr_i_lock);
 
@@ -197,7 +196,7 @@ int iscsit_remove_active_connection_recovery_entry(
 	list_del(&cr->cr_list);
 
 	sess->conn_recovery_count--;
-	TRACE(TRACE_ERL2, "Decremented connection recovery count to %u for"
+	pr_debug("Decremented connection recovery count to %u for"
 		" SID: %u\n", sess->conn_recovery_count, sess->sid);
 	spin_unlock(&sess->cr_a_lock);
 
@@ -227,7 +226,7 @@ int iscsit_remove_cmd_from_connection_recovery(
 	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
-		printk(KERN_ERR "struct iscsi_conn_recovery pointer for ITT: 0x%08x"
+		pr_err("struct iscsi_conn_recovery pointer for ITT: 0x%08x"
 			" is NULL!\n", cmd->init_task_tag);
 		BUG();
 	}
@@ -256,7 +255,7 @@ void iscsit_discard_cr_cmds_by_expstatsn(
 		}
 
 		dropped_count++;
-		TRACE(TRACE_ERL2, "Dropping Acknowledged ITT: 0x%08x, StatSN:"
+		pr_debug("Dropping Acknowledged ITT: 0x%08x, StatSN:"
 			" 0x%08x, CID: %hu.\n", cmd->init_task_tag,
 				cmd->stat_sn, cr->cid);
 
@@ -274,17 +273,17 @@ void iscsit_discard_cr_cmds_by_expstatsn(
 	}
 	spin_unlock(&cr->conn_recovery_cmd_lock);
 
-	TRACE(TRACE_ERL2, "Dropped %u total acknowledged commands on"
+	pr_debug("Dropped %u total acknowledged commands on"
 		" CID: %hu less than old ExpStatSN: 0x%08x\n",
 			dropped_count, cr->cid, exp_statsn);
 
 	if (!cr->cmd_count) {
-		TRACE(TRACE_ERL2, "No commands to be reassigned for failed"
+		pr_debug("No commands to be reassigned for failed"
 			" connection CID: %hu on SID: %u\n",
 			cr->cid, sess->sid);
 		iscsit_remove_inactive_connection_recovery_entry(cr, sess);
 		iscsit_attach_active_connection_recovery_entry(sess, cr);
-		printk(KERN_INFO "iSCSI connection recovery successful for CID:"
+		pr_debug("iSCSI connection recovery successful for CID:"
 			" %hu on SID: %u\n", cr->cid, sess->sid);
 		iscsit_remove_active_connection_recovery_entry(cr, sess);
 	} else {
@@ -308,7 +307,7 @@ int iscsit_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 			continue;
 
 		dropped_count++;
-		TRACE(TRACE_ERL2, "Dropping unacknowledged CmdSN:"
+		pr_debug("Dropping unacknowledged CmdSN:"
 		" 0x%08x during connection recovery on CID: %hu\n",
 			ooo_cmdsn->cmdsn, conn->cid);
 		iscsit_remove_ooo_cmdsn(sess, ooo_cmdsn);
@@ -334,7 +333,7 @@ int iscsit_discard_unacknowledged_ooo_cmdsns_for_conn(struct iscsi_conn *conn)
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
-	TRACE(TRACE_ERL2, "Dropped %u total unacknowledged commands on CID:"
+	pr_debug("Dropped %u total unacknowledged commands on CID:"
 		" %hu for ExpCmdSN: 0x%08x.\n", dropped_count, conn->cid,
 				sess->exp_cmd_sn);
 	return 0;
@@ -354,7 +353,7 @@ int iscsit_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	 */
 	cr = kzalloc(sizeof(struct iscsi_conn_recovery), GFP_KERNEL);
 	if (!cr) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 			" struct iscsi_conn_recovery.\n");
 		return -1;
 	}
@@ -375,7 +374,7 @@ int iscsit_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 
 		if ((cmd->iscsi_opcode != ISCSI_OP_SCSI_CMD) &&
 		    (cmd->iscsi_opcode != ISCSI_OP_NOOP_OUT)) {
-			TRACE(TRACE_ERL2, "Not performing realligence on"
+			pr_debug("Not performing realligence on"
 				" Opcode: 0x%02x, ITT: 0x%08x, CmdSN: 0x%08x,"
 				" CID: %hu\n", cmd->iscsi_opcode,
 				cmd->init_task_tag, cmd->cmd_sn, conn->cid);
@@ -422,7 +421,7 @@ int iscsit_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 		}
 
 		cmd_count++;
-		TRACE(TRACE_ERL2, "Preparing Opcode: 0x%02x, ITT: 0x%08x,"
+		pr_debug("Preparing Opcode: 0x%02x, ITT: 0x%08x,"
 			" CmdSN: 0x%08x, StatSN: 0x%08x, CID: %hu for"
 			" realligence.\n", cmd->iscsi_opcode,
 			cmd->init_task_tag, cmd->cmd_sn, cmd->stat_sn,

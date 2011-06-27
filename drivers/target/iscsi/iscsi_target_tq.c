@@ -22,7 +22,6 @@
 #include <linux/list.h>
 #include <linux/bitmap.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_tq.h"
 #include "iscsi_target.h"
@@ -85,7 +84,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 	for (i = 0; i < thread_pair_count; i++) {
 		ts = kzalloc(sizeof(struct iscsi_thread_set), GFP_KERNEL);
 		if (!(ts)) {
-			printk(KERN_ERR "Unable to allocate memory for"
+			pr_err("Unable to allocate memory for"
 					" thread set.\n");
 			return allocated_thread_pair_count;
 		}
@@ -97,7 +96,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 				iscsit_global->ts_bitmap_count, get_order(1));
 		spin_unlock(&ts_bitmap_lock);
 		if (thread_id < 0) {
-			printk(KERN_ERR "bitmap_find_free_region() failed for"
+			pr_err("bitmap_find_free_region() failed for"
 				" thread_set_bitmap\n");
 			kfree(ts);
 			return allocated_thread_pair_count;
@@ -119,7 +118,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 					ISCSI_TX_THREAD_NAME);
 		if (IS_ERR(ts->tx_thread)) {
 			dump_stack();
-			printk(KERN_ERR "Unable to start iscsi_target_tx_thread\n");
+			pr_err("Unable to start iscsi_target_tx_thread\n");
 			break;
 		}
 
@@ -127,7 +126,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 					ISCSI_RX_THREAD_NAME);
 		if (IS_ERR(ts->rx_thread)) {
 			kthread_stop(ts->tx_thread);
-			printk(KERN_ERR "Unable to start iscsi_target_rx_thread\n");
+			pr_err("Unable to start iscsi_target_rx_thread\n");
 			break;
 		}
 		ts->create_threads = 0;
@@ -136,7 +135,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 		allocated_thread_pair_count++;
 	}
 
-	printk(KERN_INFO "Spawned %d thread set(s) (%d total threads).\n",
+	pr_debug("Spawned %d thread set(s) (%d total threads).\n",
 		allocated_thread_pair_count, allocated_thread_pair_count * 2);
 	return allocated_thread_pair_count;
 }
@@ -173,7 +172,7 @@ extern void iscsi_deallocate_thread_sets(void)
 	}
 
 	if (released_count)
-		printk(KERN_INFO "Stopped %d thread set(s) (%d total threads)."
+		pr_debug("Stopped %d thread set(s) (%d total threads)."
 			"\n", released_count, released_count * 2);
 }
 
@@ -214,7 +213,7 @@ static void iscsi_deallocate_extra_thread_sets(void)
 	}
 
 	if (released_count) {
-		printk(KERN_INFO "Stopped %d thread set(s) (%d total threads)."
+		pr_debug("Stopped %d thread set(s) (%d total threads)."
 			"\n", released_count, released_count * 2);
 	}
 }
@@ -274,7 +273,7 @@ void iscsi_set_thread_clear(struct iscsi_conn *conn, u8 thread_clear)
 	struct iscsi_thread_set *ts = NULL;
 
 	if (!conn->thread_set) {
-		printk(KERN_ERR "struct iscsi_conn->thread_set is NULL\n");
+		pr_err("struct iscsi_conn->thread_set is NULL\n");
 		return;
 	}
 	ts = conn->thread_set;
@@ -296,7 +295,7 @@ void iscsi_set_thread_set_signal(struct iscsi_conn *conn, u8 signal_sent)
 	struct iscsi_thread_set *ts = NULL;
 
 	if (!conn->thread_set) {
-		printk(KERN_ERR "struct iscsi_conn->thread_set is NULL\n");
+		pr_err("struct iscsi_conn->thread_set is NULL\n");
 		return;
 	}
 	ts = conn->thread_set;
@@ -312,7 +311,7 @@ int iscsi_release_thread_set(struct iscsi_conn *conn)
 	struct iscsi_thread_set *ts = NULL;
 
 	if (!conn || !conn->thread_set) {
-		printk(KERN_ERR "connection or thread set pointer is NULL\n");
+		pr_err("connection or thread set pointer is NULL\n");
 		BUG();
 	}
 	ts = conn->thread_set;
@@ -449,7 +448,7 @@ sleep:
 		return NULL;
 
 	if (!ts->conn) {
-		printk(KERN_ERR "struct iscsi_thread_set->conn is NULL for"
+		pr_err("struct iscsi_thread_set->conn is NULL for"
 			" thread_id: %d, going back to sleep\n", ts->thread_id);
 		goto sleep;
 	}
@@ -501,7 +500,7 @@ sleep:
 		return NULL;
 
 	if (!ts->conn) {
-		printk(KERN_ERR "struct iscsi_thread_set->conn is NULL for "
+		pr_err("struct iscsi_thread_set->conn is NULL for "
 			" thread_id: %d, going back to sleep\n",
 			ts->thread_id);
 		goto sleep;
@@ -533,7 +532,7 @@ int iscsi_thread_set_init(void)
 	size = BITS_TO_LONGS(iscsit_global->ts_bitmap_count) * sizeof(long);
 	iscsit_global->ts_bitmap = kzalloc(size, GFP_KERNEL);
 	if (!(iscsit_global->ts_bitmap)) {
-		printk(KERN_ERR "Unable to allocate iscsit_global->ts_bitmap\n");
+		pr_err("Unable to allocate iscsit_global->ts_bitmap\n");
 		return -ENOMEM;
 	}
 

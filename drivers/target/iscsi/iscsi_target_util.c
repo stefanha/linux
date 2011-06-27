@@ -27,7 +27,6 @@
 #include <target/target_core_fabric_ops.h>
 #include <target/target_core_configfs.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_parameters.h"
 #include "iscsi_target_seq_pdu_list.h"
@@ -39,6 +38,23 @@
 #include "iscsi_target_tq.h"
 #include "iscsi_target_util.h"
 #include "iscsi_target.h"
+
+#define PRINT_BUFF(buff, len)					\
+{								\
+	int zzz;						\
+								\
+	pr_debug("%d:\n", __LINE__);				\
+	for (zzz = 0; zzz < len; zzz++) {			\
+		if (zzz % 16 == 0) {				\
+			if (zzz)				\
+				pr_debug("\n");			\
+			pr_debug("%4i: ", zzz);			\
+		}						\
+		pr_debug("%02x ", (unsigned char) (buff)[zzz]);	\
+	}							\
+	if ((len + 1) % 16)					\
+		pr_debug("\n");					\
+}
 
 extern struct list_head g_tiqn_list;
 extern spinlock_t tiqn_lock;
@@ -57,7 +73,7 @@ int iscsit_add_r2t_to_list(
 
 	r2t = kmem_cache_zalloc(lio_r2t_cache, GFP_ATOMIC);
 	if (!r2t) {
-		printk(KERN_ERR "Unable to allocate memory for struct iscsi_r2t.\n");
+		pr_err("Unable to allocate memory for struct iscsi_r2t.\n");
 		return -1;
 	}
 	INIT_LIST_HEAD(&r2t->r2t_list);
@@ -92,7 +108,7 @@ struct iscsi_r2t *iscsit_get_r2t_for_eos(
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
-	printk(KERN_ERR "Unable to locate R2T for Offset: %u, Length:"
+	pr_err("Unable to locate R2T for Offset: %u, Length:"
 			" %u\n", offset, length);
 	return NULL;
 }
@@ -110,7 +126,7 @@ struct iscsi_r2t *iscsit_get_r2t_from_list(struct iscsi_cmd *cmd)
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
-	printk(KERN_ERR "Unable to locate next R2T to send for ITT:"
+	pr_err("Unable to locate next R2T to send for ITT:"
 			" 0x%08x.\n", cmd->init_task_tag);
 	return NULL;
 }
@@ -144,7 +160,7 @@ struct iscsi_cmd *iscsit_allocate_cmd(struct iscsi_conn *conn, gfp_t gfp_mask)
 
 	cmd = kmem_cache_zalloc(lio_cmd_cache, gfp_mask);
 	if (!cmd) {
-		printk(KERN_ERR "Unable to allocate memory for struct iscsi_cmd.\n");
+		pr_err("Unable to allocate memory for struct iscsi_cmd.\n");
 		return NULL;
 	}
 
@@ -194,7 +210,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd(
 	else if (iscsi_task_attr == ISCSI_ATTR_ACA)
 		sam_task_attr = MSG_ACA_TAG;
 	else {
-		printk(KERN_INFO "Unknown iSCSI Task Attribute: 0x%02x, using"
+		pr_debug("Unknown iSCSI Task Attribute: 0x%02x, using"
 			" MSG_SIMPLE_TAG\n", iscsi_task_attr);
 		sam_task_attr = MSG_SIMPLE_TAG;
 	}
@@ -225,7 +241,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(
 
 	cmd->tmr_req = kzalloc(sizeof(struct iscsi_tmr_req), GFP_KERNEL);
 	if (!cmd->tmr_req) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 			" Task Management command!\n");
 		return NULL;
 	}
@@ -267,7 +283,7 @@ struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(
 		tcm_function = TMR_TARGET_COLD_RESET;
 		break;
 	default:
-		printk(KERN_ERR "Unknown iSCSI TMR Function:"
+		pr_err("Unknown iSCSI TMR Function:"
 			" 0x%02x\n", function);
 		goto out;
 	}
@@ -350,7 +366,7 @@ struct iscsi_seq *iscsit_get_seq_holder_for_r2t(struct iscsi_cmd *cmd)
 	u32 i;
 
 	if (!cmd->seq_list) {
-		printk(KERN_ERR "struct iscsi_cmd->seq_list is NULL!\n");
+		pr_err("struct iscsi_cmd->seq_list is NULL!\n");
 		return NULL;
 	}
 
@@ -395,26 +411,26 @@ static inline int iscsit_check_received_cmdsn(struct iscsi_session *sess, u32 cm
 	 * CRC failures.
 	 */
 	if (iscsi_sna_gt(cmdsn, sess->max_cmd_sn)) {
-		printk(KERN_ERR "Received CmdSN: 0x%08x is greater than"
+		pr_err("Received CmdSN: 0x%08x is greater than"
 		       " MaxCmdSN: 0x%08x, protocol error.\n", cmdsn,
 		       sess->max_cmd_sn);
 		ret = CMDSN_ERROR_CANNOT_RECOVER;
 
 	} else if (cmdsn == sess->exp_cmd_sn) {
 		sess->exp_cmd_sn++;
-		TRACE(TRACE_CMDSN, "Received CmdSN matches ExpCmdSN,"
+		pr_debug("Received CmdSN matches ExpCmdSN,"
 		      " incremented ExpCmdSN to: 0x%08x\n",
 		      sess->exp_cmd_sn);
 		ret = CMDSN_NORMAL_OPERATION;
 
 	} else if (iscsi_sna_gt(cmdsn, sess->exp_cmd_sn)) {
-		TRACE(TRACE_CMDSN, "Received CmdSN: 0x%08x is greater"
+		pr_debug("Received CmdSN: 0x%08x is greater"
 		      " than ExpCmdSN: 0x%08x, not acknowledging.\n",
 		      cmdsn, sess->exp_cmd_sn);
 		ret = CMDSN_HIGHER_THAN_EXP;
 
 	} else {
-		printk(KERN_ERR "Received CmdSN: 0x%08x is less than"
+		pr_err("Received CmdSN: 0x%08x is less than"
 		       " ExpCmdSN: 0x%08x, ignoring.\n", cmdsn,
 		       sess->exp_cmd_sn);
 		ret = CMDSN_LOWER_THAN_EXP;
@@ -469,7 +485,7 @@ int iscsit_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 	u32 payload_length = ntoh24(hdr->dlength);
 
 	if (conn->sess->sess_ops->InitialR2T) {
-		printk(KERN_ERR "Received unexpected unsolicited data"
+		pr_err("Received unexpected unsolicited data"
 			" while InitialR2T=Yes, protocol error.\n");
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_UNEXPECTED_UNSOLICITED_DATA, 0);
@@ -478,7 +494,7 @@ int iscsit_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 
 	if ((cmd->first_burst_len + payload_length) >
 	     conn->sess->sess_ops->FirstBurstLength) {
-		printk(KERN_ERR "Total %u bytes exceeds FirstBurstLength: %u"
+		pr_err("Total %u bytes exceeds FirstBurstLength: %u"
 			" for this Unsolicited DataOut Burst.\n",
 			(cmd->first_burst_len + payload_length),
 				conn->sess->sess_ops->FirstBurstLength);
@@ -493,7 +509,7 @@ int iscsit_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 	if (((cmd->first_burst_len + payload_length) != cmd->data_length) &&
 	    ((cmd->first_burst_len + payload_length) !=
 	      conn->sess->sess_ops->FirstBurstLength)) {
-		printk(KERN_ERR "Unsolicited non-immediate data received %u"
+		pr_err("Unsolicited non-immediate data received %u"
 			" does not equal FirstBurstLength: %u, and does"
 			" not equal ExpXferLen %u.\n",
 			(cmd->first_burst_len + payload_length),
@@ -520,7 +536,7 @@ struct iscsi_cmd *iscsit_find_cmd_from_itt(
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
-	printk(KERN_ERR "Unable to locate ITT: 0x%08x on CID: %hu",
+	pr_err("Unable to locate ITT: 0x%08x on CID: %hu",
 			init_task_tag, conn->cid);
 	return NULL;
 }
@@ -541,7 +557,7 @@ struct iscsi_cmd *iscsit_find_cmd_from_itt_or_dump(
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
-	printk(KERN_ERR "Unable to locate ITT: 0x%08x on CID: %hu,"
+	pr_err("Unable to locate ITT: 0x%08x on CID: %hu,"
 			" dumping payload\n", init_task_tag, conn->cid);
 	if (length)
 		iscsit_dump_data_payload(conn, length, 1);
@@ -564,7 +580,7 @@ struct iscsi_cmd *iscsit_find_cmd_from_ttt(
 	}
 	spin_unlock_bh(&conn->cmd_lock);
 
-	printk(KERN_ERR "Unable to locate TTT: 0x%08x on CID: %hu\n",
+	pr_err("Unable to locate TTT: 0x%08x on CID: %hu\n",
 			targ_xfer_tag, conn->cid);
 	return NULL;
 }
@@ -630,7 +646,7 @@ void iscsit_add_cmd_to_immediate_queue(
 
 	qr = kmem_cache_zalloc(lio_qr_cache, GFP_ATOMIC);
 	if (!qr) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 				" struct iscsi_queue_req\n");
 		return;
 	}
@@ -690,7 +706,7 @@ static void iscsit_remove_cmd_from_immediate_queue(
 	spin_unlock_bh(&conn->immed_queue_lock);
 
 	if (atomic_read(&cmd->immed_queue_count)) {
-		printk(KERN_ERR "ITT: 0x%08x immed_queue_count: %d\n",
+		pr_err("ITT: 0x%08x immed_queue_count: %d\n",
 			cmd->init_task_tag,
 			atomic_read(&cmd->immed_queue_count));
 	}
@@ -705,7 +721,7 @@ void iscsit_add_cmd_to_response_queue(
 
 	qr = kmem_cache_zalloc(lio_qr_cache, GFP_ATOMIC);
 	if (!qr) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 			" struct iscsi_queue_req\n");
 		return;
 	}
@@ -766,7 +782,7 @@ static void iscsit_remove_cmd_from_response_queue(
 	spin_unlock_bh(&conn->response_queue_lock);
 
 	if (atomic_read(&cmd->response_queue_count)) {
-		printk(KERN_ERR "ITT: 0x%08x response_queue_count: %d\n",
+		pr_err("ITT: 0x%08x response_queue_count: %d\n",
 			cmd->init_task_tag,
 			atomic_read(&cmd->response_queue_count));
 	}
@@ -922,7 +938,7 @@ int iscsit_set_sync_and_steering_values(struct iscsi_conn *conn)
 			conn->of_marker = (next_marker - conn->of_marker);
 		}
 		conn->of_marker_offset = 0;
-		printk(KERN_INFO "Setting OFMarker value to %u based on Initial"
+		pr_debug("Setting OFMarker value to %u based on Initial"
 			" Markerless Interval.\n", conn->of_marker);
 	}
 
@@ -935,7 +951,7 @@ int iscsit_set_sync_and_steering_values(struct iscsi_conn *conn)
 					(login_ifmarker_count * MARKER_SIZE);
 			conn->if_marker = (next_marker - conn->if_marker);
 		}
-		printk(KERN_INFO "Setting IFMarker value to %u based on Initial"
+		pr_debug("Setting IFMarker value to %u based on Initial"
 			" Markerless Interval.\n", conn->if_marker);
 	}
 
@@ -1055,7 +1071,7 @@ static void iscsit_handle_nopin_response_timeout(unsigned long data)
 		return;
 	}
 
-	TRACE(TRACE_TIMER, "Did not receive response to NOPIN on CID: %hu on"
+	pr_debug("Did not receive response to NOPIN on CID: %hu on"
 		" SID: %u, failing connection.\n", conn->cid,
 			conn->sess->sid);
 	conn->nopin_response_timer_flags &= ~ISCSI_TF_RUNNING;
@@ -1120,7 +1136,7 @@ void iscsit_start_nopin_response_timer(struct iscsi_conn *conn)
 	conn->nopin_response_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_response_timer);
 
-	TRACE(TRACE_TIMER, "Started NOPIN Response Timer on CID: %d to %u"
+	pr_debug("Started NOPIN Response Timer on CID: %d to %u"
 		" seconds\n", conn->cid, na->nopin_response_timeout);
 	spin_unlock_bh(&conn->nopin_timer_lock);
 }
@@ -1185,7 +1201,7 @@ void __iscsit_start_nopin_timer(struct iscsi_conn *conn)
 	conn->nopin_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_timer);
 
-	TRACE(TRACE_TIMER, "Started NOPIN Timer on CID: %d at %u second"
+	pr_debug("Started NOPIN Timer on CID: %d at %u second"
 		" interval\n", conn->cid, na->nopin_timeout);
 }
 
@@ -1213,7 +1229,7 @@ void iscsit_start_nopin_timer(struct iscsi_conn *conn)
 	conn->nopin_timer_flags |= ISCSI_TF_RUNNING;
 	add_timer(&conn->nopin_timer);
 
-	TRACE(TRACE_TIMER, "Started NOPIN Timer on CID: %d at %u second"
+	pr_debug("Started NOPIN Timer on CID: %d at %u second"
 			" interval\n", conn->cid, na->nopin_timeout);
 	spin_unlock_bh(&conn->nopin_timer_lock);
 }
@@ -1258,7 +1274,7 @@ send_data:
 	tx_sent = tx_data(conn, &iov[0], iov_count, tx_size);
 	if (tx_size != tx_sent) {
 		if (tx_sent == -EAGAIN) {
-			printk(KERN_ERR "tx_data() returned -EAGAIN\n");
+			pr_err("tx_data() returned -EAGAIN\n");
 			goto send_data;
 		} else
 			return -1;
@@ -1289,7 +1305,7 @@ send_hdr:
 	tx_sent = tx_data(conn, &iov, 1, tx_hdr_size);
 	if (tx_hdr_size != tx_sent) {
 		if (tx_sent == -EAGAIN) {
-			printk(KERN_ERR "tx_data() returned -EAGAIN\n");
+			pr_err("tx_data() returned -EAGAIN\n");
 			goto send_hdr;
 		}
 		return -1;
@@ -1310,12 +1326,12 @@ send_pg:
 					sg_page(sg), sg->offset + offset, sub_len, 0);
 		if (tx_sent != sub_len) {
 			if (tx_sent == -EAGAIN) {
-				printk(KERN_ERR "tcp_sendpage() returned"
+				pr_err("tcp_sendpage() returned"
 						" -EAGAIN\n");
 				goto send_pg;
 			}
 
-			printk(KERN_ERR "tcp_sendpage() failure: %d\n",
+			pr_err("tcp_sendpage() failure: %d\n",
 					tx_sent);
 			return -1;
 		}
@@ -1333,7 +1349,7 @@ send_padding:
 		tx_sent = tx_data(conn, iov_p, 1, cmd->padding);
 		if (cmd->padding != tx_sent) {
 			if (tx_sent == -EAGAIN) {
-				printk(KERN_ERR "tx_data() returned -EAGAIN\n");
+				pr_err("tx_data() returned -EAGAIN\n");
 				goto send_padding;
 			}
 			return -1;
@@ -1348,7 +1364,7 @@ send_datacrc:
 		tx_sent = tx_data(conn, iov_d, 1, ISCSI_CRC_LEN);
 		if (ISCSI_CRC_LEN != tx_sent) {
 			if (tx_sent == -EAGAIN) {
-				printk(KERN_ERR "tx_data() returned -EAGAIN\n");
+				pr_err("tx_data() returned -EAGAIN\n");
 				goto send_datacrc;
 			}
 			return -1;
@@ -1391,7 +1407,7 @@ int iscsit_tx_login_rsp(struct iscsi_conn *conn, u8 status_class, u8 status_deta
 
 	err = tx_data(conn, &iov, 1, ISCSI_HDR_LEN);
 	if (err != ISCSI_HDR_LEN) {
-		printk(KERN_ERR "tx_data returned less than expected\n");
+		pr_err("tx_data returned less than expected\n");
 		return -1;
 	}
 
@@ -1402,7 +1418,7 @@ void iscsit_print_session_params(struct iscsi_session *sess)
 {
 	struct iscsi_conn *conn;
 
-	printk(KERN_INFO "-----------------------------[Session Params for"
+	pr_debug("-----------------------------[Session Params for"
 		" SID: %u]-----------------------------\n", sess->sid);
 	spin_lock_bh(&sess->conn_lock);
 	list_for_each_entry(conn, &sess->sess_conn_list, conn_list)
@@ -1446,9 +1462,9 @@ static int iscsit_do_rx_data(
 		size = data;
 		orig_iov_len = iov_record[orig_iov_loc].iov_len;
 		while (size > 0) {
-			TRACE(TRACE_SSLR, "rx_data: #1 orig_iov_len %u,"
+			pr_debug("rx_data: #1 orig_iov_len %u,"
 			" orig_iov_loc %u\n", orig_iov_len, orig_iov_loc);
-			TRACE(TRACE_SSLR, "rx_data: #2 rx_marker %u, size"
+			pr_debug("rx_data: #2 rx_marker %u, size"
 				" %u\n", *rx_marker, size);
 
 			if (orig_iov_len >= *rx_marker) {
@@ -1473,7 +1489,7 @@ static int iscsit_do_rx_data(
 				orig_iov_len -= old_rx_marker;
 				per_iov_bytes += old_rx_marker;
 
-				TRACE(TRACE_SSLR, "rx_data: #3 new_rx_marker"
+				pr_debug("rx_data: #3 new_rx_marker"
 					" %u, size %u\n", *rx_marker, size);
 			} else {
 				iov[iov_count].iov_len = orig_iov_len;
@@ -1489,7 +1505,7 @@ static int iscsit_do_rx_data(
 					orig_iov_len =
 					iov_record[++orig_iov_loc].iov_len;
 
-				TRACE(TRACE_SSLR, "rx_data: #4 new_rx_marker"
+				pr_debug("rx_data: #4 new_rx_marker"
 					" %u, size %u\n", *rx_marker, size);
 			}
 		}
@@ -1499,12 +1515,12 @@ static int iscsit_do_rx_data(
 		iov_len	= iov_count;
 
 		if (iov_count > count->ss_iov_count) {
-			printk(KERN_ERR "iov_count: %d, count->ss_iov_count:"
+			pr_err("iov_count: %d, count->ss_iov_count:"
 				" %d\n", iov_count, count->ss_iov_count);
 			return -1;
 		}
 		if (rx_marker_iov > count->ss_marker_count) {
-			printk(KERN_ERR "rx_marker_iov: %d, count->ss_marker"
+			pr_err("rx_marker_iov: %d, count->ss_marker"
 				"_count: %d\n", rx_marker_iov,
 				count->ss_marker_count);
 			return -1;
@@ -1518,19 +1534,19 @@ static int iscsit_do_rx_data(
 		rx_loop = kernel_recvmsg(conn->sock, &msg, iov_p, iov_len,
 					(data - total_rx), MSG_WAITALL);
 		if (rx_loop <= 0) {
-			TRACE(TRACE_NET, "rx_loop: %d total_rx: %d\n",
+			pr_debug("rx_loop: %d total_rx: %d\n",
 				rx_loop, total_rx);
 			return rx_loop;
 		}
 		total_rx += rx_loop;
-		TRACE(TRACE_NET, "rx_loop: %d, total_rx: %d, data: %d\n",
+		pr_debug("rx_loop: %d, total_rx: %d, data: %d\n",
 				rx_loop, total_rx, data);
 	}
 
 	if (count->sync_and_steering) {
 		int j;
 		for (j = 0; j < rx_marker_iov; j++) {
-			TRACE(TRACE_SSLR, "rx_data: #5 j: %d, offset: %d\n",
+			pr_debug("rx_data: #5 j: %d, offset: %d\n",
 				j, rx_marker_val[j]);
 			conn->of_marker_offset = rx_marker_val[j];
 		}
@@ -1553,7 +1569,7 @@ static int iscsit_do_tx_data(
 		return -1;
 
 	if (data <= 0) {
-		printk(KERN_ERR "Data length is: %d\n", data);
+		pr_err("Data length is: %d\n", data);
 		return -1;
 	}
 
@@ -1579,9 +1595,9 @@ static int iscsit_do_tx_data(
 		size = data;
 		orig_iov_len = iov_record[orig_iov_loc].iov_len;
 		while (size > 0) {
-			TRACE(TRACE_SSLT, "tx_data: #1 orig_iov_len %u,"
+			pr_debug("tx_data: #1 orig_iov_len %u,"
 			" orig_iov_loc %u\n", orig_iov_len, orig_iov_loc);
-			TRACE(TRACE_SSLT, "tx_data: #2 tx_marker %u, size"
+			pr_debug("tx_data: #2 tx_marker %u, size"
 				" %u\n", *tx_marker, size);
 
 			if (orig_iov_len >= *tx_marker) {
@@ -1608,9 +1624,9 @@ static int iscsit_do_tx_data(
 				orig_iov_len -= old_tx_marker;
 				per_iov_bytes += old_tx_marker;
 
-				TRACE(TRACE_SSLT, "tx_data: #3 new_tx_marker"
+				pr_debug("tx_data: #3 new_tx_marker"
 					" %u, size %u\n", *tx_marker, size);
-				TRACE(TRACE_SSLT, "tx_data: #4 offset %u\n",
+				pr_debug("tx_data: #4 offset %u\n",
 					tx_marker_val[tx_marker_iov-1]);
 			} else {
 				iov[iov_count].iov_len = orig_iov_len;
@@ -1626,7 +1642,7 @@ static int iscsit_do_tx_data(
 					orig_iov_len =
 					iov_record[++orig_iov_loc].iov_len;
 
-				TRACE(TRACE_SSLT, "tx_data: #5 new_tx_marker"
+				pr_debug("tx_data: #5 new_tx_marker"
 					" %u, size %u\n", *tx_marker, size);
 			}
 		}
@@ -1637,12 +1653,12 @@ static int iscsit_do_tx_data(
 		iov_len = iov_count;
 
 		if (iov_count > count->ss_iov_count) {
-			printk(KERN_ERR "iov_count: %d, count->ss_iov_count:"
+			pr_err("iov_count: %d, count->ss_iov_count:"
 				" %d\n", iov_count, count->ss_iov_count);
 			return -1;
 		}
 		if (tx_marker_iov > count->ss_marker_count) {
-			printk(KERN_ERR "tx_marker_iov: %d, count->ss_marker"
+			pr_err("tx_marker_iov: %d, count->ss_marker"
 				"_count: %d\n", tx_marker_iov,
 				count->ss_marker_count);
 			return -1;
@@ -1656,12 +1672,12 @@ static int iscsit_do_tx_data(
 		tx_loop = kernel_sendmsg(conn->sock, &msg, iov_p, iov_len,
 					(data - total_tx));
 		if (tx_loop <= 0) {
-			TRACE(TRACE_NET, "tx_loop: %d total_tx %d\n",
+			pr_debug("tx_loop: %d total_tx %d\n",
 				tx_loop, total_tx);
 			return tx_loop;
 		}
 		total_tx += tx_loop;
-		TRACE(TRACE_NET, "tx_loop: %d, total_tx: %d, data: %d\n",
+		pr_debug("tx_loop: %d, total_tx: %d, data: %d\n",
 					tx_loop, total_tx, data);
 	}
 

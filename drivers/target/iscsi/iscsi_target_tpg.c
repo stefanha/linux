@@ -24,7 +24,6 @@
 #include <target/target_core_configfs.h>
 #include <target/target_core_tpg.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_erl0.h"
 #include "iscsi_target_login.h"
@@ -40,7 +39,7 @@ struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *tiqn, u1
 
 	tpg = kzalloc(sizeof(struct iscsi_portal_group), GFP_KERNEL);
 	if (!tpg) {
-		printk(KERN_ERR "Unable to allocate struct iscsi_portal_group\n");
+		pr_err("Unable to allocate struct iscsi_portal_group\n");
 		return NULL;
 	}
 
@@ -67,7 +66,7 @@ int iscsit_load_discovery_tpg(void)
 
 	tpg = iscsit_alloc_portal_group(NULL, 1);
 	if (!tpg) {
-		printk(KERN_ERR "Unable to allocate struct iscsi_portal_group\n");
+		pr_err("Unable to allocate struct iscsi_portal_group\n");
 		return -1;
 	}
 
@@ -105,7 +104,7 @@ int iscsit_load_discovery_tpg(void)
 	spin_unlock(&tpg->tpg_state_lock);
 
 	iscsit_global->discovery_tpg = tpg;
-	printk(KERN_INFO "CORE[0] - Allocated Discovery TPG\n");
+	pr_debug("CORE[0] - Allocated Discovery TPG\n");
 
 	return 0;
 out:
@@ -179,7 +178,7 @@ static void iscsit_clear_tpg_np_login_thread(
 	struct iscsi_portal_group *tpg)
 {
 	if (!tpg_np->tpg_np) {
-		printk(KERN_ERR "struct iscsi_tpg_np->tpg_np is NULL!\n");
+		pr_err("struct iscsi_tpg_np->tpg_np is NULL!\n");
 		return;
 	}
 
@@ -194,7 +193,7 @@ void iscsit_clear_tpg_np_login_threads(
 	spin_lock(&tpg->tpg_np_lock);
 	list_for_each_entry(tpg_np, &tpg->tpg_gnp_list, tpg_np_list) {
 		if (!tpg_np->tpg_np) {
-			printk(KERN_ERR "struct iscsi_tpg_np->tpg_np is NULL!\n");
+			pr_err("struct iscsi_tpg_np->tpg_np is NULL!\n");
 			continue;
 		}
 		spin_unlock(&tpg->tpg_np_lock);
@@ -226,7 +225,7 @@ static void iscsit_set_default_tpg_attribs(struct iscsi_portal_group *tpg)
 int iscsit_tpg_add_portal_group(struct iscsi_tiqn *tiqn, struct iscsi_portal_group *tpg)
 {
 	if (tpg->tpg_state != TPG_STATE_FREE) {
-		printk(KERN_ERR "Unable to add iSCSI Target Portal Group: %d"
+		pr_err("Unable to add iSCSI Target Portal Group: %d"
 			" while not in TPG_STATE_FREE state.\n", tpg->tpgt);
 		return -EEXIST;
 	}
@@ -244,7 +243,7 @@ int iscsit_tpg_add_portal_group(struct iscsi_tiqn *tiqn, struct iscsi_portal_gro
 	spin_lock(&tiqn->tiqn_tpg_lock);
 	list_add_tail(&tpg->tpg_list, &tiqn->tiqn_tpg_list);
 	tiqn->tiqn_ntpgs++;
-	printk(KERN_INFO "CORE[%s]_TPG[%hu] - Added iSCSI Target Portal Group\n",
+	pr_debug("CORE[%s]_TPG[%hu] - Added iSCSI Target Portal Group\n",
 			tiqn->tiqn, tpg->tpgt);
 	spin_unlock(&tiqn->tiqn_tpg_lock);
 
@@ -270,7 +269,7 @@ int iscsit_tpg_del_portal_group(
 	spin_unlock(&tpg->tpg_state_lock);
 
 	if (iscsit_release_sessions_for_tpg(tpg, force) < 0) {
-		printk(KERN_ERR "Unable to delete iSCSI Target Portal Group:"
+		pr_err("Unable to delete iSCSI Target Portal Group:"
 			" %hu while active sessions exist, and force=0\n",
 			tpg->tpgt);
 		tpg->tpg_state = old_state;
@@ -295,7 +294,7 @@ int iscsit_tpg_del_portal_group(
 	list_del(&tpg->tpg_list);
 	spin_unlock(&tiqn->tiqn_tpg_lock);
 
-	printk(KERN_INFO "CORE[%s]_TPG[%hu] - Deleted iSCSI Target Portal Group\n",
+	pr_debug("CORE[%s]_TPG[%hu] - Deleted iSCSI Target Portal Group\n",
 			tiqn->tiqn, tpg->tpgt);
 
 	kfree(tpg);
@@ -309,7 +308,7 @@ int iscsit_tpg_enable_portal_group(struct iscsi_portal_group *tpg)
 
 	spin_lock(&tpg->tpg_state_lock);
 	if (tpg->tpg_state == TPG_STATE_ACTIVE) {
-		printk(KERN_ERR "iSCSI target portal group: %hu is already"
+		pr_err("iSCSI target portal group: %hu is already"
 			" active, ignoring request.\n", tpg->tpgt);
 		spin_unlock(&tpg->tpg_state_lock);
 		return -EINVAL;
@@ -342,7 +341,7 @@ int iscsit_tpg_enable_portal_group(struct iscsi_portal_group *tpg)
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
 	tiqn->tiqn_active_tpgs++;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Enabled iSCSI Target Portal Group\n",
+	pr_debug("iSCSI_TPG[%hu] - Enabled iSCSI Target Portal Group\n",
 			tpg->tpgt);
 	spin_unlock(&tiqn->tiqn_tpg_lock);
 
@@ -356,7 +355,7 @@ int iscsit_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 
 	spin_lock(&tpg->tpg_state_lock);
 	if (tpg->tpg_state == TPG_STATE_INACTIVE) {
-		printk(KERN_ERR "iSCSI Target Portal Group: %hu is already"
+		pr_err("iSCSI Target Portal Group: %hu is already"
 			" inactive, ignoring request.\n", tpg->tpgt);
 		spin_unlock(&tpg->tpg_state_lock);
 		return -EINVAL;
@@ -370,7 +369,7 @@ int iscsit_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 		spin_lock(&tpg->tpg_state_lock);
 		tpg->tpg_state = old_state;
 		spin_unlock(&tpg->tpg_state_lock);
-		printk(KERN_ERR "Unable to disable iSCSI Target Portal Group:"
+		pr_err("Unable to disable iSCSI Target Portal Group:"
 			" %hu while active sessions exist, and force=0\n",
 			tpg->tpgt);
 		return -EPERM;
@@ -382,7 +381,7 @@ int iscsit_tpg_disable_portal_group(struct iscsi_portal_group *tpg, int force)
 
 	spin_lock(&tiqn->tiqn_tpg_lock);
 	tiqn->tiqn_active_tpgs--;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Disabled iSCSI Target Portal Group\n",
+	pr_debug("iSCSI_TPG[%hu] - Disabled iSCSI Target Portal Group\n",
 			tpg->tpgt);
 	spin_unlock(&tiqn->tiqn_tpg_lock);
 
@@ -432,7 +431,7 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
 	if (!tpg_np) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 				" struct iscsi_tpg_np.\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -465,7 +464,7 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 		spin_unlock(&tpg_np_parent->tpg_np_parent_lock);
 	}
 
-	printk(KERN_INFO "CORE[%s] - Added Network Portal: %s:%hu,%hu on %s\n",
+	pr_debug("CORE[%s] - Added Network Portal: %s:%hu,%hu on %s\n",
 		tpg->tpg_tiqn->tiqn, np->np_ip, np->np_port, tpg->tpgt,
 		(np->np_network_transport == ISCSI_TCP) ? "TCP" : "SCTP");
 
@@ -479,7 +478,7 @@ static int iscsit_tpg_release_np(
 {
 	iscsit_clear_tpg_np_login_thread(tpg_np, tpg);
 
-	printk(KERN_INFO "CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s\n",
+	pr_debug("CORE[%s] - Removed Network Portal: %s:%hu,%hu on %s\n",
 		tpg->tpg_tiqn->tiqn, np->np_ip, np->np_port, tpg->tpgt,
 		(np->np_network_transport == ISCSI_TCP) ? "TCP" : "SCTP");
 
@@ -502,7 +501,7 @@ int iscsit_tpg_del_network_portal(
 
 	np = tpg_np->tpg_np;
 	if (!np) {
-		printk(KERN_ERR "Unable to locate struct iscsi_np from"
+		pr_err("Unable to locate struct iscsi_np from"
 				" struct iscsi_tpg_np\n");
 		return -EINVAL;
 	}
@@ -518,7 +517,7 @@ int iscsit_tpg_del_network_portal(
 				tpg_np_child_list) {
 			ret = iscsit_tpg_del_network_portal(tpg, tpg_np_child);
 			if (ret < 0)
-				printk(KERN_ERR "iscsit_tpg_del_network_portal()"
+				pr_err("iscsit_tpg_del_network_portal()"
 					" failed: %d\n", ret);
 		}
 	} else {
@@ -559,7 +558,7 @@ int iscsit_ta_authentication(struct iscsi_portal_group *tpg, u32 authentication)
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if ((authentication != 1) && (authentication != 0)) {
-		printk(KERN_ERR "Illegal value for authentication parameter:"
+		pr_err("Illegal value for authentication parameter:"
 			" %u, ignoring request.\n", authentication);
 		return -1;
 	}
@@ -606,7 +605,7 @@ int iscsit_ta_authentication(struct iscsi_portal_group *tpg, u32 authentication)
 
 out:
 	a->authentication = authentication;
-	printk(KERN_INFO "%s iSCSI Authentication Methods for TPG: %hu.\n",
+	pr_debug("%s iSCSI Authentication Methods for TPG: %hu.\n",
 		a->authentication ? "Enforcing" : "Disabling", tpg->tpgt);
 
 	return 0;
@@ -619,17 +618,17 @@ int iscsit_ta_login_timeout(
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if (login_timeout > TA_LOGIN_TIMEOUT_MAX) {
-		printk(KERN_ERR "Requested Login Timeout %u larger than maximum"
+		pr_err("Requested Login Timeout %u larger than maximum"
 			" %u\n", login_timeout, TA_LOGIN_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (login_timeout < TA_LOGIN_TIMEOUT_MIN) {
-		printk(KERN_ERR "Requested Logout Timeout %u smaller than"
+		pr_err("Requested Logout Timeout %u smaller than"
 			" minimum %u\n", login_timeout, TA_LOGIN_TIMEOUT_MIN);
 		return -EINVAL;
 	}
 
 	a->login_timeout = login_timeout;
-	printk(KERN_INFO "Set Logout Timeout to %u for Target Portal Group"
+	pr_debug("Set Logout Timeout to %u for Target Portal Group"
 		" %hu\n", a->login_timeout, tpg->tpgt);
 
 	return 0;
@@ -642,19 +641,19 @@ int iscsit_ta_netif_timeout(
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if (netif_timeout > TA_NETIF_TIMEOUT_MAX) {
-		printk(KERN_ERR "Requested Network Interface Timeout %u larger"
+		pr_err("Requested Network Interface Timeout %u larger"
 			" than maximum %u\n", netif_timeout,
 				TA_NETIF_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (netif_timeout < TA_NETIF_TIMEOUT_MIN) {
-		printk(KERN_ERR "Requested Network Interface Timeout %u smaller"
+		pr_err("Requested Network Interface Timeout %u smaller"
 			" than minimum %u\n", netif_timeout,
 				TA_NETIF_TIMEOUT_MIN);
 		return -EINVAL;
 	}
 
 	a->netif_timeout = netif_timeout;
-	printk(KERN_INFO "Set Network Interface Timeout to %u for"
+	pr_debug("Set Network Interface Timeout to %u for"
 		" Target Portal Group %hu\n", a->netif_timeout, tpg->tpgt);
 
 	return 0;
@@ -667,12 +666,12 @@ int iscsit_ta_generate_node_acls(
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if ((flag != 0) && (flag != 1)) {
-		printk(KERN_ERR "Illegal value %d\n", flag);
+		pr_err("Illegal value %d\n", flag);
 		return -EINVAL;
 	}
 
 	a->generate_node_acls = flag;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Generate Initiator Portal Group ACLs: %s\n",
+	pr_debug("iSCSI_TPG[%hu] - Generate Initiator Portal Group ACLs: %s\n",
 		tpg->tpgt, (a->generate_node_acls) ? "Enabled" : "Disabled");
 
 	return 0;
@@ -685,19 +684,19 @@ int iscsit_ta_default_cmdsn_depth(
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if (tcq_depth > TA_DEFAULT_CMDSN_DEPTH_MAX) {
-		printk(KERN_ERR "Requested Default Queue Depth: %u larger"
+		pr_err("Requested Default Queue Depth: %u larger"
 			" than maximum %u\n", tcq_depth,
 				TA_DEFAULT_CMDSN_DEPTH_MAX);
 		return -EINVAL;
 	} else if (tcq_depth < TA_DEFAULT_CMDSN_DEPTH_MIN) {
-		printk(KERN_ERR "Requested Default Queue Depth: %u smaller"
+		pr_err("Requested Default Queue Depth: %u smaller"
 			" than minimum %u\n", tcq_depth,
 				TA_DEFAULT_CMDSN_DEPTH_MIN);
 		return -EINVAL;
 	}
 
 	a->default_cmdsn_depth = tcq_depth;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Set Default CmdSN TCQ Depth to %u\n",
+	pr_debug("iSCSI_TPG[%hu] - Set Default CmdSN TCQ Depth to %u\n",
 		tpg->tpgt, a->default_cmdsn_depth);
 
 	return 0;
@@ -710,12 +709,12 @@ int iscsit_ta_cache_dynamic_acls(
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if ((flag != 0) && (flag != 1)) {
-		printk(KERN_ERR "Illegal value %d\n", flag);
+		pr_err("Illegal value %d\n", flag);
 		return -EINVAL;
 	}
 
 	a->cache_dynamic_acls = flag;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Cache Dynamic Initiator Portal Group"
+	pr_debug("iSCSI_TPG[%hu] - Cache Dynamic Initiator Portal Group"
 		" ACLs %s\n", tpg->tpgt, (a->cache_dynamic_acls) ?
 		"Enabled" : "Disabled");
 
@@ -729,12 +728,12 @@ int iscsit_ta_demo_mode_write_protect(
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if ((flag != 0) && (flag != 1)) {
-		printk(KERN_ERR "Illegal value %d\n", flag);
+		pr_err("Illegal value %d\n", flag);
 		return -EINVAL;
 	}
 
 	a->demo_mode_write_protect = flag;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Demo Mode Write Protect bit: %s\n",
+	pr_debug("iSCSI_TPG[%hu] - Demo Mode Write Protect bit: %s\n",
 		tpg->tpgt, (a->demo_mode_write_protect) ? "ON" : "OFF");
 
 	return 0;
@@ -747,12 +746,12 @@ int iscsit_ta_prod_mode_write_protect(
 	struct iscsi_tpg_attrib *a = &tpg->tpg_attrib;
 
 	if ((flag != 0) && (flag != 1)) {
-		printk(KERN_ERR "Illegal value %d\n", flag);
+		pr_err("Illegal value %d\n", flag);
 		return -EINVAL;
 	}
 
 	a->prod_mode_write_protect = flag;
-	printk(KERN_INFO "iSCSI_TPG[%hu] - Production Mode Write Protect bit:"
+	pr_debug("iSCSI_TPG[%hu] - Production Mode Write Protect bit:"
 		" %s\n", tpg->tpgt, (a->prod_mode_write_protect) ?
 		"ON" : "OFF");
 

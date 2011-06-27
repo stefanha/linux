@@ -60,7 +60,7 @@ struct iscsi_portal_group *lio_get_tpg_from_tpg_item(
 	int ret;
 
 	if (!tpg) {
-		printk(KERN_ERR "Unable to locate struct iscsi_portal_group "
+		pr_err("Unable to locate struct iscsi_portal_group "
 			"pointer\n");
 		return NULL;
 	}
@@ -108,12 +108,12 @@ static ssize_t lio_target_np_store_sctp(
 
 	op = simple_strtoul(page, &endptr, 0);
 	if ((op != 1) && (op != 0)) {
-		printk(KERN_ERR "Illegal value for tpg_enable: %u\n", op);
+		pr_err("Illegal value for tpg_enable: %u\n", op);
 		return -EINVAL;
 	}
 	np = tpg_np->tpg_np;
 	if (!np) {
-		printk(KERN_ERR "Unable to locate struct iscsi_np from"
+		pr_err("Unable to locate struct iscsi_np from"
 				" struct iscsi_tpg_np\n");
 		return -EINVAL;
 	}
@@ -176,7 +176,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	char buf[MAX_PORTAL_LEN + 1];
 
 	if (strlen(name) > MAX_PORTAL_LEN) {
-		printk(KERN_ERR "strlen(name): %d exceeds MAX_PORTAL_LEN: %d\n",
+		pr_err("strlen(name): %d exceeds MAX_PORTAL_LEN: %d\n",
 			(int)strlen(name), MAX_PORTAL_LEN);
 		return ERR_PTR(-EOVERFLOW);
 	}
@@ -191,7 +191,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 
 		str2 = strstr(str, "]");
 		if (!str2) {
-			printk(KERN_ERR "Unable to locate trailing \"]\""
+			pr_err("Unable to locate trailing \"]\""
 				" in IPv6 iSCSI network portal address\n");
 			return ERR_PTR(-EINVAL);
 		}
@@ -200,7 +200,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		str2++; /* Skip over the "]" */
 		port_str = strstr(str2, ":");
 		if (!port_str) {
-			printk(KERN_ERR "Unable to locate \":port\""
+			pr_err("Unable to locate \":port\""
 				" in IPv6 iSCSI network portal address\n");
 			return ERR_PTR(-EINVAL);
 		}
@@ -209,7 +209,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 
 		ret = strict_strtoul(port_str, 0, &port);
 		if (ret < 0) {
-			printk("strict_strtoul() failed for port_str: %d\n", ret);
+			pr_err("strict_strtoul() failed for port_str: %d\n", ret);
 			return ERR_PTR(ret);
 		}
 		sock_in6 = (struct sockaddr_in6 *)&sockaddr;
@@ -218,14 +218,14 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		ret = in6_pton(str, IPV6_ADDRESS_SPACE,
 				(void *)&sock_in6->sin6_addr.in6_u, -1, &end);	
 		if (ret <= 0) {
-			printk(KERN_ERR "in6_pton returned: %d\n", ret);
+			pr_err("in6_pton returned: %d\n", ret);
 			return ERR_PTR(-EINVAL);
 		}
 	} else {
 		str = ip_str = &buf[0];
 		port_str = strstr(ip_str, ":");
 		if (!port_str) {
-			printk(KERN_ERR "Unable to locate \":port\""
+			pr_err("Unable to locate \":port\""
 				" in IPv4 iSCSI network portal address\n");
 			return ERR_PTR(-EINVAL);
 		}
@@ -234,7 +234,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 
 		ret = strict_strtoul(port_str, 0, &port);
 		if (ret < 0) {
-			printk("strict_strtoul() failed for port_str: %d\n", ret);
+			pr_err("strict_strtoul() failed for port_str: %d\n", ret);
 			return ERR_PTR(ret);
 		}
 		sock_in = (struct sockaddr_in *)&sockaddr;
@@ -247,7 +247,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 	if (ret < 0)
 		return ERR_PTR(-EINVAL);
 
-	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu"
+	pr_debug("LIO_Target_ConfigFS: REGISTER -> %s TPGT: %hu"
 		" PORTAL: %s\n",
 		config_item_name(&se_tpg->se_tpg_wwn->wwn_group.cg_item),
 		tpg->tpgt, name);
@@ -270,7 +270,7 @@ struct se_tpg_np *lio_target_call_addnptotpg(
 		iscsit_put_tpg(tpg);
 		return ERR_PTR(PTR_ERR(tpg_np));
 	}
-	printk(KERN_INFO "LIO_Target_ConfigFS: addnptotpg done!\n");
+	pr_debug("LIO_Target_ConfigFS: addnptotpg done!\n");
 
 	iscsit_put_tpg(tpg);
 	return &tpg_np->se_tpg_np;
@@ -291,7 +291,7 @@ static void lio_target_call_delnpfromtpg(
 		return;
 
 	se_tpg = &tpg->tpg_se_tpg;
-	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s TPGT: %hu"
+	pr_debug("LIO_Target_ConfigFS: DEREGISTER -> %s TPGT: %hu"
 		" PORTAL: %s:%hu\n", config_item_name(&se_tpg->se_tpg_wwn->wwn_group.cg_item),
 		tpg->tpgt, tpg_np->tpg_np->np_ip, tpg_np->tpg_np->np_port);
 
@@ -299,7 +299,7 @@ static void lio_target_call_delnpfromtpg(
 	if (ret < 0)
 		goto out;
 
-	printk(KERN_INFO "LIO_Target_ConfigFS: delnpfromtpg done!\n");
+	pr_debug("LIO_Target_ConfigFS: delnpfromtpg done!\n");
 out:
 	iscsit_put_tpg(tpg);
 }
@@ -739,24 +739,24 @@ static ssize_t lio_target_nacl_store_cmdsn_depth(
 
 	cmdsn_depth = simple_strtoul(page, &endptr, 0);
 	if (cmdsn_depth > TA_DEFAULT_CMDSN_DEPTH_MAX) {
-		printk(KERN_ERR "Passed cmdsn_depth: %u exceeds"
+		pr_err("Passed cmdsn_depth: %u exceeds"
 			" TA_DEFAULT_CMDSN_DEPTH_MAX: %u\n", cmdsn_depth,
 			TA_DEFAULT_CMDSN_DEPTH_MAX);
 		return -EINVAL;
 	}
 	acl_ci = &se_nacl->acl_group.cg_item;
 	if (!acl_ci) {
-		printk(KERN_ERR "Unable to locatel acl_ci\n");
+		pr_err("Unable to locatel acl_ci\n");
 		return -EINVAL;
 	}
 	tpg_ci = &acl_ci->ci_parent->ci_group->cg_item;
 	if (!tpg_ci) {
-		printk(KERN_ERR "Unable to locate tpg_ci\n");
+		pr_err("Unable to locate tpg_ci\n");
 		return -EINVAL;
 	}
 	wwn_ci = &tpg_ci->ci_group->cg_item;
 	if (!wwn_ci) {
-		printk(KERN_ERR "Unable to locate config_item wwn_ci\n");
+		pr_err("Unable to locate config_item wwn_ci\n");
 		return -EINVAL;
 	}
 
@@ -768,7 +768,7 @@ static ssize_t lio_target_nacl_store_cmdsn_depth(
 	ret = iscsit_tpg_set_initiator_node_queue_depth(tpg,
 				config_item_name(acl_ci), cmdsn_depth, 1);
 
-	printk(KERN_INFO "LIO_Target_ConfigFS: %s/%s Set CmdSN Window: %u for"
+	pr_debug("LIO_Target_ConfigFS: %s/%s Set CmdSN Window: %u for"
 		"InitiatorName: %s\n", config_item_name(wwn_ci),
 		config_item_name(tpg_ci), cmdsn_depth,
 		config_item_name(acl_ci));
@@ -792,7 +792,7 @@ static struct se_node_acl *lio_tpg_alloc_fabric_acl(
 
 	acl = kzalloc(sizeof(struct iscsi_node_acl), GFP_KERNEL);
 	if (!acl) {
-		printk(KERN_ERR "Unable to allocate memory for struct iscsi_node_acl\n");
+		pr_err("Unable to allocate memory for struct iscsi_node_acl\n");
 		return NULL;
 	}
 
@@ -833,7 +833,7 @@ static struct se_node_acl *lio_target_make_nodeacl(
 	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 2,
 				GFP_KERNEL);
 	if (!stats_cg->default_groups) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 				" stats_cg->default_groups\n");
 		core_tpg_del_initiator_node_acl(se_tpg, se_nacl, 1);
 		kfree(acl);
@@ -1154,7 +1154,7 @@ static ssize_t lio_target_tpg_store_enable(
 
 	op = simple_strtoul(page, &endptr, 0);
 	if ((op != 1) && (op != 0)) {
-		printk(KERN_ERR "Illegal value for tpg_enable: %u\n", op);
+		pr_err("Illegal value for tpg_enable: %u\n", op);
 		return -EINVAL;
 	}
 
@@ -1211,7 +1211,7 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	*/
 	tpgt_str = strstr(name, "tpgt_");
 	if (!tpgt_str) {
-		printk(KERN_ERR "Unable to locate \"tpgt_#\" directory"
+		pr_err("Unable to locate \"tpgt_#\" directory"
 				" group\n");
 		return NULL;
 	}
@@ -1233,8 +1233,8 @@ struct se_portal_group *lio_target_tiqn_addtpg(
 	if (ret != 0)
 		goto out;
 
-	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
-	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> Allocated TPG: %s\n",
+	pr_debug("LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
+	pr_debug("LIO_Target_ConfigFS: REGISTER -> Allocated TPG: %s\n",
 			name);
 	return &tpg->tpg_se_tpg;
 out:
@@ -1253,7 +1253,7 @@ void lio_target_tiqn_deltpg(struct se_portal_group *se_tpg)
 	/*
 	 * iscsit_tpg_del_portal_group() assumes force=1
 	 */
-	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> Releasing TPG\n");
+	pr_debug("LIO_Target_ConfigFS: DEREGISTER -> Releasing TPG\n");
 	iscsit_tpg_del_portal_group(tiqn, tpg, 1);
 }
 
@@ -1294,7 +1294,7 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	stats_cg->default_groups = kzalloc(sizeof(struct config_group) * 6,
 				GFP_KERNEL);
 	if (!stats_cg->default_groups) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 				" stats_cg->default_groups\n");
 		iscsit_del_tiqn(tiqn);
 		return ERR_PTR(-ENOMEM);
@@ -1317,8 +1317,8 @@ struct se_wwn *lio_target_call_coreaddtiqn(
 	config_group_init_type_name(&WWN_STAT_GRPS(tiqn)->iscsi_logout_stats_group,
 			"iscsi_logout_stats", &iscsi_stat_logout_cit);
 
-	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
-	printk(KERN_INFO "LIO_Target_ConfigFS: REGISTER -> Allocated Node:"
+	pr_debug("LIO_Target_ConfigFS: REGISTER -> %s\n", tiqn->tiqn);
+	pr_debug("LIO_Target_ConfigFS: REGISTER -> Allocated Node:"
 			" %s\n", name);
 	return &tiqn->tiqn_wwn;
 }
@@ -1339,7 +1339,7 @@ void lio_target_call_coredeltiqn(
 	}
 	kfree(stats_cg->default_groups);
 
-	printk(KERN_INFO "LIO_Target_ConfigFS: DEREGISTER -> %s\n",
+	pr_debug("LIO_Target_ConfigFS: DEREGISTER -> %s\n",
 			tiqn->tiqn);
 	iscsit_del_tiqn(tiqn);
 }
@@ -1429,13 +1429,13 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 
 	op = simple_strtoul(page, &endptr, 0);
 	if ((op != 1) && (op != 0)) {
-		printk(KERN_ERR "Illegal value for enforce_discovery_auth:"
+		pr_err("Illegal value for enforce_discovery_auth:"
 				" %u\n", op);
 		return -EINVAL;
 	}
 
 	if (!discovery_tpg) {
-		printk(KERN_ERR "iscsit_global->discovery_tpg is NULL\n");
+		pr_err("iscsit_global->discovery_tpg is NULL\n");
 		return -EINVAL;
 	}
 
@@ -1453,7 +1453,7 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 
 		discovery_tpg->tpg_attrib.authentication = 1;
 		iscsit_global->discovery_acl.node_auth.enforce_discovery_auth = 1;
-		printk(KERN_INFO "LIO-CORE[0] Successfully enabled"
+		pr_debug("LIO-CORE[0] Successfully enabled"
 			" authentication enforcement for iSCSI"
 			" Discovery TPG\n");
 	} else {
@@ -1465,7 +1465,7 @@ static ssize_t iscsi_disc_store_enforce_discovery_auth(
 
 		discovery_tpg->tpg_attrib.authentication = 0;
 		iscsit_global->discovery_acl.node_auth.enforce_discovery_auth = 0;
-		printk(KERN_INFO "LIO-CORE[0] Successfully disabled"
+		pr_debug("LIO-CORE[0] Successfully disabled"
 			" authentication enforcement for iSCSI"
 			" Discovery TPG\n");
 	}
@@ -1775,7 +1775,7 @@ int iscsi_target_register_configfs(void)
 	lio_target_fabric_configfs = NULL;
 	fabric = target_fabric_configfs_init(THIS_MODULE, "iscsi");
 	if (IS_ERR(fabric)) {
-		printk(KERN_ERR "target_fabric_configfs_init() for"
+		pr_err("target_fabric_configfs_init() for"
 				" LIO-Target failed!\n");
 		return PTR_ERR(fabric);
 	}
@@ -1852,14 +1852,14 @@ int iscsi_target_register_configfs(void)
 
 	ret = target_fabric_configfs_register(fabric);
 	if (ret < 0) {
-		printk(KERN_ERR "target_fabric_configfs_register() for"
+		pr_err("target_fabric_configfs_register() for"
 				" LIO-Target failed!\n");
 		target_fabric_configfs_free(fabric);
 		return ret;
 	}
 
 	lio_target_fabric_configfs = fabric;
-	printk(KERN_INFO "LIO_TARGET[0] - Set fabric ->"
+	pr_debug("LIO_TARGET[0] - Set fabric ->"
 			" lio_target_fabric_configfs\n");
 	return 0;
 }
@@ -1877,6 +1877,6 @@ void iscsi_target_deregister_configfs(void)
 
 	target_fabric_configfs_deregister(lio_target_fabric_configfs);
 	lio_target_fabric_configfs = NULL;
-	printk(KERN_INFO "LIO_TARGET[0] - Cleared"
+	pr_debug("LIO_TARGET[0] - Cleared"
 				" lio_target_fabric_configfs\n");
 }

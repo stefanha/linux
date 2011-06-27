@@ -24,7 +24,6 @@
 #include <target/target_core_device.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_device.h"
 #include "iscsi_target_tpg.h"
@@ -83,6 +82,6 @@ void iscsit_increment_maxcmdsn(struct iscsi_cmd *cmd, struct iscsi_session *sess
 
 	mutex_lock(&sess->cmdsn_mutex);
 	sess->max_cmd_sn += 1;
-	TRACE(TRACE_ISCSI, "Updated MaxCmdSN to 0x%08x\n", sess->max_cmd_sn);
+	pr_debug("Updated MaxCmdSN to 0x%08x\n", sess->max_cmd_sn);
 	mutex_unlock(&sess->cmdsn_mutex);
 }
