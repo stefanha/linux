@@ -480,7 +480,7 @@ int iscsit_sequence_cmd(
 int iscsit_check_unsolicited_dataout(struct iscsi_cmd *cmd, unsigned char *buf)
 {
 	struct iscsi_conn *conn = cmd->conn;
-	struct se_cmd *se_cmd = SE_CMD(cmd);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	struct iscsi_data *hdr = (struct iscsi_data *) buf;
 	u32 payload_length = ntoh24(hdr->dlength);
 

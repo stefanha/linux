@@ -42,7 +42,7 @@ u8 iscsit_tmr_abort_task(
 	struct iscsi_cmd *ref_cmd;
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 
 	ref_cmd = iscsit_find_cmd_from_itt(conn, hdr->rtt);
@@ -122,7 +122,7 @@ u8 iscsit_tmr_task_reassign(
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_conn_recovery *cr = NULL;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 	int ret;
 
@@ -231,7 +231,7 @@ static int iscsit_task_reassign_complete_write(
 	int no_build_r2ts = 0;
 	u32 length = 0, offset = 0;
 	struct iscsi_conn *conn = cmd->conn;
-	struct se_cmd *se_cmd = SE_CMD(cmd);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	/*
 	 * The Initiator must not send a R2T SNACK with a Begrun less than
 	 * the TMR TASK_REASSIGN's ExpDataSN.
@@ -301,7 +301,7 @@ static int iscsit_task_reassign_complete_read(
 {
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
-	struct se_cmd *se_cmd = SE_CMD(cmd);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	/*
 	 * The Initiator must not send a Data SNACK with a BegRun less than
 	 * the TMR TASK_REASSIGN's ExpDataSN.
@@ -317,7 +317,7 @@ static int iscsit_task_reassign_complete_read(
 	if (!atomic_read(&cmd->transport_sent)) {
 		pr_debug("READ ITT: 0x%08x: t_state: %d never sent to"
 			" transport\n", cmd->init_task_tag,
-			SE_CMD(cmd)->t_state);
+			cmd->se_cmd.t_state);
 		transport_generic_handle_cdb(se_cmd);
 		return 0;
 	}
@@ -325,7 +325,7 @@ static int iscsit_task_reassign_complete_read(
 	if (!atomic_read(&se_cmd->t_transport_complete)) {
 		pr_err("READ ITT: 0x%08x: t_state: %d, never returned"
 			" from transport\n", cmd->init_task_tag,
-			SE_CMD(cmd)->t_state);
+			cmd->se_cmd.t_state);
 		return -1;
 	}
 
@@ -459,7 +459,7 @@ static int iscsit_task_reassign_complete(
 extern int iscsit_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 
 	if (tmr_req->task_reassign &&
 	   (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))

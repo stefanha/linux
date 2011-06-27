@@ -164,7 +164,7 @@ static int iscsit_dataout_check_unsolicited_sequence(
 		pr_err("Total %u bytes exceeds FirstBurstLength: %u"
 			" for this Unsolicited DataOut Burst.\n",
 			first_burst_len, conn->sess->sess_ops->FirstBurstLength);
-		transport_send_check_condition_and_sense(SE_CMD(cmd),
+		transport_send_check_condition_and_sense(&cmd->se_cmd,
 				TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 		return DATAOUT_CANNOT_RECOVER;
 	}
@@ -189,7 +189,7 @@ static int iscsit_dataout_check_unsolicited_sequence(
 			" does not equal ExpXferLen %u.\n", first_burst_len,
 				conn->sess->sess_ops->FirstBurstLength,
 				cmd->data_length);
-			transport_send_check_condition_and_sense(SE_CMD(cmd),
+			transport_send_check_condition_and_sense(&cmd->se_cmd,
 					TCM_INCORRECT_AMOUNT_OF_DATA, 0);
 			return DATAOUT_CANNOT_RECOVER;
 		}

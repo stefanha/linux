@@ -1027,7 +1027,7 @@ int iscsit_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		}
 		spin_unlock_bh(&cmd->istate_lock);
 
-		return transport_generic_handle_tmr(SE_CMD(cmd));
+		return transport_generic_handle_tmr(&cmd->se_cmd);
 	case ISCSI_OP_LOGOUT:
 		spin_unlock_bh(&cmd->istate_lock);
 		switch (cmd->logout_reason) {

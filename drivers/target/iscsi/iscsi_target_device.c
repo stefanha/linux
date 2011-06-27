@@ -35,7 +35,7 @@ int iscsit_get_lun_for_tmr(
 {
 	u32 unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
-	return transport_lookup_tmr_lun(SE_CMD(cmd), unpacked_lun);
+	return transport_lookup_tmr_lun(&cmd->se_cmd, unpacked_lun);
 }
 
 int iscsit_get_lun_for_cmd(
@@ -45,7 +45,7 @@ int iscsit_get_lun_for_cmd(
 {
 	u32 unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
-	return transport_lookup_cmd_lun(SE_CMD(cmd), unpacked_lun);
+	return transport_lookup_cmd_lun(&cmd->se_cmd, unpacked_lun);
 }
 
 void iscsit_determine_maxcmdsn(struct iscsi_session *sess)

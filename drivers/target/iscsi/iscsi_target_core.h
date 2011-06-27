@@ -482,8 +482,6 @@ struct iscsi_cmd {
 
 }  ____cacheline_aligned;
 
-#define SE_CMD(cmd)		(&(cmd)->se_cmd)
-
 struct iscsi_tmr_req {
 	bool			task_reassign:1;
 	u32			ref_cmd_sn;
