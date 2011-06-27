@@ -3072,10 +3072,13 @@ static int transport_generic_cmd_sequencer(
 			if (sector_ret)
 				goto out_unsupported_cdb;
 			
-			if (sectors != 0)
+			if (sectors)
 				size = transport_get_size(sectors, cdb, cmd);
-			else
-				size = dev->se_sub_dev->se_dev_attrib.block_size;
+			else {
+				pr_err("WSNZ=1, WRITE_SAME w/sectors=0 not"
+				       " supported\n");
+				goto out_invalid_cdb_field;
+			}
 
 			cmd->t_task_lba = get_unaligned_be64(&cdb[12]);
 			cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
@@ -3349,10 +3352,12 @@ static int transport_generic_cmd_sequencer(
 		if (sector_ret)
 			goto out_unsupported_cdb;
 
-		if (sectors != 0)
+		if (sectors)
 			size = transport_get_size(sectors, cdb, cmd);
-		else
-			size = dev->se_sub_dev->se_dev_attrib.block_size;
+		else {
+			pr_err("WSNZ=1, WRITE_SAME w/sectors=0 not supported\n");
+			goto out_invalid_cdb_field;
+		}
 
 		cmd->t_task_lba = get_unaligned_be16(&cdb[2]);
 		passthrough = (dev->transport->transport_type ==

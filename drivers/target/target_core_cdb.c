@@ -491,6 +491,9 @@ target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	buf[0] = dev->transport->get_device_type(dev);
 	buf[3] = have_tp ? 0x3c : 0x10;
 
+	/* Set WSNZ to 1 */
+	buf[4] = 0x01;
+
 	/*
 	 * Set OPTIMAL TRANSFER LENGTH GRANULARITY
 	 */
