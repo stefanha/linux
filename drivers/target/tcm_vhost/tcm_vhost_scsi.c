@@ -52,14 +52,14 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 
 	tv_nexus = tv_tpg->tpg_nexus;
 	if (!tv_nexus) {
-		printk(KERN_ERR "Unable to locate active struct tcm_vhost_nexus\n");
+		pr_err("Unable to locate active struct tcm_vhost_nexus\n");
 		return ERR_PTR(-EIO);
 	}
 	se_sess = tv_nexus->tvn_se_sess;
 
 	tv_cmd = kzalloc(sizeof(struct tcm_vhost_cmd), GFP_ATOMIC);
 	if (!tv_cmd) {
-		printk(KERN_ERR "Unable to allocate struct tcm_vhost_cmd\n");
+		pr_err("Unable to allocate struct tcm_vhost_cmd\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	tv_cmd->tvc_tag = v_header->tag;
@@ -144,7 +144,7 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 		 * hardcoded max for t
 		 */
 		if (scsi_command_size(cdb) > TCM_VHOST_MAX_CDB_SIZE) {
-			printk(KERN_ERR "Received SCSI CDB with command_size:"
+			pr_err("Received SCSI CDB with command_size:"
 				" %d that exceeds SCSI_MAX_VARLEN_CDB_SIZE: %d\n",
 				scsi_command_size(cdb), TCM_VHOST_MAX_CDB_SIZE);
 			break;
@@ -294,7 +294,7 @@ static int vhost_scsi_clear_endpoint(
 	if (strcmp(tv_tport->tport_name, t->vhost_wwpn) ||
 	    (tv_tpg->tport_tpgt != t->vhost_tpgt)) {
 		mutex_unlock(&vq->mutex);
-		printk(KERN_WARNING "tv_tport->tport_name: %s, tv_tpg->tport_tpgt: %hu"
+		pr_warn("tv_tport->tport_name: %s, tv_tpg->tport_tpgt: %hu"
 			" does not match t->vhost_wwpn: %s, t->vhost_tpgt: %hu\n",
 			tv_tport->tport_name, tv_tpg->tport_tpgt,
 			t->vhost_wwpn, t->vhost_tpgt);

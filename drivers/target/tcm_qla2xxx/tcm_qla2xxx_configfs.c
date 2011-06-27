@@ -79,7 +79,7 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 		if (rport_wwnn != rport->node_name)
 			continue;
 
-		DEBUG_QLA_TGT_SESS_MAP("Located existing rport_wwpn and rport->node_name:"
+		pr_debug("Located existing rport_wwpn and rport->node_name:"
 			" 0x%016LX, port_id: 0x%04x\n", rport->node_name,
 			rport->port_id);
 		domain = (rport->port_id >> 16) & 0xff;
@@ -87,21 +87,21 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 		al_pa = rport->port_id & 0xff;
 		nacl->nport_id = rport->port_id;
 
-		DEBUG_QLA_TGT_SESS_MAP("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
+		pr_debug("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
 				domain, area, al_pa);
 		spin_unlock_irqrestore(sh->host_lock, flags);
 
 
 		spin_lock_irqsave(&vha->hw->hardware_lock, flags);
 		d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
-		DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+		pr_debug("Using d: %p for domain: 0x%02x\n", d, domain);
 		a = &d->areas[area];
-		DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+		pr_debug("Using a: %p for area: 0x%02x\n", a, area);
 		p = &a->al_pas[al_pa];
-		DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+		pr_debug("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 		p->se_nacl = se_nacl;
-		DEBUG_QLA_TGT_SESS_MAP("Setting p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
+		pr_debug("Setting p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
 			" port_id: 0x%04x\n", se_nacl, rport_wwnn,
 			nacl->nport_id);
 		spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
@@ -134,18 +134,18 @@ int tcm_qla2xxx_clear_nacl_from_fcport_map(
 	area = (nacl->nport_id >> 8) & 0xff;
 	al_pa = nacl->nport_id & 0xff;
 
-	DEBUG_QLA_TGT_SESS_MAP("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
+	pr_debug("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
 	d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
-	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+	pr_debug("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
-	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+	pr_debug("Using a: %p for area: 0x%02x\n", a, area);
 	p = &a->al_pas[al_pa];
-	DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+	pr_debug("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 	p->se_nacl = NULL;
-	DEBUG_QLA_TGT_SESS_MAP("Clearing p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
+	pr_debug("Clearing p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
 		" port_id: 0x%04x\n", se_nacl, nacl->nport_wwnn,
 		nacl->nport_id);
 
@@ -241,7 +241,7 @@ static ssize_t tcm_qla2xxx_tpg_attrib_store_##name(			\
 									\
 	ret = strict_strtoul(page, 0, &val);				\
 	if (ret < 0) {							\
-		printk(KERN_ERR "strict_strtoul() failed with"		\
+		pr_err("strict_strtoul() failed with"		\
 				" ret: %d\n", ret);			\
 		return -EINVAL;						\
 	}								\
@@ -259,7 +259,7 @@ static int tcm_qla2xxx_set_attrib_##_name(				\
 	struct tcm_qla2xxx_tpg_attrib *a = &tpg->tpg_attrib;		\
 									\
 	if ((val != 0) && (val != 1)) {					\
-		printk(KERN_ERR "Illegal boolean value %lu\n", val);	\
+		pr_err("Illegal boolean value %lu\n", val);	\
                 return -EINVAL;						\
 	}								\
 									\
@@ -335,7 +335,7 @@ static ssize_t tcm_qla2xxx_tpg_store_enable(
 
 	op = simple_strtoul(page, &endptr, 0);
 	if ((op != 1) && (op != 0)) {
-		printk(KERN_ERR "Illegal value for tpg_enable: %u\n", op);
+		pr_err("Illegal value for tpg_enable: %u\n", op);
 		return -EINVAL;
 	}
 
@@ -344,7 +344,7 @@ static ssize_t tcm_qla2xxx_tpg_store_enable(
 		qla_tgt_enable_vha(vha);
 	} else {
 		if (!ha->qla_tgt) {
-			printk(KERN_ERR "truct qla_hw_data *ha->qla_tgt is NULL\n");
+			pr_err("truct qla_hw_data *ha->qla_tgt is NULL\n");
 			return -ENODEV;
 		}
 		atomic_set(&tpg->lport_tpg_enabled, 0);
@@ -378,14 +378,14 @@ static struct se_portal_group *tcm_qla2xxx_make_tpg(
 		return ERR_PTR(-EINVAL);
 	
 	if ((lport->qla_npiv_vp == NULL) && (tpgt != 1)) {
-		printk(KERN_ERR "In non NPIV mode, a single TPG=1 is used for"
+		pr_err("In non NPIV mode, a single TPG=1 is used for"
 			" HW port mappings\n");
 		return ERR_PTR(-ENOSYS);
 	}
 
 	tpg = kzalloc(sizeof(struct tcm_qla2xxx_tpg), GFP_KERNEL);
 	if (!(tpg)) {
-		printk(KERN_ERR "Unable to allocate struct tcm_qla2xxx_tpg\n");
+		pr_err("Unable to allocate struct tcm_qla2xxx_tpg\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	tpg->lport = lport;
@@ -455,7 +455,7 @@ static struct se_portal_group *tcm_qla2xxx_npiv_make_tpg(
 
 	tpg = kzalloc(sizeof(struct tcm_qla2xxx_tpg), GFP_KERNEL);
 	if (!(tpg)) {
-		printk(KERN_ERR "Unable to allocate struct tcm_qla2xxx_tpg\n");
+		pr_err("Unable to allocate struct tcm_qla2xxx_tpg\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	tpg->lport = lport;
@@ -489,7 +489,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 
 	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
 	if (!lport) {
-		printk(KERN_ERR "Unable to locate struct tcm_qla2xxx_lport\n");
+		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();
 		return NULL;
 	}
@@ -498,28 +498,28 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 	area = s_id[1];
 	al_pa = s_id[2];
 
-	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_s_id: 0x%02x area: 0x%02x al_pa: %02x\n",
+	pr_debug("find_sess_by_s_id: 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
 	d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
-	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+	pr_debug("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
-	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+	pr_debug("Using a: %p for area: 0x%02x\n", a, area);
 	p = &a->al_pas[al_pa];
-	DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+	pr_debug("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 	se_nacl = p->se_nacl;
 	if (!se_nacl) {
-		DEBUG_QLA_TGT_SESS_MAP("Unable to locate s_id: 0x%02x area: 0x%02x"
+		pr_debug("Unable to locate s_id: 0x%02x area: 0x%02x"
 			" al_pa: %02x\n", domain, area, al_pa);
 		return NULL;
 	}
-	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_s_id: located se_nacl: %p,"
+	pr_debug("find_sess_by_s_id: located se_nacl: %p,"
 		" initiatorname: %s\n", se_nacl, se_nacl->initiatorname);
 
 	nacl = container_of(se_nacl, struct tcm_qla2xxx_nacl, se_node_acl);
 	if (!nacl->qla_tgt_sess) {
-		printk(KERN_ERR "Unable to locate struct qla_tgt_sess\n");
+		pr_err("Unable to locate struct qla_tgt_sess\n");
 		return NULL;
 	}
 
@@ -546,19 +546,19 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 	domain = s_id[0];
 	area = s_id[1];
 	al_pa = s_id[2];
-	DEBUG_QLA_TGT_SESS_MAP("set_sess_by_s_id: domain 0x%02x area: 0x%02x al_pa: %02x\n",
+	pr_debug("set_sess_by_s_id: domain 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
 	d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
-	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
+	pr_debug("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
-	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
+	pr_debug("Using a: %p for area: 0x%02x\n", a, area);
 	p = &a->al_pas[al_pa];
-	DEBUG_QLA_TGT_SESS_MAP("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
+	pr_debug("Using p: %p for al_pa: 0x%02x\n", p, al_pa);
 
 	saved_nacl = p->se_nacl;
 	if (!saved_nacl) {
-		DEBUG_QLA_TGT_SESS_MAP("Setting up new p->se_nacl to new_se_nacl\n");
+		pr_debug("Setting up new p->se_nacl to new_se_nacl\n");
 		p->se_nacl = new_se_nacl;
 		qla_tgt_sess->se_sess = se_sess;
 		nacl->qla_tgt_sess = qla_tgt_sess;
@@ -567,13 +567,13 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 
 	if (nacl->qla_tgt_sess) {
 		if (new_se_nacl == NULL) {
-			DEBUG_QLA_TGT_SESS_MAP("Clearing existing nacl->qla_tgt_sess"
+			pr_debug("Clearing existing nacl->qla_tgt_sess"
 					" and p->se_nacl\n");
 			p->se_nacl = NULL;
 			nacl->qla_tgt_sess = NULL;
 			return;
 		}
-		DEBUG_QLA_TGT_SESS_MAP("Replacing existing nacl->qla_tgt_sess and"
+		pr_debug("Replacing existing nacl->qla_tgt_sess and"
 				" p->se_nacl\n");
 		p->se_nacl = new_se_nacl;
 		qla_tgt_sess->se_sess = se_sess;
@@ -582,18 +582,18 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 	}
 
 	if (new_se_nacl == NULL) {
-		DEBUG_QLA_TGT_SESS_MAP("Clearing existing p->se_nacl\n");
+		pr_debug("Clearing existing p->se_nacl\n");
 		p->se_nacl = NULL;
 		return;
 	}
 
-	DEBUG_QLA_TGT_SESS_MAP("Replacing existing p->se_nacl w/o active"
+	pr_debug("Replacing existing p->se_nacl w/o active"
 				" nacl->qla_tgt_sess\n");
 	p->se_nacl = new_se_nacl;
 	qla_tgt_sess->se_sess = se_sess;
 	nacl->qla_tgt_sess = qla_tgt_sess;
 
-	DEBUG_QLA_TGT_SESS_MAP("Setup nacl->qla_tgt_sess %p by s_id for se_nacl: %p,"
+	pr_debug("Setup nacl->qla_tgt_sess %p by s_id for se_nacl: %p,"
 		" initiatorname: %s\n", nacl->qla_tgt_sess, new_se_nacl,
 		new_se_nacl->initiatorname);
 }
@@ -613,18 +613,18 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 
 	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
 	if (!lport) {
-		printk(KERN_ERR "Unable to locate struct tcm_qla2xxx_lport\n");
+		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();
 		return NULL;
 	}
 
-	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
+	pr_debug("find_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
 
 	fc_loopid = &((struct tcm_qla2xxx_fc_loopid *)lport->lport_loopid_map)[loop_id];
 
 	se_nacl = fc_loopid->se_nacl;
 	if (!se_nacl) {
-		DEBUG_QLA_TGT_SESS_MAP("Unable to locate se_nacl by loop_id:"
+		pr_debug("Unable to locate se_nacl by loop_id:"
 				" 0x%04x\n", loop_id);
 		return NULL;
 	}
@@ -632,7 +632,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 	nacl = container_of(se_nacl, struct tcm_qla2xxx_nacl, se_node_acl);
 
 	if (!nacl->qla_tgt_sess) {
-		printk(KERN_ERR "Unable to locate struct qla_tgt_sess\n");
+		pr_err("Unable to locate struct qla_tgt_sess\n");
 		return NULL;
 	}
 
@@ -653,13 +653,13 @@ static void tcm_qla2xxx_set_sess_by_loop_id(
 	struct se_node_acl *saved_nacl;
 	struct tcm_qla2xxx_fc_loopid *fc_loopid;
 
-	DEBUG_QLA_TGT_SESS_MAP("set_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
+	pr_debug("set_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
 
 	fc_loopid = &((struct tcm_qla2xxx_fc_loopid *)lport->lport_loopid_map)[loop_id];
 
 	saved_nacl = fc_loopid->se_nacl;
 	if (!saved_nacl) {
-		DEBUG_QLA_TGT_SESS_MAP("Setting up new fc_loopid->se_nacl"
+		pr_debug("Setting up new fc_loopid->se_nacl"
 				" to new_se_nacl\n");
 		fc_loopid->se_nacl = new_se_nacl;
 		if (qla_tgt_sess->se_sess != se_sess)
@@ -671,14 +671,14 @@ static void tcm_qla2xxx_set_sess_by_loop_id(
 
 	if (nacl->qla_tgt_sess) {
 		if (new_se_nacl == NULL) {
-			DEBUG_QLA_TGT_SESS_MAP("Clearing nacl->qla_tgt_sess and"
+			pr_debug("Clearing nacl->qla_tgt_sess and"
 					" fc_loopid->se_nacl\n");
 			fc_loopid->se_nacl = NULL;
 			nacl->qla_tgt_sess = NULL;
 			return;
 		}
 
-		DEBUG_QLA_TGT_SESS_MAP("Replacing existing nacl->qla_tgt_sess and"
+		pr_debug("Replacing existing nacl->qla_tgt_sess and"
 				" fc_loopid->se_nacl\n");
 		fc_loopid->se_nacl = new_se_nacl;
 		if (qla_tgt_sess->se_sess != se_sess)
@@ -689,12 +689,12 @@ static void tcm_qla2xxx_set_sess_by_loop_id(
 	}
 
 	if (new_se_nacl == NULL) {
-		DEBUG_QLA_TGT_SESS_MAP("Clearing fc_loopid->se_nacl\n");
+		pr_debug("Clearing fc_loopid->se_nacl\n");
 		fc_loopid->se_nacl = NULL;
 		return;
 	}
 
-	DEBUG_QLA_TGT_SESS_MAP("Replacing existing fc_loopid->se_nacl w/o"
+	pr_debug("Replacing existing fc_loopid->se_nacl w/o"
 			" active nacl->qla_tgt_sess\n");
 	fc_loopid->se_nacl = new_se_nacl;
 	if (qla_tgt_sess->se_sess != se_sess)
@@ -702,7 +702,7 @@ static void tcm_qla2xxx_set_sess_by_loop_id(
 	if (nacl->qla_tgt_sess != qla_tgt_sess)
 		nacl->qla_tgt_sess = qla_tgt_sess;
 
-	DEBUG_QLA_TGT_SESS_MAP("Setup nacl->qla_tgt_sess %p by loop_id for se_nacl: %p,"
+	pr_debug("Setup nacl->qla_tgt_sess %p by loop_id for se_nacl: %p,"
 		" initiatorname: %s\n", nacl->qla_tgt_sess, new_se_nacl,
 		new_se_nacl->initiatorname);
 }
@@ -719,7 +719,7 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 
 	se_sess = sess->se_sess;
 	if (!se_sess) {
-		printk(KERN_ERR "struct qla_tgt_sess->se_sess is NULL\n");
+		pr_err("struct qla_tgt_sess->se_sess is NULL\n");
 		dump_stack();
 		return;
 	}
@@ -728,7 +728,7 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 
 	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
 	if (!lport) {
-		printk(KERN_ERR "Unable to locate struct tcm_qla2xxx_lport\n");
+		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();
 		return;
 	}
@@ -780,7 +780,7 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 
 	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
 	if (!lport) {
-		printk(KERN_ERR "Unable to locate struct tcm_qla2xxx_lport\n");
+		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();
 		return -EINVAL;
 	}
@@ -789,14 +789,14 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	 */
 	tpg = lport->tpg_1;
 	if (!tpg) {
-		printk(KERN_ERR "Unable to lcoate struct tcm_qla2xxx_lport->tpg_1\n");
+		pr_err("Unable to lcoate struct tcm_qla2xxx_lport->tpg_1\n");
 		return -EINVAL;
 	}
 	se_tpg = &tpg->se_tpg;
 
 	se_sess = transport_init_session();
 	if (!se_sess) {
-		printk(KERN_ERR "Unable to initialize struct se_session\n");
+		pr_err("Unable to initialize struct se_session\n");
 		return -ENOMEM;
 	}
 	/*
@@ -860,19 +860,19 @@ static int tcm_qla2xxx_init_lport(
 	lport->lport_fcport_map = vmalloc(
 			sizeof(struct tcm_qla2xxx_fc_domain) * 256);
 	if (!(lport->lport_fcport_map)) {
-		printk(KERN_ERR "Unable to allocate lport_fcport_map of %lu"
+		pr_err("Unable to allocate lport_fcport_map of %lu"
 			" bytes\n", sizeof(struct tcm_qla2xxx_fc_domain) * 256);
 		return -ENOMEM;
 	}
 	memset(lport->lport_fcport_map, 0,
 			sizeof(struct tcm_qla2xxx_fc_domain) * 256);
-	printk(KERN_INFO "qla2xxx: Allocated lport_fcport_map of %lu bytes\n",
+	pr_debug("qla2xxx: Allocated lport_fcport_map of %lu bytes\n",
 			sizeof(struct tcm_qla2xxx_fc_domain) * 256);
 
 	lport->lport_loopid_map = vmalloc(sizeof(struct tcm_qla2xxx_fc_loopid) *
 				65536);
 	if (!(lport->lport_loopid_map)) {
-		printk(KERN_ERR "Unable to allocate lport->lport_loopid_map"
+		pr_err("Unable to allocate lport->lport_loopid_map"
 			" of %lu bytes\n", sizeof(struct tcm_qla2xxx_fc_loopid)
 			* 65536);
 		vfree(lport->lport_fcport_map);
@@ -880,7 +880,7 @@ static int tcm_qla2xxx_init_lport(
 	}
 	memset(lport->lport_loopid_map, 0, sizeof(struct tcm_qla2xxx_fc_loopid)
 			* 65536);
-	printk(KERN_INFO "qla2xxx: Allocated lport_loopid_map of %lu bytes\n",
+	pr_debug("qla2xxx: Allocated lport_loopid_map of %lu bytes\n",
 			sizeof(struct tcm_qla2xxx_fc_loopid) * 65536);
 	/*
 	 * Setup local pointer to vha, NPIV VP pointer (if present) and
@@ -917,7 +917,7 @@ static struct se_wwn *tcm_qla2xxx_make_lport(
 
 	lport = kzalloc(sizeof(struct tcm_qla2xxx_lport), GFP_KERNEL);
 	if (!(lport)) {
-		printk(KERN_ERR "Unable to allocate struct tcm_qla2xxx_lport\n");
+		pr_err("Unable to allocate struct tcm_qla2xxx_lport\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	lport->lport_wwpn = wwpn;
@@ -941,7 +941,7 @@ static struct se_wwn *tcm_qla2xxx_make_lport(
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 		if (host->active_mode & MODE_TARGET) {
-			printk(KERN_INFO "MODE_TARGET already active on qla2xxx"
+			pr_debug("MODE_TARGET already active on qla2xxx"
 					"(%d)\n",  host->host_no);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 			continue;
@@ -949,33 +949,33 @@ static struct se_wwn *tcm_qla2xxx_make_lport(
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		if (!scsi_host_get(host)) {
-			printk(KERN_ERR "Unable to scsi_host_get() for"
+			pr_err("Unable to scsi_host_get() for"
 				" qla2xxx scsi_host\n");
 			ret = -EINVAL;
 			goto out;
 		}
 
-		printk("qla2xxx HW vha->node_name: ");
+		pr_debug("qla2xxx HW vha->node_name: ");
 		for (i = 0; i < 8; i++)
-			printk("%02x ", vha->node_name[i]);
-		printk("\n");
+			pr_debug("%02x ", vha->node_name[i]);
+		pr_debug("\n");
 
-		printk("qla2xxx HW vha->port_name: ");
+		pr_debug("qla2xxx HW vha->port_name: ");
 		for (i = 0; i < 8; i++)
-			printk("%02x ", vha->port_name[i]);
-		printk("\n");
+			pr_debug("%02x ", vha->port_name[i]);
+		pr_debug("\n");
 
-		printk("qla2xxx passed configfs WWPN: ");
+		pr_debug("qla2xxx passed configfs WWPN: ");
 		put_unaligned_be64(wwpn, b);
 		for (i = 0; i < 8; i++)
-			printk("%02x ", b[i]);
-		printk("\n");
+			pr_debug("%02x ", b[i]);
+		pr_debug("\n");
 
 		if (memcmp(vha->port_name, b, 8)) {
 			scsi_host_put(host);
 			continue;
 		}
-		printk("qla2xxx: Found matching HW WWPN: %s for lport\n", name);
+		pr_debug("qla2xxx: Found matching HW WWPN: %s for lport\n", name);
 		ret = tcm_qla2xxx_init_lport(lport, vha, NULL);
 		break;
 	}
@@ -1041,7 +1041,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 
 	lport = kzalloc(sizeof(struct tcm_qla2xxx_lport), GFP_KERNEL);
 	if (!(lport)) {
-		printk(KERN_ERR "Unable to allocate struct tcm_qla2xxx_lport"
+		pr_err("Unable to allocate struct tcm_qla2xxx_lport"
 				" for NPIV\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -1068,7 +1068,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 		if (host->active_mode & MODE_TARGET) {
-			printk(KERN_INFO "MODE_TARGET already active on qla2xxx"
+			pr_debug("MODE_TARGET already active on qla2xxx"
 					"(%d)\n",  host->host_no);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 			continue;
@@ -1076,33 +1076,33 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		if (!scsi_host_get(host)) {
-			printk(KERN_ERR "Unable to scsi_host_get() for"
+			pr_err("Unable to scsi_host_get() for"
 				" qla2xxx scsi_host\n");
 			ret = -EINVAL;
 			goto out;
 		}
 
-		printk("qla2xxx HW vha->node_name: ");
+		pr_debug("qla2xxx HW vha->node_name: ");
 		for (i = 0; i < 8; i++)
-			printk("%02x ", vha->node_name[i]);
-		printk("\n");
+			pr_debug("%02x ", vha->node_name[i]);
+		pr_debug("\n");
 
-		printk("qla2xxx HW vha->port_name: ");
+		pr_debug("qla2xxx HW vha->port_name: ");
 		for (i = 0; i < 8; i++)
-			printk("%02x ", vha->port_name[i]);
-		printk("\n");
+			pr_debug("%02x ", vha->port_name[i]);
+		pr_debug("\n");
 
-		printk("qla2xxx passed configfs NPIV WWPN: ");
+		pr_debug("qla2xxx passed configfs NPIV WWPN: ");
 		put_unaligned_be64(npiv_wwpn, b);
 		for (i = 0; i < 8; i++)
-			printk("%02x ", b[i]);
-		printk("\n");
+			pr_debug("%02x ", b[i]);
+		pr_debug("\n");
 
-		printk("qla2xxx passed configfs NPIV WWNN: ");
+		pr_debug("qla2xxx passed configfs NPIV WWNN: ");
 		put_unaligned_be64(npiv_wwnn, b2);
 		for (i = 0; i < 8; i++)
-			printk("%02x ", b2[i]);
-		printk("\n");
+			pr_debug("%02x ", b2[i]);
+		pr_debug("\n");
 
 		spin_lock_irqsave(&ha->vport_slock, flags);
 		list_for_each_entry(npiv_vp, &ha->vp_list, list) {
@@ -1116,7 +1116,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 #warning FIXME: Need to add atomic_inc(&npiv_vp->vref_count) before dropping ha->vport_slock..?
 			spin_unlock_irqrestore(&ha->vport_slock, flags);
 
-			printk("qla2xxx_npiv: Found matching NPIV WWPN+WWNN: %s "
+			pr_debug("qla2xxx_npiv: Found matching NPIV WWPN+WWNN: %s "
 					" for lport\n", name);
 			tcm_qla2xxx_init_lport(lport, vha, npiv_vp);
 			/*
@@ -1134,7 +1134,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 			/* we only allow support on Channel 0 !!! */
 			vport = fc_vport_create(host, 0, &vid);
 			if (!vport) {
-				printk(KERN_ERR "fc_vport_create() failed for"
+				pr_err("fc_vport_create() failed for"
 						" NPIV tcm_qla2xxx\n");
 				scsi_host_put(host);
 				ret = -EINVAL;
@@ -1301,7 +1301,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	struct target_fabric_configfs *fabric, *npiv_fabric;
 	int ret;
 
-	printk(KERN_INFO "TCM QLOGIC QLA2XXX fabric module %s on %s/%s"
+	pr_debug("TCM QLOGIC QLA2XXX fabric module %s on %s/%s"
 		" on "UTS_RELEASE"\n", TCM_QLA2XXX_VERSION, utsname()->sysname,
 		utsname()->machine);
 	/*
@@ -1309,7 +1309,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "qla2xxx");
 	if (!(fabric)) {
-		printk(KERN_ERR "target_fabric_configfs_init() failed\n");
+		pr_err("target_fabric_configfs_init() failed\n");
 		return -ENOMEM;
 	}
 	/*
@@ -1337,7 +1337,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	 */
 	ret = target_fabric_configfs_register(fabric);
 	if (ret < 0) {
-		printk(KERN_ERR "target_fabric_configfs_register() failed"
+		pr_err("target_fabric_configfs_register() failed"
 				" for TCM_QLA2XXX\n");
 		return ret;
 	}
@@ -1345,14 +1345,14 @@ static int tcm_qla2xxx_register_configfs(void)
 	 * Setup our local pointer to *fabric
 	 */
 	tcm_qla2xxx_fabric_configfs = fabric;	
-	printk(KERN_INFO "TCM_QLA2XXX[0] - Set fabric -> tcm_qla2xxx_fabric_configfs\n");
+	pr_debug("TCM_QLA2XXX[0] - Set fabric -> tcm_qla2xxx_fabric_configfs\n");
 
 	/*
 	 * Register the top level struct config_item_type for NPIV with TCM core
 	 */
 	npiv_fabric = target_fabric_configfs_init(THIS_MODULE, "qla2xxx_npiv");
 	if (!(npiv_fabric)) {
-		printk(KERN_ERR "target_fabric_configfs_init() failed\n");
+		pr_err("target_fabric_configfs_init() failed\n");
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -1377,7 +1377,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	 */
 	ret = target_fabric_configfs_register(npiv_fabric);
 	if (ret < 0) {
-		printk(KERN_ERR "target_fabric_configfs_register() failed"
+		pr_err("target_fabric_configfs_register() failed"
 				" for TCM_QLA2XXX\n");
 		goto out;;
 	}
@@ -1385,7 +1385,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	 * Setup our local pointer to *npiv_fabric
 	 */
 	tcm_qla2xxx_npiv_fabric_configfs = npiv_fabric;
-	printk(KERN_INFO "TCM_QLA2XXX[0] - Set fabric -> tcm_qla2xxx_npiv_fabric_configfs\n");
+	pr_debug("TCM_QLA2XXX[0] - Set fabric -> tcm_qla2xxx_npiv_fabric_configfs\n");
 
 	return 0;
 out:
@@ -1402,11 +1402,11 @@ static void tcm_qla2xxx_deregister_configfs(void)
 
 	target_fabric_configfs_deregister(tcm_qla2xxx_fabric_configfs);
 	tcm_qla2xxx_fabric_configfs = NULL;
-	printk(KERN_INFO "TCM_QLA2XXX[0] - Cleared tcm_qla2xxx_fabric_configfs\n");
+	pr_debug("TCM_QLA2XXX[0] - Cleared tcm_qla2xxx_fabric_configfs\n");
 
 	target_fabric_configfs_deregister(tcm_qla2xxx_npiv_fabric_configfs);
 	tcm_qla2xxx_npiv_fabric_configfs = NULL;
-	printk(KERN_INFO "TCM_QLA2XXX[0] - Cleared tcm_qla2xxx_npiv_fabric_configfs\n");
+	pr_debug("TCM_QLA2XXX[0] - Cleared tcm_qla2xxx_npiv_fabric_configfs\n");
 }
 
 static int __init tcm_qla2xxx_init(void)

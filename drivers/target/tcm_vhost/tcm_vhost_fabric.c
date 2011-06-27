@@ -76,7 +76,7 @@ u8 tcm_vhost_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 	case SCSI_PROTOCOL_ISCSI:
 		return iscsi_get_fabric_proto_ident(se_tpg);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;
 	}
@@ -127,7 +127,7 @@ u32 tcm_vhost_get_pr_transport_id(
 		return iscsi_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
 					format_code, buf);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;	
 	}
@@ -157,7 +157,7 @@ u32 tcm_vhost_get_pr_transport_id_len(
 		return iscsi_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
 					format_code);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;
 	}
@@ -187,7 +187,7 @@ char *tcm_vhost_parse_pr_out_transport_id(
 		return iscsi_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
 					port_nexus_ptr);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;
 	}
@@ -202,7 +202,7 @@ struct se_node_acl *tcm_vhost_alloc_fabric_acl(struct se_portal_group *se_tpg)
 
 	nacl = kzalloc(sizeof(struct tcm_vhost_nacl), GFP_KERNEL);
 	if (!(nacl)) {
-		printk(KERN_ERR "Unable to alocate struct tcm_vhost_nacl\n");
+		pr_err("Unable to alocate struct tcm_vhost_nacl\n");
 		return NULL;
 	}
 

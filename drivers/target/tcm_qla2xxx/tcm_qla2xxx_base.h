@@ -8,12 +8,6 @@
 
 #include "qla_target.h"
 
-#if 0
-#define DEBUG_QLA_TGT_SESS_MAP(x...)	printk(KERN_INFO x)
-#else
-#define DEBUG_QLA_TGT_SESS_MAP(x...)
-#endif
-
 struct tcm_qla2xxx_nacl {
 	/* From libfc struct fc_rport->port_id */
 	u16 nport_id;
