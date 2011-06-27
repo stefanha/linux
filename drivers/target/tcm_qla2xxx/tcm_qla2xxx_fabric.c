@@ -604,10 +604,11 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	if (transport_lookup_cmd_lun(se_cmd, lun) < 0) {
 		/*
 		 * Clear qla_tgt_cmd->locked_rsp as ha->hardware_lock
-		 * is already held here..
+		 * is already held here, and we'll end up calling back
+		 * into ->queue_status (tcm_qla2xxx_queue_status())
+		 * and hence qla2xxx_xmit_response().
 		 */
-		if (spin_is_locked(&cmd->vha->hw->hardware_lock))
-			cmd->locked_rsp = 0;
+		cmd->locked_rsp = 0;
 
 		/* NON_EXISTENT_LUN */
 		transport_send_check_condition_and_sense(se_cmd,

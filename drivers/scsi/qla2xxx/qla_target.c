@@ -3170,10 +3170,8 @@ static int qla24xx_send_cmd_to_target(struct scsi_qla_host *vha, struct qla_tgt_
 	/*
 	 * Dispatch command to tcm_qla2xxx fabric module code
 	 */
-	spin_unlock_irq(&vha->hw->hardware_lock);
 	ret = vha->hw->qla2x_tmpl->handle_cmd(vha, cmd, unpacked_lun, data_length,
 				fcp_task_attr, data_dir, bidi);
-	spin_lock_irq(&vha->hw->hardware_lock);
 	return ret;
 }
 
