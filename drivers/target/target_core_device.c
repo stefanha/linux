@@ -1577,7 +1577,7 @@ int core_dev_setup_virtual_lun0(void)
 	char buf[16];
 	int ret;
 
-	hba = core_alloc_hba("rd_dr", 0, HBA_FLAGS_INTERNAL_USE);
+	hba = core_alloc_hba("rd_mcp", 0, HBA_FLAGS_INTERNAL_USE);
 	if (IS_ERR(hba))
 		return PTR_ERR(hba);
 
