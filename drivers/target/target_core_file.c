@@ -295,20 +295,20 @@ static int fd_do_readv(struct se_task *task)
 		      task->se_dev->se_sub_dev->se_dev_attrib.block_size);
 	int ret = 0, i;
 
-	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
+	iov = kzalloc(sizeof(struct iovec) * task->task_sg_nents, GFP_KERNEL);
 	if (!(iov)) {
 		printk(KERN_ERR "Unable to allocate fd_do_readv iov[]\n");
 		return -ENOMEM;
 	}
 
-	for (i = 0; i < task->task_sg_num; i++) {
+	for (i = 0; i < task->task_sg_nents; i++) {
 		iov[i].iov_len = sg[i].length;
 		iov[i].iov_base = sg_virt(&sg[i]);
 	}
 
 	old_fs = get_fs();
 	set_fs(get_ds());
-	ret = vfs_readv(fd, &iov[0], task->task_sg_num, &pos);
+	ret = vfs_readv(fd, &iov[0], task->task_sg_nents, &pos);
 	set_fs(old_fs);
 
 	kfree(iov);
@@ -346,20 +346,20 @@ static int fd_do_writev(struct se_task *task)
 		      task->se_dev->se_sub_dev->se_dev_attrib.block_size);
 	int ret, i = 0;
 
-	iov = kzalloc(sizeof(struct iovec) * task->task_sg_num, GFP_KERNEL);
+	iov = kzalloc(sizeof(struct iovec) * task->task_sg_nents, GFP_KERNEL);
 	if (!(iov)) {
 		printk(KERN_ERR "Unable to allocate fd_do_writev iov[]\n");
 		return -ENOMEM;
 	}
 
-	for (i = 0; i < task->task_sg_num; i++) {
+	for (i = 0; i < task->task_sg_nents; i++) {
 		iov[i].iov_len = sg[i].length;
 		iov[i].iov_base = sg_virt(&sg[i]);
 	}
 
 	old_fs = get_fs();
 	set_fs(get_ds());
-	ret = vfs_writev(fd, &iov[0], task->task_sg_num, &pos);
+	ret = vfs_writev(fd, &iov[0], task->task_sg_nents, &pos);
 	set_fs(old_fs);
 
 	kfree(iov);

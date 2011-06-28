@@ -606,7 +606,7 @@ static int iblock_map_task_SG(struct se_task *task)
 	struct bio *bio = NULL, *hbio = NULL, *tbio = NULL;
 	struct scatterlist *sg;
 	int ret = 0;
-	u32 i, sg_num = task->task_sg_num;
+	u32 i, sg_num = task->task_sg_nents;
 	sector_t block_lba;
 	/*
 	 * Do starting conversion up from non 512-byte blocksize with
@@ -636,7 +636,7 @@ static int iblock_map_task_SG(struct se_task *task)
 	 * Use fs/bio.c:bio_add_pages() to setup the bio_vec maplist
 	 * from task->task_sg -> struct scatterlist memory.
 	 */
-	for_each_sg(task->task_sg, sg, task->task_sg_num, i) {
+	for_each_sg(task->task_sg, sg, task->task_sg_nents, i) {
 		DEBUG_IBLOCK("task: %p bio: %p Calling bio_add_page(): page:"
 			" %p len: %u offset: %u\n", task, bio, sg_page(sg),
 				sg->length, sg->offset);

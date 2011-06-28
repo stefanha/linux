@@ -1200,7 +1200,7 @@ static int __pscsi_map_task_SG(
 		 */
 		pscsi_blk_init_request(task, pt, pt->pscsi_req, 0);
 
-		return task->task_sg_num;
+		return task->task_sg_nents;
 	}
 	/*
 	 * Setup the secondary pt->pscsi_req->next_rq used for the extra BIDI-COMMAND
@@ -1214,7 +1214,7 @@ static int __pscsi_map_task_SG(
 	}
 	pscsi_blk_init_request(task, pt, pt->pscsi_req->next_rq, 1);
 
-	return task->task_sg_num;
+	return task->task_sg_nents;
 fail:
 	while (hbio) {
 		bio = hbio;
@@ -1233,14 +1233,14 @@ static int pscsi_map_task_SG(struct se_task *task)
 	 * Setup the main struct request for the task->task_sg[] payload
 	 */
 
-	ret = __pscsi_map_task_SG(task, task->task_sg, task->task_sg_num, 0);
+	ret = __pscsi_map_task_SG(task, task->task_sg, task->task_sg_nents, 0);
 	if (ret >= 0 && task->task_sg_bidi) {
 		/*
 		 * If present, set up the extra BIDI-COMMAND SCSI READ
 		 * struct request and payload.
 		 */
 		ret = __pscsi_map_task_SG(task, task->task_sg_bidi,
-					task->task_sg_num, 1);
+					task->task_sg_nents, 1);
 	}
 
 	if (ret < 0)
