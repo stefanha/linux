@@ -3729,40 +3729,27 @@ static void transport_free_dev_tasks(struct se_cmd *cmd)
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 }
 
-static inline void transport_free_pages(struct se_cmd *cmd)
+static inline void transport_free_sgl(struct scatterlist *sgl, int nents)
 {
 	struct scatterlist *sg;
-	int free_page = 1;
 	int count;
 
+	for_each_sg(sgl, sg, nents, count)
+		__free_page(sg_page(sg));
+
+	kfree(sgl);
+}
+
+static inline void transport_free_pages(struct se_cmd *cmd)
+{
 	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC)
-		free_page = 0;
+		return;
 
-	for_each_sg(cmd->t_data_sg, sg, cmd->t_data_nents, count) {
-		/*
-		 * Only called if
-		 * SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC is NOT in use,
-		 */
-		if (free_page)
-			__free_page(sg_page(sg));
-
-	}
-	if (free_page)
-		kfree(cmd->t_data_sg);
+	transport_free_sgl(cmd->t_data_sg, cmd->t_data_nents);
 	cmd->t_data_sg = NULL;
 	cmd->t_data_nents = 0;
 
-	for_each_sg(cmd->t_bidi_data_sg, sg, cmd->t_bidi_data_nents, count) {
-		/*
-		 * Only called if
-		 * SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC is NOT in use,
-		 */
-		if (free_page)
-			__free_page(sg_page(sg));
-
-	}
-	if (free_page)
-		kfree(cmd->t_bidi_data_sg);
+	transport_free_sgl(cmd->t_bidi_data_sg, cmd->t_bidi_data_nents);
 	cmd->t_bidi_data_sg = NULL;
 	cmd->t_bidi_data_nents = 0;
 }
