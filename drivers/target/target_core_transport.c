@@ -3916,7 +3916,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 					     cmd->data_direction,
 					     cmd->t_data_sg,
 					     cmd->t_data_nents);
-	if (!task_cdbs) {
+	if (task_cdbs <= 0) {
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason =
 			TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -4160,6 +4160,7 @@ transport_allocate_control_task(struct se_cmd *cmd)
 	unsigned char *cdb;
 	struct se_task *task;
 	unsigned long flags;
+	int ret = 0;
 
 	task = transport_generic_get_task(cmd, cmd->data_direction);
 	if (!task)
@@ -4191,16 +4192,19 @@ transport_allocate_control_task(struct se_cmd *cmd)
 
 	if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB) {
 		if (dev->transport->map_task_SG)
-			return dev->transport->map_task_SG(task);
-		return 0;
+			ret = dev->transport->map_task_SG(task);
 	} else if (cmd->se_cmd_flags & SCF_SCSI_NON_DATA_CDB) {
 		if (dev->transport->cdb_none)
-			return dev->transport->cdb_none(task);
-		return 0;
+			ret = dev->transport->cdb_none(task);
 	} else {
+		pr_err("target: Unknown control cmd type!\n");
 		BUG();
-		return -ENOMEM;
 	}
+
+	/* Success! Return number of tasks allocated */
+	if (ret == 0)
+		return 1;
+	return ret;
 }
 
 static u32 transport_allocate_tasks(
@@ -4210,18 +4214,12 @@ static u32 transport_allocate_tasks(
 	struct scatterlist *sgl,
 	unsigned int sgl_nents)
 {
-	int ret;
-
-	if (cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) {
+	if (cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)
 		return transport_allocate_data_tasks(cmd, lba, data_direction,
 						     sgl, sgl_nents);
-	} else {
-		ret = transport_allocate_control_task(cmd);
-		if (ret < 0)
-			return ret;
-		else
-			return 1;
-	}
+	else
+		return transport_allocate_control_task(cmd);
+
 }
 
 
