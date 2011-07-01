@@ -18,6 +18,8 @@ slink /lib/x86_64-linux-gnu/libc.so.6 libc-2.13.so 0755 0 0
 file /lib/x86_64-linux-gnu/ld-2.13.so /lib/x86_64-linux-gnu/ld-2.13.so 0755 0 0
 slink /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 ld-2.13.so 0755 0 0
 slink /lib/ld-linux-x86-64.so.2 x86_64-linux-gnu/ld-2.13.so 0755 0 0
+file /lib/x86_64-linux-gnu/libpthread-2.13.so /lib/x86_64-linux-gnu/libpthread-2.13.so 0644 0 0
+slink /lib/x86_64-linux-gnu/libpthread.so.0 libpthread-2.13.so  0644 0 0
 dir /lib/modules 0755 0 0
 dir /lib/modules/KERNELRELEASE 0755 0 0
 dir /sbin 0755 0 0
