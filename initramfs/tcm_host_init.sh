@@ -20,5 +20,5 @@ echo -n naa.60014059811d880d >/sys/kernel/config/target/vhost/naa.60014059811d88
 cd /sys/kernel/config/target/vhost/naa.60014059811d880b/tpgt_1/lun/lun_0
 ln -s ../../../../../core/iblock_0/vda/ .
 cd - >/dev/null
-/usr/bin/qemu -m 512 -nographic -kernel /boot/bzImage -initrd /boot/initramfs.gz -append console=ttyS0 -vhost-scsi id=vhost-scsi0,wwpn=naa.60014059811d880b,tpgt=1 -device virtio-scsi-pci,vhost-scsi=vhost-scsi0
+/usr/bin/qemu -m 512 -nographic -kernel /boot/bzImage -initrd /boot/initramfs.gz -append console=ttyS0 -vhost-scsi id=vhost-scsi0,wwpn=naa.60014059811d880b,tpgt=1 -device virtio-scsi-pci,vhost-scsi=vhost-scsi0,event_idx=off
 exec /bin/sh -i
