@@ -9,6 +9,7 @@ insmod /lib/modules/$(uname -r)/kernel/drivers/target/target_core_mod.ko
 insmod /lib/modules/$(uname -r)/kernel/drivers/target/target_core_file.ko
 insmod /lib/modules/$(uname -r)/kernel/drivers/target/target_core_iblock.ko
 insmod /lib/modules/$(uname -r)/kernel/drivers/target/tcm_vhost/tcm_vhost.ko
+mknod /dev/vda b 254 0
 mknod /dev/vhost-scsi c $(tr ':' ' ' </sys/class/misc/vhost-scsi/dev)
 cd /sys/kernel/config/target
 mkdir -p /sys/kernel/config/target/vhost/naa.60014059811d880b/tpgt_1
