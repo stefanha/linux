@@ -326,6 +326,8 @@ u32 tcm_vhost_sess_get_index(struct se_session *se_sess)
 
 int tcm_vhost_write_pending(struct se_cmd *se_cmd)
 {
+	/* Go ahead and process the write immediately */
+	transport_generic_process_write(se_cmd);
 	return 0;
 }
 
