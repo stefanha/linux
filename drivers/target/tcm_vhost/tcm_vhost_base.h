@@ -6,7 +6,7 @@ struct tcm_vhost_cmd {
 	/* Descriptor from vhost_get_vq_desc() for virt_queue segment */
 	int tvc_vq_desc;
 	/* The Tag from include/linux/virtio_scsi.h:struct virtio_scsi_cmd_header */
-	u32 tvc_tag;
+	u64 tvc_tag;
 	/* The number of scatterlists associated with this cmd */
 	u32 tvc_sgl_count;
 	/* Pointer to the SGL formatted memory from virtio-scsi */
