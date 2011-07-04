@@ -14,4 +14,4 @@ def initramfs():
     tcm_host_initramfs()
 
 def run():
-    local('/home/stefanha/qemu/x86_64-softmmu/qemu-system-x86_64 -enable-kvm -m 1024 -nographic -kernel arch/x86/boot/bzImage -initrd tcm_host_initramfs.gz -append console=ttyS0', capture=False)
+    local('/home/stefanha/qemu/x86_64-softmmu/qemu-system-x86_64 -enable-kvm -m 1024 -nographic -kernel arch/x86/boot/bzImage -initrd tcm_host_initramfs.gz -append console=ttyS0 -drive if=virtio,file=test.img,cache=none', capture=False)
