@@ -136,7 +136,7 @@ redo:
 			continue;
 		}
 		array = kzalloc(seq_count * sizeof(u32), GFP_KERNEL);
-		if (!(array)) {
+		if (!array) {
 			pr_err("Unable to allocate memory"
 				" for random array.\n");
 			return -1;
@@ -156,7 +156,7 @@ redo:
 
 	if (seq_count) {
 		array = kzalloc(seq_count * sizeof(u32), GFP_KERNEL);
-		if (!(array)) {
+		if (!array) {
 			pr_err("Unable to allocate memory for"
 				" random array.\n");
 			return -1;
@@ -188,7 +188,7 @@ static int iscsit_randomize_seq_lists(
 		return 0;
 
 	array = kzalloc(seq_count * sizeof(u32), GFP_KERNEL);
-	if (!(array)) {
+	if (!array) {
 		pr_err("Unable to allocate memory for random array.\n");
 		return -1;
 	}
@@ -508,7 +508,7 @@ int iscsit_do_build_list(
 
 	if (!conn->sess->sess_ops->DataSequenceInOrder) {
 		seq = kzalloc(seq_count * sizeof(struct iscsi_seq), GFP_ATOMIC);
-		if (!(seq)) {
+		if (!seq) {
 			pr_err("Unable to allocate struct iscsi_seq list\n");
 			return -1;
 		}
@@ -518,7 +518,7 @@ int iscsit_do_build_list(
 
 	if (!conn->sess->sess_ops->DataPDUInOrder) {
 		pdu = kzalloc(pdu_count * sizeof(struct iscsi_pdu), GFP_ATOMIC);
-		if (!(pdu)) {
+		if (!pdu) {
 			pr_err("Unable to allocate struct iscsi_pdu list.\n");
 			kfree(seq);
 			return -1;

@@ -83,7 +83,7 @@ extern int iscsi_allocate_thread_sets(u32 thread_pair_count)
 
 	for (i = 0; i < thread_pair_count; i++) {
 		ts = kzalloc(sizeof(struct iscsi_thread_set), GFP_KERNEL);
-		if (!(ts)) {
+		if (!ts) {
 			pr_err("Unable to allocate memory for"
 					" thread set.\n");
 			return allocated_thread_pair_count;
@@ -185,7 +185,7 @@ static void iscsi_deallocate_extra_thread_sets(void)
 
 	while ((iscsit_global->inactive_ts + 1) > orig_count) {
 		ts = iscsi_get_ts_from_inactive_list();
-		if (!(ts))
+		if (!ts)
 			break;
 
 		spin_lock_bh(&ts->ts_state_lock);
@@ -248,7 +248,7 @@ struct iscsi_thread_set *iscsi_get_thread_set(void)
 	 */
 get_set:
 	ts = iscsi_get_ts_from_inactive_list();
-	if (!(ts)) {
+	if (!ts) {
 		if (allocate_ts == 2)
 			iscsi_allocate_thread_sets(1);
 
@@ -319,11 +319,11 @@ int iscsi_release_thread_set(struct iscsi_conn *conn)
 	spin_lock_bh(&ts->ts_state_lock);
 	ts->status = ISCSI_THREAD_SET_RESET;
 
-	if (!(strncmp(current->comm, ISCSI_RX_THREAD_NAME,
-			strlen(ISCSI_RX_THREAD_NAME))))
+	if (!strncmp(current->comm, ISCSI_RX_THREAD_NAME,
+			strlen(ISCSI_RX_THREAD_NAME)))
 		thread_called = ISCSI_RX_THREAD;
-	else if (!(strncmp(current->comm, ISCSI_TX_THREAD_NAME,
-			strlen(ISCSI_TX_THREAD_NAME))))
+	else if (!strncmp(current->comm, ISCSI_TX_THREAD_NAME,
+			strlen(ISCSI_TX_THREAD_NAME)))
 		thread_called = ISCSI_TX_THREAD;
 
 	if (ts->rx_thread && (thread_called == ISCSI_TX_THREAD) &&
@@ -531,7 +531,7 @@ int iscsi_thread_set_init(void)
 
 	size = BITS_TO_LONGS(iscsit_global->ts_bitmap_count) * sizeof(long);
 	iscsit_global->ts_bitmap = kzalloc(size, GFP_KERNEL);
-	if (!(iscsit_global->ts_bitmap)) {
+	if (!iscsit_global->ts_bitmap) {
 		pr_err("Unable to allocate iscsit_global->ts_bitmap\n");
 		return -ENOMEM;
 	}

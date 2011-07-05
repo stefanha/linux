@@ -3736,7 +3736,7 @@ check_rsp_state:
 				break;
 			case ISTATE_SEND_LOGOUTRSP:
 				spin_unlock_bh(&cmd->istate_lock);
-				if (!(iscsit_logout_post_handler(cmd, conn)))
+				if (!iscsit_logout_post_handler(cmd, conn))
 					goto restart;
 				spin_lock_bh(&cmd->istate_lock);
 				use_misc = 0;

@@ -765,7 +765,7 @@ static void iscsit_remove_cmd_from_response_queue(
 	struct iscsi_queue_req *qr, *qr_tmp;
 
 	spin_lock_bh(&conn->response_queue_lock);
-	if (!(atomic_read(&cmd->response_queue_count))) {
+	if (!atomic_read(&cmd->response_queue_count)) {
 		spin_unlock_bh(&conn->response_queue_lock);
 		return;
 	}
@@ -1749,7 +1749,7 @@ void iscsit_collect_login_stats(
 	struct iscsi_login_stats *ls;
 
 	tiqn = iscsit_snmp_get_tiqn(conn);
-	if (!(tiqn))
+	if (!tiqn)
 		return;
 
 	ls = &tiqn->login_stats;

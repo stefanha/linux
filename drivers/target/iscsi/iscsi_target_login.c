@@ -62,7 +62,7 @@ static int iscsi_login_init_conn(struct iscsi_conn *conn)
 	spin_lock_init(&conn->response_queue_lock);
 	spin_lock_init(&conn->state_lock);
 
-	if (!(zalloc_cpumask_var(&conn->conn_cpumask, GFP_KERNEL))) {
+	if (!zalloc_cpumask_var(&conn->conn_cpumask, GFP_KERNEL)) {
 		pr_err("Unable to allocate conn->conn_cpumask\n");
 		return -ENOMEM;
 	}
@@ -437,8 +437,8 @@ static int iscsi_login_non_zero_tsih_s2(
 		    atomic_read(&sess_p->session_logout) ||
 		   (sess_p->time2retain_timer_flags & ISCSI_TF_EXPIRED))
 			continue;
-		if (!(memcmp((const void *)sess_p->isid,
-		     (const void *)pdu->isid, 6)) &&
+		if (!memcmp((const void *)sess_p->isid,
+		     (const void *)pdu->isid, 6) &&
 		     (sess_p->tsih == pdu->tsih)) {
 			iscsit_inc_session_usage_count(sess_p);
 			iscsit_stop_time2retain_timer(sess_p);
@@ -1014,10 +1014,10 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 			goto new_sess_out;
 		}
 #if 0
-		if (!(iscsi_ntop6((const unsigned char *)
+		if (!iscsi_ntop6((const unsigned char *)
 				&sock_in6.sin6_addr.in6_u,
 				(char *)&conn->ipv6_login_ip[0],
-				IPV6_ADDRESS_SPACE))) {
+				IPV6_ADDRESS_SPACE)) {
 			pr_err("iscsi_ntop6() failed\n");
 			iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 					ISCSI_LOGIN_STATUS_TARGET_ERROR);
