@@ -445,7 +445,8 @@ int iscsit_del_np_comm(struct iscsi_np *np)
 int iscsit_del_np(struct iscsi_np *np)
 {
 	spin_lock_bh(&np->np_thread_lock);
-	if (!(--np->np_exports == 0)) {
+	np->np_exports--;
+	if (np->np_exports) {
 		spin_unlock_bh(&np->np_thread_lock);
 		return 0;
 	}
@@ -3941,8 +3942,7 @@ static void iscsit_release_commands_from_conn(struct iscsi_conn *conn)
 	 */
 	spin_lock_bh(&conn->cmd_lock);
 	list_for_each_entry_safe(cmd, cmd_tmp, &conn->conn_cmd_list, i_list) {
-		if (!(&cmd->se_cmd) ||
-		    !(cmd->se_cmd.se_cmd_flags & SCF_SE_LUN_CMD)) {
+		if (!(cmd->se_cmd.se_cmd_flags & SCF_SE_LUN_CMD)) {
 
 			list_del(&cmd->i_list);
 			spin_unlock_bh(&conn->cmd_lock);
