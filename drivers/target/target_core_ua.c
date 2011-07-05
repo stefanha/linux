@@ -49,15 +49,15 @@ int core_scsi3_ua_check(
 	struct se_session *sess = cmd->se_sess;
 	struct se_node_acl *nacl;
 
-	if (!(sess))
+	if (!sess)
 		return 0;
 
 	nacl = sess->se_node_acl;
-	if (!(nacl))
+	if (!nacl)
 		return 0;
 
 	deve = &nacl->device_list[cmd->orig_fe_lun];
-	if (!(atomic_read(&deve->ua_count)))
+	if (!atomic_read(&deve->ua_count))
 		return 0;
 	/*
 	 * From sam4r14, section 5.14 Unit attention condition:
@@ -97,11 +97,11 @@ int core_scsi3_ua_allocate(
 	/*
 	 * PASSTHROUGH OPS
 	 */
-	if (!(nacl))
+	if (!nacl)
 		return -EINVAL;
 
 	ua = kmem_cache_zalloc(se_ua_cache, GFP_ATOMIC);
-	if (!(ua)) {
+	if (!ua) {
 		pr_err("Unable to allocate struct se_ua\n");
 		return -ENOMEM;
 	}
@@ -215,16 +215,16 @@ void core_scsi3_ua_for_check_condition(
 	struct se_ua *ua = NULL, *ua_p;
 	int head = 1;
 
-	if (!(sess))
+	if (!sess)
 		return;
 
 	nacl = sess->se_node_acl;
-	if (!(nacl))
+	if (!nacl)
 		return;
 
 	spin_lock_irq(&nacl->device_list_lock);
 	deve = &nacl->device_list[cmd->orig_fe_lun];
-	if (!(atomic_read(&deve->ua_count))) {
+	if (!atomic_read(&deve->ua_count)) {
 		spin_unlock_irq(&nacl->device_list_lock);
 		return;
 	}
@@ -284,16 +284,16 @@ int core_scsi3_ua_clear_for_request_sense(
 	struct se_ua *ua = NULL, *ua_p;
 	int head = 1;
 
-	if (!(sess))
+	if (!sess)
 		return -EINVAL;
 
 	nacl = sess->se_node_acl;
-	if (!(nacl))
+	if (!nacl)
 		return -EINVAL;
 
 	spin_lock_irq(&nacl->device_list_lock);
 	deve = &nacl->device_list[cmd->orig_fe_lun];
-	if (!(atomic_read(&deve->ua_count))) {
+	if (!atomic_read(&deve->ua_count)) {
 		spin_unlock_irq(&nacl->device_list_lock);
 		return -EPERM;
 	}

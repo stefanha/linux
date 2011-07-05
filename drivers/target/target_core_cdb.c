@@ -327,7 +327,7 @@ check_tpgi:
 
 		spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 		tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
-		if (!(tg_pt_gp)) {
+		if (!tg_pt_gp) {
 			spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 			goto check_lu_gp;
 		}
@@ -358,12 +358,12 @@ check_lu_gp:
 			goto check_scsi_name;
 		}
 		lu_gp_mem = dev->dev_alua_lu_gp_mem;
-		if (!(lu_gp_mem))
+		if (!lu_gp_mem)
 			goto check_scsi_name;
 
 		spin_lock(&lu_gp_mem->lu_gp_mem_lock);
 		lu_gp = lu_gp_mem->lu_gp;
-		if (!(lu_gp)) {
+		if (!lu_gp) {
 			spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 			goto check_scsi_name;
 		}
@@ -955,7 +955,7 @@ target_emulate_request_sense(struct se_cmd *cmd)
 
 	buf = transport_kmap_first_data_page(cmd);
 
-	if (!(core_scsi3_ua_clear_for_request_sense(cmd, &ua_asc, &ua_ascq))) {
+	if (!core_scsi3_ua_clear_for_request_sense(cmd, &ua_asc, &ua_ascq)) {
 		/*
 		 * CURRENT ERROR, UNIT ATTENTION
 		 */

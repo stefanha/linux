@@ -60,7 +60,7 @@ static int iblock_attach_hba(struct se_hba *hba, u32 host_id)
 	struct iblock_hba *ib_host;
 
 	ib_host = kzalloc(sizeof(struct iblock_hba), GFP_KERNEL);
-	if (!(ib_host)) {
+	if (!ib_host) {
 		pr_err("Unable to allocate memory for"
 				" struct iblock_hba\n");
 		return -ENOMEM;
@@ -97,7 +97,7 @@ static void *iblock_allocate_virtdevice(struct se_hba *hba, const char *name)
 	struct iblock_hba *ib_host = hba->hba_ptr;
 
 	ib_dev = kzalloc(sizeof(struct iblock_dev), GFP_KERNEL);
-	if (!(ib_dev)) {
+	if (!ib_dev) {
 		pr_err("Unable to allocate struct iblock_dev\n");
 		return NULL;
 	}
@@ -122,7 +122,7 @@ static struct se_device *iblock_create_virtdevice(
 	u32 dev_flags = 0;
 	int ret = -EINVAL;
 
-	if (!(ib_dev)) {
+	if (!ib_dev) {
 		pr_err("Unable to locate struct iblock_dev parameter\n");
 		return ERR_PTR(ret);
 	}
@@ -131,7 +131,7 @@ static struct se_device *iblock_create_virtdevice(
 	 * These settings need to be made tunable..
 	 */
 	ib_dev->ibd_bio_set = bioset_create(32, 64);
-	if (!(ib_dev->ibd_bio_set)) {
+	if (!ib_dev->ibd_bio_set) {
 		pr_err("IBLOCK: Unable to create bioset()\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -166,7 +166,7 @@ static struct se_device *iblock_create_virtdevice(
 	dev = transport_add_device_to_core_hba(hba,
 			&iblock_template, se_dev, dev_flags, ib_dev,
 			&dev_limits, "IBLOCK", IBLOCK_VERSION);
-	if (!(dev))
+	if (!dev)
 		goto failed;
 
 	/*
@@ -226,7 +226,7 @@ iblock_alloc_task(struct se_cmd *cmd)
 	struct iblock_req *ib_req;
 
 	ib_req = kzalloc(sizeof(struct iblock_req), GFP_KERNEL);
-	if (!(ib_req)) {
+	if (!ib_req) {
 		pr_err("Unable to allocate memory for struct iblock_req\n");
 		return NULL;
 	}
@@ -569,7 +569,7 @@ static struct bio *iblock_get_bio(
 	struct bio *bio;
 
 	bio = bio_alloc_bioset(GFP_NOIO, sg_num, ib_dev->ibd_bio_set);
-	if (!(bio)) {
+	if (!bio) {
 		pr_err("Unable to allocate memory for bio\n");
 		*ret = PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
 		return NULL;
@@ -622,7 +622,7 @@ static int iblock_map_task_SG(struct se_task *task)
 	}
 
 	bio = iblock_get_bio(task, ib_req, ib_dev, &ret, block_lba, sg_num);
-	if (!(bio))
+	if (!bio)
 		return ret;
 
 	ib_req->ib_bio = bio;
@@ -650,7 +650,7 @@ again:
 
 			bio = iblock_get_bio(task, ib_req, ib_dev, &ret,
 						block_lba, sg_num);
-			if (!(bio))
+			if (!bio)
 				goto fail;
 
 			tbio = tbio->bi_next = bio;
@@ -711,7 +711,7 @@ static void iblock_bio_done(struct bio *bio, int err)
 	/*
 	 * Set -EIO if !BIO_UPTODATE and the passed is still err=0
 	 */
-	if (!(test_bit(BIO_UPTODATE, &bio->bi_flags)) && !(err))
+	if (!test_bit(BIO_UPTODATE, &bio->bi_flags) && !err)
 		err = -EIO;
 
 	if (err != 0) {
@@ -726,7 +726,7 @@ static void iblock_bio_done(struct bio *bio, int err)
 		/*
 		 * Wait to complete the task until the last bio as completed.
 		 */
-		if (!(atomic_dec_and_test(&ibr->ib_bio_cnt)))
+		if (!atomic_dec_and_test(&ibr->ib_bio_cnt))
 			return;
 
 		ibr->ib_bio = NULL;
@@ -743,7 +743,7 @@ static void iblock_bio_done(struct bio *bio, int err)
 	/*
 	 * Wait to complete the task until the last bio as completed.
 	 */
-	if (!(atomic_dec_and_test(&ibr->ib_bio_cnt)))
+	if (!atomic_dec_and_test(&ibr->ib_bio_cnt))
 		return;
 	/*
 	 * Return GOOD status for task if zero ib_bio_err_cnt exists.

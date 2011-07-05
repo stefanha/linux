@@ -100,14 +100,14 @@ int init_se_kmem_caches(void)
 {
 	se_cmd_cache = kmem_cache_create("se_cmd_cache",
 			sizeof(struct se_cmd), __alignof__(struct se_cmd), 0, NULL);
-	if (!(se_cmd_cache)) {
+	if (!se_cmd_cache) {
 		pr_err("kmem_cache_create for struct se_cmd failed\n");
 		goto out;
 	}
 	se_tmr_req_cache = kmem_cache_create("se_tmr_cache",
 			sizeof(struct se_tmr_req), __alignof__(struct se_tmr_req),
 			0, NULL);
-	if (!(se_tmr_req_cache)) {
+	if (!se_tmr_req_cache) {
 		pr_err("kmem_cache_create() for struct se_tmr_req"
 				" failed\n");
 		goto out;
@@ -115,7 +115,7 @@ int init_se_kmem_caches(void)
 	se_sess_cache = kmem_cache_create("se_sess_cache",
 			sizeof(struct se_session), __alignof__(struct se_session),
 			0, NULL);
-	if (!(se_sess_cache)) {
+	if (!se_sess_cache) {
 		pr_err("kmem_cache_create() for struct se_session"
 				" failed\n");
 		goto out;
@@ -123,14 +123,14 @@ int init_se_kmem_caches(void)
 	se_ua_cache = kmem_cache_create("se_ua_cache",
 			sizeof(struct se_ua), __alignof__(struct se_ua),
 			0, NULL);
-	if (!(se_ua_cache)) {
+	if (!se_ua_cache) {
 		pr_err("kmem_cache_create() for struct se_ua failed\n");
 		goto out;
 	}
 	t10_pr_reg_cache = kmem_cache_create("t10_pr_reg_cache",
 			sizeof(struct t10_pr_registration),
 			__alignof__(struct t10_pr_registration), 0, NULL);
-	if (!(t10_pr_reg_cache)) {
+	if (!t10_pr_reg_cache) {
 		pr_err("kmem_cache_create() for struct t10_pr_registration"
 				" failed\n");
 		goto out;
@@ -138,7 +138,7 @@ int init_se_kmem_caches(void)
 	t10_alua_lu_gp_cache = kmem_cache_create("t10_alua_lu_gp_cache",
 			sizeof(struct t10_alua_lu_gp), __alignof__(struct t10_alua_lu_gp),
 			0, NULL);
-	if (!(t10_alua_lu_gp_cache)) {
+	if (!t10_alua_lu_gp_cache) {
 		pr_err("kmem_cache_create() for t10_alua_lu_gp_cache"
 				" failed\n");
 		goto out;
@@ -146,7 +146,7 @@ int init_se_kmem_caches(void)
 	t10_alua_lu_gp_mem_cache = kmem_cache_create("t10_alua_lu_gp_mem_cache",
 			sizeof(struct t10_alua_lu_gp_member),
 			__alignof__(struct t10_alua_lu_gp_member), 0, NULL);
-	if (!(t10_alua_lu_gp_mem_cache)) {
+	if (!t10_alua_lu_gp_mem_cache) {
 		pr_err("kmem_cache_create() for t10_alua_lu_gp_mem_"
 				"cache failed\n");
 		goto out;
@@ -154,7 +154,7 @@ int init_se_kmem_caches(void)
 	t10_alua_tg_pt_gp_cache = kmem_cache_create("t10_alua_tg_pt_gp_cache",
 			sizeof(struct t10_alua_tg_pt_gp),
 			__alignof__(struct t10_alua_tg_pt_gp), 0, NULL);
-	if (!(t10_alua_tg_pt_gp_cache)) {
+	if (!t10_alua_tg_pt_gp_cache) {
 		pr_err("kmem_cache_create() for t10_alua_tg_pt_gp_"
 				"cache failed\n");
 		goto out;
@@ -164,7 +164,7 @@ int init_se_kmem_caches(void)
 			sizeof(struct t10_alua_tg_pt_gp_member),
 			__alignof__(struct t10_alua_tg_pt_gp_member),
 			0, NULL);
-	if (!(t10_alua_tg_pt_gp_mem_cache)) {
+	if (!t10_alua_tg_pt_gp_mem_cache) {
 		pr_err("kmem_cache_create() for t10_alua_tg_pt_gp_"
 				"mem_t failed\n");
 		goto out;
@@ -280,7 +280,7 @@ struct se_session *transport_init_session(void)
 	struct se_session *se_sess;
 
 	se_sess = kmem_cache_zalloc(se_sess_cache, GFP_KERNEL);
-	if (!(se_sess)) {
+	if (!se_sess) {
 		pr_err("Unable to allocate struct se_session from"
 				" se_sess_cache\n");
 		return ERR_PTR(-ENOMEM);
@@ -360,7 +360,7 @@ void transport_deregister_session_configfs(struct se_session *se_sess)
 	 * Used by struct se_node_acl's under ConfigFS to locate active struct se_session
 	 */
 	se_nacl = se_sess->se_node_acl;
-	if ((se_nacl)) {
+	if (se_nacl) {
 		spin_lock_irqsave(&se_nacl->nacl_sess_lock, flags);
 		list_del(&se_sess->sess_acl_list);
 		/*
@@ -391,7 +391,7 @@ void transport_deregister_session(struct se_session *se_sess)
 	struct se_portal_group *se_tpg = se_sess->se_tpg;
 	struct se_node_acl *se_nacl;
 
-	if (!(se_tpg)) {
+	if (!se_tpg) {
 		transport_free_session(se_sess);
 		return;
 	}
@@ -407,11 +407,11 @@ void transport_deregister_session(struct se_session *se_sess)
 	 * struct se_node_acl if it had been previously dynamically generated.
 	 */
 	se_nacl = se_sess->se_node_acl;
-	if ((se_nacl)) {
+	if (se_nacl) {
 		spin_lock_bh(&se_tpg->acl_node_lock);
 		if (se_nacl->dynamic_node_acl) {
-			if (!(se_tpg->se_tpg_tfo->tpg_check_demo_mode_cache(
-					se_tpg))) {
+			if (!se_tpg->se_tpg_tfo->tpg_check_demo_mode_cache(
+					se_tpg)) {
 				list_del(&se_nacl->acl_list);
 				se_tpg->num_node_acls--;
 				spin_unlock_bh(&se_tpg->acl_node_lock);
@@ -444,13 +444,13 @@ static void transport_all_task_dev_remove_state(struct se_cmd *cmd)
 
 	list_for_each_entry(task, &cmd->t_task_list, t_list) {
 		dev = task->se_dev;
-		if (!(dev))
+		if (!dev)
 			continue;
 
 		if (atomic_read(&task->task_active))
 			continue;
 
-		if (!(atomic_read(&task->task_state_active)))
+		if (!atomic_read(&task->task_state_active))
 			continue;
 
 		spin_lock_irqsave(&dev->execute_task_lock, flags);
@@ -570,7 +570,7 @@ static void transport_lun_remove_cmd(struct se_cmd *cmd)
 		return;
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
-	if (!(atomic_read(&cmd->transport_dev_active))) {
+	if (!atomic_read(&cmd->transport_dev_active)) {
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 		goto check_lun;
 	}
@@ -672,7 +672,7 @@ static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 	unsigned long flags;
 
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	if (!(atomic_read(&cmd->t_transport_queue_active))) {
+	if (!atomic_read(&cmd->t_transport_queue_active)) {
 		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 		return;
 	}
@@ -775,8 +775,8 @@ void transport_complete_task(struct se_task *task, int success)
 	 * the processing thread.
 	 */
 	if (atomic_read(&task->task_timeout)) {
-		if (!(atomic_dec_and_test(
-				&cmd->t_task_cdbs_timeout_left))) {
+		if (!atomic_dec_and_test(
+				&cmd->t_task_cdbs_timeout_left)) {
 			spin_unlock_irqrestore(&cmd->t_state_lock,
 				flags);
 			return;
@@ -794,7 +794,7 @@ void transport_complete_task(struct se_task *task, int success)
 	 * struct se_task from struct se_cmd will complete itself into the
 	 * device queue depending upon int success.
 	 */
-	if (!(atomic_dec_and_test(&cmd->t_task_cdbs_left))) {
+	if (!atomic_dec_and_test(&cmd->t_task_cdbs_left)) {
 		if (!success)
 			cmd->t_tasks_failed = 1;
 
@@ -1416,7 +1416,7 @@ struct se_device *transport_add_device_to_core_hba(
 	struct se_device  *dev;
 
 	dev = kzalloc(sizeof(struct se_device), GFP_KERNEL);
-	if (!(dev)) {
+	if (!dev) {
 		pr_err("Unable to allocate memory for se_dev_t\n");
 		return NULL;
 	}
@@ -1696,7 +1696,7 @@ int transport_generic_allocate_tasks(
 	if (scsi_command_size(cdb) > sizeof(cmd->__t_task_cdb)) {
 		cmd->t_task_cdb = kzalloc(scsi_command_size(cdb),
 						GFP_KERNEL);
-		if (!(cmd->t_task_cdb)) {
+		if (!cmd->t_task_cdb) {
 			pr_err("Unable to allocate cmd->t_task_cdb"
 				" %u > sizeof(cmd->__t_task_cdb): %lu ops\n",
 				scsi_command_size(cdb),
@@ -2043,7 +2043,7 @@ static void transport_generic_request_failure(
 
 check_stop:
 	transport_lun_remove_cmd(cmd);
-	if (!(transport_cmd_check_stop_to_fabric(cmd)))
+	if (!transport_cmd_check_stop_to_fabric(cmd))
 		;
 	return;
 
@@ -2057,7 +2057,7 @@ static void transport_direct_request_timeout(struct se_cmd *cmd)
 	unsigned long flags;
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
-	if (!(atomic_read(&cmd->t_transport_timeout))) {
+	if (!atomic_read(&cmd->t_transport_timeout)) {
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 		return;
 	}
@@ -2153,7 +2153,7 @@ static void transport_task_timeout_handler(unsigned long data)
 	/*
 	 * Determine if transport_complete_task() has already been called.
 	 */
-	if (!(atomic_read(&task->task_active))) {
+	if (!atomic_read(&task->task_active)) {
 		pr_debug("transport task: %p cmd: %p timeout task_active"
 				" == 0\n", task, cmd);
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
@@ -2176,7 +2176,7 @@ static void transport_task_timeout_handler(unsigned long data)
 		return;
 	}
 
-	if (!(atomic_dec_and_test(&cmd->t_task_cdbs_left))) {
+	if (!atomic_dec_and_test(&cmd->t_task_cdbs_left)) {
 		pr_debug("transport task: %p cmd: %p timeout non zero"
 				" t_task_cdbs_left\n", task, cmd);
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
@@ -2205,7 +2205,7 @@ static void transport_start_task_timer(struct se_task *task)
 	 * If the task_timeout is disabled, exit now.
 	 */
 	timeout = dev->se_sub_dev->se_dev_attrib.task_timeout;
-	if (!(timeout))
+	if (!timeout)
 		return;
 
 	init_timer(&task->task_timer);
@@ -2228,7 +2228,7 @@ void __transport_stop_task_timer(struct se_task *task, unsigned long *flags)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
 
-	if (!(task->task_flags & TF_RUNNING))
+	if (!task->task_flags & TF_RUNNING)
 		return;
 
 	task->task_flags |= TF_STOP;
@@ -2306,7 +2306,7 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 		 * no other older commands exist that need to be
 		 * completed first.
 		 */
-		if (!(atomic_read(&cmd->se_dev->simple_cmds)))
+		if (!atomic_read(&cmd->se_dev->simple_cmds))
 			return 1;
 	} else {
 		/*
@@ -2365,7 +2365,7 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 	 * Call transport_cmd_check_stop() to see if a fabric exception
 	 * has occurred that prevents execution.
 	 */
-	if (!(transport_cmd_check_stop(cmd, 0, TRANSPORT_PROCESSING))) {
+	if (!transport_cmd_check_stop(cmd, 0, TRANSPORT_PROCESSING)) {
 		/*
 		 * Check for SAM Task Attribute emulation and HEAD_OF_QUEUE
 		 * attribute for the tasks of the received struct se_cmd CDB
@@ -2712,7 +2712,7 @@ static void transport_xor_callback(struct se_cmd *cmd)
 	 * 5) transfer the resulting XOR data to the data-in buffer.
 	 */
 	buf = kmalloc(cmd->data_length, GFP_KERNEL);
-	if (!(buf)) {
+	if (!buf) {
 		pr_err("Unable to allocate xor_callback buf\n");
 		return;
 	}
@@ -2773,7 +2773,7 @@ static int transport_get_sense_data(struct se_cmd *cmd)
 			continue;
 
 		dev = task->se_dev;
-		if (!(dev))
+		if (!dev)
 			continue;
 
 		if (!dev->transport->get_sense_buffer) {
@@ -2783,7 +2783,7 @@ static int transport_get_sense_data(struct se_cmd *cmd)
 		}
 
 		sense_buffer = dev->transport->get_sense_buffer(task);
-		if (!(sense_buffer)) {
+		if (!sense_buffer) {
 			pr_err("ITT[0x%08x]_TASK[%d]: Unable to locate"
 				" sense buffer for task with sense\n",
 				cmd->se_tfo->get_task_tag(cmd), task->task_no);
@@ -2849,8 +2849,7 @@ static int transport_cmd_get_valid_sectors(struct se_cmd *cmd)
 
 	sectors = (cmd->data_length / dev->se_sub_dev->se_dev_attrib.block_size);
 
-	if ((cmd->t_task_lba + sectors) >
-	     transport_dev_end_lba(dev)) {
+	if ((cmd->t_task_lba + sectors) > transport_dev_end_lba(dev)) {
 		pr_err("LBA: %llu Sectors: %u exceeds"
 			" transport_dev_end_lba(): %llu\n",
 			cmd->t_task_lba, sectors,
@@ -3369,7 +3368,7 @@ static int transport_generic_cmd_sequencer(
 		 * emulation for -> Linux/BLOCK disbard with TCM/IBLOCK and
 		 * TCM/FILEIO subsystem plugin backstores.
 		 */
-		if (!(passthrough)) {
+		if (!passthrough) {
 			if ((cdb[1] & 0x04) || (cdb[1] & 0x02)) {
 				pr_err("WRITE_SAME PBDATA and LBDATA"
 					" bits not supported for Block Discard"
@@ -3441,7 +3440,7 @@ static int transport_generic_cmd_sequencer(
 		 * Reject READ_* or WRITE_* with overflow/underflow for
 		 * type SCF_SCSI_DATA_SG_IO_CDB.
 		 */
-		if (!(ret) && (dev->se_sub_dev->se_dev_attrib.block_size != 512))  {
+		if (!ret && (dev->se_sub_dev->se_dev_attrib.block_size != 512))  {
 			pr_err("Failing OVERFLOW/UNDERFLOW for LBA op"
 				" CDB on non 512-byte sector setup subsystem"
 				" plugin: %s\n", dev->transport->name);
@@ -3765,7 +3764,7 @@ static inline int transport_dec_and_check(struct se_cmd *cmd)
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	if (atomic_read(&cmd->t_fe_count)) {
-		if (!(atomic_dec_and_test(&cmd->t_fe_count))) {
+		if (!atomic_dec_and_test(&cmd->t_fe_count)) {
 			spin_unlock_irqrestore(&cmd->t_state_lock,
 					flags);
 			return 1;
@@ -3773,7 +3772,7 @@ static inline int transport_dec_and_check(struct se_cmd *cmd)
 	}
 
 	if (atomic_read(&cmd->t_se_count)) {
-		if (!(atomic_dec_and_test(&cmd->t_se_count))) {
+		if (!atomic_dec_and_test(&cmd->t_se_count)) {
 			spin_unlock_irqrestore(&cmd->t_state_lock,
 					flags);
 			return 1;
@@ -3792,7 +3791,7 @@ static void transport_release_fe_cmd(struct se_cmd *cmd)
 		return;
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
-	if (!(atomic_read(&cmd->transport_dev_active))) {
+	if (!atomic_read(&cmd->transport_dev_active)) {
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 		goto free_pages;
 	}
@@ -3823,7 +3822,7 @@ transport_generic_remove(struct se_cmd *cmd, int session_reinstatement)
 	}
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
-	if (!(atomic_read(&cmd->transport_dev_active))) {
+	if (!atomic_read(&cmd->transport_dev_active)) {
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 		goto free_pages;
 	}
@@ -4476,7 +4475,7 @@ static void __transport_clear_lun_from_sessions(struct se_lun *lun)
 
 		spin_unlock_irqrestore(&lun->lun_cmd_lock, lun_flags);
 
-		if (!(cmd->se_lun)) {
+		if (!cmd->se_lun) {
 			pr_err("ITT: 0x%08x, [i,t]_state: %u/%u\n",
 				cmd->se_tfo->get_task_tag(cmd),
 				cmd->se_tfo->get_cmd_state(cmd), cmd->t_state);
@@ -4501,7 +4500,7 @@ static void __transport_clear_lun_from_sessions(struct se_lun *lun)
 			cmd->se_tfo->get_task_tag(cmd));
 
 		spin_lock_irqsave(&cmd->t_state_lock, cmd_flags);
-		if (!(atomic_read(&cmd->transport_dev_active))) {
+		if (!atomic_read(&cmd->transport_dev_active)) {
 			spin_unlock_irqrestore(&cmd->t_state_lock, cmd_flags);
 			goto check_cond;
 		}
@@ -4856,7 +4855,7 @@ int transport_check_aborted_status(struct se_cmd *cmd, int send_status)
 	int ret = 0;
 
 	if (atomic_read(&cmd->t_transport_aborted) != 0) {
-		if (!(send_status) ||
+		if (!send_status ||
 		     (cmd->se_cmd_flags & SCF_SENT_DELAYED_TAS))
 			return 1;
 #if 0
@@ -5024,7 +5023,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 		}
 		__transport_stop_task_timer(task, &flags);
 
-		if (!(atomic_dec_and_test(&cmd->t_task_cdbs_ex_left))) {
+		if (!atomic_dec_and_test(&cmd->t_task_cdbs_ex_left)) {
 			spin_unlock_irqrestore(
 					&cmd->t_state_lock, flags);
 
@@ -5153,7 +5152,7 @@ get_cmd:
 
 		switch (cmd->t_state) {
 		case TRANSPORT_NEW_CMD_MAP:
-			if (!(cmd->se_tfo->new_cmd_map)) {
+			if (!cmd->se_tfo->new_cmd_map) {
 				pr_err("cmd->se_tfo->new_cmd_map is"
 					" NULL for TRANSPORT_NEW_CMD_MAP\n");
 				BUG();

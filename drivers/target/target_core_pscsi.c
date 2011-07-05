@@ -65,7 +65,7 @@ static int pscsi_attach_hba(struct se_hba *hba, u32 host_id)
 	struct pscsi_hba_virt *phv;
 
 	phv = kzalloc(sizeof(struct pscsi_hba_virt), GFP_KERNEL);
-	if (!(phv)) {
+	if (!phv) {
 		pr_err("Unable to allocate struct pscsi_hba_virt\n");
 		return -ENOMEM;
 	}
@@ -110,8 +110,8 @@ static int pscsi_pmode_enable_hba(struct se_hba *hba, unsigned long mode_flag)
 	/*
 	 * Release the struct Scsi_Host
 	 */
-	if (!(mode_flag)) {
-		if (!(sh))
+	if (!mode_flag) {
+		if (!sh)
 			return 0;
 
 		phv->phv_lld_host = NULL;
@@ -355,7 +355,7 @@ static struct se_device *pscsi_add_device_to_list(
 	dev = transport_add_device_to_core_hba(hba, &pscsi_template,
 				se_dev, dev_flags, pdv,
 				&dev_limits, NULL, NULL);
-	if (!(dev)) {
+	if (!dev) {
 		pdv->pdv_sd = NULL;
 		return NULL;
 	}
@@ -385,7 +385,7 @@ static void *pscsi_allocate_virtdevice(struct se_hba *hba, const char *name)
 	struct pscsi_dev_virt *pdv;
 
 	pdv = kzalloc(sizeof(struct pscsi_dev_virt), GFP_KERNEL);
-	if (!(pdv)) {
+	if (!pdv) {
 		pr_err("Unable to allocate memory for struct pscsi_dev_virt\n");
 		return NULL;
 	}
@@ -432,7 +432,7 @@ static struct se_device *pscsi_create_type_disk(
 	pdv->pdv_bd = bd;
 
 	dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags);
-	if (!(dev)) {
+	if (!dev) {
 		blkdev_put(pdv->pdv_bd, FMODE_WRITE|FMODE_READ|FMODE_EXCL);
 		scsi_device_put(sd);
 		return NULL;
@@ -467,7 +467,7 @@ static struct se_device *pscsi_create_type_rom(
 	spin_unlock_irq(sh->host_lock);
 
 	dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags);
-	if (!(dev)) {
+	if (!dev) {
 		scsi_device_put(sd);
 		return NULL;
 	}
@@ -495,7 +495,7 @@ static struct se_device *pscsi_create_type_other(
 
 	spin_unlock_irq(sh->host_lock);
 	dev = pscsi_add_device_to_list(hba, se_dev, pdv, sd, dev_flags);
-	if (!(dev))
+	if (!dev)
 		return NULL;
 
 	pr_debug("CORE_PSCSI[%d] - Added Type: %s for %d:%d:%d:%d\n",
@@ -517,7 +517,7 @@ static struct se_device *pscsi_create_virtdevice(
 	struct Scsi_Host *sh = phv->phv_lld_host;
 	int legacy_mode_enable = 0;
 
-	if (!(pdv)) {
+	if (!pdv) {
 		pr_err("Unable to locate struct pscsi_dev_virt"
 				" parameter\n");
 		return ERR_PTR(-EINVAL);
@@ -526,7 +526,7 @@ static struct se_device *pscsi_create_virtdevice(
 	 * If not running in PHV_LLD_SCSI_HOST_NO mode, locate the
 	 * struct Scsi_Host we will need to bring the TCM/pSCSI object online
 	 */
-	if (!(sh)) {
+	if (!sh) {
 		if (phv->phv_mode == PHV_LLD_SCSI_HOST_NO) {
 			pr_err("pSCSI: Unable to locate struct"
 				" Scsi_Host for PHV_LLD_SCSI_HOST_NO\n");
@@ -548,7 +548,7 @@ static struct se_device *pscsi_create_virtdevice(
 		 */
 		if (!(pdv->pdv_flags & PDF_HAS_VIRT_HOST_ID)) {
 			spin_lock(&hba->device_lock);
-			if (!(list_empty(&hba->hba_dev_list))) {
+			if (!list_empty(&hba->hba_dev_list)) {
 				pr_err("pSCSI: Unable to set hba_mode"
 					" with active devices\n");
 				spin_unlock(&hba->device_lock);
@@ -601,7 +601,7 @@ static struct se_device *pscsi_create_virtdevice(
 			break;
 		}
 
-		if (!(dev)) {
+		if (!dev) {
 			if (phv->phv_mode == PHV_VIRUTAL_HOST_ID)
 				scsi_host_put(sh);
 			else if (legacy_mode_enable) {
@@ -729,7 +729,7 @@ after_mode_sense:
 		u32 blocksize;
 
 		buf = sg_virt(&sg[0]);
-		if (!(buf)) {
+		if (!buf) {
 			pr_err("Unable to get buf for scatterlist\n");
 			goto after_mode_select;
 		}
@@ -779,7 +779,7 @@ pscsi_alloc_task(struct se_cmd *cmd)
 	if (cmd->t_task_cdb != cmd->__t_task_cdb) {
 
 		pt->pscsi_cdb = kzalloc(scsi_command_size(cdb), GFP_KERNEL);
-		if (!(pt->pscsi_cdb)) {
+		if (!pt->pscsi_cdb) {
 			pr_err("pSCSI: Unable to allocate extended"
 					" pt->pscsi_cdb\n");
 			kfree(pt);
@@ -837,7 +837,7 @@ static int pscsi_blk_get_request(struct se_task *task)
 	pt->pscsi_req = blk_get_request(pdv->pdv_sd->request_queue,
 			(task->task_data_direction == DMA_TO_DEVICE),
 			GFP_KERNEL);
-	if (!(pt->pscsi_req) || IS_ERR(pt->pscsi_req)) {
+	if (!pt->pscsi_req || IS_ERR(pt->pscsi_req)) {
 		pr_err("PSCSI: blk_get_request() failed: %ld\n",
 				IS_ERR(pt->pscsi_req));
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
@@ -1061,7 +1061,7 @@ static inline struct bio *pscsi_get_bio(int sg_num)
 	 * in block/blk-core.c:blk_make_request()
 	 */
 	bio = bio_kmalloc(GFP_KERNEL, sg_num);
-	if (!(bio)) {
+	if (!bio) {
 		pr_err("PSCSI: bio_kmalloc() failed\n");
 		return NULL;
 	}
@@ -1114,14 +1114,14 @@ static int __pscsi_map_task_SG(
 			bytes = min_t(unsigned int, len, PAGE_SIZE - off);
 			bytes = min(bytes, data_len);
 
-			if (!(bio)) {
+			if (!bio) {
 				nr_vecs = min_t(int, BIO_MAX_PAGES, nr_pages);
 				nr_pages -= nr_vecs;
 				/*
 				 * Calls bio_kmalloc() and sets bio->bi_end_io()
 				 */
 				bio = pscsi_get_bio(nr_vecs);
-				if (!(bio))
+				if (!bio)
 					goto fail;
 
 				if (rw)
@@ -1177,14 +1177,14 @@ static int __pscsi_map_task_SG(
 	 * Setup the primary pt->pscsi_req used for non BIDI and BIDI-COMMAND
 	 * primary SCSI WRITE poayload mapped for struct se_task->task_sg[]
 	 */
-	if (!(bidi_read)) {
+	if (!bidi_read) {
 		/*
 		 * Starting with v2.6.31, call blk_make_request() passing in *hbio to
 		 * allocate the pSCSI task a struct request.
 		 */
 		pt->pscsi_req = blk_make_request(pdv->pdv_sd->request_queue,
 					hbio, GFP_KERNEL);
-		if (!(pt->pscsi_req)) {
+		if (!pt->pscsi_req) {
 			pr_err("pSCSI: blk_make_request() failed\n");
 			goto fail;
 		}
@@ -1202,7 +1202,7 @@ static int __pscsi_map_task_SG(
 	 */
 	pt->pscsi_req->next_rq = blk_make_request(pdv->pdv_sd->request_queue,
 					hbio, GFP_KERNEL);
-	if (!(pt->pscsi_req->next_rq)) {
+	if (!pt->pscsi_req->next_rq) {
 		pr_err("pSCSI: blk_make_request() failed for BIDI\n");
 		goto fail;
 	}
@@ -1313,7 +1313,7 @@ static inline void pscsi_process_SAM_status(
 	struct pscsi_plugin_task *pt)
 {
 	task->task_scsi_status = status_byte(pt->pscsi_result);
-	if ((task->task_scsi_status)) {
+	if (task->task_scsi_status) {
 		task->task_scsi_status <<= 1;
 		pr_debug("PSCSI Status Byte exception at task: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", task, pt->pscsi_cdb[0],

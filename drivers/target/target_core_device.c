@@ -257,14 +257,14 @@ struct se_dev_entry *core_get_se_deve_from_rtpi(
 			continue;
 
 		lun = deve->se_lun;
-		if (!(lun)) {
+		if (!lun) {
 			pr_err("%s device entries device pointer is"
 				" NULL, but Initiator has access.\n",
 				tpg->se_tpg_tfo->get_fabric_name());
 			continue;
 		}
 		port = lun->lun_sep;
-		if (!(port)) {
+		if (!port) {
 			pr_err("%s device entries device pointer is"
 				" NULL, but Initiator has access.\n",
 				tpg->se_tpg_tfo->get_fabric_name());
@@ -374,7 +374,7 @@ int core_update_device_list_for_node(
 	 * struct se_dev_entry pointers below as logic in
 	 * core_alua_do_transition_tg_pt() depends on these being present.
 	 */
-	if (!(enable)) {
+	if (!enable) {
 		/*
 		 * deve->se_lun_acl will be NULL for demo-mode created LUNs
 		 * that have not been explicitly concerted to MappedLUNs ->
@@ -503,7 +503,7 @@ static struct se_port *core_alloc_port(struct se_device *dev)
 	struct se_port *port, *port_tmp;
 
 	port = kzalloc(sizeof(struct se_port), GFP_KERNEL);
-	if (!(port)) {
+	if (!port) {
 		pr_err("Unable to allocate struct se_port\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -534,7 +534,7 @@ again:
 	 * 3h to FFFFh    Relative port 3 through 65 535
 	 */
 	port->sep_rtpi = dev->dev_rpti_counter++;
-	if (!(port->sep_rtpi))
+	if (!port->sep_rtpi)
 		goto again;
 
 	list_for_each_entry(port_tmp, &dev->dev_sep_list, sep_list) {
@@ -665,7 +665,7 @@ int transport_core_report_lun_response(struct se_cmd *se_cmd)
 	list_for_each_entry(se_task, &se_cmd->t_task_list, t_list)
 		break;
 
-	if (!(se_task)) {
+	if (!se_task) {
 		pr_err("Unable to locate struct se_task for struct se_cmd\n");
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
@@ -677,7 +677,7 @@ int transport_core_report_lun_response(struct se_cmd *se_cmd)
 	 * coming via a target_core_mod PASSTHROUGH op, and not through
 	 * a $FABRIC_MOD.  In that case, report LUN=0 only.
 	 */
-	if (!(se_sess)) {
+	if (!se_sess) {
 		int_to_scsilun(0, (struct scsi_lun *)&buf[offset]);
 		lun_count = 1;
 		goto done;
@@ -1079,7 +1079,7 @@ int se_dev_set_emulate_tpu(struct se_device *dev, int flag)
 	 * We expect this value to be non-zero when generic Block Layer
 	 * Discard supported is detected iblock_create_virtdevice().
 	 */
-	if (!(dev->se_sub_dev->se_dev_attrib.max_unmap_block_desc_count)) {
+	if (!dev->se_sub_dev->se_dev_attrib.max_unmap_block_desc_count) {
 		pr_err("Generic Block Discard not supported\n");
 		return -ENOSYS;
 	}
@@ -1100,7 +1100,7 @@ int se_dev_set_emulate_tpws(struct se_device *dev, int flag)
 	 * We expect this value to be non-zero when generic Block Layer
 	 * Discard supported is detected iblock_create_virtdevice().
 	 */
-	if (!(dev->se_sub_dev->se_dev_attrib.max_unmap_block_desc_count)) {
+	if (!dev->se_sub_dev->se_dev_attrib.max_unmap_block_desc_count) {
 		pr_err("Generic Block Discard not supported\n");
 		return -ENOSYS;
 	}
@@ -1148,7 +1148,7 @@ int se_dev_set_queue_depth(struct se_device *dev, u32 queue_depth)
 			atomic_read(&dev->dev_export_obj.obj_access_count));
 		return -EINVAL;
 	}
-	if (!(queue_depth)) {
+	if (!queue_depth) {
 		pr_err("dev[%p]: Illegal ZERO value for queue"
 			"_depth\n", dev);
 		return -EINVAL;
@@ -1195,7 +1195,7 @@ int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 			dev, atomic_read(&dev->dev_export_obj.obj_access_count));
 		return -EINVAL;
 	}
-	if (!(max_sectors)) {
+	if (!max_sectors) {
 		pr_err("dev[%p]: Illegal ZERO value for"
 			" max_sectors\n", dev);
 		return -EINVAL;
@@ -1215,7 +1215,7 @@ int se_dev_set_max_sectors(struct se_device *dev, u32 max_sectors)
 			 return -EINVAL;
 		}
 	} else {
-		if (!(force) && (max_sectors >
+		if (!force && (max_sectors >
 				 dev->se_sub_dev->se_dev_attrib.hw_max_sectors)) {
 			pr_err("dev[%p]: Passed max_sectors: %u"
 				" greater than TCM/SE_Device max_sectors"
@@ -1312,7 +1312,7 @@ struct se_lun *core_dev_add_lun(
 	}
 
 	lun_p = core_tpg_pre_addlun(tpg, lun);
-	if ((IS_ERR(lun_p)) || !(lun_p))
+	if ((IS_ERR(lun_p)) || !lun_p)
 		return NULL;
 
 	if (dev->dev_flags & DF_READ_ONLY)
@@ -1359,7 +1359,7 @@ int core_dev_del_lun(
 	int ret = 0;
 
 	lun = core_tpg_pre_dellun(tpg, unpacked_lun, &ret);
-	if (!(lun))
+	if (!lun)
 		return ret;
 
 	core_tpg_post_dellun(tpg, lun);
@@ -1450,12 +1450,12 @@ struct se_lun_acl *core_dev_init_initiator_node_lun_acl(
 		return NULL;
 	}
 	nacl = core_tpg_get_initiator_node_acl(tpg, initiatorname);
-	if (!(nacl)) {
+	if (!nacl) {
 		*ret = -EINVAL;
 		return NULL;
 	}
 	lacl = kzalloc(sizeof(struct se_lun_acl), GFP_KERNEL);
-	if (!(lacl)) {
+	if (!lacl) {
 		pr_err("Unable to allocate memory for struct se_lun_acl.\n");
 		*ret = -ENOMEM;
 		return NULL;
@@ -1479,7 +1479,7 @@ int core_dev_add_initiator_node_lun_acl(
 	struct se_node_acl *nacl;
 
 	lun = core_dev_get_lun(tpg, unpacked_lun);
-	if (!(lun)) {
+	if (!lun) {
 		pr_err("%s Logical Unit Number: %u is not active on"
 			" Target Portal Group: %hu, ignoring request.\n",
 			tpg->se_tpg_tfo->get_fabric_name(), unpacked_lun,
@@ -1488,7 +1488,7 @@ int core_dev_add_initiator_node_lun_acl(
 	}
 
 	nacl = lacl->se_lun_nacl;
-	if (!(nacl))
+	if (!nacl)
 		return -EINVAL;
 
 	if ((lun->lun_access & TRANSPORT_LUNFLAGS_READ_ONLY) &&
@@ -1532,7 +1532,7 @@ int core_dev_del_initiator_node_lun_acl(
 	struct se_node_acl *nacl;
 
 	nacl = lacl->se_lun_nacl;
-	if (!(nacl))
+	if (!nacl)
 		return -EINVAL;
 
 	spin_lock(&lun->lun_acl_lock);
@@ -1585,7 +1585,7 @@ int core_dev_setup_virtual_lun0(void)
 	t = hba->transport;
 
 	se_dev = kzalloc(sizeof(struct se_subsystem_dev), GFP_KERNEL);
-	if (!(se_dev)) {
+	if (!se_dev) {
 		pr_err("Unable to allocate memory for"
 				" struct se_subsystem_dev\n");
 		ret = -ENOMEM;
@@ -1608,7 +1608,7 @@ int core_dev_setup_virtual_lun0(void)
 	se_dev->se_dev_hba = hba;
 
 	se_dev->se_dev_su_ptr = t->allocate_virtdevice(hba, "virt_lun0");
-	if (!(se_dev->se_dev_su_ptr)) {
+	if (!se_dev->se_dev_su_ptr) {
 		pr_err("Unable to locate subsystem dependent pointer"
 			" from allocate_virtdevice()\n");
 		ret = -ENOMEM;
@@ -1645,7 +1645,7 @@ void core_dev_release_virtual_lun0(void)
 	struct se_hba *hba = lun0_hba;
 	struct se_subsystem_dev *su_dev = lun0_su_dev;
 
-	if (!(hba))
+	if (!hba)
 		return;
 
 	if (g_lun0_dev)

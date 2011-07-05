@@ -50,7 +50,7 @@ struct se_tmr_req *core_tmr_alloc_req(
 
 	tmr = kmem_cache_zalloc(se_tmr_req_cache, (in_interrupt()) ?
 					GFP_ATOMIC : GFP_KERNEL);
-	if (!(tmr)) {
+	if (!tmr) {
 		pr_err("Unable to allocate struct se_tmr_req\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -85,14 +85,14 @@ static void core_tmr_handle_tas_abort(
 	int tas,
 	int fe_count)
 {
-	if (!(fe_count)) {
+	if (!fe_count) {
 		transport_cmd_finish_abort(cmd, 1);
 		return;
 	}
 	/*
 	 * TASK ABORTED status (TAS) bit support
 	*/
-	if (((tmr_nacl != NULL) &&
+	if ((tmr_nacl &&
 	     (tmr_nacl == cmd->se_sess->se_node_acl)) || tas)
 		transport_send_task_abort(cmd);
 
@@ -156,7 +156,7 @@ int core_tmr_lun_reset(
 			continue;
 
 		cmd = tmr_p->task_cmd;
-		if (!(cmd)) {
+		if (!cmd) {
 			pr_err("Unable to locate struct se_cmd for TMR\n");
 			continue;
 		}
@@ -165,14 +165,14 @@ int core_tmr_lun_reset(
 		 * parameter (eg: for PROUT PREEMPT_AND_ABORT service action
 		 * skip non regisration key matching TMRs.
 		 */
-		if ((preempt_and_abort_list != NULL) &&
+		if (preempt_and_abort_list &&
 		    (core_scsi3_check_cdb_abort_and_preempt(
 					preempt_and_abort_list, cmd) != 0))
 			continue;
 		spin_unlock_irq(&dev->se_tmr_lock);
 
 		spin_lock_irqsave(&cmd->t_state_lock, flags);
-		if (!(atomic_read(&cmd->t_transport_active))) {
+		if (!atomic_read(&cmd->t_transport_active)) {
 			spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 			spin_lock_irq(&dev->se_tmr_lock);
 			continue;
@@ -226,7 +226,7 @@ int core_tmr_lun_reset(
 		 * For PREEMPT_AND_ABORT usage, only process commands
 		 * with a matching reservation key.
 		 */
-		if ((preempt_and_abort_list != NULL) &&
+		if (preempt_and_abort_list &&
 		    (core_scsi3_check_cdb_abort_and_preempt(
 					preempt_and_abort_list, cmd) != 0))
 			continue;
@@ -281,7 +281,7 @@ int core_tmr_lun_reset(
 		}
 		__transport_stop_task_timer(task, &flags);
 
-		if (!(atomic_dec_and_test(&cmd->t_task_cdbs_ex_left))) {
+		if (!atomic_dec_and_test(&cmd->t_task_cdbs_ex_left)) {
 			spin_unlock_irqrestore(
 					&cmd->t_state_lock, flags);
 			pr_debug("LUN_RESET: Skipping task: %p, dev: %p for"
@@ -325,7 +325,7 @@ int core_tmr_lun_reset(
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
 	list_for_each_entry_safe(qr, qr_tmp, &qobj->qobj_list, qr_list) {
 		cmd = (struct se_cmd *)qr->cmd;
-		if (!(cmd)) {
+		if (!cmd) {
 			/*
 			 * Skip these for non PREEMPT_AND_ABORT usage..
 			 */
@@ -341,7 +341,7 @@ int core_tmr_lun_reset(
 		 * For PREEMPT_AND_ABORT usage, only process commands
 		 * with a matching reservation key.
 		 */
-		if ((preempt_and_abort_list != NULL) &&
+		if (preempt_and_abort_list &&
 		    (core_scsi3_check_cdb_abort_and_preempt(
 					preempt_and_abort_list, cmd) != 0))
 			continue;
@@ -377,7 +377,7 @@ int core_tmr_lun_reset(
 	 * Clear any legacy SPC-2 reservation when called during
 	 * LOGICAL UNIT RESET
 	 */
-	if (!(preempt_and_abort_list) &&
+	if (!preempt_and_abort_list &&
 	     (dev->dev_flags & DF_SPC2_RESERVATIONS)) {
 		spin_lock(&dev->dev_reservation_lock);
 		dev->dev_reserved_node_acl = NULL;

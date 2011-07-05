@@ -55,7 +55,7 @@ static int rd_attach_hba(struct se_hba *hba, u32 host_id)
 	struct rd_host *rd_host;
 
 	rd_host = kzalloc(sizeof(struct rd_host), GFP_KERNEL);
-	if (!(rd_host)) {
+	if (!rd_host) {
 		pr_err("Unable to allocate memory for struct rd_host\n");
 		return -ENOMEM;
 	}
@@ -107,7 +107,7 @@ static void rd_release_device_space(struct rd_dev *rd_dev)
 
 		for (j = 0; j < sg_per_table; j++) {
 			pg = sg_page(&sg[j]);
-			if ((pg)) {
+			if (pg) {
 				__free_page(pg);
 				page_count++;
 			}
@@ -150,7 +150,7 @@ static int rd_build_device_space(struct rd_dev *rd_dev)
 	sg_tables = (total_sg_needed / max_sg_per_table) + 1;
 
 	sg_table = kzalloc(sg_tables * sizeof(struct rd_dev_sg_table), GFP_KERNEL);
-	if (!(sg_table)) {
+	if (!sg_table) {
 		pr_err("Unable to allocate memory for Ramdisk"
 			" scatterlist tables\n");
 		return -ENOMEM;
@@ -165,7 +165,7 @@ static int rd_build_device_space(struct rd_dev *rd_dev)
 
 		sg = kzalloc(sg_per_table * sizeof(struct scatterlist),
 				GFP_KERNEL);
-		if (!(sg)) {
+		if (!sg) {
 			pr_err("Unable to allocate scatterlist array"
 				" for struct rd_dev\n");
 			return -ENOMEM;
@@ -181,7 +181,7 @@ static int rd_build_device_space(struct rd_dev *rd_dev)
 
 		for (j = 0; j < sg_per_table; j++) {
 			pg = alloc_pages(GFP_KERNEL, 0);
-			if (!(pg)) {
+			if (!pg) {
 				pr_err("Unable to allocate scatterlist"
 					" pages for struct rd_dev_sg_table\n");
 				return -ENOMEM;
@@ -211,7 +211,7 @@ static void *rd_allocate_virtdevice(
 	struct rd_host *rd_host = hba->hba_ptr;
 
 	rd_dev = kzalloc(sizeof(struct rd_dev), GFP_KERNEL);
-	if (!(rd_dev)) {
+	if (!rd_dev) {
 		pr_err("Unable to allocate memory for struct rd_dev\n");
 		return NULL;
 	}
@@ -263,7 +263,7 @@ static struct se_device *rd_create_virtdevice(
 	dev = transport_add_device_to_core_hba(hba,
 			&rd_mcp_template, se_dev, dev_flags, rd_dev,
 			&dev_limits, prod, rev);
-	if (!(dev))
+	if (!dev)
 		goto fail;
 
 	rd_dev->rd_dev_id = rd_host->rd_host_dev_id_count++;
@@ -361,7 +361,7 @@ static int rd_MEMCPY_read(struct rd_request *req)
 	u32 rd_offset = req->rd_offset;
 
 	table = rd_get_sg_table(dev, req->rd_page);
-	if (!(table))
+	if (!table)
 		return -EINVAL;
 
 	table_sg_end = (table->page_end_offset - req->rd_page);
@@ -440,7 +440,7 @@ static int rd_MEMCPY_read(struct rd_request *req)
 			(req->rd_size - length), length, i, j);
 
 		req->rd_size -= length;
-		if (!(req->rd_size))
+		if (!req->rd_size)
 			return 0;
 
 		if (!page_end)
@@ -456,7 +456,7 @@ static int rd_MEMCPY_read(struct rd_request *req)
 				req->rd_page);
 
 		table = rd_get_sg_table(dev, req->rd_page);
-		if (!(table))
+		if (!table)
 			return -EINVAL;
 
 		sg_s = &table->sg_table[j = 0];
@@ -481,7 +481,7 @@ static int rd_MEMCPY_write(struct rd_request *req)
 	u32 rd_offset = req->rd_offset;
 
 	table = rd_get_sg_table(dev, req->rd_page);
-	if (!(table))
+	if (!table)
 		return -EINVAL;
 
 	table_sg_end = (table->page_end_offset - req->rd_page);
@@ -560,7 +560,7 @@ static int rd_MEMCPY_write(struct rd_request *req)
 			(req->rd_size - length), length, i, j);
 
 		req->rd_size -= length;
-		if (!(req->rd_size))
+		if (!req->rd_size)
 			return 0;
 
 		if (!page_end)
@@ -576,7 +576,7 @@ static int rd_MEMCPY_write(struct rd_request *req)
 				req->rd_page);
 
 		table = rd_get_sg_table(dev, req->rd_page);
-		if (!(table))
+		if (!table)
 			return -EINVAL;
 
 		sg_d = &table->sg_table[j = 0];

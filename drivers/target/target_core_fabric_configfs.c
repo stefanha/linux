@@ -80,7 +80,7 @@ static int target_fabric_mappedlun_link(
 	/*
 	 * Ensure that the source port exists
 	 */
-	if (!(lun->lun_sep) || !(lun->lun_sep->sep_tpg)) {
+	if (!lun->lun_sep || !lun->lun_sep->sep_tpg) {
 		pr_err("Source se_lun->lun_sep or lun->lun_sep->sep"
 				"_tpg does not exist\n");
 		return -EINVAL;
@@ -147,7 +147,7 @@ static int target_fabric_mappedlun_unlink(
 	/*
 	 * Determine if the underlying MappedLUN has already been released..
 	 */
-	if (!(deve->se_lun))
+	if (!deve->se_lun)
 		return 0;
 
 	lun = container_of(to_config_group(lun_ci), struct se_lun, lun_group);
@@ -327,13 +327,13 @@ static struct config_group *target_fabric_make_mappedlun(
 	int ret = 0;
 
 	acl_ci = &group->cg_item;
-	if (!(acl_ci)) {
+	if (!acl_ci) {
 		pr_err("Unable to locatel acl_ci\n");
 		return NULL;
 	}
 
 	buf = kzalloc(strlen(name) + 1, GFP_KERNEL);
-	if (!(buf)) {
+	if (!buf) {
 		pr_err("Unable to allocate memory for name buf\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -358,7 +358,7 @@ static struct config_group *target_fabric_make_mappedlun(
 
 	lacl = core_dev_init_initiator_node_lun_acl(se_tpg, mapped_lun,
 			config_item_name(acl_ci), &ret);
-	if (!(lacl)) {
+	if (!lacl) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -476,7 +476,7 @@ static struct config_group *target_fabric_make_nodeacl(
 	struct se_node_acl *se_nacl;
 	struct config_group *nacl_cg;
 
-	if (!(tf->tf_ops.fabric_make_nodeacl)) {
+	if (!tf->tf_ops.fabric_make_nodeacl) {
 		pr_err("tf->tf_ops.fabric_make_nodeacl is NULL\n");
 		return ERR_PTR(-ENOSYS);
 	}
@@ -574,13 +574,13 @@ static struct config_group *target_fabric_make_np(
 	struct target_fabric_configfs *tf = se_tpg->se_tpg_wwn->wwn_tf;
 	struct se_tpg_np *se_tpg_np;
 
-	if (!(tf->tf_ops.fabric_make_np)) {
+	if (!tf->tf_ops.fabric_make_np) {
 		pr_err("tf->tf_ops.fabric_make_np is NULL\n");
 		return ERR_PTR(-ENOSYS);
 	}
 
 	se_tpg_np = tf->tf_ops.fabric_make_np(se_tpg, group, name);
-	if (!(se_tpg_np) || IS_ERR(se_tpg_np))
+	if (!se_tpg_np || IS_ERR(se_tpg_np))
 		return ERR_PTR(-EINVAL);
 
 	se_tpg_np->tpg_np_parent = se_tpg;
@@ -629,10 +629,7 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_gp(
 	struct se_lun *lun,
 	char *page)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_show_tg_pt_gp_info(lun->lun_sep, page);
@@ -643,10 +640,7 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_gp(
 	const char *page,
 	size_t count)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_store_tg_pt_gp_info(lun->lun_sep, page, count);
@@ -661,10 +655,7 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_offline(
 	struct se_lun *lun,
 	char *page)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_show_offline_bit(lun, page);
@@ -675,10 +666,7 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_offline(
 	const char *page,
 	size_t count)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_store_offline_bit(lun, page, count);
@@ -693,10 +681,7 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_status(
 	struct se_lun *lun,
 	char *page)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_show_secondary_status(lun, page);
@@ -707,10 +692,7 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_status(
 	const char *page,
 	size_t count)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_store_secondary_status(lun, page, count);
@@ -725,10 +707,7 @@ static ssize_t target_fabric_port_show_attr_alua_tg_pt_write_md(
 	struct se_lun *lun,
 	char *page)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_show_secondary_write_metadata(lun, page);
@@ -739,10 +718,7 @@ static ssize_t target_fabric_port_store_attr_alua_tg_pt_write_md(
 	const char *page,
 	size_t count)
 {
-	if (!(lun))
-		return -ENODEV;
-
-	if (!(lun->lun_sep))
+	if (!lun || !lun->lun_sep)
 		return -ENODEV;
 
 	return core_alua_store_secondary_write_metadata(lun, page, count);
@@ -788,7 +764,7 @@ static int target_fabric_port_link(
 	}
 
 	dev = se_dev->se_dev_ptr;
-	if (!(dev)) {
+	if (!dev) {
 		pr_err("Unable to locate struct se_device pointer from"
 			" %s\n", config_item_name(se_dev_ci));
 		ret = -ENODEV;
@@ -797,7 +773,7 @@ static int target_fabric_port_link(
 
 	lun_p = core_dev_add_lun(se_tpg, dev->se_hba, dev,
 				lun->unpacked_lun);
-	if ((IS_ERR(lun_p)) || !(lun_p)) {
+	if (IS_ERR(lun_p) || !lun_p) {
 		pr_err("core_dev_add_lun() failed\n");
 		ret = -EINVAL;
 		goto out;
@@ -898,7 +874,7 @@ static struct config_group *target_fabric_make_lun(
 		return ERR_PTR(-EINVAL);
 
 	lun = core_get_lun_from_tpg(se_tpg, unpacked_lun);
-	if (!(lun))
+	if (!lun)
 		return ERR_PTR(-EINVAL);
 
 	lun_cg = &lun->lun_group;
@@ -1033,13 +1009,13 @@ static struct config_group *target_fabric_make_tpg(
 	struct target_fabric_configfs *tf = wwn->wwn_tf;
 	struct se_portal_group *se_tpg;
 
-	if (!(tf->tf_ops.fabric_make_tpg)) {
+	if (!tf->tf_ops.fabric_make_tpg) {
 		pr_err("tf->tf_ops.fabric_make_tpg is NULL\n");
 		return ERR_PTR(-ENOSYS);
 	}
 
 	se_tpg = tf->tf_ops.fabric_make_tpg(wwn, group, name);
-	if (!(se_tpg) || IS_ERR(se_tpg))
+	if (!se_tpg || IS_ERR(se_tpg))
 		return ERR_PTR(-EINVAL);
 	/*
 	 * Setup default groups from pre-allocated se_tpg->tpg_default_groups
@@ -1132,13 +1108,13 @@ static struct config_group *target_fabric_make_wwn(
 				struct target_fabric_configfs, tf_group);
 	struct se_wwn *wwn;
 
-	if (!(tf->tf_ops.fabric_make_wwn)) {
+	if (!tf->tf_ops.fabric_make_wwn) {
 		pr_err("tf->tf_ops.fabric_make_wwn is NULL\n");
 		return ERR_PTR(-ENOSYS);
 	}
 
 	wwn = tf->tf_ops.fabric_make_wwn(tf, group, name);
-	if (!(wwn) || IS_ERR(wwn))
+	if (!wwn || IS_ERR(wwn))
 		return ERR_PTR(-EINVAL);
 
 	wwn->wwn_tf = tf;

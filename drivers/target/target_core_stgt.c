@@ -119,7 +119,7 @@ static int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 	int err;
 
 	stgt_hba = kzalloc(sizeof(struct stgt_hba), GFP_KERNEL);
-	if (!(stgt_hba)) {
+	if (!stgt_hba) {
 		pr_err("Unable to allocate struct stgt_hba\n");
 		return -ENOMEM;
 	}
@@ -152,7 +152,7 @@ static int stgt_lld_probe(struct device *dev)
 	stgt_hba = to_stgt_hba(dev);
 
 	sh = scsi_host_alloc(&stgt_driver_template, sizeof(stgt_hba));
-	if (!(sh)) {
+	if (!sh) {
 		pr_err("scsi_host_alloc() failed\n");
 		return -ENOMEM;
 	}
@@ -229,7 +229,7 @@ static void *stgt_allocate_virtdevice(struct se_hba *hba, const char *name)
 	struct stgt_dev_virt *sdv;
 
 	sdv = kzalloc(sizeof(struct stgt_dev_virt), GFP_KERNEL);
-	if (!(sdv)) {
+	if (!sdv) {
 		pr_err("Unable to allocate memory for struct stgt_dev_virt\n");
 		return NULL;
 	}
@@ -248,7 +248,7 @@ static struct se_device *stgt_create_virtdevice(
 	struct stgt_dev_virt *sdv = p;
 	struct Scsi_Host *sh = hba->hba_ptr;
 
-	if (!(sdv)) {
+	if (!sdv) {
 		pr_err("Unable to locate struct stgt_dev_virt"
 				" parameter\n");
 		return NULL;
@@ -518,7 +518,7 @@ static inline void stgt_process_SAM_status(
 	struct stgt_plugin_task *st)
 {
 	task->task_scsi_status = status_byte(st->stgt_result);
-	if ((task->task_scsi_status)) {
+	if (task->task_scsi_status) {
 		task->task_scsi_status <<= 1;
 		pr_debug("PSCSI Status Byte exception at task: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", task, st->stgt_cdb[0],

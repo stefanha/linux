@@ -86,9 +86,8 @@ static void core_clear_initiator_node_from_tpg(
 		spin_lock(&lun->lun_acl_lock);
 		list_for_each_entry_safe(acl, acl_tmp,
 					&lun->lun_acl_list, lacl_list) {
-			if (!(strcmp(acl->initiatorname,
-					nacl->initiatorname)) &&
-			     (acl->mapped_lun == deve->mapped_lun))
+			if (!strcmp(acl->initiatorname, nacl->initiatorname) &&
+			    (acl->mapped_lun == deve->mapped_lun))
 				break;
 		}
 
@@ -121,7 +120,7 @@ struct se_node_acl *__core_tpg_get_initiator_node_acl(
 	struct se_node_acl *acl;
 
 	list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
-		if (!(strcmp(acl->initiatorname, initiatorname)))
+		if (!strcmp(acl->initiatorname, initiatorname))
 			return acl;
 	}
 
@@ -140,8 +139,8 @@ struct se_node_acl *core_tpg_get_initiator_node_acl(
 
 	spin_lock_bh(&tpg->acl_node_lock);
 	list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
-		if (!(strcmp(acl->initiatorname, initiatorname)) &&
-		   (!(acl->dynamic_node_acl))) {
+		if (!strcmp(acl->initiatorname, initiatorname) &&
+		    !acl->dynamic_node_acl) {
 			spin_unlock_bh(&tpg->acl_node_lock);
 			return acl;
 		}
@@ -177,7 +176,7 @@ void core_tpg_add_node_to_devs(
 		 * By default in LIO-Target $FABRIC_MOD,
 		 * demo_mode_write_protect is ON, or READ_ONLY;
 		 */
-		if (!(tpg->se_tpg_tfo->tpg_check_demo_mode_write_protect(tpg))) {
+		if (!tpg->se_tpg_tfo->tpg_check_demo_mode_write_protect(tpg)) {
 			if (dev->dev_flags & DF_READ_ONLY)
 				lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
 			else
@@ -236,7 +235,7 @@ static int core_create_device_list_for_node(struct se_node_acl *nacl)
 
 	nacl->device_list = kzalloc(sizeof(struct se_dev_entry) *
 				TRANSPORT_MAX_LUNS_PER_TPG, GFP_KERNEL);
-	if (!(nacl->device_list)) {
+	if (!nacl->device_list) {
 		pr_err("Unable to allocate memory for"
 			" struct se_node_acl->device_list\n");
 		return -ENOMEM;
@@ -265,14 +264,14 @@ struct se_node_acl *core_tpg_check_initiator_node_acl(
 	struct se_node_acl *acl;
 
 	acl = core_tpg_get_initiator_node_acl(tpg, initiatorname);
-	if ((acl))
+	if (acl)
 		return acl;
 
-	if (!(tpg->se_tpg_tfo->tpg_check_demo_mode(tpg)))
+	if (!tpg->se_tpg_tfo->tpg_check_demo_mode(tpg))
 		return NULL;
 
 	acl =  tpg->se_tpg_tfo->tpg_alloc_fabric_acl(tpg);
-	if (!(acl))
+	if (!acl)
 		return NULL;
 
 	INIT_LIST_HEAD(&acl->acl_list);
@@ -357,7 +356,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 
 	spin_lock_bh(&tpg->acl_node_lock);
 	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
-	if ((acl)) {
+	if (acl) {
 		if (acl->dynamic_node_acl) {
 			acl->dynamic_node_acl = 0;
 			pr_debug("%s_TPG[%u] - Replacing dynamic ACL"
@@ -384,7 +383,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	}
 	spin_unlock_bh(&tpg->acl_node_lock);
 
-	if (!(se_nacl)) {
+	if (!se_nacl) {
 		pr_err("struct se_node_acl pointer is NULL\n");
 		return ERR_PTR(-EINVAL);
 	}
@@ -463,7 +462,7 @@ int core_tpg_del_initiator_node_acl(
 		/*
 		 * Determine if the session needs to be closed by our context.
 		 */
-		if (!(tpg->se_tpg_tfo->shutdown_session(sess)))
+		if (!tpg->se_tpg_tfo->shutdown_session(sess))
 			continue;
 
 		spin_unlock_bh(&tpg->session_lock);
@@ -506,7 +505,7 @@ int core_tpg_set_initiator_node_queue_depth(
 
 	spin_lock_bh(&tpg->acl_node_lock);
 	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
-	if (!(acl)) {
+	if (!acl) {
 		pr_err("Access Control List entry for %s Initiator"
 			" Node %s does not exists for TPG %hu, ignoring"
 			" request.\n", tpg->se_tpg_tfo->get_fabric_name(),
@@ -543,7 +542,7 @@ int core_tpg_set_initiator_node_queue_depth(
 		/*
 		 * Determine if the session needs to be closed by our context.
 		 */
-		if (!(tpg->se_tpg_tfo->shutdown_session(sess)))
+		if (!tpg->se_tpg_tfo->shutdown_session(sess))
 			continue;
 
 		init_sess = sess;
@@ -644,7 +643,7 @@ int core_tpg_register(
 
 	se_tpg->tpg_lun_list = kzalloc((sizeof(struct se_lun) *
 				TRANSPORT_MAX_LUNS_PER_TPG), GFP_KERNEL);
-	if (!(se_tpg->tpg_lun_list)) {
+	if (!se_tpg->tpg_lun_list) {
 		pr_err("Unable to allocate struct se_portal_group->"
 				"tpg_lun_list\n");
 		return -ENOMEM;

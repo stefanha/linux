@@ -53,7 +53,7 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 	struct fd_host *fd_host;
 
 	fd_host = kzalloc(sizeof(struct fd_host), GFP_KERNEL);
-	if (!(fd_host)) {
+	if (!fd_host) {
 		pr_err("Unable to allocate memory for struct fd_host\n");
 		return -ENOMEM;
 	}
@@ -89,7 +89,7 @@ static void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)
 	struct fd_host *fd_host = (struct fd_host *) hba->hba_ptr;
 
 	fd_dev = kzalloc(sizeof(struct fd_dev), GFP_KERNEL);
-	if (!(fd_dev)) {
+	if (!fd_dev) {
 		pr_err("Unable to allocate memory for struct fd_dev\n");
 		return NULL;
 	}
@@ -213,7 +213,7 @@ static struct se_device *fd_create_virtdevice(
 	dev = transport_add_device_to_core_hba(hba, &fileio_template,
 				se_dev, dev_flags, fd_dev,
 				&dev_limits, "FILEIO", FD_VERSION);
-	if (!(dev))
+	if (!dev)
 		goto fail;
 
 	fd_dev->fd_dev_id = fd_host->fd_host_dev_id_count++;
@@ -262,7 +262,7 @@ fd_alloc_task(struct se_cmd *cmd)
 	struct fd_request *fd_req;
 
 	fd_req = kzalloc(sizeof(struct fd_request), GFP_KERNEL);
-	if (!(fd_req)) {
+	if (!fd_req) {
 		pr_err("Unable to allocate struct fd_request\n");
 		return NULL;
 	}
@@ -284,7 +284,7 @@ static int fd_do_readv(struct se_task *task)
 	int ret = 0, i;
 
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_nents, GFP_KERNEL);
-	if (!(iov)) {
+	if (!iov) {
 		pr_err("Unable to allocate fd_do_readv iov[]\n");
 		return -ENOMEM;
 	}
@@ -335,7 +335,7 @@ static int fd_do_writev(struct se_task *task)
 	int ret, i = 0;
 
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_nents, GFP_KERNEL);
-	if (!(iov)) {
+	if (!iov) {
 		pr_err("Unable to allocate fd_do_writev iov[]\n");
 		return -ENOMEM;
 	}

@@ -172,7 +172,7 @@ u32 fc_get_pr_transport_id(
 	ptr = &se_nacl->initiatorname[0];
 
 	for (i = 0; i < 24; ) {
-		if (!(strncmp(&ptr[i], ":", 1))) {
+		if (!strncmp(&ptr[i], ":", 1)) {
 			i++;
 			continue;
 		}
@@ -420,7 +420,7 @@ char *iscsi_parse_pr_out_transport_id(
 	 */
 	if (format_code == 0x40) {
 		p = strstr((char *)&buf[4], ",i,0x");
-		if (!(p)) {
+		if (!p) {
 			pr_err("Unable to locate \",i,0x\" seperator"
 				" for Initiator port identifier: %s\n",
 				(char *)&buf[4]);
