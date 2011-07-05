@@ -357,7 +357,7 @@ struct se_node_acl *tcm_qla2xxx_alloc_fabric_acl(struct se_portal_group *se_tpg)
 	struct tcm_qla2xxx_nacl *nacl;
 
 	nacl = kzalloc(sizeof(struct tcm_qla2xxx_nacl), GFP_KERNEL);
-	if (!(nacl)) {
+	if (!nacl) {
 		pr_err("Unable to alocate struct tcm_qla2xxx_nacl\n");
 		return NULL;
 	}

@@ -111,7 +111,7 @@ static struct se_node_acl *tcm_vhost_make_nodeacl(
 	/* tcm_vhost_parse_wwn(name, &wwpn, 1) < 0)
 		return ERR_PTR(-EINVAL); */
 	se_nacl_new = tcm_vhost_alloc_fabric_acl(se_tpg);
-	if (!(se_nacl_new))
+	if (!se_nacl_new)
 		return ERR_PTR(-ENOMEM);
 //#warning FIXME: Hardcoded nexus depth in tcm_vhost_make_nodeacl()
 	nexus_depth = 1;
@@ -283,7 +283,7 @@ static ssize_t tcm_vhost_tpg_store_nexus(
 	/*
 	 * Shutdown the active I_T nexus if 'NULL' is passed..
 	 */
-	if (!(strncmp(page, "NULL", 4))) {
+	if (!strncmp(page, "NULL", 4)) {
 		ret = tcm_vhost_drop_nexus(tv_tpg);
 		return (!ret) ? count : ret;
 	}
@@ -467,7 +467,7 @@ static struct se_portal_group *tcm_vhost_make_tpg(
 		return ERR_PTR(-EINVAL);
 
 	tpg = kzalloc(sizeof(struct tcm_vhost_tpg), GFP_KERNEL);
-	if (!(tpg)) {
+	if (!tpg) {
 		pr_err("Unable to allocate struct tcm_vhost_tpg");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -523,7 +523,7 @@ static struct se_wwn *tcm_vhost_make_tport(
 		return ERR_PTR(-EINVAL); */
 
 	tport = kzalloc(sizeof(struct tcm_vhost_tport), GFP_KERNEL);
-	if (!(tport)) {
+	if (!tport) {
 		pr_err("Unable to allocate struct tcm_vhost_tport");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -661,7 +661,7 @@ static int tcm_vhost_register_configfs(void)
 	 * Register the top level struct config_item_type with TCM core
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "vhost");
-	if (!(fabric)) {
+	if (!fabric) {
 		pr_err("target_fabric_configfs_init() failed\n");
 		return -ENOMEM;
 	}
@@ -700,7 +700,7 @@ static int tcm_vhost_register_configfs(void)
 
 static void tcm_vhost_deregister_configfs(void)
 {
-	if (!(tcm_vhost_fabric_configfs))
+	if (!tcm_vhost_fabric_configfs)
 		return;
 
 	target_fabric_configfs_deregister(tcm_vhost_fabric_configfs);

@@ -170,7 +170,7 @@ static struct se_node_acl *tcm_qla2xxx_make_nodeacl(
 		return ERR_PTR(-EINVAL);
 
 	se_nacl_new = tcm_qla2xxx_alloc_fabric_acl(se_tpg);
-	if (!(se_nacl_new))
+	if (!se_nacl_new)
 		return ERR_PTR(-ENOMEM);
 //#warning FIXME: Hardcoded qla2xxx_nexus depth in tcm_qla2xxx_make_nodeacl()
 	qla2xxx_nexus_depth = 1;
@@ -377,14 +377,14 @@ static struct se_portal_group *tcm_qla2xxx_make_tpg(
 	if (strict_strtoul(name + 5, 10, &tpgt) || tpgt > USHRT_MAX)
 		return ERR_PTR(-EINVAL);
 	
-	if ((lport->qla_npiv_vp == NULL) && (tpgt != 1)) {
+	if (!lport->qla_npiv_vp && (tpgt != 1)) {
 		pr_err("In non NPIV mode, a single TPG=1 is used for"
 			" HW port mappings\n");
 		return ERR_PTR(-ENOSYS);
 	}
 
 	tpg = kzalloc(sizeof(struct tcm_qla2xxx_tpg), GFP_KERNEL);
-	if (!(tpg)) {
+	if (!tpg) {
 		pr_err("Unable to allocate struct tcm_qla2xxx_tpg\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -424,7 +424,7 @@ static void tcm_qla2xxx_drop_tpg(struct se_portal_group *se_tpg)
 	 * Call into qla2x_target.c LLD logic to shutdown the active
 	 * FC Nexuses and disable target mode operation for this qla_hw_data
 	 */
-	if ((ha->qla_tgt != NULL) && !ha->qla_tgt->tgt_stopped)
+	if (ha->qla_tgt && !ha->qla_tgt->tgt_stopped)
 		qla_tgt_stop_phase1(ha->qla_tgt);
 
 	core_tpg_deregister(se_tpg);
@@ -454,7 +454,7 @@ static struct se_portal_group *tcm_qla2xxx_npiv_make_tpg(
 		return ERR_PTR(-EINVAL);
 
 	tpg = kzalloc(sizeof(struct tcm_qla2xxx_tpg), GFP_KERNEL);
-	if (!(tpg)) {
+	if (!tpg) {
 		pr_err("Unable to allocate struct tcm_qla2xxx_tpg\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -859,7 +859,7 @@ static int tcm_qla2xxx_init_lport(
 
 	lport->lport_fcport_map = vmalloc(
 			sizeof(struct tcm_qla2xxx_fc_domain) * 256);
-	if (!(lport->lport_fcport_map)) {
+	if (!lport->lport_fcport_map) {
 		pr_err("Unable to allocate lport_fcport_map of %lu"
 			" bytes\n", sizeof(struct tcm_qla2xxx_fc_domain) * 256);
 		return -ENOMEM;
@@ -871,7 +871,7 @@ static int tcm_qla2xxx_init_lport(
 
 	lport->lport_loopid_map = vmalloc(sizeof(struct tcm_qla2xxx_fc_loopid) *
 				65536);
-	if (!(lport->lport_loopid_map)) {
+	if (!lport->lport_loopid_map) {
 		pr_err("Unable to allocate lport->lport_loopid_map"
 			" of %lu bytes\n", sizeof(struct tcm_qla2xxx_fc_loopid)
 			* 65536);
@@ -916,7 +916,7 @@ static struct se_wwn *tcm_qla2xxx_make_lport(
 		return ERR_PTR(-EINVAL);
 
 	lport = kzalloc(sizeof(struct tcm_qla2xxx_lport), GFP_KERNEL);
-	if (!(lport)) {
+	if (!lport) {
 		pr_err("Unable to allocate struct tcm_qla2xxx_lport\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -1001,7 +1001,7 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 	 * shutdown of struct qla_tgt after the call to
 	 * qla_tgt_stop_phase1() from tcm_qla2xxx_drop_tpg() above..
 	 */
-	if ((ha->qla_tgt != NULL) && !ha->qla_tgt->tgt_stopped)
+	if (ha->qla_tgt && !ha->qla_tgt->tgt_stopped)
 		qla_tgt_stop_phase2(ha->qla_tgt);
 	/*
 	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
@@ -1040,7 +1040,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 		return ERR_PTR(-EINVAL);
 
 	lport = kzalloc(sizeof(struct tcm_qla2xxx_lport), GFP_KERNEL);
-	if (!(lport)) {
+	if (!lport) {
 		pr_err("Unable to allocate struct tcm_qla2xxx_lport"
 				" for NPIV\n");
 		return ERR_PTR(-ENOMEM);
@@ -1308,7 +1308,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	 * Register the top level struct config_item_type with TCM core
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "qla2xxx");
-	if (!(fabric)) {
+	if (!fabric) {
 		pr_err("target_fabric_configfs_init() failed\n");
 		return -ENOMEM;
 	}
@@ -1351,7 +1351,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	 * Register the top level struct config_item_type for NPIV with TCM core
 	 */
 	npiv_fabric = target_fabric_configfs_init(THIS_MODULE, "qla2xxx_npiv");
-	if (!(npiv_fabric)) {
+	if (!npiv_fabric) {
 		pr_err("target_fabric_configfs_init() failed\n");
 		ret = -ENOMEM;
 		goto out;
@@ -1397,7 +1397,7 @@ out:
 
 static void tcm_qla2xxx_deregister_configfs(void)
 {
-	if (!(tcm_qla2xxx_fabric_configfs))
+	if (!tcm_qla2xxx_fabric_configfs)
 		return;
 
 	target_fabric_configfs_deregister(tcm_qla2xxx_fabric_configfs);
