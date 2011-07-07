@@ -102,7 +102,7 @@ int core_scsi3_ua_allocate(
 
 	ua = kmem_cache_zalloc(se_ua_cache, GFP_ATOMIC);
 	if (!(ua)) {
-		printk(KERN_ERR "Unable to allocate struct se_ua\n");
+		pr_err("Unable to allocate struct se_ua\n");
 		return -ENOMEM;
 	}
 	INIT_LIST_HEAD(&ua->ua_dev_list);
@@ -177,7 +177,7 @@ int core_scsi3_ua_allocate(
 	spin_unlock(&deve->ua_lock);
 	spin_unlock_irq(&nacl->device_list_lock);
 
-	printk(KERN_INFO "[%s]: Allocated UNIT ATTENTION, mapped LUN: %u, ASC:"
+	pr_debug("[%s]: Allocated UNIT ATTENTION, mapped LUN: %u, ASC:"
 		" 0x%02x, ASCQ: 0x%02x\n",
 		nacl->se_tpg->se_tpg_tfo->get_fabric_name(), unpacked_lun,
 		asc, ascq);
@@ -264,7 +264,7 @@ void core_scsi3_ua_for_check_condition(
 	spin_unlock(&deve->ua_lock);
 	spin_unlock_irq(&nacl->device_list_lock);
 
-	printk(KERN_INFO "[%s]: %s UNIT ATTENTION condition with"
+	pr_debug("[%s]: %s UNIT ATTENTION condition with"
 		" INTLCK_CTRL: %d, mapped LUN: %u, got CDB: 0x%02x"
 		" reported ASC: 0x%02x, ASCQ: 0x%02x\n",
 		nacl->se_tpg->se_tpg_tfo->get_fabric_name(),
@@ -323,7 +323,7 @@ int core_scsi3_ua_clear_for_request_sense(
 	spin_unlock(&deve->ua_lock);
 	spin_unlock_irq(&nacl->device_list_lock);
 
-	printk(KERN_INFO "[%s]: Released UNIT ATTENTION condition, mapped"
+	pr_debug("[%s]: Released UNIT ATTENTION condition, mapped"
 		" LUN: %u, got REQUEST_SENSE reported ASC: 0x%02x,"
 		" ASCQ: 0x%02x\n", nacl->se_tpg->se_tpg_tfo->get_fabric_name(),
 		cmd->orig_fe_lun, *asc, *ascq);

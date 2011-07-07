@@ -42,18 +42,6 @@
 
 #include "target_core_file.h"
 
-#if 1
-#define DEBUG_FD_CACHE(x...) printk(x)
-#else
-#define DEBUG_FD_CACHE(x...)
-#endif
-
-#if 1
-#define DEBUG_FD_FUA(x...) printk(x)
-#else
-#define DEBUG_FD_FUA(x...)
-#endif
-
 static struct se_subsystem_api fileio_template;
 
 /*	fd_attach_hba(): (Part of se_subsystem_api_t template)
@@ -66,7 +54,7 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 
 	fd_host = kzalloc(sizeof(struct fd_host), GFP_KERNEL);
 	if (!(fd_host)) {
-		printk(KERN_ERR "Unable to allocate memory for struct fd_host\n");
+		pr_err("Unable to allocate memory for struct fd_host\n");
 		return -ENOMEM;
 	}
 
@@ -74,10 +62,10 @@ static int fd_attach_hba(struct se_hba *hba, u32 host_id)
 
 	hba->hba_ptr = fd_host;
 
-	printk(KERN_INFO "CORE_HBA[%d] - TCM FILEIO HBA Driver %s on Generic"
+	pr_debug("CORE_HBA[%d] - TCM FILEIO HBA Driver %s on Generic"
 		" Target Core Stack %s\n", hba->hba_id, FD_VERSION,
 		TARGET_CORE_MOD_VERSION);
-	printk(KERN_INFO "CORE_HBA[%d] - Attached FILEIO HBA: %u to Generic"
+	pr_debug("CORE_HBA[%d] - Attached FILEIO HBA: %u to Generic"
 		" MaxSectors: %u\n",
 		hba->hba_id, fd_host->fd_host_id, FD_MAX_SECTORS);
 
@@ -88,7 +76,7 @@ static void fd_detach_hba(struct se_hba *hba)
 {
 	struct fd_host *fd_host = hba->hba_ptr;
 
-	printk(KERN_INFO "CORE_HBA[%d] - Detached FILEIO HBA: %u from Generic"
+	pr_debug("CORE_HBA[%d] - Detached FILEIO HBA: %u from Generic"
 		" Target Core\n", hba->hba_id, fd_host->fd_host_id);
 
 	kfree(fd_host);
@@ -102,13 +90,13 @@ static void *fd_allocate_virtdevice(struct se_hba *hba, const char *name)
 
 	fd_dev = kzalloc(sizeof(struct fd_dev), GFP_KERNEL);
 	if (!(fd_dev)) {
-		printk(KERN_ERR "Unable to allocate memory for struct fd_dev\n");
+		pr_err("Unable to allocate memory for struct fd_dev\n");
 		return NULL;
 	}
 
 	fd_dev->fd_host = fd_host;
 
-	printk(KERN_INFO "FILEIO: Allocated fd_dev for %p\n", name);
+	pr_debug("FILEIO: Allocated fd_dev for %p\n", name);
 
 	return fd_dev;
 }
@@ -141,7 +129,7 @@ static struct se_device *fd_create_virtdevice(
 	set_fs(old_fs);
 
 	if (IS_ERR(dev_p)) {
-		printk(KERN_ERR "getname(%s) failed: %lu\n",
+		pr_err("getname(%s) failed: %lu\n",
 			fd_dev->fd_dev_name, IS_ERR(dev_p));
 		ret = PTR_ERR(dev_p);
 		goto fail;
@@ -164,12 +152,12 @@ static struct se_device *fd_create_virtdevice(
 
 	file = filp_open(dev_p, flags, 0600);
 	if (IS_ERR(file)) {
-		printk(KERN_ERR "filp_open(%s) failed\n", dev_p);
+		pr_err("filp_open(%s) failed\n", dev_p);
 		ret = PTR_ERR(file);
 		goto fail;
 	}
 	if (!file || !file->f_dentry) {
-		printk(KERN_ERR "filp_open(%s) failed\n", dev_p);
+		pr_err("filp_open(%s) failed\n", dev_p);
 		goto fail;
 	}
 	fd_dev->fd_file = file;
@@ -199,14 +187,14 @@ static struct se_device *fd_create_virtdevice(
 		fd_dev->fd_dev_size = (i_size_read(file->f_mapping->host) -
 				       fd_dev->fd_block_size);
 
-		printk(KERN_INFO "FILEIO: Using size: %llu bytes from struct"
+		pr_debug("FILEIO: Using size: %llu bytes from struct"
 			" block_device blocks: %llu logical_block_size: %d\n",
 			fd_dev->fd_dev_size,
 			div_u64(fd_dev->fd_dev_size, fd_dev->fd_block_size),
 			fd_dev->fd_block_size);
 	} else {
 		if (!(fd_dev->fbd_flags & FBDF_HAS_SIZE)) {
-			printk(KERN_ERR "FILEIO: Missing fd_dev_size="
+			pr_err("FILEIO: Missing fd_dev_size="
 				" parameter, and no backing struct"
 				" block_device\n");
 			goto fail;
@@ -231,7 +219,7 @@ static struct se_device *fd_create_virtdevice(
 	fd_dev->fd_dev_id = fd_host->fd_host_dev_id_count++;
 	fd_dev->fd_queue_depth = dev->queue_depth;
 
-	printk(KERN_INFO "CORE_FILE[%u] - Added TCM FILEIO Device ID: %u at %s,"
+	pr_debug("CORE_FILE[%u] - Added TCM FILEIO Device ID: %u at %s,"
 		" %llu total bytes\n", fd_host->fd_host_id, fd_dev->fd_dev_id,
 			fd_dev->fd_dev_name, fd_dev->fd_dev_size);
 
@@ -275,7 +263,7 @@ fd_alloc_task(struct se_cmd *cmd)
 
 	fd_req = kzalloc(sizeof(struct fd_request), GFP_KERNEL);
 	if (!(fd_req)) {
-		printk(KERN_ERR "Unable to allocate struct fd_request\n");
+		pr_err("Unable to allocate struct fd_request\n");
 		return NULL;
 	}
 
@@ -297,7 +285,7 @@ static int fd_do_readv(struct se_task *task)
 
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_nents, GFP_KERNEL);
 	if (!(iov)) {
-		printk(KERN_ERR "Unable to allocate fd_do_readv iov[]\n");
+		pr_err("Unable to allocate fd_do_readv iov[]\n");
 		return -ENOMEM;
 	}
 
@@ -319,14 +307,14 @@ static int fd_do_readv(struct se_task *task)
 	 */
 	if (S_ISBLK(fd->f_dentry->d_inode->i_mode)) {
 		if (ret < 0 || ret != task->task_size) {
-			printk(KERN_ERR "vfs_readv() returned %d,"
+			pr_err("vfs_readv() returned %d,"
 				" expecting %d for S_ISBLK\n", ret,
 				(int)task->task_size);
 			return (ret < 0 ? ret : -EINVAL);
 		}
 	} else {
 		if (ret < 0) {
-			printk(KERN_ERR "vfs_readv() returned %d for non"
+			pr_err("vfs_readv() returned %d for non"
 				" S_ISBLK\n", ret);
 			return ret;
 		}
@@ -348,7 +336,7 @@ static int fd_do_writev(struct se_task *task)
 
 	iov = kzalloc(sizeof(struct iovec) * task->task_sg_nents, GFP_KERNEL);
 	if (!(iov)) {
-		printk(KERN_ERR "Unable to allocate fd_do_writev iov[]\n");
+		pr_err("Unable to allocate fd_do_writev iov[]\n");
 		return -ENOMEM;
 	}
 
@@ -365,7 +353,7 @@ static int fd_do_writev(struct se_task *task)
 	kfree(iov);
 
 	if (ret < 0 || ret != task->task_size) {
-		printk(KERN_ERR "vfs_writev() returned %d\n", ret);
+		pr_err("vfs_writev() returned %d\n", ret);
 		return (ret < 0 ? ret : -EINVAL);
 	}
 
@@ -404,7 +392,7 @@ static void fd_emulate_sync_cache(struct se_task *task)
 
 	ret = vfs_fsync_range(fd_dev->fd_file, start, end, 1);
 	if (ret != 0)
-		printk(KERN_ERR "FILEIO: vfs_fsync_range() failed: %d\n", ret);
+		pr_err("FILEIO: vfs_fsync_range() failed: %d\n", ret);
 
 	if (!immed)
 		transport_complete_sync_cache(cmd, ret == 0);
@@ -449,12 +437,12 @@ static void fd_emulate_write_fua(struct se_cmd *cmd, struct se_task *task)
 	loff_t end = start + task->task_size;
 	int ret;
 
-	DEBUG_FD_CACHE("FILEIO: FUA WRITE LBA: %llu, bytes: %u\n",
+	pr_debug("FILEIO: FUA WRITE LBA: %llu, bytes: %u\n",
 			task->task_lba, task->task_size);
 
 	ret = vfs_fsync_range(fd_dev->fd_file, start, end, 1);
 	if (ret != 0)
-		printk(KERN_ERR "FILEIO: vfs_fsync_range() failed: %d\n", ret);
+		pr_err("FILEIO: vfs_fsync_range() failed: %d\n", ret);
 }
 
 static int fd_do_task(struct se_task *task)
@@ -548,7 +536,7 @@ static ssize_t fd_set_configfs_dev_params(
 			snprintf(fd_dev->fd_dev_name, FD_MAX_DEV_NAME,
 					"%s", arg_p);
 			kfree(arg_p);
-			printk(KERN_INFO "FILEIO: Referencing Path: %s\n",
+			pr_debug("FILEIO: Referencing Path: %s\n",
 					fd_dev->fd_dev_name);
 			fd_dev->fbd_flags |= FBDF_HAS_PATH;
 			break;
@@ -561,23 +549,23 @@ static ssize_t fd_set_configfs_dev_params(
 			ret = strict_strtoull(arg_p, 0, &fd_dev->fd_dev_size);
 			kfree(arg_p);
 			if (ret < 0) {
-				printk(KERN_ERR "strict_strtoull() failed for"
+				pr_err("strict_strtoull() failed for"
 						" fd_dev_size=\n");
 				goto out;
 			}
-			printk(KERN_INFO "FILEIO: Referencing Size: %llu"
+			pr_debug("FILEIO: Referencing Size: %llu"
 					" bytes\n", fd_dev->fd_dev_size);
 			fd_dev->fbd_flags |= FBDF_HAS_SIZE;
 			break;
 		case Opt_fd_buffered_io:
 			match_int(args, &arg);
 			if (arg != 1) {
-				printk(KERN_ERR "bogus fd_buffered_io=%d value\n", arg);
+				pr_err("bogus fd_buffered_io=%d value\n", arg);
 				ret = -EINVAL;
 				goto out;
 			}
 
-			printk(KERN_INFO "FILEIO: Using buffered I/O"
+			pr_debug("FILEIO: Using buffered I/O"
 				" operations for struct fd_dev\n");
 
 			fd_dev->fbd_flags |= FDBD_USE_BUFFERED_IO;
@@ -597,7 +585,7 @@ static ssize_t fd_check_configfs_dev_params(struct se_hba *hba, struct se_subsys
 	struct fd_dev *fd_dev = (struct fd_dev *) se_dev->se_dev_su_ptr;
 
 	if (!(fd_dev->fbd_flags & FBDF_HAS_PATH)) {
-		printk(KERN_ERR "Missing fd_dev_name=\n");
+		pr_err("Missing fd_dev_name=\n");
 		return -EINVAL;
 	}
 

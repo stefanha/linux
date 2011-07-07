@@ -178,7 +178,7 @@ int core_emulate_set_target_port_groups(struct se_cmd *cmd)
 	 */
 	l_tg_pt_gp_mem = l_port->sep_alua_tg_pt_gp_mem;
 	if (!(l_tg_pt_gp_mem)) {
-		printk(KERN_ERR "Unable to access l_port->sep_alua_tg_pt_gp_mem\n");
+		pr_err("Unable to access l_port->sep_alua_tg_pt_gp_mem\n");
 		rc = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		goto out;
 	}
@@ -186,7 +186,7 @@ int core_emulate_set_target_port_groups(struct se_cmd *cmd)
 	l_tg_pt_gp = l_tg_pt_gp_mem->tg_pt_gp;
 	if (!(l_tg_pt_gp)) {
 		spin_unlock(&l_tg_pt_gp_mem->tg_pt_gp_mem_lock);
-		printk(KERN_ERR "Unable to access *l_tg_pt_gp_mem->tg_pt_gp\n");
+		pr_err("Unable to access *l_tg_pt_gp_mem->tg_pt_gp\n");
 		rc = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		goto out;
 	}
@@ -194,7 +194,7 @@ int core_emulate_set_target_port_groups(struct se_cmd *cmd)
 	spin_unlock(&l_tg_pt_gp_mem->tg_pt_gp_mem_lock);
 
 	if (!(rc)) {
-		printk(KERN_INFO "Unable to process SET_TARGET_PORT_GROUPS"
+		pr_debug("Unable to process SET_TARGET_PORT_GROUPS"
 				" while TPGS_EXPLICT_ALUA is disabled\n");
 		rc = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		goto out;
@@ -506,7 +506,7 @@ static int core_alua_state_check(
 	 */
 	if (atomic_read(&port->sep_tg_pt_secondary_offline)) {
 		*alua_ascq = ASCQ_04H_ALUA_OFFLINE;
-		printk(KERN_INFO "ALUA: Got secondary offline status for local"
+		pr_debug("ALUA: Got secondary offline status for local"
 				" target port\n");
 		*alua_ascq = ASCQ_04H_ALUA_OFFLINE;
 		return 1;
@@ -548,7 +548,7 @@ static int core_alua_state_check(
 	 */
 	case ALUA_ACCESS_STATE_OFFLINE:
 	default:
-		printk(KERN_ERR "Unknown ALUA access state: 0x%02x\n",
+		pr_err("Unknown ALUA access state: 0x%02x\n",
 				out_alua_state);
 		return -EINVAL;
 	}
@@ -580,7 +580,7 @@ static int core_alua_check_transition(int state, int *primary)
 		*primary = 0;
 		break;
 	default:
-		printk(KERN_ERR "Unknown ALUA access state: 0x%02x\n", state);
+		pr_err("Unknown ALUA access state: 0x%02x\n", state);
 		return -EINVAL;
 	}
 
@@ -667,7 +667,7 @@ static int core_alua_write_tpg_metadata(
 
 	file = filp_open(path, flags, 0600);
 	if (IS_ERR(file) || !file || !file->f_dentry) {
-		printk(KERN_ERR "filp_open(%s) for ALUA metadata failed\n",
+		pr_err("filp_open(%s) for ALUA metadata failed\n",
 			path);
 		return -ENODEV;
 	}
@@ -681,7 +681,7 @@ static int core_alua_write_tpg_metadata(
 	set_fs(old_fs);
 
 	if (ret < 0) {
-		printk(KERN_ERR "Error writing ALUA metadata file: %s\n", path);
+		pr_err("Error writing ALUA metadata file: %s\n", path);
 		filp_close(file, NULL);
 		return -EIO;
 	}
@@ -820,7 +820,7 @@ static int core_alua_do_transition_tg_pt(
 	 */
 	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state, new_state);
 
-	printk(KERN_INFO "Successful %s ALUA transition TG PT Group: %s ID: %hu"
+	pr_debug("Successful %s ALUA transition TG PT Group: %s ID: %hu"
 		" from primary access state %s to %s\n", (explict) ? "explict" :
 		"implict", config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item),
 		tg_pt_gp->tg_pt_gp_id, core_alua_dump_state(old_state),
@@ -852,7 +852,7 @@ int core_alua_do_port_transition(
 
 	md_buf = kzalloc(l_tg_pt_gp->tg_pt_gp_md_buf_len, GFP_KERNEL);
 	if (!(md_buf)) {
-		printk("Unable to allocate buf for ALUA metadata\n");
+		pr_err("Unable to allocate buf for ALUA metadata\n");
 		return -ENOMEM;
 	}
 
@@ -941,7 +941,7 @@ int core_alua_do_port_transition(
 	}
 	spin_unlock(&lu_gp->lu_gp_lock);
 
-	printk(KERN_INFO "Successfully processed LU Group: %s all ALUA TG PT"
+	pr_debug("Successfully processed LU Group: %s all ALUA TG PT"
 		" Group IDs: %hu %s transition to primary state: %s\n",
 		config_item_name(&lu_gp->lu_gp_group.cg_item),
 		l_tg_pt_gp->tg_pt_gp_id, (explict) ? "explict" : "implict",
@@ -1003,7 +1003,7 @@ static int core_alua_set_tg_pt_secondary_state(
 	tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
 	if (!(tg_pt_gp)) {
 		spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
-		printk(KERN_ERR "Unable to complete secondary state"
+		pr_err("Unable to complete secondary state"
 				" transition\n");
 		return -EINVAL;
 	}
@@ -1022,7 +1022,7 @@ static int core_alua_set_tg_pt_secondary_state(
 			ALUA_STATUS_ALTERED_BY_EXPLICT_STPG :
 			ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA;
 
-	printk(KERN_INFO "Successful %s ALUA transition TG PT Group: %s ID: %hu"
+	pr_debug("Successful %s ALUA transition TG PT Group: %s ID: %hu"
 		" to secondary access state: %s\n", (explict) ? "explict" :
 		"implict", config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item),
 		tg_pt_gp->tg_pt_gp_id, (offline) ? "OFFLINE" : "ONLINE");
@@ -1041,7 +1041,7 @@ static int core_alua_set_tg_pt_secondary_state(
 	if (port->sep_tg_pt_secondary_write_md) {
 		md_buf = kzalloc(md_buf_len, GFP_KERNEL);
 		if (!(md_buf)) {
-			printk(KERN_ERR "Unable to allocate md_buf for"
+			pr_err("Unable to allocate md_buf for"
 				" secondary ALUA access metadata\n");
 			return -ENOMEM;
 		}
@@ -1063,7 +1063,7 @@ core_alua_allocate_lu_gp(const char *name, int def_group)
 
 	lu_gp = kmem_cache_zalloc(t10_alua_lu_gp_cache, GFP_KERNEL);
 	if (!(lu_gp)) {
-		printk(KERN_ERR "Unable to allocate struct t10_alua_lu_gp\n");
+		pr_err("Unable to allocate struct t10_alua_lu_gp\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	INIT_LIST_HEAD(&lu_gp->lu_gp_node);
@@ -1088,14 +1088,14 @@ int core_alua_set_lu_gp_id(struct t10_alua_lu_gp *lu_gp, u16 lu_gp_id)
 	 * The lu_gp->lu_gp_id may only be set once..
 	 */
 	if (lu_gp->lu_gp_valid_id) {
-		printk(KERN_WARNING "ALUA LU Group already has a valid ID,"
+		pr_warn("ALUA LU Group already has a valid ID,"
 			" ignoring request\n");
 		return -EINVAL;
 	}
 
 	spin_lock(&lu_gps_lock);
 	if (alua_lu_gps_count == 0x0000ffff) {
-		printk(KERN_ERR "Maximum ALUA alua_lu_gps_count:"
+		pr_err("Maximum ALUA alua_lu_gps_count:"
 				" 0x0000ffff reached\n");
 		spin_unlock(&lu_gps_lock);
 		kmem_cache_free(t10_alua_lu_gp_cache, lu_gp);
@@ -1110,7 +1110,7 @@ again:
 			if (!(lu_gp_id))
 				goto again;
 
-			printk(KERN_WARNING "ALUA Logical Unit Group ID: %hu"
+			pr_warn("ALUA Logical Unit Group ID: %hu"
 				" already exists, ignoring request\n",
 				lu_gp_id);
 			spin_unlock(&lu_gps_lock);
@@ -1134,7 +1134,7 @@ core_alua_allocate_lu_gp_mem(struct se_device *dev)
 
 	lu_gp_mem = kmem_cache_zalloc(t10_alua_lu_gp_mem_cache, GFP_KERNEL);
 	if (!(lu_gp_mem)) {
-		printk(KERN_ERR "Unable to allocate struct t10_alua_lu_gp_member\n");
+		pr_err("Unable to allocate struct t10_alua_lu_gp_member\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	INIT_LIST_HEAD(&lu_gp_mem->lu_gp_mem_list);
@@ -1308,7 +1308,7 @@ struct t10_alua_tg_pt_gp *core_alua_allocate_tg_pt_gp(
 
 	tg_pt_gp = kmem_cache_zalloc(t10_alua_tg_pt_gp_cache, GFP_KERNEL);
 	if (!(tg_pt_gp)) {
-		printk(KERN_ERR "Unable to allocate struct t10_alua_tg_pt_gp\n");
+		pr_err("Unable to allocate struct t10_alua_tg_pt_gp\n");
 		return NULL;
 	}
 	INIT_LIST_HEAD(&tg_pt_gp->tg_pt_gp_list);
@@ -1356,14 +1356,14 @@ int core_alua_set_tg_pt_gp_id(
 	 * The tg_pt_gp->tg_pt_gp_id may only be set once..
 	 */
 	if (tg_pt_gp->tg_pt_gp_valid_id) {
-		printk(KERN_WARNING "ALUA TG PT Group already has a valid ID,"
+		pr_warn("ALUA TG PT Group already has a valid ID,"
 			" ignoring request\n");
 		return -EINVAL;
 	}
 
 	spin_lock(&su_dev->t10_alua.tg_pt_gps_lock);
 	if (su_dev->t10_alua.alua_tg_pt_gps_count == 0x0000ffff) {
-		printk(KERN_ERR "Maximum ALUA alua_tg_pt_gps_count:"
+		pr_err("Maximum ALUA alua_tg_pt_gps_count:"
 			" 0x0000ffff reached\n");
 		spin_unlock(&su_dev->t10_alua.tg_pt_gps_lock);
 		kmem_cache_free(t10_alua_tg_pt_gp_cache, tg_pt_gp);
@@ -1379,7 +1379,7 @@ again:
 			if (!(tg_pt_gp_id))
 				goto again;
 
-			printk(KERN_ERR "ALUA Target Port Group ID: %hu already"
+			pr_err("ALUA Target Port Group ID: %hu already"
 				" exists, ignoring request\n", tg_pt_gp_id);
 			spin_unlock(&su_dev->t10_alua.tg_pt_gps_lock);
 			return -EINVAL;
@@ -1404,7 +1404,7 @@ struct t10_alua_tg_pt_gp_member *core_alua_allocate_tg_pt_gp_mem(
 	tg_pt_gp_mem = kmem_cache_zalloc(t10_alua_tg_pt_gp_mem_cache,
 				GFP_KERNEL);
 	if (!(tg_pt_gp_mem)) {
-		printk(KERN_ERR "Unable to allocate struct t10_alua_tg_pt_gp_member\n");
+		pr_err("Unable to allocate struct t10_alua_tg_pt_gp_member\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	INIT_LIST_HEAD(&tg_pt_gp_mem->tg_pt_gp_mem_list);
@@ -1634,7 +1634,7 @@ ssize_t core_alua_store_tg_pt_gp_info(
 	lun = port->sep_lun;
 
 	if (su_dev->t10_alua.alua_type != SPC3_ALUA_EMULATED) {
-		printk(KERN_WARNING "SPC3_ALUA_EMULATED not enabled for"
+		pr_warn("SPC3_ALUA_EMULATED not enabled for"
 			" %s/tpgt_%hu/%s\n", tpg->se_tpg_tfo->tpg_get_wwn(tpg),
 			tpg->se_tpg_tfo->tpg_get_tag(tpg),
 			config_item_name(&lun->lun_group.cg_item));
@@ -1642,7 +1642,7 @@ ssize_t core_alua_store_tg_pt_gp_info(
 	}
 
 	if (count > TG_PT_GROUP_NAME_BUF) {
-		printk(KERN_ERR "ALUA Target Port Group alias too large!\n");
+		pr_err("ALUA Target Port Group alias too large!\n");
 		return -EINVAL;
 	}
 	memset(buf, 0, TG_PT_GROUP_NAME_BUF);
@@ -1666,7 +1666,7 @@ ssize_t core_alua_store_tg_pt_gp_info(
 	if (!(tg_pt_gp_mem)) {
 		if (tg_pt_gp_new)
 			core_alua_put_tg_pt_gp_from_name(tg_pt_gp_new);
-		printk(KERN_ERR "NULL struct se_port->sep_alua_tg_pt_gp_mem pointer\n");
+		pr_err("NULL struct se_port->sep_alua_tg_pt_gp_mem pointer\n");
 		return -EINVAL;
 	}
 
@@ -1678,7 +1678,7 @@ ssize_t core_alua_store_tg_pt_gp_info(
 		 * with the default_tg_pt_gp.
 		 */
 		if (!(tg_pt_gp_new)) {
-			printk(KERN_INFO "Target_Core_ConfigFS: Moving"
+			pr_debug("Target_Core_ConfigFS: Moving"
 				" %s/tpgt_%hu/%s from ALUA Target Port Group:"
 				" alua/%s, ID: %hu back to"
 				" default_tg_pt_gp\n",
@@ -1707,7 +1707,7 @@ ssize_t core_alua_store_tg_pt_gp_info(
 	 */
 	__core_alua_attach_tg_pt_gp_mem(tg_pt_gp_mem, tg_pt_gp_new);
 	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
-	printk(KERN_INFO "Target_Core_ConfigFS: %s %s/tpgt_%hu/%s to ALUA"
+	pr_debug("Target_Core_ConfigFS: %s %s/tpgt_%hu/%s to ALUA"
 		" Target Port Group: alua/%s, ID: %hu\n", (move) ?
 		"Moving" : "Adding", tpg->se_tpg_tfo->tpg_get_wwn(tpg),
 		tpg->se_tpg_tfo->tpg_get_tag(tpg),
@@ -1744,11 +1744,11 @@ ssize_t core_alua_store_access_type(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract alua_access_type\n");
+		pr_err("Unable to extract alua_access_type\n");
 		return -EINVAL;
 	}
 	if ((tmp != 0) && (tmp != 1) && (tmp != 2) && (tmp != 3)) {
-		printk(KERN_ERR "Illegal value for alua_access_type:"
+		pr_err("Illegal value for alua_access_type:"
 				" %lu\n", tmp);
 		return -EINVAL;
 	}
@@ -1782,11 +1782,11 @@ ssize_t core_alua_store_nonop_delay_msecs(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract nonop_delay_msecs\n");
+		pr_err("Unable to extract nonop_delay_msecs\n");
 		return -EINVAL;
 	}
 	if (tmp > ALUA_MAX_NONOP_DELAY_MSECS) {
-		printk(KERN_ERR "Passed nonop_delay_msecs: %lu, exceeds"
+		pr_err("Passed nonop_delay_msecs: %lu, exceeds"
 			" ALUA_MAX_NONOP_DELAY_MSECS: %d\n", tmp,
 			ALUA_MAX_NONOP_DELAY_MSECS);
 		return -EINVAL;
@@ -1813,11 +1813,11 @@ ssize_t core_alua_store_trans_delay_msecs(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract trans_delay_msecs\n");
+		pr_err("Unable to extract trans_delay_msecs\n");
 		return -EINVAL;
 	}
 	if (tmp > ALUA_MAX_TRANS_DELAY_MSECS) {
-		printk(KERN_ERR "Passed trans_delay_msecs: %lu, exceeds"
+		pr_err("Passed trans_delay_msecs: %lu, exceeds"
 			" ALUA_MAX_TRANS_DELAY_MSECS: %d\n", tmp,
 			ALUA_MAX_TRANS_DELAY_MSECS);
 		return -EINVAL;
@@ -1844,11 +1844,11 @@ ssize_t core_alua_store_preferred_bit(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract preferred ALUA value\n");
+		pr_err("Unable to extract preferred ALUA value\n");
 		return -EINVAL;
 	}
 	if ((tmp != 0) && (tmp != 1)) {
-		printk(KERN_ERR "Illegal value for preferred ALUA: %lu\n", tmp);
+		pr_err("Illegal value for preferred ALUA: %lu\n", tmp);
 		return -EINVAL;
 	}
 	tg_pt_gp->tg_pt_gp_pref = (int)tmp;
@@ -1879,17 +1879,17 @@ ssize_t core_alua_store_offline_bit(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract alua_tg_pt_offline value\n");
+		pr_err("Unable to extract alua_tg_pt_offline value\n");
 		return -EINVAL;
 	}
 	if ((tmp != 0) && (tmp != 1)) {
-		printk(KERN_ERR "Illegal value for alua_tg_pt_offline: %lu\n",
+		pr_err("Illegal value for alua_tg_pt_offline: %lu\n",
 				tmp);
 		return -EINVAL;
 	}
 	tg_pt_gp_mem = lun->lun_sep->sep_alua_tg_pt_gp_mem;
 	if (!(tg_pt_gp_mem)) {
-		printk(KERN_ERR "Unable to locate *tg_pt_gp_mem\n");
+		pr_err("Unable to locate *tg_pt_gp_mem\n");
 		return -EINVAL;
 	}
 
@@ -1918,13 +1918,13 @@ ssize_t core_alua_store_secondary_status(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract alua_tg_pt_status\n");
+		pr_err("Unable to extract alua_tg_pt_status\n");
 		return -EINVAL;
 	}
 	if ((tmp != ALUA_STATUS_NONE) &&
 	    (tmp != ALUA_STATUS_ALTERED_BY_EXPLICT_STPG) &&
 	    (tmp != ALUA_STATUS_ALTERED_BY_IMPLICT_ALUA)) {
-		printk(KERN_ERR "Illegal value for alua_tg_pt_status: %lu\n",
+		pr_err("Illegal value for alua_tg_pt_status: %lu\n",
 				tmp);
 		return -EINVAL;
 	}
@@ -1951,11 +1951,11 @@ ssize_t core_alua_store_secondary_write_metadata(
 
 	ret = strict_strtoul(page, 0, &tmp);
 	if (ret < 0) {
-		printk(KERN_ERR "Unable to extract alua_tg_pt_write_md\n");
+		pr_err("Unable to extract alua_tg_pt_write_md\n");
 		return -EINVAL;
 	}
 	if ((tmp != 0) && (tmp != 1)) {
-		printk(KERN_ERR "Illegal value for alua_tg_pt_write_md:"
+		pr_err("Illegal value for alua_tg_pt_write_md:"
 				" %lu\n", tmp);
 		return -EINVAL;
 	}
@@ -1979,7 +1979,7 @@ int core_setup_alua(struct se_device *dev, int force_pt)
 	    !(dev->se_sub_dev->se_dev_attrib.emulate_alua)) || force_pt) {
 		alua->alua_type = SPC_ALUA_PASSTHROUGH;
 		alua->alua_state_check = &core_alua_state_check_nop;
-		printk(KERN_INFO "%s: Using SPC_ALUA_PASSTHROUGH, no ALUA"
+		pr_debug("%s: Using SPC_ALUA_PASSTHROUGH, no ALUA"
 			" emulation\n", dev->transport->name);
 		return 0;
 	}
@@ -1988,7 +1988,7 @@ int core_setup_alua(struct se_device *dev, int force_pt)
 	 * use emulated ALUA.
 	 */
 	if (dev->transport->get_device_rev(dev) >= SCSI_3) {
-		printk(KERN_INFO "%s: Enabling ALUA Emulation for SPC-3"
+		pr_debug("%s: Enabling ALUA Emulation for SPC-3"
 			" device\n", dev->transport->name);
 		/*
 		 * Associate this struct se_device with the default ALUA
@@ -2005,13 +2005,13 @@ int core_setup_alua(struct se_device *dev, int force_pt)
 				default_lu_gp);
 		spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 
-		printk(KERN_INFO "%s: Adding to default ALUA LU Group:"
+		pr_debug("%s: Adding to default ALUA LU Group:"
 			" core/alua/lu_gps/default_lu_gp\n",
 			dev->transport->name);
 	} else {
 		alua->alua_type = SPC2_ALUA_DISABLED;
 		alua->alua_state_check = &core_alua_state_check_nop;
-		printk(KERN_INFO "%s: Disabling ALUA Emulation for SPC-2"
+		pr_debug("%s: Disabling ALUA Emulation for SPC-2"
 			" device\n", dev->transport->name);
 	}
 

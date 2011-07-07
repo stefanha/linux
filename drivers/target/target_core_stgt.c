@@ -120,7 +120,7 @@ static int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 
 	stgt_hba = kzalloc(sizeof(struct stgt_hba), GFP_KERNEL);
 	if (!(stgt_hba)) {
-		printk(KERN_ERR "Unable to allocate struct stgt_hba\n");
+		pr_err("Unable to allocate struct stgt_hba\n");
 		return -ENOMEM;
 	}
 	stgt_hba->se_hba = hba;
@@ -132,7 +132,7 @@ static int stgt_attach_hba(struct se_hba *hba, u32 host_id)
 
 	err = device_register(&stgt_hba->dev);
 	if (err) {
-		printk(KERN_ERR "device_register() for stgt_hba failed:"
+		pr_err("device_register() for stgt_hba failed:"
 				" %d\n", err);
 		return err;
 	}
@@ -153,7 +153,7 @@ static int stgt_lld_probe(struct device *dev)
 
 	sh = scsi_host_alloc(&stgt_driver_template, sizeof(stgt_hba));
 	if (!(sh)) {
-		printk(KERN_ERR "scsi_host_alloc() failed\n");
+		pr_err("scsi_host_alloc() failed\n");
 		return -ENOMEM;
 	}
 	hba = stgt_hba->se_hba;
@@ -169,7 +169,7 @@ static int stgt_lld_probe(struct device *dev)
 
 	err = scsi_add_host(sh, &stgt_hba->dev);
 	if (err) {
-		printk(KERN_ERR "scsi_add_host() failed with err: %d\n", err);
+		pr_err("scsi_add_host() failed with err: %d\n", err);
 		return err;
 	}
 
@@ -184,12 +184,12 @@ static int stgt_lld_probe(struct device *dev)
 
 	hba->hba_ptr = sh;
 
-	printk(KERN_INFO "CORE_HBA[%d] - TCM STGT HBA Driver %s on"
+	pr_debug("CORE_HBA[%d] - TCM STGT HBA Driver %s on"
 		" Generic Target Core Stack %s\n", hba->hba_id,
 		STGT_VERSION, TARGET_CORE_MOD_VERSION);
-	printk(KERN_INFO "CORE_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
+	pr_debug("CORE_HBA[%d] - %s\n", hba->hba_id, (sh->hostt->name) ?
 			(sh->hostt->name) : "Unknown");
-	printk(KERN_INFO "CORE_HBA[%d] - Attached STGT HBA to Generic"
+	pr_debug("CORE_HBA[%d] - Attached STGT HBA to Generic"
 		" MaxSectors: %hu\n",
 		hba->hba_id, max_sectors);
 
@@ -215,7 +215,7 @@ static void stgt_detach_hba(struct se_hba *hba)
 	struct Scsi_Host *scsi_host = hba->hba_ptr;
 	struct stgt_hba *stgt_hba = *(struct stgt_hba **)shost_priv(scsi_host);
 
-	printk(KERN_INFO "CORE_HBA[%d] - Detached STGT HBA: %s from"
+	pr_debug("CORE_HBA[%d] - Detached STGT HBA: %s from"
 		" Generic Target Core\n", hba->hba_id,
 		(scsi_host->hostt->name) ? (scsi_host->hostt->name) :
 		"Unknown");
@@ -230,12 +230,12 @@ static void *stgt_allocate_virtdevice(struct se_hba *hba, const char *name)
 
 	sdv = kzalloc(sizeof(struct stgt_dev_virt), GFP_KERNEL);
 	if (!(sdv)) {
-		printk(KERN_ERR "Unable to allocate memory for struct stgt_dev_virt\n");
+		pr_err("Unable to allocate memory for struct stgt_dev_virt\n");
 		return NULL;
 	}
 	sdv->sdv_se_hba = hba;
 
-	printk(KERN_INFO "STGT: Allocated sdv: %p for %s\n", sdv, name);
+	pr_debug("STGT: Allocated sdv: %p for %s\n", sdv, name);
 	return sdv;
 }
 
@@ -249,12 +249,12 @@ static struct se_device *stgt_create_virtdevice(
 	struct Scsi_Host *sh = hba->hba_ptr;
 
 	if (!(sdv)) {
-		printk(KERN_ERR "Unable to locate struct stgt_dev_virt"
+		pr_err("Unable to locate struct stgt_dev_virt"
 				" parameter\n");
 		return NULL;
 	}
 
-	printk(KERN_ERR "Unable to locate %d:%d:%d:%d\n", sh->host_no,
+	pr_err("Unable to locate %d:%d:%d:%d\n", sh->host_no,
 		sdv->sdv_channel_id,  sdv->sdv_target_id, sdv->sdv_lun_id);
 
 	return NULL;
@@ -311,7 +311,7 @@ stgt_alloc_task(struct se_cmd *cmd)
 
 	st = kzalloc(sizeof(struct stgt_plugin_task), GFP_KERNEL);
 	if (!st) {
-		printk(KERN_ERR "Unable to allocate struct stgt_plugin_task\n");
+		pr_err("Unable to allocate struct stgt_plugin_task\n");
 		return NULL;
 	}
 
@@ -332,7 +332,7 @@ static int stgt_do_task(struct se_task *task)
 	sc = scsi_host_get_command(sh, task->task_data_direction,
 				   GFP_KERNEL);
 	if (!sc) {
-		printk(KERN_ERR "Unable to allocate memory for struct"
+		pr_err("Unable to allocate memory for struct"
 			" scsi_cmnd\n");
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
@@ -348,7 +348,7 @@ static int stgt_do_task(struct se_task *task)
 	err = scsi_tgt_queue_command(sc, itn_id, (struct scsi_lun *)&cmd->lun,
 			cmd->tag);
 	if (err) {
-		printk(KERN_INFO "scsi_tgt_queue_command() failed for sc:"
+		pr_debug("scsi_tgt_queue_command() failed for sc:"
 			" %p\n", sc);
 		scsi_host_put_command(sh, sc);
 	}
@@ -404,21 +404,21 @@ static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 		case Opt_scsi_channel_id:
 			match_int(args, &arg);
 			sdv->sdv_channel_id = arg;
-			printk(KERN_INFO "STGT[%d]: Referencing SCSI Channel"
+			pr_debug("STGT[%d]: Referencing SCSI Channel"
 				" ID: %d\n",  sh->host_no, sdv->sdv_channel_id);
 			sdv->sdv_flags |= PDF_HAS_CHANNEL_ID;
 			break;
 		case Opt_scsi_target_id:
 			match_int(args, &arg);
 			sdv->sdv_target_id = arg;
-			printk(KERN_INFO "STGT[%d]: Referencing SCSI Target"
+			pr_debug("STGT[%d]: Referencing SCSI Target"
 				" ID: %d\n", sh->host_no, sdv->sdv_target_id);
 			sdv->sdv_flags |= PDF_HAS_TARGET_ID;
 			break;
 		case Opt_scsi_lun_id:
 			match_int(args, &arg);
 			sdv->sdv_lun_id = arg;
-			printk(KERN_INFO "STGT[%d]: Referencing SCSI LUN ID:"
+			pr_debug("STGT[%d]: Referencing SCSI LUN ID:"
 				" %d\n", sh->host_no, sdv->sdv_lun_id);
 			sdv->sdv_flags |= PDF_HAS_LUN_ID;
 			break;
@@ -440,7 +440,7 @@ static ssize_t stgt_check_configfs_dev_params(
 	if (!(sdv->sdv_flags & PDF_HAS_CHANNEL_ID) ||
 	    !(sdv->sdv_flags & PDF_HAS_TARGET_ID) ||
 	    !(sdv->sdv_flags & PDF_HAS_TARGET_ID)) {
-		printk(KERN_ERR "Missing scsi_channel_id=, scsi_target_id= and"
+		pr_err("Missing scsi_channel_id=, scsi_target_id= and"
 			" scsi_lun_id= parameters\n");
 		return -1;
 	}
@@ -520,7 +520,7 @@ static inline void stgt_process_SAM_status(
 	task->task_scsi_status = status_byte(st->stgt_result);
 	if ((task->task_scsi_status)) {
 		task->task_scsi_status <<= 1;
-		printk(KERN_INFO "PSCSI Status Byte exception at task: %p CDB:"
+		pr_debug("PSCSI Status Byte exception at task: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", task, st->stgt_cdb[0],
 			st->stgt_result);
 	}
@@ -530,7 +530,7 @@ static inline void stgt_process_SAM_status(
 		transport_complete_task(task, (!task->task_scsi_status));
 		break;
 	default:
-		printk(KERN_INFO "PSCSI Host Byte exception at task: %p CDB:"
+		pr_debug("PSCSI Host Byte exception at task: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", task, st->stgt_cdb[0],
 			st->stgt_result);
 		task->task_scsi_status = SAM_STAT_CHECK_CONDITION;
@@ -556,11 +556,11 @@ static int stgt_transfer_response(struct scsi_cmnd *sc,
 	struct stgt_plugin_task *st = STGT_TASK(task);
 
 	if (!task) {
-		printk(KERN_ERR "struct se_task is NULL!\n");
+		pr_err("struct se_task is NULL!\n");
 		BUG();
 	}
 	if (!st) {
-		printk(KERN_ERR "struct stgt_plugin_task is NULL!\n");
+		pr_err("struct stgt_plugin_task is NULL!\n");
 		BUG();
 	}
 	st->stgt_result = sc->request->errors;
@@ -603,19 +603,19 @@ static int __init stgt_module_init(void)
 
 	ret = device_register(&stgt_primary);
 	if (ret) {
-		printk(KERN_ERR "device_register() failed for stgt_primary\n");
+		pr_err("device_register() failed for stgt_primary\n");
 		return ret;
 	}
 
 	ret = bus_register(&stgt_lld_bus);
 	if (ret) {
-		printk(KERN_ERR "bus_register() failed for stgt_ldd_bus\n");
+		pr_err("bus_register() failed for stgt_ldd_bus\n");
 		goto out_unregister_device;
 	}
 
 	ret = driver_register(&stgt_driverfs_driver);
 	if (ret) {
-		printk(KERN_ERR "driver_register() failed for"
+		pr_err("driver_register() failed for"
 			" stgt_driverfs_driver\n");
 		goto out_unregister_bus;
 	}

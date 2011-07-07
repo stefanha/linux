@@ -72,7 +72,7 @@ static void core_clear_initiator_node_from_tpg(
 			continue;
 
 		if (!deve->se_lun) {
-			printk(KERN_ERR "%s device entries device pointer is"
+			pr_err("%s device entries device pointer is"
 				" NULL, but Initiator has access.\n",
 				tpg->se_tpg_tfo->get_fabric_name());
 			continue;
@@ -93,7 +93,7 @@ static void core_clear_initiator_node_from_tpg(
 		}
 
 		if (!acl) {
-			printk(KERN_ERR "Unable to locate struct se_lun_acl for %s,"
+			pr_err("Unable to locate struct se_lun_acl for %s,"
 				" mapped_lun: %u\n", nacl->initiatorname,
 				deve->mapped_lun);
 			spin_unlock(&lun->lun_acl_lock);
@@ -193,7 +193,7 @@ void core_tpg_add_node_to_devs(
 				lun_access = TRANSPORT_LUNFLAGS_READ_WRITE;
 		}
 
-		printk(KERN_INFO "TARGET_CORE[%s]->TPG[%u]_LUN[%u] - Adding %s"
+		pr_debug("TARGET_CORE[%s]->TPG[%u]_LUN[%u] - Adding %s"
 			" access for LUN in Demo Mode\n",
 			tpg->se_tpg_tfo->get_fabric_name(),
 			tpg->se_tpg_tfo->tpg_get_tag(tpg), lun->unpacked_lun,
@@ -216,7 +216,7 @@ static int core_set_queue_depth_for_node(
 	struct se_node_acl *acl)
 {
 	if (!acl->queue_depth) {
-		printk(KERN_ERR "Queue depth for %s Initiator Node: %s is 0,"
+		pr_err("Queue depth for %s Initiator Node: %s is 0,"
 			"defaulting to 1.\n", tpg->se_tpg_tfo->get_fabric_name(),
 			acl->initiatorname);
 		acl->queue_depth = 1;
@@ -237,7 +237,7 @@ static int core_create_device_list_for_node(struct se_node_acl *nacl)
 	nacl->device_list = kzalloc(sizeof(struct se_dev_entry) *
 				TRANSPORT_MAX_LUNS_PER_TPG, GFP_KERNEL);
 	if (!(nacl->device_list)) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 			" struct se_node_acl->device_list\n");
 		return -ENOMEM;
 	}
@@ -307,7 +307,7 @@ struct se_node_acl *core_tpg_check_initiator_node_acl(
 	tpg->num_node_acls++;
 	spin_unlock_bh(&tpg->acl_node_lock);
 
-	printk("%s_TPG[%u] - Added DYNAMIC ACL with TCQ Depth: %d for %s"
+	pr_debug("%s_TPG[%u] - Added DYNAMIC ACL with TCQ Depth: %d for %s"
 		" Initiator Node: %s\n", tpg->se_tpg_tfo->get_fabric_name(),
 		tpg->se_tpg_tfo->tpg_get_tag(tpg), acl->queue_depth,
 		tpg->se_tpg_tfo->get_fabric_name(), initiatorname);
@@ -360,7 +360,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	if ((acl)) {
 		if (acl->dynamic_node_acl) {
 			acl->dynamic_node_acl = 0;
-			printk(KERN_INFO "%s_TPG[%u] - Replacing dynamic ACL"
+			pr_debug("%s_TPG[%u] - Replacing dynamic ACL"
 				" for %s\n", tpg->se_tpg_tfo->get_fabric_name(),
 				tpg->se_tpg_tfo->tpg_get_tag(tpg), initiatorname);
 			spin_unlock_bh(&tpg->acl_node_lock);
@@ -375,7 +375,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 			goto done;
 		}
 
-		printk(KERN_ERR "ACL entry for %s Initiator"
+		pr_err("ACL entry for %s Initiator"
 			" Node %s already exists for TPG %u, ignoring"
 			" request.\n",  tpg->se_tpg_tfo->get_fabric_name(),
 			initiatorname, tpg->se_tpg_tfo->tpg_get_tag(tpg));
@@ -385,7 +385,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	spin_unlock_bh(&tpg->acl_node_lock);
 
 	if (!(se_nacl)) {
-		printk("struct se_node_acl pointer is NULL\n");
+		pr_err("struct se_node_acl pointer is NULL\n");
 		return ERR_PTR(-EINVAL);
 	}
 	/*
@@ -425,7 +425,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	spin_unlock_bh(&tpg->acl_node_lock);
 
 done:
-	printk(KERN_INFO "%s_TPG[%hu] - Added ACL with TCQ Depth: %d for %s"
+	pr_debug("%s_TPG[%hu] - Added ACL with TCQ Depth: %d for %s"
 		" Initiator Node: %s\n", tpg->se_tpg_tfo->get_fabric_name(),
 		tpg->se_tpg_tfo->tpg_get_tag(tpg), acl->queue_depth,
 		tpg->se_tpg_tfo->get_fabric_name(), initiatorname);
@@ -481,7 +481,7 @@ int core_tpg_del_initiator_node_acl(
 	core_clear_initiator_node_from_tpg(acl, tpg);
 	core_free_device_list_for_node(acl, tpg);
 
-	printk(KERN_INFO "%s_TPG[%hu] - Deleted ACL with TCQ Depth: %d for %s"
+	pr_debug("%s_TPG[%hu] - Deleted ACL with TCQ Depth: %d for %s"
 		" Initiator Node: %s\n", tpg->se_tpg_tfo->get_fabric_name(),
 		tpg->se_tpg_tfo->tpg_get_tag(tpg), acl->queue_depth,
 		tpg->se_tpg_tfo->get_fabric_name(), acl->initiatorname);
@@ -507,7 +507,7 @@ int core_tpg_set_initiator_node_queue_depth(
 	spin_lock_bh(&tpg->acl_node_lock);
 	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
 	if (!(acl)) {
-		printk(KERN_ERR "Access Control List entry for %s Initiator"
+		pr_err("Access Control List entry for %s Initiator"
 			" Node %s does not exists for TPG %hu, ignoring"
 			" request.\n", tpg->se_tpg_tfo->get_fabric_name(),
 			initiatorname, tpg->se_tpg_tfo->tpg_get_tag(tpg));
@@ -526,7 +526,7 @@ int core_tpg_set_initiator_node_queue_depth(
 			continue;
 
 		if (!force) {
-			printk(KERN_ERR "Unable to change queue depth for %s"
+			pr_err("Unable to change queue depth for %s"
 				" Initiator Node: %s while session is"
 				" operational.  To forcefully change the queue"
 				" depth and force session reinstatement"
@@ -586,7 +586,7 @@ int core_tpg_set_initiator_node_queue_depth(
 	if (init_sess)
 		tpg->se_tpg_tfo->close_session(init_sess);
 
-	printk(KERN_INFO "Successfuly changed queue depth to: %d for Initiator"
+	pr_debug("Successfuly changed queue depth to: %d for Initiator"
 		" Node: %s on %s Target Portal Group: %u\n", queue_depth,
 		initiatorname, tpg->se_tpg_tfo->get_fabric_name(),
 		tpg->se_tpg_tfo->tpg_get_tag(tpg));
@@ -645,7 +645,7 @@ int core_tpg_register(
 	se_tpg->tpg_lun_list = kzalloc((sizeof(struct se_lun) *
 				TRANSPORT_MAX_LUNS_PER_TPG), GFP_KERNEL);
 	if (!(se_tpg->tpg_lun_list)) {
-		printk(KERN_ERR "Unable to allocate struct se_portal_group->"
+		pr_err("Unable to allocate struct se_portal_group->"
 				"tpg_lun_list\n");
 		return -ENOMEM;
 	}
@@ -686,7 +686,7 @@ int core_tpg_register(
 	list_add_tail(&se_tpg->se_tpg_node, &tpg_list);
 	spin_unlock_bh(&tpg_lock);
 
-	printk(KERN_INFO "TARGET_CORE[%s]: Allocated %s struct se_portal_group for"
+	pr_debug("TARGET_CORE[%s]: Allocated %s struct se_portal_group for"
 		" endpoint: %s, Portal Tag: %u\n", tfo->get_fabric_name(),
 		(se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) ?
 		"Normal" : "Discovery", (tfo->tpg_get_wwn(se_tpg) == NULL) ?
@@ -700,7 +700,7 @@ int core_tpg_deregister(struct se_portal_group *se_tpg)
 {
 	struct se_node_acl *nacl, *nacl_tmp;
 
-	printk(KERN_INFO "TARGET_CORE[%s]: Deallocating %s struct se_portal_group"
+	pr_debug("TARGET_CORE[%s]: Deallocating %s struct se_portal_group"
 		" for endpoint: %s Portal Tag %u\n",
 		(se_tpg->se_tpg_type == TRANSPORT_TPG_TYPE_NORMAL) ?
 		"Normal" : "Discovery", se_tpg->se_tpg_tfo->get_fabric_name(),
@@ -749,7 +749,7 @@ struct se_lun *core_tpg_pre_addlun(
 	struct se_lun *lun;
 
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "%s LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
+		pr_err("%s LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %u\n",
 			tpg->se_tpg_tfo->get_fabric_name(),
 			unpacked_lun, TRANSPORT_MAX_LUNS_PER_TPG-1,
@@ -760,7 +760,7 @@ struct se_lun *core_tpg_pre_addlun(
 	spin_lock(&tpg->tpg_lun_lock);
 	lun = &tpg->tpg_lun_list[unpacked_lun];
 	if (lun->lun_status == TRANSPORT_LUN_STATUS_ACTIVE) {
-		printk(KERN_ERR "TPG Logical Unit Number: %u is already active"
+		pr_err("TPG Logical Unit Number: %u is already active"
 			" on %s Target Portal Group: %u, ignoring request.\n",
 			unpacked_lun, tpg->se_tpg_tfo->get_fabric_name(),
 			tpg->se_tpg_tfo->tpg_get_tag(tpg));
@@ -808,7 +808,7 @@ struct se_lun *core_tpg_pre_dellun(
 	struct se_lun *lun;
 
 	if (unpacked_lun > (TRANSPORT_MAX_LUNS_PER_TPG-1)) {
-		printk(KERN_ERR "%s LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
+		pr_err("%s LUN: %u exceeds TRANSPORT_MAX_LUNS_PER_TPG"
 			"-1: %u for Target Portal Group: %u\n",
 			tpg->se_tpg_tfo->get_fabric_name(), unpacked_lun,
 			TRANSPORT_MAX_LUNS_PER_TPG-1,
@@ -819,7 +819,7 @@ struct se_lun *core_tpg_pre_dellun(
 	spin_lock(&tpg->tpg_lun_lock);
 	lun = &tpg->tpg_lun_list[unpacked_lun];
 	if (lun->lun_status != TRANSPORT_LUN_STATUS_ACTIVE) {
-		printk(KERN_ERR "%s Logical Unit Number: %u is not active on"
+		pr_err("%s Logical Unit Number: %u is not active on"
 			" Target Portal Group: %u, ignoring request.\n",
 			tpg->se_tpg_tfo->get_fabric_name(), unpacked_lun,
 			tpg->se_tpg_tfo->tpg_get_tag(tpg));
