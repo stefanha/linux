@@ -257,7 +257,7 @@ static inline struct fd_request *FILE_REQ(struct se_task *task)
 
 
 static struct se_task *
-fd_alloc_task(struct se_cmd *cmd)
+fd_alloc_task(unsigned char *cdb)
 {
 	struct fd_request *fd_req;
 
@@ -267,15 +267,14 @@ fd_alloc_task(struct se_cmd *cmd)
 		return NULL;
 	}
 
-	fd_req->fd_dev = cmd->se_dev->dev_ptr;
-
 	return &fd_req->fd_task;
 }
 
 static int fd_do_readv(struct se_task *task)
 {
 	struct fd_request *req = FILE_REQ(task);
-	struct file *fd = req->fd_dev->fd_file;
+	struct fd_dev *dev = req->fd_task.se_dev->dev_ptr;
+	struct file *fd = dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	mm_segment_t old_fs;
@@ -326,7 +325,8 @@ static int fd_do_readv(struct se_task *task)
 static int fd_do_writev(struct se_task *task)
 {
 	struct fd_request *req = FILE_REQ(task);
-	struct file *fd = req->fd_dev->fd_file;
+	struct fd_dev *dev = req->fd_task.se_dev->dev_ptr;
+	struct file *fd = dev->fd_file;
 	struct scatterlist *sg = task->task_sg;
 	struct iovec *iov;
 	mm_segment_t old_fs;

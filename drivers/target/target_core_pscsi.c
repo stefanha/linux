@@ -760,33 +760,19 @@ after_mode_select:
 }
 
 static struct se_task *
-pscsi_alloc_task(struct se_cmd *cmd)
+pscsi_alloc_task(unsigned char *cdb)
 {
 	struct pscsi_plugin_task *pt;
-	unsigned char *cdb = cmd->t_task_cdb;
 
-	pt = kzalloc(sizeof(struct pscsi_plugin_task), GFP_KERNEL);
+	/*
+	 * Dynamically alloc cdb space, since it may be larger than
+	 * TCM_MAX_COMMAND_SIZE
+	 */
+	pt = kzalloc(sizeof(*pt) + scsi_command_size(cdb), GFP_KERNEL);
 	if (!pt) {
 		pr_err("Unable to allocate struct pscsi_plugin_task\n");
 		return NULL;
 	}
-
-	/*
-	 * If TCM Core is signaling a > TCM_MAX_COMMAND_SIZE allocation,
-	 * allocate the extended CDB buffer for per struct se_task context
-	 * pt->pscsi_cdb now.
-	 */
-	if (cmd->t_task_cdb != cmd->__t_task_cdb) {
-
-		pt->pscsi_cdb = kzalloc(scsi_command_size(cdb), GFP_KERNEL);
-		if (!pt->pscsi_cdb) {
-			pr_err("pSCSI: Unable to allocate extended"
-					" pt->pscsi_cdb\n");
-			kfree(pt);
-			return NULL;
-		}
-	} else
-		pt->pscsi_cdb = &pt->__pscsi_cdb[0];
 
 	return &pt->pscsi_task;
 }
@@ -883,14 +869,7 @@ static int pscsi_do_task(struct se_task *task)
 static void pscsi_free_task(struct se_task *task)
 {
 	struct pscsi_plugin_task *pt = PSCSI_TASK(task);
-	struct se_cmd *cmd = task->task_se_cmd;
 
-	/*
-	 * Release the extended CDB allocation from pscsi_alloc_task()
-	 * if one exists.
-	 */
-	if (cmd->t_task_cdb != cmd->__t_task_cdb)
-		kfree(pt->pscsi_cdb);
 	/*
 	 * We do not release the bio(s) here associated with this task, as
 	 * this is handled by bio_put() and pscsi_bi_endio().

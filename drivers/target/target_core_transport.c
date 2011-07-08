@@ -1567,7 +1567,7 @@ transport_generic_get_task(struct se_cmd *cmd,
 	struct se_task *task;
 	struct se_device *dev = cmd->se_dev;
 
-	task = dev->transport->alloc_task(cmd);
+	task = dev->transport->alloc_task(cmd->t_task_cdb);
 	if (!task) {
 		pr_err("Unable to allocate struct se_task\n");
 		return NULL;

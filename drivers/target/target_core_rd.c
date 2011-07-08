@@ -309,7 +309,7 @@ static inline struct rd_request *RD_REQ(struct se_task *task)
 }
 
 static struct se_task *
-rd_alloc_task(struct se_cmd *cmd)
+rd_alloc_task(unsigned char *cdb)
 {
 	struct rd_request *rd_req;
 
@@ -318,7 +318,6 @@ rd_alloc_task(struct se_cmd *cmd)
 		pr_err("Unable to allocate struct rd_request\n");
 		return NULL;
 	}
-	rd_req->rd_dev = cmd->se_dev->dev_ptr;
 
 	return &rd_req->rd_task;
 }
@@ -352,7 +351,7 @@ static struct rd_dev_sg_table *rd_get_sg_table(struct rd_dev *rd_dev, u32 page)
 static int rd_MEMCPY_read(struct rd_request *req)
 {
 	struct se_task *task = &req->rd_task;
-	struct rd_dev *dev = req->rd_dev;
+	struct rd_dev *dev = req->rd_task.se_dev->dev_ptr;
 	struct rd_dev_sg_table *table;
 	struct scatterlist *sg_d, *sg_s;
 	void *dst, *src;
@@ -472,7 +471,7 @@ static int rd_MEMCPY_read(struct rd_request *req)
 static int rd_MEMCPY_write(struct rd_request *req)
 {
 	struct se_task *task = &req->rd_task;
-	struct rd_dev *dev = req->rd_dev;
+	struct rd_dev *dev = req->rd_task.se_dev->dev_ptr;
 	struct rd_dev_sg_table *table;
 	struct scatterlist *sg_d, *sg_s;
 	void *dst, *src;

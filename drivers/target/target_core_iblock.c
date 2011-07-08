@@ -221,7 +221,7 @@ static inline struct iblock_req *IBLOCK_REQ(struct se_task *task)
 }
 
 static struct se_task *
-iblock_alloc_task(struct se_cmd *cmd)
+iblock_alloc_task(unsigned char *cdb)
 {
 	struct iblock_req *ib_req;
 
@@ -231,7 +231,6 @@ iblock_alloc_task(struct se_cmd *cmd)
 		return NULL;
 	}
 
-	ib_req->ib_dev = cmd->se_dev->dev_ptr;
 	atomic_set(&ib_req->ib_bio_cnt, 0);
 	return &ib_req->ib_task;
 }
