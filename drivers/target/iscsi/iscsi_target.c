@@ -762,8 +762,8 @@ static void iscsit_ack_from_expstatsn(struct iscsi_conn *conn, u32 exp_statsn)
 
 static int iscsit_allocate_iovecs(struct iscsi_cmd *cmd)
 {
-	u32 iov_count = (cmd->se_cmd.t_tasks_se_num == 0) ? 1 :
-				cmd->se_cmd.t_tasks_se_num;
+	u32 iov_count = (cmd->se_cmd.t_data_nents == 0) ? 1 :
+				cmd->se_cmd.t_data_nents;
 
 	iov_count += TRANSPORT_IOV_DATA_BUFFER;
 
@@ -815,7 +815,7 @@ static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 
 	/* BIDI ops not supported */
 
-	/* make se_mem list from the memory */
+	/* Tell the core about our preallocated memory */
 	transport_generic_map_mem_to_cmd(&cmd->se_cmd, sgl, nents, NULL, 0);
 	/*
 	 * Allocate iovecs for SCSI payload after transport_generic_map_mem_to_cmd

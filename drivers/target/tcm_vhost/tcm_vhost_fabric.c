@@ -278,10 +278,8 @@ int tcm_vhost_new_cmd_map(struct se_cmd *se_cmd)
 		 */
 		sg_ptr = NULL;
 	}
-	/*
-	 * Map the SG memory into struct se_mem->page linked list using the same
-	 * physical memory at sg->page_link.
-	 */
+
+	/* Tell the core about our preallocated memory */
 	ret = transport_generic_map_mem_to_cmd(se_cmd, sg_ptr,
 				tv_cmd->tvc_sgl_count, sg_bidi_ptr,
 				sg_no_bidi);

@@ -160,12 +160,7 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 		 * transport_generic_allocate_tasks()
 		 */
 		memcpy(tv_cmd->tvc_cdb, cdb, scsi_command_size(cdb));
-		/*
-		 * Now set the virtio-scsi SGL memory + SGL counter values in
-		 * tv_cmd for use in tcm_vhost_new_cmd_map() and down into
-		 * transport_generic_map_mem_to_cmd() code to setup the
-		 * virtio-scsi SGL  -> TCM struct se_mem mapping.
-		 */
+
 #warning FIXME: Setup tv_cmd->tvc_sgl and tv_cmd->tvc_sgl_count
 		tv_cmd->tvc_sgl = NULL;
 		tv_cmd->tvc_sgl_count = 0;
