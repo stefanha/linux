@@ -3888,9 +3888,6 @@ restart:
 		    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 			cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
 			cmd->sg = se_cmd->t_tasks_sg_chained;
-		} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-			cmd->sg_cnt = 1;
-			cmd->sg = &se_cmd->t_tasks_sg_bounce;
 		}
 
 		DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p (se_cmd %p, tag %d, op %x), "

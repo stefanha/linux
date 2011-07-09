@@ -780,7 +780,6 @@ static int iscsit_allocate_iovecs(struct iscsi_cmd *cmd)
 static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 {
 	struct scatterlist *sgl;
-	void *buf, *cur;
 	u32 length = cmd->se_cmd.data_length;
 	int nents = DIV_ROUND_UP(length, PAGE_SIZE);
 	int i = 0, ret;
@@ -790,72 +789,25 @@ static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 	 */
 	if (!length)
 		return iscsit_allocate_iovecs(cmd);
-	/*
-	 * Allocate from slab if nonsg, but sgl should point
-	 * to the malloced mem.
-	 * We know we have to kfree it if t_mem is set.
-	 * Alloc pages if sg.
-	 */
-	if (cmd->se_cmd.se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		int pg_off = 0, buf_size;
 
-		buf = kmalloc(length, GFP_KERNEL);
-		if (!buf)
-			return -ENOMEM;
-		/*
-		 * Allocate extra SGL for offset_in_page exceeding DIV_ROUND_UP
-		 */
-		pg_off = offset_in_page(buf);
-		if ((pg_off + length) > (PAGE_SIZE * nents))
-			nents++;
+	sgl = kzalloc(sizeof(*sgl) * nents, GFP_KERNEL);
+	if (!sgl)
+		return -ENOMEM;
 
-		sgl = kzalloc(sizeof(*sgl) * nents, GFP_KERNEL);
-		if (!sgl)
-			return -ENOMEM;
-		sg_init_table(sgl, nents);
+	sg_init_table(sgl, nents);
 
-		cur = buf;
-		while (length) {
-			if (pg_off != 0) {
-				buf_size = min_t(int, PAGE_SIZE - pg_off, length);
-				pg_off = 0;
-			} else
-				buf_size = min_t(int, length, PAGE_SIZE);
-					
-			sg_set_buf(&sgl[i], cur, buf_size);
+	while (length) {
+		int buf_size = min_t(int, length, PAGE_SIZE);
+		struct page *page;
 
-			if (sgl[i].length < 0) {
-				printk("sg_set_buf: page: %p, len: %d, offset: %d\n",
-					sg_page(&sgl[i]), sgl[i].length, sgl[i].offset);
-				BUG();
-			}
-			length -= buf_size;
-			cur += buf_size;
-			i++;
-		}
-		cmd->se_cmd.t_task_buf = buf;
-		cmd->t_mem = buf;
+		page = alloc_page(GFP_KERNEL);
+		if (!page)
+			goto page_alloc_failed;
 
-	} else {
-		sgl = kzalloc(sizeof(*sgl) * nents, GFP_KERNEL);
-		if (!sgl)
-			return -ENOMEM;
+		sg_set_page(&sgl[i], page, buf_size, 0);
 
-		sg_init_table(sgl, nents);
-
-		while (length) {
-			int buf_size = min_t(int, length, PAGE_SIZE);
-			struct page *page;
-
-			page = alloc_page(GFP_KERNEL);
-			if (!page)
-				goto page_alloc_failed;
-
-			sg_set_page(&sgl[i], page, buf_size, 0);
-
-			length -= buf_size;
-			i++;
-		}
+		length -= buf_size;
+		i++;
 	}
 
 	cmd->t_mem_sg = sgl;

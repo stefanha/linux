@@ -214,7 +214,7 @@ static u32 transport_allocate_tasks(struct se_cmd *cmd,
 		unsigned long long starting_lba, u32 sectors,
 		enum dma_data_direction data_direction,
 		struct list_head *mem_list, int set_counts);
-static int transport_generic_get_mem(struct se_cmd *cmd, u32 length);
+static int transport_generic_get_mem(struct se_cmd *cmd);
 static int transport_generic_remove(struct se_cmd *cmd,
 		int session_reinstatement);
 static int transport_cmd_get_valid_sectors(struct se_cmd *cmd);
@@ -2238,23 +2238,6 @@ static void transport_generic_request_timeout(struct se_cmd *cmd)
 	transport_generic_remove(cmd, 0);
 }
 
-static int
-transport_generic_allocate_buf(struct se_cmd *cmd, u32 data_length)
-{
-	unsigned char *buf;
-
-	buf = kzalloc(data_length, GFP_KERNEL);
-	if (!(buf)) {
-		printk(KERN_ERR "Unable to allocate memory for buffer\n");
-		return -ENOMEM;
-	}
-
-	cmd->t_tasks_se_num = 0;
-	cmd->t_task_buf = buf;
-
-	return 0;
-}
-
 static inline u32 transport_lba_21(unsigned char *cdb)
 {
 	return ((cdb[1] & 0x1f) << 16) | (cdb[2] << 8) | cdb[3];
@@ -2972,19 +2955,6 @@ static int transport_get_sense_data(struct se_cmd *cmd)
 	return -1;
 }
 
-static int transport_allocate_resources(struct se_cmd *cmd)
-{
-	u32 length = cmd->data_length;
-
-	if ((cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
-	    (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB))
-		return transport_generic_get_mem(cmd, length);
-	else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB)
-		return transport_generic_allocate_buf(cmd, length);
-	else
-		return 0;
-}
-
 static int
 transport_handle_reservation_conflict(struct se_cmd *cmd)
 {
@@ -3271,7 +3241,7 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_SEND_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SELECT:
 		size = cdb[4];
@@ -3283,7 +3253,7 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case MODE_SENSE:
 		size = cdb[4];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case MODE_SENSE_10:
 	case GPCMD_READ_BUFFER_CAPACITY:
@@ -3291,11 +3261,11 @@ static int transport_generic_cmd_sequencer(
 	case LOG_SELECT:
 	case LOG_SENSE:
 		size = (cdb[7] << 8) + cdb[8];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case READ_BLOCK_LIMITS:
 		size = READ_BLOCK_LEN;
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case GPCMD_GET_CONFIGURATION:
 	case GPCMD_READ_FORMAT_CAPACITIES:
@@ -3311,7 +3281,7 @@ static int transport_generic_cmd_sequencer(
 			 SPC3_PERSISTENT_RESERVATIONS) ?
 			core_scsi3_emulate_pr : NULL;
 		size = (cdb[7] << 8) + cdb[8];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case GPCMD_MECHANISM_STATUS:
 	case GPCMD_READ_DVD_STRUCTURE:
@@ -3320,7 +3290,7 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case READ_POSITION:
 		size = READ_POSITION_LEN;
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case MAINTENANCE_OUT:
 		if (dev->transport->get_device_type(dev) != TYPE_ROM) {
@@ -3342,7 +3312,7 @@ static int transport_generic_cmd_sequencer(
 			/* GPCMD_REPORT_KEY from multi media commands */
 			size = (cdb[8] << 8) + cdb[9];
 		}
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case INQUIRY:
 		size = (cdb[3] << 8) + cdb[4];
@@ -3352,21 +3322,21 @@ static int transport_generic_cmd_sequencer(
 		 */
 		if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 			cmd->sam_task_attr = MSG_HEAD_TAG;
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case READ_BUFFER:
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case READ_CAPACITY:
 		size = READ_CAP_LEN;
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case READ_MEDIA_SERIAL_NUMBER:
 	case SECURITY_PROTOCOL_IN:
 	case SECURITY_PROTOCOL_OUT:
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case SERVICE_ACTION_IN:
 	case ACCESS_CONTROL_IN:
@@ -3377,36 +3347,36 @@ static int transport_generic_cmd_sequencer(
 	case WRITE_ATTRIBUTE:
 		size = (cdb[10] << 24) | (cdb[11] << 16) |
 		       (cdb[12] << 8) | cdb[13];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case RECEIVE_DIAGNOSTIC:
 	case SEND_DIAGNOSTIC:
 		size = (cdb[3] << 8) | cdb[4];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 /* #warning FIXME: Figure out correct GPCMD_READ_CD blocksize. */
 #if 0
 	case GPCMD_READ_CD:
 		sectors = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
 		size = (2336 * sectors);
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 #endif
 	case READ_TOC:
 		size = cdb[8];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case REQUEST_SENSE:
 		size = cdb[4];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case READ_ELEMENT_STATUS:
 		size = 65536 * cdb[7] + 256 * cdb[8] + cdb[9];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case WRITE_BUFFER:
 		size = (cdb[6] << 16) + (cdb[7] << 8) + cdb[8];
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case RESERVE:
 	case RESERVE_10:
@@ -3486,7 +3456,7 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case UNMAP:
 		size = get_unaligned_be16(&cdb[7]);
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case WRITE_SAME_16:
 		sectors = transport_get_sectors_16(cdb, cmd, &sector_ret);
@@ -3553,7 +3523,7 @@ static int transport_generic_cmd_sequencer(
 		 */
 		if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 			cmd->sam_task_attr = MSG_HEAD_TAG;
-		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_NONSG_IO_CDB;
+		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	default:
 		printk(KERN_WARNING "TARGET_CORE[%s]: Unsupported SCSI Opcode"
@@ -3810,16 +3780,6 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 					cmd->data_length;
 		}
 		spin_unlock(&cmd->se_lun->lun_sep_lock);
-		/*
-		 * If enabled by TCM fabric module pre-registered SGL
-		 * memory, perform the memcpy() from the TCM internal
-		 * contiguous buffer back to the original SGL.
-		 */
-		if (cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG)
-			sg_copy_from_buffer(cmd->t_task_pt_sgl,
-					    cmd->t_task_pt_sgl_num,
-					    cmd->t_task_buf,
-					    cmd->data_length);
 
 		ret = cmd->se_tfo->queue_data_in(cmd);
 		if (ret == -EAGAIN)
@@ -3904,12 +3864,6 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 		free_page = 0;
 	if (cmd->se_dev->transport->do_se_mem_map)
 		free_page = 0;
-
-	if (cmd->t_task_buf) {
-		kfree(cmd->t_task_buf);
-		cmd->t_task_buf = NULL;
-		return;
-	}
 
 	list_for_each_entry_safe(se_mem, se_mem_tmp,
 			&cmd->t_mem_list, se_list) {
@@ -4074,25 +4028,6 @@ int transport_generic_map_mem_to_cmd(
 			cmd->t_tasks_se_bidi_num = ret;
 		}
 		cmd->se_cmd_flags |= SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC;
-
-	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		if (sgl_bidi || sgl_bidi_count) {
-			printk(KERN_ERR "BIDI-Commands not supported using "
-				"SCF_SCSI_CONTROL_NONSG_IO_CDB\n");
-			return -ENOSYS;
-		}
-		/*
-		 * For incoming CDBs using a contiguous buffer internal with TCM,
-		 * save the passed struct scatterlist memory.  After TCM storage object
-		 * processing has completed for this struct se_cmd, TCM core will call
-		 * transport_memcpy_[write,read]_contig() as necessary from
-		 * transport_generic_complete_ok() and transport_write_pending() in order
-		 * to copy the TCM buffer to/from the original passed *mem in SGL ->
-		 * struct scatterlist format.
-		 */
-		cmd->se_cmd_flags |= SCF_PASSTHROUGH_CONTIG_TO_SG;
-		cmd->t_task_pt_sgl = sgl;
-		cmd->t_task_pt_sgl_num = sgl_count;
 	}
 
 	return 0;
@@ -4190,10 +4125,41 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 	return 0;
 }
 
-static int
-transport_generic_get_mem(struct se_cmd *cmd, u32 length)
+void *transport_kmap_first_data_page(struct se_cmd *cmd)
 {
 	struct se_mem *se_mem;
+
+	BUG_ON(list_empty(&cmd->t_mem_list));
+
+	se_mem = list_first_entry(&cmd->t_mem_list, struct se_mem, se_list);
+
+	/*
+	 * 1st se_mem should point to a page, and we shouldn't need more than
+	 * that for this cmd
+	 */
+	BUG_ON(cmd->data_length > PAGE_SIZE);
+
+	return kmap(se_mem->se_page);
+}
+EXPORT_SYMBOL(transport_kmap_first_data_page);
+
+void transport_kunmap_first_data_page(struct se_cmd *cmd)
+{
+	struct se_mem *se_mem;
+
+	BUG_ON(list_empty(&cmd->t_mem_list));
+
+	se_mem = list_first_entry(&cmd->t_mem_list, struct se_mem, se_list);
+
+	kunmap(se_mem->se_page);
+}
+EXPORT_SYMBOL(transport_kunmap_first_data_page);
+
+static int
+transport_generic_get_mem(struct se_cmd *cmd)
+{
+	struct se_mem *se_mem;
+	int length = cmd->data_length;
 
 	/*
 	 * If the device uses memory mapping this is enough.
@@ -4201,6 +4167,7 @@ transport_generic_get_mem(struct se_cmd *cmd, u32 length)
 	if (cmd->se_dev->transport->do_se_mem_map)
 		return 0;
 
+	/* Even cmds with length 0 will get here, btw */
 	while (length) {
 		se_mem = kmem_cache_zalloc(se_mem_cache, GFP_KERNEL);
 		if (!(se_mem)) {
@@ -4856,10 +4823,6 @@ transport_map_control_cmd_to_task(struct se_cmd *cmd)
 		if (dev->transport->map_task_SG)
 			return dev->transport->map_task_SG(task);
 		return 0;
-	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		if (dev->transport->map_task_non_SG)
-			return dev->transport->map_task_non_SG(task);
-		return 0;
 	} else if (cmd->se_cmd_flags & SCF_SCSI_NON_DATA_CDB) {
 		if (dev->transport->cdb_none)
 			return dev->transport->cdb_none(task);
@@ -4892,7 +4855,7 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 	 * cmd->t_mem_list of struct se_mem->se_page
 	 */
 	if (!(cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC)) {
-		ret = transport_allocate_resources(cmd);
+		ret = transport_generic_get_mem(cmd);
 		if (ret < 0)
 			return ret;
 	}
@@ -4976,17 +4939,7 @@ static int transport_generic_write_pending(struct se_cmd *cmd)
 		cmd->transport_qf_callback = NULL;
 		return 0;
 	}
-	/*
-	 * For the TCM control CDBs using a contiguous buffer, do the memcpy
-	 * from the passed Linux/SCSI struct scatterlist located at
-	 * se_cmd->t_task_pt_sgl to the contiguous buffer at
-	 * se_cmd->t_task_buf.
-	 */
-	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_CONTIG_TO_SG)
-		sg_copy_to_buffer(cmd->t_task_pt_sgl,
-				    cmd->t_task_pt_sgl_num,
-				    cmd->t_task_buf,
-				    cmd->data_length);
+
 	/*
 	 * Clear the se_cmd for WRITE_PENDING status in order to set
 	 * cmd->t_transport_active=0 so that transport_generic_handle_data

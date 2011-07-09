@@ -517,16 +517,6 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 
 		cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
 		cmd->sg = se_cmd->t_tasks_sg_chained;
-	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		/*
-		 * Use se_cmd->t_task->t_tasks_sg_bounce for control CDBs
-		 * using a contiguous buffer
-		 */
-		sg_init_table(&se_cmd->t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_tasks_sg_bounce,
-			se_cmd->t_task_buf, se_cmd->data_length);
-		cmd->sg_cnt = 1;
-		cmd->sg = &se_cmd->t_tasks_sg_bounce;
 	} else {
 		printk(KERN_ERR "Unknown se_cmd_flags: 0x%08x in"
 			" tcm_qla2xxx_write_pending()\n", se_cmd->se_cmd_flags);
@@ -730,17 +720,6 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 
 		cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
 		cmd->sg = se_cmd->t_tasks_sg_chained;
-	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		/*
-		 * Use se_cmd->t_task->t_tasks_sg_bounce for control CDBs
-		 * using a contigious buffer
-		 */
-		sg_init_table(&se_cmd->t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_tasks_sg_bounce,
-			se_cmd->t_task_buf, se_cmd->data_length);
-
-		cmd->sg_cnt = 1;
-		cmd->sg = &se_cmd->t_tasks_sg_bounce;
 	} else {
 		cmd->sg_cnt = 0;
 		cmd->sg = NULL;

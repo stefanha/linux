@@ -801,6 +801,7 @@ void iscsit_free_queue_reqs_for_conn(struct iscsi_conn *conn)
 void iscsit_release_cmd(struct iscsi_cmd *cmd)
 {
 	struct iscsi_conn *conn = cmd->conn;
+	int i;
 
 	iscsit_free_r2ts_from_list(cmd);
 	iscsit_free_all_datain_reqs(cmd);
@@ -811,15 +812,9 @@ void iscsit_release_cmd(struct iscsi_cmd *cmd)
 	kfree(cmd->tmr_req);
 	kfree(cmd->iov_data);
 
-	/* see iscsit_alloc_buffs */
-	if (cmd->t_mem) {
-		kfree(cmd->t_mem);
-	} else {
-		int i;
+	for (i = 0; i < cmd->t_mem_sg_nents; i++)
+		__free_page(sg_page(&cmd->t_mem_sg[i]));
 
-		for (i = 0; i < cmd->t_mem_sg_nents; i++)
-			__free_page(sg_page(&cmd->t_mem_sg[i]));
-	}
 	kfree(cmd->t_mem_sg);
 
 	if (conn) {
