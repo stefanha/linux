@@ -3737,8 +3737,6 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 
 	if (cmd->se_cmd_flags & SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC)
 		free_page = 0;
-	if (cmd->se_dev->transport->do_se_mem_map)
-		free_page = 0;
 
 	for_each_sg(cmd->t_data_sg, sg, cmd->t_data_nents, count) {
 		/*
@@ -3972,12 +3970,6 @@ transport_generic_get_mem(struct se_cmd *cmd)
 	unsigned int nents;
 	struct page *page;
 	int i = 0;
-
-	/*
-	 * If the device uses memory mapping this is enough.
-	 */
-	if (cmd->se_dev->transport->do_se_mem_map)
-		return 0;
 
 	nents = DIV_ROUND_UP(length, PAGE_SIZE);
 	cmd->t_data_sg = kmalloc(sizeof(struct scatterlist) * nents, GFP_KERNEL);

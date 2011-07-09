@@ -342,11 +342,6 @@ struct se_subsystem_api {
 	 */
 	sector_t (*get_blocks)(struct se_device *);
 	/*
-	 * do_se_mem_map():
-	 */
-	int (*do_se_mem_map)(struct se_task *, struct list_head *, void *,
-				struct se_mem *, struct se_mem **, u32 *, u32 *);
-	/*
 	 * get_sense_buffer():
 	 */
 	unsigned char *(*get_sense_buffer)(struct se_task *);
