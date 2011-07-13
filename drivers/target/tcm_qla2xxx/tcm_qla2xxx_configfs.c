@@ -93,7 +93,7 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 
 
 		spin_lock_irqsave(&vha->hw->hardware_lock, flags);
-		d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
+		d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
 		DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 		a = &d->areas[area];
 		DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
@@ -137,7 +137,7 @@ int tcm_qla2xxx_clear_nacl_from_fcport_map(
 	DEBUG_QLA_TGT_SESS_MAP("fc_rport domain: 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
-	d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
+	d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
 	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
 	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
@@ -501,7 +501,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_s_id: 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
-	d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
+	d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
 	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
 	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
@@ -549,7 +549,7 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 	DEBUG_QLA_TGT_SESS_MAP("set_sess_by_s_id: domain 0x%02x area: 0x%02x al_pa: %02x\n",
 			domain, area, al_pa);
 
-	d = (struct tcm_qla2xxx_fc_domain *)&lport->lport_fcport_map[domain];
+	d = &((struct tcm_qla2xxx_fc_domain *)lport->lport_fcport_map)[domain];
 	DEBUG_QLA_TGT_SESS_MAP("Using d: %p for domain: 0x%02x\n", d, domain);
 	a = &d->areas[area];
 	DEBUG_QLA_TGT_SESS_MAP("Using a: %p for area: 0x%02x\n", a, area);
@@ -620,7 +620,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 
 	DEBUG_QLA_TGT_SESS_MAP("find_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
 
-	fc_loopid = (struct tcm_qla2xxx_fc_loopid *)&lport->lport_loopid_map[loop_id];
+	fc_loopid = &((struct tcm_qla2xxx_fc_loopid *)lport->lport_loopid_map)[loop_id];
 
 	se_nacl = fc_loopid->se_nacl;
 	if (!se_nacl) {
@@ -655,7 +655,7 @@ static void tcm_qla2xxx_set_sess_by_loop_id(
 
 	DEBUG_QLA_TGT_SESS_MAP("set_sess_by_loop_id: Using loop_id: 0x%04x\n", loop_id);
 
-	fc_loopid = (struct tcm_qla2xxx_fc_loopid *)&lport->lport_loopid_map[loop_id];
+	fc_loopid = &((struct tcm_qla2xxx_fc_loopid *)lport->lport_loopid_map)[loop_id];
 
 	saved_nacl = fc_loopid->se_nacl;
 	if (!saved_nacl) {
