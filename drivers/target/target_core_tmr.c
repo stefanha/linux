@@ -106,15 +106,14 @@ int core_tmr_lun_reset(
 	struct list_head *preempt_and_abort_list,
 	struct se_cmd *prout_cmd)
 {
-	struct se_cmd *cmd;
-	struct se_queue_req *qr, *qr_tmp;
+	struct se_cmd *cmd, *tcmd;
 	struct se_node_acl *tmr_nacl = NULL;
 	struct se_portal_group *tmr_tpg = NULL;
 	struct se_queue_obj *qobj = &dev->dev_queue_obj;
 	struct se_tmr_req *tmr_p, *tmr_pp;
 	struct se_task *task, *task_tmp;
 	unsigned long flags;
-	int fe_count, state, tas;
+	int fe_count, tas;
 	/*
 	 * TASK_ABORTED status bit, this is configurable via ConfigFS
 	 * struct se_device attributes.  spc4r17 section 7.4.6 Control mode page
@@ -324,20 +323,7 @@ int core_tmr_lun_reset(
 	 * reference, otherwise the struct se_cmd is released.
 	 */
 	spin_lock_irqsave(&qobj->cmd_queue_lock, flags);
-	list_for_each_entry_safe(qr, qr_tmp, &qobj->qobj_list, qr_list) {
-		cmd = (struct se_cmd *)qr->cmd;
-		if (!cmd) {
-			/*
-			 * Skip these for non PREEMPT_AND_ABORT usage..
-			 */
-			if (preempt_and_abort_list != NULL)
-				continue;
-
-			atomic_dec(&qobj->queue_cnt);
-			list_del(&qr->qr_list);
-			kfree(qr);
-			continue;
-		}
+	list_for_each_entry_safe(cmd, tcmd, &qobj->qobj_list, se_queue_node) {
 		/*
 		 * For PREEMPT_AND_ABORT usage, only process commands
 		 * with a matching reservation key.
@@ -354,15 +340,12 @@ int core_tmr_lun_reset(
 
 		atomic_dec(&cmd->t_transport_queue_active);
 		atomic_dec(&qobj->queue_cnt);
-		list_del(&qr->qr_list);
+		list_del(&cmd->se_queue_node);
 		spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
-
-		state = qr->state;
-		kfree(qr);
 
 		pr_debug("LUN_RESET: %s from Device Queue: cmd: %p t_state:"
 			" %d t_fe_count: %d\n", (preempt_and_abort_list) ?
-			"Preempt" : "", cmd, state,
+			"Preempt" : "", cmd, cmd->t_state,
 			atomic_read(&cmd->t_fe_count));
 		/*
 		 * Signal that the command has failed via cmd->se_cmd_flags,
