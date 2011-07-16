@@ -654,7 +654,6 @@ target_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf)
 static int
 target_emulate_inquiry(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf;
 	unsigned char *cdb = cmd->t_task_cdb;
 	int p, ret;
