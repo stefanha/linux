@@ -305,7 +305,7 @@ static int stgt_transport_complete(struct se_task *task)
 }
 
 static struct se_task *
-stgt_alloc_task(struct se_cmd *cmd)
+stgt_alloc_task(unsigned char *cdb)
 {
 	struct stgt_plugin_task *st;
 
