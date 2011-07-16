@@ -22,8 +22,6 @@ struct tcm_vhost_cmd {
 };
 
 struct tcm_vhost_nexus {
-	/* Index reference for the vhost_scsi device */
-	u32 tvn_dev_index;
 	/* Pointer to TCM session for I_T Nexus */
 	struct se_session *tvn_se_sess;
 };

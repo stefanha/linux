@@ -191,28 +191,6 @@ static void vhost_scsi_handle_kick(struct vhost_work *work)
 }
 
 /*
- * Used by tcm_vhost_configfs.c:tcm_vhost_tpg_store_dev_index() to
- * create the vhost_scsi device association from the passed dev_index.
- */
-#warning FIXME: Add vhost_scsi_dev_index_associate() logic
-int vhost_scsi_dev_index_associate(struct tcm_vhost_tpg *tv_tpg, u32 dev_index)
-{
-	return -ENOSYS;
-}
-
-/*
- * Used by tcm_vhost_configfs.c:cm_vhost_tpg_store_dev_index() to
- * release the vhost_scsi device association when 'NULL' has been passed
- * into the /sys/kernel/config/target/vhost/$TARGET_WWN/tpgt_$TPGT/dev_index
- * configfs attribute.
- */
-#warning FIXME: Add vhost_scsi_dev_index_release() logic
-int vhost_scsi_dev_index_release(struct tcm_vhost_tpg *tv_tpg, u32 dev_index)
-{
-	return -ENOSYS;
-}
-
-/*
  * Called from vhost_scsi_ioctl() context to walk the list of available tcm_vhost_tpg
  * with an active struct tcm_vhost_nexus
  */
