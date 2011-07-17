@@ -454,7 +454,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 			 * since "unable to  handle TMR request because failed
 			 * to get to LUN"
 			 */
-			FT_TM_DBG("Failed to get LUN for TMR func %d, "
+			pr_debug("Failed to get LUN for TMR func %d, "
 				  "se_cmd %p, unpacked_lun %d\n",
 				  tm_func, &cmd->se_cmd, cmd->lun);
 			ft_dump_cmd(cmd, __func__);
