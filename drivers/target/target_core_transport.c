@@ -3933,9 +3933,15 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 
 void *transport_kmap_first_data_page(struct se_cmd *cmd)
 {
-	BUG_ON(!cmd->t_data_sg);
+	struct scatterlist *sg = cmd->t_data_sg;
 
-	return kmap(sg_page(cmd->t_data_sg));
+	BUG_ON(!sg);
+	/*
+	 * We need to take into account a possible offset here for fabrics like
+	 * tcm_loop who may be using a contig buffer from the SCSI midlayer for
+	 * control CDBs passed as SGLs via transport_generic_map_mem_to_cmd()
+	 */
+	return kmap(sg_page(sg)) + sg->offset;
 }
 EXPORT_SYMBOL(transport_kmap_first_data_page);
 
