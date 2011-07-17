@@ -4197,9 +4197,6 @@ transport_allocate_control_task(struct se_cmd *cmd)
 	task->task_size = cmd->data_length;
 	task->task_sg_nents = cmd->t_data_nents;
 
-	atomic_inc(&cmd->t_fe_count);
-	atomic_inc(&cmd->t_se_count);
-
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	list_add_tail(&task->t_list, &cmd->t_task_list);
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
