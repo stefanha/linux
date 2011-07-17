@@ -676,6 +676,8 @@ target_emulate_inquiry(struct se_cmd *cmd)
 
 	buf = transport_kmap_first_data_page(cmd);
 
+	buf[0] = cmd->se_dev->transport->get_device_type(cmd->se_dev);
+
 	for (p = 0; p < ARRAY_SIZE(evpd_handlers); ++p)
 		if (cdb[2] == evpd_handlers[p].page) {
 			buf[1] = cdb[2];
