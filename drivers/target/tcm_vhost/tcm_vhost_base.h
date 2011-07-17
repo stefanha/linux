@@ -11,6 +11,8 @@ struct tcm_vhost_cmd {
 	u32 tvc_sgl_count;
 	/* Pointer to the SGL formatted memory from virtio-scsi */
 	struct scatterlist *tvc_sgl;
+	/* Pointer to response */
+	struct virtio_scsi_footer __user *tvc_footer;
 	/* Pointer to vhost_scsi for our device */
 	struct vhost_scsi *tvc_vhost;
 	 /* The TCM I/O descriptor that is accessed via container_of() */
@@ -19,6 +21,8 @@ struct tcm_vhost_cmd {
 	unsigned char tvc_cdb[TCM_VHOST_MAX_CDB_SIZE];
 	/* Sense buffer that will be mapped into outgoing status */
 	unsigned char tvc_sense_buf[TRANSPORT_SENSE_BUFFER];
+	/* Completed commands list, serviced from vhost worker thread */
+	struct list_head tvc_completion_list;
 };
 
 struct tcm_vhost_nexus {

@@ -353,12 +353,7 @@ int tcm_vhost_queue_data_in(struct se_cmd *se_cmd)
 {
 	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
 				struct tcm_vhost_cmd, tvc_se_cmd);
-	struct vhost_scsi *vs = tv_cmd->tvc_vhost;
-	/*
-	 * Signal to vhost that we are done processing this ring descriptor
-	 */
-	vhost_add_used_and_signal(&vs->dev, &vs->cmd_vq, tv_cmd->tvc_vq_desc, 0);
-
+	vhost_scsi_complete_cmd(tv_cmd);
 	return 0;
 }
 
@@ -366,12 +361,7 @@ int tcm_vhost_queue_status(struct se_cmd *se_cmd)
 {
 	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
 				struct tcm_vhost_cmd, tvc_se_cmd);
-	struct vhost_scsi *vs = tv_cmd->tvc_vhost;
-	/*
-	 * Signal to vhost that we are done processing this ring descriptor
-	 */
-	vhost_add_used_and_signal(&vs->dev, &vs->cmd_vq, tv_cmd->tvc_vq_desc, 0);
-
+	vhost_scsi_complete_cmd(tv_cmd);
 	return 0;
 }
 
