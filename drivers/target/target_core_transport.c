@@ -3892,7 +3892,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 					      DMA_FROM_DEVICE,
 					      cmd->t_bidi_data_sg,
 					      cmd->t_bidi_data_nents);
-		if (!rc) {
+		if (rc <= 0) {
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			cmd->scsi_sense_reason =
 				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -4068,8 +4068,7 @@ static int transport_allocate_data_tasks(
 	struct se_device *dev = cmd->se_dev;
 	unsigned long flags;
 	sector_t sectors;
-	int task_count;
-	int i;
+	int task_count, i, ret;
 	sector_t dev_max_sectors = dev->se_sub_dev->se_dev_attrib.max_sectors;
 	u32 sector_size = dev->se_sub_dev->se_dev_attrib.block_size;
 	struct scatterlist *sg;
@@ -4116,7 +4115,7 @@ static int transport_allocate_data_tasks(
 			task->task_padded_sg = 1;
 		}
 
-		task->task_sg = kmalloc(sizeof(struct scatterlist) * \
+		task->task_sg = kmalloc(sizeof(struct scatterlist) *
 					task->task_sg_nents, GFP_KERNEL);
 		if (!task->task_sg) {
 			cmd->se_dev->transport->free_task(task);
@@ -4143,6 +4142,20 @@ static int transport_allocate_data_tasks(
 		spin_lock_irqsave(&cmd->t_state_lock, flags);
 		list_add_tail(&task->t_list, &cmd->t_task_list);
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
+	}
+	/*
+	 * Now perform the memory map of task->task_sg[] into backend
+	 * subsystem memory..
+	 */
+	list_for_each_entry(task, &cmd->t_task_list, t_list) {
+		if (atomic_read(&task->task_sent))
+			continue;
+		if (!dev->transport->map_task_SG)
+			continue;
+
+		ret = dev->transport->map_task_SG(task);
+		if (ret < 0)
+			return 0;
 	}
 
 	return task_count;
@@ -4229,8 +4242,6 @@ static u32 transport_allocate_tasks(
 	 */
 int transport_generic_new_cmd(struct se_cmd *cmd)
 {
-	struct se_task *task;
-	struct se_device *dev = cmd->se_dev;
 	int ret = 0;
 
 	/*
@@ -4244,22 +4255,13 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 		if (ret < 0)
 			return ret;
 	}
-
+	/*
+	 * Call transport_new_cmd_obj() to invoke transport_allocate_tasks()
+	 * and perform the memory map to backend subsystem devices.
+	 */
 	ret = transport_new_cmd_obj(cmd);
 	if (ret < 0)
 		return ret;
-
-	list_for_each_entry(task, &cmd->t_task_list, t_list) {
-		if (atomic_read(&task->task_sent))
-			continue;
-		if (!dev->transport->map_task_SG)
-			continue;
-
-		ret = dev->transport->map_task_SG(task);
-		if (ret < 0)
-			return ret;
-	}
-
 	/*
 	 * For WRITEs, let the fabric know its buffer is ready..
 	 * This WRITE struct se_cmd (and all of its associated struct se_task's)
