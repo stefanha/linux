@@ -67,7 +67,8 @@ static void vhost_scsi_complete_cmd_work(struct vhost_work *work)
 		struct se_cmd *se_cmd = &tv_cmd->tvc_se_cmd;
 		int ret;
 
-		printk("%s tv_cmd %p\n", __func__, tv_cmd);
+		printk("%s tv_cmd %p resid %u status %#02x\n", __func__,
+			tv_cmd, se_cmd->residual_count, se_cmd->scsi_status);
 
 		list_del(&tv_cmd->tvc_completion_list);
 
@@ -152,16 +153,6 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 	if (bidi)
 		T_TASK(se_cmd)->t_tasks_bidi = 1;
 #endif
-	/*
-	 * Locate the struct se_lun pointer based on the passed v_header->lun,
-	 * and attach it to struct se_cmd
-	 *
-	 * Note this currently assumes v_header->lun has already been unpacked.
-	 */
-	if (transport_lookup_cmd_lun(se_cmd, v_header->lun) < 0) {
-		kfree(tv_cmd);
-		return ERR_PTR(-ENODEV);
-	}
 	/*
 	 * From here the rest of the se_cmd will be setup and dispatched
 	 * via tcm_vhost_new_cmd_map() from TCM backend thread context
@@ -292,6 +283,9 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 			break; /* TODO */
 		}
 
+		printk("vhost_scsi got command opcode: %#02x, lun: %#llx\n",
+			tv_cmd->tvc_cdb[0], v_header.lun);
+
 #warning FIXME: Setup tv_cmd->tvc_sgl and tv_cmd->tvc_sgl_count
 		tv_cmd->tvc_sgl = NULL;
 		tv_cmd->tvc_sgl_count = 0;
@@ -301,6 +295,19 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 		 * tcm_vhost_queue_data_in() and tcm_vhost_queue_status()
 		 */
 		tv_cmd->tvc_vq_desc = head;
+		/*
+		 * Locate the struct se_lun pointer based on v_header->lun, and
+		 * attach it to struct se_cmd
+		 *
+		 * Note this currently assumes v_header->lun has already been unpacked.
+		 */
+		if (transport_lookup_cmd_lun(&tv_cmd->tvc_se_cmd, v_header.lun) < 0) {
+			pr_err("Failed to look up lun: %#08llx\n", v_header.lun);
+			/* NON_EXISTENT_LUN */
+			transport_send_check_condition_and_sense(&tv_cmd->tvc_se_cmd,
+					tv_cmd->tvc_se_cmd.scsi_sense_reason, 0);
+			continue;
+		}
 		/*
 		 * Now queue up the newly allocated se_cmd to be processed
 		 * within TCM thread context to finish the setup and dispatched
