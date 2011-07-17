@@ -93,7 +93,7 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 
 	if (cmd->data_length < 8) {
 		buf[4] = 1; /* Set additional length to 1 */
-		return 0;
+		goto out;
 	}
 
 	buf[7] = 0x32; /* Sync=1 and CmdQue=1 */
@@ -104,7 +104,7 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 	 */
 	if (cmd->data_length < 36) {
 		buf[4] = 3; /* Set additional length to 3 */
-		return 0;
+		goto out;
 	}
 
 	snprintf((unsigned char *)&buf[8], 8, "LIO-ORG");
@@ -114,8 +114,8 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 		 &dev->se_sub_dev->t10_wwn.revision[0]);
 	buf[4] = 31; /* Set additional length to 31 */
 
+out:
 	transport_kunmap_first_data_page(cmd);
-
 	return 0;
 }
 
