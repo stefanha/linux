@@ -106,14 +106,19 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 {
 	struct vhost_virtqueue *vq = &vs->cmd_vq;
-	struct virtio_scsi_cmd_header *v_header;
+	struct virtio_scsi_cmd_header v_header;
 	struct tcm_vhost_tpg *tv_tpg;
 	struct tcm_vhost_cmd *tv_cmd;
-	unsigned char *cdb;
 	u32 exp_data_len, data_direction;
-	unsigned out, in;
-	int head;
+	unsigned out, in, i;
+	int head, ret;
 
+	/* Must use ioctl VHOST_SCSI_SET_ENDPOINT */
+	tv_tpg = vs->vs_tpg;
+	if (unlikely(!tv_tpg)) {
+		pr_err("%s endpoint not set\n", __func__);
+		return;
+	}
 
 	mutex_lock(&vq->mutex);
 	vhost_disable_notify(&vs->dev, vq);
@@ -133,33 +138,83 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 			}
 			break;
 		}
-#warning FIXME: Locate v_header, cdb, exp_data_len and data_direction for vhost_scsi_allocate_cmd()
-		tv_tpg = vs->vs_tpg;
-		v_header = NULL;
-		cdb = NULL;
-		exp_data_len = 0;
-		data_direction = 0;
-		/*
-		 * Check that the recieved CDB size does not exceeded our
-		 * hardcoded max for t
-		 */
-		if (scsi_command_size(cdb) > TCM_VHOST_MAX_CDB_SIZE) {
-			pr_err("Received SCSI CDB with command_size:"
-				" %d that exceeds SCSI_MAX_VARLEN_CDB_SIZE: %d\n",
-				scsi_command_size(cdb), TCM_VHOST_MAX_CDB_SIZE);
+
+#warning FIXME: BIDI operation
+		if (out == 2 && in == 1) {
+			data_direction = DMA_NONE;
+		} else if (out == 2 && in > 1) {
+			data_direction = DMA_FROM_DEVICE;
+		} else if (out > 2 && in == 1) {
+			data_direction = DMA_TO_DEVICE;
+		} else {
+			pr_err("Invalid buffer layout out: %u in: %u\n", out, in);
 			break;
 		}
 
-		tv_cmd = vhost_scsi_allocate_cmd(tv_tpg, v_header,
-					exp_data_len, data_direction);
-		if (IS_ERR(tv_cmd))
+		/*
+		 * Check for a sane footer buffer so we can report errors to
+		 * the guest.
+		 */
+		if (unlikely(vq->iov[out + in - 1].iov_len !=
+					sizeof(struct virtio_scsi_footer))) {
+			pr_err("Expecting virtio_scsi_footer, got %zu bytes\n",
+					vq->iov[out + in - 1].iov_len);
 			break;
+		}
+
+		if (unlikely(vq->iov[0].iov_len != sizeof(v_header))) {
+			pr_err("Expecting virtio_scsi_cmd_header, got %zu bytes\n",
+					vq->iov[0].iov_len);
+			break;
+		}
+		ret = __copy_from_user(&v_header, vq->iov[0].iov_base, sizeof(v_header));
+		if (unlikely(ret)) {
+			pr_err("Faulted on virtio_scsi_cmd_header\n");
+			break;
+		}
+
+		exp_data_len = 0;
+		for (i = 2; i < out + in - 1; i++) {
+			exp_data_len += vq->iov[i].iov_len;
+		}
+
+		tv_cmd = vhost_scsi_allocate_cmd(tv_tpg, &v_header,
+					exp_data_len, data_direction);
+		if (IS_ERR(tv_cmd)) {
+			pr_err("vhost_scsi_allocate_cmd failed %ld\n", PTR_ERR(tv_cmd));
+			break;
+		}
+
+		tv_cmd->tvc_vhost = vs;
+		
+		if (unlikely(vq->iov[1].iov_len > TCM_VHOST_MAX_CDB_SIZE)) {
+			pr_err("CDB length: %zu exceeds %d\n",
+				vq->iov[1].iov_len, TCM_VHOST_MAX_CDB_SIZE);
+			/* TODO clean up and free tv_cmd */
+			break;
+		}
 		/*
 		 * Copy in the recieved CDB descriptor into tv_cmd->tvc_cdb
 		 * that will be used by tcm_vhost_new_cmd_map() and down into
 		 * transport_generic_allocate_tasks()
 		 */
-		memcpy(tv_cmd->tvc_cdb, cdb, scsi_command_size(cdb));
+		ret = __copy_from_user(tv_cmd->tvc_cdb, vq->iov[1].iov_base,
+					vq->iov[1].iov_len);
+		if (unlikely(ret)) {
+			pr_err("Faulted on CDB\n");
+			break; /* TODO should all breaks be continues? */
+		}
+		/*
+		 * Check that the recieved CDB size does not exceeded our
+		 * hardcoded max for tcm_vhost
+		 */
+		/* TODO what if cdb was too small for varlen cdb header? */
+		if (unlikely(scsi_command_size(tv_cmd->tvc_cdb) > TCM_VHOST_MAX_CDB_SIZE)) {
+			pr_err("Received SCSI CDB with command_size: %d that exceeds"
+				" SCSI_MAX_VARLEN_CDB_SIZE: %d\n",
+				scsi_command_size(tv_cmd->tvc_cdb), TCM_VHOST_MAX_CDB_SIZE);
+			break; /* TODO */
+		}
 
 #warning FIXME: Setup tv_cmd->tvc_sgl and tv_cmd->tvc_sgl_count
 		tv_cmd->tvc_sgl = NULL;
