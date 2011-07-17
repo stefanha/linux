@@ -603,6 +603,11 @@ static int iblock_map_task_SG(struct se_task *task)
 	u32 i, sg_num = task->task_sg_nents;
 	sector_t block_lba;
 	/*
+	 * Only setup bios for SCF_SCSI_DATA_SG_IO_CDB type payloads
+	 */
+	if (!(cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB))
+		return 0;
+	/*
 	 * Do starting conversion up from non 512-byte blocksize with
 	 * struct se_task SCSI blocksize into Linux/Block 512 units for BIO.
 	 */
