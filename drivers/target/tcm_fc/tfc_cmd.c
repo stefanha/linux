@@ -447,6 +447,36 @@ static void ft_send_tm(struct ft_cmd *cmd)
 		return;
 	}
 	cmd->se_cmd.se_tmr_req = tmr;
+
+	switch (fcp->fc_tm_flags) {
+	case FCP_TMF_LUN_RESET:
+		cmd->lun = scsilun_to_int((struct scsi_lun *)fcp->fc_lun);
+		if (transport_lookup_tmr_lun(&cmd->se_cmd, cmd->lun) < 0) {
+			/*
+			 * Make sure to clean up newly allocated TMR request
+			 * since "unable to  handle TMR request because failed
+			 * to get to LUN"
+			 */
+			FT_TM_DBG("Failed to get LUN for TMR func %d, "
+				  "se_cmd %p, unpacked_lun %d\n",
+				  tm_func, &cmd->se_cmd, cmd->lun);
+			ft_dump_cmd(cmd, __func__);
+			sess = cmd->sess;
+			transport_send_check_condition_and_sense(&cmd->se_cmd,
+				cmd->se_cmd.scsi_sense_reason, 0);
+			transport_generic_free_cmd(&cmd->se_cmd, 0, 0);
+			ft_sess_put(sess);
+			return;
+		}
+		break;
+	case FCP_TMF_TGT_RESET:
+	case FCP_TMF_CLR_TASK_SET:
+	case FCP_TMF_ABT_TASK_SET:
+	case FCP_TMF_CLR_ACA:
+		break;
+	default:
+		return;
+	}
 	transport_generic_handle_tmr(&cmd->se_cmd);
 }
 

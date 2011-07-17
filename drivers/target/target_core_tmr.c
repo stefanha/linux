@@ -83,6 +83,7 @@ void core_tmr_release_req(
 	spin_lock(&dev->se_tmr_lock);
 	list_del(&tmr->tmr_list);
 	spin_unlock(&dev->se_tmr_lock);
+
 	kmem_cache_free(se_tmr_req_cache, tmr);
 }
 
