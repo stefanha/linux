@@ -42,9 +42,15 @@ static void vhost_scsi_free_cmd(struct tcm_vhost_cmd *tv_cmd)
 	struct se_cmd *se_cmd = &tv_cmd->tvc_se_cmd;
 
 	/* TODO locking against target/backend threads? */
+
+	if (tv_cmd->tvc_sgl_count) {
+		u32 i;
+		for (i = 0; i < tv_cmd->tvc_sgl_count; i++)
+			put_page(sg_page(&tv_cmd->tvc_sgl[i]));
+	}
+
 	/* TODO what do wait_for_tasks and session_reinstatement do? */
 	transport_generic_free_cmd(se_cmd, 1, 0);
-	/* TODO unmap sgl */
 	kfree(tv_cmd);
 }
 
@@ -160,6 +166,98 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 	 * vhost_scsi_handle_vq() below..
 	 */
 	return tv_cmd;
+}
+
+/*
+ * Map a user memory range into a scatterlist
+ *
+ * Returns the number of scatterlist entries used or -errno on error.
+ */
+static int vhost_scsi_map_to_sgl(struct scatterlist *sgl,
+		                 unsigned int sgl_count,
+		                 void __user *ptr, size_t len, int write)
+{
+	struct scatterlist *sg = sgl;
+	unsigned int npages = 0;
+	int ret;
+
+	while (len > 0) {
+		struct page *page;
+		unsigned int offset = (uintptr_t)ptr & ~PAGE_MASK;
+		unsigned int nbytes = min(PAGE_SIZE - offset, len);
+
+		if (npages == sgl_count) {
+			ret = -ENOBUFS;
+			goto err;
+		}
+
+		ret = get_user_pages_fast((unsigned long)ptr, 1, write, &page);
+		BUG_ON(ret == 0); /* we should either get our page or fail */
+		if (ret < 0)
+			goto err;
+
+		sg_set_page(sg, page, nbytes, offset);
+		ptr += nbytes;
+		len -= nbytes;
+		sg++;
+		npages++;
+	}
+	return npages;
+
+err:
+	/* Put pages that we hold */
+	for (sg = sgl; sg != &sgl[npages]; sg++)
+		put_page(sg_page(sg));
+	return ret;
+}
+
+static int vhost_scsi_map_iov_to_sgl(struct tcm_vhost_cmd *tv_cmd,
+                                     struct iovec *iov, unsigned int niov,
+				     int write)
+{
+	int ret;
+	unsigned int i;
+	u32 sgl_count;
+	struct scatterlist *sg;
+
+	/*
+	 * Find out how long sglist needs to be
+	 */
+	sgl_count = 0;
+	for (i = 0; i < niov; i++) {
+		sgl_count += (((uintptr_t)iov[i].iov_base + iov[i].iov_len +
+		             PAGE_SIZE - 1) >> PAGE_SHIFT) -
+		             ((uintptr_t)iov[i].iov_base >> PAGE_SHIFT);
+	}
+	/* TODO overflow checking */
+
+	sg = kmalloc(sizeof(tv_cmd->tvc_sgl[0]) * sgl_count, GFP_ATOMIC);
+	if (!sg)
+		return -ENOMEM;
+	printk("%s sg %p sgl_count %u is_err %ld\n", __func__,
+	       sg, sgl_count, IS_ERR(sg));
+	sg_init_table(sg, sgl_count);
+
+	tv_cmd->tvc_sgl = sg;
+	tv_cmd->tvc_sgl_count = sgl_count;
+
+	printk("Mapping %u iovecs for %u pages\n", niov, sgl_count);
+	for (i = 0; i < niov; i++) {
+		ret = vhost_scsi_map_to_sgl(sg, sgl_count, iov[i].iov_base,
+		                            iov[i].iov_len, write);
+		if (ret < 0) {
+			for (i = 0; i < tv_cmd->tvc_sgl_count; i++)
+				put_page(sg_page(&tv_cmd->tvc_sgl[i]));
+			kfree(tv_cmd->tvc_sgl);
+			tv_cmd->tvc_sgl = NULL;
+			tv_cmd->tvc_sgl_count = 0;
+			return ret;
+		}
+
+		sg += ret;
+		sgl_count -= ret;
+	}
+	return 0;
 }
 
 static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
@@ -286,9 +384,15 @@ static void vhost_scsi_handle_vq(struct vhost_scsi *vs)
 		printk("vhost_scsi got command opcode: %#02x, lun: %#llx\n",
 			tv_cmd->tvc_cdb[0], v_header.lun);
 
-#warning FIXME: Setup tv_cmd->tvc_sgl and tv_cmd->tvc_sgl_count
-		tv_cmd->tvc_sgl = NULL;
-		tv_cmd->tvc_sgl_count = 0;
+		if (data_direction != DMA_NONE) {
+			ret = vhost_scsi_map_iov_to_sgl(tv_cmd, &vq->iov[2],
+					out + in - 3, data_direction == DMA_TO_DEVICE);
+			if (unlikely(ret)) {
+				pr_err("Failed to map iov to sgl\n");
+				break; /* TODO */
+			}
+		}
+
 		/*
 		 * Save the descriptor from vhost_get_vq_desc() to be used to
 		 * complete the virtio-scsi request in TCM callback context via
