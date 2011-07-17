@@ -66,17 +66,19 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 {
 	struct se_lun *lun = cmd->se_lun;
 	struct se_device *dev = cmd->se_dev;
-	unsigned char *buf = cmd->t_task_buf;
+	unsigned char *buf;
 
 	/*
 	 * Make sure we at least have 6 bytes of INQUIRY response
 	 * payload going back for EVPD=0
 	 */
 	if (cmd->data_length < 6) {
-		printk(KERN_ERR "SCSI Inquiry payload length: %u"
+		pr_err("SCSI Inquiry payload length: %u"
 			" too small for EVPD=0\n", cmd->data_length);
 		return -EINVAL;
 	}
+
+	buf = transport_kmap_first_data_page(cmd);
 
 	buf[0] = dev->transport->get_device_type(dev);
 	if (buf[0] == TYPE_TAPE)
@@ -111,30 +113,8 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 	snprintf((unsigned char *)&buf[32], 4, "%s",
 		 &dev->se_sub_dev->t10_wwn.revision[0]);
 	buf[4] = 31; /* Set additional length to 31 */
-	return 0;
-}
 
-/* supported vital product data pages */
-static int
-target_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf)
-{
-	buf[1] = 0x00;
-	if (cmd->data_length < 8)
-		return 0;
-
-	buf[4] = 0x0;
-	/*
-	 * Only report the INQUIRY EVPD=1 pages after a valid NAA
-	 * Registered Extended LUN WWN has been set via ConfigFS
-	 * during device creation/restart.
-	 */
-	if (cmd->se_dev->se_sub_dev->su_dev_flags &
-			SDF_EMULATED_VPD_UNIT_SERIAL) {
-		buf[3] = 3;
-		buf[5] = 0x80;
-		buf[6] = 0x83;
-		buf[7] = 0x86;
-	}
+	transport_kunmap_first_data_page(cmd);
 
 	return 0;
 }
@@ -146,7 +126,6 @@ target_emulate_evpd_80(struct se_cmd *cmd, unsigned char *buf)
 	struct se_device *dev = cmd->se_dev;
 	u16 len = 0;
 
-	buf[1] = 0x80;
 	if (dev->se_sub_dev->su_dev_flags &
 			SDF_EMULATED_VPD_UNIT_SERIAL) {
 		u32 unit_serial_len;
@@ -190,7 +169,6 @@ target_emulate_evpd_83(struct se_cmd *cmd, unsigned char *buf)
 	int i;
 	u16 len = 0, id_len;
 
-	buf[1] = 0x83;
 	off = 4;
 
 	/*
@@ -349,7 +327,7 @@ check_tpgi:
 
 		spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 		tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
-		if (!(tg_pt_gp)) {
+		if (!tg_pt_gp) {
 			spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 			goto check_lu_gp;
 		}
@@ -380,12 +358,12 @@ check_lu_gp:
 			goto check_scsi_name;
 		}
 		lu_gp_mem = dev->dev_alua_lu_gp_mem;
-		if (!(lu_gp_mem))
+		if (!lu_gp_mem)
 			goto check_scsi_name;
 
 		spin_lock(&lu_gp_mem->lu_gp_mem_lock);
 		lu_gp = lu_gp_mem->lu_gp;
-		if (!(lu_gp)) {
+		if (!lu_gp) {
 			spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
 			goto check_scsi_name;
 		}
@@ -471,7 +449,6 @@ target_emulate_evpd_86(struct se_cmd *cmd, unsigned char *buf)
 	if (cmd->data_length < 60)
 		return 0;
 
-	buf[1] = 0x86;
 	buf[2] = 0x3c;
 	/* Set HEADSUP, ORDSUP, SIMPSUP */
 	buf[5] = 0x07;
@@ -498,22 +475,24 @@ target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 		have_tp = 1;
 
 	if (cmd->data_length < (0x10 + 4)) {
-		printk(KERN_INFO "Received data_length: %u"
+		pr_debug("Received data_length: %u"
 			" too small for EVPD 0xb0\n",
 			cmd->data_length);
 		return -EINVAL;
 	}
 
 	if (have_tp && cmd->data_length < (0x3c + 4)) {
-		printk(KERN_INFO "Received data_length: %u"
+		pr_debug("Received data_length: %u"
 			" too small for TPE=1 EVPD 0xb0\n",
 			cmd->data_length);
 		have_tp = 0;
 	}
 
 	buf[0] = dev->transport->get_device_type(dev);
-	buf[1] = 0xb0;
 	buf[3] = have_tp ? 0x3c : 0x10;
+
+	/* Set WSNZ to 1 */
+	buf[4] = 0x01;
 
 	/*
 	 * Set OPTIMAL TRANSFER LENGTH GRANULARITY
@@ -564,6 +543,22 @@ target_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 	return 0;
 }
 
+/* Block Device Characteristics VPD page */
+static int
+target_emulate_evpd_b1(struct se_cmd *cmd, unsigned char *buf)
+{
+	struct se_device *dev = cmd->se_dev;
+
+	buf[0] = dev->transport->get_device_type(dev);
+	buf[3] = 0x3c;
+
+	if (cmd->data_length >= 5 &&
+	    dev->se_sub_dev->se_dev_attrib.is_nonrot)
+		buf[5] = 1;
+
+	return 0;
+}
+
 /* Thin Provisioning VPD */
 static int
 target_emulate_evpd_b2(struct se_cmd *cmd, unsigned char *buf)
@@ -579,7 +574,6 @@ target_emulate_evpd_b2(struct se_cmd *cmd, unsigned char *buf)
 	 * defined in table 162.
 	 */
 	buf[0] = dev->transport->get_device_type(dev);
-	buf[1] = 0xb2;
 
 	/*
 	 * Set Hardcoded length mentioned above for DP=0
@@ -618,11 +612,51 @@ target_emulate_evpd_b2(struct se_cmd *cmd, unsigned char *buf)
 }
 
 static int
+target_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf);
+
+static struct {
+	uint8_t		page;
+	int		(*emulate)(struct se_cmd *, unsigned char *);
+} evpd_handlers[] = {
+	{ .page = 0x00, .emulate = target_emulate_evpd_00 },
+	{ .page = 0x80, .emulate = target_emulate_evpd_80 },
+	{ .page = 0x83, .emulate = target_emulate_evpd_83 },
+	{ .page = 0x86, .emulate = target_emulate_evpd_86 },
+	{ .page = 0xb0, .emulate = target_emulate_evpd_b0 },
+	{ .page = 0xb1, .emulate = target_emulate_evpd_b1 },
+	{ .page = 0xb2, .emulate = target_emulate_evpd_b2 },
+};
+
+/* supported vital product data pages */
+static int
+target_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf)
+{
+	int p;
+
+	if (cmd->data_length < 8)
+		return 0;
+	/*
+	 * Only report the INQUIRY EVPD=1 pages after a valid NAA
+	 * Registered Extended LUN WWN has been set via ConfigFS
+	 * during device creation/restart.
+	 */
+	if (cmd->se_dev->se_sub_dev->su_dev_flags &
+			SDF_EMULATED_VPD_UNIT_SERIAL) {
+		buf[3] = ARRAY_SIZE(evpd_handlers);
+		for (p = 0; p < min_t(int, ARRAY_SIZE(evpd_handlers),
+				      cmd->data_length - 4); ++p)
+			buf[p + 4] = evpd_handlers[p].page;
+	}
+
+	return 0;
+}
+
+static int
 target_emulate_inquiry(struct se_cmd *cmd)
 {
-	struct se_device *dev = cmd->se_dev;
-	unsigned char *buf = cmd->t_task_buf;
+	unsigned char *buf;
 	unsigned char *cdb = cmd->t_task_cdb;
+	int p, ret;
 
 	if (!(cdb[1] & 0x1))
 		return target_emulate_inquiry_std(cmd);
@@ -635,38 +669,31 @@ target_emulate_inquiry(struct se_cmd *cmd)
 	 * payload length left for the next outgoing EVPD metadata
 	 */
 	if (cmd->data_length < 4) {
-		printk(KERN_ERR "SCSI Inquiry payload length: %u"
+		pr_err("SCSI Inquiry payload length: %u"
 			" too small for EVPD=1\n", cmd->data_length);
 		return -EINVAL;
 	}
-	buf[0] = dev->transport->get_device_type(dev);
 
-	switch (cdb[2]) {
-	case 0x00:
-		return target_emulate_evpd_00(cmd, buf);
-	case 0x80:
-		return target_emulate_evpd_80(cmd, buf);
-	case 0x83:
-		return target_emulate_evpd_83(cmd, buf);
-	case 0x86:
-		return target_emulate_evpd_86(cmd, buf);
-	case 0xb0:
-		return target_emulate_evpd_b0(cmd, buf);
-	case 0xb2:
-		return target_emulate_evpd_b2(cmd, buf);
-	default:
-		printk(KERN_ERR "Unknown VPD Code: 0x%02x\n", cdb[2]);
-		return -EINVAL;
-	}
+	buf = transport_kmap_first_data_page(cmd);
 
-	return 0;
+	for (p = 0; p < ARRAY_SIZE(evpd_handlers); ++p)
+		if (cdb[2] == evpd_handlers[p].page) {
+			buf[1] = cdb[2];
+			ret = evpd_handlers[p].emulate(cmd, buf);
+			transport_kunmap_first_data_page(cmd);
+			return ret;
+		}
+
+	transport_kunmap_first_data_page(cmd);
+	pr_err("Unknown VPD Code: 0x%02x\n", cdb[2]);
+	return -EINVAL;
 }
 
 static int
 target_emulate_readcapacity(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	unsigned char *buf = cmd->t_task_buf;
+	unsigned char *buf;
 	unsigned long long blocks_long = dev->transport->get_blocks(dev);
 	u32 blocks;
 
@@ -674,6 +701,8 @@ target_emulate_readcapacity(struct se_cmd *cmd)
 		blocks = 0xffffffff;
 	else
 		blocks = (u32)blocks_long;
+
+	buf = transport_kmap_first_data_page(cmd);
 
 	buf[0] = (blocks >> 24) & 0xff;
 	buf[1] = (blocks >> 16) & 0xff;
@@ -689,6 +718,8 @@ target_emulate_readcapacity(struct se_cmd *cmd)
 	if (dev->se_sub_dev->se_dev_attrib.emulate_tpu || dev->se_sub_dev->se_dev_attrib.emulate_tpws)
 		put_unaligned_be32(0xFFFFFFFF, &buf[0]);
 
+	transport_kunmap_first_data_page(cmd);
+
 	return 0;
 }
 
@@ -696,8 +727,10 @@ static int
 target_emulate_readcapacity_16(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	unsigned char *buf = cmd->t_task_buf;
+	unsigned char *buf;
 	unsigned long long blocks = dev->transport->get_blocks(dev);
+
+	buf = transport_kmap_first_data_page(cmd);
 
 	buf[0] = (blocks >> 56) & 0xff;
 	buf[1] = (blocks >> 48) & 0xff;
@@ -717,6 +750,8 @@ target_emulate_readcapacity_16(struct se_cmd *cmd)
 	 */
 	if (dev->se_sub_dev->se_dev_attrib.emulate_tpu || dev->se_sub_dev->se_dev_attrib.emulate_tpws)
 		buf[14] = 0x80;
+
+	transport_kunmap_first_data_page(cmd);
 
 	return 0;
 }
@@ -832,7 +867,7 @@ target_emulate_modesense(struct se_cmd *cmd, int ten)
 {
 	struct se_device *dev = cmd->se_dev;
 	char *cdb = cmd->t_task_cdb;
-	unsigned char *rbuf = cmd->t_task_buf;
+	unsigned char *rbuf;
 	int type = dev->transport->get_device_type(dev);
 	int offset = (ten) ? 8 : 4;
 	int length = 0;
@@ -856,7 +891,7 @@ target_emulate_modesense(struct se_cmd *cmd, int ten)
 		length += target_modesense_control(dev, &buf[offset+length]);
 		break;
 	default:
-		printk(KERN_ERR "Got Unknown Mode Page: 0x%02x\n",
+		pr_err("Got Unknown Mode Page: 0x%02x\n",
 				cdb[2] & 0x3f);
 		return PYX_TRANSPORT_UNKNOWN_MODE_PAGE;
 	}
@@ -895,7 +930,10 @@ target_emulate_modesense(struct se_cmd *cmd, int ten)
 		if ((offset + 1) > cmd->data_length)
 			offset = cmd->data_length;
 	}
+
+	rbuf = transport_kmap_first_data_page(cmd);
 	memcpy(rbuf, buf, offset);
+	transport_kunmap_first_data_page(cmd);
 
 	return 0;
 }
@@ -904,15 +942,19 @@ static int
 target_emulate_request_sense(struct se_cmd *cmd)
 {
 	unsigned char *cdb = cmd->t_task_cdb;
-	unsigned char *buf = cmd->t_task_buf;
+	unsigned char *buf;
 	u8 ua_asc = 0, ua_ascq = 0;
+	int err = 0;
 
 	if (cdb[1] & 0x01) {
-		printk(KERN_ERR "REQUEST_SENSE description emulation not"
+		pr_err("REQUEST_SENSE description emulation not"
 			" supported\n");
 		return PYX_TRANSPORT_INVALID_CDB_FIELD;
 	}
-	if (!(core_scsi3_ua_clear_for_request_sense(cmd, &ua_asc, &ua_ascq))) {
+
+	buf = transport_kmap_first_data_page(cmd);
+
+	if (!core_scsi3_ua_clear_for_request_sense(cmd, &ua_asc, &ua_ascq)) {
 		/*
 		 * CURRENT ERROR, UNIT ATTENTION
 		 */
@@ -924,7 +966,8 @@ target_emulate_request_sense(struct se_cmd *cmd)
 		 */
 		if (cmd->data_length <= 18) {
 			buf[7] = 0x00;
-			return 0;
+			err = -EINVAL;
+			goto end;
 		}
 		/*
 		 * The Additional Sense Code (ASC) from the UNIT ATTENTION
@@ -944,7 +987,8 @@ target_emulate_request_sense(struct se_cmd *cmd)
 		 */
 		if (cmd->data_length <= 18) {
 			buf[7] = 0x00;
-			return 0;
+			err = -EINVAL;
+			goto end;
 		}
 		/*
 		 * NO ADDITIONAL SENSE INFORMATION
@@ -952,6 +996,9 @@ target_emulate_request_sense(struct se_cmd *cmd)
 		buf[SPC_ASC_KEY_OFFSET] = 0x00;
 		buf[7] = 0x0A;
 	}
+
+end:
+	transport_kunmap_first_data_page(cmd);
 
 	return 0;
 }
@@ -965,11 +1012,11 @@ target_emulate_unmap(struct se_task *task)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
 	struct se_device *dev = cmd->se_dev;
-	unsigned char *buf = cmd->t_task_buf, *ptr = NULL;
+	unsigned char *buf, *ptr = NULL;
 	unsigned char *cdb = &cmd->t_task_cdb[0];
 	sector_t lba;
 	unsigned int size = cmd->data_length, range;
-	int ret, offset;
+	int ret = 0, offset;
 	unsigned short dl, bd_dl;
 
 	/* First UNMAP block descriptor starts at 8 byte offset */
@@ -977,21 +1024,24 @@ target_emulate_unmap(struct se_task *task)
 	size -= 8;
 	dl = get_unaligned_be16(&cdb[0]);
 	bd_dl = get_unaligned_be16(&cdb[2]);
+
+	buf = transport_kmap_first_data_page(cmd);
+
 	ptr = &buf[offset];
-	printk(KERN_INFO "UNMAP: Sub: %s Using dl: %hu bd_dl: %hu size: %hu"
+	pr_debug("UNMAP: Sub: %s Using dl: %hu bd_dl: %hu size: %hu"
 		" ptr: %p\n", dev->transport->name, dl, bd_dl, size, ptr);
 
 	while (size) {
 		lba = get_unaligned_be64(&ptr[0]);
 		range = get_unaligned_be32(&ptr[8]);
-		printk(KERN_INFO "UNMAP: Using lba: %llu and range: %u\n",
+		pr_debug("UNMAP: Using lba: %llu and range: %u\n",
 				 (unsigned long long)lba, range);
 
 		ret = dev->transport->do_discard(dev, lba, range);
 		if (ret < 0) {
-			printk(KERN_ERR "blkdev_issue_discard() failed: %d\n",
+			pr_err("blkdev_issue_discard() failed: %d\n",
 					ret);
-			return ret;
+			goto err;
 		}
 
 		ptr += 16;
@@ -1000,7 +1050,10 @@ target_emulate_unmap(struct se_task *task)
 
 	task->task_scsi_status = GOOD;
 	transport_complete_task(task, 1);
-	return 0;
+err:
+	transport_kunmap_first_data_page(cmd);
+
+	return ret;
 }
 
 /*
@@ -1031,12 +1084,12 @@ target_emulate_write_same(struct se_task *task, int write_same32)
 	else
 		range = (dev->transport->get_blocks(dev) - lba);
 
-	printk(KERN_INFO "WRITE_SAME UNMAP: LBA: %llu Range: %llu\n",
+	pr_debug("WRITE_SAME UNMAP: LBA: %llu Range: %llu\n",
 		 (unsigned long long)lba, (unsigned long long)range);
 
 	ret = dev->transport->do_discard(dev, lba, range);
 	if (ret < 0) {
-		printk(KERN_INFO "blkdev_issue_discard() failed for WRITE_SAME\n");
+		pr_debug("blkdev_issue_discard() failed for WRITE_SAME\n");
 		return ret;
 	}
 
@@ -1072,7 +1125,7 @@ transport_emulate_control_cdb(struct se_task *task)
 			ret = target_emulate_readcapacity_16(cmd);
 			break;
 		default:
-			printk(KERN_ERR "Unsupported SA: 0x%02x\n",
+			pr_err("Unsupported SA: 0x%02x\n",
 				cmd->t_task_cdb[1] & 0x1f);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
@@ -1082,7 +1135,7 @@ transport_emulate_control_cdb(struct se_task *task)
 		break;
 	case UNMAP:
 		if (!dev->transport->do_discard) {
-			printk(KERN_ERR "UNMAP emulation not supported for: %s\n",
+			pr_err("UNMAP emulation not supported for: %s\n",
 					dev->transport->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
@@ -1090,7 +1143,7 @@ transport_emulate_control_cdb(struct se_task *task)
 		break;
 	case WRITE_SAME_16:
 		if (!dev->transport->do_discard) {
-			printk(KERN_ERR "WRITE_SAME_16 emulation not supported"
+			pr_err("WRITE_SAME_16 emulation not supported"
 					" for: %s\n", dev->transport->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
@@ -1102,7 +1155,7 @@ transport_emulate_control_cdb(struct se_task *task)
 		switch (service_action) {
 		case WRITE_SAME_32:
 			if (!dev->transport->do_discard) {
-				printk(KERN_ERR "WRITE_SAME_32 SA emulation not"
+				pr_err("WRITE_SAME_32 SA emulation not"
 					" supported for: %s\n",
 					dev->transport->name);
 				return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
@@ -1110,7 +1163,7 @@ transport_emulate_control_cdb(struct se_task *task)
 			ret = target_emulate_write_same(task, 1);
 			break;
 		default:
-			printk(KERN_ERR "Unsupported VARIABLE_LENGTH_CMD SA:"
+			pr_err("Unsupported VARIABLE_LENGTH_CMD SA:"
 					" 0x%02x\n", service_action);
 			break;
 		}
@@ -1118,8 +1171,7 @@ transport_emulate_control_cdb(struct se_task *task)
 	case SYNCHRONIZE_CACHE:
 	case 0x91: /* SYNCHRONIZE_CACHE_16: */
 		if (!dev->transport->do_sync_cache) {
-			printk(KERN_ERR
-				"SYNCHRONIZE_CACHE emulation not supported"
+			pr_err("SYNCHRONIZE_CACHE emulation not supported"
 				" for: %s\n", dev->transport->name);
 			return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 		}
@@ -1136,7 +1188,7 @@ transport_emulate_control_cdb(struct se_task *task)
 	case WRITE_FILEMARKS:
 		break;
 	default:
-		printk(KERN_ERR "Unsupported SCSI Opcode: 0x%02x for %s\n",
+		pr_err("Unsupported SCSI Opcode: 0x%02x for %s\n",
 			cmd->t_task_cdb[0], dev->transport->name);
 		return PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
 	}

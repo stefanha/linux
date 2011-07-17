@@ -470,7 +470,6 @@ struct iscsi_cmd {
 #define ISCSI_SENSE_BUFFER_LEN          (TRANSPORT_SENSE_BUFFER + 2)
 	unsigned char		sense_buffer[ISCSI_SENSE_BUFFER_LEN];
 
-	void			*t_mem;
 	struct scatterlist	*t_mem_sg;
 	u32			t_mem_sg_nents;
 
@@ -482,8 +481,6 @@ struct iscsi_cmd {
 	u32			kmapped_nents;
 
 }  ____cacheline_aligned;
-
-#define SE_CMD(cmd)		(&(cmd)->se_cmd)
 
 struct iscsi_tmr_req {
 	bool			task_reassign:1;

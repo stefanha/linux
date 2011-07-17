@@ -106,7 +106,7 @@ ssize_t tcm_qla2xxx_parse_wwn(const char *name, u64 *wwn, int strict)
 	}
 	err = 4;
 fail:
-	printk(KERN_INFO "err %u len %zu pos %u byte %u\n",
+	pr_debug("err %u len %zu pos %u byte %u\n",
 			err, cp - name, pos, byte);
 	return -1;
 }
@@ -357,8 +357,8 @@ struct se_node_acl *tcm_qla2xxx_alloc_fabric_acl(struct se_portal_group *se_tpg)
 	struct tcm_qla2xxx_nacl *nacl;
 
 	nacl = kzalloc(sizeof(struct tcm_qla2xxx_nacl), GFP_KERNEL);
-	if (!(nacl)) {
-		printk(KERN_ERR "Unable to alocate struct tcm_qla2xxx_nacl\n");
+	if (!nacl) {
+		pr_err("Unable to alocate struct tcm_qla2xxx_nacl\n");
 		return NULL;
 	}
 
@@ -427,7 +427,7 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 		return;
 
 	while (atomic_read(&cmd->cmd_stop_free) != 1) {
-		printk(KERN_WARNING "Hit atomic_read(&cmd->cmd_stop_free)=1"
+		pr_warn("Hit atomic_read(&cmd->cmd_stop_free)=1"
 				" in tcm_qla2xxx_release_cmd\n");
 		cpu_relax();
 	}
@@ -440,7 +440,7 @@ int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
 	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
 
 	if (!sess) {
-		printk("se_sess->fabric_sess_ptr is NULL\n");
+		pr_err("se_sess->fabric_sess_ptr is NULL\n");
 		dump_stack();
 		return 0;
 	}
@@ -457,7 +457,7 @@ void tcm_qla2xxx_close_session(struct se_session *se_sess)
 	unsigned long flags;
 
 	if (!sess) {
-		printk(KERN_ERR "se_sess->fabric_sess_ptr is NULL\n");
+		pr_err("se_sess->fabric_sess_ptr is NULL\n");
 		dump_stack();
 		return;
 	}
@@ -476,7 +476,7 @@ void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int c
 	unsigned long flags;
 
 	if (!sess) {
-		printk(KERN_ERR "se_sess->fabric_sess_ptr is NULL\n");
+		pr_err("se_sess->fabric_sess_ptr is NULL\n");
 		dump_stack();
 		return;
 	}
@@ -517,18 +517,8 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 
 		cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
 		cmd->sg = se_cmd->t_tasks_sg_chained;
-	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		/*
-		 * Use se_cmd->t_task->t_tasks_sg_bounce for control CDBs
-		 * using a contiguous buffer
-		 */
-		sg_init_table(&se_cmd->t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_tasks_sg_bounce,
-			se_cmd->t_task_buf, se_cmd->data_length);
-		cmd->sg_cnt = 1;
-		cmd->sg = &se_cmd->t_tasks_sg_bounce;
 	} else {
-		printk(KERN_ERR "Unknown se_cmd_flags: 0x%08x in"
+		pr_err("Unknown se_cmd_flags: 0x%08x in"
 			" tcm_qla2xxx_write_pending()\n", se_cmd->se_cmd_flags);
 		BUG();
 	}
@@ -576,13 +566,13 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 
 	sess = cmd->sess;
 	if (!sess) {
-		printk(KERN_ERR "Unable to locate struct qla_tgt_sess from qla_tgt_cmd\n");
+		pr_err("Unable to locate struct qla_tgt_sess from qla_tgt_cmd\n");
 		return -EINVAL;
 	}
 
 	se_sess = sess->se_sess;
 	if (!se_sess) {
-		printk(KERN_ERR "Unable to locate active struct se_session\n");
+		pr_err("Unable to locate active struct se_session\n");
 		return -EINVAL;
 	}
 	se_tpg = se_sess->se_tpg;
@@ -604,10 +594,11 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	if (transport_lookup_cmd_lun(se_cmd, lun) < 0) {
 		/*
 		 * Clear qla_tgt_cmd->locked_rsp as ha->hardware_lock
-		 * is already held here..
+		 * is already held here, and we'll end up calling back
+		 * into ->queue_status (tcm_qla2xxx_queue_status())
+		 * and hence qla2xxx_xmit_response().
 		 */
-		if (spin_is_locked(&cmd->vha->hw->hardware_lock))
-			cmd->locked_rsp = 0;
+		cmd->locked_rsp = 0;
 
 		/* NON_EXISTENT_LUN */
 		transport_send_check_condition_and_sense(se_cmd,
@@ -729,17 +720,6 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 
 		cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
 		cmd->sg = se_cmd->t_tasks_sg_chained;
-	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		/*
-		 * Use se_cmd->t_task->t_tasks_sg_bounce for control CDBs
-		 * using a contigious buffer
-		 */
-		sg_init_table(&se_cmd->t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_tasks_sg_bounce,
-			se_cmd->t_task_buf, se_cmd->data_length);
-
-		cmd->sg_cnt = 1;
-		cmd->sg = &se_cmd->t_tasks_sg_bounce;
 	} else {
 		cmd->sg_cnt = 0;
 		cmd->sg = NULL;
@@ -777,7 +757,7 @@ int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 	struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
 				struct qla_tgt_mgmt_cmd, se_cmd);
 
-	printk("queue_tm_rsp: mcmd: %p func: 0x%02x response: 0x%02x\n",
+	pr_debug("queue_tm_rsp: mcmd: %p func: 0x%02x response: 0x%02x\n",
 			mcmd, se_tmr->function, se_tmr->response);
 	/*
 	 * Do translation between TCM TM response codes and

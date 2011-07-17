@@ -3170,10 +3170,8 @@ static int qla24xx_send_cmd_to_target(struct scsi_qla_host *vha, struct qla_tgt_
 	/*
 	 * Dispatch command to tcm_qla2xxx fabric module code
 	 */
-	spin_unlock_irq(&vha->hw->hardware_lock);
 	ret = vha->hw->qla2x_tmpl->handle_cmd(vha, cmd, unpacked_lun, data_length,
 				fcp_task_attr, data_dir, bidi);
-	spin_lock_irq(&vha->hw->hardware_lock);
 	return ret;
 }
 
@@ -3890,9 +3888,6 @@ restart:
 		    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 			cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
 			cmd->sg = se_cmd->t_tasks_sg_chained;
-		} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-			cmd->sg_cnt = 1;
-			cmd->sg = &se_cmd->t_tasks_sg_bounce;
 		}
 
 		DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p (se_cmd %p, tag %d, op %x), "

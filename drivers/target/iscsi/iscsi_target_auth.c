@@ -27,12 +27,6 @@
 #include "iscsi_target_nego.h"
 #include "iscsi_target_auth.h"
 
-#ifdef DEBUG_CHAP
-#define PRINT(x...)		printk(KERN_INFO x)
-#else
-#define PRINT(x...)
-#endif
-
 static unsigned char chap_asciihex_to_binaryhex(unsigned char val[2])
 {
 	unsigned char result = 0;
@@ -127,7 +121,7 @@ static void chap_gen_challenge(
 	*c_len += sprintf(c_str + *c_len, "CHAP_C=0x%s", challenge_asciihex);
 	*c_len += 1;
 
-	PRINT("[%s] Sending CHAP_C=0x%s\n\n", (caller) ? "server" : "client",
+	pr_debug("[%s] Sending CHAP_C=0x%s\n\n", (caller) ? "server" : "client",
 			challenge_asciihex);
 }
 
@@ -143,7 +137,7 @@ static struct iscsi_chap *chap_server_open(
 
 	if (!(auth->naf_flags & NAF_USERID_SET) ||
 	    !(auth->naf_flags & NAF_PASSWORD_SET)) {
-		printk(KERN_ERR "CHAP user or password not set for"
+		pr_err("CHAP user or password not set for"
 				" Initiator ACL\n");
 		return NULL;
 	}
@@ -157,24 +151,24 @@ static struct iscsi_chap *chap_server_open(
 	 * We only support MD5 MDA presently.
 	 */
 	if (strncmp(a_str, "CHAP_A=5", 8)) {
-		printk(KERN_ERR "CHAP_A is not MD5.\n");
+		pr_err("CHAP_A is not MD5.\n");
 		return NULL;
 	}
-	PRINT("[server] Got CHAP_A=5\n");
+	pr_debug("[server] Got CHAP_A=5\n");
 	/*
 	 * Send back CHAP_A set to MD5.
 	 */
 	*aic_len = sprintf(aic_str, "CHAP_A=5");
 	*aic_len += 1;
 	chap->digest_type = CHAP_DIGEST_MD5;
-	PRINT("[server] Sending CHAP_A=%d\n", chap->digest_type);
+	pr_debug("[server] Sending CHAP_A=%d\n", chap->digest_type);
 	/*
 	 * Set Identifier.
 	 */
 	chap->id = ISCSI_TPG_C(conn)->tpg_chap_id++;
 	*aic_len += sprintf(aic_str + *aic_len, "CHAP_I=%d", chap->id);
 	*aic_len += 1;
-	PRINT("[server] Sending CHAP_I=%d\n", chap->id);
+	pr_debug("[server] Sending CHAP_I=%d\n", chap->id);
 	/*
 	 * Generate Challenge.
 	 */
@@ -220,13 +214,13 @@ static int chap_server_compute_md5(
 
 	challenge = kzalloc(CHAP_CHALLENGE_STR_LEN, GFP_KERNEL);
 	if (!challenge) {
-		printk(KERN_ERR "Unable to allocate challenge buffer\n");
+		pr_err("Unable to allocate challenge buffer\n");
 		goto out;
 	}
 
 	challenge_binhex = kzalloc(CHAP_CHALLENGE_STR_LEN, GFP_KERNEL);
 	if (!challenge_binhex) {
-		printk(KERN_ERR "Unable to allocate challenge_binhex buffer\n");
+		pr_err("Unable to allocate challenge_binhex buffer\n");
 		goto out;
 	}
 	/*
@@ -234,38 +228,38 @@ static int chap_server_compute_md5(
 	 */
 	if (extract_param(nr_in_ptr, "CHAP_N", MAX_CHAP_N_SIZE, chap_n,
 				&type) < 0) {
-		printk(KERN_ERR "Could not find CHAP_N.\n");
+		pr_err("Could not find CHAP_N.\n");
 		goto out;
 	}
 	if (type == HEX) {
-		printk(KERN_ERR "Could not find CHAP_N.\n");
+		pr_err("Could not find CHAP_N.\n");
 		goto out;
 	}
 
 	if (memcmp(chap_n, auth->userid, strlen(auth->userid)) != 0) {
-		printk(KERN_ERR "CHAP_N values do not match!\n");
+		pr_err("CHAP_N values do not match!\n");
 		goto out;
 	}
-	PRINT("[server] Got CHAP_N=%s\n", chap_n);
+	pr_debug("[server] Got CHAP_N=%s\n", chap_n);
 	/*
 	 * Extract CHAP_R.
 	 */
 	if (extract_param(nr_in_ptr, "CHAP_R", MAX_RESPONSE_LENGTH, chap_r,
 				&type) < 0) {
-		printk(KERN_ERR "Could not find CHAP_R.\n");
+		pr_err("Could not find CHAP_R.\n");
 		goto out;
 	}
 	if (type != HEX) {
-		printk(KERN_ERR "Could not find CHAP_R.\n");
+		pr_err("Could not find CHAP_R.\n");
 		goto out;
 	}
 
-	PRINT("[server] Got CHAP_R=%s\n", chap_r);
+	pr_debug("[server] Got CHAP_R=%s\n", chap_r);
 	chap_string_to_hex(client_digest, chap_r, strlen(chap_r));
 
 	tfm = crypto_alloc_hash("md5", 0, CRYPTO_ALG_ASYNC);
 	if (IS_ERR(tfm)) {
-		printk(KERN_ERR "Unable to allocate struct crypto_hash\n");
+		pr_err("Unable to allocate struct crypto_hash\n");
 		goto out;
 	}
 	desc.tfm = tfm;
@@ -273,7 +267,7 @@ static int chap_server_compute_md5(
 
 	ret = crypto_hash_init(&desc);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_init() failed\n");
+		pr_err("crypto_hash_init() failed\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -281,7 +275,7 @@ static int chap_server_compute_md5(
 	sg_init_one(&sg, (void *)&chap->id, 1);
 	ret = crypto_hash_update(&desc, &sg, 1);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for id\n");
+		pr_err("crypto_hash_update() failed for id\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -289,7 +283,7 @@ static int chap_server_compute_md5(
 	sg_init_one(&sg, (void *)&auth->password, strlen(auth->password));
 	ret = crypto_hash_update(&desc, &sg, strlen(auth->password));
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for password\n");
+		pr_err("crypto_hash_update() failed for password\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -297,27 +291,27 @@ static int chap_server_compute_md5(
 	sg_init_one(&sg, (void *)chap->challenge, CHAP_CHALLENGE_LENGTH);
 	ret = crypto_hash_update(&desc, &sg, CHAP_CHALLENGE_LENGTH);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for challenge\n");
+		pr_err("crypto_hash_update() failed for challenge\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
 
 	ret = crypto_hash_final(&desc, server_digest);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_final() failed for server digest\n");
+		pr_err("crypto_hash_final() failed for server digest\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
 	crypto_free_hash(tfm);
 
 	chap_binaryhex_to_asciihex(response, server_digest, MD5_SIGNATURE_SIZE);
-	PRINT("[server] MD5 Server Digest: %s\n", response);
+	pr_debug("[server] MD5 Server Digest: %s\n", response);
 
 	if (memcmp(server_digest, client_digest, MD5_SIGNATURE_SIZE) != 0) {
-		PRINT("[server] MD5 Digests do not match!\n\n");
+		pr_debug("[server] MD5 Digests do not match!\n\n");
 		goto out;
 	} else
-		PRINT("[server] MD5 Digests match, CHAP connetication"
+		pr_debug("[server] MD5 Digests match, CHAP connetication"
 				" successful.\n\n");
 	/*
 	 * One way authentication has succeeded, return now if mutual
@@ -332,7 +326,7 @@ static int chap_server_compute_md5(
 	 * Get CHAP_I.
 	 */
 	if (extract_param(nr_in_ptr, "CHAP_I", 10, identifier, &type) < 0) {
-		printk(KERN_ERR "Could not find CHAP_I.\n");
+		pr_err("Could not find CHAP_I.\n");
 		goto out;
 	}
 
@@ -344,25 +338,25 @@ static int chap_server_compute_md5(
 	/*
 	 * RFC 1994 says Identifier is no more than octet (8 bits).
 	 */
-	PRINT("[server] Got CHAP_I=%d\n", id);
+	pr_debug("[server] Got CHAP_I=%d\n", id);
 	/*
 	 * Get CHAP_C.
 	 */
 	if (extract_param(nr_in_ptr, "CHAP_C", CHAP_CHALLENGE_STR_LEN,
 			challenge, &type) < 0) {
-		printk(KERN_ERR "Could not find CHAP_C.\n");
+		pr_err("Could not find CHAP_C.\n");
 		goto out;
 	}
 
 	if (type != HEX) {
-		printk(KERN_ERR "Could not find CHAP_C.\n");
+		pr_err("Could not find CHAP_C.\n");
 		goto out;
 	}
-	PRINT("[server] Got CHAP_C=%s\n", challenge);
+	pr_debug("[server] Got CHAP_C=%s\n", challenge);
 	challenge_len = chap_string_to_hex(challenge_binhex, challenge,
 				strlen(challenge));
 	if (!challenge_len) {
-		printk(KERN_ERR "Unable to convert incoming challenge\n");
+		pr_err("Unable to convert incoming challenge\n");
 		goto out;
 	}
 	/*
@@ -370,7 +364,7 @@ static int chap_server_compute_md5(
 	 */
 	tfm = crypto_alloc_hash("md5", 0, CRYPTO_ALG_ASYNC);
 	if (IS_ERR(tfm)) {
-		printk(KERN_ERR "Unable to allocate struct crypto_hash\n");
+		pr_err("Unable to allocate struct crypto_hash\n");
 		goto out;
 	}
 	desc.tfm = tfm;
@@ -378,7 +372,7 @@ static int chap_server_compute_md5(
 
 	ret = crypto_hash_init(&desc);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_init() failed\n");
+		pr_err("crypto_hash_init() failed\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -386,7 +380,7 @@ static int chap_server_compute_md5(
 	sg_init_one(&sg, (void *)&id, 1);
 	ret = crypto_hash_update(&desc, &sg, 1);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for id\n");
+		pr_err("crypto_hash_update() failed for id\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -395,7 +389,7 @@ static int chap_server_compute_md5(
 				strlen(auth->password_mutual));
 	ret = crypto_hash_update(&desc, &sg, strlen(auth->password_mutual));
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for"
+		pr_err("crypto_hash_update() failed for"
 				" password_mutual\n");
 		crypto_free_hash(tfm);
 		goto out;
@@ -406,14 +400,14 @@ static int chap_server_compute_md5(
 	sg_init_one(&sg, (void *)challenge_binhex, challenge_len);
 	ret = crypto_hash_update(&desc, &sg, challenge_len);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_update() failed for ma challenge\n");
+		pr_err("crypto_hash_update() failed for ma challenge\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
 
 	ret = crypto_hash_final(&desc, digest);
 	if (ret < 0) {
-		printk(KERN_ERR "crypto_hash_final() failed for ma digest\n");
+		pr_err("crypto_hash_final() failed for ma digest\n");
 		crypto_free_hash(tfm);
 		goto out;
 	}
@@ -423,7 +417,7 @@ static int chap_server_compute_md5(
 	 */
 	*nr_out_len = sprintf(nr_out_ptr, "CHAP_N=%s", auth->userid_mutual);
 	*nr_out_len += 1;
-	PRINT("[server] Sending CHAP_N=%s\n", auth->userid_mutual);
+	pr_debug("[server] Sending CHAP_N=%s\n", auth->userid_mutual);
 	/*
 	 * Convert response from binary hex to ascii hext.
 	 */
@@ -431,7 +425,7 @@ static int chap_server_compute_md5(
 	*nr_out_len += sprintf(nr_out_ptr + *nr_out_len, "CHAP_R=0x%s",
 			response);
 	*nr_out_len += 1;
-	PRINT("[server] Sending CHAP_R=0x%s\n", response);
+	pr_debug("[server] Sending CHAP_R=0x%s\n", response);
 	auth_ret = 0;
 out:
 	kfree(challenge);
@@ -455,7 +449,7 @@ static int chap_got_response(
 			return -1;
 		return 0;
 	default:
-		printk(KERN_ERR "Unknown CHAP digest type %d!\n",
+		pr_err("Unknown CHAP digest type %d!\n",
 				chap->digest_type);
 		return -1;
 	}

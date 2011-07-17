@@ -59,32 +59,30 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 	struct fc_exch *ep;
 	struct fc_seq *sp;
 	struct se_cmd *se_cmd;
-	struct se_mem *mem;
-
-	if (!(ft_debug_logging & FT_DEBUG_IO))
-		return;
+	struct scatterlist *sg;
+	int count;
 
 	se_cmd = &cmd->se_cmd;
-	printk(KERN_INFO "%s: cmd %p state %d sess %p seq %p se_cmd %p\n",
+	pr_debug("%s: cmd %p state %d sess %p seq %p se_cmd %p\n",
 		caller, cmd, cmd->state, cmd->sess, cmd->seq, se_cmd);
-	printk(KERN_INFO "%s: cmd %p cdb %p\n",
+	pr_debug("%s: cmd %p cdb %p\n",
 		caller, cmd, cmd->cdb);
-	printk(KERN_INFO "%s: cmd %p lun %d\n", caller, cmd, cmd->lun);
+	pr_debug("%s: cmd %p lun %d\n", caller, cmd, cmd->lun);
 
-	printk(KERN_INFO "%s: cmd %p se_num %u buf %p len %u se_cmd_flags <0x%x>\n",
-	       caller, cmd, se_cmd->t_tasks_se_num,
-	       se_cmd->t_task_buf, se_cmd->data_length, se_cmd->se_cmd_flags);
+	pr_debug("%s: cmd %p data_nents %u len %u se_cmd_flags <0x%x>\n",
+	       caller, cmd, se_cmd->t_data_nents,
+	       se_cmd->data_length, se_cmd->se_cmd_flags);
 
-	list_for_each_entry(mem, &se_cmd->t_mem_list, se_list)
-		printk(KERN_INFO "%s: cmd %p mem %p page %p "
+	for_each_sg(se_cmd->t_data_sg, sg, se_cmd->t_data_nents, count)
+		pr_debug("%s: cmd %p sg %p page %p "
 		       "len 0x%x off 0x%x\n",
-		       caller, cmd, mem,
-		       mem->se_page, mem->se_len, mem->se_off);
+		       caller, cmd, sg,
+		       sg_page(sg), sg->length, sg->offset);
 
 	sp = cmd->seq;
 	if (sp) {
 		ep = fc_seq_exch(sp);
-		printk(KERN_INFO "%s: cmd %p sid %x did %x "
+		pr_debug("%s: cmd %p sid %x did %x "
 			"ox_id %x rx_id %x seq_id %x e_stat %x\n",
 			caller, cmd, ep->sid, ep->did, ep->oxid, ep->rxid,
 			sp->id, ep->esb_stat);
@@ -257,10 +255,9 @@ int ft_write_pending(struct se_cmd *se_cmd)
 		    (fh->fh_r_ctl == FC_RCTL_DD_DATA_DESC)) {
 			if (se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) {
 				/*
-				 * Map se_mem list to scatterlist, so that
-				 * DDP can be setup. DDP setup function require
-				 * scatterlist. se_mem_list is internal to
-				 * TCM/LIO target
+				 * cmd may have been broken up into multiple
+				 * tasks. Link their sgs together so we can
+				 * operate on them all at once.
 				 */
 				transport_do_task_sg_chain(se_cmd);
 				cmd->sg = se_cmd->t_tasks_sg_chained;
@@ -321,7 +318,7 @@ static void ft_recv_seq(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 	case FC_RCTL_DD_SOL_CTL:	/* transfer ready */
 	case FC_RCTL_DD_DATA_DESC:	/* transfer ready */
 	default:
-		printk(KERN_INFO "%s: unhandled frame r_ctl %x\n",
+		pr_debug("%s: unhandled frame r_ctl %x\n",
 		       __func__, fh->fh_r_ctl);
 		fc_frame_free(fp);
 		transport_generic_free_cmd(&cmd->se_cmd, 0, 0);
@@ -346,7 +343,7 @@ static void ft_send_resp_status(struct fc_lport *lport,
 	struct fcp_resp_rsp_info *info;
 
 	fh = fc_frame_header_get(rx_fp);
-	FT_IO_DBG("FCP error response: did %x oxid %x status %x code %x\n",
+	pr_debug("FCP error response: did %x oxid %x status %x code %x\n",
 		  ntoh24(fh->fh_s_id), ntohs(fh->fh_ox_id), status, code);
 	len = sizeof(*fcp);
 	if (status == SAM_STAT_GOOD)
@@ -405,7 +402,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 			 * since "unable to  handle TMR request because failed
 			 * to get to LUN"
 			 */
-			FT_TM_DBG("Failed to get LUN for TMR func %d, "
+			pr_debug("Failed to get LUN for TMR func %d, "
 				"se_cmd %p, unpacked_lun %d\n",
 				tm_func, &cmd->se_cmd, cmd->lun);
 			ft_dump_cmd(cmd, __func__);
@@ -434,15 +431,15 @@ static void ft_send_tm(struct ft_cmd *cmd)
 		 * FCP4r01 indicates having a combination of
 		 * tm_flags set is invalid.
 		 */
-		FT_TM_DBG("invalid FCP tm_flags %x\n", fcp->fc_tm_flags);
+		pr_debug("invalid FCP tm_flags %x\n", fcp->fc_tm_flags);
 		ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
 		return;
 	}
 
-	FT_TM_DBG("alloc tm cmd fn %d\n", tm_func);
+	pr_debug("alloc tm cmd fn %d\n", tm_func);
 	tmr = core_tmr_alloc_req(&cmd->se_cmd, cmd, tm_func);
 	if (!tmr) {
-		FT_TM_DBG("alloc failed\n");
+		pr_debug("alloc failed\n");
 		ft_send_resp_code(cmd, FCP_TMF_FAILED);
 		return;
 	}
@@ -508,7 +505,7 @@ int ft_queue_tm_resp(struct se_cmd *se_cmd)
 		code = FCP_TMF_FAILED;
 		break;
 	}
-	FT_TM_DBG("tmr fn %d resp %d fcp code %d\n",
+	pr_debug("tmr fn %d resp %d fcp code %d\n",
 		  tmr->function, tmr->response, code);
 	ft_send_resp_code(cmd, code);
 	return 0;
@@ -536,7 +533,7 @@ static void ft_recv_cmd(struct ft_sess *sess, struct fc_frame *fp)
 	return;
 
 busy:
-	FT_IO_DBG("cmd or seq allocation failure - sending BUSY\n");
+	pr_debug("cmd or seq allocation failure - sending BUSY\n");
 	ft_send_resp_status(lport, fp, SAM_STAT_BUSY, 0);
 	fc_frame_free(fp);
 	ft_sess_put(sess);		/* undo get from lookup */
@@ -561,7 +558,7 @@ void ft_recv_req(struct ft_sess *sess, struct fc_frame *fp)
 	case FC_RCTL_DD_DATA_DESC:	/* transfer ready */
 	case FC_RCTL_ELS4_REQ:		/* SRR, perhaps */
 	default:
-		printk(KERN_INFO "%s: unhandled frame r_ctl %x\n",
+		pr_debug("%s: unhandled frame r_ctl %x\n",
 		       __func__, fh->fh_r_ctl);
 		fc_frame_free(fp);
 		ft_sess_put(sess);	/* undo get from lookup */
@@ -656,7 +653,7 @@ static void ft_send_cmd(struct ft_cmd *cmd)
 
 	ret = transport_generic_allocate_tasks(se_cmd, cmd->cdb);
 
-	FT_IO_DBG("r_ctl %x alloc task ret %d\n", fh->fh_r_ctl, ret);
+	pr_debug("r_ctl %x alloc task ret %d\n", fh->fh_r_ctl, ret);
 	ft_dump_cmd(cmd, __func__);
 
 	if (ret == -ENOMEM) {
@@ -687,7 +684,7 @@ err:
  */
 static void ft_exec_req(struct ft_cmd *cmd)
 {
-	FT_IO_DBG("cmd state %x\n", cmd->state);
+	pr_debug("cmd state %x\n", cmd->state);
 	switch (cmd->state) {
 	case FC_CMD_ST_NEW:
 		ft_send_cmd(cmd);

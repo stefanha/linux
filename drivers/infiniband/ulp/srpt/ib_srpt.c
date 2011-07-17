@@ -1131,13 +1131,6 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 		transport_do_task_sg_chain(cmd);
 		sg = sg_orig = cmd->t_tasks_sg_chained;
 		sg_cnt = cmd->t_tasks_sg_chained_no;
-	} else if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		/* Use task->t_tasks_sg_bounce for control CDBs. */
-		sg_init_table(&cmd->t_tasks_sg_bounce, 1);
-		sg_set_buf(&cmd->t_tasks_sg_bounce, cmd->t_task_buf,
-			   cmd->data_length);
-		sg = sg_orig = &cmd->t_tasks_sg_bounce;
-		sg_cnt = 1;
 	} else {
 		pr_debug("?? sg == NULL\n");
 		ioctx->mapped_sg_count = 0;

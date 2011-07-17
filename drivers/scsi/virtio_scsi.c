@@ -227,7 +227,7 @@ static int __devinit virtscsi_probe(struct virtio_device *vdev)
 	}
 
 	/* TODO correct these */
-	shost->max_id = 64;
+	shost->max_id = 1;
 	shost->max_lun = 8;
 	shost->max_channel = 0;
 	shost->max_cmd_len = 32;

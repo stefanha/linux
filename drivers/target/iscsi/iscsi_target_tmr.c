@@ -23,7 +23,6 @@
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_seq_pdu_list.h"
 #include "iscsi_target_datain_values.h"
@@ -43,19 +42,19 @@ u8 iscsit_tmr_abort_task(
 	struct iscsi_cmd *ref_cmd;
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 
 	ref_cmd = iscsit_find_cmd_from_itt(conn, hdr->rtt);
 	if (!ref_cmd) {
-		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x on CID:"
+		pr_err("Unable to locate RefTaskTag: 0x%08x on CID:"
 			" %hu.\n", hdr->rtt, conn->cid);
 		return ((hdr->refcmdsn >= conn->sess->exp_cmd_sn) &&
 			(hdr->refcmdsn <= conn->sess->max_cmd_sn)) ?
 			ISCSI_TMF_RSP_COMPLETE : ISCSI_TMF_RSP_NO_TASK;
 	}
 	if (ref_cmd->cmd_sn != hdr->refcmdsn) {
-		printk(KERN_ERR "RefCmdSN 0x%08x does not equal"
+		pr_err("RefCmdSN 0x%08x does not equal"
 			" task's CmdSN 0x%08x. Rejecting ABORT_TASK.\n",
 			hdr->refcmdsn, ref_cmd->cmd_sn);
 		return ISCSI_TMF_RSP_REJECTED;
@@ -84,7 +83,7 @@ int iscsit_tmr_task_warm_reset(
 		(struct iscsi_init_task_mgt_cmnd *) buf;
 #endif
 	if (!na->tmr_warm_reset) {
-		printk(KERN_ERR "TMR Opcode TARGET_WARM_RESET authorization"
+		pr_err("TMR Opcode TARGET_WARM_RESET authorization"
 			" failed for Initiator Node: %s\n",
 			sess->se_sess->se_node_acl->initiatorname);
 		 return -1;
@@ -104,7 +103,7 @@ int iscsit_tmr_task_cold_reset(
 	struct iscsi_node_attrib *na = iscsit_tpg_get_node_attrib(sess);
 
 	if (!na->tmr_cold_reset) {
-		printk(KERN_ERR "TMR Opcode TARGET_COLD_RESET authorization"
+		pr_err("TMR Opcode TARGET_COLD_RESET authorization"
 			" failed for Initiator Node: %s\n",
 			sess->se_sess->se_node_acl->initiatorname);
 		return -1;
@@ -123,27 +122,27 @@ u8 iscsit_tmr_task_reassign(
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_conn_recovery *cr = NULL;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 	int ret;
 
-	TRACE(TRACE_ERL2, "Got TASK_REASSIGN TMR ITT: 0x%08x,"
+	pr_debug("Got TASK_REASSIGN TMR ITT: 0x%08x,"
 		" RefTaskTag: 0x%08x, ExpDataSN: 0x%08x, CID: %hu\n",
 		hdr->itt, hdr->rtt, hdr->exp_datasn, conn->cid);
 
 	if (conn->sess->sess_ops->ErrorRecoveryLevel != 2) {
-		printk(KERN_ERR "TMR TASK_REASSIGN not supported in ERL<2,"
+		pr_err("TMR TASK_REASSIGN not supported in ERL<2,"
 				" ignoring request.\n");
 		return ISCSI_TMF_RSP_NOT_SUPPORTED;
 	}
 
 	ret = iscsit_find_cmd_for_recovery(conn->sess, &ref_cmd, &cr, hdr->rtt);
 	if (ret == -2) {
-		printk(KERN_ERR "Command ITT: 0x%08x is still alligent to CID:"
+		pr_err("Command ITT: 0x%08x is still alligent to CID:"
 			" %hu\n", ref_cmd->init_task_tag, cr->cid);
 		return ISCSI_TMF_RSP_TASK_ALLEGIANT;
 	} else if (ret == -1) {
-		printk(KERN_ERR "Unable to locate RefTaskTag: 0x%08x in"
+		pr_err("Unable to locate RefTaskTag: 0x%08x in"
 			" connection recovery command list.\n", hdr->rtt);
 		return ISCSI_TMF_RSP_NO_TASK;
 	}
@@ -153,7 +152,7 @@ u8 iscsit_tmr_task_reassign(
 	 */
 	if (cr->maxrecvdatasegmentlength !=
 	    conn->conn_ops->MaxRecvDataSegmentLength) {
-		printk(KERN_ERR "Unable to perform connection recovery for"
+		pr_err("Unable to perform connection recovery for"
 			" differing MaxRecvDataSegmentLength, rejecting"
 			" TMR TASK_REASSIGN.\n");
 		return ISCSI_TMF_RSP_REJECTED;
@@ -185,7 +184,7 @@ static void iscsit_task_reassign_remove_cmd(
 	ret = iscsit_remove_cmd_from_connection_recovery(cmd, sess);
 	spin_unlock(&cr->conn_recovery_cmd_lock);
 	if (!ret) {
-		printk(KERN_INFO "iSCSI connection recovery successful for CID:"
+		pr_debug("iSCSI connection recovery successful for CID:"
 			" %hu on SID: %u\n", cr->cid, sess->sid);
 		iscsit_remove_active_connection_recovery_entry(cr, sess);
 	}
@@ -201,7 +200,7 @@ static int iscsit_task_reassign_complete_nop_out(
 	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
-		printk(KERN_ERR "struct iscsi_conn_recovery pointer for ITT: 0x%08x"
+		pr_err("struct iscsi_conn_recovery pointer for ITT: 0x%08x"
 			" is NULL!\n", cmd->init_task_tag);
 		return -1;
 	}
@@ -232,7 +231,7 @@ static int iscsit_task_reassign_complete_write(
 	int no_build_r2ts = 0;
 	u32 length = 0, offset = 0;
 	struct iscsi_conn *conn = cmd->conn;
-	struct se_cmd *se_cmd = SE_CMD(cmd);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	/*
 	 * The Initiator must not send a R2T SNACK with a Begrun less than
 	 * the TMR TASK_REASSIGN's ExpDataSN.
@@ -252,7 +251,7 @@ static int iscsit_task_reassign_complete_write(
 	 */
 	if (cmd->cmd_flags & ICF_GOT_LAST_DATAOUT) {
 		if (!atomic_read(&cmd->transport_sent)) {
-			TRACE(TRACE_ERL2, "WRITE ITT: 0x%08x: t_state: %d"
+			pr_debug("WRITE ITT: 0x%08x: t_state: %d"
 				" never sent to transport\n",
 				cmd->init_task_tag, cmd->se_cmd.t_state);
 			return transport_generic_handle_data(se_cmd);
@@ -302,7 +301,7 @@ static int iscsit_task_reassign_complete_read(
 {
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_datain_req *dr;
-	struct se_cmd *se_cmd = SE_CMD(cmd);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	/*
 	 * The Initiator must not send a Data SNACK with a BegRun less than
 	 * the TMR TASK_REASSIGN's ExpDataSN.
@@ -316,17 +315,17 @@ static int iscsit_task_reassign_complete_read(
 	}
 
 	if (!atomic_read(&cmd->transport_sent)) {
-		printk(KERN_INFO "READ ITT: 0x%08x: t_state: %d never sent to"
+		pr_debug("READ ITT: 0x%08x: t_state: %d never sent to"
 			" transport\n", cmd->init_task_tag,
-			SE_CMD(cmd)->t_state);
+			cmd->se_cmd.t_state);
 		transport_generic_handle_cdb(se_cmd);
 		return 0;
 	}
 
 	if (!atomic_read(&se_cmd->t_transport_complete)) {
-		printk(KERN_ERR "READ ITT: 0x%08x: t_state: %d, never returned"
+		pr_err("READ ITT: 0x%08x: t_state: %d, never returned"
 			" from transport\n", cmd->init_task_tag,
-			SE_CMD(cmd)->t_state);
+			cmd->se_cmd.t_state);
 		return -1;
 	}
 
@@ -370,7 +369,7 @@ static int iscsit_task_reassign_complete_scsi_cmnd(
 	struct iscsi_conn_recovery *cr;
 
 	if (!cmd->cr) {
-		printk(KERN_ERR "struct iscsi_conn_recovery pointer for ITT: 0x%08x"
+		pr_err("struct iscsi_conn_recovery pointer for ITT: 0x%08x"
 			" is NULL!\n", cmd->init_task_tag);
 		return -1;
 	}
@@ -403,7 +402,7 @@ static int iscsit_task_reassign_complete_scsi_cmnd(
 	case DMA_NONE:
 		return iscsit_task_reassign_complete_none(cmd, tmr_req);
 	default:
-		printk(KERN_ERR "Unknown cmd->data_direction: 0x%02x\n",
+		pr_err("Unknown cmd->data_direction: 0x%02x\n",
 				cmd->data_direction);
 		return -1;
 	}
@@ -421,7 +420,7 @@ static int iscsit_task_reassign_complete(
 	int ret = 0;
 
 	if (!se_tmr->ref_cmd) {
-		printk(KERN_ERR "TMR Request is missing a RefCmd struct iscsi_cmd.\n");
+		pr_err("TMR Request is missing a RefCmd struct iscsi_cmd.\n");
 		return -1;
 	}
 	se_cmd = se_tmr->ref_cmd;
@@ -437,7 +436,7 @@ static int iscsit_task_reassign_complete(
 		ret = iscsit_task_reassign_complete_scsi_cmnd(tmr_req, conn);
 		break;
 	default:
-		 printk(KERN_ERR "Illegal iSCSI Opcode 0x%02x during"
+		 pr_err("Illegal iSCSI Opcode 0x%02x during"
 			" command realligence\n", cmd->iscsi_opcode);
 		return -1;
 	}
@@ -445,7 +444,7 @@ static int iscsit_task_reassign_complete(
 	if (ret != 0)
 		return ret;
 
-	TRACE(TRACE_ERL2, "Completed connection realligence for Opcode: 0x%02x,"
+	pr_debug("Completed connection realligence for Opcode: 0x%02x,"
 		" ITT: 0x%08x to CID: %hu.\n", cmd->iscsi_opcode,
 			cmd->init_task_tag, conn->cid);
 
@@ -460,7 +459,7 @@ static int iscsit_task_reassign_complete(
 extern int iscsit_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = SE_CMD(cmd)->se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 
 	if (tmr_req->task_reassign &&
 	   (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))
@@ -734,7 +733,7 @@ drop_unacknowledged_r2ts:
 			continue;
 
 		if (r2t->seq_complete) {
-			printk(KERN_ERR "Initiator is requesting R2Ts from"
+			pr_err("Initiator is requesting R2Ts from"
 				" R2TSN: 0x%08x, but R2TSN: 0x%08x, Offset: %u,"
 				" Length: %u is already complete."
 				"   BAD INITIATOR ERL=2 IMPLEMENTATION!\n",
@@ -808,7 +807,7 @@ int iscsit_check_task_reassign_expdatasn(
 	 */
 	if (ref_cmd->data_direction == DMA_FROM_DEVICE) {
 		if (tmr_req->exp_data_sn > ref_cmd->data_sn) {
-			printk(KERN_ERR "Received ExpDataSN: 0x%08x for READ"
+			pr_err("Received ExpDataSN: 0x%08x for READ"
 				" in TMR TASK_REASSIGN greater than command's"
 				" DataSN: 0x%08x.\n", tmr_req->exp_data_sn,
 				ref_cmd->data_sn);
@@ -816,7 +815,7 @@ int iscsit_check_task_reassign_expdatasn(
 		}
 		if ((ref_cmd->cmd_flags & ICF_GOT_DATACK_SNACK) &&
 		    (tmr_req->exp_data_sn <= ref_cmd->acked_data_sn)) {
-			printk(KERN_ERR "Received ExpDataSN: 0x%08x for READ"
+			pr_err("Received ExpDataSN: 0x%08x for READ"
 				" in TMR TASK_REASSIGN for previously"
 				" acknowledged DataIN: 0x%08x,"
 				" protocol error\n", tmr_req->exp_data_sn,
@@ -834,7 +833,7 @@ int iscsit_check_task_reassign_expdatasn(
 	 */
 	if (ref_cmd->data_direction == DMA_TO_DEVICE) {
 		if (tmr_req->exp_data_sn > ref_cmd->r2t_sn) {
-			printk(KERN_ERR "Received ExpDataSN: 0x%08x for WRITE"
+			pr_err("Received ExpDataSN: 0x%08x for WRITE"
 				" in TMR TASK_REASSIGN greater than command's"
 				" R2TSN: 0x%08x.\n", tmr_req->exp_data_sn,
 					ref_cmd->r2t_sn);
@@ -843,7 +842,7 @@ int iscsit_check_task_reassign_expdatasn(
 		return iscsit_task_reassign_prepare_write(tmr_req, conn);
 	}
 
-	printk(KERN_ERR "Unknown iSCSI data_direction: 0x%02x\n",
+	pr_err("Unknown iSCSI data_direction: 0x%02x\n",
 			ref_cmd->data_direction);
 
 	return -1;

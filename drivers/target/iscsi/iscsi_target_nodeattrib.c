@@ -21,7 +21,6 @@
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_device.h"
 #include "iscsi_target_tpg.h"
@@ -58,19 +57,19 @@ extern int iscsit_na_dataout_timeout(
 	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (dataout_timeout > NA_DATAOUT_TIMEOUT_MAX) {
-		printk(KERN_ERR "Requested DataOut Timeout %u larger than"
+		pr_err("Requested DataOut Timeout %u larger than"
 			" maximum %u\n", dataout_timeout,
 			NA_DATAOUT_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (dataout_timeout < NA_DATAOUT_TIMEOUT_MIX) {
-		printk(KERN_ERR "Requested DataOut Timeout %u smaller than"
+		pr_err("Requested DataOut Timeout %u smaller than"
 			" minimum %u\n", dataout_timeout,
 			NA_DATAOUT_TIMEOUT_MIX);
 		return -EINVAL;
 	}
 
 	a->dataout_timeout = dataout_timeout;
-	TRACE(TRACE_NODEATTRIB, "Set DataOut Timeout to %u for Initiator Node"
+	pr_debug("Set DataOut Timeout to %u for Initiator Node"
 		" %s\n", a->dataout_timeout, iscsit_na_get_initiatorname(acl));
 
 	return 0;
@@ -83,19 +82,19 @@ extern int iscsit_na_dataout_timeout_retries(
 	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (dataout_timeout_retries > NA_DATAOUT_TIMEOUT_RETRIES_MAX) {
-		printk(KERN_ERR "Requested DataOut Timeout Retries %u larger"
+		pr_err("Requested DataOut Timeout Retries %u larger"
 			" than maximum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MAX);
 		return -EINVAL;
 	} else if (dataout_timeout_retries < NA_DATAOUT_TIMEOUT_RETRIES_MIN) {
-		printk(KERN_ERR "Requested DataOut Timeout Retries %u smaller"
+		pr_err("Requested DataOut Timeout Retries %u smaller"
 			" than minimum %u", dataout_timeout_retries,
 				NA_DATAOUT_TIMEOUT_RETRIES_MIN);
 		return -EINVAL;
 	}
 
 	a->dataout_timeout_retries = dataout_timeout_retries;
-	TRACE(TRACE_NODEATTRIB, "Set DataOut Timeout Retries to %u for"
+	pr_debug("Set DataOut Timeout Retries to %u for"
 		" Initiator Node %s\n", a->dataout_timeout_retries,
 		iscsit_na_get_initiatorname(acl));
 
@@ -114,19 +113,19 @@ extern int iscsit_na_nopin_timeout(
 	u32 orig_nopin_timeout = a->nopin_timeout;
 
 	if (nopin_timeout > NA_NOPIN_TIMEOUT_MAX) {
-		printk(KERN_ERR "Requested NopIn Timeout %u larger than maximum"
+		pr_err("Requested NopIn Timeout %u larger than maximum"
 			" %u\n", nopin_timeout, NA_NOPIN_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if ((nopin_timeout < NA_NOPIN_TIMEOUT_MIN) &&
 		   (nopin_timeout != 0)) {
-		printk(KERN_ERR "Requested NopIn Timeout %u smaller than"
+		pr_err("Requested NopIn Timeout %u smaller than"
 			" minimum %u and not 0\n", nopin_timeout,
 			NA_NOPIN_TIMEOUT_MIN);
 		return -EINVAL;
 	}
 
 	a->nopin_timeout = nopin_timeout;
-	TRACE(TRACE_NODEATTRIB, "Set NopIn Timeout to %u for Initiator"
+	pr_debug("Set NopIn Timeout to %u for Initiator"
 		" Node %s\n", a->nopin_timeout,
 		iscsit_na_get_initiatorname(acl));
 	/*
@@ -164,19 +163,19 @@ extern int iscsit_na_nopin_response_timeout(
 	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (nopin_response_timeout > NA_NOPIN_RESPONSE_TIMEOUT_MAX) {
-		printk(KERN_ERR "Requested NopIn Response Timeout %u larger"
+		pr_err("Requested NopIn Response Timeout %u larger"
 			" than maximum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MAX);
 		return -EINVAL;
 	} else if (nopin_response_timeout < NA_NOPIN_RESPONSE_TIMEOUT_MIN) {
-		printk(KERN_ERR "Requested NopIn Response Timeout %u smaller"
+		pr_err("Requested NopIn Response Timeout %u smaller"
 			" than minimum %u\n", nopin_response_timeout,
 				NA_NOPIN_RESPONSE_TIMEOUT_MIN);
 		return -EINVAL;
 	}
 
 	a->nopin_response_timeout = nopin_response_timeout;
-	TRACE(TRACE_NODEATTRIB, "Set NopIn Response Timeout to %u for"
+	pr_debug("Set NopIn Response Timeout to %u for"
 		" Initiator Node %s\n", a->nopin_timeout,
 		iscsit_na_get_initiatorname(acl));
 
@@ -190,13 +189,13 @@ extern int iscsit_na_random_datain_pdu_offsets(
 	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (random_datain_pdu_offsets != 0 && random_datain_pdu_offsets != 1) {
-		printk(KERN_ERR "Requested Random DataIN PDU Offsets: %u not"
+		pr_err("Requested Random DataIN PDU Offsets: %u not"
 			" 0 or 1\n", random_datain_pdu_offsets);
 		return -EINVAL;
 	}
 
 	a->random_datain_pdu_offsets = random_datain_pdu_offsets;
-	TRACE(TRACE_NODEATTRIB, "Set Random DataIN PDU Offsets to %u for"
+	pr_debug("Set Random DataIN PDU Offsets to %u for"
 		" Initiator Node %s\n", a->random_datain_pdu_offsets,
 		iscsit_na_get_initiatorname(acl));
 
@@ -210,13 +209,13 @@ extern int iscsit_na_random_datain_seq_offsets(
 	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (random_datain_seq_offsets != 0 && random_datain_seq_offsets != 1) {
-		printk(KERN_ERR "Requested Random DataIN Sequence Offsets: %u"
+		pr_err("Requested Random DataIN Sequence Offsets: %u"
 			" not 0 or 1\n", random_datain_seq_offsets);
 		return -EINVAL;
 	}
 
 	a->random_datain_seq_offsets = random_datain_seq_offsets;
-	TRACE(TRACE_NODEATTRIB, "Set Random DataIN Sequence Offsets to %u for"
+	pr_debug("Set Random DataIN Sequence Offsets to %u for"
 		" Initiator Node %s\n", a->random_datain_seq_offsets,
 		iscsit_na_get_initiatorname(acl));
 
@@ -230,13 +229,13 @@ extern int iscsit_na_random_r2t_offsets(
 	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (random_r2t_offsets != 0 && random_r2t_offsets != 1) {
-		printk(KERN_ERR "Requested Random R2T Offsets: %u not"
+		pr_err("Requested Random R2T Offsets: %u not"
 			" 0 or 1\n", random_r2t_offsets);
 		return -EINVAL;
 	}
 
 	a->random_r2t_offsets = random_r2t_offsets;
-	TRACE(TRACE_NODEATTRIB, "Set Random R2T Offsets to %u for"
+	pr_debug("Set Random R2T Offsets to %u for"
 		" Initiator Node %s\n", a->random_r2t_offsets,
 		iscsit_na_get_initiatorname(acl));
 
@@ -250,13 +249,13 @@ extern int iscsit_na_default_erl(
 	struct iscsi_node_attrib *a = &acl->node_attrib;
 
 	if (default_erl != 0 && default_erl != 1 && default_erl != 2) {
-		printk(KERN_ERR "Requested default ERL: %u not 0, 1, or 2\n",
+		pr_err("Requested default ERL: %u not 0, 1, or 2\n",
 				default_erl);
 		return -EINVAL;
 	}
 
 	a->default_erl = default_erl;
-	TRACE(TRACE_NODEATTRIB, "Set use ERL0 flag to %u for Initiator"
+	pr_debug("Set use ERL0 flag to %u for Initiator"
 		" Node %s\n", a->default_erl,
 		iscsit_na_get_initiatorname(acl));
 

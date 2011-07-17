@@ -6,11 +6,13 @@ struct tcm_vhost_cmd {
 	/* Descriptor from vhost_get_vq_desc() for virt_queue segment */
 	int tvc_vq_desc;
 	/* The Tag from include/linux/virtio_scsi.h:struct virtio_scsi_cmd_header */
-	u32 tvc_tag;
-	/* The number of scatterlista associated with this cmd */
+	u64 tvc_tag;
+	/* The number of scatterlists associated with this cmd */
 	u32 tvc_sgl_count;
 	/* Pointer to the SGL formatted memory from virtio-scsi */
 	struct scatterlist *tvc_sgl;
+	/* Pointer to response */
+	struct virtio_scsi_footer __user *tvc_footer;
 	/* Pointer to vhost_scsi for our device */
 	struct vhost_scsi *tvc_vhost;
 	 /* The TCM I/O descriptor that is accessed via container_of() */
@@ -19,11 +21,11 @@ struct tcm_vhost_cmd {
 	unsigned char tvc_cdb[TCM_VHOST_MAX_CDB_SIZE];
 	/* Sense buffer that will be mapped into outgoing status */
 	unsigned char tvc_sense_buf[TRANSPORT_SENSE_BUFFER];
+	/* Completed commands list, serviced from vhost worker thread */
+	struct list_head tvc_completion_list;
 };
 
 struct tcm_vhost_nexus {
-	/* Index reference for the vhost_scsi device */
-	u32 tvn_dev_index;
 	/* Pointer to TCM session for I_T Nexus */
 	struct se_session *tvn_se_sess;
 };

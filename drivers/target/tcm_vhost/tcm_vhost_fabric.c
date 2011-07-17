@@ -76,7 +76,7 @@ u8 tcm_vhost_get_fabric_proto_ident(struct se_portal_group *se_tpg)
 	case SCSI_PROTOCOL_ISCSI:
 		return iscsi_get_fabric_proto_ident(se_tpg);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;
 	}
@@ -127,7 +127,7 @@ u32 tcm_vhost_get_pr_transport_id(
 		return iscsi_get_pr_transport_id(se_tpg, se_nacl, pr_reg,
 					format_code, buf);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;	
 	}
@@ -157,7 +157,7 @@ u32 tcm_vhost_get_pr_transport_id_len(
 		return iscsi_get_pr_transport_id_len(se_tpg, se_nacl, pr_reg,
 					format_code);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;
 	}
@@ -187,7 +187,7 @@ char *tcm_vhost_parse_pr_out_transport_id(
 		return iscsi_parse_pr_out_transport_id(se_tpg, buf, out_tid_len,
 					port_nexus_ptr);
 	default:
-		printk(KERN_ERR "Unknown tport_proto_id: 0x%02x, using"
+		pr_err("Unknown tport_proto_id: 0x%02x, using"
 			" SAS emulation\n", tport->tport_proto_id);
 		break;
 	}
@@ -201,8 +201,8 @@ struct se_node_acl *tcm_vhost_alloc_fabric_acl(struct se_portal_group *se_tpg)
 	struct tcm_vhost_nacl *nacl;
 
 	nacl = kzalloc(sizeof(struct tcm_vhost_nacl), GFP_KERNEL);
-	if (!(nacl)) {
-		printk(KERN_ERR "Unable to alocate struct tcm_vhost_nacl\n");
+	if (!nacl) {
+		pr_err("Unable to alocate struct tcm_vhost_nacl\n");
 		return NULL;
 	}
 
@@ -278,10 +278,8 @@ int tcm_vhost_new_cmd_map(struct se_cmd *se_cmd)
 		 */
 		sg_ptr = NULL;
 	}
-	/*
-	 * Map the SG memory into struct se_mem->page linked list using the same
-	 * physical memory at sg->page_link.
-	 */
+
+	/* Tell the core about our preallocated memory */
 	ret = transport_generic_map_mem_to_cmd(se_cmd, sg_ptr,
 				tv_cmd->tvc_sgl_count, sg_bidi_ptr,
 				sg_no_bidi);
@@ -328,6 +326,8 @@ u32 tcm_vhost_sess_get_index(struct se_session *se_sess)
 
 int tcm_vhost_write_pending(struct se_cmd *se_cmd)
 {
+	/* Go ahead and process the write immediately */
+	transport_generic_process_write(se_cmd);
 	return 0;
 }
 
@@ -355,12 +355,7 @@ int tcm_vhost_queue_data_in(struct se_cmd *se_cmd)
 {
 	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
 				struct tcm_vhost_cmd, tvc_se_cmd);
-	struct vhost_scsi *vs = tv_cmd->tvc_vhost;
-	/*
-	 * Signal to vhost that we are done processing this ring descriptor
-	 */
-	vhost_add_used_and_signal(&vs->dev, &vs->cmd_vq, tv_cmd->tvc_vq_desc, 0);
-
+	vhost_scsi_complete_cmd(tv_cmd);
 	return 0;
 }
 
@@ -368,12 +363,7 @@ int tcm_vhost_queue_status(struct se_cmd *se_cmd)
 {
 	struct tcm_vhost_cmd *tv_cmd = container_of(se_cmd,
 				struct tcm_vhost_cmd, tvc_se_cmd);
-	struct vhost_scsi *vs = tv_cmd->tvc_vhost;
-	/*
-	 * Signal to vhost that we are done processing this ring descriptor
-	 */
-	vhost_add_used_and_signal(&vs->dev, &vs->cmd_vq, tv_cmd->tvc_vq_desc, 0);
-
+	vhost_scsi_complete_cmd(tv_cmd);
 	return 0;
 }
 

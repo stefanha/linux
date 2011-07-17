@@ -101,6 +101,8 @@
 #define DA_ENFORCE_PR_ISIDS			1
 #define DA_STATUS_MAX_SECTORS_MIN		16
 #define DA_STATUS_MAX_SECTORS_MAX		8192
+/* By default don't report non-rotating (solid state) medium */
+#define DA_IS_NONROT				0
 
 #define SE_MODE_PAGE_BUF			512
 
@@ -163,6 +165,8 @@ extern void transport_init_se_cmd(struct se_cmd *,
 					struct target_core_fabric_ops *,
 					struct se_session *, u32, int, int,
 					unsigned char *);
+void *transport_kmap_first_data_page(struct se_cmd *cmd);
+void transport_kunmap_first_data_page(struct se_cmd *cmd);
 extern void transport_free_se_cmd(struct se_cmd *);
 extern int transport_generic_allocate_tasks(struct se_cmd *, unsigned char *);
 extern int transport_generic_handle_cdb(struct se_cmd *);
@@ -235,10 +239,6 @@ struct se_subsystem_api {
 	 */
 	int (*cdb_none)(struct se_task *);
 	/*
-	 * For SCF_SCSI_CONTROL_NONSG_IO_CDB
-	 */
-	int (*map_task_non_SG)(struct se_task *);
-	/*
 	 * For SCF_SCSI_DATA_SG_IO_CDB and SCF_SCSI_CONTROL_SG_IO_CDB
 	 */
 	int (*map_task_SG)(struct se_task *);
@@ -292,7 +292,7 @@ struct se_subsystem_api {
 	 * drivers.  Provided out of convenience.
 	 */
 	int (*transport_complete)(struct se_task *task);
-	struct se_task *(*alloc_task)(struct se_cmd *);
+	struct se_task *(*alloc_task)(unsigned char *cdb);
 	/*
 	 * do_task():
 	 */
@@ -341,11 +341,6 @@ struct se_subsystem_api {
 	 * Get the sector_t from a subsystem backstore..
 	 */
 	sector_t (*get_blocks)(struct se_device *);
-	/*
-	 * do_se_mem_map():
-	 */
-	int (*do_se_mem_map)(struct se_task *, struct list_head *, void *,
-				struct se_mem *, struct se_mem **, u32 *, u32 *);
 	/*
 	 * get_sense_buffer():
 	 */

@@ -23,7 +23,6 @@
 #include <target/target_core_base.h>
 #include <target/target_core_transport.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_seq_pdu_list.h"
 #include "iscsi_target_datain_values.h"
@@ -58,7 +57,7 @@ int iscsit_dump_data_payload(
 
 	buf = kzalloc(length, GFP_ATOMIC);
 	if (!buf) {
-		printk(KERN_ERR "Unable to allocate %u bytes for offload"
+		pr_err("Unable to allocate %u bytes for offload"
 				" buffer.\n", length);
 		return -1;
 	}
@@ -153,7 +152,7 @@ static int iscsit_handle_r2t_snack(
 	 */
 	if ((cmd->cmd_flags & ICF_GOT_DATACK_SNACK) &&
 	    (begrun <= cmd->acked_data_sn)) {
-		printk(KERN_ERR "ITT: 0x%08x, R2T SNACK requesting"
+		pr_err("ITT: 0x%08x, R2T SNACK requesting"
 			" retransmission of R2TSN: 0x%08x to 0x%08x but already"
 			" acked to  R2TSN: 0x%08x by TMR TASK_REASSIGN,"
 			" protocol error.\n", cmd->init_task_tag, begrun,
@@ -166,7 +165,7 @@ static int iscsit_handle_r2t_snack(
 
 	if (runlength) {
 		if ((begrun + runlength) > cmd->r2t_sn) {
-			printk(KERN_ERR "Command ITT: 0x%08x received R2T SNACK"
+			pr_err("Command ITT: 0x%08x received R2T SNACK"
 			" with BegRun: 0x%08x, RunLength: 0x%08x, exceeds"
 			" current R2TSN: 0x%08x, protocol error.\n",
 			cmd->init_task_tag, begrun, runlength, cmd->r2t_sn);
@@ -256,7 +255,7 @@ int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 	struct iscsi_seq *first_seq = NULL, *seq = NULL;
 
 	if (!cmd->seq_list) {
-		printk(KERN_ERR "struct iscsi_cmd->seq_list is NULL!\n");
+		pr_err("struct iscsi_cmd->seq_list is NULL!\n");
 		return -1;
 	}
 
@@ -281,7 +280,7 @@ int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 		 */
 		if (!seq->sent) {
 #if 0
-			printk(KERN_ERR "Ignoring non-sent sequence 0x%08x ->"
+			pr_err("Ignoring non-sent sequence 0x%08x ->"
 				" 0x%08x\n\n", seq->first_datasn,
 				seq->last_datasn);
 #endif
@@ -296,7 +295,7 @@ int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 		if ((seq->first_datasn < begrun) &&
 				(seq->last_datasn < begrun)) {
 #if 0
-			printk(KERN_ERR "Pre BegRun sequence 0x%08x ->"
+			pr_err("Pre BegRun sequence 0x%08x ->"
 				" 0x%08x\n", seq->first_datasn,
 				seq->last_datasn);
 #endif
@@ -311,7 +310,7 @@ int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 		if ((seq->first_datasn <= begrun) &&
 				(seq->last_datasn >= begrun)) {
 #if 0
-			printk(KERN_ERR "Found sequence begrun: 0x%08x in"
+			pr_err("Found sequence begrun: 0x%08x in"
 				" 0x%08x -> 0x%08x\n", begrun,
 				seq->first_datasn, seq->last_datasn);
 #endif
@@ -371,7 +370,7 @@ int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 		if ((seq->first_datasn > begrun) ||
 				(seq->last_datasn > begrun)) {
 #if 0
-			printk(KERN_ERR "Post BegRun sequence 0x%08x -> 0x%08x\n",
+			pr_err("Post BegRun sequence 0x%08x -> 0x%08x\n",
 					seq->first_datasn, seq->last_datasn);
 #endif
 			seq->next_burst_len = seq->pdu_send_order = 0;
@@ -382,7 +381,7 @@ int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 	if (!found_seq) {
 		if (!begrun) {
 			if (!first_seq) {
-				printk(KERN_ERR "ITT: 0x%08x, Begrun: 0x%08x"
+				pr_err("ITT: 0x%08x, Begrun: 0x%08x"
 					" but first_seq is NULL\n",
 					cmd->init_task_tag, begrun);
 				return -1;
@@ -392,7 +391,7 @@ int iscsit_create_recovery_datain_values_datasequenceinorder_no(
 			goto done;
 		}
 
-		printk(KERN_ERR "Unable to locate struct iscsi_seq for ITT: 0x%08x,"
+		pr_err("Unable to locate struct iscsi_seq for ITT: 0x%08x,"
 			" BegRun: 0x%08x, RunLength: 0x%08x while"
 			" DataSequenceInOrder=No and DataPDUInOrder=%s.\n",
 				cmd->init_task_tag, begrun, runlength,
@@ -418,7 +417,7 @@ static int iscsit_handle_recovery_datain(
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 
 	if (!atomic_read(&se_cmd->t_transport_complete)) {
-		printk(KERN_ERR "Ignoring ITT: 0x%08x Data SNACK\n",
+		pr_err("Ignoring ITT: 0x%08x Data SNACK\n",
 				cmd->init_task_tag);
 		return 0;
 	}
@@ -429,7 +428,7 @@ static int iscsit_handle_recovery_datain(
 	 */
 	if ((cmd->cmd_flags & ICF_GOT_DATACK_SNACK) &&
 	    (begrun <= cmd->acked_data_sn)) {
-		printk(KERN_ERR "ITT: 0x%08x, Data SNACK requesting"
+		pr_err("ITT: 0x%08x, Data SNACK requesting"
 			" retransmission of DataSN: 0x%08x to 0x%08x but"
 			" already acked to DataSN: 0x%08x by Data ACK SNACK,"
 			" protocol error.\n", cmd->init_task_tag, begrun,
@@ -444,7 +443,7 @@ static int iscsit_handle_recovery_datain(
 	 * Note: (cmd->data_sn - 1) will carry the maximum DataSN sent.
 	 */
 	if ((begrun + runlength) > (cmd->data_sn - 1)) {
-		printk(KERN_ERR "Initiator requesting BegRun: 0x%08x, RunLength"
+		pr_err("Initiator requesting BegRun: 0x%08x, RunLength"
 			": 0x%08x greater than maximum DataSN: 0x%08x.\n",
 				begrun, runlength, (cmd->data_sn - 1));
 		return iscsit_add_reject_from_cmd(ISCSI_REASON_BOOKMARK_INVALID,
@@ -493,7 +492,7 @@ int iscsit_handle_recovery_datain_or_r2t(
 		return iscsit_handle_recovery_datain(cmd, buf, begrun,
 				runlength);
 	default:
-		printk(KERN_ERR "Unknown cmd->data_direction: 0x%02x\n",
+		pr_err("Unknown cmd->data_direction: 0x%02x\n",
 				cmd->data_direction);
 		return -1;
 	}
@@ -514,7 +513,7 @@ int iscsit_handle_status_snack(
 	int found_cmd;
 
 	if (conn->exp_statsn > begrun) {
-		printk(KERN_ERR "Got Status SNACK Begrun: 0x%08x, RunLength:"
+		pr_err("Got Status SNACK Begrun: 0x%08x, RunLength:"
 			" 0x%08x but already got ExpStatSN: 0x%08x on CID:"
 			" %hu.\n", begrun, runlength, conn->exp_statsn,
 			conn->cid);
@@ -536,7 +535,7 @@ int iscsit_handle_status_snack(
 		spin_unlock_bh(&conn->cmd_lock);
 
 		if (!found_cmd) {
-			printk(KERN_ERR "Unable to find StatSN: 0x%08x for"
+			pr_err("Unable to find StatSN: 0x%08x for"
 				" a Status SNACK, assuming this was a"
 				" protactic SNACK for an untransmitted"
 				" StatSN, ignoring.\n", begrun);
@@ -547,7 +546,7 @@ int iscsit_handle_status_snack(
 		spin_lock_bh(&cmd->istate_lock);
 		if (cmd->i_state == ISTATE_SEND_DATAIN) {
 			spin_unlock_bh(&cmd->istate_lock);
-			printk(KERN_ERR "Ignoring Status SNACK for BegRun:"
+			pr_err("Ignoring Status SNACK for BegRun:"
 				" 0x%08x, RunLength: 0x%08x, assuming this was"
 				" a protactic SNACK for an untransmitted"
 				" StatSN\n", begrun, runlength);
@@ -574,13 +573,13 @@ int iscsit_handle_data_ack(
 
 	cmd = iscsit_find_cmd_from_ttt(conn, targ_xfer_tag);
 	if (!cmd) {
-		printk(KERN_ERR "Data ACK SNACK for TTT: 0x%08x is"
+		pr_err("Data ACK SNACK for TTT: 0x%08x is"
 			" invalid.\n", targ_xfer_tag);
 		return -1;
 	}
 
 	if (begrun <= cmd->acked_data_sn) {
-		printk(KERN_ERR "ITT: 0x%08x Data ACK SNACK BegRUN: 0x%08x is"
+		pr_err("ITT: 0x%08x Data ACK SNACK BegRUN: 0x%08x is"
 			" less than the already acked DataSN: 0x%08x.\n",
 			cmd->init_task_tag, begrun, cmd->acked_data_sn);
 		return -1;
@@ -593,7 +592,7 @@ int iscsit_handle_data_ack(
 	cmd->cmd_flags |= ICF_GOT_DATACK_SNACK;
 	cmd->acked_data_sn = (begrun - 1);
 
-	TRACE(TRACE_ISCSI, "Received Data ACK SNACK for ITT: 0x%08x,"
+	pr_debug("Received Data ACK SNACK for ITT: 0x%08x,"
 		" updated acked DataSN to 0x%08x.\n",
 			cmd->init_task_tag, cmd->acked_data_sn);
 
@@ -793,7 +792,7 @@ static struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
 
 	ooo_cmdsn = kmem_cache_zalloc(lio_ooo_cache, GFP_ATOMIC);
 	if (!ooo_cmdsn) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 			" struct iscsi_ooo_cmdsn.\n");
 		return NULL;
 	}
@@ -899,7 +898,7 @@ int iscsit_execute_ooo_cmdsns(struct iscsi_session *sess)
 		cmd->i_state = cmd->deferred_i_state;
 		ooo_count++;
 		sess->exp_cmd_sn++;
-		TRACE(TRACE_CMDSN, "Executing out of order CmdSN: 0x%08x,"
+		pr_debug("Executing out of order CmdSN: 0x%08x,"
 			" incremented ExpCmdSN to 0x%08x.\n",
 			cmd->cmd_sn, sess->exp_cmd_sn);
 
@@ -1028,7 +1027,7 @@ int iscsit_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		}
 		spin_unlock_bh(&cmd->istate_lock);
 
-		return transport_generic_handle_tmr(SE_CMD(cmd));
+		return transport_generic_handle_tmr(&cmd->se_cmd);
 	case ISCSI_OP_LOGOUT:
 		spin_unlock_bh(&cmd->istate_lock);
 		switch (cmd->logout_reason) {
@@ -1042,7 +1041,7 @@ int iscsit_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 			lr = iscsit_logout_removeconnforrecovery(cmd, cmd->conn);
 			break;
 		default:
-			printk(KERN_ERR "Unknown iSCSI Logout Request Code:"
+			pr_err("Unknown iSCSI Logout Request Code:"
 				" 0x%02x\n", cmd->logout_reason);
 			return -1;
 		}
@@ -1050,7 +1049,7 @@ int iscsit_execute_cmd(struct iscsi_cmd *cmd, int ooo)
 		return lr;
 	default:
 		spin_unlock_bh(&cmd->istate_lock);
-		printk(KERN_ERR "Cannot perform out of order execution for"
+		pr_err("Cannot perform out of order execution for"
 		" unknown iSCSI Opcode: 0x%02x\n", cmd->iscsi_opcode);
 		return -1;
 	}
@@ -1131,7 +1130,7 @@ static int iscsit_set_dataout_timeout_values(
 
 	spin_lock_bh(&cmd->r2t_lock);
 	if (list_empty(&cmd->cmd_r2t_list)) {
-		printk(KERN_ERR "cmd->cmd_r2t_list is empty!\n");
+		pr_err("cmd->cmd_r2t_list is empty!\n");
 		spin_unlock_bh(&cmd->r2t_lock);
 		return -1;
 	}
@@ -1146,7 +1145,7 @@ static int iscsit_set_dataout_timeout_values(
 	}
 	spin_unlock_bh(&cmd->r2t_lock);
 
-	printk(KERN_ERR "Unable to locate any incomplete DataOUT"
+	pr_err("Unable to locate any incomplete DataOUT"
 		" sequences for ITT: 0x%08x.\n", cmd->init_task_tag);
 
 	return -1;
@@ -1177,13 +1176,13 @@ static void iscsit_handle_dataout_timeout(unsigned long data)
 	na = iscsit_tpg_get_node_attrib(sess);
 
 	if (!sess->sess_ops->ErrorRecoveryLevel) {
-		TRACE(TRACE_ERL0, "Unable to recover from DataOut timeout while"
+		pr_debug("Unable to recover from DataOut timeout while"
 			" in ERL=0.\n");
 		goto failure;
 	}
 
 	if (++cmd->dataout_timeout_retries == na->dataout_timeout_retries) {
-		TRACE(TRACE_TIMER, "Command ITT: 0x%08x exceeded max retries"
+		pr_debug("Command ITT: 0x%08x exceeded max retries"
 			" for DataOUT timeout %u, closing iSCSI connection.\n",
 			cmd->init_task_tag, na->dataout_timeout_retries);
 		goto failure;
@@ -1216,7 +1215,7 @@ static void iscsit_handle_dataout_timeout(unsigned long data)
 			&r2t_offset, &r2t_length) < 0)
 		goto failure;
 
-	TRACE(TRACE_TIMER, "Command ITT: 0x%08x timed out waiting for"
+	pr_debug("Command ITT: 0x%08x timed out waiting for"
 		" completion of %sDataOUT Sequence Offset: %u, Length: %u\n",
 		cmd->init_task_tag, (cmd->unsolicited_data) ? "Unsolicited " :
 		"", r2t_offset, r2t_length);
@@ -1250,7 +1249,7 @@ void iscsit_mod_dataout_timer(struct iscsi_cmd *cmd)
 
 	mod_timer(&cmd->dataout_timer,
 		(get_jiffies_64() + na->dataout_timeout * HZ));
-	TRACE(TRACE_TIMER, "Updated DataOUT timer for ITT: 0x%08x",
+	pr_debug("Updated DataOUT timer for ITT: 0x%08x",
 			cmd->init_task_tag);
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
 }
@@ -1268,7 +1267,7 @@ void iscsit_start_dataout_timer(
 	if (cmd->dataout_timer_flags & ISCSI_TF_RUNNING)
 		return;
 
-	TRACE(TRACE_TIMER, "Starting DataOUT timer for ITT: 0x%08x on"
+	pr_debug("Starting DataOUT timer for ITT: 0x%08x on"
 		" CID: %hu.\n", cmd->init_task_tag, conn->cid);
 
 	init_timer(&cmd->dataout_timer);
@@ -1294,7 +1293,7 @@ void iscsit_stop_dataout_timer(struct iscsi_cmd *cmd)
 
 	spin_lock_bh(&cmd->dataout_timeout_lock);
 	cmd->dataout_timer_flags &= ~ISCSI_TF_RUNNING;
-	TRACE(TRACE_TIMER, "Stopped DataOUT Timer for ITT: 0x%08x\n",
+	pr_debug("Stopped DataOUT Timer for ITT: 0x%08x\n",
 			cmd->init_task_tag);
 	spin_unlock_bh(&cmd->dataout_timeout_lock);
 }

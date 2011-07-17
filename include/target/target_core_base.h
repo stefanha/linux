@@ -15,6 +15,7 @@
 /* Used by transport_generic_allocate_iovecs() */
 #define TRANSPORT_IOV_DATA_BUFFER		5
 /* Maximum Number of LUNs per Target Portal Group */
+/* Don't raise above 511 or REPORT_LUNS needs to handle >1 page */
 #define TRANSPORT_MAX_LUNS_PER_TPG		256
 /*
  * By default we use 32-byte CDBs in TCM Core and subsystem plugin code.
@@ -109,7 +110,6 @@ enum se_cmd_flags_table {
 	SCF_EMULATED_TASK_SENSE		= 0x00000004,
 	SCF_SCSI_DATA_SG_IO_CDB		= 0x00000008,
 	SCF_SCSI_CONTROL_SG_IO_CDB	= 0x00000010,
-	SCF_SCSI_CONTROL_NONSG_IO_CDB	= 0x00000020,
 	SCF_SCSI_NON_DATA_CDB		= 0x00000040,
 	SCF_SCSI_CDB_EXCEPTION		= 0x00000080,
 	SCF_SCSI_RESERVATION_CONFLICT	= 0x00000100,
@@ -123,7 +123,6 @@ enum se_cmd_flags_table {
 	SCF_ALUA_NON_OPTIMIZED		= 0x00040000,
 	SCF_DELAYED_CMD_FROM_SAM_ATTR	= 0x00080000,
 	SCF_UNUSED			= 0x00100000,
-	SCF_PASSTHROUGH_CONTIG_TO_SG	= 0x00200000,
 	SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC = 0x00400000,
 	SCF_EMULATE_CDB_ASYNC		= 0x01000000,
 	SCF_EMULATE_QUEUE_FULL		= 0x02000000,
@@ -404,7 +403,7 @@ struct se_queue_obj {
 struct se_task {
 	unsigned char	task_sense;
 	struct scatterlist *task_sg;
-	u32		task_sg_num;
+	u32		task_sg_nents;
 	struct scatterlist *task_sg_bidi;
 	u8		task_scsi_status;
 	u8		task_flags;
@@ -480,7 +479,7 @@ struct se_cmd {
 	struct list_head	se_queue_node;
 	struct target_core_fabric_ops *se_tfo;
 	int (*transport_emulate_cdb)(struct se_cmd *);
-	void (*transport_split_cdb)(unsigned long long, u32 *, unsigned char *);
+	void (*transport_split_cdb)(unsigned long long, u32, unsigned char *);
 	void (*transport_wait_for_tasks)(struct se_cmd *, int, int);
 	void (*transport_complete_callback)(struct se_cmd *);
 	int (*transport_qf_callback)(struct se_cmd *);
@@ -491,8 +490,6 @@ struct se_cmd {
 	int			t_tasks_failed;
 	int			t_tasks_fua;
 	bool			t_tasks_bidi;
-	u32			t_tasks_se_num;
-	u32			t_tasks_se_bidi_num;
 	u32			t_tasks_sg_chained_no;
 	atomic_t		t_fe_count;
 	atomic_t		t_se_count;
@@ -516,8 +513,7 @@ struct se_cmd {
 	struct completion	transport_lun_fe_stop_comp;
 	struct completion	transport_lun_stop_comp;
 	struct scatterlist	*t_tasks_sg_chained;
-	struct scatterlist	t_tasks_sg_bounce;
-	void			*t_task_buf;
+
 	/*
 	 * Used for pre-registered fabric SGL passthrough WRITE and READ
 	 * with the special SCF_PASSTHROUGH_CONTIG_TO_SG case for TCM_Loop
@@ -525,9 +521,13 @@ struct se_cmd {
 	 */
 	struct scatterlist	*t_task_pt_sgl;
 	u32			t_task_pt_sgl_num;
-	struct list_head	t_mem_list;
+
+	struct scatterlist	*t_data_sg;
+	unsigned int		t_data_nents;
+	struct scatterlist	*t_bidi_data_sg;
+	unsigned int		t_bidi_data_nents;
+
 	/* Used for BIDI READ */
-	struct list_head	t_mem_bidi_list;
 	struct list_head	t_task_list;
 	u32			t_task_list_num;
 
@@ -661,6 +661,7 @@ struct se_dev_attrib {
 	int		emulate_reservations;
 	int		emulate_alua;
 	int		enforce_pr_isids;
+	int		is_nonrot;
 	u32		hw_block_size;
 	u32		block_size;
 	u32		hw_max_sectors;

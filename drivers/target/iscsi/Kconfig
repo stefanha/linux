@@ -6,12 +6,3 @@ config ISCSI_TARGET
 	help
 	Say M here to enable the ConfigFS enabled Linux-iSCSI.org iSCSI
 	Target Mode Stack.
-
-if ISCSI_TARGET
-
-config ISCSI_TARGET_DEBUG
-	bool "LIO-Target iscsi_debug.h ring buffer messages"
-	help
-	Say Y here to enable the legacy DEBUG_ISCSI macros in iscsi_debug.h
-
-endif

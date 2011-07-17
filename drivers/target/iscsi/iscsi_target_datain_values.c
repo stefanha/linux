@@ -20,7 +20,6 @@
 
 #include <scsi/iscsi_proto.h>
 
-#include "iscsi_target_debug.h"
 #include "iscsi_target_core.h"
 #include "iscsi_target_seq_pdu_list.h"
 #include "iscsi_target_erl1.h"
@@ -34,7 +33,7 @@ struct iscsi_datain_req *iscsit_allocate_datain_req(void)
 
 	dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC);
 	if (!dr) {
-		printk(KERN_ERR "Unable to allocate memory for"
+		pr_err("Unable to allocate memory for"
 				" struct iscsi_datain_req\n");
 		return NULL;
 	}
@@ -76,7 +75,7 @@ struct iscsi_datain_req *iscsit_get_datain_req(struct iscsi_cmd *cmd)
 	struct iscsi_datain_req *dr;
 
 	if (list_empty(&cmd->datain_list)) {
-		printk(KERN_ERR "cmd->datain_list is empty for ITT:"
+		pr_err("cmd->datain_list is empty for ITT:"
 			" 0x%08x\n", cmd->init_task_tag);
 		return NULL;
 	}
@@ -116,7 +115,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_yes_and_yes(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!read_data_left) {
-		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
+		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
@@ -215,7 +214,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_no_and_yes(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!read_data_left) {
-		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
+		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
@@ -336,7 +335,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_yes_and_no(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!read_data_left) {
-		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
+		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return dr;
 	}
@@ -436,7 +435,7 @@ static struct iscsi_datain_req *iscsit_set_datain_values_no_and_no(
 
 	read_data_left = (cmd->data_length - read_data_done);
 	if (!read_data_left) {
-		printk(KERN_ERR "ITT: 0x%08x read_data_left is zero!\n",
+		pr_err("ITT: 0x%08x read_data_left is zero!\n",
 				cmd->init_task_tag);
 		return NULL;
 	}
