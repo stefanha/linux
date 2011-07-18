@@ -390,6 +390,17 @@ u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *se_tpg)
 void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 {
 	barrier();
+	/*
+	 * Handle tcm_qla2xxx_handle_cmd() -> transport_get_lun_for_cmd()
+	 * failure case where cmd->se_cmd.se_dev was not assigned, and
+	 * a call to transport_generic_free_cmd_intr() is not possible..
+	 */
+	if (!cmd->se_cmd.se_dev) {
+		atomic_set(&cmd->cmd_stop_free, 1);
+		transport_generic_free_cmd(&cmd->se_cmd, 0, 0);
+		return;
+	}
+
 	transport_generic_free_cmd_intr(&cmd->se_cmd);
 }
 
