@@ -4240,8 +4240,11 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 			return ret;
 	}
 	/*
-	 * Call transport_new_cmd_obj() to invoke transport_allocate_tasks()
-	 * and perform the memory map to backend subsystem devices.
+	 * Call transport_new_cmd_obj() to invoke transport_allocate_tasks() for
+	 * control or data CDB types, and perform the map to backend subsystem
+	 * code from SGL memory allocated here by transport_generic_get_mem(), or
+	 * via pre-existing SGL memory setup explictly by fabric module code with
+	 * transport_generic_map_mem_to_cmd().
 	 */
 	ret = transport_new_cmd_obj(cmd);
 	if (ret < 0)
