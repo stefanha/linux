@@ -4137,10 +4137,10 @@ static int transport_allocate_data_tasks(
 	list_for_each_entry(task, &cmd->t_task_list, t_list) {
 		if (atomic_read(&task->task_sent))
 			continue;
-		if (!dev->transport->map_task_SG)
+		if (!dev->transport->map_data_SG)
 			continue;
 
-		ret = dev->transport->map_task_SG(task);
+		ret = dev->transport->map_data_SG(task);
 		if (ret < 0)
 			return 0;
 	}
@@ -4183,8 +4183,8 @@ transport_allocate_control_task(struct se_cmd *cmd)
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 
 	if (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB) {
-		if (dev->transport->map_task_SG)
-			ret = dev->transport->map_task_SG(task);
+		if (dev->transport->map_control_SG)
+			ret = dev->transport->map_control_SG(task);
 	} else if (cmd->se_cmd_flags & SCF_SCSI_NON_DATA_CDB) {
 		if (dev->transport->cdb_none)
 			ret = dev->transport->cdb_none(task);
