@@ -780,7 +780,6 @@ static int iscsit_allocate_iovecs(struct iscsi_cmd *cmd)
 static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 {
 	struct scatterlist *sgl;
-	unsigned char *buf;
 	u32 length = cmd->se_cmd.data_length;
 	int nents = DIV_ROUND_UP(length, PAGE_SIZE);
 	int i = 0, ret;
@@ -801,17 +800,9 @@ static int iscsit_alloc_buffs(struct iscsi_cmd *cmd)
 		int buf_size = min_t(int, length, PAGE_SIZE);
 		struct page *page;
 
-		page = alloc_page(GFP_KERNEL);
+		page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 		if (!page)
 			goto page_alloc_failed;
-
-		buf = kmap_atomic(page, KM_IRQ0);
-		if (!buf) {
-			pr_err("kmap_atomic failed\n");
-			goto page_alloc_failed;
-		}
-		memset(buf, 0, buf_size);
-		kunmap_atomic(buf, KM_IRQ0);
 
 		sg_set_page(&sgl[i], page, buf_size, 0);
 

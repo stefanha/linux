@@ -3929,7 +3929,6 @@ transport_generic_get_mem(struct se_cmd *cmd)
 	u32 length = cmd->data_length;
 	unsigned int nents;
 	struct page *page;
-	unsigned char *buf;
 	int i = 0;
 
 	nents = DIV_ROUND_UP(length, PAGE_SIZE);
@@ -3942,17 +3941,9 @@ transport_generic_get_mem(struct se_cmd *cmd)
 
 	while (length) {
 		u32 page_len = min_t(u32, length, PAGE_SIZE);
-		page = alloc_page(GFP_KERNEL);
+		page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 		if (!page)
 			goto out;
-
-		buf = kmap_atomic(page, KM_IRQ0);
-		if (!buf) {
-			pr_err("kmap_atomic failed\n");
-			goto out;
-		}
-		memset(buf, 0, page_len);
-		kunmap_atomic(buf, KM_IRQ0);
 
 		sg_set_page(&cmd->t_data_sg[i], page, page_len, 0);
 		length -= page_len;
