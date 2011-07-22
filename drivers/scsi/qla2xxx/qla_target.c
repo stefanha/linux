@@ -4718,6 +4718,7 @@ static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
 	unsigned long flags;
 	uint32_t be_s_id;
 	uint8_t *s_id = NULL; /* to hide compiler warnings */
+	uint8_t local_s_id[3];
 	int rc, loop_id = -1; /* to hide compiler warnings */
 
 	DEBUG22(qla_printk(KERN_INFO, ha, "qla_tgt_exec_sess_work() processing -> prm %p\n", prm));
@@ -4746,6 +4747,12 @@ static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
 
 			sess = ha->qla2x_tmpl->find_sess_by_s_id(vha,
 					(unsigned char *)&be_s_id);
+			if (!sess) {
+				s_id = local_s_id;
+				s_id[0] = prm->abts.fcp_hdr_le.s_id[2];
+				s_id[1] = prm->abts.fcp_hdr_le.s_id[1];
+				s_id[2] = prm->abts.fcp_hdr_le.s_id[0];
+			}
 			goto after_find;
 		} else
 			loop_id = GET_TARGET_ID(ha, &prm->tm_iocb);
