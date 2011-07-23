@@ -2224,7 +2224,7 @@ void __transport_stop_task_timer(struct se_task *task, unsigned long *flags)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
 
-	if (!task->task_flags & TF_RUNNING)
+	if (!(task->task_flags & TF_RUNNING))
 		return;
 
 	task->task_flags |= TF_STOP;
