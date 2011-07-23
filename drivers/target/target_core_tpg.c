@@ -46,8 +46,6 @@
 #include "target_core_hba.h"
 #include "target_core_stat.h"
 
-extern struct se_device *g_lun0_dev;
-
 static DEFINE_SPINLOCK(tpg_lock);
 static LIST_HEAD(tpg_list);
 

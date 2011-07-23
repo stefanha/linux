@@ -52,8 +52,6 @@ static u32 alua_lu_gps_count;
 static DEFINE_SPINLOCK(lu_gps_lock);
 static LIST_HEAD(lu_gps_list);
 
-struct t10_alua_lu_gp *default_lu_gp;
-
 /*
  * REPORT_TARGET_PORT_GROUPS
  *

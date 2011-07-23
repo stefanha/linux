@@ -56,8 +56,6 @@ static void se_dev_stop(struct se_device *dev);
 
 static struct se_hba *lun0_hba;
 static struct se_subsystem_dev *lun0_su_dev;
-/* not static, needed by tpg.c */
-struct se_device *g_lun0_dev;
 
 int transport_lookup_cmd_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 {
