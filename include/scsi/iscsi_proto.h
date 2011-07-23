@@ -44,30 +44,22 @@
 
 static inline int iscsi_sna_lt(u32 n1, u32 n2)
 {
-	s32 diff = n1 - n2;
-
-	return diff < 0;
+	return (s32)(n1 - n2) < 0;
 }
 
 static inline int iscsi_sna_lte(u32 n1, u32 n2)
 {
-	s32 diff = n1 - n2;
-
-	return diff <= 0;
+	return (s32)(n1 - n2) <= 0;
 }
 
 static inline int iscsi_sna_gt(u32 n1, u32 n2)
 {
-	s32 diff = n1 - n2;
-
-	return diff > 0;
+	return (s32)(n1 - n2) > 0;
 }
 
 static inline int iscsi_sna_gte(u32 n1, u32 n2)
 {
-	s32 diff = n1 - n2;
-
-	return diff >= 0;
+	return (s32)(n1 - n2) >= 0;
 }
 
 /*
