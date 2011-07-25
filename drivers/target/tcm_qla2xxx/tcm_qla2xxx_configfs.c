@@ -390,12 +390,6 @@ static struct se_portal_group *tcm_qla2xxx_make_tpg(
 	}
 	tpg->lport = lport;
 	tpg->lport_tpgt = tpgt;
-	/*
-	 * By default allow READ-ONLY TPG demo-mode access w/ cached dynamic NodeACLs
-	 */
-	QLA_TPG_ATTRIB(tpg)->generate_node_acls = 1;
-	QLA_TPG_ATTRIB(tpg)->demo_mode_write_protect = 1;
-	QLA_TPG_ATTRIB(tpg)->cache_dynamic_acls = 1;
 
 	ret = core_tpg_register(&tcm_qla2xxx_fabric_configfs->tf_ops, wwn,
 				&tpg->se_tpg, (void *)tpg,
