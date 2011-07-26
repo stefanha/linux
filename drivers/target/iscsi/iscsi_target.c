@@ -2416,7 +2416,7 @@ static int iscsit_send_conn_drop_async_message(
 	hdr->flags		= ISCSI_FLAG_CMD_FINAL;
 	cmd->init_task_tag	= 0xFFFFFFFF;
 	cmd->targ_xfer_tag	= 0xFFFFFFFF;
-	put_unaligned_be64(0xffffffffffffffff, &hdr->rsvd4[0]);
+	put_unaligned_be64(0xFFFFFFFFFFFFFFFFULL, &hdr->rsvd4[0]);
 	cmd->stat_sn		= conn->stat_sn++;
 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
 	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
