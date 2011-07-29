@@ -748,6 +748,7 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+	int xmit_type = QLA_TGT_XMIT_STATUS;
 
 	cmd->bufflen = se_cmd->data_length;
 	cmd->sg = NULL;
@@ -756,10 +757,17 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	cmd->dma_data_direction = se_cmd->data_direction;
 	cmd->aborted = atomic_read(&se_cmd->t_transport_aborted);
 
+	if (se_cmd->data_direction == DMA_FROM_DEVICE) {
+		/*
+		 * For FCP_READ with CHECK_CONDITION status, clear cmd->bufflen
+		 * for qla2xxx_xmit_response LLD code
+		 */
+		cmd->bufflen = 0;
+	}
 	/*
 	 * Now queue status response to qla2xxx LLD code and response ring
 	 */
-	return qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
+	return qla2xxx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
 }
 
 int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)

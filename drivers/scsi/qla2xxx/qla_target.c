@@ -2402,10 +2402,17 @@ static void qla24xx_init_ctio_ret_entry(ctio7_status0_entry_t *ctio,
 
 		ctio1 = (ctio7_status1_entry_t *)ctio;
 		if (qla_tgt_need_explicit_conf(prm->tgt->ha, prm->cmd, 1)) {
+			if (prm->cmd->se_cmd.scsi_status != 0) {
+				DEBUG21(qla_printk(KERN_INFO, cmd->vha->hw,
+					"Skipping EXPLICIT_CONFORM and CTIO7_FLAGS_CONFORM_REQ"
+					" for FCP READ w/ non GOOD status\n"));
+				goto skip_explict_conf;
+			}
 			ctio1->flags |= __constant_cpu_to_le16(
 				CTIO7_FLAGS_EXPLICIT_CONFORM |
 				CTIO7_FLAGS_CONFORM_REQ);
 		}
+skip_explict_conf:
 		ctio1->flags &= ~__constant_cpu_to_le16(CTIO7_FLAGS_STATUS_MODE_0);
 		ctio1->flags |= __constant_cpu_to_le16(CTIO7_FLAGS_STATUS_MODE_1);
 		ctio1->scsi_status |= __constant_cpu_to_le16(SS_SENSE_LEN_VALID);
