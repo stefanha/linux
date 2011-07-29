@@ -2104,7 +2104,7 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		DEBUG21(qla_printk(KERN_INFO, ha, "Residual underflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
-			T_TASK(se_cmd)->t_task_cdb[0], cmd->bufflen,
+			se_cmd->t_task_cdb[0], cmd->bufflen,
 			prm->rq_result));
 		prm->rq_result |= SS_RESIDUAL_UNDER;
 	} else if (se_cmd->se_cmd_flags & SCF_OVERFLOW_BIT) {
@@ -2112,7 +2112,7 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		DEBUG21(qla_printk(KERN_INFO, ha, "Residual overflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
-			T_TASK(se_cmd)->t_task_cdb[0], cmd->bufflen,
+			se_cmd->t_task_cdb[0], cmd->bufflen,
 			prm->rq_result));
 		prm->rq_result |= SS_RESIDUAL_OVER;
 		prm->residual = -prm->residual;
@@ -3523,7 +3523,7 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	size_t first_offset = 0, rem_offset = offset, tmp = 0;
 	int i;
 
-	DEBUG24(qla_printk(cmd->vha->hw, "Entering qla_tgt_set_data_offset:"
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "Entering qla_tgt_set_data_offset:"
 		" cmd: %p, cmd->sg: %p, cmd->sg_cnt: %u, direction: %d\n",
 		cmd, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction));
 
@@ -3536,14 +3536,14 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	 * Walk the current cmd->sg list until we locate the new sg_srr_start
 	 */
 	for_each_sg(cmd->sg, sg, cmd->sg_cnt, i) {
-		DEBUG24(qla_printk(cmd->vha->hw, "sg[%d]: %p page: %p,"
+		DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "sg[%d]: %p page: %p,"
 			" length: %d, offset: %d\n", i, sg, sg_page(sg),
 			sg->length, sg->offset));
 
 		if ((sg->length + tmp) > offset) {
 			first_offset = rem_offset;
 			sg_srr_start = sg;
-			DEBUG24(qla_printk(cmd->vha->hw, "Found matching sg[%d],"
+			DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "Found matching sg[%d],"
 				" using %p as sg_srr_start, and using first_offset:"
 				" %lu\n", i, sg, first_offset));
 			break;
@@ -3568,11 +3568,11 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	cmd->bufflen -= offset;
 	cmd->offset += offset;
 
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg: %p\n", cmd->sg));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg_cnt: %u\n", cmd->sg_cnt));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->bufflen: %u\n", cmd->bufflen));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->offset: %u\n", cmd->offset));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg: %p\n", cmd->sg));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg_cnt: %u\n", cmd->sg_cnt));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->bufflen: %u\n", cmd->bufflen));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->offset: %u\n", cmd->offset));
 
 	if (cmd->sg_cnt < 0)
 		BUG();
@@ -3892,7 +3892,7 @@ restart:
 
 		DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p (se_cmd %p, tag %d, op %x), "
 			"sg_cnt=%d, offset=%d", cmd, &cmd->se_cmd,
-			cmd->tag, T_TASK(se_cmd)->t_task_cdb[0], cmd->sg_cnt,
+			cmd->tag, se_cmd->t_task_cdb[0], cmd->sg_cnt,
 			cmd->offset));
 
 		if (IS_FWI2_CAPABLE(ha))
