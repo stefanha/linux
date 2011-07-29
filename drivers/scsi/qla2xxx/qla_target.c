@@ -3635,6 +3635,11 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			dump_stack();
 			goto out_reject;
 		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_IN"
+					" with non GOOD scsi_status\n"));
+			goto out_reject;
+		}
 		cmd->bufflen = se_cmd->data_length;
 
 		if (qla_tgt_has_data(cmd)) {
@@ -3661,6 +3666,11 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			printk(KERN_ERR "Unable to process SRR_IU_DATA_OUT due to"
 				" missing cmd->sg\n");
 			dump_stack();
+			goto out_reject;
+		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_OUT"
+					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
@@ -3728,7 +3738,19 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 		__qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
 		break;
 	case SRR_IU_DATA_IN:
+		if (!cmd->sg || !cmd->sg_cnt) {
+			printk(KERN_ERR "Unable to process SRR_IU_DATA_IN due to"
+				" missing cmd->sg, state: %d\n", cmd->state);
+			dump_stack();
+			goto out_reject;
+		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_IN"
+					" with non GOOD scsi_status\n"));
+			goto out_reject;
+		}
 		cmd->bufflen = se_cmd->data_length;
+
 		if (qla_tgt_has_data(cmd)) {
 			uint32_t offset;
 			int xmit_type;
@@ -3752,6 +3774,11 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 		if (!cmd->sg || !cmd->sg_cnt) {
 			printk(KERN_ERR "Unable to process SRR_IU_DATA_OUT due to"
 					" missing cmd->sg\n");
+			goto out_reject;
+		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_OUT"
+					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
