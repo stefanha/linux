@@ -231,38 +231,31 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 		pr_err("%s: xid 0x%x, f_ctl 0x%x, cmd->sg %p, "
 				"cmd->sg_cnt 0x%x. DDP was setup"
 				" hence not expected to receive frame with "
-				"payload, Frame will be dropped if TSI bit"
-				"in f_ctl is not set\n",
-				__func__, ep->xid, f_ctl, cmd->sg, cmd->sg_cnt);
-	}
-	/*
-	 * If ft_cmd indicated 'ddp_setup', in that case only the last frame
-	 * should come with 'TSI bit being set'. If 'TSI bit is not set and if
-	 * data frame appears here, means error condition. In both the cases
-	 * release the DDP context (ddp_put) and in error case, as well
-	 * initiate error recovery mechanism.
-	 */
-	if (cmd->was_ddp_setup && ep->xid != FC_XID_UNKNOWN) {
+				"payload, Frame will be dropped if "
+				"'Sequence Initiative' bit in f_ctl is "
+				"not set\n", __func__, ep->xid, f_ctl,
+				cmd->sg, cmd->sg_cnt);
 		/*
-		 * If TSI bit set in f_ctl, means last write data frame is
-		 * received successfully where payload is posted directly
-		 * to user buffer and only the last frame's header is posted
-		 * in legacy receive queue
+		 * Invalidate HW DDP context if it was setup for respective
+		 * command. Invalidation of HW DDP context is requited in both
+		 * situation (success and error). 
 		 */
-		if (f_ctl & FC_FC_SEQ_INIT) { /* TSI bit set in FC frame */
-			cmd->write_data_len = lport->tt.ddp_done(lport,
-								ep->xid);
+		ft_invl_hw_context(cmd);
+
+		/*
+		 * If "Sequence Initiative (TSI)" bit set in f_ctl, means last
+		 * write data frame is received successfully where payload is
+		 * posted directly to user buffer and only the last frame's
+		 * header is posted in receive queue.
+		 *
+		 * If "Sequence Initiative (TSI)" bit is not set, means error
+		 * condition w.r.t. DDP, hence drop the packet and let explict
+		 * ABORTS from other end of exchange timer trigger the recovery.
+		 */
+		if (f_ctl & FC_FC_SEQ_INIT)
 			goto last_frame;
-		} else {
-			/*
-			 * Updating the write_data_len may be meaningless at
-			 * this point, but just in case if required in future
-			 * for debugging or any other purpose
-			 */
-			cmd->write_data_len = lport->tt.ddp_done(lport,
-							      ep->xid);
+		else
 			goto drop;
-		}
 	}
 
 	rel_off = ntohl(fh->fh_parm_offset);
@@ -325,4 +318,40 @@ last_frame:
 		transport_generic_handle_data(se_cmd);
 drop:
 	fc_frame_free(fp);
+}
+
+/*
+ * Handle and cleanup any HW specific resources if
+ * received ABORTS, errors, timeouts.
+ */
+void ft_invl_hw_context(struct ft_cmd *cmd)
+{
+	struct fc_seq *seq = cmd->seq;
+	struct fc_exch *ep = NULL;
+	struct fc_lport *lport = NULL;
+
+	BUG_ON(!cmd);
+
+	/* Cleanup the DDP context in HW if DDP was setup */
+	if (cmd->was_ddp_setup && seq) {
+		ep = fc_seq_exch(seq);
+		if (ep) {
+			lport = ep->lp;
+			if (lport && (ep->xid <= lport->lro_xid))
+				/*
+				 * "ddp_done" trigger invalidation of HW
+				 * specific DDP context
+				 */
+				cmd->write_data_len = lport->tt.ddp_done(lport,
+								      ep->xid);
+
+				/*
+				 * Resetting same variable to indicate HW's
+				 * DDP context has been invalidated to avoid
+				 * re_invalidation of same context (context is
+				 * identified using ep->xid)
+				 */
+				cmd->was_ddp_setup = 0;
+		}
+	}
 }
