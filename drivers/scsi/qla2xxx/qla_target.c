@@ -2104,7 +2104,7 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		DEBUG21(qla_printk(KERN_INFO, ha, "Residual underflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
-			T_TASK(se_cmd)->t_task_cdb[0], cmd->bufflen,
+			se_cmd->t_task_cdb[0], cmd->bufflen,
 			prm->rq_result));
 		prm->rq_result |= SS_RESIDUAL_UNDER;
 	} else if (se_cmd->se_cmd_flags & SCF_OVERFLOW_BIT) {
@@ -2112,7 +2112,7 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		DEBUG21(qla_printk(KERN_INFO, ha, "Residual overflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
-			T_TASK(se_cmd)->t_task_cdb[0], cmd->bufflen,
+			se_cmd->t_task_cdb[0], cmd->bufflen,
 			prm->rq_result));
 		prm->rq_result |= SS_RESIDUAL_OVER;
 		prm->residual = -prm->residual;
@@ -2402,10 +2402,17 @@ static void qla24xx_init_ctio_ret_entry(ctio7_status0_entry_t *ctio,
 
 		ctio1 = (ctio7_status1_entry_t *)ctio;
 		if (qla_tgt_need_explicit_conf(prm->tgt->ha, prm->cmd, 1)) {
+			if (prm->cmd->se_cmd.scsi_status != 0) {
+				DEBUG21(qla_printk(KERN_INFO, cmd->vha->hw,
+					"Skipping EXPLICIT_CONFORM and CTIO7_FLAGS_CONFORM_REQ"
+					" for FCP READ w/ non GOOD status\n"));
+				goto skip_explict_conf;
+			}
 			ctio1->flags |= __constant_cpu_to_le16(
 				CTIO7_FLAGS_EXPLICIT_CONFORM |
 				CTIO7_FLAGS_CONFORM_REQ);
 		}
+skip_explict_conf:
 		ctio1->flags &= ~__constant_cpu_to_le16(CTIO7_FLAGS_STATUS_MODE_0);
 		ctio1->flags |= __constant_cpu_to_le16(CTIO7_FLAGS_STATUS_MODE_1);
 		ctio1->scsi_status |= __constant_cpu_to_le16(SS_SENSE_LEN_VALID);
@@ -3523,7 +3530,7 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	size_t first_offset = 0, rem_offset = offset, tmp = 0;
 	int i;
 
-	DEBUG24(qla_printk(cmd->vha->hw, "Entering qla_tgt_set_data_offset:"
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "Entering qla_tgt_set_data_offset:"
 		" cmd: %p, cmd->sg: %p, cmd->sg_cnt: %u, direction: %d\n",
 		cmd, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction));
 
@@ -3536,14 +3543,14 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	 * Walk the current cmd->sg list until we locate the new sg_srr_start
 	 */
 	for_each_sg(cmd->sg, sg, cmd->sg_cnt, i) {
-		DEBUG24(qla_printk(cmd->vha->hw, "sg[%d]: %p page: %p,"
+		DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "sg[%d]: %p page: %p,"
 			" length: %d, offset: %d\n", i, sg, sg_page(sg),
 			sg->length, sg->offset));
 
 		if ((sg->length + tmp) > offset) {
 			first_offset = rem_offset;
 			sg_srr_start = sg;
-			DEBUG24(qla_printk(cmd->vha->hw, "Found matching sg[%d],"
+			DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "Found matching sg[%d],"
 				" using %p as sg_srr_start, and using first_offset:"
 				" %lu\n", i, sg, first_offset));
 			break;
@@ -3568,11 +3575,11 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	cmd->bufflen -= offset;
 	cmd->offset += offset;
 
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg: %p\n", cmd->sg));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg_cnt: %u\n", cmd->sg_cnt));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->bufflen: %u\n", cmd->bufflen));
-	DEBUG24(qla_printk(cmd->vha->hw, "New cmd->offset: %u\n", cmd->offset));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg: %p\n", cmd->sg));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg_cnt: %u\n", cmd->sg_cnt));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->bufflen: %u\n", cmd->bufflen));
+	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->offset: %u\n", cmd->offset));
 
 	if (cmd->sg_cnt < 0)
 		BUG();
@@ -3635,6 +3642,11 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			dump_stack();
 			goto out_reject;
 		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_IN"
+					" with non GOOD scsi_status\n"));
+			goto out_reject;
+		}
 		cmd->bufflen = se_cmd->data_length;
 
 		if (qla_tgt_has_data(cmd)) {
@@ -3661,6 +3673,11 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			printk(KERN_ERR "Unable to process SRR_IU_DATA_OUT due to"
 				" missing cmd->sg\n");
 			dump_stack();
+			goto out_reject;
+		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_OUT"
+					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
@@ -3728,7 +3745,19 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 		__qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
 		break;
 	case SRR_IU_DATA_IN:
+		if (!cmd->sg || !cmd->sg_cnt) {
+			printk(KERN_ERR "Unable to process SRR_IU_DATA_IN due to"
+				" missing cmd->sg, state: %d\n", cmd->state);
+			dump_stack();
+			goto out_reject;
+		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_IN"
+					" with non GOOD scsi_status\n"));
+			goto out_reject;
+		}
 		cmd->bufflen = se_cmd->data_length;
+
 		if (qla_tgt_has_data(cmd)) {
 			uint32_t offset;
 			int xmit_type;
@@ -3752,6 +3781,11 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 		if (!cmd->sg || !cmd->sg_cnt) {
 			printk(KERN_ERR "Unable to process SRR_IU_DATA_OUT due to"
 					" missing cmd->sg\n");
+			goto out_reject;
+		}
+		if (se_cmd->scsi_status != 0) {
+			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_OUT"
+					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
@@ -3892,7 +3926,7 @@ restart:
 
 		DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p (se_cmd %p, tag %d, op %x), "
 			"sg_cnt=%d, offset=%d", cmd, &cmd->se_cmd,
-			cmd->tag, T_TASK(se_cmd)->t_task_cdb[0], cmd->sg_cnt,
+			cmd->tag, se_cmd->t_task_cdb[0], cmd->sg_cnt,
 			cmd->offset));
 
 		if (IS_FWI2_CAPABLE(ha))
