@@ -227,7 +227,7 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 	 * due to DDP (Large Rx offload),
 	 */
 	buf = fc_frame_payload_get(fp, 1);
-	if (cmd->was_ddp_setup && buf) {
+	if (buf)
 		pr_err("%s: xid 0x%x, f_ctl 0x%x, cmd->sg %p, "
 				"cmd->sg_cnt 0x%x. DDP was setup"
 				" hence not expected to receive frame with "
@@ -235,28 +235,27 @@ void ft_recv_write_data(struct ft_cmd *cmd, struct fc_frame *fp)
 				"'Sequence Initiative' bit in f_ctl is "
 				"not set\n", __func__, ep->xid, f_ctl,
 				cmd->sg, cmd->sg_cnt);
-		/*
-		 * Invalidate HW DDP context if it was setup for respective
-		 * command. Invalidation of HW DDP context is requited in both
-		 * situation (success and error). 
-		 */
-		ft_invl_hw_context(cmd);
+	/*
+	 * Invalidate HW DDP context if it was setup for respective
+	 * command. Invalidation of HW DDP context is requited in both
+	 * situation (success and error). 
+	 */
+	ft_invl_hw_context(cmd);
 
-		/*
-		 * If "Sequence Initiative (TSI)" bit set in f_ctl, means last
-		 * write data frame is received successfully where payload is
-		 * posted directly to user buffer and only the last frame's
-		 * header is posted in receive queue.
-		 *
-		 * If "Sequence Initiative (TSI)" bit is not set, means error
-		 * condition w.r.t. DDP, hence drop the packet and let explict
-		 * ABORTS from other end of exchange timer trigger the recovery.
-		 */
-		if (f_ctl & FC_FC_SEQ_INIT)
-			goto last_frame;
-		else
-			goto drop;
-	}
+	/*
+	 * If "Sequence Initiative (TSI)" bit set in f_ctl, means last
+	 * write data frame is received successfully where payload is
+	 * posted directly to user buffer and only the last frame's
+	 * header is posted in receive queue.
+	 *
+	 * If "Sequence Initiative (TSI)" bit is not set, means error
+	 * condition w.r.t. DDP, hence drop the packet and let explict
+	 * ABORTS from other end of exchange timer trigger the recovery.
+	 */
+	if (f_ctl & FC_FC_SEQ_INIT)
+		goto last_frame;
+	else
+		goto drop;
 
 	rel_off = ntohl(fh->fh_parm_offset);
 	frame_len = fr_len(fp);
