@@ -2863,7 +2863,7 @@ static int transport_cmd_get_valid_sectors(struct se_cmd *cmd)
 	return sectors;
 }
 
-static int target_check_write_same_discard(unsigned char *cdb, struct se_device *dev)
+static int target_check_write_same_discard(unsigned char *flags, struct se_device *dev)
 {
 	/*
 	 * Determine if the received WRITE_SAME is used to for direct
@@ -2875,7 +2875,7 @@ static int target_check_write_same_discard(unsigned char *cdb, struct se_device 
 				TRANSPORT_PLUGIN_PHBA_PDEV);
 
 	if (!passthrough) {
-		if ((cdb[1] & 0x04) || (cdb[1] & 0x02)) {
+		if ((flags[0] & 0x04) || (flags[0] & 0x02)) {
 			pr_err("WRITE_SAME PBDATA and LBDATA"
 				" bits not supported for Block Discard"
 				" Emulation\n");
@@ -2885,8 +2885,8 @@ static int target_check_write_same_discard(unsigned char *cdb, struct se_device 
 		 * Currently for the emulated case we only accept
 		 * tpws with the UNMAP=1 bit set.
 		 */
-		if (!(cdb[1] & 0x08)) {
-			pr_err("WRITE_SAME w/o UNMAP bit not "
+		if (!(flags[0] & 0x08)) {
+			pr_err("WRITE_SAME w/o UNMAP bit not"
 				" supported for Block Discard Emulation\n");
 			return -ENOSYS;
 		}
@@ -3115,7 +3115,7 @@ static int transport_generic_cmd_sequencer(
 			cmd->t_task_lba = get_unaligned_be64(&cdb[12]);
 			cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 
-			if (target_check_write_same_discard(cdb, dev) < 0)
+			if (target_check_write_same_discard(&cdb[10], dev) < 0)
 				goto out_invalid_cdb_field;
 
 			break;
@@ -3376,7 +3376,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->t_task_lba = get_unaligned_be64(&cdb[2]);
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 
-		if (target_check_write_same_discard(cdb, dev) < 0)
+		if (target_check_write_same_discard(&cdb[1], dev) < 0)
 			goto out_invalid_cdb_field;
 		break;
 	case WRITE_SAME:
@@ -3397,7 +3397,7 @@ static int transport_generic_cmd_sequencer(
 		 * Follow sbcr26 with WRITE_SAME (10) and check for the existence
 		 * of byte 1 bit 3 UNMAP instead of original reserved field
 		 */
-		if (target_check_write_same_discard(cdb, dev) < 0)
+		if (target_check_write_same_discard(&cdb[1], dev) < 0)
 			goto out_invalid_cdb_field;
 		break;
 	case ALLOW_MEDIUM_REMOVAL:
