@@ -3105,7 +3105,7 @@ static int transport_generic_cmd_sequencer(
 				goto out_unsupported_cdb;
 			
 			if (sectors)
-				size = transport_get_size(sectors, cdb, cmd);
+				size = transport_get_size(1, cdb, cmd);
 			else {
 				pr_err("WSNZ=1, WRITE_SAME w/sectors=0 not"
 				       " supported\n");
@@ -3367,7 +3367,7 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 
 		if (sectors)
-			size = transport_get_size(sectors, cdb, cmd);
+			size = transport_get_size(1, cdb, cmd);
 		else {
 			pr_err("WSNZ=1, WRITE_SAME w/sectors=0 not supported\n");
 			goto out_invalid_cdb_field;
@@ -3385,7 +3385,7 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 
 		if (sectors)
-			size = transport_get_size(sectors, cdb, cmd);
+			size = transport_get_size(1, cdb, cmd);
 		else {
 			pr_err("WSNZ=1, WRITE_SAME w/sectors=0 not supported\n");
 			goto out_invalid_cdb_field;
