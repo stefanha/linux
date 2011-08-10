@@ -3893,9 +3893,7 @@ EXPORT_SYMBOL(transport_generic_map_mem_to_cmd);
 static int transport_new_cmd_obj(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	u32 task_cdbs;
-	u32 rc;
-	int set_counts = 1;
+	int set_counts = 1, rc, task_cdbs;
 
 	/*
 	 * Setup any BIDI READ tasks and memory from
@@ -3913,7 +3911,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			cmd->scsi_sense_reason =
 				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-			return PYX_TRANSPORT_LU_COMM_FAILURE;
+			return -EINVAL;
 		}
 		atomic_inc(&cmd->t_fe_count);
 		atomic_inc(&cmd->t_se_count);
@@ -3932,7 +3930,7 @@ static int transport_new_cmd_obj(struct se_cmd *cmd)
 		cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		cmd->scsi_sense_reason =
 			TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
+		return -EINVAL;
 	}
 
 	if (set_counts) {
@@ -4250,10 +4248,13 @@ static u32 transport_allocate_tasks(
 	struct scatterlist *sgl,
 	unsigned int sgl_nents)
 {
-	if (cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)
+	if (cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) {
+		if (transport_cmd_get_valid_sectors(cmd) < 0)
+			return -EINVAL;
+
 		return transport_allocate_data_tasks(cmd, lba, data_direction,
 						     sgl, sgl_nents);
-	else
+	} else
 		return transport_allocate_control_task(cmd);
 
 }
