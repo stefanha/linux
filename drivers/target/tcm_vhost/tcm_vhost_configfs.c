@@ -636,9 +636,7 @@ static void tcm_vhost_exit(void)
 	vhost_scsi_deregister();
 };
 
-#ifdef MODULE
 MODULE_DESCRIPTION("TCM_VHOST series fabric driver");
 MODULE_LICENSE("GPL");
 module_init(tcm_vhost_init);
 module_exit(tcm_vhost_exit);
-#endif
