@@ -787,6 +787,9 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 		 * For FCP_READ with CHECK_CONDITION status, clear cmd->bufflen
 		 * for qla2xxx_xmit_response LLD code
 		 */
+		se_cmd->se_cmd_flags |= SCF_UNDERFLOW_BIT;
+		se_cmd->residual_count = se_cmd->data_length;
+
 		cmd->bufflen = 0;
 	}
 	/*
