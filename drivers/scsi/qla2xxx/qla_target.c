@@ -1647,14 +1647,9 @@ static int qla_tgt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 	 * If greater than four sg entries then we need to allocate
 	 * the continuation entries
 	 */
-	if (prm->seg_cnt > prm->tgt->datasegs_per_cmd) {
-		prm->req_cnt += (uint16_t)(prm->seg_cnt -
-				prm->tgt->datasegs_per_cmd) /
-				prm->tgt->datasegs_per_cont;
-		if (((uint16_t)(prm->seg_cnt - prm->tgt->datasegs_per_cmd)) %
-		    prm->tgt->datasegs_per_cont)
-			prm->req_cnt++;
-	}
+	if (prm->seg_cnt > prm->tgt->datasegs_per_cmd)
+		prm->req_cnt += DIV_ROUND_UP(prm->seg_cnt - prm->tgt->datasegs_per_cmd,
+					     prm->tgt->datasegs_per_cont);
 
 	DEBUG21(qla_printk(KERN_INFO, prm->cmd->vha->hw, "seg_cnt=%d, req_cnt=%d\n",
 			prm->seg_cnt, prm->req_cnt));
