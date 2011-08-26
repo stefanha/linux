@@ -1727,10 +1727,10 @@ static int qla_tgt_check_reserve_free_req(struct scsi_qla_host *vha, uint32_t re
 	}
 
 	if (unlikely(vha->req->cnt < (req_cnt + 2))) {
-		printk(KERN_INFO "qla_target(%d): There is no room in the "
+		DEBUG21(qla_printk(KERN_INFO, ha, "qla_target(%d): There is no room in the "
 			"request ring: vha->req->ring_index=%d, vha->req->cnt=%d, "
 			"req_cnt=%d\n", vha->vp_idx, vha->req->ring_index,
-			vha->req->cnt, req_cnt);
+			vha->req->cnt, req_cnt));
 		return -EAGAIN;
 	}
 	vha->req->cnt -= req_cnt;
