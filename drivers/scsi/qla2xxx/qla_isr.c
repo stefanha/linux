@@ -1926,7 +1926,7 @@ qla2x00_error_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, sts_entry_t *pkt)
 	struct qla_hw_data *ha = vha->hw;
 	uint32_t handle = LSW(pkt->handle);
 	uint16_t que = MSW(pkt->handle);
-	struct req_que *req = ha->req_q_map[que];
+	struct req_que *req;
 #if defined(QL_DEBUG_LEVEL_2)
 	if (pkt->entry_status & RF_INV_E_ORDER)
 		qla_printk(KERN_ERR, ha, "%s: Invalid Entry Order\n", __func__);
@@ -1942,6 +1942,15 @@ qla2x00_error_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, sts_entry_t *pkt)
 	else
 		qla_printk(KERN_ERR, ha, "%s: UNKNOWN flag error\n", __func__);
 #endif
+
+	if (que >= ha->max_req_queues) {
+		/* Target command with high bits of handle set */
+		qla_printk(KERN_ERR, ha, "%s: error entry, type 0x%0x status 0x%x\n",
+			   __func__, pkt->entry_type, pkt->entry_status);
+		return;
+	}
+
+	req = ha->req_q_map[que];
 
 	/* Validate handle. */
 	if (handle < MAX_OUTSTANDING_COMMANDS)
