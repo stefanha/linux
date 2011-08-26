@@ -2214,7 +2214,7 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 
 	/* Does F/W have an IOCBs for this request */
 	res = qla_tgt_check_reserve_free_req(vha, full_req_cnt);
-	if (unlikely(res != 0) && (xmit_type & QLA_TGT_XMIT_DATA))
+	if (unlikely(res))
 		goto out_unmap_unlock;
 
 	qla2xxx_build_ctio_pkt(&prm, cmd->vha);
@@ -2471,7 +2471,7 @@ static int __qla24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 
         /* Does F/W have an IOCBs for this request */
 	res = qla_tgt_check_reserve_free_req(vha, full_req_cnt);
-	if (unlikely(res != 0) && (xmit_type & QLA_TGT_XMIT_DATA))
+	if (unlikely(res))
 		goto out_unmap_unlock;
 
 	res = qla24xx_build_ctio_pkt(&prm, vha);
