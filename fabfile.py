@@ -17,4 +17,4 @@ def run():
     local('/home/stefanha/qemu/x86_64-softmmu/qemu-system-x86_64 -enable-kvm -m 1024 -nographic -kernel arch/x86/boot/bzImage -initrd tcm_host_initramfs.gz -append console=ttyS0 -drive if=virtio,file=test.img,cache=none', capture=False)
 
 def demo():
-    local('/home/stefanha/qemu/x86_64-softmmu/qemu-system-x86_64 -enable-kvm -m 1024 -nographic -kernel arch/x86/boot/bzImage -initrd virtio_scsi_guest_initramfs.gz -append console=ttyS0 -vhost-scsi id=vhost-scsi0,wwpn=naa.60014059811d880b,tpgt=1 -device virtio-scsi-pci,vhost-scsi=vhost-scsi0,event_idx=off', capture=False)
+    local('/home/stefanha/qemu/x86_64-softmmu/qemu-system-x86_64 -vnc :0 -enable-kvm -m 1024 -nographic -drive if=virtio,file=/home/stefanha/vm/fedora-15.img,cache=none -vhost-scsi id=vhost-scsi0,wwpn=naa.60014059811d880b,tpgt=1 -device virtio-scsi-pci,vhost-scsi=vhost-scsi0,event_idx=off', capture=False)
