@@ -401,6 +401,23 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 		return;
 	}
 
+	if (cmd->tgt->tgt_stop) {
+		pr_warn("tcm_qla2xxx_free_cmd: Detected tgt_stop"
+			" for cmd: %p !!!!!!\n", cmd);
+		complete(&cmd->cmd_free_comp);
+		return;
+	}
+
+	if (cmd->sess->tearing_down) {
+		pr_warn("tcm_qla2xxx_free_cmd: Detected tearing_down"
+			" for cmd: %p !!!!!!\n", cmd);
+		complete(&cmd->cmd_free_comp);
+		return;
+	}
+
+	atomic_set(&cmd->cmd_free, 1);
+	smp_mb__after_atomic_dec();
+
 	transport_generic_free_cmd_intr(&cmd->se_cmd);
 }
 
@@ -432,16 +449,40 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
  */
 void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+	struct qla_tgt_cmd *cmd;
+	struct qla_tgt_sess *sess;
+	unsigned long flags;
 
 	if (se_cmd->se_tmr_req != NULL)
 		return;
+
+	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+	sess = cmd->sess;
+
+	if (!sess)
+		BUG();
 
 	while (atomic_read(&cmd->cmd_stop_free) != 1) {
 		pr_warn("Hit atomic_read(&cmd->cmd_stop_free)=1"
 				" in tcm_qla2xxx_release_cmd\n");
 		cpu_relax();
 	}
+
+
+	spin_lock_irqsave(&sess->sess_cmd_lock, flags);
+	if (cmd->tgt->tgt_stop || sess->tearing_down) {
+		if (atomic_read(&cmd->cmd_free_comp_set) ||
+		    atomic_read(&cmd->cmd_free)) {
+			pr_warn("Detected shutdown, calling complete("
+				"&cmd->cmd_free_comp): cmd: %p\n", cmd);
+			spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
+			complete(&cmd->cmd_free_comp);
+			return;
+		}
+	}
+	if (atomic_read(&cmd->cmd_free))
+		list_del(&cmd->cmd_list);
+	spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
 
 	qla_tgt_free_cmd(cmd);
 }
@@ -599,6 +640,7 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	struct se_session *se_sess;
 	struct se_portal_group *se_tpg;
 	struct qla_tgt_sess *sess;
+	unsigned long flags;
 
 	sess = cmd->sess;
 	if (!sess) {
@@ -619,6 +661,11 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
 			data_length, data_dir,
 			fcp_task_attr, &cmd->sense_buffer[0]);
+
+	spin_lock_irqsave(&sess->sess_cmd_lock, flags);
+	list_add_tail(&cmd->cmd_list, &sess->sess_cmd_list);
+	spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
+
 	/*
 	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
 	 */

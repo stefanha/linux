@@ -876,6 +876,7 @@ struct qla_tgt_sess {
 	unsigned int conf_compl_supported:1;
 	unsigned int deleted:1;
 	unsigned int local:1;
+	unsigned int tearing_down:1;
 
 	struct se_session *se_sess;
 	struct scsi_qla_host *vha;
@@ -887,6 +888,9 @@ struct qla_tgt_sess {
 	unsigned long expires;
 	struct list_head del_list_entry;
 
+	struct list_head sess_cmd_list;
+	spinlock_t sess_cmd_lock;
+
 	uint8_t port_name[WWN_SIZE];
 };
 
@@ -895,6 +899,9 @@ struct qla_tgt_cmd {
 	int state;
 	int locked_rsp;
 	atomic_t cmd_stop_free;
+	atomic_t cmd_free;
+	atomic_t cmd_free_comp_set;
+	struct completion cmd_free_comp;
 	struct se_cmd se_cmd;
 	/* Sense buffer that will be mapped into outgoing status */
 	unsigned char sense_buffer[TRANSPORT_SENSE_BUFFER];
@@ -917,6 +924,7 @@ struct qla_tgt_cmd {
 	uint16_t loop_id;		    /* to save extra sess dereferences */
 	struct qla_tgt *tgt;		    /* to save extra sess dereferences */
 	struct scsi_qla_host *vha;
+	struct list_head cmd_list;
 
 	union {
 		atio7_entry_t atio7;

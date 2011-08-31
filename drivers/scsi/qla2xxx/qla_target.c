@@ -369,6 +369,70 @@ void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *vha, response_t *pkt)
 
 }
 
+static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess)
+{
+	LIST_HEAD(tmp_list);
+	struct qla_tgt_cmd *cmd;
+	struct se_cmd *se_cmd;
+	unsigned long flags;
+	int cmd_free;
+
+	spin_lock_irqsave(&sess->sess_cmd_lock, flags);
+	list_splice_init(&sess->sess_cmd_list, &tmp_list);
+	spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
+
+	while (!list_empty(&tmp_list)) {
+
+		cmd = list_entry(tmp_list.next, struct qla_tgt_cmd, cmd_list);
+		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Waiting for cmd:"
+			" %p\n", cmd));
+
+		if ((atomic_read(&cmd->cmd_free) != 0) ||
+		    (atomic_read(&cmd->cmd_stop_free) != 0))	
+			cmd_free = 1;
+		else {
+			cmd_free = 0;
+			atomic_set(&cmd->cmd_free_comp_set, 1);
+			smp_mb__after_atomic_dec();
+		}
+		list_del(&cmd->cmd_list);
+
+		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Waiting for cmd: %p,"
+				" cmd_free: %d\n", cmd, cmd_free));
+
+		se_cmd = &cmd->se_cmd;
+
+		if (!cmd_free) {
+			if (se_cmd->transport_wait_for_tasks) {
+				DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Before"
+					" se_cmd->transport_wait_for_tasks cmd:"
+					" %p, se_cmd: %p\n", cmd, se_cmd));
+				se_cmd->transport_wait_for_tasks(se_cmd, 0, 0);
+
+				DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
+					" se_cmd->transport_wait_for_tasks ----------->\n"));
+			}
+		}
+		
+		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Before"
+			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
+			" se_cmd: %p\n", cmd, se_cmd));
+		wait_for_completion(&cmd->cmd_free_comp);
+		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
+			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
+			" se_cmd: %p\n", cmd, se_cmd));
+
+		atomic_set(&cmd->cmd_free, 0);
+		smp_mb__after_atomic_dec();
+
+		qla_tgt_free_cmd(cmd);
+
+		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
+			" qla_tgt_free_cmd --------------------->\n"));
+	}
+
+}
+
 
 /* ha->hardware_lock supposed to be held on entry */
 static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
@@ -378,6 +442,12 @@ static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
 	struct qla_hw_data *ha = vha->hw;
 
 	tgt = sess->tgt;
+
+	sess->tearing_down = 1;
+	spin_unlock_irq(&ha->hardware_lock);
+	qla_tgt_wait_for_cmds(sess);
+	spin_lock_irq(&ha->hardware_lock);
+
 	/*
 	 * Release the target session for FC Nexus from fabric module code.
 	 */
@@ -547,10 +617,11 @@ static void qla_tgt_schedule_sess_for_deletion(struct qla_tgt_sess *sess)
 /* ha->hardware_lock supposed to be held on entry */
 static void qla_tgt_clear_tgt_db(struct qla_tgt *tgt, bool local_only)
 {
-	struct qla_tgt_sess *sess, *sess_tmp;
+	struct qla_tgt_sess *sess;
 
-	list_for_each_entry_safe(sess, sess_tmp, &tgt->sess_list,
-					sess_list_entry) {
+	while (!list_empty(&tgt->sess_list)) {
+		sess = list_first_entry(&tgt->sess_list, struct qla_tgt_sess,
+					sess_list_entry);
 		if (local_only) {
 			if (!sess->local)
 				continue;
@@ -860,6 +931,9 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 	sess->loop_id = fcport->loop_id;
 	sess->local = local;
 
+	INIT_LIST_HEAD(&sess->sess_cmd_list);
+	spin_lock_init(&sess->sess_cmd_lock);	
+
 	DEBUG22(qla_printk(KERN_INFO, ha, "Adding sess %p to tgt %p via"
 		" ->check_initiator_node_acl()\n", sess, ha->qla_tgt));
 
@@ -1042,7 +1116,6 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 	mutex_lock(&ha->tgt_mutex);
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	tgt->tgt_stop = 1;
-	qla_tgt_clear_tgt_db(tgt, false);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	mutex_unlock(&ha->tgt_mutex);
 
@@ -1056,6 +1129,12 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 		spin_lock_irqsave(&tgt->sess_work_lock, flags);
 	}
 	spin_unlock_irqrestore(&tgt->sess_work_lock, flags);
+
+	mutex_lock(&ha->tgt_mutex);
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	qla_tgt_clear_tgt_db(tgt, false);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	mutex_unlock(&ha->tgt_mutex);
 
 	DEBUG22(qla_printk(KERN_INFO, ha, "Waiting for tgt %p: list_empty(sess_list)=%d "
 		"sess_count=%d\n", tgt, list_empty(&tgt->sess_list),
@@ -3213,6 +3292,9 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 		return -ENOMEM;
 	}
 
+	INIT_LIST_HEAD(&cmd->cmd_list);
+	init_completion(&cmd->cmd_free_comp);
+
 	memcpy(&cmd->atio.atio2x, atio, sizeof(*atio));
 	cmd->state = QLA_TGT_STATE_NEW;
 	cmd->locked_rsp = 1;
@@ -3241,6 +3323,9 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 			goto out_sched;
 		}
 	}
+
+	if (sess->tearing_down)
+		goto out_free_cmd;
 
 	res = qla_tgt_send_cmd_to_target(vha, cmd, sess);
 	if (unlikely(res != 0))
@@ -4323,10 +4408,15 @@ static void qla24xx_atio_pkt(struct scsi_qla_host *vha, atio7_entry_t *atio)
 				qla24xx_send_term_exchange(vha, NULL, atio, 1);
 #endif
 			} else {
-				printk(KERN_INFO "qla_target(%d): Unable to send "
-				   "command to target, sending BUSY status\n",
-				   vha->vp_idx);
-				qla24xx_send_busy(vha, atio, SAM_STAT_BUSY);
+				if (tgt->tgt_stop) {
+					printk(KERN_INFO "qla_target: Unable to send "
+					"command to target for req, ignoring \n");
+				} else {
+					printk(KERN_INFO "qla_target(%d): Unable to send "
+					   "command to target, sending BUSY status\n",
+					   vha->vp_idx);
+					qla24xx_send_busy(vha, atio, SAM_STAT_BUSY);
+				}
 			}
 		}
 		break;
@@ -4420,10 +4510,17 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 				qla2xxx_send_term_exchange(vha, NULL, atio, 1);
 #endif
 			} else {
-				printk(KERN_INFO "qla_target(%d): Unable to send "
-					"command to target, sending BUSY status\n",
-					vha->vp_idx);
-				qla2xxx_send_busy(vha, atio);
+				if (tgt->tgt_stop) {
+					printk(KERN_INFO "qla_target: Unable to send "
+						"command to target, sending TERM EXCHANGE"
+						" for rsp\n");
+					qla2xxx_send_term_exchange(vha, NULL, atio, 1);
+				} else {
+					printk(KERN_INFO "qla_target(%d): Unable to send "
+						"command to target, sending BUSY status\n",
+						vha->vp_idx);
+					qla2xxx_send_busy(vha, atio);
+				}
 			}
 		}
 	}
