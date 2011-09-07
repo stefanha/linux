@@ -749,6 +749,16 @@ int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
 int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 {
 	/*
+	 * Ensure that the complete FCP WRITE payload has been received.
+	 * Otherwise return an exception via CHECK_CONDITION status.
+	 */
+	if (!cmd->write_data_transferred) {
+		cmd->locked_rsp = 0;		
+
+		return transport_send_check_condition_and_sense(&cmd->se_cmd,
+				TCM_CHECK_CONDITION_ABORT_CMD, 0);
+	}
+	/*
 	 * We now tell TCM to queue this WRITE CDB with TRANSPORT_PROCESS_WRITE
 	 * status to the backstore processing thread.
 	 */
