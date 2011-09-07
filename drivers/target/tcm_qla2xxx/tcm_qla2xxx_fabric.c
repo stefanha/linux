@@ -415,6 +415,11 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 		return;
 	}
 
+	if (!atomic_read(&cmd->se_cmd.t_transport_complete)) {
+		atomic_set(&cmd->cmd_stop_free, 1);
+		smp_mb__after_atomic_dec();
+	}
+
 	atomic_set(&cmd->cmd_free, 1);
 	smp_mb__after_atomic_dec();
 
