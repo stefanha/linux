@@ -1795,7 +1795,7 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	else
 		WARN_ON_ONCE(ret);
 
-	transport_generic_handle_cdb(cmd);
+	transport_handle_cdb_direct(cmd);
 	return 0;
 
 send_sense:
