@@ -88,8 +88,6 @@ static u32 transport_allocate_tasks(struct se_cmd *cmd,
 		enum dma_data_direction data_direction,
 		struct scatterlist *sgl, unsigned int nents);
 static int transport_generic_get_mem(struct se_cmd *cmd);
-static int transport_generic_remove(struct se_cmd *cmd,
-		int session_reinstatement);
 static bool transport_put_cmd(struct se_cmd *cmd);
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd,
 		struct se_queue_obj *qobj);
@@ -603,7 +601,7 @@ void transport_cmd_finish_abort(struct se_cmd *cmd, int remove)
 		return;
 	if (remove) {
 		transport_remove_cmd_from_queue(cmd, &cmd->se_dev->dev_queue_obj);
-		transport_generic_remove(cmd, 0);
+		transport_put_cmd(cmd);
 	}
 }
 
@@ -614,7 +612,7 @@ void transport_cmd_finish_abort_tmr(struct se_cmd *cmd)
 	if (transport_cmd_check_stop_to_fabric(cmd))
 		return;
 
-	transport_generic_remove(cmd, 0);
+	transport_put_cmd(cmd);
 }
 
 static void transport_add_cmd_to_queue(
@@ -2075,7 +2073,7 @@ static void transport_generic_request_timeout(struct se_cmd *cmd)
 	unsigned long flags;
 
 	/*
-	 * Reset cmd->t_se_count to allow transport_generic_remove()
+	 * Reset cmd->t_se_count to allow transport_put_cmd()
 	 * to allow last call to free memory resources.
 	 */
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
@@ -2086,7 +2084,7 @@ static void transport_generic_request_timeout(struct se_cmd *cmd)
 	}
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 
-	transport_generic_remove(cmd, 0);
+	transport_put_cmd(cmd);
 }
 
 static inline u32 transport_lba_21(unsigned char *cdb)
@@ -3775,24 +3773,6 @@ out_busy:
 	return false;
 }
 
-static int
-transport_generic_remove(struct se_cmd *cmd, int session_reinstatement)
-{
-	unsigned long flags;
-
-	if (!transport_put_cmd(cmd)) {
-		if (session_reinstatement) {
-			spin_lock_irqsave(&cmd->t_state_lock, flags);
-			transport_all_task_dev_remove_state(cmd);
-			spin_unlock_irqrestore(&cmd->t_state_lock,
-					flags);
-		}
-		return 1;
-	}
-
-	return 0;
-}
-
 /*
  * transport_generic_map_mem_to_cmd - Use fabric-alloced pages instead of
  * allocating in the core.
@@ -4382,7 +4362,13 @@ void transport_generic_free_cmd(
 
 		transport_free_dev_tasks(cmd);
 
-		transport_generic_remove(cmd, session_reinstatement);
+		if (!transport_put_cmd(cmd) && session_reinstatement) {
+			unsigned long flags;
+
+			spin_lock_irqsave(&cmd->t_state_lock, flags);
+			transport_all_task_dev_remove_state(cmd);
+			spin_unlock_irqrestore(&cmd->t_state_lock, flags);
+		}
 	}
 }
 EXPORT_SYMBOL(transport_generic_free_cmd);
@@ -5069,7 +5055,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 				transport_lun_remove_cmd(cmd);
 
 				if (transport_cmd_check_stop(cmd, 1, 0))
-					transport_generic_remove(cmd, 0);
+					transport_put_cmd(cmd);
 			}
 
 			spin_lock_irqsave(&dev->execute_task_lock, flags);
@@ -5097,7 +5083,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 			transport_lun_remove_cmd(cmd);
 
 			if (transport_cmd_check_stop(cmd, 1, 0))
-				transport_generic_remove(cmd, 0);
+				transport_put_cmd(cmd);
 		}
 
 		spin_lock_irqsave(&dev->execute_task_lock, flags);
@@ -5120,7 +5106,7 @@ static void transport_processing_shutdown(struct se_device *dev)
 		} else {
 			transport_lun_remove_cmd(cmd);
 			if (transport_cmd_check_stop(cmd, 1, 0))
-				transport_generic_remove(cmd, 0);
+				transport_put_cmd(cmd);
 		}
 	}
 }
@@ -5195,7 +5181,7 @@ get_cmd:
 			transport_generic_complete_ok(cmd);
 			break;
 		case TRANSPORT_REMOVE:
-			transport_generic_remove(cmd, 0);
+			transport_put_cmd(cmd);
 			break;
 		case TRANSPORT_FREE_CMD_INTR:
 			transport_generic_free_cmd(cmd, 0, 0);
