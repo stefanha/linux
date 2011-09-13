@@ -1340,7 +1340,7 @@ static void srpt_put_send_ioctx(struct srpt_send_ioctx *ioctx)
 	WARN_ON(srpt_get_cmd_state(ioctx) != SRPT_STATE_DONE);
 
 	srpt_unmap_sg_to_ib_sge(ioctx->ch, ioctx);
-	transport_generic_free_cmd(&ioctx->cmd, 0, 0);
+	transport_generic_free_cmd(&ioctx->cmd, 0);
 
 	if (ioctx->n_rbuf > 1) {
 		kfree(ioctx->rbufs);

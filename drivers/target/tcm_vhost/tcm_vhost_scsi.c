@@ -49,8 +49,8 @@ static void vhost_scsi_free_cmd(struct tcm_vhost_cmd *tv_cmd)
 			put_page(sg_page(&tv_cmd->tvc_sgl[i]));
 	}
 
-	/* TODO what do wait_for_tasks and session_reinstatement do? */
-	transport_generic_free_cmd(se_cmd, 1, 0);
+	/* TODO what does wait_for_tasks do? */
+	transport_generic_free_cmd(se_cmd, 1);
 	kfree(tv_cmd);
 }
 
