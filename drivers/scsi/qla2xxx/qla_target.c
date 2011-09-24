@@ -2477,7 +2477,7 @@ static void qla24xx_init_ctio_ret_entry(ctio7_status0_entry_t *ctio,
 		ctio1 = (ctio7_status1_entry_t *)ctio;
 		if (qla_tgt_need_explicit_conf(prm->tgt->ha, prm->cmd, 1)) {
 			if (prm->cmd->se_cmd.scsi_status != 0) {
-				DEBUG21(qla_printk(KERN_INFO, cmd->vha->hw,
+				DEBUG21(qla_printk(KERN_INFO, prm->cmd->vha->hw,
 					"Skipping EXPLICIT_CONFORM and CTIO7_FLAGS_CONFORM_REQ"
 					" for FCP READ w/ non GOOD status\n"));
 				goto skip_explict_conf;
@@ -3723,7 +3723,7 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_IN"
+			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_IN"
 					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
@@ -3756,7 +3756,7 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_OUT"
+			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_OUT"
 					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
@@ -3832,7 +3832,7 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_IN"
+			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_IN"
 					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
@@ -3864,7 +3864,7 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->ha, "Rejecting SRR_IU_DATA_OUT"
+			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_OUT"
 					" with non GOOD scsi_status\n"));
 			goto out_reject;
 		}
