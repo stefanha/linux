@@ -424,7 +424,7 @@ static void tcm_qla2xxx_drop_tpg(struct se_portal_group *se_tpg)
 	 * Call into qla2x_target.c LLD logic to shutdown the active
 	 * FC Nexuses and disable target mode operation for this qla_hw_data
 	 */
-	if (ha->qla_tgt && !ha->qla_tgt->tgt_stopped)
+	if (ha->qla_tgt && !ha->qla_tgt->tgt_stop)
 		qla_tgt_stop_phase1(ha->qla_tgt);
 
 	core_tpg_deregister(se_tpg);
