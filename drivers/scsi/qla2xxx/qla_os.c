@@ -2276,6 +2276,14 @@ que_init:
 		goto probe_failed;
 	}
 
+	/*
+	 * If we're not coming up in initiator mode, we might sit for
+	 * a while without waking up the dpc thread, which leads to a
+	 * stuck process warning.  So just kick the dpc once here and
+	 * let the kthread start (and go back to sleep in qla2x00_do_dpc).
+	 */
+	qla2xxx_wake_dpc(base_vha);
+
 skip_dpc:
 	list_add_tail(&base_vha->list, &ha->vp_list);
 	base_vha->host->irq = ha->pdev->irq;
@@ -2313,7 +2321,10 @@ skip_dpc:
 	base_vha->flags.init_done = 1;
 	base_vha->flags.online = 1;
 
-	scsi_scan_host(host);
+	if (qla_ini_mode_enabled(base_vha))
+		scsi_scan_host(host);
+	else
+		qla_printk(KERN_INFO, ha, "skipping scsi_scan_host() for non-initiator port\n");
 
 	qla2x00_alloc_sysfs_attr(base_vha);
 

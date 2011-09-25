@@ -44,14 +44,14 @@
 #include "qla_def.h"
 #include "qla_target.h"
 
-static char *qlini_mode = QLA2X_INI_MODE_STR_EXCLUSIVE;
+static char *qlini_mode = QLA2X_INI_MODE_STR_DISABLED;
 module_param(qlini_mode, charp, S_IRUGO);
 MODULE_PARM_DESC(qlini_mode,
 	"Determines when initiator mode will be enabled. Possible values: "
-	"\"exclusive\" (default) - initiator mode will be enabled on load, "
+	"\"exclusive\" - initiator mode will be enabled on load, "
 	"disabled on enabling target mode and then on disabling target mode "
 	"enabled back; "
-	"\"disabled\" - initiator mode will never be enabled; "
+	"\"disabled\" (default) - initiator mode will never be enabled; "
 	"\"enabled\" - initiator mode will always stay enabled.");
 
 static int ql2x_ini_mode = QLA2X_INI_MODE_EXCLUSIVE;
@@ -5476,6 +5476,10 @@ qla_tgt_24xx_config_nvram_stage1(struct scsi_qla_host *vha, struct nvram_24xx *n
 		nv->firmware_options_1 &= __constant_cpu_to_le32(~BIT_9);
 		/* Enable FC tapes support */
 		nv->firmware_options_2 |= __constant_cpu_to_le32(BIT_12);
+		/* Disable Full Login after LIP */
+		nv->host_p &= __constant_cpu_to_le32(~BIT_10);
+		/* Enable target PRLI control */
+		nv->firmware_options_2 |= __constant_cpu_to_le32(BIT_14);
 	} else {
 		if (ha->saved_set) {
 			nv->exchange_count = ha->saved_exchange_count;

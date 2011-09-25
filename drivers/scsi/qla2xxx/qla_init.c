@@ -576,7 +576,10 @@ qla2x00_initialize_adapter(scsi_qla_host_t *vha)
 			return QLA_FUNCTION_FAILED;
 		}
 	}
-	rval = qla2x00_init_rings(vha);
+
+	if (qla_ini_mode_enabled(vha))
+		rval = qla2x00_init_rings(vha);
+
 	ha->flags.chip_reset_done = 1;
 
 	if (rval == QLA_SUCCESS && IS_QLA84XX(ha)) {
@@ -4513,6 +4516,13 @@ qla24xx_nvram_config(scsi_qla_host_t *vha)
 		nv->link_down_timeout = __constant_cpu_to_le16(30);
 
 		rval = 1;
+	}
+
+	if (!qla_ini_mode_enabled(vha)) {
+		/* Don't enable full login after initial LIP */
+		nv->firmware_options_1 &= __constant_cpu_to_le32(~BIT_13);
+		/* Don't enable LIP full login for initiator */
+		nv->host_p &= __constant_cpu_to_le32(~BIT_10);
 	}
 
 	qla_tgt_24xx_config_nvram_stage1(vha, nv);
