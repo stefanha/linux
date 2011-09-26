@@ -397,6 +397,8 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 	 */
 	if (!cmd->se_cmd.se_dev) {
 		atomic_set(&cmd->cmd_stop_free, 1);
+		atomic_set(&cmd->cmd_free, 1);
+		smp_mb__after_atomic_dec();
 		transport_generic_free_cmd(&cmd->se_cmd, 0, 0);
 		return;
 	}
