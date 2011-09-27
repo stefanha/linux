@@ -385,7 +385,7 @@ u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *se_tpg)
 /*
  * Called from qla_target_template->free_cmd(), and will call
  * tcm_qla2xxx_release_cmd via normal struct target_core_fabric_ops
- * release callback.
+ * release callback.  qla_hw_data->hardware_lock is expected to be held
  */
 void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 {
@@ -400,20 +400,6 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 		atomic_set(&cmd->cmd_free, 1);
 		smp_mb__after_atomic_dec();
 		transport_generic_free_cmd(&cmd->se_cmd, 0, 0);
-		return;
-	}
-
-	if (cmd->tgt->tgt_stop) {
-		pr_warn("tcm_qla2xxx_free_cmd: Detected tgt_stop"
-			" for cmd: %p !!!!!!\n", cmd);
-		complete(&cmd->cmd_free_comp);
-		return;
-	}
-
-	if (cmd->sess->tearing_down) {
-		pr_warn("tcm_qla2xxx_free_cmd: Detected tearing_down"
-			" for cmd: %p !!!!!!\n", cmd);
-		complete(&cmd->cmd_free_comp);
 		return;
 	}
 
@@ -435,6 +421,8 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
 	struct qla_tgt_mgmt_cmd *mcmd;
+	struct qla_hw_data *ha;
+	unsigned long flags;
 
 	if (se_cmd->se_tmr_req) {
 		mcmd = container_of(se_cmd, struct qla_tgt_mgmt_cmd, se_cmd);
@@ -446,9 +434,16 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 		qla_tgt_free_mcmd(mcmd);
 		return;
 	}
-
+	ha = cmd->sess->vha->hw;
+	/*
+ 	 * Set cmd_stop_free and wakeup cmd_stop_free_comp if necessary
+ 	 * if tcm_qla2xxx_release_cmd() context is waiting for completion.
+ 	 */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
 	atomic_set(&cmd->cmd_stop_free, 1);
-	barrier();
+	if (atomic_read(&cmd->cmd_free) != 0)
+		complete(&cmd->cmd_stop_free_comp);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
 /*
@@ -458,6 +453,7 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd;
 	struct qla_tgt_sess *sess;
+	struct qla_hw_data *ha;
 	unsigned long flags;
 
 	if (se_cmd->se_tmr_req != NULL)
@@ -469,27 +465,41 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 	if (!sess)
 		BUG();
 
-	while (atomic_read(&cmd->cmd_stop_free) != 1) {
-		pr_warn("Hit atomic_read(&cmd->cmd_stop_free)=1"
-				" in tcm_qla2xxx_release_cmd\n");
-		cpu_relax();
+	ha = sess->vha->hw;
+	/*
+	 * If the callback to tcm_qla2xxx_check_stop_free() has not finished,
+	 * before the release path is invoked, go ahead and wait on
+	 * cmd_stop_free_comp until tcm_qla2xxx_check_stop_free completes.
+	 */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	if ((atomic_read(&cmd->cmd_stop_free) != 1) &&
+	    (atomic_read(&cmd->cmd_free_comp_set) == 0)) {
+		pr_warn("Detected cmd->cmd_stop_free != 0, waiting on"
+			" cmd_stop_free_comp for cmd: %p\n", cmd);
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+		wait_for_completion(&cmd->cmd_stop_free_comp);
+		spin_lock_irqsave(&ha->hardware_lock, flags);
 	}
-
-
-	spin_lock_irqsave(&sess->sess_cmd_lock, flags);
+	/*
+	 * During shutdown, qla_tgt_wait_for_cmds() will be waiting on
+	 * this outstanding qla_tgt_cmd descriptor.  For this case,
+	 * perform the completion and return, and qla_tgt_wait_for_cmds()
+	 * will handle the direct call to qla_tgt_free_cmd()
+	 */
 	if (cmd->tgt->tgt_stop || sess->tearing_down) {
 		if (atomic_read(&cmd->cmd_free_comp_set) ||
 		    atomic_read(&cmd->cmd_free)) {
 			pr_warn("Detected shutdown, calling complete("
 				"&cmd->cmd_free_comp): cmd: %p\n", cmd);
-			spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
+			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 			complete(&cmd->cmd_free_comp);
 			return;
 		}
 	}
-	if (atomic_read(&cmd->cmd_free))
-		list_del(&cmd->cmd_list);
-	spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
+	spin_lock(&sess->sess_cmd_lock);
+	list_del(&cmd->cmd_list);
+	spin_unlock(&sess->sess_cmd_lock);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	qla_tgt_free_cmd(cmd);
 }
@@ -637,7 +647,7 @@ int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
 
 /*
  * Main entry point for incoming ATIO packets from qla_target.c
- * and qla2xxx LLD code.
+ * and qla2xxx LLD code.  Called with qla_hw_data->hardware_lock held
  */
 int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 			uint32_t lun, uint32_t data_length,
@@ -647,7 +657,6 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	struct se_session *se_sess;
 	struct se_portal_group *se_tpg;
 	struct qla_tgt_sess *sess;
-	unsigned long flags;
 
 	sess = cmd->sess;
 	if (!sess) {
@@ -669,9 +678,9 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 			data_length, data_dir,
 			fcp_task_attr, &cmd->sense_buffer[0]);
 
-	spin_lock_irqsave(&sess->sess_cmd_lock, flags);
+	spin_lock(&sess->sess_cmd_lock);
 	list_add_tail(&cmd->cmd_list, &sess->sess_cmd_list);
-	spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
+	spin_unlock(&sess->sess_cmd_lock);
 
 	/*
 	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
