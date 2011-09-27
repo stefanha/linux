@@ -369,55 +369,45 @@ void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *vha, response_t *pkt)
 
 }
 
-static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess)
+/*
+ * Called with qla_hw_data->hardware_lock held.
+ */
+static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess, struct qla_hw_data *ha)
 {
 	LIST_HEAD(tmp_list);
 	struct qla_tgt_cmd *cmd;
 	struct se_cmd *se_cmd;
-	unsigned long flags;
-	int cmd_free;
 
-	spin_lock_irqsave(&sess->sess_cmd_lock, flags);
+	spin_lock(&sess->sess_cmd_lock);
 	list_splice_init(&sess->sess_cmd_list, &tmp_list);
-	spin_unlock_irqrestore(&sess->sess_cmd_lock, flags);
+	spin_unlock(&sess->sess_cmd_lock);
 
 	while (!list_empty(&tmp_list)) {
 
 		cmd = list_entry(tmp_list.next, struct qla_tgt_cmd, cmd_list);
 		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Waiting for cmd:"
 			" %p\n", cmd));
+		/*
+		 * This will signal that completion should be called from
+		 * tcm_qla2xxx_release_cmd() context.
+		 */ 
+		atomic_set(&cmd->cmd_free_comp_set, 1);
+		spin_unlock_irq(&ha->hardware_lock);
 
-		if ((atomic_read(&cmd->cmd_free) != 0) ||
-		    (atomic_read(&cmd->cmd_stop_free) != 0))	
-			cmd_free = 1;
-		else {
-			cmd_free = 0;
-			atomic_set(&cmd->cmd_free_comp_set, 1);
-			smp_mb__after_atomic_dec();
-		}
 		list_del(&cmd->cmd_list);
 
-		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Waiting for cmd: %p,"
-				" cmd_free: %d\n", cmd, cmd_free));
-
 		se_cmd = &cmd->se_cmd;
-
-		if (!cmd_free) {
-			if (se_cmd->transport_wait_for_tasks) {
-				DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Before"
-					" se_cmd->transport_wait_for_tasks cmd:"
-					" %p, se_cmd: %p\n", cmd, se_cmd));
-				se_cmd->transport_wait_for_tasks(se_cmd, 0, 0);
-
-				DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
-					" se_cmd->transport_wait_for_tasks ----------->\n"));
-			}
-		}
-		
+		/*
+		 * Wait for completion of the outstanding descriptor in
+		 * tcm_qla2xxx_release_cmd() from transport processing
+		 * context, then a direct call to qla_tgt_free_cmd() below.
+		 */
 		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Before"
 			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
 			" se_cmd: %p\n", cmd, se_cmd));
+
 		wait_for_completion(&cmd->cmd_free_comp);
+
 		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
 			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
 			" se_cmd: %p\n", cmd, se_cmd));
@@ -429,6 +419,8 @@ static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess)
 
 		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
 			" qla_tgt_free_cmd --------------------->\n"));
+
+		spin_lock_irq(&ha->hardware_lock);
 	}
 
 }
@@ -444,9 +436,7 @@ static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
 	tgt = sess->tgt;
 
 	sess->tearing_down = 1;
-	spin_unlock_irq(&ha->hardware_lock);
-	qla_tgt_wait_for_cmds(sess);
-	spin_lock_irq(&ha->hardware_lock);
+	qla_tgt_wait_for_cmds(sess, ha);
 
 	/*
 	 * Release the target session for FC Nexus from fabric module code.
@@ -3294,6 +3284,7 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 
 	INIT_LIST_HEAD(&cmd->cmd_list);
 	init_completion(&cmd->cmd_free_comp);
+	init_completion(&cmd->cmd_stop_free_comp);
 
 	memcpy(&cmd->atio.atio2x, atio, sizeof(*atio));
 	cmd->state = QLA_TGT_STATE_NEW;
@@ -3324,7 +3315,7 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 		}
 	}
 
-	if (sess->tearing_down)
+	if (sess->tearing_down || tgt->tgt_stop)
 		goto out_free_cmd;
 
 	res = qla_tgt_send_cmd_to_target(vha, cmd, sess);
