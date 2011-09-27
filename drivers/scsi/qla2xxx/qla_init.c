@@ -4256,6 +4256,7 @@ qla2x00_restart_isp(scsi_qla_host_t *vha)
 	struct qla_hw_data *ha = vha->hw;
 	struct req_que *req = ha->req_q_map[0];
 	struct rsp_que *rsp = ha->rsp_q_map[0];
+	unsigned long flags;
 
 	/* If firmware needs to be loaded */
 	if (qla2x00_isp_firmware(vha)) {
@@ -4280,6 +4281,16 @@ qla2x00_restart_isp(scsi_qla_host_t *vha)
 			qla2x00_marker(vha, req, rsp, 0, 0, MK_SYNC_ALL);
 
 			vha->flags.online = 1;
+
+			/*
+			 * Process any ATIO queue entries that came in
+			 * while we weren't online.
+			 */
+			spin_lock_irqsave(&ha->hardware_lock, flags);
+			if (qla_tgt_mode_enabled(vha))
+				qla_tgt_24xx_process_atio_queue(vha);
+			spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
 			/* Wait at most MAX_TARGET RSCNs for a stable link. */
 			wait_time = 256;
 			do {
