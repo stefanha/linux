@@ -378,9 +378,7 @@ static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess, struct qla_hw_data 
 	struct qla_tgt_cmd *cmd;
 	struct se_cmd *se_cmd;
 
-	spin_lock(&sess->sess_cmd_lock);
 	list_splice_init(&sess->sess_cmd_list, &tmp_list);
-	spin_unlock(&sess->sess_cmd_lock);
 
 	while (!list_empty(&tmp_list)) {
 
@@ -922,7 +920,6 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 	sess->local = local;
 
 	INIT_LIST_HEAD(&sess->sess_cmd_list);
-	spin_lock_init(&sess->sess_cmd_lock);	
 
 	DEBUG22(qla_printk(KERN_INFO, ha, "Adding sess %p to tgt %p via"
 		" ->check_initiator_node_acl()\n", sess, ha->qla_tgt));

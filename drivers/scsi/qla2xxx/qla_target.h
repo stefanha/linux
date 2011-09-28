@@ -887,9 +887,8 @@ struct qla_tgt_sess {
 	struct list_head sess_list_entry;
 	unsigned long expires;
 	struct list_head del_list_entry;
-
-	struct list_head sess_cmd_list;
-	spinlock_t sess_cmd_lock;
+	
+	struct list_head sess_cmd_list; /* Protected by qla_hw_data->hardware_lock */
 
 	uint8_t port_name[WWN_SIZE];
 };

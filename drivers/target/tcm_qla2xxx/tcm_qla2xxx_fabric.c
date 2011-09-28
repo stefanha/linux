@@ -496,9 +496,7 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 			return;
 		}
 	}
-	spin_lock(&sess->sess_cmd_lock);
 	list_del(&cmd->cmd_list);
-	spin_unlock(&sess->sess_cmd_lock);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	qla_tgt_free_cmd(cmd);
@@ -677,11 +675,10 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
 			data_length, data_dir,
 			fcp_task_attr, &cmd->sense_buffer[0]);
-
-	spin_lock(&sess->sess_cmd_lock);
+	/*
+ 	 * Protected by qla_hw_data->hardware_lock
+ 	 */
 	list_add_tail(&cmd->cmd_list, &sess->sess_cmd_list);
-	spin_unlock(&sess->sess_cmd_lock);
-
 	/*
 	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
 	 */
