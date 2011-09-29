@@ -2118,6 +2118,8 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 
 	if (unlikely(cmd->aborted)) {
+		int unlocked_term = (cmd->locked_rsp == 0);
+
 		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): terminating exchange "
 			"for aborted cmd=%p (se_cmd=%p, tag=%d)",
 			vha->vp_idx, cmd, se_cmd, cmd->tag));
@@ -2125,9 +2127,11 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		cmd->state = QLA_TGT_STATE_ABORTED;
 
 		if (IS_FWI2_CAPABLE(ha))
-			qla24xx_send_term_exchange(vha, cmd, &cmd->atio.atio7, 0);
+			qla24xx_send_term_exchange(vha, cmd, &cmd->atio.atio7,
+						unlocked_term);
 		else
-			qla2xxx_send_term_exchange(vha, cmd, &cmd->atio.atio2x, 0);
+			qla2xxx_send_term_exchange(vha, cmd, &cmd->atio.atio2x,
+						unlocked_term);
 		/* !! At this point cmd could be already freed !! */
 		return QLA_TGT_PRE_XMIT_RESP_CMD_ABORTED;
 	}
