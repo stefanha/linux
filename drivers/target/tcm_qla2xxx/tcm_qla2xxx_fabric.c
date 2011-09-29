@@ -447,6 +447,33 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 }
 
 /*
+ * Called with qla_hw_data->hardware_lock held..
+ */
+static int tcm_qla2xxx_release_shutdown_check(
+	struct qla_tgt_cmd *cmd,
+	struct qla_tgt_sess *sess)
+{
+	/*
+	 * During shutdown, qla_tgt_wait_for_cmds() will be waiting on
+	 * this outstanding qla_tgt_cmd descriptor.  For this case,
+	 * perform the completion and return, and qla_tgt_wait_for_cmds()
+	 * will handle the direct call to qla_tgt_free_cmd()
+	 */
+	if (cmd->tgt->tgt_stop || sess->tearing_down) {
+		if (atomic_read(&cmd->cmd_free_comp_set) ||
+		    atomic_read(&cmd->cmd_free)) {
+			pr_warn("Detected shutdown, calling complete("
+				"&cmd->cmd_free_comp): cmd: %p\n", cmd);
+			complete(&cmd->cmd_free_comp);
+			return 1;
+		}
+	}
+	list_del(&cmd->cmd_list);
+
+	return 0;
+}
+
+/*
  * Callback from TCM Core to release underlying fabric descriptor
  */
 void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
@@ -455,6 +482,7 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 	struct qla_tgt_sess *sess;
 	struct qla_hw_data *ha;
 	unsigned long flags;
+	int ret;
 
 	if (se_cmd->se_tmr_req != NULL)
 		return;
@@ -466,6 +494,16 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 		BUG();
 
 	ha = sess->vha->hw;
+	/*
+	 * Check if qla_hw_data->hardware_lock is already held from an
+	 * exception path..  This also skips the possible wait for
+	 * completion on cmd_stop_free_comp below..
+	 */
+	if (!cmd->locked_rsp) {
+		if (!tcm_qla2xxx_release_shutdown_check(cmd, sess))
+			qla_tgt_free_cmd(cmd);	
+		return;
+	}
 	/*
 	 * If the callback to tcm_qla2xxx_check_stop_free() has not finished,
 	 * before the release path is invoked, go ahead and wait on
@@ -480,26 +518,11 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 		wait_for_completion(&cmd->cmd_stop_free_comp);
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 	}
-	/*
-	 * During shutdown, qla_tgt_wait_for_cmds() will be waiting on
-	 * this outstanding qla_tgt_cmd descriptor.  For this case,
-	 * perform the completion and return, and qla_tgt_wait_for_cmds()
-	 * will handle the direct call to qla_tgt_free_cmd()
-	 */
-	if (cmd->tgt->tgt_stop || sess->tearing_down) {
-		if (atomic_read(&cmd->cmd_free_comp_set) ||
-		    atomic_read(&cmd->cmd_free)) {
-			pr_warn("Detected shutdown, calling complete("
-				"&cmd->cmd_free_comp): cmd: %p\n", cmd);
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			complete(&cmd->cmd_free_comp);
-			return;
-		}
-	}
-	list_del(&cmd->cmd_list);
+	ret = tcm_qla2xxx_release_shutdown_check(cmd, sess);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-	qla_tgt_free_cmd(cmd);
+	if (!ret)
+		qla_tgt_free_cmd(cmd);
 }
 
 int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
