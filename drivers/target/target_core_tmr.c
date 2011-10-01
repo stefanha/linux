@@ -224,7 +224,14 @@ static void core_tmr_drain_task_list(
 
 		list_move_tail(&task->t_state_list, &drain_task_list);
 		atomic_set(&task->task_state_active, 0);
-		atomic_set(&task->task_execute_queue, 0);
+		/*
+		 * Remove from task execute list before processing drain_task_list
+		 */
+		if (atomic_read(&task->task_execute_queue) != 0) {
+			list_del(&task->t_execute_list);
+			atomic_set(&task->task_execute_queue, 0);
+			atomic_dec(&dev->execute_tasks);
+		}
 	}
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 
