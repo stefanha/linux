@@ -646,6 +646,19 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 
 int tcm_qla2xxx_write_pending_status(struct se_cmd *se_cmd)
 {
+	unsigned long flags;
+	/*
+	 * Check for WRITE_PENDING status to determine if we need to wait for
+	 * CTIO aborts to be posted via hardware in tcm_qla2xxx_handle_data().
+	 */
+	spin_lock_irqsave(&se_cmd->t_state_lock, flags);
+	if (se_cmd->t_state == TRANSPORT_WRITE_PENDING) {
+		spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
+		wait_for_completion_timeout(&se_cmd->t_transport_stop_comp, 3000);
+		return 0;
+	}
+	spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
+
 	return 0;
 }
 
@@ -779,11 +792,25 @@ int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
  */
 int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 {
+	struct se_cmd *se_cmd = &cmd->se_cmd;
+	unsigned long flags;
 	/*
 	 * Ensure that the complete FCP WRITE payload has been received.
 	 * Otherwise return an exception via CHECK_CONDITION status.
 	 */
 	if (!cmd->write_data_transferred) {
+		/*
+		 * Check if se_cmd has already been aborted via LUN_RESET, and is
+		 * waiting upon completion in tcm_qla2xxx_write_pending_status()..
+		 */
+		spin_lock_irqsave(&se_cmd->t_state_lock, flags);
+		if (atomic_read(&se_cmd->t_transport_aborted)) {
+			spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
+			complete(&se_cmd->t_transport_stop_comp);
+			return 0;
+		}
+		spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
+
 		cmd->locked_rsp = 0;		
 
 		return transport_send_check_condition_and_sense(&cmd->se_cmd,
