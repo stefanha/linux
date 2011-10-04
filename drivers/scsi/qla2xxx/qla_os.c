@@ -878,13 +878,13 @@ qla2xxx_abort_fcport_cmds(fc_port_t *fcport)
 
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 		if (ha->isp_ops->abort_command(sp)) {
-			DEBUG2(qla_printk(KERN_WARNING, ha,
-				"Abort failed --  %lx\n", sp->cmd->serial_number));
+			ql_dbg(ql_dbg_taskm, vha, 0x8010,
+				"Abort failed --  %lx\n", sp->cmd->serial_number);
 		} else {
 			if (qla2x00_eh_wait_on_command(sp->cmd) != QLA_SUCCESS)
-				DEBUG2(qla_printk(KERN_WARNING, ha,
+				ql_dbg(ql_dbg_taskm, vha, 0x8011,
 					"Abort failed while waiting --  %lx\n",
-					sp->cmd->serial_number));
+					sp->cmd->serial_number);
 		}
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 	}

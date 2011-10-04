@@ -25,6 +25,11 @@
  * | ISP82XX Specific             |       0xb04f       |    		|
  * | MultiQ                       |       0xc00b       |		|
  * | Misc                         |       0xd00b       |		|
+ * | Target Mode		  |	  0xe037       |		|
+ * | Target Mode Management	  |	  0xe14e       |		|
+ * | Target Mode SCSI Packets	  |	  0xe20b       |		|
+ * | Target Mode Scatterlists	  |	  0xe30c       |		|
+ * | Target Mode Task Management  |	  0xe409       |		|
  * ----------------------------------------------------------------------
  */
 

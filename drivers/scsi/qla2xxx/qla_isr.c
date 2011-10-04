@@ -1353,9 +1353,6 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 	while (rsp->ring_ptr->signature != RESPONSE_PROCESSED) {
 		pkt = (sts_entry_t *)rsp->ring_ptr;
 
-		DEBUG5(printk(KERN_INFO "%s(): IOCB data:\n", __func__));
-		DEBUG5(qla2x00_dump_buffer((uint8_t *)pkt, RESPONSE_ENTRY_SIZE));
-
 		rsp->ring_index++;
 		if (rsp->ring_index == rsp->length) {
 			rsp->ring_index = 0;
@@ -1386,10 +1383,6 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 		case NOTIFY_ACK_TYPE:
 		case ENABLE_LUN_TYPE:
 		case MODIFY_LUN_TYPE:
-			DEBUG5(printk(KERN_WARNING "qla2x00_response_pkt: calling"
-				" tgt_response_pkt %p (type %02X)\n",
-				qla_target.tgt_response_pkt, pkt->entry_type););
-
 			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
 		case STATUS_TYPE:

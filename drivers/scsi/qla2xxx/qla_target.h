@@ -1070,10 +1070,6 @@ __qla2x00_send_enable_lun(struct scsi_qla_host *vha, int enable)
 			pkt->immed_notify_count = 0;
 			pkt->timeout = 0;
 		}
-		DEBUG2(printk(KERN_DEBUG
-			      "scsi%lu:ENABLE_LUN IOCB imm %u cmd %u timeout %u\n",
-			      vha->host_no, pkt->immed_notify_count,
-			      pkt->command_count, pkt->timeout));
 
 		/* Issue command to ISP */
 		qla2x00_isp_cmd(vha, vha->req);

@@ -128,15 +128,15 @@ extern request_t *qla2x00_req_pkt(struct scsi_qla_host *);
 static inline void qla_tgt_sess_get(struct qla_tgt_sess *sess)
 {
 	sess->sess_ref++;
-	DEBUG21(qla_printk(KERN_INFO, sess->vha->hw, "sess %p, new sess_ref %d\n",
-			sess, sess->sess_ref));
+	ql_dbg(ql_dbg_tgt, sess->vha, 0xe000, "sess %p, new sess_ref %d\n",
+			sess, sess->sess_ref);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
 void qla_tgt_sess_put(struct qla_tgt_sess *sess)
 {
-	DEBUG21(qla_printk(KERN_INFO, sess->vha->hw, "sess %p, new sess_ref %d\n",
-			sess, sess->sess_ref-1));
+	ql_dbg(ql_dbg_tgt, sess->vha, 0xe001, "sess %p, new sess_ref %d\n",
+			sess, sess->sess_ref-1);
 	BUG_ON(sess->sess_ref == 0);
 
 	sess->sess_ref--;
@@ -383,8 +383,8 @@ static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess, struct qla_hw_data 
 	while (!list_empty(&tmp_list)) {
 
 		cmd = list_entry(tmp_list.next, struct qla_tgt_cmd, cmd_list);
-		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Waiting for cmd:"
-			" %p\n", cmd));
+		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe100, "Waiting for cmd:"
+			" %p\n", cmd);
 		/*
 		 * This will signal that completion should be called from
 		 * tcm_qla2xxx_release_cmd() context.
@@ -400,23 +400,23 @@ static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess, struct qla_hw_data 
 		 * tcm_qla2xxx_release_cmd() from transport processing
 		 * context, then a direct call to qla_tgt_free_cmd() below.
 		 */
-		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "Before"
+		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe101, "Before"
 			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
-			" se_cmd: %p\n", cmd, se_cmd));
+			" se_cmd: %p\n", cmd, se_cmd);
 
 		wait_for_completion(&cmd->cmd_free_comp);
 
-		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
+		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe102, "After"
 			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
-			" se_cmd: %p\n", cmd, se_cmd));
+			" se_cmd: %p\n", cmd, se_cmd);
 
 		atomic_set(&cmd->cmd_free, 0);
 		smp_mb__after_atomic_dec();
 
 		qla_tgt_free_cmd(cmd);
 
-		DEBUG22(qla_printk(KERN_INFO, sess->vha->hw, "After"
-			" qla_tgt_free_cmd --------------------->\n"));
+		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe103, "After"
+			" qla_tgt_free_cmd --------------------->\n");
 
 		spin_lock_irq(&ha->hardware_lock);
 	}
@@ -442,16 +442,16 @@ static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
 	if (sess->se_sess != NULL)
 		ha->qla2x_tmpl->free_session(sess);
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Unregistration of"
-		" sess %p finished\n", sess));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe104, "Unregistration of"
+		" sess %p finished\n", sess);
 
 	kfree(sess);
 
 	if (!tgt)
 		return;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "empty(sess_list) %d"
-		" sess_count %d\n", list_empty(&tgt->sess_list), tgt->sess_count));
+	ql_dbg(ql_dbg_tgt, vha, 0xe002, "empty(sess_list) %d"
+		" sess_count %d\n", list_empty(&tgt->sess_list), tgt->sess_count);
 	/*
 	 * We need to protect against race, when tgt is freed before or
 	 * inside wake_up()
@@ -538,7 +538,8 @@ static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 		sess = ha->qla2x_tmpl->find_sess_by_loop_id(vha, loop_id);
 	}
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Using sess for qla_tgt_reset: %p\n", sess));
+	ql_dbg(ql_dbg_tgt, vha, 0xe003, "Using sess for"
+			" qla_tgt_reset: %p\n", sess);
 	if (!sess) {
 		res = -ESRCH;
 		ha->qla_tgt->tm_to_unknown = 1;
@@ -582,8 +583,8 @@ static void qla_tgt_schedule_sess_for_deletion(struct qla_tgt_sess *sess)
 	 */
 	schedule = list_empty(&tgt->del_sess_list);
 
-	DEBUG21(qla_printk(KERN_INFO, sess->vha->hw, "Scheduling sess %p for"
-		" deletion (schedule %d)", sess, schedule));
+	ql_dbg(ql_dbg_tgt, sess->vha, 0xe004, "Scheduling sess %p for"
+		" deletion (schedule %d)", sess, schedule);
 	list_add_tail(&sess->del_list_entry, &tgt->del_sess_list);
 	sess->deleted = 1;
 	sess->expires = jiffies + dev_loss_tmo * HZ;
@@ -758,18 +759,18 @@ retry:
 	}
 
 	if (global_resets != atomic_read(&ha->qla_tgt->tgt_global_resets_count)) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): global reset"
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe105, "qla_target(%d): global reset"
 			" during session discovery (counter was %d, new %d),"
 			" retrying", vha->vp_idx, global_resets,
-			atomic_read(&ha->qla_tgt->tgt_global_resets_count)));
+			atomic_read(&ha->qla_tgt->tgt_global_resets_count));
 		goto retry;
 	}
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Updating sess %p s_id %x:%x:%x, "
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe106, "Updating sess %p s_id %x:%x:%x, "
 		"loop_id %d) to d_id %x:%x:%x, loop_id %d", sess,
 		sess->s_id.b.domain, sess->s_id.b.al_pa,
 		sess->s_id.b.area, sess->loop_id, fcport->d_id.b.domain,
-		fcport->d_id.b.al_pa, fcport->d_id.b.area, fcport->loop_id));
+		fcport->d_id.b.al_pa, fcport->d_id.b.area, fcport->loop_id);
 
 	sess->s_id = fcport->d_id;
 	sess->loop_id = fcport->loop_id;
@@ -834,8 +835,8 @@ static void qla_tgt_del_sess_work_fn(struct delayed_work *work)
 					sess->port_name[6], sess->port_name[7],
 					sess->loop_id);
 			} else {
-				DEBUG22(qla_printk(KERN_INFO, ha, "Timeout: sess %p"
-					" about to be deleted\n", sess));
+				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe107, "Timeout: sess %p"
+					" about to be deleted\n", sess);
 				qla_tgt_sess_put(sess);
 			}
 		} else {
@@ -873,13 +874,14 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 		    (sess->port_name[5] == fcport->port_name[5]) &&
 		    (sess->port_name[6] == fcport->port_name[6]) &&
 		    (sess->port_name[7] == fcport->port_name[7])) {
-			DEBUG22(qla_printk(KERN_INFO, "Double sess %p found (s_id %x:%x:%x, "
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe108, "Double sess %p"
+				" found (s_id %x:%x:%x, "
 				"loop_id %d), updating to d_id %x:%x:%x, "
 				"loop_id %d", sess, sess->s_id.b.domain,
 				sess->s_id.b.al_pa, sess->s_id.b.area,
 				sess->loop_id, fcport->d_id.b.domain,
 				fcport->d_id.b.al_pa, fcport->d_id.b.area,
-				fcport->loop_id));
+				fcport->loop_id)
 
 			if (sess->deleted)
 				qla_tgt_undelete_sess(sess);
@@ -921,8 +923,8 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 
 	INIT_LIST_HEAD(&sess->sess_cmd_list);
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Adding sess %p to tgt %p via"
-		" ->check_initiator_node_acl()\n", sess, ha->qla_tgt));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe109, "Adding sess %p to tgt %p via"
+		" ->check_initiator_node_acl()\n", sess, ha->qla_tgt);
 
 	be_sid[0] = sess->s_id.b.domain;
 	be_sid[1] = sess->s_id.b.area;
@@ -1011,7 +1013,7 @@ void qla_tgt_fc_port_added(struct scsi_qla_host *vha, fc_port_t *fcport)
 				sess->port_name[5], sess->port_name[6],
 				sess->port_name[7], sess->loop_id);
 
-			DEBUG22(qla_printk(KERN_INFO, ha, "Reappeared sess %p\n", sess));
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe10a, "Reappeared sess %p\n", sess);
 		}
 		sess->s_id = fcport->d_id;
 		sess->loop_id = fcport->loop_id;
@@ -1056,7 +1058,7 @@ void qla_tgt_fc_port_deleted(struct scsi_qla_host *vha, fc_port_t *fcport)
 		return;
 	}
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "qla_tgt_fc_port_deleted %p", sess));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe10b, "qla_tgt_fc_port_deleted %p", sess);
 
 	sess->local = 1;
 	qla_tgt_schedule_sess_for_deletion(sess);
@@ -1073,8 +1075,8 @@ static inline int test_tgt_sess_count(struct qla_tgt *tgt)
 	 * inside wake_up()
 	 */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	DEBUG21(qla_printk(KERN_INFO, ha, "tgt %p, empty(sess_list)=%d sess_count=%d\n",
-	      tgt, list_empty(&tgt->sess_list), tgt->sess_count));
+	ql_dbg(ql_dbg_tgt, tgt->vha, 0xe005, "tgt %p, empty(sess_list)=%d sess_count=%d\n",
+	      tgt, list_empty(&tgt->sess_list), tgt->sess_count);
 	res = (tgt->sess_count == 0);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -1094,8 +1096,8 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 		return;
 	}
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Stopping target for host %ld(%p)\n",
-				vha->host_no, vha));
+	ql_dbg(ql_dbg_tgt, vha, 0xe006, "Stopping target for host %ld(%p)\n",
+				vha->host_no, vha);
 	/*
 	 * Mutex needed to sync with qla_tgt_fc_port_[added,deleted].
 	 * Lock is needed, because we still can get an incoming packet.
@@ -1108,7 +1110,7 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 
 	cancel_delayed_work_sync(&tgt->sess_del_work);
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Waiting for sess works (tgt %p)", tgt));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe10c, "Waiting for sess works (tgt %p)", tgt);
 	spin_lock_irqsave(&tgt->sess_work_lock, flags);
 	while (!list_empty(&tgt->sess_works_list)) {
 		spin_unlock_irqrestore(&tgt->sess_work_lock, flags);
@@ -1123,9 +1125,9 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	mutex_unlock(&ha->tgt_mutex);
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Waiting for tgt %p: list_empty(sess_list)=%d "
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe10d, "Waiting for tgt %p: list_empty(sess_list)=%d "
 		"sess_count=%d\n", tgt, list_empty(&tgt->sess_list),
-		tgt->sess_count));
+		tgt->sess_count);
 
 	wait_event(tgt->waitQ, test_tgt_sess_count(tgt));
 
@@ -1150,8 +1152,8 @@ void qla_tgt_stop_phase2(struct qla_tgt *tgt)
 		return;
 	}
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Waiting for %d IRQ commands to"
-		" complete (tgt %p)", tgt->irq_cmd_count, tgt));
+	ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe10e, "Waiting for %d IRQ commands to"
+		" complete (tgt %p)", tgt->irq_cmd_count, tgt);
 
 	mutex_lock(&ha->tgt_mutex);
 	spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -1165,7 +1167,7 @@ void qla_tgt_stop_phase2(struct qla_tgt *tgt)
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	mutex_unlock(&ha->tgt_mutex);
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Stop of tgt %p finished", tgt));
+	ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe10f, "Stop of tgt %p finished", tgt);
 }
 EXPORT_SYMBOL(qla_tgt_stop_phase2);
 
@@ -1179,7 +1181,7 @@ void qla_tgt_release(struct qla_tgt *tgt)
 
 	ha->qla_tgt = NULL;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Release of tgt %p finished\n", tgt));
+	ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe110, "Release of tgt %p finished\n", tgt);
 
 	kfree(tgt);
 }
@@ -1198,9 +1200,9 @@ static int qla_tgt_sched_sess_work(struct qla_tgt *tgt, int type,
 		return -ENOMEM;
 	}
 
-	DEBUG22(qla_printk(KERN_INFO, tgt->vha->hw, "Scheduling work (type %d, prm %p)"
+	ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe111, "Scheduling work (type %d, prm %p)"
 		" to find session for param %p (size %d, tgt %p)\n", type, prm, param,
-		param_size, tgt));
+		param_size, tgt);
 
 	BUG_ON(param_size > (sizeof(*prm) -
 		offsetof(struct qla_tgt_sess_work_param, cmd)));
@@ -1276,7 +1278,7 @@ static void qla2xxx_send_notify_ack(struct scsi_qla_host *vha, notify_entry_t *i
 	struct qla_hw_data *ha = vha->hw;
 	nack_entry_t *ntfy;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Sending NOTIFY_ACK (ha=%p)\n", ha));
+	ql_dbg(ql_dbg_tgt, vha, 0xe007, "Sending NOTIFY_ACK (ha=%p)\n", ha);
 
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(vha, 1) != QLA_SUCCESS)
@@ -1315,10 +1317,10 @@ static void qla2xxx_send_notify_ack(struct scsi_qla_host *vha, notify_entry_t *i
 			NOTIFY_ACK_TM_RESP_CODE_VALID);
 	}
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): Sending Notify Ack"
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe200, "qla_target(%d): Sending Notify Ack"
 		" Seq %#x -> I %#x St %#x RC %#x\n", vha->vp_idx,
 		le16_to_cpu(iocb->seq_id), GET_TARGET_ID(ha, iocb),
-		le16_to_cpu(iocb->status), le16_to_cpu(ntfy->resp_code)));
+		le16_to_cpu(iocb->status), le16_to_cpu(ntfy->resp_code));
 
 	qla2x00_isp_cmd(vha, vha->req);
 }
@@ -1334,8 +1336,8 @@ static void qla24xx_send_abts_resp(struct scsi_qla_host *vha,
 	uint32_t f_ctl;
 	uint8_t *p;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Sending task mgmt ABTS response"
-		" (ha=%p, atio=%p, status=%x\n", ha, abts, status));
+	ql_dbg(ql_dbg_tgt, vha, 0xe008, "Sending task mgmt ABTS response"
+		" (ha=%p, atio=%p, status=%x\n", ha, abts, status);
 
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(vha, 1) != QLA_SUCCESS)
@@ -1405,8 +1407,8 @@ static void qla24xx_retry_term_exchange(struct scsi_qla_host *vha,
 {
 	ctio7_status1_entry_t *ctio;
 
-	DEBUG21(qla_printk(KERN_INFO, vha->hw, "Sending retry TERM EXCH CTIO7"
-			" (ha=%p)\n", vha->hw));
+	ql_dbg(ql_dbg_tgt, vha, 0xe009, "Sending retry TERM EXCH CTIO7"
+			" (ha=%p)\n", vha->hw);
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(vha, 1) != QLA_SUCCESS)
 		return;
@@ -1450,8 +1452,8 @@ static int __qla24xx_handle_abts(struct scsi_qla_host *vha, abts24_recv_entry_t 
 	struct qla_tgt_mgmt_cmd *mcmd;
 	int rc;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): task abort (tag=%d)\n",
-		vha->vp_idx, abts->exchange_addr_to_abort));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe112, "qla_target(%d): task abort (tag=%d)\n",
+		vha->vp_idx, abts->exchange_addr_to_abort);
 
 	mcmd = mempool_alloc(qla_tgt_mgmt_cmd_mempool, GFP_ATOMIC);
 	if (mcmd == NULL) {
@@ -1493,16 +1495,16 @@ static void qla24xx_handle_abts(struct scsi_qla_host *vha, abts24_recv_entry_t *
 	}
 
 	if (tag == ATIO_EXCHANGE_ADDRESS_UNKNOWN) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): ABTS: Unknown Exchange "
-			"Address received\n", vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe113, "qla_target(%d): ABTS: Unknown Exchange "
+			"Address received\n", vha->vp_idx);
 		qla24xx_send_abts_resp(vha, abts, FCP_TMF_REJECTED, false);
 		return;
 	}
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): task abort (s_id=%x:%x:%x, "
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe114, "qla_target(%d): task abort (s_id=%x:%x:%x, "
 		"tag=%d, param=%x)\n", vha->vp_idx, abts->fcp_hdr_le.s_id[2],
 		abts->fcp_hdr_le.s_id[1], abts->fcp_hdr_le.s_id[0], tag,
-		le32_to_cpu(abts->fcp_hdr_le.parameter)));
+		le32_to_cpu(abts->fcp_hdr_le.parameter));
 
 	memset(&s_id, 0, 3);
 	s_id = (abts->fcp_hdr_le.s_id[0] << 16) | (abts->fcp_hdr_le.s_id[1] << 8) |
@@ -1510,8 +1512,8 @@ static void qla24xx_handle_abts(struct scsi_qla_host *vha, abts24_recv_entry_t *
 
 	sess = ha->qla2x_tmpl->find_sess_by_s_id(vha, (unsigned char *)&s_id);
 	if (!sess) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): task abort for"
-			" non-existant session\n", vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe115, "qla_target(%d): task abort for"
+			" non-existant session\n", vha->vp_idx);
 		rc = qla_tgt_sched_sess_work(ha->qla_tgt, QLA_TGT_SESS_WORK_ABORT,
 					abts, sizeof(*abts));
 		if (rc != 0) {
@@ -1539,8 +1541,8 @@ static void qla24xx_send_task_mgmt_ctio(struct scsi_qla_host *ha,
 	const atio7_entry_t *atio = &mcmd->orig_iocb.atio7;
 	ctio7_status1_entry_t *ctio;
 
-	DEBUG21(qla_printk(KERN_INFO, ha->hw, "Sending task mgmt CTIO7 (ha=%p,"
-		" atio=%p, resp_code=%x\n", ha, atio, resp_code));
+	ql_dbg(ql_dbg_tgt, ha, 0xe00a, "Sending task mgmt CTIO7 (ha=%p,"
+		" atio=%p, resp_code=%x\n", ha, atio, resp_code);
 
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(ha, 1) != QLA_SUCCESS)
@@ -1583,7 +1585,7 @@ static void qla24xx_send_notify_ack(struct scsi_qla_host *vha,
 	struct qla_hw_data *ha = vha->hw;
 	nack24xx_entry_t *nack;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Sending NOTIFY_ACK24 (ha=%p)\n", ha));
+	ql_dbg(ql_dbg_tgt, vha, 0xe00b, "Sending NOTIFY_ACK24 (ha=%p)\n", ha);
 
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(vha, 1) != QLA_SUCCESS)
@@ -1618,8 +1620,8 @@ static void qla24xx_send_notify_ack(struct scsi_qla_host *vha,
 	nack->ox_id = iocb->ox_id;
 	nack->vp_index = iocb->vp_index;
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): Sending 24xx Notify Ack %d\n",
-		vha->vp_idx, nack->status));
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe201, "qla_target(%d): Sending 24xx Notify Ack %d\n",
+		vha->vp_idx, nack->status);
 
 	qla2x00_isp_cmd(vha, vha->req);
 }
@@ -1633,16 +1635,13 @@ EXPORT_SYMBOL(qla_tgt_free_mcmd);
 /* callback from target fabric module code */
 void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 {
-	struct scsi_qla_host *vha;
-	struct qla_hw_data *ha;
+	struct scsi_qla_host *vha = mcmd->sess->vha;
+	struct qla_hw_data *ha = vha->hw;
 	unsigned long flags;
 
-	DEBUG22(qla_printk(KERN_INFO, mcmd->sess->vha->hw, "TM response mcmd"
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe116, "TM response mcmd"
 		" (%p) status %#x state %#x", mcmd, mcmd->se_tmr_req->response,
-		mcmd->flags));
-
-	vha = mcmd->sess->vha;
-	ha = vha->hw;
+		mcmd->flags);
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	if (IS_FWI2_CAPABLE(ha)) {
@@ -1687,10 +1686,10 @@ static int qla_tgt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 		u64 dma_pointer;
 
 		for_each_sg(cmd->sg_srr_start, sg, cmd->sg_cnt, i) {
-			DEBUG22(qla_printk(KERN_INFO, cmd->vha->hw, "Calling pci_map_page:"
+			ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe117, "Calling pci_map_page:"
 				" sg[%d]: %p, page: %p, offset: %d , init_off: %d"
 				" length: %d\n", i, sg, sg_page(sg), sg->offset,
-				initial_off, (sg->length - initial_off)));
+				initial_off, (sg->length - initial_off));
 
 			dma_pointer = pci_map_page(prm->tgt->ha->pdev,
 						sg_page(sg), initial_off,
@@ -1717,8 +1716,8 @@ static int qla_tgt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 		prm->req_cnt += DIV_ROUND_UP(prm->seg_cnt - prm->tgt->datasegs_per_cmd,
 					     prm->tgt->datasegs_per_cont);
 
-	DEBUG21(qla_printk(KERN_INFO, prm->cmd->vha->hw, "seg_cnt=%d, req_cnt=%d\n",
-			prm->seg_cnt, prm->req_cnt));
+	ql_dbg(ql_dbg_tgt, prm->cmd->vha, 0xe00c, "seg_cnt=%d, req_cnt=%d\n",
+			prm->seg_cnt, prm->req_cnt);
 	return 0;
 
 out_err:
@@ -1777,9 +1776,9 @@ static int qla_tgt_check_reserve_free_req(struct scsi_qla_host *vha, uint32_t re
 		else
 			cnt = qla2x00_debounce_register(
 				    ISP_REQ_Q_OUT(ha, &reg->isp));
-		DEBUG21(qla_printk(KERN_INFO, ha, "Request ring circled: cnt=%d, "
+		ql_dbg(ql_dbg_tgt, vha, 0xe00d, "Request ring circled: cnt=%d, "
 			"vha->->ring_index=%d, vha->req->cnt=%d, req_cnt=%d\n",
-			cnt, vha->req->ring_index, vha->req->cnt, req_cnt));
+			cnt, vha->req->ring_index, vha->req->cnt, req_cnt);
 		if  (vha->req->ring_index < cnt)
 			vha->req->cnt = cnt - vha->req->ring_index;
 		else
@@ -1788,10 +1787,10 @@ static int qla_tgt_check_reserve_free_req(struct scsi_qla_host *vha, uint32_t re
 	}
 
 	if (unlikely(vha->req->cnt < (req_cnt + 2))) {
-		DEBUG21(qla_printk(KERN_INFO, ha, "qla_target(%d): There is no room in the "
+		ql_dbg(ql_dbg_tgt, vha, 0xe00e, "qla_target(%d): There is no room in the "
 			"request ring: vha->req->ring_index=%d, vha->req->cnt=%d, "
 			"req_cnt=%d\n", vha->vp_idx, vha->req->ring_index,
-			vha->req->cnt, req_cnt));
+			vha->req->cnt, req_cnt);
 		return -EAGAIN;
 	}
 	vha->req->cnt -= req_cnt;
@@ -1875,11 +1874,11 @@ static void qla2xxx_build_ctio_pkt(struct qla_tgt_prm *prm, struct scsi_qla_host
 	pkt->common.rx_id = prm->cmd->atio.atio2x.rx_id;
 	pkt->common.relative_offset = cpu_to_le32(prm->cmd->offset);
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): handle(se_cmd) -> %08x, "
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe202, "qla_target(%d): handle(se_cmd) -> %08x, "
 		"timeout %d L %#x -> I %#x E %#x\n", vha->vp_idx,
 		pkt->common.handle, QLA_TGT_TIMEOUT,
 		le16_to_cpu(prm->cmd->atio.atio2x.lun),
-		GET_TARGET_ID(ha, &pkt->common), pkt->common.rx_id));
+		GET_TARGET_ID(ha, &pkt->common), pkt->common.rx_id);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -1920,9 +1919,9 @@ static int qla24xx_build_ctio_pkt(struct qla_tgt_prm *prm, struct scsi_qla_host 
 	pkt->ox_id = swab16(atio->fcp_hdr.ox_id);
 	pkt->relative_offset = cpu_to_le32(prm->cmd->offset);
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): handle(cmd) -> %08x, "
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe203, "qla_target(%d): handle(cmd) -> %08x, "
 		"timeout %d, ox_id %#x\n", vha->vp_idx, pkt->common.handle,
-		QLA_TGT_TIMEOUT, le16_to_cpu(pkt->ox_id)));
+		QLA_TGT_TIMEOUT, le16_to_cpu(pkt->ox_id));
 	return 0;
 }
 
@@ -1979,10 +1978,11 @@ static void qla_tgt_load_cont_data_segments(struct qla_tgt_prm *prm, struct scsi
 			}
 			*dword_ptr++ = cpu_to_le32(sg_dma_len(prm->sg));
 
-			DEBUG24(qla_printk(KERN_INFO, vha->hw, "S/G Segment Cont. phys_addr=%llx:%llx, len=%d\n",
+			ql_dbg(ql_dbg_tgt_sgl, vha, 0xe300, "S/G Segment Cont. phys_addr="
+				"%llx:%llx, len=%d\n",
 			      (long long unsigned int)pci_dma_hi32(sg_dma_address(prm->sg)),
 			      (long long unsigned int)pci_dma_lo32(sg_dma_address(prm->sg)),
-			      (int)sg_dma_len(prm->sg)));
+			      (int)sg_dma_len(prm->sg));
 
 			prm->sg = sg_next(prm->sg);
 		}
@@ -2000,8 +2000,8 @@ static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 	int enable_64bit_addressing = prm->tgt->tgt_enable_64bit_addr;
 	ctio_common_entry_t *pkt = (ctio_common_entry_t *)prm->pkt;
 
-	DEBUG23(qla_printk(KERN_INFO, vha->hw, "iocb->scsi_status=%x, iocb->flags=%x\n",
-	      le16_to_cpu(pkt->scsi_status), le16_to_cpu(pkt->flags)));
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe204, "iocb->scsi_status=%x, iocb->flags=%x\n",
+	      le16_to_cpu(pkt->scsi_status), le16_to_cpu(pkt->flags));
 
 	pkt->transfer_length = cpu_to_le32(prm->cmd->bufflen);
 
@@ -2019,7 +2019,7 @@ static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 	pkt->dseg_count = cpu_to_le16(prm->seg_cnt);
 
 	/* If scatter gather */
-	DEBUG24(qla_printk(KERN_INFO, vha->hw, "%s", "Building S/G data segments..."));
+	ql_dbg(ql_dbg_tgt_sgl, vha, 0xe301, "Building S/G data segments...");
 	/* Load command entry data segments */
 	for (cnt = 0;
 	     (cnt < prm->tgt->datasegs_per_cmd) && prm->seg_cnt;
@@ -2033,10 +2033,10 @@ static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 		}
 		*dword_ptr++ = cpu_to_le32(sg_dma_len(prm->sg));
 
-		DEBUG24(qla_printk(KERN_INFO, vha->hw, "S/G Segment phys_addr=%llx:%llx, len=%d\n",
+		ql_dbg(ql_dbg_tgt_sgl, vha, 0xe302, "S/G Segment phys_addr=%llx:%llx, len=%d\n",
 		      (long long unsigned int)pci_dma_hi32(sg_dma_address(prm->sg)),
 		      (long long unsigned int)pci_dma_lo32(sg_dma_address(prm->sg)),
-		      (int)sg_dma_len(prm->sg)));
+		      (int)sg_dma_len(prm->sg));
 
 		prm->sg = sg_next(prm->sg);
 	}
@@ -2055,8 +2055,8 @@ static void qla24xx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 	int enable_64bit_addressing = prm->tgt->tgt_enable_64bit_addr;
 	ctio7_status0_entry_t *pkt = (ctio7_status0_entry_t *)prm->pkt;
 
-	DEBUG21(qla_printk(KERN_INFO, vha->hw, "iocb->scsi_status=%x, iocb->flags=%x\n",
-	      le16_to_cpu(pkt->scsi_status), le16_to_cpu(pkt->flags)));
+	ql_dbg(ql_dbg_tgt, vha, 0xe00f, "iocb->scsi_status=%x, iocb->flags=%x\n",
+	      le16_to_cpu(pkt->scsi_status), le16_to_cpu(pkt->flags));
 
 	pkt->transfer_length = cpu_to_le32(prm->cmd->bufflen);
 
@@ -2074,7 +2074,7 @@ static void qla24xx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 	pkt->common.dseg_count = cpu_to_le16(prm->seg_cnt);
 
 	/* If scatter gather */
-	DEBUG24(qla_printk(KERN_INFO, vha->hw, "%s", "Building S/G data segments..."));
+	ql_dbg(ql_dbg_tgt_sgl, vha, 0xe303, "%s", "Building S/G data segments...");
 	/* Load command entry data segments */
 	for (cnt = 0;
 	     (cnt < prm->tgt->datasegs_per_cmd) && prm->seg_cnt;
@@ -2088,12 +2088,13 @@ static void qla24xx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 		}
 		*dword_ptr++ = cpu_to_le32(sg_dma_len(prm->sg));
 
-		DEBUG24(qla_printk(KERN_INFO, vha->hw, "S/G Segment phys_addr=%llx:%llx, len=%d\n",
+		ql_dbg(ql_dbg_tgt_sgl, vha, 0xe304, "S/G Segment phys_addr="
+			"%llx:%llx, len=%d\n",
 		      (long long unsigned int)pci_dma_hi32(sg_dma_address(
 								prm->sg)),
 		      (long long unsigned int)pci_dma_lo32(sg_dma_address(
 								prm->sg)),
-		      (int)sg_dma_len(prm->sg)));
+		      (int)sg_dma_len(prm->sg));
 
 		prm->sg = sg_next(prm->sg);
 	}
@@ -2120,9 +2121,9 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 	if (unlikely(cmd->aborted)) {
 		int unlocked_term = (cmd->locked_rsp == 0);
 
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): terminating exchange "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe118, "qla_target(%d): terminating exchange "
 			"for aborted cmd=%p (se_cmd=%p, tag=%d)",
-			vha->vp_idx, cmd, se_cmd, cmd->tag));
+			vha->vp_idx, cmd, se_cmd, cmd->tag);
 
 		cmd->state = QLA_TGT_STATE_ABORTED;
 
@@ -2136,7 +2137,7 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		return QLA_TGT_PRE_XMIT_RESP_CMD_ABORTED;
 	}
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): tag=%u\n", vha->vp_idx, cmd->tag));
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe205, "qla_target(%d): tag=%u\n", vha->vp_idx, cmd->tag);
 
 	prm->cmd = cmd;
 	prm->tgt = tgt;
@@ -2148,14 +2149,14 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 	prm->req_cnt = 1;
 	prm->add_status_pkt = 0;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "rq_result=%x, xmit_type=%x\n",
-				prm->rq_result, xmit_type));
+	ql_dbg(ql_dbg_tgt, vha, 0xe010, "rq_result=%x, xmit_type=%x\n",
+				prm->rq_result, xmit_type);
 
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(vha, 0) != QLA_SUCCESS)
 		return -EFAULT;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "CTIO start: vha(%d)\n", vha->vp_idx));
+	ql_dbg(ql_dbg_tgt, vha, 0xe011, "CTIO start: vha(%d)\n", vha->vp_idx);
 
 	if ((xmit_type & QLA_TGT_XMIT_DATA) && qla_tgt_has_data(cmd)) {
 		if  (qla_tgt_pci_map_calc_cnt(prm) != 0)
@@ -2166,19 +2167,19 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 
 	if (se_cmd->se_cmd_flags & SCF_UNDERFLOW_BIT) {
 		prm->residual = se_cmd->residual_count;
-		DEBUG21(qla_printk(KERN_INFO, ha, "Residual underflow: %d (tag %d, "
+		ql_dbg(ql_dbg_tgt, vha, 0xe012, "Residual underflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
 			se_cmd->t_task_cdb[0], cmd->bufflen,
-			prm->rq_result));
+			prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_UNDER;
 	} else if (se_cmd->se_cmd_flags & SCF_OVERFLOW_BIT) {
 		prm->residual = se_cmd->residual_count;
-		DEBUG21(qla_printk(KERN_INFO, ha, "Residual overflow: %d (tag %d, "
+		ql_dbg(ql_dbg_tgt, vha, 0xe013, "Residual overflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
 			se_cmd->t_task_cdb[0], cmd->bufflen,
-			prm->rq_result));
+			prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_OVER;
 		prm->residual = -prm->residual;
 	}
@@ -2198,9 +2199,9 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		}
 	}
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "req_cnt=%d, full_req_cnt=%d,"
+	ql_dbg(ql_dbg_tgt, vha, 0xe014, "req_cnt=%d, full_req_cnt=%d,"
 		" add_status_pkt=%d\n", prm->req_cnt, *full_req_cnt,
-		prm->add_status_pkt));
+		prm->add_status_pkt);
 
 	return 0;
 }
@@ -2311,8 +2312,8 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 			ctio_ret_entry_t *ctio_m1 =
 				(ctio_ret_entry_t *)qla_tgt_get_req_pkt(vha);
 
-			DEBUG21(qla_printk(KERN_INFO, ha, "%s", "Building"
-				" additional status packet"));
+			ql_dbg(ql_dbg_tgt, vha, 0xe015, "%s", "Building"
+				" additional status packet");
 
 			memcpy(ctio_m1, pkt, sizeof(*ctio_m1));
 			ctio_m1->entry_count = 1;
@@ -2330,8 +2331,8 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 
 	cmd->state = QLA_TGT_STATE_PROCESSED; /* Mid-level is done processing */
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Xmitting CTIO7 response pkt for 2xxx:"
-			" %p scsi_status: 0x%02x\n", pkt, scsi_status));
+	ql_dbg(ql_dbg_tgt, vha, 0xe016, "Xmitting CTIO7 response pkt for 2xxx:"
+			" %p scsi_status: 0x%02x\n", pkt, scsi_status);
 
 	qla2x00_isp_cmd(vha, vha->req);
 	if (cmd->locked_rsp)
@@ -2384,8 +2385,8 @@ static void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_type)
 #if 0 /* This is not a real status packets lost, so it won't lead to SRR */
 	if ((*xmit_type & QLA_TGT_XMIT_STATUS) && (qla_tgt_srr_random() % 200) == 50) {
 		*xmit_type &= ~QLA_TGT_XMIT_STATUS;
-		DEBUG22(qla_printk(KERN_INFO, "Dropping cmd %p (tag %d) status", cmd,
-			cmd->tag));
+		ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe119, "Dropping cmd %p (tag %d) status",
+			cmd, cmd->tag);
 	}
 #endif
 	/*
@@ -2406,9 +2407,9 @@ static void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_type)
 		for (i = 0; i < leave; i++)
 			tot_len += cmd->sg[i].length;
 
-		DEBUG22(qla_printk(KERN_INFO, "Cutting cmd %p (tag %d) buffer tail to len %d, "
-			"sg_cnt %d (cmd->bufflen %d, cmd->sg_cnt %d)", cmd,
-			cmd->tag, tot_len, leave, cmd->bufflen, cmd->sg_cnt));
+		ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe11a, "Cutting cmd %p (tag %d) buffer"
+			" tail to len %d, sg_cnt %d (cmd->bufflen %d, cmd->sg_cnt %d)",
+			cmd, cmd->tag, tot_len, leave, cmd->bufflen, cmd->sg_cnt);
 
 		cmd->bufflen = tot_len;
 		cmd->sg_cnt = leave;
@@ -2417,14 +2418,14 @@ static void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_type)
 	if (qla_tgt_has_data(cmd) && ((qla_tgt_srr_random() % 100) == 70)) {
 		unsigned int offset = qla_tgt_srr_random() % cmd->bufflen;
 
-		DEBUG22(qla_printk(KERN_INFO, "Cutting cmd %p (tag %d) buffer head "
+		ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe11b, "Cutting cmd %p (tag %d) buffer head "
 			"to offset %d (cmd->bufflen %d)", cmd, cmd->tag,
-			offset, cmd->bufflen));
+			offset, cmd->bufflen);
 		if (offset == 0)
 			*xmit_type &= ~QLA_TGT_XMIT_DATA;
 		else if (qla_tgt_set_data_offset(cmd, offset)) {
-			DEBUG22(qla_printk(KERN_INFO, cmd->vha->hw, "qla_tgt_set_data_offset()"
-				" failed (tag %d)", cmd->tag));
+			ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe11c, "qla_tgt_set_data_offset()"
+				" failed (tag %d)", cmd->tag);
 		}
 	}
 }
@@ -2436,10 +2437,10 @@ int qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_s
 {
 	qla_tgt_check_srr_debug(cmd, &xmit_type);
 
-	DEBUG21(qla_printk(KERN_INFO, cmd->vha->hw, "is_send_status=%d,"
+	ql_dbg(ql_dbg_tgt, cmd->vha, 0xe017, "is_send_status=%d,"
 		" cmd->bufflen=%d, cmd->sg_cnt=%d, cmd->dma_data_direction=%d",
 		(xmit_type & QLA_TGT_XMIT_STATUS) ? 1 : 0, cmd->bufflen,
-		cmd->sg_cnt, cmd->dma_data_direction));
+		cmd->sg_cnt, cmd->dma_data_direction);
 
 	return (IS_FWI2_CAPABLE(cmd->tgt->ha)) ?
 		__qla24xx_xmit_response(cmd, xmit_type, scsi_status) :
@@ -2468,9 +2469,9 @@ static void qla24xx_init_ctio_ret_entry(ctio7_status0_entry_t *ctio,
 		ctio1 = (ctio7_status1_entry_t *)ctio;
 		if (qla_tgt_need_explicit_conf(prm->tgt->ha, prm->cmd, 1)) {
 			if (prm->cmd->se_cmd.scsi_status != 0) {
-				DEBUG21(qla_printk(KERN_INFO, prm->cmd->vha->hw,
+				ql_dbg(ql_dbg_tgt, prm->cmd->vha, 0xe018,
 					"Skipping EXPLICIT_CONFORM and CTIO7_FLAGS_CONFORM_REQ"
-					" for FCP READ w/ non GOOD status\n"));
+					" for FCP READ w/ non GOOD status\n");
 				goto skip_explict_conf;
 			}
 			ctio1->flags |= __constant_cpu_to_le16(
@@ -2574,8 +2575,8 @@ static int __qla24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 			ctio7_status1_entry_t *ctio =
 				(ctio7_status1_entry_t *)qla_tgt_get_req_pkt(vha);
 
-			DEBUG21(qla_printk(KERN_INFO, ha, "Building additional"
-					" status packet\n"));
+			ql_dbg(ql_dbg_tgt, vha, 0xe019, "Building additional"
+					" status packet\n");
 
 			memcpy(ctio, pkt, sizeof(*ctio));
 			ctio->common.entry_count = 1;
@@ -2597,8 +2598,8 @@ static int __qla24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 
 	cmd->state = QLA_TGT_STATE_PROCESSED; /* Mid-level is done processing */
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Xmitting CTIO7 response pkt for 24xx:"
-			" %p scsi_status: 0x%02x\n", pkt, scsi_status));
+	ql_dbg(ql_dbg_tgt, vha, 0xe01a, "Xmitting CTIO7 response pkt for 24xx:"
+			" %p scsi_status: 0x%02x\n", pkt, scsi_status);
 
 	qla2x00_isp_cmd(vha, vha->req);
 	if (cmd->locked_rsp)
@@ -2635,7 +2636,7 @@ int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 	if (qla_tgt_issue_marker(vha, 0) != QLA_SUCCESS)
 		return -EIO;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "CTIO_start: vha(%d)", (int)vha->vp_idx));
+	ql_dbg(ql_dbg_tgt, vha, 0xe01b, "CTIO_start: vha(%d)", (int)vha->vp_idx);
 
 	/* Calculate number of entries and segments required */
 	if (qla_tgt_pci_map_calc_cnt(&prm) != 0)
@@ -2692,7 +2693,7 @@ static void qla2xxx_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt
 	unsigned long flags = 0; /* to stop compiler's warning */
 	int do_tgt_cmd_done = 0;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Sending TERM EXCH CTIO (ha=%p)\n", ha));
+	ql_dbg(ql_dbg_tgt, vha, 0xe01c, "Sending TERM EXCH CTIO (ha=%p)\n", ha);
 
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(vha, ha_locked) != QLA_SUCCESS)
@@ -2756,7 +2757,7 @@ static void qla24xx_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt
 	unsigned long flags = 0; /* to stop compiler's warning */
 	int do_tgt_cmd_done = 0;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Sending TERM EXCH CTIO7 (ha=%p)\n", ha));
+	ql_dbg(ql_dbg_tgt, vha, 0xe01d, "Sending TERM EXCH CTIO7 (ha=%p)\n", ha);
 
 	/* Send marker if required */
 	if (qla_tgt_issue_marker(vha, ha_locked) != QLA_SUCCESS)
@@ -2836,8 +2837,8 @@ static int qla_tgt_prepare_srr_ctio(struct scsi_qla_host *vha, struct qla_tgt_cm
 
 	tgt->ctio_srr_id++;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): CTIO with SRR "
-		"status received\n", vha->vp_idx));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe11d, "qla_target(%d): CTIO with SRR "
+		"status received\n", vha->vp_idx);
 
 	if (!ctio) {
 		printk(KERN_ERR "qla_target(%d): SRR CTIO, "
@@ -2853,8 +2854,8 @@ static int qla_tgt_prepare_srr_ctio(struct scsi_qla_host *vha, struct qla_tgt_cm
 		sc->srr_id = tgt->ctio_srr_id;
 		list_add_tail(&sc->srr_list_entry,
 			&tgt->srr_ctio_list);
-		DEBUG22(qla_printk(KERN_INFO, ha, "CTIO SRR %p added (id %d)\n",
-			sc, sc->srr_id));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe11e, "CTIO SRR %p added (id %d)\n",
+			sc, sc->srr_id);
 		if (tgt->imm_srr_id == tgt->ctio_srr_id) {
 			int found = 0;
 			list_for_each_entry(imm, &tgt->srr_imm_list,
@@ -2865,7 +2866,8 @@ static int qla_tgt_prepare_srr_ctio(struct scsi_qla_host *vha, struct qla_tgt_cm
 				}
 			}
 			if (found) {
-				DEBUG22(qla_printk(KERN_INFO, ha, "%s", "Scheduling srr work\n"));
+				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe11f,
+					"Scheduling srr work\n");
 				schedule_work(&tgt->srr_work);
 			} else {
 				printk(KERN_ERR "qla_target(%d): imm_srr_id "
@@ -2890,8 +2892,8 @@ static int qla_tgt_prepare_srr_ctio(struct scsi_qla_host *vha, struct qla_tgt_cm
 		list_for_each_entry_safe(imm, ti, &tgt->srr_imm_list,
 					srr_list_entry) {
 			if (imm->srr_id == tgt->ctio_srr_id) {
-				DEBUG22(qla_printk(KERN_INFO, ha, "IMM SRR %p deleted "
-					"(id %d)\n", imm, imm->srr_id));
+				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe120, "IMM SRR %p"
+					" deleted (id %d)\n", imm, imm->srr_id);
 				list_del(&imm->srr_list_entry);
 				qla_tgt_reject_free_srr_imm(vha, imm, 1);
 			}
@@ -2970,7 +2972,7 @@ static struct qla_tgt_cmd *qla_tgt_ctio_to_cmd(struct scsi_qla_host *vha, uint32
 
 	if (handle != QLA_TGT_NULL_HANDLE) {
 		if (unlikely(handle == QLA_TGT_SKIP_HANDLE)) {
-			DEBUG21(qla_printk(KERN_INFO, ha, "%s", "SKIP_HANDLE CTIO\n"));
+			ql_dbg(ql_dbg_tgt, vha, 0xe01e, "%s", "SKIP_HANDLE CTIO\n");
 			return NULL;
 		}
 		/* handle-1 is actually used */
@@ -3027,14 +3029,14 @@ static void qla_tgt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handl
 	struct target_core_fabric_ops *tfo;
 	struct qla_tgt_cmd *cmd;
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): handle(ctio %p status"
-		" %#x) <- %08x\n", vha->vp_idx, ctio, status, handle));
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe206, "qla_target(%d): handle(ctio %p status"
+		" %#x) <- %08x\n", vha->vp_idx, ctio, status, handle);
 
 	if (handle & CTIO_INTERMEDIATE_HANDLE_MARK) {
 		/* That could happen only in case of an error/reset/abort */
 		if (status != CTIO_SUCCESS) {
-			DEBUG22(qla_printk(KERN_INFO, ha, "Intermediate CTIO received"
-				" (status %x)\n", status));
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe121, "Intermediate CTIO received"
+				" (status %x)\n", status);
 		}
 		return;
 	}
@@ -3096,7 +3098,7 @@ static void qla_tgt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handl
 	}
 
 	if (cmd->state == QLA_TGT_STATE_PROCESSED) {
-		DEBUG21(qla_printk(KERN_INFO, ha, "Command %p finished\n", cmd));
+		ql_dbg(ql_dbg_tgt, vha, 0xe01f, "Command %p finished\n", cmd);
 	} else if (cmd->state == QLA_TGT_STATE_NEED_DATA) {
 		int rx_status = 0;
 
@@ -3107,21 +3109,21 @@ static void qla_tgt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handl
 		else
 			cmd->write_data_transferred = 1;
 
-		DEBUG21(qla_printk(KERN_INFO, ha, "Data received, context %x,"
-				" rx_status %d\n", 0x0, rx_status));
+		ql_dbg(ql_dbg_tgt, vha, 0xe020, "Data received, context %x,"
+				" rx_status %d\n", 0x0, rx_status);
 
 		ha->qla2x_tmpl->handle_data(cmd);
 		return;
 	} else if (cmd->state == QLA_TGT_STATE_ABORTED) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "Aborted command %p (tag %d) finished\n",
-				cmd, cmd->tag));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe122, "Aborted command %p (tag %d) finished\n",
+				cmd, cmd->tag);
 	} else {
 		printk(KERN_ERR "qla_target(%d): A command in state (%d) should "
 			"not return a CTIO complete\n", vha->vp_idx, cmd->state);
 	}
 
 	if (unlikely(status != CTIO_SUCCESS)) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "%s", "Finishing failed CTIO\n"));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe123, "Finishing failed CTIO\n");
 		dump_stack();
 	}
 
@@ -3136,8 +3138,8 @@ void qla_tgt_ctio_completion(struct scsi_qla_host *vha, uint32_t handle)
 	struct qla_tgt *tgt = ha->qla_tgt;
 
 	if (likely(tgt == NULL)) {
-		DEBUG21(qla_printk(KERN_INFO, ha, "CTIO, but target mode not enabled"
-			" (ha %d %p handle %#x)", vha->vp_idx, ha, handle));
+		ql_dbg(ql_dbg_tgt, vha, 0xe021, "CTIO, but target mode not enabled"
+			" (ha %d %p handle %#x)", vha->vp_idx, ha, handle);
 		return;
 	}
 
@@ -3203,8 +3205,8 @@ static int qla2xxx_send_cmd_to_target(struct scsi_qla_host *vha, struct qla_tgt_
 	fcp_task_attr = qla_tgt_get_fcp_task_attr(atio->task_codes);
 	data_length = le32_to_cpu(atio->data_length);
 
-	DEBUG23(qla_printk(KERN_INFO, vha->hw, "qla_target: START q2x command: %p"
-		" lun: 0x%04x (tag %d)\n", cmd, lun, cmd->tag));
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe207, "qla_target: START q2x command: %p"
+		" lun: 0x%04x (tag %d)\n", cmd, lun, cmd->tag);
 	/*
 	 * Dispatch command to tcm_qla2xxx fabric module code
 	 */
@@ -3237,8 +3239,8 @@ static int qla24xx_send_cmd_to_target(struct scsi_qla_host *vha, struct qla_tgt_
 	data_length = be32_to_cpu(get_unaligned((uint32_t *)
 			&atio->fcp_cmnd.add_cdb[atio->fcp_cmnd.add_cdb_len]));
 
-	DEBUG23(qla_printk(KERN_INFO, vha->hw, "qla_target: START q24 Command %p"
-		" unpacked_lun: 0x%08x (tag %d)\n", cmd, unpacked_lun, cmd->tag));
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe208, "qla_target: START q24 Command %p"
+		" unpacked_lun: 0x%08x (tag %d)\n", cmd, unpacked_lun, cmd->tag);
 	/*
 	 * Dispatch command to tcm_qla2xxx fabric module code
 	 */
@@ -3271,8 +3273,8 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 	int res = 0;
 
 	if (unlikely(tgt->tgt_stop)) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "New command while device %p"
-			" is shutting down\n", tgt));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe124, "New command while device %p"
+			" is shutting down\n", tgt);
 		return -EFAULT;
 	}
 
@@ -3297,21 +3299,21 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 		atio7_entry_t *a = (atio7_entry_t *)atio;
 		sess = ha->qla2x_tmpl->find_sess_by_s_id(vha, a->fcp_hdr.s_id);
 		if (unlikely(!sess)) {
-			DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Unable to find "
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe125, "qla_target(%d): Unable to find "
 				"wwn login (s_id %x:%x:%x), trying to create "
 				"it manually\n", vha->vp_idx,
 				a->fcp_hdr.s_id[0], a->fcp_hdr.s_id[1],
-				a->fcp_hdr.s_id[2]));
+				a->fcp_hdr.s_id[2]);
 			goto out_sched;
 		}
 	} else {
 		sess = ha->qla2x_tmpl->find_sess_by_loop_id(vha,
 			GET_TARGET_ID(ha, (atio_entry_t *)atio));
 		if (unlikely(!sess)) {
-			DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Unable to find "
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe126, "qla_target(%d): Unable to find "
 				"wwn login (loop_id=%d), trying to create it "
 				"manually\n", vha->vp_idx,
-				GET_TARGET_ID(ha, (atio_entry_t *)atio)));
+				GET_TARGET_ID(ha, (atio_entry_t *)atio));
 			goto out_sched;
 		}
 	}
@@ -3331,7 +3333,7 @@ out_free_cmd:
 
 out_sched:
 	if (atio->entry_count > 1) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "Dropping multy entry cmd %p\n", cmd));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe127, "Dropping multy entry cmd %p\n", cmd);
 		res = -EBUSY;
 		goto out_free_cmd;
 	}
@@ -3371,55 +3373,55 @@ static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
 
 	switch (fn) {
 	case QLA_TGT_CLEAR_ACA:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): CLEAR_ACA received\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe400, "qla_target(%d): CLEAR_ACA received\n",
+			sess->vha->vp_idx);
 		tmr_func = TMR_CLEAR_ACA;
 		break;
 
 	case QLA_TGT_TARGET_RESET:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): TARGET_RESET received\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe401, "qla_target(%d): TARGET_RESET received\n",
+			sess->vha->vp_idx);
 		tmr_func = TMR_TARGET_WARM_RESET;
 		break;
 
 	case QLA_TGT_LUN_RESET:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): LUN_RESET received\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe402, "qla_target(%d): LUN_RESET received\n",
+			sess->vha->vp_idx);
 		tmr_func = TMR_LUN_RESET;
 		break;
 
 	case QLA_TGT_CLEAR_TS:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): CLEAR_TS received\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe403, "qla_target(%d): CLEAR_TS received\n",
+			sess->vha->vp_idx);
 		tmr_func = TMR_CLEAR_TASK_SET;
 		break;
 
 	case QLA_TGT_ABORT_TS:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): ABORT_TS received\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe405, "qla_target(%d): ABORT_TS received\n",
+			sess->vha->vp_idx);
 		tmr_func = TMR_ABORT_TASK_SET;
 		break;
 #if 0
 	case QLA_TGT_ABORT_ALL:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): Doing ABORT_ALL_TASKS\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe406, "qla_target(%d): Doing ABORT_ALL_TASKS\n",
+			sess->vha->vp_idx);
 		tmr_func = 0;
 		break;
 
 	case QLA_TGT_ABORT_ALL_SESS:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): Doing ABORT_ALL_TASKS_SESS\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe407, "qla_target(%d): Doing ABORT_ALL_TASKS_SESS\n",
+			sess->vha->vp_idx);
 		tmr_func = 0;
 		break;
 
 	case QLA_TGT_NEXUS_LOSS_SESS:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): Doing NEXUS_LOSS_SESS\n",
-			sess->vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe408, "qla_target(%d): Doing NEXUS_LOSS_SESS\n",
+			sess->vha->vp_idx);
 		tmr_func = 0;
 		break;
 
 	case QLA_TGT_NEXUS_LOSS:
-		DEBUG25(qla_printk(KERN_INFO, ha, "qla_target(%d): Doing NEXUS_LOSS\n",
+		ql_dbg(ql_dbg_tgt_tmr, vha, 0xe409, "qla_target(%d): Doing NEXUS_LOSS\n",
 			sess->vha->vp_idx));
 		tmr_func = 0;
 		break;
@@ -3472,8 +3474,8 @@ static int qla_tgt_handle_task_mgmt(struct scsi_qla_host *vha, void *iocb)
 	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
 	if (!sess) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): task mgmt fn 0x%x for "
-			"non-existant session\n", vha->vp_idx, fn));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe128, "qla_target(%d): task mgmt fn 0x%x for "
+			"non-existant session\n", vha->vp_idx, fn);
 		res = qla_tgt_sched_sess_work(tgt, QLA_TGT_SESS_WORK_TM, iocb,
 			IS_FWI2_CAPABLE(ha) ? sizeof(atio7_entry_t) :
 					      sizeof(notify_entry_t));
@@ -3541,8 +3543,8 @@ static int qla_tgt_abort_task(struct scsi_qla_host *vha, notify_entry_t *iocb)
 
 	sess = ha->qla2x_tmpl->find_sess_by_loop_id(vha, loop_id);
 	if (sess == NULL) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): task abort for unexisting "
-			"session\n", vha->vp_idx));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe129, "qla_target(%d): task abort for unexisting "
+			"session\n", vha->vp_idx);
 		res = qla_tgt_sched_sess_work(sess->tgt, QLA_TGT_SESS_WORK_ABORT,
 					iocb, sizeof(*iocb));
 		if (res != 0)
@@ -3562,9 +3564,9 @@ static int qla24xx_handle_els(struct scsi_qla_host *vha, notify24xx_entry_t *ioc
 	struct qla_hw_data *ha = vha->hw;
 	int res = 0;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Port ID: 0x%02x:%02x:%02x"
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12a, "qla_target(%d): Port ID: 0x%02x:%02x:%02x"
 		" ELS opcode: 0x%02x\n", vha->vp_idx, iocb->port_id[0],
-		iocb->port_id[1], iocb->port_id[2], iocb->status_subcode));
+		iocb->port_id[1], iocb->port_id[2], iocb->status_subcode);
 
 	switch (iocb->status_subcode) {
 	case ELS_PLOGI:
@@ -3602,9 +3604,9 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	size_t first_offset = 0, rem_offset = offset, tmp = 0;
 	int i;
 
-	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "Entering qla_tgt_set_data_offset:"
+	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe305, "Entering qla_tgt_set_data_offset:"
 		" cmd: %p, cmd->sg: %p, cmd->sg_cnt: %u, direction: %d\n",
-		cmd, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction));
+		cmd, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction);
 
 	if (!cmd->sg || !cmd->sg_cnt) {
 		printk(KERN_ERR "Missing cmd->sg or zero cmd->sg_cnt in"
@@ -3615,16 +3617,16 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	 * Walk the current cmd->sg list until we locate the new sg_srr_start
 	 */
 	for_each_sg(cmd->sg, sg, cmd->sg_cnt, i) {
-		DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "sg[%d]: %p page: %p,"
+		ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe306, "sg[%d]: %p page: %p,"
 			" length: %d, offset: %d\n", i, sg, sg_page(sg),
-			sg->length, sg->offset));
+			sg->length, sg->offset);
 
 		if ((sg->length + tmp) > offset) {
 			first_offset = rem_offset;
 			sg_srr_start = sg;
-			DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "Found matching sg[%d],"
+			ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe307, "Found matching sg[%d],"
 				" using %p as sg_srr_start, and using first_offset:"
-				" %lu\n", i, sg, first_offset));
+				" %lu\n", i, sg, first_offset);
 			break;
 		}
 		tmp += sg->length;
@@ -3647,11 +3649,11 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 	cmd->bufflen -= offset;
 	cmd->offset += offset;
 
-	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg: %p\n", cmd->sg));
-	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg_cnt: %u\n", cmd->sg_cnt));
-	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off));
-	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->bufflen: %u\n", cmd->bufflen));
-	DEBUG24(qla_printk(KERN_INFO, cmd->vha->hw, "New cmd->offset: %u\n", cmd->offset));
+	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe308, "New cmd->sg: %p\n", cmd->sg);
+	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe309, "New cmd->sg_cnt: %u\n", cmd->sg_cnt);
+	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe30a, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off);
+	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe30b, "New cmd->bufflen: %u\n", cmd->bufflen);
+	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe30c, "New cmd->offset: %u\n", cmd->offset);
 
 	if (cmd->sg_cnt < 0)
 		BUG();
@@ -3669,8 +3671,8 @@ static inline int qla_tgt_srr_adjust_data(struct qla_tgt_cmd *cmd,
 	uint32_t rel_offs;
 
 	rel_offs = srr_rel_offs - cmd->offset;
-	DEBUG22(qla_printk(KERN_INFO, cmd->vha->hw, "srr_rel_offs=%d, rel_offs=%d",
-			srr_rel_offs, rel_offs));
+	ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe12b, "srr_rel_offs=%d, rel_offs=%d",
+			srr_rel_offs, rel_offs);
 
 	*xmit_type = QLA_TGT_XMIT_ALL;
 
@@ -3696,8 +3698,8 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	unsigned long flags;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p, srr_ui %x\n",
-			cmd, ntfy->srr_ui));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12c, "SRR cmd %p, srr_ui %x\n",
+			cmd, ntfy->srr_ui);
 
 	switch (ntfy->srr_ui) {
 	case SRR_IU_STATUS:
@@ -3715,8 +3717,8 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_IN"
-					" with non GOOD scsi_status\n"));
+			ql_dbg(ql_dbg_tgt, vha, 0xe022, "Rejecting SRR_IU_DATA_IN"
+					" with non GOOD scsi_status\n");
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
@@ -3748,8 +3750,8 @@ static void qla24xx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_OUT"
-					" with non GOOD scsi_status\n"));
+			ql_dbg(ql_dbg_tgt, vha, 0xe023, "Rejecting SRR_IU_DATA_OUT"
+					" with non GOOD scsi_status\n");
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
@@ -3805,8 +3807,8 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	unsigned long flags;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p, srr_ui %x\n",
-			cmd, ntfy->srr_ui));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12d, "SRR cmd %p, srr_ui %x\n",
+			cmd, ntfy->srr_ui);
 
 	switch (ntfy->srr_ui) {
 	case SRR_IU_STATUS:
@@ -3824,8 +3826,8 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_IN"
-					" with non GOOD scsi_status\n"));
+			ql_dbg(ql_dbg_tgt, vha, 0xe024, "Rejecting SRR_IU_DATA_IN"
+					" with non GOOD scsi_status\n");
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
@@ -3856,8 +3858,8 @@ static void qla2xxx_handle_srr(struct scsi_qla_host *vha, struct srr_ctio *sctio
 			goto out_reject;
 		}
 		if (se_cmd->scsi_status != 0) {
-			DEBUG21(qla_printk(KERN_ERR, vha->hw, "Rejecting SRR_IU_DATA_OUT"
-					" with non GOOD scsi_status\n"));
+			ql_dbg(ql_dbg_tgt, vha, 0xe025, "Rejecting SRR_IU_DATA_OUT"
+					" with non GOOD scsi_status\n");
 			goto out_reject;
 		}
 		cmd->bufflen = se_cmd->data_length;
@@ -3938,7 +3940,7 @@ static void qla_tgt_handle_srr_work(struct work_struct *work)
 	struct srr_ctio *sctio;
 	unsigned long flags;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Entering SRR work (tgt %p)\n", tgt));
+	ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe12e, "Entering SRR work (tgt %p)\n", tgt);
 
 restart:
 	spin_lock_irqsave(&tgt->srr_lock, flags);
@@ -3963,12 +3965,12 @@ restart:
 			}
 		}
 
-		DEBUG22(qla_printk(KERN_INFO, ha, "IMM SRR %p, CTIO SRR %p (id %d)\n",
-			imm, sctio, sctio->srr_id));
+		ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe12f, "IMM SRR %p, CTIO SRR %p (id %d)\n",
+			imm, sctio, sctio->srr_id);
 
 		if (imm == NULL) {
-			DEBUG22(qla_printk(KERN_INFO, ha, "Not found matching IMM"
-				" for SRR CTIO (id %d)\n", sctio->srr_id));
+			ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe130, "Not found matching IMM"
+				" for SRR CTIO (id %d)\n", sctio->srr_id);
 			continue;
 		} else
 			list_del(&sctio->srr_list_entry);
@@ -3996,10 +3998,10 @@ restart:
 			cmd->sg = se_cmd->t_tasks_sg_chained;
 		}
 
-		DEBUG22(qla_printk(KERN_INFO, ha, "SRR cmd %p (se_cmd %p, tag %d, op %x), "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe131,  "SRR cmd %p (se_cmd %p, tag %d, op %x), "
 			"sg_cnt=%d, offset=%d", cmd, &cmd->se_cmd,
 			cmd->tag, se_cmd->t_task_cdb[0], cmd->sg_cnt,
-			cmd->offset));
+			cmd->offset);
 
 		if (IS_FWI2_CAPABLE(ha))
 			qla24xx_handle_srr(vha, sctio, imm);
@@ -4025,8 +4027,8 @@ static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
 
 	tgt->imm_srr_id++;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): SRR received\n",
-			vha->vp_idx));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe132, "qla_target(%d): SRR received\n",
+			vha->vp_idx);
 
 	imm = kzalloc(sizeof(*imm), GFP_ATOMIC);
 	if (imm != NULL) {
@@ -4038,8 +4040,8 @@ static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
 		imm->srr_id = tgt->imm_srr_id;
 		list_add_tail(&imm->srr_list_entry,
 			&tgt->srr_imm_list);
-		DEBUG22(qla_printk(KERN_INFO, ha, "IMM NTFY SRR %p added (id %d,"
-			" ui %x)\n", imm, imm->srr_id, iocb24->srr_ui));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe133, "IMM NTFY SRR %p added (id %d,"
+			" ui %x)\n", imm, imm->srr_id, iocb24->srr_ui);
 		if (tgt->imm_srr_id == tgt->ctio_srr_id) {
 			int found = 0;
 			list_for_each_entry(sctio, &tgt->srr_ctio_list,
@@ -4050,14 +4052,14 @@ static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
 				}
 			}
 			if (found) {
-				DEBUG22(qla_printk(KERN_INFO, ha, "%s", "Scheduling srr work\n"));
+				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe134, "%s", "Scheduling srr work\n");
 				schedule_work(&tgt->srr_work);
 			} else {
-				DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): imm_srr_id "
+				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe135, "qla_target(%d): imm_srr_id "
 					"== ctio_srr_id (%d), but there is no "
 					"corresponding SRR CTIO, deleting IMM "
 					"SRR %p\n", vha->vp_idx, tgt->ctio_srr_id,
-					imm));
+					imm);
 				list_del(&imm->srr_list_entry);
 
 				kfree(imm);
@@ -4078,8 +4080,8 @@ static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
 		list_for_each_entry_safe(sctio, ts, &tgt->srr_ctio_list,
 					srr_list_entry) {
 			if (sctio->srr_id == tgt->imm_srr_id) {
-				DEBUG22(qla_printk(KERN_INFO, ha, "CTIO SRR %p deleted "
-					"(id %d)\n", sctio, sctio->srr_id));
+				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe136, "CTIO SRR %p deleted "
+					"(id %d)\n", sctio, sctio->srr_id);
 				list_del(&sctio->srr_list_entry);
 				if (IS_FWI2_CAPABLE(ha)) {
 					qla24xx_send_term_exchange(vha, sctio->cmd,
@@ -4128,13 +4130,13 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 	case IMM_NTFY_LIP_RESET:
 	{
 		if (IS_FWI2_CAPABLE(ha)) {
-			DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): LIP reset"
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe137, "qla_target(%d): LIP reset"
 				" (loop %#x), subcode %x\n", vha->vp_idx,
 				le16_to_cpu(iocb24->nport_handle),
-				iocb24->status_subcode));
+				iocb24->status_subcode);
 		} else {
-			DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): LIP reset"
-				" (I %#x)\n", vha->vp_idx, GET_TARGET_ID(ha, iocb2x)));
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe138, "qla_target(%d): LIP reset"
+				" (I %#x)\n", vha->vp_idx, GET_TARGET_ID(ha, iocb2x));
 			/* set the Clear LIP reset event flag */
 			add_flags |= NOTIFY_ACK_CLEAR_LIP_RESET;
 		}
@@ -4146,10 +4148,10 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 	case IMM_NTFY_LIP_LINK_REINIT:
 	{
 		struct qla_tgt *tgt = ha->qla_tgt;
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): LINK REINIT (loop %#x, "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe139, "qla_target(%d): LINK REINIT (loop %#x, "
 			"subcode %x)\n", vha->vp_idx,
 			le16_to_cpu(iocb24->nport_handle),
-			iocb24->status_subcode));
+			iocb24->status_subcode);
 		if (tgt->link_reinit_iocb_pending)
 			qla24xx_send_notify_ack(vha, &tgt->link_reinit_iocb, 0, 0, 0);
 		memcpy(&tgt->link_reinit_iocb, iocb24, sizeof(*iocb24));
@@ -4164,15 +4166,15 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 
 	case IMM_NTFY_PORT_LOGOUT:
 		if (IS_FWI2_CAPABLE(ha)) {
-			DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Port logout (loop "
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13a, "qla_target(%d): Port logout (loop "
 				"%#x, subcode %x)\n", vha->vp_idx,
 				le16_to_cpu(iocb24->nport_handle),
-				iocb24->status_subcode));
+				iocb24->status_subcode);
 		} else {
-			DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Port logout (S "
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13b, "qla_target(%d): Port logout (S "
 				"%08x -> L %#x)\n", vha->vp_idx,
 				le16_to_cpu(iocb2x->seq_id),
-				le16_to_cpu(iocb2x->lun)));
+				le16_to_cpu(iocb2x->lun));
 		}
 		if (qla_tgt_reset(vha, iocb, QLA_TGT_NEXUS_LOSS_SESS) == 0)
 			send_notify_ack = 0;
@@ -4180,16 +4182,16 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 		break;
 
 	case IMM_NTFY_GLBL_TPRLO:
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Global TPRLO (%x)\n",
-			vha->vp_idx, status));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13c, "qla_target(%d): Global TPRLO (%x)\n",
+			vha->vp_idx, status);
 		if (qla_tgt_reset(vha, iocb, QLA_TGT_NEXUS_LOSS) == 0)
 			send_notify_ack = 0;
 		/* The sessions will be cleared in the callback, if needed */
 		break;
 
 	case IMM_NTFY_PORT_CONFIG:
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Port config changed (%x)\n",
-			vha->vp_idx, status));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13d, "qla_target(%d): Port config changed (%x)\n",
+			vha->vp_idx, status);
 		if (qla_tgt_reset(vha, iocb, QLA_TGT_ABORT_ALL) == 0)
 			send_notify_ack = 0;
 		/* The sessions will be cleared in the callback, if needed */
@@ -4210,9 +4212,9 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 		break;
 
 	case IMM_NTFY_ABORT_TASK:
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Abort Task (S %08x I %#x -> "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13e, "qla_target(%d): Abort Task (S %08x I %#x -> "
 			"L %#x)\n", vha->vp_idx, le16_to_cpu(iocb2x->seq_id),
-			GET_TARGET_ID(ha, iocb2x), le16_to_cpu(iocb2x->lun)));
+			GET_TARGET_ID(ha, iocb2x), le16_to_cpu(iocb2x->lun));
 		if (qla_tgt_abort_task(vha, iocb2x) == 0)
 			send_notify_ack = 0;
 		break;
@@ -4223,8 +4225,8 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 		break;
 
 	case IMM_NTFY_MSG_RX:
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Immediate notify task %x\n",
-			vha->vp_idx, iocb2x->task_flags));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13f, "qla_target(%d): Immediate notify task %x\n",
+			vha->vp_idx, iocb2x->task_flags);
 		if (qla_tgt_handle_task_mgmt(vha, iocb2x) == 0)
 			send_notify_ack = 0;
 		break;
@@ -4354,13 +4356,13 @@ static void qla24xx_atio_pkt(struct scsi_qla_host *vha, atio7_entry_t *atio)
 	int rc;
 
 	if (unlikely(tgt == NULL)) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "ATIO pkt, but no tgt (ha %p)", ha));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe140, "ATIO pkt, but no tgt (ha %p)", ha);
 		return;
 	}
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): ATIO pkt %p:"
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe209, "qla_target(%d): ATIO pkt %p:"
 		" type %02x count %02x", vha->vp_idx, atio, atio->entry_type,
-		atio->entry_count));
+		atio->entry_count);
 	/*
 	 * In tgt_stop mode we also should allow all requests to pass.
 	 * Otherwise, some commands can stuck.
@@ -4370,7 +4372,7 @@ static void qla24xx_atio_pkt(struct scsi_qla_host *vha, atio7_entry_t *atio)
 
 	switch (atio->entry_type) {
 	case ATIO_TYPE7:
-		DEBUG21(qla_printk(KERN_INFO, ha, "ATIO_TYPE7 instance %d, lun"
+		ql_dbg(ql_dbg_tgt, vha, 0xe026, "ATIO_TYPE7 instance %d, lun"
 			" %Lx, read/write %d/%d, add_cdb_len %d, data_length "
 			"%04x, s_id %x:%x:%x\n", vha->vp_idx, atio->fcp_cmnd.lun,
 			atio->fcp_cmnd.rddata, atio->fcp_cmnd.wrdata,
@@ -4378,7 +4380,7 @@ static void qla24xx_atio_pkt(struct scsi_qla_host *vha, atio7_entry_t *atio)
 			be32_to_cpu(get_unaligned((uint32_t *)
 				&atio->fcp_cmnd.add_cdb[atio->fcp_cmnd.add_cdb_len])),
 			atio->fcp_hdr.s_id[0], atio->fcp_hdr.s_id[1],
-			atio->fcp_hdr.s_id[2]));
+			atio->fcp_hdr.s_id[2]);
 
 		if (unlikely(atio->exchange_addr ==
 				ATIO_EXCHANGE_ADDRESS_UNKNOWN)) {
@@ -4422,7 +4424,7 @@ static void qla24xx_atio_pkt(struct scsi_qla_host *vha, atio7_entry_t *atio)
 				pkt->entry_type, pkt->entry_status);
 			break;
 		}
-		DEBUG21(qla_printk(KERN_INFO, ha, "%s", "IMMED_NOTIFY ATIO"));
+		ql_dbg(ql_dbg_tgt, vha, 0xe027, "%s", "IMMED_NOTIFY ATIO");
 		qla_tgt_handle_imm_notify(vha, pkt);
 		break;
 	}
@@ -4449,9 +4451,9 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		return;
 	}
 
-	DEBUG23(qla_printk(KERN_INFO, ha, "qla_target(%d): response pkt %p: T %02x"
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe20a, "qla_target(%d): response pkt %p: T %02x"
 		" C %02x S %02x handle %#x\n", vha->vp_idx, pkt, pkt->entry_type,
-		pkt->entry_count, pkt->entry_status, pkt->handle));
+		pkt->entry_count, pkt->entry_status, pkt->handle);
 
 	/*
 	 * In tgt_stop mode we also should allow all requests to pass.
@@ -4464,7 +4466,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 	case CTIO_TYPE7:
 	{
 		ctio7_fw_entry_t *entry = (ctio7_fw_entry_t *)pkt;
-		DEBUG21(qla_printk(KERN_INFO, ha, "CTIO_TYPE7: instance %d\n", vha->vp_idx));
+		ql_dbg(ql_dbg_tgt, vha, 0xe028, "CTIO_TYPE7: instance %d\n", vha->vp_idx);
 		qla_tgt_do_ctio_completion(vha, entry->handle,
 			le16_to_cpu(entry->status)|(pkt->entry_status << 16),
 			entry);
@@ -4476,22 +4478,22 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		atio_entry_t *atio;
 		int rc;
 		atio = (atio_entry_t *)pkt;
-		DEBUG21(qla_printk(KERN_INFO, ha, "ACCEPT_TGT_IO instance %d status %04x "
+		ql_dbg(ql_dbg_tgt, vha, 0xe029, "ACCEPT_TGT_IO instance %d status %04x "
 			  "lun %04x read/write %d data_length %04x "
 			  "target_id %02x rx_id %04x\n ",
 			  vha->vp_idx, le16_to_cpu(atio->status),
 			  le16_to_cpu(atio->lun),
 			  atio->execution_codes,
 			  le32_to_cpu(atio->data_length),
-			  GET_TARGET_ID(ha, atio), atio->rx_id));
+			  GET_TARGET_ID(ha, atio), atio->rx_id);
 		if (atio->status != __constant_cpu_to_le16(ATIO_CDB_VALID)) {
 			printk(KERN_ERR "qla_target(%d): ATIO with error "
 				    "status %x received\n", vha->vp_idx,
 				    le16_to_cpu(atio->status));
 			break;
 		}
-		DEBUG23(qla_printk(KERN_INFO, ha, "FCP CDB: 0x%02x, sizeof(cdb): %lu",
-			atio->cdb[0], (unsigned long int)sizeof(atio->cdb)));
+		ql_dbg(ql_dbg_tgt_pkt, vha, 0xe20b, "FCP CDB: 0x%02x, sizeof(cdb): %lu",
+			atio->cdb[0], (unsigned long int)sizeof(atio->cdb));
 
 		rc = qla_tgt_handle_cmd_for_atio(vha, (atio_t *)atio);
 		if (unlikely(rc != 0)) {
@@ -4521,7 +4523,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 	case CONTINUE_TGT_IO_TYPE:
 	{
 		ctio_common_entry_t *entry = (ctio_common_entry_t *)pkt;
-		DEBUG21(qla_printk(KERN_INFO, ha, "CONTINUE_TGT_IO: instance %d\n", vha->vp_idx));
+		ql_dbg(ql_dbg_tgt, vha, 0xe02a, "CONTINUE_TGT_IO: instance %d\n", vha->vp_idx);
 		qla_tgt_do_ctio_completion(vha, entry->handle,
 			le16_to_cpu(entry->status)|(pkt->entry_status << 16),
 			entry);
@@ -4531,7 +4533,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 	case CTIO_A64_TYPE:
 	{
 		ctio_common_entry_t *entry = (ctio_common_entry_t *)pkt;
-		DEBUG21(qla_printk(KERN_INFO, ha, "CTIO_A64: instance %d\n", vha->vp_idx));
+		ql_dbg(ql_dbg_tgt, vha, 0xe02b, "CTIO_A64: instance %d\n", vha->vp_idx);
 		qla_tgt_do_ctio_completion(vha, entry->handle,
 			le16_to_cpu(entry->status)|(pkt->entry_status << 16),
 			entry);
@@ -4539,16 +4541,16 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 	}
 
 	case IMMED_NOTIFY_TYPE:
-		DEBUG21(qla_printk(KERN_INFO, ha, "%s", "IMMED_NOTIFY\n"));
+		ql_dbg(ql_dbg_tgt, vha, 0xe02c, "%s", "IMMED_NOTIFY\n");
 		qla_tgt_handle_imm_notify(vha, (notify_entry_t *)pkt);
 		break;
 
 	case NOTIFY_ACK_TYPE:
 		if (tgt->notify_ack_expected > 0) {
 			nack_entry_t *entry = (nack_entry_t *)pkt;
-			DEBUG21(qla_printk(KERN_INFO, ha, "NOTIFY_ACK seq %08x status %x\n",
+			ql_dbg(ql_dbg_tgt, vha, 0xe02d, "NOTIFY_ACK seq %08x status %x\n",
 				  le16_to_cpu(entry->seq_id),
-				  le16_to_cpu(entry->status)));
+				  le16_to_cpu(entry->status));
 			tgt->notify_ack_expected--;
 			if (entry->status != __constant_cpu_to_le16(NOTIFY_ACK_SUCCESS)) {
 				printk(KERN_ERR "qla_target(%d): NOTIFY_ACK "
@@ -4562,7 +4564,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		break;
 
 	case ABTS_RECV_24XX:
-		DEBUG21(qla_printk(KERN_INFO, ha, "ABTS_RECV_24XX: instance %d\n", vha->vp_idx));
+		ql_dbg(ql_dbg_tgt, vha, 0xe02e, "ABTS_RECV_24XX: instance %d\n", vha->vp_idx);
 		qla24xx_handle_abts(vha, (abts24_recv_entry_t *)pkt);
 		break;
 
@@ -4570,8 +4572,8 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		if (tgt->abts_resp_expected > 0) {
 			abts24_resp_fw_entry_t *entry =
 				(abts24_resp_fw_entry_t *)pkt;
-			DEBUG21(qla_printk(KERN_INFO, ha, "ABTS_RESP_24XX: compl_status %x\n",
-				entry->compl_status));
+			ql_dbg(ql_dbg_tgt, vha, 0xe02f, "ABTS_RESP_24XX: compl_status %x\n",
+				entry->compl_status);
 			tgt->abts_resp_expected--;
 			if (le16_to_cpu(entry->compl_status) != ABTS_RESP_COMPL_SUCCESS) {
 				if ((entry->error_subcode1 == 0x1E) &&
@@ -4604,7 +4606,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 	case MODIFY_LUN_TYPE:
 		if (tgt->modify_lun_expected > 0) {
 			modify_lun_entry_t *entry = (modify_lun_entry_t *)pkt;
-			DEBUG21(qla_printk(KERN_INFO, ha, "MODIFY_LUN %x, imm %c%d, cmd %c%d",
+			ql_dbg(ql_dbg_tgt, vha, 0xe030, "MODIFY_LUN %x, imm %c%d, cmd %c%d",
 				  entry->status,
 				  (entry->operators & MODIFY_LUN_IMM_ADD) ? '+'
 				  : (entry->operators & MODIFY_LUN_IMM_SUB) ? '-'
@@ -4613,7 +4615,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 				  (entry->operators & MODIFY_LUN_CMD_ADD) ? '+'
 				  : (entry->operators & MODIFY_LUN_CMD_SUB) ? '-'
 				  : ' ',
-				  entry->command_count));
+				  entry->command_count);
 			tgt->modify_lun_expected--;
 			if (entry->status != MODIFY_LUN_SUCCESS) {
 				printk(KERN_ERR "qla_target(%d): MODIFY_LUN "
@@ -4629,16 +4631,16 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 	case ENABLE_LUN_TYPE:
 	{
 		elun_entry_t *entry = (elun_entry_t *)pkt;
-		DEBUG21(qla_printk(KERN_INFO, ha, "ENABLE_LUN %x imm %u cmd %u \n",
+		ql_dbg(ql_dbg_tgt, vha, 0xe031, "ENABLE_LUN %x imm %u cmd %u \n",
 			  entry->status, entry->immed_notify_count,
-			  entry->command_count));
+			  entry->command_count);
 		if (entry->status == ENABLE_LUN_ALREADY_ENABLED) {
-			DEBUG21(qla_printk(KERN_INFO, ha, "LUN is already enabled: %#x\n",
-				  entry->status));
+			ql_dbg(ql_dbg_tgt, vha, 0xe032, "LUN is already enabled: %#x\n",
+				  entry->status);
 			entry->status = ENABLE_LUN_SUCCESS;
 		} else if (entry->status == ENABLE_LUN_RC_NONZERO) {
-			DEBUG21(qla_printk(KERN_INFO, ha, "ENABLE_LUN succeeded, but with "
-				"error: %#x\n", entry->status));
+			ql_dbg(ql_dbg_tgt, vha, 0xe033, "ENABLE_LUN succeeded, but with "
+				"error: %#x\n", entry->status);
 			entry->status = ENABLE_LUN_SUCCESS;
 		} else if (entry->status != ENABLE_LUN_SUCCESS) {
 			printk(KERN_ERR "qla_target(%d): ENABLE_LUN "
@@ -4666,16 +4668,16 @@ void qla_tgt_async_event(uint16_t code, struct scsi_qla_host *vha, uint16_t *mai
 	struct qla_tgt *tgt = ha->qla_tgt;
 	int reason_code;
 
-	DEBUG2(printk(KERN_INFO "scsi(%ld): ha state %d init_done %d oper_mode %d"
-		" topo %d\n", vha->host_no, atomic_read(&vha->loop_state),
-		vha->flags.init_done, ha->operating_mode, ha->current_topology));
+	ql_dbg(ql_dbg_tgt, vha, 0xe034, "scsi(%ld): ha state %d init_done %d"
+		" oper_mode %d topo %d\n", vha->host_no, atomic_read(&vha->loop_state),
+		vha->flags.init_done, ha->operating_mode, ha->current_topology);
 
 	if (!ha->qla2x_tmpl)
 		return;
 
 	if (unlikely(tgt == NULL)) {
-		DEBUG21(qla_printk(KERN_INFO, ha, "ASYNC EVENT %#x, but no tgt"
-				" (ha %p)", code, ha));
+		ql_dbg(ql_dbg_tgt, vha, 0xe035, "ASYNC EVENT %#x, but no tgt"
+				" (ha %p)", code, ha);
 		return;
 	}
 
@@ -4695,16 +4697,16 @@ void qla_tgt_async_event(uint16_t code, struct scsi_qla_host *vha, uint16_t *mai
 	case MBA_REQ_TRANSFER_ERR:	/* Request Transfer Error */
 	case MBA_RSP_TRANSFER_ERR:	/* Response Transfer Error */
 	case MBA_WAKEUP_THRES:		/* Request Queue Wake-up. */
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): System error async event %#x "
-			"occured", vha->vp_idx, code));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe141, "qla_target(%d): System error async event %#x "
+			"occured", vha->vp_idx, code);
 		break;
 
 	case MBA_LOOP_UP:
 	{
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Async LOOP_UP occured "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe142, "qla_target(%d): Async LOOP_UP occured "
 			"(m[1]=%x, m[2]=%x, m[3]=%x, m[4]=%x)", vha->vp_idx,
 			le16_to_cpu(mailbox[1]), le16_to_cpu(mailbox[2]),
-			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4])));
+			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4]));
 		if (tgt->link_reinit_iocb_pending) {
 			qla24xx_send_notify_ack(vha, &tgt->link_reinit_iocb, 0, 0, 0);
 			tgt->link_reinit_iocb_pending = 0;
@@ -4716,31 +4718,31 @@ void qla_tgt_async_event(uint16_t code, struct scsi_qla_host *vha, uint16_t *mai
 	case MBA_LOOP_DOWN:
 	case MBA_LIP_RESET:
 	case MBA_RSCN_UPDATE:
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Async event %#x occured "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe143, "qla_target(%d): Async event %#x occured "
 			"(m[1]=%x, m[2]=%x, m[3]=%x, m[4]=%x)", vha->vp_idx,
 			code, le16_to_cpu(mailbox[1]), le16_to_cpu(mailbox[2]),
-			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4])));
+			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4]));
 		break;
 
 	case MBA_PORT_UPDATE:
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Port update async event %#x "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe144, "qla_target(%d): Port update async event %#x "
 			"occured: updating the ports database (m[1]=%x, m[2]=%x, "
 			"m[3]=%x, m[4]=%x)", vha->vp_idx, code,
 			le16_to_cpu(mailbox[1]), le16_to_cpu(mailbox[2]),
-			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4])));
+			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4]));
 		reason_code = le16_to_cpu(mailbox[2]);
 		if (reason_code == 0x4)
-			DEBUG22(qla_printk(KERN_INFO, ha, "Async MB 2: Got PLOGI Complete\n"));
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe145, "Async MB 2: Got PLOGI Complete\n");
 		else if (reason_code == 0x7)
-			DEBUG22(qla_printk(KERN_INFO, ha, "Async MB 2: Port Logged Out\n"));
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe146, "Async MB 2: Port Logged Out\n");
 		break;
 
 	default:
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): Async event %#x occured: "
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe147, "qla_target(%d): Async event %#x occured: "
 			"ignore (m[1]=%x, m[2]=%x, m[3]=%x, m[4]=%x)",
 			vha->vp_idx, code,
 			le16_to_cpu(mailbox[1]), le16_to_cpu(mailbox[2]),
-			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4])));
+			le16_to_cpu(mailbox[3]), le16_to_cpu(mailbox[4]));
 		break;
 	}
 
@@ -4760,7 +4762,7 @@ static fc_port_t *qla_tgt_get_port_database(struct scsi_qla_host *vha,
 		return NULL;
 	}
 
-	DEBUG22(qla_printk(KERN_INFO, vha->hw, "loop_id %d", loop_id));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe148, "loop_id %d", loop_id);
 
 	fcport->loop_id = loop_id;
 
@@ -4797,9 +4799,9 @@ retry:
 				 * This is Domain Controller, so it should be
 				 * OK to drop SCSI commands from it.
 				 */
-				DEBUG22(qla_printk(KERN_INFO, ha, "Unable to find"
+				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe149, "Unable to find"
 					" initiator with S_ID %x:%x:%x", s_id[0],
-					s_id[1], s_id[2]));
+					s_id[1], s_id[2]);
 			} else
 				printk(KERN_ERR "qla_target(%d): Unable to find "
 					"initiator with S_ID %x:%x:%x",
@@ -4814,10 +4816,10 @@ retry:
 		return NULL;
 
 	if (global_resets != atomic_read(&ha->qla_tgt->tgt_global_resets_count)) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "qla_target(%d): global reset"
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14a, "qla_target(%d): global reset"
 			" during session discovery (counter was %d, new %d),"
 			" retrying", vha->vp_idx, global_resets,
-			atomic_read(&ha->qla_tgt->tgt_global_resets_count)));
+			atomic_read(&ha->qla_tgt->tgt_global_resets_count));
 		goto retry;
 	}
 
@@ -4839,7 +4841,7 @@ static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
 	uint8_t local_s_id[3];
 	int rc, loop_id = -1; /* to hide compiler warnings */
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "qla_tgt_exec_sess_work() processing -> prm %p\n", prm));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14b, "qla_tgt_exec_sess_work() processing -> prm %p\n", prm);
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
@@ -4893,7 +4895,7 @@ static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
 
 after_find:
 	if (sess != NULL) {
-		DEBUG22(qla_printk(KERN_INFO, ha, "sess %p found\n", sess));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
 		qla_tgt_sess_get(sess);
 	} else {
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -4975,7 +4977,7 @@ out_term:
 	case QLA_TGT_SESS_WORK_CMD:
 	{
 		struct qla_tgt_cmd *cmd = prm->cmd;
-		DEBUG22(qla_printk(KERN_INFO, ha, "Terminating work cmd %p", cmd));
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14d, "Terminating work cmd %p", cmd);
 		/*
 		 * cmd has not sent to target yet, so pass NULL as the second
 		 * argument
@@ -5018,7 +5020,7 @@ static void qla_tgt_sess_work_fn(struct work_struct *work)
 	struct qla_hw_data *ha = vha->hw;
 	unsigned long flags;
 
-	DEBUG22(qla_printk(KERN_INFO, ha, "Sess work (tgt %p)", tgt));
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14e, "Sess work (tgt %p)", tgt);
 
 	spin_lock_irqsave(&tgt->sess_work_lock, flags);
 	while (!list_empty(&tgt->sess_works_list)) {
@@ -5057,8 +5059,8 @@ int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 {
 	struct qla_tgt *tgt;
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Registering target for host %ld(%p)",
-			base_vha->host_no, ha));
+	ql_dbg(ql_dbg_tgt, base_vha, 0xe036, "Registering target for host %ld(%p)",
+			base_vha->host_no, ha);
 
 	BUG_ON((ha->qla_tgt != NULL) || (ha->qla2x_tmpl != NULL));
 
@@ -5127,8 +5129,8 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, struct scsi_qla_host *vha)
 		return 0;
 	}
 
-	DEBUG21(qla_printk(KERN_INFO, ha, "Unregistering target for host %ld(%p)",
-			vha->host_no, ha));
+	ql_dbg(ql_dbg_tgt, vha, 0xe037, "Unregistering target for host %ld(%p)",
+			vha->host_no, ha);
 	qla_tgt_release(ha->qla_tgt);
 
 	return 0;
@@ -5554,15 +5556,11 @@ qla_tgt_24xx_process_response_error(struct scsi_qla_host *vha, struct sts_entry_
 void
 qla_tgt_modify_vp_config(struct scsi_qla_host *vha, struct vp_config_entry_24xx *vpmod)
 {
-	if (qla_tgt_mode_enabled(vha)) {
-		DEBUG11(printk("MODE_TARGET enabled, clearing BIT_5\n"));
+	if (qla_tgt_mode_enabled(vha))
 		vpmod->options_idx1 &= ~BIT_5;
-	}
 	/* Disable ini mode, if requested */
-	if (!qla_ini_mode_enabled(vha)) {
-		DEBUG11(printk("MODE_INITIATOR disabled, clearing BIT_4\n"));
+	if (!qla_ini_mode_enabled(vha))
 		vpmod->options_idx1 &= ~BIT_4;
-	}
 }
 
 void

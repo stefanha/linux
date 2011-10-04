@@ -275,5 +275,10 @@ ql_log_pci(uint32_t, struct pci_dev *pdev, int32_t, char *, ...);
 #define ql_dbg_misc	0x00010000 /* For dumping everything that is not
 				    * not covered by upper categories
 				    */
+#define ql_dbg_tgt	0x00008000 /* Target mode */
+#define ql_dbg_tgt_mgt	0x00004000 /* Target mode management */
+#define ql_dbg_tgt_pkt	0x00002000 /* Target mode SCSI packets */
+#define ql_dbg_tgt_sgl	0x00001000 /* Target mode scatterlists */
+#define ql_dbg_tgt_tmr	0x00000800 /* Target mode task management */
 
 #define QL_DBG_BUF_LEN	512
