@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file contains error recovery level one used by the iSCSI Target driver.
  *
- * © Copyright 2007-2011 RisingTide Systems LLC.
+ * \u00a9 Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
@@ -530,7 +530,7 @@ int iscsit_handle_status_snack(
 			if (cmd->stat_sn == begrun) {
 				found_cmd = 1;
 				break;
-			}	
+			}
 		}
 		spin_unlock_bh(&conn->cmd_lock);
 
@@ -1150,7 +1150,7 @@ static int iscsit_set_dataout_timeout_values(
 
 	return -1;
 }
- 
+
 /*
  *	NOTE: Called from interrupt (timer) context.
  */

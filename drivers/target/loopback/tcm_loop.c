@@ -1286,7 +1286,7 @@ struct se_wwn *tcm_loop_make_scsi_hba(
 	}
 	ptr = strstr(name, "iqn.");
 	if (!ptr) {
-		printk(KERN_ERR "Unable to locate prefix for emulated Target "
+		pr_err("Unable to locate prefix for emulated Target "
 				"Port: %s\n", name);
 		ret = -EINVAL;
 		goto out;
@@ -1498,7 +1498,7 @@ static int __init tcm_loop_fabric_init(void)
 				__alignof__(struct tcm_loop_cmd),
 				0, NULL);
 	if (!tcm_loop_cmd_cache) {
-		pr_err("kmem_cache_create() for"
+		pr_debug("kmem_cache_create() for"
 			" tcm_loop_cmd_cache failed\n");
 		return -ENOMEM;
 	}

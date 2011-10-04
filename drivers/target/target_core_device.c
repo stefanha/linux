@@ -56,7 +56,7 @@ static void se_dev_stop(struct se_device *dev);
 
 static struct se_hba *lun0_hba;
 static struct se_subsystem_dev *lun0_su_dev;
-/* not static, needed from target_core_tpg.h */
+/* not static, needed by tpg.c */
 struct se_device *g_lun0_dev;
 
 int transport_lookup_cmd_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
@@ -74,7 +74,6 @@ int transport_lookup_cmd_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 
 	spin_lock_irqsave(&se_sess->se_node_acl->device_list_lock, flags);
 	se_cmd->se_deve = &se_sess->se_node_acl->device_list[unpacked_lun];
-
 	if (se_cmd->se_deve->lun_flags & TRANSPORT_LUNFLAGS_INITIATOR_ACCESS) {
 		struct se_dev_entry *deve = se_cmd->se_deve;
 
@@ -86,9 +85,9 @@ int transport_lookup_cmd_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 			se_cmd->scsi_sense_reason = TCM_WRITE_PROTECTED;
 			se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			pr_err("TARGET_CORE[%s]: Detected WRITE_PROTECTED LUN"
-			       " Access for 0x%08x\n",
-			       se_cmd->se_tfo->get_fabric_name(),
-			       unpacked_lun);
+				" Access for 0x%08x\n",
+				se_cmd->se_tfo->get_fabric_name(),
+				unpacked_lun);
 			spin_unlock_irqrestore(&se_sess->se_node_acl->device_list_lock, flags);
 			return -EACCES;
 		}
@@ -119,9 +118,9 @@ int transport_lookup_cmd_lun(struct se_cmd *se_cmd, u32 unpacked_lun)
 			se_cmd->scsi_sense_reason = TCM_NON_EXISTENT_LUN;
 			se_cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			pr_err("TARGET_CORE[%s]: Detected NON_EXISTENT_LUN"
-			       " Access for 0x%08x\n",
-			       se_cmd->se_tfo->get_fabric_name(),
-			       unpacked_lun);
+				" Access for 0x%08x\n",
+				se_cmd->se_tfo->get_fabric_name(),
+				unpacked_lun);
 			return -ENODEV;
 		}
 		/*
@@ -848,7 +847,7 @@ u32 se_dev_align_max_sectors(u32 max_sectors, u32 block_size)
 	 * Limit max_sectors to a PAGE_SIZE aligned value for modern
 	 * transport_allocate_data_tasks() operation.
 	 */
-	tmp = rounddown((max_sectors * block_size), PAGE_SIZE);	
+	tmp = rounddown((max_sectors * block_size), PAGE_SIZE);
 	aligned_max_sectors = (tmp / block_size);
 	if (max_sectors != aligned_max_sectors) {
 		printk(KERN_INFO "Rounding down aligned max_sectors from %u"

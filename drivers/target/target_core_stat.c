@@ -417,7 +417,7 @@ static ssize_t target_stat_scsi_lu_show_attr_vend(
 
 	if (!dev)
 		return -ENODEV;
-	
+
 	/* scsiLuVendorId */
 	for (i = 0; i < sizeof(dev->se_sub_dev->t10_wwn.vendor); i++)
 		str[i] = ISPRINT(dev->se_sub_dev->t10_wwn.vendor[i]) ?

@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file contains main functions related to the iSCSI Target Core Driver.
  *
- * © Copyright 2007-2011 RisingTide Systems LLC.
+ * \u00a9 Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
@@ -299,7 +299,7 @@ static struct iscsi_np *iscsit_get_np(
 
 			port = ntohs(sock_in->sin_port);
 		}
-			
+
 		if ((ip_match == 1) && (np->np_port == port) &&
 		    (np->np_network_transport == network_transport)) {
 			/*
@@ -1009,12 +1009,12 @@ done:
 	 * The CDB is going to an se_device_t.
 	 */
 	ret = iscsit_get_lun_for_cmd(cmd, hdr->cdb,
-				get_unaligned_le64(&hdr->lun[0]));
+				get_unaligned_le64(&hdr->lun));
 	if (ret < 0) {
 		if (cmd->se_cmd.scsi_sense_reason == TCM_NON_EXISTENT_LUN) {
 			pr_debug("Responding to non-acl'ed,"
 				" non-existent or non-exported iSCSI LUN:"
-				" 0x%016Lx\n", get_unaligned_le64(&hdr->lun[0]));
+				" 0x%016Lx\n", get_unaligned_le64(&hdr->lun));
 		}
 		if (ret == PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES)
 			return iscsit_add_reject_from_cmd(
@@ -1481,7 +1481,7 @@ static int iscsit_handle_nop_out(
 
 	hdr			= (struct iscsi_nopout *) buf;
 	payload_length		= ntoh24(hdr->dlength);
-	lun			= get_unaligned_le64(&hdr->lun[0]);
+	lun			= get_unaligned_le64(&hdr->lun);
 	hdr->itt		= be32_to_cpu(hdr->itt);
 	hdr->ttt		= be32_to_cpu(hdr->ttt);
 	hdr->cmdsn		= be32_to_cpu(hdr->cmdsn);
@@ -1750,7 +1750,7 @@ static int iscsit_handle_task_mgt_cmd(
 	 */
 	if (function != ISCSI_TM_FUNC_TASK_REASSIGN) {
 		ret = iscsit_get_lun_for_tmr(cmd,
-				get_unaligned_le64(&hdr->lun[0]));
+				get_unaligned_le64(&hdr->lun));
 		if (ret < 0) {
 			cmd->se_cmd.se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 			se_tmr->response = ISCSI_TMF_RSP_NO_LUN;
@@ -2216,7 +2216,7 @@ static int iscsit_handle_snack(
 
 	hdr			= (struct iscsi_snack *) buf;
 	hdr->flags		&= ~ISCSI_FLAG_CMD_FINAL;
-	lun			= get_unaligned_le64(&hdr->lun[0]);
+	lun			= get_unaligned_le64(&hdr->lun);
 	unpacked_lun		= scsilun_to_int((struct scsi_lun *)&lun);
 	hdr->itt		= be32_to_cpu(hdr->itt);
 	hdr->ttt		= be32_to_cpu(hdr->ttt);
@@ -2520,9 +2520,9 @@ static int iscsit_send_data_in(
 	hton24(hdr->dlength, datain.length);
 	if (hdr->flags & ISCSI_FLAG_DATA_ACK)
 		int_to_scsilun(cmd->se_cmd.orig_fe_lun,
-				(struct scsi_lun *)&hdr->lun[0]);
+				(struct scsi_lun *)&hdr->lun);
 	else
-		put_unaligned_le64(0xFFFFFFFFFFFFFFFFULL, &hdr->lun[0]);
+		put_unaligned_le64(0xFFFFFFFFFFFFFFFFULL, &hdr->lun);
 
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	hdr->ttt		= (hdr->flags & ISCSI_FLAG_DATA_ACK) ?
@@ -2545,7 +2545,7 @@ static int iscsit_send_data_in(
 
 		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
-				0, NULL, (u8 *)header_digest);	
+				0, NULL, (u8 *)header_digest);
 
 		iov[0].iov_len += ISCSI_CRC_LEN;
 		tx_size += ISCSI_CRC_LEN;
@@ -2778,7 +2778,7 @@ static int iscsit_send_nopin_response(
 	hdr->opcode		= ISCSI_OP_NOOP_IN;
 	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
 	hton24(hdr->dlength, cmd->buf_ptr_size);
-	put_unaligned_le64(0xFFFFFFFFFFFFFFFFULL, &hdr->lun[0]);
+	put_unaligned_le64(0xFFFFFFFFFFFFFFFFULL, &hdr->lun);
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	hdr->ttt		= cpu_to_be32(cmd->targ_xfer_tag);
 	cmd->stat_sn		= conn->stat_sn++;
@@ -2798,7 +2798,7 @@ static int iscsit_send_nopin_response(
 		iscsit_do_crypto_hash_buf(&conn->conn_tx_hash,
 				(unsigned char *)hdr, ISCSI_HDR_LEN,
 				0, NULL, (u8 *)header_digest);
-					
+
 		iov[0].iov_len += ISCSI_CRC_LEN;
 		tx_size += ISCSI_CRC_LEN;
 		pr_debug("Attaching CRC32C HeaderDigest"
@@ -2830,7 +2830,7 @@ static int iscsit_send_nopin_response(
 				cmd->buf_ptr, cmd->buf_ptr_size,
 				padding, (u8 *)&cmd->pad_bytes,
 				(u8 *)&cmd->data_crc);
-			
+
 			iov[niov].iov_base = &cmd->data_crc;
 			iov[niov++].iov_len = ISCSI_CRC_LEN;
 			tx_size += ISCSI_CRC_LEN;
@@ -2867,7 +2867,7 @@ int iscsit_send_r2t(
 	hdr->opcode		= ISCSI_OP_R2T;
 	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
 	int_to_scsilun(cmd->se_cmd.orig_fe_lun,
-			(struct scsi_lun *)&hdr->lun[0]);
+			(struct scsi_lun *)&hdr->lun);
 	hdr->itt		= cpu_to_be32(cmd->init_task_tag);
 	spin_lock_bh(&conn->sess->ttt_lock);
 	r2t->targ_xfer_tag	= conn->sess->targ_xfer_tag++;
@@ -4452,7 +4452,7 @@ int iscsit_free_session(struct iscsi_session *sess)
 		iscsit_dec_conn_usage_count(conn);
 		if (is_last == 0)
 			iscsit_dec_conn_usage_count(conn_tmp);
-	
+
 		conn_count--;
 	}
 

@@ -51,7 +51,7 @@ static u32 alua_lu_gps_count;
 
 static DEFINE_SPINLOCK(lu_gps_lock);
 static LIST_HEAD(lu_gps_list);
-/* not static, needed from target_core_configfs.h */
+
 struct t10_alua_lu_gp *default_lu_gp;
 
 /*
@@ -1072,7 +1072,7 @@ core_alua_allocate_lu_gp(const char *name, int def_group)
 	atomic_set(&lu_gp->lu_gp_ref_cnt, 0);
 
 	if (def_group) {
-		lu_gp->lu_gp_id = alua_lu_gps_counter++;;
+		lu_gp->lu_gp_id = alua_lu_gps_counter++;
 		lu_gp->lu_gp_valid_id = 1;
 		alua_lu_gps_count++;
 	}

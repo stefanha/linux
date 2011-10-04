@@ -682,6 +682,7 @@ target_emulate_evpd_00(struct se_cmd *cmd, unsigned char *buf)
 static int
 target_emulate_inquiry(struct se_cmd *cmd)
 {
+	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf;
 	unsigned char *cdb = cmd->t_task_cdb;
 	int p, ret;
@@ -704,7 +705,7 @@ target_emulate_inquiry(struct se_cmd *cmd)
 
 	buf = transport_kmap_first_data_page(cmd);
 
-	buf[0] = cmd->se_dev->transport->get_device_type(cmd->se_dev);
+	buf[0] = dev->transport->get_device_type(dev);
 
 	for (p = 0; p < ARRAY_SIZE(evpd_handlers); ++p)
 		if (cdb[2] == evpd_handlers[p].page) {

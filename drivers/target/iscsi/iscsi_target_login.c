@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file contains the login functions used by the iSCSI Target driver.
  *
- * © Copyright 2007-2011 RisingTide Systems LLC.
+ * \u00a9 Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
@@ -250,7 +250,7 @@ static int iscsi_login_zero_tsih_s1(
 		pr_err("idr_pre_get() for sess_idr failed\n");
 		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
-		return -1;	
+		return -1;
 	}
 	spin_lock(&sess_idr_lock);
 	idr_get_new(&sess_idr, NULL, &sess->session_index);

@@ -665,8 +665,8 @@ transport_get_cmd_from_queue(struct se_queue_obj *qobj)
 	cmd = list_first_entry(&qobj->qobj_list, struct se_cmd, se_queue_node);
 
 	atomic_set(&cmd->t_transport_queue_active, 0);
-
 	list_del_init(&cmd->se_queue_node);
+
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
@@ -1601,7 +1601,6 @@ void transport_init_se_cmd(
 	INIT_LIST_HEAD(&cmd->se_ordered_node);
 	INIT_LIST_HEAD(&cmd->se_qf_node);
 	INIT_LIST_HEAD(&cmd->se_queue_node);
-
 	INIT_LIST_HEAD(&cmd->t_task_list);
 	init_completion(&cmd->transport_lun_fe_stop_comp);
 	init_completion(&cmd->transport_lun_stop_comp);
@@ -2259,7 +2258,7 @@ void __transport_stop_task_timer(struct se_task *task, unsigned long *flags)
 {
 	struct se_cmd *cmd = task->task_se_cmd;
 
-	if (!(task->task_flags & TF_RUNNING))
+	if (!task->task_flags & TF_RUNNING)
 		return;
 
 	task->task_flags |= TF_STOP;
@@ -2444,7 +2443,6 @@ check_depth:
 
 	dev->dev_tcq_window_closed = 0;
 
-	/* Get a task */
 	spin_lock_irq(&dev->execute_task_lock);
 	if (list_empty(&dev->execute_task_list)) {
 		spin_unlock_irq(&dev->execute_task_lock);
@@ -3103,7 +3101,7 @@ static int transport_generic_cmd_sequencer(
 			sectors = transport_get_sectors_32(cdb, cmd, &sector_ret);
 			if (sector_ret)
 				goto out_unsupported_cdb;
-			
+
 			if (sectors)
 				size = transport_get_size(1, cdb, cmd);
 			else {
@@ -3647,7 +3645,7 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 					cmd, reason, 1);
 			if (ret == -EAGAIN)
 				goto queue_full;
-			
+
 			transport_lun_remove_cmd(cmd);
 			transport_cmd_check_stop_to_fabric(cmd);
 			return;

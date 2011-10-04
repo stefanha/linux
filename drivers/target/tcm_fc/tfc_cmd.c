@@ -69,14 +69,14 @@ void ft_dump_cmd(struct ft_cmd *cmd, const char *caller)
 	pr_debug("%s: cmd %p lun %d\n", caller, cmd, cmd->lun);
 
 	pr_debug("%s: cmd %p data_nents %u len %u se_cmd_flags <0x%x>\n",
-	       caller, cmd, se_cmd->t_data_nents,
+		caller, cmd, se_cmd->t_data_nents,
 	       se_cmd->data_length, se_cmd->se_cmd_flags);
 
 	for_each_sg(se_cmd->t_data_sg, sg, se_cmd->t_data_nents, count)
 		pr_debug("%s: cmd %p sg %p page %p "
-		       "len 0x%x off 0x%x\n",
-		       caller, cmd, sg,
-		       sg_page(sg), sg->length, sg->offset);
+			"len 0x%x off 0x%x\n",
+			caller, cmd, sg,
+			sg_page(sg), sg->length, sg->offset);
 
 	sp = cmd->seq;
 	if (sp) {
@@ -231,8 +231,9 @@ int ft_write_pending(struct se_cmd *se_cmd)
 				cmd->sg_cnt =
 					se_cmd->t_tasks_sg_chained_no;
 			}
-			if (cmd->sg && lport->tt.ddp_setup(lport, ep->xid,
-						    cmd->sg, cmd->sg_cnt))
+			if (cmd->sg && lport->tt.ddp_target(lport, ep->xid,
+							    cmd->sg,
+							    cmd->sg_cnt))
 				cmd->was_ddp_setup = 1;
 		}
 	}
@@ -337,12 +338,23 @@ static void ft_send_resp_status(struct fc_lport *lport,
 
 /*
  * Send error or task management response.
- * Always frees the cmd and associated state.
  */
-static void ft_send_resp_code(struct ft_cmd *cmd, enum fcp_resp_rsp_codes code)
+static void ft_send_resp_code(struct ft_cmd *cmd,
+			      enum fcp_resp_rsp_codes code)
 {
 	ft_send_resp_status(cmd->sess->tport->lport,
 			    cmd->req_frame, SAM_STAT_GOOD, code);
+}
+
+
+/*
+ * Send error or task management response.
+ * Always frees the cmd and associated state.
+ */
+static void ft_send_resp_code_and_free(struct ft_cmd *cmd,
+				      enum fcp_resp_rsp_codes code)
+{
+	ft_send_resp_code(cmd, code);
 	ft_free_cmd(cmd);
 }
 
@@ -398,7 +410,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 		 * tm_flags set is invalid.
 		 */
 		pr_debug("invalid FCP tm_flags %x\n", fcp->fc_tm_flags);
-		ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
+		ft_send_resp_code_and_free(cmd, FCP_CMND_FIELDS_INVALID);
 		return;
 	}
 
@@ -406,7 +418,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 	tmr = core_tmr_alloc_req(&cmd->se_cmd, cmd, tm_func);
 	if (!tmr) {
 		pr_debug("alloc failed\n");
-		ft_send_resp_code(cmd, FCP_TMF_FAILED);
+		ft_send_resp_code_and_free(cmd, FCP_TMF_FAILED);
 		return;
 	}
 	cmd->se_cmd.se_tmr_req = tmr;
@@ -497,7 +509,7 @@ static void ft_recv_cmd(struct ft_sess *sess, struct fc_frame *fp)
 		goto busy;
 	}
 	cmd->req_frame = fp;		/* hold frame during cmd */
-	
+
 	INIT_WORK(&cmd->work, ft_send_work);
 	queue_work(sess->tport->tpg->workqueue, &cmd->work);
 	return;
@@ -545,7 +557,7 @@ static void ft_send_work(struct work_struct *work)
 	struct fc_frame_header *fh = fc_frame_header_get(cmd->req_frame);
 	struct se_cmd *se_cmd;
 	struct fcp_cmnd *fcp;
-	int data_dir;
+	int data_dir = 0;
 	u32 data_len;
 	int task_attr;
 	int ret;
@@ -646,6 +658,5 @@ static void ft_send_work(struct work_struct *work)
 	return;
 
 err:
-	ft_send_resp_code(cmd, FCP_CMND_FIELDS_INVALID);
-	return;
+	ft_send_resp_code_and_free(cmd, FCP_CMND_FIELDS_INVALID);
 }

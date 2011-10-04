@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file contains the iSCSI Target specific Task Management functions.
  *
- * © Copyright 2007-2011 RisingTide Systems LLC.
+ * \u00a9 Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
@@ -160,7 +160,7 @@ u8 iscsit_tmr_task_reassign(
 
 	se_tmr->ref_task_tag		= hdr->rtt;
 	se_tmr->ref_cmd			= &ref_cmd->se_cmd;
-	se_tmr->ref_task_lun		= get_unaligned_le64(&hdr->lun[0]);
+	se_tmr->ref_task_lun		= get_unaligned_le64(&hdr->lun);
 	tmr_req->ref_cmd_sn		= hdr->refcmdsn;
 	tmr_req->exp_data_sn		= hdr->exp_datasn;
 	tmr_req->conn_recovery		= cr;

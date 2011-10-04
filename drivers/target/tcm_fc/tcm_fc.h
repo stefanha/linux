@@ -113,7 +113,7 @@ struct ft_lport_acl {
  * Commands
  */
 struct ft_cmd {
-	u32 lun;			/* LUN from request */
+	u32 lun;                        /* LUN from request */
 	struct ft_sess *sess;		/* session held for cmd */
 	struct fc_seq *seq;		/* sequence in exchange mgr */
 	struct se_cmd se_cmd;		/* Local TCM I/O descriptor */
@@ -121,7 +121,8 @@ struct ft_cmd {
 	unsigned char *cdb;		/* pointer to CDB inside frame */
 	u32 write_data_len;		/* data received on writes */
 	struct work_struct work;
-	unsigned char ft_sense_buffer[TRANSPORT_SENSE_BUFFER]; /* Local sense buffer */
+	/* Local sense buffer */
+	unsigned char ft_sense_buffer[TRANSPORT_SENSE_BUFFER];
 	u32 was_ddp_setup:1;		/* Set only if ddp is setup */
 	struct scatterlist *sg;		/* Set only if DDP is setup */
 	u32 sg_cnt;			/* No. of item in scatterlist */

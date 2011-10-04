@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file contains the iSCSI Target DataIN value generation functions.
  *
- * © Copyright 2007-2011 RisingTide Systems LLC.
+ * \u00a9 Copyright 2007-2011 RisingTide Systems LLC.
  *
  * Licensed to the Linux Foundation under the General Public License (GPL) version 2.
  *
@@ -529,4 +529,3 @@ struct iscsi_datain_req *iscsit_get_datain_values(
 
 	return NULL;
 }
-

@@ -90,7 +90,7 @@ struct iscsi_hdr {
 	uint8_t		rsvd2[2];
 	uint8_t		hlength;	/* AHSs total length */
 	uint8_t		dlength[3];	/* Data length */
-	uint8_t		lun[8];
+	struct scsi_lun	lun;
 	itt_t		itt;		/* Initiator Task Tag, opaque for target */
 	__be32		ttt;		/* Target Task Tag */
 	__be32		statsn;
@@ -152,7 +152,7 @@ struct iscsi_scsi_req {
 	__be16 rsvd2;
 	uint8_t hlength;
 	uint8_t dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun lun;
 	itt_t	 itt;	/* Initiator Task Tag */
 	__be32 data_length;
 	__be32 cmdsn;
@@ -228,7 +228,7 @@ struct iscsi_async {
 	uint8_t rsvd2[2];
 	uint8_t rsvd3;
 	uint8_t dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun	lun;
 	uint8_t rsvd4[8];
 	__be32	statsn;
 	__be32	exp_cmdsn;
@@ -256,7 +256,7 @@ struct iscsi_nopout {
 	__be16	rsvd2;
 	uint8_t rsvd3;
 	uint8_t dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun	lun;
 	itt_t	 itt;	/* Initiator Task Tag */
 	__be32	ttt;	/* Target Transfer Tag */
 	__be32	cmdsn;
@@ -271,7 +271,7 @@ struct iscsi_nopin {
 	__be16	rsvd2;
 	uint8_t rsvd3;
 	uint8_t dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun	lun;
 	itt_t	 itt;	/* Initiator Task Tag */
 	__be32	ttt;	/* Target Transfer Tag */
 	__be32	statsn;
@@ -287,7 +287,7 @@ struct iscsi_tm {
 	uint8_t rsvd1[2];
 	uint8_t hlength;
 	uint8_t dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun lun;
 	itt_t	 itt;	/* Initiator Task Tag */
 	itt_t	 rtt;	/* Reference Task Tag */
 	__be32	cmdsn;
@@ -345,7 +345,7 @@ struct iscsi_r2t_rsp {
 	uint8_t rsvd2[2];
 	uint8_t	hlength;
 	uint8_t	dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun	lun;
 	itt_t	 itt;	/* Initiator Task Tag */
 	__be32	ttt;	/* Target Transfer Tag */
 	__be32	statsn;
@@ -363,7 +363,7 @@ struct iscsi_data {
 	uint8_t rsvd2[2];
 	uint8_t rsvd3;
 	uint8_t dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun lun;
 	itt_t	 itt;
 	__be32	ttt;
 	__be32	rsvd4;
@@ -383,7 +383,7 @@ struct iscsi_data_rsp {
 	uint8_t cmd_status;
 	uint8_t hlength;
 	uint8_t dlength[3];
-	uint8_t lun[8];
+	struct scsi_lun	lun;
 	itt_t	 itt;
 	__be32	ttt;
 	__be32	statsn;
@@ -589,7 +589,7 @@ struct iscsi_snack {
 	uint8_t rsvd2[2];
 	uint8_t hlength;
 	uint8_t dlength[3];
-	uint8_t lun[8];	
+	uint8_t lun[8];
 	itt_t	 itt;
 	__be32  ttt;
 	uint8_t rsvd3[4];

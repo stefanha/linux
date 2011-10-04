@@ -86,4 +86,3 @@ struct iscsi_thread_set {
 };
 
 #endif   /*** ISCSI_THREAD_QUEUE_H ***/
-

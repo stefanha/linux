@@ -353,7 +353,7 @@ static void ft_del_tpg(struct se_portal_group *se_tpg)
 	struct ft_tpg *tpg = container_of(se_tpg, struct ft_tpg, se_tpg);
 
 	pr_debug("del tpg %s\n",
-		config_item_name(&tpg->se_tpg.tpg_group.cg_item));
+		    config_item_name(&tpg->se_tpg.tpg_group.cg_item));
 
 	destroy_workqueue(tpg->workqueue);
 
@@ -578,7 +578,7 @@ int ft_register_configfs(void)
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "fc");
 	if (IS_ERR(fabric)) {
-		pr_debug("%s: target_fabric_configfs_init() failed!\n",
+		pr_err("%s: target_fabric_configfs_init() failed!\n",
 		       __func__);
 		return PTR_ERR(fabric);
 	}
@@ -607,8 +607,6 @@ int ft_register_configfs(void)
 	if (ret < 0) {
 		pr_debug("target_fabric_configfs_register() for"
 			    " FC Target failed!\n");
-		pr_debug("%s: target_fabric_configfs_register() failed!\n",
-		       __func__);
 		target_fabric_configfs_free(fabric);
 		return -1;
 	}
