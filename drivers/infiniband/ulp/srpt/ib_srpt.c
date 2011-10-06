@@ -1899,7 +1899,7 @@ static void srpt_handle_tsk_mgmt(struct srpt_rdma_ch *ch,
 			TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED;
 		goto process_tmr;
 	}
-	cmd->se_tmr_req = core_tmr_alloc_req(cmd, NULL, tcm_tmr);
+	cmd->se_tmr_req = core_tmr_alloc_req(cmd, NULL, tcm_tmr, GFP_KERNEL);
 	if (!cmd->se_tmr_req) {
 		send_ioctx->cmd.se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
 		send_ioctx->cmd.se_tmr_req->response = TMR_FUNCTION_REJECTED;

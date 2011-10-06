@@ -840,7 +840,7 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun, uint8_t 
 	/*
 	 * Allocate the TCM TMR
 	 */
-	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, (void *)mcmd, tmr_func);
+	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, mcmd, tmr_func, GFP_ATOMIC);
 	if (!se_cmd->se_tmr_req)
 		return -ENOMEM;
 	/*
