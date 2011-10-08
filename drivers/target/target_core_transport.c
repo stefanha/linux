@@ -1641,7 +1641,7 @@ static int transport_check_alloc_task_attr(struct se_cmd *cmd)
 	return 0;
 }
 
-static void transport_generic_wait_for_tasks(struct se_cmd *, int, int);
+static void transport_generic_wait_for_tasks(struct se_cmd *, int);
 
 /*	transport_generic_allocate_tasks():
  *
@@ -2507,7 +2507,7 @@ void transport_new_cmd_failure(struct se_cmd *se_cmd)
 	spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
 }
 
-static void transport_nop_wait_for_tasks(struct se_cmd *, int, int);
+static void transport_nop_wait_for_tasks(struct se_cmd *, int);
 
 static inline u32 transport_get_sectors_6(
 	unsigned char *cdb,
@@ -4345,7 +4345,7 @@ bool transport_generic_free_cmd(struct se_cmd *cmd, int wait_for_tasks)
 			transport_lun_remove_cmd(cmd);
 
 		if (wait_for_tasks && cmd->transport_wait_for_tasks)
-			cmd->transport_wait_for_tasks(cmd, 0, 0);
+			cmd->transport_wait_for_tasks(cmd, 0);
 
 		transport_free_dev_tasks(cmd);
 
@@ -4358,8 +4358,7 @@ EXPORT_SYMBOL(transport_generic_free_cmd);
 
 static void transport_nop_wait_for_tasks(
 	struct se_cmd *cmd,
-	int remove_cmd,
-	int session_reinstatement)
+	int remove_cmd)
 {
 	return;
 }
@@ -4540,8 +4539,7 @@ int transport_clear_lun_from_sessions(struct se_lun *lun)
  */
 static void transport_generic_wait_for_tasks(
 	struct se_cmd *cmd,
-	int remove_cmd,
-	int session_reinstatement)
+	int remove_cmd)
 {
 	unsigned long flags;
 
@@ -4617,13 +4615,7 @@ remove:
 	if (!remove_cmd)
 		return;
 
-	if (!transport_generic_free_cmd(cmd, 0) && session_reinstatement) {
-		unsigned long flags;
-
-		spin_lock_irqsave(&cmd->t_state_lock, flags);
-		transport_all_task_dev_remove_state(cmd);
-		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
-	}
+	transport_generic_free_cmd(cmd, 0);
 }
 
 static int transport_get_sense_codes(
