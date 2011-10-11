@@ -280,8 +280,8 @@ typedef struct {
 #ifndef CONTINUE_TGT_IO_TYPE
 #define CONTINUE_TGT_IO_TYPE 0x17
 /*
- * ISP queue - Continue Target I/O (CTIO) entry for status mode 0
- *	       structure definition.
+ * ISP queue -	Continue Target I/O (CTIO) entry for status mode 0 structure.
+ *		This structure is sent to the ISP 2xxx from target driver.
  */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
@@ -300,8 +300,13 @@ typedef struct {
 	uint16_t reserved_1[3];
 	uint16_t scsi_status;
 	uint32_t transfer_length;
-	uint32_t dseg_0_address[0];
-} __attribute__((packed)) ctio_common_entry_t;
+	uint32_t dseg_0_address;	    /* Data segment 0 address. */
+	uint32_t dseg_0_length;		    /* Data segment 0 length. */
+	uint32_t dseg_1_address;	    /* Data segment 1 address. */
+	uint32_t dseg_1_length;		    /* Data segment 1 length. */
+	uint32_t dseg_2_address;	    /* Data segment 2 address. */
+	uint32_t dseg_2_length;		    /* Data segment 2 length. */
+} __attribute__((packed)) ctio_to_2xxx_entry_t;
 #define ATIO_PATH_INVALID       0x07
 #define ATIO_CANT_PROV_CAP      0x16
 #define ATIO_CDB_VALID          0x3D
@@ -312,15 +317,6 @@ typedef struct {
 
 #ifndef CTIO_A64_TYPE
 #define CTIO_A64_TYPE 0x1F
-typedef struct {
-	ctio_common_entry_t common;
-	uint32_t dseg_0_address;	    /* Data segment 0 address. */
-	uint32_t dseg_0_length;		    /* Data segment 0 length. */
-	uint32_t dseg_1_address;	    /* Data segment 1 address. */
-	uint32_t dseg_1_length;		    /* Data segment 1 length. */
-	uint32_t dseg_2_address;	    /* Data segment 2 address. */
-	uint32_t dseg_2_length;		    /* Data segment 2 length. */
-} __attribute__((packed)) ctio_entry_t;
 #define CTIO_SUCCESS			0x01
 #define CTIO_ABORTED			0x02
 #define CTIO_INVALID_RX_ID		0x08
@@ -331,13 +327,12 @@ typedef struct {
 #define CTIO_PORT_LOGGED_OUT		0x29
 #define CTIO_PORT_CONF_CHANGED		0x2A
 #define CTIO_SRR_RECEIVED		0x45
-
 #endif
 
 #ifndef CTIO_RET_TYPE
 #define CTIO_RET_TYPE	0x17		/* CTIO return entry */
 /*
- * ISP queue - CTIO returned entry structure definition.
+ * ISP queue - CTIO from ISP 2xxx to target driver returned entry structure.
  */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
@@ -358,7 +353,7 @@ typedef struct {
 	uint16_t scsi_status;
 	uint16_t response_length;
 	uint8_t	 sense_data[26];
-} __attribute__((packed)) ctio_ret_entry_t;
+} __attribute__((packed)) ctio_from_2xxx_entry_t;
 #endif
 
 #define ATIO_TYPE7 0x06 /* Accept target I/O entry for 24xx */

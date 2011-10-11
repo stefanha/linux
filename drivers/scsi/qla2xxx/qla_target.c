@@ -1846,39 +1846,39 @@ static inline uint32_t qla_tgt_make_handle(struct scsi_qla_host *vha)
 static void qla2xxx_build_ctio_pkt(struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	uint32_t h;
-	ctio_entry_t *pkt;
+	ctio_to_2xxx_entry_t *pkt;
 	struct qla_hw_data *ha = vha->hw;
 
-	pkt = (ctio_entry_t *)vha->req->ring_ptr;
+	pkt = (ctio_to_2xxx_entry_t *)vha->req->ring_ptr;
 	prm->pkt = pkt;
 	memset(pkt, 0, sizeof(*pkt));
 
 	if (prm->tgt->tgt_enable_64bit_addr)
-		pkt->common.entry_type = CTIO_A64_TYPE;
+		pkt->entry_type = CTIO_A64_TYPE;
 	else
-		pkt->common.entry_type = CONTINUE_TGT_IO_TYPE;
+		pkt->entry_type = CONTINUE_TGT_IO_TYPE;
 
-	pkt->common.entry_count = (uint8_t)prm->req_cnt;
+	pkt->entry_count = (uint8_t)prm->req_cnt;
 
 	h = qla_tgt_make_handle(vha);
 	if (h != QLA_TGT_NULL_HANDLE)
 		ha->cmds[h-1] = prm->cmd;
 
-	pkt->common.handle = h | CTIO_COMPLETION_HANDLE_MARK;
-	pkt->common.timeout = __constant_cpu_to_le16(QLA_TGT_TIMEOUT);
+	pkt->handle = h | CTIO_COMPLETION_HANDLE_MARK;
+	pkt->timeout = __constant_cpu_to_le16(QLA_TGT_TIMEOUT);
 
 	/* Set initiator ID */
 	h = GET_TARGET_ID(ha, &prm->cmd->atio.atio2x);
-	SET_TARGET_ID(ha, pkt->common.target, h);
+	SET_TARGET_ID(ha, pkt->target, h);
 
-	pkt->common.rx_id = prm->cmd->atio.atio2x.rx_id;
-	pkt->common.relative_offset = cpu_to_le32(prm->cmd->offset);
+	pkt->rx_id = prm->cmd->atio.atio2x.rx_id;
+	pkt->relative_offset = cpu_to_le32(prm->cmd->offset);
 
 	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe202, "qla_target(%d): handle(se_cmd) -> %08x, "
 		"timeout %d L %#x -> I %#x E %#x\n", vha->vp_idx,
-		pkt->common.handle, QLA_TGT_TIMEOUT,
+		pkt->handle, QLA_TGT_TIMEOUT,
 		le16_to_cpu(prm->cmd->atio.atio2x.lun),
-		GET_TARGET_ID(ha, &pkt->common), pkt->common.rx_id);
+		GET_TARGET_ID(ha, pkt), pkt->rx_id);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -1998,7 +1998,7 @@ static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 	int cnt;
 	uint32_t *dword_ptr;
 	int enable_64bit_addressing = prm->tgt->tgt_enable_64bit_addr;
-	ctio_common_entry_t *pkt = (ctio_common_entry_t *)prm->pkt;
+	ctio_to_2xxx_entry_t *pkt = (ctio_to_2xxx_entry_t *)prm->pkt;
 
 	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe204, "iocb->scsi_status=%x, iocb->flags=%x\n",
 	      le16_to_cpu(pkt->scsi_status), le16_to_cpu(pkt->flags));
@@ -2006,7 +2006,7 @@ static void qla2xxx_load_data_segments(struct qla_tgt_prm *prm, struct scsi_qla_
 	pkt->transfer_length = cpu_to_le32(prm->cmd->bufflen);
 
 	/* Setup packet address segment pointer */
-	dword_ptr = pkt->dseg_0_address;
+	dword_ptr = &pkt->dseg_0_address;
 
 	if (prm->seg_cnt == 0) {
 		/* No data transfer */
@@ -2218,7 +2218,7 @@ static inline int qla_tgt_need_explicit_conf(struct qla_hw_data *ha,
 		return ha->enable_explicit_conf && cmd->conf_compl_supported;
 }
 
-static void qla_tgt_init_ctio_ret_entry(ctio_ret_entry_t *ctio_m1,
+static void qla_tgt_init_ctio_ret_entry(ctio_from_2xxx_entry_t *ctio_m1,
 	struct qla_tgt_prm *prm, struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -2260,7 +2260,7 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 	struct scsi_qla_host *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_prm prm;
-	ctio_common_entry_t *pkt;
+	ctio_to_2xxx_entry_t *pkt;
 	unsigned long flags = 0;
 	uint32_t full_req_cnt = 0;
 	int res;
@@ -2284,7 +2284,7 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 		goto out_unmap_unlock;
 
 	qla2xxx_build_ctio_pkt(&prm, cmd->vha);
-	pkt = (ctio_common_entry_t *)prm.pkt;
+	pkt = (ctio_to_2xxx_entry_t *)prm.pkt;
 
 	if (qla_tgt_has_data(cmd) && (xmit_type & QLA_TGT_XMIT_DATA)) {
 		pkt->flags |= __constant_cpu_to_le16(OF_FAST_POST | OF_DATA_IN);
@@ -2309,8 +2309,8 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 			 * amount of request entries to not drop HW lock in
 			 * req_pkt().
 			 */
-			ctio_ret_entry_t *ctio_m1 =
-				(ctio_ret_entry_t *)qla_tgt_get_req_pkt(vha);
+			ctio_from_2xxx_entry_t *ctio_m1 =
+				(ctio_from_2xxx_entry_t *)qla_tgt_get_req_pkt(vha);
 
 			ql_dbg(ql_dbg_tgt, vha, 0xe015, "%s", "Building"
 				" additional status packet");
@@ -2326,7 +2326,7 @@ static int __qla2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8
 			qla_tgt_init_ctio_ret_entry(ctio_m1, &prm, cmd->vha);
 		}
 	} else
-		qla_tgt_init_ctio_ret_entry((ctio_ret_entry_t *)pkt,
+		qla_tgt_init_ctio_ret_entry((ctio_from_2xxx_entry_t *)pkt,
 					&prm, cmd->vha);
 
 	cmd->state = QLA_TGT_STATE_PROCESSED; /* Mid-level is done processing */
@@ -2660,9 +2660,9 @@ int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 		qla24xx_load_data_segments(&prm, vha);
 		p = pkt;
 	} else {
-		ctio_common_entry_t *pkt;
+		ctio_to_2xxx_entry_t *pkt;
 		qla2xxx_build_ctio_pkt(&prm, vha);
-		pkt = (ctio_common_entry_t *)prm.pkt;
+		pkt = (ctio_to_2xxx_entry_t *)prm.pkt;
 		pkt->flags = __constant_cpu_to_le16(OF_FAST_POST | OF_DATA_OUT);
 		qla2xxx_load_data_segments(&prm, vha);
 		p = pkt;
@@ -2689,7 +2689,7 @@ static void qla2xxx_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt
 	atio_entry_t *atio, int ha_locked)
 {
 	struct qla_hw_data *ha = vha->hw;
-	ctio_ret_entry_t *ctio;
+	ctio_from_2xxx_entry_t *ctio;
 	unsigned long flags = 0; /* to stop compiler's warning */
 	int do_tgt_cmd_done = 0;
 
@@ -2702,7 +2702,7 @@ static void qla2xxx_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt
 	if (!ha_locked)
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 
-	ctio = (ctio_ret_entry_t *)qla2x00_req_pkt(vha);
+	ctio = (ctio_from_2xxx_entry_t *)qla2x00_req_pkt(vha);
 	if (ctio == NULL) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
@@ -2931,7 +2931,7 @@ static int qla_tgt_term_ctio_exchange(struct scsi_qla_host *vha, void *ctio,
 			qla_tgt_modify_command_count(vha, 1, 0);
 #if 0 /* seems, it isn't needed */
 		if (ctio != NULL) {
-			ctio_common_entry_t *c = (ctio_common_entry_t *)ctio;
+			ctio_to_2xxx_entry_t *c = (ctio_to_2xxx_entry_t *)ctio;
 			term = !(c->flags &
 				__constant_cpu_to_le16(
 					CTIO7_FLAGS_TERMINATE));
@@ -3000,7 +3000,7 @@ static struct qla_tgt_cmd *qla_tgt_ctio_to_cmd(struct scsi_qla_host *vha, uint32
 				vha->vp_idx);
 			return NULL;
 		} else {
-			ctio_common_entry_t *c = (ctio_common_entry_t *)ctio;
+			ctio_to_2xxx_entry_t *c = (ctio_to_2xxx_entry_t *)ctio;
 			loop_id = GET_TARGET_ID(ha, c);
 			tag = c->rx_id;
 		}
@@ -4262,11 +4262,11 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 static void qla2xxx_send_busy(struct scsi_qla_host *vha, atio_entry_t *atio)
 {
 	struct qla_hw_data *ha = vha->hw;
-	ctio_ret_entry_t *ctio;
+	ctio_from_2xxx_entry_t *ctio;
 
 	/* Sending marker isn't necessary, since we called from ISR */
 
-	ctio = (ctio_ret_entry_t *)qla2x00_req_pkt(vha);
+	ctio = (ctio_from_2xxx_entry_t *)qla2x00_req_pkt(vha);
 	if (!ctio) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet", vha->vp_idx, __func__);
@@ -4522,7 +4522,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 
 	case CONTINUE_TGT_IO_TYPE:
 	{
-		ctio_common_entry_t *entry = (ctio_common_entry_t *)pkt;
+		ctio_to_2xxx_entry_t *entry = (ctio_to_2xxx_entry_t *)pkt;
 		ql_dbg(ql_dbg_tgt, vha, 0xe02a, "CONTINUE_TGT_IO: instance %d\n", vha->vp_idx);
 		qla_tgt_do_ctio_completion(vha, entry->handle,
 			le16_to_cpu(entry->status)|(pkt->entry_status << 16),
@@ -4532,7 +4532,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 
 	case CTIO_A64_TYPE:
 	{
-		ctio_common_entry_t *entry = (ctio_common_entry_t *)pkt;
+		ctio_to_2xxx_entry_t *entry = (ctio_to_2xxx_entry_t *)pkt;
 		ql_dbg(ql_dbg_tgt, vha, 0xe02b, "CTIO_A64: instance %d\n", vha->vp_idx);
 		qla_tgt_do_ctio_completion(vha, entry->handle,
 			le16_to_cpu(entry->status)|(pkt->entry_status << 16),
