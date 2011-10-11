@@ -441,8 +441,8 @@ typedef struct {
 #define CTIO_TYPE7 0x12 /* Continue target I/O entry (for 24xx) */
 
 /*
- * ISP queue - Continue Target I/O (ATIO) type 7 entry (for 24xx) structure
- * definition.
+ * ISP queue -	Continue Target I/O (ATIO) type 7 entry (for 24xx) structure.
+ *		This structure is sent to the ISP 24xx from the target driver.
  */
 
 typedef struct {
@@ -460,35 +460,36 @@ typedef struct {
 	uint8_t  initiator_id[3];
 	uint8_t  reserved;
 	uint32_t exchange_addr;
-} __attribute__((packed)) ctio7_common_entry_t;
+	union {
+		struct {
+			uint16_t reserved1;
+			uint16_t flags;
+			uint32_t residual;
+			uint16_t ox_id;
+			uint16_t scsi_status;
+			uint32_t relative_offset;
+			uint32_t reserved2;
+			uint32_t transfer_length;
+			uint32_t reserved3;
+			uint32_t dseg_0_address[2]; /* Data segment 0 address. */
+			uint32_t dseg_0_length; /* Data segment 0 length. */
+		} status0;
+		struct {
+			uint16_t sense_length;
+			uint16_t flags;
+			uint32_t residual;
+			uint16_t ox_id;
+			uint16_t scsi_status;
+			uint16_t response_len;
+			uint16_t reserved;
+			uint8_t sense_data[24];
+		} status1;
+	} u;
+} __attribute__((packed)) ctio7_to_24xx_entry_t;
 
-typedef struct {
-	ctio7_common_entry_t common;
-	uint16_t reserved1;
-	uint16_t flags;
-	uint32_t residual;
-	uint16_t ox_id;
-	uint16_t scsi_status;
-	uint32_t relative_offset;
-	uint32_t reserved2;
-	uint32_t transfer_length;
-	uint32_t reserved3;
-	uint32_t dseg_0_address[2];	    /* Data segment 0 address. */
-	uint32_t dseg_0_length;		    /* Data segment 0 length. */
-} __attribute__((packed)) ctio7_status0_entry_t;
-
-typedef struct {
-	ctio7_common_entry_t common;
-	uint16_t sense_length;
-	uint16_t flags;
-	uint32_t residual;
-	uint16_t ox_id;
-	uint16_t scsi_status;
-	uint16_t response_len;
-	uint16_t reserved;
-	uint8_t sense_data[24];
-} __attribute__((packed)) ctio7_status1_entry_t;
-
+/*
+ * ISP queue - CTIO type 7 from ISP 24xx to target driver returned entry structure.
+ */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
 	uint8_t	 entry_count;		    /* Entry count. */
@@ -508,7 +509,7 @@ typedef struct {
 	uint16_t reserved3;
 	uint32_t relative_offset;
 	uint8_t  reserved4[24];
-} __attribute__((packed)) ctio7_fw_entry_t;
+} __attribute__((packed)) ctio7_from_24xx_entry_t;
 
 /* CTIO7 flags values */
 #define CTIO7_FLAGS_SEND_STATUS		BIT_15
