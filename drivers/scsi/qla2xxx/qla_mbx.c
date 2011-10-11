@@ -1190,15 +1190,15 @@ int
 qla2x00_get_node_name_list(scsi_qla_host_t *vha, void **out_data, int *out_len)
 {
 	struct qla_hw_data *ha = vha->hw;
-	struct qla_port24_data *list = NULL;
+	struct qla_port_24xx_data *list = NULL;
 	void *pmap;
 	mbx_cmd_t mc;
 	dma_addr_t pmap_dma;
 	ulong dma_size;
 	int rval, left;
 
-	BUILD_BUG_ON(sizeof(struct qla_port24_data) <
-			sizeof(struct qla_port23_data));
+	BUILD_BUG_ON(sizeof(struct qla_port_24xx_data) <
+			sizeof(struct qla_port_2xxx_data));
 
 	left = 1;
 	while (left > 0) {
@@ -1229,9 +1229,9 @@ qla2x00_get_node_name_list(scsi_qla_host_t *vha, void **out_data, int *out_len)
 			if ((mc.mb[0] == MBS_COMMAND_ERROR) &&
 			    (mc.mb[1] == 0xA)) {
 				if (IS_FWI2_CAPABLE(ha))
-					left += le16_to_cpu(mc.mb[2]) / sizeof(struct qla_port24_data);
+					left += le16_to_cpu(mc.mb[2]) / sizeof(struct qla_port_24xx_data);
 				else
-					left += le16_to_cpu(mc.mb[2]) / sizeof(struct qla_port23_data);
+					left += le16_to_cpu(mc.mb[2]) / sizeof(struct qla_port_2xxx_data);
 				goto restart;
 			}
 			goto out_free;

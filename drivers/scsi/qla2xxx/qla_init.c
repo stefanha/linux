@@ -2322,7 +2322,7 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 	}
 #endif
 
-	qla_tgt_2x00_config_nvram_stage1(vha, nv);
+	qla_tgt_2xxx_config_nvram_stage1(vha, nv);
 
 	/* Reset Initialization control block */
 	memset(icb, 0, ha->init_cb_size);
@@ -2398,7 +2398,7 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 		memcpy(icb->port_name, nv->alternate_port_name, WWN_SIZE);
 	}
 
-	qla_tgt_2x00_config_nvram_stage2(vha, icb);
+	qla_tgt_2xxx_config_nvram_stage2(vha, icb);
 
 	/* Prepare nodename */
 	if ((icb->firmware_options[1] & BIT_6) == 0) {
@@ -3627,7 +3627,7 @@ qla2x00_device_resync(scsi_qla_host_t *vha)
 				continue;
 
 			if (atomic_read(&fcport->state) == FCS_ONLINE) {
-				if (vha->hw->qla2x_tmpl != NULL)
+				if (vha->hw->tgt_ops != NULL)
 					qla2x00_mark_device_lost(vha, fcport,
 							0, 0);
 				else if ((format != 3) ||

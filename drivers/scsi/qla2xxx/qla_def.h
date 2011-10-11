@@ -2857,7 +2857,7 @@ struct qla_hw_data {
 	uint16_t atio_q_length;
 
 	void *target_lport_ptr;
-	struct qla_target_template *qla2x_tmpl;
+	struct qla_tgt_func_tmpl *tgt_ops;
 	struct qla_tgt *qla_tgt;
 	struct qla_tgt_cmd *cmds[MAX_OUTSTANDING_COMMANDS];
 	uint16_t current_handle;

@@ -1367,7 +1367,7 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 
 			qla2x00_error_entry(vha, rsp, pkt);
 
-			if (qla_tgt_2x00_process_response_error(vha, pkt) == 1)
+			if (qla_tgt_2xxx_process_response_error(vha, pkt) == 1)
 				break;
 
 			((response_t *)pkt)->signature = RESPONSE_PROCESSED;

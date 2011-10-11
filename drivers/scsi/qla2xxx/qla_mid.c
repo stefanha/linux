@@ -304,7 +304,7 @@ qla2x00_vp_abort_isp(scsi_qla_host_t *vha)
 
 	/* Enable target response to SCSI bus. */
 	if (qla_tgt_mode_enabled(vha))
-		qla2x00_send_enable_lun(vha, true);
+		qla_tgt_2xxx_send_enable_lun(vha, true);
 
 	return 0;
 }

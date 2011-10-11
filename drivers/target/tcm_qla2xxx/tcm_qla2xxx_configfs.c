@@ -838,7 +838,7 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 /*
  * Calls into tcm_qla2xxx used by qla2xxx LLD I/O path.
  */
-static struct qla_target_template tcm_qla2xxx_template = {
+static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.handle_cmd		= tcm_qla2xxx_handle_cmd,
 	.handle_data		= tcm_qla2xxx_handle_data,
 	.handle_tmr		= tcm_qla2xxx_handle_tmr,
@@ -891,7 +891,7 @@ static int tcm_qla2xxx_init_lport(
 	 * Setup the target_lport_ptr and qla2x_tmpl.
 	 */
 	ha->target_lport_ptr = lport;
-	ha->qla2x_tmpl = &tcm_qla2xxx_template;
+	ha->tgt_ops = &tcm_qla2xxx_template;
 
 	return 0;
 }
@@ -1006,7 +1006,7 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
 	 */
 	ha->target_lport_ptr = NULL;
-	ha->qla2x_tmpl = NULL;
+	ha->tgt_ops = NULL;
 	/*
 	 * Release the Scsi_Host reference for the underlying qla2xxx host
 	 */

@@ -886,7 +886,7 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	/*
 	 * Now queue completed DATA_IN the qla2xxx LLD and response ring
 	 */
-	return qla2xxx_xmit_response(cmd, QLA_TGT_XMIT_DATA|QLA_TGT_XMIT_STATUS,
+	return qla_tgt_2xxx_xmit_response(cmd, QLA_TGT_XMIT_DATA|QLA_TGT_XMIT_STATUS,
 				se_cmd->scsi_status);
 }
 
@@ -915,7 +915,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	/*
 	 * Now queue status response to qla2xxx LLD code and response ring
 	 */
-	return qla2xxx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
+	return qla_tgt_2xxx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
 }
 
 int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)

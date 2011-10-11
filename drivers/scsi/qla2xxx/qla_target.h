@@ -34,24 +34,24 @@
  * Must be changed on any change in any initiator visible interfaces or
  * data in the target add-on
  */
-#define QLA2X_TARGET_MAGIC	269
+#define QLA2XXX_TARGET_MAGIC	269
 
 /*
  * Must be changed on any change in any target visible interfaces or
  * data in the initiator
  */
-#define QLA2X_INITIATOR_MAGIC   57222
+#define QLA2XXX_INITIATOR_MAGIC   57222
 
-#define QLA2X_INI_MODE_STR_EXCLUSIVE	"exclusive"
-#define QLA2X_INI_MODE_STR_DISABLED	"disabled"
-#define QLA2X_INI_MODE_STR_ENABLED	"enabled"
+#define QLA2XXX_INI_MODE_STR_EXCLUSIVE	"exclusive"
+#define QLA2XXX_INI_MODE_STR_DISABLED	"disabled"
+#define QLA2XXX_INI_MODE_STR_ENABLED	"enabled"
 
-#define QLA2X_INI_MODE_EXCLUSIVE	0
-#define QLA2X_INI_MODE_DISABLED		1
-#define QLA2X_INI_MODE_ENABLED		2
+#define QLA2XXX_INI_MODE_EXCLUSIVE	0
+#define QLA2XXX_INI_MODE_DISABLED	1
+#define QLA2XXX_INI_MODE_ENABLED	2
 
-#define QLA2X00_COMMAND_COUNT_INIT	250
-#define QLA2X00_IMMED_NOTIFY_COUNT_INIT 250
+#define QLA2XXX_COMMAND_COUNT_INIT	250
+#define QLA2XXX_IMMED_NOTIFY_COUNT_INIT 250
 
 /*
  * Used to mark which completion handles (for RIO Status's) are for CTIO's
@@ -90,23 +90,23 @@
 #define OF_SSTS             BIT_15      /* Send SCSI status */
 #endif
 
-#ifndef DATASEGS_PER_COMMAND32
-#define DATASEGS_PER_COMMAND32    3
-#define DATASEGS_PER_CONT32       7
-#define QLA_MAX_SG32(ql) \
-   (((ql) > 0) ? (DATASEGS_PER_COMMAND32 + DATASEGS_PER_CONT32*((ql) - 1)) : 0)
+#ifndef QLA_TGT_DATASEGS_PER_CMD32
+#define QLA_TGT_DATASEGS_PER_CMD32	3
+#define QLA_TGT_DATASEGS_PER_CONT32	7
+#define QLA_TGT_MAX_SG32(ql) \
+   (((ql) > 0) ? (QLA_TGT_DATASEGS_PER_CMD32 + QLA_TGT_DATASEGS_PER_CONT32*((ql) - 1)) : 0)
 
-#define DATASEGS_PER_COMMAND64    2
-#define DATASEGS_PER_CONT64       5
-#define QLA_MAX_SG64(ql) \
-   (((ql) > 0) ? (DATASEGS_PER_COMMAND64 + DATASEGS_PER_CONT64*((ql) - 1)) : 0)
+#define QLA_TGT_DATASEGS_PER_CMD64	2
+#define QLA_TGT_DATASEGS_PER_CONT64	5
+#define QLA_TGT_MAX_SG64(ql) \
+   (((ql) > 0) ? (QLA_TGT_DATASEGS_PER_CMD64 + QLA_TGT_DATASEGS_PER_CONT64*((ql) - 1)) : 0)
 #endif
 
-#ifndef DATASEGS_PER_COMMAND_24XX
-#define DATASEGS_PER_COMMAND_24XX 1
-#define DATASEGS_PER_CONT_24XX    5
-#define QLA_MAX_SG_24XX(ql) \
-   (min(1270, ((ql) > 0) ? (DATASEGS_PER_COMMAND_24XX + DATASEGS_PER_CONT_24XX*((ql) - 1)) : 0))
+#ifndef QLA_TGT_DATASEGS_PER_CMD_24XX
+#define QLA_TGT_DATASEGS_PER_CMD_24XX	1
+#define QLA_TGT_DATASEGS_PER_CONT_24XX	5
+#define QLA_TGT_MAX_SG_24XX(ql) \
+   (min(1270, ((ql) > 0) ? (QLA_TGT_DATASEGS_PER_CMD_24XX + QLA_TGT_DATASEGS_PER_CONT_24XX*((ql) - 1)) : 0))
 #endif
 
 /********************************************************************\
@@ -181,7 +181,11 @@ typedef struct {
 #ifndef IMMED_NOTIFY_TYPE
 #define IMMED_NOTIFY_TYPE 0x0D		/* Immediate notify entry. */
 /*
- * ISP queue - immediate notify entry structure definition.
+ * ISP queue -	immediate notify entry structure definition.
+ *		This is sent by the ISP 2xxx to the Target driver.
+ *		This IOCB would have report of events sent by the
+ *		initiator, that needs to be handled by the target
+ *		driver immediately.
  */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
@@ -206,7 +210,7 @@ typedef struct {
 	uint16_t srr_ox_id;
 	uint8_t reserved_2[30];
 	uint16_t ox_id;
-} __attribute__((packed)) notify_entry_t;
+} __attribute__((packed)) imm_ntfy_from_2xxx_entry_t;
 #endif
 
 #ifndef NOTIFY_ACK_TYPE
@@ -237,7 +241,7 @@ typedef struct {
 	uint8_t  srr_reject_code_expl;
 	uint8_t  reserved_2[26];
 	uint16_t ox_id;
-} __attribute__((packed)) nack_entry_t;
+} __attribute__((packed)) nack_to_2xxx_entry_t;
 #define NOTIFY_ACK_SRR_FLAGS_ACCEPT	0
 #define NOTIFY_ACK_SRR_FLAGS_REJECT	1
 
@@ -553,7 +557,7 @@ typedef struct {
 	uint8_t  reserved_6;
 	uint16_t reserved_7;
 	uint16_t ox_id;
-} __attribute__((packed)) notify24xx_entry_t;
+} __attribute__((packed)) imm_ntfy_from_24xx_entry_t;
 
 #define ELS_PLOGI			0x3
 #define ELS_FLOGI			0x4
@@ -591,7 +595,7 @@ typedef struct {
 	uint8_t  srr_reject_code;
 	uint8_t  reserved_5[7];
 	uint16_t ox_id;
-} __attribute__((packed)) nack24xx_entry_t;
+} __attribute__((packed)) nack_24xx_entry_t;
 
 /*
  * ISP queue - ABTS received/response entries structure definition for 24xx.
@@ -599,6 +603,12 @@ typedef struct {
 #define ABTS_RECV_24XX		0x54 /* ABTS received (for 24xx) */
 #define ABTS_RESP_24XX		0x55 /* ABTS responce (for 24xx) */
 
+/*
+ * ISP queue -	ABTS received IOCB entry structure definition for 24xx.
+ *		The ABTS BLS received from the wire is sent to the
+ *		target driver by the ISP 24xx.
+ *		The IOCB is placed on the response queue.
+ */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
 	uint8_t	 entry_count;		    /* Entry count. */
@@ -614,7 +624,7 @@ typedef struct {
 	fcp_hdr_le_t fcp_hdr_le;
 	uint8_t  reserved_4[16];
 	uint32_t exchange_addr_to_abort;
-} __attribute__((packed)) abts24_recv_entry_t;
+} __attribute__((packed)) abts_recv_from_24xx_entry_t;
 
 #define ABTS_PARAM_ABORT_SEQ		BIT_0
 
@@ -639,6 +649,12 @@ typedef struct {
 	uint8_t reserved;
 } __attribute__((packed)) ba_rjt_le_t;
 
+/*
+ * ISP queue -	ABTS Response IOCB entry structure definition for 24xx.
+ *		The ABTS response to the ABTS received is sent by the
+ *		target driver to the ISP 24xx.
+ *		The IOCB is placed on the request queue.
+ */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
 	uint8_t	 entry_count;		    /* Entry count. */
@@ -660,8 +676,15 @@ typedef struct {
 	} __attribute__((packed)) payload;
 	uint32_t reserved_4;
 	uint32_t exchange_addr_to_abort;
-} __attribute__((packed)) abts24_resp_entry_t;
+} __attribute__((packed)) abts_resp_to_24xx_entry_t;
 
+/*
+ * ISP queue -	ABTS Response IOCB from ISP24xx Firmware entry structure.
+ *		The ABTS response with completion status to the ABTS response
+ * 		(sent by the target driver to the ISP 24xx) is sent by the
+ *		ISP24xx firmware to the target driver.
+ *		The IOCB is placed on the response queue.
+ */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
 	uint8_t	 entry_count;		    /* Entry count. */
@@ -683,7 +706,7 @@ typedef struct {
 #define ABTS_RESP_SUBCODE_ERR_ABORTED_EXCH_NOT_TERM	0x1E
 	uint32_t error_subcode2;
 	uint32_t exchange_addr_to_abort;
-} __attribute__((packed)) abts24_resp_fw_entry_t;
+} __attribute__((packed)) abts_resp_from_24xx_fw_entry_t;
 
 /********************************************************************\
  * Type Definitions used by initiator & target halves
@@ -692,7 +715,12 @@ typedef struct {
 struct qla_tgt_mgmt_cmd;
 struct qla_tgt_sess;
 
-struct qla_target_template {
+/*
+ * This structure provides a template of function calls that the
+ * target driver (from within qla_target.c) can issue to the
+ * target module (tcm_qla2xxx).
+ */
+struct qla_tgt_func_tmpl {
 
 	int (*handle_cmd)(struct scsi_qla_host *, struct qla_tgt_cmd *, uint32_t,
 			uint32_t, int, int, int);
@@ -793,12 +821,12 @@ int qla2x00_wait_for_hba_online(struct scsi_qla_host *);
 #define QLA_TGT_SENSE_VALID(sense)  ((sense != NULL) && \
 				(((const uint8_t *)(sense))[0] & 0x70) == 0x70)
 
-struct qla_port23_data {
+struct qla_port_2xxx_data {
 	uint8_t port_name[WWN_SIZE];
 	uint16_t loop_id;
 };
 
-struct qla_port24_data {
+struct qla_port_24xx_data {
 	uint8_t port_name[WWN_SIZE];
 	uint16_t loop_id;
 	uint16_t reserved;
@@ -844,7 +872,7 @@ struct qla_tgt {
 	struct list_head sess_works_list;
 	struct work_struct sess_work;
 
-	notify24xx_entry_t link_reinit_iocb;
+	imm_ntfy_from_24xx_entry_t link_reinit_iocb;
 	wait_queue_head_t waitQ;
 	int notify_ack_expected;
 	int abts_resp_expected;
@@ -938,8 +966,8 @@ struct qla_tgt_sess_work_param {
 
 	union {
 		struct qla_tgt_cmd *cmd;
-		abts24_recv_entry_t abts;
-		notify_entry_t tm_iocb;
+		abts_recv_from_24xx_entry_t abts;
+		imm_ntfy_from_2xxx_entry_t tm_iocb;
 		atio7_entry_t tm_iocb2;
 	};
 };
@@ -954,9 +982,9 @@ struct qla_tgt_mgmt_cmd {
 #define Q24_MGMT_SEND_NACK	1
 	union {
 		atio7_entry_t atio7;
-		notify_entry_t notify_entry;
-		notify24xx_entry_t notify_entry24;
-		abts24_recv_entry_t abts;
+		imm_ntfy_from_2xxx_entry_t imm_ntfy;
+		imm_ntfy_from_24xx_entry_t imm_ntfy24;
+		abts_recv_from_24xx_entry_t abts;
 	} __attribute__((packed)) orig_iocb;
 };
 
@@ -975,16 +1003,16 @@ struct qla_tgt_prm {
 	int add_status_pkt;
 };
 
-struct srr_imm {
+struct qla_tgt_srr_imm {
 	struct list_head srr_list_entry;
 	int srr_id;
 	union {
-		notify_entry_t notify_entry;
-		notify24xx_entry_t notify_entry24;
+		imm_ntfy_from_2xxx_entry_t imm_ntfy;
+		imm_ntfy_from_24xx_entry_t imm_ntfy24;
 	} __attribute__((packed)) imm;
 };
 
-struct srr_ctio {
+struct qla_tgt_srr_ctio {
 	struct list_head srr_list_entry;
 	int srr_id;
 	struct qla_tgt_cmd *cmd;
@@ -1037,8 +1065,8 @@ static inline void qla_reverse_ini_mode(struct scsi_qla_host *ha)
 \********************************************************************/
 
 /*
- * qla2x00_do_en_dis_lun
- *	Issue enable or disable LUN entry IOCB.
+ * qla_tgt_2xxx_send_enable_lun
+ *	Issue enable or disable LUN entry IOCB to the ISP.
  *
  * Input:
  *	ha = adapter block pointer.
@@ -1047,7 +1075,7 @@ static inline void qla_reverse_ini_mode(struct scsi_qla_host *ha)
  * then reaquire.
  */
 static inline void
-__qla2x00_send_enable_lun(struct scsi_qla_host *vha, int enable)
+__qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, int enable)
 {
 	elun_entry_t *pkt;
 	struct qla_hw_data *ha = vha->hw;
@@ -1058,8 +1086,8 @@ __qla2x00_send_enable_lun(struct scsi_qla_host *vha, int enable)
 	if (pkt != NULL) {
 		pkt->entry_type = ENABLE_LUN_TYPE;
 		if (enable) {
-			pkt->command_count = QLA2X00_COMMAND_COUNT_INIT;
-			pkt->immed_notify_count = QLA2X00_IMMED_NOTIFY_COUNT_INIT;
+			pkt->command_count = QLA2XXX_COMMAND_COUNT_INIT;
+			pkt->immed_notify_count = QLA2XXX_IMMED_NOTIFY_COUNT_INIT;
 			pkt->timeout = 0xffff;
 		} else {
 			pkt->command_count = 0;
@@ -1081,7 +1109,7 @@ __qla2x00_send_enable_lun(struct scsi_qla_host *vha, int enable)
 }
 
 /*
- * qla2x00_send_enable_lun
+ * qla_tgt_2xxx_send_enable_lun
  *      Issue enable LUN entry IOCB.
  *
  * Input:
@@ -1089,24 +1117,24 @@ __qla2x00_send_enable_lun(struct scsi_qla_host *vha, int enable)
  *	enable = enable/disable flag.
  */
 static inline void
-qla2x00_send_enable_lun(struct scsi_qla_host *vha, bool enable)
+qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, bool enable)
 {
 	struct qla_hw_data *ha = vha->hw;
 
 	if (!IS_FWI2_CAPABLE(ha)) {
 		unsigned long flags;
 		spin_lock_irqsave(&ha->hardware_lock, flags);
-		__qla2x00_send_enable_lun(vha, enable);
+		__qla_tgt_2xxx_send_enable_lun(vha, enable);
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	}
 }
 /*
- * Exported symbols from qla_target.c LLD logic used by tcm_qla2xxx code..
+ * Exported symbols from qla_target.c LLD logic used by qla2xxx code..
  */
-extern void qla24xx_atio_pkt_all_vps(struct scsi_qla_host *, atio7_entry_t *);
+extern void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *, atio7_entry_t *);
 extern void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *, response_t *);
 extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
-extern int qla2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
+extern int qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
@@ -1120,12 +1148,12 @@ extern void qla_tgt_initialize_adapter(struct scsi_qla_host *, struct qla_hw_dat
 extern void qla_tgt_init_atio_q_entries(struct scsi_qla_host *);
 extern void qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *);
 extern void qla_tgt_24xx_config_rings(struct scsi_qla_host *, device_reg_t __iomem *);
-extern void qla_tgt_2x00_config_nvram_stage1(struct scsi_qla_host *, nvram_t *);
-extern void qla_tgt_2x00_config_nvram_stage2(struct scsi_qla_host *, init_cb_t *);
+extern void qla_tgt_2xxx_config_nvram_stage1(struct scsi_qla_host *, nvram_t *);
+extern void qla_tgt_2xxx_config_nvram_stage2(struct scsi_qla_host *, init_cb_t *);
 extern void qla_tgt_24xx_config_nvram_stage1(struct scsi_qla_host *, struct nvram_24xx *);
 extern void qla_tgt_24xx_config_nvram_stage2(struct scsi_qla_host *, struct init_cb_24xx *);
 extern void qla_tgt_abort_isp(struct scsi_qla_host *);
-extern int qla_tgt_2x00_process_response_error(struct scsi_qla_host *, sts_entry_t *);
+extern int qla_tgt_2xxx_process_response_error(struct scsi_qla_host *, sts_entry_t *);
 extern int qla_tgt_24xx_process_response_error(struct scsi_qla_host *, struct sts_entry_24xx *);
 extern void qla_tgt_modify_vp_config(struct scsi_qla_host *, struct vp_config_entry_24xx *);
 extern void qla_tgt_probe_one_stage1(struct scsi_qla_host *, struct qla_hw_data *);
