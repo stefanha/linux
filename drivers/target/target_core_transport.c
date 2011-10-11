@@ -4243,9 +4243,12 @@ EXPORT_SYMBOL(transport_release_cmd);
 
 void transport_generic_free_cmd(struct se_cmd *cmd, int wait_for_tasks)
 {
-	if (!(cmd->se_cmd_flags & SCF_SE_LUN_CMD))
+	if (!(cmd->se_cmd_flags & SCF_SE_LUN_CMD)) {
+		if (wait_for_tasks && cmd->se_tmr_req)
+			 transport_wait_for_tasks(cmd);
+
 		transport_release_cmd(cmd);
-	else {
+	} else {
 		if (wait_for_tasks)
 			transport_wait_for_tasks(cmd);
 
@@ -4450,7 +4453,7 @@ void transport_wait_for_tasks(struct se_cmd *cmd)
 	 * Only perform a possible wait_for_tasks if SCF_SUPPORTED_SAM_OPCODE
 	 * has been set in transport_set_supported_SAM_opcode().
 	 */
-	if (!(cmd->se_cmd_flags & SCF_SUPPORTED_SAM_OPCODE)) {
+	if (!(cmd->se_cmd_flags & SCF_SUPPORTED_SAM_OPCODE) && !cmd->se_tmr_req) {
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 		return;
 	}
