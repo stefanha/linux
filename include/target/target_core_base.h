@@ -409,7 +409,6 @@ struct se_task {
 	u8		task_scsi_status;
 	u8		task_flags;
 	int		task_error_status;
-	bool		task_padded_sg;
 	unsigned long long	task_lba;
 	u32		task_sectors;
 	u32		task_size;

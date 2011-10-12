@@ -3891,15 +3891,13 @@ void transport_do_task_sg_chain(struct se_cmd *cmd)
 		/*
 		 * For the padded tasks, use the extra SGL vector allocated
 		 * in transport_allocate_data_tasks() for the sg_prev_nents
-		 * offset into sg_chain() above..  The last task of a
-		 * multi-task list, or a single task will not have
-		 * task->task_sg_padded set..
+		 * offset into sg_chain() above.
+		 *
+		 * We do not need the padding for the last task (or a single
+		 * task), but in that case we will never use the sg_prev_nents
+		 * value below which would be incorrect.
 		 */
-		if (task->task_padded_sg)
-			sg_prev_nents = (task->task_sg_nents + 1);
-		else
-			sg_prev_nents = task->task_sg_nents;
-
+		sg_prev_nents = (task->task_sg_nents + 1);
 		sg_prev = task->task_sg;
 	}
 	/*
@@ -3986,7 +3984,6 @@ static int transport_allocate_data_tasks(
 		 */
 		if (cmd->se_tfo->task_sg_chaining && (i < (task_count - 1))) {
 			task_sg_nents_padded = (task->task_sg_nents + 1);
-			task->task_padded_sg = 1;
 		} else
 			task_sg_nents_padded = task->task_sg_nents;
 
