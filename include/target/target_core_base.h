@@ -412,7 +412,6 @@ struct se_task {
 	u32		task_size;
 	enum dma_data_direction	task_data_direction;
 	struct se_cmd *task_se_cmd;
-	struct se_device	*se_dev;
 	struct completion	task_stop_comp;
 	atomic_t	task_active;
 	atomic_t	task_execute_queue;

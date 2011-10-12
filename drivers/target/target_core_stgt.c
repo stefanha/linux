@@ -324,7 +324,7 @@ stgt_alloc_task(unsigned char *cdb)
 static int stgt_do_task(struct se_task *task)
 {
 	struct stgt_plugin_task *st = STGT_TASK(task);
-	struct Scsi_Host *sh = task->se_dev->se_hba->hba_ptr;
+	struct Scsi_Host *sh = task->task_se_cmd->se_dev->se_hba->hba_ptr;
 	struct scsi_cmnd *sc;
 	int tag = MSG_SIMPLE_TAG;
 
