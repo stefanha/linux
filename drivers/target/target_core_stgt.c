@@ -336,6 +336,7 @@ static int stgt_do_task(struct se_task *task)
 		return PYX_TRANSPORT_LU_COMM_FAILURE;
 	}
 
+	target_get_task_cdb(task, st->stgt_cdb);
 	memcpy(sc->cmnd, st->stgt_cdb, MAX_COMMAND_SIZE);
 	sc->sdb.length = task->task_size;
 	sc->sdb.table.sgl = task->task_sg;
@@ -462,17 +463,6 @@ static ssize_t stgt_show_configfs_dev_params(
 	return bl;
 }
 
-/*	stgt_get_cdb():
- *
- *
- */
-static unsigned char *stgt_get_cdb(struct se_task *task)
-{
-	struct stgt_plugin_task *pt = STGT_TASK(task);
-
-	return pt->stgt_cdb;
-}
-
 /*	stgt_get_sense_buffer():
  *
  *
@@ -590,7 +580,6 @@ static struct se_subsystem_api stgt_template = {
 	.check_configfs_dev_params = stgt_check_configfs_dev_params,
 	.set_configfs_dev_params = stgt_set_configfs_dev_params,
 	.show_configfs_dev_params = stgt_show_configfs_dev_params,
-	.get_cdb		= stgt_get_cdb,
 	.get_sense_buffer	= stgt_get_sense_buffer,
 	.get_device_rev		= stgt_get_device_rev,
 	.get_device_type	= stgt_get_device_type,
