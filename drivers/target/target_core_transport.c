@@ -3934,7 +3934,6 @@ static int transport_allocate_data_tasks(
 	struct scatterlist *sgl,
 	unsigned int sgl_nents)
 {
-	unsigned char *cdb = NULL;
 	struct se_task *task;
 	struct se_device *dev = cmd->se_dev;
 	unsigned long flags;
@@ -3961,14 +3960,17 @@ static int transport_allocate_data_tasks(
 		task->task_sectors = min(sectors, dev_max_sectors);
 		task->task_size = task->task_sectors * sector_size;
 
-		cdb = dev->transport->get_cdb(task);
-		BUG_ON(!cdb);
+		if (dev->transport->get_cdb) {
+			unsigned char *cdb = dev->transport->get_cdb(task);
 
-		memcpy(cdb, cmd->t_task_cdb,
-		       scsi_command_size(cmd->t_task_cdb));
+			memcpy(cdb, cmd->t_task_cdb,
+			       scsi_command_size(cmd->t_task_cdb));
 
-		/* Update new cdb with updated lba/sectors */
-		cmd->transport_split_cdb(task->task_lba, task->task_sectors, cdb);
+			/* Update new cdb with updated lba/sectors */
+			cmd->transport_split_cdb(task->task_lba,
+						 task->task_sectors, cdb);
+		}
+
 		/*
 		 * This now assumes that passed sg_ents are in PAGE_SIZE chunks
 		 * in order to calculate the number per task SGL entries
@@ -4023,7 +4025,6 @@ static int
 transport_allocate_control_task(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	unsigned char *cdb;
 	struct se_task *task;
 	unsigned long flags;
 
@@ -4031,10 +4032,11 @@ transport_allocate_control_task(struct se_cmd *cmd)
 	if (!task)
 		return -ENOMEM;
 
-	cdb = dev->transport->get_cdb(task);
-	BUG_ON(!cdb);
-	memcpy(cdb, cmd->t_task_cdb,
-	       scsi_command_size(cmd->t_task_cdb));
+	if (dev->transport->get_cdb) {
+		unsigned char *cdb = dev->transport->get_cdb(task);
+
+		memcpy(cdb, cmd->t_task_cdb, scsi_command_size(cmd->t_task_cdb));
+	}
 
 	task->task_sg = kmalloc(sizeof(struct scatterlist) * cmd->t_data_nents,
 				GFP_KERNEL);
