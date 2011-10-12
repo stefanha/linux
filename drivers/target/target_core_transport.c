@@ -918,38 +918,36 @@ static void transport_add_tasks_from_cmd(struct se_cmd *cmd)
 
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
 	list_for_each_entry(task, &cmd->t_task_list, t_list) {
-		if (atomic_read(&task->task_execute_queue))
+		if (!list_empty(&task->t_execute_list))
 			continue;
 		/*
 		 * __transport_add_task_to_execute_queue() handles the
 		 * SAM Task Attribute emulation if enabled
 		 */
 		__transport_add_task_to_execute_queue(task, task_prev, dev);
-		atomic_set(&task->task_execute_queue, 1);
 		task_prev = task;
 	}
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 }
 
-/*	transport_remove_task_from_execute_queue():
- *
- *
- */
+void __transport_remove_task_from_execute_queue(struct se_task *task,
+		struct se_device *dev)
+{
+	list_del_init(&task->t_execute_list);
+	atomic_dec(&dev->execute_tasks);
+}
+
 void transport_remove_task_from_execute_queue(
 	struct se_task *task,
 	struct se_device *dev)
 {
 	unsigned long flags;
 
-	if (atomic_read(&task->task_execute_queue) == 0) {
-		dump_stack();
+	if (WARN_ON(list_empty(&task->t_execute_list)))
 		return;
-	}
 
 	spin_lock_irqsave(&dev->execute_task_lock, flags);
-	list_del(&task->t_execute_list);
-	atomic_set(&task->task_execute_queue, 0);
-	atomic_dec(&dev->execute_tasks);
+	__transport_remove_task_from_execute_queue(task, dev);
 	spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 }
 
@@ -2349,9 +2347,7 @@ check_depth:
 	}
 	task = list_first_entry(&dev->execute_task_list,
 				struct se_task, t_execute_list);
-	list_del(&task->t_execute_list);
-	atomic_set(&task->task_execute_queue, 0);
-	atomic_dec(&dev->execute_tasks);
+	__transport_remove_task_from_execute_queue(task, dev);
 	spin_unlock_irq(&dev->execute_task_lock);
 
 	atomic_dec(&dev->depth_left);

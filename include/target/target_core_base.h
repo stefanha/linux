@@ -417,7 +417,6 @@ struct se_task {
 	enum dma_data_direction	task_data_direction;
 	struct se_cmd *task_se_cmd;
 	struct completion	task_stop_comp;
-	atomic_t	task_execute_queue;
 	atomic_t	task_state_active;
 	struct timer_list	task_timer;
 	struct list_head t_list;
