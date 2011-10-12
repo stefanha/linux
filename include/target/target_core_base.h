@@ -421,7 +421,6 @@ struct se_task {
 	atomic_t	task_stop;
 	atomic_t	task_state_active;
 	struct timer_list	task_timer;
-	struct se_device *se_obj_ptr;
 	struct list_head t_list;
 	struct list_head t_execute_list;
 	struct list_head t_state_list;
