@@ -411,7 +411,6 @@ struct se_task {
 	int		task_error_status;
 	bool		task_padded_sg;
 	unsigned long long	task_lba;
-	u32		task_no;
 	u32		task_sectors;
 	u32		task_size;
 	enum dma_data_direction	task_data_direction;

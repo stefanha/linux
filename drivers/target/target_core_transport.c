@@ -1787,8 +1787,7 @@ static int transport_stop_tasks_for_cmd(struct se_cmd *cmd)
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	list_for_each_entry_safe(task, task_tmp,
 				&cmd->t_task_list, t_list) {
-		pr_debug("task_no[%d] - Processing task %p\n",
-				task->task_no, task);
+		pr_debug("Processing task %p\n", task);
 		/*
 		 * If the struct se_task has not been sent and is not active,
 		 * remove the struct se_task from the execution queue.
@@ -1799,8 +1798,7 @@ static int transport_stop_tasks_for_cmd(struct se_cmd *cmd)
 			transport_remove_task_from_execute_queue(task,
 					cmd->se_dev);
 
-			pr_debug("task_no[%d] - Removed from execute queue\n",
-				task->task_no);
+			pr_debug("Task %p removed from execute queue\n", task);
 			spin_lock_irqsave(&cmd->t_state_lock, flags);
 			continue;
 		}
@@ -1814,17 +1812,15 @@ static int transport_stop_tasks_for_cmd(struct se_cmd *cmd)
 			spin_unlock_irqrestore(&cmd->t_state_lock,
 					flags);
 
-			pr_debug("task_no[%d] - Waiting to complete\n",
-				task->task_no);
+			pr_debug("Task %p waiting to complete\n", task);
 			wait_for_completion(&task->task_stop_comp);
-			pr_debug("task_no[%d] - Stopped successfully\n",
-				task->task_no);
+			pr_debug("Task %p stopped successfully\n", task);
 
 			spin_lock_irqsave(&cmd->t_state_lock, flags);
 			atomic_dec(&cmd->t_task_cdbs_left);
 			task->task_flags &= ~(TF_ACTIVE | TF_REQUEST_STOP);
 		} else {
-			pr_debug("task_no[%d] - Did nothing\n", task->task_no);
+			pr_debug("Task %p - did nothing\n", task);
 			ret++;
 		}
 
@@ -2679,9 +2675,9 @@ static int transport_get_sense_data(struct se_cmd *cmd)
 
 		sense_buffer = dev->transport->get_sense_buffer(task);
 		if (!sense_buffer) {
-			pr_err("ITT[0x%08x]_TASK[%d]: Unable to locate"
+			pr_err("ITT[0x%08x]_TASK[%p]: Unable to locate"
 				" sense buffer for task with sense\n",
-				cmd->se_tfo->get_task_tag(cmd), task->task_no);
+				cmd->se_tfo->get_task_tag(cmd), task);
 			continue;
 		}
 		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
