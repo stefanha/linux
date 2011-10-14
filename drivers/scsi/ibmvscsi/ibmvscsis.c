@@ -1241,17 +1241,10 @@ static int ibmvscsis_write_pending(struct se_cmd *se_cmd)
 
 	sc->sdb.length = se_cmd->data_length;
 
-	if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
-	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
-		transport_do_task_sg_chain(se_cmd);
+	transport_do_task_sg_chain(se_cmd);
 
-		sc->sdb.table.nents = se_cmd->t_tasks_sg_chained_no;
-		sc->sdb.table.sgl = se_cmd->t_tasks_sg_chained;
-	} else {
-		pr_err("Unknown se_cmd_flags: 0x%08x in"
-			" ibmvscsis_write_pendingg()\n", se_cmd->se_cmd_flags);
-		BUG();
-	}
+	sc->sdb.table.nents = se_cmd->t_tasks_sg_chained_no;
+	sc->sdb.table.sgl = se_cmd->t_tasks_sg_chained;
 
 	ret = srp_transfer_data(sc, &vio_iu(iue)->srp.cmd,
 				ibmvscsis_rdma, 1, 1);
@@ -1283,17 +1276,11 @@ static int ibmvscsis_queue_data_in(struct se_cmd *se_cmd)
 	/*
 	 * Setup the struct se_task->task_sg[] chained SG list
 	 */
-	if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
-	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
-		transport_do_task_sg_chain(se_cmd);
+	transport_do_task_sg_chain(se_cmd);
 
-		sc->sdb.table.nents = se_cmd->t_tasks_sg_chained_no;
-		sc->sdb.table.sgl = se_cmd->t_tasks_sg_chained;
-	} else {
-		pr_err("Unknown se_cmd_flags: 0x%08x in"
-			" ibmvscsis_queue_data_in()\n", se_cmd->se_cmd_flags);
-		BUG();
-	}
+	sc->sdb.table.nents = se_cmd->t_tasks_sg_chained_no;
+	sc->sdb.table.sgl = se_cmd->t_tasks_sg_chained;
+
 	/*
 	 * This will call srp_transfer_data() and post the response
 	 * to VIO via libsrp.

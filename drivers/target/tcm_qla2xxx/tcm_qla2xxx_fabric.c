@@ -623,20 +623,12 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 
 	cmd->bufflen = se_cmd->data_length;
 	cmd->dma_data_direction = tcm_qla2xxx_mapping_dir(se_cmd);
+
 	/*
 	 * Setup the struct se_task->task_sg[] chained SG list
 	 */
-	if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
-	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
-		transport_do_task_sg_chain(se_cmd);
+	transport_do_task_sg_chain(se_cmd);
 
-		cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
-		cmd->sg = se_cmd->t_tasks_sg_chained;
-	} else {
-		pr_err("Unknown se_cmd_flags: 0x%08x in"
-			" tcm_qla2xxx_write_pending()\n", se_cmd->se_cmd_flags);
-		BUG();
-	}
 	/*
 	 * qla_target.c:qla_tgt_rdy_to_xfer() will call pci_map_sg() to setup
 	 * the SGL mappings into PCIe memory for incoming FCP WRITE data.
@@ -867,20 +859,13 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	cmd->bufflen = se_cmd->data_length;
 	cmd->dma_data_direction = tcm_qla2xxx_mapping_dir(se_cmd);
 	cmd->aborted = atomic_read(&se_cmd->t_transport_aborted);
+
 	/*
 	 * Setup the struct se_task->task_sg[] chained SG list
 	 */
-	if ((se_cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
-	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
-		transport_do_task_sg_chain(se_cmd);
-
-		cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
-		cmd->sg = se_cmd->t_tasks_sg_chained;
-	} else {
-		cmd->sg_cnt = 0;
-		cmd->sg = NULL;
-	}
-
+	transport_do_task_sg_chain(se_cmd);
+	cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
+	cmd->sg = se_cmd->t_tasks_sg_chained;
 	cmd->offset = 0;
 
 	/*

@@ -1126,18 +1126,12 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	cmd = &ioctx->cmd;
 	dir = cmd->data_direction;
 	BUG_ON(dir == DMA_NONE);
-	if (cmd->se_cmd_flags & (SCF_SCSI_DATA_SG_IO_CDB
-				 | SCF_SCSI_CONTROL_SG_IO_CDB)) {
-		transport_do_task_sg_chain(cmd);
-		sg = sg_orig = cmd->t_tasks_sg_chained;
-		sg_cnt = cmd->t_tasks_sg_chained_no;
-	} else {
-		pr_debug("?? sg == NULL\n");
-		ioctx->mapped_sg_count = 0;
-		return 0;
-	}
-	ioctx->sg = sg;
-	ioctx->sg_cnt = sg_cnt;
+
+	transport_do_task_sg_chain(cmd);
+
+	ioctx->sg = sg = sg_orig = cmd->t_tasks_sg_chained;
+	ioctx->sg_cnt = sg_cnt = cmd->t_tasks_sg_chained_no;
+
 	count = ib_dma_map_sg(ch->sport->sdev->device, sg, sg_cnt,
 			      opposite_dma_dir(dir));
 	if (unlikely(!count))
