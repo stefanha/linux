@@ -1245,19 +1245,12 @@ static int ibmvscsis_write_pending(struct se_cmd *se_cmd)
 	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(se_cmd);
 
-		sc->sdb.table.nents = se_cmd->t_task.t_tasks_sg_chained_no;
-		sc->sdb.table.sgl = se_cmd->t_task.t_tasks_sg_chained;
-	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		/*
-		 * Use T_TASK(se_cmd)->t_tasks_sg_bounce for control CDBs
-		 * using a contigious buffer
-		 */
-		sg_init_table(&se_cmd->t_task.t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_task.t_tasks_sg_bounce,
-			se_cmd->t_task.t_task_buf, se_cmd->data_length);
-
-		sc->sdb.table.nents = 1;
-		sc->sdb.table.sgl = &se_cmd->t_task.t_tasks_sg_bounce;
+		sc->sdb.table.nents = se_cmd->t_tasks_sg_chained_no;
+		sc->sdb.table.sgl = se_cmd->t_tasks_sg_chained;
+	} else {
+		pr_err("Unknown se_cmd_flags: 0x%08x in"
+			" ibmvscsis_write_pendingg()\n", se_cmd->se_cmd_flags);
+		BUG();
 	}
 
 	ret = srp_transfer_data(sc, &vio_iu(iue)->srp.cmd,
@@ -1294,19 +1287,12 @@ static int ibmvscsis_queue_data_in(struct se_cmd *se_cmd)
 	    (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
 		transport_do_task_sg_chain(se_cmd);
 
-		sc->sdb.table.nents = se_cmd->t_task.t_tasks_sg_chained_no;
-		sc->sdb.table.sgl = se_cmd->t_task.t_tasks_sg_chained;
-	} else if (se_cmd->se_cmd_flags & SCF_SCSI_CONTROL_NONSG_IO_CDB) {
-		/*
-		 * Use T_TASK(se_cmd)->t_tasks_sg_bounce for control CDBs
-		 * using a contigious buffer
-		 */
-		sg_init_table(&se_cmd->t_task.t_tasks_sg_bounce, 1);
-		sg_set_buf(&se_cmd->t_task.t_tasks_sg_bounce,
-			se_cmd->t_task.t_task_buf, se_cmd->data_length);
-
-		sc->sdb.table.nents = 1;
-		sc->sdb.table.sgl = &se_cmd->t_task.t_tasks_sg_bounce;
+		sc->sdb.table.nents = se_cmd->t_tasks_sg_chained_no;
+		sc->sdb.table.sgl = se_cmd->t_tasks_sg_chained;
+	} else {
+		pr_err("Unknown se_cmd_flags: 0x%08x in"
+			" ibmvscsis_queue_data_in()\n", se_cmd->se_cmd_flags);
+		BUG();
 	}
 	/*
 	 * This will call srp_transfer_data() and post the response
