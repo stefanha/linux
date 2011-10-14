@@ -312,13 +312,6 @@ static int ibmvscsis_is_state_remove(struct se_cmd *se_cmd)
 	return 0;
 }
 
-static u64 make_lun(unsigned int bus, unsigned int target, unsigned int lun);
-
-static u64 ibmvscsis_pack_lun(unsigned int lun)
-{
-	return make_lun(0, lun & 0x003f, 0);
-}
-
 /* Local pointer to allocated TCM configfs fabric module */
 static struct target_fabric_configfs *ibmvscsis_fabric_configfs;
 
@@ -465,7 +458,6 @@ static struct target_core_fabric_ops ibmvscsis_ops = {
 	.get_fabric_sense_len		= ibmvscsis_get_fabric_sense_len,
 	.set_fabric_sense_len		= ibmvscsis_set_fabric_sense_len,
 	.is_state_remove		= ibmvscsis_is_state_remove,
-	.pack_lun			= ibmvscsis_pack_lun,
 	.fabric_make_wwn		= ibmvscsis_make_tport,
 	.fabric_drop_wwn		= ibmvscsis_drop_tport,
 	.fabric_make_tpg		= ibmvscsis_make_tpg,
