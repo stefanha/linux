@@ -1132,7 +1132,7 @@ extern void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *,
 	atio7_from_24xx_entry_t *);
 extern void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *, response_t *);
 extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
-extern int qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
+extern int qla_tgt_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);

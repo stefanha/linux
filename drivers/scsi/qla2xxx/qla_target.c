@@ -2387,7 +2387,7 @@ static void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_type)
 static inline void qla_tgt_check_srr_debug(struct qla_tgt_cmd *cmd, int *xmit_type) {}
 #endif
 
-int qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_status)
+int qla_tgt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_status)
 {
 	qla_tgt_check_srr_debug(cmd, &xmit_type);
 
@@ -2400,7 +2400,7 @@ int qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t s
 		__qla_tgt_24xx_xmit_response(cmd, xmit_type, scsi_status) :
 		__qla_tgt_2xxx_xmit_response(cmd, xmit_type, scsi_status);
 }
-EXPORT_SYMBOL(qla_tgt_2xxx_xmit_response);
+EXPORT_SYMBOL(qla_tgt_xmit_response);
 
 static void qla_tgt_24xx_init_ctio_ret_entry(ctio7_to_24xx_entry_t *ctio,
 	struct qla_tgt_prm *prm)

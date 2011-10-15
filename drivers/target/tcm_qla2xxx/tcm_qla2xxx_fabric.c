@@ -722,7 +722,7 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 		 * Clear qla_tgt_cmd->locked_rsp as ha->hardware_lock
 		 * is already held here, and we'll end up calling back
 		 * into ->queue_status (tcm_qla2xxx_queue_status())
-		 * and hence qla2xxx_xmit_response().
+		 * and hence qla_tgt_xmit_response().
 		 */
 		cmd->locked_rsp = 0;
 
@@ -873,7 +873,7 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	/*
 	 * Now queue completed DATA_IN the qla2xxx LLD and response ring
 	 */
-	return qla_tgt_2xxx_xmit_response(cmd, QLA_TGT_XMIT_DATA|QLA_TGT_XMIT_STATUS,
+	return qla_tgt_xmit_response(cmd, QLA_TGT_XMIT_DATA|QLA_TGT_XMIT_STATUS,
 				se_cmd->scsi_status);
 }
 
@@ -892,7 +892,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	if (se_cmd->data_direction == DMA_FROM_DEVICE) {
 		/*
 		 * For FCP_READ with CHECK_CONDITION status, clear cmd->bufflen
-		 * for qla2xxx_xmit_response LLD code
+		 * for qla_tgt_xmit_response LLD code
 		 */
 		se_cmd->se_cmd_flags |= SCF_UNDERFLOW_BIT;
 		se_cmd->residual_count = se_cmd->data_length;
@@ -902,7 +902,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	/*
 	 * Now queue status response to qla2xxx LLD code and response ring
 	 */
-	return qla_tgt_2xxx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
+	return qla_tgt_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
 }
 
 int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
