@@ -2402,7 +2402,7 @@ int qla_tgt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_s
 }
 EXPORT_SYMBOL(qla_tgt_xmit_response);
 
-static void qla_tgt_24xx_init_ctio_ret_entry(ctio7_to_24xx_entry_t *ctio,
+static void qla_tgt_24xx_init_ctio_to_isp(ctio7_to_24xx_entry_t *ctio,
 	struct qla_tgt_prm *prm)
 {
 	prm->sense_buffer_len = min((uint32_t)prm->sense_buffer_len,
@@ -2539,12 +2539,12 @@ static int __qla_tgt_24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 			pkt->handle |= CTIO_INTERMEDIATE_HANDLE_MARK;
 			pkt->u.status0.flags |= __constant_cpu_to_le16(
 					CTIO7_FLAGS_DONT_RET_CTIO);
-			qla_tgt_24xx_init_ctio_ret_entry((ctio7_to_24xx_entry_t *)ctio,
+			qla_tgt_24xx_init_ctio_to_isp((ctio7_to_24xx_entry_t *)ctio,
 							&prm);
 			printk("Status CTIO7: %p\n", ctio);
 		}
 	} else
-		qla_tgt_24xx_init_ctio_ret_entry(pkt, &prm);
+		qla_tgt_24xx_init_ctio_to_isp(pkt, &prm);
 
 
 	cmd->state = QLA_TGT_STATE_PROCESSED; /* Mid-level is done processing */
