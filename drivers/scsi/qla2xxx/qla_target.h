@@ -278,7 +278,7 @@ typedef struct {
 	uint8_t  initiator_port_name[WWN_SIZE]; /* on qla23xx */
 	uint16_t reserved_32[6];
 	uint16_t ox_id;
-} __attribute__((packed)) atio_entry_t;
+} __attribute__((packed)) atio_from_2xxx_entry_t;
 #endif
 
 #ifndef CONTINUE_TGT_IO_TYPE
@@ -427,8 +427,8 @@ typedef struct {
 } __attribute__((packed)) atio7_fcp_cmnd_t;
 
 /*
- * ISP queue - Accept Target I/O (ATIO) type 7 entry for 24xx structure
- * definition.
+ * ISP queue -	Accept Target I/O (ATIO) type 7 entry for 24xx structure.
+ *		This is sent from ISP 24xx to the target driver.
  */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
@@ -440,7 +440,7 @@ typedef struct {
 #define ATIO_EXCHANGE_ADDRESS_UNKNOWN		0xFFFFFFFF
 	fcp_hdr_t fcp_hdr;
 	atio7_fcp_cmnd_t fcp_cmnd;
-} __attribute__((packed)) atio7_entry_t;
+} __attribute__((packed)) atio7_from_24xx_entry_t;
 
 #define CTIO_TYPE7 0x12 /* Continue target I/O entry (for 24xx) */
 
@@ -951,8 +951,8 @@ struct qla_tgt_cmd {
 	struct list_head cmd_list;
 
 	union {
-		atio7_entry_t atio7;
-		atio_entry_t atio2x;
+		atio7_from_24xx_entry_t atio7;
+		atio_from_2xxx_entry_t atio2x;
 	} __attribute__((packed)) atio;
 };
 
@@ -968,7 +968,7 @@ struct qla_tgt_sess_work_param {
 		struct qla_tgt_cmd *cmd;
 		abts_recv_from_24xx_entry_t abts;
 		imm_ntfy_from_2xxx_entry_t tm_iocb;
-		atio7_entry_t tm_iocb2;
+		atio7_from_24xx_entry_t tm_iocb2;
 	};
 };
 
@@ -981,7 +981,7 @@ struct qla_tgt_mgmt_cmd {
 	unsigned int flags;
 #define Q24_MGMT_SEND_NACK	1
 	union {
-		atio7_entry_t atio7;
+		atio7_from_24xx_entry_t atio7;
 		imm_ntfy_from_2xxx_entry_t imm_ntfy;
 		imm_ntfy_from_24xx_entry_t imm_ntfy24;
 		abts_recv_from_24xx_entry_t abts;
@@ -1131,7 +1131,8 @@ qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, bool enable)
 /*
  * Exported symbols from qla_target.c LLD logic used by qla2xxx code..
  */
-extern void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *, atio7_entry_t *);
+extern void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *,
+	atio7_from_24xx_entry_t *);
 extern void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *, response_t *);
 extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
 extern int qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *, int, uint8_t);

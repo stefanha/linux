@@ -747,10 +747,10 @@ int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
 	int ret;
 
 	if (IS_FWI2_CAPABLE(ha)) {
-		atio7_entry_t *atio = &cmd->atio.atio7;
+		atio7_from_24xx_entry_t *atio = &cmd->atio.atio7;
 		cdb = &atio->fcp_cmnd.cdb[0];
 	} else {
-		atio_entry_t *atio = &cmd->atio.atio2x;
+		atio_from_2xxx_entry_t *atio = &cmd->atio.atio2x;
 		cdb = &atio->cdb[0];
 	}
 
