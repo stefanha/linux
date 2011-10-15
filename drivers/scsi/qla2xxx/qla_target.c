@@ -4185,92 +4185,84 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
+ * This function sends busy to ISP 2xxx or 24xx.
  */
-static void qla_tgt_2xxx_send_busy(struct scsi_qla_host *vha,
-	atio_from_2xxx_entry_t *atio)
+static void qla_tgt_send_busy(struct scsi_qla_host *vha,
+	void *atio, uint16_t status)
 {
 	struct qla_hw_data *ha = vha->hw;
-	ctio_from_2xxx_entry_t *ctio;
+	request_t *pkt;
+	atio7_from_24xx_entry_t *atio24 = (atio7_from_24xx_entry_t *)atio;
+	atio_from_2xxx_entry_t *atio2x = (atio_from_2xxx_entry_t *)atio;
+	struct qla_tgt_sess *sess = NULL;
+
+	if (IS_FWI2_CAPABLE(ha)) {
+		sess = ha->tgt_ops->find_sess_by_s_id(vha, atio24->fcp_hdr.s_id);
+		if (!sess) {
+			qla_tgt_send_term_exchange(vha, NULL, atio, 1);
+			return;
+		}
+	}
 
 	/* Sending marker isn't necessary, since we called from ISR */
 
-	ctio = (ctio_from_2xxx_entry_t *)qla2x00_req_pkt(vha);
-	if (!ctio) {
+	pkt = (request_t *)qla2x00_req_pkt(vha);
+	if (!pkt) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet", vha->vp_idx, __func__);
 		return;
 	}
 
-	ctio->entry_type = CTIO_RET_TYPE;
-	ctio->entry_count = 1;
-	ctio->handle = QLA_TGT_SKIP_HANDLE | CTIO_COMPLETION_HANDLE_MARK;
-	ctio->scsi_status = __constant_cpu_to_le16(SAM_STAT_BUSY);
-	ctio->residual = atio->data_length;
-	if (ctio->residual != 0)
-		ctio->scsi_status |= SS_RESIDUAL_UNDER;
+	pkt->entry_count = 1;
+	pkt->handle = QLA_TGT_SKIP_HANDLE | CTIO_COMPLETION_HANDLE_MARK;
 
-	/* Set IDs */
-	SET_TARGET_ID(ha, ctio->target, GET_TARGET_ID(ha, atio));
-	ctio->rx_id = atio->rx_id;
+	if (IS_FWI2_CAPABLE(ha)) {
+		ctio7_to_24xx_entry_t *ctio24 = (ctio7_to_24xx_entry_t *)pkt;
 
-	ctio->flags = __constant_cpu_to_le16(OF_SSTS | OF_FAST_POST |
-				  OF_NO_DATA | OF_SS_MODE_1);
-	ctio->flags |= __constant_cpu_to_le16(OF_INC_RC);
-	/*
-	 * CTIO from fw w/o se_cmd doesn't provide enough info to retry it,
-	 * if the explicit conformation is used.
-	 */
-	qla2x00_isp_cmd(vha, vha->req);
-}
+		ctio24->entry_type = CTIO_TYPE7;
+		ctio24->nport_handle = sess->loop_id;
+		ctio24->timeout = __constant_cpu_to_le16(QLA_TGT_TIMEOUT);
+		ctio24->vp_index = vha->vp_idx;
+		ctio24->initiator_id[0] = atio24->fcp_hdr.s_id[2];
+		ctio24->initiator_id[1] = atio24->fcp_hdr.s_id[1];
+		ctio24->initiator_id[2] = atio24->fcp_hdr.s_id[0];
+		ctio24->exchange_addr = atio24->exchange_addr;
+		ctio24->u.status1.flags = (atio24->attr << 9) | __constant_cpu_to_le16(
+			CTIO7_FLAGS_STATUS_MODE_1 | CTIO7_FLAGS_SEND_STATUS |
+			CTIO7_FLAGS_DONT_RET_CTIO);
+		/*
+		 * CTIO from fw w/o se_cmd doesn't provide enough info to retry it,
+		 * if the explicit conformation is used.
+		 */
+		ctio24->u.status1.ox_id = swab16(atio24->fcp_hdr.ox_id);
+		ctio24->u.status1.scsi_status = cpu_to_le16(status);
+		ctio24->u.status1.residual = get_unaligned((uint32_t *)
+			&atio24->fcp_cmnd.add_cdb[atio24->fcp_cmnd.add_cdb_len]);
+		if (ctio24->u.status1.residual != 0)
+			ctio24->u.status1.scsi_status |= SS_RESIDUAL_UNDER;
+	} else {
+		ctio_from_2xxx_entry_t *ctio2x = (ctio_from_2xxx_entry_t *)pkt;
 
-/*
- * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
- */
-static void qla_tgt_24xx_send_busy(struct scsi_qla_host *vha,
-	atio7_from_24xx_entry_t *atio, uint16_t status)
-{
-	struct qla_hw_data *ha = vha->hw;
-	ctio7_to_24xx_entry_t *ctio;
-	struct qla_tgt_sess *sess;
+		ctio2x->entry_type = CTIO_RET_TYPE;
+		ctio2x->entry_count = 1;
+		ctio2x->handle = QLA_TGT_SKIP_HANDLE | CTIO_COMPLETION_HANDLE_MARK;
+		ctio2x->scsi_status = __constant_cpu_to_le16(SAM_STAT_BUSY);
+		ctio2x->residual = atio2x->data_length;
+		if (ctio2x->residual != 0)
+			ctio2x->scsi_status |= SS_RESIDUAL_UNDER;
 
-	sess = ha->tgt_ops->find_sess_by_s_id(vha, atio->fcp_hdr.s_id);
-	if (!sess) {
-		qla_tgt_send_term_exchange(vha, NULL, (void *)atio, 1);
-		return;
+		/* Set IDs */
+		SET_TARGET_ID(ha, ctio2x->target, GET_TARGET_ID(ha, atio2x));
+		ctio2x->rx_id = atio2x->rx_id;
+
+		ctio2x->flags = __constant_cpu_to_le16(OF_SSTS | OF_FAST_POST |
+				OF_NO_DATA | OF_SS_MODE_1);
+		ctio2x->flags |= __constant_cpu_to_le16(OF_INC_RC);
+		/*
+		 * CTIO from fw w/o se_cmd doesn't provide enough info to retry it,
+		 * if the explicit conformation is used.
+		 */
 	}
-
-	/* Sending marker isn't necessary, since we called from ISR */
-
-	ctio = (ctio7_to_24xx_entry_t *)qla2x00_req_pkt(vha);
-	if (!ctio) {
-		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
-			"request packet", vha->vp_idx, __func__);
-		return;
-	}
-
-	ctio->entry_type = CTIO_TYPE7;
-	ctio->entry_count = 1;
-	ctio->handle = QLA_TGT_SKIP_HANDLE | CTIO_COMPLETION_HANDLE_MARK;
-	ctio->nport_handle = sess->loop_id;
-	ctio->timeout = __constant_cpu_to_le16(QLA_TGT_TIMEOUT);
-	ctio->vp_index = vha->vp_idx;
-	ctio->initiator_id[0] = atio->fcp_hdr.s_id[2];
-	ctio->initiator_id[1] = atio->fcp_hdr.s_id[1];
-	ctio->initiator_id[2] = atio->fcp_hdr.s_id[0];
-	ctio->exchange_addr = atio->exchange_addr;
-	ctio->u.status1.flags = (atio->attr << 9) | __constant_cpu_to_le16(
-		CTIO7_FLAGS_STATUS_MODE_1 | CTIO7_FLAGS_SEND_STATUS |
-		CTIO7_FLAGS_DONT_RET_CTIO);
-	/*
-	 * CTIO from fw w/o se_cmd doesn't provide enough info to retry it,
-	 * if the explicit conformation is used.
-	 */
-	ctio->u.status1.ox_id = swab16(atio->fcp_hdr.ox_id);
-	ctio->u.status1.scsi_status = cpu_to_le16(status);
-	ctio->u.status1.residual = get_unaligned((uint32_t *)
-			&atio->fcp_cmnd.add_cdb[atio->fcp_cmnd.add_cdb_len]);
-	if (ctio->u.status1.residual != 0)
-		ctio->u.status1.scsi_status |= SS_RESIDUAL_UNDER;
 
 	qla2x00_isp_cmd(vha, vha->req);
 }
@@ -4316,7 +4308,7 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha,
 			printk(KERN_INFO "qla_target(%d): ATIO_TYPE7 "
 				"received with UNKNOWN exchange address, "
 				"sending QUEUE_FULL\n", vha->vp_idx);
-			qla_tgt_24xx_send_busy(vha, atio, SAM_STAT_TASK_SET_FULL);
+			qla_tgt_send_busy(vha, (void *)atio, SAM_STAT_TASK_SET_FULL);
 			break;
 		}
 		if (likely(atio->fcp_cmnd.task_mgmt_flags == 0))
@@ -4326,7 +4318,7 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha,
 		if (unlikely(rc != 0)) {
 			if (rc == -ESRCH) {
 #if 1 /* With TERM EXCHANGE some FC cards refuse to boot */
-				qla_tgt_24xx_send_busy(vha, atio, SAM_STAT_BUSY);
+				qla_tgt_send_busy(vha, (void *)atio, SAM_STAT_BUSY);
 #else
 				qla_tgt_send_term_exchange(vha, NULL,
 					(void *)atio, 1);
@@ -4339,7 +4331,7 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha,
 					printk(KERN_INFO "qla_target(%d): Unable to send "
 					   "command to target, sending BUSY status\n",
 					   vha->vp_idx);
-					qla_tgt_24xx_send_busy(vha, atio, SAM_STAT_BUSY);
+					qla_tgt_send_busy(vha, (void *)atio, SAM_STAT_BUSY);
 				}
 			}
 		}
@@ -4429,7 +4421,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		if (unlikely(rc != 0)) {
 			if (rc == -ESRCH) {
 #if 1 /* With TERM EXCHANGE some FC cards refuse to boot */
-				qla_tgt_2xxx_send_busy(vha, atio);
+				qla_tgt_send_busy(vha, (void *)atio, 0);
 #else
 				qla_tgt_send_term_exchange(vha, NULL,
 					(void *)atio, 1);
@@ -4445,7 +4437,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 					printk(KERN_INFO "qla_target(%d): Unable to send "
 						"command to target, sending BUSY status\n",
 						vha->vp_idx);
-					qla_tgt_2xxx_send_busy(vha, atio);
+					qla_tgt_send_busy(vha, atio, 0);
 				}
 			}
 		}
