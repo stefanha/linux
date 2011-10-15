@@ -1978,21 +1978,46 @@ static void qla_tgt_load_cont_data_segments(struct qla_tgt_prm *prm, struct scsi
  * ha->hardware_lock supposed to be held on entry. We have already made sure
  * that there is sufficient amount of request entries to not drop it.
  */
-static void qla_tgt_2xxx_load_data_segments(struct qla_tgt_prm *prm,
+static void qla_tgt_load_data_segments(struct qla_tgt_prm *prm,
 	struct scsi_qla_host *vha)
 {
+	struct qla_hw_data *ha = vha->hw;
 	int cnt;
 	uint32_t *dword_ptr;
 	int enable_64bit_addressing = prm->tgt->tgt_enable_64bit_addr;
-	ctio_to_2xxx_entry_t *pkt = (ctio_to_2xxx_entry_t *)prm->pkt;
 
-	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe204, "iocb->scsi_status=%x, iocb->flags=%x\n",
-	      le16_to_cpu(pkt->scsi_status), le16_to_cpu(pkt->flags));
+	if (IS_FWI2_CAPABLE(ha)) {
+		ctio7_to_24xx_entry_t *pkt24 = (ctio7_to_24xx_entry_t *)prm->pkt;
 
-	pkt->transfer_length = cpu_to_le32(prm->cmd->bufflen);
+		ql_dbg(ql_dbg_tgt, vha, 0xe00f,
+			"iocb->scsi_status=%x, iocb->flags=%x\n",
+			le16_to_cpu(pkt24->u.status0.scsi_status),
+			le16_to_cpu(pkt24->u.status0.flags));
 
-	/* Setup packet address segment pointer */
-	dword_ptr = &pkt->dseg_0_address;
+		pkt24->u.status0.transfer_length = cpu_to_le32(prm->cmd->bufflen);
+
+		/* Setup packet address segment pointer */
+		dword_ptr = pkt24->u.status0.dseg_0_address;
+
+		/* Set total data segment count */
+		if (prm->seg_cnt)
+			pkt24->dseg_count = cpu_to_le16(prm->seg_cnt);
+	} else {
+		ctio_to_2xxx_entry_t *pkt2x = (ctio_to_2xxx_entry_t *)prm->pkt;
+
+		ql_dbg(ql_dbg_tgt_pkt, vha, 0xe204,
+			"iocb->scsi_status=%x, iocb->flags=%x\n",
+			le16_to_cpu(pkt2x->scsi_status), le16_to_cpu(pkt2x->flags));
+
+		pkt2x->transfer_length = cpu_to_le32(prm->cmd->bufflen);
+
+		/* Setup packet address segment pointer */
+		dword_ptr = &pkt2x->dseg_0_address;
+
+		/* Set total data segment count */
+		if (prm->seg_cnt)
+			pkt2x->dseg_count = cpu_to_le16(prm->seg_cnt);
+	}
 
 	if (prm->seg_cnt == 0) {
 		/* No data transfer */
@@ -2000,69 +2025,10 @@ static void qla_tgt_2xxx_load_data_segments(struct qla_tgt_prm *prm,
 		*dword_ptr = 0;
 		return;
 	}
-
-	/* Set total data segment count */
-	pkt->dseg_count = cpu_to_le16(prm->seg_cnt);
-
-	/* If scatter gather */
-	ql_dbg(ql_dbg_tgt_sgl, vha, 0xe301, "Building S/G data segments...");
-	/* Load command entry data segments */
-	for (cnt = 0;
-	     (cnt < prm->tgt->datasegs_per_cmd) && prm->seg_cnt;
-	     cnt++, prm->seg_cnt--) {
-		*dword_ptr++ =
-		    cpu_to_le32(pci_dma_lo32(sg_dma_address(prm->sg)));
-		if (enable_64bit_addressing) {
-			*dword_ptr++ =
-			    cpu_to_le32(pci_dma_hi32
-					(sg_dma_address(prm->sg)));
-		}
-		*dword_ptr++ = cpu_to_le32(sg_dma_len(prm->sg));
-
-		ql_dbg(ql_dbg_tgt_sgl, vha, 0xe302, "S/G Segment phys_addr=%llx:%llx, len=%d\n",
-		      (long long unsigned int)pci_dma_hi32(sg_dma_address(prm->sg)),
-		      (long long unsigned int)pci_dma_lo32(sg_dma_address(prm->sg)),
-		      (int)sg_dma_len(prm->sg));
-
-		prm->sg = sg_next(prm->sg);
-	}
-
-	qla_tgt_load_cont_data_segments(prm, vha);
-}
-
-/*
- * ha->hardware_lock supposed to be held on entry. We have already made sure
- * that there is sufficient amount of request entries to not drop it.
- */
-static void qla_tgt_24xx_load_data_segments(struct qla_tgt_prm *prm,
-	struct scsi_qla_host *vha)
-{
-	int cnt;
-	uint32_t *dword_ptr;
-	int enable_64bit_addressing = prm->tgt->tgt_enable_64bit_addr;
-	ctio7_to_24xx_entry_t *pkt = (ctio7_to_24xx_entry_t *)prm->pkt;
-
-	ql_dbg(ql_dbg_tgt, vha, 0xe00f, "iocb->scsi_status=%x, iocb->flags=%x\n",
-		le16_to_cpu(pkt->u.status0.scsi_status),
-		le16_to_cpu(pkt->u.status0.flags));
-
-	pkt->u.status0.transfer_length = cpu_to_le32(prm->cmd->bufflen);
-
-	/* Setup packet address segment pointer */
-	dword_ptr = pkt->u.status0.dseg_0_address;
-
-	if (prm->seg_cnt == 0) {
-		/* No data transfer */
-		*dword_ptr++ = 0;
-		*dword_ptr = 0;
-		return;
-	}
-
-	/* Set total data segment count */
-	pkt->dseg_count = cpu_to_le16(prm->seg_cnt);
 
 	/* If scatter gather */
 	ql_dbg(ql_dbg_tgt_sgl, vha, 0xe303, "%s", "Building S/G data segments...");
+
 	/* Load command entry data segments */
 	for (cnt = 0;
 	     (cnt < prm->tgt->datasegs_per_cmd) && prm->seg_cnt;
@@ -2276,7 +2242,7 @@ static int __qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 		pkt->flags |= __constant_cpu_to_le16(OF_FAST_POST | OF_DATA_IN);
 		pkt->flags |= __constant_cpu_to_le16(OF_INC_RC);
 
-		qla_tgt_2xxx_load_data_segments(&prm, vha);
+		qla_tgt_load_data_segments(&prm, vha);
 
 		if (prm.add_status_pkt == 0) {
 			if (xmit_type & QLA_TGT_XMIT_STATUS) {
@@ -2534,7 +2500,7 @@ static int __qla_tgt_24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 		pkt->u.status0.flags |= __constant_cpu_to_le16(CTIO7_FLAGS_DATA_IN |
 				CTIO7_FLAGS_STATUS_MODE_0);
 
-		qla_tgt_24xx_load_data_segments(&prm, vha);
+		qla_tgt_load_data_segments(&prm, vha);
 
 		if (prm.add_status_pkt == 0) {
 			if (xmit_type & QLA_TGT_XMIT_STATUS) {
@@ -2639,13 +2605,13 @@ int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 		pkt = (ctio7_to_24xx_entry_t *)prm.pkt;
 		pkt->u.status0.flags |= __constant_cpu_to_le16(CTIO7_FLAGS_DATA_OUT |
 				CTIO7_FLAGS_STATUS_MODE_0);
-		qla_tgt_24xx_load_data_segments(&prm, vha);
+		qla_tgt_load_data_segments(&prm, vha);
 	} else {
 		ctio_to_2xxx_entry_t *pkt;
 		qla_tgt_2xxx_build_ctio_pkt(&prm, vha);
 		pkt = (ctio_to_2xxx_entry_t *)prm.pkt;
 		pkt->flags = __constant_cpu_to_le16(OF_FAST_POST | OF_DATA_OUT);
-		qla_tgt_2xxx_load_data_segments(&prm, vha);
+		qla_tgt_load_data_segments(&prm, vha);
 	}
 
 	cmd->state = QLA_TGT_STATE_NEED_DATA;
