@@ -1224,8 +1224,10 @@ static int qla_tgt_sched_sess_work(struct qla_tgt *tgt, int type,
 
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
+ * This function issues a modify LUN IOCB to ISP 2xxx to change or modify
+ * the command count.
  */
-static void qla_tgt_modify_command_count(struct scsi_qla_host *vha, int cmd_count,
+static void qla_tgt_2xxx_send_modify_lun(struct scsi_qla_host *vha, int cmd_count,
 	int imm_count)
 {
 	struct qla_hw_data *ha = vha->hw;
@@ -2835,7 +2837,7 @@ static int qla_tgt_term_ctio_exchange(struct scsi_qla_host *vha, void *ctio,
 		}
 	} else {
 		if (status != CTIO_SUCCESS)
-			qla_tgt_modify_command_count(vha, 1, 0);
+			qla_tgt_2xxx_send_modify_lun(vha, 1, 0);
 #if 0 /* seems, it isn't needed */
 		if (ctio != NULL) {
 			ctio_to_2xxx_entry_t *c = (ctio_to_2xxx_entry_t *)ctio;
@@ -5075,13 +5077,11 @@ qla_tgt_rff_id(struct scsi_qla_host *vha, struct ct_sns_req *ct_req)
 void
 qla_tgt_initialize_adapter(struct scsi_qla_host *vha, struct qla_hw_data *ha)
 {
-	if (IS_QLA24XX_TYPE(ha) || IS_QLA25XX(ha)) {
-		/* Enable target response to SCSI bus. */
-		if (qla_tgt_mode_enabled(vha))
-			qla_tgt_2xxx_send_enable_lun(vha, true);
-		else if (qla_ini_mode_enabled(vha))
-			qla_tgt_2xxx_send_enable_lun(vha, false);
-	}
+	/* Enable target response to SCSI bus. */
+	if (qla_tgt_mode_enabled(vha))
+		qla_tgt_2xxx_send_enable_lun(vha, true);
+	else if (qla_ini_mode_enabled(vha))
+		qla_tgt_2xxx_send_enable_lun(vha, false);
 }
 
 /*

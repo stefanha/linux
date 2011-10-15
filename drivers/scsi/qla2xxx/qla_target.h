@@ -1067,7 +1067,8 @@ static inline void qla_reverse_ini_mode(struct scsi_qla_host *ha)
 
 /*
  * qla_tgt_2xxx_send_enable_lun
- *	Issue enable or disable LUN entry IOCB to the ISP.
+ *	Issue enable or disable LUN entry IOCB to ISP 2xxx.
+ *	NOTE: This IOCB is not available, and so not issued to ISPs >=24xx.
  *
  * Input:
  *	ha = adapter block pointer.
@@ -1079,9 +1080,6 @@ static inline void
 __qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, int enable)
 {
 	elun_entry_t *pkt;
-	struct qla_hw_data *ha = vha->hw;
-
-	BUG_ON(IS_FWI2_CAPABLE(ha));
 
 	pkt = (elun_entry_t *)qla2x00_alloc_iocbs(vha, 0);
 	if (pkt != NULL) {
@@ -1101,10 +1099,8 @@ __qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, int enable)
 
 	} else
 		qla_tgt_clear_mode(vha);
-#if defined(QL_DEBUG_LEVEL_2) || defined(QL_DEBUG_LEVEL_3)
 	if (!pkt)
-		printk(KERN_ERR "%s: **** FAILED ****\n", __func__);
-#endif
+		printk (KERN_ERR "%s: **** FAILED ****\n", __func__);
 
 	return;
 }
