@@ -569,7 +569,8 @@ typedef struct {
 #define ELS_ADISC			0x52
 
 /*
- * ISP queue - notify acknowledge entry structure definition for 24xx.
+ * ISP queue -	notify acknowledge entry structure definition for 24xx.
+ *		This is sent to the ISP 24xx from the target driver.
  */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
@@ -595,7 +596,7 @@ typedef struct {
 	uint8_t  srr_reject_code;
 	uint8_t  reserved_5[7];
 	uint16_t ox_id;
-} __attribute__((packed)) nack_24xx_entry_t;
+} __attribute__((packed)) nack_to_24xx_entry_t;
 
 /*
  * ISP queue - ABTS received/response entries structure definition for 24xx.
