@@ -3600,25 +3600,42 @@ static inline int qla_tgt_srr_adjust_data(struct qla_tgt_cmd *cmd,
 }
 
 /* No locks, thread context */
-static void qla_tgt_24xx_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_ctio *sctio,
+static void qla_tgt_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_ctio *sctio,
 	struct qla_tgt_srr_imm *imm)
 {
-	imm_ntfy_from_24xx_entry_t *ntfy = &imm->imm.imm_ntfy24;
+	void *ntfy, *atio;
+	imm_ntfy_from_24xx_entry_t *ntfy24 = &imm->imm.imm_ntfy24;
+	imm_ntfy_from_2xxx_entry_t *ntfy2x = &imm->imm.imm_ntfy;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_cmd *cmd = sctio->cmd;
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	unsigned long flags;
+	int xmit_type, resp=0;
+	uint32_t offset;
+	uint16_t srr_ui;
+
+	if (IS_FWI2_CAPABLE(ha)) {
+		ntfy = (void *)ntfy24;
+		atio = (void *)&cmd->atio.atio7;
+		offset = le32_to_cpu(ntfy24->srr_rel_offs);
+		srr_ui = ntfy24->srr_ui;
+	} else {
+		ntfy = (void *)ntfy2x;
+		atio = (void *)&cmd->atio.atio2x;
+		offset = le32_to_cpu(ntfy2x->srr_rel_offs);
+		srr_ui = ntfy2x->srr_ui;
+	}
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12c, "SRR cmd %p, srr_ui %x\n",
-			cmd, ntfy->srr_ui);
+			cmd, srr_ui);
 
-	switch (ntfy->srr_ui) {
+	switch (srr_ui) {
 	case SRR_IU_STATUS:
 		spin_lock_irqsave(&ha->hardware_lock, flags);
-		qla_tgt_send_notify_ack(vha, (void *)ntfy,
+		qla_tgt_send_notify_ack(vha, ntfy,
 			0, 0, 0, NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-		__qla_tgt_24xx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
+		resp = 1;
 		break;
 	case SRR_IU_DATA_IN:
 		if (!cmd->sg || !cmd->sg_cnt) {
@@ -3635,16 +3652,13 @@ static void qla_tgt_24xx_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_sr
 		cmd->bufflen = se_cmd->data_length;
 
 		if (qla_tgt_has_data(cmd)) {
-			uint32_t offset;
-			int xmit_type;
-			offset = le32_to_cpu(imm->imm.imm_ntfy24.srr_rel_offs);
 			if (qla_tgt_srr_adjust_data(cmd, offset, &xmit_type) != 0)
 				goto out_reject;
 			spin_lock_irqsave(&ha->hardware_lock, flags);
-			qla_tgt_send_notify_ack(vha, (void *)ntfy,
+			qla_tgt_send_notify_ack(vha, ntfy,
 				0, 0, 0, NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			__qla_tgt_24xx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
+			resp = 1;
 		} else {
 			printk(KERN_ERR "qla_target(%d): SRR for in data for cmd "
 				"without them (tag %d, SCSI status %d), "
@@ -3668,13 +3682,10 @@ static void qla_tgt_24xx_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_sr
 		cmd->bufflen = se_cmd->data_length;
 
 		if (qla_tgt_has_data(cmd)) {
-			uint32_t offset;
-			int xmit_type;
-			offset = le32_to_cpu(imm->imm.imm_ntfy24.srr_rel_offs);
 			if (qla_tgt_srr_adjust_data(cmd, offset, &xmit_type) != 0)
 				goto out_reject;
 			spin_lock_irqsave(&ha->hardware_lock, flags);
-			qla_tgt_send_notify_ack(vha, (void *)ntfy,
+			qla_tgt_send_notify_ack(vha, ntfy,
 				0, 0, 0, NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 			if (xmit_type & QLA_TGT_XMIT_DATA)
@@ -3689,15 +3700,25 @@ static void qla_tgt_24xx_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_sr
 		break;
 	default:
 		printk(KERN_ERR "qla_target(%d): Unknown srr_ui value %x",
-			vha->vp_idx, ntfy->srr_ui);
+			vha->vp_idx, srr_ui);
 		goto out_reject;
+	}
+
+	/* Transmit response in case of status and data-in cases */
+	if (resp) {
+		if (IS_FWI2_CAPABLE(ha))
+			__qla_tgt_24xx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
+		else {
+			__qla_tgt_2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS,
+				se_cmd->scsi_status);
+		}
 	}
 
 	return;
 
 out_reject:
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	qla_tgt_send_notify_ack(vha, (void *)ntfy, 0, 0, 0,
+	qla_tgt_send_notify_ack(vha, ntfy, 0, 0, 0,
 		NOTIFY_ACK_SRR_FLAGS_REJECT,
 		NOTIFY_ACK_SRR_REJECT_REASON_UNABLE_TO_PERFORM,
 		NOTIFY_ACK_SRR_FLAGS_REJECT_EXPL_NO_EXPL);
@@ -3705,116 +3726,7 @@ out_reject:
 		cmd->state = QLA_TGT_STATE_DATA_IN;
 		dump_stack();
 	} else
-		qla_tgt_send_term_exchange(vha, cmd, (void *)&cmd->atio.atio7, 1);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-}
-
-/* No locks, thread context */
-static void qla_tgt_2xxx_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_ctio *sctio,
-	struct qla_tgt_srr_imm *imm)
-{
-	imm_ntfy_from_2xxx_entry_t *ntfy = &imm->imm.imm_ntfy;
-	struct qla_hw_data *ha = vha->hw;
-	struct qla_tgt_cmd *cmd = sctio->cmd;
-	struct se_cmd *se_cmd = &cmd->se_cmd;
-	unsigned long flags;
-
-	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12d, "SRR cmd %p, srr_ui %x\n",
-			cmd, ntfy->srr_ui);
-
-	switch (ntfy->srr_ui) {
-	case SRR_IU_STATUS:
-		spin_lock_irqsave(&ha->hardware_lock, flags);
-		qla_tgt_send_notify_ack(vha, (void *)ntfy,
-			0, 0, 0, NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-		__qla_tgt_2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS, se_cmd->scsi_status);
-		break;
-	case SRR_IU_DATA_IN:
-		if (!cmd->sg || !cmd->sg_cnt) {
-			printk(KERN_ERR "Unable to process SRR_IU_DATA_IN due to"
-				" missing cmd->sg, state: %d\n", cmd->state);
-			dump_stack();
-			goto out_reject;
-		}
-		if (se_cmd->scsi_status != 0) {
-			ql_dbg(ql_dbg_tgt, vha, 0xe024, "Rejecting SRR_IU_DATA_IN"
-					" with non GOOD scsi_status\n");
-			goto out_reject;
-		}
-		cmd->bufflen = se_cmd->data_length;
-
-		if (qla_tgt_has_data(cmd)) {
-			uint32_t offset;
-			int xmit_type;
-			offset = le32_to_cpu(imm->imm.imm_ntfy.srr_rel_offs);
-			if (qla_tgt_srr_adjust_data(cmd, offset, &xmit_type) != 0)
-				goto out_reject;
-			spin_lock_irqsave(&ha->hardware_lock, flags);
-			qla_tgt_send_notify_ack(vha, (void *)ntfy,
-				0, 0, 0, NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			__qla_tgt_2xxx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
-		} else {
-			printk(KERN_ERR "qla_target(%d): SRR for in data for cmd "
-				"without them (tag %d, SCSI status %d), "
-				"reject", vha->vp_idx, cmd->tag,
-				cmd->se_cmd.scsi_status);
-			goto out_reject;
-		}
-		break;
-	case SRR_IU_DATA_OUT:
-		if (!cmd->sg || !cmd->sg_cnt) {
-			printk(KERN_ERR "Unable to process SRR_IU_DATA_OUT due to"
-					" missing cmd->sg\n");
-			goto out_reject;
-		}
-		if (se_cmd->scsi_status != 0) {
-			ql_dbg(ql_dbg_tgt, vha, 0xe025, "Rejecting SRR_IU_DATA_OUT"
-					" with non GOOD scsi_status\n");
-			goto out_reject;
-		}
-		cmd->bufflen = se_cmd->data_length;
-
-		if (qla_tgt_has_data(cmd)) {
-			uint32_t offset;
-			int xmit_type;
-			offset = le32_to_cpu(imm->imm.imm_ntfy.srr_rel_offs);
-			if (qla_tgt_srr_adjust_data(cmd, offset, &xmit_type) != 0)
-				goto out_reject;
-			spin_lock_irqsave(&ha->hardware_lock, flags);
-			qla_tgt_send_notify_ack(vha, (void *)ntfy,
-				0, 0, 0, NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			if (xmit_type & QLA_TGT_XMIT_DATA)
-				qla_tgt_rdy_to_xfer(cmd);
-		} else {
-			printk(KERN_ERR "qla_target(%d): SRR for out data for cmd "
-				"without them (tag %d, SCSI status %d), "
-				"reject", vha->vp_idx, cmd->tag,
-				cmd->se_cmd.scsi_status);
-			goto out_reject;
-		}
-		break;
-	default:
-		printk(KERN_ERR "qla_target(%d): Unknown srr_ui value %x",
-			vha->vp_idx, ntfy->srr_ui);
-		goto out_reject;
-	}
-
-	return;
-
-out_reject:
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	qla_tgt_send_notify_ack(vha, (void *)ntfy, 0, 0, 0,
-		NOTIFY_ACK_SRR_FLAGS_REJECT,
-		NOTIFY_ACK_SRR_REJECT_REASON_UNABLE_TO_PERFORM,
-		NOTIFY_ACK_SRR_FLAGS_REJECT_EXPL_NO_EXPL);
-	if (cmd->state == QLA_TGT_STATE_NEED_DATA) {
-		cmd->state = QLA_TGT_STATE_DATA_IN;
-		dump_stack();
-	} else
-		qla_tgt_send_term_exchange(vha, cmd, (void *)&cmd->atio.atio2x, 1);
+		qla_tgt_send_term_exchange(vha, cmd, atio, 1);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
@@ -3848,7 +3760,6 @@ static void qla_tgt_handle_srr_work(struct work_struct *work)
 {
 	struct qla_tgt *tgt = container_of(work, struct qla_tgt, srr_work);
 	struct scsi_qla_host *vha = NULL;
-	struct qla_hw_data *ha = tgt->ha;
 	struct qla_tgt_srr_ctio *sctio;
 	unsigned long flags;
 
@@ -3912,10 +3823,7 @@ restart:
 			cmd->tag, se_cmd->t_task_cdb[0], cmd->sg_cnt,
 			cmd->offset);
 
-		if (IS_FWI2_CAPABLE(ha))
-			qla_tgt_24xx_handle_srr(vha, sctio, imm);
-		else
-			qla_tgt_2xxx_handle_srr(vha, sctio, imm);
+		qla_tgt_handle_srr(vha, sctio, imm);
 
 		kfree(imm);
 		kfree(sctio);
