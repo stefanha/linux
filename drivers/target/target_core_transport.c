@@ -4789,9 +4789,6 @@ get_cmd:
 		case TRANSPORT_COMPLETE_OK:
 			transport_generic_complete_ok(cmd);
 			break;
-		case TRANSPORT_REMOVE:
-			transport_put_cmd(cmd);
-			break;
 		case TRANSPORT_FREE_CMD_INTR:
 			transport_generic_free_cmd(cmd, 0);
 			break;
