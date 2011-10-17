@@ -646,7 +646,8 @@ int tcm_qla2xxx_write_pending_status(struct se_cmd *se_cmd)
 	 * CTIO aborts to be posted via hardware in tcm_qla2xxx_handle_data().
 	 */
 	spin_lock_irqsave(&se_cmd->t_state_lock, flags);
-	if (se_cmd->t_state == TRANSPORT_WRITE_PENDING) {
+	if (se_cmd->t_state == TRANSPORT_WRITE_PENDING ||
+	    se_cmd->t_state == TRANSPORT_COMPLETE_QF_WP) {
 		spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
 		wait_for_completion_timeout(&se_cmd->t_transport_stop_comp, 3000);
 		return 0;

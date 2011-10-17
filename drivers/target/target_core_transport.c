@@ -73,9 +73,8 @@ static int transport_generic_write_pending(struct se_cmd *);
 static int transport_processing_thread(void *param);
 static int __transport_execute_tasks(struct se_device *dev);
 static void transport_complete_task_attr(struct se_cmd *cmd);
-static int transport_complete_qf(struct se_cmd *cmd);
 static void transport_handle_queue_full(struct se_cmd *cmd,
-		struct se_device *dev, int (*qf_callback)(struct se_cmd *));
+		struct se_device *dev);
 static void transport_direct_request_timeout(struct se_cmd *cmd);
 static void transport_free_dev_tasks(struct se_cmd *cmd);
 static u32 transport_allocate_tasks(struct se_cmd *cmd,
@@ -972,7 +971,7 @@ static void target_qf_do_work(struct work_struct *work)
 
 		pr_debug("Processing %s cmd: %p QUEUE_FULL in work queue"
 			" context: %s\n", cmd->se_tfo->get_fabric_name(), cmd,
-			(cmd->t_state == TRANSPORT_COMPLETE_OK) ? "COMPLETE_OK" :
+			(cmd->t_state == TRANSPORT_COMPLETE_QF_OK) ? "COMPLETE_OK" :
 			(cmd->t_state == TRANSPORT_COMPLETE_QF_WP) ? "WRITE_PENDING"
 			: "UNKNOWN");
 		/*
@@ -1970,8 +1969,8 @@ check_stop:
 	return;
 
 queue_full:
-	cmd->t_state = TRANSPORT_COMPLETE_OK;
-	transport_handle_queue_full(cmd, cmd->se_dev, transport_complete_qf);
+	cmd->t_state = TRANSPORT_COMPLETE_QF_OK;
+	transport_handle_queue_full(cmd, cmd->se_dev);
 }
 
 static void transport_direct_request_timeout(struct se_cmd *cmd)
@@ -3433,12 +3432,19 @@ static void transport_complete_task_attr(struct se_cmd *cmd)
 		wake_up_interruptible(&dev->dev_queue_obj.thread_wq);
 }
 
-static int transport_complete_qf(struct se_cmd *cmd)
+static void transport_complete_qf(struct se_cmd *cmd)
 {
 	int ret = 0;
 
-	if (cmd->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE)
-		return cmd->se_tfo->queue_status(cmd);
+	transport_stop_all_task_timers(cmd);
+	if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
+		transport_complete_task_attr(cmd);
+
+	if (cmd->se_cmd_flags & SCF_TRANSPORT_TASK_SENSE) {
+		ret = cmd->se_tfo->queue_status(cmd);
+		if (ret)
+			goto out;
+	}
 
 	switch (cmd->data_direction) {
 	case DMA_FROM_DEVICE:
@@ -3448,7 +3454,7 @@ static int transport_complete_qf(struct se_cmd *cmd)
 		if (cmd->t_bidi_data_sg) {
 			ret = cmd->se_tfo->queue_data_in(cmd);
 			if (ret < 0)
-				return ret;
+				break;
 		}
 		/* Fall through for DMA_TO_DEVICE */
 	case DMA_NONE:
@@ -3458,17 +3464,21 @@ static int transport_complete_qf(struct se_cmd *cmd)
 		break;
 	}
 
-	return ret;
+out:
+	if (ret < 0) {
+		transport_handle_queue_full(cmd, cmd->se_dev);
+		return;
+	}
+	transport_lun_remove_cmd(cmd);
+	transport_cmd_check_stop_to_fabric(cmd);
 }
 
 static void transport_handle_queue_full(
 	struct se_cmd *cmd,
-	struct se_device *dev,
-	int (*qf_callback)(struct se_cmd *))
+	struct se_device *dev)
 {
 	spin_lock_irq(&dev->qf_cmd_lock);
 	cmd->se_cmd_flags |= SCF_EMULATE_QUEUE_FULL;
-	cmd->transport_qf_callback = qf_callback;
 	list_add_tail(&cmd->se_qf_node, &cmd->se_dev->qf_cmd_list);
 	atomic_inc(&dev->dev_qf_count);
 	smp_mb__after_atomic_inc();
@@ -3494,14 +3504,6 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 	if (atomic_read(&cmd->se_dev->dev_qf_count) != 0)
 		schedule_work(&cmd->se_dev->qf_work_queue);
 
-	if (cmd->transport_qf_callback) {
-		ret = cmd->transport_qf_callback(cmd);
-		if (ret < 0)
-			goto queue_full;
-
-		cmd->transport_qf_callback = NULL;
-		goto done;
-	}
 	/*
 	 * Check if we need to retrieve a sense buffer from
 	 * the struct se_cmd in question.
@@ -3577,7 +3579,6 @@ static void transport_generic_complete_ok(struct se_cmd *cmd)
 		break;
 	}
 
-done:
 	transport_lun_remove_cmd(cmd);
 	transport_cmd_check_stop_to_fabric(cmd);
 	return;
@@ -3585,7 +3586,8 @@ done:
 queue_full:
 	pr_debug("Handling complete_ok QUEUE_FULL: se_cmd: %p,"
 		" data_direction: %d\n", cmd, cmd->data_direction);
-	transport_handle_queue_full(cmd, cmd->se_dev, transport_complete_qf);
+	cmd->t_state = TRANSPORT_COMPLETE_QF_OK;
+	transport_handle_queue_full(cmd, cmd->se_dev);
 }
 
 static void transport_free_dev_tasks(struct se_cmd *cmd)
@@ -4112,15 +4114,15 @@ void transport_generic_process_write(struct se_cmd *cmd)
 }
 EXPORT_SYMBOL(transport_generic_process_write);
 
-static int transport_write_pending_qf(struct se_cmd *cmd)
+static void transport_write_pending_qf(struct se_cmd *cmd)
 {
-	return cmd->se_tfo->write_pending(cmd);
+	if (cmd->se_tfo->write_pending(cmd) == -EAGAIN) {
+		pr_debug("Handling write_pending QUEUE__FULL: se_cmd: %p\n",
+			 cmd);
+		transport_handle_queue_full(cmd, cmd->se_dev);
+	}
 }
 
-/*	transport_generic_write_pending():
- *
- *
- */
 static int transport_generic_write_pending(struct se_cmd *cmd)
 {
 	unsigned long flags;
@@ -4129,17 +4131,6 @@ static int transport_generic_write_pending(struct se_cmd *cmd)
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	cmd->t_state = TRANSPORT_WRITE_PENDING;
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
-
-	if (cmd->transport_qf_callback) {
-		ret = cmd->transport_qf_callback(cmd);
-		if (ret == -EAGAIN)
-			goto queue_full;
-		else if (ret < 0)
-			return ret;
-
-		cmd->transport_qf_callback = NULL;
-		return 0;
-	}
 
 	/*
 	 * Clear the se_cmd for WRITE_PENDING status in order to set
@@ -4165,8 +4156,7 @@ static int transport_generic_write_pending(struct se_cmd *cmd)
 queue_full:
 	pr_debug("Handling write_pending QUEUE__FULL: se_cmd: %p\n", cmd);
 	cmd->t_state = TRANSPORT_COMPLETE_QF_WP;
-	transport_handle_queue_full(cmd, cmd->se_dev,
-			transport_write_pending_qf);
+	transport_handle_queue_full(cmd, cmd->se_dev);
 	return ret;
 }
 
@@ -4853,7 +4843,10 @@ get_cmd:
 			transport_generic_request_timeout(cmd);
 			break;
 		case TRANSPORT_COMPLETE_QF_WP:
-			transport_generic_write_pending(cmd);
+			transport_write_pending_qf(cmd);
+			break;
+		case TRANSPORT_COMPLETE_QF_OK:
+			transport_complete_qf(cmd);
 			break;
 		default:
 			pr_err("Unknown t_state: %d deferred_t_state:"
