@@ -85,7 +85,6 @@ static int transport_generic_get_mem(struct se_cmd *cmd);
 static void transport_put_cmd(struct se_cmd *cmd);
 static void transport_remove_cmd_from_queue(struct se_cmd *cmd);
 static int transport_set_sense_codes(struct se_cmd *cmd, u8 asc, u8 ascq);
-static void transport_stop_all_task_timers(struct se_cmd *cmd);
 
 int init_se_kmem_caches(void)
 {
@@ -714,6 +713,8 @@ void transport_complete_task(struct se_task *task, int success)
 #endif
 	if (dev)
 		atomic_inc(&dev->depth_left);
+
+	del_timer(&task->task_timer);
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	task->task_flags &= ~TF_ACTIVE;
@@ -1510,6 +1511,7 @@ transport_generic_get_task(struct se_cmd *cmd,
 	INIT_LIST_HEAD(&task->t_list);
 	INIT_LIST_HEAD(&task->t_execute_list);
 	INIT_LIST_HEAD(&task->t_state_list);
+	init_timer(&task->task_timer);
 	init_completion(&task->task_stop_comp);
 	task->task_se_cmd = cmd;
 	task->task_data_direction = data_direction;
@@ -1778,6 +1780,7 @@ bool target_stop_task(struct se_task *task, unsigned long *flags)
 		spin_unlock_irqrestore(&cmd->t_state_lock, *flags);
 
 		pr_debug("Task %p waiting to complete\n", task);
+		del_timer_sync(&task->task_timer);
 		wait_for_completion(&task->task_stop_comp);
 		pr_debug("Task %p stopped successfully\n", task);
 
@@ -1787,7 +1790,6 @@ bool target_stop_task(struct se_task *task, unsigned long *flags)
 		was_active = true;
 	}
 
-	__transport_stop_task_timer(task, flags);
 	return was_active;
 }
 
@@ -1861,8 +1863,6 @@ static void transport_generic_request_failure(
 		atomic_read(&cmd->t_transport_active),
 		atomic_read(&cmd->t_transport_stop),
 		atomic_read(&cmd->t_transport_sent));
-
-	transport_stop_all_task_timers(cmd);
 
 	if (dev)
 		atomic_inc(&dev->depth_left);
@@ -2068,7 +2068,6 @@ static void transport_task_timeout_handler(unsigned long data)
 	pr_debug("transport task timeout fired! task: %p cmd: %p\n", task, cmd);
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
-	task->task_flags &= ~TF_TIMER_RUNNING;
 
 	/*
 	 * Determine if transport_complete_task() has already been called.
@@ -2111,16 +2110,11 @@ static void transport_task_timeout_handler(unsigned long data)
 	transport_add_cmd_to_queue(cmd, TRANSPORT_COMPLETE_FAILURE, false);
 }
 
-/*
- * Called with cmd->t_state_lock held.
- */
 static void transport_start_task_timer(struct se_task *task)
 {
 	struct se_device *dev = task->task_se_cmd->se_dev;
 	int timeout;
 
-	if (task->task_flags & TF_TIMER_RUNNING)
-		return;
 	/*
 	 * If the task_timeout is disabled, exit now.
 	 */
@@ -2128,47 +2122,10 @@ static void transport_start_task_timer(struct se_task *task)
 	if (!timeout)
 		return;
 
-	init_timer(&task->task_timer);
 	task->task_timer.expires = (get_jiffies_64() + timeout * HZ);
 	task->task_timer.data = (unsigned long) task;
 	task->task_timer.function = transport_task_timeout_handler;
-
-	task->task_flags |= TF_TIMER_RUNNING;
 	add_timer(&task->task_timer);
-#if 0
-	pr_debug("Starting task timer for cmd: %p task: %p seconds:"
-		" %d\n", task->task_se_cmd, task, timeout);
-#endif
-}
-
-/*
- * Called with spin_lock_irq(&cmd->t_state_lock) held.
- */
-void __transport_stop_task_timer(struct se_task *task, unsigned long *flags)
-{
-	struct se_cmd *cmd = task->task_se_cmd;
-
-	if (!(task->task_flags & TF_TIMER_RUNNING))
-		return;
-
-	spin_unlock_irqrestore(&cmd->t_state_lock, *flags);
-
-	del_timer_sync(&task->task_timer);
-
-	spin_lock_irqsave(&cmd->t_state_lock, *flags);
-	task->task_flags &= ~TF_TIMER_RUNNING;
-}
-
-static void transport_stop_all_task_timers(struct se_cmd *cmd)
-{
-	struct se_task *task = NULL, *task_tmp;
-	unsigned long flags;
-
-	spin_lock_irqsave(&cmd->t_state_lock, flags);
-	list_for_each_entry_safe(task, task_tmp,
-				&cmd->t_task_list, t_list)
-		__transport_stop_task_timer(task, &flags);
-	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 }
 
 static inline int transport_tcq_window_closed(struct se_device *dev)
@@ -2367,6 +2324,7 @@ check_depth:
 			spin_lock_irqsave(&cmd->t_state_lock, flags);
 			task->task_flags &= ~TF_ACTIVE;
 			spin_unlock_irqrestore(&cmd->t_state_lock, flags);
+			del_timer_sync(&task->task_timer);
 			atomic_set(&cmd->transport_sent, 0);
 			transport_stop_tasks_for_cmd(cmd);
 			transport_generic_request_failure(cmd, dev, 0, 1);
@@ -2405,6 +2363,7 @@ check_depth:
 			spin_lock_irqsave(&cmd->t_state_lock, flags);
 			task->task_flags &= ~TF_ACTIVE;
 			spin_unlock_irqrestore(&cmd->t_state_lock, flags);
+			del_timer_sync(&task->task_timer);
 			atomic_set(&cmd->transport_sent, 0);
 			transport_stop_tasks_for_cmd(cmd);
 			transport_generic_request_failure(cmd, dev, 0, 1);
@@ -3433,7 +3392,6 @@ static void transport_complete_qf(struct se_cmd *cmd)
 {
 	int ret = 0;
 
-	transport_stop_all_task_timers(cmd);
 	if (cmd->se_dev->dev_task_attr_type == SAM_TASK_ATTR_EMULATED)
 		transport_complete_task_attr(cmd);
 
@@ -3602,6 +3560,14 @@ static void transport_free_dev_tasks(struct se_cmd *cmd)
 
 	while (!list_empty(&dispose_list)) {
 		task = list_first_entry(&dispose_list, struct se_task, t_list);
+
+		/*
+		 * We already cancelled all pending timers in
+		 * transport_complete_task, but that was just a pure del_timer,
+		 * so do a full del_timer_sync here to make sure any handler
+		 * that was running at that point has finished execution.
+		 */
+		del_timer_sync(&task->task_timer);
 
 		kfree(task->task_sg_bidi);
 		kfree(task->task_sg);
@@ -4822,7 +4788,6 @@ get_cmd:
 			transport_generic_process_write(cmd);
 			break;
 		case TRANSPORT_COMPLETE_OK:
-			transport_stop_all_task_timers(cmd);
 			transport_generic_complete_ok(cmd);
 			break;
 		case TRANSPORT_REMOVE:
@@ -4838,7 +4803,6 @@ get_cmd:
 			transport_generic_request_failure(cmd, NULL, 1, 1);
 			break;
 		case TRANSPORT_COMPLETE_TIMEOUT:
-			transport_stop_all_task_timers(cmd);
 			transport_generic_request_timeout(cmd);
 			break;
 		case TRANSPORT_COMPLETE_QF_WP:
