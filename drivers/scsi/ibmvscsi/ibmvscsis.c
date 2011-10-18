@@ -417,7 +417,6 @@ static struct configfs_attribute *ibmvscsis_wwn_attrs[] = {
 static int ibmvscsis_write_pending(struct se_cmd *se_cmd);
 static int ibmvscsis_queue_data_in(struct se_cmd *se_cmd);
 static int ibmvscsis_queue_status(struct se_cmd *se_cmd);
-static int ibmvscsis_new_cmd_map(struct se_cmd *se_cmd);
 static void ibmvscsis_check_stop_free(struct se_cmd *se_cmd);
 
 static struct target_core_fabric_ops ibmvscsis_ops = {
@@ -437,7 +436,6 @@ static struct target_core_fabric_ops ibmvscsis_ops = {
 	.tpg_alloc_fabric_acl		= ibmvscsis_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= ibmvscsis_release_fabric_acl,
 	.tpg_get_inst_index		= ibmvscsis_tpg_get_inst_index,
-	.new_cmd_map			= ibmvscsis_new_cmd_map,
 	.check_stop_free		= ibmvscsis_check_stop_free,
 	.release_cmd			= ibmvscsis_release_cmd,
 	.shutdown_session		= ibmvscsis_shutdown_session,
@@ -831,14 +829,14 @@ static inline struct viosrp_crq *next_crq(struct crq_queue *queue)
 
 static int tcm_queuecommand(struct ibmvscsis_adapter *adapter,
 			    struct ibmvscsis_cmnd *vsc,
-			    struct srp_cmd *cmd)
+			    struct srp_cmd *scmd)
 {
 	struct se_cmd *se_cmd;
 	int attr;
 	int data_len;
 	int ret;
 
-	switch (cmd->task_attr) {
+	switch (scmd->task_attr) {
 	case SRP_SIMPLE_TASK:
 		attr = MSG_SIMPLE_TAG;
 		break;
@@ -850,63 +848,50 @@ static int tcm_queuecommand(struct ibmvscsis_adapter *adapter,
 		break;
 	default:
 		printk(KERN_WARNING "Task attribute %d not supported\n",
-		       cmd->task_attr);
+		       scmd->task_attr);
 		attr = MSG_SIMPLE_TAG;
 	}
 
-	data_len = srp_data_length(cmd, srp_cmd_direction(cmd));
+	data_len = srp_data_length(scmd, srp_cmd_direction(scmd));
 
 	se_cmd = &vsc->se_cmd;
 
 	transport_init_se_cmd(se_cmd,
 			      adapter->se_tpg.se_tpg_tfo,
 			      adapter->se_sess, data_len,
-			      srp_cmd_direction(cmd),
+			      srp_cmd_direction(scmd),
 			      attr, vsc->sense_buf);
 
-	ret = transport_lookup_cmd_lun(se_cmd, cmd->lun);
+	ret = transport_lookup_cmd_lun(se_cmd, scmd->lun);
 	if (ret) {
-		printk(KERN_ERR "invalid lun %u\n", GETLUN(cmd->lun));
+		printk(KERN_ERR "invalid lun %u\n", GETLUN(scmd->lun));
 		transport_send_check_condition_and_sense(se_cmd,
 							 se_cmd->scsi_sense_reason,
 							 0);
 		return ret;
 	}
 
-	transport_generic_handle_cdb_map(se_cmd);
-
-	return 0;
-}
-
-static int ibmvscsis_new_cmd_map(struct se_cmd *se_cmd)
-{
-	struct ibmvscsis_cmnd *cmd =
-		container_of(se_cmd, struct ibmvscsis_cmnd, se_cmd);
-	struct scsi_cmnd *sc = &cmd->sc;
-	struct iu_entry *iue = (struct iu_entry *)sc->SCp.ptr;
-	struct srp_cmd *scmd = iue->sbuf->buf;
-	int ret;
-
 	/*
 	 * Allocate the necessary tasks to complete the received CDB+data
 	 */
 	ret = transport_generic_allocate_tasks(se_cmd, scmd->cdb);
-	if (ret == -1) {
-		/* Out of Resources */
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
-	} else if (ret == -2) {
-		/*
-		 * Handle case for SAM_STAT_RESERVATION_CONFLICT
-		 */
+	if (ret == -ENOMEM) {
+		transport_send_check_condition_and_sense(se_cmd,
+				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE, 0);
+		transport_generic_free_cmd(se_cmd, 0);
+		return 0;
+	}
+	if (ret == -EINVAL) {
 		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
-			return PYX_TRANSPORT_RESERVATION_CONFLICT;
-		/*
-		 * Otherwise, return SAM_STAT_CHECK_CONDITION and return
-		 * sense data
-		 */
-		return PYX_TRANSPORT_USE_SENSE_REASON;
+			ibmvscsis_queue_status(se_cmd);
+		else
+			transport_send_check_condition_and_sense(se_cmd,
+					se_cmd->scsi_sense_reason, 0);
+		transport_generic_free_cmd(se_cmd, 0);
+		return 0;
 	}
 
+	transport_handle_cdb_direct(se_cmd);
 	return 0;
 }
 
