@@ -3564,7 +3564,6 @@ static void transport_free_dev_tasks(struct se_cmd *cmd)
 		 */
 		del_timer_sync(&task->task_timer);
 
-		kfree(task->task_sg_bidi);
 		kfree(task->task_sg);
 
 		list_del(&task->t_list);
