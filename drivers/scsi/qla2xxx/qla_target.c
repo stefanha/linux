@@ -3610,7 +3610,7 @@ static void qla_tgt_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_cti
 	struct qla_tgt_cmd *cmd = sctio->cmd;
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	unsigned long flags;
-	int xmit_type, resp=0;
+	int xmit_type = 0, resp = 0;
 	uint32_t offset;
 	uint16_t srr_ui;
 
@@ -3635,6 +3635,7 @@ static void qla_tgt_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_cti
 		qla_tgt_send_notify_ack(vha, ntfy,
 			0, 0, 0, NOTIFY_ACK_SRR_FLAGS_ACCEPT, 0, 0);
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+		xmit_type = QLA_TGT_XMIT_STATUS;
 		resp = 1;
 		break;
 	case SRR_IU_DATA_IN:
@@ -3708,10 +3709,8 @@ static void qla_tgt_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_cti
 	if (resp) {
 		if (IS_FWI2_CAPABLE(ha))
 			__qla_tgt_24xx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
-		else {
-			__qla_tgt_2xxx_xmit_response(cmd, QLA_TGT_XMIT_STATUS,
-				se_cmd->scsi_status);
-		}
+		else
+			__qla_tgt_2xxx_xmit_response(cmd, xmit_type, se_cmd->scsi_status);
 	}
 
 	return;
