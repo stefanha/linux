@@ -628,6 +628,8 @@ int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 	 * Setup the struct se_task->task_sg[] chained SG list
 	 */
 	transport_do_task_sg_chain(se_cmd);
+	cmd->sg_cnt = se_cmd->t_tasks_sg_chained_no;
+	cmd->sg = se_cmd->t_tasks_sg_chained;
 
 	/*
 	 * qla_target.c:qla_tgt_rdy_to_xfer() will call pci_map_sg() to setup
