@@ -96,7 +96,7 @@ static ssize_t ft_parse_wwn(const char *name, u64 *wwn, int strict)
 		}
 		err = 3;
 		val = hex_to_bin(c);
-		if (val < 0)
+		if (val < 0 || (strict && isupper(c)))
 			goto fail;
 		*wwn = (*wwn << 4) | val;
 	}
