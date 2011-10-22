@@ -2873,13 +2873,10 @@ static int transport_generic_cmd_sequencer(
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->t_task_lba = transport_lba_32(cdb);
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
-		passthrough = (dev->transport->transport_type ==
-				TRANSPORT_PLUGIN_PHBA_PDEV);
-		/*
-		 * Skip the remaining assignments for TCM/PSCSI passthrough
-		 */
-		if (passthrough)
-			break;
+
+		if (dev->transport->transport_type ==
+				TRANSPORT_PLUGIN_PHBA_PDEV)
+			goto out_unsupported_cdb;
 		/*
 		 * Setup BIDI XOR callback to be run after I/O completion.
 		 */
@@ -2908,12 +2905,8 @@ static int transport_generic_cmd_sequencer(
 			cmd->t_task_lba = transport_lba_64_ext(cdb);
 			cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
 
-			/*
-			 * Skip the remaining assignments for TCM/PSCSI passthrough
-			 */
 			if (passthrough)
-				break;
-
+				goto out_unsupported_cdb;
 			/*
 			 * Setup BIDI XOR callback to be run during after I/O
 			 * completion.
