@@ -982,11 +982,10 @@ struct qla_tgt_mgmt_cmd {
 	struct se_cmd se_cmd;
 	struct se_tmr_req *se_tmr_req;
 	unsigned int flags;
-#define Q24_MGMT_SEND_NACK	1
+#define QLA24XX_MGMT_SEND_NACK	1
 	union {
 		atio7_from_24xx_entry_t atio7;
-		imm_ntfy_from_2xxx_entry_t imm_ntfy;
-		imm_ntfy_from_24xx_entry_t imm_ntfy24;
+		iocb_t imm_ntfy;
 		abts_recv_from_24xx_entry_t abts;
 	} __attribute__((packed)) orig_iocb;
 };
@@ -1009,10 +1008,7 @@ struct qla_tgt_prm {
 struct qla_tgt_srr_imm {
 	struct list_head srr_list_entry;
 	int srr_id;
-	union {
-		imm_ntfy_from_2xxx_entry_t imm_ntfy;
-		imm_ntfy_from_24xx_entry_t imm_ntfy24;
-	} __attribute__((packed)) imm;
+	iocb_t imm_ntfy;
 };
 
 struct qla_tgt_srr_ctio {

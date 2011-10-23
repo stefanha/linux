@@ -509,7 +509,7 @@ static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
 	return qla_tgt_issue_task_mgmt(sess, unpacked_lun, mcmd,
-				iocb, Q24_MGMT_SEND_NACK);
+				iocb, QLA24XX_MGMT_SEND_NACK);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -1574,9 +1574,9 @@ void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	if (IS_FWI2_CAPABLE(ha)) {
-		if (mcmd->flags == Q24_MGMT_SEND_NACK) {
+		if (mcmd->flags == QLA24XX_MGMT_SEND_NACK) {
 			qla_tgt_send_notify_ack(vha,
-				(void *)&mcmd->orig_iocb.imm_ntfy24, 0, 0, 0, 0, 0, 0);
+				(void *)&mcmd->orig_iocb.imm_ntfy, 0, 0, 0, 0, 0, 0);
 		} else {
 			if (mcmd->se_tmr_req->function == ABORT_TASK)
 				qla_tgt_24xx_send_abts_resp(vha, &mcmd->orig_iocb.abts,
@@ -3547,8 +3547,8 @@ static void qla_tgt_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_cti
 	struct qla_tgt_srr_imm *imm)
 {
 	void *ntfy, *atio;
-	imm_ntfy_from_24xx_entry_t *ntfy24 = &imm->imm.imm_ntfy24;
-	imm_ntfy_from_2xxx_entry_t *ntfy2x = &imm->imm.imm_ntfy;
+	imm_ntfy_from_24xx_entry_t *ntfy24 = (imm_ntfy_from_24xx_entry_t *)&imm->imm_ntfy;
+	imm_ntfy_from_2xxx_entry_t *ntfy2x = (imm_ntfy_from_2xxx_entry_t *)&imm->imm_ntfy;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_cmd *cmd = sctio->cmd;
 	struct se_cmd *se_cmd = &cmd->se_cmd;
@@ -3677,17 +3677,11 @@ static void qla_tgt_reject_free_srr_imm(struct scsi_qla_host *vha, struct qla_tg
 {
 	struct qla_hw_data *ha = vha->hw;
 	unsigned long flags = 0;
-	void *iocb;
 
 	if (!ha_locked)
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 
-	if (IS_FWI2_CAPABLE(ha))
-		iocb = (void *)&imm->imm.imm_ntfy24;
-	else
-		iocb = (void *)&imm->imm.imm_ntfy;
-
-	qla_tgt_send_notify_ack(vha, iocb, 0, 0, 0,
+	qla_tgt_send_notify_ack(vha, (void *)&imm->imm_ntfy, 0, 0, 0,
 		NOTIFY_ACK_SRR_FLAGS_REJECT,
 		NOTIFY_ACK_SRR_REJECT_REASON_UNABLE_TO_PERFORM,
 		NOTIFY_ACK_SRR_FLAGS_REJECT_EXPL_NO_EXPL);
@@ -3790,8 +3784,7 @@ static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
 
 	imm = kzalloc(sizeof(*imm), GFP_ATOMIC);
 	if (imm != NULL) {
-		memcpy(&imm->imm.imm_ntfy, iocb,
-			sizeof(imm->imm.imm_ntfy));
+		memcpy(&imm->imm_ntfy, iocb, sizeof(imm->imm_ntfy));
 
 		/* IRQ is already OFF */
 		spin_lock(&tgt->srr_lock);
