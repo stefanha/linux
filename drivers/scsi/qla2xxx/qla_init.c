@@ -2556,7 +2556,7 @@ qla2x00_rport_del(void *data)
 	if (rport) {
 		fc_remote_port_delete(rport);
 		/*
-		 * Release the target mode FC NEXUS in qla2x_target.c code
+		 * Release the target mode FC NEXUS in qla_target.c code
 		 * if target mod is enabled.
 		 */
 		qla_tgt_fc_port_deleted(vha, fcport);
@@ -2957,7 +2957,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 		return;
 	}
 	/*
-	 * Create target mode FC NEXUS in qla2x_target.c if target mode is
+	 * Create target mode FC NEXUS in qla_target.c if target mode is
 	 * enabled..
 	 */
 	qla_tgt_fc_port_added(vha, fcport);
