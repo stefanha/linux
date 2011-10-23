@@ -980,11 +980,7 @@ struct qla_tgt_mgmt_cmd {
 	struct se_tmr_req *se_tmr_req;
 	unsigned int flags;
 #define QLA24XX_MGMT_SEND_NACK	1
-	union {
-		atio7_from_24xx_entry_t atio7;
-		iocb_t imm_ntfy;
-		abts_recv_from_24xx_entry_t abts;
-	} __attribute__((packed)) orig_iocb;
+	iocb_t orig_iocb;
 };
 
 struct qla_tgt_prm {
