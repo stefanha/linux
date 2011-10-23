@@ -953,10 +953,7 @@ struct qla_tgt_cmd {
 	struct scsi_qla_host *vha;
 	struct list_head cmd_list;
 
-	union {
-		atio7_from_24xx_entry_t atio7;
-		atio_from_2xxx_entry_t atio2x;
-	} __attribute__((packed)) atio;
+	atio_t atio;
 };
 
 struct qla_tgt_sess_work_param {
