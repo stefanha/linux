@@ -140,7 +140,7 @@ typedef struct {
 	uint16_t reserved_5;
 	uint16_t timeout;		/* 0 = 30 seconds, 0xFFFF = disable */
 	uint16_t reserved_6[20];
-} __attribute__((packed)) elun_entry_t;
+} __attribute__((packed)) enable_lun_t;
 #define ENABLE_LUN_SUCCESS          0x01
 #define ENABLE_LUN_RC_NONZERO       0x04
 #define ENABLE_LUN_INVALID_REQUEST  0x06
@@ -171,7 +171,7 @@ typedef struct {
 	uint16_t reserved_5;
 	uint16_t timeout;		    /* 0 = 30 seconds, 0xFFFF = disable */
 	uint16_t reserved_7[20];
-} __attribute__((packed)) modify_lun_entry_t;
+} __attribute__((packed)) modify_lun_t;
 #define MODIFY_LUN_SUCCESS	0x01
 #define MODIFY_LUN_CMD_ADD BIT_0
 #define MODIFY_LUN_CMD_SUB BIT_1
@@ -215,7 +215,7 @@ typedef struct {
 	uint16_t srr_ox_id;
 	uint8_t reserved_2[30];
 	uint16_t ox_id;
-} __attribute__((packed)) imm_ntfy_from_2xxx_entry_t;
+} __attribute__((packed)) imm_ntfy_from_2xxx_t;
 #endif
 
 #ifndef NOTIFY_ACK_TYPE
@@ -246,7 +246,7 @@ typedef struct {
 	uint8_t  srr_reject_code_expl;
 	uint8_t  reserved_2[26];
 	uint16_t ox_id;
-} __attribute__((packed)) nack_to_2xxx_entry_t;
+} __attribute__((packed)) nack_to_2xxx_t;
 #define NOTIFY_ACK_SRR_FLAGS_ACCEPT	0
 #define NOTIFY_ACK_SRR_FLAGS_REJECT	1
 
@@ -283,7 +283,7 @@ typedef struct {
 	uint8_t  initiator_port_name[WWN_SIZE]; /* on qla23xx */
 	uint16_t reserved_32[6];
 	uint16_t ox_id;
-} __attribute__((packed)) atio_from_2xxx_entry_t;
+} __attribute__((packed)) atio_from_2xxx_t;
 #endif
 
 #ifndef CONTINUE_TGT_IO_TYPE
@@ -315,7 +315,7 @@ typedef struct {
 	uint32_t dseg_1_length;		    /* Data segment 1 length. */
 	uint32_t dseg_2_address;	    /* Data segment 2 address. */
 	uint32_t dseg_2_length;		    /* Data segment 2 length. */
-} __attribute__((packed)) ctio_to_2xxx_entry_t;
+} __attribute__((packed)) ctio_to_2xxx_t;
 #define ATIO_PATH_INVALID       0x07
 #define ATIO_CANT_PROV_CAP      0x16
 #define ATIO_CDB_VALID          0x3D
@@ -362,7 +362,7 @@ typedef struct {
 	uint16_t scsi_status;
 	uint16_t response_length;
 	uint8_t	 sense_data[26];
-} __attribute__((packed)) ctio_from_2xxx_entry_t;
+} __attribute__((packed)) ctio_from_2xxx_t;
 #endif
 
 #define ATIO_TYPE7 0x06 /* Accept target I/O entry for 24xx */
@@ -445,7 +445,7 @@ typedef struct {
 #define ATIO_EXCHANGE_ADDRESS_UNKNOWN		0xFFFFFFFF
 	fcp_hdr_t fcp_hdr;
 	atio7_fcp_cmnd_t fcp_cmnd;
-} __attribute__((packed)) atio7_from_24xx_entry_t;
+} __attribute__((packed)) atio7_from_24xx_t;
 
 #define CTIO_TYPE7 0x12 /* Continue target I/O entry (for 24xx) */
 
@@ -494,7 +494,7 @@ typedef struct {
 			uint8_t sense_data[24];
 		} status1;
 	} u;
-} __attribute__((packed)) ctio7_to_24xx_entry_t;
+} __attribute__((packed)) ctio7_to_24xx_t;
 
 /*
  * ISP queue - CTIO type 7 from ISP 24xx to target driver returned entry structure.
@@ -518,7 +518,7 @@ typedef struct {
 	uint16_t reserved3;
 	uint32_t relative_offset;
 	uint8_t  reserved4[24];
-} __attribute__((packed)) ctio7_from_24xx_entry_t;
+} __attribute__((packed)) ctio7_from_24xx_t;
 
 /* CTIO7 flags values */
 #define CTIO7_FLAGS_SEND_STATUS		BIT_15
@@ -562,7 +562,7 @@ typedef struct {
 	uint8_t  reserved_6;
 	uint16_t reserved_7;
 	uint16_t ox_id;
-} __attribute__((packed)) imm_ntfy_from_24xx_entry_t;
+} __attribute__((packed)) imm_ntfy_from_24xx_t;
 
 #define ELS_PLOGI			0x3
 #define ELS_FLOGI			0x4
@@ -601,7 +601,7 @@ typedef struct {
 	uint8_t  srr_reject_code;
 	uint8_t  reserved_5[7];
 	uint16_t ox_id;
-} __attribute__((packed)) nack_to_24xx_entry_t;
+} __attribute__((packed)) nack_to_24xx_t;
 
 /*
  * ISP queue - ABTS received/response entries structure definition for 24xx.
@@ -630,7 +630,7 @@ typedef struct {
 	fcp_hdr_le_t fcp_hdr_le;
 	uint8_t  reserved_4[16];
 	uint32_t exchange_addr_to_abort;
-} __attribute__((packed)) abts_recv_from_24xx_entry_t;
+} __attribute__((packed)) abts_recv_from_24xx_t;
 
 #define ABTS_PARAM_ABORT_SEQ		BIT_0
 
@@ -682,7 +682,7 @@ typedef struct {
 	} __attribute__((packed)) payload;
 	uint32_t reserved_4;
 	uint32_t exchange_addr_to_abort;
-} __attribute__((packed)) abts_resp_to_24xx_entry_t;
+} __attribute__((packed)) abts_resp_to_24xx_t;
 
 /*
  * ISP queue -	ABTS Response IOCB from ISP24xx Firmware entry structure.
@@ -712,7 +712,7 @@ typedef struct {
 #define ABTS_RESP_SUBCODE_ERR_ABORTED_EXCH_NOT_TERM	0x1E
 	uint32_t error_subcode2;
 	uint32_t exchange_addr_to_abort;
-} __attribute__((packed)) abts_resp_from_24xx_fw_entry_t;
+} __attribute__((packed)) abts_resp_from_24xx_fw_t;
 
 /********************************************************************\
  * Type Definitions used by initiator & target halves
@@ -878,7 +878,7 @@ struct qla_tgt {
 	struct list_head sess_works_list;
 	struct work_struct sess_work;
 
-	imm_ntfy_from_24xx_entry_t link_reinit_iocb;
+	imm_ntfy_from_24xx_t link_reinit_iocb;
 	wait_queue_head_t waitQ;
 	int notify_ack_expected;
 	int abts_resp_expected;
@@ -966,9 +966,9 @@ struct qla_tgt_sess_work_param {
 
 	union {
 		struct qla_tgt_cmd *cmd;
-		abts_recv_from_24xx_entry_t abts;
-		imm_ntfy_from_2xxx_entry_t tm_iocb;
-		atio7_from_24xx_entry_t tm_iocb2;
+		abts_recv_from_24xx_t abts;
+		imm_ntfy_from_2xxx_t tm_iocb;
+		atio7_from_24xx_t tm_iocb2;
 	};
 };
 
@@ -1070,9 +1070,9 @@ static inline void qla_reverse_ini_mode(struct scsi_qla_host *ha)
 static inline void
 __qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, int enable)
 {
-	elun_entry_t *pkt;
+	enable_lun_t *pkt;
 
-	pkt = (elun_entry_t *)qla2x00_alloc_iocbs(vha, 0);
+	pkt = (enable_lun_t *)qla2x00_alloc_iocbs(vha, 0);
 	if (pkt != NULL) {
 		pkt->entry_type = ENABLE_LUN_TYPE;
 		if (enable) {
@@ -1120,7 +1120,7 @@ qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, bool enable)
  * Exported symbols from qla_target.c LLD logic used by qla2xxx code..
  */
 extern void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *,
-	atio7_from_24xx_entry_t *);
+	atio7_from_24xx_t *);
 extern void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *, response_t *);
 extern int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *);
 extern int qla_tgt_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
