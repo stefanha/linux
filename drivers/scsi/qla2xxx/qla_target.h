@@ -113,6 +113,11 @@
  * ISP Queue types left out of new QLogic driver (from old version)
 \********************************************************************/
 
+/* Generic IOCB struct */
+typedef struct {
+	uint8_t data[64];
+} iocb_t;
+
 #ifndef ENABLE_LUN_TYPE
 #define ENABLE_LUN_TYPE 0x0B		/* Enable LUN entry. */
 /*
