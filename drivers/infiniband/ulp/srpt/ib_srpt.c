@@ -1142,7 +1142,8 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	if (ioctx->rdma_ius && ioctx->n_rdma_ius)
 		nrdma = ioctx->n_rdma_ius;
 	else {
-		nrdma = count / SRPT_DEF_SG_PER_WQE + ioctx->n_rbuf;
+		nrdma = (count + SRPT_DEF_SG_PER_WQE - 1) / SRPT_DEF_SG_PER_WQE
+			+ ioctx->n_rbuf;
 
 		ioctx->rdma_ius = kzalloc(nrdma * sizeof *riu, GFP_KERNEL);
 		if (!ioctx->rdma_ius)
@@ -1258,11 +1259,11 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 			}
 
 			++k;
-			if (k == riu->sge_cnt && rsize > 0) {
+			if (k == riu->sge_cnt && rsize > 0 && tsize > 0) {
 				++riu;
 				sge = riu->sge;
 				k = 0;
-			} else if (rsize > 0)
+			} else if (rsize > 0 && tsize > 0)
 				++sge;
 		}
 	}
