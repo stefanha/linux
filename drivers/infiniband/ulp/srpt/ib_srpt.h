@@ -114,6 +114,7 @@ enum {
 	MIN_SRPT_SRQ_SIZE = 4,
 	DEFAULT_SRPT_SRQ_SIZE = 4095,
 	MAX_SRPT_SRQ_SIZE = 65535,
+	MAX_SRPT_RDMA_SIZE = 256U,
 
 	MIN_MAX_REQ_SIZE = 996,
 	DEFAULT_MAX_REQ_SIZE
@@ -326,6 +327,14 @@ struct srpt_rdma_ch {
 };
 
 /**
+ * struct srpt_port_attib - Attributes for SRPT port
+ * @srp_max_rdma_size: Maximum size of SRP RDMA transfers for new connections.
+ */
+struct srpt_port_attrib {
+	u32			srp_max_rdma_size;
+};
+
+/**
  * struct srpt_port - Information associated by SRPT with a single IB port.
  * @sdev:      backpointer to the HCA information.
  * @mad_agent: per-port management datagram processing information.
@@ -355,6 +364,7 @@ struct srpt_port {
 	struct se_portal_group	port_tpg_1;
 	struct se_wwn		port_wwn;
 	struct list_head	port_acl_list;
+	struct srpt_port_attrib port_attrib;
 };
 
 /**
