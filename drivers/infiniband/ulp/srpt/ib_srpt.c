@@ -3325,17 +3325,14 @@ static void srpt_add_one(struct ib_device *device)
 		INIT_LIST_HEAD(&sport->port_acl_list);
 		spin_lock_init(&sport->port_acl_lock);
 
-		sprintf(sport->port_guid, "0x0000000000000000%04x%04x%04x%04x",
-                                be16_to_cpu(((__be16 *)&device->node_guid)[0]),
-                                be16_to_cpu(((__be16 *)&device->node_guid)[1]),
-                                be16_to_cpu(((__be16 *)&device->node_guid)[2]),
-                                be16_to_cpu(((__be16 *)&device->node_guid)[3]) + i);
-
 		if (srpt_refresh_port(sport)) {
 			printk(KERN_ERR "MAD registration failed for %s-%d.\n",
 			       srpt_sdev_name(sdev), i);
 			goto err_ring;
 		}
+		snprintf(sport->port_guid, sizeof(sport->port_guid),
+				"0x0000000000000000%016llx",
+				be64_to_cpu(sport->gid.global.interface_id));
 	}
 
 	spin_lock(&srpt_dev_lock);
