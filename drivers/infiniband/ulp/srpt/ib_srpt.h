@@ -277,6 +277,7 @@ enum rdma_ch_state {
  * @qp:            IB queue pair used for communicating over this channel.
  * @cq:            IB completion queue for this channel.
  * @rq_size:       IB receive queue size.
+ * @rsp_size	   IB response message size in bytes.
  * @sq_wr_avail:   number of work requests available in the send queue.
  * @sport:         pointer to the information of the HCA port used by this
  *                 channel.
@@ -307,6 +308,7 @@ struct srpt_rdma_ch {
 	struct ib_qp		*qp;
 	struct ib_cq		*cq;
 	int			rq_size;
+	u32			rsp_size;
 	atomic_t		sq_wr_avail;
 	struct srpt_port	*sport;
 	u8			i_port_id[16];

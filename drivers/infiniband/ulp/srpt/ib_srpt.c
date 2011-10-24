@@ -2373,8 +2373,7 @@ static void srpt_release_channel_work(struct work_struct *w)
 
 	srpt_free_ioctx_ring((struct srpt_ioctx **)ch->ioctx_ring,
 			     ch->sport->sdev, ch->rq_size,
-			     ch->sport->port_attrib.srp_max_rsp_size,
-			     DMA_TO_DEVICE);
+			     ch->rsp_size, DMA_TO_DEVICE);
 
 	spin_lock_irq(&sdev->spinlock);
 	list_del(&ch->list);
@@ -2554,12 +2553,12 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 	spin_lock_init(&ch->spinlock);
 	ch->state = CH_CONNECTING;
 	INIT_LIST_HEAD(&ch->cmd_wait_list);
+	ch->rsp_size = ch->sport->port_attrib.srp_max_rsp_size;
 
 	ch->ioctx_ring = (struct srpt_send_ioctx **)
 		srpt_alloc_ioctx_ring(ch->sport->sdev, ch->rq_size,
 				      sizeof(*ch->ioctx_ring[0]),
-				      ch->sport->port_attrib.srp_max_rsp_size,
-				      DMA_TO_DEVICE);
+				      ch->rsp_size, DMA_TO_DEVICE);
 	if (!ch->ioctx_ring)
 		goto free_ch;
 
@@ -2667,8 +2666,7 @@ destroy_ib:
 free_ring:
 	srpt_free_ioctx_ring((struct srpt_ioctx **)ch->ioctx_ring,
 			     ch->sport->sdev, ch->rq_size,
-			     ch->sport->port_attrib.srp_max_rsp_size,
-			     DMA_TO_DEVICE);
+			     ch->rsp_size, DMA_TO_DEVICE);
 free_ch:
 	kfree(ch);
 
