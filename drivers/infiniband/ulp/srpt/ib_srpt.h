@@ -331,10 +331,12 @@ struct srpt_rdma_ch {
  * struct srpt_port_attib - Attributes for SRPT port
  * @srp_max_rdma_size: Maximum size of SRP RDMA transfers for new connections.
  * @srp_max_rsp_size: Maximum size of SRP response messages in bytes.
+ * @srp_sq_size: Shared receive queue (SRQ) size.
  */
 struct srpt_port_attrib {
 	u32			srp_max_rdma_size;
 	u32			srp_max_rsp_size;
+	u32			srp_sq_size;
 };
 
 /**
