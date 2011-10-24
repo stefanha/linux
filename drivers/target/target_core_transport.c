@@ -2296,7 +2296,7 @@ check_depth:
 
 	if (atomic_read(&cmd->t_task_cdbs_sent) ==
 	    cmd->t_task_list_num)
-		atomic_set(&cmd->transport_sent, 1);
+		atomic_set(&cmd->t_transport_sent, 1);
 
 	transport_start_task_timer(task);
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
@@ -2313,7 +2313,7 @@ check_depth:
 			task->task_flags &= ~TF_ACTIVE;
 			spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 			del_timer_sync(&task->task_timer);
-			atomic_set(&cmd->transport_sent, 0);
+			atomic_set(&cmd->t_transport_sent, 0);
 			transport_stop_tasks_for_cmd(cmd);
 			atomic_inc(&dev->depth_left);
 			transport_generic_request_failure(cmd, 0, 1);
@@ -2353,7 +2353,7 @@ check_depth:
 			task->task_flags &= ~TF_ACTIVE;
 			spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 			del_timer_sync(&task->task_timer);
-			atomic_set(&cmd->transport_sent, 0);
+			atomic_set(&cmd->t_transport_sent, 0);
 			transport_stop_tasks_for_cmd(cmd);
 			atomic_inc(&dev->depth_left);
 			transport_generic_request_failure(cmd, 0, 1);
