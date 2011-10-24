@@ -2130,6 +2130,7 @@ static int srpt_create_ch_ib(struct srpt_rdma_ch *ch)
 	struct ib_qp_init_attr *qp_init;
 	struct srpt_port *sport = ch->sport;
 	struct srpt_device *sdev = sport->sdev;
+	u32 srp_sq_size = sport->port_attrib.srp_sq_size;
 	int ret;
 
 	WARN_ON(ch->rq_size < 1);
@@ -2140,11 +2141,11 @@ static int srpt_create_ch_ib(struct srpt_rdma_ch *ch)
 		goto out;
 
 	ch->cq = ib_create_cq(sdev->device, srpt_completion, NULL, ch,
-			      ch->rq_size + sport->port_attrib.srp_sq_size, 0);
+			      ch->rq_size + srp_sq_size, 0);
 	if (IS_ERR(ch->cq)) {
 		ret = PTR_ERR(ch->cq);
 		printk(KERN_ERR "failed to create CQ cqe= %d ret= %d\n",
-		       ch->rq_size + sport->port_attrib.srp_sq_size, ret);
+		       ch->rq_size + srp_sq_size, ret);
 		goto out;
 	}
 
@@ -2156,7 +2157,7 @@ static int srpt_create_ch_ib(struct srpt_rdma_ch *ch)
 	qp_init->srq = sdev->srq;
 	qp_init->sq_sig_type = IB_SIGNAL_REQ_WR;
 	qp_init->qp_type = IB_QPT_RC;
-	qp_init->cap.max_send_wr = sport->port_attrib.srp_sq_size;
+	qp_init->cap.max_send_wr = srp_sq_size;
 	qp_init->cap.max_send_sge = SRPT_DEF_SG_PER_WQE;
 
 	ch->qp = ib_create_qp(sdev->pd, qp_init);
