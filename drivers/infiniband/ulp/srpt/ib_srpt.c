@@ -83,11 +83,6 @@ module_param(srp_max_req_size, int, 0444);
 MODULE_PARM_DESC(srp_max_req_size,
 		 "Maximum size of SRP request messages in bytes.");
 
-static unsigned int srp_max_rsp_size = DEFAULT_MAX_RSP_SIZE;
-module_param(srp_max_rsp_size, int, 0444);
-MODULE_PARM_DESC(srp_max_rsp_size,
-		 "Maximum size of SRP response messages in bytes.");
-
 static int srpt_srq_size = DEFAULT_SRPT_SRQ_SIZE;
 module_param(srpt_srq_size, int, 0444);
 MODULE_PARM_DESC(srpt_srq_size,
@@ -687,7 +682,6 @@ static struct srpt_ioctx **srpt_alloc_ioctx_ring(struct srpt_device *sdev,
 
 	WARN_ON(ioctx_size != sizeof(struct srpt_recv_ioctx)
 		&& ioctx_size != sizeof(struct srpt_send_ioctx));
-	WARN_ON(dma_size != srp_max_req_size && dma_size != srp_max_rsp_size);
 
 	ring = kmalloc(ring_size * sizeof(ring[0]), GFP_KERNEL);
 	if (!ring)
@@ -716,8 +710,6 @@ static void srpt_free_ioctx_ring(struct srpt_ioctx **ioctx_ring,
 				 int dma_size, enum dma_data_direction dir)
 {
 	int i;
-
-	WARN_ON(dma_size != srp_max_req_size && dma_size != srp_max_rsp_size);
 
 	for (i = 0; i < ring_size; ++i)
 		srpt_free_ioctx(sdev, ioctx_ring[i], dma_size, dir);
@@ -2384,7 +2376,8 @@ static void srpt_release_channel_work(struct work_struct *w)
 
 	srpt_free_ioctx_ring((struct srpt_ioctx **)ch->ioctx_ring,
 			     ch->sport->sdev, ch->rq_size,
-			     srp_max_rsp_size, DMA_TO_DEVICE);
+			     ch->sport->port_attrib.srp_max_rsp_size,
+			     DMA_TO_DEVICE);
 
 	spin_lock_irq(&sdev->spinlock);
 	list_del(&ch->list);
@@ -2568,7 +2561,8 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 	ch->ioctx_ring = (struct srpt_send_ioctx **)
 		srpt_alloc_ioctx_ring(ch->sport->sdev, ch->rq_size,
 				      sizeof(*ch->ioctx_ring[0]),
-				      srp_max_rsp_size, DMA_TO_DEVICE);
+				      ch->sport->port_attrib.srp_max_rsp_size,
+				      DMA_TO_DEVICE);
 	if (!ch->ioctx_ring)
 		goto free_ch;
 
@@ -2676,8 +2670,8 @@ destroy_ib:
 free_ring:
 	srpt_free_ioctx_ring((struct srpt_ioctx **)ch->ioctx_ring,
 			     ch->sport->sdev, ch->rq_size,
-			     srp_max_rsp_size, DMA_TO_DEVICE);
-
+			     ch->sport->port_attrib.srp_max_rsp_size,
+			     DMA_TO_DEVICE);
 free_ch:
 	kfree(ch);
 
@@ -3294,6 +3288,7 @@ static void srpt_add_one(struct ib_device *device)
 		sport->sdev = sdev;
 		sport->port = i;
 		sport->port_attrib.srp_max_rdma_size = DEFAULT_MAX_RDMA_SIZE;
+		sport->port_attrib.srp_max_rsp_size = DEFAULT_MAX_RSP_SIZE;
 		INIT_WORK(&sport->work, srpt_refresh_port_work);
 		INIT_LIST_HEAD(&sport->port_acl_list);
 		spin_lock_init(&sport->port_acl_lock);
@@ -3737,8 +3732,49 @@ static ssize_t srpt_tpg_attrib_store_srp_max_rdma_size(
 
 TF_TPG_ATTRIB_ATTR(srpt, srp_max_rdma_size, S_IRUGO | S_IWUSR);
 
+static ssize_t srpt_tpg_attrib_show_srp_max_rsp_size(
+	struct se_portal_group *se_tpg,
+	char *page)
+{
+	struct srpt_port *sport = container_of(se_tpg, struct srpt_port, port_tpg_1);
+
+	return sprintf(page, "%u\n", sport->port_attrib.srp_max_rsp_size);
+}
+
+static ssize_t srpt_tpg_attrib_store_srp_max_rsp_size(
+	struct se_portal_group *se_tpg,
+	const char *page,
+	size_t count)
+{
+	struct srpt_port *sport = container_of(se_tpg, struct srpt_port, port_tpg_1);
+	unsigned long val;
+	int ret;
+
+	ret = strict_strtoul(page, 0, &val);
+	if (ret < 0) {
+		pr_err("strict_strtoul() failed with ret: %d\n", ret);
+		return -EINVAL;
+	}
+	if (val > MAX_SRPT_RSP_SIZE) {
+		pr_err("val: %lu exceeds MAX_SRPT_RSP_SIZE: %d\n", val,
+			MAX_SRPT_RSP_SIZE);
+		return -EINVAL;
+	}
+	if (val < MIN_MAX_RSP_SIZE) {
+		pr_err("val: %lu smaller than MIN_MAX_RSP_SIZE: %d\n", val,
+			MIN_MAX_RSP_SIZE);
+		return -EINVAL;
+	}
+	sport->port_attrib.srp_max_rsp_size = val;
+
+	return count;
+}
+
+TF_TPG_ATTRIB_ATTR(srpt, srp_max_rsp_size, S_IRUGO | S_IWUSR);
+
 static struct configfs_attribute *srpt_tpg_attrib_attrs[] = {
 	&srpt_tpg_attrib_srp_max_rdma_size.attr,
+	&srpt_tpg_attrib_srp_max_rsp_size.attr,
 	NULL,
 };
 
@@ -3934,13 +3970,6 @@ static int __init srpt_init_module(void)
 		printk(KERN_ERR "invalid value %d for kernel module parameter"
 		       " srp_max_req_size -- must be at least %d.\n",
 		       srp_max_req_size, MIN_MAX_REQ_SIZE);
-		goto out;
-	}
-
-	if (srp_max_rsp_size < MIN_MAX_RSP_SIZE) {
-		printk(KERN_ERR "invalid value %d for kernel module parameter"
-		       " srp_max_rsp_size -- must be at least %d.\n",
-		       srp_max_rsp_size, MIN_MAX_RSP_SIZE);
 		goto out;
 	}
 

@@ -115,6 +115,7 @@ enum {
 	DEFAULT_SRPT_SRQ_SIZE = 4095,
 	MAX_SRPT_SRQ_SIZE = 65535,
 	MAX_SRPT_RDMA_SIZE = 256U,
+	MAX_SRPT_RSP_SIZE = 1024,
 
 	MIN_MAX_REQ_SIZE = 996,
 	DEFAULT_MAX_REQ_SIZE
@@ -329,9 +330,11 @@ struct srpt_rdma_ch {
 /**
  * struct srpt_port_attib - Attributes for SRPT port
  * @srp_max_rdma_size: Maximum size of SRP RDMA transfers for new connections.
+ * @srp_max_rsp_size: Maximum size of SRP response messages in bytes.
  */
 struct srpt_port_attrib {
 	u32			srp_max_rdma_size;
+	u32			srp_max_rsp_size;
 };
 
 /**
