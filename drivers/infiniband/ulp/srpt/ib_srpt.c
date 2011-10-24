@@ -3805,7 +3805,7 @@ static void srpt_drop_tpg(struct se_portal_group *tpg)
 
 /**
  * configfs callback invoked for
- * mkdir /sys/kernel/config/target/$driver/$target
+ * mkdir /sys/kernel/config/target/$driver/$port
  */
 static struct se_wwn *srpt_make_tport(struct target_fabric_configfs *tf,
 				      struct config_group *group,
@@ -3828,7 +3828,7 @@ err:
 
 /**
  * configfs callback invoked for
- * rmdir /sys/kernel/config/target/$driver/$target
+ * rmdir /sys/kernel/config/target/$driver/$port
  */
 static void srpt_drop_tport(struct se_wwn *wwn)
 {
