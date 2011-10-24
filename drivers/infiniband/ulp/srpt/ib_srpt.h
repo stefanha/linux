@@ -127,12 +127,27 @@ enum {
 	DEFAULT_MAX_RDMA_SIZE = 65536,
 };
 
+enum srpt_opcode {
+	SRPT_RECV,
+	SRPT_SEND,
+	SRPT_RDMA_MID,
+	SRPT_RDMA_ABORT,
+	SRPT_RDMA_READ_LAST,
+	SRPT_RDMA_WRITE_LAST,
+};
+
 static inline u64 encode_wr_id(u8 opcode, u32 idx)
-{ return ((u64)opcode << 32) | idx; }
-static inline u8 opcode_from_wr_id(u64 wr_id)
-{ return wr_id >> 32; }
+{
+	return ((u64)opcode << 32) | idx;
+}
+static inline enum srpt_opcode opcode_from_wr_id(u64 wr_id)
+{
+	return wr_id >> 32;
+}
 static inline u32 idx_from_wr_id(u64 wr_id)
-{ return (u32)wr_id; }
+{
+	return (u32)wr_id;
+}
 
 struct rdma_iu {
 	u64		raddr;
@@ -204,6 +219,8 @@ struct srpt_recv_ioctx {
  * @tag:         Tag of the received SRP information unit.
  * @spinlock:    Protects 'state'.
  * @state:       I/O context state.
+ * @rdma_aborted: If initiating a multipart RDMA transfer failed, whether
+ * 		 the already initiated transfers have finished.
  * @cmd:         Target core command data structure.
  * @sense_data:  SCSI sense data.
  */
@@ -218,6 +235,7 @@ struct srpt_send_ioctx {
 	struct list_head	free_list;
 	spinlock_t		spinlock;
 	enum srpt_command_state	state;
+	bool			rdma_aborted;
 	struct se_cmd		cmd;
 	struct completion	tx_done;
 	u64			tag;
