@@ -3679,8 +3679,10 @@ static struct se_node_acl *srpt_make_nodeacl(struct se_portal_group *tpg,
 	}
 
 	se_nacl_new = srpt_alloc_fabric_acl(tpg);
-	if (!se_nacl_new)
+	if (!se_nacl_new) {
+		ret = -ENOMEM;
 		goto err;
+	}
 	/*
 	 * nacl_new may be released by core_tpg_add_initiator_node_acl()
 	 * when converting a node ACL from demo mode to explict
