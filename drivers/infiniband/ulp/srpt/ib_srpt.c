@@ -1112,7 +1112,7 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	count = ib_dma_map_sg(ch->sport->sdev->device, sg, sg_cnt,
 			      opposite_dma_dir(dir));
 	if (unlikely(!count))
-		return -EBUSY;
+		return -EAGAIN;
 
 	ioctx->mapped_sg_count = count;
 
