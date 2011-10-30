@@ -399,8 +399,8 @@ int line6_init_midi(struct usb_line6 *line6)
 		return err;
 
 	line6midi->line6 = line6;
-	line6midi->midi_mask_transmit = 1;
-	line6midi->midi_mask_receive = 4;
+	line6midi->midi_mask_transmit = 0xffff;
+	line6midi->midi_mask_receive = 0xffff;
 	line6->line6midi = line6midi;
 
 	err = snd_device_new(line6->card, SNDRV_DEV_RAWMIDI, line6midi,
