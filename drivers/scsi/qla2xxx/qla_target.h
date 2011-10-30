@@ -247,32 +247,58 @@ typedef struct {
 #ifndef NOTIFY_ACK_TYPE
 #define NOTIFY_ACK_TYPE 0x0E	  /* Notify acknowledge entry. */
 /*
- * ISP queue - notify acknowledge entry structure definition.
+ * ISP queue -	notify acknowledge entry structure definition.
+ *		This is sent to the ISP from the target driver.
  */
 typedef struct {
 	uint8_t	 entry_type;		    /* Entry type. */
 	uint8_t	 entry_count;		    /* Entry count. */
 	uint8_t	 sys_define;		    /* System defined. */
 	uint8_t	 entry_status;		    /* Entry Status. */
-	uint32_t sys_define_2;		    /* System defined. */
-	target_id_t target;
-	uint8_t	 target_id;
-	uint8_t	 reserved_1;
-	uint16_t flags;
-	uint16_t resp_code;
-	uint16_t status;
-	uint16_t task_flags;
-	uint16_t seq_id;
-	uint16_t srr_rx_id;
-	uint32_t srr_rel_offs;
-	uint16_t srr_ui;
-	uint16_t srr_flags;
-	uint16_t srr_reject_code;
-	uint8_t  srr_reject_vendor_uniq;
-	uint8_t  srr_reject_code_expl;
-	uint8_t  reserved_2[26];
+	union {
+		struct {
+			uint32_t sys_define_2; /* System defined. */
+			target_id_t target;
+			uint8_t	 target_id;
+			uint8_t	 reserved_1;
+			uint16_t flags;
+			uint16_t resp_code;
+			uint16_t status;
+			uint16_t task_flags;
+			uint16_t seq_id;
+			uint16_t srr_rx_id;
+			uint32_t srr_rel_offs;
+			uint16_t srr_ui;
+			uint16_t srr_flags;
+			uint16_t srr_reject_code;
+			uint8_t  srr_reject_vendor_uniq;
+			uint8_t  srr_reject_code_expl;
+			uint8_t  reserved_2[24];
+		} isp2x;
+		struct {
+			uint32_t handle;
+			uint16_t nport_handle;
+			uint16_t reserved_1;
+			uint16_t flags;
+			uint16_t srr_rx_id;
+			uint16_t status;
+			uint8_t  status_subcode;
+			uint8_t  reserved_3;
+			uint32_t exchange_address;
+			uint32_t srr_rel_offs;
+			uint16_t srr_ui;
+			uint16_t srr_flags;
+			uint8_t  reserved_4[19];
+			uint8_t  vp_index;
+			uint8_t  srr_reject_vendor_uniq;
+			uint8_t  srr_reject_code_expl;
+			uint8_t  srr_reject_code;
+			uint8_t  reserved_5[5];
+		} isp24;
+	} u;
+	uint8_t  reserved[2];
 	uint16_t ox_id;
-} __attribute__((packed)) nack_to_2xxx_t;
+} __attribute__((packed)) nack_to_isp_t;
 #define NOTIFY_ACK_SRR_FLAGS_ACCEPT	0
 #define NOTIFY_ACK_SRR_FLAGS_REJECT	1
 
@@ -571,36 +597,6 @@ typedef struct {
 #define ELS_TPRLO			0x24
 #define ELS_PDISC			0x50
 #define ELS_ADISC			0x52
-
-/*
- * ISP queue -	notify acknowledge entry structure definition for 24xx.
- *		This is sent to the ISP 24xx from the target driver.
- */
-typedef struct {
-	uint8_t	 entry_type;		    /* Entry type. */
-	uint8_t	 entry_count;		    /* Entry count. */
-	uint8_t	 sys_define;		    /* System defined. */
-	uint8_t	 entry_status;		    /* Entry Status. */
-	uint32_t handle;
-	uint16_t nport_handle;
-	uint16_t reserved_1;
-	uint16_t flags;
-	uint16_t srr_rx_id;
-	uint16_t status;
-	uint8_t  status_subcode;
-	uint8_t  reserved_3;
-	uint32_t exchange_address;
-	uint32_t srr_rel_offs;
-	uint16_t srr_ui;
-	uint16_t srr_flags;
-	uint8_t  reserved_4[19];
-	uint8_t  vp_index;
-	uint8_t  srr_reject_vendor_uniq;
-	uint8_t  srr_reject_code_expl;
-	uint8_t  srr_reject_code;
-	uint8_t  reserved_5[7];
-	uint16_t ox_id;
-} __attribute__((packed)) nack_to_24xx_t;
 
 /*
  * ISP queue - ABTS received/response entries structure definition for 24xx.

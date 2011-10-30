@@ -314,16 +314,16 @@ void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *vha, response_t *pkt)
 	{
 		struct scsi_qla_host *host = vha;
 		if (IS_FWI2_CAPABLE(ha)) {
-			nack_to_24xx_t *entry = (nack_to_24xx_t *)pkt;
-			if (0xFF != entry->vp_index) {
+			nack_to_isp_t *entry = (nack_to_isp_t *)pkt;
+			if (0xFF != entry->u.isp24.vp_index) {
 				host = qla_tgt_find_host_by_vp_idx(vha,
-						entry->vp_index);
+						entry->u.isp24.vp_index);
 				if (unlikely(!host)) {
 					printk(KERN_ERR "qla_target(%d): Response "
 						"pkt (NOTIFY_ACK_TYPE) "
 						"received, with unknown "
 						"vp_index %d\n", vha->vp_idx,
-						entry->vp_index);
+						entry->u.isp24.vp_index);
 					break;
 				}
 			}
@@ -1221,6 +1221,7 @@ static void qla_tgt_send_notify_ack(struct scsi_qla_host *vha,
 {
 	struct qla_hw_data *ha = vha->hw;
 	request_t *pkt;
+	nack_to_isp_t *nack;
 
 	ql_dbg(ql_dbg_tgt, vha, 0xe007, "Sending NOTIFY_ACK (ha=%p)\n", ha);
 
@@ -1241,50 +1242,47 @@ static void qla_tgt_send_notify_ack(struct scsi_qla_host *vha,
 	pkt->entry_type = NOTIFY_ACK_TYPE;
 	pkt->entry_count = 1;
 
+	nack = (nack_to_isp_t *)pkt;
+	nack->ox_id = ntfy->ox_id;
 	if (IS_FWI2_CAPABLE(ha)) {
-		nack_to_24xx_t *nack24 = (nack_to_24xx_t *)pkt;
-
-		nack24->nport_handle = ntfy->u.isp24.nport_handle;
+		nack->u.isp24.nport_handle = ntfy->u.isp24.nport_handle;
 		if (le16_to_cpu(ntfy->u.isp24.status) == IMM_NTFY_ELS) {
-			nack24->flags = ntfy->u.isp24.flags &
+			nack->u.isp24.flags = ntfy->u.isp24.flags &
 				__constant_cpu_to_le32(NOTIFY24XX_FLAGS_PUREX_IOCB);
 		}
-		nack24->srr_rx_id = ntfy->u.isp24.srr_rx_id;
-		nack24->status = ntfy->u.isp24.status;
-		nack24->status_subcode = ntfy->u.isp24.status_subcode;
-		nack24->exchange_address = ntfy->u.isp24.exchange_address;
-		nack24->srr_rel_offs = ntfy->u.isp24.srr_rel_offs;
-		nack24->srr_ui = ntfy->u.isp24.srr_ui;
-		nack24->srr_flags = cpu_to_le16(srr_flags);
-		nack24->srr_reject_code = srr_reject_code;
-		nack24->srr_reject_code_expl = srr_explan;
-		nack24->vp_index = ntfy->u.isp24.vp_index;
-		nack24->ox_id = ntfy->ox_id;
+		nack->u.isp24.srr_rx_id = ntfy->u.isp24.srr_rx_id;
+		nack->u.isp24.status = ntfy->u.isp24.status;
+		nack->u.isp24.status_subcode = ntfy->u.isp24.status_subcode;
+		nack->u.isp24.exchange_address = ntfy->u.isp24.exchange_address;
+		nack->u.isp24.srr_rel_offs = ntfy->u.isp24.srr_rel_offs;
+		nack->u.isp24.srr_ui = ntfy->u.isp24.srr_ui;
+		nack->u.isp24.srr_flags = cpu_to_le16(srr_flags);
+		nack->u.isp24.srr_reject_code = srr_reject_code;
+		nack->u.isp24.srr_reject_code_expl = srr_explan;
+		nack->u.isp24.vp_index = ntfy->u.isp24.vp_index;
 
 		ql_dbg(ql_dbg_tgt_pkt, vha, 0xe201,
 			"qla_target(%d): Sending 24xx Notify Ack %d\n",
-			vha->vp_idx, nack24->status);
+			vha->vp_idx, nack->u.isp24.status);
 	} else {
-		nack_to_2xxx_t *nack = (nack_to_2xxx_t *)pkt;
-
-		SET_TARGET_ID(ha, nack->target, GET_TARGET_ID(ha, (atio_from_isp_t *)ntfy));
-		nack->status = ntfy->u.isp2x.status;
-		nack->task_flags = ntfy->u.isp2x.task_flags;
-		nack->seq_id = ntfy->u.isp2x.seq_id;
+		SET_TARGET_ID(ha, nack->u.isp2x.target,
+			GET_TARGET_ID(ha, (atio_from_isp_t *)ntfy));
+		nack->u.isp2x.status = ntfy->u.isp2x.status;
+		nack->u.isp2x.task_flags = ntfy->u.isp2x.task_flags;
+		nack->u.isp2x.seq_id = ntfy->u.isp2x.seq_id;
 		/* Do not increment here, the chip isn't decrementing */
-		/* nack->flags = __constant_cpu_to_le16(NOTIFY_ACK_RES_COUNT); */
-		nack->flags |= cpu_to_le16(add_flags);
-		nack->srr_rx_id = ntfy->u.isp2x.srr_rx_id;
-		nack->srr_rel_offs = ntfy->u.isp2x.srr_rel_offs;
-		nack->srr_ui = ntfy->u.isp2x.srr_ui;
-		nack->srr_flags = cpu_to_le16(srr_flags);
-		nack->srr_reject_code = cpu_to_le16(srr_reject_code);
-		nack->srr_reject_code_expl = srr_explan;
-		nack->ox_id = ntfy->ox_id;
+		/* nack->u.isp2x.flags = __constant_cpu_to_le16(NOTIFY_ACK_RES_COUNT); */
+		nack->u.isp2x.flags |= cpu_to_le16(add_flags);
+		nack->u.isp2x.srr_rx_id = ntfy->u.isp2x.srr_rx_id;
+		nack->u.isp2x.srr_rel_offs = ntfy->u.isp2x.srr_rel_offs;
+		nack->u.isp2x.srr_ui = ntfy->u.isp2x.srr_ui;
+		nack->u.isp2x.srr_flags = cpu_to_le16(srr_flags);
+		nack->u.isp2x.srr_reject_code = cpu_to_le16(srr_reject_code);
+		nack->u.isp2x.srr_reject_code_expl = srr_explan;
 
 		if (resp_code_valid) {
-			nack->resp_code = cpu_to_le16(resp_code);
-			nack->flags |= __constant_cpu_to_le16(
+			nack->u.isp2x.resp_code = cpu_to_le16(resp_code);
+			nack->u.isp2x.flags |= __constant_cpu_to_le16(
 				NOTIFY_ACK_TM_RESP_CODE_VALID);
 		}
 
@@ -1292,7 +1290,8 @@ static void qla_tgt_send_notify_ack(struct scsi_qla_host *vha,
 			" Seq %#x -> I %#x St %#x RC %#x\n", vha->vp_idx,
 			le16_to_cpu(ntfy->u.isp2x.seq_id),
 			GET_TARGET_ID(ha, (atio_from_isp_t *)ntfy),
-			le16_to_cpu(ntfy->u.isp2x.status), le16_to_cpu(nack->resp_code));
+			le16_to_cpu(ntfy->u.isp2x.status),
+			le16_to_cpu(nack->u.isp2x.resp_code));
 	}
 
 	qla2x00_isp_cmd(vha, vha->req);
@@ -4262,15 +4261,16 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 
 	case NOTIFY_ACK_TYPE:
 		if (tgt->notify_ack_expected > 0) {
-			nack_to_2xxx_t *entry = (nack_to_2xxx_t *)pkt;
+			nack_to_isp_t *entry = (nack_to_isp_t *)pkt;
 			ql_dbg(ql_dbg_tgt, vha, 0xe02d, "NOTIFY_ACK seq %08x status %x\n",
-				  le16_to_cpu(entry->seq_id),
-				  le16_to_cpu(entry->status));
+				  le16_to_cpu(entry->u.isp2x.seq_id),
+				  le16_to_cpu(entry->u.isp2x.status));
 			tgt->notify_ack_expected--;
-			if (entry->status != __constant_cpu_to_le16(NOTIFY_ACK_SUCCESS)) {
+			if (entry->u.isp2x.status !=
+				__constant_cpu_to_le16(NOTIFY_ACK_SUCCESS)) {
 				printk(KERN_ERR "qla_target(%d): NOTIFY_ACK "
 					    "failed %x\n", vha->vp_idx,
-					    le16_to_cpu(entry->status));
+					    le16_to_cpu(entry->u.isp2x.status));
 			}
 		} else {
 			printk(KERN_ERR "qla_target(%d): Unexpected NOTIFY_ACK "
