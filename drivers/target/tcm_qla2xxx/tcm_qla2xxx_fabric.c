@@ -737,14 +737,12 @@ int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
 	scsi_qla_host_t *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	unsigned char *cdb;
+	atio_from_isp_t *atio = &cmd->atio;
 
-	if (IS_FWI2_CAPABLE(ha)) {
-		atio7_from_24xx_t *atio = (atio7_from_24xx_t *)&cmd->atio;
-		cdb = &atio->fcp_cmnd.cdb[0];
-	} else {
-		atio_from_2xxx_t *atio = (atio_from_2xxx_t *)&cmd->atio;
-		cdb = &atio->cdb[0];
-	}
+	if (IS_FWI2_CAPABLE(ha))
+		cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
+	else
+		cdb = &atio->u.isp2x.cdb[0];
 
 	/*
 	 * Allocate the necessary tasks to complete the received CDB+data

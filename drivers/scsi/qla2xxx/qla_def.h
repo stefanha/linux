@@ -1231,17 +1231,6 @@ typedef struct {
 #define RESPONSE_PROCESSED	0xDEADDEAD	/* Signature */
 } response_t;
 
-/*
- * ISP queue - ATIO queue entry definition.
- */
-typedef struct {
-	uint8_t		entry_type;		/* Entry type. */
-	uint8_t		entry_count;		/* Entry count. */
-	uint8_t		data[58];
-	uint32_t	signature;
-#define ATIO_PROCESSED 0xDEADDEAD		/* Signature */
-} atio_t;
-
 typedef union {
 	uint16_t extended;
 	struct {
@@ -2851,8 +2840,8 @@ struct qla_hw_data {
 	uint32_t node_name_set:1;
 
 	dma_addr_t atio_dma;	/* Physical address. */
-	atio_t  *atio_ring;	/* Base virtual address */
-	atio_t	*atio_ring_ptr;	/* Current address. */
+	void *atio_ring;	/* Base virtual address */
+	void *atio_ring_ptr;	/* Current address. */
 	uint16_t atio_ring_index; /* Current index. */
 	uint16_t atio_q_length;
 
