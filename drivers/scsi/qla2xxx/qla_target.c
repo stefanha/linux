@@ -1438,7 +1438,7 @@ static int __qla_tgt_24xx_handle_abts(struct scsi_qla_host *vha,
 	memset(mcmd, 0, sizeof(*mcmd));
 
 	mcmd->sess = sess;
-	memcpy(&mcmd->orig_iocb, abts, sizeof(mcmd->orig_iocb));
+	memcpy(&mcmd->orig_iocb.abts, abts, sizeof(mcmd->orig_iocb.abts));
 
 	rc = ha->tgt_ops->handle_tmr(mcmd, 0, ABORT_TASK);
 	if (rc != 0) {
@@ -1513,7 +1513,7 @@ static void qla_tgt_24xx_handle_abts(struct scsi_qla_host *vha,
 static void qla_tgt_24xx_send_task_mgmt_ctio(struct scsi_qla_host *ha,
 	struct qla_tgt_mgmt_cmd *mcmd, uint32_t resp_code)
 {
-	atio_from_isp_t *atio = (atio_from_isp_t *)&mcmd->orig_iocb;
+	atio_from_isp_t *atio = &mcmd->orig_iocb.atio;
 	ctio7_to_24xx_t *ctio;
 
 	ql_dbg(ql_dbg_tgt, ha, 0xe00a, "Sending task mgmt CTIO7 (ha=%p,"
@@ -1570,12 +1570,11 @@ void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	if (IS_FWI2_CAPABLE(ha)) {
 		if (mcmd->flags == QLA24XX_MGMT_SEND_NACK)
-			qla_tgt_send_notify_ack(vha, (imm_ntfy_from_isp_t *)&mcmd->orig_iocb,
+			qla_tgt_send_notify_ack(vha, &mcmd->orig_iocb.imm_ntfy,
 				0, 0, 0, 0, 0, 0);
 		else {
 			if (mcmd->se_tmr_req->function == ABORT_TASK)
-				qla_tgt_24xx_send_abts_resp(vha,
-					(abts_recv_from_24xx_t *)&mcmd->orig_iocb,
+				qla_tgt_24xx_send_abts_resp(vha, &mcmd->orig_iocb.abts,
 					mcmd->fc_tm_rsp, false);
 			else
 				qla_tgt_24xx_send_task_mgmt_ctio(vha, mcmd, mcmd->fc_tm_rsp);
@@ -3209,7 +3208,8 @@ static int qla_tgt_issue_task_mgmt(struct qla_tgt_sess *sess, uint32_t lun,
 	mcmd->sess = sess;
 
 	if (iocb) {
-		memcpy(&mcmd->orig_iocb, iocb, sizeof(mcmd->orig_iocb));
+		memcpy(&mcmd->orig_iocb.imm_ntfy, iocb,
+			sizeof(mcmd->orig_iocb.imm_ntfy));
 	}
 	mcmd->tmr_func = fn;
 	mcmd->flags = flags;
@@ -3350,7 +3350,7 @@ static int __qla_tgt_abort_task(struct scsi_qla_host *vha,
 	memset(mcmd, 0, sizeof(*mcmd));
 
 	mcmd->sess = sess;
-	memcpy(&mcmd->orig_iocb, iocb, sizeof(mcmd->orig_iocb));
+	memcpy(&mcmd->orig_iocb.imm_ntfy, iocb, sizeof(mcmd->orig_iocb.imm_ntfy));
 
 	tag = le16_to_cpu(iocb->u.isp2x.seq_id);
 
