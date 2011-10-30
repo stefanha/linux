@@ -4962,10 +4962,14 @@ qla_tgt_vport_create(struct scsi_qla_host *vha, struct qla_hw_data *ha)
 	mutex_init(&ha->tgt_host_action_mutex);
 	qla_tgt_clear_mode(vha);
 	qla_tgt_2xxx_send_enable_lun(vha, false);
-	if (IS_QLA24XX_TYPE(ha))
-		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
-	else if (IS_QLA25XX(ha))
-		ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
+
+	/*
+	 * NOTE: Currently the value is kept the same for <24xx and
+	 * 	 >=24xx ISPs. If it is necessary to change it,
+	 *	 the check should be added for specific ISPs,
+	 *	 assigning the value appropriately.
+	 */
+	ha->atio_q_length = ATIO_ENTRY_CNT_24XX;
 }
 
 void
