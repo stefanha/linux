@@ -243,16 +243,16 @@ void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *vha, atio7_from_24xx_t 
 		struct scsi_qla_host *host = vha;
 
 		if (IS_FWI2_CAPABLE(ha)) {
-			imm_ntfy_from_24xx_t *entry = (imm_ntfy_from_24xx_t *)atio;
-			if ((entry->vp_index != 0xFF) &&
-			    (entry->nport_handle != 0xFFFF)) {
+			imm_ntfy_from_isp_t *entry = (imm_ntfy_from_isp_t *)atio;
+			if ((entry->u.isp24.vp_index != 0xFF) &&
+			    (entry->u.isp24.nport_handle != 0xFFFF)) {
 				host = qla_tgt_find_host_by_vp_idx(vha,
-							entry->vp_index);
+							entry->u.isp24.vp_index);
 				if (unlikely(!host)) {
 					printk(KERN_ERR "qla_target(%d): Received "
 						"ATIO (IMMED_NOTIFY_TYPE) "
 						"with unknown vp_index %d\n",
-						vha->vp_idx, entry->vp_index);
+						vha->vp_idx, entry->u.isp24.vp_index);
 					break;
 				}
 			}
@@ -294,13 +294,13 @@ void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *vha, response_t *pkt)
 	{
 		struct scsi_qla_host *host = vha;
 		if (IS_FWI2_CAPABLE(ha)) {
-			imm_ntfy_from_24xx_t *entry = (imm_ntfy_from_24xx_t *)pkt;
-			host = qla_tgt_find_host_by_vp_idx(vha, entry->vp_index);
+			imm_ntfy_from_isp_t *entry = (imm_ntfy_from_isp_t *)pkt;
+			host = qla_tgt_find_host_by_vp_idx(vha, entry->u.isp24.vp_index);
 			if (unlikely(!host)) {
 				printk(KERN_ERR "qla_target(%d): Response pkt "
 					"(IMMED_NOTIFY_TYPE) received, "
 					"with unknown vp_index %d\n",
-					vha->vp_idx, entry->vp_index);
+					vha->vp_idx, entry->u.isp24.vp_index);
 				break;
 			}
 		}
@@ -434,17 +434,17 @@ static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 	uint16_t loop_id;
 	int res = 0;
 	uint8_t s_id[3];
+	imm_ntfy_from_isp_t *n = (imm_ntfy_from_isp_t *)iocb;
 
 	memset(&s_id, 0, 3);
 
 	if (IS_FWI2_CAPABLE(ha)) {
-		imm_ntfy_from_24xx_t *n = (imm_ntfy_from_24xx_t *)iocb;
-		loop_id = le16_to_cpu(n->nport_handle);
-		s_id[0] = n->port_id[0];
-		s_id[1] = n->port_id[1];
-		s_id[2] = n->port_id[2];
+		loop_id = le16_to_cpu(n->u.isp24.nport_handle);
+		s_id[0] = n->u.isp24.port_id[0];
+		s_id[1] = n->u.isp24.port_id[1];
+		s_id[2] = n->u.isp24.port_id[2];
 	} else
-		loop_id = GET_TARGET_ID(ha, (imm_ntfy_from_2xxx_t *)iocb);
+		loop_id = GET_TARGET_ID(ha, (atio_from_2xxx_t *)n);
 
 	if (loop_id == 0xFFFF) {
 #warning FIXME: Re-enable Global event handling..
@@ -500,10 +500,9 @@ static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 	if (IS_FWI2_CAPABLE(ha)) {
 		atio7_from_24xx_t *a = (atio7_from_24xx_t *)iocb;
 		lun = a->fcp_cmnd.lun;
-	} else {
-		imm_ntfy_from_2xxx_t *n = (imm_ntfy_from_2xxx_t *)iocb;
-		lun = swab16(le16_to_cpu(n->lun));
-	}
+	} else
+		lun = swab16(le16_to_cpu(n->u.isp2x.lun));
+
 	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
 	return qla_tgt_issue_task_mgmt(sess, unpacked_lun, mcmd,
@@ -1214,7 +1213,7 @@ static void qla_tgt_2xxx_send_modify_lun(struct scsi_qla_host *vha, int cmd_coun
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
 static void qla_tgt_send_notify_ack(struct scsi_qla_host *vha,
-	void *iocb,
+	imm_ntfy_from_isp_t *ntfy,
 	uint32_t add_flags, uint16_t resp_code, int resp_code_valid,
 	uint16_t srr_flags, uint16_t srr_reject_code, uint8_t srr_explan)
 {
@@ -1242,44 +1241,40 @@ static void qla_tgt_send_notify_ack(struct scsi_qla_host *vha,
 
 	if (IS_FWI2_CAPABLE(ha)) {
 		nack_to_24xx_t *nack24 = (nack_to_24xx_t *)pkt;
-		imm_ntfy_from_24xx_t *ntfy24 =
-			(imm_ntfy_from_24xx_t *)iocb;
 
-		nack24->nport_handle = ntfy24->nport_handle;
-		if (le16_to_cpu(ntfy24->status) == IMM_NTFY_ELS) {
-			nack24->flags = ntfy24->flags &
+		nack24->nport_handle = ntfy->u.isp24.nport_handle;
+		if (le16_to_cpu(ntfy->u.isp24.status) == IMM_NTFY_ELS) {
+			nack24->flags = ntfy->u.isp24.flags &
 				__constant_cpu_to_le32(NOTIFY24XX_FLAGS_PUREX_IOCB);
 		}
-		nack24->srr_rx_id = ntfy24->srr_rx_id;
-		nack24->status = ntfy24->status;
-		nack24->status_subcode = ntfy24->status_subcode;
-		nack24->exchange_address = ntfy24->exchange_address;
-		nack24->srr_rel_offs = ntfy24->srr_rel_offs;
-		nack24->srr_ui = ntfy24->srr_ui;
+		nack24->srr_rx_id = ntfy->u.isp24.srr_rx_id;
+		nack24->status = ntfy->u.isp24.status;
+		nack24->status_subcode = ntfy->u.isp24.status_subcode;
+		nack24->exchange_address = ntfy->u.isp24.exchange_address;
+		nack24->srr_rel_offs = ntfy->u.isp24.srr_rel_offs;
+		nack24->srr_ui = ntfy->u.isp24.srr_ui;
 		nack24->srr_flags = cpu_to_le16(srr_flags);
 		nack24->srr_reject_code = srr_reject_code;
 		nack24->srr_reject_code_expl = srr_explan;
-		nack24->ox_id = ntfy24->ox_id;
-		nack24->vp_index = ntfy24->vp_index;
+		nack24->vp_index = ntfy->u.isp24.vp_index;
+		nack24->ox_id = ntfy->ox_id;
 
 		ql_dbg(ql_dbg_tgt_pkt, vha, 0xe201,
 			"qla_target(%d): Sending 24xx Notify Ack %d\n",
 			vha->vp_idx, nack24->status);
 	} else {
 		nack_to_2xxx_t *nack = (nack_to_2xxx_t *)pkt;
-		imm_ntfy_from_2xxx_t *ntfy =
-			(imm_ntfy_from_2xxx_t *)iocb;
 
-		SET_TARGET_ID(ha, nack->target, GET_TARGET_ID(ha, ntfy));
-		nack->status = ntfy->status;
-		nack->task_flags = ntfy->task_flags;
-		nack->seq_id = ntfy->seq_id;
+		SET_TARGET_ID(ha, nack->target, GET_TARGET_ID(ha, (atio_from_2xxx_t *)ntfy));
+		nack->status = ntfy->u.isp2x.status;
+		nack->task_flags = ntfy->u.isp2x.task_flags;
+		nack->seq_id = ntfy->u.isp2x.seq_id;
 		/* Do not increment here, the chip isn't decrementing */
 		/* nack->flags = __constant_cpu_to_le16(NOTIFY_ACK_RES_COUNT); */
 		nack->flags |= cpu_to_le16(add_flags);
-		nack->srr_rx_id = ntfy->srr_rx_id;
-		nack->srr_rel_offs = ntfy->srr_rel_offs;
-		nack->srr_ui = ntfy->srr_ui;
+		nack->srr_rx_id = ntfy->u.isp2x.srr_rx_id;
+		nack->srr_rel_offs = ntfy->u.isp2x.srr_rel_offs;
+		nack->srr_ui = ntfy->u.isp2x.srr_ui;
 		nack->srr_flags = cpu_to_le16(srr_flags);
 		nack->srr_reject_code = cpu_to_le16(srr_reject_code);
 		nack->srr_reject_code_expl = srr_explan;
@@ -1293,8 +1288,9 @@ static void qla_tgt_send_notify_ack(struct scsi_qla_host *vha,
 
 		ql_dbg(ql_dbg_tgt_pkt, vha, 0xe200, "qla_target(%d): Sending Notify Ack"
 			" Seq %#x -> I %#x St %#x RC %#x\n", vha->vp_idx,
-			le16_to_cpu(ntfy->seq_id), GET_TARGET_ID(ha, ntfy),
-			le16_to_cpu(ntfy->status), le16_to_cpu(nack->resp_code));
+			le16_to_cpu(ntfy->u.isp2x.seq_id),
+			GET_TARGET_ID(ha, (atio_from_2xxx_t *)ntfy),
+			le16_to_cpu(ntfy->u.isp2x.status), le16_to_cpu(nack->resp_code));
 	}
 
 	qla2x00_isp_cmd(vha, vha->req);
@@ -1572,10 +1568,10 @@ void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	if (IS_FWI2_CAPABLE(ha)) {
-		if (mcmd->flags == QLA24XX_MGMT_SEND_NACK) {
-			qla_tgt_send_notify_ack(vha,
-				(void *)&mcmd->orig_iocb, 0, 0, 0, 0, 0, 0);
-		} else {
+		if (mcmd->flags == QLA24XX_MGMT_SEND_NACK)
+			qla_tgt_send_notify_ack(vha, (imm_ntfy_from_isp_t *)&mcmd->orig_iocb,
+				0, 0, 0, 0, 0, 0);
+		else {
 			if (mcmd->se_tmr_req->function == ABORT_TASK)
 				qla_tgt_24xx_send_abts_resp(vha,
 					(abts_recv_from_24xx_t *)&mcmd->orig_iocb,
@@ -3312,13 +3308,13 @@ static int qla_tgt_handle_task_mgmt(struct scsi_qla_host *vha, void *iocb)
 		sess = ha->tgt_ops->find_sess_by_s_id(vha,
 					a->fcp_hdr.s_id);
 	} else {
-		imm_ntfy_from_2xxx_t *n = (imm_ntfy_from_2xxx_t *)iocb;
+		imm_ntfy_from_isp_t *n = (imm_ntfy_from_isp_t *)iocb;
 		/* make it be in network byte order */
-		lun = swab16(le16_to_cpu(n->lun));
+		lun = swab16(le16_to_cpu(n->u.isp2x.lun));
 		lun_size = sizeof(lun);
-		fn = n->task_flags >> IMM_NTFY_TASK_MGMT_SHIFT;
+		fn = n->u.isp2x.task_flags >> IMM_NTFY_TASK_MGMT_SHIFT;
 		sess = ha->tgt_ops->find_sess_by_loop_id(vha,
-					GET_TARGET_ID(ha, n));
+					GET_TARGET_ID(ha, (atio_from_2xxx_t *)iocb));
 	}
 	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
@@ -3327,7 +3323,7 @@ static int qla_tgt_handle_task_mgmt(struct scsi_qla_host *vha, void *iocb)
 			"non-existant session\n", vha->vp_idx, fn);
 		res = qla_tgt_sched_sess_work(tgt, QLA_TGT_SESS_WORK_TM, iocb,
 			IS_FWI2_CAPABLE(ha) ? sizeof(atio7_from_24xx_t) :
-					      sizeof(imm_ntfy_from_2xxx_t));
+					      sizeof(imm_ntfy_from_isp_t));
 		if (res != 0)
 			tgt->tm_to_unknown = 1;
 
@@ -3339,7 +3335,7 @@ static int qla_tgt_handle_task_mgmt(struct scsi_qla_host *vha, void *iocb)
 
 /* ha->hardware_lock supposed to be held on entry */
 static int __qla_tgt_abort_task(struct scsi_qla_host *vha,
-	imm_ntfy_from_2xxx_t *iocb, struct qla_tgt_sess *sess)
+	imm_ntfy_from_isp_t *iocb, struct qla_tgt_sess *sess)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_mgmt_cmd *mcmd;
@@ -3358,15 +3354,14 @@ static int __qla_tgt_abort_task(struct scsi_qla_host *vha,
 	mcmd->sess = sess;
 	memcpy(&mcmd->orig_iocb, iocb, sizeof(mcmd->orig_iocb));
 
-	tag = le16_to_cpu(iocb->seq_id);
+	tag = le16_to_cpu(iocb->u.isp2x.seq_id);
 
 	if (IS_FWI2_CAPABLE(ha)) {
 		atio7_from_24xx_t *a = (atio7_from_24xx_t *)iocb;
 		lun = a->fcp_cmnd.lun;
-	} else {
-		imm_ntfy_from_2xxx_t *n = (imm_ntfy_from_2xxx_t *)iocb;
-		lun = swab16(le16_to_cpu(n->lun));
-	}
+	} else
+		lun = swab16(le16_to_cpu(iocb->u.isp2x.lun));
+
 	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 
 	rc = ha->tgt_ops->handle_tmr(mcmd, unpacked_lun, ABORT_TASK);
@@ -3381,13 +3376,13 @@ static int __qla_tgt_abort_task(struct scsi_qla_host *vha,
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_abort_task(struct scsi_qla_host *vha, imm_ntfy_from_2xxx_t *iocb)
+static int qla_tgt_abort_task(struct scsi_qla_host *vha, imm_ntfy_from_isp_t *iocb)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess;
 	int loop_id, res;
 
-	loop_id = GET_TARGET_ID(ha, iocb);
+	loop_id = GET_TARGET_ID(ha, (atio_from_2xxx_t *)iocb);
 
 	sess = ha->tgt_ops->find_sess_by_loop_id(vha, loop_id);
 	if (sess == NULL) {
@@ -3408,16 +3403,17 @@ static int qla_tgt_abort_task(struct scsi_qla_host *vha, imm_ntfy_from_2xxx_t *i
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
 static int qla_tgt_24xx_handle_els(struct scsi_qla_host *vha,
-	imm_ntfy_from_24xx_t *iocb)
+	imm_ntfy_from_isp_t *iocb)
 {
 	struct qla_hw_data *ha = vha->hw;
 	int res = 0;
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12a, "qla_target(%d): Port ID: 0x%02x:%02x:%02x"
-		" ELS opcode: 0x%02x\n", vha->vp_idx, iocb->port_id[0],
-		iocb->port_id[1], iocb->port_id[2], iocb->status_subcode);
+		" ELS opcode: 0x%02x\n", vha->vp_idx, iocb->u.isp24.port_id[0],
+		iocb->u.isp24.port_id[1], iocb->u.isp24.port_id[2],
+		iocb->u.isp24.status_subcode);
 
-	switch (iocb->status_subcode) {
+	switch (iocb->u.isp24.status_subcode) {
 	case ELS_PLOGI:
 	case ELS_FLOGI:
 	case ELS_PRLI:
@@ -3430,7 +3426,7 @@ static int qla_tgt_24xx_handle_els(struct scsi_qla_host *vha,
 	{
 		struct qla_tgt *tgt = ha->qla_tgt;
 		if (tgt->link_reinit_iocb_pending) {
-			qla_tgt_send_notify_ack(vha, (void *)&tgt->link_reinit_iocb,
+			qla_tgt_send_notify_ack(vha, &tgt->link_reinit_iocb,
 				0, 0, 0, 0, 0, 0);
 			tgt->link_reinit_iocb_pending = 0;
 		}
@@ -3440,7 +3436,7 @@ static int qla_tgt_24xx_handle_els(struct scsi_qla_host *vha,
 
 	default:
 		printk(KERN_ERR "qla_target(%d): Unsupported ELS command %x "
-			"received\n", vha->vp_idx, iocb->status_subcode);
+			"received\n", vha->vp_idx, iocb->u.isp24.status_subcode);
 		res = qla_tgt_reset(vha, iocb, QLA_TGT_NEXUS_LOSS_SESS);
 		break;
 	}
@@ -3542,9 +3538,8 @@ static inline int qla_tgt_srr_adjust_data(struct qla_tgt_cmd *cmd,
 static void qla_tgt_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_ctio *sctio,
 	struct qla_tgt_srr_imm *imm)
 {
-	void *ntfy, *atio;
-	imm_ntfy_from_24xx_t *ntfy24 = (imm_ntfy_from_24xx_t *)&imm->imm_ntfy;
-	imm_ntfy_from_2xxx_t *ntfy2x = (imm_ntfy_from_2xxx_t *)&imm->imm_ntfy;
+	void *atio;
+	imm_ntfy_from_isp_t *ntfy = (imm_ntfy_from_isp_t *)&imm->imm_ntfy;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_cmd *cmd = sctio->cmd;
 	struct se_cmd *se_cmd = &cmd->se_cmd;
@@ -3555,13 +3550,11 @@ static void qla_tgt_handle_srr(struct scsi_qla_host *vha, struct qla_tgt_srr_cti
 
 	atio = (void *)&cmd->atio;
 	if (IS_FWI2_CAPABLE(ha)) {
-		ntfy = (void *)ntfy24;
-		offset = le32_to_cpu(ntfy24->srr_rel_offs);
-		srr_ui = ntfy24->srr_ui;
+		offset = le32_to_cpu(ntfy->u.isp24.srr_rel_offs);
+		srr_ui = ntfy->u.isp24.srr_ui;
 	} else {
-		ntfy = (void *)ntfy2x;
-		offset = le32_to_cpu(ntfy2x->srr_rel_offs);
-		srr_ui = ntfy2x->srr_ui;
+		offset = le32_to_cpu(ntfy->u.isp2x.srr_rel_offs);
+		srr_ui = ntfy->u.isp2x.srr_ui;
 	}
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12c, "SRR cmd %p, srr_ui %x\n",
@@ -3764,12 +3757,12 @@ restart:
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
+static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha,
+	imm_ntfy_from_isp_t *iocb)
 {
 	struct qla_tgt_srr_imm *imm;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
-	imm_ntfy_from_24xx_t *iocb24 = (imm_ntfy_from_24xx_t *)iocb;
 	struct qla_tgt_srr_ctio *sctio;
 
 	tgt->imm_srr_id++;
@@ -3787,7 +3780,7 @@ static void qla_tgt_prepare_srr_imm(struct scsi_qla_host *vha, void *iocb)
 		list_add_tail(&imm->srr_list_entry,
 			&tgt->srr_imm_list);
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe133, "IMM NTFY SRR %p added (id %d,"
-			" ui %x)\n", imm, imm->srr_id, iocb24->srr_ui);
+			" ui %x)\n", imm, imm->srr_id, iocb->u.isp24.srr_ui);
 		if (tgt->imm_srr_id == tgt->ctio_srr_id) {
 			int found = 0;
 			list_for_each_entry(sctio, &tgt->srr_ctio_list,
@@ -3850,27 +3843,27 @@ out_reject:
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
-static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
+static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha,
+	imm_ntfy_from_isp_t *iocb)
 {
 	struct qla_hw_data *ha = vha->hw;
-	imm_ntfy_from_2xxx_t *iocb2x = (imm_ntfy_from_2xxx_t *)iocb;
-	imm_ntfy_from_24xx_t *iocb24 = (imm_ntfy_from_24xx_t *)iocb;
 	uint32_t add_flags = 0;
 	int send_notify_ack = 1;
 	uint16_t status;
 
-	status = le16_to_cpu(iocb2x->status);
+	status = le16_to_cpu(iocb->u.isp2x.status);
 	switch (status) {
 	case IMM_NTFY_LIP_RESET:
 	{
 		if (IS_FWI2_CAPABLE(ha)) {
 			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe137, "qla_target(%d): LIP reset"
 				" (loop %#x), subcode %x\n", vha->vp_idx,
-				le16_to_cpu(iocb24->nport_handle),
-				iocb24->status_subcode);
+				le16_to_cpu(iocb->u.isp24.nport_handle),
+				iocb->u.isp24.status_subcode);
 		} else {
 			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe138, "qla_target(%d): LIP reset"
-				" (I %#x)\n", vha->vp_idx, GET_TARGET_ID(ha, iocb2x));
+				" (I %#x)\n", vha->vp_idx,
+				GET_TARGET_ID(ha, (atio_from_2xxx_t *)iocb));
 			/* set the Clear LIP reset event flag */
 			add_flags |= NOTIFY_ACK_CLEAR_LIP_RESET;
 		}
@@ -3884,13 +3877,13 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 		struct qla_tgt *tgt = ha->qla_tgt;
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe139, "qla_target(%d): LINK REINIT (loop %#x, "
 			"subcode %x)\n", vha->vp_idx,
-			le16_to_cpu(iocb24->nport_handle),
-			iocb24->status_subcode);
+			le16_to_cpu(iocb->u.isp24.nport_handle),
+			iocb->u.isp24.status_subcode);
 		if (tgt->link_reinit_iocb_pending) {
 			qla_tgt_send_notify_ack(vha, &tgt->link_reinit_iocb,
 				0, 0, 0, 0, 0, 0);
 		}
-		memcpy(&tgt->link_reinit_iocb, iocb24, sizeof(*iocb24));
+		memcpy(&tgt->link_reinit_iocb, iocb, sizeof(*iocb));
 		tgt->link_reinit_iocb_pending = 1;
 		/*
 		 * QLogic requires to wait after LINK REINIT for possible
@@ -3904,13 +3897,13 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 		if (IS_FWI2_CAPABLE(ha)) {
 			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13a, "qla_target(%d): Port logout (loop "
 				"%#x, subcode %x)\n", vha->vp_idx,
-				le16_to_cpu(iocb24->nport_handle),
-				iocb24->status_subcode);
+				le16_to_cpu(iocb->u.isp24.nport_handle),
+				iocb->u.isp24.status_subcode);
 		} else {
 			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13b, "qla_target(%d): Port logout (S "
 				"%08x -> L %#x)\n", vha->vp_idx,
-				le16_to_cpu(iocb2x->seq_id),
-				le16_to_cpu(iocb2x->lun));
+				le16_to_cpu(iocb->u.isp2x.seq_id),
+				le16_to_cpu(iocb->u.isp2x.lun));
 		}
 		if (qla_tgt_reset(vha, iocb, QLA_TGT_NEXUS_LOSS_SESS) == 0)
 			send_notify_ack = 0;
@@ -3948,10 +3941,12 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 		break;
 
 	case IMM_NTFY_ABORT_TASK:
-		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13e, "qla_target(%d): Abort Task (S %08x I %#x -> "
-			"L %#x)\n", vha->vp_idx, le16_to_cpu(iocb2x->seq_id),
-			GET_TARGET_ID(ha, iocb2x), le16_to_cpu(iocb2x->lun));
-		if (qla_tgt_abort_task(vha, iocb2x) == 0)
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13e,
+			"qla_target(%d): Abort Task (S %08x I %#x -> "
+			"L %#x)\n", vha->vp_idx, le16_to_cpu(iocb->u.isp2x.seq_id),
+			GET_TARGET_ID(ha, (atio_from_2xxx_t *)iocb),
+			le16_to_cpu(iocb->u.isp2x.lun));
+		if (qla_tgt_abort_task(vha, iocb) == 0)
 			send_notify_ack = 0;
 		break;
 
@@ -3961,14 +3956,15 @@ static void qla_tgt_handle_imm_notify(struct scsi_qla_host *vha, void *iocb)
 		break;
 
 	case IMM_NTFY_MSG_RX:
-		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13f, "qla_target(%d): Immediate notify task %x\n",
-			vha->vp_idx, iocb2x->task_flags);
-		if (qla_tgt_handle_task_mgmt(vha, iocb2x) == 0)
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe13f,
+			"qla_target(%d): Immediate notify task %x\n",
+			vha->vp_idx, iocb->u.isp2x.task_flags);
+		if (qla_tgt_handle_task_mgmt(vha, iocb) == 0)
 			send_notify_ack = 0;
 		break;
 
 	case IMM_NTFY_ELS:
-		if (qla_tgt_24xx_handle_els(vha, iocb24) == 0)
+		if (qla_tgt_24xx_handle_els(vha, iocb) == 0)
 			send_notify_ack = 0;
 		break;
 
@@ -4142,7 +4138,7 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha, atio7_from_24xx_t *
 
 	case IMMED_NOTIFY_TYPE:
 	{
-		imm_ntfy_from_2xxx_t *pkt = (imm_ntfy_from_2xxx_t *)atio;
+		imm_ntfy_from_isp_t *pkt = (imm_ntfy_from_isp_t *)atio;
 		if (unlikely(pkt->entry_status != 0)) {
 			printk(KERN_ERR "qla_target(%d): Received ATIO packet %x "
 				"with error status %x\n", vha->vp_idx,
@@ -4269,7 +4265,7 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 
 	case IMMED_NOTIFY_TYPE:
 		ql_dbg(ql_dbg_tgt, vha, 0xe02c, "%s", "IMMED_NOTIFY\n");
-		qla_tgt_handle_imm_notify(vha, (imm_ntfy_from_2xxx_t *)pkt);
+		qla_tgt_handle_imm_notify(vha, (imm_ntfy_from_isp_t *)pkt);
 		break;
 
 	case NOTIFY_ACK_TYPE:
@@ -4603,13 +4599,13 @@ static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
 			}
 			goto after_find;
 		} else
-			loop_id = GET_TARGET_ID(ha, &prm->tm_iocb);
+			loop_id = GET_TARGET_ID(ha, (atio_from_2xxx_t *)&prm->tm_iocb);
 		break;
 	case QLA_TGT_SESS_WORK_TM:
 		if (IS_FWI2_CAPABLE(ha))
 			s_id = prm->tm_iocb2.fcp_hdr.s_id;
 		else
-			loop_id = GET_TARGET_ID(ha, &prm->tm_iocb);
+			loop_id = GET_TARGET_ID(ha, (atio_from_2xxx_t *)&prm->tm_iocb);
 		break;
 	default:
 		BUG_ON(1);
@@ -4674,12 +4670,12 @@ send:
 			lun_size = sizeof(a->fcp_cmnd.lun);
 			fn = a->fcp_cmnd.task_mgmt_flags;
 		} else {
-			imm_ntfy_from_2xxx_t *n = &prm->tm_iocb;
+			imm_ntfy_from_isp_t *n = &prm->tm_iocb;
 			iocb = n;
 			/* make it be in network byte order */
-			lun = swab16(le16_to_cpu(n->lun));
+			lun = swab16(le16_to_cpu(n->u.isp2x.lun));
 			lun_size = sizeof(lun);
-			fn = n->task_flags >> IMM_NTFY_TASK_MGMT_SHIFT;
+			fn = n->u.isp2x.task_flags >> IMM_NTFY_TASK_MGMT_SHIFT;
 		}
 		unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 

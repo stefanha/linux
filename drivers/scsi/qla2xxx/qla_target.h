@@ -187,7 +187,7 @@ typedef struct {
 #define IMMED_NOTIFY_TYPE 0x0D		/* Immediate notify entry. */
 /*
  * ISP queue -	immediate notify entry structure definition.
- *		This is sent by the ISP 2xxx to the Target driver.
+ *		This is sent by the ISP to the Target driver.
  *		This IOCB would have report of events sent by the
  *		initiator, that needs to be handled by the target
  *		driver immediately.
@@ -197,25 +197,51 @@ typedef struct {
 	uint8_t	 entry_count;		    /* Entry count. */
 	uint8_t	 sys_define;		    /* System defined. */
 	uint8_t	 entry_status;		    /* Entry Status. */
-	uint32_t sys_define_2;		    /* System defined. */
-	target_id_t target;
-	uint16_t lun;
-	uint8_t  target_id;
-	uint8_t  reserved_1;
-	uint16_t status_modifier;
-	uint16_t status;
-	uint16_t task_flags;
-	uint16_t seq_id;
-	uint16_t srr_rx_id;
-	uint32_t srr_rel_offs;
-	uint16_t srr_ui;
-#define SRR_IU_DATA_IN		0x1
-#define SRR_IU_DATA_OUT		0x5
-#define SRR_IU_STATUS		0x7
-	uint16_t srr_ox_id;
-	uint8_t reserved_2[30];
+	union {
+		struct {
+			uint32_t sys_define_2; /* System defined. */
+			target_id_t target;
+			uint16_t lun;
+			uint8_t  target_id;
+			uint8_t  reserved_1;
+			uint16_t status_modifier;
+			uint16_t status;
+			uint16_t task_flags;
+			uint16_t seq_id;
+			uint16_t srr_rx_id;
+			uint32_t srr_rel_offs;
+			uint16_t srr_ui;
+#define SRR_IU_DATA_IN	0x1
+#define SRR_IU_DATA_OUT	0x5
+#define SRR_IU_STATUS	0x7
+			uint16_t srr_ox_id;
+			uint8_t reserved_2[28];
+		} isp2x;
+		struct {
+			uint32_t reserved;
+			uint16_t nport_handle;
+			uint16_t reserved_2;
+			uint16_t flags;
+#define NOTIFY24XX_FLAGS_GLOBAL_TPRLO   BIT_1
+#define NOTIFY24XX_FLAGS_PUREX_IOCB     BIT_0
+			uint16_t srr_rx_id;
+			uint16_t status;
+			uint8_t  status_subcode;
+			uint8_t  reserved_3;
+			uint32_t exchange_address;
+			uint32_t srr_rel_offs;
+			uint16_t srr_ui;
+			uint16_t srr_ox_id;
+			uint8_t  reserved_4[19];
+			uint8_t  vp_index;
+			uint32_t reserved_5;
+			uint8_t  port_id[3];
+			uint8_t  reserved_6;
+		} isp24;
+	} u;
+	uint16_t reserved_7;
 	uint16_t ox_id;
-} __attribute__((packed)) imm_ntfy_from_2xxx_t;
+} __attribute__((packed)) imm_ntfy_from_isp_t;
 #endif
 
 #ifndef NOTIFY_ACK_TYPE
@@ -533,37 +559,6 @@ typedef struct {
 #define CTIO7_FLAGS_DATA_IN		BIT_1
 #define CTIO7_FLAGS_DATA_OUT		BIT_0
 
-/*
- * ISP queue - immediate notify entry structure definition for 24xx.
- */
-typedef struct {
-	uint8_t	 entry_type;		    /* Entry type. */
-	uint8_t	 entry_count;		    /* Entry count. */
-	uint8_t	 sys_define;		    /* System defined. */
-	uint8_t	 entry_status;		    /* Entry Status. */
-	uint32_t reserved;
-	uint16_t nport_handle;
-	uint16_t reserved_2;
-	uint16_t flags;
-#define NOTIFY24XX_FLAGS_GLOBAL_TPRLO	BIT_1
-#define NOTIFY24XX_FLAGS_PUREX_IOCB	BIT_0
-	uint16_t srr_rx_id;
-	uint16_t status;
-	uint8_t  status_subcode;
-	uint8_t  reserved_3;
-	uint32_t exchange_address;
-	uint32_t srr_rel_offs;
-	uint16_t srr_ui;
-	uint16_t srr_ox_id;
-	uint8_t  reserved_4[19];
-	uint8_t  vp_index;
-	uint32_t reserved_5;
-	uint8_t  port_id[3];
-	uint8_t  reserved_6;
-	uint16_t reserved_7;
-	uint16_t ox_id;
-} __attribute__((packed)) imm_ntfy_from_24xx_t;
-
 #define ELS_PLOGI			0x3
 #define ELS_FLOGI			0x4
 #define ELS_LOGO			0x5
@@ -878,7 +873,7 @@ struct qla_tgt {
 	struct list_head sess_works_list;
 	struct work_struct sess_work;
 
-	imm_ntfy_from_24xx_t link_reinit_iocb;
+	imm_ntfy_from_isp_t link_reinit_iocb;
 	wait_queue_head_t waitQ;
 	int notify_ack_expected;
 	int abts_resp_expected;
@@ -967,7 +962,7 @@ struct qla_tgt_sess_work_param {
 	union {
 		struct qla_tgt_cmd *cmd;
 		abts_recv_from_24xx_t abts;
-		imm_ntfy_from_2xxx_t tm_iocb;
+		imm_ntfy_from_isp_t tm_iocb;
 		atio7_from_24xx_t tm_iocb2;
 	};
 };
@@ -1001,7 +996,7 @@ struct qla_tgt_prm {
 struct qla_tgt_srr_imm {
 	struct list_head srr_list_entry;
 	int srr_id;
-	iocb_t imm_ntfy;
+	imm_ntfy_from_isp_t imm_ntfy;
 };
 
 struct qla_tgt_srr_ctio {
