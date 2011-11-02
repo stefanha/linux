@@ -1707,12 +1707,12 @@ out_err:
 	goto out;
 }
 
-static void srpt_check_stop_free(struct se_cmd *cmd)
+static int srpt_check_stop_free(struct se_cmd *cmd)
 {
 	struct srpt_send_ioctx *ioctx;
 
 	ioctx = container_of(cmd, struct srpt_send_ioctx, cmd);
-	kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
+	return kref_put(&ioctx->kref, srpt_put_send_ioctx_kref);
 }
 
 /**

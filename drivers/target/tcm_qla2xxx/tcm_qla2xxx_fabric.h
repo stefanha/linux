@@ -25,7 +25,7 @@ extern struct se_node_acl *tcm_qla2xxx_alloc_fabric_acl(struct se_portal_group *
 extern void tcm_qla2xxx_release_fabric_acl(struct se_portal_group *, struct se_node_acl *);
 extern u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *);
 extern void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *);
-extern void tcm_qla2xxx_check_stop_free(struct se_cmd *);
+extern int tcm_qla2xxx_check_stop_free(struct se_cmd *);
 extern void tcm_qla2xxx_release_cmd(struct se_cmd *);
 extern int tcm_qla2xxx_shutdown_session(struct se_session *);
 extern void tcm_qla2xxx_close_session(struct se_session *);

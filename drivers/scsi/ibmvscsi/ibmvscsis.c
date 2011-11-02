@@ -895,11 +895,12 @@ static int tcm_queuecommand(struct ibmvscsis_adapter *adapter,
 	return 0;
 }
 
-static void ibmvscsis_check_stop_free(struct se_cmd *se_cmd)
+static int ibmvscsis_check_stop_free(struct se_cmd *se_cmd)
 {
 	if (se_cmd->se_tmr_req)
-		return;
+		return 0;
 	transport_generic_free_cmd(se_cmd, 0);
+	return 1;
 }
 
 static u64 scsi_lun_to_int(u64 lun)

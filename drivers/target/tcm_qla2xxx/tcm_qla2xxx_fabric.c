@@ -417,7 +417,7 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 /*
  * Called from struct target_core_fabric_ops->check_stop_free() context
  */
-void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
+int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
 	struct qla_tgt_mgmt_cmd *mcmd;
@@ -432,7 +432,7 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 		 */
 		transport_generic_free_cmd(se_cmd, 1);
 		qla_tgt_free_mcmd(mcmd);
-		return;
+		return 1;
 	}
 	ha = cmd->sess->vha->hw;
 	/*
@@ -444,6 +444,8 @@ void tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 	if (atomic_read(&cmd->cmd_free) != 0)
 		complete(&cmd->cmd_stop_free_comp);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	return 0;
 }
 
 /*
