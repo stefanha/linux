@@ -3295,8 +3295,9 @@ static void srpt_add_one(struct ib_device *device)
 			goto err_ring;
 		}
 		snprintf(sport->port_guid, sizeof(sport->port_guid),
-				"0x0000000000000000%016llx",
-				be64_to_cpu(sport->gid.global.interface_id));
+			"0x%016llx%016llx",
+			be64_to_cpu(sport->gid.global.subnet_prefix),
+			be64_to_cpu(sport->gid.global.interface_id));
 	}
 
 	spin_lock(&srpt_dev_lock);
