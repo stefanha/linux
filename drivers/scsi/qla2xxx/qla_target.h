@@ -928,7 +928,7 @@ struct qla_tgt_cmd {
 	struct completion cmd_free_comp;
 	struct completion cmd_stop_free_comp;
 	struct se_cmd se_cmd;
-	struct work_struct work_free;
+	struct work_struct free_work;
 	/* Sense buffer that will be mapped into outgoing status */
 	unsigned char sense_buffer[TRANSPORT_SENSE_BUFFER];
 
