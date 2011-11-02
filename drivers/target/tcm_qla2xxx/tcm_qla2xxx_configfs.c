@@ -52,6 +52,8 @@
 struct target_fabric_configfs *tcm_qla2xxx_fabric_configfs;
 struct target_fabric_configfs *tcm_qla2xxx_npiv_fabric_configfs;
 
+struct workqueue_struct *tcm_qla2xxx_free_wq;
+
 static int tcm_qla2xxx_setup_nacl_from_rport(
 	struct se_portal_group *se_tpg,
 	struct se_node_acl *se_nacl,
@@ -1388,10 +1390,17 @@ static int tcm_qla2xxx_register_configfs(void)
 	tcm_qla2xxx_npiv_fabric_configfs = npiv_fabric;
 	pr_debug("TCM_QLA2XXX[0] - Set fabric -> tcm_qla2xxx_npiv_fabric_configfs\n");
 
+	tcm_qla2xxx_free_wq = alloc_workqueue("tcm_qla2xxx_free",
+						WQ_MEM_RECLAIM, 0);
+	if (!tcm_qla2xxx_free_wq)
+		goto out;
+
 	return 0;
 out:
 	if (tcm_qla2xxx_fabric_configfs != NULL)
 		target_fabric_configfs_deregister(tcm_qla2xxx_fabric_configfs);
+	if (tcm_qla2xxx_npiv_fabric_configfs != NULL)
+		target_fabric_configfs_deregister(tcm_qla2xxx_npiv_fabric_configfs);
 
 	return ret;
 }
@@ -1400,6 +1409,8 @@ static void tcm_qla2xxx_deregister_configfs(void)
 {
 	if (!tcm_qla2xxx_fabric_configfs)
 		return;
+
+	destroy_workqueue(tcm_qla2xxx_free_wq);
 
 	target_fabric_configfs_deregister(tcm_qla2xxx_fabric_configfs);
 	tcm_qla2xxx_fabric_configfs = NULL;

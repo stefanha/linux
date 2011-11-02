@@ -52,6 +52,8 @@
 #include "tcm_qla2xxx_base.h"
 #include "tcm_qla2xxx_fabric.h"
 
+extern struct workqueue_struct *tcm_qla2xxx_free_wq;
+
 int tcm_qla2xxx_check_true(struct se_portal_group *se_tpg)
 {
 	return 1;
@@ -382,6 +384,14 @@ u32 tcm_qla2xxx_tpg_get_inst_index(struct se_portal_group *se_tpg)
 	return tpg->lport_tpgt;
 }
 
+static void tcm_qla2xxx_complete_free(struct work_struct *work)
+{
+	struct qla_tgt_cmd *cmd = container_of(work,
+				struct qla_tgt_cmd, work_free);
+
+	 transport_generic_free_cmd(&cmd->se_cmd, 0);
+}
+
 /*
  * Called from qla_target_template->free_cmd(), and will call
  * tcm_qla2xxx_release_cmd via normal struct target_core_fabric_ops
@@ -411,7 +421,8 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 	atomic_set(&cmd->cmd_free, 1);
 	smp_mb__after_atomic_dec();
 
-	transport_generic_free_cmd_intr(&cmd->se_cmd);
+	INIT_WORK(&cmd->work_free, tcm_qla2xxx_complete_free);
+	queue_work(tcm_qla2xxx_free_wq, &cmd->work_free);
 }
 
 /*
