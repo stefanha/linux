@@ -1330,6 +1330,17 @@ static void srpt_put_send_ioctx_kref(struct kref *kref)
 	srpt_put_send_ioctx(container_of(kref, struct srpt_send_ioctx, kref));
 }
 
+static int srpt_check_release_cmd(struct se_cmd *se_cmd)
+{
+	struct srpt_send_ioctx *ioctx = container_of(se_cmd,
+				struct srpt_send_ioctx, cmd);
+	struct srpt_rdma_ch *ch = ioctx->ch;
+
+	BUG_ON(ch->sess == NULL);
+
+	return target_put_sess_cmd(ch->sess, se_cmd);
+}
+
 /**
  * srpt_abort_cmd() - Abort a SCSI command.
  * @ioctx:   I/O context associated with the SCSI command.
@@ -1366,11 +1377,17 @@ static int srpt_abort_cmd(struct srpt_send_ioctx *ioctx)
 	}
 	spin_unlock_irqrestore(&ioctx->spinlock, flags);
 
-	if (state == SRPT_STATE_DONE)
-		goto out;
+	pr_debug("Aborting cmd %p with state %d and tag %lld\n", &ioctx->cmd,
+			state, ioctx->tag);
 
-	pr_debug("Aborting cmd with state %d and tag %lld\n", state,
-		 ioctx->tag);
+	if (state == SRPT_STATE_DONE) {
+		struct srpt_rdma_ch *ch = ioctx->ch;
+
+		BUG_ON(ch->sess == NULL);
+
+		target_put_sess_cmd(ch->sess, &ioctx->cmd);
+		goto out;
+	}
 
 	switch (state) {
 	case SRPT_STATE_NEW:
@@ -1775,6 +1792,7 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	else
 		WARN_ON_ONCE(ret);
 
+	target_get_sess_cmd(ch->sess, cmd);
 	transport_handle_cdb_direct(cmd);
 	return 0;
 
@@ -2357,6 +2375,7 @@ static void srpt_release_channel_work(struct work_struct *w)
 {
 	struct srpt_rdma_ch *ch;
 	struct srpt_device *sdev;
+	struct se_session *se_sess;
 
 	ch = container_of(w, struct srpt_rdma_ch, release_work);
 	pr_debug("ch = %p; ch->sess = %p; release_done = %p\n", ch, ch->sess,
@@ -2365,8 +2384,14 @@ static void srpt_release_channel_work(struct work_struct *w)
 	sdev = ch->sport->sdev;
 	BUG_ON(!sdev);
 
-	transport_deregister_session_configfs(ch->sess);
-	transport_deregister_session(ch->sess);
+	se_sess = ch->sess;
+	BUG_ON(!se_sess);
+
+	target_splice_sess_cmd_list(se_sess);
+	target_wait_for_sess_cmds(se_sess, 0);
+
+	transport_deregister_session_configfs(se_sess);
+	transport_deregister_session(se_sess);
 	ch->sess = NULL;
 
 	srpt_destroy_ch_ib(ch);
@@ -3955,6 +3980,7 @@ static struct target_core_fabric_ops srpt_template = {
 	.tpg_alloc_fabric_acl		= srpt_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= srpt_release_fabric_acl,
 	.tpg_get_inst_index		= srpt_tpg_get_inst_index,
+	.check_release_cmd		= srpt_check_release_cmd,
 	.release_cmd			= srpt_release_cmd,
 	.check_stop_free		= srpt_check_stop_free,
 	.shutdown_session		= srpt_shutdown_session,
