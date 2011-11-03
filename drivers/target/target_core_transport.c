@@ -2159,12 +2159,12 @@ check_depth:
 
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 	/*
-	 * The struct se_cmd->transport_emulate_cdb() function pointer is used
+	 * The struct se_cmd->execute_task() function pointer is used
 	 * to grab REPORT_LUNS and other CDBs we want to handle before they hit the
 	 * struct se_subsystem_api->do_task() caller below.
 	 */
-	if (cmd->transport_emulate_cdb) {
-		error = cmd->transport_emulate_cdb(cmd);
+	if (cmd->execute_task) {
+		error = cmd->execute_task(task);
 		if (error != 0) {
 			cmd->transport_error_status = error;
 			spin_lock_irqsave(&cmd->t_state_lock, flags);
@@ -2177,7 +2177,7 @@ check_depth:
 			goto check_depth;
 		}
 		/*
-		 * Handle the successful completion for transport_emulate_cdb()
+		 * Handle the successful completion for execute_task()
 		 * for synchronous operation, following SCF_EMULATE_CDB_ASYNC
 		 * Otherwise the caller is expected to complete the task with
 		 * proper status.
@@ -2798,12 +2798,10 @@ static int transport_generic_cmd_sequencer(
 			/*
 			 * Check for emulated MI_REPORT_TARGET_PGS.
 			 */
-			if (cdb[1] == MI_REPORT_TARGET_PGS) {
-				cmd->transport_emulate_cdb =
-				(su_dev->t10_alua.alua_type ==
-				 SPC3_ALUA_EMULATED) ?
-				core_emulate_report_target_port_groups :
-				NULL;
+			if (cdb[1] == MI_REPORT_TARGET_PGS &&
+			    su_dev->t10_alua.alua_type == SPC3_ALUA_EMULATED) {
+				cmd->execute_task =
+					target_emulate_report_target_port_groups;
 			}
 			size = (cdb[6] << 24) | (cdb[7] << 16) |
 			       (cdb[8] << 8) | cdb[9];
@@ -2846,13 +2844,13 @@ static int transport_generic_cmd_sequencer(
 		break;
 	case PERSISTENT_RESERVE_IN:
 		if (su_dev->t10_pr.res_type == SPC3_PERSISTENT_RESERVATIONS)
-			cmd->transport_emulate_cdb = target_scsi3_emulate_pr_in;
+			cmd->execute_task = target_scsi3_emulate_pr_in;
 		size = (cdb[7] << 8) + cdb[8];
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
 	case PERSISTENT_RESERVE_OUT:
 		if (su_dev->t10_pr.res_type == SPC3_PERSISTENT_RESERVATIONS)
-			cmd->transport_emulate_cdb = target_scsi3_emulate_pr_out;
+			cmd->execute_task = target_scsi3_emulate_pr_out;
 		size = (cdb[7] << 8) + cdb[8];
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 		break;
@@ -2871,12 +2869,10 @@ static int transport_generic_cmd_sequencer(
 			 *
 			 * Check for emulated MO_SET_TARGET_PGS.
 			 */
-			if (cdb[1] == MO_SET_TARGET_PGS) {
-				cmd->transport_emulate_cdb =
-				(su_dev->t10_alua.alua_type ==
-					SPC3_ALUA_EMULATED) ?
-				core_emulate_set_target_port_groups :
-				NULL;
+			if (cdb[1] == MO_SET_TARGET_PGS &&
+			    su_dev->t10_alua.alua_type == SPC3_ALUA_EMULATED) {
+				cmd->execute_task =
+					target_emulate_set_target_port_groups;
 			}
 
 			size = (cdb[6] << 24) | (cdb[7] << 16) |
@@ -2969,10 +2965,8 @@ static int transport_generic_cmd_sequencer(
 		 * is running in SPC_PASSTHROUGH, and wants reservations
 		 * emulation disabled.
 		 */
-		if (su_dev->t10_pr.res_type != SPC_PASSTHROUGH) {
-			cmd->transport_emulate_cdb =
-				target_scsi2_reservation_reserve;
-		}
+		if (su_dev->t10_pr.res_type != SPC_PASSTHROUGH)
+			cmd->execute_task = target_scsi2_reservation_reserve;
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 		break;
 	case RELEASE:
@@ -2986,10 +2980,8 @@ static int transport_generic_cmd_sequencer(
 		else
 			size = cmd->data_length;
 
-		if (su_dev->t10_pr.res_type != SPC_PASSTHROUGH) {
-			cmd->transport_emulate_cdb =
-				target_scsi2_reservation_release;
-		}
+		if (su_dev->t10_pr.res_type != SPC_PASSTHROUGH)
+			cmd->execute_task = target_scsi2_reservation_release;
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 		break;
 	case SYNCHRONIZE_CACHE:
@@ -3010,9 +3002,6 @@ static int transport_generic_cmd_sequencer(
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 
-		/*
-		 * For TCM/pSCSI passthrough, skip cmd->transport_emulate_cdb()
-		 */
 		if (dev->transport->transport_type == TRANSPORT_PLUGIN_PHBA_PDEV)
 			break;
 		/*
@@ -3089,8 +3078,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 		break;
 	case REPORT_LUNS:
-		cmd->transport_emulate_cdb =
-				transport_core_report_lun_response;
+		cmd->execute_task = target_report_luns;
 		size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		/*
 		 * Do implict HEAD_OF_QUEUE processing for REPORT_LUNS
