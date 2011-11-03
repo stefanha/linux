@@ -913,8 +913,6 @@ struct qla_tgt_sess {
 	unsigned long expires;
 	struct list_head del_list_entry;
 	
-	struct list_head sess_cmd_list; /* Protected by qla_hw_data->hardware_lock */
-
 	uint8_t port_name[WWN_SIZE];
 };
 
@@ -924,8 +922,6 @@ struct qla_tgt_cmd {
 	int locked_rsp;
 	atomic_t cmd_stop_free;
 	atomic_t cmd_free;
-	atomic_t cmd_free_comp_set;
-	struct completion cmd_free_comp;
 	struct completion cmd_stop_free_comp;
 	struct se_cmd se_cmd;
 	struct work_struct work_free;

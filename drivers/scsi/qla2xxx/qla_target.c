@@ -369,61 +369,6 @@ void qla_tgt_response_pkt_all_vps(struct scsi_qla_host *vha, response_t *pkt)
 
 }
 
-/*
- * Called with qla_hw_data->hardware_lock held.
- */
-static void qla_tgt_wait_for_cmds(struct qla_tgt_sess *sess, struct qla_hw_data *ha)
-{
-	LIST_HEAD(tmp_list);
-	struct qla_tgt_cmd *cmd;
-	struct se_cmd *se_cmd;
-
-	list_splice_init(&sess->sess_cmd_list, &tmp_list);
-
-	while (!list_empty(&tmp_list)) {
-
-		cmd = list_entry(tmp_list.next, struct qla_tgt_cmd, cmd_list);
-		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe100, "Waiting for cmd:"
-			" %p\n", cmd);
-		/*
-		 * This will signal that completion should be called from
-		 * tcm_qla2xxx_release_cmd() context.
-		 */ 
-		atomic_set(&cmd->cmd_free_comp_set, 1);
-		spin_unlock_irq(&ha->hardware_lock);
-
-		list_del(&cmd->cmd_list);
-
-		se_cmd = &cmd->se_cmd;
-		/*
-		 * Wait for completion of the outstanding descriptor in
-		 * tcm_qla2xxx_release_cmd() from transport processing
-		 * context, then a direct call to qla_tgt_free_cmd() below.
-		 */
-		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe101, "Before"
-			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
-			" se_cmd: %p\n", cmd, se_cmd);
-
-		wait_for_completion(&cmd->cmd_free_comp);
-
-		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe102, "After"
-			" wait_for_completion(&cmd->cmd_free_comp); cmd: %p,"
-			" se_cmd: %p\n", cmd, se_cmd);
-
-		atomic_set(&cmd->cmd_free, 0);
-		smp_mb__after_atomic_dec();
-
-		qla_tgt_free_cmd(cmd);
-
-		ql_dbg(ql_dbg_tgt_mgt, sess->vha, 0xe103, "After"
-			" qla_tgt_free_cmd --------------------->\n");
-
-		spin_lock_irq(&ha->hardware_lock);
-	}
-
-}
-
-
 /* ha->hardware_lock supposed to be held on entry */
 static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
 {
@@ -434,7 +379,6 @@ static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
 	tgt = sess->tgt;
 
 	sess->tearing_down = 1;
-	qla_tgt_wait_for_cmds(sess, ha);
 
 	/*
 	 * Release the target session for FC Nexus from fabric module code.
@@ -920,8 +864,6 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 	sess->s_id = fcport->d_id;
 	sess->loop_id = fcport->loop_id;
 	sess->local = local;
-
-	INIT_LIST_HEAD(&sess->sess_cmd_list);
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe109, "Adding sess %p to tgt %p via"
 		" ->check_initiator_node_acl()\n", sess, ha->qla_tgt);
@@ -3197,7 +3139,6 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha, atio_t *atio)
 	}
 
 	INIT_LIST_HEAD(&cmd->cmd_list);
-	init_completion(&cmd->cmd_free_comp);
 	init_completion(&cmd->cmd_stop_free_comp);
 
 	memcpy(&cmd->atio.atio2x, atio, sizeof(*atio));

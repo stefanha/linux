@@ -733,6 +733,15 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 		dump_stack();
 		return;
 	}
+
+	target_splice_sess_cmd_list(se_sess);
+	spin_unlock_irq(&ha->hardware_lock);
+
+	target_wait_for_sess_cmds(se_sess, 0);
+
+	spin_lock_irq(&ha->hardware_lock);
+
+
 	/*
 	 * Now clear the struct se_node_acl->nacl_sess pointer
 	 */
@@ -1214,6 +1223,7 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.tpg_get_inst_index		= tcm_qla2xxx_tpg_get_inst_index,
 	.new_cmd_map			= tcm_qla2xxx_new_cmd_map,
 	.check_stop_free		= tcm_qla2xxx_check_stop_free,
+	.check_release_cmd		= tcm_qla2xxx_check_release_cmd,
 	.release_cmd			= tcm_qla2xxx_release_cmd,
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,

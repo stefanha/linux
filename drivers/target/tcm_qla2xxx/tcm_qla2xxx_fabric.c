@@ -459,46 +459,16 @@ int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 	return 0;
 }
 
-/*
- * Called with qla_hw_data->hardware_lock held..
- */
-static int tcm_qla2xxx_release_shutdown_check(
-	struct qla_tgt_cmd *cmd,
-	struct qla_tgt_sess *sess)
-{
-	/*
-	 * During shutdown, qla_tgt_wait_for_cmds() will be waiting on
-	 * this outstanding qla_tgt_cmd descriptor.  For this case,
-	 * perform the completion and return, and qla_tgt_wait_for_cmds()
-	 * will handle the direct call to qla_tgt_free_cmd()
-	 */
-	if (cmd->tgt->tgt_stop || sess->tearing_down) {
-		if (atomic_read(&cmd->cmd_free_comp_set) ||
-		    atomic_read(&cmd->cmd_free)) {
-			pr_warn("Detected shutdown, calling complete("
-				"&cmd->cmd_free_comp): cmd: %p\n", cmd);
-			complete(&cmd->cmd_free_comp);
-			return 1;
-		}
-	}
-	list_del(&cmd->cmd_list);
-
-	return 0;
-}
-
-/*
- * Callback from TCM Core to release underlying fabric descriptor
- */
-void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
+int tcm_qla2xxx_check_release_cmd(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd;
 	struct qla_tgt_sess *sess;
 	struct qla_hw_data *ha;
 	unsigned long flags;
-	int ret;
+	int ret = 0;
 
 	if (se_cmd->se_tmr_req != NULL)
-		return;
+		return 0;
 
 	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
 	sess = cmd->sess;
@@ -512,30 +482,39 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 	 * exception path..  This also skips the possible wait for
 	 * completion on cmd_stop_free_comp below..
 	 */
-	if (!cmd->locked_rsp) {
-		if (!tcm_qla2xxx_release_shutdown_check(cmd, sess))
-			qla_tgt_free_cmd(cmd);	
-		return;
-	}
+	if (!cmd->locked_rsp)
+		return target_put_sess_cmd(sess->se_sess, se_cmd);
 	/*
 	 * If the callback to tcm_qla2xxx_check_stop_free() has not finished,
 	 * before the release path is invoked, go ahead and wait on
 	 * cmd_stop_free_comp until tcm_qla2xxx_check_stop_free completes.
 	 */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	if ((atomic_read(&cmd->cmd_stop_free) != 1) &&
-	    (atomic_read(&cmd->cmd_free_comp_set) == 0)) {
+	if (atomic_read(&cmd->cmd_stop_free) != 1) {
 		pr_warn("Detected cmd->cmd_stop_free != 0, waiting on"
 			" cmd_stop_free_comp for cmd: %p\n", cmd);
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 		wait_for_completion(&cmd->cmd_stop_free_comp);
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 	}
-	ret = tcm_qla2xxx_release_shutdown_check(cmd, sess);
+	ret = target_put_sess_cmd(sess->se_sess, se_cmd);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-	if (!ret)
-		qla_tgt_free_cmd(cmd);
+	return ret;
+}
+
+/* tcm_qla2xxx_release_cmd - Callback from TCM Core to release underlying fabric descriptor
+ * @se_cmd command to release
+ */
+void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
+{
+	struct qla_tgt_cmd *cmd;
+
+	if (se_cmd->se_tmr_req != NULL)
+		return;
+
+	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+	qla_tgt_free_cmd(cmd);
 }
 
 int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
@@ -722,7 +701,7 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	/*
  	 * Protected by qla_hw_data->hardware_lock
  	 */
-	list_add_tail(&cmd->cmd_list, &sess->sess_cmd_list);
+	target_get_sess_cmd(se_sess, se_cmd);
 	/*
 	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
 	 */
