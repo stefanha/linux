@@ -167,7 +167,7 @@ static int tcm_vhost_make_nexus(
 	 *  Initialize the struct se_session pointer
 	 */
 	tv_nexus->tvn_se_sess = transport_init_session();
-	if (!tv_nexus->tvn_se_sess) {
+	if (IS_ERR(tv_nexus->tvn_se_sess)) {
 		mutex_unlock(&tv_tpg->tv_tpg_mutex);
 		kfree(tv_nexus);
 		return -ENOMEM;

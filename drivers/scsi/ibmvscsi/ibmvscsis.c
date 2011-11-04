@@ -335,7 +335,7 @@ static struct se_portal_group *ibmvscsis_make_tpg(struct se_wwn *wwn,
 		return ERR_PTR(-ENOMEM);
 
 	adapter->se_sess = transport_init_session();
-	if (!adapter->se_sess) {
+	if (IS_ERR(adapter->se_sess)) {
 		core_tpg_deregister(&adapter->se_tpg);
 		return ERR_PTR(-ENOMEM);
 	}

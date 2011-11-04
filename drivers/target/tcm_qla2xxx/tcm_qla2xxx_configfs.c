@@ -805,9 +805,9 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	se_tpg = &tpg->se_tpg;
 
 	se_sess = transport_init_session();
-	if (!se_sess) {
+	if (IS_ERR(se_sess)) {
 		pr_err("Unable to initialize struct se_session\n");
-		return -ENOMEM;
+		return PTR_ERR(se_sess);
 	}
 	/*
 	 * Format the FCP Initiator port_name into colon seperated values to match
