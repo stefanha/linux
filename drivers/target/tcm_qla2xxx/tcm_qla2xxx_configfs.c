@@ -1321,9 +1321,9 @@ static int tcm_qla2xxx_register_configfs(void)
 	 * Register the top level struct config_item_type with TCM core
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "qla2xxx");
-	if (!fabric) {
+	if (IS_ERR(fabric)) {
 		pr_err("target_fabric_configfs_init() failed\n");
-		return -ENOMEM;
+		return PTR_ERR(fabric);
 	}
 	/*
 	 * Setup fabric->tf_ops from our local tcm_qla2xxx_ops

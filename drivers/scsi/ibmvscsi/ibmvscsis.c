@@ -1624,9 +1624,9 @@ static int ibmvscsis_register_configfs(void)
 	 * Register the top level struct config_item_type with TCM core
 	 */
 	fabric = target_fabric_configfs_init(THIS_MODULE, "ibmvscsis");
-	if (!(fabric)) {
+	if (IS_ERR(fabric)) {
 		printk(KERN_ERR "target_fabric_configfs_init() failed\n");
-		return -ENOMEM;
+		return PTR_ERR(fabric);
 	}
 	/*
 	 * Setup fabric->tf_ops from our local ibmvscsis_ops
