@@ -1367,7 +1367,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	if (!npiv_fabric) {
 		pr_err("target_fabric_configfs_init() failed\n");
 		ret = -ENOMEM;
-		goto out;
+		goto out_fabric;
 	}
 	/*
 	 * Setup fabric->tf_ops from our local tcm_qla2xxx_npiv_ops
@@ -1392,7 +1392,7 @@ static int tcm_qla2xxx_register_configfs(void)
 	if (ret < 0) {
 		pr_err("target_fabric_configfs_register() failed"
 				" for TCM_QLA2XXX\n");
-		goto out;;
+		goto out_fabric;
 	}
 	/*
 	 * Setup our local pointer to *npiv_fabric
@@ -1403,15 +1403,14 @@ static int tcm_qla2xxx_register_configfs(void)
 	tcm_qla2xxx_free_wq = alloc_workqueue("tcm_qla2xxx_free",
 						WQ_MEM_RECLAIM, 0);
 	if (!tcm_qla2xxx_free_wq)
-		goto out;
+		goto out_fabric_npiv;
 
 	return 0;
-out:
-	if (tcm_qla2xxx_fabric_configfs != NULL)
-		target_fabric_configfs_deregister(tcm_qla2xxx_fabric_configfs);
-	if (tcm_qla2xxx_npiv_fabric_configfs != NULL)
-		target_fabric_configfs_deregister(tcm_qla2xxx_npiv_fabric_configfs);
 
+out_fabric_npiv:
+	target_fabric_configfs_deregister(tcm_qla2xxx_npiv_fabric_configfs);
+out_fabric:
+	target_fabric_configfs_deregister(tcm_qla2xxx_fabric_configfs);
 	return ret;
 }
 
