@@ -1236,7 +1236,7 @@ static int ibmvscsis_write_pending(struct se_cmd *se_cmd)
 				ibmvscsis_rdma, 1, 1);
 	if (ret) {
 		printk(KERN_ERR "srp_transfer_data() failed: %d\n", ret);
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
+		return -EAGAIN;  /* Signal QUEUE_FULL */
 	}
 	/*
 	 * We now tell TCM to add this WRITE CDB directly into the TCM storage

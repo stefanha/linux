@@ -737,7 +737,6 @@ int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
 	scsi_qla_host_t *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	unsigned char *cdb;
-	int ret;
 
 	if (IS_FWI2_CAPABLE(ha)) {
 		atio7_from_24xx_entry_t *atio = &cmd->atio.atio7;
@@ -749,29 +748,10 @@ int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
 
 	/*
 	 * Allocate the necessary tasks to complete the received CDB+data
-	 */
-	ret = transport_generic_allocate_tasks(se_cmd, cdb);
-	if (ret == -ENOMEM) {
-		/* Out of Resources */
-		return PYX_TRANSPORT_OUT_OF_MEMORY_RESOURCES;
-	} else if (ret == -EINVAL) {
-		/*
-		 * Handle case for SAM_STAT_RESERVATION_CONFLICT
-		 */
-		if (se_cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
-			return PYX_TRANSPORT_RESERVATION_CONFLICT;
-		/*
-		 * Otherwise, se_cmd->scsi_sense_reason will be set, so
-		 * return PYX_TRANSPORT_USE_SENSE_REASON to signal
-		 * transport_generic_request_failure()
-		 */
-		return PYX_TRANSPORT_USE_SENSE_REASON;
-	}
-	/*
 	 * drivers/target/target_core_transport.c:transport_processing_thread()
 	 * falls through to TRANSPORT_NEW_CMD.
 	 */
-	return 0;
+	return transport_generic_allocate_tasks(se_cmd, cdb);
 }
 
 /*

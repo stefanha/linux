@@ -323,6 +323,7 @@ stgt_alloc_task(unsigned char *cdb)
  */
 static int stgt_do_task(struct se_task *task)
 {
+	struct se_cmd *cmd = task->task_se_cmd;
 	struct stgt_plugin_task *st = STGT_TASK(task);
 	struct Scsi_Host *sh = task->task_se_cmd->se_dev->se_hba->hba_ptr;
 	struct scsi_cmnd *sc;
@@ -333,7 +334,8 @@ static int stgt_do_task(struct se_task *task)
 	if (!sc) {
 		pr_err("Unable to allocate memory for struct"
 			" scsi_cmnd\n");
-		return PYX_TRANSPORT_LU_COMM_FAILURE;
+		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+		return -ENOMEM;
 	}
 
 	target_get_task_cdb(task, st->stgt_cdb);
@@ -353,7 +355,7 @@ static int stgt_do_task(struct se_task *task)
 		scsi_host_put_command(sh, sc);
 	}
 #endif
-	return PYX_TRANSPORT_SENT_TO_TRANSPORT;
+	return 0;
 }
 
 /*	stgt_free_task(): (Part of se_subsystem_api_t template)
@@ -523,9 +525,8 @@ static inline void stgt_process_SAM_status(
 			" 0x%02x Result: 0x%08x\n", task, st->stgt_cdb[0],
 			st->stgt_result);
 		task->task_scsi_status = SAM_STAT_CHECK_CONDITION;
-		task->task_error_status = PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
-		task->task_se_cmd->transport_error_status =
-					PYX_TRANSPORT_UNKNOWN_SAM_OPCODE;
+		task->task_se_cmd->scsi_sense_reason =
+					TCM_UNSUPPORTED_SCSI_OPCODE;
 		transport_complete_task(task, 0);
 		break;
 	}
