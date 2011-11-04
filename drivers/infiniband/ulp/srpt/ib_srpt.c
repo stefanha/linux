@@ -3730,11 +3730,11 @@ static ssize_t srpt_tpg_attrib_store_srp_max_rdma_size(
 	struct srpt_port *sport = container_of(se_tpg, struct srpt_port, port_tpg_1);
 	unsigned long val;
 	int ret;
-	
-	ret = strict_strtoul(page, 0, &val);
+
+	ret = kstrtoul(page, 0, &val);
 	if (ret < 0) {
-		pr_err("strict_strtoul() failed with ret: %d\n", ret);
-		return -EINVAL;
+		pr_err("kstrtoul() failed with ret: %d\n", ret);
+		return ret;
 	}
 	if (val > MAX_SRPT_RDMA_SIZE) {
 		pr_err("val: %lu exceeds MAX_SRPT_RDMA_SIZE: %d\n", val,
@@ -3771,10 +3771,10 @@ static ssize_t srpt_tpg_attrib_store_srp_max_rsp_size(
 	unsigned long val;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &val);
+	ret = kstrtoul(page, 0, &val);
 	if (ret < 0) {
-		pr_err("strict_strtoul() failed with ret: %d\n", ret);
-		return -EINVAL;
+		pr_err("kstrtoul() failed with ret: %d\n", ret);
+		return ret;
 	}
 	if (val > MAX_SRPT_RSP_SIZE) {
 		pr_err("val: %lu exceeds MAX_SRPT_RSP_SIZE: %d\n", val,
@@ -3811,10 +3811,10 @@ static ssize_t srpt_tpg_attrib_store_srp_sq_size(
 	unsigned long val;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &val);
+	ret = kstrtoul(page, 0, &val);
 	if (ret < 0) {
-		pr_err("strict_strtoul() failed with ret: %d\n", ret);
-		return -EINVAL;
+		pr_err("kstrtoul() failed with ret: %d\n", ret);
+		return ret;
 	}
 	if (val > MAX_SRPT_SRQ_SIZE) {
 		pr_err("val: %lu exceeds MAX_SRPT_SRQ_SIZE: %d\n", val,
@@ -3858,10 +3858,10 @@ static ssize_t srpt_tpg_store_enable(
 	unsigned long tmp;
         int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		printk(KERN_ERR "Unable to extract srpt_tpg_store_enable\n");
-		return -EINVAL;
+		return ret;
 	}
 
 	if ((tmp != 0) && (tmp != 1)) {
