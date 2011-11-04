@@ -680,21 +680,20 @@ static struct srpt_ioctx **srpt_alloc_ioctx_ring(struct srpt_device *sdev,
 
 	ring = kmalloc(ring_size * sizeof(ring[0]), GFP_KERNEL);
 	if (!ring)
-		goto out;
+		return NULL;
 	for (i = 0; i < ring_size; ++i) {
 		ring[i] = srpt_alloc_ioctx(sdev, ioctx_size, dma_size, dir);
 		if (!ring[i])
 			goto err;
 		ring[i]->index = i;
 	}
-	goto out;
+	return ring;
 
 err:
 	while (--i >= 0)
 		srpt_free_ioctx(sdev, ring[i], dma_size, dir);
 	kfree(ring);
-out:
-	return ring;
+	return NULL;
 }
 
 /**
