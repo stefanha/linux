@@ -2628,7 +2628,7 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 	}
 
 	ch->sess = transport_init_session();
-	if (!ch->sess) {
+	if (IS_ERR(ch->sess)) {
 		rej->reason = __constant_cpu_to_be32(
 				SRP_LOGIN_REJ_INSUFFICIENT_RESOURCES);
 		pr_debug("Failed to create session\n");
@@ -4047,10 +4047,10 @@ static int __init srpt_init_module(void)
 	spin_lock_init(&srpt_dev_lock);
 	INIT_LIST_HEAD(&srpt_dev_list);
 
-	ret = -ENODEV;
 	srpt_target = target_fabric_configfs_init(THIS_MODULE, "srpt");
-	if (!srpt_target) {
+	if (IS_ERR(srpt_target)) {
 		printk(KERN_ERR "couldn't register\n");
+		ret = PTR_ERR(srpt_target);
 		goto out;
 	}
 
