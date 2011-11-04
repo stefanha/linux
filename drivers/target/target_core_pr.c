@@ -3849,28 +3849,37 @@ int target_scsi3_emulate_pr_out(struct se_task *task)
 	case PRO_REGISTER:
 		ret = core_scsi3_emulate_pro_register(cmd,
 			res_key, sa_res_key, aptpl, all_tg_pt, spec_i_pt, 0);
+		break;
 	case PRO_RESERVE:
 		ret = core_scsi3_emulate_pro_reserve(cmd, type, scope, res_key);
+		break;
 	case PRO_RELEASE:
 		ret = core_scsi3_emulate_pro_release(cmd, type, scope, res_key);
+		break;
 	case PRO_CLEAR:
 		ret = core_scsi3_emulate_pro_clear(cmd, res_key);
+		break;
 	case PRO_PREEMPT:
 		ret = core_scsi3_emulate_pro_preempt(cmd, type, scope,
 					res_key, sa_res_key, 0);
+		break;
 	case PRO_PREEMPT_AND_ABORT:
 		ret = core_scsi3_emulate_pro_preempt(cmd, type, scope,
 					res_key, sa_res_key, 1);
+		break;
 	case PRO_REGISTER_AND_IGNORE_EXISTING_KEY:
 		ret = core_scsi3_emulate_pro_register(cmd,
 			0, sa_res_key, aptpl, all_tg_pt, spec_i_pt, 1);
+		break;
 	case PRO_REGISTER_AND_MOVE:
 		ret = core_scsi3_emulate_pro_register_and_move(cmd, res_key,
 				sa_res_key, aptpl, unreg);
+		break;
 	default:
 		pr_err("Unknown PERSISTENT_RESERVE_OUT service"
 			" action: 0x%02x\n", cdb[1] & 0x1f);
 		ret = PYX_TRANSPORT_INVALID_CDB_FIELD;
+		break;
 	}
 
 out:
@@ -4252,16 +4261,21 @@ int target_scsi3_emulate_pr_in(struct se_task *task)
 	switch (cmd->t_task_cdb[1] & 0x1f) {
 	case PRI_READ_KEYS:
 		ret = core_scsi3_pri_read_keys(cmd);
+		break;
 	case PRI_READ_RESERVATION:
 		ret = core_scsi3_pri_read_reservation(cmd);
+		break;
 	case PRI_REPORT_CAPABILITIES:
 		ret = core_scsi3_pri_report_capabilities(cmd);
+		break;
 	case PRI_READ_FULL_STATUS:
 		ret = core_scsi3_pri_read_full_status(cmd);
+		break;
 	default:
 		pr_err("Unknown PERSISTENT_RESERVE_IN service"
 			" action: 0x%02x\n", cmd->t_task_cdb[1] & 0x1f);
 		ret = PYX_TRANSPORT_INVALID_CDB_FIELD;
+		break;
 	}
 
 	if (!ret) {
