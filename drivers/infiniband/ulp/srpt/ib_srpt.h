@@ -257,20 +257,17 @@ struct srpt_send_ioctx {
  * @CH_DISCONNECTING:    DREQ has been received; waiting for DREP
  *                       or DREQ has been send and waiting for DREP
  *                       or .
- * @CH_DRAINING:	 QP is in ERR state; waiting for last WQE event.
- * @CH_RELEASING:	 Last WQE event has been received; releasing resources.
+ * @CH_DRAINING:	 QP is in ERR state.
  */
 enum rdma_ch_state {
 	CH_CONNECTING,
 	CH_LIVE,
 	CH_DISCONNECTING,
 	CH_DRAINING,
-	CH_RELEASING
 };
 
 /**
  * struct srpt_rdma_ch - RDMA channel.
- * @wait_queue:    Allows the kernel thread to wait for more work.
  * @thread:        Kernel thread that processes the IB queues associated with
  *                 the channel.
  * @cm_id:         IB CM ID associated with the channel.
@@ -299,10 +296,10 @@ enum rdma_ch_state {
  * @sess:          Session information associated with this SRP channel.
  * @sess_name:     Session name.
  * @release_work:  Allows scheduling of srpt_release_channel().
+ * @last_wqe_received: Whether the Last WQE event has already been received.
  * @release_done:  Enables waiting for srpt_release_channel() completion.
  */
 struct srpt_rdma_ch {
-	wait_queue_head_t	wait_queue;
 	struct task_struct	*thread;
 	struct ib_cm_id		*cm_id;
 	struct ib_qp		*qp;
@@ -326,6 +323,7 @@ struct srpt_rdma_ch {
 	struct se_session	*sess;
 	u8			sess_name[36];
 	struct work_struct	release_work;
+	bool			last_wqe_received;
 	struct completion	*release_done;
 };
 

@@ -239,12 +239,10 @@ static void srpt_qp_event(struct ib_event *event, struct srpt_rdma_ch *ch)
 		ib_cm_notify(ch->cm_id, event->event);
 		break;
 	case IB_EVENT_QP_LAST_WQE_REACHED:
-		if (srpt_test_and_set_ch_state(ch, CH_DRAINING,
-					       CH_RELEASING))
-			srpt_release_channel(ch);
-		else
-			pr_debug("%s: state %d - ignored LAST_WQE.\n",
-				 ch->sess_name, srpt_get_ch_state(ch));
+		pr_debug("%s; state %d: received LAST WQE event.\n",
+			 ch->sess_name, srpt_get_ch_state(ch));
+		ch->last_wqe_received = true;
+		wake_up_process(ch->thread);
 		break;
 	default:
 		printk(KERN_ERR "received unrecognized IB QP event %d\n",
@@ -2115,7 +2113,7 @@ static void srpt_completion(struct ib_cq *cq, void *ctx)
 {
 	struct srpt_rdma_ch *ch = ctx;
 
-	wake_up_interruptible(&ch->wait_queue);
+	wake_up_process(ch->thread);
 }
 
 static int srpt_compl_thread(void *arg)
@@ -2127,15 +2125,23 @@ static int srpt_compl_thread(void *arg)
 
 	ch = arg;
 	BUG_ON(!ch);
-	printk(KERN_INFO "Session %s: kernel thread %s (PID %d) started\n",
-	       ch->sess_name, ch->thread->comm, current->pid);
-	while (!kthread_should_stop()) {
-		wait_event_interruptible(ch->wait_queue,
-			(srpt_process_completion(ch->cq, ch),
-			 kthread_should_stop()));
+
+	while (!kthread_should_stop() && !ch->last_wqe_received) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		srpt_process_completion(ch->cq, ch);
+		schedule();
 	}
-	printk(KERN_INFO "Session %s: kernel thread %s (PID %d) stopped\n",
-	       ch->sess_name, ch->thread->comm, current->pid);
+
+	set_current_state(TASK_RUNNING);
+	srpt_process_completion(ch->cq, ch);
+	srpt_release_channel(ch);
+
+	while (!kthread_should_stop()) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		srpt_process_completion(ch->cq, ch);
+		schedule();
+	}
+
 	return 0;
 }
 
@@ -2193,8 +2199,6 @@ static int srpt_create_ch_ib(struct srpt_rdma_ch *ch)
 	ret = srpt_init_ch_qp(ch, ch->qp);
 	if (ret)
 		goto err_destroy_qp;
-
-	init_waitqueue_head(&ch->wait_queue);
 
 	pr_debug("creating thread for session %s\n", ch->sess_name);
 
@@ -2266,7 +2270,6 @@ static void __srpt_close_ch(struct srpt_rdma_ch *ch)
 	case CH_DISCONNECTING:
 		break;
 	case CH_DRAINING:
-	case CH_RELEASING:
 		break;
 	}
 }
@@ -2358,12 +2361,7 @@ static struct srpt_rdma_ch *srpt_find_channel(struct srpt_device *sdev,
 }
 
 /**
- * srpt_release_channel() - Release channel resources.
- *
- * Schedules the actual release because:
- * - Calling the ib_destroy_cm_id() call from inside an IB CM callback would
- *   trigger a deadlock.
- * - It is not safe to call TCM transport_* functions from interrupt context.
+ * srpt_release_channel() - Schedule releasing channel resources.
  */
 static void srpt_release_channel(struct srpt_rdma_ch *ch)
 {
@@ -2677,7 +2675,7 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 	goto out;
 
 release_channel:
-	srpt_set_ch_state(ch, CH_RELEASING);
+	srpt_set_ch_state(ch, CH_DRAINING);
 	transport_deregister_session_configfs(ch->sess);
 
 deregister_session:
@@ -2781,7 +2779,6 @@ static void srpt_cm_dreq_recv(struct ib_cm_id *cm_id)
 		break;
 	case CH_DISCONNECTING:
 	case CH_DRAINING:
-	case CH_RELEASING:
 		__WARN();
 		break;
 	}
@@ -3017,7 +3014,6 @@ static int srpt_write_pending(struct se_cmd *se_cmd)
 		break;
 	case CH_DISCONNECTING:
 	case CH_DRAINING:
-	case CH_RELEASING:
 		pr_debug("cmd with tag %lld: channel disconnecting\n",
 			 ioctx->tag);
 		srpt_set_cmd_state(ioctx, SRPT_STATE_DATA_IN);
