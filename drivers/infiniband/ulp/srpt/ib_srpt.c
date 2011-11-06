@@ -3743,7 +3743,7 @@ static ssize_t srpt_tpg_attrib_store_srp_max_rdma_size(
 		return -EINVAL;
 	}
 	sport->port_attrib.srp_max_rdma_size = val;
-	
+
 	return count;
 }
 
@@ -3842,7 +3842,7 @@ static ssize_t srpt_tpg_show_enable(
 {
 	struct srpt_port *sport = container_of(se_tpg, struct srpt_port, port_tpg_1);
 
-	return snprintf(page, PAGE_SIZE, "%d\n", (sport->enabled) ? 1: 0);
+	return snprintf(page, PAGE_SIZE, "%d\n", (sport->enabled) ? 1 : 0);
 }
 
 static ssize_t srpt_tpg_store_enable(
@@ -3852,7 +3852,7 @@ static ssize_t srpt_tpg_store_enable(
 {
 	struct srpt_port *sport = container_of(se_tpg, struct srpt_port, port_tpg_1);
 	unsigned long tmp;
-        int ret;
+	int ret;
 
 	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {

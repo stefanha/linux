@@ -222,7 +222,7 @@ struct srpt_recv_ioctx {
  * @spinlock:    Protects 'state'.
  * @state:       I/O context state.
  * @rdma_aborted: If initiating a multipart RDMA transfer failed, whether
- * 		 the already initiated transfers have finished.
+ *		 the already initiated transfers have finished.
  * @cmd:         Target core command data structure.
  * @sense_data:  SCSI sense data.
  */
