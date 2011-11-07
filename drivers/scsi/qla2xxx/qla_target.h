@@ -459,10 +459,9 @@ typedef struct {
  *		This is sent from the ISP to the target driver.
  */
 typedef struct {
-	uint8_t	 entry_type;		    /* Entry type. */
-	uint8_t	 entry_count;		    /* Entry count. */
 	union {
 		struct {
+			uint16_t entry_hdr;
 			uint8_t  sys_define;   /* System defined. */
 			uint8_t  entry_status; /* Entry Status.   */
 			uint32_t sys_define_2; /* System defined. */
@@ -482,6 +481,7 @@ typedef struct {
 			uint16_t ox_id;
 		} isp2x;
 		struct {
+			uint16_t entry_hdr;
 			uint8_t  fcp_cmnd_len_low;
 			uint8_t  fcp_cmnd_len_high:4;
 			uint8_t  attr:4;
@@ -491,6 +491,8 @@ typedef struct {
 			atio7_fcp_cmnd_t fcp_cmnd;
 		} isp24;
 		struct {
+			uint8_t  entry_type;	/* Entry type. */
+			uint8_t  entry_count;	/* Entry count. */
 			uint8_t  data[58];
 			uint32_t signature;
 #define ATIO_PROCESSED 0xDEADDEAD		/* Signature */

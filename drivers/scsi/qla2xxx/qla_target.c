@@ -223,7 +223,7 @@ void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *vha, atio_from_isp_t *a
 {
 	struct qla_hw_data *ha = vha->hw;
 
-	switch (atio->entry_type) {
+	switch (atio->u.raw.entry_type) {
 	case ATIO_TYPE7:
 	{
 		struct scsi_qla_host *host = qla_tgt_find_host_by_d_id(vha,
@@ -265,7 +265,7 @@ void qla_tgt_24xx_atio_pkt_all_vps(struct scsi_qla_host *vha, atio_from_isp_t *a
 
 	default:
 		printk(KERN_ERR "qla_target(%d): Received unknown ATIO atio "
-		     "type %x\n", vha->vp_idx, atio->entry_type);
+		     "type %x\n", vha->vp_idx, atio->u.raw.entry_type);
 		break;
 	}
 
@@ -3175,7 +3175,7 @@ out_free_cmd:
 	return res;
 
 out_sched:
-	if (atio->entry_count > 1) {
+	if (atio->u.raw.entry_count > 1) {
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe127, "Dropping multy entry cmd %p\n", cmd);
 		res = -EBUSY;
 		goto out_free_cmd;
@@ -4073,10 +4073,9 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha, atio_from_isp_t *at
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe140, "ATIO pkt, but no tgt (ha %p)", ha);
 		return;
 	}
-
 	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe209, "qla_target(%d): ATIO pkt %p:"
-		" type %02x count %02x", vha->vp_idx, atio, atio->entry_type,
-		atio->entry_count);
+		" type %02x count %02x", vha->vp_idx, atio, atio->u.raw.entry_type,
+		atio->u.raw.entry_count);
 	/*
 	 * In tgt_stop mode we also should allow all requests to pass.
 	 * Otherwise, some commands can stuck.
@@ -4084,7 +4083,7 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha, atio_from_isp_t *at
 
 	tgt->irq_cmd_count++;
 
-	switch (atio->entry_type) {
+	switch (atio->u.raw.entry_type) {
 	case ATIO_TYPE7:
 		ql_dbg(ql_dbg_tgt, vha, 0xe026, "ATIO_TYPE7 instance %d, lun"
 			" %Lx, read/write %d/%d, add_cdb_len %d, data_length "
@@ -4135,7 +4134,7 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha, atio_from_isp_t *at
 		if (unlikely(atio->u.isp2x.entry_status != 0)) {
 			printk(KERN_ERR "qla_target(%d): Received ATIO packet %x "
 				"with error status %x\n", vha->vp_idx,
-				atio->entry_type, atio->u.isp2x.entry_status);
+				atio->u.raw.entry_type, atio->u.isp2x.entry_status);
 			break;
 		}
 		ql_dbg(ql_dbg_tgt, vha, 0xe027, "%s", "IMMED_NOTIFY ATIO");
@@ -4145,7 +4144,7 @@ static void qla_tgt_24xx_atio_pkt(struct scsi_qla_host *vha, atio_from_isp_t *at
 
 	default:
 		printk(KERN_ERR "qla_target(%d): Received unknown ATIO atio "
-		     "type %x\n", vha->vp_idx, atio->entry_type);
+		     "type %x\n", vha->vp_idx, atio->u.raw.entry_type);
 		break;
 	}
 
@@ -5015,7 +5014,7 @@ qla_tgt_init_atio_q_entries(struct scsi_qla_host *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
 	uint16_t cnt;
-	atio_from_isp_t *pkt = ha->atio_ring;
+	atio_from_isp_t *pkt = (atio_from_isp_t *)ha->atio_ring;
 
 	for (cnt = 0; cnt < ha->atio_q_length; cnt++) {
 		pkt->u.raw.signature = ATIO_PROCESSED;
@@ -5039,9 +5038,9 @@ qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *vha)
 	if (!vha->flags.online)
 		return;
 
-	pkt = ha->atio_ring_ptr;
-	while (pkt->u.raw.signature != ATIO_PROCESSED) {
-		cnt = pkt->entry_count;
+	while (ha->atio_ring_ptr->signature != ATIO_PROCESSED) {
+		pkt = (atio_from_isp_t *)ha->atio_ring_ptr;
+		cnt = pkt->u.raw.entry_count;
 
 		qla_tgt_24xx_atio_pkt_all_vps(vha, (atio_from_isp_t *)pkt);
 
@@ -5054,7 +5053,7 @@ qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *vha)
 				ha->atio_ring_ptr++;
 
 			pkt->u.raw.signature = ATIO_PROCESSED;
-			pkt = ha->atio_ring_ptr;
+			pkt = (atio_from_isp_t *)ha->atio_ring_ptr;
 		}
 		wmb();
 	}
