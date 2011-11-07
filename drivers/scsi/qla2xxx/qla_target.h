@@ -921,7 +921,7 @@ struct qla_tgt_cmd {
 	atomic_t cmd_free;
 	struct completion cmd_stop_free_comp;
 	struct se_cmd se_cmd;
-	struct work_struct free_work;
+	struct work_struct work;
 	/* Sense buffer that will be mapped into outgoing status */
 	unsigned char sense_buffer[TRANSPORT_SENSE_BUFFER];
 
@@ -951,13 +951,11 @@ struct qla_tgt_cmd {
 struct qla_tgt_sess_work_param {
 	struct list_head sess_works_list_entry;
 
-#define QLA_TGT_SESS_WORK_CMD	0
 #define QLA_TGT_SESS_WORK_ABORT	1
 #define QLA_TGT_SESS_WORK_TM	2
 	int type;
 
 	union {
-		struct qla_tgt_cmd *cmd;
 		abts_recv_from_24xx_t abts;
 		imm_ntfy_from_isp_t tm_iocb;
 		atio_from_isp_t tm_iocb2;

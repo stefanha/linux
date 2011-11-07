@@ -80,6 +80,8 @@ enum fcp_resp_rsp_codes {
 #define FCP_PRI_SHIFT       3   /* priority field starts in bit 3 */
 #define FCP_PRI_RESVD_MASK  0x80        /* reserved bits in priority field */
 
+static void qla_tgt_exec_cmd_work(struct work_struct *work);
+
 /*
  * This driver calls qla2x00_req_pkt() and qla2x00_issue_marker(), which
  * must be called under HW lock and could unlock/lock it inside.
@@ -1145,11 +1147,8 @@ static int qla_tgt_sched_sess_work(struct qla_tgt *tgt, int type,
 		" to find session for param %p (size %d, tgt %p)\n", type, prm, param,
 		param_size, tgt);
 
-	BUG_ON(param_size > (sizeof(*prm) -
-		offsetof(struct qla_tgt_sess_work_param, cmd)));
-
 	prm->type = type;
-	memcpy(&prm->cmd, param, param_size);
+	memcpy(&prm->tm_iocb, param, param_size);
 
 	spin_lock_irqsave(&tgt->sess_work_lock, flags);
 	if (!tgt->sess_works_pending)
@@ -3180,11 +3179,10 @@ out_sched:
 		res = -EBUSY;
 		goto out_free_cmd;
 	}
-	res = qla_tgt_sched_sess_work(tgt, QLA_TGT_SESS_WORK_CMD, &cmd, sizeof(cmd));
-	if (res != 0)
-		qla_tgt_free_cmd(cmd);
 
-	return res;
+	INIT_WORK(&cmd->work, qla_tgt_exec_cmd_work);
+	schedule_work(&cmd->work);
+	return 0;
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -4544,19 +4542,17 @@ retry:
 	return sess;
 }
 
-static void qla_tgt_exec_cmd_work(struct qla_tgt *tgt,
-	struct qla_tgt_sess_work_param *prm)
+static void qla_tgt_exec_cmd_work(struct work_struct *work)
 {
+	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
+	struct qla_tgt *tgt = cmd->tgt;
 	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess = NULL;
 	unsigned long flags;
 	uint8_t *s_id = NULL; /* to hide compiler warnings */
 	int rc, loop_id = -1; /* to hide compiler warnings */
-	struct qla_tgt_cmd *cmd = prm->cmd;
 	atio_from_isp_t *a = (atio_from_isp_t *)&cmd->atio;
-
-	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14b, "qla_tgt_exec_sess_work() processing -> prm %p\n", prm);
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
@@ -4805,9 +4801,6 @@ static void qla_tgt_sess_work_fn(struct work_struct *work)
 		spin_unlock_irqrestore(&tgt->sess_work_lock, flags);
 
 		switch (prm->type) {
-		case QLA_TGT_SESS_WORK_CMD:
-			qla_tgt_exec_cmd_work(tgt, prm);
-			break;
 		case QLA_TGT_SESS_WORK_ABORT:
 			qla_tgt_abort_work(tgt, prm);
 			break;
