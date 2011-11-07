@@ -4544,7 +4544,83 @@ retry:
 	return sess;
 }
 
-static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
+static void qla_tgt_exec_cmd_work(struct qla_tgt *tgt,
+	struct qla_tgt_sess_work_param *prm)
+{
+	struct scsi_qla_host *vha = tgt->vha;
+	struct qla_hw_data *ha = vha->hw;
+	struct qla_tgt_sess *sess = NULL;
+	unsigned long flags;
+	uint8_t *s_id = NULL; /* to hide compiler warnings */
+	int rc, loop_id = -1; /* to hide compiler warnings */
+	struct qla_tgt_cmd *cmd = prm->cmd;
+	atio_from_isp_t *a = (atio_from_isp_t *)&cmd->atio;
+
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14b, "qla_tgt_exec_sess_work() processing -> prm %p\n", prm);
+
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+
+	if (tgt->tgt_stop)
+		goto out_term;
+
+	if (IS_FWI2_CAPABLE(ha)) {
+		s_id = a->u.isp24.fcp_hdr.s_id;
+		sess = ha->tgt_ops->find_sess_by_s_id(vha, s_id);
+	} else {
+		loop_id = GET_TARGET_ID(ha, a);
+		sess = ha->tgt_ops->find_sess_by_loop_id(vha, loop_id);
+	}
+
+	if (sess) {
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
+		qla_tgt_sess_get(sess);
+	} else {
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+		mutex_lock(&ha->tgt_mutex);
+		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		/* sess has got an extra creation ref */
+		mutex_unlock(&ha->tgt_mutex);
+
+		spin_lock_irqsave(&ha->hardware_lock, flags);
+
+		if (!sess)
+			goto out_term;
+	}
+
+	if (tgt->tgt_stop)
+		goto out_term;
+
+	if (tgt->tm_to_unknown) {
+		/*
+		 * Cmd might be already aborted behind us, so be safe
+		 * and abort it. It should be OK, initiator will retry
+		 * it.
+		 */
+		goto out_term;
+	}
+	rc = qla_tgt_send_cmd_to_target(vha, cmd, sess);
+	if (rc != 0)
+		goto out_term;
+
+out:
+	if (sess)
+		qla_tgt_sess_put(sess);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	return;
+
+out_term:
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14d, "Terminating work cmd %p", cmd);
+	/*
+	 * cmd has not sent to target yet, so pass NULL as the second
+	 * argument
+	 */
+	qla_tgt_send_term_exchange(vha, NULL, &cmd->atio, 1);
+	goto out;
+}
+
+
+static void qla_tgt_abort_work(struct qla_tgt *tgt,
 	struct qla_tgt_sess_work_param *prm)
 {
 	struct scsi_qla_host *vha = tgt->vha;
@@ -4556,60 +4632,30 @@ static void qla_tgt_exec_sess_work(struct qla_tgt *tgt,
 	uint8_t local_s_id[3];
 	int rc, loop_id = -1; /* to hide compiler warnings */
 
-	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14b, "qla_tgt_exec_sess_work() processing -> prm %p\n", prm);
-
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
 	if (tgt->tgt_stop)
-		goto send;
+		goto out_term;
 
-	switch (prm->type) {
-	case QLA_TGT_SESS_WORK_CMD:
-	{
-		struct qla_tgt_cmd *cmd = prm->cmd;
-		atio_from_isp_t *a = (atio_from_isp_t *)&cmd->atio;
-		if (IS_FWI2_CAPABLE(ha))
-			s_id = a->u.isp24.fcp_hdr.s_id;
-		else
-			loop_id = GET_TARGET_ID(ha, a);
-		break;
-	}
-	case QLA_TGT_SESS_WORK_ABORT:
-		if (IS_FWI2_CAPABLE(ha)) {
-			be_s_id = (prm->abts.fcp_hdr_le.s_id[0] << 16) |
-				(prm->abts.fcp_hdr_le.s_id[1] << 8) |
-				prm->abts.fcp_hdr_le.s_id[2];
+	if (IS_FWI2_CAPABLE(ha)) {
+		be_s_id = (prm->abts.fcp_hdr_le.s_id[0] << 16) |
+			(prm->abts.fcp_hdr_le.s_id[1] << 8) |
+			prm->abts.fcp_hdr_le.s_id[2];
 
-			sess = ha->tgt_ops->find_sess_by_s_id(vha,
-					(unsigned char *)&be_s_id);
-			if (!sess) {
-				s_id = local_s_id;
-				s_id[0] = prm->abts.fcp_hdr_le.s_id[2];
-				s_id[1] = prm->abts.fcp_hdr_le.s_id[1];
-				s_id[2] = prm->abts.fcp_hdr_le.s_id[0];
-			}
-			goto after_find;
-		} else
-			loop_id = GET_TARGET_ID(ha, (atio_from_isp_t *)&prm->tm_iocb);
-		break;
-	case QLA_TGT_SESS_WORK_TM:
-		if (IS_FWI2_CAPABLE(ha))
-			s_id = prm->tm_iocb2.u.isp24.fcp_hdr.s_id;
-		else
-			loop_id = GET_TARGET_ID(ha, (atio_from_isp_t *)&prm->tm_iocb);
-		break;
-	default:
-		BUG_ON(1);
-		break;
-	}
-
-	if (IS_FWI2_CAPABLE(ha))
-		sess = ha->tgt_ops->find_sess_by_s_id(vha, s_id);
-	else
+		sess = ha->tgt_ops->find_sess_by_s_id(vha,
+				(unsigned char *)&be_s_id);
+		if (!sess) {
+			s_id = local_s_id;
+			s_id[0] = prm->abts.fcp_hdr_le.s_id[2];
+			s_id[1] = prm->abts.fcp_hdr_le.s_id[1];
+			s_id[2] = prm->abts.fcp_hdr_le.s_id[0];
+		}
+	} else {
+		loop_id = GET_TARGET_ID(ha, (atio_from_isp_t *)&prm->tm_iocb);
 		sess = ha->tgt_ops->find_sess_by_loop_id(vha, loop_id);
+	}
 
-after_find:
-	if (sess != NULL) {
+	if (sess) {
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
 		qla_tgt_sess_get(sess);
 	} else {
@@ -4617,111 +4663,122 @@ after_find:
 
 		mutex_lock(&ha->tgt_mutex);
 		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		/* sess has got an extra creation ref */
 		mutex_unlock(&ha->tgt_mutex);
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
-		/* sess has got an extra creation ref */
+
+		if (!sess)
+			goto out_term;
 	}
 
-send:
-	if ((sess == NULL) || tgt->tgt_stop)
+	if (tgt->tgt_stop)
 		goto out_term;
 
-	switch (prm->type) {
-	case QLA_TGT_SESS_WORK_CMD:
-	{
-		struct qla_tgt_cmd *cmd = prm->cmd;
-		if (tgt->tm_to_unknown) {
-			/*
-			 * Cmd might be already aborted behind us, so be safe
-			 * and abort it. It should be OK, initiator will retry
-			 * it.
-			 */
-			goto out_term;
-		}
-		rc = qla_tgt_send_cmd_to_target(vha, cmd, sess);
-		break;
-	}
-	case QLA_TGT_SESS_WORK_ABORT:
-		if (IS_FWI2_CAPABLE(ha))
-			rc = __qla_tgt_24xx_handle_abts(vha, &prm->abts, sess);
-		else
-			rc = __qla_tgt_abort_task(vha, &prm->tm_iocb, sess);
-		break;
-	case QLA_TGT_SESS_WORK_TM:
-	{
-		uint32_t lun, unpacked_lun;
-		int lun_size, fn;
-		void *iocb;
-
-		if (IS_FWI2_CAPABLE(ha)) {
-			atio_from_isp_t *a = &prm->tm_iocb2;
-			iocb = a;
-			lun = a->u.isp24.fcp_cmnd.lun;
-			lun_size = sizeof(lun);
-			fn = a->u.isp24.fcp_cmnd.task_mgmt_flags;
-		} else {
-			imm_ntfy_from_isp_t *n = &prm->tm_iocb;
-			iocb = n;
-			/* make it be in network byte order */
-			lun = swab16(le16_to_cpu(n->u.isp2x.lun));
-			lun_size = sizeof(lun);
-			fn = n->u.isp2x.task_flags >> IMM_NTFY_TASK_MGMT_SHIFT;
-		}
-		unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
-
-		rc = qla_tgt_issue_task_mgmt(sess, unpacked_lun, fn, iocb, 0);
-		break;
-	}
-	default:
-		BUG_ON(1);
-		break;
-	}
-
+	if (IS_FWI2_CAPABLE(ha))
+		rc = __qla_tgt_24xx_handle_abts(vha, &prm->abts, sess);
+	else
+		rc = __qla_tgt_abort_task(vha, &prm->tm_iocb, sess);
 	if (rc != 0)
 		goto out_term;
 
-	if (sess != NULL)
+out:
+	if (sess)
 		qla_tgt_sess_put(sess);
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	return;
 
 out_term:
-	switch (prm->type) {
-	case QLA_TGT_SESS_WORK_CMD:
-	{
-		struct qla_tgt_cmd *cmd = prm->cmd;
-		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14d, "Terminating work cmd %p", cmd);
-		/*
-		 * cmd has not sent to target yet, so pass NULL as the second
-		 * argument
-		 */
-		qla_tgt_send_term_exchange(vha, NULL, &cmd->atio, 1);
+	if (IS_FWI2_CAPABLE(ha)) {
+		qla_tgt_24xx_send_abts_resp(vha, &prm->abts,
+			FCP_TMF_REJECTED, false);
+	} else {
+		qla_tgt_send_notify_ack(vha, (void *)&prm->tm_iocb,
+			0, 0, 0, 0, 0, 0);
 	}
-	case QLA_TGT_SESS_WORK_ABORT:
-		if (IS_FWI2_CAPABLE(ha))
-			qla_tgt_24xx_send_abts_resp(vha, &prm->abts,
-				FCP_TMF_REJECTED, false);
-		else
-			qla_tgt_send_notify_ack(vha, (void *)&prm->tm_iocb,
-				0, 0, 0, 0, 0, 0);
-		break;
-	case QLA_TGT_SESS_WORK_TM:
-		if (IS_FWI2_CAPABLE(ha))
-			qla_tgt_send_term_exchange(vha, NULL, &prm->tm_iocb2, 1);
-		else
-			qla_tgt_send_notify_ack(vha, &prm->tm_iocb,
-				0, 0, 0, 0, 0, 0);
-		break;
-	default:
-		BUG_ON(1);
-		break;
+
+	goto out;
+}
+
+static void qla_tgt_tmr_work(struct qla_tgt *tgt,
+	struct qla_tgt_sess_work_param *prm)
+{
+	struct scsi_qla_host *vha = tgt->vha;
+	struct qla_hw_data *ha = vha->hw;
+	struct qla_tgt_sess *sess = NULL;
+	unsigned long flags;
+	uint8_t *s_id = NULL; /* to hide compiler warnings */
+	int rc, loop_id = -1; /* to hide compiler warnings */
+	uint32_t lun, unpacked_lun;
+	int lun_size, fn;
+	void *iocb;
+
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+
+	if (tgt->tgt_stop)
+		goto out_term;
+
+	if (IS_FWI2_CAPABLE(ha)) {
+		s_id = prm->tm_iocb2.u.isp24.fcp_hdr.s_id;
+		sess = ha->tgt_ops->find_sess_by_s_id(vha, s_id);
+	} else {
+		loop_id = GET_TARGET_ID(ha, (atio_from_isp_t *)&prm->tm_iocb);
+		sess = ha->tgt_ops->find_sess_by_loop_id(vha, loop_id);
 	}
-	if (sess != NULL)
+
+	if (sess) {
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
+		qla_tgt_sess_get(sess);
+	} else {
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+		mutex_lock(&ha->tgt_mutex);
+		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		/* sess has got an extra creation ref */
+		mutex_unlock(&ha->tgt_mutex);
+
+		spin_lock_irqsave(&ha->hardware_lock, flags);
+		if (!sess)
+			goto out_term;
+	}
+
+
+	if (IS_FWI2_CAPABLE(ha)) {
+		atio_from_isp_t *a = &prm->tm_iocb2;
+		iocb = a;
+		lun = a->u.isp24.fcp_cmnd.lun;
+		lun_size = sizeof(lun);
+		fn = a->u.isp24.fcp_cmnd.task_mgmt_flags;
+	} else {
+		imm_ntfy_from_isp_t *n = &prm->tm_iocb;
+		iocb = n;
+		/* make it be in network byte order */
+		lun = swab16(le16_to_cpu(n->u.isp2x.lun));
+		lun_size = sizeof(lun);
+		fn = n->u.isp2x.task_flags >> IMM_NTFY_TASK_MGMT_SHIFT;
+	}
+	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
+
+	rc = qla_tgt_issue_task_mgmt(sess, unpacked_lun, fn, iocb, 0);
+	if (rc != 0)
+		goto out_term;
+
+out:
+	if (sess)
 		qla_tgt_sess_put(sess);
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	return;
+
+out_term:
+	if (IS_FWI2_CAPABLE(ha))
+		qla_tgt_send_term_exchange(vha, NULL, &prm->tm_iocb2, 1);
+	else
+		qla_tgt_send_notify_ack(vha, &prm->tm_iocb,
+			0, 0, 0, 0, 0, 0);
+
+	goto out;
 }
 
 static void qla_tgt_sess_work_fn(struct work_struct *work)
@@ -4747,7 +4804,20 @@ static void qla_tgt_sess_work_fn(struct work_struct *work)
 
 		spin_unlock_irqrestore(&tgt->sess_work_lock, flags);
 
-		qla_tgt_exec_sess_work(tgt, prm);
+		switch (prm->type) {
+		case QLA_TGT_SESS_WORK_CMD:
+			qla_tgt_exec_cmd_work(tgt, prm);
+			break;
+		case QLA_TGT_SESS_WORK_ABORT:
+			qla_tgt_abort_work(tgt, prm);
+			break;
+		case QLA_TGT_SESS_WORK_TM:
+			qla_tgt_tmr_work(tgt, prm);
+			break;
+		default:
+			BUG_ON(1);
+			break;
+		}
 
 		spin_lock_irqsave(&tgt->sess_work_lock, flags);
 
