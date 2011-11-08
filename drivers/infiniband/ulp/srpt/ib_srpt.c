@@ -2932,7 +2932,8 @@ static int srpt_perform_rdmas(struct srpt_rdma_ch *ch,
 				ioctx->ioctx.index);
 			msleep(1000);
 		}
-		while (ch->state != CH_RELEASING && !ioctx->rdma_aborted) {
+
+		while (ch->state != CH_DRAINING && !ioctx->rdma_aborted) {
 			printk(KERN_INFO "Waiting until RDMA abort finished [%d]",
 				ioctx->ioctx.index);
 			msleep(1000);
