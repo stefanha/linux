@@ -53,6 +53,7 @@ struct target_fabric_configfs *tcm_qla2xxx_fabric_configfs;
 struct target_fabric_configfs *tcm_qla2xxx_npiv_fabric_configfs;
 
 struct workqueue_struct *tcm_qla2xxx_free_wq;
+struct workqueue_struct *tcm_qla2xxx_cmd_wq;
 
 static int tcm_qla2xxx_setup_nacl_from_rport(
 	struct se_portal_group *se_tpg,
@@ -1221,7 +1222,7 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.tpg_alloc_fabric_acl		= tcm_qla2xxx_alloc_fabric_acl,
 	.tpg_release_fabric_acl		= tcm_qla2xxx_release_fabric_acl,
 	.tpg_get_inst_index		= tcm_qla2xxx_tpg_get_inst_index,
-	.new_cmd_map			= tcm_qla2xxx_new_cmd_map,
+	.new_cmd_map			= NULL,
 	.check_stop_free		= tcm_qla2xxx_check_stop_free,
 	.check_release_cmd		= tcm_qla2xxx_check_release_cmd,
 	.release_cmd			= tcm_qla2xxx_release_cmd,
@@ -1402,11 +1403,21 @@ static int tcm_qla2xxx_register_configfs(void)
 
 	tcm_qla2xxx_free_wq = alloc_workqueue("tcm_qla2xxx_free",
 						WQ_MEM_RECLAIM, 0);
-	if (!tcm_qla2xxx_free_wq)
+	if (!tcm_qla2xxx_free_wq) {
+		ret = -ENOMEM;
 		goto out_fabric_npiv;
+	}
+
+	tcm_qla2xxx_cmd_wq = alloc_workqueue("tcm_qla2xxx_cmd", 0, 0);
+	if (!tcm_qla2xxx_cmd_wq) {
+		ret = -ENOMEM;
+		goto out_free_wq;
+	}
 
 	return 0;
 
+out_free_wq:
+	destroy_workqueue(tcm_qla2xxx_free_wq);
 out_fabric_npiv:
 	target_fabric_configfs_deregister(tcm_qla2xxx_npiv_fabric_configfs);
 out_fabric:
@@ -1416,9 +1427,7 @@ out_fabric:
 
 static void tcm_qla2xxx_deregister_configfs(void)
 {
-	if (!tcm_qla2xxx_fabric_configfs)
-		return;
-
+	destroy_workqueue(tcm_qla2xxx_cmd_wq);
 	destroy_workqueue(tcm_qla2xxx_free_wq);
 
 	target_fabric_configfs_deregister(tcm_qla2xxx_fabric_configfs);

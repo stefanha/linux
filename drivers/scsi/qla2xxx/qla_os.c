@@ -4,9 +4,6 @@
  *
  * See LICENSE.qla2xxx for copyright and licensing details.
  */
-#include "qla_def.h"
-#include "qla_target.h"
-
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
@@ -14,11 +11,14 @@
 #include <linux/mutex.h>
 #include <linux/kobject.h>
 #include <linux/slab.h>
-
+#include <linux/workqueue.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsicam.h>
 #include <scsi/scsi_transport.h>
 #include <scsi/scsi_transport_fc.h>
+
+#include "qla_def.h"
+#include "qla_target.h"
 
 /*
  * Driver version

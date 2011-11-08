@@ -32,6 +32,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/list.h>
+#include <linux/workqueue.h>
 #include <asm/unaligned.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
@@ -116,9 +117,6 @@ static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess);
 static struct kmem_cache *qla_tgt_cmd_cachep;
 static struct kmem_cache *qla_tgt_mgmt_cmd_cachep;
 static mempool_t *qla_tgt_mgmt_cmd_mempool;
-
-static DECLARE_RWSEM(qla_tgt_unreg_rwsem);
-
 /*
  * From qla2xxx/qla_iobc.c and used by various qla_target.c logic
  */
@@ -3020,16 +3018,16 @@ static inline int qla_tgt_get_fcp_task_attr(uint8_t task_codes)
 
 /* ha->hardware_lock supposed to be held on entry */
 /* This functions sends the ISP 2xxx command to the tcm_qla2xxx target */
-static int qla_tgt_2xxx_send_cmd_to_tcm(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
+static int qla_tgt_2xxx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 {
 	atio_from_isp_t *atio = &cmd->atio;
 	uint32_t data_length;
 	int fcp_task_attr, data_dir, bidi = 0, ret;
-	uint16_t lun, unpacked_lun;
+	uint16_t lun;
 
 	/* make it be in network byte order */
 	lun = swab16(le16_to_cpu(atio->u.isp2x.lun));
-	unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
+	cmd->unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
 	cmd->tag = atio->u.isp2x.rx_id;
 
 	if ((atio->u.isp2x.execution_codes & (ATIO_EXEC_READ | ATIO_EXEC_WRITE)) ==
@@ -3048,24 +3046,21 @@ static int qla_tgt_2xxx_send_cmd_to_tcm(struct scsi_qla_host *vha, struct qla_tg
 
 	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe207, "qla_target: START q2x command: %p"
 		" lun: 0x%04x (tag %d)\n", cmd, lun, cmd->tag);
-	/*
-	 * Dispatch command to tcm_qla2xxx fabric module code
-	 */
-	ret = vha->hw->tgt_ops->handle_cmd(vha, cmd, unpacked_lun, data_length,
+	return vha->hw->tgt_ops->handle_cmd(vha, cmd, data_length,
 				fcp_task_attr, data_dir, bidi);
-	return ret;
 }
 
 /* ha->hardware_lock supposed to be held on entry */
 /* This function sends the ISP 24xx command to the tcm_qla2xxx target */
-static int qla_tgt_24xx_send_cmd_to_tcm(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
+static int qla_tgt_24xx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 {
 	atio_from_isp_t *atio = &cmd->atio;
-	uint32_t unpacked_lun, data_length;
+	uint32_t data_length;
 	int fcp_task_attr, data_dir, bidi = 0, ret;
 
 	cmd->tag = atio->u.isp24.exchange_addr;
-	unpacked_lun = scsilun_to_int((struct scsi_lun *)&atio->u.isp24.fcp_cmnd.lun);
+	cmd->unpacked_lun = scsilun_to_int(
+				(struct scsi_lun *)&atio->u.isp24.fcp_cmnd.lun);
 
 	if (atio->u.isp24.fcp_cmnd.rddata && atio->u.isp24.fcp_cmnd.wrdata) {
 		bidi = 1;
@@ -3082,13 +3077,10 @@ static int qla_tgt_24xx_send_cmd_to_tcm(struct scsi_qla_host *vha, struct qla_tg
 			&atio->u.isp24.fcp_cmnd.add_cdb[atio->u.isp24.fcp_cmnd.add_cdb_len]));
 
 	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe208, "qla_target: START q24 Command %p"
-		" unpacked_lun: 0x%08x (tag %d)\n", cmd, unpacked_lun, cmd->tag);
-	/*
-	 * Dispatch command to tcm_qla2xxx fabric module code
-	 */
-	ret = vha->hw->tgt_ops->handle_cmd(vha, cmd, unpacked_lun, data_length,
+		" unpacked_lun: 0x%08x (tag %d)\n", cmd, cmd->unpacked_lun, cmd->tag);
+
+	return vha->hw->tgt_ops->handle_cmd(vha, cmd, data_length,
 				fcp_task_attr, data_dir, bidi);
-	return ret;
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -3101,8 +3093,10 @@ static int qla_tgt_send_cmd_to_target(struct scsi_qla_host *vha,
 	cmd->loop_id = sess->loop_id;
 	cmd->conf_compl_supported = sess->conf_compl_supported;
 
-	return (IS_FWI2_CAPABLE(ha)) ? qla_tgt_24xx_send_cmd_to_tcm(vha, cmd) :
-			qla_tgt_2xxx_send_cmd_to_tcm(vha, cmd);
+	if (IS_FWI2_CAPABLE(ha))
+		return qla_tgt_24xx_send_cmd(vha, cmd);
+	else
+		return qla_tgt_2xxx_send_cmd(vha, cmd);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -4859,7 +4853,12 @@ int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 	INIT_LIST_HEAD(&tgt->srr_imm_list);
 	INIT_WORK(&tgt->srr_work, qla_tgt_handle_srr_work);
 	atomic_set(&tgt->tgt_global_resets_count, 0);
+	
+	tgt->qla_tgt_wq = alloc_workqueue("qla_tgt_wq", WQ_UNBOUND, 0);
+	if (!tgt->qla_tgt_wq)
+		return -ENOMEM;
 
+	printk("Setup tgt->qla_tgt_wq: %p for qla_hw_data: %p\n", tgt->qla_tgt_wq, ha);
 	ha->qla_tgt = tgt;
 
 	if (IS_FWI2_CAPABLE(ha)) {
@@ -4902,6 +4901,7 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, struct scsi_qla_host *vha)
 			"existing target", vha->vp_idx);
 		return 0;
 	}
+	destroy_workqueue(ha->qla_tgt->qla_tgt_wq);
 
 	ql_dbg(ql_dbg_tgt, vha, 0xe037, "Unregistering target for host %ld(%p)",
 			vha->host_no, ha);
@@ -5393,9 +5393,7 @@ static int __init qla_tgt_parse_ini_mode(void)
 
 int __init qla_tgt_init(void)
 {
-	qla_tgt_cmd_cachep = NULL;
-	qla_tgt_mgmt_cmd_cachep = NULL;
-	qla_tgt_mgmt_cmd_mempool = NULL;
+	int ret;
 
 	if (!qla_tgt_parse_ini_mode()) {
 		printk(KERN_ERR "qla_tgt_parse_ini_mode() failed\n");
@@ -5414,29 +5412,31 @@ int __init qla_tgt_init(void)
 		sizeof(struct qla_tgt_mgmt_cmd), __alignof__(struct qla_tgt_mgmt_cmd),
 			0, NULL);
 	if (!qla_tgt_mgmt_cmd_cachep) {
-		printk(KERN_ERR "kmem_cache_create for qla_tgt_mgmt_cmd_cachep failed\n");
-		kmem_cache_destroy(qla_tgt_cmd_cachep);
-		return -ENOMEM;
+		pr_warn(KERN_ERR "kmem_cache_create for qla_tgt_mgmt_cmd_cachep failed\n");
+		ret = -ENOMEM;
+		goto out;
 	}
 
 	qla_tgt_mgmt_cmd_mempool = mempool_create(25, mempool_alloc_slab,
 				mempool_free_slab, qla_tgt_mgmt_cmd_cachep);
 	if (!qla_tgt_mgmt_cmd_mempool) {
-		printk(KERN_ERR "mempool_create for qla_tgt_mgmt_cmd_mempool failed\n");
-		kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
-		kmem_cache_destroy(qla_tgt_cmd_cachep);
-		return -ENOMEM;
+		pr_warn(KERN_ERR "mempool_create for qla_tgt_mgmt_cmd_mempool failed\n");
+		ret = -ENOMEM;
+		goto out_mgmt_cmd_cachep;
 	}
 
 	return 0;
+
+out_mgmt_cmd_cachep:
+	kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
+out:
+	kmem_cache_destroy(qla_tgt_cmd_cachep);
+	return ret;
 }
 
 void __exit qla_tgt_exit(void)
 {
-	if (qla_tgt_mgmt_cmd_mempool != NULL)
-		mempool_destroy(qla_tgt_mgmt_cmd_mempool);
-	if (qla_tgt_mgmt_cmd_cachep != NULL)
-		kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
-	if (qla_tgt_cmd_cachep != NULL)
-		kmem_cache_destroy(qla_tgt_cmd_cachep);
+	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
+	kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
+	kmem_cache_destroy(qla_tgt_cmd_cachep);
 }

@@ -720,7 +720,7 @@ struct qla_tgt_sess;
  */
 struct qla_tgt_func_tmpl {
 
-	int (*handle_cmd)(struct scsi_qla_host *, struct qla_tgt_cmd *, uint32_t,
+	int (*handle_cmd)(struct scsi_qla_host *, struct qla_tgt_cmd *,
 			uint32_t, int, int, int);
 	int (*handle_data)(struct qla_tgt_cmd *);
 	int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
@@ -869,6 +869,7 @@ struct qla_tgt {
 	spinlock_t sess_work_lock;
 	struct list_head sess_works_list;
 	struct work_struct sess_work;
+	struct workqueue_struct *qla_tgt_wq;
 
 	imm_ntfy_from_isp_t link_reinit_iocb;
 	wait_queue_head_t waitQ;
@@ -921,6 +922,7 @@ struct qla_tgt_cmd {
 	atomic_t cmd_free;
 	struct completion cmd_stop_free_comp;
 	struct se_cmd se_cmd;
+	struct work_struct free_work;
 	struct work_struct work;
 	/* Sense buffer that will be mapped into outgoing status */
 	unsigned char sense_buffer[TRANSPORT_SENSE_BUFFER];
@@ -937,6 +939,7 @@ struct qla_tgt_cmd {
 	int bufflen;		/* cmd buffer length */
 	int offset;
 	uint32_t tag;
+	uint32_t unpacked_lun;
 	dma_addr_t *srr_dma_buffer; /* Used for SRR offsets with pci_map_page() */
 	enum dma_data_direction dma_data_direction;
 

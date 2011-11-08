@@ -40,7 +40,7 @@ extern void tcm_qla2xxx_set_default_node_attrs(struct se_node_acl *);
 extern u32 tcm_qla2xxx_get_task_tag(struct se_cmd *);
 extern int tcm_qla2xxx_get_cmd_state(struct se_cmd *);
 extern int tcm_qla2xxx_handle_cmd(struct scsi_qla_host *, struct qla_tgt_cmd *,
-                        uint32_t, uint32_t, int, int, int);
+                        uint32_t, int, int, int);
 extern int tcm_qla2xxx_new_cmd_map(struct se_cmd *);
 extern int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *);
 extern int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);

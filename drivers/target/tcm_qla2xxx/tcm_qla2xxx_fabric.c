@@ -53,6 +53,7 @@
 #include "tcm_qla2xxx_fabric.h"
 
 extern struct workqueue_struct *tcm_qla2xxx_free_wq;
+extern struct workqueue_struct *tcm_qla2xxx_cmd_wq;
 
 int tcm_qla2xxx_check_true(struct se_portal_group *se_tpg)
 {
@@ -665,13 +666,15 @@ int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
 	return 0;
 }
 
+static void tcm_qla2xxx_do_work(struct work_struct *);
+
 /*
  * Main entry point for incoming ATIO packets from qla_target.c
  * and qla2xxx LLD code.  Called with qla_hw_data->hardware_lock held
  */
 int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
-			uint32_t lun, uint32_t data_length,
-			int fcp_task_attr, int data_dir, int bidi)
+			uint32_t data_length, int fcp_task_attr,
+			int data_dir, int bidi)
 {
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	struct se_session *se_sess;
@@ -706,49 +709,47 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	 */
 	if (bidi)
 		se_cmd->t_tasks_bidi = 1;
-	/*
-	 * Locate the struct se_lun pointer and attach it to struct se_cmd
-	 */
-	if (transport_lookup_cmd_lun(se_cmd, lun) < 0) {
-		/*
-		 * Clear qla_tgt_cmd->locked_rsp as ha->hardware_lock
-		 * is already held here, and we'll end up calling back
-		 * into ->queue_status (tcm_qla2xxx_queue_status())
-		 * and hence qla_tgt_xmit_response().
-		 */
-		cmd->locked_rsp = 0;
 
-		/* NON_EXISTENT_LUN */
-		transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
-		return 0;
-	}
-	/*
-	 * Queue up the newly allocated to be processed in TCM thread context.
-	 */
-	transport_generic_handle_cdb_map(se_cmd);
+	INIT_WORK(&cmd->work, tcm_qla2xxx_do_work);
+	queue_work(cmd->tgt->qla_tgt_wq, &cmd->work);
 	return 0;
 }
 
-int tcm_qla2xxx_new_cmd_map(struct se_cmd *se_cmd)
+void tcm_qla2xxx_do_work(struct work_struct *work)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
+	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
 	scsi_qla_host_t *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	unsigned char *cdb;
 	atio_from_isp_t *atio = &cmd->atio;
+	int rc;
 
 	if (IS_FWI2_CAPABLE(ha))
 		cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
 	else
 		cdb = &atio->u.isp2x.cdb[0];
+	/*
+ 	 * Locate se_lun pointer and attach it to struct se_cmd
+ 	 */
+	if (transport_lookup_cmd_lun(se_cmd, cmd->unpacked_lun) < 0) {
+		transport_send_check_condition_and_sense(se_cmd,
+			se_cmd->scsi_sense_reason, 0);
+		return;
+	}
 
 	/*
 	 * Allocate the necessary tasks to complete the received CDB+data
 	 * drivers/target/target_core_transport.c:transport_processing_thread()
 	 * falls through to TRANSPORT_NEW_CMD.
 	 */
-	return transport_generic_allocate_tasks(se_cmd, cdb);
+	rc = transport_generic_allocate_tasks(se_cmd, cdb);
+	if (rc != 0) {
+		transport_send_check_condition_and_sense(se_cmd,
+				se_cmd->scsi_sense_reason, 0);
+		return;
+	}
+	transport_handle_cdb_direct(se_cmd);
 }
 
 /*
