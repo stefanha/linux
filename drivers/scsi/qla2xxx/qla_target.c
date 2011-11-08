@@ -2568,28 +2568,20 @@ EXPORT_SYMBOL(qla_tgt_rdy_to_xfer);
 
 /* If hardware_lock held on entry, might drop it, then reaquire */
 /* This function sends the appropriate CTIO to ISP 2xxx or 24xx */
-static void qla_tgt_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
-	atio_from_isp_t *atio, int ha_locked)
+static int __qla_tgt_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
+	atio_from_isp_t *atio)
 {
 	struct qla_hw_data *ha = vha->hw;
 	request_t *pkt;
-	unsigned long flags = 0; /* to stop compiler's warning */
-	int do_tgt_cmd_done = 0;
+	int ret = 0;
 
 	ql_dbg(ql_dbg_tgt, vha, 0xe01c, "Sending TERM EXCH CTIO (ha=%p)\n", ha);
-
-	/* Send marker if required */
-	if (qla_tgt_issue_marker(vha, ha_locked) != QLA_SUCCESS)
-		return;
-
-	if (!ha_locked)
-		spin_lock_irqsave(&ha->hardware_lock, flags);
 
 	pkt = (request_t *)qla2x00_req_pkt(vha);
 	if (pkt == NULL) {
 		printk(KERN_ERR "qla_target(%d): %s failed: unable to allocate "
 			"request packet\n", vha->vp_idx, __func__);
-		goto out_unlock;
+		return -ENOMEM;
 	}
 
 	if (cmd != NULL) {
@@ -2598,7 +2590,7 @@ static void qla_tgt_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt
 				"incorrect state %d\n", vha->vp_idx, cmd,
 				cmd->state);
 		} else
-			do_tgt_cmd_done = 1;
+			ret = 1;
 	}
 
 	pkt->entry_count = 1;
@@ -2644,16 +2636,31 @@ static void qla_tgt_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt
 	}
 
 	qla2x00_isp_cmd(vha, vha->req);
+	return ret;
+}
 
-out_unlock:
-	if (!ha_locked)
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+static void qla_tgt_send_term_exchange(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd,
+        atio_from_isp_t *atio, int ha_locked)
+{
+	unsigned long flags;
+	int rc;
 
-	if (do_tgt_cmd_done) {
+	if (qla_tgt_issue_marker(vha, ha_locked) < 0)
+		return;
+
+	if (ha_locked) {
+		rc = __qla_tgt_send_term_exchange(vha, cmd, atio);
+		goto done;
+	}
+	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
+	rc = __qla_tgt_send_term_exchange(vha, cmd, atio);
+	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
+done:
+	if (rc == 1) {
 		if (!ha_locked && !in_interrupt())
 			msleep(250); /* just in case */
 
-		ha->tgt_ops->free_cmd(cmd);
+		vha->hw->tgt_ops->free_cmd(cmd);
 	}
 }
 
@@ -4593,7 +4600,6 @@ static void qla_tgt_exec_cmd_work(struct work_struct *work)
 	if (rc != 0)
 		goto out_term;
 
-out:
 	if (sess)
 		qla_tgt_sess_put(sess);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -4606,7 +4612,9 @@ out_term:
 	 * argument
 	 */
 	qla_tgt_send_term_exchange(vha, NULL, &cmd->atio, 1);
-	goto out;
+	if (sess)
+		qla_tgt_sess_put(sess);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
 
@@ -4672,7 +4680,6 @@ static void qla_tgt_abort_work(struct qla_tgt *tgt,
 	if (rc != 0)
 		goto out_term;
 
-out:
 	if (sess)
 		qla_tgt_sess_put(sess);
 
@@ -4688,7 +4695,10 @@ out_term:
 			0, 0, 0, 0, 0, 0);
 	}
 
-	goto out;
+	if (sess)
+		 qla_tgt_sess_put(sess);
+
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
 static void qla_tgt_tmr_work(struct qla_tgt *tgt,
@@ -4754,10 +4764,8 @@ static void qla_tgt_tmr_work(struct qla_tgt *tgt,
 	if (rc != 0)
 		goto out_term;
 
-out:
 	if (sess)
 		qla_tgt_sess_put(sess);
-
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	return;
 
@@ -4767,8 +4775,9 @@ out_term:
 	else
 		qla_tgt_send_notify_ack(vha, &prm->tm_iocb,
 			0, 0, 0, 0, 0, 0);
-
-	goto out;
+	if (sess)
+		qla_tgt_sess_put(sess);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
 static void qla_tgt_sess_work_fn(struct work_struct *work)
