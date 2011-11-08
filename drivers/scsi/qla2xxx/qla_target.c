@@ -2010,15 +2010,13 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 
 	if (unlikely(cmd->aborted)) {
-		int unlocked_term = (cmd->locked_rsp == 0);
-
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe118, "qla_target(%d): terminating exchange "
 			"for aborted cmd=%p (se_cmd=%p, tag=%d)",
 			vha->vp_idx, cmd, se_cmd, cmd->tag);
 
 		cmd->state = QLA_TGT_STATE_ABORTED;
 
-		qla_tgt_send_term_exchange(vha, cmd, &cmd->atio, unlocked_term);
+		qla_tgt_send_term_exchange(vha, cmd, &cmd->atio, 0);
 
 		/* !! At this point cmd could be already freed !! */
 		return QLA_TGT_PRE_XMIT_RESP_CMD_ABORTED;
@@ -2163,8 +2161,7 @@ static int __qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 		return res;
 	}
 
-	if (cmd->locked_rsp)
-		spin_lock_irqsave(&ha->hardware_lock, flags);
+	spin_lock_irqsave(&ha->hardware_lock, flags);
 
 	/* Does F/W have an IOCBs for this request */
 	res = qla_tgt_check_reserve_free_req(vha, full_req_cnt);
@@ -2223,16 +2220,14 @@ static int __qla_tgt_2xxx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 			" %p scsi_status: 0x%02x\n", pkt, scsi_status);
 
 	qla2x00_isp_cmd(vha, vha->req);
-	if (cmd->locked_rsp)
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return 0;
 
 out_unmap_unlock:
 	if (cmd->sg_mapped)
 		qla_tgt_unmap_sg(vha, cmd);
-	if (cmd->locked_rsp)
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return res;
 }
@@ -2417,8 +2412,7 @@ static int __qla_tgt_24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 		return res;
 	}
 
-	if (cmd->locked_rsp)
-		spin_lock_irqsave(&ha->hardware_lock, flags);
+	spin_lock_irqsave(&ha->hardware_lock, flags);
 
         /* Does F/W have an IOCBs for this request */
 	res = qla_tgt_check_reserve_free_req(vha, full_req_cnt);
@@ -2487,16 +2481,14 @@ static int __qla_tgt_24xx_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 			" %p scsi_status: 0x%02x\n", pkt, scsi_status);
 
 	qla2x00_isp_cmd(vha, vha->req);
-	if (cmd->locked_rsp)
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return 0;
 
 out_unmap_unlock:
 	if (cmd->sg_mapped)
 		qla_tgt_unmap_sg(vha, cmd);
-	if (cmd->locked_rsp)
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return res;
 }
@@ -3029,7 +3021,7 @@ static int qla_tgt_2xxx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *
 {
 	atio_from_isp_t *atio = &cmd->atio;
 	uint32_t data_length;
-	int fcp_task_attr, data_dir, bidi = 0, ret;
+	int fcp_task_attr, data_dir, bidi = 0;
 	uint16_t lun;
 
 	/* make it be in network byte order */
@@ -3063,7 +3055,7 @@ static int qla_tgt_24xx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *
 {
 	atio_from_isp_t *atio = &cmd->atio;
 	uint32_t data_length;
-	int fcp_task_attr, data_dir, bidi = 0, ret;
+	int fcp_task_attr, data_dir, bidi = 0;
 
 	cmd->tag = atio->u.isp24.exchange_addr;
 	cmd->unpacked_lun = scsilun_to_int(
@@ -3134,7 +3126,6 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 
 	memcpy(&cmd->atio, atio, sizeof(*atio));
 	cmd->state = QLA_TGT_STATE_NEW;
-	cmd->locked_rsp = 1;
 	cmd->tgt = ha->qla_tgt;
 	cmd->vha = vha;
 

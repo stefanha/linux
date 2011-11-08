@@ -478,13 +478,6 @@ int tcm_qla2xxx_check_release_cmd(struct se_cmd *se_cmd)
 
 	ha = sess->vha->hw;
 	/*
-	 * Check if qla_hw_data->hardware_lock is already held from an
-	 * exception path..  This also skips the possible wait for
-	 * completion on cmd_stop_free_comp below..
-	 */
-	if (!cmd->locked_rsp)
-		return target_put_sess_cmd(sess->se_sess, se_cmd);
-	/*
 	 * If the callback to tcm_qla2xxx_check_stop_free() has not finished,
 	 * before the release path is invoked, go ahead and wait on
 	 * cmd_stop_free_comp until tcm_qla2xxx_check_stop_free completes.
@@ -752,6 +745,16 @@ void tcm_qla2xxx_do_work(struct work_struct *work)
 	transport_handle_cdb_direct(se_cmd);
 }
 
+void tcm_qla2xxx_do_rsp(struct work_struct *work)
+{
+	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
+	/*
+	 * Dispatch ->queue_status from workqueue process context
+	 */
+	transport_send_check_condition_and_sense(&cmd->se_cmd,
+				cmd->se_cmd.scsi_sense_reason, 0);
+}
+
 /*
  * Called from qla_target.c:qla_tgt_do_ctio_completion()
  */
@@ -776,10 +779,10 @@ int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 		}
 		spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
 
-		cmd->locked_rsp = 0;		
-
-		return transport_send_check_condition_and_sense(&cmd->se_cmd,
-				TCM_CHECK_CONDITION_ABORT_CMD, 0);
+		se_cmd->scsi_sense_reason = TCM_CHECK_CONDITION_ABORT_CMD;
+		INIT_WORK(&cmd->work, tcm_qla2xxx_do_rsp);
+		queue_work(cmd->tgt->qla_tgt_wq, &cmd->work);
+		return 0;
 	}
 	/*
 	 * We now tell TCM to queue this WRITE CDB with TRANSPORT_PROCESS_WRITE
