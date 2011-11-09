@@ -870,7 +870,6 @@ struct qla_tgt {
 	spinlock_t sess_work_lock;
 	struct list_head sess_works_list;
 	struct work_struct sess_work;
-	struct workqueue_struct *qla_tgt_wq;
 
 	imm_ntfy_from_isp_t link_reinit_iocb;
 	wait_queue_head_t waitQ;

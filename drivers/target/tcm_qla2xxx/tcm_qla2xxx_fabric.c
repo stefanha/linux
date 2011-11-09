@@ -771,7 +771,7 @@ int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 
 		se_cmd->scsi_sense_reason = TCM_CHECK_CONDITION_ABORT_CMD;
 		INIT_WORK(&cmd->work, tcm_qla2xxx_do_rsp);
-		queue_work(cmd->tgt->qla_tgt_wq, &cmd->work);
+		queue_work(tcm_qla2xxx_free_wq, &cmd->work);
 		return 0;
 	}
 	/*

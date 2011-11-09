@@ -117,6 +117,7 @@ static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess);
 static struct kmem_cache *qla_tgt_cmd_cachep;
 static struct kmem_cache *qla_tgt_mgmt_cmd_cachep;
 static mempool_t *qla_tgt_mgmt_cmd_mempool;
+static struct workqueue_struct *qla_tgt_wq;
 /*
  * From qla2xxx/qla_iobc.c and used by various qla_target.c logic
  */
@@ -3119,7 +3120,7 @@ static int qla_tgt_send_cmd_to_target(struct scsi_qla_host *vha,
 
 	if (!ret) {
 		INIT_WORK(&cmd->work, qla_tgt_do_work);
-		queue_work(cmd->tgt->qla_tgt_wq, &cmd->work);
+		queue_work(qla_tgt_wq, &cmd->work);
 	}
 	return ret;
 }
@@ -4880,11 +4881,6 @@ int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 	INIT_WORK(&tgt->srr_work, qla_tgt_handle_srr_work);
 	atomic_set(&tgt->tgt_global_resets_count, 0);
 	
-	tgt->qla_tgt_wq = alloc_workqueue("qla_tgt_wq", WQ_UNBOUND, 1);
-	if (!tgt->qla_tgt_wq)
-		return -ENOMEM;
-
-	printk("Setup tgt->qla_tgt_wq: %p for qla_hw_data: %p\n", tgt->qla_tgt_wq, ha);
 	ha->qla_tgt = tgt;
 
 	if (IS_FWI2_CAPABLE(ha)) {
@@ -4927,7 +4923,6 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, struct scsi_qla_host *vha)
 			"existing target", vha->vp_idx);
 		return 0;
 	}
-	destroy_workqueue(ha->qla_tgt->qla_tgt_wq);
 
 	ql_dbg(ql_dbg_tgt, vha, 0xe037, "Unregistering target for host %ld(%p)",
 			vha->host_no, ha);
@@ -5451,8 +5446,17 @@ int __init qla_tgt_init(void)
 		goto out_mgmt_cmd_cachep;
 	}
 
+	qla_tgt_wq = alloc_workqueue("qla_tgt_wq", 0, 0);
+	if (!qla_tgt_wq) {
+		pr_warn(KERN_ERR "alloc_workqueue for qla_tgt_wq failed\n");
+		ret = -ENOMEM;
+		goto out_cmd_mempool;
+	}
+
 	return 0;
 
+out_cmd_mempool:
+	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
 out_mgmt_cmd_cachep:
 	kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
 out:
@@ -5462,6 +5466,7 @@ out:
 
 void __exit qla_tgt_exit(void)
 {
+	destroy_workqueue(qla_tgt_wq);
 	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
 	kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
 	kmem_cache_destroy(qla_tgt_cmd_cachep);
