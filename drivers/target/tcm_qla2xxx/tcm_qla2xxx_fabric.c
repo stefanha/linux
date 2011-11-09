@@ -401,7 +401,7 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 {
 	barrier();
 	/*
-	 * Handle tcm_qla2xxx_handle_cmd() -> transport_get_lun_for_cmd()
+	 * Handle tcm_qla2xxx_init_cmd() -> transport_get_lun_for_cmd()
 	 * failure case where cmd->se_cmd.se_dev was not assigned, and
 	 * a call to transport_generic_free_cmd_intr() is not possible..
 	 */
@@ -659,13 +659,12 @@ int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
 	return 0;
 }
 
-static void tcm_qla2xxx_do_work(struct work_struct *);
-
 /*
  * Main entry point for incoming ATIO packets from qla_target.c
- * and qla2xxx LLD code.  Called with qla_hw_data->hardware_lock held
+ * and qla2xxx LLD code.  Called with qla_hw_data->hardware_lock to
+ * setup qla_tgt_cmd->se_cmd
  */
-int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
+int tcm_qla2xxx_init_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 			uint32_t data_length, int fcp_task_attr,
 			int data_dir, int bidi)
 {
@@ -703,25 +702,16 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	if (bidi)
 		se_cmd->t_tasks_bidi = 1;
 
-	INIT_WORK(&cmd->work, tcm_qla2xxx_do_work);
-	queue_work(cmd->tgt->qla_tgt_wq, &cmd->work);
 	return 0;
 }
 
-void tcm_qla2xxx_do_work(struct work_struct *work)
+/*
+ * Called from process context in qla_target.c:qla_tgt_do_work() code
+ */
+void tcm_qla2xxx_handle_cmd(struct qla_tgt_cmd *cmd, unsigned char *cdb)
 {
-	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
 	struct se_cmd *se_cmd = &cmd->se_cmd;
-	scsi_qla_host_t *vha = cmd->vha;
-	struct qla_hw_data *ha = vha->hw;
-	unsigned char *cdb;
-	atio_from_isp_t *atio = &cmd->atio;
 	int rc;
-
-	if (IS_FWI2_CAPABLE(ha))
-		cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
-	else
-		cdb = &atio->u.isp2x.cdb[0];
 	/*
  	 * Locate se_lun pointer and attach it to struct se_cmd
  	 */

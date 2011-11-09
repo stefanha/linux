@@ -851,6 +851,7 @@ static int tcm_qla2xxx_check_initiator_node_acl(
  * Calls into tcm_qla2xxx used by qla2xxx LLD I/O path.
  */
 static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
+	.init_cmd		= tcm_qla2xxx_init_cmd,
 	.handle_cmd		= tcm_qla2xxx_handle_cmd,
 	.handle_data		= tcm_qla2xxx_handle_data,
 	.handle_tmr		= tcm_qla2xxx_handle_tmr,

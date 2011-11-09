@@ -3017,7 +3017,7 @@ static inline int qla_tgt_get_fcp_task_attr(uint8_t task_codes)
 
 /* ha->hardware_lock supposed to be held on entry */
 /* This functions sends the ISP 2xxx command to the tcm_qla2xxx target */
-static int qla_tgt_2xxx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
+static int qla_tgt_2xxx_init_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 {
 	atio_from_isp_t *atio = &cmd->atio;
 	uint32_t data_length;
@@ -3045,13 +3045,13 @@ static int qla_tgt_2xxx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *
 
 	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe207, "qla_target: START q2x command: %p"
 		" lun: 0x%04x (tag %d)\n", cmd, lun, cmd->tag);
-	return vha->hw->tgt_ops->handle_cmd(vha, cmd, data_length,
+	return vha->hw->tgt_ops->init_cmd(vha, cmd, data_length,
 				fcp_task_attr, data_dir, bidi);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
 /* This function sends the ISP 24xx command to the tcm_qla2xxx target */
-static int qla_tgt_24xx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
+static int qla_tgt_24xx_init_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 {
 	atio_from_isp_t *atio = &cmd->atio;
 	uint32_t data_length;
@@ -3078,8 +3078,27 @@ static int qla_tgt_24xx_send_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *
 	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe208, "qla_target: START q24 Command %p"
 		" unpacked_lun: 0x%08x (tag %d)\n", cmd, cmd->unpacked_lun, cmd->tag);
 
-	return vha->hw->tgt_ops->handle_cmd(vha, cmd, data_length,
+	return vha->hw->tgt_ops->init_cmd(vha, cmd, data_length,
 				fcp_task_attr, data_dir, bidi);
+}
+
+/*
+ * Process context for I/O path into tcm_qla2xxx code
+ */
+static void qla_tgt_do_work(struct work_struct *work)
+{
+	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
+	scsi_qla_host_t *vha = cmd->vha;
+	struct qla_hw_data *ha = vha->hw;
+	unsigned char *cdb;
+	atio_from_isp_t *atio = &cmd->atio;
+
+	if (IS_FWI2_CAPABLE(ha))
+		cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
+	else
+		cdb = &atio->u.isp2x.cdb[0];
+
+	vha->hw->tgt_ops->handle_cmd(cmd, cdb);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -3087,15 +3106,22 @@ static int qla_tgt_send_cmd_to_target(struct scsi_qla_host *vha,
 	struct qla_tgt_cmd *cmd, struct qla_tgt_sess *sess)
 {
 	struct qla_hw_data *ha = vha->hw;
+	int ret = 0;
 
 	cmd->sess = sess;
 	cmd->loop_id = sess->loop_id;
 	cmd->conf_compl_supported = sess->conf_compl_supported;
 
 	if (IS_FWI2_CAPABLE(ha))
-		return qla_tgt_24xx_send_cmd(vha, cmd);
+		ret = qla_tgt_24xx_init_cmd(vha, cmd);
 	else
-		return qla_tgt_2xxx_send_cmd(vha, cmd);
+		ret = qla_tgt_2xxx_init_cmd(vha, cmd);
+
+	if (!ret) {
+		INIT_WORK(&cmd->work, qla_tgt_do_work);
+		queue_work(cmd->tgt->qla_tgt_wq, &cmd->work);
+	}
+	return ret;
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -4854,7 +4880,7 @@ int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 	INIT_WORK(&tgt->srr_work, qla_tgt_handle_srr_work);
 	atomic_set(&tgt->tgt_global_resets_count, 0);
 	
-	tgt->qla_tgt_wq = alloc_workqueue("qla_tgt_wq", WQ_UNBOUND, 0);
+	tgt->qla_tgt_wq = alloc_workqueue("qla_tgt_wq", WQ_UNBOUND, 1);
 	if (!tgt->qla_tgt_wq)
 		return -ENOMEM;
 
