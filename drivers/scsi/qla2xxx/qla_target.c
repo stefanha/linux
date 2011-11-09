@@ -118,6 +118,8 @@ static struct kmem_cache *qla_tgt_cmd_cachep;
 static struct kmem_cache *qla_tgt_mgmt_cmd_cachep;
 static mempool_t *qla_tgt_mgmt_cmd_mempool;
 static struct workqueue_struct *qla_tgt_wq;
+static DEFINE_MUTEX(qla_tgt_mutex);
+static LIST_HEAD(qla_tgt_glist);
 /*
  * From qla2xxx/qla_iobc.c and used by various qla_target.c logic
  */
@@ -4912,6 +4914,10 @@ int qla_tgt_add_target(struct qla_hw_data *ha, struct scsi_qla_host *base_vha)
 		}
 	}
 
+	mutex_lock(&qla_tgt_mutex);
+	list_add_tail(&tgt->tgt_list_entry, &qla_tgt_glist);
+	mutex_unlock(&qla_tgt_mutex);
+
 	return 0;
 }
 
@@ -4924,12 +4930,123 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, struct scsi_qla_host *vha)
 		return 0;
 	}
 
+	mutex_lock(&qla_tgt_mutex);
+	list_del(&ha->qla_tgt->tgt_list_entry);
+	mutex_unlock(&qla_tgt_mutex);
+
 	ql_dbg(ql_dbg_tgt, vha, 0xe037, "Unregistering target for host %ld(%p)",
 			vha->host_no, ha);
 	qla_tgt_release(ha->qla_tgt);
 
 	return 0;
 }
+
+/** qla_tgt_lport_register() - Register lport with external module
+ *
+ * @qla_tgt_ops: Pointer for tcm_qla2xxx qla_tgt_ops
+ * @wwpn: Passwd FC target WWPN
+ * @callback:  lport initialization callback for tcm_qla2xxx code
+ * @target_lport_ptr: pointer for tcm_qla2xxx specific lport data
+ */
+int qla_tgt_lport_register(struct qla_tgt_func_tmpl *qla_tgt_ops, u64 wwpn,
+                       int (*callback)(struct scsi_qla_host *),
+                       void *target_lport_ptr)
+{
+	struct qla_tgt *tgt;
+	struct scsi_qla_host *vha;
+	struct qla_hw_data *ha;
+	struct Scsi_Host *host;
+	unsigned long flags;
+	int i, rc;
+	u8 b[8];
+
+	mutex_lock(&qla_tgt_mutex);
+	list_for_each_entry(tgt, &qla_tgt_glist, tgt_list_entry) {
+		vha = tgt->vha;
+		ha = vha->hw;
+
+		host = vha->host;
+		if (!host)
+			continue;
+
+		if (ha->tgt_ops != NULL)
+			continue;
+
+		if (!(host->hostt->supported_mode & MODE_TARGET))
+			continue;
+
+		spin_lock_irqsave(&ha->hardware_lock, flags);
+		if (host->active_mode & MODE_TARGET) {
+			pr_debug("MODE_TARGET already active on qla2xxx"
+					"(%d)\n",  host->host_no);
+			spin_unlock_irqrestore(&ha->hardware_lock, flags);
+			continue;
+		}
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+		if (!scsi_host_get(host)) {
+			pr_err("Unable to scsi_host_get() for"
+					" qla2xxx scsi_host\n");
+			continue;
+		}
+
+		pr_debug("qla2xxx HW vha->node_name: ");
+		for (i = 0; i < 8; i++)
+			pr_debug("%02x ", vha->node_name[i]);
+		pr_debug("\n");
+		pr_debug("qla2xxx HW vha->port_name: ");
+		for (i = 0; i < 8; i++)
+			pr_debug("%02x ", vha->port_name[i]);
+		pr_debug("\n");
+
+		pr_debug("qla2xxx passed configfs WWPN: ");
+		put_unaligned_be64(wwpn, b);
+		for (i = 0; i < 8; i++)
+			pr_debug("%02x ", b[i]);
+		pr_debug("\n");
+
+		if (memcmp(vha->port_name, b, 8)) {
+			scsi_host_put(host);
+			continue;
+		}
+		/*
+		 * Setup passed parameters ahead of invoking callback
+		 */
+		ha->tgt_ops = qla_tgt_ops;
+		ha->target_lport_ptr = target_lport_ptr;
+		rc = (*callback)(vha);
+		if (rc != 0) {
+			ha->tgt_ops = NULL;
+			ha->target_lport_ptr = NULL;
+		}
+		mutex_unlock(&qla_tgt_mutex);
+		return rc;
+	}
+	mutex_unlock(&qla_tgt_mutex);
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL(qla_tgt_lport_register);
+
+/** qla_tgt_lport_deregister - Degister lport
+ *
+ * @vha:  Registered scsi_qla_host pointer
+ */
+void qla_tgt_lport_deregister(struct scsi_qla_host *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	struct Scsi_Host *sh = vha->host;
+	/*
+	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
+	 */
+	ha->target_lport_ptr = NULL;
+	ha->tgt_ops = NULL;
+	/*
+	 * Release the Scsi_Host reference for the underlying qla2xxx host
+	 */
+	scsi_host_put(sh);
+}
+EXPORT_SYMBOL(qla_tgt_lport_deregister);
 
 /* Must be called under HW lock */
 void qla_tgt_set_mode(struct scsi_qla_host *vha)

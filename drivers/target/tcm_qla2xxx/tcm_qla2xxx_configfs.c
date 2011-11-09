@@ -862,13 +862,8 @@ static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.find_sess_by_loop_id	= tcm_qla2xxx_find_sess_by_loop_id,
 };
 
-static int tcm_qla2xxx_init_lport(
-	struct tcm_qla2xxx_lport *lport,
-	struct scsi_qla_host *vha,
-	struct scsi_qla_host *npiv_vp)
+static int tcm_qla2xxx_init_lport(struct tcm_qla2xxx_lport *lport)
 {
-	struct qla_hw_data *ha = vha->hw;
-
 	lport->lport_fcport_map = vmalloc(
 			sizeof(struct tcm_qla2xxx_fc_domain) * 256);
 	if (!lport->lport_fcport_map) {
@@ -894,18 +889,20 @@ static int tcm_qla2xxx_init_lport(
 			* 65536);
 	pr_debug("qla2xxx: Allocated lport_loopid_map of %lu bytes\n",
 			sizeof(struct tcm_qla2xxx_fc_loopid) * 65536);
-	/*
-	 * Setup local pointer to vha, NPIV VP pointer (if present) and
-	 * vha->tcm_lport pointer
-	 */
-	lport->qla_vha = vha;
-	lport->qla_npiv_vp = npiv_vp;
-	/*
-	 * Setup the target_lport_ptr and qla2x_tmpl.
-	 */
-	ha->target_lport_ptr = lport;
-	ha->tgt_ops = &tcm_qla2xxx_template;
+	return 0;
+}
 
+static int tcm_qla2xxx_lport_register_cb(struct scsi_qla_host *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	struct tcm_qla2xxx_lport *lport;
+	/*
+ 	 * Setup local pointer to vha, NPIV VP pointer (if present) and
+ 	 * vha->tcm_lport pointer
+ 	 */
+	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
+	lport->qla_vha = vha;
+	
 	return 0;
 }
 
@@ -915,14 +912,8 @@ static struct se_wwn *tcm_qla2xxx_make_lport(
 	const char *name)
 {
 	struct tcm_qla2xxx_lport *lport;
-	struct Scsi_Host *host = NULL;
-	struct pci_dev *dev = NULL;
-	struct scsi_qla_host *vha;
-	struct qla_hw_data *ha;
-	unsigned long flags;
 	u64 wwpn;
-	int i, ret = -ENODEV;
-	u8 b[8];
+	int ret = -ENODEV;
 
 	if (tcm_qla2xxx_parse_wwn(name, &wwpn, 1) < 0)
 		return ERR_PTR(-EINVAL);
@@ -935,67 +926,19 @@ static struct se_wwn *tcm_qla2xxx_make_lport(
 	lport->lport_wwpn = wwpn;
 	tcm_qla2xxx_format_wwn(&lport->lport_name[0], TCM_QLA2XXX_NAMELEN, wwpn);
 
-	while ((dev = pci_get_device(PCI_VENDOR_ID_QLOGIC, PCI_ANY_ID,
-					dev)) != NULL) {
-
-		vha = pci_get_drvdata(dev);
-		if (!vha)
-			continue;
-		ha = vha->hw;
-		if (!ha)
-			continue;
-		host = vha->host;
-		if (!host)
-			continue;
-
-		if (!(host->hostt->supported_mode & MODE_TARGET))
-			continue;
-
-		spin_lock_irqsave(&ha->hardware_lock, flags);
-		if (host->active_mode & MODE_TARGET) {
-			pr_debug("MODE_TARGET already active on qla2xxx"
-					"(%d)\n",  host->host_no);
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			continue;
-		}
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-		if (!scsi_host_get(host)) {
-			pr_err("Unable to scsi_host_get() for"
-				" qla2xxx scsi_host\n");
-			ret = -EINVAL;
-			goto out;
-		}
-
-		pr_debug("qla2xxx HW vha->node_name: ");
-		for (i = 0; i < 8; i++)
-			pr_debug("%02x ", vha->node_name[i]);
-		pr_debug("\n");
-
-		pr_debug("qla2xxx HW vha->port_name: ");
-		for (i = 0; i < 8; i++)
-			pr_debug("%02x ", vha->port_name[i]);
-		pr_debug("\n");
-
-		pr_debug("qla2xxx passed configfs WWPN: ");
-		put_unaligned_be64(wwpn, b);
-		for (i = 0; i < 8; i++)
-			pr_debug("%02x ", b[i]);
-		pr_debug("\n");
-
-		if (memcmp(vha->port_name, b, 8)) {
-			scsi_host_put(host);
-			continue;
-		}
-		pr_debug("qla2xxx: Found matching HW WWPN: %s for lport\n", name);
-		ret = tcm_qla2xxx_init_lport(lport, vha, NULL);
-		break;
-	}
-
+	ret = tcm_qla2xxx_init_lport(lport);
 	if (ret != 0)
 		goto out;
 
+	ret = qla_tgt_lport_register(&tcm_qla2xxx_template, wwpn,
+				tcm_qla2xxx_lport_register_cb, lport);
+	if (ret != 0)
+		goto out_lport;
+
 	return &lport->lport_wwn;
+out_lport:
+	vfree(lport->lport_loopid_map);
+	vfree(lport->lport_fcport_map);
 out:
 	kfree(lport);
 	return ERR_PTR(ret);
@@ -1007,7 +950,6 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 			struct tcm_qla2xxx_lport, lport_wwn);
 	struct scsi_qla_host *vha = lport->qla_vha;
 	struct qla_hw_data *ha = vha->hw;
-	struct Scsi_Host *sh = vha->host;
 	/*
 	 * Call into qla2x_target.c LLD logic to complete the
 	 * shutdown of struct qla_tgt after the call to
@@ -1015,15 +957,8 @@ static void tcm_qla2xxx_drop_lport(struct se_wwn *wwn)
 	 */
 	if (ha->qla_tgt && !ha->qla_tgt->tgt_stopped)
 		qla_tgt_stop_phase2(ha->qla_tgt);
-	/*
-	 * Clear the target_lport_ptr qla_target_template pointer in qla_hw_data
-	 */
-	ha->target_lport_ptr = NULL;
-	ha->tgt_ops = NULL;
-	/*
-	 * Release the Scsi_Host reference for the underlying qla2xxx host
-	 */
-	scsi_host_put(sh);
+
+	qla_tgt_lport_deregister(vha);
 
 	vfree(lport->lport_loopid_map);
 	vfree(lport->lport_fcport_map);
@@ -1130,7 +1065,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 
 			pr_debug("qla2xxx_npiv: Found matching NPIV WWPN+WWNN: %s "
 					" for lport\n", name);
-			tcm_qla2xxx_init_lport(lport, vha, npiv_vp);
+			tcm_qla2xxx_init_lport(lport);
 			/*
 			 * Setup fc_vport_identifiers for NPIV containing
 			 * the passed WWPN and WWNN for the new libfc vport.

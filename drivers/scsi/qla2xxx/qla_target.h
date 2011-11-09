@@ -1023,6 +1023,9 @@ void qla_tgt_disable_vha(struct scsi_qla_host *);
  */
 extern int qla_tgt_add_target(struct qla_hw_data *, struct scsi_qla_host *);
 extern int qla_tgt_remove_target(struct qla_hw_data *, struct scsi_qla_host *);
+extern int qla_tgt_lport_register(struct qla_tgt_func_tmpl *, u64,
+			int (*callback)(struct scsi_qla_host *), void *);
+extern void  qla_tgt_lport_deregister(struct scsi_qla_host *);
 extern void qla_tgt_fc_port_added(struct scsi_qla_host *, fc_port_t *);
 extern void qla_tgt_fc_port_deleted(struct scsi_qla_host *, fc_port_t *);
 extern void qla_tgt_set_mode(struct scsi_qla_host *ha);
