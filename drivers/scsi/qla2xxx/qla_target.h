@@ -722,7 +722,7 @@ struct qla_tgt_func_tmpl {
 
 	int (*init_cmd)(struct scsi_qla_host *, struct qla_tgt_cmd *,
 			uint32_t, int, int, int);
-	int (*handle_cmd)(struct qla_tgt_cmd *, unsigned char *);
+	void (*handle_cmd)(struct qla_tgt_cmd *, unsigned char *);
 	int (*handle_data)(struct qla_tgt_cmd *);
 	int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
 	void (*free_cmd)(struct qla_tgt_cmd *);
