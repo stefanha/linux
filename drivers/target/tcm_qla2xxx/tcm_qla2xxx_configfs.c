@@ -971,16 +971,8 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 	const char *name)
 {
 	struct tcm_qla2xxx_lport *lport;
-	struct Scsi_Host *host = NULL;
-	struct pci_dev *dev = NULL;
-	struct scsi_qla_host *vha, *npiv_vp;
-	struct qla_hw_data *ha;
-	struct fc_vport_identifiers vid;
-	struct fc_vport *vport;
-	unsigned long flags;
 	u64 npiv_wwpn, npiv_wwnn;
-	int i, ret = -ENODEV;
-	u8 b[8], b2[8];
+	int ret;
 
 	if (tcm_qla2xxx_npiv_parse_wwn(name, strlen(name)+1,
 				&npiv_wwpn, &npiv_wwnn) < 0)
