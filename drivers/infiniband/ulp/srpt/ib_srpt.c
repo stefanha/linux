@@ -3144,9 +3144,6 @@ static struct srpt_port *__srpt_lookup_port(const char *name)
 
 	list_for_each_entry(sdev, &srpt_dev_list, list) {
 		dev = sdev->device;
-		if (!dev)
-			continue;
-
 		for (i = 0; i < dev->phys_port_cnt; i++) {
 			sport = &sdev->port[i];
 
