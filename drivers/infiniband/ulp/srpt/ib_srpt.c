@@ -298,7 +298,7 @@ static void srpt_get_iou(struct ib_dm_mad *mad)
 }
 
 /**
- * srpt_get_ioc() - Write IOControllerprofile to a management datagram.
+ * srpt_get_ioc() - Write IOControllerProfile to a management datagram.
  *
  * See also section 16.3.3.4 IOControllerProfile in the InfiniBand
  * Architecture Specification. See also section B.7, table B.7 in the SRP
@@ -1162,7 +1162,7 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	dma_len = sg_dma_len(&sg[0]);
 	dma_addr = sg_dma_address(&sg[0]);
 
-	/* this second loop is really mapped sg_addres to rdma_iu->ib_sge */
+	/* this second loop is really mapped sg_address to rdma_iu->ib_sge */
 	for (i = 0, j = 0;
 	     j < count && i < ioctx->n_rbuf && tsize > 0; ++i, ++riu, ++db) {
 		rsize = be32_to_cpu(db->len);
@@ -2566,7 +2566,7 @@ static int srpt_cm_req_recv(struct ib_cm_id *cm_id,
 		goto destroy_ib;
 	}
 	/*
-	 * Use the initator port identifier as the session name.
+	 * Use the initiator port identifier as the session name.
 	 */
 	snprintf(ch->sess_name, sizeof(ch->sess_name), "0x%016llx%016llx",
 			be64_to_cpu(*(__be64 *)ch->i_port_id),
@@ -3170,7 +3170,7 @@ static struct srpt_port *srpt_lookup_port(const char *name)
 }
 
 /**
- * srpt_add_one() - Infiniband device addition callback function.
+ * srpt_add_one() - InfiniBand device addition callback function.
  */
 static void srpt_add_one(struct ib_device *device)
 {
@@ -3440,7 +3440,7 @@ static struct se_node_acl *srpt_alloc_fabric_acl(struct se_portal_group *se_tpg)
 
 	nacl = kzalloc(sizeof(struct srpt_node_acl), GFP_KERNEL);
 	if (!nacl) {
-		printk(KERN_ERR "Unable to alocate struct srpt_node_acl\n");
+		printk(KERN_ERR "Unable to allocate struct srpt_node_acl\n");
 		return NULL;
 	}
 
