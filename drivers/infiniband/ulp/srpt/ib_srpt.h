@@ -138,14 +138,16 @@ enum srpt_opcode {
 	SRPT_RDMA_WRITE_LAST,
 };
 
-static inline u64 encode_wr_id(u8 opcode, u32 idx)
+static inline u64 encode_wr_id(enum srpt_opcode opcode, u32 idx)
 {
 	return ((u64)opcode << 32) | idx;
 }
+
 static inline enum srpt_opcode opcode_from_wr_id(u64 wr_id)
 {
 	return wr_id >> 32;
 }
+
 static inline u32 idx_from_wr_id(u64 wr_id)
 {
 	return (u32)wr_id;
