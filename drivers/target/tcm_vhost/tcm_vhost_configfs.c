@@ -483,7 +483,7 @@ static void tcm_vhost_drop_tport(struct se_wwn *wwn)
 
 	pr_debug("TCM_VHost_ConfigFS: Deallocating emulated Target"
 		" %s Address: %s\n", tcm_vhost_dump_proto_id(tport),
-		config_item_name(&wwn->wwn_group.cg_item));
+		tport->tport_name);;
 
 	kfree(tport);
 }
