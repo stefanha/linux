@@ -3151,7 +3151,6 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 	}
 
 	INIT_LIST_HEAD(&cmd->cmd_list);
-	init_completion(&cmd->cmd_stop_free_comp);
 
 	memcpy(&cmd->atio, atio, sizeof(*atio));
 	cmd->state = QLA_TGT_STATE_NEW;

@@ -406,20 +406,13 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 	 * a call to transport_generic_free_cmd_intr() is not possible..
 	 */
 	if (!cmd->se_cmd.se_dev) {
-		atomic_set(&cmd->cmd_stop_free, 1);
-		atomic_set(&cmd->cmd_free, 1);
-		smp_mb__after_atomic_dec();
+		target_put_sess_cmd(cmd->se_cmd.se_sess, &cmd->se_cmd);	
 		transport_generic_free_cmd(&cmd->se_cmd, 0);
 		return;
 	}
 
-	if (!atomic_read(&cmd->se_cmd.t_transport_complete)) {
-		atomic_set(&cmd->cmd_stop_free, 1);
-		smp_mb__after_atomic_dec();
-	}
-
-	atomic_set(&cmd->cmd_free, 1);
-	smp_mb__after_atomic_dec();
+	if (!atomic_read(&cmd->se_cmd.t_transport_complete))
+		target_put_sess_cmd(cmd->se_cmd.se_sess, &cmd->se_cmd);
 
 	INIT_WORK(&cmd->work, tcm_qla2xxx_complete_free);
 	queue_work(tcm_qla2xxx_free_wq, &cmd->work);
@@ -430,13 +423,9 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
  */
 int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 {
-	struct qla_tgt_cmd *cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
-	struct qla_tgt_mgmt_cmd *mcmd;
-	struct qla_hw_data *ha;
-	unsigned long flags;
-
 	if (se_cmd->se_tmr_req) {
-		mcmd = container_of(se_cmd, struct qla_tgt_mgmt_cmd, se_cmd);
+		struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
+				struct qla_tgt_mgmt_cmd, se_cmd);
 		/*
 		 * Release the associated se_cmd->se_tmr_req and se_cmd
 		 * TMR related state now.
@@ -445,55 +434,7 @@ int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 		qla_tgt_free_mcmd(mcmd);
 		return 1;
 	}
-	ha = cmd->sess->vha->hw;
-	/*
- 	 * Set cmd_stop_free and wakeup cmd_stop_free_comp if necessary
- 	 * if tcm_qla2xxx_release_cmd() context is waiting for completion.
- 	 */
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	atomic_set(&cmd->cmd_stop_free, 1);
-	if (atomic_read(&cmd->cmd_free) != 0)
-		complete(&cmd->cmd_stop_free_comp);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	return 0;
-}
-
-int tcm_qla2xxx_check_release_cmd(struct se_cmd *se_cmd)
-{
-	struct qla_tgt_cmd *cmd;
-	struct qla_tgt_sess *sess;
-	struct qla_hw_data *ha;
-	unsigned long flags;
-	int ret = 0;
-
-	if (se_cmd->se_tmr_req != NULL)
-		return 0;
-
-	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
-	sess = cmd->sess;
-
-	if (!sess)
-		BUG();
-
-	ha = sess->vha->hw;
-	/*
-	 * If the callback to tcm_qla2xxx_check_stop_free() has not finished,
-	 * before the release path is invoked, go ahead and wait on
-	 * cmd_stop_free_comp until tcm_qla2xxx_check_stop_free completes.
-	 */
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	if (atomic_read(&cmd->cmd_stop_free) != 1) {
-		pr_warn("Detected cmd->cmd_stop_free != 0, waiting on"
-			" cmd_stop_free_comp for cmd: %p\n", cmd);
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-		wait_for_completion(&cmd->cmd_stop_free_comp);
-		spin_lock_irqsave(&ha->hardware_lock, flags);
-	}
-	ret = target_put_sess_cmd(sess->se_sess, se_cmd);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	return ret;
+	return target_put_sess_cmd(se_cmd->se_sess, se_cmd);
 }
 
 /* tcm_qla2xxx_release_cmd - Callback from TCM Core to release underlying fabric descriptor

@@ -917,9 +917,6 @@ struct qla_tgt_sess {
 struct qla_tgt_cmd {
 	struct qla_tgt_sess *sess;
 	int state;
-	atomic_t cmd_stop_free;
-	atomic_t cmd_free;
-	struct completion cmd_stop_free_comp;
 	struct se_cmd se_cmd;
 	struct work_struct free_work;
 	struct work_struct work;

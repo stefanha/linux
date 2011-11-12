@@ -1051,7 +1051,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.tpg_get_inst_index		= tcm_qla2xxx_tpg_get_inst_index,
 	.new_cmd_map			= NULL,
 	.check_stop_free		= tcm_qla2xxx_check_stop_free,
-	.check_release_cmd		= tcm_qla2xxx_check_release_cmd,
 	.release_cmd			= tcm_qla2xxx_release_cmd,
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,
