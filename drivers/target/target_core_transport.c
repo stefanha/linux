@@ -2574,7 +2574,8 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->t_task_lba = transport_lba_32(cdb);
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
 		break;
 	case WRITE_12:
@@ -2583,7 +2584,8 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->t_task_lba = transport_lba_32(cdb);
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
 		break;
 	case WRITE_16:
@@ -2592,7 +2594,8 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->t_task_lba = transport_lba_64(cdb);
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
 		break;
 	case XDWRITEREAD_10:
@@ -2616,7 +2619,8 @@ static int transport_generic_cmd_sequencer(
 		 * Setup BIDI XOR callback to be run after I/O completion.
 		 */
 		cmd->transport_complete_callback = &transport_xor_callback;
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		break;
 	case VARIABLE_LENGTH_CMD:
 		service_action = get_unaligned_be16(&cdb[8]);
@@ -2644,7 +2648,8 @@ static int transport_generic_cmd_sequencer(
 			 * completion.
 			 */
 			cmd->transport_complete_callback = &transport_xor_callback;
-			cmd->t_tasks_fua = (cdb[10] & 0x8);
+			if (cdb[1] & 0x8)
+				cmd->se_cmd_flags |= SCF_FUA;
 			break;
 		case WRITE_SAME_32:
 			sectors = transport_get_sectors_32(cdb, cmd, &sector_ret);
