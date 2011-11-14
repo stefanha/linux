@@ -151,13 +151,9 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 				data_direction, sam_task_attr,
 				&tv_cmd->tvc_sense_buf[0]);
 
-#warning FIXME: vhost_scsi_allocate_cmd() BIDI operation
-#if 0
-	/*
-	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
-	 */
+#if 0	/* FIXME: vhost_scsi_allocate_cmd() BIDI operation */
 	if (bidi)
-		T_TASK(se_cmd)->t_tasks_bidi = 1;
+		se_cmd->se_cmd_flags |= SCF_BIDI;
 #endif
 	/*
 	 * From here the rest of the se_cmd will be setup and dispatched

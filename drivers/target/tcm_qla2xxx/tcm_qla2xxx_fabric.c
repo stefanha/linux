@@ -588,7 +588,7 @@ u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
  */
 static enum dma_data_direction tcm_qla2xxx_mapping_dir(struct se_cmd *se_cmd)
 {
-	if (se_cmd->t_tasks_bidi)
+	if (se_cmd->se_cmd_flags & SCF_BIDI)
 		return DMA_BIDIRECTIONAL;
 
 	switch (se_cmd->data_direction) {
@@ -696,12 +696,9 @@ int tcm_qla2xxx_init_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
  	 * Protected by qla_hw_data->hardware_lock
  	 */
 	target_get_sess_cmd(se_sess, se_cmd);
-	/*
-	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
-	 */
-	if (bidi)
-		se_cmd->t_tasks_bidi = 1;
 
+	if (bidi)
+		se_cmd->se_cmd_flags |= SCF_BIDI;
 	return 0;
 }
 
