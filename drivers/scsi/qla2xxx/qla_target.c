@@ -4940,7 +4940,28 @@ int qla_tgt_remove_target(struct qla_hw_data *ha, struct scsi_qla_host *vha)
 	return 0;
 }
 
-/** qla_tgt_lport_register() - Register lport with external module
+static void qla_tgt_lport_dump(struct scsi_qla_host *vha, u64 wwpn, unsigned char *b)
+{
+	int i;
+
+	pr_debug("qla2xxx HW vha->node_name: ");
+	for (i = 0; i < 8; i++)
+		pr_debug("%02x ", vha->node_name[i]);
+	pr_debug("\n");
+	pr_debug("qla2xxx HW vha->port_name: ");
+	for (i = 0; i < 8; i++)
+		pr_debug("%02x ", vha->port_name[i]);
+	pr_debug("\n");
+
+	pr_debug("qla2xxx passed configfs WWPN: ");
+	put_unaligned_be64(wwpn, b);
+	for (i = 0; i < 8; i++)
+		pr_debug("%02x ", b[i]);
+	pr_debug("\n");
+}
+
+/**
+ * qla_tgt_lport_register - register lport with external module
  *
  * @qla_tgt_ops: Pointer for tcm_qla2xxx qla_tgt_ops
  * @wwpn: Passwd FC target WWPN
@@ -4956,7 +4977,7 @@ int qla_tgt_lport_register(struct qla_tgt_func_tmpl *qla_tgt_ops, u64 wwpn,
 	struct qla_hw_data *ha;
 	struct Scsi_Host *host;
 	unsigned long flags;
-	int i, rc;
+	int rc;
 	u8 b[8];
 
 	mutex_lock(&qla_tgt_mutex);
@@ -4988,21 +5009,7 @@ int qla_tgt_lport_register(struct qla_tgt_func_tmpl *qla_tgt_ops, u64 wwpn,
 					" qla2xxx scsi_host\n");
 			continue;
 		}
-
-		pr_debug("qla2xxx HW vha->node_name: ");
-		for (i = 0; i < 8; i++)
-			pr_debug("%02x ", vha->node_name[i]);
-		pr_debug("\n");
-		pr_debug("qla2xxx HW vha->port_name: ");
-		for (i = 0; i < 8; i++)
-			pr_debug("%02x ", vha->port_name[i]);
-		pr_debug("\n");
-
-		pr_debug("qla2xxx passed configfs WWPN: ");
-		put_unaligned_be64(wwpn, b);
-		for (i = 0; i < 8; i++)
-			pr_debug("%02x ", b[i]);
-		pr_debug("\n");
+		qla_tgt_lport_dump(vha, wwpn, b);
 
 		if (memcmp(vha->port_name, b, 8)) {
 			scsi_host_put(host);
@@ -5027,7 +5034,8 @@ int qla_tgt_lport_register(struct qla_tgt_func_tmpl *qla_tgt_ops, u64 wwpn,
 }
 EXPORT_SYMBOL(qla_tgt_lport_register);
 
-/** qla_tgt_lport_deregister - Degister lport
+/**
+ * qla_tgt_lport_deregister - Degister lport
  *
  * @vha:  Registered scsi_qla_host pointer
  */

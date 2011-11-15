@@ -989,7 +989,7 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 	tcm_qla2xxx_npiv_format_wwn(&lport->lport_npiv_name[0],
 			TCM_QLA2XXX_NAMELEN, npiv_wwpn, npiv_wwnn);
 
-#warning FIXME: tcm_qla2xxx_npiv_make_lport
+/* FIXME: tcm_qla2xxx_npiv_make_lport */
 	ret = -ENOSYS;
 	if (ret != 0)
 		goto out;
