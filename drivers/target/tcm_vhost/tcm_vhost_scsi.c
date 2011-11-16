@@ -26,8 +26,7 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_tcq.h>
 #include <target/target_core_base.h>
-#include <target/target_core_device.h>
-#include <target/target_core_transport.h>
+#include <target/target_core_fabric.h>
 
 #include "tcm_vhost_base.h"
 #include "tcm_vhost_scsi.h"
