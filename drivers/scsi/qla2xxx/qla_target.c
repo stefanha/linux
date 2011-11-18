@@ -106,9 +106,6 @@ static void qla_tgt_send_term_exchange(struct scsi_qla_host *ha, struct qla_tgt_
 	atio_from_isp_t *atio, int ha_locked);
 static void qla_tgt_reject_free_srr_imm(struct scsi_qla_host *ha, struct qla_tgt_srr_imm *imm,
 	int ha_lock);
-static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset);
-static void qla_tgt_clear_tgt_db(struct qla_tgt *tgt, bool local_only);
-static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess);
 /*
  * Global Variables
  */
@@ -513,38 +510,37 @@ static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 }
 
 /* ha->hardware_lock supposed to be held on entry */
-static void qla_tgt_schedule_sess_for_deletion(struct qla_tgt_sess *sess)
+static void qla_tgt_schedule_sess_for_deletion(struct qla_tgt_sess *sess, bool immediate)
 {
 	struct qla_tgt *tgt = sess->tgt;
 	uint32_t dev_loss_tmo = tgt->ha->port_down_retry_count + 5;
-	bool schedule;
 
 	if (sess->deleted)
 		return;
-	/*
-	 * If the list is empty, then, most likely, the work isn't
-	 * scheduled.
-	 */
-	schedule = list_empty(&tgt->del_sess_list);
 
 	ql_dbg(ql_dbg_tgt, sess->vha, 0xe004, "Scheduling sess %p for"
 		" deletion (schedule %d)", sess, schedule);
 	list_add_tail(&sess->del_list_entry, &tgt->del_sess_list);
 	sess->deleted = 1;
+
+	if (immediate)
+		dev_loss_tmo = 0;
+
 	sess->expires = jiffies + dev_loss_tmo * HZ;
 
 	printk(KERN_INFO "qla_target(%d): session for port %02x:%02x:%02x:"
 		"%02x:%02x:%02x:%02x:%02x (loop ID %d) scheduled for "
-		"deletion in %d secs\n", sess->vha->vp_idx,
+		"deletion in %u secs (expires: %lu) immed: %d\n", sess->vha->vp_idx,
 		sess->port_name[0], sess->port_name[1],
 		sess->port_name[2], sess->port_name[3],
 		sess->port_name[4], sess->port_name[5],
 		sess->port_name[6], sess->port_name[7],
-		sess->loop_id, dev_loss_tmo);
+		sess->loop_id, dev_loss_tmo, sess->expires, immediate);
 
-	if (schedule)
-		schedule_delayed_work(&tgt->sess_del_work,
-				jiffies - sess->expires);
+	if (immediate)
+		schedule_delayed_work(&tgt->sess_del_work, 0);
+	else
+		schedule_delayed_work(&tgt->sess_del_work, jiffies - sess->expires);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -552,16 +548,8 @@ static void qla_tgt_clear_tgt_db(struct qla_tgt *tgt, bool local_only)
 {
 	struct qla_tgt_sess *sess;
 
-	while (!list_empty(&tgt->sess_list)) {
-		sess = list_first_entry(&tgt->sess_list, struct qla_tgt_sess,
-					sess_list_entry);
-		if (local_only) {
-			if (!sess->local)
-				continue;
-			qla_tgt_schedule_sess_for_deletion(sess);
-		} else
-			qla_tgt_sess_put(sess);
-	}
+	list_for_each_entry(sess, &tgt->sess_list, sess_list_entry)
+		qla_tgt_schedule_sess_for_deletion(sess, true);
 
 	/* At this point tgt could be already dead */
 }
@@ -1008,7 +996,7 @@ void qla_tgt_fc_port_deleted(struct scsi_qla_host *vha, fc_port_t *fcport)
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe10b, "qla_tgt_fc_port_deleted %p", sess);
 
 	sess->local = 1;
-	qla_tgt_schedule_sess_for_deletion(sess);
+	qla_tgt_schedule_sess_for_deletion(sess, false);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
@@ -1052,10 +1040,11 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 	mutex_lock(&ha->tgt_mutex);
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	tgt->tgt_stop = 1;
+	qla_tgt_clear_tgt_db(tgt, true);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	mutex_unlock(&ha->tgt_mutex);
 
-	cancel_delayed_work_sync(&tgt->sess_del_work);
+	flush_delayed_work_sync(&tgt->sess_del_work);
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe10c, "Waiting for sess works (tgt %p)", tgt);
 	spin_lock_irqsave(&tgt->sess_work_lock, flags);
@@ -1065,12 +1054,6 @@ void qla_tgt_stop_phase1(struct qla_tgt *tgt)
 		spin_lock_irqsave(&tgt->sess_work_lock, flags);
 	}
 	spin_unlock_irqrestore(&tgt->sess_work_lock, flags);
-
-	mutex_lock(&ha->tgt_mutex);
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	qla_tgt_clear_tgt_db(tgt, false);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-	mutex_unlock(&ha->tgt_mutex);
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe10d, "Waiting for tgt %p: list_empty(sess_list)=%d "
 		"sess_count=%d\n", tgt, list_empty(&tgt->sess_list),
