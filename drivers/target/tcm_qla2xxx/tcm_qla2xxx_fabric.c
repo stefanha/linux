@@ -601,18 +601,17 @@ int tcm_qla2xxx_get_cmd_state(struct se_cmd *se_cmd)
 }
 
 /*
- * Main entry point for incoming ATIO packets from qla_target.c
- * and qla2xxx LLD code.  Called with qla_hw_data->hardware_lock to
- * setup qla_tgt_cmd->se_cmd
+ * Called from process context in qla_target.c:qla_tgt_do_work() code
  */
-int tcm_qla2xxx_init_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
-			uint32_t data_length, int fcp_task_attr,
+int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
+			unsigned char *cdb, uint32_t data_length, int fcp_task_attr,
 			int data_dir, int bidi)
 {
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	struct se_session *se_sess;
 	struct se_portal_group *se_tpg;
 	struct qla_tgt_sess *sess;
+	int rc;
 
 	sess = cmd->sess;
 	if (!sess) {
@@ -642,24 +641,13 @@ int tcm_qla2xxx_init_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	 */
 	if (bidi)
 		se_cmd->t_tasks_bidi = 1;
-
-	return 0;
-}
-
-/*
- * Called from process context in qla_target.c:qla_tgt_do_work() code
- */
-void tcm_qla2xxx_handle_cmd(struct qla_tgt_cmd *cmd, unsigned char *cdb)
-{
-	struct se_cmd *se_cmd = &cmd->se_cmd;
-	int rc;
 	/*
  	 * Locate se_lun pointer and attach it to struct se_cmd
  	 */
 	if (transport_lookup_cmd_lun(se_cmd, cmd->unpacked_lun) < 0) {
 		transport_send_check_condition_and_sense(se_cmd,
 			se_cmd->scsi_sense_reason, 0);
-		return;
+		return 0;
 	}
 
 	/*
@@ -671,9 +659,10 @@ void tcm_qla2xxx_handle_cmd(struct qla_tgt_cmd *cmd, unsigned char *cdb)
 	if (rc != 0) {
 		transport_send_check_condition_and_sense(se_cmd,
 				se_cmd->scsi_sense_reason, 0);
-		return;
+		return 0;
 	}
 	transport_handle_cdb_direct(se_cmd);
+	return 0;
 }
 
 void tcm_qla2xxx_do_rsp(struct work_struct *work)

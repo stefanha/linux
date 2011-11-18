@@ -81,8 +81,6 @@ enum fcp_resp_rsp_codes {
 #define FCP_PRI_SHIFT       3   /* priority field starts in bit 3 */
 #define FCP_PRI_RESVD_MASK  0x80        /* reserved bits in priority field */
 
-static void qla_tgt_exec_cmd_work(struct work_struct *work);
-
 /*
  * This driver calls qla2x00_req_pkt() and qla2x00_issue_marker(), which
  * must be called under HW lock and could unlock/lock it inside.
@@ -3023,73 +3021,8 @@ static inline int qla_tgt_get_fcp_task_attr(uint8_t task_codes)
 	return fcp_task_attr;
 }
 
-/* ha->hardware_lock supposed to be held on entry */
-/* This functions sends the ISP 2xxx command to the tcm_qla2xxx target */
-static int qla_tgt_2xxx_init_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
-{
-	atio_from_isp_t *atio = &cmd->atio;
-	uint32_t data_length;
-	int fcp_task_attr, data_dir, bidi = 0;
-	uint16_t lun;
-
-	/* make it be in network byte order */
-	lun = swab16(le16_to_cpu(atio->u.isp2x.lun));
-	cmd->unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
-	cmd->tag = atio->u.isp2x.rx_id;
-
-	if ((atio->u.isp2x.execution_codes & (ATIO_EXEC_READ | ATIO_EXEC_WRITE)) ==
-				(ATIO_EXEC_READ | ATIO_EXEC_WRITE)) {
-		bidi = 1;
-		data_dir = DMA_TO_DEVICE;
-	} else if (atio->u.isp2x.execution_codes & ATIO_EXEC_READ)
-		data_dir = DMA_FROM_DEVICE;
-	else if (atio->u.isp2x.execution_codes & ATIO_EXEC_WRITE)
-		data_dir = DMA_TO_DEVICE;
-	else
-		data_dir = DMA_NONE;
-
-	fcp_task_attr = qla_tgt_get_fcp_task_attr(atio->u.isp2x.task_codes);
-	data_length = le32_to_cpu(atio->u.isp2x.data_length);
-
-	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe207, "qla_target: START q2x command: %p"
-		" lun: 0x%04x (tag %d)\n", cmd, lun, cmd->tag);
-	return vha->hw->tgt_ops->init_cmd(vha, cmd, data_length,
-				fcp_task_attr, data_dir, bidi);
-}
-
-/* ha->hardware_lock supposed to be held on entry */
-/* This function sends the ISP 24xx command to the tcm_qla2xxx target */
-static int qla_tgt_24xx_init_cmd(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
-{
-	atio_from_isp_t *atio = &cmd->atio;
-	uint32_t data_length;
-	int fcp_task_attr, data_dir, bidi = 0;
-
-	cmd->tag = atio->u.isp24.exchange_addr;
-	cmd->unpacked_lun = scsilun_to_int(
-				(struct scsi_lun *)&atio->u.isp24.fcp_cmnd.lun);
-
-	if (atio->u.isp24.fcp_cmnd.rddata && atio->u.isp24.fcp_cmnd.wrdata) {
-		bidi = 1;
-		data_dir = DMA_TO_DEVICE;
-	} else if (atio->u.isp24.fcp_cmnd.rddata)
-		data_dir = DMA_FROM_DEVICE;
-	else if (atio->u.isp24.fcp_cmnd.wrdata)
-		data_dir = DMA_TO_DEVICE;
-	else
-		data_dir = DMA_NONE;
-
-	fcp_task_attr = qla_tgt_get_fcp_task_attr(atio->u.isp24.fcp_cmnd.task_attr);
-	data_length = be32_to_cpu(get_unaligned((uint32_t *)
-			&atio->u.isp24.fcp_cmnd.add_cdb[atio->u.isp24.fcp_cmnd.add_cdb_len]));
-
-	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe208, "qla_target: START q24 Command %p"
-		" unpacked_lun: 0x%08x (tag %d)\n", cmd, cmd->unpacked_lun, cmd->tag);
-
-	return vha->hw->tgt_ops->init_cmd(vha, cmd, data_length,
-				fcp_task_attr, data_dir, bidi);
-}
-
+static struct qla_tgt_sess *qla_tgt_make_local_sess(struct scsi_qla_host *,
+					uint8_t *, uint16_t);
 /*
  * Process context for I/O path into tcm_qla2xxx code
  */
@@ -3098,38 +3031,112 @@ static void qla_tgt_do_work(struct work_struct *work)
 	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
 	scsi_qla_host_t *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
-	unsigned char *cdb;
+	struct qla_tgt *tgt = ha->qla_tgt;
+	struct qla_tgt_sess *sess = NULL;
 	atio_from_isp_t *atio = &cmd->atio;
+	unsigned char *cdb;
+	unsigned long flags;
+	uint32_t data_length;
+	int ret, fcp_task_attr, data_dir, bidi = 0;;
 
-	if (IS_FWI2_CAPABLE(ha))
-		cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
-	else
-		cdb = &atio->u.isp2x.cdb[0];
+	if (tgt->tgt_stop)
+		goto out_term;	
 
-	vha->hw->tgt_ops->handle_cmd(cmd, cdb);
-}
+	sess = cmd->sess;
+	if (!sess) {
+		uint8_t *s_id = NULL;
+		uint16_t loop_id = 0;
 
-/* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_send_cmd_to_target(struct scsi_qla_host *vha,
-	struct qla_tgt_cmd *cmd, struct qla_tgt_sess *sess)
-{
-	struct qla_hw_data *ha = vha->hw;
-	int ret = 0;
+		if (IS_FWI2_CAPABLE(ha))
+			s_id = atio->u.isp24.fcp_hdr.s_id;
+		else
+			loop_id = GET_TARGET_ID(ha, atio);
+
+		mutex_lock(&ha->tgt_mutex);
+		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		/* sess has got an extra creation ref */
+		mutex_unlock(&ha->tgt_mutex);
+
+		if (!sess)
+			goto out_term;
+	}
+
+	if (tgt->tgt_stop)
+		goto out_term;
 
 	cmd->sess = sess;
 	cmd->loop_id = sess->loop_id;
 	cmd->conf_compl_supported = sess->conf_compl_supported;
 
-	if (IS_FWI2_CAPABLE(ha))
-		ret = qla_tgt_24xx_init_cmd(vha, cmd);
-	else
-		ret = qla_tgt_2xxx_init_cmd(vha, cmd);
+	if (IS_FWI2_CAPABLE(ha)) {
+		cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
+		cmd->tag = atio->u.isp24.exchange_addr;
+		cmd->unpacked_lun = scsilun_to_int(
+				(struct scsi_lun *)&atio->u.isp24.fcp_cmnd.lun);
 
-	if (!ret) {
-		INIT_WORK(&cmd->work, qla_tgt_do_work);
-		queue_work(qla_tgt_wq, &cmd->work);
+		if (atio->u.isp24.fcp_cmnd.rddata &&
+		    atio->u.isp24.fcp_cmnd.wrdata) {
+			bidi = 1;
+			data_dir = DMA_TO_DEVICE;
+		} else if (atio->u.isp24.fcp_cmnd.rddata)
+			data_dir = DMA_FROM_DEVICE;
+		else if (atio->u.isp24.fcp_cmnd.wrdata)
+			data_dir = DMA_TO_DEVICE;
+		else
+			data_dir = DMA_NONE;
+
+		fcp_task_attr = qla_tgt_get_fcp_task_attr(
+				atio->u.isp24.fcp_cmnd.task_attr);
+		data_length = be32_to_cpu(get_unaligned((uint32_t *)
+				&atio->u.isp24.fcp_cmnd.add_cdb[
+					atio->u.isp24.fcp_cmnd.add_cdb_len]));
+	} else {
+		uint16_t lun;
+
+		cdb = &atio->u.isp2x.cdb[0];
+		cmd->tag = atio->u.isp2x.rx_id;
+		lun = swab16(le16_to_cpu(atio->u.isp2x.lun));
+		cmd->unpacked_lun = scsilun_to_int((struct scsi_lun *)&lun);
+
+		if ((atio->u.isp2x.execution_codes & (ATIO_EXEC_READ | ATIO_EXEC_WRITE)) ==
+					(ATIO_EXEC_READ | ATIO_EXEC_WRITE)) {
+			bidi = 1;
+			data_dir = DMA_TO_DEVICE;
+		} else if (atio->u.isp2x.execution_codes & ATIO_EXEC_READ)
+			data_dir = DMA_FROM_DEVICE;
+		else if (atio->u.isp2x.execution_codes & ATIO_EXEC_WRITE)
+			data_dir = DMA_TO_DEVICE;
+		else
+			data_dir = DMA_NONE;
+
+		fcp_task_attr = qla_tgt_get_fcp_task_attr(atio->u.isp2x.task_codes);
+		data_length = le32_to_cpu(atio->u.isp2x.data_length);
 	}
-	return ret;
+
+	ql_dbg(ql_dbg_tgt_pkt, vha, 0xe207, "qla_target: START qla command: %p"
+		" lun: 0x%04x (tag %d)\n", cmd, cmd->unpacked_lun, cmd->tag);
+
+	ret = vha->hw->tgt_ops->handle_cmd(vha, cmd, cdb, data_length,
+			fcp_task_attr, data_dir, bidi);
+	if (ret != 0)
+		goto out_term;
+	/*
+	 * Drop extra session reference from qla_tgt_handle_cmd_for_atio*(
+	 */
+	qla_tgt_sess_put(sess);
+	return;
+
+out_term:
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14d, "Terminating work cmd %p", cmd);
+	/*
+	 * cmd has not sent to target yet, so pass NULL as the second argument
+	 */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	qla_tgt_send_term_exchange(vha, NULL, &cmd->atio, 1);
+	
+	if (sess)
+		__qla_tgt_sess_put(sess);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -3188,11 +3195,19 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 	if (sess->tearing_down || tgt->tgt_stop)
 		goto out_free_cmd;
 
-	res = qla_tgt_send_cmd_to_target(vha, cmd, sess);
-	if (unlikely(res != 0))
-		goto out_free_cmd;
+	cmd->sess = sess;
+	cmd->loop_id = sess->loop_id;
+	cmd->conf_compl_supported = sess->conf_compl_supported;
+	/*
+	 * Get the extra kref_get() before dropping qla_hw_data->hardware_lock,
+	 * and call qla_tgt_sess_put() -> kref_put() in qla_tgt_do_work() process
+	 * context to drop the extra reference.
+	*/
+	kref_get(&sess->sess_kref);
 
-	return res;
+	INIT_WORK(&cmd->work, qla_tgt_do_work);
+	queue_work(qla_tgt_wq, &cmd->work);
+	return 0;
 
 out_free_cmd:
 	qla_tgt_free_cmd(cmd);
@@ -3204,9 +3219,8 @@ out_sched:
 		res = -EBUSY;
 		goto out_free_cmd;
 	}
-
-	INIT_WORK(&cmd->work, qla_tgt_exec_cmd_work);
-	schedule_work(&cmd->work);
+	INIT_WORK(&cmd->work, qla_tgt_do_work);
+	queue_work(qla_tgt_wq, &cmd->work);
 	return 0;
 }
 
@@ -4566,81 +4580,6 @@ retry:
 	kfree(fcport);
 	return sess;
 }
-
-static void qla_tgt_exec_cmd_work(struct work_struct *work)
-{
-	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
-	struct qla_tgt *tgt = cmd->tgt;
-	struct scsi_qla_host *vha = tgt->vha;
-	struct qla_hw_data *ha = vha->hw;
-	struct qla_tgt_sess *sess = NULL;
-	unsigned long flags;
-	uint8_t *s_id = NULL; /* to hide compiler warnings */
-	int rc, loop_id = -1; /* to hide compiler warnings */
-	atio_from_isp_t *a = (atio_from_isp_t *)&cmd->atio;
-
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-
-	if (tgt->tgt_stop)
-		goto out_term;
-
-	if (IS_FWI2_CAPABLE(ha)) {
-		s_id = a->u.isp24.fcp_hdr.s_id;
-		sess = ha->tgt_ops->find_sess_by_s_id(vha, s_id);
-	} else {
-		loop_id = GET_TARGET_ID(ha, a);
-		sess = ha->tgt_ops->find_sess_by_loop_id(vha, loop_id);
-	}
-
-	if (sess) {
-		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
-		kref_get(&sess->sess_kref);
-	} else {
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-		mutex_lock(&ha->tgt_mutex);
-		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
-		/* sess has got an extra creation ref */
-		mutex_unlock(&ha->tgt_mutex);
-
-		spin_lock_irqsave(&ha->hardware_lock, flags);
-
-		if (!sess)
-			goto out_term;
-	}
-
-	if (tgt->tgt_stop)
-		goto out_term;
-
-	if (tgt->tm_to_unknown) {
-		/*
-		 * Cmd might be already aborted behind us, so be safe
-		 * and abort it. It should be OK, initiator will retry
-		 * it.
-		 */
-		goto out_term;
-	}
-	rc = qla_tgt_send_cmd_to_target(vha, cmd, sess);
-	if (rc != 0)
-		goto out_term;
-
-	if (sess)
-		qla_tgt_sess_put(sess);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-	return;
-
-out_term:
-	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14d, "Terminating work cmd %p", cmd);
-	/*
-	 * cmd has not sent to target yet, so pass NULL as the second
-	 * argument
-	 */
-	qla_tgt_send_term_exchange(vha, NULL, &cmd->atio, 1);
-	if (sess)
-		qla_tgt_sess_put(sess);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-}
-
 
 static void qla_tgt_abort_work(struct qla_tgt *tgt,
 	struct qla_tgt_sess_work_param *prm)
