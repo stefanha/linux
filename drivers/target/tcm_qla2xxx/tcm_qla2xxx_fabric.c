@@ -481,7 +481,7 @@ void tcm_qla2xxx_close_session(struct se_session *se_sess)
 
 	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
 	tcm_qla2xxx_clear_nacl_from_fcport_map(se_nacl);
-	qla_tgt_sess_put(sess);
+	__qla_tgt_sess_put(sess);
 	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 }
 

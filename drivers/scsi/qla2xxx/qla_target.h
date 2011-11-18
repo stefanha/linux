@@ -905,7 +905,7 @@ struct qla_tgt_sess {
 	struct scsi_qla_host *vha;
 	struct qla_tgt *tgt;
 
-	int sess_ref; /* protected by hardware_lock */
+	struct kref sess_kref;
 
 	struct list_head sess_list_entry;
 	unsigned long expires;
@@ -1123,7 +1123,7 @@ extern int qla_tgt_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
-extern void qla_tgt_sess_put(struct qla_tgt_sess *);
+extern int __qla_tgt_sess_put(struct qla_tgt_sess *);
 extern void qla_tgt_ctio_completion(struct scsi_qla_host *, uint32_t);
 extern void qla_tgt_async_event(uint16_t, struct scsi_qla_host *, uint16_t *);
 extern void qla_tgt_enable_vha(struct scsi_qla_host *);

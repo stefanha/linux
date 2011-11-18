@@ -125,27 +125,6 @@ static LIST_HEAD(qla_tgt_glist);
  */
 extern request_t *qla2x00_req_pkt(struct scsi_qla_host *);
 
-/* ha->hardware_lock supposed to be held on entry */
-static inline void qla_tgt_sess_get(struct qla_tgt_sess *sess)
-{
-	sess->sess_ref++;
-	ql_dbg(ql_dbg_tgt, sess->vha, 0xe000, "sess %p, new sess_ref %d\n",
-			sess, sess->sess_ref);
-}
-
-/* ha->hardware_lock supposed to be held on entry */
-void qla_tgt_sess_put(struct qla_tgt_sess *sess)
-{
-	ql_dbg(ql_dbg_tgt, sess->vha, 0xe001, "sess %p, new sess_ref %d\n",
-			sess, sess->sess_ref-1);
-	BUG_ON(sess->sess_ref == 0);
-
-	sess->sess_ref--;
-	if (sess->sess_ref == 0)
-		qla_tgt_unreg_sess(sess);
-}
-EXPORT_SYMBOL(qla_tgt_sess_put);
-
 /* ha->hardware_lock supposed to be held on entry (to protect tgt->sess_list) */
 static struct qla_tgt_sess *qla_tgt_find_sess_by_port_name(
 	struct qla_tgt *tgt,
@@ -408,13 +387,10 @@ static void qla_tgt_free_session_done(struct qla_tgt_sess *sess)
 		wake_up_all(&tgt->waitQ);
 }
 
-/* ha->hardware_lock supposed to be held on entry */
-static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess)
+static void __qla_tgt_unreg_sess(struct kref *kref)
 {
-	int res = 1;
-
-	BUG_ON(sess == NULL);
-	BUG_ON(sess->sess_ref != 0);
+	struct qla_tgt_sess *sess = container_of(kref, struct qla_tgt_sess,
+				sess_kref);
 
 	list_del(&sess->sess_list_entry);
 
@@ -426,8 +402,32 @@ static int qla_tgt_unreg_sess(struct qla_tgt_sess *sess)
 		sess->loop_id);
 
 	qla_tgt_free_session_done(sess);
+}
 
-	return res;
+/* ha->hardware_lock supposed to be held on entry */
+static void qla_tgt_unreg_sess(struct kref *kref)
+{
+	struct qla_tgt_sess *sess = container_of(kref, struct qla_tgt_sess,
+				sess_kref);
+	struct scsi_qla_host *vha = sess->vha;
+	unsigned long flags;
+
+	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
+	__qla_tgt_unreg_sess(kref);
+	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
+}
+
+/* ha->hardware_lock supposed to be held on entry */
+int __qla_tgt_sess_put(struct qla_tgt_sess *sess)
+{
+	return kref_put(&sess->sess_kref, __qla_tgt_unreg_sess);
+}
+EXPORT_SYMBOL(__qla_tgt_sess_put);
+
+/* called without ha->hardware_lock held */
+static int qla_tgt_sess_put(struct qla_tgt_sess *sess)
+{
+	return kref_put(&sess->sess_kref, qla_tgt_unreg_sess);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
@@ -783,7 +783,7 @@ static void qla_tgt_del_sess_work_fn(struct delayed_work *work)
 			} else {
 				ql_dbg(ql_dbg_tgt_mgt, vha, 0xe107, "Timeout: sess %p"
 					" about to be deleted\n", sess);
-				qla_tgt_sess_put(sess);
+				__qla_tgt_sess_put(sess);
 			}
 		} else {
 			schedule_delayed_work(&tgt->sess_del_work,
@@ -858,11 +858,15 @@ static struct qla_tgt_sess *qla_tgt_create_sess(
 
 		return NULL;
 	}
+	/*
+	 * Take two references to ->sess_kref here to handle qla_tgt_sess
+	 * access across ->hardware_lock reaquire.
+	 */
+	kref_init(&sess->sess_kref);
+	kref_get(&sess->sess_kref);
 
-	sess->sess_ref = 2; /* plus 1 extra ref, see above */
 	sess->tgt = ha->qla_tgt;
 	sess->vha = vha;
-
 	sess->s_id = fcport->d_id;
 	sess->loop_id = fcport->loop_id;
 	sess->local = local;
@@ -942,8 +946,9 @@ void qla_tgt_fc_port_added(struct scsi_qla_host *vha, fc_port_t *fcport)
 		mutex_unlock(&ha->tgt_mutex);
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
+		/* put the extra creation ref */
 		if (sess != NULL)
-			qla_tgt_sess_put(sess); /* put the extra creation ref */
+			__qla_tgt_sess_put(sess);
 	} else {
 		if (sess->deleted) {
 			qla_tgt_undelete_sess(sess);
@@ -4589,7 +4594,7 @@ static void qla_tgt_exec_cmd_work(struct work_struct *work)
 
 	if (sess) {
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
-		qla_tgt_sess_get(sess);
+		kref_get(&sess->sess_kref);
 	} else {
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -4674,7 +4679,7 @@ static void qla_tgt_abort_work(struct qla_tgt *tgt,
 
 	if (sess) {
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
-		qla_tgt_sess_get(sess);
+		kref_get(&sess->sess_kref);
 	} else {
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -4700,8 +4705,7 @@ static void qla_tgt_abort_work(struct qla_tgt *tgt,
 		goto out_term;
 
 	if (sess)
-		qla_tgt_sess_put(sess);
-
+		__qla_tgt_sess_put(sess);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	return;
 
@@ -4715,8 +4719,7 @@ out_term:
 	}
 
 	if (sess)
-		 qla_tgt_sess_put(sess);
-
+		__qla_tgt_sess_put(sess);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
@@ -4748,7 +4751,7 @@ static void qla_tgt_tmr_work(struct qla_tgt *tgt,
 
 	if (sess) {
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe14c, "sess %p found\n", sess);
-		qla_tgt_sess_get(sess);
+		kref_get(&sess->sess_kref);
 	} else {
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -4784,7 +4787,7 @@ static void qla_tgt_tmr_work(struct qla_tgt *tgt,
 		goto out_term;
 
 	if (sess)
-		qla_tgt_sess_put(sess);
+		__qla_tgt_sess_put(sess);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	return;
 
@@ -4795,7 +4798,7 @@ out_term:
 		qla_tgt_send_notify_ack(vha, &prm->tm_iocb,
 			0, 0, 0, 0, 0, 0);
 	if (sess)
-		qla_tgt_sess_put(sess);
+		__qla_tgt_sess_put(sess);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
