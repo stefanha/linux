@@ -3047,10 +3047,6 @@ static void qla_tgt_do_work(struct work_struct *work)
 	if (tgt->tgt_stop)
 		goto out_term;
 
-	cmd->sess = sess;
-	cmd->loop_id = sess->loop_id;
-	cmd->conf_compl_supported = sess->conf_compl_supported;
-
 	if (IS_FWI2_CAPABLE(ha)) {
 		cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
 		cmd->tag = atio->u.isp24.exchange_addr;
