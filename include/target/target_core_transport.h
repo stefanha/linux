@@ -132,6 +132,8 @@ extern void transport_init_se_cmd(struct se_cmd *,
 void *transport_kmap_first_data_page(struct se_cmd *cmd);
 void transport_kunmap_first_data_page(struct se_cmd *cmd);
 extern int transport_generic_allocate_tasks(struct se_cmd *, unsigned char *);
+extern int target_submit_cmd(struct se_cmd *, struct se_session *, unsigned char *,
+			unsigned char *, u32, u32, int, int, int);
 extern int transport_handle_cdb_direct(struct se_cmd *);
 extern int transport_generic_handle_cdb_map(struct se_cmd *);
 extern int transport_generic_handle_data(struct se_cmd *);
