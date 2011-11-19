@@ -609,7 +609,6 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 {
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	struct se_session *se_sess;
-	struct se_portal_group *se_tpg;
 	struct qla_tgt_sess *sess;
 	int rc;
 
@@ -624,44 +623,13 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 		pr_err("Unable to locate active struct se_session\n");
 		return -EINVAL;
 	}
-	se_tpg = se_sess->se_tpg;
 
-	/*
-	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
-	 */
-	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
-			data_length, data_dir,
-			fcp_task_attr, &cmd->sense_buffer[0]);
-	/*
- 	 * Protected by qla_hw_data->hardware_lock
- 	 */
-	target_get_sess_cmd(se_sess, se_cmd);
-	/*
-	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
-	 */
-	if (bidi)
-		se_cmd->t_tasks_bidi = 1;
-	/*
- 	 * Locate se_lun pointer and attach it to struct se_cmd
- 	 */
-	if (transport_lookup_cmd_lun(se_cmd, cmd->unpacked_lun) < 0) {
-		transport_send_check_condition_and_sense(se_cmd,
-			se_cmd->scsi_sense_reason, 0);
-		return 0;
-	}
+	rc = target_submit_cmd(se_cmd, se_sess, cdb, &cmd->sense_buffer[0],
+				cmd->unpacked_lun, data_length, fcp_task_attr,
+				data_dir, bidi);
+	if (rc != 0)
+		return -EINVAL;
 
-	/*
-	 * Allocate the necessary tasks to complete the received CDB+data
-	 * drivers/target/target_core_transport.c:transport_processing_thread()
-	 * falls through to TRANSPORT_NEW_CMD.
-	 */
-	rc = transport_generic_allocate_tasks(se_cmd, cdb);
-	if (rc != 0) {
-		transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
-		return 0;
-	}
-	transport_handle_cdb_direct(se_cmd);
 	return 0;
 }
 
