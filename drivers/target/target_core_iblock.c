@@ -46,6 +46,8 @@
 
 #include "target_core_iblock.h"
 
+#define BIOS_PER_CMD	64
+
 static struct se_subsystem_api iblock_template;
 
 static void iblock_bio_done(struct bio *, int);
@@ -129,7 +131,7 @@ static struct se_device *iblock_create_virtdevice(
 	/*
 	 * These settings need to be made tunable..
 	 */
-	ib_dev->ibd_bio_set = bioset_create(32, 64);
+	ib_dev->ibd_bio_set = bioset_create(128, 0);
 	if (!ib_dev->ibd_bio_set) {
 		pr_err("IBLOCK: Unable to create bioset()\n");
 		return ERR_PTR(-ENOMEM);
@@ -155,8 +157,8 @@ static struct se_device *iblock_create_virtdevice(
 	q = bdev_get_queue(bd);
 	limits = &dev_limits.limits;
 	limits->logical_block_size = bdev_logical_block_size(bd);
-	limits->max_hw_sectors = queue_max_hw_sectors(q);
-	limits->max_sectors = queue_max_sectors(q);
+	limits->max_hw_sectors = queue_max_hw_sectors(q) * BIOS_PER_CMD;
+	limits->max_sectors = queue_max_sectors(q) * BIOS_PER_CMD;
 	dev_limits.hw_queue_depth = q->nr_requests;
 	dev_limits.queue_depth = q->nr_requests;
 
