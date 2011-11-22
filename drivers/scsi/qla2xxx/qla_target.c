@@ -3148,27 +3148,33 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 	cmd->tgt = ha->qla_tgt;
 	cmd->vha = vha;
 
-	if (IS_FWI2_CAPABLE(ha)) {
-		sess = ha->tgt_ops->find_sess_by_s_id(vha, atio->u.isp24.fcp_hdr.s_id);
-		if (unlikely(!sess)) {
-			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe125, "qla_target(%d): Unable to find "
-				"wwn login (s_id %x:%x:%x), trying to create "
-				"it manually\n", vha->vp_idx,
+	if (IS_FWI2_CAPABLE(ha))
+		sess = ha->tgt_ops->find_sess_by_s_id(vha,
+					atio->u.isp24.fcp_hdr.s_id);
+	else
+		sess = ha->tgt_ops->find_sess_by_loop_id(vha,
+					GET_TARGET_ID(ha, atio));
+
+	if (unlikely(!sess)) {
+		if (IS_FWI2_CAPABLE(ha)) {
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe125, "qla_target(%d):"
+				" Unable to find wwn login (s_id %x:%x:%x),"
+				" trying to create it manually\n", vha->vp_idx,
 				atio->u.isp24.fcp_hdr.s_id[0],
 				atio->u.isp24.fcp_hdr.s_id[1],
 				atio->u.isp24.fcp_hdr.s_id[2]);
-			goto out_sched;
-		}
-	} else {
-		sess = ha->tgt_ops->find_sess_by_loop_id(vha,
-			GET_TARGET_ID(ha, atio));
-		if (unlikely(!sess)) {
-			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe126, "qla_target(%d): Unable to find "
-				"wwn login (loop_id=%d), trying to create it "
-				"manually\n", vha->vp_idx,
+		} else {
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe126, "qla_target(%d):"
+				" Unable to find wwn login (loop_id=%d), trying"
+				" to create it manually\n", vha->vp_idx,
 				GET_TARGET_ID(ha, atio));
-			goto out_sched;
 		}
+		if (atio->u.raw.entry_count > 1) {
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe127, "Dropping multy entry"
+					" cmd %p\n", cmd);
+			goto out_free_cmd;
+		}
+		goto out_sched;
 	}
 
 	if (sess->tearing_down || tgt->tgt_stop)
@@ -3184,6 +3190,7 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 	*/
 	kref_get(&sess->sess_kref);
 
+out_sched:
 	INIT_WORK(&cmd->work, qla_tgt_do_work);
 	queue_work(qla_tgt_wq, &cmd->work);
 	return 0;
@@ -3191,16 +3198,6 @@ static int qla_tgt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 out_free_cmd:
 	qla_tgt_free_cmd(cmd);
 	return res;
-
-out_sched:
-	if (atio->u.raw.entry_count > 1) {
-		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe127, "Dropping multy entry cmd %p\n", cmd);
-		res = -EBUSY;
-		goto out_free_cmd;
-	}
-	INIT_WORK(&cmd->work, qla_tgt_do_work);
-	queue_work(qla_tgt_wq, &cmd->work);
-	return 0;
 }
 
 /* ha->hardware_lock supposed to be held on entry */
