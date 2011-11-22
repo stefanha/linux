@@ -1674,12 +1674,7 @@ int transport_handle_cdb_direct(
 EXPORT_SYMBOL(transport_handle_cdb_direct);
 
 /**
- * target_submit_cmd() - Lookup unpacked lun and submit a previously
- * uninitialized se_cmd descriptor to struct se_lun->lun_se_dev
- * backend using struct se_sess nexus.
- *
- * This may only be called from process context, and also currently
- * assumes internal allocation of fabric payload buffer by target-core.
+ * target_submit_cmd - lookup unpacked lun and submit uninitialized se_cmd
  *
  * @se_cmd: command descriptor to submit
  * @se_sess: associated se_sess for endpoint
@@ -1689,39 +1684,22 @@ EXPORT_SYMBOL(transport_handle_cdb_direct);
  * @data_length: fabric expected data transfer length
  * @task_addr: SAM task attribute
  * @data_dir: DMA data direction
- * @bidi: signal bidirectional data payload
+ * @flags: flags for command submission from target_sc_flags_tables
+ *
+ * This may only be called from process context, and also currently
+ * assumes internal allocation of fabric payload buffer by target-core.
  **/
-int target_submit_cmd(
-	struct se_cmd *se_cmd,
-	struct se_session *se_sess,
-	unsigned char *cdb,
-	unsigned char *sense,
-	u32 unpacked_lun,
-	u32 data_length,
-	int task_attr,
-	int data_dir,
-	int bidi)
+int target_submit_cmd(struct se_cmd *se_cmd, struct se_session *se_sess,
+		unsigned char *cdb, unsigned char *sense, u32 unpacked_lun,
+		u32 data_length, int task_attr, int data_dir, int flags)
 {
 	struct se_portal_group *se_tpg;	
 	int rc;
 
-	if (!se_cmd || !se_sess) {
-		pr_err("Missing se_cmd or se_sess descriptor\n");
-		return -EINVAL;
-	}
 	se_tpg = se_sess->se_tpg;
-	if (!se_tpg) {
-		pr_err("Unable to locate se_tpg in target_submit_cmd\n");	
-		return -EINVAL;
-	}
-	if (se_cmd->se_tfo || se_cmd->se_sess) {
-		pr_err("struct se_cmd already initialized\n");
-		return -EEXIST;
-	}
-	if (in_interrupt()) {
-		pr_err("target_submit_cmd() may only be used from process context\n");
-		return -ENOSYS;
-	}
+	BUG_ON(!se_tpg);
+	BUG_ON(se_cmd->se_tfo || se_cmd->se_sess);
+	BUG_ON(in_interrupt());
 	/*
  	 * Initialize se_cmd for target operation.  From this point
  	 * exceptions are handled by sending exception status via
@@ -1737,26 +1715,20 @@ int target_submit_cmd(
 	/*
 	 * Signal bidirectional data payloads to target-core
 	 */
-	if (bidi)
+	if (flags & TARGET_SCF_BIDI_OP)
 		se_cmd->t_tasks_bidi = 1;
 	/*
  	 * Locate se_lun pointer and attach it to struct se_cmd
  	 */
-	if (transport_lookup_cmd_lun(se_cmd, unpacked_lun) < 0) {
-		transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
-		return 0;
-	}
+	if (transport_lookup_cmd_lun(se_cmd, unpacked_lun) < 0)
+		goto out_check_cond;
 	/*
 	 * Sanitize CDBs via transport_generic_cmd_sequencer() and
 	 * allocate the necessary tasks to complete the received CDB+data
 	 */
 	rc = transport_generic_allocate_tasks(se_cmd, cdb);
-	if (rc != 0) {
-		transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
-		return 0;
-	}
+	if (rc != 0)
+		goto out_check_cond;
 	/*
 	 * Dispatch se_cmd descriptor to se_lun->lun_se_dev backend
 	 * for immediate execution of READs, otherwise wait for
@@ -1764,6 +1736,11 @@ int target_submit_cmd(
 	 * when fabric has filled the incoming buffer.
 	 */
 	transport_handle_cdb_direct(se_cmd);
+	return 0;
+
+out_check_cond:
+	transport_send_check_condition_and_sense(se_cmd,
+				se_cmd->scsi_sense_reason, 0);
 	return 0;
 }
 EXPORT_SYMBOL(target_submit_cmd);

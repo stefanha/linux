@@ -156,6 +156,10 @@ enum tcm_sense_reason_table {
 	TCM_RESERVATION_CONFLICT		= 0x10,
 };
 
+enum target_sc_flags_table {
+	TARGET_SCF_BIDI_OP		= 0x01,
+};
+
 struct se_obj {
 	atomic_t obj_access_count;
 } ____cacheline_aligned;
