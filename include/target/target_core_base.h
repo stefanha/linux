@@ -158,6 +158,7 @@ enum tcm_sense_reason_table {
 
 enum target_sc_flags_table {
 	TARGET_SCF_BIDI_OP		= 0x01,
+	TARGET_SCF_ACK_KREF		= 0x02,
 };
 
 struct se_obj {

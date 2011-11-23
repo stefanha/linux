@@ -610,7 +610,10 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 	struct se_cmd *se_cmd = &cmd->se_cmd;
 	struct se_session *se_sess;
 	struct qla_tgt_sess *sess;
-	int rc;
+	int rc, flags = TARGET_SCF_ACK_KREF;
+
+	if (bidi)
+		flags |= TARGET_SCF_BIDI_OP;
 
 	sess = cmd->sess;
 	if (!sess) {
@@ -626,7 +629,7 @@ int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 
 	rc = target_submit_cmd(se_cmd, se_sess, cdb, &cmd->sense_buffer[0],
 				cmd->unpacked_lun, data_length, fcp_task_attr,
-				data_dir, (bidi) ? TARGET_SCF_BIDI_OP : 0);
+				data_dir, flags);
 	if (rc != 0)
 		return -EINVAL;
 

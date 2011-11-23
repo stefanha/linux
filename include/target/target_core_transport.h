@@ -148,7 +148,7 @@ extern int transport_send_check_condition_and_sense(struct se_cmd *, u8, int);
 extern void transport_send_task_abort(struct se_cmd *);
 extern void transport_release_cmd(struct se_cmd *);
 extern void transport_generic_free_cmd(struct se_cmd *, int);
-extern void target_get_sess_cmd(struct se_session *, struct se_cmd *);
+extern void target_get_sess_cmd(struct se_session *, struct se_cmd *, bool);
 extern int target_put_sess_cmd(struct se_session *, struct se_cmd *);
 extern void target_splice_sess_cmd_list(struct se_session *);
 extern void target_wait_for_sess_cmds(struct se_session *, int);

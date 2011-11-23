@@ -1708,10 +1708,12 @@ int target_submit_cmd(struct se_cmd *se_cmd, struct se_session *se_sess,
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
 				data_length, data_dir, task_attr, sense);
 	/*
-	 * Obtain struct se_cmd->cmd_kref references and add new cmd to
-	 * se_sess->sess_cmd_list
+	 * Obtain struct se_cmd->cmd_kref reference and add new cmd to
+	 * se_sess->sess_cmd_list.  A second kref_get here is necessary
+	 * for fabrics using TARGET_SCF_ACK_KREF that expect a second
+	 * kref_put() to happen during fabric packet acknowledgement.
 	 */
-	target_get_sess_cmd(se_sess, se_cmd);
+	target_get_sess_cmd(se_sess, se_cmd, (flags & TARGET_SCF_ACK_KREF));
 	/*
 	 * Signal bidirectional data payloads to target-core
 	 */
@@ -3997,13 +3999,21 @@ EXPORT_SYMBOL(transport_generic_free_cmd);
 /* target_get_sess_cmd - Add command to active ->sess_cmd_list
  * @se_sess:	session to reference
  * @se_cmd:	command descriptor to add
+ * @ack_kref:	Signal that fabric will perform an ack target_put_sess_cmd()
  */
-void target_get_sess_cmd(struct se_session *se_sess, struct se_cmd *se_cmd)
+void target_get_sess_cmd(struct se_session *se_sess, struct se_cmd *se_cmd,
+			bool ack_kref)
 {
 	unsigned long flags;
 
 	kref_init(&se_cmd->cmd_kref);
-	kref_get(&se_cmd->cmd_kref);
+	/*
+	 * Add a second kref if the fabric caller is expecting to handle
+	 * fabric acknowledgement that requires two target_put_sess_cmd()
+	 * invocations before se_cmd descriptor release.
+	 */
+	if (ack_kref == true)
+		kref_get(&se_cmd->cmd_kref);
 
 	spin_lock_irqsave(&se_sess->sess_cmd_lock, flags);
 	list_add_tail(&se_cmd->se_cmd_list, &se_sess->sess_cmd_list);

@@ -1752,7 +1752,7 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	else
 		WARN_ON_ONCE(ret);
 
-	target_get_sess_cmd(ch->sess, cmd);
+	target_get_sess_cmd(ch->sess, cmd, true);
 	transport_handle_cdb_direct(cmd);
 	return 0;
 
