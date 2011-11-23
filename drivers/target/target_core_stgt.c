@@ -396,7 +396,7 @@ static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 
 	orig = opts;
 
-	while ((ptr = strsep(&opts, ",")) != NULL) {
+	while ((ptr = strsep(&opts, ",\n")) != NULL) {
 		if (!*ptr)
 			continue;
 
