@@ -2340,7 +2340,13 @@ static void srpt_release_channel_work(struct work_struct *w)
 	BUG_ON(!sdev);
 
 	se_sess = ch->sess;
-	BUG_ON(!se_sess);
+	/*
+	 * May be NULL when shutting down during srpt_cm_req_recv() login
+	 * exception where the caller is expected to free *ch in the
+	 * failure path.
+ 	 */
+	if (!se_sess)
+		return;
 
 	target_splice_sess_cmd_list(se_sess);
 	target_wait_for_sess_cmds(se_sess, 0);
