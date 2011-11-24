@@ -1692,23 +1692,14 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
 		goto send_sense;
 	}
-
-	cmd->data_length = data_len;
-	cmd->data_direction = dir;
 	unpacked_lun = srpt_unpack_lun((uint8_t *)&srp_cmd->lun,
 				       sizeof(srp_cmd->lun));
-	if (transport_lookup_cmd_lun(cmd, unpacked_lun) < 0)
-		goto send_sense;
-	ret = transport_generic_allocate_tasks(cmd, srp_cmd->cdb);
-	if (cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT)
-		srpt_queue_status(cmd);
-	else if (cmd->se_cmd_flags & SCF_SCSI_CDB_EXCEPTION)
-		goto send_sense;
-	else
-		WARN_ON_ONCE(ret);
+	ret = target_submit_cmd(cmd, ch->sess, srp_cmd->cdb,
+			&send_ioctx->sense_data[0], unpacked_lun, data_len,
+			MSG_SIMPLE_TAG, dir, TARGET_SCF_ACK_KREF);
+	if (ret != 0)
+		return -1;
 
-	target_get_sess_cmd(ch->sess, cmd, true);
-	transport_handle_cdb_direct(cmd);
 	return 0;
 
 send_sense:
@@ -1812,6 +1803,9 @@ static void srpt_handle_tsk_mgmt(struct srpt_rdma_ch *ch,
 			TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED;
 		goto process_tmr;
 	}
+	transport_init_se_cmd(&send_ioctx->cmd, &srpt_target->tf_ops, ch->sess,
+			0, DMA_NONE, MSG_SIMPLE_TAG, send_ioctx->sense_data);
+
 	cmd->se_tmr_req = core_tmr_alloc_req(cmd, NULL, tcm_tmr, GFP_KERNEL);
 	if (!cmd->se_tmr_req) {
 		send_ioctx->cmd.se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
@@ -1875,10 +1869,6 @@ static void srpt_handle_new_iu(struct srpt_rdma_ch *ch,
 			goto out;
 		}
 	}
-
-	transport_init_se_cmd(&send_ioctx->cmd, &srpt_target->tf_ops, ch->sess,
-			      0, DMA_NONE, MSG_SIMPLE_TAG,
-			      send_ioctx->sense_data);
 
 	switch (srp_cmd->opcode) {
 	case SRP_CMD:
