@@ -187,7 +187,7 @@ static int tcm_vhost_make_nexus(
 	 * call to __transport_register_session()
 	 */
 	__transport_register_session(se_tpg, tv_nexus->tvn_se_sess->se_node_acl,
-			tv_nexus->tvn_se_sess, (void *)tv_nexus);
+			tv_nexus->tvn_se_sess, tv_nexus);
 	tv_tpg->tpg_nexus = tv_nexus;
 
 	mutex_unlock(&tv_tpg->tv_tpg_mutex);
@@ -378,8 +378,7 @@ static struct se_portal_group *tcm_vhost_make_tpg(
 	tpg->tport_tpgt = tpgt;
 
 	ret = core_tpg_register(&tcm_vhost_fabric_configfs->tf_ops, wwn,
-				&tpg->se_tpg, (void *)tpg,
-				TRANSPORT_TPG_TYPE_NORMAL);
+				&tpg->se_tpg, tpg, TRANSPORT_TPG_TYPE_NORMAL);
 	if (ret < 0) {
 		kfree(tpg);
 		return NULL;

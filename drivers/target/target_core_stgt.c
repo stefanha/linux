@@ -472,7 +472,7 @@ static unsigned char *stgt_get_sense_buffer(struct se_task *task)
 {
 	struct stgt_plugin_task *pt = STGT_TASK(task);
 
-	return (unsigned char *)&pt->stgt_sense[0];
+	return pt->stgt_sense;
 }
 
 /*	stgt_get_device_rev():
