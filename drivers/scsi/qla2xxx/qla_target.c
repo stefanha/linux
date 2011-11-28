@@ -1577,44 +1577,14 @@ EXPORT_SYMBOL(qla_tgt_xmit_tm_rsp);
 static int qla_tgt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 {
 	struct qla_tgt_cmd *cmd = prm->cmd;
-	struct scatterlist *sg;
-	int initial_off = cmd->sg_srr_off, i = 0, j;
 
 	BUG_ON(cmd->sg_cnt == 0);
 
 	prm->sg = (struct scatterlist *)cmd->sg;
-	/*
-	 * Use pci_map_sg() for non SRR payloads, otherwise use pci_map_page()
-	 * from cmd->sg_srr_start with sg_srr_off -> initial_off
-	 */
-	if (!cmd->sg_srr_start) {
-		prm->seg_cnt = pci_map_sg(prm->tgt->ha->pdev, cmd->sg,
-					cmd->sg_cnt, cmd->dma_data_direction);
-		if (unlikely(prm->seg_cnt == 0))
-			goto out_err;
-	} else {
-		u64 dma_pointer;
-
-		for_each_sg(cmd->sg_srr_start, sg, cmd->sg_cnt, i) {
-			ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe117, "Calling pci_map_page:"
-				" sg[%d]: %p, page: %p, offset: %d , init_off: %d"
-				" length: %d\n", i, sg, sg_page(sg), sg->offset,
-				initial_off, (sg->length - initial_off));
-
-			dma_pointer = pci_map_page(prm->tgt->ha->pdev,
-						sg_page(sg), initial_off,
-						(sg->length - initial_off),
-						prm->cmd->dma_data_direction);
-			if (unlikely(pci_dma_mapping_error(prm->tgt->ha->pdev,
-							dma_pointer)))
-				goto out_err;
-
-			cmd->srr_dma_buffer[i] = dma_pointer;
-			initial_off = 0;
-		}
-
-		prm->seg_cnt += i;
-	}
+	prm->seg_cnt = pci_map_sg(prm->tgt->ha->pdev, cmd->sg,
+				cmd->sg_cnt, cmd->dma_data_direction);
+	if (unlikely(prm->seg_cnt == 0))
+		goto out_err;
 
 	prm->cmd->sg_mapped = 1;
 
@@ -1631,19 +1601,6 @@ static int qla_tgt_pci_map_calc_cnt(struct qla_tgt_prm *prm)
 	return 0;
 
 out_err:
-	if (!cmd->sg_srr_start)
-		goto out;
-	j = i;
-	i = 0;
-	initial_off = cmd->sg_srr_off;
-
-	for_each_sg(cmd->sg_srr_start, sg, j, i) {
-		pci_unmap_page(prm->tgt->ha->pdev, cmd->srr_dma_buffer[i],
-				(sg->length - initial_off),
-				cmd->dma_data_direction);
-		initial_off = 0;
-	}
-out:
 	printk(KERN_ERR "qla_target(%d): PCI mapping failed: sg_cnt=%d",
 		0, prm->cmd->sg_cnt);
 	return -1;
@@ -1654,22 +1611,7 @@ static inline void qla_tgt_unmap_sg(struct scsi_qla_host *vha, struct qla_tgt_cm
 	struct qla_hw_data *ha = vha->hw;
 
 	BUG_ON(!cmd->sg_mapped);
-	if (!cmd->sg_srr_start)
-		pci_unmap_sg(ha->pdev, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction);
-	else {
-		struct scatterlist *sg;
-		int i, initial_off = cmd->sg_srr_off;
-
-		for_each_sg(cmd->sg_srr_start, sg, cmd->sg_cnt, i) {
-			pci_unmap_page(ha->pdev, cmd->srr_dma_buffer[i],
-					(sg->length - initial_off),
-					cmd->dma_data_direction);
-			initial_off = 0;
-		}
-
-		cmd->sg_srr_start = NULL;
-		cmd->sg_srr_off = 0;
-	}
+	pci_unmap_sg(ha->pdev, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction);
 	cmd->sg_mapped = 0;
 }
 
@@ -2649,8 +2591,8 @@ void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd)
 {
 	BUG_ON(cmd->sg_mapped);
 
-	if (unlikely(cmd->srr_dma_buffer))
-		kfree(cmd->srr_dma_buffer);
+	if (unlikely(cmd->free_sg))
+		kfree(cmd->sg);
 	kmem_cache_free(qla_tgt_cmd_cachep, cmd);
 }
 EXPORT_SYMBOL(qla_tgt_free_cmd);
@@ -3457,9 +3399,9 @@ static int qla_tgt_24xx_handle_els(struct scsi_qla_host *vha,
 
 static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 {
-	struct scatterlist *sg = NULL, *sg_srr_start = NULL;
+	struct scatterlist *sg, *sgp, *sg_srr, *sg_srr_start = NULL;
 	size_t first_offset = 0, rem_offset = offset, tmp = 0;
-	int i;
+	int i, sg_srr_cnt, bufflen = 0;
 
 	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe305, "Entering qla_tgt_set_data_offset:"
 		" cmd: %p, cmd->sg: %p, cmd->sg_cnt: %u, direction: %d\n",
@@ -3494,21 +3436,42 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 		printk(KERN_ERR "Unable to locate sg_srr_start for offset: %u\n", offset);
 		return -EINVAL;
 	}
+	sg_srr_cnt = (cmd->sg_cnt - i);
 
-	cmd->srr_dma_buffer = kzalloc(sizeof(dma_addr_t) * cmd->tgt->sg_tablesize,
-					GFP_KERNEL);
-	if (!cmd->srr_dma_buffer)
+	sg_srr = kzalloc(sizeof(struct scatterlist) * sg_srr_cnt, GFP_KERNEL);
+	if (!sg_srr) {
+		printk(KERN_ERR "Unable to allocate sgp\n");
 		return -ENOMEM;
+	}
+	sg_init_table(sg_srr, sg_srr_cnt);
+	sgp = &sg_srr[0];
+	/*
+	 * Walk the remaining list for sg_srr_start, mapping to the newly
+	 * allocated sg_srr taking first_offset into account.
+	 */
+	for_each_sg(sg_srr_start, sg, sg_srr_cnt, i) { 
+		if (first_offset) {
+			sg_set_page(sgp, sg_page(sg),
+				(sg->length - first_offset), first_offset);
+			first_offset = 0;
+		} else {
+			sg_set_page(sgp, sg_page(sg), sg->length, 0);
+		}
+		bufflen += sgp->length;
 
-	cmd->sg_srr_start = sg_srr_start;
-	cmd->sg_cnt -= i;
-	cmd->sg_srr_off = first_offset;
-	cmd->bufflen -= offset;
+		sgp = sg_next(sgp);
+		if (!sgp)
+			break;
+	}
+
+	cmd->sg = sg_srr;
+	cmd->sg_cnt = sg_srr_cnt;
+	cmd->bufflen = bufflen;
 	cmd->offset += offset;
+	cmd->free_sg = 1;
 
 	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe308, "New cmd->sg: %p\n", cmd->sg);
 	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe309, "New cmd->sg_cnt: %u\n", cmd->sg_cnt);
-	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe30a, "New cmd->sg_srr_off: %u\n", cmd->sg_srr_off);
 	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe30b, "New cmd->bufflen: %u\n", cmd->bufflen);
 	ql_dbg(ql_dbg_tgt_sgl, cmd->vha, 0xe30c, "New cmd->offset: %u\n", cmd->offset);
 
@@ -3524,8 +3487,7 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 static inline int qla_tgt_srr_adjust_data(struct qla_tgt_cmd *cmd,
 	uint32_t srr_rel_offs, int *xmit_type)
 {
-	int res = 0;
-	uint32_t rel_offs;
+	int res = 0, rel_offs;
 
 	rel_offs = srr_rel_offs - cmd->offset;
 	ql_dbg(ql_dbg_tgt_mgt, cmd->vha, 0xe12b, "srr_rel_offs=%d, rel_offs=%d",
@@ -3741,10 +3703,10 @@ restart:
 		 * logic..
 		 */
 		cmd->offset = 0;
-		if (cmd->sg_srr_start) {
-			cmd->sg_srr_start = NULL;
-			cmd->sg_srr_off = 0;
-			kfree(cmd->srr_dma_buffer);
+		if (cmd->free_sg) {
+			kfree(cmd->sg);
+			cmd->sg = NULL;
+			cmd->free_sg = 0;
 		}
 		se_cmd = &cmd->se_cmd;
 

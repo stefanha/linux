@@ -924,18 +924,16 @@ struct qla_tgt_cmd {
 
 	unsigned int conf_compl_supported:1;/* to save extra sess dereferences */
 	unsigned int sg_mapped:1;
+	unsigned int free_sg:1;
 	unsigned int aborted:1; /* Needed in case of SRR */
 	unsigned int write_data_transferred:1;
 
 	struct scatterlist *sg;	/* cmd data buffer SG vector */
-	struct scatterlist *sg_srr_start; /* Used for SRR data offset */
 	int sg_cnt;		/* SG segments count */
-	int sg_srr_off;		/* Used for SRR offsets into sg_srr_start */
 	int bufflen;		/* cmd buffer length */
 	int offset;
 	uint32_t tag;
 	uint32_t unpacked_lun;
-	dma_addr_t *srr_dma_buffer; /* Used for SRR offsets with pci_map_page() */
 	enum dma_data_direction dma_data_direction;
 
 	uint16_t loop_id;		    /* to save extra sess dereferences */
