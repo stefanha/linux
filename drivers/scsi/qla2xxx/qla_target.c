@@ -3407,6 +3407,13 @@ static int qla_tgt_set_data_offset(struct qla_tgt_cmd *cmd, uint32_t offset)
 		" cmd: %p, cmd->sg: %p, cmd->sg_cnt: %u, direction: %d\n",
 		cmd, cmd->sg, cmd->sg_cnt, cmd->dma_data_direction);
 
+	/*
+	 * FIXME: Reject non zero SRR relative offset until we can test
+	 * this code properly.
+	 */
+	printk("Rejecting non zero SRR rel_offs: %u\n", offset);
+	return -1;
+
 	if (!cmd->sg || !cmd->sg_cnt) {
 		printk(KERN_ERR "Missing cmd->sg or zero cmd->sg_cnt in"
 				" qla_tgt_set_data_offset\n");
