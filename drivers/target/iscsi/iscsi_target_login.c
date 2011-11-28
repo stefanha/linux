@@ -759,7 +759,8 @@ int iscsi_target_setup_login_socket(
 	struct __kernel_sockaddr_storage *sockaddr)
 {
 	struct socket *sock;
-	int backlog = 5, ret, opt = 0, len;
+	int backlog = 5, ret, len;
+	char opt = 1;
 
 	switch (np->np_network_transport) {
 	case ISCSI_TCP:
@@ -820,7 +821,6 @@ int iscsi_target_setup_login_socket(
 	/*
 	 * Set SO_REUSEADDR, and disable Nagel Algorithm with TCP_NODELAY.
 	 */
-	/* FIXME: Someone please explain why this is endian-safe */
 	opt = 1;
 	if (np->np_network_transport == ISCSI_TCP) {
 		ret = kernel_setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
@@ -832,7 +832,6 @@ int iscsi_target_setup_login_socket(
 		}
 	}
 
-	/* FIXME: Someone please explain why this is endian-safe */
 	ret = kernel_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 			(char *)&opt, sizeof(opt));
 	if (ret < 0) {
