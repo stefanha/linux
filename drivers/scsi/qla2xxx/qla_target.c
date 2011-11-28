@@ -2044,16 +2044,16 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 		ql_dbg(ql_dbg_tgt, vha, 0xe012, "Residual underflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
-			se_cmd->t_task_cdb[0], cmd->bufflen,
-			prm->rq_result);
+			se_cmd->t_task_cdb ? se_cmd->t_task_cdb[0] : 0,
+			cmd->bufflen, prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_UNDER;
 	} else if (se_cmd->se_cmd_flags & SCF_OVERFLOW_BIT) {
 		prm->residual = se_cmd->residual_count;
 		ql_dbg(ql_dbg_tgt, vha, 0xe013, "Residual overflow: %d (tag %d, "
 			"op %x, bufflen %d, rq_result %x)\n",
 			prm->residual, cmd->tag,
-			se_cmd->t_task_cdb[0], cmd->bufflen,
-			prm->rq_result);
+			se_cmd->t_task_cdb ? se_cmd->t_task_cdb[0] : 0,
+			cmd->bufflen, prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_OVER;
 		prm->residual = -prm->residual;
 	}
