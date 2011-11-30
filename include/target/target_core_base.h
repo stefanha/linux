@@ -725,7 +725,6 @@ struct se_device {
 	/* Active commands on this virtual SE device */
 	atomic_t		active_cmds;
 	atomic_t		simple_cmds;
-	atomic_t		depth_left;
 	atomic_t		dev_ordered_id;
 	atomic_t		dev_tur_active;
 	atomic_t		execute_tasks;
