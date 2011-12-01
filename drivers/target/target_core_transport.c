@@ -4707,9 +4707,11 @@ get_cmd:
 			break;
 		case TRANSPORT_COMPLETE_QF_WP:
 			transport_write_pending_qf(cmd);
+			__transport_execute_tasks(dev, NULL);
 			break;
 		case TRANSPORT_COMPLETE_QF_OK:
 			transport_complete_qf(cmd);
+			__transport_execute_tasks(dev, NULL);
 			break;
 		default:
 			pr_err("Unknown t_state: %d  for ITT: 0x%08x "
