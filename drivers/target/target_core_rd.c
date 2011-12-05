@@ -370,7 +370,7 @@ static int rd_MEMCPY(struct rd_request *req, u32 read_rd)
 		void *rd_addr;
 
 		sg_miter_next(&m);
-		len = min(m.length, src_len);
+		len = min((u32)m.length, src_len);
 		m.consumed = len;
 
 		rd_addr = sg_virt(rd_sg) + rd_offset;
