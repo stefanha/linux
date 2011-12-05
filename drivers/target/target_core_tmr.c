@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
+#include <linux/export.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 
@@ -147,7 +148,7 @@ static void core_tmr_drain_tmr_list(
 		 */
 		if (target_check_cdb_and_preempt(preempt_and_abort_list, cmd))
 			continue;
-		
+
 		spin_lock(&cmd->t_state_lock);
 		if (!atomic_read(&cmd->t_transport_active)) {
 			spin_unlock(&cmd->t_state_lock);
@@ -171,7 +172,7 @@ static void core_tmr_drain_tmr_list(
 			" Response: 0x%02x, t_state: %d\n",
 			(preempt_and_abort_list) ? "Preempt" : "", tmr_p,
 			tmr_p->function, tmr_p->response, cmd->t_state);
-		
+
 		transport_cmd_finish_abort(cmd, 1);
 	}
 }

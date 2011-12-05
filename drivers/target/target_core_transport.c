@@ -36,6 +36,7 @@
 #include <linux/kthread.h>
 #include <linux/in.h>
 #include <linux/cdrom.h>
+#include <linux/module.h>
 #include <asm/unaligned.h>
 #include <net/sock.h>
 #include <net/tcp.h>
@@ -221,7 +222,7 @@ void transport_subsystem_check_init(void)
 
 	if (sub_api_initialized)
 		return;
-	
+
 	ret = request_module("target_core_iblock");
 	if (ret != 0)
 		pr_err("Unable to load target_core_iblock\n");
@@ -623,7 +624,6 @@ transport_get_cmd_from_queue(struct se_queue_obj *qobj)
 
 	atomic_set(&cmd->t_transport_queue_active, 0);
 	list_del_init(&cmd->se_queue_node);
-
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
@@ -843,6 +843,9 @@ static void transport_add_tasks_to_state_queue(struct se_cmd *cmd)
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	list_for_each_entry(task, &cmd->t_task_list, t_list) {
+		if (task->task_flags & TF_ACTIVE)
+			continue;
+
 		spin_lock(&dev->execute_task_lock);
 		if (!task->t_state_active) {
 			list_add_tail(&task->t_state_list,
@@ -3388,7 +3391,7 @@ static void transport_put_cmd(struct se_cmd *cmd)
 		free_tasks = 1;
 	}
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
-	
+
 	if (free_tasks != 0)
 		transport_free_dev_tasks(cmd);
 
@@ -3656,10 +3659,12 @@ transport_allocate_data_tasks(struct se_cmd *cmd,
 		if (!task)
 			return -ENOMEM;
 
-		task->task_lba = lba;
-		task->task_sectors = min(sectors, dev_max_sectors);
-		task->task_size = task->task_sectors * sector_size;
+		task->task_sg = cmd_sg;
+		task->task_sg_nents = sgl_nents;
 
+		task->task_lba = lba;
+		task->task_sectors = sectors;
+		task->task_size = task->task_sectors * sector_size;
 		/*
 		 * This now assumes that passed sg_ents are in PAGE_SIZE chunks
 		 * in order to calculate the number per task SGL entries
@@ -3940,12 +3945,12 @@ int target_put_sess_cmd(struct se_session *se_sess, struct se_cmd *se_cmd)
 
 	if (se_sess->sess_tearing_down && se_cmd->cmd_wait_set) {
 		spin_unlock_irqrestore(&se_sess->sess_cmd_lock, flags);
-		complete(&se_cmd->cmd_wait_comp);		
+		complete(&se_cmd->cmd_wait_comp);
 		return 1;
 	}
 	list_del(&se_cmd->se_cmd_list);
 	spin_unlock_irqrestore(&se_sess->sess_cmd_lock, flags);
-	
+
 	return 0;
 }
 EXPORT_SYMBOL(target_put_sess_cmd);

@@ -20,6 +20,7 @@
  ****************************************************************************/
 
 #include <linux/configfs.h>
+#include <linux/export.h>
 #include <target/target_core_base.h>
 #include <target/target_core_fabric.h>
 #include <target/target_core_fabric_configfs.h>

@@ -2128,6 +2128,10 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 		case CTIO_TYPE7:
 		case NOTIFY_ACK_TYPE:
 			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
+		case MARKER_TYPE:
+			/* Do nothing in this case, this check is to prevent it
+			 * from falling into default case
+			 */
 			break;
 		default:
 			/* Type Not Supported. */
@@ -2350,7 +2354,7 @@ qla25xx_msix_rsp_q(int irq, void *dev_id)
 	ha = rsp->hw;
 
 	/* Clear the interrupt, if enabled, for this response queue */
-	if (rsp->options & ~BIT_6) {
+	if (!ha->flags.disable_msix_handshake) {
 		reg = &ha->iobase->isp24;
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 		WRT_REG_DWORD(&reg->hccr, HCCRX_CLR_RISC_INT);

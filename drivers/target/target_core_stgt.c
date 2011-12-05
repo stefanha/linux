@@ -33,6 +33,7 @@
 #include <linux/genhd.h>
 #include <linux/cdrom.h>
 #include <linux/file.h>
+#include <linux/module.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
@@ -88,7 +89,6 @@ static struct device stgt_primary = {
 
 static struct scsi_host_template stgt_driver_template = {
 	.name		= STGT_NAME,
-	.module		= THIS_MODULE,
 	.can_queue	= 1,
 	.sg_tablesize	= SG_ALL,
 	.use_clustering	= DISABLE_CLUSTERING,

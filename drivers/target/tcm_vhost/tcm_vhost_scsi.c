@@ -18,6 +18,7 @@
 #include <linux/vhost.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/module.h>
 #include <linux/vhost.h>
 #include <linux/virtio_net.h> /* TODO vhost.h currently depends on this */
 #include <linux/virtio_scsi.h>

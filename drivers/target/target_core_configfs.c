@@ -3107,7 +3107,7 @@ static int __init target_core_init_configfs(void)
 
 	pr_debug("TARGET_CORE[0]: Loading Generic Kernel Storage"
 		" Engine: %s on %s/%s on "UTS_RELEASE"\n",
-		TARGET_CORE_VERSION, utsname()->sysname, utsname()->machine);
+		TARGET_CORE_MOD_VERSION, utsname()->sysname, utsname()->machine);
 
 	subsys = target_core_subsystem[0];
 	config_group_init(&subsys->su_group);

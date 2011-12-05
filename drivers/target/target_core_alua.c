@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/configfs.h>
+#include <linux/export.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 
@@ -90,7 +91,7 @@ int target_emulate_report_target_port_groups(struct se_task *task)
 		 */
 		if ((off + 8 + (tg_pt_gp->tg_pt_gp_members * 4)) >
 		     cmd->data_length) {
-			rd_len += 8 + (tg_pt_gp->tg_pt_gp_members * 4); 
+			rd_len += 8 + (tg_pt_gp->tg_pt_gp_members * 4);
 			continue;
 		}
 		/*
