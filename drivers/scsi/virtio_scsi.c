@@ -12,6 +12,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <linux/virtio.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
