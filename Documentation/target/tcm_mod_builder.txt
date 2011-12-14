@@ -38,7 +38,7 @@ Creating fabric_mod_dir:
 Writing file:
 /mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/tcm_nab5000_base.h
 Using tcm_mod_scan_fabric_ops:
-/mnt/sdb/lio-core-2.6.git/Documentation/target/../../include/target/target_core_fabric_ops.h
+/mnt/sdb/lio-core-2.6.git/Documentation/target/../../include/target/target_core_fabric.h
 Writing file:
 /mnt/sdb/lio-core-2.6.git/Documentation/target/../../drivers/target/tcm_nab5000/tcm_nab5000_fabric.c
 Writing file:
@@ -138,7 +138,7 @@ Future TODO items:
 
 	*) Add more T10 proto_idents
 	*) Make tcm_mod_dump_fabric_ops() smarter and generate function pointer
-	   defs directly from include/target/target_core_fabric_ops.h:struct target_core_fabric_ops
+	   defs directly from include/target/target_core_fabric.h:struct target_core_fabric_ops
 	   structure members.
 
 October 5th, 2010

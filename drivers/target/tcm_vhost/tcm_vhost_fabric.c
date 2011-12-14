@@ -36,11 +36,7 @@
 #include "../../vhost/vhost.h" /* TODO this is ugly */
 
 #include <target/target_core_base.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_fabric_ops.h>
-#include <target/target_core_fabric_lib.h>
-#include <target/target_core_device.h>
-#include <target/target_core_tpg.h>
+#include <target/target_core_fabric.h>
 #include <target/target_core_configfs.h>
 
 #include "tcm_vhost_base.h"
@@ -254,7 +250,7 @@ int tcm_vhost_new_cmd_map(struct se_cmd *se_cmd)
 		 */
 #warning FIXME: Fix BIDI operation in tcm_vhost_new_cmd_map()
 #if 0
-		if (T_TASK(se_cmd)->t_tasks_bidi) {
+		if (se_cmd->se_cmd_flags & SCF_BIDI) {
 			mem_bidi_ptr = NULL;
 			sg_no_bidi = 0;
 		}

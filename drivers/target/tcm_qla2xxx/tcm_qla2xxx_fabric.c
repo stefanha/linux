@@ -38,13 +38,8 @@
 #include <scsi/scsi_cmnd.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_fabric_ops.h>
-#include <target/target_core_fabric_lib.h>
-#include <target/target_core_device.h>
-#include <target/target_core_tpg.h>
+#include <target/target_core_fabric.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_tmr.h>
 
 #include <qla_def.h>
 #include <qla_target.h>
@@ -529,7 +524,7 @@ u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
  */
 static enum dma_data_direction tcm_qla2xxx_mapping_dir(struct se_cmd *se_cmd)
 {
-	if (se_cmd->t_tasks_bidi)
+	if (se_cmd->se_cmd_flags & SCF_BIDI)
 		return DMA_BIDIRECTIONAL;
 
 	switch (se_cmd->data_direction) {

@@ -40,13 +40,10 @@
 #include <generated/utsrelease.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_fabric_ops.h>
-#include <target/target_core_fabric_lib.h>
+#include <target/target_core_fabric.h>
 #include <target/target_core_fabric_configfs.h>
-#include <target/target_core_device.h>
-#include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
+#include <target/target_core_backend.h>
 
 #include <asm/hvcall.h>
 #include <asm/iommu.h>
@@ -417,7 +414,7 @@ static struct configfs_attribute *ibmvscsis_wwn_attrs[] = {
 static int ibmvscsis_write_pending(struct se_cmd *se_cmd);
 static int ibmvscsis_queue_data_in(struct se_cmd *se_cmd);
 static int ibmvscsis_queue_status(struct se_cmd *se_cmd);
-static void ibmvscsis_check_stop_free(struct se_cmd *se_cmd);
+static int ibmvscsis_check_stop_free(struct se_cmd *se_cmd);
 
 static struct target_core_fabric_ops ibmvscsis_ops = {
 	.task_sg_chaining		= 1,

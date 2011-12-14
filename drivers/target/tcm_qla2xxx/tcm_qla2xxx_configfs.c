@@ -33,14 +33,9 @@
 #include <asm/unaligned.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_fabric_ops.h>
+#include <target/target_core_fabric.h>
 #include <target/target_core_fabric_configfs.h>
-#include <target/target_core_fabric_lib.h>
-#include <target/target_core_device.h>
-#include <target/target_core_tpg.h>
 #include <target/target_core_configfs.h>
-#include <target/target_core_base.h>
 #include <target/configfs_macros.h>
 
 #include "tcm_qla2xxx_base.h"
@@ -400,8 +395,7 @@ static struct se_portal_group *tcm_qla2xxx_make_tpg(
 	QLA_TPG_ATTRIB(tpg)->cache_dynamic_acls = 1;
 
 	ret = core_tpg_register(&tcm_qla2xxx_fabric_configfs->tf_ops, wwn,
-				&tpg->se_tpg, (void *)tpg,
-				TRANSPORT_TPG_TYPE_NORMAL);
+				&tpg->se_tpg, tpg, TRANSPORT_TPG_TYPE_NORMAL);
 	if (ret < 0) {
 		kfree(tpg);
 		return NULL;
@@ -464,8 +458,7 @@ static struct se_portal_group *tcm_qla2xxx_npiv_make_tpg(
 	tpg->lport_tpgt = tpgt;
 
 	ret = core_tpg_register(&tcm_qla2xxx_npiv_fabric_configfs->tf_ops, wwn,
-				&tpg->se_tpg, (void *)tpg,
-				TRANSPORT_TPG_TYPE_NORMAL);
+				&tpg->se_tpg, tpg, TRANSPORT_TPG_TYPE_NORMAL);
 	if (ret < 0) {
 		kfree(tpg);
 		return NULL;
@@ -489,7 +482,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_s_id(
 	struct tcm_qla2xxx_fc_al_pa *p;
 	unsigned char domain, area, al_pa;
 
-	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
+	lport = ha->target_lport_ptr;
 	if (!lport) {
 		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();
@@ -613,7 +606,7 @@ static struct qla_tgt_sess *tcm_qla2xxx_find_sess_by_loop_id(
 	struct tcm_qla2xxx_nacl *nacl;
 	struct tcm_qla2xxx_fc_loopid *fc_loopid;
 
-	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
+	lport = ha->target_lport_ptr;
 	if (!lport) {
 		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();
@@ -728,7 +721,7 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 	se_nacl = se_sess->se_node_acl;
         nacl = container_of(se_nacl, struct tcm_qla2xxx_nacl, se_node_acl);
 
-	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
+	lport = ha->target_lport_ptr;
 	if (!lport) {
 		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();
@@ -789,7 +782,7 @@ static int tcm_qla2xxx_check_initiator_node_acl(
 	unsigned char port_name[36];
 	unsigned long flags;
 
-	lport = (struct tcm_qla2xxx_lport *)ha->target_lport_ptr;
+	lport = ha->target_lport_ptr;
 	if (!lport) {
 		pr_err("Unable to locate struct tcm_qla2xxx_lport\n");
 		dump_stack();

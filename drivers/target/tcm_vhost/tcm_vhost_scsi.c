@@ -18,6 +18,7 @@
 #include <linux/vhost.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/module.h>
 #include <linux/vhost.h>
 #include <linux/virtio_net.h> /* TODO vhost.h currently depends on this */
 #include <linux/virtio_scsi.h>
@@ -26,8 +27,7 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_tcq.h>
 #include <target/target_core_base.h>
-#include <target/target_core_device.h>
-#include <target/target_core_transport.h>
+#include <target/target_core_fabric.h>
 
 #include "tcm_vhost_base.h"
 #include "tcm_vhost_scsi.h"
@@ -151,13 +151,9 @@ static struct tcm_vhost_cmd *vhost_scsi_allocate_cmd(
 				data_direction, sam_task_attr,
 				&tv_cmd->tvc_sense_buf[0]);
 
-#warning FIXME: vhost_scsi_allocate_cmd() BIDI operation
-#if 0
-	/*
-	 * Signal BIDI usage with T_TASK(cmd)->t_tasks_bidi
-	 */
+#if 0	/* FIXME: vhost_scsi_allocate_cmd() BIDI operation */
 	if (bidi)
-		T_TASK(se_cmd)->t_tasks_bidi = 1;
+		se_cmd->se_cmd_flags |= SCF_BIDI;
 #endif
 	/*
 	 * From here the rest of the se_cmd will be setup and dispatched

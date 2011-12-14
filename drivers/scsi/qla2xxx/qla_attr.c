@@ -24,11 +24,23 @@ qla2x00_sysfs_read_fw_dump(struct file *filp, struct kobject *kobj,
 	struct scsi_qla_host *vha = shost_priv(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
 	struct qla_hw_data *ha = vha->hw;
+	int rval = 0;
 
 	if (ha->fw_dump_reading == 0)
 		return 0;
 
-	return memory_read_from_buffer(buf, count, &off, ha->fw_dump,
+	if (IS_QLA82XX(ha)) {
+		if (off < ha->md_template_size) {
+			rval = memory_read_from_buffer(buf, count,
+			    &off, ha->md_tmplt_hdr, ha->md_template_size);
+			return rval;
+		}
+		off -= ha->md_template_size;
+		rval = memory_read_from_buffer(buf, count,
+		    &off, ha->md_dump, ha->md_dump_size);
+		return rval;
+	} else
+		return memory_read_from_buffer(buf, count, &off, ha->fw_dump,
 					ha->fw_dump_len);
 }
 
@@ -42,12 +54,6 @@ qla2x00_sysfs_write_fw_dump(struct file *filp, struct kobject *kobj,
 	struct qla_hw_data *ha = vha->hw;
 	int reading;
 
-	if (IS_QLA82XX(ha)) {
-		ql_dbg(ql_dbg_user, vha, 0x705b,
-		    "Firmware dump not supported for ISP82xx\n");
-		return count;
-	}
-
 	if (off != 0)
 		return (0);
 
@@ -60,6 +66,10 @@ qla2x00_sysfs_write_fw_dump(struct file *filp, struct kobject *kobj,
 		ql_log(ql_log_info, vha, 0x705d,
 		    "Firmware dump cleared on (%ld).\n", vha->host_no);
 
+		if (IS_QLA82XX(vha->hw)) {
+			qla82xx_md_free(vha);
+			qla82xx_md_prep(vha);
+		}
 		ha->fw_dump_reading = 0;
 		ha->fw_dumped = 0;
 		break;
@@ -76,10 +86,29 @@ qla2x00_sysfs_write_fw_dump(struct file *filp, struct kobject *kobj,
 		qla2x00_alloc_fw_dump(vha);
 		break;
 	case 3:
-		qla2x00_system_error(vha);
+		if (IS_QLA82XX(ha)) {
+			qla82xx_idc_lock(ha);
+			qla82xx_set_reset_owner(vha);
+			qla82xx_idc_unlock(ha);
+		} else
+			qla2x00_system_error(vha);
+		break;
+	case 4:
+		if (IS_QLA82XX(ha)) {
+			if (ha->md_tmplt_hdr)
+				ql_dbg(ql_dbg_user, vha, 0x705b,
+				    "MiniDump supported with this firmware.\n");
+			else
+				ql_dbg(ql_dbg_user, vha, 0x709d,
+				    "MiniDump not supported with this firmware.\n");
+		}
+		break;
+	case 5:
+		if (IS_QLA82XX(ha))
+			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 		break;
 	}
-	return (count);
+	return -EINVAL;
 }
 
 static struct bin_attribute sysfs_fw_dump_attr = {
@@ -123,7 +152,7 @@ qla2x00_sysfs_write_nvram(struct file *filp, struct kobject *kobj,
 
 	if (!capable(CAP_SYS_ADMIN) || off != 0 || count != ha->nvram_size ||
 	    !ha->isp_ops->write_nvram)
-		return 0;
+		return -EINVAL;
 
 	/* Checksum NVRAM. */
 	if (IS_FWI2_CAPABLE(ha)) {
@@ -166,7 +195,7 @@ qla2x00_sysfs_write_nvram(struct file *filp, struct kobject *kobj,
 	qla2xxx_wake_dpc(vha);
 	qla2x00_wait_for_chip_reset(vha);
 
-	return (count);
+	return count;
 }
 
 static struct bin_attribute sysfs_nvram_attr = {
@@ -240,10 +269,10 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 	int val, valid;
 
 	if (off)
-		return 0;
+		return -EINVAL;
 
 	if (unlikely(pci_channel_offline(ha->pdev)))
-		return 0;
+		return -EAGAIN;
 
 	if (sscanf(buf, "%d:%x:%x", &val, &start, &size) < 1)
 		return -EINVAL;
@@ -254,7 +283,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 	case 0:
 		if (ha->optrom_state != QLA_SREADING &&
 		    ha->optrom_state != QLA_SWRITING)
-			break;
+			return -EINVAL;
 
 		ha->optrom_state = QLA_SWAITING;
 
@@ -267,7 +296,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		break;
 	case 1:
 		if (ha->optrom_state != QLA_SWAITING)
-			break;
+			return -EINVAL;
 
 		ha->optrom_region_start = start;
 		ha->optrom_region_size = start + size > ha->optrom_size ?
@@ -281,7 +310,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 			    "(%x).\n", ha->optrom_region_size);
 
 			ha->optrom_state = QLA_SWAITING;
-			return count;
+			return -ENOMEM;
 		}
 
 		if (qla2x00_wait_for_hba_online(vha) != QLA_SUCCESS) {
@@ -300,7 +329,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		break;
 	case 2:
 		if (ha->optrom_state != QLA_SWAITING)
-			break;
+			return -EINVAL;
 
 		/*
 		 * We need to be more restrictive on which FLASH regions are
@@ -348,7 +377,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 			    "(%x)\n", ha->optrom_region_size);
 
 			ha->optrom_state = QLA_SWAITING;
-			return count;
+			return -ENOMEM;
 		}
 
 		ql_dbg(ql_dbg_user, vha, 0x7067,
@@ -359,7 +388,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		break;
 	case 3:
 		if (ha->optrom_state != QLA_SWRITING)
-			break;
+			return -ENOMEM;
 
 		if (qla2x00_wait_for_hba_online(vha) != QLA_SUCCESS) {
 			ql_log(ql_log_warn, vha, 0x7068,
@@ -375,7 +404,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		    ha->optrom_region_start, ha->optrom_region_size);
 		break;
 	default:
-		count = -EINVAL;
+		return -EINVAL;
 	}
 	return count;
 }
@@ -399,10 +428,10 @@ qla2x00_sysfs_read_vpd(struct file *filp, struct kobject *kobj,
 	struct qla_hw_data *ha = vha->hw;
 
 	if (unlikely(pci_channel_offline(ha->pdev)))
-		return 0;
+		return -EAGAIN;
 
 	if (!capable(CAP_SYS_ADMIN))
-		return 0;
+		return -EINVAL;
 
 	if (IS_NOCACHE_VPD_TYPE(ha))
 		ha->isp_ops->read_optrom(vha, ha->vpd, ha->flt_region_vpd << 2,
@@ -439,17 +468,17 @@ qla2x00_sysfs_write_vpd(struct file *filp, struct kobject *kobj,
 
 	/* Update flash version information for 4Gb & above. */
 	if (!IS_FWI2_CAPABLE(ha))
-		goto done;
+		return -EINVAL;
 
 	tmp_data = vmalloc(256);
 	if (!tmp_data) {
 		ql_log(ql_log_warn, vha, 0x706b,
 		    "Unable to allocate memory for VPD information update.\n");
-		goto done;
+		return -ENOMEM;
 	}
 	ha->isp_ops->get_flash_version(vha, tmp_data);
 	vfree(tmp_data);
-done:
+
 	return count;
 }
 
@@ -506,8 +535,7 @@ do_read:
 			    "Unable to read SFP data (%x/%x/%x).\n", rval,
 			    addr, offset);
 
-			count = 0;
-			break;
+			return -EIO;
 		}
 		memcpy(buf, ha->sfp_data, SFP_BLOCK_SIZE);
 		buf += SFP_BLOCK_SIZE;
@@ -537,7 +565,7 @@ qla2x00_sysfs_write_reset(struct file *filp, struct kobject *kobj,
 	int type;
 
 	if (off != 0)
-		return 0;
+		return -EINVAL;
 
 	type = simple_strtol(buf, NULL, 10);
 	switch (type) {
@@ -547,13 +575,18 @@ qla2x00_sysfs_write_reset(struct file *filp, struct kobject *kobj,
 
 		scsi_block_requests(vha->host);
 		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+		if (IS_QLA82XX(ha)) {
+			qla82xx_idc_lock(ha);
+			qla82xx_set_reset_owner(vha);
+			qla82xx_idc_unlock(ha);
+		}
 		qla2xxx_wake_dpc(vha);
 		qla2x00_wait_for_chip_reset(vha);
 		scsi_unblock_requests(vha->host);
 		break;
 	case 0x2025d:
 		if (!IS_QLA81XX(ha))
-			break;
+			return -EPERM;
 
 		ql_log(ql_log_info, vha, 0x706f,
 		    "Issuing MPI reset.\n");
@@ -572,7 +605,7 @@ qla2x00_sysfs_write_reset(struct file *filp, struct kobject *kobj,
 		if (!IS_QLA82XX(ha) || vha != base_vha) {
 			ql_log(ql_log_info, vha, 0x7071,
 			    "FCoE ctx reset no supported.\n");
-			return count;
+			return -EPERM;
 		}
 
 		ql_log(ql_log_info, vha, 0x7072,
@@ -608,7 +641,7 @@ qla2x00_sysfs_write_edc(struct file *filp, struct kobject *kobj,
 	ha->edc_data_len = 0;
 
 	if (!capable(CAP_SYS_ADMIN) || off != 0 || count < 8)
-		return 0;
+		return -EINVAL;
 
 	if (!ha->edc_data) {
 		ha->edc_data = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
@@ -616,7 +649,7 @@ qla2x00_sysfs_write_edc(struct file *filp, struct kobject *kobj,
 		if (!ha->edc_data) {
 			ql_log(ql_log_warn, vha, 0x7073,
 			    "Unable to allocate memory for EDC write.\n");
-			return 0;
+			return -ENOMEM;
 		}
 	}
 
@@ -635,9 +668,9 @@ qla2x00_sysfs_write_edc(struct file *filp, struct kobject *kobj,
 	    dev, adr, len, opt);
 	if (rval != QLA_SUCCESS) {
 		ql_log(ql_log_warn, vha, 0x7074,
-		    "Unable to write EDC (%x) %02x:%04x:%02x:%02x\n",
+		    "Unable to write EDC (%x) %02x:%04x:%02x:%02hhx\n",
 		    rval, dev, adr, opt, len, buf[8]);
-		return 0;
+		return -EIO;
 	}
 
 	return count;
@@ -666,7 +699,7 @@ qla2x00_sysfs_write_edc_status(struct file *filp, struct kobject *kobj,
 	ha->edc_data_len = 0;
 
 	if (!capable(CAP_SYS_ADMIN) || off != 0 || count < 8)
-		return 0;
+		return -EINVAL;
 
 	if (!ha->edc_data) {
 		ha->edc_data = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
@@ -674,7 +707,7 @@ qla2x00_sysfs_write_edc_status(struct file *filp, struct kobject *kobj,
 		if (!ha->edc_data) {
 			ql_log(ql_log_warn, vha, 0x708c,
 			    "Unable to allocate memory for EDC status.\n");
-			return 0;
+			return -ENOMEM;
 		}
 	}
 
@@ -694,7 +727,7 @@ qla2x00_sysfs_write_edc_status(struct file *filp, struct kobject *kobj,
 		ql_log(ql_log_info, vha, 0x7075,
 		    "Unable to write EDC status (%x) %02x:%04x:%02x.\n",
 		    rval, dev, adr, opt, len);
-		return 0;
+		return -EIO;
 	}
 
 	ha->edc_data_len = len;
@@ -806,7 +839,7 @@ qla2x00_sysfs_read_dcbx_tlv(struct file *filp, struct kobject *kobj,
 	if (!ha->dcbx_tlv) {
 		ql_log(ql_log_warn, vha, 0x7078,
 		    "Unable to allocate memory for DCBX TLV read-data.\n");
-		return 0;
+		return -ENOMEM;
 	}
 
 do_read:
@@ -818,7 +851,7 @@ do_read:
 	if (rval != QLA_SUCCESS) {
 		ql_log(ql_log_warn, vha, 0x7079,
 		    "Unable to read DCBX TLV (%x).\n", rval);
-		count = 0;
+		return -EIO;
 	}
 
 	memcpy(buf, ha->dcbx_tlv, count);

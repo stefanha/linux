@@ -38,9 +38,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
 #include <target/target_core_base.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_fabric_ops.h>
-#include <target/target_core_tmr.h>
+#include <target/target_core_fabric.h>
 
 #include "qla_def.h"
 #include "qla_target.h"

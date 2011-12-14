@@ -5,9 +5,6 @@
 #define TARGET_CORE_NAME_MAX_LEN	64
 #define TARGET_FABRIC_NAME_SIZE		32
 
-/* Used by target_core_alua.c */
-extern struct t10_alua_lu_gp *default_lu_gp;
-
 extern struct target_fabric_configfs *target_fabric_configfs_init(
 				struct module *, const char *);
 extern void target_fabric_configfs_free(struct target_fabric_configfs *);

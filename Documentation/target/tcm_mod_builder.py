@@ -230,14 +230,9 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "#include <linux/ctype.h>\n"
 	buf += "#include <asm/unaligned.h>\n\n"
 	buf += "#include <target/target_core_base.h>\n"
-	buf += "#include <target/target_core_transport.h>\n"
-	buf += "#include <target/target_core_fabric_ops.h>\n"
+	buf += "#include <target/target_core_fabric.h>\n"
 	buf += "#include <target/target_core_fabric_configfs.h>\n"
-	buf += "#include <target/target_core_fabric_lib.h>\n"
-	buf += "#include <target/target_core_device.h>\n"
-	buf += "#include <target/target_core_tpg.h>\n"
 	buf += "#include <target/target_core_configfs.h>\n"
-	buf += "#include <target/target_core_base.h>\n"
 	buf += "#include <target/configfs_macros.h>\n\n"
 	buf += "#include \"" + fabric_mod_name + "_base.h\"\n"
 	buf += "#include \"" + fabric_mod_name + "_fabric.h\"\n\n"
@@ -410,7 +405,6 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "	.get_fabric_sense_len		= " + fabric_mod_name + "_get_fabric_sense_len,\n"
 	buf += "	.set_fabric_sense_len		= " + fabric_mod_name + "_set_fabric_sense_len,\n"
 	buf += "	.is_state_remove		= " + fabric_mod_name + "_is_state_remove,\n"
-	buf += "	.pack_lun			= " + fabric_mod_name + "_pack_lun,\n"
 	buf += "	/*\n"
 	buf += "	 * Setup function pointers for generic logic in target_core_fabric_configfs.c\n"
 	buf += "	 */\n"
@@ -512,7 +506,7 @@ def tcm_mod_build_configfs(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 
 def tcm_mod_scan_fabric_ops(tcm_dir):
 
-	fabric_ops_api = tcm_dir + "include/target/target_core_fabric_ops.h"
+	fabric_ops_api = tcm_dir + "include/target/target_core_fabric.h"
 
 	print "Using tcm_mod_scan_fabric_ops: " + fabric_ops_api
 	process_fo = 0;
@@ -577,11 +571,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 	buf += "#include <scsi/scsi_cmnd.h>\n"
 	buf += "#include <scsi/libfc.h>\n\n"
 	buf += "#include <target/target_core_base.h>\n"
-	buf += "#include <target/target_core_transport.h>\n"
-	buf += "#include <target/target_core_fabric_ops.h>\n"
-	buf += "#include <target/target_core_fabric_lib.h>\n"
-	buf += "#include <target/target_core_device.h>\n"
-	buf += "#include <target/target_core_tpg.h>\n"
+	buf += "#include <target/target_core_fabric.h>\n"
 	buf += "#include <target/target_core_configfs.h>\n\n"
 	buf += "#include \"" + fabric_mod_name + "_base.h\"\n"
 	buf += "#include \"" + fabric_mod_name + "_fabric.h\"\n\n"
@@ -813,7 +803,7 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "}\n\n"
 			bufi += "u32 " + fabric_mod_name + "_tpg_get_inst_index(struct se_portal_group *);\n"
 
-		if re.search('release_cmd', fo):
+		if re.search('\*release_cmd\)\(', fo):
 			buf += "void " + fabric_mod_name + "_release_cmd(struct se_cmd *se_cmd)\n"
 			buf += "{\n"
 			buf += "	return;\n"
@@ -938,15 +928,6 @@ def tcm_mod_dump_fabric_ops(proto_ident, fabric_mod_dir_var, fabric_mod_name):
 			buf += "	return 0;\n"
 			buf += "}\n\n"
 			bufi += "int " + fabric_mod_name + "_is_state_remove(struct se_cmd *);\n"
-
-		if re.search('pack_lun\)\(', fo):
-			buf += "u64 " + fabric_mod_name + "_pack_lun(unsigned int lun)\n"
-			buf += "{\n"
-			buf += "	WARN_ON(lun >= 256);\n"
-			buf += "	/* Caller wants this byte-swapped */\n"
-			buf += "	return cpu_to_le64((lun & 0xff) << 8);\n"
-			buf += "}\n\n"
-			bufi += "u64 " + fabric_mod_name + "_pack_lun(unsigned int);\n"
 
 
 	ret = p.write(buf)

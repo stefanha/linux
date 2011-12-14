@@ -33,6 +33,7 @@
 #include <linux/genhd.h>
 #include <linux/cdrom.h>
 #include <linux/file.h>
+#include <linux/module.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
@@ -41,8 +42,7 @@
 #include <scsi/scsi_tgt.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_device.h>
-#include <target/target_core_transport.h>
+#include <target/target_core_backend.h>
 
 #include "target_core_stgt.h"
 
@@ -89,7 +89,6 @@ static struct device stgt_primary = {
 
 static struct scsi_host_template stgt_driver_template = {
 	.name		= STGT_NAME,
-	.module		= THIS_MODULE,
 	.can_queue	= 1,
 	.sg_tablesize	= SG_ALL,
 	.use_clustering	= DISABLE_CLUSTERING,
@@ -397,7 +396,7 @@ static ssize_t stgt_set_configfs_dev_params(struct se_hba *hba,
 
 	orig = opts;
 
-	while ((ptr = strsep(&opts, ",")) != NULL) {
+	while ((ptr = strsep(&opts, ",\n")) != NULL) {
 		if (!*ptr)
 			continue;
 
@@ -473,7 +472,7 @@ static unsigned char *stgt_get_sense_buffer(struct se_task *task)
 {
 	struct stgt_plugin_task *pt = STGT_TASK(task);
 
-	return (unsigned char *)&pt->stgt_sense[0];
+	return pt->stgt_sense;
 }
 
 /*	stgt_get_device_rev():

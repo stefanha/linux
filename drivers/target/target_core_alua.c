@@ -27,17 +27,17 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/configfs.h>
+#include <linux/export.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_device.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_fabric_ops.h>
+#include <target/target_core_backend.h>
+#include <target/target_core_fabric.h>
 #include <target/target_core_configfs.h>
 
+#include "target_core_internal.h"
 #include "target_core_alua.h"
-#include "target_core_hba.h"
 #include "target_core_ua.h"
 
 static int core_alua_check_transition(int state, int *primary);
@@ -91,7 +91,7 @@ int target_emulate_report_target_port_groups(struct se_task *task)
 		 */
 		if ((off + 8 + (tg_pt_gp->tg_pt_gp_members * 4)) >
 		     cmd->data_length) {
-			rd_len += 8 + (tg_pt_gp->tg_pt_gp_members * 4); 
+			rd_len += 8 + (tg_pt_gp->tg_pt_gp_members * 4);
 			continue;
 		}
 		/*
@@ -1190,7 +1190,6 @@ void core_alua_free_lu_gp(struct t10_alua_lu_gp *lu_gp)
 	 * struct t10_alua_lu_gp.
 	 */
 	spin_lock(&lu_gps_lock);
-	atomic_set(&lu_gp->lu_gp_shutdown, 1);
 	list_del(&lu_gp->lu_gp_node);
 	alua_lu_gps_count--;
 	spin_unlock(&lu_gps_lock);
@@ -1444,7 +1443,6 @@ struct t10_alua_tg_pt_gp_member *core_alua_allocate_tg_pt_gp_mem(
 
 	tg_pt_gp_mem->tg_pt = port;
 	port->sep_alua_tg_pt_gp_mem = tg_pt_gp_mem;
-	atomic_set(&port->sep_tg_pt_gp_active, 1);
 
 	return tg_pt_gp_mem;
 }

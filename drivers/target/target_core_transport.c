@@ -36,6 +36,7 @@
 #include <linux/kthread.h>
 #include <linux/in.h>
 #include <linux/cdrom.h>
+#include <linux/module.h>
 #include <asm/unaligned.h>
 #include <net/sock.h>
 #include <net/tcp.h>
@@ -44,24 +45,18 @@
 #include <scsi/scsi_tcq.h>
 
 #include <target/target_core_base.h>
-#include <target/target_core_device.h>
-#include <target/target_core_tmr.h>
-#include <target/target_core_tpg.h>
-#include <target/target_core_transport.h>
-#include <target/target_core_fabric_ops.h>
+#include <target/target_core_backend.h>
+#include <target/target_core_fabric.h>
 #include <target/target_core_configfs.h>
 
+#include "target_core_internal.h"
 #include "target_core_alua.h"
-#include "target_core_cdb.h"
-#include "target_core_hba.h"
-#include "target_core_stat.h"
 #include "target_core_pr.h"
 #include "target_core_ua.h"
 
 static int sub_api_initialized;
 
 static struct workqueue_struct *target_completion_wq;
-static struct kmem_cache *se_cmd_cache;
 static struct kmem_cache *se_sess_cache;
 struct kmem_cache *se_tmr_req_cache;
 struct kmem_cache *se_ua_cache;
@@ -87,19 +82,13 @@ static void target_complete_ok_work(struct work_struct *work);
 
 int init_se_kmem_caches(void)
 {
-	se_cmd_cache = kmem_cache_create("se_cmd_cache",
-			sizeof(struct se_cmd), __alignof__(struct se_cmd), 0, NULL);
-	if (!se_cmd_cache) {
-		pr_err("kmem_cache_create for struct se_cmd failed\n");
-		goto out;
-	}
 	se_tmr_req_cache = kmem_cache_create("se_tmr_cache",
 			sizeof(struct se_tmr_req), __alignof__(struct se_tmr_req),
 			0, NULL);
 	if (!se_tmr_req_cache) {
 		pr_err("kmem_cache_create() for struct se_tmr_req"
 				" failed\n");
-		goto out_free_cmd_cache;
+		goto out;
 	}
 	se_sess_cache = kmem_cache_create("se_sess_cache",
 			sizeof(struct se_session), __alignof__(struct se_session),
@@ -182,8 +171,6 @@ out_free_sess_cache:
 	kmem_cache_destroy(se_sess_cache);
 out_free_tmr_req_cache:
 	kmem_cache_destroy(se_tmr_req_cache);
-out_free_cmd_cache:
-	kmem_cache_destroy(se_cmd_cache);
 out:
 	return -ENOMEM;
 }
@@ -191,7 +178,6 @@ out:
 void release_se_kmem_caches(void)
 {
 	destroy_workqueue(target_completion_wq);
-	kmem_cache_destroy(se_cmd_cache);
 	kmem_cache_destroy(se_tmr_req_cache);
 	kmem_cache_destroy(se_sess_cache);
 	kmem_cache_destroy(se_ua_cache);
@@ -222,14 +208,13 @@ u32 scsi_get_new_index(scsi_index_t type)
 	return new_index;
 }
 
-void transport_init_queue_obj(struct se_queue_obj *qobj)
+static void transport_init_queue_obj(struct se_queue_obj *qobj)
 {
 	atomic_set(&qobj->queue_cnt, 0);
 	INIT_LIST_HEAD(&qobj->qobj_list);
 	init_waitqueue_head(&qobj->thread_wq);
 	spin_lock_init(&qobj->cmd_queue_lock);
 }
-EXPORT_SYMBOL(transport_init_queue_obj);
 
 void transport_subsystem_check_init(void)
 {
@@ -237,7 +222,7 @@ void transport_subsystem_check_init(void)
 
 	if (sub_api_initialized)
 		return;
-	
+
 	ret = request_module("target_core_iblock");
 	if (ret != 0)
 		pr_err("Unable to load target_core_iblock\n");
@@ -438,18 +423,18 @@ static void transport_all_task_dev_remove_state(struct se_cmd *cmd)
 		if (task->task_flags & TF_ACTIVE)
 			continue;
 
-		if (!atomic_read(&task->task_state_active))
-			continue;
-
 		spin_lock_irqsave(&dev->execute_task_lock, flags);
-		list_del(&task->t_state_list);
-		pr_debug("Removed ITT: 0x%08x dev: %p task[%p]\n",
-			cmd->se_tfo->get_task_tag(cmd), dev, task);
-		spin_unlock_irqrestore(&dev->execute_task_lock, flags);
+		if (task->t_state_active) {
+			pr_debug("Removed ITT: 0x%08x dev: %p task[%p]\n",
+				cmd->se_tfo->get_task_tag(cmd), dev, task);
 
-		atomic_set(&task->task_state_active, 0);
-		atomic_dec(&cmd->t_task_cdbs_ex_left);
+			list_del(&task->t_state_list);
+			atomic_dec(&cmd->t_task_cdbs_ex_left);
+			task->t_state_active = false;
+		}
+		spin_unlock_irqrestore(&dev->execute_task_lock, flags);
 	}
+
 }
 
 /*	transport_cmd_check_stop():
@@ -639,7 +624,6 @@ transport_get_cmd_from_queue(struct se_queue_obj *qobj)
 
 	atomic_set(&cmd->t_transport_queue_active, 0);
 	list_del_init(&cmd->se_queue_node);
-
 	atomic_dec(&qobj->queue_cnt);
 	spin_unlock_irqrestore(&qobj->cmd_queue_lock, flags);
 
@@ -720,7 +704,7 @@ void transport_complete_task(struct se_task *task, int success)
 	if (dev && dev->transport->transport_complete) {
 		if (dev->transport->transport_complete(task) != 0) {
 			cmd->se_cmd_flags |= SCF_TRANSPORT_TASK_SENSE;
-			task->task_sense = 1;
+			task->task_flags |= TF_HAS_SENSE;
 			success = 1;
 		}
 	}
@@ -749,13 +733,7 @@ void transport_complete_task(struct se_task *task, int success)
 	}
 
 	if (cmd->t_tasks_failed) {
-		if (!task->task_error_status) {
-			task->task_error_status =
-				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-			cmd->scsi_sense_reason =
-				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-		}
-
+		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		INIT_WORK(&cmd->work, target_complete_failure_work);
 	} else {
 		atomic_set(&cmd->t_transport_complete, 1);
@@ -830,7 +808,7 @@ static void __transport_add_task_to_execute_queue(
 	head_of_queue = transport_add_task_check_sam_attr(task, task_prev, dev);
 	atomic_inc(&dev->execute_tasks);
 
-	if (atomic_read(&task->task_state_active))
+	if (task->t_state_active)
 		return;
 	/*
 	 * Determine if this task needs to go to HEAD_OF_QUEUE for the
@@ -844,7 +822,7 @@ static void __transport_add_task_to_execute_queue(
 	else
 		list_add_tail(&task->t_state_list, &dev->state_task_list);
 
-	atomic_set(&task->task_state_active, 1);
+	task->t_state_active = true;
 
 	pr_debug("Added ITT: 0x%08x task[%p] to dev: %p\n",
 		task->task_se_cmd->se_tfo->get_task_tag(task->task_se_cmd),
@@ -859,17 +837,19 @@ static void transport_add_tasks_to_state_queue(struct se_cmd *cmd)
 
 	spin_lock_irqsave(&cmd->t_state_lock, flags);
 	list_for_each_entry(task, &cmd->t_task_list, t_list) {
-		if (atomic_read(&task->task_state_active))
+		if (task->task_flags & TF_ACTIVE)
 			continue;
 
 		spin_lock(&dev->execute_task_lock);
-		list_add_tail(&task->t_state_list, &dev->state_task_list);
-		atomic_set(&task->task_state_active, 1);
+		if (!task->t_state_active) {
+			list_add_tail(&task->t_state_list,
+				      &dev->state_task_list);
+			task->t_state_active = true;
 
-		pr_debug("Added ITT: 0x%08x task[%p] to dev: %p\n",
-			task->task_se_cmd->se_tfo->get_task_tag(
-			task->task_se_cmd), task, dev);
-
+			pr_debug("Added ITT: 0x%08x task[%p] to dev: %p\n",
+				task->task_se_cmd->se_tfo->get_task_tag(
+				task->task_se_cmd), task, dev);
+		}
 		spin_unlock(&dev->execute_task_lock);
 	}
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
@@ -909,7 +889,7 @@ void __transport_remove_task_from_execute_queue(struct se_task *task,
 	atomic_dec(&dev->execute_tasks);
 }
 
-void transport_remove_task_from_execute_queue(
+static void transport_remove_task_from_execute_queue(
 	struct se_task *task,
 	struct se_device *dev)
 {
@@ -1338,23 +1318,17 @@ struct se_device *transport_add_device_to_core_hba(
 	dev->se_hba		= hba;
 	dev->se_sub_dev		= se_dev;
 	dev->transport		= transport;
-	atomic_set(&dev->active_cmds, 0);
 	INIT_LIST_HEAD(&dev->dev_list);
 	INIT_LIST_HEAD(&dev->dev_sep_list);
 	INIT_LIST_HEAD(&dev->dev_tmr_list);
 	INIT_LIST_HEAD(&dev->execute_task_list);
 	INIT_LIST_HEAD(&dev->delayed_cmd_list);
-	INIT_LIST_HEAD(&dev->ordered_cmd_list);
 	INIT_LIST_HEAD(&dev->state_task_list);
 	INIT_LIST_HEAD(&dev->qf_cmd_list);
 	spin_lock_init(&dev->execute_task_lock);
 	spin_lock_init(&dev->delayed_cmd_lock);
-	spin_lock_init(&dev->ordered_cmd_lock);
-	spin_lock_init(&dev->state_task_lock);
-	spin_lock_init(&dev->dev_alua_lock);
 	spin_lock_init(&dev->dev_reservation_lock);
 	spin_lock_init(&dev->dev_status_lock);
-	spin_lock_init(&dev->dev_status_thr_lock);
 	spin_lock_init(&dev->se_port_lock);
 	spin_lock_init(&dev->se_tmr_lock);
 	spin_lock_init(&dev->qf_cmd_lock);
@@ -1507,7 +1481,6 @@ void transport_init_se_cmd(
 {
 	INIT_LIST_HEAD(&cmd->se_lun_node);
 	INIT_LIST_HEAD(&cmd->se_delayed_node);
-	INIT_LIST_HEAD(&cmd->se_ordered_node);
 	INIT_LIST_HEAD(&cmd->se_qf_node);
 	INIT_LIST_HEAD(&cmd->se_queue_node);
 	INIT_LIST_HEAD(&cmd->se_cmd_list);
@@ -1715,7 +1688,7 @@ int target_submit_cmd(struct se_cmd *se_cmd, struct se_session *se_sess,
 	 * Signal bidirectional data payloads to target-core
 	 */
 	if (flags & TARGET_SCF_BIDI_OP)
-		se_cmd->t_tasks_bidi = 1;
+		se_cmd->se_cmd_flags |= SCF_BIDI;
 	/*
  	 * Locate se_lun pointer and attach it to struct se_cmd
  	 */
@@ -2026,19 +1999,12 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 	 * to allow the passed struct se_cmd list of tasks to the front of the list.
 	 */
 	 if (cmd->sam_task_attr == MSG_HEAD_TAG) {
-		atomic_inc(&cmd->se_dev->dev_hoq_count);
-		smp_mb__after_atomic_inc();
 		pr_debug("Added HEAD_OF_QUEUE for CDB:"
 			" 0x%02x, se_ordered_id: %u\n",
 			cmd->t_task_cdb[0],
 			cmd->se_ordered_id);
 		return 1;
 	} else if (cmd->sam_task_attr == MSG_ORDERED_TAG) {
-		spin_lock(&cmd->se_dev->ordered_cmd_lock);
-		list_add_tail(&cmd->se_ordered_node,
-				&cmd->se_dev->ordered_cmd_list);
-		spin_unlock(&cmd->se_dev->ordered_cmd_lock);
-
 		atomic_inc(&cmd->se_dev->dev_ordered_sync);
 		smp_mb__after_atomic_inc();
 
@@ -2100,6 +2066,7 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 {
 	int add_tasks;
 	struct se_device *se_dev = cmd->se_dev;
+
 	/*
 	 * Call transport_cmd_check_stop() to see if a fabric exception
 	 * has occurred that prevents execution.
@@ -2205,10 +2172,15 @@ static inline u32 transport_get_sectors_6(
 
 	/*
 	 * Everything else assume TYPE_DISK Sector CDB location.
-	 * Use 8-bit sector value.
+	 * Use 8-bit sector value.  SBC-3 says:
+	 *
+	 *   A TRANSFER LENGTH field set to zero specifies that 256
+	 *   logical blocks shall be written.  Any other value
+	 *   specifies the number of logical blocks that shall be
+	 *   written.
 	 */
 type_disk:
-	return (u32)cdb[4];
+	return cdb[4] ? : 256;
 }
 
 static inline u32 transport_get_sectors_10(
@@ -2413,7 +2385,7 @@ static int transport_get_sense_data(struct se_cmd *cmd)
 
 	list_for_each_entry_safe(task, task_tmp,
 				&cmd->t_task_list, t_list) {
-		if (!task->task_sense)
+		if (!(task->task_flags & TF_HAS_SENSE))
 			continue;
 
 		if (!dev->transport->get_sense_buffer) {
@@ -2633,7 +2605,8 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->t_task_lba = transport_lba_32(cdb);
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
 		break;
 	case WRITE_12:
@@ -2642,7 +2615,8 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->t_task_lba = transport_lba_32(cdb);
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
 		break;
 	case WRITE_16:
@@ -2651,12 +2625,13 @@ static int transport_generic_cmd_sequencer(
 			goto out_unsupported_cdb;
 		size = transport_get_size(sectors, cdb, cmd);
 		cmd->t_task_lba = transport_lba_64(cdb);
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		cmd->se_cmd_flags |= SCF_SCSI_DATA_SG_IO_CDB;
 		break;
 	case XDWRITEREAD_10:
 		if ((cmd->data_direction != DMA_TO_DEVICE) ||
-		    !(cmd->t_tasks_bidi))
+		    !(cmd->se_cmd_flags & SCF_BIDI))
 			goto out_invalid_cdb_field;
 		sectors = transport_get_sectors_10(cdb, cmd, &sector_ret);
 		if (sector_ret)
@@ -2675,7 +2650,8 @@ static int transport_generic_cmd_sequencer(
 		 * Setup BIDI XOR callback to be run after I/O completion.
 		 */
 		cmd->transport_complete_callback = &transport_xor_callback;
-		cmd->t_tasks_fua = (cdb[1] & 0x8);
+		if (cdb[1] & 0x8)
+			cmd->se_cmd_flags |= SCF_FUA;
 		break;
 	case VARIABLE_LENGTH_CMD:
 		service_action = get_unaligned_be16(&cdb[8]);
@@ -2703,7 +2679,8 @@ static int transport_generic_cmd_sequencer(
 			 * completion.
 			 */
 			cmd->transport_complete_callback = &transport_xor_callback;
-			cmd->t_tasks_fua = (cdb[10] & 0x8);
+			if (cdb[1] & 0x8)
+				cmd->se_cmd_flags |= SCF_FUA;
 			break;
 		case WRITE_SAME_32:
 			sectors = transport_get_sectors_32(cdb, cmd, &sector_ret);
@@ -3146,18 +3123,13 @@ static void transport_complete_task_attr(struct se_cmd *cmd)
 			" SIMPLE: %u\n", dev->dev_cur_ordered_id,
 			cmd->se_ordered_id);
 	} else if (cmd->sam_task_attr == MSG_HEAD_TAG) {
-		atomic_dec(&dev->dev_hoq_count);
-		smp_mb__after_atomic_dec();
 		dev->dev_cur_ordered_id++;
 		pr_debug("Incremented dev_cur_ordered_id: %u for"
 			" HEAD_OF_QUEUE: %u\n", dev->dev_cur_ordered_id,
 			cmd->se_ordered_id);
 	} else if (cmd->sam_task_attr == MSG_ORDERED_TAG) {
-		spin_lock(&dev->ordered_cmd_lock);
-		list_del(&cmd->se_ordered_node);
 		atomic_dec(&dev->dev_ordered_sync);
 		smp_mb__after_atomic_dec();
-		spin_unlock(&dev->ordered_cmd_lock);
 
 		dev->dev_cur_ordered_id++;
 		pr_debug("Incremented dev_cur_ordered_id: %u for ORDERED:"
@@ -3435,7 +3407,7 @@ static void transport_put_cmd(struct se_cmd *cmd)
 		free_tasks = 1;
 	}
 	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
-	
+
 	if (free_tasks != 0)
 		transport_free_dev_tasks(cmd);
 
@@ -3470,6 +3442,18 @@ int transport_generic_map_mem_to_cmd(
 
 	if ((cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB) ||
 	    (cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB)) {
+		/*
+		 * Reject SCSI data overflow with map_mem_to_cmd() as incoming
+		 * scatterlists already have been set to follow what the fabric
+		 * passes for the original expected data transfer length.
+		 */
+		if (cmd->se_cmd_flags & SCF_OVERFLOW_BIT) {
+			pr_warn("Rejecting SCSI DATA overflow for fabric using"
+				" SCF_PASSTHROUGH_SG_TO_MEM_NOALLOC\n");
+			cmd->se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+			cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
+			return -EINVAL;
+		}
 
 		cmd->t_data_sg = sgl;
 		cmd->t_data_nents = sgl_count;
@@ -3691,10 +3675,12 @@ transport_allocate_data_tasks(struct se_cmd *cmd,
 		if (!task)
 			return -ENOMEM;
 
-		task->task_lba = lba;
-		task->task_sectors = min(sectors, dev_max_sectors);
-		task->task_size = task->task_sectors * sector_size;
+		task->task_sg = cmd_sg;
+		task->task_sg_nents = sgl_nents;
 
+		task->task_lba = lba;
+		task->task_sectors = sectors;
+		task->task_size = task->task_sectors * sector_size;
 		/*
 		 * This now assumes that passed sg_ents are in PAGE_SIZE chunks
 		 * in order to calculate the number per task SGL entries
@@ -3817,8 +3803,15 @@ int transport_generic_new_cmd(struct se_cmd *cmd)
 		task_cdbs = transport_allocate_control_task(cmd);
 	}
 
-	if (task_cdbs <= 0)
+	if (task_cdbs < 0)
 		goto out_fail;
+	else if (!task_cdbs && (cmd->se_cmd_flags & SCF_SCSI_DATA_SG_IO_CDB)) {
+		cmd->t_state = TRANSPORT_COMPLETE;
+		atomic_set(&cmd->t_transport_active, 1);
+		INIT_WORK(&cmd->work, target_complete_ok_work);
+		queue_work(target_completion_wq, &cmd->work);
+		return 0;
+	}
 
 	if (set_counts) {
 		atomic_inc(&cmd->t_fe_count);
@@ -4234,7 +4227,7 @@ check_cond:
 
 static int transport_clear_lun_thread(void *p)
 {
-	struct se_lun *lun = (struct se_lun *)p;
+	struct se_lun *lun = p;
 
 	__transport_clear_lun_from_sessions(lun);
 	complete(&lun->lun_shutdown_comp);
@@ -4605,11 +4598,7 @@ void transport_send_task_abort(struct se_cmd *cmd)
 	cmd->se_tfo->queue_status(cmd);
 }
 
-/*	transport_generic_do_tmr():
- *
- *
- */
-int transport_generic_do_tmr(struct se_cmd *cmd)
+static int transport_generic_do_tmr(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
 	struct se_tmr_req *tmr = cmd->se_tmr_req;
@@ -4657,7 +4646,7 @@ static int transport_processing_thread(void *param)
 {
 	int ret;
 	struct se_cmd *cmd;
-	struct se_device *dev = (struct se_device *) param;
+	struct se_device *dev = param;
 
 	while (!kthread_should_stop()) {
 		ret = wait_event_interruptible(dev->dev_queue_obj.thread_wq,
