@@ -91,11 +91,8 @@ static int core_scsi2_reservation_check(struct se_cmd *cmd, u32 *pr_reg_type)
 	struct se_session *sess = cmd->se_sess;
 	int ret;
 
-	if (!sess)
-		return 0;
-
 	spin_lock(&dev->dev_reservation_lock);
-	if (!dev->dev_reserved_node_acl || !sess) {
+	if (!dev->dev_reserved_node_acl) {
 		spin_unlock(&dev->dev_reservation_lock);
 		return 0;
 	}
@@ -203,14 +200,12 @@ int target_scsi2_reservation_release(struct se_task *task)
 	struct se_portal_group *tpg = sess->se_tpg;
 	int ret = 0;
 
-	if (!sess || !tpg)
-		goto out;
 	if (target_check_scsi2_reservation_conflict(cmd, &ret))
 		goto out;
 
 	ret = 0;
 	spin_lock(&dev->dev_reservation_lock);
-	if (!dev->dev_reserved_node_acl || !sess)
+	if (!dev->dev_reserved_node_acl)
 		goto out_unlock;
 
 	if (dev->dev_reserved_node_acl != sess->se_node_acl)
@@ -253,12 +248,6 @@ int target_scsi2_reservation_reserve(struct se_task *task)
 		ret = -EINVAL;
 		goto out;
 	}
-	/*
-	 * This is currently the case for target_core_mod passthrough struct se_cmd
-	 * ops
-	 */
-	if (!sess || !tpg)
-		goto out;
 	if (target_check_scsi2_reservation_conflict(cmd, &ret))
 		goto out;
 
@@ -581,9 +570,6 @@ static int core_scsi3_pr_reservation_check(
 	struct se_device *dev = cmd->se_dev;
 	struct se_session *sess = cmd->se_sess;
 	int ret;
-
-	if (!sess)
-		return 0;
 	/*
 	 * A legacy SPC-2 reservation is being held.
 	 */
