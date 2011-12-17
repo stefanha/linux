@@ -39,7 +39,6 @@ config TCM_STGT
 source "drivers/target/loopback/Kconfig"
 source "drivers/target/tcm_fc/Kconfig"
 source "drivers/target/iscsi/Kconfig"
-source "drivers/target/tcm_qla2xxx/Kconfig"
 source "drivers/target/tcm_vhost/Kconfig"
 
 endif

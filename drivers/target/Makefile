@@ -26,5 +26,4 @@ obj-$(CONFIG_TCM_STGT)		+= target_core_stgt.o
 obj-$(CONFIG_LOOPBACK_TARGET)	+= loopback/
 obj-$(CONFIG_TCM_FC)		+= tcm_fc/
 obj-$(CONFIG_ISCSI_TARGET)	+= iscsi/
-obj-$(CONFIG_TCM_QLA2XXX)	+= tcm_qla2xxx/
 obj-$(CONFIG_TCM_VHOST)		+= tcm_vhost/
