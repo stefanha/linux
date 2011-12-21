@@ -408,7 +408,7 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 		return;
 	}
 
-	if (!atomic_read(&cmd->se_cmd.t_transport_complete)) {
+	if (!(cmd->se_cmd.transport_state & CMD_T_COMPLETE)) {
 		atomic_set(&cmd->cmd_stop_free, 1);
 		smp_mb__after_atomic_dec();
 	}
@@ -754,7 +754,7 @@ int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 		 * waiting upon completion in tcm_qla2xxx_write_pending_status()..
 		 */
 		spin_lock_irqsave(&se_cmd->t_state_lock, flags);
-		if (atomic_read(&se_cmd->t_transport_aborted)) {
+		if (se_cmd->transport_state & CMD_T_ABORTED) {
 			spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
 			complete(&se_cmd->t_transport_stop_comp);
 			return 0;
@@ -816,7 +816,7 @@ int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 
 	cmd->bufflen = se_cmd->data_length;
 	cmd->dma_data_direction = tcm_qla2xxx_mapping_dir(se_cmd);
-	cmd->aborted = atomic_read(&se_cmd->t_transport_aborted);
+	cmd->aborted = (se_cmd->transport_state & CMD_T_ABORTED);
 
 	/*
 	 * Setup the struct se_task->task_sg[] chained SG list
@@ -843,7 +843,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 	cmd->sg_cnt = 0;
 	cmd->offset = 0;
 	cmd->dma_data_direction = tcm_qla2xxx_mapping_dir(se_cmd);
-	cmd->aborted = atomic_read(&se_cmd->t_transport_aborted);
+	cmd->aborted = (se_cmd->transport_state & CMD_T_ABORTED);
 
 	if (se_cmd->data_direction == DMA_FROM_DEVICE) {
 		/*
