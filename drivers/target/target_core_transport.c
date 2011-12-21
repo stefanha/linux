@@ -3675,11 +3675,8 @@ transport_allocate_data_tasks(struct se_cmd *cmd,
 		if (!task)
 			return -ENOMEM;
 
-		task->task_sg = cmd_sg;
-		task->task_sg_nents = sgl_nents;
-
 		task->task_lba = lba;
-		task->task_sectors = sectors;
+		task->task_sectors = min(sectors, dev_max_sectors);
 		task->task_size = task->task_sectors * sector_size;
 		/*
 		 * This now assumes that passed sg_ents are in PAGE_SIZE chunks
