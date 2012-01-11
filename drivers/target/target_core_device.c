@@ -1306,7 +1306,7 @@ struct se_lun *core_dev_add_lun(
 	}
 
 	lun_p = core_tpg_pre_addlun(tpg, lun);
-	if ((IS_ERR(lun_p)) || !lun_p)
+	if (IS_ERR(lun_p))
 		return NULL;
 
 	if (dev->dev_flags & DF_READ_ONLY)
@@ -1352,11 +1352,10 @@ int core_dev_del_lun(
 	u32 unpacked_lun)
 {
 	struct se_lun *lun;
-	int ret = 0;
 
-	lun = core_tpg_pre_dellun(tpg, unpacked_lun, &ret);
-	if (!lun)
-		return ret;
+	lun = core_tpg_pre_dellun(tpg, unpacked_lun);
+	if (IS_ERR(lun))
+		return PTR_ERR(lun);
 
 	core_tpg_post_dellun(tpg, lun);
 
