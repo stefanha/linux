@@ -2955,7 +2955,7 @@ static void qla_tgt_do_work(struct work_struct *work)
 	scsi_qla_host_t *vha = cmd->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt *tgt = ha->qla_tgt;
-	struct qla_tgt_sess *sess = NULL;
+	struct qla_tgt_sess *sess = cmd->sess;
 	atio_from_isp_t *atio = &cmd->atio;
 	unsigned char *cdb;
 	unsigned long flags;
@@ -2965,7 +2965,6 @@ static void qla_tgt_do_work(struct work_struct *work)
 	if (tgt->tgt_stop)
 		goto out_term;	
 
-	sess = cmd->sess;
 	if (!sess) {
 		uint8_t *s_id = NULL;
 		uint16_t loop_id = 0;
