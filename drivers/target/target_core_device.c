@@ -1298,24 +1298,26 @@ struct se_lun *core_dev_add_lun(
 {
 	struct se_lun *lun_p;
 	u32 lun_access = 0;
+	int rc;
 
 	if (atomic_read(&dev->dev_access_obj.obj_access_count) != 0) {
 		pr_err("Unable to export struct se_device while dev_access_obj: %d\n",
 			atomic_read(&dev->dev_access_obj.obj_access_count));
-		return NULL;
+		return ERR_PTR(-EACCES);
 	}
 
 	lun_p = core_tpg_pre_addlun(tpg, lun);
 	if (IS_ERR(lun_p))
-		return NULL;
+		return lun_p;
 
 	if (dev->dev_flags & DF_READ_ONLY)
 		lun_access = TRANSPORT_LUNFLAGS_READ_ONLY;
 	else
 		lun_access = TRANSPORT_LUNFLAGS_READ_WRITE;
 
-	if (core_tpg_post_addlun(tpg, lun_p, lun_access, dev) < 0)
-		return NULL;
+	rc = core_tpg_post_addlun(tpg, lun_p, lun_access, dev);
+	if (rc < 0)
+		return ERR_PTR(rc);
 
 	pr_debug("%s_TPG[%u]_LUN[%u] - Activated %s Logical Unit from"
 		" CORE HBA: %u\n", tpg->se_tpg_tfo->get_fabric_name(),
