@@ -401,21 +401,6 @@ static void tcm_qla2xxx_complete_free(struct work_struct *work)
  */
 void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 {
-	barrier();
-	/*
-	 * Handle tcm_qla2xxx_init_cmd() -> transport_get_lun_for_cmd()
-	 * failure case where cmd->se_cmd.se_dev was not assigned, and
-	 * a call to transport_generic_free_cmd_intr() is not possible..
-	 */
-	if (!cmd->se_cmd.se_dev) {
-		target_put_sess_cmd(cmd->se_cmd.se_sess, &cmd->se_cmd);	
-		transport_generic_free_cmd(&cmd->se_cmd, 0);
-		return;
-	}
-
-	if (!atomic_read(&cmd->se_cmd.t_transport_complete))
-		target_put_sess_cmd(cmd->se_cmd.se_sess, &cmd->se_cmd);
-
 	INIT_WORK(&cmd->work, tcm_qla2xxx_complete_free);
 	queue_work(tcm_qla2xxx_free_wq, &cmd->work);
 }
