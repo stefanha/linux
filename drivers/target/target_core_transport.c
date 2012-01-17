@@ -2875,7 +2875,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->se_cmd_flags |= SCF_SCSI_NON_DATA_CDB;
 		break;
 	case SYNCHRONIZE_CACHE:
-	case 0x91: /* SYNCHRONIZE_CACHE_16: */
+	case SYNCHRONIZE_CACHE_16:
 		/*
 		 * Extract LBA and range to be flushed for emulated SYNCHRONIZE_CACHE
 		 */
