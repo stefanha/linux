@@ -545,7 +545,7 @@ static int iblock_do_task(struct se_task *task)
 
 	bio = iblock_get_bio(task, block_lba, sg_num);
 	if (!bio) {
-		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;	
+		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		return -ENOMEM;
 	}
 

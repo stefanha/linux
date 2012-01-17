@@ -3601,7 +3601,7 @@ after_iport_check:
 	if (!pr_res_holder) {
 		pr_warn("SPC-3 PR REGISTER_AND_MOVE: No reservation"
 			" currently held\n");
-		spin_unlock(&dev->dev_reservation_lock); 
+		spin_unlock(&dev->dev_reservation_lock);
 		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
 		ret = -EINVAL;
 		goto out;

@@ -286,7 +286,7 @@ static bool ath_complete_reset(struct ath_softc *sc, bool start)
 			ath_start_ani(common);
 	}
 
-	if (ath9k_hw_ops(ah)->antdiv_comb_conf_get && sc->ant_rx != 3) {
+	if ((ah->caps.hw_caps & ATH9K_HW_CAP_ANT_DIV_COMB) && sc->ant_rx != 3) {
 		struct ath_hw_antcomb_conf div_ant_conf;
 		u8 lna_conf;
 
@@ -1842,6 +1842,9 @@ static void ath9k_sta_notify(struct ieee80211_hw *hw,
 {
 	struct ath_softc *sc = hw->priv;
 	struct ath_node *an = (struct ath_node *) sta->drv_priv;
+
+	if (!(sc->sc_flags & SC_OP_TXAGGR))
+		return;
 
 	switch (cmd) {
 	case STA_NOTIFY_SLEEP:

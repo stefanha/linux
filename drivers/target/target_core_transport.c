@@ -651,7 +651,7 @@ void transport_complete_sync_cache(struct se_cmd *cmd, int good)
 		task->task_scsi_status = SAM_STAT_CHECK_CONDITION;
 		task->task_se_cmd->scsi_sense_reason =
 				TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-					
+
 	}
 
 	transport_complete_task(task, good);
@@ -1994,7 +1994,7 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 	int add_tasks;
 
 	if (se_dev_check_online(cmd->se_dev) != 0) {
-		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;	
+		cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		transport_generic_request_failure(cmd);
 		return 0;
 	}
