@@ -226,6 +226,11 @@ enum tcm_sense_reason_table {
 	TCM_RESERVATION_CONFLICT		= 0x10,
 };
 
+enum target_sc_flags_table {
+	TARGET_SCF_BIDI_OP		= 0x01,
+	TARGET_SCF_ACK_KREF		= 0x02,
+};
+
 /* fabric independent task management function values */
 enum tcm_tmreq_table {
 	TMR_ABORT_TASK		= 1,
@@ -244,7 +249,7 @@ enum tcm_tmrsp_table {
 	TMR_TASK_DOES_NOT_EXIST		= 1,
 	TMR_LUN_DOES_NOT_EXIST		= 2,
 	TMR_TASK_STILL_ALLEGIANT	= 3,
-	TMR_TASK_FAILOVER_NOT_SUPPORTED	= 4,
+	TMR_TASK_FAILOVER_NOT_SUPPORTED = 4,
 	TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED	= 5,
 	TMR_FUNCTION_AUTHORIZATION_FAILED = 6,
 	TMR_FUNCTION_REJECTED		= 255,
@@ -541,6 +546,7 @@ struct se_cmd {
 	struct list_head	se_queue_node;
 	struct list_head	se_cmd_list;
 	struct completion	cmd_wait_comp;
+	struct kref		cmd_kref;
 	struct target_core_fabric_ops *se_tfo;
 	int (*execute_task)(struct se_task *);
 	void (*transport_complete_callback)(struct se_cmd *);
@@ -776,7 +782,6 @@ struct se_device {
 	u32			dev_port_count;
 	/* See transport_device_status_table */
 	u32			dev_status;
-	u32			dev_tcq_window_closed;
 	/* Physical device queue depth */
 	u32			queue_depth;
 	/* Used for SPC-2 reservations enforce of ISIDs */
@@ -793,7 +798,6 @@ struct se_device {
 	spinlock_t		stats_lock;
 	/* Active commands on this virtual SE device */
 	atomic_t		simple_cmds;
-	atomic_t		depth_left;
 	atomic_t		dev_ordered_id;
 	atomic_t		execute_tasks;
 	atomic_t		dev_ordered_sync;

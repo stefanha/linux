@@ -81,6 +81,7 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 	if (cmd->data_length < 6) {
 		pr_err("SCSI Inquiry payload length: %u"
 			" too small for EVPD=0\n", cmd->data_length);
+		cmd->scsi_sense_reason = TCM_INVALID_CDB_FIELD;
 		return -EINVAL;
 	}
 

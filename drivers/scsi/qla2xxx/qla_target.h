@@ -720,9 +720,8 @@ struct qla_tgt_sess;
  */
 struct qla_tgt_func_tmpl {
 
-	int (*init_cmd)(struct scsi_qla_host *, struct qla_tgt_cmd *,
-			uint32_t, int, int, int);
-	void (*handle_cmd)(struct qla_tgt_cmd *, unsigned char *);
+	int (*handle_cmd)(struct scsi_qla_host *, struct qla_tgt_cmd *,
+			unsigned char *, uint32_t, int, int, int);
 	int (*handle_data)(struct qla_tgt_cmd *);
 	int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
 	void (*free_cmd)(struct qla_tgt_cmd *);
@@ -870,7 +869,6 @@ struct qla_tgt {
 	spinlock_t sess_work_lock;
 	struct list_head sess_works_list;
 	struct work_struct sess_work;
-	struct workqueue_struct *qla_tgt_wq;
 
 	imm_ntfy_from_isp_t link_reinit_iocb;
 	wait_queue_head_t waitQ;
@@ -906,7 +904,7 @@ struct qla_tgt_sess {
 	struct scsi_qla_host *vha;
 	struct qla_tgt *tgt;
 
-	int sess_ref; /* protected by hardware_lock */
+	struct kref sess_kref;
 
 	struct list_head sess_list_entry;
 	unsigned long expires;
@@ -918,9 +916,6 @@ struct qla_tgt_sess {
 struct qla_tgt_cmd {
 	struct qla_tgt_sess *sess;
 	int state;
-	atomic_t cmd_stop_free;
-	atomic_t cmd_free;
-	struct completion cmd_stop_free_comp;
 	struct se_cmd se_cmd;
 	struct work_struct free_work;
 	struct work_struct work;
@@ -929,18 +924,16 @@ struct qla_tgt_cmd {
 
 	unsigned int conf_compl_supported:1;/* to save extra sess dereferences */
 	unsigned int sg_mapped:1;
+	unsigned int free_sg:1;
 	unsigned int aborted:1; /* Needed in case of SRR */
 	unsigned int write_data_transferred:1;
 
 	struct scatterlist *sg;	/* cmd data buffer SG vector */
-	struct scatterlist *sg_srr_start; /* Used for SRR data offset */
 	int sg_cnt;		/* SG segments count */
-	int sg_srr_off;		/* Used for SRR offsets into sg_srr_start */
 	int bufflen;		/* cmd buffer length */
 	int offset;
 	uint32_t tag;
 	uint32_t unpacked_lun;
-	dma_addr_t *srr_dma_buffer; /* Used for SRR offsets with pci_map_page() */
 	enum dma_data_direction dma_data_direction;
 
 	uint16_t loop_id;		    /* to save extra sess dereferences */
@@ -1024,6 +1017,9 @@ void qla_tgt_disable_vha(struct scsi_qla_host *);
  */
 extern int qla_tgt_add_target(struct qla_hw_data *, struct scsi_qla_host *);
 extern int qla_tgt_remove_target(struct qla_hw_data *, struct scsi_qla_host *);
+extern int qla_tgt_lport_register(struct qla_tgt_func_tmpl *, u64,
+			int (*callback)(struct scsi_qla_host *), void *);
+extern void  qla_tgt_lport_deregister(struct scsi_qla_host *);
 extern void qla_tgt_fc_port_added(struct scsi_qla_host *, fc_port_t *);
 extern void qla_tgt_fc_port_deleted(struct scsi_qla_host *, fc_port_t *);
 extern void qla_tgt_set_mode(struct scsi_qla_host *ha);
@@ -1124,7 +1120,7 @@ extern int qla_tgt_xmit_response(struct qla_tgt_cmd *, int, uint8_t);
 extern void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *);
 extern void qla_tgt_free_cmd(struct qla_tgt_cmd *cmd);
-extern void qla_tgt_sess_put(struct qla_tgt_sess *);
+extern int __qla_tgt_sess_put(struct qla_tgt_sess *);
 extern void qla_tgt_ctio_completion(struct scsi_qla_host *, uint32_t);
 extern void qla_tgt_async_event(uint16_t, struct scsi_qla_host *, uint16_t *);
 extern void qla_tgt_enable_vha(struct scsi_qla_host *);

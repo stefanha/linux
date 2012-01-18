@@ -1676,8 +1676,6 @@ ql_dbg(uint32_t level, scsi_qla_host_t *vha, int32_t id, char *msg, ...) {
 	uint32_t len;
 	struct pci_dev *pdev = NULL;
 
-	memset(pbuf, 0, QL_DBG_BUF_LEN);
-
 	va_start(ap, msg);
 
 	if ((level & ql2xextended_error_logging) == level) {
@@ -1724,8 +1722,6 @@ ql_dbg_pci(uint32_t level, struct pci_dev *pdev, int32_t id, char *msg, ...) {
 	if (pdev == NULL)
 		return;
 
-	memset(pbuf, 0, QL_DBG_BUF_LEN);
-
 	va_start(ap, msg);
 
 	if ((level & ql2xextended_error_logging) == level) {
@@ -1762,8 +1758,6 @@ ql_log(uint32_t level, scsi_qla_host_t *vha, int32_t id, char *msg, ...) {
 	va_list ap;
 	uint32_t len;
 	struct pci_dev *pdev = NULL;
-
-	memset(pbuf, 0, QL_DBG_BUF_LEN);
 
 	va_start(ap, msg);
 
@@ -1822,8 +1816,6 @@ ql_log_pci(uint32_t level, struct pci_dev *pdev, int32_t id, char *msg, ...) {
 
 	if (pdev == NULL)
 		return;
-
-	memset(pbuf, 0, QL_DBG_BUF_LEN);
 
 	va_start(ap, msg);
 
