@@ -824,49 +824,6 @@ qla2x00_wait_for_chip_reset(scsi_qla_host_t *vha)
 	return return_status;
 }
 
-/*
- * qla2x00_wait_for_loop_ready
- *    Wait for MAX_LOOP_TIMEOUT(5 min) value for loop
- *    to be in LOOP_READY state.
- * Input:
- *     ha - pointer to host adapter structure
- *
- * Note:
- *    Does context switching-Release SPIN_LOCK
- *    (if any) before calling this routine.
- *
- *
- * Return:
- *    Success (LOOP_READY) : 0
- *    Failed  (LOOP_NOT_READY) : 1
- */
-static int
-qla2x00_wait_for_loop_ready(scsi_qla_host_t *vha)
-{
-	int 	 return_status = QLA_SUCCESS;
-	unsigned long loop_timeout ;
-	struct qla_hw_data *ha = vha->hw;
-	scsi_qla_host_t *base_vha = pci_get_drvdata(ha->pdev);
-
-	/* wait for 5 min at the max for loop to be ready */
-	loop_timeout = jiffies + (MAX_LOOP_TIMEOUT * HZ);
-
-	while ((!atomic_read(&base_vha->loop_down_timer) &&
-	    atomic_read(&base_vha->loop_state) == LOOP_DOWN) ||
-	    atomic_read(&base_vha->loop_state) != LOOP_READY) {
-		if (atomic_read(&base_vha->loop_state) == LOOP_DEAD) {
-			return_status = QLA_FUNCTION_FAILED;
-			break;
-		}
-		msleep(1000);
-		if (time_after_eq(jiffies, loop_timeout)) {
-			return_status = QLA_FUNCTION_FAILED;
-			break;
-		}
-	}
-	return (return_status);
-}
-
 static void
 sp_get(struct srb *sp)
 {
