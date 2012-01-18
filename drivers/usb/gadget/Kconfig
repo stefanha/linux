@@ -802,6 +802,9 @@ config USB_MASS_STORAGE
 	  Say "y" to link the driver statically, or "m" to build
 	  a dynamically linked module called "g_mass_storage".
 
+comment "You need to go to the target framework for target gadget support"
+	depends on TARGET_USB_GADGET=n
+
 config USB_G_SERIAL
 	tristate "Serial Gadget (with CDC ACM and CDC OBEX support)"
 	help

@@ -1,0 +1,9 @@
+config TARGET_USB_GADGET
+	tristate "USB Gadget Fabric Module"
+	depends on USB_GADGET
+	---help---
+	This fabric is an USB gadget. Two USB protocols are supported that is
+	BBB or BOT (Bulk Only Transport) and UAS (USB Attached SCSI). BOT is
+	advertised on alternative interface 0 (primary) and UAS is on
+	alternative interface 1. Both protocols can work on USB2.0 and USB3.0.
+	UAS utilizes the USB 3.0 feature called streams support.
