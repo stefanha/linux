@@ -357,11 +357,6 @@ static void ft_send_tm(struct ft_cmd *cmd)
 	struct ft_sess *sess;
 	u8 tm_func;
 
-	transport_init_se_cmd(&cmd->se_cmd, &ft_configfs->tf_ops,
-			cmd->sess->se_sess, 0, DMA_NONE, 0,
-			&cmd->ft_sense_buffer[0]);
-	target_get_sess_cmd(cmd->sess->se_sess, &cmd->se_cmd, false);
-
 	fcp = fc_frame_payload_get(cmd->req_frame, sizeof(*fcp));
 
 	switch (fcp->fc_tm_flags) {
@@ -389,6 +384,11 @@ static void ft_send_tm(struct ft_cmd *cmd)
 		ft_send_resp_code_and_free(cmd, FCP_CMND_FIELDS_INVALID);
 		return;
 	}
+
+	transport_init_se_cmd(&cmd->se_cmd, &ft_configfs->tf_ops,
+			cmd->sess->se_sess, 0, DMA_NONE, 0,
+			&cmd->ft_sense_buffer[0]);
+	target_get_sess_cmd(cmd->sess->se_sess, &cmd->se_cmd, false);
 
 	pr_debug("alloc tm cmd fn %d\n", tm_func);
 	core_tmr_req_init(&cmd->se_cmd, cmd, tm_func);
