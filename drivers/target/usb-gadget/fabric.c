@@ -181,7 +181,6 @@ static void usbg_cmd_work(struct work_struct *work)
 	struct se_cmd *se_cmd;
 	struct tcm_usbg_nexus *tv_nexus;
 	struct usbg_tpg *tpg;
-	int ret;
 	int dir;
 
 	se_cmd = &cmd->se_cmd;
@@ -199,11 +198,9 @@ static void usbg_cmd_work(struct work_struct *work)
 		return;
 	}
 
-	ret = target_submit_cmd(se_cmd, tv_nexus->tvn_se_sess,
+	target_submit_cmd(se_cmd, tv_nexus->tvn_se_sess,
 			cmd->cmd_buf, cmd->sense_iu.sense, cmd->unpacked_lun,
 			0, cmd->prio_attr, dir, TARGET_SCF_UNKNOWN_SIZE);
-	if (ret)
-		kref_put(&cmd->ref, usbg_cmd_release);
 }
 
 int usbg_submit_command(struct f_uas *fu,

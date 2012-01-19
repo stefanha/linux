@@ -1692,12 +1692,9 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 	}
 	unpacked_lun = srpt_unpack_lun((uint8_t *)&srp_cmd->lun,
 				       sizeof(srp_cmd->lun));
-	ret = target_submit_cmd(cmd, ch->sess, srp_cmd->cdb,
+	target_submit_cmd(cmd, ch->sess, srp_cmd->cdb,
 			&send_ioctx->sense_data[0], unpacked_lun, data_len,
 			MSG_SIMPLE_TAG, dir, TARGET_SCF_ACK_KREF);
-	if (ret != 0)
-		return -1;
-
 	return 0;
 
 send_sense:
