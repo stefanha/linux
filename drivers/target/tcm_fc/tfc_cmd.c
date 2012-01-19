@@ -353,7 +353,6 @@ static void ft_send_resp_code_and_free(struct ft_cmd *cmd,
  */
 static void ft_send_tm(struct ft_cmd *cmd)
 {
-	struct se_tmr_req *tmr;
 	struct fcp_cmnd *fcp;
 	struct ft_sess *sess;
 	u8 tm_func;
@@ -392,13 +391,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 	}
 
 	pr_debug("alloc tm cmd fn %d\n", tm_func);
-	tmr = core_tmr_alloc_req(&cmd->se_cmd, cmd, tm_func, GFP_KERNEL);
-	if (!tmr) {
-		pr_debug("alloc failed\n");
-		ft_send_resp_code_and_free(cmd, FCP_TMF_FAILED);
-		return;
-	}
-	cmd->se_cmd.se_tmr_req = tmr;
+	core_tmr_req_init(&cmd->se_cmd, cmd, tm_func);
 
 	switch (fcp->fc_tm_flags) {
 	case FCP_TMF_LUN_RESET:
@@ -436,7 +429,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 int ft_queue_tm_resp(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
-	struct se_tmr_req *tmr = se_cmd->se_tmr_req;
+	struct se_tmr_req *tmr = &se_cmd->se_tmr_req;
 	enum fcp_resp_rsp_codes code;
 
 	switch (tmr->response) {

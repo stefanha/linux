@@ -286,13 +286,9 @@ struct iscsi_cmd *iscsit_allocate_se_cmd_for_tmr(
 		goto out;
 	}
 
-	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd,
-				cmd->tmr_req, tcm_function,
-				GFP_KERNEL);
-	if (!se_cmd->se_tmr_req)
-		goto out;
+	core_tmr_req_init(se_cmd, cmd->tmr_req, tcm_function);
 
-	cmd->tmr_req->se_tmr_req = se_cmd->se_tmr_req;
+	cmd->tmr_req->se_tmr_req = &se_cmd->se_tmr_req;
 
 	return cmd;
 out:

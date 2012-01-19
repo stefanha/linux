@@ -410,7 +410,7 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
  */
 int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 {
-	if (se_cmd->se_tmr_req) {
+	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB) {
 		struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
 				struct qla_tgt_mgmt_cmd, se_cmd);
 		/*
@@ -431,7 +431,7 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd;
 
-	if (se_cmd->se_tmr_req != NULL)
+	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)
 		return;
 
 	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
@@ -684,15 +684,14 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun, uint8_t 
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
 				DMA_NONE, 0, NULL);
 	/*
-	 * Allocate the TCM TMR
+	 * Initialize the TCM TMR
 	 */
-	se_cmd->se_tmr_req = core_tmr_alloc_req(se_cmd, mcmd, tmr_func, GFP_ATOMIC);
-	if (!se_cmd->se_tmr_req)
-		return -ENOMEM;
+	core_tmr_req_init(se_cmd, mcmd, tmr_func);
+
 	/*
 	 * Save the se_tmr_req for qla_tgt_xmit_tm_rsp() callback into LLD code
 	 */
-	mcmd->se_tmr_req = se_cmd->se_tmr_req;
+	mcmd->se_tmr_req = &se_cmd->se_tmr_req;
 	/*
 	 * Locate the underlying TCM struct se_lun from sc->device->lun
 	 */
@@ -759,7 +758,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 
 int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 {
-	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
+	struct se_tmr_req *se_tmr = &se_cmd->se_tmr_req;
 	struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
 				struct qla_tgt_mgmt_cmd, se_cmd);
 
