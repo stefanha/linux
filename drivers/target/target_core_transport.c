@@ -1687,8 +1687,7 @@ void target_submit_cmd(struct se_cmd *se_cmd, struct se_session *se_sess,
 	return;
 
 out_check_cond:
-	transport_send_check_condition_and_sense(se_cmd,
-				se_cmd->scsi_sense_reason, 0);
+	transport_generic_request_failure(se_cmd);
 }
 EXPORT_SYMBOL(target_submit_cmd);
 
