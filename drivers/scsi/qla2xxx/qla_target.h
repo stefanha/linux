@@ -108,36 +108,6 @@
 #define QLA_TGT_MAX_SG_24XX(ql) \
    (min(1270, ((ql) > 0) ? (QLA_TGT_DATASEGS_PER_CMD_24XX + QLA_TGT_DATASEGS_PER_CONT_24XX*((ql) - 1)) : 0))
 #endif
-
-#define MODIFY_LUN_TYPE 0x0C	  /* Modify LUN entry. */
-/*
- * ISP queue - modify LUN entry structure definition.
- */
-typedef struct {
-	uint8_t	 entry_type;		    /* Entry type. */
-	uint8_t	 entry_count;		    /* Entry count. */
-	uint8_t	 sys_define;		    /* System defined. */
-	uint8_t	 entry_status;		    /* Entry Status. */
-	uint32_t sys_define_2;		    /* System defined. */
-	uint8_t	 reserved_8;
-	uint8_t	 reserved_1;
-	uint8_t	 operators;
-	uint8_t	 reserved_2;
-	uint32_t reserved_3;
-	uint8_t	 status;
-	uint8_t	 reserved_4;
-	uint8_t	 command_count;		    /* Number of ATIOs allocated. */
-	uint8_t	 immed_notify_count;	    /* Number of Immediate Notify */
-	/* entries allocated. */
-	uint16_t reserved_5;
-	uint16_t timeout;		    /* 0 = 30 seconds, 0xFFFF = disable */
-	uint16_t reserved_7[20];
-} __attribute__((packed)) modify_lun_t;
-#define MODIFY_LUN_SUCCESS	0x01
-#define MODIFY_LUN_CMD_ADD BIT_0
-#define MODIFY_LUN_CMD_SUB BIT_1
-#define MODIFY_LUN_IMM_ADD BIT_2
-#define MODIFY_LUN_IMM_SUB BIT_3
 #endif
 
 #define GET_TARGET_ID(ha, iocb) ((HAS_EXTENDED_IDS(ha))				\

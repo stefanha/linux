@@ -3808,31 +3808,6 @@ static void qla_tgt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		}
 		break;
 
-	case MODIFY_LUN_TYPE:
-		if (tgt->modify_lun_expected > 0) {
-			modify_lun_t *entry = (modify_lun_t *)pkt;
-			ql_dbg(ql_dbg_tgt, vha, 0xe030, "MODIFY_LUN %x, imm %c%d, cmd %c%d",
-				  entry->status,
-				  (entry->operators & MODIFY_LUN_IMM_ADD) ? '+'
-				  : (entry->operators & MODIFY_LUN_IMM_SUB) ? '-'
-				  : ' ',
-				  entry->immed_notify_count,
-				  (entry->operators & MODIFY_LUN_CMD_ADD) ? '+'
-				  : (entry->operators & MODIFY_LUN_CMD_SUB) ? '-'
-				  : ' ',
-				  entry->command_count);
-			tgt->modify_lun_expected--;
-			if (entry->status != MODIFY_LUN_SUCCESS) {
-				printk(KERN_ERR "qla_target(%d): MODIFY_LUN "
-					    "failed %x\n", vha->vp_idx,
-					    entry->status);
-			}
-		} else {
-			printk(KERN_ERR "qla_target(%d): Unexpected MODIFY_LUN "
-			    "received\n", (ha != NULL) ? vha->vp_idx : -1);
-		}
-		break;
-
 	default:
 		printk(KERN_ERR "qla_target(%d): Received unknown response pkt "
 		     "type %x\n", vha->vp_idx, pkt->entry_type);

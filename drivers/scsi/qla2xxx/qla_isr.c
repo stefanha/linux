@@ -1377,7 +1377,6 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 		case CTIO_A64_TYPE:
 		case IMMED_NOTIFY_TYPE:
 		case NOTIFY_ACK_TYPE:
-		case MODIFY_LUN_TYPE:
 			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;
 		case STATUS_TYPE:
