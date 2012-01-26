@@ -1214,9 +1214,6 @@ qla2x00_get_node_name_list(scsi_qla_host_t *vha, void **out_data, int *out_len)
 	ulong dma_size;
 	int rval, left;
 
-	BUILD_BUG_ON(sizeof(struct qla_port_24xx_data) <
-			sizeof(struct qla_port_2xxx_data));
-
 	left = 1;
 	while (left > 0) {
 		dma_size = left * sizeof(*list);
@@ -1245,10 +1242,7 @@ qla2x00_get_node_name_list(scsi_qla_host_t *vha, void **out_data, int *out_len)
 		if (rval != QLA_SUCCESS) {
 			if ((mc.mb[0] == MBS_COMMAND_ERROR) &&
 			    (mc.mb[1] == 0xA)) {
-				if (IS_FWI2_CAPABLE(ha))
-					left += le16_to_cpu(mc.mb[2]) / sizeof(struct qla_port_24xx_data);
-				else
-					left += le16_to_cpu(mc.mb[2]) / sizeof(struct qla_port_2xxx_data);
+				left += le16_to_cpu(mc.mb[2]) / sizeof(struct qla_port_24xx_data);
 				goto restart;
 			}
 			goto out_free;

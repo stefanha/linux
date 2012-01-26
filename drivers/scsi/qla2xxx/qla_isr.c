@@ -1366,10 +1366,6 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 			    "Process error entry.\n");
 
 			qla2x00_error_entry(vha, rsp, pkt);
-
-			if (qla_tgt_2xxx_process_response_error(vha, pkt) == 1)
-				break;
-
 			((response_t *)pkt)->signature = RESPONSE_PROCESSED;
 			wmb();
 			continue;
@@ -1381,7 +1377,6 @@ qla2x00_process_response_queue(struct rsp_que *rsp)
 		case CTIO_A64_TYPE:
 		case IMMED_NOTIFY_TYPE:
 		case NOTIFY_ACK_TYPE:
-		case ENABLE_LUN_TYPE:
 		case MODIFY_LUN_TYPE:
 			qla_tgt_response_pkt_all_vps(vha, (response_t *)pkt);
 			break;

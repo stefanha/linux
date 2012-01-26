@@ -592,9 +592,6 @@ qla2x00_initialize_adapter(scsi_qla_host_t *vha)
 	if (IS_QLA24XX_TYPE(ha) || IS_QLA25XX(ha))
 		qla24xx_read_fcp_prio_cfg(vha);
 
-	if (rval == QLA_SUCCESS)
-		qla_tgt_initialize_adapter(vha, ha);
-
 	return (rval);
 }
 
@@ -2326,8 +2323,6 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 	}
 #endif
 
-	qla_tgt_2xxx_config_nvram_stage1(vha, nv);
-
 	/* Reset Initialization control block */
 	memset(icb, 0, ha->init_cb_size);
 
@@ -2401,8 +2396,6 @@ qla2x00_nvram_config(scsi_qla_host_t *vha)
 		memcpy(icb->node_name, nv->alternate_node_name, WWN_SIZE);
 		memcpy(icb->port_name, nv->alternate_port_name, WWN_SIZE);
 	}
-
-	qla_tgt_2xxx_config_nvram_stage2(vha, icb);
 
 	/* Prepare nodename */
 	if ((icb->firmware_options[1] & BIT_6) == 0) {
@@ -4154,8 +4147,6 @@ qla2x00_abort_isp(scsi_qla_host_t *vha)
 			}
 
 			vha->flags.online = 1;
-
-			qla_tgt_abort_isp(vha);
 
 			ha->isp_ops->enable_intrs(ha);
 

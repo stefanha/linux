@@ -109,40 +109,6 @@
    (min(1270, ((ql) > 0) ? (QLA_TGT_DATASEGS_PER_CMD_24XX + QLA_TGT_DATASEGS_PER_CONT_24XX*((ql) - 1)) : 0))
 #endif
 
-/********************************************************************\
- * ISP Queue types left out of new QLogic driver (from old version)
-\********************************************************************/
-
-#ifndef ENABLE_LUN_TYPE
-#define ENABLE_LUN_TYPE 0x0B		/* Enable LUN entry. */
-/*
- * ISP queue - enable LUN entry structure definition.
- */
-typedef struct {
-	uint8_t	 entry_type;		/* Entry type. */
-	uint8_t	 entry_count;		/* Entry count. */
-	uint8_t	 sys_define;		/* System defined. */
-	uint8_t	 entry_status;		/* Entry Status. */
-	uint32_t sys_define_2;		/* System defined. */
-	uint8_t	 reserved_8;
-	uint8_t	 reserved_1;
-	uint16_t reserved_2;
-	uint32_t reserved_3;
-	uint8_t	 status;
-	uint8_t	 reserved_4;
-	uint8_t	 command_count;		/* Number of ATIOs allocated. */
-	uint8_t	 immed_notify_count;	/* Number of Immediate Notify entries allocated. */
-	uint16_t reserved_5;
-	uint16_t timeout;		/* 0 = 30 seconds, 0xFFFF = disable */
-	uint16_t reserved_6[20];
-} __attribute__((packed)) enable_lun_t;
-#define ENABLE_LUN_SUCCESS          0x01
-#define ENABLE_LUN_RC_NONZERO       0x04
-#define ENABLE_LUN_INVALID_REQUEST  0x06
-#define ENABLE_LUN_ALREADY_ENABLED  0x3E
-#endif
-
-#ifndef MODIFY_LUN_TYPE
 #define MODIFY_LUN_TYPE 0x0C	  /* Modify LUN entry. */
 /*
  * ISP queue - modify LUN entry structure definition.
@@ -363,31 +329,6 @@ typedef struct {
 
 #ifndef CTIO_RET_TYPE
 #define CTIO_RET_TYPE	0x17		/* CTIO return entry */
-/*
- * ISP queue - CTIO from ISP 2xxx to target driver returned entry structure.
- */
-typedef struct {
-	uint8_t	 entry_type;		    /* Entry type. */
-	uint8_t	 entry_count;		    /* Entry count. */
-	uint8_t	 sys_define;		    /* System defined. */
-	uint8_t	 entry_status;		    /* Entry Status. */
-	uint32_t handle;		    /* System defined handle. */
-	target_id_t target;
-	uint16_t rx_id;
-	uint16_t flags;
-	uint16_t status;
-	uint16_t timeout;	    /* 0 = 30 seconds, 0xFFFF = disable */
-	uint16_t dseg_count;	    /* Data segment count. */
-	uint32_t relative_offset;
-	uint32_t residual;
-	uint16_t reserved_1[2];
-	uint16_t sense_length;
-	uint16_t scsi_status;
-	uint16_t response_length;
-	uint8_t	 sense_data[26];
-} __attribute__((packed)) ctio_from_2xxx_t;
-#endif
-
 #define ATIO_TYPE7 0x06 /* Accept target I/O entry for 24xx */
 
 typedef struct {
@@ -819,11 +760,6 @@ int qla2x00_wait_for_hba_online(struct scsi_qla_host *);
 #define QLA_TGT_SENSE_VALID(sense)  ((sense != NULL) && \
 				(((const uint8_t *)(sense))[0] & 0x70) == 0x70)
 
-struct qla_port_2xxx_data {
-	uint8_t port_name[WWN_SIZE];
-	uint16_t loop_id;
-};
-
 struct qla_port_24xx_data {
 	uint8_t port_name[WWN_SIZE];
 	uint16_t loop_id;
@@ -1045,70 +981,6 @@ static inline void qla_reverse_ini_mode(struct scsi_qla_host *ha)
 		ha->host->active_mode |= MODE_INITIATOR;
 }
 
-/********************************************************************\
- * ISP Queue types left out of new QLogic driver (from old version)
-\********************************************************************/
-
-/*
- * qla_tgt_2xxx_send_enable_lun
- *	Issue enable or disable LUN entry IOCB to ISP 2xxx.
- *	NOTE: This IOCB is not available, and so not issued to ISPs >=24xx.
- *
- * Input:
- *	ha = adapter block pointer.
- *
- * Caller MUST have hardware lock held. This function might release it,
- * then reaquire.
- */
-static inline void
-__qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, int enable)
-{
-	enable_lun_t *pkt;
-
-	pkt = (enable_lun_t *)qla2x00_alloc_iocbs(vha, 0);
-	if (pkt != NULL) {
-		pkt->entry_type = ENABLE_LUN_TYPE;
-		if (enable) {
-			pkt->command_count = QLA2XXX_COMMAND_COUNT_INIT;
-			pkt->immed_notify_count = QLA2XXX_IMMED_NOTIFY_COUNT_INIT;
-			pkt->timeout = 0xffff;
-		} else {
-			pkt->command_count = 0;
-			pkt->immed_notify_count = 0;
-			pkt->timeout = 0;
-		}
-
-		/* Issue command to ISP */
-		qla2x00_isp_cmd(vha, vha->req);
-
-	} else
-		qla_tgt_clear_mode(vha);
-	if (!pkt)
-		printk (KERN_ERR "%s: **** FAILED ****\n", __func__);
-
-	return;
-}
-
-/*
- * qla_tgt_2xxx_send_enable_lun
- *      Issue enable LUN entry IOCB.
- *
- * Input:
- *      ha = adapter block pointer.
- *	enable = enable/disable flag.
- */
-static inline void
-qla_tgt_2xxx_send_enable_lun(struct scsi_qla_host *vha, bool enable)
-{
-	struct qla_hw_data *ha = vha->hw;
-
-	if (!IS_FWI2_CAPABLE(ha)) {
-		unsigned long flags;
-		spin_lock_irqsave(&ha->hardware_lock, flags);
-		__qla_tgt_2xxx_send_enable_lun(vha, enable);
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-	}
-}
 /*
  * Exported symbols from qla_target.c LLD logic used by qla2xxx code..
  */
@@ -1126,16 +998,11 @@ extern void qla_tgt_async_event(uint16_t, struct scsi_qla_host *, uint16_t *);
 extern void qla_tgt_enable_vha(struct scsi_qla_host *);
 extern void qla_tgt_vport_create(struct scsi_qla_host *, struct qla_hw_data *);
 extern void qla_tgt_rff_id(struct scsi_qla_host *, struct ct_sns_req *);
-extern void qla_tgt_initialize_adapter(struct scsi_qla_host *, struct qla_hw_data *);
 extern void qla_tgt_init_atio_q_entries(struct scsi_qla_host *);
 extern void qla_tgt_24xx_process_atio_queue(struct scsi_qla_host *);
 extern void qla_tgt_24xx_config_rings(struct scsi_qla_host *, device_reg_t __iomem *);
-extern void qla_tgt_2xxx_config_nvram_stage1(struct scsi_qla_host *, nvram_t *);
-extern void qla_tgt_2xxx_config_nvram_stage2(struct scsi_qla_host *, init_cb_t *);
 extern void qla_tgt_24xx_config_nvram_stage1(struct scsi_qla_host *, struct nvram_24xx *);
 extern void qla_tgt_24xx_config_nvram_stage2(struct scsi_qla_host *, struct init_cb_24xx *);
-extern void qla_tgt_abort_isp(struct scsi_qla_host *);
-extern int qla_tgt_2xxx_process_response_error(struct scsi_qla_host *, sts_entry_t *);
 extern int qla_tgt_24xx_process_response_error(struct scsi_qla_host *, struct sts_entry_24xx *);
 extern void qla_tgt_modify_vp_config(struct scsi_qla_host *, struct vp_config_entry_24xx *);
 extern void qla_tgt_probe_one_stage1(struct scsi_qla_host *, struct qla_hw_data *);
