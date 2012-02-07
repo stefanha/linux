@@ -2719,7 +2719,7 @@ static int transport_generic_cmd_sequencer(
 			cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 
 			if (target_check_write_same_discard(&cdb[10], dev) < 0)
-				goto out_invalid_cdb_field;
+				goto out_unsupported_cdb;
 			if (!passthrough)
 				cmd->execute_task = target_emulate_write_same;
 			break;
@@ -3002,7 +3002,7 @@ static int transport_generic_cmd_sequencer(
 		cmd->se_cmd_flags |= SCF_SCSI_CONTROL_SG_IO_CDB;
 
 		if (target_check_write_same_discard(&cdb[1], dev) < 0)
-			goto out_invalid_cdb_field;
+			goto out_unsupported_cdb;
 		if (!passthrough)
 			cmd->execute_task = target_emulate_write_same;
 		break;
@@ -3025,7 +3025,7 @@ static int transport_generic_cmd_sequencer(
 		 * of byte 1 bit 3 UNMAP instead of original reserved field
 		 */
 		if (target_check_write_same_discard(&cdb[1], dev) < 0)
-			goto out_invalid_cdb_field;
+			goto out_unsupported_cdb;
 		if (!passthrough)
 			cmd->execute_task = target_emulate_write_same;
 		break;
