@@ -2584,7 +2584,8 @@ static void qla_tgt_do_work(struct work_struct *work)
 		s_id = atio->u.isp24.fcp_hdr.s_id;
 
 		mutex_lock(&ha->tgt_mutex);
-		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		cmd->sess = sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		cmd->loop_id = sess->loop_id;
 		/* sess has got an extra creation ref */
 		mutex_unlock(&ha->tgt_mutex);
 
