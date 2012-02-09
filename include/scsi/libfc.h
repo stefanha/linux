@@ -569,7 +569,6 @@ struct libfc_function_template {
 			     void *arg);
 
 	/*
->>>>>>> 0ce790e7d736cedc563e1fb4e998babf5a4dbc3d
 	 * Assign a sequence for an incoming request frame.
 	 *
 	 * STATUS: OPTIONAL
