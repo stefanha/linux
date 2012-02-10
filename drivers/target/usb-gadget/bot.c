@@ -355,10 +355,15 @@ void bot_cleanup_old_alt(struct f_uas *fu)
 	usb_ep_free_request(fu->ep_in, fu->bot_req_in);
 	usb_ep_free_request(fu->ep_out, fu->bot_req_out);
 	usb_ep_free_request(fu->ep_out, fu->cmd.req);
+	usb_ep_free_request(fu->ep_out, fu->bot_status.req);
+
+	kfree(fu->cmd.buf);
 
 	fu->bot_req_in = NULL;
 	fu->bot_req_out = NULL;
 	fu->cmd.req = NULL;
+	fu->bot_status.req = NULL;
+	fu->cmd.buf = NULL;
 }
 
 void bot_set_alt(struct f_uas *fu)
