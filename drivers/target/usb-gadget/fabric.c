@@ -195,6 +195,7 @@ static void usbg_cmd_work(struct work_struct *work)
 
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_UNSUPPORTED_SCSI_OPCODE, 1);
+		usbg_cleanup_cmd(cmd);
 		return;
 	}
 
@@ -306,6 +307,7 @@ static void bot_cmd_work(struct work_struct *work)
 
 		transport_send_check_condition_and_sense(se_cmd,
 				TCM_UNSUPPORTED_SCSI_OPCODE, 1);
+		usbg_cleanup_cmd(cmd);
 		return;
 	}
 
