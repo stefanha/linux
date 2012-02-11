@@ -626,8 +626,7 @@ void tcm_qla2xxx_do_rsp(struct work_struct *work)
 	/*
 	 * Dispatch ->queue_status from workqueue process context
 	 */
-	transport_send_check_condition_and_sense(&cmd->se_cmd,
-				cmd->se_cmd.scsi_sense_reason, 0);
+	transport_generic_request_failure(&cmd->se_cmd);
 }
 
 /*
