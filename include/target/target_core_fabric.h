@@ -150,6 +150,7 @@ int	core_alua_check_nonop_delay(struct se_cmd *);
 void	core_tmr_req_init(struct se_cmd *, void *, u8);
 void	core_tmr_release_req(struct se_tmr_req *);
 int	transport_generic_handle_tmr(struct se_cmd *);
+void	transport_generic_request_failure(struct se_cmd *);
 int	transport_lookup_tmr_lun(struct se_cmd *, u32);
 
 struct se_node_acl *core_tpg_check_initiator_node_acl(struct se_portal_group *,
