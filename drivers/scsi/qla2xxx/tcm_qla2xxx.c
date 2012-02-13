@@ -668,7 +668,8 @@ int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 /*
  * Called from qla_target.c:qla_tgt_issue_task_mgmt()
  */
-int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun, uint8_t tmr_func)
+int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
+			uint8_t tmr_func, uint32_t tag)
 {
 	struct qla_tgt_sess *sess = mcmd->sess;
 	struct se_session *se_sess = sess->se_sess;
@@ -688,6 +689,9 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun, uint8_t 
 	 * Save the se_tmr_req for qla_tgt_xmit_tm_rsp() callback into LLD code
 	 */
 	mcmd->se_tmr_req = &se_cmd->se_tmr_req;
+
+	if (tmr_func == TMR_ABORT_TASK)
+		mcmd->se_tmr_req->ref_task_tag = tag;
 	/*
 	 * Locate the underlying TCM struct se_lun from sc->device->lun
 	 */

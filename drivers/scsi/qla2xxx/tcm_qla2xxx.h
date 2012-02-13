@@ -139,7 +139,8 @@ extern int tcm_qla2xxx_handle_cmd(struct scsi_qla_host *, struct qla_tgt_cmd *,
 			unsigned char *, uint32_t, int, int, int);
 extern int tcm_qla2xxx_new_cmd_map(struct se_cmd *);
 extern int tcm_qla2xxx_handle_data(struct qla_tgt_cmd *);
-extern int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t);
+extern int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *, uint32_t,
+				uint8_t, uint32_t);
 extern int tcm_qla2xxx_queue_data_in(struct se_cmd *);
 extern int tcm_qla2xxx_queue_status(struct se_cmd *);
 extern int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *);
