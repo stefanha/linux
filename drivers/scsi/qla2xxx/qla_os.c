@@ -4405,6 +4405,14 @@ qla2x00_module_init(void)
 	if (ret < 0) {
 		kmem_cache_destroy(srb_cachep);
 		return ret;
+	} else if (ret > 0) {
+		/*
+		 * If initiator mode is explictly disabled by qla_tgt_init(),
+		 * prevent scsi_transport_fc.c:fc_scsi_scan_rport() from
+		 * performing scsi_scan_target() during LOOP UP event.
+		 */
+		qla2xxx_transport_functions.disable_target_scan = 1;
+		qla2xxx_transport_vport_functions.disable_target_scan = 1;
 	}
 
 	/* Derive version string. */

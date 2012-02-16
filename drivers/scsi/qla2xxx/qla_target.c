@@ -4753,8 +4753,10 @@ int __init qla_tgt_init(void)
 		ret = -ENOMEM;
 		goto out_cmd_mempool;
 	}
-
-	return 0;
+	/*
+	 * Return 1 to signal that initiator-mode is being disabled
+	 */
+	return (ql2x_ini_mode == QLA2XXX_INI_MODE_DISABLED) ? 1 : 0;
 
 out_cmd_mempool:
 	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
