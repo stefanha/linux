@@ -2586,12 +2586,12 @@ static void qla_tgt_do_work(struct work_struct *work)
 
 		mutex_lock(&ha->tgt_mutex);
 		cmd->sess = sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
-		cmd->loop_id = sess->loop_id;
 		/* sess has got an extra creation ref */
 		mutex_unlock(&ha->tgt_mutex);
 
 		if (!sess)
 			goto out_term;
+		cmd->loop_id = sess->loop_id;
 	}
 
 	if (tgt->tgt_stop)
