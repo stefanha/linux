@@ -1808,7 +1808,6 @@ static int qla_tgt_pre_xmit_response(struct qla_tgt_cmd *cmd, struct qla_tgt_prm
 			se_cmd->t_task_cdb ? se_cmd->t_task_cdb[0] : 0,
 			cmd->bufflen, prm->rq_result);
 		prm->rq_result |= SS_RESIDUAL_OVER;
-		prm->residual = -prm->residual;
 	}
 
 	if (xmit_type & QLA_TGT_XMIT_STATUS) {
