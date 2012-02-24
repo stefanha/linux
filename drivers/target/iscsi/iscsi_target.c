@@ -830,7 +830,7 @@ page_alloc_failed:
 		__free_page(sg_page(&sgl[i]));
 		i--;
 	}
-	kfree(cmd->t_mem_sg);
+	kfree(sgl);
 	cmd->t_mem_sg = NULL;
 	return -ENOMEM;
 }
