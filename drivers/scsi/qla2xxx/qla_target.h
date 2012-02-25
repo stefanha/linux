@@ -869,7 +869,6 @@ struct qla_tgt_mgmt_cmd {
 	uint8_t fc_tm_rsp;
 	struct qla_tgt_sess *sess;
 	struct se_cmd se_cmd;
-	struct se_tmr_req *se_tmr_req;
 	unsigned int flags;
 #define QLA24XX_MGMT_SEND_NACK	1
 	union {

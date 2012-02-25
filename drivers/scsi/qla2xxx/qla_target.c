@@ -1437,7 +1437,7 @@ void qla_tgt_xmit_tm_rsp(struct qla_tgt_mgmt_cmd *mcmd)
 		qla_tgt_send_notify_ack(vha, &mcmd->orig_iocb.imm_ntfy,
 			0, 0, 0, 0, 0, 0);
 	else {
-		if (mcmd->se_tmr_req->function == TMR_ABORT_TASK)
+		if (mcmd->se_cmd.se_tmr_req->function == TMR_ABORT_TASK)
 			qla_tgt_24xx_send_abts_resp(vha, &mcmd->orig_iocb.abts,
 				mcmd->fc_tm_rsp, false);
 		else
