@@ -410,17 +410,6 @@ void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
  */
 int tcm_qla2xxx_check_stop_free(struct se_cmd *se_cmd)
 {
-	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB) {
-		struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
-				struct qla_tgt_mgmt_cmd, se_cmd);
-		/*
-		 * Release the associated se_cmd->se_tmr_req and se_cmd
-		 * TMR related state now.
-		 */
-		transport_generic_free_cmd(se_cmd, 1);
-		qla_tgt_free_mcmd(mcmd);
-		return 1;
-	}
 	return target_put_sess_cmd(se_cmd->se_sess, se_cmd);
 }
 
@@ -431,8 +420,12 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd;
 
-	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)
+	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB) {
+		struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
+				struct qla_tgt_mgmt_cmd, se_cmd);
+		qla_tgt_free_mcmd(mcmd);
 		return;
+	}
 
 	cmd = container_of(se_cmd, struct qla_tgt_cmd, se_cmd);
 	qla_tgt_free_cmd(cmd);
@@ -672,39 +665,10 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
 			uint8_t tmr_func, uint32_t tag)
 {
 	struct qla_tgt_sess *sess = mcmd->sess;
-	struct se_session *se_sess = sess->se_sess;
-	struct se_portal_group *se_tpg = se_sess->se_tpg;
 	struct se_cmd *se_cmd = &mcmd->se_cmd;
-	int rc;
-	/*
-	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
-	 */
-	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
-				DMA_NONE, 0, NULL);
 
-	rc = core_tmr_alloc_req(se_cmd, mcmd, tmr_func, GFP_ATOMIC);
-	if (rc < 0) {
-		transport_generic_free_cmd(se_cmd, 1);
-		return -ENOMEM;
-	}
-	/*
-	 * Save the se_tmr_req for qla_tgt_xmit_tm_rsp() callback into LLD code
-	 */
-	mcmd->se_tmr_req = se_cmd->se_tmr_req;
-
-	if (tmr_func == TMR_ABORT_TASK)
-		mcmd->se_tmr_req->ref_task_tag = tag;
-	/*
-	 * Locate the underlying TCM struct se_lun from sc->device->lun
-	 */
-	if (transport_lookup_tmr_lun(se_cmd, lun) < 0) {
-		transport_generic_free_cmd(se_cmd, 1);
-		return -EINVAL;
-	}
-	/*
-	 * Queue the TMR associated se_cmd into TCM Core for processing
-	 */
-	return transport_generic_handle_tmr(se_cmd);
+	return target_submit_tmr(se_cmd, sess->se_sess, NULL, lun, mcmd,
+			tmr_func, GFP_ATOMIC, tag, 0);
 }
 
 int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)

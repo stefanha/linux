@@ -1726,14 +1726,14 @@ static void target_complete_tmr_failure(struct work_struct *work)
 
 int target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
 		unsigned char *sense, u32 unpacked_lun,
-		void *fabric_tmr_ptr, unsigned char tm_type, int flags)
+		void *fabric_tmr_ptr, unsigned char tm_type,
+		gfp_t gfp, unsigned int tag, int flags)
 {
 	struct se_portal_group *se_tpg;
 	int ret;
 
 	se_tpg = se_sess->se_tpg;
 	BUG_ON(!se_tpg);
-	BUG_ON(in_interrupt());
 
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
 			      0, DMA_NONE, MSG_SIMPLE_TAG, sense);
@@ -1741,9 +1741,12 @@ int target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
 	 * FIXME: Currently expect caller to handle se_cmd->se_tmr_req
 	 * allocation failure.
 	 */
-	ret = core_tmr_alloc_req(se_cmd, fabric_tmr_ptr, tm_type, GFP_KERNEL);
+	ret = core_tmr_alloc_req(se_cmd, fabric_tmr_ptr, tm_type, gfp);
 	if (ret < 0)
 		return -ENOMEM;
+
+	if (tm_type == TMR_ABORT_TASK)
+		se_cmd->se_tmr_req->ref_task_tag = tag;
 
 	/* See target_submit_cmd for commentary */
 	target_get_sess_cmd(se_sess, se_cmd, (flags & TARGET_SCF_ACK_KREF));
