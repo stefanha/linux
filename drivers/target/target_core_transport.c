@@ -1712,7 +1712,7 @@ EXPORT_SYMBOL(target_submit_cmd);
  * @fabric_context: fabric context for TMR req
  * @tm_type: Type of TM request
  *
- * Callable from all contexts.
+ * Callable from process context
  **/
 
 void target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
@@ -1724,6 +1724,7 @@ void target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
 
 	se_tpg = se_sess->se_tpg;
 	BUG_ON(!se_tpg);
+	BUG_ON(in_interrupt());
 
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
 			      0, DMA_NONE, MSG_SIMPLE_TAG, sense);
@@ -1731,13 +1732,19 @@ void target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
 	/* See target_submit_cmd for commentary */
 	target_get_sess_cmd(se_sess, se_cmd, (flags & TARGET_SCF_ACK_KREF));
 
-	core_tmr_req_init(se_cmd, fabric_tmr_ptr, tm_type);
+	ret = core_tmr_alloc_req(se_cmd, fabric_tmr_ptr, tm_type, GFP_KERNEL);
+	if (ret < 0) {
+		dump_stack();
+		/* FIXME XXX */
+		return;
+	}
 
 	ret = transport_lookup_tmr_lun(se_cmd, unpacked_lun);
 	if (ret) {
 		transport_send_check_condition_and_sense(se_cmd,
 			se_cmd->scsi_sense_reason, 0);
 		transport_generic_free_cmd(se_cmd, 0);
+		return;
 	}
 	transport_generic_handle_tmr(se_cmd);
 }
@@ -3996,7 +4003,7 @@ void transport_release_cmd(struct se_cmd *cmd)
 	BUG_ON(!cmd->se_tfo);
 
 	if (cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)
-		core_tmr_release_req(&cmd->se_tmr_req);
+		core_tmr_release_req(cmd->se_tmr_req);
 	if (cmd->t_task_cdb != cmd->__t_task_cdb)
 		kfree(cmd->t_task_cdb);
 	/*
@@ -4695,7 +4702,7 @@ void transport_send_task_abort(struct se_cmd *cmd)
 static int transport_generic_do_tmr(struct se_cmd *cmd)
 {
 	struct se_device *dev = cmd->se_dev;
-	struct se_tmr_req *tmr = &cmd->se_tmr_req;
+	struct se_tmr_req *tmr = cmd->se_tmr_req;
 	int ret;
 
 	switch (tmr->function) {

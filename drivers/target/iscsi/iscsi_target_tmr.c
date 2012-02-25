@@ -42,7 +42,7 @@ u8 iscsit_tmr_abort_task(
 	struct iscsi_cmd *ref_cmd;
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = &cmd->se_cmd.se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 
 	ref_cmd = iscsit_find_cmd_from_itt(conn, hdr->rtt);
@@ -122,7 +122,7 @@ u8 iscsit_tmr_task_reassign(
 	struct iscsi_conn *conn = cmd->conn;
 	struct iscsi_conn_recovery *cr = NULL;
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = &cmd->se_cmd.se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 	struct iscsi_tm *hdr = (struct iscsi_tm *) buf;
 	int ret;
 
@@ -459,7 +459,7 @@ static int iscsit_task_reassign_complete(
 extern int iscsit_tmr_post_handler(struct iscsi_cmd *cmd, struct iscsi_conn *conn)
 {
 	struct iscsi_tmr_req *tmr_req = cmd->tmr_req;
-	struct se_tmr_req *se_tmr = &cmd->se_cmd.se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 
 	if (tmr_req->task_reassign &&
 	   (se_tmr->response == ISCSI_TMF_RSP_COMPLETE))

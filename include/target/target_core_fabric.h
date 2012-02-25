@@ -147,7 +147,7 @@ void	target_wait_for_sess_cmds(struct se_session *, int);
 
 int	core_alua_check_nonop_delay(struct se_cmd *);
 
-void	core_tmr_req_init(struct se_cmd *, void *, u8);
+int	core_tmr_alloc_req(struct se_cmd *, void *, u8, gfp_t);
 void	core_tmr_release_req(struct se_tmr_req *);
 int	transport_generic_handle_tmr(struct se_cmd *);
 void	transport_generic_request_failure(struct se_cmd *);

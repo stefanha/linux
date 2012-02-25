@@ -1794,22 +1794,26 @@ static void srpt_handle_tsk_mgmt(struct srpt_rdma_ch *ch,
 	tcm_tmr = srp_tmr_to_tcm(srp_tsk->tsk_mgmt_func);
 	if (tcm_tmr < 0) {
 		send_ioctx->cmd.se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		send_ioctx->cmd.se_tmr_req.response =
+		send_ioctx->cmd.se_tmr_req->response =
 			TMR_TASK_MGMT_FUNCTION_NOT_SUPPORTED;
 		goto process_tmr;
 	}
 	transport_init_se_cmd(&send_ioctx->cmd, &srpt_target->tf_ops, ch->sess,
 			0, DMA_NONE, MSG_SIMPLE_TAG, send_ioctx->sense_data);
 
-	core_tmr_req_init(cmd, NULL, tcm_tmr);
-
+	res = core_tmr_alloc_req(cmd, NULL, tcm_tmr, GFP_KERNEL);
+	if (res < 0) {
+		send_ioctx->cmd.se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
+		send_ioctx->cmd.se_tmr_req->response = TMR_FUNCTION_REJECTED;
+		goto process_tmr;
+	}
 	unpacked_lun = srpt_unpack_lun((uint8_t *)&srp_tsk->lun,
 				       sizeof(srp_tsk->lun));
 	res = transport_lookup_tmr_lun(&send_ioctx->cmd, unpacked_lun);
 	if (res) {
 		pr_debug("rejecting TMR for LUN %lld\n", unpacked_lun);
 		send_ioctx->cmd.se_cmd_flags |= SCF_SCSI_CDB_EXCEPTION;
-		send_ioctx->cmd.se_tmr_req.response = TMR_LUN_DOES_NOT_EXIST;
+		send_ioctx->cmd.se_tmr_req->response = TMR_LUN_DOES_NOT_EXIST;
 		goto process_tmr;
 	}
 
@@ -3003,7 +3007,7 @@ static int srpt_queue_response(struct se_cmd *cmd)
 					      cmd->scsi_status);
 	else {
 		srp_tm_status
-			= tcm_to_srp_tsk_mgmt_status(cmd->se_tmr_req.response);
+			= tcm_to_srp_tsk_mgmt_status(cmd->se_tmr_req->response);
 		resp_len = srpt_build_tskmgmt_rsp(ch, ioctx, srp_tm_status,
 						 ioctx->tag);
 	}

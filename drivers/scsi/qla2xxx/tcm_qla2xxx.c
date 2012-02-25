@@ -675,20 +675,22 @@ int tcm_qla2xxx_handle_tmr(struct qla_tgt_mgmt_cmd *mcmd, uint32_t lun,
 	struct se_session *se_sess = sess->se_sess;
 	struct se_portal_group *se_tpg = se_sess->se_tpg;
 	struct se_cmd *se_cmd = &mcmd->se_cmd;
+	int rc;
 	/*
 	 * Initialize struct se_cmd descriptor from target_core_mod infrastructure
 	 */
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
 				DMA_NONE, 0, NULL);
-	/*
-	 * Initialize the TCM TMR
-	 */
-	core_tmr_req_init(se_cmd, mcmd, tmr_func);
 
+	rc = core_tmr_alloc_req(se_cmd, mcmd, tmr_func, GFP_ATOMIC);
+	if (rc < 0) {
+		transport_generic_free_cmd(se_cmd, 1);
+		return -ENOMEM;
+	}
 	/*
 	 * Save the se_tmr_req for qla_tgt_xmit_tm_rsp() callback into LLD code
 	 */
-	mcmd->se_tmr_req = &se_cmd->se_tmr_req;
+	mcmd->se_tmr_req = se_cmd->se_tmr_req;
 
 	if (tmr_func == TMR_ABORT_TASK)
 		mcmd->se_tmr_req->ref_task_tag = tag;
@@ -758,7 +760,7 @@ int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 
 int tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 {
-	struct se_tmr_req *se_tmr = &se_cmd->se_tmr_req;
+	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
 	struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
 				struct qla_tgt_mgmt_cmd, se_cmd);
 

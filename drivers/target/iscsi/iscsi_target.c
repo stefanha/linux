@@ -1740,7 +1740,7 @@ static int iscsit_handle_task_mgt_cmd(
 	cmd->targ_xfer_tag	= 0xFFFFFFFF;
 	cmd->cmd_sn		= hdr->cmdsn;
 	cmd->exp_stat_sn	= hdr->exp_statsn;
-	se_tmr			= &cmd->se_cmd.se_tmr_req;
+	se_tmr			= cmd->se_cmd.se_tmr_req;
 	tmr_req			= cmd->tmr_req;
 	/*
 	 * Locate the struct se_lun for all TMRs not related to ERL=2 TASK_REASSIGN
@@ -3120,7 +3120,7 @@ static int iscsit_send_task_mgt_rsp(
 	struct iscsi_cmd *cmd,
 	struct iscsi_conn *conn)
 {
-	struct se_tmr_req *se_tmr = &cmd->se_cmd.se_tmr_req;
+	struct se_tmr_req *se_tmr = cmd->se_cmd.se_tmr_req;
 	struct iscsi_tm_rsp *hdr;
 	u32 tx_size = 0;
 

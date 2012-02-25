@@ -394,7 +394,7 @@ static void ft_send_tm(struct ft_cmd *cmd)
 int ft_queue_tm_resp(struct se_cmd *se_cmd)
 {
 	struct ft_cmd *cmd = container_of(se_cmd, struct ft_cmd, se_cmd);
-	struct se_tmr_req *tmr = &se_cmd->se_tmr_req;
+	struct se_tmr_req *tmr = se_cmd->se_tmr_req;
 	enum fcp_resp_rsp_codes code;
 
 	switch (tmr->response) {

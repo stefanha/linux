@@ -560,7 +560,7 @@ struct se_cmd {
 	struct se_lun		*se_lun;
 	/* Only used for internal passthrough and legacy TCM fabric modules */
 	struct se_session	*se_sess;
-	struct se_tmr_req	se_tmr_req;
+	struct se_tmr_req	*se_tmr_req;
 	struct list_head	se_queue_node;
 	struct list_head	se_cmd_list;
 	struct completion	cmd_wait_comp;

@@ -301,7 +301,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	struct tcm_loop_nexus *tl_nexus;
 	struct tcm_loop_tmr *tl_tmr = NULL;
 	struct tcm_loop_tpg *tl_tpg;
-	int ret = FAILED;
+	int ret = FAILED, rc;
 	/*
 	 * Locate the tcm_loop_hba_t pointer
 	 */
@@ -342,11 +342,10 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess, 0,
 				DMA_NONE, MSG_SIMPLE_TAG,
 				&tl_cmd->tl_sense_buf[0]);
-	/*
-	 * Initialize the LUN_RESET TMR
-	 */
-	core_tmr_req_init(se_cmd, tl_tmr, TMR_LUN_RESET);
 
+	rc = core_tmr_alloc_req(se_cmd, tl_tmr, TMR_LUN_RESET, GFP_KERNEL);
+	if (rc < 0)
+		goto release;
 	/*
 	 * Locate the underlying TCM struct se_lun from sc->device->lun
 	 */
@@ -362,7 +361,7 @@ static int tcm_loop_device_reset(struct scsi_cmnd *sc)
 	 * The TMR LUN_RESET has completed, check the response status and
 	 * then release allocations.
 	 */
-	ret = (se_cmd->se_tmr_req.response == TMR_FUNCTION_COMPLETE) ?
+	ret = (se_cmd->se_tmr_req->response == TMR_FUNCTION_COMPLETE) ?
 		SUCCESS : FAILED;
 release:
 	if (se_cmd)
@@ -867,7 +866,7 @@ static int tcm_loop_queue_status(struct se_cmd *se_cmd)
 
 static int tcm_loop_queue_tm_rsp(struct se_cmd *se_cmd)
 {
-	struct se_tmr_req *se_tmr = &se_cmd->se_tmr_req;
+	struct se_tmr_req *se_tmr = se_cmd->se_tmr_req;
 	struct tcm_loop_tmr *tl_tmr = se_tmr->fabric_tmr_ptr;
 	/*
 	 * The SCSI EH thread will be sleeping on se_tmr->tl_tmr_wait, go ahead
