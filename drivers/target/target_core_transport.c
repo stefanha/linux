@@ -1715,7 +1715,7 @@ EXPORT_SYMBOL(target_submit_cmd);
  * Callable from process context
  **/
 
-void target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
+int target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
 		unsigned char *sense, u32 unpacked_lun,
 		void *fabric_tmr_ptr, unsigned char tm_type, int flags)
 {
@@ -1728,25 +1728,26 @@ void target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
 
 	transport_init_se_cmd(se_cmd, se_tpg->se_tpg_tfo, se_sess,
 			      0, DMA_NONE, MSG_SIMPLE_TAG, sense);
+	/*
+	 * FIXME: Currently expect caller to handle se_cmd->se_tmr_req
+	 * allocation failure.
+	 */
+	ret = core_tmr_alloc_req(se_cmd, fabric_tmr_ptr, tm_type, GFP_KERNEL);
+	if (ret < 0)
+		return -ENOMEM;
 
 	/* See target_submit_cmd for commentary */
 	target_get_sess_cmd(se_sess, se_cmd, (flags & TARGET_SCF_ACK_KREF));
-
-	ret = core_tmr_alloc_req(se_cmd, fabric_tmr_ptr, tm_type, GFP_KERNEL);
-	if (ret < 0) {
-		dump_stack();
-		/* FIXME XXX */
-		return;
-	}
 
 	ret = transport_lookup_tmr_lun(se_cmd, unpacked_lun);
 	if (ret) {
 		se_cmd->se_tmr_req->response = TMR_LUN_DOES_NOT_EXIST;
 		se_cmd->se_tfo->queue_tm_rsp(se_cmd);
 		transport_generic_free_cmd(se_cmd, 0);
-		return;
+		return 0;
 	}
 	transport_generic_handle_tmr(se_cmd);
+	return 0;
 }
 EXPORT_SYMBOL(target_submit_tmr);
 
