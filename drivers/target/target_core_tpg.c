@@ -274,6 +274,7 @@ struct se_node_acl *core_tpg_check_initiator_node_acl(
 
 	INIT_LIST_HEAD(&acl->acl_list);
 	INIT_LIST_HEAD(&acl->acl_sess_list);
+	init_completion(&acl->acl_free_comp);
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
 	atomic_set(&acl->acl_pr_ref_count, 0);
@@ -402,6 +403,7 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 
 	INIT_LIST_HEAD(&acl->acl_list);
 	INIT_LIST_HEAD(&acl->acl_sess_list);
+	init_completion(&acl->acl_free_comp);
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
 	atomic_set(&acl->acl_pr_ref_count, 0);
@@ -450,7 +452,7 @@ int core_tpg_del_initiator_node_acl(
 {
 	struct se_session *sess, *sess_tmp;
 	unsigned long flags;
-	int dynamic_acl = 0;
+	int dynamic_acl = 0, rc;
 
 	spin_lock_irq(&tpg->acl_node_lock);
 	if (acl->dynamic_node_acl) {
@@ -466,18 +468,17 @@ int core_tpg_del_initiator_node_acl(
 				&tpg->tpg_sess_list, sess_list) {
 		if (sess->se_node_acl != acl)
 			continue;
-		/*
-		 * Determine if the session needs to be closed by our context.
-		 */
-		if (!tpg->se_tpg_tfo->shutdown_session(sess))
-			continue;
 
+		kref_get(&sess->sess_kref);
 		spin_unlock_irqrestore(&tpg->session_lock, flags);
-		/*
-		 * If the $FABRIC_MOD session for the Initiator Node ACL exists,
-		 * forcefully shutdown the $FABRIC_MOD session/nexus.
-		 */
-		tpg->se_tpg_tfo->close_session(sess);
+
+		rc = tpg->se_tpg_tfo->shutdown_session(sess);
+		target_put_session(sess);
+		if (!rc)
+			continue;
+		target_put_session(sess);
+		/* Wait for fabric session shutdown to complete.. */
+		wait_for_completion(&acl->acl_free_comp);
 
 		spin_lock_irqsave(&tpg->session_lock, flags);
 	}

@@ -414,6 +414,12 @@ void transport_deregister_session(struct se_session *se_sess)
 
 	pr_debug("TARGET_CORE[%s]: Deregistered fabric_sess\n",
 		se_tpg->se_tpg_tfo->get_fabric_name());
+	/*
+	 * Awake sleeping ->acl_free_comp caller from configfs se_node_acl
+	 * removal context
+	 */
+	if (comp_nacl)
+		complete(&se_nacl->acl_free_comp);
 }
 EXPORT_SYMBOL(transport_deregister_session);
 
