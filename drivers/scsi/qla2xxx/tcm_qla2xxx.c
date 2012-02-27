@@ -434,39 +434,37 @@ void tcm_qla2xxx_release_cmd(struct se_cmd *se_cmd)
 int tcm_qla2xxx_shutdown_session(struct se_session *se_sess)
 {
 	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
+	struct scsi_qla_host *vha;
+	unsigned long flags;
 
-	if (!sess) {
-		pr_err("se_sess->fabric_sess_ptr is NULL\n");
-		dump_stack();
-		return 0;
-	}
+	BUG_ON(!sess);
+	vha = sess->vha;
+
+	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
+	sess->tearing_down = 1;
+	target_splice_sess_cmd_list(se_sess);
+	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
+
 	return 1;
 }
 
-extern int tcm_qla2xxx_clear_nacl_from_fcport_map(struct se_node_acl *);
-
 void tcm_qla2xxx_close_session(struct se_session *se_sess)
 {
-	struct se_node_acl *se_nacl = se_sess->se_node_acl;
 	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
 	struct scsi_qla_host *vha;
 	unsigned long flags;
 
-	if (!sess) {
-		pr_err("se_sess->fabric_sess_ptr is NULL\n");
-		dump_stack();
-		return;
-	}
+	BUG_ON(!sess);
 	vha = sess->vha;
 
 	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
-	tcm_qla2xxx_clear_nacl_from_fcport_map(se_nacl);
-	__qla_tgt_sess_put(sess);
+	qla_tgt_unreg_sess(sess);
 	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 }
 
 void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int conn_sleep)
 {
+#if 0
 	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
 	struct scsi_qla_host *vha;
 	unsigned long flags;
@@ -481,6 +479,7 @@ void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int c
 	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
 	tcm_qla2xxx_clear_nacl_from_fcport_map(se_sess->se_node_acl);
 	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
+#endif
 }
 
 void tcm_qla2xxx_reset_nexus(struct se_session *se_sess)
@@ -843,9 +842,9 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 /*
  * Expected to be called with struct qla_hw_data->hardware_lock held
  */
-int tcm_qla2xxx_clear_nacl_from_fcport_map(
-	struct se_node_acl *se_nacl)
+void tcm_qla2xxx_clear_nacl_from_fcport_map(struct qla_tgt_sess *sess)
 {
+	struct se_node_acl *se_nacl = sess->se_sess->se_node_acl;
 	struct se_portal_group *se_tpg = se_nacl->se_tpg;
 	struct se_wwn *se_wwn = se_tpg->se_tpg_wwn;
 	struct tcm_qla2xxx_lport *lport = container_of(se_wwn,
@@ -875,8 +874,11 @@ int tcm_qla2xxx_clear_nacl_from_fcport_map(
 	pr_debug("Clearing p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
 		" port_id: 0x%04x\n", se_nacl, nacl->nport_wwnn,
 		nacl->nport_id);
+}
 
-	return 0;
+void tcm_qla2xxx_put_sess(struct qla_tgt_sess *sess)
+{
+	target_put_session(sess->se_sess);
 }
 
 static struct se_node_acl *tcm_qla2xxx_make_nodeacl(
@@ -1441,6 +1443,9 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 	struct tcm_qla2xxx_lport *lport;
 	struct tcm_qla2xxx_nacl *nacl;
 	unsigned char be_sid[3];
+	unsigned long flags;
+
+	BUG_ON(in_interrupt());
 
 	se_sess = sess->se_sess;
 	if (!se_sess) {
@@ -1457,20 +1462,7 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 		dump_stack();
 		return;
 	}
-
-	target_splice_sess_cmd_list(se_sess);
-	spin_unlock_irq(&ha->hardware_lock);
-
 	target_wait_for_sess_cmds(se_sess, 0);
-
-	spin_lock_irq(&ha->hardware_lock);
-
-
-	/*
-	 * Now clear the struct se_node_acl->nacl_sess pointer
-	 */
-	transport_deregister_session_configfs(sess->se_sess);
-
         /*
          * And now clear the se_nacl and session pointers from our HW lport
          * mappings for fabric S_ID and LOOP_ID.
@@ -1480,13 +1472,14 @@ static void tcm_qla2xxx_free_session(struct qla_tgt_sess *sess)
 	be_sid[1] = sess->s_id.b.area;
 	be_sid[2] = sess->s_id.b.al_pa;
 
-        tcm_qla2xxx_set_sess_by_s_id(lport, NULL, nacl, se_sess,
-                        sess, be_sid);
-        tcm_qla2xxx_set_sess_by_loop_id(lport, NULL, nacl, se_sess,
-                        sess, sess->loop_id);
-	/*
-	 * Release the FC nexus -> target se_session link now.
-	 */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	tcm_qla2xxx_set_sess_by_s_id(lport, NULL, nacl, se_sess,
+			sess, be_sid);
+	tcm_qla2xxx_set_sess_by_loop_id(lport, NULL, nacl, se_sess,
+			sess, sess->loop_id);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	transport_deregister_session_configfs(sess->se_sess);
 	transport_deregister_session(sess->se_sess);
 }
 
@@ -1582,6 +1575,8 @@ static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.check_initiator_node_acl = tcm_qla2xxx_check_initiator_node_acl,
 	.find_sess_by_s_id	= tcm_qla2xxx_find_sess_by_s_id,
 	.find_sess_by_loop_id	= tcm_qla2xxx_find_sess_by_loop_id,
+	.clear_nacl_from_fcport_map = tcm_qla2xxx_clear_nacl_from_fcport_map,
+	.put_sess		= tcm_qla2xxx_put_sess,
 };
 
 static int tcm_qla2xxx_init_lport(struct tcm_qla2xxx_lport *lport)
