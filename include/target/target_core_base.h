@@ -655,6 +655,7 @@ struct se_session {
 	struct list_head	sess_cmd_list;
 	struct list_head	sess_wait_list;
 	spinlock_t		sess_cmd_lock;
+	struct kref		sess_kref;
 };
 
 struct se_device;
