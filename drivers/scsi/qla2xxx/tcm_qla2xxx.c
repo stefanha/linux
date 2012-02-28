@@ -462,26 +462,6 @@ void tcm_qla2xxx_close_session(struct se_session *se_sess)
 	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 }
 
-void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int conn_sleep)
-{
-#if 0
-	struct qla_tgt_sess *sess = se_sess->fabric_sess_ptr;
-	struct scsi_qla_host *vha;
-	unsigned long flags;
-
-	if (!sess) {
-		pr_err("se_sess->fabric_sess_ptr is NULL\n");
-		dump_stack();
-		return;
-	}
-	vha = sess->vha;
-
-	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
-	tcm_qla2xxx_clear_nacl_from_fcport_map(se_sess->se_node_acl);
-	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
-#endif
-}
-
 int tcm_qla2xxx_sess_logged_in(struct se_session *se_sess)
 {
 	return 0;
@@ -1766,7 +1746,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.release_cmd			= tcm_qla2xxx_release_cmd,
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,
-	.stop_session			= tcm_qla2xxx_stop_session,
 	.sess_logged_in			= tcm_qla2xxx_sess_logged_in,
 	.sess_get_index			= tcm_qla2xxx_sess_get_index,
 	.sess_get_initiator_sid		= NULL,
@@ -1816,7 +1795,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_npiv_ops = {
 	.release_cmd			= tcm_qla2xxx_release_cmd,
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,
-	.stop_session			= tcm_qla2xxx_stop_session,
 	.sess_logged_in			= tcm_qla2xxx_sess_logged_in,
 	.sess_get_index			= tcm_qla2xxx_sess_get_index,
 	.sess_get_initiator_sid		= NULL,

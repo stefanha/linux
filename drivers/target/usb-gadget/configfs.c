@@ -440,7 +440,6 @@ static struct target_core_fabric_ops usbg_ops = {
 	.release_cmd			= usbg_release_cmd,
 	.shutdown_session		= usbg_shutdown_session,
 	.close_session			= usbg_close_session,
-	.stop_session			= usbg_stop_session,
 	.sess_logged_in			= usbg_sess_logged_in,
 	.sess_get_index			= usbg_sess_get_index,
 	.sess_get_initiator_sid		= NULL,

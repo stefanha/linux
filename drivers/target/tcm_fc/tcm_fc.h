@@ -141,7 +141,6 @@ extern struct target_fabric_configfs *ft_configfs;
 void ft_sess_put(struct ft_sess *);
 int ft_sess_shutdown(struct se_session *);
 void ft_sess_close(struct se_session *);
-void ft_sess_stop(struct se_session *, int, int);
 int ft_sess_logged_in(struct se_session *);
 u32 ft_sess_get_index(struct se_session *);
 u32 ft_sess_get_port_name(struct se_session *, unsigned char *, u32);

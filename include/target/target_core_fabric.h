@@ -62,7 +62,6 @@ struct target_core_fabric_ops {
 	 */
 	int (*shutdown_session)(struct se_session *);
 	void (*close_session)(struct se_session *);
-	void (*stop_session)(struct se_session *, int, int);
 	int (*sess_logged_in)(struct se_session *);
 	u32 (*sess_get_index)(struct se_session *);
 	/*

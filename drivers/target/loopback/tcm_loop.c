@@ -785,14 +785,6 @@ static void tcm_loop_close_session(struct se_session *se_sess)
 	return;
 };
 
-static void tcm_loop_stop_session(
-	struct se_session *se_sess,
-	int sess_sleep,
-	int conn_sleep)
-{
-	return;
-}
-
 static int tcm_loop_write_pending(struct se_cmd *se_cmd)
 {
 	/*
@@ -1386,7 +1378,6 @@ static int tcm_loop_register_configfs(void)
 	fabric->tf_ops.release_cmd = &tcm_loop_release_cmd;
 	fabric->tf_ops.shutdown_session = &tcm_loop_shutdown_session;
 	fabric->tf_ops.close_session = &tcm_loop_close_session;
-	fabric->tf_ops.stop_session = &tcm_loop_stop_session;
 	fabric->tf_ops.sess_logged_in = &tcm_loop_sess_logged_in;
 	fabric->tf_ops.sess_get_index = &tcm_loop_sess_get_index;
 	fabric->tf_ops.sess_get_initiator_sid = NULL;

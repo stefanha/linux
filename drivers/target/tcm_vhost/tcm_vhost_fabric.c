@@ -283,11 +283,6 @@ void tcm_vhost_close_session(struct se_session *se_sess)
 	return;
 }
 
-void tcm_vhost_stop_session(struct se_session *se_sess, int sess_sleep , int conn_sleep)
-{
-	return;
-}
-
 int tcm_vhost_sess_logged_in(struct se_session *se_sess)
 {
 	return 0;

@@ -328,13 +328,6 @@ void ft_sess_close(struct se_session *se_sess)
 	synchronize_rcu();		/* let transport deregister happen */
 }
 
-void ft_sess_stop(struct se_session *se_sess, int sess_sleep, int conn_sleep)
-{
-	struct ft_sess *sess = se_sess->fabric_sess_ptr;
-
-	pr_debug("port_id %x\n", sess->port_id);
-}
-
 int ft_sess_logged_in(struct se_session *se_sess)
 {
 	struct ft_sess *sess = se_sess->fabric_sess_ptr;
