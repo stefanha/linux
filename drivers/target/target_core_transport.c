@@ -1720,8 +1720,11 @@ static void target_complete_tmr_failure(struct work_struct *work)
  * @unpacked_lun: unpacked LUN to reference for struct se_lun
  * @fabric_context: fabric context for TMR req
  * @tm_type: Type of TM request
+ * @gfp: gfp type for caller
+ * @tag: referenced task tag for TMR_ABORT_TASK
+ * @flags: submit cmd flags 
  *
- * Callable from process context
+ * Callable from all contexts
  **/
 
 int target_submit_tmr(struct se_cmd *se_cmd, struct se_session *se_sess,
