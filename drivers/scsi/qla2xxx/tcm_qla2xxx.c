@@ -482,11 +482,6 @@ void tcm_qla2xxx_stop_session(struct se_session *se_sess, int sess_sleep , int c
 #endif
 }
 
-void tcm_qla2xxx_reset_nexus(struct se_session *se_sess)
-{
-	return;
-}
-
 int tcm_qla2xxx_sess_logged_in(struct se_session *se_sess)
 {
 	return 0;
@@ -1772,7 +1767,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,
 	.stop_session			= tcm_qla2xxx_stop_session,
-	.fall_back_to_erl0		= tcm_qla2xxx_reset_nexus,
 	.sess_logged_in			= tcm_qla2xxx_sess_logged_in,
 	.sess_get_index			= tcm_qla2xxx_sess_get_index,
 	.sess_get_initiator_sid		= NULL,
@@ -1823,7 +1817,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_npiv_ops = {
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,
 	.stop_session			= tcm_qla2xxx_stop_session,
-	.fall_back_to_erl0		= tcm_qla2xxx_reset_nexus,
 	.sess_logged_in			= tcm_qla2xxx_sess_logged_in,
 	.sess_get_index			= tcm_qla2xxx_sess_get_index,
 	.sess_get_initiator_sid		= NULL,

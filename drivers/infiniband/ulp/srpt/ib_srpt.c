@@ -3471,11 +3471,6 @@ static void srpt_stop_session(struct se_session *se_sess, int sess_sleep,
 {
 }
 
-static void srpt_reset_nexus(struct se_session *sess)
-{
-	printk(KERN_ERR "This is the SRP protocol, not iSCSI\n");
-}
-
 static int srpt_sess_logged_in(struct se_session *se_sess)
 {
 	return true;
@@ -3898,7 +3893,6 @@ static struct target_core_fabric_ops srpt_template = {
 	.shutdown_session		= srpt_shutdown_session,
 	.close_session			= srpt_close_session,
 	.stop_session			= srpt_stop_session,
-	.fall_back_to_erl0		= srpt_reset_nexus,
 	.sess_logged_in			= srpt_sess_logged_in,
 	.sess_get_index			= srpt_sess_get_index,
 	.sess_get_initiator_sid		= NULL,

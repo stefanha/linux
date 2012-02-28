@@ -530,7 +530,6 @@ static struct target_core_fabric_ops ft_fabric_ops = {
 	.shutdown_session =		ft_sess_shutdown,
 	.close_session =		ft_sess_close,
 	.stop_session =			ft_sess_stop,
-	.fall_back_to_erl0 =		ft_sess_set_erl0,
 	.sess_logged_in =		ft_sess_logged_in,
 	.sess_get_index =		ft_sess_get_index,
 	.sess_get_initiator_sid =	NULL,

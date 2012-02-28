@@ -357,11 +357,6 @@ u32 ft_sess_get_port_name(struct se_session *se_sess,
 	return ft_format_wwn(buf, len, sess->port_name);
 }
 
-void ft_sess_set_erl0(struct se_session *se_sess)
-{
-	/* XXX TBD called when out of memory */
-}
-
 /*
  * libfc ops involving sessions.
  */

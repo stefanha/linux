@@ -194,7 +194,6 @@ void usbg_release_cmd(struct se_cmd *);
 int usbg_shutdown_session(struct se_session *);
 void usbg_close_session(struct se_session *);
 void usbg_stop_session(struct se_session *, int, int);
-void usbg_reset_nexus(struct se_session *);
 int usbg_sess_logged_in(struct se_session *);
 u32 usbg_sess_get_index(struct se_session *);
 int usbg_write_pending(struct se_cmd *);

@@ -425,10 +425,6 @@ static int target_fabric_tf_ops_check(
 		pr_err("Missing tfo->stop_session()\n");
 		return -EINVAL;
 	}
-	if (!tfo->fall_back_to_erl0) {
-		pr_err("Missing tfo->fall_back_to_erl0()\n");
-		return -EINVAL;
-	}
 	if (!tfo->sess_logged_in) {
 		pr_err("Missing tfo->sess_logged_in()\n");
 		return -EINVAL;

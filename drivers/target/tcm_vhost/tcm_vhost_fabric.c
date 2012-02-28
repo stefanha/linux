@@ -288,11 +288,6 @@ void tcm_vhost_stop_session(struct se_session *se_sess, int sess_sleep , int con
 	return;
 }
 
-void tcm_vhost_reset_nexus(struct se_session *se_sess)
-{
-	return;
-}
-
 int tcm_vhost_sess_logged_in(struct se_session *se_sess)
 {
 	return 0;

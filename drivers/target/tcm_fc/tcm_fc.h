@@ -145,7 +145,6 @@ void ft_sess_stop(struct se_session *, int, int);
 int ft_sess_logged_in(struct se_session *);
 u32 ft_sess_get_index(struct se_session *);
 u32 ft_sess_get_port_name(struct se_session *, unsigned char *, u32);
-void ft_sess_set_erl0(struct se_session *);
 
 void ft_lport_add(struct fc_lport *, void *);
 void ft_lport_del(struct fc_lport *, void *);

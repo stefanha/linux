@@ -519,7 +519,6 @@ static struct target_core_fabric_ops tcm_vhost_ops = {
 	.shutdown_session		= tcm_vhost_shutdown_session,
 	.close_session			= tcm_vhost_close_session,
 	.stop_session			= tcm_vhost_stop_session,
-	.fall_back_to_erl0		= tcm_vhost_reset_nexus,
 	.sess_logged_in			= tcm_vhost_sess_logged_in,
 	.sess_get_index			= tcm_vhost_sess_get_index,
 	.sess_get_initiator_sid		= NULL,

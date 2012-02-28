@@ -1728,13 +1728,6 @@ static void lio_tpg_stop_session(
 	iscsit_stop_session(sess, sess_sleep, conn_sleep);
 }
 
-static void lio_tpg_fall_back_to_erl0(struct se_session *se_sess)
-{
-	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
-
-	iscsit_fall_back_to_erl0(sess);
-}
-
 static u32 lio_tpg_get_inst_index(struct se_portal_group *se_tpg)
 {
 	struct iscsi_portal_group *tpg = se_tpg->se_tpg_fabric_ptr;
@@ -1799,7 +1792,6 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;
 	fabric->tf_ops.close_session = &lio_tpg_close_session;
 	fabric->tf_ops.stop_session = &lio_tpg_stop_session;
-	fabric->tf_ops.fall_back_to_erl0 = &lio_tpg_fall_back_to_erl0;
 	fabric->tf_ops.sess_logged_in = &lio_sess_logged_in;
 	fabric->tf_ops.sess_get_index = &lio_sess_get_index;
 	fabric->tf_ops.sess_get_initiator_sid = &lio_sess_get_initiator_sid;
