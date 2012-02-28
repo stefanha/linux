@@ -193,7 +193,6 @@ int usbg_cmd_queue_supported(struct se_cmd *se_cmd);
 void usbg_release_cmd(struct se_cmd *);
 int usbg_shutdown_session(struct se_session *);
 void usbg_close_session(struct se_session *);
-int usbg_sess_logged_in(struct se_session *);
 u32 usbg_sess_get_index(struct se_session *);
 int usbg_write_pending(struct se_cmd *);
 int usbg_write_pending_status(struct se_cmd *);

@@ -3462,11 +3462,6 @@ static void srpt_close_session(struct se_session *se_sess)
 	WARN_ON(res <= 0);
 }
 
-static int srpt_sess_logged_in(struct se_session *se_sess)
-{
-	return true;
-}
-
 /**
  * srpt_sess_get_index() - Return the value of scsiAttIntrPortIndex (SCSI-MIB).
  *
@@ -3883,7 +3878,6 @@ static struct target_core_fabric_ops srpt_template = {
 	.check_stop_free		= srpt_check_stop_free,
 	.shutdown_session		= srpt_shutdown_session,
 	.close_session			= srpt_close_session,
-	.sess_logged_in			= srpt_sess_logged_in,
 	.sess_get_index			= srpt_sess_get_index,
 	.sess_get_initiator_sid		= NULL,
 	.write_pending			= srpt_write_pending,

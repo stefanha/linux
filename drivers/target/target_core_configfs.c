@@ -421,10 +421,6 @@ static int target_fabric_tf_ops_check(
 		pr_err("Missing tfo->close_session()\n");
 		return -EINVAL;
 	}
-	if (!tfo->sess_logged_in) {
-		pr_err("Missing tfo->sess_logged_in()\n");
-		return -EINVAL;
-	}
 	if (!tfo->sess_get_index) {
 		pr_err("Missing tfo->sess_get_index()\n");
 		return -EINVAL;

@@ -21,7 +21,6 @@ int tcm_vhost_new_cmd_map(struct se_cmd *);
 void tcm_vhost_release_cmd(struct se_cmd *);
 int tcm_vhost_shutdown_session(struct se_session *);
 void tcm_vhost_close_session(struct se_session *);
-int tcm_vhost_sess_logged_in(struct se_session *);
 u32 tcm_vhost_sess_get_index(struct se_session *);
 int tcm_vhost_write_pending(struct se_cmd *);
 int tcm_vhost_write_pending_status(struct se_cmd *);

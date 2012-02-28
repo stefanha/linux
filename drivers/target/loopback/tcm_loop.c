@@ -744,14 +744,6 @@ static int tcm_loop_is_state_remove(struct se_cmd *se_cmd)
 	return 0;
 }
 
-static int tcm_loop_sess_logged_in(struct se_session *se_sess)
-{
-	/*
-	 * Assume that TL Nexus is always active
-	 */
-	return 1;
-}
-
 static u32 tcm_loop_sess_get_index(struct se_session *se_sess)
 {
 	return 1;
@@ -1378,7 +1370,6 @@ static int tcm_loop_register_configfs(void)
 	fabric->tf_ops.release_cmd = &tcm_loop_release_cmd;
 	fabric->tf_ops.shutdown_session = &tcm_loop_shutdown_session;
 	fabric->tf_ops.close_session = &tcm_loop_close_session;
-	fabric->tf_ops.sess_logged_in = &tcm_loop_sess_logged_in;
 	fabric->tf_ops.sess_get_index = &tcm_loop_sess_get_index;
 	fabric->tf_ops.sess_get_initiator_sid = NULL;
 	fabric->tf_ops.write_pending = &tcm_loop_write_pending;

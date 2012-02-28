@@ -1510,21 +1510,6 @@ static int iscsi_is_state_remove(struct se_cmd *se_cmd)
 	return (cmd->i_state == ISTATE_REMOVE);
 }
 
-static int lio_sess_logged_in(struct se_session *se_sess)
-{
-	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
-	int ret;
-	/*
-	 * Called with spin_lock_bh(&tpg_lock); and
-	 * spin_lock(&se_tpg->session_lock); held.
-	 */
-	spin_lock(&sess->conn_lock);
-	ret = (sess->session_state != TARG_SESS_STATE_LOGGED_IN);
-	spin_unlock(&sess->conn_lock);
-
-	return ret;
-}
-
 static u32 lio_sess_get_index(struct se_session *se_sess)
 {
 	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
@@ -1781,7 +1766,6 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.release_cmd = &lio_release_cmd;
 	fabric->tf_ops.shutdown_session = &lio_tpg_shutdown_session;
 	fabric->tf_ops.close_session = &lio_tpg_close_session;
-	fabric->tf_ops.sess_logged_in = &lio_sess_logged_in;
 	fabric->tf_ops.sess_get_index = &lio_sess_get_index;
 	fabric->tf_ops.sess_get_initiator_sid = &lio_sess_get_initiator_sid;
 	fabric->tf_ops.write_pending = &lio_write_pending;

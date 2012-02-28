@@ -462,11 +462,6 @@ void tcm_qla2xxx_close_session(struct se_session *se_sess)
 	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 }
 
-int tcm_qla2xxx_sess_logged_in(struct se_session *se_sess)
-{
-	return 0;
-}
-
 u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
 {
 	return 0;
@@ -1746,7 +1741,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_ops = {
 	.release_cmd			= tcm_qla2xxx_release_cmd,
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,
-	.sess_logged_in			= tcm_qla2xxx_sess_logged_in,
 	.sess_get_index			= tcm_qla2xxx_sess_get_index,
 	.sess_get_initiator_sid		= NULL,
 	.write_pending			= tcm_qla2xxx_write_pending,
@@ -1795,7 +1789,6 @@ static struct target_core_fabric_ops tcm_qla2xxx_npiv_ops = {
 	.release_cmd			= tcm_qla2xxx_release_cmd,
 	.shutdown_session		= tcm_qla2xxx_shutdown_session,
 	.close_session			= tcm_qla2xxx_close_session,
-	.sess_logged_in			= tcm_qla2xxx_sess_logged_in,
 	.sess_get_index			= tcm_qla2xxx_sess_get_index,
 	.sess_get_initiator_sid		= NULL,
 	.write_pending			= tcm_qla2xxx_write_pending,

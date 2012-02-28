@@ -571,11 +571,6 @@ void usbg_stop_session(struct se_session *se_sess, int sess_sleep,
 	return;
 }
 
-int usbg_sess_logged_in(struct se_session *se_sess)
-{
-	return 0;
-}
-
 u32 usbg_sess_get_index(struct se_session *se_sess)
 {
 	return 0;

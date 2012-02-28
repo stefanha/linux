@@ -283,11 +283,6 @@ void tcm_vhost_close_session(struct se_session *se_sess)
 	return;
 }
 
-int tcm_vhost_sess_logged_in(struct se_session *se_sess)
-{
-	return 0;
-}
-
 u32 tcm_vhost_sess_get_index(struct se_session *se_sess)
 {
 	return 0;
