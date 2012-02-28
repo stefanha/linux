@@ -1503,13 +1503,6 @@ static int iscsi_get_cmd_state(struct se_cmd *se_cmd)
 	return cmd->i_state;
 }
 
-static int iscsi_is_state_remove(struct se_cmd *se_cmd)
-{
-	struct iscsi_cmd *cmd = container_of(se_cmd, struct iscsi_cmd, se_cmd);
-
-	return (cmd->i_state == ISTATE_REMOVE);
-}
-
 static u32 lio_sess_get_index(struct se_session *se_sess)
 {
 	struct iscsi_session *sess = se_sess->fabric_sess_ptr;
@@ -1779,7 +1772,6 @@ int iscsi_target_register_configfs(void)
 	fabric->tf_ops.queue_tm_rsp = &lio_queue_tm_rsp;
 	fabric->tf_ops.set_fabric_sense_len = &lio_set_fabric_sense_len;
 	fabric->tf_ops.get_fabric_sense_len = &lio_get_fabric_sense_len;
-	fabric->tf_ops.is_state_remove = &iscsi_is_state_remove;
 	/*
 	 * Setup function pointers for generic logic in target_core_fabric_configfs.c
 	 */

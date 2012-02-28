@@ -32,4 +32,3 @@ int tcm_vhost_queue_status(struct se_cmd *);
 int tcm_vhost_queue_tm_rsp(struct se_cmd *);
 u16 tcm_vhost_set_fabric_sense_len(struct se_cmd *, u32);
 u16 tcm_vhost_get_fabric_sense_len(void);
-int tcm_vhost_is_state_remove(struct se_cmd *);

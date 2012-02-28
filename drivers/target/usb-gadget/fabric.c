@@ -620,8 +620,3 @@ u16 usbg_get_fabric_sense_len(void)
 {
 	return 0;
 }
-
-int usbg_is_state_remove(struct se_cmd *se_cmd)
-{
-	return 0;
-}

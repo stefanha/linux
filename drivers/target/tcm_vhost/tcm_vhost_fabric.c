@@ -345,8 +345,3 @@ u16 tcm_vhost_get_fabric_sense_len(void)
 {
 	return 0;
 }
-
-int tcm_vhost_is_state_remove(struct se_cmd *se_cmd)
-{
-	return 0;
-}

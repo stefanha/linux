@@ -3506,11 +3506,6 @@ static u16 srpt_get_fabric_sense_len(void)
 	return 0;
 }
 
-static int srpt_is_state_remove(struct se_cmd *se_cmd)
-{
-	return 0;
-}
-
 /**
  * srpt_parse_i_port_id() - Parse an initiator port ID.
  * @name: ASCII representation of a 128-bit initiator port ID.
@@ -3890,7 +3885,6 @@ static struct target_core_fabric_ops srpt_template = {
 	.queue_tm_rsp			= srpt_queue_response,
 	.get_fabric_sense_len		= srpt_get_fabric_sense_len,
 	.set_fabric_sense_len		= srpt_set_fabric_sense_len,
-	.is_state_remove		= srpt_is_state_remove,
 	/*
 	 * Setup function pointers for generic logic in
 	 * target_core_fabric_configfs.c

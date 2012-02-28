@@ -736,14 +736,6 @@ static u32 tcm_loop_get_inst_index(struct se_portal_group *se_tpg)
 	return 1;
 }
 
-static int tcm_loop_is_state_remove(struct se_cmd *se_cmd)
-{
-	/*
-	 * Assume struct scsi_cmnd is not in remove state..
-	 */
-	return 0;
-}
-
 static u32 tcm_loop_sess_get_index(struct se_session *se_sess)
 {
 	return 1;
@@ -1386,7 +1378,6 @@ static int tcm_loop_register_configfs(void)
 	fabric->tf_ops.queue_tm_rsp = &tcm_loop_queue_tm_rsp;
 	fabric->tf_ops.set_fabric_sense_len = &tcm_loop_set_fabric_sense_len;
 	fabric->tf_ops.get_fabric_sense_len = &tcm_loop_get_fabric_sense_len;
-	fabric->tf_ops.is_state_remove = &tcm_loop_is_state_remove;
 
 	tf_cg = &fabric->tf_group;
 	/*

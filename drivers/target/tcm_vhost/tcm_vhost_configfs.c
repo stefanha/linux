@@ -530,7 +530,6 @@ static struct target_core_fabric_ops tcm_vhost_ops = {
 	.queue_tm_rsp			= tcm_vhost_queue_tm_rsp,
 	.get_fabric_sense_len		= tcm_vhost_get_fabric_sense_len,
 	.set_fabric_sense_len		= tcm_vhost_set_fabric_sense_len,
-	.is_state_remove		= tcm_vhost_is_state_remove,
 	/*
 	 * Setup function pointers for generic logic in target_core_fabric_configfs.c
 	 */

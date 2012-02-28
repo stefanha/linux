@@ -202,6 +202,5 @@ int usbg_get_cmd_state(struct se_cmd *);
 int usbg_queue_tm_rsp(struct se_cmd *);
 u16 usbg_set_fabric_sense_len(struct se_cmd *, u32);
 u16 usbg_get_fabric_sense_len(void);
-int usbg_is_state_remove(struct se_cmd *);
 
 #endif

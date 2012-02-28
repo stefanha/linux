@@ -452,7 +452,6 @@ static struct target_core_fabric_ops usbg_ops = {
 	.queue_tm_rsp			= usbg_queue_tm_rsp,
 	.get_fabric_sense_len		= usbg_get_fabric_sense_len,
 	.set_fabric_sense_len		= usbg_set_fabric_sense_len,
-	.is_state_remove		= usbg_is_state_remove,
 	.check_stop_free		= usbg_check_stop_free,
 
 	.fabric_make_wwn		= usbg_make_tport,

@@ -465,10 +465,6 @@ static int target_fabric_tf_ops_check(
 		pr_err("Missing tfo->get_fabric_sense_len()\n");
 		return -EINVAL;
 	}
-	if (!tfo->is_state_remove) {
-		pr_err("Missing tfo->is_state_remove()\n");
-		return -EINVAL;
-	}
 	/*
 	 * We at least require tfo->fabric_make_wwn(), tfo->fabric_drop_wwn()
 	 * tfo->fabric_make_tpg() and tfo->fabric_drop_tpg() in
