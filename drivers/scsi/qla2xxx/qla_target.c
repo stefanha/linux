@@ -1124,7 +1124,7 @@ static void qla_tgt_send_notify_ack(struct scsi_qla_host *vha,
 		"qla_target(%d): Sending 24xx Notify Ack %d\n",
 		vha->vp_idx, nack->u.isp24.status);
 
-	qla2x00_isp_cmd(vha, vha->req);
+	qla2x00_start_iocbs(vha, vha->req);
 }
 
 /*
@@ -1199,7 +1199,7 @@ static void qla_tgt_24xx_send_abts_resp(struct scsi_qla_host *vha,
 
 	ha->qla_tgt->abts_resp_expected++;
 
-	qla2x00_isp_cmd(vha, vha->req);
+	qla2x00_start_iocbs(vha, vha->req);
 }
 
 /*
@@ -1242,7 +1242,7 @@ static void qla_tgt_24xx_retry_term_exchange(struct scsi_qla_host *vha,
 		__constant_cpu_to_le16(CTIO7_FLAGS_STATUS_MODE_1 | CTIO7_FLAGS_TERMINATE);
 	ctio->u.status1.ox_id = entry->fcp_hdr_le.ox_id;
 
-	qla2x00_isp_cmd(vha, vha->req);
+	qla2x00_start_iocbs(vha, vha->req);
 
 	qla_tgt_24xx_send_abts_resp(vha, (abts_recv_from_24xx_t *)entry,
 		FCP_TMF_CMPL, true);
@@ -1378,7 +1378,7 @@ static void qla_tgt_24xx_send_task_mgmt_ctio(struct scsi_qla_host *ha,
 	ctio->u.status1.response_len = __constant_cpu_to_le16(8);
 	((uint32_t *)ctio->u.status1.sense_data)[0] = cpu_to_be32(resp_code);
 
-	qla2x00_isp_cmd(ha, ha->req);
+	qla2x00_start_iocbs(ha, ha->req);
 }
 
 void qla_tgt_free_mcmd(struct qla_tgt_mgmt_cmd *mcmd)
@@ -2048,7 +2048,7 @@ int qla_tgt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type, uint8_t scsi_s
 	ql_dbg(ql_dbg_tgt, vha, 0xe01a, "Xmitting CTIO7 response pkt for 24xx:"
 			" %p scsi_status: 0x%02x\n", pkt, scsi_status);
 
-	qla2x00_isp_cmd(vha, vha->req);
+	qla2x00_start_iocbs(vha, vha->req);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return 0;
@@ -2105,7 +2105,7 @@ int qla_tgt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 
 	cmd->state = QLA_TGT_STATE_NEED_DATA;
 
-	qla2x00_isp_cmd(vha, vha->req);
+	qla2x00_start_iocbs(vha, vha->req);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return res;
@@ -2169,7 +2169,7 @@ static int __qla_tgt_send_term_exchange(struct scsi_qla_host *vha, struct qla_tg
 	if (ctio24->u.status1.residual != 0)
 		ctio24->u.status1.scsi_status |= SS_RESIDUAL_UNDER;
 
-	qla2x00_isp_cmd(vha, vha->req);
+	qla2x00_start_iocbs(vha, vha->req);
 	return ret;
 }
 
@@ -3512,7 +3512,7 @@ static void qla_tgt_send_busy(struct scsi_qla_host *vha,
 	if (ctio24->u.status1.residual != 0)
 		ctio24->u.status1.scsi_status |= SS_RESIDUAL_UNDER;
 
-	qla2x00_isp_cmd(vha, vha->req);
+	qla2x00_start_iocbs(vha, vha->req);
 }
 
 /* ha->hardware_lock supposed to be held on entry */
