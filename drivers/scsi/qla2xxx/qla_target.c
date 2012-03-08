@@ -2152,8 +2152,7 @@ static int __qla_tgt_send_term_exchange(struct scsi_qla_host *vha, struct qla_tg
 
 	ctio24 = (ctio7_to_24xx_t *)pkt;
 	ctio24->entry_type = CTIO_TYPE7;
-	if (cmd == NULL)
-		ctio24->nport_handle = CTIO7_NHANDLE_UNRECOGNIZED;
+	ctio24->nport_handle = cmd ? cmd->loop_id : CTIO7_NHANDLE_UNRECOGNIZED;
 	ctio24->timeout = __constant_cpu_to_le16(QLA_TGT_TIMEOUT);
 	ctio24->vp_index = vha->vp_idx;
 	ctio24->initiator_id[0] = atio->u.isp24.fcp_hdr.s_id[2];
