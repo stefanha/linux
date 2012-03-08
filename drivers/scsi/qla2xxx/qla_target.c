@@ -460,7 +460,7 @@ static void qla_tgt_schedule_sess_for_deletion(struct qla_tgt_sess *sess, bool i
 		return;
 
 	ql_dbg(ql_dbg_tgt, sess->vha, 0xe004, "Scheduling sess %p for"
-		" deletion (schedule %d)", sess, schedule);
+		" deletion\n", sess);
 	list_add_tail(&sess->del_list_entry, &tgt->del_sess_list);
 	sess->deleted = 1;
 
