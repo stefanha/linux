@@ -1674,7 +1674,7 @@ void target_submit_cmd(struct se_cmd *se_cmd, struct se_session *se_sess,
 		unsigned char *cdb, unsigned char *sense, u32 unpacked_lun,
 		u32 data_length, int task_attr, int data_dir, int flags)
 {
-	struct se_portal_group *se_tpg;	
+	struct se_portal_group *se_tpg;
 	int rc;
 
 	se_tpg = se_sess->se_tpg;
@@ -1703,8 +1703,8 @@ void target_submit_cmd(struct se_cmd *se_cmd, struct se_session *se_sess,
 	if (flags & TARGET_SCF_BIDI_OP)
 		se_cmd->se_cmd_flags |= SCF_BIDI;
 	/*
- 	 * Locate se_lun pointer and attach it to struct se_cmd
- 	 */
+	 * Locate se_lun pointer and attach it to struct se_cmd
+	 */
 	if (transport_lookup_cmd_lun(se_cmd, unpacked_lun) < 0) {
 		transport_send_check_condition_and_sense(se_cmd,
 				se_cmd->scsi_sense_reason, 0);
@@ -2149,7 +2149,6 @@ static int transport_execute_tasks(struct se_cmd *cmd)
 {
 	int add_tasks;
 	struct se_device *se_dev = cmd->se_dev;
-
 	/*
 	 * Call transport_cmd_check_stop() to see if a fabric exception
 	 * has occurred that prevents execution.
@@ -3469,6 +3468,32 @@ static inline void transport_free_pages(struct se_cmd *cmd)
 }
 
 /**
+ * transport_release_cmd - free a command
+ * @cmd:       command to free
+ *
+ * This routine unconditionally frees a command, and reference counting
+ * or list removal must be done in the caller.
+ */
+void transport_release_cmd(struct se_cmd *cmd)
+{
+	BUG_ON(!cmd->se_tfo);
+
+	if (cmd->se_tmr_req)
+		core_tmr_release_req(cmd->se_tmr_req);
+	if (cmd->t_task_cdb != cmd->__t_task_cdb)
+		kfree(cmd->t_task_cdb);
+	/*
+	 * If this cmd has been setup with target_get_sess_cmd(), drop
+	 * the kref and call ->release_cmd() in kref callback.
+	 */
+	 if (cmd->check_release != 0) {
+		target_put_sess_cmd(cmd->se_sess, cmd);
+		return;
+	}
+	cmd->se_tfo->release_cmd(cmd);
+}
+
+/**
  * transport_put_cmd - release a reference to a command
  * @cmd:       command to release
  *
@@ -3858,7 +3883,7 @@ transport_allocate_control_task(struct se_cmd *cmd)
 
 	/* Workaround for handling zero-length control CDBs */
 	if ((cmd->se_cmd_flags & SCF_SCSI_CONTROL_SG_IO_CDB) &&
-	    !cmd->data_length)	
+	    !cmd->data_length)
 		return 0;
 
 	task = transport_generic_get_task(cmd, cmd->data_direction);
@@ -4040,33 +4065,6 @@ queue_full:
 	return 0;
 }
 
-/**
- * transport_release_cmd - free a command
- * @cmd:       command to free
- *
- * This routine unconditionally frees a command, and reference counting
- * or list removal must be done in the caller.
- */
-void transport_release_cmd(struct se_cmd *cmd)
-{
-	BUG_ON(!cmd->se_tfo);
-
-	if (cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)
-		core_tmr_release_req(cmd->se_tmr_req);
-	if (cmd->t_task_cdb != cmd->__t_task_cdb)
-		kfree(cmd->t_task_cdb);
-	/*
-	 * If this cmd has been setup with target_get_sess_cmd(), drop
-	 * the kref and call ->release_cmd() in kref callback.
-	 */
-	if (cmd->check_release != 0) {
-		target_put_sess_cmd(cmd->se_sess, cmd);
-		return;
-	}
-	cmd->se_tfo->release_cmd(cmd);
-}
-EXPORT_SYMBOL(transport_release_cmd);
-
 void transport_generic_free_cmd(struct se_cmd *cmd, int wait_for_tasks)
 {
 	if (!(cmd->se_cmd_flags & SCF_SE_LUN_CMD)) {
@@ -4142,7 +4140,7 @@ static void target_release_cmd_kref(struct kref *kref)
 }
 
 /* target_put_sess_cmd - Check for active I/O shutdown via kref_put
- * @se_sess: 	session to reference
+ * @se_sess:	session to reference
  * @se_cmd:	command descriptor to drop
  */
 int target_put_sess_cmd(struct se_session *se_sess, struct se_cmd *se_cmd)

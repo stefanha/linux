@@ -3182,7 +3182,7 @@ static bool iscsit_check_inaddr_any(struct iscsi_np *np)
 		if (sock_in->sin_addr.s_addr == INADDR_ANY)
 			ret = true;
 	}
-		
+
 	return ret;
 }
 
