@@ -393,7 +393,7 @@ static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 	s_id[2] = n->u.isp24.port_id[2];
 
 	if (loop_id == 0xFFFF) {
-#warning FIXME: Re-enable Global event handling..
+/* FIXME: Re-enable Global event handling.. */
 #if 0
 		/* Global event */
 		printk("Processing qla_tgt_reset with loop_id=0xffff global event............\n");
@@ -4507,7 +4507,7 @@ qla_tgt_24xx_config_rings(struct scsi_qla_host *vha, device_reg_t __iomem *reg)
 {
 	struct qla_hw_data *ha = vha->hw;
 
-#warning FIXME: atio_q in/out for ha->mqenable=1..?
+/* FIXME: atio_q in/out for ha->mqenable=1..? */
 	if (ha->mqenable) {
 #if 0
                 WRT_REG_DWORD(&reg->isp25mq.atio_q_in, 0);
