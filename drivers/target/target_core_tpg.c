@@ -452,6 +452,7 @@ int core_tpg_del_initiator_node_acl(
 	struct se_node_acl *acl,
 	int force)
 {
+	LIST_HEAD(sess_list);
 	struct se_session *sess, *sess_tmp;
 	unsigned long flags;
 	int dynamic_acl = 0, rc;
@@ -465,26 +466,34 @@ int core_tpg_del_initiator_node_acl(
 	tpg->num_node_acls--;
 	spin_unlock_irq(&tpg->acl_node_lock);
 
-	spin_lock_irqsave(&tpg->session_lock, flags);
-	list_for_each_entry_safe(sess, sess_tmp,
-				&tpg->tpg_sess_list, sess_list) {
-		if (sess->se_node_acl != acl)
+	spin_lock_irqsave(&acl->nacl_sess_lock, flags);
+	acl->acl_stop = 1;
+
+	list_for_each_entry_safe(sess, sess_tmp, &acl->acl_sess_list,
+				sess_acl_list) {
+		if (sess->sess_tearing_down != 0)
 			continue;
 
-		kref_get(&sess->sess_kref);
-		spin_unlock_irqrestore(&tpg->session_lock, flags);
+		target_get_session(sess);
+		list_move(&sess->sess_acl_list, &sess_list);
+	}
+	spin_unlock_irqrestore(&acl->nacl_sess_lock, flags);
+
+	list_for_each_entry_safe(sess, sess_tmp, &sess_list, sess_acl_list) {
+		list_del(&sess->sess_acl_list);
 
 		rc = tpg->se_tpg_tfo->shutdown_session(sess);
 		target_put_session(sess);
 		if (!rc)
 			continue;
 		target_put_session(sess);
-		/* Wait for fabric session shutdown to complete.. */
-		wait_for_completion(&acl->acl_free_comp);
-
-		spin_lock_irqsave(&tpg->session_lock, flags);
 	}
-	spin_unlock_irqrestore(&tpg->session_lock, flags);
+	target_put_nacl(acl);
+	/*
+	 * Wait for last target_put_nacl() to complete in target_complete_nacl()
+	 * for active fabric session transport_deregister_session() callbacks.
+	 */
+	wait_for_completion(&acl->acl_free_comp);
 
 	core_tpg_wait_for_nacl_pr_ref(acl);
 	core_clear_initiator_node_from_tpg(acl, tpg);
