@@ -394,10 +394,9 @@ void transport_deregister_session(struct se_session *se_sess)
 	 * struct se_node_acl if it had been previously dynamically generated.
 	 */
 	se_nacl = se_sess->se_node_acl;
-	BUG_ON(!se_nacl);
 
 	spin_lock_irqsave(&se_tpg->acl_node_lock, flags);
-	if (se_nacl->dynamic_node_acl) {
+	if (se_nacl && se_nacl->dynamic_node_acl) {
 		if (!se_tfo->tpg_check_demo_mode_cache(se_tpg)) {
 			list_del(&se_nacl->acl_list);
 			se_tpg->num_node_acls--;
@@ -420,8 +419,9 @@ void transport_deregister_session(struct se_session *se_sess)
 	 * Awake sleeping ->acl_free_comp caller from configfs se_node_acl
 	 * removal context
 	 */
-	if (comp_nacl)
+	if (se_nacl && comp_nacl == true)
 		complete(&se_nacl->acl_free_comp);
+
 }
 EXPORT_SYMBOL(transport_deregister_session);
 
