@@ -532,6 +532,7 @@ static int vhost_scsi_clear_endpoint(
 			t->vhost_wwpn, t->vhost_tpgt);
 		return -EINVAL;
 	}
+        atomic_dec(&tv_tpg->tv_tpg_vhost_count);
 	vs->vs_tpg = NULL;
 	mutex_unlock(&vq->mutex);
 
@@ -565,6 +566,13 @@ static int vhost_scsi_open(struct inode *inode, struct file *f)
 static int vhost_scsi_release(struct inode *inode, struct file *f)
 {
 	struct vhost_scsi *s = f->private_data;
+
+        if (s->vs_tpg && s->vs_tpg->tport) {
+            struct vhost_vring_target backend;
+            strcpy(backend.vhost_wwpn, s->vs_tpg->tport->tport_name);
+            backend.vhost_tpgt = s->vs_tpg->tport_tpgt;
+            vhost_scsi_clear_endpoint(s, &backend);
+        }
 
 	vhost_dev_cleanup(&s->dev);
 	kfree(s);
