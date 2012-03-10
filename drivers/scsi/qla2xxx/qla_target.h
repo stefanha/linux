@@ -636,6 +636,7 @@ struct qla_tgt_func_tmpl {
 	int (*handle_data)(struct qla_tgt_cmd *);
 	int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, uint32_t, uint8_t, uint32_t);
 	void (*free_cmd)(struct qla_tgt_cmd *);
+	void (*free_mcmd)(struct qla_tgt_mgmt_cmd *);
 	void (*free_session)(struct qla_tgt_sess *);
 
 	int (*check_initiator_node_acl)(struct scsi_qla_host *, unsigned char *,
@@ -870,6 +871,7 @@ struct qla_tgt_mgmt_cmd {
 	uint8_t fc_tm_rsp;
 	struct qla_tgt_sess *sess;
 	struct se_cmd se_cmd;
+	struct work_struct free_work;
 	unsigned int flags;
 #define QLA24XX_MGMT_SEND_NACK	1
 	union {
