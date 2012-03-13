@@ -381,17 +381,10 @@ static int qla_tgt_reset(struct scsi_qla_host *vha, void *iocb, int mcmd)
 	uint32_t unpacked_lun, lun = 0;
 	uint16_t loop_id;
 	int res = 0;
-	uint8_t s_id[3];
 	imm_ntfy_from_isp_t *n = (imm_ntfy_from_isp_t *)iocb;
 	atio_from_isp_t *a = (atio_from_isp_t *)iocb;
 
-	memset(&s_id, 0, 3);
-
 	loop_id = le16_to_cpu(n->u.isp24.nport_handle);
-	s_id[0] = n->u.isp24.port_id[0];
-	s_id[1] = n->u.isp24.port_id[1];
-	s_id[2] = n->u.isp24.port_id[2];
-
 	if (loop_id == 0xFFFF) {
 /* FIXME: Re-enable Global event handling.. */
 #if 0
@@ -825,7 +818,6 @@ void qla_tgt_fc_port_added(struct scsi_qla_host *vha, fc_port_t *fcport)
 	struct qla_tgt *tgt = ha->qla_tgt;
 	struct qla_tgt_sess *sess;
 	unsigned long flags;
-	unsigned char s_id[3];
 
 	if (!vha->hw->tgt_ops)
 		return;
@@ -841,11 +833,6 @@ void qla_tgt_fc_port_added(struct scsi_qla_host *vha, fc_port_t *fcport)
 	sess = qla_tgt_find_sess_by_port_name(tgt, fcport->port_name);
 	if (!sess) {
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-		memset(&s_id, 0, 3);
-		s_id[0] = fcport->d_id.b.domain;
-		s_id[1] = fcport->d_id.b.area;
-		s_id[2] = fcport->d_id.b.al_pa;
 
 		mutex_lock(&ha->tgt_mutex);
 		sess = qla_tgt_create_sess(vha, fcport, false);
@@ -3880,7 +3867,7 @@ void qla_tgt_async_event(uint16_t code, struct scsi_qla_host *vha, uint16_t *mai
 }
 
 static fc_port_t *qla_tgt_get_port_database(struct scsi_qla_host *vha,
-	const uint8_t *s_id, uint16_t loop_id)
+	uint16_t loop_id)
 {
 	fc_port_t *fcport;
 	int rc;
@@ -3940,7 +3927,7 @@ retry:
 		return NULL;
 	}
 
-	fcport = qla_tgt_get_port_database(vha, s_id, loop_id);
+	fcport = qla_tgt_get_port_database(vha, loop_id);
 	if (!fcport)
 		return NULL;
 
