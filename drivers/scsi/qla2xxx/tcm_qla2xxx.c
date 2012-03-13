@@ -1885,9 +1885,9 @@ static int tcm_qla2xxx_register_configfs(void)
 	 * Register the top level struct config_item_type for NPIV with TCM core
 	 */
 	npiv_fabric = target_fabric_configfs_init(THIS_MODULE, "qla2xxx_npiv");
-	if (!npiv_fabric) {
+	if (IS_ERR(npiv_fabric)) {
 		pr_err("target_fabric_configfs_init() failed\n");
-		ret = -ENOMEM;
+		ret = PTR_ERR(npiv_fabric);
 		goto out_fabric;
 	}
 	/*
