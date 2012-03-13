@@ -2531,7 +2531,7 @@ static inline int qla_tgt_get_fcp_task_attr(uint8_t task_codes)
 }
 
 static struct qla_tgt_sess *qla_tgt_make_local_sess(struct scsi_qla_host *,
-					uint8_t *, uint16_t);
+					uint8_t *);
 /*
  * Process context for I/O path into tcm_qla2xxx code
  */
@@ -2553,12 +2553,11 @@ static void qla_tgt_do_work(struct work_struct *work)
 
 	if (!sess) {
 		uint8_t *s_id = NULL;
-		uint16_t loop_id = 0;
 
 		s_id = atio->u.isp24.fcp_hdr.s_id;
 
 		mutex_lock(&ha->tgt_mutex);
-		cmd->sess = sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		cmd->sess = sess = qla_tgt_make_local_sess(vha, s_id);
 		/* sess has got an extra creation ref */
 		mutex_unlock(&ha->tgt_mutex);
 
@@ -3911,12 +3910,13 @@ static fc_port_t *qla_tgt_get_port_database(struct scsi_qla_host *vha,
 
 /* Must be called under tgt_mutex */
 static struct qla_tgt_sess *qla_tgt_make_local_sess(struct scsi_qla_host *vha,
-	uint8_t *s_id, uint16_t loop_id)
+	uint8_t *s_id)
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess = NULL;
 	fc_port_t *fcport = NULL;
 	int rc, global_resets;
+	uint16_t loop_id = 0;
 
 retry:
 	global_resets = atomic_read(&ha->qla_tgt->tgt_global_resets_count);
@@ -3968,7 +3968,7 @@ static void qla_tgt_abort_work(struct qla_tgt *tgt,
 	uint32_t be_s_id;
 	uint8_t *s_id = NULL; /* to hide compiler warnings */
 	uint8_t local_s_id[3];
-	int rc, loop_id = -1; /* to hide compiler warnings */
+	int rc;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
@@ -3989,7 +3989,7 @@ static void qla_tgt_abort_work(struct qla_tgt *tgt,
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		mutex_lock(&ha->tgt_mutex);
-		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		sess = qla_tgt_make_local_sess(vha, s_id);
 		/* sess has got an extra creation ref */
 		mutex_unlock(&ha->tgt_mutex);
 
@@ -4027,7 +4027,7 @@ static void qla_tgt_tmr_work(struct qla_tgt *tgt,
 	struct qla_tgt_sess *sess = NULL;
 	unsigned long flags;
 	uint8_t *s_id = NULL; /* to hide compiler warnings */
-	int rc, loop_id = -1; /* to hide compiler warnings */
+	int rc;
 	uint32_t lun, unpacked_lun;
 	int lun_size, fn;
 	void *iocb;
@@ -4043,7 +4043,7 @@ static void qla_tgt_tmr_work(struct qla_tgt *tgt,
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		mutex_lock(&ha->tgt_mutex);
-		sess = qla_tgt_make_local_sess(vha, s_id, loop_id);
+		sess = qla_tgt_make_local_sess(vha, s_id);
 		/* sess has got an extra creation ref */
 		mutex_unlock(&ha->tgt_mutex);
 
