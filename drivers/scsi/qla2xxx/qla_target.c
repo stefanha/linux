@@ -3954,8 +3954,7 @@ static void qla_tgt_abort_work(struct qla_tgt *tgt,
 	struct qla_tgt_sess *sess = NULL;
 	unsigned long flags;
 	uint32_t be_s_id;
-	uint8_t *s_id = NULL; /* to hide compiler warnings */
-	uint8_t local_s_id[3];
+	uint8_t s_id[3];
 	int rc;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -3963,17 +3962,13 @@ static void qla_tgt_abort_work(struct qla_tgt *tgt,
 	if (tgt->tgt_stop)
 		goto out_term;
 
-	be_s_id = (prm->abts.fcp_hdr_le.s_id[0] << 16) |
-		(prm->abts.fcp_hdr_le.s_id[1] << 8) |
-		prm->abts.fcp_hdr_le.s_id[2];
+	s_id[0] = prm->abts.fcp_hdr_le.s_id[2];
+	s_id[1] = prm->abts.fcp_hdr_le.s_id[1];
+	s_id[2] = prm->abts.fcp_hdr_le.s_id[0];
 
 	sess = ha->tgt_ops->find_sess_by_s_id(vha,
 			(unsigned char *)&be_s_id);
 	if (!sess) {
-		s_id = local_s_id;
-		s_id[0] = prm->abts.fcp_hdr_le.s_id[2];
-		s_id[1] = prm->abts.fcp_hdr_le.s_id[1];
-		s_id[2] = prm->abts.fcp_hdr_le.s_id[0];
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		mutex_lock(&ha->tgt_mutex);
