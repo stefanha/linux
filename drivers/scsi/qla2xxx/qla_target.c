@@ -1277,7 +1277,8 @@ static void qla_tgt_24xx_handle_abts(struct scsi_qla_host *vha,
 {
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess;
-	uint32_t tag = abts->exchange_addr_to_abort, s_id;
+	uint32_t tag = abts->exchange_addr_to_abort;
+	uint8_t s_id[3];
 	int rc;
 
 	if (le32_to_cpu(abts->fcp_hdr_le.parameter) & ABTS_PARAM_ABORT_SEQ) {
@@ -1299,11 +1300,11 @@ static void qla_tgt_24xx_handle_abts(struct scsi_qla_host *vha,
 		abts->fcp_hdr_le.s_id[1], abts->fcp_hdr_le.s_id[0], tag,
 		le32_to_cpu(abts->fcp_hdr_le.parameter));
 
-	memset(&s_id, 0, 3);
-	s_id = (abts->fcp_hdr_le.s_id[0] << 16) | (abts->fcp_hdr_le.s_id[1] << 8) |
-		abts->fcp_hdr_le.s_id[2];
+	s_id[0] = abts->fcp_hdr_le.s_id[2];
+	s_id[1] = abts->fcp_hdr_le.s_id[1];
+	s_id[2] = abts->fcp_hdr_le.s_id[0];
 
-	sess = ha->tgt_ops->find_sess_by_s_id(vha, (unsigned char *)&s_id);
+	sess = ha->tgt_ops->find_sess_by_s_id(vha, s_id);
 	if (!sess) {
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe115, "qla_target(%d): task abort for"
 			" non-existant session\n", vha->vp_idx);
