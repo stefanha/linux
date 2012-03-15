@@ -4712,7 +4712,7 @@ out:
 	return ret;
 }
 
-void __exit qla_tgt_exit(void)
+void qla_tgt_exit(void)
 {
 	destroy_workqueue(qla_tgt_wq);
 	mempool_destroy(qla_tgt_mgmt_cmd_mempool);

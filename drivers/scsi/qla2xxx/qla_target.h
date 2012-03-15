@@ -934,7 +934,7 @@ extern void qla_tgt_fc_port_deleted(struct scsi_qla_host *, fc_port_t *);
 extern void qla_tgt_set_mode(struct scsi_qla_host *ha);
 extern void qla_tgt_clear_mode(struct scsi_qla_host *ha);
 extern int __init qla_tgt_init(void);
-extern void __exit qla_tgt_exit(void);
+extern void qla_tgt_exit(void);
 
 static inline bool qla_tgt_mode_enabled(struct scsi_qla_host *ha)
 {
