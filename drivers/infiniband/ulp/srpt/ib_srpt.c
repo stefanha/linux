@@ -673,7 +673,6 @@ static struct srpt_ioctx **srpt_alloc_ioctx_ring(struct srpt_device *sdev,
 	ring = kmalloc(ring_size * sizeof(ring[0]), GFP_KERNEL);
 	if (!ring)
 		return NULL;
-		goto out;
 
 	for (i = 0; i < ring_size; ++i) {
 		ring[i] = srpt_alloc_ioctx(sdev, ioctx_size, dma_size, dir);
@@ -1197,7 +1196,6 @@ static int srpt_map_sg_to_ib_sge(struct srpt_rdma_ch *ch,
 	dma_addr = sg_dma_address(&sg[0]);
 
 	/* this second loop is really mapped sg_address to rdma_iu->ib_sge */
-	/* this second loop is really mapped sg_addres to rdma_iu->ib_sge */
 	for (i = 0, j = 0;
 	     j < count && i < ioctx->n_rbuf && tsize > 0; ++i, ++riu, ++db) {
 		rsize = be32_to_cpu(db->len);
@@ -2312,7 +2310,6 @@ static struct srpt_rdma_ch *srpt_find_channel(struct srpt_device *sdev,
  * - Calling the ib_destroy_cm_id() call from inside an IB CM callback would
  *   trigger a deadlock.
  * - It is not safe to call TCM transport_* functions from interrupt context.
->>>>>>> 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d
  */
 static void srpt_release_channel(struct srpt_rdma_ch *ch)
 {
