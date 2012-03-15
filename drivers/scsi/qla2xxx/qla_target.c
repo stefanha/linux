@@ -3169,11 +3169,11 @@ static void qla_tgt_reject_free_srr_imm(struct scsi_qla_host *vha, struct qla_tg
 static void qla_tgt_handle_srr_work(struct work_struct *work)
 {
 	struct qla_tgt *tgt = container_of(work, struct qla_tgt, srr_work);
-	struct scsi_qla_host *vha = NULL;
+	struct scsi_qla_host *vha = tgt->vha;
 	struct qla_tgt_srr_ctio *sctio;
 	unsigned long flags;
 
-	ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe12e, "Entering SRR work (tgt %p)\n", tgt);
+	ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12e, "Entering SRR work (tgt %p)\n", tgt);
 
 restart:
 	spin_lock_irqsave(&tgt->srr_lock, flags);
@@ -3192,17 +3192,17 @@ restart:
 					  "be only one IMM SRR per CTIO SRR "
 					  "(IMM SRR %p, id %d, CTIO %p\n",
 					  vha->vp_idx, i, i->srr_id, sctio);
-					qla_tgt_reject_free_srr_imm(vha, i, 0);
+					qla_tgt_reject_free_srr_imm(tgt->vha, i, 0);
 				} else
 					imm = i;
 			}
 		}
 
-		ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe12f, "IMM SRR %p, CTIO SRR %p (id %d)\n",
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe12f, "IMM SRR %p, CTIO SRR %p (id %d)\n",
 			imm, sctio, sctio->srr_id);
 
 		if (imm == NULL) {
-			ql_dbg(ql_dbg_tgt_mgt, tgt->vha, 0xe130, "Not found matching IMM"
+			ql_dbg(ql_dbg_tgt_mgt, vha, 0xe130, "Not found matching IMM"
 				" for SRR CTIO (id %d)\n", sctio->srr_id);
 			continue;
 		} else
@@ -3211,7 +3211,6 @@ restart:
 		spin_unlock_irqrestore(&tgt->srr_lock, flags);
 
 		cmd = sctio->cmd;
-		vha = cmd->vha;
 		/*
 		 * Reset qla_tgt_cmd SRR values and SGL pointer+count to follow
 		 * tcm_qla2xxx_write_pending() and tcm_qla2xxx_queue_data_in()
