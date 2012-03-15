@@ -2857,7 +2857,7 @@ static int qla_tgt_abort_task(struct scsi_qla_host *vha, imm_ntfy_from_isp_t *io
 	if (sess == NULL) {
 		ql_dbg(ql_dbg_tgt_mgt, vha, 0xe129, "qla_target(%d): task abort for unexisting "
 			"session\n", vha->vp_idx);
-		res = qla_tgt_sched_sess_work(sess->tgt, QLA_TGT_SESS_WORK_ABORT,
+		res = qla_tgt_sched_sess_work(ha->qla_tgt, QLA_TGT_SESS_WORK_ABORT,
 					iocb, sizeof(*iocb));
 		if (res != 0)
 			sess->tgt->tm_to_unknown = 1;
