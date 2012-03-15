@@ -1407,9 +1407,9 @@ qla2x00_get_port_database(scsi_qla_host_t *vha, fc_port_t *fcport, uint8_t opt)
 		fcport->d_id.b.rsvd_1 = 0;
 
 		/* If not target must be initiator or unknown type. */
-		if ((pd24->prli_svc_param_word_3[0] & BIT_4))
+		if ((pd->prli_svc_param_word_3[0] & BIT_4))
 			fcport->port_type = FCT_TARGET;
-		else if ((pd24->prli_svc_param_word_3[0] & BIT_5))
+		else if ((pd->prli_svc_param_word_3[0] & BIT_5))
 			fcport->port_type = FCT_INITIATOR;
 
 		/* Passback COS information. */
