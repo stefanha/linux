@@ -812,7 +812,7 @@ static int tcm_qla2xxx_setup_nacl_from_rport(
 
 		p->se_nacl = se_nacl;
 		pr_debug("Setting p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
-			" port_id: 0x%04x\n", se_nacl, rport_wwnn,
+			" port_id: 0x%08x\n", se_nacl, rport_wwnn,
 			nacl->nport_id);
 		spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 
@@ -856,7 +856,7 @@ void tcm_qla2xxx_clear_nacl_from_fcport_map(struct qla_tgt_sess *sess)
 
 	p->se_nacl = NULL;
 	pr_debug("Clearing p->se_nacl to se_nacl: %p for WWNN: 0x%016LX,"
-		" port_id: 0x%04x\n", se_nacl, nacl->nport_wwnn,
+		" port_id: 0x%08x\n", se_nacl, nacl->nport_wwnn,
 		nacl->nport_id);
 }
 

@@ -10,7 +10,7 @@
 
 struct tcm_qla2xxx_nacl {
 	/* From libfc struct fc_rport->port_id */
-	u16 nport_id;
+	u32 nport_id;
 	/* Binary World Wide unique Node Name for remote FC Initiator Nport */
 	u64 nport_wwnn;
 	/* ASCII formatted WWPN for FC Initiator Nport */
