@@ -3192,7 +3192,7 @@ restart:
 					  "be only one IMM SRR per CTIO SRR "
 					  "(IMM SRR %p, id %d, CTIO %p\n",
 					  vha->vp_idx, i, i->srr_id, sctio);
-					qla_tgt_reject_free_srr_imm(tgt->vha, i, 0);
+					qla_tgt_reject_free_srr_imm(vha, i, 0);
 				} else
 					imm = i;
 			}
