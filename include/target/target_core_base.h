@@ -112,7 +112,7 @@
 /* Enforce SCSI Initiator Port TransportID with 'ISID' for PR */
 #define DA_ENFORCE_PR_ISIDS			1
 #define DA_STATUS_MAX_SECTORS_MIN		16
-#define DA_STATUS_MAX_SECTORS_MAX		8192
+#define DA_STATUS_MAX_SECTORS_MAX		UINT_MAX
 /* By default don't report non-rotating (solid state) medium */
 #define DA_IS_NONROT				0
 /* Queue Algorithm Modifier default for restricted reordering in control mode page */

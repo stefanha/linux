@@ -827,15 +827,14 @@ int se_dev_check_shutdown(struct se_device *dev)
 
 u32 se_dev_align_max_sectors(u32 max_sectors, u32 block_size)
 {
-	u32 tmp, aligned_max_sectors;
+	u32 aligned_max_sectors;
 	/*
 	 * Limit max_sectors to a PAGE_SIZE aligned value for modern
 	 * transport_allocate_data_tasks() operation.
 	 */
-	tmp = rounddown((max_sectors * block_size), PAGE_SIZE);
-	aligned_max_sectors = (tmp / block_size);
+	aligned_max_sectors = rounddown(max_sectors, PAGE_SIZE / block_size);
 	if (max_sectors != aligned_max_sectors) {
-		printk(KERN_INFO "Rounding down aligned max_sectors from %u"
+		pr_debug("Rounding down aligned max_sectors from %u"
 				" to %u\n", max_sectors, aligned_max_sectors);
 		return aligned_max_sectors;
 	}
