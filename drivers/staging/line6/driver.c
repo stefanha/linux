@@ -424,11 +424,6 @@ static void line6_data_received(struct urb *urb)
 		if (done == 0)
 			break;
 
-		/* MIDI input filter */
-		if (line6_midibuf_skip_message
-		    (mb, line6->line6midi->midi_mask_receive))
-			continue;
-
 		line6->message_length = done;
 #ifdef CONFIG_LINE6_USB_DUMP_MIDI
 		line6_write_hexdump(line6, 'r', line6->buffer_message, done);
