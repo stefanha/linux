@@ -1,0 +1,47 @@
+#!/bin/sh
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t configfs none /sys/kernel/config
+mount -t debugfs none /sys/kernel/debug
+mount -t tmpfs none /tmp
+
+echo 8 >/proc/sys/kernel/printk
+
+insmod /lib/modules/4.5.0-rc6+/kernel/drivers/virtio/virtio.ko dyndbg==p
+insmod /lib/modules/4.5.0-rc6+/kernel/drivers/virtio/virtio_ring.ko dyndbg==p
+insmod /lib/modules/4.5.0-rc6+/kernel/drivers/virtio/virtio_pci.ko dyndbg==p
+insmod /lib/modules/4.5.0-rc6+/kernel/net/vmw_vsock/vsock.ko dyndbg==p
+insmod /lib/modules/4.5.0-rc6+/kernel/net/vmw_vsock/virtio_transport_common.ko dyndbg==p
+
+#echo virtio_dev_probe >/sys/kernel/debug/tracing/set_graph_function
+#echo function_graph >/sys/kernel/debug/tracing/current_tracer
+#echo 1 >/sys/kernel/debug/tracing/tracing_on
+
+insmod /lib/modules/4.5.0-rc6+/kernel/net/vmw_vsock/virtio_transport.ko dyndbg==p
+
+#echo 0 >/sys/kernel/debug/tracing/tracing_on
+#echo >/sys/kernel/debug/tracing/current_tracer
+#echo >/sys/kernel/debug/tracing/set_graph_function
+#cat /sys/kernel/debug/tracing/trace
+
+insmod /lib/modules/4.5.0-rc6+/kernel/net/dns_resolver/dns_resolver.ko
+insmod /lib/modules/4.5.0-rc6+/kernel/net/sunrpc/sunrpc.ko dyndbg==p
+insmod /lib/modules/4.5.0-rc6+/kernel/fs/nfs_common/grace.ko
+insmod /lib/modules/4.5.0-rc6+/kernel/fs/lockd/lockd.ko
+insmod /lib/modules/4.5.0-rc6+/kernel/fs/fscache/fscache.ko
+insmod /lib/modules/4.5.0-rc6+/kernel/fs/nfs/nfs.ko dyndbg==p
+insmod /lib/modules/4.5.0-rc6+/kernel/fs/nfs/nfsv4.ko dyndbg==p
+
+echo -n 65535 >/proc/sys/sunrpc/nfs_debug
+echo -n 65535 >/proc/sys/sunrpc/rpc_debug
+
+eval $(grep -o -e "stefan_mode=[^ ]*" /proc/cmdline)
+case "$stefan_mode" in
+nfs_*)
+	/sbin/mount.nfs 2:/export /mnt -v -o clientaddr=3,proto=vsock
+	;;
+netperf)
+	/usr/bin/netserver -D -d -L ,vsock
+	;;
+esac
+exec /bin/sh -i
