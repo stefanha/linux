@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/workqueue.h>
 #include <linux/vm_sockets.h>
+#include <net/tcp.h> /* for sk_read_actor_t */
 
 #include "vsock_addr.h"
 
@@ -73,6 +74,8 @@ struct vsock_sock {
 	void *trans;
 };
 
+int vsock_read_sock(struct sock *sk, read_descriptor_t *desc,
+		    sk_read_actor_t recv_actor);
 s64 vsock_stream_has_data(struct vsock_sock *vsk);
 s64 vsock_stream_has_space(struct vsock_sock *vsk);
 void vsock_pending_work(struct work_struct *work);
@@ -122,6 +125,8 @@ struct vsock_transport {
 	u64 (*stream_rcvhiwat)(struct vsock_sock *);
 	bool (*stream_is_active)(struct vsock_sock *);
 	bool (*stream_allow)(u32 cid, u32 port);
+	int (*stream_read_sock)(struct vsock_sock *, read_descriptor_t *desc,
+				sk_read_actor_t recv_actor);
 
 	/* Notification. */
 	int (*notify_poll_in)(struct vsock_sock *, size_t, bool *);
