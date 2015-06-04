@@ -1449,7 +1449,7 @@ static int xs_stream_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb, 
 	return len - desc.count;
 }
 
-static void xs_tcp_data_receive(struct sock_xprt *transport)
+static void xs_stream_data_receive(struct sock_xprt *transport)
 {
 	struct rpc_xprt *xprt = &transport->xprt;
 	struct sock *sk;
@@ -1465,10 +1465,11 @@ static void xs_tcp_data_receive(struct sock_xprt *transport)
 	if (sk == NULL)
 		goto out;
 
-	/* We use rd_desc to pass struct xprt to xs_tcp_data_recv */
+	/* We use rd_desc to pass struct xprt to xs_stream_data_recv */
 	for (;;) {
 		lock_sock(sk);
-		read = tcp_read_sock(sk, &rd_desc, xs_stream_data_recv);
+		read = transport->stream_read_sock(sk, &rd_desc,
+						   xs_stream_data_recv);
 		release_sock(sk);
 		if (read <= 0)
 			break;
@@ -1480,11 +1481,11 @@ out:
 	trace_xs_stream_data_ready(xprt, read, total);
 }
 
-static void xs_tcp_data_receive_workfn(struct work_struct *work)
+static void xs_stream_data_receive_workfn(struct work_struct *work)
 {
 	struct sock_xprt *transport =
 		container_of(work, struct sock_xprt, recv_worker);
-	xs_tcp_data_receive(transport);
+	xs_stream_data_receive(transport);
 }
 
 /**
@@ -1548,6 +1549,7 @@ static void xs_tcp_state_change(struct sock *sk)
 			transport->stream_copied = 0;
 			transport->stream_flags =
 				STREAM_RCV_COPY_FRAGHDR | STREAM_RCV_COPY_XID;
+			transport->stream_read_sock = tcp_read_sock;
 			xprt->connect_cookie++;
 			clear_bit(XPRT_SOCK_CONNECTING, &transport->sock_state);
 			xprt_clear_connecting(xprt);
@@ -2935,7 +2937,7 @@ static struct rpc_xprt *xs_setup_tcp(struct xprt_create *args)
 	xprt->ops = &xs_tcp_ops;
 	xprt->timeout = &xs_tcp_default_timeout;
 
-	INIT_WORK(&transport->recv_worker, xs_tcp_data_receive_workfn);
+	INIT_WORK(&transport->recv_worker, xs_stream_data_receive_workfn);
 	INIT_DELAYED_WORK(&transport->connect_worker, xs_tcp_setup_socket);
 
 	switch (addr->sa_family) {
