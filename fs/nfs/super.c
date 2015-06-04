@@ -191,6 +191,7 @@ static const match_table_t nfs_mount_option_tokens = {
 
 enum {
 	Opt_xprt_udp, Opt_xprt_udp6, Opt_xprt_tcp, Opt_xprt_tcp6, Opt_xprt_rdma,
+	Opt_xprt_vsock,
 
 	Opt_xprt_err
 };
@@ -201,6 +202,7 @@ static const match_table_t nfs_xprt_protocol_tokens = {
 	{ Opt_xprt_tcp, "tcp" },
 	{ Opt_xprt_tcp6, "tcp6" },
 	{ Opt_xprt_rdma, "rdma" },
+	{ Opt_xprt_vsock, "vsock" },
 
 	{ Opt_xprt_err, NULL }
 };
@@ -967,6 +969,8 @@ static int nfs_verify_server_address(struct sockaddr *addr)
 		struct in6_addr *sa = &((struct sockaddr_in6 *)addr)->sin6_addr;
 		return !ipv6_addr_any(sa);
 	}
+	case AF_VSOCK:
+		return 1;
 	}
 
 	dfprintk(MOUNT, "NFS: Invalid IP address specified\n");
@@ -996,6 +1000,7 @@ static void nfs_validate_transport_protocol(struct nfs_parsed_mount_data *mnt)
 	case XPRT_TRANSPORT_UDP:
 	case XPRT_TRANSPORT_TCP:
 	case XPRT_TRANSPORT_RDMA:
+	case XPRT_TRANSPORT_VSOCK:
 		break;
 	default:
 		mnt->nfs_server.protocol = XPRT_TRANSPORT_TCP;
@@ -1461,6 +1466,11 @@ static int nfs_parse_mount_options(char *raw,
 				mnt->flags |= NFS_MOUNT_TCP;
 				mnt->nfs_server.protocol = XPRT_TRANSPORT_RDMA;
 				xprt_load_transport(string);
+				break;
+			case Opt_xprt_vsock:
+				protofamily = AF_VSOCK;
+				mnt->flags &= ~NFS_MOUNT_TCP;
+				mnt->nfs_server.protocol = XPRT_TRANSPORT_VSOCK;
 				break;
 			default:
 				dfprintk(MOUNT, "NFS:   unrecognized "

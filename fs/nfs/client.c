@@ -35,6 +35,7 @@
 #include <linux/vfs.h>
 #include <linux/inet.h>
 #include <linux/in6.h>
+#include <linux/vm_sockets.h>
 #include <linux/slab.h>
 #include <linux/idr.h>
 #include <net/ipv6.h>
@@ -436,6 +437,7 @@ void nfs_init_timeout_values(struct rpc_timeout *to, int proto,
 	switch (proto) {
 	case XPRT_TRANSPORT_TCP:
 	case XPRT_TRANSPORT_RDMA:
+	case XPRT_TRANSPORT_VSOCK:
 		if (to->to_retries == 0)
 			to->to_retries = NFS_DEF_TCP_RETRANS;
 		if (to->to_initval == 0)
