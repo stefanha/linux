@@ -27,17 +27,18 @@ struct sock_xprt {
 	struct sock *		inet;
 
 	/*
-	 * State of TCP reply receive
+	 * State of SOCK_STREAM reply receive
 	 */
-	__be32			tcp_fraghdr,
-				tcp_xid,
-				tcp_calldir;
+	__be32			stream_fraghdr,
+				stream_xid,
+				stream_calldir;
 
-	u32			tcp_offset,
-				tcp_reclen;
+	u32			stream_offset,
+				stream_reclen;
 
-	unsigned long		tcp_copied,
-				tcp_flags;
+	unsigned long		stream_copied,
+				stream_flags;
+
 
 	/*
 	 * Connection of transports
@@ -67,17 +68,17 @@ struct sock_xprt {
 /*
  * TCP receive state flags
  */
-#define TCP_RCV_LAST_FRAG	(1UL << 0)
-#define TCP_RCV_COPY_FRAGHDR	(1UL << 1)
-#define TCP_RCV_COPY_XID	(1UL << 2)
-#define TCP_RCV_COPY_DATA	(1UL << 3)
-#define TCP_RCV_READ_CALLDIR	(1UL << 4)
-#define TCP_RCV_COPY_CALLDIR	(1UL << 5)
+#define STREAM_RCV_LAST_FRAG	(1UL << 0)
+#define STREAM_RCV_COPY_FRAGHDR	(1UL << 1)
+#define STREAM_RCV_COPY_XID	(1UL << 2)
+#define STREAM_RCV_COPY_DATA	(1UL << 3)
+#define STREAM_RCV_READ_CALLDIR	(1UL << 4)
+#define STREAM_RCV_COPY_CALLDIR	(1UL << 5)
 
 /*
  * TCP RPC flags
  */
-#define TCP_RPC_REPLY		(1UL << 6)
+#define STREAM_RPC_REPLY	(1UL << 6)
 
 #define XPRT_SOCK_CONNECTING	1U
 

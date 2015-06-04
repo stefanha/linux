@@ -371,7 +371,7 @@ DEFINE_EVENT(rpc_xprt_event, xprt_complete_rqst,
 	TP_PROTO(struct rpc_xprt *xprt, __be32 xid, int status),
 	TP_ARGS(xprt, xid, status));
 
-TRACE_EVENT(xs_tcp_data_ready,
+TRACE_EVENT(xs_stream_data_ready,
 	TP_PROTO(struct rpc_xprt *xprt, int err, unsigned int total),
 
 	TP_ARGS(xprt, err, total),
@@ -400,15 +400,15 @@ TRACE_EVENT(xs_tcp_data_ready,
 
 #define rpc_show_sock_xprt_flags(flags) \
 	__print_flags(flags, "|", \
-		{ TCP_RCV_LAST_FRAG, "TCP_RCV_LAST_FRAG" }, \
-		{ TCP_RCV_COPY_FRAGHDR, "TCP_RCV_COPY_FRAGHDR" }, \
-		{ TCP_RCV_COPY_XID, "TCP_RCV_COPY_XID" }, \
-		{ TCP_RCV_COPY_DATA, "TCP_RCV_COPY_DATA" }, \
-		{ TCP_RCV_READ_CALLDIR, "TCP_RCV_READ_CALLDIR" }, \
-		{ TCP_RCV_COPY_CALLDIR, "TCP_RCV_COPY_CALLDIR" }, \
-		{ TCP_RPC_REPLY, "TCP_RPC_REPLY" })
+		{ STREAM_RCV_LAST_FRAG, "STREAM_RCV_LAST_FRAG" }, \
+		{ STREAM_RCV_COPY_FRAGHDR, "STREAM_RCV_COPY_FRAGHDR" }, \
+		{ STREAM_RCV_COPY_XID, "STREAM_RCV_COPY_XID" }, \
+		{ STREAM_RCV_COPY_DATA, "STREAM_RCV_COPY_DATA" }, \
+		{ STREAM_RCV_READ_CALLDIR, "STREAM_RCV_READ_CALLDIR" }, \
+		{ STREAM_RCV_COPY_CALLDIR, "STREAM_RCV_COPY_CALLDIR" }, \
+		{ STREAM_RPC_REPLY, "STREAM_RPC_REPLY" })
 
-TRACE_EVENT(xs_tcp_data_recv,
+TRACE_EVENT(xs_stream_data_recv,
 	TP_PROTO(struct sock_xprt *xs),
 
 	TP_ARGS(xs),
@@ -426,11 +426,11 @@ TRACE_EVENT(xs_tcp_data_recv,
 	TP_fast_assign(
 		__assign_str(addr, xs->xprt.address_strings[RPC_DISPLAY_ADDR]);
 		__assign_str(port, xs->xprt.address_strings[RPC_DISPLAY_PORT]);
-		__entry->xid = xs->tcp_xid;
-		__entry->flags = xs->tcp_flags;
-		__entry->copied = xs->tcp_copied;
-		__entry->reclen = xs->tcp_reclen;
-		__entry->offset = xs->tcp_offset;
+		__entry->xid = xs->stream_xid;
+		__entry->flags = xs->stream_flags;
+		__entry->copied = xs->stream_copied;
+		__entry->reclen = xs->stream_reclen;
+		__entry->offset = xs->stream_offset;
 	),
 
 	TP_printk("peer=[%s]:%s xid=0x%x flags=%s copied=%lu reclen=%u offset=%lu",
