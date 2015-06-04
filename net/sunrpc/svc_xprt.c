@@ -10,6 +10,7 @@
 #include <linux/kthread.h>
 #include <linux/slab.h>
 #include <net/sock.h>
+#include <net/af_vsock.h>
 #include <linux/sunrpc/addr.h>
 #include <linux/sunrpc/stats.h>
 #include <linux/sunrpc/svc_xprt.h>
@@ -189,6 +190,13 @@ static struct svc_xprt *__svc_xpo_create(struct svc_xprt_class *xcl,
 		.sin6_port		= htons(port),
 	};
 #endif
+#if IS_ENABLED(CONFIG_VSOCKETS)
+	struct sockaddr_vm svm = {
+		.svm_family		= AF_VSOCK,
+		.svm_cid		= VMADDR_CID_ANY,
+		.svm_port		= port,
+	};
+#endif
 	struct sockaddr *sap;
 	size_t len;
 
@@ -201,6 +209,12 @@ static struct svc_xprt *__svc_xpo_create(struct svc_xprt_class *xcl,
 	case PF_INET6:
 		sap = (struct sockaddr *)&sin6;
 		len = sizeof(sin6);
+		break;
+#endif
+#if IS_ENABLED(CONFIG_VSOCKETS)
+	case AF_VSOCK:
+		sap = (struct sockaddr *)&svm;
+		len = sizeof(svm);
 		break;
 #endif
 	default:
@@ -543,6 +557,10 @@ int svc_port_is_privileged(struct sockaddr *sin)
 	case AF_INET6:
 		return ntohs(((struct sockaddr_in6 *)sin)->sin6_port)
 			< PROT_SOCK;
+	case AF_VSOCK:
+		return ((struct sockaddr_vm *)sin)->svm_port <=
+			LAST_RESERVED_PORT;
+
 	default:
 		return 0;
 	}

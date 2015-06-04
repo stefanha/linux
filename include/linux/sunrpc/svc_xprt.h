@@ -8,6 +8,7 @@
 #define SUNRPC_SVC_XPRT_H
 
 #include <linux/sunrpc/svc.h>
+#include <linux/vm_sockets.h>
 
 struct module;
 
@@ -152,12 +153,15 @@ static inline unsigned short svc_addr_port(const struct sockaddr *sa)
 {
 	const struct sockaddr_in *sin = (const struct sockaddr_in *)sa;
 	const struct sockaddr_in6 *sin6 = (const struct sockaddr_in6 *)sa;
+	const struct sockaddr_vm *svm = (const struct sockaddr_vm *)sa;
 
 	switch (sa->sa_family) {
 	case AF_INET:
 		return ntohs(sin->sin_port);
 	case AF_INET6:
 		return ntohs(sin6->sin6_port);
+	case AF_VSOCK:
+		return svm->svm_port;
 	}
 
 	return 0;
@@ -170,6 +174,8 @@ static inline size_t svc_addr_len(const struct sockaddr *sa)
 		return sizeof(struct sockaddr_in);
 	case AF_INET6:
 		return sizeof(struct sockaddr_in6);
+	case AF_VSOCK:
+		return sizeof(struct sockaddr_vm);
 	}
 	BUG();
 }
@@ -189,6 +195,7 @@ static inline char *__svc_print_addr(const struct sockaddr *addr,
 {
 	const struct sockaddr_in *sin = (const struct sockaddr_in *)addr;
 	const struct sockaddr_in6 *sin6 = (const struct sockaddr_in6 *)addr;
+	const struct sockaddr_vm *svm = (const struct sockaddr_vm *)addr;
 
 	switch (addr->sa_family) {
 	case AF_INET:
@@ -200,6 +207,11 @@ static inline char *__svc_print_addr(const struct sockaddr *addr,
 		snprintf(buf, len, "%pI6, port=%u",
 			 &sin6->sin6_addr,
 			ntohs(sin6->sin6_port));
+		break;
+
+	case AF_VSOCK:
+		snprintf(buf, len, "%u, port=%u",
+			 svm->svm_cid, svm->svm_port);
 		break;
 
 	default:
