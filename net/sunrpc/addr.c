@@ -16,11 +16,14 @@
  * RFC 4291, Section 2.2 for details on IPv6 presentation formats.
  */
 
+ /* TODO register netid and uaddr with IANA? (See RFC 5665 5.1/5.2) */
+
 #include <net/ipv6.h>
 #include <linux/sunrpc/addr.h>
 #include <linux/sunrpc/msg_prot.h>
 #include <linux/slab.h>
 #include <linux/export.h>
+#include <linux/vm_sockets.h>
 
 #if IS_ENABLED(CONFIG_IPV6)
 
@@ -108,6 +111,26 @@ static size_t rpc_ntop6(const struct sockaddr *sap,
 
 #endif	/* !IS_ENABLED(CONFIG_IPV6) */
 
+#if IS_ENABLED(CONFIG_VSOCKETS)
+
+static size_t rpc_ntop_vsock(const struct sockaddr *sap,
+			     char *buf, const size_t buflen)
+{
+	const struct sockaddr_vm *svm = (struct sockaddr_vm *)sap;
+
+	return snprintf(buf, buflen, "%u", svm->svm_cid);
+}
+
+#else	/* !IS_ENABLED(CONFIG_VSOCKETS) */
+
+static size_t rpc_ntop_vsock(const struct sockaddr *sap,
+			     char *buf, const size_t buflen)
+{
+	return 0;
+}
+
+#endif	/* !IS_ENABLED(CONFIG_VSOCKETS) */
+
 static int rpc_ntop4(const struct sockaddr *sap,
 		     char *buf, const size_t buflen)
 {
@@ -132,6 +155,8 @@ size_t rpc_ntop(const struct sockaddr *sap, char *buf, const size_t buflen)
 		return rpc_ntop4(sap, buf, buflen);
 	case AF_INET6:
 		return rpc_ntop6(sap, buf, buflen);
+	case AF_VSOCK:
+		return rpc_ntop_vsock(sap, buf, buflen);
 	}
 
 	return 0;
@@ -229,6 +254,34 @@ static size_t rpc_pton6(struct net *net, const char *buf, const size_t buflen,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_VSOCKETS)
+static size_t rpc_pton_vsock(const char *buf, const size_t buflen,
+			     struct sockaddr *sap, const size_t salen)
+{
+	const size_t prefix_len = strlen("vsock:");
+	struct sockaddr_vm *svm = (struct sockaddr_vm *)sap;
+	unsigned int cid;
+
+	if (strncmp(buf, "vsock:", prefix_len) != 0 ||
+	    salen < sizeof(struct sockaddr_vm))
+		return 0;
+
+	if (kstrtouint(buf + prefix_len, 10, &cid) != 0)
+		return 0;
+
+	memset(svm, 0, sizeof(struct sockaddr_vm));
+	svm->svm_family = AF_VSOCK;
+	svm->svm_cid = cid;
+	return sizeof(struct sockaddr_vm);
+}
+#else
+static size_t rpc_pton_vsock(const char *buf, const size_t buflen,
+			     struct sockaddr *sap, const size_t salen)
+{
+	return 0;
+}
+#endif
+
 /**
  * rpc_pton - Construct a sockaddr in @sap
  * @net: applicable network namespace
@@ -248,6 +301,10 @@ size_t rpc_pton(struct net *net, const char *buf, const size_t buflen,
 		struct sockaddr *sap, const size_t salen)
 {
 	unsigned int i;
+
+	/* TODO is there a nicer way to distinguish vsock addresses? */
+	if (strncmp(buf, "vsock:", 6) == 0)
+		return rpc_pton_vsock(buf, buflen, sap, salen);
 
 	for (i = 0; i < buflen; i++)
 		if (buf[i] == ':')
