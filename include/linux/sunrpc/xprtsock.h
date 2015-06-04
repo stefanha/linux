@@ -9,6 +9,8 @@
 
 #ifdef __KERNEL__
 
+#include <net/tcp.h> /* for sk_read_actor_t */
+
 int		init_socket_xprt(void);
 void		cleanup_socket_xprt(void);
 
@@ -39,6 +41,9 @@ struct sock_xprt {
 	unsigned long		stream_copied,
 				stream_flags;
 
+	int			(*stream_read_sock)(struct sock *,
+						    read_descriptor_t *,
+						    sk_read_actor_t);
 
 	/*
 	 * Connection of transports
