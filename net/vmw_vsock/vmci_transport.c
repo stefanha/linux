@@ -654,6 +654,13 @@ static bool vmci_transport_stream_allow(u32 cid, u32 port)
 	return true;
 }
 
+static int vmci_transport_stream_read_sock(struct vsock_sock *vsk,
+					   read_descriptor_t *desc,
+					   sk_read_actor_t recv_actor)
+{
+	return -EOPNOTSUPP; /* not yet implemented */
+}
+
 /* This is invoked as part of a tasklet that's scheduled when the VMCI
  * interrupt fires.  This is run in bottom-half context but it defers most of
  * its work to the packet handling work queue.
@@ -2067,6 +2074,7 @@ static const struct vsock_transport vmci_transport = {
 	.stream_rcvhiwat = vmci_transport_stream_rcvhiwat,
 	.stream_is_active = vmci_transport_stream_is_active,
 	.stream_allow = vmci_transport_stream_allow,
+	.stream_read_sock = vmci_transport_stream_read_sock,
 	.notify_poll_in = vmci_transport_notify_poll_in,
 	.notify_poll_out = vmci_transport_notify_poll_out,
 	.notify_recv_init = vmci_transport_notify_recv_init,

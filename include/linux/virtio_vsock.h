@@ -5,6 +5,7 @@
 #include <linux/socket.h>
 #include <net/sock.h>
 #include <net/af_vsock.h>
+#include <net/tcp.h> /* for sk_read_actor_t */
 
 #define VIRTIO_VSOCK_DEFAULT_MIN_BUF_SIZE	128
 #define VIRTIO_VSOCK_DEFAULT_BUF_SIZE		(1024 * 256)
@@ -136,6 +137,9 @@ int virtio_transport_notify_send_post_enqueue(struct vsock_sock *vsk,
 u64 virtio_transport_stream_rcvhiwat(struct vsock_sock *vsk);
 bool virtio_transport_stream_is_active(struct vsock_sock *vsk);
 bool virtio_transport_stream_allow(u32 cid, u32 port);
+int virtio_transport_stream_read_sock(struct vsock_sock *vsk,
+				      read_descriptor_t *desc,
+				      sk_read_actor_t recv_actor);
 int virtio_transport_dgram_bind(struct vsock_sock *vsk,
 				struct sockaddr_vm *addr);
 bool virtio_transport_dgram_allow(u32 cid, u32 port);

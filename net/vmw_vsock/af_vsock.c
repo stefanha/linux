@@ -693,6 +693,21 @@ static void vsock_sk_destruct(struct sock *sk)
 	put_cred(vsk->owner);
 }
 
+int vsock_read_sock(struct sock *sk, read_descriptor_t *desc,
+		    sk_read_actor_t recv_actor)
+{
+	struct vsock_sock *vsp = vsock_sk(sk);
+
+	if (sk->sk_type != SOCK_STREAM)
+		return -EOPNOTSUPP;
+
+	if (sk->sk_state != SS_CONNECTED && sk->sk_state != SS_DISCONNECTING)
+		return -ENOTCONN;
+
+	return transport->stream_read_sock(vsp, desc, recv_actor);
+}
+EXPORT_SYMBOL(vsock_read_sock);
+
 static int vsock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	int err;

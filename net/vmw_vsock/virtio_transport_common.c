@@ -208,6 +208,62 @@ virtio_transport_stream_dequeue(struct vsock_sock *vsk,
 EXPORT_SYMBOL_GPL(virtio_transport_stream_dequeue);
 
 int
+virtio_transport_stream_read_sock(struct vsock_sock *vsk,
+				  read_descriptor_t *desc,
+				  sk_read_actor_t recv_actor)
+{
+	struct virtio_vsock_sock *vvs;
+	int ret = 0;
+
+	vvs = vsk->trans;
+
+	mutex_lock(&vvs->rx_lock);
+	while (vvs->rx_bytes) {
+		struct virtio_vsock_pkt *pkt;
+		struct sk_buff *skb;
+		size_t len;
+		int used;
+
+		pkt = list_first_entry(&vvs->rx_queue,
+				       struct virtio_vsock_pkt, list);
+
+		len = pkt->len - pkt->off;
+		skb = alloc_skb(len, GFP_KERNEL);
+		if (!skb)
+			break;
+
+		memcpy(skb_put(skb, len),
+		       pkt->buf + pkt->off,
+		       len);
+
+		used = recv_actor(desc, skb, 0, len);
+
+		kfree_skb(skb);
+
+		if (used > 0) {
+			ret += used;
+			pkt->off += used;
+			if (pkt->off == pkt->len) {
+				virtio_transport_dec_rx_pkt(vvs, pkt);
+				list_del(&pkt->list);
+				virtio_transport_free_pkt(pkt);
+			}
+		}
+
+		if (used <= 0 || !desc->count)
+			break;
+	}
+	mutex_unlock(&vvs->rx_lock);
+
+	if (ret > 0)
+		virtio_transport_send_credit_update(vsk,
+				VIRTIO_VSOCK_TYPE_STREAM, NULL);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(virtio_transport_stream_read_sock);
+
+int
 virtio_transport_dgram_dequeue(struct vsock_sock *vsk,
 			       struct msghdr *msg,
 			       size_t len, int flags)
