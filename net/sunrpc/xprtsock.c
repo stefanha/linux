@@ -1517,6 +1517,28 @@ out:
 }
 
 /**
+ * xs_stream_reset_state - reset SOCK_STREAM record parser
+ * @transport: socket transport
+ * @read_sock: tcp_read_sock()-like function
+ *
+ */
+static void xs_stream_reset_state(struct rpc_xprt *xprt,
+				  int (*read_sock)(struct sock *,
+						   read_descriptor_t *,
+						   sk_read_actor_t))
+{
+	struct sock_xprt *transport = container_of(xprt,
+			struct sock_xprt, xprt);
+
+	transport->stream_offset = 0;
+	transport->stream_reclen = 0;
+	transport->stream_copied = 0;
+	transport->stream_flags =
+		STREAM_RCV_COPY_FRAGHDR | STREAM_RCV_COPY_XID;
+	transport->stream_read_sock = read_sock;
+}
+
+/**
  * xs_tcp_state_change - callback to handle TCP socket state changes
  * @sk: socket whose state has changed
  *
@@ -1542,14 +1564,7 @@ static void xs_tcp_state_change(struct sock *sk)
 	case TCP_ESTABLISHED:
 		spin_lock(&xprt->transport_lock);
 		if (!xprt_test_and_set_connected(xprt)) {
-
-			/* Reset stream record info */
-			transport->stream_offset = 0;
-			transport->stream_reclen = 0;
-			transport->stream_copied = 0;
-			transport->stream_flags =
-				STREAM_RCV_COPY_FRAGHDR | STREAM_RCV_COPY_XID;
-			transport->stream_read_sock = tcp_read_sock;
+			xs_stream_reset_state(xprt, tcp_read_sock);
 			xprt->connect_cookie++;
 			clear_bit(XPRT_SOCK_CONNECTING, &transport->sock_state);
 			xprt_clear_connecting(xprt);
