@@ -61,3 +61,13 @@ config SUNRPC_XPRT_RDMA
 
 	  If unsure, or you know there is no RDMA capability on your
 	  hardware platform, say N.
+
+config SUNRPC_XPRT_VSOCK
+	bool "RPC-over-AF_VSOCK transport"
+	depends on SUNRPC && VSOCKETS && !(SUNRPC=y && VSOCKETS=m)
+	default SUNRPC && VSOCKETS
+	help
+	  This option allows the NFS client and server to use the AF_VSOCK
+	  transport to communicate between virtual machines and the host.
+
+	  If unsure, say Y.
