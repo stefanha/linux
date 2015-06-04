@@ -10,6 +10,7 @@
 #include <linux/socket.h>
 #include <linux/in.h>
 #include <linux/in6.h>
+#include <linux/vm_sockets.h>
 #include <net/ipv6.h>
 
 size_t		rpc_ntop(const struct sockaddr *, char *, const size_t);
@@ -26,6 +27,8 @@ static inline unsigned short rpc_get_port(const struct sockaddr *sap)
 		return ntohs(((struct sockaddr_in *)sap)->sin_port);
 	case AF_INET6:
 		return ntohs(((struct sockaddr_in6 *)sap)->sin6_port);
+	case AF_VSOCK:
+		return ((struct sockaddr_vm *)sap)->svm_port;
 	}
 	return 0;
 }
@@ -39,6 +42,9 @@ static inline void rpc_set_port(struct sockaddr *sap,
 		break;
 	case AF_INET6:
 		((struct sockaddr_in6 *)sap)->sin6_port = htons(port);
+		break;
+	case AF_VSOCK:
+		((struct sockaddr_vm *)sap)->svm_port = port;
 		break;
 	}
 }
@@ -106,6 +112,40 @@ static inline bool __rpc_copy_addr6(struct sockaddr *dst,
 }
 #endif	/* !(IS_ENABLED(CONFIG_IPV6) */
 
+#if IS_ENABLED(CONFIG_VSOCKETS)
+static inline bool rpc_cmp_vsock_addr(const struct sockaddr *sap1,
+				      const struct sockaddr *sap2)
+{
+	const struct sockaddr_vm *svm1 = (const struct sockaddr_vm *)sap1;
+	const struct sockaddr_vm *svm2 = (const struct sockaddr_vm *)sap2;
+
+	return svm1->svm_cid == svm2->svm_cid;
+}
+
+static inline bool __rpc_copy_vsock_addr(struct sockaddr *dst,
+					 const struct sockaddr *src)
+{
+	const struct sockaddr_vm *ssvm = (const struct sockaddr_vm *)src;
+	struct sockaddr_vm *dsvm = (struct sockaddr_vm *)dst;
+
+	dsvm->svm_family = ssvm->svm_family;
+	dsvm->svm_cid = ssvm->svm_cid;
+	return true;
+}
+#else	/* !(IS_ENABLED(CONFIG_VSOCKETS) */
+static inline bool rpc_cmp_vsock_addr(const struct sockaddr *sap1,
+				      const struct sockaddr *sap2)
+{
+	return false;
+}
+
+static inline bool __rpc_copy_vsock_addr(struct sockaddr *dst,
+					 const struct sockaddr *src)
+{
+	return false;
+}
+#endif	/* !(IS_ENABLED(CONFIG_VSOCKETS) */
+
 /**
  * rpc_cmp_addr - compare the address portion of two sockaddrs.
  * @sap1: first sockaddr
@@ -125,6 +165,8 @@ static inline bool rpc_cmp_addr(const struct sockaddr *sap1,
 			return rpc_cmp_addr4(sap1, sap2);
 		case AF_INET6:
 			return rpc_cmp_addr6(sap1, sap2);
+		case AF_VSOCK:
+			return rpc_cmp_vsock_addr(sap1, sap2);
 		}
 	}
 	return false;
@@ -161,6 +203,8 @@ static inline bool rpc_copy_addr(struct sockaddr *dst,
 		return __rpc_copy_addr4(dst, src);
 	case AF_INET6:
 		return __rpc_copy_addr6(dst, src);
+	case AF_VSOCK:
+		return __rpc_copy_vsock_addr(dst, src);
 	}
 	return false;
 }
