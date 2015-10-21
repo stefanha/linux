@@ -78,8 +78,8 @@ static void svc_bc_sock_free(struct svc_xprt *xprt);
 #endif /* CONFIG_SUNRPC_BACKCHANNEL */
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
-static struct lock_class_key svc_key[2];
-static struct lock_class_key svc_slock_key[2];
+static struct lock_class_key svc_key[3];
+static struct lock_class_key svc_slock_key[3];
 
 static void svc_reclassify_socket(struct socket *sock)
 {
@@ -101,6 +101,13 @@ static void svc_reclassify_socket(struct socket *sock)
 					      &svc_slock_key[1],
 					      "sk_xprt.xpt_lock-AF_INET6-NFSD",
 					      &svc_key[1]);
+		break;
+
+	case AF_VSOCK:
+		sock_lock_init_class_and_name(sk, "slock-AF_VSOCK-NFSD",
+					      &svc_slock_key[2],
+					      "sk_xprt.xpt_lock-AF_VSOCK-NFSD",
+					      &svc_key[2]);
 		break;
 
 	default:
