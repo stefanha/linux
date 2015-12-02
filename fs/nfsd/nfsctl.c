@@ -748,15 +748,22 @@ static ssize_t __write_ports_addxprt(char *buf, struct net *net)
 	if (err != 0)
 		return err;
 
-	err = svc_create_xprt(nn->nfsd_serv, transport, net,
-				PF_INET, port, SVC_SOCK_ANONYMOUS);
-	if (err < 0)
-		goto out_err;
+	if (!strcmp(transport, "vsock")) {
+		err = svc_create_xprt(nn->nfsd_serv, transport, net,
+					AF_VSOCK, port, SVC_SOCK_ANONYMOUS);
+		if (err < 0)
+			goto out_err;
+	} else {
+		err = svc_create_xprt(nn->nfsd_serv, transport, net,
+					PF_INET, port, SVC_SOCK_ANONYMOUS);
+		if (err < 0)
+			goto out_err;
 
-	err = svc_create_xprt(nn->nfsd_serv, transport, net,
-				PF_INET6, port, SVC_SOCK_ANONYMOUS);
-	if (err < 0 && err != -EAFNOSUPPORT)
-		goto out_close;
+		err = svc_create_xprt(nn->nfsd_serv, transport, net,
+					PF_INET6, port, SVC_SOCK_ANONYMOUS);
+		if (err < 0 && err != -EAFNOSUPPORT)
+			goto out_close;
+	}
 
 	/* Decrease the count, but don't shut down the service */
 	nn->nfsd_serv->sv_nrthreads--;
