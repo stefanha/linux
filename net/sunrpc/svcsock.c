@@ -1279,14 +1279,41 @@ static struct svc_xprt_class svc_tcp_bc_class = {
 	.xcl_max_payload = RPCSVC_MAXPAYLOAD_TCP,
 };
 
+#if IS_ENABLED(CONFIG_VSOCKETS)
+static void svc_bc_vsock_sock_detach(struct svc_xprt *xprt)
+{
+}
+
+static struct svc_xprt_ops svc_vsock_bc_ops = {
+	.xpo_create = svc_bc_create_socket,
+	.xpo_detach = svc_bc_vsock_sock_detach,
+	.xpo_free = svc_bc_sock_free,
+	.xpo_prep_reply_hdr = svc_tcp_prep_reply_hdr,
+	.xpo_secure_port = svc_sock_secure_port,
+};
+
+static struct svc_xprt_class svc_vsock_bc_class = {
+	.xcl_name = "vsock-bc",
+	.xcl_owner = THIS_MODULE,
+	.xcl_ops = &svc_vsock_bc_ops,
+	.xcl_max_payload = RPCSVC_MAXPAYLOAD,
+};
+#endif /* IS_ENABLED(CONFIG_VSOCKETS) */
+
 static void svc_init_bc_xprt_sock(void)
 {
 	svc_reg_xprt_class(&svc_tcp_bc_class);
+#if IS_ENABLED(CONFIG_VSOCKETS)
+	svc_reg_xprt_class(&svc_vsock_bc_class);
+#endif
 }
 
 static void svc_cleanup_bc_xprt_sock(void)
 {
 	svc_unreg_xprt_class(&svc_tcp_bc_class);
+#if IS_ENABLED(CONFIG_VSOCKETS)
+	svc_unreg_xprt_class(&svc_vsock_bc_class);
+#endif
 }
 #else /* CONFIG_SUNRPC_BACKCHANNEL */
 static void svc_init_bc_xprt_sock(void)

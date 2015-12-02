@@ -1372,6 +1372,19 @@ static int xs_tcp_bc_up(struct svc_serv *serv, struct net *net)
 		return ret;
 	return 0;
 }
+
+#if IS_ENABLED(CONFIG_VSOCKETS)
+static int xs_vsock_bc_up(struct svc_serv *serv, struct net *net)
+{
+	int ret;
+
+	ret = svc_create_xprt(serv, "vsock-bc", net, AF_VSOCK, 0,
+			      SVC_SOCK_ANONYMOUS);
+	if (ret < 0)
+		return ret;
+	return 0;
+}
+#endif /* IS_ENABLED(CONFIG_VSOCKETS) */
 #else
 static inline int _xs_stream_read_data(struct rpc_xprt *xprt,
 				       struct xdr_skb_reader *desc)
@@ -3363,6 +3376,12 @@ static struct rpc_xprt_ops xs_vsock_ops = {
 	.close			= xs_tcp_shutdown,
 	.destroy		= xs_destroy,
 	.print_stats		= xs_vsock_print_stats,
+#ifdef CONFIG_SUNRPC_BACKCHANNEL
+	.bc_setup		= xprt_setup_bc,
+	.bc_up			= xs_vsock_bc_up,
+	.bc_free_rqst		= xprt_free_bc_rqst,
+	.bc_destroy		= xprt_destroy_bc,
+#endif
 };
 
 static const struct rpc_timeout xs_vsock_default_timeout = {
