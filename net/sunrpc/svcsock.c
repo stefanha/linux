@@ -71,7 +71,7 @@ static struct svc_xprt *svc_create_socket(struct svc_serv *, int,
 					  struct net *, struct sockaddr *,
 					  int, int);
 #if defined(CONFIG_SUNRPC_BACKCHANNEL)
-static struct svc_xprt *svc_bc_create_socket(struct svc_serv *, int,
+static struct svc_xprt *svc_bc_create_socket(struct svc_serv *,
 					     struct net *, struct sockaddr *,
 					     int, int);
 static void svc_bc_sock_free(struct svc_xprt *xprt);
@@ -1255,25 +1255,17 @@ static struct svc_xprt *svc_tcp_create(struct svc_serv *serv,
 }
 
 #if defined(CONFIG_SUNRPC_BACKCHANNEL)
-static struct svc_xprt *svc_bc_create_socket(struct svc_serv *, int,
+static struct svc_xprt *svc_bc_create_socket(struct svc_serv *,
 					     struct net *, struct sockaddr *,
 					     int, int);
 static void svc_bc_sock_free(struct svc_xprt *xprt);
-
-static struct svc_xprt *svc_bc_tcp_create(struct svc_serv *serv,
-				       struct net *net,
-				       struct sockaddr *sa, int salen,
-				       int flags)
-{
-	return svc_bc_create_socket(serv, IPPROTO_TCP, net, sa, salen, flags);
-}
 
 static void svc_bc_tcp_sock_detach(struct svc_xprt *xprt)
 {
 }
 
 static struct svc_xprt_ops svc_tcp_bc_ops = {
-	.xpo_create = svc_bc_tcp_create,
+	.xpo_create = svc_bc_create_socket,
 	.xpo_detach = svc_bc_tcp_sock_detach,
 	.xpo_free = svc_bc_sock_free,
 	.xpo_prep_reply_hdr = svc_tcp_prep_reply_hdr,
@@ -1657,19 +1649,12 @@ static void svc_sock_free(struct svc_xprt *xprt)
  * Create a back channel svc_xprt which shares the fore channel socket.
  */
 static struct svc_xprt *svc_bc_create_socket(struct svc_serv *serv,
-					     int protocol,
 					     struct net *net,
 					     struct sockaddr *sin, int len,
 					     int flags)
 {
 	struct svc_sock *svsk;
 	struct svc_xprt *xprt;
-
-	if (protocol != IPPROTO_TCP) {
-		printk(KERN_WARNING "svc: only TCP sockets"
-			" supported on shared back channel\n");
-		return ERR_PTR(-EINVAL);
-	}
 
 	svsk = kzalloc(sizeof(*svsk), GFP_KERNEL);
 	if (!svsk)
