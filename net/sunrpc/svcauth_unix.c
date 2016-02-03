@@ -663,7 +663,11 @@ svcauth_unix_set_client(struct svc_rqst *rqstp)
 	struct net *net = xprt->xpt_net;
 	struct sunrpc_net *sn = net_generic(net, sunrpc_net_id);
 
-	switch (rqstp->rq_addr.ss_family) {
+	rqstp->rq_client = NULL;
+	if (rqstp->rq_proc == 0)
+		return SVC_OK;
+
+	switch (rqstp->rq_addr.ss_family) { /* TODO add vsock support? */
 	case AF_INET:
 		sin = svc_addr_in(rqstp);
 		sin6 = &sin6_storage;
@@ -675,10 +679,6 @@ svcauth_unix_set_client(struct svc_rqst *rqstp)
 	default:
 		BUG();
 	}
-
-	rqstp->rq_client = NULL;
-	if (rqstp->rq_proc == 0)
-		return SVC_OK;
 
 	ipm = ip_map_cached_get(xprt);
 	if (ipm == NULL)
