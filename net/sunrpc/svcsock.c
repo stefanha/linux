@@ -1399,12 +1399,6 @@ static struct svc_xprt *svc_vsock_create(struct svc_serv *serv,
 /*
  * Send out data on an AF_VSOCK socket.
  */
-static int svc_vsock_sendto(struct svc_rqst *rqstp)
-{
-	dprintk("*** %s not implemented ***\n", __func__);
-	return -EAGAIN;
-}
-
 static void svc_vsock_adjust_wspace(struct svc_xprt *xprt) /* TODO make generic with tcp? */
 {
 	struct svc_sock *svsk = container_of(xprt, struct svc_sock, sk_xprt);
@@ -1416,7 +1410,7 @@ static void svc_vsock_adjust_wspace(struct svc_xprt *xprt) /* TODO make generic 
 static struct svc_xprt_ops svc_vsock_ops = {
 	.xpo_create = svc_vsock_create,
 	.xpo_recvfrom = svc_tcp_recvfrom,
-	.xpo_sendto = svc_vsock_sendto,
+	.xpo_sendto = svc_tcp_sendto,
 	.xpo_release_rqst = svc_release_skb,
 	.xpo_detach = svc_common_sock_detach,
 	.xpo_free = svc_sock_free,

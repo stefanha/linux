@@ -33,6 +33,8 @@ nfsd_start() {
 		sudo systemctl start nfs-server.service
 		;;
 	*vsock*)
+		sudo systemctl start rpcbind.service
+		sudo "$NFSUTILSDIR/mountd/mountd"
 		sudo "$NFSUTILSDIR/exportfs/exportfs" -r
 		sudo "$NFSUTILSDIR/nfsd/nfsd" -TU -N3 -V4.1 -v 2049
 		;;
@@ -48,6 +50,8 @@ nfsd_stop() {
 		sudo "$NFSUTILSDIR/nfsd/nfsd" 0 || true
 		sudo "$NFSUTILSDIR/exportfs/exportfs" -au || true
 		sudo "$NFSUTILSDIR/exportfs/exportfs" -f || true
+		sudo pkill mountd || true
+		sudo systemctl stop rpcbind.service
 		;;
 	esac
 	sudo systemctl stop proc-fs-nfsd.mount
