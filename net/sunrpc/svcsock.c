@@ -1313,7 +1313,7 @@ static int svc_vsock_sendto(struct svc_rqst *rqstp)
 static struct svc_xprt_ops svc_vsock_ops = {
 	.xpo_create = svc_vsock_create,
 	.xpo_recvfrom = svc_tcp_recvfrom,
-	.xpo_sendto = svc_vsock_sendto,
+	.xpo_sendto = svc_tcp_sendto,
 	.xpo_release_rqst = svc_release_skb,
 	.xpo_detach = svc_common_sock_detach,
 	.xpo_free = svc_sock_free,
