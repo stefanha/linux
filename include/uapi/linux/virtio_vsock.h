@@ -39,7 +39,7 @@
 #include <linux/virtio_config.h>
 
 struct virtio_vsock_config {
-	__le32 guest_cid;
+	__le64 guest_cid;
 };
 
 enum virtio_vsock_event_id {
@@ -51,9 +51,9 @@ struct virtio_vsock_event {
 };
 
 struct virtio_vsock_hdr {
-	__le32	src_cid;
+	__le64	src_cid;
+	__le64	dst_cid;
 	__le32	src_port;
-	__le32	dst_cid;
 	__le32	dst_port;
 	__le32	len;
 	__le16	type;		/* enum virtio_vsock_type */
