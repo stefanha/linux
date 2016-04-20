@@ -57,9 +57,9 @@ virtio_transport_alloc_pkt(struct virtio_vsock_pkt_info *info,
 
 	pkt->hdr.type		= cpu_to_le16(info->type);
 	pkt->hdr.op		= cpu_to_le16(info->op);
-	pkt->hdr.src_cid	= cpu_to_le32(src_cid);
+	pkt->hdr.src_cid	= cpu_to_le64(src_cid);
+	pkt->hdr.dst_cid	= cpu_to_le64(dst_cid);
 	pkt->hdr.src_port	= cpu_to_le32(src_port);
-	pkt->hdr.dst_cid	= cpu_to_le32(dst_cid);
 	pkt->hdr.dst_port	= cpu_to_le32(dst_port);
 	pkt->hdr.flags		= cpu_to_le32(info->flags);
 	pkt->len		= len;
