@@ -186,7 +186,7 @@ vhost_transport_send_pkt_no_sock(struct virtio_vsock_pkt *pkt)
 	struct vhost_vsock *vsock;
 
 	/* Find the vhost_vsock according to guest context id  */
-	vsock = vhost_vsock_get(le32_to_cpu(pkt->hdr.dst_cid));
+	vsock = vhost_vsock_get(le64_to_cpu(pkt->hdr.dst_cid));
 	if (!vsock) {
 		virtio_transport_free_pkt(pkt);
 		return -ENODEV;
@@ -359,7 +359,7 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 		}
 
 		/* Only accept correctly addressed packets */
-		if (le32_to_cpu(pkt->hdr.src_cid) == vsock->guest_cid)
+		if (le64_to_cpu(pkt->hdr.src_cid) == vsock->guest_cid)
 			virtio_transport_recv_pkt(pkt);
 		else
 			virtio_transport_free_pkt(pkt);
@@ -541,12 +541,17 @@ static int vhost_vsock_dev_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int vhost_vsock_set_cid(struct vhost_vsock *vsock, u32 guest_cid)
+static int vhost_vsock_set_cid(struct vhost_vsock *vsock, u64 guest_cid)
 {
 	struct vhost_vsock *other;
 
 	/* Refuse reserved CIDs */
-	if (guest_cid <= VMADDR_CID_HOST)
+	if (guest_cid <= VMADDR_CID_HOST ||
+	    guest_cid == U32_MAX)
+		return -EINVAL;
+
+	/* 64-bit CIDs are not yet supported */
+	if (guest_cid > U32_MAX)
 		return -EINVAL;
 
 	/* Refuse if CID is already in use */
@@ -592,14 +597,14 @@ static long vhost_vsock_dev_ioctl(struct file *f, unsigned int ioctl,
 	struct vhost_vsock *vsock = f->private_data;
 	void __user *argp = (void __user *)arg;
 	u64 __user *featurep = argp;
-	u32 __user *cidp = argp;
-	u32 guest_cid;
+	u64 __user *cidp = argp;
+	u64 guest_cid;
 	u64 features;
 	int r;
 
 	switch (ioctl) {
 	case VHOST_VSOCK_SET_GUEST_CID:
-		if (get_user(guest_cid, cidp))
+		if (copy_from_user(&guest_cid, cidp, sizeof(guest_cid)))
 			return -EFAULT;
 		return vhost_vsock_set_cid(vsock, guest_cid);
 	case VHOST_VSOCK_START:
