@@ -10,6 +10,7 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/vmalloc.h>
 #include <net/sock.h>
 #include <linux/virtio_vsock.h>
 #include <linux/vhost.h>
@@ -444,15 +445,29 @@ static void vhost_vsock_stop(struct vhost_vsock *vsock)
 	mutex_unlock(&vsock->dev.mutex);
 }
 
+static void vhost_vsock_free(struct vhost_vsock *vsock)
+{
+	if (is_vmalloc_addr(vsock))
+		vfree(vsock);
+	else
+		kfree(vsock);
+}
+
 static int vhost_vsock_dev_open(struct inode *inode, struct file *file)
 {
 	struct vhost_virtqueue **vqs;
 	struct vhost_vsock *vsock;
 	int ret;
 
-	vsock = kzalloc(sizeof(*vsock), GFP_KERNEL);
-	if (!vsock)
-		return -ENOMEM;
+	/* This struct is large and allocation could fail, fall back to vmalloc
+	 * if there is no other way.
+	 */
+	vsock = kzalloc(sizeof(*vsock), GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
+	if (!vsock) {
+		vsock = vmalloc(sizeof(*vsock));
+		if (!vsock)
+			return -ENOMEM;
+	}
 
 	vqs = kmalloc_array(ARRAY_SIZE(vsock->vqs), sizeof(*vqs), GFP_KERNEL);
 	if (!vqs) {
@@ -478,7 +493,7 @@ static int vhost_vsock_dev_open(struct inode *inode, struct file *file)
 	return 0;
 
 out:
-	kfree(vsock);
+	vhost_vsock_free(vsock);
 	return ret;
 }
 
@@ -522,7 +537,7 @@ static int vhost_vsock_dev_release(struct inode *inode, struct file *file)
 	vhost_dev_stop(&vsock->dev);
 	vhost_dev_cleanup(&vsock->dev, false);
 	kfree(vsock->dev.vqs);
-	kfree(vsock);
+	vhost_vsock_free(vsock);
 	return 0;
 }
 
