@@ -323,11 +323,11 @@ static void virtio_vsock_reset_sock(struct sock *sk)
 static void virtio_vsock_update_guest_cid(struct virtio_vsock *vsock)
 {
 	struct virtio_device *vdev = vsock->vdev;
-	u32 guest_cid;
+	u64 guest_cid;
 
 	vdev->config->get(vdev, offsetof(struct virtio_vsock_config, guest_cid),
 			  &guest_cid, sizeof(guest_cid));
-	vsock->guest_cid = le32_to_cpu(guest_cid);
+	vsock->guest_cid = le64_to_cpu(guest_cid);
 }
 
 /* event_lock must be held */
