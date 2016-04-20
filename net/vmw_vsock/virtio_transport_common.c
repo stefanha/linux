@@ -217,7 +217,8 @@ virtio_transport_stream_read_sock(struct vsock_sock *vsk,
 
 	vvs = vsk->trans;
 
-	mutex_lock(&vvs->rx_lock);
+	/* TODO spinlock vs alloc_skb(GFP_KERNEL) and recv_actor() */
+	spin_lock(&vvs->rx_lock);
 	while (vvs->rx_bytes) {
 		struct virtio_vsock_pkt *pkt;
 		struct sk_buff *skb;
@@ -253,7 +254,7 @@ virtio_transport_stream_read_sock(struct vsock_sock *vsk,
 		if (used <= 0 || !desc->count)
 			break;
 	}
-	mutex_unlock(&vvs->rx_lock);
+	spin_unlock(&vvs->rx_lock);
 
 	if (ret > 0)
 		virtio_transport_send_credit_update(vsk,
