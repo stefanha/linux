@@ -555,18 +555,6 @@ int virtio_transport_shutdown(struct vsock_sock *vsk, int mode)
 }
 EXPORT_SYMBOL_GPL(virtio_transport_shutdown);
 
-void virtio_transport_release(struct vsock_sock *vsk)
-{
-	struct sock *sk = &vsk->sk;
-
-	/* Tell other side to terminate connection */
-	if (sk->sk_type == SOCK_STREAM &&
-	    vsk->peer_shutdown != SHUTDOWN_MASK &&
-	    sk->sk_state == SS_CONNECTED)
-		(void)virtio_transport_shutdown(vsk, SHUTDOWN_MASK);
-}
-EXPORT_SYMBOL_GPL(virtio_transport_release);
-
 int
 virtio_transport_dgram_enqueue(struct vsock_sock *vsk,
 			       struct sockaddr_vm *remote_addr,
@@ -610,7 +598,7 @@ static int virtio_transport_send_reset(struct vsock_sock *vsk,
 	};
 
 	/* Send RST only if the original pkt is not a RST pkt */
-	if (le16_to_cpu(pkt->hdr.op) == VIRTIO_VSOCK_OP_RST)
+	if (pkt && le16_to_cpu(pkt->hdr.op) == VIRTIO_VSOCK_OP_RST)
 		return 0;
 
 	return virtio_transport_send_pkt(vsk, &info);
@@ -640,6 +628,16 @@ static int virtio_transport_send_reset_no_sock(struct virtio_vsock_pkt *pkt)
 
 	return virtio_transport_send_pkt_no_sock(pkt);
 }
+
+void virtio_transport_release(struct vsock_sock *vsk)
+{
+	struct sock *sk = &vsk->sk;
+
+	/* Tell other side to terminate connection */
+	if (sk->sk_type == SOCK_STREAM && sk->sk_state == SS_CONNECTED)
+		(void)virtio_transport_send_reset(vsk, NULL);
+}
+EXPORT_SYMBOL_GPL(virtio_transport_release);
 
 static int
 virtio_transport_recv_connecting(struct sock *sk,
