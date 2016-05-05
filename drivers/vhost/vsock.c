@@ -80,6 +80,9 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 
 	mutex_lock(&vq->mutex);
 
+	if (!vq->private_data)
+		goto out;
+
 	/* Avoid further vmexits, we're already processing the virtqueue */
 	vhost_disable_notify(&vsock->dev, vq);
 
@@ -148,6 +151,8 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 	}
 	if (added)
 		vhost_signal(&vsock->dev, vq);
+
+out:
 	mutex_unlock(&vq->mutex);
 
 	if (added)
@@ -337,6 +342,10 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 	bool added = false;
 
 	mutex_lock(&vq->mutex);
+
+	if (!vq->private_data)
+		goto out;
+
 	vhost_disable_notify(&vsock->dev, vq);
 	for (;;) {
 		head = vhost_get_vq_desc(vq, vq->iov, ARRAY_SIZE(vq->iov),
@@ -369,6 +378,8 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 	}
 	if (added)
 		vhost_signal(&vsock->dev, vq);
+
+out:
 	mutex_unlock(&vq->mutex);
 }
 
@@ -428,21 +439,28 @@ err:
 	return ret;
 }
 
-static void vhost_vsock_stop(struct vhost_vsock *vsock)
+static int vhost_vsock_stop(struct vhost_vsock *vsock)
 {
 	size_t i;
+	int ret;
 
 	mutex_lock(&vsock->dev.mutex);
+
+	ret = vhost_dev_check_owner(&vsock->dev);
+	if (ret)
+		goto err;
 
 	for (i = 0; i < ARRAY_SIZE(vsock->vqs); i++) {
 		struct vhost_virtqueue *vq = &vsock->vqs[i];
 
 		mutex_lock(&vq->mutex);
-		vq->private_data = vsock;
+		vq->private_data = NULL;
 		mutex_unlock(&vq->mutex);
 	}
 
+err:
 	mutex_unlock(&vsock->dev.mutex);
+	return ret;
 }
 
 static void vhost_vsock_free(struct vhost_vsock *vsock)
@@ -596,26 +614,30 @@ static long vhost_vsock_dev_ioctl(struct file *f, unsigned int ioctl,
 {
 	struct vhost_vsock *vsock = f->private_data;
 	void __user *argp = (void __user *)arg;
-	u64 __user *featurep = argp;
-	u64 __user *cidp = argp;
 	u64 guest_cid;
 	u64 features;
+	int start;
 	int r;
 
 	switch (ioctl) {
 	case VHOST_VSOCK_SET_GUEST_CID:
-		if (copy_from_user(&guest_cid, cidp, sizeof(guest_cid)))
+		if (copy_from_user(&guest_cid, argp, sizeof(guest_cid)))
 			return -EFAULT;
 		return vhost_vsock_set_cid(vsock, guest_cid);
-	case VHOST_VSOCK_START:
-		return vhost_vsock_start(vsock);
+	case VHOST_VSOCK_SET_RUNNING:
+		if (copy_from_user(&start, argp, sizeof(start)))
+			return -EFAULT;
+		if (start)
+			return vhost_vsock_start(vsock);
+		else
+			return vhost_vsock_stop(vsock);
 	case VHOST_GET_FEATURES:
 		features = VHOST_VSOCK_FEATURES;
-		if (copy_to_user(featurep, &features, sizeof(features)))
+		if (copy_to_user(argp, &features, sizeof(features)))
 			return -EFAULT;
 		return 0;
 	case VHOST_SET_FEATURES:
-		if (copy_from_user(&features, featurep, sizeof(features)))
+		if (copy_from_user(&features, argp, sizeof(features)))
 			return -EFAULT;
 		return vhost_vsock_set_features(vsock, features);
 	default:

@@ -178,8 +178,6 @@ struct vhost_scsi_target {
 /* VHOST_VSOCK specific defines */
 
 #define VHOST_VSOCK_SET_GUEST_CID	_IOW(VHOST_VIRTIO, 0x60, __u64)
-
-/* Begin vhost processing */
-#define VHOST_VSOCK_START		_IO(VHOST_VIRTIO, 0x61)
+#define VHOST_VSOCK_SET_RUNNING		_IOW(VHOST_VIRTIO, 0x61, int)
 
 #endif
