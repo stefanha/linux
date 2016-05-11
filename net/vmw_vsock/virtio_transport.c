@@ -568,6 +568,7 @@ out:
 static void virtio_vsock_remove(struct virtio_device *vdev)
 {
 	struct virtio_vsock *vsock = vdev->priv;
+	struct virtio_vsock_pkt *pkt;
 
 	flush_work(&vsock->rx_work);
 	flush_work(&vsock->tx_work);
@@ -575,6 +576,25 @@ static void virtio_vsock_remove(struct virtio_device *vdev)
 	flush_work(&vsock->send_pkt_work);
 
 	vdev->config->reset(vdev);
+
+	mutex_lock(&vsock->rx_lock);
+	while ((pkt = virtqueue_detach_unused_buf(vsock->vqs[VSOCK_VQ_RX])))
+		virtio_transport_free_pkt(pkt);
+	mutex_unlock(&vsock->rx_lock);
+
+	mutex_lock(&vsock->tx_lock);
+	while ((pkt = virtqueue_detach_unused_buf(vsock->vqs[VSOCK_VQ_TX])))
+		virtio_transport_free_pkt(pkt);
+	mutex_unlock(&vsock->tx_lock);
+
+	spin_lock(&vsock->send_pkt_list_lock);
+	while (!list_empty(&vsock->send_pkt_list)) {
+		pkt = list_first_entry(&vsock->send_pkt_list,
+				       struct virtio_vsock_pkt, list);
+		list_del(&pkt->list);
+		virtio_transport_free_pkt(pkt);
+	}
+	spin_unlock(&vsock->send_pkt_list_lock);
 
 	mutex_lock(&the_virtio_vsock_mutex);
 	the_virtio_vsock = NULL;
