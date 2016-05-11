@@ -159,9 +159,7 @@ virtio_transport_stream_do_dequeue(struct vsock_sock *vsk,
 	int err = -EFAULT;
 
 	spin_lock(&vvs->rx_lock);
-	while (total < len &&
-	       vvs->rx_bytes > 0 &&
-	       !list_empty(&vvs->rx_queue)) {
+	while (total < len && !list_empty(&vvs->rx_queue)) {
 		pkt = list_first_entry(&vvs->rx_queue,
 				       struct virtio_vsock_pkt, list);
 
@@ -169,9 +167,17 @@ virtio_transport_stream_do_dequeue(struct vsock_sock *vsk,
 		if (bytes > pkt->len - pkt->off)
 			bytes = pkt->len - pkt->off;
 
+		/* sk_lock is held by caller so no one else can dequeue.
+		 * Unlock rx_lock since memcpy_to_msg() may sleep.
+		 */
+		spin_unlock(&vvs->rx_lock);
+
 		err = memcpy_to_msg(msg, pkt->buf + pkt->off, bytes);
 		if (err)
 			goto out;
+
+		spin_lock(&vvs->rx_lock);
+
 		total += bytes;
 		pkt->off += bytes;
 		if (pkt->off == pkt->len) {
@@ -189,7 +195,6 @@ virtio_transport_stream_do_dequeue(struct vsock_sock *vsk,
 	return total;
 
 out:
-	spin_unlock(&vvs->rx_lock);
 	if (total)
 		err = total;
 	return err;
