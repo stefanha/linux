@@ -13,19 +13,19 @@ dir /usr/sbin 0755 0 0
 dir /lib64 0755 0 0
 dir /lib 0755 0 0
 dir /lib/modules 0755 0 0
-dir /lib/modules/4.5.0-rc6+ 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/fs 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/fs/fscache 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/fs/lockd 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/fs/nfs 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/fs/nfs_common 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/drivers 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/drivers/virtio 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/net 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/net/dns_resolver 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/net/sunrpc 0755 0 0
-dir /lib/modules/4.5.0-rc6+/kernel/net/vmw_vsock 0755 0 0
+dir /lib/modules/$KVER 0755 0 0
+dir /lib/modules/$KVER/kernel 0755 0 0
+dir /lib/modules/$KVER/kernel/fs 0755 0 0
+dir /lib/modules/$KVER/kernel/fs/fscache 0755 0 0
+dir /lib/modules/$KVER/kernel/fs/lockd 0755 0 0
+dir /lib/modules/$KVER/kernel/fs/nfs 0755 0 0
+dir /lib/modules/$KVER/kernel/fs/nfs_common 0755 0 0
+dir /lib/modules/$KVER/kernel/drivers 0755 0 0
+dir /lib/modules/$KVER/kernel/drivers/virtio 0755 0 0
+dir /lib/modules/$KVER/kernel/net 0755 0 0
+dir /lib/modules/$KVER/kernel/net/dns_resolver 0755 0 0
+dir /lib/modules/$KVER/kernel/net/sunrpc 0755 0 0
+dir /lib/modules/$KVER/kernel/net/vmw_vsock 0755 0 0
 
 # nod <name> <mode> <uid> <gid> <dev_type> <maj> <min>
 nod /dev/console 0600 0 0 c 5 1
@@ -36,19 +36,19 @@ nod /dev/urandom 0666 0 0 c 1 9
 nod /dev/zero 0666 0 0 c 1 5
 
 # Kernel modules
-file /lib/modules/4.5.0-rc6+/kernel/fs/nfs/nfsv4.ko fs/nfs/nfsv4.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/fs/nfs/nfs.ko fs/nfs/nfs.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/net/sunrpc/sunrpc.ko net/sunrpc/sunrpc.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/fs/lockd/lockd.ko fs/lockd/lockd.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/fs/fscache/fscache.ko fs/fscache/fscache.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/net/dns_resolver/dns_resolver.ko net/dns_resolver/dns_resolver.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/fs/nfs_common/grace.ko fs/nfs_common/grace.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/drivers/virtio/virtio.ko drivers/virtio/virtio.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/drivers/virtio/virtio_pci.ko drivers/virtio/virtio_pci.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/drivers/virtio/virtio_ring.ko drivers/virtio/virtio_ring.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/net/vmw_vsock/virtio_transport_common.ko net/vmw_vsock/virtio_transport_common.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/net/vmw_vsock/virtio_transport.ko net/vmw_vsock/virtio_transport.ko 0644 0 0
-file /lib/modules/4.5.0-rc6+/kernel/net/vmw_vsock/vsock.ko net/vmw_vsock/vsock.ko 0644 0 0
+file /lib/modules/$KVER/kernel/fs/nfs/nfsv4.ko fs/nfs/nfsv4.ko 0644 0 0
+file /lib/modules/$KVER/kernel/fs/nfs/nfs.ko fs/nfs/nfs.ko 0644 0 0
+file /lib/modules/$KVER/kernel/net/sunrpc/sunrpc.ko net/sunrpc/sunrpc.ko 0644 0 0
+file /lib/modules/$KVER/kernel/fs/lockd/lockd.ko fs/lockd/lockd.ko 0644 0 0
+file /lib/modules/$KVER/kernel/fs/fscache/fscache.ko fs/fscache/fscache.ko 0644 0 0
+file /lib/modules/$KVER/kernel/net/dns_resolver/dns_resolver.ko net/dns_resolver/dns_resolver.ko 0644 0 0
+file /lib/modules/$KVER/kernel/fs/nfs_common/grace.ko fs/nfs_common/grace.ko 0644 0 0
+file /lib/modules/$KVER/kernel/drivers/virtio/virtio.ko drivers/virtio/virtio.ko 0644 0 0
+file /lib/modules/$KVER/kernel/drivers/virtio/virtio_pci.ko drivers/virtio/virtio_pci.ko 0644 0 0
+file /lib/modules/$KVER/kernel/drivers/virtio/virtio_ring.ko drivers/virtio/virtio_ring.ko 0644 0 0
+file /lib/modules/$KVER/kernel/net/vmw_vsock/virtio_transport_common.ko net/vmw_vsock/virtio_transport_common.ko 0644 0 0
+file /lib/modules/$KVER/kernel/net/vmw_vsock/virtio_transport.ko net/vmw_vsock/virtio_transport.ko 0644 0 0
+file /lib/modules/$KVER/kernel/net/vmw_vsock/vsock.ko net/vmw_vsock/vsock.ko 0644 0 0
 
 # Busybox
 file /usr/sbin/busybox /usr/sbin/busybox 0755 0 0

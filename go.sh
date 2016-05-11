@@ -104,7 +104,7 @@ nfs_*)
 	;;
 esac
 
-usr/gen_init_cpio initramfs/cpio-list | gzip >initramfs.gz
+sed "s/\$KVER/$(uname -r)/g" initramfs/cpio-list | usr/gen_init_cpio - | gzip >initramfs.gz
 if [ "$mode" = "nfs_tcp" ]
 then
 	kill_nc_vsock() {
