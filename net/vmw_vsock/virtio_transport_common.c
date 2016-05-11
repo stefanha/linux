@@ -222,9 +222,8 @@ virtio_transport_stream_read_sock(struct vsock_sock *vsk,
 
 	vvs = vsk->trans;
 
-	/* TODO spinlock vs alloc_skb(GFP_KERNEL) and recv_actor() */
 	spin_lock(&vvs->rx_lock);
-	while (vvs->rx_bytes) {
+	while (!list_empty(&vvs->rx_queue)) {
 		struct virtio_vsock_pkt *pkt;
 		struct sk_buff *skb;
 		size_t len;
@@ -233,10 +232,14 @@ virtio_transport_stream_read_sock(struct vsock_sock *vsk,
 		pkt = list_first_entry(&vvs->rx_queue,
 				       struct virtio_vsock_pkt, list);
 
+		spin_unlock(&vvs->rx_lock);
+
 		len = pkt->len - pkt->off;
 		skb = alloc_skb(len, GFP_KERNEL);
-		if (!skb)
-			break;
+		if (!skb) {
+			ret = -ENOMEM;
+			goto out_nolock;
+		}
 
 		memcpy(skb_put(skb, len),
 		       pkt->buf + pkt->off,
@@ -245,6 +248,8 @@ virtio_transport_stream_read_sock(struct vsock_sock *vsk,
 		used = recv_actor(desc, skb, 0, len);
 
 		kfree_skb(skb);
+
+		spin_lock(&vvs->rx_lock);
 
 		if (used > 0) {
 			ret += used;
@@ -261,6 +266,7 @@ virtio_transport_stream_read_sock(struct vsock_sock *vsk,
 	}
 	spin_unlock(&vvs->rx_lock);
 
+out_nolock:
 	if (ret > 0)
 		virtio_transport_send_credit_update(vsk,
 				VIRTIO_VSOCK_TYPE_STREAM, NULL);
