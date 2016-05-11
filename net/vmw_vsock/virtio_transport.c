@@ -24,7 +24,6 @@
 static struct workqueue_struct *virtio_vsock_workqueue;
 static struct virtio_vsock *the_virtio_vsock;
 static DEFINE_MUTEX(the_virtio_vsock_mutex); /* protects the_virtio_vsock */
-static void virtio_vsock_rx_fill(struct virtio_vsock *vsock);
 
 struct virtio_vsock {
 	struct virtio_device *vdev;
