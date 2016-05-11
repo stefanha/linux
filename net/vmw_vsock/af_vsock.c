@@ -693,6 +693,7 @@ static void vsock_sk_destruct(struct sock *sk)
 	put_cred(vsk->owner);
 }
 
+/* See documentation for tcp_read_sock() */
 int vsock_read_sock(struct sock *sk, read_descriptor_t *desc,
 		    sk_read_actor_t recv_actor)
 {
