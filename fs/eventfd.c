@@ -5,6 +5,7 @@
  *
  */
 
+#include <uapi/linux/eventfd.h>
 #include <linux/file.h>
 #include <linux/poll.h>
 #include <linux/init.h>
@@ -34,6 +35,7 @@ struct eventfd_ctx {
 	 * issue a wakeup.
 	 */
 	__u64 count;
+	struct eventfd_poll_info poll_info;
 	unsigned int flags;
 };
 
@@ -114,11 +116,72 @@ static int eventfd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static void eventfd_busy_loop(struct eventfd_ctx *ctx)
+{
+	struct eventfd_poll_info *poll_info = &ctx->poll_info;
+	void __user *valuep = (void __user *)poll_info->addr;
+	u64 value;
+	bool result;
+
+	/* Fetch the user memory value */
+	switch (poll_info->flags & EVENTFD_POLL_INFO_SIZE_MASK) {
+	case EVENTFD_POLL_INFO_U8:
+		if (get_user(value, (u8 __user *)valuep) != 0)
+			return;
+		break;
+
+	case EVENTFD_POLL_INFO_U16:
+		if (get_user(value, (u16 __user *)valuep) != 0)
+			return;
+		break;
+
+	case EVENTFD_POLL_INFO_U32:
+		if (get_user(value, (u32 __user *)valuep) != 0)
+			return;
+		break;
+
+	case EVENTFD_POLL_INFO_U64:
+		if (get_user(value, (u64 __user *)valuep) != 0)
+			return;
+		break;
+	}
+
+	/* Do the polling operation */
+	switch (poll_info->op) {
+	case EVENTFD_POLL_INFO_OP_EQUAL:
+		result = value == poll_info->value;
+		break;
+	case EVENTFD_POLL_INFO_OP_NOT_EQUAL:
+		result = value != poll_info->value;
+		break;
+	case EVENTFD_POLL_INFO_OP_AND:
+		result = value & poll_info->value;
+		break;
+	}
+
+	/* Signal eventfd if polling succeeded */
+	if (result) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&ctx->wqh.lock, flags);
+		if (ULLONG_MAX - ctx->count >= 1)
+			ctx->count++;
+		spin_unlock_irqrestore(&ctx->wqh.lock, flags);
+	}
+}
+
 static unsigned int eventfd_poll(struct file *file, poll_table *wait)
 {
 	struct eventfd_ctx *ctx = file->private_data;
 	unsigned int events = 0;
 	u64 count;
+
+	if (ctx->poll_info.op != EVENTFD_POLL_INFO_OP_NOP) {
+		events |= POLL_BUSY_LOOP; /* we support polling */
+
+		if (wait && (wait->_key & POLL_BUSY_LOOP))
+			eventfd_busy_loop(ctx);
+	}
 
 	poll_wait(file, &ctx->wqh, wait);
 
@@ -170,6 +233,40 @@ static unsigned int eventfd_poll(struct file *file, poll_table *wait)
 		events |= POLLOUT;
 
 	return events;
+}
+
+static long eventfd_ioctl(struct file *filp, unsigned int ioctl,
+			  unsigned long arg)
+{
+	struct eventfd_ctx *ctx = filp->private_data;
+	void __user *argp = (void __user *)arg;
+	struct eventfd_poll_info poll_info;
+	long ret = -EFAULT;
+
+	/* TODO locking */
+
+	switch (ioctl) {
+	case EVENTFD_SET_POLL_INFO:
+		if (copy_from_user(&poll_info, argp, sizeof(poll_info)))
+			goto out;
+
+		ret = -EINVAL;
+		if (poll_info.op > EVENTFD_POLL_INFO_OP_MAX)
+			goto out;
+		if (poll_info.flags & ~EVENTFD_POLL_INFO_SIZE_MASK)
+			goto out;
+
+		ctx->poll_info = poll_info;
+		ret = 0;
+		break;
+
+	default:
+		ret = -ENOTTY;
+		break;
+	}
+
+out:
+	return ret;
 }
 
 static void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt)
@@ -345,6 +442,7 @@ static const struct file_operations eventfd_fops = {
 	.read		= eventfd_read,
 	.write		= eventfd_write,
 	.llseek		= noop_llseek,
+	.unlocked_ioctl	= eventfd_ioctl,
 };
 
 /**
@@ -446,6 +544,7 @@ struct file *eventfd_file_create(unsigned int count, int flags)
 	init_waitqueue_head(&ctx->wqh);
 	ctx->count = count;
 	ctx->flags = flags;
+	ctx->poll_info.op = EVENTFD_POLL_INFO_OP_NOP;
 
 	file = anon_inode_getfile("[eventfd]", &eventfd_fops, ctx,
 				  O_RDWR | (flags & EFD_SHARED_FCNTL_FLAGS));
