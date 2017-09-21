@@ -250,15 +250,17 @@ static struct sock *__vsock_find_connected_socket(struct sockaddr_vm *src,
 	return NULL;
 }
 
-static bool __vsock_in_bound_table(struct vsock_sock *vsk)
+bool __vsock_in_bound_table(struct vsock_sock *vsk)
 {
 	return !list_empty(&vsk->bound_table);
 }
+EXPORT_SYMBOL_GPL(__vsock_in_bound_table);
 
-static bool __vsock_in_connected_table(struct vsock_sock *vsk)
+bool __vsock_in_connected_table(struct vsock_sock *vsk)
 {
 	return !list_empty(&vsk->connected_table);
 }
+EXPORT_SYMBOL_GPL(__vsock_in_connected_table);
 
 static void vsock_insert_unbound(struct vsock_sock *vsk)
 {
