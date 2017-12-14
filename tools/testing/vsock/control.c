@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /* Control socket for client/server test execution
  *
  * Copyright (C) 2017 Red Hat, Inc.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /* Timeout API for single-threaded programs that use blocking
  * syscalls (read/write/send/recv/connect/accept).
  *

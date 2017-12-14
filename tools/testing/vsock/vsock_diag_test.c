@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * vsock_diag_test - vsock_diag.ko test suite
  *
