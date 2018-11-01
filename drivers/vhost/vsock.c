@@ -9,6 +9,7 @@
  */
 #include <linux/miscdevice.h>
 #include <linux/atomic.h>
+#include <linux/refcount.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/vmalloc.h>
@@ -41,6 +42,12 @@ struct vhost_vsock {
 	struct list_head send_pkt_list;	/* host->guest pending packets */
 
 	atomic_t queued_replies;
+
+	/* For staying alive while there are network stack
+	 * .send_pkt()/.cancel_pkt() callers.
+	 */
+	refcount_t net_users;
+	wait_queue_head_t net_users_wq;
 
 	u32 guest_cid;
 };
@@ -75,6 +82,8 @@ static struct vhost_vsock *vhost_vsock_get(u32 guest_cid)
 
 	spin_lock_bh(&vhost_vsock_lock);
 	vsock = __vhost_vsock_get(guest_cid);
+	if (vsock)
+		refcount_inc(&vsock->net_users);
 	spin_unlock_bh(&vhost_vsock_lock);
 
 	return vsock;
@@ -225,6 +234,10 @@ vhost_transport_send_pkt(struct virtio_vsock_pkt *pkt)
 	spin_unlock_bh(&vsock->send_pkt_list_lock);
 
 	vhost_work_queue(&vsock->dev, &vsock->send_pkt_work);
+
+	if (refcount_dec_and_test(&vsock->net_users))
+		wake_up(&vsock->net_users_wq);
+
 	return len;
 }
 
@@ -264,6 +277,9 @@ vhost_transport_cancel_pkt(struct vsock_sock *vsk)
 		if (new_cnt + cnt >= tx_vq->num && new_cnt < tx_vq->num)
 			vhost_poll_queue(&tx_vq->poll);
 	}
+
+	if (refcount_dec_and_test(&vsock->net_users))
+		wake_up(&vsock->net_users_wq);
 
 	return 0;
 }
@@ -521,6 +537,8 @@ static int vhost_vsock_dev_open(struct inode *inode, struct file *file)
 	vsock->guest_cid = 0; /* no CID assigned yet */
 
 	atomic_set(&vsock->queued_replies, 0);
+	refcount_set(&vsock->net_users, 1);
+	init_waitqueue_head(&vsock->net_users_wq);
 
 	vqs[VSOCK_VQ_TX] = &vsock->vqs[VSOCK_VQ_TX];
 	vqs[VSOCK_VQ_RX] = &vsock->vqs[VSOCK_VQ_RX];
@@ -557,13 +575,17 @@ static void vhost_vsock_flush(struct vhost_vsock *vsock)
 static void vhost_vsock_reset_orphans(struct sock *sk)
 {
 	struct vsock_sock *vsk = vsock_sk(sk);
+	bool orphan;
+
+	spin_lock_bh(&vhost_vsock_lock);
+	orphan = __vhost_vsock_get(vsk->remote_addr.svm_cid) == NULL;
+	spin_unlock_bh(&vhost_vsock_lock);
 
 	/* vmci_transport.c doesn't take sk_lock here either.  At least we're
 	 * under vsock_table_lock so the sock cannot disappear while we're
 	 * executing.
 	 */
-
-	if (!vhost_vsock_get(vsk->remote_addr.svm_cid)) {
+	if (orphan) {
 		sock_set_flag(sk, SOCK_DONE);
 		vsk->peer_shutdown = SHUTDOWN_MASK;
 		sk->sk_state = SS_UNCONNECTED;
@@ -579,6 +601,13 @@ static int vhost_vsock_dev_release(struct inode *inode, struct file *file)
 	spin_lock_bh(&vhost_vsock_lock);
 	list_del(&vsock->list);
 	spin_unlock_bh(&vhost_vsock_lock);
+
+	/* Now that the vsock instance is no longer visible, wait for other
+	 * CPUs to drop their references.
+	 */
+	if (!refcount_dec_and_test(&vsock->net_users))
+		wait_event(vsock->net_users_wq,
+			   refcount_read(&vsock->net_users) == 0);
 
 	/* Iterating over all connections for all CIDs to find orphans is
 	 * inefficient.  Room for improvement here. */
