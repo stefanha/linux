@@ -178,11 +178,13 @@ static struct virtqueue *vp_setup_vq(struct virtio_device *vdev, unsigned index,
 				     u16 msix_vec)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-	struct virtio_pci_vq_info *info = kmalloc(sizeof *info, GFP_KERNEL);
+	int node = dev_to_node(&vdev->dev);
+	struct virtio_pci_vq_info *info;
 	struct virtqueue *vq;
 	unsigned long flags;
 
 	/* fill out our structure that represents an active queue */
+	info = kmalloc_node(sizeof *info, GFP_KERNEL, node);
 	if (!info)
 		return ERR_PTR(-ENOMEM);
 
@@ -283,10 +285,12 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
 		struct irq_affinity *desc)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+	int node = dev_to_node(&vdev->dev);
 	u16 msix_vec;
 	int i, err, nvectors, allocated_vectors, queue_idx = 0;
 
-	vp_dev->vqs = kcalloc(nvqs, sizeof(*vp_dev->vqs), GFP_KERNEL);
+	vp_dev->vqs = kcalloc_node(nvqs, sizeof(*vp_dev->vqs),
+				   GFP_KERNEL, node);
 	if (!vp_dev->vqs)
 		return -ENOMEM;
 
@@ -355,9 +359,11 @@ static int vp_find_vqs_intx(struct virtio_device *vdev, unsigned nvqs,
 		const char * const names[], const bool *ctx)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+	int node = dev_to_node(&vdev->dev);
 	int i, err, queue_idx = 0;
 
-	vp_dev->vqs = kcalloc(nvqs, sizeof(*vp_dev->vqs), GFP_KERNEL);
+	vp_dev->vqs = kcalloc_node(nvqs, sizeof(*vp_dev->vqs),
+				   GFP_KERNEL, node);
 	if (!vp_dev->vqs)
 		return -ENOMEM;
 
@@ -513,10 +519,12 @@ static int virtio_pci_probe(struct pci_dev *pci_dev,
 			    const struct pci_device_id *id)
 {
 	struct virtio_pci_device *vp_dev, *reg_dev = NULL;
+	int node = dev_to_node(&pci_dev->dev);
 	int rc;
 
 	/* allocate our structure and fill it out */
-	vp_dev = kzalloc(sizeof(struct virtio_pci_device), GFP_KERNEL);
+	vp_dev = kzalloc_node(sizeof(struct virtio_pci_device),
+			      GFP_KERNEL, node);
 	if (!vp_dev)
 		return -ENOMEM;
 
