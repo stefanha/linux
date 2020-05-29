@@ -482,6 +482,7 @@ static int init_vq(struct virtio_blk *vblk)
 	unsigned short num_vqs;
 	struct virtio_device *vdev = vblk->vdev;
 	struct irq_affinity desc = { 0, };
+	int node = dev_to_node(&vdev->dev);
 
 	err = virtio_cread_feature(vdev, VIRTIO_BLK_F_MQ,
 				   struct virtio_blk_config, num_queues,
@@ -491,7 +492,8 @@ static int init_vq(struct virtio_blk *vblk)
 
 	num_vqs = min_t(unsigned int, nr_cpu_ids, num_vqs);
 
-	vblk->vqs = kmalloc_array(num_vqs, sizeof(*vblk->vqs), GFP_KERNEL);
+	vblk->vqs = kmalloc_array_node(num_vqs, sizeof(*vblk->vqs),
+				       GFP_KERNEL, node);
 	if (!vblk->vqs)
 		return -ENOMEM;
 
@@ -683,6 +685,7 @@ module_param_named(queue_depth, virtblk_queue_depth, uint, 0444);
 
 static int virtblk_probe(struct virtio_device *vdev)
 {
+	int node = dev_to_node(&vdev->dev);
 	struct virtio_blk *vblk;
 	struct request_queue *q;
 	int err, index;
@@ -714,7 +717,7 @@ static int virtblk_probe(struct virtio_device *vdev)
 
 	/* We need an extra sg elements at head and tail. */
 	sg_elems += 2;
-	vdev->priv = vblk = kmalloc(sizeof(*vblk), GFP_KERNEL);
+	vdev->priv = vblk = kmalloc_node(sizeof(*vblk), GFP_KERNEL, node);
 	if (!vblk) {
 		err = -ENOMEM;
 		goto out_free_index;
