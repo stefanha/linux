@@ -276,7 +276,9 @@ static void *vring_alloc_queue(struct virtio_device *vdev, size_t size,
 		return dma_alloc_coherent(vdev->dev.parent, size,
 					  dma_handle, flag);
 	} else {
-		void *queue = alloc_pages_exact(PAGE_ALIGN(size), flag);
+		int node = dev_to_node(&vdev->dev);
+		void *queue = alloc_pages_exact_nid(node, PAGE_ALIGN(size),
+						    flag);
 
 		if (queue) {
 			phys_addr_t phys_addr = virt_to_phys(queue);
@@ -1567,6 +1569,7 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	struct vring_packed_desc_event *driver, *device;
 	dma_addr_t ring_dma_addr, driver_event_dma_addr, device_event_dma_addr;
 	size_t ring_size_in_bytes, event_size_in_bytes;
+	int node = dev_to_node(&vdev->dev);
 	unsigned int i;
 
 	ring_size_in_bytes = num * sizeof(struct vring_packed_desc);
@@ -1591,7 +1594,7 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	if (!device)
 		goto err_device;
 
-	vq = kmalloc(sizeof(*vq), GFP_KERNEL);
+	vq = kmalloc_node(sizeof(*vq), GFP_KERNEL, node);
 	if (!vq)
 		goto err_vq;
 
@@ -1639,9 +1642,10 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	vq->packed.event_flags_shadow = 0;
 	vq->packed.avail_used_flags = 1 << VRING_PACKED_DESC_F_AVAIL;
 
-	vq->packed.desc_state = kmalloc_array(num,
+	vq->packed.desc_state = kmalloc_array_node(num,
 			sizeof(struct vring_desc_state_packed),
-			GFP_KERNEL);
+			GFP_KERNEL,
+			node);
 	if (!vq->packed.desc_state)
 		goto err_desc_state;
 
@@ -1653,9 +1657,10 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	for (i = 0; i < num-1; i++)
 		vq->packed.desc_state[i].next = i + 1;
 
-	vq->packed.desc_extra = kmalloc_array(num,
+	vq->packed.desc_extra = kmalloc_array_node(num,
 			sizeof(struct vring_desc_extra_packed),
-			GFP_KERNEL);
+			GFP_KERNEL,
+			node);
 	if (!vq->packed.desc_extra)
 		goto err_desc_extra;
 
@@ -2059,13 +2064,14 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 					void (*callback)(struct virtqueue *),
 					const char *name)
 {
+	int node = dev_to_node(&vdev->dev);
 	unsigned int i;
 	struct vring_virtqueue *vq;
 
 	if (virtio_has_feature(vdev, VIRTIO_F_RING_PACKED))
 		return NULL;
 
-	vq = kmalloc(sizeof(*vq), GFP_KERNEL);
+	vq = kmalloc_node(sizeof(*vq), GFP_KERNEL, node);
 	if (!vq)
 		return NULL;
 
@@ -2110,8 +2116,10 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 					vq->split.avail_flags_shadow);
 	}
 
-	vq->split.desc_state = kmalloc_array(vring.num,
-			sizeof(struct vring_desc_state_split), GFP_KERNEL);
+	vq->split.desc_state = kmalloc_array_node(vring.num,
+			sizeof(struct vring_desc_state_split),
+			GFP_KERNEL,
+			node);
 	if (!vq->split.desc_state) {
 		kfree(vq);
 		return NULL;
