@@ -30,8 +30,14 @@ struct virtio_blk_vq {
 	struct virtqueue *vq;
 	spinlock_t lock;
 
+	/* Number of non-RWF_HIPRI requests in flight. Protected by lock. */
+	unsigned int num_lopri;
+
 	/* Number of RWF_HIPRI requests in flight. Protected by lock. */
 	unsigned int num_hipri;
+
+	/* Are vq notifications enabled? Protected by lock. */
+	bool cb_enabled;
 
 	char name[VQ_NAME_LEN];
 } ____cacheline_aligned_in_smp;
@@ -180,7 +186,8 @@ static bool virtblk_complete_requests(struct virtqueue *vq)
 {
 	struct virtio_blk *vblk = vq->vdev->priv;
 	bool req_done = false;
-	bool disable_cb = true;
+	bool last_hipri_done = false;
+	bool disable_cb;
 	int qid = vq->index;
 	struct virtblk_req *vbr;
 	unsigned long flags;
@@ -188,16 +195,7 @@ static bool virtblk_complete_requests(struct virtqueue *vq)
 
 	spin_lock_irqsave(&vblk->vqs[qid].lock, flags);
 
-	/* Disable vq notifications to save CPU cycles while processing
-	 * completions. Requests that complete without a notification are
-	 * detected because we loop carefully below.
-	 *
-	 * If there are polled requests in flight then notifications are
-	 * already disabled. virtqueue_disable_cb() does not support nesting so
-	 * don't disable them again.
-	 */
-	if (vblk->vqs[qid].num_hipri > 0)
-		disable_cb = false;
+	disable_cb = vblk->vqs[qid].cb_enabled;
 
 	do {
 		if (disable_cb)
@@ -205,11 +203,11 @@ static bool virtblk_complete_requests(struct virtqueue *vq)
 		while ((vbr = virtqueue_get_buf(vblk->vqs[qid].vq, &len)) != NULL) {
 			struct request *req = blk_mq_rq_from_pdu(vbr);
 
-			/* Re-enable vq notifications after last polled req */
 			if (req->cmd_flags & REQ_HIPRI) {
 				if (--vblk->vqs[qid].num_hipri == 0)
-					disable_cb = true;
-			}
+					last_hipri_done = true;
+			} else
+				vblk->vqs[qid].num_lopri--;
 
 			if (likely(!blk_should_fake_timeout(req->q)))
 				blk_mq_complete_request(req);
@@ -217,6 +215,12 @@ static bool virtblk_complete_requests(struct virtqueue *vq)
 		}
 		if (unlikely(virtqueue_is_broken(vq)))
 			break;
+
+		/* Enable vq notifications if non-polled requests remain */
+		if (last_hipri_done && vblk->vqs[qid].num_lopri > 0) {
+			vblk->vqs[qid].cb_enabled = true;
+			disable_cb = true;
+		}
 	} while (disable_cb && !virtqueue_enable_cb(vq));
 
 	/* In case queue is stopped waiting for more buffers. */
@@ -261,11 +265,11 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 			   const struct blk_mq_queue_data *bd)
 {
 	struct virtio_blk *vblk = hctx->queue->queuedata;
+	struct virtio_blk_vq *vq = &vblk->vqs[hctx->queue_num];
 	struct request *req = bd->rq;
 	struct virtblk_req *vbr = blk_mq_rq_to_pdu(req);
 	unsigned long flags;
 	unsigned int num;
-	int qid = hctx->queue_num;
 	int err;
 	bool notify = false;
 	bool unmap = false;
@@ -317,17 +321,27 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 			vbr->out_hdr.type |= cpu_to_virtio32(vblk->vdev, VIRTIO_BLK_T_IN);
 	}
 
-	spin_lock_irqsave(&vblk->vqs[qid].lock, flags);
-	err = virtblk_add_req(vblk->vqs[qid].vq, vbr, vbr->sg, num);
+	spin_lock_irqsave(&vq->lock, flags);
+
+	/* Re-enable vq notifications if first req is non-polling */
+	if (!(req->cmd_flags & REQ_HIPRI) &&
+	    vq->num_lopri == 0 && vq->num_hipri == 0 &&
+	    !vq->cb_enabled) {
+		/* Can't return false since there are no in-flight reqs */
+		virtqueue_enable_cb(vq->vq);
+		vq->cb_enabled = true;
+	}
+
+	err = virtblk_add_req(vq->vq, vbr, vbr->sg, num);
 	if (err) {
-		virtqueue_kick(vblk->vqs[qid].vq);
+		virtqueue_kick(vq->vq);
 		/* Don't stop the queue if -ENOMEM: we may have failed to
 		 * bounce the buffer due to global resource outage.
 		 */
 		if (err == -ENOSPC)
 			blk_mq_stop_hw_queue(hctx);
 
-		spin_unlock_irqrestore(&vblk->vqs[qid].lock, flags);
+		spin_unlock_irqrestore(&vq->lock, flags);
 		switch (err) {
 		case -ENOSPC:
 			return BLK_STS_DEV_RESOURCE;
@@ -346,16 +360,19 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 	 * we just added before virtqueue_notify(). req is still valid here.
 	 */
 	if (req->cmd_flags & REQ_HIPRI) {
-		if (vblk->vqs[qid].num_hipri++ == 0)
-			virtqueue_disable_cb(vblk->vqs[qid].vq);
-	}
+		if (vq->num_hipri++ == 0 && vq->cb_enabled) {
+			virtqueue_disable_cb(vq->vq);
+			vq->cb_enabled = false;
+		}
+	} else
+		vq->num_lopri++;
 
-	if (bd->last && virtqueue_kick_prepare(vblk->vqs[qid].vq))
+	if (bd->last && virtqueue_kick_prepare(vq->vq))
 		notify = true;
-	spin_unlock_irqrestore(&vblk->vqs[qid].lock, flags);
+	spin_unlock_irqrestore(&vq->lock, flags);
 
 	if (notify)
-		virtqueue_notify(vblk->vqs[qid].vq);
+		virtqueue_notify(vq->vq);
 	return BLK_STS_OK;
 }
 
@@ -589,7 +606,9 @@ static int init_vq(struct virtio_blk *vblk)
 	for (i = 0; i < num_vqs; i++) {
 		spin_lock_init(&vblk->vqs[i].lock);
 		vblk->vqs[i].vq = vqs[i];
+		vblk->vqs[i].num_lopri = 0;
 		vblk->vqs[i].num_hipri = 0;
+		vblk->vqs[i].cb_enabled = true;
 	}
 	vblk->num_vqs = num_vqs;
 
